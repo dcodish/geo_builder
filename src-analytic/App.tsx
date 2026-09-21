@@ -24,7 +24,7 @@ import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/
 import { INITIAL_VIEW, carryWindow, centreOf, figureIsVisible, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { fmtAnalytic } from './format';
-import { curveDetailsKey, curveEquationText, curveParts } from './app/curveText';
+import { curveDetailsKey, curveEquationText, curveParts, namedRow } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { isDirectionSymbol, paramRegister, reportedDof, usedSymbols } from './engine/carriers';
 import { derive } from './engine/derive';
@@ -1351,7 +1351,9 @@ export function App() {
                    * It states no VALUE, so ADR-AG-003 §2 is untouched — it names the dependency, which
                    * is more than the dash said and less than a number.
                    */
-                  const lead = name ? `${name}: ` : '';
+                  // #1344 — the row is composed by `namedRow`, which isolates a Hebrew display name so
+                  // «ישר 3: 3x…» does not render as «3 :3 ישרx…» in this LTR section. One composer with
+                  // the ask lane, so the two surfaces cannot disagree about a name again.
                   /**
                    * THE ROW LEADS WITH THE EQUATION; THE PROPERTIES FOLD AWAY (#1212).
                    *
@@ -1370,7 +1372,7 @@ export function App() {
                   const parts = known ? curveParts(known, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }) : null;
                   return (
                     <span key={c.id}>
-                      <ValueRow text={parts ? `${lead}${parts.equation}` : `${lead}${openCurveText(d, c.id)}`} />
+                      <ValueRow text={namedRow(name, parts ? parts.equation : openCurveText(d, c.id))} />
                       {parts?.details && (
                         <details style={askTraceBox} open>
                           <summary style={askTraceToggle} title={t('curveDetailsToggle')}>

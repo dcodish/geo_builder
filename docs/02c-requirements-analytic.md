@@ -874,6 +874,15 @@ English `=` form — «angle ABC = 90» — and they mean the same thing **in an
 is named by a WHOLE name, never by a letter pair taken out of the middle of a word.** «ANGLE ABC» is not
 three measurements. A non-right angle value remains out of scope in both languages.
 
+**R113 — a display name reads in the right order, whatever its script**
+([ADR-AG-149](06c-decisions-analytic.md#adr-ag-149),
+[#1344](https://github.com/dcodish/geo_builder/issues/1344)). The panel's equations row must read
+«ישר 3: 3x + 2y − 2 = 0», never «3 :3 ישרx + 2y − 2 = 0». A name that mixes a Hebrew noun with a digit
+— «ישר 1», «מעגל 1», the names the tool itself gives (R63, R109) — is an ISLAND in a left-to-right row
+and is isolated as one. The panel is the one place a student checks what the tool understood, so a row
+they cannot read is a row that fails its purpose. The typed INPUT BOX is a separate surface with its
+own answer (the live preview beneath it) and its own open question (R-#1296).
+
 **R112 — one line, one row: a curve stated twice is ONE object, however it is spelled**
 ([ADR-AG-147](06c-decisions-analytic.md#adr-ag-147),
 [#1342](https://github.com/dcodish/geo_builder/issues/1342)). «נתון הישר 1: 2x-y+8=0» then

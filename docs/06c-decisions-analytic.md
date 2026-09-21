@@ -7326,3 +7326,33 @@ Three orders of margin on a metric that shrinks what it measures — and [#1235]
 **Sibling audit (docs/17 §1).** 2-D and 3-D print no equations — a line there is a segment or a construction. Analytic-only.
 
 **Consequences.** `app/curveText.ts` (`curveEquationText`, `linearCoefficients`, `signedTerms`, `factors`, `symbolicTerm`); `App.tsx` (`openCurveText` calls it). Lock: `__tests__/issue-1299-symbolic-notation.test.ts` (14), whose centre is the seven-row agreement table between the two paths.
+
+## ADR-AG-149 — A Hebrew display name is an ISLAND in an LTR row: the isolate goes on the name, at the one composer (#1344)
+
+**Status:** accepted, 2026-09-21 · **Issue:** [#1344](https://github.com/dcodish/geo_builder/issues/1344) (bug, `P2`, `analytic`) · round [#1345](https://github.com/dcodish/geo_builder/issues/1345) · operator, playing PR #1341 T19: *"note that the bidi input for line 3 is bad both in input and data panels"*
+**Requirements:** [02c](02c-requirements-analytic.md) R113 (new) · **Design:** [04c](04c-design-analytic.md#a-display-name-in-an-ltr-row-adr-ag-149) (new section) — the canvas's bidi chokepoint ([ADR-AG-087](#adr-ag-087)) extended to the panel's LTR rows
+
+**Measured before (`265b110c`), through the real composer.**
+
+```
+  «נתון הישר 3: …»    row text  "ישר 3: 3x + 2y - 2 = 0"    no isolate   renders «3 :3 ישרx + 2y - 2 = 0»  ✘
+  «נתון המעגל 1: …»   row text  "מעגל 1: x² + y² = 9"       no isolate   reversed since #1216 shipped      ✘
+  «נתון הישר l3: …»   row text  "l3: 3x + 2y - 2 = 0"                    correct                           ✔
+  «נתון המעגל I: …»   row text  "מעגל I: x² + y² = 16"                   correct on screen                 ✔
+```
+
+**The class.** The equations section is laid out `ltr`, and the row is composed as `${name}: ${equation}`. A name that is Latin sits in the LTR run; a name that is a **Hebrew word followed by a DIGIT** does not — under the bidi algorithm a European number adjacent to a right-to-left run takes that run's direction, so «ישר 3:» becomes ONE RTL run, displayed reversed, and the colon and the equation's leading digit join it. **The class is a display name that mixes a Hebrew noun with a digit, printed into an LTR row with no isolation.** It was introduced for circles by [#1216](https://github.com/dcodish/geo_builder/issues/1216) and never noticed there, because the operator's circles were «I»/«II»; [ADR-AG-144](#adr-ag-144) gave lines the same display name — deliberately, on the circle precedent — and it surfaced on the first digit-named line.
+
+**The mechanism.** `shell/bidi.ts` gains `isolateRtlName` — the mirror of `isolateLtrRuns`, which protects a technical run inside an RTL paragraph; this protects an RTL name inside an LTR row. **FSI (U+2068), not RLI**: first-strong takes the direction from the name's own first letter, so the caller never has to classify. Applied only when the name contains a Hebrew letter, so a Latin name carries no invisible characters at all. Never an inline literal, so the .docx export's run-based renderer keeps one rule (ADR-431 Am. 1, which cannot draw U+2066–2069) — and `stripFormatControls` already covers that range at the parser and store boundaries, so a display isolate can never reach the grammar or the saved fact list (#751).
+
+**At the one composer, which is the half that makes it stay fixed.** The panel's equations row and the ask lane's `describeCurve` each built `name: equation` inline and were wrong in the same way. `namedRow(name, body)` in `curveText.ts` is now the only composer, and both call it — so the next surface that prints a named equation inherits the isolate instead of rediscovering the defect.
+
+**The audit the plan asked for, done and clean.** `measurable.ts` puts the name into a HEBREW SENTENCE («משוואת ישר 3»), which is an RTL context and correct as it stands; `panelRows.ts` reads `label.name` only as a boolean; `lines.ts` uses it for lookup. The «שיפועים»/«אורכים» rows print pairs of LETTERS and are unaffected. The two LTR composers were the two that were broken.
+
+**Recorded, NOT fixed here: the INPUT BOX.** That is the [#1296](https://github.com/dcodish/geo_builder/issues/1296) class — a raw `<input>` holds the student's characters and no isolate, so the bidi algorithm reorders a Hebrew prefix, a digit, a colon and a parenthesised Latin run. The shell's answer to that surface is the live preview beneath the box (#1215), which renders this text correctly. The only fix for the box itself is to inject isolates into the VALUE and strip them on submit, which is a workspace-wide decision belonging to #1296.
+
+**Measured after.** «ישר 3» and «מעגל 1» carry `FSI … PDI` around the name and nothing else changes — `stripFormatControls` returns the original text exactly. «l3» is byte-identical to before. Analytic lane: 159 files / 2312 tests green.
+
+**Sibling audit (docs/17 §1).** 2-D and 3-D have no LTR panel section of this shape — their rows are Hebrew sentences or letter pairs. The helper is in `shell/` regardless, because the NEXT product's LTR row should not have to rediscover FSI.
+
+**Consequences.** `shell/bidi.ts` (`isolateRtlName`, `FSI`); `src-analytic/app/curveText.ts` (`namedRow`, `describeCurve` composes through it); `src-analytic/App.tsx` (the equations row). Lock: `__tests__/issue-1344-name-isolate.test.ts` (7).

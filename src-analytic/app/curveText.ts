@@ -31,6 +31,7 @@
  * Numbers go through `fmtAnalytic` — this tree's one display formatter (#1029, #1120) — so the panel,
  * the canvas and the ask lane cannot round differently.
  */
+import { isolateRtlName } from '../../shell/bidi';
 import { fmtAnalytic, fractionClearingFactor } from '../format';
 import { ellipseFoci, parabolaFocus } from '../engine/curves';
 import { isVerticalLine } from '../engine/lines';
@@ -459,9 +460,23 @@ export function curveDetailsKey(kind: NumCurve['kind']): string {
 }
 
 /** The whole row on one line, named — what a caller with nowhere to fold the detail away shows. */
+/**
+ * `name: body` for a row laid out LEFT TO RIGHT — the ONE composer, for every such row (#1344).
+ *
+ * The panel's equations section and the ask lane each built this string inline, and both were wrong
+ * in the same way for a Hebrew display name followed by a digit. Composing it once means the next
+ * surface that prints a named equation inherits the isolate instead of rediscovering the defect.
+ *
+ * The isolate goes on the NAME only. The body is an equation — Latin and digits — which is already at
+ * home in an LTR row.
+ */
+export function namedRow(name: string, body: string): string {
+  return name ? `${isolateRtlName(name)}: ${body}` : body;
+}
+
 export function describeCurve(name: string, c: NumCurve, nameAt?: NameAt): string {
   const { equation, details } = curveParts(c, nameAt);
-  return `${name ? `${name}: ` : ''}${equation}${details ? `, ${details}` : ''}`;
+  return namedRow(name, `${equation}${details ? `, ${details}` : ''}`);
 }
 
 /**

@@ -101,6 +101,32 @@ export function stripFormatControls(s: string): string {
   return s.replace(FORMAT_CONTROLS, '');
 }
 
+const FSI = '\u2068'; // FIRST STRONG ISOLATE
+
+/**
+ * THE MIRROR OF `isolateLtrRuns`: an RTL NAME inside an LTR row (#1344).
+ *
+ * `isolateLtrRuns` protects a technical run inside an RTL paragraph. This protects the other
+ * direction, which the analytic panel needs: its equations section is laid out `ltr`, and a display
+ * name that mixes a Hebrew noun with a DIGIT — «ישר 3», «מעגל 1» — is not a self-contained island
+ * there. Under the bidi algorithm a European number adjacent to a right-to-left run takes that run's
+ * direction, so «ישר 3:» becomes ONE RTL run, displayed reversed, and it drags the colon and the
+ * equation's leading digit in with it: «ישר 3: 3x + 2y − 2 = 0» rendered as «3 :3 ישרx + 2y - 2 = 0».
+ * A Latin name (`l3`, `I`) never had the problem, which is why #1216 shipped digit-named circles
+ * without anyone seeing it.
+ *
+ * **FSI, not RLI**: first-strong takes the direction from the name's own first letter, so this is
+ * correct for a Hebrew name and harmless for any other — the caller does not have to classify.
+ *
+ * Applied only when there IS a Hebrew letter, so a Latin name carries no invisible characters at all.
+ * Like every other isolate this kit emits, it is DISPLAY only: `stripFormatControls` already covers
+ * U+2066–2069 at the parser and store boundaries, so it can never reach the grammar, the fact list or
+ * the .docx export's run renderer (ADR-431 Am. 1, which cannot draw these code points).
+ */
+export function isolateRtlName(name: string): string {
+  return HEBREW_LETTER.test(name) ? FSI + name + PDI : name;
+}
+
 /** Escape a character for safe inclusion in a regex character class. */
 const escapeForClass = (s: string) => s.replace(/[\\\]^-]/g, (c) => `\\${c}`);
 

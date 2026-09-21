@@ -270,6 +270,29 @@ shape the relation and slope rules use — therefore took #1075’s area-as-a-te
 away, measured as seven failing locks. Giving the blocks a real fall-through means reworking the decline
 contract for every rule in the function; until that is worth doing, precedence inside `parseConstraint` is
 expressed as an explicit guard at the rule that must yield.
+## A display name in an LTR row ([ADR-AG-149](06c-decisions-analytic.md#adr-ag-149))
+
+The equations section is laid out `ltr` because an equation is a left-to-right object. A display NAME
+in it may not be: «ישר 3» and «מעגל 1» mix a Hebrew noun with a digit, and a European number adjacent
+to a right-to-left run joins it, so the name, the colon and the equation's leading digit render as one
+reversed run.
+
+| helper | protects | emits | direction |
+| --- | --- | --- | --- |
+| `isolateLtrRuns` | a technical run inside an RTL paragraph | LRI … PDI | the fact list, the input preview |
+| `isolateRtlName` | a display NAME inside an LTR row | FSI … PDI | the panel's equations row, the ask lane |
+
+FSI rather than RLI: first-strong reads the direction off the name's own first letter, so one call is
+correct for a Hebrew name and harmless for any other, and no caller has to classify a name's script.
+
+**One composer.** `namedRow(name, body)` in `curveText.ts` is the only place `name: equation` is built.
+The panel row and `describeCurve` both call it, so a surface added later inherits the isolate. That is
+the half that makes the fix hold — the isolate itself is two characters.
+
+**It is DISPLAY only.** `stripFormatControls` covers U+2066–2069 at the parser and the store
+boundaries, so an isolate can never reach the grammar, the saved fact list, the logs or the .docx
+export, whose run renderer draws these code points as missing-glyph boxes (ADR-431 Am. 1).
+
 ## Notation has one owner ([ADR-AG-148](06c-decisions-analytic.md#adr-ag-148))
 
 `app/curveText.ts` is this tree's equation-NOTATION module, the way `format.ts` is its number module.
