@@ -6987,3 +6987,34 @@ The default display (seed 0) showed a point on neither curve, the data panel lis
 **Sibling audit (docs/17 §1).** 2-D's driven solvers have had multi-start since ADR-033 (`multiStartSolve`: regularised search, then polish) and its accept gate refuses a non-converged solve (`solutionAccepted`); 3-D's pivot has its own restarts (ADR-3D-007). Complex's `foldConstraints` is numeric over algebraic constraints and was not measured; noted, not claimed.
 
 **Consequences.** `engine/solve.ts` (+`solveMultiStart`); `engine/evaluate.ts` (the restart list in the solve block; `whole` gains the unsatisfied term); `engine/derive.ts` (one `unsatisfiable` per line). `__tests__/issue-1287-crossing-settles.test.ts` (6): the eight seeds on both curves, both roots reachable, the solver alone from the saddle, the impossible chord reported once, the search never showing an unsatisfied seed with the knowledge gate reading only holding ones, and the once-failing seeds converging raw. `docs/04c` — the validity table.
+
+## ADR-AG-136 — A cluster inside the solver's resolution is ONE answer, and a determined point's locus is that point (#1259, #1227)
+
+**Status:** accepted, 2026-09-21 · **Issues:** #1259 (bug, P2, `analytic`; operator ruling 2026-09-20: *"a cluster inside solver resolution is NOT an option set"*, k = 10) and #1227 (bug, P2, `analytic`; operator 2026-09-19: *"saying M cannot be calculated is wrong … refer to the location of point M"*) · round #1332
+**Requirements:** [02c](02c-requirements-analytic.md) — the honesty invariants (no sampled value printed as fact) and R23–R27 (the ask lane answers every determinacy state honestly) · **Design:** [04c](04c-design-analytic.md#the-ask-lane-adr-ag-044) — the `Answer` outcomes; `knownOptions` / `isKnowledge` tolerances
+**Extends** [ADR-AG-098](#adr-ag-098) (#1223 — an answer can be a FACT) with its second consumer; **adds a third tolerance** beside [ADR-AG-021](#adr-ag-021)'s value-identity ones
+
+**Measured before** («A(0,0)» · «B(8,0)» · «נקודה M» · «MA = MB», then the two closing lines):
+
+```
+«MA = 4»  (a tangency — M is exactly (4, 0))
+  knownOptions   [(4, −0.0016), (4, 0.0018), (4, −0.0011), (4, 0.0010)]   ← FOUR "cases", none true
+  isKnowledge    x known · y NOT known (spread 3.5e-3 > SAME_VALUE_EPS·scale)
+  panel row      (4, -0.0016) או (4, 0.0018) או (4, -0.0011) או [(4, 0.001)]
+«MA = 5»  (two real roots)
+  knownOptions   [(4, −3), (4, 3)]           ← correct
+  ask «המקום הגיאומטרי של M»   { value: null }  →  «לא ניתן לחשב מהנתונים»   ← false: the tool holds both
+```
+
+**The class.** *Sameness of two solved positions was judged by value-identity thresholds only, while at a double root the solver's own resolution is coarser than they are; and the locus lane collapsed "determined, finite" into `null` beside "open" and "uncomputable".* Two thresholds ask two questions: `SAME_VALUE_EPS` and `apart()` ask whether two VALUES are one value; a tangency asks whether two SOLVES could have told the positions apart. #1235 was fixed by inheriting the first; this one could not be.
+
+**The mechanism.**
+
+1. **`SOLVE_RESOLUTION = 10·√SOLVE_TOL`** (`solve.ts`), derived: at a double root the residual is quadratic in the displacement, so a descent stopping at `SOLVE_TOL = 1e-7` stops anywhere within `√SOLVE_TOL ≈ 3.2e-4` of the root; measured, the cluster sits at 7.5e-4 of scale, the real two-option separation at 1.5. k = 10 is four times the noise and 470× below any real pair — two and a half orders of headroom either side, the operator's ruling recorded on the issue.
+2. **`knownOptions`**: after the value-identity dedup, a set whose every member lies within the resolution of every other is NOT a set — `null`, so the figure routes to the knowledge gate. Never re-sampled: measured, the noise set is unstable at 12 → 24 seeds and stable at 24 → 36, and this runs per point per render.
+3. **`isKnowledge`**: no tighter than the solver's resolution either (the #1078 argument, one bar wider): a spread within `SOLVE_RESOLUTION·scale` is one value, reported at the cluster's midpoint, which rounds to the exact one. So the tangential figure prints M = (4, 0), as a determined point.
+4. **The locus lane** (`ask.ts`, `LOCUS_OF`): where no curve is a locus, the point set is the answer — `fact: 'points'` carrying `knownOptions`' resolution-aware set, or the single point both coordinates of which the gate fixes — worded by the component in the lane's own grammar («נקודה · (4, 3)», «שתי נקודות · (4, −3), (4, 3)», beside «ישר · x = 4»; He/En keys). An open figure and a genuinely uncomputable one keep their two absences. The count is the set's, never a sample length: the tangential figure answers ONE point, not six.
+
+**Measured after.** «MA = 4»: options `null`, M known at (4, 0), the locus answer one point; «MA = 5»: exactly two options, y not knowledge, the locus answer the two points; «M(3,7)»: that point; the open figure: the line locus, unchanged; the panel and the answer row agree. Run against the pre-change `evaluate`/`ask` first: red on the tangency, the locus answers and the agreement.
+
+**Consequences.** `engine/solve.ts` (+`SOLVE_RESOLUTION`); `engine/evaluate.ts` (`knownOptions` cluster → null; `isKnowledge`'s resolution bar); `app/ask.ts` (`fact: 'points'` + `points`); `App.tsx` (the wording); `i18n` (askPointOne/Two/Many, He + En). `__tests__/issue-1259-1227-degenerate-locus.test.ts` (9).

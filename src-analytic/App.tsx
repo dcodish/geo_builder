@@ -1474,7 +1474,13 @@ export function App() {
                               ? t('slopeVertical')
                               : a.fact === 'lines-cross'
                                 ? t('askLinesCross')
-                                : t(figureIsOpen(d) ? 'askOpen' : 'askNoValue'))
+                                : a.fact === 'points' && a.points
+                                  ? /* #1227 (ADR-AG-136): a determined point's locus IS the point(s) — the
+                                       locus lane's own grammar, «נקודה · (4, 3)» beside «ישר · x = 4» */
+                                    `${a.points.length === 1 ? t('askPointOne') : a.points.length === 2 ? t('askPointTwo') : t('askPointMany', { count: a.points.length })} · ${a.points
+                                      .map((p) => `(${fmt(p.x)}, ${fmt(p.y)})`)
+                                      .join(', ')}`
+                                  : t(figureIsOpen(d) ? 'askOpen' : 'askNoValue'))
                           }`,
                         )}
                       />

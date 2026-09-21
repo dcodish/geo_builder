@@ -22,7 +22,7 @@
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
-import { isKnowledge, knownCurve } from '../engine/evaluate';
+import { isKnowledge, knownCurve, knownOptions, type Figure } from '../engine/evaluate';
 import { locusOf } from '../engine/locus';
 
 import { objectById, type Id } from '../engine/types';
@@ -77,7 +77,13 @@ export interface Answer {
    * whether the intersecting case should answer 0 or refuse, he chose refuse-and-explain — the refusal
    * teaches the concept, while 0 lets the misconception stand.
    */
-  fact?: 'vertical' | 'lines-cross';
+  fact?: 'vertical' | 'lines-cross' | 'points';
+  /**
+   * THE POINT SET a degenerate locus answers with (#1227, ADR-AG-136): «המקום הגיאומטרי של M» on a
+   * determined M is M's position, or its finite set of positions — one entry per resolution-aware
+   * option (#1259). Present exactly when `fact === 'points'`; the component words the count.
+   */
+  points?: { x: number; y: number }[];
   /**
    * HOW THE ANSWER WAS REACHED (#1053) — the formula with this figure's values substituted.
    *
@@ -238,10 +244,36 @@ export function ask(
      * back to describing a figure nobody is looking at.
      */
     const res = locusOf(d.construction, name, [d.seed, d.seed + 1], d.box);
-    // No locus is a TRUE answer about the figure, not a failure to understand: the point is
-    // determined, or its freedom is not a curve. `value: null` is the lane's own way of saying
-    // «the figure does not determine this», and it is the honest one here too.
-    if (!res || !res.shape) return { question, value: null };
+    if (!res || !res.shape) {
+      /**
+       * A DETERMINED POINT'S LOCUS IS THAT POINT, OR THAT FINITE SET (#1227, ADR-AG-136).
+       *
+       * Operator, 2026-09-19: *"saying M cannot be calculated is wrong … refer to the location of
+       * point M"*. «M» on `x = 4` with |MA| = 5 has no curve for a locus because it has exactly two
+       * positions — and the tool held both in `knownOptions` while answering «לא ניתן לחשב מהנתונים».
+       * That is #1223's false absence on a second surface, so it takes the same `fact` seam #1223 built:
+       * the answer is a FACT about the figure, carried as the point set for the component to word.
+       *
+       * The count is the resolution-aware set's (#1259), never a sample length: at a tangency the solves
+       * cluster inside the solver's resolution and `knownOptions` answers "not a set", so the single
+       * point comes from the knowledge gate — which is what makes the tangential figure answer ONE
+       * point rather than six. A point the gate cannot fix on either coordinate falls through to the
+       * lane's own `value: null`, which the component words as open or uncomputable as before.
+       */
+      const readPt = (f: Figure) => {
+        const p = f.points.find((q) => q.id === name);
+        return p ? [p.x, p.y] : null;
+      };
+      const set = knownOptions(d.construction, readPt);
+      if (set) return { question, value: null, fact: 'points', points: set.map(([x, y]) => ({ x, y })) };
+      const kx = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === name)?.x ?? null);
+      const ky = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === name)?.y ?? null);
+      if (kx.known && ky.known) return { question, value: null, fact: 'points', points: [{ x: kx.value, y: ky.value }] };
+      // No locus is a TRUE answer about the figure, not a failure to understand: the point's freedom is
+      // not a curve, or the figure is still open. `value: null` is the lane's own way of saying «the
+      // figure does not determine this», and it is the honest one here too.
+      return { question, value: null };
+    }
     const eq = locusEquation(res.shape, fmt);
     return {
       question,

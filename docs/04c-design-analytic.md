@@ -620,6 +620,12 @@ of letting it fall through. The narrower symbol set is the deliberate trade.
 The catalog carries the symbol rows, which is what keeps them alive: the guard re-parses every row in
 both languages, so a notation that stops parsing fails the suite rather than becoming documentation.
 
+
+### A determined point's locus is a point set ([ADR-AG-136](06c-decisions-analytic.md#adr-ag-136), #1227 on #1259)
+
+The `LOCUS_OF` branch's "no curve" case is not one absence but three, and #1223's `fact` seam carries the third: `fact: 'points'` with the point set — `knownOptions`' resolution-aware set when there is one, else the single point both of whose coordinates `isKnowledge` fixes — which the component words in the lane's own grammar («נקודה · (4, 3)», «שתי נקודות · …», He/En keys `askPointOne/Two/Many`). An open figure and a genuinely uncomputable one keep `value: null` and their two wordings. The count is the set's and never a sample length: at a tangency the twenty-four solves cluster inside `SOLVE_RESOLUTION` (`solve.ts`, `10·√SOLVE_TOL` of scale — derived from the quadratic residual at a double root, k = 10 by the operator's ruling), `knownOptions` answers "not a set", and `isKnowledge` — now no tighter than that resolution either — reports the cluster's midpoint. Three thresholds, three questions: `SAME_VALUE_EPS` and `apart()` ask whether two values are one value; `SOLVE_RESOLUTION` asks whether two solves could have told them apart.
+
+
 ## A circle on a point ([ADR-AG-045](06c-decisions-analytic.md#adr-ag-045))
 
 Every curve in this product is an equation over `x` and `y` whose coefficients are expressions in

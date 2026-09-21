@@ -885,6 +885,8 @@ draws `C` in that quadrant. It is a REGION: the point keeps both degrees of free
 «הציגו תצורה אחרת» inside its quadrant, and a point already placed elsewhere is refused rather than
 quietly redrawn.
 
+**R60 — two positions the solver cannot tell apart are ONE position, and a determined point's locus is that point** ([ADR-AG-136](06c-decisions-analytic.md#adr-ag-136)). *(Operator, 2026-09-20 on #1259: "a cluster inside solver resolution is not an option set"; 2026-09-19 on #1227: "saying M cannot be calculated is wrong … refer to the location of point M".)* At a tangency the solves land within the solver's own resolution of one another; the panel prints ONE point there, never a list of near-identical "cases" with magnitudes nobody gave — the tolerance is derived from the solve's own stopping rule, `10·√SOLVE_TOL` of scale. And «המקום הגיאומטרי של M» on a determined M answers M's position («נקודה · (4, 0)») or its finite set («שתי נקודות · (4, −3), (4, 3)») in the locus lane's own grammar; «לא ניתן לחשב מהנתונים» is reserved for what the givens genuinely do not fix, and «עדיין לא נקבע» for an open figure.
+
 **R61 — a circle marks its centre** ([ADR-AG-036](06c-decisions-analytic.md#adr-ag-036)). Every drawn
 circle shows its centre, because in analytic geometry the centre is always part of the figure. The
 mark appears whenever the circle does; the VALUE beside it appears only when the givens fix it, so a

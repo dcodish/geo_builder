@@ -64,6 +64,11 @@ const he = {
   // Three different answers, because they are three different situations.
   askOpen: 'עדיין לא נקבע מהנתונים',
   askNoValue: 'לא ניתן לחשב מהנתונים',
+  // #1227 (ADR-AG-136) — a determined point's locus is that point, or that finite set: the locus lane's
+  // own grammar («נקודה · (4, 3)» beside «ישר · x = 4»), never «לא ניתן לחשב».
+  askPointOne: 'נקודה',
+  askPointTwo: 'שתי נקודות',
+  askPointMany: '{{count}} נקודות',
   // #1205 — the refusal TEACHES: it names why there is no single distance, and names the two
   // questions that ARE askable here. Both suggestions are driven in the lock, because a remedy the
   // tool cannot itself answer is the #1156 failure mode.
@@ -265,6 +270,9 @@ const en: typeof he = {
   askRemove: 'Remove this measurement',
   askOpen: 'not fixed by the givens yet',
   askNoValue: 'cannot be computed from the givens',
+  askPointOne: 'a point',
+  askPointTwo: 'two points',
+  askPointMany: '{{count}} points',
   askLinesCross:
     'the lines intersect, so there is no single distance between them — it is zero at the crossing and grows away from it. A distance is defined only between PARALLEL lines. You can ask for the distance from a point to a line, for example "the distance from A to line l1", or name the crossing point itself.',
   askUnreadable: 'I did not understand the question',
