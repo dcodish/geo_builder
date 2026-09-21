@@ -35,7 +35,7 @@ describe('#955 — the reported figure stops claiming a magnitude it does not ha
   const fig = replayFacts(facts);
 
   it('the α line is the refused one, and the corner it names carries NO label', () => {
-    expect(fig.lastError, 'the figure is genuinely over-constrained').toMatch(/cannot hold/);
+    expect(fig.lastError, 'the figure is genuinely over-constrained').toMatch(/cannot hold|^impossible: the angles of/);
     // #956 ([ADR-492](../../docs/06-decisions.md#adr-492)) moved the BLAME to the value line — «α = 70»
     // is the statement that turned a feasible figure infeasible. The α-definition is green again, and
     // that is exactly why this file matters: green does NOT mean labelled. Its constraint was still
@@ -76,7 +76,7 @@ describe('#955 — the four lanes of the ruling’s table (angle/length × symbo
   it('length, symbol: «AB = 3» · «AB = x» · «x = 8» — the refused x-line no longer prints 8 on a 3-long segment', () => {
     const facts = factsOf(['משולש ABC', 'AB = 3', 'AB = x', 'x = 8']);
     const fig = replayFacts(facts);
-    expect(fig.lastError).toMatch(/cannot hold/);
+    expect(fig.lastError).toMatch(/cannot hold|^impossible: the angles of/);
     // as above: after ADR-492 the VALUE line is the blamed one, and «AB = x» is green but unapplied.
     expect(statusOf(fig, facts, 'x = 8'), 'the value line carries the refusal').not.toBe('ok');
     expect(statusOf(fig, facts, 'AB = x'), 'and the symbolic length stays green').toBe('ok');
@@ -89,7 +89,7 @@ describe('#955 — the four lanes of the ruling’s table (angle/length × symbo
   it('angle, numeric: a refused concrete «∠ABC = 80» shows nothing — the lane that was already honest, locked with the other', () => {
     const facts = factsOf(['משולש ABC', 'זווית BCA = 50', 'זווית CAB = 70', 'זווית ABC = 80']);
     const fig = replayFacts(facts);
-    expect(fig.lastError).toMatch(/cannot hold/);
+    expect(fig.lastError).toMatch(/cannot hold|^impossible: the angles of/);
     expect(statusOf(fig, facts, 'זווית ABC = 80')).not.toBe('ok');
     expect(angleLabelAt(fig, 'B')).toBeUndefined();
   });
@@ -97,7 +97,7 @@ describe('#955 — the four lanes of the ruling’s table (angle/length × symbo
   it('length, numeric: «AB = 3» then a refused «AB = 8» keeps the 3', () => {
     const facts = factsOf(['משולש ABC', 'AB = 3', 'AB = 8']);
     const fig = replayFacts(facts);
-    expect(fig.lastError).toMatch(/cannot hold/);
+    expect(fig.lastError).toMatch(/cannot hold|^impossible: the angles of/);
     expect(statusOf(fig, facts, 'AB = 8')).not.toBe('ok');
     expect(lengthLabel(fig, 'A', 'B')?.text).toBe('3');
   });

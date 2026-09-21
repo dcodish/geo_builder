@@ -223,6 +223,8 @@
   "errors": {
     "metricImpossibleTriangle": "לא ניתן: |{{seg}}| = {{value}} — סכום שתי צלעות תמיד גדול מהצלע השלישית, וכאן {{sides}} = {{sum}}. בדקו את הנתונים.",
     "metricImpossiblePath": "לא ניתן: |{{seg}}| = {{value}} — הדרך מ-{{a}} ל-{{b}} דרך {{via}} היא {{sum}}, וקטע ישר קצר מכל דרך אחרת בין קצותיו. בדקו את הנתונים.",
+    "angleSumImpossibleTriangle": "לא ניתן: סכום הזוויות במשולש הוא תמיד 180°, וכאן {{angles}} מסתכמות ב-{{sum}}. בדקו את הנתונים.",
+    "angleSumImpossiblePolygon": "לא ניתן: סכום הזוויות במצולע {{poly}} הוא {{bound}}, וכאן {{angles}} מסתכמות ב-{{sum}}. בדקו את הנתונים.",
     "desc": {
       "collinear": "על ישר אחד",
       "concyclic": "על מעגל אחד",

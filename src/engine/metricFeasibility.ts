@@ -25,7 +25,7 @@
  * beyond a relative tolerance is impossible.
  */
 
-import type { Constraint, Id } from './types';
+import type { Constraint, GeoObject, Id } from './types';
 
 export interface MetricImpossibility {
   /** the two endpoints of the pinned edge that cannot be that long */
@@ -109,4 +109,79 @@ export function metricImpossibility(constraints: Constraint[]): MetricImpossibil
  */
 export function metricImpossibilityError(m: MetricImpossibility): string {
   return `impossible: |${m.a}${m.b}| = ${m.value} exceeds ${m.sum}, the distance from ${m.a} to ${m.b} via ${m.via.join(', ')}`;
+}
+
+/**
+ * ANGLE-SUM FEASIBILITY (#1329, ADR-538) — the angle twin of the metric check above.
+ *
+ * A polygon's interior angles sum to (n − 2)·180°, so the stated interior angles of one declared polygon
+ * can never sum past that. If they do, NO configuration satisfies the system — not for any placement,
+ * any free radius, any remaining DOF. «∠ABC = 100» · «∠ACB = 100» on «משולש ABC» is the reported
+ * member: the solver finds nothing (the apex would have to be negative), the step fails, and the fold's
+ * classifier filed the failure as PENDING — "add the remaining givens" — because the figure still had
+ * freedom and the flex probe saw the residual move. ADR-537 did not take it: its gate fires when a
+ * solution EXISTS and is not a figure; here none exists at all.
+ *
+ * The same one-way soundness as the metric check: a strict excess PROVES impossibility and is refused
+ * instantly, before the ladder; passing proves nothing and the ordinary ladder still runs. Equality is
+ * allowed — the remaining angles at zero is a FLAT polygon, which is ADR-413/ADR-513's concern, exactly
+ * the metric prover's equality rule. Only INTERIOR angles are read: the angle at vertex v between v's two
+ * polygon neighbours, in either ray order. «∠ABD» on ABCD is a diagonal's angle and says nothing about
+ * the sum; an ARC measure (`arcOf`) sits at a centre and is not a polygon angle. Where one vertex has
+ * several stated values the smallest is taken, so the verdict stays sound (two different values for one
+ * angle is a contradiction the ordinary solver reports).
+ *
+ * Not a triangle rule: any declared ring is bounded by its own (n − 2)·180°, so a quadrilateral with
+ * four stated angles past 360° is covered by the same code. A single reflex angle in a quadrilateral
+ * («∠ABC = 200» on ABCD) is NOT refused — a non-convex quadrilateral is a real figure.
+ */
+export interface AngleSumImpossibility {
+  /** the polygon, as its vertex run */
+  polygon: Id[];
+  /** the stated interior angles that were summed, in polygon order, as the student wrote them */
+  angles: { vertex: Id; ray1: Id; ray2: Id; value: number }[];
+  /** their sum, in degrees */
+  sum: number;
+  /** (n − 2)·180 */
+  bound: number;
+}
+
+export function angleSumImpossibility(
+  objects: readonly GeoObject[],
+  constraints: readonly Constraint[],
+): AngleSumImpossibility | null {
+  for (const o of objects) {
+    if (o.kind !== 'polygon' || o.vertices.length < 3) continue;
+    const n = o.vertices.length;
+    const bound = (n - 2) * 180;
+    const angles: AngleSumImpossibility['angles'] = [];
+    for (let i = 0; i < n; i++) {
+      const v = o.vertices[i]!;
+      const prev = o.vertices[(i + n - 1) % n]!;
+      const next = o.vertices[(i + 1) % n]!;
+      let stated: AngleSumImpossibility['angles'][number] | null = null;
+      for (const c of constraints) {
+        if (c.type !== 'angle' || c.arcOf || c.vertex !== v || !Number.isFinite(c.value)) continue;
+        const interior = (c.ray1 === prev && c.ray2 === next) || (c.ray1 === next && c.ray2 === prev);
+        if (!interior) continue;
+        if (!stated || c.value < stated.value) stated = { vertex: v, ray1: c.ray1, ray2: c.ray2, value: c.value };
+      }
+      if (stated) angles.push(stated);
+    }
+    if (!angles.length) continue;
+    const sum = angles.reduce((s, a) => s + a.value, 0);
+    if (sum > bound * (1 + TOL) + TOL) return { polygon: [...o.vertices], angles, sum, bound };
+  }
+  return null;
+}
+
+/**
+ * The engine-side English diagnostic; `humanizeError` maps it to the student's language. The bound is
+ * printed so the humaniser can tell the triangle case (180°, the curriculum's own sentence) from a
+ * longer ring, exactly as the metric message's comma does.
+ */
+export function angleSumImpossibilityError(m: AngleSumImpossibility): string {
+  const deg = (v: number) => `${Number(v.toFixed(2))}°`;
+  const list = m.angles.map((a) => `∠${a.ray1}${a.vertex}${a.ray2} = ${deg(a.value)}`).join(', ');
+  return `impossible: the angles of ${m.polygon.join('')} sum to ${deg(m.sum)}, exceeding ${deg(m.bound)}: ${list}`;
 }
