@@ -39,16 +39,22 @@ describe('#1168 — the noun decides which root comes up first', () => {
     }
   });
 
-  it('«הישר» is unchanged — the infinite line keeps the first root it always had', () => {
+  // CHANGED 2026-09-21 (ADR-AG-135, #1286). The two cases below used to lock the OPPOSITE of the
+  // operator's later ruling: «הישר CA» opening on the FAR root, and the far root being "one
+  // configuration away" from «הצלע CA». On 2026-09-20 he ruled (a) "the figure is the authority" — CA is
+  // drawn as a side, so «הישר CA» denotes that side — and "a root outside the segment is not a lesser
+  // configuration — it is not a configuration". #1168's distinction survives only where the letters name
+  // nothing drawn (locked in issue-1286-extent-bounds-roots.test.ts, with the two-root chord).
+  it('«הישר CA» on a DRAWN side denotes the side: the figure is the authority (ruling (a), reverses this lock’s earlier reading)', () => {
     const p = at([...BASE, 'P נקודת החיתוך של הישר CA עם המעגל x^2+y^2=16'], 'P');
-    expect(near(p, FAR)).toBe(true);
+    expect(near(p, NEAR)).toBe(true);
   });
 
-  it('it is a PREFERENCE, not a filter: the far root is one configuration away', () => {
+  it('the extent is a FILTER, not a preference: the far root is not a configuration at any seed', () => {
     const lines = [...BASE, 'P נקודת החיתוך של הצלע CA עם המעגל x^2+y^2=16'];
     const seen = [0, 1, 2, 3].map((s) => at(lines, 'P', s));
-    expect(seen.some((p) => near(p, NEAR)), 'the drawn root is reachable').toBe(true);
-    expect(seen.some((p) => near(p, FAR)), 'and so is the far one — «הציגו תצורה אחרת» must still work').toBe(true);
+    expect(seen.every((p) => near(p, NEAR)), 'the drawn root at every seed').toBe(true);
+    expect(seen.some((p) => near(p, FAR)), 'the far root is never offered').toBe(false);
   });
 });
 

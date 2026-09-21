@@ -25,6 +25,7 @@
 import { evalExpr, type Env } from './expr';
 import type { Id, NumCurve } from './types';
 import { residual as curveResidual } from './curves';
+import { SEGMENT_EXTENT_TOL, segmentParam } from './extent';
 import {
   describeLengthExpr,
   evalLengthExpr,
@@ -165,6 +166,15 @@ export type Constraint =
        * lands in (ADR-AG-085’s own lesson, #1085). Cycling still reaches the far root.
        */
       bounded?: boolean;
+      /**
+       * This incidence is one side of a CROSSING sentence — «P נקודת החיתוך של … עם …» (#1286,
+       * ADR-AG-135). Only for a crossing does the drawn extent bound the SOLUTION set: the operator's
+       * T11 ruling ("a root outside the segment is not a configuration") and ruling (a) ("the figure is
+       * the authority" on the noun) were both given about the crossing sentence. A cevian's foot
+       * («AD גובה לצלע BC», #1232) and a point «על הישר BC» (#1069) keep the line reading their own
+       * rulings gave them, so those sites never set this.
+       */
+      crossing?: boolean;
     }
   /**
    * A DISCRETE degree of freedom — exactly one of these holds, and the student has not said which
@@ -587,7 +597,20 @@ export function residual(
       // The perpendicular distance from `d` to the line through `a` and `b` — the cross product over
       // the base length. Zero exactly on the line, and a true distance, so it is comparable with
       // every other residual here without further scaling.
-      return [((d.x - a.x) * uy - (d.y - a.y) * ux) / n];
+      const off = ((d.x - a.x) * uy - (d.y - a.y) * ux) / n;
+      if (!(k.bounded && k.crossing)) return [off];
+      /**
+       * A bounded CROSSING is on the PIECE, not the line (#1286, ADR-AG-135): the drawn extent decides
+       * which roots exist. Two more rows, each the distance the point sits BEYOND an end along the line —
+       * zero anywhere within the piece (to the ring filter's own tolerance), a true distance outside it.
+       * So the solve is pulled back inside, a root outside the piece is UNSATISFIED rather than a
+       * configuration, and a segment that never reaches the curve is reported on the line that stated
+       * it. `segmentParam` is the ruler `crossings.ts`'s rings use, so a ring offered is a root that
+       * satisfies this. Crossings only — see `crossing` on the type for the two rulings that keep a
+       * cevian's foot and a point «על הישר» on the infinite line.
+       */
+      const t = segmentParam(a, b, d)!; // n > 0 above ⇒ never null
+      return [off, Math.max(0, -SEGMENT_EXTENT_TOL - t) * n, Math.max(0, t - 1 - SEGMENT_EXTENT_TOL) * n];
     }
     case 'tangent-axis': {
       const radius = evalExpr(k.r, env);

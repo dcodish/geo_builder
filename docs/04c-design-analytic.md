@@ -142,6 +142,9 @@ figure came out two ways.
 cross far outside the drawing; that is `within`’s question. Widening the angular bar to cover it would
 start calling distinct lines identical, which is the defect it was introduced to remove.
 
+**The extent is ONE ruler ([ADR-AG-135](06c-decisions-analytic.md#adr-ag-135), #1286).** `extent.ts` owns `segmentParam` / `withinSegment` (the ring filter's tolerance) and `drawnPieceOver`, and three readers share it so they cannot disagree: the click-path rings (`within`), the solver's bounded-crossing residual (two rows — the distance beyond each end — that make an out-of-piece root UNSATISFIED and therefore, by ADR-AG-134's validity term, not a configuration), and the figure-is-the-authority promotion in `evaluate` (a crossing's incidence on a pair the figure draws as a segment or a polygon side is `bounded` whatever noun the sentence used). The extent binds **crossings only** (`crossing` on the incidence, set by `parseIntersection`): a cevian's foot (#1232) and a point «על הישר» (#1069) keep the infinite-line reading their own rulings gave them.
+
+
 ## The parser's rule contract ([ADR-AG-017](06c-decisions-analytic.md#adr-ag-017))
 
 A rule in `parseAnalytic.ts` answers one of **three** ways, and the third is the one round #1056 added:

@@ -885,6 +885,8 @@ draws `C` in that quadrant. It is a REGION: the point keeps both degrees of free
 «הציגו תצורה אחרת» inside its quadrant, and a point already placed elsewhere is refused rather than
 quietly redrawn.
 
+**R59 — a crossing with a DRAWN PIECE exists only on the piece, and the figure decides what is a piece** ([ADR-AG-135](06c-decisions-analytic.md#adr-ag-135)). *(Operator, 2026-09-20, T11: "a root outside the segment is not a lesser configuration — it is not a configuration"; on the noun: "the figure is the authority".)* «P נקודת החיתוך של הצלע CA עם המעגל» has exactly the roots that lie on the side `CA`; a chord that genuinely meets the circle twice offers both; a segment that never reaches the curve has no crossing and the sentence is refused, never drawn past its own end. `CA` drawn as a side is a segment whatever word the sentence used — «הישר CA» denotes the side there and keeps its infinite reading only where the letters name nothing drawn. This is about the crossing sentence: an altitude's foot may fall beyond its side (#1232) and a point «על הישר BC» may sit beyond the endpoints (#1069), as their own rulings say.
+
 **R61 — a circle marks its centre** ([ADR-AG-036](06c-decisions-analytic.md#adr-ag-036)). Every drawn
 circle shows its centre, because in analytic geometry the centre is always part of the figure. The
 mark appears whenever the circle does; the VALUE beside it appears only when the givens fix it, so a
