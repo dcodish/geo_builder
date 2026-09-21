@@ -38,7 +38,8 @@ import { drawnBox as composeDrawnBox } from './app/drawnBox';
 import { SYMBOLS } from './ui/symbols';
 import { logAnalytic, logAnalyticFigure } from './debug/sessionLogAnalytic';
 import { exprText } from './engine/expr';
-import { MathText, hasMath } from '../shell/math';
+import { MathText } from '../shell/math';
+import { inputPreviewNodeAnalytic } from './render/inputPreviewNodeAnalytic';
 import { Banner } from '../shell/frame/Banner';
 import { FigureName } from '../shell/frame/FigureName';
 import { ManualScreen } from '../shell/frame/ManualScreen';
@@ -917,9 +918,8 @@ export function App() {
                * with `=25` at the far LEFT. That is the defect this preview exists to prevent,
                * reintroduced by its own fix. The answer rows already do it in this order (#1097).
                */
-              preview={(s) =>
-                hasMath(s) ? <MathText text={analyticBidi.isolateLtrRuns(s, true)} /> : analyticBidi.inputPreview(s)
-              }
+              /* #1315 — the decision is a callable function, so its lock can CALL it. */
+              preview={(s) => inputPreviewNodeAnalytic(s)}
               previewDir={(s) => analyticBidi.textDir(s)}
               boxDir={(s) => analyticBidi.textDir(s)}
             >

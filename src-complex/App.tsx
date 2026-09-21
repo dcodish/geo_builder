@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppFrame } from '../shell/frame/AppFrame';
-import { hasMath, MathText } from '../shell/math';
+import { inputPreviewNodeCx } from './ui/inputPreviewNodeCx';
 import { Banner } from '../shell/frame/Banner';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
@@ -454,9 +454,8 @@ export function App() {
                * had no strip at all. It gets one now. That is deliberate: the strip stops being "a
                * bidi repair" and becomes "what you typed, typeset".
                */
-              preview={(s) =>
-                hasMath(s) ? <MathText text={complexBidi.isolateLtrRuns(s, true)} /> : complexBidi.inputPreview(s)
-              }
+              /* #1315 — the decision is a callable function, so its lock can CALL it. */
+              preview={(s) => inputPreviewNodeCx(s)}
               previewDir={(s) => complexBidi.textDir(s)}
             >
               {/* No quick strip above the box (operator ruling 2026-08-18: "expensive screen

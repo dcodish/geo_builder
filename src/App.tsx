@@ -36,6 +36,7 @@ import { crossingCommands } from '@/engine';
 import { independentConstructs } from '@/app/independence';
 import type { Crossing } from '@/engine';
 import { MathText, hasMath } from '../shell/math';
+import { inputPreviewNode } from '@/render/inputPreviewNode';
 import { MathValue } from '@/render/MathValue';
 import { formatMeasure } from '@/format';
 import { readoutForGroup } from '@/render/computedValue';
@@ -56,7 +57,7 @@ import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureF
 import { applyDisplayMode, competingSymbols, paramChipsByFact } from '@/store/paramChips';
 import { displayModeOf, displayModeToIndexed } from '../shell/displayMode';
 import { questionLines } from '@/export/questionLines';
-import { bidiSegments, inputPreview, isolateLtrRuns } from '@/i18n/bidi';
+import { bidiSegments, isolateLtrRuns } from '@/i18n/bidi';
 // #742: the exports live in the TOP TOOL ROW now (ADR-W-024) — App rasterises the canvas svg itself.
 // #745: the rasteriser and the printed width are SHARED (shell/export/svgToPng), so every builder that
 // prints a figure prints it at one width and one ink weight. Two copies could drift; one cannot.
@@ -1264,7 +1265,8 @@ export default function App() {
               symbols={SYMBOL_SPECS}
               // #997 (ADR-504): the bidi live preview rides the same seam as the maths one — the surface the
               // student is LOOKING at while typing shows a mixed Hebrew+Latin line laid out correctly.
-              preview={(s) => (hasMath(s) ? <MathText text={s} /> : inputPreview(s))}
+              /* #1315 — the decision is a callable function, so its lock can CALL it. */
+              preview={(s) => inputPreviewNode(s)}
               previewDir={(s) => textDir(s)}
               boxDir={(s) => textDir(s)}
             >

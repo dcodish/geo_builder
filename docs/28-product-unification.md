@@ -904,3 +904,25 @@ locked by a single fixture table run against **all three kits**
 (`shell/__tests__/issue-1296-leading-sign.test.ts`), because a per-tree lock cannot see a copy drifting.
 The one legitimate divergence is 3-D's `declSplit` (a declaration renders as a name island plus an equation
 island); it is asserted per product so a migration has to decide about it rather than lose it.
+
+## 5c. How a cross-product wiring guard is written ([ADR-W-071](06w-decisions-workspace.md#adr-w-071))
+
+`shell/` may never import a product tree, so a guard that wants to check "every builder does X" cannot
+simply call all four. The tempting answer — read each `App*.tsx` as text and grep for the shape — asserts
+where a decision LIVES rather than that the product MAKES it, and breaks the first time someone extracts
+the decision into its own function. That is what went red in #1315, on a refactor that improved the code.
+
+**The pattern instead:**
+
+1. The product's decision is a **callable function**, not an arrow inside a JSX prop. A ternary in a prop
+   is invisible to every test, which is what forces the source scan in the first place.
+2. The **rows and the checks** live once, in `shell/__tests__/fixtures/`, as a pure
+   `xFaults(subject, opts) → string[]` plus a thin `xSuite()` wrapper that runs it as `it` rows.
+3. Each tree has a **thin lock** importing its own function and calling the shared suite. Products
+   importing `shell/` is the allowed direction.
+4. Where products legitimately differ, the difference is an **explicit option** on the suite
+   (`isolatesFirst` for the preview), never a silent exclusion.
+5. A **meta-lock** in `shell/` runs the shared checks against deliberately broken stubs and asserts each
+   is caught. It calls the same `xFaults`, never its own copy.
+
+Live instances: `issue-1152-preview-rows.ts` (the input preview) and `issue-1296-rows.ts` (bidi run spans).

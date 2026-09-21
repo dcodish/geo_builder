@@ -34,18 +34,21 @@
  * products, separate issues.
  */
 import { describe, expect, it } from 'vitest';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { hasMath, mathHtml } from '../../shell/math';
 import { analyticBidi } from '../i18n';
+import { inputPreviewNodeAnalytic } from '../render/inputPreviewNodeAnalytic';
+import { isTypeset, textOf } from '../../shell/__tests__/fixtures/issue-1152-preview-rows';
 
-const APP = fs.readFileSync(path.resolve(__dirname, '..', 'App.tsx'), 'utf8');
 const LINE = 'מעגל (x-3)^2+(y-5)^2=25';
 
 describe('#1215 — the input preview renders maths as maths', () => {
   it('the panel wires the maths renderer into the preview seam', () => {
-    // A source scan, like `bidi-wiring.test.ts`: this seam is what a refactor drops silently.
-    expect(APP).toMatch(/preview=\{[\s\S]{0,80}hasMath\(s\)[\s\S]{0,40}<MathText/);
+    /**
+     * #1315 — this CALLS the preview. It was a source scan of `App.tsx` (`/preview=\{…hasMath\(s\)…/`),
+     * which asserted where the decision lived rather than that it was made, and went red the day the
+     * decision was correctly extracted into its own module. See ADR-W-071.
+     */
+    expect(isTypeset(inputPreviewNodeAnalytic(LINE))).toBe(true);
   });
 
   it('IT ISOLATES BEFORE IT TYPESETS — found by looking, not by asserting', () => {
@@ -59,7 +62,10 @@ describe('#1215 — the input preview renders maths as maths', () => {
      * `[(y-5)², (x-3)²]`; after, `[(x-3)², (y-5)²]`. jsdom does not do bidi layout, so what a unit
      * test CAN hold is that the isolate is still applied on this path — which is the cause.
      */
-    expect(APP).toMatch(/<MathText text=\{analyticBidi\.isolateLtrRuns\(s/);
+    // #1315 — asserted on the text MathText actually RECEIVES, not on the App's source.
+    const handed = textOf(inputPreviewNodeAnalytic(LINE));
+    expect(handed, 'MathText received the raw string').not.toBe(LINE);
+    expect(handed).toBe(analyticBidi.isolateLtrRuns(LINE, true));
   });
 
   it('THE BIDI PREVIEWER IS STILL THERE as the fallback — it is not replaced', () => {
@@ -67,7 +73,14 @@ describe('#1215 — the input preview renders maths as maths', () => {
      * The preview exists for bidi in the first place. If adoption dropped it, a half-typed Hebrew
      * line would lose the reading order this panel was built to fix (#1088).
      */
-    expect(APP).toContain('analyticBidi.inputPreview(s)');
+    // #1315 — asserted by BEHAVIOUR: a half-typed Hebrew line is not maths, so it must still come back
+    // as the isolated bidi form rather than null or a MathText.
+    const partial = 'מעגל (x-3';
+    expect(hasMath(partial), 'precondition: this prefix is not maths yet').toBe(false);
+    const node = inputPreviewNodeAnalytic(partial);
+    expect(isTypeset(node), 'a half-typed line must not be typeset').toBe(false);
+    expect(node).toBe(analyticBidi.inputPreview(partial));
+    expect(node, 'the bidi fallback must still produce a preview').not.toBeNull();
   });
 
   it("the operator's own line is maths, and typesets", () => {

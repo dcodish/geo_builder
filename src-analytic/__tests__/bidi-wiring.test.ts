@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { analyticBidi } from '../i18n';
+import { inputPreviewNodeAnalytic } from '../render/inputPreviewNodeAnalytic';
 
 const APP = fs
   .readFileSync(path.resolve(__dirname, '..', 'App.tsx'), 'utf8')
@@ -73,7 +74,14 @@ describe('#1088 — every seam the siblings pass, this panel passes', () => {
   });
 
   it('a line being typed gets the live preview, laid out correctly', () => {
-    expect(passes('preview', 'inputPreview')).toBe(true);
+    /**
+     * #1315 — the PREVIEW half is asserted by calling it, not by grepping the prop. The decision moved
+     * into `render/inputPreviewNodeAnalytic.tsx`, and a scan for `analyticBidi.inputPreview` inside the
+     * prop went red on that extraction although the behaviour was unchanged (ADR-W-071). `previewDir`
+     * is still a one-liner in the JSX, so it stays a wiring scan — this file's subject really is wiring.
+     */
+    const partial = 'מעגל (x-3';
+    expect(inputPreviewNodeAnalytic(partial)).toBe(analyticBidi.inputPreview(partial));
     expect(passes('previewDir', 'textDir')).toBe(true);
   });
 
