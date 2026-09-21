@@ -10,7 +10,7 @@
  * An entry with `onTry` is clickable: it SUBMITS the example into the tool and closes the manual —
  * reading about a command and watching it build are one gesture.
  */
-import type { CSSProperties, ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { color } from '../theme';
 
 export interface ManualEntry {
@@ -23,6 +23,18 @@ export interface ManualEntry {
   /** Optional — a catalog without prose (3-D's) lists bare examples. */
   description?: ReactNode;
   onTry?: () => void;
+  /**
+   * SHOW THIS ONE FIRST (#1275).
+   *
+   * Which examples a capped section shows used to be decided by FILE ORDER — nothing chose them, they
+   * were whichever rows were written first, so **every capability added afterwards landed in the
+   * invisible tail**. #1165's own stated purpose was *"a student looking for «תיכון» found nothing"*,
+   * and after that fix a student looking for «תיכון» still found nothing: it was row 8 of 10.
+   *
+   * A featured entry is taken into the cap before any unfeatured one, so a later addition can be made
+   * visible without reordering the catalog (whose order is its own documentation).
+   */
+  featured?: boolean;
 }
 
 export interface ManualSection {
@@ -45,9 +57,31 @@ export interface ManualScreenProps {
    *  section («...ואלו רק דוגמאות»). Omit for the full list. */
   sectionCap?: number;
   moreNote?: string;
+  /**
+   * «הצג הכול» / «הצג פחות» (#1275) — a capped section EXPANDS.
+   *
+   * The cap is deliberate and stays: a student meeting 63 circle rows learns nothing (the ruling the
+   * guide shipped with). But a cap without an escape hatch is a coverage map two thirds of which the
+   * student cannot reach, and the catalog is exactly that map. Both labels or neither.
+   */
+  showAllLabel?: string;
+  showLessLabel?: string;
 }
 
-export function ManualScreen({ open, title, intro, sections, closeLabel, onClose, tryHint, sectionCap, moreNote }: ManualScreenProps) {
+/**
+ * The entries a capped section shows: FEATURED first, then the rest in catalog order.
+ *
+ * Exported so its lock CALLS it rather than re-slicing the array — a test that re-implements the
+ * selection stays green through the change that breaks it ([ADR-W-053](../../docs/06w-decisions-workspace.md)).
+ * Stable and order-preserving within each group, so the catalog's own order still documents itself.
+ */
+export function manualShown(entries: readonly ManualEntry[], cap?: number): readonly ManualEntry[] {
+  if (cap === undefined || entries.length <= cap) return entries;
+  return [...entries.filter((e) => e.featured), ...entries.filter((e) => !e.featured)].slice(0, cap);
+}
+
+export function ManualScreen({ open, title, intro, sections, closeLabel, onClose, tryHint, sectionCap, moreNote, showAllLabel, showLessLabel }: ManualScreenProps) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   if (!open) return null;
   return (
     <div style={overlay} role="dialog" aria-modal="true" aria-label={title}>
@@ -60,7 +94,9 @@ export function ManualScreen({ open, title, intro, sections, closeLabel, onClose
         </div>
         {intro != null && <p style={introStyle}>{intro}</p>}
         {sections.map((s) => {
-          const shown = sectionCap ? s.entries.slice(0, sectionCap) : s.entries;
+          const capped = sectionCap !== undefined && s.entries.length > sectionCap;
+          const isOpen = expanded[s.key] === true;
+          const shown = capped && !isOpen ? manualShown(s.entries, sectionCap) : s.entries;
           return (
           <section key={s.key} style={sectionStyle}>
             <h2 style={sectionTitle}>{s.title}</h2>
@@ -85,8 +121,20 @@ export function ManualScreen({ open, title, intro, sections, closeLabel, onClose
                   {e.description != null && <span style={descStyle}>{e.description}</span>}
                 </div>
               ))}
-              {sectionCap !== undefined && s.entries.length > sectionCap && moreNote != null && (
-                <span style={moreStyle}>{moreNote}</span>
+              {capped && (
+                <span style={moreStyle}>
+                  {!isOpen && moreNote != null && <span>{moreNote}</span>}
+                  {showAllLabel != null && showLessLabel != null && (
+                    <button
+                      type="button"
+                      style={moreBtn}
+                      aria-expanded={isOpen}
+                      onClick={() => setExpanded((p) => ({ ...p, [s.key]: !isOpen }))}
+                    >
+                      {isOpen ? showLessLabel : `${showAllLabel} (${s.entries.length})`}
+                    </button>
+                  )}
+                </span>
               )}
             </div>
           </section>
@@ -120,6 +168,17 @@ const closeBtn: CSSProperties = {
   fontFamily: 'inherit',
   cursor: 'pointer',
   whiteSpace: 'nowrap',
+};
+const moreBtn: CSSProperties = {
+  border: 'none',
+  background: 'none',
+  color: color.accent,
+  font: 'inherit',
+  fontSize: '0.85rem',
+  textDecoration: 'underline',
+  cursor: 'pointer',
+  padding: 0,
+  marginInlineStart: 8,
 };
 const introStyle: CSSProperties = { margin: '0 0 18px', color: color.muted, fontSize: '0.95rem', maxWidth: 640 };
 const sectionStyle: CSSProperties = { marginBottom: 22 };

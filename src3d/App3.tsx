@@ -1172,6 +1172,8 @@ export default function App3() {
         closeLabel={t('manual.close')}
         tryHint={t('manual.try')}
         sectionCap={6}
+        showAllLabel={t('manual.showAll')}
+        showLessLabel={t('manual.showLess')}
         moreNote={t('manual.more')}
         sections={(['solids', 'points', 'vectors', 'planesLines', 'claims', 'drawing'] as const).map((cat) => ({
           key: cat,

@@ -1670,6 +1670,8 @@ export function App() {
         closeLabel={t('close')}
         tryHint={t('manualTry')}
         sectionCap={6}
+        showAllLabel={t('manualShowAll')}
+        showLessLabel={t('manualShowLess')}
         moreNote={t('manualMore')}
         sections={MANUAL_SECTIONS.map((section) => ({
           key: section.key,
@@ -1679,6 +1681,7 @@ export function App() {
             return {
               example: analyticBidi.isolateLtrRuns(raw),
               dir: analyticBidi.textDir(raw) as 'rtl' | 'ltr',
+              featured: e.featured,
               onTry: () => {
                 setManualOpen(false);
                 submit(raw);

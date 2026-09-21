@@ -218,7 +218,9 @@ const he = {
     'זהו מדריך חלקי — מוצגות דוגמאות מייצגות בלבד, כדי להראות אילו מיני משפטים אפשר להקליד. ' +
     'לחצו על דוגמה כדי לנסות אותה על השרטוט.',
   manualTry: 'לחצו כדי לנסות — הדוגמה תיבנה על השרטוט',
-  manualMore: '…ואלו רק דוגמאות — הכלי מבין ניסוחים נוספים מהסוג הזה',
+  manualMore: '…ואלו רק דוגמאות — לכלי יש כאן פקודות נוספות, לא רק ניסוחים אחרים של אלו',
+  manualShowAll: 'הצג הכול',
+  manualShowLess: 'הצג פחות',
   manualPoints: 'נקודות',
   manualLines: 'ישרים',
   manualCircles: 'מעגלים',
@@ -402,7 +404,9 @@ const en: typeof he = {
     'A partial guide — representative examples only, to show what kinds of sentence you can type. ' +
     'Click an example to try it on the figure.',
   manualTry: 'Click to try — the example will be built on the figure',
-  manualMore: '…and these are only examples — the tool reads further phrasings of the same kind',
+  manualMore: '…and these are only examples — the tool has more COMMANDS here, not just other phrasings of these',
+  manualShowAll: 'Show all',
+  manualShowLess: 'Show fewer',
   manualPoints: 'Points',
   manualLines: 'Lines',
   manualCircles: 'Circles',
