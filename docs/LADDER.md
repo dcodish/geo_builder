@@ -14,10 +14,12 @@ _Instrumentation: `StepResult.ladder` (an ordered string trace of the stages tra
 | 0d | `normalizeShapeComposition` — rotate a shape's vertices onto an existing edge (rewrite, not a gate) | — | no |
 | 0e | `metricImpossibility` — a pinned distance longer than the shortest pinned PATH between its endpoints ([ADR-417](06-decisions.md#adr-417); as-found, recorded here by ADR-538) | `pre:impossible` | yes |
 | 0f | `angleSumImpossibility` — a declared polygon's stated interior angles summing past its own (n − 2)·180° ([ADR-538](06-decisions.md#adr-538)) | `pre:impossible` | yes |
+| 0g | `boundImpossibility` — a stated BOUND and a stated VALUE of the same measure that exclude each other, strictness respected ([ADR-541](06-decisions.md#adr-541)) | `pre:impossible` | yes |
 
-Both provers are SOUND one way only: a violation proves impossibility and refuses before the ladder; passing
-proves nothing. The same two run inside the classifier's `constraintIsPending` (stage 5), so a proven
-contradiction is never filed as ADR-104's pending state.
+All three provers are SOUND one way only: a violation proves impossibility and refuses before the ladder;
+passing proves nothing. The same three run inside the classifier's `constraintIsPending` (stage 5), so a
+proven contradiction is never filed as ADR-104's pending state — and, because they run before anything
+mutates, the refusal is also the CHEAP path (#1335 measured 19.6 s → 2.2 s on its own sequence).
 
 ## Stage 1 — the conflict / M1 branch (`commandConflict` ≠ null)
 

@@ -90,7 +90,15 @@ describe('#1265 — the class: a bound accepts exactly what it admits', () => {
       const ok = admits(rel, 10, value);
       it(`«BC ${rel} 10» then «BC = ${value}» ${ok ? 'HOLDS' : 'cannot hold'}`, async () => {
         const f = await play(`BC ${rel} 10`, `BC = ${value}`);
-        expect(f.clean, `${rel} 10 with ${value}: ${f.statuses}`).toBe(ok);
+        // WAS the line ACCEPTED? — not "is the committed figure clean". Since #1335 (ADR-540) a bound
+        // and a value of the same measure that exclude each other are a PROVEN contradiction, so the
+        // submit gate refuses the second line at the door and it never becomes a fact, exactly as
+        // ADR-417's metric contradiction and ADR-538's angle-sum one already did. #1265's rule is
+        // unchanged and this asserts it more precisely: the line lands if and only if the student's
+        // own inequality admits its value. (The «BC = 9» · «BC ≥ 10» row below has always read the
+        // refusal this way; the two orders now agree.)
+        expect(f.refusedUpFront, `${rel} 10 with ${value}: ${f.statuses} | ${f.notes.join(' | ')}`).toBe(!ok);
+        expect(f.clean, `${rel} 10 with ${value}: ${f.statuses}`).toBe(true);
         if (ok) expect(f.bc).toBeCloseTo(value, 3); // and the figure actually IS that value
       });
     }
@@ -151,7 +159,8 @@ describe('#1265 — the strictness is read, carried, and quoted', () => {
 
   it('and “strict by absence” means what it says: «גדול מ-10» still excludes 10', async () => {
     const f = await play('BC גדול מ-10', 'BC = 10');
-    expect(f.clean).toBe(false);
+    expect(f.refusedUpFront, f.notes.join(' | ')).toBe(true); // refused at the door since ADR-540
+    expect(f.notes.join(' ')).toContain('|BC| = 10');
   });
 
   it('each END of a two-sided range keeps its own operator', () => {
@@ -173,25 +182,28 @@ describe('#1265 — the strictness is read, carried, and quoted', () => {
 });
 
 describe('#1265 — angles, the same rule', () => {
-  it('«∠ABC ≥ 40» admits 40; «∠ABC > 40» does not', async () => {
+  /** «משולש ABC», the bound, then the value — and whether the VALUE was accepted. */
+  const playAngle = async (bound: string, value: string) => {
     useGeoStore.getState().clear();
     await runSubmit('משולש ABC', makeDeps().deps);
-    await runSubmit('∠ABC ≥ 40', makeDeps().deps);
-    await runSubmit('∠ABC = 40', makeDeps().deps);
-    expect(figure().clean).toBe(true);
+    await runSubmit(bound, makeDeps().deps);
+    const last = makeDeps();
+    await runSubmit(value, last.deps);
+    return { ...figure(), accepted: last.calls.cleared > 0, notes: last.calls.notes.filter(Boolean) };
+  };
 
-    useGeoStore.getState().clear();
-    await runSubmit('משולש ABC', makeDeps().deps);
-    await runSubmit('∠ABC > 40', makeDeps().deps);
-    await runSubmit('∠ABC = 40', makeDeps().deps);
-    expect(figure().clean).toBe(false);
+  it('«∠ABC ≥ 40» admits 40; «∠ABC > 40» does not', async () => {
+    const admitted = await playAngle('∠ABC ≥ 40', '∠ABC = 40');
+    expect(admitted.accepted).toBe(true);
+    expect(admitted.clean).toBe(true);
+
+    // Excluded ⇒ refused at the door since #1335 (ADR-540), where it used to commit and go red.
+    const excluded = await playAngle('∠ABC > 40', '∠ABC = 40');
+    expect(excluded.accepted, excluded.notes.join(' | ')).toBe(false);
   });
 
   it('«זווית קהה» stays STRICT — an obtuse angle is not 90°', async () => {
-    useGeoStore.getState().clear();
-    await runSubmit('משולש ABC', makeDeps().deps);
-    await runSubmit('זווית ABC קהה', makeDeps().deps);
-    await runSubmit('∠ABC = 90', makeDeps().deps);
-    expect(figure().clean).toBe(false);
+    const f = await playAngle('זווית ABC קהה', '∠ABC = 90');
+    expect(f.accepted, f.notes.join(' | ')).toBe(false);
   });
 });

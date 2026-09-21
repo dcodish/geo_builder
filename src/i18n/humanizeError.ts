@@ -166,6 +166,14 @@ export const PATTERNS: Pattern[] = [
     keyOf: (m) => (m[3] === '180°' ? 'errors.angleSumImpossibleTriangle' : 'errors.angleSumImpossiblePolygon'),
     params: (m) => ({ poly: m[1], sum: m[2], bound: m[3], angles: m[4] }),
   },
+  // metricFeasibility.ts (#1335, ADR-540) — `impossible: |BC| = 4 contradicts |BC| > 10`
+  // Both halves are the student's own statements, so the sentence names what they said and nothing
+  // internal — there is no geometry principle to cite here, only the two givens.
+  {
+    re: /^impossible: (.+) contradicts (.+)$/,
+    key: 'errors.boundImpossible',
+    params: (m) => ({ value: m[1], bound: m[2] }),
+  },
   // step.ts danglingCircleError (#186) — `circle 'O2' is not defined`
   { re: /^circle '(.+)' is not defined$/, key: 'errors.unknownCircle', params: (m) => ({ center: m[1] }) },
 

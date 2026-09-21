@@ -69,7 +69,7 @@ describe('#1249 — the wordy frame routes a bound to the bound rule', () => {
   it('the bound genuinely constrains what is built next — «אורך הקטע BC גדול מ-10» refuses a later «BC = 4»', () => {
     const fig = replay(factsOf(['משולש ABC', 'אורך הקטע BC גדול מ-10', 'BC = 4'] as never));
     const last = String(Object.values(fig.status).at(-1));
-    expect(last, 'the equality row is refused against the bound').toMatch(/^over-constrained: \|BC\| = 4 cannot hold/);
+    expect(last, 'the equality row is refused against the bound').toMatch(/^impossible: \|BC\| = 4 contradicts \|BC\| > 10$/);
     // parity with the bare twin — the same verdict, the same classification
     const bare = replay(factsOf(['משולש ABC', 'BC גדול מ-10', 'BC = 4'] as never));
     expect(String(Object.values(bare.status).at(-1))).toBe(last);

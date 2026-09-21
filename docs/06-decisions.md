@@ -12767,3 +12767,35 @@ There is no triangle in those givens — both base angles right, the apex 0°, s
 **Measured after.** «CE חוצה זווית C במשולש ABC», «CD חוצה זווית במשולש ABC», "CE bisects angle C in triangle ABC" build the figure «CE חוצה זווית C» builds (E on AB, ∠ACE = ∠ECB); on a figure where C has three edges the triangle form builds and the bare form still asks; «CE חוצה זווית A במשולש ABC» is refused naming C and A; #1267's own rows unchanged.
 
 **Consequences.** `parser/parse.ts` (`statedTriangle`, the rule, `Clarify`/`ParseFail`/`refusalOf`, the registry comment); `app/submitPipeline.ts`; `i18n/locales/he,en` (`input.bisectorWrongApex`); `parser/catalog.ts`. `parser/__tests__/issue-1285-bisector-triangle.test.ts`; scenario `bisector-reads-the-triangle-operand-1285` (corpus 4). `docs/04` the rule contract.
+
+## ADR-541 — A stated BOUND and a stated VALUE of the same measure that exclude each other are a proven contradiction, never a pending figure (#1335)
+
+**Status:** accepted, 2026-09-21 · **Issue:** [#1335](https://github.com/dcodish/geo_builder/issues/1335) (bug, `P2`, `2d`) · round [#1345](https://github.com/dcodish/geo_builder/issues/1345) · found validating round #1332's play sheet (T24)
+**Requirements:** [02](02-requirements.md) FR-EN-8 / FR-BND-1 (both extended, no new row) · **Design:** [LADDER](LADDER.md) stage 0 — a new pre-gate 0g
+**The third member of** [ADR-417](#adr-417) (#420, the metric prover) and [ADR-538](#adr-538) (#1329, the angle-sum prover), with the same one-way soundness
+
+**Measured before (`043c2db3`).** «משולש ABC» · «BC > 10» · «BC = 4»: `pending` **true**, `lastError` **null** — the student's banner reads «הנתון נרשם אך לא משפיע בינתיים» / *"add the remaining givens"* for a pair of statements no later given can reconcile. |BC| = 4 and |BC| > 10 exclude each other in every configuration. The angle member measures the same: «∠ABC > 100» · «∠ABC = 40» → `pending` true.
+
+**Two divergences from the issue's record, both measured at pickup (ADR-W-064).** The body reports `status[«BC = 4»]` as `over-constrained` with `lastError null`; today `lastError` is null and the constraint is simply absent. And the **reverse order already refused** — «BC = 4» · «BC > 10» answered `over-constrained: |BC| > 10 cannot hold [vs #1]`, `pending` false. So only one of the two orders was broken, not both as the plan assumed. The fix makes them one case rather than two, which is the point of proving it in the constraint list: the list carries no order.
+
+**The class.** `constraintIsPending` (`src/replay/core.ts`) asks whether the residual MOVES across seeds — on a free triangle it does — which is not whether it can reach ZERO. ADR-417's prover reads only `distance` constraints and ADR-538's only a polygon's interior angles; a bound against a pinned value of the same measure is a third provable contradiction neither sees. Members: a length bound against a pinned length, an angle bound against a pinned angle, an upper bound, a two-sided range that excludes the value, and either order of statement.
+
+**The mechanism.** `boundImpossibility(constraints)` beside the two, in `engine/metricFeasibility.ts`: for every bound constraint, a stated value of the same measure must lie inside the bound's region. Both operands are STATED — a bound is only ever a student's sentence, and a `distance`/`angle` constraint is a magnitude they gave (ADR-052: the tool states no magnitude of its own) — so a violation is a contradiction between two things the student said, and the message names **both**: `impossible: |BC| = 4 contradicts |BC| > 10`. It is read at `applyStep`'s pre-gate (LADDER 0g) and inside `constraintIsPending`, exactly as its two siblings are.
+
+**Strictness is respected** ([ADR-529](#adr-529), #1265): `minStrict` absent means STRICT, which is what every figure saved before that field meant. «BC ≥ 10» · «BC = 10» is a figure and still builds; «BC > 10» · «BC = 10» is not. An ARC measure is excluded for ADR-538's reason — it is a measure on a circle, not the angle at a vertex a bound is about.
+
+**A behaviour change #1265's locks had to record, and it is the convention, not a new one.** A proven contradiction is **refused at the door**: the submit gate declines the line and it never becomes a fact, where before it committed and went red. That is precisely what ADR-417's and ADR-538's contradictions already do — measured side by side through `runSubmit` before changing anything:
+
+```
+ADR-417  «AB=4» «BC=4» «AC=9»      refused up front, figure clean, note carries the message
+ADR-538  «∠ABC=100» «∠ACB=100»     refused up front, figure clean, note carries the message
+ADR-541  «BC>10» «BC=4»            refused up front, figure clean, note carries the message
+```
+
+`issue-1265-bound-boundary.test.ts` asserted *"the committed figure is not clean"* for an excluded value; it now asserts *"the line was not ACCEPTED"*, which is a **stronger** statement of the same rule (it distinguishes a refusal from a silent drop) and is how that file's own «BC = 9» · «BC ≥ 10» row has always read the other order. #1265's decision — *a bound admits exactly what its own inequality admits* — is unchanged, and every one of its twenty rows still asserts it.
+
+**Measured after.** Both orders and the wordy spelling (ADR-539) give one message, `pending` false; the angle member likewise. «BC ≥ 10» · «BC = 10» and «BC > 10» · «BC = 40» still build. The refusal also became **cheap**: the reported sequence fell from 19.6 s to 2.2 s, because the contradiction is proven before the ladder runs (docs/17 §7 — the failure path must be cheaper than the success path). 2-D lane: 416 files / 7218 tests green.
+
+**Sibling audit (docs/17 §1).** 3-D has bounds (`set-angle-bound`) and the same classifier shape; not measured here and not changed — noted as the next member if it is reported. Analytic's bound lane is `selectorsHold`, a different mechanism.
+
+**Consequences.** `engine/metricFeasibility.ts` (`BoundImpossibility`, `boundImpossibility`, `boundImpossibilityError`); `engine/step.ts` (pre-gate 0g); `replay/core.ts` (`constraintIsPending`); `i18n/humanizeError.ts` + `locales/{he,en}.json` (`errors.boundImpossible`). Locks: `engine/__tests__/bound-feasibility.test.ts` (15) — the operator's exact sequence drives the real `parse → replay` path there, because a corpus scenario still cannot express *"this step is expected to be REFUSED"* (#1288); `i18n/__tests__/humanize-error.test.ts` gains its two coverage rows; `issue-1265-bound-boundary.test.ts` and `issue-1249-wordy-bound.test.ts` updated as above.
