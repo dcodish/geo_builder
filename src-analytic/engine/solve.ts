@@ -645,6 +645,25 @@ export function residual(
 /** The tolerance at which a constraint counts as satisfied. Residuals are scale-normalised above. */
 export const SOLVE_TOL = 1e-7;
 
+/**
+ * THE SOLVER'S RESOLUTION — how close two candidate positions may be and still be indistinguishable
+ * BY THIS SOLVER (#1259, [ADR-AG-136](../../docs/06c-decisions-analytic.md#adr-ag-136)), relative to
+ * the figure's scale.
+ *
+ * Derived, not invented: at a double root — a tangency — the residual is quadratic in the displacement,
+ * so a descent that stops at `SOLVE_TOL` can stop anywhere within `√SOLVE_TOL ≈ 3.2e-4` of the root.
+ * Measured on «A(0,0)» · «B(8,0)» · «נקודה M» · «MA = MB» · «MA = 4» (M is exactly (4, 0)): the
+ * twenty-four solves spread over 7.5e-4 of scale — the same order, 2.4× the floor — and the panel
+ * printed them as FOUR cases with magnitudes nobody gave. The real two-option separation on the
+ * neighbouring «MA = 5» is 1.5 of scale. `k = 10` (the operator's ruling, 2026-09-20): four times the
+ * measured noise, 470× below any real option pair, two and a half orders of headroom either side.
+ *
+ * A value-IDENTITY threshold (`SAME_VALUE_EPS`, `apart()`) answers a different question and is not
+ * widened for this; two candidates within this resolution are ONE answer, and a set of them is not an
+ * option set at all.
+ */
+export const SOLVE_RESOLUTION = 10 * Math.sqrt(SOLVE_TOL);
+
 export interface SolveResult {
   /** The carrier values that satisfy the constraints, in the order they were handed in. */
   values: number[];

@@ -19,7 +19,7 @@ import { pairKey, pinnedLengths } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, type RingFault } from './rings';
-import { dirVector, freeRank, residual, resolveChoices, solveMultiStart, type Constraint } from './solve';
+import { dirVector, freeRank, residual, resolveChoices, solveMultiStart, SOLVE_RESOLUTION, type Constraint } from './solve';
 import { drawnPieceOver } from './extent';
 import { inDomain, isFree, objectById, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
 
@@ -1211,7 +1211,16 @@ export function isKnowledge(
    * solver's own noise as freedom. It stays RELATIVE, so nothing about the honesty rule changes:
    * a quantity that really moves with a free DOF moves by orders of magnitude more than this.
    */
-  return spread <= SAME_VALUE_EPS * scale ? { known: true, value: vals[0] } : { known: false };
+  if (spread <= SAME_VALUE_EPS * scale) return { known: true, value: vals[0] };
+  /**
+   * …and no tighter than the solver's RESOLUTION either (#1259, ADR-AG-136). At a tangency the solves land
+   * within `SOLVE_RESOLUTION` of one another — 7.5e-4 of scale on the operator's figure, above the
+   * value-identity bar — so the value the givens fix exactly (M = (4, 0)) read as unknown while
+   * `knownOptions` read it as four cases. Two values the solver cannot tell apart are one value; the
+   * midpoint of the cluster is the honest number to print, and it rounds to the exact one.
+   */
+  if (spread <= SOLVE_RESOLUTION * scale) return { known: true, value: (Math.max(...vals) + Math.min(...vals)) / 2 };
+  return { known: false };
 }
 
 
@@ -1277,6 +1286,17 @@ export function knownOptions(
     if (distinct.length > OPTION_CAP) return null;
   }
   if (distinct.length < 2) return null;
+  /**
+   * A CLUSTER INSIDE SOLVER RESOLUTION IS NOT AN OPTION SET (#1259, ADR-AG-136 — operator ruling,
+   * 2026-09-20). At a tangency every solve lands within the solver's own resolution of every other and the
+   * value-identity dedup above still read four "cases" out of one point, each with a magnitude nobody gave.
+   * When every member sits within `SOLVE_RESOLUTION` of every other there is nothing to choose between:
+   * answer NOT a set, so the figure routes to `isKnowledge`'s answer and the panel says what it says for a
+   * determined point. Never re-sample instead — measured, the noise set is unstable at 12 → 24 seeds and
+   * stable at 24 → 36, and this runs per point per render.
+   */
+  const withinResolution = (a: number[], b: number[]) => a.every((n, i) => Math.abs(n - b[i]) <= SOLVE_RESOLUTION * scale);
+  if (distinct.every((a) => distinct.every((b) => withinResolution(a, b)))) return null;
   // A STABLE order, so the options do not permute as the student cycles and look like new answers.
   return distinct.sort((a, b) => {
     for (let i = 0; i < a.length; i += 1) {
