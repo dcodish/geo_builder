@@ -33,7 +33,8 @@ describe('#1272 — a rule that matched a noun and never read the tail answers n
     ['נתון מעגל I - x^2+y^2=16', 'the dash read as a sign: a hyperbola labelled circle → out-of-scope'],
     ['נתונה פרבולה I - y^2=2x', 'the dash read as a sign → out-of-scope'],
     // the same class at the other claiming sites — a Hebrew word is not an expression
-    ['שיפוע הישר AB הוא חיובי', 'the slope rule claimed a Hebrew word'],
+    // «שיפוע הישר AB הוא חיובי» left this table with #1323 (ADR-AG-144): the SIGN of a slope is a
+    // sentence the tool now reads, so it is no longer a claim the rule never read — see below.
     ['שטח המשולש ABC הוא גדול', 'the area rule claimed a Hebrew word'],
     ['שיעור ה-x של A הוא שלילי', 'the component rule claimed a Hebrew word'],
     ['האלכסון הראשי: משהו', 'the diagonal-equation rule claimed a Hebrew word'],
@@ -46,6 +47,15 @@ describe('#1272 — a rule that matched a noun and never read the tail answers n
     expect(reachesFallback(v), `${line}: the seam fires`).toBe(true);
     // the refusal is about the student's own sentence, never about a fragment the reader cut
     expect(v.kind === 'refused' && v.error.detail, line).toBe(line);
+  });
+
+  it('«שיפוע הישר AB הוא חיובי» is UNDERSTOOD since #1323 — a sign selector, refused only for the points it names', () => {
+    // The row used to be a Hebrew word the slope rule swallowed; it is now the sign of a slope. With
+    // no A and B the honest answer is the missing points, not "not understood" — and the seam does
+    // not fire for a sentence the tool read.
+    expect(parseLine('שיפוע הישר AB הוא חיובי').ok).toBe(true);
+    expect(codeOf('שיפוע הישר AB הוא חיובי')).toBe('unknown-reference');
+    expect(decideSubmit('שיפוע הישר AB הוא חיובי', ['משולש ABC'], 0).kind).toBe('record');
   });
 
   it('a genuinely owned refusal stays terminal — the seam was not widened', () => {

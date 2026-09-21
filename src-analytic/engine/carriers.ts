@@ -33,7 +33,7 @@
  */
 import { curveParentOf, parentsOf } from './derived';
 import { evalExpr, exprText, symbolsOf, type Env } from './expr';
-import { constraintRefs, dirRefs } from './solve';
+import { constraintRefs, dirRefs, freeDirectionSymbol } from './solve';
 import { UNBOUNDED, type Construction, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
 
 /**
@@ -132,9 +132,13 @@ export function symbolDeps(o: GeoObject): string[] {
       // Its RADIUS is an expression, and that is the one thing it contributes to the register.
       case 'circle-at':
         return symbolsOf(o.r);
-      // A copied direction carries no expression at all — nothing to register (#1093).
-      case 'line-at':
-        return [];
+      // A copied direction carries no expression at all — nothing to register (#1093). A FREE one
+      // (#1319) is a direction parameter, and registering it here is exactly what makes it a free DOF
+      // the sampler moves and the solve can pin — the #1014 rule, applied to a symbol no equation holds.
+      case 'line-at': {
+        const sym = freeDirectionSymbol(o.dir);
+        return sym === null ? [] : [sym];
+      }
       default: {
         const unwalked: never = o;
         throw new Error(`object kind declares no symbol dependencies: ${JSON.stringify(unwalked)}`);
@@ -252,9 +256,32 @@ export function dofCount(c: Construction): number {
  * determinacy signal ([02c R22](../../docs/02c-requirements-analytic.md)) says the opposite of the
  * truth at exactly the moment it matters most.
  */
-export function reportedDof(c: Construction, carrierDof: number): number {
-  return paramRegister(c).length + carrierDof;
+export function reportedDof(_c: Construction, carrierDof: number): number {
+  /**
+   * PARAMETERS ARE INSIDE `carrierDof` NOW (#1317, ADR-AG-144).
+   *
+   * This used to add the register's length to the carriers' residual freedom, because the solve never
+   * moved a parameter: a pinned `k` still counted as one degree of freedom, and the cue said «1» about a
+   * figure the givens had fully determined. The solve vector holds every unknown — free vertices AND
+   * parameters — so `evaluate` reports the freedom left over ALL of them, rank-aware, and a parameter
+   * that a given pins is subtracted exactly as a coordinate is. Kept as the one call every surface
+   * makes, so the definition of "how free is this figure" has one home.
+   */
+  return carrierDof;
 }
+
+/**
+ * THE DIRECTION PARAMETER OF A FREE LINE (#1319, ADR-AG-144) — how its symbol is spelled, and how the
+ * panel tells one from a symbol the student wrote.
+ *
+ * It is a free DOF like a free vertex's coordinates: counted in the cue, moved by «הציגו תצורה אחרת»,
+ * solved when a given pins it. Like those coordinates it is NOT a parameter row — the student never
+ * wrote `θ`, and listing a symbol the tool made up would be an invented name in the givens' own
+ * neighbourhood (#1263's concern). The line's own row shows its equation once the direction is
+ * knowledge, and an open row until then.
+ */
+export const directionSymbol = (lineId: Id): string => `θ_${lineId}`;
+export const isDirectionSymbol = (sym: string): boolean => sym.startsWith('θ_');
 
 // ---------------------------------------------------------------------------
 // PROVENANCE — what the student's own givens say about one point (#1032)

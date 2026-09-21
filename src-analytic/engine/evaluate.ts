@@ -20,9 +20,9 @@ import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
 import { apart } from './crossings';
-import { dirVector, freeRank, residual, resolveChoices, solveMultiStart, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint } from './solve';
+import { dirVector, freeRank, residual, resolveChoices, solveLM, solveMultiStart, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
 import { drawnPieceOver } from './extent';
-import { inDomain, isFree, objectById, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
+import { curveByName, inDomain, isFree, objectById, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type Selector } from './types';
 
 export interface FigurePoint {
   id: Id;
@@ -340,24 +340,68 @@ function place(c: Construction, env: Env, free: Map<Id, Pt>): Map<Id, Pt> {
 export interface CarrierSystem {
   /** The free vertices, in the order their coordinates occupy the vector (two entries each). */
   ids: Id[];
-  /** Positions → vector, and back. */
-  toVec: (free: Map<Id, Pt>) => number[];
+  /**
+   * The PARAMETERS in the vector, after the vertices — one entry each (#1317, ADR-AG-144).
+   *
+   * Empty when the caller asked for them FIXED (the locus tracer, which walks a point's freedom at
+   * one configuration of the parameters — #1186's question is deliberately left where it was).
+   */
+  syms: string[];
+  /** Positions (and the environment's parameter values) → vector, and back. */
+  toVec: (free: Map<Id, Pt>, env?: Env) => number[];
   asMap: (x: number[]) => Map<Id, Pt>;
+  /** The environment at these vector values — the sampled one with the solved parameters written in. */
+  envAt: (x: number[]) => Env;
   /** Every object's position at these carrier values — derived points included. */
   positionsAt: (x: number[]) => Map<Id, Pt>;
   /** The constraint residuals there. Empty when the figure states none. */
   residualsAt: (x: number[]) => number[];
 }
 
-export function carrierSystem(c: Construction, env: Env): CarrierSystem {
+/**
+ * THE SOLVE VECTOR HOLDS EVERY UNKNOWN — free vertices AND parameters (#1317, ADR-AG-144).
+ *
+ * Before this the unknown vector was the free vertices alone, and a parameter was a constant the seed
+ * had drawn: «N על הישר l3» on `(k+1)x+2y-12+5k=0` had a residual that depended on `k`, was evaluated
+ * at whatever `k` the seed drew, and could not be driven to zero by any step the solver was able to take
+ * — `unsatisfiable` was the honest report of a solve that was never given the unknown. The tree's own
+ * contract had said since day one that *"pinning a parameter is a numeric root-find"*; it was simply
+ * not wired. The class is *every given that determines a parameter* — an incidence, a slope, an area
+ * over a point written `A(-9a, 0)` — so the fix is the vector, not any rule.
+ *
+ * `params: 'fixed'` keeps the old shape for the locus tracer: it walks a NAMED POINT's freedom at one
+ * configuration of the figure's parameters, and letting the walk turn a parameter would make a 1-DOF
+ * locus into a 2-DOF surface. Whether a parameterised locus should sweep its parameter is #1186, and
+ * it is answered there, not here by accident.
+ */
+export function carrierSystem(
+  c: Construction,
+  env: Env,
+  opts: { params: 'solve' | 'fixed' } = { params: 'solve' },
+): CarrierSystem {
   const ids = freeIds(c);
+  const syms = opts.params === 'solve' ? paramRegister(c).map((p) => p.sym) : [];
+  const base = 2 * ids.length;
   const asMap = (x: number[]) =>
     new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
-  const positionsAt = (x: number[]) => place(c, env, asMap(x));
+  const envAt = (x: number[]): Env => {
+    if (syms.length === 0) return env;
+    const out: Record<string, number> = { ...env };
+    syms.forEach((sym, j) => {
+      out[sym] = x[base + j];
+    });
+    return out;
+  };
+  const positionsAt = (x: number[]) => place(c, envAt(x), asMap(x));
   return {
     ids,
+    syms,
     asMap,
-    toVec: (free) => ids.flatMap((id) => [free.get(id)!.x, free.get(id)!.y]),
+    envAt,
+    toVec: (free, at = env) => [
+      ...ids.flatMap((id) => [free.get(id)!.x, free.get(id)!.y]),
+      ...syms.map((sym) => at[sym] ?? env[sym] ?? 0),
+    ],
     positionsAt,
     /**
      * `lineAtOf` is threaded here, not only at the call sites (#1201 meets #1137).
@@ -374,13 +418,46 @@ export function carrierSystem(c: Construction, env: Env): CarrierSystem {
      * predicted exactly this: *"the branch predates #1201 — a rebase changes what a locus is."*
      */
     residualsAt: (x) => {
+      const e = envAt(x);
       const pos = positionsAt(x);
       const at = (id: Id) => pos.get(id) ?? null;
       return c.constraints.flatMap(
-        (k) => residual(k, at, env, curveAtOf(c, env, at), lineAtOf(c, env, at)) ?? [0],
+        (k) => residual(k, at, e, curveAtOf(c, e, at), lineAtOf(c, e, at)) ?? [0],
       );
     },
   };
+}
+
+/**
+ * A `line-at` as the `NumCurve` it is in this configuration (#1093; #1319 for the free direction).
+ *
+ * One reading for the object walk AND the curve resolver, so a line constructed through a point can be
+ * crossed, measured against and asked about exactly as a stated line is — «A נקודת החיתוך של הישר l4
+ * עם הישר 1» needs `curveAtOf` to answer for `l4`, and before this it answered only for equations.
+ *
+ * `null` is a VACANCY, not an error: the anchor may not be placed yet, and a direction read from
+ * something unplaced (or a free angle no environment carries) is a line that does not exist at this
+ * configuration.
+ */
+function lineAtCurve(
+  c: Construction,
+  env: Env,
+  at: (id: Id) => Pt | null,
+  o: Extract<GeoObject, { kind: 'line-at' }>,
+): NumCurve | null {
+  const p0 = at(o.through);
+  const along = p0 ? dirVector(o.dir, at, curveAtOf(c, env, at), env) : null;
+  // The perpendicular reading is the same construction a quarter turn on. Rotating the RESOLVED
+  // vector keeps `Direction` a pure reference to something in the figure — it names an object, and
+  // "that object turned 90°" is not an object.
+  const v = along && (o.perp ? { x: -along.y, y: along.x } : along);
+  if (!p0 || !v) return null;
+  // Through `(px, py)` with direction `(vx, vy)`: the normal is `(vy, -vx)`, so the line is
+  // `vy·x − vx·y + (vx·py − vy·px) = 0`. NORMALISED — one line, one triple (`normalizedLine`, #1201):
+  // a free direction's angle may land on θ or θ + π at different configurations, and the raw triple
+  // flips sign with it, which read to the knowledge gate as a line that moves when it does not.
+  const n = normalizedLine(v.y, -v.x, v.x * p0.y - v.y * p0.x);
+  return n ? { kind: 'line', ...n } : null;
 }
 
 /** Carrier freedom left after the constraints — `carriers − rank(J)`, so dependent givens do not
@@ -418,6 +495,9 @@ export function curveAtOf(c: Construction, env: Env, at?: (id: Id) => Pt | null)
       if (!centre || !Number.isFinite(r) || r <= 0) return null;
       return { kind: 'circle', cx: centre.x, cy: centre.y, r };
     }
+    // A line CONSTRUCTED through a point is a curve to every constraint that names one (#1319) — the
+    // exam's «A נקודת החיתוך של הישר l4 עם הישר 1» is an incidence on a `line-at`.
+    if (o.kind === 'line-at') return at ? lineAtCurve(c, env, at, o) : null;
     if (o.kind !== 'curve') return null;
     const res = resolveCurve(o.curve, env);
     return res.ok ? res.curve : null;
@@ -441,9 +521,8 @@ export function lineAtOf(c: Construction, env: Env, at: (id: Id) => Pt | null): 
     lineByName(
       name,
       (n: string) => {
-        const o = c.objects.find(
-          (q) => q.kind === 'curve' && (q.label.name === n || q.id === `line-${n}` || q.id === `circle-${n}`),
-        );
+        // The ONE by-name lookup (ADR-AG-144): a constructed line answers to its name here too.
+        const o = curveByName(c, n);
         return o ? curves(o.id) : null;
       },
       at,
@@ -468,16 +547,16 @@ function segmentLabel(
   return pinned.get(pairKey(ends[0], ends[1]));
 }
 
-function carrierDofOf(c: Construction, env: Env, free: Map<Id, Pt>, ids: Id[]): number {
-  if (ids.length === 0) return 0;
-  if (c.constraints.length === 0) return 2 * ids.length;
-  const vec = ids.flatMap((id) => [free.get(id)!.x, free.get(id)!.y]);
-  const asMap = (x: number[]) =>
-    new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
-  return freeRank(vec, (x) => {
-    const pos = place(c, env, asMap(x));
-    return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null), lineAtOf(c, env, (id) => pos.get(id) ?? null)) ?? [0]);
-  });
+/**
+ * The figure's freedom LEFT after the constraints, over EVERY unknown — free vertices and parameters
+ * (#1317, ADR-AG-144) — as `unknowns − rank(J)`, so a parameter a given pins is subtracted exactly as a
+ * coordinate is, and a dependent given still over-counts nothing. This is what `reportedDof` reports.
+ */
+function figureDofOf(c: Construction, sys: CarrierSystem, x: number[]): number {
+  const n = 2 * sys.ids.length + sys.syms.length;
+  if (n === 0) return 0;
+  if (c.constraints.length === 0) return n;
+  return freeRank(x, sys.residualsAt);
 }
 
 /**
@@ -487,7 +566,7 @@ function carrierDofOf(c: Construction, env: Env, free: Map<Id, Pt>, ids: Id[]): 
  * solve already produced, and a configuration that fails them asks for a different seed rather than
  * reporting a contradiction (D7 kind 2).
  */
-function selectorsHold(c: Construction, at: Map<Id, Pt>): boolean {
+function selectorsHold(c: Construction, at: Map<Id, Pt>, env: Env): boolean {
   /**
    * The scale the DISTINCT test is measured against (#1077).
    *
@@ -509,6 +588,23 @@ function selectorsHold(c: Construction, at: Map<Id, Pt>): boolean {
   const apart = span * 1e-2;
 
   return c.selectors.every((s) => {
+    /**
+     * THE SIGN OF A DERIVED QUANTITY (#1323, ADR-AG-144) — «שיפוע הישר l1 שלילי».
+     *
+     * Judged inside validity, like every selector, so a configuration whose slope has the wrong sign is
+     * not a figure this tool draws: `drawableAt` walks past it, and a figure with no freedom left is
+     * reported on the sentence (the #1071 predicate `derive` already applies). A VERTICAL direction has
+     * no slope, so a sign given about it does not hold — false, never "cannot be judged": the student
+     * stated a sign, and a line with no slope contradicts it.
+     */
+    if (s.kind === 'sign') {
+      const atFn = (id: Id) => at.get(id) ?? null;
+      const v = dirVector(s.q.u, atFn, curveAtOf(c, env, atFn), env);
+      if (!v) return true; // an operand that is not placed yet judges nothing, as below
+      if (Math.abs(v.x) < 1e-9 * Math.hypot(v.x, v.y)) return false;
+      const positive = v.x * v.y > 0;
+      return s.positive ? positive : !positive;
+    }
     if (s.kind === 'distinct') {
       const ps = s.ids.map((id) => at.get(id));
       // A selector about an absent point judges nothing, as below.
@@ -583,7 +679,73 @@ export interface SolveReport {
   unsatisfied: Constraint[];
 }
 
+/**
+ * A SIGN SELECTOR SEEDS THE FREE DIRECTION IT JUDGES (#1323, the #1071 shape for a parameter).
+ *
+ * «דרך B עובר ישר l5» · «שיפוע הישר l5 שלילי»: the direction is a free angle, and the sign says which
+ * half of its range the student meant. Folding the sign into the sample costs nothing, keeps the seed's
+ * own magnitude — so «הציגו תצורה אחרת» still turns the line, inside its half — and starts the solve in
+ * the basin the sentence names, which is the #818 lesson: a filter that only rejects can be left with
+ * nothing but configurations that contradict the given. The post-hoc check is unchanged and still has
+ * the last word. Applied to the seed's sample and to every re-sample the solve tries.
+ */
+/**
+ * THE FREE ANGLE A SIGN SELECTOR JUDGES, if it judges one (#1323). «שיפוע הישר l5 שלילי» names the LINE, so
+ * the selector's direction is the curve `line-l5` — and that curve is a `line-at` whose direction is a free
+ * angle. Seeding and root selection must reach that angle through the name, or they never fire on the
+ * exam's own sentence (measured: they did not, and the sign held at 22 of 24 seeds by the walk's luck).
+ * A perpendicular construction inverts the sign and is not reached here; the post-hoc check still judges it.
+ */
+function freeAngleOf(c: Construction, sel: Extract<Selector, { kind: 'sign' }>): string | null {
+  const u = sel.q.u;
+  if (u.k === 'free') return u.sym;
+  if (u.k !== 'curve') return null;
+  const o = objectById(c, u.id);
+  if (!o || o.kind !== 'line-at' || o.dir.k !== 'free' || o.perp) return null;
+  return o.dir.sym;
+}
+
+function foldSignSelectors(c: Construction, env: Env): Env {
+  let out = env;
+  for (const sel of c.selectors) {
+    if (sel.kind !== 'sign') continue;
+    const sym = freeAngleOf(c, sel);
+    if (sym === null) continue;
+    const theta = out[sym];
+    if (theta === undefined || !Number.isFinite(theta)) continue;
+    // Reduce to [0, π) — a direction is periodic in π — then put it in the half the sign names: a
+    // positive slope is an angle in (0, π/2), a negative one in (π/2, π).
+    const reduced = ((theta % Math.PI) + Math.PI) % Math.PI;
+    const isPositive = reduced > 0 && reduced < Math.PI / 2;
+    if (isPositive !== sel.positive) out = { ...out, [sym]: Math.PI - reduced };
+  }
+  return out;
+}
+
+/**
+ * ONE EVALUATION PER (CONSTRUCTION, SEED) — the drawable walk and the knowledge gates share it (ADR-AG-144).
+ *
+ * `drawableAt` with the spread preference walks the seeds looking for an open ring, and on a DETERMINED
+ * figure whose one triangle is narrow it walks all twenty-four; `distinctConfigSeeds` then evaluates the
+ * same twenty-four for the panel. `evaluate` is pure over its two arguments, so the second walk is the
+ * first one's work done again. Keyed weakly on the construction, which every consumer of one derivation
+ * shares, so the memo lives exactly as long as the figure it describes.
+ */
+const evaluateMemo = new WeakMap<Construction, Map<number, Figure>>();
 export function evaluate(raw: Construction, seed = 0): Figure {
+  let perSeed = evaluateMemo.get(raw);
+  if (!perSeed) {
+    perSeed = new Map();
+    evaluateMemo.set(raw, perSeed);
+  }
+  const hit = perSeed.get(seed);
+  if (hit) return hit;
+  const out = evaluateUncached(raw, seed);
+  perSeed.set(seed, out);
+  return out;
+}
+
+function evaluateUncached(raw: Construction, seed = 0): Figure {
   /**
    * DISCRETE freedom is resolved HERE, once, before anything measures a constraint (#1049).
    *
@@ -605,7 +767,7 @@ export function evaluate(raw: Construction, seed = 0): Figure {
     k.t === 'on-line-2pt' && k.crossing && !k.bounded && drawnPieceOver(raw, k.a, k.b) ? { ...k, bounded: true } : k,
   );
   const c: Construction = { ...raw, constraints: resolveChoices(bound, seed) };
-  const env = sampleEnv(c, seed);
+  let env = foldSignSelectors(c, sampleEnv(c, seed));
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];
   const segments: FigureSegment[] = [];
@@ -697,12 +859,31 @@ export function evaluate(raw: Construction, seed = 0): Figure {
 
   const unsatisfied: Constraint[] = [];
   let free = seeded;
-  let sys: CarrierSystem | null = null;
+  // Built unconditionally (#1317): the DOF report is rank over the SAME vector the solve moves, and a
+  // figure with parameters and no free vertex still has unknowns to count.
+  const sys: CarrierSystem = carrierSystem(c, env);
+  let solvedVec: number[] = sys.toVec(seeded, env);
 
-  if (ids.length > 0 && c.constraints.length > 0) {
+  /**
+   * TWO STAGES: the vertices first, the parameters only when the vertices cannot (#1317, ADR-AG-144).
+   *
+   * A parameter in the vector is a knob, and a least-squares descent reaches for every knob it has.
+   * Measured on «A(0,0)» · «B(8a,0)» · «נקודה M» · «MA = MB»: solved jointly from the seed, the descent
+   * drove `a` to 0 — B onto A, where |MA| = |MB| holds for every M — and drew the collapsed figure as
+   * the configuration. Nothing had asked for `a` to move: M alone satisfies the given. So the first
+   * stage is the solve as it always was, over the free vertices with every parameter held at its
+   * sample, and a figure that converges there keeps its sampled parameters exactly as before — an
+   * unpinned parameter stays the seed's, and «הציגו תצורה אחרת» still moves it. Only when that solve
+   * does NOT converge do the parameters join the vector, from the same starts: that is the case the
+   * old solve could never reach — a given that DETERMINES a parameter — and it is the only case in
+   * which moving one is honest.
+   */
+  const stageOne = carrierSystem(c, env, { params: 'fixed' });
+  let converged = false;
+
+  if ((ids.length > 0 || sys.syms.length > 0) && c.constraints.length > 0) {
     // Through `carrierSystem` (#1137) so the locus tracer walks the SAME residuals this solves.
-    const solved = carrierSystem(c, env);
-    sys = solved;
+    const solved = sys;
     /**
      * SEVERAL STARTS, first convergence wins (#1287, ADR-AG-134).
      *
@@ -736,8 +917,141 @@ export function evaluate(raw: Construction, seed = 0): Figure {
       }
       starts.push(m);
     }
-    const res = solveMultiStart(starts.map((m) => solved.toVec(m)), solved.residualsAt);
-    free = solved.asMap(res.values);
+    /**
+     * PARAMETER RESTARTS (#1317). A pin with two roots (`a² = 4`) is reached from two basins, and a
+     * parameter's basin is decided by where its start sits: the seeded value goes first (a solve that
+     * lands from it costs exactly what it did), and only if nothing converges are the parameters
+     * re-sampled at other seeds — so a root the first sample cannot reach is still reachable, and
+     * successive configurations walk the roots (ADR-AG-047's branch question, answered by the seed
+     * exactly as the crossing's is).
+     */
+    // STAGE ONE — the vertices, parameters fixed at their sample. With no parameters the two vectors
+    // are the same vector, and stage one IS the solve.
+    let firstEffort: Map<Id, Pt> | null = null;
+    if (ids.length > 0) {
+      // With parameters in the figure, stage one is a QUESTION — can the vertices alone do it? — and
+      // a question with a bounded budget: a vertex-only solve that converges does so in a few dozen
+      // steps, and one that cannot (a parameter the givens pin) would otherwise spend the full budget
+      // on every start of the multi-start, at every seed. Stage two continues from its effort.
+      // …and asked from the SEEDED start alone when parameters exist: the restarts (a bounded crossing's
+      // quarter points, the seed pushed off itself) are stage two's attempts, walked in the student's order.
+      // A figure with no parameters keeps the multi-start as it always was.
+      const budget = solved.syms.length > 0 ? 40 : 120;
+      const vertexStarts = solved.syms.length > 0 ? [starts[0]] : starts;
+      const first = solveMultiStart(vertexStarts.map((m) => stageOne.toVec(m)), stageOne.residualsAt, budget);
+      firstEffort = stageOne.asMap(first.values);
+      if (first.ok || solved.syms.length === 0) {
+        converged = true;
+        free = firstEffort;
+        solvedVec = solved.toVec(free, env);
+      }
+    }
+    // STAGE TWO — every unknown, only when the vertices alone could not satisfy the givens.
+    if (!converged) {
+      const domains = new Map(paramRegister(c).map((p) => [p.sym, p.domain] as const));
+      // A DOMAIN filters a pin's roots silently (D7 kind 1): a converged solve that drove a parameter
+      // out of its declared domain is not an answer — the next attempt is tried. A SIGN about a free
+      // direction is the same kind of preference over attempts (the seeding, applied to the result): a
+      // root with the wrong sign is not the one the sentence names; the post-hoc check keeps the last word.
+      const admissible = (x: number[]) => {
+        const e = solved.envAt(x);
+        if (!solved.syms.every((sym) => inDomain(domains.get(sym) ?? {}, e[sym]))) return false;
+        for (const sel of c.selectors) {
+          if (sel.kind !== 'sign') continue;
+          const sym = freeAngleOf(c, sel);
+          if (sym === null) continue;
+          const theta = e[sym];
+          if (theta === undefined || !Number.isFinite(theta)) continue;
+          if ((Math.tan(theta) > 0) !== sel.positive) return false;
+        }
+        return true;
+      };
+      /**
+       * IN THE STUDENT'S ORDER, ONE GIVEN AT A TIME, FROM EACH SAMPLE OF THE PARAMETERS (ADR-AG-144).
+       *
+       * A joint descent over a dozen unknowns from a compromised start goes to a bad basin at a third of
+       * the seeds — measured on the 572 figure: the second free line spun to the far root, the sign filter
+       * rejected it, and every restart landed in the valley where C sits far out and the area is nearly
+       * met. Each given ADDED to a state consistent with the ones before it is a small perturbation the
+       * descent absorbs in a few steps — that is how the figure was typed, and how the 2-D fold replays
+       * it. So the constraints are walked in application order from stage one's effort, each solve
+       * warm-started from the last, then polished against the whole system; and the walk is repeated
+       * from the parameters re-sampled at other seeds (a sign folded into each), so a root the first
+       * sample does not reach is still reached. The joint multi-start remains the fallback.
+       */
+      const attempts: Env[] = [env];
+      for (let salt = 1; salt <= 3; salt += 1) {
+        attempts.push(foldSignSelectors(c, { ...env, ...sampleEnv(c, seed + 1000 * salt) }));
+      }
+      const state: { best: SolveResult | null; accepted: boolean } = { best: null, accepted: false };
+      const walk = (start: Map<Id, Pt>, attempt: Env): SolveResult => {
+        let x = solved.toVec(start, attempt);
+        for (let i = 1; i <= c.constraints.length; i += 1) {
+          const prefix = carrierSystem({ ...c, constraints: c.constraints.slice(0, i) }, attempt);
+          x = solveLM(x, prefix.residualsAt, 60).values;
+        }
+        return solveLM(x, solved.residualsAt);
+      };
+      const consider = (r: SolveResult): boolean => {
+        if (r.ok && admissible(r.values)) {
+          state.best = r;
+          state.accepted = true;
+          return true;
+        }
+        if (!state.best || r.worst < state.best.worst) state.best = { ...r, ok: false };
+        return false;
+      };
+      for (const [j, attempt] of attempts.entries()) {
+        // The first walk starts from stage one's effort; a RETRY starts its vertices afresh from the
+        // seed. Measured: a retry that kept the effort's vertices kept its far-flung crossing too, and
+        // the walk turned the free line parallel to that crossing's line — the pole — at every retry.
+        const r = walk(j === 0 ? (firstEffort ?? seeded) : starts[Math.min(j, starts.length - 1)], attempt);
+        if (consider(r)) break;
+        /**
+         * A CONVERGED SOLUTION WITH THE WRONG SIGN is one root away, not one figure away. Re-sampling
+         * every parameter throws the rest of the figure back to the seed; what the sign rejected is
+         * one angle, so that angle alone is re-seeded at spread points inside its half — the two roots
+         * of the exam's part (ג) are slopes −4 and +0.12, and the boundary between their basins falls
+         * inside the "negative" half — and the walk resumes from the converged figure.
+         */
+        if (r.ok) {
+          const e = solved.envAt(r.values);
+          const wrong: Array<{ sym: string; positive: boolean }> = [];
+          for (const sel of c.selectors) {
+            if (sel.kind !== 'sign') continue;
+            const sym = freeAngleOf(c, sel);
+            if (sym === null || !Number.isFinite(e[sym])) continue;
+            if ((Math.tan(e[sym]) > 0) !== sel.positive) wrong.push({ sym, positive: sel.positive });
+          }
+          if (wrong.length > 0) {
+            let found = false;
+            for (const frac of [0.5, 0.25, 0.75]) {
+              let reseeded: Env = e;
+              for (const sel of wrong) {
+                const half = sel.positive ? 0 : Math.PI / 2;
+                reseeded = { ...reseeded, [sel.sym]: half + (Math.PI / 2) * frac };
+              }
+              if (consider(walk(solved.asMap(r.values), reseeded))) {
+                found = true;
+                break;
+              }
+            }
+            if (found) break;
+          }
+        }
+      }
+      if (!state.accepted) {
+        const vecs: number[][] = [];
+        if (firstEffort) vecs.push(solved.toVec(firstEffort, env));
+        vecs.push(...starts.map((m) => solved.toVec(m, env)));
+        const r = solveMultiStart(vecs, solved.residualsAt, 120, admissible);
+        if (r.ok || !state.best || r.worst < state.best.worst) state.best = r;
+      }
+      const res = state.best!;
+      free = solved.asMap(res.values);
+      env = solved.envAt(res.values);
+      solvedVec = res.values;
+    }
   }
 
   /**
@@ -788,13 +1102,13 @@ export function evaluate(raw: Construction, seed = 0): Figure {
    * rule of ADR-492: the statement that completed the contradiction), so the fold names the student's
    * own sentence. Sound one way only: a re-solve that does not collapse changes nothing.
    */
-  if (unsatisfied.length === 0 && sys && c.constraints.length > 0) {
+  if (unsatisfied.length === 0 && c.constraints.length > 0 && (ids.length > 0 || sys.syms.length > 0)) {
     const pos0 = place(c, env, free);
     const thin = thinRingsOf(c, (id) => pos0.get(id));
     if (thin.length > 0) {
       const system = sys;
-      const tight = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveMultiStart([system.toVec(free)], system.residualsAt));
-      const posT = place(c, env, system.asMap(tight.values));
+      const tight = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveMultiStart([system.toVec(free, env)], system.residualsAt));
+      const posT = place(c, system.envAt(tight.values), system.asMap(tight.values));
       const collapsed = new Set(ringFaultsOf(c, (id) => posT.get(id)).filter((f) => f.violation === 'degenerate').map((f) => f.id));
       for (const ring of thin) {
         if (!collapsed.has(ring.id)) continue;
@@ -938,21 +1252,12 @@ export function evaluate(raw: Construction, seed = 0): Figure {
        * already reports honestly.
        */
       case 'line-at': {
-        const p0 = at(o.through);
-        const along = p0 ? dirVector(o.dir, at, curveAtOf(c, env, at)) : null;
-        // The perpendicular reading is the same construction a quarter turn on. Rotating the
-        // RESOLVED vector keeps `Direction` a pure reference to something in the figure — it names
-        // an object, and "that object turned 90°" is not an object.
-        const v = along && (o.perp ? { x: -along.y, y: along.x } : along);
-        if (p0 && v) {
-          // Through `(px, py)` with direction `(vx, vy)`: the normal is `(vy, -vx)`, so the line is
-          // `vy·x − vx·y + (vx·py − vy·px) = 0`.
-          curves.push({
-            id: o.id,
-            label: { name: '', kind: 'line' },
-            curve: { kind: 'line', a: v.y, b: -v.x, c: v.x * p0.y - v.y * p0.x },
-            stated: true,
-          });
+        // One reading with the curve resolver (`lineAtCurve`), so the line drawn is the line the
+        // constraints were measured against. The NAME rides on the label (#1319), so the panel lists it
+        // and a crossing ring can offer a sentence about it.
+        const curve = lineAtCurve(c, env, at, o);
+        if (curve) {
+          curves.push({ id: o.id, label: { name: o.name ?? '', kind: 'line' }, curve, stated: true });
         } else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
@@ -974,7 +1279,7 @@ export function evaluate(raw: Construction, seed = 0): Figure {
     construction,
     vacant,
     unsatisfied,
-    selectorsOk: selectorsHold(c, placed),
+    selectorsOk: selectorsHold(c, placed, env),
     /**
      * Read from the POINTS this evaluation just produced, so the ring judged is the ring drawn
      * (#1158, #1166). A vertex that did not resolve leaves its polygon unjudged — that is a vacancy
@@ -987,7 +1292,7 @@ export function evaluate(raw: Construction, seed = 0): Figure {
         return p ? { x: p.x, y: p.y } : undefined;
       },
     ),
-    carrierDof: carrierDofOf(c, env, free, ids),
+    carrierDof: figureDofOf(c, sys, solvedVec),
     provenance: Object.fromEntries(
       points.map((p) => [p.id, provenanceOf(c, p.id, env, curves) ?? { x: { known: false }, y: { known: false } }]),
     ),
@@ -1152,8 +1457,17 @@ export function drawableAt(
   let wholeSeparated: Figure | null = whole(first) && (!preferSpread || separated(first)) ? first : null;
   let wholeFallback: Figure | null = whole(first) ? first : null;
   let fallback: Figure | null = first.selectorsOk ? first : null;
+  /**
+   * A DETERMINED figure that is whole but narrow has nowhere to walk TO (ADR-AG-144): with no freedom
+   * left, another seed can reach only another ROOT of the same givens, and a prettier root is found
+   * within a few seeds or not at all (#1174 measured a valid ring within 7 extra seeds from every
+   * start). Walking all twenty-four cost the 572 figure — fifteen lines, three parameters, one narrow
+   * triangle the givens fix — two seconds per derivation for a walk that could change nothing. The
+   * budget is a PREFERENCE's budget; validity (a non-whole first figure) keeps the full walk.
+   */
+  const budget = whole(first) && first.carrierDof === 0 ? 8 : DRAWABLE_TRIES;
   if (!preferred(first)) {
-    for (let extra = 1; extra <= DRAWABLE_TRIES; extra += 1) {
+    for (let extra = 1; extra <= budget; extra += 1) {
       const candidate = evaluate(c, seed + extra);
       if (preferred(candidate)) {
         chosen = candidate;
@@ -1410,7 +1724,11 @@ export function knownCurve(
   seeds: readonly number[] = [0, 1, 2],
 ): NumCurve | null {
   const read = (f: Figure) => f.curves.find((q) => q.id === id)?.curve ?? null;
-  const first = read(evaluate(c, seeds[0]));
+  // The SAME figures the gate judges (ADR-AG-126): the value returned is read from the drawable
+  // configuration at the first seed, never from a raw seed the tool would not show — measured on the
+  // 572 figure, the raw seed 0 had not converged and its slope was 5e-5 off the one every drawable
+  // configuration agreed on (#1317).
+  const first = read(drawableAt(c, seeds[0]));
   if (!first) return null;
   for (const field of Object.keys(first) as Array<keyof NumCurve>) {
     if (typeof first[field] !== 'number') continue; // `kind` — the discriminant, not a coefficient

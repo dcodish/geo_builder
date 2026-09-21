@@ -32,7 +32,7 @@ import {
   lengthRefs,
   type LengthExpr,
 } from './lengths';
-import type { Pt } from './derived';
+import { curveParentOf, evalRule, parentsOf, type DerivedRule, type Pt } from './derived';
 import type { Expr } from './expr';
 
 /**
@@ -61,7 +61,14 @@ export type Direction =
   /** An axis. Carries no point, and needs none: its direction is fixed. */
   | { k: 'axis'; axis: 'x' | 'y' }
   /** A named line — `ℓ1`, `AC`. Its direction comes from the resolved equation. */
-  | { k: 'curve'; id: Id };
+  | { k: 'curve'; id: Id }
+  /**
+   * A FREE direction — «דרך N עובר ישר» (#1319, ADR-AG-144): the angle is a parameter in the register,
+   * read from the environment. Sampled like any unstated magnitude and SOLVED like any parameter once
+   * a later given pins it. The angle is unbounded (a direction is periodic in π), which is what keeps
+   * the domain filter out of it.
+   */
+  | { k: 'free'; sym: string };
 
 export type Constraint =
   /** `A(6,4)` on a point that is not free to be replaced — one or both coordinates pinned. */
@@ -205,6 +212,17 @@ export type Constraint =
    * needs and it keeps this kind independent of how the circle was stated.
    */
   | { t: 'tangent-axis'; centre: Id; r: Expr; axis: 'x' | 'y' }
+  /**
+   * A DERIVATION RESTATED ABOUT AN EXISTING POINT — «M אמצע AB» when `M` is already the y-axis crossing
+   * (#1320, ADR-AG-144; #1046's converse, which the M1 boundary never got).
+   *
+   * As a definition «M אמצע AB» is a 0-DOF closed form (`derived.ts`). About a point that already exists
+   * it is a CONSTRAINT: M's position equals what the rule computes from its parents, two residuals over
+   * whatever is still free — in the exam, the direction of the line that put A and B where they are.
+   * ONE residual arm serves every `DerivedRule` (the target is `evalRule`'s answer), so «O מרכז המעגל»
+   * or «M מפגש התיכונים» about an existing point is the same statement and not a per-rule list.
+   */
+  | { t: 'derived-at'; id: Id; rule: DerivedRule }
   | { t: 'choice'; options: Constraint[] };
 
 /**
@@ -247,7 +265,7 @@ export function resolveChoices(ks: readonly Constraint[], seed: number): Constra
  */
 export function canonicalConstraint(k: Constraint): string {
   const dir = (d: Direction): string =>
-    d.k === 'points' ? `p:${[d.a, d.b].sort().join(',')}` : d.k === 'axis' ? `a:${d.axis}` : `c:${d.id}`;
+    d.k === 'points' ? `p:${[d.a, d.b].sort().join(',')}` : d.k === 'axis' ? `a:${d.axis}` : d.k === 'curve' ? `c:${d.id}` : `f:${d.sym}`;
   if (k.t === 'relation') {
     // Both relations are symmetric in their operands: `u ∥ v` is `v ∥ u`, and likewise for ⊥.
     const [u, v] = [dir(k.u), dir(k.v)].sort();
@@ -290,11 +308,37 @@ export function constraintRefs(k: Constraint): Id[] {
     // are involved, and a carrier any option could move must be searched over.
     case 'tangent-axis':
       return [k.centre];
+    case 'derived-at':
+      return [k.id, ...parentsOf(k.rule)];
     case 'choice':
       return [...new Set(k.options.flatMap(constraintRefs))];
     default: {
       const unreferenced: never = k;
       throw new Error(`constraint declares no refs: ${JSON.stringify(unreferenced)}`);
+    }
+  }
+}
+
+/** A derived rule, in the student's terms — for a refusal about a restated derivation. */
+function describeRule(r: DerivedRule): string {
+  switch (r.t) {
+    case 'midpoint':
+      return `אמצע ${r.a}${r.b}`;
+    case 'centroid':
+      return `מפגש התיכונים ${r.v.join('')}`;
+    case 'incentre':
+      return `מפגש חוצי הזוויות ${r.v.join('')}`;
+    case 'orthocentre':
+      return `מפגש הגבהים ${r.v.join('')}`;
+    case 'circumcentre':
+      return `מפגש האנכים האמצעיים ${r.v.join('')}`;
+    case 'diagonals':
+      return `מפגש האלכסונים ${r.v.join('')}`;
+    case 'circle-centre':
+      return `מרכז ${r.curve}`;
+    default: {
+      const undescribed: never = r;
+      throw new Error(`rule has no description: ${JSON.stringify(undescribed)}`);
     }
   }
 }
@@ -324,6 +368,8 @@ export function describeConstraint(k: Constraint): string {
       return `${k.id} על ${k.a}${k.b}`;
     case 'tangent-axis':
       return `${k.centre} משיק לציר ${k.axis}`;
+    case 'derived-at':
+      return `${k.id} = ${describeRule(k.rule)}`;
     case 'choice':
       return k.options.map(describeConstraint).join(' או ');
     default: {
@@ -364,6 +410,10 @@ export function constraintCurveRefs(k: Constraint): Id[] {
       return [...ofDir(k.u), ...ofDir(k.v)];
     case 'slope':
       return ofDir(k.u);
+    case 'derived-at': {
+      const parent = curveParentOf(k.rule);
+      return parent === null ? [] : [parent];
+    }
     case 'choice':
       return [...new Set(k.options.flatMap(constraintCurveRefs))];
     default:
@@ -380,6 +430,7 @@ export function dirRefs(d: Direction): Id[] {
       return [d.a, d.b];
     case 'axis':
     case 'curve':
+    case 'free':
       return [];
     default: {
       const unreferenced: never = d;
@@ -387,6 +438,9 @@ export function dirRefs(d: Direction): Id[] {
     }
   }
 }
+
+/** The symbol a FREE direction reads from the environment, or `null` for any other direction. */
+export const freeDirectionSymbol = (d: Direction): string | null => (d.k === 'free' ? d.sym : null);
 
 /** Named in the student's own terms, so a refusal can quote the statement. */
 function describeDir(d: Direction): string {
@@ -397,6 +451,8 @@ function describeDir(d: Direction): string {
       return `ציר ה-${d.axis}`;
     case 'curve':
       return d.id;
+    case 'free':
+      return 'ישר';
     default: {
       const undescribed: never = d;
       throw new Error(`direction has no description: ${JSON.stringify(undescribed)}`);
@@ -418,9 +474,18 @@ export function dirVector(
   d: Direction,
   at: (id: Id) => Pt | null,
   curveAt?: (id: Id) => NumCurve | null,
+  /** The environment, for a FREE direction's angle (#1319). A caller without one cannot judge it. */
+  env?: Env,
 ): Pt | null {
   let v: Pt | null = null;
   switch (d.k) {
+    case 'free': {
+      // The angle is a parameter: sampled by the seed, moved by the solve. Read at every iterate, so
+      // the line turns as the solver turns it — the whole point of putting it in the vector.
+      const theta = env?.[d.sym];
+      if (theta === undefined || !Number.isFinite(theta)) return null;
+      return { x: Math.cos(theta), y: Math.sin(theta) };
+    }
     case 'points': {
       const a = at(d.a);
       const b = at(d.b);
@@ -543,15 +608,15 @@ export function residual(
       return [(u.x * v.x + u.y * v.y) / n];
     }
     case 'relation': {
-      const u = dirVector(k.u, at, curveAt);
-      const v = dirVector(k.v, at, curveAt);
+      const u = dirVector(k.u, at, curveAt, env);
+      const v = dirVector(k.v, at, curveAt, env);
       if (!u || !v) return null;
       // Both unit, so each product is already in [-1, 1] and needs no further scaling. Parallel
       // drives the CROSS product to zero, perpendicular the DOT — the only difference between them.
       return [k.rel === 'parallel' ? u.x * v.y - u.y * v.x : u.x * v.x + u.y * v.y];
     }
     case 'slope': {
-      const u = dirVector(k.u, at, curveAt);
+      const u = dirVector(k.u, at, curveAt, env);
       if (!u) return null;
       const m = evalExpr(k.value, env);
       if (!Number.isFinite(m)) return null;
@@ -620,6 +685,23 @@ export function residual(
       // a side the student never gave (ADR-052). Which side is a SELECTOR’s business, not this.
       const d = k.axis === 'x' ? Math.abs(p[0].y) : Math.abs(p[0].x);
       return [d - radius];
+    }
+    case 'derived-at': {
+      /**
+       * The target is the rule's OWN closed form, so this arm cannot disagree with the derivation it
+       * restates (#1320). `null` — a degenerate configuration, a vacant parent — is "cannot be judged",
+       * exactly as `derived.ts` answers for the object form.
+       */
+      const target = evalRule(k.rule, at, curveAt);
+      if (!target || !Number.isFinite(target.x) || !Number.isFinite(target.y)) return null;
+      // Per component (a norm would have rank 1 at the solution — the midpoint arm's own lesson), and
+      // scaled to the parents' spread so a figure in thousands converges like one in units.
+      const parents = parentsOf(k.rule).map(at).filter((q): q is Pt => q !== null);
+      const xs = parents.map((q) => q.x);
+      const ys = parents.map((q) => q.y);
+      const spread = parents.length > 1 ? Math.max(...xs) - Math.min(...xs) + Math.max(...ys) - Math.min(...ys) : 0;
+      const scale = Math.max(1, spread);
+      return [(p[0].x - target.x) / scale, (p[0].y - target.y) / scale];
     }
     /**
      * A discrete choice HAS no residual, by construction (#1049).
@@ -722,6 +804,7 @@ export function solveLM(
 
   const cost = (v: number[]) => residuals(v).reduce((s, r) => s + r * r, 0);
   let f = cost(x);
+  let stalled = 0;
 
   const tol = SOLVE_TOL * TOLERANCE_FACTOR;
   for (let iter = 0; iter < maxIter && f > tol * tol; iter += 1) {
@@ -766,9 +849,19 @@ export function solveLM(
     const next = x.map((v, i) => v + delta[i]);
     const fn = cost(next);
     if (fn < f) {
+      /**
+       * A STALL IS NOT CONVERGENCE (ADR-AG-144, #1317). A descent parked at a saddle or on a valley
+       * toward infinity keeps accepting steps that shave a millionth off the cost, and used to spend the
+       * whole budget doing it — measured, ~100 iterations per failing start on the 572 figure, at every
+       * seed, for every failing start of the multi-start. Genuine convergence, linear or quadratic,
+       * takes far more than a millionth per step; eight such steps in a row is a stall, and stopping
+       * there returns the same best effort a hundred iterations later would.
+       */
+      stalled = fn > f * (1 - 1e-6) ? stalled + 1 : 0;
       x = next;
       f = fn;
       lambda = Math.max(lambda * 0.3, 1e-12);
+      if (stalled >= 8) break;
     } else {
       lambda *= 10;
       if (lambda > 1e12) break;
@@ -798,12 +891,18 @@ export function solveMultiStart(
   starts: readonly number[][],
   residuals: (x: number[]) => number[],
   maxIter = 120,
+  /**
+   * A converged solve that is not ADMISSIBLE — a parameter driven outside its declared domain
+   * (#1317, ADR-AG-144: `a > 0` filters a pin's roots silently, D7 kind 1) — is treated as a start that
+   * did not converge, so the next start is tried and the best effort still reports honestly.
+   */
+  accept: (x: number[]) => boolean = () => true,
 ): SolveResult {
   let best: SolveResult | null = null;
   for (const x0 of starts) {
     const r = solveLM(x0, residuals, maxIter);
-    if (r.ok) return r;
-    if (!best || r.worst < best.worst) best = r;
+    if (r.ok && accept(r.values)) return r;
+    if (!best || r.worst < best.worst) best = { ...r, ok: false };
   }
   return best ?? { values: starts[0] ? [...starts[0]] : [], ok: residuals(starts[0] ?? []).length === 0, worst: 0 };
 }

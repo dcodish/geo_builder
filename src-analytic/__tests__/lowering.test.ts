@@ -45,11 +45,16 @@ describe('#1046 — a coordinate about an existing point is a STATEMENT about it
     expect(d.construction.objects.find((o) => o.id === 'A')?.kind).toBe('point');
   });
 
-  it('and a genuine second DEFINITION is still a clash', () => {
-    // The asymmetry is the point: naming M and then saying M is the centroid defines M twice.
-    expect(codes(['A(0,0)', 'B(6,0)', 'C(3,6)', 'M(3,5)', 'M מפגש התיכונים במשולש ABC'])).toEqual([
-      'name-kind-clash',
-    ]);
+  it('and the other direction is a CONDITION too — #1320 removed the asymmetry', () => {
+    /**
+     * INVERTED by #1320 (ADR-AG-144). #1046 built one direction and left this one a clash on the
+     * reading that "M is the centroid" after M exists is a second definition. The 572 exam says
+     * otherwise — M is the y-axis crossing AND the midpoint — so a derivation about an existing point
+     * lowers to a `derived-at` constraint at the M1 boundary. Here the centroid is (3,2) and M was
+     * placed at (3,5): refused, on the sentence, as unsatisfiable. The TRUE version is simply accepted.
+     */
+    expect(codes(['A(0,0)', 'B(6,0)', 'C(3,6)', 'M(3,5)', 'M מפגש התיכונים במשולש ABC'])).toEqual(['unsatisfiable']);
+    expect(codes(['A(0,0)', 'B(6,0)', 'C(3,6)', 'M(3,2)', 'M מפגש התיכונים במשולש ABC'])).toEqual([]);
   });
 });
 

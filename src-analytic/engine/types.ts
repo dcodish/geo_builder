@@ -216,8 +216,14 @@ export type Fact =
   | (FactBase & { t: 'diagonal-eq'; principal: boolean; eq: Expr })
   /** «נתון מעגל O» — a circle on a centre point, with a radius parameter (#1060). */
   | (FactBase & { t: 'circle-at'; id: Id; centre: Id; r: Expr })
-  /** «דרך P עובר ישר מקביל ל AB» — a line through a point, with a copied direction (#1093). */
-  | (FactBase & { t: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean })
+  /**
+   * «דרך P עובר ישר מקביל ל AB» — a line through a point, with a copied direction (#1093).
+   *
+   * `dir` may also be FREE (#1319, ADR-AG-144): «דרך N עובר ישר» creates a line whose direction is the
+   * unknown the rest of the question determines. `name` is the student's own name for it («ישר l3»),
+   * absent for an anonymous one.
+   */
+  | (FactBase & { t: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string })
   /**
    * «המעגל משיק לציר ה-x» — tangency stated about the ONE circle in the figure (#1060).
    *
@@ -325,7 +331,17 @@ export type GeoObject =
    * with the direction turned a quarter turn — a flag rather than a second object kind, because
    * nothing else about it differs.
    */
-  | { kind: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean };
+  /**
+   * …and since #1319 (ADR-AG-144) the direction may be FREE: «דרך N עובר ישר» is the exam's own
+   * sentence for a line whose direction the rest of the question determines. Its one degree of
+   * freedom is a DIRECTION PARAMETER in the register — `symbolDeps` reports the symbol, so it is
+   * sampled like any unstated magnitude (ADR-052) and SOLVED like any parameter once a later given
+   * pins it (the #1317 seam). `carrierOf` still answers `null`: the freedom lives in the register.
+   *
+   * `name` is how the student refers to it («ישר l3»), so a crossing can name it; absent for an
+   * anonymous line.
+   */
+  | { kind: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string };
 
 export type PointObject = Extract<GeoObject, { kind: 'point' }>;
 export type CurveObject = Extract<GeoObject, { kind: 'curve' }>;
@@ -432,7 +448,25 @@ export type Selector =
    * pinned by its two incidences) and "not the other root" is a region, not an equation a
    * least-squares solve can drive to zero.
    */
-  | { kind: 'crossing-distinct'; id: Id };
+  | { kind: 'crossing-distinct'; id: Id }
+  /**
+   * THE SIGN OF A DERIVED QUANTITY — «שיפוע הישר l1 שלילי» (#1323, ADR-AG-144).
+   *
+   * The exam's part (ג): *«ישר זה חותך את ציר ה-x בנקודה C ושיפועו שלילי»* — the sign picks between the
+   * two configurations the rest of the sentence leaves open. It is a stated given and may not vanish,
+   * and it is D7's KIND 2: it consumes no freedom (the area given already pins the direction; the sign
+   * says WHICH root), so it is a selector inside validity, never a residual and never a post-filter.
+   * #818 (3-D) is the failure mode designed against — a stated sign violated at some seeds because a
+   * filter fell back to a configuration contradicting it — and validity is what `drawableAt` walks.
+   *
+   * The QUANTITY is a discriminated union so the class — an inequality about a DERIVED quantity — has
+   * one home. A slope is its first member; a length, an area or a coordinate would be further members
+   * with their own reader, never a fourth value keyword in the slope rule (the #1201 shape).
+   */
+  | { kind: 'sign'; q: Quantity; positive: boolean };
+
+/** A quantity the figure DERIVES — never a symbol the student declared (that is a domain, kind 1). */
+export type Quantity = { k: 'slope'; u: Direction };
 
 export const EMPTY_CONSTRUCTION: Construction = {
   params: [],
@@ -446,6 +480,26 @@ export const positionalOf = (c: Construction) => c.objects.filter(isPositional);
 export const curvesOf = (c: Construction): CurveObject[] => c.objects.filter(isCurve);
 export const objectById = (c: Construction, id: Id): GeoObject | undefined =>
   c.objects.find((o) => o.id === id);
+
+/**
+ * THE CURVE A NAME DENOTES, in the construction — one lookup for every layer that asks (#1319,
+ * ADR-AG-144; the ADR-AG-092 "naming paths and the shared check" rule).
+ *
+ * Three sites used to spell this inline over `kind === 'curve'` alone, and a line CONSTRUCTED through
+ * a point («דרך N עובר ישר l3», a `line-at`) is a curve with a name too — `label.name` on the figure,
+ * `name` on the object. Spelled once here so a `line-at` can be crossed, measured against and asked
+ * about exactly as a stated line can.
+ *
+ * A name matches the student's own token (`l3`, `AB`, «ישר 1») or the id the naming rules mint from it
+ * (`line-l3`, `circle-I`).
+ */
+export function curveByName(c: Construction, name: string): GeoObject | undefined {
+  return c.objects.find(
+    (o) =>
+      (o.kind === 'curve' && (o.label.name === name || o.id === `line-${name}` || o.id === `circle-${name}`)) ||
+      (o.kind === 'line-at' && (o.name === name || o.id === `line-${name}`)),
+  );
+}
 
 /*
  * `conicSlotTaken` lived here — the at-most-one rule for the anonymous conics (D6), deleted by

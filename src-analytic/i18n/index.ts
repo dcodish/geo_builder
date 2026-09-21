@@ -95,6 +95,7 @@ const he = {
   // A vertical segment HAS no slope, and that is an answer rather than an absence (#1078).
   slopeVertical: 'אנכי (אין שיפוע)',
   secParams: 'פרמטרים',
+  paramUnused: '(לא בשימוש בשרטוט)',
   freeDof: '{{count}} דרגות חופש',
   pinned: 'הכול נקבע על-ידי הנתונים',
   about: 'אודות',
@@ -297,6 +298,7 @@ const en: typeof he = {
   symComponent: 'the x-coordinate of a point',
   slopeVertical: 'vertical (no slope)',
   secParams: 'Parameters',
+  paramUnused: '(not used by the figure)',
   freeDof: '{{count}} degrees of freedom',
   pinned: 'Everything is fixed by the givens',
   about: 'About',

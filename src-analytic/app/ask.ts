@@ -25,7 +25,7 @@ import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
 import { isKnowledge, knownCurve, knownOptions, type Figure } from '../engine/evaluate';
 import { locusOf } from '../engine/locus';
 
-import { objectById, type Id } from '../engine/types';
+import { curveByName, objectById, type Id } from '../engine/types';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { isVerticalLine } from '../engine/lines';
 import { asPair, lineNamed } from './lines';
@@ -346,9 +346,8 @@ export function ask(
   const eq = EQUATION_OF.exec(text);
   if (eq) {
     const name = eq[1].trim();
-    const curve = d.construction.objects.find(
-      (o) => o.kind === 'curve' && (o.label.name === name || o.id === `line-${name}` || o.id === `circle-${name}`),
-    );
+    // The ONE by-name lookup (ADR-AG-144): a line constructed through a point answers to its name too.
+    const curve = curveByName(d.construction, name);
     /**
      * A LINE THROUGH TWO POINTS IS A LINE TO THIS QUESTION TOO (#1148).
      *
