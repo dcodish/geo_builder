@@ -89,7 +89,7 @@ has four tiers, strongest first:
 | tier | predicate | added by |
 | --- | --- | --- |
 | preferred | whole **and** every declared ring at least `SPREAD_MIN_DEG` open | #1174 |
-| whole | selectors hold · nothing vacant · no ring contradicts its noun | #1083, #1158/#1166 |
+| whole | selectors hold · nothing vacant · no ring contradicts its noun · **every given holds** (an unsatisfied constraint is a validity failure, not a preference — a point the solve parked on neither of its curves is not a configuration) | #1083, #1158/#1166, #1287 |
 | second best | the selectors hold, something named is missing | #1083 |
 | fallback | the raw figure at this seed | — |
 

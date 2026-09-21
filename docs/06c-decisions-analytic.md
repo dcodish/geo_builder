@@ -6955,3 +6955,35 @@ foot off BC : 1.288 × |BC|            <- a segment AD drawn, asserting nothing
 **Sibling audit (docs/17 §1), measured.** 2-D has both halves (ADR-104, and the atomic-group poisoning in `computeFold`). **3-D has the class**: on `derive3` the pair «פירמידה SABCD שבסיסה ריבוע» · «∠SAB = 70» reversed gives the angle row `unknown-point A` and draws the pyramid with `scalarPins: []` — the given dropped, the solid drawn; ADR-3D-220's post-pass retry covers only `unknown-symbol` rows. Filed as #1327, not fixed here (different product, different lane, different log). **Complex** folds algebraic constraints numerically (`foldConstraints`) with references resolved at parse time; whether a forward reference can reach its fold at all was not measured, and is noted on #1327 as the open question rather than claimed either way.
 
 **Consequences.** `engine/apply.ts` (`fold` → the group fixpoint over `foldPass`; +`NON_CREATING`); `engine/derive.ts` (`fold(facts, owner)`, one fault per line); `__tests__/issue-1242-fold-deferral.test.ts` (12): the reversed order at eight seeds as a PARITY against the working order, the non-cevian member, the six-permutation property, #1232's guard in both orders, the unrescuable line leaving nothing, the stranded later line, one fault per line, the fold's positional errors, a genuine contradiction still refused, an all-known line still `known`, and the submit gate in both directions. `docs/02c` R19 extended; `docs/04c` — the fold section.
+
+## ADR-AG-134 — A crossing settles on its curves or is reported once; a non-solution is never a configuration (#1287)
+
+**Status:** accepted, 2026-09-21 · **Issue:** #1287 (bug, P2, `analytic`) · found measuring #1286's ruling, not reported by the operator
+**Requirements:** [02c](02c-requirements-analytic.md) — the honesty invariants (a figure is never shown as though it satisfied a given it does not) · **Design:** [04c](04c-design-analytic.md#the-configuration-search-validity-then-preference-adr-ag-128) — the validity tier gains its fourth term
+**Precedes** #1286 (the extent bound on the solution set), whose seed-sweeping lock trips on this row; **completes** [ADR-AG-124](#adr-ag-124)'s seeding, whose even-seed midpoint start is the case that fails
+
+**Measured before, on the chord «A(-5,1)» · «B(5,1)» · «משוואת המעגל x^2+y^2=16» · «הקטע AB» · «P נקודת החיתוך של הקטע AB עם המעגל x^2+y^2=16»** (the roots are (±3.873, 1)):
+
+```
+seed 0, 4:  P = (0.000, 2.500)   |y−1| = 1.5   |r−4| = 1.5   faults: unsatisfiable ×2, same index, same words   carrierDof 1
+seed 1, 5:  P = (−3.873, 1)      converged
+seed 2, 3:  P = ( 3.873, 1)      converged
+```
+
+The default display (seed 0) showed a point on neither curve, the data panel listed it as a configuration, and the student's sentence was blamed twice.
+
+**The class (docs/17 §1).** *A least-squares descent from ONE start parks at a local minimum that is not a solution; the tool commits the point there, the configuration search calls the result valid because validity never asked whether the givens hold, and the failure is reported once per constraint rather than once per statement.* Three seams, one row.
+
+**Why seed 0 in particular.** ADR-AG-124 seeds a bounded crossing at its piece's MIDPOINT on even seeds when the sample falls outside the piece. For a chord centred on the circle's axis of symmetry the midpoint is the one start where the line's gradient and the circle's gradient are parallel: the Gauss–Newton step has no component along the chord, the descent cannot leave x = 0, and it converges to the minimum of the two squared residuals on that axis — (0, 2.5), which is the point of the axis equidistant, in residual, from the line and the circle. Reproduced on the solver alone: `solveLM([0, 1])` on the two residuals returns `ok: false`; from (±2.5, 1) it lands on a root.
+
+**The mechanism — at the three seams that already existed.**
+
+1. **`solveMultiStart`** (`solve.ts`): LM from several starts, first convergence wins — the 2-D `multiStartSolve` discipline, retry-only. `evaluate` supplies the starts: the seeded one first (a solve that converges from it costs exactly what it did), then for every bounded crossing the QUARTER points of its piece (the midpoint is the one symmetric start; the quarter points are off the axis by construction), then the seeded start pushed off itself by 0.3 of the search span, deterministically in the seed. A restart is a start, never a result: what the student sees is the configuration that converged, and if none does, the best effort is reported below as unsatisfied and never drawn as if.
+2. **Validity** (`drawableAt`, ADR-AG-128's table): `whole` gains its fourth term — every constraint holds. A configuration with an unsatisfied given is not a lesser configuration; it is not one. So the search moves on to a seed where the givens hold, «הציגו תצורה אחרת» never offers a non-solution, and `isKnowledge` reads the crossing from configurations that hold (P's y is known to be 1; its x, with two roots, is not). A figure whose givens hold at NO seed still falls through to the fallback and is reported — nothing vanishes.
+3. **One fault per line** (`derive`): the two incidences of one crossing were each pushing the same `unsatisfiable` with the same index and words.
+
+**Measured after.** Seeds 0–7: P on both curves to 1e-6, no fault, `carrierDof 0`; both roots reached across the eight seeds (the case #1286's ruling protects — a chord that meets the circle twice offers both). The impossible chord (`x²+y²=0.25`, which the chord misses): exactly one `unsatisfiable` on line 4, the line `faulted`, the incidences listed as unmet. The lock was run against the pre-change `evaluate`/`derive` first: red on the seeds, red on the search, red on the double fault.
+
+**Sibling audit (docs/17 §1).** 2-D's driven solvers have had multi-start since ADR-033 (`multiStartSolve`: regularised search, then polish) and its accept gate refuses a non-converged solve (`solutionAccepted`); 3-D's pivot has its own restarts (ADR-3D-007). Complex's `foldConstraints` is numeric over algebraic constraints and was not measured; noted, not claimed.
+
+**Consequences.** `engine/solve.ts` (+`solveMultiStart`); `engine/evaluate.ts` (the restart list in the solve block; `whole` gains the unsatisfied term); `engine/derive.ts` (one `unsatisfiable` per line). `__tests__/issue-1287-crossing-settles.test.ts` (6): the eight seeds on both curves, both roots reachable, the solver alone from the saddle, the impossible chord reported once, the search never showing an unsatisfied seed with the knowledge gate reading only holding ones, and the once-failing seeds converging raw. `docs/04c` — the validity table.

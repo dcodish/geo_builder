@@ -19,7 +19,7 @@ import { pairKey, pinnedLengths } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, type RingFault } from './rings';
-import { dirVector, freeRank, residual, resolveChoices, solveLM, type Constraint } from './solve';
+import { dirVector, freeRank, residual, resolveChoices, solveMultiStart, type Constraint } from './solve';
 import { inDomain, isFree, objectById, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
 
 export interface FigurePoint {
@@ -674,7 +674,40 @@ export function evaluate(raw: Construction, seed = 0): Figure {
   if (ids.length > 0 && c.constraints.length > 0) {
     // Through `carrierSystem` (#1137) so the locus tracer walks the SAME residuals this solves.
     const sys = carrierSystem(c, env);
-    const res = solveLM(sys.toVec(seeded), sys.residualsAt);
+    /**
+     * SEVERAL STARTS, first convergence wins (#1287, ADR-AG-134).
+     *
+     * The seeded start goes first, so a solve that lands from it costs exactly what it did. Only when it
+     * does not converge are the RESTARTS tried: for every bounded crossing, the quarter points of its
+     * piece — a symmetric chord's midpoint is the one start on the circle's axis, where the descent
+     * cannot leave the axis and parks on neither curve — and then the seeded start pushed off itself,
+     * deterministically in the seed, so a start that sat on a symmetry axis or a saddle is moved off it.
+     * Every restart is a start, never a result: the point the student sees is the one that CONVERGED,
+     * and if none does, the best effort is reported below as unsatisfied, never drawn as if.
+     */
+    const starts: Map<Id, Pt>[] = [seeded];
+    const restartsForBounded: Map<Id, Pt>[] = [];
+    for (const k of c.constraints) {
+      if (k.t !== 'on-line-2pt' || !k.bounded) continue;
+      const pa = pointAtId(c, env, k.a);
+      const pb = pointAtId(c, env, k.b);
+      if (!pa || !pb) continue;
+      for (const t of [0.25, 0.75]) {
+        const m = new Map(seeded);
+        m.set(k.id, { x: pa.x + t * (pb.x - pa.x), y: pa.y + t * (pb.y - pa.y) });
+        restartsForBounded.push(m);
+      }
+    }
+    starts.push(...restartsForBounded);
+    const reach = Math.max(span.x.hi - span.x.lo, span.y.hi - span.y.lo, 1);
+    for (let salt = 1; salt <= 3; salt += 1) {
+      const m = new Map<Id, Pt>();
+      for (const [id, p] of seeded) {
+        m.set(id, { x: p.x + reach * 0.3 * (jitter(seed, salt * 101 + 7) - 0.5), y: p.y + reach * 0.3 * (jitter(seed, salt * 103 + 11) - 0.5) });
+      }
+      starts.push(m);
+    }
+    const res = solveMultiStart(starts.map((m) => sys.toVec(m)), sys.residualsAt);
     free = sys.asMap(res.values);
   }
 
@@ -993,7 +1026,18 @@ export function drawableAt(
    * figures (#1158), a valid ring was reachable within 7 extra seeds from every start and there were
    * ZERO starts with none inside `DRAWABLE_TRIES`, so the budget did not need raising.
    */
-  const whole = (f: Figure) => f.selectorsOk && f.vacant.length === 0 && f.ringFaults.length === 0;
+  /**
+   * …and the fourth term of VALIDITY: every constraint HOLDS (#1287, ADR-AG-134).
+   *
+   * A configuration in which the solve stopped at a non-solution — a point on neither of the two
+   * curves it was told to lie on — was `whole`: its selectors held, nothing was vacant, no ring was
+   * wrong, so it was chosen for display, listed in the data panel and offered by «הציגו תצורה אחרת»
+   * while seeds either side of it had the real crossing. Unsatisfied givens are the one thing this
+   * product may never draw as if; they are a validity failure, not a preference, and they belong here
+   * beside the other three. A figure whose givens hold at NO seed still falls through to the fallback
+   * and is reported on the line that stated them — nothing vanishes.
+   */
+  const whole = (f: Figure) => f.selectorsOk && f.vacant.length === 0 && f.ringFaults.length === 0 && f.unsatisfied.length === 0;
   /**
    * …and, for the display callers only, a FOURTH term above validity (#1174).
    *

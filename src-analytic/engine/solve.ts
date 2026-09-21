@@ -710,6 +710,35 @@ export function solveLM(
   return { values: x, ok: worst <= 1e-6, worst };
 }
 
+/**
+ * Levenberg–Marquardt from SEVERAL starts, first success wins (#1287, ADR-AG-134).
+ *
+ * A least-squares descent goes to the basin it starts in — and a start can sit where NO basin leads to
+ * a root: the chord `A(-5,1) B(5,1)` on `x²+y²=16` was seeded at the chord's midpoint `(0,1)`, which is
+ * on the circle's axis of symmetry, where the line's gradient and the circle's gradient are parallel
+ * and the step has no component along the chord. The descent parked at `(0, 2.5)` — on neither curve,
+ * a local minimum of the two squared residuals — and the point was committed there. The roots at
+ * `(±3.873, 1)` were one asymmetric start away.
+ *
+ * The starts are tried in order and the first that CONVERGES is returned, so a solve that succeeds
+ * from its seed pays nothing extra (the 2-D `multiStartSolve` discipline: retry-only). When none
+ * converges, the best-effort result of the lowest worst residual is returned, `ok: false`, and the
+ * caller reports — it never draws as if.
+ */
+export function solveMultiStart(
+  starts: readonly number[][],
+  residuals: (x: number[]) => number[],
+  maxIter = 120,
+): SolveResult {
+  let best: SolveResult | null = null;
+  for (const x0 of starts) {
+    const r = solveLM(x0, residuals, maxIter);
+    if (r.ok) return r;
+    if (!best || r.worst < best.worst) best = r;
+  }
+  return best ?? { values: starts[0] ? [...starts[0]] : [], ok: residuals(starts[0] ?? []).length === 0, worst: 0 };
+}
+
 /** Gaussian elimination with partial pivoting. `null` when the system is singular to working
  *  precision — which the caller answers by damping harder rather than by inventing a step. */
 function gaussian(A: number[][], n: number): number[] | null {

@@ -171,6 +171,9 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
     const fact = at >= 0 ? constraintFact[at] : undefined;
     const line = fact === undefined ? undefined : owner[fact];
     if (line === undefined) continue;
+    // ONE fault per line (#1287): a crossing lowers to two incidence constraints, and when the solve
+    // misses both, the student's sentence was being blamed twice with the same words.
+    if (faults.some((f) => f.index === line && f.code === 'unsatisfiable')) continue;
     faults.push({ index: line, code: 'unsatisfiable', detail: lines[line] });
   }
 
