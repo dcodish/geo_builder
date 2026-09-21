@@ -110,6 +110,40 @@ const made = (facts: Fact[]): ParseResult => ({ ok: true, facts });
 const refuse = (code: ParseFailure['code'], detail: string): ParseResult =>
   ({ ok: false, code, detail }) as ParseResult;
 
+/**
+ * A RULE OWNS ONLY WHAT IT PARSED (#1272, [ADR-AG-139](../../docs/06c-decisions-analytic.md#adr-ag-139)
+ * — ADR-AG-114's claim gate, generalised to every claiming site).
+ *
+ * `refuse` is an OWNED answer: "I recognised your sentence and it is wrong". It is honest only about a
+ * tail the rule actually read. Three tails a rule matched by its NOUN and never read, measured:
+ *
+ *   «פרבולה I: y^2=2x»          → `bad-equation` about «I: y^2=2x», an equation the student never wrote
+ *   «נתון מעגל I - x^2+y^2=16»  → the connective read as a SIGN: a hyperbola labelled "circle", `out-of-scope`
+ *   «שיפוע הישר AB הוא חיובי»   → `bad-equation` about a Hebrew word
+ *
+ * Each is terminal at the LLM seam — `not-handled` is the ONE code that escalates (#1251) — so a
+ * mis-owning rule cost the student the escape the operator expects for minor deviations (#1271). The
+ * answer is not to widen the seam (a genuinely owned refusal beats a guess — #1183's lesson) but to
+ * make the claim honest. A tail is NOT the rule's to refuse when it
+ *
+ *   - carries Hebrew letters — a word, not an expression;
+ *   - opens with a connective dash — a hyphen followed by a space, or any en/em dash;
+ *   - opens with a NAME the rule did not consume, followed by a connective («I:», «AB -») — the
+ *     plane's own variables excepted, so «y - 2x = 0» stays an equation.
+ *
+ * Then the rule answers `null`, the chain moves on, and the sentence reaches `not-handled`: the seam
+ * fires by itself, with no change to the seam. A hyphen glued to its term («-x+y=1») is a sign and
+ * stays claimable; the one spelling this leaves ambiguous is «מעגל I -x^2+…», which reads as a sign.
+ */
+const claimable = (tail: string): boolean => {
+  const t = tail.trim();
+  if (/[\u0590-\u05FF]/.test(t)) return false;
+  if (/^(?:-\s|[–—])/.test(t)) return false;
+  const lead = /^([A-Za-zℓ]+\d?)\s*(?::|\s[-–—]|[–—])/.exec(t);
+  if (lead && !RESERVED_SYMBOLS.has(lead[1])) return false;
+  return true;
+};
+
 // ---------------------------------------------------------------------------
 // Shared tokens — spelled ONCE (the 3-D lesson: a noun gate re-spelled inline drifts)
 // ---------------------------------------------------------------------------
@@ -1009,7 +1043,7 @@ function parseDerived(line: string): RuleOutcome {
   }
 
   const diag = DIAGONAL_EQ_HE.exec(line) ?? DIAGONAL_EQ_EN.exec(line);
-  if (diag) {
+  if (diag && claimable(diag[2])) {
     const [, which, eqSrc] = diag;
     const eq = equationExpr(eqSrc);
     if (!eq) return refuse('bad-equation', trim(eqSrc));
@@ -1797,7 +1831,7 @@ function parseConstraint(raw: string): RuleOutcome {
   }
 
   const slope = SLOPE_HE.exec(line) ?? SLOPE_EN.exec(line);
-  if (slope) {
+  if (slope && claimable(slope[2])) {
     const u = direction(slope[1]);
     if (!u) return refuse('bad-operand', line);
     const value = parseExpr(normalizeMath(slope[2]));
@@ -1835,7 +1869,7 @@ function parseConstraint(raw: string): RuleOutcome {
   }
   const areaHe = AREA_HE.exec(line);
   const area = areaHe ?? AREA_EN.exec(line);
-  if (area) {
+  if (area && claimable(area[3])) {
     const [, nounSrc, run, valueSrc] = area;
     /**
      * The COPULA is not part of the noun.
@@ -2080,7 +2114,7 @@ function parseConstraint(raw: string): RuleOutcome {
     COMPONENT_EN.exec(line) ??
     COMPONENT_OF.exec(line) ??
     COMPONENT_SUB.exec(line);
-  if (comp) {
+  if (comp && claimable(comp[3])) {
     const [, axis, id, valueSrc] = comp;
     const value = parseExpr(normalizeMath(valueSrc));
     if (!value) return refuse('bad-equation', trim(valueSrc));
@@ -2384,8 +2418,9 @@ export function parseLine(raw: string): ParseResult {
       new RegExp(`(?<![A-Za-z])${v}(?![A-Za-z])`).test(curve.eqSrc),
     );
   })();
-  if (curve && (/[֐-׿]/.test(curve.eqSrc) || !curveTailMeansEquation)) {
-    // fall through: the noun matched, the tail is not an equation, so this rule has no claim
+  if (curve && (!claimable(curve.eqSrc) || !curveTailMeansEquation)) {
+    // fall through: the noun matched, the tail is not an equation — or opens with a name/connective
+    // the rule never read (#1272, `claimable`) — so this rule has no claim
   } else if (curve) {
     const eq = equationExpr(curve.eqSrc);
     if (!eq) return { ok: false, code: 'bad-equation', detail: trim(curve.eqSrc) };

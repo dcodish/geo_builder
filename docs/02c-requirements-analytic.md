@@ -713,6 +713,8 @@ internal terms. «השם כבר משמש עצם מסוג אחר» told the stude
 and it sent them to fix the letter instead of showing them the collision. A refusal that misdescribes
 the problem is worse than one that is merely narrow, because the student acts on it.
 
+**R104 — a rule owns only what it PARSED; a sentence it recognised by its noun alone reaches the fallback** ([ADR-AG-139](06c-decisions-analytic.md#adr-ag-139), [#1272](https://github.com/dcodish/geo_builder/issues/1272)). *(Operator, 2026-09-20: "we need to support all such forms of writing. I would expect the llm escape to assist in cases of minor deviations".)* A refusal is a statement about the student's own words, so a rule may refuse only a tail it actually read. «פרבולה I: y^2=2x» is not a bad equation — «I: y^2=2x» is not something the student wrote — and «נתון מעגל I - x^2+y^2=16» is not a hyperbola out of scope: the dash is the student's connective, not a sign. Such a sentence is «לא הצלחתי להבין», which is the one answer that lets the model normalise the spelling. The other direction stands unchanged: a refusal the tool genuinely owns (a truncated equation, a reserved coordinate, a degenerate role, a curve with no points) is a better answer than a guess and never goes to the model.
+
 **R44 — an anonymous curve's identity is its EQUATION** ([ADR-AG-019](06c-decisions-analytic.md#adr-ag-019)).
 «הישר x-y+2=0» and the bare «x-y+2=0» are one line stated two ways, and the figure must hold one object,
 not two. All unnamed curves therefore share a single content-derived namespace; a NAMED curve (`ℓ1`,

@@ -173,6 +173,18 @@ same wrong input answered the same way whichever rule caught it.
 `App.tsx`. The engine stays language-free and the message can still say *what* the name already holds
 — the split that lets a refusal name a construct without the engine knowing any Hebrew.
 
+**A rule owns only what it parsed** ([ADR-AG-139](06c-decisions-analytic.md#adr-ag-139), R104). `refuse`
+is honest only about a tail the rule READ, and a rule that matched its noun and then refused the
+remainder unread produced owned codes about fragments the student never wrote — terminal at the LLM seam.
+`claimable(tail)` in `parseAnalytic.ts` is the one discriminator, asked at every claiming site (the
+diagonal, slope, area and component values, and `matchCurve`'s single exit, where it absorbs
+ADR-AG-114's Hebrew test): a tail with Hebrew letters, one opening with a connective dash (a spaced
+hyphen or any en/em dash), or one opening with an unread name followed by a connective («I:», «AB -»)
+is not the rule's — it answers `null`, the chain moves on, and the sentence ends at `not-handled`.
+The plane's own variables are excepted so «y - 2x = 0» stays an equation, and a hyphen glued to its
+term is a sign. The seam itself keys on `reachesFallback(verdict)` in `app/submit.ts` — refused ∧
+`not-handled` — the one predicate `App.tsx` and the locks share; its width never changed.
+
 ## A given’s connective, and who gets the sentence ([ADR-AG-127](06c-decisions-analytic.md#adr-ag-127))
 
 **One vocabulary for "is".** `COPULA_WORDS` — «הוא/היא/הם/הן/שווה [ל-]» — is the single source in

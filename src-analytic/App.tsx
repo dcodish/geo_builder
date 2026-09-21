@@ -28,7 +28,7 @@ import { curveDetailsKey, curveParts } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
-import { decideSubmit } from './app/submit';
+import { decideSubmit, reachesFallback } from './app/submit';
 import { runFallback } from './app/fallback';
 import { panelListsCurve } from './app/panelRows';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
@@ -594,7 +594,7 @@ export function App() {
         locale: i18n.language,
         source: 'parser',
         result: verdict.kind === 'refused' ? verdict.error.key : verdict.kind,
-        ...(verdict.kind === 'refused' && verdict.error.key === 'not-handled' ? { intermediate: true } : {}),
+        ...(reachesFallback(verdict) ? { intermediate: true } : {}),
       });
     }
     switch (verdict.kind) {
@@ -608,7 +608,7 @@ export function App() {
          * tool understood the student and disagreed, and handing that to a model would replace a
          * correct explanation with a guess.
          */
-        if (verdict.error.key === 'not-handled') {
+        if (reachesFallback(verdict)) {
           void tryFallback(raw, verdict.error);
           return;
         }
