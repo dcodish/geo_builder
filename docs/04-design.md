@@ -439,6 +439,17 @@ The general lesson, and the reason this is documented next to its sibling rather
 the naming half and said so; the value half stayed split for eleven months underneath that sentence.
 ### The relation half: where the right-hand side starts (#976, [ADR-507](06-decisions.md#adr-507))
 
+**The verbose LENGTH frame routes by its connective** ([ADR-524](06-decisions.md#adr-524), [ADR-539](06-decisions.md#adr-539)).
+`normalizeVerboseLength` reads «אורך/הצלע/הקטע <seg> <connective> <value>» and asks one question of the
+connective — not what the sentence means, but WHICH rule owns it: a copula (the closed allowlist
+`LENGTH_COPULA`: nothing, «=», «הוא», «שווה ל») → `<seg> = <value>` for the equality rule; a relation
+(`LENGTH_RELATION`, built from the bound rule's own atoms — the glyphs, `CMP_BIG`/`CMP_SMALL`,
+`CMP_AT_LEAST`/`CMP_AT_MOST`, «בין») → the frame stripped and `<seg> <connective> <value>` handed verbatim
+to `measureBound`; anything else → untouched, failing closed. The two sets are disjoint by construction and
+never merged into one alternation — a relation word beside the copulas is how a bound became an equality
+(#1248, the P1). `CMP_AT_LEAST`/`CMP_AT_MOST` are the non-strict words («לפחות», «לכל היותר», "at least",
+"at most"): the bound rule lowers them with `minStrict: false` / `maxStrict: false`, the ADR-529 fields.
+
 ADR-498 stopped the VALUE lanes from locating by copula. The RELATION readers — `angleEquality`,
 `arcEquality`, `measureSum` — still split the line on the literal `=`, so «זווית ABC היא זווית DEF» was
 `not-handled` while «= זווית DEF» and «שווה לזווית DEF» worked. The seam has ONE home: `normalizeWordEquality`
