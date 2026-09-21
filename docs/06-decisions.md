@@ -12595,3 +12595,30 @@ Both siblings read a 3-run as *centre, then the two ends*. The semicircle read n
 **The catalog is updated**, because it is the user-facing reference and the coverage map at once: the semicircle row now teaches the 3-run and says what it means.
 
 **Consequences.** `parser/parse.ts` (the `semicircle` rule: +the 3-run read, the centre from the run, the leftover guard and the `autoCenter` flag following it); `parser/catalog.ts` (the row). `issue-1204-semicircle-run.test.ts` (11): the two new spellings read; the lowering asserted **against the quarter's skeleton** rather than written out, so the family cannot drift; the geometry read off the BUILT figure with the quarter as the counter-case; the previously-working spellings pinned to their measured pre-change lowerings; and the role re-reading driven through the real submit path.
+
+## ADR-535 — 2-D's input preview ISOLATES before it typesets (#1316)
+
+**Status:** accepted, 2026-09-21 · **Issue:** #1316 (bug, P1, `2d`)
+**Requirements:** [02](02-requirements.md) — the honesty invariant that a student never reads a formula they did not write · **Design:** [28](28-product-unification.md#5b-the-shared-bidi-cores-run-span-rule)
+**Ports** [#1215](https://github.com/dcodish/geo_builder/issues/1215)'s analytic fix into the last builder that lacked it, and closes the exclusion [#1152](https://github.com/dcodish/geo_builder/issues/1152) wrote down without arguing
+
+**How it was found, and it could only have been found this way.** Playing the #1315 sheet, case T6 asked the operator to LOOK at 2-D's preview strip. He passed it — and the case was wrong: the line it gave, «משולש ABC ושטחו x^2», produces **one** `<math>` island, while the reversal needs **two inside one expression**. A passing case that never exercised the mechanism, caught before the issue was closed on it.
+
+**Measured in a real browser**, typing «מעגל (x-3)^2+(y-5)^2=25» — the exact line from #1215 — into each input and reading the islands' x-positions, with analytic as the control:
+
+```
+                  (x-3)²    (y-5)²
+  2-D  before     x=1153    x=1107     ← right-to-left: the equation reads BACKWARDS
+  2-D  after      x=1085    x=1131     ← left-to-right
+  analytic        x=1098    x=1144     ← the control, correct throughout
+```
+
+**The cause.** `mathHtml` emits several `<math>` islands with text between them, and in an RTL paragraph that whole sequence runs right-to-left unless the run is isolated. Every other builder passes `isolateLtrRuns(…)` output to `MathText`; 2-D passed the raw string. #1152's lock excluded it **by name**, with the bare statement *"it is the tree the mechanism came from and it typesets the raw string"* — a note that records the behaviour and never argues it is correct. That is the shape worth naming: **an exclusion written as a fact rather than as a reason is an unexamined bug with a comment on it.**
+
+**Why no test caught it, and why that is not a gap to close.** jsdom lays out no bidi, so the reversal is invisible to the entire unit suite — it was invisible to #1152's source scan and to #1315's behaviour locks alike. Only looking finds it, which is exactly why [#1316](https://github.com/dcodish/geo_builder/issues/1316) was filed as *a look, not a fix*, with the mechanism measured and the symptom explicitly unknown. What a unit test CAN hold is the CAUSE — that the text `MathText` receives carries the isolate controls — and `src/render/__tests__/issue-1152-preview-parity.test.tsx` now asserts it for 2-D with the other three, its `isolatesFirst` flag flipped from `false` to `true`. The flag existed because #1315 turned the silent exclusion into an explicit option; this is the one-line switch that option was built for.
+
+**The third argument is 2-D's, not the shared kit's.** `isolateLtrRuns(s, rtlParagraph, liveTail)` here versus `(s, liveTail)` in `shell/bidi`, so the live preview passes `(text, false, true)`. Dropping `liveTail` would trim the half-typed `(` out of the run, where it resolves as a neutral and jumps the row — the #997 defect, reintroduced by this fix's own carelessness if the signature were assumed rather than read.
+
+**Severity.** Filed P2 on the mechanism alone, with the issue stating *"if the screenshot shows a reversed equation in prod, it is P1"*. It did, and 2-D is the deployed flagship: a student typing a Hebrew sentence with an equation read a formula they had not written. Raised to P1 and fixed ahead of the queue, announced first.
+
+**Consequences.** `src/render/inputPreviewNode.tsx` (isolate before typeset; the measurement recorded in its docblock). `src/render/__tests__/issue-1152-preview-parity.test.tsx` (`isolatesFirst: true`, with the browser numbers and the note that this row is the cause and not the symptom).
