@@ -54,3 +54,5 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Deploy transport](deploy-transport-scp-tar.md) — recursive scp can die mid-upload; check the server before retrying, and tar|ssh carries the LOCAL uid so chown root:root after (prod/2026-09-18)
 - [Absence cases need the next line](absence-cases-need-the-next-line.md) — a play case whose Look-for is “not X” stops one line short of the defect; add the student’s natural follow-up (2026-09-20 #1265)
 - [Parked arms need successor issues](parked-arms-need-successor-issues.md) — a CLOSED issue's ADR "not built" table is unfiled work; #1165 parked the angle bisector with no successor and the operator re-reported it six days later (2026-09-20 #1284)
+- [Search the prerequisite, not the symptom](search-the-prerequisite-not-the-symptom.md) — a parity issue filed on symptom words missed an ARMED prerequisite whose ruling it then contradicted (2026-09-21 #1303 vs #1154)
+- [Issue titles lead with his words](issue-titles-lead-with-his-words.md) — open the title with the sentence he typed, not the class name; he scans for his own words and re-reports an issue he cannot see (2026-09-21 #1323)

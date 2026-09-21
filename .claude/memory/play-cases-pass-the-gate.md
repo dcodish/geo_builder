@@ -43,3 +43,20 @@ measurement table. Nobody had to re-derive it; it only had to be read.
   there, not in the PR body — the PR body is written by the session that thought it worked.
 - A case can also pass for the WRONG REASON: #1006's T6 chained «זוית ABC» then «זווית BCA = 40» and
   would have read green on the 40°, while the arc it was actually checking was never drawn.
+
+**A DISPLAY case must still be SUBMITTED (2026-09-21, round #1306 T1/T2).** Two cases on PR #1307 were
+written as preview-only — *"do not submit; the preview is the whole case"* — because the PR's deliverable
+was the input preview. I validated them by calling `inputPreviewDisplay3` directly, which is the display
+function and nothing else. Both passed. The operator typed the same lines, pressed enter, and both
+REFUSED: «וקטור CD» after «וקטור AB» is `unknown-point` (#1310) and «אורך AB = 5» on a free vector is
+`claim-refuted` (#1311) — pre-existing lanes, byte-identical on `main`, invisible to the display function.
+
+A case a student can only pass by NOT finishing their action is testing half a feature, and it hides
+whether the sentence being previewed so nicely can be entered at all. Validating against the unit under
+test rather than the student's whole action is the same error as driving `factsOf` instead of the gate —
+[[drive-the-reported-path]] one layer up.
+
+- **Every play case runs to the end of the student's action, submit included**, whatever layer the item
+  under test lives at. If the submit is expected to refuse, that refusal belongs in **Look for**.
+- Validate by driving the STORE's submit (`useGeo3.getState().submit` / `runSubmit`), never the
+  component function the fix happens to touch — then read back both the display and `lastError`.
