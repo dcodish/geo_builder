@@ -12819,3 +12819,34 @@ There is no triangle in those givens — both base angles right, the apex 0°, s
 **Measured after.** ✕ on the offending row clears the banner and the figure redraws; mute, undo and clear do the same; cycling the configuration does not. 2-D lane: 417 files / 7216 tests green.
 
 **Consequences.** `app/figureNotes.ts` (new); `App.tsx` (one effect). Lock: `app/__tests__/figure-notes-1338.test.ts` (9).
+
+## ADR-544 — A mark is sized by its CORNER, not by the figure: marks and values shrink to fit, never drop (#1337)
+
+**Status:** accepted, 2026-09-21 · **Issue:** [#1337](https://github.com/dcodish/geo_builder/issues/1337) (bug, `P3`, `2d`) · round [#1345](https://github.com/dcodish/geo_builder/issues/1345) · operator, playing round #1332 T21
+**Requirements:** [02](02-requirements.md) FR-RN — the value-label promise (everything stated is visible), no new row · **Design:** [04](04-design.md) — the render's mark sizing
+**Operator ruling:** *"while this is a rare case, the diagram is bad. I would say that in such a case we show all values very small to fit diagram"*
+
+**Measured before (`bc55676d`)** on «משולש ABC» · «∠ABC = 90» · «∠ACB = 89» — the legitimate 1° apex:
+
+```
+  corner room (B, C)   10.2 px       arc radius drawn   26.0 px      ✘ the mark is wider than its corner
+  an ordinary 60°      553.9 px      arc radius drawn   26.0 px      ✔
+```
+
+B and C sit ten pixels apart and each mark was drawn at 26 px, so the 90° square, the 89° arc and both numbers piled on top of each other and on the segment.
+
+**The class.** *A mark's size is a global constant, so a corner smaller than the mark cannot show it.* The arc radius was `ANGLE_ARC_R * r`, the right-angle square `4 * r`, and the value offset `angleValueOffset(r, fontSize)` — all functions of the FIGURE-WIDE unit `r` and none of the local geometry. Members: two angle marks at vertices closer than 2·arc radius; a value label longer than the side it labels; a right-angle square larger than its corner.
+
+**The figure itself is right** — 89° + 90° is a real triangle, and [ADR-513](#adr-513) measured it above the notice band. This is display only, and nothing about what is DRAWN changes.
+
+**The mechanism.** `markScale(roomPx, r)` in `scene.ts`, pure and beside the constants it scales: a corner's marks are drawn at `min(1, MARK_FIT_FRACTION · room / (ANGLE_ARC_R · r))`, where `room` is the shortest adjacent side in screen px. The arc, the right-angle square and the value's offset all take the same ratio, so a corner's marks shrink together rather than three constants being tuned apart again. `SceneMeasure` carries `ends` — the mark's own adjacent points in world coordinates — so the label and the mark measure the same room and cannot disagree; the renderer converts through the transform it already draws with.
+
+**Shrink, never drop.** A stated value is always visible (the honesty invariant), so `markScale` returns a ratio with a floor and never zero, and the value's font has its own floor at `MIN_MEASURE_FONT_PX` = 8 px — the operator asked for values shown *very small*, not omitted.
+
+**The floor is deliberately TINY (0.05), and that is the part worth recording.** A comfortable floor fights the fit: with `MARK_FIT_FRACTION = 0.35`, two marks at the ends of ONE side occupy at most `0.7 · room` and **therefore cannot touch** — that is a structural guarantee, not a tuning. A floor large enough to keep marks comfortably visible would break it on exactly the smallest corners, where it matters. The first build used 0.18 and the two arcs cleared each other by 0.8 px, which is luck rather than a property. The TEXT floor is what keeps a value readable, and it is separate.
+
+**Measured after.** The needle's corner scales to 0.137: each arc is 3.6 px and the two together are 7.2 px inside a 10.2 px side — they cannot touch, and both numbers still print at 8 px. An ordinary triangle scales to exactly 1 and draws at 26 px, unchanged. 2-D lane: 418 files / 7225 tests green.
+
+**Sibling audit (docs/17 §1).** 3-D's marks are drawn in a projected frame with their own sizing; analytic marks angles only at stated right angles. Neither measured here; the class is the same shape and is noted for whichever is reported first.
+
+**Consequences.** `render/scene.ts` (`markScale`, `labelScale`, `MARK_FIT_FRACTION`, `MIN_MARK_SCALE`, `MIN_MEASURE_FONT_PX`, `SceneMeasure.ends`); `render/Figure.tsx` (the measure-label branch and the angle-mark branch both take the ratio). Lock: `render/__tests__/issue-1337-mark-fit.test.ts` (9), whose centre is the *"the two marks cannot touch"* property over the operator's own figure.

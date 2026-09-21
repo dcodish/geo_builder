@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
-import { ANGLE_ARC_R, angleValueOffset, buildScene, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
+import { ANGLE_ARC_R, MIN_MEASURE_FONT_PX, angleValueOffset, buildScene, labelScale, markScale, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
 // #742 / ADR-W-024: the canvas corner cluster (↺ − +) — one look and one arithmetic in every
 // builder, from the shell contract. (The exports left this file for the top tool row.)
 import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../../shell/frame/canvasControls';
@@ -896,7 +896,22 @@ export function Figure({
               // the mark (#475). Moving outward also carries it AWAY from a vertex sitting on the figure's
               // edge, where the old inside-the-arc placement clipped it against the frame.
               // An AREA label sits AT the polygon's centroid (no offset).
-              const off = m.kind === 'area' ? 0 : m.kind === 'angle' ? angleValueOffset(r, fontSize) : r * 1.4 + fontSize * 0.55;
+              /**
+               * #1337 — THE MARK IS SIZED BY ITS CORNER. A value written for a ~60 px corner cannot be
+               * shown at a corner of 5 px, and the operator's ruling is to shrink everything to fit
+               * rather than drop anything: a stated value stays visible, small.
+               */
+              const ends = m.ends?.map((e) => transform.toScreen(e));
+              const roomPx = ends ? Math.min(...ends.map((e) => Math.hypot(e.x - s.x, e.y - s.y))) : Infinity;
+              const base = fontSize * (m.kind === 'angle' ? 1.05 : 0.85);
+              const k =
+                m.kind === 'angle'
+                  ? markScale(roomPx, r)
+                  : m.kind === 'length' && ends
+                    ? labelScale(Math.hypot(ends[1].x - ends[0].x, ends[1].y - ends[0].y), m.text, base)
+                    : 1;
+              const mFont = Math.max(MIN_MEASURE_FONT_PX, base * k);
+              const off = m.kind === 'area' ? 0 : m.kind === 'angle' ? angleValueOffset(r * k, mFont) : r * 1.4 * k + mFont * 0.55;
               // A measure is a math expression (12√2, 7k/5, 2α, 37°). `MathSvg` lays out a radical (√ + a real
               // vinculum) or a fraction as pure SVG so it EXPORTS (#98 — MathML/foreignObject rasterizes blank);
               // a plain label stays the single haloed <text> it always was. LTR is forced inside so the RTL page
@@ -907,7 +922,7 @@ export function Figure({
                   text={m.text}
                   cx={s.x + sd.x * off}
                   cy={s.y + sd.y * off}
-                  fontSize={fontSize * (m.kind === 'angle' ? 1.05 : 0.85)}
+                  fontSize={mFont}
                 />
               );
             })}
@@ -921,8 +936,12 @@ export function Figure({
               const P2 = transform.toScreen(m.p2);
               const u1 = unitVec({ x: P1.x - V.x, y: P1.y - V.y });
               const u2 = unitVec({ x: P2.x - V.x, y: P2.y - V.y });
+              // #1337 — the shortest adjacent side is the room this corner has; the square and the arc
+              // shrink into it together, so a needle's two marks stop overprinting each other.
+              const roomPx = Math.min(Math.hypot(P1.x - V.x, P1.y - V.y), Math.hypot(P2.x - V.x, P2.y - V.y));
+              const k = markScale(roomPx, r);
               if (m.right) {
-                const s = 4 * r; // right-angle square — a touch larger so it reads clearly (operator request)
+                const s = 4 * r * k; // right-angle square — a touch larger so it reads clearly (operator request)
                 const c1 = `${V.x + u1.x * s},${V.y + u1.y * s}`;
                 const c2 = `${V.x + (u1.x + u2.x) * s},${V.y + (u1.y + u2.y) * s}`;
                 const c3 = `${V.x + u2.x * s},${V.y + u2.y * s}`;
@@ -930,7 +949,7 @@ export function Figure({
               }
               // arc: sample the SHORT signed angle from ray1 to ray2 (the interior angle). Drawn well clear
               // of the vertex so it's obvious WHICH angle is marked, not a tiny nick at the corner (operator).
-              const ar = ANGLE_ARC_R * r;
+              const ar = ANGLE_ARC_R * r * k;
               const th1 = Math.atan2(u1.y, u1.x);
               let dth = Math.atan2(u2.y, u2.x) - th1;
               while (dth > Math.PI) dth -= 2 * Math.PI;
