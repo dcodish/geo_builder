@@ -1110,11 +1110,14 @@ of 6 configurations** — the tool clipping the one thing the question was about
 has collapsed does not widen the frame: it is not on the canvas, and zooming out for something
 invisible is the same failure pointing the other way.
 
-**Still open, and it is a ruling:** the frame is re-fitted from nothing on every «הציגו תצורה אחרת»,
-so with a symbolic parameter it lurches — measured, its width varies by a factor of 2.6 and its
-centre swings from +55 to −63. What that control should feel like (a frame kept while only the
-figure moves · a scale normalised by the parameter · a clamp on how far it may move) is a product
-decision, and is #1198's second symptom.
+**And the frame stays put across «הציגו תצורה אחרת»** ([ADR-AG-137](06c-decisions-analytic.md#adr-ag-137),
+[#1262](https://github.com/dcodish/geo_builder/issues/1262) — #1198's second symptom, ruled
+2026-09-20: *"fit once, then the frame is the student's"*). The control changes the DRAWING inside a
+frame that stays where it was — flipping transparencies on one projector — and whatever zoom or pan
+the student had is kept. The frame re-fits only when the new configuration has largely left it, the
+same rule that governs a new fact; a configuration much larger or smaller than the first may then be
+badly framed, and re-centre is the escape hatch. Measured on the figure above: the shown window is
+identical at every press (was a factor of 3 in width and a ±60 swing in centre).
 
 **The tool never grades.** The student does not type a claimed equation to be marked ✓ or ✗ (operator,
 2026-09-16: *"I dont want a validation tool"* — ADR-AG-072 §6, amending
