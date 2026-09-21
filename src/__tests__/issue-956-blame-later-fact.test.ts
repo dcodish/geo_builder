@@ -38,7 +38,7 @@ const ORDER_B = ['משולש ABC', 'זווית BCA = 50', 'α = 70', 'זווית
 describe('#956 — the value line takes the blame it earned', () => {
   it('ordering A: «α = 70» is red and «זווית ABC = α» is green', () => {
     const { facts, fig } = run(ORDER_A);
-    expect(fig.lastError, 'the figure really is over-constrained').toMatch(/cannot hold/);
+    expect(fig.lastError, 'the figure really is over-constrained').toMatch(/cannot hold|^impossible: the angles of/);
     expect(redRows(fig, facts)).toEqual(['α = 70']);
   });
 
@@ -69,7 +69,7 @@ describe('#956 — what must NOT change', () => {
     // The case a careless fix breaks: here «זווית CAB = 70» IS the line that flipped the figure, so
     // naming it is already correct. Measured on the pre-fix build and unchanged by ADR-492.
     const { facts, fig } = run(ORDER_B);
-    expect(fig.lastError).toMatch(/cannot hold/);
+    expect(fig.lastError).toMatch(/cannot hold|^impossible: the angles of/);
     expect(redRows(fig, facts)).toEqual(['זווית CAB = 70']);
   });
 
@@ -81,7 +81,7 @@ describe('#956 — what must NOT change', () => {
 
   it('a plain numeric given that fails is still blamed itself — no symbol, no redirect', () => {
     const { facts, fig } = run(['משולש ABC', 'זווית BCA = 50', 'זווית CAB = 70', 'זווית ABC = 80']);
-    expect(fig.lastError).toMatch(/cannot hold/);
+    expect(fig.lastError).toMatch(/cannot hold|^impossible: the angles of/);
     expect(redRows(fig, facts)).toEqual(['זווית ABC = 80']);
   });
 
@@ -95,13 +95,13 @@ describe('#956 — what must NOT change', () => {
 describe('#956 — the CLASS: any lane where the number arrives from another row', () => {
   it('the LENGTH lane has the same defect and the same fix', () => {
     const { facts, fig } = run(['משולש ABC', 'BC = 4', 'AC = 5', 'זווית ABC = 90', 'AB = x', 'x = 8']);
-    expect(fig.lastError).toMatch(/cannot hold/);
+    expect(fig.lastError).toMatch(/cannot hold|^impossible: the angles of/);
     expect(redRows(fig, facts), 'the value line, not «AB = x»').toEqual(['x = 8']);
   });
 
   it('the RESTATED value is the one blamed — the last set-var wins, as the symbol table does', () => {
     const { facts, fig } = run(['משולש ABC', 'BC = 4', 'AC = 5', 'זווית ABC = 90', 'AB = x', 'x = 3', 'x = 8']);
-    expect(fig.lastError).toMatch(/cannot hold/);
+    expect(fig.lastError).toMatch(/cannot hold|^impossible: the angles of/);
     expect(redRows(fig, facts), 'the second value is what broke it').toEqual(['x = 8']);
   });
 

@@ -157,6 +157,15 @@ export const PATTERNS: Pattern[] = [
       sides: `|${m[4]}${m[6]}| + |${m[6]}${m[5]}|`,
     }),
   },
+  // metricFeasibility.ts (#1329, ADR-538) — `impossible: the angles of ABC sum to 200°, exceeding 180°: ∠ABC = 100°, ∠ACB = 100°`
+  // The triangle wording is the curriculum's own sentence («סכום הזוויות במשולש הוא 180°»); a longer
+  // ring states its own bound instead.
+  {
+    re: /^impossible: the angles of (\S+) sum to (\S+), exceeding (\S+): (.*)$/,
+    key: 'errors.angleSumImpossible',
+    keyOf: (m) => (m[3] === '180°' ? 'errors.angleSumImpossibleTriangle' : 'errors.angleSumImpossiblePolygon'),
+    params: (m) => ({ poly: m[1], sum: m[2], bound: m[3], angles: m[4] }),
+  },
   // step.ts danglingCircleError (#186) — `circle 'O2' is not defined`
   { re: /^circle '(.+)' is not defined$/, key: 'errors.unknownCircle', params: (m) => ({ center: m[1] }) },
 

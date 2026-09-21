@@ -23,6 +23,10 @@ const CASES: { raw: string; contains: string[] }[] = [
   // Added by #983's coverage gate, which found this pattern carried no evidence row at all.
   { raw: 'impossible: |AC| = 9 exceeds 8, the distance from A to C via B', contains: ['|AC|', '9'] },
   { raw: 'impossible: |AD| = 20 exceeds 12, the distance from A to D via B, C', contains: ['|AD|', '20'] },
+  // metricFeasibility.ts (#1329, ADR-538) — the angle twin, BOTH wordings: the triangle sentence at a
+  // 180° bound and the general polygon sentence otherwise.
+  { raw: 'impossible: the angles of ABC sum to 200°, exceeding 180°: ∠ABC = 100°, ∠ACB = 100°', contains: ['∠ABC = 100°', '200°'] },
+  { raw: 'impossible: the angles of ABCD sum to 400°, exceeding 360°: ∠DAB = 100°, ∠ABC = 100°, ∠BCD = 100°, ∠CDA = 100°', contains: ['ABCD', '400°', '360°'] },
   // core.ts (#926) — a variable whose defining step was removed, muted or failed. Same finding.
   { raw: 'variable α is not defined by any statement (the step that defined it was removed, muted or failed)', contains: ['α'] },
   // step.ts danglingCircleError (#186) — a reference to a circle that doesn't exist

@@ -14,7 +14,7 @@
  */
 
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { metricImpossibility } from '@/engine/metricFeasibility';
+import { angleSumImpossibility, metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
@@ -1541,6 +1541,10 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   // AC=9» the free radius and placement do move |AC|, so the impossibility was reported as a pending
   // info state. Where impossibility is provable, say so.
   if (metricImpossibility(probe.constraints)) return false;
+  // #1329 (ADR-538): the angle twin — «∠ABC = 100» · «∠ACB = 100» on a triangle. The residual moves
+  // across seeds (the free apex changes both angles), which is not whether it can reach zero; the
+  // polygon's own angle sum proves it cannot.
+  if (angleSumImpossibility(probe.objects, probe.constraints)) return false;
   return newCons.some((con) => {
     const vals: number[] = [];
     for (const s of [0, 1, 2, 3, 4]) {

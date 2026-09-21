@@ -2381,7 +2381,7 @@ export const SCENARIOS_4: Scenario[] = [
       "operator, playing round #949 T2 (2026-09-09): \"despite getting an honest error message that it is impossible, the diagram still put 70 instead of alpha.\" Measured: the α line was correctly refused (70 + 50 leaves 60 at B), the figure was drawn right, and the canvas STILL wrote «70°» at B — the three labels summed to 190° — with violations = [], because a label is not a constraint. The symbolic-measure label seam ran at the top of the fold loop, BEFORE applyStep, so a fact that was then refused had already annotated the figure with a number resolved through the whole-list symbol table («α = 70» binds wherever it sits). The other two label sources (#474's stated-magnitude pass, the constraint fill) were always gated on the outcome; this one was not. ADR-491 moves the seam to the fact's SUCCESS branch (in-order pass AND the ADR-104 retry) and adds the verifier check the ruling required — a numeric label must agree with the drawing. Ruling: a refused measure writes NOTHING, not its letter either («α = 70» still reads green in the list, so «α» on the corner would still say 70). This scenario is the operator's exact sequence: B carries no label, A and C keep their true 70° and 50°, the drawn angle at B is 60°, and the printed labels no longer sum to 190°.",
     steps: ['משולש ABC', 'זווית BCA = 50', 'זווית CAB = 70', 'זווית ABC = α', 'α = 70'],
     check(fig) {
-      expect(fig.lastError, 'the α line is genuinely refused').toMatch(/cannot hold/);
+      expect(fig.lastError, 'the α line is genuinely refused').toMatch(/cannot hold|^impossible: the angles of/);
       // anti-vacuity: the figure really is in the refused state. #956 (ADR-492) moved the BLAME to the
       // VALUE line — «α = 70» is the statement that turned a feasible figure infeasible — so g4 is the
       // red row and the α-definition (g3) is green again. That green is exactly why this scenario still
@@ -2420,7 +2420,7 @@ export const SCENARIOS_4: Scenario[] = [
     steps: ['משולש ABC', 'זווית BCA = 50', 'זווית CAB = 70', 'זווית ABC = α', 'α = 70'],
     expectViolations: true, // the α line is INTENTIONALLY refused — the kept figure is the prior one
     check(fig) {
-      expect(fig.lastError, 'the honest over-constrained refusal').toMatch(/cannot hold/);
+      expect(fig.lastError, 'the honest over-constrained refusal').toMatch(/cannot hold|^impossible: the angles of/);
       // `factsOf` groups by typed step: g4 is «α = 70». The refusal must be owned by that group and by
       // no other — counting GROUPS, not facts, because one utterance can lower to several commands.
       const redGroups = new Set(
@@ -2640,6 +2640,25 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs(dist(A, B) - dist(A, C))).toBeLessThan(1e-6 * dist(A, B));
       expect(dist(B, C) / dist(A, B), 'not a needle').toBeGreaterThan(0.1);
       expect(fig.degeneracies).toEqual([]);
+    },
+  },
+  {
+    id: 'angle-sum-contradiction-not-pending-1329',
+    title: '#1329 / ADR-538: «∠ABC = 100» · «∠ACB = 100» on a triangle is refused as IMPOSSIBLE — two angles past 180° are a contradiction, never a pending «add the remaining givens»',
+    guards:
+      "Found fixing #1328 (2026-09-21). The solver never finds a solution (the apex would be negative), the step fails on its own, and the fold's classifier filed the failure as PENDING because the figure still had freedom and the flex probe saw the residual move — the angle twin of #420 (ADR-417). The angle-sum prover beside the metric prover proves the excess before the ladder runs: a strict excess over the polygon's own (n − 2)·180° is refused naming the angles and the bound, and because it is PROVEN it is never pending. The prior figure — the triangle with its 100° at B — stands.",
+    steps: ['משולש ABC', '∠ABC = 100', '∠ACB = 100'],
+    expectViolations: true,
+    check: (fig) => {
+      const entries = Object.entries(fig.status);
+      const last = entries[entries.length - 1]!;
+      expect(String(last[1]), 'refused as impossible, naming the angles and the bound').toMatch(/^impossible: the angles of ABC sum to 200°, exceeding 180°: ∠ABC = 100°, ∠ACB = 100°$/);
+      expect(fig.pending, 'a proven contradiction is never a pending info state').toBe(false);
+      // keep-prior: the triangle with its stated 100° at B is still there
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      const ux = A.x - B.x, uy = A.y - B.y, vx = C.x - B.x, vy = C.y - B.y;
+      const deg = (Math.acos((ux * vx + uy * vy) / (Math.hypot(ux, uy) * Math.hypot(vx, vy))) * 180) / Math.PI;
+      expect(deg, '∠ABC = 100° survives').toBeCloseTo(100, 1);
     },
   },
 ];

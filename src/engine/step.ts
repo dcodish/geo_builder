@@ -17,7 +17,7 @@ import { circleCircleIntersect, dist, isRingDiagonal, sub } from './geometry';
 import { budgetExceeded } from './solveBudget';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 import { componentOf, minimalComponentOf } from './components';
-import { metricImpossibility, metricImpossibilityError } from './metricFeasibility';
+import { angleSumImpossibility, angleSumImpossibilityError, metricImpossibility, metricImpossibilityError } from './metricFeasibility';
 import { degeneratePolygons, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
 import { applySeed, freeDofs } from './sample';
 import { constraintKey, constraintRefs, describeConstraint, solvedOnSegmentCandidates } from './solve';
@@ -825,9 +825,18 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   // HONEST: without this the contradiction reached `constraintIsPending`, whose "the residual moves"
   // probe called it a deferrable PENDING state. Sound one way only — a violation proves impossibility;
   // passing proves nothing and the ordinary ladder still runs.
-  const metricErr = metricImpossibility(applyCommand(prev, cmd).constraints);
+  const probed = applyCommand(prev, cmd);
+  const metricErr = metricImpossibility(probed.constraints);
   if (metricErr) {
     return { ok: false, error: metricImpossibilityError(metricErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  }
+  // #1329 (ADR-538): the angle twin — a declared polygon's stated interior angles summing past
+  // (n − 2)·180° is impossible in the plane. Without this the solver found nothing, the step failed on
+  // its own, and the classifier's flex probe filed the contradiction as a PENDING "add the remaining
+  // givens". Same one-way soundness as the metric gate above.
+  const angleErr = angleSumImpossibility(probed.objects, probed.constraints);
+  if (angleErr) {
+    return { ok: false, error: angleSumImpossibilityError(angleErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
 
   // #966 (ADR-499) — A ROLE CLAIM IS CHECKED AGAINST THE FIGURE THAT IS ALREADY THERE.
