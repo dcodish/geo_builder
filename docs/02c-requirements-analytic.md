@@ -867,6 +867,17 @@ coordinate join it as members, not as new rules. «m<0» remains a parameter dec
 the corpus's declare-before-use) — and a declared symbol nothing uses is marked as such in the panel, so a
 student who meant a slope is told.
 
+**R111 — a word the tool does not know is REFUSED in a value slot, never absorbed as parameters**
+([ADR-AG-145](06c-decisions-analytic.md#adr-ag-145),
+[#1321](https://github.com/dcodish/geo_builder/issues/1321)). «שיפוע הישר l1 הוא tan(30)» must be refused
+naming the sentence, not accepted as `t·a·n·30`. The promise is the honesty invariant applied to the
+expression layer: **a stated magnitude is never silently reinterpreted.** `√` is the only function the tool
+has; every other letter run in a value slot is either the exam's juxtaposed parameters (`2a`, `2ax`, `25k²`
+— kept, they are the corpus's own notation) or a word, and a word is a refusal the student can see. The same
+promise covers the tool's own vocabulary: a measure noun the tool writes into its catalog («the distance
+between A and B») must be CONSUMED by the rule that claims it, because a leftover word is a phantom
+parameter and a phantom parameter makes the given satisfiable at any value.
+
 **R61 — a value is called KNOWN only if it holds across configurations that actually DIFFER**
 ([ADR-AG-126](06c-decisions-analytic.md#adr-ag-126)). The data panel may present a number as determined
 only when the givens determine it — never because the three configurations it happened to sample were the

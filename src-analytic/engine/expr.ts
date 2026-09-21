@@ -85,6 +85,13 @@ type Tok =
  */
 const SYMBOL_RE = /[A-Za-z-]/;
 
+/**
+ * The LATIN half of `SYMBOL_RE`, separately, because the letter-run rules below are about what a
+ * student can type. The private-use range is `lengths.ts`'s encoding of a length term (`AB` as one
+ * character) and can never appear in student input, so it is never a "run" and is never refused.
+ */
+const LATIN_RE = /[A-Za-z]/;
+
 function tokenize(src: string): Tok[] | null {
   const out: Tok[] = [];
   let i = 0;
@@ -104,6 +111,39 @@ function tokenize(src: string): Tok[] | null {
       continue;
     }
     if (SYMBOL_RE.test(c)) {
+      /**
+       * A LETTER RUN IS NOT AUTOMATICALLY A PRODUCT OF PARAMETERS (#1321).
+       *
+       * Juxtaposition is why this parser is hand-written — `2a`, `2ax`, `25k²` are products in the
+       * exam's notation. But the same rule read `tan(30)` as `t·a·n·30`, minting three symbols the
+       * student never wrote: the register takes its parameters from what expressions USE (#1014), so
+       * those became free DOF and the residual could always be driven to zero. «שיפוע l1 הוא tan(30)»
+       * on `y=2x` therefore built GREEN — a false given, drawn. `√` is the only function in this
+       * language (`sqrt` normalises to it above), so an unknown letter run is not a function the tool
+       * has, and an honest grammar must say which letter runs are symbols.
+       *
+       * **The word test is not invented here.** `parseAnalytic`'s `HAS_A_WORD` already answers
+       * *"is this letter run a word?"* for the bare-equation branch, and #1068 ruled its boundary:
+       * SPACE-DELIMITED and ≥3 letters, deliberately, so that `x²+y²-2abc=0` stays a legal product
+       * of juxtaposed parameters. That decision stands and its lock is untouched. The defect #1321
+       * reports is that the test guarded **one branch** — a value slot inside a recognised sentence
+       * never passed through it. It moves HERE, the tokenizer every value slot in the grammar routes
+       * through, so one place makes every sentence honest at once (docs/17 — the chokepoint, never
+       * the calling rule, and never a list of function names, which would miss the next one).
+       *
+       * One boundary is added, for the form the word test cannot see: a run applied to `(`.
+       * `tan(30)` is not space-delimited, and a function APPLICATION is unambiguous — `√` is the
+       * only function there is. A single letter keeps juxtaposition, because `k(x+1)` is a product
+       * and the corpus writes it.
+       */
+      if (LATIN_RE.test(c)) {
+        let j = i;
+        while (j < src.length && LATIN_RE.test(src[j])) j += 1;
+        const run = j - i;
+        const spaceDelimited = (i === 0 || src[i - 1] === ' ') && (j === src.length || src[j] === ' ');
+        if (run >= 3 && spaceDelimited) return null; // a WORD — #1068's ruled boundary
+        if (run >= 2 && src[j] === '(') return null; // a function APPLICATION — the only function is √
+      }
       out.push({ t: 'sym', v: c });
       i += 1;
       continue;

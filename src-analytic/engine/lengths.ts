@@ -164,7 +164,17 @@ const LENGTH_TOKEN = /([A-Z][0-9]?)([A-Z][0-9]?)/g;
 const OPERAND = String.raw`[A-Za-zℓ][0-9]?[A-Z]?[0-9]?`;
 /** An optional noun before either operand -- «המרחק מ-C לישר AB». */
 const NOUN = String.raw`(?:ה?(?:ישר|קטע|צלע)\s+|(?:the\s+)?line\s+)?`;
-const DISTANCE = String.raw`(?:ה?מרחק|[Dd]istance)\s+`;
+/**
+ * The noun, with its ARTICLE — Hebrew's is a prefix (`ה?מרחק`) and English's is a separate word.
+ *
+ * «the distance between A and B» left `the ` unconsumed, and #1321's measurement is what exposed
+ * it: the remainder went to `parseExpr`, which multiplied the leftover letters as juxtaposed
+ * parameters, so the catalog's own F19 English row built `t·h·e·|AB| = 10` — three phantom free
+ * symbols against the real distance term, satisfiable at any length. The row parsed, so the
+ * catalog lock was green while the constraint it built was false. `NOUN` below already spells the
+ * article for `line`; the measure noun simply never did.
+ */
+const DISTANCE = String.raw`(?:ה?מרחק|(?:the\s+)?[Dd]istance)\s+`;
 const frame = (open: string, join: string) =>
   // `String.raw`, not a plain template: a template literal drops the backslash in `\s`, which would
   // silently turn every gap in these frames into a literal «s».

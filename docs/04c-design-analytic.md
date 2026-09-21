@@ -270,6 +270,41 @@ shape the relation and slope rules use — therefore took #1075’s area-as-a-te
 away, measured as seven failing locks. Giving the blocks a real fall-through means reworking the decline
 contract for every rule in the function; until that is worth doing, precedence inside `parseConstraint` is
 expressed as an explicit guard at the rule that must yield.
+## A letter run is not automatically a product ([ADR-AG-145](06c-decisions-analytic.md#adr-ag-145))
+
+`expr.ts` multiplies by JUXTAPOSITION — that is the whole reason it is hand-written rather than a one-line
+eval, because `2a`, `4√5`, `25k²` and `2ax` are all products in the notation the exam prints. Its atom
+grammar has exactly one function, `√`, and `normalizeMath` maps `sqrt` onto it before the tokenizer runs.
+Everything else that looks like a function is a run of letters — so `tan(30)` was `t·a·n·30`, and because
+the parameter register is built from the symbols expressions USE, those three letters became free DOF that
+could satisfy any residual.
+
+**Where the decision lives.** *Which letter runs are symbols* is answered in `tokenize`, and nowhere else.
+Every value slot in the grammar reaches a number through `parseExpr`, so the tokenizer is the chokepoint;
+putting the test in a calling rule would fix one sentence and leave the class alive in every other slot,
+which is what happened when [ADR-AG-144](06c-decisions-analytic.md#adr-ag-144) fixed the slope-sign sentence.
+
+**Two rules, both about the RUN and neither about a name:**
+
+| the run | verdict | why |
+| --- | --- | --- |
+| ≥3 Latin letters, SPACE-DELIMITED | refused — a word | [#1068](https://github.com/dcodish/geo_builder/issues/1068)'s ruled boundary, moved here from `HAS_A_WORD` |
+| ≥2 Latin letters immediately before `(` | refused — a function application | `√` is the only function; a space cannot delimit `tan(30)` |
+| 1 letter before `(` | kept | `k(x+1)` is a product, and the corpus writes it |
+| ≥3 letters NOT space-delimited | kept | `x²+y²-2abc=0` — juxtaposed parameters, ruled legal by #1068 |
+| the private-use range | never a run | `lengths.ts` encodes a length term (`AB`) as one character; it cannot appear in student input |
+
+**No list of function names appears anywhere in the fix or its lock.** A list catches `tan` and misses
+`arctan`; the run test catches both, and the one after them.
+
+**The noun must be consumed by the rule that claims it.** The corollary this fix surfaced: a leftover word
+from the tool's OWN vocabulary is the same defect. `DISTANCE` in `lengths.ts` matched `ה?מרחק` (Hebrew's
+article is a prefix) and `[Dd]istance` (English's is a separate word, and was not matched), so
+«the distance between A and B = 10» lowered to `t·h·e·|AB| = 10` and pinned nothing. `NOUN` beside it
+already spelled `(?:the\s+)?line\s+`; the measure noun now spells its article the same way. The general
+rule for any new frame: **if the frame does not consume the whole noun phrase, the remainder becomes free
+parameters and the given silently stops constraining.**
+
 ## The parser's last branch: a bare equation ([ADR-AG-019](06c-decisions-analytic.md#adr-ag-019))
 
 `parseLine` ends with a branch that accepts an equation carrying no noun at all — `x-y+2=0`,
