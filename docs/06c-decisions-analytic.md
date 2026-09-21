@@ -7290,3 +7290,39 @@ Three orders of margin on a metric that shrinks what it measures — and [#1235]
 **Sibling audit (docs/17 §1).** 2-D and 3-D have no equation-defined curve objects — a line there is a segment or a construction — so one equation cannot arrive under two ids. Analytic-only.
 
 **Consequences.** `engine/apply.ts` (`identicalCurve`, `IDENTICAL_COEF_TOL`, the twin scan at the curve arm); `app/submit.ts` (a `narrowed` line records). Lock: `__tests__/issue-1342-curve-identity.test.ts` (10).
+
+## ADR-AG-148 — Notation has ONE owner: `curveText.ts` takes the symbolic case, and the numeric case delegates to `lineText` (#1299)
+
+**Status:** accepted, 2026-09-21 · **Issue:** [#1299](https://github.com/dcodish/geo_builder/issues/1299) (bug, `P3`, `analytic`) · round [#1345](https://github.com/dcodish/geo_builder/issues/1345) · not reported — found in the operator's 2026-09-20 screenshot while triaging #1296/#1297/#1298
+**Requirements:** none (internal — the equation shown is the same equation) · **Design:** [04c](04c-design-analytic.md#notation-has-one-owner-adr-ag-148) (new section)
+
+**Measured before (`b85e8350`).** The student typed `(k+1)x+2y-12+5k=0` and the panel printed:
+
+```
+  (k+1)x+2y-12+5k=0   ->  (k + 1)·x + 2·y - 12 + 5·k - 0 = 0     <- a «- 0» they never wrote
+  2x-y+8=0            ->  2·x - y + 8 - 0 = 0
+  kx+y=3              ->  k·x + y - 3 = 0
+  y=2x-4              ->  y - (2·x - 4) = 0
+```
+
+**The class — two printers answer one question and only one of them knows the answer.** The question is *how is a line's equation written for a student?* `app/curveText.ts`'s `lineText` is the NOTATION printer and says so in its own docblock: *"the way a textbook writes it: no `1x`, no `+ 0`, no `+ -3`"*. `App.tsx`'s `openCurveText` printed `exprText(eq) + ' = 0'`, and `exprText` is the ALGEBRAIC printer — its docblock is about precedence and minimal parenthesisation, and it is right for that. It has no zero-suppression, no `1x` rule and no implicit-product rule, because those are notation decisions and **it was never told it was making them**.
+
+**The split was by ACCIDENT of representation, not by intent.** `lineText` takes three NUMBERS, and a curve still carrying a parameter has none — so a student saw textbook notation exactly until they introduced a parameter, which is the moment the equation is hardest to read and they most need it. This is the [ADR-AG-130](#adr-ag-130) Defect-2 shape (*two answers to one question*) in the display layer.
+
+**The mechanism.** `curveText.ts` — this tree's equation-notation module, as `format.ts` is its number module — gains the symbolic case. `curveEquationText(eq)` splits a linear left-hand side into its `x`, `y` and constant TERMS, each keeping its own sign, and applies `lineText`'s three rules where the expression lets them be decided: a term that is zero is not printed, a unit coefficient is suppressed, and the sign is folded into the connective. Where a coefficient is a parameter expression none of the three can be decided, so it is printed as it stands, bracketed — `(k + 1)x` is what a textbook writes and `k + 1x` would be a different equation. `exprText` is unchanged and is called for the coefficient BODIES; this is a layer above it.
+
+**Every coefficient numeric ⇒ it DELEGATES to `lineText`.** That is what makes *"the two rows agree"* a fact about the code rather than a test that has to be kept in step, and it is also what keeps [#1180](https://github.com/dcodish/geo_builder/issues/1180)'s fraction clearing: a symbolic path that re-decided numeric notation would have quietly lost it.
+
+**The `= 0` normalisation, the actual reported symptom.** A stated `LHS = RHS` is held as `LHS - RHS`, and with `RHS = 0` — how most of the corpus writes a line — the subtraction was printed literally. Removed by **not building it into the printed form**, never by pattern-matching `- 0` out of a string, so it also holds for the conic fallback.
+
+**Terms are kept as a LIST, not summed, and that was measured.** The first build lumped «-12» and «5k» into one constant coefficient and printed `+ -12 + 5·k` — sign-folding is one of the three rules, and the sign belongs to the term.
+
+**Two things deliberately NOT decided here.**
+- **`y - (2·x - 4) = 0`.** Printing the equation *as the student stated it* means keeping the stated sides, which is a change to what the curve object REMEMBERS, not to the printer. Out of scope, and not quietly widened into — the row now reads `-2x + y + 4 = 0`, which is correct textbook notation of the same equation.
+- **The `·`.** Still a notation ruling the operator has not given, and #1082/#1097 put this panel under MathML where the answer may differ again. It DOES disappear between a coefficient and its variable (`(k + 1)x`, `kx`) — not as a new ruling, but because that is the answer `lineText` already shipped for the numeric case and the two printers now agree. Inside a coefficient body it remains (`5·k`), which is `exprText`'s to decide. Flagged, not settled.
+
+**Measured after.** `(k + 1)x + 2y - 12 + 5·k = 0` · `2x - y + 8 = 0` · `kx + y - 3 = 0` · `y - 3 = 0` · `x - 15 = 0`. Analytic lane: 158 files / 2305 tests green.
+
+**Sibling audit (docs/17 §1).** 2-D and 3-D print no equations — a line there is a segment or a construction. Analytic-only.
+
+**Consequences.** `app/curveText.ts` (`curveEquationText`, `linearCoefficients`, `signedTerms`, `factors`, `symbolicTerm`); `App.tsx` (`openCurveText` calls it). Lock: `__tests__/issue-1299-symbolic-notation.test.ts` (14), whose centre is the seven-row agreement table between the two paths.

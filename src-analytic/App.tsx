@@ -24,7 +24,7 @@ import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/
 import { INITIAL_VIEW, carryWindow, centreOf, figureIsVisible, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { fmtAnalytic } from './format';
-import { curveDetailsKey, curveParts } from './app/curveText';
+import { curveDetailsKey, curveEquationText, curveParts } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { isDirectionSymbol, paramRegister, reportedDof, usedSymbols } from './engine/carriers';
 import { derive } from './engine/derive';
@@ -1954,7 +1954,11 @@ const askDismiss: CSSProperties = {
  */
 function openCurveText(d: ReturnType<typeof derive>, id: string): string {
   const o = d.construction.objects.find((q) => q.id === id);
-  if (o?.kind === 'curve') return `${exprText(o.curve.eq)} = 0`;
+  // #1299 — notation has ONE owner (`curveText.ts`), and it delegates to `lineText` for a line whose
+  // coefficients are numbers, so this row and a determined line's row cannot disagree. `exprText` is
+  // the ALGEBRAIC printer and was never a notation decision; it printed the student's own equation
+  // with a trailing `- 0` it never wrote.
+  if (o?.kind === 'curve') return curveEquationText(o.curve.eq);
   if (o?.kind === 'circle-at') return `O(${o.centre}), r = ${exprText(o.r)}`;
   return '—';
 }

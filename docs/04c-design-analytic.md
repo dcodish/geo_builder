@@ -270,6 +270,34 @@ shape the relation and slope rules use — therefore took #1075’s area-as-a-te
 away, measured as seven failing locks. Giving the blocks a real fall-through means reworking the decline
 contract for every rule in the function; until that is worth doing, precedence inside `parseConstraint` is
 expressed as an explicit guard at the rule that must yield.
+## Notation has one owner ([ADR-AG-148](06c-decisions-analytic.md#adr-ag-148))
+
+`app/curveText.ts` is this tree's equation-NOTATION module, the way `format.ts` is its number module.
+`engine/expr.ts`'s `exprText` is the ALGEBRAIC printer: precedence and minimal parenthesisation, and
+nothing about how a student reads an equation. The two are not interchangeable, and the panel calling
+the algebraic one is how a line printed a `- 0` the student never wrote.
+
+| the equation | printed by | why |
+| --- | --- | --- |
+| all coefficients numeric | `lineText`, **via** `curveEquationText` | one owner; #1180's fraction clearing lives there |
+| a coefficient carries a parameter | `curveEquationText` | the same three rules, applied where the expression lets them be |
+| a coefficient BODY | `exprText` | algebra inside a coefficient is algebra |
+| not linear in x and y | `exprText`, as a fallback | there is no notation decision to make |
+
+**The three rules**, stated once in `lineText`'s docblock and applied by both paths: a term that reads
+as zero is not printed · a unit coefficient is suppressed · the sign is folded into the connective
+(never `+ -3`). Terms are carried as a LIST with their signs rather than summed, because the sign
+belongs to the term — summing them printed `+ -12 + 5·k`.
+
+**A stated `LHS = RHS` is held as `LHS - RHS`.** When `RHS` is zero the subtraction is not BUILT into
+the printed form. Doing it structurally rather than by stripping `- 0` from a string is what makes it
+hold for the conic fallback too.
+
+**The delegation is the lock.** Because the numeric case calls `lineText` rather than re-deciding, a
+determined line's row and a parametric line's row cannot drift apart — the test asserts equality of the
+two paths, which would be a re-implementation if they were two independent printers
+([ADR-W-053](06w-decisions-workspace.md)).
+
 ## Curve identity at the M1 boundary ([ADR-AG-147](06c-decisions-analytic.md#adr-ag-147))
 
 Two predicates answer two different questions about two curves, and they are deliberately not the same

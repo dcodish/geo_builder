@@ -34,6 +34,7 @@
 import { fmtAnalytic, fractionClearingFactor } from '../format';
 import { ellipseFoci, parabolaFocus } from '../engine/curves';
 import { isVerticalLine } from '../engine/lines';
+import { evalExpr, exprText, isConstant, symbolsOf, type Expr } from '../engine/expr';
 import type { NumCurve } from '../engine/types';
 import type { LocusShape } from '../engine/locusFit';
 
@@ -61,6 +62,168 @@ export function lineText(a0: number, b0: number, c0: number): string {
   // A leading `+ ` is noise; a leading `- ` is a sign and stays attached.
   const body = parts.startsWith('+ ') ? parts.slice(2) : parts.replace(/^- /, '-');
   return `${body} = 0`;
+}
+
+/**
+ * THE SYMBOLIC CASE OF THE SAME QUESTION (#1299) — *how is a line's equation written for a student?*
+ *
+ * Two printers were answering it and only one of them knew the answer. `lineText` above is the
+ * NOTATION printer and its rules are stated in its own docblock; `App.tsx` printed a parametric line
+ * with `exprText(eq) + ' = 0'`, and `exprText` is the ALGEBRAIC printer — its job is precedence and
+ * minimal parenthesisation, and it is right for that. It has no zero-suppression and no `1x` rule
+ * because those are notation decisions and it was never told it was making them.
+ *
+ * The split was by ACCIDENT of representation: `lineText` takes three NUMBERS, so a curve still
+ * carrying a parameter could not use it. The student therefore saw textbook notation exactly until
+ * they introduced a parameter — the moment the equation is hardest to read. Measured on the
+ * operator's own line: `(k + 1)·x + 2·y - 12 + 5·k - 0 = 0`.
+ *
+ * So notation gets ONE owner, here, and the numeric case DELEGATES to `lineText` rather than
+ * re-deciding anything — which is what makes "the two rows agree" a structural fact rather than a
+ * test that has to be kept in sync ([ADR-W-053](../../docs/06w-decisions-workspace.md#adr-w-053)).
+ *
+ * **Deliberately NOT in scope.** The `·` between a coefficient and its variable is a notation ruling
+ * the operator has not given, it is visible in BOTH printers, and #1082/#1097 put this panel under
+ * MathML where the answer may differ again. And `y - (2·x - 4) = 0` — the student's own equation
+ * turned inside out — needs the curve to REMEMBER the sides it was stated with, which is a change to
+ * the object and not to the printer. Both are flagged, neither is decided here.
+ */
+
+/** One signed term of a flattened `+`/`-` chain. */
+interface SignedTerm {
+  sign: 1 | -1;
+  e: Expr;
+}
+
+/** Flatten an add/sub/neg tree into signed terms, so notation can be decided per term. */
+function signedTerms(e: Expr, sign: 1 | -1 = 1, out: SignedTerm[] = []): SignedTerm[] {
+  if (e.kind === 'add') {
+    signedTerms(e.a, sign, out);
+    signedTerms(e.b, sign, out);
+  } else if (e.kind === 'sub') {
+    signedTerms(e.a, sign, out);
+    signedTerms(e.b, (sign * -1) as 1 | -1, out);
+  } else if (e.kind === 'neg') {
+    signedTerms(e.a, (sign * -1) as 1 | -1, out);
+  } else {
+    out.push({ sign, e });
+  }
+  return out;
+}
+
+/** Flatten a `*` chain into its factors. `div` is left alone — it is not a product. */
+function factors(e: Expr, out: Expr[] = []): Expr[] {
+  if (e.kind === 'mul') {
+    factors(e.a, out);
+    factors(e.b, out);
+  } else {
+    out.push(e);
+  }
+  return out;
+}
+
+const PLANE_VARS = new Set(['x', 'y']);
+
+/** Does this expression mention the plane's own variables at all? */
+const mentionsPlaneVar = (e: Expr): boolean => symbolsOf(e).some((s) => PLANE_VARS.has(s));
+
+/**
+ * Split a linear equation's left-hand side into its `x`, `y` and constant terms, each keeping its own
+ * SIGN.
+ *
+ * Kept as lists rather than summed, because the sign belongs to the term: lumping «-12» and «5k» into
+ * one coefficient printed «+ -12 + 5·k», and folding the sign into the connective is one of the three
+ * rules this whole change exists to apply.
+ *
+ * `null` when the expression is not linear in `x` and `y` — a conic, a power, a variable in a
+ * denominator — and the caller then falls back to the algebraic printer, which is honest: it prints
+ * the same equation, just without the notation polish.
+ */
+function linearCoefficients(eq: Expr): { x: SignedTerm[]; y: SignedTerm[]; c: SignedTerm[] } | null {
+  const parts: { x: SignedTerm[]; y: SignedTerm[]; c: SignedTerm[] } = { x: [], y: [], c: [] };
+  for (const { sign, e } of signedTerms(eq)) {
+    if (!mentionsPlaneVar(e)) {
+      parts.c.push({ sign, e });
+      continue;
+    }
+    const fs2 = factors(e);
+    const varAt = fs2.findIndex((f) => f.kind === 'sym' && PLANE_VARS.has(f.name));
+    if (varAt < 0) return null; // a plane variable, but not as a plain factor — not linear
+    const rest = fs2.filter((_, i) => i !== varAt);
+    if (rest.some(mentionsPlaneVar)) return null; // x·y, or x², or x in a denominator
+    const slot = (fs2[varAt] as { name: string }).name as 'x' | 'y';
+    const coef: Expr = rest.length === 0 ? { kind: 'num', value: 1 } : rest.reduce((p, q) => ({ kind: 'mul', a: p, b: q }));
+    parts[slot].push({ sign, e: coef });
+  }
+  return parts;
+}
+
+/** A coefficient that is a plain number, or null when it still carries a parameter. */
+function numericValue(e: Expr): number | null {
+  if (!isConstant(e)) return null;
+  const v = evalExpr(e);
+  return Number.isFinite(v) ? v : null;
+}
+
+/**
+ * One term of the symbolic general form, with `lineText`'s own three rules applied where the
+ * expression lets them be: a term that IS zero is not printed, a unit coefficient is suppressed, and
+ * the sign is folded into the connective. Where the coefficient is a parameter expression none of the
+ * three can be decided, so it is printed as it stands — in brackets, because `(k + 1)x` is what a
+ * textbook writes and `k + 1x` would be a different equation.
+ */
+function symbolicTerm({ sign, e }: SignedTerm, sym: string): string {
+  const n = numericValue(e);
+  // Exactly `term`'s decisions, reached through the same formatter, so the two paths cannot drift.
+  if (n !== null) return term(sign * n, sym);
+  const body = exprText(e);
+  // `(k + 1)x` is what a textbook writes; `k + 1x` would be a different equation. A single symbol or
+  // number needs no brackets.
+  const needsBrackets = sym !== '' && !/^[A-Za-z0-9.]+$/.test(body);
+  return `${sign < 0 ? '-' : '+'} ${needsBrackets ? `(${body})` : body}${sym} `;
+}
+
+/**
+ * A curve's equation, written for a student — the ONE entry point for the panel and the ask lane.
+ *
+ * A line whose coefficients are all numbers is handed to `lineText`, unchanged. A line still carrying
+ * a parameter is printed here with the same rules. Anything else falls back to the algebraic printer.
+ */
+export function curveEquationText(eq: Expr): string {
+  /**
+   * A STATED `LHS = RHS` IS HELD AS `LHS - RHS`, and with `RHS = 0` — which is how most of the
+   * corpus writes a line — the algebraic printer emitted the subtraction literally: `… + 5·k - 0 = 0`.
+   * Removed by not BUILDING it into the printed form, never by pattern-matching `- 0` out of a string.
+   */
+  const body = eq.kind === 'sub' && numericValue(eq.b) === 0 ? eq.a : eq;
+
+  const parts = linearCoefficients(body);
+  if (!parts) return `${exprText(body)} = 0`;
+
+  /**
+   * EVERY coefficient numeric ⇒ hand the whole thing to `lineText`, which already owns the numeric
+   * notation (fraction clearing included). This delegation is what makes "the two rows agree" a fact
+   * about the code rather than a test that must be kept in step.
+   */
+  const sum = (ts: SignedTerm[]): number | null =>
+    ts.reduce<number | null>((acc, t) => {
+      if (acc === null) return null;
+      const v = numericValue(t.e);
+      return v === null ? null : acc + t.sign * v;
+    }, 0);
+  const [na, nb, nc] = [sum(parts.x), sum(parts.y), sum(parts.c)];
+  if (na !== null && nb !== null && nc !== null) return lineText(na, nb, nc);
+
+  const printed = [
+    ...parts.x.map((t) => symbolicTerm(t, 'x')),
+    ...parts.y.map((t) => symbolicTerm(t, 'y')),
+    ...parts.c.map((t) => symbolicTerm(t, '')),
+  ]
+    .join('')
+    .trim();
+  if (printed === '') return `${exprText(body)} = 0`; // nothing survived the rules — say the raw thing
+  const lead = printed.startsWith('+ ') ? printed.slice(2) : printed.replace(/^- /, '-');
+  return `${lead} = 0`;
 }
 
 /**
