@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 79d8e913-3646-42eb-939a-24700cb56522
-  modified: 2026-09-02T05:09:39.673Z
+  modified: 2026-09-21T01:39:16.857Z
 ---
 
 Writing file content through a Bash heredoc in this harness **corrupts it silently**. Two distinct
@@ -44,6 +44,27 @@ printed its success line.
 **Always pass a FUNCTION replacement** — `s.replace(from, () => to)` — in these edit scripts. A function
 return value is used literally, so no `$` sequence can be special. It costs nothing and removes the whole
 class.
+
+**A fourth mode — a PYTHON edit script turns `\uXXXX` into the real character (2026-09-21, #1296/#1315):**
+`⁦` inside an ordinary Python string literal is not four characters, it is the character. So an edit
+script carrying replacement text through a normal `'…'`/`"""…"""` literal writes **literal invisible
+controls** into the source. It happened twice in one session, in two different files, and both times the
+diff looked perfect — `const LRI = '⁦';` renders identically to `const LRI = '⁦';` in every view.
+
+It matters here beyond aesthetics: `shell/bidi.ts` states the rule in as many words — *"Written by CODE
+POINT, never literally: typed as themselves they are invisible in this source file, so a later edit cannot
+see what it is changing"* — so the corruption silently violates a discipline the module depends on. `tsc`
+is green, the tests pass, nothing warns.
+
+**How to apply:** in a Python edit script, double the backslash (`'\\u2066'`) or build it with
+`chr(92)+'u2066'`; and afterwards **assert the absence**, not just eyeball the diff:
+
+```
+python -c "import io; s=io.open(PATH,encoding='utf-8').read(); print(chr(0x2066) in s or chr(0x2069) in s)"
+```
+
+That one line is what caught both. The general form: after a scripted edit that carries Unicode, grep the
+file for the literal code point you meant to write as an escape.
 
 Related: [[gh-body-at-dash-eats-issues]] — same class, same lesson (the tool reports success while the
 content is gone).
