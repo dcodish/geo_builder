@@ -2659,6 +2659,9 @@ export const SCENARIOS_4: Scenario[] = [
       const ux = A.x - B.x, uy = A.y - B.y, vx = C.x - B.x, vy = C.y - B.y;
       const deg = (Math.acos((ux * vx + uy * vy) / (Math.hypot(ux, uy) * Math.hypot(vx, vy))) * 180) / Math.PI;
       expect(deg, '∠ABC = 100° survives').toBeCloseTo(100, 1);
+    },
+  },
+  {
     id: 'bisector-reads-the-triangle-operand-1285',
     title: '#1285 / ADR-540: «CE חוצה זווית C במשולש ABC» builds the SAME figure as «CE חוצה זווית C» — the triangle names the angle, it is not three letters to be mistaken for one',
     guards:
