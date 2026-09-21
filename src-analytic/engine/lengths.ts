@@ -96,8 +96,24 @@ const polygonArea = (ps: Pt[]): number => {
  */
 const PLACEHOLDER_BASE = 0xe000;
 
-/** Two point names run together — `AB`, `A1B2`. The same shape the rest of the parser uses. */
-const LENGTH_TOKEN = /([A-Z][0-9]?)([A-Z][0-9]?)/g;
+/**
+ * Two point names run together — `AB`, `A1B2`. The same shape the rest of the parser uses.
+ *
+ * **BOUNDED BY LETTERS, so a pair is never taken out of the MIDDLE of a word (#1333).** The token
+ * used to match anywhere, and the file's own docblock records where that leads: *"the token missed,
+ * `LENGTH_TOKEN` then ate `AB` out of the sentence, and the student was answered about a DIFFERENT
+ * measurement"* (#1151). Each time it bit, a frame was moved ahead of it — areas, then point-to-line
+ * distances — but the token itself stayed unbounded, so every word the frames do not claim was still
+ * fair game. «ANGLE ABC = 90» lowered to lengths `AN`, `GL` and `AB`: three measurements out of one
+ * word, and the leftover letters became free parameters (#1321), so the guard that should have left
+ * the sentence to the ANGLE rule saw a length expression and `LENGTH_EQ` claimed it.
+ *
+ * The boundary is on LETTERS only, not digits: `2AB` is a coefficient times a length — the same
+ * juxtaposition the expression layer is built for — and the token's own optional digits (`A1B2`) sit
+ * inside the match. A run of three or more capitals (`ABC`) now yields nothing here, which is right:
+ * it is a polygon, and the area frame that owns it already runs first.
+ */
+const LENGTH_TOKEN = /(?<![A-Za-z])([A-Z][0-9]?)([A-Z][0-9]?)(?![A-Za-z])/g;
 
 /**
  * `AB + BC` → an expression over placeholders, plus the pairs they stand for.

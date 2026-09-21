@@ -867,6 +867,13 @@ coordinate join it as members, not as new rules. «m<0» remains a parameter dec
 the corpus's declare-before-use) — and a declared symbol nothing uses is marked as such in the panel, so a
 student who meant a slope is told.
 
+**R60 amendment (2026-09-21, [ADR-AG-146](06c-decisions-analytic.md#adr-ag-146),
+[#1333](https://github.com/dcodish/geo_builder/issues/1333)).** The right angle's spellings include the
+English `=` form — «angle ABC = 90» — and they mean the same thing **in any case**: «Angle», «ANGLE» and
+«angle» are one sentence. The rule behind it is general and belongs to every measure sentence: **a length
+is named by a WHOLE name, never by a letter pair taken out of the middle of a word.** «ANGLE ABC» is not
+three measurements. A non-right angle value remains out of scope in both languages.
+
 **R111 — a word the tool does not know is REFUSED in a value slot, never absorbed as parameters**
 ([ADR-AG-145](06c-decisions-analytic.md#adr-ag-145),
 [#1321](https://github.com/dcodish/geo_builder/issues/1321)). «שיפוע הישר l1 הוא tan(30)» must be refused
