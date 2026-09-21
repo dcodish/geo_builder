@@ -185,8 +185,12 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   marked as not in effect with a reason naming the letter, and the figure does not pretend the value
   applies; the delete / mute / edit is committed as asked but reports the rows it left without effect,
   in the student's wording — never a bare success. The value **takes effect again by itself** when a
-  definition is back, even one added after the value row. The same report serves a relation on a point
-  whose defining row is gone — one class, one seam. Suite rule:
+  definition is back, even one added after the value row — and so does **any constraint typed before
+  the points it names**: «∠SAB = 70» above the pyramid that declares A and B takes effect once the
+  pyramid exists, to a fixpoint over such rows, while a row that would INTRODUCE a point is never
+  re-ordered and stays visibly red ([ADR-3D-257](06b-decisions-3d.md#adr-3d-257), #1327 — the operator's
+  #1242 ruling, *"the diagram should either respect all input or refuse to build"*). The same report
+  serves a relation on a point whose defining row is gone — one class, one seam. Suite rule:
   [ADR-W-044](06w-decisions-workspace.md#adr-w-044). *(Realised — [ADR-3D-220](06b-decisions-3d.md#adr-3d-220),
   #926; `issue-926.test.ts`.)*
 - **FR-VC-2d (Must)** — **A SYMBOLIC ANGLE may carry a coefficient, and no copula decides whether a
