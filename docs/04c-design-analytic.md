@@ -1136,6 +1136,15 @@ The nearness epsilon is relative to the figure with a floor tied to `SOLVE_TOL` 
 all sit at the origin has no span, and the solver leaves its crossing ~1e-9 from the point it coincides
 with, so an absolute floor below that decides nothing.
 
+**The structural member has two arms, both in `parseIntersection`** ([ADR-AG-116](06c-decisions-analytic.md#adr-ag-116),
+[ADR-AG-140](06c-decisions-analytic.md#adr-ag-140)). Two carriers named by two points each share exactly
+ONE letter → they meet there → `crossing-already-named`, carrying the holder. They share BOTH letters → they
+are one line → `self-crossing`, an owned refusal with no holder (there is no point to name). Neither arm
+needs a figure, a seed or a tolerance: the operands are written in the sentence. `self-crossing` is owned
+rather than `not-handled` for ADR-AG-130's reason — the grammar read the sentence, and the LLM seam would
+ask a model to accept the spelling the ruling declined. The OFFER half (the click surface never authoring
+this sentence) is `meet()`'s normalised determinant, ADR-AG-130.
+
 ## The knowledge gate samples CONFIGURATIONS, not seeds ([ADR-AG-126](06c-decisions-analytic.md#adr-ag-126))
 
 `isKnowledge` decides whether a printed value is determined by reading it at several configurations and

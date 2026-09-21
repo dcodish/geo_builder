@@ -6987,3 +6987,18 @@ The default display (seed 0) showed a point on neither curve, the data panel lis
 **Sibling audit (docs/17 §1).** 2-D's driven solvers have had multi-start since ADR-033 (`multiStartSolve`: regularised search, then polish) and its accept gate refuses a non-converged solve (`solutionAccepted`); 3-D's pivot has its own restarts (ADR-3D-007). Complex's `foldConstraints` is numeric over algebraic constraints and was not measured; noted, not claimed.
 
 **Consequences.** `engine/solve.ts` (+`solveMultiStart`); `engine/evaluate.ts` (the restart list in the solve block; `whole` gains the unsatisfied term); `engine/derive.ts` (one `unsatisfiable` per line). `__tests__/issue-1287-crossing-settles.test.ts` (6): the eight seeds on both curves, both roots reachable, the solver alone from the saddle, the impossible chord reported once, the search never showing an unsatisfied seed with the knowledge gate reading only holding ones, and the once-failing seeds converging raw. `docs/04c` — the validity table.
+
+## ADR-AG-140 — A crossing of a line with ITSELF names no point and is refused by an owned answer (#1255; the typed half of ADR-AG-130)
+
+**Status:** accepted, 2026-09-21 · **Issue:** #1255 (bug, P3, `analytic`) · operator ruling 2026-09-20: *"refuse it"* — the alternative (read it as a free 1-DOF point on the line) was put to him with its argument and declined · round #1332
+**Requirements:** [02c](02c-requirements-analytic.md) R60 (the structural sentence, extended) · **Design:** [04c](04c-design-analytic.md#a-forced-coincidence-is-refused-a-configuration-dependent-one-is-not-adr-ag-125) — the structural member's two arms
+
+**Measured before (71fc71ad, re-measured at pickup; identical to the filing at 031e2545).** «משולש ABC» · «A(2,-5)» · «P נקודת החיתוך של הישר AB עם הישר BA»: `record`, `faults: []`, P built and floating along AB — one incidence instead of two, an under-determined point the tool reported nothing about. The same for «… עם הישר AB» and for the English «P is the intersection of line AB with line BA».
+
+**The mechanism.** ADR-AG-116's structural gate in `parseIntersection` gains its second arm: two carriers named by two points each that share BOTH letters are one line, so the sentence names no point → `self-crossing`, an owned `ParseFailure` code with no holder (there is no point to name), rendered by `errSelfCrossing`, which says what the sentence failed to define and shows the sentence for what the student may have meant («P על הישר AB»). No figure, no seed, no tolerance: the operands are written in the sentence. The docblock that parked this case pending the ruling is replaced by the arm, as the plan asked.
+
+**Why owned and not `not-handled`.** The grammar read the sentence perfectly; `not-handled` would claim otherwise, and it is the LLM seam (#1251) — sending a form the tool deliberately declines to a model asks it to accept the very spelling just ruled out. ADR-AG-130 made this argument for the OFFER half (the click surface no longer authoring a ring for a line with itself); this is the TYPED half and the pair is now closed.
+
+**Measured after.** The three spellings refuse `self-crossing` naming the student's sentence, never reach the fallback, and build nothing. ADR-AG-116's own cases unchanged: «הישר AB עם הישר BC» still refused naming B; «הישר AD עם הישר CE» on the two-medians figure still builds and names P.
+
+**Consequences.** `parser/parseAnalytic.ts` (the arm, the code); `store/useAnalyticStore.ts` (`InputError`); `App.tsx` (the map); `i18n/index.ts` (`errSelfCrossing`, he + en). `__tests__/issue-1255-self-crossing.test.ts` (6). `docs/02c` R60; `docs/04c` the two arms.

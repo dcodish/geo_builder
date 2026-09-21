@@ -163,6 +163,10 @@ const he = {
   // the reason, so a student who mis-read their own figure learns the thing they got wrong.
   errCrossingAlreadyNamed:
     'הישרים האלה נפגשים ב-{{holder}}, ולנקודה הזאת כבר יש שם. המשפט "{{detail}}" היה נותן לה שם שני. אם התכוונתם לנקודה אחרת, בדקו אילו שני ישרים נחתכים בה.',
+  // #1255 — one line written twice has no crossing with itself. Says what the sentence failed to
+  // define and shows the sentence that says what they may have meant, per the operator's ruling.
+  errSelfCrossing:
+    'שני הישרים במשפט "{{detail}}" הם אותו ישר, ולישר אין נקודת חיתוך עם עצמו, ולכן המשפט אינו מגדיר נקודה. אם התכוונתם לנקודה כלשהי על הישר, אפשר לכתוב למשל "P על הישר AB".',
   // #1251 — a THROTTLE is not a misunderstanding. The student is told the service is busy, never
   // that their sentence was wrong: the tool did not get as far as looking at it.
   errLlmBusy:
@@ -350,6 +354,8 @@ const en: typeof he = {
     'example "AD is the median in triangle ABC" — or name the side outright.',
   errCrossingAlreadyNamed:
     'Those lines meet at {{holder}}, and that point already has a name. "{{detail}}" would give it a second one. If you meant a different point, check which two lines cross there.',
+  errSelfCrossing:
+    'The two lines in "{{detail}}" are the same line, and a line has no intersection with itself, so the sentence defines no point. If you meant some point on that line, write for example "P on line AB".',
   errLlmBusy:
     'The service is busy, so I could not check "{{detail}}". Try again in a moment, or write it in one of the forms listed in the commands panel.',
   thinking: 'Thinking…',

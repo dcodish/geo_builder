@@ -819,7 +819,11 @@ what R55's sibling rule protects in the other direction.
 place. «P נקודת החיתוך של הישר AB עם הישר CD» where that crossing IS `B` must not mint a second letter at
 B's position: the geometry is right and only the name is wrong, so the tool affirms the crossing and
 refuses the name, saying which point is already there. The structural member — two lines whose letters
-force it — is refused at the parser (R-level, #1175); this is the POSITIONAL one, and **its freedom gate is
+force it — is refused at the parser (R-level, #1175), and so is its limit: a crossing of a line WITH ITSELF
+(«הישר AB עם הישר BA», [#1255](https://github.com/dcodish/geo_builder/issues/1255),
+[ADR-AG-140](06c-decisions-analytic.md#adr-ag-140)) names no point and is refused by an OWNED answer that
+says so and shows «P על הישר AB» — never escalated to the model, never built as a silently floating point
+(*operator ruling, 2026-09-20: refuse it*); this is the POSITIONAL one, and **its freedom gate is
 R55's, for R55's reason**: silent while another configuration may still separate them, reported once none
 can. A coincidence in a figure that can still move is a fact about this configuration and is the
 configuration search's business ([#1273](https://github.com/dcodish/geo_builder/issues/1273)), not a
