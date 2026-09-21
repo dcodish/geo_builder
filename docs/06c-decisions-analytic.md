@@ -6987,3 +6987,18 @@ The default display (seed 0) showed a point on neither curve, the data panel lis
 **Sibling audit (docs/17 §1).** 2-D's driven solvers have had multi-start since ADR-033 (`multiStartSolve`: regularised search, then polish) and its accept gate refuses a non-converged solve (`solutionAccepted`); 3-D's pivot has its own restarts (ADR-3D-007). Complex's `foldConstraints` is numeric over algebraic constraints and was not measured; noted, not claimed.
 
 **Consequences.** `engine/solve.ts` (+`solveMultiStart`); `engine/evaluate.ts` (the restart list in the solve block; `whole` gains the unsatisfied term); `engine/derive.ts` (one `unsatisfiable` per line). `__tests__/issue-1287-crossing-settles.test.ts` (6): the eight seeds on both curves, both roots reachable, the solver alone from the saddle, the impossible chord reported once, the search never showing an unsatisfied seed with the knowledge gate reading only holding ones, and the once-failing seeds converging raw. `docs/04c` — the validity table.
+
+## ADR-AG-141 — The locus question is one question however it opens: «משוואת המקום הגיאומטרי של B» and the enumerated lead-ins (#1301)
+
+**Status:** accepted, 2026-09-21 · **Issue:** #1301 (bug, P2, `analytic`) · operator, 2026-09-20: *"when i write משוואת המקום הגיאומטרי של A i get not determined when the message should be נקודה"* — the routing half; the «נקודה» half is #1227 (ADR-AG-136, this round) · round #1332
+**Requirements:** [02c](02c-requirements-analytic.md) R87 (the sentence extended) · **Design:** [04c](04c-design-analytic.md#the-ask-lane-adr-ag-044) — the ask lane's table
+
+**Measured before (71fc71ad, re-measured at pickup; identical to the filing at bf6f2e0d).** Figure «A(0,0)» · «נקודה B» · «אורך הקטע AB הוא 10». «המקום הגיאומטרי של B» → «מעגל · x² + y² = 10²». «משוואת המקום הגיאומטרי של B» → *missing curve named «המקום הגיאומטרי של B»* — the student's whole question repeated back as the name of a line they forgot to draw. «מצא את …», «מצאי את …», «חשב את …», «מהו …», «מה הוא …», «find the locus of B», «equation of the locus of B» → «לא הבנתי את השאלה». Exactly one spelling worked, and it was not the exam's.
+
+**Root cause — an ordering fault, not a missing pattern.** `LOCUS_OF` admitted no lead-in; `EQUATION_OF` below it has an OPTIONAL noun group, so its `(.+)` swallowed the locus phrase as a curve name and the curve resolver's honest "no such curve" message (#1111) printed the phrase verbatim. The same shape as `SLOPE_OF`'s standing note — only the leading phrase separates two questions about one object — one lead-in short.
+
+**The mechanism.** The lead-ins are admitted INTO `LOCUS_OF` (`app/ask.ts`), which stays above `EQUATION_OF`: first the enumerated imperative/interrogative openers — «מצא(י/ו) את», «חשב(י/ו) את», «מהו», «מהי», «מה הוא», «מה היא», «find», «what is» — then the equation-of prefix («משוואת», «the equation of», «equation of»), both optional, both leading. No second branch and no pre-stripping, so the spellings share one code path (ADR-W-053); enumerated, never `.*`, in #1210's discipline. The pattern is greedier than before, which is why the lock's anti-widening rows are the ones that matter.
+
+**Measured after.** All eleven spellings answer «מעגל · x² + y² = 10²», identical to the bare one; the anti-widening rows — «משוואת הישר l1» (missing curve l1), «משוואת AB», «שיפוע AB», «A» → «(0, 0)», «B» → not determined — answer exactly as before; on the operator's own figure «משוואת המקום הגיאומטרי של A» and «המקום הגיאומטרי של A» agree (the #1227 half decides WHAT they say; this half that they say the same thing).
+
+**Consequences.** `app/ask.ts` (`LOCUS_OF`). `__tests__/issue-1301-locus-question-spellings.test.ts` (5). `docs/02c` R87; `docs/04c` the ask lane's table.

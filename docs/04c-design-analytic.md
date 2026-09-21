@@ -497,6 +497,12 @@ evaluated against the current derivation and discarded — it never becomes a fa
 | `שטח ABC` | (with a value) a GIVEN that shapes the figure | the area, if the givens fix it |
 | `AB` | the segment, drawn | its length |
 | `משוואת הישר ℓ1` | (with an equation) the line | its equation |
+| `משוואת המקום הגיאומטרי של P` · `המקום הגיאומטרי של P` · `מהו המקום הגיאומטרי של P` | — | one question: P's locus, as an equation when known ([ADR-AG-141](06c-decisions-analytic.md#adr-ag-141)) |
+
+The locus question's lead-ins (the equation-of prefix, the enumerated imperative/interrogative openers)
+are admitted INTO `LOCUS_OF`, which sits above `EQUATION_OF` — a second branch or a pre-strip would give
+one question two code paths. An anti-widening lock keeps the greedier pattern from swallowing its
+neighbours («משוואת הישר l1», «שיפוע AB», «A» answer exactly as before).
 
 That table is the design: **a thing is askable because it was sayable.** `app/ask.ts` runs the
 question through `parseLengthExpr` — the same measure grammar the constraint rules use — so a

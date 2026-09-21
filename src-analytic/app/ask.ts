@@ -171,8 +171,25 @@ const EQUATION_OF = /^(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+(?:ה?(?:יש
  * spelling rather than answering a question, which is the defect #1156/#1183 named.
  *
  * `י?` rather than a second alternation: one character, at the one place they differ.
+ *
+ * THE EXAM'S OWN PHRASING IS «משוואת המקום הגיאומטרי של B» (#1301, ADR-AG-141).
+ *
+ * Operator, 2026-09-20: *"when i write משוואת המקום הגיאומטרי של A i get not determined"* — measured,
+ * it was worse than that: this pattern admitted no lead-in at all, so `EQUATION_OF` below (whose noun
+ * group is optional) swallowed «המקום הגיאומטרי של B» as a curve NAME and the tool answered «אין
+ * בשרטוט ישר או מעגל בשם המקום הגיאומטרי של B» — the student's whole question repeated back as the
+ * name of a line they forgot to draw. Exactly one spelling worked, and it was not the exam's.
+ *
+ * The locus row already answers with an EQUATION when it knows one, so «המקום הגיאומטרי של B» and
+ * «משוואת המקום הגיאומטרי של B» are one question, not two. The lead-ins are admitted INTO this pattern
+ * — no second branch, no pre-stripping — so the spellings share one code path (ADR-W-053), and they
+ * are ENUMERATED, never `.*`: the imperative/interrogative openers a student writes («מצא את»,
+ * «מצאי את», «חשב את», «מהו», «מה הוא», «מהי», «find», «what is»), then the equation-of prefix. This
+ * pattern sits ABOVE `EQUATION_OF` and must stay there; the anti-widening lock in
+ * `issue-1301-locus-question-spellings.test.ts` is what makes the greedier pattern safe.
  */
-const LOCUS_OF = /^(?:ה?מקום\s+ה?גי?אומטרי|[Tt]he\s+locus|[Ll]ocus)\s+(?:של\s+|of\s+)?(?:ה?נקודה\s+)?(.+)$/;
+const LOCUS_OF =
+  /^(?:(?:מצא(?:י|ו)?|חשב(?:י|ו)?)\s+את\s+|מה(?:ו|י)\s+|מה\s+ה(?:וא|יא)\s+|[Ff]ind\s+|[Ww]hat\s+is\s+)?(?:(?:ה?משוואת|[Tt]he\s+equation\s+of|[Ee]quation\s+of)\s+)?(?:ה?מקום\s+ה?גי?אומטרי|[Tt]he\s+locus|[Ll]ocus)\s+(?:של\s+|of\s+)?(?:ה?נקודה\s+)?(.+)$/;
 
 /**
  * Answer one question against the figure the student has built.
