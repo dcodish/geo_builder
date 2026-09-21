@@ -45,9 +45,23 @@
  */
 export const RULING_MARKERS = [
   /^\s*#{1,4}\s*operator (ruling|decision|answer)\b/im,
-  /\boperator (ruling|decision|answer)\s*[—\-(:]/i,
+  // #1325: the separator after the phrase is a dash, a paren, a colon — or a COMMA («**Operator ruling,
+  // 2026-09-19:**»). Whitespace alone is deliberately NOT enough: "needs an operator ruling on X" is an
+  // escalation asking, and must never read as an answer.
+  /\boperator (ruling|decision|answer)\s*[—\-(:,]/i,
   /\*\*ruled\b/i,
+  // #1325: «… is ruled** (operator, 2026-09-20)» — the verb form, anchored to the operator in the trailing
+  // parenthesis so a session's "until it is ruled" never counts.
+  /\bis ruled\b[^\n]*\(operator\b/i,
 ];
+
+/**
+ * THE CANONICAL HEADING the passes write (#1325, ADR-W-073). The vocabulary above is measured from what
+ * the passes DID write and will keep widening as long as every pass invents its own phrasing; the
+ * `/decisions` skill and a round's escalation-resolution comment therefore write this line verbatim,
+ * and it is the first marker's shape.
+ */
+export const CANONICAL_RULING_HEADING = (date) => `## Operator ruling — ${date}`;
 
 /** Does this comment body announce an operator ruling? */
 export const isRulingComment = (body) => RULING_MARKERS.some((re) => re.test(body ?? ''));
