@@ -19,7 +19,7 @@ import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY } from '@/engine';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -2343,7 +2343,12 @@ export function viewUsable(d: Derived): boolean {
   return true;
 }
 
-export type StepOutcome = { produced: true } | { produced: false; reason: 'error' | 'empty'; detail?: string };
+/**
+ * `'implied'` is a reason of its own and NOT a reuse of `'empty'` (#999, ADR-542). `'empty'` falls
+ * through to the new-label check and then to the **LLM escalation**; a restatement the tool understood
+ * perfectly must never reach the model. Routed straight to «כבר קיים» instead.
+ */
+export type StepOutcome = { produced: true } | { produced: false; reason: 'error' | 'empty' | 'implied'; detail?: string };
 
 /**
  * Dry-run a parsed step's engine commands on top of the current facts WITHOUT committing, to decide
@@ -2353,6 +2358,69 @@ export type StepOutcome = { produced: true } | { produced: false; reason: 'error
  * step that produces nothing must never be a silent no-op). A *givens violation* is deliberately NOT
  * "produced nothing" — the amber "may not match" cue already flags that, and the figure is still shown.
  */
+/**
+ * The prior figure must offer at least this many distinct configurations before "satisfied everywhere
+ * we looked" is allowed to mean ENTAILED. A determined figure is exempt — its one sample IS its
+ * complete admissible set (ADR-101/ADR-509's `determined` flag), which is a stronger statement than
+ * any number of samples.
+ */
+const IMPLIED_MIN_SAMPLES = 3;
+
+/**
+ * ARE THE CONSTRAINTS THIS STEP ADDS ALREADY ENTAILED BY THE FIGURE? (#999, [ADR-542](docs/06-decisions.md#adr-542))
+ *
+ * *Satisfied here* is not entailed; *satisfied everywhere the figure can be* is. So the question is
+ * asked over the prior figure's SAMPLED configurations — the ADR-101 / ADR-256 discipline, through the
+ * one shared sampler (M3) — and never at a single seed. The two locks that prove the difference are
+ * #156 (an angle that holds at the seeded midpoints and fails elsewhere) and #883 (a radius equal to
+ * the sampled default); both must keep committing, and a single-seed test breaks both.
+ *
+ * **FAILS OPEN, and that is mandatory.** Anything entailment cannot be ESTABLISHED for — a thin sample
+ * pool, a constraint family with no residual (the order/bound family), a referenced point missing from
+ * a sample, a non-finite residual, any throw — is treated as NOT implied and applied normally. A missed
+ * note costs nothing; a dropped given is a P1, and that is the honesty line (the ADR-385 hazard).
+ *
+ * Only a step that adds CONSTRAINTS AND NOTHING ELSE can qualify. A display-only command adds no
+ * constraint, so this arm never sees one — which is the shape #1011 needs it to have, and the way the
+ * two compose rather than fight (the chokepoint-collision note on #999, 2026-09-15).
+ */
+export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0): boolean {
+  try {
+    const before = replay(facts, seed);
+    const all = trialFacts(facts, commands);
+    if (all.length === facts.length) return false; // nothing added — `empty`'s business, not this arm's
+    const after = replay(all, seed);
+    // Anything OTHER than a constraint means the step built something. Objects and labels are visible;
+    // a step that adds one has produced, whatever else it also did.
+    if (after.construction.objects.length !== before.construction.objects.length) return false;
+    const labels = (l: MeasureLabels) => l.lengths.length + l.angles.length + l.areas.length;
+    if (labels(after.labels) !== labels(before.labels)) return false;
+
+    const had = new Set(before.construction.constraints.map((con) => constraintKey(con)));
+    const added = after.construction.constraints.filter((con) => !had.has(constraintKey(con)));
+    if (added.length === 0) return false;
+    // The order/bound family has no scale-invariant residual to test — fail open rather than guess.
+    if (added.some((con) => isOrderConstraint(con))) return false;
+
+    const pool = sharedSamples(facts);
+    if (!pool.determined && pool.samples.length < IMPLIED_MIN_SAMPLES) return false;
+    if (pool.samples.length === 0) return false;
+
+    for (const positions of pool.samples) {
+      for (const con of added) {
+        if (constraintRefs(con).some((id) => !positions.has(id))) return false; // cannot be established
+        const get = (id: Id) => positions.get(id) as Vec;
+        const r = residual(con, get);
+        if (!Number.isFinite(r)) return false;
+        if (Math.abs(r) > residualTolerance(con, constraintScale(con, get))) return false; // NOT entailed
+      }
+    }
+    return true;
+  } catch {
+    return false; // fails open, always
+  }
+}
+
 export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): StepOutcome {
   // ALL THREE label kinds (#162): the gate predates ADR-118's `areas`, so a lone symbolic area label
   // («שטח משולש AFO הוא 9b» — correctly no constraint, ADR-031/118) counted as nothing and the
@@ -2439,6 +2507,25 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
    * one value that happened to be reported.
    */
   const scaleFixed = !scalePinned(before.construction) && scalePinned(after.construction);
+  /**
+   * A RESTATEMENT IN ANOTHER SPELLING IS A NO-OP, AND THIS ARM RUNS AHEAD OF THE OTHERS (#999, ADR-542).
+   *
+   * «משולש ABC» · «∠ABC = 90» · «AB ⟂ BC» committed silently: the third line says exactly what the
+   * second says, and the figure gained nothing a student can see. The change-signals above cannot tell
+   * that — `moved` and `grew` fire PRECISELY on a redundant restatement, because a constraint that adds
+   * no information is still applied as an independent one and the solver re-solves around it. Consulting
+   * them as guards is what defeated two earlier attempts at this issue (round #1006, overnight #1252):
+   * both tried to NARROW the count arm, and the count arm is not what fires.
+   *
+   * **Operator ruling, 2026-09-15:** decline it at the door. So the question is asked BEFORE the
+   * change-signals, and they are never consulted — the ruling says in as many words that `moved` and
+   * `dofReduced` are consequences of the double-application, not evidence about it.
+   *
+   * The apply-time root — that an implied constraint is applied as an independent one at all, so the
+   * figure jumps and the DOF count over-counts — is **#1007**, deliberately still open. This covers the
+   * typed seam and the ✎ edit seam; a loaded file has no door and is knowingly not covered.
+   */
+  if (impliedByPrior(facts, commands, seed)) return { produced: false, reason: 'implied' };
   if (grew || dofReduced || scaleFixed || dataOnly || reveals) return { produced: true };
   // No geometric change — but a `set-equal` NAMING an enabled shape-variant's (kite/isosceles) equal-pair
   // that no explicit equality already asserts is the student CHOOSING which sides are equal: it PINS a

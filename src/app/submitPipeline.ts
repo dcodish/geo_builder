@@ -602,6 +602,20 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
       // LLM (which would just say "couldn't build"): tell the student it's already drawn. Signal: produced
       // nothing, NOT an error, and the utterance introduces no new label (every label it names already
       // exists). (ADR-156 follow-up — the friendly no-op message.)
+      /**
+       * A RESTATEMENT IN ANOTHER SPELLING (#999, ADR-542) — «AB ⟂ BC» after «∠ABC = 90».
+       *
+       * Understood perfectly and adding nothing, so it takes the «כבר קיים» note directly and never
+       * escalates: reaching the LLM would spend a call on a sentence the parser read correctly, and the
+       * model could only answer "couldn't build". Its own log result, so the class is countable.
+       */
+      if (outcome.reason === 'implied') {
+        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: 'implied-restatement', commands: r.commands });
+        ui.setInputNote(t('input.alreadyDrawn'));
+        ui.clearText();
+        ui.setBusy(false);
+        return;
+      }
       if (outcome.reason === 'empty') {
         // A #186 auto-bind ALREADY changed the figure (an unnamed circle took the student's name and
         // its centre revealed) — geometrically-idempotent leftovers ("D,F on circle O1" when D,F
