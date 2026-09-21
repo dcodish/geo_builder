@@ -889,6 +889,8 @@ quietly redrawn.
 
 **R60 — two positions the solver cannot tell apart are ONE position, and a determined point's locus is that point** ([ADR-AG-136](06c-decisions-analytic.md#adr-ag-136)). *(Operator, 2026-09-20 on #1259: "a cluster inside solver resolution is not an option set"; 2026-09-19 on #1227: "saying M cannot be calculated is wrong … refer to the location of point M".)* At a tangency the solves land within the solver's own resolution of one another; the panel prints ONE point there, never a list of near-identical "cases" with magnitudes nobody gave — the tolerance is derived from the solve's own stopping rule, `10·√SOLVE_TOL` of scale. And «המקום הגיאומטרי של M» on a determined M answers M's position («נקודה · (4, 0)») or its finite set («שתי נקודות · (4, −3), (4, 3)») in the locus lane's own grammar; «לא ניתן לחשב מהנתונים» is reserved for what the givens genuinely do not fix, and «עדיין לא נקבע» for an open figure.
 
+**R61 — two distinct named points are never opened on top of each other** ([ADR-W-070](06w-decisions-workspace.md#adr-w-070), [ADR-AG-138](06c-decisions-analytic.md#adr-ag-138)). *(Operator, 2026-09-20, T18: "even if they do fall on the same point by chance … the system should not show them on top of each other. It should automatically look for a different config and show them differently"; the same rule in every builder.)* Where a configuration keeps the figure's named points apart, the tool opens on it by itself. A preference below validity, never a requirement: a figure whose every configuration stacks two labels is still drawn — refusing such a statement is R43/#1254's job — and the tolerance is the figure's own span, never an absolute number.
+
 **R61 — a circle marks its centre** ([ADR-AG-036](06c-decisions-analytic.md#adr-ag-036)). Every drawn
 circle shows its centre, because in analytic geometry the centre is always part of the figure. The
 mark appears whenever the circle does; the VALUE beside it appears only when the givens fix it, so a
@@ -992,7 +994,7 @@ becomes «2+(y-4)^2=9^(x-3)», a formula the student did not write. Every surfac
 the box while typing, its live preview, the example chips, the fact list and its editor — isolates the
 runs and takes its direction from the content.
 
-**And the live preview TYPESETS what it shows** ([ADR-W-069](06w-decisions-workspace.md#adr-w-069) ·
+**And the live preview TYPESETS what it shows** ([ADR-W-070](06w-decisions-workspace.md#adr-w-070) ·
 [#1152](https://github.com/dcodish/geo_builder/issues/1152)). The strip under the box and the fact row
 a few pixels below it show the same equation, so one of them printing `^2` where the other draws a real
 superscript tells the student their transcription came out wrong when it did not. Mathematics is

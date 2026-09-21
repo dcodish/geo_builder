@@ -19,6 +19,7 @@ import { pairKey, pinnedLengths } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, type RingFault } from './rings';
+import { apart } from './crossings';
 import { dirVector, freeRank, residual, resolveChoices, solveMultiStart, SOLVE_RESOLUTION, type Constraint } from './solve';
 import { drawnPieceOver } from './extent';
 import { inDomain, isFree, objectById, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
@@ -1066,12 +1067,36 @@ export function drawableAt(
       const p = f.points.find((q) => q.id === id);
       return p ? { x: p.x, y: p.y } : undefined;
     }) >= SPREAD_MIN_DEG;
-  const preferred = (f: Figure) => whole(f) && (!preferSpread || spread(f));
+  /**
+   * …and, for the display callers, TWO DISTINCT NAMED POINTS ARE NEVER OPENED ON TOP OF EACH OTHER
+   * (#1273, ADR-W-072 / ADR-AG-138 — operator ruling, 2026-09-20, T18: *"even if they do fall on the same
+   * point by chance … the system should not show them on top of each other. It should automatically look
+   * for a different config and show them differently"*, and cross-product: *"the 2d and 3d tools should
+   * follow the same logic"*).
+   *
+   * The 2-D shape, ported rather than reinvented (ADR-486, `firstSatisfyingSeed`): a separated
+   * configuration wins outright; a stacked one is REMEMBERED and used only if nothing else turns up
+   * inside the budget. So it is a preference below validity and never a requirement — a figure whose
+   * every configuration stacks two labels (the coincidence the givens FORCE) is still drawn, and refusing
+   * such a statement at its source is #1254's half. The tolerance is `apart()`'s — relative to the figure's
+   * own span, the ruler the click-path rings already use to ask "is there a point here" (ADR-AG-021).
+   * Display only, like `spread`: the knowledge gates must keep every admissible configuration.
+   */
+  const separated = (f: Figure) => {
+    const near = apart(f);
+    const ps = f.points;
+    for (let i = 0; i < ps.length; i += 1)
+      for (let j = i + 1; j < ps.length; j += 1)
+        if (Math.hypot(ps[i].x - ps[j].x, ps[i].y - ps[j].y) < near) return false;
+    return true;
+  };
+  const preferred = (f: Figure) => whole(f) && (!preferSpread || (spread(f) && separated(f)));
 
   const first = evaluate(c, seed);
   let chosen = first;
-  // The tiers, weakest last: a whole figure that is merely narrow still beats one with a vacancy,
-  // which still beats one that fails a selector outright.
+  // The tiers, weakest last: a whole SEPARATED figure beats a whole stacked one, which is merely narrow
+  // or stacked but still beats one with a vacancy, which still beats one that fails a selector outright.
+  let wholeSeparated: Figure | null = whole(first) && (!preferSpread || separated(first)) ? first : null;
   let wholeFallback: Figure | null = whole(first) ? first : null;
   let fallback: Figure | null = first.selectorsOk ? first : null;
   if (!preferred(first)) {
@@ -1081,14 +1106,16 @@ export function drawableAt(
         chosen = candidate;
         fallback = candidate;
         wholeFallback = candidate;
+        wholeSeparated = candidate;
         break;
       }
+      if (!wholeSeparated && whole(candidate) && (!preferSpread || separated(candidate))) wholeSeparated = candidate;
       if (!wholeFallback && whole(candidate)) wholeFallback = candidate;
       // Second best: the selectors hold and something the student named is missing. Remembered, so a
       // figure with a vacancy still beats one that fails a selector outright.
       if (!fallback && candidate.selectorsOk) fallback = candidate;
     }
-    if (!preferred(chosen)) chosen = wholeFallback ?? fallback ?? chosen;
+    if (!preferred(chosen)) chosen = wholeSeparated ?? wholeFallback ?? fallback ?? chosen;
   }
   perSeed.set(key, chosen);
   return chosen;

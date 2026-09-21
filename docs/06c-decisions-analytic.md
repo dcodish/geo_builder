@@ -7075,3 +7075,16 @@ A `CanvasView` is RELATIVE to the figure's box (`zoom` divides its half-extents,
 **Measured after.** Over the eight seeds the shown window is identical at every press (width ratio 1.000, was 3.0) and no re-fit is needed — every configuration of that figure stays largely inside the first frame; containment (ADR-AG-120) is untouched because the drawn box, trace included, is what the visibility question is asked of. The #1198 row that pinned the lurch as a known state is MOVED, not deleted: it still asserts the figure's own box varies (that is the figure), and points at the new lock for the frame.
 
 **Consequences.** `render/view.ts` (+`carryWindow`); `App.tsx` (the carry branch of the box effect, the button's flag). `__tests__/issue-1262-frame-stays.test.ts` (5): the figure's box still varies, the carry reproduces the window exactly, a zoomed-and-panned window is kept, the sweep needs no re-fit and the shown width is constant, and a figure that has left the frame re-fits. `issue-1198-locus-in-view.test.ts` (the lurch row rewritten). `docs/02c` R25a.
+
+## ADR-AG-138 — The configuration search prefers one that keeps distinct named points apart (#1273; the analytic half of ADR-W-072)
+
+**Status:** accepted, 2026-09-21 · **Issue:** #1273 (bug, P2, `analytic`) · operator ruling 2026-09-20 (T18), cross-product per [ADR-W-072](06w-decisions-workspace.md#adr-w-072) · round #1332
+**Requirements:** [02c](02c-requirements-analytic.md) R61 (new) · **Design:** [04c](04c-design-analytic.md#the-configuration-search-validity-then-preference-adr-ag-128) — the display tier
+
+**Measured before.** «A(3,4)» · «B(0,4)» · «משוואת המעגל x^2+y^2=25» · «P נקודת החיתוך של הישר AB עם המעגל»: the line y = 4 meets the circle at A itself and at (−3, 4). The crossing P landed ON A at seeds 2, 3, 4, 6 and 7 and was shown there — two labels at one place, the figure the operator called "very confusing" — because nothing in the search ever asked whether two labels had ended up in one spot.
+
+**The mechanism — the 2-D ranking, ported.** `drawableAt`'s display tier (`preferSpread`, the opt-in the display callers ask for) gains `separated`: no two of the figure's points within `apart()` of each other — the click-path rings' own relative ruler, exported from `crossings.ts` rather than copied. Ranking, strongest first: whole ∧ spread ∧ separated · whole ∧ separated · whole · second best · fallback — a stacked configuration is REMEMBERED and used only when nothing else turns up inside `DRAWABLE_TRIES`, exactly ADR-486's shape. Display only: with `preferSpread` off — `isKnowledge`, `knownOptions`, the locus gate — the pool is untouched, so the stacked root stays admissible (the two roots print as two options) and nothing is claimed that is not true across every configuration.
+
+**Measured after.** At every seed 0–7 the shown P is (−3, 4), apart from A; `knownOptions(P)` still holds both roots; a figure whose every configuration stacks («A(2,2)» · «B(2,2)») still draws. The plan's fourth lock (the walk still reaches the stacked one) is deliberately not built — see ADR-W-072's recorded deviation.
+
+**Consequences.** `engine/evaluate.ts` (`separated`, the `wholeSeparated` rung); `engine/crossings.ts` (`apart` exported). `__tests__/issue-1273-separated-by-default.test.ts` (5). `docs/02c` R61; `docs/04c` the tier table.

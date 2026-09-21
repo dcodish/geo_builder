@@ -88,7 +88,8 @@ has four tiers, strongest first:
 
 | tier | predicate | added by |
 | --- | --- | --- |
-| preferred | whole **and** every declared ring at least `SPREAD_MIN_DEG` open | #1174 |
+| preferred | whole **and** every declared ring at least `SPREAD_MIN_DEG` open **and** no two named points at one place (`separated`, `apart()`'s relative ruler) | #1174, #1273 |
+| whole, separated | whole and separated but narrow — remembered above a stacked whole one (the ADR-486 ranking, ported) | #1273 |
 | whole | selectors hold · nothing vacant · no ring contradicts its noun · **every given holds** (an unsatisfied constraint is a validity failure, not a preference — a point the solve parked on neither of its curves is not a configuration) | #1083, #1158/#1166, #1287 |
 | second best | the selectors hold, something named is missing | #1083 |
 | fallback | the raw figure at this seed | — |
