@@ -118,7 +118,9 @@ every answered decision already recorded on GitHub.
 Per ruling:
 
 1. **Comment it on the issue.** The operator's words in substance, quoted verbatim where they were
-   verbatim, dated. Then what it changes about the issue and the scope it now has. **Never revise the
+   verbatim, dated. **The comment opens with the canonical heading, verbatim:** `## Operator ruling — YYYY-MM-DD`
+   — it is the one shape `scripts/queue-hygiene.mjs` is guaranteed to read as an answer (#1325, ADR-W-073);
+   a pass that invents its own phrasing is how a ruled thread reads as unanswered. Then what it changes about the issue and the scope it now has. **Never revise the
    issue body** — a body is written once; rulings live in comments.
 2. **Update the labels to match the new truth:**
    - clear `needs-operator`

@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — a plain .mjs script, deliberately not part of the TS project
-import { isRulingComment, rulingComments, labelThreadDisagreement, auditQueue } from '../queue-hygiene.mjs';
+import { isRulingComment, rulingComments, labelThreadDisagreement, auditQueue, CANONICAL_RULING_HEADING } from '../queue-hygiene.mjs';
 
 const c = (body: string) => ({ body });
 const issue = (over: Record<string, unknown> = {}) => ({ number: 1, title: 't', labels: [], comments: [], ...over });
@@ -23,6 +23,11 @@ describe('#959 — a ruling announces itself in the shapes passes actually write
     // found by RUNNING the script, not by writing the list: #960's operator answer used this
     // heading and the first vocabulary did not know it, so a real answer read as unanswered.
     ['## Operator answer — 2026-09-10: *"i cannot reproduce this now so maybe its fixed"*'],
+    // #1325 — the two real answers the guard reported as unanswered on 2026-09-21, verbatim from the threads.
+    ['**Operator ruling, 2026-09-19:** *"agree. it should refuse."*\n\nSo the behaviour is settled: naming an object that already carries a name **refuses and names the holder**, rather than silently renaming.'],
+    ['## Escalation resolved\n\n**Arm 2 is unblocked — #1188\'s question 2 is ruled** (operator, 2026-09-20). The plan below is the arm as ruled.'],
+    // and the canonical heading the passes now write
+    [`${CANONICAL_RULING_HEADING('2026-09-21')}\n\n*"approved"*`],
   ])('recognises %s', (body) => {
     expect(isRulingComment(body)).toBe(true);
   });
@@ -33,6 +38,10 @@ describe('#959 — a ruling announces itself in the shapes passes actually write
       '## Plan correction — 2026-09-05 (`/decisions` pass). **Not a ruling; no approval implied.**',
       '## The corrected scan, RUN — 2026-09-07. **Evidence only; still not a ruling.**',
       '`auto-ok` applied per the operator’s STANDING ruling (2026-08-13, ADR-W-014 Am. 1)',
+      // #1325's anti-widening rows: the phrase without a separator is an escalation ASKING, and the verb
+      // without the operator is a session talking about a ruling, not giving one.
+      'This needs an operator ruling on whether the bound is strict — escalated.',
+      'Arm 2 stays parked until it is ruled; the round built arms 1 and 3.',
     ]) {
       expect(isRulingComment(body), body.slice(0, 40)).toBe(false);
     }
@@ -117,5 +126,21 @@ describe('#959 — the queue audit', () => {
 
   it('an empty queue is clean, not an error', () => {
     expect(auditQueue([])).toEqual([]);
+  });
+});
+
+describe('#1325 — the two 2026-09-21 false positives, end to end through labelThreadDisagreement', () => {
+  const escalation = c('## Escalation — arm 2 is not built, and the two issues\' scopes are circular\n\nWhat the plan said…');
+  it('#1164: a comma after «Operator ruling» is an answer, so a thread ruled after its escalation is not an unlabelled question', () => {
+    const ruled = c('**Operator ruling, 2026-09-19:** *"agree. it should refuse."*');
+    expect(labelThreadDisagreement(issue({ number: 1164, comments: [escalation, ruled] }))).toBeNull();
+  });
+  it('#1184: «… is ruled** (operator, DATE)» is an answer', () => {
+    const ruled = c('**Arm 2 is unblocked — #1188\'s question 2 is ruled** (operator, 2026-09-20)');
+    expect(labelThreadDisagreement(issue({ number: 1184, comments: [escalation, ruled] }))).toBeNull();
+  });
+  it('and an escalation still followed by NO ruling is still reported — the guard did not go blind', () => {
+    const chatter = c('Arm 2 stays parked until it is ruled; the round built arms 1 and 3.');
+    expect(labelThreadDisagreement(issue({ number: 1, comments: [escalation, chatter] }))?.kind).toBe('unlabelled-question');
   });
 });

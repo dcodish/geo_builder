@@ -144,7 +144,10 @@ Escalate — do not patch — when any of these hits:
 
 Escalating means: comment the docs/17 escalation template on the issue (what the plan said,
 what the code showed, the options with costs), swap labels `auto-ok` → `needs-operator`, drop
-the worktree, record it in the ledger (issue → why, one line), move to the next item. An
+the worktree, record it in the ledger (issue → why, one line), move to the next item. The escalation
+comment opens with `## Escalation — …` (what `queue-hygiene` reads as a question), and when a later
+session transcribes the operator's answer to it, that comment opens with the canonical
+`## Operator ruling — YYYY-MM-DD` (#1325, ADR-W-073) — never a phrasing of its own. An
 escaped item is a GOOD outcome — it is the mechanism working. The stats line (Step 5) is what
 accumulates the escalation rate across rounds; it is the data the Phase-2 (unattended runs)
 landing-policy decision needs (#543).

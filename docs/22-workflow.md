@@ -51,6 +51,8 @@ The operator raises issues **while testing**, often several per pass. If the rep
 3. **Write the analysis into the issue** (a comment or the body): root cause, the class it belongs to, a concrete fix plan (mechanism, files, tests, blast radius), open questions for the operator.
 4. **STOP — do not implement.** No branch, no code, no "it's a one-liner" exceptions. Reply to the operator with the classification + plan and move to the next report.
 
+**A ruling is transcribed under ONE heading.** When the operator's answer to an escalation or an open question is written onto the issue — by the `/decisions` pass or by the session resolving a round's escalation — the comment opens with `## Operator ruling — YYYY-MM-DD`, verbatim ([ADR-W-073](06w-decisions-workspace.md#adr-w-073)). `scripts/queue-hygiene.mjs` reads that shape (and the handful measured from older threads) as an answer; a pass that invents its own phrasing is how a ruled thread is reported to the operator as still waiting on them (#1325).
+
 Fixing happens in **dedicated fix sessions**: the operator opens one and picks issues off the queue by priority (`gh issue list` sorted P1→P3), or invokes an autonomous **fix round** over operator-approved plans (§2d). Only then do the bug route (§3 steps 4–6) / feature route (§4 steps 3–7) run.
 
 **Exceptions:** (a) the operator explicitly says to fix/build it *now* in this session; (b) a **P1 prod-down / honesty emergency** — drop-everything still applies, but say so before starting.
