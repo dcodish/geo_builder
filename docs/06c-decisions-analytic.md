@@ -6987,3 +6987,35 @@ The default display (seed 0) showed a point on neither curve, the data panel lis
 **Sibling audit (docs/17 §1).** 2-D's driven solvers have had multi-start since ADR-033 (`multiStartSolve`: regularised search, then polish) and its accept gate refuses a non-converged solve (`solutionAccepted`); 3-D's pivot has its own restarts (ADR-3D-007). Complex's `foldConstraints` is numeric over algebraic constraints and was not measured; noted, not claimed.
 
 **Consequences.** `engine/solve.ts` (+`solveMultiStart`); `engine/evaluate.ts` (the restart list in the solve block; `whole` gains the unsatisfied term); `engine/derive.ts` (one `unsatisfiable` per line). `__tests__/issue-1287-crossing-settles.test.ts` (6): the eight seeds on both curves, both roots reachable, the solver alone from the saddle, the impossible chord reported once, the search never showing an unsatisfied seed with the knowledge gate reading only holding ones, and the once-failing seeds converging raw. `docs/04c` — the validity table.
+
+## ADR-AG-135 — The drawn extent bounds a crossing's SOLUTION set, and the figure is the authority on the extent (#1286)
+
+**Status:** accepted, 2026-09-21 · **Issue:** #1286 (bug, P2, `analytic`) · operator rulings 2026-09-20 (T11: *"a root outside the segment is not a lesser configuration — it is not a configuration"*; on the noun, (a): *"the figure is the authority"*) · round #1332
+**Requirements:** [02c](02c-requirements-analytic.md) R59 (new) · **Design:** [04c](04c-design-analytic.md#the-crossing-modules-tolerances-adr-ag-130) — "The extent is one ruler"
+**Narrows** [ADR-AG-124](#adr-ag-124) (#1168), which made the noun SEED the root; **builds on** [ADR-AG-134](#adr-ag-134) (#1287), whose validity term is what turns an out-of-piece root into a non-configuration; **respects** #1232 (a cevian's foot may fall beyond its side) and #1069 (a point «על הישר» may sit beyond the endpoints)
+
+**Measured before, 12 seeds each, real `derive`:**
+
+```
+«P נקודת החיתוך של הצלע CA עם המעגל»   (2.058, 3.430) on the side — seeds 0, 2–11;   (−2.058, −3.430) OFF the side — seed 1
+«P נקודת החיתוך של הישר CA עם המעגל»   the far root — seeds 0–2;   the near root — seeds 3–11
+the chord A(-5,1)·B(5,1)                 both roots, across seeds                         (the case the ruling protects)
+the segment A(0,0)·B(1,0) on x²+y²=16    P at (±4, 0) — beyond B — faults: []            (a crossing that does not exist, drawn green)
+```
+
+ADR-AG-124 read `bounded` where the search STARTS; nothing downstream ever asked whether the solved point lay on the piece, so the far root was preferred against and still reached, the data panel listed it, and a segment that never reaches the circle drew its "crossing" past its own end.
+
+**The class.** *A statement about a bounded piece was enforced on the infinite line: the extent shaped the seed, never the solution set.* Three readers of "is this on the piece" existed — the ring filter had it, the solver did not, the noun decided it and the figure did not.
+
+**The mechanism — one ruler, three readers, crossings only.**
+
+- **`extent.ts`** (new): `segmentParam`, `withinSegment` with the ring filter's own tolerance, `isPolygonSide` (moved out of `crossings.ts`), `drawnPieceOver`. The click-path rings read `withinSegment`; nothing else defines the extent.
+- **The bounded CROSSING residual** (`solve.ts`): two more rows on `on-line-2pt` when it is both `bounded` and a `crossing` — the distance the point sits beyond each end along the line, zero anywhere within the piece. The solve is pulled back inside (the multi-start of ADR-AG-134 finds the in-piece root from the quarter-point restarts), a root outside is UNSATISFIED and therefore not a configuration (ADR-AG-134's validity term), and a segment that never reaches the curve is reported once on the line that stated it.
+- **The figure is the authority** (`evaluate.ts`, beside `resolveChoices`): a crossing's incidence on a pair the figure DRAWS as a piece — a segment object or a polygon side — is promoted to `bounded` whatever noun the sentence used. «הישר CA» on a triangle side denotes the side and yields one root; «הישר» keeps its infinite reading where the letters name nothing drawn (locked: two placed points and no piece — both roots remain).
+- **`crossing`** is set only by `parseIntersection`. The first cut applied the extent to every bounded incidence and failed two locks that are two operator rulings: #1232 (an altitude's foot on an obtuse triangle falls beyond the side and must build) and #1069 («D על הישר BC» may sit beyond the endpoints). Both rulings were given about incidences; T11 and (a) were given about the crossing sentence. The marker keeps all four true.
+
+**Measured after.** «הצלע CA» and «הישר CA» on the drawn side: the near root at every one of 12 seeds; the two-root chord keeps both roots; the segment that misses the circle: one `unsatisfiable` on its line, `faulted`; the undrawn pair's «הישר» keeps both roots. The #1168 lock's two cases that asserted the opposite (the far root as «הישר»'s first, and "one configuration away") are rewritten to the ruling and say why.
+
+**What the cost he accepted looks like now** (recorded on the issue when he ruled): «הישר» stops distinguishing anything for a drawn side, and the far intersection is unreachable from that figure; the way to ASK for it is a construct for the extension, not a re-reading of «הישר» — filed when a play pass wants it, not built on speculation.
+
+**Consequences.** `engine/extent.ts` (new); `engine/crossings.ts` (reads `withinSegment`, `isPolygonSide` from it); `engine/solve.ts` (`crossing` on the type; the bounded-crossing rows); `engine/evaluate.ts` (the promotion); `parser/parseAnalytic.ts` (`parseIntersection` marks its incidences). `__tests__/issue-1286-extent-bounds-roots.test.ts` (7); `issue-1168-1269-noun-root.test.ts` (two cases rewritten to the ruling). `docs/02c` R59; `docs/04c` the extent paragraph.

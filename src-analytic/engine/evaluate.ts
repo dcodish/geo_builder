@@ -20,6 +20,7 @@ import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, type RingFault } from './rings';
 import { dirVector, freeRank, residual, resolveChoices, solveMultiStart, type Constraint } from './solve';
+import { drawnPieceOver } from './extent';
 import { inDomain, isFree, objectById, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
 
 export interface FigurePoint {
@@ -577,7 +578,18 @@ export function evaluate(raw: Construction, seed = 0): Figure {
    * count, the satisfaction check, the provenance — then sees an ordinary constraint and never
    * learns that discrete freedom exists.
    */
-  const c: Construction = { ...raw, constraints: resolveChoices(raw.constraints, seed) };
+  /**
+   * THE FIGURE IS THE AUTHORITY on a straight's extent (#1286, ADR-AG-135 — operator ruling (a),
+   * 2026-09-20): an incidence on a pair the figure DRAWS as a piece — a segment object, a polygon side —
+   * is bounded whatever noun the sentence used. «הישר CA» on a triangle side denotes that side and
+   * yields the root on it; «הישר» keeps its infinite reading only where the letters name nothing drawn.
+   * Resolved here, once, like the discrete choices above, so the solve, the validity check and the
+   * knowledge gate all see one truth. The parser's noun stays a hint, never the decision.
+   */
+  const bound = raw.constraints.map((k) =>
+    k.t === 'on-line-2pt' && k.crossing && !k.bounded && drawnPieceOver(raw, k.a, k.b) ? { ...k, bounded: true } : k,
+  );
+  const c: Construction = { ...raw, constraints: resolveChoices(bound, seed) };
   const env = sampleEnv(c, seed);
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];

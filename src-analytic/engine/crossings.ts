@@ -18,6 +18,7 @@
 import type { Figure } from './evaluate';
 import type { Construction, CurveKind, Id, NumCurve } from './types';
 import { objectById } from './types';
+import { isPolygonSide, withinSegment } from './extent';
 
 export interface Crossing {
   /** Where, in world coordinates. */
@@ -137,20 +138,6 @@ const CONIC_NOUN: Record<string, string> = {
  * family, so the construction object carries none; only the fit knows it is a line, and a caller
  * that has already tested for one should not make this function guess again.
  */
-/** Is this pair an edge of a polygon the student declared? Then its noun is «הצלע» (#1269). */
-function isPolygonSide(c: Construction, a: Id, b: Id): boolean {
-  for (const o of c.objects) {
-    if (o.kind !== 'polygon') continue;
-    const ids = o.vertices;
-    for (let i = 0; i < ids.length; i += 1) {
-      const p1 = ids[i];
-      const p2 = ids[(i + 1) % ids.length];
-      if ((p1 === a && p2 === b) || (p1 === b && p2 === a)) return true;
-    }
-  }
-  return false;
-}
-
 function words(c: Construction, id: Id, classified?: CurveKind): string | null {
   const o = objectById(c, id);
   if (!o) return null;
@@ -228,10 +215,9 @@ function straightOfSegment(s: Figure['segments'][number], c: Construction): Stra
     a: dy,
     b: -dx,
     c: dx * s.a.y - dy * s.a.x,
-    within: (x, y) => {
-      const t = ((x - s.a.x) * dx + (y - s.a.y) * dy) / (dx * dx + dy * dy);
-      return t >= -1e-6 && t <= 1 + 1e-6;
-    },
+    // The ONE extent predicate (`extent.ts`, #1286): the solver's bounded residual and the figure-is-the-
+    // authority promotion read the same ruler, so a ring offered here is a root the solve can land on.
+    within: (x, y) => withinSegment(s.a, s.b, { x, y }),
     words: w,
   };
 }

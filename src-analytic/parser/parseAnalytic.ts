@@ -929,8 +929,12 @@ function parseIntersection(line: string): RuleOutcome {
   const m = INTERSECT_HE.exec(line) ?? INTERSECT_EN.exec(line);
   if (!m) return null;
   const [, id, leftSrc, rightSrc] = m;
-  const left = incidenceOn(leftSrc, id);
-  const right = incidenceOn(rightSrc, id);
+  // #1286 (ADR-AG-135): a crossing's incidences are marked as such — the drawn extent bounds the
+  // SOLUTION set for a crossing only (the operator's T11 ruling and ruling (a) were about this
+  // sentence); a cevian's foot or a point «על הישר» keeps the line reading its own ruling gave it.
+  const asCrossing = (k: ReturnType<typeof incidenceOn>) => (k && k.t === 'on-line-2pt' ? { ...k, crossing: true as const } : k);
+  const left = asCrossing(incidenceOn(leftSrc, id));
+  const right = asCrossing(incidenceOn(rightSrc, id));
   // The verb was understood and an operand was not — #1052’s refusal, which names the formats that
   // do work rather than calling the whole sentence unintelligible.
   if (!left || !right) return refuse('bad-operand', line);
