@@ -2001,6 +2001,8 @@ export default function App() {
         closeLabel={t('manualClose')}
         tryHint={t('manualTry')}
         sectionCap={6}
+        showAllLabel={t('manualShowAll')}
+        showLessLabel={t('manualShowLess')}
         moreNote={t('manualMore')}
         sections={CATEGORY_ORDER.map((cat) => ({
           key: cat,

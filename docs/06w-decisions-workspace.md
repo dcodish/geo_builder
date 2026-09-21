@@ -3685,3 +3685,40 @@ A sweep for the remaining `readFileSync(App…)` tests found no others touching 
 **Locks.** The two real comment bodies as fixtures, red-then-green per spelling, through `isRulingComment` and end to end through `labelThreadDisagreement` (an escalation followed by each reads as ruled); the anti-widening rows (the phrase without a separator, the verb without the operator) still read as not a ruling, and an escalation followed only by chatter is still reported.
 
 **Consequences.** `scripts/queue-hygiene.mjs` (two markers, `CANONICAL_RULING_HEADING`); `scripts/__tests__/queue-hygiene.test.ts`; `.claude/skills/decisions/SKILL.md` Step 4, `.claude/skills/fix-round/SKILL.md` Step 4; `docs/22` §2b.
+
+## ADR-W-074 — The guide's sample is CHOSEN and every row is REACHABLE: a `featured` flag plus «הצג הכול», in the shared chrome (#1275)
+
+**Status:** accepted, 2026-09-21 · **Issue:** [#1275](https://github.com/dcodish/geo_builder/issues/1275) (bug, `P2`, `workspace`) · round [#1345](https://github.com/dcodish/geo_builder/issues/1345) · all four products
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-7 (extended) · **Design:** [04w](04w-design-shell.md#the-guides-sample-and-its-escape-hatch-adr-w-074) (new section)
+**Operator, 2026-09-20**, on the overnight sheet's T25 (*"open the guide and find a «תיכון» row and a «גובה» row"*): *"what do i need to test there? if i clear all there will be nothing to test"*
+
+**Measured — he would not have found them.** The guide shows the first six entries per section and those rows are entries **8 and 9** of «נקודות נגזרות». [#1165](https://github.com/dcodish/geo_builder/issues/1165) added them for a student who *"looking for «תיכון» found nothing"*; after that fix, a student looking for «תיכון» still found nothing. Re-measured at pickup (ADR-W-064) — the catalogs have grown since the report, and the numbers with them:
+
+```
+  analytic    71 rows,  26 hidden      derived: «תיכון» is row 8 of 10, «גובה» row 9
+  2-D        155 rows, 125 hidden      circles: 63 rows, 6 shown
+  3-D        230 rows, 188 hidden      planesLines: 87 rows, 6 shown
+```
+
+**The cap is defensible and STAYS.** It came in with the guide itself (operator ruling, 2026-08-18: a student meeting 63 circle rows learns nothing). Two other things are defects:
+
+1. **WHICH six is decided by FILE ORDER.** Nothing chooses them — they are whichever rows were written first, so **every capability added afterwards lands in the invisible tail**, silently. That is what makes it a class and not a row.
+2. **The note misdescribes what is missing.** `manualMore` said *«…ואלו רק דוגמאות — הכלי מבין ניסוחים נוספים מהסוג הזה»* — further phrasings **of the same kind**. The hidden rows are not phrasings of the shown ones: «AB = 10», «AB ⊥ BC», «AB = AC» are separate CAPABILITIES. The student was told the tool knows more ways to say what they can see, when in fact it knows things they cannot see.
+
+**And no lock could catch it.** #1165's own lock asserts the two rows **exist in the array**; the catalog parse lock proves each row **builds**. Both are green while the feature is invisible. **Nothing anywhere asserted a row is DISPLAYED** — which is the third thing, and now is.
+
+**What shipped.**
+- `manualShown(entries, cap)` in `shell/frame/ManualScreen.tsx` — the selection, exported so its lock CALLS it instead of re-slicing the array (ADR-W-053). Featured entries enter the cap first, then catalog order; both groups keep their relative order, so the catalog's order still documents itself, and a featured entry can never take a section past its cap.
+- **«הצג הכול» / «הצג פחות» per capped section**, in all four products. This is the half that actually protects future additions: with it, a hidden row is one click away rather than unreachable, and the catalog is a coverage map a student can read.
+- **The note re-worded** in both languages and all four products: it now says the tool has more COMMANDS here, not just other phrasings of these.
+- **Two entries marked `featured`** — «AD תיכון במשולש ABC» and «AD גובה לצלע BC», the rows the operator's own report named. T25 is now checkable at a glance.
+
+**What did NOT ship, and why that is the decision rather than an omission.** The plan also wanted every capped section's six chosen, with a LINT failing any capped section that features nothing. Eighteen sections across four products exceed the cap: that is **~108 decisions about what a student should meet first**, which is pedagogy — the judgement docs/10 records, and the operator is the teacher. A round making 108 of them silently, across every product's front door, is what the escalation exit exists to prevent. No uniform RULE could substitute: only the analytic and complex catalogs carry a `family` field, so *"one row per family"* — which would encode this issue's own diagnosis exactly — cannot reach 2-D or 3-D.
+
+So the **mechanism** landed and the **choosing** is filed as [#1347](https://github.com/dcodish/geo_builder/issues/1347) (`needs-operator`), with the options priced. **The lint belongs with it**, in the same change: adding it now would turn all 18 sections red and force the 108 choices immediately, which is the pressure #1347 exists to relieve. Nothing is lost meanwhile — with «הצג הכול» every row is reachable, and only the first impression stays accidental.
+
+**The lock is SPLIT, and the boundary is why.** The selection rule is locked in `shell/__tests__/manual-featured-1275.test.ts`; the T25 half — *does a student MEET the rows #1165 added?* — is in `src-analytic/__tests__/issue-1275-guide-featured.test.ts`. The first version put both in `shell/` and `isolation.test.ts` refused it: **`shell/` may never import a product tree** (ADR-W-016 rule 2 — the frame must serve builder N+1 without knowing any builder). The guard was right and the split is the correct shape: the chrome owns the rule, the product owns the question about its own catalog.
+
+**Measured after.** «נקודות נגזרות» leads with «AD תיכון במשולש ABC» and «AD גובה לצלע BC». Every capped section in all four products carries its expander. Lanes: 2-D 415 files / 7201 tests · 3-D 258 / 4906 · analytic 157 / 2273 · complex 44 / 772 — all green.
+
+**Consequences.** `shell/frame/ManualScreen.tsx` (`featured`, `manualShown`, `showAllLabel`/`showLessLabel`, the per-section expander); `src-analytic/parser/catalogAnalytic.ts` (`featured?: true`, two rows marked); the four `App` call sites; `manualMore` + `manualShowAll` + `manualShowLess` in all four products × two languages. Locks: `shell/__tests__/manual-featured-1275.test.ts` (5), `src-analytic/__tests__/issue-1275-guide-featured.test.ts` (3).

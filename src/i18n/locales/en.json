@@ -12,7 +12,7 @@
   "manualClose": "Back to the tool",
   "manualTry": "Click to try — the example builds on the figure",
   "manualPartial": "This is a partial guide — only representative examples are shown, so you can see what sorts of sentences can be typed. If the tool didn't understand a sentence, try different wording — unsupported sentences are collected and reviewed by the project team for future support.",
-  "manualMore": "…and these are just examples — the tool reads more phrasings of this kind",
+  "manualMore": "…and these are only examples — the tool has more COMMANDS here, not just other phrasings of these",
   "switcher2d": "Plane Geometry",
   "switcher3d": "Space Geometry",
   "switcherComplex": "Complex Numbers",
@@ -507,5 +507,7 @@
     "isosceles": "isosceles triangle",
     "isoTrapezoid": "isosceles trapezoid",
     "midsegment": "midsegment"
-  }
+  },
+  "manualShowAll": "Show all",
+  "manualShowLess": "Show fewer"
 }

@@ -112,7 +112,9 @@ const he = {
     'זהו מדריך חלקי — מוצגות דוגמאות מייצגות מכל סוג, כדי להראות אילו מיני משפטים אפשר להקליד. לחצו על דוגמה כדי לראות אותה נבנית, או נסחו חופשי משלכם — ואם הכלי לא הבין, נסו ניסוח אחר: אוצר המשפטים של הכלי הולך וגדל.',
   manualClose: 'חזרה לכלי',
   manualTry: 'לחצו כדי לנסות — הדוגמה תיבנה על הציור',
-  manualMore: '…ואלו רק דוגמאות — הכלי מבין ניסוחים נוספים מהסוג הזה',
+  manualMore: '…ואלו רק דוגמאות — לכלי יש כאן פקודות נוספות, לא רק ניסוחים אחרים של אלו',
+  manualShowAll: 'הצג הכול',
+  manualShowLess: 'הצג פחות',
   // B6 (D8): the data-panel skeleton — same sections, same order, in every builder.
   secPoints: 'נקודות',
   secMeasures: 'מדידות',
@@ -288,7 +290,9 @@ const en: typeof he = {
     "This is a partial guide — representative examples of each kind, to show what sorts of sentences can be typed. Click one to watch it build, or phrase your own freely — and if the tool didn't understand, try different wording: its vocabulary keeps growing.",
   manualClose: 'Back to the tool',
   manualTry: 'Click to try — the example builds on the figure',
-  manualMore: '…and these are just examples — the tool reads more phrasings of this kind',
+  manualMore: '…and these are only examples — the tool has more COMMANDS here, not just other phrasings of these',
+  manualShowAll: 'Show all',
+  manualShowLess: 'Show fewer',
   // B6 (D8): the data-panel skeleton — same sections, same order, in every builder.
   secPoints: 'Points',
   secMeasures: 'Measures',

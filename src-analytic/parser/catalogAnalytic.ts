@@ -40,6 +40,19 @@ export interface CatalogEntryAnalytic {
    * Hebrew only — it feeds the build check, while the parse check covers both languages.
    */
   needs?: string[];
+  /**
+   * SHOW THIS ONE FIRST in a capped guide section (#1275).
+   *
+   * The guide shows six entries per section, and which six used to be FILE ORDER — so every
+   * capability added after the section filled up landed in the invisible tail. #1165 added the cevian
+   * rows for a student who *"looking for «תיכון» found nothing"*, and they arrived as rows 8 and 9 of
+   * «נקודות נגזרות»: still nothing. Marking an entry pulls it into the cap without reordering the
+   * catalog, whose order is its own documentation.
+   *
+   * Which SIX each section should feature is an open pedagogy question (#1347) — this flag is the
+   * mechanism, and only the rows a report has actually named carry it today.
+   */
+  featured?: true;
 }
 
 export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
@@ -452,6 +465,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'derived',
     family: 'F16',
+    featured: true,
     he: 'AD תיכון במשולש ABC',
     en: 'AD is the median in triangle ABC',
     needs: ['A(1,3)', 'B(-4,1)', 'C(-3,8)'],
@@ -459,6 +473,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'derived',
     family: 'F16',
+    featured: true,
     he: 'AD גובה לצלע BC',
     en: 'AD is the altitude to side BC',
     // An ACUTE triangle, so the foot lands between B and C: the rule admits an obtuse figure too

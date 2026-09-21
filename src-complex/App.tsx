@@ -772,6 +772,8 @@ export function App() {
         closeLabel={t('manualClose')}
         tryHint={t('manualTry')}
         sectionCap={6}
+        showAllLabel={t('manualShowAll')}
+        showLessLabel={t('manualShowLess')}
         moreNote={t('manualMore')}
         sections={manualSections(i18n.language === 'he' ? 'he' : 'en').map((s) => ({
           key: s.family,

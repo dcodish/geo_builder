@@ -61,7 +61,7 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
 - **FR-SU-6 (Should)** — **Every figure action lives under the canvas**, not scattered between header and
   sidebar. *(Realised — D7.)*
 - **FR-SU-7 (Should)** — **A manual screen per builder, in one chrome.** Each builder documents its own
-  language; the frame around that documentation is identical. *(Realised — `ManualScreen.tsx`; D9.)*
+  language; the frame around that documentation is identical. **A section shows a SAMPLE, and the sample is chosen rather than sliced:** the guide caps each section so it teaches rather than inventories, the entries it shows first are marked and not merely written first, and **every remaining row is one click away** — a coverage map two thirds of which a student cannot reach is not a guide. The note under a capped section says the tool has more COMMANDS there, never "more phrasings of these", because what is hidden are separate capabilities. *(Realised — `ManualScreen.tsx`; D9; [ADR-W-074](06w-decisions-workspace.md#adr-w-074), #1275. Which six each section features is [#1347](https://github.com/dcodish/geo_builder/issues/1347).)*
 - **FR-SU-8 (Should)** — **Quick commands adapt to the moment:** large chips on an empty canvas, a compact
   row once the student is building — so the affordance teaches at the point of not-knowing and gets out of
   the way afterwards. *(Realised — `QuickChips.tsx` + `InputArea.tsx`; D9b.)*

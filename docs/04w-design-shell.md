@@ -68,6 +68,29 @@ chassis existed, so it mounted the frame rather than re-deriving it) → `src` *
 the one-look goal became structural rather than aspirational: every product now consumes the tree, so a
 chrome change that reaches one reaches all.
 
+## The guide's sample, and its escape hatch ([ADR-W-074](06w-decisions-workspace.md#adr-w-074))
+
+`ManualScreen` shows a capped SAMPLE per section, because a guide that lists 63 circle rows teaches
+nothing. Two rules make a cap honest, and the shipped guide had neither:
+
+| rule | mechanism | why |
+| --- | --- | --- |
+| the sample is CHOSEN | `featured` on the entry; `manualShown` takes featured first, then catalog order | file order meant every capability added after a section filled up landed in the invisible tail |
+| every row is REACHABLE | «הצג הכול» / «הצג פחות» per capped section | the catalog is a coverage map; a map a student cannot read is not one |
+
+`manualShown` is exported so its lock calls it rather than re-slicing the array (ADR-W-053). Both
+groups keep their relative order, so the catalog's own order still documents itself, and a featured
+entry can never push a section past its cap.
+
+**The note under a capped section is part of the contract.** It must say the tool has more COMMANDS
+there — not "more phrasings of these", which was false: what is hidden are separate capabilities, and
+telling a student otherwise is a claim about the tool that the tool does not meet.
+
+**The chrome owns the RULE; the product owns the QUESTION.** `shell/` may never import a product tree
+(ADR-W-016 rule 2), so the selection's lock lives here and *"does this catalog's section display the
+rows a student was told to look for?"* lives in the product's own tests. `isolation.test.ts` enforced
+this the first time the two were written together, which is the guard working.
+
 ## Boundaries
 
 Enforced by `server/__tests__/isolation.test.ts` reading `BOUNDARIES.json`:
