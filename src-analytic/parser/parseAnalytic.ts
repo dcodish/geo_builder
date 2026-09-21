@@ -1408,13 +1408,23 @@ const ON_OBJECT_EN = new RegExp(
  * Only 90° for now: a general «זווית ABC היא 60» needs an angle RESIDUAL, which is its own
  * mechanism and its own issue. A stated value that is not 90 therefore falls through rather than
  * being quietly treated as a right angle.
+ *
+ * THE NOUN IS ONE ATOM, AND THE GLYPHS ARE IN IT (#1330, ADR-AG-142). Operator, playing the #1328
+ * sheet on this page: *"the errors on the 90 is לא הצלחתי להבין את המשפט: «∠ABC = 90» which is wrong
+ * error"*. The angle noun was spelled three times — «זווית», a separate `∡`-only pattern, «angle» —
+ * and `∠` (U+2220, the glyph the 2-D tool teaches on its palette, in its catalog and in its
+ * messages) was in none of them, so a student who learned it there was told this tool cannot do
+ * right angles. Both glyphs sit in the noun alternation, once per language, the 2-D lexicon's
+ * `ANGLE_WORD` shape: an angle rule that reads the noun reads every spelling of it, and the `∡`-only
+ * pattern is gone rather than kept beside a `∠` twin.
  */
+const ANGLE_NOUN_HE = '(?:ה?זווית\\s+|[∠∡]\\s*)';
+const ANGLE_NOUN_EN = '(?:(?:the\\s+)?angle\\s+|[∠∡]\\s*)';
 const ANGLE_HE = new RegExp(
-  `^${HE_GIVEN}ה?זווית\\s+(${NAME})(${NAME})?(${NAME})?${HE_IS}\\s*(?:ישרה|=\\s*90|90)$`,
+  `^${HE_GIVEN}${ANGLE_NOUN_HE}(${NAME})(${NAME})?(${NAME})?${HE_IS}\\s*(?:ישרה|=\\s*90°?|90°?)$`,
 );
-const ANGLE_SIGN = new RegExp(`^${HE_GIVEN}∡\\s*(${NAME})(${NAME})?(${NAME})?\\s*=\\s*90°?$`);
 const ANGLE_EN = new RegExp(
-  `^(?:the\\s+)?angle\\s+(${NAME})(${NAME})?(${NAME})?\\s+(?:is\\s+)?(?:right|=\\s*90°?|90°?)$`,
+  `^${ANGLE_NOUN_EN}(${NAME})(${NAME})?(${NAME})?\\s*(?:is\\s+)?(?:right|=\\s*90°?|90°?)$`,
   'i',
 );
 /**
@@ -2043,7 +2053,7 @@ function parseConstraint(raw: string): RuleOutcome {
     // exit `parseConstraint` entirely and skip the area, cevian and axis rules that follow.
   }
 
-  const ang = ANGLE_HE.exec(line) ?? ANGLE_SIGN.exec(line) ?? ANGLE_EN.exec(line);
+  const ang = ANGLE_HE.exec(line) ?? ANGLE_EN.exec(line);
   if (ang) {
     const [, a, b, c] = ang;
     // Three letters: the middle one is the vertex and the outer two are the rays. That is the

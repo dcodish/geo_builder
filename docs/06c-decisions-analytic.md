@@ -6987,3 +6987,20 @@ The default display (seed 0) showed a point on neither curve, the data panel lis
 **Sibling audit (docs/17 §1).** 2-D's driven solvers have had multi-start since ADR-033 (`multiStartSolve`: regularised search, then polish) and its accept gate refuses a non-converged solve (`solutionAccepted`); 3-D's pivot has its own restarts (ADR-3D-007). Complex's `foldConstraints` is numeric over algebraic constraints and was not measured; noted, not claimed.
 
 **Consequences.** `engine/solve.ts` (+`solveMultiStart`); `engine/evaluate.ts` (the restart list in the solve block; `whole` gains the unsatisfied term); `engine/derive.ts` (one `unsatisfiable` per line). `__tests__/issue-1287-crossing-settles.test.ts` (6): the eight seeds on both curves, both roots reachable, the solver alone from the saddle, the impossible chord reported once, the search never showing an unsatisfied seed with the knowledge gate reading only holding ones, and the once-failing seeds converging raw. `docs/04c` — the validity table.
+
+## ADR-AG-142 — The angle noun is one atom per language, and the `∠` glyph the 2-D tool teaches is in it (#1330)
+
+**Status:** accepted, 2026-09-21 · **Issue:** #1330 (bug, P2, `analytic`) · operator, 2026-09-21, playing the #1328 sheet on the analytic page: *"the errors on the 90 is לא הצלחתי להבין את המשפט: «∠ABC = 90» which is wrong error"* · round #1332
+**Requirements:** [02c](02c-requirements-analytic.md) R60 (the spellings) · **Design:** [04c](04c-design-analytic.md#the-parsers-rule-contract-adr-ag-017) — the rule contract
+
+**Measured before (71fc71ad, re-measured at pickup; as filed).** On «משולש ABC» · «AB = AC»: «∠ABC = 90», «∠ABC = 90°», «∠ABC ישרה», «∠B ישרה», «∠B = 90», «נתון ∠ABC = 90» → `not-handled` («לא הצלחתי להבין את המשפט»); «∡ABC = 90», «זווית ABC = 90», «זווית ABC ישרה» → `constraint:relation`, recorded. Two glyphs, one meaning, one of them read — the two-spellings shape: the right angle is in the grammar, and the spelling the sibling product teaches on its palette, catalog and messages is not.
+
+**Root cause.** The angle noun was spelled three times — «זווית» in `ANGLE_HE`, a separate `∡`-only `ANGLE_SIGN`, «angle» in `ANGLE_EN` — and `∠` (U+2220) was in none. A glyph-only sibling pattern is exactly how one spelling drifts from the others in silence.
+
+**The mechanism.** `ANGLE_NOUN_HE` = «ה?זווית» | `[∠∡]`, `ANGLE_NOUN_EN` = «(the) angle» | `[∠∡]` — one atom per language, the 2-D lexicon's `ANGLE_WORD` shape — used by `ANGLE_HE` and `ANGLE_EN`; `ANGLE_SIGN` is deleted, its «∡ABC = 90°» form subsumed (the HE tail now takes the optional «°» it did). The catalog gains the right angle in both spellings («זווית ABC ישרה» / «angle ABC is right», «∠ABC = 90»), which the every-entry-parses guard drives through the real grammar in both languages. The palette keeps holding `°`/`∡` per the 2026-09-16 ruling (a general angle VALUE is still unbuilt — «∠ABC = 60» still falls through) — one more reason the glyph must parse: a student pastes it from the 2-D page.
+
+**Found while measuring, filed rather than fixed here.** «angle ABC = 90» (English, «=» form) is claimed by `LENGTH_EQ` before the angle rule and lowers to a `length-eq` — a rule-order defect of a different mechanism; «angle ABC is right» and «the angle ABC is 90» read correctly. Its own issue.
+
+**Measured after.** Every `∠` spelling lowers to the same `constraint:relation` (three letters) or `right-angle` (one letter) as its word twin, on the same figure; the `∡` spellings unchanged; «∠ABC = 60» still falls through (no angle residual — unchanged scope).
+
+**Consequences.** `parser/parseAnalytic.ts` (`ANGLE_NOUN_HE/EN`; `ANGLE_SIGN` removed); `parser/catalogAnalytic.ts` (two rows). `__tests__/issue-1330-angle-glyph.test.ts` (4). `docs/02c` R60; `docs/04c` the rule contract.

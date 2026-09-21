@@ -836,7 +836,9 @@ the noun alone when the figure has exactly one such shape.
 **R60 — an unstated choice CYCLES, and the student can consume it**
 ([ADR-AG-035](06c-decisions-analytic.md#adr-ag-035)). «משולש ישר-זווית ABC» does not say which angle
 is right, so «הציגו תצורה אחרת» walks all three — R14's discrete degree of freedom, made real.
-«זווית B ישרה» (also «הזווית B היא 90», «∡B = 90») settles it, and the figure keeps that seat at
+«זווית B ישרה» (also «הזווית B היא 90», «∡B = 90», and «∠ABC = 90» / «∠B ישרה» — the glyph the 2-D
+tool teaches reads here too, [#1330](https://github.com/dcodish/geo_builder/issues/1330),
+[ADR-AG-142](06c-decisions-analytic.md#adr-ag-142)) settles it, and the figure keeps that seat at
 every configuration. A vertex that names no single angle — no shape through it, or several — is
 refused with the format that would work, never resolved by guessing which two rays were meant.
 
