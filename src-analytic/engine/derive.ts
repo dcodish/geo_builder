@@ -359,7 +359,7 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
 
 export const EMPTY_DERIVATION: Derivation = {
   construction: EMPTY_CONSTRUCTION,
-  figure: { env: {}, points: [], curves: [], segments: [], construction: [], vacant: [], unsatisfied: [], selectorsOk: true, ringFaults: [], carrierDof: 0, provenance: {} },
+  figure: { env: {}, points: [], curves: [], segments: [], construction: [], vacant: [], unsatisfied: [], selectorsOk: true, ringFaults: [], carrierDof: 0, provenance: {}, usedSymbols: [] },
   box: { minX: -10, minY: -10, maxX: 10, maxY: 10 },
   seed: 0,
   faults: [],

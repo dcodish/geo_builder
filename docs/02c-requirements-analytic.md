@@ -827,7 +827,7 @@ configurations, walked by «הציגו תצורה אחרת» and listed as the o
 keeps only the roots inside it, silently (D7 kind 1). **An unpinned parameter is never moved by the solve**:
 the vertices are solved first with every parameter at its sample, and the parameters join only when the
 vertices alone cannot satisfy the givens — a free `a` stays the seed's, so no given the student never
-gave is manufactured by the solver reaching for a knob.
+gave is manufactured by the solver reaching for a knob. **A parameter row is a claim** (#1343): a value prints only through the knowledge gate, and a declared symbol nothing in the figure reads is never a value — its row is its domain, marked «(לא בשימוש בשרטוט)».
 
 **R107 — a line may be created through a point with its direction UNKNOWN** ([ADR-AG-144](06c-decisions-analytic.md#adr-ag-144),
 [#1319](https://github.com/dcodish/geo_builder/issues/1319)). «דרך N עובר ישר», «דרך M עובר ישר l4», «a line

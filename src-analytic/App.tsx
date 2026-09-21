@@ -26,7 +26,7 @@ import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowS
 import { fmtAnalytic } from './format';
 import { curveDetailsKey, curveParts } from './app/curveText';
 import { color, fs } from '../shell/theme';
-import { isDirectionSymbol, paramRegister, reportedDof, symbolDeps } from './engine/carriers';
+import { isDirectionSymbol, paramRegister, reportedDof, usedSymbols } from './engine/carriers';
 import { derive } from './engine/derive';
 import { decideSubmit, reachesFallback } from './app/submit';
 import { runFallback } from './app/fallback';
@@ -1262,8 +1262,10 @@ export function App() {
                 rows: register
                   .filter((p) => !isDirectionSymbol(p.sym))
                   .map((p) => {
-                    const k = isKnowledge(d.construction, (f) => f.env[p.sym] ?? null);
-                    const used = d.construction.objects.some((o) => symbolDeps(o).includes(p.sym));
+                    // A symbol nothing reads is never asked of the gate (#1343): it is not part of any
+                    // configuration, and one sample of it is not knowledge — it printed «m = -3.46» once.
+                    const used = usedSymbols(d.construction).has(p.sym);
+                    const k = used ? isKnowledge(d.construction, (f) => f.env[p.sym] ?? null) : { known: false as const };
                     const text = k.known
                       ? `${p.sym} = ${fmtAnalytic(k.value)}`
                       : `${domainText(p.sym, p.domain)}${used ? '' : ` ${t('paramUnused')}`}`;

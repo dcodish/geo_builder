@@ -10,7 +10,7 @@
  * The domain is honoured HERE, at sampling time, which is D7 kind 1: a value outside it was never
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
-import { paramRegister } from './carriers';
+import { isDirectionSymbol, paramRegister, usedSymbols } from './carriers';
 import { constructionOf, evalRule, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
@@ -113,6 +113,8 @@ export interface Figure {
   carrierDof: number;
   /** Per point: what the student's OWN givens fix about it — the canvas label (#1032). */
   provenance: Record<Id, PointProvenance>;
+  /** The register symbols some object or constraint reads (#1343) — the ones a configuration is made of. */
+  usedSymbols: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -1293,6 +1295,7 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
       },
     ),
     carrierDof: figureDofOf(c, sys, solvedVec),
+    usedSymbols: [...usedSymbols(c)],
     provenance: Object.fromEntries(
       points.map((p) => [p.id, provenanceOf(c, p.id, env, curves) ?? { x: { known: false }, y: { known: false } }]),
     ),
@@ -1519,7 +1522,19 @@ export function figureSignature(f: Figure): string {
   const n = (v: number) => v.toFixed(4);
   const points = f.points.map((p) => `${p.id}:${n(p.x)},${n(p.y)}`);
   const curves = f.curves.map((c) => `${c.id}:${curveSignature(c.curve)}`);
-  return [...points, ...curves].join('|');
+  /**
+   * …AND THE PARAMETERS THE FIGURE USES (#1343, amending ADR-AG-144). A parameter is part of the
+   * configuration exactly as a point is, and a value that lives only in the environment was invisible
+   * here: every seed signed identically for a figure whose parameter nothing drew, the knowledge gate saw
+   * ONE configuration, and printed its one sample as certainty. Only the USED symbols sign — a declared
+   * symbol nothing reads is not part of any configuration a student can see, so «הציגו תצורה אחרת»
+   * stays honest about it — and never a free direction, whose line already signs and whose angle has two
+   * spellings for one line.
+   */
+  const params = f.usedSymbols
+    .filter((sym) => !isDirectionSymbol(sym) && Number.isFinite(f.env[sym]))
+    .map((sym) => `${sym}=${n(f.env[sym])}`);
+  return [...points, ...curves, ...params].join('|');
 }
 
 /** The resolved shape of one curve, to the precision a student could see. */

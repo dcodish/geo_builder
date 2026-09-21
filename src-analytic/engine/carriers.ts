@@ -234,6 +234,59 @@ export function paramRegister(c: Construction): ParamDecl[] {
       out.push({ sym, domain: UNBOUNDED });
     }
   }
+  /**
+   * …AND EVERY SYMBOL A CONSTRAINT HOLDS (#1343, found by its lock). «שטח המשולש ABC הוא k» carries `k` in
+   * a constraint's value and nowhere else; read from the objects alone, `k` was never registered, never
+   * sampled, evaluated to NaN, and the area given was silently unjudged — #1014's defect, one layer over.
+   * Registered, it is a free DOF the solve vector can pin (ADR-AG-144): the area gives k = 9.
+   */
+  for (const sym of constraintSymbols(c.constraints)) {
+    if (seen.has(sym)) continue;
+    seen.add(sym);
+    out.push({ sym, domain: UNBOUNDED });
+  }
+  return out;
+}
+
+/**
+ * THE SYMBOLS THE FIGURE USES — by an object's expressions OR by a constraint's (#1343, amending ADR-AG-144).
+ *
+ * `symbolDeps` walks objects, and that is the right register for SAMPLING: a symbol an equation holds is
+ * a free DOF. It is the wrong test for "does anything in this figure depend on this symbol": «שטח המשולש
+ * ABC הוא k» holds `k` in a CONSTRAINT's value, and a `k` the area pins must not read as unused. The
+ * constraint walk is structural — every `{ kind: 'sym' }` node anywhere in the constraint, the shape
+ * `mentionsAny` uses — so a constraint kind added later is covered without a per-kind list.
+ *
+ * A symbol NOTHING uses («m<0» typed for a slope) is a declaration the figure never reads: never sampled
+ * into anything drawn, never pinned, and therefore never KNOWLEDGE — a value the panel may not print.
+ */
+/** Every symbol a constraint's expressions mention — a structural walk over `{ kind: 'sym' }` nodes. */
+export function constraintSymbols(constraints: Construction['constraints']): string[] {
+  const out: string[] = [];
+  const walk = (v: unknown): void => {
+    if (!v || typeof v !== 'object') return;
+    if (Array.isArray(v)) {
+      v.forEach(walk);
+      return;
+    }
+    const node = v as Record<string, unknown>;
+    if (node.kind === 'sym' && typeof node.name === 'string') {
+      // A length expression binds its TERMS to private-use placeholder symbols (lengths.ts
+      // `PLACEHOLDER_BASE`, U+E000…); they are positions in a term list, not parameters.
+      const placeholder = node.name.length === 1 && node.name.charCodeAt(0) >= 0xe000 && node.name.charCodeAt(0) <= 0xf8ff;
+      if (!placeholder && !RESERVED_SYMBOLS.has(node.name) && !out.includes(node.name)) out.push(node.name);
+      return;
+    }
+    Object.values(node).forEach(walk);
+  };
+  walk(constraints);
+  return out;
+}
+
+export function usedSymbols(c: Construction): Set<string> {
+  const out = new Set<string>();
+  for (const o of c.objects) for (const s of symbolDeps(o)) out.add(s);
+  for (const s of constraintSymbols(c.constraints)) out.add(s);
   return out;
 }
 
