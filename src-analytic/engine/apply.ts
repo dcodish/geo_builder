@@ -571,6 +571,77 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
       }
       /**
+       * ONE LINE, ONE ROW (#1342) — the CURVE arm of #1153's «one position, one name».
+       *
+       * `priorOf` compares **ids only**, and an anonymous curve's id is content-derived from its
+       * equation TEXT (ADR-AG-023) while a named one's is its name. So one equation stated under two
+       * identities was two objects: «נתון הישר 1: 2x-y+8=0» then «נתון הישר 2x-y+8=0» drew two stacked
+       * lines, put two rows in the panel, and offered the same line twice in a crossing ring — with no
+       * fault. The same for two names, and for the same line written in slope form.
+       *
+       * `sameCurve` — the equation-identity predicate, probe-environment based — already lived in this
+       * file, but was only ever consulted AFTER an id match, to tell a contradiction from a repeat.
+       * Nothing asked *"does the figure already hold THIS LINE under another id?"* That question is
+       * asked here, once, for every curve, so no rule needs a case of its own.
+       *
+       * What happens next is decided by what the second statement ADDS — never by which spelling it
+       * used:
+       *
+       *  - **nothing new** ⇒ `known`, absorbed; the submit gate answers «כבר ידוע»;
+       *  - **a NAME for an anonymous line** ⇒ `narrowed`: the existing object gains `label.name`.
+       *    Its id is deliberately NOT rewritten — constraints already hold it — and `curveByName`
+       *    matches `label.name` as well as the id, so every by-name reference resolves;
+       *  - **a SECOND name for a named line** ⇒ refused `already-named`, naming the holder. A line has
+       *    one name, which is #1153's rule and not a new one.
+       *
+       * `line-at` (a free line through a point) is deliberately out of scope: it is not an equation,
+       * so there is nothing for `sameCurve` to compare.
+       */
+      /**
+       * ONLY A STATED DECLARATION JOINS THE SCAN, and that is a measured boundary, not caution.
+       *
+       * A CARRIER is not an object the student asked to see — «נקודה P על הישר y=x» mints `y=x` with
+       * `stated: false` purely so the membership has something to hold, and **the very next fact of that
+       * same line references it by id**. Absorbing it into an existing `l2: y=x` therefore deleted the id
+       * P's membership was about, and P stopped existing (measured: #1048's honesty-gate row went red).
+       * A carrier is also invisible — not drawn, no panel row, no crossing ring — so it is none of the
+       * three things this issue is about. The incoming side is what is tested, because that is the fact
+       * whose id may still be referenced; a stated line absorbed INTO a carrier is the #1076 promotion
+       * and is safe, since references to a stated line go by name.
+       */
+      const twin = f.stated
+        ? c.objects.find(
+            (o): o is CurveObject => o.kind === 'curve' && o.id !== f.id && identicalCurve(o.curve, f.curve),
+          )
+        : undefined;
+      if (twin) {
+        const incoming = f.label.name;
+        const held = twin.label.name;
+        if (incoming && held && incoming !== held) {
+          return { ok: false, error: { code: 'already-named', detail: f.src, holder: held } };
+        }
+        /**
+         * The #1149 promotion rule, reached by the other door: a line first minted as a CARRIER and
+         * now stated outright (or now named) visibly gains something, so it is not «כבר ידוע». The
+         * incoming label wins except for a name the prior already holds — the student's own.
+         */
+        if ((incoming && !held) || (f.stated && !twin.stated)) {
+          const label = { ...twin.label, ...f.label, name: held || incoming };
+          return {
+            ok: true,
+            effect: incoming && !held ? 'narrowed' : 'created',
+            next: {
+              ...c,
+              objects: c.objects.map((o) =>
+                o.id === twin.id ? { ...twin, label, stated: twin.stated || f.stated } : o,
+              ),
+            },
+          };
+        }
+        return { ok: true, effect: 'known', next: c };
+      }
+
+      /**
        * THE BARE FORM TAKES THE EXTENT THE OBJECT ALREADY HAS (#1234).
        *
        * «משוואת CE היא x-3y=0» writes no noun, so it says nothing about whether the student means the
@@ -1233,6 +1304,52 @@ function sameCurve(a: Curve, b: Curve): boolean {
     // Proportional up to sign: |cos| between the two coefficient vectors is 1.
     const dot = va.reduce((s, x, i) => s + (x / na) * (vb[i] / nb), 0);
     return Math.abs(Math.abs(dot) - 1) <= 1e-9;
+  });
+}
+
+/**
+ * IS THIS THE SAME CURVE OBJECT? — a STRICTER question than `sameCurve`'s (#1342).
+ *
+ * `sameCurve` answers *"does the student's restatement contradict what this id already holds?"*, and it
+ * is only ever asked of a curve whose id ALREADY matched. Its `|cos|` test is right for that: it is
+ * comparing two spellings of one object, so it only has to survive floating-point noise.
+ *
+ * Scanning the whole figure for a twin is a different question, and `|cos|` is the wrong instrument
+ * for it — it is QUADRATIC near 1, so it squashes genuine differences into the noise band. Measured:
+ *
+ * ```
+ *   2x-y+8=0   vs  y=2x+8           0            same line, two spellings
+ *   x-y=0      vs  y=x              2.2e-16      same line, machine epsilon
+ *   y=x        vs  y=1.000001x      1.25e-13     DIFFERENT lines, 1e-6 apart in slope
+ *   y=0        vs  y=0.00001x       5.0e-11      DIFFERENT lines (#1235's own rows)
+ * ```
+ *
+ * Three orders of margin, on a metric that shrinks the thing being measured — and [#1235](https://github.com/dcodish/geo_builder/issues/1235)
+ * has already RULED that lines this close are distinct and must offer a crossing ring. So the twin scan
+ * compares the NORMALIZED coefficient vectors component by component, resolved for sign, which is
+ * LINEAR in the difference: the same pairs then read 1e-16 against 7e-7 and 1e-5 — nine orders of
+ * margin instead of three, and #1235's ruling is untouched because `sameCurve` is not modified.
+ */
+const IDENTICAL_COEF_TOL = 1e-12;
+
+function identicalCurve(a: Curve, b: Curve): boolean {
+  if (a.kind && b.kind && a.kind !== b.kind) return false;
+  return PROBE_ENVS.every((env) => {
+    const ka = fitConic(a.eq, env);
+    const kb = fitConic(b.eq, env);
+    if (!ka || !kb) return false;
+    const va = [ka.A, ka.B, ka.C, ka.D, ka.E, ka.F];
+    const vb = [kb.A, kb.B, kb.C, kb.D, kb.E, kb.F];
+    const na = Math.hypot(...va);
+    const nb = Math.hypot(...vb);
+    if (na < 1e-12 || nb < 1e-12) return false;
+    const ua = va.map((x) => x / na);
+    const ub = vb.map((x) => x / nb);
+    // An equation and its negation are one curve, so the sign of the whole vector is free — resolve it
+    // from the dominant component rather than trying both and hoping.
+    const lead = ua.reduce((best, x, i) => (Math.abs(x) > Math.abs(ua[best]) ? i : best), 0);
+    const sign = ua[lead] * ub[lead] < 0 ? -1 : 1;
+    return ua.every((x, i) => Math.abs(x - sign * ub[i]) <= IDENTICAL_COEF_TOL);
   });
 }
 

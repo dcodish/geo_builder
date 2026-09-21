@@ -143,6 +143,24 @@ export function decideSubmit(
   }
 
   /**
+   * A NARROWED line RECORDS (#1342) — the promotion shape, one door over.
+   *
+   * «נתון הישר 2x-y+8=0» then «נתון הישר 1: 2x-y+8=0» gives an anonymous line the student's own name,
+   * and the panel now calls it «ישר 1». No object appeared, no constraint was stated and no freedom
+   * was consumed, so the entailment gate below saw all three of its conditions met and answered
+   * «זה כבר נובע מהנתונים שכתבתם» — *it already follows*. That sentence is false: a NAME does not
+   * follow from anything, and the line is the only reason the figure has one.
+   *
+   * This file already states the rule for the other `narrowed` member two branches up — *"«a הוא
+   * פרמטר» then «a<13» is also absorbed, but it added information and belongs in the list like any
+   * other given"* — which reached `record` only because a parameter happens to be COUNTED. Read the
+   * effect instead of inferring it from a count, and both members are one rule.
+   */
+  if (trial.outcomes[lines.length] === 'narrowed') {
+    return { kind: 'record', line };
+  }
+
+  /**
    * A given the figure ALREADY ENTAILS (#1063) — the operator's B11/B12.
    *
    * #1045 catches a RESTATEMENT: the same fact twice, decided structurally in `applyFact`. This is

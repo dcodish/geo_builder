@@ -7257,3 +7257,36 @@ A `CanvasView` is RELATIVE to the figure's box (`zoom` divides its half-extents,
 **Sibling audit (docs/17 §1).** 2-D and 3-D resolve a length from a named segment rather than by scanning free text for capital pairs, so neither can take a pair out of a word. Analytic-only.
 
 **Consequences.** `engine/lengths.ts` (`LENGTH_TOKEN` bounded). Lock: `__tests__/issue-1330-angle-glyph.test.ts` gains the #1333 block (17 total).
+
+## ADR-AG-147 — One line, one row: curve identity is the EQUATION, not the id — the curve arm of «one position, one name» (#1342)
+
+**Status:** accepted, 2026-09-21 · **Issue:** [#1342](https://github.com/dcodish/geo_builder/issues/1342) (bug, `P2`, `analytic`) · round [#1345](https://github.com/dcodish/geo_builder/issues/1345) · operator, playing PR #1341: *"second line should have said this already exists"*
+**Requirements:** [02c](02c-requirements-analytic.md) R112 (new) · **Design:** [04c](04c-design-analytic.md#curve-identity-at-the-m1-boundary-adr-ag-147) (new section)
+**The curve arm of** [ADR-AG-124](#adr-ag-124)/[#1153](https://github.com/dcodish/geo_builder/issues/1153)'s *one position, one name*, which #1113/#1126 measured on crossings and #1153 closed for derived points
+
+**Measured before (`49472033`), the issue's own table, reproduced row for row.** «נתון הישר 1: 2x-y+8=0» then «נתון הישר 2x-y+8=0» → `record`: `line-1` **and** `curve-anont941wy`, two drawn lines stacked, two panel rows, and a crossing ring offering the same line twice. The same for the reverse order, for a named line and an anonymous restatement, for two names, and for the same line written in slope form. The only two rows the boundary already caught are the ones where the **ids** happen to agree.
+
+**The class.** `applyFact`'s `curve` arm decides restatement-vs-new with `priorOf`, which compares **ids only** — and an anonymous curve's id is content-derived from its equation TEXT (ADR-AG-023) while a named one's is its name. `sameCurve`, the equation-identity predicate, lives in the same file and was consulted only AFTER an id match, to tell a contradiction from a repeat. Nothing ever asked *"does the figure already hold THIS LINE under another id?"*
+
+**The mechanism.** At the curve arm, before creating: find an existing curve the incoming one is identical to, and decide by what the second statement ADDS — never by which spelling it used. Nothing new ⇒ `known` («כבר ידוע»). A NAME for an anonymous line ⇒ `narrowed`: the existing object gains `label.name`, and its id is deliberately **not** rewritten, because constraints already hold it and `curveByName` matches `label.name` as well as the id. A SECOND name for a named line ⇒ refused `already-named`, naming the holder.
+
+**A `narrowed` line RECORDS.** «נתון הישר 2x-y+8=0» then «נתון הישר 1: 2x-y+8=0» gives the line the student's own name, and the panel now calls it «ישר 1» — but no object appeared, no constraint was stated and no freedom was consumed, so the #1063 entailment gate met all three of its conditions and answered *«זה כבר נובע מהנתונים שכתבתם»*. **A name does not follow from anything.** `submit.ts` now reads the `narrowed` EFFECT directly; the other member of that effect («a הוא פרמטר» then «a<13») reached `record` only because a parameter happens to be counted, and this file already stated the rule for it in as many words.
+
+**`sameCurve` is NOT the right instrument for the scan, and that is measured.** `sameCurve` answers *"does this restatement contradict what this id already holds?"* of a curve whose id already matched; its `|cos|` test only has to survive floating-point noise. Scanning the whole figure is a stronger question, and `|cos|` is QUADRATIC near 1:
+
+```
+  2x-y+8=0  vs  y=2x+8          0          one line, two spellings
+  x-y=0     vs  y=x             2.2e-16    one line, machine epsilon
+  y=x       vs  y=1.000001x     1.25e-13   DIFFERENT lines, 1e-6 apart in slope
+  y=0       vs  y=0.00001x      5.0e-11    DIFFERENT lines — #1235's own rows
+```
+
+Three orders of margin on a metric that shrinks what it measures — and [#1235](https://github.com/dcodish/geo_builder/issues/1235) has **already ruled** that lines this close are distinct and must offer a crossing ring. Its two rows went red on the first build, which is the lock working. So `identicalCurve` compares the NORMALIZED coefficient vectors component-wise, sign resolved from the dominant component, which is LINEAR in the difference: the same pairs read 1e-16 against 7e-7 and 1e-5 — nine orders of margin. `sameCurve` is untouched, so #1235's ruling and every existing caller are unchanged.
+
+**Only a STATED declaration joins the scan, and that boundary is measured too.** A CARRIER is not an object the student asked to see — «נקודה P על הישר y=x» mints `y=x` with `stated: false` purely so the membership has something to hold, and **the next fact of that same line references it by id**. Absorbing it into an existing `l2: y=x` deleted the id P's membership was about and P stopped existing (#1048's honesty-gate row, measured red). A carrier is also invisible — not drawn, no panel row, no crossing ring — so it is none of the three things this issue is about. The incoming side is what is tested: a stated line absorbed INTO a carrier is the #1076 promotion and is safe, because references to a stated line go by name.
+
+**Measured after.** All eight rows of the table give ONE curve. «כבר ידוע» for the three absorbing forms, `record` + the name attached for the narrowing form, `already-named` naming `l1` for the second name, and two genuinely different lines are still two. #1235's near-parallel rows and #1048's carrier row are green. Analytic lane: 156 files / 2281 tests green.
+
+**Sibling audit (docs/17 §1).** 2-D and 3-D have no equation-defined curve objects — a line there is a segment or a construction — so one equation cannot arrive under two ids. Analytic-only.
+
+**Consequences.** `engine/apply.ts` (`identicalCurve`, `IDENTICAL_COEF_TOL`, the twin scan at the curve arm); `app/submit.ts` (a `narrowed` line records). Lock: `__tests__/issue-1342-curve-identity.test.ts` (10).

@@ -270,6 +270,32 @@ shape the relation and slope rules use — therefore took #1075’s area-as-a-te
 away, measured as seven failing locks. Giving the blocks a real fall-through means reworking the decline
 contract for every rule in the function; until that is worth doing, precedence inside `parseConstraint` is
 expressed as an explicit guard at the rule that must yield.
+## Curve identity at the M1 boundary ([ADR-AG-147](06c-decisions-analytic.md#adr-ag-147))
+
+Two predicates answer two different questions about two curves, and they are deliberately not the same
+function:
+
+| predicate | question | test | asked of |
+| --- | --- | --- | --- |
+| `sameCurve` | *does this restatement CONTRADICT what this id holds?* | `\|cos\|` between coefficient vectors, 1e-9 | a curve whose **id already matched** |
+| `identicalCurve` | *is this the SAME OBJECT as that one?* | normalized coefficients component-wise, sign resolved, 1e-12 | **every** curve in the figure |
+
+The second is the stronger question and needs the stronger instrument. `|cos|` is quadratic near 1, so it
+squashes a real 1e-6 difference in slope down to 1e-13 — inside the noise band — and
+[#1235](https://github.com/dcodish/geo_builder/issues/1235) has already ruled that lines that close are
+DISTINCT and must offer a crossing ring. A component-wise comparison is linear in the difference and
+separates the two cases by nine orders of magnitude instead of three.
+
+**The scan is over STATED declarations only.** A carrier — the curve a membership sentence mints so it has
+something to hold — is invisible (not drawn, no panel row, no ring), and **the next fact of its own line
+references it by id**, so absorbing one deletes the id that membership is about. The incoming side is what
+is tested; a stated line absorbed into a carrier is [#1076](https://github.com/dcodish/geo_builder/issues/1076)'s
+promotion, and references to a stated line go by name.
+
+**An absorbed statement's id is never rewritten.** The surviving object keeps the id its constraints
+already hold and gains the incoming `label.name`; `curveByName` matches a curve by `label.name` as well
+as by id, so every by-name reference resolves either way.
+
 ## A letter run is not automatically a product ([ADR-AG-145](06c-decisions-analytic.md#adr-ag-145))
 
 `expr.ts` multiplies by JUXTAPOSITION — that is the whole reason it is hand-written rather than a one-line

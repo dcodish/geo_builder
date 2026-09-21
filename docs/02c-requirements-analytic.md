@@ -874,6 +874,15 @@ English `=` form — «angle ABC = 90» — and they mean the same thing **in an
 is named by a WHOLE name, never by a letter pair taken out of the middle of a word.** «ANGLE ABC» is not
 three measurements. A non-right angle value remains out of scope in both languages.
 
+**R112 — one line, one row: a curve stated twice is ONE object, however it is spelled**
+([ADR-AG-147](06c-decisions-analytic.md#adr-ag-147),
+[#1342](https://github.com/dcodish/geo_builder/issues/1342)). «נתון הישר 1: 2x-y+8=0» then
+«נתון הישר 2x-y+8=0» — or the same line in slope form, or under a second name — is the SAME line, and the
+tool says «כבר ידוע» instead of drawing it twice. Identity is the EQUATION, never the id the tool happened
+to mint. Naming a line that had no name is not a restatement: it records, and the panel calls the line by
+the student's name from then on. A line has ONE name, so a second one is refused naming the holder (the
+R-#1153 rule, for curves). Two lines that are genuinely different — however close — stay two lines.
+
 **R111 — a word the tool does not know is REFUSED in a value slot, never absorbed as parameters**
 ([ADR-AG-145](06c-decisions-analytic.md#adr-ag-145),
 [#1321](https://github.com/dcodish/geo_builder/issues/1321)). «שיפוע הישר l1 הוא tan(30)» must be refused
