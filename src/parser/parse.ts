@@ -2392,10 +2392,18 @@ const angle: Rule = (s, ctx) => {
 /** The comparison words, in both languages — the operator is a WORD as often as a glyph. */
 const CMP_BIG = String.raw`גדול[֐-׿]*|larger|longer|greater|bigger|more`;
 const CMP_SMALL = String.raw`קט[ןנ][֐-׿]*|smaller|shorter|less`; // BOTH nun forms: קטן (m) / קטנה (f) — a one-spelling gate silently drops the other
+/**
+ * The NON-STRICT comparison words (#1249) — «BC לפחות 10» admits 10, exactly as «BC ≥ 10» does
+ * ([ADR-529](docs/06-decisions.md#adr-529)'s `minStrict`/`maxStrict`). They carry no glyph and no
+ * «מ-», so they are their own atom rather than a third member of CMP_BIG/CMP_SMALL, whose word forms
+ * are STRICT («גדול מ» excludes its value).
+ */
+const CMP_AT_LEAST = String.raw`לפחות|at\s+least|no\s+less\s+than`;
+const CMP_AT_MOST = String.raw`לכל\s+היותר|at\s+most|no\s+more\s+than`;
 /** A comparison against a NUMBER anywhere in the utterance — the tripwire the value rules check
  *  before reading a bare number as an equality (ADR-390, issue #277). */
 export const COMPARES_WITH_NUMBER = new RegExp(
-  String.raw`(?:<=|>=|<|>|≤|≥)\s*-?\d|-?\d\s*(?:<=|>=|<|>|≤|≥)|(?:${CMP_BIG}|${CMP_SMALL})\s*(?:than\s+|מ-?|מן\s+)?\s*-?\d|בין\s*-?\d|between\s*-?\d`,
+  String.raw`(?:<=|>=|<|>|≤|≥)\s*-?\d|-?\d\s*(?:<=|>=|<|>|≤|≥)|(?:${CMP_BIG}|${CMP_SMALL})\s*(?:than\s+|מ-?|מן\s+)?\s*-?\d|(?:${CMP_AT_LEAST}|${CMP_AT_MOST})\s*-?\d|בין\s*-?\d|between\s*-?\d`,
   'i',
 );
 
@@ -2502,6 +2510,17 @@ const measureBound: Rule = (s, ctx) => {
     if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
     const n = parseFloat(word[4]);
     return boundCommands(op, word[2] ? n : undefined, word[3] ? n : undefined);
+  }
+
+  // Non-strict words: "X לפחות 10" / "X at least 10" (and the small twin) — #1249. The value is ADMITTED,
+  // as with `≥`/`≤` (ADR-529); the strict word forms above exclude it.
+  const lax = body.match(new RegExp(String.raw`^(.*?)\s*(?:(${CMP_AT_LEAST})|(${CMP_AT_MOST}))\s*${num}\s*°?\s*$`, 'i'));
+  if (lax) {
+    const op = boundOperand(lax[1].replace(/\b(?:is|are|הוא|היא)\b/gi, ' '), ctx);
+    if (!op) return null;
+    if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
+    const n = parseFloat(lax[4]);
+    return lax[2] ? boundCommands(op, n, undefined, { minStrict: false }) : boundCommands(op, undefined, n, { maxStrict: false });
   }
 
   // Symbol forms: split on the comparison glyphs so one/two-sided share a path.
@@ -10374,7 +10393,7 @@ const stripValueUnits = (s: string): string => s.replace(VALUE_UNIT_RX, '');
  * matters is the one standing between this segment and this value. Built from the comparison
  * vocabulary the bound rules already own — not a second copy of it.
  */
-const LENGTH_NOUN = String.raw`(?:אורך|הצלע|הקטע)`;
+const LENGTH_NOUN = String.raw`(?:אורך(?:\s+ה?(?:צלע|קטע))?|הצלע|הקטע)`;
 const LENGTH_CONNECTIVE = String.raw`[^A-Za-z0-9√()]*`;
 const VERBOSE_LENGTH = new RegExp(
   String.raw`${LENGTH_NOUN}\s+(${LABEL}\s*${LABEL})(${LENGTH_CONNECTIVE})(?=[√\d(])`,
@@ -10410,8 +10429,28 @@ const VERBOSE_LENGTH = new RegExp(
 // cross a label), so an English copula could never appear in a connective anyway. The Hebrew nouns this
 // construct is built on make that a closed question rather than a gap — «BC = 10» is English’s own way in.
 const LENGTH_COPULA = new RegExp(String.raw`^[\s.,:]*(?:=|הוא|היא|הם|הן|שווה(?:\s*ל)?)?[\s.,:-]*$`);
+/**
+ * THE CONNECTIVE ROUTES; IT NEVER DECIDES WHAT THE SENTENCE MEANS (#1249, [ADR-539](../../docs/06-decisions.md#adr-539)).
+ *
+ * Operator, 2026-09-19, on «אורך הקטע BC גדול מ-10»: *"rejected and not accepted … this is something
+ * that should be part of future buildings of the shape"* — a bound cannot be drawn but constrains what
+ * is built next (ADR-390), and the capability had six working spellings, none with the noun in front.
+ * The copula guard above correctly refused to rewrite the bound into an equality (#1248) and then left
+ * the whole frame alone, so the segment rule read «BC» and the 10 was dropped for the honesty gate to
+ * catch — a refusal on a sentence the tool understands, and a paid call per occurrence.
+ *
+ * A connective that carries a RELATION is the statement's operator, so the frame is STRIPPED and the
+ * relation is handed, verbatim, to the rule that owns it: «אורך הקטע BC גדול מ-10» → «BC גדול מ-10»,
+ * which the bound rule already reads. The relation vocabulary is the bound rule's own atoms — the
+ * glyphs, CMP_BIG/CMP_SMALL, CMP_AT_LEAST/CMP_AT_MOST, «בין» — not a second copy; an alternation of
+ * relation words beside the copulas would be the P1 #1248 proved. Anything else — a connective that is
+ * neither a copula nor a relation — stays exactly as written, so the frame still fails CLOSED.
+ */
+const LENGTH_RELATION = new RegExp(String.raw`(?:<=|>=|<|>|≤|≥|${CMP_BIG}|${CMP_SMALL}|${CMP_AT_LEAST}|${CMP_AT_MOST}|בין)`, 'i');
 const normalizeVerboseLength = (s: string): string =>
-  s.replace(VERBOSE_LENGTH, (m: string, seg: string, conn: string) => (LENGTH_COPULA.test(conn) ? `${seg} = ` : m));
+  s.replace(VERBOSE_LENGTH, (m: string, seg: string, conn: string) =>
+    LENGTH_COPULA.test(conn) ? `${seg} = ` : LENGTH_RELATION.test(conn) ? `${seg}${conn}` : m,
+  );
 
 
 /**
