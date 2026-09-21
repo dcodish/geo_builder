@@ -269,6 +269,38 @@ counter and the notice agree: they read one answer rather than each re-deriving 
 the existing declaration — absorbed — but adds information, so it is a real given and belongs in the
 list. Collapsing it into "already known" would silently drop a stated given.
 
+## The fold defers, and the LINE is its unit of application ([ADR-AG-133](06c-decisions-analytic.md#adr-ag-133))
+
+`fold(facts, groupOf)` is no longer a single forward pass. Two things happen after the in-order pass,
+and both are the operator's one sentence — *the diagram should either respect all input or refuse to
+build* — made mechanical:
+
+**Deferral, to a fixpoint.** A fact that CREATES nothing (`constraint`, `selector`, `right-angle`,
+`area-of`, `tangent-of`, `on-kind` — the `NON_CREATING` set beside `fold`) and failed at its position is
+retried against the completed construction until a pass lands nothing. «AD גובה לצלע BC» typed before
+«משולש ABC» fails only because `B` and `C` do not exist YET; once the triangle declares them the two
+constraints hold exactly as in the other order. This is ADR-104's mechanism ported, with ADR-104's
+limit: a creating fact is never deferred, because re-ordering it would strand its dependents — which
+is also why evaluation still needs no topological sort ([ADR-AG-013](06c-decisions-analytic.md#adr-ag-013)):
+objects are still appended in declaration order, only a constraint may land later than it was typed. A
+genuinely unresolvable reference keeps failing and keeps its error.
+
+**The line is the unit.** `derive` hands `fold` each fact's line index (`owner`). If any fact of a line
+still fails after the fixpoint, NONE of that line's facts survive: the fold re-runs without that line
+and every one of its facts carries the line's error, positionally, so `derive`'s per-line rollup sees one
+refusal and no fragment reads as accepted. Removing a line can strand a later line that leaned on its
+partial objects, so this too runs to a fixpoint (the 2-D fold's atomic-group poisoning). A clean list
+pays exactly one pass; a list with k faulted lines pays at most k+1.
+
+**What the submit gate does with a forward reference** is unchanged: `decideSubmit` dry-runs the list
+with the new line appended and refuses on a fault at that index, so «AD גובה לצלע BC» typed on a canvas
+with no `B` is refused by name ([ADR-AG-015](06c-decisions-analytic.md#adr-ag-015) — a reference may not
+invent a point). The reversed order is reached by EDITING — deleting or rewording an earlier line — and
+that is where the fold now honours it instead of drawing a fragment.
+
+`errors`, `effects` and `constraintFact` stay positional per fact: `derive`'s rollup and #1079's
+constraint blame read them unchanged; only whether a partial line survives changed.
+
 ## Relations, and the direction resolver ([ADR-AG-024](06c-decisions-analytic.md#adr-ag-024))
 
 Four things in this grammar have a direction:

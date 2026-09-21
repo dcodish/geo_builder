@@ -81,9 +81,16 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
     }
   });
 
-  const { construction, errors, effects, constraintFact } = fold(facts);
+  // The LINE is the fold's unit of application (#1242, ADR-AG-133): every fact of a faulted line carries
+  // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
+  const { construction, errors, effects, constraintFact } = fold(facts, owner);
+  const reported = new Set<string>();
   errors.forEach((e, i) => {
-    if (e) faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder });
+    if (!e) return;
+    const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null]);
+    if (reported.has(key)) return;
+    reported.add(key);
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder });
   });
 
   /**

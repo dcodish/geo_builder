@@ -291,6 +291,11 @@ only, or may the tool *prompt* ("still 2 free — did the question state more?")
 (R2). «משוואת הצלע AB היא y = x−1» then constrains it. Both orders must work — Q3's text gives the
 equations first, the operator's example gives the noun first — which is the entry-order independence
 the 2-D tool locks as M2.
+**Extended (operator, 2026-09-19, #1242):** *"the idea of order is not relevant since the diagram should
+either respect all input or refuse to build."* Any CONSISTENT given set builds the same figure in any
+order — a constraint typed before the objects it names is honoured once a later line declares them — and a
+line the figure cannot honour is refused IN FULL: nothing of it is drawn, no fragment of it reads as
+accepted ([ADR-AG-133](06c-decisions-analytic.md#adr-ag-133)).
 
 **R20 — Objects can display their equations on the canvas, behind a toggle, with STATED and DERIVED
 visually distinguished.** *(Operator: "so user can see what he entered and what was derived from it —

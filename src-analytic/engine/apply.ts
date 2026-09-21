@@ -1210,11 +1210,73 @@ export interface FoldResult {
   constraintFact: number[];
 }
 
-/** The replay fold: facts in, figure-defining construction out. Pure over the ordered list. */
-export function fold(facts: readonly Fact[]): FoldResult {
+/**
+ * Fact kinds that CREATE nothing — a statement about objects that must already exist. These are the
+ * only facts the deferral fixpoint retries (#1242, ADR-AG-133): re-ordering a creating fact to the end
+ * would strand its dependents, which is the limit ADR-104 set for the 2-D twin and the reason
+ * evaluation still needs no topological sort (ADR-AG-013 — objects are still appended in declaration
+ * order; only a CONSTRAINT may land later than it was typed).
+ */
+const NON_CREATING: ReadonlySet<Fact['t']> = new Set<Fact['t']>([
+  'constraint',
+  'selector',
+  'right-angle',
+  'area-of',
+  'tangent-of',
+  'on-kind',
+]);
+
+/**
+ * The replay fold: facts in, figure-defining construction out. Pure over the ordered list.
+ *
+ * `groupOf[i]` is the LINE each fact came from (`derive`'s `owner`); a caller with no lines treats
+ * every fact as its own line. Two things happen beyond the in-order pass (#1242, ADR-AG-133):
+ *
+ * 1. **Deferral, to a fixpoint.** A non-creating fact that failed at its position is retried against
+ *    the completed construction until nothing more lands — «AD גובה לצלע BC» typed before «משולש ABC»
+ *    fails only because `B` and `C` do not exist YET, and once the triangle declares them the two
+ *    constraints hold exactly as they do in the other order. The 2-D twin is ADR-104, and the operator's
+ *    ruling is the same sentence in both products: *the diagram should either respect all input or
+ *    refuse to build.* A genuinely unresolvable reference keeps failing and keeps its error.
+ * 2. **The LINE is the unit of application.** If any fact of a line still fails after the fixpoint,
+ *    NONE of that line's facts survive: the fold re-runs without that line, and every one of its facts
+ *    carries the line's error. Before this a line lowering to five facts could land three and drop two,
+ *    leaving a segment `AD` on the canvas that asserted nothing in a row that read as accepted. Removing
+ *    a line can strand a later line that leaned on its partial objects, so this too runs to a fixpoint
+ *    (the atomic-group poisoning of the 2-D fold). A clean list pays exactly one pass.
+ */
+export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldResult {
+  const group = groupOf ?? facts.map((_, i) => i);
+  const excluded = new Map<number, ApplyError>(); // line → the error that faulted it
+  for (;;) {
+    const r = foldPass(facts, (i) => !excluded.has(group[i]));
+    let newly = 0;
+    r.errors.forEach((e, i) => {
+      if (e && !excluded.has(group[i])) {
+        excluded.set(group[i], e);
+        newly++;
+      }
+    });
+    if (newly === 0) {
+      // Every fact of a faulted line carries the line's error, so a per-line rollup sees one refusal
+      // and a positional reader sees no fact of that line as having landed.
+      facts.forEach((_, i) => {
+        const e = excluded.get(group[i]);
+        if (e) {
+          r.errors[i] = e;
+          r.effects[i] = null;
+        }
+      });
+      return r;
+    }
+  }
+}
+
+/** One fold over the facts `include` admits: the in-order pass, then the deferral fixpoint. */
+function foldPass(facts: readonly Fact[], include: (i: number) => boolean): FoldResult {
   let c = EMPTY_CONSTRUCTION;
-  const errors: Array<ApplyError | null> = [];
-  const effects: Array<LineEffect | null> = [];
+  const errors: Array<ApplyError | null> = facts.map(() => null);
+  const effects: Array<LineEffect | null> = facts.map(() => null);
   /**
    * Which FACT put each constraint in the construction (#1079).
    *
@@ -1229,24 +1291,44 @@ export function fold(facts: readonly Fact[]): FoldResult {
    * anything about it, so a future resolved reference is attributed with nothing to remember.
    */
   const constraintFact: number[] = [];
-  facts.forEach((f, i) => {
+  const commit = (i: number, next: Construction, effect: LineEffect) => {
     const before = c.constraints;
+    c = next;
+    // Appended AND replaced: #1049’s choice collapse swaps a constraint in place, and the
+    // replacement belongs to the line that named the seat, not to the line that opened it.
+    c.constraints.forEach((k, at) => {
+      if (before[at] === k && constraintFact[at] !== undefined) return;
+      constraintFact[at] = i;
+    });
+    errors[i] = null;
+    effects[i] = effect;
+  };
+  facts.forEach((f, i) => {
+    if (!include(i)) return;
     const out = applyFact(c, f);
-    if (out.ok) {
-      c = out.next;
-      // Appended AND replaced: #1049’s choice collapse swaps a constraint in place, and the
-      // replacement belongs to the line that named the seat, not to the line that opened it.
-      c.constraints.forEach((k, at) => {
-        if (before[at] === k && constraintFact[at] !== undefined) return;
-        constraintFact[at] = i;
-      });
-      errors.push(null);
-      effects.push(out.effect);
-    } else {
-      errors.push(out.error);
-      effects.push(null);
-    }
+    if (out.ok) commit(i, out.next, out.effect);
+    else errors[i] = out.error;
   });
+  // The deferral fixpoint: retry every still-failed non-creating fact against the construction the
+  // later facts completed. Bounded by the fact count; a pass that lands nothing ends it. A fact is not
+  // retried against the very construction it last failed on (nothing changed, so nothing can differ).
+  const failedOn = new Map<number, Construction>();
+  for (let pass = 0; pass < facts.length; pass++) {
+    let progressed = false;
+    facts.forEach((f, i) => {
+      if (!include(i) || !errors[i] || !NON_CREATING.has(f.t)) return;
+      if (failedOn.get(i) === c) return;
+      const out = applyFact(c, f);
+      if (out.ok) {
+        commit(i, out.next, out.effect);
+        progressed = true;
+      } else {
+        errors[i] = out.error;
+        failedOn.set(i, c);
+      }
+    });
+    if (!progressed) break;
+  }
   return { construction: c, errors, effects, constraintFact };
 }
 
