@@ -96,17 +96,19 @@ describe('ADR-AG-120 — the traced locus is inside the view (#1198)', () => {
   });
 
   /**
-   * ⚠ THE HALF THAT IS NOT FIXED. The frame is still re-fitted from nothing on every press, so its
-   * width varies by a large factor across configurations — which is the «jumping right and left»
-   * the operator also reported. Pinned as a KNOWN state: when a ruling lands and this improves, the
-   * row fails and sends the reader to the ruling rather than letting the change pass unnoticed.
+   * THE HALF THAT WAS NOT FIXED — MOVED, not deleted (#1262, ADR-AG-137). This row pinned the lurch as a
+   * KNOWN state: the figure's own box varies by a factor above 2 across configurations. It still does —
+   * that is the figure, whose points scale with `a` — and the row keeps saying so. What changed is the
+   * FRAME: the shown window is now carried across a configuration change (`carryWindow`) and re-fits
+   * only when the figure has largely left it; that expectation lives in
+   * `issue-1262-frame-stays.test.ts`, with the ruling (fit once, then the frame is the student's).
    */
-  it('the frame still lurches between configurations — #1198 symptom 2, unfixed on purpose', () => {
+  it('the figure’s own box still varies between configurations — the frame no longer follows it (#1198 symptom 2 → #1262)', () => {
     const widths = SEEDS.map((seed) => {
       const { box } = frameAt(seed);
       return box.maxX - box.minX;
     });
     const factor = Math.max(...widths) / Math.min(...widths);
-    expect(factor, 'if this dropped, symptom 2 was addressed — read the ruling on #1198').toBeGreaterThan(2);
+    expect(factor, 'the figure varies — the frame rule is locked in issue-1262-frame-stays.test.ts').toBeGreaterThan(2);
   });
 });

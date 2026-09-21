@@ -91,6 +91,38 @@ export function viewBox(figure: Box, view: CanvasView, surface?: Surface): Box {
 }
 
 /**
+ * THE SAME WORLD WINDOW, EXPRESSED AGAINST A NEW FIGURE BOX (#1262, ADR-AG-137).
+ *
+ * A `CanvasView` is RELATIVE to the figure's box — `zoom` divides the box's half-extents, `centre`
+ * defaults to the box's centre — so when the box changes under it the shown window moves with the box.
+ * On «הציגו תצורה אחרת» that was the lurch the operator reported: each configuration is a correct fit to
+ * its own box, and with a symbolic parameter the boxes swing by the whole range of the parameter (width
+ * 85 … 256, a factor of 3; centre +55 … −63, measured on «A(-9a,0)» · «B(41a,0)» · «נקודה P» · «PA מאונך
+ * ל-PB»).
+ *
+ * Operator ruling, 2026-09-20: *fit once, then the frame is the student's* — the control changes the
+ * DRAWING inside a frame that stays put, like flipping transparencies on one projector. This computes
+ * the view that shows, against `to`, exactly the window `view` showed against `from`. With a surface the
+ * window is reproduced exactly (the aspect step is inverted: the shown half-height is
+ * `max(halfY, halfX/aspect)`, so the zoom is solved from it); without one, the figure's own aspect
+ * stands and the window is reproduced on the taller axis, as `viewBox` itself does before first paint.
+ * Whether the new figure is still worth looking at through that window is `figureIsVisible`'s question,
+ * asked by the caller — the #1225 rule, one idea for a fact and a configuration alike.
+ */
+export function carryWindow(from: Box, view: CanvasView, to: Box, surface?: Surface): CanvasView {
+  const shown = viewBox(from, view, surface);
+  const halfYShown = (shown.maxY - shown.minY) / 2;
+  const halfXShown = (shown.maxX - shown.minX) / 2;
+  const spanX = to.maxX - to.minX;
+  const spanY = to.maxY - to.minY;
+  const aspect = surface && surface.width > 0 && surface.height > 0 ? surface.width / surface.height : halfYShown > 0 ? halfXShown / halfYShown : 1;
+  // viewBox(to, view') shows half-height max(spanY/2/zoom', spanX/2/zoom'/aspect); solve for zoom'.
+  const govern = Math.max(spanY, spanX / aspect) / 2;
+  const zoom = halfYShown > 0 && govern > 0 ? govern / halfYShown : view.zoom;
+  return { zoom, centre: centreOf(shown) };
+}
+
+/**
  * IS THE FIGURE STILL WORTH LOOKING AT THROUGH THIS VIEW? (#1225)
  *
  * Operator, playing T34: *"when i put MA=5 the focus on the canvas is lost and the image is not

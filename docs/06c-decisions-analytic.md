@@ -7050,3 +7050,28 @@ ADR-AG-124 read `bounded` where the search STARTS; nothing downstream ever asked
 **Measured after.** «MA = 4»: options `null`, M known at (4, 0), the locus answer one point; «MA = 5»: exactly two options, y not knowledge, the locus answer the two points; «M(3,7)»: that point; the open figure: the line locus, unchanged; the panel and the answer row agree. Run against the pre-change `evaluate`/`ask` first: red on the tangency, the locus answers and the agreement.
 
 **Consequences.** `engine/solve.ts` (+`SOLVE_RESOLUTION`); `engine/evaluate.ts` (`knownOptions` cluster → null; `isKnowledge`'s resolution bar); `app/ask.ts` (`fact: 'points'` + `points`); `App.tsx` (the wording); `i18n` (askPointOne/Two/Many, He + En). `__tests__/issue-1259-1227-degenerate-locus.test.ts` (9).
+
+## ADR-AG-137 — «הציגו תצורה אחרת» keeps the frame: the view is carried across a configuration change and re-fits only when the figure has largely left it (#1262)
+
+**Status:** accepted, 2026-09-21 · **Issue:** #1262 (bug, P2, `analytic`; symptom 2 of #1198) · operator ruling 2026-09-20 (a): *"fit once, then the frame is the student's"* · round #1332
+**Requirements:** [02c](02c-requirements-analytic.md) R25a — the open remainder it recorded, now closed · **Design:** [04c](04c-design-analytic.md) — the view model (`render/view.ts`)
+**Completes** [ADR-AG-120](#adr-ag-120) (#1198 symptom 1, containment) and **extends** #1225's rule (*re-fit only when the figure has largely left the screen*) from a new fact to a new configuration — one idea in the product, not a frame rule per control
+
+**Measured before** («A(-9a,0)» · «B(41a,0)» · «נקודה P» · «PA מאונך ל-PB», eight presses):
+
+```
+seed 0: x[ −57, 168] width 225     seed 4: x[ −55, 162] width 217
+seed 1: x[ −22,  64] width  85     seed 5: x[ −44, 130] width 175
+seed 2: x[−165,  56] width 221     seed 6: x[−191,  65] width 256
+seed 3: x[−140,  48] width 188     seed 7: x[−182,  62] width 244
+```
+
+A `CanvasView` is RELATIVE to the figure's box (`zoom` divides its half-extents, `centre` defaults to its centre), so each configuration's frame was a correct fit to its own box, and with a symbolic parameter the box swings by the whole range of `a`: width 85 … 256, centre +55 … −63. No frame was wrong; nothing tied one to the next.
+
+**The ruling, and the two options it rejected** (each put with its cost): normalising by the parameter works only where there is one scale parameter and would make the tool behave differently on different figures; clamping the movement per press introduces an unstated magnitude (ADR-052) and still wanders. The accepted cost of (a): a configuration much larger or smaller than the first may be badly framed, and the student presses re-centre.
+
+**The mechanism.** `carryWindow(from, view, to, surface)` (`render/view.ts`, pure): the view that shows, against the new box `to`, exactly the world window `view` showed against `from` — with a surface the window is reproduced exactly (the aspect step is inverted: the shown half-height is `max(halfY, halfX/aspect)`, so the zoom is solved from it), without one the taller axis is reproduced, as `viewBox` itself does before first paint. In `App.tsx` the box effect that already applies #1225's rule on a fact gains one branch: when the box changed because the configuration did (a ref set by the button, keyed on the seed as well so an unchanged box still clears it), the view is carried and THEN asked #1225's question — `figureIsVisible` keeps it, else `INITIAL_VIEW` re-fits. A deliberate zoom or pan is carried the same way: whatever window the student had is the window they keep.
+
+**Measured after.** Over the eight seeds the shown window is identical at every press (width ratio 1.000, was 3.0) and no re-fit is needed — every configuration of that figure stays largely inside the first frame; containment (ADR-AG-120) is untouched because the drawn box, trace included, is what the visibility question is asked of. The #1198 row that pinned the lurch as a known state is MOVED, not deleted: it still asserts the figure's own box varies (that is the figure), and points at the new lock for the frame.
+
+**Consequences.** `render/view.ts` (+`carryWindow`); `App.tsx` (the carry branch of the box effect, the button's flag). `__tests__/issue-1262-frame-stays.test.ts` (5): the figure's box still varies, the carry reproduces the window exactly, a zoomed-and-panned window is kept, the sweep needs no re-fit and the shown width is constant, and a figure that has left the frame re-fits. `issue-1198-locus-in-view.test.ts` (the lurch row rewritten). `docs/02c` R25a.

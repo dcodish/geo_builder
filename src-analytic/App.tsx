@@ -21,7 +21,7 @@ import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
-import { INITIAL_VIEW, centreOf, figureIsVisible, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
+import { INITIAL_VIEW, carryWindow, centreOf, figureIsVisible, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { fmtAnalytic } from './format';
 import { curveDetailsKey, curveParts } from './app/curveText';
@@ -514,9 +514,36 @@ export function App() {
    * is what keeps this from looping.
    */
   const figureBoxKey = `${drawnBox.minX},${drawnBox.minY},${drawnBox.maxX},${drawnBox.maxY}`;
+  /**
+   * …AND A CONFIGURATION CHANGE KEEPS THE FRAME (#1262, ADR-AG-137) — the same rule, one more door.
+   *
+   * Operator, playing round #1193 T11: *"pressing on show another config causes the image to jump
+   * right and left"*, and his ruling (2026-09-20): *fit once, then the frame is the student's* —
+   * «הציגו תצורה אחרת» changes the drawing inside a frame that stays put. A view is relative to the
+   * figure's box, so a new configuration's box would move the frame under it; when the box changed
+   * BECAUSE the configuration did (`carryFrameRef`, set by the button), the view is re-expressed
+   * against the new box so it shows the same world window — and then the #1225 question is asked of
+   * it exactly as for a fact: re-fit only when the new figure has largely left the screen. That is
+   * the accepted cost, with the re-centre button as the escape hatch. Keyed on the seed as well, so
+   * a configuration whose box happens to equal the last one still clears the flag.
+   */
+  const prevBoxRef = useRef(drawnBox);
+  const carryFrameRef = useRef(false);
   useEffect(() => {
+    const prev = prevBoxRef.current;
+    prevBoxRef.current = drawnBox;
+    if (carryFrameRef.current) {
+      carryFrameRef.current = false;
+      const surface = { width: canvasSize.w, height: canvasSize.h };
+      setView((v) => {
+        const kept = carryWindow(prev, v, drawnBox, surface);
+        return figureIsVisible(drawnBox, kept, surface) ? kept : INITIAL_VIEW;
+      });
+      return;
+    }
     setView((v) => (figureIsVisible(figureBoxRef.current, v) ? v : INITIAL_VIEW));
-  }, [figureBoxKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [figureBoxKey, seed]);
 
   /**
    * WHEEL TO ZOOM, about the cursor (#1094).
@@ -1151,6 +1178,8 @@ export function App() {
                 // #1300: the seed IS the configuration, so a replay that loses this press redraws a
                 // different figure from the one the report is about.
                 logAnalytic({ kind: 'action', action: 'show-another', detail: next.found ? next.seed : 'none' });
+                // #1262: the frame is carried across the configuration change (see the box effect).
+                if (next.found) carryFrameRef.current = true;
                 if (next.found) goToSeed(next.seed);
                 else setNotice(t('noticeOnlyConfiguration'));
               }}
