@@ -186,3 +186,17 @@ export function decideSubmit(
 
   return { kind: 'record', line };
 }
+
+/**
+ * THE LLM SEAM'S ONE QUESTION (#1251, #1272).
+ *
+ * `not-handled` means no rule matched — the one code that means "I do not know this sentence" rather
+ * than "this sentence is wrong". Every other refusal is an OWNED answer (a degenerate role, a reserved
+ * coordinate, a name clash) and stands: the tool understood the student and disagreed, and handing
+ * that to a model would replace a correct explanation with a guess. The seam is therefore exactly as
+ * wide as the parser's honesty about ownership — #1272 fixed the claiming end, never this predicate.
+ *
+ * Extracted so `App.tsx` and the lock ask the same function ([ADR-AG-139](../../docs/06c-decisions-analytic.md#adr-ag-139)).
+ */
+export const reachesFallback = (verdict: SubmitVerdict): boolean =>
+  verdict.kind === 'refused' && verdict.error.key === 'not-handled';
