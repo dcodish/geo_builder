@@ -2133,7 +2133,23 @@ export const SCENARIOS_4: Scenario[] = [
       'מיתר AB',
     ],
     check(fig) {
-      allStepsOk(fig);
+      // CHANGED 2026-09-21 (ADR-537, #1328). «משולש ישר זווית ABC» seats the right angle at C, and with
+      // ∠C = 90 the hypotenuse AB is a diameter — «קשת AB = קשת BC» then holds only in the degenerate limit,
+      // which is what ADR-445 recorded when it built the seat tier for THIS figure. Until ADR-537 the apply
+      // layer ACCEPTED the collapse (flatness 7.5e-4, above the notice band, every row green) and this lock's
+      // «|AB| = |BC|» held on a triangle that was a line. The accept gate now refuses the needle at the
+      // default seat as over-constrained, and the app's config search reseats the right angle at B, where
+      // the sentence's figure — the isosceles right triangle — builds; that rescue is locked in
+      // src/engine/__tests__/issue-1328-tolerance-artefact.test.ts, because the harness folds at ONE seed
+      // without the view search. What this lock still holds is #546's own claim: the anonymous references
+      // BIND the circumcircle rather than minting a third circle — the four binding rows are green and the
+      // arc row is refused ON the circumcircle's arcs (∠AOB = ∠BOC), never handed to the LLM.
+      expect(fig.lastError, 'the default seat admits only the needle — refused, not drawn').toMatch(/^over-constrained: ∠AOB = 1·∠BOC cannot hold/);
+      expect(fig.pending, 'a contradiction at this seat, not an incomplete figure').toBe(false);
+      for (const [id, s] of Object.entries(fig.status)) {
+        if (id.startsWith('g4')) expect(s, id).not.toBe('ok');
+        else expect(s, id).toBe('ok');
+      }
       const circles = fig.construction.objects.filter(
         (o): o is Extract<typeof o, { kind: 'circle' }> => o.kind === 'circle',
       );
@@ -2148,8 +2164,7 @@ export const SCENARIOS_4: Scenario[] = [
       };
       const centres = circles.map((c) => at(fig, c.center));
       expect(centres.some(isCircum), 'one of the two circles IS the circumcircle').toBe(true);
-      // «קשת AB = קשת BC» bound the circumcircle and DROVE the figure: equal arcs ⇒ equal chords.
-      expect(Math.abs(dist(A, B) - dist(B, C)), 'equal arcs ⇒ |AB| = |BC|').toBeLessThan(1e-4);
+      expect(dist(B, C) / dist(A, B), 'the drawn figure is the prior real triangle, never the needle').toBeGreaterThan(0.1);
     },
   },
   {
@@ -2605,6 +2620,26 @@ export const SCENARIOS_4: Scenario[] = [
       const [A, B, C] = ['A', 'B', 'C'].map((id) => fig.positions.get(id)!);
       const dot = (B.x - A.x) * (C.x - B.x) + (B.y - A.y) * (C.y - B.y);
       expect(Math.abs(dot)).toBeLessThan(1e-6 * Math.hypot(B.x - A.x, B.y - A.y) * Math.hypot(C.x - B.x, C.y - B.y));
+    },
+  },
+  {
+    id: 'contradictory-right-angles-refused-not-drawn-1328',
+    title: '#1328 P1: «∠ABC = 90» on an isosceles triangle with equal base angles is REFUSED — a needle the tolerance bought is not a figure',
+    guards:
+      "The operator's exact sequence (2026-09-21, playing T4 of the #1264 sheet on T3's figure). Both base angles right and a 0° apex: the givens hold only in the limit B = C, and the solver satisfied them WITHIN ANGLE_EPS (0.5°) with a 0.35° apex — a needle at flatness 6e-3, above both the ADR-413 collapse floor (1e-4) and the ADR-513 notice band (5e-4) — drawn with every row green and «נקבע במלואו». ADR-537: the accept gate re-solves a figure whose declared polygon came out thin under a tightened degree tolerance; a needle cannot survive it, so the step is refused as over-constrained naming the statement, and — because a solution EXISTED and was not a figure — the refusal is a hard error, never a pending 'add the remaining givens'. The T3 prefix stays exactly as it was. The direct control «∠ABC = 90» · «∠ACB = 90», the legitimate thin triangles (89° + 90°, a stated 1°) and the ADR-513 notice figures are locked in src/engine/__tests__/issue-1328-tolerance-artefact.test.ts.",
+    steps: ['משולש ABC', 'AB = AC', '∠ABC = ∠ACB', '∠ABC = 90'],
+    check(fig) {
+      expect(fig.lastError, 'refused, naming the statement').toMatch(/^over-constrained: ∠ABC = 90° cannot hold/);
+      expect(fig.pending, 'a contradiction, not an incomplete figure').toBe(false);
+      for (const [id, s] of Object.entries(fig.status)) {
+        if (id.startsWith('g3')) expect(s, id).not.toBe('ok');
+        else expect(s, id).toBe('ok');
+      }
+      // the prior figure stands: a real isosceles triangle with equal base angles, not a needle
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(Math.abs(dist(A, B) - dist(A, C))).toBeLessThan(1e-6 * dist(A, B));
+      expect(dist(B, C) / dist(A, B), 'not a needle').toBeGreaterThan(0.1);
+      expect(fig.degeneracies).toEqual([]);
     },
   },
 ];

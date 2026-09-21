@@ -24,7 +24,7 @@ import {
   sub,
   unit,
 } from './geometry';
-import { constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates } from './solve';
+import { constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates, withToleranceFactor } from './solve';
 import { budgetExceeded } from './solveBudget';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
@@ -1089,7 +1089,18 @@ export function resolveDrivenMemo(c: Construction): Construction {
   return r;
 }
 
-function evaluateUncached(c: Construction): EvalResult {
+/**
+ * #1328 (ADR-537): the figure re-solved under a TIGHTENED tolerance — every residual tolerance multiplied by
+ * `factor` — with no memo on either side (the memos hold the ordinary-tolerance bake). The step-accept gate
+ * asks this of a figure whose declared polygon came out thin: a real thin triangle re-solves to the same
+ * shape; a needle the slack bought cannot satisfy the tighter bar without collapsing past the coincidence
+ * floor, where `solutionAccepted` refuses it, so this comes back `ok: false`.
+ */
+export function evaluateTightened(c: Construction, factor: number): EvalResult {
+  return withToleranceFactor(factor, () => evaluateUncached(c, resolveDriven));
+}
+
+function evaluateUncached(c: Construction, resolve: (c: Construction) => Construction = resolveDrivenMemo): EvalResult {
   const driven = drivenConstraintsOf(c);
   // #403 (ADR-407): a driven constraint referencing an id with NO OBJECT behind it can never be
   // satisfied — no solve can conjure a position for a point the construction doesn't contain. This
@@ -1103,7 +1114,7 @@ function evaluateUncached(c: Construction): EvalResult {
       }
     }
   }
-  const res = evaluateCore(resolveDrivenMemo(c));
+  const res = evaluateCore(resolve(c));
   if (!res.ok || driven.length === 0) return res;
   // Report the whole CONFLICT SET, not one arbitrary member. When a joint solve can't satisfy an
   // impossible constraint it drags its co-drivers off too (here the impossible ⟂ pulls F off the

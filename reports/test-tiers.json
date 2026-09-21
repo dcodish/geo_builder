@@ -6,7 +6,7 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-09-20",
+  "updatedAt": "2026-09-21",
   "slow": [
     "src/__tests__/determined-prints-1.test.ts",
     "src/__tests__/determined-prints-2.test.ts",
@@ -32,6 +32,7 @@
     "src/app/__tests__/resolve-view.test.ts",
     "src/engine/__tests__/dof-vacuous.test.ts",
     "src/engine/__tests__/inscribe-joint-solve.test.ts",
+    "src/engine/__tests__/issue-1328-tolerance-artefact.test.ts",
     "src/engine/__tests__/issue-541.test.ts",
     "src/engine/__tests__/membership-conversion.test.ts",
     "src/engine/__tests__/obligation-preservation.test.ts",

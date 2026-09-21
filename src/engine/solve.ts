@@ -371,7 +371,47 @@ export function constraintScale(con: Constraint, get: (id: Id) => Vec): number {
   }
 }
 
+/**
+ * #1328 ([ADR-537](docs/06-decisions.md#adr-537)) — the tolerance FACTOR under which a solve is judged.
+ * 1 is the ordinary tolerance. The step-accept gate re-solves a figure whose declared polygon came out THIN
+ * under a tightened factor: a genuine thin triangle is an exact solution and re-solves to the same shape;
+ * a needle the tolerance's slack bought — two right angles in one triangle satisfied to 0.5° by a 0.35°
+ * apex — can only satisfy a tighter tolerance by collapsing past the coincidence floor, where the solvers'
+ * own accept refuses it. Set only through {@link withToleranceFactor}, which always restores it (the
+ * `withSolveBudget` shape); nothing else may write it.
+ */
+export const toleranceScale = { factor: 1 };
+
+/** Run `fn` with every residual tolerance multiplied by `factor` (nested calls keep the tighter one). */
+export function withToleranceFactor<T>(factor: number, fn: () => T): T {
+  const prev = toleranceScale.factor;
+  toleranceScale.factor = Math.min(prev, factor);
+  try {
+    return fn();
+  } finally {
+    toleranceScale.factor = prev;
+  }
+}
+
 export function residualTolerance(con: Constraint, scale = 1): number {
+  const base = baseResidualTolerance(con, scale);
+  return toleranceScale.factor < 1 && isDegreeTolerance(con) ? base * toleranceScale.factor : base;
+}
+
+/**
+ * The tolerances the tightening reaches: the ones stated in DEGREES. A tolerance can buy a degenerate
+ * figure only when its slack exceeds the solvers' coincidence floor (1e-3 of the figure's extent, the
+ * `solutionAccepted` bar): `ANGLE_EPS` = 0.5° is 8.7e-3 in radians and does; the length family's
+ * 2e-4·scale and the ∥/⟂/collinear family's 1e-6 sit below it and cannot. Tightening those would only
+ * put the re-solve on a bar the derivative-free solves were never asked to reach (measured on the #830
+ * crossing figure, whose chord∩circle construction fails under a uniformly tightened length tolerance
+ * while its triangle is perfectly honest). A region/bound is never tightened: it holds or it does not.
+ */
+function isDegreeTolerance(con: Constraint): boolean {
+  return con.type === 'angle' || con.type === 'angle-ratio' || (con.type === 'measure-sum' && con.unit === 'angle');
+}
+
+function baseResidualTolerance(con: Constraint, scale = 1): number {
   switch (con.type) {
     case 'angle':
       return ANGLE_EPS;

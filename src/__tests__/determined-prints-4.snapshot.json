@@ -41,7 +41,6 @@
   "panel radius O = 4.62",
   "panel radius ~tanmid-OA = 4.62"
  ],
- "fx:issue-572-load-collapse.geo.json": [],
  "sc:arc-midpoint-takes-the-drawn-arc": [],
  "sc:central-angle-valueless-and-valued": [
   "canvas ∠COD = 80.00",

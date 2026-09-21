@@ -11,13 +11,14 @@ import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObjec
 import { LEN_EPS, isGeoPoint, isOrderConstraint } from './types';
 import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
 import { lower } from './lower';
-import { evaluate, resolveDriven, drivenConstraintsOf } from './evaluate';
+import { evaluate, evaluateTightened, resolveDriven, drivenConstraintsOf } from './evaluate';
 import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist, isRingDiagonal, sub } from './geometry';
 import { budgetExceeded } from './solveBudget';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 import { componentOf, minimalComponentOf } from './components';
 import { metricImpossibility, metricImpossibilityError } from './metricFeasibility';
+import { degeneratePolygons, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
 import { applySeed, freeDofs } from './sample';
 import { constraintKey, constraintRefs, describeConstraint, solvedOnSegmentCandidates } from './solve';
 
@@ -35,6 +36,13 @@ export interface StepErr {
   positions: Map<Id, Vec>;
   /** Ordered trace of the ladder stages traversed (docs/LADDER.md) — diagnostic metadata, never semantics. */
   ladder?: string[];
+  /**
+   * #1328 (ADR-537): the solve SUCCEEDED and the step-accept gate refused the result as not a figure — a
+   * vacuous satisfaction, a collapsed polygon, a tolerance artefact. A rigid contradiction: the fold's
+   * classifier never files it as a pending "add the remaining givens" state, whatever freedom the figure
+   * still has.
+   */
+  degenerate?: true;
 }
 export type StepResult = StepOk | StepErr;
 
@@ -287,35 +295,35 @@ function newConstraintsNonVacuous(c: Construction, positions: Map<Id, Vec>, newC
  * legitimately-constructible triangle orders above.
  */
 function collapsedPolygon(c: Construction, positions: Map<Id, Vec>): boolean {
-  for (const o of c.objects) {
-    if (o.kind !== 'polygon') continue;
-    const pts = o.vertices.map((id) => positions.get(id));
-    if (pts.length < 3 || pts.some((p) => !p)) continue;
-    // The line through the two most-separated vertices; every vertex within tol of it = collapsed.
-    let ai = 0, bi = 1, span = -1;
-    for (let i = 0; i < pts.length; i++)
-      for (let j = i + 1; j < pts.length; j++) {
-        const d = Math.hypot(pts[i]!.x - pts[j]!.x, pts[i]!.y - pts[j]!.y);
-        if (d > span) { span = d; ai = i; bi = j; }
-      }
-    if (span <= 0) continue; // all vertices coincide — the coincidence machinery's concern, not this gate's
-    const A = pts[ai]!, B = pts[bi]!;
-    const ux = (B.x - A.x) / span, uy = (B.y - A.y) / span;
-    const off = pts.reduce((m, p) => Math.max(m, Math.abs((p!.x - A.x) * uy - (p!.y - A.y) * ux)), 0);
-    if (off < 1e-4 * span) return true;
-  }
-  return false;
+  // The one flatness ruler (`polygonFlatness`) — an all-coincident ring answers null, which is the
+  // coincidence machinery's concern, not this gate's.
+  return degeneratePolygons(c, positions, COLLAPSED_POLYGON_RATIO).length > 0;
+}
+/** ADR-413's floor: a numeric collapse sits orders of magnitude below, the thinnest legit triangle orders above. */
+const COLLAPSED_POLYGON_RATIO = 1e-4;
+
+/**
+ * #1328 (ADR-537): a declared polygon that is THIN and whose constraints hold only by the tolerance's
+ * slack is a tolerance artefact, not a solution — the accept gate asks not only "are the residuals
+ * small" but "is the tolerance what made them small". Every ENFORCED constraint is examined (the checked
+ * list, the directives and the embedded solved-point constraints), because the slack that bought the
+ * needle may be on an earlier given as easily as on this step's. See `toleranceArtefacts`.
+ */
+function toleranceArtefactPolygon(c: Construction, positions: Map<Id, Vec>): boolean {
+  if (degeneratePolygons(c, positions, THIN_POLYGON_RATIO).length === 0) return false; // the trigger: an ordinary figure pays nothing
+  return !evaluateTightened(c, TIGHT_TOLERANCE_FACTOR).ok;
 }
 
 /**
  * THE step-accept predicate — one TOTAL gate at every accept event (the docs/17 guard-binds-to-the-
- * event rule): the new constraints hold non-vacuously (#7) AND no declared polygon has collapsed to a
- * line (#408). A rejecting accept routes the solve into the same failure ladder as a genuine
- * over-constraint, so the recruiter hunts for a REAL configuration and, when only degenerate ones
- * exist, the refusal honestly names the student's statement (ADR-276).
+ * event rule): the new constraints hold non-vacuously (#7), no declared polygon has collapsed to a
+ * line (#408), and no declared polygon is thin only by the tolerance's grace (#1328). A rejecting accept
+ * routes the solve into the same failure ladder as a genuine over-constraint, so the recruiter hunts for
+ * a REAL configuration and, when only degenerate ones exist, the refusal honestly names the student's
+ * statement (ADR-276).
  */
 function stepAccepted(c: Construction, positions: Map<Id, Vec>, newCons: Constraint[]): boolean {
-  return newConstraintsNonVacuous(c, positions, newCons) && !collapsedPolygon(c, positions);
+  return newConstraintsNonVacuous(c, positions, newCons) && !collapsedPolygon(c, positions) && !toleranceArtefactPolygon(c, positions);
 }
 
 /**
@@ -570,6 +578,14 @@ function runFailureLadder(
   // On a miss, REPAIR: resurrect the dropped obligations as listed checks and re-verify — accepted only
   // if the whole figure (including them) still evaluates; otherwise the stage's accept FAILS and the
   // ladder falls through to the next stage, which sees `next` intact.
+  // #1328 (ADR-537): did ANY stage find a solution the accept gate refused as not a figure? Then the
+  // refusal below is a rigid contradiction (a solution exists and is degenerate), whichever stage saw it.
+  let refusedAsNotAFigure = primary.ok;
+  const gate = (c: Construction, pos: Map<Id, Vec>): boolean => {
+    const ok = stepAccepted(c, pos, newCons);
+    if (!ok) refusedAsNotAFigure = true;
+    return ok;
+  };
   const baseline = obligationsOf(next);
   const accept = (construction: Construction, positions: Map<Id, Vec>, token: string): StepResult | null => {
     const have = obligationsOf(construction);
@@ -577,7 +593,7 @@ function runFailureLadder(
     if (!missing.length) return { ok: true, construction, positions, ladder: [...trace, token] };
     const repaired: Construction = { ...construction, constraints: [...construction.constraints, ...missing] };
     const r = evaluate(repaired);
-    if (r.ok && stepAccepted(repaired, r.positions, newCons)) {
+    if (r.ok && gate(repaired, r.positions)) {
       return { ok: true, construction: repaired, positions: r.positions, ladder: [...trace, token, 'preserve:repair'] };
     }
     trace.push('preserve:reject'); // the stage won by dropping a given — its accept is void; keep climbing
@@ -610,7 +626,7 @@ function runFailureLadder(
   const recruited = recruitFreeDofs(next, [...newCons, ...orphans], trace);
   if (recruited) {
     const r2 = evaluate(recruited);
-    if (r2.ok && stepAccepted(recruited, r2.positions, newCons)) {
+    if (r2.ok && gate(recruited, r2.positions)) {
       const a = accept(recruited, r2.positions, `${prefix}:recruit`);
       if (a) return a;
     }
@@ -626,7 +642,7 @@ function runFailureLadder(
   const joint = jointFirst(next, newCons, trace);
   if (joint) {
     const rj = evaluate(joint);
-    if (rj.ok && stepAccepted(joint, rj.positions, newCons)) {
+    if (rj.ok && gate(joint, rj.positions)) {
       const a = accept(joint, rj.positions, `${prefix}:component`);
       if (a) return a;
     }
@@ -639,7 +655,7 @@ function runFailureLadder(
   const scaled = scaleRescue(next, newCons, prevPositions);
   if (scaled) {
     const rs = evaluate(scaled);
-    if (rs.ok && stepAccepted(scaled, rs.positions, newCons)) {
+    if (rs.ok && gate(scaled, rs.positions)) {
       const a = accept(scaled, rs.positions, `${prefix}:scale`);
       if (a) return a;
     }
@@ -650,7 +666,11 @@ function runFailureLadder(
   // solve directives lists none, and both messages below were being built from an empty set.
   const blameCons = addedConstraints(prev, next);
   const vacuousErr = blameCons.length ? `over-constrained: ${describeConstraint(describeNewStatement(blameCons))} cannot hold` : 'over-constrained';
-  return { ok: false, error: primary.ok ? vacuousErr : blameNewStatement(primary.error, blameCons, primary.violated), construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:refuse`] };
+  // #1328 (ADR-537): when the PRIMARY solve succeeded and the step-accept gate refused it — a vacuous
+  // satisfaction (#7), a collapsed polygon (#408), a tolerance artefact (#1328) — a solution EXISTS and is
+  // not a figure. That is a rigid contradiction, never "waiting for more givens": the fold's classifier
+  // must not file it as pending on the strength of the figure still having freedom.
+  return { ok: false, error: primary.ok ? vacuousErr : blameNewStatement(primary.error, blameCons, primary.violated), construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:refuse`], ...(refusedAsNotAFigure ? { degenerate: true as const } : {}) };
 }
 
 /**

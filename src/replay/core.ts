@@ -783,6 +783,12 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
   // #365: `start` resumes from a clean prefix fold — the prefix facts keep their cached statuses and the
   // loop begins at `start.count`. The poisoning rebuild always runs WITHOUT `start` (a forced block can
   // reach prefix groups, so the resumed state would be stale).
+  // #1328 (ADR-537): facts whose step FOUND a solution that the accept gate refused as not a figure (a
+  // vacuous satisfaction, a collapsed polygon, a tolerance artefact). Such a failure is a rigid
+  // contradiction — `classify` below must never file it as pending, whatever freedom the figure keeps.
+  // Written at the one site a step's error becomes a status; a later run that lands the fact makes its
+  // status `ok`, which `classify` filters first, so a stale entry can never matter.
+  const rigid = new Set<string>();
   const runBuild = (forced: Map<string, string>, start: { node: FoldNode; count: number } | null = null) => {
     let cur = start ? start.node.cur : emptyConstruction();
     const status: Record<string, FactStatus> = {};
@@ -945,6 +951,7 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
         if (r.ok) trial = r.construction;
         else {
           status[f.id] = r.error; // dependencies gone, contradiction, etc. — keep prior figure
+          if (r.degenerate) rigid.add(f.id); else rigid.delete(f.id);
           ok = false;
           failedWith.set(f.id, cur); // the PRE-fact figure — what the retry must compare against (ADR-280 purity skip)
           break;
@@ -987,7 +994,11 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
         for (const ec of engineCmds) {
           const r = applyStep(trial, ec);
           if (r.ok) trial = r.construction;
-          else { ok = false; break; }
+          else {
+            if (r.degenerate) rigid.add(f.id); // #1328: a retry that found only a degenerate solution is a rigid contradiction too
+            ok = false;
+            break;
+          }
         }
         if (ok) {
           cur = trial;
@@ -1015,6 +1026,9 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       // have deleted the step that used the letter. Either way it is ADR-104's register — recorded,
       // marked, not yet in effect — not a contradiction; the row says why, the cue says "not yet".
       if (f.cmd.type === 'set-var') return !isSymbolBound(symtab, f.cmd.name, enabledCmds);
+      // #1328 (ADR-537): a solution was found and refused as not a figure — a rigid contradiction, not a
+      // constraint waiting for givens, however much the figure still flexes.
+      if (rigid.has(f.id)) return false;
       const ec = lowerOne(f.cmd, symtab);
       return hasDeferrableConstraint(ec) && constraintIsPending(cur, ec); // a deferrable constraint that still FLEXES (not a rigid contradiction)
     });

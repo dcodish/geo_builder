@@ -42,9 +42,16 @@ describe('#945 — the trigger family: givens that force a declared polygon flat
     }
   });
 
-  it('two right angles (90 + 90) are NOT a member: the tool draws only an approximate sliver that fails the requirement bar (never displayed), above the band', () => {
+  it('two right angles (90 + 90) are NOT a member: since #1328 (ADR-537) the second is REFUSED as over-constrained — a needle the tolerance bought is not a figure, so there is nothing to notice', () => {
+    // When this lock was written the case read "draws only an approximate sliver that fails the
+    // requirement bar (never displayed)". Measured 2026-09-21, it WAS displayed: the solver satisfied both
+    // right angles to within ANGLE_EPS with a 0.35° apex at flatness 1.5e-3 — above this notice's band —
+    // and committed it green (the operator's T4). ADR-537's accept gate now refuses it; the prior
+    // figure (one right angle) stays, and it is above the band as before.
     const facts = factsOf(['משולש ABC', 'זווית BAC = 90', 'זווית ABC = 90']);
     const fig = replay(facts, 0);
+    expect(fig.lastError, 'refused, not drawn').toMatch(/^over-constrained: .*cannot hold/);
+    expect(fig.pending, 'a contradiction, never "add the remaining givens"').toBe(false);
     expect(fig.degeneracies).toEqual([]);
     expect(degeneratePolygons(fig.construction, fig.positions, 1)[0]?.ratio).toBeGreaterThan(DEGENERATE_EXTENT_RATIO);
   });

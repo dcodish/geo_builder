@@ -53,5 +53,5 @@ export { computeValuesPanel, queryLabel, valueText } from './valuesPanel';
 export type { QueryInput, QueryNote, QueryRow, ValueQuery } from './valuesPanel';
 export type { ValueRow, AreaClassRow, ValuesPanelResult } from './valuesPanel';
 
-export { degeneratePolygons, DEGENERATE_EXTENT_RATIO } from './degeneracy';
+export { degeneratePolygons, polygonFlatness, DEGENERATE_EXTENT_RATIO, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
 export type { DegeneratePolygon } from './degeneracy';

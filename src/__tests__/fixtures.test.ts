@@ -27,6 +27,7 @@
 import { describe, it, expect } from 'vitest';
 import { deserializeFigure } from '@/store/figureFile';
 import { replay, groupKey } from '@/store/geoStore';
+import { findValidConfig } from '@/replay/core';
 import type { Fact } from '@/store/geoStore';
 import { parse, buildParseCtx } from '@/parser';
 import type { AnyCommand } from '@/engine';
@@ -49,6 +50,16 @@ const FIXTURE_DEGENERATE: Record<string, string[]> = {
 
 };
 
+/**
+ * #1328 (ADR-537): saved figures whose DEFAULT configuration the accept gate now refuses and whose load the
+ * app rescues through the config search at the display event (ADR-446) — the seat tier of ADR-445. The
+ * one member is the operator's saved collapse figure itself: «משולש ישר זווית ABC» seats the right angle at
+ * C, where «קשת AB = קשת BC» holds only as a needle; the app reseats it at B on load. The net applies that
+ * same rescue for a fixture listed here and for NO other — a fixture newly needing it fails loudly, which
+ * is the point of a net. The artifact's bytes are untouched.
+ */
+const FIXTURE_LOAD_RESCUED = new Set<string>(['issue-572-load-collapse']);
+
 describe('figure-file fixtures net', () => {
   it('the net is not empty', () => {
     expect(Object.keys(files).length).toBeGreaterThan(0);
@@ -64,10 +75,23 @@ describe('figure-file fixtures net', () => {
         expect(r.ok, !r.ok ? `refused: ${(r as { reason: string }).reason}` : undefined).toBe(true);
       });
       if (!r.ok) return;
-      const { facts, seed } = r.file;
+      const { facts: savedFacts, seed: savedSeed } = r.file;
+      // ADR-537: the load rescue (ADR-446), for the fixtures that name themselves above — and only those.
+      const rescued = FIXTURE_LOAD_RESCUED.has(name) ? findValidConfig(savedFacts) : null;
+      if (FIXTURE_LOAD_RESCUED.has(name)) {
+        it('the load rescue reseats a figure whose default configuration is refused (ADR-537 on ADR-446)', () => {
+          expect(replay(savedFacts, savedSeed).lastError, 'the default configuration IS refused — else this fixture no longer belongs in FIXTURE_LOAD_RESCUED').not.toBeNull();
+          expect(rescued, 'the app finds the honest configuration').not.toBeNull();
+        });
+      }
+      // The parser-drift check below compares against the SAVED commands (the artifact); the replay checks use
+      // the configuration the app would display.
+      const facts = savedFacts;
+      const built = rescued?.facts ?? savedFacts;
+      const builtSeed = rescued?.seed ?? savedSeed;
 
       it('replays green: builds, verified, nothing pending', () => {
-        const fig = replay(facts, seed);
+        const fig = replay(built, builtSeed);
         expect(fig.lastError).toBeNull();
         expect(fig.pending).toBe(false);
         expect(fig.violations).toEqual([]);
@@ -75,7 +99,7 @@ describe('figure-file fixtures net', () => {
       });
 
       it('says so if the givens force a declared polygon flat, and stays SILENT otherwise (#945, ADR-513)', () => {
-        const fig = replay(facts, seed);
+        const fig = replay(built, builtSeed);
         const want = [...(FIXTURE_DEGENERATE[name] ?? [])].sort();
         expect(fig.degeneracies.map((d) => d.object).sort(), `degeneracy notices of ${name} (ratios ${fig.degeneracies.map((d) => d.ratio.toExponential(2)).join(', ')})`).toEqual(want);
       });
