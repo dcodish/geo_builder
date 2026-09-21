@@ -75,6 +75,8 @@ export type InputError =
   | { key: 'apex-not-a-vertex'; detail: string }
   /** A crossing the student named that the figure already names — carrying WHO holds it (#1175). */
   | { key: 'crossing-already-named'; detail: string; holder: string }
+  /** A crossing of a line with itself — «הישר AB עם הישר BA» names no point (#1255). */
+  | { key: 'self-crossing'; detail: string }
   /**
    * The LLM fallback was THROTTLED, not confused (#1251) — a per-IP or daily cap.
    *

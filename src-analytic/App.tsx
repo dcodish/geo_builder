@@ -773,6 +773,7 @@ export function App() {
           'degenerate-role': 'errDegenerateRole',
           'apex-not-a-vertex': 'errApexNotAVertex',
           'crossing-already-named': 'errCrossingAlreadyNamed',
+          'self-crossing': 'errSelfCrossing',
           'llm-busy': 'errLlmBusy',
           'bad-operand': 'errBadOperand',
           'conflicting-restatement': 'errConflict',

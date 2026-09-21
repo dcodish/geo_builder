@@ -94,6 +94,12 @@ export type ParseFailure =
    */
   | { code: 'crossing-already-named'; detail: string; holder: string }
   /**
+   * A crossing of a line WITH ITSELF (#1255) — «הישר AB עם הישר BA» names one line twice, and a line
+   * has no crossing with itself, so the sentence defines no point. Owned, never `not-handled`: the
+   * grammar read it, and the seam would ask a model to accept the very spelling just ruled out.
+   */
+  | { code: 'self-crossing'; detail: string }
+  /**
    * A relation whose VERB was understood and whose operand was not — «DE מקביל לפיל» (#1052).
    *
    * Its own code because the student got the sentence shape right: telling them "I did not
@@ -987,12 +993,13 @@ function parseIntersection(line: string): RuleOutcome {
    * lines named by two points each that share exactly one letter meet at that letter, whatever the
    * configuration. No solve, no seed, no tolerance.
    *
-   * **Sharing BOTH letters is a different sentence and is NOT answered here** — «הישר AB עם הישר BA»
-   * is one line, not two, so its "crossing" is the whole line rather than a point. Measured, it
-   * currently BUILDS an under-determined `P` floating somewhere along AB with `faults: []` — a real
-   * defect, but a different one (an unconstrained point, not a duplicate name) whose honest answer
-   * might be a refusal or might be «P on AB», which is the student's to decide. Filed separately and
-   * left alone here, so this code never claims a sentence it cannot explain.
+   * **Sharing BOTH letters is the same family, one step over (#1255, ADR-AG-140).** «הישר AB עם
+   * הישר BA» is one line written twice, so its "crossing" is the whole line and the sentence names no
+   * point. Measured before the arm: it BUILT an under-determined `P` floating along AB with
+   * `faults: []`. Operator ruling, 2026-09-20: **refuse it** — the alternative, reading it as a free
+   * point on AB, was put to him with its argument and declined. The refusal is OWNED (`self-crossing`),
+   * never `not-handled`: the grammar read the sentence, and the LLM seam would ask a model to accept
+   * the very spelling just ruled out (the argument ADR-AG-130 made for the ring half, unchanged).
    *
    * ⚠ THIS IS THE STRUCTURAL MEMBER ONLY, and that is deliberate. Two lines given by EQUATIONS that
    * happen to cross where a point already sits is the same defect — measured, «l1: y=x» and
@@ -1005,6 +1012,7 @@ function parseIntersection(line: string): RuleOutcome {
     if (shared.length === 1) {
       return { ok: false, code: 'crossing-already-named', detail: line, holder: shared[0] } as ParseResult;
     }
+    if (shared.length === 2) return refuse('self-crossing', line);
   }
   return made([
     { t: 'declare', id, src: line },
