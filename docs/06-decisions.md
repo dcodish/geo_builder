@@ -12797,3 +12797,25 @@ There is no triangle in those givens — both base angles right, the apex 0°, s
 **Sibling audit (docs/17 §1).** 3-D's `store3.submit` has the same shape and was not measured here; analytic's M1 boundary answers restatement by id (ADR-AG-146's neighbourhood). Noted, not built.
 
 **Consequences.** `replay/core.ts` (`impliedByPrior`, `IMPLIED_MIN_SAMPLES`, the `'implied'` reason, the arm ahead of the return); `app/submitPipeline.ts` (the route to the note); `app/editPipeline.ts` (the same predicate at the edit seam). Lock: `replay/__tests__/issue-999-implied-restatement.test.ts` (8). `dry-run.test.ts`, `issue-883.test.ts` and `edit-pipeline-782.test.ts` deliberately unchanged.
+
+## ADR-543 — A message about the FIGURE is derived from the facts: every fact mutation clears the figure-level notes, in one subscription (#1338)
+
+**Status:** accepted, 2026-09-21 · **Issue:** [#1338](https://github.com/dcodish/geo_builder/issues/1338) (bug, `P2`, `2d`) · round [#1345](https://github.com/dcodish/geo_builder/issues/1345) · operator, playing round #1332, not tied to one case
+**Requirements:** [02](02-requirements.md) FR-EN-8 (extended — a report is about the CURRENT figure) · **Design:** [04](04-design.md) — what is derived from `(facts, seed)` and what is submit-time UI state
+**Operator:** *"when there is an error message of any kind and user removes an input line (presses x), the shape gets recalculated correctly but the error message stays."*
+
+**Measured before (`56ceeb65`).** The banner is `figure.noValidConfig`, set at submit time by the view search's exhaustion callback (`App.tsx`, ADR-445). `inputNote` was cleared in exactly three places — the submit pipeline's start, a successful submit, and TYPING in the box. The row's ✕ calls the store's `remove`, which re-folds the facts and redraws, and **never touched the component**. So every message about the FIGURE — «לא נמצאה תצורה שמקיימת את כל הדרישות יחד», the LLM-dropped list, a rename note — outlived the line it was about: the drawing was right while the message still accused it.
+
+**The class.** *A message about the figure is stored as a message about the last submit.* The store's whole design is that the figure is DERIVED from `(facts, seed)` — positions are never stored, so undo cannot desync ([ADR-484](#adr-484)). The banner was the one thing that escaped that, because it lives in React state rather than in the fold.
+
+**The mechanism — one subscription on the FACTS, not a call in each handler.** Clearing the notes inside `remove` would be the patch shape: ✕, mute, undo, redo, ✎ and a file load are six doors and the seventh is not written yet — and the three existing clear sites are exactly the evidence that enumerating them does not hold. `app/figureNotes.ts` owns the rule (`clearFigureNotes`, `subscribeFigureNotes`) and `App.tsx` mounts it once: **the notes belong to a fact list, and a different fact list has no notes yet.** A mutation added later inherits it without knowing the file exists. Deliberately NOT on `seed`: cycling configurations keeps the same statements, so a note about them is still true.
+
+**Ordering is what makes it safe, and it was measured rather than assumed.** Every site that sets a note either commits nothing (the refusal paths; `setRenameNote` only fires in its `else` branches) or commits FIRST and sets the note after — `executeMany` then `setLlmDropped`; `resolveAfterCommit` then `onExhausted`. Zustand notifies synchronously, so the clear always lands before the note it must not erase.
+
+**Sibling audit (docs/17 §1) — 2-D ONLY, measured, and the reason is instructive.** The analytic store clears `error`/`notice` **inside `removeLine` itself**; 3-D's `remove` and `toggle` recompute `lastError` from `dependentsBroken`. Both keep the message in the STORE, where it is a function of the facts. 2-D kept it in the component, and that is the whole of the defect — the class does not reach the siblings because they never had the separation.
+
+**The lock, and why it has two halves.** `figure-notes-1338.test.ts` drives the REAL store through the REAL subscription — ✕, mute, undo and clear, plus the seed-only negative control (ADR-W-053: a test that re-implements the decision it guards stays green through the change that kills it). But all of that stays green if `App.tsx` stops calling it, so the WIRING is asserted separately by reading `App.tsx` for the call and its four sinks — #955's lesson, with the device `triage-mirror` and `lexicon-consumers` already use.
+
+**Measured after.** ✕ on the offending row clears the banner and the figure redraws; mute, undo and clear do the same; cycling the configuration does not. 2-D lane: 417 files / 7216 tests green.
+
+**Consequences.** `app/figureNotes.ts` (new); `App.tsx` (one effect). Lock: `app/__tests__/figure-notes-1338.test.ts` (9).
