@@ -7,11 +7,9 @@ design doc ([ADR-W-041](06w-decisions-workspace.md#adr-w-041))._
 captured live from the operator. Decisions are [06c](06c-decisions-analytic.md); the plan of record is
 [docs/19](19-analytic-geometry-tool.md).
 
-> **Status: V0 in build, and deliberately NOT DEPLOYED**
-> ([ADR-AG-007](06c-decisions-analytic.md)). Its `products.json` entry carries `enabled: false` plus
-> `devOnly: true`, so no shipped builder can render a chip pointing at a 404 while the app is still
-> reachable in its own dev switcher. This document describes a tree that is smaller and younger than its
-> three siblings, and says so rather than describing an aspiration.
+> **Status: DEPLOYED since `prod/2026-09-16`** at `/analytic-builder/` (`products.json` `enabled: true`; the
+> [ADR-AG-007](06c-decisions-analytic.md) hold was lifted by the operator — [DEPLOY-LOG](DEPLOY-LOG.md)
+> 2026-09-16). Requirements 02c are still marked IN PROGRESS; that is a doc status, not a deploy status.
 
 ## What is different about this product
 
@@ -711,8 +709,8 @@ applied to the fourth.
   vocabulary: B1 re-founded the model without adding a single new statement form, so the families this
   product can express are still V0's. B2 (the joint solve) and B3 (the shape vocabulary) are where that
   moves.
-- **Not deployed** (above). The readmission path is mechanical: flip `enabled` to `true` and drop
-  `devOnly` in [`products.json`](../products.json), and add its RUNBOOK row.
+- **Deployed** since `prod/2026-09-16` (above); the registry's `enabled`/`devOnly` pair remains the mechanism for
+  whichever builder is held back next.
 
 
 ## The session, and the panel that shows it ([ADR-AG-055](06c-decisions-analytic.md#adr-ag-055))
@@ -1201,9 +1199,9 @@ there was no spread to measure.
 
 `src-analytic/debug/sessionLogAnalytic.ts` fire-and-forgets one JSON line per event to the shared Vite dev
 plugin (`server/logProxy.ts`) at `${BASE_URL}api/log`, tagged `tool:'analytic'`, which routes it to
-`logs/debug-log-analytic.jsonl`. **Dev only** — the tool is not deployed ([ADR-AG-007](06c-decisions-analytic.md#adr-ag-007)),
-so unlike its 2-D and 3-D siblings this module has no production analytics sink, and the `import.meta.env.DEV`
-early return is the whole of that posture.
+`logs/debug-log-analytic.jsonl`. **Dev only by its own gate** — the tool IS deployed (`prod/2026-09-16`), but unlike its 2-D and 3-D
+siblings this module has no production analytics sink (the `/analytic-builder/api/…` Apache directives were
+never applied — DEPLOY-LOG 2026-09-16), and the `import.meta.env.DEV` early return is the whole of that posture.
 
 **What it records, and why that set is a complete reconstruction.** The session here IS the line list — the
 store's source of truth is `(lines, seed)` and the figure is replayed from it — so nothing derived needs

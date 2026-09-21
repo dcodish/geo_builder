@@ -15,10 +15,11 @@ coordinate plane, with points, lines, circles and canonical conics as objects ca
 Plan: [docs/19](../docs/19-analytic-geometry-tool.md). Decisions: `ADR-AG-NNN` in
 [06c](../docs/06c-decisions-analytic.md). Issue label `analytic`.
 
-**NOT DEPLOYED** ([ADR-AG-007](../docs/06c-decisions-analytic.md#adr-ag-007)) until the tool has
-decent capability: the registry entry carries `enabled: false`, so no shipped builder can render a
-chip pointing at `/analytic-builder/`, plus `devOnly: true`, which this app alone honours so its own
-switcher stays whole locally. Undeploying is one registry line plus a RUNBOOK row.
+**DEPLOYED** since `prod/2026-09-16` at `/analytic-builder/` — the registry entry carries `enabled: true`
+(the [ADR-AG-007](../docs/06c-decisions-analytic.md#adr-ag-007) hold was lifted by the operator; see
+[DEPLOY-LOG](../docs/DEPLOY-LOG.md) 2026-09-16). A change in this tree reaches students on the next deploy
+and pays the RUNBOOK's analytic row. Holding a builder back is one registry line (`enabled: false` plus
+`devOnly: true`, which the roster filter still honours).
 
 **Its distinguishing fact: the exam prints no figure.** 17 of the 20 sampled Q1s carry no drawing at
 all and two of them instruct the student to draw one. The siblings *reproduce* a printed figure;
