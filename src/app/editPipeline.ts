@@ -20,6 +20,7 @@
 import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabelFold, parse } from '@/parser';
 import { autoNamedLabels, groupKey, replay, useGeoStore } from '@/store/geoStore';
 import { honestyGateReport } from './honestyGates';
+import { impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
 
 export interface EditDeps {
@@ -116,6 +117,26 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   // asked for it) and the orphaned rows stay in the list, marked; what must not happen is a bare
   // success. The note names them in the student's own wording — the same report the delete path gets
   // from the fold's own banner, made explicit at the seam that returned `true`.
+  /**
+   * #999 (ADR-542) — THE SAME QUESTION ON THIS SEAM, THROUGH THE SAME FUNCTION.
+   *
+   * Exactly the `honestyGateReport` shape above (#782 / ADR-461 / ADR-W-006): one predicate, both
+   * commit seams, so the next gate lands here for free. Asked against the PREFIX facts — the figure as
+   * it stands BEFORE the edited step, the ADR-015 ordering this seam already established — because that
+   * is what the replacement is replayed against. Refusing inline and leaving the editor open is this
+   * seam's existing convention (`editRefused`, `editDropped`, the #779 nudge all return false with a
+   * note); the edit seam never escalates to the LLM (operator ruling, 2026-08-25).
+   */
+  const prefixFacts = (() => {
+    const facts = store().facts;
+    const start = facts.findIndex((f) => groupKey(f) === key);
+    return start >= 0 ? facts.slice(0, start) : facts;
+  })();
+  if (impliedByPrior(prefixFacts, r.commands, store().seed)) {
+    logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-implied-restatement', commands: r.commands });
+    setInputNote(t('input.alreadyDrawn'));
+    return false;
+  }
   const wasOk = replay(store().facts, store().seed).status;
   store().replaceGroup(key, r.commands, editText.trim());
   logDebug({ kind: 'action', action: 'edit', detail: `${key} → ${editText.trim()}` }); // #84: so a reported session replays edits

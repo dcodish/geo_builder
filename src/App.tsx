@@ -68,6 +68,7 @@ import { logDebug } from '@/debug/sessionLog';
 import { runSubmit } from '@/app/submitPipeline';
 import { runViewResolve } from '@/app/resolveView';
 import { runEditCommit, runSetGroupEnabled } from '@/app/editPipeline';
+import { subscribeFigureNotes } from '@/app/figureNotes';
 import { anonPointDescriptor, visibleCoincidences } from '@/render/pointDescriptions';
 import { humanizeError, translateParams } from '@/i18n/humanizeError';
 import { otherUtteranceForError, utteranceForError } from '@/app/errorSubject';
@@ -234,6 +235,26 @@ export default function App() {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  /**
+   * A MESSAGE ABOUT THE FIGURE DIES WITH THE FACTS IT WAS ABOUT (#1338, ADR-543).
+   *
+   * The figure is derived from `(facts, seed)`; the banner was not, so «לא נמצאה תצורה…», the
+   * LLM-dropped list and a rename note outlived the line they were about — press ✕ on the offending
+   * row and the drawing was right while the message still accused it. The rule lives on the FACTS, in
+   * one subscription, so ✕ / mute / undo / redo / ✎ / load all inherit it and the next mutation does
+   * too. The decision itself is `app/figureNotes.ts`, which is where its lock drives it.
+   */
+  useEffect(
+    () =>
+      subscribeFigureNotes(useGeoStore.subscribe, {
+        setInputNote,
+        setLlmDropped,
+        setRenameNote,
+        setAltNote,
+      }),
+    [],
+  );
 
   // Show the "what is this?" intro once, on a visitor's first load (persisted in
   // localStorage). It stays reopenable from the header button afterwards.

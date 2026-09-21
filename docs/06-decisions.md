@@ -12799,3 +12799,86 @@ ADR-541  «BC>10» «BC=4»            refused up front, figure clean, note carr
 **Sibling audit (docs/17 §1).** 3-D has bounds (`set-angle-bound`) and the same classifier shape; not measured here and not changed — noted as the next member if it is reported. Analytic's bound lane is `selectorsHold`, a different mechanism.
 
 **Consequences.** `engine/metricFeasibility.ts` (`BoundImpossibility`, `boundImpossibility`, `boundImpossibilityError`); `engine/step.ts` (pre-gate 0g); `replay/core.ts` (`constraintIsPending`); `i18n/humanizeError.ts` + `locales/{he,en}.json` (`errors.boundImpossible`). Locks: `engine/__tests__/bound-feasibility.test.ts` (15) — the operator's exact sequence drives the real `parse → replay` path there, because a corpus scenario still cannot express *"this step is expected to be REFUSED"* (#1288); `i18n/__tests__/humanize-error.test.ts` gains its two coverage rows; `issue-1265-bound-boundary.test.ts` and `issue-1249-wordy-bound.test.ts` updated as above.
+
+## ADR-542 — A relation restated in another spelling is declined AT THE DOOR: entailment over the prior figure's sampled configurations, asked ahead of every change-signal (#999)
+
+**Status:** accepted, 2026-09-21 · **Issue:** [#999](https://github.com/dcodish/geo_builder/issues/999) (bug, `P3`, `2d`) · round [#1345](https://github.com/dcodish/geo_builder/issues/1345) · reported 2026-09-13 playing round #998 T21, re-reported on #1264's sheet 2026-09-21
+**Requirements:** [02](02-requirements.md) FR-EN-9 (extended — a restatement is a no-op WITH the note) · **Design:** [04](04-design.md) — the submit pipeline's `produced` signal, and [LADDER](LADDER.md) stage 5
+**Operator ruling, 2026-09-15** (`/decisions`): *decline it at the door* — Option A of the round-#1006 escalation. **This is the submit-layer half BY RULING**; the apply-time root is [#1007](https://github.com/dcodish/geo_builder/issues/1007) and stays open.
+
+**Measured before (`043c2db3`).** «משולש ABC» · «∠ABC = 90» · «AB ⟂ BC» → `produced: true`, committed silently. So do the mirror-operand spelling («BC ⟂ AB» after «AB ⟂ BC»). The row reads as new information the figure never gained.
+
+**Why two earlier attempts failed, and what this one does differently.** Round #1006 and overnight #1252 both followed the issue body's original prescription — NARROW the constraint-count arm — and both found that the count arm is not what fires. Re-measured at pickup here: `dofReduced` no longer fires (1 → 1) since [ADR-536](#adr-536) (#1264 ②) shipped, but `moved` still does — B moves 2.27 on a statement that adds nothing, because a redundant constraint is applied as an independent one and the solver re-solves around it. **Consulting `moved` or `grew` as guards is the mistake**, and the ruling says so in as many words: they are *consequences of the double-application*, not evidence about it. So the question is asked **ahead of** the `grew || dofReduced || scaleFixed || dataOnly || reveals` return, and they are never consulted. The thread's later note that this is "blocked on the `moved` arm" was reasoning about the narrowing approach the ruling had already superseded; nothing blocks the arm-ahead form, which is why it is built now.
+
+**The mechanism.** `impliedByPrior(facts, commands, seed)` beside `dryRunOutcome` in `src/replay/core.ts`: the trial adds constraints and nothing else — **are all of them already satisfied in the PRIOR figure, across its SAMPLED configurations?** Judged by `residual`/`residualTolerance` over `sharedSamples(facts)`, the M3 one-sampler pool, under the ADR-101 / ADR-256 discipline. *Satisfied here* is not entailed; *satisfied everywhere the figure can be* is — and **a single-seed test is wrong**, which is exactly what locks #156 and #883 prove.
+
+**FAILS OPEN, mandatory.** A thin sample pool (fewer than three configurations, unless the figure is `determined` — where one sample IS the complete admissible set, ADR-509), a constraint family with no scale-invariant residual (the order/bound family), a referenced point missing from a sample, a non-finite residual, any throw ⇒ NOT implied, applied normally. A missed note costs nothing; a dropped given is a P1 (the ADR-385 hazard).
+
+**`'implied'` is a NEW `StepOutcome.reason`, not a reuse of `'empty'`.** `'empty'` falls through to the new-label check and then to the **LLM escalation**, and a sentence the parser read perfectly must never cost a model call. Routed straight to `t('input.alreadyDrawn')`, logged as `result: 'implied-restatement'` so the class is countable.
+
+**Both commit seams, one function** (#782 / ADR-461 / ADR-W-006 — derive, don't duplicate). `editPipeline` runs the same predicate against the PREFIX facts, before `replaceGroup`, and refuses inline with the note; the edit seam never escalates (operator ruling 2026-08-25). A LOADED file is knowingly not covered — it has no door.
+
+**It composes with [#1011](https://github.com/dcodish/geo_builder/issues/1011), by construction.** The arm fires only when the step adds constraints and nothing else; a display-only command adds no constraint, so it never reaches this arm. That was the shape the 2026-09-15 chokepoint-collision note required, and it is why the predicate is residual-over-sampled-configurations rather than any kind of "nothing changed" test.
+
+**One of the plan's nine locks is NOT honoured, and the plan's own mechanism is why.** Lock 4 asked that the mirror order — «∠ABC = 90» after «AB ⟂ BC» — also be declined. Measured: that step adds the entailed constraint **and a measure LABEL**, a «90°» value the figure did not carry, because the ⟂ mark shows no number. Declining it would delete a magnitude the student stated from the canvas — the honesty invariant's cardinal sin — and the plan's own mechanism already excludes it (*"the step adds ONLY constraints"*). The mechanism was followed and the lock was not. The display question it raises is filed as [#1346](https://github.com/dcodish/geo_builder/issues/1346) (`needs-operator`), with the recommendation to leave it until #1007 lands, since the honest form falls out of #1007 nearly for free. **Both directions the operator actually reported are fixed.**
+
+**Measured after.** «AB ⟂ BC» after «∠ABC = 90» and «BC ⟂ AB» after «AB ⟂ BC» both answer `implied` ⇒ «כבר קיים», keep-prior, and the figure is not touched. An exact duplicate is still `empty` (its own path, unchanged). «AB ⟂ BC» on a bare triangle, «AB = AC», «BC = 5» after «AB = 5», «∠ACB = 40» after «∠ABC = 90» all still commit. **#156's driven parametric row and #883's first-magnitude row are byte-identical and green** — the two locks the plan named as the escalation trigger. 2-D lane: 416 files / 7207 tests green.
+
+**What is knowingly NOT covered.** The apply-time root (#1007): an implied constraint reaching the engine by any route the door does not guard — a loaded file — is still applied as an independent one, so the figure jumps and the DOF count over-counts there. The operator was shown this in the option itself and chose A with it on the table: the ruling is that **the typed path is the product surface that must be honest now**.
+
+**Sibling audit (docs/17 §1).** 3-D's `store3.submit` has the same shape and was not measured here; analytic's M1 boundary answers restatement by id (ADR-AG-146's neighbourhood). Noted, not built.
+
+**Consequences.** `replay/core.ts` (`impliedByPrior`, `IMPLIED_MIN_SAMPLES`, the `'implied'` reason, the arm ahead of the return); `app/submitPipeline.ts` (the route to the note); `app/editPipeline.ts` (the same predicate at the edit seam). Lock: `replay/__tests__/issue-999-implied-restatement.test.ts` (8). `dry-run.test.ts`, `issue-883.test.ts` and `edit-pipeline-782.test.ts` deliberately unchanged.
+
+## ADR-543 — A message about the FIGURE is derived from the facts: every fact mutation clears the figure-level notes, in one subscription (#1338)
+
+**Status:** accepted, 2026-09-21 · **Issue:** [#1338](https://github.com/dcodish/geo_builder/issues/1338) (bug, `P2`, `2d`) · round [#1345](https://github.com/dcodish/geo_builder/issues/1345) · operator, playing round #1332, not tied to one case
+**Requirements:** [02](02-requirements.md) FR-EN-8 (extended — a report is about the CURRENT figure) · **Design:** [04](04-design.md) — what is derived from `(facts, seed)` and what is submit-time UI state
+**Operator:** *"when there is an error message of any kind and user removes an input line (presses x), the shape gets recalculated correctly but the error message stays."*
+
+**Measured before (`56ceeb65`).** The banner is `figure.noValidConfig`, set at submit time by the view search's exhaustion callback (`App.tsx`, ADR-445). `inputNote` was cleared in exactly three places — the submit pipeline's start, a successful submit, and TYPING in the box. The row's ✕ calls the store's `remove`, which re-folds the facts and redraws, and **never touched the component**. So every message about the FIGURE — «לא נמצאה תצורה שמקיימת את כל הדרישות יחד», the LLM-dropped list, a rename note — outlived the line it was about: the drawing was right while the message still accused it.
+
+**The class.** *A message about the figure is stored as a message about the last submit.* The store's whole design is that the figure is DERIVED from `(facts, seed)` — positions are never stored, so undo cannot desync ([ADR-484](#adr-484)). The banner was the one thing that escaped that, because it lives in React state rather than in the fold.
+
+**The mechanism — one subscription on the FACTS, not a call in each handler.** Clearing the notes inside `remove` would be the patch shape: ✕, mute, undo, redo, ✎ and a file load are six doors and the seventh is not written yet — and the three existing clear sites are exactly the evidence that enumerating them does not hold. `app/figureNotes.ts` owns the rule (`clearFigureNotes`, `subscribeFigureNotes`) and `App.tsx` mounts it once: **the notes belong to a fact list, and a different fact list has no notes yet.** A mutation added later inherits it without knowing the file exists. Deliberately NOT on `seed`: cycling configurations keeps the same statements, so a note about them is still true.
+
+**Ordering is what makes it safe, and it was measured rather than assumed.** Every site that sets a note either commits nothing (the refusal paths; `setRenameNote` only fires in its `else` branches) or commits FIRST and sets the note after — `executeMany` then `setLlmDropped`; `resolveAfterCommit` then `onExhausted`. Zustand notifies synchronously, so the clear always lands before the note it must not erase.
+
+**Sibling audit (docs/17 §1) — 2-D ONLY, measured, and the reason is instructive.** The analytic store clears `error`/`notice` **inside `removeLine` itself**; 3-D's `remove` and `toggle` recompute `lastError` from `dependentsBroken`. Both keep the message in the STORE, where it is a function of the facts. 2-D kept it in the component, and that is the whole of the defect — the class does not reach the siblings because they never had the separation.
+
+**The lock, and why it has two halves.** `figure-notes-1338.test.ts` drives the REAL store through the REAL subscription — ✕, mute, undo and clear, plus the seed-only negative control (ADR-W-053: a test that re-implements the decision it guards stays green through the change that kills it). But all of that stays green if `App.tsx` stops calling it, so the WIRING is asserted separately by reading `App.tsx` for the call and its four sinks — #955's lesson, with the device `triage-mirror` and `lexicon-consumers` already use.
+
+**Measured after.** ✕ on the offending row clears the banner and the figure redraws; mute, undo and clear do the same; cycling the configuration does not. 2-D lane: 417 files / 7216 tests green.
+
+**Consequences.** `app/figureNotes.ts` (new); `App.tsx` (one effect). Lock: `app/__tests__/figure-notes-1338.test.ts` (9).
+
+## ADR-544 — A mark is sized by its CORNER, not by the figure: marks and values shrink to fit, never drop (#1337)
+
+**Status:** accepted, 2026-09-21 · **Issue:** [#1337](https://github.com/dcodish/geo_builder/issues/1337) (bug, `P3`, `2d`) · round [#1345](https://github.com/dcodish/geo_builder/issues/1345) · operator, playing round #1332 T21
+**Requirements:** [02](02-requirements.md) FR-RN — the value-label promise (everything stated is visible), no new row · **Design:** [04](04-design.md) — the render's mark sizing
+**Operator ruling:** *"while this is a rare case, the diagram is bad. I would say that in such a case we show all values very small to fit diagram"*
+
+**Measured before (`bc55676d`)** on «משולש ABC» · «∠ABC = 90» · «∠ACB = 89» — the legitimate 1° apex:
+
+```
+  corner room (B, C)   10.2 px       arc radius drawn   26.0 px      ✘ the mark is wider than its corner
+  an ordinary 60°      553.9 px      arc radius drawn   26.0 px      ✔
+```
+
+B and C sit ten pixels apart and each mark was drawn at 26 px, so the 90° square, the 89° arc and both numbers piled on top of each other and on the segment.
+
+**The class.** *A mark's size is a global constant, so a corner smaller than the mark cannot show it.* The arc radius was `ANGLE_ARC_R * r`, the right-angle square `4 * r`, and the value offset `angleValueOffset(r, fontSize)` — all functions of the FIGURE-WIDE unit `r` and none of the local geometry. Members: two angle marks at vertices closer than 2·arc radius; a value label longer than the side it labels; a right-angle square larger than its corner.
+
+**The figure itself is right** — 89° + 90° is a real triangle, and [ADR-513](#adr-513) measured it above the notice band. This is display only, and nothing about what is DRAWN changes.
+
+**The mechanism.** `markScale(roomPx, r)` in `scene.ts`, pure and beside the constants it scales: a corner's marks are drawn at `min(1, MARK_FIT_FRACTION · room / (ANGLE_ARC_R · r))`, where `room` is the shortest adjacent side in screen px. The arc, the right-angle square and the value's offset all take the same ratio, so a corner's marks shrink together rather than three constants being tuned apart again. `SceneMeasure` carries `ends` — the mark's own adjacent points in world coordinates — so the label and the mark measure the same room and cannot disagree; the renderer converts through the transform it already draws with.
+
+**Shrink, never drop.** A stated value is always visible (the honesty invariant), so `markScale` returns a ratio with a floor and never zero, and the value's font has its own floor at `MIN_MEASURE_FONT_PX` = 8 px — the operator asked for values shown *very small*, not omitted.
+
+**The floor is deliberately TINY (0.05), and that is the part worth recording.** A comfortable floor fights the fit: with `MARK_FIT_FRACTION = 0.35`, two marks at the ends of ONE side occupy at most `0.7 · room` and **therefore cannot touch** — that is a structural guarantee, not a tuning. A floor large enough to keep marks comfortably visible would break it on exactly the smallest corners, where it matters. The first build used 0.18 and the two arcs cleared each other by 0.8 px, which is luck rather than a property. The TEXT floor is what keeps a value readable, and it is separate.
+
+**Measured after.** The needle's corner scales to 0.137: each arc is 3.6 px and the two together are 7.2 px inside a 10.2 px side — they cannot touch, and both numbers still print at 8 px. An ordinary triangle scales to exactly 1 and draws at 26 px, unchanged. 2-D lane: 418 files / 7225 tests green.
+
+**Sibling audit (docs/17 §1).** 3-D's marks are drawn in a projected frame with their own sizing; analytic marks angles only at stated right angles. Neither measured here; the class is the same shape and is noted for whichever is reported first.
+
+**Consequences.** `render/scene.ts` (`markScale`, `labelScale`, `MARK_FIT_FRACTION`, `MIN_MARK_SCALE`, `MIN_MEASURE_FONT_PX`, `SceneMeasure.ends`); `render/Figure.tsx` (the measure-label branch and the angle-mark branch both take the ratio). Lock: `render/__tests__/issue-1337-mark-fit.test.ts` (9), whose centre is the *"the two marks cannot touch"* property over the operator's own figure.

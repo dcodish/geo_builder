@@ -89,6 +89,17 @@ export interface SceneMeasure {
   /** Unit direction (y-up) to offset the text along — outward for a length, into the angle for an angle, none for area. */
   dir: Vec;
   text: string;
+  /**
+   * THE ROOM THIS MARK HAS, in WORLD units (#1337).
+   *
+   * For an angle: the world positions of its two ray points, so the renderer can measure the shortest
+   * adjacent side in the same screen space it draws the arc in. For a length: the segment's own
+   * endpoints. Absent for an area, which has no corner to overflow.
+   *
+   * Carried rather than re-derived, so the label and the mark cannot disagree about how much room the
+   * corner has — they are two halves of one decision.
+   */
+  ends?: readonly [Vec, Vec];
 }
 
 /** The figure context the parser/store provides for measure labels. */
@@ -452,7 +463,7 @@ export function buildScene(
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
       let perp = unit(rot90(sub(b, a)));
       if ((mid.x - cen.x) * perp.x + (mid.y - cen.y) * perp.y < 0) perp = { x: -perp.x, y: -perp.y }; // outward
-      measures.push({ kind: 'length', pos: mid, dir: perp, text: L.text });
+      measures.push({ kind: 'length', pos: mid, dir: perp, text: L.text, ends: [a, b] });
     }
     for (const A of labels.angles) {
       const v = positions.get(A.vertex);
@@ -463,7 +474,7 @@ export function buildScene(
       const d2 = unit(sub(r2, v));
       let bis = { x: d1.x + d2.x, y: d1.y + d2.y };
       bis = len(bis) < 1e-9 ? rot90(d1) : unit(bis); // a straight angle → perpendicular
-      measures.push({ kind: 'angle', pos: v, dir: bis, text: A.text });
+      measures.push({ kind: 'angle', pos: v, dir: bis, text: A.text, ends: [r1, r2] });
     }
     // An area label sits at the polygon's centroid (ADR-118) — no offset direction.
     for (const Ar of labels.areas ?? []) {
@@ -872,4 +883,62 @@ export const ANGLE_ARC_R = 6.5;
  */
 export function angleValueOffset(r: number, fontSize: number): number {
   return ANGLE_ARC_R * r + fontSize * 0.6;
+}
+
+/**
+ * A MARK IS SIZED BY ITS CORNER, NOT BY THE FIGURE (#1337, [ADR-544](../../docs/06-decisions.md#adr-544)).
+ *
+ * **Operator, playing round #1332 T21** («משולש ABC» · «∠ABC = 90» · «∠ACB = 89», the legitimate 1°
+ * apex): *"while this is a rare case, the diagram is bad. I would say that in such a case we show all
+ * values very small to fit diagram"*.
+ *
+ * The arc radius was `ANGLE_ARC_R * r`, the right-angle square `4 * r` and the value offset
+ * `angleValueOffset(r, fontSize)` — all functions of the figure-wide unit `r` and none of the LOCAL
+ * geometry. On a needle whose short side is ~5 px, marks sized for a ~60 px corner cannot fit, so the
+ * two marks and both numbers piled on top of each other and on the segment. The figure itself is right
+ * — 89° + 90° is a real triangle (ADR-513 measured it) — so this is display only.
+ *
+ * **The class:** *a mark's size is a global constant, so a corner smaller than the mark cannot show it.*
+ * Members: two angle marks at vertices closer than 2·arc radius; a value label longer than the side it
+ * labels; a right-angle square larger than its corner.
+ *
+ * The ruling is SHRINK, never drop: everything the student stated stays visible (the honesty
+ * invariant), so this returns a ratio with a floor and never zero.
+ */
+export const MARK_FIT_FRACTION = 0.35;
+/**
+ * A mark never shrinks past this — but the floor is deliberately TINY, because it must not fight the
+ * fit. With `MARK_FIT_FRACTION = 0.35`, two marks at the ends of one side occupy `0.7 · room` and
+ * therefore cannot touch; a floor big enough to be comfortable would break exactly that guarantee on
+ * the smallest corners, which is where it matters. The TEXT has its own floor (`MIN_MEASURE_FONT_PX`)
+ * and that is the one that keeps a value readable — the operator asked for values shown very small, not
+ * for marks that stay big.
+ */
+export const MIN_MARK_SCALE = 0.05;
+/** …and a value never prints smaller than this many px, whatever the ratio says. */
+export const MIN_MEASURE_FONT_PX = 8;
+
+/**
+ * The ratio to draw a corner's marks and value at: 1 when the corner has room, less when it does not.
+ *
+ * `roomPx` is the shortest adjacent side in screen px; `r` the figure-wide unit. Pure, so the lock
+ * calls it rather than reproducing the arithmetic ([ADR-W-053](../../docs/06w-decisions-workspace.md)).
+ */
+export function markScale(roomPx: number, r: number): number {
+  const full = ANGLE_ARC_R * r;
+  if (!Number.isFinite(roomPx) || roomPx <= 0 || full <= 0) return 1;
+  return Math.min(1, Math.max(MARK_FIT_FRACTION * roomPx / full, MIN_MARK_SCALE));
+}
+
+/**
+ * The same question for a LENGTH label: does the number fit along the side it labels?
+ *
+ * The width is estimated from the glyph count — the renderer lays a measure out as SVG and has no
+ * metrics to ask, and an estimate is the honest instrument here: it only has to decide whether a
+ * number is wildly wider than its side, which is the reported failure.
+ */
+export function labelScale(sidePx: number, text: string, fontSize: number): number {
+  const width = Math.max(1, text.length) * fontSize * 0.6;
+  if (!Number.isFinite(sidePx) || sidePx <= 0 || width <= 0) return 1;
+  return Math.min(1, Math.max(sidePx / width, MIN_MARK_SCALE));
 }
