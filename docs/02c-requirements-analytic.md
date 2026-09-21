@@ -1094,8 +1094,12 @@ corpus — 13 of 20 — and the exam prints no figure for it (P1).
 
 **It is asked, not stated.** The student describes the point with ordinary givens, leaving it free:
 «נקודה P» and «PA מאונך ל-PB» is a P with one degree of freedom left, and the DOF cue already says so
-(R18, P4). Then the ask lane is asked — «המקום הגיאומטרי של P» — and the answer is a row plus a
-drawing, under R86's lifetimes: clicking the entry again clears the drawing and keeps the row, ✕
+(R18, P4). Then the ask lane is asked — «המקום הגיאומטרי של P», or in the exam's own words
+«משוואת המקום הגיאומטרי של P», or with the opener a student writes («מצא את», «מהו», «find», «what
+is»; [#1301](https://github.com/dcodish/geo_builder/issues/1301),
+[ADR-AG-141](06c-decisions-analytic.md#adr-ag-141)) — every spelling one question with one answer, and
+never a question repeated back as the name of a curve the student forgot to draw — and the answer is a
+row plus a drawing, under R86's lifetimes: clicking the entry again clears the drawing and keeps the row, ✕
 discards both. **There is no locus sentence to learn**; the set-former phrasing is sugar over the same
 figure, and a locus that needs a quantifier over *objects* rather than points («מרכזי המעגלים
 שהקטע AB הוא מיתר שלהם») is refused by name rather than approximated (R-refusal, §9).
