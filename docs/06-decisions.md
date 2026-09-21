@@ -12751,3 +12751,19 @@ There is no triangle in those givens — both base angles right, the apex 0°, s
 **Measured after.** Every wordy spelling in the table produces the same commands as its bare twin (a parity assertion, never a hand-written expectation); «אורך הקטע BC = 10» still produces the EQUALITY; #1248's class table unchanged (no non-copula connective yields `set-distance`); the bound constrains — «אורך הקטע BC גדול מ-10» then «BC = 4» is refused, and «אורך הקטע BC לפחות 10» then «BC = 10» builds.
 
 **Consequences.** `parser/parse.ts` (`CMP_AT_LEAST`/`CMP_AT_MOST`, `COMPARES_WITH_NUMBER`, the `measureBound` non-strict branch, `LENGTH_NOUN`, `LENGTH_RELATION`, `normalizeVerboseLength`). `parser/__tests__/issue-1249-wordy-bound.test.ts`. `docs/02` FR-BND-1; `docs/04` the verbose frame.
+
+## ADR-540 — The bisector rule READS its triangle operand: «CE חוצה זווית C במשולש ABC» names ∠BCA, not three letters to be mistaken for an angle (#1285)
+
+**Status:** accepted, 2026-09-21 · **Issue:** #1285 (bug, P2, `2d`) · operator, 2026-09-20: *"analytical tool doesnt support `CE חוצה זווית C במשולש ABC`"* — the same sentence failed in 2-D · round #1332
+**Requirements:** none (internal — the catalog row is the promise, and it gains the triangle spelling) · **Design:** [04](04-design.md) — the rule contract bullet on the cevian readers
+**The #1267 class, one operand over** ([ADR-528](#adr-528))
+
+**Measured before (71fc71ad, re-measured at pickup; as filed).** On «משולש ABC»: «CE חוצה זווית C במשולש ABC» → not-handled; «CD חוצה זווית במשולש ABC» → not-handled; «CE חוצה זווית C» → builds (bisector, line-through, line-intersection, segment); «CE תיכון במשולש ABC» → builds. Adding «במשולש ABC» — a true statement about the figure — turned a working sentence into a refusal, and the registry comment asserted the bracketed form as supported.
+
+**Root cause.** `bisectorPlacesPoint` stripped the keywords and hunted a three-letter run in what was left; for «… זווית C במשולש ABC» the run it found was the TRIANGLE's name — `tri = [A, B, C]`, vertex B, neither the apex nor the foot — and the rule fell off its end. The stated vertex, the lone «C», was discarded because the only reader of the remainder wanted three letters. #1267 fixed the identical defect for a SIDE read as half an angle.
+
+**The mechanism.** `statedTriangle` («במשולש ABC», "in triangle ABC"), one reader beside `statedSide`: read before the hunt and removed from it. And the triangle is not tolerated, it is USED: apex C in ring ABC is ∠BCA — determined by the sentence alone, ADR-AG-117's argument for the analytic cevian — so `tri` is built from the ring's neighbours and the figure is never consulted. That is a strict widening: the triangle form answers on a figure where the bare form must ask `ambiguous-angle` (a vertex with more than two edges). A lone vertex letter after the strip must be the segment's first letter — the bisector runs FROM it — else `bisector-wrong-apex`, refused quoting both letters through the `Clarify` channel, never silently redirected (the #1267 shape); an apex not in the stated ring is refused the same way. The registry comment is corrected. The catalog gains the triangle spelling.
+
+**Measured after.** «CE חוצה זווית C במשולש ABC», «CD חוצה זווית במשולש ABC», "CE bisects angle C in triangle ABC" build the figure «CE חוצה זווית C» builds (E on AB, ∠ACE = ∠ECB); on a figure where C has three edges the triangle form builds and the bare form still asks; «CE חוצה זווית A במשולש ABC» is refused naming C and A; #1267's own rows unchanged.
+
+**Consequences.** `parser/parse.ts` (`statedTriangle`, the rule, `Clarify`/`ParseFail`/`refusalOf`, the registry comment); `app/submitPipeline.ts`; `i18n/locales/he,en` (`input.bisectorWrongApex`); `parser/catalog.ts`. `parser/__tests__/issue-1285-bisector-triangle.test.ts`; scenario `bisector-reads-the-triangle-operand-1285` (corpus 4). `docs/04` the rule contract.

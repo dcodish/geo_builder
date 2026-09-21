@@ -337,6 +337,13 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     ui.setBusy(false);
     return;
   }
+  // #1285: the same channel — the angle's stated vertex is not the bisector's own first letter.
+  if (!r.ok && r.reason === 'bisector-wrong-apex') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `bisector-wrong-apex:${r.apex}:${r.stated}` });
+    ui.setInputNote(t('input.bisectorWrongApex', { apex: r.apex, stated: r.stated }));
+    ui.setBusy(false);
+    return;
+  }
   /**
    * #1274 (operator ruling, ADR-W-066): «D = חיתוך AB ו-BC» — AB and BC meet at B and nowhere else, so
    * the letter the student asked for would be a second name for a point the figure already has. The

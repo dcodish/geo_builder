@@ -340,6 +340,20 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-on-line",
     ],
   },
+  "CE bisects angle C in triangle ABC": {
+    "en": [
+      "bisector",
+      "line-through",
+      "line-intersection",
+      "segment",
+    ],
+    "he": [
+      "bisector",
+      "line-through",
+      "line-intersection",
+      "segment",
+    ],
+  },
   "D on AB at a distance of 3 from A": {
     "en": [
       "segment",
