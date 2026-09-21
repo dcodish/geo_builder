@@ -39,9 +39,6 @@
   "panel angle DAB = 90.00",
   "panel angle DBA = 30.00"
  ],
- "sc:arc-ratio-and-implicit-tangent-q4": [
-  "canvas ∠ABE = 90.00"
- ],
  "sc:area-absolute-sets-scale-not-shape": [
   "canvas |AB| = 5.48",
   "canvas |AC| = 5.48",
@@ -89,29 +86,6 @@
   "panel angle BCD = 90.00",
   "panel angle CDA = 90.00",
   "panel angle DAB = 90.00"
- ],
- "sc:extension-cuts-bare-segment-keeps-on-segment-default": [
-  "canvas ∠ACB = 90.00",
-  "canvas ∠ACF = 45.00",
-  "canvas ∠AFE = 90.00",
-  "canvas ∠AFG = 45.00",
-  "canvas ∠AFH = 135.00",
-  "canvas ∠BCF = 45.00",
-  "canvas ∠BFE = 90.00",
-  "canvas ∠BFG = 135.00",
-  "canvas ∠BFH = 45.00",
-  "canvas ∠EFG = 45.00",
-  "canvas ∠EFH = 45.00",
-  "canvas ∠EOG = 90.00",
-  "canvas ∠EOH = 90.00",
-  "canvas ∠FGH = 45.00",
-  "canvas ∠FHG = 45.00",
-  "canvas ∠FOG = 90.00",
-  "canvas ∠FOH = 90.00",
-  "canvas ∠GFH = 90.00",
-  "panel angle BCA = 90.00",
-  "panel angle GCH = 90.00",
-  "panel angle HFG = 90.00"
  ],
  "sc:line-through-both-centres-avoids-tangency-point": [
   "canvas |AB| = 24.00",

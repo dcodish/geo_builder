@@ -282,6 +282,33 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
 }
 
 /**
+ * The constraint as a VECTOR of scalar equations — the rows it contributes to the figure's constraint
+ * system, for the rank the DOF accountant measures (#1264, `dofRank.ts`). `residual` folds every
+ * constraint into ONE scalar for the solvers, and for two kinds that scalar hides the equation count or
+ * its gradient: a `coincide` is two equations (x and y) whose scalar distance is not differentiable at
+ * the very point it holds, and a `concyclic` of n points is n−3 equations summed into one. An order /
+ * bound constraint is a region, not an equation — no rows (ADR-039). Everything else is its residual.
+ */
+export function residualRows(con: Constraint, get: (id: Id) => Vec): number[] {
+  if (isOrderConstraint(con)) return [];
+  switch (con.type) {
+    case 'coincide': {
+      const p = get(con.p);
+      const q = get(con.q);
+      return [p.x - q.x, p.y - q.y];
+    }
+    case 'concyclic': {
+      const pts = con.points.map(get);
+      const c = concyclicCircle(pts);
+      if (!c) return con.points.length < 4 ? [] : [NaN];
+      return pts.slice(3).map((p) => dist(c.o, p) - c.r);
+    }
+    default:
+      return [residual(con, get)];
+  }
+}
+
+/**
  * Tolerance for "is this constraint satisfied?" — degrees for angle, units for length, sin/cos for ∥/⟂.
  * For the LENGTH-unit constraints (distance/equal/ratio) the tolerance is **relative to the figure
  * scale** (`scale` = the figure's extent): a fixed 1e-6 is ~7 significant digits on a figure of size

@@ -84,6 +84,14 @@ M4 pre-scans (soft-equal / right-angle reseat / trapezoid rotate / centre promot
 
 `firstSatisfyingSeed` (strict → relaxed extension bar → converged fallback, reflection-mask tiers in seed high bits) · `meetsRequirements` · `findValidConfig` (bounded branch combinatorics) · `searchResample` (shape-fingerprint difference). Budgets: worker 12 s (`WORKER_SEARCH_BUDGET_MS`), main-thread sync fallback 2.5 s, tests ∞. A budget-aborted fold is never cached.
 
+## The DOF accountant (`freeDofCount`, src/engine/sample.ts) — read at 2d′/the submit gate and by every knowledge gate
+
+Not a stage the ladder climbs, but the one number every stage's consumers read: `dryRunOutcome`'s `dofReduced` arm (the #156 guard), the «הכל נקבע» cue, the determined-figure fast path of the shared sample core, and the values-panel / relations knowledge gates. Its contract, since [ADR-536](06-decisions.md#adr-536) (#1264):
+
+**shape DOF = raw movable DOF − rank(J) − free similarity gauge**, where **J** is the numeric Jacobian of every enforced constraint's residual rows (`residualRows`: a `coincide` is two rows, a `concyclic` of n points n−3, an order/bound constraint none) over every raw-movable parameter (`carrierParams`), taken at the SOLVED configuration — `resolveDrivenMemo`'s baked construction, i.e. the drawn figure. A row the others imply («AB ⟂ BC» after «∠ABC = 90», swapped operands, a right angle a square already has, a collinear the dependency graph guarantees) adds no rank and removes nothing. The enforced set is the checked list plus every `solve` directive's primary constraint AND its `also` obligations.
+
+**Fails open toward MORE freedom:** a row whose gradient cannot be established (an unplaced operand, a collapsed ray) is counted as one per-row removal exactly as before, and a configuration that does not evaluate keeps the whole per-row tally. Over-counting freedom withholds a print; under-counting it asserts one — the honesty asymmetry every knowledge gate already follows. Memoised per construction identity (the `evaluate` idiom); cost 2·(movable parameters) `evaluateCore` sweeps with no solving.
+
 ## As-found asymmetries — RESOLVED by S1.1 (one `runFailureLadder`, 2026-07-24)
 
 | # | Asymmetry | Resolution |

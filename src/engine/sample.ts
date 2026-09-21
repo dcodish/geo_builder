@@ -21,6 +21,7 @@ import { isGeoPoint, isOrderConstraint } from './types';
 import { carrierOf, isShapeCarrier } from './carriers';
 import { constraintRefs } from './solve';
 import { evaluate } from './evaluate';
+import { constraintRank } from './dofRank';
 
 /**
  * An ORDER/REGION constraint ('angle-order' / 'length-order' / 'collinear-order' / 'angle-acuteness')
@@ -653,89 +654,6 @@ function dofRemoved(con: Constraint, byId?: Map<Id, Construction['objects'][numb
   return 1;
 }
 
-/**
- * #432 ([ADR-424](docs/06-decisions.md#adr-424)): a `collinear` constraint whose residual is IDENTICALLY
- * satisfied by the dependency graph removes NO degree of freedom. The member that bit: «ישר ADE» typed
- * after a secant — E is *defined* as the line∩circle crossing on the line through A and D, so the
- * lowered `collinear` is true at every configuration of every figure, yet `dofRemoved` counted it as
- * removing 1. Two such statements pushed the count below zero (clamped to 0) on a figure with one
- * genuine shape DOF left (the angle between the secants), which starved the shared sample pool to a
- * single drawing and defeated every knowledge gate downstream: the values panel printed one seed's
- * CD/a as if forced, and the cue read "✓ fully determined".
- *
- * The test is CONSERVATIVE and purely structural — a sufficient condition, never a numeric probe: every
- * referenced point (resolved through `coincide` identification — a free point pinned onto a line-riding
- * helper, e.g. the secant's `coincide(B, ~B)`) must provably ride ONE construction line. A false
- * negative just keeps today's count for that constraint. Returns a predicate so `freeDofCount` builds
- * the carrier index once per call.
- */
-function vacuousCollinearPredicate(c: Construction, cons: Set<Constraint>): (con: Constraint) => boolean {
-  // union-find over coincide-identified points: a merged pair shares its line carriers.
-  const parent = new Map<Id, Id>();
-  const find = (x: Id): Id => {
-    const p = parent.get(x);
-    if (p === undefined || p === x) return x;
-    const r = find(p);
-    parent.set(x, r);
-    return r;
-  };
-  for (const k of cons) {
-    if (k.type !== 'coincide') continue;
-    const a = find(k.p), b = find(k.q);
-    if (a !== b) parent.set(a, b);
-  }
-  // line-carrier keys per coincide-class root: `L:<lineId>` (a Line object) / `P:<a>|<b>` (the line
-  // through a point pair). A point gets a key when its DEFINITION puts it on that line.
-  const classKeys = new Map<Id, Set<string>>();
-  const add = (id: Id, key: string) => {
-    const root = find(id);
-    let s = classKeys.get(root);
-    if (!s) classKeys.set(root, (s = new Set()));
-    s.add(key);
-  };
-  const pairKey = (a: Id, b: Id) => (a < b ? `P:${a}|${b}` : `P:${b}|${a}`);
-  const centerOf = new Map<Id, Id>();
-  for (const o of c.objects) if (o.kind === 'circle') centerOf.set(o.id, o.center);
-  for (const o of c.objects) {
-    switch (o.kind) {
-      case 'line': {
-        const s = o.spec;
-        if (s.via === 'through') { add(s.a, `L:${o.id}`); add(s.b, `L:${o.id}`); }
-        else if (s.via === 'bisector') add(s.vertex, `L:${o.id}`);
-        else if (s.via === 'tangent') add(s.at, `L:${o.id}`);
-        else add(s.through, `L:${o.id}`);
-        break;
-      }
-      case 'on-line': add(o.id, `L:${o.line}`); break;
-      case 'line-circle': add(o.id, `L:${o.line}`); break;
-      case 'line-intersection': { add(o.id, `L:${o.line1}`); add(o.id, `L:${o.line2}`); break; }
-      case 'on-segment': case 'on-segment-solved': case 'midpoint': add(o.id, pairKey(o.a, o.b)); break;
-      case 'foot': add(o.id, pairKey(o.a, o.b)); break; // on the (infinite) line a→b
-      case 'line-line-intersection': { add(o.id, pairKey(o.a, o.b)); add(o.id, pairKey(o.c, o.d)); break; }
-      case 'antipode': { const ctr = centerOf.get(o.circle); if (ctr) add(o.id, pairKey(ctr, o.of)); break; }
-      case 'radial-toward': { const ctr = centerOf.get(o.circle); if (ctr) add(o.id, pairKey(ctr, o.toward)); break; }
-      default: break;
-    }
-  }
-  // A pair line contains its own endpoints; an `L:` line contains only points keyed onto it.
-  const onKey = (root: Id, key: string): boolean => {
-    if (classKeys.get(root)?.has(key)) return true;
-    if (key.startsWith('P:')) {
-      const [x, y] = key.slice(2).split('|');
-      return find(x) === root || find(y) === root;
-    }
-    return false;
-  };
-  return (con: Constraint): boolean => {
-    if (con.type !== 'collinear') return false;
-    const roots = [con.a, con.b, con.c].map(find);
-    if (new Set(roots).size < 3) return true; // two operands are the SAME point — nothing to remove
-    const candidates = new Set<string>();
-    for (const r of roots) for (const k of classKeys.get(r) ?? []) candidates.add(k);
-    for (const key of candidates) if (roots.every((r) => onKey(r, key))) return true;
-    return false;
-  };
-}
 
 /**
  * The dimension of the SIMILARITY gauge that is still FREE in the figure — the placement/rotation/scale
@@ -794,35 +712,59 @@ export function scalePinned(c: Construction, cons: Set<Constraint> = allConstrai
   );
 }
 
-/** Every constraint the figure enforces: the checked list PLUS the driven ones living on `solve`. */
+/** Every constraint the figure enforces: the checked list PLUS the driven ones living on `solve` — the
+ *  primary directive AND its co-driven `also` obligations (ADR-229), which the solvers fold into their cost
+ *  exactly like the primary and which the count therefore owes as well. */
 function allConstraints(c: Construction): Set<Constraint> {
   const cons = new Set<Constraint>(c.constraints);
   for (const o of c.objects) {
-    const sv = (o as { solve?: { constraint: Constraint } }).solve;
+    const sv = (o as { solve?: SolveDirective }).solve;
     if (sv?.constraint) cons.add(sv.constraint);
+    for (const k of sv?.also ?? []) cons.add(k);
   }
   return cons;
 }
 
 /**
- * The figure's remaining SHAPE degrees of freedom = (raw movable DOF) − (DOF the constraints remove) −
- * (the free similarity gauge). Counting the SHAPE freedom (modulo place/rotate/scale) means a figure
- * that is rigid up to similarity reads 0 — so "✓ fully determined" fires when the SHAPE is pinned down,
- * not only when points carry absolute coordinates (ADR-101, refining ADR-018 Stage 3). The raw count is
- * honest: one scalar constraint (e.g. `CD ⟂ AB`) removes ONE DOF even though the joint solver marks
- * several referenced vertices with `solve` — a `solve`-marked free point is NOT determined, it just
+ * The figure's remaining SHAPE degrees of freedom = (raw movable DOF) − (the RANK of the constraint
+ * system) − (the free similarity gauge). Counting the SHAPE freedom (modulo place/rotate/scale) means a
+ * figure that is rigid up to similarity reads 0 — so "✓ fully determined" fires when the SHAPE is pinned
+ * down, not only when points carry absolute coordinates (ADR-101, refining ADR-018 Stage 3). The raw
+ * count is honest: one scalar constraint (e.g. `CD ⟂ AB`) removes ONE DOF even though the joint solver
+ * marks several referenced vertices with `solve` — a `solve`-marked free point is NOT determined, it just
  * participates in the solve. Constraints are gathered from BOTH the checked list and the `solve`
  * directives (a driven constraint lives only in `solve`), deduped by identity.
+ *
+ * #1264 ([ADR-536](docs/06-decisions.md#adr-536)): what a constraint removes is its contribution to the
+ * system's RANK at the solved configuration (`constraintRank`), not a per-row tally. A row the existing
+ * rows already imply — «AB ⟂ BC» after «∠ABC = 90», the same relation with its operands swapped, a right
+ * angle a square already has, a collinear the dependency graph guarantees (the ADR-424 member, now a
+ * case of this rather than a structural special case) — removes nothing, because the figure lost nothing.
+ * A row whose gradient cannot be established is counted as it always was (`dofRemoved`), and a
+ * configuration that does not evaluate keeps the whole per-row count: the accountant fails OPEN toward
+ * reporting MORE freedom, never less. Memoised per construction identity (the `evaluate` idiom) — the
+ * rank costs 2·(movable parameters) `evaluateCore` calls and every consumer asks about the same figure.
  */
+const dofMemo = new WeakMap<Construction, number>();
 export function freeDofCount(c: Construction): number {
+  const hit = dofMemo.get(c);
+  if (hit !== undefined) return hit;
+  const n = freeDofCountUncached(c);
+  dofMemo.set(c, n);
+  return n;
+}
+function freeDofCountUncached(c: Construction): number {
   const raw = c.objects.reduce((n, o) => n + rawMovableDof(o), 0);
   const cons = allConstraints(c);
   const byId = new Map(c.objects.map((o) => [o.id, o] as const));
-  const vacuous = vacuousCollinearPredicate(c, cons);
+  const movable = c.objects.filter((o) => rawMovableDof(o) > 0).map((o) => o.id);
+  const ranked = constraintRank(c, movable, [...cons]);
   let removed = 0;
-  // #432: a structurally-implied collinear is identically satisfied — it removes nothing. (Deliberately
-  // NOT applied to `isOverRecruited`'s dofRemoved call — that site decides perturbation policy, and its
-  // behaviour is locked by the existing sampling expectations; this site decides the COUNT.)
-  for (const con of cons) removed += vacuous(con) ? 0 : dofRemoved(con, byId);
+  if (ranked) {
+    removed = ranked.consumed;
+    for (const con of ranked.unranked) removed += dofRemoved(con, byId);
+  } else {
+    for (const con of cons) removed += dofRemoved(con, byId);
+  }
   return Math.max(0, raw - removed - similarityGauge(c, cons));
 }

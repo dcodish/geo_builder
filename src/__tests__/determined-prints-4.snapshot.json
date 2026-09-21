@@ -43,38 +43,10 @@
  ],
  "fx:issue-572-load-collapse.geo.json": [],
  "sc:arc-midpoint-takes-the-drawn-arc": [],
- "sc:bagrut-gchf-cyclic-tangent-parallel": [
-  "canvas ∠ACB = 90.00",
-  "canvas ∠AFE = 90.00",
-  "canvas ∠AFG = 45.00",
-  "canvas ∠AFH = 135.00",
-  "canvas ∠BFE = 90.00",
-  "canvas ∠BFG = 135.00",
-  "canvas ∠BFH = 45.00",
-  "canvas ∠EFG = 45.00",
-  "canvas ∠EFH = 45.00",
-  "canvas ∠EOG = 90.00",
-  "canvas ∠EOH = 90.00",
-  "canvas ∠FGH = 45.00",
-  "canvas ∠FHG = 45.00",
-  "canvas ∠FOG = 90.00",
-  "canvas ∠FOH = 90.00",
-  "canvas ∠GFH = 90.00",
-  "panel angle BCA = 90.00",
-  "panel angle GCH = 90.00",
-  "panel angle HFG = 90.00"
- ],
  "sc:central-angle-valueless-and-valued": [
   "canvas ∠COD = 80.00",
   "panel angle COD = 80.00"
  ],
- "sc:chained-value-marks-every-member": [
-  "canvas |AB| = 8.00",
-  "canvas |BC| = 8.00",
-  "panel length AB = 8.00",
-  "panel length BC = 8.00"
- ],
- "sc:corner-tangent-on-existing-circle": [],
  "sc:cut-form-intersection-on-extensions": [
   "canvas |AB| = 3.00",
   "canvas |AC| = 1.00",
@@ -100,34 +72,7 @@
   "panel angle BCA = 60.00",
   "panel angle CAB = 60.00"
  ],
- "sc:inscribe-square-in-right-triangle": [
-  "canvas ∠BAC = 90.00",
-  "canvas ∠BDG = 90.00",
-  "canvas ∠BEF = 90.00",
-  "canvas ∠CDG = 90.00",
-  "canvas ∠CEF = 90.00",
-  "canvas ∠DGF = 90.00",
-  "canvas ∠EFG = 90.00",
-  "panel angle CAB = 90.00",
-  "panel angle DEF = 90.00",
-  "panel angle EFG = 90.00",
-  "panel angle FGD = 90.00",
-  "panel angle GDE = 90.00"
- ],
  "sc:midpoint-creates-its-endpoints": [],
- "sc:right-triangle-explicit-angle-reseats-right-vertex": [
-  "canvas ∠ABC = 90.00",
-  "panel angle CBA = 90.00"
- ],
- "sc:sqrt-times-free-radius": [
-  "canvas ∠ADO = 90.00",
-  "panel area O = 567.21",
-  "panel length AB = 18.57",
-  "panel length BO = 13.13",
-  "panel length DO = 13.13",
-  "panel perimeter O = 82.51",
-  "panel radius O = 13.13"
- ],
  "sc:square-both-diagonals-no-phantom-kites": [
   "canvas ∠ABC = 90.00",
   "canvas ∠ABD = 45.00",
@@ -175,28 +120,6 @@
   "panel length BC = 4.00",
   "panel length CD = 4.00",
   "panel perimeter ABCD = 16.00"
- ],
- "sc:stated-betweenness-adb-holds-through-the-llm-lane": [
-  "panel area O1 = 28.27",
-  "panel area O2 = 254.47",
-  "panel perimeter O1 = 18.85",
-  "panel perimeter O2 = 56.55",
-  "panel radius O1 = 3.00",
-  "panel radius O2 = 9.00"
- ],
- "sc:tangent-circle-size-given-drives-radius-not-centre": [
-  "canvas |MO1| = 9.00",
-  "canvas |MO2| = 16.00",
-  "canvas ∠NMO1 = 90.00",
-  "canvas ∠NMO2 = 90.00",
-  "panel area O1 = 254.47",
-  "panel area O2 = 804.25",
-  "panel length MO1 = 9.00",
-  "panel length MO2 = 16.00",
-  "panel perimeter O1 = 56.55",
-  "panel perimeter O2 = 100.53",
-  "panel radius O1 = 9.00",
-  "panel radius O2 = 16.00"
  ],
  "sc:two-tangent-circles-sizes-bind-touch-named-centre-line-builds": [
   "canvas |AC| = 24.00",

@@ -29,12 +29,18 @@ const panelRows = (facts: Fact[], kind: string) =>
 describe('#434 — the count lies, the admissible set does not (the seed axis)', () => {
   const isosceles = ['AB=BC=8'];
 
-  it('«AB=BC=8» alone prints NO ∠ABC — the count says 0 while the figure still moves with the seed', () => {
+  it('«AB=BC=8» alone prints NO ∠ABC — and since #1264 the count no longer lies about it either', () => {
     const facts = factsOf(isosceles);
-    expect(freeDofCount(replay(facts, 0).construction), 'the count that lies').toBe(0);
+    // When this lock was written the count read 0 here — «AB=BC=8» lowers to an `equal` PLUS two
+    // distances, and the equal is implied by the distances, so the per-row tally over-subtracted (the
+    // ADR-424 class). ADR-536 (#1264) made the accountant subtract the RANK of the constraint system, so
+    // the count is now the honest 1 (an isosceles triangle up to similarity has one shape parameter) and
+    // the pool is the ordinary under-determined one. The withheld angle below is the #434 promise; it
+    // now holds for the honest reason rather than despite the count.
+    expect(freeDofCount(replay(facts, 0).construction), 'the count that used to lie').toBe(1);
     const pool = sharedSamples(facts);
-    expect(pool.determined, 'count 0 + complete admissible set').toBe(true);
-    expect(pool.samples.length, 'three seeds, not one').toBe(ADMISSIBLE_SEEDS);
+    expect(pool.determined, 'one shape DOF left — not determined').toBe(false);
+    expect(pool.samples.length, 'an honest under-determined pool').toBeGreaterThanOrEqual(ADMISSIBLE_SEEDS);
     expect(canvasAngle(facts, 'B', 'A', 'C'), 'the 31° that was one seed’s accident').toBeUndefined();
     expect(panelRows(facts, 'angle'), 'no angle row either').toHaveLength(0);
     // …while the two STATED lengths still print — they are the same in every configuration.

@@ -17,29 +17,6 @@
   "canvas ∠CAG = 90.00",
   "panel angle ADB = 30.00"
  ],
- "sc:bare-diameter-from-point": [
-  "canvas ∠ACB = 90.00",
-  "canvas ∠ACF = 45.00",
-  "canvas ∠AFD = 90.00",
-  "canvas ∠AFG = 45.00",
-  "canvas ∠AFH = 135.00",
-  "canvas ∠BCF = 45.00",
-  "canvas ∠BFD = 90.00",
-  "canvas ∠BFG = 135.00",
-  "canvas ∠BFH = 45.00",
-  "canvas ∠DFG = 45.00",
-  "canvas ∠DFH = 45.00",
-  "canvas ∠DOG = 90.00",
-  "canvas ∠DOH = 90.00",
-  "canvas ∠FGH = 45.00",
-  "canvas ∠FHG = 45.00",
-  "canvas ∠FOG = 90.00",
-  "canvas ∠FOH = 90.00",
-  "canvas ∠GFH = 90.00",
-  "panel angle BCA = 90.00",
-  "panel angle GCH = 90.00",
-  "panel angle HFG = 90.00"
- ],
  "sc:common-tangent-two-circles": [
   "canvas |AB| = 24.00",
   "canvas |AN| = 12.00",
@@ -63,22 +40,6 @@
   "panel perimeter O2 = 100.53",
   "panel radius O1 = 9.00",
   "panel radius O2 = 16.00"
- ],
- "sc:concyclic-flexes-the-rectangle": [
-  "canvas ∠ABC = 90.00",
-  "canvas ∠ADC = 90.00",
-  "canvas ∠BAD = 90.00",
-  "canvas ∠BCD = 90.00",
-  "canvas ∠BFC = 90.00",
-  "canvas ∠BFE = 90.00",
-  "canvas ∠CFD = 90.00",
-  "canvas ∠DFE = 90.00",
-  "panel angle ABC = 90.00",
-  "panel angle BCD = 90.00",
-  "panel angle BFE = 90.00",
-  "panel angle CDA = 90.00",
-  "panel angle DAB = 90.00",
-  "panel angle EAB = 90.00"
  ],
  "sc:copula-less-symbolic-radius-binds-existing-circle-772": [
   "canvas ∠BAC = 16.26",

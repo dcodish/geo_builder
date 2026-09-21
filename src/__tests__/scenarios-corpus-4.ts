@@ -2592,4 +2592,19 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs(chord(C, D) - chord(D, E))).toBeLessThan(1e-6 * Math.max(1, chord(C, D)));
     },
   },
+  {
+    id: 'redundant-restatement-keeps-the-dof-count-1264',
+    title: '#1264: «AB ⟂ BC» after «∠ABC = 90» removes no degree of freedom — the count stays 1 and the figure stays samplable',
+    guards:
+      "The operator's exact sequence (found measuring #999 in overnight run #1252; ruled 2026-09-20: the rank half now, the jump half with #1182). The third line restates what the figure already shows at every seed, yet freeDofCount read 1 → 0 and the panel claimed «הכל נקבע» while «הציגו תצורה אחרת» went on producing six distinct shapes — a false claim about the student's own givens. Root cause (ADR-536): the accountant subtracted one per constraint ROW; a dependent row is a linear combination of the others at the solved figure and must add no RANK. The count is now raw − rank(Jacobian) − gauge, which also subsumes the ADR-424 vacuous-collinear special case. This scenario locks the count through the app's real parse→fact→replay path and — via the harness's dofHonesty oracle, which runs on every scenario — that the claimed freedom is samplable; the shape-still-varies half and the parallel-rows mechanism are in src/engine/__tests__/issue-1264-dof-rank.test.ts.",
+    steps: ['משולש ABC', '∠ABC = 90', 'AB ⟂ BC'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the restated relation holds').toEqual([]);
+      expect(freeDofCount(fig.construction), 'a right triangle up to similarity keeps its one shape parameter').toBe(1);
+      const [A, B, C] = ['A', 'B', 'C'].map((id) => fig.positions.get(id)!);
+      const dot = (B.x - A.x) * (C.x - B.x) + (B.y - A.y) * (C.y - B.y);
+      expect(Math.abs(dot)).toBeLessThan(1e-6 * Math.hypot(B.x - A.x, B.y - A.y) * Math.hypot(C.x - B.x, C.y - B.y));
+    },
+  },
 ];

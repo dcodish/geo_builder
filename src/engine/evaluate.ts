@@ -551,25 +551,48 @@ interface CarrierSpec {
   seed: number[];
   scale: number[];
 }
-function carrierSpec(o: GeoObject, span: number): CarrierSpec | null {
-  const floor = Math.max(1, span * 0.1); // a per-coordinate scale floor so a near-zero coord still gets sane steps
+/**
+ * A carrier's CURRENT parameter value(s) — the READ half of {@link setCarrierVals}, and the one place
+ * the per-kind value fields are named for reading (`carrierSpec` seeds from it; the DOF accountant's
+ * Jacobian, `dofRank.ts`, differentiates over it). Null for an object that carries no parameter.
+ * Kind-switch kept exhaustive alongside {@link carrierSpec} / {@link setCarrierVals} /
+ * {@link warmStartCarriers} — a new carrier kind must be added to all four.
+ */
+export function carrierParams(o: GeoObject): number[] | null {
   switch (o.kind) {
-    // Each coordinate is normalised by its OWN magnitude (not the global span) so a small leg
-    // (CA≈4) next to a long one (CB≈19) still gets fine restart resolution — ADR-033.
-    case 'free-point': return o.solve ? { id: o.id, n: 2, seed: [o.x, o.y], scale: [Math.max(Math.abs(o.x), floor), Math.max(Math.abs(o.y), floor)] } : null;
-    case 'on-segment': return o.solve ? { id: o.id, n: 1, seed: [o.t], scale: [1] } : null;
-    case 'on-circle': return o.solve ? { id: o.id, n: 1, seed: [o.theta], scale: [1] } : null;
-    case 'perp-offset': return o.solve ? { id: o.id, n: 1, seed: [o.dist], scale: [Math.max(Math.abs(o.dist), 1)] } : null;
-    case 'rotated': return o.solve ? { id: o.id, n: 1, seed: [o.angleDeg], scale: [90] } : null;
-    case 'scaled-offset': return o.solve ? { id: o.id, n: 1, seed: [o.k], scale: [Math.max(Math.abs(o.k), 0.5)] } : null;
-    case 'on-line': return o.solve ? { id: o.id, n: 1, seed: [o.offset], scale: [Math.max(Math.abs(o.offset), floor)] } : null;
-    // A free-radius circle's radius is a shape scalar (ADR-051) — seed at its current value, scaled by it.
-    case 'circle': return o.solve && o.radius.via === 'free' ? { id: o.id, n: 1, seed: [o.radius.value], scale: [Math.max(o.radius.value, 1)] } : null;
+    case 'free-point': return [o.x, o.y];
+    case 'on-segment': return [o.t];
+    case 'on-circle': return [o.theta];
+    case 'perp-offset': return [o.dist];
+    case 'rotated': return [o.angleDeg];
+    case 'scaled-offset': return [o.k];
+    case 'on-line': return [o.offset];
+    case 'circle': return o.radius.via === 'free' ? [o.radius.value] : null;
     default: return null;
   }
 }
-/** Write a carrier's resolved param(s) into the construction (clearing its solve directive). */
-function setCarrierVals(c: Construction, vals: Map<Id, number[]>): Construction {
+function carrierSpec(o: GeoObject, span: number): CarrierSpec | null {
+  const floor = Math.max(1, span * 0.1); // a per-coordinate scale floor so a near-zero coord still gets sane steps
+  const seed = carrierParams(o);
+  if (!seed || !(o as { solve?: unknown }).solve) return null;
+  switch (o.kind) {
+    // Each coordinate is normalised by its OWN magnitude (not the global span) so a small leg
+    // (CA≈4) next to a long one (CB≈19) still gets fine restart resolution — ADR-033.
+    case 'free-point': return { id: o.id, n: 2, seed, scale: [Math.max(Math.abs(o.x), floor), Math.max(Math.abs(o.y), floor)] };
+    case 'on-segment': return { id: o.id, n: 1, seed, scale: [1] };
+    case 'on-circle': return { id: o.id, n: 1, seed, scale: [1] };
+    case 'perp-offset': return { id: o.id, n: 1, seed, scale: [Math.max(Math.abs(o.dist), 1)] };
+    case 'rotated': return { id: o.id, n: 1, seed, scale: [90] };
+    case 'scaled-offset': return { id: o.id, n: 1, seed, scale: [Math.max(Math.abs(o.k), 0.5)] };
+    case 'on-line': return { id: o.id, n: 1, seed, scale: [Math.max(Math.abs(o.offset), floor)] };
+    // A free-radius circle's radius is a shape scalar (ADR-051) — seed at its current value, scaled by it.
+    case 'circle': return o.radius.via === 'free' ? { id: o.id, n: 1, seed, scale: [Math.max(o.radius.value, 1)] } : null;
+    default: return null;
+  }
+}
+/** Write a carrier's resolved param(s) into the construction (clearing its solve directive). Exported for
+ *  the DOF accountant's Jacobian (`dofRank.ts`), which perturbs one parameter at a time through it. */
+export function setCarrierVals(c: Construction, vals: Map<Id, number[]>): Construction {
   return {
     ...c,
     objects: c.objects.map((o) => {
@@ -1051,6 +1074,21 @@ export function evaluate(c: Construction): EvalResult {
   return r;
 }
 
+/**
+ * `resolveDriven` memoised by construction identity, exactly as {@link evaluate} is: the BAKED
+ * construction (every driven carrier at its solved value, directives cleared) whose `evaluateCore` IS the
+ * drawn figure. `evaluate` fills it, so a consumer that needs the solved configuration of a figure that
+ * was already evaluated — the DOF accountant's Jacobian (#1264) — pays no second solve.
+ */
+const resolvedMemo = new WeakMap<Construction, Construction>();
+export function resolveDrivenMemo(c: Construction): Construction {
+  const hit = resolvedMemo.get(c);
+  if (hit) return hit;
+  const r = resolveDriven(c);
+  resolvedMemo.set(c, r);
+  return r;
+}
+
 function evaluateUncached(c: Construction): EvalResult {
   const driven = drivenConstraintsOf(c);
   // #403 (ADR-407): a driven constraint referencing an id with NO OBJECT behind it can never be
@@ -1065,7 +1103,7 @@ function evaluateUncached(c: Construction): EvalResult {
       }
     }
   }
-  const res = evaluateCore(resolveDriven(c));
+  const res = evaluateCore(resolveDrivenMemo(c));
   if (!res.ok || driven.length === 0) return res;
   // Report the whole CONFLICT SET, not one arbitrary member. When a joint solve can't satisfy an
   // impossible constraint it drags its co-drivers off too (here the impossible ⟂ pulls F off the
@@ -1091,7 +1129,9 @@ function evaluateUncached(c: Construction): EvalResult {
   return res;
 }
 
-function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): EvalResult {
+/** Exported for the DOF accountant's Jacobian (`dofRank.ts`): positions of a construction WITHOUT solving —
+ *  every parameter at its stored value — which is what a finite difference over one parameter needs. */
+export function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): EvalResult {
   const pos = new Map<Id, Vec>();
   const lines = new Map<Id, ResolvedLine>();
   const circles = new Map<Id, ResolvedCircle>();

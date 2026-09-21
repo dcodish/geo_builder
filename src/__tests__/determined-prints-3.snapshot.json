@@ -39,11 +39,6 @@
   "canvas |AB| = 5.00",
   "panel length AB = 5.00"
  ],
- "sc:diameter-from-point-cuts-side-onto-segment": [
-  "canvas ∠AFE = 90.00",
-  "canvas ∠BFE = 90.00"
- ],
- "sc:existing-line-tangent-adapts-the-circle": [],
  "sc:four-unnamed-semicircles-on-square": [
   "canvas ∠ABC = 90.00",
   "canvas ∠ADC = 90.00",
@@ -55,19 +50,6 @@
   "panel angle DAB = 90.00"
  ],
  "sc:given-diameter-defines-circle": [],
- "sc:inscribed-angle-on-diameter-thales": [
-  "canvas |AB| = 10.00",
-  "canvas |AO| = 5.00",
-  "canvas |BO| = 5.00",
-  "canvas ∠ACB = 90.00",
-  "panel angle ACB = 90.00",
-  "panel area O = 78.54",
-  "panel length AB = 10.00",
-  "panel length AO = 5.00",
-  "panel length BO = 5.00",
-  "panel perimeter O = 31.42",
-  "panel radius O = 5.00"
- ],
  "sc:point-is-meeting-of-line-with-circle": [],
  "sc:q5-circle-cuts-BO-K-stays-on-segment": [
   "canvas |AB| = 10.39",
