@@ -50,6 +50,10 @@ export type ParseResult =
   // #1267: «BD חוצה זווית לצלע BC» — the bisector from B meets AC, and the side the student NAMED is not
   // the one it can meet. Refused with both sides quoted, never silently redirected to the real one.
   | { ok: false; reason: 'cevian-wrong-side'; apex: string; stated: [string, string]; actual: [string, string] }
+  // #1285: «CE חוצה זווית A במשולש ABC» — the angle the student named has a vertex that is not the
+  // segment's first letter. The bisector runs FROM its first letter, so the sentence contradicts itself;
+  // refused quoting both letters, never silently redirected to either.
+  | { ok: false; reason: 'bisector-wrong-apex'; apex: string; stated: string }
   // #1274 (operator ruling, ADR-W-066): «D = חיתוך AB ו-BC» — the two carriers the student named share a
   // letter, so their crossing IS that letter, in every configuration, with no solve, no seed and no
   // tolerance. The geometry is right and only the NAME is wrong: there is no new point to make. Refused
@@ -290,7 +294,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -8273,6 +8277,24 @@ const statedSide = (s: string): { side: [Id, Id]; match: string } | null => {
   return m ? { side: [up(m[1]), up(m[2])], match: m[0] } : null;
 };
 
+/**
+ * THE TRIANGLE A CEVIAN SENTENCE NAMES — «במשולש ABC», "in triangle ABC" (#1285).
+ *
+ * The bisector rule hunted a three-letter run in whatever survived a keyword strip, and for
+ * «CE חוצה זווית C במשולש ABC» the run it found was the TRIANGLE's name: `tri = [A, B, C]`, vertex B,
+ * neither the apex nor the foot, and the rule fell off its end into `not-handled` — while the sentence
+ * one word shorter built. The same defect #1267 fixed one operand over (a SIDE read as half an angle).
+ *
+ * Read first and REMOVED from the hunt text, like the side. And it is not decoration: the triangle
+ * IDENTIFIES the angle — apex C in ring ABC is ∠BCA, determined by the sentence alone (ADR-AG-117's
+ * argument for the analytic cevian), so the triangle form answers where the bare form must ask
+ * (`ambiguous-angle`, a vertex with more than two edges).
+ */
+const statedTriangle = (s: string): { ring: [Id, Id, Id]; match: string } | null => {
+  const m = s.match(/(?:\bin\s+(?:the\s+)?triangle\s+|ב?ה?משולש\s+)([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  return m ? { ring: [up(m[1]), up(m[2]), up(m[3])], match: m[0] } : null;
+};
+
 type CevianRole = 'median' | 'altitude';
 
 /**
@@ -8749,10 +8771,30 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
    * angle, and leaving them in is how a side name becomes half an angle.
    */
   const stated = statedSide(s);
-  let after = s.slice(s.search(/bisects?|חוצ/i)).replace(/bisects?|חוצ\w*|angles?|the|את|הזוו?ית|זוו?ית|של/gi, ' ');
+  const tail = s.slice(s.search(/bisects?|חוצ/i));
+  // #1285: the triangle is read BEFORE the keyword strip — «angle» is a substring of «triangle», and the
+  // strip would leave "in tri ABC": the English form of the very defect this fixes.
+  const triangle = statedTriangle(tail);
+  let after = (triangle ? tail.replace(triangle.match, ' ') : tail).replace(/bisects?|חוצ\w*|angles?|the|את|הזוו?ית|זוו?ית|של/gi, ' ');
   const statedInAfter = statedSide(after);
   if (statedInAfter) after = after.replace(statedInAfter.match, ' ');
+  /**
+   * #1285: the TRIANGLE operand, read before the hunt and removed from it — its three letters are a ring,
+   * not an angle. What is left after the strip is then either a three-letter angle («CE חוצה זווית ACB
+   * במשולש ABC»), a lone vertex letter («… זווית C במשולש ABC»), or nothing («CD חוצה זווית במשולש ABC»).
+   */
   let tri = labelRun(after, 3);
+  if (!tri && triangle) {
+    // A lone vertex letter names the angle's apex. It must be the segment's first letter — the bisector
+    // runs FROM it — or the student has written something false about their own segment: refused
+    // quoting both, exactly as #1267 refuses a wrongly-named side, never silently redirected.
+    const lone = labelRun(after, 1);
+    if (lone && lone[0] !== apex && lone[0] !== D) return { clarify: 'bisector-wrong-apex', apex, stated: lone[0] };
+    // The triangle IDENTIFIES the angle: the apex's two ring neighbours are its arms.
+    const i = triangle.ring.indexOf(apex);
+    if (i < 0) return { clarify: 'bisector-wrong-apex', apex, stated: triangle.ring.join('') };
+    tri = [triangle.ring[(i + 2) % 3], apex, triangle.ring[(i + 1) % 3]];
+  }
   if (!tri) {
     // No explicit angle triple ("CD חוצה זוית" / "CD bisects the angle"): resolve the angle from the
     // figure. Gated to an explicit "angle"/"זוית" utterance so a SEGMENT bisection ("AB חוצה את הקטע CD")
@@ -9370,7 +9412,7 @@ export const RULES: Rule[] = [
   specialPointMeet, // "X מפגש האלכסונים/התיכונים/…" — a named centre meet (noun form); before the shapes + diagonals (#44)
   perpBisector, // "perpendicular bisector of AB"
   midsegment, // "midsegment to BC in triangle ABC" — a triangle construct ("במשולש"); before the shapes AND before segment/midpoint (its "קטע"/"אמצע" keywords)
-  bisectorPlacesPoint, // "AD bisects ∠BAC" / "CD חוצה זוית [במשולש ABC]" — places D on the opposite side. Before the shapes (its "במשולש ABC" form would otherwise make `triangle` 'stop'); safe before the bisector-∩ compounds because it DEFERS on intersect keywords.
+  bisectorPlacesPoint, // "AD bisects ∠BAC" / "CD חוצה זווית [C] [במשולש ABC]" — places D on the opposite side; the triangle operand is READ (#1285), it identifies the angle. Before the shapes (its "במשולש ABC" form would otherwise make `triangle` 'stop'); safe before the bisector-∩ compounds because it DEFERS on intersect keywords.
   bisectsSegment, // "CD חוצה את AB" / "CD bisects AB" — SEGMENT bisection (#240, ADR-382): midpoint + set-line macro. After the angle sense (which owns any angle-keyword utterance); before `chord`/`segment` (whose "הקטע AB" would half-parse the object and drop the bisection).
   regularPolygon, // "regular pentagon ABCDE" / "מחומש משוכלל" — before square (it also routes "regular triangle/quadrilateral")
   square,
@@ -11141,6 +11183,7 @@ function refusalOf(res: Clarify): ParseResult {
     return { ok: false, reason: 'cevian-degenerate', role: res.role, why: res.why, apex: res.apex, foot: res.foot, side: res.side };
   if (res.clarify === 'cevian-wrong-side')
     return { ok: false, reason: 'cevian-wrong-side', apex: res.apex, stated: res.stated, actual: res.actual };
+  if (res.clarify === 'bisector-wrong-apex') return { ok: false, reason: 'bisector-wrong-apex', apex: res.apex, stated: res.stated };
   if (res.clarify === 'crossing-already-named')
     return { ok: false, reason: 'crossing-already-named', holder: res.holder, id: res.id, s1: res.s1, s2: res.s2 };
   if (res.clarify === 'arc-copula') return { ok: false, reason: 'arc-copula', a: res.a, b: res.b };

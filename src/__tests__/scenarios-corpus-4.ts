@@ -2642,4 +2642,21 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.degeneracies).toEqual([]);
     },
   },
+  {
+    id: 'bisector-reads-the-triangle-operand-1285',
+    title: '#1285 / ADR-540: «CE חוצה זווית C במשולש ABC» builds the SAME figure as «CE חוצה זווית C» — the triangle names the angle, it is not three letters to be mistaken for one',
+    guards:
+      "The operator's sentence (2026-09-20). labelRun(after, 3) found the TRIANGLE's letters and read them as the angle, so tri = [A,B,C] had a vertex that was neither the apex nor the foot and the rule fell off its end into not-handled — while the sentence one word shorter built. The triangle operand is now read first and removed from the hunt (the #1267 shape), and it identifies the angle: apex C in ring ABC is ∠BCA. Parity with the bare form, asserted on the figure, so the lock cannot go green by re-implementing the grammar.",
+    steps: ['משולש ABC', 'CE חוצה זווית C במשולש ABC'],
+    check: (fig) => {
+      expect(fig.lastError).toBeNull();
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), E = at(fig, 'E');
+      // E is on AB, and CE halves ∠ACB
+      const cross = (B.x - A.x) * (E.y - A.y) - (B.y - A.y) * (E.x - A.x);
+      expect(Math.abs(cross) / Math.hypot(B.x - A.x, B.y - A.y), 'E on AB').toBeLessThan(1e-6);
+      const ang = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.atan2(p.y - C.y, p.x - C.x) - Math.atan2(q.y - C.y, q.x - C.x);
+      const norm = (a: number) => Math.abs(((((a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI);
+      expect(norm(ang(A, E)), '∠ACE = ∠ECB').toBeCloseTo(norm(ang(E, B)), 6);
+    },
+  },
 ];

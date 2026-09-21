@@ -1526,3 +1526,7 @@ over all four (ADR-041).
 ### `anonymous-circle-binds-by-membership-beside-second-circle` — CHANGED 2026-09-21 (ADR-537): the default seat is refused, the seat tier rescues
 
 **What changed:** the scenario had been green on a needle — «משולש ישר זווית ABC» seats the right angle at C, where «קשת AB = קשת BC» holds only degenerately (ADR-445 built the seat tier for this figure), and the apply layer accepted the collapse at flatness 7.5e-4 with every row green. The check now asserts the refusal at the default seat and keeps #546's own claim (the anonymous references bind the circumcircle, no third circle); the seat rescue through `findValidConfig` (`rot: 2`, the isosceles right triangle) is locked in the #1328 test, because the harness folds at one seed without the view search.
+
+### `bisector-reads-the-triangle-operand-1285` — «CE חוצה זווית C במשולש ABC» builds the same figure as «CE חוצה זווית C» (#1285, ADR-540)
+
+**Guards against:** the bisector rule reading the TRIANGLE's three letters as the angle. The operator's sentence fell into `not-handled` while the sentence one word shorter built; the triangle operand is now read first, removed from the letter hunt, and used to identify the angle (apex C in ring ABC is ∠BCA). The unit locks — the equal-angle property, the widening (the triangle form answers where the bare form asks `ambiguous-angle`), the wrong-apex refusal, the English spelling — are in `src/parser/__tests__/issue-1285-bisector-triangle.test.ts`.

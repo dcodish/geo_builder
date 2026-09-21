@@ -1072,6 +1072,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "CE bisects angle C in triangle ABC",
+    "winner": "bisectorPlacesPoint",
+  },
+  {
+    "lang": "he",
+    "text": "CE חוצה זווית C במשולש ABC",
+    "winner": "bisectorPlacesPoint",
+  },
+  {
+    "lang": "en",
     "text": "CD cuts AB",
     "winner": "lineLineIntersection",
   },
