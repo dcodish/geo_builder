@@ -14,7 +14,9 @@ import { derive } from '../engine/derive';
 import { parseLine } from '../parser/parseAnalytic';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
 
-const FIG = ['משולש ABC', 'AB = AC'];
+// #1334 (ADR-AG-143): with «AB = AC» this figure IS the needle the accept gate now refuses — the equivalence
+// this file locks is between spellings, so it is asserted on a triangle the right angle can live in.
+const FIG = ['משולש ABC'];
 /** The lowered facts, with the sentence itself stripped — what the two spellings must share. */
 const lowered = (line: string) => {
   const r = parseLine(line);

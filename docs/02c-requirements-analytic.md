@@ -807,6 +807,15 @@ fixed there is no other configuration, so «מפגש האלכסונים» of a c
 of three collinear points and an empty circle are each named as not existing, rather than left absent
 with nothing said.
 
+**R105 — a given set that holds only in a degenerate limit is REFUSED, never drawn as a needle**
+([ADR-AG-143](06c-decisions-analytic.md#adr-ag-143), [#1334](https://github.com/dcodish/geo_builder/issues/1334) —
+the analytic twin of 2-D's [ADR-537](06-decisions.md#adr-537)). «משולש ABC» · «AB = AC» · «∠ABC = 90»
+holds only when B and C are one point; a figure that satisfies it within the solver's tolerance is a
+needle the tolerance bought, not a triangle, and it is refused naming the statement that completed the
+contradiction — at every configuration, never only at the seeds where the needle happens to fall under
+the collapse floor. A genuinely thin figure (a stated 1° apex, 89° + 90°) is an exact solution and is
+still drawn: thinness is never the test, the existence of an exact solution is.
+
 **R61 — a value is called KNOWN only if it holds across configurations that actually DIFFER**
 ([ADR-AG-126](06c-decisions-analytic.md#adr-ag-126)). The data panel may present a number as determined
 only when the givens determine it — never because the three configurations it happened to sample were the

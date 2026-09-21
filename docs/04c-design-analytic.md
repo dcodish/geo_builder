@@ -90,7 +90,7 @@ has four tiers, strongest first:
 | --- | --- | --- |
 | preferred | whole **and** every declared ring at least `SPREAD_MIN_DEG` open **and** no two named points at one place (`separated`, `apart()`'s relative ruler) | #1174, #1273 |
 | whole, separated | whole and separated but narrow — remembered above a stacked whole one (the ADR-486 ranking, ported) | #1273 |
-| whole | selectors hold · nothing vacant · no ring contradicts its noun · **every given holds** (an unsatisfied constraint is a validity failure, not a preference — a point the solve parked on neither of its curves is not a configuration) | #1083, #1158/#1166, #1287 |
+| whole | selectors hold · nothing vacant · no ring contradicts its noun · **every given holds** (an unsatisfied constraint is a validity failure, not a preference — a point the solve parked on neither of its curves is not a configuration) · **and no declared ring holds only by the tolerance's slack**: a thin ring (`thinRingsOf`, min |sin θ| < `THIN_SIN_TOL`) is re-solved under `withToleranceFactor(TIGHT_TOLERANCE_FACTOR)` from the converged point, and a ring that collapses there is reported as unsatisfied on the last given touching it ([ADR-AG-143](06c-decisions-analytic.md#adr-ag-143), the ADR-537 port) | #1083, #1158/#1166, #1287 |
 | second best | the selectors hold, something named is missing | #1083 |
 | fallback | the raw figure at this seed | — |
 

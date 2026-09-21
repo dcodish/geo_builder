@@ -646,6 +646,32 @@ export function residual(
 export const SOLVE_TOL = 1e-7;
 
 /**
+ * THE TOLERANCE CAN BE TIGHTENED FOR ONE QUESTION (#1334, [ADR-AG-143](../../docs/06c-decisions-analytic.md#adr-ag-143)
+ * — the 2-D `withToleranceFactor` of ADR-537, ported).
+ *
+ * A needle — «משולש ABC» · «AB = AC» · «∠ABC = 90», whose givens hold only in the limit B = C — meets
+ * `SOLVE_TOL` with |BC| ≈ 0.005 on 7-unit sides, and the configuration search finds seeds where it
+ * sits just above the ring collapse floor. The residual is not the signal; the existence of an EXACT
+ * solution is: re-solved under a tighter tolerance, a genuine thin triangle keeps its shape and a
+ * needle collapses. The factor is set only through `withToleranceFactor`, which always restores it.
+ */
+let TOLERANCE_FACTOR = 1;
+/** The factor a tolerance-artefact re-solve tightens by — the 2-D value, for the same reason. */
+export const TIGHT_TOLERANCE_FACTOR = 0.02;
+export function toleranceFactor(): number {
+  return TOLERANCE_FACTOR;
+}
+export function withToleranceFactor<T>(factor: number, fn: () => T): T {
+  const prev = TOLERANCE_FACTOR;
+  TOLERANCE_FACTOR = prev * factor;
+  try {
+    return fn();
+  } finally {
+    TOLERANCE_FACTOR = prev;
+  }
+}
+
+/**
  * THE SOLVER'S RESOLUTION — how close two candidate positions may be and still be indistinguishable
  * BY THIS SOLVER (#1259, [ADR-AG-136](../../docs/06c-decisions-analytic.md#adr-ag-136)), relative to
  * the figure's scale.
@@ -697,7 +723,8 @@ export function solveLM(
   const cost = (v: number[]) => residuals(v).reduce((s, r) => s + r * r, 0);
   let f = cost(x);
 
-  for (let iter = 0; iter < maxIter && f > SOLVE_TOL * SOLVE_TOL; iter += 1) {
+  const tol = SOLVE_TOL * TOLERANCE_FACTOR;
+  for (let iter = 0; iter < maxIter && f > tol * tol; iter += 1) {
     const r = residuals(x);
     const m = r.length;
     if (m === 0) break;
@@ -749,7 +776,7 @@ export function solveLM(
   }
 
   const worst = residuals(x).reduce((w, r) => Math.max(w, Math.abs(r)), 0);
-  return { values: x, ok: worst <= 1e-6, worst };
+  return { values: x, ok: worst <= 1e-6 * TOLERANCE_FACTOR, worst };
 }
 
 /**

@@ -86,6 +86,14 @@ export interface RingFault {
  */
 export const COLLAPSED_SIN_TOL = 1e-3;
 
+/**
+ * A ring THIN enough to ask the tolerance-artefact question (#1334, ADR-AG-143): min |sin θ| over its
+ * corners below this — 5e-2 is 2.9°. The band deliberately contains legitimate figures (a stated 1°
+ * apex is 1.7e-2): they are told apart by re-solving under a tighter tolerance, never by their shape.
+ * It is the TRIGGER, so an ordinary figure pays nothing. The 2-D `THIN_POLYGON_RATIO` is the same band.
+ */
+export const THIN_SIN_TOL = 5e-2;
+
 /** Below this, two consecutive vertices are the same point and no angle can be read at all. */
 const COINCIDENT_EPS = 1e-9;
 
@@ -99,6 +107,22 @@ const len = (u: RingPt): number => Math.hypot(u.x, u.y);
  * Read per VERTEX rather than over the whole ring, because that is the question the noun asks: an
  * n-gon with a straight corner is really an (n−1)-gon, whatever its area says.
  */
+/** The smallest |sin θ| over the ring's corners — 0 when two consecutive vertices coincide. */
+export function minCornerSin(p: readonly RingPt[]): number {
+  const n = p.length;
+  let min = Infinity;
+  for (let i = 0; i < n; i += 1) {
+    const b = p[i];
+    const u = sub(p[(i + n - 1) % n], b);
+    const w = sub(p[(i + 1) % n], b);
+    const lu = len(u);
+    const lw = len(w);
+    if (lu < COINCIDENT_EPS || lw < COINCIDENT_EPS) return 0;
+    min = Math.min(min, Math.abs(cross(u, w)) / (lu * lw));
+  }
+  return min;
+}
+
 function isCollapsed(p: readonly RingPt[]): boolean {
   const n = p.length;
   for (let i = 0; i < n; i += 1) {
@@ -178,6 +202,22 @@ export function ringFaultsOf(c: Construction, at: (id: Id) => RingPt | undefined
     if (violation) faults.push({ id: o.id, noun: o.noun, violation });
   }
   return faults;
+}
+
+/**
+ * Every declared polygon of `c` that is THIN at these positions (#1334) — the rings whose givens the
+ * tolerance-artefact gate must re-solve to judge. A polygon with an unplaced vertex is skipped, as in
+ * `ringFaultsOf`, and for the same reason.
+ */
+export function thinRingsOf(c: Construction, at: (id: Id) => RingPt | undefined): { id: Id; vertices: Id[] }[] {
+  const thin: { id: Id; vertices: Id[] }[] = [];
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon') continue;
+    const pts = o.vertices.map(at);
+    if (pts.length < 3 || pts.some((p) => !p)) continue;
+    if (minCornerSin(pts as RingPt[]) < THIN_SIN_TOL) thin.push({ id: o.id, vertices: [...o.vertices] });
+  }
+  return thin;
 }
 
 /**

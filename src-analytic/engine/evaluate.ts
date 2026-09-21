@@ -18,9 +18,9 @@ import { evalExpr, type Env } from './expr';
 import { pairKey, pinnedLengths } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
-import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, type RingFault } from './rings';
+import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
 import { apart } from './crossings';
-import { dirVector, freeRank, residual, resolveChoices, solveMultiStart, SOLVE_RESOLUTION, type Constraint } from './solve';
+import { dirVector, freeRank, residual, resolveChoices, solveMultiStart, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint } from './solve';
 import { drawnPieceOver } from './extent';
 import { inDomain, isFree, objectById, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
 
@@ -134,6 +134,20 @@ function freeCoord(seed: number, id: string, axis: 0 | 1, span: Span = DEFAULT_S
 interface Span {
   x: { lo: number; hi: number };
   y: { lo: number; hi: number };
+}
+
+/**
+ * Does this constraint name any of these points? A structural walk over the constraint's fields — the
+ * constraint kinds carry their point ids under different keys (`a`/`b`, `u.a`, `terms[].a`, `id`),
+ * and enumerating them per kind is the per-kind growth the residual/solver split exists to prevent.
+ * Point ids are the student's labels (a capital letter with an optional digit); no other string field
+ * of a constraint takes that shape.
+ */
+function mentionsAny(value: unknown, ids: ReadonlySet<Id>): boolean {
+  if (typeof value === 'string') return ids.has(value);
+  if (Array.isArray(value)) return value.some((v) => mentionsAny(v, ids));
+  if (value && typeof value === 'object') return Object.values(value as Record<string, unknown>).some((v) => mentionsAny(v, ids));
+  return false;
 }
 
 /** With nothing placed, the figure has no scale of its own and this is as good as any. */
@@ -683,10 +697,12 @@ export function evaluate(raw: Construction, seed = 0): Figure {
 
   const unsatisfied: Constraint[] = [];
   let free = seeded;
+  let sys: CarrierSystem | null = null;
 
   if (ids.length > 0 && c.constraints.length > 0) {
     // Through `carrierSystem` (#1137) so the locus tracer walks the SAME residuals this solves.
-    const sys = carrierSystem(c, env);
+    const solved = carrierSystem(c, env);
+    sys = solved;
     /**
      * SEVERAL STARTS, first convergence wins (#1287, ADR-AG-134).
      *
@@ -720,8 +736,8 @@ export function evaluate(raw: Construction, seed = 0): Figure {
       }
       starts.push(m);
     }
-    const res = solveMultiStart(starts.map((m) => sys.toVec(m)), sys.residualsAt);
-    free = sys.asMap(res.values);
+    const res = solveMultiStart(starts.map((m) => solved.toVec(m)), solved.residualsAt);
+    free = solved.asMap(res.values);
   }
 
   /**
@@ -749,6 +765,43 @@ export function evaluate(raw: Construction, seed = 0): Figure {
       // wrong statement, and vacancy is not a fault ([ADR-AG-008]).
       if (r === null) continue;
       if (r.some((v) => Math.abs(v) > SATISFIED_EPS)) unsatisfied.push(k);
+    }
+  }
+
+  /**
+   * A RING THINNER THAN ITS TOLERANCE IS NOT A SOLUTION (#1334, [ADR-AG-143](../../docs/06c-decisions-analytic.md#adr-ag-143)
+   * — the analytic port of 2-D's ADR-537, the #1328 P1 one product over).
+   *
+   * «משולש ABC» · «AB = AC» · «∠ABC = 90» has no triangle in it: the givens hold only in the limit
+   * B = C. Measured, the solve met both residuals within `SATISFIED_EPS` with |BC| ≈ 0.005 on 7-unit
+   * sides — a needle — and while most seeds put it under the ring collapse floor (`COLLAPSED_SIN_TOL`),
+   * the configuration search found seeds where it sat just above the floor and showed it whole, every
+   * row green. The needle's thinness is not the geometry's; it is the tolerance's.
+   *
+   * The accept gate therefore asks not only "are the residuals small" but "is the tolerance what made
+   * them small". The TRIGGER is a declared ring that is thin (`thinRingsOf`, min |sin θ| < 5e-2 — an
+   * ordinary figure pays nothing). Then the SAME system is re-solved from the converged point under a
+   * tightened tolerance: a genuine thin triangle (a stated 1° apex, 89° + 90°) is an EXACT solution and
+   * keeps its shape; a needle bought with slack can only meet the tighter bar by collapsing past the
+   * floor, where `ringFaultsOf` calls it degenerate — and then it is reported as unsatisfied, never
+   * drawn as if. Blame lands on the LAST given that touches the ring (the shortest infeasible prefix
+   * rule of ADR-492: the statement that completed the contradiction), so the fold names the student's
+   * own sentence. Sound one way only: a re-solve that does not collapse changes nothing.
+   */
+  if (unsatisfied.length === 0 && sys && c.constraints.length > 0) {
+    const pos0 = place(c, env, free);
+    const thin = thinRingsOf(c, (id) => pos0.get(id));
+    if (thin.length > 0) {
+      const system = sys;
+      const tight = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveMultiStart([system.toVec(free)], system.residualsAt));
+      const posT = place(c, env, system.asMap(tight.values));
+      const collapsed = new Set(ringFaultsOf(c, (id) => posT.get(id)).filter((f) => f.violation === 'degenerate').map((f) => f.id));
+      for (const ring of thin) {
+        if (!collapsed.has(ring.id)) continue;
+        const vertices = new Set<Id>(ring.vertices);
+        const k = [...c.constraints].reverse().find((con) => mentionsAny(con, vertices));
+        if (k && !unsatisfied.includes(k)) unsatisfied.push(k);
+      }
     }
   }
   const placed = new Map<Id, Pt>(free);

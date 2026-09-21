@@ -90,7 +90,19 @@ export function decideSubmit(
    * still folds. A refusal keeps the prior figure and names the student's own words.
    */
   const trial = derive([...lines, line], seed);
-  const fault = trial.faults.find((f) => f.index === lines.length);
+  /**
+   * WHICH fault is this line's (#1334, ADR-AG-143 — ADR-492's rule, at the one chokepoint every typed
+   * line passes)? Its own, first. But a solver that cannot meet the whole set blames whichever
+   * constraint it fell short on — «משולש ABC» · «AB = AC» · «∠ABC = 90» at some seeds lands the blame
+   * on «AB = AC» — and looking only for a fault ON the new line then RECORDED the sentence that
+   * completed the contradiction and painted an earlier, true statement red. Before this line the
+   * figure was whole; after it something is red; so a fault that APPEARED with this line (absent from
+   * the current figure, by line and code) is this line's, and the refusal names this sentence.
+   */
+  const appeared = (f: Derivation['faults'][number]) => !current.faults.some((g) => g.index === f.index && g.code === f.code);
+  const fault =
+    trial.faults.find((f) => f.index === lines.length) ??
+    trial.faults.filter(appeared).map((f) => ({ ...f, index: lines.length, detail: line }))[0];
   if (fault) {
     return {
       kind: 'refused',
