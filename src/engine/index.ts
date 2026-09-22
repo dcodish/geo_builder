@@ -44,7 +44,7 @@ export type { Carrier, CarrierFamily } from './carriers';
 export { lower, lowerOne, buildSymTab, isSymbolBound, measureLabelText, measureLabelForms, isMeasure, symbolsConsumedBy } from './lower';
 export type { MeasureLabelForms } from './lower';
 export type { SymTab } from './lower';
-export { expandShapeVariant, eqMatchesPair, pinsSoftVariant, statedShapeEqualities, trapezoidLegs, trapezoidRingInForce, unstatedChoices, UNSTATED_CHOICE_KINDS, VARIANT_COUNT } from './shapeVariants';
+export { expandShapeVariant, eqMatchesPair, MIDSEGMENT_SHAPES, pinsSoftVariant, statedShapeEqualities, trapezoidLegs, trapezoidRingInForce, unstatedChoices, UNSTATED_CHOICE_KINDS, VARIANT_COUNT } from './shapeVariants';
 export type { ChoiceFact, StatedShapeEquality, UnstatedChoice, UnstatedChoiceKind, VariantShape } from './shapeVariants';
 export { expandInscribe, inscribePlacements, inscribeVariantCount } from './inscribe';
 export type { InscribeShape, InscribeCmd } from './inscribe';

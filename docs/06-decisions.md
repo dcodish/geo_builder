@@ -12882,3 +12882,53 @@ B and C sit ten pixels apart and each mark was drawn at 26 px, so the 90° squar
 **Sibling audit (docs/17 §1).** 3-D's marks are drawn in a projected frame with their own sizing; analytic marks angles only at stated right angles. Neither measured here; the class is the same shape and is noted for whichever is reported first.
 
 **Consequences.** `render/scene.ts` (`markScale`, `labelScale`, `MARK_FIT_FRACTION`, `MIN_MARK_SCALE`, `MIN_MEASURE_FONT_PX`, `SceneMeasure.ends`); `render/Figure.tsx` (the measure-label branch and the angle-mark branch both take the ratio). Lock: `render/__tests__/issue-1337-mark-fit.test.ts` (9), whose centre is the *"the two marks cannot touch"* property over the operator's own figure.
+
+## ADR-545 — «קטע אמצעים» with nothing named binds the figure's triangle, and the unstated side is a 3-way DOF (#1368)
+
+**Requirements:** [02](02-requirements.md) FR-CN — the construct register, no new row (the midsegment was already promised; this is the spelling with no arguments) · **Design:** [04](04-design.md) — the shape-variant channel, and why `midsegment-free` is a separate shape
+
+**Operator, 2026-09-22, playing `prod/2026-09-22-3`:** he typed «תוסיף קטע אמצעים» on a figure holding «משולש ABC». It built — and the model chose the side. His ruling when shown it:
+
+> *"the קטע אמצעים should draw with dof meaning it can move on a new config. this is how it was tested in the past"*
+
+He was right that it was tested before: scenario `baseless-midsegment-places-G-on-a-side-and-alternates` ([ADR-199](#adr-199)) records his earlier ruling in almost the same words.
+
+### Root cause — a REACH gap, not a missing mechanism
+
+`קטע אמצעים` with no endpoints named was `not-handled`, so the line escalated and the LLM supplied the missing arguments. **That is ADR-052's cardinal sin arriving through the fallback:** the figure asserted a side the student never stated, and «הציגו תצורה אחרת» could not move it, because it was baked into a command rather than carried as a choice.
+
+The cyclable mechanism already existed. ADR-199's `midsegmentBaseless` emits a `midsegment` `shape-variant` and `VARIANT_COUNT` drives the cycle — but every branch of it anchors on a **named endpoint** (`EG קטע אמצעים`, E resolved from `ctx.onSegment` or `ctx.midpointOf`). Between that and the catalog's fully-spelled `קטע האמצעים לצלע BC במשולש ABC`, the form with **no arguments at all** was the one with no rule.
+
+### The mechanism
+
+`midsegmentFree` binds the figure's single triangle — the same `ctx` inference altitude, median and bisector already use — and emits a `midsegment-free` `shape-variant`. **0 or ≥2 candidate triangles returns null**, and the `droppedMidsegment` gate turns that into an honest escalation; picking one would reintroduce the defect this removes.
+
+Both endpoints are `@`-anonymous ([ADR-297](#adr-297)) with deterministic ids (`@ms-ABC-1/2`), so re-issuing the sentence is idempotent and the ids are stable across cycling. No `M`/`N` is minted — scenario `named-midsegment-reuses-existing-midpoint-endpoint` records that exact complaint («I now have M and N somehow»).
+
+### Why a SEPARATE shape, and not `midsegment` with three variants
+
+This is the decision worth recording, because the cheap version is wrong in a way that only shows up later.
+
+`midsegment` has **two** variants because the student has already placed one endpoint on a side: that side is **stated**, and only the other endpoint is free. `midsegment-free` has **three** because nothing is stated — the choice is which of the three sides the midsegment is parallel to.
+
+Raising `VARIANT_COUNT.midsegment` to 3 would have let "show another configuration" move `E` **off the side the student named** — cycling into a figure that contradicts a given. The variant channel exists to explore what was *not* stated; a variant that violates a statement is the exact inversion of its purpose. So the two forms are two shapes, and `VARIANT_COUNT` carries both numbers with the reason beside them.
+
+### The honesty gate had to learn the new shape, and that is now mechanical
+
+`droppedMidsegment` tested `c.shape === 'midsegment'` as a literal, so the new command read as a **dropped** midsegment and a correctly-parsed utterance was refused. Fixed at the mechanism rather than by adding a second literal: `MIDSEGMENT_SHAPES` is exported from `shapeVariants.ts` and the gate asks the set. A fourth midsegment form cannot silently fail a gate written when there were two.
+
+This is the generalisable part. **A gate that enumerates the shapes it accepts is a chokepoint list** (docs/17 §3) — it grows silently and its failure mode is refusing correct input, which reads exactly like a parser bug.
+
+### Unstated-choice note
+
+`unstatedChoices` gains a row (the file's own rule: *"a new shape is a row, not a mechanism"*), reporting the side the midsegment ended up **parallel to** — which describes the whole configuration, since that side determines both endpoints. Pinned, like its sibling, the moment the student places an endpoint on a side ([ADR-412](#adr-412)).
+
+### NOT in this change
+
+The «תוסיף» wrapper is a separate defect: it must be **taught**, not absorbed ([#1358](https://github.com/dcodish/geo_builder/issues/1358)/#778). It is recorded in the scenario's guards so the next reader does not assume this ADR covered it. The two compose well — once `קטע אמצעים` is deterministically buildable, the imperative teach gate's precondition is satisfied and «תוסיף קטע אמצעים» becomes an ordinary teach with no LLM call at all.
+
+### Sibling audit
+
+- **`src3d/`** — no midsegment construct; the class is not present.
+- **`src/` trapezoid median** (`trapezoidMidsegment`) — resolves from the figure's unique parallel base-pair and already refuses on 0 or ≥2, the same discipline; unchanged.
+- The other `VariantShape`s (`kite`, `isosceles`) enumerate no shapes in gates, so the `MIDSEGMENT_SHAPES` class has one member — checked, not assumed.

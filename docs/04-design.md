@@ -578,9 +578,11 @@ pure derivation, one table, one text builder, two render sites:
   commands — `equal-pair` (kite / isosceles: the drawn pairs read from the ACTIVE variant, pinned by a stated
   equality on any variant's pair), `free-endpoint` (a base-less midsegment: which side the free end rides,
   pinned by «G על PR»), `parallel-pair` (the isosceles trapezoid: the lowering assumed AB ∥ DC, pinned by a
-  stated ∥ on two ring sides). A new shape is a row. **Derived on every render** like `hasVariant`, so the
+  stated ∥ on two ring sides). A new shape is a row — `midsegment-free` (#1368, [ADR-545](06-decisions.md#adr-545)) is one: with NOTHING named the whole configuration is unstated, so the row names the side the midsegment ended up PARALLEL to, which determines both endpoints. **Derived on every render** like `hasVariant`, so the
   note appears with the fact, follows the cycle, and vanishes when a later fact pins the choice or the fact
   is disabled, removed or broken. Nothing is stored.
+- **Two midsegments, two shapes, two counts (#1368, [ADR-545](06-decisions.md#adr-545)).** `midsegment` has TWO variants and `midsegment-free` THREE, and they are separate `VariantShape`s rather than one shape with a bigger count. `midsegment` is used when the student has already placed an endpoint on a side, so that side is **stated** and only the other is free; `midsegment-free` is «קטע אמצעים» with no arguments, where the choice is which of the three sides it is parallel to. Raising `midsegment` to 3 would let «show another configuration» move the student's endpoint **off the side they named** — a variant that contradicts a given, which inverts what the channel is for. **The rule the pair encodes: a variant explores what was not stated, never what was.**
+- **A gate that enumerates shapes is a chokepoint.** `droppedMidsegment` tested `shape === 'midsegment'` as a literal, so a new midsegment form read as a DROPPED one and a correctly-parsed utterance was refused. Consumers now ask `MIDSEGMENT_SHAPES` (exported by `shapeVariants.ts`), so a fourth form cannot silently fail a gate written when there were two. The failure mode is worth naming: an out-of-date gate refuses CORRECT input and reads exactly like a parser bug.
 - **The trapezoid's ring in force (#989, [ADR-506](06-decisions.md#adr-506)).** The `trapezoid` lowering makes
   sides 0 and 2 of the ring it receives parallel, and `trapezoidRingInForce(ids, statedParallels)` (same file)
   is the ONE reader of which ring that is: as named (AB ∥ DC for «טרפז ABCD»), rotated by one when a stated ∥

@@ -16,14 +16,31 @@
  * supplies the explicit equalities for the pin), and `VARIANT_COUNT` drives the cycle ("show another").
  */
 
-import type { AnyCommand, Command, Id } from './types';
+import type { AnyCommand, Command, Id, VariantShape } from './types';
 
-export type VariantShape = 'kite' | 'isosceles' | 'midsegment';
+export type { VariantShape };
+
 
 /** How many valid configurations each shape has — the modulus "show another configuration" cycles. A kite has
  *  two symmetry axes, an isosceles triangle three apexes, a base-less midsegment two host sides for its free
- *  endpoint ([ADR-199](docs/06-decisions.md#adr-199)). */
-export const VARIANT_COUNT: Record<VariantShape, number> = { kite: 2, isosceles: 3, midsegment: 2 };
+ *  endpoint ([ADR-199](docs/06-decisions.md#adr-199)).
+ *
+ *  `midsegment-free` has THREE, and the difference from `midsegment` is load-bearing rather than cosmetic
+ *  ([ADR-545](docs/06-decisions.md), #1368). In `midsegment` the student has already placed one endpoint on a
+ *  side — «E על AC» — so that side is STATED and only the other endpoint's side is free: two configurations.
+ *  In `midsegment-free` nothing is stated at all («קטע אמצעים» alone), so the choice is which of the three
+ *  sides the midsegment is PARALLEL to. Giving `midsegment` three variants instead would let "show another
+ *  configuration" move E off the side the student named — cycling into a figure that contradicts a given,
+ *  which is the opposite of what the variant channel is for. */
+export const VARIANT_COUNT: Record<VariantShape, number> = { kite: 2, isosceles: 3, midsegment: 2, 'midsegment-free': 3 };
+
+/**
+ * The shapes that ARE a midsegment. Consumers ask this set rather than naming `'midsegment'` literally, so
+ * adding a fourth midsegment form cannot silently fail a gate that was written when there were two — which
+ * is exactly what happened when `midsegment-free` was added: `droppedMidsegment` tested one literal, did not
+ * recognise the new command, and refused a correctly-parsed utterance as a dropped given (#1368).
+ */
+export const MIDSEGMENT_SHAPES: ReadonlySet<VariantShape> = new Set<VariantShape>(['midsegment', 'midsegment-free']);
 
 /** A `set-equal` argument tuple `[a,b,c,d]` meaning |ab| = |cd|. */
 type EqTuple = [Id, Id, Id, Id];
@@ -84,7 +101,8 @@ export function pinsSoftVariant(
 ): boolean {
   const alreadyStated = (pair: EqTuple) => explicitEqs.some((eq) => eqMatchesPair(eq, pair));
   for (const sv of shapeVariants) {
-    if (sv.shape === 'midsegment') continue;
+    // Neither midsegment form carries an equal-pair, so neither can be pinned by a stated equality.
+    if (sv.shape === 'midsegment' || sv.shape === 'midsegment-free') continue;
     for (const variant of variantPairs(sv.shape, sv.ids)) {
       for (const pair of variant) {
         if (eqMatchesPair(setEqual, pair) && !alreadyStated(pair)) return true;
@@ -123,6 +141,44 @@ function expandMidsegment(ids: Id[], variant: number, explicitOnSegs: { id: Id; 
 }
 
 /**
+ * The FULLY base-less midsegment ([ADR-545](docs/06-decisions.md), #1368) — `ids = [P, Q, R, E, G]` over
+ * triangle `PQR`, where BOTH endpoints are fresh: the student said «קטע אמצעים» and named nothing else.
+ *
+ * A midsegment joins the midpoints of two sides, so the real choice is **which pair** — equivalently, which
+ * side it ends up PARALLEL to. The three sides give three configurations, and the variant selects among them:
+ * `0 ⇒ ∥ QR` (endpoints on PQ, PR) · `1 ⇒ ∥ PR` (on PQ, QR) · `2 ⇒ ∥ PQ` (on PR, QR). Nothing here is a
+ * default masquerading as a given: all three are genuinely unstated (ADR-052) and «הציגו תצורה אחרת» walks them.
+ *
+ * Both endpoints are plain `midpoint`s — unlike `expandMidsegment`, there is no pre-existing free rider to
+ * drive with a `set-equal`. The student may still PIN the choice by placing an endpoint: an explicit
+ * `point-on-segment` on one of the three sides selects the variant whose endpoints ride it
+ * ([ADR-412](docs/06-decisions.md#adr-412)), the same pin the two-variant form honours.
+ */
+function expandMidsegmentFree(ids: Id[], variant: number, explicitOnSegs: { id: Id; a: Id; b: Id }[] = []): Command[] {
+  const [p, q, r, e, g] = ids;
+  // Variant k ⇒ the two sides the endpoints ride. Index matches the docblock: 0 ∥ QR, 1 ∥ PR, 2 ∥ PQ.
+  const sidesFor = (v: number): [[Id, Id], [Id, Id]] =>
+    v === 0 ? [[p, q], [p, r]] : v === 1 ? [[p, q], [q, r]] : [[p, r], [q, r]];
+  let chosen = ((variant % 3) + 3) % 3;
+  // An explicitly stated on-segment placement of either endpoint pins the configuration that honours it.
+  for (let v = 0; v < 3; v++) {
+    const [sa, sb] = sidesFor(v);
+    const rides = (pt: Id, side: [Id, Id]) =>
+      explicitOnSegs.some((o) => o.id === pt && ((o.a === side[0] && o.b === side[1]) || (o.a === side[1] && o.b === side[0])));
+    if (rides(e, sa) || rides(g, sb) || rides(e, sb) || rides(g, sa)) {
+      chosen = v;
+      break;
+    }
+  }
+  const [sideE, sideG] = sidesFor(chosen);
+  return [
+    { type: 'midpoint', id: e, a: sideE[0], b: sideE[1] },
+    { type: 'midpoint', id: g, a: sideG[0], b: sideG[1] },
+    { type: 'segment', a: e, b: g },
+  ];
+}
+
+/**
  * Expand a `shape-variant` command into engine commands. `explicitEqs` are the genuine `set-equal`s the
  * student/LLM gave (NOT from another shape-variant) — they (1) PIN the variant they match and (2) suppress
  * re-emitting that pair. With none, the figure uses `cmd.variant` and emits all its pairs (seed-0/variant-0
@@ -135,6 +191,7 @@ export function expandShapeVariant(
   explicitOnSegs: { id: Id; a: Id; b: Id }[] = [],
 ): Command[] {
   if (cmd.shape === 'midsegment') return expandMidsegment(cmd.ids, cmd.variant, explicitOnSegs);
+  if (cmd.shape === 'midsegment-free') return expandMidsegmentFree(cmd.ids, cmd.variant, explicitOnSegs);
   const all = variantPairs(cmd.shape, cmd.ids);
   const n = all.length;
   const matchesAny = (pair: EqTuple) => explicitEqs.some((eq) => eqMatchesPair(eq, pair));
@@ -231,7 +288,7 @@ export type UnstatedChoice =
   | {
       factId: string;
       kind: 'free-endpoint';
-      shape: 'midsegment';
+      shape: 'midsegment' | 'midsegment-free';
       ids: Id[];
       /** The free endpoint, the side it rides in the active variant, and the side the midsegment is therefore parallel to. */
       point: Id;
@@ -312,6 +369,19 @@ export function unstatedChoices(facts: readonly ChoiceFact[]): UnstatedChoice[] 
         if (pinned) continue;
         const v = ((c.variant % 2) + 2) % 2;
         out.push({ factId: f.id, kind: 'free-endpoint', shape: 'midsegment', ids: [...c.ids], point: g, side: v === 0 ? [p, r] : [q, r], parallelTo: v === 0 ? [q, r] : [p, r] });
+        continue;
+      }
+      if (c.shape === 'midsegment-free') {
+        // Nothing was stated, so the whole configuration is the choice — and naming the side it ended up
+        // PARALLEL to describes it completely (that side determines both endpoints). Pinned the moment the
+        // student places either endpoint on a side (ADR-412), exactly as the two-variant form is.
+        const [p, q, r, e, g] = c.ids;
+        const v = ((c.variant % 3) + 3) % 3;
+        const sides: [[Id, Id], [Id, Id]] = v === 0 ? [[p, q], [p, r]] : v === 1 ? [[p, q], [q, r]] : [[p, r], [q, r]];
+        const parallelTo: [Id, Id] = v === 0 ? [q, r] : v === 1 ? [p, r] : [p, q];
+        const pinned = onSegs.some((o) => (o.id === e || o.id === g) && sides.some((s) => sameSeg([o.a, o.b], s)));
+        if (pinned) continue;
+        out.push({ factId: f.id, kind: 'free-endpoint', shape: 'midsegment-free', ids: [...c.ids], point: g, side: sides[1], parallelTo });
         continue;
       }
       // kite / isosceles: a stated equality on ANY variant's pair pins the choice (the ADR-138 rule

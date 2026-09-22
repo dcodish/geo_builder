@@ -19,7 +19,7 @@
  * no digits). Keywords are bilingual; the same rule matches either language.
  */
 
-import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
+import { MIDSEGMENT_SHAPES, RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
 import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { stripFormatControls } from '../../shell/bidi';
@@ -1123,6 +1123,36 @@ const rightTrapezoid = shapeMacro(
 );
 
 /**
+ * The midsegment with NOTHING named — «קטע אמצעים» alone ([ADR-545](docs/06-decisions.md), #1368).
+ *
+ * The operator's report: on a figure holding «משולש ABC», «תוסיף קטע אמצעים» was `not-handled`, escalated,
+ * and the model supplied the missing arguments — drawing the midsegment to a side the student never named.
+ * That is the ADR-052 cardinal sin arriving through the LLM: a given the question never gave.
+ *
+ * A midsegment joins the midpoints of two sides, so with the triangle resolved from the figure the ONLY
+ * unstated thing is which pair — equivalently which side it is parallel to. Three sides, three
+ * configurations, and «הציגו תצורה אחרת» walks them. Both endpoints are `@`-anonymous
+ * ([ADR-297](docs/06-decisions.md#adr-297)) so no auto-minted `M`/`N` hijacks the student's namespace —
+ * the class scenario `named-midsegment-reuses-existing-midpoint-endpoint` records that exact complaint
+ * («I now have M and N somehow»). The student promotes a dot to a letter when they want to name it.
+ *
+ * Ambiguity REFUSES rather than picks: 0 or ≥2 candidate triangles returns null, and the `droppedMidsegment`
+ * gate turns that into an honest escalation. Picking one would reintroduce the very defect this removes.
+ */
+function midsegmentFree(s: string, ctx: ParseContext): AnyCommand[] | null {
+  // Only the bare keyword — no base, no endpoints, no named triangle. Anything richer is another branch's.
+  if (!/^\s*(?:the\s+|ה)?(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)\s*$/i.test(s.trim())) return null;
+  const tris = (ctx.polygons ?? []).filter((v) => v.length === 3);
+  if (tris.length !== 1) return null; // 0 ⇒ nothing to bind to · ≥2 ⇒ which one? — escalate, never guess
+  const tri = tris[0].map(up);
+  // Deterministic ids (CLAUDE.md) so re-issuing the same sentence is idempotent, and STABLE across variants
+  // so cycling moves the same two dots rather than minting new ones.
+  const e = anonId('ms', tri.join(''), '1');
+  const g = anonId('ms', tri.join(''), '2');
+  return [{ type: 'shape-variant', shape: 'midsegment-free', ids: [tri[0], tri[1], tri[2], e, g], variant: 0 }];
+}
+
+/**
  * The base-less midsegment ("EG קטע אמצעים", no parallel base) — [ADR-199](docs/06-decisions.md#adr-199).
  * Requires the named endpoint pair and figure context: exactly one endpoint (`E`) already sits on a triangle
  * side — either riding it FREE (`ctx.onSegment`) or as its existing MIDPOINT (`ctx.midpointOf`, ADR-199 Am.,
@@ -1136,7 +1166,7 @@ function midsegmentBaseless(s: string, ctx: ParseContext): AnyCommand[] | null {
   const nm =
     s.match(/^\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)/i) ??
     s.match(/(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)\s+\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
-  if (!nm || !isUpperLabel(nm[1]) || !isUpperLabel(nm[2])) return null;
+  if (!nm || !isUpperLabel(nm[1]) || !isUpperLabel(nm[2])) return midsegmentFree(s, ctx);
   const pair = [up(nm[1]), up(nm[2])];
   if (pair[0] === pair[1]) return null;
   const onSeg = ctx.onSegment ?? {};
@@ -5335,7 +5365,7 @@ const semicircle: Rule = (s, ctx) => {
   );
   const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
   /**
-   * A CENTRE-FIRST 3-RUN — «חצי מעגל ODC» (#1204, ADR-NNN).
+   * A CENTRE-FIRST 3-RUN — «חצי מעגל ODC» (#1204, ADR-545).
    *
    * The arc family reads a 3-run as *centre, then the two ends*: «רבע מעגל ODC» and «גזרה ODC» both do,
    * and the semicircle was the one member that read no 3-run at all — it went to the LLM lane or to
@@ -10933,7 +10963,8 @@ const POLY_NOUN =
 export function droppedMidsegment(utterance: string, commands: AnyCommand[]): boolean {
   if (!/midsegment|mid-?segment|midline|קטע\s+ה?אמצעים/i.test(utterance)) return false;
   return !commands.some(
-    (c) => c.type === 'midpoint' || (c.type === 'shape-variant' && c.shape === 'midsegment') || c.type === 'set-equal',
+    // MIDSEGMENT_SHAPES, not a literal: a new midsegment form must not read as a DROPPED one (#1368).
+    (c) => c.type === 'midpoint' || (c.type === 'shape-variant' && MIDSEGMENT_SHAPES.has(c.shape)) || c.type === 'set-equal',
   );
 }
 function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseContext): boolean {

@@ -995,6 +995,14 @@ export interface Construction {
 }
 
 /** Commands the engine applies. The parser (Phase 4) will produce these. */
+/**
+ * The shapes whose configuration is genuinely unstated and therefore CYCLABLE. Declared here rather than in
+ * `shapeVariants.ts` so the command type and the expander read ONE list: the union was written out twice, and
+ * adding `midsegment-free` (#1368) to one copy left the other rejecting a command the parser legitimately
+ * emits. `shapeVariants.ts` re-exports it, so every existing import keeps working.
+ */
+export type VariantShape = 'kite' | 'isosceles' | 'midsegment' | 'midsegment-free';
+
 export type Command =
   | { type: 'square'; ids: [Id, Id, Id, Id]; side?: number }
   | { type: 'quadrilateral'; ids: [Id, Id, Id, Id]; declaredAs?: string } // declaredAs: the variant noun a shape-variant lowering carries through its base command ('kite', #770)
@@ -1223,7 +1231,7 @@ export type SymbolicCommand =
   // `replay` EXPANDS it to the base shape + the variant-selected commands; for kite/isosceles an explicit
   // `set-equal` on the shape's sides PINS the matching variant (and that pair is not re-emitted). `variant`
   // is the persisted, cyclable index ("show another configuration" steps it).
-  | { type: 'shape-variant'; shape: 'kite' | 'isosceles' | 'midsegment'; ids: Id[]; variant: number }
+  | { type: 'shape-variant'; shape: VariantShape; ids: Id[]; variant: number }
   // A polygon INSCRIBED IN ANOTHER POLYGON ([ADR-262](docs/06-decisions.md#adr-262)) — "מעוין BDEF חסום
   // במשולש ABC" / "rectangle inscribed in triangle ABC". The inscribed `shape` (rhombus/rectangle/square/
   // parallelogram) has its vertices `ids` (cyclic order) riding the boundary of `container` (cyclic order):

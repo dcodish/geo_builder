@@ -40,11 +40,12 @@
  */
 
 import { expect } from 'vitest';
+import { replay } from '@/store/geoStore';
 import { isGeoPoint, freeDofCount, detectRelations, detectShapes } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 
 import type { Scenario } from './scenarios-harness';
-import { at, dist, angle, allStepsOk, convexQuad } from './scenarios-harness';
+import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-harness';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -2676,6 +2677,51 @@ export const SCENARIOS_4: Scenario[] = [
       const ang = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.atan2(p.y - C.y, p.x - C.x) - Math.atan2(q.y - C.y, q.x - C.x);
       const norm = (a: number) => Math.abs(((((a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI);
       expect(norm(ang(A, E)), '∠ACE = ∠ECB').toBeCloseTo(norm(ang(E, B)), 6);
+    },
+  },
+  {
+    id: 'bare-midsegment-binds-the-triangle-and-cycles-1368',
+    title:
+      '#1368 / ADR-545: «קטע אמצעים» with NOTHING named binds the figure\'s one triangle and draws a real midsegment whose side is a 3-way cyclable DOF — was not-handled, so the LLM invented the side',
+    guards:
+      "The operator's play of prod/2026-09-22-3: on a figure holding «משולש ABC» he typed «תוסיף קטע אמצעים». The remainder «קטע אמצעים» was not-handled, so the line escalated and the model supplied the missing arguments — drawing the midsegment to CB, a side he never named. That is ADR-052's cardinal sin arriving through the LLM. ADR-199's cyclable shape-variant already existed but anchors on a NAMED endpoint, so the fully bare form had no rule. Now it binds the figure's single triangle (ambiguity REFUSES rather than picks) and the unstated side is the variant: three sides, three configurations, «הציגו תצורה אחרת» walks them. Endpoints are @-anonymous (ADR-297) so no auto-minted M/N hijacks the student's namespace — the complaint scenario named-midsegment-reuses-existing-midpoint-endpoint records. The «תוסיף» wrapper itself is a separate defect (#1358): it must be TAUGHT, not absorbed, and arrives with the shared imperative register.",
+    steps: ['משולש ABC', 'קטע אמצעים'],
+    check(fig) {
+      allStepsOk(fig);
+      const e = '@ms-ABC-1';
+      const g = '@ms-ABC-2';
+      expect(fig.positions.has(e) && fig.positions.has(g), 'both endpoints are placed').toBe(true);
+      // No letter was minted — the student's namespace is untouched (ADR-297).
+      for (const stray of ['M', 'N', 'E', 'G']) {
+        expect(fig.positions.has(stray), `no ${stray} minted`).toBe(false);
+      }
+      // Each endpoint is the MIDPOINT of a side, and the two sides differ.
+      const V: Record<string, Vec> = { A: at(fig, 'A'), B: at(fig, 'B'), C: at(fig, 'C') };
+      const sides: [string, string][] = [['A', 'B'], ['A', 'C'], ['B', 'C']];
+      const midOf = (pt: Vec) =>
+        sides.find(([x, y]) => Math.abs(dist(V[x], pt) + dist(pt, V[y]) - dist(V[x], V[y])) < 1e-6 && Math.abs(dist(V[x], pt) - dist(pt, V[y])) < 1e-6);
+      const sE = midOf(fig.positions.get(e)!);
+      const sG = midOf(fig.positions.get(g)!);
+      expect(sE, 'first endpoint is a side midpoint').toBeDefined();
+      expect(sG, 'second endpoint is a side midpoint').toBeDefined();
+      expect(sE!.join('') === sG!.join(''), 'the two endpoints are on DIFFERENT sides').toBe(false);
+      // A genuine midsegment: parallel to the third side (the one neither endpoint rides).
+      const third = sides.find((s) => s.join('') !== sE!.join('') && s.join('') !== sG!.join(''))!;
+      const seg = { x: fig.positions.get(g)!.x - fig.positions.get(e)!.x, y: fig.positions.get(g)!.y - fig.positions.get(e)!.y };
+      const base = { x: V[third[1]].x - V[third[0]].x, y: V[third[1]].y - V[third[0]].y };
+      expect(
+        Math.abs(seg.x * base.y - seg.y * base.x) / (Math.hypot(seg.x, seg.y) * Math.hypot(base.x, base.y)),
+        'the midsegment is parallel to the third side',
+      ).toBeLessThan(1e-6);
+      // THREE configurations, all distinct — the operator's ruling that it "can move on a new config".
+      const seen = new Set();
+      for (let v = 0; v < 3; v++) {
+        const r = replay(factsOf(['משולש ABC', 'קטע אמצעים']).map((f) => (f.cmd.type === 'shape-variant' ? { ...f, cmd: { ...f.cmd, variant: v } } : f)));
+        const W: Record<string, Vec> = { A: r.positions.get('A')!, B: r.positions.get('B')!, C: r.positions.get('C')! };
+        const which = (pt: Vec) => sides.find(([x, y]) => Math.abs(dist(W[x], pt) + dist(pt, W[y]) - dist(W[x], W[y])) < 1e-6)!.join('');
+        seen.add([which(r.positions.get(e)!), which(r.positions.get(g)!)].sort().join('|'));
+      }
+      expect(seen.size, 'all three side-pairs are reachable by cycling').toBe(3);
     },
   },
 ];
