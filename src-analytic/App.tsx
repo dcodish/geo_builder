@@ -653,6 +653,20 @@ export function App() {
         recordLine(verdict.line);
         setDraft('');
         return;
+      /**
+       * THE TEACHING CASE (#1353, ADR-W-030) — the one branch that deliberately does NOT clear the box.
+       *
+       * The canonical sentence is put INTO the input, visibly replacing what the student typed, and
+       * the note tells them why. One Enter builds it: no retyping, and the form they read is the form
+       * they then submit, so the fact list records a sentence they actually stated.
+       *
+       * `setNotice` rather than `setError`: we understood them perfectly. Colouring a correct
+       * intention as a mistake is the #1045 lesson.
+       */
+      case 'teach':
+        setDraft(verdict.canonical);
+        setNotice(t('noticeTeachCanonical', { verb: verdict.verb, canonical: verdict.canonical }));
+        return;
     }
   };
 

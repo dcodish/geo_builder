@@ -621,6 +621,9 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
       case 'already-follows': return 'entailed';
       case 'record': return 'recorded';
       case 'ignored': return 'ignored';
+      // #1353 — an imperative wrapper teaches instead of committing. None of the cases below is
+      // wrapped, so reaching this here would itself be the finding.
+      case 'teach': return `teach:${v.canonical}`;
     }
   };
 

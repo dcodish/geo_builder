@@ -20,6 +20,7 @@
  */
 import type { InputError } from '../store/useAnalyticStore';
 import { parseLine } from '../parser/parseAnalytic';
+import { imperativeCandidates } from '../parser/scopeAnalytic';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 
@@ -34,7 +35,18 @@ export type SubmitVerdict =
   /** #1063 — the line is TRUE and the figure already settled it; it adds nothing to the list. */
   | { kind: 'already-follows'; line: string }
   /** The line contributes. Record it. */
-  | { kind: 'record'; line: string };
+  | { kind: 'record'; line: string }
+  /**
+   * #1353 / ADR-W-030 — the line is an IMPERATIVE WRAPPER over a sentence the tool does understand.
+   *
+   * Nothing is recorded. The caller pre-fills the input with `canonical` and shows the teaching line,
+   * so the student reads the textbook form and presses Enter once. What ends up in the fact list is
+   * therefore a sentence they submitted, not a rewrite done on their behalf (ADR-W-029).
+   *
+   * `canonical` is a string `parseLine` has just accepted, so this verdict can never teach a form the
+   * tool would reject.
+   */
+  | { kind: 'teach'; verb: string; canonical: string };
 
 /**
  * How many CONSTRAINTS the line appended — the measurement that separates #1063 from #1076.
@@ -77,6 +89,43 @@ export function decideSubmit(
 ): SubmitVerdict {
   const line = raw.trim();
   if (!line) return { kind: 'ignored' };
+
+  /**
+   * NON-CANONICAL INPUT IS TAUGHT, NEVER SILENTLY ACCEPTED (#1353, ADR-W-030) — and it is checked
+   * FIRST, because the defect is that the wrapped form currently succeeds.
+   *
+   * 42 of the 1,470 wrapper x catalog pairs built silently before this: «הוסף C מחלקת את AB ביחס 3:2»
+   * was recorded verbatim, so the fact list taught the imperative back to the student. Placing this
+   * after `parseLine` would leave exactly those 42 untouched, which is the whole issue.
+   *
+   * A candidate becomes a lesson ONLY when the remainder parses. That is what keeps a sentence which
+   * merely opens with a verb-like word from being dismembered: if nothing underneath the wrapper is a
+   * real sentence, this returns nothing and the original line takes its ordinary path — refusal, and
+   * the LLM seam if it is `not-handled`.
+   */
+  for (const candidate of imperativeCandidates(line)) {
+    /**
+     * TWO GATES, and the second one is the one that matters.
+     *
+     * `parseLine` is the cheap filter. It is NOT the promise: measured on an empty canvas,
+     * «הוסף C מחלקת את AB ביחס 3:2» has a remainder the PARSER accepts and the FOLD refuses
+     * (`unknown-reference` — there is no A and no B yet). Teaching on the parser alone would put a
+     * sentence in the box, tell the student to press Enter, and refuse them for doing it — worse than
+     * the silent acceptance this feature exists to remove.
+     *
+     * So the lesson is offered only when this same function would RECORD the sentence as it stands.
+     * What is pre-filled is therefore not merely grammatical: it is a line that will be accepted, in
+     * this figure, right now. Where it would not be, the wrapper falls through and the student gets
+     * the honest refusal about the real problem — that A and B do not exist yet.
+     *
+     * The recursion terminates: each candidate drops at least the leading verb, and a remainder with
+     * no verb in front yields no candidates at all.
+     */
+    if (!parseLine(candidate.remainder).ok) continue;
+    if (decideSubmit(candidate.remainder, lines, seed, current).kind === 'record') {
+      return { kind: 'teach', verb: candidate.verb, canonical: candidate.remainder };
+    }
+  }
 
   const parsed = parseLine(line);
   if (!parsed.ok) {

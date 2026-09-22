@@ -874,6 +874,25 @@ English `=` form — «angle ABC = 90» — and they mean the same thing **in an
 is named by a WHOLE name, never by a letter pair taken out of the middle of a word.** «ANGLE ABC» is not
 three measurements. A non-right angle value remains out of scope in both languages.
 
+**R114 — the tool never accepts a sentence a textbook would not print; it teaches the one it would**
+([ADR-AG-150](06c-decisions-analytic.md#adr-ag-150),
+[#1353](https://github.com/dcodish/geo_builder/issues/1353), implementing
+[ADR-W-030](06w-decisions-workspace.md#adr-w-030)). «הוסף C מחלקת את AB ביחס 3:2» must not build. The
+tool understood it perfectly, and that is exactly why it must not accept it: what a student types comes
+back to them in the fact list, in the saved file and in the exported image, so accepting the imperative
+teaches the imperative. Instead the tool puts the textbook sentence — «C מחלקת את AB ביחס 3:2» — into
+the input box, says why, and the student presses Enter once. Nothing is recorded on their behalf: the
+row that appears is a sentence they submitted.
+
+The sentence the tool offers is always one the tool would ACCEPT IF SUBMITTED NOW — not merely one
+that parses. Pre-filling a grammatical sentence the figure cannot yet support would tell the student
+to press Enter and then refuse them for doing it, which is worse than accepting the imperative. So
+where the underlying sentence would not be accepted — «C מחלקת את AB ביחס 3:2» before A and B exist —
+nothing is taught, and the student gets the honest refusal naming the real problem. Where it cannot produce a sentence it is silent about it rather than guessing — an
+imperative over something the tool does not understand («צייר משהו יפה») is left exactly as it is
+today. The verbs are a closed, published list, not a model's judgement: what counts as non-canonical
+input is a teaching decision this product owns.
+
 **R113 — a display name reads in the right order, whatever its script**
 ([ADR-AG-149](06c-decisions-analytic.md#adr-ag-149),
 [#1344](https://github.com/dcodish/geo_builder/issues/1344)). The panel's equations row must read
