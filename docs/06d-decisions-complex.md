@@ -2356,3 +2356,93 @@ its history.
 **Consequences.** `useComplexStore` is wrapped in `temporal`; the row gains undo · redo before clear-all,
 matching the sibling order. `row-parity.test.ts` asserts all four builders with no carve-out. Complex
 lane 74 files / 1137 tests.
+## ADR-CX-040 — A real parameter is a SINGLE letter: an unknown word must not become an invented coefficient (#1364)
+
+**Requirements:** none (internal) — no promise changes; a line that silently meant something else now
+refuses. **Design:** [04d](04d-design-complex.md) — "The parameter floor".
+
+**The class:** *a permissive fallback that accepts an unknown token as a fresh symbol, in a grammar
+where juxtaposition means multiplication.* Found while triaging the operator's play of
+`prod/2026-09-22-3`.
+
+### The defect
+
+```
+«add z1 = 3+4i»  ->  ok: true
+     lhs = { t:"mul", l:{ t:"param", name:"add" }, r:{ t:"ref", name:"z1" } }
+```
+
+`add z1 = 3+4i` was read as **`add · z1 = 3+4i`**, a different equation from the one the student typed,
+and it reported `ok`. The student saw a green figure for a given they never stated.
+
+### Root cause — the ruling was right, the fallback had no floor
+
+[ADR-CX-004](#adr-cx-004) rules that a name outside the z/w family **is** a real parameter, so that
+`|z₁| = 9r` creates `r` with no declaration — the operator's own words: *"z and w are complex numbers,
+so if I just write z or z2 … it should be a complex number without having to specify it"*. That ruling
+is correct and is preserved here in full.
+
+What was missing is a floor on *what may be a parameter name*. `nameExpr` applied the ruling to an
+arbitrary letter RUN, so every word the grammar did not know became a coefficient. The generalisation
+is the point, and it is why this could not be closed on the reported word:
+
+- an English wrapper verb — `add`, `draw`, `let`, `plot`, `set`;
+- a **typo** — `zz1 = 3+4i` silently declares a parameter `zz1` instead of failing;
+- a **keyword typo** — `conjj(z1)`, which no keyword list can anticipate.
+
+### Why this is fixed at the mechanism, and not with a fourth keyword
+
+**This is the third instance of the class in this file, and the first fix at the mechanism.** Both
+earlier ones were closed by teaching the tokenizer one more keyword, and both left the next unknown
+word free to do it again:
+
+| instance | what it silently became | how it was closed |
+| --- | --- | --- |
+| `2cis150` | the tail lexed as the NAME `cis150` → a product with an invented parameter | `cis(?![A-Za-z])` added to `TOKEN` |
+| `im(z1)` | `im · z1` — the `proj` docblock: *"a stated projection silently became a product with an invented real parameter"* | `re`/`im` added to `TOKEN` |
+| `add z1` (this) | `add · z1` | **the floor** |
+
+Growing a keyword list to stop an unknown token claiming meaning is
+[docs/17](17-design-rules.md) tripwire 4 — *word-presence is not semantics*. The keyword list fixes the
+words we have already been bitten by; the floor fixes the ones we have not.
+
+### The mechanism
+
+A real parameter is a **single letter, optionally indexed** — `PARAM_NAME = /^[a-z]\d*$/` in
+`exprParse.ts`. That is the exam's register and the whole legitimate set: measured, the only parameter
+name anywhere in this tree is `r`. `nameExpr` now returns `Expr | null`, and `null` refuses the line.
+
+Resolution order is unchanged and matters: two glued CAPITALS are a **distance** (`AB`, #791,
+[ADR-CX-033](#adr-cx-033)) and are resolved *before* the floor, so the one legitimate multi-letter run
+is untouched.
+
+**The honesty invariant is what the refusal buys** (CLAUDE.md): a given parses to a constraint,
+escalates, or errors — it never vanishes into a different meaning. A refused line escalates like any
+other unhandled input rather than drawing something the student did not ask for.
+
+### What this deliberately does NOT do
+
+`z1 = a+bi` now refuses. It did not work before either — `bi` lexed as one name and became a single
+real parameter, so the line meant `a + bi` with `bi` atomic, **not** `a + b·i`. So this is a silently
+wrong parse becoming an honest refusal, not a capability removed; the symbolic cartesian form has
+never been supported. It is worth having, and is filed separately (#1365) rather than smuggled in
+here — the two changes have different risk and different tests.
+
+### Sibling audit
+
+- **`src-analytic/`** — not present, and it already has this floor. Measured: its parameters require an
+  explicit declaration sentence («a הוא פרמטר»), and the symbol capture is `^([a-zA-Z])` — a SINGLE
+  letter by regex. Analytic therefore demands both a declaration and a one-letter name, where complex
+  demanded neither. Nothing there invents a symbol from an unrecognised token.
+- **`src/` (2-D) and `src3d/`** — not present, and not applicable in the same form: both read relation
+  *sentences* with a leftover guard (ADR-024) rather than a free expression grammar, so an unknown
+  token fails the rule rather than becoming an operand.
+- The only other expression grammar in the workspace is analytic's, checked above.
+
+### Lock
+
+`src-complex/__tests__/invented-parameter-1364.test.ts` — 28 cases through the real `parseLineV2` /
+`deriveLines` path, never re-implementing the rule (#1102/#1118): the reported line; seven wrapper
+verbs; typos; keyword typos; **the two historical instances, so the mechanism now defends what the
+keyword list used to**; and the legitimate register (`9r`, `2a`, `3k`, indexed `n1`, the capital label
+pair, and the catalog forms).

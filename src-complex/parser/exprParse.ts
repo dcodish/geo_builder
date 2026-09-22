@@ -50,11 +50,41 @@ const labelPair = (raw: string): [string, string] | null => {
   return m ? [m[1], m[2]] : null;
 };
 
-const nameExpr = (raw: string): Expr => {
+/**
+ * A real parameter is a SINGLE letter, optionally indexed — `r`, `a`, `b`, `k`, `n₁`. That is the
+ * exam's register, and it is the whole legitimate set: the only parameter name anywhere in this tree
+ * is `r`.
+ *
+ * **The rule exists because the fallback had no floor (#1364).** ADR-CX-004 rules that a name outside
+ * the z/w family IS a real parameter, so that `|z₁| = 9r` creates `r` without a declaration. Applied
+ * to an arbitrary letter RUN that ruling invents a coefficient out of any word the grammar does not
+ * know: `add z1 = 3+4i` parsed as `add · z1 = 3+4i` and reported `ok`, so the student was shown a
+ * figure for an equation they never wrote. A typo does the same — `zz1 = 3+4i` silently declares a
+ * parameter `zz1` rather than failing.
+ *
+ * This is the THIRD time this class has been fixed here, and the first time at the mechanism. The
+ * TOKEN comment records `2cis150` lexing its tail as the name `cis150`, and the `proj` docblock
+ * records `im(z1)` reading as `im · z1` — *"a stated projection silently became a product with an
+ * invented real parameter"*. Both were closed by teaching the tokenizer one more keyword, which fixes
+ * the instance and leaves the next unknown word to do it again. A floor on what may BE a parameter
+ * closes all of them, including keyword typos (`conjj(z1)`) that no keyword list can anticipate.
+ *
+ * A multi-letter run is not always wrong — two glued CAPITALS are a distance (`AB`, #791) and are
+ * resolved above this, before the floor applies.
+ */
+const PARAM_NAME = /^[a-z]\d*$/;
+
+/**
+ * Null means "this name is not something the grammar knows", which refuses the whole line rather than
+ * quietly re-interpreting it — the honesty invariant: a given parses, escalates or errors, never
+ * vanishes into a different meaning.
+ */
+const nameExpr = (raw: string): Expr | null => {
   const pair = labelPair(raw);
   if (pair) return abs(sub(ref(pair[0]), ref(pair[1])));
   const name = canonName(raw);
-  return isComplexName(name) ? ref(name) : param(name);
+  if (isComplexName(name)) return ref(name);
+  return PARAM_NAME.test(name) ? param(name) : null;
 };
 
 type Tok =

@@ -59,6 +59,17 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   `existingRef()` rather than each deciding for itself
   ([ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md)) — the difference
   between a rule and an enumeration of the cases someone remembered.
+- **The parameter floor: a real parameter is a SINGLE letter** (`PARAM_NAME` in `exprParse.ts`;
+  [ADR-CX-040](06d-decisions-complex.md#adr-cx-040)). [ADR-CX-004](06d-decisions-complex.md) rules that
+  a name outside the z/w family *is* a real parameter, so `|z₁| = 9r` needs no declaration. Without a
+  floor on the NAME that ruling invents a coefficient from any word the grammar does not know —
+  `add z1 = 3+4i` parsed as `add · z1 = 3+4i` and reported `ok` (#1364). Two glued capitals are a
+  distance (#791) and resolve before the floor; everything else multi-letter refuses.
+  **This is also the limit of span accounting, and the reason the two rules are stated together:**
+  the accountant guarantees every token is *claimed*, not that the claim is *meaningful*. `add` was
+  claimed — as a parameter — so the line balanced perfectly while meaning something the student never
+  wrote. A grammar where juxtaposition means multiplication needs both: every span claimed, and a
+  floor on what a claim may invent.
 - **A display transform never reaches the parser or the engine.** The polar↔cartesian toggle and the `n`
   stepper are view state, outside the store and outside undo. So changing how a number is *shown* can
   never change what was *stated* — a class of bug that is otherwise very hard to see.
