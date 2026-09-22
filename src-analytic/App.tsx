@@ -700,6 +700,10 @@ export function App() {
         source: 'llm',
         result: out.kind,
         ...(out.kind === 'lines' ? { steps: out.lines } : {}),
+        // #1356: point runs the sequence gate CORRECTED, as `WAS→WANT`. Without this a submit that was
+        // silently fixed reads identically to one that needed no fixing — which is how the 2-D #536 P1
+        // stayed invisible. Both siblings log the same field.
+        ...(out.kind === 'lines' && out.restored ? { restored: out.restored } : {}),
         ...(out.kind === 'rejected' ? { steps: [out.refusedStep] } : {}),
         ...(out.kind === 'busy' ? { why: out.why } : {}),
       });

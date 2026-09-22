@@ -926,3 +926,39 @@ the decision into its own function. That is what went red in #1315, on a refacto
    is caught. It calls the same `xFaults`, never its own copy.
 
 Live instances: `issue-1152-preview-rows.ts` (the input preview) and `issue-1296-rows.ts` (bidi run spans).
+
+## 5d. The sequence gate ([ADR-W-076](06w-decisions-workspace.md#adr-w-076))
+
+*Never reorder the letters of a point sequence — the sequence IS the statement.* One algorithm,
+`shell/llm/sequenceGate.ts`, three consumers.
+
+```
+shell/llm/sequenceGate.ts        the algorithm: stated runs by label multiset, ambiguity -> refuse,
+                                 reverse == same statement, rewrite by match index
+        ^            ^            ^
+        |            |            |
+src/parser/parse.ts  src3d/parser/honesty3.ts  src-analytic/parser/honestyAnalytic.ts
+  ULABEL             primed labels             a capital + optional digit
+  normalizeUtterance normalize3                identity
+  mask the area S    canonicalise primes       identity
+  emit the ORIGINAL  emit the CANONICALISED    emit the original
+```
+
+The last row of that table is the one to read: the two shipped copies **differed** in what they emit,
+and the extraction preserved the difference (`prepareLine` returns `{ match, emit }`) rather than
+unifying it. Unifying would have changed output in a shipped tool — a behaviour change wearing a
+refactor's clothes.
+
+**Where each product runs it:** 2-D in `submitPipeline`, 3-D in `App3`, analytic in `runFallback` — in
+every case on the model's lines and **before** the deterministic re-parse, because the restored
+spelling is what must be parsed, recorded and read back.
+
+**The corrections are logged.** Each product puts `restored` (`WAS→WANT`) on the submit event. Without
+it, a submit that was silently corrected looks exactly like one that needed no correction — which is
+how 2-D #536 went unnoticed until it reached production.
+
+**The rows, and the proof they bite.** `shell/__tests__/fixtures/sequence-gate-rows.ts` holds the
+checks once; each tree has a thin lock; 3-D's primed alphabet rides as an explicit option. The §5c
+meta-lock runs those rows against six broken gates and asserts each is caught — and one row was
+DELETED when the meta-lock showed it could not fail (a "not stateful across calls" check, which
+`matchAll`'s cloning makes unreachable). That deletion is the pattern working.

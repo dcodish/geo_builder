@@ -33,14 +33,21 @@
 import { decideSubmit, type SubmitVerdict } from './submit';
 import { derive } from '../engine/derive';
 import type { LlmStepsOutcome } from '../parser/llmAnalytic';
+import { restoreStatedSequencesAnalytic } from '../parser/honestyAnalytic';
 
 export type FallbackOutcome =
   /** The proxy was throttled. The caller says "busy", never "I did not understand". */
   | { kind: 'busy'; why: 'rate-limited' | 'daily-limit' }
   /** No usable answer, or the model judged the request inexpressible. Keep the deterministic refusal. */
   | { kind: 'none' }
-  /** Every line was accepted. Record them, in order. */
-  | { kind: 'lines'; lines: string[] }
+  /**
+   * Every line was accepted. Record them, in order.
+   *
+   * `restored` lists any `WAS→WANT` point-run corrections the sequence gate made (#1356). Carried out
+   * so the caller can log them: both siblings do, and it is how #536 was diagnosed at all — without it
+   * a `source:'llm'` submit that was silently corrected is indistinguishable from one that was not.
+   */
+  | { kind: 'lines'; lines: string[]; restored?: string[] }
   /**
    * The model answered and at least one line would be refused. Nothing is recorded, and the caller
    * keeps the ORIGINAL refusal rather than reporting the model's line — the student never wrote it,
@@ -71,10 +78,23 @@ export async function runFallback(
   if (answer.busy) return { kind: 'busy', why: answer.busy };
   if (!answer.steps.length) return { kind: 'none' };
 
+  /**
+   * THE SEQUENCE GATE (#1356), before anything re-parses — the siblings' rule, reached here at last.
+   *
+   * *Never reorder the letters of a point sequence: the sequence IS the statement.* 2-D #536 was a
+   * production P1 for exactly this — the model alphabetised a stated betweenness and the figure
+   * committed the NEGATION of the given. The system prompt asks the model not to; a prompt is a
+   * request, and #1251's own ADR argues this lane's safety must not rest on one.
+   *
+   * It runs BEFORE `decideSubmit` because the restored spelling is what must be parsed, recorded and
+   * read back — restoring afterwards would fix the text and leave the figure wrong.
+   */
+  const gated = restoreStatedSequencesAnalytic(utterance, [...answer.steps]);
+
   // Re-decide each line against the figure as it would stand after the ones before it — the same
   // incremental path the student walks, so a later line may legitimately depend on an earlier one.
   const accepted: string[] = [];
-  for (const step of answer.steps) {
+  for (const step of gated.lines) {
     const soFar = [...lines, ...accepted];
     const verdict: SubmitVerdict = decideSubmit(step, soFar, seed, derive(soFar, seed));
     if (verdict.kind === 'refused' || verdict.kind === 'ignored') {
@@ -85,5 +105,5 @@ export async function runFallback(
     if (verdict.kind === 'record') accepted.push(verdict.line);
   }
 
-  return accepted.length ? { kind: 'lines', lines: accepted } : { kind: 'none' };
+  return accepted.length ? { kind: 'lines', lines: accepted, ...(gated.restored.length ? { restored: gated.restored } : {}) } : { kind: 'none' };
 }
