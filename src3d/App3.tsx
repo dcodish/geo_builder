@@ -1182,6 +1182,7 @@ export default function App3() {
             const raw = i18n.language === 'he' ? c.he : c.en;
             return {
               example: isolateLtrRuns3(raw),
+              featured: c.featured,
               dir: textDir3(raw),
               onTry: () => {
                 setManualOpen(false);

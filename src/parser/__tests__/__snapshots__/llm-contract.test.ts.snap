@@ -1442,14 +1442,6 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "free-point",
     ],
   },
-  "point A at (0,0)": {
-    "en": [
-      "free-point",
-    ],
-    "he": [
-      "free-point",
-    ],
-  },
   "point E lies inside triangle KAO": {
     "en": [
       "triangle",

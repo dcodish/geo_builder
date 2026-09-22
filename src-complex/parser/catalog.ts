@@ -20,6 +20,20 @@ export interface CatalogEntry {
   readonly en: string;
   readonly descHe: string;
   readonly descEn: string;
+  /**
+   * SHOW THIS ONE FIRST in a capped guide section (#1347, [ADR-W-074](../../docs/06w-decisions-workspace.md#adr-w-074)).
+   *
+   * The guide shows six entries per section, and which six used to be FILE ORDER — so the six a
+   * student met were whichever rows happened to be written first, and every capability added after a
+   * section filled up landed in the invisible tail. Measured before this: «אילוצים» led with four
+   * spellings of one angle value, «מעגלים» with five variants of "two circles", and «גופים» with six
+   * prisms and no pyramid, cone or sphere at all.
+   *
+   * The six marked in each section are chosen to span six DIFFERENT capabilities, not six phrasings
+   * of one (operator-approved list, 2026-09-22). `manualSectionsLint` fails the suite if a capped
+   * section has fewer than the cap, so the next addition cannot quietly vanish into the tail.
+   */
+  readonly featured?: true;
 }
 
 export const CATALOG: readonly CatalogEntry[] = [
@@ -32,6 +46,7 @@ export const CATALOG: readonly CatalogEntry[] = [
   },
   {
     family: 'F2',
+    featured: true,
     he: 'z1 = 3+4i',
     en: 'z1 = 3+4i',
     descHe: 'הגדרה בצורה קרטזית',
@@ -39,6 +54,7 @@ export const CATALOG: readonly CatalogEntry[] = [
   },
   {
     family: 'F2',
+    featured: true,
     he: 'z2 = 2cis150',
     en: 'z2 = 2cis150',
     descHe: 'הגדרה בצורה קוטבית',
@@ -46,6 +62,7 @@ export const CATALOG: readonly CatalogEntry[] = [
   },
   {
     family: 'F2',
+    featured: true,
     he: 'w = z1*z2',
     en: 'w = z1*z2',
     descHe: 'מספר נגזר — זז עם הגורמים שלו',
@@ -60,6 +77,7 @@ export const CATALOG: readonly CatalogEntry[] = [
   },
   {
     family: 'F3',
+    featured: true,
     he: '|z1| = 9r',
     en: '|z1| = 9r',
     descHe: 'ערך מוחלט באמצעות פרמטר — r נשאר חופשי',
@@ -81,6 +99,7 @@ export const CATALOG: readonly CatalogEntry[] = [
   },
   {
     family: 'F4',
+    featured: true,
     he: 'arg z1 = 45',
     en: 'arg z1 = 45',
     descHe: 'ארגומנט נתון',
@@ -130,6 +149,7 @@ export const CATALOG: readonly CatalogEntry[] = [
   },
   {
     family: 'F6',
+    featured: true,
     he: 'המעגל החוסם את המשולש z1z2z3',
     en: 'circumscribed circle of triangle z1z2z3',
     descHe: 'המעגל החוסם — עובר בשלוש הנקודות',
