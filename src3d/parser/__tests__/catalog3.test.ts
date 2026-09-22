@@ -7,8 +7,15 @@
 
 import { describe, expect, it } from 'vitest';
 import { COMMAND_CATALOG_3D, type CatalogEntry3 } from '../catalog3';
-import { PROMPT_EXAMPLES_3D, buildSystemPrompt3, buildLlmRequest3 } from '../llmShared3';
+import { PROMPT_EXAMPLES_3D, PROMPT_SPEC_3D } from '../llmShared3';
 import { parse3, parseRename3 } from '../parse3';
+
+// #1359: the request body is composed in `server/llm/harness.ts`, which a product tree may not
+// import (BOUNDARIES: src -> server is forbidden). These cases assert this product's own prompt
+// PARTS instead — a tighter check than searching the composed blob, and the composition itself is
+// covered once for all three products in `server/__tests__/issue-1359-prompt-lane.test.ts`.
+const promptText = (s: { rules: string[]; vocabulary: () => string; examples: { freeform: string }[] }) =>
+  [...s.rules, s.vocabulary(), ...s.examples.map((e) => `"${e.freeform}" →`)].join('\n');
 
 /**
  * #578 (ADR-3D-211): the deterministic lane has TWO readers — `parse3`, which lowers a sentence to
@@ -41,12 +48,11 @@ describe('LLM prompt contract (PAR-10)', () => {
     });
   }
 
-  it('the request body is well-formed and carries the 3-D vocabulary', () => {
-    const req = buildLlmRequest3('a cube', 'The canvas is empty.');
-    expect(req.model).toBe('claude-haiku-4-5');
-    expect(req.tool_choice).toEqual({ type: 'tool', name: 'emit_steps' });
-    expect(buildSystemPrompt3()).toContain('קובייה ABCD');
-    expect(buildSystemPrompt3()).toContain('the volume of the cone');
+  it('the prompt carries the 3-D vocabulary and examples', () => {
+    // The request BODY (model, tool_choice, budget) is asserted once for all products in
+    // `server/__tests__/issue-1359-prompt-lane.test.ts` — this tree cannot import the composer.
+    expect(promptText(PROMPT_SPEC_3D)).toContain('קובייה ABCD');
+    expect(PROMPT_SPEC_3D.vocabulary()).toContain('the volume of the cone');
   });
 });
 
@@ -65,7 +71,7 @@ describe('#290 — the prompt never teaches inventing an unstated property', () 
   });
 
   it('the system prompt carries the ADR-052 property-honesty rule', () => {
-    const p = buildSystemPrompt3();
+    const p = promptText(PROMPT_SPEC_3D);
     expect(p).toMatch(/never invent an unstated property/i);
     expect(p).toMatch(/ישרה/); // names the prism-rightness case explicitly
   });

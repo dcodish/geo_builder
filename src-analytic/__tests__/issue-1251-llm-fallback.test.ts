@@ -10,11 +10,18 @@
  * precisely so this suite never reaches the network.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { PROMPT_EXAMPLES_ANALYTIC, buildSystemPromptAnalytic, buildLlmRequestAnalytic } from '../parser/llmSharedAnalytic';
+import { PROMPT_EXAMPLES_ANALYTIC, PROMPT_SPEC_ANALYTIC } from '../parser/llmSharedAnalytic';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
 import { parseLine } from '../parser/parseAnalytic';
 import { runFallback, fallbackContext } from '../app/fallback';
 import { derive } from '../engine/derive';
+
+// #1359: the request body is composed in `server/llm/harness.ts`, which a product tree may not
+// import (BOUNDARIES: src -> server is forbidden). These cases assert this product's own prompt
+// PARTS instead — a tighter check than searching the composed blob, and the composition itself is
+// covered once for all three products in `server/__tests__/issue-1359-prompt-lane.test.ts`.
+const promptText = (s: { rules: string[]; vocabulary: () => string; examples: { freeform: string }[] }) =>
+  [...s.rules, s.vocabulary(), ...s.examples.map((e) => `"${e.freeform}" →`)].join('\n');
 
 /**
  * THE PAR-10 CONTRACT: every step the prompt teaches must parse.
@@ -51,7 +58,7 @@ describe('#1251 — the prompt teaches only lines that parse', () => {
 });
 
 describe('#1251 — the system prompt carries the catalogue and the rules that matter', () => {
-  const prompt = buildSystemPromptAnalytic();
+  const prompt = promptText(PROMPT_SPEC_ANALYTIC);
 
   it('renders every catalogue entry as vocabulary', () => {
     expect(COMMAND_CATALOG_ANALYTIC.length).toBeGreaterThan(20);
@@ -70,12 +77,8 @@ describe('#1251 — the system prompt carries the catalogue and the rules that m
     expect(prompt).toMatch(re as RegExp);
   });
 
-  it('builds a request tagged for this tool', () => {
-    const req = buildLlmRequestAnalytic('נקודה A', 'The figure is empty.');
-    expect(req.system).toBe(prompt);
-    expect(req.tool_choice).toEqual({ type: 'tool', name: 'emit_steps' });
-    expect(req.messages[0].content).toContain('נקודה A');
-  });
+  // The request body (model, tool_choice, the utterance in the message) is asserted for all three
+  // products in `server/__tests__/issue-1359-prompt-lane.test.ts`; this tree cannot import the composer.
 });
 
 describe('#1251 — every returned line goes back through the real submit gate', () => {

@@ -9,10 +9,17 @@
 
 import { describe, it, expect } from 'vitest';
 import { parse } from '../parse';
-import { PROMPT_EXAMPLES, buildSystemPrompt } from '../llmShared';
+import { PROMPT_EXAMPLES, PROMPT_SPEC_2D } from '../llmShared';
 import { absorb } from '../llm';
 import { COMMAND_CATALOG } from '../catalog';
 import type { AnyCommand } from '@/engine';
+
+// #1359: the request body is composed in `server/llm/harness.ts`, which a product tree may not
+// import (BOUNDARIES: src -> server is forbidden). These cases assert this product's own prompt
+// PARTS instead — a tighter check than searching the composed blob, and the composition itself is
+// covered once for all three products in `server/__tests__/issue-1359-prompt-lane.test.ts`.
+const promptText = (s: { rules: string[]; vocabulary: () => string; examples: { freeform: string }[] }) =>
+  [...s.rules, s.vocabulary(), ...s.examples.map((e) => `"${e.freeform}" →`)].join('\n');
 
 // ── (a) every prompt few-shot example's steps parse ──────────────────────────
 describe('PAR-10 (a) — every PROMPT_EXAMPLES step parses (the prompt teaches only readable canonical forms)', () => {
@@ -31,7 +38,7 @@ describe('PAR-10 (a) — every PROMPT_EXAMPLES step parses (the prompt teaches o
   }
 
   it('the rendered prompt still contains every example (extraction stayed in sync)', () => {
-    const prompt = buildSystemPrompt();
+    const prompt = promptText(PROMPT_SPEC_2D);
     for (const ex of PROMPT_EXAMPLES) expect(prompt).toContain(`"${ex.freeform}" →`);
   });
 });
@@ -118,7 +125,7 @@ describe('PAR-10 (e) — no prompt example invents a magnitude the freeform neve
   });
 
   it('the system prompt carries the never-invent-a-property rule and its never-drop twin', () => {
-    const prompt = buildSystemPrompt();
+    const prompt = promptText(PROMPT_SPEC_2D);
     expect(prompt).toMatch(/NEVER invent an unstated property/);
     expect(prompt).toMatch(/NEVER drop a property the student DID state/);
   });

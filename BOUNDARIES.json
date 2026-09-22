@@ -67,6 +67,11 @@
       },
       {
         "from": "server",
+        "to": "src-analytic",
+        "why": "The same binding point as server -> src / src3d: parseHandler imports the analytic PROMPT SPEC (src-analytic/parser/llmSharedAnalytic) and composes it through server/llm/harness.ts. The edge has existed since #1251 wired analytic to the proxy and was never declared; found and registered by #1359."
+      },
+      {
+        "from": "server",
         "to": "src-complex",
         "why": "The same binding-point pattern as server -> src / src3d (llmShared): server/adminConfig.ts runs the complex grammar (parser/rules parseLineV2, context-free) to validate featured quick commands at SAVE time — a command the parser refuses is never offered to a student (#662's lock, the #511 asymmetry closed at the source)."
       },
@@ -242,6 +247,7 @@
     "src3d/store": "engine",
 
     "server": "shell",
+    "server/llm": "shell",
 
     "src-complex": "shell",
     "src-complex/engine": "engine",
@@ -276,6 +282,6 @@
     "src/render": "A pure consumer of engine output, but it reasons about geometry (label wedges, arc extents, foreshortening). Copied, not shared.",
     "src/validation": "engine-layer by subject, and additionally forbidden from importing the engine at all — its oracle must stay independent (enforced separately by its own tests).",
     "src/shapes": "A ShapeType -> book-URL reference table. Not geometry reasoning and not vocabulary.",
-    "server": "Only __tests__ sits below it; the tree key covers the proxy sources themselves."
+    "server": "The tree key covers the proxy sources themselves; below it sit __tests__ and llm/ (the one LLM request harness, #1359 — not chrome, but not engine or lexicon either, so it classifies as shell like the rest of server/)."
   }
 }

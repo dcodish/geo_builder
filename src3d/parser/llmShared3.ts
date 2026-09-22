@@ -9,23 +9,6 @@
 
 import { COMMAND_CATALOG_3D } from './catalog3';
 
-export const LLM_MODEL_3D = 'claude-haiku-4-5';
-export const LLM_MAX_TOKENS_3D = 1024;
-const TOOL_NAME = 'emit_steps';
-
-export const STEPS_TOOL_3D = {
-  name: TOOL_NAME,
-  description:
-    'Return the 3-D space/vectors construction as an ordered list of canonical command strings the app understands. Empty if the request cannot be expressed.',
-  input_schema: {
-    type: 'object',
-    properties: {
-      steps: { type: 'array', description: 'Ordered canonical command lines.', items: { type: 'string' } },
-    },
-    required: ['steps'],
-    additionalProperties: false,
-  },
-} as const;
 
 export interface PromptExample3 {
   freeform: string;
@@ -61,18 +44,28 @@ export const PROMPT_EXAMPLES_3D: PromptExample3[] = [
   { freeform: 'a cone with apex S over center O, radius 5 and height 12', steps: ['cone with apex S base center O radius 5 height 12'] },
 ];
 
-const renderExample = (e: PromptExample3): string => `"${e.freeform}" → ${JSON.stringify(e.steps)}`;
-
-export function buildSystemPrompt3(): string {
-  // #578: only the CONSTRUCTION lane is emittable. A 'rewrite' entry (a rename) is read before the
-  // grammar and never lowers to a command, so teaching it here would produce steps the deterministic
-  // re-parse must refuse — the PAR-10 contract, and a paid call spent on a line that cannot commit.
-  const vocab = COMMAND_CATALOG_3D.filter((e) => e.lane !== 'rewrite').map((c) => `- ${c.en}   |   ${c.he}`).join('\n');
-  return [
+/**
+ * THIS PRODUCT'S HALF OF THE PROMPT (#1359) - data only.
+ *
+ * The skeleton, the model, the tool schema, the request body and the response reader live once in
+ * `server/llm/harness.ts`. They cannot be imported here: `BOUNDARIES.json` forbids the product ->
+ * server direction, which is exactly why this file exports DATA and `server/parseHandler.ts`
+ * composes it on the sanctioned server -> product edge. The shape is checked structurally where it
+ * is consumed, so a drift here is a compile error there.
+ *
+ * The rule lines below are VERBATIM what this product's prompt has always said. #1359 changed no
+ * prompt text in any tool; harmonising the wording is a separate decision with its own risk, since
+ * a prompt regression is invisible to every test.
+ */
+export const PROMPT_SPEC_3D = {
+  toolDescription:
+    'Return the 3-D space/vectors construction as an ordered list of canonical command strings the app understands. Empty if the request cannot be expressed.',
+  stepsDescription: 'Ordered canonical command lines.',
+  intro: (tool: string) => [
     "You translate a high-school student's freeform 3-D geometry / vectors request (Hebrew or English) into",
-    `an ordered list of canonical command lines, returned ONLY through the ${TOOL_NAME} tool.`,
-    '',
-    'Rules:',
+    `an ordered list of canonical command lines, returned ONLY through the ${tool} tool.`,
+  ],
+  rules: [
     '- Each line MUST be one of the supported canonical forms below (translate He↔En, fill in concrete labels).',
     '- Output each step in the SAME language the student wrote in. Labels (A, B, …) and numbers stay as-is.',
     "- Points are capital letters, optionally primed (A', B'). Vector names are single lowercase letters (u, v, w).",
@@ -97,23 +90,7 @@ export function buildSystemPrompt3(): string {
     '  run exactly as typed, primes included.',
     '- Decompose multi-part requests into several lines, in build order.',
     '- If the request cannot be expressed with the supported forms, return an empty list.',
-    '',
-    'Supported canonical forms (English | Hebrew):',
-    vocab,
-    '',
-    'Examples (freeform → steps):',
-    ...PROMPT_EXAMPLES_3D.map(renderExample),
-  ].join('\n');
-}
-
-/** The full Messages-API request body — the proxy calls this when the body says `tool: '3d'`. */
-export function buildLlmRequest3(utterance: string, context: string) {
-  return {
-    model: LLM_MODEL_3D,
-    max_tokens: LLM_MAX_TOKENS_3D,
-    system: buildSystemPrompt3(),
-    tools: [STEPS_TOOL_3D],
-    tool_choice: { type: 'tool' as const, name: TOOL_NAME },
-    messages: [{ role: 'user' as const, content: `${context}\n\nStudent request: "${utterance}"` }],
-  };
-}
+  ],
+  vocabulary: () => COMMAND_CATALOG_3D.filter((e) => e.lane !== 'rewrite').map((c) => `- ${c.en}   |   ${c.he}`).join('\n'),
+  examples: PROMPT_EXAMPLES_3D,
+};
