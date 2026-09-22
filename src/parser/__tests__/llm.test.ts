@@ -7,45 +7,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, sep } from 'node:path';
-import { buildLlmRequest, extractSteps, LLM_MODEL, STEPS_TOOL } from '../llmShared';
 import { llmParse } from '../llm';
 import { restoreStatedSequences } from '../parse';
 
-describe('buildLlmRequest', () => {
-  it('targets Haiku with a forced single tool call and a bounded token budget', () => {
-    const req = buildLlmRequest('draw a square', 'The canvas is empty.');
-    expect(req.model).toBe(LLM_MODEL);
-    expect(LLM_MODEL).toBe('claude-haiku-4-5');
-    expect(req.tool_choice).toEqual({ type: 'tool', name: 'emit_steps' });
-    expect(req.tools[0]).toBe(STEPS_TOOL);
-    expect(req.max_tokens).toBeLessThanOrEqual(2048);
-  });
-
-  it('grounds the prompt in the supported catalog and includes context + utterance', () => {
-    const req = buildLlmRequest('put a dot in the middle of AB', 'Existing points: A, B.');
-    expect(req.system).toContain('square ABCD'); // a supported catalog form is offered as vocabulary
-    expect(req.system).toContain('emit_steps');
-    const msg = req.messages[0].content;
-    expect(msg).toContain('Existing points: A, B.');
-    expect(msg).toContain('put a dot in the middle of AB');
-  });
-});
-
-describe('extractSteps', () => {
-  it('pulls the step strings out of the forced tool call, dropping non-strings/blanks', () => {
-    const content = [
-      { type: 'text', text: 'sure' },
-      { type: 'tool_use', name: 'emit_steps', input: { steps: ['square ABCD', 123, '', 'segment AC'] } },
-    ];
-    expect(extractSteps(content)).toEqual(['square ABCD', 'segment AC']);
-  });
-
-  it('returns null when there is no emit_steps tool call', () => {
-    expect(extractSteps([{ type: 'text', text: 'hello' }])).toBeNull();
-    expect(extractSteps([{ type: 'tool_use', name: 'other', input: { steps: ['x'] } }])).toBeNull();
-  });
-});
-
+// #1359 — `buildLlmRequest` and `extractSteps` moved to `server/llm/harness.ts`, the one composer
+// for all three products. Their cases moved with them to `server/__tests__/issue-1359-prompt-lane.test.ts`:
+// a product tree may not import `server/` (BOUNDARIES), and the request body is no longer this
+// tree's to build. What stays here is what is still 2-D's: the client transport and the sequence gate.
 describe('llmParse (client dispatch — fetch mocked)', () => {
   afterEach(() => vi.unstubAllGlobals());
 

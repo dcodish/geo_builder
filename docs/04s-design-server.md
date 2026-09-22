@@ -126,3 +126,38 @@ their `as const` makes every array readonly where the SDK wants mutable `string[
 **boundary** concern, so the widening lives at the seam that knows this data is an SDK request — typed as
 `MessageCreateParamsNonStreaming`, which both widens and pins the non-streaming overload, rather than
 pulling SDK types into a product tree.
+
+## The one LLM request harness ([ADR-W-075](06w-decisions-workspace.md#adr-w-075))
+
+The proxy serves every product that escalates, and until #1359 each of them shipped its own copy of the
+request: three declarations of the model, three of the 1024-token budget, three of the `emit_steps`
+tool, three copies of the same four-section prompt skeleton.
+
+```
+server/llm/harness.ts          the model, the budget, the tool schema, the skeleton,
+                               the request body, the response reader          <- ONE copy
+        ^
+        | composes
+server/parseHandler.ts         PROMPT_SPECS: tool -> spec, dispatch by `tool:`
+        ^
+        | imports DATA (the sanctioned server -> product edge)
+src/parser/llmShared.ts        PROMPT_SPEC_2D        { intro, rules, vocabulary, examples,
+src3d/parser/llmShared3.ts     PROMPT_SPEC_3D          toolDescription, stepsDescription }
+src-analytic/…llmSharedAnalytic.ts  PROMPT_SPEC_ANALYTIC
+```
+
+**The direction is forced, not chosen.** `BOUNDARIES.json` forbids `server -> shell` (*the proxy has
+no UI*) and `src -> server` (*the key-handling path must not reach a browser bundle*). So the harness
+cannot live in `shell/`, and the products cannot import it where it does live. What remains is the one
+edge the registry already sanctions: the product exports **data**, the proxy composes. The spec is
+structurally typed at the import, so a drifted product shape is a compile error in `parseHandler`.
+
+**What is deliberately NOT shared.** Each product's rule lines, its intro (the three copies wrap the
+opening sentence at different points), its vocabulary, its examples, and the two strings that describe
+the tool to the model. Those go to the model and shape its answers; unifying them is a prompt change,
+not a refactor, and it would land in tools that work. The extraction changed no prompt byte, verified
+against goldens captured before the first edit.
+
+**The client half lives elsewhere.** The sequence gate and the honesty-gate battery run on the steps
+after they return, in the browser, and belong in `shell/` — which every product may import and the
+proxy may not. Two halves, two homes, one per allowed edge.

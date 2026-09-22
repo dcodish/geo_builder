@@ -17,29 +17,6 @@
 
 import { COMMAND_CATALOG } from './catalog';
 
-/** The model: Haiku 4.5 — cheap and sufficient for this bounded structured task. */
-export const LLM_MODEL = 'claude-haiku-4-5';
-export const LLM_MAX_TOKENS = 1024;
-const TOOL_NAME = 'emit_steps';
-
-/** The forced tool: the model must return an ordered list of canonical command strings. */
-export const STEPS_TOOL = {
-  name: TOOL_NAME,
-  description:
-    'Return the geometry construction as an ordered list of canonical command strings the app understands. Empty if the request cannot be expressed.',
-  input_schema: {
-    type: 'object',
-    properties: {
-      steps: {
-        type: 'array',
-        description: 'Ordered canonical command lines (each one a supported phrasing).',
-        items: { type: 'string' },
-      },
-    },
-    required: ['steps'],
-    additionalProperties: false,
-  },
-} as const;
 
 /**
  * The few-shot examples shown in the system prompt (freeform → canonical steps). Extracted from the prompt
@@ -85,21 +62,28 @@ export const PROMPT_EXAMPLES: PromptExample[] = [
   { freeform: 'tangents at each vertex of triangle ABC meet at D, E, F', steps: ['the tangent at A and the tangent at B meet at D', 'the tangent at B and the tangent at C meet at E', 'the tangent at C and the tangent at A meet at F'], ctx: { circles: ['O'], points: ['A', 'B', 'C'] } },
 ];
 
-/** Render one example back to the `"freeform" → ["step", …]` prompt line (with an optional note). */
-function renderExample(e: PromptExample): string {
-  return `"${e.freeform}" → ${JSON.stringify(e.steps)}${e.note ? `   (${e.note})` : ''}`;
-}
-
-/** Build the system prompt: the rules + the supported vocabulary (the catalog) + a few examples. */
-export function buildSystemPrompt(): string {
-  const vocab = COMMAND_CATALOG.filter((c) => c.supported)
-    .map((c) => `- ${c.en}   |   ${c.he}`)
-    .join('\n');
-  return [
-    'You translate a high-school student\'s freeform geometry request (Hebrew or English) into an ordered',
-    `list of canonical command lines, returned ONLY through the ${TOOL_NAME} tool.`,
-    '',
-    'Rules:',
+/**
+ * THIS PRODUCT'S HALF OF THE PROMPT (#1359) — data only.
+ *
+ * The skeleton, the model, the tool schema, the request body and the response reader live once in
+ * `server/llm/harness.ts`. They cannot be imported here: `BOUNDARIES.json` forbids the product ->
+ * server direction, which is exactly why this file exports DATA and `server/parseHandler.ts`
+ * composes it on the sanctioned server -> product edge. The shape is checked structurally where it
+ * is consumed, so a drift here is a compile error there.
+ *
+ * The rule lines below are VERBATIM what this product's prompt has always said. #1359 changed no
+ * prompt text in any tool; harmonising the wording is a separate decision with its own risk, since
+ * a prompt regression is invisible to every test.
+ */
+export const PROMPT_SPEC_2D = {
+  toolDescription:
+    'Return the geometry construction as an ordered list of canonical command strings the app understands. Empty if the request cannot be expressed.',
+  stepsDescription: 'Ordered canonical command lines (each one a supported phrasing).',
+  intro: (tool: string) => [
+    "You translate a high-school student's freeform geometry request (Hebrew or English) into an ordered",
+    `list of canonical command lines, returned ONLY through the ${tool} tool.`,
+  ],
+  rules: [
     '- Each line you output MUST be one of the supported canonical forms below (you may translate He↔En and',
     '  fill in concrete labels). Do not invent new command words.',
     '- LANGUAGE: output each step in the SAME language the student wrote in. A Hebrew request → the Hebrew',
@@ -130,14 +114,13 @@ export function buildSystemPrompt(): string {
     '  and quadrilateral ABCD is a different shape from ABDC. Copy every letter run exactly as typed.',
     '- Decompose a multi-part request into several lines, in build order.',
     '- If you cannot express the request with the supported forms, return an empty list.',
-    '',
-    'Supported canonical forms (English | Hebrew):',
-    vocab,
-    '',
-    'Examples (freeform → steps):',
-    ...PROMPT_EXAMPLES.map(renderExample),
-  ].join('\n');
-}
+  ],
+  vocabulary: () => COMMAND_CATALOG.filter((c) => c.supported)
+    .map((c) => `- ${c.en}   |   ${c.he}`)
+    .join('\n'),
+  examples: PROMPT_EXAMPLES,
+};
+
 
 /** A short description of the current figure, so the model can reference existing objects. */
 export function figureContext(pointIds: string[], circleCenters: string[]): string {
@@ -145,34 +128,4 @@ export function figureContext(pointIds: string[], circleCenters: string[]): stri
   if (pointIds.length) parts.push(`Existing points: ${pointIds.join(', ')}.`);
   if (circleCenters.length) parts.push(`Existing circles (by centre): ${circleCenters.join(', ')}.`);
   return parts.length ? parts.join(' ') : 'The canvas is empty.';
-}
-
-/** The full Messages-API request body (model, tool, forced tool_choice, message). Pure + testable. */
-export function buildLlmRequest(utterance: string, context: string) {
-  return {
-    model: LLM_MODEL,
-    max_tokens: LLM_MAX_TOKENS,
-    system: buildSystemPrompt(),
-    tools: [STEPS_TOOL],
-    tool_choice: { type: 'tool' as const, name: TOOL_NAME },
-    messages: [{ role: 'user' as const, content: `${context}\n\nStudent request: "${utterance}"` }],
-  };
-}
-
-/** A minimal shape of an Anthropic response content block (we avoid importing the SDK types). */
-interface ContentBlock {
-  type: string;
-  name?: string;
-  input?: unknown;
-  [k: string]: unknown;
-}
-
-/** Pull the canonical step strings out of the forced tool call. null if absent/malformed. */
-export function extractSteps(content: ContentBlock[]): string[] | null {
-  const block = content.find((b) => b.type === 'tool_use' && b.name === TOOL_NAME);
-  const steps = block && typeof block.input === 'object' && block.input !== null
-    ? (block.input as { steps?: unknown }).steps
-    : undefined;
-  if (!Array.isArray(steps)) return null;
-  return steps.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
 }

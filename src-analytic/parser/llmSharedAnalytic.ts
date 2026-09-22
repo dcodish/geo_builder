@@ -19,23 +19,6 @@
 
 import { COMMAND_CATALOG_ANALYTIC, type CatalogEntryAnalytic } from './catalogAnalytic';
 
-export const LLM_MODEL_ANALYTIC = 'claude-haiku-4-5';
-export const LLM_MAX_TOKENS_ANALYTIC = 1024;
-const TOOL_NAME = 'emit_steps';
-
-export const STEPS_TOOL_ANALYTIC = {
-  name: TOOL_NAME,
-  description:
-    'Return the analytic-geometry construction as an ordered list of canonical command strings the app understands. Empty if the request cannot be expressed.',
-  input_schema: {
-    type: 'object',
-    properties: {
-      steps: { type: 'array', description: 'Ordered canonical command lines.', items: { type: 'string' } },
-    },
-    required: ['steps'],
-    additionalProperties: false,
-  },
-} as const;
 
 export interface PromptExampleAnalytic {
   freeform: string;
@@ -69,18 +52,32 @@ export const PROMPT_EXAMPLES_ANALYTIC: PromptExampleAnalytic[] = [
   { freeform: 'find the area under the curve between x=1 and x=4', steps: [] },
 ];
 
-const renderExample = (e: PromptExampleAnalytic): string => `"${e.freeform}" → ${JSON.stringify(e.steps)}`;
-
 /** The catalog rendered as the model's vocabulary — English and Hebrew side by side, one per line. */
 const vocabOf = (entries: readonly CatalogEntryAnalytic[]): string =>
   entries.map((c) => `- ${c.en}   |   ${c.he}`).join('\n');
 
-export function buildSystemPromptAnalytic(): string {
-  return [
+/**
+ * THIS PRODUCT'S HALF OF THE PROMPT (#1359) - data only.
+ *
+ * The skeleton, the model, the tool schema, the request body and the response reader live once in
+ * `server/llm/harness.ts`. They cannot be imported here: `BOUNDARIES.json` forbids the product ->
+ * server direction, which is exactly why this file exports DATA and `server/parseHandler.ts`
+ * composes it on the sanctioned server -> product edge. The shape is checked structurally where it
+ * is consumed, so a drift here is a compile error there.
+ *
+ * The rule lines below are VERBATIM what this product's prompt has always said. #1359 changed no
+ * prompt text in any tool; harmonising the wording is a separate decision with its own risk, since
+ * a prompt regression is invisible to every test.
+ */
+export const PROMPT_SPEC_ANALYTIC = {
+  toolDescription:
+    'Return the analytic-geometry construction as an ordered list of canonical command strings the app understands. Empty if the request cannot be expressed.',
+  stepsDescription: 'Ordered canonical command lines.',
+  intro: (tool: string) => [
     "You translate a high-school student's freeform analytic-geometry request (Hebrew or English) into",
-    `an ordered list of canonical command lines, returned ONLY through the ${TOOL_NAME} tool.`,
-    '',
-    'Rules:',
+    `an ordered list of canonical command lines, returned ONLY through the ${tool} tool.`,
+  ],
+  rules: [
     '- Each line MUST be one of the supported canonical forms below (translate He↔En, fill in concrete labels).',
     '- Output each step in the SAME language the student wrote in. Labels (A, B, …) and numbers stay as-is.',
     '- Points are capital letters, optionally with a digit subscript (A, B, F1). Parameters are single',
@@ -108,23 +105,7 @@ export function buildSystemPromptAnalytic(): string {
     '- A statement about EXISTING objects is not a re-construction: never re-declare a point that already exists.',
     '- If the request cannot be expressed with the supported forms, return an EMPTY list. An honest refusal',
     '  is better than an approximation.',
-    '',
-    'Supported canonical forms (English | Hebrew):',
-    vocabOf(COMMAND_CATALOG_ANALYTIC),
-    '',
-    'Examples (freeform → steps):',
-    ...PROMPT_EXAMPLES_ANALYTIC.map(renderExample),
-  ].join('\n');
-}
-
-/** The full Messages-API request body — the proxy calls this when the body says `tool: 'analytic'`. */
-export function buildLlmRequestAnalytic(utterance: string, context: string) {
-  return {
-    model: LLM_MODEL_ANALYTIC,
-    max_tokens: LLM_MAX_TOKENS_ANALYTIC,
-    system: buildSystemPromptAnalytic(),
-    tools: [STEPS_TOOL_ANALYTIC],
-    tool_choice: { type: 'tool' as const, name: TOOL_NAME },
-    messages: [{ role: 'user' as const, content: `${context}\n\nStudent request: "${utterance}"` }],
-  };
-}
+  ],
+  vocabulary: () => vocabOf(COMMAND_CATALOG_ANALYTIC),
+  examples: PROMPT_EXAMPLES_ANALYTIC,
+};

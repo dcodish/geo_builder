@@ -19,12 +19,13 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 // Type-only: erased at build, so the dynamic import('@anthropic-ai/sdk') below still governs runtime.
 import type { MessageCreateParamsNonStreaming } from '@anthropic-ai/sdk/resources';
-import { buildLlmRequest, extractSteps } from '../src/parser/llmShared';
+import { buildRequest, extractSteps, type PromptSpec } from './llm/harness';
+import { PROMPT_SPEC_2D } from '../src/parser/llmShared';
 // The 3-D sibling app shares this proxy: a `tool: '3d'` field in the body selects its
 // prompt (docs/20 §6.6 — one process, one endpoint, no new infrastructure). The server
 // is the ONE place that binds both apps; src/ and src3d/ still never import each other.
-import { buildLlmRequest3 } from '../src3d/parser/llmShared3';
-import { buildLlmRequestAnalytic } from '../src-analytic/parser/llmSharedAnalytic';
+import { PROMPT_SPEC_3D } from '../src3d/parser/llmShared3';
+import { PROMPT_SPEC_ANALYTIC } from '../src-analytic/parser/llmSharedAnalytic';
 import { clientIp, makeRateLimiter, readBody } from './http';
 
 /**
@@ -41,14 +42,14 @@ import { clientIp, makeRateLimiter, readBody } from './http';
  * client falls back to the deterministic refusal it had before. `parse-handler-registry.test.ts`
  * asserts every product in `products.json` that declares an LLM fallback appears here.
  */
-const PROMPT_BUILDERS: Record<string, (utterance: string, context: string) => unknown> = {
-  '2d': buildLlmRequest,
-  '3d': buildLlmRequest3,
-  analytic: buildLlmRequestAnalytic,
+const PROMPT_SPECS: Record<string, PromptSpec> = {
+  '2d': PROMPT_SPEC_2D,
+  '3d': PROMPT_SPEC_3D,
+  analytic: PROMPT_SPEC_ANALYTIC,
 };
 
 /** The tools the proxy will spend on. An empty/absent `tool` means 2-D, as it always has. */
-export const LLM_TOOLS = Object.keys(PROMPT_BUILDERS);
+export const LLM_TOOLS = Object.keys(PROMPT_SPECS);
 
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 30; // requests/minute/IP
@@ -110,7 +111,7 @@ export async function handleParse(
   if (!utterance.trim()) return send(400, { error: 'empty' });
   // An unregistered tool is refused BEFORE the quota checks, so junk never burns budget and — more
   // to the point — never silently receives another product's prompt (#1251).
-  if (!PROMPT_BUILDERS[tool]) return send(400, { error: 'unknown-tool' });
+  if (!PROMPT_SPECS[tool]) return send(400, { error: 'unknown-tool' });
 
   // Global daily ceiling — checked after validation (junk never burns quota) and before the SDK call.
   // When hit, a DISTINCT 429 `daily-limit` (the client shows "service busy", not "couldn't understand")
@@ -142,11 +143,11 @@ export async function handleParse(
     // Explicit timeout + no auto-retries (SEC-5): the SDK's multi-minute default timeout + retries would
     // hold sockets and multiply spend on a slow/hung upstream. One attempt, ~15 s ceiling.
     const client = new Anthropic({ apiKey, timeout: 15_000, maxRetries: 0 });
-    const build = PROMPT_BUILDERS[tool];
-    // Unreachable — the tool was validated before any spend (see REQUEST_BUILDERS above). Kept as a
+    const spec = PROMPT_SPECS[tool];
+    // Unreachable — the tool was validated before any spend (see PROMPT_SPECS above). Kept as a
     // typed floor so this stays a total function if the guard above is ever moved.
-    if (!build) return send(400, { error: 'unknown-tool' });
-    const request = build(utterance, context);
+    if (!spec) return send(400, { error: 'unknown-tool' });
+    const request = buildRequest(spec, utterance, context);
     // The prompt builders own the request as PLAIN DATA and deliberately import no SDK types — they ship in
     // browser bundles, and `llmShared.ts` says so explicitly. Their `as const` therefore makes every array
     // readonly, which the SDK's mutable `string[]` fields reject. Widening is a boundary concern, so it
