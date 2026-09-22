@@ -82,10 +82,18 @@ describe('#1364 — the legitimate register is untouched', () => {
     expect(accepts('|z1| = 2n1')).toBe(true);
   });
 
-  /** #791: two glued CAPITALS are a distance, resolved before the floor applies. */
+  /**
+   * #791: two glued CAPITALS are a distance, resolved before the floor applies.
+   *
+   * The values are chosen CONSISTENT on purpose — B − A = 3+4i, so |AB| really is 5. An earlier draft
+   * used contradictory values and still passed, because `untranslated` reports what failed to PARSE,
+   * not what failed to hold. A pair that parses and then contradicts would have proved nothing about
+   * the floor, which is the only thing this case is here to guard.
+   */
   it('a capital label pair is still a distance, not a refused multi-letter run', () => {
-    const d = deriveLines(['A = 3+4i', 'B = 1+i', 'AB = 5'], 0, 0);
+    const d = deriveLines(['A = 1+i', 'B = 4+5i', 'AB = 5'], 0, 0);
     expect(d.untranslated).toEqual([]);
+    expect(d.points.map((p) => p.name).sort()).toEqual(['A', 'B']);
   });
 
   it.each([
