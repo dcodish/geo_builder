@@ -27,6 +27,7 @@
  */
 
 import type { Command3, Id } from '../engine/types';
+import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { QUAD_PYRAMIDS, type QuadBase } from '../engine/baseShapes';
 import { CONSTRUCT_NOUNS, labelTokens, normalize3 } from './parse3';
 
@@ -425,36 +426,17 @@ export function restoreStatedSequences3(
   utterance: string,
   lines: string[],
 ): { lines: string[]; restored: string[] } {
-  const sameSeq = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
-  const rev = (a: readonly string[]) => [...a].reverse();
-  const RUN = () => /(?<![A-Za-z])(?:[A-Z]\d*'?){3,}(?![a-z\d])/g;
-  const split = (run: string): string[] => run.match(/[A-Z]\d*'?/g) ?? [];
-  // the LINE side needs INDEX-STABLE matching, so only the length-preserving prime canonicalisation
-  // is applied there; the student side takes the full normaliser (its indices are never used)
-  const canonPrimes = (s: string) => s.replace(/[′’]/g, "'");
-  const stated = new Map<string, string[] | null>();
-  for (const m of normalize3(utterance).matchAll(RUN())) {
-    const labels = split(m[0]);
-    const key = [...labels].sort().join(',');
-    const prev = stated.get(key);
-    if (prev === undefined) stated.set(key, labels);
-    else if (prev !== null && !sameSeq(prev, labels) && !sameSeq(prev, rev(labels))) stated.set(key, null);
-  }
-  if (stated.size === 0) return { lines, restored: [] };
-  const restored: string[] = [];
-  const out = lines.map((line) => {
-    const canon = canonPrimes(line);
-    let result = '';
-    let last = 0;
-    for (const m of canon.matchAll(RUN())) {
-      const labels = split(m[0]);
-      const want = stated.get([...labels].sort().join(','));
-      if (!want || sameSeq(labels, want) || sameSeq(labels, rev(want))) continue;
-      restored.push(`${labels.join('')}→${want.join('')}`);
-      result += canon.slice(last, m.index) + want.join('');
-      last = m.index! + m[0].length;
-    }
-    return result ? result + canon.slice(last) : line;
+  // #1356: the ALGORITHM moved to `shell/llm/sequenceGate.ts`, shared with 2-D and analytic. What
+  // stays here is 3-D's own three: primed labels, `normalize3`, and the prime canonicalisation — which
+  // is length-preserving, so match indices hold, and which 3-D also EMITS from (unlike 2-D). That
+  // difference is preserved deliberately rather than unified.
+  return restoreStatedSequencesShared(utterance, lines, {
+    label: () => /[A-Z]\d*'?/g,
+    run: () => /(?<![A-Za-z])(?:[A-Z]\d*'?){3,}(?![a-z\d])/g,
+    normalizeUtterance: normalize3,
+    prepareLine: (line) => {
+      const canon = line.replace(/[′’]/g, "'");
+      return { match: canon, emit: canon };
+    },
   });
-  return { lines: out, restored };
 }

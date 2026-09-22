@@ -21,6 +21,7 @@
 
 import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
 import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW } from './lexicon';
+import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { stripFormatControls } from '../../shell/bidi';
 
 export type ParseResult =
@@ -11647,43 +11648,23 @@ export function restoreStatedSequences(
   utterance: string,
   lines: string[],
 ): { lines: string[]; restored: string[] } {
-  const sameSeq = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
-  const rev = (a: readonly string[]) => [...a].reverse();
-  // The ADR-118 area marker is masked exactly as in `droppedNewLabels` — the `S` of a glued `SABC`
-  // is notation, not a point — on the student side AND the line side. The mask swaps single chars for
-  // spaces, so it PRESERVES LENGTH (the line-side replacement below relies on stable match indices);
-  // only the student side gets the full length-changing `normalizeUtterance` first (indices unused).
-  const maskS = (s: string) => s.replace(rx(String.raw`(?<![A-Za-z])S(?=(?:${ULABEL}){3,4}(?![A-Za-z\d]))`, 'g'), ' ');
-  const RUN = () => rx(String.raw`(?<![A-Za-z])(?:${ULABEL}){3,}(?![a-z\d])`, 'g');
-  const split = (run: string): string[] => run.match(rx(ULABEL, 'g')) ?? [];
-  // Stated runs, keyed by label multiset; a key stated with two inequivalent sequences → ambiguous (null).
-  const stated = new Map<string, string[] | null>();
-  for (const m of maskS(normalizeUtterance(utterance)).matchAll(RUN())) {
-    const labels = split(m[0]);
-    const key = [...labels].sort().join(',');
-    const prev = stated.get(key);
-    if (prev === undefined) stated.set(key, labels);
-    else if (prev !== null && !sameSeq(prev, labels) && !sameSeq(prev, rev(labels))) stated.set(key, null);
-  }
-  if (stated.size === 0) return { lines, restored: [] };
-  const restored: string[] = [];
-  const out = lines.map((line) => {
-    // Match over the S-MASKED text so an area-marker S never reads as a run member; the mask is
-    // length-preserving, so match indices line up with the original string.
-    const masked = maskS(line);
-    let result = '';
-    let last = 0;
-    for (const m of masked.matchAll(RUN())) {
-      const labels = split(m[0]);
-      const want = stated.get([...labels].sort().join(','));
-      if (!want || sameSeq(labels, want) || sameSeq(labels, rev(want))) continue;
-      restored.push(`${labels.join('')}→${want.join('')}`);
-      result += line.slice(last, m.index) + want.join('');
-      last = m.index + m[0].length;
-    }
-    return result ? result + line.slice(last) : line;
+  // #1356: the ALGORITHM moved to `shell/llm/sequenceGate.ts`, shared with 3-D and analytic — it was
+  // the same code in two trees and analytic's would have been the third (#1358). What stays here is
+  // the three things that are 2-D's: the label pattern, the utterance normaliser, and the ADR-118
+  // area-marker mask.
+  return restoreStatedSequencesShared(utterance, lines, {
+    label: () => rx(ULABEL, 'g'),
+    run: () => rx(String.raw`(?<![A-Za-z])(?:${ULABEL}){3,}(?![a-z\d])`, 'g'),
+    normalizeUtterance,
+    // The ADR-118 area marker is masked exactly as in `droppedNewLabels` — the `S` of a glued `SABC`
+    // is notation, not a point. The mask swaps single chars for spaces, so it PRESERVES LENGTH and the
+    // match indices still line up with the ORIGINAL line, which is what `emit` stays as: a line this
+    // gate does not rewrite comes back byte-for-byte.
+    prepareLine: (line) => ({
+      match: line.replace(rx(String.raw`(?<![A-Za-z])S(?=(?:${ULABEL}){3,4}(?![A-Za-z\d]))`, 'g'), ' '),
+      emit: line,
+    }),
   });
-  return { lines: out, restored };
 }
 
 /**
