@@ -243,6 +243,14 @@ const he = {
   redo: 'בצע שוב',
   noticeAlreadyFollows:
     'זה כבר נובע מהנתונים שכתבתם — השרטוט מקיים את זה ממילא, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
+  /**
+   * #1353 / ADR-W-030 — the teaching line for an imperative wrapper.
+   *
+   * It names the student's own verb, shows the textbook sentence, and says what to press. The
+   * sentence is already in the input box when this appears, so «לחצו Enter» is literally true.
+   */
+  noticeTeachCanonical:
+    'בספר לא כותבים "{{verb}}" — כותבים את הנתון עצמו. כתבתי לכם את המשפט בשורת הקלט: "{{canonical}}" — לחצו Enter כדי לשרטט.',
 };
 
 const en: typeof he = {
@@ -424,6 +432,8 @@ const en: typeof he = {
   redo: 'Redo',
   noticeAlreadyFollows:
     'That already follows from what you have written — the figure satisfies it anyway, so I did not add another row: "{{detail}}"',
+  noticeTeachCanonical:
+    'A textbook does not say "{{verb}}" — it states the given itself. I have put the sentence in the input box for you: "{{canonical}}" — press Enter to draw it.',
 };
 
 export const analyticI18n = createProductI18n({

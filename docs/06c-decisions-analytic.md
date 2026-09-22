@@ -7356,3 +7356,47 @@ Three orders of margin on a metric that shrinks what it measures — and [#1235]
 **Sibling audit (docs/17 §1).** 2-D and 3-D have no LTR panel section of this shape — their rows are Hebrew sentences or letter pairs. The helper is in `shell/` regardless, because the NEXT product's LTR row should not have to rediscover FSI.
 
 **Consequences.** `shell/bidi.ts` (`isolateRtlName`, `FSI`); `src-analytic/app/curveText.ts` (`namedRow`, `describeCurve` composes through it); `src-analytic/App.tsx` (the equations row). Lock: `__tests__/issue-1344-name-isolate.test.ts` (7).
+
+## ADR-AG-150 — An imperative wrapper is TAUGHT: the sentence underneath is verified, pre-filled, and the student presses Enter (#1353)
+
+**Status:** accepted, 2026-09-22 · **Issue:** [#1353](https://github.com/dcodish/geo_builder/issues/1353) (feature, `P2`, `analytic`) — slice (e) of [#778](https://github.com/dcodish/geo_builder/issues/778), implementing the workspace ruling [ADR-W-030](06w-decisions-workspace.md#adr-w-030)
+**Requirements:** [02c](02c-requirements-analytic.md) R114 (new) · **Design:** [04c](04c-design-analytic.md#an-imperative-wrapper-is-taught-adr-ag-150) (new section) — the guidance register this tree did not have
+
+**The ruling this implements.** Operator, `/log-triage` 2026-08-24: *"When a user enters a command like add a line, draw a shape, we need to tell him to add the input as a textbook would… I don't want the tool to support the wrong text input because it teaches them wrong."* And the half that makes it kind rather than merely strict: *"we can tell them exactly how to write it… but also translate what the user said and write it ourselves, so the user isn't upset that he has to enter things twice."*
+
+**Measured before, over the WHOLE catalog rather than a sample** (HEAD `57cb52c`, every entry × 21 imperative wrappers through the real `parseLine`):
+
+```
+analytic   70 catalog entries · 1,470 wrapper x line pairs ·  42 BUILD SILENTLY (3%) · control 70/70
+2-D       154 catalog entries · 3,234 pairs               · 2,438 build silently (75%)
+3-D       228 catalog entries · 4,788 pairs               ·   739 build silently (15%)
+complex    35 catalog entries ·   735 pairs               ·   108 build silently (15%, all ENGLISH)
+```
+
+**Read that column precisely: it is what the GRAMMAR accepts.** Whether a wrapped line then commits depends on the figure — «הוסף C מחלקת את AB ביחס 3:2» is refused on an empty canvas because there is no A and no B, and commits the moment they exist. Measured end-to-end on the ratio family: with «נקודה A(0,0)» and «נקודה B(10,0)» already stated, the wrapped line RECORDED, verbatim, into the fact list. That is the defect, and the parse-level count is the size of the surface it can happen on.
+
+The 42 are the ratio family — «הוסף C מחלקת את AB ביחס 3:2» and «הוסף היחס בין AC ל-CB הוא 3:2» — identical for all 21 verbs, which is wrapper text absorbed as noise by one rule rather than a general acceptance. Small, and that is the point: analytic is the cheapest tree in which to build the pattern the other two slices copy.
+
+**Why it is a defect at 42 and not only at 2,438.** What a student types is what the fact list, the saved `.geo.json` and the exported image show them afterwards. A recorded «הוסף …» is the tool teaching the imperative back, on the one surface this product uses to teach — the same argument [#1297](https://github.com/dcodish/geo_builder/issues/1297) made about English rows, and the operator's ruling there («the fact list shows what the STUDENT said») is the same principle seen from the other side.
+
+**The mechanism — and the one place it deviates from the umbrella's wording.**
+
+#778's 2-D design derives the teaching sentence from the lowered commands, for a stated reason: *"derivation buys the property that the tool can never teach a form it would reject, and a table drifts the moment a rule moves."* This tree has no canonical renderer, and building one is real work that #1297's ruling also needs and that should be sized on its own.
+
+So the sentence taught here is **the stripped remainder, re-parsed**. That yields the same property *more* directly — there is no renderer between the check and the text; the string shown is the string `parseLine` just accepted. It is not a table, so it cannot drift. What it cannot do is REPAIR an incomplete remainder the way a renderer could (2-D's «אלכסוני הבסיס» → «אלכסוני הבסיס נפגשים בנקודה O»); a remainder that does not parse is therefore not taught at all, and the line takes its ordinary path.
+
+**TWO GATES, and the first cut got this wrong — recorded because the mistake is instructive.** The lesson was originally offered whenever `parseLine(remainder)` succeeded. Walking the case rather than reasoning about it showed what that means on an empty canvas: the remainder parses, the FOLD refuses it (`unknown-reference`), and so the tool pre-filled a sentence, told the student to press Enter, and refused them for pressing Enter — strictly worse than the silent acceptance this feature exists to remove. The promise is therefore about the WHOLE gate: a lesson is offered only when `decideSubmit` would RECORD the remainder as the figure now stands. Where it would not, the wrapper falls through and the student gets the honest refusal about the real problem — that A and B do not exist yet. The property is *what is taught will be accepted*, not *what is taught is grammatical*.
+
+**Pre-fill, never auto-build.** The canonical sentence goes into the input box, visibly replacing what was typed, with the note beside it. One Enter builds it. Auto-building has no honest answer to what gets stored — the imperative teaches the wrong form, and a silent rewrite stores a sentence the student never wrote ([ADR-W-029](06w-decisions-workspace.md#adr-w-029)). Pre-fill dissolves the question: they submit it, so the list holds what they stated.
+
+**At the chokepoint.** `app/submit.ts`'s `decideSubmit`, checked FIRST — after `parseLine` it would leave exactly the 42 untouched, which is the whole issue. A new `SubmitVerdict` kind keeps the switch exhaustive; `engine.test.ts`'s verdict reader stopped compiling the moment the kind was added, which is what that file's docblock promises it will do (#1102).
+
+**The guard against dismembering input.** A candidate becomes a lesson only when its remainder PARSES. «צייר משהו יפה» opens with a verb and is left completely alone, because nothing underneath it is a sentence. Two candidates are offered per utterance — particles stripped («תצייר לי משולש ABC» → «משולש ABC») and verb-only — and the first that parses wins, so a particle that is really part of the sentence costs nothing.
+
+**HELD, deliberately: the LLM SUGGEST lane.** ADR-W-030 says that when the sentence cannot be derived the model suggests at visibly lower weight, click-to-insert, never auto-submitted. That contradicts the operator's later ruling on [#1297](https://github.com/dcodish/geo_builder/issues/1297) (2026-09-20), which has the analytic fallback RECORD the model's step, re-serialised into the UI locale. Analytic's fallback ([#1251](https://github.com/dcodish/geo_builder/issues/1251)) shipped a month after ADR-W-030 was written, so the umbrella could not have accounted for it. Building the suggest lane here would give one student two different escalation behaviours depending on whether they happened to type a verb. It waits for a ruling; nothing in this ADR depends on which way it goes.
+
+**Sibling audit (docs/17 §1).** The same class is live in all three siblings and is much larger in 2-D — #778 slices (a)/(b)/(c) carry them, with the measurements above. The lexicon is intentionally NOT hoisted into `shell/` yet: one implementation is not a pattern, and `shell/` is parameterized with no product strings ([ADR-W-016](06w-decisions-workspace.md#adr-w-016)). The second slice is where the shared shape becomes visible; hoisting it now would be guessing at it.
+
+**Measured after.** 0 of the 1,470 pairs reach the fact list, in an empty figure and in a populated one; the ratio family teaches once its referents exist and is honestly refused before that; every sentence taught is one the gate then ACCEPTS (asserted by submitting it); the bare catalog lines are unaffected.
+
+**Consequences.** `src-analytic/parser/scopeAnalytic.ts` (new — `IMPERATIVE_VERBS_HE`/`_EN`, `imperativeCandidates`); `src-analytic/app/submit.ts` (the `teach` verdict, checked first); `src-analytic/App.tsx` (the one branch that does not clear the box); `src-analytic/i18n/index.ts` (`noticeTeachCanonical`, both locales). Lock: `__tests__/issue-1353-imperatives-taught.test.ts` (10), whose centre is the catalog-wide property and the teach→Enter→accepted walk that caught the trap above — the catalog and the verb list are IMPORTED, so a new entry or a new verb is covered the moment it is added.

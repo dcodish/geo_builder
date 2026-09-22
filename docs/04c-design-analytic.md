@@ -1389,3 +1389,69 @@ default.
 
 Logging is best-effort throughout: it never throws and never blocks a submit. A logger that can break the
 app is worse than no logger.
+
+## An imperative wrapper is TAUGHT ([ADR-AG-150](06c-decisions-analytic.md#adr-ag-150))
+
+The tree's first **guidance register**. 2-D has `src/parser/scope.ts` and 3-D has
+`src3d/parser/scope3.ts`; analytic had none, so every family it could not build got the same
+`not-handled` and an input the tool could have taught was indistinguishable from one it had never
+heard of.
+
+```
+raw ──▶ imperativeCandidates()            scopeAnalytic.ts — a closed verb lexicon, no parsing
+          │  []  ─────────────────────▶ ordinary path (parse · fold · refuse · LLM seam)
+          │  [{verb, remainder}, …]        most-stripped first
+          ▼
+        parseLine(remainder).ok ?          submit.ts — the cheap filter
+          │  no  ──────────────────────▶ ordinary path, untouched
+          ▼ yes
+        decideSubmit(remainder) records ?  the REAL gate: would this be accepted, here, now?
+          │  no  ──────────────────────▶ ordinary path — the honest refusal about the real problem
+          ▼ yes
+        { kind: 'teach', verb, canonical } ──▶ App.tsx: setDraft(canonical) + the note
+                                                          the ONE branch that does not clear the box
+```
+
+### Three properties, and where each one lives
+
+**The taught sentence is one the gate ACCEPTS** — not merely one that parses, and the difference is
+the whole design. The register produces candidates and no text of its own, so there is no renderer, no
+table and nothing to drift; the string shown is a string the tool has just run through its own front
+door. This is what #778's 2-D half buys by deriving the sentence from the lowered commands, and it
+gets it one step further: grammatical *and* acceptable.
+
+The first cut checked only the parser, and walking the case is what exposed it — «C מחלקת את AB ביחס
+3:2» parses on an empty canvas and the fold refuses it, so the tool would have pre-filled a sentence,
+said «press Enter», and refused the Enter. A feature that teaches a student to do something and then
+punishes them for it is worse than the silent acceptance it replaces.
+
+The cost of taking the remainder as-is: an INCOMPLETE remainder cannot be repaired into a whole
+sentence the way a renderer could, so it is simply not taught.
+
+**Input the tool does not understand is never dismembered.** The strip applies only when the remainder
+parses. A verb-initial sentence with nothing real underneath it takes its ordinary path, including the
+LLM seam — the register cannot turn an unknown sentence into a worse one.
+
+**The order of the check is load-bearing.** It runs BEFORE `parseLine(line)`. The defect is that the
+wrapped form *succeeds*; a check placed after the parse would leave exactly the succeeding cases
+untouched.
+
+### Why the verdict, and not a boolean
+
+`decideSubmit` returns one verdict per submitted line and `App.tsx` switches on it exhaustively. A new
+kind therefore breaks compilation everywhere the decision is read — which is how the existing lock in
+`__tests__/engine.test.ts` caught this change the moment it was made, exactly as its docblock says it
+will (#1102: *"the component and the locks call the SAME decision"*). A boolean beside the verdict
+would have been silently ignorable.
+
+### Not here
+
+The **LLM suggest lane** of ADR-W-030 (a model phrasing offered click-to-insert at lower weight when
+no sentence can be derived) is held: it contradicts the operator's 2026-09-20 ruling on
+[#1297](https://github.com/dcodish/geo_builder/issues/1297), where the fallback RECORDS the model's
+step re-serialised into the UI locale. The two rulings describe the same lane and disagree; the ADR
+records the conflict rather than a session's choice between them.
+
+The lexicon is **not** in `shell/` yet. One implementation is not a pattern, and `shell/` carries no
+product strings ([ADR-W-016](06w-decisions-workspace.md#adr-w-016)) — the second slice (#778 (b)/(c))
+is where the shared shape becomes visible.
