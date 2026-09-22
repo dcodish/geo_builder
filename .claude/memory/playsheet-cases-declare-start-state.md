@@ -1,6 +1,6 @@
 ---
 name: playsheet-cases-declare-start-state
-description: Every play-sheet case must state the canvas it starts from — the operator continues from the previous case, so a case written for a fresh canvas fails and reads as a code bug
+description: Every play-sheet case must state the canvas AND THE TOOL it starts from — the operator continues from the previous case, so a case written for a fresh canvas or a different builder fails and reads as a code bug
 metadata:
   type: feedback
 ---
@@ -32,3 +32,18 @@ canvas that the givens never fixed. A clean run of the three utterances he paste
 at all, and he confirmed: *"that was from a different test"*. So a screenshot of a sheet run is a
 picture of the WHOLE run, not of the case — re-run the case's own lines on a cleared canvas before
 believing anything in the frame that the case did not ask for.
+
+**THE TOOL IS PART OF THE START STATE, and a number that is only true in one tool is a trap**
+(2026-09-22, round #1345 T22). The case said *"open the guide and find «מעגלים» — look for «הצג הכול
+(63)»"* with the 2-D server on its Server line. He had been in the ANALYTIC builder for the four cases
+before it and stayed there, where «מעגלים» is a different section with 5 rows — under the cap, so
+correctly no link at all. Reported as *"there are no 63 examples"*. Measured after: 2-D circles 63,
+analytic lines 16, analytic circles 5. **The feature was working in his screenshot** — the «הצג הכול
+(16)» in frame was analytic's lines section.
+
+Two rules follow, and they cost nothing:
+- When consecutive cases change BUILDER, say so on the case's face («THE 2-D TOOL — switch back from
+  analytic first»), not only in the Server line. He reads the instruction, not the URL.
+- **Never quote a count, a name or a section that is only true in one builder without naming it.**
+  A section name shared across tools («מעגלים», «נקודות», «ישרים») is exactly where this bites; give
+  the per-tool numbers in the Look-for so the case is checkable wherever he happens to be.

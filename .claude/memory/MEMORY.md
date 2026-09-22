@@ -33,7 +33,7 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Anchor wait predicates](anchor-wait-predicates.md) — `grep -q "3d exit"` matched `build:3d exit 0` and overlapped the batch suite with a lane; markers must not be substrings of each other (round #927)
 - [Measure the plan's "therefore"](measure-the-plans-therefore.md) — the sentence linking mechanism to symptom is a separate hypothesis, and the cheapest one to falsify (#920, round #931)
 - [Try the neighbouring spelling](try-the-neighbouring-spelling.md) — a working alternate spelling turns a "missing capability" into a two-spellings bug, which changes the ROUTE (#921, round #931)
-- [Cases declare their start state](playsheet-cases-declare-start-state.md) — a play-sheet case written for a fresh canvas fails when he continues from the previous case; say «נקה הכל» or say it continues (2026-09-08 #942 T2)
+- [Cases declare their start state](playsheet-cases-declare-start-state.md) — a play case must name the canvas AND THE TOOL it starts from; a count true in only one builder is a trap (2026-09-08 #942 T2; 2026-09-22 #1345 T22)
 - [Play sheet is copy-pasteable lines](playsheet-is-copy-pasteable-lines.md) — every utterance one per line in a code block in the CHAT report, never a table and never a pointer to the issue
 - [Drive the reported path](drive-the-reported-path.md) — a display fix must be driven through the path the REPORT takes; a refused line may never become a fact, so fact-keyed wiring never fires (#943, round #946)
 - [Play cases pass the gate](play-cases-pass-the-gate.md) — a factsOf sequence commits lines the submit gate REFUSES; validate every play case through the real dry-run gate before listing it, or the sheet dies at line 3 (#955 T2/T6, 2026-09-09)
