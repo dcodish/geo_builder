@@ -785,6 +785,7 @@ export function App() {
               // Hebrew sentence (the kit's isolation — the operator caught «המעגל שמרכזו O
               // ורדיוסו r» reversing under a forced ltr chip).
               example: complexBidi.inputPreview(raw) ?? raw,
+              featured: e.featured,
               dir: complexBidi.textDir(raw),
               description: i18n.language === 'he' ? e.descHe : e.descEn,
               onTry: () => {

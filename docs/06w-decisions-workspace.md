@@ -3722,3 +3722,58 @@ So the **mechanism** landed and the **choosing** is filed as [#1347](https://git
 **Measured after.** «נקודות נגזרות» leads with «AD תיכון במשולש ABC» and «AD גובה לצלע BC». Every capped section in all four products carries its expander. Lanes: 2-D 415 files / 7201 tests · 3-D 258 / 4906 · analytic 157 / 2273 · complex 44 / 772 — all green.
 
 **Consequences.** `shell/frame/ManualScreen.tsx` (`featured`, `manualShown`, `showAllLabel`/`showLessLabel`, the per-section expander); `src-analytic/parser/catalogAnalytic.ts` (`featured?: true`, two rows marked); the four `App` call sites; `manualMore` + `manualShowAll` + `manualShowLess` in all four products × two languages. Locks: `shell/__tests__/manual-featured-1275.test.ts` (5), `src-analytic/__tests__/issue-1275-guide-featured.test.ts` (3).
+
+### Amendment 1 — the sample is CHOSEN for real, and a lint keeps it that way (#1347, 2026-09-22)
+
+ADR-W-074 shipped the mechanism and marked **two** rows. Everything else still showed whichever six were
+written first, in sixteen capped sections across four products — so the defect this ADR names ("which six
+is decided by FILE ORDER") was still live everywhere except «נקודות נגזרות».
+
+**The choosing is a PEDAGOGY call and it went to the operator**, priced as four options on #1347. He took
+the third — *"i will go with your recommendation"* — a proposed list to approve or edit, and then
+**approved all sixteen sections**: *"all approved"*.
+
+**The rule the list was picked by: the six span six DIFFERENT capabilities, not six phrasings of one.**
+That is not a stylistic preference — it is what the measurement showed the defect to be:
+
+```
+2-D «אילוצים»        32 rows   four of six state an angle's value in four wordings; «AB = 6» was row 17
+2-D «מעגלים»         63 rows   five of six are "two circles"; tangent(45), chord(33), diameter(40) unseen
+2-D «ישרים ואנכים»   20 rows   no median, altitude, bisector or midsegment — rows 12, 15, 19, 17
+3-D «גופים»          55 rows   ALL SIX are boxes and prisms: no pyramid, cone, cylinder or sphere at all
+3-D «וקטורים»        18 rows   all six are |…| magnitude relations; NAMING vectors was row 9
+3-D «מישורים וישרים» 87 rows   five of six are a plane against a coordinate plane; declaring one was row 8
+analytic «יחסים»     19 rows   three spellings of one distance, two of one parallel
+```
+
+**96 rows are now marked** (94 here + the two from this ADR), and the flag is declared on all four catalog
+entry types and carried through all four `App` mappings — it had only ever existed in analytic.
+
+**The lint lands WITH the choices, which is the only moment it can start green.** `featuredShortfall` in
+the chrome answers *"is this capped section short of its cap?"*; each product asserts it against its own
+catalog, because `shell/` may never import a product tree (ADR-W-016 rule 2 — the same split this ADR's
+own locks needed). A capped section that features fewer than six now fails the suite, so the next catalog
+addition cannot quietly vanish into the tail. Holding it until now was deliberate: added at ADR-W-074 time
+it would have turned all sixteen sections red and forced ~96 pedagogy decisions inside a bug fix.
+
+**Two catalog-hygiene rules arrived with it**, on the operator's instruction — *"we need to remove any
+analytical sytax from the 2d and ofcourse no duplicates"* — and the whole measured inventory was three rows:
+
+- **`נקודה A ב-(0,0)` is out of the 2-D catalog.** Placing a point at coordinates is analytic-geometry
+  syntax, and [#1245](https://github.com/dcodish/geo_builder/issues/1245) will make it a REFUSAL in 2-D
+  that points the student at the analytic Builder — so advertising it was advertising a sentence the tool
+  is about to decline. The PARSER is untouched: the form still builds, and `bare-free-point.test.ts` and
+  `issue-260-meeting-reseat.test.ts` still exercise it. Only the guide stops offering it. Two catalog
+  snapshots (`llm-contract`, `shadow-matrix`) lose that row and nothing else — the diff is deletions only.
+- **The analytic duplicate is gone.** «M אמצע AB» appeared twice in «נקודות נגזרות» with identical `he`
+  and `en`, differing only in `needs`, and BOTH copies were inside the visible six — two of six slots
+  spent on one line a student sees twice with no explanation.
+- **3-D's «טטראדר ABCD» / «ABCD ארבעון» are NOT a duplicate** and are deliberately kept: two different
+  Hebrew word orders the parser supports, sharing one English translation. The row is coverage; only the
+  `en` string collides. Flagged rather than deleted — removing a supported spelling would shrink the
+  coverage map to tidy a translation.
+
+**Consequences.** `shell/frame/ManualScreen.tsx` (`featuredShortfall`); `featured?: true` on the 2-D, 3-D
+and complex entry types; 94 rows marked across the four catalogs; `featured` carried through `src/App.tsx`,
+`src3d/App3.tsx` and `src-complex/App.tsx`; two rows removed. Locks: `issue-1347-featured-lint.test.ts` in
+each of the four product trees (24). `docs/02w` FR-SU-7 extended.

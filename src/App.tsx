@@ -2011,6 +2011,7 @@ export default function App() {
             const raw = he ? c.he : c.en;
             return {
               example: raw,
+              featured: c.featured,
               dir: textDir(raw),
               description: he ? c.descHe : c.descEn,
               onTry: () => {

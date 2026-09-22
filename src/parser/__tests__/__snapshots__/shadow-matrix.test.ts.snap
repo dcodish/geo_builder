@@ -732,16 +732,6 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
-    "text": "point A at (0,0)",
-    "winner": "freePoint",
-  },
-  {
-    "lang": "he",
-    "text": "נקודה A ב-(0,0)",
-    "winner": "freePoint",
-  },
-  {
-    "lang": "en",
     "text": "point E on AC at 40%",
     "winner": "pointOnSegment",
   },

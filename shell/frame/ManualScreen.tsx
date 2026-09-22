@@ -80,6 +80,20 @@ export function manualShown(entries: readonly ManualEntry[], cap?: number): read
   return [...entries.filter((e) => e.featured), ...entries.filter((e) => !e.featured)].slice(0, cap);
 }
 
+/**
+ * How many featured entries a capped section is SHORT of its cap — 0 when it is fine, and 0 for any
+ * section at or under the cap (#1347, [ADR-W-074](../../docs/06w-decisions-workspace.md#adr-w-074) Am. 1).
+ *
+ * The rule lives here because the chrome owns the selection; each product asserts it against its OWN
+ * catalog, because `shell/` may never import a product tree (ADR-W-016 rule 2). Without this lint the
+ * `featured` flag rots the way file order did: a new row lands in a full section, nobody marks it, and
+ * the section silently reverts to showing whichever six were written first.
+ */
+export function featuredShortfall(entries: readonly ManualEntry[], cap?: number): number {
+  if (cap === undefined || entries.length <= cap) return 0;
+  return Math.max(0, cap - entries.filter((e) => e.featured).length);
+}
+
 export function ManualScreen({ open, title, intro, sections, closeLabel, onClose, tryHint, sectionCap, moreNote, showAllLabel, showLessLabel }: ManualScreenProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   if (!open) return null;

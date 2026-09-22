@@ -65,9 +65,9 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'parameters', family: 'F11', he: 'a > 0', en: 'a > 0' },
 
   // --- F1 · points ---
-  { category: 'points', family: 'F1', he: 'נתונה הנקודה A(2,6)', en: 'point A(2,6)' },
-  { category: 'points', family: 'F1', he: 'נתונות הנקודות A(0,24), B(18,0)', en: 'points A(0,24), B(18,0)' },
-  { category: 'points', family: 'F1', he: 'A(-9a,0)', en: 'A(-9a,0)' },
+  { featured: true, category: 'points', family: 'F1', he: 'נתונה הנקודה A(2,6)', en: 'point A(2,6)' },
+  { featured: true, category: 'points', family: 'F1', he: 'נתונות הנקודות A(0,24), B(18,0)', en: 'points A(0,24), B(18,0)' },
+  { featured: true, category: 'points', family: 'F1', he: 'A(-9a,0)', en: 'A(-9a,0)' },
   /**
    * A point NAMED without being PLACED (#1136) — two degrees of freedom, its own.
    *
@@ -76,12 +76,12 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
    * smuggle it in as a polygon vertex («משולש ABM»), which asserts a triangle the student never
    * mentioned — ADR-052's cardinal sin through the front door.
    */
-  { category: 'points', family: 'F1', he: 'נקודה M', en: 'point M' },
+  { featured: true, category: 'points', family: 'F1', he: 'נקודה M', en: 'point M' },
 
   // --- F3 · lines by equation ---
-  { category: 'lines', family: 'F3', he: 'נתון הישר l1: 4y-3x-20=0', en: 'line l1: 4y-3x-20=0' },
-  { category: 'lines', family: 'F3', he: 'משוואת הישר AC היא y=-2x+8', en: 'the line AC is y=-2x+8' },
-  { category: 'lines', family: 'F3', he: 'הישר x=-4', en: 'the line x=-4' },
+  { featured: true, category: 'lines', family: 'F3', he: 'נתון הישר l1: 4y-3x-20=0', en: 'line l1: 4y-3x-20=0' },
+  { featured: true, category: 'lines', family: 'F3', he: 'משוואת הישר AC היא y=-2x+8', en: 'the line AC is y=-2x+8' },
+  { featured: true, category: 'lines', family: 'F3', he: 'הישר x=-4', en: 'the line x=-4' },
   { category: 'lines', family: 'F3', he: 'הישר y=x', en: 'the line y=x' },
 
   // The noun is OPTIONAL for an equation (02c R6, #1037) — the fit names the family, and the
@@ -92,7 +92,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
 
   // A line CONSTRUCTED through a point, copying a direction (#1093, ADR-AG-057). Not an equation
   // given but a construction: the line does not exist until the sentence creates it.
-  { category: 'lines', family: 'F3', he: 'דרך P עובר ישר מקביל לציר ה-x', en: 'a line through P is parallel to the x-axis' },
+  { featured: true, category: 'lines', family: 'F3', he: 'דרך P עובר ישר מקביל לציר ה-x', en: 'a line through P is parallel to the x-axis' },
   { category: 'lines', family: 'F3', he: 'דרך P עובר ישר מאונך לציר ה-x', en: 'a line through P is perpendicular to the x-axis' },
   /**
    * A line through a point with a FREE direction (#1319, ADR-AG-144) — the exam's own «דרך הנקודה N
@@ -110,6 +110,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'lines',
     family: 'F3',
+    featured: true,
     he: 'N על הישר 1',
     en: 'N is on line 1',
     needs: ['נתון הישר 1: 2x-y+8=0'],
@@ -121,6 +122,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'lines',
     family: 'F3',
+    featured: true,
     he: 'נתון הישר 3: (k+1)x+2y-12+5k=0',
     en: 'line 3: (k+1)x+2y-12+5k=0',
     needs: ['k הוא פרמטר'],
@@ -186,6 +188,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'relations',
     family: 'F19',
+    featured: true,
     he: 'אורך הקטע AB = 10',
     en: 'length AB = 10',
     needs: ['A(0,0)', 'נקודה B'],
@@ -245,6 +248,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'relations',
     family: 'F18',
+    featured: true,
     he: 'AB ∥ DC',
     en: 'AB ∥ DC',
     needs: ['מרובע ABCD'],
@@ -252,6 +256,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'relations',
     family: 'F18',
+    featured: true,
     he: 'AB ⊥ BC',
     en: 'AB ⊥ BC',
     needs: ['משולש ABC'],
@@ -277,6 +282,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'relations',
     family: 'F19',
+    featured: true,
     he: 'שיפוע AB הוא 2',
     en: 'the slope of AB is 2',
     needs: ['משולש ABC'],
@@ -328,6 +334,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'points',
     family: 'F1',
+    featured: true,
     he: 'x_A = 5',
     en: 'x_A = 5',
   },
@@ -340,6 +347,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'points',
     family: 'F1',
+    featured: true,
     he: 'קדקוד A(1,2)',
     /**
      * English has no `vertex` NOUN, and deliberately does not gain one here. `point` is spelled inline
@@ -360,6 +368,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'relations',
     family: 'F20',
+    featured: true,
     he: 'AC:CB = 3:2',
     en: 'AC:CB = 3:2',
     needs: ['A(0,0)', 'B(10,0)', 'C על הקטע AB'],
@@ -394,6 +403,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'relations',
     family: 'F17',
+    featured: true,
     he: '∠ABC = 90',
     en: '∠ABC = 90',
     needs: ['משולש ABC'],
@@ -403,6 +413,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'derived',
     family: 'F16',
+    featured: true,
     he: 'O מרכז המעגל I',
     en: 'O is the centre of circle I',
     needs: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9'],
@@ -412,6 +423,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'derived',
     family: 'F16',
+    featured: true,
     he: 'M אמצע AB',
     en: 'M is the midpoint of AB',
     needs: ['A(8,1)', 'B(-2,-5)'],
@@ -424,13 +436,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'derived',
     family: 'F16',
-    he: 'M אמצע AB',
-    en: 'M is the midpoint of AB',
-    needs: ['נקודה A', 'נקודה B', 'נקודה M'],
-  },
-  {
-    category: 'derived',
-    family: 'F16',
+    featured: true,
     he: 'M מפגש התיכונים במשולש ABC',
     en: 'M is the centroid of triangle ABC',
     needs: ['A(1,3)', 'B(-4,1)', 'C(-3,8)'],
@@ -483,6 +489,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'derived',
     family: 'F16',
+    featured: true,
     he: 'G מפגש האלכסונים במרובע ABCD',
     // The NOUN on both halves (#1080): the Hebrew says «במרובע», so the English must say which
     // shape too, or the two halves of one catalog row mean different things — the Hebrew draws a
