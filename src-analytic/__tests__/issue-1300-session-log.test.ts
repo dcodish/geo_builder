@@ -76,16 +76,59 @@ describe('#1300 — the analytic session log', () => {
   });
 
   /**
-   * THE PRODUCTION POSTURE. Not a nicety — the tool is undeployed and has no prod sink, so this early
-   * return is the only thing standing between a build and an unaudited POST.
+   * THE PRODUCTION POSTURE — REWRITTEN BY #1243, and deliberately stronger than what it replaces.
+   *
+   * This used to assert *"posts NOTHING outside DEV"*, which was correct while the tool was undeployed
+   * and had no prod sink. Analytic is live now, and that absence had a cost: `/log-triage` reported
+   * nothing for the most active product in the queue, which is indistinguishable from "no failures".
+   *
+   * So the contract is no longer "silence" but "ONLY the lean analytics event". The rows below pin what
+   * that means, and they are the part worth keeping: a figure snapshot — the most voluminous and most
+   * revealing event this module has — must NEVER leave the browser in production, and neither must the
+   * dev trace's shape.
    */
-  it('posts NOTHING outside DEV', () => {
-    const spy = withFetch(() => Promise.resolve());
-    vi.stubEnv('DEV', false);
-    logAnalytic({ kind: 'input', utterance: 'anything' });
-    logAnalytic({ kind: 'figure', lines: ['A(0,0)'] });
-    logAnalytic({ kind: 'action', action: 'clear' });
-    expect(spy).not.toHaveBeenCalled();
+  describe('outside DEV it posts ONLY the lean usage event (#1243)', () => {
+    it('never posts a FIGURE snapshot — the dev-only reconstruction trace stays dev-only', () => {
+      const spy = withFetch(() => Promise.resolve());
+      vi.stubEnv('DEV', false);
+      logAnalytic({ kind: 'figure', lines: ['A(0,0)'] });
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('never posts an INTERMEDIATE step — one submission must not be counted twice', () => {
+      const spy = withFetch(() => Promise.resolve());
+      vi.stubEnv('DEV', false);
+      logAnalytic({ kind: 'input', utterance: 'x', intermediate: true, source: 'parser', result: 'not-handled' });
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Both properties in ONE case, deliberately: `sessionAnnounced` is module state, so a separate
+     * "announces once" test would pass or fail on the order the file happens to run in — which is a
+     * test of the runner, not of the module.
+     */
+    it('posts ONE session line then a lean submit each, and NOT the dev trace fields', () => {
+      const spy = withFetch(() => Promise.resolve());
+      vi.stubEnv('DEV', false);
+      logAnalytic({ kind: 'input', utterance: 'נקודה A(2,3)', locale: 'he', source: 'parser', result: 'ok' });
+      logAnalytic({ kind: 'input', utterance: 'נקודה B(4,1)', locale: 'he', source: 'parser', result: 'ok' });
+
+      expect(spy).toHaveBeenCalledTimes(3); // one session announce + two submits
+      const bodies = [0, 1, 2].map((i) => bodyOf(spy, i));
+      expect(bodies.filter((b) => b.ev === 'session')).toHaveLength(1);
+      const submits = bodies.filter((b) => b.ev === 'submit');
+      expect(submits).toHaveLength(2);
+      expect(submits[0].tool).toBe('analytic'); // the tag that keeps it out of 2-D's file (#1243)
+      expect(submits[0].utterance).toBe('נקודה A(2,3)');
+      expect(submits[1].utterance).toBe('נקודה B(4,1)');
+      // the DEV trace's shape must not ride along into production
+      for (const b of submits) {
+        expect(b.kind).toBeUndefined();
+        expect(b.seq).toBeUndefined();
+        expect(b.clientTs).toBeUndefined();
+      }
+    });
+
   });
 
   /**

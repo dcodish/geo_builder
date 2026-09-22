@@ -17,6 +17,7 @@ import { createHmac } from 'node:crypto';
 import { appendFile, mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { clientIp, makeRateLimiter, readBody } from './http';
+import { eventsLogPathForTool, DEFAULT_TOOL } from './toolRouting';
 
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 120; // events/minute/IP — a busy session fires several per submit
@@ -70,6 +71,14 @@ export interface LogHandlerOpts {
   logPath?: string;
   /** Override the 3-D events file (tests). Defaults to `events3LogPath()`. */
   log3Path?: string;
+  /**
+   * Override ANY product's events file, by registry id (tests) — `{ analytic: '/tmp/a.jsonl' }`.
+   *
+   * `logPath`/`log3Path` stay as the 2-D and 3-D spellings their existing callers use; this is how
+   * every product added since is reachable without growing a named field per product, which is the
+   * shape that produced #1243 in the first place.
+   */
+  logPaths?: Record<string, string>;
 }
 
 /** Validate + normalise one client payload into a lean stored event (or null to drop). */
@@ -184,7 +193,7 @@ async function rotateIfLarge(file: string): Promise<void> {
 export async function handleLog(
   req: IncomingMessage,
   res: ServerResponse,
-  { ipSalt, logPath, log3Path }: LogHandlerOpts,
+  { ipSalt, logPath, log3Path, logPaths }: LogHandlerOpts,
 ): Promise<void> {
   const end = (code: number) => {
     res.statusCode = code;
@@ -207,11 +216,22 @@ export async function handleLog(
   const lean = normalise(payload);
   if (!lean) return end(400);
 
-  // Route the event to its app's OWN file by the client's `tool` tag (the 3-D sibling sends `tool:'3d'`,
-  // mirroring how the shared parse proxy selects the 3-D prompt). The stored event stays lean — the file
-  // choice IS the app tag, so `tool` is not duplicated into every line.
-  const is3d = (payload as { tool?: unknown } | null)?.tool === '3d';
-  const file = is3d ? (log3Path ?? events3LogPath()) : (logPath ?? eventsLogPath());
+  /**
+   * Route the event to its app's OWN file by the client's `tool` tag. The stored event stays lean —
+   * the file choice IS the app tag, so `tool` is not duplicated into every line.
+   *
+   * #1243: this was `payload?.tool === '3d' ? 3-D : 2-D`, so EVERY tag that was not `'3d'` — including
+   * a third product's, and including a typo — landed in 2-D's file and corrupted 2-D's numbers. The
+   * lookup below rejects an unknown tag instead (400), exactly as the dev trace's router already did.
+   * An ABSENT tag is still 2-D: that client has never tagged its events.
+   */
+  const tool = (payload as { tool?: unknown } | null)?.tool;
+  const id = tool === undefined || tool === null ? DEFAULT_TOOL : String(tool);
+  // `logPath`/`log3Path` are the two spellings existing callers already pass; `logPaths` reaches every
+  // other product by id. The registry lookup is the real answer and the only one that can refuse.
+  const legacy = id === DEFAULT_TOOL ? logPath : id === '3d' ? log3Path : undefined;
+  const file = legacy ?? logPaths?.[id] ?? eventsLogPathForTool(tool);
+  if (!file) return end(400); // an unregistered tool — never someone else's file
   const entry: UsageEvent = { serverTs: new Date().toISOString(), iph: hashIp(ip, ipSalt), ...lean };
   try {
     // One writer at a time (see `serialized`): the prune's read-modify-write and every append are

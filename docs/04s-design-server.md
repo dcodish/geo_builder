@@ -161,3 +161,29 @@ against goldens captured before the first edit.
 **The client half lives elsewhere.** The sequence gate and the honesty-gate battery run on the steps
 after they return, in the browser, and belong in `shell/` — which every product may import and the
 proxy may not. Two halves, two homes, one per allowed edge.
+
+## Event routing is a registry lookup ([ADR-W-077](06w-decisions-workspace.md#adr-w-077))
+
+Every builder posts its usage events to the same `${BASE_URL}api/log`, tagged with its product id. The
+server files each under its own product:
+
+```
+tool tag      ->  file                      env override
+(absent)      ->  logs/events.jsonl         EVENTS_LOG_PATH          <- 2-D, predates the tag
+'3d'          ->  logs/events-3d.jsonl      EVENTS_3D_LOG_PATH
+'analytic'    ->  logs/events-analytic.jsonl EVENTS_ANALYTIC_LOG_PATH
+'complex'     ->  logs/events-complex.jsonl EVENTS_COMPLEX_LOG_PATH
+anything else ->  400, written nowhere
+```
+
+The table is **derived from `products.json`**, not written out — so builder N+1 is routable the day it
+is registered, and a totality lock fails the suite if one ever is not. Before #1243 this was
+`tool === '3d' ? 3-D : 2-D`, whose else-arm silently swallowed every other product.
+
+**An unknown tag is refused, never defaulted.** A wrong destination is invisible from the client, so
+the only safe answer to a tag the server does not recognise is to refuse it. The dev trace's router
+(`logProxy.ts`) reached the same conclusion first; this is the production sink catching up.
+
+**Known inconsistency, recorded rather than unified:** `parseHandler` treats an empty-string `tool` as
+2-D; both event routers refuse it. Changing the parse path is a live-behaviour change and was out of
+scope for the routing fix.

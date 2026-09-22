@@ -3827,3 +3827,35 @@ each of the four product trees (24). `docs/02w` FR-SU-7 extended.
 **What is NOT built here.** #1356's second arm — restoring an OBJECT NAME the model changed («ישר 1» → `l1`) — is a different analysis from a letter run and stays open on that issue. This is the point-run half, shared.
 
 **Consequences.** `shell/llm/sequenceGate.ts` (new); `src/parser/parse.ts` and `src3d/parser/honesty3.ts` (now thin wrappers supplying their three differences); `src-analytic/parser/honestyAnalytic.ts` (new — also the home #1355's gates will land in); `src-analytic/app/fallback.ts` (runs the gate before the re-parse, carries `restored`); `src-analytic/App.tsx` (logs it); `BOUNDARIES.json` (`shell/llm` classified). Locks: `shell/__tests__/fixtures/sequence-gate-rows.ts`, `shell/__tests__/issue-1356-sequence-gate-meta.test.ts` (6), and one thin lock per tree.
+
+## ADR-W-077 — Event routing is a registry lookup, not a boolean; and analytic finally reports (#1243)
+
+**Status:** accepted, 2026-09-22 · **Issue:** [#1243](https://github.com/dcodish/geo_builder/issues/1243) (bug, `P3`, `server`) · step 3 of the operator's 2026-09-22 plan (#1359)
+**Requirements:** none (internal) · **Design:** [04s](04s-design-server.md#event-routing-is-a-registry-lookup-adr-w-077) (new section)
+
+**The defect.** `handleLog` routed production usage events with a boolean:
+
+```ts
+const is3d = payload?.tool === '3d';
+const file = is3d ? events3LogPath() : eventsLogPath();   // everything else -> 2-D
+```
+
+Two products, one branch, and **the else-arm was 2-D**. Any third product's events — or a typo, or an attacker's tag — landed in 2-D's file and corrupted 2-D's numbers rather than appearing as their own. Silently: from the client a wrong destination looks exactly like a right one.
+
+**The class** (docs/17): *a capability parameterised for two products and then hard-branched, so product three inherits the default arm instead of failing loudly.* The shared server is `tool:`-parameterised by contract (CLAUDE.md: *"parameterized by `tool:` — never forked per product"*); this is where the parameterisation was written as a boolean.
+
+**The precedent was already in the repo, one file over.** `server/logProxy.ts` — the DEV debug trace — hit this exact defect and fixed it properly: a lookup, an unknown tag rejected rather than defaulted, an absent tag meaning 2-D. The production sink never got the same treatment. `server/toolRouting.ts` is that fix plus the one thing `logProxy` still lacked: the table is **derived from `products.json`**, so adding builder N+1 cannot leave a stale literal behind.
+
+**Two conventions preserved exactly, because production data depends on them.** An ABSENT tag is 2-D (that client has never tagged its events). And 2-D's filenames carry no suffix — `events.jsonl` / `EVENTS_LOG_PATH`, not `events-2d.jsonl` — so the derivation reproduces the two live names rather than orphaning the files that hold real data. Asserted.
+
+**Analytic now reports, and its DEV-ONLY posture is deliberately reversed.** `sessionLogAnalytic.ts` shipped with no production sink on a stated premise — *"the analytic tool is not deployed"* ([ADR-AG-007](06c-decisions-analytic.md)) — which was correct then and has expired: analytic is live and has had repeated prod deploys. The cost was concrete: `/log-triage` reports *nothing* for it, which is indistinguishable from *no failures*, so the most active queue in the repo was being prioritised against data nobody was collecting. Privacy and retention are **inherited, not re-decided** — the same hashed IP, the same lean payload, the same SEC-7 retention. No new category of stored data.
+
+**The lock that replaced a lock.** `issue-1300-session-log.test.ts` asserted *"posts NOTHING outside DEV"*. That encoded the old premise, so it is rewritten rather than relaxed — and made **stronger**: outside DEV the module posts ONLY the lean event, never a figure snapshot (the most voluminous and most revealing event it has), never an intermediate step, and never the dev trace's own fields. A second drafted case ("announces the session once") was folded into the first, because `sessionAnnounced` is module state and a separate case would have passed or failed on file order — a test of the runner, not the module.
+
+**The poster is shared.** 2-D and 3-D each carried a byte-identical `post()`; analytic's would have been the third (#1358). It is now `shell/usageLog.ts`, parameterized by tool id and URL — every product may import `shell/`, and `shell/` imports none of them.
+
+**An inconsistency found and NOT silently unified.** For an empty-string tag, `parseHandler` treats `''` as 2-D (`String(j.tool ?? '') || '2d'`) while both event routers refuse it. This change matches the nearer precedent (the routers) rather than quietly changing a live parse path to agree. Recorded so the next reader does not assume one of them is a bug.
+
+**What this does NOT do, and why.** The **collection** half ships; the **consumption** half does not. An analytic dashboard profile needs an outcome taxonomy — which refusal codes are "real gaps" versus "the tool correctly declining" — and `/log-triage` needs an analytic classifier and replay path. Both are product judgement about what matters, not mechanism, and inventing eight Hebrew bucket labels inside an engineering PR is the mistake the memory note *ship the mechanism, file the judgement* names. Filed separately. **Consequence to state plainly: the evidence #1355 is meant to be authored against does not flow until that half lands and a deploy carries this one.**
+
+**Consequences.** `server/toolRouting.ts` (new — `PRODUCT_IDS`, `eventsLogPathForTool`, the filename/env derivations); `server/eventLog.ts` (lookup + 400 on an unknown tag, `logPaths` by id); `shell/usageLog.ts` (new — the shared poster); `src/debug/sessionLog.ts`, `src3d/debug/sessionLog3.ts` (use it); `src-analytic/debug/sessionLogAnalytic.ts` (dual-sink, `analyticsSubmitAnalytic`). Locks: `server/__tests__/issue-1243-event-routing.test.ts` (13 — routing asserted in BOTH directions, since the bug was a wrong destination rather than a missing one, plus the **totality** row that would have caught the original gap), and the rewritten production-posture cases.

@@ -22,24 +22,17 @@ let sessionAnnounced = false; // PROD: emit the `session` marker exactly once pe
 // The build this page is running (git short-hash · date, injected by Vite `define` in vite.config.3d.ts).
 // Stamped on every PROD event so the /admin3 dashboard can filter outcomes by release. `typeof` guard so a
 // context without the define (test runners) degrades to 'dev' instead of throwing.
+import { makeUsagePoster } from '../../shell/usageLog';
+
 const REL = typeof __BUILD__ !== 'undefined' ? __BUILD__ : 'dev';
 
 // `import.meta.env.BASE_URL` is `/` in dev and `/3d-builder/` in the production build, so this resolves to
 // `/api/log` (dev Vite plugin) or `/3d-builder/api/log` (prod Node proxy) automatically.
 const LOG_URL = `${import.meta.env.BASE_URL}api/log`;
 
-function post(body: Record<string, unknown>): void {
-  try {
-    void fetch(LOG_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ tool: '3d', ...body }),
-      keepalive: true,
-    }).catch(() => {});
-  } catch {
-    /* logging must never break the app */
-  }
-}
+// #1243: the poster is `shell/usageLog.ts`, shared with every sibling; the tag is what files the
+// event under this product rather than 2-D's default arm.
+const post = makeUsagePoster({ tool: '3d', url: LOG_URL });
 
 /**
  * Decide what a `logDebug3` event contributes to PRODUCTION usage analytics: the

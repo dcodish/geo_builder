@@ -22,6 +22,8 @@ let sessionAnnounced = false; // PROD: emit the `session` marker exactly once pe
 // The build this page is running (git short-hash · date, injected by Vite `define`). Stamped on every
 // PROD event so the admin dashboard can filter outcomes by release (ADR-146/ADR-148 follow-up) — `typeof`
 // guard so a context without the define (some test runners) degrades to 'dev' instead of throwing.
+import { makeUsagePoster } from '../../shell/usageLog';
+
 const REL = typeof __BUILD__ !== 'undefined' ? __BUILD__ : 'dev';
 
 // `import.meta.env.BASE_URL` is `/` in dev and `/geo-builder/` in the production
@@ -29,18 +31,10 @@ const REL = typeof __BUILD__ !== 'undefined' ? __BUILD__ : 'dev';
 // (prod Node proxy) automatically — the same way the `/api/parse` fetch does.
 const LOG_URL = `${import.meta.env.BASE_URL}api/log`;
 
-function post(body: Record<string, unknown>): void {
-  try {
-    void fetch(LOG_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-      keepalive: true,
-    }).catch(() => {});
-  } catch {
-    /* logging must never break the app */
-  }
-}
+// #1243: the poster is `shell/usageLog.ts`, shared with every sibling. NO `tool` tag — this client has
+// never sent one and the server reads an absent tag as 2-D; adding it now would change the one product
+// with live historical data.
+const post = makeUsagePoster({ url: LOG_URL });
 
 /**
  * Decide what a `logDebug` event contributes to PRODUCTION usage analytics: the
