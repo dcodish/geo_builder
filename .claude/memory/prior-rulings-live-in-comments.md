@@ -51,3 +51,20 @@ exactly where this misfires. Read the comment run BEFORE adding an attention lab
 writing the row. If the body states a routing gate ("needs sign-off", "blocked on X", "build order"),
 treat that as a claim to verify, never as current state — gates in bodies are the single most
 frequently-stale thing in this queue.
+
+**A STALE TITLE is the same trap wearing a disguise** (2026-09-22, #1279). The title said *"the analytic
+builder has NO Apache block in prod"*. The operator had pasted the block on 2026-09-20 and the thread said
+so twice — a PERMANENT comment with the GUI field verified at 08:13 and diffed against the pre-edit backup,
+then a re-measurement the next day. I read the BODY to explain the issue, re-measured in prod, and raised it
+to him as an open decision. He answered: *"I updated the plesk https apache part a few days ago. we
+discussed this in one of our previous sessions."*
+
+A title is written once, like a body — so **an issue whose remaining scope has moved is misfiled under its
+own name**, and it will keep pulling sessions back to work that is done.
+
+- Reading the body is NOT reading the issue. Read the comments before reporting anything as open —
+  especially before putting it in front of him as a decision.
+- When the comments show the scope has moved, **retitle the issue to the work that is actually left**, and
+  say in a comment why. That is the cheap fix that stops the next reader repeating it.
+- The arming comment often already states the true remaining scope — #1279's said "deploy:preflight probes
+  each enabled product's routes", which was the real work all along.
