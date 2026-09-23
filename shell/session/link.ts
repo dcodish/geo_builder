@@ -123,13 +123,22 @@ export function consumeFragment(): void {
 }
 
 /**
- * Where a builder lives — `/` in dev, `/geo-builder/`, `/3d-builder/`, … in production. The caller
- * passes `import.meta.env.BASE_URL`; a link that pointed at the wrong base would 404 for every
- * student who tapped it, so no builder hardcodes its own.
+ * Where a builder lives, for a link that must reopen THIS builder.
+ *
+ * It reads `location.pathname`, not the build's configured base, and that is a correction rather
+ * than a preference. In production each builder is built with its own base (`/geo-builder/`,
+ * `/3d-builder/`, …) and the two agree. **In development all four are served by one server from
+ * `/`**, with the siblings on `/3d.html`, `/complex.html`, `/analytic.html` — so
+ * `import.meta.env.BASE_URL` is `/` for every one of them, and a link copied from 3-D reopened the
+ * 2-D app. Measured, not reasoned: an analytic link built that way round-tripped to an empty canvas.
+ *
+ * `pathname` is right in both: `/analytic.html` in dev, `/analytic-builder/` in production. The
+ * query is deliberately dropped — a shared figure should not carry the sender's tracking tail — and
+ * `base` remains the fallback for a non-browser caller.
  */
 export function appBaseUrl(base: string): string {
-  const origin = typeof window === 'undefined' ? '' : window.location.origin;
-  return `${origin}${base}`;
+  if (typeof window === 'undefined') return base;
+  return `${window.location.origin}${window.location.pathname || base}`;
 }
 
 /** What arrived, and what the caller must decide about it. */

@@ -12,7 +12,7 @@
  * would be expensive to get wrong — do not re-enter when the consume rewrites the URL.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { encodeFigurePayload, onSharedLink } from '../session/link';
+import { appBaseUrl, encodeFigurePayload, onSharedLink } from '../session/link';
 
 const PAYLOAD = '{"app":"geo-builder","schemaVersion":1,"seed":0,"facts":[]}';
 
@@ -132,5 +132,44 @@ describe('#1373 — the consume, and the loop that must not happen', () => {
   it('survives an environment with no window at all (node, tests, SSR)', () => {
     delete (globalThis as { window?: unknown }).window;
     expect(() => onSharedLink(() => {})()).not.toThrow();
+  });
+});
+
+/**
+ * The link must reopen THIS builder — the defect a browser found and the suite could not.
+ *
+ * Measured on the branch dev server: an analytic link built from `import.meta.env.BASE_URL`
+ * round-tripped to an EMPTY canvas. In production each builder is built with its own base and the
+ * two agree, but in development all four are served by one server from `/`, so BASE_URL is `/` for
+ * every one of them and a sibling's link reopened the 2-D app. `pathname` is correct in both.
+ */
+describe('#1372 — a link points at the builder it was copied from', () => {
+  const withLocation = (pathname: string, search = '') => {
+    (globalThis as { window?: unknown }).window = {
+      location: { origin: 'https://themathbible.com', pathname, search, hash: '' },
+      history: { replaceState: () => {} },
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    };
+  };
+
+  it.each([
+    ['dev, a sibling entry point', '/analytic.html', '/', 'https://themathbible.com/analytic.html'],
+    ['dev, 2-D at the root', '/', '/', 'https://themathbible.com/'],
+    ['production, 3-D', '/3d-builder/', '/3d-builder/', 'https://themathbible.com/3d-builder/'],
+    ['production, 2-D', '/geo-builder/', '/geo-builder/', 'https://themathbible.com/geo-builder/'],
+  ])('%s', (_label, pathname, base, expected) => {
+    withLocation(pathname);
+    expect(appBaseUrl(base)).toBe(expected);
+  });
+
+  it("drops the sender's query tail — a shared figure carries no tracking", () => {
+    withLocation('/analytic.html', '?utm=whatsapp');
+    expect(appBaseUrl('/')).toBe('https://themathbible.com/analytic.html');
+  });
+
+  it('falls back to the configured base with no window (node, SSR)', () => {
+    delete (globalThis as { window?: unknown }).window;
+    expect(appBaseUrl('/geo-builder/')).toBe('/geo-builder/');
   });
 });

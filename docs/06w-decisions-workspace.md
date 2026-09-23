@@ -4112,6 +4112,17 @@ and copying 2-D's answer would have been wrong in all three:
   same unchanged figure produce a different URL on every press, and a teacher who sends the link
   twice appears to have sent two different figures. That is one omitted field, not a second schema.
 
+### The link points at the builder it was copied FROM, and that took a browser to find
+
+`appBaseUrl` first used `import.meta.env.BASE_URL`. In production that is right — each builder is
+built with its own base (`/geo-builder/`, `/3d-builder/`, …). **In development all four are served
+by one server from `/`**, with the siblings on `/3d.html`, `/complex.html`, `/analytic.html`, so
+BASE_URL is `/` for every one of them and a sibling's link reopened the 2-D app. Measured, not
+reasoned: an analytic link built that way round-tripped to an empty canvas when driven through a
+real browser. `location.pathname` is correct in both environments, and it is what ships. Locked
+against a stand-in `window` for all four cases — the unit suite could not have caught this, because
+the defect lives in the difference between two ways of being served.
+
 ### Three things moved to `shell/` rather than being copied a fourth time
 
 `payloadInHash`, `consumeFragment` and the origin half of the base URL are product-independent. 2-D
