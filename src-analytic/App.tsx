@@ -355,9 +355,18 @@ export function App() {
     setOffer(null);
   };
 
-  /** The image exports — the shared rasteriser, the top row, as in every sibling (ADR-W-024). */
+  /**
+   * The image exports — the shared rasteriser, the top row, as in every sibling (ADR-W-024).
+   *
+   * #1378: this read `canvasCard`, a ref that was DECLARED and never attached to anything — so
+   * `.current` was permanently null and every rasterise rejected. «העתיקו תמונה» and «הורידו תמונה»
+   * had therefore never worked, failing into a 1.4-second ✕ with no explanation, and the share
+   * feature inherited it as a preview image that was never uploaded (the operator saw a WhatsApp
+   * card with no picture). `viewportRef` is the element that actually holds the `<svg>`, and it is
+   * bound — its siblings bind theirs too (complex App.tsx, 3-D App3.tsx).
+   */
   const rasterCanvas = (): Promise<Blob> => {
-    const svg = canvasCard.current?.querySelector('svg');
+    const svg = viewportRef.current?.querySelector('svg');
     if (!svg) return Promise.reject(new Error('no canvas'));
     return svgToPng(svg as SVGSVGElement);
   };
@@ -445,7 +454,6 @@ export function App() {
   const [manualOpen, setManualOpen] = useState(false);
   const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>('');
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const canvasCard = useRef<HTMLDivElement | null>(null);
   /**
    * THE MEASURE MENU (#1048) — what was clicked, and where to put the list.
    *
