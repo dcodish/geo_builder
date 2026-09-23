@@ -25,6 +25,11 @@ import { applySwitcherConfig, configOf, readToolConfig, type ToolConfig } from '
 import { deriveLines } from './app/deriveLines';
 import { askRowsOf } from './app/askLane';
 import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, submitQuery, toggleLine } from './app/submit';
+// #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
+// This tree is why the rule exists: #919 removed a seam here that re-submitted stored lines on every load.
+import { forgetSessionCx, offeredSessionCx, restoreSessionCx, startSessionPersistCx } from './app/sessionPersistCx';
+import type { StoredSession } from '../shell/session/persist';
+import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { v2Claims, v2Contradiction, v2Formulas, v2Freedom, v2Labels, v2Measures, whyText } from './replay/scene2';
 import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
@@ -161,6 +166,33 @@ export function App() {
       else useComplexStore.getState().setName(figureNameFromFileName(file.name, 'complex'));
     });
   };
+  /**
+   * #1238 (ADR-W-068) — the continue-or-start-fresh OFFER. ADR-W-046 stands: the builder opens
+   * EMPTY. This reads what COULD be restored, once, on mount; the lines re-enter only on the
+   * student's tap, through the same audited hydrate the file picker uses.
+   */
+  const [offer, setOffer] = useState<StoredSession | null>(null);
+  useEffect(() => {
+    setOffer(offeredSessionCx());
+    return startSessionPersistCx();
+  }, []);
+
+  const acceptOffer = () => {
+    if (!offer) return;
+    const ok = restoreSessionCx(offer.payload);
+    setOffer(null);
+    // Refused: name it in this product's own error voice, then stop offering what cannot open.
+    if (!ok) {
+      useComplexStore.setState({ lastError: { key: 'parse-error', detail: t('sessionOffer') } });
+      forgetSessionCx();
+    }
+  };
+
+  const declineOffer = () => {
+    forgetSessionCx();
+    setOffer(null);
+  };
+
   const [input, setInput] = useState('');
 
   // the language toggle and the document-direction flip are the FRAME's now (suite-level chrome,
@@ -394,7 +426,21 @@ export function App() {
         closeLabel: t('aboutClose'),
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
-      banner={auditBanner}
+      /* #1238: the offer outranks the load audit for the one render where both could exist — an
+         empty canvas has no audit to show, so in practice they never collide. */
+      banner={
+        offer && lines.length === 0 ? (
+          <ResumeOffer
+            message={t('sessionOffer')}
+            continueLabel={t('sessionContinue')}
+            restartLabel={t('sessionStartFresh')}
+            onContinue={acceptOffer}
+            onRestart={declineOffer}
+          />
+        ) : (
+          auditBanner
+        )
+      }
     >
       <div className="app">
         {/* The load target must OUTLIVE the overflow menu (its items unmount on close), so the

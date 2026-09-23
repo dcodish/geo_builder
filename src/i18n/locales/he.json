@@ -509,5 +509,10 @@
     "midsegment": "קטע האמצעים"
   },
   "manualShowAll": "הצג הכול",
-  "manualShowLess": "הצג פחות"
+  "manualShowLess": "הצג פחות",
+  "session": {
+    "offer": "נמצאה עבודה מהפעם הקודמת שלא נשמרה.",
+    "continue": "המשך מהמקום שבו הפסקת",
+    "startFresh": "התחל מחדש"
+  }
 }

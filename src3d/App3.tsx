@@ -38,9 +38,13 @@ import { classifyGuidance3, upperCasedLabelCandidate3 } from './parser/scope3';
 import { parse3 } from './parser/parse3';
 import Figure3 from './render/Figure3';
 import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
+// #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
+import { forgetSession3, offeredSession3, restoreSession3, startSessionPersist3 } from './store/sessionPersist3';
+import type { StoredSession } from '../shell/session/persist';
+import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { auditLoad3 } from './store/loadAudit3';
 import { useStore } from 'zustand';
-import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
+import { derive3, redo3, undo3, useGeo3, type Fact3, type FactStatus3, type StoreError3 } from './store/store3';
 import { planeChipsByFact } from './store/planeChips';
 import { paramChipsByFact } from './store/paramChips';
 import { collectWedges, competingArcSymbols } from './render/wedges';
@@ -436,21 +440,59 @@ export default function App3() {
     if (!f) return;
     const r = deserializeFigure3(await f.text());
     if (r.ok) {
-      logDebug3({ kind: 'action', action: 'load', detail: `${r.facts.length} facts` }); // #182: a load replaces the figure — the replay must know
       loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode);
       setFigureName(figureNameFromFileName3(f.name)); // the FILENAME names the figure (issue #42)
-      // #309 (ADR-3D-087): deserializing checks the SCHEMA, not the OUTCOME. A file this build cannot
-      // rebuild used to load with lastError cleared and an empty canvas. The load still opens the file
-      // exactly as saved (never destructive) — it just stops claiming the figure is fine when it is not.
-      const audit = auditLoad3(r.facts, r.seed);
-      setLoadNote(
-        audit.failed.length === 0
-          ? null
-          : audit.unbuildable
-            ? t('load.unbuildable', { count: audit.total })
-            : t('load.partial', { count: audit.failed.length, steps: audit.failed.map((x) => x.step).join(', ') }),
-      );
+      noteLoadOutcome(r.facts, r.seed);
     } else reportLoadError(r.reason);
+  };
+
+  /**
+   * #309 (ADR-3D-087): deserializing checks the SCHEMA, not the OUTCOME. A file this build cannot
+   * rebuild used to load with lastError cleared and an empty canvas. The load still opens the file
+   * exactly as saved (never destructive) — it just stops claiming the figure is fine when it is not.
+   * Shared by the file picker and the restored session offer (#1238): a restore is a load, so it is
+   * audited like one.
+   */
+  const noteLoadOutcome = (facts: Fact3[], seed: number) => {
+    logDebug3({ kind: 'action', action: 'load', detail: `${facts.length} facts` }); // #182: a load replaces the figure — the replay must know
+    const audit = auditLoad3(facts, seed);
+    setLoadNote(
+      audit.failed.length === 0
+        ? null
+        : audit.unbuildable
+          ? t('load.unbuildable', { count: audit.total })
+          : t('load.partial', { count: audit.failed.length, steps: audit.failed.map((x) => x.step).join(', ') }),
+    );
+  };
+
+  /**
+   * #1238 (ADR-W-068) — the continue-or-start-fresh OFFER. ADR-W-046 stands: the builder opens
+   * EMPTY. This reads what COULD be restored, once, on mount; the figure enters the session only on
+   * the student's tap, and the banner retires as soon as the canvas is no longer empty.
+   */
+  const [offer, setOffer] = useState<StoredSession | null>(null);
+  useEffect(() => {
+    setOffer(offeredSession3());
+    return startSessionPersist3();
+  }, []);
+
+  const acceptOffer = () => {
+    if (!offer) return;
+    const r = restoreSession3(offer.payload);
+    setOffer(null);
+    if (r.ok) {
+      setFigureName(r.name ?? ''); // a restored session has no filename to take its name from
+      noteLoadOutcome(r.facts, r.seed);
+    } else {
+      // Refused and NAMED, exactly as a stale file is — then stop offering what cannot open.
+      reportLoadError(r.reason);
+      forgetSession3();
+    }
+  };
+
+  const declineOffer = () => {
+    forgetSession3();
+    setOffer(null);
   };
 
   // Debug log (dev only): snapshot the fact list + statuses whenever the figure
@@ -642,6 +684,19 @@ export default function App3() {
         closeLabel: t('aboutClose'),
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
+      /* #1238: the offer sits in the frame's banner region, above the workbench — and is gone the
+         moment the canvas is no longer empty. */
+      banner={
+        offer && facts.length === 0 ? (
+          <ResumeOffer
+            message={t('session.offer')}
+            continueLabel={t('session.continue')}
+            restartLabel={t('session.startFresh')}
+            onContinue={acceptOffer}
+            onRestart={declineOffer}
+          />
+        ) : undefined
+      }
     >
     {/* THE WORKBENCH (#734): the three-zone GEOMETRY is the shell's — identical columns, canvas
         card and empty-state placement in every builder; this product passes zone content only.

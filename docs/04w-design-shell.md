@@ -116,3 +116,29 @@ issue [#664](https://github.com/dcodish/geo_builder/issues/664)) — one row per
 column per builder, where *an unexamined cell fails the suite*. It is specified and not yet built.
 Recorded here rather than only in the issue, because a design doc that omits the weakest property of its
 central rule is not describing the system.
+
+## The session seam ([ADR-W-078](06w-decisions-workspace.md#adr-w-078))
+
+A builder opens EMPTY and OFFERS to continue. Three files, and the split between them is what keeps
+`shell/` free of product knowledge:
+
+| file | what it owns |
+| --- | --- |
+| `shell/session/persist.ts` | the only door to browser storage — `{savedAt, payload}` under a per-product key, the staleness window, and the wrapping that turns a private window / blocked site data / an exhausted quota into "no stored session" |
+| `shell/session/adapter.ts` | the `SessionAdapter` contract a product exports as a VALUE, so the cross-product checks (docs/28 §5c) can drive real wiring rather than scan source |
+| `shell/frame/ResumeOffer.tsx` | the banner — two actions, caller's strings, no auto-dismiss (a banner that expires on its own is a silent start-fresh) |
+
+**The payload is the product's own save-envelope text**, byte for byte — the same string its save
+button writes to a file. `shell/` never parses it. Two consequences worth stating: restoring is
+LOADING, so the load audit (FR-SL-3) covers a restored session for free; and the persisted shape
+inherits the save file's versioning rather than becoming a second format to migrate.
+
+**The write rule is the load-bearing one: an empty session is never written.** Every builder boots
+empty, so a persister that mirrored its boot state would erase the session it was about to offer.
+The adapter's `snapshot()` returns `null` for an empty session, and that null is checked by the
+shared rows and by the meta-lock — it is a contract, not an optimisation.
+
+Each product wires four things: its key, its `snapshot()` (its serializer, skipped when empty), its
+`restore()` (its existing load path), and its `isEmpty()`/`reset()`. The app reads the offer ONCE on
+mount — never in a selector, never on every render — and the figure enters the session only on the
+student's tap.

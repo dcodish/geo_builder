@@ -109,12 +109,27 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
   later engine that lays the same facts out differently still loads the file. *(Generalises
   [FR-HS-10](02-requirements.md).)*
 - **FR-SL-5 (Must)** — **A builder opens EMPTY.** Every load — from the switcher, a bookmark, or a
-  refresh — starts with a clean canvas and an empty list; no product restores a previous session from
-  browser storage, and no product tree reads or writes a session key. Durable work is the explicit
-  save to a file (FR-SL-1…4). One rule for all builders, so a student opening a tool to start a new
-  question is never evaluated against a figure they did not build. *(Operator ruling 2026-09-06 —
-  [ADR-W-046](06w-decisions-workspace.md#adr-w-046), #919; withdraws [02](02-requirements.md) FR-HS-4.
-  Lock: `src-complex/__tests__/no-session-restore-919.test.ts`, a grep guard over every product tree.)*
+  refresh — starts with a clean canvas and an empty list; **no product restores a previous session on
+  its own.** One rule for all builders, so a student opening a tool to start a new question is never
+  evaluated against a figure they did not build. *(Operator ruling 2026-09-06 —
+  [ADR-W-046](06w-decisions-workspace.md#adr-w-046), #919. **Amended 2026-09-21
+  ([ADR-W-078](06w-decisions-workspace.md#adr-w-078), #1238):** a session may now be PERSISTED and
+  OFFERED (FR-SL-6) — what is forbidden is restoring it without being asked. The clause "no product
+  tree reads or writes a session key" narrows accordingly: storage is reached through ONE module,
+  `shell/session/persist.ts`, and never directly from a product tree. Lock:
+  `src-complex/__tests__/no-session-restore-919.test.ts`, asserting both directions.)*
+- **FR-SL-6 (Must)** — **Unsaved work survives a reload as an OFFER.** When a builder loads and a
+  recent session exists, it says so and gives the student two choices — continue where they left off,
+  or start fresh — and does nothing until one is chosen. A student who switches apps, takes a call or
+  locks their phone does not lose an hour's figure; a student who came to start a new question is not
+  handed an old one. The stored payload is the product's own save envelope, so **restoring is
+  loading**: a statement the tool can no longer rebuild is reported by the load audit (FR-SL-3), never
+  dropped in silence, and positions are still never stored (FR-SL-4). A session is offered for a
+  bounded window and is forgotten when the student starts fresh or clears the canvas; storage that is
+  unavailable, blocked or full simply means no offer. *(Operator ruling 2026-09-21 —
+  [ADR-W-078](06w-decisions-workspace.md#adr-w-078), #1238; un-withdraws [02](02-requirements.md)
+  FR-HS-4 in this form only. Locks: `shell/__tests__/session-persist-1238.test.ts`, the cross-product
+  `session-offer-1238.test.ts` in each tree, and a meta-lock over the shared checks.)*
 
 ## Export
 

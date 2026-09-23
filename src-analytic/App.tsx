@@ -58,6 +58,11 @@ import { anotherConfiguration } from './app/another';
 import { centresOf, crossingSentence, crossingsOf, freeLetter, pointAt } from './engine/crossings';
 import { VERTICAL_TOL, verticality } from './engine/lines';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
+// #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
+import { forgetSessionAn, offeredSessionAn, restoreSessionAn, startSessionPersistAn } from './app/sessionPersistAn';
+import { loadAnalyticSession } from './app/loadSession';
+import type { StoredSession } from '../shell/session/persist';
+import { ResumeOffer } from '../shell/frame/ResumeOffer';
 
 declare const __BUILD__: string;
 
@@ -152,7 +157,6 @@ export function App() {
     loadAudit,
     setLoadAudit,
     serialize,
-    restore,
     undo,
     redo,
   } = useAnalyticStore();
@@ -219,37 +223,40 @@ export function App() {
         });
         return;
       }
-      const saved = env.data as { lines?: unknown; seed?: unknown; name?: unknown };
-      const savedLines = Array.isArray(saved.lines)
-        ? saved.lines.filter((l): l is string => typeof l === 'string')
-        : [];
-      restore({
-        lines: savedLines,
-        seed: typeof saved.seed === 'number' ? saved.seed : 0,
-        name: typeof saved.name === 'string' ? saved.name : figureNameFromFileName(file.name, 'analytic'),
-      });
+      // The restore + audit + trace is app/loadSession.ts, shared with the session offer (#1238):
+      // a restore is a load, so it is audited like one.
+      loadAnalyticSession(env.data, figureNameFromFileName(file.name, 'analytic'));
       // A load is a new figure, so the view it is seen through is a new view too (#1209).
       showWholeFigure();
-      /**
-       * A LOAD IS AUDITED, not trusted (#1087). The lines are re-parsed on the way in, and a line
-       * that no longer builds is reported rather than dropped in silence — which is the whole value
-       * of storing lines instead of positions.
-       */
-      const replayed = derive(savedLines, 0);
-      setLoadAudit({
-        total: savedLines.length,
-        failed: replayed.faults.map((f) => ({ line: savedLines[f.index] ?? '', reason: f.code })),
-      });
-      // #1300 — a load REPLACES the figure, so a replay that misses it continues from the wrong one. The
-      // audit's own result rides along: a file that stopped loading is the parser-drift signal this trace
-      // exists to make visible.
-      logAnalytic({
-        kind: 'action',
-        action: 'load',
-        detail: `${savedLines.length} lines`,
-        result: replayed.faults.length ? `${replayed.faults.length} failed` : 'ok',
-      });
     });
+  };
+
+  /**
+   * #1238 (ADR-W-068) — the continue-or-start-fresh OFFER. ADR-W-046 stands: the builder opens
+   * EMPTY. This reads what COULD be restored, once, on mount; the lines re-enter only on the
+   * student's tap, through the same audited load path a file takes.
+   */
+  const [offer, setOffer] = useState<StoredSession | null>(null);
+  useEffect(() => {
+    setOffer(offeredSessionAn());
+    return startSessionPersistAn();
+  }, []);
+
+  const acceptOffer = () => {
+    if (!offer) return;
+    const ok = restoreSessionAn(offer.payload);
+    setOffer(null);
+    if (ok) showWholeFigure();
+    else {
+      // Refused: named in this product's own error voice, then stop offering what cannot open.
+      setError({ key: 'load-unreadable', detail: t('sessionOffer') });
+      forgetSessionAn();
+    }
+  };
+
+  const declineOffer = () => {
+    forgetSessionAn();
+    setOffer(null);
   };
 
   /** The image exports — the shared rasteriser, the top row, as in every sibling (ADR-W-024). */
@@ -858,8 +865,18 @@ export function App() {
           <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
         </>
       }
+      /* #1238: the offer outranks the load audit for the one render where both could exist — an
+         empty canvas has no audit to show, so in practice they never collide. */
       banner={
-        loadAudit ? (
+        offer && lines.length === 0 ? (
+          <ResumeOffer
+            message={t('sessionOffer')}
+            continueLabel={t('sessionContinue')}
+            restartLabel={t('sessionStartFresh')}
+            onContinue={acceptOffer}
+            onRestart={declineOffer}
+          />
+        ) : loadAudit ? (
           <Banner kind="notice" onDismiss={() => setLoadAudit(null)} dismissLabel={t('close')}>
             {loadAudit.failed.length
               ? t('loadPartial', {

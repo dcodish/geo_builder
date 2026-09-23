@@ -162,7 +162,17 @@ export function serializeFigure3(
 }
 
 export type LoadResult3 =
-  | { ok: true; facts: Fact3[]; seed: number; queries: string[]; planeDisplay: PlaneDisplayMode3Map; displayMode: DisplayModeMap }
+  | {
+      ok: true;
+      facts: Fact3[];
+      seed: number;
+      queries: string[];
+      planeDisplay: PlaneDisplayMode3Map;
+      displayMode: DisplayModeMap;
+      /** The name the envelope carried. PROVENANCE for a file (the FILENAME wins, issue #42) — but a
+       *  RESTORED session (#1238) has no filename, so it is the only name it can take. */
+      name?: string;
+    }
   | { ok: false; reason: 'bad-file' | 'newer-schema' };
 
 /**
@@ -226,7 +236,15 @@ export function deserializeFigure3(text: string): LoadResult3 {
       if (v === 'face' || v === 'full' || v === 'hidden') planeDisplay[k] = v;
     }
   }
-  return { ok: true, facts, seed: file.seed, queries, planeDisplay, displayMode: displayModeFromIndexed(file.displayMode, facts.map((f) => f.id)) };
+  return {
+    ok: true,
+    facts,
+    seed: file.seed,
+    queries,
+    planeDisplay,
+    displayMode: displayModeFromIndexed(file.displayMode, facts.map((f) => f.id)),
+    ...(typeof file.name === "string" ? { name: file.name } : {}),
+  };
 }
 
 /** This product's save-file suffix (issue #20; registry: docs/22-workflow.md §9). COPIED per product

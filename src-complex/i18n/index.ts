@@ -190,6 +190,10 @@ const he = {
   askRemove: 'הסרת השאלה',
   askUnreadable: 'הכלי לא הבין את השאלה — נסו ניסוח אחר',
   askIsStatement: 'זהו נתון, לא שאלה — הקלידו אותו בתיבת הנתונים',
+  // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
+  sessionOffer: 'נמצאה עבודה מהפעם הקודמת שלא נשמרה.',
+  sessionContinue: 'המשך מהמקום שבו הפסקת',
+  sessionStartFresh: 'התחל מחדש',
 };
 
 // #904 Phase 4: typed against `he`, so a missing or misspelled key is a COMPILE error rather than a
@@ -364,6 +368,10 @@ const en: typeof he = {
   askRemove: 'Remove question',
   askUnreadable: 'the tool could not read this question — try another phrasing',
   askIsStatement: 'this is a given, not a question — enter it in the givens box',
+  // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
+  sessionOffer: 'Unsaved work from your last session was found.',
+  sessionContinue: 'Continue where you left off',
+  sessionStartFresh: 'Start fresh',
 };
 
 export const complexI18n = createProductI18n({

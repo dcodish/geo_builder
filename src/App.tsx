@@ -53,16 +53,22 @@ import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSubtleStyle, rowS
 import { cyclableSeat, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
-import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
+import { chooseSaveName, figureNameFromFileName, figureStateOf, namedFigureFileName, serializeFigure } from '@/store/figureFile';
+import type { FigureLoadOutcome } from '@/store/figureLoad';
+import { loadFigureText } from '@/store/figureLoad';
+// #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
+import { forgetSession, offeredSession, restoreSession, startSessionPersist } from '@/store/sessionPersist';
+import type { StoredSession } from '../shell/session/persist';
+import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { applyDisplayMode, competingSymbols, paramChipsByFact } from '@/store/paramChips';
-import { displayModeOf, displayModeToIndexed } from '../shell/displayMode';
+import { displayModeOf } from '../shell/displayMode';
 import { questionLines } from '@/export/questionLines';
 import { bidiSegments, isolateLtrRuns } from '@/i18n/bidi';
 // #742: the exports live in the TOP TOOL ROW now (ADR-W-024) — App rasterises the canvas svg itself.
 // #745: the rasteriser and the printed width are SHARED (shell/export/svgToPng), so every builder that
 // prints a figure prints it at one width and one ink weight. Two copies could drift; one cannot.
 import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
-import { auditLoadedFigure, liveAuditFindings, refreshLoadedFigure } from '@/store/loadAudit';
+import { auditLoadedFigure, liveAuditFindings } from '@/store/loadAudit';
 import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { runSubmit } from '@/app/submitPipeline';
@@ -141,7 +147,6 @@ export default function App() {
   const detectShapes = useGeoStore((s) => s.detectShapes);
   const clearShapes = useGeoStore((s) => s.clearShapes);
   const clear = useGeoStore((s) => s.clear);
-  const loadFigure = useGeoStore((s) => s.loadFigure);
 
   // The STORE's undo/redo wrappers (E5/STO-5), not raw zundo: they also clear the dialed-radius
   // scratchpad, and the temporal state itself now carries facts + seed so the restored view matches.
@@ -374,23 +379,13 @@ export default function App() {
       name = (window.prompt(t('file.saveNamePrompt')) ?? '').trim();
       if (name) setFigureName(name);
     }
-    const json = serializeFigure(
-      {
-        facts: st.facts,
-        seed: st.seed,
-        display: {
-          hidden: st.hidden,
-          segStyle: st.segStyle,
-          hiddenCircles: st.hiddenCircles,
-          showMeasures: st.showMeasures,
-          showCenters: st.showCenters,
-          // #948: by POSITION — see FigureFileDisplay.displayMode for why not by fact id.
-          displayMode: displayModeToIndexed(st.displayMode, st.facts.map((f) => f.id)),
-        },
-        queries: st.queries, // #477: questions travel with the figure
-      },
-      { locale: i18n.language, savedAt: new Date().toISOString(), ...(name ? { name } : {}) },
-    );
+    // The payload shape is figureStateOf's, shared with the session persister (#1238) and the share
+    // link (#1189) — three writers, one definition of what a saved session contains.
+    const json = serializeFigure(figureStateOf(st), {
+      locale: i18n.language,
+      savedAt: new Date().toISOString(),
+      ...(name ? { name } : {}),
+    });
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
     const a = document.createElement('a');
     a.href = url;
@@ -492,48 +487,44 @@ export default function App() {
     setRenameNote('');
     setAltNote('');
     setLlmDropped([]);
+    // #1238: clearing is the student saying they are done with this figure, and `clear` wipes the undo
+    // history — so the stored session goes with it. Leaving it would offer back, on the next visit,
+    // exactly the work they just discarded.
+    forgetSession();
+    setOffer(null);
     // the FactList editor state is the chrome's own (B5-2d) — a clear needs no reset here
   };
 
-  const loadFigureFile = async (f: File) => {
-    const r = deserializeFigure(await f.text());
-    if (!r.ok) {
-      noteFileProblem(r.reason === 'newer-version' ? 'file.newerVersion' : 'file.badFile');
-      return;
-    }
-    // Auto-re-lower the DETERMINISTIC steps against the current parser (ADR-232 Am. / issue #120): an old
-    // save replays its saved lowering, so a parser/engine fix that landed since would otherwise never
-    // reach it (the #119 K stayed misplaced on a pre-fix save). LLM steps stay byte-for-byte (no
-    // re-escalation). Do it BEFORE the fold/replay so the refreshed facts are what loads.
-    const { facts: refreshedFacts, refreshed } = refreshLoadedFigure(r.file.facts);
-    r.file.facts = refreshedFacts;
+  /**
+   * The shared TAIL of every way a figure enters the session — the file picker, a restored session
+   * offer (#1238), and the shared link (#1189). The load itself (parse → re-lower → prefold →
+   * smoke-replay → commit) lives in `src/store/figureLoad.ts` so all three get the same refusals,
+   * the same ADR-232 re-lowering and the same ADR-242 audit; what stays here is the chrome around
+   * it: the busy cue, the refusal note, the figure's name, and the requirements rescue.
+   *
+   * `name` says where the figure's NAME comes from: a file's FILENAME wins (issue #42), while a
+   * restored session has no filename and falls back to the name the envelope carries.
+   */
+  const runLoad = async (
+    load: () => Promise<FigureLoadOutcome>,
+    name: { fileName: string } | { fromEnvelope: true },
+  ): Promise<boolean> => {
     // #41 (ADR-290, + the #67 core): a saved heavy figure's ENTIRE load cost is one cold fold (27 s
-    // measured on the #59 file) — compute it in the geometry WORKER behind the busy cue and transplant
-    // it, so the smoke-replay below and the post-load render both run at tail speed on the main thread.
+    // measured on the #59 file) — computed in the geometry WORKER behind this busy cue, so the smoke
+    // replay and the post-load render both run at tail speed on the main thread.
     setBusy(true);
+    let out: FigureLoadOutcome;
     try {
-      const fold = await geoWork.prefold(r.file.facts, r.file.seed);
-      if (fold) primeFoldFor(r.file.facts, fold);
-    } catch (err) {
-      if (!isCancelled(err)) {
-        setBusy(false);
-        noteFileProblem('file.badFile'); // the worker replay threw — same refusal as the smoke-replay
-        return;
-      }
-    }
-    // Smoke-replay before committing: a file that makes the derivation THROW (not merely flag a fact)
-    // must never become the session — refuse it instead of a white screen on the next render.
-    try {
-      replay(r.file.facts, r.file.seed);
-    } catch {
-      setBusy(false);
-      noteFileProblem('file.badFile');
-      return;
+      out = await load();
     } finally {
       setBusy(false);
     }
-    loadFigure(r.file); // one undo restores the session that was open before
-    setFigureName(figureNameFromFileName(f.name)); // the FILENAME names the figure (issue #42)
+    if (!out.ok) {
+      noteFileProblem(out.reason === 'newer-version' ? 'file.newerVersion' : 'file.badFile');
+      return false;
+    }
+    const { file: loaded, refreshed } = out;
+    setFigureName('fileName' in name ? figureNameFromFileName(name.fileName) : (loaded.name ?? ''));
     setFileNote('');
     setFileAudit([]); // drop the prior load's audit before the new one (issue #24)
     // Honesty audit (ADR-242): the file replays its SAVED lowering (deterministic restore, ADR-232), so
@@ -548,7 +539,7 @@ export default function App() {
     // re-drew C-on-A on every load, silently. One undo still restores the pre-load session: the
     // resolve's applyView merges into the load's own history entry (temporal paused there).
     void resolveAfterCommit();
-    const audit = auditLoadedFigure(r.file.facts);
+    const audit = auditLoadedFigure(loaded.facts);
     if (audit.findings.length > 0) {
       setFileAudit(audit.findings); // note is DERIVED from these against live facts (issue #24) — self-clears
     } else if (refreshed.length > 0) {
@@ -558,6 +549,49 @@ export default function App() {
       // 6 s auto-clear instead of hanging forever with no dismissal path.
       noteFileProblem('file.loadRefreshed', { count: refreshed.length });
     }
+    return true;
+  };
+
+  const loadFigureFile = async (f: File) => {
+    const text = await f.text();
+    await runLoad(() => loadFigureText(text, { prefold: (facts, seed) => geoWork.prefold(facts, seed) }), {
+      fileName: f.name,
+    });
+  };
+
+  /**
+   * #1238 (ADR-W-068) — the continue-or-start-fresh OFFER.
+   *
+   * ADR-W-046's rule is untouched: the builder opens EMPTY. This reads what COULD be restored and
+   * renders a banner; the figure enters the session only on the student's tap. The read happens
+   * ONCE on mount, so a session the student has started typing into can never be replaced by an
+   * offer mid-build — and the banner retires as soon as the canvas is no longer empty, because at
+   * that point «start fresh» is what they already did.
+   */
+  const [offer, setOffer] = useState<StoredSession | null>(null);
+  useEffect(() => {
+    setOffer(offeredSession());
+    return startSessionPersist();
+  }, []);
+
+  const acceptOffer = async () => {
+    if (!offer) return;
+    // The SAME call the cross-product lock drives (shell/__tests__/fixtures/session-offer-rows):
+    // restoring is loading, and the undo history starts empty because there is no session behind it.
+    const restored = await runLoad(
+      () => restoreSession(offer.payload, { prefold: (facts, seed) => geoWork.prefold(facts, seed) }),
+      { fromEnvelope: true },
+    );
+    setOffer(null);
+    // A stored session this build can no longer load has been REFUSED and named by loadFigureFrom
+    // (the ADR-242 voice, same as a stale file). Stop offering it — re-offering a figure that
+    // cannot open is the pure-noise case.
+    if (!restored) forgetSession();
+  };
+
+  const declineOffer = () => {
+    forgetSession();
+    setOffer(null);
   };
 
   // After a step commits OR a file loads, VERIFY the figure meets every requirement; if not,
@@ -1046,6 +1080,19 @@ export default function App() {
         closeLabel: t('about.close'),
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
+      /* #1238: the offer sits in the frame's banner region, above the workbench — the first thing
+         a student who lost a session sees, and gone the moment the canvas is no longer empty. */
+      banner={
+        offer && facts.length === 0 ? (
+          <ResumeOffer
+            message={t('session.offer')}
+            continueLabel={t('session.continue')}
+            restartLabel={t('session.startFresh')}
+            onContinue={() => void acceptOffer()}
+            onRestart={declineOffer}
+          />
+        ) : undefined
+      }
     >
       {/* THE WORKBENCH (#734): the three-zone GEOMETRY is the shell's — identical columns, canvas
           card and empty-state placement in every builder; this product passes zone content only. */}

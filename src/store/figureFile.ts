@@ -23,8 +23,9 @@
 
 import { nanoid } from 'nanoid';
 import { stripFormatControls } from '../../shell/bidi';
+import { displayModeToIndexed } from '../../shell/displayMode';
 import type { AnyCommand, Id } from '@/engine';
-import type { Fact } from './geoStore';
+import type { Fact, GeoState } from './geoStore';
 
 /** Bump when the file shape changes incompatibly; keep loading every older version. */
 export const FIGURE_FILE_VERSION = 1;
@@ -71,6 +72,34 @@ export interface FigureFile {
 
 export type FigureLoadFailure = 'bad-json' | 'not-figure' | 'newer-version' | 'no-facts';
 export type FigureLoadResult = { ok: true; file: FigureFile } | { ok: false; reason: FigureLoadFailure };
+
+/** The replay inputs a session serializes to — the fact list, the configuration index, and the
+ *  display preferences that make a styled figure survive the round trip.
+ *
+ *  ONE definition, three writers: the save button, the session persister (#1238) and the share link
+ *  (#1189). It was inline in the save handler while there was only one; a second copy is how the
+ *  three quietly start saving different things. */
+export function figureStateOf(
+  st: Pick<
+    GeoState,
+    'facts' | 'seed' | 'hidden' | 'segStyle' | 'hiddenCircles' | 'showMeasures' | 'showCenters' | 'displayMode' | 'queries'
+  >,
+): { facts: Fact[]; seed: number; display: FigureFileDisplay; queries: string[] } {
+  return {
+    facts: st.facts,
+    seed: st.seed,
+    display: {
+      hidden: st.hidden,
+      segStyle: st.segStyle,
+      hiddenCircles: st.hiddenCircles,
+      showMeasures: st.showMeasures,
+      showCenters: st.showCenters,
+      // #948: by POSITION — see FigureFileDisplay.displayMode for why not by fact id.
+      displayMode: displayModeToIndexed(st.displayMode, st.facts.map((f) => f.id)),
+    },
+    queries: st.queries, // #477: questions travel with the figure
+  };
+}
 
 /** Serialize the session to pretty-printed JSON (human-diffable — the point of a text format). */
 export function serializeFigure(
