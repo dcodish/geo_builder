@@ -60,6 +60,9 @@ import { loadFigureText } from '@/store/figureLoad';
 import { forgetSession, offeredSession, restoreSession, startSessionPersist } from '@/store/sessionPersist';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
+import { Banner } from '../shell/frame/Banner';
+// #1189 (ADR-W-079): a figure travels as a LINK — the teacher copies one, the student taps it.
+import { consumeShareFragment, openSharedFigure, shareLinkFor, sharedPayloadIn } from '@/store/shareLink';
 import { applyDisplayMode, competingSymbols, paramChipsByFact } from '@/store/paramChips';
 import { displayModeOf } from '../shell/displayMode';
 import { questionLines } from '@/export/questionLines';
@@ -568,11 +571,65 @@ export default function App() {
    * offer mid-build — and the banner retires as soon as the canvas is no longer empty, because at
    * that point «start fresh» is what they already did.
    */
+  /**
+   * #1189 — a link that cannot be opened says so and KEEPS saying so. Unlike a file refusal, which
+   * answers a click the student just made, this one greets them on a cold page load; the 6-second
+   * lane would leave them looking at an empty canvas with the explanation already gone.
+   */
+  const [shareError, setShareError] = useState(false);
   const [offer, setOffer] = useState<StoredSession | null>(null);
   useEffect(() => {
-    setOffer(offeredSession());
+    /**
+     * #1189 — arriving by LINK outranks the offer, and is never mixed with it: a student who tapped
+     * a teacher's figure asked for THAT figure, and being asked about an unrelated older session on
+     * top of it would be noise. A fragment that is present but unreadable is REFUSED out loud —
+     * silently opening an empty canvas would look like the teacher sent a broken figure.
+     */
+    const hash = window.location.hash;
+    if (hash && hash !== '#') {
+      const payload = sharedPayloadIn(hash);
+      consumeShareFragment(); // once read, the URL is no longer in charge of the session
+      if (payload) void openShared(payload);
+      else setShareError(true);
+    } else {
+      setOffer(offeredSession());
+    }
     return startSessionPersist();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only: the URL is read once
   }, []);
+
+  const openShared = async (payload: string) => {
+    const ok = await runLoad(
+      () => openSharedFigure(payload, { prefold: (facts, seed) => geoWork.prefold(facts, seed) }),
+      { fromEnvelope: true },
+    );
+    if (!ok) setShareError(true); // decoded, but not a figure this build can open
+  };
+
+  /**
+   * «העתק קישור» — the teacher's half of #1189.
+   *
+   * MEASURED BEFORE IT COPIES: a URL that some client truncates opens as a figure missing its last
+   * statements, and nobody can tell. And copied SYNCHRONOUSLY — no `await` before the clipboard
+   * write, because Safari rejects a write once the user-gesture context is gone (the same shape the
+   * image-copy button has, flagged for its own triage on #1189).
+   */
+  const copyShareLink = () => {
+    const link = shareLinkFor(useGeoStore.getState());
+    if (!link.ok) {
+      if (link.reason === 'too-long') setInputNote(t('share.tooLong'));
+      return;
+    }
+    navigator.clipboard.writeText(link.url).then(
+      () => flashShare('ok'),
+      () => flashShare('err'),
+    );
+  };
+  const [shareFlash, setShareFlash] = useState<'' | 'ok' | 'err'>('');
+  const flashShare = (v: 'ok' | 'err') => {
+    setShareFlash(v);
+    window.setTimeout(() => setShareFlash(''), 1400);
+  };
 
   const acceptOffer = async () => {
     if (!offer) return;
@@ -1055,6 +1112,11 @@ export default function App() {
             💾 {t('file.save')}
           </ToolButton>
           <ToolButton onClick={() => fileInputRef.current?.click()}>📂 {t('file.load')}</ToolButton>
+          {/* #1189: the teacher sends a LINK — one tap for the student, and the same button hands
+              their work back when they are done. */}
+          <ToolButton onClick={copyShareLink} disabled={facts.length === 0}>
+            {shareFlash === 'ok' ? `✓ ${t('share.copied')}` : shareFlash === 'err' ? '✕' : `🔗 ${t('share.copyLink')}`}
+          </ToolButton>
           {/* #742 / ADR-W-024: the image exports live HERE in every builder — one home (they sat
               on the 2-D canvas toolbar while 3-D had them up here; that drift is the defect). */}
           <ToolButton onClick={() => void copyImageTop()} disabled={facts.length === 0}>
@@ -1083,7 +1145,11 @@ export default function App() {
       /* #1238: the offer sits in the frame's banner region, above the workbench — the first thing
          a student who lost a session sees, and gone the moment the canvas is no longer empty. */
       banner={
-        offer && facts.length === 0 ? (
+        shareError ? (
+          <Banner kind="error" onDismiss={() => setShareError(false)} dismissLabel={t('file.dismissAudit')}>
+            {t('share.badLink')}
+          </Banner>
+        ) : offer && facts.length === 0 ? (
           <ResumeOffer
             message={t('session.offer')}
             continueLabel={t('session.continue')}

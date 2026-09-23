@@ -142,3 +142,29 @@ Each product wires four things: its key, its `snapshot()` (its serializer, skipp
 `restore()` (its existing load path), and its `isEmpty()`/`reset()`. The app reads the offer ONCE on
 mount — never in a selector, never on every render — and the figure enters the session only on the
 student's tap.
+
+## The share link ([ADR-W-079](06w-decisions-workspace.md#adr-w-079))
+
+`shell/session/link.ts` — the encoding, and nothing about any product. A save-envelope text goes in;
+a base64url string goes out, and the caller puts it after a `#`.
+
+- **base64url**, because a chat client's link detector must not be able to chop the payload; plain
+  base64's `+ / =` invites exactly that.
+- **the `#` fragment**, because a fragment is never sent to a server: the figure reaches no log, and
+  a link-preview fetch sees only the bare app URL. A privacy property of the encoding, not a policy.
+- **`deflateSync`, synchronously** (fflate's "deflate" is the raw stream), because Safari rejects a
+  clipboard write issued after an `await`, and `CompressionStream` does not exist before iOS 16.4.
+- **`decode` returns null for anything that is not ours** — truncated, foreign, or not deflate — so
+  the caller refuses rather than half-loading.
+
+The product half (2-D: `src/store/shareLink.ts`) owns the base path (`import.meta.env.BASE_URL`,
+never hardcoded — the same code serves `/` in dev and `/geo-builder/` in production), the
+measurement, and the boot read. Three rules there are worth stating because each one protects a
+student rather than a byte:
+
+1. **Measure before copying.** An over-long link is refused with a reason; a truncated one opens as
+   a figure silently missing its last statements.
+2. **A link outranks the session offer** (ADR-W-078) and is never shown alongside it — the student
+   asked for *this* figure.
+3. **Consume the fragment once read** (`history.replaceState`). Otherwise a refresh sits behind a
+   URL that still says "open the original", and the student's later edits are discarded by it.
