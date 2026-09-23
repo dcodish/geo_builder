@@ -25,6 +25,8 @@ import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
+// #1376: the row's ORDER is a shared contract — a product supplies actions by id, never by position.
+import { orderToolActions } from '../shell/frame/toolRow';
 import registry from '../products.json';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, unstatedChoices, VARIANT_COUNT } from '@/engine';
 import { viewDeltaOf } from '@/store/geoStore';
@@ -1128,33 +1130,73 @@ export default function App() {
     <AppFrame
       title={t('app.title')}
       subtitle={t('app.subtitle')}
-      utilityActions={
-        /* שמור/טען FIRST so they sit at the same position as in every other builder (the
-           operator's parity ruling); the product's extra עזרה rides after them. */
-        <>
-          <ToolButton onClick={saveFigure} disabled={facts.length === 0}>
-            💾 {t('file.save')}
-          </ToolButton>
-          <ToolButton onClick={() => fileInputRef.current?.click()}>📂 {t('file.load')}</ToolButton>
-          {/* #1189: the teacher sends a LINK — one tap for the student, and the same button hands
-              their work back when they are done. */}
-          <ToolButton onClick={copyShareLink} disabled={facts.length === 0}>
-            {shareFlash === 'ok' ? `✓ ${t('share.copied')}` : shareFlash === 'err' ? '✕' : `🔗 ${t('share.copyLink')}`}
-          </ToolButton>
-          {/* #742 / ADR-W-024: the image exports live HERE in every builder — one home (they sat
-              on the 2-D canvas toolbar while 3-D had them up here; that drift is the defect). */}
-          <ToolButton onClick={() => void copyImageTop()} disabled={facts.length === 0}>
-            {exportFlash === 'ok' ? `✓ ${t('canvas.copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('canvas.copyImage')}`}
-          </ToolButton>
-          <ToolButton onClick={() => void saveImageTop()} disabled={facts.length === 0}>
-            ⤓ {t('canvas.saveImage')}
-          </ToolButton>
-          <ToolButton onClick={() => void saveQuestionTop()} disabled={questionLines(facts, canonLocale).length === 0}>
-            ⤓ {t('canvas.saveQuestion')}
-          </ToolButton>
-          <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
-        </>
-      }
+      utilityActions={orderToolActions([
+        /* The ORDER is shell/frame/toolRow's (#1376) — this list may read in any order; what
+           renders is the one canonical sequence every builder shares. */
+        {
+          id: 'save',
+          node: (
+            <ToolButton key="save" onClick={saveFigure} disabled={facts.length === 0}>
+              💾 {t('file.save')}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'load',
+          node: (
+            <ToolButton key="load" onClick={() => fileInputRef.current?.click()}>
+              📂 {t('file.load')}
+            </ToolButton>
+          ),
+        },
+        {
+          /* #1189: the teacher sends a LINK — one tap for the student, and the same button hands
+             their work back when they are done. */
+          id: 'share',
+          node: (
+            <ToolButton key="share" onClick={copyShareLink} disabled={facts.length === 0}>
+              {shareFlash === 'ok' ? `✓ ${t('share.copied')}` : shareFlash === 'err' ? '✕' : `🔗 ${t('share.copyLink')}`}
+            </ToolButton>
+          ),
+        },
+        {
+          /* #742 / ADR-W-024: the image exports live HERE in every builder — one home. */
+          id: 'copyImage',
+          node: (
+            <ToolButton key="copyImage" onClick={() => void copyImageTop()} disabled={facts.length === 0}>
+              {exportFlash === 'ok' ? `✓ ${t('canvas.copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('canvas.copyImage')}`}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'saveImage',
+          node: (
+            <ToolButton key="saveImage" onClick={() => void saveImageTop()} disabled={facts.length === 0}>
+              ⤓ {t('canvas.saveImage')}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'saveQuestion',
+          node: (
+            <ToolButton
+              key="saveQuestion"
+              onClick={() => void saveQuestionTop()}
+              disabled={questionLines(facts, canonLocale).length === 0}
+            >
+              ⤓ {t('canvas.saveQuestion')}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'manual',
+          node: (
+            <ToolButton key="manual" onClick={() => setManualOpen(true)}>
+              {t('manualButton')}
+            </ToolButton>
+          ),
+        },
+      ])}
       roster={roster}
       activeProductId="2d"
       switcherLabel={t('switcherAria')}

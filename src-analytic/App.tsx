@@ -19,6 +19,8 @@ import { FactList } from '../shell/frame/FactList';
 import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
+// #1376: the row's ORDER is a shared contract — a product supplies actions by id, never by position.
+import { orderToolActions } from '../shell/frame/toolRow';
 import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
 import { INITIAL_VIEW, carryWindow, centreOf, figureIsVisible, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
@@ -900,24 +902,56 @@ export function App() {
        * states the rule this follows — שמור/טען FIRST, the image exports next, the manual last —
        * and this product passed no utility actions at all, so the row was simply absent.
        */
-      utilityActions={
-        <>
-          <ToolButton onClick={saveFile} disabled={lines.length === 0}>
-            💾 {t('save')}
-          </ToolButton>
-          <ToolButton onClick={() => fileRef.current?.click()}>📂 {t('load')}</ToolButton>
-          <ToolButton onClick={() => void copyImage()} disabled={lines.length === 0}>
-            {exportFlash === 'ok' ? `✓ ${t('copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('copyImage')}`}
-          </ToolButton>
-          <ToolButton onClick={() => void saveImage()} disabled={lines.length === 0}>
-            ⤓ {t('saveImage')}
-          </ToolButton>
-          <ToolButton onClick={copyShareLink} disabled={lines.length === 0}>
-            {shareFlash === 'ok' ? `✓ ${t('shareCopied')}` : shareFlash === 'err' ? '✕' : `🔗 ${t('shareCopyLink')}`}
-          </ToolButton>
-          <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
-        </>
-      }
+      utilityActions={orderToolActions([
+        {
+          id: 'save',
+          node: (
+            <ToolButton key="save" onClick={saveFile} disabled={lines.length === 0}>
+              💾 {t('save')}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'load',
+          node: (
+            <ToolButton key="load" onClick={() => fileRef.current?.click()}>
+              📂 {t('load')}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'copyImage',
+          node: (
+            <ToolButton key="copyImage" onClick={() => void copyImage()} disabled={lines.length === 0}>
+              {exportFlash === 'ok' ? `✓ ${t('copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('copyImage')}`}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'saveImage',
+          node: (
+            <ToolButton key="saveImage" onClick={() => void saveImage()} disabled={lines.length === 0}>
+              ⤓ {t('saveImage')}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'share',
+          node: (
+            <ToolButton key="share" onClick={copyShareLink} disabled={lines.length === 0}>
+              {shareFlash === 'ok' ? `✓ ${t('shareCopied')}` : shareFlash === 'err' ? '✕' : `🔗 ${t('shareCopyLink')}`}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'manual',
+          node: (
+            <ToolButton key="manual" onClick={() => setManualOpen(true)}>
+              {t('manualButton')}
+            </ToolButton>
+          ),
+        },
+      ])}
       /* #1238: the offer outranks the load audit for the one render where both could exist — an
          empty canvas has no audit to show, so in practice they never collide. */
       banner={

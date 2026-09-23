@@ -14,6 +14,8 @@ import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
+// #1376: the row's ORDER is a shared contract — a product supplies actions by id, never by position.
+import { orderToolActions } from '../shell/frame/toolRow';
 // #742 / ADR-W-024: the shared canvas corner cluster — one look in every builder.
 // #745: and the shared RASTERISER — one svg→png in the workspace, not one per product.
 import { svgToPng } from '../shell/export/svgToPng';
@@ -440,29 +442,60 @@ export function App() {
     <AppFrame
       title={t('title')}
       subtitle={t('subtitle')}
-      utilityActions={
-        /* ONE look for the session actions in every builder (shell/ToolButton). שמור/טען FIRST
-           (the parity rule: same position in every tool); the manual rides after them. */
-        <>
-          <ToolButton onClick={saveFile} disabled={lines.length === 0}>
-            💾 {t('save')}
-          </ToolButton>
-          <ToolButton onClick={() => fileRef.current?.click()}>📂 {t('load')}</ToolButton>
-          {/* #1372: the teacher sends a LINK; the same button hands the student's work back. */}
-          <ToolButton onClick={copyShareLink} disabled={lines.length === 0}>
-            {shareFlash === 'ok' ? `✓ ${t('shareCopied')}` : shareFlash === 'err' ? '✕' : `🔗 ${t('shareCopyLink')}`}
-          </ToolButton>
-          {/* #742 / ADR-W-024 (operator: "3d and complex tools can have the same functionality"):
-              the image exports in the TOP ROW, the one export home in every builder. */}
-          <ToolButton onClick={() => void copyImage()} disabled={lines.length === 0}>
-            {exportFlash === 'ok' ? `✓ ${t('copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('copyImage')}`}
-          </ToolButton>
-          <ToolButton onClick={() => void saveImage()} disabled={lines.length === 0}>
-            ⤓ {t('saveImage')}
-          </ToolButton>
-          <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
-        </>
-      }
+      utilityActions={orderToolActions([
+        {
+          /* ONE look for the session actions in every builder (shell/ToolButton); ONE order too
+             (#1376) — this list may read in any order, the row renders the canonical one. */
+          id: 'save',
+          node: (
+            <ToolButton key="save" onClick={saveFile} disabled={lines.length === 0}>
+              💾 {t('save')}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'load',
+          node: (
+            <ToolButton key="load" onClick={() => fileRef.current?.click()}>
+              📂 {t('load')}
+            </ToolButton>
+          ),
+        },
+        {
+          /* #1372: the teacher sends a LINK; the same button hands the student's work back. */
+          id: 'share',
+          node: (
+            <ToolButton key="share" onClick={copyShareLink} disabled={lines.length === 0}>
+              {shareFlash === 'ok' ? `✓ ${t('shareCopied')}` : shareFlash === 'err' ? '✕' : `🔗 ${t('shareCopyLink')}`}
+            </ToolButton>
+          ),
+        },
+        {
+          /* #742 / ADR-W-024: the image exports in the TOP ROW, the one export home everywhere. */
+          id: 'copyImage',
+          node: (
+            <ToolButton key="copyImage" onClick={() => void copyImage()} disabled={lines.length === 0}>
+              {exportFlash === 'ok' ? `✓ ${t('copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('copyImage')}`}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'saveImage',
+          node: (
+            <ToolButton key="saveImage" onClick={() => void saveImage()} disabled={lines.length === 0}>
+              ⤓ {t('saveImage')}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'manual',
+          node: (
+            <ToolButton key="manual" onClick={() => setManualOpen(true)}>
+              {t('manualButton')}
+            </ToolButton>
+          ),
+        },
+      ])}
       roster={roster}
       activeProductId="complex"
       switcherLabel={t('switcherAria')}

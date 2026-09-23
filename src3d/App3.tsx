@@ -18,6 +18,8 @@ import { Workbench } from '../shell/frame/Workbench';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { ToolButton } from '../shell/frame/ToolButton';
+// #1376: the row's ORDER is a shared contract — a product supplies actions by id, never by position.
+import { orderToolActions } from '../shell/frame/toolRow';
 // #743: the under-canvas row's ONE look — the shell contract, replacing this tree's own buttons.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import registry from '../products.json';
@@ -716,37 +718,68 @@ export default function App3() {
     <AppFrame
       title={t('title')}
       subtitle={t('tagline')}
-      utilityActions={
-        /* ONE look for the session actions in every builder (shell/ToolButton) — the operator's
-           2026-08-18 catch: shared row, per-product buttons still rendered differently. */
-        <>
-          <ToolButton onClick={onSaveFile} disabled={facts.length === 0}>
-            💾 {t('actions.save')}
-          </ToolButton>
-          <ToolButton onClick={() => fileInput.current?.click()}>📂 {t('actions.load')}</ToolButton>
-          {/* #1372: the teacher sends a LINK; the same button hands the student's work back. */}
-          <ToolButton onClick={copyShareLink} disabled={facts.length === 0}>
-            {shareFlash === 'ok' ? `✓ ${t('share.copied')}` : shareFlash === 'err' ? '✕' : `🔗 ${t('share.copyLink')}`}
-          </ToolButton>
-          {/* #742 / ADR-W-024 (operator: "3d and complex tools can have the same functionality"):
-              the image exports in the 2-D order, DISABLED-not-hidden on empty (today's ruling
-              supersedes the earlier appears-when-nonempty one — stable suite positions). */}
-          <ToolButton onClick={() => void onCopyImage()} disabled={facts.length === 0}>
-            {exportFlash === 'ok' ? `✓ ${t('actions.copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('actions.copyImage')}`}
-          </ToolButton>
-          <ToolButton onClick={() => void onSaveImage()} disabled={facts.length === 0}>
-            ⤓ {t('actions.saveImage')}
-          </ToolButton>
-          {/* «הורידו שאלה» (#745) — DISABLED-not-hidden like its neighbours (ADR-W-024), so the row
-              keeps stable suite positions. Gated on there being a GIVEN to print rather than on the
-              fact count: a figure whose every statement is muted has no question, and an enabled
-              button whose handler quietly returns is the #511 broken promise in a nicer costume. */}
-          <ToolButton onClick={() => void onSaveQuestion()} disabled={questionLines3(facts).length === 0}>
-            ⤓ {t('actions.saveQuestion')}
-          </ToolButton>
-          <ToolButton onClick={() => setManualOpen(true)}>{t('manual.button')}</ToolButton>
-        </>
-      }
+      utilityActions={orderToolActions([
+        {
+          /* ONE look for the session actions in every builder (shell/ToolButton); ONE order too (#1376). */
+          id: 'save',
+          node: (
+            <ToolButton key="save" onClick={onSaveFile} disabled={facts.length === 0}>
+              💾 {t('actions.save')}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'load',
+          node: (
+            <ToolButton key="load" onClick={() => fileInput.current?.click()}>
+              📂 {t('actions.load')}
+            </ToolButton>
+          ),
+        },
+        {
+          /* #1372: the teacher sends a LINK; the same button hands the student's work back. */
+          id: 'share',
+          node: (
+            <ToolButton key="share" onClick={copyShareLink} disabled={facts.length === 0}>
+              {shareFlash === 'ok' ? `✓ ${t('share.copied')}` : shareFlash === 'err' ? '✕' : `🔗 ${t('share.copyLink')}`}
+            </ToolButton>
+          ),
+        },
+        {
+          /* #742 / ADR-W-024: the image exports, DISABLED-not-hidden on empty (stable suite positions). */
+          id: 'copyImage',
+          node: (
+            <ToolButton key="copyImage" onClick={() => void onCopyImage()} disabled={facts.length === 0}>
+              {exportFlash === 'ok' ? `✓ ${t('actions.copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('actions.copyImage')}`}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'saveImage',
+          node: (
+            <ToolButton key="saveImage" onClick={() => void onSaveImage()} disabled={facts.length === 0}>
+              ⤓ {t('actions.saveImage')}
+            </ToolButton>
+          ),
+        },
+        {
+          /* Gated on there being a GIVEN to print, not on the fact count: an enabled button whose handler quietly returns is the #511 broken promise in a nicer costume. */
+          id: 'saveQuestion',
+          node: (
+            <ToolButton key="saveQuestion" onClick={() => void onSaveQuestion()} disabled={questionLines3(facts).length === 0}>
+              ⤓ {t('actions.saveQuestion')}
+            </ToolButton>
+          ),
+        },
+        {
+          id: 'manual',
+          node: (
+            <ToolButton key="manual" onClick={() => setManualOpen(true)}>
+              {t('manual.button')}
+            </ToolButton>
+          ),
+        },
+      ])}
       roster={roster}
       activeProductId="3d"
       switcherLabel={t('switcherAria')}
