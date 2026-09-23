@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import { execSync } from 'node:child_process';
 import { llmProxyPlugin } from './server/llmProxy';
+import { shareProxyPlugin } from './server/shareProxy';
 import { logProxyPlugin } from './server/logProxy';
 import { configProxyPlugin } from './server/configProxy';
 
@@ -29,7 +30,7 @@ export default defineConfig(({ command }) => ({
   // llmProxyPlugin serves POST /api/parse in dev (Phase 7 LLM fallback); the
   // ANTHROPIC_API_KEY lives only in this Node process, never in the browser.
   // logProxyPlugin serves POST /api/log in dev → logs/debug-log.jsonl (debug aid).
-  plugins: [react(), tailwindcss(), llmProxyPlugin(), logProxyPlugin(), configProxyPlugin()],
+  plugins: [react(), tailwindcss(), llmProxyPlugin(), shareProxyPlugin(), logProxyPlugin(), configProxyPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

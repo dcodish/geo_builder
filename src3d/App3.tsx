@@ -46,6 +46,9 @@ import { forgetSession3, offeredSession3, restoreSession3, startSessionPersist3 
 // read once — a link pasted into an already-open tab is a same-document navigation.
 import { openShared3, shareLinkFor3 } from './store/shareLink3';
 import { onSharedLink } from '../shell/session/link';
+// #1374: the SHORT link — upload the figure + its preview, get themathbible.com/g/<id> back.
+import { pngToBase64, shortLinkFor } from '../shell/session/shortLink';
+import { ShareSheet } from '../shell/frame/ShareSheet';
 import { Banner } from '../shell/frame/Banner';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
@@ -484,7 +487,6 @@ export default function App3() {
    * note would leave an empty canvas with the explanation already gone.
    */
   const [shareError, setShareError] = useState(false);
-  const [shareFlash, setShareFlash] = useState<'' | 'ok' | 'err'>('');
   /** #1373 — a link arriving on a canvas that is NOT empty asks before replacing the student's work. */
   const [pendingLink, setPendingLink] = useState<string | null>(null);
 
@@ -525,26 +527,59 @@ export default function App3() {
     if (payload) openLink3(payload);
   };
 
+
   /**
-   * «העתק קישור» — MEASURED before it copies, because a URL some client truncates opens as a figure
-   * missing its last statements and nobody can tell. Copied SYNCHRONOUSLY: Safari drops the
-   * user-gesture context across an `await`.
+   * «העתק קישור» — the long fragment link is computed first so there is always something to give,
+   * then the figure and its preview are uploaded and the short link takes its place (#1374). When
+   * the upload cannot happen the long link is handed over, named as such: a share button that fails
+   * closed on a flaky network is worse than the URL it replaced.
+   *
+   * SHOWN rather than silently copied — the upload is async, and Safari rejects a clipboard write
+   * issued after an await. The sheet's own button copies on a fresh gesture.
    */
-  const copyShareLink = () => {
+  const [share, setShare] = useState<{ url: string; fallback?: string } | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  const copyShareLink = async () => {
     const link = shareLinkFor3();
     if (!link.ok) {
       if (link.reason === 'too-long') setLoadNote(t('share.tooLong'));
       return;
     }
-    navigator.clipboard.writeText(link.url).then(
-      () => {
-        setShareFlash('ok');
-        window.setTimeout(() => setShareFlash(''), 1400);
-      },
-      () => {
-        setShareFlash('err');
-        window.setTimeout(() => setShareFlash(''), 1400);
-      },
+    setShareBusy(true);
+    setShareCopied(false);
+    try {
+      // Best-effort preview: a share without an image still works, it just shows a plain card.
+      let png: string | undefined;
+      try {
+        png = await pngToBase64(await rasterCanvas());
+      } catch {
+        png = undefined;
+      }
+      const short = await shortLinkFor({
+        base: import.meta.env.BASE_URL,
+        tool: '3d',
+        fragment: link.url.slice(link.url.indexOf('#') + 1),
+        png,
+        title: figureName.trim() || undefined,
+      });
+      if (short.ok) setShare({ url: short.url });
+      else setShare({ url: link.url, fallback: t(short.reason === 'store-full' ? 'share.storeFull' : 'share.offline') });
+      void navigator.clipboard?.writeText?.(short.ok ? short.url : link.url).then(
+        () => setShareCopied(true),
+        () => {},
+      );
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
+  const copyShownLink = () => {
+    if (!share) return;
+    navigator.clipboard.writeText(share.url).then(
+      () => setShareCopied(true),
+      () => setShareCopied(false),
     );
   };
 
@@ -740,8 +775,8 @@ export default function App3() {
           /* #1372: the teacher sends a LINK; the same button hands the student's work back. */
           id: 'share',
           node: (
-            <ToolButton key="share" onClick={copyShareLink} disabled={facts.length === 0}>
-              {shareFlash === 'ok' ? `✓ ${t('share.copied')}` : shareFlash === 'err' ? '✕' : `🔗 ${t('share.copyLink')}`}
+            <ToolButton key="share" onClick={() => void copyShareLink()} disabled={facts.length === 0 || shareBusy}>
+              {shareBusy ? `… ${t('share.preparing')}` : `🔗 ${t('share.copyLink')}`}
             </ToolButton>
           ),
         },
@@ -794,7 +829,19 @@ export default function App3() {
       /* #1238: the offer sits in the frame's banner region, above the workbench — and is gone the
          moment the canvas is no longer empty. */
       banner={
-        shareError ? (
+        share ? (
+          <ShareSheet
+            url={share.url}
+            message={t('share.ready')}
+            copyLabel={t('share.copyButton')}
+            copiedLabel={t('share.copied')}
+            dismissLabel={t('share.dismiss')}
+            fallbackNote={share.fallback}
+            copied={shareCopied}
+            onCopy={copyShownLink}
+            onDismiss={() => setShare(null)}
+          />
+        ) : shareError ? (
           <Banner kind="error" onDismiss={() => setShareError(false)} dismissLabel={t('share.dismiss')}>
             {t('share.badLink')}
           </Banner>

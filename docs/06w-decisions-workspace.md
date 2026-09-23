@@ -4152,3 +4152,90 @@ filing three prod bugs that did not exist.
 `src-complex/App.tsx`, `src-analytic/App.tsx` (subscribe + the pending-link ask + the button);
 `src3d/store/shareLink3.ts`, `src-complex/app/shareLinkCx.ts`, `src-analytic/app/shareLinkAn.ts`
 (new); `src3d/store/figureFile3.ts` (`serializeFigure3ForLink`); locales in four trees.
+
+## ADR-W-081 — A shared figure gets a SHORT link and a chat preview, which means the server holds it (#1374)
+
+**Status:** accepted, 2026-09-23 · **Issue:** [#1374](https://github.com/dcodish/geo_builder/issues/1374) (feature, `P2`, `workspace`, operator-ruled) · extends [ADR-W-079](#adr-w-079) / [ADR-W-080](#adr-w-080)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SL-7 extended + FR-SL-8 (new); NFR-SE-3's in-app note amended · **Design:** [04w](04w-design-shell.md#the-share-link-adr-w-079) (extended)
+
+**The ask.** *"the url. it is too long and ugly for sharing nicely... a url like
+`https://themathbible/<something short>`. when i post it on whatsapp... it will show the image that
+is being shared."*
+
+**The fact that decides the whole shape.** ADR-W-079 put the figure in the URL's `#` fragment
+precisely so it never reached any server — and **a fragment is invisible to a link-preview crawler**.
+No amount of meta-tag work changes that. A preview therefore REQUIRES server-side storage, so the
+two asks ("shorter" and "with a picture") are one decision, not two. Stated to the operator that way
+before anything was built.
+
+### What the operator ruled, and what each ruling bought
+
+| question | ruling | consequence |
+| --- | --- | --- |
+| at the space cap | *"No cap for now — just alert me"*, then *"allocate 2GB... we will track this periodically, maybe through the admin dashboards"* | a 2 GB ceiling that REFUSES past the allocation and never evicts, plus a dashboard card |
+| the preview image | in scope | the PNG is what sizes the store, not the figure |
+| privacy | *"i see no issue with this. these are geo shapes"* | no new privacy surface — but the NOTE still changes, see below |
+| overwriting | *"a user cannot access an existing diagram and change and overwrite a diagram. he can only create a new version"* | the store is **append-only**, by design rather than omission |
+
+**Append-only is the load-bearing one.** Nothing updates or deletes a stored share. So there is no
+overwrite attack, no ownership to authenticate, and a link's content can never change under the
+person holding it — a teacher's link means the same figure forever. It also makes the image
+`immutable`-cacheable for free.
+
+**Refuse, never evict.** Eviction would silently kill links already sent, which is the one failure a
+teacher could not diagnose; refusing is loud and lands on the person who can act on it. The operator
+declined a hard cap in words but allocated 2 GB, and an allocation with no ceiling is a wish — so the
+ceiling exists at his number and the dashboard reports against it.
+
+**Storage was MEASURED, not estimated.** Rasterised through the real `shell/export/svgToPng`: a
+typical figure is 37 KB at ×2 and a busy one 74 KB; ×1 is 13/28 KB and ×3 is 66/128 KB. So ~50 KB a
+share, ~130 KB worst — 1,000 shares ≈ 50 MB, 100,000 ≈ 5 GB. The server has 108 GB free of 155 GB,
+and `/var/log` alone already holds 5 GB. 2 GB ≈ 40,000 shares at under 2% of free space.
+
+### The privacy NOTE changes even though the privacy RISK does not
+
+The operator is right that the content is harmless — geometry statements and a picture of shapes,
+no names, no accounts. But the complex builder's note said *"שום מידע אינו נשלח לשרת"* (nothing is
+sent to a server) and analytic's said the typed lines *"stay in your own browser"*. Once a share is
+stored those sentences are simply **untrue**, harmless content or not. All four notes gain one
+clause saying a SHARED figure is stored so the link can work. **Accuracy, not risk** — and it ships
+in the same change, because a builder whose privacy text is stale is exactly the gap ADR-W-019 put
+that note in the shared frame to prevent.
+
+### What is stored is the FRAGMENT, not the envelope
+
+The client uploads exactly the base64url blob it would otherwise have put after `#`, so the server
+remains unable to read a figure at all — it moves an opaque string and a picture. `/g/<id>` hands
+that blob straight back as a fragment, which means **the builders' existing loader opens a short
+link with no new code path** and no second format to keep in step. It also means the long link
+remains a first-class fallback rather than a legacy path: offline, or with the store full, the
+teacher still gets a link that works.
+
+### `/g/<id>` is top-level on purpose
+
+The operator asked for `themathbible.com/<something short>`, and a preview crawler reads OpenGraph
+tags from the URL it is GIVEN — it does not follow a builder's prefix. So `/g/` is one route shared
+by all four builders, and the page redirects on to whichever builder the figure belongs to, by
+BOTH a `<meta http-equiv="refresh">` and a script: an iOS in-app preview sandbox may not run JS.
+Its Apache tail is a deploy step, not an afterthought (#903 / [ADR-W-043](#adr-w-043)).
+
+**The hand-off reads `devUrl` in development.** `products.json` carries two paths per builder, and a
+page that always used the production one hands a developer a 404 — which makes the feature testable
+only after deploy, which is exactly how #1373 reached production. Caught on the dev server here,
+before it shipped, and locked.
+
+### The clipboard stopped being guaranteed, so the UI stopped pretending
+
+Making the link now requires an upload, and Safari rejects a clipboard write issued after an
+`await`. Rather than a button that silently fails on iOS, the link is SHOWN in a sheet with its own
+copy button, which runs on a fresh gesture and works everywhere — and which the teacher wanted
+anyway, since *"too long and ugly"* was partly a complaint about looking at it.
+
+**Consequences.** `server/shareStore.ts` (the store, the upload handler, the `/g/` page),
+`server/shareProxy.ts` (the dev host, so dev and prod behave alike), `server/standalone.ts` and
+`vite.config.ts` (routes), `server/admin.ts` (the usage card — the operator's chosen safety
+mechanism, so it ships with the feature); `shell/session/shortLink.ts` and
+`shell/frame/ShareSheet.tsx` (new, product-free); all four `App`s and their locales; the four
+`deploy/apache-*.conf` tails. Locks: `server/__tests__/share-store-1374.test.ts` (33 — append-only,
+unguessable and traversal-proof ids, every named refusal, the full store refusing without evicting,
+usage in bytes and count, the OG tags, the escaped title, and the dev/prod hand-off paths).
