@@ -126,6 +126,36 @@ surface under prod conditions, re-create the channel from ADR-W-020's mechanism 
 its own tag scheme) — do not keep an idle one alive. The Plesk api mapping for `-next` paths must be
 re-added then. Removing the existing `/geo-builder-next/api` + `/3d-builder-next/api` mappings is the operator's remaining teardown step (flagged on #747) — they are inert once the directories are gone.
 
+### The share store's env var is a DEPLOY STEP ([ADR-W-081](06w-decisions-workspace.md#adr-w-081), #1374)
+
+`SHARE_STORE_PATH` must be set in `/var/www/geo-proxy/geo-proxy.env`, beside `EVENTS_LOG_PATH`:
+
+```
+SHARE_STORE_PATH=/var/www/geo-proxy/shares
+```
+
+**Why this is called out rather than assumed.** The default resolves relative to the process's
+working directory, and the service runs with cwd `/` — so without the var the store resolves to
+`/logs`, `mkdir` throws `EACCES`, and (before the handler was hardened) the rejection **killed the
+whole proxy**, taking `/api/parse` down with it. The handler now survives any storage failure, but
+sharing simply will not work until the var is set and the directory exists:
+
+```sh
+mkdir -p /var/www/geo-proxy/shares && chown root:root /var/www/geo-proxy/shares && chmod 755 /var/www/geo-proxy/shares
+systemctl restart geo-proxy
+```
+
+`/g/` and `api/share` also need their Apache tails — see `deploy/apache-*.conf` (#903 rules apply:
+a missing tail 404s silently). Probe after deploy, since a 404 here looks exactly like a working
+deploy from the outside:
+
+```sh
+curl -s -o /dev/null -w '%{http_code}
+' -X POST https://themathbible.com/geo-builder/api/share   -H 'content-type: application/json' -d '{"tool":"2d","fragment":"probeABC_-"}'   # 200
+curl -s -o /dev/null -w '%{http_code}
+' https://themathbible.com/g/aaaaaaaaaaaa   # 404 = routed
+```
+
 ## Verify (every deploy)
 
 - `ssh root@themathbible.com 'curl -s http://127.0.0.1:8788/healthz'` → `ok`

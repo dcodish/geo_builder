@@ -208,20 +208,37 @@ export async function handleShare(
   const title = typeof parsed.title === 'string' ? parsed.title.slice(0, 120) : undefined;
   const record: SharedFigure = { tool, fragment, savedAt: now().toISOString(), ...(title ? { title } : {}) };
 
-  await mkdir(dir, { recursive: true });
-  // Append-only: a fresh id every time, and an existing one is never overwritten. The retry covers
-  // the (vanishingly unlikely) collision rather than pretending it cannot happen.
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const id = newShareId();
-    try {
-      await writeFile(path.join(dir, `${id}.json`), JSON.stringify(record), { flag: 'wx' });
-      if (png) await writeFile(path.join(dir, `${id}.png`), png);
-      return json(res, 200, { id });
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') return json(res, 500, { error: 'write-failed' });
+  /**
+   * EVERY write failure is caught here, and that is not defensive habit — it is a defect this
+   * endpoint already caused. On its first production request the store path resolved to `/logs`
+   * (the service's cwd is `/`), `mkdir` threw EACCES, and the rejection escaped the handler and
+   * **killed the whole proxy process** — taking the LLM fallback down with it until systemd
+   * restarted it. A sharing feature must never be able to stop the tool from parsing.
+   *
+   * So: the share fails, says so, and the process lives. The path itself is configured through
+   * `SHARE_STORE_PATH` beside `EVENTS_LOG_PATH`, which is the fix for the original cause.
+   */
+  try {
+    await mkdir(dir, { recursive: true });
+    // Append-only: a fresh id every time, and an existing one is never overwritten. The retry
+    // covers the (vanishingly unlikely) collision rather than pretending it cannot happen.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const id = newShareId();
+      try {
+        await writeFile(path.join(dir, `${id}.json`), JSON.stringify(record), { flag: 'wx' });
+        if (png) await writeFile(path.join(dir, `${id}.png`), png);
+        return json(res, 200, { id });
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+      }
     }
+    return json(res, 500, { error: 'no-id' });
+  } catch (err) {
+    // Named on the server so the operator can see WHY in the journal; the client only learns that
+    // storing failed, and falls back to the long link that needs no server at all.
+    console.error('[geo-proxy] share write failed:', (err as Error)?.message ?? err);
+    return json(res, 500, { error: 'write-failed' });
   }
-  return json(res, 500, { error: 'no-id' });
 }
 
 /** HTML-escape for the few values that reach the page (a title the client supplied). */

@@ -291,3 +291,31 @@ describe('#1374 — the share page sends the student where the builder really is
     expect(await target(tool as string, dev as boolean)).toContain(expected as string);
   });
 });
+
+/**
+ * A storage failure must NOT take the proxy down.
+ *
+ * Not hypothetical: on its first production request this endpoint resolved its store to `/logs`
+ * (the service's cwd is `/`), `mkdir` threw EACCES, the rejection escaped the handler and **killed
+ * the whole proxy process** — the LLM fallback with it — until systemd restarted it. The path is
+ * configured through `SHARE_STORE_PATH` now, and the handler catches regardless: a sharing feature
+ * must never be able to stop the tool from parsing.
+ */
+describe('#1374 — an unwritable store fails the SHARE, never the process', () => {
+  it('answers 500 write-failed instead of rejecting', async () => {
+    const res = mockRes();
+    // A path under a FILE cannot be created — the same class as the EACCES that crashed prod.
+    const wall = path.join(dir, 'a-file');
+    writeFileSync(wall, 'not a directory');
+    await expect(handleShare(mockReq(GOOD), res, { dir: path.join(wall, 'shares') })).resolves.toBeUndefined();
+    expect(res.statusCode).toBe(500);
+    expect(JSON.parse(String(res.body)).error).toBe('write-failed');
+  });
+
+  it('and the endpoint still works for the next caller', async () => {
+    const wall = path.join(dir, 'a-file2');
+    writeFileSync(wall, 'x');
+    await handleShare(mockReq(GOOD), mockRes(), { dir: path.join(wall, 'shares') });
+    expect(isShareId(await shareOk(GOOD))).toBe(true);
+  });
+});
