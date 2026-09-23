@@ -15,6 +15,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { storeUsage } from './shareStore';
 import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -705,6 +706,24 @@ function loginPage(base: string, error: boolean, title?: string): string {
   );
 }
 
+/**
+ * The SHARE STORE's usage (#1374) — the operator's chosen safety mechanism.
+ *
+ * He declined a cap in favour of *"we will track this periodically, maybe through the admin
+ * dashboards"*, which makes this card the whole of it rather than decoration. It reports BYTES and
+ * count, because the preview image is what grows (~50 KB a share against a few hundred bytes for
+ * the figure) and a count alone would hide the quantity that matters. Past 50% it warns, and at the
+ * allocation it says FULL — the point at which new shares are refused and old links keep working.
+ */
+function shareCard(u: { bytes: number; shares: number; maxBytes: number } | null): string {
+  if (!u) return '';
+  const pct = u.maxBytes > 0 ? Math.round((u.bytes / u.maxBytes) * 100) : 0;
+  const mb = (n: number) => (n / (1024 * 1024)).toFixed(n < 10 * 1024 * 1024 ? 1 : 0);
+  const state = pct >= 100 ? ' · מלא' : pct >= 50 ? ' · ' + String(pct) + '%' : '';
+  const label = 'שרטוטים משותפים · ' + mb(u.bytes) + ' מ״ב מתוך ' + mb(u.maxBytes) + state;
+  return card(u.shares, label);
+}
+
 function card(n: string | number, l: string): string {
   return `<div class="card"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`;
 }
@@ -937,6 +956,7 @@ function filterBar(base: string, releases: string[], cur: Filter, presets: { lab
 function dashboard(
   base: string,
   s: Stats,
+  shares: { bytes: number; shares: number; maxBytes: number } | null,
   releases: string[],
   cur: Filter,
   presets: { label: string; since: string }[],
@@ -969,6 +989,7 @@ function dashboard(
        ${card(s.llmFallbacks, 'נפילה ל-LLM')}
        ${cardLink(gapCount, gapLabel, `${esc(base)}${queryString(cur, { view: cur.view === 'gaps' ? undefined : 'gaps' })}`, cur.view === 'gaps')}
        ${cardLink(s.outOfScope, profile.secondaryCard, `${esc(base)}${queryString(cur, { view: cur.view === 'scope' ? undefined : 'scope' })}`, cur.view === 'scope')}
+       ${shareCard(shares)}
      </div>
      ${
        cur.view === 'gaps'
@@ -1178,6 +1199,15 @@ ${rows}
 </body></html>`;
 }
 
+/** The store's usage, or null when it cannot be read — a dashboard must never fail over a card. */
+async function shareUsageOrNull() {
+  try {
+    return await storeUsage();
+  } catch {
+    return null;
+  }
+}
+
 export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opts: AdminOpts): Promise<void> {
   const base = opts.base ?? '/admin';
   const cookiePath = base; // Path attr the browser scopes the cookie to
@@ -1282,5 +1312,5 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
   // The per-session timelines (#470) are built only for the view that shows them — every other view pays nothing.
   const sessions = cur.view === 'sessions' ? sessionsOf(events, profile) : [];
   const unattributed = cur.view === 'sessions' ? unattributedCount(events) : 0;
-  return send(res, 200, dashboard(base, aggregate(events, profile), releases, cur, presets, profile, vm, sessions, unattributed));
+  return send(res, 200, dashboard(base, aggregate(events, profile), await shareUsageOrNull(), releases, cur, presets, profile, vm, sessions, unattributed));
 }

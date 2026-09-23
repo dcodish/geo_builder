@@ -36,6 +36,10 @@ import { handleParse } from './parseHandler';
 import { handleLog, events3LogPath, eventsLogPath } from './eventLog';
 import { handleAdmin, PROFILE_3D } from './admin';
 import { handleConfigRead } from './adminConfig';
+// #1374: the share store — a short link with a WhatsApp preview. `/g/<id>` is TOP-LEVEL on
+// purpose: the operator asked for `themathbible.com/<something short>`, and a preview crawler
+// never follows a builder's own prefix.
+import { handleShare, handleSharePage } from './shareStore';
 
 const PORT = Number(process.env.PORT ?? 8788);
 const HOST = process.env.HOST ?? '127.0.0.1';
@@ -91,6 +95,16 @@ const server = createServer((req, res) => {
   if (path.endsWith('/api/log')) {
     // handleLog routes the event to the 2-D or 3-D file by the request body's `tool` tag.
     void handleLog(req, res, { ipSalt });
+    return;
+  }
+  // The SHARE page, checked before the api tails: it is the one route that is NOT under a builder
+  // prefix, because the link a teacher sends has to be short (#1374).
+  if (path.startsWith('/g/')) {
+    void handleSharePage(req, res);
+    return;
+  }
+  if (path.endsWith('/api/share')) {
+    void handleShare(req, res);
     return;
   }
   if (path.endsWith('/api/config')) {

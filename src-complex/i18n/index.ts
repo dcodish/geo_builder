@@ -80,7 +80,8 @@ const he = {
     'כלי לבניית הציור של שאלת מספרים מרוכבים: מקלידים את הנתונים שורה-שורה, והציור נבנה ומתעדכן תוך כדי. הכלי מצייר ובודק את הנתונים — הוא אינו פותר את השאלה.',
   aboutClose: 'סגירה',
   privacy:
-    'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. העבודה נשמרת בדפדפן שלכם בלבד ובקבצים שאתם בוחרים לשמור — שום מידע אינו נשלח לשרת.',
+    'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. העבודה נשמרת בדפדפן שלכם ובקבצים שאתם בוחרים לשמור.' +
+    'כשאתם לוחצים «העתק קישור», השרטוט ותמונה שלו נשמרים בשרת כדי שהקישור יעבוד — בלי שם ובלי פרטים אישיים, ומי שיש לו את הקישור יכול לפתוח אותו.',
   // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
   loadAuditTitle: 'הקובץ נטען חלקית: {{restored}} מתוך {{total}} שורות נוספו. שורות שלא נוספו:',
   loadAuditDismiss: 'סגור',
@@ -202,6 +203,11 @@ const he = {
   shareArrived: 'הקישור שפתחתם מכיל שרטוט. לפתוח אותו במקום מה שבניתם?',
   shareOpenIt: 'פתח את השרטוט מהקישור',
   shareKeepMine: 'השאר את שלי',
+  sharePreparing: 'מכין קישור…',
+  shareReady: 'הקישור מוכן — העתיקו ושלחו',
+  shareCopyButton: 'העתק',
+  shareStoreFull: 'שטח השיתוף בשרת מלא — זהו הקישור הארוך, והוא עובד',
+  shareOffline: 'לא הצלחנו ליצור קישור קצר — זהו הקישור הארוך, והוא עובד',
 };
 
 // #904 Phase 4: typed against `he`, so a missing or misspelled key is a COMPILE error rather than a
@@ -270,7 +276,8 @@ const en: typeof he = {
     'A tool for building the figure of a complex-numbers question: enter the givens line by line and the figure forms and adapts as you go. It draws and verifies the givens — it never solves the question.',
   aboutClose: 'Close',
   privacy:
-    'Privacy: no registration, and no personal data is collected. Your work is stored only in your browser and in files you choose to save — nothing is sent to a server.',
+    'Privacy: no registration, and no personal data is collected. Your work is stored in your browser and in files you choose to save.' +
+    ' When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.',
   // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
   loadAuditTitle: 'The file loaded partially: {{restored}} of {{total}} lines were added. Lines not added:',
   loadAuditDismiss: 'Dismiss',
@@ -388,6 +395,11 @@ const en: typeof he = {
   shareArrived: 'The link you opened contains a figure. Open it instead of what you built?',
   shareOpenIt: 'Open the shared figure',
   shareKeepMine: 'Keep mine',
+  sharePreparing: 'Preparing link…',
+  shareReady: 'Your link is ready — copy it and send it',
+  shareCopyButton: 'Copy',
+  shareStoreFull: 'The share space on the server is full — this is the long link, and it works',
+  shareOffline: 'Could not make a short link — this is the long link, and it works',
 };
 
 export const complexI18n = createProductI18n({

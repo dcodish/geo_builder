@@ -41,7 +41,7 @@
       "point G on AD",
       "angle GBA = 37°"
     ],
-    "privacy": "Privacy: no sign-up and no personal details are collected. To improve the tool, typed instructions (math text only) are kept for a few days with an anonymous visitor id — your IP address is never stored.",
+    "privacy": "Privacy: no sign-up and no personal details are collected. To improve the tool, typed instructions (math text only) are kept for a few days with an anonymous visitor id — your IP address is never stored. When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.",
     "close": "Got it — let's start"
   },
   "input": {
@@ -522,6 +522,11 @@
     "badLink": "This link is not valid — ask the sender to send it again",
     "arrived": "The link you opened contains a figure. Open it instead of what you built?",
     "openIt": "Open the shared figure",
-    "keepMine": "Keep mine"
+    "keepMine": "Keep mine",
+    "preparing": "Preparing link…",
+    "ready": "Your link is ready — copy it and send it",
+    "copyButton": "Copy",
+    "storeFull": "The share space on the server is full — this is the long link, and it works",
+    "offline": "Could not make a short link — this is the long link, and it works"
   }
 }

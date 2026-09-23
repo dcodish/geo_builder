@@ -192,3 +192,37 @@ link twice* — while leaving each product's payload its own.
 **A link arriving on a non-empty canvas ASKS.** It cannot happen on a cold load, so it could not
 happen at all until the fragment became a subscription; once it can, opening silently would discard
 work the student cannot recover. Same banner shape as the session offer, same rule.
+
+### The SHORT link and the store ([ADR-W-081](06w-decisions-workspace.md#adr-w-081))
+
+The long fragment link above is unchanged and is still what a figure travels as. `/g/<id>` trades it
+for something a teacher can send without it looking like phishing, and — the reason it exists at all
+— something a chat client can PREVIEW.
+
+**A preview forces server storage.** A crawler cannot see a `#` fragment. So the short link and the
+preview are one decision, and the trade (figures leave the machine) was the operator's, made
+explicitly.
+
+| piece | owns |
+| --- | --- |
+| `server/shareStore.ts` | the append-only store, the upload's refusals, and the `/g/<id>` page + image |
+| `server/shareProxy.ts` | the DEV host of the same handlers — dev and prod must not differ, which is how #1373 shipped |
+| `shell/session/shortLink.ts` | the upload, product-free; returns a URL or a NAMED reason to fall back |
+| `shell/frame/ShareSheet.tsx` | the sheet that shows the link with its own copy button |
+
+**What is uploaded is the FRAGMENT**, not the save envelope — the server moves an opaque string and
+a picture, and `/g/<id>` hands the blob straight back as a fragment, so the existing loader opens a
+short link with no new code path.
+
+**Three rules that are not implementation detail:**
+
+1. **Append-only.** No endpoint updates or deletes. A link means the same figure forever, which also
+   makes the image immutable-cacheable.
+2. **Refuse, never evict.** Past the allocation a new share is refused with a reason; links already
+   sent keep working. Eviction would be the one failure a teacher could not diagnose.
+3. **The long link is a first-class fallback.** Offline or store-full, the teacher still gets a
+   working link, named as the long one. A share button that fails closed would be worse than the URL
+   it replaced.
+
+**The clipboard is no longer guaranteed**, because the link now requires an upload and Safari
+rejects a clipboard write after an `await`. The sheet shows the URL and copies on a fresh gesture.

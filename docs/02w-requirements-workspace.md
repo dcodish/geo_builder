@@ -149,6 +149,21 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
   threshold. A short link through the proxy, with a preview image, is
   [#1374](https://github.com/dcodish/geo_builder/issues/1374) and deliberately separate — it would
   put figures on a server, which this does not.)*
+- **FR-SL-8 (Should)** — **A shared figure has a SHORT link and shows a picture of itself.** The link
+  a teacher sends is short enough to look trustworthy in a chat — a long opaque blob reads as
+  phishing to a teenager, a parent or a school — and chat clients that preview links show the
+  FIGURE, so the recipient can see what they are being sent before tapping. This necessarily means
+  the figure is **stored on the server**: a preview crawler cannot see a URL fragment, so FR-SL-7's
+  privacy property (nothing leaves the machine) cannot coexist with a preview, and the in-app
+  privacy note says so plainly rather than going stale. A stored share is **append-only** — nothing
+  can overwrite or alter a figure someone already holds a link to, so a link means the same figure
+  forever — and ids are unguessable, so the store cannot be walked. Storage is bounded by an
+  allocation; past it a new share is **refused with a reason** and links already sent keep working,
+  because silently deleting an old figure to make room is the one failure a teacher could not
+  diagnose. FR-SL-7's long link remains as the offline fallback and whenever the store cannot be
+  reached. *(Realised — [ADR-W-081](06w-decisions-workspace.md#adr-w-081), #1374. Operator ruling
+  2026-09-23: 2 GB allocated, usage tracked on the admin dashboard rather than by push alert;
+  measured at ~50 KB a share, so ~40,000 shares.)*
 
 ## Export
 

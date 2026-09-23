@@ -102,7 +102,9 @@ const he = {
   aboutTitle: 'גאומטריה אנליטית',
   aboutBody:
     'כלי לשרטוט שאלות גאומטריה אנליטית: מקלידים את הנתונים כלשונם, והכלי משרטט את הצורה. הכלי אינו פותר את השאלה.',
-  privacy: 'המשפטים שאתם מקלידים נשמרים בדפדפן שלכם בלבד.',
+  privacy:
+    'המשפטים שאתם מקלידים נשמרים בדפדפן שלכם.' +
+    'כשאתם לוחצים «העתק קישור», השרטוט ותמונה שלו נשמרים בשרת כדי שהקישור יעבוד — בלי שם ובלי פרטים אישיים, ומי שיש לו את הקישור יכול לפתוח אותו.',
   close: 'סגור',
   switcherLabel: 'בחירת כלי',
   switcherMore: 'עוד',
@@ -263,6 +265,11 @@ const he = {
   shareArrived: 'הקישור שפתחתם מכיל שרטוט. לפתוח אותו במקום מה שבניתם?',
   shareOpenIt: 'פתח את השרטוט מהקישור',
   shareKeepMine: 'השאר את שלי',
+  sharePreparing: 'מכין קישור…',
+  shareReady: 'הקישור מוכן — העתיקו ושלחו',
+  shareCopyButton: 'העתק',
+  shareStoreFull: 'שטח השיתוף בשרת מלא — זהו הקישור הארוך, והוא עובד',
+  shareOffline: 'לא הצלחנו ליצור קישור קצר — זהו הקישור הארוך, והוא עובד',
 };
 
 const en: typeof he = {
@@ -327,7 +334,9 @@ const en: typeof he = {
   aboutTitle: 'Analytic Geometry',
   aboutBody:
     'A tool for drawing analytic-geometry questions: type the givens as the exam words them and the tool draws the figure. It does not solve the question.',
-  privacy: 'The statements you type stay in your own browser.',
+  privacy:
+    'The statements you type stay in your own browser.' +
+    ' When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.',
   close: 'Close',
   switcherLabel: 'Choose a tool',
   switcherMore: 'More',
@@ -458,6 +467,11 @@ const en: typeof he = {
   shareArrived: 'The link you opened contains a figure. Open it instead of what you built?',
   shareOpenIt: 'Open the shared figure',
   shareKeepMine: 'Keep mine',
+  sharePreparing: 'Preparing link…',
+  shareReady: 'Your link is ready — copy it and send it',
+  shareCopyButton: 'Copy',
+  shareStoreFull: 'The share space on the server is full — this is the long link, and it works',
+  shareOffline: 'Could not make a short link — this is the long link, and it works',
 };
 
 export const analyticI18n = createProductI18n({
