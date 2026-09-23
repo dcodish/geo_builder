@@ -4092,7 +4092,10 @@ That contradicts the operator's own 2026-09-21 ruling ([ADR-W-078](#adr-w-078)):
 silently*. So a link arriving on a **non-empty** canvas now ASKS — «פתח את השרטוט מהקישור» /
 «השאר את שלי» — in the same banner shape as the session offer. On an empty canvas it opens directly,
 as before. **This was not requested; it is the direct consequence of making the fix correct, and it
-is flagged for the operator on the play sheet as a behaviour he has not ruled on.**
+shipped FLAGGED as unruled** — a data-loss path is not something to leave open while waiting for an
+answer. **Ruled 2026-09-23, after he played it:** *"we have the warning message and the question
+what to do"* — the ask stays. Links always winning (silent replacement) is on the record as not
+taken, so it is not re-proposed later as a simplification.
 
 ### The payload trim is per-product, and was MEASURED rather than copied
 
