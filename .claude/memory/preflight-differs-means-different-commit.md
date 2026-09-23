@@ -26,5 +26,11 @@ misattributes analytics by release, so pushing all four is correct. But before t
 Report the trees that really moved; say "re-pushed for the release id" for the rest. The preflight is
 authoritative about what to PUSH and says nothing about what CHANGED.
 
+**A `MATCHES live` is not counter-evidence to this.** On 2026-09-23 three artifacts were pushed and 3-D and
+analytic read `MATCHES live` across a new commit — which momentarily looked like proof that `__BUILD__` is not
+universal. It is not: all four vite configs define it. Those two simply were **not rebuilt**, so the preflight
+compared last deploy's artifacts to themselves. The rule is about REBUILT bundles. Leaving an unrebuilt product
+alone is right, and it keeps its reported release id pointing at the build actually running.
+
 Complements [[proxy-bundle-is-wider-than-server]] — the proxy rule under-detects, this one
 over-reports, and both are read off the same preflight. Related: [[gate-lines-are-read-not-matched]].
