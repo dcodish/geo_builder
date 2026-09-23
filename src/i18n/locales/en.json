@@ -514,5 +514,11 @@
     "offer": "Unsaved work from your last session was found.",
     "continue": "Continue where you left off",
     "startFresh": "Start fresh"
+  },
+  "share": {
+    "copyLink": "Copy link",
+    "copied": "Link copied",
+    "tooLong": "This link is too long to share — save the figure as a file and send that instead",
+    "badLink": "This link is not valid — ask the sender to send it again"
   }
 }

@@ -120,6 +120,44 @@ export function serializeFigure(
   return JSON.stringify(file, null, 2);
 }
 
+/**
+ * The SHARE-LINK payload (#1189, ADR-W-079): the same envelope, made small enough to live in a URL
+ * a teacher pastes into WhatsApp.
+ *
+ * Two trims, and the line between what goes and what stays is deliberate:
+ *
+ *  - **fact ids and the indentation go.** Nothing in the file cross-references a fact id —
+ *    `display.displayMode` is keyed by row POSITION exactly so it survives a file that has none —
+ *    and `sanitizeFactIn` mints fresh ids when they are absent. Verified lossless over the corpus.
+ *  - **`savedAt` and `locale` go**, because they mean nothing on this path: a link is not an
+ *    archive, and a load never switches the UI language.
+ *  - **`app` and `schemaVersion` STAY**, at a cost of a handful of compressed characters. They
+ *    are what makes a foreign or future payload refuse instead of half-loading, and the whole
+ *    reason the link reuses the save envelope is to inherit that refusal rather than re-invent it.
+ *
+ * The SAVED FILE keeps its provenance — the two formats are allowed to diverge because they answer
+ * different questions (the operator's ruling on #1189), and the link payload is a legal SUBSET of
+ * the file format rather than a second schema to maintain.
+ */
+export function serializeFigureForLink(
+  state: { facts: Fact[]; seed: number; display?: FigureFileDisplay; queries?: string[] },
+  meta: { name?: string } = {},
+): string {
+  const file: FigureFile = {
+    app: APP_MARKER,
+    schemaVersion: FIGURE_FILE_VERSION,
+    ...(meta.name ? { name: meta.name } : {}),
+    seed: state.seed,
+    facts: state.facts.map((f) => {
+      const { id: _dropped, ...rest } = sanitizeFactOut(f);
+      return rest as Fact;
+    }),
+    ...(state.display ? { display: state.display } : {}),
+    ...(state.queries?.length ? { queries: state.queries } : {}),
+  };
+  return JSON.stringify(file);
+}
+
 /** Keep exactly the fields a fact persists — a saved file never leaks future in-memory extras. */
 function sanitizeFactOut(f: Fact): Fact {
   return {

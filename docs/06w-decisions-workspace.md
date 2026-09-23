@@ -3947,3 +3947,97 @@ a session contains; `src3d/store/sessionPersist3.ts` (+ the envelope `name` now 
 `shell/__tests__/session-persist-1238.test.ts` (13), `shell/__tests__/session-offer-meta-1238.test.ts`
 (5), one `session-offer-1238.test.ts` per tree (5/4/4/5), and the rewritten
 `src-complex/__tests__/no-session-restore-919.test.ts` (4).
+
+## ADR-W-079 — A figure travels as a LINK, in the URL fragment, refused rather than truncated (#1189)
+
+**Status:** accepted, 2026-09-23 · **Issue:** [#1189](https://github.com/dcodish/geo_builder/issues/1189) (feature, `P2`, `workspace`) · built on [ADR-W-078](#adr-w-078), which it was blocked on
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SL-7 (new); [02](02-requirements.md) FR-HS-6 realised · **Design:** [04w](04w-design-shell.md#the-share-link-adr-w-079) (new section)
+
+**The ask.** A teacher builds a figure once and hands it to a class. Measured before building: **no
+product read `location.hash` or a query parameter** — the only way into a figure was the file
+picker.
+
+**Delivery is a LINK, not a file** (operator ruling). On WhatsApp a tapped link opens the browser
+directly; an attachment costs download → "open with" → file manager, and students drop out at every
+step. A `.json` is close to unopenable on a phone, double-clicks into Notepad on Windows, and a web
+app cannot register a file association. The HTML-wrapper alternative is parked: on iOS, WhatsApp
+opens documents in a QuickLook preview that does not reliably execute page JS, and engineering
+around a preview sandbox to deliver what a plain link does in one tap is the wrong trade.
+
+**The student lands in a FULLY EDITABLE session** (operator ruling) — no read-only mode, no unlock
+affordance. It is the existing load path fed from the URL, so this costs nothing extra, and it
+closes the round trip without any further work: the student has the same button, so *teacher shares
+→ student works → student shares back* is the submission channel. On iOS that matters more than it
+looks, because it avoids extracting a `.geo.json` out of an in-app webview.
+
+**Two decisions about the URL, both about what a chat client does to text.** The payload is
+**base64url** (`A–Z a–z 0–9 - _`), so a link detector cannot chop it mid-blob the way plain base64's
+`+ / =` would invite. And it rides in a **`#` fragment, never a query parameter** — a fragment is
+never sent to any server, so no student's figure is logged anywhere and a link-preview fetch sees
+only the bare app URL. That is a privacy property of the encoding, not of a policy.
+
+**Compression is SYNCHRONOUS** — `fflate`'s `deflateSync` (fflate's "deflate" is the raw stream) —
+never `CompressionStream`. Safari rejects a clipboard write issued after an `await`, because the
+user-gesture context is gone by then, and `CompressionStream` does not exist before iOS 16.4, which
+would strand students on older iPhones. ⚠️ Both claims are **from knowledge, not from a device**;
+the synchronous route is correct under either, which is exactly why it costs nothing to take. (The
+existing copy-image button has the `await`-then-write shape and is therefore *probably* already
+failing silently into its error flash on iOS — noted, not fixed here, and not assumed true.)
+
+**The refusal is the part that protects a student, and it is measured before the copy.** A URL that
+some client truncates opens as a figure missing its last statements, and neither the teacher nor the
+student can tell. So the button builds the link, measures it, and either copies it whole or refuses
+with a reason. **Measured over all 17 saved fixtures: worst case 1,162 characters, typical 400–800**
+— against a 2,000-character conservative threshold and a ~65,000-character WhatsApp message limit.
+The threshold is not a transport limit; it is the figure that survives every channel, including ones
+that wrap or rewrite.
+
+**The payload is the save envelope, trimmed — a legal SUBSET, not a second schema.** Fact ids and
+the indentation go (nothing cross-references an id; `display.displayMode` is keyed by row POSITION
+precisely so it survives a file without them, and `sanitizeFactIn` mints fresh ones). `savedAt` and
+`locale` go — a link is not an archive, and a load never switches the UI language. **`app` and
+`schemaVersion` STAY**, at a cost of a few compressed characters, because they are what makes a
+foreign or future payload REFUSE instead of half-loading, and inheriting that refusal is the whole
+reason the link reuses the envelope. The **saved file keeps its provenance**: the two formats answer
+different questions and are allowed to diverge (operator ruling).
+
+**A link outranks the session offer, and the fragment is consumed once read.** A student who tapped
+a teacher's figure asked for *that* figure; being asked about an unrelated older session on top of
+it is noise. And the URL stops being in charge immediately: without `history.replaceState`, a
+refresh — or ADR-W-078's persistence restoring the student's later edits — would sit behind a URL
+still saying "open the original", and the next reload would quietly discard their work.
+
+**A fragment that is present but unreadable is refused OUT LOUD, and the refusal PERSISTS.** Opening
+a blank canvas instead would read as the teacher having sent a broken figure, with nothing to act
+on. The first implementation routed it through the 6-second auto-clearing file-note lane, which is
+right for a file the student just picked — they know what they did — and wrong here: a link refusal
+greets them on a cold page load, and a message that disappears leaves exactly the empty canvas with
+no cause that it exists to prevent. It is a dismissible banner in the frame instead.
+
+**On the ONE thing that can never be migrated.** A sent link is fixed forever in someone's chat
+history — no `schemaVersion` bump can rewrite it. The #1359 ruling opens a question that lands here:
+does a fact carry one text or two (the student's sentence and the canonical line)? It does not need
+to be answered before this ships, because the payload IS the save envelope and therefore inherits
+the file's own evolution story — a lenient sanitizer that drops unknown fields and regenerates
+absent ones. A future second text is an optional field; **an old link keeps building correctly
+(load replays `cmd`, never the utterance) and displays the text it carries.** What is foreclosed is
+nothing; what is accepted is that links sent today display the phrasing that was recorded today.
+
+**What is NOT built.** Phase 2 — a short link through the proxy (`themathbible.com/g/AB7K2`) — is a
+separate issue, and its argument is *not* the size ceiling: it is that a 1,200-character opaque URL
+arriving in a teenager's WhatsApp reads as phishing. It costs a proxy endpoint, stored payloads, a
+retention policy, a privacy surface (figures would then leave the student's machine, which this
+design deliberately avoids) and its own Apache conf tail. Also not built: the `.geo.html` wrapper,
+a read-only mode, and an offline single-file build — all three reasoned out on the issue.
+
+**Scope: 2-D only**, per the issue's phase 1. `shell/session/link.ts` is shared and product-free, so
+a sibling inherits the encoding by wiring a button and a boot read; nothing in this ADR decides when.
+
+**Consequences.** `shell/session/link.ts` (new), `fflate` added as a dependency (the one named in
+the plan); `src/store/figureFile.ts` (`serializeFigureForLink`); `src/store/shareLink.ts` (new — the
+2-D half: the base path, the measurement, the fragment read, the consume); `src/App.tsx` (the boot
+read, the «העתק קישור» button); locales. Locks:
+`shell/__tests__/link-1189.test.ts` (13 — the encoding, what a chat client does to a URL, and every
+refusal including a truncated payload) and `src/__tests__/share-link-1189.test.ts` (13 — the round
+trip through the real load path, the editable session, the trim asserted as a property, the
+refusals, and a corpus-wide size row over all 17 fixtures).

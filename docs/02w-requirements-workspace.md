@@ -130,6 +130,19 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
   [ADR-W-078](06w-decisions-workspace.md#adr-w-078), #1238; un-withdraws [02](02-requirements.md)
   FR-HS-4 in this form only. Locks: `shell/__tests__/session-persist-1238.test.ts`, the cross-product
   `session-offer-1238.test.ts` in each tree, and a meta-lock over the shared checks.)*
+- **FR-SL-7 (Should)** — **A figure travels as a LINK.** A teacher can copy the current figure as a
+  single URL, send it over an ordinary channel (WhatsApp), and a student who taps it lands in the
+  builder **with that figure, fully editable** — no account, no download, no "open with". The figure
+  rides in the URL's **fragment**, so it is never sent to any server and no student's work is logged
+  by following a link; and the link is **measured before it is offered** — a figure too large for a
+  safe URL is refused with a reason, never emitted truncated, because a truncated link opens as a
+  figure missing statements that nobody can see are missing. The payload is the product's own save
+  envelope, trimmed, so opening a link is a LOAD and inherits every refusal and the load audit
+  (FR-SL-3). The same button is the student's way to hand work back. *(Realised for 2-D —
+  [ADR-W-079](06w-decisions-workspace.md#adr-w-079), #1189; realises [02](02-requirements.md)
+  FR-HS-6. Measured over the saved corpus: worst case 1,162 characters against a 2,000 threshold.
+  A short link through the proxy is phase 2 and deliberately separate — it would put figures on a
+  server, which this does not.)*
 
 ## Export
 
