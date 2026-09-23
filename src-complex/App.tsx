@@ -28,6 +28,9 @@ import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, submitQuery, tog
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
 // This tree is why the rule exists: #919 removed a seam here that re-submitted stored lines on every load.
 import { forgetSessionCx, offeredSessionCx, restoreSessionCx, startSessionPersistCx } from './app/sessionPersistCx';
+// #1372 (ADR-W-080): a figure travels as a LINK here too.
+import { openSharedComplex, shareLinkForComplex } from './app/shareLinkCx';
+import { onSharedLink } from '../shell/session/link';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { v2Claims, v2Contradiction, v2Formulas, v2Freedom, v2Labels, v2Measures, whyText } from './replay/scene2';
@@ -172,10 +175,51 @@ export function App() {
    * student's tap, through the same audited hydrate the file picker uses.
    */
   const [offer, setOffer] = useState<StoredSession | null>(null);
+  /** #1372 — a link that cannot be opened says so and KEEPS saying so (see the analytic twin). */
+  const [shareError, setShareError] = useState(false);
+  const [shareFlash, setShareFlash] = useState<'' | 'ok' | 'err'>('');
+  /** #1373 — a link arriving on a canvas that is NOT empty asks before replacing the student's work. */
+  const [pendingLink, setPendingLink] = useState<string | null>(null);
+
   useEffect(() => {
-    setOffer(offeredSessionCx());
-    return startSessionPersistCx();
+    // A link outranks the session offer and is never shown beside it. #1373: SUBSCRIBED, not read
+    // once — a link pasted into an already-open tab never remounts the app. The store is read via
+    // getState(), since this handler outlives the mount.
+    const stopLink = onSharedLink(({ payload }) => {
+      if (!payload) {
+        setShareError(true);
+        return;
+      }
+      if (useComplexStore.getState().lines.length === 0) {
+        if (!openSharedComplex(payload)) setShareError(true);
+      } else setPendingLink(payload);
+    });
+    if (!window.location.hash || window.location.hash === '#') setOffer(offeredSessionCx());
+    const stopPersist = startSessionPersistCx();
+    return () => {
+      stopLink();
+      stopPersist();
+    };
   }, []);
+
+  const acceptPendingLink = () => {
+    const payload = pendingLink;
+    setPendingLink(null);
+    if (payload && !openSharedComplex(payload)) setShareError(true);
+  };
+
+  const copyShareLink = () => {
+    const link = shareLinkForComplex();
+    if (!link.ok) {
+      if (link.reason === 'too-long') useComplexStore.setState({ lastError: { key: 'parse-error', detail: t('shareTooLong') } });
+      return;
+    }
+    // Copied SYNCHRONOUSLY — Safari drops the user-gesture context across an await.
+    navigator.clipboard.writeText(link.url).then(
+      () => { setShareFlash('ok'); window.setTimeout(() => setShareFlash(''), 1400); },
+      () => { setShareFlash('err'); window.setTimeout(() => setShareFlash(''), 1400); },
+    );
+  };
 
   const acceptOffer = () => {
     if (!offer) return;
@@ -404,6 +448,10 @@ export function App() {
             💾 {t('save')}
           </ToolButton>
           <ToolButton onClick={() => fileRef.current?.click()}>📂 {t('load')}</ToolButton>
+          {/* #1372: the teacher sends a LINK; the same button hands the student's work back. */}
+          <ToolButton onClick={copyShareLink} disabled={lines.length === 0}>
+            {shareFlash === 'ok' ? `✓ ${t('shareCopied')}` : shareFlash === 'err' ? '✕' : `🔗 ${t('shareCopyLink')}`}
+          </ToolButton>
           {/* #742 / ADR-W-024 (operator: "3d and complex tools can have the same functionality"):
               the image exports in the TOP ROW, the one export home in every builder. */}
           <ToolButton onClick={() => void copyImage()} disabled={lines.length === 0}>
@@ -429,7 +477,20 @@ export function App() {
       /* #1238: the offer outranks the load audit for the one render where both could exist — an
          empty canvas has no audit to show, so in practice they never collide. */
       banner={
-        offer && lines.length === 0 ? (
+        shareError ? (
+          <Banner kind="error" onDismiss={() => setShareError(false)} dismissLabel={t('loadAuditDismiss')}>
+            {t('shareBadLink')}
+          </Banner>
+        ) : pendingLink ? (
+          /* #1373: a link arrived on a canvas that is NOT empty — ask, never replace silently. */
+          <ResumeOffer
+            message={t('shareArrived')}
+            continueLabel={t('shareOpenIt')}
+            restartLabel={t('shareKeepMine')}
+            onContinue={acceptPendingLink}
+            onRestart={() => setPendingLink(null)}
+          />
+        ) : offer && lines.length === 0 ? (
           <ResumeOffer
             message={t('sessionOffer')}
             continueLabel={t('sessionContinue')}

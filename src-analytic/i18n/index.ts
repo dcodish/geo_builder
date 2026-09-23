@@ -255,6 +255,14 @@ const he = {
   sessionOffer: 'נמצאה עבודה מהפעם הקודמת שלא נשמרה.',
   sessionContinue: 'המשך מהמקום שבו הפסקת',
   sessionStartFresh: 'התחל מחדש',
+  // #1372 (ADR-W-080) — the share link, and #1373's ask-before-replacing.
+  shareCopyLink: 'העתק קישור',
+  shareCopied: 'הקישור הועתק',
+  shareTooLong: 'הקישור ארוך מדי לשיתוף — שמרו את השרטוט כקובץ ושלחו אותו',
+  shareBadLink: 'הקישור אינו תקין — בקשו מהשולח לשלוח אותו שוב',
+  shareArrived: 'הקישור שפתחתם מכיל שרטוט. לפתוח אותו במקום מה שבניתם?',
+  shareOpenIt: 'פתח את השרטוט מהקישור',
+  shareKeepMine: 'השאר את שלי',
 };
 
 const en: typeof he = {
@@ -442,6 +450,14 @@ const en: typeof he = {
   sessionOffer: 'Unsaved work from your last session was found.',
   sessionContinue: 'Continue where you left off',
   sessionStartFresh: 'Start fresh',
+  // #1372 (ADR-W-080) — the share link, and #1373's ask-before-replacing.
+  shareCopyLink: 'Copy link',
+  shareCopied: 'Link copied',
+  shareTooLong: 'This link is too long to share — save the figure as a file and send that instead',
+  shareBadLink: 'This link is not valid — ask the sender to send it again',
+  shareArrived: 'The link you opened contains a figure. Open it instead of what you built?',
+  shareOpenIt: 'Open the shared figure',
+  shareKeepMine: 'Keep mine',
 };
 
 export const analyticI18n = createProductI18n({

@@ -60,6 +60,9 @@ import { VERTICAL_TOL, verticality } from './engine/lines';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
 import { forgetSessionAn, offeredSessionAn, restoreSessionAn, startSessionPersistAn } from './app/sessionPersistAn';
+// #1372 (ADR-W-080): a figure travels as a LINK here too — the operator could not share an analytic session.
+import { openSharedAnalytic, shareLinkForAnalytic } from './app/shareLinkAn';
+import { onSharedLink } from '../shell/session/link';
 import { loadAnalyticSession } from './app/loadSession';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
@@ -237,10 +240,57 @@ export function App() {
    * student's tap, through the same audited load path a file takes.
    */
   const [offer, setOffer] = useState<StoredSession | null>(null);
+  /** #1372 — a link that cannot be opened says so and KEEPS saying so: unlike a file refusal, this
+   *  one greets the student on a cold page load, where a self-clearing note would leave an empty
+   *  canvas with the explanation already gone. */
+  const [shareError, setShareError] = useState(false);
+  const [shareFlash, setShareFlash] = useState<'' | 'ok' | 'err'>('');
+  /** #1373 — a link arriving on a canvas that is NOT empty asks before replacing the student's work. */
+  const [pendingLink, setPendingLink] = useState<string | null>(null);
+
+  const openLinkAn = (payload: string) => {
+    if (openSharedAnalytic(payload)) showWholeFigure();
+    else setShareError(true);
+  };
+
   useEffect(() => {
-    setOffer(offeredSessionAn());
-    return startSessionPersistAn();
+    // A link outranks the session offer and is never shown beside it: the student asked for THIS
+    // figure. #1373: SUBSCRIBED, not read once — a link pasted into an already-open tab never
+    // remounts the app. The store is read via getState(), since this handler outlives the mount.
+    const stopLink = onSharedLink(({ payload }) => {
+      if (!payload) {
+        setShareError(true);
+        return;
+      }
+      if (useAnalyticStore.getState().lines.length === 0) openLinkAn(payload);
+      else setPendingLink(payload);
+    });
+    if (!window.location.hash || window.location.hash === '#') setOffer(offeredSessionAn());
+    const stopPersist = startSessionPersistAn();
+    return () => {
+      stopLink();
+      stopPersist();
+    };
   }, []);
+
+  const acceptPendingLink = () => {
+    const payload = pendingLink;
+    setPendingLink(null);
+    if (payload) openLinkAn(payload);
+  };
+
+  const copyShareLink = () => {
+    const link = shareLinkForAnalytic();
+    if (!link.ok) {
+      if (link.reason === 'too-long') setError({ key: 'load-unreadable', detail: t('shareTooLong') });
+      return;
+    }
+    // Copied SYNCHRONOUSLY — Safari drops the user-gesture context across an await.
+    navigator.clipboard.writeText(link.url).then(
+      () => { setShareFlash('ok'); window.setTimeout(() => setShareFlash(''), 1400); },
+      () => { setShareFlash('err'); window.setTimeout(() => setShareFlash(''), 1400); },
+    );
+  };
 
   const acceptOffer = () => {
     if (!offer) return;
@@ -862,13 +912,29 @@ export function App() {
           <ToolButton onClick={() => void saveImage()} disabled={lines.length === 0}>
             ⤓ {t('saveImage')}
           </ToolButton>
+          <ToolButton onClick={copyShareLink} disabled={lines.length === 0}>
+            {shareFlash === 'ok' ? `✓ ${t('shareCopied')}` : shareFlash === 'err' ? '✕' : `🔗 ${t('shareCopyLink')}`}
+          </ToolButton>
           <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
         </>
       }
       /* #1238: the offer outranks the load audit for the one render where both could exist — an
          empty canvas has no audit to show, so in practice they never collide. */
       banner={
-        offer && lines.length === 0 ? (
+        shareError ? (
+          <Banner kind="error" onDismiss={() => setShareError(false)} dismissLabel={t('close')}>
+            {t('shareBadLink')}
+          </Banner>
+        ) : pendingLink ? (
+          /* #1373: a link arrived on a canvas that is NOT empty — ask, never replace silently. */
+          <ResumeOffer
+            message={t('shareArrived')}
+            continueLabel={t('shareOpenIt')}
+            restartLabel={t('shareKeepMine')}
+            onContinue={acceptPendingLink}
+            onRestart={() => setPendingLink(null)}
+          />
+        ) : offer && lines.length === 0 ? (
           <ResumeOffer
             message={t('sessionOffer')}
             continueLabel={t('sessionContinue')}

@@ -519,6 +519,9 @@
     "copyLink": "Copy link",
     "copied": "Link copied",
     "tooLong": "This link is too long to share — save the figure as a file and send that instead",
-    "badLink": "This link is not valid — ask the sender to send it again"
+    "badLink": "This link is not valid — ask the sender to send it again",
+    "arrived": "The link you opened contains a figure. Open it instead of what you built?",
+    "openIt": "Open the shared figure",
+    "keepMine": "Keep mine"
   }
 }

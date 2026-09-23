@@ -144,10 +144,24 @@ export function serializeFigure3(
    *  when non-empty, so an untouched figure's file is byte-identical to before. */
   displayMode: DisplayModeMap = {},
 ): string {
-  const file: FigureFile3 = {
+  return JSON.stringify(figureFile3Of(facts, seed, name, queries, planeDisplay, displayMode, new Date()), null, 2);
+}
+
+/** The envelope both writers share. `savedAt` is a Date for the file and absent for a link — see
+ *  {@link serializeFigure3ForLink}. */
+function figureFile3Of(
+  facts: Fact3[],
+  seed: number,
+  name: string | undefined,
+  queries: string[],
+  planeDisplay: PlaneDisplayMode3Map,
+  displayMode: DisplayModeMap,
+  savedAt: Date | null,
+): FigureFile3 {
+  return {
     schemaVersion: SCHEMA_VERSION_3D,
     app: '3d-builder',
-    savedAt: new Date().toISOString(),
+    ...(savedAt ? { savedAt: savedAt.toISOString() } : {}),
     ...(name ? { name } : {}),
     seed,
     facts: facts.map((f) => ({ utterance: f.utterance, cmds: f.cmds, ...(f.enabled ? {} : { enabled: false }) })),
@@ -158,7 +172,28 @@ export function serializeFigure3(
       return Object.keys(indexed).length ? { displayMode: indexed } : {};
     })(),
   };
-  return JSON.stringify(file, null, 2);
+}
+
+/**
+ * The SHARE-LINK payload (#1372, ADR-W-079 extended): the same envelope, minified and **without
+ * `savedAt`**.
+ *
+ * The reason is DETERMINISM, not size — measured over all 31 `fixtures3/` figures, the as-saved
+ * payload already fits (worst case 1,255 characters against a 2,000 cap; minifying takes it to
+ * 1,008). But `savedAt` is a timestamp, so leaving it in makes the same unchanged figure produce a
+ * different URL on every press, and a teacher who sends the link twice appears to have sent two
+ * different figures. Unlike 2-D there are no fact ids to drop: this format never stored them
+ * (`deserializeFigure3` mints them fresh on load), so this is one omitted field, not a second schema.
+ */
+export function serializeFigure3ForLink(
+  facts: Fact3[],
+  seed: number,
+  name?: string,
+  queries: string[] = [],
+  planeDisplay: PlaneDisplayMode3Map = {},
+  displayMode: DisplayModeMap = {},
+): string {
+  return JSON.stringify(figureFile3Of(facts, seed, name, queries, planeDisplay, displayMode, null));
 }
 
 export type LoadResult3 =

@@ -4041,3 +4041,114 @@ read, the «העתק קישור» button); locales. Locks:
 refusal including a truncated payload) and `src/__tests__/share-link-1189.test.ts` (13 — the round
 trip through the real load path, the editable session, the trim asserted as a property, the
 refusals, and a corpus-wide size row over all 17 fixtures).
+
+## ADR-W-080 — The share link reaches every builder, and the fragment becomes a SUBSCRIPTION (#1372, #1373)
+
+**Status:** accepted, 2026-09-23 · **Issues:** [#1372](https://github.com/dcodish/geo_builder/issues/1372) (feature, `P2`, `workspace`), [#1373](https://github.com/dcodish/geo_builder/issues/1373) (bug, `P2` by operator ruling — filed `P1`, *"T11 can move to be P2 - not critical"*) · amends [ADR-W-079](#adr-w-079)'s *"Scope: 2-D only"*
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SL-7 — "Realised for 2-D" becomes all four · **Design:** [04w](04w-design-shell.md#the-share-link-adr-w-079) (extended)
+
+**Why now.** The operator tried to send an analytic session — «עבודת סוכות - שאלה 4», 13 lines — and
+could not: [ADR-W-079](#adr-w-079) shipped the link for 2-D only. Asked whether to port analytic alone
+or all three, he chose **all three**, on the reasoning that a builder which cannot share is the kind
+of gap that returns later as a bug report.
+
+**And the port surfaced a defect in the shipped 2-D feature, which is the more important half.**
+
+### The defect (#1373)
+
+He played `prod/2026-09-23-2` and reported: *"T11 ... did show the banner in a new window but on an
+existing browser window just did nothing."* Measured against live prod, four ways:
+
+| case | result |
+| --- | --- |
+| bad link, cold tab | refusal banner ✅ |
+| bad link, tab already on the app | nothing ❌ — his report |
+| **good link, tab already on the app** | **figure does not load** — 0 labels, fragment left in the URL ❌ |
+| good link, cold tab | loads ✅ |
+
+**Root cause.** The fragment was read once, in a mount effect. A URL differing from the current one
+only by its `#` is a **same-document navigation**: the browser fires `hashchange` and does not reload
+the document, so React never remounts and the effect never runs again. `grep` for
+`hashchange|popstate` across all four trees and `shell/`: zero hits. The class is *a capability bound
+to a lifecycle event that does not fire on the path the user actually takes* — the same shape as
+#943.
+
+The refusal he saw was the visible symptom; the silent one was the feature itself. The realistic
+shape is a student who opens one link and is then sent a second: the second looks like a dead link.
+
+**The fix: the fragment is a STREAM, not a boot value.** `shell/session/link.ts` gains
+`onSharedLink`, which delivers the fragment present at subscribe time AND every later `hashchange`.
+The consume uses `replaceState`, which by specification does not fire `hashchange`, so there is no
+loop — asserted, because "it does not loop" is exactly the property that fails silently and
+expensively.
+
+### What the fix EXPOSED, and the guard it needed
+
+With a mount-only read, a link always arrived on an empty canvas. Once `hashchange` works, one can
+arrive **while the student has work in progress** — and opening it would replace that work, with the
+persister then overwriting the stored copy too. The work would be gone.
+
+That contradicts the operator's own 2026-09-21 ruling ([ADR-W-078](#adr-w-078)): *offer, never
+silently*. So a link arriving on a **non-empty** canvas now ASKS — «פתח את השרטוט מהקישור» /
+«השאר את שלי» — in the same banner shape as the session offer. On an empty canvas it opens directly,
+as before. **This was not requested; it is the direct consequence of making the fix correct, and it
+is flagged for the operator on the play sheet as a behaviour he has not ruled on.**
+
+### The payload trim is per-product, and was MEASURED rather than copied
+
+2-D drops fact ids and its archive header because its envelope is fat with them. The others differ,
+and copying 2-D's answer would have been wrong in all three:
+
+- **analytic** — the envelope is `lines[] + seed + name`. His own 13-line session: **346 characters →
+  a 407-character URL** against a 2,000 cap. There is nothing to trim but whitespace, and inventing a
+  second format to save nothing is how two formats start drifting. **No trim.**
+- **complex** — carries `freePos`, where the student PLACED a free point. It looks like a position
+  and is not one: it is an input, so FR-SL-4's *"replay inputs, not positions"* keeps it. Dropping it
+  to shorten a URL would silently move someone's construction. **No trim.**
+- **3-D** — facts carry no ids at all (they are minted fresh on load), so 2-D's id-trim has nothing
+  to remove. Measured over all 31 `fixtures3/` figures: as-saved worst case **1,255 characters**,
+  minified-without-`savedAt` **1,008** — both inside the cap, so size does not argue for a trim.
+  **`savedAt` is dropped anyway, for DETERMINISM**: it is a timestamp, so leaving it in makes the
+  same unchanged figure produce a different URL on every press, and a teacher who sends the link
+  twice appears to have sent two different figures. That is one omitted field, not a second schema.
+
+### The link points at the builder it was copied FROM, and that took a browser to find
+
+`appBaseUrl` first used `import.meta.env.BASE_URL`. In production that is right — each builder is
+built with its own base (`/geo-builder/`, `/3d-builder/`, …). **In development all four are served
+by one server from `/`**, with the siblings on `/3d.html`, `/complex.html`, `/analytic.html`, so
+BASE_URL is `/` for every one of them and a sibling's link reopened the 2-D app. Measured, not
+reasoned: an analytic link built that way round-tripped to an empty canvas when driven through a
+real browser. `location.pathname` is correct in both environments, and it is what ships. Locked
+against a stand-in `window` for all four cases — the unit suite could not have caught this, because
+the defect lives in the difference between two ways of being served.
+
+### Three things moved to `shell/` rather than being copied a fourth time
+
+`payloadInHash`, `consumeFragment` and the origin half of the base URL are product-independent. 2-D
+owned copies; the port would have made four. They are now the shell's, and 2-D delegates.
+
+### Locks
+
+`shell/__tests__/link-subscription-1373.test.ts` (9) drives `onSharedLink` against a stand-in
+`window`, because the property under test IS the browser event plumbing: the reported defect, the
+refusal in an open tab, a second link in the same tab, the consume, the no-loop property, and
+unsubscribe. The cross-product rows live once in
+`shell/__tests__/fixtures/share-link-rows.ts`, with a thin lock per tree (2-D backported) and a
+**meta-lock** over six deliberately broken builders — including one that timestamps its payload,
+which is not a hypothetical mutant but the exact 3-D behaviour the trim above exists to prevent.
+
+**A guard added because this branch tripped over the gap it closes.** A banner shipped
+`t('load.dismiss')` in 3-D — a key that exists in neither locale, which `tsc` cannot see and the
+he⇄en parity guard cannot see either (both locales agreed: absent). It reaches a student as a raw
+dotted key. `shell/__tests__/fixtures/i18n-keys.ts` now audits every literal `t('…')` against the
+locale, with a thin lock in each JSON-locale tree and a row proving the detector can fail. Its first
+run reported three false positives (locale ARRAYS, addressed by their container key), which is why
+it registers array containers as well as their elements — found by checking the locale rather than
+filing three prod bugs that did not exist.
+
+**Consequences.** `shell/session/link.ts` (`onSharedLink`, `payloadInHash`, `consumeFragment`,
+`appBaseUrl`); `src/store/shareLink.ts` (delegates); `src/App.tsx`, `src3d/App3.tsx`,
+`src-complex/App.tsx`, `src-analytic/App.tsx` (subscribe + the pending-link ask + the button);
+`src3d/store/shareLink3.ts`, `src-complex/app/shareLinkCx.ts`, `src-analytic/app/shareLinkAn.ts`
+(new); `src3d/store/figureFile3.ts` (`serializeFigure3ForLink`); locales in four trees.

@@ -18,6 +18,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { deserializeFigure, serializeFigureForLink } from '@/store/figureFile';
 import { LINK_MAX_CHARS, decodeFigurePayload, encodeFigurePayload } from '../../shell/session/link';
+import { shareLinkFaults } from '../../shell/__tests__/fixtures/share-link-rows';
 
 const ctxOf = () => {
   const st = useGeoStore.getState();
@@ -197,5 +198,27 @@ describe('#1189 — every saved fixture fits in a link', () => {
     }
     const worst = sizes.sort((a, b) => b.chars - a.chars)[0];
     expect(worst.chars, `worst case: ${worst.file} at ${worst.chars} chars`).toBeLessThan(LINK_MAX_CHARS - 200);
+  });
+});
+
+/**
+ * #1372 — 2-D joins the shared cross-product contract.
+ *
+ * The rows above are 2-D's own and stay. This one asserts 2-D satisfies the SAME checks its three
+ * siblings now do, so "every builder shares the same way" is a property of the suite rather than of
+ * four files that happen to look alike.
+ */
+describe('#1372 — 2-D conforms to the shared share contract', () => {
+  it('no faults against the cross-product checks', async () => {
+    expect(
+      await shareLinkFaults({
+        build: () => build(['משולש ABC']),
+        clear: () => useGeoStore.getState().clear(),
+        isEmpty: () => useGeoStore.getState().facts.length === 0,
+        link: () => shareLinkFor(),
+        open: async (payload) => (await openSharedFigure(payload)).ok,
+        foreign: JSON.stringify({ app: '3d-builder', schemaVersion: 1, seed: 0, facts: [] }),
+      }),
+    ).toEqual([]);
   });
 });

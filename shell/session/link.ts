@@ -93,3 +93,88 @@ export function figureLinkUrl(base: string, payload: string): string {
 export function linkFits(url: string, max: number = LINK_MAX_CHARS): boolean {
   return url.length <= max;
 }
+
+/**
+ * The payload a page was opened with, or null when the URL carries none — and null is also what a
+ * MALFORMED fragment gives, so the caller distinguishes the two by whether a fragment was present
+ * at all. "You followed a broken link" and "you opened the app normally" are different messages.
+ *
+ * Product-independent, and deliberately here rather than in each builder: the first copy lived in
+ * 2-D, and the sibling port (#1372) would have made four.
+ */
+export function payloadInHash(hash: string): string | null {
+  return hash && hash !== '#' ? decodeFigurePayload(hash) : null;
+}
+
+/**
+ * Drop the fragment once it has been read.
+ *
+ * Without this, a refresh — or the session persistence (ADR-W-078) restoring the student's LATER
+ * edits — would sit behind a URL still saying "open this original figure", and the next reload would
+ * quietly throw their work away. The link delivers the figure once; after that the session is theirs.
+ */
+export function consumeFragment(): void {
+  if (typeof window === 'undefined' || !window.history?.replaceState) return;
+  try {
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+  } catch {
+    /* a sandboxed history is not a reason to fail the load that just succeeded */
+  }
+}
+
+/**
+ * Where a builder lives, for a link that must reopen THIS builder.
+ *
+ * It reads `location.pathname`, not the build's configured base, and that is a correction rather
+ * than a preference. In production each builder is built with its own base (`/geo-builder/`,
+ * `/3d-builder/`, …) and the two agree. **In development all four are served by one server from
+ * `/`**, with the siblings on `/3d.html`, `/complex.html`, `/analytic.html` — so
+ * `import.meta.env.BASE_URL` is `/` for every one of them, and a link copied from 3-D reopened the
+ * 2-D app. Measured, not reasoned: an analytic link built that way round-tripped to an empty canvas.
+ *
+ * `pathname` is right in both: `/analytic.html` in dev, `/analytic-builder/` in production. The
+ * query is deliberately dropped — a shared figure should not carry the sender's tracking tail — and
+ * `base` remains the fallback for a non-browser caller.
+ */
+export function appBaseUrl(base: string): string {
+  if (typeof window === 'undefined') return base;
+  return `${window.location.origin}${window.location.pathname || base}`;
+}
+
+/** What arrived, and what the caller must decide about it. */
+export interface SharedLinkArrival {
+  /** The decoded payload, or null when the fragment was present but unreadable (refuse out loud). */
+  payload: string | null;
+}
+
+/**
+ * SUBSCRIBE to shared links — the mount read plus every later one (#1373).
+ *
+ * The first implementation read `location.hash` once, in a mount effect. Measured against
+ * `prod/2026-09-23-2`: a URL differing from the current one only by its `#` is a **same-document
+ * navigation** — the browser fires `hashchange` and does NOT reload the document, so React never
+ * remounts and the effect never runs again. The operator hit it on the refusal case («on an existing
+ * browser window just did nothing»); the same cause silently broke the SUCCESS case, which is the
+ * feature itself: a student who already has the builder open in that tab taps a teacher's link and
+ * gets no figure, no message, and a fragment left sitting in the URL.
+ *
+ * So the fragment is a stream, not a boot value. `handler` runs for the fragment present at
+ * subscribe time (the cold-load case) and again on every `hashchange` (the open-tab case).
+ *
+ * **No loop:** the fragment is consumed with `replaceState`, which by specification does not fire
+ * `hashchange`. Asserted by a lock, because "it does not loop" is exactly the property that would
+ * fail silently and expensively.
+ */
+export function onSharedLink(handler: (arrival: SharedLinkArrival) => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const read = () => {
+    const hash = window.location.hash;
+    if (!hash || hash === '#') return; // an ordinary visit, not a shared link
+    const payload = payloadInHash(hash);
+    consumeFragment(); // the link delivers once; after that the session is the student's
+    handler({ payload });
+  };
+  read();
+  window.addEventListener('hashchange', read);
+  return () => window.removeEventListener('hashchange', read);
+}

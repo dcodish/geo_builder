@@ -40,6 +40,11 @@ import Figure3 from './render/Figure3';
 import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
 import { forgetSession3, offeredSession3, restoreSession3, startSessionPersist3 } from './store/sessionPersist3';
+// #1372 (ADR-W-080): a figure travels as a LINK here too. #1373: the fragment is SUBSCRIBED to, not
+// read once — a link pasted into an already-open tab is a same-document navigation.
+import { openShared3, shareLinkFor3 } from './store/shareLink3';
+import { onSharedLink } from '../shell/session/link';
+import { Banner } from '../shell/frame/Banner';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { auditLoad3 } from './store/loadAudit3';
@@ -471,10 +476,75 @@ export default function App3() {
    * the student's tap, and the banner retires as soon as the canvas is no longer empty.
    */
   const [offer, setOffer] = useState<StoredSession | null>(null);
+  /**
+   * #1372 — a link that cannot be opened says so and KEEPS saying so. Unlike a file refusal, which
+   * answers a click the student just made, this one greets them on a cold page load; a self-clearing
+   * note would leave an empty canvas with the explanation already gone.
+   */
+  const [shareError, setShareError] = useState(false);
+  const [shareFlash, setShareFlash] = useState<'' | 'ok' | 'err'>('');
+  /** #1373 — a link arriving on a canvas that is NOT empty asks before replacing the student's work. */
+  const [pendingLink, setPendingLink] = useState<string | null>(null);
+
+  const openLink3 = (payload: string) => {
+    const r = openShared3(payload);
+    if (r.ok) {
+      setFigureName(r.name ?? ''); // a link has no filename to take the name from
+      noteLoadOutcome(r.facts, r.seed);
+    } else {
+      setShareError(true);
+    }
+  };
+
   useEffect(() => {
-    setOffer(offeredSession3());
-    return startSessionPersist3();
+    // #1372: a link OUTRANKS the session offer and is never shown beside it — the student who tapped
+    // a teacher's figure asked for THAT figure.
+    // #1373: SUBSCRIBED, not read once. The store is read via getState(), not the render closure,
+    // because this handler outlives the mount.
+    const stopLink = onSharedLink(({ payload }) => {
+      if (!payload) {
+        setShareError(true);
+        return;
+      }
+      if (useGeo3.getState().facts.length === 0) openLink3(payload);
+      else setPendingLink(payload);
+    });
+    if (!window.location.hash || window.location.hash === '#') setOffer(offeredSession3());
+    const stopPersist = startSessionPersist3();
+    return () => {
+      stopLink();
+      stopPersist();
+    };
   }, []);
+
+  const acceptPendingLink = () => {
+    const payload = pendingLink;
+    setPendingLink(null);
+    if (payload) openLink3(payload);
+  };
+
+  /**
+   * «העתק קישור» — MEASURED before it copies, because a URL some client truncates opens as a figure
+   * missing its last statements and nobody can tell. Copied SYNCHRONOUSLY: Safari drops the
+   * user-gesture context across an `await`.
+   */
+  const copyShareLink = () => {
+    const link = shareLinkFor3();
+    if (!link.ok) {
+      if (link.reason === 'too-long') setLoadNote(t('share.tooLong'));
+      return;
+    }
+    navigator.clipboard.writeText(link.url).then(
+      () => {
+        setShareFlash('ok');
+        window.setTimeout(() => setShareFlash(''), 1400);
+      },
+      () => {
+        setShareFlash('err');
+        window.setTimeout(() => setShareFlash(''), 1400);
+      },
+    );
+  };
 
   const acceptOffer = () => {
     if (!offer) return;
@@ -654,6 +724,10 @@ export default function App3() {
             💾 {t('actions.save')}
           </ToolButton>
           <ToolButton onClick={() => fileInput.current?.click()}>📂 {t('actions.load')}</ToolButton>
+          {/* #1372: the teacher sends a LINK; the same button hands the student's work back. */}
+          <ToolButton onClick={copyShareLink} disabled={facts.length === 0}>
+            {shareFlash === 'ok' ? `✓ ${t('share.copied')}` : shareFlash === 'err' ? '✕' : `🔗 ${t('share.copyLink')}`}
+          </ToolButton>
           {/* #742 / ADR-W-024 (operator: "3d and complex tools can have the same functionality"):
               the image exports in the 2-D order, DISABLED-not-hidden on empty (today's ruling
               supersedes the earlier appears-when-nonempty one — stable suite positions). */}
@@ -687,7 +761,20 @@ export default function App3() {
       /* #1238: the offer sits in the frame's banner region, above the workbench — and is gone the
          moment the canvas is no longer empty. */
       banner={
-        offer && facts.length === 0 ? (
+        shareError ? (
+          <Banner kind="error" onDismiss={() => setShareError(false)} dismissLabel={t('share.dismiss')}>
+            {t('share.badLink')}
+          </Banner>
+        ) : pendingLink ? (
+          /* #1373: a link arrived on a canvas that is NOT empty — ask, never replace silently. */
+          <ResumeOffer
+            message={t('share.arrived')}
+            continueLabel={t('share.openIt')}
+            restartLabel={t('share.keepMine')}
+            onContinue={acceptPendingLink}
+            onRestart={() => setPendingLink(null)}
+          />
+        ) : offer && facts.length === 0 ? (
           <ResumeOffer
             message={t('session.offer')}
             continueLabel={t('session.continue')}

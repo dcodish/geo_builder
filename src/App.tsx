@@ -62,7 +62,10 @@ import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { Banner } from '../shell/frame/Banner';
 // #1189 (ADR-W-079): a figure travels as a LINK — the teacher copies one, the student taps it.
-import { consumeShareFragment, openSharedFigure, shareLinkFor, sharedPayloadIn } from '@/store/shareLink';
+import { openSharedFigure, shareLinkFor } from '@/store/shareLink';
+// #1373: the fragment is SUBSCRIBED to, not read once — a link pasted into a tab already on this
+// page is a same-document navigation, so the app never remounts and a mount-only read never fires.
+import { onSharedLink } from '../shell/session/link';
 import { applyDisplayMode, competingSymbols, paramChipsByFact } from '@/store/paramChips';
 import { displayModeOf } from '../shell/displayMode';
 import { questionLines } from '@/export/questionLines';
@@ -578,25 +581,46 @@ export default function App() {
    */
   const [shareError, setShareError] = useState(false);
   const [offer, setOffer] = useState<StoredSession | null>(null);
+  /**
+   * #1373 — a link that arrives while the student is MID-FIGURE. It cannot happen on a cold load
+   * (the canvas is empty), so it could not happen at all until the fragment became a subscription.
+   * Opening it would replace their work, and the persister would then overwrite the stored copy too:
+   * the work would be gone. The operator's own rule covers this — offer, never silently.
+   */
+  const [pendingLink, setPendingLink] = useState<string | null>(null);
   useEffect(() => {
     /**
      * #1189 — arriving by LINK outranks the offer, and is never mixed with it: a student who tapped
      * a teacher's figure asked for THAT figure, and being asked about an unrelated older session on
      * top of it would be noise. A fragment that is present but unreadable is REFUSED out loud —
      * silently opening an empty canvas would look like the teacher sent a broken figure.
+     *
+     * #1373 — SUBSCRIBED, not read once: a link pasted into a tab already on this page is a
+     * same-document navigation, so the mount effect never runs again. The store is read through
+     * `getState()` rather than the render closure, because this handler outlives the mount.
      */
-    const hash = window.location.hash;
-    if (hash && hash !== '#') {
-      const payload = sharedPayloadIn(hash);
-      consumeShareFragment(); // once read, the URL is no longer in charge of the session
-      if (payload) void openShared(payload);
-      else setShareError(true);
-    } else {
-      setOffer(offeredSession());
-    }
-    return startSessionPersist();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only: the URL is read once
+    const stopLink = onSharedLink(({ payload }) => {
+      if (!payload) {
+        setShareError(true);
+        return;
+      }
+      if (useGeoStore.getState().facts.length === 0) void openShared(payload);
+      else setPendingLink(payload);
+    });
+    if (!window.location.hash || window.location.hash === '#') setOffer(offeredSession());
+    const stopPersist = startSessionPersist();
+    return () => {
+      stopLink();
+      stopPersist();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only: the subscription lives on
   }, []);
+
+  const acceptPendingLink = () => {
+    const payload = pendingLink;
+    setPendingLink(null);
+    if (payload) void openShared(payload);
+  };
 
   const openShared = async (payload: string) => {
     const ok = await runLoad(
@@ -1149,6 +1173,16 @@ export default function App() {
           <Banner kind="error" onDismiss={() => setShareError(false)} dismissLabel={t('file.dismissAudit')}>
             {t('share.badLink')}
           </Banner>
+        ) : pendingLink ? (
+          /* #1373: a link arrived on a canvas that is NOT empty. Opening it would discard work the
+             student can no longer get back, so it asks — the same shape as the session offer. */
+          <ResumeOffer
+            message={t('share.arrived')}
+            continueLabel={t('share.openIt')}
+            restartLabel={t('share.keepMine')}
+            onContinue={acceptPendingLink}
+            onRestart={() => setPendingLink(null)}
+          />
         ) : offer && facts.length === 0 ? (
           <ResumeOffer
             message={t('session.offer')}

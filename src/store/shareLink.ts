@@ -10,7 +10,7 @@
  * ADR-242 audit as a file. The history is reset because a link arrives with nothing behind it.
  */
 
-import { decodeFigurePayload, figureLinkUrl, linkFits } from '../../shell/session/link';
+import { appBaseUrl, consumeFragment, figureLinkUrl, linkFits, payloadInHash } from '../../shell/session/link';
 import { figureStateOf, serializeFigureForLink } from './figureFile';
 import type { FigureLoadOpts, FigureLoadOutcome } from './figureLoad';
 import { loadFigureText } from './figureLoad';
@@ -18,14 +18,12 @@ import type { GeoState } from './geoStore';
 import { useGeoStore } from './geoStore';
 
 /**
- * Where this build lives — `/` in dev, `/geo-builder/` in production (`import.meta.env.BASE_URL`,
- * which carries a trailing slash). Never hardcoded: the same code serves both, and a link that
- * pointed at the wrong base would 404 for every student who tapped it.
+ * Where this build lives. The base is the caller's (`import.meta.env.BASE_URL`, trailing slash
+ * included) and never hardcoded — the same code serves `/` in dev and `/geo-builder/` in
+ * production, and a link pointing at the wrong base would 404 for every student who tapped it.
+ * The origin half is `shell/`'s, since all four builders ask it the same way (#1372).
  */
-function appBase(): string {
-  const origin = typeof window === 'undefined' ? '' : window.location.origin;
-  return `${origin}${import.meta.env.BASE_URL}`;
-}
+const appBase = () => appBaseUrl(import.meta.env.BASE_URL);
 
 export type ShareLinkResult =
   | { ok: true; url: string }
@@ -48,33 +46,14 @@ export function shareLinkFor(state: GeoState = useGeoStore.getState()): ShareLin
   return linkFits(url) ? { ok: true, url } : { ok: false, reason: 'too-long', length: url.length };
 }
 
-/**
- * The payload a page was opened with, or null when the URL carries none. Null is also what a
- * MALFORMED fragment returns — the caller distinguishes them by whether there was a fragment at
- * all, because "you followed a broken link" and "you opened the app normally" are different
- * messages.
- */
-export function sharedPayloadIn(hash: string): string | null {
-  return hash ? decodeFigurePayload(hash) : null;
-}
+/** The payload a page was opened with, or null. The decode is `shell/session/link`'s: four builders
+ *  ask the same question (#1372), so there is one implementation of the answer. */
+export const sharedPayloadIn = payloadInHash;
 
 /** Open a shared payload: the normal load path, with no session behind it. */
 export function openSharedFigure(payload: string, opts: FigureLoadOpts = {}): Promise<FigureLoadOutcome> {
   return loadFigureText(payload, { ...opts, resetHistory: true });
 }
 
-/**
- * Consume the fragment once it has been read.
- *
- * Without this, a refresh — or the session persistence restoring the student's LATER edits — would
- * sit behind a URL that still says "open this original figure", and the next reload would quietly
- * throw away their work. The link delivers the figure once; after that the session is the student's.
- */
-export function consumeShareFragment(): void {
-  if (typeof window === 'undefined' || !window.history?.replaceState) return;
-  try {
-    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
-  } catch {
-    /* a sandboxed history is not a reason to fail the load that just succeeded */
-  }
-}
+/** Drop the fragment once read — `shell/`'s, for the same reason as the decode. */
+export const consumeShareFragment = consumeFragment;
