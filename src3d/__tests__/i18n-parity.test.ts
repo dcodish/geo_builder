@@ -11,6 +11,8 @@
  * available to them because their locales are code; these are JSON, so a test is the equivalent.
  */
 import { describe, it, expect } from 'vitest';
+import { join } from 'node:path';
+import { i18nKeyAudit } from '../../shell/__tests__/fixtures/i18n-keys';
 import he from '../i18n/locales/he.json';
 import en from '../i18n/locales/en.json';
 
@@ -38,5 +40,31 @@ describe('3-D i18n — key parity (he ⇄ en)', () => {
       enPaths.filter((k) => !hePaths.includes(k)),
       'keys in en.json with no he.json counterpart — Hebrew, the DEFAULT locale, would print the raw key',
     ).toEqual([]);
+  });
+});
+
+/**
+ * #1372/#1373 — and every literal `t('…')` key actually RESOLVES.
+ *
+ * Parity above compares the two locales with each other; it cannot see a key missing from BOTH. That
+ * is not hypothetical: this suite was extended the day a banner shipped `t('load.dismiss')`, a key
+ * that never existed, which `tsc` cannot catch and which reaches a student as a raw dotted string
+ * where a sentence belongs.
+ */
+describe('3-D i18n — every literal key resolves', () => {
+  const audit = i18nKeyAudit(join(__dirname, '..', '..'), ['src3d'], he);
+
+  it('checks a real surface (the guard is not vacuous)', () => {
+    expect(audit.checked).toBeGreaterThan(100);
+  });
+
+  it('every literal t() key exists in the locale', () => {
+    expect(audit.missing, 'a missing key prints itself on screen').toEqual([]);
+  });
+
+  /** The detector must be able to FAIL — an empty locale means every key is missing. */
+  it('reports missing keys when they really are missing', () => {
+    const blind = i18nKeyAudit(join(__dirname, '..', '..'), ['src3d'], {});
+    expect(blind.missing.length).toBeGreaterThan(50);
   });
 });

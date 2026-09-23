@@ -168,3 +168,27 @@ student rather than a byte:
    asked for *this* figure.
 3. **Consume the fragment once read** (`history.replaceState`). Otherwise a refresh sits behind a
    URL that still says "open the original", and the student's later edits are discarded by it.
+
+### Extended to every builder, and the fragment is a SUBSCRIPTION ([ADR-W-080](06w-decisions-workspace.md#adr-w-080))
+
+`shell/session/link.ts` now owns four product-independent pieces — the encoding, `payloadInHash`,
+`consumeFragment` and `appBaseUrl` — because the sibling port would otherwise have made four copies
+of each. Each product keeps only what is genuinely its own: the payload, the load path, and "is the
+canvas empty".
+
+**`onSharedLink` replaces the mount read.** A URL differing only by its `#` is a same-document
+navigation: `hashchange` fires and the document does not reload, so a mount-only read never fires
+again and a link pasted into an already-open tab does nothing at all (#1373, measured in prod). The
+handler therefore runs for the fragment present at subscribe time *and* on every later change. The
+consume uses `replaceState`, which does not fire `hashchange`, so there is no loop — locked, because
+that is the property whose failure would be silent and expensive.
+
+**The trim is a per-product MEASUREMENT, never a copy.** 2-D drops fact ids and its archive header;
+analytic has nothing to drop (346 chars for a real session); complex keeps `freePos`, which is an
+input rather than a position; 3-D drops `savedAt` for determinism, not size. The cross-product rows
+lock the properties — fragment not query, base64url, refusals, and *the same figure gives the same
+link twice* — while leaving each product's payload its own.
+
+**A link arriving on a non-empty canvas ASKS.** It cannot happen on a cold load, so it could not
+happen at all until the fragment became a subscription; once it can, opening silently would discard
+work the student cannot recover. Same banner shape as the session offer, same rule.
