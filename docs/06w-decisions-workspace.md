@@ -3859,3 +3859,91 @@ Two products, one branch, and **the else-arm was 2-D**. Any third product's even
 **What this does NOT do, and why.** The **collection** half ships; the **consumption** half does not. An analytic dashboard profile needs an outcome taxonomy — which refusal codes are "real gaps" versus "the tool correctly declining" — and `/log-triage` needs an analytic classifier and replay path. Both are product judgement about what matters, not mechanism, and inventing eight Hebrew bucket labels inside an engineering PR is the mistake the memory note *ship the mechanism, file the judgement* names. Filed separately. **Consequence to state plainly: the evidence #1355 is meant to be authored against does not flow until that half lands and a deploy carries this one.**
 
 **Consequences.** `server/toolRouting.ts` (new — `PRODUCT_IDS`, `eventsLogPathForTool`, the filename/env derivations); `server/eventLog.ts` (lookup + 400 on an unknown tag, `logPaths` by id); `shell/usageLog.ts` (new — the shared poster); `src/debug/sessionLog.ts`, `src3d/debug/sessionLog3.ts` (use it); `src-analytic/debug/sessionLogAnalytic.ts` (dual-sink, `analyticsSubmitAnalytic`). Locks: `server/__tests__/issue-1243-event-routing.test.ts` (13 — routing asserted in BOTH directions, since the bug was a wrong destination rather than a missing one, plus the **totality** row that would have caught the original gap), and the rewritten production-posture cases.
+
+## ADR-W-078 — A session survives a reload as an OFFER, never as a silent restore (#1238)
+
+**Status:** accepted, 2026-09-23 · **Issue:** [#1238](https://github.com/dcodish/geo_builder/issues/1238) (feature, `P2`, `workspace`, `auto-ok`) · amends [ADR-W-046](#adr-w-046) · unblocks [#1189](https://github.com/dcodish/geo_builder/issues/1189)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SL-5 amended + FR-SL-6 (new); [02](02-requirements.md) FR-HS-4 un-withdrawn in its OFFER form · **Design:** [04w](04w-design-shell.md#the-session-seam-adr-w-078) (new section)
+
+**The symptom, from the student's side.** A student works on a figure, switches away — answers a
+message, takes a call, locks the phone — and comes back to an empty canvas. On iOS in an in-app
+browser (a WKWebView) the eviction is routine, not an edge case.
+
+**Two of the operator's own rulings collided, and both stay true.** 2026-09-06, on #919:
+*"clean canvas always"* — a builder opens EMPTY, FR-HS-4 withdrawn, after the complex prototype
+re-submitted a stored session on every page load and the product switcher made arriving from
+another tool a page load. 2026-09-19, on #1189: *"persistence first, then the link"* — sharing a
+figure as a WhatsApp link delivers a whole population of students into exactly the browser context
+where eviction happens, so shipping link-first makes the first cohort the cohort that loses work.
+
+Asked which should give, the operator chose neither: **«offer to continue, never restore silently»**
+(2026-09-21). Every builder still opens empty; if a recent unsaved session exists, a banner offers
+«המשך מהמקום שבו הפסקת» / «התחל מחדש».
+
+**Rejected, on the record:** silent restore on reload (reverses W-046 outright — the complex
+behaviour he complained about returns everywhere); persisting only a session opened from a link
+(two behaviours for one tool, the split W-046 exists to stop); leaving it filed (the link stays
+blocked and a refresh keeps losing figures).
+
+**The mechanism — one shell seam, parameterised by the product.** `shell/session/persist.ts` stores
+`{savedAt, payload}` under a per-product key, where **the payload is the product's own save-envelope
+text** — the same string its save button writes to a file. `shell/` never parses it, so it carries
+no product knowledge (ADR-W-016 rule 2), and **restoring is LOADING**: each builder feeds the
+payload through the load path it already has. That is what makes the honesty properties inherited
+rather than re-implemented — a stored statement the parser no longer produces is NAMED by the load
+audit (ADR-242 / ADR-3D-087 / #1087), never silently dropped.
+
+**The rule the whole feature rests on, and it is a write rule, not a read rule: an EMPTY session is
+never written.** Every builder boots empty by design. A persister that mirrored its boot state
+would erase the stored session milliseconds before the banner could offer it — the feature would
+appear to work "sometimes", which is the worst available outcome. Stored sessions die two ways
+only: the student chooses «התחל מחדש» (or clears the canvas, which is the same intent), or the
+24-hour staleness window expires on read. The window is a design default, not a ruling.
+
+**A restore is a load, so the undo history starts EMPTY** — there is no earlier session for undo to
+return to. The file picker keeps its history, where one undo must still restore what was open
+before. In 2-D both paths now run through one function (`src/store/figureLoad.ts`), because the
+alternative was a second copy of the parse → re-lower → prefold → smoke-replay → commit sequence,
+and the two copies would have diverged on exactly the honesty steps.
+
+**What this AMENDS in ADR-W-046, precisely.** "Clean canvas always" is unchanged and still locked.
+What narrows is the guard: from *"no tree touches browser storage"* to *"no tree RESTORES without
+being asked"*, plus a new, stronger structural rule — session storage has exactly **one door**
+(`shell/session/persist.ts`), asserted in both directions, so the next session that wants to break
+this has one file to break it in. FR-HS-4 returns in its OFFER form only.
+
+**The cross-product lock (docs/28 §5c).** `shell/` may not import a product tree, so "every builder
+offers rather than restores" is checked through a `SessionAdapter` each product exports as a value —
+the real wiring the app calls, not test scaffolding. The rows live once in
+`shell/__tests__/fixtures/session-offer-rows.ts`; four thin locks hand their own adapter over; and a
+**meta-lock** runs the same rows against four deliberately broken builders — one that persists its
+empty boot state, one that accepts any payload, one whose restore claims success and loads nothing,
+one whose «start fresh» does not clear — and asserts each is caught.
+
+**One row was rewritten after the meta-lock caught it misattributing.** The "a refused payload
+changes nothing" check originally asserted the session was EMPTY afterwards; a builder with a broken
+reset then failed *that* row instead of the reset row, reporting the wrong defect. It now compares
+against the state before the attempt. A shared suite that names the wrong cause is only marginally
+better than one that stays silent.
+
+**Storage failures degrade, they never take a builder down.** `localStorage` throws in a private
+window, with site data blocked, and on quota exhaustion; every accessor is wrapped, and each failure
+means "no stored session". A boot path that throws is strictly worse than no persistence.
+
+**What is NOT decided here.** The per-fact TEXT SHAPE question the #1359 ruling opens (does a fact
+carry one text or two — the student's sentence and the canonical line?) is untouched: the payload IS
+the save envelope, so it inherits the file format's own evolution story — `schemaVersion` plus a
+lenient sanitizer that drops unknown fields and regenerates absent ones. A future second text is an
+optional field; an old payload displays the text it carries. That answer is cheap here because
+localStorage is migratable, and it is the answer #1189 will need where a sent URL is not.
+
+**Consequences.** `shell/session/persist.ts`, `shell/session/adapter.ts`, `shell/frame/ResumeOffer.tsx`
+(new); `src/store/figureLoad.ts`, `src/store/sessionPersist.ts` (new) with `figureStateOf` extracted
+in `figureFile.ts` so the save button, the persister and the coming link share one definition of what
+a session contains; `src3d/store/sessionPersist3.ts` (+ the envelope `name` now carried through
+`deserializeFigure3`, which a restored session needs and a file does not);
+`src-complex/app/sessionPersistCx.ts`; `src-analytic/app/loadSession.ts` (the load body extracted from
+`App.tsx`) and `src-analytic/app/sessionPersistAn.ts`; the four apps wire the banner. Locks:
+`shell/__tests__/session-persist-1238.test.ts` (13), `shell/__tests__/session-offer-meta-1238.test.ts`
+(5), one `session-offer-1238.test.ts` per tree (5/4/4/5), and the rewritten
+`src-complex/__tests__/no-session-restore-919.test.ts` (4).

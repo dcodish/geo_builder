@@ -249,6 +249,7 @@
     "server": "shell",
     "server/llm": "shell",
     "shell/llm": "shell",
+    "shell/session": "shell",
 
     "src-complex": "shell",
     "src-complex/engine": "engine",

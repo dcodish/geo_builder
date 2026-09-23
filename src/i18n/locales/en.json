@@ -509,5 +509,10 @@
     "midsegment": "midsegment"
   },
   "manualShowAll": "Show all",
-  "manualShowLess": "Show fewer"
+  "manualShowLess": "Show fewer",
+  "session": {
+    "offer": "Unsaved work from your last session was found.",
+    "continue": "Continue where you left off",
+    "startFresh": "Start fresh"
+  }
 }

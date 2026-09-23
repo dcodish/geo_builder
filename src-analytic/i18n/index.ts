@@ -251,6 +251,10 @@ const he = {
    */
   noticeTeachCanonical:
     'בספר לא כותבים "{{verb}}" — כותבים את הנתון עצמו. כתבתי לכם את המשפט בשורת הקלט: "{{canonical}}" — לחצו Enter כדי לשרטט.',
+  // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
+  sessionOffer: 'נמצאה עבודה מהפעם הקודמת שלא נשמרה.',
+  sessionContinue: 'המשך מהמקום שבו הפסקת',
+  sessionStartFresh: 'התחל מחדש',
 };
 
 const en: typeof he = {
@@ -434,6 +438,10 @@ const en: typeof he = {
     'That already follows from what you have written — the figure satisfies it anyway, so I did not add another row: "{{detail}}"',
   noticeTeachCanonical:
     'A textbook does not say "{{verb}}" — it states the given itself. I have put the sentence in the input box for you: "{{canonical}}" — press Enter to draw it.',
+  // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
+  sessionOffer: 'Unsaved work from your last session was found.',
+  sessionContinue: 'Continue where you left off',
+  sessionStartFresh: 'Start fresh',
 };
 
 export const analyticI18n = createProductI18n({
