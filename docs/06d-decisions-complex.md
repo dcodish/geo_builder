@@ -2446,3 +2446,65 @@ here — the two changes have different risk and different tests.
 verbs; typos; keyword typos; **the two historical instances, so the mechanism now defends what the
 keyword list used to**; and the legitimate register (`9r`, `2a`, `3k`, indexed `n1`, the capital label
 pair, and the catalog forms).
+
+## ADR-CX-041 — A `0 = c` modulus row that carries a PARAMETER is an equation in it, not a contradiction (#1366)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1366](https://github.com/dcodish/geo_builder/issues/1366) (bug, `P2`, `complex`) · round [#1382](https://github.com/dcodish/geo_builder/issues/1382)
+**Requirements:** none (internal) — it restores a promise the catalog already makes (F3's featured row
+«ערך מוחלט באמצעות פרמטר — r נשאר חופשי»). **Design:** [04d](04d-design-complex.md) — "A parameter
+lives in the modulus constant, and the leftover rows are read over the parameters".
+
+**The defect.** `z1 = 3+4i` then `|z1| = 9r` was refused with «אינו מתיישב עם: "z1 = 3+4i"» — a false
+mathematical claim about the student's own givens, since `r = 5/9` satisfies both. Both entry orders,
+any coefficient, a bare `r`, and the polar form all failed the same way: **a determined modulus plus a
+free real parameter.** The row is `featured: true`, so it is one of the first six commands a student
+meets in its guide section.
+
+**Root cause (measured at pickup, as the plan's escalation diagnosed).** `linearize` encodes a real
+parameter in the modulus CONSTANT (`9r` is the exponent vector `{3:2, r:1}`), not as an unknown. So the
+two givens eliminate to `0 = 9r/5`: a row with no unknowns and a non-trivial constant, which
+`solveLinear` correctly reports as `0 = c`. **A constant cannot absorb a given; only an unknown can.**
+The derive layer published `r` as a free DOF while the solver never treated it as one — two definitions
+of one quantity, disagreeing, which is the ADR-052 conformance smell CLAUDE.md names.
+
+**Why not make `r` an unknown.** Tried in round #1369 and reverted: every parametric ANSWER (`15r`,
+`54r²`, `36r`) reads the constant encoding, and with `r` in the unknown list the elimination may pivot
+on `r` instead of a name, moving the free-DOF basis. Both properties are required at once.
+
+**The fix — the representation is untouched; only the verdict changes.**
+
+1. `solveLinear` also returns its `leftover` rows (the `0 = c` rows themselves). Additive:
+   `inconsistent` is exactly `leftover.length > 0`, as before.
+2. Tier 1 reads the modulus leftovers as a small log-space system whose unknowns are the PARAMETER
+   atoms (`solveParams`): a row's parameter exponents are its coefficients and its prime part, inverted,
+   is its right-hand side. A row with no parameter is a genuine contradiction exactly as before, and so
+   is a set that forces one parameter to two values (`9r = 5` and `4r = 5`). Only when THAT system has
+   no solution is the modulus half inconsistent. Its solution is published as `Tier1Result.params`.
+3. `foldConstraints` draws every parameter the givens determine AT its solved value and removes it from
+   the free basis. Left at its seed sample, `r` would print as free, and tier 2, which may move every
+   free parameter, could drive it off 5/9 to satisfy some other given, silently breaking the one that
+   pinned it.
+4. **The mirror half (a deviation from the plan, found by the lane).** `o = 1+i` reads *a positive real
+   parameter equals 1+i*. It used to be refused only by accident, because the modulus half called
+   `0 = o/√2` a contradiction. Once that half solves `o = √2`, the argument half must refute it, and it
+   had a latent gap: a turn-unknown pinned to a non-whole CONSTANT (`k = ⅛`) was integrality-checked
+   only when some direction was also determined. That check now runs unconditionally, on `emit`'s own
+   criterion. The acceptance gate's «o = 1+i» refusal is unchanged for the student; it now comes from
+   the half that is actually true.
+
+**Measured.** A 24-seed sweep over every catalog row (alone, and after `z1 = 3+4i · z2 = 2cis150 ·
+w = z1*z2`), every complex fixture and the new cases: 1,872 seed×sequence verdicts, 96 changed, and they
+are exactly the four `|z| = …r` sequences, identical across all 24 seeds. Nothing else moved.
+
+**What this does NOT do.** It does not print `r = 5/9` anywhere, and a second modulus in `r`
+(`|z2| = 18r`) still reads as bare `z₂` rather than `10`. That is the existing reading of a parametric
+modulus, and surfacing solved parameters is a new surface, not this fix. It does not model a
+NEGATIVE real parameter: parameters remain positive reals, as `modulus.ts` already assumes.
+
+**Consequences.** `src-complex/solve/linear.ts` (`leftover`), `src-complex/solve/tier1.ts`
+(`solveParams`, `params`, the unconditional constant-turn integrality check),
+`src-complex/replay/derive2.ts` (solved parameters pinned, out of the free basis). Lock:
+`src-complex/__tests__/param-modulus-1366.test.ts` (15: the reported case in both orders, three
+coefficient positions, the polar sibling, `r` solved at all 24 seeds, `r` counted once, the catalog row
+alone unchanged, the two conflicts that must still refuse, `|z1| = -5` still on the #719 channel, the
+argument half refusing `o = 1+i` / `r = 3+4i`, and the reported sequence through the real submit gate).
