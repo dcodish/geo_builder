@@ -22,7 +22,7 @@ import { isMonomial, refsOf } from '../model/expr';
 import type { Constraint } from '../model/constraint';
 
 export type { Constraint } from '../model/constraint';
-import { type LogPolarForm, argumentRow, linearize, modulusRow } from './logpolar';
+import { type LogPolarForm, argumentRow, isSignUnknown, linearize, modulusRow, paramOfSignUnknown } from './logpolar';
 import { type LinearSolution, type Row, type VectorOps, solveLinear } from './linear';
 import { type Rat, isInt, mul as ratMul, rat, toNumber } from '../value/rational';
 import {
@@ -117,6 +117,12 @@ export interface Tier1Result {
    * {@link substituteSolvedParams}, so none of them can print `18r` for a number the givens made `10`.
    */
   readonly paramValues: ReadonlyMap<string, ExpVec>;
+  /**
+   * #1387/#1406 (ADR-CX-045) — the SIGN-FREE parameters this system carries a sign for, each as the
+   * argument unknown `signUnknown(p)`. Its value (0 or ½ turn) is read off a branch like any other
+   * enumerated direction; its magnitude lives in `params` / `paramValues` exactly as a size's does.
+   */
+  readonly signedParams: readonly string[];
 }
 
 const BRANCH_BUDGET = 2048;
@@ -133,7 +139,7 @@ const lcm = (a: bigint, b: bigint): bigint => {
  * the *numbers* in terms of the *turn choices* rather than the other way round. That is what leaves a
  * clean finite family to enumerate.
  */
-export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
+export function solveTier1(constraints: readonly Constraint[], signed: ReadonlySet<string> = new Set()): Tier1Result {
   const modRows: Row<ExpVec>[] = [];
   const argRows: Row<Angle>[] = [];
   const deferred: Constraint[] = [];
@@ -141,6 +147,8 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
   const impossible: string[] = [];
   const names: string[] = [];
   const kNames: string[] = [];
+  /** ADR-CX-045 — the sign unknowns the argument rows mention, in first-seen order */
+  const signNames: string[] = [];
 
   const noteName = (n: string): void => {
     if (!names.includes(n)) names.push(n);
@@ -152,8 +160,8 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
     let lf: LogPolarForm | null = null;
     let rf: LogPolarForm | null = null;
     if (isMonomial(c.lhs) && isMonomial(c.rhs)) {
-      lf = linearize(c.lhs);
-      rf = linearize(c.rhs);
+      lf = linearize(c.lhs, signed);
+      rf = linearize(c.rhs, signed);
     }
     if (!lf || !rf) {
       deferred.push(c);
@@ -200,11 +208,26 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
     // so the solve can refuse it.
     if (a.coef.size === 0 && ANG_OPS.isZero(rhs) && !c.principal) continue;
     if (k) kNames.push(k);
+    for (const n of coef.keys()) if (isSignUnknown(n) && !signNames.includes(n)) signNames.push(n);
     argRows.push({ coef, rhs });
   }
 
+  /**
+   * ADR-CX-045 — A SIGN IS HALF A TURN, AND NOTHING ELSE. A real number's direction is 0 or ½, so each
+   * sign unknown gets its own row `2·s − k = 0` with a fresh turn unknown, and the enumeration walks
+   * it like any turn choice. `u^5 = -32` then reads `5s = ½ + k₀` beside `2s = k₁`, whose one
+   * integral solution is s = ½ (u = −2); `u^4 = -16` has none, and the existing integrality check
+   * refuses it without a new rule.
+   */
+  for (const sn of signNames) {
+    const k = kName(kNames.length);
+    kNames.push(k);
+    argRows.push({ coef: new Map([[sn, rat(2)], [k, rat(-1)]]), rhs: angZero() });
+  }
+
   const modulus = solveLinear(modRows, names, MOD_OPS);
-  const argument = solveLinear(argRows, [...names, ...kNames], ANG_OPS);
+  // signs come after the names and before the turn choices: a sign is solved FOR, in terms of turns
+  const argument = solveLinear(argRows, [...names, ...signNames, ...kNames], ANG_OPS);
   const params = solveParams(modulus.leftover);
   const paramValues = solvedParamValues(params);
 
@@ -224,7 +247,7 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
 
   const freeDof = [
     ...modulus.free.map((n) => `|${n}|`),
-    ...argument.free.filter((n) => !isTurnUnknown(n)).map((n) => `arg ${n}`),
+    ...argument.free.filter((n) => !isTurnUnknown(n) && !isSignUnknown(n)).map((n) => `arg ${n}`),
   ];
 
   return {
@@ -240,6 +263,7 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
     names,
     params,
     paramValues,
+    signedParams: signNames.map(paramOfSignUnknown),
   };
 }
 

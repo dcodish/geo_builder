@@ -53,6 +53,8 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   free degree of freedom: it must move on "another configuration" or when a later given forces it. Free
   DOF has **one** definition — the nullspace dimension — read by the cue, the knowledge gates and the
   sampler alike, so the three can never disagree. *(The complex form of [ADR-052](06-decisions.md#adr-052).)*
+  A sign-free parameter's SIGN is part of its freedom (FR-CN-7): it is sampled, never assumed positive.
+  *(Amended — [ADR-CX-045](06d-decisions-complex.md#adr-cx-045).)*
 - **FR-CN-5 (Must)** — **A second mention of a name is a GIVEN, not a redefinition.** Re-stating `z1`
   adds information about the existing number; it never silently replaces it. *(Realised —
   [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md).)*
@@ -64,6 +66,15 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   equation is **refused**, naming the student's statement, in either entry order. So a question that states z₁, z₂… and then solves an equation over them is refused
   unless those numbers are its solutions (operator ruling, #1367, with the §2b part ד cost shown).
   *(Realised — [ADR-CX-042](06d-decisions-complex.md#adr-cx-042).)*
+
+- **FR-CN-7 (Must)** — **A real parameter's sign follows its use.** A parameter that stands as a
+  SIZE — a modulus (`|z1| = 9r`), anything inside `|…|`, a circle's radius, a measure's value, a scale
+  factor multiplying a complex number (`z2 = r·z1`) — is **positive**. A parameter in any other use — an
+  additive term (`z1 = a + b·i`), a power equated to a number (`u^5 = -32`), a number equal to it
+  (`z1 = u`) — is **any real**: `u^5 = -32` gives u = −2, and «z1 = a + b·i · z1 ברביע השני» holds with
+  a < 0. An even power of a negative (`u^4 = -16`) has no real solution and is refused. Mixed use is a
+  size. The value shown carries the sign (`u = -2`, and `u = ±2` when the configurations disagree).
+  *(Operator ruling 2026-09-24; realised — [ADR-CX-045](06d-decisions-complex.md#adr-cx-045).)*
 
 ## Knowledge and claims
 

@@ -100,8 +100,14 @@ describe('#1390 — the reported line is visible now', () => {
     expect(d.params).toEqual([{ name: 'u', value: '2' }]);
   });
 
-  it('«u^5 = -32» and «u^5 = 32 · u = 3» stay refused — a positive real cannot satisfy them', () => {
-    expect(acceptLine([], 'u^5 = -32', 0).ok).toBe(false);
+  /**
+   * Amended by ADR-CX-045 (#1406, operator ruling 2026-09-24: *"u^5=-32 gives u=-2"*). A parameter in an
+   * odd power is sign-free, so «u^5 = -32» is ACCEPTED with u = −2; the even power «u^4 = -16» has no
+   * real solution and stays refused, as does a second value for a solved u.
+   */
+  it('«u^5 = -32» is accepted (u = −2); «u^4 = -16» and «u^5 = 32 · u = 3» stay refused', () => {
+    expect(acceptLine([], 'u^5 = -32', 0).ok).toBe(true);
+    expect(acceptLine([], 'u^4 = -16', 0).ok).toBe(false);
     expect(acceptLine(['u^5 = 32'], 'u = 3', 0).ok).toBe(false);
   });
 

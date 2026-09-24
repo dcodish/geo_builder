@@ -2501,7 +2501,9 @@ are exactly the four `|z| = …r` sequences, identical across all 24 seeds. Noth
 **What this does NOT do.** *(Amended by [ADR-CX-043](#adr-cx-043): solved parameters are now shown, askable and substituted.)* It does not print `r = 5/9` anywhere, and a second modulus in `r`
 (`|z2| = 18r`) still reads as bare `z₂` rather than `10`. That is the existing reading of a parametric
 modulus, and surfacing solved parameters is a new surface, not this fix. It does not model a
-NEGATIVE real parameter: parameters remain positive reals, as `modulus.ts` already assumes.
+NEGATIVE real parameter: parameters remain positive reals, as `modulus.ts` already assumes. *(Amended by
+[ADR-CX-045](#adr-cx-045): a parameter's sign follows its use — a size stays positive, any other use is
+any real.)*
 
 **Consequences.** `src-complex/solve/linear.ts` (`leftover`), `src-complex/solve/tier1.ts`
 (`solveParams`, `params`, the unconditional constant-turn integrality check),
@@ -2627,7 +2629,8 @@ already show parameters. Complex was the one builder without them, so no sibling
 
 **What this does NOT do.** It does not add «מהו r» / «what is r»: the complex ask grammar has no "what
 is" form for anything, so this item ends at the bare forms. It does not change what a parameter IS
-(still a positive real, ADR-CX-041).
+(still a positive real, ADR-CX-041). *(Amended by [ADR-CX-045](#adr-cx-045): «u^5 = -32» is now
+accepted with u = −2.)*
 
 **Consequences.** `src-complex/solve/tier1.ts` (`paramValues`, `substituteSolvedParams`),
 `src-complex/replay/derive2.ts` (`params`, substituted readings, the parameter-only and exact-modulus
@@ -2688,3 +2691,107 @@ applied in the other order.
 `roots-set-membership-1396.test.ts` (11: both orders, a member off index, a negative right-hand side,
 two members, the refusals, and what does not move), `roots-claim-names-1367.test.ts`'s index row
 FLIPPED with a comment naming this ruling, and fixture `roots-set-membership-1396.complex.json`.
+
+## ADR-CX-045 — A real parameter's SIGN follows its use: a size is positive, anything else is any real (#1387 + #1406)
+
+**Status:** accepted, 2026-09-24 (operator ruling 2026-09-24) · **Issues:**
+[#1387](https://github.com/dcodish/geo_builder/issues/1387) + [#1406](https://github.com/dcodish/geo_builder/issues/1406)
+(bug, `P2`, `complex`), built as one item · round [#1408](https://github.com/dcodish/geo_builder/issues/1408) ·
+**amends** [ADR-CX-041](#adr-cx-041) and [ADR-CX-043](#adr-cx-043) ("parameters remain positive reals")
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-7 (new): a real parameter's sign follows its
+use; FR-CN-4 (amended): a sign-free parameter's sign is part of its freedom · **Design:**
+[04d](04d-design-complex.md), "A parameter's sign follows its use" · **Ladder:** stages 1c/1d and 3c
+([LADDER-CX](LADDER-CX.md))
+
+**What was seen.** Two surfaces of one missing capability. `z1 = a + b*i` then `|z1| = 5` (or
+`z1 ברביע השני`) was REFUSED with «אינו מתיישב עם: "z1 = a + b*i"», although a = −3, b = 4 satisfies
+both (#1387). `u^5 = -32` was refused, although u = −2 (#1406; the operator, playing round #1397:
+*"u^5=-32 gives u=-2"*).
+
+**The ruling.** *"param as a size if positive. this is not the case for u^5=-32"*. A parameter that
+stands as a SIZE is positive. Any other use makes it any real. Mixed use is a size.
+
+**Class.** *A real parameter in a non-size use is modelled as positive, so a given that needs it
+negative is refused as a conflict with the statement that introduced it.*
+
+**Root cause (measured at pickup, `eef9dda4`, no divergence from the issues).** Every parameter was
+positive in BOTH tiers. Tier 1 carried it only as a log-magnitude atom in the modulus constant, with
+argument 0, so `5·arg u = arg(−32) = ½` had no solution (`contradiction: 'argument'` at 24/24). Tier 2
+bounded every free parameter with `lo: 1e-6`, so `a + b·i` could only reach quadrant I. Measured through
+the real `acceptLine` and `deriveLines` over seeds 0–23:
+
+| lines | before (gate · unsatisfied/24) | after |
+|---|---|---|
+| `z1 = a + b*i` · `\|z1\| = 5` | refused · 14/24 | accepted · 0/24 |
+| `z1 = a + b*i` · `z1 ברביע השני` | refused · 24/24 | accepted · 0/24 |
+| `z1 = a+3i` · `\|z1\| = 5` | accepted · 5/24 | accepted · 0/24 |
+| `z1 = 2 + r*i` · `\|z1\| = 5` | accepted · 0/24 | accepted · 0/24 |
+| `z1 = a + b*i` alone | accepted · 1/24 | accepted · 0/24 |
+| `u^5 = -32` | refused (argument) | accepted, u = −2 |
+| `u^4 = -16` | refused (argument) | refused (argument) |
+
+**The mechanism — one decision, read by both tiers.**
+
+1. **Sign by use** (`model/paramSign.ts`, `paramSigns`). One syntax-local, semantic reading over every
+   constraint, object and measure. A parameter is a SIZE when it sits under `|…|`, in a `mod`-kind row
+   (`|z1| = 9r`), in a circle's radius, in a measure's value, or in one product with a complex name (a
+   scale factor, `z2 = r·z1`). Every other occurrence is sign-free. A parameter with any size use is a
+   size. The reading never consults solver state, so one statement means one thing (docs/17 §2.3). A
+   ratio written as `z2/z1 = r` has no complex name in the parameter's own product, so it reads
+   sign-free («the quotient is real»).
+2. **Tier 1: magnitude plus a half-turn sign** (`linearize(e, signed)`, `solveTier1(…, signed)`). A
+   sign-free parameter keeps its magnitude in the log-space constant, exactly as a size does, so
+   ADR-CX-041's parameter solve and every parametric answer are untouched. Its sign becomes an argument
+   unknown `#s:p` with its own row `2·s − k = 0`. The existing enumeration walks it like any turn
+   choice. `u^5 = -32` has exactly one integral solution, s = ½. For `u^4 = -16` none exists, and the
+   existing integrality check refuses it with no new rule. `u^2 = 4` enumerates both signs (two
+   configurations). The unknown order is names, then signs, then turns, so a sign is always a pivot and
+   never a free DOF.
+3. **Tier 2: the bound follows the use** (`derive2.ts`). A size keeps `lo: 1e-6`. A sign-free parameter
+   that tier 1 carries keeps the sign its branch chose, because the branch owns it. A sign-free
+   parameter only tier 2 sees (`a`, `b` in `a + b·i`) is unbounded. Its starting sign is sampled per
+   seed (seed 0 starts positive), because under FR-CN-4 a sign that is never sampled would be a default
+   posing as a fixed value.
+4. **Stage 5d: the sign is part of the value.** `Derived2.params` prints `u = -2`, and `u = ±2` when
+   the kept configurations disagree. Asking `u` answers `-2`, and `±` is not knowledge, so it prints no
+   value. A reading whose exact modulus still holds a free sign-free parameter prints `|u|`, never `u`.
+   `z1 = u` in its negative configuration is `|u|·cis180°`, where `u·cis180°` would be a false positive
+   number.
+
+**What moved (the #1366 method).** A 24-seed sweep over every catalog row in both languages (alone,
+and after `z1 = 3+4i · z2 = 2cis150 · w = z1*z2`), every complex fixture and the new cases: 126
+sequences and 3,024 seed×sequence verdicts. 140 verdicts changed, all in the intended sequences above
+plus `u^5 = -32 · z1 = u` (now z₁ = −2), `u^2 = 4` (now ±2, two configurations) and `z1 = u` (now two
+configurations, the negative one reading `|u|`). **No catalog row and no fixture moved, in verdict or
+in position.** One figure moves without changing its verdict: `z1 = 2 + r*i · |z1| = 5` now draws r < 0
+at 11/24 seeds, since r is any real there.
+
+**Deviation: #1387's definition mechanism is NOT built.** The plan let it ride with this item
+(`z1 = a+b*i` derived from a and b, free DOF `[a, b]` instead of `[|z1|, arg z1, a, b]`). Reading the
+fold shows it collides with the quadrant lock. Stage 2b bounds only coordinates in the free basis, or
+dependents that tier 1 expresses as an affine form. A name derived from tier-2 parameters is neither,
+so «z1 ברביע השני» would reach only stage 3e and refuse at every seed whose sample leaves quadrant II.
+Filters on tier-2-derived names would first need their own mechanism (inequality residuals), plus
+re-routing every tier-1 row that mentions the derived name. That outgrows this item. The refusal it was
+meant to cure is cured by the sign capability alone. The four-DOF count (an FR-CN-4 conformance smell)
+remains and is reported as new work. This is read off the code, not measured.
+
+**Sibling check.** 3-D (`paramSigns` in `src3d/engine/evaluate.ts`, «t פרמטר חיובי») and analytic («a
+is a positive parameter») already default a parameter to any real, with an explicit sign given. The
+class does not exist there. Complex was the one builder that assumed positive, so no sibling issue is
+owed. 2-D has no real parameters.
+
+**Cost.** At most one extra turn unknown per sign-free parameter in an exact row. The enumeration
+multiplier is ≤ 2 per such parameter whose sign stays free, within the existing `BRANCH_BUDGET`. No new
+solve and no new sampling loop.
+
+**Consequences.** `src-complex/model/paramSign.ts` (new), `src-complex/solve/logpolar.ts`
+(`signUnknown`, `linearize(e, signed)`), `src-complex/solve/tier1.ts` (sign rows, `signedParams`),
+`src-complex/replay/derive2.ts` (signs applied per branch, the tier-2 bound, `±`/`-` in params and asks,
+`|u|` readings), `src-complex/app/deriveLines.ts` (`placeSolutionSets` reads the same signs). Locks:
+`param-sign-1387.test.ts` (29: the sign-by-use reading, both #1387 cases in both orders and both
+languages through the real `submitLine` at 24/24 seeds, the quadrant really held, the neighbours,
+`u^5 = -32` → −2 shown and asked, the `u^4 = -16` refusal, `u^2 = 4` → ±2, the `|u|` reading, and a size
+staying positive, including mixed use), `accepted-line-visible-1390.test.ts`'s `u^5 = -32` row FLIPPED
+with a comment naming this ruling, and fixtures `param-sign-modulus-1387`, `param-sign-quadrant-1387`
+and `param-sign-odd-power-1406`.

@@ -83,6 +83,15 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   (`Derived2.params`) and the ask lane all read it, so none can print `18r` for a number the givens made
   10. The class net `accepted-line-visible-1390.test.ts` fails any accepted given whose numbers and
   parameters appear on no surface.
+- **A parameter's sign follows its use** ([ADR-CX-045](06d-decisions-complex.md#adr-cx-045)). ONE reading,
+  `paramSigns` (`model/paramSign.ts`), splits the parameters into SIZES (under `|…|`, a `mod` row, a
+  radius, a measure, or one product with a complex name) and SIGN-FREE (everything else; any size use
+  wins). Both tiers read it. Tier 1 keeps a sign-free parameter's magnitude in the modulus constant,
+  exactly as a size's, and adds its sign as an argument unknown `#s:p` pinned by `2·s − k = 0`, so the
+  enumeration decides it: `u^5 = -32` has one integral sign (½), `u^4 = -16` has none and refuses
+  through the existing integrality check. Tier 2 bounds a size `> 0`, holds a tier-1 sign to its branch,
+  and leaves a tier-2-only sign-free parameter (`a + b·i`) unbounded, with a per-seed starting sign.
+  Stage 5d prints the sign (`-2`, `±2`) and reads a free sign-free magnitude as `|u|`.
 - **A solution set claims its names** ([ADR-CX-042](06d-decisions-complex.md#adr-cx-042)). `X^n = …` on a fresh
   letter lowers to X₁ pinned to the principal root and Xₖ pinned `(k−1)/n` of a turn from it — always,
   whether or not the student already holds some Xₖ. That makes claiming the name the consistency

@@ -27,12 +27,22 @@
 import { fmtNum } from '../../shell/format';
 import type { Cx } from '../value/value';
 import { cPolar, evaluate, exact, formatPolar } from '../value/value';
-import { toNumber } from '../value/rational';
+import { rat, toNumber } from '../value/rational';
 import { type ExpVec, evaluate as evalMod, format as fmtMod, isOne as modIsOne, isParametric } from '../value/modulus';
-import { type Angle, period as anglePeriod, sameDirection, toDegrees, zero as angZero } from '../value/angle';
+import {
+  type Angle,
+  add as angAdd,
+  fromTurns,
+  period as anglePeriod,
+  sameDirection,
+  scale as angScale,
+  toDegrees,
+  zero as angZero,
+} from '../value/angle';
 import { type Expr, paramsOf, refsOf } from '../model/expr';
 import { type Branch, isTurnUnknown, solveTier1, substituteSolvedParams } from '../solve/tier1';
-import { linearize } from '../solve/logpolar';
+import { isSignUnknown, linearize, paramOfSignUnknown, signUnknown } from '../solve/logpolar';
+import { paramSigns } from '../model/paramSign';
 import type { Claim as Assertion, CheckedClaim } from '../model/claim';
 import { type FigureObject, ORIGIN, objectPoints } from '../model/figure';
 import {
@@ -285,6 +295,25 @@ const paramSample = (name: string, seed: number): number => {
 };
 
 /**
+ * ADR-CX-045 — the STARTING sign of a sign-free parameter that no exact equation reaches (`a` in
+ * `z1 = a + b·i`). A start, never a fixed value (ADR-052): the sign is part of the parameter's freedom,
+ * so "show another configuration" varies it. Seed 0 — the first drawing — starts positive, the
+ * register's conventional reading.
+ */
+const paramSignSample = (name: string, seed: number): 1 | -1 => {
+  if (seed === 0) return 1;
+  let h = 2166136261;
+  for (const ch of `sign:${name}@${seed}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return (h >>> 0) % 2 === 0 ? 1 : -1;
+};
+
+/** A parameter map read as MAGNITUDES — the log-space modulus carrier only knows positive atoms. */
+const magnitudes = (m: ReadonlyMap<string, number>): Map<string, number> =>
+  new Map([...m].map(([k, v]) => [k, Math.abs(v)]));
+
+const HALF_TURN = fromTurns(rat(1, 2));
+
+/**
  * Everything a fold reads, named rather than ordered.
  *
  * It was eleven positional parameters and every family since F6 has added another. A call site of
@@ -379,9 +408,15 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * is the one place that knows — it already holds tier 1's `freeDof` and `knownModulus` — and #680 hits
    * the same wall with `rootsMode`, so fixing the seam once serves both. See `solve/claimDrive.ts`.
    */
-  const t1Base = solveTier1(constraints);
+  /**
+   * #1387/#1406 (ADR-CX-045) — a parameter's SIGN follows its use: a size (`|z1| = 9r`, a radius, a
+   * measure, a scale factor) is positive; any other use (`a + b·i`, `u^5 = -32`) is any real. Decided
+   * ONCE here, over everything the figure states, and read by both tiers.
+   */
+  const { signed } = paramSigns({ constraints, objects, measures });
+  const t1Base = solveTier1(constraints, signed);
   const driveRows = claimDriveRows(assertions, t1Base);
-  const t1 = driveRows.length ? solveTier1([...constraints, ...driveRows]) : t1Base;
+  const t1 = driveRows.length ? solveTier1([...constraints, ...driveRows], signed) : t1Base;
 
   const sample = new Map(literalSample);
   for (const c of constraints) {
@@ -408,9 +443,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
    */
   const solvedParams = new Set<string>();
   for (const [p, d] of t1.params.determined) {
-    let v = evalMod(d.konst, sample);
+    let v = evalMod(d.konst, magnitudes(sample));
     if (v === null) continue;
-    for (const [fn, c] of d.coefs) v *= Math.pow(sample.get(fn) ?? paramSample(fn, seed), toNumber(c));
+    for (const [fn, c] of d.coefs) v *= Math.pow(Math.abs(sample.get(fn) ?? paramSample(fn, seed)), toNumber(c));
     if (!Number.isFinite(v) || v <= 0) continue;
     sample.set(p, v);
     solvedParams.add(p);
@@ -430,6 +465,45 @@ export function foldConstraints(input: FoldInput): Derived2 {
   const hasConfiguration = enumeratedConfigCount > 0 || (!t1.inconsistent && emptiedBy === null);
   const index = enumeratedConfigCount ? ((configIndex % enumeratedConfigCount) + enumeratedConfigCount) % enumeratedConfigCount : 0;
   const branch: Branch | undefined = kept[index];
+
+  /**
+   * ADR-CX-045 — GIVE EACH SIGN-FREE PARAMETER ITS SIGN in this configuration. One tier 1 carries (it
+   * appears in an exact equation) takes the sign the BRANCH chose — `u^5 = -32` enumerates exactly one,
+   * s = ½, so u = −2. One only the numeric tier sees (`a` in `a + b·i`) starts at a per-seed sign and
+   * tier 2 may move it through zero. The magnitude is untouched: it is still the sample or the exact
+   * solve above.
+   */
+  const branchSign = (p: string): 1 | -1 => {
+    const a = branch?.angles.get(signUnknown(p));
+    return a !== undefined && sameDirection(a, HALF_TURN) ? -1 : 1;
+  };
+  for (const p of signed) {
+    const v = sample.get(p);
+    if (v === undefined) continue;
+    const sgn = t1.signedParams.includes(p) ? branchSign(p) : paramSignSample(p, seed);
+    sample.set(p, sgn * Math.abs(v));
+  }
+  /**
+   * The sign of a parameter as KNOWLEDGE: the direction every kept configuration agrees on, or null when
+   * they differ (`u^2 = 4` is u = ±2). A size, or a sign-free parameter no exact equation reaches, has
+   * no enumerated sign — the former is positive by its use and the latter is not solved exactly anyway.
+   */
+  /**
+   * The modulus carrier holds a sign-free parameter's MAGNITUDE, so a reading must say `|u|`, not
+   * `u`: `z1 = u` in its negative configuration is `|u|·cis180°`, and `u·cis180°` would read as a
+   * positive number there. A size parameter prints bare, as always.
+   */
+  const asMagnitude = (v: ExpVec): ExpVec => {
+    if (![...v.keys()].some((k) => signed.has(k))) return v;
+    return new Map([...v].map(([k, e]) => [signed.has(k) ? `|${k}|` : k, e]));
+  };
+  const signKnowledge = (p: string): Angle | null => {
+    if (!t1.signedParams.includes(p)) return angZero();
+    const dirs = kept.map((b) => b.angles.get(signUnknown(p)));
+    if (dirs.every((a) => a !== undefined && sameDirection(a, HALF_TURN))) return HALF_TURN;
+    if (dirs.every((a) => a === undefined || !sameDirection(a, HALF_TURN))) return angZero();
+    return null;
+  };
 
   /**
    * SAMPLE THE FREE DEGREES OF FREEDOM, then draw everything.
@@ -549,7 +623,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
   ];
   const freeArgNames = [
     ...new Set([
-      ...t1.argument.free.filter((n) => !isTurnUnknown(n)),
+      ...t1.argument.free.filter((n) => !isTurnUnknown(n) && !isSignUnknown(n)),
       ...drawnNames.filter((n) => !t1.argument.determined.has(n) && !branch?.angles.has(n)),
     ]),
   ].filter((n) => !isTurnUnknown(n));
@@ -589,7 +663,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
   const modulusOf = (name: string, st: State): { value: number; exact: ExpVec | null } => {
     const d = t1.modulus.determined.get(name);
     if (!d) return { value: st.mod.get(name) ?? sampleModulus(name), exact: null };
-    const base = evalMod(d.konst, st.par);
+    const base = evalMod(d.konst, magnitudes(st.par));
     if (base === null) return { value: sampleModulus(name), exact: null };
     let v = base;
     for (const [fn, c] of d.coefs) v *= Math.pow(st.mod.get(fn) ?? 1, toNumber(c));
@@ -695,8 +769,17 @@ export function foldConstraints(input: FoldInput): Derived2 {
         hi: w && Number.isFinite(w.max) ? w.max - 1e-6 : undefined,
       };
     }),
-    // a real parameter of the exam's kind (`r`, `d`) is a positive magnitude
-    ...freeParamNames.map(() => ({ lo: 1e-6 })),
+    /**
+     * ADR-CX-045 — a SIZE parameter (`r` in `|z1| = 9r`) is a positive magnitude; a sign-free one an
+     * exact equation carries keeps the sign its branch chose (the branch owns it, and tier 2 crossing
+     * zero would draw a figure the enumeration never produced); a sign-free one only this tier sees
+     * (`a`, `b` in `a + b·i`) is any real, unbounded.
+     */
+    ...freeParamNames.map((p): Bound => {
+      if (!signed.has(p)) return { lo: 1e-6 };
+      if (!t1.signedParams.includes(p)) return {};
+      return (sample.get(p) ?? 1) < 0 ? { hi: -1e-6 } : { lo: 1e-6 };
+    }),
   ];
 
   const solved =
@@ -769,7 +852,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
       const m = modulusOf(name, state);
       const a = argumentOf(name, state);
       if (!Number.isFinite(m.value) || !Number.isFinite(a.deg)) continue;
-      const modulus = m.exact ? fmtMod(m.exact) : round2(m.value);
+      const modulus = m.exact ? fmtMod(asMagnitude(m.exact)) : round2(m.value);
       // a cycle needs BOTH halves exact: unit modulus, and an argument that is a rational part of a turn
       const cycle = m.exact && a.exact && modIsOne(m.exact) ? anglePeriod(a.exact) : null;
       // a DIRECTION, folded into one turn — see the note on `argumentDeg` below
@@ -1050,10 +1133,21 @@ export function foldConstraints(input: FoldInput): Derived2 {
     const names = paramsOf(e);
     if (names.length === 0) return undefined;
     if (names.some((p) => !solvedParams.has(p) || !t1.paramValues.has(p))) return null;
-    const form = linearize(e);
-    if (form && sameDirection(form.tConst, angZero())) {
+    const form = linearize(e, signed);
+    if (form) {
+      // ADR-CX-045 — a sign-free parameter contributes its KNOWN sign; one whose sign differs between
+      // configurations (`u^2 = 4`) makes the expression's value differ too, so it is not knowledge
+      let dir = form.tConst;
+      for (const [n, c] of form.tCoef) {
+        const sgn = isSignUnknown(n) ? signKnowledge(paramOfSignUnknown(n)) : null;
+        if (sgn === null) return null;
+        dir = angAdd(dir, angScale(sgn, c));
+      }
       const v = substituteSolvedParams(form.uConst, t1.paramValues);
-      if (paramsOf(e).every((p) => !v.has(p))) return fmtMod(v);
+      if (paramsOf(e).every((p) => !v.has(p))) {
+        if (sameDirection(dir, angZero())) return fmtMod(v);
+        if (sameDirection(dir, HALF_TURN)) return `-${fmtMod(v)}`;
+      }
     }
     const here = evalComplex(e, finalEnv);
     return here ? round2(here.re) : null;
@@ -1118,7 +1212,11 @@ export function foldConstraints(input: FoldInput): Derived2 {
     .filter((p) => !literalSample.has(p))
     .map((p) => {
       const v = solvedParams.has(p) ? t1.paramValues.get(p) : undefined;
-      return { name: p, value: v ? fmtMod(v) : null };
+      if (!v) return { name: p, value: null };
+      // ADR-CX-045 — the sign is part of the value: u = −2 for `u^5 = -32`, u = ±2 for `u^2 = 4`
+      const sgn = signKnowledge(p);
+      const prefix = sgn === null ? '±' : sameDirection(sgn, HALF_TURN) ? '-' : '';
+      return { name: p, value: `${prefix}${fmtMod(v)}` };
     });
 
   const knowledge: KnowledgeRow[] = queries.map((q) => {

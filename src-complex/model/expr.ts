@@ -30,7 +30,7 @@ export type Expr =
   | { readonly t: 'i' }
   /** a named complex number — an unknown of the system */
   | { readonly t: 'ref'; readonly name: string }
-  /** a named POSITIVE real parameter (`r`, `d`) — a modulus-only unknown */
+  /** a named real parameter (`r`, `d`) — positive as a SIZE, any real otherwise (`model/paramSign.ts`, ADR-CX-045) */
   | { readonly t: 'param'; readonly name: string }
   | { readonly t: 'add'; readonly l: Expr; readonly r: Expr }
   | { readonly t: 'sub'; readonly l: Expr; readonly r: Expr }

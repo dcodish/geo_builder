@@ -36,7 +36,7 @@ conjugation — **no addition**) become two ℚ-linear systems over the log-pola
 | 1a | classify each constraint `monomial | general` — structural, on the AST | — |
 | 1b | modulus system: exact Gaussian elimination over ℚ, RHS an exponent vector over prime/parameter atoms | `cx1:mod` |
 | 1c | argument system: elimination over ℚ in **turns**, carrying the integer unknowns `k` — except a `principal` row, which drops its `k` because a solution set's labelling is a convention, not a configuration ([ADR-CX-021](06d-decisions-complex.md#adr-cx-021)) | `cx1:arg` |
-| 1d | **branch enumeration** — solve the `k` family modulo one turn; the result IS the configuration set | `cx1:branch` |
+| 1d | **branch enumeration** — solve the `k` family modulo one turn; the result IS the configuration set. A **sign-free real parameter** contributes its sign as an argument unknown pinned by `2·s − k = 0` (0 or ½ turn), enumerated with the rest; its magnitude stays in the modulus constant ([ADR-CX-045](06d-decisions-complex.md#adr-cx-045)) | `cx1:branch` |
 | 1e | publish the **nullspace dimension as the free-DOF count** — one definition, read by the DOF cue, the knowledge gates and the sampler alike | `cx1:dof` |
 | — | an inconsistent linear system is an honest contradiction naming the conflicting statements | `cx1:refuse` |
 
@@ -66,7 +66,7 @@ preference costs zero ([ADR-276](06-decisions.md#adr-276)).
 |---|---|---|---|
 | 3a | build residuals over the free basis stage 1 left (usually 0–3 dimensions) | — | ✅ `solve/residuals.ts` |
 | 3b | 1-D: enumerate **all** roots → further branches, ordered by nearness to the current value (stability) | `cx3:roots` | ✅ `otherRoots` |
-| 3c | n-D: Levenberg–Marquardt with a numeric Jacobian, multi-start, budgeted | `cx3:lm` | ✅ `solveResiduals` |
+| 3c | n-D: Levenberg–Marquardt with a numeric Jacobian, multi-start, budgeted. A parameter's bound follows its use: a size `> 0`, a tier-1 sign-free parameter held to its branch's sign, a tier-2-only one unbounded ([ADR-CX-045](06d-decisions-complex.md#adr-cx-045)) | `cx3:lm` | ✅ `solveResiduals` |
 | 3d | **obligation-preservation gate** — a solve may not lose a given; `obligations(next) ⊇ obligations(prev)` | `preserve:reject` on a voided accept | ⬜ pending |
 | 3e | honesty backstop: re-verify **every** constraint against final values; a best-effort solve that missed fails loudly. **Filters too** — read off the DRAWN direction, so no change of basis and no later numeric drive can void a stated window in silence; reported through `unsatisfied`, which is the signal stage 0e's gate already reads ([ADR-CX-025](06d-decisions-complex.md#adr-cx-025)) | `cx3:verify` | ✅ `Derived2.measures` / `.unsatisfied` |
 | — | refuse, naming the student's **new statement**, never a collateral casualty | `cx3:refuse` | ⬜ pending |
