@@ -36,112 +36,37 @@ const setLiteral = (src: string, name: string): string[] => {
 };
 
 describe('ADR-346 — log-triage mirrors the App submit path', () => {
-  it('the pre-LLM out-of-scope register is identical in both', () => {
-    // App.tsx short-circuits these categories with a guided message BEFORE paying for an LLM call
-    // (ADR-289). If the harness misses one, that category's utterances are reported as grammar gaps
-    // although the tool answers them on purpose — the 2026-07-17 `orientation` / `ui-command` rows.
-    expect(setLiteral(triageSrc, 'PRE_LLM')).toEqual(setLiteral(pipeSrc, 'PRE_LLM'));
+  /**
+   * #1395 — THE 2-D MIRROR IS GONE: triage CALLS the App's decision instead of copying it.
+   *
+   * The checks that stood here compared hand-copied lists — the PRE_LLM set, the pre-parse guards
+   * (#501), the post-parse seams (#829), the honesty-gate call list, the format guards, the #186
+   * auto-bind — because the harness re-implemented the submit path and each list could drift. Five
+   * instances did. The whole pre-LLM lane is now `decideDeterministic2D`, which `runSubmit` dispatches
+   * and `session2d` calls, so there is nothing left to compare: a gate added to the App reaches the
+   * report the day it is written. These checks pin that structure, so a later edit cannot quietly
+   * reintroduce a copy.
+   */
+  it('#1395 — session2d decides through decideDeterministic2D, the function runSubmit dispatches', () => {
+    expect(triageSrc).toMatch(/import\s*\{\s*decideDeterministic2D\s*\}\s*from\s*'\.\.\/\.\.\/\.\.\/src\/app\/decideDeterministic\.ts'/);
+    const s2 = triageSrc.slice(triageSrc.indexOf('async function session2d'), triageSrc.indexOf('function session3d'));
+    expect(s2, 'session2d must call the App decision').toContain('decideDeterministic2D(');
+    expect(pipeSrc, 'runSubmit must dispatch the same decision').toContain('decidePreParse(');
+    expect(pipeSrc, 'runSubmit must dispatch the same decision').toContain('decideFromParse(');
   });
 
-  it('#501 — the PRE-PARSE predicate guards are DERIVED from the pipeline source, never enumerated', () => {
-    // A guided family whose trigger is a PREDICATE rather than a `scope` category is invisible to the
-    // set-literal check above. This check used to enumerate the predicates it knew about — and a guard
-    // that lists what it knows cannot fail on what it does not: #436 added `statedNegation` as a third
-    // pre-parse guard, nothing forced the list to follow, and the harness reported two deliberately
-    // refused utterances as LIVE grammar gaps, shipping false verdicts to the prod dashboard (#501, the
-    // 4th ADR-346 drift). So the list is now EXTRACTED from the pipeline: everything called with the
-    // bare utterance between the store-op block and the `parse(` call is a pre-parse guard, and a new
-    // one fails this test the day it lands, with nobody having to remember anything.
-    const start = pipeSrc.indexOf('parseMerge(utterance)');
-    const end = pipeSrc.indexOf('parse(utterance,');
-    expect(start, 'the store-op anchor moved — re-anchor this extraction').toBeGreaterThan(0);
-    expect(end, 'the parse anchor moved — re-anchor this extraction').toBeGreaterThan(start);
-    const guards = [...new Set([...pipeSrc.slice(start, end).matchAll(/\b([a-z]\w*)\(utterance\)/g)].map((m) => m[1]))];
-    // The extraction must actually find something: an anchor drift that silently yields an empty list
-    // would make this test pass forever while proving nothing (the shrinking-expectation trap).
-    expect(guards.length, 'no pre-parse guards extracted — the anchors are wrong').toBeGreaterThanOrEqual(2);
-    for (const p of guards) {
-      expect(triageSrc, `triage.mjs must mirror the submit pipeline's pre-parse ${p}() short-circuit (ADR-346)`).toContain(`${p}(`);
+  it('#1395 — no hand mirror of the 2-D lane survives in triage.mjs', () => {
+    for (const copy of ['const PRE_LLM', 'function droppedBy', 'function guidedAtSeam', 'impliedCircleBinding(', 'parse(u, pctx)', 'classifyOutOfScope(']) {
+      expect(triageSrc, `triage.mjs re-implements part of the 2-D decision again (${copy}) — call decideDeterministic2D instead`).not.toContain(copy);
     }
   });
 
-  it('#829 — the POST-PARSE escalation seams are DERIVED too, not enumerated', () => {
-    // The 5th #35-class drift, and the one the #501 fix left standing. That fix derived the
-    // PRE-parse guards and then covered the escalation-seam side with a hand-written list of ONE
-    // (`['wordRootMagnitude']`) — verbatim the trap its own comment says it removed: *a guard that
-    // lists what it knows cannot fail on what it does not*. Three seams landed there afterwards
-    // (`splitGuidance`, `independentConstructs` #763, `upperCasedLabelCandidate` #779), nothing
-    // forced the list to follow, and the harness reported all three as LIVE grammar gaps — shipping
-    // false `not-handled` verdicts to the prod dashboard's «פערים אמיתיים» card.
-    //
-    // So this side is derived from the same source, between the parse and the LLM escalation.
-    const start = pipeSrc.indexOf('parse(utterance,');
-    // Search for the escalation FROM `start`: the bare name also appears in the import block above.
-    const end = pipeSrc.indexOf('llmParse(utterance', start);
-    expect(start, 'the parse anchor moved — re-anchor this extraction').toBeGreaterThan(0);
-    expect(end, 'the llmParse anchor moved — re-anchor this extraction').toBeGreaterThan(start);
-    // Built with String.raw, like the set-literal reader above: a regex literal written through a
-    // generator is one silent escape away from matching nothing.
-    const CALL = new RegExp(String.raw`\b([a-z]\w*)\(utterance\)`, 'g');
-    const region = pipeSrc.slice(start, end);
-    // Not every `f(utterance)` after the parse is a SEAM — `statedLabelTokens` feeds the dropped-label
-    // accounting, which the harness mirrors through `droppedNewLabels` instead. The discriminator is
-    // the pipeline's OWN declaration: a guided short-circuit logs `source: 'scope'`, which is exactly
-    // the verdict the harness has to reproduce (`guided`, with that `scope:` detail). So a call counts
-    // as a seam when the FIRST thing the pipeline logs after consulting it is a scope answer.
-    // Deriving it from the log rather than from a character window keeps the rule free of a magic
-    // distance that would drift the first time a seam grows a line.
-    const seams = [...new Set([...region.matchAll(CALL)]
-      .filter((m) => {
-        const after = region.slice(m.index);
-        const at = after.indexOf('logDebug({');
-        if (at < 0) return false;
-        return /source: 'scope'/.test(after.slice(at, after.indexOf('});', at)));
-      })
-      .map((m) => m[1]))];
-    // The shrinking-expectation guard the pre-parse half already has: an anchor drift that yields an
-    // empty list would make this test pass forever while proving nothing. Four seams exist today.
-    expect(seams.length, `no post-parse seams extracted — the anchors are wrong (found ${JSON.stringify(seams)})`).toBeGreaterThanOrEqual(4);
-    for (const p of seams) {
-      expect(triageSrc, `triage.mjs must mirror the submit pipeline's post-parse ${p}() short-circuit (ADR-346, #829)`).toContain(`${p}(`);
-    }
-  });
-
-  it('every honesty gate the App submit path calls is also called by the harness', () => {
-    // A gate the harness skips = a partial parse the App would escalate but the harness reports as
-    // `built` — i.e. a real gap silently marked "already fixed". The inverse of the #35 defect, and
-    // strictly worse (it hides work rather than inventing it).
-    const GATES = [
-      'droppedNewLabels',       // ADR-089
-      'droppedGivenNumbers',    // ADR-250
-      'droppedGivenRelations',  // ADR-264
-      'droppedGivenVerbs',      // ADR-292
-      'droppedCompoundRelation', // #153/#145
-      'unaccountedSpans',       // ADR-453 (#659 step 3) — span accounting, enforcing on hard spans
-    ];
-    // Guard the guard: if the submit pipeline stops calling one of these, this list is stale and must be
-    // revisited (a silently-shrinking expectation would pass forever while proving nothing).
-    for (const g of GATES) expect(pipeSrc, `submitPipeline.ts no longer calls ${g} — update this guard + the harness`).toContain(`${g}(`);
-    for (const g of GATES) expect(triageSrc, `triage.mjs must mirror the submit pipeline's ${g} gate (ADR-346)`).toContain(`${g}(`);
-  });
-
-  it('the pre-LLM FORMAT guards (LaTeX, שורש-word) are mirrored in both (#329/#246, ADR-391)', () => {
-    // Two pre-LLM guidance short-circuits added in the P3 guided-message batch — a `$…$`/`\`-command LaTeX
-    // paste (pre-parse) and a «שורש N» word-form magnitude (at the escalation seam). If the harness skips
-    // one, those prod utterances read as grammar gaps although the App answers them with guidance — exactly
-    // the #35 false-signal class this ADR-346 guard exists to prevent.
-    for (const src of [pipeSrc, triageSrc]) {
-      expect(src, 'looksLikeLatex (#329) must be called in submitPipeline.ts AND triage.mjs').toContain('looksLikeLatex(');
-      expect(src, 'wordRootMagnitude (#246) must be called in submitPipeline.ts AND triage.mjs').toContain('wordRootMagnitude(');
-    }
-  });
-
-  it('the #186 circle-name auto-bind runs in both (the shared decision helper + the shared fact core)', () => {
-    // App.submit binds a fresh circle name to an UNNAMED circle (impliedCircleBinding → nameCentre →
-    // re-parse). A harness that skips the bind reports every such utterance as refused/clarify —
-    // false gaps for input the App resolves silently.
-    for (const src of [pipeSrc, triageSrc]) expect(src).toContain('impliedCircleBinding(');
-    expect(triageSrc).toContain('nameCentreFacts(');
+  it('#1395 — the submit pipeline decides nothing before the model itself: no parse, no refusal branch', () => {
+    // Everything up to the LLM call lives in `decideDeterministic.ts`. A branch added back into
+    // `runSubmit` would be invisible to triage and to #1358's register, which ask the decision.
+    const beforeLlm = pipeSrc.slice(pipeSrc.indexOf('export async function runSubmit('), pipeSrc.indexOf('llmParse(utterance'));
+    expect(beforeLlm).not.toMatch(/\bparse\(utterance/);
+    expect(beforeLlm).not.toMatch(/r\.reason === '/);
   });
 
   it('the #189 followable actions are followed, and the App logs them', () => {
@@ -153,17 +78,17 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
     }
   });
 
-  it('the harness derives its parse context from the shared builder, never a local copy', () => {
+  it('the 2-D decision reads the parse context from the shared builder, never a local copy', () => {
     // The ADR-169 instance: the harness had its OWN ctx builder, missing `parallels`, so every
-    // trapezoid-altitude utterance read as a gap. `context.ts` was centralized to end that class —
-    // which only works if the harness actually calls it.
-    expect(triageSrc).toContain('buildParseCtx');
-    expect(triageSrc).toMatch(/import\s*\{[^}]*buildParseCtx[^}]*\}\s*from\s*'\.\.\/\.\.\/\.\.\/src\/parser\/index\.ts'/s);
+    // trapezoid-altitude utterance read as a gap. The decision now builds the context, from the one builder.
+    const decideSrc = readFileSync(path.join(root, 'src/app/decideDeterministic.ts'), 'utf8');
+    expect(decideSrc).toContain('buildParseCtx(');
   });
 
-  it('the harness parses WITH context and replays a session prefix (not a lone standalone parse)', () => {
-    // The #35 defect itself: `parse(u)` with no second argument, one utterance at a time.
-    expect(triageSrc).toContain('parse(u, pctx)');
+  it('the harness replays a session PREFIX (not a lone standalone parse), and hands the decision that figure', () => {
+    // The #35 defect itself: one utterance at a time, with no figure. session2d threads the facts forward
+    // and passes the figure it built as the decision's view.
+    expect(triageSrc).toMatch(/decideDeterministic2D\(\{ facts, seed: 0, view: \{ construction: fig\.construction, positions: fig\.positions \} \}/);
     expect(triageSrc).toMatch(/session2d|session3d/);
     // A degraded prefix must never be promoted to a gap (the false-signal class this ADR removes).
     expect(triageSrc).toContain('degraded');

@@ -87,7 +87,10 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   letter lowers to X₁ pinned to the principal root and Xₖ pinned `(k−1)/n` of a turn from it — always,
   whether or not the student already holds some Xₖ. That makes claiming the name the consistency
   check: there is no fallback that steps around a taken name, because stepping around it is what hid
-  the contradiction.
+  the contradiction. **Which root a stated member claims is decided by the member, not its index**
+  ([ADR-CX-044](06d-decisions-complex.md#adr-cx-044)): `lowerLines` holds each set's rows back, tier 1
+  solves the rest of the figure once, and a DETERMINED member off its index root keeps its own root while
+  the unstated names take the rest. In every other case the index pins above are emitted unchanged.
 - **A display transform never reaches the parser or the engine.** The polar↔cartesian toggle and the `n`
   stepper are view state, outside the store and outside undo. So changing how a number is *shown* can
   never change what was *stated* — a class of bug that is otherwise very hard to see.

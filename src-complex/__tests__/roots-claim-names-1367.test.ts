@@ -63,9 +63,12 @@ describe('#1367 — a member that is NOT its solution refuses, naming the studen
     expect(store().lastError).toEqual({ key: 'incompatible', detail: 'z^3 = 8' });
   });
 
-  it('INDEX matching, not set membership: «z1 = 2cis120» is a cube root of 8 but not solution 1 — refused', () => {
-    expect(play(['z1 = 2cis120', 'z^3 = 8'])).toEqual([true, false]);
-    expect(play(['z2 = 2cis240', 'z^3 = 8'])).toEqual([true, false]);
+  // FLIPPED by #1396 (operator ruling 2026-09-24, ADR-CX-044): the roots are matched by SET MEMBERSHIP.
+  // 2cis120 IS a cube root of 8, so a student who numbered it z₁ made no mistake. Do not revert this to
+  // index matching; the ruling chose "accept it, and name the rest" over "keep refusing".
+  it('SET membership (#1396): «z1 = 2cis120» is a cube root of 8, so it is accepted even though it is not solution 1', () => {
+    expect(play(['z1 = 2cis120', 'z^3 = 8'])).toEqual([true, true]);
+    expect(play(['z2 = 2cis240', 'z^3 = 8'])).toEqual([true, true]);
   });
 });
 

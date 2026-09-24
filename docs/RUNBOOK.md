@@ -13,6 +13,7 @@ The single ops entry point. Deep 2-D proxy detail (one-time setup, env file, sec
 | Shared Node proxy (`dist-server/proxy.mjs`) | `npm run build:proxy` | `/var/www/geo-proxy/proxy.mjs` | `geo-proxy.service` on loopback **:8788**, reverse-proxied by Apache |
 | **Site homepage** (tool links) | — hand-edited; **canonical copy: [`deploy/homepage/index.html`](../deploy/homepage/index.html)** | `…/httpdocs/index.html` | `https://themathbible.com/` (Apache static) |
 | **Site-root crawl files** (#1384) | — hand-edited, beside the homepage: `robots.txt`, `sitemap.xml`, `favicon.svg`; `favicon.ico` + `apple-touch-icon.png` are REGENERATED from the SVG by `node scripts/render-icons.mjs deploy/homepage/favicon.svg deploy/homepage` | `…/httpdocs/` | `https://themathbible.com/robots.txt` etc. |
+| **Page metadata + preview images** (#1383) | the builds themselves: each builder's `seo/` (icon, touch icon, `og.png`) is emitted into its `dist*/seo/` and ships with the ordinary `scp -r dist*/*`. The PNGs are REGENERATED, never edited: `node scripts/render-icons.mjs <product>/seo/icon.svg <product>/seo` and, against a running dev server, `node scripts/render-og.mjs --base http://localhost:5173` (also writes `deploy/homepage/og.png`) | `…/httpdocs/<builder>/seo/`, `…/httpdocs/og.png` | `https://themathbible.com/geo-builder/seo/og.png` etc. |
 | Proxy env (key, admin creds, log paths) | — (hand-edited) | `/var/www/geo-proxy/geo-proxy.env` (mode 600) | read by the service |
 
 - **Server:** `ssh root@themathbible.com` (74.208.61.39). Plesk on Ubuntu 22.04. **Apache serves everything; nginx is OFF** — never touch `vhost_nginx.conf`.
@@ -105,7 +106,10 @@ ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/analytic
 scp deploy/homepage/index.html root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/index.html
 #     …and the site-root crawl files whenever they changed (#1384). robots.txt names the sitemap; the
 #     sitemap must list every builder (a lock checks it against products.json, not the server copy):
-scp deploy/homepage/robots.txt deploy/homepage/sitemap.xml deploy/homepage/favicon.svg deploy/homepage/favicon.ico deploy/homepage/apple-touch-icon.png root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/
+scp deploy/homepage/robots.txt deploy/homepage/sitemap.xml deploy/homepage/favicon.svg deploy/homepage/favicon.ico deploy/homepage/apple-touch-icon.png deploy/homepage/og.png root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/
+#     …and the GeoGebra comparison page (#1386), its own directory so /geogebra/ serves index.html:
+ssh root@themathbible.com 'mkdir -p /var/www/vhosts/themathbible.com/httpdocs/geogebra'
+scp deploy/homepage/geogebra/index.html root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/geogebra/index.html
 
 # 3. perms (static files should be 644 root:root — scp usually preserves this; verify)
 ssh root@themathbible.com 'chmod -R a+rX /var/www/vhosts/themathbible.com/httpdocs/geo-builder /var/www/vhosts/themathbible.com/httpdocs/3d-builder /var/www/vhosts/themathbible.com/httpdocs/complex-builder /var/www/vhosts/themathbible.com/httpdocs/analytic-builder'

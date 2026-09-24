@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- #1386 (ADR-W-086): an HONEST comparison page. Every sentence is the operator-approved draft
+       (#1386, draft v1). Claims about GeoGebra were checked against its own site and manual on
+       2026-09-24 and must be RE-CHECKED before any edit; claims about our tool are locked by
+       scripts/__tests__/geogebra-page-1386.test.ts (the examples build; the demo link opens). No
+       GeoGebra logo, no styling that imitates theirs, and the not-affiliated line stays. -->
+  <title>חלופה ל-GeoGebra לשרטוט שאלות בגרות — בעברית | themathbible</title>
+  <meta name="description" content="ב-GeoGebra בונים שרטוט בכלים ובפקודות. כאן מקלידים את משפטי השאלה בעברית, והשרטוט נבנה לבד. השוואה הוגנת: מתי כל כלי מתאים יותר. חינם, לבגרות 4 ו-5 יחידות.">
+  <link rel="canonical" href="https://themathbible.com/geogebra/">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="themathbible">
+  <meta property="og:locale" content="he_IL">
+  <meta property="og:title" content="GeoGebra או בונה השרטוטים? השוואה הוגנת">
+  <meta property="og:description" content="ב-GeoGebra בונים שרטוט בכלים ובפקודות. כאן מקלידים את משפטי השאלה בעברית, והשרטוט נבנה לבד.">
+  <meta property="og:url" content="https://themathbible.com/geogebra/">
+  <meta property="og:image" content="https://themathbible.com/geo-builder/seo/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://themathbible.com/geo-builder/seo/og.png">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://themathbible.com/geogebra/","url":"https://themathbible.com/geogebra/","name":"GeoGebra או בונה השרטוטים? השוואה הוגנת","inLanguage":"he","isPartOf":{"@id":"https://themathbible.com/#site"},"author":{"@id":"https://themathbible.com/#author"}},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"האם זה בחינם?","acceptedAnswer":{"@type":"Answer","text":"כן, בלי הרשמה."}},{"@type":"Question","name":"צריך ללמוד פקודות?","acceptedAnswer":{"@type":"Answer","text":"לא. כותבים בעברית רגילה, כמו בשאלה. אם משפט לא מובן, הכלי אומר זאת."}},{"@type":"Question","name":"האם הכלי פותר את השאלה?","acceptedAnswer":{"@type":"Answer","text":"לא. הוא משרטט את הנתונים בלבד."}},{"@type":"Question","name":"אפשר להשתמש בשניהם?","acceptedAnswer":{"@type":"Answer","text":"בהחלט. למשל, לשרטט כאן את נתוני השאלה ולחקור ב-GeoGebra."}},{"@type":"Question","name":"האם יש קשר ל-GeoGebra?","acceptedAnswer":{"@type":"Answer","text":"לא. אתר זה אינו קשור ל-GeoGebra. GeoGebra הוא סימן מסחרי של בעליו."}}]}]}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --blue: #046bd2; --blue-dark: #0357b0; --blue-light: #e8f2fc;
+      --ink: #0f1923; --ink-mid: #3a4a5a; --ink-light: #6b7c8d;
+      --border: #d0dce8; --bg: #f8fafc; --white: #ffffff;
+    }
+    body { font-family: 'Heebo', system-ui, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.7; }
+    header { background: var(--white); border-bottom: 1px solid var(--border); }
+    .bar { max-width: 46rem; margin: 0 auto; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; }
+    .bar a { color: var(--blue); text-decoration: none; font-weight: 700; }
+    main { max-width: 46rem; margin: 0 auto; padding: 32px 16px 56px; }
+    h1 { font-size: clamp(1.6rem, 5vw, 2.2rem); font-weight: 800; line-height: 1.25; margin-bottom: 16px; }
+    h2 { font-size: 1.3rem; font-weight: 700; margin: 36px 0 12px; }
+    p { margin: 10px 0; color: var(--ink-mid); }
+    strong { color: var(--ink); }
+    ul { margin: 10px 0; padding-inline-start: 1.3rem; color: var(--ink-mid); }
+    li { margin: 6px 0; }
+    pre { direction: rtl; background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+          font-family: inherit; font-size: 1rem; line-height: 1.9; white-space: pre-wrap; }
+    code { font-family: ui-monospace, Consolas, monospace; background: var(--blue-light); border-radius: 4px; padding: 0 .3rem; direction: ltr; unicode-bidi: isolate; white-space: nowrap; }
+    .cta { display: inline-block; margin: 8px 0 4px; background: var(--blue); color: #fff; text-decoration: none; font-weight: 700;
+           padding: 10px 20px; border-radius: 10px; }
+    .cta:hover { background: var(--blue-dark); }
+    .faq dt { font-weight: 700; margin-top: 16px; }
+    .faq dd { margin: 4px 0 0; color: var(--ink-mid); }
+    footer { border-top: 1px solid var(--border); background: var(--white); }
+    footer p { max-width: 46rem; margin: 0 auto; padding: 18px 16px; font-size: .9rem; color: var(--ink-light); }
+  </style>
+</head>
+<body>
+  <header><div class="bar"><a href="/">themathbible.com</a><a href="/geo-builder/">לבונה השרטוטים ←</a></div></header>
+  <main>
+    <h1>GeoGebra או בונה השרטוטים? השוואה הוגנת</h1>
+    <p>GeoGebra (גאוגברה) הוא אחד מכלי המתמטיקה הפופולריים בעולם: חינמי לשימוש לא מסחרי, עשיר ביכולות, ומשמש יותר מ-100 מיליון תלמידים ומורים. בוני השרטוטים של themathbible עושים דבר צר יותר: לוקחים את נתוני שאלת הבגרות <strong>כפי שהם כתובים בשאלה</strong>, ומשרטטים אותם.</p>
+
+    <h2>ההבדל המרכזי: פקודות מול משפטים</h2>
+    <p><strong>ב-GeoGebra</strong> בונים שרטוט בבחירת כלים ולחיצות על המסך, או בהקלדת פקודות בתחביר קבוע, למשל <code>Line(A, B)</code>.</p>
+    <p><strong>כאן</strong> מקלידים את משפטי השאלה עצמם, שורה אחר שורה. למשל, נתוני שאלה מבגרות קיץ 2022:</p>
+<pre data-example="bagrut-2022">נתון מעגל שרדיוסו R ומרכזו O
+מנקודה A הוציאו משיק למעגל בנקודה B
+המשך AO חותך את המעגל בנקודה D
+AO חותך את המעגל בנקודה C
+G נמצאת על המשך DB
+AG מאונך ל AD
+AG=8
+AC=0.5DC</pre>
+    <p>והשרטוט נבנה.</p>
+    <a class="cta" data-try="bagrut-2022" href="https://themathbible.com/geo-builder/#zZfbTttAEIZfxdrrGAWXtBCJixwgRaQKpNBCEEJre0m22F7LXkehiD5DKdCqLUpbpJbCC-3rdNYHSHBURxUlucqe5_tnZ2ecI4RdFxVRmzBVD6hlEg_lkG90iI1fEc-nzEHF2RxysE1gmTgRH8RvcS5uFHElPoufipbXNLmDEBMV8zm0jw3uo-LOEQo4Jx52jHDfd3EDu74poi8u4YgLRVzDOadwxLn4Ic6VpgKNPgx9FR-h24Aj2x4LQjTVoJ5hEbWp6tQxYcawwdYR4oeuPDuahWEKo3FPlQcYxAECGJMdD5s0ALACIHqENOMu9wJynEPEwbolFUT9x4OPsFT_0NaZJWcjMUM6Yt83USZoH1CvgOVUnCklRZxB8xdQvgcomLuG5pUiLu5knAysLw9Q77HO5oa25s_T2qq9rfNNTtd7KXbpR9Vl1OGJ80vQ6EG8aDl0GEUDLBnTyY_LHmInd-NT8zZ-pIRRlxCuKSIW8LA1ZXJsag5dxDuOHRhTG1IOjp-AHsqbMvLYxbwDu9qdhB_wcdCL8G-f8ZCoZEMkrUNNk0CmmsJIiwXGP3BHkFWJwWVijcXKM6Pp2XsJLGxq9_yhSyEgPD9lQn3StuGq4oALSUNxmZhnIcwXpdRQxCdZW6ANkFBi5MwItmrKNulx4pgqcziLPZ04V64d5Lnz66CvsxjHRqsMuK07x97ue5X1lcbCVrM1u8TLL-YOUugWdVLhb3SYZ6olyTrMPmnOv0SxPFGuGcYflUpxl92mWua8jMOmuBMONNDuBEWOjuHKJP0-jJTk8WykmgJm-_DgQ5xLCZI8tOrg4863W6uFerPwNL9UXvHbebzN9zYzKOSjGu9xPyxFVLWZo97hhJFUS3FBgYDvkJkngCdTQ_QdO051-J9uk_slXi07ngCjLxM1wEBEXSglKS2xvfC8tdo4CJp15rb3n-nd-uvqmrQxTixP0nb1kWxz1SWeCwWBGoGF5R-aYQ_AjrgfVYgsqrJ8teNc7BiJorY4P6Bo2W5pW-qbuqttUHdu1truFpbl_EPd5D8Z46pJffjigDPSnutiK4Bl85m2K4v5mUJ1lOe46mGoHKkkG12LvPCknhzAV85MIWVq9_gP">פתחו את הדוגמה בבונה השרטוטים</a>
+
+    <h2>השרטוט מתעדכן עם כל נתון</h2>
+<pre data-example="defining">ריבוע ABCD
+נקודה G על AD
+זווית GBA = 37</pre>
+    <p>אחרי השורה השנייה, G היא נקודה כלשהי על AD. אחרי השלישית, G זזה לאורך הצלע עד שהזווית היא בדיוק 37°. הנקודות שכבר נבנו לא קופצות.</p>
+    <p><strong>ועוד:</strong></p>
+    <ul>
+      <li><strong>שום הנחה שלא נתונה.</strong> גודל שלא הוגדר בשאלה נשאר חופשי, והכלי לא "מחליט" עליו בשקט.</li>
+      <li><strong>כשיש יותר משרטוט נכון אחד</strong>, מוצג אחד מהם, ובלחיצה עוברים לתצורה אחרת.</li>
+      <li><strong>השרטוט נבדק מול הנתונים.</strong> אם נתון לא מתקיים בציור, הכלי אומר זאת.</li>
+      <li>ארבעה בונים: <a href="/geo-builder/">הנדסת המישור</a>, <a href="/3d-builder/">הנדסת המרחב</a>, <a href="/complex-builder/">מספרים מרוכבים</a> ו<a href="/analytic-builder/">גאומטריה אנליטית</a>.</li>
+      <li>שיתוף בקישור, ויצוא לתמונה ולקובץ Word.</li>
+    </ul>
+
+    <h2>מתי GeoGebra מתאים יותר</h2>
+    <ul>
+      <li><strong>חקירה חופשית:</strong> גרירת נקודות, בנייה ידנית וניסוי.</li>
+      <li><strong>גרפים של פונקציות, חשבון דיפרנציאלי ואינטגרלי, סטטיסטיקה ומערכת אלגברה ממוחשבת (CAS).</strong></li>
+      <li><strong>מאגר עצום</strong> של חומרי לימוד שמורים ותלמידים שיתפו.</li>
+      <li><strong>זמין בעשרות שפות</strong> ובכל פלטפורמה.</li>
+      <li><strong>פתרון תרגילים:</strong> ל-GeoGebra יש כלי שפותר תרגיל מצילום ומציג פתרון צעד אחר צעד. <strong>הכלי כאן במכוון לא פותר</strong>: הוא משרטט את הנתונים, והפתרון נשאר של התלמיד.</li>
+    </ul>
+
+    <h2>שאלות נפוצות</h2>
+    <dl class="faq">
+      <dt>האם זה בחינם?</dt><dd>כן, בלי הרשמה.</dd>
+      <dt>צריך ללמוד פקודות?</dt><dd>לא. כותבים בעברית רגילה, כמו בשאלה. אם משפט לא מובן, הכלי אומר זאת.</dd>
+      <dt>האם הכלי פותר את השאלה?</dt><dd>לא. הוא משרטט את הנתונים בלבד.</dd>
+      <dt>אפשר להשתמש בשניהם?</dt><dd>בהחלט. למשל, לשרטט כאן את נתוני השאלה ולחקור ב-GeoGebra.</dd>
+      <dt>האם יש קשר ל-GeoGebra?</dt><dd>לא. אתר זה אינו קשור ל-GeoGebra. GeoGebra הוא סימן מסחרי של בעליו.</dd>
+    </dl>
+  </main>
+  <footer><p>© ד״ר דוד קודיש · <a href="/">themathbible.com</a> · אתר זה אינו קשור ל-GeoGebra.</p></footer>
+</body>
+</html>

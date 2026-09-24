@@ -10240,3 +10240,43 @@ The gate stays the caller's job either way: `VecMath`'s `PAIR` regex matches a b
 **The complex question carried from the audit.** `src-complex/replay/derive2.ts` folds algebraic constraints numerically with references resolved at parse time; whether a forward reference can reach its fold at all was not measured in this round either — recorded here so the next session that touches complex measures it and files against `complex` if it can.
 
 **Consequences.** `src3d/store/store3.ts` (the retry predicate and loop). `src3d/__tests__/issue-1327-forward-constraint.test.ts`. `docs/02b` FR-VC-2c; `docs/04b` the retry pass.
+
+## ADR-3D-258 — The 3-D submit decision is a pure function, `decideSubmit3`: `submit` dispatches it, and the three statement seams share one reader and one gate list (#1394)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1394](https://github.com/dcodish/geo_builder/issues/1394) (debt, `P2`, `3d`) · round [#1397](https://github.com/dcodish/geo_builder/issues/1397) · groundwork for [#1358](https://github.com/dcodish/geo_builder/issues/1358) (operator ruling 2026-09-24: *"Rework first, then all four"*)
+**Requirements:** none (internal) · **Design:** [04b](04b-design-3d.md#the-submit-decision-1394-adr-3d-258) (new section)
+
+**Why.** #1358's shared imperative register teaches «צייר משולש» → «משולש», and it must only ever teach a
+sentence the tool will then ACCEPT. That needs a pure "would this line be recorded?" answer from each
+builder. Analytic (`decideSubmit`) and complex (`acceptLine`) had one. 3-D did not: `store3.submit`
+intercepted renames, parsed, ran the honesty gates, detected twins, derived, searched a seed and committed,
+all inside one `set`.
+
+**The decision.**
+1. **`decideSubmit3(state, utterance, newId?)`** returns a `Verdict3`, one of:
+   - `rename`;
+   - `not-understood` (the one verdict the App escalates);
+   - `refused {error}`;
+   - `already-stated {twin, facts}`;
+   - `record {fact, facts, seed}`.
+
+   It covers every branch `submit` had, in the same order. It sets nothing, and the fact id is injected,
+   so asking twice gives the same answer and leaves the store as it was.
+2. **`submit` is `dispatch(decideSubmit3(get(), utterance))`**, the analytic #1102 shape.
+3. **One tail for both lanes.** `decideCommands3` (gates, then twin, then candidate derive, then search)
+   is what `decideSubmit3` ends in and what `submitSteps` (the LLM lane) now calls. The LLM lane asks it
+   without the twin rule and without the search, exactly as before. So the gates and the candidate
+   derive are one code path, not two copies.
+4. **`replaceFact` shares the same reader and gate list** (`readStatement3`: the #866 one-angle repair
+   plus the #516 typed refusals; `lostGivens3`: the five honesty gates). That removes the third verbatim
+   copy of both.
+
+**Parity, measured.** Before the extraction, every 3-D fixture, every catalog specimen in both languages,
+and every string-array sequence the 3-D suite types (**1,500 sequences**) were replayed through the real `submit`, and the store
+was recorded after each line: `lastError`, `lastNotice`, the seed, and the fact list without its random
+ids. After the extraction all of them reproduce exactly (`decide-submit3-parity-1394.test.ts`).
+
+**Consequences.** `src3d/store/store3.ts` (`decideSubmit3`, `decideCommands3`, `readStatement3`,
+`lostGivens3`; `submit`, `submitSteps` and `replaceFact` reduced to dispatch). Locks: the parity test and
+its golden file, and `decide-submit3-purity-1394.test.ts` (asking leaves the store identical, including
+for a rename, a twin and a record).

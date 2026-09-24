@@ -19,7 +19,12 @@ import type { ExprQuery, MeasureQuery, MeasureRelation, RatioQuery } from '../mo
 import type { SequenceStatement } from '../model/sequence';
 import { type RootsMode, rootsMode } from '../model/naming';
 import { refsOf } from '../model/expr';
-import { type RootsEquation, solutionSetConstraints, solutionSetNames } from '../model/solutionSet';
+import { type RootsEquation, solutionSetConstraints, solutionSetConstraintsPlaced, solutionSetNames } from '../model/solutionSet';
+import { type Tier1Result, isTurnUnknown, solveTier1 } from '../solve/tier1';
+import { linearize } from '../solve/logpolar';
+import { type ExpVec, eq as modEq, mul as modMul, pow as modPow } from '../value/modulus';
+import { type Angle, add as angAdd, scale as angScale, sub as angSub } from '../value/angle';
+import { isInt, rat } from '../value/rational';
 import { type Derived2, type FoldInput, type ResolvedSelection, type Untranslated, foldConstraints } from '../replay/derive2';
 
 /**
@@ -174,6 +179,12 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
    * SAME function that named them in the first place, never a second naming convention.
    */
   const rootsByLetter = new Map<string, { eq: RootsEquation; mode: RootsMode }>();
+  /**
+   * #1396 — enumerating sets whose pins wait for the rest of the figure: WHICH root a stated member
+   * occupies can only be read once the other lines are solved, and a member may be stated after the
+   * equation (order independence, ADR-CX-042 item 3). `at` keeps the rows where the line put them.
+   */
+  const pendingSets: { eq: RootsEquation; at: number }[] = [];
 
   lines.forEach((raw, idx) => {
     const r = parseLineV2(raw);
@@ -203,7 +214,8 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
     for (const eq of r.line.roots) {
       const grounded = refsOf(eq.rhs).every((n) => mentioned.has(n));
       const mode = rootsMode(eq.varName, mentioned, grounded);
-      constraints.push(...solutionSetConstraints(eq, mode));
+      if (mode === 'enumerate') pendingSets.push({ eq, at: constraints.length });
+      else constraints.push(...solutionSetConstraints(eq, mode));
       declared.push(...solutionSetNames(eq, mode));
       // the bare letter stays reserved in every mode: `z` is related to `z₁..zₙ`
       mentioned.add(eq.varName);
@@ -257,6 +269,8 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
     for (const [k, v] of r.line.atoms) atoms.set(k, v);
   });
 
+  placeSolutionSets(pendingSets, constraints, filters, measures);
+
   return {
     constraints,
     filters,
@@ -273,4 +287,95 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
     sequences,
     selections,
   };
+}
+
+/**
+ * #1396 — lower each enumerating set, matching stated members by SET MEMBERSHIP (operator ruling,
+ * 2026-09-24): «z1 = 2cis120» then «z^3 = 8» is accepted, because 2cis120 IS a cube root of 8, and z₂, z₃
+ * take the other two roots. The student who numbered the roots in a different order made no mistake.
+ *
+ * The rest of the figure is solved once WITHOUT the pending sets (tier 1, exact), and each solution
+ * name another line mentions is read off it. The placed lowering is used only when every such member
+ * is DETERMINED exactly, lies on a root (modulus equal, argument an exact `j/n` turn from the
+ * principal root), no two members share a root, and at least one member sits off its index root.
+ * Every other case lowers by index exactly as ADR-CX-042 did:
+ *
+ * - no member, or every member on its own index root: nothing changes;
+ * - a member that is no root at all (`z1 = 3`): the index pins contradict it, and the gate refuses
+ *   naming the student's statement, as before;
+ * - two members on one root: the index pins refuse it;
+ * - a member that is stated but FREE (`|z1| = 2`, a quadrant): which root it is would be a
+ *   configuration choice, and the plan left that to the operator, so it keeps today's reading.
+ */
+function placeSolutionSets(
+  pending: readonly { eq: RootsEquation; at: number }[],
+  constraints: Constraint[],
+  filters: readonly BranchFilter[],
+  measures: readonly MeasureRelation[],
+): void {
+  if (pending.length === 0) return;
+  const t1 = solveTier1(constraints);
+  const mentioned = new Set<string>();
+  for (const c of constraints) for (const n of [...refsOf(c.lhs), ...refsOf(c.rhs)]) mentioned.add(n);
+  for (const f of filters) mentioned.add(f.name);
+  for (const m of measures) for (const p of m.points) mentioned.add(p);
+  // splice from the back so earlier positions stay valid
+  for (const { eq, at } of [...pending].sort((a, b) => b.at - a.at)) {
+    const placed = t1.inconsistent ? null : placement(eq, t1, mentioned);
+    constraints.splice(at, 0, ...(placed ? solutionSetConstraintsPlaced(eq, placed) : solutionSetConstraints(eq, 'enumerate')));
+  }
+}
+
+/**
+ * The exact direction tier 1 gives a name, when nothing free is left in it. A stated argument row
+ * carries its whole-turn unknown (`arg z1 = 1/3 + k`), and a WHOLE multiple of a turn is not a
+ * different direction, so a turn unknown with an integer coefficient is dropped. A fractional one
+ * (`k/3`) means the name is one of several directions and is not determined.
+ */
+const exactArg = (t1: Tier1Result, name: string): Angle | null => {
+  const d = t1.argument.determined.get(name);
+  if (!d) return null;
+  for (const [u, c] of d.coefs) if (!isTurnUnknown(u) || !isInt(c)) return null;
+  return d.konst;
+};
+
+/** Which root each stated member occupies, or null when the index lowering must stand (see above). */
+function placement(eq: RootsEquation, t1: Tier1Result, mentioned: ReadonlySet<string>): Map<string, number> | null {
+  const n = eq.n;
+  const sols = solutionSetNames(eq, 'enumerate');
+  const members = sols.filter((s) => mentioned.has(s));
+  if (members.length === 0) return null;
+  // the right-hand side, exactly: every name it mentions must be determined
+  const form = linearize(eq.rhs);
+  if (!form) return null;
+  let mod: ExpVec = form.uConst;
+  let arg: Angle = form.tConst;
+  for (const [name, c] of form.uCoef) {
+    const m = t1.knownModulus.get(name);
+    if (!m) return null;
+    mod = modMul(mod, modPow(m, c));
+  }
+  for (const [name, c] of form.tCoef) {
+    const a = exactArg(t1, name);
+    if (!a) return null;
+    arg = angAdd(arg, angScale(a, c));
+  }
+  // the principal root, as the enumerate lowering's `principal` row defines it
+  const rootMod = modPow(mod, rat(1, n));
+  const rootArg = angScale(arg, rat(1, n));
+  const placed = new Map<string, number>();
+  for (const m of members) {
+    const mm = t1.knownModulus.get(m);
+    const ma = exactArg(t1, m);
+    if (!mm || !ma) return null; // a FREE member: keep today's reading (see the doc above)
+    if (!modEq(mm, rootMod)) return null;
+    const steps = angScale(angSub(ma, rootArg), rat(n));
+    if (steps.atoms.size > 0 || !isInt(steps.turns)) return null;
+    const j = Number(((steps.turns.n % BigInt(n)) + BigInt(n)) % BigInt(n));
+    if ([...placed.values()].includes(j)) return null;
+    placed.set(m, j);
+  }
+  // every member already on its own index root: the index lowering IS this placement
+  if (members.every((m) => placed.get(m) === sols.indexOf(m))) return null;
+  return placed;
 }

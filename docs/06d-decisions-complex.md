@@ -2547,7 +2547,7 @@ naming the student's own statement (`«z1 = 3»`, or `«z^3 = 8»` in the other 
 `ANON_PREFIX`, `isAnonymous` and `prettyName`'s empty-string branch are removed; none had another
 producer.
 
-**Index matching, not set membership — the ruling forces it.** If z₁ could equal any solution, a z₁ that
+**Index matching, not set membership — the ruling forces it.** *(Superseded by [ADR-CX-044](#adr-cx-044), operator ruling 2026-09-24: members are matched by set membership.)* If z₁ could equal any solution, a z₁ that
 is solution 2 would leave solution 1 unnamed and z₁ contradicting its index, and the naming would stop
 being well defined. So `z1 = 2cis120` then `z^3 = 8` is refused (2cis120 is a cube root of 8, but
 solution 2, not solution 1). The operator was told of this narrowing on the issue; if it is wrong, it is
@@ -2635,3 +2635,56 @@ answers), `src-complex/parser/rules.ts` (`bareExpression`), `src-complex/App.tsx
 `src-complex/i18n/index.ts`. Locks: `accepted-line-visible-1390.test.ts` (the reported cases plus the
 class net over the catalog and every fixture), `param-knowledge-1389.test.ts` (the operator's sequence,
 asks, free r, 18r → 10, the capstone's `15r` unchanged), and fixture `param-u-solved-1390.complex.json`.
+
+## ADR-CX-044 — The solutions of `X^n = …` are matched to stated members by SET MEMBERSHIP, not by index (#1396)
+
+**Status:** accepted, 2026-09-24 (operator ruling 2026-09-24) · **Issue:**
+[#1396](https://github.com/dcodish/geo_builder/issues/1396) (bug, `P2`, `complex`) · round
+[#1397](https://github.com/dcodish/geo_builder/issues/1397) · **amends** [ADR-CX-042](#adr-cx-042) ("Index
+matching, not set membership")
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-6 (amended): a number named zₖ is a claim that
+it is ONE of the solutions · **Design:** [04d](04d-design-complex.md), "A solution set claims its names"
+(amended) · **Ladder:** stage 0d′ ([LADDER-CX](LADDER-CX.md))
+
+**What was seen.** `z1 = 2cis120` then `z^3 = 8` was refused, although 2cis120 IS a cube root of 8.
+ADR-CX-042 pinned X₁ to the principal root and Xₖ to `(k−1)/n` of a turn from it, so a student who
+numbered the roots in a different order was refused as though they had written a non-root.
+
+**The ruling.** *Accept it, and name the rest* (chosen over "keep refusing" and "accept and
+renumber"). This is set membership, and it matches the operator's 2026-09-22 wording (*"if … z3 doesnt
+fit one of the solutions, it should be rejected"*).
+
+**Measured at pickup (no divergence).** `z1 = 2cis120 · z^3 = 8` and `z2 = 2 · z^3 = 8` were refused.
+`z1 = 2 · z^3 = 8` was accepted.
+
+**The mechanism: the pins are decided by the members, once the rest of the figure is solved.**
+`lowerLines` now holds back each enumerating set's rows. After every line is read, tier 1 solves the
+rest of the figure once (exact), and `placeSolutionSets` reads each solution name another line
+mentions. A member that is DETERMINED (exact modulus, and a direction whose only turn unknowns have
+whole coefficients) is placed exactly. Its modulus must equal the principal root's, and its direction
+must be a whole number `j` of `1/n` turns from it. The unstated names take the remaining roots in
+index order, in argument order from the principal root. Each member keeps its own row `Xₘ^n = rhs`, so
+the solve still checks it. The index lowering (ADR-CX-042) is emitted unchanged in every other case:
+
+- **no member, or every member already on its index root.** Nothing moves (`z^3 = 8`,
+  `z1 = 2 · z^3 = 8`, the example button);
+- **a member that is no root** (`z1 = 3`). The index pins contradict it, and the gate refuses it naming
+  the student's statement, as before;
+- **two members on one root.** Refused;
+- **a member stated but not DETERMINED** (`|z2| = 2`, or a quadrant only). Which root it is would be a
+  configuration choice, and the plan returned that to the operator. It keeps today's reading. That is
+  filed as its own question, [#1399](https://github.com/dcodish/geo_builder/issues/1399), not decided here.
+
+Because the members are read from the whole figure, the order of entry does not matter:
+`z^3 = 8 · z1 = 2cis120` draws the same figure as the other order (ADR-CX-042 item 3).
+
+**What changes for a student.** Numbering the roots in any order is accepted: z₁ = 2cis120 stays at 120°,
+and z₂, z₃ take 0° and 240°. **A figure can re-label.** After `z^3 = 8` (z₁ at 0°), a later
+`z1 = 2cis120` moves the name z₁ to 120° and hands 0° to z₂. That is the ruling's "name the rest",
+applied in the other order.
+
+**Consequences.** `src-complex/model/solutionSet.ts` (`solutionSetConstraintsPlaced`),
+`src-complex/app/deriveLines.ts` (`placeSolutionSets`, `placement`, `exactArg`). Locks:
+`roots-set-membership-1396.test.ts` (11: both orders, a member off index, a negative right-hand side,
+two members, the refusals, and what does not move), `roots-claim-names-1367.test.ts`'s index row
+FLIPPED with a comment naming this ruling, and fixture `roots-set-membership-1396.complex.json`.
