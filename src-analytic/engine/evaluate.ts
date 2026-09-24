@@ -22,6 +22,7 @@ import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type Rin
 import { apart } from './crossings';
 import { dirVector, freeRank, residual, resolveChoices, solveLM, solveMultiStart, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
 import { drawnPieceOver } from './extent';
+import { nthHolds, orderedCrossings } from './crossing-order';
 import { curveByName, inDomain, isFree, objectById, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type Selector } from './types';
 
 export interface FigurePoint {
@@ -103,6 +104,9 @@ export interface Figure {
   unsatisfied: Constraint[];
   /** Do the D7 branch selectors hold in this configuration? `false` asks for a different one. */
   selectorsOk: boolean;
+  /** WHICH selectors failed, when `selectorsOk` is false (#1268) — the objects from `construction.selectors`,
+   *  so a refusal is blamed on the sentence that stated them. Absent on a figure built by hand. */
+  selectorsFailing?: Selector[];
   /**
    * Declared polygons whose drawn ring CONTRADICTS the noun that declared it — crossed, or collapsed
    * (#1158, #1166). Non-empty is the same kind of statement as `unsatisfied`: this configuration must
@@ -568,7 +572,12 @@ function figureDofOf(c: Construction, sys: CarrierSystem, x: number[]): number {
  * solve already produced, and a configuration that fails them asks for a different seed rather than
  * reporting a contradiction (D7 kind 2).
  */
-function selectorsHold(c: Construction, at: Map<Id, Pt>, env: Env): boolean {
+/**
+ * WHICH selectors fail here (#1268) — so a refusal blames the sentence whose selector failed, not every
+ * sentence that happens to carry one. `derive` blamed every selector line when any failed, which named
+ * «משולש ABC» (its vertices' `distinct`) beside the crossing sentence that was actually impossible.
+ */
+function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[] {
   /**
    * The scale the DISTINCT test is measured against (#1077).
    *
@@ -589,7 +598,7 @@ function selectorsHold(c: Construction, at: Map<Id, Pt>, env: Env): boolean {
   );
   const apart = span * 1e-2;
 
-  return c.selectors.every((s) => {
+  const holds = (s: Selector): boolean => {
     /**
      * THE SIGN OF A DERIVED QUANTITY (#1323, ADR-AG-144) — «שיפוע הישר l1 שלילי».
      *
@@ -649,6 +658,14 @@ function selectorsHold(c: Construction, at: Map<Id, Pt>, env: Env): boolean {
       }
       return true;
     }
+    /**
+     * THE SENTENCE NAMED THIS ROOT (#1268, ADR-AG-157) — the pair's crossing in its canonical order
+     * (`crossing-order.ts`), judged against the configuration itself so the order follows the figure.
+     */
+    if (s.kind === 'crossing-nth') {
+      const atFn = (id: Id) => at.get(id) ?? null;
+      return nthHolds(p, s.nth, s.pair, atFn, curveAtOf(c, env, atFn));
+    }
     if (s.kind === 'axis-side') {
       const v = s.axis === 'x' ? p.x : p.y;
       return s.positive ? v > 0 : v < 0;
@@ -670,7 +687,8 @@ function selectorsHold(c: Construction, at: Map<Id, Pt>, env: Env): boolean {
     if (nn < 1e-24) return true;
     const t = ((p.x - a.x) * ux + (p.y - a.y) * uy) / nn;
     return t >= -1e-9 && t <= 1 + 1e-9;
-  });
+  };
+  return c.selectors.filter((s) => !holds(s));
 }
 
 /** The free vertices, in a stable order — the solver's unknown vector is two entries each. */
@@ -857,6 +875,27 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
     const mag = Math.abs(v) < 1e-6 ? 1 : Math.abs(v);
     const want = sel.positive ? mag : -mag;
     seeded.set(sel.id, sel.axis === 'x' ? { x: want, y: at0.y } : { x: at0.x, y: want });
+  }
+  /**
+   * AN ORDINAL SEEDS THE ROOT IT NAMES (#1268, ADR-AG-157) — the #1071 lesson for a branch.
+   *
+   * «נקודת החיתוך השנייה» is judged by the `crossing-nth` selector, and a filter that only rejects leaves
+   * the search to find the named root by luck (measured before: the solve's first converged start took
+   * the same root whichever word was written). So the crossing STARTS on the root its sentence names, in
+   * the order `crossing-order.ts` states, read off the seeded positions of what it crosses. Where the
+   * anchors are themselves free and move in the solve this is a start, not a verdict — the selector still
+   * has the last word. It runs after the bounded-noun projection above and overrides it: the ordinal is
+   * the more specific statement. Costs one `place` per evaluation, and only when an ordinal exists.
+   */
+  if (c.selectors.some((s) => s.kind === 'crossing-nth')) {
+    const pos = place(c, env, seeded);
+    const atSeed = (id: Id) => pos.get(id) ?? null;
+    for (const sel of c.selectors) {
+      if (sel.kind !== 'crossing-nth' || !seeded.has(sel.id)) continue;
+      const o = orderedCrossings(sel.pair, atSeed, curveAtOf(c, env, atSeed));
+      const root = o && !o.touching ? o.roots[sel.nth] : undefined;
+      if (root) seeded.set(sel.id, { x: root.x, y: root.y });
+    }
   }
 
   const unsatisfied: Constraint[] = [];
@@ -1281,7 +1320,7 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
     construction,
     vacant,
     unsatisfied,
-    selectorsOk: selectorsHold(c, placed, env),
+    ...((failing) => ({ selectorsOk: failing.length === 0, selectorsFailing: failing }))(failingSelectors(c, placed, env)),
     /**
      * Read from the POINTS this evaluation just produced, so the ring judged is the ring drawn
      * (#1158, #1166). A vertex that did not resolve leaves its polygon unjudged — that is a vacancy

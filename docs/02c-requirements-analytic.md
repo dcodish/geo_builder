@@ -1197,6 +1197,15 @@ crossings are offered, so the student must be able to name either: «נקודת 
 the tool may never put two letters on one location — and the ring a student clicks commits the sentence
 for the crossing under it, so what is written down re-reads as the point that was clicked. Where a pair
 has only one crossing the sentence carries no ordinal, because there is nothing to disambiguate.
+**Amended by [ADR-AG-157](06c-decisions-analytic.md#adr-ag-157) (#1268): the ordinal CHOOSES.** «הראשונה» and
+«השנייה» each name one root on their own, with no second named point needed, in one stated order: the
+straight is walked from the first letter it is named by toward the second («הישר AB» and «הישר BA» number
+the other way round), or left to right — bottom to top when vertical — when it has no points of its own
+(an equation, an axis, a named line). The order is the whole line's, so the crossing on a triangle side
+keeps its line's number, and naming the one beyond the side is refused on that sentence. A clicked ring
+commits the word for the root under it, and a ring is never re-numbered once its sibling is taken.
+«הציגו תצורה אחרת» never swaps a crossing the sentence named; a sentence without an ordinal still leaves
+the choice open, and both roots stay listed and reachable for it (R72).
 
 **R86 — a measurement can be reached by CLICKING, and a distance is shown as a construction**
 ([ADR-AG-066](06c-decisions-analytic.md#adr-ag-066)). Clicking a point or a line offers the questions

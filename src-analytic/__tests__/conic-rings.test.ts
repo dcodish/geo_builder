@@ -16,7 +16,6 @@
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
 import { crossingSentence, crossingsOf, freeLetter } from '../engine/crossings';
-import { seedShowing } from '../app/another';
 
 const at = (lines: string[]) => {
   const d = derive(lines, 0);
@@ -96,34 +95,30 @@ describe('#1096 — every offered sentence round-trips', () => {
 });
 
 describe('#1096 — the ring you click is the point you get', () => {
-  it('each of an ellipse’s two crossings resolves to ITS OWN point', () => {
-    /**
-     * Both rings carry the same words, because the sentence names both crossings and ADR-AG-047
-     * lists both. Without this, clicking the right-hand ring could land the point on the left one —
-     * which would break the contract the rings exist for.
-     *
-     * The seed chooses which solution is shown FIRST; it invents nothing, and «הציגו תצורה אחרת»
-     * still reaches the other.
-     */
-    const lines = ['x^2/9+y^2/4=1', 'נתון הישר l1: y=x'];
+  /**
+   * #1268 (ADR-AG-157) rewrote this pair. It used to find, per ring, the SEED that showed the clicked
+   * root (`seedShowing`), because both rings offered the same words and the sentence chose nothing. The
+   * sentence now NAMES its root — «הראשונה»/«השנייה» in the pair's canonical order — so each click lands
+   * on its own ring at whatever configuration the student is on, and no seed is searched for at all.
+   */
+  const lines = ['x^2/9+y^2/4=1', 'נתון הישר l1: y=x'];
+
+  it('each of an ellipse’s two crossings resolves to ITS OWN point, at every seed, with no seed search', () => {
     const { d, crossings } = at(lines);
     expect(crossings).toHaveLength(2);
-
     for (const ring of crossings) {
       const id = freeLetter(d.construction);
       const next = [...lines, crossingSentence(ring, id)];
-      const seed = seedShowing(next, id, ring);
-      const p = derive(next, seed).figure.points.find((q) => q.id === id)!;
-      expect(Math.hypot(p.x - ring.x, p.y - ring.y)).toBeLessThan(1e-4);
+      for (const seed of [0, 1, 2, 3]) {
+        const p = derive(next, seed).figure.points.find((q) => q.id === id)!;
+        expect(Math.hypot(p.x - ring.x, p.y - ring.y)).toBeLessThan(1e-4);
+      }
     }
   });
 
-  it('and the two clicks really do choose DIFFERENT configurations', () => {
-    // Otherwise the test above would pass trivially by both rings happening to share a seed.
-    const lines = ['x^2/9+y^2/4=1', 'נתון הישר l1: y=x'];
+  it('and the two rings offer DIFFERENT sentences — the words carry the choice, not the seed', () => {
     const { d, crossings } = at(lines);
     const id = freeLetter(d.construction);
-    const seeds = crossings.map((ring) => seedShowing([...lines, crossingSentence(ring, id)], id, ring));
-    expect(new Set(seeds).size).toBe(2);
+    expect(new Set(crossings.map((ring) => crossingSentence(ring, id))).size).toBe(2);
   });
 });

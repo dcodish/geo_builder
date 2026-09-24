@@ -19,6 +19,7 @@ import type { Figure } from './evaluate';
 import type { Construction, CurveKind, Id, NumCurve } from './types';
 import { objectById } from './types';
 import { isPolygonSide, withinSegment } from './extent';
+import { conicMeet, walkOfCoefficients, walkThrough, type Walk } from './crossing-order';
 
 export interface Crossing {
   /** Where, in world coordinates. */
@@ -44,6 +45,8 @@ interface Straight {
   /** The drawn extent — a segment is bounded, a stated line is not. */
   within: ((x: number, y: number) => boolean) | null;
   words: string;
+  /** The straight walked in its own direction — what numbers its crossings with a conic (#1268). */
+  walk: Walk | null;
 }
 
 const EPS = 1e-9;
@@ -219,6 +222,8 @@ function straightOfSegment(s: Figure['segments'][number], c: Construction): Stra
     // authority promotion read the same ruler, so a ring offered here is a root the solve can land on.
     within: (x, y) => withinSegment(s.a, s.b, { x, y }),
     words: w,
+    // From the first letter the words carry toward the second — `ends` is the order `w` names them in.
+    walk: walkThrough(s.a, s.b),
   };
 }
 
@@ -229,78 +234,26 @@ function straightOfCurve(id: Id, curve: NumCurve, c: Construction): Straight | n
   // construction object that a bare equation leaves kind-less.
   const w = words(c, id, 'line');
   if (!w) return null;
-  return { a: curve.a, b: curve.b, c: curve.c, within: null, words: w };
+  return { a: curve.a, b: curve.b, c: curve.c, within: null, words: w, walk: walkOfCoefficients(curve.a, curve.b, curve.c) };
 }
 
 /**
- * WHERE A STRAIGHT MEETS A CONIC (#1096) — up to two points, in closed form.
+ * WHERE A STRAIGHT MEETS A CONIC (#1096) — EVERY root, in the pair's canonical order (#1268).
  *
- * The line is parametrised as `P0 + t·d` (`P0` its point nearest the origin, `d = (−b, a)`), which
- * removes every vertical/horizontal special case: substituting into each canonical conic leaves a
- * QUADRATIC in `t`, and the three canonical forms are the only shapes `NumCurve` admits.
+ * The algebra is `crossing-order.ts`'s `conicMeet`, shared with the `crossing-nth` selector so the
+ * ring's «הראשונה» and the sentence's «הראשונה» are one number. Nothing is filtered here: the ORDER is
+ * over the whole line, and the drawn extent is applied by the caller AFTER each root has its number —
+ * which is what the #1113 comment below always claimed and what this function used to undo by filtering
+ * one call deeper, so a segment's ring carried no ordinal at all.
  *
- * A near-zero leading coefficient is the genuinely linear case — a line parallel to a parabola's
- * axis meets it exactly once — and is solved as such rather than divided through, which is where a
- * naive quadratic produces an infinity and draws a ring at the edge of the world.
+ * A TANGENCY OFFERS NO RING, deliberately (#1096): measured, the sentence a ring would offer at a touch
+ * does not build — the two incidences are degenerate there and the solve returns `unsatisfiable` even
+ * though it lands on the right point. **A ring whose click fails is worse than no ring** (ADR-AG-054).
  */
 function meetConic(l: Straight, conic: NumCurve): Array<{ x: number; y: number }> {
-  const n2 = l.a * l.a + l.b * l.b;
-  if (n2 < EPS) return [];
-  const p0 = { x: (-l.a * l.c) / n2, y: (-l.b * l.c) / n2 };
-  const d = { x: -l.b, y: l.a };
-
-  let A = 0;
-  let B = 0;
-  let C = 0;
-  if (conic.kind === 'circle') {
-    const q = { x: p0.x - conic.cx, y: p0.y - conic.cy };
-    A = d.x * d.x + d.y * d.y;
-    B = 2 * (d.x * q.x + d.y * q.y);
-    C = q.x * q.x + q.y * q.y - conic.r * conic.r;
-  } else if (conic.kind === 'ellipse') {
-    const ia = 1 / (conic.a * conic.a);
-    const ib = 1 / (conic.b * conic.b);
-    A = d.x * d.x * ia + d.y * d.y * ib;
-    B = 2 * (p0.x * d.x * ia + p0.y * d.y * ib);
-    C = p0.x * p0.x * ia + p0.y * p0.y * ib - 1;
-  } else if (conic.kind === 'parabola') {
-    // y² = 2p·x
-    const two = 2 * conic.p;
-    A = d.y * d.y;
-    B = 2 * p0.y * d.y - two * d.x;
-    C = p0.y * p0.y - two * p0.x;
-  } else {
-    return [];
-  }
-
-  const ts: number[] = [];
-  if (Math.abs(A) < 1e-12) {
-    if (Math.abs(B) > 1e-12) ts.push(-C / B); // the honestly linear case
-  } else {
-    const disc = B * B - 4 * A * C;
-    if (disc < -1e-9) return []; // misses it
-    const root = Math.sqrt(Math.max(disc, 0));
-    /**
-     * A TANGENCY OFFERS NO RING, deliberately (#1096).
-     *
-     * It is a real meeting point and a student may well want to name it, but measured, the sentence
-     * a ring would offer there does not build: the two incidences are degenerate at a touch and the
-     * solve returns `unsatisfiable` even though it lands on the right point. **A ring whose click
-     * fails is worse than no ring** — that is ADR-AG-054's whole principle, and it outranks the
-     * ruling to offer more rings, which was about anonymous conics and not about tangency.
-     *
-     * Filed separately rather than papered over here.
-     */
-    if (root <= 1e-6) return [];
-    ts.push((-B + root) / (2 * A));
-    ts.push((-B - root) / (2 * A));
-  }
-
-  return ts
-    .map((t) => ({ x: p0.x + t * d.x, y: p0.y + t * d.y }))
-    .filter((q) => Number.isFinite(q.x) && Number.isFinite(q.y))
-    // A SEGMENT is bounded; a stated line is not. The same `within` the straight-to-straight path uses.
-    .filter((q) => !l.within || l.within(q.x, q.y));
+  if (!l.walk) return [];
+  const m = conicMeet(l.walk, conic);
+  return m.touching ? [] : m.roots;
 }
 
 /** A drawn conic the student can NAME — the other half of a crossing (#1096). */
@@ -325,10 +278,8 @@ function meet(p: Straight, q: Straight): { x: number; y: number } | null {
 /**
  * Every crossing of drawn straight pieces that the student could NAME.
  *
- * Straight-to-straight only, for now. A line meets a circle twice and the sentence handles that
- * perfectly well ([ADR-AG-047](../../docs/06c-decisions-analytic.md#adr-ag-047) lists both), but the
- * DOT would then have to say which of the two it is, and that is a second question this does not
- * need to answer to be useful.
+ * Straight × straight, and straight × conic (#1096) — where each dot says WHICH of the pair's two roots
+ * it is, in the canonical order `crossing-order.ts` states (#1113, #1268).
  *
  * A crossing that already HAS a point on it is dropped: offering to create what is there would be the
  * tool suggesting the student repeat themselves.
@@ -368,20 +319,22 @@ export function crossingsOf(figure: Figure, c: Construction): Crossing[] {
 
   /**
    * STRAIGHT × CONIC (#1096). A line meets a conic twice, and BOTH are offered: the student can name
-   * either, and ADR-AG-047 already lists both solutions with «הציגו תצורה אחרת» moving between them.
-   * Which one a click lands on is settled at the click (see `App.tsx`), not here — this module knows
-   * where the crossings are, not what a mouse did.
+   * either. Which one a click lands on is settled by the WORDS (#1268): each ring's sentence carries its
+   * root's ordinal in the pair's canonical order, and the `crossing-nth` selector puts the point there.
    */
   for (const st of straights) {
     for (const cn of conics) {
       const roots = meetConic(st, cn.curve);
       /**
        * `nth` is the ROOT'S ORDER in this pair, taken before any filtering (#1113) — which is why
-       * this is `forEach` over the full root list and not a loop over the survivors. It is what lets
+       * this is `forEach` over the full root list and not a loop over the survivors. Since #1268 that is
+       * true: `meetConic` returns every root, and the extent is applied inside the loop, after the number. It is what lets
        * the offered sentence say «הראשונה» or «השנייה»; drop a taken crossing first and the
        * remaining one would call itself "the first" and collide with the point already there.
        */
       roots.forEach((at, n) => {
+        // A SEGMENT is bounded; a stated line is not — applied here, after the root has its number.
+        if (st.within && !st.within(at.x, at.y)) return;
         if (occupied(figure, at)) return;
         const id = `${at.x.toFixed(6)},${at.y.toFixed(6)}`;
         if (out.some((o) => o.id === id)) return;
@@ -498,4 +451,21 @@ export function centresOf(figure: Figure, letter: string): Namable[] {
     });
   }
   return out;
+}
+
+/**
+ * EVERYTHING THE CANVAS OFFERS TO NAME, as the sentences its clicks commit (#1025, #1109, #1268).
+ *
+ * The one list `App.tsx` hands the renderer: every crossing ring and every nameable centre, each carrying
+ * the WHOLE sentence a click adds. Lifted out of the component so the click path is reachable from a
+ * test — the #1268 lock clicks a ring through exactly this function and re-derives with its sentence,
+ * rather than re-assembling the offer by hand (a lock that reproduces the decision it guards stays green
+ * through the change that breaks it).
+ */
+export function offersOf(figure: Figure, c: Construction): Namable[] {
+  const letter = freeLetter(c);
+  return [
+    ...crossingsOf(figure, c).map((k) => ({ id: k.id, x: k.x, y: k.y, sentence: crossingSentence(k, letter) })),
+    ...centresOf(figure, letter),
+  ];
 }

@@ -439,8 +439,9 @@ export type Selector =
    * happen"*.
    *
    * The ruling (his, 2026-09-16) was that **the sentence names the root** rather than a branch index
-   * being stored behind the student's back, so «נקודת החיתוך הראשונה/השנייה» is the wording and this
-   * selector is what makes the two words mean different points. It names only its own subject: the
+   * being stored behind the student's back, so «נקודת החיתוך הראשונה/השנייה» is the wording. Since #1268
+   * the ordinal has its own selector (`crossing-nth`, below), which picks the root; this one serves the
+   * sentences that name none, and makes them not their sibling. It names only its own subject: the
    * siblings are found from the construction by their incidence signature, because the parser is pure
    * over one line and cannot know what the figure already holds.
    *
@@ -449,6 +450,20 @@ export type Selector =
    * least-squares solve can drive to zero.
    */
   | { kind: 'crossing-distinct'; id: Id }
+  /**
+   * «נקודת החיתוך הראשונה/השנייה» — THE SENTENCE NAMES ITS ROOT (#1268, ADR-AG-157).
+   *
+   * #1113's ruling, implemented: the ordinal picks the root on its own, with no second named point
+   * needed. `nth` counts the pair's crossings in the canonical order `crossing-order.ts` states (the
+   * straight walked in its own direction), and `pair` is the sentence's own two incidences — carried
+   * here rather than looked up, because the point may later gain other incidences and the order is a
+   * fact about THESE two.
+   *
+   * A selector for `crossing-distinct`'s reasons: it consumes no freedom (the two incidences already
+   * pin the point to a root) and "this root, not that one" is a region, not an equation. It is also why
+   * «הציגו תצורה אחרת» cannot swap the named crossing: a configuration on the other root is not valid.
+   */
+  | { kind: 'crossing-nth'; id: Id; nth: 0 | 1; pair: [Constraint, Constraint] }
   /**
    * THE SIGN OF A DERIVED QUANTITY — «שיפוע הישר l1 שלילי» (#1323, ADR-AG-144).
    *
