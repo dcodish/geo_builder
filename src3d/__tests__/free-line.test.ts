@@ -17,6 +17,12 @@ import { parse3 } from '../parser/parse3';
 import { freeDofCount3 } from '../engine/evaluate';
 import { derive3, useGeo3 } from '../store/store3';
 import { cross3, dot3, norm3, normalize3, sub3, type Vec3 } from '../engine/vec3';
+// #1305: every module a test uses is imported HERE, at collection — never `await import()` inside a
+// test body, where its load latency (queued on the shared vite-node server under full-suite load)
+// is charged to the 5 s per-test timeout. Locked by `test-imports-at-collection.test.ts`.
+import { buildScene3 } from '../render/scene3';
+import { HOME_CAMERA } from '../render/camera';
+import { serializeFigure3, deserializeFigure3 } from '../store/figureFile3';
 
 const state = () => useGeo3.getState();
 const submit = (u: string) => state().submit(u);
@@ -321,9 +327,7 @@ describe('#552 — honesty boundaries', () => {
     expect(state().lastError).toEqual({ code: 'line-not-determined', id: 'ℓ' });
   });
 
-  it('the canvas echo for a free line is its NAME, never a sampled equation (ADR-052 — canvas numbers are knowledge)', async () => {
-    const { buildScene3 } = await import('../render/scene3');
-    const { HOME_CAMERA } = await import('../render/camera');
+  it('the canvas echo for a free line is its NAME, never a sampled equation (ADR-052 — canvas numbers are knowledge)', () => {
     build(['ישר l1']);
     const d = derived();
     const scene = buildScene3(d.construction, d.resolved, HOME_CAMERA, { width: 640, height: 460 });
@@ -333,8 +337,7 @@ describe('#552 — honesty boundaries', () => {
 });
 
 describe('#552 — the figure file round-trips a free line', () => {
-  it('save → load keeps the declaration and the relation', async () => {
-    const { serializeFigure3, deserializeFigure3 } = await import('../store/figureFile3');
+  it('save → load keeps the declaration and the relation', () => {
     state().clear();
     build(['פירמידה BCKS', 'l⊥BCK']);
     const text = serializeFigure3(state().facts, state().seed);

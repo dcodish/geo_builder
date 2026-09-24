@@ -10424,3 +10424,50 @@ exact sequences through the real load path, parser-drift net included.
 `engine/evaluate.ts` (a driven coordinate is placed where the pivot put it; the pivot gate);
 `engine/apply.ts` (the fork's gate); `parser/parse3.ts` (`lengthClaim`'s carrier); `store/store3.ts`
 (`sampledCarrierVerdict`); `App3.tsx` and both locales.
+
+## ADR-3D-261 — A 3-D test loads its source modules at collection, never inside a timed test body: the `free-line` full-suite flake (#1305)
+
+**Status:** accepted, 2026-09-25 · **Issue:** [#1305](https://github.com/dcodish/geo_builder/issues/1305) (debt, `P2`, `3d`) · round [#1408](https://github.com/dcodish/geo_builder/issues/1408)
+**Requirements:** none (internal) · **Design:** none (internal)
+
+**Class.** A test that loads a source module inside its body (`await import('../render/scene3')`) has that
+module's load time charged to the 5 s per-test timeout. In isolation the load takes about 50 ms, so the test
+passes. In the full suite, every worker's module requests queue on the one shared vite-node server, and the
+same load can take seconds. The test then times out on some runs and passes on others, with the tree
+unchanged. A static import has the same latency but pays it during collection, where no per-test timeout
+applies.
+
+**Measured, not inferred.**
+- The round-#1292 red run recorded only the test's name. A saved local `test:fast` log from the #1357 round
+  has the same test (`free-line`'s last) failing with its message: `Test timed out in 5000ms`. It is a
+  timeout, not an assertion. Candidate 1 of the plan, state leakage, is ruled out: `build()` clears the store and every stateful describe has a `beforeEach` clear.
+- **Deterministic reproduction.** A scratch vitest config delays the *transform* of `render/scene3.ts` and
+  `store/figureFile3.ts` by 6 s, which models the contended server. At the base, 2 tests fail with
+  `Test timed out in 5000ms`: `free-line` "the canvas echo…" and `free-plane` "save → load…". With the
+  imports hoisted, 60/60 pass (at 6 s, and also at 20 s). The delay moves from `tests` into `collect`.
+- **The August catch was not this flake.** `tier-catches.jsonl` 2026-08-25 (sha `c7f6aaa`, 23:33 +0300)
+  falls between that commit and `83b08e82` (23:39, #613), which changed exactly those two
+  idempotence assertions. It was a real failure caught mid-change on a working tree.
+
+**The decision.**
+1. `free-line.test.ts` and `free-plane.test.ts` import `buildScene3`, `HOME_CAMERA` and
+   `serializeFigure3`/`deserializeFigure3` statically. Their tests are now synchronous.
+2. **The rule is enforced.** `src3d/__tests__/test-imports-at-collection.test.ts` scans every 3-D test file.
+   It refuses any indented (non-top-level) dynamic `import('…')` of anything except a `node:` builtin,
+   because builtins are not transformed and nothing queues. A body that genuinely needs a fresh module
+   instance says so on the line with `// load-in-body-ok: <reason>`. The lint carries a self-test, so it
+   can fail, and a scanned-file floor, so it cannot pass by scanning nothing. At the base it names exactly
+   the four offending lines.
+3. There is no retry and no raised timeout. Either would hide the next instance without removing it.
+
+**Sibling audit (docs/17 §1).** 3-D: the four lines above were the only offenders. The only other in-body
+import is `node:fs` in `issue-1347-featured-lint`, which is allowed. Other products have the same shape, and
+they are filed rather than fixed here:
+- 2-D: `general-position`, `scope`, `two-circle-family` (`@/render/scene`), `verb-gate`, `session-offer-1238`.
+- complex: `solve/window`.
+- server: `issue-1359-prompt-lane`.
+
+`no-session-restore-919` (complex) imports in the body deliberately, to test that importing is inert, and
+would take the opt-out marker.
+
+**Consequences.** Two test files are hoisted and there is one new lint. Nothing changes for students.
