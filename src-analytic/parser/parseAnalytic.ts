@@ -1510,6 +1510,31 @@ const ANGLE_EN = new RegExp(
   'i',
 );
 /**
+ * A NUMERIC angle, and an angle in RATIO to another (#1331) — «∠ABC = 60», «זווית ABC היא 40»,
+ * «∠ABC = ∠ACB», «∠ABC = 2∠ACB», in both languages and both glyphs.
+ *
+ * Operator, 2026-09-21: *"∠ABC = ∠ACB gives לא הצלחתי להבין את המשפט"*, and on round #1332's T19
+ * (*"should be supported (a 60 degree angle)"*); ruled 2026-09-24 that both halves build. The noun is the
+ * SAME atom the right-angle rule reads (#1330), so every spelling of it reaches both. Three letters
+ * only: a lone vertex names an angle relative to a figure, which only a right angle resolves (M1).
+ * The right-angle rule runs FIRST, so «∠ABC = 90» keeps its exact `perpendicular` lowering.
+ */
+const ANGLE_VALUE_HE = new RegExp(
+  `^${HE_GIVEN}${ANGLE_NOUN_HE}(${NAME})(${NAME})(${NAME})${HE_IS}\\s*(?:=\\s*)?(.+)$`,
+);
+const ANGLE_VALUE_EN = new RegExp(
+  `^${ANGLE_NOUN_EN}(${NAME})(${NAME})(${NAME})\\s*(?:is\\s+|equals?\\s+)?(?:=\\s*)?(.+)$`,
+  'i',
+);
+/** The right side as ANOTHER angle, with an optional numeric factor: «2∠ACB», «זווית ACB», «2·∠ACB». */
+const ANGLE_OF = new RegExp(
+  `^(?:(\\d+(?:\\.\\d+)?(?:/\\d+)?)\\s*[·*]?\\s*)?(?:${ANGLE_NOUN_HE}|${ANGLE_NOUN_EN})(${NAME})(${NAME})(${NAME})$`,
+  'i',
+);
+/** A degree tail the value may carry: «60°», «60 מעלות», "60 degrees". */
+const DEGREE_TAIL = /\s*(?:°|מעלות|degrees?)\s*$/i;
+
+/**
  * «C ברביע השלישי» — a point placed in a REGION (#1071).
  *
  * A quadrant is not a curve and not a value: it is a pair of inequalities. That makes it D7's SECOND
@@ -2227,6 +2252,30 @@ function parseConstraint(raw: string): RuleOutcome {
     if (!b && !c) return made([{ t: 'right-angle', id: a, src: line }]);
     // Two letters name no angle at all; saying so beats guessing which one was meant.
     return refuse('bad-operand', line);
+  }
+
+  const angVal = ANGLE_VALUE_HE.exec(line) ?? ANGLE_VALUE_EN.exec(line);
+  if (angVal) {
+    const [, a, v, b, rhsSrc] = angVal;
+    const rhs = trim(rhsSrc);
+    // Read the same way as the right angle: the middle letter is the vertex, the outer two the rays.
+    if (a === v || v === b || a === b) return refuse('repeated-vertex', line);
+    const other = ANGLE_OF.exec(rhs);
+    if (other) {
+      const [, kSrc, a2, v2, b2] = other;
+      if (a2 === v2 || v2 === b2 || a2 === b2) return refuse('repeated-vertex', line);
+      const k = parseExpr(kSrc ?? '1');
+      if (!k) return refuse('bad-equation', rhs);
+      return made([{ t: 'constraint', k: { t: 'angle-ratio', left: { v, a, b }, right: { v: v2, a: a2, b: b2 }, k }, src: line }]);
+    }
+    const valueSrc = rhs.replace(DEGREE_TAIL, '');
+    // A word on the right («חדה», «acute») is not a value this rule reads — leave the sentence to
+    // whoever owns it rather than answer with an equation error.
+    if (claimable(valueSrc)) {
+      const value = parseExpr(normalizeMath(valueSrc));
+      if (!value) return refuse('bad-equation', valueSrc);
+      return made([{ t: 'constraint', k: { t: 'angle', at: { v, a, b }, value }, src: line }]);
+    }
   }
 
   const quad = QUADRANT_HE.exec(line) ?? QUADRANT_EN.exec(line);

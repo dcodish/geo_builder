@@ -408,6 +408,28 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: '∠ABC = 90',
     needs: ['משולש ABC'],
   },
+  // #1331 — a NUMERIC angle and an angle in RATIO to another (the 2-D ADR-018 / ADR-100 pair, ported).
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'זווית ABC היא 60',
+    en: 'angle ABC is 60',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: '∠ABC = ∠ACB',
+    en: '∠ABC = ∠ACB',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: '∠ABC = 2∠ACB',
+    en: '∠ABC = 2∠ACB',
+    needs: ['משולש ABC'],
+  },
 
   /** Naming a circle's CENTRE (#1109) — the same click-to-name family as a crossing. */
   {

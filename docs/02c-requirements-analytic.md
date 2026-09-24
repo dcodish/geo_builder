@@ -874,6 +874,12 @@ English `=` form — «angle ABC = 90» — and they mean the same thing **in an
 is named by a WHOLE name, never by a letter pair taken out of the middle of a word.** «ANGLE ABC» is not
 three measurements. A non-right angle value remains out of scope in both languages.
 
+**R115 — an angle can be stated by its SIZE and in RATIO to another angle**
+([ADR-AG-153](06c-decisions-analytic.md#adr-ag-153), [#1331](https://github.com/dcodish/geo_builder/issues/1331)).
+«∠ABC = 60» (also «זווית ABC היא 60», «60°», «60 מעלות»), «∠ABC = ∠ACB» and «∠ABC = 2∠ACB» are givens in
+both languages: the figure honours them at every configuration, and each consumes a degree of freedom.
+Three letters name the angle; a lone vertex still names only a right angle (R60).
+
 **R114 — the tool never accepts a sentence a textbook would not print; it teaches the one it would**
 ([ADR-AG-150](06c-decisions-analytic.md#adr-ag-150),
 [#1353](https://github.com/dcodish/geo_builder/issues/1353), implementing

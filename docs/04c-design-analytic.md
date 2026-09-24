@@ -496,6 +496,10 @@ constraint blame read them unchanged; only whether a partial line survives chang
 
 ## Relations, and the direction resolver ([ADR-AG-024](06c-decisions-analytic.md#adr-ag-024))
 
+*Angles ([ADR-AG-153](06c-decisions-analytic.md#adr-ag-153)).* An angle by SIZE and an angle in RATIO are two
+rows of the solve (`angle`, `angle-ratio`), each the unsigned angle difference over π, beside the
+`perpendicular` row a right angle lowers to. They are not directions and never reach the resolver below.
+
 Four things in this grammar have a direction:
 
 | operand | written | resolves to |
