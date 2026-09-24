@@ -10282,3 +10282,29 @@ ids. After the extraction all of them reproduce exactly (`decide-submit3-parity-
 `lostGivens3`; `submit`, `submitSteps` and `replaceFact` reduced to dispatch). Locks: the parity test and
 its golden file, and `decide-submit3-purity-1394.test.ts` (asking leaves the store identical, including
 for a rename, a twin and a record).
+
+## ADR-3D-259 — The post-pass retry takes a red row that CREATES a point: «M אמצע SA» typed above its pyramid builds (#1339; the 3-D half of ADR-W-089)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1339](https://github.com/dcodish/geo_builder/issues/1339) (bug, `P2`, `3d`) · operator ruling 2026-09-21: *"yes - it should"* · round [#1408](https://github.com/dcodish/geo_builder/issues/1408)
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-2c (extended) · **Design:** [04b](04b-design-3d.md) the retry pass
+**Widens** [ADR-3D-257](#adr-3d-257) and withdraws its "a creating row stays red" clause. The cross-product rule is [ADR-W-089](06w-decisions-workspace.md#adr-w-089).
+
+**Measured before (`eef9dda4`, the real store).** `submit` the pyramid, then «M אמצע SA». `remove` the pyramid and `submit` it again. The list reads «M אמצע SA» · «פירמידה SABCD שבסיסה ריבוע». The statuses are `{unknown-point S}`, ok, and there is no M in the figure. This is T30 of round #1332, exactly as the issue reports it.
+
+**Root cause.** ADR-3D-257's post-pass retry was gated on `retryWouldSucceedWithoutCreating`: the dry run had to succeed AND leave `points.size` unchanged. The second clause carried 2-D's ADR-104 stranding limit into a loop where stranding cannot happen. That loop touches only red rows, in list order, pass after pass. So a row that referenced M before M existed is itself red and is retried after M lands.
+
+**The change.** The predicate is now `retryWouldSucceed`: the dry run on a scratch copy succeeds. Everything else is unchanged. `applyCommand3` is pure, the real `applyFact` runs with its count-delta attribution, a pass with no progress ends the loop, and green rows are never touched.
+
+**Measured after.**
+- The operator's sequence through the store: ok, ok, with M at the midpoint of SA (to 1e-9, seeds 0–5).
+- A row naming a point no line declares («M אמצע XA») stays red with `unknown-point X`, and no M is drawn.
+- A chain settles in both orders: «M אמצע SA» · «SM = 3» · pyramid, and «SM = 3» · «M אמצע SA» · pyramid. Both give SM = 3 and SA = 6.
+- ADR-3D-257's own cases are unchanged. Its lock for the withdrawn clause now asserts the new behaviour and points here.
+
+**Sibling audit (docs/17 §1).**
+- Analytic had the same class (`NON_CREATING`) and is fixed in the same round as [ADR-AG-156](06c-decisions-analytic.md#adr-ag-156).
+- 2-D builds the typed-first case but not the edited list. That half is filed as [#1411](https://github.com/dcodish/geo_builder/issues/1411) (see ADR-W-089).
+
+**Not built, noted.** A row that stays red keeps its IN-ORDER error. «M אמצע SX» above the pyramid still reads `unknown-point S` after the pyramid has declared S. Refreshing the error from the dry run was tried and withdrawn in this change. The in-order fold commits a failing fact's earlier commands (partial application), so a re-run can report `already-defined` for the row's own earlier command, which is a worse message. The stale naming needs the partial-application question answered first.
+
+**Consequences.** `src3d/store/store3.ts` (the predicate). Locks: `src3d/__tests__/issue-1339-forward-creating-row.test.ts` (new), and the flipped case in `issue-1327-forward-constraint.test.ts`.

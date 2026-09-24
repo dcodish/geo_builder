@@ -187,9 +187,13 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   in the student's wording — never a bare success. The value **takes effect again by itself** when a
   definition is back, even one added after the value row — and so does **any constraint typed before
   the points it names**: «∠SAB = 70» above the pyramid that declares A and B takes effect once the
-  pyramid exists, to a fixpoint over such rows, while a row that would INTRODUCE a point is never
-  re-ordered and stays visibly red ([ADR-3D-257](06b-decisions-3d.md#adr-3d-257), #1327 — the operator's
-  #1242 ruling, *"the diagram should either respect all input or refuse to build"*). The same report
+  pyramid exists, to a fixpoint over such rows ([ADR-3D-257](06b-decisions-3d.md#adr-3d-257), #1327 — the
+  operator's #1242 ruling, *"the diagram should either respect all input or refuse to build"*) — **and so
+  does a row that CREATES a point**: «M אמצע SA» above the pyramid builds, with M at the midpoint of SA,
+  once the pyramid declares S and A, and a row that leans on M settles after it
+  ([ADR-3D-259](06b-decisions-3d.md#adr-3d-259), #1339, operator 2026-09-21: *"yes - it should"*; the
+  cross-product rule is [ADR-W-089](06w-decisions-workspace.md#adr-w-089)). A row naming a point no line
+  declares stays visibly red. The same report
   serves a relation on a point whose defining row is gone — one class, one seam. Suite rule:
   [ADR-W-044](06w-decisions-workspace.md#adr-w-044). *(Realised — [ADR-3D-220](06b-decisions-3d.md#adr-3d-220),
   #926; `issue-926.test.ts`.)*

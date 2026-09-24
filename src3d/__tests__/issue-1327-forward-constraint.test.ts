@@ -6,7 +6,7 @@
  * either respect all input or refuse to build"*. Measured: «∠SAB = 70» above «פירמידה SABCD שבסיסה
  * ריבוע» was red with `unknown-point` and the pyramid was drawn WITHOUT the 70° — both halves failed.
  * ADR-3D-220 retried only `unknown-symbol` rows; this is the same rule one predicate wider, decided by
- * a dry run (a row that would introduce a point is never re-ordered — the ADR-104 limit).
+ * a dry run. (Its "a row that would introduce a point is never re-ordered" clause was withdrawn by #1339.)
  *
  * The list reaches that shape only by editing, so the facts are built directly (as the store's own
  * remove / replaceFact would leave them), not through `submit`'s gate.
@@ -51,12 +51,11 @@ describe('#1327 — «∠SAB = 70» above the pyramid that declares A and B', ()
     expect(vangles(['α = 70', '∠SAB = α', PYR])).toEqual([70]);
   });
 
-  it('the ADR-104 limit: a row that would INTRODUCE a point is never re-ordered — it stays red and visible', () => {
-    const [first, second] = statuses(['M אמצע SA', PYR]);
-    expect(typeof first, 'stays red').not.toBe('string');
-    expect(second).toBe('ok');
-    // and the point it would have made is not in the figure
-    expect(fold(['M אמצע SA', PYR]).construction.points.has('M')).toBe(false);
+  it('#1339 (ADR-3D-259) withdrew the ADR-104 limit here: a row that INTRODUCES a point is retried too', () => {
+    // This case used to lock the row red (T30 of round #1332). The operator ruled it should build; the
+    // creating-row locks live in issue-1339-forward-creating-row.test.ts.
+    expect(statuses(['M אמצע SA', PYR])).toEqual(['ok', 'ok']);
+    expect(fold(['M אמצע SA', PYR]).construction.points.has('M')).toBe(true);
   });
 
   it('a green figure never changes: the retry touches only rows that were red', () => {

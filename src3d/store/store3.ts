@@ -341,10 +341,20 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
   // does, so it is retried on exactly ADR-3D-220's grounds. What is retried is decided by a DRY RUN, not
   // by a list of command kinds (a list drifts): `applyCommand3` is pure, so the fact is applied to a
   // scratch copy, and it is retried for real only if that run succeeds AND introduces no point — the
-  // ADR-104 limit made mechanical. A row that would create («M אמצע SA» above its solid) stays red and
-  // visible, which is the "refuse to build" half. Bounded like the 2-D deferral: a pass that makes no
+  // ADR-104 limit made mechanical. A row that would create («M אמצע SA» above its solid) stayed red and
+  // visible — that clause is withdrawn by #1339 below. Bounded like the 2-D deferral: a pass that makes no
   // progress ends it, so a chain of forward references settles to a fixpoint.
-  const retryWouldSucceedWithoutCreating = (f: Fact3): boolean => {
+  //
+  // #1339 (ADR-3D-259, the 3-D half of ADR-W-089): the "introduces no point" clause is DROPPED — a row
+  // that CREATES («M אמצע SA» above «פירמידה SABCD שבסיסה ריבוע») is retried exactly as the angle row
+  // is (operator ruling 2026-09-21: "yes - it should"). ADR-104's stranding hazard belongs to the MAIN
+  // fold, where moving a creating row later would leave the rows between seeing a figure without its
+  // point. It cannot occur HERE: a row that referenced M before M existed is itself red, and this loop
+  // retries red rows in list order, pass after pass, so M's dependents land after M; a green row cannot
+  // have depended on a point that did not exist. The rule is now one sentence — a red row is retried
+  // iff its dry run succeeds — and a row whose reference nothing declares still fails the dry run and
+  // stays red.
+  const retryWouldSucceed = (f: Fact3): boolean => {
     let probe = c;
     for (const cmd of f.cmds) {
       if (droppedSoft(cmd)) continue;
@@ -352,13 +362,13 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
       if (!r.ok) return false;
       probe = r.next;
     }
-    return probe.points.size === c.points.size;
+    return true;
   };
   for (let pass = 0; pass < facts.length; pass++) {
     let progressed = false;
     for (const f of facts) {
       if (typeof status[f.id] === 'string') continue; // ok, or disabled — never touched
-      if (!retryWouldSucceedWithoutCreating(f)) continue; // still unsatisfiable, or it would introduce a point — stays red
+      if (!retryWouldSucceed(f)) continue; // still unsatisfiable against the completed figure — stays red
       status[f.id] = applyFact(f);
       progressed = true;
     }

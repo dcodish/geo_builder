@@ -482,15 +482,18 @@ list. Collapsing it into "already known" would silently drop a stated given.
 and both are the operator's one sentence — *the diagram should either respect all input or refuse to
 build* — made mechanical:
 
-**Deferral, to a fixpoint.** A fact that CREATES nothing (`constraint`, `selector`, `right-angle`,
-`area-of`, `tangent-of`, `on-kind` — the `NON_CREATING` set beside `fold`) and failed at its position is
-retried against the completed construction until a pass lands nothing. «AD גובה לצלע BC» typed before
-«משולש ABC» fails only because `B` and `C` do not exist YET; once the triangle declares them the two
-constraints hold exactly as in the other order. This is ADR-104's mechanism ported, with ADR-104's
-limit: a creating fact is never deferred, because re-ordering it would strand its dependents — which
-is also why evaluation still needs no topological sort ([ADR-AG-013](06c-decisions-analytic.md#adr-ag-013)):
-objects are still appended in declaration order, only a constraint may land later than it was typed. A
-genuinely unresolvable reference keeps failing and keeps its error.
+**Deferral, to a fixpoint.** Every fact that failed at its position is retried against the completed
+construction until a pass lands nothing, and it lands iff its re-apply now succeeds. «AD גובה לצלע BC»
+typed before «משולש ABC» fails only because `B` and `C` do not exist YET; once the triangle declares
+them the two constraints hold exactly as in the other order. Until #1340 the retry took only the kinds
+that create nothing (a `NON_CREATING` set — ADR-104's limit); [ADR-AG-156](06c-decisions-analytic.md#adr-ag-156)
+removed the set, so «M אמצע AB» typed above «A(0,0)» · «B(4,0)» lands too. The limit belonged to the
+IN-ORDER pass: here a fact that referenced the new object before it existed is itself failed and is
+retried after it, in list order, so nothing is stranded ([ADR-W-089](06w-decisions-workspace.md#adr-w-089)).
+Evaluation still needs no topological sort ([ADR-AG-013](06c-decisions-analytic.md#adr-ag-013)): an
+object can only land once every object it references exists, so the construction stays in dependency
+order even when an object lands later than it was typed. A genuinely unresolvable reference keeps
+failing and keeps its error.
 
 **The line is the unit.** `derive` hands `fold` each fact's line index (`owner`). If any fact of a line
 still fails after the fixpoint, NONE of that line's facts survive: the fold re-runs without that line

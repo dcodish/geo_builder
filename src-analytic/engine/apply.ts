@@ -1371,33 +1371,27 @@ export interface FoldResult {
 }
 
 /**
- * Fact kinds that CREATE nothing — a statement about objects that must already exist. These are the
- * only facts the deferral fixpoint retries (#1242, ADR-AG-133): re-ordering a creating fact to the end
- * would strand its dependents, which is the limit ADR-104 set for the 2-D twin and the reason
- * evaluation still needs no topological sort (ADR-AG-013 — objects are still appended in declaration
- * order; only a CONSTRAINT may land later than it was typed).
- */
-const NON_CREATING: ReadonlySet<Fact['t']> = new Set<Fact['t']>([
-  'constraint',
-  'selector',
-  'right-angle',
-  'area-of',
-  'tangent-of',
-  'on-kind',
-]);
-
-/**
  * The replay fold: facts in, figure-defining construction out. Pure over the ordered list.
  *
  * `groupOf[i]` is the LINE each fact came from (`derive`'s `owner`); a caller with no lines treats
  * every fact as its own line. Two things happen beyond the in-order pass (#1242, ADR-AG-133):
  *
- * 1. **Deferral, to a fixpoint.** A non-creating fact that failed at its position is retried against
+ * 1. **Deferral, to a fixpoint.** A fact that failed at its position is retried against
  *    the completed construction until nothing more lands — «AD גובה לצלע BC» typed before «משולש ABC»
  *    fails only because `B` and `C` do not exist YET, and once the triangle declares them the two
  *    constraints hold exactly as they do in the other order. The 2-D twin is ADR-104, and the operator's
  *    ruling is the same sentence in both products: *the diagram should either respect all input or
  *    refuse to build.* A genuinely unresolvable reference keeps failing and keeps its error.
+ *
+ *    #1340 (ADR-AG-156, the analytic half of ADR-W-089): the retry takes EVERY failed fact whose
+ *    re-apply now succeeds, creating or not. It used to take only the kinds that create nothing (a
+ *    `NON_CREATING` list), so «M אמצע AB» typed above «A(0,0)» · «B(4,0)» stayed red while the
+ *    crossing typed above its lines built. The list carried ADR-104's stranding limit, which belongs to
+ *    the IN-ORDER pass (a creating fact moved later would leave the facts between seeing a figure
+ *    without its object); it cannot occur here, because a fact that referenced the new object before
+ *    it existed is itself failed and is retried after it, in list order, pass after pass. ADR-AG-013
+ *    still holds: an object can only land once every object it references exists, so the construction
+ *    stays in dependency order and evaluation still needs no topological sort.
  * 2. **The LINE is the unit of application.** If any fact of a line still fails after the fixpoint,
  *    NONE of that line's facts survive: the fold re-runs without that line, and every one of its facts
  *    carries the line's error. Before this a line lowering to five facts could land three and drop two,
@@ -1469,14 +1463,14 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean): Fold
     if (out.ok) commit(i, out.next, out.effect);
     else errors[i] = out.error;
   });
-  // The deferral fixpoint: retry every still-failed non-creating fact against the construction the
+  // The deferral fixpoint: retry every still-failed fact — creating or not (#1340) — against the construction the
   // later facts completed. Bounded by the fact count; a pass that lands nothing ends it. A fact is not
   // retried against the very construction it last failed on (nothing changed, so nothing can differ).
   const failedOn = new Map<number, Construction>();
   for (let pass = 0; pass < facts.length; pass++) {
     let progressed = false;
     facts.forEach((f, i) => {
-      if (!include(i) || !errors[i] || !NON_CREATING.has(f.t)) return;
+      if (!include(i) || !errors[i]) return;
       if (failedOn.get(i) === c) return;
       const out = applyFact(c, f);
       if (out.ok) {

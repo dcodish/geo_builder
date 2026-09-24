@@ -7582,3 +7582,42 @@ play servers) is process, and the operator has ruled on it.
 spellings through `decideSubmit` + `reachesFallback`, eleven single/double lowering equivalences, the same
 figure for «זוית C ישרה», the question lane, the shape-noun folds with a word-boundary guard, and the catalog
 row).
+
+## ADR-AG-156 — The fold's deferral retries a fact that CREATES: «M אמצע AB» typed above «A(0,0)» · «B(4,0)» builds (#1340; the analytic half of ADR-W-089)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1340](https://github.com/dcodish/geo_builder/issues/1340) (bug, `P2`, `analytic`), transcribed from the #1339 ruling of 2026-09-21: *"yes - it should"* · round [#1408](https://github.com/dcodish/geo_builder/issues/1408)
+**Requirements:** [02c](02c-requirements-analytic.md) R19 (extended) · **Design:** [04c](04c-design-analytic.md) the fold's deferral
+**Widens** [ADR-AG-133](#adr-ag-133)'s deferral fixpoint. The cross-product rule is [ADR-W-089](06w-decisions-workspace.md#adr-w-089).
+
+**Measured before (`eef9dda4`).**
+
+| input | result |
+| --- | --- |
+| `derive`: «M אמצע AB» · «A(0,0)» · «B(4,0)» | `unknown-reference A` at line 0. Points A and B only, no M |
+| the store: record A, B, M through `decideSubmit`, remove A and B, record them again | the same list and the same fault |
+| the working order, and «P נקודת החיתוך …» typed above its four points | build |
+
+**Root cause.** `foldPass`'s deferral fixpoint retried a failed fact only when its kind was in `NON_CREATING` (`constraint`, `selector`, `right-angle`, `area-of`, `tangent-of`, `on-kind`). A `derived` fact creates M, so it was never retried. That list is ADR-104's in-order stranding limit applied to a post-pass. In the post-pass, a fact that referenced the new object before it existed has itself failed and is retried after it, in list order.
+
+**The change.** The list is removed. The fixpoint retries every failed fact, and the fact lands iff `applyFact` against the current construction succeeds. Three things are unchanged:
+- The `failedOn` guard: a fact is not retried against the construction it last failed on.
+- The pass bound.
+- Line atomicity: after the fixpoint, a line with any failing fact is excluded in full, and the poisoning runs to its own fixpoint.
+
+ADR-AG-013 still holds. An object can land only once every object it references exists, so the construction stays in dependency order even when an object lands later than it was typed.
+
+**Measured after.**
+
+| input | result |
+| --- | --- |
+| the three sequences above | all build, with M = (2, 0) in both orders |
+| a derived point whose operand no line declares («M אמצע AX») | stays faulted, `unknown-reference X`. A and B only |
+| a chain («N אמצע AM» · «M אמצע AB» · A · B) | settles to M = (2, 0), N = (1, 0) |
+| every permutation of A, B, M | builds the same M |
+| ADR-AG-133's own lock file, including the atomicity cases | 12 of 12 unchanged |
+
+**Sibling audit.**
+- 3-D had the same class and is fixed in the same round: [ADR-3D-259](06b-decisions-3d.md#adr-3d-259).
+- 2-D is filed as [#1411](https://github.com/dcodish/geo_builder/issues/1411).
+
+**Consequences.** `src-analytic/engine/apply.ts` (`NON_CREATING` removed, `foldPass`'s fixpoint gate). Lock: `src-analytic/__tests__/issue-1340-forward-derived-point.test.ts`. It includes the store and submit-gate sequence and asserts every row green with M at (2, 0).
