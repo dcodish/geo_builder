@@ -77,6 +77,12 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   is an equation in `r`, solved as its own small system over the parameter atoms, not a contradiction.
   A solved parameter is drawn at its value and leaves the free basis. The argument half holds the other
   end: a turn-unknown pinned to a non-whole constant is always a contradiction.
+- **A solved parameter has ONE exact value** ([ADR-CX-043](06d-decisions-complex.md#adr-cx-043)). Tier 1
+  publishes `paramValues` (each determined parameter as an exact `ExpVec`), and `substituteSolvedParams` is the
+  only way a solved atom leaves a modulus: `knownModulus`, the drawn reading, the «פרמטרים» panel section
+  (`Derived2.params`) and the ask lane all read it, so none can print `18r` for a number the givens made
+  10. The class net `accepted-line-visible-1390.test.ts` fails any accepted given whose numbers and
+  parameters appear on no surface.
 - **A solution set claims its names** ([ADR-CX-042](06d-decisions-complex.md#adr-cx-042)). `X^n = …` on a fresh
   letter lowers to X₁ pinned to the principal root and Xₖ pinned `(k−1)/n` of a turn from it — always,
   whether or not the student already holds some Xₖ. That makes claiming the name the consistency

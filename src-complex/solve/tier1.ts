@@ -107,6 +107,16 @@ export interface Tier1Result {
    * sample; its `free` ones stay free. Empty when no given pins a parameter.
    */
   readonly params: LinearSolution<ExpVec>;
+  /**
+   * #1389/#1390 — every parameter the givens DETERMINE, as an exact value: `u^5 = 32` gives
+   * `u → {2:1}`, and `9r = 5` gives `r → {5:1, 3:-2}`. A parameter determined in terms of others
+   * that stay free is carried in them (`r → {s:1, 2:-1}` for r = s/2), so it is exact but parametric.
+   *
+   * This is the ONE place a solved parameter becomes a value. `knownModulus` is already substituted
+   * through it, and every other reader (the drawn reading, the parameters section, the ask lane) calls
+   * {@link substituteSolvedParams}, so none of them can print `18r` for a number the givens made `10`.
+   */
+  readonly paramValues: ReadonlyMap<string, ExpVec>;
 }
 
 const BRANCH_BUDGET = 2048;
@@ -196,6 +206,7 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
   const modulus = solveLinear(modRows, names, MOD_OPS);
   const argument = solveLinear(argRows, [...names, ...kNames], ANG_OPS);
   const params = solveParams(modulus.leftover);
+  const paramValues = solvedParamValues(params);
 
   const { branches, truncated, integralityFailed } = enumerateBranches(argument, kNames);
 
@@ -207,7 +218,9 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
 
   // A modulus is KNOWN only when nothing free is left in it — otherwise it is a relation, not a value.
   const knownModulus = new Map<string, ExpVec>();
-  for (const [n, d] of modulus.determined) if (d.coefs.size === 0) knownModulus.set(n, d.konst);
+  for (const [n, d] of modulus.determined) {
+    if (d.coefs.size === 0) knownModulus.set(n, substituteSolvedParams(d.konst, paramValues));
+  }
 
   const freeDof = [
     ...modulus.free.map((n) => `|${n}|`),
@@ -226,7 +239,40 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
     deferred,
     names,
     params,
+    paramValues,
   };
+}
+
+/**
+ * The exact value of each SOLVED parameter (#1389/#1390). The params system works in log space, so a
+ * determined row reads `log p = log konst + Σ c·log f`, i.e. `p = konst · Π f^c` over parameters f
+ * that stay free. Because the elimination is reduced, those f are never themselves determined, so a
+ * single pass gives a closed value.
+ */
+function solvedParamValues(params: LinearSolution<ExpVec>): Map<string, ExpVec> {
+  const out = new Map<string, ExpVec>();
+  if (params.inconsistent) return out;
+  for (const [p, d] of params.determined) {
+    let v: ExpVec = d.konst;
+    for (const [f, c] of d.coefs) v = modMul(v, modPow(new Map([[f, rat(1)]]), c));
+    out.set(p, v);
+  }
+  return out;
+}
+
+/**
+ * Replace every SOLVED parameter atom in an exact modulus by its value: `{2:1, 3:2, r:1}` with
+ * `r = 5/9` becomes `{2:1, 5:1}`, which is `10`. Atoms of parameters that stay free are left in
+ * place, so a genuinely parametric answer (`15r` with r free) is unchanged.
+ */
+export function substituteSolvedParams(v: ExpVec, values: ReadonlyMap<string, ExpVec>): ExpVec {
+  if (values.size === 0) return v;
+  let out: ExpVec = new Map();
+  for (const [atom, e] of v) {
+    const value = isPrimeAtom(atom) ? undefined : values.get(atom);
+    out = modMul(out, value ? modPow(value, e) : new Map([[atom, e]]));
+  }
+  return out;
 }
 
 /**
