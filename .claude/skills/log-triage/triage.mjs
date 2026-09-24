@@ -23,15 +23,13 @@
  * tangent-from-external family — and (b) everything the App answers with a GUIDED refusal. The distortion is
  * not uniform: the context-dependent constructs are exactly the recently-fixed ones, so FIXED WORK FLOATED TO
  * THE TOP of the very ranking the skill says to trust. Two runs (2026-07-11, 2026-07-17) burned most of a
- * session re-checking by hand. So this file now mirrors `App.tsx#submit`, in its order:
+ * session re-checking by hand. So this file mirrored `App.tsx#submit` by hand, in its order — and that
+ * mirror drifted five more times (ADR-346: #35, ADR-169, #501, #829, and a pre-LLM set per new category).
  *
- *   store ops (nameCentre/rename/merge/swap) → parse(u, buildParseCtx(figure)) → clarify (ambiguous-*)
- *   → PRE_LLM out-of-scope short-circuit (ADR-289) → honesty gates (ADR-089/250/264/292 + #153 + span accounting, ADR-453)
- *   → replay → built / refused
- *
- * `buildParseCtx` is IMPORTED, never re-implemented — that mirror drifting is what this file is a fix for,
- * and `src/parser/context.ts`'s own header documents the same class (its ADR-169 `parallels` drift). When
- * the App's submit path gains a gate, ADD IT HERE — a missing gate is a false gap, silently.
+ * **Since #1395 it mirrors nothing for 2-D.** The whole pre-LLM lane — store ops, the #186/#539 auto-binds,
+ * every refusal branch, the scope register, the honesty gates, the dry run, the seam guards — is ONE pure
+ * function, `decideDeterministic2D` (`src/app/decideDeterministic.ts`), which `runSubmit` dispatches and
+ * `session2d` below calls. A gate added to the App reaches this report the day it is written.
  *
  * Session context: each session's (`sid`) submits are replayed IN ORDER, threading ONE figure forward (one
  * `replay` per step, reused for both the context and the `before` figure — the naive prefix-replay-per-step
@@ -72,16 +70,10 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import {
-  parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, impliedPointBinding, buildParseCtx, classifyOutOfScope,
-  looksLikeLatex, wordRootMagnitude, statedNegation, splitGuidance, upperCasedLabelCandidate, hebrewLabelCandidate,
-  droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs, droppedCompoundRelation,
-} from '../../../src/parser/index.ts';
-// #829: `independentConstructs` (#763) lives in the APP layer, not the parser — the seam is a submit-path
-// decision, so the mirror must reach across the same boundary the pipeline does.
-import { independentConstructs } from '../../../src/app/independence.ts';
-import { unaccountedSpans } from '../../../src/parser/spanAccounting.ts';
-import { replay, nameCentreFacts, renameFacts, autoNamedLabels } from '../../../src/store/geoStore.ts';
+// #1395 — 2-D: the App's OWN pre-LLM decision, called rather than mirrored. The hand mirror that stood
+// here (PRE_LLM, the gate list, the seam guards, the auto-bind loop) drifted five times (ADR-346).
+import { decideDeterministic2D } from '../../../src/app/decideDeterministic.ts';
+import { replay, nameCentreFacts, renameFacts } from '../../../src/store/geoStore.ts';
 import { parse3 } from '../../../src3d/parser/parse3.ts';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from '../../../src3d/parser/scope3.ts';
 import { derive3 } from '../../../src3d/store/store3.ts';
@@ -141,7 +133,7 @@ function outcome3D(e) {
  * without the report saying so.
  */
 const ADAPTERS = {
-  '2d': { name: 'Geo Builder (2-D)', classify: outcome2D, session: (evs) => session2d(evs) },
+  '2d': { name: 'Geo Builder (2-D)', classify: outcome2D, session: async (evs) => session2d(evs) },
   '3d': { name: 'Space Builder (3-D)', classify: outcome3D, session: (evs) => session3d(evs) },
   analytic: { name: 'Analytic Builder', classify: outcomeOfAnalytic, session: (evs) => replayAnalyticSession(evs, sessionBudgetMs) },
 };
@@ -256,76 +248,6 @@ const headRev = (() => {
  *  a REGRESSION in already-working input is what the test suite is for, not what triage is for. */
 const OPEN = new Set(['not-handled', 'would-escalate', 'refused', 'error', 'unverified']);
 
-/**
- * #829 — THE POST-PARSE ESCALATION SEAMS, mirrored at the App's own position and in the App's order.
- *
- * `submitPipeline.ts#runSubmit` runs FOUR guided short-circuits after `parse()` and before paying for
- * an LLM call. The harness mirrored one (`wordRootMagnitude`) and missed three, so every utterance
- * the tool answers ON PURPOSE — the #763 independent-constructs teaching, the #108 compound split,
- * the #779 lowercase-label nudge — was reported as a LIVE grammar gap, and those false `not-handled`
- * verdicts shipped to the prod dashboard's «פערים אמיתיים» card. In the 2026-08-30 window that was
- * 100% of the 2-D worklist.
- *
- * Returns the `guided` verdict the App would produce, or null to let the caller fall through.
- * `parsed` is the App's `!r.ok` gate: the lowercase-label nudge only applies to a FAILED parse.
- */
-function guidedAtSeam(u, pctx, parsed) {
-  // 1 — #246: the «שורש N» format nudge.
-  if (wordRootMagnitude(u)) return { now: 'guided', detail: 'scope:word-root' };
-  // 2 — #108: a compound line is TAUGHT as numbered steps, never auto-parsed.
-  const split = splitGuidance(u);
-  if (split) return { now: 'guided', detail: `scope:${split.category}` };
-  // 3 — #763: the compounds `splitGuidance`'s hand-listed separators cannot see.
-  const independent = independentConstructs(u);
-  if (independent) return { now: 'guided', detail: `scope:${independent.category}:independent` };
-  // 4 — #779: PROOF-BASED, exactly as the App and the 3-D harness do it — the nudge fires only when
-  // the upper-cased candidate actually parses, so a genuine gap stays a genuine gap.
-  if (!parsed) {
-    const lifted = upperCasedLabelCandidate(u);
-    if (lifted) {
-      const lr = parse(lifted, pctx);
-      if (lr.ok && lr.commands.length > 0) return { now: 'guided', detail: 'scope:lowercase-labels' };
-    }
-  }
-  // 5 — #968: the same nudge one ALPHABET over — Hebrew-letter vertex labels («מלבן אבגד»). Proof-based
-  // in the same way, and pre-LLM, so a triage row reads 'guided' exactly where the App now answers
-  // instead of paying for the call the prod session wasted.
-  if (!parsed) {
-    const latin = hebrewLabelCandidate(u);
-    if (latin) {
-      const hr = parse(latin, pctx);
-      if (hr.ok && hr.commands.length > 0) return { now: 'guided', detail: 'scope:hebrew-labels' };
-    }
-  }
-  return null;
-}
-
-// ---- verify: replay each SESSION through the App's submit path ------------
-// The categories App.tsx#submit refuses with a GUIDED message BEFORE ever paying for an LLM call
-// (ADR-289 / #43). Not gaps — the tool answering on purpose. Keep in sync with App.tsx's PRE_LLM.
-const PRE_LLM = new Set(['analytic', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point', 'unnamed-sides', 'compound-relation', 'unrelated']); // #1357: unrelated is pre-LLM too
-
-/** The honesty gates of the submit pipeline, in its order. Any hit ⇒ the App escalates to the LLM
- *  instead of committing the partial parse — so the deterministic grammar does NOT own this utterance.
- *  `triage-mirror.test.ts` fails if this list drifts from `src/app/submitPipeline.ts`. */
-function droppedBy(u, cmds, pctx) {
-  const hits = [
-    // SPAN ACCOUNTING, enforcing since ADR-453 (#659 step 3) — the total mechanism, alongside the
-    // per-category gates it will eventually retire (#758).
-    ...unaccountedSpans(u, cmds, {
-      existingPoints: pctx.points ?? [],
-      radiusSymbols: (pctx.radiusSymbols ?? []).map((x) => x.name),
-      angleAliases: (pctx.angleAliases ?? []).map((x) => x.name),
-    }).map((x) => x.text),
-    ...droppedNewLabels(u, cmds, pctx.points ?? [], (pctx.radiusSymbols ?? []).map((x) => x.name)), // ADR-089
-    ...droppedGivenNumbers(u, cmds),      // ADR-250
-    ...droppedGivenRelations(u, cmds),    // ADR-264
-    ...droppedGivenVerbs(u, cmds),        // ADR-292
-    ...droppedCompoundRelation(u, cmds),  // #153/#145
-  ];
-  return hits.map(String);
-}
-
 /** The canonical commands the LLM actually committed, logged since issue #84 (a JSON string): 2-D carries
  *  engine COMMAND OBJECTS (since 2026-07-14), 3-D the canonical LINES submitSteps re-parsed (#182, since
  *  2026-07-17). Lets the replay follow a step our grammar can't reproduce, keeping the PREFIX faithful —
@@ -340,7 +262,7 @@ const loggedCommands = (e) => {
 };
 
 /** One 2-D session, in order, threading ONE figure forward. Returns an outcome per event index. */
-function session2d(evs) {
+async function session2d(evs) {
   const out = [];
   let facts = [];
   let fig;
@@ -374,77 +296,35 @@ function session2d(evs) {
     const u = norm(e.utterance);
     if (!u) { out.push({ now: 'skip', detail: '', degraded }); continue; }
     if (Date.now() - t0 > sessionBudgetMs) { out.push({ now: 'unverified', detail: 'session budget', degraded: true }); continue; }
-    let pctx = {};
-    try { pctx = buildParseCtx(fig.construction, fig.positions); } catch { pctx = {}; }
     let res;
     try {
-      // Store operations run BEFORE the parser in submit — a rename/merge/swap/name-centre is not a
-      // geometry command and must never be counted as a grammar gap.
-      if (parseNameCenter(u, pctx) || parseRename(u) || parseMerge(u) || parseSwap(u)) {
-        res = { now: 'store-op', detail: 'rename/merge/swap/name-centre' };
-      } else if (looksLikeLatex(u)) {
-        res = { now: 'guided', detail: 'scope:latex' }; // #329: pre-parse LaTeX guard, mirrors submitPipeline
-      } else if (statedNegation(u)) {
-        // #436: a NEGATED statement is refused PRE-parse with guidance («זווית A לא תהיה ישרה» used to
-        // lower to the POSITIVE form's commands). Mirrored here at the App's own position — without it
-        // the replay fell through to `parse` → not-handled and reported a deliberate refusal as a LIVE
-        // grammar gap, shipping false verdicts to the dashboard (#501, the 4th ADR-346 drift).
-        res = { now: 'guided', detail: 'scope:negation' };
+      // #1395: the App's own pre-LLM decision — the same function `runSubmit` dispatches — so this
+      // verdict IS what the tool does with the line in this figure, never a copy of it.
+      const v = await decideDeterministic2D({ facts, seed: 0, view: { construction: fig.construction, positions: fig.positions } }, u, e.locale === 'en' ? 'en' : 'he');
+      // The #186 / #539 auto-binds the App applies before anything else, each its own history entry
+      // (the store's nameCentre / rename set()), so the prefix keeps following the student's figure.
+      for (const b of v.kind === 'store-op' ? [] : v.binds) {
+        const nb = b.op === 'name-centre' ? nameCentreFacts(facts, b.from, b.to) : renameFacts(facts, b.from, b.to);
+        if (nb.ok) advance(nb.facts, replay(nb.facts, 0));
+      }
+      const primary = v.kind === 'store-op' ? null : v.logs.find((l) => !l.intermediate) ?? v.logs[v.logs.length - 1];
+      const detail = String(primary?.result ?? '').slice(0, 60);
+      if (v.kind === 'store-op') {
+        // Store operations run BEFORE the parser — a rename/merge/swap/name-centre is never a grammar gap.
+        res = { now: 'store-op', detail: v.op };
+      } else if (v.kind === 'refuse') {
+        res = { now: v.category === 'conflict' ? 'refused' : v.category, detail };
+      } else if (v.kind === 'noop') {
+        res = { now: 'built-nothing', detail };
+      } else if (v.kind === 'commit') {
+        const next = [...facts, ...v.commands.map((cmd, k) => ({ id: `f${facts.length}-${k}`, group: `g${out.length}`, cmd, enabled: true }))];
+        const d = replay(next, 0);
+        res = { now: 'built', detail: v.deferred ? 'deferred' : v.commands.map((c) => c.type).join(',') };
+        advance(next, d); // advance only on success (keep-prior)
       } else {
-        let r = parse(u, pctx);
-        // #186 mirror: a circle referenced by a name that matches no circle, with UNNAMED circles in the
-        // figure, BINDS the fresh name to one of them (App.submit's auto-bind: `impliedCircleBinding` →
-        // `nameCentreFacts` → re-parse); ambiguous → the same clarify the App shows.
-        let bindClarify = null;
-        for (let guard = 0; r.ok && guard < 3; guard++) {
-          const bind = impliedCircleBinding(r.commands, pctx);
-          if (bind && bind.clarify) { bindClarify = bind.center; break; }
-          if (bind) {
-            const nc = nameCentreFacts(facts, bind.from, bind.to);
-            if (!nc.ok) break;
-            advance(nc.facts, replay(nc.facts, 0)); // #189: its own history entry (the store's nameCentre set())
-          } else {
-            // #539 mirror (App.submit's point auto-bind): a fresh set-line label whose stated slot an
-            // AUTO-NAMED drawn point structurally occupies renames that point (shared decision helper +
-            // the pure `renameFacts` core) instead of minting a duplicate node.
-            const pbind = impliedPointBinding(r.commands, pctx, autoNamedLabels(facts));
-            if (!pbind) break;
-            const rn = renameFacts(facts, pbind.from, pbind.to);
-            if (!rn.ok) break;
-            advance(rn.facts, replay(rn.facts, 0));
-          }
-          pctx = buildParseCtx(fig.construction, fig.positions);
-          r = parse(u, pctx);
-        }
-        if (bindClarify) {
-          res = { now: 'clarify', detail: `unknown-circle:${bindClarify}` };
-        } else if (!r.ok && (r.reason === 'ambiguous-angle' || r.reason === 'ambiguous-circle' || r.reason === 'ambiguous-container')) {
-          res = { now: 'clarify', detail: r.reason };
-        } else if (!r.ok) {
-          const oos = classifyOutOfScope(u);
-          res =
-            oos && PRE_LLM.has(oos.category) ? { now: 'guided', detail: `scope:${oos.category}` }
-            // #829: ALL FOUR post-parse seams, in the App's order — not just the √ one (#246)
-            : guidedAtSeam(u, pctx, false)
-            ?? { now: 'not-handled', detail: oos ? `${r.reason} (scope:${oos.category})` : r.reason };
-        } else {
-          const dropped = droppedBy(u, r.commands, pctx);
-          if (dropped.length) {
-            // The seam is reached by a WEAK parse too, not only a failed one — the App runs these
-            // guards after the dropped-span accounting and before the LLM, so a dropped given that
-            // one of them answers is `guided`, never `would-escalate`. `parsed: true` here, so the
-            // #779 lowercase nudge (a failed-parse guard) correctly does not apply (#246, #829).
-            res = guidedAtSeam(u, pctx, true)
-              ?? { now: 'would-escalate', detail: `dropped:${dropped.join(',').slice(0, 40)}` };
-          } else {
-            const next = [...facts, ...r.commands.map((cmd, k) => ({ id: `f${facts.length}-${k}`, group: `g${out.length}`, cmd, enabled: true }))];
-            const d = replay(next, 0);
-            const bad = Object.entries(d.status).find(([, v]) => v !== 'ok' && v !== 'disabled');
-            if (bad) res = { now: 'refused', detail: String(typeof bad[1] === 'string' ? bad[1] : bad[1]?.code ?? 'err').slice(0, 60) };
-            else if (d.positions.size === 0) res = { now: 'built-nothing', detail: r.commands.map((c) => c.type).join(',') };
-            else { res = { now: 'built', detail: r.commands.map((c) => c.type).join(',') }; advance(next, d); } // advance only on success (keep-prior)
-          }
-        }
+        res = v.weak
+          ? { now: 'would-escalate', detail: String(v.logs.find((l) => String(l.result ?? '').startsWith('weak:'))?.result ?? `weak:${v.weak}`).slice(0, 60) }
+          : { now: 'not-handled', detail: v.parseReason ?? '' };
       }
     } catch (err) { res = { now: 'error', detail: String(err?.message ?? err).slice(0, 70) }; }
     out.push({ ...res, degraded });
@@ -548,7 +428,7 @@ function session3d(evs) {
 
 /** Replay every session of an app; return normalized-utterance → the outcomes it got across sessions.
  *  Sessions are re-replayed only when NEW, GROWN, or holding a still-open row (ADR-346 Am. 2). */
-function verifyAll(a, events, state) {
+async function verifyAll(a, events, state) {
   const bySid = new Map();
   for (const e of events) {
     const sid = e.sid ?? '(nosid)';
@@ -564,7 +444,7 @@ function verifyAll(a, events, state) {
     const reusable = !reverify && prior && prior.n === evs.length && !prior.outs.some((o) => OPEN.has(o.now));
     let outs;
     if (reusable) { outs = prior.outs; cached++; }
-    else { outs = ADAPTERS[a].session(evs); replayed++; }
+    else { outs = await ADAPTERS[a].session(evs); replayed++; }
     state.sessions[sid] = { n: evs.length, rev: reusable ? prior.rev : headRev, at: reusable ? prior.at : new Date().toISOString(), outs };
     outs.forEach((o, i) => {
       if (evs[i].ev !== 'submit') return; // `action` rows exist only to degrade the prefix, never to be judged
@@ -589,7 +469,7 @@ function bestOutcome(outs) {
 }
 
 // ---- per-app report ------------------------------------------------------
-function reportFor(a) {
+async function reportFor(a) {
   // `events` carries submits AND the store `action` rows (needed by the session replay); every STAT and
   // candidate below is over `submits` only, so the counts stay comparable to server/admin.ts.
   const { events, submits, sessions, visitors, span } = load(a);
@@ -626,7 +506,7 @@ function reportFor(a) {
   const prevRun = surfaced.lastRun[a] ?? state.lastRun;
   const { byUtterance, replayed, cached } = noVerify
     ? { byUtterance: new Map(), replayed: 0, cached: 0 }
-    : verifyAll(a, events, state);
+    : await verifyAll(a, events, state);
   // `firstSeen` is already derived from the log above. The ONLY thing that needs persisting is whether we
   // have put this row in front of the operator before — "carried over" means *we already reported it*, not
   // merely that it existed in the log.
@@ -653,7 +533,7 @@ function reportFor(a) {
   if (agedRows.length && !noVerify) {
     const agedEvents = agedRows.map((r, i) => ({ sid: `__aged-${i}`, ev: 'submit', utterance: r.u, source: 'parser', result: 'ok' }));
     const scratch = { version: 1, lastRun: null, sessions: {}, utterances: {} }; // never poisons the real cache
-    const { byUtterance: agedBy } = verifyAll(a, agedEvents, scratch);
+    const { byUtterance: agedBy } = await verifyAll(a, agedEvents, scratch);
     for (const r of agedRows) {
       const v = bestOutcome(agedBy.get(r.u));
       cands.push({
@@ -776,7 +656,7 @@ for (const a of APPS) {
     out += `\n# ${ADAPTERS[a].name} — NO DATA: ${unavailable[a]}. This is not "no failures".\n`;
     continue;
   }
-  const r = reportFor(a);
+  const r = await reportFor(a);
   out += r.md;
   verdictMaps[a] = r.verdictMap ?? {};
 }
