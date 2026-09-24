@@ -28,6 +28,7 @@ import { fmtNum } from '../../shell/format';
 import type { Cx } from '../value/value';
 import { cPolar, evaluate, exact, formatPolar } from '../value/value';
 import { rat, toNumber } from '../value/rational';
+import { composeCartesian, exactCartesianParts, numericPart } from '../value/cartesian';
 import { type ExpVec, evaluate as evalMod, format as fmtMod, isOne as modIsOne, isParametric } from '../value/modulus';
 import {
   type Angle,
@@ -892,6 +893,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
           display,
           z: cPolar(m.value, a.deg),
           known: m.exact !== null && a.exact !== null,
+          // #1404 — the SAME exactness condition as the polar `exactLabel`: both carriers exact
+          exactParts: m.exact && a.exact && exactLabel !== null ? exactCartesianParts(m.exact, a.exact) : null,
         }),
         exactLabel,
         cyclePeriod: cycle === null ? null : Number(cycle),
@@ -1601,23 +1604,32 @@ function readingOf(p: {
 }
 
 /**
- * #703 — the cartesian reading («z₁ = 3+4i» / «z ≈ -1+1.73i»), stage 5d's second view of the same
- * point. Exactness rule, deliberately conservative: when BOTH re and im land on integers (within
- * float noise) the reading prints `=` with the integers — that covers every `a+bi` definition the
- * curriculum types — and anything else prints `≈` at the #723 display precision. The no-guess rule
- * binds identically to the polar reading: undetermined → the bare name.
+ * #703 — the CARTESIAN reading («z₁ = 3+4i» / «z ≈ 1.88+0.68i»), stage 5d's second view of the same
+ * point. Three things are said, in this order of preference (#1404, ADR-CX-046):
+ *
+ * 1. **Exact radical parts, with `=`**, when the exact carriers give them in closed form —
+ *    `2·cis120°` reads `-1+√3i`, `⁵√100·cis72°` reads its radicals (`value/cartesian`).
+ * 2. **Integers, with `=`**, when both parts land on integers within float noise — every `a+bi`
+ *    definition the curriculum types, including those whose argument is an atom (`3+4i`).
+ * 3. **Decimals, with `≈`**, at the #723 display precision — cos 20° has no radical form, and the
+ *    display never invents one.
+ *
+ * Composition is the value layer's ONE composer, so a zero part is dropped on every path («-2»,
+ * «2i»). The no-guess rule binds identically to the polar reading: undetermined → the bare name.
  */
-function readingCartOf(p: { display: string; z: Cx; known: boolean }): string {
+function readingCartOf(p: {
+  display: string;
+  z: Cx;
+  known: boolean;
+  exactParts: ReturnType<typeof exactCartesianParts>;
+}): string {
   const label = p.display;
   if (!p.known) return label;
+  if (p.exactParts) return `${label} = ${composeCartesian(p.exactParts.re, p.exactParts.im)}`;
   const isInt = (x: number) => Math.abs(x - Math.round(x)) < 1e-9;
   const exact = isInt(p.z.re) && isInt(p.z.im);
   const fmt = (x: number) => (exact ? `${Math.round(x)}` : fmtNum(x));
-  const re = fmt(p.z.re);
-  const imAbs = fmt(Math.abs(p.z.im));
-  const imMag = imAbs === '1' ? '' : imAbs;
-  const im = p.z.im === 0 ? '' : `${p.z.im < 0 ? '-' : '+'}${imMag}i`;
-  const body = im === '' ? re : p.z.re === 0 ? `${p.z.im < 0 ? '-' : ''}${imMag}i` : `${re}${im}`;
+  const body = composeCartesian(numericPart(p.z.re, fmt), numericPart(p.z.im, fmt));
   return `${label} ${exact ? '=' : '≈'} ${body}`;
 }
 
