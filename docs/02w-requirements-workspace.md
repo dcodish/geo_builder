@@ -206,8 +206,10 @@ engine. Owned by the site-root files in `deploy/homepage/` and by each builder's
   `shell/export/svgToPng.ts`); the opt-in is each renderer's tagging, and each product carries a lock
   that renders its figure with every chrome affordance ON and asserts the stripped ink is its chrome-free
   render — so a product cannot ship untagged chrome by forgetting to opt in. *(Realised —
-  [ADR-W-051](06w-decisions-workspace.md#adr-w-051); locks `clean-export.test.tsx` in `src/render`,
-  `src3d/render` and `src-complex`, over `shell/export/exportMarkup.ts`.)*
+  [ADR-W-051](06w-decisions-workspace.md#adr-w-051), [ADR-AG-151](06c-decisions-analytic.md#adr-ag-151); a
+  `clean-export.test.tsx` in every builder that exports an image, over `shell/export/exportMarkup.ts`, and
+  that list is READ from `products.json` by `shell/__tests__/clean-export-registry-1391.test.ts`, so a new
+  builder cannot ship an export without one.)*
 
 ## The admin surface
 
