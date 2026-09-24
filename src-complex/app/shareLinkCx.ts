@@ -16,7 +16,8 @@
  */
 
 import { appBaseUrl, figureLinkUrl, linkFits } from '../../shell/session/link';
-import { hydrateSession } from './submit';
+import { readEnvelope } from '../../shell/save';
+import { COMPLEX_SESSION, hydrateSession } from './submit';
 import { useComplexStore } from '../store/useComplexStore';
 
 export type ShareLinkResult =
@@ -34,15 +35,18 @@ export function shareLinkForComplex(): ShareLinkResult {
 }
 
 /**
- * Open a shared payload through the normal audited hydrate. False when it is not a session this
- * builder can read (`hydrateSession` checks the envelope itself); the store is left as it was.
+ * Open a shared payload through the normal audited hydrate. True when it opened; otherwise WHY not —
+ * `broken` for anything that is not a session this builder can read, `too-large` for one over the
+ * shared statement ceiling (#1379), refused before a line replays. The store is left as it was.
  */
-export function openSharedComplex(payload: string): boolean {
+export function openSharedComplex(payload: string): true | 'broken' | 'too-large' {
   let parsed: unknown;
   try {
     parsed = JSON.parse(payload);
   } catch {
-    return false;
+    return 'broken';
   }
-  return hydrateSession(parsed);
+  const env = readEnvelope(parsed, COMPLEX_SESSION);
+  if (!env.ok) return env.reason === 'too-large' ? 'too-large' : 'broken';
+  return hydrateSession(parsed) ? true : 'broken';
 }

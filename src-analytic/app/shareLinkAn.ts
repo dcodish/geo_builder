@@ -21,7 +21,7 @@
 import { appBaseUrl, figureLinkUrl, linkFits } from '../../shell/session/link';
 import { readEnvelope } from '../../shell/save';
 import { loadAnalyticSession } from './loadSession';
-import { ANALYTIC_APP, ANALYTIC_SAVE_VERSION, useAnalyticStore } from '../store/useAnalyticStore';
+import { ANALYTIC_ENVELOPE, useAnalyticStore } from '../store/useAnalyticStore';
 
 export type ShareLinkResult =
   | { ok: true; url: string }
@@ -43,19 +43,20 @@ export function shareLinkForAnalytic(): ShareLinkResult {
 }
 
 /**
- * Open a shared payload through the envelope check and the normal load path. False when it is not a
- * session this builder can read — another tool's link, or a future version — and the store is left
- * exactly as it was.
+ * Open a shared payload through the envelope check and the normal load path. True when it opened;
+ * otherwise WHY not — `broken` when it is not a session this builder can read (another tool's link,
+ * a future version), `too-large` over the shared statement ceiling (#1379), refused before a line
+ * replays. The store is left exactly as it was.
  */
-export function openSharedAnalytic(payload: string): boolean {
+export function openSharedAnalytic(payload: string): true | 'broken' | 'too-large' {
   let parsed: unknown;
   try {
     parsed = JSON.parse(payload);
   } catch {
-    return false;
+    return 'broken';
   }
-  const env = readEnvelope(parsed, { app: ANALYTIC_APP, maxVersion: ANALYTIC_SAVE_VERSION });
-  if (!env.ok) return false;
+  const env = readEnvelope(parsed, ANALYTIC_ENVELOPE);
+  if (!env.ok) return env.reason === 'too-large' ? 'too-large' : 'broken';
   // A link has no filename to name the figure from, so the envelope's own name is all there is.
   loadAnalyticSession(env.data, '');
   return true;

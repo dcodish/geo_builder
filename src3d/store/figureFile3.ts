@@ -12,6 +12,7 @@
 
 import { nanoid } from 'nanoid';
 import { stripFormatControls } from '../../shell/bidi';
+import { figureTooLarge } from '../../shell/save';
 import { displayModeFromIndexed, displayModeToIndexed, type DisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import type { Command3 } from '../engine/types';
 import type { Fact3 } from './store3';
@@ -208,7 +209,7 @@ export type LoadResult3 =
        *  RESTORED session (#1238) has no filename, so it is the only name it can take. */
       name?: string;
     }
-  | { ok: false; reason: 'bad-file' | 'newer-schema' };
+  | { ok: false; reason: 'bad-file' | 'newer-schema' | 'too-large' };
 
 /**
  * #509 ([ADR-3D-213](../../docs/06b-decisions-3d.md)) — a saved figure written before the affine
@@ -246,6 +247,8 @@ export function deserializeFigure3(text: string): LoadResult3 {
   if (typeof file.schemaVersion !== 'number' || file.app !== '3d-builder') return { ok: false, reason: 'bad-file' };
   if (file.schemaVersion > SCHEMA_VERSION_3D) return { ok: false, reason: 'newer-schema' };
   if (!Array.isArray(file.facts) || file.facts.length === 0) return { ok: false, reason: 'bad-file' };
+  // #1379: more statements than any figure needs — refused BEFORE anything replays (shell/save).
+  if (figureTooLarge(file.facts.length)) return { ok: false, reason: 'too-large' };
   if (typeof file.seed !== 'number' || !Number.isFinite(file.seed)) return { ok: false, reason: 'bad-file' };
 
   const facts: Fact3[] = [];

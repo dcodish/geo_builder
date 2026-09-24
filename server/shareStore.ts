@@ -40,6 +40,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomBytes } from 'node:crypto';
+import { inflateRawSync } from 'node:zlib';
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { clientIp, makeRateLimiter, readBody } from './http';
@@ -52,7 +53,16 @@ const ID_LENGTH = 12;
 
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 20; // shares/minute/IP — a teacher shares a handful; a script does not
-const MAX_PAYLOAD_BYTES = 64 * 1024; // the save envelope; the biggest corpus figure is ~6 KB
+/**
+ * The ARRIVAL ceilings (#1379), MIRRORED from `shell/session/link.ts` (`LINK_ARRIVAL_MAX_CHARS`,
+ * `PAYLOAD_MAX_BYTES`) — `server/` may not import `shell/`, so the contract lives on both sides and a
+ * lock in `server/__tests__` holds them equal. The store refuses exactly what a builder would refuse
+ * to open: holding a fragment no builder opens serves nobody, and serving one from `/g/` would hand
+ * the student's tab the decompression bomb the builders now refuse.
+ */
+export const SHARE_FRAGMENT_MAX_CHARS = 8000;
+export const SHARE_INFLATED_MAX_BYTES = 256 * 1024;
+const MAX_PAYLOAD_BYTES = SHARE_FRAGMENT_MAX_CHARS; // base64url is ASCII: one byte per character
 const MAX_PNG_BYTES = 512 * 1024; // measured: a busy figure at ×2 is ~74 KB, ×3 ~128 KB
 const MAX_BODY = MAX_PAYLOAD_BYTES + MAX_PNG_BYTES * 2; // base64 inflates by 4/3, plus JSON framing
 
@@ -189,6 +199,9 @@ export async function handleShare(
   // base64url ONLY: it is echoed into a URL fragment and into HTML, so anything else is refused at
   // the door rather than escaped later. This is the injection guard for the /g/ page.
   if (!/^[A-Za-z0-9_-]+$/.test(fragment)) return json(res, 400, { error: 'bad-payload' });
+  // #1379 — a short fragment can still inflate to megabytes (measured 768:1). Inflate it here with an
+  // output ceiling, so a bomb is refused at the door rather than stored and served from /g/.
+  if (inflatesPastCeiling(fragment)) return json(res, 413, { error: 'payload-too-large' });
 
   let png: Buffer | null = null;
   if (typeof parsed.png === 'string' && parsed.png) {
@@ -238,6 +251,21 @@ export async function handleShare(
     // storing failed, and falls back to the long link that needs no server at all.
     console.error('[geo-proxy] share write failed:', (err as Error)?.message ?? err);
     return json(res, 500, { error: 'write-failed' });
+  }
+}
+
+/**
+ * Does this base64url fragment inflate past {@link SHARE_INFLATED_MAX_BYTES}? zlib stops at the
+ * ceiling (`maxOutputLength`), so the check costs the ceiling at most, never the bomb. Only the SIZE is
+ * judged: a fragment that fails to inflate for another reason is left to the builder, which refuses it
+ * as a broken link — the server still never reads a figure.
+ */
+function inflatesPastCeiling(fragment: string): boolean {
+  try {
+    inflateRawSync(Buffer.from(fragment, 'base64url'), { maxOutputLength: SHARE_INFLATED_MAX_BYTES });
+    return false;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE';
   }
 }
 

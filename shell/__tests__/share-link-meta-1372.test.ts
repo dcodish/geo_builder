@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { encodeFigurePayload } from '../session/link';
+import { MAX_FIGURE_STATEMENTS } from '../save';
 import { shareLinkFaults, type ShareSubject } from './fixtures/share-link-rows';
 
 type Bug =
@@ -16,7 +17,8 @@ type Bug =
   | 'payload-in-the-query'
   | 'timestamped-payload'
   | 'accepts-anything'
-  | 'cannot-read-its-own';
+  | 'cannot-read-its-own'
+  | 'ignores-the-ceiling';
 
 /** A miniature builder whose session is a list of lines — enough to drive every row. */
 function stub(bug?: Bug): ShareSubject {
@@ -39,16 +41,18 @@ function stub(bug?: Bug): ShareSubject {
         lines = ['whatever'];
         return true;
       }
-      if (bug === 'cannot-read-its-own') return false;
+      if (bug === 'cannot-read-its-own') return 'broken';
       try {
         const v = JSON.parse(payload) as { app?: string; lines?: unknown };
-        if (v.app !== 'stub' || !Array.isArray(v.lines) || v.lines.length === 0) return false;
+        if (v.app !== 'stub' || !Array.isArray(v.lines) || v.lines.length === 0) return 'broken';
+        if (bug !== 'ignores-the-ceiling' && v.lines.length > MAX_FIGURE_STATEMENTS) return 'too-large';
         lines = v.lines.map(String);
         return true;
       } catch {
-        return false;
+        return 'broken';
       }
     },
+    statements: 'lines',
     foreign: JSON.stringify({ app: 'another-builder', lines: ['x'] }),
   };
 }
@@ -72,6 +76,10 @@ describe('#1372 — the shared share checks really check', () => {
 
   it('CATCHES a builder that accepts any payload as a figure', async () => {
     expect((await shareLinkFaults(stub('accepts-anything'))).join(' | ')).toMatch(/was ACCEPTED as a shared figure/);
+  });
+
+  it('CATCHES a builder that opens a figure past the statement ceiling (#1379)', async () => {
+    expect((await shareLinkFaults(stub('ignores-the-ceiling'))).join(' | ')).toMatch(/not refused as too large/);
   });
 
   it('CATCHES a builder that cannot read the link it just wrote', async () => {

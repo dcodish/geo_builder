@@ -12,7 +12,7 @@ import type { SessionSpec } from '../../shell/session/persist';
 import { clearSession, readSession, writeSession } from '../../shell/session/persist';
 import { readEnvelope } from '../../shell/save';
 import { loadAnalyticSession } from './loadSession';
-import { ANALYTIC_APP, ANALYTIC_SAVE_VERSION, useAnalyticStore } from '../store/useAnalyticStore';
+import { ANALYTIC_ENVELOPE, useAnalyticStore } from '../store/useAnalyticStore';
 
 /** Namespaced per builder — four tools share one origin in dev. */
 export const SESSION_AN: SessionSpec = { key: 'analytic-builder:session' };
@@ -59,7 +59,7 @@ export function restoreSessionAn(payload: string): boolean {
   } catch {
     return false;
   }
-  const env = readEnvelope(parsed, { app: ANALYTIC_APP, maxVersion: ANALYTIC_SAVE_VERSION });
+  const env = readEnvelope(parsed, ANALYTIC_ENVELOPE);
   if (!env.ok) return false;
   loadAnalyticSession(env.data, '');
   return true;

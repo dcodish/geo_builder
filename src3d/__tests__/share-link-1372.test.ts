@@ -28,7 +28,11 @@ describe('#1372 — the 3-D builder conforms to the shared share contract', () =
         clear: () => useGeo3.getState().clear(),
         isEmpty: () => useGeo3.getState().facts.length === 0,
         link: shareLinkFor3,
-        open: (payload) => openShared3(payload).ok,
+        open: (payload) => {
+          const r = openShared3(payload);
+          return r.ok ? true : r.reason === 'too-large' ? 'too-large' : 'broken';
+        },
+        statements: 'facts',
         foreign: FOREIGN,
       }),
     ).toEqual([]);

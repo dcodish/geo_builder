@@ -47,7 +47,8 @@ import { deriveLines } from './deriveLines';
 
 /** This product's save-file envelope (shell/save): the marker `serialize()` writes, and the
  *  highest `SavedSession.version` this build can read. */
-export const COMPLEX_SESSION = { app: 'complex-builder', maxVersion: 1 } as const;
+/** `statements` lets the shared envelope refuse an oversized session before a line replays (#1379). */
+export const COMPLEX_SESSION = { app: 'complex-builder', maxVersion: 1, statements: 'lines' } as const;
 
 /**
  * How many configurations to try before blaming the new line — the prototype's mini config-search.

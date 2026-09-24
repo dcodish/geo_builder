@@ -27,6 +27,7 @@ describe('#1372 — the complex builder conforms to the shared share contract', 
         isEmpty: () => useComplexStore.getState().lines.length === 0,
         link: shareLinkForComplex,
         open: openSharedComplex,
+        statements: 'lines',
         foreign: FOREIGN,
       }),
     ).toEqual([]);

@@ -27,7 +27,7 @@
  * ({@link linkFits}). Emitting a URL that some client truncates would hand a student a figure
  * missing its last statements, silently — the cardinal sin here. A link is whole or it is refused.
  */
-import { deflateSync, inflateSync, strFromU8, strToU8 } from 'fflate';
+import { Inflate, deflateSync, strFromU8, strToU8 } from 'fflate';
 
 /**
  * The longest link this will emit. Not a transport limit — WhatsApp's message limit is ~65,000
@@ -36,6 +36,27 @@ import { deflateSync, inflateSync, strFromU8, strToU8 } from 'fflate';
  * biggest figure (23 facts) encodes to ~1,200 characters, typical ones to 330–530.
  */
 export const LINK_MAX_CHARS = 2000;
+
+/**
+ * The ARRIVAL ceilings (#1379). `LINK_MAX_CHARS` bounds what this code EMITS — and a link is hand-
+ * buildable, so an emit-side cap protects nobody who opens one. A stranger's link is untrusted input,
+ * and the decoder used to inflate it with no output bound: measured, a 1,416-character fragment
+ * inflated to 1 MB and an 87 KB one to 64 MB, all before anything was validated.
+ *
+ * - **Characters, before decoding at all.** Nothing this code emits is longer than `LINK_MAX_CHARS`;
+ *   the factor of four is headroom for a future raise of the emit cap, never a size a figure needs.
+ * - **Bytes, while inflating.** The biggest corpus figure is ~6 KB raw; 256 KB is forty times that.
+ *   The inflate is STREAMED in small slices and abandoned the moment it crosses the line, so a
+ *   decompression bomb costs about a millisecond instead of its whole expansion.
+ *
+ * ⚠️ MIRRORED in `server/shareStore.ts` (`server/` may not import `shell/`) — the store refuses to
+ * hold a fragment these would refuse to open. A lock in `server/__tests__` holds the two equal.
+ */
+export const LINK_ARRIVAL_MAX_CHARS = LINK_MAX_CHARS * 4;
+export const PAYLOAD_MAX_BYTES = 256 * 1024;
+/** Input fed to the inflater per step — small enough that one step's output (≤ ~1,032× its input
+ *  for raw deflate) cannot itself be the bomb. */
+const INFLATE_SLICE = 512;
 
 const BASE64URL_ONLY = /^[A-Za-z0-9_-]+$/;
 
@@ -63,22 +84,62 @@ export function encodeFigurePayload(payload: string): string {
   return toBase64Url(deflateSync(strToU8(payload)));
 }
 
+/** Why an arriving payload was not opened. The two are different messages to the student: a
+ *  broken link is the sender's mistake, a too-large one is a link this tool will not open. */
+export type PayloadRefusal = 'malformed' | 'too-large';
+
+export type PayloadRead = { ok: true; text: string } | { ok: false; reason: PayloadRefusal };
+
+/** Inflate with an output ceiling — `too-large` past it, and past it NOTHING more is inflated. */
+function inflateBounded(bytes: Uint8Array, maxBytes: number): Uint8Array | 'too-large' {
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  let over = false;
+  const inflater = new Inflate((chunk) => {
+    total += chunk.length;
+    if (total > maxBytes) over = true;
+    else chunks.push(chunk);
+  });
+  for (let i = 0; i < bytes.length && !over; i += INFLATE_SLICE) {
+    inflater.push(bytes.subarray(i, i + INFLATE_SLICE), i + INFLATE_SLICE >= bytes.length);
+  }
+  if (over) return 'too-large';
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.length;
+  }
+  return out;
+}
+
 /**
  * The inverse, tolerant of what a chat client does to a link — a leading `#`, a tracking tail,
- * surrounding whitespace. Returns null for anything that is not one of our payloads (a truncated
- * blob, a foreign fragment, an inflate that fails), so the caller REFUSES instead of half-loading.
+ * surrounding whitespace — and BOUNDED against what a stranger can put in one (#1379). Refuses,
+ * naming which: `malformed` for anything that is not one of our payloads (a truncated blob, a
+ * foreign fragment, an inflate that fails), `too-large` for a fragment or an expansion past the
+ * arrival ceilings. The caller REFUSES in both cases instead of half-loading.
  */
-export function decodeFigurePayload(fragment: string): string | null {
+export function readFigurePayload(fragment: string): PayloadRead {
   const cleaned = fragment.trim().replace(/^#+/, '').split(/[?&]/)[0];
-  if (!cleaned) return null;
+  if (!cleaned) return { ok: false, reason: 'malformed' };
+  if (cleaned.length > LINK_ARRIVAL_MAX_CHARS) return { ok: false, reason: 'too-large' };
   const bytes = fromBase64Url(cleaned);
-  if (!bytes || bytes.length === 0) return null;
+  if (!bytes || bytes.length === 0) return { ok: false, reason: 'malformed' };
   try {
-    const text = strFromU8(inflateSync(bytes));
-    return text.length > 0 ? text : null;
+    const inflated = inflateBounded(bytes, PAYLOAD_MAX_BYTES);
+    if (inflated === 'too-large') return { ok: false, reason: 'too-large' };
+    const text = strFromU8(inflated);
+    return text.length > 0 ? { ok: true, text } : { ok: false, reason: 'malformed' };
   } catch {
-    return null;
+    return { ok: false, reason: 'malformed' };
   }
+}
+
+/** {@link readFigurePayload} for a caller that only needs the text — null for either refusal. */
+export function decodeFigurePayload(fragment: string): string | null {
+  const r = readFigurePayload(fragment);
+  return r.ok ? r.text : null;
 }
 
 /**
@@ -145,6 +206,8 @@ export function appBaseUrl(base: string): string {
 export interface SharedLinkArrival {
   /** The decoded payload, or null when the fragment was present but unreadable (refuse out loud). */
   payload: string | null;
+  /** When `payload` is null, why — so «too large to open» is not shown as «broken link» (#1379). */
+  refusal?: PayloadRefusal;
 }
 
 /**
@@ -170,9 +233,9 @@ export function onSharedLink(handler: (arrival: SharedLinkArrival) => void): () 
   const read = () => {
     const hash = window.location.hash;
     if (!hash || hash === '#') return; // an ordinary visit, not a shared link
-    const payload = payloadInHash(hash);
+    const got = readFigurePayload(hash);
     consumeFragment(); // the link delivers once; after that the session is the student's
-    handler({ payload });
+    handler(got.ok ? { payload: got.text } : { payload: null, refusal: got.reason });
   };
   read();
   window.addEventListener('hashchange', read);

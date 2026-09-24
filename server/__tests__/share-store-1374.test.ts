@@ -14,8 +14,11 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { deflateRawSync } from 'node:zlib';
 import {
   DEFAULT_STORE_MAX_BYTES,
+  SHARE_FRAGMENT_MAX_CHARS,
+  SHARE_INFLATED_MAX_BYTES,
   handleShare,
   handleSharePage,
   isShareId,
@@ -317,5 +320,67 @@ describe('#1374 — an unwritable store fails the SHARE, never the process', () 
     writeFileSync(wall, 'x');
     await handleShare(mockReq(GOOD), mockRes(), { dir: path.join(wall, 'shares') });
     expect(isShareId(await shareOk(GOOD))).toBe(true);
+  });
+});
+
+/**
+ * #1379 — the store refuses what a builder would refuse to open. A short fragment can inflate to
+ * megabytes (measured 768:1), and `/g/<id>` hands a stored fragment straight to the student's tab.
+ */
+describe('#1379 — a share that no builder would open is refused at the door', () => {
+  const reason = async (body: unknown) => {
+    const res = mockRes();
+    await handleShare(mockReq(body), res, { dir });
+    return { code: res.statusCode, error: JSON.parse(String(res.body)).error as string };
+  };
+  const fragmentOf = (bytes: Buffer) => deflateRawSync(bytes).toString('base64url');
+
+  it('a 1 MB decompression bomb in a ~1,400-character fragment is refused 413, fast, and nothing is stored', async () => {
+    const bomb = fragmentOf(Buffer.alloc(1024 * 1024));
+    expect(bomb.length).toBeLessThan(2000);
+    const t0 = performance.now();
+    expect(await reason({ tool: '2d', fragment: bomb })).toEqual({ code: 413, error: 'payload-too-large' });
+    expect(performance.now() - t0).toBeLessThan(100);
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
+  it('a fragment inflating to exactly the ceiling is stored; one byte more is refused', async () => {
+    await shareOk({ tool: '2d', fragment: fragmentOf(Buffer.alloc(SHARE_INFLATED_MAX_BYTES, 120)) });
+    expect(await reason({ tool: '2d', fragment: fragmentOf(Buffer.alloc(SHARE_INFLATED_MAX_BYTES + 1, 120)) })).toEqual({
+      code: 413,
+      error: 'payload-too-large',
+    });
+  });
+
+  it('a fragment over the character ceiling is refused even when it would inflate small', async () => {
+    expect(await reason({ tool: '2d', fragment: 'A'.repeat(SHARE_FRAGMENT_MAX_CHARS + 1) })).toEqual({
+      code: 413,
+      error: 'payload-too-large',
+    });
+  });
+
+  it('a real figure fragment is stored as before', async () => {
+    const env = JSON.stringify({ app: 'geo-builder', schemaVersion: 1, seed: 0, facts: [{ utterance: 'ריבוע ABCD' }] });
+    await shareOk({ tool: '2d', fragment: fragmentOf(Buffer.from(env)) });
+  });
+
+  /**
+   * The MIRROR lock. `server/` may not import `shell/` (BOUNDARIES.json), so the ceilings are written
+   * twice — and a store that accepts what the builders refuse would store links nobody can open, while
+   * one that refuses what they accept would break sharing. Read from the shell SOURCE, since importing
+   * it here is the edge the boundary forbids.
+   */
+  it("the server ceilings EQUAL the builders' arrival ceilings in shell/session/link.ts", () => {
+    const src = readFileSync(path.join(__dirname, '..', '..', 'shell', 'session', 'link.ts'), 'utf8');
+    const num = (re: RegExp) => {
+      const m = src.match(re);
+      if (!m) throw new Error(`shell/session/link.ts no longer matches ${re} — update this mirror lock with it`);
+      return m.slice(1).map(Number).reduce((a, b) => a * b, 1);
+    };
+    const emitMax = num(/export const LINK_MAX_CHARS = (\d+);/);
+    const arrivalFactor = num(/export const LINK_ARRIVAL_MAX_CHARS = LINK_MAX_CHARS \* (\d+);/);
+    const payloadMax = num(/export const PAYLOAD_MAX_BYTES = (\d+) \* (\d+);/);
+    expect(SHARE_FRAGMENT_MAX_CHARS).toBe(emitMax * arrivalFactor);
+    expect(SHARE_INFLATED_MAX_BYTES).toBe(payloadMax);
   });
 });

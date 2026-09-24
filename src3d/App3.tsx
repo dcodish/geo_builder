@@ -46,6 +46,7 @@ import { forgetSession3, offeredSession3, restoreSession3, startSessionPersist3 
 // read once — a link pasted into an already-open tab is a same-document navigation.
 import { openShared3, shareLinkFor3 } from './store/shareLink3';
 import { onSharedLink } from '../shell/session/link';
+import { MAX_FIGURE_STATEMENTS } from '../shell/save';
 // #1374: the SHORT link — upload the figure + its preview, get themathbible.com/g/<id> back.
 import { pngToBase64, shortLinkFor } from '../shell/session/shortLink';
 import { ShareSheet } from '../shell/frame/ShareSheet';
@@ -120,6 +121,8 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.badFile');
     case 'newer-schema':
       return t('err.newerSchema');
+    case 'too-large':
+      return t('err.tooLarge', { max: MAX_FIGURE_STATEMENTS });
     // #578 (ADR-3D-211): a rename we UNDERSTOOD and declined. Each reason names the letters the
     // student typed, never internal state — a 'target-taken' is the honest answer that renaming onto a
     // live letter would merge two of their vertices, which is a different operation nobody asked for.
@@ -486,7 +489,7 @@ export default function App3() {
    * answers a click the student just made, this one greets them on a cold page load; a self-clearing
    * note would leave an empty canvas with the explanation already gone.
    */
-  const [shareError, setShareError] = useState(false);
+  const [shareError, setShareError] = useState<false | 'broken' | 'too-large'>(false); // #1379: which
   /** #1373 — a link arriving on a canvas that is NOT empty asks before replacing the student's work. */
   const [pendingLink, setPendingLink] = useState<string | null>(null);
 
@@ -496,7 +499,7 @@ export default function App3() {
       setFigureName(r.name ?? ''); // a link has no filename to take the name from
       noteLoadOutcome(r.facts, r.seed);
     } else {
-      setShareError(true);
+      setShareError(r.reason === 'too-large' ? 'too-large' : 'broken');
     }
   };
 
@@ -505,9 +508,9 @@ export default function App3() {
     // a teacher's figure asked for THAT figure.
     // #1373: SUBSCRIBED, not read once. The store is read via getState(), not the render closure,
     // because this handler outlives the mount.
-    const stopLink = onSharedLink(({ payload }) => {
+    const stopLink = onSharedLink(({ payload, refusal }) => {
       if (!payload) {
-        setShareError(true);
+        setShareError(refusal === 'too-large' ? 'too-large' : 'broken');
         return;
       }
       if (useGeo3.getState().facts.length === 0) openLink3(payload);
@@ -843,7 +846,7 @@ export default function App3() {
           />
         ) : shareError ? (
           <Banner kind="error" onDismiss={() => setShareError(false)} dismissLabel={t('share.dismiss')}>
-            {t('share.badLink')}
+            {shareError === 'too-large' ? t('share.tooLarge', { max: MAX_FIGURE_STATEMENTS }) : t('share.badLink')}
           </Banner>
         ) : pendingLink ? (
           /* #1373: a link arrived on a canvas that is NOT empty — ask, never replace silently. */

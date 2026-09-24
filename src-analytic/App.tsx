@@ -46,8 +46,8 @@ import { Banner } from '../shell/frame/Banner';
 import { FigureName } from '../shell/frame/FigureName';
 import { ManualScreen } from '../shell/frame/ManualScreen';
 import { svgToPng } from '../shell/export/svgToPng';
-import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
-import { ANALYTIC_APP, ANALYTIC_SAVE_VERSION } from './store/useAnalyticStore';
+import { MAX_FIGURE_STATEMENTS, figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
+import { ANALYTIC_ENVELOPE } from './store/useAnalyticStore';
 import { COMMAND_CATALOG_ANALYTIC } from './parser/catalogAnalytic';
 import { analyticBidi } from './i18n';
 import { Figure } from './render/Figure';
@@ -218,7 +218,7 @@ export function App() {
        * from a newer version says to refresh — never a generic "could not read", which sends a
        * student to fix a file that was read perfectly well.
        */
-      const env = readEnvelope(parsed, { app: ANALYTIC_APP, maxVersion: ANALYTIC_SAVE_VERSION });
+      const env = readEnvelope(parsed, ANALYTIC_ENVELOPE);
       if (!env.ok) {
         setError({
           key:
@@ -226,7 +226,9 @@ export function App() {
               ? 'load-foreign'
               : env.reason === 'newer-version'
                 ? 'load-newer'
-                : 'load-unreadable',
+                : env.reason === 'too-large'
+                  ? 'load-too-large'
+                  : 'load-unreadable',
           detail: file.name,
         });
         return;
@@ -248,22 +250,23 @@ export function App() {
   /** #1372 — a link that cannot be opened says so and KEEPS saying so: unlike a file refusal, this
    *  one greets the student on a cold page load, where a self-clearing note would leave an empty
    *  canvas with the explanation already gone. */
-  const [shareError, setShareError] = useState(false);
+  const [shareError, setShareError] = useState<false | 'broken' | 'too-large'>(false); // #1379: which
   /** #1373 — a link arriving on a canvas that is NOT empty asks before replacing the student's work. */
   const [pendingLink, setPendingLink] = useState<string | null>(null);
 
   const openLinkAn = (payload: string) => {
-    if (openSharedAnalytic(payload)) showWholeFigure();
-    else setShareError(true);
+    const r = openSharedAnalytic(payload);
+    if (r === true) showWholeFigure();
+    else setShareError(r);
   };
 
   useEffect(() => {
     // A link outranks the session offer and is never shown beside it: the student asked for THIS
     // figure. #1373: SUBSCRIBED, not read once — a link pasted into an already-open tab never
     // remounts the app. The store is read via getState(), since this handler outlives the mount.
-    const stopLink = onSharedLink(({ payload }) => {
+    const stopLink = onSharedLink(({ payload, refusal }) => {
       if (!payload) {
-        setShareError(true);
+        setShareError(refusal === 'too-large' ? 'too-large' : 'broken');
         return;
       }
       if (useAnalyticStore.getState().lines.length === 0) openLinkAn(payload);
@@ -929,9 +932,10 @@ export function App() {
           // A save file this tool will not open, named by WHICH of the three reasons (#1087).
           'load-foreign': 'errLoadForeign',
           'load-newer': 'errLoadNewer',
+          'load-too-large': 'errLoadTooLarge',
           'load-unreadable': 'errLoadUnreadable',
         }[error.key],
-        { detail: error.detail, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '' },
+        { detail: error.detail, max: MAX_FIGURE_STATEMENTS, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '' },
       )
     : null;
 
@@ -1021,7 +1025,7 @@ export function App() {
           />
         ) : shareError ? (
           <Banner kind="error" onDismiss={() => setShareError(false)} dismissLabel={t('close')}>
-            {t('shareBadLink')}
+            {shareError === 'too-large' ? t('shareTooLarge', { max: MAX_FIGURE_STATEMENTS }) : t('shareBadLink')}
           </Banner>
         ) : pendingLink ? (
           /* #1373: a link arrived on a canvas that is NOT empty — ask, never replace silently. */

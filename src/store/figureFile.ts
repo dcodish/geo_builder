@@ -24,6 +24,7 @@
 import { nanoid } from 'nanoid';
 import { stripFormatControls } from '../../shell/bidi';
 import { displayModeToIndexed } from '../../shell/displayMode';
+import { figureTooLarge } from '../../shell/save';
 import type { AnyCommand, Id } from '@/engine';
 import type { Fact, GeoState } from './geoStore';
 
@@ -70,7 +71,7 @@ export interface FigureFile {
   queries?: string[];
 }
 
-export type FigureLoadFailure = 'bad-json' | 'not-figure' | 'newer-version' | 'no-facts';
+export type FigureLoadFailure = 'bad-json' | 'not-figure' | 'newer-version' | 'no-facts' | 'too-large';
 export type FigureLoadResult = { ok: true; file: FigureFile } | { ok: false; reason: FigureLoadFailure };
 
 /** The replay inputs a session serializes to — the fact list, the configuration index, and the
@@ -194,7 +195,9 @@ function sanitizeFactIn(v: unknown): Fact | null {
  * - `bad-json` — the text isn't JSON at all;
  * - `not-figure` — JSON, but not a Geo Builder figure file (or its facts are malformed);
  * - `newer-version` — saved by a newer app (the caller should say "update to open this");
- * - `no-facts` — a structurally valid file with nothing in it.
+ * - `no-facts` — a structurally valid file with nothing in it;
+ * - `too-large` — more statements than any figure needs (`shell/save`'s ceiling, #1379), refused
+ *   BEFORE a single one is replayed, because a link is a stranger's input and replay is superlinear.
  */
 export function deserializeFigure(text: string): FigureLoadResult {
   let raw: unknown;
@@ -206,6 +209,7 @@ export function deserializeFigure(text: string): FigureLoadResult {
   if (!isRecord(raw) || raw.app !== APP_MARKER || typeof raw.schemaVersion !== 'number' || !Array.isArray(raw.facts))
     return { ok: false, reason: 'not-figure' };
   if (raw.schemaVersion > FIGURE_FILE_VERSION) return { ok: false, reason: 'newer-version' };
+  if (figureTooLarge(raw.facts.length)) return { ok: false, reason: 'too-large' };
 
   const facts: Fact[] = [];
   for (const f of raw.facts) {

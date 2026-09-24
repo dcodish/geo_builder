@@ -34,6 +34,8 @@ export type InputError =
   | { key: 'wrong-app'; detail: string }
   /** the loaded file was saved by a NEWER app version — refused rather than half-loaded */
   | { key: 'newer-version'; detail: string }
+  /** #1379 — more lines than any figure needs (`shell/save`'s ceiling); `detail` is that ceiling */
+  | { key: 'too-large'; detail: string }
   /** the new statement cannot hold together with the named earlier statement (#606) */
   | { key: 'incompatible'; detail: string }
   /**
