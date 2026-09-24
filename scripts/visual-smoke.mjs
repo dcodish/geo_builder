@@ -67,7 +67,10 @@ export const APPS = {
     inputHint: 'z1 = 3+4i',
     // The #701 repro — enumerated roots are the worst labelling case in any product: five labels on
     // one ring plus a point far enough out to clip. If label placement breaks, it breaks here first.
-    sequence: ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2', 'z^5 = w^2'],
+    // The inputs are w1/w2, not z1/z2 (#1390): since ADR-CX-042 (#1367) the solutions of `z^5 = …`
+    // ARE z1..z5, so a z1 declared first must be solution 1 or the line is refused — correctly. The
+    // old z1/z2 spelling made this sequence refuse its own last line. Same figure, same crowding.
+    sequence: ['w1 = 3+4i', 'w2 = 2cis150', 'w = w1*w2', 'z^5 = w^2'],
   },
   analytic: {
     urlPath: '/analytic.html',
@@ -136,7 +139,7 @@ function fail(msg) {
  * has been identical for `quiet` ms. Returns the time it took, which the manifest records — a step
  * that suddenly takes much longer is worth seeing.
  */
-async function waitForSettle(page, { quiet = 450, timeout = 15000 } = {}) {
+export async function waitForSettle(page, { quiet = 450, timeout = 15000 } = {}) {
   const started = Date.now();
   let last = null;
   let lastChange = Date.now();
@@ -172,7 +175,7 @@ async function figureStats(page) {
  * every test passed, and the surface the student sees went amber. The harness reads the app's own
  * error copy rather than guessing at CSS: `role=alert` is what the apps use for a conflict row.
  */
-async function refusals(page) {
+export async function refusals(page) {
   return page.evaluate(() =>
     [...document.querySelectorAll('[role=alert]')]
       .map((n) => (n.textContent || '').replace(/\s+/g, ' ').trim())
@@ -181,7 +184,7 @@ async function refusals(page) {
   );
 }
 
-async function dismissModal(page) {
+export async function dismissModal(page) {
   const dialog = page.locator('[role=dialog]');
   if ((await dialog.count()) === 0) return false;
   for (const label of ACKNOWLEDGE) {

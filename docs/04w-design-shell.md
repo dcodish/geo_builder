@@ -262,6 +262,40 @@ and the site icon. `favicon.svg` is the one source; `favicon.ico` (16/32/48, PNG
 and committed because this directory deploys as a plain copy with no build step. The `www.` → apex
 redirect is a Plesk setting, outside the repo (RUNBOOK).
 
+### The comparison page ([ADR-W-086](06w-decisions-workspace.md#adr-w-086))
+
+`deploy/homepage/geogebra/index.html` is a hand-written static page beside the homepage, deployed to
+`httpdocs/geogebra/`. Its two example blocks are `<pre data-example="…">` so the lock can read them
+back and replay them; the bagrut block is compared line for line with the locked fixture
+`2022-summer-a-issue59.geo.json`. The «open the example» button is an ordinary share link
+(`serializeFigureForLink` → `figureLinkUrl`, ADR-W-079) generated from that same fixture, and the lock
+decodes it through the loader a click uses. The example blocks use the body font in plain RTL — not a
+monospace font, which has no Hebrew glyphs, and not `unicode-bidi: plaintext`, which turned every
+line that starts with a Latin label into a left-aligned LTR paragraph (measured at phone width).
+
+## The page a crawler reads ([ADR-W-085](06w-decisions-workspace.md#adr-w-085))
+
+`shell/seo/seo.ts` is pure `SeoPage → HTML`: `seoHead` (title, description, canonical, icons, OG and
+Twitter, JSON-LD — `<` escaped as `\u003c` so no string can close the script) and `seoStaticBody` (one
+`h1`, `h2` sections, the examples as a list). `applySeo` replaces the entry's `<title>` and fills its
+EMPTY `#root`, and throws when either anchor is missing, so a builder cannot ship bare.
+`shell/seo/seoPlugin.ts` applies it in `transformIndexHtml`, **keyed by the entry file name**
+(`index.html`, `3d.html`, …) because one dev server serves all four entries; every config passes the
+same table and an unknown entry refuses the build. In a build it emits `seo/icon.svg`,
+`seo/apple-touch-icon.png` and `seo/og.png` under the builder's base with **unhashed** names (chat apps
+cache a preview URL forever); in dev it inlines the icons and omits `og:image`.
+
+The table is `seo-pages.ts` at the repo root — build tooling, the one place that knows all four
+products, so `shell/` keeps its no-product-knowledge rule. Its three sources: the approved wording,
+`products.json` for URLs, and each catalog's `featured` rows for the examples. The static block works
+because every `main.tsx` mounts with `createRoot().render`, which **replaces** the container's
+children: a student sees the block only while the script downloads, as the loading screen.
+
+The images are regenerated, never edited: `scripts/render-icons.mjs` (from each product's
+`seo/icon.svg`) and `scripts/render-og.mjs`, which types a figure into the running app and takes the
+app's **own «download image» output** (FR-EX-3's chrome-free export), then lays it beside the icon and
+the name read from the served `<h1>`.
+
 ## The junk gate ([ADR-W-087](06w-decisions-workspace.md#adr-w-087))
 
 `shell/llm/constructionSignal.ts` answers one question for every builder that escalates to the model:
