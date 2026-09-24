@@ -36,8 +36,35 @@ export const isPointLabel = (raw: string): boolean => /^[A-NP-VXY]\d*$/.test(raw
  */
 export const canonName = (raw: string): string => (isPointLabel(raw) ? raw : raw.toLowerCase());
 
-/** A z/w-family name or a point label is complex; anything else is a real parameter. */
-export const isComplexName = (name: string): boolean => /^[zw]\d*$/i.test(name) || isPointLabel(name);
+/**
+ * The letter FAMILIES a student has declared complex — «u מספר מרוכב» (#1405,
+ * [ADR-CX-047](../../docs/06d-decisions-complex.md#adr-cx-047)). A declared letter joins the z/w
+ * convention for the whole figure: `u`, `u1`, `u2`… are complex exactly as `z`, `z1` are.
+ *
+ * The parser reads one line at a time and cannot see the declaration, so the layer that sees every
+ * line (`lowerLines`) collects the families first and hands them to each parse. Empty by default,
+ * which is ADR-CX-004 unchanged.
+ */
+export type ComplexScope = ReadonlySet<string>;
+export const NO_SCOPE: ComplexScope = new Set<string>();
+
+/** The family letter of a lowercase name: `u2` → `u`. Null for anything that is not one letter + index. */
+export const familyOf = (name: string): string | null => /^([a-z])\d*$/.exec(name)?.[1] ?? null;
+
+/**
+ * A z/w-family name, a point label, or a member of a DECLARED family is complex; anything else is a
+ * real parameter.
+ */
+export const isComplexName = (name: string, scope: ComplexScope = NO_SCOPE): boolean =>
+  /^[zw]\d*$/i.test(name) || isPointLabel(name) || (scope.size > 0 && scope.has(familyOf(name) ?? ''));
+
+/**
+ * May this (canonical) name be DECLARED complex? A z/w name or a point label already is, and declaring
+ * it again changes nothing. Any other name must pass the parameter floor below (one letter, optionally
+ * indexed) and must not be `i` (the imaginary unit) or `o` (the origin), which are constants.
+ */
+export const isDeclarableName = (name: string): boolean =>
+  isComplexName(name) || (/^[a-z]\d*$/.test(name) && !/^[io]\d*$/.test(name));
 
 /**
  * Two glued point labels are a DISTANCE (#791, operator ruling): «AB» is |A−B|, never a product —
@@ -79,11 +106,11 @@ const PARAM_NAME = /^[a-z]\d*$/;
  * quietly re-interpreting it — the honesty invariant: a given parses, escalates or errors, never
  * vanishes into a different meaning.
  */
-const nameExpr = (raw: string): Expr | null => {
+const nameExpr = (raw: string, scope: ComplexScope): Expr | null => {
   const pair = labelPair(raw);
   if (pair) return abs(sub(ref(pair[0]), ref(pair[1])));
   const name = canonName(raw);
-  if (isComplexName(name)) return ref(name);
+  if (isComplexName(name, scope)) return ref(name);
   return PARAM_NAME.test(name) ? param(name) : null;
 };
 
@@ -156,6 +183,8 @@ export function parseExpr(
   to = src.length,
   /** angle atoms a cartesian literal introduced, collected for the caller's sample */
   atoms: Map<string, number> = new Map(),
+  /** #1405 — the letter families declared complex elsewhere in the figure */
+  scope: ComplexScope = NO_SCOPE,
 ): Expr | null {
   const toks = lex(src, from, to);
   if (!toks || toks.length === 0) return null;
@@ -284,7 +313,7 @@ export function parseExpr(
     }
     if (t.t === 'name') {
       i++;
-      return nameExpr(t.v);
+      return nameExpr(t.v, scope);
     }
     if (t.t === 'dist') {
       i++;

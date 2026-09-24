@@ -50,7 +50,15 @@ const isNotPositiveReal = (e: Expr): boolean => {
   const a = angNormalize(e.v.arg);
   return a.atoms.size === 0 && ratFrac(a.turns).n !== 0n;
 };
-import { canonName, isComplexName, isPointLabel, parseExpr } from './exprParse';
+import {
+  type ComplexScope,
+  NO_SCOPE,
+  canonName,
+  isComplexName,
+  isDeclarableName,
+  isPointLabel,
+  parseExpr,
+} from './exprParse';
 import {
   ACCUSATIVE_KW,
   AND_KW,
@@ -146,6 +154,15 @@ export interface ParsedLine {
   readonly selections: Selection[];
   /** names the line brings into existence, whether or not a constraint mentions them */
   readonly declares: string[];
+  /**
+   * #1405 (ADR-CX-047) — names the line TYPES as complex: «u מספר מרוכב» / «u is a complex number».
+   *
+   * Kept apart from `declares` because a type is not an existence. The declaration makes the letter's
+   * family complex for the WHOLE figure, in every line, before or after it; it does not make `u` an
+   * existing number, so `u^5 = 32` still reads as the exam's «פתרו את המשוואה» in either order. The
+   * fold draws a typed name as a free number only when nothing else in the figure claims the letter.
+   */
+  readonly typed: string[];
   readonly claims: Claim[];
   /** angle atoms a cartesian literal introduced, with the degrees they stand for */
   readonly atoms: Map<string, number>;
@@ -176,11 +193,16 @@ const empty = (): ParsedLine => ({
   roots: [],
   selections: [],
   declares: [],
+  typed: [],
   claims: [],
   atoms: new Map(),
 });
 
-type Rule = (s: string) => ParsedLine | null;
+/**
+ * A rule reads one normalized line. `scope` is the set of letter families the figure declared complex
+ * (#1405), supplied by the layer that sees every line; a rule that never reads a name ignores it.
+ */
+type Rule = (s: string, scope: ComplexScope) => ParsedLine | null;
 
 /**
  * F1 — a name declares a number: `z1` on its own line, or «z1 מספר מרוכב» / «z1 is a complex number».
@@ -190,11 +212,11 @@ type Rule = (s: string) => ParsedLine | null;
  * OUTSIDE that convention can be declared complex at all — without it, a student who writes `a` and
  * says it is a complex number is told the line is not understood.
  */
-const declaration: Rule = (s) => {
+const declaration: Rule = (s, scope) => {
   const bare = s.match(rx(`^(${NAME})$`));
   if (bare) {
     const name = canonName(bare[1]);
-    if (!isComplexName(name)) return null; // a bare parameter declares nothing to draw
+    if (!isComplexName(name, scope)) return null; // a bare parameter declares nothing to draw
     return { ...empty(), declares: [name], claims: [claimAll(s)] };
   }
   // «z1 ו-z2 מספרים מרוכבים» — any number of names, either language, the copula optional in Hebrew
@@ -204,7 +226,10 @@ const declaration: Rule = (s) => {
   if (!spelled) return null;
   const names = (spelled[1].match(rx(NAME, 'giu')) ?? []).map((n) => canonName(n));
   if (!names.length) return null;
-  return { ...empty(), declares: names, claims: [claimAll(s)] };
+  // #1405: a TYPE statement, not an existence — see `ParsedLine.typed`. A name that cannot be a
+  // number (`i`, the origin, a multi-letter word) refuses the line rather than inventing one.
+  if (!names.every(isDeclarableName)) return null;
+  return { ...empty(), typed: names, claims: [claimAll(s)] };
 };
 
 /**
@@ -340,7 +365,7 @@ const argumentRelation: Rule = (s) => {
  * name is declared, `|z1| = 2` is emitted, and the direction stays a free degree of freedom that
  * "another configuration" resamples.
  */
-const genericPolar: Rule = (s) => {
+const genericPolar: Rule = (s, scope) => {
   // Either half may be symbolic, so both are read as "number or name" and the SHAPE decides the
   // lowering. Writing only the numeric-modulus case meant «z1 = r cis θ» — the spelling the exam
   // prints — fell through to the expression grammar, which lexed `rcis` as one name and read the line
@@ -350,9 +375,9 @@ const genericPolar: Rule = (s) => {
   const m = s.match(rx(`^(${NAME})\\s*=\\s*(${HALF})?\\s*cis\\s*\\(?\\s*(${HALF})\\s*\\)?$`));
   if (!m) return null;
   const name = canonName(m[1]);
-  if (!isComplexName(name)) return null;
+  if (!isComplexName(name, scope)) return null;
   const angle = canonName(m[3]);
-  if (isComplexName(angle)) return null; // `z1 = 2cis z2` is not an angle, it is a product
+  if (isComplexName(angle, scope)) return null; // `z1 = 2cis z2` is not an angle, it is a product
   const isNumeric = (t: string): boolean => rx(`^${NUM}$`).test(t);
   const modIsNum = m[2] !== undefined && isNumeric(m[2]);
   const angIsNum = isNumeric(angle);
@@ -360,7 +385,7 @@ const genericPolar: Rule = (s) => {
   if (modIsNum && angIsNum) return null;
   // a magnitude is not negative; `-2 cis θ` is not this sentence, so it goes to the equation rule
   if (modIsNum && Number(m[2]) < 0) return null;
-  if (m[2] !== undefined && !modIsNum && isComplexName(canonName(m[2]))) return null;
+  if (m[2] !== undefined && !modIsNum && isComplexName(canonName(m[2]), scope)) return null;
 
   /**
    * What the sentence actually STATES — never more (ADR-052: an unstated magnitude is a free DOF).
@@ -443,12 +468,12 @@ const argumentInequality: Rule = (s) => {
  * P1 — one form, driveOrCheck decides — so a magnitude given and a magnitude claim are never two
  * phrasings.
  */
-const equation: Rule = (s) => {
+const equation: Rule = (s, scope) => {
   const eq = s.indexOf('=');
   if (eq < 0) return null;
   const atoms = new Map<string, number>();
-  const lhs = parseExpr(s, 0, eq, atoms);
-  const rhs = parseExpr(s, eq + 1, s.length, atoms);
+  const lhs = parseExpr(s, 0, eq, atoms, scope);
+  const rhs = parseExpr(s, eq + 1, s.length, atoms, scope);
   if (!lhs || !rhs) return null;
   /**
    * A `|·|` on one side asks a THREE-way question, and reading it as two is how givens went missing.
@@ -707,14 +732,17 @@ const circumscribedCircle: Rule = (s) => {
  * Both English spellings of «centre» are in the atom: textbooks and students split on it, and refusing
  * one is the same shape of defect as refusing one Hebrew word order.
  */
-const circleByCenterRadius: Rule = (s) => {
+const circleByCenterRadius: Rule = (s, scope) => {
   const m = s.match(
     rx(`^${OF_A}${CIRCLE_KW}\\s+${WITH_KW}${CENTER_KW}\\s+(${RUN_ATOM})\\s+${AND_KW}?\\s*${RADIUS_KW}\\s+(.+)$`),
   );
   if (!m) return null;
   // the radius text is anchored to the end of the line, so its span starts exactly that far back
-  const radius = parseExpr(s, s.length - m[2].length, s.length);
+  const radius = parseExpr(s, s.length - m[2].length, s.length, undefined, scope);
   if (!radius) return null;
+  // #1405 — a radius is a LENGTH: a complex number outside `|…|` is not one (the same type question
+  // the equation rule asks of `|z1| = 9w`)
+  if (hasBareComplexRef(radius)) return null;
   return objectLine({ kind: 'circle', center: canonName(m[1]), radius, src: s }, s);
 };
 
@@ -734,7 +762,7 @@ const MEASURE_NOUNS: readonly (readonly [string, MeasureKind])[] = [
  * of freedom the numeric tier drives it to zero, while a determined figure simply evaluates it. That
  * is why there is no second sentence shape for "verify that the area is 150r²".
  */
-const measureRelation: Rule = (s) => {
+const measureRelation: Rule = (s, scope) => {
   const shapeNoun = `(?:${SHAPES.map(([kw]) => kw).join('|')})`;
   for (const [kw, kind] of MEASURE_NOUNS) {
     const m = s.match(
@@ -745,8 +773,10 @@ const measureRelation: Rule = (s) => {
     const arity = MEASURE_ARITY[kind];
     if (points.length < arity.min) return null;
     if (arity.exact !== undefined && points.length !== arity.exact) return null;
-    const rhs = parseExpr(s, s.length - m[2].length, s.length);
+    const rhs = parseExpr(s, s.length - m[2].length, s.length, undefined, scope);
     if (!rhs) return null;
+    // #1405 — a length, perimeter or area is a real magnitude; a bare complex number is not a value of one
+    if (hasBareComplexRef(rhs)) return null;
     return {
       ...empty(),
       measures: [{ kind, points, rhs, src: s }],
@@ -854,13 +884,13 @@ const sequenceLine = (
  * Both orders are spelled because RTL typing makes the order genuinely ambiguous, and the sibling
  * trees paid for assuming one (#598, ADR-3D-145). Listed names are CONSECUTIVE terms.
  */
-const sequenceList: Rule = (s) => {
+const sequenceList: Rule = (s, scope) => {
   const m =
     s.match(rx(`^(${NAME_LIST})\\s+${COPULA_KW}${OF_A}${SEQ_PHRASE}$`)) ??
     s.match(rx(`^${SEQ_PHRASE}\\s*:?\\s*(${NAME_LIST})$`));
   if (!m) return null;
   const list = m[1].split(',').map((n) => n.trim().toLowerCase());
-  if (!list.every(isComplexName)) return null; // a real parameter is not a term of a complex sequence
+  if (!list.every((n) => isComplexName(n, scope))) return null; // a real parameter is not a term of a complex sequence
   return sequenceLine(
     kindOf(s),
     list.map((name, i) => ({ name, position: i + 1 })),
@@ -876,7 +906,7 @@ const sequenceList: Rule = (s) => {
  * between positions 1, 2 and 5 is emitted — which is what makes term-position givens («בהתאמה») the
  * general case here instead of a second rule.
  */
-const sequenceFirstTerms: Rule = (s) => {
+const sequenceFirstTerms: Rule = (s, scope) => {
   // The TARGET term is the only ordinal the rule reads, and the two languages order it the other way
   // round — «האיבר השלישי» against «the third term» — so both orders are spelled and whichever group
   // matched carries the position.
@@ -891,7 +921,7 @@ const sequenceFirstTerms: Rule = (s) => {
   const at = ordinalOf(m[3] ?? m[4] ?? '');
   if (at === null) return null;
   const [a, b, c] = [m[1], m[2], m[5]].map((n) => canonName(n));
-  if (![a, b, c].every(isComplexName)) return null;
+  if (![a, b, c].every((n) => isComplexName(n, scope))) return null;
   return sequenceLine(
     kindOf(s),
     [
@@ -932,7 +962,7 @@ const propertyOf = (tail: string): 'real' | 'imaginary' | null =>
  * so both orders are spelled — the third family in a row to need that, which is why the rule is stated
  * as a rule rather than discovered again (ADR-CX-012).
  */
-const forallPower: Rule = (s) => {
+const forallPower: Rule = (s, scope) => {
   // «לכל n טבעי» puts the adjective AFTER the variable; «for every natural n» puts it before. Same
   // asymmetry as «ברביע הראשון» / «in the first quadrant» and «שני האיברים הראשונים» / «the first two
   // terms» — every noun-plus-modifier phrase in this grammar needs both orders spelled.
@@ -943,7 +973,7 @@ const forallPower: Rule = (s) => {
     s.match(rx(`^${power}\\s+${COPULA_KW}(.+?)\\s+${quantifier}$`));
   if (!m) return null;
   const name = canonName(m[1]);
-  if (!isComplexName(name)) return null;
+  if (!isComplexName(name, scope)) return null;
   const exp = exponentKN(m[2]);
   const prop = propertyOf(m[3]);
   if (!exp || !prop) return null;
@@ -962,7 +992,7 @@ const forallPower: Rule = (s) => {
  * There is no question form here on purpose: «find the minimal n» is what the exam asks the STUDENT,
  * and a tool that printed it unprompted would be answering the question rather than checking it.
  */
-const minimalPower: Rule = (s) => {
+const minimalPower: Rule = (s, scope) => {
   const m = s.match(
     rx(
       // «ה-n המינימלי» against «the minimal n» — the same both-orders rule as every other modifier here
@@ -972,7 +1002,7 @@ const minimalPower: Rule = (s) => {
   );
   if (!m) return null;
   const name = canonName(m[1]);
-  if (!isComplexName(name)) return null;
+  if (!isComplexName(name, scope)) return null;
   const prop = propertyOf(m[2]);
   if (!prop) return null;
   return {
@@ -993,7 +1023,7 @@ const minimalPower: Rule = (s) => {
  * already refused. It states nothing and constrains nothing — the names it mentions are declared (so
  * «|z1-z2|» draws both numbers, always-visualise) and the value is answered by the knowledge rule.
  */
-const bareExpression: Rule = (s) => {
+const bareExpression: Rule = (s, scope) => {
   if (s.includes('=')) return null; // an equation is a statement, and its rule has already run
   /**
    * TWO WORDS ARE A SENTENCE, NOT AN EXPRESSION — and this rule may not rescue a refused sentence.
@@ -1009,7 +1039,7 @@ const bareExpression: Rule = (s) => {
    */
   if (/[A-Za-z0-9)|]\s+[A-Za-z(|]/u.test(s)) return null;
   const atoms = new Map<string, number>();
-  const expr = parseExpr(s, 0, s.length, atoms);
+  const expr = parseExpr(s, 0, s.length, atoms, scope);
   if (!expr) return null;
   const names = refNames(expr);
   // a bare literal («5») asks nothing about the figure; a bare name is F1 and was matched above.
@@ -1073,12 +1103,16 @@ export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = 
  * A rule that matches but leaves content unclaimed does NOT commit — the line is refused with the
  * student's own words, which is the whole point of the accountant. `not-handled` is reserved for
  * "no rule recognised this", and is the only outcome that escalates.
+ *
+ * `scope` (#1405) is the letter families the figure declared complex. Only the layer that sees every
+ * line can know it (`lowerLines`); a caller reading one line on its own passes nothing and gets the
+ * ADR-CX-004 convention.
  */
-export function parseLineV2(raw: string): ParseOutcome {
+export function parseLineV2(raw: string, scope: ComplexScope = NO_SCOPE): ParseOutcome {
   const normalized = normalize(raw);
   if (!normalized) return { ok: false, reason: 'not-handled', normalized };
   for (const { rule } of RULES) {
-    const line = rule(normalized);
+    const line = rule(normalized, scope);
     if (!line) continue;
     const items = unaccountedText(normalized, line.claims);
     if (items.length) return { ok: false, reason: 'unaccounted', normalized, items };

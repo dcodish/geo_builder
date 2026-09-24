@@ -76,6 +76,8 @@ export function whyText(w: Why, t: Translate): string {
       return t('whyLineUnrecognized');
     case 'reserved-letter':
       return t('whyReservedLetter', { letter: w.letter, equation: w.equation });
+    case 'declared-complex-real':
+      return t('whyDeclaredComplexReal', { letter: w.letter, declaration: w.declaration });
   }
 }
 

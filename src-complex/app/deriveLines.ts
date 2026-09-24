@@ -11,7 +11,8 @@
  */
 
 import { type ParsedLine, parseLineV2 } from '../parser/rules';
-import { isPointLabel } from '../parser/exprParse';
+import { type ComplexScope, NO_SCOPE, familyOf, isPointLabel } from '../parser/exprParse';
+import type { Why } from '../model/why';
 import type { BranchFilter, Constraint } from '../model/constraint';
 import type { Claim as Assertion } from '../model/claim';
 import type { FigureObject } from '../model/figure';
@@ -54,8 +55,10 @@ export function deriveLines(
   seed = 0,
   asks: readonly string[] = [],
 ): Derived2 {
-  const lowered = lowerLines(lines);
-  const lane = lowerAsks(asks);
+  const declaredBy = complexScopeOf(lines);
+  const lowered = lowerLines(lines, declaredBy);
+  // #1405: a question reads a declared letter the way the givens do
+  const lane = lowerAsks(asks, new Set(declaredBy.keys()));
   return foldConstraints({
     ...lowered,
     queries: [...(lowered.queries ?? []), ...lane.queries],
@@ -75,7 +78,7 @@ export function deriveLines(
  * exists to forbid. Grammar unchanged: the fact list still lowers query LINES (legacy saved files
  * replay through the router in `submit.ts`, which files them here instead).
  */
-export function lowerAsks(asks: readonly string[]): {
+export function lowerAsks(asks: readonly string[], scope: ComplexScope = NO_SCOPE): {
   queries: MeasureQuery[];
   ratios: RatioQuery[];
   exprQueries: ExprQuery[];
@@ -84,7 +87,7 @@ export function lowerAsks(asks: readonly string[]): {
   const ratios: RatioQuery[] = [];
   const exprQueries: ExprQuery[] = [];
   for (const raw of asks) {
-    const r = parseLineV2(raw.trim());
+    const r = parseLineV2(raw.trim(), scope);
     if (!r.ok) continue;
     const a = askArtifacts(r.line);
     if (!a) continue;
@@ -136,7 +139,14 @@ export function askArtifacts(l: ParsedLine): {
  * is not hypothetical: `parser/__tests__/rules.test.ts` had exactly such a helper, and it dropped #607's
  * middle line the moment the reading moved here. One accumulator, so there is nothing to forget.
  */
-export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configIndex' | 'seed'> {
+export function lowerLines(
+  lines: readonly string[],
+  /** #1405 — the declared complex families; computed here when the caller did not already */
+  declaredBy: ReadonlyMap<string, string> = complexScopeOf(lines),
+): Omit<FoldInput, 'configIndex' | 'seed'> {
+  const scope: ComplexScope = new Set(declaredBy.keys());
+  /** #1405 — names a type declaration drew; dropped at the end when an enumeration reserved the letter */
+  const typedOnly = new Set<string>();
   const constraints: Constraint[] = [];
   const filters: BranchFilter[] = [];
   const declared: string[] = [];
@@ -188,17 +198,25 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
   const pendingSets: { eq: RootsEquation; at: number }[] = [];
 
   lines.forEach((raw, idx) => {
-    const r = parseLineV2(raw);
+    const r = parseLineV2(raw, scope);
     if (!r.ok) {
       untranslated.push({
         factId: `line-${idx}`,
         src: raw,
         why:
-          r.reason === 'unaccounted'
+          realSlotConflict(raw, declaredBy) ??
+          (r.reason === 'unaccounted'
             ? { code: 'line-unaccounted', items: r.items.join(', ') }
-            : { code: 'line-unrecognized' },
+            : { code: 'line-unrecognized' }),
       });
       return;
+    }
+    // #1405 — a TYPE declaration is not an existence: it neither grounds nor clashes with `X^n = …`,
+    // so the declaration may stand on either side of the equation it types (the ruling's order
+    // independence). The name is drawn only if no enumeration took the letter — see the end.
+    for (const n of r.line.typed) {
+      if (!declared.includes(n)) typedOnly.add(n);
+      declared.push(n);
     }
     const clash = r.line.declares.find((n) => reserved.has(n));
     if (clash !== undefined) {
@@ -272,6 +290,12 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
 
   placeSolutionSets(pendingSets, constraints, filters, measures, objects);
 
+  // #1405 — «u מספר מרוכב» beside `u^5 = 32`: u is the SET u₁..u₅, and a free point named u would be
+  // the phantom ADR-CX-024 reserves the letter against
+  for (let k = declared.length - 1; k >= 0; k--) {
+    if (typedOnly.has(declared[k]) && reserved.has(declared[k])) declared.splice(k, 1);
+  }
+
   return {
     constraints,
     filters,
@@ -288,6 +312,50 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
     sequences,
     selections,
   };
+}
+
+/**
+ * #1405 ([ADR-CX-047](../../docs/06d-decisions-complex.md#adr-cx-047)) — the letter FAMILIES the figure
+ * declares complex, each with the first statement that declared it.
+ *
+ * «u מספר מרוכב» makes `u`, `u1`, `u2`… complex in EVERY line, before or after it — the same
+ * whole-figure reading ADR-CX-042 gives reserved letters. So the declarations are read before any line
+ * is lowered. Reading them needs no scope: the declaration rule is first in the rule list and its
+ * spelled form does not depend on what any name means, so this pre-scan cannot disagree with itself.
+ * z and w are complex already and are not recorded; declaring them changes nothing.
+ */
+export function complexScopeOf(lines: readonly string[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const raw of lines) {
+    const r = parseLineV2(raw);
+    if (!r.ok) continue;
+    for (const n of r.line.typed) {
+      const fam = familyOf(n);
+      if (fam !== null && fam !== 'z' && fam !== 'w' && !out.has(fam)) out.set(fam, raw);
+    }
+  }
+  return out;
+}
+
+/**
+ * #1405 — why a line that reads under ADR-CX-004 stops reading once a letter is declared complex.
+ *
+ * Declaring a letter complex can only ever make a line FAIL where the grammar needs a real number: a
+ * size (`|z1| = 9r`, a radius, a measure's value) or an angle (`z1 = 2cis u`). Those rules already
+ * refuse a complex name there. So a line that parses without the declarations and fails with them
+ * is exactly that conflict, and it is reported against the declaration that caused it, never as
+ * "not understood".
+ */
+function realSlotConflict(raw: string, declaredBy: ReadonlyMap<string, string>): Why | null {
+  if (declaredBy.size === 0) return null;
+  const plain = parseLineV2(raw);
+  if (!plain.ok) return null;
+  for (const [letter, declaration] of declaredBy) {
+    if (new RegExp(`(?<![A-Za-z])${letter}\\d*(?![A-Za-z])`).test(plain.normalized)) {
+      return { code: 'declared-complex-real', letter, declaration };
+    }
+  }
+  return null;
 }
 
 /**
