@@ -28,13 +28,13 @@ import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowS
 import { fmtAnalytic } from './format';
 import { curveDetailsKey, curveEquationText, curveParts, namedRow } from './app/curveText';
 import { color, fs } from '../shell/theme';
-import { isDirectionSymbol, paramRegister, reportedDof, usedSymbols } from './engine/carriers';
+import { reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
 import { decideSubmit, reachesFallback } from './app/submit';
 import { runFallback } from './app/fallback';
-import { panelListsCurve } from './app/panelRows';
+import { panelKnowledge } from './app/panelRows';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
-import { domainText, positionalOf } from './engine/types';
+import { domainText } from './engine/types';
 import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
 import { drawnBox as composeDrawnBox } from './app/drawnBox';
 import { SYMBOLS } from './ui/symbols';
@@ -942,8 +942,10 @@ export function App() {
   // The DOF cue (02c P4 — an under-determined figure is drawn, and its openness is VISIBLE).
   // Counted from the register, not from the declarations, so an undeclared parameter is reported
   // as the freedom it is rather than silently absent (#1014).
-  const register = paramRegister(d.construction);
   const freeCount = reportedDof(d.construction, d.figure.carrierDof);
+  // #1289 — the panel's knowledge gates, decided ONCE (app/panelRows.ts) and rendered below; the
+  // corpus invariant "freedom in the panel ⇒ something in it is unknown" asks the same function.
+  const knows = useMemo(() => panelKnowledge(d), [d]);
 
   // NO `suiteActions`: AppFrame renders the language toggle AND the About button itself, using this
   // product's own `language` key. Passing a toggle here put two «English» buttons on the suite bar.
@@ -1462,28 +1464,23 @@ export function App() {
                  * not a row: it is counted in the cue and shown by the line's own row, like a free
                  * vertex's coordinates.
                  */
-                rows: register
-                  .filter((p) => !isDirectionSymbol(p.sym))
-                  .map((p) => {
-                    // A symbol nothing reads is never asked of the gate (#1343): it is not part of any
-                    // configuration, and one sample of it is not knowledge — it printed «m = -3.46» once.
-                    const used = usedSymbols(d.construction).has(p.sym);
-                    const k = used ? isKnowledge(d.construction, (f) => f.env[p.sym] ?? null) : { known: false as const };
-                    const text = k.known
-                      ? `${p.sym} = ${fmtAnalytic(k.value)}`
-                      : `${domainText(p.sym, p.domain)}${used ? '' : ` ${t('paramUnused')}`}`;
-                    return <span key={p.sym}><ValueRow text={text} /></span>;
-                  }),
+                rows: knows.params.map(({ sym, domain, used, k }) => {
+                  // A symbol nothing reads is never asked of the gate (#1343): it is not part of any
+                  // configuration, and one sample of it is not knowledge — it printed «m = -3.46» once.
+                  const text = k.known
+                    ? `${sym} = ${fmtAnalytic(k.value)}`
+                    : `${domainText(sym, domain)}${used ? '' : ` ${t('paramUnused')}`}`;
+                  return <span key={sym}><ValueRow text={text} /></span>;
+                }),
               },
               {
                 key: 'points',
                 title: t('secPoints'),
                 dir: 'ltr',
-                rows: positionalOf(d.construction).map((p) => {
+                rows: knows.points.map(({ id, x: kx, y: ky }) => {
                   // The honesty gate (ADR-AG-003 §2): a coordinate is printed only when it is
                   // KNOWLEDGE — the same value at every seed — never one sample's number.
-                  const kx = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === p.id)?.x ?? null);
-                  const ky = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === p.id)?.y ?? null);
+                  const p = { id };
                   return (
                     <span key={p.id}>
                       <ValueRow text={`${p.id} = ${pointText(d, p.id, kx, ky)}`} />
@@ -1529,11 +1526,11 @@ export function App() {
                  * would have to be set correctly at every mint site, and the name already answers
                  * truthfully at all of them.
                  */
-                rows: d.figure.curves.filter(panelListsCurve).map((c) => {
+                rows: knows.curves.map(({ id, known }) => {
+                  const c = d.figure.curves.find((cu) => cu.id === id)!;
                   // The SAME honesty gate the point rows use: an equation prints only when every
                   // coefficient is invariant across the free DOFs. A parabola whose `a` is still
                   // free is drawn, and its row is open — never a sampled coefficient as fact.
-                  const known = knownCurve(d.construction, c.id);
                   /**
                    * An UNNAMED curve prints no name — never its id (#1026).
                    *
