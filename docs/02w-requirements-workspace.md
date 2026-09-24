@@ -189,6 +189,13 @@ engine. Owned by the site-root files in `deploy/homepage/` and by each builder's
   icon a browser and a search result can show; and **one host** — `www.` redirects to the apex rather
   than serving a second copy. *(Realised — [ADR-W-084](06w-decisions-workspace.md#adr-w-084), #1384; the
   `www.` redirect is a hosting-panel setting, see [RUNBOOK](RUNBOOK.md).)*
+- **FR-DI-3 (Should)** — **A student searching for GeoGebra can find an honest comparison.** One page,
+  `/geogebra/`, says what the tools do differently (the question's own sentences, not tools or command
+  syntax) **and where GeoGebra is the better tool**, in wording the operator approved sentence by
+  sentence. It names GeoGebra only to compare — no logo, nothing imitating its identity, and a line
+  saying the site is not affiliated. Every example on it builds, and its «open the example» link opens
+  that figure. Claims about GeoGebra are re-checked against GeoGebra's own site before any edit.
+  *(Realised — [ADR-W-086](06w-decisions-workspace.md#adr-w-086), #1386.)*
 
 ## Export
 

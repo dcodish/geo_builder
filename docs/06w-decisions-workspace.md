@@ -4349,3 +4349,40 @@ queued for the next round — this change does not touch that interpolation).
 both 404s) and no canonical — **mutation-checked**: removing the one header line fails 3 of its 7
 rows; every `products.json` builder in the sitemap; robots.txt names the sitemap, has no `Disallow`,
 and one `User-agent: *`; the icon files exist and the `.ico` has its three frames.
+
+## ADR-W-086 — An honest GeoGebra comparison page: the searches behind the brand, not the brand (#1386)
+
+**Status:** accepted, 2026-09-24 (PR, awaiting the operator's play) · **Issue:** [#1386](https://github.com/dcodish/geo_builder/issues/1386) (feature, `P3`; operator: *"my main competition is geogebra — when people search for that, i want my site to also show"*; approved routes 1 + 2; draft v1 approved with the URL `/geogebra/`) · depends on [ADR-W-085](#adr-w-085) for its preview image
+**Requirements:** [02w](02w-requirements-workspace.md) FR-DI-3 (new) · **Design:** [04w](04w-design-shell.md#the-comparison-page-adr-w-086) (new subsection)
+
+**The goal, and what cannot be done.** The operator wants to appear when students search for GeoGebra.
+The bare brand search is GeoGebra's own — putting its name in our titles would not rank, would read as
+misleading, and is a trademark risk; that route was discussed and **not taken**. Two routes were
+approved: the generic intent behind the brand (already in #1383's wording) and **this page**, which
+targets the searches that ARE winnable — «חלופה לגאוגברה», «geogebra בעברית», «גאוגברה לבגרות» — and
+is the page AI answer engines can quote when a student asks for an alternative.
+
+**Decisions.**
+
+1. **Honest in both directions.** The page says where GeoGebra is the better tool (free exploration,
+   functions and calculus, its library, its languages, its photo solver). That is what makes it
+   credible to a teacher and quotable by an answer engine. The one fair difference it leads with is
+   real: GeoGebra builds from tools or command syntax (`Line(A, B)`); ours reads the question's own
+   Hebrew sentences — and ours deliberately does not solve (GeoGebra's Math Solver does).
+2. **Every GeoGebra claim is sourced** (its homepage, its Input Bar manual, Wikipedia; 2026-09-24) and
+   the page's head comment requires a re-check before any edit. Claims that age badly or are false
+   were left out: exact library counts, the owner's legal name, "GeoGebra has no Hebrew".
+3. **Every claim about our tool is locked**, through the real pipeline: both example blocks build
+   green; the bagrut block IS the locked fixture's sentences; the «open the example» link — generated
+   from that fixture, 1,154 characters — decodes, loads and replays green, and was opened in a running
+   builder (the figure «בגרות קיץ 2022», every step ✓). The FAQ's JSON-LD equals the visible FAQ
+   word for word.
+4. **Trademark hygiene:** no logo, no image at all, nothing styled like GeoGebra, and a not-affiliated
+   line in the FAQ and the footer.
+5. **In the sitemap**, with its own canonical; the preview image is the 2-D builder's card from #1383,
+   so **#1383 merges first**.
+
+**Locks.** `scripts/__tests__/geogebra-page-1386.test.ts` — 8 rows: head sizes and canonical; in the
+sitemap; not-affiliated, no `<img>`, no geogebra.org asset; the bagrut block equals the fixture; both
+blocks build green; the demo link decodes, loads, replays green, stays under `LINK_MAX_CHARS` and is
+the same figure as the block; FAQ markup equals the visible FAQ.

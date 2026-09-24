@@ -261,3 +261,14 @@ and the site icon. `favicon.svg` is the one source; `favicon.ico` (16/32/48, PNG
 `apple-touch-icon.png` (180) are regenerated from it by `scripts/render-icons.mjs` through Chromium,
 and committed because this directory deploys as a plain copy with no build step. The `www.` → apex
 redirect is a Plesk setting, outside the repo (RUNBOOK).
+
+### The comparison page ([ADR-W-086](06w-decisions-workspace.md#adr-w-086))
+
+`deploy/homepage/geogebra/index.html` is a hand-written static page beside the homepage, deployed to
+`httpdocs/geogebra/`. Its two example blocks are `<pre data-example="…">` so the lock can read them
+back and replay them; the bagrut block is compared line for line with the locked fixture
+`2022-summer-a-issue59.geo.json`. The «open the example» button is an ordinary share link
+(`serializeFigureForLink` → `figureLinkUrl`, ADR-W-079) generated from that same fixture, and the lock
+decodes it through the loader a click uses. The example blocks use the body font in plain RTL — not a
+monospace font, which has no Hebrew glyphs, and not `unicode-bidi: plaintext`, which turned every
+line that starts with a Latin label into a left-aligned LTR paragraph (measured at phone width).
