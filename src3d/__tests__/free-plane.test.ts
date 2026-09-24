@@ -16,6 +16,8 @@ import { parse3 } from '../parser/parse3';
 import { freeDofCount3, resolve3 } from '../engine/evaluate';
 import { derive3, useGeo3 } from '../store/store3';
 import { cross3, dot3, norm3, normalize3, sub3, type Vec3 } from '../engine/vec3';
+// #1305: imported at collection, never inside a test body (see free-line.test.ts).
+import { serializeFigure3, deserializeFigure3 } from '../store/figureFile3';
 
 const state = () => useGeo3.getState();
 const submit = (u: string) => state().submit(u);
@@ -241,8 +243,7 @@ describe('#557 — the latent PLANE half of the pivot-staleness class (found via
 });
 
 describe('#487 — the figure file round-trips a free plane', () => {
-  it('save → load keeps the declaration and the auto-created membership', async () => {
-    const { serializeFigure3, deserializeFigure3 } = await import('../store/figureFile3');
+  it('save → load keeps the declaration and the auto-created membership', () => {
     state().clear();
     build(['מישור π2', 'B על המישור π2']);
     const text = serializeFigure3(state().facts, state().seed);
