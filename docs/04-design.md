@@ -149,6 +149,9 @@ src/
                    ADR-264 Am. 1 split rescues (deriving it was tried in round #961 and refuted)
   app/           submitPipeline.ts — the text→command orchestration, extracted from App.tsx and
                  directly tested (S0.4)
+                 decideDeterministic.ts — the whole PRE-LLM lane as one pure verdict (ADR-546, #1395):
+                   runSubmit dispatches it, log-triage calls it; it never touches the store, logs, or
+                   calls the model (the auto-binds are simulated on a copy of the facts)
                  - THE COMMIT SEAMS AND THE POST-COMMIT SEARCH (ADR-518, #1041). Three store actions
                    change the fact list; the configuration search is a property of the SEAM, and the
                    list below is an assertion in `app/__tests__/issue-1041-edit-resolve.test.ts`,
@@ -736,9 +739,20 @@ Two rules keep it honest:
 The membership is tested at the gate the app calls, never below it: #1011 reached a play session at all
 because the feature's own lock drove the store directly and never crossed `dryRunOutcome`.
 
+## The pre-LLM decision ([ADR-546](06-decisions.md#adr-546))
+
+`runSubmit` no longer decides. Everything up to the model call — store operations, the pre-parse guards,
+the parse and its #186/#539 auto-binds, every typed refusal, the scope register, the honesty battery, the dry
+run, the role re-readings, deferral and the seam guards — is `decideDeterministic2D` in
+`app/decideDeterministic.ts`, a pure function of `(facts, seed, view, utterance, locale)` returning a
+`Verdict2D` (store-op · refuse · commit · noop · escalate), with its binds, its log events and its note.
+`runSubmit` applies the verdict; `log-triage` calls the same function, so there is no mirror left to drift.
+A new pre-LLM branch belongs in the decision — the mirror test fails if `runSubmit` parses or refuses on its
+own — and the parity shards (`decide-parity-1395-*`) hold the whole corpus to the recorded behaviour.
+
 ## Re-reading a role-assigned letter run ([ADR-521](06-decisions.md#adr-521))
 
-Between the dry run and the refusal, `app/submitPipeline.ts` asks `app/roleReadings.ts` one question:
+Between the dry run and the refusal, the pre-LLM decision (`app/decideDeterministic.ts`) asks `app/roleReadings.ts` one question:
 *what else could that letter run have meant?*
 
 The answer is produced by **rewriting the utterance** and handing it back to the same parser — so no
