@@ -6,7 +6,7 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-09-21",
+  "updatedAt": "2026-09-24",
   "slow": [
     "src/__tests__/determined-prints-1.test.ts",
     "src/__tests__/determined-prints-2.test.ts",
@@ -28,7 +28,7 @@
     "src/__tests__/scenarios-props-budget.test.ts",
     "src/__tests__/scenarios-props-resample.test.ts",
     "src/__tests__/scenarios-props-submit-gate.test.ts",
-    "src/app/__tests__/issue-1265-bound-boundary.test.ts",
+    "src/app/__tests__/issue-1351-bound-aim-yields.test.ts",
     "src/app/__tests__/resolve-view.test.ts",
     "src/engine/__tests__/dof-vacuous.test.ts",
     "src/engine/__tests__/inscribe-joint-solve.test.ts",
@@ -44,6 +44,7 @@
     "src3d/__tests__/adr-3d-032.test.ts",
     "src3d/__tests__/book-coordinate-givens.test.ts",
     "src3d/__tests__/exam-2026-2.test.ts",
+    "src3d/__tests__/issue-1311-free-pair-length-drive.test.ts",
     "src3d/__tests__/issue-814.test.ts",
     "src3d/__tests__/issue-815.test.ts",
     "src3d/__tests__/issue-816.test.ts",
