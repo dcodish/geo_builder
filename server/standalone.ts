@@ -24,6 +24,8 @@
  *   ADMIN_COOKIE_SECRET  (signs the admin session cookie)
  *   ADMIN_BASE   (2-D dashboard base path the browser sees; default /geo-builder/admin)
  *   ADMIN_3D_BASE (3-D dashboard base path; default /3d-builder/admin, proxied to the /admin3 tail)
+ *   ADMIN_ANALYTIC_BASE (analytic dashboard base path; default /analytic-builder/admin, proxied to the
+ *                 /admin-analytic tail — #1362)
  *
  * A `tool:'3d'` tag in a POST /api/log body routes the event to the 3-D file; the 3-D dashboard is
  * served on the /admin3 path tail (Apache maps /3d-builder/admin -> /admin3, since the prefix is stripped).
@@ -34,7 +36,8 @@ import { randomBytes } from 'node:crypto';
 import { dirname } from 'node:path';
 import { handleParse } from './parseHandler';
 import { handleLog, events3LogPath, eventsLogPath } from './eventLog';
-import { handleAdmin, PROFILE_3D } from './admin';
+import { handleAdmin, PROFILE_3D, PROFILE_ANALYTIC } from './admin';
+import { eventsLogPathForId } from './toolRouting';
 import { handleConfigRead } from './adminConfig';
 // #1374: the share store — a short link with a WhatsApp preview. `/g/<id>` is TOP-LEVEL on
 // purpose: the operator asked for `themathbible.com/<something short>`, and a preview crawler
@@ -66,6 +69,9 @@ const adminBase = process.env.ADMIN_BASE || '/geo-builder/admin';
 // path + cookie scope, and reads the 3-D events file. Apache maps `/3d-builder/admin` → the `/admin3`
 // tail here (the prefix is stripped at the proxy, so the two dashboards MUST differ by tail, not prefix).
 const admin3Base = process.env.ADMIN_3D_BASE || '/3d-builder/admin';
+// #1362 — the analytic dashboard, on its own DISTINCT tail for the same reason as /admin3: Apache strips
+// the prefix, and a bare /admin would be the 2-D dashboard serving 2-D data under the analytic prefix.
+const adminAnalyticBase = process.env.ADMIN_ANALYTIC_BASE || '/analytic-builder/admin';
 
 if (!apiKey) {
   console.error('[geo-proxy] WARNING: ANTHROPIC_API_KEY is not set — /api/parse will return 503.');
@@ -111,6 +117,18 @@ const server = createServer((req, res) => {
     // A3 (#662): the PUBLIC curation read — unauthenticated by design; 204 = "use your static
     // roster" (the degraded path). Config lives beside the events files.
     void handleConfigRead(req, res, { dir: dirname(eventsLogPath()) });
+    return;
+  }
+  // #1362: the analytic tail, before `/admin` for the same substring reason as `/admin3` below.
+  if (path.includes('/admin-analytic')) {
+    void handleAdmin(req, res, {
+      username: adminUsername,
+      password: adminPassword,
+      cookieSecret: adminCookieSecret,
+      base: adminAnalyticBase,
+      logPath: eventsLogPathForId('analytic') ?? undefined,
+      profile: PROFILE_ANALYTIC,
+    });
     return;
   }
   // The 3-D dashboard tail (`/admin3`) MUST be checked before the 2-D `/admin` — `'/admin3'.includes('/admin')`

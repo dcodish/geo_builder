@@ -339,6 +339,81 @@ export const PROFILE_3D: DashboardProfile = {
   verdictsFile: 'verdicts-3d.json',
 };
 
+// ── the analytic profile (`/analytic-builder/`, #1362) ─────────────────────
+
+/**
+ * The analytic outcome TAXONOMY — operator ruling, 2026-09-24 (#1362): three buckets, not a split.
+ *
+ *  - `not-handled` — **a capability to build** (no rule matched: the one code meaning "I do not know
+ *    this sentence", which is also the only one that reaches the LLM seam);
+ *  - `out-of-scope` — **correctly declined**;
+ *  - `bad-equation` · `unknown-reference` · `bad-arity` — **review**: neither auto-filed nor discarded.
+ *    Analytic only began reporting on 2026-09-22, and a split chosen before one real session was seen
+ *    would be reasoning about student mistakes nobody has observed.
+ *
+ * Every OTHER refusal code (the role/degenerate codes, `unsatisfiable`, a name clash…) was not ruled on.
+ * It goes to `review` as well — the reading that files nothing and discards nothing, pending the count
+ * the ruling's own revisit trigger asks for («once a triage pass has real analytic sessions, count how
+ * the middle three actually distribute»).
+ *
+ * Exported because `/log-triage` classifies with THIS function rather than a copy (ADR-W-053).
+ */
+export const ANALYTIC_REVIEW_RULED = ['bad-equation', 'unknown-reference', 'bad-arity'] as const;
+
+/** Parser results that mean the line was UNDERSTOOD (built, noted as already known, or taught). */
+const ANALYTIC_UNDERSTOOD = new Set(['ok', 'record', 'already-known', 'already-follows', 'teach']);
+
+export function outcomeOfAnalytic(e: UsageEvent): string {
+  const r = e.result ?? 'ok';
+  if (e.source === 'llm') {
+    if (r === 'lines') return 'llm-built';
+    if (r === 'busy') return 'throttled';
+    return 'not-understood'; // `none` / `rejected`: the student kept the refusal about their own words
+  }
+  if (ANALYTIC_UNDERSTOOD.has(r)) return 'parsed';
+  if (r === 'not-handled') return 'not-understood'; // a FINAL not-handled — the fallback did not run
+  if (r === 'out-of-scope') return 'out-of-scope';
+  return 'review';
+}
+
+const OUTCOME_LABELS_ANALYTIC: Record<string, string> = {
+  parsed: 'נותח (דקדוק)',
+  'llm-built': 'נותח (LLM)',
+  'not-understood': 'לא הובן — פער אמיתי (לטיפול)',
+  review: 'לבדיקה — סירוב שעדיין לא סווג',
+  'out-of-scope': 'מחוץ לתחום (לא נדרש)',
+  throttled: 'נחסם — מגבלת עומס/תקציב (SEC-2)',
+};
+
+/** The three RULED review codes, labelled; any other code in the bucket shows as itself. */
+const REVIEW_LABELS_ANALYTIC: Record<string, string> = {
+  'bad-equation': 'משוואה שלא נקראה',
+  'unknown-reference': 'הפניה לאובייקט לא קיים',
+  'bad-arity': 'מספר נקודות שגוי לצורה',
+};
+
+/** The refusal code of a `review` event — the breakdown the ruling's revisit trigger will read. */
+function reviewCodeOfAnalytic(e: UsageEvent): string | null {
+  return outcomeOfAnalytic(e) === 'review' ? (e.result ?? 'unknown') : null;
+}
+
+export const PROFILE_ANALYTIC: DashboardProfile = {
+  tool: 'analytic',
+  title: 'Analytic Builder — דוח שימוש',
+  outcomeLabels: OUTCOME_LABELS_ANALYTIC,
+  classify: outcomeOfAnalytic,
+  gapKey: 'not-understood',
+  gapCard: 'פערים אמיתיים (לטיפול)',
+  secondaryKey: 'review',
+  secondaryCard: 'לבדיקה',
+  gapDrillTitle: 'פערים אמיתיים — משפטים שלא הובנו (לטיפול)',
+  secondaryDrillTitle: 'לבדיקה — סירובים שעדיין לא הוחלט אם הם פער או דחייה נכונה',
+  subCategoryOf: reviewCodeOfAnalytic,
+  subLabels: REVIEW_LABELS_ANALYTIC,
+  subPanelTitle: 'לבדיקה — לפי קוד הסירוב',
+  verdictsFile: 'verdicts-analytic.json',
+};
+
 /**
  * One step of a session timeline (#470) — a `submit` or a store `action`, in LOG order.
  *
