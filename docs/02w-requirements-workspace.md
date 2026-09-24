@@ -12,6 +12,7 @@ The surfaces a student meets in **every** builder, and the operator surface behi
 | The suite chrome — frame, switcher, workbench, tool row, banner, manual | `shell/frame/` | `FR-SU-*` |
 | The data panel and the ask lane | `shell/frame/` + per-product answers | `FR-DP-*` |
 | Save-file envelope, naming, load audit | `shell/save.ts` | `FR-SL-*` |
+| Discoverability — crawl files, page metadata | `deploy/homepage/` + each builder's page head | `FR-DI-*` |
 | Image and question-document export | `shell/export/` | `FR-EX-*` |
 | The admin dashboard and operator config | `server/` | `FR-AD-*` |
 | Shared i18n, bidi isolation, number display | `shell/` | `FR-WI-*` |
@@ -171,6 +172,23 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
   with a message that says it is too large to open rather than calling it broken, and the student's
   canvas is left as it was. The share store refuses to hold what the builders would refuse to open.
   *(Realised in all four builders and the store — [ADR-W-082](06w-decisions-workspace.md#adr-w-082), #1379.)*
+- **FR-SL-10 (Must)** — **A shared figure never becomes a search result.** Every `/g/` response — the
+  page, its preview image, and the dead-link answer — tells search engines not to index it, because the
+  page's title is whatever the uploader typed, and an indexable one would put a stranger's words on a
+  themathbible.com result. The chat-app preview (FR-SL-8) is unaffected: it reads the page, it does not
+  index it. *(Realised — [ADR-W-084](06w-decisions-workspace.md#adr-w-084), #1384.)*
+
+## Discoverability
+
+How a student who has never heard of the tools finds them — through a search engine or an AI answer
+engine. Owned by the site-root files in `deploy/homepage/` and by each builder's page head.
+
+- **FR-DI-1 (Should)** — **The site answers a crawler.** A `robots.txt` that admits **every** crawler,
+  AI answer and training crawlers included (operator ruling, #1384: reach is the point of a free tool),
+  and names a sitemap; a sitemap listing the homepage and **every** builder in `products.json`; a site
+  icon a browser and a search result can show; and **one host** — `www.` redirects to the apex rather
+  than serving a second copy. *(Realised — [ADR-W-084](06w-decisions-workspace.md#adr-w-084), #1384; the
+  `www.` redirect is a hosting-panel setting, see [RUNBOOK](RUNBOOK.md).)*
 
 ## Export
 
