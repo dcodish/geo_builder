@@ -443,7 +443,9 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     const oos = classifyOutOfScope(utterance);
     // #43 (ADR-289): the whole GUIDANCE register short-circuits BEFORE the LLM — none of these
     // families can ever build, so an LLM call on them is pure cost (the analytic precedent).
-    const PRE_LLM = new Set(['analytic', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point', 'unnamed-sides', 'compound-relation']);
+    // #1357: `unrelated` (no construction signal at all) joins the set — junk was classified BEFORE the call
+    // and paid for anyway, the category read only afterwards to word the message.
+    const PRE_LLM = new Set(['analytic', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point', 'unnamed-sides', 'compound-relation', 'unrelated']);
     if (oos && PRE_LLM.has(oos.category)) {
       logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${oos.category}` });
       ui.setInputNote(t(oos.messageKey, oos.params));
