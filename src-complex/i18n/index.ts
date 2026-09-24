@@ -121,6 +121,9 @@ const he = {
   secPoints: 'נקודות',
   secMeasures: 'מדידות',
   secRelations: 'יחסים',
+  // #1389/#1390: every real parameter the figure mentions — its value when the givens force it
+  secParams: 'פרמטרים',
+  paramFree: 'חופשי',
   secAsk: 'חישוב',
   // S5 — the visualization layer (#622)
   stepperLabel: 'מחזור החזקות: n',
@@ -319,6 +322,8 @@ const en: typeof he = {
   secPoints: 'Points',
   secMeasures: 'Measures',
   secRelations: 'Relations',
+  secParams: 'Parameters',
+  paramFree: 'free',
   secAsk: 'Calculate',
   // S5 — the visualization layer (#622)
   stepperLabel: 'power cycle: n',

@@ -24,6 +24,8 @@
  * they must NOT match a legitimate construction (a real gap must stay a real gap, not be mislabelled).
  */
 
+import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
+
 export type ScopeCategory =
   | 'analytic'
   | 'angle-relation'
@@ -200,12 +202,9 @@ const RULES: ScopeRule[] = [
   },
 ];
 
-/**
- * Tokens suggesting a REAL construction: a point label, a number, a math/angle symbol (these are
- * CASE-SENSITIVE — a label is an UPPERCASE letter, so a lowercase greeting isn't mistaken for one)…
- */
-const GEO_SYMBOL = /[A-Z]\d*|\d|[∠°⊥⟂∥√△▲◯=<>]/;
-/** …or a geometry keyword in Hebrew or English (case-insensitive). Text with NONE of these is `unrelated`.
+/** A geometry keyword in Hebrew or English (case-insensitive) — this tool's VOCABULARY for the shared
+ *  construction-signal test (`shell/llm/constructionSignal.ts`, #1357), which also accepts a point label
+ *  or a relation symbol. Text with none of these is `unrelated`.
  *  The angle stem is `זו?וי` — BOTH the single-vav «זוית» and double-vav «זווית» spellings (the ADR-3D-032
  *  vav class): «זווי» alone missed the single-vav form, so «זוית abc» (lowercase labels, so no GEO_SYMBOL
  *  either) was mis-classified `unrelated` and got a "not geometry" brush-off (#244). */
@@ -297,7 +296,9 @@ export function classifyOutOfScope(utterance: string): ScopeMatch | null {
     }
   }
   // No construction signal at all → free text (greeting, question, gibberish).
-  if (!GEO_SYMBOL.test(s) && !GEO_KEYWORD.test(s)) return { category: 'unrelated', messageKey: 'input.scope.unrelated' };
+  // #1357: the POSITIVE test, shared with every builder that escalates. A digit alone is no longer a
+  // signal («12345»), nor is the capital of an ordinary word («Hello there»).
+  if (!hasConstructionSignal(s, GEO_KEYWORD)) return { category: 'unrelated', messageKey: 'input.scope.unrelated' };
   return null; // has geometric content but unmatched → a real gap to implement (stays 'not-understood').
 }
 

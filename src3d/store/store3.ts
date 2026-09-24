@@ -834,6 +834,147 @@ function dependentsBroken(before: Fact3[], after: Fact3[], seed: number, changed
   return { code: 'dependents-broken', items: broken.map((f) => `«${f.utterance}»`).join(', '), cause: changed.utterance };
 }
 
+/**
+ * #1394 — READ ONE STATEMENT against the figure: the grammar, plus the two figure-aware repairs every
+ * statement seam applies (`submit`, `replaceFact`). One function, so the seams cannot disagree about
+ * what a sentence means or how its refusal is worded.
+ */
+function readStatement3(
+  st: { facts: Fact3[]; seed: number },
+  utterance: string,
+): { ok: true; commands: Command3[] } | { ok: false; error: NonNullable<StoreError3> } {
+  let parsed = parse3(utterance);
+  // #866 (ADR-3D-239) — a vertex carrying exactly ONE angle is not ambiguous, and asking there
+  // would make the clarification's own sentence false ("more than one angle meets at A" when one
+  // does). The figure is known here, so the canonical three-letter sentence is rebuilt and read by
+  // the SAME grammar: no command is synthesised in the store, and the student's own wording stays
+  // on the fact. Two or more candidates is the operator's case and still asks.
+  if (!parsed.ok && parsed.reason === 'ambiguous-angle-vertex') {
+    const only = angleCandidatesAt(st, parsed.vertex);
+    if (only.length === 1) parsed = parse3(`${parsed.vertex}${parsed.rider} חוצה זווית ${only[0]}`);
+  }
+  if (parsed.ok) return { ok: true, commands: parsed.commands };
+  // #516: every TYPED refusal keeps its identity — only a genuine `not-handled` may read as
+  // not-understood, because not-understood is what the App escalates to the LLM lane.
+  return {
+    ok: false,
+    error:
+      parsed.reason === 'ambiguous-vector-length'
+        ? { code: 'ambiguous-vector-length' }
+        : parsed.reason === 'param-roles-conflated'
+          ? { code: 'param-roles-conflated', letter: parsed.letter }
+          : parsed.reason === 'ambiguous-main-diagonal'
+            ? { code: 'ambiguous-main-diagonal', pairs: mainDiagonalCandidates(st) }
+            : parsed.reason === 'ambiguous-angle-vertex'
+              ? { code: 'ambiguous-angle-vertex', vertex: parsed.vertex, angles: angleCandidatesAt(st, parsed.vertex).join(', ') }
+              : { code: 'not-understood' },
+  };
+}
+
+/**
+ * The honesty gates, ONE list for every statement seam (#424 / #438 / #440 / #535, ADR-3D-147): what a
+ * stated line names that the commands never carry. `prior` is the figure the line is added to.
+ */
+function lostGivens3(utterance: string, commands: readonly Command3[], prior: Construction3): string[] {
+  const cmds = [...commands];
+  return [
+    ...droppedNewLabels3(utterance, cmds, [...prior.points.keys()], [...prior.vectors.keys()]),
+    ...droppedGivenNumbers3(utterance, cmds),
+    ...droppedShapeNoun3(utterance, cmds), // #587 / ADR-3D-084: a stated base shape the lane cannot lower
+    ...droppedTriShape3(utterance, cmds), // #424: a stated triangle qualifier silently dropped
+    ...droppedConstructNoun3(utterance, cmds), // #438/#440: a stated OBJECT never materialised
+  ];
+}
+
+/**
+ * THE 3-D SUBMIT DECISION (#1394) — "would you accept this line?", asked without accepting it.
+ *
+ * `store3.submit` used to intercept renames, parse, run the honesty gates, detect twins, derive, run
+ * `seedForRequirements` and commit, all in one function, so nothing could ask it the question #1358's
+ * shared register needs: will the tool RECORD the sentence it is about to teach? This is that function,
+ * pure over `(facts, seed, utterance)`. It sets nothing and the fact id is injected, so asking twice is
+ * the same answer and leaves the store as it was. `submit` dispatches it; the LLM lane's `submitSteps`
+ * shares its tail ({@link decideCommands3}), so the gates and the candidate derive are one code path.
+ */
+export type Verdict3 =
+  | { readonly kind: 'rename'; readonly from: string; readonly to: string }
+  /** the line reads as nothing the grammar knows — the one verdict the App escalates to the model */
+  | { readonly kind: 'not-understood' }
+  | { readonly kind: 'refused'; readonly error: NonNullable<StoreError3> }
+  /** #613 (ADR-W-031): already stated — nothing is appended; a MUTED twin is re-enabled instead */
+  | { readonly kind: 'already-stated'; readonly twin: Fact3; readonly facts: Fact3[] }
+  | { readonly kind: 'record'; readonly fact: Fact3; readonly facts: Fact3[]; readonly seed: number };
+
+export function decideSubmit3(
+  st: { facts: Fact3[]; seed: number },
+  raw: string,
+  newId: () => string = () => nanoid(8),
+): Verdict3 {
+  const utterance = stripFormatControls(raw); // #751 (ADR-W-029) — the store-side ingest invariant
+  // #578 (ADR-3D-211): «שנה שם E ל-O» is a rewrite of HISTORY, not a statement about the figure,
+  // so it is read BEFORE the grammar and never becomes a fact. Intercepted here rather than in
+  // App3 because this is where the fact list lives — and because a refusal must carry its own
+  // code: a rename we understood and declined must not reach the LLM lane, which escalates on
+  // `not-understood` and would pay for a guess at a question already answered.
+  const rn = parseRename3(utterance);
+  if (rn) return { kind: 'rename', from: rn.from, to: rn.to };
+  const read = readStatement3(st, utterance);
+  if (!read.ok) return read.error.code === 'not-understood' ? { kind: 'not-understood' } : { kind: 'refused', error: read.error };
+  return decideCommands3(st, utterance, read.commands, { twins: true, seedSearch: true }, newId);
+}
+
+/**
+ * The TAIL both statement seams share (#1394): gates → twin → candidate derive → configuration search.
+ * `submitSteps` (the LLM lane) asks it without the twin rule and without the search, exactly as it
+ * always has; the deterministic lane asks it with both.
+ */
+export function decideCommands3(
+  st: { facts: Fact3[]; seed: number },
+  utterance: string,
+  commands: readonly Command3[],
+  opts: { twins: boolean; seedSearch: boolean },
+  newId: () => string = () => nanoid(8),
+): Verdict3 {
+  const { facts, seed } = st;
+  // #424 / #438 / #440 / #535: the honesty gates guard the DETERMINISTIC path too — bound to the
+  // EVENT, not to a commit path. The old reasoning ("the rules parse the utterance itself, so
+  // nothing can leak") was falsified by #530: a rule CAN match an utterance and still drop part
+  // of it — an optional label capture that quietly goes unfilled commits a partial figure with a
+  // green ✓, and the label/number gates knew but were only ever asked on the LLM seam
+  // (ADR-3D-147). The catalog corpus is asserted gate-clean in honesty3.test.ts, so the canonical
+  // phrasings never pay this check with a false refusal.
+  const lost = lostGivens3(utterance, commands, derive3(facts, seed).construction);
+  if (lost.length > 0) return { kind: 'refused', error: { code: 'dropped-given', items: lost.join(', ') } };
+  // #613 (ADR-W-031, operator ruling 2026-08-16: "if a fact is already known - it should not be
+  // added. this is true to all tools") — a RESTATED fact succeeds and appends no row. M1
+  // idempotency is at APPLY, where a statement about existing objects correctly returns the
+  // construction unchanged; the STORE then appended anyway, so the fact list — the record of what
+  // the student stated, and what `.geo3.json` saves and replays — grew entries that state nothing.
+  // This is the store-level rule 2-D has always had in `foldFact`, which is why this is a port and
+  // not a new mechanism. A disabled twin is RE-ENABLED rather than duplicated (2-D's FR-EN-9).
+  if (opts.twins) {
+    const twin = facts.find((f) => sameStatement(f.cmds, commands));
+    if (twin) {
+      return {
+        kind: 'already-stated',
+        twin,
+        facts: twin.enabled ? facts : facts.map((f) => (f.id === twin.id ? { ...f, enabled: true } : f)),
+      };
+    }
+  }
+  const fact: Fact3 = { id: newId(), utterance: utterance.trim(), cmds: [...commands], enabled: true };
+  const candidate = [...facts, fact];
+  const status = derive3(candidate, seed).status[fact.id];
+  if (status !== 'ok' && status !== 'disabled') return { kind: 'refused', error: status }; // keep-prior
+  if (!opts.seedSearch) return { kind: 'record', fact, facts: candidate, seed };
+  // ADR-3D-053 (#273): a stated inequality determines nothing, so it can only be honoured by
+  // CHOOSING a configuration that satisfies it. Land on one before drawing; if none exists within
+  // budget, refuse and keep the prior figure rather than draw a figure that contradicts the given.
+  const found = seedForRequirements(candidate, seed);
+  if (found === null) return { kind: 'refused', error: { code: 'bound-unsatisfiable', id: '' } };
+  return { kind: 'record', fact, facts: candidate, seed: found };
+}
+
 export const useGeo3 = create<Geo3State>()(
   temporal(
     (set, get) => ({
@@ -847,96 +988,25 @@ export const useGeo3 = create<Geo3State>()(
       lastNotice: null,
 
       submit: (utterance) => {
-        utterance = stripFormatControls(utterance); // #751 (ADR-W-029) — the store-side ingest invariant
-        // #578 (ADR-3D-211): «שנה שם E ל-O» is a rewrite of HISTORY, not a statement about the figure,
-        // so it is read BEFORE the grammar and never becomes a fact. Intercepted here rather than in
-        // App3 because this is where the fact list lives — and because a refusal must carry its own
-        // code: a rename we understood and declined must not reach the LLM lane, which escalates on
-        // `not-understood` and would pay for a guess at a question already answered.
-        const rn = parseRename3(utterance);
-        if (rn) {
-          get().rename(rn.from, rn.to);
-          return;
+        // #1394: DECIDED, then dispatched — every branch lives in `decideSubmit3`, pure over the state.
+        const v = decideSubmit3(get(), utterance);
+        switch (v.kind) {
+          case 'rename':
+            get().rename(v.from, v.to);
+            return;
+          case 'not-understood':
+            set({ lastError: { code: 'not-understood' } });
+            return;
+          case 'refused':
+            set({ lastError: v.error }); // keep-prior: the refused statement is not added
+            return;
+          case 'already-stated':
+            set({ facts: v.facts, lastError: null, lastNotice: { code: 'already-stated', utterance: v.twin.utterance } });
+            return;
+          case 'record':
+            set({ facts: v.facts, seed: v.seed, lastError: null, lastNotice: null });
+            return;
         }
-        let parsed = parse3(utterance);
-        // #866 (ADR-3D-239) — a vertex carrying exactly ONE angle is not ambiguous, and asking there
-        // would make the clarification's own sentence false ("more than one angle meets at A" when one
-        // does). The figure is known here, so the canonical three-letter sentence is rebuilt and read by
-        // the SAME grammar: no command is synthesised in the store, and the student's own wording stays
-        // on the fact. Two or more candidates is the operator's case and still asks.
-        if (!parsed.ok && parsed.reason === 'ambiguous-angle-vertex') {
-          const only = angleCandidatesAt(get(), parsed.vertex);
-          if (only.length === 1) parsed = parse3(`${parsed.vertex}${parsed.rider} חוצה זווית ${only[0]}`);
-        }
-        if (!parsed.ok) {
-          // #516: every TYPED refusal keeps its identity — only a genuine `not-handled` may read as
-          // not-understood, because not-understood is what the App escalates to the LLM lane.
-          set({
-            lastError:
-              parsed.reason === 'ambiguous-vector-length'
-                ? { code: 'ambiguous-vector-length' }
-                : parsed.reason === 'param-roles-conflated'
-                  ? { code: 'param-roles-conflated', letter: parsed.letter }
-                  : parsed.reason === 'ambiguous-main-diagonal'
-                    ? { code: 'ambiguous-main-diagonal', pairs: mainDiagonalCandidates(get()) }
-                    : parsed.reason === 'ambiguous-angle-vertex'
-                      ? { code: 'ambiguous-angle-vertex', vertex: parsed.vertex, angles: angleCandidatesAt(get(), parsed.vertex).join(', ') }
-                      : { code: 'not-understood' },
-          });
-          return;
-        }
-        const { facts, seed } = get();
-        // #424 / #438 / #440 / #535: the honesty gates guard the DETERMINISTIC path too — bound to the
-        // EVENT, not to a commit path. The old reasoning ("the rules parse the utterance itself, so
-        // nothing can leak") was falsified by #530: a rule CAN match an utterance and still drop part
-        // of it — an optional label capture that quietly goes unfilled commits a partial figure with a
-        // green ✓, and the label/number gates knew but were only ever asked on the LLM seam
-        // (ADR-3D-147). The catalog corpus is asserted gate-clean in honesty3.test.ts, so the canonical
-        // phrasings never pay this check with a false refusal.
-        const prior3 = derive3(facts, seed).construction;
-        const lostDet = [
-          ...droppedNewLabels3(utterance, parsed.commands, [...prior3.points.keys()], [...prior3.vectors.keys()]),
-          ...droppedGivenNumbers3(utterance, parsed.commands),
-          ...droppedShapeNoun3(utterance, parsed.commands), // #587: a stated QUAD noun the flat lane cannot lower
-          ...droppedTriShape3(utterance, parsed.commands),
-          ...droppedConstructNoun3(utterance, parsed.commands),
-        ];
-        if (lostDet.length > 0) {
-          set({ lastError: { code: 'dropped-given', items: lostDet.join(', ') } });
-          return;
-        }
-        // #613 (ADR-W-031, operator ruling 2026-08-16: "if a fact is already known - it should not be
-        // added. this is true to all tools") — a RESTATED fact succeeds and appends no row. M1
-        // idempotency is at APPLY, where a statement about existing objects correctly returns the
-        // construction unchanged; the STORE then appended anyway, so the fact list — the record of what
-        // the student stated, and what `.geo3.json` saves and replays — grew entries that state nothing.
-        // This is the store-level rule 2-D has always had in `foldFact`, which is why this is a port and
-        // not a new mechanism. A disabled twin is RE-ENABLED rather than duplicated (2-D's FR-EN-9).
-        const twin = facts.find((f) => sameStatement(f.cmds, parsed.commands));
-        if (twin) {
-          set({
-            facts: twin.enabled ? facts : facts.map((f) => (f.id === twin.id ? { ...f, enabled: true } : f)),
-            lastError: null,
-            lastNotice: { code: 'already-stated', utterance: twin.utterance },
-          });
-          return;
-        }
-        const fact: Fact3 = { id: nanoid(8), utterance: utterance.trim(), cmds: parsed.commands, enabled: true };
-        const candidate = [...facts, fact];
-        const st = derive3(candidate, seed).status[fact.id];
-        if (st !== 'ok' && st !== 'disabled') {
-          set({ lastError: st }); // keep-prior: the bad fact is not added
-          return;
-        }
-        // ADR-3D-053 (#273): a stated inequality determines nothing, so it can only be honoured by
-        // CHOOSING a configuration that satisfies it. Land on one before drawing; if none exists within
-        // budget, refuse and keep the prior figure rather than draw a figure that contradicts the given.
-        const found = seedForRequirements(candidate, seed);
-        if (found === null) {
-          set({ lastError: { code: 'bound-unsatisfiable', id: '' } });
-          return;
-        }
-        set({ facts: candidate, seed: found, lastError: null, lastNotice: null });
       },
 
       submitSteps: (utterance, steps) => {
@@ -954,33 +1024,17 @@ export const useGeo3 = create<Geo3State>()(
           set({ lastError: { code: 'not-understood' } });
           return;
         }
-        const { facts, seed } = get();
         // HONESTY GATES on the LLM seam (docs/24 S2.3 — the 2-D ADR-240/ADR-250 line, copied per
         // docs/20 §12): the decomposition must account for every NEW label and every stated magnitude
         // of the student's ORIGINAL utterance, or the commit refuses NAMING what was lost — a
-        // silently-partial figure must never sit on the canvas with a green row. The deterministic
-        // path runs the same label/number gates in `submit` (#535, ADR-3D-147) — a rule that matches
-        // and still drops part of the sentence leaks exactly as an LLM decomposition can (#530).
-        const prior = derive3(facts, seed).construction;
-        const lost = [
-          ...droppedNewLabels3(utterance, all, [...prior.points.keys()], [...prior.vectors.keys()]),
-          ...droppedGivenNumbers3(utterance, all),
-          ...droppedShapeNoun3(utterance, all), // ADR-3D-084 (#304): a stated base shape silently changed
-          ...droppedTriShape3(utterance, all), // #424: a stated triangle qualifier silently dropped
-          ...droppedConstructNoun3(utterance, all), // #438/#440: a stated OBJECT never materialised
-        ];
-        if (lost.length > 0) {
-          set({ lastError: { code: 'dropped-given', items: lost.join(', ') } });
+        // silently-partial figure must never sit on the canvas with a green row. #1394: the SAME gate
+        // list and candidate derive as the deterministic lane (`decideCommands3`), not a copy of it.
+        const v = decideCommands3(get(), utterance, all, { twins: false, seedSearch: false });
+        if (v.kind === 'refused') {
+          set({ lastError: v.error });
           return;
         }
-        const fact: Fact3 = { id: nanoid(8), utterance: utterance.trim(), cmds: all, enabled: true };
-        const candidate = [...facts, fact];
-        const st = derive3(candidate, seed).status[fact.id];
-        if (st !== 'ok' && st !== 'disabled') {
-          set({ lastError: st });
-          return;
-        }
-        set({ facts: candidate, lastError: null, lastNotice: null });
+        if (v.kind === 'record') set({ facts: v.facts, lastError: null, lastNotice: null });
       },
 
       toggle: (factId) => {
@@ -1004,43 +1058,16 @@ export const useGeo3 = create<Geo3State>()(
         const { facts, seed } = get();
         const old = facts.find((f) => f.id === factId);
         if (!old) return false;
-        let parsed = parse3(utterance);
-        // #866 (ADR-3D-239) — a vertex carrying exactly ONE angle is not ambiguous, and asking there
-        // would make the clarification's own sentence false ("more than one angle meets at A" when one
-        // does). The figure is known here, so the canonical three-letter sentence is rebuilt and read by
-        // the SAME grammar: no command is synthesised in the store, and the student's own wording stays
-        // on the fact. Two or more candidates is the operator's case and still asks.
-        if (!parsed.ok && parsed.reason === 'ambiguous-angle-vertex') {
-          const only = angleCandidatesAt(get(), parsed.vertex);
-          if (only.length === 1) parsed = parse3(`${parsed.vertex}${parsed.rider} חוצה זווית ${only[0]}`);
-        }
+        // #1394: the same reader as `submit` — the #866 one-angle repair and the #516 typed refusals
+        const parsed = readStatement3(get(), utterance);
         if (!parsed.ok) {
-          // the same #516 identity-preserving refusal mapping as `submit`
-          set({
-            lastError:
-              parsed.reason === 'ambiguous-vector-length'
-                ? { code: 'ambiguous-vector-length' }
-                : parsed.reason === 'param-roles-conflated'
-                  ? { code: 'param-roles-conflated', letter: parsed.letter }
-                  : parsed.reason === 'ambiguous-main-diagonal'
-                    ? { code: 'ambiguous-main-diagonal', pairs: mainDiagonalCandidates(get()) }
-                    : parsed.reason === 'ambiguous-angle-vertex'
-                      ? { code: 'ambiguous-angle-vertex', vertex: parsed.vertex, angles: angleCandidatesAt(get(), parsed.vertex).join(', ') }
-                      : { code: 'not-understood' },
-          });
+          set({ lastError: parsed.error });
           return false;
         }
         // The honesty gates read "prior" as the OTHER facts — the edited statement's own old
         // labels are exactly what the edit may be renaming, so they must count as new here.
         const rest = facts.filter((f) => f.id !== factId);
-        const prior3 = derive3(rest, seed).construction;
-        const lostDet = [
-          ...droppedNewLabels3(utterance, parsed.commands, [...prior3.points.keys()], [...prior3.vectors.keys()]),
-          ...droppedGivenNumbers3(utterance, parsed.commands),
-          ...droppedShapeNoun3(utterance, parsed.commands),
-          ...droppedTriShape3(utterance, parsed.commands),
-          ...droppedConstructNoun3(utterance, parsed.commands),
-        ];
+        const lostDet = lostGivens3(utterance, parsed.commands, derive3(rest, seed).construction);
         if (lostDet.length > 0) {
           set({ lastError: { code: 'dropped-given', items: lostDet.join(', ') } });
           return false;

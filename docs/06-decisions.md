@@ -12932,3 +12932,62 @@ The «תוסיף» wrapper is a separate defect: it must be **taught**, not abso
 - **`src3d/`** — no midsegment construct; the class is not present.
 - **`src/` trapezoid median** (`trapezoidMidsegment`) — resolves from the figure's unique parallel base-pair and already refuses on 0 or ≥2, the same discipline; unchanged.
 - The other `VariantShape`s (`kite`, `isosceles`) enumerate no shapes in gates, so the `MIDSEGMENT_SHAPES` class has one member — checked, not assumed.
+
+## ADR-546 — The pre-LLM lane is ONE pure decision, `decideDeterministic2D`: `runSubmit` dispatches it, and log-triage calls it instead of mirroring it (#1395)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1395](https://github.com/dcodish/geo_builder/issues/1395) (debt, `P2`, `2d`) · round [#1397](https://github.com/dcodish/geo_builder/issues/1397) · groundwork for [#1358](https://github.com/dcodish/geo_builder/issues/1358) (operator ruling 2026-09-24: *"Rework first, then all four"*)
+**Requirements:** none (internal) · **Design:** [04](04-design.md), "The pre-LLM decision" (new section) and the `app/` layer entry
+
+**Why.** #1358's shared imperative register must teach only sentences the tool will then ACCEPT, which
+needs a pure "would this line be recorded?" answer from each builder. 2-D's `runSubmit` could not give
+one:
+- it **mutated the store before it had parsed**: the #186 circle auto-bind and the #539 point auto-bind
+  called `nameCentre` / `rename` inside the parse loop;
+- it interleaved UI notes with every branch;
+- it could reach the paid model.
+
+`log-triage` needed the same answer and got it from a ~200-line hand mirror of the lane, which had
+drifted five times (ADR-346).
+
+**The decision.**
+1. **`src/app/decideDeterministic.ts`** holds the whole pre-LLM lane, in `runSubmit`'s order, with each
+   branch's own issue comment moved verbatim. It covers the store operations, the LaTeX and negation
+   guards, the parse with context, the auto-binds (**simulated on a copy of the facts** with the store's
+   own pure cores `nameCentreFacts` / `renameFacts`), every typed refusal, the scope register, the
+   lowercase fold, the honesty battery, the dry run, role re-readings, deferral, `implied`, `empty`, and
+   `weak`. It returns a `Verdict2D`:
+   - `store-op`;
+   - `refuse`, with a `category` of guided / clarify / conflict;
+   - `commit`, possibly deferred;
+   - `noop`;
+   - `escalate`.
+
+   Each verdict carries its binds, its log events in order, and its note (an i18n key and params, or a
+   raw engine error to humanize). It never touches the store, never logs and never calls the model. It
+   is split into `decidePreParse` and `decideFromParse` only so the dispatcher can paint the spinner
+   between them. The worker prefold is an injected hook, because it only primes a memo.
+2. **`runSubmit` is a dispatcher**: it applies the verdict's store operation or binds, commits, logs,
+   and shows the note. The LLM half is unchanged.
+3. **`triage.mjs`'s `session2d` calls `decideDeterministic2D`**. `PRE_LLM`, `droppedBy`,
+   `guidedAtSeam` and the auto-bind loop are deleted. `triage-mirror.test.ts`'s list comparisons
+   (#501, #829, the gate list, the format guards) are replaced by structural checks: triage calls the
+   decision, no copy survives, and `runSubmit` decides nothing before the model itself.
+
+**Parity, measured.** Before the extraction, the whole 2-D scenario corpus and every fixture (**355
+cases**) were replayed through the real `runSubmit` (model mocked) and recorded: notes, rename notes,
+clears, commits, model calls, and the final fact list. After it, all 355 reproduce byte for byte
+(`decide-parity-1395-{1..4}.test.ts`, sharded like `scenarios-e2e-*` because the corpus is ~8 minutes in
+one file).
+
+**Triage, measured on the same cached prod events.** 8 distinct 2-D utterances, 3 verdicts changed, and
+all 3 are the old mirror being wrong:
+- «משולש abc» and «הנקודה e=(-1,7)» were reported `built`. The App refuses them with the #779
+  lowercase-labels nudge, a parsed-path guard the mirror never had. That was a sixth drift.
+- «E=(-1,7)» was reported `built`. In its session the App answers «already drawn».
+
+**Consequences.** `src/app/decideDeterministic.ts` (new), `src/app/submitPipeline.ts`,
+`.claude/skills/log-triage/triage.mjs`, `src/parser/__tests__/triage-mirror.test.ts`. Locks:
+`decide-parity-1395-{1..4}.test.ts` with their golden files and `decideParity.ts`, and
+`decide-purity-1395.test.ts` (6: commit, store operation, pre-parse and pre-LLM refusals, escalation,
+and a circle and a point auto-bind taken from the corpus, each leaving the store, the debug log and the
+model untouched).

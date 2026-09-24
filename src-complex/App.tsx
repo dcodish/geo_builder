@@ -897,6 +897,26 @@ export function App() {
                 { key: 'measures', title: t('secMeasures'), rows: v2Measures(derived2, t), dir: 'app' },
                 { key: 'relations', title: t('secRelations'), rows: v2Claims(derived2, t), dir: 'app' },
                 {
+                  /* #1389/#1390 — the real PARAMETERS, in the shared panel's parameters slot (the 3-D and
+                     analytic template). A parameter draws no point, so this row is where «u^5 = 32»
+                     becomes visible: u = 2 when the givens force it, «u — חופשי» when they do not. */
+                  key: 'parameters',
+                  title: t('secParams'),
+                  dir: 'app',
+                  rows: (derived2?.params ?? []).map((p) =>
+                    p.value !== null ? (
+                      <span key={p.name} dir="ltr">{`${p.name} = ${p.value}`}</span>
+                    ) : (
+                      /* the free row mixes a Latin name with a word in the UI's language: its base
+                         direction comes from that word (the #934 content seam), the name is isolated */
+                      <span key={p.name} dir={complexBidi.textDir(t('paramFree'))}>
+                        <bdi dir="ltr">{p.name}</bdi>
+                        <span style={{ color: '#94a3b8' }}> — {t('paramFree')}</span>
+                      </span>
+                    ),
+                  ),
+                },
+                {
                   /* #789 — the ASK LANE (ADR-3D-057 arriving here): saved questions with their
                      answers, each row deletable; the box that feeds it is in the children below */
                   key: 'ask',

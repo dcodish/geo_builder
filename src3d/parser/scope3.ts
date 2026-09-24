@@ -1,4 +1,5 @@
 import { EN_STOP, NOUN_EN } from './parse3';
+import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 
 /**
  * #73 (ADR-3D-040): the 3-D GUIDANCE register — the 2-D scope.ts pattern, COPIED per docs/20 §12
@@ -25,6 +26,8 @@ import { EN_STOP, NOUN_EN } from './parse3';
  */
 
 export type ScopeCategory3 =
+  /** #1357: NO construction signal at all (gibberish, a greeting) — never worth a paid call */
+  | 'unrelated'
   | 'valueless-query'
   | 'cross-app'
   | 'bare-solid'
@@ -226,8 +229,26 @@ export function classifyGuidance3(utterance: string): ScopeMatch3 | null {
   for (const rule of RULES3) {
     if (rule.patterns.some((p) => p.test(s))) return { category: rule.category, messageKey: `scope.${rule.category}` };
   }
+  // #1357: the POSITIVE test, shared with every builder that escalates (`shell/llm/constructionSignal.ts`).
+  // Last, so a specific guidance always wins; the catalog NO-THEFT sweep keeps it off every supported line.
+  if (!hasConstructionSignal(s, VOCABULARY_3D)) return { category: 'unrelated', messageKey: 'scope.unrelated' };
   return null;
 }
+
+/**
+ * #1357 — this builder's VOCABULARY for the construction-signal test: the solid nouns `parse3` owns
+ * (English), their Hebrew stems, and the space-geometry words a statement is built from. A point label or
+ * a relation symbol is a signal on its own (the shared test), so this list only has to carry the words
+ * of a sentence that has neither.
+ */
+const VOCABULARY_3D = new RegExp(
+  // a line or plane NAME (l1, π2) and a parameter are this builder's own symbols, so they are words here
+  String.raw`(?<![A-Za-z])[lπ]\d|π|פרמטר|parameter|מצטלב|skew|sphere|cylinder|cone|` +
+    '(?:' + NOUN_EN + ')|פירמיד|טטר|ארבעון|קוביי?|תיב|מנסר|גוף|גליל|חרוט|כדור|נקוד|ישר|קטע|מישור|וקטור|זו?וי|מקצוע|פא[הות]|' +
+    'אלכסון|גובה|היטל|מעגל|צלע|בסיס|אמצע|מרכז|נפח|שטח|אורך|מרחק|מקביל|מאונך|ניצב|' +
+    'point|line|segment|plane|vector|angle|edge|face|diagonal|height|projection|circle|base|midpoint|volume|area|length|distance|parallel|perpendicular',
+  'i',
+);
 
 /**
  * #353 (ADR-397, operator ruling 2026-07-26): a candidate re-spelling of an utterance whose NODE labels

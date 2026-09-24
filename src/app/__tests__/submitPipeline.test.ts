@@ -107,12 +107,24 @@ describe('submit pipeline — grammar path', () => {
 });
 
 describe('submit pipeline — LLM second attempt', () => {
-  it('out-of-grammar input that the LLM also cannot build refuses honestly', async () => {
+  // FLIPPED by #1357: this lock asserted that free text with no geometry in it WAS sent to the paid model
+  // (`toHaveBeenCalledTimes(1)`) and only then refused as unrelated — the exact defect the issue reports.
+  // The refusal is unchanged; the call is gone.
+  it('free text with no construction signal refuses honestly WITHOUT a model call (#1357)', async () => {
     llmParseMock.mockResolvedValue({ built: [], dropped: [] });
     const { deps, notes } = makeDeps();
     await runSubmit('דבר מה שאיננו גאומטריה כלל', deps);
-    expect(llmParseMock).toHaveBeenCalledTimes(1);
+    expect(llmParseMock).not.toHaveBeenCalled();
     expect(notes()).toEqual(['input.scope.unrelated']); // classified out-of-scope free text — the honest refusal lane
+    expect(useGeoStore.getState().facts.length).toBe(0);
+  });
+
+  it('a real construct gap the grammar lacks still reaches the model and refuses honestly when it cannot build', async () => {
+    llmParseMock.mockResolvedValue({ built: [], dropped: [] });
+    const { deps, notes } = makeDeps();
+    await runSubmit('CD חותך את המעגל', deps);
+    expect(llmParseMock).toHaveBeenCalledTimes(1);
+    expect(notes()).toEqual(['input.notUnderstood']);
     expect(useGeoStore.getState().facts.length).toBe(0);
   });
 

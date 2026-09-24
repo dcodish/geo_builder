@@ -99,6 +99,38 @@ export function solutionSetConstraints(eq: RootsEquation, mode: RootsMode): Cons
 }
 
 /**
+ * #1396 — the enumerate lowering when the student has ALREADY STATED some of X₁..Xₙ, and at least one
+ * of them sits on a root other than its index: the solutions are matched by SET MEMBERSHIP (operator
+ * ruling, 2026-09-24, amending [ADR-CX-042](../../docs/06d-decisions-complex.md#adr-cx-042)).
+ *
+ * `placed` maps each stated member to the root it occupies, `j ∈ 0..n−1`, counted in argument order
+ * from the principal root. The caller decided that exactly, and only for DETERMINED members. Each
+ * member keeps its own row `Xₘ^n = rhs` (so the solve still checks it), and the unstated names take the
+ * remaining roots in index order, ascending j, each pinned to the first member by modulus and by
+ * `(j − j₀)/n` of a turn. With no member, or every member on its own index root, the caller uses
+ * {@link solutionSetConstraints} instead, so the common case lowers exactly as it always did.
+ */
+export function solutionSetConstraintsPlaced(eq: RootsEquation, placed: ReadonlyMap<string, number>): Constraint[] {
+  const n = eq.n;
+  const sols = solutionNames(eq.varName, n);
+  const stated = sols.filter((s) => placed.has(s));
+  if (stated.length === 0) throw new Error('solutionSetConstraintsPlaced needs at least one placed member');
+  const anchor = stated[0];
+  const j0 = placed.get(anchor)!;
+  const taken = new Set(placed.values());
+  const free = Array.from({ length: n }, (_, j) => j).filter((j) => !taken.has(j));
+  const out: Constraint[] = stated.map((m) => ({ lhs: pow(ref(m), rat(n)), rhs: eq.rhs, src: eq.src }));
+  let next = 0;
+  for (const s of sols) {
+    if (placed.has(s)) continue;
+    const j = free[next++];
+    out.push({ kind: 'mod', lhs: abs(ref(s)), rhs: abs(ref(anchor)), src: eq.src });
+    out.push({ kind: 'arg', lhs: ref(s), rhs: ref(anchor), deltaTurns: rat((((j - j0) % n) + n) % n, n), src: eq.src });
+  }
+  return out;
+}
+
+/**
  * Which names the figure should DRAW for this reading, and which it must not.
  *
  * In `constrain` mode the letter is the number, so it is drawn. In `enumerate` the letter is

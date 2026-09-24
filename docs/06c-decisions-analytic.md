@@ -7401,6 +7401,70 @@ So the sentence taught here is **the stripped remainder, re-parsed**. That yield
 
 **Consequences.** `src-analytic/parser/scopeAnalytic.ts` (new — `IMPERATIVE_VERBS_HE`/`_EN`, `imperativeCandidates`); `src-analytic/app/submit.ts` (the `teach` verdict, checked first); `src-analytic/App.tsx` (the one branch that does not clear the box); `src-analytic/i18n/index.ts` (`noticeTeachCanonical`, both locales). Lock: `__tests__/issue-1353-imperatives-taught.test.ts` (10), whose centre is the catalog-wide property and the teach→Enter→accepted walk that caught the trap above — the catalog and the verb list are IMPORTED, so a new entry or a new verb is covered the moment it is added.
 
+## ADR-AG-151 — The downloaded image carries no chrome: analytic tags its offers and hit targets, and FR-EX-3's lock set is read from the product registry (#1391)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1391](https://github.com/dcodish/geo_builder/issues/1391) (bug, `P2`, `analytic`) · round [#1397](https://github.com/dcodish/geo_builder/issues/1397)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-EX-3, realised for the fourth builder and made registry-driven · **Design:** [04c](04c-design-analytic.md#the-image-carries-no-chrome-adr-ag-151) (new section)
+
+**What was seen (prod, `prod/2026-09-23-5`).** `נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9` ·
+`נתון הישר l1: y=x`, then «הורידו תמונה». The image carried the dashed crossing-offer rings, one at
+each circle/line crossing and one around the centre mark. None of the three was inside
+`[data-noexport]`, so the shared strip in `shell/export/svgToPng.ts` could not remove them.
+
+**Measured at pickup.** The new lock (below) failed all three of its assertions against the unchanged
+renderer.
+
+**Root cause (the class).** FR-EX-3's opt-in is per renderer, and its locks were three hand-named
+files (`src/render`, `src3d/render`, `src-complex`). Analytic's image export first worked on 2026-09-23
+(#1378: the canvas ref had never been attached), so the chrome question never came up for it. The
+requirement named three locks, which is how the fourth builder's absence stayed invisible.
+
+**Decisions.**
+1. **Tag analytic's chrome** in `render/Figure.tsx`: the crossing-offer group (crossings and the
+   #1109 centre offer ride one list), the transparent hit layer over curves and segments (#1048,
+   #1139), and each point's hit ring.
+2. **`src-analytic/render/__tests__/clean-export.test.tsx`**, the lock the other three builders
+   carry. It renders the prod figure with every chrome affordance ON and asserts the stripped ink
+   equals the chrome-free render.
+3. **The lock set is read from `products.json`**
+   (`shell/__tests__/clean-export-registry-1391.test.ts`). Every enabled builder whose tree uses
+   `shell/export/svgToPng` must carry a `clean-export.test.tsx`. With analytic's lock removed, it
+   fails naming `src-analytic/`, so a fifth builder cannot ship an export without the lock.
+
+**Consequences.** `src-analytic/render/Figure.tsx`. Locks: the two test files above.
+
+## ADR-AG-152 — "Freedom in the panel, certainty in every value" is a corpus-wide invariant, over the panel's own decision (#1289)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1289](https://github.com/dcodish/geo_builder/issues/1289) (debt, `P2`, `analytic`) · round [#1397](https://github.com/dcodish/geo_builder/issues/1397)
+**Requirements:** none (internal). It guards ADR-AG-003 §2's existing promise that a printed number is knowledge · **Design:** [04c](04c-design-analytic.md#the-panels-knowledge-has-one-home-adr-ag-152) (new section)
+
+**The invariant.** A figure that reports `reportedDof > 0` must report at least one quantity unknown.
+#1282 shipped the contradiction («1 דרגות חופש» above a panel of certainties): `carrierDof` is analytic
+while `isKnowledge` is sampled, and when sampling collapsed the two disagreed silently. #1282 locked one
+figure. This is the net.
+
+**Two findings at pickup that shaped it.**
+- **The panel's gates were inline in `App.tsx`.** Each row called `isKnowledge` or `knownCurve` itself,
+  so an invariant over "what the panel prints as unknown" could only reproduce those calls. A lock that
+  reproduces its subject stays green through the change that breaks it (ADR-W-053). The decisions are
+  now ONE function, `panelKnowledge(d)` in `app/panelRows.ts` (parameters, points, listed equations),
+  and the panel renders from it.
+- **Analytic has no scenario corpus.** The sweep takes every figure the analytic suite already builds:
+  each string-array literal in `src-analytic/__tests__`, harvested from source, plus each catalog entry
+  with its `needs`. It checks only figures that build green, because a faulted figure has no freedom to
+  report honestly.
+
+**Measured.** 677 sequences, 531 built, 237 with freedom, **0 violations**. The issue expected more
+than one. The first probe did report two, but neither was real. One was a faulted figure (#1287's
+impossible crossing). The other was an unused parameter the panel already prints as its domain, and
+the probe had left parameters out. The #1282 fix holds across the corpus.
+
+**Consequences.** `src-analytic/app/panelRows.ts` (`panelKnowledge`, `panelShowsUnknown`),
+`src-analytic/App.tsx` (the parameter, point and equation rows render from it). Lock:
+`panel-freedom-invariant-1289.test.ts`: the sweep with an exercised-counter (more than 100 free figures),
+a self-test that the predicate fires on the #1282 state, and a source check that the panel calls the
+shared decision.
+
 ## ADR-AG-153 — A numeric angle and an angle ratio are givens: «∠ABC = 60», «∠ABC = ∠ACB», «∠ABC = 2∠ACB» (#1331)
 
 **Status:** accepted, 2026-09-24 · **Issue:** [#1331](https://github.com/dcodish/geo_builder/issues/1331) (feature, `P2`, `analytic`) · round [#1397](https://github.com/dcodish/geo_builder/issues/1397) · PR route

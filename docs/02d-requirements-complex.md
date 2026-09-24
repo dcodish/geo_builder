@@ -58,9 +58,10 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md).)*
 - **FR-CN-6 (Must)** — **The solutions of an equation on a bare letter ARE its indexed names.** `z³ = 8`
   plots z₁, z₂, z₃ (in argument order from the principal solution), every one a name the student can
-  write in the next sentence. A number the student already named z₂ is a claim that it IS solution 2:
-  if it is, it is reused; if it is not, the equation is **refused**, naming the student's statement, in
-  either entry order. So a question that states z₁, z₂… and then solves an equation over them is refused
+  write in the next sentence. A number the student already named z₂ is a claim that it is ONE OF the
+  solutions (set membership, [ADR-CX-044](06d-decisions-complex.md#adr-cx-044)): if it is, it keeps its
+  place and the unstated names take the remaining solutions in argument order; if it is not, the
+  equation is **refused**, naming the student's statement, in either entry order. So a question that states z₁, z₂… and then solves an equation over them is refused
   unless those numbers are its solutions (operator ruling, #1367, with the §2b part ד cost shown).
   *(Realised — [ADR-CX-042](06d-decisions-complex.md#adr-cx-042).)*
 
@@ -87,6 +88,11 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
 - **FR-KN-4 (Must)** — **The engine states WHAT happened; the reading layer words it.** A verdict carries
   a structured reason code, not a sentence, so the same fact reads correctly in Hebrew and English and
   the wording can improve without touching the engine. *(Realised — `model/why.ts`, #716.)*
+- **FR-KN-5 (Must)** — **A real parameter is visible.** Every parameter the figure mentions is listed
+  in the data panel: its exact value when the givens force it (`u^5 = 32` → `u = 2`), «חופשי» when they
+  do not. It can be asked (`r`, `9r`), and wherever a solved parameter would print inside another value,
+  its value is printed instead (`|z₂| = 18r` with r = 5/9 reads 10). An accepted given never leaves
+  nothing on screen. *(Realised — [ADR-CX-043](06d-decisions-complex.md#adr-cx-043), #1389/#1390.)*
 
 ## Input honesty
 

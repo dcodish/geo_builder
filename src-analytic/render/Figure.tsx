@@ -172,7 +172,8 @@ export function Figure({
         encloses: clicking inside a circle is not clicking the circle.
       */}
       {onPick && (
-        <g fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: 'stroke' }}>
+        // data-noexport (#1391, FR-EX-3): a hit target is interaction chrome, never ink
+        <g data-noexport="1" fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: 'stroke' }}>
           {curves.map((c) => (
             <path
               key={`hit-${c.id}`}
@@ -337,7 +338,9 @@ export function Figure({
           </g>
         ))}
       </g>
-      <g>
+      {/* data-noexport (#1391, FR-EX-3): a crossing ring is an OFFER to name a point, not part of the
+          figure — the downloaded image used to carry every one of them */}
+      <g data-noexport="1">
         {crossings.map((k) => (
           <g key={k.id} data-crossing={k.id}>
             <title>{k.sentence}</title>
@@ -367,6 +370,7 @@ export function Figure({
                 wants picks (#1048). */}
             {onPick && (
               <circle
+                data-noexport="1"
                 cx={p.cx}
                 cy={p.cy}
                 r={10}
