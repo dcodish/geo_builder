@@ -12991,3 +12991,48 @@ all 3 are the old mirror being wrong:
 `decide-purity-1395.test.ts` (6: commit, store operation, pre-parse and pre-LLM refusals, escalation,
 and a circle and a point auto-bind taken from the corpus, each leaving the store, the debug log and the
 model untouched).
+
+## ADR-547 — A bound's drawing AIM yields to the givens: the driven solvers drop it when no configuration satisfies the givens with it (#1351)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1351](https://github.com/dcodish/geo_builder/issues/1351) (bug, `P2`, `2d`) · round [#1408](https://github.com/dcodish/geo_builder/issues/1408) · resolves the symptom [#1349](https://github.com/dcodish/geo_builder/issues/1349)
+**Requirements:** [02](02-requirements.md) — FR-BND-1, extended: a bound's boundary value is admitted **and the figure still draws at every configuration** · **Design:** [04](04-design.md) — "A bound's aim is not its test", amended; [LADDER](LADDER.md) stage 4 · **LADDER stage:** 4.2/4.3, a last rung of each driven solver (after convex-then-relaxed and the anti-collapse retry)
+**Amends** [ADR-529](#adr-529) (the acceptance half, untouched) · **cites** [ADR-390](#adr-390) (the aim) and [ADR-276](#adr-276) (a satisfied order costs 0)
+
+**What the student saw.** «משולש ABC» «BC ≥ 10» «BC = 10» built at one seed in sixteen and the shared sample pool held ONE configuration, so «הציגו תצורה אחרת» had nothing to offer on a figure with a free DOF, and #1349's «כבר קיים» note was silently lost (`impliedByPrior` fails open below three samples, ADR-542, correctly).
+
+**Measured before any change (the plan's first step).** One failing seed, instrumented: the joint solve does **not** diverge and does not exhaust its budget. It **converges**, to BC = 10.27, 10.39, 10.27, 10.25, 10.22 at seeds 1–5, and the accept gate then rejects `|BC| = 10`. That is the edge of ADR-390's aim zone: `jointCostTerm` still charged a bound for anything short of `min + minGap` (10.2), so the given and the aim split the difference and neither held. ADR-529 had moved **acceptance** to the stated inequality but left the **cost's zero zone** at the old aim, which is ADR-276's rule ("inside acceptance a preference costs nothing") broken for exactly the two bound kinds.
+
+**The class is wider than the plan's predicate — measured.** The plan named "is this measure pinned by something else?" as the structural decision. Three more members came out of the same measurement at the base, none of them an equality on the same measure:
+
+| figure (24 seeds) | before | after |
+| --- | --- | --- |
+| «BC ≥ 10» «BC = 10» | 1 / 24, pool 1 | 24 / 24, pool 16 |
+| … then «∠ABC = 90» (the #1349 figure) | 1 / 24, pool 1 | 24 / 24, pool 16 |
+| «BC = 10» typed FIRST, then «BC ≥ 10» | 1 / 24 | 24 / 24 |
+| «BC ≤ 10» «BC = 10» · «10 ≤ BC ≤ 20» «BC = 10» | 1 / 24 each | 24 / 24 each |
+| «BC ≥ 10» «BC = 10.1» — a pin INSIDE the aim band, not on the bound | 1 / 24, pool 1 | 24 / 24, pool 16 |
+| «BC ≥ 10» «AB = BC» «AB = 10» — pinned through an equality chain | 1 / 24 | 24 / 24 |
+| «BC ≥ 10» «AB = 6» «AC = 8» «∠BAC = 90» — pinned by derivation | **0 / 24** (`∠BAC = 90° cannot hold`) | 24 / 24 |
+| the same with «BC ≥ 10» typed last | 24 / 24 | 24 / 24 |
+| «BC ≥ 10» «BC = 40» (INSIDE) | 24 / 24, pool 16 | unchanged |
+| «∠ABC ≥ 40» «∠ABC = 40» (the angle twin) | 24 / 24 | unchanged |
+
+The derived pin was refused at EVERY seed in one entry order and built in the other — docs/17 M2's first law. A same-measure check would have left it, the equality chain and the in-band pin all broken. The angle twin measured clean at the base (a single angle pin is solved by the 1-D root path, where the aim only orders roots), and it and a derived angle are locked anyway.
+
+**Class (docs/17 §1).** *A soft drawing preference, costed in the joint solve, outranks a hard given whenever the given leaves the preference unreachable.*
+
+**Decision — the aim is lexicographically below every given, implemented as the ladder already does for every other preference.** Each driven solver (`resolveFreeDriven`, `resolveMixedCarriers`) runs its whole existing ladder first — unchanged, so every figure the aim-first pass accepts is bit-for-bit what it was. Only if that finds **no** accepted configuration, and a bound is in the system, it runs the ladder again with `jointCostTerm(…, aim = false)`: a bound then costs only its distance **outside the region its own inequality admits** (`boundShortfall`, the one definition `boundHolds` now reads too, so the relaxed target and the accept gate cannot drift). This is the ADR-097 convex-first → relaxed shape and the ADR-238 retry-only shape, applied to the third preference.
+
+- **Why not the structural pin test.** "Is this measure pinned?" is a rigidity question once derivations count, and answering it structurally means a second solver. "Is there a configuration satisfying the givens WITH the aim?" is the same question asked of the solver that already answers it. It is not the §2.2 symptom predicate: what the retry decides is only HOW a satisfiable system is satisfied — the accept gate, and so what may hold, is untouched.
+- **The equality case is not special-cased.** The in-band pin (`BC = 10.1`) and the derived pins go through the same rung.
+- **ADR-390's drawing promise holds.** With nothing pinning it, the aim-first pass succeeds and the rung never runs: «BC ≥ 10» and «BC > 10» alone still draw with BC > 10.1 at every seed (locked).
+- **ADR-529's acceptance is untouched.** `isSatisfied` still answers the stated inequality, strictness included: «BC > 10» «BC = 10» is refused at every seed, and a strict bound still costs its own value on the relaxed pass. `issue-1265-bound-boundary.test.ts` (30) is unchanged and green.
+- **Only the two bound kinds.** `length-order`, `angle-order`, `collinear-order` keep their gap on every pass: there the gap IS the meaning (ADR-529).
+
+**Cost (docs/17 §7).** Worst-case multiplier ×2 on a driven solve that FAILS with a bound present; zero on every solve that succeeds or carries no bound. Measured per line, mean over 24 seeds, before → after: «BC = 10» after «BC ≥ 10» **159.6 → 55.1 ms**; «∠ABC = 90» on that figure **211.1 → 61.9 ms**; «BC = 40» 10.1 → 10.1; «∠ABC = 40» after «∠ABC ≥ 40» 12.2 → 11.6; the refused «BC = 10» after «BC > 10» 13.9 → 13.7 (the impossibility is proven pre-solve, ADR-541). The rescued lines got cheaper (measured, not attributed).
+
+**#1349 — verified, not assumed.** His exact run from the dev log (session `tww10vbw`: «משולש ABC» «BC>=10» «BC=10» «∠ABC = 90» «AB ⟂ BC») through the real `runSubmit`: the last line now answers `input.alreadyDrawn` and adds nothing. ADR-542 is unchanged — the pool is simply 16 again.
+
+**Sibling audit (docs/17 §1).** In 2-D the two bound kinds are the only constraints whose aim differs from their meaning; `ORDER_*` constraints assert their gap. `src3d/` — a numeric angle bound is a sampling REQUIREMENT (ADR-3D-053), never a term in a cost, so the class is not present. `src-analytic/` and `src-complex/` have no bound aim.
+
+**Consequences.** `src/engine/solve.ts` (`boundShortfall`, `boundHolds` reads it, `carriesBoundAim`, `jointCostTerm`'s `aim` parameter), `src/engine/evaluate.ts` (the relaxed rung in both driven solvers). Locks: `src/app/__tests__/issue-1351-bound-aim-yields.test.ts` (20: the table above over 24 seeds with the pool's size and ≥ 3 distinct configurations, the angle twin and a derived angle, ADR-390's inside-draw for `≥` and `>`, the strict refusal, the cost term with and without the aim, and #1349 through the real submit pipeline); scenario `bound-with-its-value-on-the-boundary-samples-1351` (the operator's exact sequence, every step holding at eight seeds with ≥ 3 different triangles). The #1395 parity goldens gain that scenario's record.

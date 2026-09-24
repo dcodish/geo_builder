@@ -51,15 +51,25 @@ import { add, angleDeg, circumcenter, dist, polygonArea, polygonPerimeter, scale
  * (#281’s lock). A test that changes what the solver reaches for is not a test.
  */
 function boundHolds(value: number, min: number | undefined, max: number | undefined, minStrict: boolean | undefined, maxStrict: boolean | undefined, eps: number): boolean {
+  return boundShortfall(value, min, max, minStrict, maxStrict, eps) === 0;
+}
+/**
+ * HOW FAR OUTSIDE ITS ACCEPTED REGION a bounded measure sits — 0 exactly when {@link boundHolds} (a NaN
+ * value is never 0, so it never holds). One definition of the region, read by the accept gate AND by the
+ * joint cost once the aim has yielded (#1351, {@link jointCostTerm}'s `aim: false`), so the solver's
+ * relaxed target and the test that judges it cannot drift apart.
+ */
+function boundShortfall(value: number, min: number | undefined, max: number | undefined, minStrict: boolean | undefined, maxStrict: boolean | undefined, eps: number): number {
   const ref = Math.max(Math.abs(max ?? 0), Math.abs(min ?? 0), 1);
   // `eps` is the measure's own equality tolerance — LEN_EPS in units, ANGLE_EPS in degrees. `admits` is
   // the float cushion (never tighter than that tolerance); `excludes` clears it, so a strict bound and an
   // equality at the same number cannot both report satisfied.
   const admits = Math.max(eps, 2e-4 * ref);
   const excludes = Math.max(eps * 2, 1e-3 * ref);
-  if (min !== undefined && !(minStrict === false ? value >= min - admits : value >= min + excludes)) return false;
-  if (max !== undefined && !(maxStrict === false ? value <= max + admits : value <= max - excludes)) return false;
-  return true;
+  let s = 0;
+  if (min !== undefined) s += Math.max(0, (minStrict === false ? min - admits : min + excludes) - value);
+  if (max !== undefined) s += Math.max(0, value - (maxStrict === false ? max + admits : max - excludes));
+  return s;
 }
 function lengthBoundAim(con: LengthBoundConstraint): { margin: number; minGap: number } {
   const ref = Math.max(Math.abs(con.max ?? con.min ?? 0), 1e-9);
@@ -498,8 +508,31 @@ export function isSatisfied(con: Constraint, get: (id: Id) => Vec): boolean {
  * back in. The aim margin keeps steering where it belongs: the 1-D driven path's root ORDERING (which
  * picks among discrete roots) — there is no competing equality inside a root choice.
  */
-export function jointCostTerm(con: Constraint, get: (id: Id) => Vec): number {
+/**
+ * Does this joint system carry a bound whose AIM can yield (#1351, ADR-547)? The driven solvers run their
+ * relaxed pass only then — a system with no bound costs the same either way, so it pays nothing.
+ */
+export function carriesBoundAim(cons: readonly Constraint[]): boolean {
+  return cons.some((k) => k.type === 'length-bound' || k.type === 'angle-bound');
+}
+
+export function jointCostTerm(con: Constraint, get: (id: Id) => Vec, aim = true): number {
   const sc = Math.max(constraintScale(con, get), 1e-9);
+  // #1351 (ADR-547): the bound's AIM has YIELDED. A stated bound's visible gap (ADR-390) is a drawing
+  // preference, lexicographically below every given — so on the solver's relaxed pass the bound costs
+  // only its distance OUTSIDE the region its own inequality admits (the accept gate's region, ADR-529),
+  // and nothing anywhere inside it. Only the two BOUND kinds have an aim that differs from their meaning;
+  // the measure-vs-measure orders keep their gap, which IS what they assert.
+  if (!aim && con.type === 'length-bound') {
+    const v = boundShortfall(dist(get(con.a), get(con.b)), con.min, con.max, con.minStrict, con.maxStrict, LEN_EPS) / sc;
+    return v * v;
+  }
+  if (!aim && con.type === 'angle-bound') {
+    const a = angleDeg(get(con.vertex), get(con.ray1), get(con.ray2));
+    if (Number.isNaN(a)) return 0; // the `isSatisfied` convention: a collapsed ray is not a violated bound
+    const v = boundShortfall(a, con.min, con.max, con.minStrict, con.maxStrict, ANGLE_EPS) / sc;
+    return v * v;
+  }
   const v = residual(con, get) / sc;
   if (isOrderConstraint(con)) {
     const tolN = residualTolerance(con, sc) / sc;

@@ -24,7 +24,7 @@ import {
   sub,
   unit,
 } from './geometry';
-import { constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates, withToleranceFactor } from './solve';
+import { carriesBoundAim, constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates, withToleranceFactor } from './solve';
 import { budgetExceeded } from './solveBudget';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
@@ -322,6 +322,9 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     setFreePos(c, new Map(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }])));
   // The pure constraint cost (Σ residual²) and a lightly-regularised variant that
   // adds λ·Σ‖p−seed‖² to prefer the configuration nearest the current one.
+  // `aim`: whether a stated bound still reaches for ADR-390's visible gap — false only on the relaxed
+  // pass below, once the gap proved unreachable beside the givens (#1351, ADR-547).
+  let aim = true;
   const residFull = (x: number[]): { s: number; pos: Map<Id, Vec> | null } => {
     const r = evaluateCore(place(x), { skipConstraints: true });
     if (!r.ok) return { s: Infinity, pos: null };
@@ -335,7 +338,7 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
       // same place; it only rebalances multi-constraint joint solves and the seed tie-breaker.
       // A SATISFIED one-sided order costs 0 (jointCostTerm, ADR-276) — a preference never outweighs
       // a hard constraint's root.
-      s += jointCostTerm(con, get);
+      s += jointCostTerm(con, get, aim);
     }
     return { s, pos: r.positions };
   };
@@ -391,8 +394,22 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     if (retry.ok && barrierAt(retry.x) < b0) return retry;
     return base;
   };
-  const conv = pick(true);
-  return place(conv.ok ? conv.x : pick(false).x);
+  const solveAll = (): { x: number[]; ok: boolean } => {
+    const conv = pick(true);
+    return conv.ok ? conv : pick(false);
+  };
+  let out = solveAll();
+  // THE AIM YIELDS (#1351, ADR-547). A bound's visible gap is a drawing PREFERENCE, lexicographically below
+  // every given: when no configuration satisfies the givens WITH the gap — a later given pins the measure
+  // on or near its boundary, directly (`BC = 10` under `BC ≥ 10`) or by derivation (`AB = BC`, `AB = 10`)
+  // — re-solve with the aim dropped, where a bound costs only its distance outside its own inequality.
+  // The ADR-097 convex-first ladder's shape: a result the aim-first pass accepts returns untouched.
+  if (!out.ok && carriesBoundAim(cons)) {
+    aim = false;
+    const relaxed = solveAll();
+    if (relaxed.ok) out = relaxed;
+  }
+  return place(out.x);
 }
 
 /**
@@ -673,7 +690,7 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
   // Solve a given carrier list: returns the chosen construction and whether a solution was ACCEPTED
   // (under `requireConvex`). Extra carriers with NO `solve` directive (recruited free polygon vertices)
   // contribute DOF but no constraint — they give the joint solve room to land on a CONVEX branch (ADR-097).
-  const solveFor = (carrierList: GeoObject[], requireConvex: boolean): { result: Construction; ok: boolean } => {
+  const solveFor = (carrierList: GeoObject[], requireConvex: boolean, aim = true): { result: Construction; ok: boolean } => {
     const span = Math.max(1, ...carrierList.flatMap((o) => (o.kind === 'free-point' && o.solve ? [Math.abs(o.x), Math.abs(o.y)] : [])));
     // A spec for each carrier: a constraint-carrier via carrierSpec, or a recruited FREE on-circle vertex
     // (no solve) as a plain bounded θ DOF.
@@ -712,8 +729,8 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
         for (const id of constraintRefs(con)) if (!r.positions.has(id)) return { s: Infinity, pos: null };
         const get = (id: Id) => r.positions.get(id)!;
         // A SATISFIED one-sided order costs 0 (jointCostTerm, ADR-276) — a preference never outweighs
-        // a hard constraint's root.
-        s += jointCostTerm(con, get);
+        // a hard constraint's root. `aim`: see resolveFreeDriven (#1351, ADR-547).
+        s += jointCostTerm(con, get, aim);
       }
       return { s, pos: r.positions };
     };
@@ -858,14 +875,24 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
   // still no convex solution exists fall back to the relaxed accept with the original carriers — so a figure
   // that genuinely has no convex drawing still solves. When no ≥4-gon is declared, `declaredPolygonsConvex`
   // is always true ⇒ step (1) succeeds immediately and behaviour is unchanged.
-  const conv = solveFor(carriers, true);
-  if (conv.ok) return conv.result;
-  const extra = freePolygonVerticesToRecruit(c, carriers);
-  if (extra.length) {
-    const conv2 = solveFor([...carriers, ...extra], true);
-    if (conv2.ok) return conv2.result;
+  const ladder = (aim: boolean): { result: Construction; ok: boolean } => {
+    const conv = solveFor(carriers, true, aim);
+    if (conv.ok) return conv;
+    const extra = freePolygonVerticesToRecruit(c, carriers);
+    if (extra.length) {
+      const conv2 = solveFor([...carriers, ...extra], true, aim);
+      if (conv2.ok) return conv2;
+    }
+    return solveFor(carriers, false, aim);
+  };
+  const out = ladder(true);
+  // THE AIM YIELDS (#1351, ADR-547) — the same rung as resolveFreeDriven's: only when the aim-first ladder
+  // found nothing, and only when a bound is in the system (`withOrderCons` joins every one in `c`).
+  if (!out.ok && carriesBoundAim(c.constraints)) {
+    const relaxed = ladder(false);
+    if (relaxed.ok) return relaxed.result;
   }
-  return solveFor(carriers, false).result;
+  return out.result;
 }
 
 /**
