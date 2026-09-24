@@ -198,6 +198,14 @@ engine. Owned by the site-root files in `deploy/homepage/` and by each builder's
   starts. A builder with no page cannot be built. The homepage carries the same, and promises nothing
   a tool does not currently do. *(Realised — [ADR-W-085](06w-decisions-workspace.md#adr-w-085), #1383.)*
 
+- **FR-DI-3 (Should)** — **A student searching for GeoGebra can find an honest comparison.** One page,
+  `/geogebra/`, says what the tools do differently (the question's own sentences, not tools or command
+  syntax) **and where GeoGebra is the better tool**, in wording the operator approved sentence by
+  sentence. It names GeoGebra only to compare — no logo, nothing imitating its identity, and a line
+  saying the site is not affiliated. Every example on it builds, and its «open the example» link opens
+  that figure. Claims about GeoGebra are re-checked against GeoGebra's own site before any edit.
+  *(Realised — [ADR-W-086](06w-decisions-workspace.md#adr-w-086), #1386.)*
+
 ## Export
 
 - **FR-EX-1 (Should)** — **A clean, print-ready image** of the current figure, from every builder, on a

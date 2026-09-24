@@ -107,6 +107,9 @@ scp deploy/homepage/index.html root@themathbible.com:/var/www/vhosts/themathbibl
 #     …and the site-root crawl files whenever they changed (#1384). robots.txt names the sitemap; the
 #     sitemap must list every builder (a lock checks it against products.json, not the server copy):
 scp deploy/homepage/robots.txt deploy/homepage/sitemap.xml deploy/homepage/favicon.svg deploy/homepage/favicon.ico deploy/homepage/apple-touch-icon.png deploy/homepage/og.png root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/
+#     …and the GeoGebra comparison page (#1386), its own directory so /geogebra/ serves index.html:
+ssh root@themathbible.com 'mkdir -p /var/www/vhosts/themathbible.com/httpdocs/geogebra'
+scp deploy/homepage/geogebra/index.html root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/geogebra/index.html
 
 # 3. perms (static files should be 644 root:root — scp usually preserves this; verify)
 ssh root@themathbible.com 'chmod -R a+rX /var/www/vhosts/themathbible.com/httpdocs/geo-builder /var/www/vhosts/themathbible.com/httpdocs/3d-builder /var/www/vhosts/themathbible.com/httpdocs/complex-builder /var/www/vhosts/themathbible.com/httpdocs/analytic-builder'
