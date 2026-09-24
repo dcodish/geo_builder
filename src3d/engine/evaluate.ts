@@ -32,7 +32,7 @@ import {
 import { applyGauge, scalePinned, solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3 } from './vecExpr';
-import { absolutePointCount, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
+import { absolutePointCount, freeCoordKey, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
 import { resolveFreePlane } from './freePlane';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
@@ -1413,7 +1413,9 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       c.planePins.length > 0 || c.coordPlanePins.length > 0 || figPlanePerps.length > 0 ||
       gaugeLineRels.length > 0 || drivableMemberships.length > 0 ||
       symDrives.length > 0) && // #815: a pin-symbol membership with NO pin beside it enters the pivot too
-    c.solids.length > 0
+    // #1311 (ADR-3D-260): a figure with no solid still has DOF to drive when it holds a never-positioned
+    // point — the vectors unit's «וקטור AB» is exactly that figure, and a given naming it must move it.
+    (c.solids.length > 0 || hasFreePoint3(c))
   ) {
     // #863 (ADR-3D-245): the solids' seeded dims are sampled ONCE here and threaded into every residual
     // evaluation — `evalCanonical` runs per LM iteration (680 k times on the issue's figure), and re-sampling
@@ -2306,6 +2308,10 @@ function evaluateSolidsAndPoints(
       let spread = 1.2;
       for (const q of placed) spread = Math.max(spread, Math.abs(q.x), Math.abs(q.y), Math.abs(q.z));
       const comp3 = (ax: 'x' | 'y' | 'z'): number => {
+        // #1311 (ADR-3D-260): a coordinate the PIVOT drove is placed where the pivot put it — the rider
+        // override's twin, so every re-evaluation of a solution agrees with the residuals that accepted it.
+        const driven = riderTOverride?.get(freeCoordKey(id, ax));
+        if (driven !== undefined) return driven;
         const mag = sample(seed, `free3-${ax}-${id}`, 0.3, 1.05) * spread;
         return (sample(seed, `free3sgn-${ax}-${id}`, -1, 1) >= 0 ? 1 : -1) * mag;
       };

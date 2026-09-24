@@ -132,6 +132,7 @@
     "noPrismToMakeRight": "there is no prism in the figure to make right — build a prism or a parallelepiped first",
     "ambiguousPrism": "there is more than one prism in the figure — it's unclear which one you mean",
     "planeNotDetermined": "Plane {{id}} has no stated equation or orientation yet — this statement needs a determined plane. Pin it with an equation, three points on it, or a ∥/⊥ relation",
+    "pointNotDetermined": "Point {{id}} has no determined position yet, so this statement cannot be checked — pin the point first: its coordinates, or a length or angle that fixes it",
     "lineNotDetermined": "Line {{id}} has no determined direction or position yet — this statement needs a determined line. Pin it with two points on it, a parametric form, or a ∥/⊥ relation",
     "ambiguousAngleVertex": "More than one angle meets at {{vertex}}: {{angles}}. Name all three letters of the one you mean (e.g. \"AD bisects angle {{angles}}\" — using one of those).",
     "ambiguousAngleVertexBare": "More than one angle can meet at {{vertex}}, so \"angle {{vertex}}\" does not say which. Name all three letters of the angle you mean.",

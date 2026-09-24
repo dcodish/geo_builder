@@ -228,6 +228,11 @@ const SEEDED: SeededCorpus = {
   // angle drove the figure (#909) but the arc lane was keyed on a shared NAME, so nothing was drawn
   // where they meet.
   'box-seg-angle-cross-917.geo3.json': ["תיבה ABCDA'B'C'D'", "הזווית בין AC' לבין BD' היא 55"],
+  // #1311 (ADR-3D-260) — the operator's exact sequence, both orders. A stated length on a FREE vector was
+  // refuted `claim-refuted` against the ≈2.34 the sampler invented; it is a GIVEN the pivot drives, and the
+  // one-line form (refused `unknown-point: A`) now builds the same figure. Green replay + no drift.
+  'free-vector-length-1311.geo3.json': ['וקטור AB', 'אורך AB = 5'],
+  'free-vector-length-oneline-1311.geo3.json': ['וקטור AB = 5'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

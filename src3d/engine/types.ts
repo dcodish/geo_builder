@@ -1333,6 +1333,39 @@ export interface Construction3 {
   lineRels: { rel: 'perp' | 'parallel' | 'angle' | 'contained'; deg?: number; op: Operand3; line: string; statedAsPlane?: true }[];
 }
 
+/**
+ * #1311 (ADR-3D-260) — the pivot-lane key of ONE coordinate of a never-positioned (`free3`) point.
+ *
+ * A free point's three coordinates are pivot unknowns exactly as a free rider's `t` is (#820): a stated
+ * given that names the point DRIVES them instead of being judged against the sampler's guess. They ride
+ * the rider lane's record (`riderTs`), keyed here so the lane stays one map; `@` never occurs in a point
+ * label, so a key can never collide with a rider's own id.
+ */
+/** #1311 (ADR-3D-260): does the figure hold a never-positioned (`free3`) point — DOF the pivot can drive? */
+export const hasFreePoint3 = (c: Construction3): boolean => [...c.points.values()].some((def) => def.kind === 'free3');
+
+export const freeCoordKey = (id: Id, axis: 'x' | 'y' | 'z'): string => `${id}@${axis}`;
+
+/**
+ * #1311 (ADR-3D-260) — every point a claim names, wherever it sits in the claim's shape: a STRUCTURAL walk
+ * (the #508 `freePlanesOf` discipline) rather than a switch over claim kinds, so a claim kind added later
+ * cannot escape either reader — the apply-time drive routing and the store's not-determined guard.
+ */
+export function claimPointIds(c: Construction3, claim: unknown): Id[] {
+  const out = new Set<Id>();
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') {
+      if (c.points.has(v)) out.add(v);
+      return;
+    }
+    if (Array.isArray(v)) return v.forEach(walk);
+    if (!v || typeof v !== 'object') return;
+    for (const val of Object.values(v as Record<string, unknown>)) walk(val);
+  };
+  walk(claim);
+  return [...out];
+}
+
 export const emptyConstruction3 = (): Construction3 => ({
   solids: [],
   points: new Map(),
@@ -1626,6 +1659,7 @@ export type EngineError3 =
   | { code: 'vacuous-relation' } // S4 (#378): a mutual position stated between an object and itself
   | { code: 'plane-not-determined'; id: string } // #487: this construct needs a plane with a stated equation — π is still free
   | { code: 'line-not-determined'; id: string } // #552: a claim judged against a free line whose relevant DOF is still sampled — pin it first, never accuse
+  | { code: 'point-not-determined'; id: string } // #1311: a claim judged against a never-positioned (free3) point the drive does not pin — pin it first, never accuse
   | { code: 'claim-refuted' } // the stated answer does not hold in the figure
   // #512: a relation to the COORDINATE FRAME judged against a placement the funnel sampled — the
   // statement may well be satisfiable; what is missing is a given that fixes where the figure sits.

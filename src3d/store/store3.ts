@@ -36,7 +36,7 @@ import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLine
 import { verifyClaim } from '../engine/claims';
 import { dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
-import { emptyConstruction3, pinSymsOf, symbolValueOf, type Command3, type Construction3, type EngineError3, type Id, type Positions3 } from '../engine/types';
+import { claimPointIds, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
 import { parse3, parseRename3 } from '../parser/parse3';
 
@@ -172,6 +172,48 @@ const refsCoordFrame = (claim: unknown): boolean => {
   walk(claim);
   return found;
 };
+
+/**
+ * THE NOT-DETERMINED RULE — one rule, of which #508, #552, #512 and #1311 are the carriers
+ * ([ADR-3D-260](../../docs/06b-decisions-3d.md#adr-3d-260)).
+ *
+ * **A failing claim that reads a carrier whose freedom the tool SAMPLED is not refuted.** The configuration
+ * it "fails" in is one the tool invented, not one the student stated, so `claim-refuted` there is a false
+ * accusation — «your distance is wrong» about a perfectly good given, purely because nothing had tried to
+ * move the carrier (#508's words). The drives pin what they can (a free plane's memberships and ∥/⟂, a free
+ * line's, the pivot's free-point lane); this rule is the CLASS half, so a statement no drive pins degrades
+ * to an honest "pin this first", naming the carrier, instead of blaming the student.
+ *
+ * It was written three times, one carrier each, as three inline conditions — and the fourth carrier (a
+ * never-positioned `free3` point, reachable since #1184 put one on an empty canvas) was simply missing, so
+ * «וקטור AB» then any undriven statement about A was refuted against the sampler's guess. The rule is now
+ * the loop; a carrier is a ROW: which of them a claim reads (a structural walk, never a switch over claim
+ * kinds, so a kind added later cannot escape), whether a carrier's freedom is still sampled (the
+ * resolution's own record, or the point's kind — a `free3` point is one no statement ever positioned), and
+ * the verdict that names it. Row order is the old condition order with the new carrier last, so every
+ * verdict the three guards gave is byte-identical.
+ *
+ * It judges which carrier a claim READS, never whether the claim's value varies across seeds — the
+ * three-valued verdict #909 deferred, which this deliberately does not build.
+ */
+function sampledCarrierVerdict(claim: Claim3, c: Construction3, resolved: Resolved3): EngineError3 | null {
+  const carriers: { reads: (cl: Claim3) => string[]; sampled: (id: string) => boolean; verdict: (id: string) => EngineError3 }[] = [
+    // #508 — a FREE plane whose relevant DOF is still sampled
+    { reads: freePlanesOf, sampled: (p) => (resolved.freePlaneDofs.get(p) ?? 0) > 0, verdict: (id) => ({ code: 'plane-not-determined', id }) },
+    // #552 — a FREE line, same argument
+    { reads: linesOf, sampled: (l) => (resolved.freeLineDofs.get(l) ?? 0) > 0, verdict: (id) => ({ code: 'line-not-determined', id }) },
+    // #512 — the COORDINATE FRAME: «BD' ⊥ מישור [xy]» is satisfiable (rotate the box), so while the landing
+    // funnel sampled the placement the claim is about where the figure sits, which nothing stated fixed
+    { reads: (cl) => (refsCoordFrame(cl) ? ['frame'] : []), sampled: () => resolved.placementSampled, verdict: () => ({ code: 'placement-not-fixed' }) },
+    // #1311 — a NEVER-POSITIONED point: its three coordinates are samples (ADR-052), not givens
+    { reads: (cl) => claimPointIds(c, cl), sampled: (id) => c.points.get(id)?.kind === 'free3', verdict: (id) => ({ code: 'point-not-determined', id }) },
+  ];
+  for (const k of carriers) {
+    const id = k.reads(claim).find(k.sampled);
+    if (id !== undefined) return k.verdict(id);
+  }
+  return null;
+}
 
 /**
  * #836 — the space diagonals of the figure's single solid, as a readable list («AC', BD', CA', DB'»).
@@ -465,26 +507,7 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
           }
         }
         if (!verifyClaim(claim, c, seed)) {
-          // #508 — a claim about a FREE plane whose relevant DOF is still SAMPLED cannot be refuted:
-          // the configuration it "fails" in is one the tool invented, not one the student stated.
-          // Reporting `claim-refuted` there is a false accusation — «your distance is wrong» about a
-          // perfectly good given, purely because nothing had tried to move the plane's offset. The
-          // resolver now pins what it can (memberships, ∥/⟂, distance); this guard is the CLASS half,
-          // so a constraint kind it does not yet pin degrades to an honest "pin this plane first"
-          // instead of blaming the student. Named plane first, so the message can say which.
-          const undetermined = freePlanesOf(claim).find((p) => (resolved.freePlaneDofs.get(p) ?? 0) > 0);
-          // #552 — the same guard, line edition: a free LINE whose DOFs are still sampled.
-          const undeterminedLine = linesOf(claim).find((l) => (resolved.freeLineDofs.get(l) ?? 0) > 0);
-          // #512 — the same argument one step out: a claim against the COORDINATE FRAME is a claim
-          // about where the figure sits, and the landing funnel SAMPLED that placement (nothing the
-          // student stated fixed it). «BD' ⊥ מישור [xy]» is perfectly satisfiable — rotate the box
-          // until its diagonal stands vertical — so refuting it would accuse the student on the
-          // strength of an arbitrary choice the tool made. Say what is actually missing instead.
-          status[owner.factId] =
-            undetermined ? { code: 'plane-not-determined', id: undetermined }
-            : undeterminedLine ? { code: 'line-not-determined', id: undeterminedLine }
-            : resolved.placementSampled && refsCoordFrame(claim) ? { code: 'placement-not-fixed' }
-            : { code: 'claim-refuted' };
+          status[owner.factId] = sampledCarrierVerdict(claim, c, resolved) ?? { code: 'claim-refuted' };
           break;
         }
       }
