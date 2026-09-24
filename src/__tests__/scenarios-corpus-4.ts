@@ -2724,4 +2724,27 @@ export const SCENARIOS_4: Scenario[] = [
       expect(seen.size, 'all three side-pairs are reachable by cycling').toBe(3);
     },
   },
+  {
+    id: 'bound-with-its-value-on-the-boundary-samples-1351',
+    title:
+      '#1351 / ADR-547: «BC>=10» then «BC=10» (a value exactly ON a non-strict bound) draws at every configuration — was one seed in sixteen, the bound drawing aim out-pulling the given',
+    guards:
+      "The operator's own run (dev log session tww10vbw, the #1349 report): «משולש ABC» «BC>=10» «BC=10» «∠ABC = 90». ADR-529 made the boundary ACCEPTABLE, but ADR-390's visible-gap aim still sat in the joint solver's cost, so at 15 of 16 seeds the solve converged to BC ≈ 10.2 and the accept gate refused |BC| = 10 — «הציגו תצורה אחרת» had one configuration to offer and #1349's «כבר קיים» note was lost with the pool. The aim now yields when no configuration satisfies the givens with it. Asserted: every step holds at every one of the first eight seeds, BC = 10 and ∠ABC = 90 at each, and the seeds give at least three genuinely different triangles. The pool, the angle twin, the derived pins and the #1349 note are in src/app/__tests__/issue-1351-bound-aim-yields.test.ts.",
+    steps: ['משולש ABC', 'BC>=10', 'BC=10', '∠ABC = 90'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC', 'BC>=10', 'BC=10', '∠ABC = 90']);
+      const shapes = new Set<string>();
+      for (let s = 0; s < 8; s++) {
+        const r = replay(facts, s);
+        expect(r.lastError, `seed ${s} builds`).toBeNull();
+        expect(facts.every((f) => r.status[f.id] === 'ok'), `every step holds at seed ${s}`).toBe(true);
+        const A = r.positions.get('A')!, B = r.positions.get('B')!, C = r.positions.get('C')!;
+        expect(dist(B, C), `BC = 10 at seed ${s}`).toBeCloseTo(10, 3);
+        expect(angle(A, B, C), `∠ABC = 90 at seed ${s}`).toBeCloseTo(90, 2);
+        shapes.add(dist(A, B).toFixed(2));
+      }
+      expect(shapes.size, 'the configurations are genuinely different').toBeGreaterThanOrEqual(3);
+    },
+  },
 ];

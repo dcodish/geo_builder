@@ -79,7 +79,7 @@ Cooperative budget (`budgetExceeded()`) can bail between cases — armed only ar
 
 1. Topological sweep (`evaluateCore`) resolves circles, lines, points in one interleaved fixed point.
 2. `resolveDriven` routing: coupled closed-form points promote to numeric → heterogeneous carrier mix (shape scalars / on-line / free+param) → `resolveMixedCarriers`; free vertices only → `resolveFreeDriven` (regularised Nelder–Mead); single param carrier → 1-D `drivenRoots` with **order-preferred else nearest-root** selection (branch cycles the sorted roots).
-3. `resolveMixedCarriers` internal escalation: near-first accept → grid-scan seed → binding-aware Gauss–Seidel seed → cardinal restarts → convex-then-relaxed → **anti-collapse barrier retry** (retry-only; primary descent untouched).
+3. `resolveMixedCarriers` internal escalation: near-first accept → grid-scan seed → binding-aware Gauss–Seidel seed → cardinal restarts → convex-then-relaxed → **anti-collapse barrier retry** (retry-only; primary descent untouched) → **the bound-aim yield** ([ADR-547](06-decisions.md#adr-547), #1351): only when that whole ladder accepted nothing and a `length-bound`/`angle-bound` is in the system, the ladder runs again with the bound's ADR-390 aim dropped (it costs only its distance outside its own inequality). `resolveFreeDriven` carries the same last rung after its convex-then-relaxed pick. Worst case ×2 on a failing solve with a bound; zero otherwise.
 4. **The honesty backstop (always):** every driven constraint is re-verified against final positions — a best-effort solve that missed fails the evaluate loudly. This is what makes stages 2–3 unable to commit a lying figure.
 
 ## Stage 5 — the replay fold (`computeFold`, src/replay/core.ts — moved out of the store by S1.2)
