@@ -238,6 +238,7 @@ const he = {
     'טענתי {{restored}} נתונים מתוך {{total}}. את אלה לא הצלחתי לקרוא מחדש: {{lines}}',
   errLoadForeign: 'הקובץ "{{detail}}" שייך לכלי אחר בסדרה — פתחו אותו שם.',
   errLoadNewer: 'הקובץ "{{detail}}" נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב.',
+  errLoadTooLarge: 'הקובץ "{{detail}}" גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{max}} משפטים.',
   errLoadUnreadable: 'הקובץ "{{detail}}" אינו קובץ שרטוט שמור.',
   // The under-canvas row's session ops (#1098) — the suite's words, so «בטל» means here what it
   // means in הנדסת המישור.
@@ -262,6 +263,7 @@ const he = {
   shareCopied: 'הקישור הועתק',
   shareTooLong: 'הקישור ארוך מדי לשיתוף — שמרו את השרטוט כקובץ ושלחו אותו',
   shareBadLink: 'הקישור אינו תקין — בקשו מהשולח לשלוח אותו שוב',
+  shareTooLarge: 'הקישור גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{max}} משפטים. בקשו מהשולח לשלוח את השרטוט כקובץ',
   shareArrived: 'הקישור שפתחתם מכיל שרטוט. לפתוח אותו במקום מה שבניתם?',
   shareOpenIt: 'פתח את השרטוט מהקישור',
   shareKeepMine: 'השאר את שלי',
@@ -448,6 +450,7 @@ const en: typeof he = {
   loadPartial: 'Loaded {{restored}} of {{total}} givens. These could not be read again: {{lines}}',
   errLoadForeign: 'The file "{{detail}}" belongs to another builder in the suite — open it there.',
   errLoadNewer: 'The file "{{detail}}" was saved by a newer version of the tool — refresh and try again.',
+  errLoadTooLarge: 'The file "{{detail}}" is too large to open — a figure can hold up to {{max}} statements.',
   errLoadUnreadable: 'The file "{{detail}}" is not a saved figure.',
   undo: 'Undo',
   redo: 'Redo',
@@ -464,6 +467,7 @@ const en: typeof he = {
   shareCopied: 'Link copied',
   shareTooLong: 'This link is too long to share — save the figure as a file and send that instead',
   shareBadLink: 'This link is not valid — ask the sender to send it again',
+  shareTooLarge: 'This link is too large to open — a figure can hold up to {{max}} statements. Ask the sender to send the figure as a file',
   shareArrived: 'The link you opened contains a figure. Open it instead of what you built?',
   shareOpenIt: 'Open the shared figure',
   shareKeepMine: 'Keep mine',

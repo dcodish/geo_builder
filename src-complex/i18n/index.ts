@@ -37,6 +37,7 @@ const he = {
   errUnaccounted: 'הבנתי חלק מהשורה, אבל לא את: {{detail}}',
   errWrongApp: 'הקובץ שייך לכלי אחר ({{detail}}) — כאן נטענים קבצים של בונה המרוכבים בלבד',
   errNewerVersion: 'הקובץ נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב',
+  errTooLarge: 'הקובץ גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{detail}} משפטים',
   // #721 — the labels no longer promise dragging: the v2 canvas has no point-drag (the prototype's
   // died at the cutover). «הציגו תצורה אחרת» is the working affordance and the label SAYS so.
   freeLabel: 'מספר חופשי — «הציגו תצורה אחרת» דוגמת מחדש',
@@ -200,6 +201,7 @@ const he = {
   shareCopied: 'הקישור הועתק',
   shareTooLong: 'הקישור ארוך מדי לשיתוף — שמרו את השרטוט כקובץ ושלחו אותו',
   shareBadLink: 'הקישור אינו תקין — בקשו מהשולח לשלוח אותו שוב',
+  shareTooLarge: 'הקישור גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{max}} משפטים. בקשו מהשולח לשלוח את השרטוט כקובץ',
   shareArrived: 'הקישור שפתחתם מכיל שרטוט. לפתוח אותו במקום מה שבניתם?',
   shareOpenIt: 'פתח את השרטוט מהקישור',
   shareKeepMine: 'השאר את שלי',
@@ -234,6 +236,7 @@ const en: typeof he = {
   errUnaccounted: 'I read part of the line, but not: {{detail}}',
   errWrongApp: 'This file belongs to another tool ({{detail}}) — only Complex Builder files load here',
   errNewerVersion: 'This file was saved by a newer version of the tool — refresh the page and try again',
+  errTooLarge: 'This file is too large to open — a figure can hold up to {{detail}} statements',
   // #721 — the labels no longer promise dragging (no point-drag in the v2 canvas).
   freeLabel: 'free number — "Show another configuration" resamples it',
   implicitLabel: 'created by reference — free, resampled by "Show another configuration"',
@@ -392,6 +395,7 @@ const en: typeof he = {
   shareCopied: 'Link copied',
   shareTooLong: 'This link is too long to share — save the figure as a file and send that instead',
   shareBadLink: 'This link is not valid — ask the sender to send it again',
+  shareTooLarge: 'This link is too large to open — a figure can hold up to {{max}} statements. Ask the sender to send the figure as a file',
   shareArrived: 'The link you opened contains a figure. Open it instead of what you built?',
   shareOpenIt: 'Open the shared figure',
   shareKeepMine: 'Keep mine',

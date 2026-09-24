@@ -4243,6 +4243,70 @@ mechanism, so it ships with the feature); `shell/session/shortLink.ts` and
 unguessable and traversal-proof ids, every named refusal, the full store refusing without evicting,
 usage in bytes and count, the OG tags, the escaped title, and the dev/prod hand-off paths).
 
+## ADR-W-082 — A link is a stranger's input: arrival is BOUNDED, in characters, bytes and statements (#1379)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1379](https://github.com/dcodish/geo_builder/issues/1379) (bug, `P2`, `workspace`; operator-approved items 1–4, item 5 split to [#1381](https://github.com/dcodish/geo_builder/issues/1381)) · round [#1382](https://github.com/dcodish/geo_builder/issues/1382) · hardens [ADR-W-079](#adr-w-079) / [ADR-W-080](#adr-w-080) / [ADR-W-081](#adr-w-081)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SL-9 (new) · **Design:** [04w](04w-design-shell.md#arrival-is-bounded-adr-w-082) (new subsection)
+
+**The defect.** The operator asked whether a user can attack the tools by what they type. Typed input
+is contained (no `eval`, LLM output is re-parsed through the grammar). **The share link is not typed
+input — it is a stranger's.** And its load path trusted the fragment's size: `LINK_MAX_CHARS` was
+checked only when EMITTING a link, and an attacker builds the fragment by hand. Measured in the issue:
+`inflateSync` ran on the attacker's bytes with no output ceiling (768:1 — a 1,416-character fragment
+became 1 MB, an 87 KB one 64 MB), and nothing bounded what the envelope asked the engine to replay (a
+1,360-character link carried 96 constrained facts, 5.4 s of replay). The store had the same gap: `POST
+/api/share` accepted a 64 KB fragment and `/g/<id>` handed it straight to the builder.
+
+**The class** is *every loader of untrusted figure text* — link, short link, and (lower risk) a file or
+a restored session — in all four builders, since the decoder is shared.
+
+**Root cause.** A ceiling that only the EMITTER applies protects nobody who RECEIVES. The fix puts the
+bound on arrival, at the two chokepoints every loader already passes through:
+
+1. **`shell/session/link.ts` — the decode.** A character ceiling (`LINK_ARRIVAL_MAX_CHARS` = 4 × the
+   emit cap) is checked before decoding at all, and the inflate is **streamed in 512-byte slices and
+   abandoned at `PAYLOAD_MAX_BYTES` (256 KB)** — fflate's one-shot `Inflate.push` emits the whole
+   expansion before any callback can object, so slicing is what makes the ceiling real. A 64 MB bomb
+   now costs ~1 ms. `readFigurePayload` names the refusal (`malformed` | `too-large`) and
+   `onSharedLink` carries it, so a too-large link is never called broken.
+2. **`shell/save.ts` — the envelope.** `MAX_FIGURE_STATEMENTS` and `figureTooLarge`, checked BEFORE a
+   statement replays: `readEnvelope` takes the envelope's statement-list name (complex and analytic,
+   whose every loader already goes through it — analytic's three call sites now share one
+   `ANALYTIC_ENVELOPE` spec so none can forget it), and 2-D's and 3-D's own deserializers call
+   `figureTooLarge` directly. Refusal reason `too-large` everywhere.
+3. **`server/shareStore.ts` — the store.** `handleShare` refuses (413) a fragment over the same
+   character ceiling or one that inflates past the same byte ceiling (`zlib.inflateRawSync` with
+   `maxOutputLength`, which stops AT the ceiling). `server/` may not import `shell/`, so the two
+   constants are MIRRORED, the ADR-W-016 precedent, and a lock reads the shell source and holds them
+   equal. Only the size is judged — the server still never reads a figure.
+4. **The student is told.** «הקישור גדול מדי ולא ייפתח — שרטוט יכול להכיל עד 64 משפטים» on a link,
+   «הקובץ גדול מדי…» on a file, in every builder, instead of a frozen tab or «הקישור אינו תקין».
+
+**One deviation from the plan, measured: the ceiling is 64, not the plan's "e.g. 300".** The plan's
+own lock says the 96-fact link must be refused, and a 300 ceiling admits it — the mechanism and the
+lock disagreed, and the lock is what describes the attack. 64 comes from the data: the largest figure
+in any corpus has 23 statements and the largest ever built in the dev logs 26, so 64 is ~2.5× every
+real figure and below the attack. It is one constant; if a real figure ever reaches it, raising it is
+a one-line change with the reason recorded here.
+
+**What this does NOT do.** It does not move load-time replay off the main thread in 3-D, analytic and
+complex (2-D already folds a shared link in its worker) — that is [#1381](https://github.com/dcodish/geo_builder/issues/1381),
+not approved here. A figure under the ceiling can still take seconds to replay in those three; the
+ceiling bounds the worst case, it does not make every case instant. It does not refuse a stored
+fragment that fails to inflate for reasons other than size — the builder refuses that as broken.
+
+**Consequences.** `shell/session/link.ts` (`readFigurePayload`, the two arrival constants, the bounded
+inflate, `SharedLinkArrival.refusal`), `shell/save.ts` (`MAX_FIGURE_STATEMENTS`, `figureTooLarge`,
+`readEnvelope`'s `statements`), `server/shareStore.ts`; the four builders' deserializers, share-link
+openers and link banners, and their locales. Locks: `shell/__tests__/link-arrival-1379.test.ts` (10 —
+the 1 MB and 64 MB bombs refused in < 50 ms, the character ceiling checked before decoding, both
+ceilings exact at the boundary, broken still called broken), the shared §5c row in
+`shell/__tests__/fixtures/share-link-rows.ts` (every builder refuses one past the ceiling AS too large
+and leaves the canvas unchanged, and does not refuse AT it) with its meta-lock mutant,
+`src/__tests__/share-link-ceiling-1379.test.ts` (the issue's 96-fact link decodes fine and is refused
+without the fold ever starting), and `server/__tests__/share-store-1374.test.ts` (+5 — the bomb
+refused at the door with nothing stored, the byte ceiling exact, the mirror lock).
+
 ## ADR-W-083 — Analytic's events are READ: a dashboard profile, a triage adapter, and a triage app list from the registry (#1362)
 
 **Status:** accepted, 2026-09-24 (taxonomy: operator ruling, 2026-09-24) · **Issue:** [#1362](https://github.com/dcodish/geo_builder/issues/1362) (feature, `P2`, `server`/`workspace`) · the consumption half of [#1243](https://github.com/dcodish/geo_builder/issues/1243) / [ADR-W-077](#adr-w-077) · round [#1382](https://github.com/dcodish/geo_builder/issues/1382)

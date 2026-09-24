@@ -22,6 +22,9 @@ import type { LoadAudit } from '../../shell/save';
  */
 export const ANALYTIC_APP = 'analytic-builder';
 export const ANALYTIC_SAVE_VERSION = 1;
+/** The envelope spec every analytic loader reads with — file, link and restored session alike, so the
+ *  shared statement ceiling (#1379) cannot be forgotten by one of them. */
+export const ANALYTIC_ENVELOPE = { app: ANALYTIC_APP, maxVersion: ANALYTIC_SAVE_VERSION, statements: 'lines' } as const;
 
 /** What a saved session holds — the lines, and the little that is not derivable from them. */
 export interface SavedAnalyticSession {
@@ -121,6 +124,8 @@ export type InputError =
    */
   | { key: 'load-foreign'; detail: string }
   | { key: 'load-newer'; detail: string }
+  /** #1379 — over `shell/save`'s statement ceiling; `detail` is the file name */
+  | { key: 'load-too-large'; detail: string }
   | { key: 'load-unreadable'; detail: string };
 
 interface AnalyticState {

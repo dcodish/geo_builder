@@ -17,7 +17,27 @@
  *    reasons.
  */
 
-export type EnvelopeFailure = 'not-a-session' | 'wrong-app' | 'newer-version';
+export type EnvelopeFailure = 'not-a-session' | 'wrong-app' | 'newer-version' | 'too-large';
+
+/**
+ * The most statements a loaded figure may carry (#1379) — checked BEFORE anything replays.
+ *
+ * A figure arriving by link is a stranger's input, and replay cost is superlinear in constrained
+ * statements: measured on 2-D, 24 facts replay in 0.9 s, 48 in 2.4 s, 96 in 5.4 s — and a
+ * 1,360-character link carries 96. So an arrival bound on the TEXT is not enough; the bound that
+ * matters is on what the text asks the engine to do.
+ *
+ * 64 is measured, not chosen: the largest figure anywhere in the corpus has 23 statements, the
+ * largest ever built in the logs 26. A student who reaches 64 is not building a bagrut figure. Every
+ * builder, and every loader — link, short link, file, restored session — refuses above it with
+ * `too-large`, never a frozen tab.
+ */
+export const MAX_FIGURE_STATEMENTS = 64;
+
+/** Is this many statements over {@link MAX_FIGURE_STATEMENTS}? The one comparison every loader asks. */
+export function figureTooLarge(statements: number): boolean {
+  return statements > MAX_FIGURE_STATEMENTS;
+}
 
 export type EnvelopeResult =
   | { ok: true; data: Record<string, unknown> }
@@ -31,7 +51,9 @@ export type EnvelopeResult =
  */
 export function readEnvelope(
   data: unknown,
-  spec: { app: string; maxVersion: number },
+  /** `statements` names the envelope's statement list (`lines`, `facts`) so the size ceiling is
+   *  checked here, before the caller replays a single one (#1379). */
+  spec: { app: string; maxVersion: number; statements?: string },
 ): EnvelopeResult {
   if (typeof data !== 'object' || data === null || Array.isArray(data))
     return { ok: false, reason: 'not-a-session' };
@@ -42,6 +64,8 @@ export function readEnvelope(
   if (typeof version !== 'number' || !Number.isInteger(version) || version < 1)
     return { ok: false, reason: 'not-a-session' };
   if (version > spec.maxVersion) return { ok: false, reason: 'newer-version' };
+  const list = spec.statements ? rec[spec.statements] : undefined;
+  if (Array.isArray(list) && figureTooLarge(list.length)) return { ok: false, reason: 'too-large' };
   return { ok: true, data: rec };
 }
 

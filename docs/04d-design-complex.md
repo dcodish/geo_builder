@@ -70,6 +70,18 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   claimed — as a parameter — so the line balanced perfectly while meaning something the student never
   wrote. A grammar where juxtaposition means multiplication needs both: every span claimed, and a
   floor on what a claim may invent.
+- **A parameter lives in the modulus CONSTANT, and the leftover rows are read over the parameters**
+  ([ADR-CX-041](06d-decisions-complex.md#adr-cx-041)). `9r` is `{3:2, r:1}` in the constant, never an
+  unknown, because every parametric answer (`15r`) reads that encoding. So a given that DETERMINES `r`
+  (`|z1| = 9r` beside `z1 = 3+4i`) eliminates to a `0 = c` row whose constant carries `r` — and that row
+  is an equation in `r`, solved as its own small system over the parameter atoms, not a contradiction.
+  A solved parameter is drawn at its value and leaves the free basis. The argument half holds the other
+  end: a turn-unknown pinned to a non-whole constant is always a contradiction.
+- **A solution set claims its names** ([ADR-CX-042](06d-decisions-complex.md#adr-cx-042)). `X^n = …` on a fresh
+  letter lowers to X₁ pinned to the principal root and Xₖ pinned `(k−1)/n` of a turn from it — always,
+  whether or not the student already holds some Xₖ. That makes claiming the name the consistency
+  check: there is no fallback that steps around a taken name, because stepping around it is what hid
+  the contradiction.
 - **A display transform never reaches the parser or the engine.** The polar↔cartesian toggle and the `n`
   stepper are view state, outside the store and outside undo. So changing how a number is *shown* can
   never change what was *stated* — a class of bug that is otherwise very hard to see.

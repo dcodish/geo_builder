@@ -226,3 +226,18 @@ short link with no new code path.
 
 **The clipboard is no longer guaranteed**, because the link now requires an upload and Safari
 rejects a clipboard write after an `await`. The sheet shows the URL and copies on a fresh gesture.
+
+### Arrival is bounded ([ADR-W-082](06w-decisions-workspace.md#adr-w-082))
+
+A link is a stranger's input, so every ceiling that matters is checked on ARRIVAL, not only on emit:
+
+| bound | where | value | why this chokepoint |
+| --- | --- | --- | --- |
+| characters, before decoding | `readFigurePayload` (`shell/session/link.ts`) | `LINK_ARRIVAL_MAX_CHARS` = 4 × `LINK_MAX_CHARS` | nothing this code emits is longer; refusing before `atob` costs nothing |
+| inflated bytes, while inflating | the same | `PAYLOAD_MAX_BYTES` = 256 KB | fflate is fed 512-byte slices and abandoned at the line — a one-shot push expands the whole bomb before any callback can object |
+| statements, before replay | `readEnvelope` (`statements:` names the list) and 2-D's / 3-D's own deserializers, via `figureTooLarge` (`shell/save.ts`) | `MAX_FIGURE_STATEMENTS` = 64 | replay is superlinear in constrained statements; a short link can carry 96 |
+| the store | `handleShare` (`server/shareStore.ts`) | the same two size constants, MIRRORED | `server/` may not import `shell/`; a lock reads the shell source and holds them equal |
+
+Every refusal is `too-large`, carried to the student as its own message (link or file), never as
+«broken link». The §5c share rows grow each product's OWN payload past the ceiling, so all four
+builders are held to the same bound by one fixture.

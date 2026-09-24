@@ -216,7 +216,11 @@ describe('#1372 — 2-D conforms to the shared share contract', () => {
         clear: () => useGeoStore.getState().clear(),
         isEmpty: () => useGeoStore.getState().facts.length === 0,
         link: () => shareLinkFor(),
-        open: async (payload) => (await openSharedFigure(payload)).ok,
+        open: async (payload) => {
+          const r = await openSharedFigure(payload);
+          return r.ok ? true : r.reason === 'too-large' ? 'too-large' : 'broken';
+        },
+        statements: 'facts',
         foreign: JSON.stringify({ app: '3d-builder', schemaVersion: 1, seed: 0, facts: [] }),
       }),
     ).toEqual([]);

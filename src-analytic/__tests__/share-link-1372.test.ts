@@ -46,6 +46,7 @@ describe('#1372 — the analytic builder conforms to the shared share contract',
         isEmpty: () => useAnalyticStore.getState().lines.length === 0,
         link: shareLinkForAnalytic,
         open: openSharedAnalytic,
+        statements: 'lines',
         foreign: FOREIGN,
       }),
     ).toEqual([]);

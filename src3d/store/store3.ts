@@ -88,6 +88,8 @@ export type StoreError3 =
   | { code: 'rename-refused'; reason: 'same' | 'no-source' | 'target-taken'; from: string; to: string }
   | { code: 'bad-file' }
   | { code: 'newer-schema' }
+  /** #1379 — a file or link over `shell/save`'s statement ceiling, refused before any replay. */
+  | { code: 'too-large' }
   | null;
 
 /**
@@ -801,7 +803,7 @@ export interface Geo3State {
   /** Load a deserialised figure — ONE undoable set (never destructive: undo restores the prior session). */
   loadFigure: (facts: Fact3[], seed: number, queries?: string[], planeDisplay?: PlaneDisplayMode3Map, displayMode?: DisplayModeMap) => void;
   /** Surface a file-load refusal through the normal error banner. */
-  reportLoadError: (reason: 'bad-file' | 'newer-schema') => void;
+  reportLoadError: (reason: 'bad-file' | 'newer-schema' | 'too-large') => void;
 }
 
 /**

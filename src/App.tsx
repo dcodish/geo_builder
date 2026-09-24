@@ -56,7 +56,7 @@ import { cyclableSeat, groupKey, introducedIds, meetsRequirements, primeFoldFor,
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, figureNameFromFileName, figureStateOf, namedFigureFileName, serializeFigure } from '@/store/figureFile';
-import type { FigureLoadOutcome } from '@/store/figureLoad';
+import type { FigureLoadOutcome, FigureLoadRefusal } from '@/store/figureLoad';
 import { loadFigureText } from '@/store/figureLoad';
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
 import { forgetSession, offeredSession, restoreSession, startSessionPersist } from '@/store/sessionPersist';
@@ -68,6 +68,7 @@ import { openSharedFigure, shareLinkFor } from '@/store/shareLink';
 // #1373: the fragment is SUBSCRIBED to, not read once — a link pasted into a tab already on this
 // page is a same-document navigation, so the app never remounts and a mount-only read never fires.
 import { onSharedLink } from '../shell/session/link';
+import { MAX_FIGURE_STATEMENTS } from '../shell/save';
 // #1374: the SHORT link — upload the figure + its preview, get themathbible.com/g/<id> back.
 import { pngToBase64, shortLinkFor } from '../shell/session/shortLink';
 import { ShareSheet } from '../shell/frame/ShareSheet';
@@ -531,7 +532,10 @@ export default function App() {
       setBusy(false);
     }
     if (!out.ok) {
-      noteFileProblem(out.reason === 'newer-version' ? 'file.newerVersion' : 'file.badFile');
+      noteFileProblem(
+        out.reason === 'newer-version' ? 'file.newerVersion' : out.reason === 'too-large' ? 'file.tooLarge' : 'file.badFile',
+        { max: MAX_FIGURE_STATEMENTS },
+      );
       return false;
     }
     const { file: loaded, refreshed } = out;
@@ -584,7 +588,8 @@ export default function App() {
    * answers a click the student just made, this one greets them on a cold page load; the 6-second
    * lane would leave them looking at an empty canvas with the explanation already gone.
    */
-  const [shareError, setShareError] = useState(false);
+  /** Why an arriving link was refused — «too large» (#1379) is not «broken», and says so. */
+  const [shareError, setShareError] = useState<false | 'broken' | 'too-large'>(false);
   const [offer, setOffer] = useState<StoredSession | null>(null);
   /**
    * #1373 — a link that arrives while the student is MID-FIGURE. It cannot happen on a cold load
@@ -604,9 +609,9 @@ export default function App() {
      * same-document navigation, so the mount effect never runs again. The store is read through
      * `getState()` rather than the render closure, because this handler outlives the mount.
      */
-    const stopLink = onSharedLink(({ payload }) => {
+    const stopLink = onSharedLink(({ payload, refusal }) => {
       if (!payload) {
-        setShareError(true);
+        setShareError(refusal === 'too-large' ? 'too-large' : 'broken');
         return;
       }
       if (useGeoStore.getState().facts.length === 0) void openShared(payload);
@@ -628,11 +633,14 @@ export default function App() {
   };
 
   const openShared = async (payload: string) => {
-    const ok = await runLoad(
-      () => openSharedFigure(payload, { prefold: (facts, seed) => geoWork.prefold(facts, seed) }),
-      { fromEnvelope: true },
-    );
-    if (!ok) setShareError(true); // decoded, but not a figure this build can open
+    let refusal = null as FigureLoadRefusal | null; // assigned inside the load callback
+    const ok = await runLoad(async () => {
+      const out = await openSharedFigure(payload, { prefold: (facts, seed) => geoWork.prefold(facts, seed) });
+      if (!out.ok) refusal = out.reason;
+      return out;
+    }, { fromEnvelope: true });
+    // decoded, but not a figure this build can open — or one too large to (#1379)
+    if (!ok) setShareError(refusal === 'too-large' ? 'too-large' : 'broken');
   };
 
   /**
@@ -1274,7 +1282,7 @@ export default function App() {
           />
         ) : shareError ? (
           <Banner kind="error" onDismiss={() => setShareError(false)} dismissLabel={t('file.dismissAudit')}>
-            {t('share.badLink')}
+            {shareError === 'too-large' ? t('share.tooLarge', { max: MAX_FIGURE_STATEMENTS }) : t('share.badLink')}
           </Banner>
         ) : pendingLink ? (
           /* #1373: a link arrived on a canvas that is NOT empty. Opening it would discard work the

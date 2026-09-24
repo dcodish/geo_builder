@@ -164,6 +164,13 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
   reached. *(Realised — [ADR-W-081](06w-decisions-workspace.md#adr-w-081), #1374. Operator ruling
   2026-09-23: 2 GB allocated, usage tracked on the admin dashboard rather than by push alert;
   measured at ~50 KB a share, so ~40,000 shares.)*
+- **FR-SL-9 (Must)** — **An arriving figure is bounded.** A link, a short link, a file or a restored
+  session is input from someone else, so its size is checked on ARRIVAL — never trusted because the
+  sender's tool would not have emitted it. A figure over a stated ceiling (characters, inflated bytes,
+  and statements — measured at ~2.5× the largest real figure) is **refused before anything replays**,
+  with a message that says it is too large to open rather than calling it broken, and the student's
+  canvas is left as it was. The share store refuses to hold what the builders would refuse to open.
+  *(Realised in all four builders and the store — [ADR-W-082](06w-decisions-workspace.md#adr-w-082), #1379.)*
 
 ## Export
 

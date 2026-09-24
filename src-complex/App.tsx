@@ -22,7 +22,7 @@ import { svgToPng } from '../shell/export/svgToPng';
 import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../shell/frame/canvasControls';
 // #743: the under-canvas row's ONE look — the shell contract, replacing this tree's bare buttons.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
-import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
+import { MAX_FIGURE_STATEMENTS, figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { applySwitcherConfig, configOf, readToolConfig, type ToolConfig } from '../shell/switcherConfig';
 import { deriveLines } from './app/deriveLines';
 import { askRowsOf } from './app/askLane';
@@ -48,8 +48,8 @@ import { AskText } from './ui/askText';
 import { RadicalText } from './render/radicalText';
 import { complexBidi } from './i18n';
 import registry from '../products.json';
+import { EXAMPLE_LINES } from './app/example';
 
-const EXAMPLE_LINES = ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2', 'z^5 = w^2'];
 
 const ERROR_KEY: Record<InputError['key'], string> = {
   'not-handled': 'errNotHandled',
@@ -57,6 +57,7 @@ const ERROR_KEY: Record<InputError['key'], string> = {
   'duplicate-name': 'errDuplicate',
   'wrong-app': 'errWrongApp',
   'newer-version': 'errNewerVersion',
+  'too-large': 'errTooLarge',
   incompatible: 'errIncompatible',
   impossible: 'errImpossible',
   unaccounted: 'errUnaccounted',
@@ -160,11 +161,15 @@ export function App() {
             ? ('wrong-app' as const)
             : env.reason === 'newer-version'
               ? ('newer-version' as const)
-              : ('parse-error' as const);
+              : env.reason === 'too-large'
+                ? ('too-large' as const)
+                : ('parse-error' as const);
         const detail =
           env.reason === 'wrong-app'
             ? String((parsed as { app?: unknown }).app ?? file.name)
-            : file.name;
+            : env.reason === 'too-large'
+              ? String(MAX_FIGURE_STATEMENTS)
+              : file.name;
         useComplexStore.setState({ lastError: { key, detail } });
         return;
       }
@@ -181,22 +186,26 @@ export function App() {
    */
   const [offer, setOffer] = useState<StoredSession | null>(null);
   /** #1372 — a link that cannot be opened says so and KEEPS saying so (see the analytic twin). */
-  const [shareError, setShareError] = useState(false);
+  const [shareError, setShareError] = useState<false | 'broken' | 'too-large'>(false); // #1379: which
   /** #1373 — a link arriving on a canvas that is NOT empty asks before replacing the student's work. */
   const [pendingLink, setPendingLink] = useState<string | null>(null);
+
+  const openLinkCx = (payload: string) => {
+    const r = openSharedComplex(payload);
+    if (r !== true) setShareError(r);
+  };
 
   useEffect(() => {
     // A link outranks the session offer and is never shown beside it. #1373: SUBSCRIBED, not read
     // once — a link pasted into an already-open tab never remounts the app. The store is read via
     // getState(), since this handler outlives the mount.
-    const stopLink = onSharedLink(({ payload }) => {
+    const stopLink = onSharedLink(({ payload, refusal }) => {
       if (!payload) {
-        setShareError(true);
+        setShareError(refusal === 'too-large' ? 'too-large' : 'broken');
         return;
       }
-      if (useComplexStore.getState().lines.length === 0) {
-        if (!openSharedComplex(payload)) setShareError(true);
-      } else setPendingLink(payload);
+      if (useComplexStore.getState().lines.length === 0) openLinkCx(payload);
+      else setPendingLink(payload);
     });
     if (!window.location.hash || window.location.hash === '#') setOffer(offeredSessionCx());
     const stopPersist = startSessionPersistCx();
@@ -209,7 +218,7 @@ export function App() {
   const acceptPendingLink = () => {
     const payload = pendingLink;
     setPendingLink(null);
-    if (payload && !openSharedComplex(payload)) setShareError(true);
+    if (payload) openLinkCx(payload);
   };
 
 
@@ -568,7 +577,7 @@ export function App() {
           />
         ) : shareError ? (
           <Banner kind="error" onDismiss={() => setShareError(false)} dismissLabel={t('loadAuditDismiss')}>
-            {t('shareBadLink')}
+            {shareError === 'too-large' ? t('shareTooLarge', { max: MAX_FIGURE_STATEMENTS }) : t('shareBadLink')}
           </Banner>
         ) : pendingLink ? (
           /* #1373: a link arrived on a canvas that is NOT empty — ask, never replace silently. */

@@ -28,7 +28,9 @@ import { type Rat, isInt, mul as ratMul, rat, toNumber } from '../value/rational
 import {
   type ExpVec,
   div as modDiv,
+  inv as modInv,
   isOne as modIsOne,
+  isPrimeAtom,
   mul as modMul,
   one as modOne,
   pow as modPow,
@@ -98,6 +100,13 @@ export interface Tier1Result {
    * out of domain by itself, and saying "your two statements conflict" would name the wrong culprit.
    */
   readonly impossible: readonly string[];
+  /**
+   * #1366 — the real PARAMETERS the givens determine, as their own small solve. `|z1| = 9r` beside
+   * `z1 = 3+4i` leaves `9r = 5`, which is an equation in `r` (r = 5/9), not a contradiction. Its
+   * `determined` entries are the parameters the figure must draw AT their solved value rather than at a
+   * sample; its `free` ones stay free. Empty when no given pins a parameter.
+   */
+  readonly params: LinearSolution<ExpVec>;
 }
 
 const BRANCH_BUDGET = 2048;
@@ -186,10 +195,11 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
 
   const modulus = solveLinear(modRows, names, MOD_OPS);
   const argument = solveLinear(argRows, [...names, ...kNames], ANG_OPS);
+  const params = solveParams(modulus.leftover);
 
   const { branches, truncated, integralityFailed } = enumerateBranches(argument, kNames);
 
-  const inconsistent = modulus.inconsistent
+  const inconsistent = params.inconsistent
     ? 'modulus'
     : argument.inconsistent || integralityFailed
       ? 'argument'
@@ -215,7 +225,43 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
     freeDof,
     deferred,
     names,
+    params,
   };
+}
+
+/**
+ * #1366 — what the modulus system's `0 = c` rows actually say.
+ *
+ * `linearize` keeps a real parameter inside the modulus CONSTANT (`9r` is `{3:2, r:1}`), and that is
+ * deliberate: every parametric answer (`15r`, `54r²`) and the free-DOF basis read that encoding. But a
+ * constant cannot absorb a given — so `z1 = 3+4i` beside `|z1| = 9r` eliminated to `0 = 9r/5`, and the
+ * elimination called it a contradiction. It is an equation in `r`.
+ *
+ * So the leftover rows are read here as a second, tiny log-space system whose unknowns are the
+ * parameter ATOMS: a row's parameter exponents are its coefficients and its prime part, inverted, is
+ * its right-hand side (`9r/5 = 1` ⇒ `1·log r = log(5/9)`). A row with no parameter at all is a genuine
+ * contradiction, exactly as before — and so is a set of rows that force one parameter to two values
+ * (`9r = 5` and `4r = 5`). Only when THIS system has no solution are the givens inconsistent.
+ *
+ * The representation the answer layers read is untouched: the unknown list of the modulus system does
+ * not change, so neither its pivots nor the free-DOF basis can move.
+ */
+function solveParams(leftover: readonly Row<ExpVec>[]): LinearSolution<ExpVec> {
+  const rows: Row<ExpVec>[] = [];
+  const atoms: string[] = [];
+  for (const r of leftover) {
+    const coef = new Map<string, Rat>();
+    const primes = new Map<string, Rat>();
+    for (const [atom, e] of r.rhs) {
+      if (isPrimeAtom(atom)) primes.set(atom, e);
+      else {
+        coef.set(atom, e);
+        if (!atoms.includes(atom)) atoms.push(atom);
+      }
+    }
+    rows.push({ coef, rhs: modInv(primes) });
+  }
+  return solveLinear(rows, atoms.sort(), MOD_OPS);
 }
 
 /**
@@ -250,6 +296,19 @@ function enumerateBranches(
       if (c && c.n !== 0n) period = lcm(period, c.d);
     }
     active.push({ k, period });
+  }
+
+  /**
+   * #1366 — a turn-unknown pinned to a CONSTANT must be whole on its own, whether or not any direction
+   * is determined. `o = 1+i` reads «a positive real equals 1+i»: its argument row is `−k = −⅛`, so
+   * `k = ⅛`, which no rotation satisfies. The early return below used to skip this check whenever no
+   * DIRECTION was determined — and the line was refused only by accident, because the modulus half
+   * called `0 = o/√2` a contradiction. Once the modulus half solves `o = √2`, this is the half that
+   * must refute it. Same criterion as `emit`'s, so the two cannot disagree.
+   */
+  for (const [, d] of determinedK) {
+    if (d.coefs.size > 0) continue;
+    if (!isExactRational(d.konst) || !isInt(d.konst.turns)) return { branches: [], truncated: false, integralityFailed: true };
   }
 
   if (determined.length === 0) return { branches: [], truncated: false, integralityFailed: false };

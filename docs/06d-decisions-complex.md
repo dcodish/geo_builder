@@ -153,7 +153,7 @@ Implemented in the C0 prototype with four locking tests; docs/27 §10 F1 updated
 
 ## ADR-CX-005 — An equation is ABOUT its letter (2026-08-15)
 
-**Status:** Accepted (operator ruling, during prototype play)
+**Status:** Accepted (operator ruling, during prototype play) · **amended by [ADR-CX-042](#adr-cx-042)** (#1367, 2026-09-24): the solutions of a fresh letter ALWAYS claim X₁..Xₙ, and an existing member that is not its solution refuses the line. The anonymous reading of a taken index, and its justification (*"refusing the line would lose a statement the student legitimately made"*), are reversed by operator ruling.
 
 **Context.** The prototype treated `z^3 = w` as "enumerate the cube roots of w, named z1..z3" even
 when `z` already existed as a number — leaving z disconnected from z₁..z₃. Operator: a letter z
@@ -1247,6 +1247,8 @@ The honesty argument is the one that settles it: reading `z₁³ = z₃` as an e
 `z₁₁, z₁₂, z₁₃`, and a doubled subscript is a *different number* in exam notation.
 
 ### Decision 4 — an anonymous solution has no name, and the one place that writes names enforces it
+
+> **Reversed by [ADR-CX-042](#adr-cx-042)** (#1367, operator ruling 2026-09-24). There is no anonymous solution any more: the solutions claim their names, and a taken name must BE its solution. Kept below as the record of what shipped.
 
 When the indexed names are already the student's, the set is drawn anonymously (ADR-CX-005's existing
 ruling). Those ids live in a `#s…` namespace — uncollidable for the same reason tier 1's `#k` is — and
@@ -2446,3 +2448,127 @@ here — the two changes have different risk and different tests.
 verbs; typos; keyword typos; **the two historical instances, so the mechanism now defends what the
 keyword list used to**; and the legitimate register (`9r`, `2a`, `3k`, indexed `n1`, the capital label
 pair, and the catalog forms).
+
+## ADR-CX-041 — A `0 = c` modulus row that carries a PARAMETER is an equation in it, not a contradiction (#1366)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1366](https://github.com/dcodish/geo_builder/issues/1366) (bug, `P2`, `complex`) · round [#1382](https://github.com/dcodish/geo_builder/issues/1382)
+**Requirements:** none (internal) — it restores a promise the catalog already makes (F3's featured row
+«ערך מוחלט באמצעות פרמטר — r נשאר חופשי»). **Design:** [04d](04d-design-complex.md) — "A parameter
+lives in the modulus constant, and the leftover rows are read over the parameters".
+
+**The defect.** `z1 = 3+4i` then `|z1| = 9r` was refused with «אינו מתיישב עם: "z1 = 3+4i"» — a false
+mathematical claim about the student's own givens, since `r = 5/9` satisfies both. Both entry orders,
+any coefficient, a bare `r`, and the polar form all failed the same way: **a determined modulus plus a
+free real parameter.** The row is `featured: true`, so it is one of the first six commands a student
+meets in its guide section.
+
+**Root cause (measured at pickup, as the plan's escalation diagnosed).** `linearize` encodes a real
+parameter in the modulus CONSTANT (`9r` is the exponent vector `{3:2, r:1}`), not as an unknown. So the
+two givens eliminate to `0 = 9r/5`: a row with no unknowns and a non-trivial constant, which
+`solveLinear` correctly reports as `0 = c`. **A constant cannot absorb a given; only an unknown can.**
+The derive layer published `r` as a free DOF while the solver never treated it as one — two definitions
+of one quantity, disagreeing, which is the ADR-052 conformance smell CLAUDE.md names.
+
+**Why not make `r` an unknown.** Tried in round #1369 and reverted: every parametric ANSWER (`15r`,
+`54r²`, `36r`) reads the constant encoding, and with `r` in the unknown list the elimination may pivot
+on `r` instead of a name, moving the free-DOF basis. Both properties are required at once.
+
+**The fix — the representation is untouched; only the verdict changes.**
+
+1. `solveLinear` also returns its `leftover` rows (the `0 = c` rows themselves). Additive:
+   `inconsistent` is exactly `leftover.length > 0`, as before.
+2. Tier 1 reads the modulus leftovers as a small log-space system whose unknowns are the PARAMETER
+   atoms (`solveParams`): a row's parameter exponents are its coefficients and its prime part, inverted,
+   is its right-hand side. A row with no parameter is a genuine contradiction exactly as before, and so
+   is a set that forces one parameter to two values (`9r = 5` and `4r = 5`). Only when THAT system has
+   no solution is the modulus half inconsistent. Its solution is published as `Tier1Result.params`.
+3. `foldConstraints` draws every parameter the givens determine AT its solved value and removes it from
+   the free basis. Left at its seed sample, `r` would print as free, and tier 2, which may move every
+   free parameter, could drive it off 5/9 to satisfy some other given, silently breaking the one that
+   pinned it.
+4. **The mirror half (a deviation from the plan, found by the lane).** `o = 1+i` reads *a positive real
+   parameter equals 1+i*. It used to be refused only by accident, because the modulus half called
+   `0 = o/√2` a contradiction. Once that half solves `o = √2`, the argument half must refute it, and it
+   had a latent gap: a turn-unknown pinned to a non-whole CONSTANT (`k = ⅛`) was integrality-checked
+   only when some direction was also determined. That check now runs unconditionally, on `emit`'s own
+   criterion. The acceptance gate's «o = 1+i» refusal is unchanged for the student; it now comes from
+   the half that is actually true.
+
+**Measured.** A 24-seed sweep over every catalog row (alone, and after `z1 = 3+4i · z2 = 2cis150 ·
+w = z1*z2`), every complex fixture and the new cases: 1,872 seed×sequence verdicts, 96 changed, and they
+are exactly the four `|z| = …r` sequences, identical across all 24 seeds. Nothing else moved.
+
+**What this does NOT do.** It does not print `r = 5/9` anywhere, and a second modulus in `r`
+(`|z2| = 18r`) still reads as bare `z₂` rather than `10`. That is the existing reading of a parametric
+modulus, and surfacing solved parameters is a new surface, not this fix. It does not model a
+NEGATIVE real parameter: parameters remain positive reals, as `modulus.ts` already assumes.
+
+**Consequences.** `src-complex/solve/linear.ts` (`leftover`), `src-complex/solve/tier1.ts`
+(`solveParams`, `params`, the unconditional constant-turn integrality check),
+`src-complex/replay/derive2.ts` (solved parameters pinned, out of the free basis). Lock:
+`src-complex/__tests__/param-modulus-1366.test.ts` (15: the reported case in both orders, three
+coefficient positions, the polar sibling, `r` solved at all 24 seeds, `r` counted once, the catalog row
+alone unchanged, the two conflicts that must still refuse, `|z1| = -5` still on the #719 channel, the
+argument half refusing `o = 1+i` / `r = 3+4i`, and the reported sequence through the real submit gate).
+
+## ADR-CX-042 — The solutions of `X^n = …` ARE X₁..Xₙ: an existing member must be its solution, or the line is refused (#1367)
+
+**Status:** accepted, 2026-09-24 (operator ruling 2026-09-22, reaffirmed 2026-09-24 against the stated
+cost) · **Issue:** [#1367](https://github.com/dcodish/geo_builder/issues/1367) (bug, `P2`, `complex`) ·
+round [#1382](https://github.com/dcodish/geo_builder/issues/1382) · **amends** [ADR-CX-005](#adr-cx-005)
+and **reverses** [ADR-CX-021](#adr-cx-021) Decision 4
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-6 (new) — a §2b question is now refused, which
+is a change to what the product promises · **Design:** [04d](04d-design-complex.md) — "A solution set
+claims its names"
+
+**What the operator saw.** Playing `z1 = 3+4i · z2 = 2cis150 · w = z1*z2 · z^5 = w^2` (the #1364 sheet,
+T5): the five solutions were drawn labelled only with values, *"they have no names"*. They carried
+internal ids (`#sz5_1..5`) and could not be named in a later sentence.
+
+**The ruling.** *"If users writes z3= it is accepted. if user writes z= it is accepted but if he writes
+z^3= and z3 doesnt fit one of the solutions, it should be rejected."* Asked on 2026-09-24 to choose
+between this rule and the §2b capstone (`z1 = 2cis100 · z2 = 1cis50 · z4 = 3cis10 · z^5 = z1*z2^3*z4`,
+a real bagrut question, which the rule rejects because its five solutions sit on |z| = 6^(1/5) ≈ 1.431),
+he chose the rule.
+
+**Root cause (measured at pickup, no divergence from the issue).** `rootsMode` had a third reading,
+`'anonymous'`: when any of X₁..Xₙ was already a name, the solutions were drawn under `#s…` ids. That was
+ADR-CX-005's mode for §2b part ד, justified as *"refusing the line would lose a statement the student
+legitimately made"*. It hid the check the ruling asks for: having given up the names, the solver never
+compared the student's z₁ with the root that would have claimed it. `z1 = 3 · z^3 = 8` was accepted,
+while `z^3 = 8 · z1 = 3` collapsed the figure. The same two statements gave opposite verdicts. **The
+nameless points and the missing refusal were one fallback, seen from two sides.**
+
+**The fix is a deletion.** The `enumerate` lowering already pins X₁ to the principal root (a `principal`
+row, no turn unknown) and each Xₖ to `(k−1)/n` of a turn from X₁. So when X₁..Xₙ claim their names even
+when the student already holds some of them, **the solve is the consistency check**. A member that is
+solution k is reused. One that is not contradicts the equation, and the submit gate refuses the line,
+naming the student's own statement (`«z1 = 3»`, or `«z^3 = 8»` in the other order). The anonymous mode,
+`ANON_PREFIX`, `isAnonymous` and `prettyName`'s empty-string branch are removed; none had another
+producer.
+
+**Index matching, not set membership — the ruling forces it.** If z₁ could equal any solution, a z₁ that
+is solution 2 would leave solution 1 unnamed and z₁ contradicting its index, and the naming would stop
+being well defined. So `z1 = 2cis120` then `z^3 = 8` is refused (2cis120 is a cube root of 8, but
+solution 2, not solution 1). The operator was told of this narrowing on the issue; if it is wrong, it is
+a change to the lowering's pins, not to this mechanism.
+
+**What changes for a student, stated plainly.**
+- The solutions of `z^n = …` always carry the names z₁..zₙ and can be used in the next sentence.
+- A question that states z₁, z₂… and then solves `z^n` over them is refused unless the stated numbers
+  ARE the solutions with those indices. This includes §2b part ד and the operator's T5.
+- **The complex tool's EXAMPLE button** ran exactly T5 and would now refuse its own last line. It becomes
+  `w1 = 3+4i · w2 = 2cis150 · w = w1*w2 · z^5 = w^2`: the same numbers, the givens in the `w` family, so
+  the five solutions are z₁..z₅. It moved to `app/example.ts` so a lock can hold it.
+
+**Unchanged.** `z^3 = 8` in a clean session (catalog F8 row 1, "every solution is plotted"); a relation
+`z1^3 = z3` (F8 row 2); `z3 = …` or `z = …` on its own.
+
+**Consequences.** `src-complex/model/naming.ts`, `model/solutionSet.ts`, `app/deriveLines.ts`,
+`app/example.ts` (new), `App.tsx`. Locks: `src-complex/__tests__/roots-claim-names-1367.test.ts` (11:
+T5 refused, no internal id on the canvas, the reuse case, both orders refused, index matching, and the
+four readings the ruling leaves alone, the example included); `solution-sets.test.ts` and the §2b
+capstone in `cutover-coverage.test.ts` REWRITTEN to assert the refusal, each with a comment naming this
+ruling so no later session reverts it by accident, and with the grounded-enumeration capability kept
+under names that are not the solutions' own; the `2b-capstone` fixture ends at part ג; new fixture
+`roots-reuse-member-1367.complex.json` (`z1 = 2 · z^3 = 8`).

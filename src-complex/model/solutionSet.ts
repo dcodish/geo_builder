@@ -66,7 +66,7 @@ const isWholeDegree = (e: Rat): boolean => isInt(e) && e.n > 0n;
  * **`constrain`** is the ordinary equation: one unknown, its turn unknown enumerated, and the solutions
  * genuinely ARE the configurations «show another configuration» walks (ADR-CX-005 modes 2 and 3).
  *
- * **`enumerate`/`anonymous`** is the exam's «פתרו את המשוואה»: the n solutions are one configuration
+ * **`enumerate`** is the exam's «פתרו את המשוואה»: the n solutions are one configuration
  * containing n points. X₁ solves the equation and every later solution is pinned to X₁ — same modulus,
  * exactly `k/n` of a turn further round — so the constellation is exact even when the right-hand side
  * is not yet known, and no closed form for the roots is needed. X₁'s row is `principal`, which drops
@@ -81,7 +81,7 @@ export function solutionSetConstraints(eq: RootsEquation, mode: RootsMode): Cons
   if (mode === 'constrain') {
     return [{ lhs: pow(ref(eq.varName), degree), rhs: eq.rhs, src: eq.src }];
   }
-  const sols = solutionNames(eq.varName, eq.n, mode === 'anonymous');
+  const sols = solutionNames(eq.varName, eq.n);
   const out: Constraint[] = [
     { lhs: pow(ref(sols[0]), degree), rhs: eq.rhs, src: eq.src, principal: true },
   ];
@@ -101,12 +101,12 @@ export function solutionSetConstraints(eq: RootsEquation, mode: RootsMode): Cons
 /**
  * Which names the figure should DRAW for this reading, and which it must not.
  *
- * In `constrain` mode the letter is the number, so it is drawn. In the other two the letter is
+ * In `constrain` mode the letter is the number, so it is drawn. In `enumerate` the letter is
  * reserved and the SOLUTIONS are drawn — declaring the letter as well would plot a point for a name
  * that stands for the whole set, at whatever position the sampler chose for it.
  */
 export function solutionSetNames(eq: RootsEquation, mode: RootsMode): string[] {
   return mode === 'constrain'
     ? [eq.varName]
-    : solutionNames(eq.varName, eq.n, mode === 'anonymous');
+    : solutionNames(eq.varName, eq.n);
 }
