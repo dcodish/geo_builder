@@ -58,9 +58,10 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md).)*
 - **FR-CN-6 (Must)** — **The solutions of an equation on a bare letter ARE its indexed names.** `z³ = 8`
   plots z₁, z₂, z₃ (in argument order from the principal solution), every one a name the student can
-  write in the next sentence. A number the student already named z₂ is a claim that it IS solution 2:
-  if it is, it is reused; if it is not, the equation is **refused**, naming the student's statement, in
-  either entry order. So a question that states z₁, z₂… and then solves an equation over them is refused
+  write in the next sentence. A number the student already named z₂ is a claim that it is ONE OF the
+  solutions (set membership, [ADR-CX-044](06d-decisions-complex.md#adr-cx-044)): if it is, it keeps its
+  place and the unstated names take the remaining solutions in argument order; if it is not, the
+  equation is **refused**, naming the student's statement, in either entry order. So a question that states z₁, z₂… and then solves an equation over them is refused
   unless those numbers are its solutions (operator ruling, #1367, with the §2b part ד cost shown).
   *(Realised — [ADR-CX-042](06d-decisions-complex.md#adr-cx-042).)*
 
