@@ -46,7 +46,13 @@ describe('the §2b capstone, END TO END through the submit path', () => {
    * docs/27 §2b's own gate assertions, which existed only as a prototype test. The exemplar exercises
    * all six corpus archetypes in one question, so this is the single strongest thing in the net.
    */
-  it('parts setup + א + ב + ג + ד — the figure answers every part', () => {
+  /**
+   * Part ד (`z^5 = z1*z2^3*z4`) is NOT in this sequence any more, deliberately — see the next describe.
+   * #1367: the operator ruled (2026-09-22, reaffirmed 2026-09-24 with this exact cost shown to him) that
+   * the solutions of `z^n = …` ARE z₁..zₙ, so the student's own z₁, z₂, z₄ must be solutions 1, 2 and 4.
+   * They are not, and the line is refused.
+   */
+  it('parts setup + א + ב + ג — the figure answers every part', () => {
     feed([
       ...SETUP,
       '|z1-z2|', // א
@@ -57,7 +63,6 @@ describe('the §2b capstone, END TO END through the submit path', () => {
       'היקף Oz1z2z3', // ב ask
       'z1, z2, z4 סדרה הנדסית', // ג
       'המרובע Oz2z3z4',
-      'z^5 = z1*z2^3*z4', // ד
     ]);
     const d = figure();
     expect(d.untranslated).toEqual([]);
@@ -91,23 +96,38 @@ describe('the §2b capstone, END TO END through the submit path', () => {
   });
 });
 
+/**
+ * #1367 — THIS DESCRIBE WAS REVERSED BY AN OPERATOR RULING, and the reversal is deliberate.
+ *
+ * It used to assert that §2b part ד builds: five solutions drawn ANONYMOUSLY beside the student's z₁,
+ * z₂, z₄ (ADR-CX-005 mode 3). The operator ruled (2026-09-22) — *"if he writes z^3= and z3 doesnt fit
+ * one of the solutions, it should be rejected"* — and on 2026-09-24, shown that this very question would
+ * be rejected, chose the rule over the corpus row. The solutions of `z^5 = …` ARE z₁..z₅; z₁ = 2cis100
+ * is not solution 1 (the five sit on |z| = 6^(1/5) ≈ 1.431), so the line is refused. ADR-CX-042 records
+ * it. Do not "restore" the old assertion without a new ruling.
+ */
 describe('the ד equation: an enumeration over a GROUNDED right-hand side', () => {
-  it('«z^5 = z1*z2^3*z4» over polar literals enumerates five solutions', () => {
-    feed(['z1 = 2cis100', 'z2 = 1cis50', 'z4 = 3cis10', 'z^5 = z1*z2^3*z4']);
+  it("«z^5 = z1*z2^3*z4» over the student's own z₁, z₂, z₄ is REFUSED — they are not its solutions", () => {
+    feed(['z1 = 2cis100', 'z2 = 1cis50', 'z4 = 3cis10']);
+    expect(submitLine('z^5 = z1*z2^3*z4')).toBe(false);
+    expect(store().lastError?.key).toBe('incompatible');
+    expect(store().lines).toEqual(['z1 = 2cis100', 'z2 = 1cis50', 'z4 = 3cis10']);
+  });
+
+  it('THE EXAM PASTE «Z⁵ = Z₁Z₂³Z₄» is the same utterance, and is refused the same way (ADR-CX-003 P2)', () => {
+    feed(['z1 = 2cis100', 'z2 = 1cis50', 'z4 = 3cis10']);
+    expect(submitLine('Z⁵ = Z₁Z₂³Z₄')).toBe(false);
+  });
+
+  it("the capability stands over names that are not the solutions' own: five solutions, named z₁..z₅", () => {
+    feed(['w1 = 2cis100', 'w2 = 1cis50', 'w4 = 3cis10', 'z^5 = w1*w2^3*w4']);
     const d = figure();
     expect(d.untranslated).toEqual([]);
     // rhs = 2·1·3 cis(100 + 150 + 10) = 6cis260 → five roots on |z| = 6^(1/5), the first at 52°
-    const solutions = d.points.filter((p) => !['z1', 'z2', 'z4'].includes(p.name));
-    expect(solutions).toHaveLength(5);
+    const solutions = d.points.filter((p) => /^z\d$/.test(p.name));
+    expect(solutions.map((p) => p.name).sort()).toEqual(['z1', 'z2', 'z3', 'z4', 'z5']);
     for (const s of solutions) expect(Math.hypot(s.z.re, s.z.im)).toBeCloseTo(Math.pow(6, 1 / 5), 6);
-    expect(Math.min(...solutions.map((s) => s.argumentDeg))).toBeCloseTo(52, 6);
-  });
-
-  it('THE EXAM PASTE «Z⁵ = Z₁Z₂³Z₄» is the same utterance (ADR-CX-003 P2)', () => {
-    feed(['z1 = 2cis100', 'z2 = 1cis50', 'z4 = 3cis10', 'Z⁵ = Z₁Z₂³Z₄']);
-    const d = figure();
-    expect(d.untranslated).toEqual([]);
-    expect(d.points.filter((p) => !['z1', 'z2', 'z4'].includes(p.name))).toHaveLength(5);
+    expect(pt(d, 'z1')!.argumentDeg).toBeCloseTo(52, 6);
   });
 });
 

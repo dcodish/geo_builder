@@ -153,7 +153,7 @@ Implemented in the C0 prototype with four locking tests; docs/27 §10 F1 updated
 
 ## ADR-CX-005 — An equation is ABOUT its letter (2026-08-15)
 
-**Status:** Accepted (operator ruling, during prototype play)
+**Status:** Accepted (operator ruling, during prototype play) · **amended by [ADR-CX-042](#adr-cx-042)** (#1367, 2026-09-24): the solutions of a fresh letter ALWAYS claim X₁..Xₙ, and an existing member that is not its solution refuses the line. The anonymous reading of a taken index, and its justification (*"refusing the line would lose a statement the student legitimately made"*), are reversed by operator ruling.
 
 **Context.** The prototype treated `z^3 = w` as "enumerate the cube roots of w, named z1..z3" even
 when `z` already existed as a number — leaving z disconnected from z₁..z₃. Operator: a letter z
@@ -1247,6 +1247,8 @@ The honesty argument is the one that settles it: reading `z₁³ = z₃` as an e
 `z₁₁, z₁₂, z₁₃`, and a doubled subscript is a *different number* in exam notation.
 
 ### Decision 4 — an anonymous solution has no name, and the one place that writes names enforces it
+
+> **Reversed by [ADR-CX-042](#adr-cx-042)** (#1367, operator ruling 2026-09-24). There is no anonymous solution any more: the solutions claim their names, and a taken name must BE its solution. Kept below as the record of what shipped.
 
 When the indexed names are already the student's, the set is drawn anonymously (ADR-CX-005's existing
 ruling). Those ids live in a `#s…` namespace — uncollidable for the same reason tier 1's `#k` is — and
@@ -2508,3 +2510,65 @@ NEGATIVE real parameter: parameters remain positive reals, as `modulus.ts` alrea
 coefficient positions, the polar sibling, `r` solved at all 24 seeds, `r` counted once, the catalog row
 alone unchanged, the two conflicts that must still refuse, `|z1| = -5` still on the #719 channel, the
 argument half refusing `o = 1+i` / `r = 3+4i`, and the reported sequence through the real submit gate).
+
+## ADR-CX-042 — The solutions of `X^n = …` ARE X₁..Xₙ: an existing member must be its solution, or the line is refused (#1367)
+
+**Status:** accepted, 2026-09-24 (operator ruling 2026-09-22, reaffirmed 2026-09-24 against the stated
+cost) · **Issue:** [#1367](https://github.com/dcodish/geo_builder/issues/1367) (bug, `P2`, `complex`) ·
+round [#1382](https://github.com/dcodish/geo_builder/issues/1382) · **amends** [ADR-CX-005](#adr-cx-005)
+and **reverses** [ADR-CX-021](#adr-cx-021) Decision 4
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-6 (new) — a §2b question is now refused, which
+is a change to what the product promises · **Design:** [04d](04d-design-complex.md) — "A solution set
+claims its names"
+
+**What the operator saw.** Playing `z1 = 3+4i · z2 = 2cis150 · w = z1*z2 · z^5 = w^2` (the #1364 sheet,
+T5): the five solutions were drawn labelled only with values, *"they have no names"*. They carried
+internal ids (`#sz5_1..5`) and could not be named in a later sentence.
+
+**The ruling.** *"If users writes z3= it is accepted. if user writes z= it is accepted but if he writes
+z^3= and z3 doesnt fit one of the solutions, it should be rejected."* Asked on 2026-09-24 to choose
+between this rule and the §2b capstone (`z1 = 2cis100 · z2 = 1cis50 · z4 = 3cis10 · z^5 = z1*z2^3*z4`,
+a real bagrut question, which the rule rejects because its five solutions sit on |z| = 6^(1/5) ≈ 1.431),
+he chose the rule.
+
+**Root cause (measured at pickup, no divergence from the issue).** `rootsMode` had a third reading,
+`'anonymous'`: when any of X₁..Xₙ was already a name, the solutions were drawn under `#s…` ids. That was
+ADR-CX-005's mode for §2b part ד, justified as *"refusing the line would lose a statement the student
+legitimately made"*. It hid the check the ruling asks for: having given up the names, the solver never
+compared the student's z₁ with the root that would have claimed it. `z1 = 3 · z^3 = 8` was accepted,
+while `z^3 = 8 · z1 = 3` collapsed the figure. The same two statements gave opposite verdicts. **The
+nameless points and the missing refusal were one fallback, seen from two sides.**
+
+**The fix is a deletion.** The `enumerate` lowering already pins X₁ to the principal root (a `principal`
+row, no turn unknown) and each Xₖ to `(k−1)/n` of a turn from X₁. So when X₁..Xₙ claim their names even
+when the student already holds some of them, **the solve is the consistency check**. A member that is
+solution k is reused. One that is not contradicts the equation, and the submit gate refuses the line,
+naming the student's own statement (`«z1 = 3»`, or `«z^3 = 8»` in the other order). The anonymous mode,
+`ANON_PREFIX`, `isAnonymous` and `prettyName`'s empty-string branch are removed; none had another
+producer.
+
+**Index matching, not set membership — the ruling forces it.** If z₁ could equal any solution, a z₁ that
+is solution 2 would leave solution 1 unnamed and z₁ contradicting its index, and the naming would stop
+being well defined. So `z1 = 2cis120` then `z^3 = 8` is refused (2cis120 is a cube root of 8, but
+solution 2, not solution 1). The operator was told of this narrowing on the issue; if it is wrong, it is
+a change to the lowering's pins, not to this mechanism.
+
+**What changes for a student, stated plainly.**
+- The solutions of `z^n = …` always carry the names z₁..zₙ and can be used in the next sentence.
+- A question that states z₁, z₂… and then solves `z^n` over them is refused unless the stated numbers
+  ARE the solutions with those indices. This includes §2b part ד and the operator's T5.
+- **The complex tool's EXAMPLE button** ran exactly T5 and would now refuse its own last line. It becomes
+  `w1 = 3+4i · w2 = 2cis150 · w = w1*w2 · z^5 = w^2`: the same numbers, the givens in the `w` family, so
+  the five solutions are z₁..z₅. It moved to `app/example.ts` so a lock can hold it.
+
+**Unchanged.** `z^3 = 8` in a clean session (catalog F8 row 1, "every solution is plotted"); a relation
+`z1^3 = z3` (F8 row 2); `z3 = …` or `z = …` on its own.
+
+**Consequences.** `src-complex/model/naming.ts`, `model/solutionSet.ts`, `app/deriveLines.ts`,
+`app/example.ts` (new), `App.tsx`. Locks: `src-complex/__tests__/roots-claim-names-1367.test.ts` (11:
+T5 refused, no internal id on the canvas, the reuse case, both orders refused, index matching, and the
+four readings the ruling leaves alone, the example included); `solution-sets.test.ts` and the §2b
+capstone in `cutover-coverage.test.ts` REWRITTEN to assert the refusal, each with a comment naming this
+ruling so no later session reverts it by accident, and with the grounded-enumeration capability kept
+under names that are not the solutions' own; the `2b-capstone` fixture ends at part ג; new fixture
+`roots-reuse-member-1367.complex.json` (`z1 = 2 · z^3 = 8`).
