@@ -7539,3 +7539,46 @@ slope row), `i18n/index.ts` (`angleWithX`). Locks: `issue-1322-line-angle.test.t
 the 0/180 seam, the exam's two phrasings plus English, a vertical segment answering 90°, an undetermined line
 answering "not determined", and the panel's decision equal to the ask's on one segment), and the #1139 menu
 lock extended with the fourth question.
+
+## ADR-AG-155 — The angle noun has two spellings, «זווית» and «זוית», and one stem carries both (#1407, arm 1)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1407](https://github.com/dcodish/geo_builder/issues/1407) (bug, `P2`, `analytic`; arm 1 of 3, the issue stays open for arm 2) · round [#1408](https://github.com/dcodish/geo_builder/issues/1408)
+**Requirements:** [02c](02c-requirements-analytic.md) R60 / R115 amendment (both spellings of the angle noun, and the 2-D plene/defective shape-noun spellings) · **Design:** [04c](04c-design-analytic.md#the-parsers-rule-contract-adr-ag-017), "the word itself has two spellings"
+
+**What the operator saw.** Playing round #1397 T19: *"writing זוית C=200 is not recognized"*. Re-measured at
+`eef9dda4` through `decideSubmit` after «משולש ABC»: «זווית ABC=200» was refused `unsatisfiable` (correct),
+while «זוית ABC=200», «זוית ABC ישרה» and «זוית C ישרה» were all `not-handled` and escalated. The issue's
+table held exactly as filed.
+
+**The class.** *A Hebrew noun with a plene/defective spelling variant is read only in the one spelling each
+pattern happened to hard-code.* The angle noun was spelled «זווית» as a literal in four places: the noun atom
+`ANGLE_NOUN_HE` (so every angle rule: right, numeric, ratio), the incentre role «חוצי הזוויות», the question
+«הזווית בין … לציר ה-x», and the shape-noun table key («משולש/טרפז ישר-זווית»). 2-D has read both since #244
+through its lexicon's `זו?וי` (the ADR-3D-032 vav class).
+
+**The decision.** One stem, `ANGLE_STEM_HE = 'זו?וי'`, exported from `engine/shapes.ts` (the parser already
+imports that module, so the reverse would be a cycle). All four patterns compose it, so a new angle rule
+inherits both spellings instead of re-spelling the word. The shape table is keyed by string, so its one
+normaliser, `normalizeShapeNoun`, folds the variants onto the key, word-bounded. The sibling audit found two
+more members of the same class at that same normaliser, and they are folded there too: «מעויין» → «מעוין» and
+«שוה» → «שווה» (in «משולש/טרפז שווה שוקיים»). 2-D folds both at its input boundary (#389, ADR-405). A catalog
+row «זוית C ישרה» / "angle C is right" makes the coverage guard exercise the defective spelling.
+
+**Sibling audit.** *Analytic:* every Hebrew pattern with «זוו» in `src-analytic` (parser, app, engine) was
+checked, and the scope vocabulary already read `זו?וי`. *Products:* `src3d/` (`parse3.ts`, `זו?וית` in every
+angle pattern) and `src-complex/` (`ARG_KW`, `זו?וית`) already read both spellings. 2-D is the template. Not
+built, and reported: 2-D and 3-D also fold the observed MISSPELLING «זוות» (#497), a typo fold rather than a
+spelling variant; analytic still sends it to the fallback. The synonym «עפיפון» for «דלתון», also folded in
+2-D, is a synonym rather than a spelling, and it is `not-handled` here. The copula «שוה» outside a shape noun
+(«AB שוה 5») is a different atom (`COPULA_WORDS`).
+
+**What this does NOT do.** Arm 2, a ONE-letter numeric angle («זווית C = 60»), is a feature and will be its own
+PR. «זוית C=200» therefore still reaches the fallback, exactly as «זווית C=200» does. Arm 3 (an LLM key on PR
+play servers) is process, and the operator has ruled on it.
+
+**Consequences.** `src-analytic/engine/shapes.ts` (`ANGLE_STEM_HE`, `SPELLING_FOLDS` in `normalizeShapeNoun`),
+`parser/parseAnalytic.ts` (`ANGLE_NOUN_HE`, the incentre role), `app/ask.ts` (`ANGLE_WITH_X_HE`),
+`parser/catalogAnalytic.ts` (one row). Lock: `issue-1407-single-vav-angle.test.ts` (the issue's table in both
+spellings through `decideSubmit` + `reachesFallback`, eleven single/double lowering equivalences, the same
+figure for «זוית C ישרה», the question lane, the shape-noun folds with a word-boundary guard, and the catalog
+row).

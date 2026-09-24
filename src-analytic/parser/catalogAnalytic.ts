@@ -400,6 +400,18 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'angle ABC is right',
     needs: ['משולש ABC'],
   },
+  /**
+   * The DEFECTIVE spelling «זוית» (#1407) — as common as «זווית» in student hands, and read by the same
+   * noun atom. The row is here so the coverage guard drives the single-vav form through the real
+   * grammar; it is the one-letter vertex form, resolved against the declared triangle.
+   */
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'זוית C ישרה',
+    en: 'angle C is right',
+    needs: ['משולש ABC'],
+  },
   {
     category: 'relations',
     family: 'F17',
