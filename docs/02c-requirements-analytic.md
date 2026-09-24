@@ -295,7 +295,11 @@ the 2-D tool locks as M2.
 either respect all input or refuse to build."* Any CONSISTENT given set builds the same figure in any
 order — a constraint typed before the objects it names is honoured once a later line declares them — and a
 line the figure cannot honour is refused IN FULL: nothing of it is drawn, no fragment of it reads as
-accepted ([ADR-AG-133](06c-decisions-analytic.md#adr-ag-133)).
+accepted ([ADR-AG-133](06c-decisions-analytic.md#adr-ag-133)). **A line that CREATES a point is no
+exception** (operator, 2026-09-21, #1339/#1340: *"yes - it should"*): «M אמצע AB» above «A(0,0)» ·
+«B(4,0)» builds with M at (2, 0), and a derived point whose operands no line declares stays refused,
+naming the reference ([ADR-AG-156](06c-decisions-analytic.md#adr-ag-156); the cross-product rule is
+[ADR-W-089](06w-decisions-workspace.md#adr-w-089)).
 
 **R20 — Objects can display their equations on the canvas, behind a toggle, with STATED and DERIVED
 visually distinguished.** *(Operator: "so user can see what he entered and what was derived from it —

@@ -4557,3 +4557,51 @@ still reaches the model.
 `src-analytic/parser/scopeAnalytic.ts`, `src-analytic/app/submit.ts`. Locks:
 `shell/__tests__/construction-signal-1357.test.ts` and `junk-before-llm-1357.test.ts` in 2-D (the
 real `runSubmit` with the model mocked, both directions, and the catalog net), 3-D and analytic.
+
+## ADR-W-089 — A row that CREATES a point, typed above the rows that declare its operands, builds: the post-pass retry takes every red row whose re-apply succeeds (#1339, #1340)
+
+**Status:** accepted, 2026-09-24 · **Issues:** [#1339](https://github.com/dcodish/geo_builder/issues/1339) (bug, `P2`, `3d`), [#1340](https://github.com/dcodish/geo_builder/issues/1340) (bug, `P2`, `analytic`) · operator ruling 2026-09-21 on #1339: *"yes - it should"* · round [#1408](https://github.com/dcodish/geo_builder/issues/1408)
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-2c (extended) · [02c](02c-requirements-analytic.md) R19 (extended) · **Design:** [04b](04b-design-3d.md) the retry pass · [04c](04c-design-analytic.md) the fold's deferral
+**Halves:** [ADR-3D-259](06b-decisions-3d.md#adr-3d-259) (3-D) · [ADR-AG-156](06c-decisions-analytic.md#adr-ag-156) (analytic) · 2-D: not yet, filed as [#1411](https://github.com/dcodish/geo_builder/issues/1411)
+
+**The operator's question.** Playing round #1332 T30, «M אמצע SA» left above «פירמידה SABCD שבסיסה ריבוע»
+stayed red while «∠SAB = 70» in the same place built: *"why would it stay red if the inputs allow it to
+exist. why would an angle of 70 accept this and a midsegment not?"* The #1242 rule is *"the diagram should
+either respect all input or refuse to build"*, and a row the figure can honour was being refused.
+
+**Class.** A statement that CREATES an object and is typed above the statements that declare its operands
+was never retried, though every input it needs exists. So whether it built depended on the order of the
+rows. The limit came from 2-D's ADR-104: in the IN-ORDER fold, moving a creating fact later would strand
+the facts between it and its new place. ADR-3D-257 (`points.size` unchanged) and ADR-AG-133 (a
+`NON_CREATING` list of kinds) both carried the limit into a POST-pass retry, where the reason does not
+apply.
+
+**The rule.** A red row is retried after the in-order fold, pass after pass until nothing changes, and it
+lands iff its re-apply against the completed figure succeeds, whether or not it creates anything. Why this
+cannot strand anything: a row that referenced the new point before it existed is itself red, so it is
+retried after it, in list order. A green row cannot have depended on a point that did not exist. A row
+whose reference no line declares still fails and stays red, naming the reference: the "refuse to build"
+half. Each product keeps its own unit of application (analytic: the line, all its facts or none).
+
+**Measured per product (2026-09-24, base `eef9dda4`, the real store paths):**
+
+| product | «M אמצע …» typed above the rows that declare its operands | after |
+| --- | --- | --- |
+| 3-D | store: pyramid, midpoint, delete the pyramid, type it again → `unknown-point S`, no M | ok, ok. M at the midpoint of SA ([ADR-3D-259](06b-decisions-3d.md#adr-3d-259)) |
+| analytic | store: A, B, M, delete A and B, type them again → `unknown-reference A`, no M | no faults. M = (2, 0) ([ADR-AG-156](06c-decisions-analytic.md#adr-ag-156)) |
+| 2-D | typed first on an empty canvas («M אמצע AB» · «משולש ABC») → builds, because the parser introduces A and B as free points | unchanged |
+| 2-D | the same list reached by deleting and re-typing the triangle (T30's shape) → `unresolved dependencies for: M`, no M | **not built here.** Filed as [#1411](https://github.com/dcodish/geo_builder/issues/1411) |
+
+The #1339 ruling said 2-D "already builds". That was measured only on the typed-first line. The edited
+list, which is the shape the operator actually reached in 3-D, fails in 2-D. `src/replay/core.ts`'s
+ADR-104 deferral retries only `isRelationCommand` facts. The 2-D fold is the most intricate of the three
+(deferral, atomic-group poisoning, HOIST, the fold memo), so its half is not a one-predicate change. It
+gets its own plan.
+
+**Complex.** `src-complex/` resolves references at parse time. Whether an edited list can reach its fold
+with a forward reference was not measured here, as ADR-3D-257 also recorded.
+
+**Consequences.** `src3d/store/store3.ts`, `src-analytic/engine/apply.ts`. Locks:
+`src3d/__tests__/issue-1339-forward-creating-row.test.ts`,
+`src-analytic/__tests__/issue-1340-forward-derived-point.test.ts`. Each drives its product's real store
+the way the list reaches that shape.
