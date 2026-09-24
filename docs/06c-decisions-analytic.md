@@ -7400,3 +7400,35 @@ So the sentence taught here is **the stripped remainder, re-parsed**. That yield
 **Measured after.** 0 of the 1,470 pairs reach the fact list, in an empty figure and in a populated one; the ratio family teaches once its referents exist and is honestly refused before that; every sentence taught is one the gate then ACCEPTS (asserted by submitting it); the bare catalog lines are unaffected.
 
 **Consequences.** `src-analytic/parser/scopeAnalytic.ts` (new — `IMPERATIVE_VERBS_HE`/`_EN`, `imperativeCandidates`); `src-analytic/app/submit.ts` (the `teach` verdict, checked first); `src-analytic/App.tsx` (the one branch that does not clear the box); `src-analytic/i18n/index.ts` (`noticeTeachCanonical`, both locales). Lock: `__tests__/issue-1353-imperatives-taught.test.ts` (10), whose centre is the catalog-wide property and the teach→Enter→accepted walk that caught the trap above — the catalog and the verb list are IMPORTED, so a new entry or a new verb is covered the moment it is added.
+
+## ADR-AG-151 — The downloaded image carries no chrome: analytic tags its offers and hit targets, and FR-EX-3's lock set is read from the product registry (#1391)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1391](https://github.com/dcodish/geo_builder/issues/1391) (bug, `P2`, `analytic`) · round [#1397](https://github.com/dcodish/geo_builder/issues/1397)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-EX-3, realised for the fourth builder and made registry-driven · **Design:** [04c](04c-design-analytic.md#the-image-carries-no-chrome-adr-ag-151) (new section)
+
+**What was seen (prod, `prod/2026-09-23-5`).** `נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9` ·
+`נתון הישר l1: y=x`, then «הורידו תמונה». The image carried the dashed crossing-offer rings, one at
+each circle/line crossing and one around the centre mark. None of the three was inside
+`[data-noexport]`, so the shared strip in `shell/export/svgToPng.ts` could not remove them.
+
+**Measured at pickup.** The new lock (below) failed all three of its assertions against the unchanged
+renderer.
+
+**Root cause (the class).** FR-EX-3's opt-in is per renderer, and its locks were three hand-named
+files (`src/render`, `src3d/render`, `src-complex`). Analytic's image export first worked on 2026-09-23
+(#1378: the canvas ref had never been attached), so the chrome question never came up for it. The
+requirement named three locks, which is how the fourth builder's absence stayed invisible.
+
+**Decisions.**
+1. **Tag analytic's chrome** in `render/Figure.tsx`: the crossing-offer group (crossings and the
+   #1109 centre offer ride one list), the transparent hit layer over curves and segments (#1048,
+   #1139), and each point's hit ring.
+2. **`src-analytic/render/__tests__/clean-export.test.tsx`**, the lock the other three builders
+   carry. It renders the prod figure with every chrome affordance ON and asserts the stripped ink
+   equals the chrome-free render.
+3. **The lock set is read from `products.json`**
+   (`shell/__tests__/clean-export-registry-1391.test.ts`). Every enabled builder whose tree uses
+   `shell/export/svgToPng` must carry a `clean-export.test.tsx`. With analytic's lock removed, it
+   fails naming `src-analytic/`, so a fifth builder cannot ship an export without the lock.
+
+**Consequences.** `src-analytic/render/Figure.tsx`. Locks: the two test files above.
