@@ -39,6 +39,13 @@ ring. All three sit inside `data-noexport`, the shared strip's contract (FR-EX-3
 the figure and nothing else. `render/__tests__/clean-export.test.tsx` switches every affordance on and
 asserts the stripped ink is the chrome-free render. A new affordance joins that lock with its prop ON.
 
+## The panel's knowledge has one home ([ADR-AG-152](06c-decisions-analytic.md#adr-ag-152))
+
+`panelKnowledge(d)` (`app/panelRows.ts`) decides, once, which parameters, coordinates and listed equations
+the data panel prints as KNOWN. `App.tsx` renders those rows from it, and the corpus invariant
+"`reportedDof > 0` ⇒ something is unknown" asks the same function over every figure the analytic suite
+builds. A new panel row that prints a value belongs in that function, or the invariant cannot see it.
+
 ## The model — objects, and the register that makes them free
 
 The primitive is the **geometric object** ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009),

@@ -7432,3 +7432,35 @@ requirement named three locks, which is how the fourth builder's absence stayed 
    fails naming `src-analytic/`, so a fifth builder cannot ship an export without the lock.
 
 **Consequences.** `src-analytic/render/Figure.tsx`. Locks: the two test files above.
+
+## ADR-AG-152 — "Freedom in the panel, certainty in every value" is a corpus-wide invariant, over the panel's own decision (#1289)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1289](https://github.com/dcodish/geo_builder/issues/1289) (debt, `P2`, `analytic`) · round [#1397](https://github.com/dcodish/geo_builder/issues/1397)
+**Requirements:** none (internal). It guards ADR-AG-003 §2's existing promise that a printed number is knowledge · **Design:** [04c](04c-design-analytic.md#the-panels-knowledge-has-one-home-adr-ag-152) (new section)
+
+**The invariant.** A figure that reports `reportedDof > 0` must report at least one quantity unknown.
+#1282 shipped the contradiction («1 דרגות חופש» above a panel of certainties): `carrierDof` is analytic
+while `isKnowledge` is sampled, and when sampling collapsed the two disagreed silently. #1282 locked one
+figure. This is the net.
+
+**Two findings at pickup that shaped it.**
+- **The panel's gates were inline in `App.tsx`.** Each row called `isKnowledge` or `knownCurve` itself,
+  so an invariant over "what the panel prints as unknown" could only reproduce those calls. A lock that
+  reproduces its subject stays green through the change that breaks it (ADR-W-053). The decisions are
+  now ONE function, `panelKnowledge(d)` in `app/panelRows.ts` (parameters, points, listed equations),
+  and the panel renders from it.
+- **Analytic has no scenario corpus.** The sweep takes every figure the analytic suite already builds:
+  each string-array literal in `src-analytic/__tests__`, harvested from source, plus each catalog entry
+  with its `needs`. It checks only figures that build green, because a faulted figure has no freedom to
+  report honestly.
+
+**Measured.** 677 sequences, 531 built, 237 with freedom, **0 violations**. The issue expected more
+than one. The first probe did report two, but neither was real. One was a faulted figure (#1287's
+impossible crossing). The other was an unused parameter the panel already prints as its domain, and
+the probe had left parameters out. The #1282 fix holds across the corpus.
+
+**Consequences.** `src-analytic/app/panelRows.ts` (`panelKnowledge`, `panelShowsUnknown`),
+`src-analytic/App.tsx` (the parameter, point and equation rows render from it). Lock:
+`panel-freedom-invariant-1289.test.ts`: the sweep with an exercised-counter (more than 100 free figures),
+a self-test that the predicate fires on the #1282 state, and a source check that the panel calls the
+shared decision.
