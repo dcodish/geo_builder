@@ -18,7 +18,7 @@
  * Unmatched input returns `not-handled`, which is the seam where the LLM fallback escalates.
  */
 import type { DerivedRule } from '../engine/derived';
-import type { Constraint, Direction } from '../engine/solve';
+import { isAngleRef, type AngleName, type Constraint, type Direction } from '../engine/solve';
 import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS, directionSymbol } from '../engine/carriers';
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
@@ -1506,9 +1506,9 @@ const ON_OBJECT_EN = new RegExp(
  * form lowers to a `right-angle` fact and is resolved at the M1 boundary, where the shapes are
  * known — and refused by name where the vertex belongs to no single shape.
  *
- * Only 90° for now: a general «זווית ABC היא 60» needs an angle RESIDUAL, which is its own
- * mechanism and its own issue. A stated value that is not 90 therefore falls through rather than
- * being quietly treated as a right angle.
+ * Only 90° here: any other value falls through to the numeric rule below (#1331; with a lone vertex,
+ * #1407), which resolves a one-letter angle through the SAME M1 resolver as this rule's
+ * `right-angle` fact — never quietly treated as a right angle.
  *
  * THE NOUN IS ONE ATOM, AND THE GLYPHS ARE IN IT (#1330, ADR-AG-142). Operator, playing the #1328
  * sheet on this page: *"the errors on the 90 is לא הצלחתי להבין את המשפט: «∠ABC = 90» which is wrong
@@ -1537,22 +1537,37 @@ const ANGLE_EN = new RegExp(
  *
  * Operator, 2026-09-21: *"∠ABC = ∠ACB gives לא הצלחתי להבין את המשפט"*, and on round #1332's T19
  * (*"should be supported (a 60 degree angle)"*); ruled 2026-09-24 that both halves build. The noun is the
- * SAME atom the right-angle rule reads (#1330), so every spelling of it reaches both. Three letters
- * only: a lone vertex names an angle relative to a figure, which only a right angle resolves (M1).
+ * SAME atom the right-angle rule reads (#1330), so every spelling of it reaches both.
  * The right-angle rule runs FIRST, so «∠ABC = 90» keeps its exact `perpendicular` lowering.
+ *
+ * ONE LETTER OR THREE, on either side (#1407, ADR-AG-158). Operator, 2026-09-24: *"writing זוית C=200 is
+ * not recognized"*. A lone vertex names an angle only relative to a figure, so it is not lowered here: it
+ * becomes a `vertex-angle` fact and M1 reads its rays off the one shape through it — the resolver
+ * «זווית B ישרה» has used since #1049. `ANGLE_LETTERS` ends at a letter boundary, so two letters
+ * («זווית AB = 5») name no angle and are never read as a lone `A`.
  */
+const ANGLE_LETTERS = `(${NAME})(?:(${NAME})(${NAME}))?(?![A-Za-z0-9])`;
 const ANGLE_VALUE_HE = new RegExp(
-  `^${HE_GIVEN}${ANGLE_NOUN_HE}(${NAME})(${NAME})(${NAME})${HE_IS}\\s*(?:=\\s*)?(.+)$`,
+  `^${HE_GIVEN}${ANGLE_NOUN_HE}${ANGLE_LETTERS}${HE_IS}\\s*(?:=\\s*)?(.+)$`,
 );
 const ANGLE_VALUE_EN = new RegExp(
-  `^${ANGLE_NOUN_EN}(${NAME})(${NAME})(${NAME})\\s*(?:is\\s+|equals?\\s+)?(?:=\\s*)?(.+)$`,
+  `^${ANGLE_NOUN_EN}${ANGLE_LETTERS}\\s*(?:is\\s+|equals?\\s+)?(?:=\\s*)?(.+)$`,
   'i',
 );
-/** The right side as ANOTHER angle, with an optional numeric factor: «2∠ACB», «זווית ACB», «2·∠ACB». */
+/** The right side as ANOTHER angle, with an optional numeric factor: «2∠ACB», «זווית ACB», «2·∠C». */
 const ANGLE_OF = new RegExp(
-  `^(?:(\\d+(?:\\.\\d+)?(?:/\\d+)?)\\s*[·*]?\\s*)?(?:${ANGLE_NOUN_HE}|${ANGLE_NOUN_EN})(${NAME})(${NAME})(${NAME})$`,
+  `^(?:(\\d+(?:\\.\\d+)?(?:/\\d+)?)\\s*[·*]?\\s*)?(?:${ANGLE_NOUN_HE}|${ANGLE_NOUN_EN})${ANGLE_LETTERS}$`,
   'i',
 );
+/**
+ * The angle a rule's three letter groups name: the middle letter is the vertex and the outer two its
+ * rays, or — one letter — the vertex alone. `null` for a repeated letter («∠ABA»), which names nothing.
+ */
+const angleNameOf = (p: string, v?: string, q?: string): AngleName | null => {
+  if (v === undefined || q === undefined) return { v: p };
+  if (p === v || v === q || p === q) return null;
+  return { v, a: p, b: q };
+};
 /** A degree tail the value may carry: «60°», «60 מעלות», "60 degrees". */
 const DEGREE_TAIL = /\s*(?:°|מעלות|degrees?)\s*$/i;
 
@@ -2278,17 +2293,23 @@ function parseConstraint(raw: string): RuleOutcome {
 
   const angVal = ANGLE_VALUE_HE.exec(line) ?? ANGLE_VALUE_EN.exec(line);
   if (angVal) {
-    const [, a, v, b, rhsSrc] = angVal;
+    const [, p, v, q, rhsSrc] = angVal;
     const rhs = trim(rhsSrc);
     // Read the same way as the right angle: the middle letter is the vertex, the outer two the rays.
-    if (a === v || v === b || a === b) return refuse('repeated-vertex', line);
+    const left = angleNameOf(p, v, q);
+    if (!left) return refuse('repeated-vertex', line);
     const other = ANGLE_OF.exec(rhs);
     if (other) {
-      const [, kSrc, a2, v2, b2] = other;
-      if (a2 === v2 || v2 === b2 || a2 === b2) return refuse('repeated-vertex', line);
+      const [, kSrc, p2, v2, q2] = other;
+      const right = angleNameOf(p2, v2, q2);
+      if (!right) return refuse('repeated-vertex', line);
       const k = parseExpr(kSrc ?? '1');
       if (!k) return refuse('bad-equation', rhs);
-      return made([{ t: 'constraint', k: { t: 'angle-ratio', left: { v, a, b }, right: { v: v2, a: a2, b: b2 }, k }, src: line }]);
+      // Three letters on both sides need no figure; a lone vertex on either side is resolved at M1.
+      if (isAngleRef(left) && isAngleRef(right)) {
+        return made([{ t: 'constraint', k: { t: 'angle-ratio', left, right, k }, src: line }]);
+      }
+      return made([{ t: 'vertex-angle', left, rhs: { t: 'angle', of: right, k }, src: line }]);
     }
     const valueSrc = rhs.replace(DEGREE_TAIL, '');
     // A word on the right («חדה», «acute») is not a value this rule reads — leave the sentence to
@@ -2296,7 +2317,8 @@ function parseConstraint(raw: string): RuleOutcome {
     if (claimable(valueSrc)) {
       const value = parseExpr(normalizeMath(valueSrc));
       if (!value) return refuse('bad-equation', valueSrc);
-      return made([{ t: 'constraint', k: { t: 'angle', at: { v, a, b }, value }, src: line }]);
+      if (isAngleRef(left)) return made([{ t: 'constraint', k: { t: 'angle', at: left, value }, src: line }]);
+      return made([{ t: 'vertex-angle', left, rhs: { t: 'value', value }, src: line }]);
     }
   }
 

@@ -911,7 +911,8 @@ export function App() {
               : 'errUnknownRef',
           'does-not-exist': 'errDoesNotExist',
           'ring-contradicts-noun': 'errRingContradictsNoun',
-          'ambiguous-angle': 'errAmbiguousAngle',
+          // #1407 — a vertex in SEVERAL shapes gets the three-letter name it needs; in none, the general form.
+          'ambiguous-angle': error.key === 'ambiguous-angle' && error.example ? 'errAmbiguousAngleShapes' : 'errAmbiguousAngle',
           'ambiguous-shape': 'errAmbiguousShape',
           'undistinguished-diagonal': 'errNoPrincipalDiagonal',
           'already-named': 'errAlreadyNamed',
@@ -922,7 +923,7 @@ export function App() {
           'load-too-large': 'errLoadTooLarge',
           'load-unreadable': 'errLoadUnreadable',
         }[error.key],
-        { detail: error.detail, max: MAX_FIGURE_STATEMENTS, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '' },
+        { detail: error.detail, max: MAX_FIGURE_STATEMENTS, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '', example: 'example' in error ? (error.example ?? '') : '' },
       )
     : null;
 

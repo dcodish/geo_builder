@@ -518,6 +518,12 @@ constraint blame read them unchanged; only whether a partial line survives chang
 *Angles ([ADR-AG-153](06c-decisions-analytic.md#adr-ag-153)).* An angle by SIZE and an angle in RATIO are two
 rows of the solve (`angle`, `angle-ratio`), each the unsigned angle difference over π, beside the
 `perpendicular` row a right angle lowers to. They are not directions and never reach the resolver below.
+*A lone vertex* ([ADR-AG-158](06c-decisions-analytic.md#adr-ag-158)) is an `AngleName` without rays. The parser
+never lowers it: a line with a lone vertex on either side becomes a `vertex-angle` fact, and at M1 the one
+vertex resolver `resolveAngleName` (also behind `right-angle`) reads the rays off the ONE shape through the
+vertex, sorted, then applies the same `angle` / `angle-ratio` row the three-letter twin lowers to. In several
+shapes it is `ambiguous-angle` with an `example` three-letter name; in none, `ambiguous-angle` with none.
+`canonicalConstraint` sorts each angle's rays, so either ray order is one given.
 
 Four things in this grammar have a direction:
 

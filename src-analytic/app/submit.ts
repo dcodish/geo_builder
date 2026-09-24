@@ -156,7 +156,7 @@ export function decideSubmit(
   if (fault) {
     return {
       kind: 'refused',
-      error: { key: fault.code, detail: fault.detail, existing: fault.existing, expected: fault.expected, holder: fault.holder } as InputError,
+      error: { key: fault.code, detail: fault.detail, existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example } as InputError,
     };
   }
 
