@@ -75,6 +75,15 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   a < 0. An even power of a negative (`u^4 = -16`) has no real solution and is refused. Mixed use is a
   size. The value shown carries the sign (`u = -2`, and `u = ±2` when the configurations disagree).
   *(Operator ruling 2026-09-24; realised — [ADR-CX-045](06d-decisions-complex.md#adr-cx-045).)*
+- **FR-CN-8 (Must)** — **A letter declared complex is complex in every line.** «u מספר מרוכב» /
+  «u is a complex number» makes u, u₁, u₂… complex exactly as z and w are, in every line before or
+  after it: `u^5 = 32` then draws the five roots u₁..u₅ in either order. The declaration is a TYPE, not
+  a number: on its own it draws u as a free number, and deleting it returns u to a real parameter. A
+  letter used where only a real can stand (a size such as `|z1| = 9r`, a radius, a length, an angle)
+  cannot also be declared complex. The refusal names that statement, in either order. A letter the
+  figure SOLVED as a real parameter carries a note under its first line saying so and teaching the
+  declaration, and only when that declaration would be accepted. *(Operator proposal, #1405; realised —
+  [ADR-CX-047](06d-decisions-complex.md#adr-cx-047).)*
 
 ## Knowledge and claims
 

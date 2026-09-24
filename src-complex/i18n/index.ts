@@ -35,6 +35,8 @@ const he = {
   errIncompatible: 'המשפט לא נוסף — אינו מתיישב עם: "{{detail}}"',
   errImpossible: 'המשפט לא נוסף — הוא לא יכול להתקיים: "{{detail}}"',
   errUnaccounted: 'הבנתי חלק מהשורה, אבל לא את: {{detail}}',
+  // #1405 — a letter declared complex, used where only a real number can stand
+  errComplexAsReal: 'המשפט לא נוסף — {{letter}} הוגדר כמספר מרוכב, אבל "{{detail}}" משתמש בו כמספר ממשי (גודל או זווית)',
   errWrongApp: 'הקובץ שייך לכלי אחר ({{detail}}) — כאן נטענים קבצים של בונה המרוכבים בלבד',
   errNewerVersion: 'הקובץ נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב',
   errTooLarge: 'הקובץ גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{detail}} משפטים',
@@ -124,6 +126,8 @@ const he = {
   // #1389/#1390: every real parameter the figure mentions — its value when the givens force it
   secParams: 'פרמטרים',
   paramFree: 'חופשי',
+  // #1405 — the teaching note under a line whose letter was read as a real number
+  noteRealParam: '{{name}} נקרא כמספר ממשי ({{name}} = {{value}}). אם {{name}} מרוכב, כתבו: {{name}} מספר מרוכב',
   secAsk: 'חישוב',
   // S5 — the visualization layer (#622)
   stepperLabel: 'מחזור החזקות: n',
@@ -173,6 +177,7 @@ const he = {
   whyLineUnaccounted: 'לא הובן: {{items}}',
   whyLineUnrecognized: 'הדקדוק לא מזהה את השורה הזו',
   whyReservedLetter: '{{letter}} מסמן את פתרונות המשוואה «{{equation}}» — התייחסו לפתרונות עצמם',
+  whyDeclaredComplexReal: '{{letter}} הוגדר כמספר מרוכב («{{declaration}}»), ולכן אינו יכול לשמש כאן כגודל או כזווית',
   // #716 — the honesty strip and the freedom cue (composed in scene2 / App, worded here)
   contradictionLine: 'הנתונים סותרים זה את זה ({{what}})',
   contraModulus: 'ערך מוחלט',
@@ -237,6 +242,7 @@ const en: typeof he = {
   errIncompatible: 'Statement not added — it cannot hold together with: "{{detail}}"',
   errImpossible: 'Statement not added — it cannot hold at all: "{{detail}}"',
   errUnaccounted: 'I read part of the line, but not: {{detail}}',
+  errComplexAsReal: 'Statement not added — {{letter}} is declared a complex number, but "{{detail}}" uses it as a real number (a size or an angle)',
   errWrongApp: 'This file belongs to another tool ({{detail}}) — only Complex Builder files load here',
   errNewerVersion: 'This file was saved by a newer version of the tool — refresh the page and try again',
   errTooLarge: 'This file is too large to open — a figure can hold up to {{detail}} statements',
@@ -324,6 +330,7 @@ const en: typeof he = {
   secRelations: 'Relations',
   secParams: 'Parameters',
   paramFree: 'free',
+  noteRealParam: '{{name}} is read as a real number ({{name}} = {{value}}). If {{name}} is complex, write: {{name}} is a complex number',
   secAsk: 'Calculate',
   // S5 — the visualization layer (#622)
   stepperLabel: 'power cycle: n',
@@ -372,6 +379,7 @@ const en: typeof he = {
   whyLineUnaccounted: 'not understood: {{items}}',
   whyLineUnrecognized: 'the grammar does not recognize this line',
   whyReservedLetter: '{{letter}} names the solutions of «{{equation}}» — refer to the solutions themselves',
+  whyDeclaredComplexReal: '{{letter}} is declared a complex number («{{declaration}}»), so it cannot be a size or an angle here',
   // #716 — the honesty strip and the freedom cue
   contradictionLine: 'the givens contradict each other ({{what}})',
   contraModulus: 'modulus',
