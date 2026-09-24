@@ -2795,3 +2795,73 @@ languages through the real `submitLine` at 24/24 seeds, the quadrant really held
 staying positive, including mixed use), `accepted-line-visible-1390.test.ts`'s `u^5 = -32` row FLIPPED
 with a comment naming this ruling, and fixtures `param-sign-modulus-1387`, `param-sign-quadrant-1387`
 and `param-sign-odd-power-1406`.
+
+## ADR-CX-046 — The cartesian view reads in radicals: «-1+√3i», not «-1+1.73i» (#1404)
+
+**Status:** accepted, 2026-09-25 (operator request 2026-09-24; open choice delegated to the round) ·
+**Issue:** [#1404](https://github.com/dcodish/geo_builder/issues/1404) (feature, `P3`, `complex`) · round
+[#1408](https://github.com/dcodish/geo_builder/issues/1408) · **extends** #703's cartesian reading
+**Requirements:** [02d](02d-requirements-complex.md) FR-GP-4 (new): the cartesian view reads in
+radicals whenever the value has a radical closed form, and a zero part is not written · **Design:**
+[04d](04d-design-complex.md), "The cartesian spelling is the value layer's, and it is exact by TABLE" ·
+**Ladder:** stage 5d ([LADDER-CX](LADDER-CX.md))
+
+**What was asked.** The operator, playing `z1 = 2cis120 · z^3 = 8` in the cartesian view: *"when
+converting to cartesian, i would prefer to see the sqrt and if we need n-sqrt and not a decimal"*. The
+labels read «z₁ ≈ -1+1.73i» and «z₃ ≈ -1-1.73i»; the polar view already read «2·cis120°» exactly.
+
+**Why.** `readingCartOf` (`replay/derive2.ts`, #703) printed `=` only when both parts landed on
+integers, and `≈` decimals otherwise. It never asked the exact carriers — the modulus exponent vector
+and the argument in turns — which the polar `exactLabel` already reads. Class: **a value the exact core
+carries in closed form was spelled from its float shadow in one of its two views.** The same function
+also composed `a+bi` by comparing a raw float with zero (`p.z.im === 0`), so `z1 = -2` read «-2+0i»
+and `z1 = 2i` read «0+2i» — float noise from `2·sin 180°` printed as a coordinate.
+
+**Decision.**
+1. **Exact parts by table** (`value/cartesian.ts`, new). When the modulus is an exact vector over
+   primes and the argument an exact rational part of a turn — the same condition as the polar
+   `exactLabel` — `r·cos θ` and `r·sin θ` are computed in closed form for the turns whose cosine has a
+   real-radical form: multiples of 15° (√2, √3, (√6±√2)/4), of 18° ((√5±1)/4, √(10±2√5)/4) and of
+   22.5° (√(2±√2)/2). A term is `c·√k·√(a+b√d)`; the modulus splits into a rational factor, a
+   square-root factor folded INTO the terms (`√2·√6/4` → `√3/2`, `√2·√(2+√2)` → `√(4+2√2)`), and a
+   residual higher root that multiplies from outside and is spelled by `modulus.format` (`⁵√100`).
+   Anything else — cos 20°, an angle atom (`3+4i`), a parametric modulus — has no exact part and keeps
+   its `≈` decimal. **A float is never recognised as a radical**: the table is the only door to `=`.
+2. **One composer** (`composeCartesian`) spells every `a+bi` in the product — the exact path, the
+   integer path and the decimal path of the stage-5d reading, and `value.formatCartesian`. A part is
+   zero when the exact terms cancel, or when its spelling at the display precision reads `0`; a zero
+   part is dropped («-2», «2i», `0` when both are). An imaginary magnitude that is a fraction, a sum or
+   a product with a residual root is parenthesised before its `i` («1/2+(√3/2)i»), so `√3/2i` can never
+   read as `√3/(2i)`.
+3. The reading's order of preference is exact radicals (`=`) → integers within float noise (`=`, which
+   keeps `3+4i`) → decimals (`≈`). The no-guess rule is unchanged: a sampled value reads as the bare
+   name. The polar reading is unchanged.
+
+**Round decision, overturnable by the operator: nested square roots ARE shown.** The issue left open
+whether `√(2+√2)` and `√(10+2√5)/4` should print or stay decimal; the operator delegated open plan
+choices to the round (#1404 comment, 2026-09-24). They print, because the request was radicals over
+decimals. Reverting is one line: drop the 18°/22.5° rows (keys `18`, `45/2`, `54`, `135/2`) from the
+`COS` table and those turns fall back to `≈`.
+
+**Typography chosen here (also overturnable).** Radicals are juxtaposed the way `modulus.format` already
+spells a modulus (`2√2`, `3⁵√100`), a residual root joins the rest with `·`, and a sum over a common
+denominator is written `(√6+√2)/4`. The canvas label for a fifth root is long
+(«z₂ = ⁵√100·(√5-1)/4+(⁵√100·√(10+2√5)/4)i»); that is the price of "n-sqrt if we need".
+
+**Sibling check.** Grepped `src3d/` and `src-analytic/` for a cis/polar carrier: none, and 2-D has no
+complex numbers, so the class (a closed form carried but spelled from its float in one view) has no
+member in a sibling product. Checked `src-complex/` for other `a+bi` spellings: `value.formatCartesian`
+(now through the composer) and `readingCartOf` were the only two.
+
+**Cost.** Bounded integer work per plotted point (a table lookup, gcds on radicands below a few
+hundred). No solve, no sampling loop.
+
+**Consequences.** `src-complex/value/cartesian.ts` (new), `src-complex/value/value.ts`
+(`formatCartesian` through the composer), `src-complex/replay/derive2.ts` (`readingCartOf`). Locks:
+`value/__tests__/cartesian-1404.test.ts` (every multiple of 15°, 18° and 22.5° × eight modulus shapes,
+spelling re-read by an independent evaluator and checked against `r·cos θ`, `r·sin θ`; turns outside
+the families, atoms and parametric moduli give no exact part; the composer's zero rule on the decimal
+path) and `__tests__/exact-cartesian-1404.test.tsx` (the operator's sequence through the real
+`submitLine` gate, `2cis45`, `2cis22.5`, `2cis18`, `z^5 = 100`, `2cis20` staying `≈`, a sampled point
+staying bare, `-2`, `2i`, `u^5 = -32 · z1 = u` → «-2», and canvas = panel). `cartesian-view.test.tsx`'s
+`2cis120` row FLIPPED from «≈ -1+1.73i» to «= -1+√3i» by this ruling.
