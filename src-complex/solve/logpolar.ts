@@ -53,6 +53,17 @@ export interface LogPolarForm {
   readonly tConst: Angle;
 }
 
+/**
+ * #1387/#1406 (ADR-CX-045) — the argument unknown carrying a SIGN-FREE parameter's sign. A real number's
+ * direction is 0 or ½ turn, so tier 1 pins it with its own `2·s = k` row and enumerates it like any
+ * turn choice. `#` cannot occur in a student's name.
+ */
+export const signUnknown = (param: string): string => `#s:${param}`;
+export const isSignUnknown = (name: string): boolean => name.startsWith('#s:');
+export const paramOfSignUnknown = (name: string): string => name.slice(3);
+
+const NO_SIGNED: ReadonlySet<string> = new Set();
+
 const EMPTY: LogPolarForm = { uCoef: new Map(), uConst: modOne(), tCoef: new Map(), tConst: angZero() };
 
 const combine = (a: ReadonlyMap<string, Rat>, b: ReadonlyMap<string, Rat>, k: Rat): Map<string, Rat> => {
@@ -81,7 +92,8 @@ const scaleCoef = (a: ReadonlyMap<string, Rat>, k: Rat): Map<string, Rat> => {
  * Returning null rather than throwing is the point: "this constraint belongs to the numeric tier" is a
  * routing answer, not an error, and the caller at stage 1 of the ladder is the one that knows which.
  */
-export function linearize(e: Expr): LogPolarForm | null {
+export function linearize(e: Expr, signed: ReadonlySet<string> = NO_SIGNED): LogPolarForm | null {
+  const linearize_ = (x: Expr): LogPolarForm | null => linearize(x, signed);
   switch (e.t) {
     case 'num': {
       if (ratIsZero(e.v)) return null; // ln 0 is undefined — zero is stage 3's problem
@@ -107,13 +119,16 @@ export function linearize(e: Expr): LogPolarForm | null {
         tConst: angZero(),
       };
     case 'param':
-      // A real parameter in monomial position is POSITIVE: it reaches here through a modulus or a
-      // scale factor, both of which the exam states as magnitudes (`|z1| = 9r`, `d > 0`). A parameter
-      // that could be negative appears inside an additive expression, which is not monomial anyway.
+      // A SIZE parameter (a modulus, a radius, a scale factor — `|z1| = 9r`) is POSITIVE: its modulus
+      // is itself and its argument is 0. A SIGN-FREE one (`u^5 = -32`, ADR-CX-045) keeps its MAGNITUDE
+      // in the same log-space constant, and its sign becomes an argument unknown, 0 or ½ turn.
+      if (signed.has(e.name)) {
+        return { ...EMPTY, uConst: fromParam(e.name), tCoef: new Map([[signUnknown(e.name), rat(1)]]) };
+      }
       return { ...EMPTY, uConst: fromParam(e.name) };
     case 'mul': {
-      const l = linearize(e.l);
-      const r = linearize(e.r);
+      const l = linearize_(e.l);
+      const r = linearize_(e.r);
       if (!l || !r) return null;
       return {
         uCoef: combine(l.uCoef, r.uCoef, rat(1)),
@@ -123,8 +138,8 @@ export function linearize(e: Expr): LogPolarForm | null {
       };
     }
     case 'div': {
-      const l = linearize(e.l);
-      const r = linearize(e.r);
+      const l = linearize_(e.l);
+      const r = linearize_(e.r);
       if (!l || !r) return null;
       return {
         uCoef: combine(l.uCoef, r.uCoef, rat(-1)),
@@ -134,7 +149,7 @@ export function linearize(e: Expr): LogPolarForm | null {
       };
     }
     case 'pow': {
-      const b = linearize(e.base);
+      const b = linearize_(e.base);
       if (!b) return null;
       return {
         uCoef: scaleCoef(b.uCoef, e.exp),
@@ -144,17 +159,17 @@ export function linearize(e: Expr): LogPolarForm | null {
       };
     }
     case 'conj': {
-      const x = linearize(e.e);
+      const x = linearize_(e.e);
       if (!x) return null;
       return { ...x, tCoef: scaleCoef(x.tCoef, rat(-1)), tConst: angNeg(x.tConst) };
     }
     case 'neg': {
-      const x = linearize(e.e);
+      const x = linearize_(e.e);
       if (!x) return null;
       return { ...x, tConst: angAdd(x.tConst, fromTurns(rat(1, 2))) };
     }
     case 'abs': {
-      const x = linearize(e.e);
+      const x = linearize_(e.e);
       if (!x) return null;
       return { uCoef: x.uCoef, uConst: x.uConst, tCoef: new Map(), tConst: angZero() };
     }

@@ -19,6 +19,7 @@ import type { ExprQuery, MeasureQuery, MeasureRelation, RatioQuery } from '../mo
 import type { SequenceStatement } from '../model/sequence';
 import { type RootsMode, rootsMode } from '../model/naming';
 import { refsOf } from '../model/expr';
+import { paramSigns } from '../model/paramSign';
 import { type RootsEquation, solutionSetConstraints, solutionSetConstraintsPlaced, solutionSetNames } from '../model/solutionSet';
 import { type Tier1Result, isTurnUnknown, solveTier1 } from '../solve/tier1';
 import { linearize } from '../solve/logpolar';
@@ -269,7 +270,7 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
     for (const [k, v] of r.line.atoms) atoms.set(k, v);
   });
 
-  placeSolutionSets(pendingSets, constraints, filters, measures);
+  placeSolutionSets(pendingSets, constraints, filters, measures, objects);
 
   return {
     constraints,
@@ -312,16 +313,20 @@ function placeSolutionSets(
   constraints: Constraint[],
   filters: readonly BranchFilter[],
   measures: readonly MeasureRelation[],
+  objects: readonly FigureObject[],
 ): void {
   if (pending.length === 0) return;
-  const t1 = solveTier1(constraints);
+  // ADR-CX-045 — the same sign-by-use reading the fold takes, so a sign-free parameter is not read as
+  // positive here and negative there
+  const { signed } = paramSigns({ constraints, objects, measures });
+  const t1 = solveTier1(constraints, signed);
   const mentioned = new Set<string>();
   for (const c of constraints) for (const n of [...refsOf(c.lhs), ...refsOf(c.rhs)]) mentioned.add(n);
   for (const f of filters) mentioned.add(f.name);
   for (const m of measures) for (const p of m.points) mentioned.add(p);
   // splice from the back so earlier positions stay valid
   for (const { eq, at } of [...pending].sort((a, b) => b.at - a.at)) {
-    const placed = t1.inconsistent ? null : placement(eq, t1, mentioned);
+    const placed = t1.inconsistent ? null : placement(eq, t1, mentioned, signed);
     constraints.splice(at, 0, ...(placed ? solutionSetConstraintsPlaced(eq, placed) : solutionSetConstraints(eq, 'enumerate')));
   }
 }
@@ -340,13 +345,19 @@ const exactArg = (t1: Tier1Result, name: string): Angle | null => {
 };
 
 /** Which root each stated member occupies, or null when the index lowering must stand (see above). */
-function placement(eq: RootsEquation, t1: Tier1Result, mentioned: ReadonlySet<string>): Map<string, number> | null {
+function placement(
+  eq: RootsEquation,
+  t1: Tier1Result,
+  mentioned: ReadonlySet<string>,
+  signed: ReadonlySet<string>,
+): Map<string, number> | null {
   const n = eq.n;
   const sols = solutionSetNames(eq, 'enumerate');
   const members = sols.filter((s) => mentioned.has(s));
   if (members.length === 0) return null;
   // the right-hand side, exactly: every name it mentions must be determined
-  const form = linearize(eq.rhs);
+  // a sign-free parameter's sign is an argument unknown; `exactArg` declines it unless it is pinned
+  const form = linearize(eq.rhs, signed);
   if (!form) return null;
   let mod: ExpVec = form.uConst;
   let arg: Angle = form.tConst;
