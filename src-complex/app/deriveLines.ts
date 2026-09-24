@@ -202,7 +202,7 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
     // the whole set, and drawing a point for it would plot the sampler's guess at "the solutions".
     for (const eq of r.line.roots) {
       const grounded = refsOf(eq.rhs).every((n) => mentioned.has(n));
-      const mode = rootsMode(eq.varName, eq.n, mentioned, grounded);
+      const mode = rootsMode(eq.varName, mentioned, grounded);
       constraints.push(...solutionSetConstraints(eq, mode));
       declared.push(...solutionSetNames(eq, mode));
       // the bare letter stays reserved in every mode: `z` is related to `z₁..zₙ`

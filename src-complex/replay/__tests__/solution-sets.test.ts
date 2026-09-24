@@ -17,7 +17,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { useComplexStore } from '../../store/useComplexStore';
 import { deriveLines } from '../../app/deriveLines';
 import { submitLine } from '../../app/submit';
-import { isAnonymous, prettyName, solutionNames } from '../../model/naming';
+import { prettyName, solutionNames } from '../../model/naming';
 
 const store = () => useComplexStore.getState();
 
@@ -101,18 +101,27 @@ describe('#680 — an enumerating equation draws its whole solution set', () => 
     expect(at(d, 'w')!.z.im).toBeCloseTo(0, 9);
   });
 
-  it('an equation whose indexed names are TAKEN enumerates anonymously instead of refusing', () => {
-    const d = build('z1 = 5', 'z^4 = 16');
+  /**
+   * #1367 (operator ruling 2026-09-22, reaffirmed 2026-09-24) REVERSED this row. It used to assert that
+   * a taken index made the four solutions ANONYMOUS; the ruling is that the solutions ARE z₁..z₄, so a
+   * student's z₁ = 5 that is not solution 1 (the principal fourth root of 16 is 2) contradicts the
+   * equation and the line is refused.
+   */
+  it('an equation whose indexed names are TAKEN claims them — and a member that is not its solution refuses', () => {
+    fresh();
+    expect(submitLine('z1 = 5')).toBe(true);
+    expect(submitLine('z^4 = 16')).toBe(false);
+    expect(store().lastError, "the refusal names the student's own statement").toEqual({ key: 'incompatible', detail: 'z1 = 5' });
 
-    // z₁ stays the student's, and the four solutions are drawn without claiming names
-    expect(at(d, 'z1')!.z.re).toBeCloseTo(5, 9);
-    const anon = d.points.filter((p) => isAnonymous(p.name));
-    expect(anon).toHaveLength(4);
-    for (const p of anon) expect(Math.hypot(p.z.re, p.z.im)).toBeCloseTo(2, 9);
+    // …and one that IS solution 1 is reused, the set named z₁..z₄ around it
+    const ok = build('z1 = 2', 'z^4 = 16');
+    expect(ok.contradiction).toBeNull();
+    expect(ok.points.map((p) => p.name).sort()).toEqual(['z1', 'z2', 'z3', 'z4']);
+    for (const p of ok.points) expect(Math.hypot(p.z.re, p.z.im)).toBeCloseTo(2, 9);
   });
 
-  it('an anonymous id never reaches a rendered string (ADR-447)', () => {
-    for (const n of solutionNames('z', 4, true)) expect(prettyName(n)).toBe('');
+  it('every solution has a name a student can write (no internal id reaches the canvas)', () => {
+    for (const n of solutionNames('z', 4)) expect(prettyName(n)).toMatch(/^z[₁-₄]$/);
     expect(prettyName('z1')).toBe('z₁');
   });
 });
@@ -127,12 +136,20 @@ describe('#680 — solving is told from relating by what the earlier lines said'
   });
 
   it('...but the SAME shape enumerates once its right-hand side is grounded', () => {
-    // §2b part ד: z⁴ = z₁·z₂ with both named earlier. The set is drawn; z₁ being taken makes it
-    // anonymous rather than a refusal.
-    const d = build('z1 = 2', 'z2 = 8', 'z^4 = z1*z2');
-    expect(d.points.filter((p) => isAnonymous(p.name))).toHaveLength(4);
-    expect(at(d, 'z1')).toBeDefined();
-    expect(at(d, 'z2')).toBeDefined();
+    // A grounded right-hand side over names OUTSIDE the solutions' own (w₁, w₂): the set is drawn and
+    // named z₁..z₄. #1367 — with z₁/z₂ on the right instead, they would also be two of the solutions'
+    // names, and must then BE those solutions (the next row).
+    const d = build('w1 = 2', 'w2 = 8', 'z^4 = w1*w2');
+    expect(d.contradiction).toBeNull();
+    expect(d.points.map((p) => p.name).sort()).toEqual(['w1', 'w2', 'z1', 'z2', 'z3', 'z4']);
+  });
+
+  it('#1367 — §2b part ד over z₁, z₂: members that are not the solutions claiming their names REFUSE', () => {
+    // z⁴ = z₁·z₂ = 16 has solutions 2, 2i, −2, −2i. z₁ = 2 is solution 1; z₂ = 8 is not solution 2 (2i).
+    fresh();
+    for (const l of ['z1 = 2', 'z2 = 8']) expect(submitLine(l)).toBe(true);
+    expect(submitLine('z^4 = z1*z2')).toBe(false);
+    expect(store().lines).toEqual(['z1 = 2', 'z2 = 8']);
   });
 
   it('a name MENTIONED by an earlier relation counts as stated — it need not be defined', () => {

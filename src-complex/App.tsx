@@ -48,8 +48,8 @@ import { AskText } from './ui/askText';
 import { RadicalText } from './render/radicalText';
 import { complexBidi } from './i18n';
 import registry from '../products.json';
+import { EXAMPLE_LINES } from './app/example';
 
-const EXAMPLE_LINES = ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2', 'z^5 = w^2'];
 
 const ERROR_KEY: Record<InputError['key'], string> = {
   'not-handled': 'errNotHandled',

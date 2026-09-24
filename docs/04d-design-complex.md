@@ -70,6 +70,11 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   claimed — as a parameter — so the line balanced perfectly while meaning something the student never
   wrote. A grammar where juxtaposition means multiplication needs both: every span claimed, and a
   floor on what a claim may invent.
+- **A solution set claims its names** ([ADR-CX-042](06d-decisions-complex.md#adr-cx-042)). `X^n = …` on a fresh
+  letter lowers to X₁ pinned to the principal root and Xₖ pinned `(k−1)/n` of a turn from it — always,
+  whether or not the student already holds some Xₖ. That makes claiming the name the consistency
+  check: there is no fallback that steps around a taken name, because stepping around it is what hid
+  the contradiction.
 - **A display transform never reaches the parser or the engine.** The polar↔cartesian toggle and the `n`
   stepper are view state, outside the store and outside undo. So changing how a number is *shown* can
   never change what was *stated* — a class of bug that is otherwise very hard to see.
