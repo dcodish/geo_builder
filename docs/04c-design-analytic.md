@@ -46,6 +46,12 @@ the data panel prints as KNOWN. `App.tsx` renders those rows from it, and the co
 "`reportedDof > 0` ⇒ something is unknown" asks the same function over every figure the analytic suite
 builds. A new panel row that prints a value belongs in that function, or the invariant cannot see it.
 
+## A line's angle has one decision ([ADR-AG-154](06c-decisions-analytic.md#adr-ag-154))
+
+`app/lineAngle.ts` answers "what angle does this direction make with the positive x-axis, and is it known?"
+for every surface: the «שיפועים» panel row reads a segment's direction, the ask lane a named line's, and both
+call `lineAngleOf` (fold to [0°, 180°), vertical = 90°, gated by `isKnowledge`, printed by `angleText`).
+
 ## The model — objects, and the register that makes them free
 
 The primitive is the **geometric object** ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009),

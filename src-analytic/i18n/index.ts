@@ -94,6 +94,8 @@ const he = {
   symComponent: 'שיעור ה-x של נקודה',
   // A vertical segment HAS no slope, and that is an answer rather than an absence (#1078).
   slopeVertical: 'אנכי (אין שיפוע)',
+  // #1322 — the angle a line makes with the positive x-axis, beside its slope (m = tan α)
+  angleWithX: 'זווית עם ציר ה-x',
   secParams: 'פרמטרים',
   paramUnused: '(לא בשימוש בשרטוט)',
   freeDof: '{{count}} דרגות חופש',
@@ -328,6 +330,7 @@ const en: typeof he = {
   symDist: 'distance between two points',
   symComponent: 'the x-coordinate of a point',
   slopeVertical: 'vertical (no slope)',
+  angleWithX: 'angle with the x-axis',
   secParams: 'Parameters',
   paramUnused: '(not used by the figure)',
   freeDof: '{{count}} degrees of freedom',

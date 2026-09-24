@@ -128,6 +128,8 @@ describe('#1139 — the click menu sees what the ask lane sees', () => {
       'משוואת הישר BC',
       'שיפוע הישר BC',
       'BC',
+      // #1322: the angle with the positive x-axis joins the menu, after the operator's three
+      'הזווית בין הישר BC לציר ה-x',
     ]);
   });
 

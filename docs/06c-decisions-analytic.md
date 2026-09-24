@@ -7503,3 +7503,39 @@ description and residual), `src-analytic/parser/parseAnalytic.ts` (`ANGLE_VALUE_
 `src-analytic/parser/catalogAnalytic.ts`. Lock: `issue-1331-angle-givens.test.ts` (20: ten spellings parse,
 90 keeps its lowering, 60° holds at six seeds, the operator's equality, the 2:1 ratio, one degree of freedom
 consumed, «∠ABC = 200» refused, and four lines through the real `decideSubmit`).
+
+## ADR-AG-154 — A line's angle with the positive x-axis is shown beside its slope and can be asked, from ONE decision (#1322)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1322](https://github.com/dcodish/geo_builder/issues/1322) (feature, `P2`, `analytic`) · round [#1397](https://github.com/dcodish/geo_builder/issues/1397) · PR route
+**Requirements:** [02c](02c-requirements-analytic.md) R116 (new) · **Design:** [04c](04c-design-analytic.md#a-lines-angle-has-one-decision-adr-ag-154) (new section)
+
+**What the operator asked.** *"we should add to line properties the tan of the slope (m = tan α)"*, reading
+the 572 question whose part (ב) is «מצא את הזווית שבין הישר … ובין הכיוון החיובי של ציר ה-x». Ruled
+2026-09-24: the panel row AND the question. The prerequisite #1321 (`tan` read as `t·a·n`) is closed.
+
+**The decision.** `app/lineAngle.ts` is the one decision:
+- `angleWithXAxis` folds a direction into [0°, 180°), so a negative slope reads OBTUSE (y = −x → 135°);
+- a vertical line is 90°, the one case where the angle says more than «אנכי (אין שיפוע)»;
+- both ends of the fold snap to 0, so a horizontal line never flickers between 0° and 180°;
+- `lineAngleOf` gates it through `isKnowledge`, exactly as the slope row is gated (#1020's class);
+- `angleText` prints it through `fmtNum`: two decimals, never a fraction.
+
+Every surface reads that one decision:
+- **The panel:** each row of «שיפועים» reads «AB: 1 · זווית עם ציר ה-x: 45°».
+- **The ask:** `ANGLE_WITH_X_HE/EN` reads the short form «הזווית בין הישר l1 לציר ה-x», the exam's own
+  «הזווית שבין הישר l1 ובין הכיוון החיובי של ציר ה-x», and "the angle between line l1 and the x-axis",
+  over a named line or a segment.
+- **The click menu:** a line's questions gain the angle, after the operator's three.
+
+Panel and ask are one decision over two direction readers. A lock compares them on the same segment.
+
+**Deviation from the plan.** The plan asked for "one row for the ask in `catalogAnalytic.ts`". The analytic
+catalog holds STATEMENTS (the LLM may emit only those, and its guard builds every entry and asserts it
+draws), and a question draws nothing. So the question is taught where analytic teaches questions: the
+click-to-measure menu.
+
+**Consequences.** `src-analytic/app/lineAngle.ts` (new), `app/ask.ts`, `app/measurable.ts`, `App.tsx` (the
+slope row), `i18n/index.ts` (`angleWithX`). Locks: `issue-1322-line-angle.test.ts` (14: the fold including
+the 0/180 seam, the exam's two phrasings plus English, a vertical segment answering 90°, an undetermined line
+answering "not determined", and the panel's decision equal to the ask's on one segment), and the #1139 menu
+lock extended with the fourth question.
