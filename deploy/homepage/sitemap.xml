@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The site's public pages (#1384). Every builder in products.json must appear here, and
+     server/__tests__/crawl-basics-1384.test.ts fails if one is missing. No <lastmod>: a date
+     nobody maintains is worse than none, and Google ignores lastmod it cannot trust. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://themathbible.com/</loc></url>
+  <url><loc>https://themathbible.com/geo-builder/</loc></url>
+  <url><loc>https://themathbible.com/3d-builder/</loc></url>
+  <url><loc>https://themathbible.com/complex-builder/</loc></url>
+  <url><loc>https://themathbible.com/analytic-builder/</loc></url>
+</urlset>

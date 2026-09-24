@@ -307,6 +307,21 @@ export async function handleSharePage(
   const raw = (req.url ?? '').split('?')[0];
   const tail = raw.slice(raw.lastIndexOf('/g/') + 3);
 
+  /**
+   * NOTHING under `/g/` belongs in a search index (#1384) — set once, here, so every branch below
+   * carries it: the page, the image, and the dead-link 404.
+   *
+   * A share page is a redirect with a title the UPLOADER chose (120 characters, stored as given), so
+   * an indexable one lets anyone put their own words on a themathbible.com result; and a legitimate
+   * one is a thin duplicate of the builder it hands off to. Instant refresh usually makes Google
+   * treat the page as a redirect — "usually" is why this is a header and not a hope.
+   *
+   * It is a header, NOT a `Disallow: /g/` in robots.txt, on purpose (operator ruling on #1384): a
+   * disallowed page is never fetched, so its noindex is never read — and a chat app's preview
+   * crawler that honours robots.txt would lose the preview #1374 exists for. OG tags are untouched.
+   */
+  res.setHeader('x-robots-tag', 'noindex');
+
   if (tail.endsWith('.png')) {
     const png = await readShareImage(tail.slice(0, -4), dir);
     if (!png) {
@@ -350,6 +365,7 @@ export async function handleSharePage(
     `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title>
+<meta name="robots" content="noindex">
 <meta property="og:type" content="website">
 <meta property="og:title" content="${title}">
 <meta property="og:description" content="שרטוט גאומטרי — לחצו לפתיחה ולעריכה">
@@ -358,7 +374,6 @@ export async function handleSharePage(
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="${image}">
 <meta http-equiv="refresh" content="0; url=${esc(target)}">
-<link rel="canonical" href="${esc(target)}">
 </head><body style="font-family:system-ui;margin:3rem auto;max-width:34rem;line-height:1.6;color:#0f172a">
 <p>פותח את השרטוט…</p>
 <p><a href="${esc(target)}">אם הדף לא נפתח, לחצו כאן</a></p>

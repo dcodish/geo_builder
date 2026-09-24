@@ -241,3 +241,23 @@ A link is a stranger's input, so every ceiling that matters is checked on ARRIVA
 Every refusal is `too-large`, carried to the student as its own message (link or file), never as
 «broken link». The §5c share rows grow each product's OWN payload past the ceiling, so all four
 builders are held to the same bound by one fixture.
+
+### Share pages stay out of the index ([ADR-W-084](06w-decisions-workspace.md#adr-w-084))
+
+`handleSharePage` sets `X-Robots-Tag: noindex` **once, before it branches**, so the page, the preview
+PNG and the dead-link 404 all carry it and no later early return can skip it; the page adds the
+matching `<meta name="robots">`. It is a header, not a `Disallow: /g/`: a disallowed URL is never
+fetched, so its noindex would never be read, and a preview crawler that obeys robots.txt would lose
+the picture #1374 exists for. The page's old `<link rel="canonical">` pointed at the builder URL
+*with its `#fragment`*, which search engines strip — it named every share's canonical as the bare
+builder page, and was removed.
+
+## The site root ([ADR-W-084](06w-decisions-workspace.md#adr-w-084))
+
+Not `shell/` code, recorded here because every builder is served beneath it. `deploy/homepage/` is
+the canonical copy of what sits at `httpdocs/`: the homepage, `robots.txt` (allow all, sitemap
+line), `sitemap.xml` (the homepage plus every `products.json` builder — locked against the registry),
+and the site icon. `favicon.svg` is the one source; `favicon.ico` (16/32/48, PNG frames) and
+`apple-touch-icon.png` (180) are regenerated from it by `scripts/render-icons.mjs` through Chromium,
+and committed because this directory deploys as a plain copy with no build step. The `www.` → apex
+redirect is a Plesk setting, outside the repo (RUNBOOK).

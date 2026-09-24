@@ -12,6 +12,7 @@ The single ops entry point. Deep 2-D proxy detail (one-time setup, env file, sec
 | Analytic-geometry app (`dist-analytic/`) | `npm run build:analytic` | `…/httpdocs/analytic-builder/` (**rename `analytic.html` → `index.html`**) | `https://themathbible.com/analytic-builder/` (Apache static) |
 | Shared Node proxy (`dist-server/proxy.mjs`) | `npm run build:proxy` | `/var/www/geo-proxy/proxy.mjs` | `geo-proxy.service` on loopback **:8788**, reverse-proxied by Apache |
 | **Site homepage** (tool links) | — hand-edited; **canonical copy: [`deploy/homepage/index.html`](../deploy/homepage/index.html)** | `…/httpdocs/index.html` | `https://themathbible.com/` (Apache static) |
+| **Site-root crawl files** (#1384) | — hand-edited, beside the homepage: `robots.txt`, `sitemap.xml`, `favicon.svg`; `favicon.ico` + `apple-touch-icon.png` are REGENERATED from the SVG by `node scripts/render-icons.mjs deploy/homepage/favicon.svg deploy/homepage` | `…/httpdocs/` | `https://themathbible.com/robots.txt` etc. |
 | Proxy env (key, admin creds, log paths) | — (hand-edited) | `/var/www/geo-proxy/geo-proxy.env` (mode 600) | read by the service |
 
 - **Server:** `ssh root@themathbible.com` (74.208.61.39). Plesk on Ubuntu 22.04. **Apache serves everything; nginx is OFF** — never touch `vhost_nginx.conf`.
@@ -102,6 +103,9 @@ ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/analytic
 #     (deploy/homepage/index.html), commit, then upload it — never hand-edit on the server,
 #     or the repo copy silently stops being canonical (adopted 2026-08-15, complex-card link):
 scp deploy/homepage/index.html root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/index.html
+#     …and the site-root crawl files whenever they changed (#1384). robots.txt names the sitemap; the
+#     sitemap must list every builder (a lock checks it against products.json, not the server copy):
+scp deploy/homepage/robots.txt deploy/homepage/sitemap.xml deploy/homepage/favicon.svg deploy/homepage/favicon.ico deploy/homepage/apple-touch-icon.png root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/
 
 # 3. perms (static files should be 644 root:root — scp usually preserves this; verify)
 ssh root@themathbible.com 'chmod -R a+rX /var/www/vhosts/themathbible.com/httpdocs/geo-builder /var/www/vhosts/themathbible.com/httpdocs/3d-builder /var/www/vhosts/themathbible.com/httpdocs/complex-builder /var/www/vhosts/themathbible.com/httpdocs/analytic-builder'
@@ -154,6 +158,30 @@ curl -s -o /dev/null -w '%{http_code}
 ' -X POST https://themathbible.com/geo-builder/api/share   -H 'content-type: application/json' -d '{"tool":"2d","fragment":"probeABC_-"}'   # 200
 curl -s -o /dev/null -w '%{http_code}
 ' https://themathbible.com/g/aaaaaaaaaaaa   # 404 = routed
+```
+
+### One host, not two: `www.` redirects to the apex ([ADR-W-084](06w-decisions-workspace.md#adr-w-084), #1384)
+
+`https://www.themathbible.com/…` answered **200 with a full copy of every page** (measured 2026-09-24), so
+search engines see two sites and split one site's ranking between them. The fix is a **Plesk panel
+setting, not a file in this repo — it needs the operator's hands** (the same reason as the Apache
+directives above; a session may not change prod hosting settings):
+
+*Websites & Domains → themathbible.com → Hosting & DNS → Hosting → **Preferred domain: `themathbible.com`***
+(Plesk then answers `www.` with an SEO-safe **301**). One-time; it survives regeneration because it is
+DB-backed. Probe after:
+
+```sh
+curl -s -o /dev/null -w '%{http_code} -> %{redirect_url}\n' https://www.themathbible.com/geo-builder/
+# 301 -> https://themathbible.com/geo-builder/
+```
+
+And after any deploy that touched the crawl files:
+
+```sh
+curl -sI https://themathbible.com/robots.txt | head -1            # 200
+curl -s  https://themathbible.com/sitemap.xml | grep -c '<loc>'    # one per public page
+curl -sI https://themathbible.com/g/aaaaaaaaaaaa | grep -i x-robots-tag   # noindex
 ```
 
 ## Verify (every deploy)

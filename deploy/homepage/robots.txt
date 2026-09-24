@@ -1,0 +1,9 @@
+# themathbible.com — every crawler is welcome, AI crawlers included (operator ruling, #1384).
+#
+# /g/ (shared-figure links) is deliberately NOT disallowed: those pages send `X-Robots-Tag: noindex`,
+# and a disallowed page is never fetched, so its noindex would never be read — and a chat app's
+# preview crawler that honours robots.txt would lose the link preview. See server/shareStore.ts.
+User-agent: *
+Allow: /
+
+Sitemap: https://themathbible.com/sitemap.xml
