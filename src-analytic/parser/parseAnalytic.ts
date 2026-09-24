@@ -23,7 +23,7 @@ import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS, directionSymbol } from '../engine/carriers';
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id } from '../engine/types';
-import { EN_SHAPE, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
+import { ANGLE_STEM_HE, EN_SHAPE, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 
 /**
  * Why a line did not become facts.
@@ -762,7 +762,7 @@ const splitNames = (run: string): string[] => run.match(/[A-Z][0-9]?/g) ?? [];
  */
 const ROLES: Array<{ he: RegExp; en: RegExp; t: DerivedRule['t']; n: number }> = [
   { he: /ה?תיכונ(?:ים|י)/, en: /centroid|medians/i, t: 'centroid', n: 3 },
-  { he: /חוצי\s+ה?זוויות/, en: /incent(?:re|er)|angle\s+bisectors/i, t: 'incentre', n: 3 },
+  { he: new RegExp(`חוצי\\s+ה?${ANGLE_STEM_HE}ות`), en: /incent(?:re|er)|angle\s+bisectors/i, t: 'incentre', n: 3 },
   { he: /ה?גבה(?:ים|י)/, en: /orthocent(?:re|er)|altitudes/i, t: 'orthocentre', n: 3 },
   { he: /ה?אנכ(?:ים|י)\s+ה?אמצעיים/, en: /circumcent(?:re|er)|perpendicular\s+bisectors/i, t: 'circumcentre', n: 3 },
   { he: /ה?אלכסונ(?:ים|י)/, en: /diagonals/i, t: 'diagonals', n: 4 },
@@ -1499,8 +1499,11 @@ const ON_OBJECT_EN = new RegExp(
  * right angles. Both glyphs sit in the noun alternation, once per language, the 2-D lexicon's
  * `ANGLE_WORD` shape: an angle rule that reads the noun reads every spelling of it, and the `∡`-only
  * pattern is gone rather than kept beside a `∠` twin.
+ *
+ * BOTH SPELLINGS OF THE WORD (#1407, ADR-AG-155): the word is composed from `ANGLE_STEM_HE` (`זו?וי`),
+ * so the defective «זוית» reaches every angle rule — right, numeric, ratio — exactly as «זווית» does.
  */
-const ANGLE_NOUN_HE = '(?:ה?זווית\\s+|[∠∡]\\s*)';
+const ANGLE_NOUN_HE = `(?:ה?${ANGLE_STEM_HE}ת\\s+|[∠∡]\\s*)`;
 const ANGLE_NOUN_EN = '(?:(?:the\\s+)?angle\\s+|[∠∡]\\s*)';
 const ANGLE_HE = new RegExp(
   `^${HE_GIVEN}${ANGLE_NOUN_HE}(${NAME})(${NAME})?(${NAME})?${HE_IS}\\s*(?:ישרה|=\\s*90°?|90°?)$`,

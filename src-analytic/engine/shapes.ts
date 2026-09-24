@@ -171,9 +171,39 @@ export const SHAPES: Record<string, ShapeRow> = {
   },
 };
 
+/**
+ * THE ANGLE NOUN'S STEM, in both of its spellings (#1407, ADR-AG-155).
+ *
+ * Hebrew writes «זווית» plene and «זוית» defective, and students type both. 2-D has read both since
+ * #244 through its lexicon's `זו?וי` (the ADR-3D-032 vav class); this tree spelled the noun with the
+ * double vav in every rule, so «זוית C ישרה» was `not-handled` everywhere at once. Every Hebrew angle
+ * pattern in analytic — the noun atom of the angle rules, the incentre's «חוצי הזוויות», the
+ * «הזווית בין … לציר ה-x» question, and the shape nouns below — composes THIS stem, so a new angle rule
+ * inherits both spellings instead of re-spelling the word. It lives here, beside the shape nouns,
+ * because the parser, the question lane and this registry all read it and the parser already imports
+ * this module (the reverse import would be a cycle).
+ */
+export const ANGLE_STEM_HE = 'זו?וי';
+
+/**
+ * Plene/defective VARIANTS of the nouns in this table, folded onto the canonical key (#1407).
+ *
+ * The 2-D spelling folds (#389, ADR-405) read «מעויין» as «מעוין» and «שוה» as «שווה», and 2-D's angle
+ * class reads «ישר-זוית»; a key-by-string table misses all three unless its one normaliser folds them.
+ * Word-bounded, so no fold fires inside a longer word.
+ */
+const SPELLING_FOLDS: ReadonlyArray<[RegExp, string]> = [
+  [new RegExp(`(?<![א-ת])${ANGLE_STEM_HE}ת(?![א-ת])`, 'g'), 'זווית'],
+  [/(?<![א-ת])מעויין(?![א-ת])/g, 'מעוין'],
+  [/(?<![א-ת])שוה(?![א-ת])/g, 'שווה'],
+];
+
 /** «ישר-זווית» ≡ «ישר זווית», and «ה» may front the noun — one spelling reaches the table. */
 export const normalizeShapeNoun = (src: string): string =>
-  src.replace(/[-־]/g, ' ').replace(/\s+/g, ' ').replace(/^ה/, '').trim();
+  SPELLING_FOLDS.reduce(
+    (s, [from, to]) => s.replace(from, to),
+    src.replace(/[-־]/g, ' ').replace(/\s+/g, ' ').replace(/^ה/, '').trim(),
+  );
 
 export const shapeRow = (noun: string): ShapeRow | null => SHAPES[normalizeShapeNoun(noun)] ?? null;
 

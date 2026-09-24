@@ -26,6 +26,7 @@ import { isKnowledge, knownCurve, knownOptions, type Figure } from '../engine/ev
 import { locusOf } from '../engine/locus';
 
 import { curveByName, objectById, type Id } from '../engine/types';
+import { ANGLE_STEM_HE } from '../engine/shapes';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { isVerticalLine } from '../engine/lines';
 import { asPair, lineNamed } from './lines';
@@ -166,7 +167,9 @@ const SLOPE_OF = /^(?:ה?שיפוע|[Tt]he\s+slope\s+of)\s+(?:של\s+)?(?:ה?(?:
  * the long form read, over a named line or a segment («הישר AB»). The answer is {@link lineAngleOf}, the
  * function the panel row prints from.
  */
-const ANGLE_WITH_X_HE = /^ה?זווית\s+ש?בין\s+(?:ה?(?:ישר|קטע|צלע)\s+)?(\S+)\s+(?:ל|ו?בין\s+)(?:ה?כיוון\s+ה?חיובי\s+של\s+)?ציר\s+ה-?x$/;
+const ANGLE_WITH_X_HE = new RegExp(
+  String.raw`^ה?${ANGLE_STEM_HE}ת\s+ש?בין\s+(?:ה?(?:ישר|קטע|צלע)\s+)?(\S+)\s+(?:ל|ו?בין\s+)(?:ה?כיוון\s+ה?חיובי\s+של\s+)?ציר\s+ה-?x$`,
+);
 const ANGLE_WITH_X_EN = /^(?:the\s+)?angle\s+(?:between|of)\s+(?:the\s+)?(?:line\s+|segment\s+)?(\S+)\s+(?:and|with)\s+(?:the\s+)?(?:positive\s+)?(?:direction\s+of\s+the\s+)?x-?\s*axis$/i;
 
 /** «משוואת …» / «the equation of …» — a question about a curve rather than a value. */

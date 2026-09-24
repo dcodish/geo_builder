@@ -874,6 +874,12 @@ English `=` form — «angle ABC = 90» — and they mean the same thing **in an
 is named by a WHOLE name, never by a letter pair taken out of the middle of a word.** «ANGLE ABC» is not
 three measurements. A non-right angle value remains out of scope in both languages.
 
+**R60 / R115 amendment (2026-09-24, [ADR-AG-155](06c-decisions-analytic.md#adr-ag-155),
+[#1407](https://github.com/dcodish/geo_builder/issues/1407)).** The Hebrew angle noun is read in both of its
+spellings, plene «זווית» and defective «זוית», wherever an angle is named: a right angle, a size, a ratio,
+«חוצי הזוויות», «משולש ישר-זווית» and the question «הזווית בין … לציר ה-x». The shape nouns read the plene
+and defective spellings the 2-D tool reads: «מעויין» is «מעוין», and «שוה» is «שווה».
+
 **R115 — an angle can be stated by its SIZE and in RATIO to another angle**
 ([ADR-AG-153](06c-decisions-analytic.md#adr-ag-153), [#1331](https://github.com/dcodish/geo_builder/issues/1331)).
 «∠ABC = 60» (also «זווית ABC היא 60», «60°», «60 מעלות»), «∠ABC = ∠ACB» and «∠ABC = 2∠ACB» are givens in

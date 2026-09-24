@@ -238,6 +238,14 @@ glyph-only sibling pattern is how one spelling drifts from the others in silence
 the glyph the 2-D palette teaches, did not); the catalog lists the glyph row beside the word row so the
 coverage map and the guide teach it.
 
+**The word itself has two spellings, and one stem carries both** ([ADR-AG-155](06c-decisions-analytic.md#adr-ag-155)).
+`ANGLE_STEM_HE` (`זו?וי`, in `engine/shapes.ts`, the 2-D lexicon's vav class) is what every Hebrew angle
+pattern composes: the noun atom above, the incentre role «חוצי הזוויות», the question «הזווית בין … לציר
+ה-x», and the shape-noun key. A pattern that re-spells the word as a literal is how the defective «זוית»
+fell out of every rule at once. The shape table is keyed by string, so its one normaliser,
+`normalizeShapeNoun`, folds the variants onto the key: «זוית» → «זווית», and the 2-D ADR-405 plene
+folds «מעויין» → «מעוין» and «שוה» → «שווה», word-bounded.
+
 **The refusal codes are OWNED, one per class**, each rendered by a locale string that names the
 student's own statement: `reserved-coordinate`, `bad-arity`, `repeated-vertex` alongside the existing
 `bad-equation` and `out-of-scope`. A code per class rather than a message per site is what keeps the
