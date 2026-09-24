@@ -442,6 +442,25 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: '∠ABC = 2∠ACB',
     needs: ['משולש ABC'],
   },
+  /**
+   * #1407 arm 2 (ADR-AG-158) — the VERTEX ALONE with a value, and on both sides of an equality. Resolved
+   * at M1 against the declared triangle, exactly as «זוית C ישרה» above is; the rows are here so the
+   * coverage guard drives both through the real grammar and the real resolver.
+   */
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'זווית C = 60',
+    en: 'angle C is 60',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: '∠B = ∠C',
+    en: '∠B = ∠C',
+    needs: ['משולש ABC'],
+  },
 
   /** Naming a circle's CENTRE (#1109) — the same click-to-name family as a crossing. */
   {

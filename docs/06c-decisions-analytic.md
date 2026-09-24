@@ -7709,3 +7709,70 @@ lands, «השנייה» is refused on its own line only; #1113's pair each on it
 the same ordinal twice refused; cycling leaves the named crossing in place; the click path through `offersOf`;
 the grammar); `conic-rings.test.ts` (two click cases rewritten, above). `docs/02c` R85; `docs/04c` the order
 paragraph.
+
+## ADR-AG-158 — A one-letter angle takes a value and a ratio: «זווית C = 60», «∠B = ∠C», and «זוית C=200» is refused as unsatisfiable (#1407, arm 2)
+
+**Status:** accepted, 2026-09-25 · **Issue:** [#1407](https://github.com/dcodish/geo_builder/issues/1407) (arm 2 of 3, feature, `P2`, `analytic`; arm 1 is [ADR-AG-155](#adr-ag-155), already on main) · round [#1408](https://github.com/dcodish/geo_builder/issues/1408) · PR route
+**Requirements:** [02c](02c-requirements-analytic.md) R115 amendment (a lone vertex names an angle of any size, and in a ratio) · **Design:** [04c](04c-design-analytic.md#relations-and-the-direction-resolver-adr-ag-024), the *Angles* paragraph (the one vertex resolver)
+
+**What the operator saw.** Playing round #1397 T19: *"writing זוית C=200 is not recognized"*. Arm 1 taught the
+grammar the defective spelling. The other half was that a lone vertex with a VALUE was read nowhere:
+[ADR-AG-153](#adr-ag-153) listed it as not done, because which rays a lone vertex means is decided at M1 and
+only a right angle resolved there.
+
+**Measured at pickup** (`7234e7be`, the real `decideSubmit` + `reachesFallback`, after «משולש ABC»):
+«זוית C=200», «זווית C = 60», «∠C = 60», «angle C = 60» and «זווית B = זווית C» were all `not-handled` and
+escalated; «זווית ACB = 200» was refused `unsatisfiable`; «זוית C ישרה» built (arm 1). As the issue says.
+
+**The class.** *An angle named by its vertex alone is resolved against the figure for one statement (a right
+angle) and read nowhere for its siblings (a size, a ratio)*, so the same noun phrase meant something in one
+sentence and nothing in the next.
+
+**The decision.**
+1. **One resolver** (`resolveAngleName`, `engine/apply.ts`), extracted from the `right-angle` case: a lone
+   vertex names the angle between its two NEIGHBOURS in the ONE shape through it; in no shape or in several it
+   is `ambiguous-angle`. Both the `right-angle` fact and the new `vertex-angle` fact call it.
+2. **One new fact**, `vertex-angle {left, rhs}` (`engine/types.ts`), where either side is an `AngleName`: three
+   letters or the vertex alone (`engine/solve.ts`). The parser emits it only when some side is a lone vertex;
+   three letters on every side still lower to the constraint in the parser, unchanged. At M1 each lone side is
+   resolved and the line becomes EXACTLY the `angle` / `angle-ratio` constraint its three-letter twin lowers to.
+   So «זוית C=200» is the same `unsatisfiable` refusal «זווית ACB = 200» is, «זווית C = 60» holds 60° at every
+   seed, and «זווית B = זווית C», «∠B = 2∠C», «∠ABC = ∠C» come with it (the equality asked about in #1331).
+3. **The grammar** (`ANGLE_LETTERS` in `parseAnalytic.ts`): the numeric and ratio rules read one letter or
+   three, on both sides, ending at a letter boundary, so «זווית AB = 5» names no angle and is never read as a
+   lone `A`. The right-angle rule still runs first, so «זווית C = 90» keeps its `perpendicular` lowering.
+4. **An angle is the same angle in either ray order.** `canonicalConstraint` sorts each angle's rays, so
+   «זווית ACB = 60» after «זווית C = 60» (or «∠BCA = 60» after «∠ACB = 60») is `already-known`: one given, not
+   two. The lone-vertex rays come off the ring in ring order, which is what surfaced this.
+5. **The refusal teaches a form that builds.** When the vertex is in SEVERAL shapes, `ambiguous-angle` carries
+   `example`, the three-letter name read off the first shape through it (rays sorted), and the message is
+   «הקודקוד שייך ליותר מצורה אחת … כתבו את הזווית בשלוש אותיות, והקודקוד באמצע — למשל «זווית ABC»». The lock
+   rewrites the student's own line with that name and drives it through `decideSubmit`: it is accepted. A
+   vertex in NO shape keeps the general message and teaches no rays, because any pair would be a guess. The
+   general message's example lost its «ישרה», since it now answers numeric lines too.
+6. **Catalog:** two F17 rows, «זווית C = 60» / "angle C is 60" and «∠B = ∠C», so the coverage guard drives the
+   lone vertex through the real grammar and the real resolver. The LLM grammar reads the catalog, so the
+   fallback may emit them too.
+
+**The glyph.** «∠C = 60» and «∠B = ∠C» read through the same noun atom (#1330), as the right angle does.
+
+**Sibling audit.** *Analytic:* every angle rule reads `ANGLE_NOUN_HE/EN`. The right-angle, size and ratio rules
+now share one letter grammar and one resolver; «חוצי הזוויות» and the x-axis question name no vertex angle.
+*Products:* 2-D resolves a lone vertex from the edges at it (`parse.ts`, `ambiguous-angle` clarification), and
+3-D has had a `vertex-angle` resolved at APPLY since ADR-3D-049. Analytic was the sibling that lagged, and it
+now has their shape. Nothing to file.
+
+**What this does NOT do.** A word on the right («זווית B חדה») is still left to its owner. The canvas still
+draws no arc for a stated angle (#1241). Arm 3 of #1407 (an LLM key on PR play servers) is process, and it has
+its ruling (they stay keyless).
+
+**Consequences.** `engine/solve.ts` (`AngleName`, `isAngleRef`, the ray sort in `canonicalConstraint`),
+`engine/types.ts` (`vertex-angle`), `engine/apply.ts` (`resolveAngleName`, `ApplyError.example`, the two
+cases), `engine/derive.ts` + `app/submit.ts` + `store/useAnalyticStore.ts` (carry `example`), `App.tsx` +
+`i18n/index.ts` (`errAmbiguousAngleShapes`), `parser/parseAnalytic.ts` (`ANGLE_LETTERS`, `angleNameOf`),
+`parser/catalogAnalytic.ts` (two rows). Lock: `issue-1407-one-letter-angle.test.ts` (35: the issue's table
+in both spellings and the glyph; seven lone/three-letter meaning equivalences including the ratios and a
+quadrilateral; the restatement in either ray order `already-known`; 60° at C over 24 seeds and five presses
+of «הציגו תצורה אחרת»; the equality over 24 seeds; the ambiguous vertex refused with «ABC» and the taught line
+accepted, five spellings; no rays taught for a vertex in no shape; the right angle unchanged; two letters not
+read; the two catalog rows through the gate). No solver change: the rows are #1331's, so no seed-rate change.

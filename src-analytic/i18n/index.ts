@@ -143,7 +143,9 @@ const he = {
   errAmbiguousShape:
     'בשרטוט הזה אין צורה אחת שאפשר לקרוא לה כך: "{{detail}}". אפשר לציין את הקודקודים, למשל «שטח הדלתון ABCD הוא 24».',
   errAmbiguousAngle:
-    'האות אחת לא מספיקה כדי לדעת באיזו זווית מדובר: "{{detail}}". אפשר לכתוב את שלוש האותיות, למשל «זווית ABC ישרה», או לציין קודם את הצורה שבה הקודקוד נמצא.',
+    'האות אחת לא מספיקה כדי לדעת באיזו זווית מדובר: "{{detail}}". אפשר לכתוב את שלוש האותיות, והקודקוד באמצע, למשל «זווית ABC», או לציין קודם את הצורה שבה הקודקוד נמצא.',
+  errAmbiguousAngleShapes:
+    'הקודקוד שייך ליותר מצורה אחת, ולכן אות אחת לא אומרת באיזו זווית מדובר: "{{detail}}". כתבו את הזווית בשלוש אותיות, והקודקוד באמצע — למשל «זווית {{example}}».',
   errDoesNotExist:
     'בשרטוט הזה {{existing}} לא קיים — הנתונים כבר קובעים את כל הנקודות, ואין תצורה אחרת שבה הוא ' +
     'היה קיים. המשפט "{{detail}}" לא נוסף.',
@@ -374,8 +376,11 @@ const en: typeof he = {
   errAmbiguousShape:
     'No single shape in this figure answers to that: "{{detail}}". Name its vertices — for example "the area of kite ABCD is 24".',
   errAmbiguousAngle:
-    'One letter is not enough to say which angle is meant: "{{detail}}". Write all three letters ' +
-    '— for example "angle ABC is right" — or state the shape the vertex belongs to first.',
+    'One letter is not enough to say which angle is meant: "{{detail}}". Write all three letters, the vertex ' +
+    'in the middle — for example "angle ABC" — or state the shape the vertex belongs to first.',
+  errAmbiguousAngleShapes:
+    'That vertex belongs to more than one shape, so one letter does not say which angle is meant: "{{detail}}". ' +
+    'Write the angle with three letters, the vertex in the middle — for example "angle {{example}}".',
   errDoesNotExist:
     'In this figure {{existing}} does not exist — the givens already fix every point, and there is ' +
     'no other configuration where it would. "{{detail}}" was not added.',

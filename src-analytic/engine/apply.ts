@@ -19,7 +19,7 @@ import { fitConic } from './conic';
 import { resolveCurve } from './curves';
 import { curveParentOf, parentsOf, type DerivedRule } from './derived';
 import { sameDerivation } from './sameDerivation';
-import { constraintCurveRefs, constraintRefs, dirRefs, sameConstraint } from './solve';
+import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, type AngleName, type AngleRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, shapeRow } from './shapes';
 import { evalExpr, type Env } from './expr';
 import {
@@ -154,6 +154,13 @@ export interface ApplyError {
    * stays language-free and the locale builds the message around it.
    */
   holder?: Id;
+  /**
+   * The THREE-LETTER name an ambiguous one-letter angle needs (#1407, ADR-AG-158) — «ACB» for «זווית C»
+   * when C is a vertex of two shapes. Read off the first shape through the vertex, rays sorted, so the
+   * student's own line with the letter replaced by this name is a line the tool builds. Absent when the
+   * vertex is in NO shape: there is no pair of rays to teach, and inventing one would be a guess.
+   */
+  example?: string;
 }
 
 /**
@@ -178,6 +185,48 @@ export function refKindOf(id: Id): RefKind {
 /** The one refusal for "the figure has no such thing", naming it the student's way and by its kind. */
 function unknownRef(id: Id): ApplyError {
   return { code: 'unknown-reference', detail: statedName(id), expected: refKindOf(id) };
+}
+
+/**
+ * A lone VERTEX resolved to the angle it names in this figure (#1049, #1407) — the ONE resolver behind
+ * «זווית B ישרה», «זווית C = 60» and «∠B = ∠C».
+ *
+ * The angle at a vertex of a ring is the one between its two NEIGHBOURS — the figure's own convention,
+ * and the only reading that is right for a quadrilateral as well as a triangle. So the vertex must be in
+ * exactly ONE shape; in none, or in several, it names no single angle, and the refusal says so and
+ * (where a shape exists) names the three-letter form that does — never a pick of rays. A name that is
+ * already three letters passes through untouched. Rays are sorted, so the result is the same object the
+ * parser builds for the three-letter twin.
+ */
+function resolveAngleName(
+  c: Construction,
+  n: AngleName,
+  src: string,
+): { ok: true; ref: AngleRef } | { ok: false; error: ApplyError } {
+  if (isAngleRef(n)) return { ok: true, ref: n };
+  const host = objectById(c, n.v);
+  if (!host || !isPositional(host)) return { ok: false, error: unknownRef(n.v) };
+  const rays = (ring: Id[]): [Id, Id] => {
+    const i = ring.indexOf(n.v);
+    const [a, b] = [ring[(i - 1 + ring.length) % ring.length], ring[(i + 1) % ring.length]].sort();
+    return [a, b];
+  };
+  const rings = c.objects.filter(
+    (g) => g.kind === 'polygon' && g.vertices.includes(n.v),
+  ) as PolygonObject[];
+  if (rings.length !== 1) {
+    const taught = rings[0] ? rays(rings[0].vertices) : null;
+    return {
+      ok: false,
+      error: {
+        code: 'ambiguous-angle',
+        detail: src,
+        ...(taught ? { example: `${statedName(taught[0])}${statedName(n.v)}${statedName(taught[1])}` } : {}),
+      },
+    };
+  }
+  const [a, b] = rays(rings[0].vertices);
+  return { ok: true, ref: { v: n.v, a, b } };
 }
 
 /** What a name already holds, in terms the student can recognise — see `ApplyError.existing`. */
@@ -1009,21 +1058,31 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'right-angle': {
-      const host = objectById(c, f.id);
-      if (!host || !isPositional(host)) {
-        return { ok: false, error: unknownRef(f.id) };
+      const at = resolveAngleName(c, { v: f.id }, f.src);
+      if (!at.ok) return at;
+      return applyFact(c, { t: 'constraint', k: rightAngleAt(f.id, at.ref.a, at.ref.b), src: f.src });
+    }
+
+    /**
+     * «זווית C = 60» · «∠B = ∠C» — the `right-angle` resolution with a value (#1407, ADR-AG-158).
+     *
+     * Each lone vertex goes through the one resolver above, and the line then lowers to exactly the
+     * constraint its three-letter twin lowers to in the parser — so «זוית C=200» after «משולש ABC» is the
+     * same `unsatisfiable` refusal «זווית ACB = 200» is, never a second meaning of the sentence.
+     */
+    case 'vertex-angle': {
+      const left = resolveAngleName(c, f.left, f.src);
+      if (!left.ok) return left;
+      if (f.rhs.t === 'value') {
+        return applyFact(c, { t: 'constraint', k: { t: 'angle', at: left.ref, value: f.rhs.value }, src: f.src });
       }
-      const rings = c.objects.filter((g) => g.kind === 'polygon' && g.vertices.includes(f.id));
-      if (rings.length !== 1) {
-        return { ok: false, error: { code: 'ambiguous-angle', detail: f.src } };
-      }
-      const ring = (rings[0] as PolygonObject).vertices;
-      const i = ring.indexOf(f.id);
-      // The angle AT a vertex of a ring is the one between its two NEIGHBOURS — the figure's own
-      // convention, and the only reading that is right for a quadrilateral as well as a triangle.
-      const prev = ring[(i - 1 + ring.length) % ring.length];
-      const next = ring[(i + 1) % ring.length];
-      return applyFact(c, { t: 'constraint', k: rightAngleAt(f.id, prev, next), src: f.src });
+      const right = resolveAngleName(c, f.rhs.of, f.src);
+      if (!right.ok) return right;
+      return applyFact(c, {
+        t: 'constraint',
+        k: { t: 'angle-ratio', left: left.ref, right: right.ref, k: f.rhs.k },
+        src: f.src,
+      });
     }
 
     /** Introduce a named but unplaced point; harmless and absorbed if it already exists. */
