@@ -67,3 +67,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [The dev log has his exact run](dev-log-has-his-exact-run.md) — read logs/debug-log.jsonl before saying "could not reproduce"; it records every submit's result and the rows he deleted before screenshotting (2026-09-22 #1349 → #1351)
 - [The third copy is the shared one](third-copy-is-the-shared-one.md) — count the siblings before writing a product-local mechanism; two existing copies means yours belongs in `shell/` with a §5c lock (2026-09-22 #1353/#1358)
 - [LLM-lane convergence plan](llm-lane-convergence-plan.md) — the 2026-09-22 four-step plan: steps 1-2 shipped, #1243 is COLLECTION not evidence, and #1355 waits on #1362 + a deploy
+- [PR servers have no LLM key](pr-servers-have-no-llm-key.md) — a PR worktree has no .env.local, so the fallback answers "none" in ~3 ms and reads as "not escalated"; say so on the sheet or ask to copy the key (2026-09-24 #1407)
