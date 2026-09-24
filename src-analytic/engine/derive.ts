@@ -131,8 +131,11 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
    */
   if (!figure.selectorsOk && reportedDof(construction, figure.carrierDof) === 0) {
     const blamed = new Set<number>();
+    // Only the sentences whose selector FAILED (#1268): a triangle's `distinct` did not make a crossing's
+    // ordinal impossible. Without the per-selector verdict, every selector line, as before.
+    const failing = new Set((figure.selectorsFailing ?? []).map((s) => JSON.stringify(s)));
     facts.forEach((f, i) => {
-      if (f.t === 'selector') blamed.add(owner[i]);
+      if (f.t === 'selector' && (failing.size === 0 || failing.has(JSON.stringify(f.sel)))) blamed.add(owner[i]);
     });
     for (const index of blamed) {
       faults.push({ index, code: 'unsatisfiable', detail: lines[index] });

@@ -915,11 +915,23 @@ const hasRepeat = (v: readonly string[]): boolean => new Set(v).size !== v.lengt
  *
  * A line meets a conic twice and both crossings are offered, so the sentence must be able to say
  * which one it means — the operator's ruling, 2026-09-16, over storing a branch index behind the
- * student's back. The word is accepted and carried in the student's own line; what makes the two
- * words denote different points is the `crossing-distinct` selector below, which every intersection
- * gets. It is non-capturing so the operand groups keep their indices.
+ * student's back. The word lowers to the `crossing-nth` selector below (#1268), which picks that root
+ * on its own; a sentence without one gets `crossing-distinct`. It is non-capturing so the operand groups
+ * keep their indices — `ordinalOf` reads the word beside the match.
  */
 const NTH_HE = '(?:ה?ראשונה|ה?שניי?ה|ה?אחרת)?';
+/**
+ * WHICH ROOT the ordinal names (#1268): 0 for «הראשונה»/«first», 1 for «השנייה»/«second», `null` when the
+ * sentence names none — «האחרת»/«other» says only "not its sibling", which is `crossing-distinct`'s job.
+ * Read beside the match rather than as a capture, so the operand groups keep their indices.
+ */
+function ordinalOf(line: string): 0 | 1 | null {
+  const he = /חיתוך\s*(ה?ראשונה|ה?שניי?ה)(?=\s|$)/.exec(line);
+  if (he) return /ראשונה/.test(he[1]) ? 0 : 1;
+  const en = /\bthe\s+(first|second)\s+intersection\b/i.exec(line);
+  if (en) return en[1].toLowerCase() === 'first' ? 0 : 1;
+  return null;
+}
 const INTERSECT_HE = new RegExp(
   `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה?נקודת|ה?נקודות)?\\s*ה?חיתוך\\s*${NTH_HE}\\s*(?:של\\s+)?(.+?)\\s+(?:עם|ו-?)\\s+(.+)$`
 );
@@ -1005,6 +1017,7 @@ function parseIntersection(line: string): RuleOutcome {
   const m = INTERSECT_HE.exec(line) ?? INTERSECT_EN.exec(line);
   if (!m) return null;
   const [, id, leftSrc, rightSrc] = m;
+  const ordinal = ordinalOf(line);
   // #1286 (ADR-AG-135): a crossing's incidences are marked as such — the drawn extent bounds the
   // SOLUTION set for a crossing only (the operator's T11 ruling and ruling (a) were about this
   // sentence); a cevian's foot or a point «על הישר» keeps the line reading its own ruling gave it.
@@ -1055,15 +1068,21 @@ function parseIntersection(line: string): RuleOutcome {
     { t: 'constraint', k: left, src: line },
     { t: 'constraint', k: right, src: line },
     /**
-     * AND IT IS NOT ITS SIBLING (#1113).
+     * WHICH ROOT (#1113, #1268 — ADR-AG-157).
      *
-     * Emitted for EVERY intersection, not only for one that says «השנייה» — the defect is a property
-     * of the construct, not of the wording. Two crossings of the same pair carry identical
-     * incidences, so without this the solve settles both on the same root and the student gets two
-     * letters on one point. With one crossing named there is no sibling and the selector judges
-     * nothing, which costs nothing.
+     * An ORDINAL names its root: «הראשונה»/«השנייה» lower to `crossing-nth`, which picks that crossing
+     * in the pair's canonical order (`crossing-order.ts`) on its own — no second named point needed.
+     * That is #1113's ruling, *the sentence names the root*; before #1268 the word was carried and
+     * chose nothing.
+     *
+     * A sentence WITHOUT an ordinal («נקודת החיתוך», «האחרת») keeps `crossing-distinct`: it names no
+     * root, only that it is not its sibling. Two crossings of the same pair carry identical incidences,
+     * so without it the solve settles both on the same root and the student gets two letters on one
+     * point; with one crossing named there is no sibling and it judges nothing, which costs nothing.
      */
-    { t: 'selector', sel: { kind: 'crossing-distinct', id }, src: line },
+    ordinal === null
+      ? { t: 'selector', sel: { kind: 'crossing-distinct', id }, src: line }
+      : { t: 'selector', sel: { kind: 'crossing-nth', id, nth: ordinal, pair: [left, right] }, src: line },
   ]);
 }
 function parseDerived(line: string): RuleOutcome {

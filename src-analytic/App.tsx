@@ -58,7 +58,7 @@ import { ask, figureIsOpen, type Answer } from './app/ask';
 import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
 import { anotherConfiguration } from './app/another';
-import { centresOf, crossingSentence, crossingsOf, freeLetter, pointAt } from './engine/crossings';
+import { offersOf, pointAt } from './engine/crossings';
 import { VERTICAL_TOL, verticality } from './engine/lines';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
@@ -874,23 +874,9 @@ export function App() {
        * construction, and each dot carries the SENTENCE its click would add rather than a point: two
        * surfaces, one grammar.
        */
-      crossings: [
-        ...crossingsOf(d.figure, d.construction).map((k) => ({
-          id: k.id,
-          x: k.x,
-          y: k.y,
-          sentence: crossingSentence(k, freeLetter(d.construction)),
-        })),
-        /**
-         * A circle's CENTRE is namable the same way a crossing is (#1109) — the operator's
-         * *"it should be clickable so user can assign the center with a letter"*.
-         *
-         * Concatenated into the same list rather than given its own handler, which is the issue's own
-         * design constraint: one kind of offer, one letter source, one grammar. Each entry carries the
-         * SENTENCE its click would add, so the click surface and the typing surface cannot disagree.
-         */
-        ...centresOf(d.figure, freeLetter(d.construction)),
-      ],
+      // Rings and nameable centres, one list, one letter source, one grammar (#1109) — built in
+      // `offersOf` so the click path is callable from a test (#1268).
+      crossings: offersOf(d.figure, d.construction),
     });
   }, [d, view, canvasSize, answers]);
 

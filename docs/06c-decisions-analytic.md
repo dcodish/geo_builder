@@ -7621,3 +7621,91 @@ ADR-AG-013 still holds. An object can land only once every object it references 
 - 2-D is filed as [#1411](https://github.com/dcodish/geo_builder/issues/1411).
 
 **Consequences.** `src-analytic/engine/apply.ts` (`NON_CREATING` removed, `foldPass`'s fixpoint gate). Lock: `src-analytic/__tests__/issue-1340-forward-derived-point.test.ts`. It includes the store and submit-gate sequence and asserts every row green with M at (2, 0).
+
+## ADR-AG-157 — «הראשונה» and «השנייה» name their root: an ordinal lowers to a selector over one canonical order (#1268)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1268](https://github.com/dcodish/geo_builder/issues/1268) (bug, `P2`, `analytic`) · round [#1408](https://github.com/dcodish/geo_builder/issues/1408)
+**Requirements:** [02c](02c-requirements-analytic.md) R85 (amended — what the ordinals promise) · **Design:** [04c](04c-design-analytic.md#the-crossing-modules-tolerances-adr-ag-130) — "A pair's crossings have ONE order"
+**Implements** [ADR-AG-065](#adr-ag-065)'s ruling (#1113, operator 2026-09-16: *the sentence names the root*), which the code that closed it did not keep · **consistent with** [ADR-AG-047](#adr-ag-047) and [ADR-AG-135](#adr-ag-135)
+
+**Measured at the base (`eef9dda4`, real `derive`):**
+
+```
+A(0,0)·B(6,0)·C(3,5)·משולש ABC·x^2+y^2=16
+  «P … הראשונה של הישר CA …» / «… השנייה …»   → both (2.058, 3.430), seeds 0–2      the word chose nothing
+  the side CA's ring                            → «P נקודת החיתוך של הצלע CA …»      no ordinal at all
+chord A(-5,1)·B(5,1)·x^2+y^2=16·הקטע AB
+  «… השנייה של הקטע AB …»                       → (−3.873, 1) at seeds 0, 1           same as «הראשונה»
+  click the RIGHT ring                          → commits «הראשונה», P on the LEFT; the remaining ring then also said «הראשונה»
+24-seed rate of "P on the root its word names":  chord «השנייה» 8/24 · chord «הראשונה» 16/24 · free-B line «השנייה» 13/24
+```
+
+**The class.** *A stated ordinal about a crossing was carried and never lowered*: the only selector a crossing
+sentence emitted was `crossing-distinct` ("not my sibling"), so which root a sentence landed on was the solve's
+first converged start (ADR-AG-134), and #1113's pair case passed because distinctness pushed the second name
+off the first — not because the words said which. Two readers of "which root is first" existed (the ring's
+`nth`, the sentence's word) and nothing connected them. The ring's `nth` had a second defect of its own:
+`meetConic` filtered roots by the segment's extent before `crossingsOf` numbered them, so a side that meets the
+circle once on its piece offered no ordinal, while the comment above the loop claimed the opposite.
+
+**The mechanism.**
+
+- **One canonical order** (`engine/crossing-order.ts`, new). A straight meeting a conic is walked in its own
+  direction and its crossings numbered in the order met — the parameter `t` ascending. A straight named by two
+  points is walked from the first letter toward the second (so «הישר BA» numbers the other way round from
+  «הישר AB», and the words carry the direction); a straight with no points of its own — an equation, an axis,
+  a named line — is walked left to right, bottom to top when vertical. The order is over the WHOLE line,
+  before any extent: the root on a side keeps the number its line gives it.
+- **The ordinal lowers to a selector.** `parseIntersection` reads «הראשונה»/«השנייה» (and the single-yod
+  «השניה», and "the first/second intersection") and emits `crossing-nth {id, nth, pair}` — the pair being the
+  sentence's own two incidences. A sentence with no ordinal, or with «האחרת», keeps `crossing-distinct`.
+- **The selector judges validity** (`evaluate.ts` `failingSelectors`): the point must be nearest the named root
+  of its pair in THIS configuration — no epsilon, the roots are distinct points. A named root that does not
+  exist (the second crossing of a pair that meets once) fails; a tangency, a pair that misses, or a pair with
+  no defined order judges nothing (the incidences' own residuals report a miss).
+- **It also SEEDS** (the #1071 lesson for a branch): the crossing starts on the named root, read off the seeded
+  positions of what it crosses, after the bounded-noun projection. A filter that only rejects would leave the
+  named root to the sampler's luck.
+- **The rings share the order.** `crossingsOf` numbers every root of the pair from the unfiltered list, then
+  applies the extent; the occupancy check comes after the number, so a ring is never re-numbered once its
+  sibling is taken. `offersOf` (new) is the one list the canvas renders — lifted out of `App.tsx` so the click
+  path is callable from a test.
+- **Blame names the failing sentence.** `derive` blamed every line carrying a selector whenever any selector
+  failed; «השנייה של הצלע CA» (the second crossing lies beyond the side) also blamed «משולש ABC». The figure now
+  reports WHICH selectors failed (`selectorsFailing`) and only their sentences are blamed.
+
+**«הציגו תצורה אחרת» does not swap an ordinal-named crossing — the student said which one.** A configuration
+with the point on the other root fails the selector, so it is not a valid configuration and the walk never
+offers it. This is consistent with ADR-AG-047's "both solutions are listed": 047 lists both because the figure
+LEAVES the choice open — cycle and the point moves, so neither is knowledge. An ordinal closes that choice, the
+same way a stated coordinate closes a continuous one; the unordinalled sentence («נקודת החיתוך של …») still
+leaves it open, and both roots are still listed and cycled for it.
+
+**Measured after.** Every case above 24/24 on the named root; per-derive time unchanged (0.4–1.0 ms against
+0.4–1.2 ms). Worst-case multiplier: none added — one `place` per evaluation, only when an ordinal exists, and
+one closed-form quadratic per ordinal per validity check. The click: the right ring offers «השנייה» and lands
+on the right; the remaining ring still offers «הראשונה» and lands on the left; the first point does not move.
+
+**Retired with the defect.** `seedShowing` (`app/another.ts`) searched for the seed that showed a clicked root,
+because both rings used to offer one sentence. The product stopped calling it at #1269; with the sentence now
+naming the root it has no job, and `conic-rings.test.ts`'s click cases assert the stronger claim instead —
+each ring's sentence lands on that ring at every seed, with no seed search.
+
+**Limits, stated.** Two conics («נקודת החיתוך הראשונה של המעגל I עם המעגל II») have no order this ADR defines;
+their ordinal judges nothing, as before — a successor issue, not built on speculation. The same ordinal written
+twice for two letters («P … הראשונה …» · «Q … הראשונה …») is refused on the second sentence by the existing
+positional rule (`crossing-already-named`, holder P), whose message speaks of "lines" — adequate, not exact.
+
+**Sibling audit.** 2-D (`src/`) has no crossing ordinal — its branch is a stored configuration index by design
+(the ruling that went the other way here); 3-D (`src3d/`) has none either. Class not present in either.
+
+**Consequences.** `engine/crossing-order.ts` (new); `engine/types.ts` (`crossing-nth`); `parser/parseAnalytic.ts`
+(`ordinalOf`, the selector choice); `engine/apply.ts` (refs); `engine/evaluate.ts` (judge, seeding,
+`selectorsFailing`); `engine/derive.ts` (blame); `engine/crossings.ts` (shared order, unfiltered `nth`,
+`offersOf`); `App.tsx` (calls `offersOf`); `app/another.ts` (`seedShowing` removed). Locks:
+`issue-1268-crossing-ordinal.test.ts` (14: one ordinal alone on a chord, an undrawn line, reversed letters, an
+equation and a vertical line — all against `conicMeet`; a triangle side's ring offers its ordinal, «הראשונה»
+lands, «השנייה» is refused on its own line only; #1113's pair each on its named root; the unordinalled sibling;
+the same ordinal twice refused; cycling leaves the named crossing in place; the click path through `offersOf`;
+the grammar); `conic-rings.test.ts` (two click cases rewritten, above). `docs/02c` R85; `docs/04c` the order
+paragraph.
