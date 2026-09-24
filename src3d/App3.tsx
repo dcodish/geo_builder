@@ -222,6 +222,8 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.planeNotDetermined', { id: err.id });
     case 'line-not-determined':
       return t('err.lineNotDetermined', { id: err.id });
+    case 'point-not-determined':
+      return t('err.pointNotDetermined', { id: err.id });
   }
 }
 

@@ -3873,12 +3873,21 @@ const coordsClaim: Rule = (s) => {
   return [{ type: 'claim', claim: { type: 'coords-eq', id: m[1], x: +m[2], y: +m[3], z: +m[4] } }];
 };
 
-/** `AB = 3` — a scalar length CLAIM (Lane A: all points pinned ⇒ a check, never a driver). */
+/**
+ * `AB = 3` — a scalar length statement: a check on a determined figure, a GIVEN on a free one (the
+ * engine decides at apply, M1).
+ *
+ * #1311 (ADR-3D-260): «וקטור AB = 5» states the same thing about the same pair as «וקטור AB» then
+ * «אורך AB = 5», so its carrier is the command the one-word form lowers to — an ARROW when the pair is
+ * marked (the #1184 arm-3 rule, keyed off the one `VEC_MARKED`). A plain `segment3` carrier never mints,
+ * so the one-line form was refused `unknown-point: A` on an empty canvas while the two-line form built:
+ * two orders of one sentence disagreed.
+ */
 const lengthClaim: Rule = (s) => {
   const m = s.match(new RegExp(`^([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(${NUM})$`));
   if (!m) return null;
   return [
-    { type: 'segment3', a: m[1], b: m[2] },
+    VEC_MARKED ? { type: 'draw-arrow', from: m[1], to: m[2] } : { type: 'segment3', a: m[1], b: m[2] },
     { type: 'claim', claim: { type: 'length-eq', a: m[1], b: m[2], value: +m[3] } },
   ];
 };

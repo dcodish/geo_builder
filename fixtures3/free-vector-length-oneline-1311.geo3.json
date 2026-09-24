@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-09-24T20:24:15.136Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "וקטור AB = 5",
+      "cmds": [
+        {
+          "type": "draw-arrow",
+          "from": "A",
+          "to": "B"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "B",
+            "value": 5
+          }
+        }
+      ]
+    }
+  ]
+}

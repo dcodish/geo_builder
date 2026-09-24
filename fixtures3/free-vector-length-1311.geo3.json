@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-09-24T20:24:14.622Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "וקטור AB",
+      "cmds": [
+        {
+          "type": "draw-arrow",
+          "from": "A",
+          "to": "B"
+        }
+      ]
+    },
+    {
+      "utterance": "אורך AB = 5",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "B",
+            "value": 5
+          }
+        }
+      ]
+    }
+  ]
+}

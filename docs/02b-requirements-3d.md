@@ -156,6 +156,16 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   `issue-1184-vector-starts-a-figure.test.ts`. **Not yet:** a vector declared from its COMPONENTS with
   no points at all — «נתון: v = (10,-5,0)» — which needs the positionless-vector design in
   [#1188](https://github.com/dcodish/geo_builder/issues/1188).)*
+- **FR-VC-1c (Must)** — **A stated magnitude on a free vector is a GIVEN, and the figure honours it.**
+  After «וקטור AB» the endpoints are free, so «אורך AB = 5» (or «וקטור AB = 5», «AB = 5», «|u| = 5») moves
+  them until |AB| = 5 holds, and keeps holding on «הציגו תצורה אחרת». What was not stated (the vector's
+  direction, where it sits) keeps varying. The same holds for any statement the drive understands about
+  never-positioned points: two lengths, a coordinate, an angle. The one-line «וקטור AB = 5» on an empty
+  canvas draws the same figure as the two-line form. A second, conflicting magnitude is refused naming the
+  statement it conflicts with; a magnitude on points whose positions were stated is still checked and
+  refused when wrong. *(Realised — [ADR-3D-260](06b-decisions-3d.md#adr-3d-260), #1311;
+  `issue-1311-free-pair-length-drive.test.ts`, fixtures `free-vector-length-1311` and
+  `free-vector-length-oneline-1311`.)*
 - **FR-VC-2 (Must)** — Support **at most one symbolic parameter** in a vector expression, pinned by a
   given through root-finding. *(Two unknowns in one expression is a known boundary — issue #301.)*
 - **FR-VC-2a (Must)** — **A POWER in a coordinate component is supported where the solver can pin it,
@@ -245,7 +255,11 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
 - **FR-CL-1 (Must)** — **A claim is verified, not obeyed.** When a student asserts a value or relation,
   the tool checks it against the figure across **several seeded configurations** and **refuses it
   (`claim-refuted`) when it is wrong**. A claim must never reshape the figure to become true — that would
-  make the tool agree with the student instead of checking them.
+  make the tool agree with the student instead of checking them. **A claim is only ever judged against
+  what the student stated.** A statement about a part the tool sampled (a free plane, a free line, the
+  figure's placement against the axes, a never-positioned point) that no drive honours is refused as
+  *not yet determined*, naming that part, and never as wrong
+  ([ADR-3D-260](06b-decisions-3d.md#adr-3d-260) — one rule; #508, #552, #512 and #1311 are its carriers).
 - **FR-CL-2 (Must)** — **No claim can escape by hiding inside a composite.** Every claim is recorded on
   the construction and verified on evaluation, so a claim arriving as part of a larger command is checked
   like any other. *(Realised — `Construction3.claims`, verified in `derive3`.)* A **role noun** is a claim

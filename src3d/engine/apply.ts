@@ -12,7 +12,7 @@ import { riderPairsT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
 import { diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
-import { isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
+import { claimPointIds, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
@@ -1583,7 +1583,14 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       }
       // M1 (V7 T2): a scalar statement on a figure with FREE dims is a GIVEN — it
       // drives the solve instead of being "checked" against an arbitrary sample.
-      if (freeDims(c) > 0) {
+      //
+      // #1311 (ADR-3D-260): …and so is one that names a NEVER-POSITIONED point. A `free3` point carries
+      // three sampled DOF the student never stated (ADR-052), which the pivot now owns as unknowns — so
+      // «וקטור AB» then «אורך AB = 5» moves A and B until |AB| = 5 instead of comparing 5 against the
+      // ≈2.34 the sampler invented and calling the student wrong. `freeDims` counts only a solid's dims,
+      // so it answered "determined" for the vectors unit's whole first lesson. The predicate is the
+      // statement's own reach (the points it names), never the figure's state (docs/17 §2.2).
+      if (freeDims(c) > 0 || claimPointIds(c, cmd.claim).some((id) => c.points.get(id)?.kind === 'free3')) {
         // #316 (ADR-3D-075): the COORDS twin — «D=(8,10,-12)» on an under-determined figure is the
         // same statement as «D(8,10,-12)» (one statement, one semantics, docs/17 §2.3; the `=` sign
         // must not turn a GIVEN into a refused claim). It lowers to the pivot pin exactly like

@@ -531,6 +531,35 @@ a bare segment on an empty canvas remains its own question rather than a side ef
 so this needs the positionless-vector design in
 [#1188](https://github.com/dcodish/geo_builder/issues/1188), including the pedagogical question of how an
 object with no position is drawn.
+## A never-positioned point is a pivot unknown (#1311, [ADR-3D-260](06b-decisions-3d.md#adr-3d-260))
+
+A `free3` point (minted by «וקטור AB» on an empty canvas, by «קטע BE» from a known B, or by a mixed shape
+run) carries three DOF the student never stated. They are **pivot unknowns**, not samples: each coordinate
+is an entry in the #820 rider lane, keyed `freeCoordKey(id, axis)` in the same `riderTs` record, anchored
+at its canonical sample (so what the givens leave free still varies with the seed) and started there.
+Membership is the lane's measured probe, so a free point no residual reads costs nothing and changes
+nothing. `evaluateSolidsAndPoints` places a driven coordinate where the pivot put it (the rider override's
+twin), and the pivot runs on a solid-less figure that holds a free point (`hasFreePoint3`).
+
+Two seams route a statement there, and both ask what the **statement** names, never the solver's state:
+the apply fork drives a scalar statement when `freeDims(c) > 0` or the statement names a `free3` point
+(`claimPointIds`, a structural walk over the claim); and `lengthClaim` lowers a marked «וקטור AB = 5» to
+the arrow the one-word form draws, so one line mints and drives exactly what two lines do.
+
+**The release.** The anchors choose the basin; they never decide whether the givens hold. A collected
+candidate whose primary error the anchors' pull left just above `ACCEPT` (below 1e-6) is polished on the
+primary residuals alone and kept only if that closes it without collapsing a solid. A free coordinate can
+travel a figure-width where a rider moves within `[0, 1]`, so its anchor equilibrium sits higher.
+
+**The not-determined rule** (`sampledCarrierVerdict`, `store3.ts`) is the net under the drive: a failing
+claim that reads a carrier whose freedom was sampled (a free plane, a free line, the frame placement, a
+free point, in that order) is refused naming the carrier, never `claim-refuted`. It is one loop over
+carrier rows; adding a carrier is adding a row, and it judges what a claim READS, not how its value varies
+across seeds (the three-valued verdict #909 deferred is not built).
+
+**Not driven yet:** a length on a free point after a solid's scale given (#754 owns the size; the rule makes
+it honest), and the DOF cue still counts a driven free vector's six coordinates as free (fail-open).
+
 ## The data panel has two kinds of row (#1196, [ADR-3D-254](06b-decisions-3d.md#adr-3d-254))
 
 Every field of `DataPanel` used to be a **measurement** — coordinates, a vector's components and

@@ -10280,3 +10280,119 @@ ids. After the extraction all of them reproduce exactly (`decide-submit3-parity-
 `lostGivens3`; `submit`, `submitSteps` and `replaceFact` reduced to dispatch). Locks: the parity test and
 its golden file, and `decide-submit3-purity-1394.test.ts` (asking leaves the store identical, including
 for a rename, a twin and a record).
+
+## ADR-3D-260 — A stated magnitude on a FREE point is a given the pivot drives; the not-determined guard is one rule with four carriers (#1311)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1311](https://github.com/dcodish/geo_builder/issues/1311) (bug, `P2`, `3d`) · round [#1408](https://github.com/dcodish/geo_builder/issues/1408) · governed by the [#909](https://github.com/dcodish/geo_builder/issues/909) ruling (2026-09-05: *DRIVE a stated magnitude; the three-valued verdict is deferred*)
+**Requirements:** [02b](02b-requirements-3d.md) — **FR-VC-1c** added (a stated magnitude on a free vector is a given); **FR-CL-1** gains the not-determined sentence · **Design:** [04b](04b-design-3d.md#a-never-positioned-point-is-a-pivot-unknown-1311-adr-3d-260) (new section) · **LADDER stage:** apply (the M1 claim fork, the stage #909's angle drive routes at) + the pivot's unknown set (solve: the #820 rider lane gains a carrier) + the store's post-fold claim judge (the guard)
+
+**The report.** *"it refuses. when i first create vector AB and then write the =5 thing it refuses."* Measured at `eef9dda4`:
+
+```
+«וקטור AB = 5»                     → unknown-point: A          (one line, empty canvas)
+«וקטור AB» → «וקטור AB = 5»        → claim-refuted             (|AB| sampled ≈ 2.20)
+«וקטור AB» → «אורך AB = 5»         → claim-refuted
+«וקטור AB» → «AB = 5»              → claim-refuted
+```
+
+`A` and `B` are `free3`: six sampled DOF, nothing stated about either. The tool compared 5 against its own
+sample and called the student wrong. That is [ADR-052](06-decisions.md#adr-052)'s cardinal sin, and #508's
+words ("a false accusation … about a perfectly good given, purely because nothing had tried to move") with
+*point* in place of *plane*.
+
+**Class.** *A stated magnitude or relation about a never-positioned point is judged against the sampler's
+guess instead of being honoured as a given*, because no mechanism owned a free point's DOF. Three seams each
+missed it. The apply fork routed a scalar statement to a drive only when `freeDims(c) > 0`, which counts a
+SOLID's dims and so answered "determined" for the vectors unit's whole first lesson. The pivot's unknowns
+were `[gauge | dims | coupled | pinSyms | riders]`, with no slot for a free point's coordinates. And the
+pivot never ran at all on a figure without a solid.
+
+**Decision: three arms, in the plan's order.**
+
+1. **THE DRIVE (the fix).** A never-positioned point's three coordinates join the pivot's **rider lane**
+   (#820, [ADR-3D-204](#adr-3d-204)), the lane that already makes a free rider's `t` a pivot unknown
+   instead of a sample. Each coordinate is one lane entry keyed `freeCoordKey(id, axis)` in the same
+   `riderTs` record, so every consumer that re-evaluates a solution (`applySolutions`, the pool, the sign
+   filter) places a driven point where the pivot put it, by the path it already has. Membership is the
+   lane's measured probe: a free point no residual reads is not an unknown, so every figure whose free
+   points nothing mentions solves bit-identically. Each coordinate is anchored at its canonical sample
+   with the lane's `REG_SF` pull, so what the givens leave free still varies with the seed (ADR-052): the
+   direction of a free vector with |AB| = 5 still moves on «הציגו תצורה אחרת». A coordinate starts at its
+   sample (`spread: false`), because a rider's root sits anywhere on its host and a coordinate has no host
+   to spread across. The apply fork's gate becomes `freeDims(c) > 0` **or the statement names a `free3`
+   point** (`claimPointIds`, a structural walk): the statement's own reach, never the figure's solver
+   state (docs/17 §2.2). The pivot runs on a solid-less figure that holds a free point (`hasFreePoint3`).
+   The drive lands at the same stage as #909's: a scalar pin at apply, its residual in the pivot.
+
+   **Drive and verify aim at one predicate.** The length residual is `|b − a| − value`, the quantity
+   `claims.ts` measures for `length-eq`. The locks check the landing with `verifyClaim` itself, never with
+   a tolerance of their own (the `onLineHolds3` discipline, ADR-3D-174).
+
+   **The release.** Two lengths on three free points («אורך AB = 5», «אורך AC = 3») failed at one seed in
+   24: the anchors' pull floored the primary error at 1.1e-10, a hair over `ACCEPT`. A rider moves within
+   `[0, 1]`; a free coordinate can travel a figure-width, so the equilibrium sits higher. The anchors
+   choose the basin; they must never decide whether the givens HOLD. So a collected candidate whose
+   primary error is within reach (`ACCEPT ≤ e < 1e-6`) is polished on the primary residuals alone, from
+   where it stands, and kept only if that lowers the error without collapsing a solid (the parkScale /
+   #797 hard-pin-then-release pattern). It can only turn a near-miss into an exact solution; a candidate
+   it cannot close is judged exactly as before. **24/24 seeds** after, for the reported case and for the
+   two-length case (0/24 before: every seed refuted).
+2. **THE GUARD (the class half): one rule, not a fourth `if`.** The three inline conditions of #508 (free
+   plane), #552 (free line) and #512 (sampled frame placement) are one rule: *a failing claim that reads a
+   carrier whose freedom the tool SAMPLED is not refuted; it names the carrier.* `sampledCarrierVerdict`
+   (`store3.ts`) is that rule as a loop over carrier rows. Each row says which carriers a claim reads (a
+   structural walk), whether one is still sampled (the resolution's record, or the point's kind), and the
+   verdict that names it. The free point is the fourth row (`point-not-determined`, both locales). Row
+   order keeps the old condition order with the new carrier last, so every verdict the three guards gave
+   is byte-identical. **This is NOT the three-valued verdict** #909 deferred: it asks which carrier a claim
+   reads, never whether the claim's value varies across seeds. No escalation was needed.
+3. **The one-line form.** «וקטור AB = 5» lowered to a plain `segment3` carrier (which never mints) plus the
+   claim, so it was refused on an empty canvas while the two-line form built. `lengthClaim` now emits the
+   carrier the one-word form lowers to, `draw-arrow` when the pair is marked (`VEC_MARKED`, the #1184
+   arm-3 rule), so the arrow lane mints the endpoints and the claim drives them. The one-line and two-line
+   forms produce identical positions at every seed (asserted).
+
+**Refusals, measured in their three registers.**
+
+| situation | verdict |
+| --- | --- |
+| «וקטור AB» · «אורך AB = 5» · «אורך AB = 7» | `givens-contradict`, stated «אורך AB = 7», naming «אורך AB = 5»: the pivot has no solution (the ADR-3D-217 register) |
+| «וקטור AB» · «A(0,0,0)» · «B(3,4,0)» · «אורך AB = 7» | `claim-refuted`: the givens forbid it (the points were placed, and `placeholderYields` made them coordinates) |
+| «קובייה» · «אורך AB = 2» · «קטע BE» · «אורך BE = 5» | `point-not-determined: E`: the scale given owns the cube's size (#754), so this length takes the claim lane, and E was never positioned |
+
+**A sibling improved, and the parity golden moved for it.** The exam sequence `…, «DE», «DE=(0,2,0)»,
+«BA=(6,0,6)», «B(3,9,-9)»` mints E free at «DE» (#840). Before, E only rode the gauge: «DE=(0,2,0)» was met
+by rotating the whole pyramid, then «BA=(6,0,6)» was refused `givens-contradict` naming «DE=(0,2,0)» (two
+satisfiable givens accused of each other) and «D=(8,10,-12)» came back `claim-refuted`. E's coordinates now
+move, and every line builds. These are the only two pre-existing sequences whose recorded behaviour changed
+among the ~1,500 in `decide-submit3-parity-1394`, and the golden was re-recorded (`UPDATE_PARITY_GOLDEN=1`)
+for exactly that.
+
+**Cost (M3).** Worst case: 3 extra unknowns per free point a residual reads. Those are Jacobian columns, not
+restarts; a lane entry makes the pool `collectAll`, exactly as a rider does. Measured by replaying every
+`fixtures3/` session through `submit` plus four derives: **34.07 s → 34.22 s** (noise; the hardest,
+`symbolic-line-equation-863`, 11.46 s → 10.92 s). The reported figure costs about 0.5 s per driving line.
+
+**Sibling audit.** *2-D (`src/`)*: a free point is a 2-DOF carrier that the stage-3 recruiter
+(`recruitFreeDofs`) drives by construction, so the class is not present. *3-D siblings of the carrier*: the
+guard covers any claim kind that reads a free point (structural walk); the drive covers every scalar-pin
+claim kind in the M1 fork (length, coordinates, vector equation, length ratio, segment angle). The angle and
+«|u| = 5» spellings are asserted.
+
+**Not built (reported to the round as follow-ups, not decided here).** (a) A length on a free point **after**
+a solid's scale given (#754) is not driven: the scale given owns the size, and a second length pin would
+double-apply it. The guard makes that case honest (`point-not-determined`) instead. (b) The DOF cue still
+counts a driven free vector as 6, because it measures what scalar pins consume over the solid dims only. That
+over-counts freedom, which is the fail-open direction. (c) #1310 (a second free vector) is untouched.
+
+**Locks.** `src3d/__tests__/issue-1311-free-pair-length-drive.test.ts` (13 tests): the four orders at five
+seeds through `verifyClaim`; one-line ≡ two-line positions; resample moves the vector and keeps |AB| = 5; the
+three refusal registers above; two lengths at 24/24 seeds; an angle and «|u| = 5»; the pyramid sibling.
+Fixtures `free-vector-length-1311.geo3.json` and `free-vector-length-oneline-1311.geo3.json`: the operator's
+exact sequences through the real load path, parser-drift net included.
+
+**Consequences.** `engine/types.ts` (`freeCoordKey`, `hasFreePoint3`, `claimPointIds`, the
+`point-not-determined` error); `engine/solve3.ts` (free coordinates in the rider lane; the release);
+`engine/evaluate.ts` (a driven coordinate is placed where the pivot put it; the pivot gate);
+`engine/apply.ts` (the fork's gate); `parser/parse3.ts` (`lengthClaim`'s carrier); `store/store3.ts`
+(`sampledCarrierVerdict`); `App3.tsx` and both locales.

@@ -17,7 +17,7 @@
  */
 
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
-import { evalAffine, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind } from './types';
+import { evalAffine, freeCoordKey, hasFreePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, bisectorDir3, cross3, dist3, dot3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -440,10 +440,27 @@ export function solvePivot(
   // rider lives in [0, 1]; a ratio is any positive number (k > 1 is a trapezoid whose far side is the
   // longer one, a legitimate figure), and only k ≤ 0 — the corner collapsed onto its anchor or dragged
   // across the ring — is not a figure at all.
-  let riders: { id: Id; t0: number; lo: number; hi: number }[] = [];
+  //
+  // #1311 (ADR-3D-260): a never-positioned (`free3`) point's three COORDINATES ride the same lane — the
+  // student never stated where the point is, so a given that names it («אורך AB = 5» on a free vector)
+  // must move it, not be judged against the sampler's guess (the #820 argument, one carrier over). Each
+  // coordinate is an unbounded lane entry keyed by `freeCoordKey`, anchored at its canonical SAMPLE (so
+  // what the given leaves free still varies with the seed, ADR-052) and started there — `spread: false`:
+  // a rider's root sits anywhere on its host, but a coordinate has no host to spread across. Membership
+  // is the same measured probe below, so a free point no residual reads solves exactly as before.
+  let riders: { id: string; t0: number; lo: number; hi: number; spread: boolean }[] = [];
   for (const [id, def] of c.points) {
-    if (def.kind === 'on-segment' && def.t === undefined) riders.push({ id, t0: riderSampleT(seed, id, def.a, def.b), lo: 0, hi: 1 });
-    else if (def.kind === 'scaled-offset' && def.k === undefined) riders.push({ id, t0: offsetSampleK(seed, id), lo: 1e-3, hi: Infinity });
+    if (def.kind === 'on-segment' && def.t === undefined) riders.push({ id, t0: riderSampleT(seed, id, def.a, def.b), lo: 0, hi: 1, spread: true });
+    else if (def.kind === 'scaled-offset' && def.k === undefined) riders.push({ id, t0: offsetSampleK(seed, id), lo: 1e-3, hi: Infinity, spread: true });
+  }
+  if (hasFreePoint3(c)) {
+    const sampled = evalCanonical(dims0);
+    for (const [id, def] of c.points) {
+      const p = def.kind === 'free3' ? sampled.get(id) : undefined;
+      if (!p) continue;
+      for (const axis of ['x', 'y', 'z'] as const)
+        riders.push({ id: freeCoordKey(id, axis), t0: p[axis], lo: -Infinity, hi: Infinity, spread: false });
+    }
   }
   /** The trial rider parameters at `x` — `undefined` when the lane is empty (every path stays bit-identical). */
   const riderMap = (x: number[]): ReadonlyMap<Id, number> | undefined =>
@@ -1180,7 +1197,7 @@ export function solvePivot(
     // dims-only multi-start: deterministic jitters around the seed's sample. #820: a rider start is
     // SPREAD across its host rather than jittered off the sample — the roots of a relation in `t` sit
     // anywhere in [0,1] and the near-sample basin is not privileged.
-    const riderStarts = [riders.map((r) => r.t0), riders.map(() => 0.3), riders.map(() => 0.7), riders.map(() => 0.5)];
+    const riderStarts = [riders.map((r) => r.t0), ...[0.3, 0.7, 0.5].map((v) => riders.map((r) => (r.spread ? v : r.t0)))];
     const dimStarts = [dims0, dims0.map((v) => v * 0.75), dims0.map((v) => v * 1.3), dims0.map((v, i) => (i % 2 ? v * 0.6 : v * 1.2))]
       .map((d, i) => [...d, ...riderStarts[i]]);
     if (warmDims) dimStarts.unshift(warmDims);
@@ -1239,7 +1256,7 @@ export function solvePivot(
     const pinSymStart = Array.from({ length: nPinSym }, () => (k < 4 ? 1 : -1) * (0.3 + 0.3 * (k % 3)));
     // #820: rider starts SPREAD across the host (0.2/0.35/…/0.8), never all at the seed's sample —
     // a relation's root in `t` sits anywhere in [0,1] and the sample's basin is not privileged.
-    const riderStart = riders.map((r) => (k === 0 ? r.t0 : 0.1 + 0.1 * ((k * 3) % 8)));
+    const riderStart = riders.map((r) => (k === 0 || !r.spread ? r.t0 : 0.1 + 0.1 * ((k * 3) % 8)));
     starts.push([0, 0, 0, axes[k].x * angles[k], axes[k].y * angles[k], axes[k].z * angles[k], 0, ...dims0, ...symStart, ...pinSymStart, ...riderStart]);
   }
   // #797 (ADR-3D-168 Am. 1): the ±0.3–0.9 pin-symbol spread explores only the near-origin
@@ -1438,8 +1455,29 @@ export function solvePivot(
     let best: { x: number[]; err: number } | null = null;
     const seen = new Set<string>();
     /** Accept/dedup/push one converged candidate into the pool (collectAll only). */
-    const collect = (cand: { x: number[]; err: number }): void => {
-      if (degenerate(cand.x)) return; // a collapsed solid is not a figure (general position)
+    const collect = (cand0: { x: number[]; err: number }): void => {
+      if (degenerate(cand0.x)) return; // a collapsed solid is not a figure (general position)
+      /**
+       * #1311 (ADR-3D-260) — RELEASE a candidate the anchors held just short of exact.
+       *
+       * The soft anchors pick the basin (what the givens leave free stays near the seed's sample); they
+       * must never decide whether the givens HOLD. Their pull floors the primary error at an equilibrium
+       * that grows with how far the drive had to move the anchored unknowns — negligible for a rider's
+       * `t ∈ [0, 1]`, but a free point's coordinates can travel a whole figure-width («אורך AB = 5,
+       * אורך AC = 3» on three free points floored at 1.1e-10, a hair over `ACCEPT`, at one seed in 24).
+       * So a candidate within reach of exact is polished on the PRIMARY residuals alone, from where it
+       * stands — the parkScale / #797 hard-pin-then-release pattern: the anchored solve chose the basin,
+       * the release only closes the last gap inside it. A candidate the release cannot make exact, or that
+       * it collapses, is judged exactly as before.
+       */
+      let cand = cand0;
+      if (anchored) {
+        const pe = primaryErr(cand0.x);
+        if (pe >= ACCEPT && pe < 1e-6) {
+          const rel = leastSquares(fPrimary, cand0.x);
+          if (!degenerate(rel.x) && primaryErr(rel.x) < pe) cand = rel;
+        }
+      }
       const rAccept = anchored ? primaryErr(cand.x) : cand.err;
       if (!collectAll || rAccept >= ACCEPT) return;
       const parked = parkScale(cand.x); // #518: an undriven scale parks at the seed target, exactly
