@@ -678,7 +678,11 @@ export function App() {
             <FactList
               rows={lines.map((src, i) => ({
                 id: String(i),
-                content: <code dir="ltr">{src}</code>,
+                // #1401 (ADR-W-088): the direction is the chrome's, from the line's CONTENT. This was
+                // `dir="ltr"` for every line, so a Hebrew line («z1 ברביע הראשון») took an LTR base and
+                // its words reordered; isolating the technical runs keeps «z1» whole inside RTL.
+                text: src,
+                content: <code>{complexBidi.isolateLtrRuns(src)}</code>,
                 error: v2Failed.has(src)
                   ? (() => {
                       const why = derived2?.untranslated.find((u) => u.src === src)?.why;
@@ -687,6 +691,7 @@ export function App() {
                   : undefined,
                 disabled: disabled.includes(i),
               }))}
+              textDir={complexBidi.textDir}
               emptyHint={t('emptyHint')}
               onToggle={(id) => toggleLine(Number(id))}
               toggleLabel={t('factToggle')}

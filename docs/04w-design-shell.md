@@ -305,3 +305,15 @@ not. Each builder asks it at its own escalation seam, BEFORE the call: 2-D throu
 `unrelated` (now in `PRE_LLM`), 3-D through `classifyGuidance3`'s `unrelated` fallback, analytic through
 `reachesFallback`. The vocabulary is the product's, and each product's catalog net asserts that no line
 it teaches scores zero, so the gate can never brush off a sentence the tool accepts.
+
+## The fact row's direction ([ADR-W-088](06w-decisions-workspace.md#adr-w-088))
+
+`shell/frame/FactList.tsx` owns the base direction of every statement row. A row carries `text`, the
+statement's string, and `content`, its rendering. The chrome wraps `content` in
+`<div dir={textDir(text)} data-fact-text>`, using the `textDir` the product passes (required). The
+edit-in-place box takes its `dir` from the same function, per keystroke. The row's other parts sit
+outside that scope and follow the UI's direction: `lead` (the status mark), `trail` (3-D's plane
+chips), `notes` (advisories and readouts, each with its own `dir`) and `error`. A product still
+decides WHICH string is the statement (3-D: `factRowText3`) and HOW it is typeset. Shell only decides
+that the direction comes from that string. The rows and checks live in
+`shell/__tests__/fixtures/fact-row-dir-rows.tsx`, and each tree runs them against its own `textDir`.

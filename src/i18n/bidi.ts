@@ -225,3 +225,14 @@ export const bidiPostProcessor = {
     return typeof value === 'string' ? isolateLtrRuns(value) : value;
   },
 };
+
+/**
+ * The CONTENT direction of a mixed He/En string (#118 / ADR-312): any Hebrew-block character ⇒ an
+ * RTL base, else LTR. Geometry labels, numbers and operators are Latin or neutral even inside
+ * Hebrew, and `dir="auto"` keys off the FIRST strong character only, so a Hebrew phrase opening
+ * with a point label («C במרחק…») would take an LTR base and reorder into garbage.
+ *
+ * Exported (#1401, ADR-W-088) — it was an arrow inside `App`'s body, which no test could call, and
+ * the shared `FactList` now takes it as its required `textDir`.
+ */
+export const textDir = (s: string): 'rtl' | 'ltr' => (/[֐-׿]/.test(s) ? 'rtl' : 'ltr');

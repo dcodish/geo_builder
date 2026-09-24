@@ -54,7 +54,17 @@ export type FactRowFact3 = {
  * container and its content can disagree about what the row is.
  */
 export function factRowDir3(f: FactRowFact3, vecNames: Set<string>): 'rtl' | 'ltr' {
-  return textDir3(factDisplay3(f, vecNames));
+  return textDir3(factRowText3(f, vecNames));
+}
+
+/**
+ * The row's STATEMENT TEXT — what the shared `FactList` receives as `FactRow.text` and derives the
+ * row's direction from with `textDir3` (#1401, [ADR-W-088](docs/06w-decisions-workspace.md#adr-w-088)).
+ * The direction decision moved into the chrome; which string it is decided FROM stays here, beside
+ * the renderer, for the reason above — it must be the string `FactRowText3` renders.
+ */
+export function factRowText3(f: FactRowFact3, vecNames: Set<string>): string {
+  return factDisplay3(f, vecNames);
 }
 
 export function FactRowText3({ f, vecNames }: { f: FactRowFact3; vecNames: Set<string> }): React.ReactElement {

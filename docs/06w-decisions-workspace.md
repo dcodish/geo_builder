@@ -4557,3 +4557,66 @@ still reaches the model.
 `src-analytic/parser/scopeAnalytic.ts`, `src-analytic/app/submit.ts`. Locks:
 `shell/__tests__/construction-signal-1357.test.ts` and `junk-before-llm-1357.test.ts` in 2-D (the
 real `runSubmit` with the model mocked, both directions, and the catalog net), 3-D and analytic.
+
+## ADR-W-088 — A fact row's direction is the shared FactList's decision, made from the row's CONTENT (#1401)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1401](https://github.com/dcodish/geo_builder/issues/1401) (bug, `P2`, all tools) · round [#1408](https://github.com/dcodish/geo_builder/issues/1408)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-WI-5 (new) · **Design:** [04w](04w-design-shell.md#the-fact-rows-direction-adr-w-088) (new section)
+
+**What the operator reported.** *"attached the way the angle is written in the input panel. we solved
+this for 2d so we need to ensure that fix works for all tools"*. In analytic's fact list, «∠ABC = ∠ACB»
+read «ABC = ∠ACB∠».
+
+**Re-measured at pickup** (Playwright against the worktree at `eef9dda4`): the analytic rows «∠ABC = ∠ACB»
+and «∠BAC = 90» had no `dir` anywhere and resolved `rtl`. The `∠` sat at the far end, as reported. 2-D
+and 3-D rows were already right. **The sweep found two more members:** complex rendered every line as
+`<code dir="ltr">`, so «z1 ברביע הראשון» took an LTR base and its words were reordered. And 3-D and
+complex passed no `editDir`, so their edit box fell back to `dir="auto"`, the #118 defect.
+
+**Class.** *A statement row's base direction was decided by each builder's caller, inside its own
+`rows={…}` callback, rather than by the shared row.* So each tool decided again. 2-D set `dir` on its
+button. 3-D set it on a span (#934, ADR-3D-228). Complex forced `ltr`. Analytic set nothing. The shared
+`FactList` took a direction only for the editor, and only as an optional prop with an `auto` fallback.
+
+**Root cause.** `FactList` gave a row no content direction of its own. A caller could render a row
+without one, and a bidi-neutral first character (`∠`, `|`, `(`) then resolved to the app's RTL.
+
+**Decisions.**
+
+1. **`FactRow.text` is required, and so is `FactListProps.textDir`.** `FactList` wraps the row's
+   `content` in `<div dir={textDir(row.text)} data-fact-text>`. A builder can no longer hand the chrome
+   a row with no content direction, and `tsc` enforces this at every caller. The policy is still the
+   product's own: shell calls the product's `textDir` and never picks a direction itself.
+2. **The same `textDir` drives the edit-in-place box.** It replaces the optional `editDir`, and the
+   `auto` fallback goes with it. It is still computed per keystroke from the box's own text, which is
+   the property ADR-3D-228 point 4 wanted to keep for editable fields. That point's fallback is
+   **superseded**: the prop it defaulted is now required.
+3. **The row gets `lead` / `trail` / `notes` slots outside the direction scope.** The status mark
+   (2-D ✓/✗/○, 3-D dot or ✓), 3-D's plane chips, and 2-D's advisories and readout follow the UI's
+   direction, so a mark does not change sides from row to row. Each note keeps its own `dir`.
+4. **The four builders are wired through it.** 2-D passes `textDir`, now exported from
+   `src/i18n/bidi.ts`. It was an arrow inside `App`, where no test could call it. The button's own `dir`
+   is dropped. 3-D passes `textDir3` over the new `factRowText3`, the same string `FactRowText3`
+   renders, and `factRowDir3` now composes the two. Complex passes `complexBidi.textDir`, and its
+   `<code>` renders `isolateLtrRuns(src)` so «z1» stays whole inside an RTL row. Analytic passes
+   `analyticBidi.textDir`.
+
+**Sibling audit.** Every `FactList` caller is changed here (grep: `src/App.tsx`, `src3d/App3.tsx`,
+`src-complex/App.tsx`, `src-analytic/App.tsx`). No other shell list renders student statements.
+
+**Locks (docs/28 §5c).** `shell/__tests__/fixtures/fact-row-dir-rows.tsx` holds the rows and the pure
+`factRowDirFaults`. It renders through `FactList` and checks that four LTR rows (two of them the
+operator's `∠` lines) get `dir="ltr"` with the `∠` first, and that four Hebrew rows (two of them opening
+with a Latin label) get `dir="rtl"`. Each tree runs it against its real `textDir` (`issue-1401-fact-row-dir.test.tsx`
+in `src/render`, `src3d/render` with the real `FactRowText3`, `src-complex/ui` and `src-analytic/render`).
+The meta-lock `shell/__tests__/issue-1401-suite-bites.test.tsx` shows the checks catch six broken
+stubs: all-RTL, all-LTR, first-strong (`auto`), a chrome with no scope, a chrome with `dir="auto"`, and
+a trailing `∠`. `src-analytic/__tests__/bidi-wiring.test.ts` now scans for `textDir` where it scanned
+for `editDir`. The editor half was checked in a real browser, where all four builders' boxes resolved
+`ltr` for `∠` lines and `rtl` for Hebrew ones. No DOM test environment exists to lock it.
+
+**Consequences.** `shell/frame/FactList.tsx`, `src/App.tsx`, `src/i18n/bidi.ts`, `src3d/App3.tsx`,
+`src3d/render/FactRow3.tsx`, `src-complex/App.tsx`, `src-analytic/App.tsx`. Visible change: analytic
+`∠`/`|…|`-first rows now read LTR, and complex Hebrew rows now read RTL. The editor box in 3-D and
+complex follows content instead of `auto`. 2-D and 3-D rows are unchanged; before and after screenshots
+of both were identical.

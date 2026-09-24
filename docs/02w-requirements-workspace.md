@@ -258,6 +258,11 @@ Operator-facing, never student-facing. Privacy properties are governed by
 - **FR-WI-4 (Must)** — **Every builder can name every builder.** The switcher resolves its labels through
   each consuming product's own i18n, so a missing key is a blank chip *in that product*. *(Realised;
   the failure surfaces in a different product from the omission, which is why it is stated here.)*
+- **FR-WI-5 (Must)** — **A statement row reads in the direction of its CONTENT, in every builder.** A
+  row with no Hebrew letter («∠ABC = 90», «|AB| = 5») is LTR, so a leading `∠` stays in front. A row
+  with Hebrew is RTL, even when it opens with a Latin label («K על AB»). The same holds in the row's
+  edit box. *(Realised — `shell/frame/FactList.tsx` takes each product's `textDir` and sets the
+  direction itself, [ADR-W-088](06w-decisions-workspace.md#adr-w-088).)*
 
 ## Not owned here
 

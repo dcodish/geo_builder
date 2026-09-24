@@ -8571,6 +8571,8 @@ below the row that had not.
 4. **`shell/`'s `dir={editDir ? editDir(...) : 'auto'}` fallbacks stay.** They are defaults for props a
    caller supplies, on **editable** fields, and shell may not decide a product's direction policy for it.
    The lock is on the product trees, which is where the policy belongs.
+   *Superseded in part by [ADR-W-088](06w-decisions-workspace.md#adr-w-088) (#1401):* the prop is now a
+   **required** `textDir`, so the `auto` fallback is gone. Shell still calls the product's function.
 
 **#933 — the vector row does NOT read backwards, and this is the correction.** #933 was filed from the same
 operator report with a different mechanism: *"`VecMath` emits each token as its own element, and a sequence
