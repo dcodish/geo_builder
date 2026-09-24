@@ -4242,3 +4242,64 @@ mechanism, so it ships with the feature); `shell/session/shortLink.ts` and
 `deploy/apache-*.conf` tails. Locks: `server/__tests__/share-store-1374.test.ts` (33 — append-only,
 unguessable and traversal-proof ids, every named refusal, the full store refusing without evicting,
 usage in bytes and count, the OG tags, the escaped title, and the dev/prod hand-off paths).
+
+## ADR-W-083 — Analytic's events are READ: a dashboard profile, a triage adapter, and a triage app list from the registry (#1362)
+
+**Status:** accepted, 2026-09-24 (taxonomy: operator ruling, 2026-09-24) · **Issue:** [#1362](https://github.com/dcodish/geo_builder/issues/1362) (feature, `P2`, `server`/`workspace`) · the consumption half of [#1243](https://github.com/dcodish/geo_builder/issues/1243) / [ADR-W-077](#adr-w-077) · round [#1382](https://github.com/dcodish/geo_builder/issues/1382)
+**Requirements:** none (internal — operator tooling; no student-facing promise changes) · **Design:** [04s](04s-design-server.md#dashboards-and-triage-read-every-registered-product-adr-w-083) (new section)
+
+**The gap.** #1243 made analytic POST production usage events (live since `prod/2026-09-22-3`). Nothing
+READ them. `/log-triage` carried five two-way branches (`a === '2d' ? … : …` for the app list, the
+remote and local filenames, the classifier, the session replay and the report title), each with a 2-D
+else-arm. That is the defect #1243 fixed in the server's router, reappearing in the tool that consumes
+what the router writes. The dashboard had two profiles and no analytic one. Measured 2026-09-24: 71
+events in `events-analytic.jsonl`, all unread.
+
+**The taxonomy is the operator's** (ruling 2026-09-24, a third bucket rather than a split):
+`not-handled` = build this · `out-of-scope` = correctly declined · `bad-equation` / `unknown-reference`
+/ `bad-arity` = **review**, neither auto-filed nor discarded. Analytic had been reporting for two days,
+and a split chosen before one real session was seen would have reasoned about student mistakes nobody
+had observed. **Every unruled refusal code** (role and degenerate codes, `unsatisfiable`, a name clash)
+also goes to review. That reading files nothing and discards nothing, and the ruling's own revisit
+trigger ("count how the middle three distribute") reads the same breakdown.
+
+**Decision.**
+
+1. **One classifier**, `outcomeOfAnalytic` in `server/admin.ts`, used by BOTH the dashboard
+   (`PROFILE_ANALYTIC`) and `/log-triage`. The 2-D and 3-D classifiers are still copied into the
+   script (a pre-existing mirror); the new one is not, per ADR-W-053.
+2. **A dashboard mount on a distinct tail**: `/analytic-builder/admin` → `/admin-analytic`, routed in
+   `standalone.ts` before the bare `/admin` for the same substring reason as `/admin3`. The analytic
+   Apache conf's old "no /admin line" note is replaced: that note existed because the bare tail would
+   have served 2-D data, and a distinct tail is the fix it anticipated.
+3. **`/log-triage` takes its product list from the registry** (`.claude/skills/log-triage/apps.ts`,
+   through `server/toolRouting.ts`'s own filename derivation). `--app all` is the default and `both`
+   keeps its old meaning. **A registered product the script cannot triage is REPORTED**, not
+   skipped. Complex posts no events at all, so it gets a line saying so, and a product whose file
+   cannot be fetched gets "NO DATA". An empty worklist and an unread product must never look alike;
+   that confusion is how analytic sat unread.
+4. **Analytic's replay calls the App's `decideSubmit`** (`src-analytic/app/triageReplay.ts`) instead
+   of mirroring it by hand, which is the drift class ADR-346 documents for the 2-D mirror. It follows
+   `record`, `clear`, `undo`/`redo`, `delete` and logged LLM lines. A `load` (which carries only a line
+   count) degrades the rest of the session honestly.
+
+**Measured on the real data (read-only pull, `--no-fetch --no-state`, nothing uploaded):** 23 sessions,
+2 submits, 31 `load` actions. The one LLM-built row (`DMCE מקבילית`, the #1239 shape-noun-second class)
+follows a load and so reports UNVERIFIED rather than as a gap. That is correct, and it says where the
+evidence is thin: most analytic sessions today are restored or shared figures, not typed ones.
+
+**What this does not do.** Complex still posts nothing (#1243's remaining half). Triage cannot follow a
+`load` or an `edit`; making those followable would mean logging the loaded lines, which is a privacy-
+posture change, not a mechanism. The verdict upload (`verdicts-analytic.json`) happens on the first
+real `/log-triage` run, which this change did not perform.
+
+**Deploy note.** The Apache conf line must be applied by hand in Plesk, like every conf change (RUNBOOK).
+Until it is, `/analytic-builder/admin` 404s. That is harmless, since it answers nothing wrong.
+
+**Consequences.** `server/admin.ts` (`outcomeOfAnalytic`, `PROFILE_ANALYTIC`), `server/standalone.ts`,
+`deploy/apache-analytic-builder.conf`, `.claude/skills/log-triage/{triage.mjs,apps.ts,SKILL.md}`,
+`src-analytic/app/triageReplay.ts` (new). Locks: `server/__tests__/analytic-dashboard-1362.test.ts`
+(16: the ruled taxonomy, unruled codes to review, the aggregation and its code breakdown, the mount
+tail and its route order, the registry-derived plan with complex reported silent, the filenames, and
+triage.mjs importing the shared pieces with no two-way branch left);
+`src-analytic/__tests__/triage-replay-1362.test.ts` (7).

@@ -5,18 +5,20 @@ description: Triage the PRODUCTION usage logs of the Geo Builder (2-D) and the 3
 
 # Log triage — what are prod users typing, and what's genuinely still missing?
 
-Turn the raw prod usage log into a **ranked, HEAD-verified list of things to build**, for the operator to approve. One pipeline serves both apps (2-D Geo Builder `events.jsonl`, 3-D Space Builder `events-3d.jsonl`) with an identical report shape.
+Turn the raw prod usage log into a **ranked, HEAD-verified list of things to build**, for the operator to approve. One pipeline serves every registered product that posts events (2-D Geo Builder `events.jsonl`, 3-D Space Builder `events-3d.jsonl`, Analytic Builder `events-analytic.jsonl`, #1362) with an identical report shape. The list comes from `products.json` (`apps.ts`); a registered product with nothing to read (complex posts no events yet) is **reported as NOT TRIAGED / NO DATA**, which is not the same as "no failures".
 
 ## What the data is
 
-Prod events live on the server at `/var/www/geo-proxy/events.jsonl` (2-D) and `events-3d.jsonl` (3-D). Each `submit` line is a real user utterance: `{ serverTs, iph (hashed IP), ev, sid, rel, utterance, locale, source, result }`.
+Prod events live on the server at `/var/www/geo-proxy/events.jsonl` (2-D) and `events-<id>.jsonl` for every other product. Each `submit` line is a real user utterance: `{ serverTs, iph (hashed IP), ev, sid, rel, utterance, locale, source, result }`.
 - `source` ∈ `parser` | `llm` | `scope` | `limit`; `result` = `ok` | a refusal code | `not-understood`.
 - Outcome buckets (classifier mirrors `server/admin.ts`): **parsed** (deterministic grammar ✓), **llm-built** (only the paid LLM fallback handled it), **not-understood** (real gap — the LLM failed too), **refused** (a reasoned `err.code`), **out-of-scope** / **throttled** / **deferred**.
 
 ## Step 1 — run the pipeline (fetch + bucket + verify-against-HEAD, all in one)
 
 ```
-npx vite-node .claude/skills/log-triage/triage.mjs --app both        # both apps
+npx vite-node .claude/skills/log-triage/triage.mjs                   # every registered product (--app all)
+npx vite-node .claude/skills/log-triage/triage.mjs --app both        # 2-D + 3-D only (the old default)
+npx vite-node .claude/skills/log-triage/triage.mjs --app analytic    # analytic: taxonomy per the 2026-09-24 ruling (ADR-W-083)
 npx vite-node .claude/skills/log-triage/triage.mjs --app 3d          # one app
 npx vite-node .claude/skills/log-triage/triage.mjs --app 2d --days 30 # recent window
 npx vite-node .claude/skills/log-triage/triage.mjs --app 3d --no-fetch # reuse local cache
@@ -60,7 +62,8 @@ Group the surviving utterances into **intent clusters** — the construct or phr
 ## Step 3 — cross-reference coverage
 
 For each cluster, check what already exists so the recommendation is precise and root-cause (docs/17 — a construct, not a one-off patch):
-- Catalogs: `src3d/parser/catalog3.ts` (3-D), `src/parser/catalog.ts` (2-D).
+- Catalogs: `src3d/parser/catalog3.ts` (3-D), `src/parser/catalog.ts` (2-D), `src-analytic/parser/catalogAnalytic.ts` (analytic).
+- **Analytic buckets (ADR-W-083):** `not-handled` → ▶ LIVE; `out-of-scope` → ⊘ declined; every other refusal (the ruled `bad-equation` / `unknown-reference` / `bad-arity` and the unruled codes) → ⚠ review. The first analytic report should COUNT how the review codes distribute — that is the ruling's revisit trigger.
 - 3-D: `docs/21-572-coverage-audit.md`, `docs/20-space-vectors-tool.md` §14, `docs/06b-decisions-3d.md`. 2-D: `docs/06-decisions.md`, `docs/09-implementation-plan.md`.
 - Say whether a gap is a planned slice, a documented deferral, or genuinely new, and which existing rule/pattern a fix would mirror.
 

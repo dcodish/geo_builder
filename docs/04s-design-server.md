@@ -187,3 +187,21 @@ the only safe answer to a tag the server does not recognise is to refuse it. The
 **Known inconsistency, recorded rather than unified:** `parseHandler` treats an empty-string `tool` as
 2-D; both event routers refuse it. Changing the parse path is a live-behaviour change and was out of
 scope for the routing fix.
+
+## Dashboards and triage read every registered product ([ADR-W-083](06w-decisions-workspace.md#adr-w-083))
+
+The router files each product's events under its own name; the two READERS of those files now follow the
+same registry:
+
+| reader | per product | a product it cannot read yet |
+| --- | --- | --- |
+| `admin.ts` dashboard | a `DashboardProfile` (`PROFILE_2D`, `PROFILE_3D`, `PROFILE_ANALYTIC`), mounted on a distinct tail (`/admin`, `/admin3`, `/admin-analytic`) | no mount; the conf carries no bare `/admin` line |
+| `/log-triage` | an adapter (classifier, session replay, title), with the list from `products.json` via `.claude/skills/log-triage/apps.ts` | **reported** in the output as silent or NO DATA, never simply absent |
+
+**One classifier per product, shared by both readers where it is new.** `outcomeOfAnalytic` is exported
+from `admin.ts` and imported by the triage script, so the dashboard card and the triage report cannot
+sort the same event differently. Its taxonomy is the operator's: `not-handled` build, `out-of-scope`
+declined, everything else REVIEW.
+
+**Analytic's replay is the product's own** (`src-analytic/app/triageReplay.ts`) and calls `decideSubmit`,
+the function the App dispatches on, so there is no hand mirror to drift.
