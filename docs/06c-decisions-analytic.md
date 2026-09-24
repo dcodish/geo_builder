@@ -7400,3 +7400,42 @@ So the sentence taught here is **the stripped remainder, re-parsed**. That yield
 **Measured after.** 0 of the 1,470 pairs reach the fact list, in an empty figure and in a populated one; the ratio family teaches once its referents exist and is honestly refused before that; every sentence taught is one the gate then ACCEPTS (asserted by submitting it); the bare catalog lines are unaffected.
 
 **Consequences.** `src-analytic/parser/scopeAnalytic.ts` (new — `IMPERATIVE_VERBS_HE`/`_EN`, `imperativeCandidates`); `src-analytic/app/submit.ts` (the `teach` verdict, checked first); `src-analytic/App.tsx` (the one branch that does not clear the box); `src-analytic/i18n/index.ts` (`noticeTeachCanonical`, both locales). Lock: `__tests__/issue-1353-imperatives-taught.test.ts` (10), whose centre is the catalog-wide property and the teach→Enter→accepted walk that caught the trap above — the catalog and the verb list are IMPORTED, so a new entry or a new verb is covered the moment it is added.
+
+## ADR-AG-153 — A numeric angle and an angle ratio are givens: «∠ABC = 60», «∠ABC = ∠ACB», «∠ABC = 2∠ACB» (#1331)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1331](https://github.com/dcodish/geo_builder/issues/1331) (feature, `P2`, `analytic`) · round [#1397](https://github.com/dcodish/geo_builder/issues/1397) · PR route
+**Requirements:** [02c](02c-requirements-analytic.md) R115 (new), which also closes R60 amendment's "a non-right angle value remains out of scope" · **Design:** [04c](04c-design-analytic.md#relations-and-the-direction-resolver-adr-ag-024), two residual rows
+
+**What the operator saw.** On «משולש ABC» · «AB = AC», the line «∠ABC = ∠ACB» answered «לא הצלחתי להבין את
+המשפט», and so did every other spelling. The same sentence builds in 2-D. Analytic's angle grammar was
+exactly one member wide: a RIGHT angle. **Rulings:** 2026-09-21 (round #1332 T19: *"should be supported
+(a 60 degree angle)"*) and 2026-09-24 (both halves build).
+
+**Measured at pickup.** Unchanged from the issue: «∠ABC = ∠ACB», «זווית ABC = זווית ACB» and «זווית ABC =
+37» were all `not-handled`, and «זווית ABC = 90» built.
+
+**The decision.**
+1. **Two constraint kinds in the solve** (`engine/solve.ts`). `angle {at, value}` sets the unsigned angle
+   at `at.v` between the rays to `at.a` and `at.b` to `value` degrees. `angle-ratio {left, right, k}`
+   sets left = k·right (k = 1 is an equality, the 2-D ADR-100 shape). Each residual is the angle
+   difference over π, so it lives in [-1, 1] like the dot and cross rows beside it. A ray of zero length
+   is "cannot be judged", as `perpendicular` already answers. Both are ordinary rows of the solve, so a
+   stated angle consumes a degree of freedom through the same Jacobian every given does, and the
+   knowledge gate needs nothing new.
+2. **One parser rule**, reading the SAME noun atom as the right angle (#1330: «זווית», «∠», «∡», "angle"),
+   three letters only, after the right-angle rule, so «∠ABC = 90» keeps its exact `perpendicular`
+   lowering. The right side is either another angle with an optional factor (`2∠ACB`, `זווית ACB`,
+   `שווה לזווית ACB`) or a value with an optional degree tail (`60`, `60°`, `60 מעלות`). A word on the
+   right («חדה») is left to its owner, never answered with an equation error.
+3. **Catalog:** three rows in F17 beside the right angle: `זווית ABC היא 60`, `∠ABC = ∠ACB`,
+   `∠ABC = 2∠ACB`, each He + En.
+
+**What this does NOT do.** A ONE-letter numeric angle («זווית B = 60») is still not read: which rays a lone
+vertex means is decided at M1, and only a right angle resolves there today. The canvas draws no arc for a
+stated angle; #1241, the knee for a stated right angle, is the same surface, and this work is left to it. Two defects the play surfaced, both PRE-EXISTING on main and filed rather than widened into this PR: [#1400](https://github.com/dcodish/geo_builder/issues/1400) (a restated given the figure already forces, such as `∠ABC = ∠ACB` after `AB = AC` or `AC = BD` on a rectangle, lowers the freedom cue by one; `freeRank`'s tolerance) and [#1401](https://github.com/dcodish/geo_builder/issues/1401) (a `∠`-first fact-list row shows as «ABC = 90∠»).
+
+**Consequences.** `src-analytic/engine/solve.ts` (`AngleRef`, `angleAt`, the two kinds in the refs,
+description and residual), `src-analytic/parser/parseAnalytic.ts` (`ANGLE_VALUE_HE/EN`, `ANGLE_OF`),
+`src-analytic/parser/catalogAnalytic.ts`. Lock: `issue-1331-angle-givens.test.ts` (20: ten spellings parse,
+90 keeps its lowering, 60° holds at six seeds, the operator's equality, the 2:1 ratio, one degree of freedom
+consumed, «∠ABC = 200» refused, and four lines through the real `decideSubmit`).

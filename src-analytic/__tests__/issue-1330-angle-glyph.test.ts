@@ -58,10 +58,12 @@ describe('#1330 — «∠ABC = 90» is «זווית ABC = 90»', () => {
     }
   });
 
-  it('scope unchanged: a value other than 90 still falls through (no angle residual yet), and the catalog teaches both spellings', () => {
-    const r = parseLine('∠ABC = 60') as { ok: boolean; code?: string };
-    expect(r.ok).toBe(false);
-    expect(r.code).toBe('not-handled');
+  // FLIPPED by #1331 (ADR-AG-153, operator rulings 2026-09-21 and 2026-09-24): a value other than 90 is a
+  // numeric angle given now, read through this same noun atom. 90 keeps its right-angle lowering.
+  it('a value other than 90 is a numeric ANGLE given (#1331), and the catalog teaches both spellings', () => {
+    const r = parseLine('∠ABC = 60');
+    expect(r.ok).toBe(true);
+    expect(JSON.stringify(r)).toContain('"t":"angle"');
     expect(COMMAND_CATALOG_ANALYTIC.some((e) => e.he === '∠ABC = 90')).toBe(true);
     expect(COMMAND_CATALOG_ANALYTIC.some((e) => e.he === 'זווית ABC ישרה')).toBe(true);
   });
@@ -112,11 +114,14 @@ describe('#1333 — «angle ABC = 90» is an ANGLE in every case, never a length
     expect(parseLengthExpr('2AB')?.terms).toEqual([{ a: 'A', b: 'B' }]); // a coefficient, not a boundary
   });
 
-  it('scope unchanged: a non-right angle value falls through in BOTH languages, with no disparity', () => {
+  // FLIPPED by #1331 (ADR-AG-153): a non-right value is now an ANGLE given, still in BOTH languages and in
+  // any case, and still never a length — the #1333 point this test was written for.
+  it('a non-right angle value is an ANGLE in BOTH languages and any case, never a length (#1331)', () => {
     for (const line of ['angle ABC = 45', 'זווית ABC = 45', 'ANGLE ABC = 45']) {
-      const r = parseLine(line) as { ok: boolean; code?: string };
-      expect(r.ok, line).toBe(false);
-      expect(r.code, line).toBe('not-handled');
+      const r = parseLine(line);
+      expect(r.ok, line).toBe(true);
+      expect(JSON.stringify(r), line).toContain('"t":"angle"');
+      expect(JSON.stringify(r), line).not.toContain('length-eq');
     }
   });
 });
