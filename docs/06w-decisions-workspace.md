@@ -4506,3 +4506,54 @@ is the page AI answer engines can quote when a student asks for an alternative.
 sitemap; not-affiliated, no `<img>`, no geogebra.org asset; the bagrut block equals the fixture; both
 blocks build green; the demo link decodes, loads, replays green, stays under `LINK_MAX_CHARS` and is
 the same figure as the block; FAQ markup equals the visible FAQ.
+
+## ADR-W-087 — Junk is refused BEFORE the paid call, in every builder that escalates: one positive construction-signal test in `shell/` (#1357)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1357](https://github.com/dcodish/geo_builder/issues/1357) (bug, `P2`, `workspace`/`server`), defect 1 only · round [#1397](https://github.com/dcodish/geo_builder/issues/1397)
+**Requirements:** [03](03-nonfunctional-requirements.md) NFR-CT-4 (new) · **Design:** [04w](04w-design-shell.md#the-junk-gate-adr-w-087) (new section)
+
+**What the operator asked.** *"If someone just bombards my site with gibberish, my llm costs will be
+high."* The money is already capped (ADR-177's daily ceiling). Defect 2, the shared daily budget, was
+ruled "keep one global cap" and needs no build.
+
+**Defect 1, re-measured at pickup.** In 2-D, all 12 of 12 junk strings reached the paid call, and 10 of
+them had ALREADY been classified `unrelated` before it. The pre-LLM short-circuit set (ADR-289) did not
+contain `unrelated`, which was read only after the call, to word the message. The other two, `12345`
+and `xkcd 42 zz`, scored nothing, because a digit counted as a geometry signal. **New at pickup:**
+`Hello there` and `Lorem Ipsum` slipped the same way, because any capital letter counted as a point
+label. 3-D had no `unrelated` category at all, and analytic escalated every `not-handled`.
+
+**Root cause.** The junk test was a NEGATIVE fallback consulted at the wrong time, and its idea of
+"geometry" was too loose to be trusted before the call.
+
+**Decisions.**
+
+1. **One POSITIVE test, in `shell/llm/constructionSignal.ts`.** An utterance carries a construction
+   signal when it has a **point label** (an uppercase run that does not continue into a lowercase word,
+   so `AB` and `P1` count but the capital of `Hello` does not), a **relation symbol**, or a word of the
+   **caller's vocabulary**. A digit alone is not a signal. Three builders escalate, so this is the shared
+   rule. `shell/` knows no product: each passes its own vocabulary.
+2. **Each builder asks it at its own escalation seam, before the model.**
+   - **2-D:** `classifyOutOfScope`'s `unrelated` is decided by the shared test, and `unrelated` joins
+     `PRE_LLM`. The student sees the existing «לא זוהתה כאן בנייה גאומטרית…» note.
+   - **3-D:** `classifyGuidance3` ends with an `unrelated` fallback (new `scope.unrelated` message,
+     He + En; both of its example sentences parse). `App3` already short-circuits every guidance
+     category before `escalate3`.
+   - **Analytic:** `reachesFallback` also requires the signal (vocabulary: `x`, `y`, a coordinate pair,
+     and the analytic words). The `not-handled` refusal stays as it is.
+   - **Complex** has no model fallback and is not touched.
+3. **Each vocabulary is proven against its catalog.** A lock per product asserts that no catalog line,
+   in either language, scores zero. The 3-D net and the analytic net each caught real lines on the
+   first run: parameters, the line and plane names `l1`/`π2`, «מצטלבים», and `sphere`. They were added
+   to the vocabularies before this landed.
+
+**A lock flipped.** `submitPipeline.test.ts` asserted that free text with no geometry in it IS sent to
+the model (`toHaveBeenCalledTimes(1)`) and only then refused. It now asserts no call, with a comment
+naming this ADR. A sibling case locks the other direction: a real construct gap (`CD חותך את המעגל`)
+still reaches the model.
+
+**Consequences.** `shell/llm/constructionSignal.ts` (new), `src/parser/scope.ts`,
+`src/app/submitPipeline.ts`, `src3d/parser/scope3.ts`, `src3d/i18n/locales/{he,en}.json`,
+`src-analytic/parser/scopeAnalytic.ts`, `src-analytic/app/submit.ts`. Locks:
+`shell/__tests__/construction-signal-1357.test.ts` and `junk-before-llm-1357.test.ts` in 2-D (the
+real `runSubmit` with the model mocked, both directions, and the catalog net), 3-D and analytic.

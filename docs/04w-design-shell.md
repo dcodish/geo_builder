@@ -295,3 +295,13 @@ The images are regenerated, never edited: `scripts/render-icons.mjs` (from each 
 `seo/icon.svg`) and `scripts/render-og.mjs`, which types a figure into the running app and takes the
 app's **own «download image» output** (FR-EX-3's chrome-free export), then lays it beside the icon and
 the name read from the served `<h1>`.
+
+## The junk gate ([ADR-W-087](06w-decisions-workspace.md#adr-w-087))
+
+`shell/llm/constructionSignal.ts` answers one question for every builder that escalates to the model:
+*could anything in this utterance be geometry?* A point label (an uppercase run not continuing into a
+lowercase word), a relation symbol, or a word of the caller's vocabulary is a signal; a digit alone is
+not. Each builder asks it at its own escalation seam, BEFORE the call: 2-D through `classifyOutOfScope`'s
+`unrelated` (now in `PRE_LLM`), 3-D through `classifyGuidance3`'s `unrelated` fallback, analytic through
+`reachesFallback`. The vocabulary is the product's, and each product's catalog net asserts that no line
+it teaches scores zero, so the gate can never brush off a sentence the tool accepts.

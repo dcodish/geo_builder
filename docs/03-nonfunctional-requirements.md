@@ -38,6 +38,7 @@ Quality attributes and constraints. IDs are stable references (`NFR-<area>-<n>`)
 
 - **NFR-CT-1** — Distribution must not impose a per-user cost barrier; the common case (local parser) is free.
 - **NFR-CT-2** — Total LLM API spend is **bounded and cannot surprise the operator**: enforced via a prepaid credit ceiling, a Console monthly spend limit, and usage alerts.
+- **NFR-CT-4** — **An utterance with no construction signal never reaches the paid call**, in any builder that escalates to the model. No point label, no relation symbol and no word of the builder's vocabulary means nothing the model answers can build, so the builder answers it itself. *(Realised — [ADR-W-087](06w-decisions-workspace.md#adr-w-087), #1357.)*
 - **NFR-CT-3** — The LLM model for parsing is the cheapest sufficient one (`claude-haiku-4-5`); `max_tokens` and prompt size are kept minimal.
 
 ## Feature gating & tiers

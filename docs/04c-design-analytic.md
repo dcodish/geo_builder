@@ -31,6 +31,21 @@ given, that is a defect in the exam, not a gap the tool should paper over
 
 Roughly 2,350 source lines against `src/`'s 42,000 — this is a V0, not a peer.
 
+## The image carries no chrome ([ADR-AG-151](06c-decisions-analytic.md#adr-ag-151))
+
+`render/Figure.tsx` paints three things that exist only to be clicked: the crossing and centre OFFERS (one
+list, #1025/#1109), the transparent hit layer over curves and segments (#1048/#1139), and each point's hit
+ring. All three sit inside `data-noexport`, the shared strip's contract (FR-EX-3), so «הורידו תמונה» exports
+the figure and nothing else. `render/__tests__/clean-export.test.tsx` switches every affordance on and
+asserts the stripped ink is the chrome-free render. A new affordance joins that lock with its prop ON.
+
+## The panel's knowledge has one home ([ADR-AG-152](06c-decisions-analytic.md#adr-ag-152))
+
+`panelKnowledge(d)` (`app/panelRows.ts`) decides, once, which parameters, coordinates and listed equations
+the data panel prints as KNOWN. `App.tsx` renders those rows from it, and the corpus invariant
+"`reportedDof > 0` ⇒ something is unknown" asks the same function over every figure the analytic suite
+builds. A new panel row that prints a value belongs in that function, or the invariant cannot see it.
+
 ## A line's angle has one decision ([ADR-AG-154](06c-decisions-analytic.md#adr-ag-154))
 
 `app/lineAngle.ts` answers "what angle does this direction make with the positive x-axis, and is it known?"
@@ -486,6 +501,10 @@ that is where the fold now honours it instead of drawing a fragment.
 constraint blame read them unchanged; only whether a partial line survives changed.
 
 ## Relations, and the direction resolver ([ADR-AG-024](06c-decisions-analytic.md#adr-ag-024))
+
+*Angles ([ADR-AG-153](06c-decisions-analytic.md#adr-ag-153)).* An angle by SIZE and an angle in RATIO are two
+rows of the solve (`angle`, `angle-ratio`), each the unsigned angle difference over π, beside the
+`perpendicular` row a right angle lowers to. They are not directions and never reach the resolver below.
 
 Four things in this grammar have a direction:
 

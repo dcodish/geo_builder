@@ -22,7 +22,7 @@
  * show the least-bad one: `solve` reports that it did not converge, and the caller says so. A drawn
  * figure that violates its own givens is the defect this whole product is built to avoid.
  */
-import { evalExpr, type Env } from './expr';
+import { evalExpr, exprText, type Env } from './expr';
 import type { Id, NumCurve } from './types';
 import { residual as curveResidual } from './curves';
 import { SEGMENT_EXTENT_TOL, segmentParam } from './extent';
@@ -70,6 +70,23 @@ export type Direction =
    */
   | { k: 'free'; sym: string };
 
+/** An angle named by three points: the vertex and the ends of its two rays (#1331). */
+export interface AngleRef {
+  v: Id;
+  a: Id;
+  b: Id;
+}
+
+/** The unsigned angle at `v` between the rays to `a` and `b`, in RADIANS — null when a ray has no length. */
+function angleAt(v: Pt, a: Pt, b: Pt): number | null {
+  const ux = a.x - v.x;
+  const uy = a.y - v.y;
+  const wx = b.x - v.x;
+  const wy = b.y - v.y;
+  if (Math.hypot(ux, uy) < 1e-12 || Math.hypot(wx, wy) < 1e-12) return null; // a ray from a point to itself
+  return Math.atan2(Math.abs(ux * wy - uy * wx), ux * wx + uy * wy);
+}
+
 export type Constraint =
   /** `A(6,4)` on a point that is not free to be replaced — one or both coordinates pinned. */
   | { t: 'coord'; id: Id; x?: Expr; y?: Expr }
@@ -94,6 +111,17 @@ export type Constraint =
    * `rightAngleAt` is likewise safe — both its rays start at the vertex, so incidence is structural.
    */
   | { t: 'perpendicular'; a: Id; b: Id; c: Id; d: Id }
+  /**
+   * `∠ABC = 60` — a NUMERIC angle, in degrees (#1331). The angle at `at.v` between the rays to `at.a`
+   * and `at.b`, unsigned (0°–180°), because the exam states an angle's size and never its orientation.
+   * A right angle keeps its own lowering (`rightAngleAt` → `perpendicular`), so 90° is read there first.
+   */
+  | { t: 'angle'; at: AngleRef; value: Expr }
+  /**
+   * `∠ABC = ∠ACB` · `∠ABC = 2∠ACB` — two angles in a stated ratio (#1331, the 2-D `angle-ratio` shape,
+   * ADR-100). `k` is 1 for an equality.
+   */
+  | { t: 'angle-ratio'; left: AngleRef; right: AngleRef; k: Expr }
   /**
    * `DE ∥ BF` · `DE ⊥ BF`, over any two {@link Direction}s (#1052).
    *
@@ -294,6 +322,10 @@ export function constraintRefs(k: Constraint): Id[] {
       return [k.id];
     case 'perpendicular':
       return [k.a, k.b, k.c, k.d];
+    case 'angle':
+      return [k.at.v, k.at.a, k.at.b];
+    case 'angle-ratio':
+      return [k.left.v, k.left.a, k.left.b, k.right.v, k.right.a, k.right.b];
     case 'relation':
       return [...dirRefs(k.u), ...dirRefs(k.v)];
     case 'slope':
@@ -356,6 +388,10 @@ export function describeConstraint(k: Constraint): string {
       return `${k.id} על ישר`;
     case 'perpendicular':
       return `${k.a}${k.b} ⊥ ${k.c}${k.d}`;
+    case 'angle':
+      return `∠${k.at.a}${k.at.v}${k.at.b} = ${exprText(k.value)}`;
+    case 'angle-ratio':
+      return `∠${k.left.a}${k.left.v}${k.left.b} = ${exprText(k.k) === '1' ? '' : exprText(k.k)}∠${k.right.a}${k.right.v}${k.right.b}`;
     case 'relation':
       return `${describeDir(k.u)} ${k.rel === 'parallel' ? '∥' : '⊥'} ${describeDir(k.v)}`;
     case 'slope':
@@ -606,6 +642,23 @@ export function residual(
       const n = Math.hypot(u.x, u.y) * Math.hypot(v.x, v.y);
       if (n < 1e-12) return null;
       return [(u.x * v.x + u.y * v.y) / n];
+    }
+    case 'angle': {
+      // `p` is [v, a, b], the order `constraintRefs` gives. The difference in radians over π, so the row
+      // lives in [-1, 1] like the dot and cross rows beside it and a stated angle weighs what they weigh.
+      const [v, a, b] = p;
+      const theta = angleAt(v, a, b);
+      const deg = evalExpr(k.value, env);
+      if (theta === null || !Number.isFinite(deg)) return null;
+      return [(theta - (deg * Math.PI) / 180) / Math.PI];
+    }
+    case 'angle-ratio': {
+      const [v1, a1, b1, v2, a2, b2] = p;
+      const left = angleAt(v1, a1, b1);
+      const right = angleAt(v2, a2, b2);
+      const ratio = evalExpr(k.k, env);
+      if (left === null || right === null || !Number.isFinite(ratio)) return null;
+      return [(left - ratio * right) / Math.PI];
     }
     case 'relation': {
       const u = dirVector(k.u, at, curveAt, env);

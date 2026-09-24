@@ -2498,7 +2498,7 @@ on `r` instead of a name, moving the free-DOF basis. Both properties are require
 w = z1*z2`), every complex fixture and the new cases: 1,872 seed×sequence verdicts, 96 changed, and they
 are exactly the four `|z| = …r` sequences, identical across all 24 seeds. Nothing else moved.
 
-**What this does NOT do.** It does not print `r = 5/9` anywhere, and a second modulus in `r`
+**What this does NOT do.** *(Amended by [ADR-CX-043](#adr-cx-043): solved parameters are now shown, askable and substituted.)* It does not print `r = 5/9` anywhere, and a second modulus in `r`
 (`|z2| = 18r`) still reads as bare `z₂` rather than `10`. That is the existing reading of a parametric
 modulus, and surfacing solved parameters is a new surface, not this fix. It does not model a
 NEGATIVE real parameter: parameters remain positive reals, as `modulus.ts` already assumes.
@@ -2547,7 +2547,7 @@ naming the student's own statement (`«z1 = 3»`, or `«z^3 = 8»` in the other 
 `ANON_PREFIX`, `isAnonymous` and `prettyName`'s empty-string branch are removed; none had another
 producer.
 
-**Index matching, not set membership — the ruling forces it.** If z₁ could equal any solution, a z₁ that
+**Index matching, not set membership — the ruling forces it.** *(Superseded by [ADR-CX-044](#adr-cx-044), operator ruling 2026-09-24: members are matched by set membership.)* If z₁ could equal any solution, a z₁ that
 is solution 2 would leave solution 1 unnamed and z₁ contradicting its index, and the naming would stop
 being well defined. So `z1 = 2cis120` then `z^3 = 8` is refused (2cis120 is a cube root of 8, but
 solution 2, not solution 1). The operator was told of this narrowing on the issue; if it is wrong, it is
@@ -2572,3 +2572,119 @@ capstone in `cutover-coverage.test.ts` REWRITTEN to assert the refusal, each wit
 ruling so no later session reverts it by accident, and with the grounded-enumeration capability kept
 under names that are not the solutions' own; the `2b-capstone` fixture ends at part ג; new fixture
 `roots-reuse-member-1367.complex.json` (`z1 = 2 · z^3 = 8`).
+
+## ADR-CX-043 — A real parameter is VISIBLE: solved, shown, askable and substituted, and no accepted given is silent (#1390 + #1389)
+
+**Status:** accepted, 2026-09-24 (operator ruling 2026-09-24 on #1390) · **Issues:**
+[#1390](https://github.com/dcodish/geo_builder/issues/1390) (bug, `P1`) +
+[#1389](https://github.com/dcodish/geo_builder/issues/1389) (feature, `P2`), built as ONE item per the
+ruling · round [#1397](https://github.com/dcodish/geo_builder/issues/1397) · **amends**
+[ADR-CX-041](#adr-cx-041) ("What this does NOT do")
+**Requirements:** [02d](02d-requirements-complex.md) FR-KN-5 (new): a real parameter is shown and askable
+· **Design:** [04d](04d-design-complex.md) — "A solved parameter has ONE exact value" · **Ladder:** stage 5d
+([LADDER-CX](LADDER-CX.md))
+
+**What was seen.** On `main` after round #1382, `u^5 = 32` was ACCEPTED, nothing was drawn, nothing was
+printed, and the panel said «הצורה נקבעת במלואה». Prod refused the same line. The operator's
+`z1 = 3+4i · |z1| = 9r` (#1389) was accepted too, and `r` appeared nowhere: asking `r` answered «לא הבין».
+
+**The ruling.** `u^5 = 32` means a real parameter u (ADR-CX-004), and ADR-CX-041's solve (u = 2) is the
+intended reading. **The defect is only the silence.**
+
+**Root cause (measured at pickup).** A real parameter was never a SUBJECT of any surface. The data panel
+listed drawn points, and a parameter draws no point. The ask grammar's bare-expression rule required a
+complex name, so `r`, `9r` and `r^2` were unreadable. And the solved value was not substituted where the
+parameter was read, so the exact modulus kept its parameter atom. Two readings printed a parameter the
+givens had already fixed: `z₁ ≈ u·cis0°` for `u^5 = 32 · z1 = u`, and `z₂ ≈ 18r·cis30°` for
+`|z2| = 18r` with r = 5/9. **Divergence from the issue:** `u^5 = 32 · z1 = u` was said to "draw
+NOTHING". It drew z₁ at 2 all along. Its reading was what was wrong.
+
+**The mechanism: one exact value per solved parameter, read by every surface.**
+1. **Tier 1 publishes `paramValues`**: each determined parameter as an exact `ExpVec` (`u → 2`,
+   `r → 5/9`, or `r → s/2` over a still-free `s`). `substituteSolvedParams` replaces a solved atom in
+   any exact modulus. `knownModulus` is built through it, so claims read `|z₂| = 10` too.
+2. **Stage 5d reads it**: the drawn reading (`modulusOf`), a new `Derived2.params`
+   (`{name, value | null}`, in first-seen order, never from the sample), and the ask lane.
+3. **The data panel's «פרמטרים» section**, in the shared panel's parameters slot, follows the 3-D (#325)
+   and analytic (#1317) template: `u = 2` when forced, `u — חופשי` when not.
+4. **Askable parameters.** The bare-expression rule accepts an expression over parameters alone. The
+   answer is exact when every parameter it names is solved (`9r` → `5`), and otherwise the existing
+   "not determined" row. ADR-CX-040's single-letter floor is unchanged, so `add` or `hello` stays
+   unreadable.
+5. **Knowledge rule 1 applied to `|X|`.** A modulus carried exactly is knowledge whatever else is free,
+   so `|z2|` answers 10 while arg z₂ is open. This rule existed in `model/knowledge.ts` and the
+   expression lane never used it.
+
+**The class lock.** *An accepted given whose numbers and parameters appear on no surface fails the
+suite.* It replays every catalog specimen (both languages) and every fixture through the real gate.
+It proves it can fire, because it flags `u^5 = 32` when parameter rows are withheld.
+
+**Also locked, per the ruling.** `u^5 = -32` and `u^5 = 32 · u = 3` stay refused. `u^5 = w^2` with a
+non-real w is refused, and the refusal names a statement the student wrote.
+
+**Sibling check (plan step 4).** 3-D (`dataPanel.params`, #325) and analytic (`register`, #1317)
+already show parameters. Complex was the one builder without them, so no sibling issue is owed.
+
+**What this does NOT do.** It does not add «מהו r» / «what is r»: the complex ask grammar has no "what
+is" form for anything, so this item ends at the bare forms. It does not change what a parameter IS
+(still a positive real, ADR-CX-041).
+
+**Consequences.** `src-complex/solve/tier1.ts` (`paramValues`, `substituteSolvedParams`),
+`src-complex/replay/derive2.ts` (`params`, substituted readings, the parameter-only and exact-modulus
+answers), `src-complex/parser/rules.ts` (`bareExpression`), `src-complex/App.tsx` (the section),
+`src-complex/i18n/index.ts`. Locks: `accepted-line-visible-1390.test.ts` (the reported cases plus the
+class net over the catalog and every fixture), `param-knowledge-1389.test.ts` (the operator's sequence,
+asks, free r, 18r → 10, the capstone's `15r` unchanged), and fixture `param-u-solved-1390.complex.json`.
+
+## ADR-CX-044 — The solutions of `X^n = …` are matched to stated members by SET MEMBERSHIP, not by index (#1396)
+
+**Status:** accepted, 2026-09-24 (operator ruling 2026-09-24) · **Issue:**
+[#1396](https://github.com/dcodish/geo_builder/issues/1396) (bug, `P2`, `complex`) · round
+[#1397](https://github.com/dcodish/geo_builder/issues/1397) · **amends** [ADR-CX-042](#adr-cx-042) ("Index
+matching, not set membership")
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-6 (amended): a number named zₖ is a claim that
+it is ONE of the solutions · **Design:** [04d](04d-design-complex.md), "A solution set claims its names"
+(amended) · **Ladder:** stage 0d′ ([LADDER-CX](LADDER-CX.md))
+
+**What was seen.** `z1 = 2cis120` then `z^3 = 8` was refused, although 2cis120 IS a cube root of 8.
+ADR-CX-042 pinned X₁ to the principal root and Xₖ to `(k−1)/n` of a turn from it, so a student who
+numbered the roots in a different order was refused as though they had written a non-root.
+
+**The ruling.** *Accept it, and name the rest* (chosen over "keep refusing" and "accept and
+renumber"). This is set membership, and it matches the operator's 2026-09-22 wording (*"if … z3 doesnt
+fit one of the solutions, it should be rejected"*).
+
+**Measured at pickup (no divergence).** `z1 = 2cis120 · z^3 = 8` and `z2 = 2 · z^3 = 8` were refused.
+`z1 = 2 · z^3 = 8` was accepted.
+
+**The mechanism: the pins are decided by the members, once the rest of the figure is solved.**
+`lowerLines` now holds back each enumerating set's rows. After every line is read, tier 1 solves the
+rest of the figure once (exact), and `placeSolutionSets` reads each solution name another line
+mentions. A member that is DETERMINED (exact modulus, and a direction whose only turn unknowns have
+whole coefficients) is placed exactly. Its modulus must equal the principal root's, and its direction
+must be a whole number `j` of `1/n` turns from it. The unstated names take the remaining roots in
+index order, in argument order from the principal root. Each member keeps its own row `Xₘ^n = rhs`, so
+the solve still checks it. The index lowering (ADR-CX-042) is emitted unchanged in every other case:
+
+- **no member, or every member already on its index root.** Nothing moves (`z^3 = 8`,
+  `z1 = 2 · z^3 = 8`, the example button);
+- **a member that is no root** (`z1 = 3`). The index pins contradict it, and the gate refuses it naming
+  the student's statement, as before;
+- **two members on one root.** Refused;
+- **a member stated but not DETERMINED** (`|z2| = 2`, or a quadrant only). Which root it is would be a
+  configuration choice, and the plan returned that to the operator. It keeps today's reading. That is
+  filed as its own question, [#1399](https://github.com/dcodish/geo_builder/issues/1399), not decided here.
+
+Because the members are read from the whole figure, the order of entry does not matter:
+`z^3 = 8 · z1 = 2cis120` draws the same figure as the other order (ADR-CX-042 item 3).
+
+**What changes for a student.** Numbering the roots in any order is accepted: z₁ = 2cis120 stays at 120°,
+and z₂, z₃ take 0° and 240°. **A figure can re-label.** After `z^3 = 8` (z₁ at 0°), a later
+`z1 = 2cis120` moves the name z₁ to 120° and hands 0° to z₂. That is the ruling's "name the rest",
+applied in the other order.
+
+**Consequences.** `src-complex/model/solutionSet.ts` (`solutionSetConstraintsPlaced`),
+`src-complex/app/deriveLines.ts` (`placeSolutionSets`, `placement`, `exactArg`). Locks:
+`roots-set-membership-1396.test.ts` (11: both orders, a member off index, a negative right-hand side,
+two members, the refusals, and what does not move), `roots-claim-names-1367.test.ts`'s index row
+FLIPPED with a comment naming this ruling, and fixture `roots-set-membership-1396.complex.json`.

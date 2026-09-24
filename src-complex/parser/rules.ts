@@ -12,7 +12,7 @@
  * against this same shape.
  */
 
-import { type Expr, abs, ref } from '../model/expr';
+import { type Expr, abs, paramsOf, ref } from '../model/expr';
 import type { BranchFilter, Constraint } from '../model/constraint';
 import type { Claim as Assertion } from '../model/claim';
 import {
@@ -1012,8 +1012,11 @@ const bareExpression: Rule = (s) => {
   const expr = parseExpr(s, 0, s.length, atoms);
   if (!expr) return null;
   const names = refNames(expr);
-  // a bare literal («5») asks nothing about the figure; a bare name is F1 and was matched above
-  if (!names.length || expr.t === 'ref') return null;
+  // a bare literal («5») asks nothing about the figure; a bare name is F1 and was matched above.
+  // #1389: an expression over real PARAMETERS alone («r», «9r», «r^2») IS a question — the value the
+  // givens forced on the parameter, or why they have not. Its letters are single letters by
+  // ADR-CX-040's floor, so a stray word still cannot become one.
+  if (expr.t === 'ref' || (!names.length && !paramsOf(expr).length)) return null;
   return {
     ...empty(),
     atoms,

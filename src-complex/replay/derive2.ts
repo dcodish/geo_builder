@@ -28,10 +28,11 @@ import { fmtNum } from '../../shell/format';
 import type { Cx } from '../value/value';
 import { cPolar, evaluate, exact, formatPolar } from '../value/value';
 import { toNumber } from '../value/rational';
-import { type ExpVec, evaluate as evalMod, format as fmtMod, isOne as modIsOne } from '../value/modulus';
-import { type Angle, period as anglePeriod, toDegrees } from '../value/angle';
-import { type Expr, paramsOf } from '../model/expr';
-import { type Branch, isTurnUnknown, solveTier1 } from '../solve/tier1';
+import { type ExpVec, evaluate as evalMod, format as fmtMod, isOne as modIsOne, isParametric } from '../value/modulus';
+import { type Angle, period as anglePeriod, sameDirection, toDegrees, zero as angZero } from '../value/angle';
+import { type Expr, paramsOf, refsOf } from '../model/expr';
+import { type Branch, isTurnUnknown, solveTier1, substituteSolvedParams } from '../solve/tier1';
+import { linearize } from '../solve/logpolar';
 import type { Claim as Assertion, CheckedClaim } from '../model/claim';
 import { type FigureObject, ORIGIN, objectPoints } from '../model/figure';
 import {
@@ -61,6 +62,13 @@ import { filterBranches } from '../solve/filter';
 import { type AffineArg, projectWindow, statedWindow, violatesDeg } from '../solve/window';
 import type { BranchFilter, Constraint, Selection as SolutionSelection } from '../model/constraint';
 import type { Why } from '../model/why';
+
+/** One real parameter, for the data panel's «פרמטרים» section (#1389). */
+export interface ParamRow {
+  readonly name: string;
+  /** the exact value when the givens determine it (`2`, `5/9`, or `s/2` in a free s); null = free */
+  readonly value: string | null;
+}
 
 /** A statement the fold could not use, with the reason — surfaced, never swallowed. */
 export interface Untranslated {
@@ -235,6 +243,15 @@ export interface Derived2 {
   readonly undecided: readonly string[];
   /** answers to what the student ASKED to see — a number only when the givens force one (stage 5d) */
   readonly knowledge: readonly KnowledgeRow[];
+  /**
+   * #1389/#1390 — every real PARAMETER the figure mentions, with its value when the givens force it.
+   *
+   * A parameter draws no point, so without this row a line like «u^5 = 32» (u = 2, ADR-CX-004 +
+   * ADR-CX-041) was accepted and left nothing on screen: the silent-drop class behind a green state.
+   * `value` is exact (from tier 1's `paramValues`) or `null` when the givens leave it free. It is
+   * never printed from the sample.
+   */
+  readonly params: readonly ParamRow[];
   /**
    * Is there ANOTHER drawing to show? — the one definition the button reads.
    *
@@ -576,7 +593,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
     if (base === null) return { value: sampleModulus(name), exact: null };
     let v = base;
     for (const [fn, c] of d.coefs) v *= Math.pow(st.mod.get(fn) ?? 1, toNumber(c));
-    return { value: v, exact: d.coefs.size === 0 ? d.konst : null };
+    // #1389 — a solved parameter inside the exact modulus is substituted: `18r` with r = 5/9 reads 10
+    return { value: v, exact: d.coefs.size === 0 ? substituteSolvedParams(d.konst, t1.paramValues) : null };
   };
 
   const argumentOf = (name: string, st: State): { deg: number; exact: Angle | null } => {
@@ -1022,7 +1040,40 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * not a limitation to fix: under a free rotation the value genuinely is different in every
    * configuration, and only its modulus is invariant.
    */
+  /**
+   * The exact answer to an expression over parameters ONLY: `undefined` when the expression names a
+   * complex number (the ordinary path answers it), `null` when a parameter it names is still free,
+   * else the formatted exact value. It is exact through `linearize`, so `9r` with r = 5/9 prints 5.
+   */
+  const paramOnlyValue = (e: Expr): string | null | undefined => {
+    if (refsOf(e).length > 0) return undefined;
+    const names = paramsOf(e);
+    if (names.length === 0) return undefined;
+    if (names.some((p) => !solvedParams.has(p) || !t1.paramValues.has(p))) return null;
+    const form = linearize(e);
+    if (form && sameDirection(form.tConst, angZero())) {
+      const v = substituteSolvedParams(form.uConst, t1.paramValues);
+      if (paramsOf(e).every((p) => !v.has(p))) return fmtMod(v);
+    }
+    const here = evalComplex(e, finalEnv);
+    return here ? round2(here.re) : null;
+  };
+
   const exprRows: KnowledgeRow[] = exprQueries.map((q) => {
+    // #1389 — a question about the PARAMETERS alone («r», «9r», «r^2») is answered exactly whenever
+    // the givens solve every parameter it mentions, whatever else in the figure is still free
+    const exactParam = paramOnlyValue(q.expr);
+    if (exactParam !== undefined) {
+      return exactParam === null
+        ? { label: q.src, value: null, why: whyNotKnowledge(closure) }
+        : { label: q.src, value: exactParam, why: null };
+    }
+    // Knowledge rule 1 (model/knowledge.ts): a modulus CARRIED EXACTLY is knowledge whatever else is
+    // free — «|z2|» with |z2| = 18r and r = 5/9 is 10 even while arg z2 is open (#1389 step 3)
+    if (q.expr.t === 'abs' && q.expr.e.t === 'ref') {
+      const known = t1.knownModulus.get(q.expr.e.name);
+      if (known && !isParametric(known)) return { label: q.src, value: fmtMod(known), why: null };
+    }
     const here = evalComplex(q.expr, finalEnv);
     if (!here) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
     const real = Math.abs(here.im) <= 1e-9 * Math.max(1, Math.hypot(here.re, here.im));
@@ -1057,6 +1108,18 @@ export function foldConstraints(input: FoldInput): Derived2 {
       why: null,
     };
   });
+
+  /**
+   * The parameters section (#1389/#1390): every parameter the figure mentions, in first-seen order.
+   * The value comes only from tier 1's exact solve, so a parameter is printed exactly when the givens
+   * force it, and reads free otherwise.
+   */
+  const params: ParamRow[] = [...sample.keys()]
+    .filter((p) => !literalSample.has(p))
+    .map((p) => {
+      const v = solvedParams.has(p) ? t1.paramValues.get(p) : undefined;
+      return { name: p, value: v ? fmtMod(v) : null };
+    });
 
   const knowledge: KnowledgeRow[] = queries.map((q) => {
     const value = measureAt(finalEnv, q);
@@ -1115,6 +1178,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     refusalReasons,
     undecided,
     knowledge: [...knowledge, ...ratioRows, ...exprRows],
+    params: t1.inconsistent ? [] : params,
     canCycle: enumeratedConfigCount > 1 || closure.remainingDof > 0,
     emptiedBy,
     claims: verifyClaims(assertions, t1, branch),

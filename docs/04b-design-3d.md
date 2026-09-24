@@ -414,6 +414,16 @@ gives that corner the kind `parallelogram-point` too, so both one-unknown arms n
 same way and neither emits ink. **The general form: when a construction reaches for a COMMAND to compute
 something, it inherits everything that command does for a student — including what it draws.**
 
+## The submit decision (#1394, [ADR-3D-258](06b-decisions-3d.md#adr-3d-258))
+
+`store3.submit` decides nothing itself: `decideSubmit3(state, utterance)` returns a `Verdict3` (rename ·
+not-understood · refused · already-stated · record) and `submit` dispatches it. The decision is pure — the
+fact id is injected — so #1358's register can ask "would you accept this line?" without the store moving.
+The three statement seams share their pieces: `readStatement3` (the grammar plus the #866 repair and the
+#516 typed refusals), `lostGivens3` (the honesty gates), and `decideCommands3` (gates → twin → derive →
+search), which the LLM lane's `submitSteps` also ends in. A new branch belongs in the decision; the parity
+lock replays 1,500 sequences against the recorded behaviour.
+
 ## Known gaps
 
 Recorded here because a design doc that omits its weakest properties is not describing the system.
