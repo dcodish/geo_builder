@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import { execSync } from 'node:child_process';
+import { seoPlugin } from './shell/seo/seoPlugin';
+import { seoPages } from './seo-pages';
 
 // A per-build release id (git short-hash · build date), baked into the 3-D bundle as `__BUILD__` and
 // stamped on every 3-D usage event so the /admin3 dashboard can filter outcomes by release (mirrors the
@@ -24,7 +26,7 @@ const BUILD_ID = (() => {
 export default defineConfig({
   base: '/3d-builder/',
   define: { __BUILD__: JSON.stringify(BUILD_ID) },
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), seoPlugin(seoPages())],
   // Deliberately NO `@` alias here: `@/*` maps to src/ (the 2-D app), and the
   // isolation rule (docs/20 §12, ADR-266) forbids src3d importing 2-D code —
   // without the alias such an import fails the 3-D build instead of silently working.

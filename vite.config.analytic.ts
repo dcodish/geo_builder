@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { execSync } from 'node:child_process';
+import { seoPlugin } from './shell/seo/seoPlugin';
+import { seoPages } from './seo-pages';
 
 // The same per-build release id as the siblings (git short-hash · build date), baked in as
 // `__BUILD__` and shown in the shared frame's About modal — provenance for bug reports.
@@ -25,7 +27,7 @@ const BUILD_ID = (() => {
 export default defineConfig({
   base: '/analytic-builder/',
   define: { __BUILD__: JSON.stringify(BUILD_ID) },
-  plugins: [react()],
+  plugins: [react(), seoPlugin(seoPages())],
   build: {
     outDir: 'dist-analytic',
     rollupOptions: { input: path.resolve(__dirname, 'analytic.html') },

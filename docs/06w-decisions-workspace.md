@@ -4349,3 +4349,62 @@ queued for the next round — this change does not touch that interpolation).
 both 404s) and no canonical — **mutation-checked**: removing the one header line fails 3 of its 7
 rows; every `products.json` builder in the sitemap; robots.txt names the sitemap, has no `Disallow`,
 and one `User-agent: *`; the icon files exist and the `.ico` has its three frames.
+
+## ADR-W-085 — Every builder's page says what it is to a crawler: approved head, a static block, a real preview (#1383)
+
+**Status:** accepted, 2026-09-24 (PR, awaiting the operator's play) · **Issue:** [#1383](https://github.com/dcodish/geo_builder/issues/1383) (feature, `P3`; rulings 2026-09-24: Hebrew only, wording v2 final with «4 ו-5 יחידות», «תרגול» and «חינם») · follows [ADR-W-084](#adr-w-084)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-DI-2 (new) · **Design:** [04w](04w-design-shell.md#the-page-a-crawler-reads-adr-w-085) (new section)
+
+**The gap, measured against prod.** Each builder served a crawler **~450 bytes: a four-word `<title>`
+and ~45 characters of visible text**, with no description, canonical, preview tags or structured data.
+Google renders JavaScript and saw the chrome; most AI crawlers do not, and saw nothing they could quote,
+so the tool could not be cited. The homepage, the one page with real text, had none of the tags.
+
+**Root cause.** The four `*.html` entries were Vite's minimal shells, and no build step connected them
+to facts the repo already held: the names and URLs in `products.json`, and each product's catalog.
+
+**Decisions.**
+
+1. **One mechanism for four builds** — `shell/seo/` (pure functions + a Vite plugin), keyed by entry
+   file name because the dev server is one server for four entries. `shell/` stays free of product
+   knowledge; the table is `seo-pages.ts`, build tooling at the root. A builder with no page **refuses
+   the build**.
+2. **Nothing on a page is new judgement.** Title and description are the operator's approved wording,
+   verbatim — the `| themathbible` suffix of draft v1 was dropped because v2 dropped it and it pushes
+   every title past ~60 characters. The URLs come from `products.json`. The examples ARE each catalog's
+   `featured` rows — the operator's #1347 choice of what a student sees first. The four «how it works»
+   steps are the only new copy: they state behaviour each builder has (checked per product), and they
+   sit inside a PR the operator plays.
+3. **The static block is the loading screen.** It sits in `#root`; every `main.tsx` mounts with
+   `createRoot().render`, which replaces it, so the app never renders twice. A no-JS reader of 2-D now
+   gets **2,330 characters** (measured) instead of ~45.
+4. **The preview is a figure the tool really draws**, taken from the app's own «download image» (the
+   chrome-free FR-EX-3 export), beside the builder's icon and the name read back from the served
+   `<h1>`. 2-D shows the summer-2022 bagrut figure. Analytic shows a triangle and its centroid instead of
+   its smoke figure, because analytic's export **still carries its crossing-offer rings** — found while
+   building this and filed as [#1391](https://github.com/dcodish/geo_builder/issues/1391); a preview must
+   not advertise a defect. Four icons, one per builder, each geometrically true (the triangle's
+   incircle is computed, the complex point sits on its circle).
+5. **The homepage stops promising theorems.** It told visitors the 2-D builder shows «משפטים רלוונטיים
+   לאורך הדרך» while the surface is off (#740). Removed, and a lock ties the homepage and every page to
+   `THEOREMS_SURFACE`.
+
+**Also in this PR, and why.** `scripts/visual-smoke.mjs`'s complex sequence declared `z1`/`z2` before
+`z^5 = w^2`, which ADR-CX-042 (#1367, round #1382) now correctly refuses — so the smoke had failed on
+`main` since the round. It now uses `w1`/`w2`: the same figure and the same label crowding (#701). While
+measuring that, a **P1 regression** from the same round surfaced — `u^5 = 32` accepted silently and
+drawing nothing — filed as [#1390](https://github.com/dcodish/geo_builder/issues/1390), not fixed here.
+
+**Not done.** English pages (ruled out). `llms.txt` (unproven). The 2-D bundle (#1385, escalated:
+the plan's split measured at 2.6%).
+
+**Locks.** `shell/__tests__/seo-1383.test.ts` — 13 rows over the pure functions (every tag; no card
+without an image; JSON-LD round-trips; `</script>` and hostile text stay text; a `$` is copied
+literally; a shell without its anchors throws). `scripts/__tests__/seo-pages-1383.test.ts` — 48 rows
+running the **real plugin over the real entry HTML**: the table covers exactly the registry's builders;
+canonical from the registry; title ≤ 62 and description 80–170 characters; examples **equal** the
+featured rows; a static block over 600 characters with one `h1` and links to every sibling; images at
+the promised sizes; **every analytic featured row parses** (the one product with no whole-catalog
+guard — 2-D, 3-D and complex already have one); the homepage's tags and ItemList against the registry;
+no theorem promise while the surface is off. Mutation-checked: restoring the theorem phrase fails 1
+row; dropping one featured example from a page fails 1 row.
