@@ -87,6 +87,11 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
 - **FR-KN-4 (Must)** — **The engine states WHAT happened; the reading layer words it.** A verdict carries
   a structured reason code, not a sentence, so the same fact reads correctly in Hebrew and English and
   the wording can improve without touching the engine. *(Realised — `model/why.ts`, #716.)*
+- **FR-KN-5 (Must)** — **A real parameter is visible.** Every parameter the figure mentions is listed
+  in the data panel: its exact value when the givens force it (`u^5 = 32` → `u = 2`), «חופשי» when they
+  do not. It can be asked (`r`, `9r`), and wherever a solved parameter would print inside another value,
+  its value is printed instead (`|z₂| = 18r` with r = 5/9 reads 10). An accepted given never leaves
+  nothing on screen. *(Realised — [ADR-CX-043](06d-decisions-complex.md#adr-cx-043), #1389/#1390.)*
 
 ## Input honesty
 
