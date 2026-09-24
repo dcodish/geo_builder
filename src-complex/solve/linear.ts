@@ -44,6 +44,13 @@ export interface LinearSolution<V> {
   readonly free: readonly string[];
   /** the count the DOF cue and the knowledge gates both read; never re-derived elsewhere */
   readonly rank: number;
+  /**
+   * Every row elimination emptied of unknowns whose constant is NOT zero — the `0 = c` rows themselves
+   * (#1366). `inconsistent` is exactly `leftover.length > 0`; the rows are returned because a constant
+   * can still carry a symbol the caller treats as an unknown of ANOTHER system (a real parameter inside
+   * a modulus), and only the caller can say whether `0 = 9r/5` is a contradiction or an equation in `r`.
+   */
+  readonly leftover: readonly Row<V>[];
 }
 
 /**
@@ -99,7 +106,8 @@ export function solveLinear<V>(rows: readonly Row<V>[], unknowns: readonly strin
   }
 
   // a row with no coefficients left and a non-zero constant is `0 = c`
-  const inconsistent = work.some((r) => r.coef.size === 0 && !ops.isZero(r.rhs));
+  const leftover = work.filter((r) => r.coef.size === 0 && !ops.isZero(r.rhs));
+  const inconsistent = leftover.length > 0;
 
   const free = unknowns.filter((u) => !pivotRowOf.has(u));
   const determined = new Map<string, Determined<V>>();
@@ -113,7 +121,7 @@ export function solveLinear<V>(rows: readonly Row<V>[], unknowns: readonly strin
     determined.set(u, { konst: work[i].rhs, coefs });
   }
 
-  return { inconsistent, determined, free, rank: pivotRowOf.size };
+  return { inconsistent, determined, free, rank: pivotRowOf.size, leftover };
 }
 
 /** Evaluate a determined unknown once the free unknowns have values. */

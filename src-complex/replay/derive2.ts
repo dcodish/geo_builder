@@ -381,6 +381,23 @@ export function foldConstraints(input: FoldInput): Derived2 {
   for (const m of measures) {
     for (const p of paramsOf(m.rhs)) if (!sample.has(p)) sample.set(p, paramSample(p, seed));
   }
+  /**
+   * #1366 — a parameter the givens DETERMINE is drawn at its solved value, and is not a free DOF.
+   *
+   * `z1 = 3+4i` with `|z1| = 9r` solves `r = 5/9` (tier 1's `params`). Left at its seed sample, `r`
+   * would print as free, and tier 2 — which may move every free parameter — could drive it off 5/9 to
+   * satisfy some other given, silently breaking the one that pinned it. A parameter determined in terms
+   * of other, still-free parameters follows them: their samples are taken first, then it is computed.
+   */
+  const solvedParams = new Set<string>();
+  for (const [p, d] of t1.params.determined) {
+    let v = evalMod(d.konst, sample);
+    if (v === null) continue;
+    for (const [fn, c] of d.coefs) v *= Math.pow(sample.get(fn) ?? paramSample(fn, seed), toNumber(c));
+    if (!Number.isFinite(v) || v <= 0) continue;
+    sample.set(p, v);
+    solvedParams.add(p);
+  }
 
   const { kept, emptiedBy } = filterBranches(t1.branches, filterList, sample);
   const enumeratedConfigCount = kept.length;
@@ -519,7 +536,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
       ...drawnNames.filter((n) => !t1.argument.determined.has(n) && !branch?.angles.has(n)),
     ]),
   ].filter((n) => !isTurnUnknown(n));
-  const freeParamNames = [...sample.keys()].filter((p) => !literalSample.has(p));
+  const freeParamNames = [...sample.keys()].filter((p) => !literalSample.has(p) && !solvedParams.has(p));
 
   /**
    * THE PUBLISHED FREE-DOF LIST — derived from the basis above, not from `t1.freeDof`.
