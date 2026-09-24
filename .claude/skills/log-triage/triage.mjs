@@ -303,7 +303,7 @@ function guidedAtSeam(u, pctx, parsed) {
 // ---- verify: replay each SESSION through the App's submit path ------------
 // The categories App.tsx#submit refuses with a GUIDED message BEFORE ever paying for an LLM call
 // (ADR-289 / #43). Not gaps — the tool answering on purpose. Keep in sync with App.tsx's PRE_LLM.
-const PRE_LLM = new Set(['analytic', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point', 'unnamed-sides', 'compound-relation']);
+const PRE_LLM = new Set(['analytic', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point', 'unnamed-sides', 'compound-relation', 'unrelated']); // #1357: unrelated is pre-LLM too
 
 /** The honesty gates of the submit pipeline, in its order. Any hit ⇒ the App escalates to the LLM
  *  instead of committing the partial parse — so the deterministic grammar does NOT own this utterance.

@@ -20,7 +20,8 @@
  */
 import type { InputError } from '../store/useAnalyticStore';
 import { parseLine } from '../parser/parseAnalytic';
-import { imperativeCandidates } from '../parser/scopeAnalytic';
+import { VOCABULARY_ANALYTIC, imperativeCandidates } from '../parser/scopeAnalytic';
+import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 
@@ -278,4 +279,9 @@ export function decideSubmit(
  * Extracted so `App.tsx` and the lock ask the same function ([ADR-AG-139](../../docs/06c-decisions-analytic.md#adr-ag-139)).
  */
 export const reachesFallback = (verdict: SubmitVerdict): boolean =>
-  verdict.kind === 'refused' && verdict.error.key === 'not-handled';
+  verdict.kind === 'refused' &&
+  verdict.error.key === 'not-handled' &&
+  // #1357: a sentence with NO construction signal (gibberish, a greeting) cannot build whatever the model
+  // answers, so it keeps the deterministic refusal and never costs a call. `not-handled` carries the
+  // student's own line as its detail (the #1272 lock), so the predicate needs nothing more.
+  hasConstructionSignal(verdict.error.detail ?? '', VOCABULARY_ANALYTIC);

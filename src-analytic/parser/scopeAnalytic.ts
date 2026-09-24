@@ -104,3 +104,23 @@ export function imperativeCandidates(raw: string): ImperativeCandidate[] {
   push(1); // the verb alone removed, in case a "particle" was really part of the sentence
   return out;
 }
+
+/**
+ * #1357 — this builder's VOCABULARY for the shared construction-signal test
+ * (`shell/llm/constructionSignal.ts`), which the LLM seam asks before paying for a call.
+ *
+ * A point label and a relation symbol are signals on their own, so this carries what an analytic
+ * sentence can have without either: the coordinate letters `x` and `y`, a coordinate pair `(2, 3)`,
+ * and the words of the analytic grammar. The catalog net asserts that no catalog line scores zero.
+ */
+export const VOCABULARY_ANALYTIC = new RegExp(
+  [
+    String.raw`(?<![A-Za-z])[xy](?![a-z])`,
+    String.raw`\(\s*-?\d`,
+    'ישר|מעגל|פרבול|אליפס|היפרבול|נקוד|שיפוע|ציר|משווא|מרחק|אמצע|משולש|מרובע|ריבוע|מלבן|מקבילית|מעוי?ין|טרפז|דלתון',
+    'זו?וי|אנך|מאונך|מקביל|חיתוך|חותך|משיק|רדיוס|מרכז|קוטר|מיתר|אורך|שטח|היקף|קטע|תיכון|גובה|חוצה|אלכסון|מוקד|מדריך|קודקוד|שיעור|פרמטר',
+    'line|circle|parabola|ellipse|hyperbola|point|slope|axis|equation|distance|midpoint|triangle|quadrilateral|square|rectangle|parallelogram|rhombus|trapezoid|kite',
+    'angle|perpendicular|parallel|intersect|tangent|parameter|radius|cent(?:er|re)|diameter|chord|length|area|perimeter|segment|median|altitude|bisector|diagonal|focus|directrix|vertex',
+  ].join('|'),
+  'i',
+);

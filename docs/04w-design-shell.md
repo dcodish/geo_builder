@@ -261,3 +261,13 @@ and the site icon. `favicon.svg` is the one source; `favicon.ico` (16/32/48, PNG
 `apple-touch-icon.png` (180) are regenerated from it by `scripts/render-icons.mjs` through Chromium,
 and committed because this directory deploys as a plain copy with no build step. The `www.` → apex
 redirect is a Plesk setting, outside the repo (RUNBOOK).
+
+## The junk gate ([ADR-W-087](06w-decisions-workspace.md#adr-w-087))
+
+`shell/llm/constructionSignal.ts` answers one question for every builder that escalates to the model:
+*could anything in this utterance be geometry?* A point label (an uppercase run not continuing into a
+lowercase word), a relation symbol, or a word of the caller's vocabulary is a signal; a digit alone is
+not. Each builder asks it at its own escalation seam, BEFORE the call: 2-D through `classifyOutOfScope`'s
+`unrelated` (now in `PRE_LLM`), 3-D through `classifyGuidance3`'s `unrelated` fallback, analytic through
+`reachesFallback`. The vocabulary is the product's, and each product's catalog net asserts that no line
+it teaches scores zero, so the gate can never brush off a sentence the tool accepts.
