@@ -31,6 +31,12 @@ given, that is a defect in the exam, not a gap the tool should paper over
 
 Roughly 2,350 source lines against `src/`'s 42,000 — this is a V0, not a peer.
 
+## A line's angle has one decision ([ADR-AG-154](06c-decisions-analytic.md#adr-ag-154))
+
+`app/lineAngle.ts` answers "what angle does this direction make with the positive x-axis, and is it known?"
+for every surface: the «שיפועים» panel row reads a segment's direction, the ask lane a named line's, and both
+call `lineAngleOf` (fold to [0°, 180°), vertical = 90°, gated by `isKnowledge`, printed by `angleText`).
+
 ## The model — objects, and the register that makes them free
 
 The primitive is the **geometric object** ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009),

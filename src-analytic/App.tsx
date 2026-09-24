@@ -33,6 +33,7 @@ import { derive } from './engine/derive';
 import { decideSubmit, reachesFallback } from './app/submit';
 import { runFallback } from './app/fallback';
 import { panelListsCurve } from './app/panelRows';
+import { angleText, lineAngleOf } from './app/lineAngle';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
 import { domainText, positionalOf } from './engine/types';
 import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
@@ -1632,14 +1633,18 @@ export function App() {
                     const v = read(f);
                     return v === null ? null : verticality(v.dx, v.dy);
                   });
+                  // #1322 — beside the slope, the angle it makes with the positive x-axis (m = tan α). The
+                  // SAME decision the ask lane answers from (`lineAngleOf`), gated the same way.
+                  const angle = lineAngleOf(d.construction, read);
+                  const angleSuffix = ` · ${t('angleWithX')}: ${angle.known ? angleText(angle.deg) : '—'}`;
                   if (vertical.known && vertical.value < VERTICAL_TOL) {
-                    return <span key={seg.id}><ValueRow text={`${a}${b}: ${t('slopeVertical')}`} /></span>;
+                    return <span key={seg.id}><ValueRow text={`${a}${b}: ${t('slopeVertical')}${angleSuffix}`} /></span>;
                   }
                   const k = isKnowledge(d.construction, (f) => {
                     const v = read(f);
                     return v === null || Math.abs(v.dx) < 1e-12 ? null : v.dy / v.dx;
                   });
-                  return <span key={seg.id}><ValueRow text={`${a}${b}: ${k.known ? fmt(k.value) : '—'}`} /></span>;
+                  return <span key={seg.id}><ValueRow text={`${a}${b}: ${k.known ? fmt(k.value) : '—'}${angleSuffix}`} /></span>;
                 }),
               },
               {

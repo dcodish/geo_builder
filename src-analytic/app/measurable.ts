@@ -81,6 +81,9 @@ function lineQuestions(c: Construction, name: string): Measurable[] {
   const pair = asPair(name);
   if (pair && c.objects.some((q) => q.id === pair[0]) && c.objects.some((q) => q.id === pair[1]))
     out.push({ sentence: `${pair[0]}${pair[1]}` });
+  // #1322 — after the operator's three: the angle with the positive x-axis (m = tan α). Offered HERE because
+  // this menu is where the tool teaches its questions; the catalog holds statements, and a question draws nothing.
+  out.push({ sentence: `הזווית בין הישר ${name} לציר ה-x` });
   return out;
 }
 

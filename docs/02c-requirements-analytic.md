@@ -874,6 +874,12 @@ English `=` form — «angle ABC = 90» — and they mean the same thing **in an
 is named by a WHOLE name, never by a letter pair taken out of the middle of a word.** «ANGLE ABC» is not
 three measurements. A non-right angle value remains out of scope in both languages.
 
+**R116 — a line's angle with the positive x-axis is shown and can be asked**
+([ADR-AG-154](06c-decisions-analytic.md#adr-ag-154), [#1322](https://github.com/dcodish/geo_builder/issues/1322)).
+Beside each slope the panel prints the angle α the line makes with the positive x-axis (m = tan α), in
+[0°, 180°) so a negative slope reads obtuse, 90° for a vertical line, and only when the givens fix it.
+«הזווית בין הישר l1 לציר ה-x» (and the exam's «…ובין הכיוון החיובי של ציר ה-x») asks the same number.
+
 **R114 — the tool never accepts a sentence a textbook would not print; it teaches the one it would**
 ([ADR-AG-150](06c-decisions-analytic.md#adr-ag-150),
 [#1353](https://github.com/dcodish/geo_builder/issues/1353), implementing

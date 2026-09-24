@@ -29,6 +29,7 @@ import { curveByName, objectById, type Id } from '../engine/types';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { isVerticalLine } from '../engine/lines';
 import { asPair, lineNamed } from './lines';
+import { angleText, lineAngleOf } from './lineAngle';
 import { curveParts, locusEquation } from './curveText';
 
 /** The question is EXACTLY one point-to-line distance, for the same reason `BARE_LENGTH` exists. */
@@ -157,6 +158,16 @@ const POINT_ONLY = /^[A-Z][0-9]?$/;
  * and the ask lane already follow.
  */
 const SLOPE_OF = /^(?:ה?שיפוע|[Tt]he\s+slope\s+of)\s+(?:של\s+)?(?:ה?(?:ישר|קטע|צלע)\s+)?(.+)$/;
+
+/**
+ * «הזווית בין הישר l1 לציר ה-x» — the angle a line makes with the positive x-axis (#1322).
+ *
+ * The exam's own phrasing is «הזווית שבין הישר … ובין הכיוון החיובי של ציר ה-x», so both the short and
+ * the long form read, over a named line or a segment («הישר AB»). The answer is {@link lineAngleOf}, the
+ * function the panel row prints from.
+ */
+const ANGLE_WITH_X_HE = /^ה?זווית\s+ש?בין\s+(?:ה?(?:ישר|קטע|צלע)\s+)?(\S+)\s+(?:ל|ו?בין\s+)(?:ה?כיוון\s+ה?חיובי\s+של\s+)?ציר\s+ה-?x$/;
+const ANGLE_WITH_X_EN = /^(?:the\s+)?angle\s+(?:between|of)\s+(?:the\s+)?(?:line\s+|segment\s+)?(\S+)\s+(?:and|with)\s+(?:the\s+)?(?:positive\s+)?(?:direction\s+of\s+the\s+)?x-?\s*axis$/i;
 
 /** «משוואת …» / «the equation of …» — a question about a curve rather than a value. */
 const EQUATION_OF = /^(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+(?:ה?(?:ישר|מעגל|פרבולה|אליפסה|אלכסון)\s+)?(.+)$/;
@@ -320,6 +331,19 @@ export function ask(
    * Before the equation rule, because «שיפוע הישר l1» and «משוואת הישר l1» are different
    * questions about the same object and only the leading noun separates them.
    */
+  // --- a line's angle with the positive x-axis (#1322) ---
+  const ax = ANGLE_WITH_X_HE.exec(text) ?? ANGLE_WITH_X_EN.exec(text);
+  if (ax) {
+    const name = ax[1].trim();
+    if (!lineNamed(d.figure, name)) return { question, value: null, missing: { name, kind: 'curve' } };
+    // A line `ax + by + c = 0` runs along (−b, a); a vertical one answers 90° rather than failing.
+    const angle = lineAngleOf(d.construction, (f) => {
+      const l = lineNamed(f, name);
+      return l ? { dx: -l.b, dy: l.a } : null;
+    });
+    return { question, value: angle.known ? angleText(angle.deg) : null };
+  }
+
   const sl = SLOPE_OF.exec(text);
   if (sl) {
     const name = sl[1].trim();

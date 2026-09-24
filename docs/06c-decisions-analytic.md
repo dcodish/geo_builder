@@ -7400,3 +7400,39 @@ So the sentence taught here is **the stripped remainder, re-parsed**. That yield
 **Measured after.** 0 of the 1,470 pairs reach the fact list, in an empty figure and in a populated one; the ratio family teaches once its referents exist and is honestly refused before that; every sentence taught is one the gate then ACCEPTS (asserted by submitting it); the bare catalog lines are unaffected.
 
 **Consequences.** `src-analytic/parser/scopeAnalytic.ts` (new — `IMPERATIVE_VERBS_HE`/`_EN`, `imperativeCandidates`); `src-analytic/app/submit.ts` (the `teach` verdict, checked first); `src-analytic/App.tsx` (the one branch that does not clear the box); `src-analytic/i18n/index.ts` (`noticeTeachCanonical`, both locales). Lock: `__tests__/issue-1353-imperatives-taught.test.ts` (10), whose centre is the catalog-wide property and the teach→Enter→accepted walk that caught the trap above — the catalog and the verb list are IMPORTED, so a new entry or a new verb is covered the moment it is added.
+
+## ADR-AG-154 — A line's angle with the positive x-axis is shown beside its slope and can be asked, from ONE decision (#1322)
+
+**Status:** accepted, 2026-09-24 · **Issue:** [#1322](https://github.com/dcodish/geo_builder/issues/1322) (feature, `P2`, `analytic`) · round [#1397](https://github.com/dcodish/geo_builder/issues/1397) · PR route
+**Requirements:** [02c](02c-requirements-analytic.md) R116 (new) · **Design:** [04c](04c-design-analytic.md#a-lines-angle-has-one-decision-adr-ag-154) (new section)
+
+**What the operator asked.** *"we should add to line properties the tan of the slope (m = tan α)"*, reading
+the 572 question whose part (ב) is «מצא את הזווית שבין הישר … ובין הכיוון החיובי של ציר ה-x». Ruled
+2026-09-24: the panel row AND the question. The prerequisite #1321 (`tan` read as `t·a·n`) is closed.
+
+**The decision.** `app/lineAngle.ts` is the one decision:
+- `angleWithXAxis` folds a direction into [0°, 180°), so a negative slope reads OBTUSE (y = −x → 135°);
+- a vertical line is 90°, the one case where the angle says more than «אנכי (אין שיפוע)»;
+- both ends of the fold snap to 0, so a horizontal line never flickers between 0° and 180°;
+- `lineAngleOf` gates it through `isKnowledge`, exactly as the slope row is gated (#1020's class);
+- `angleText` prints it through `fmtNum`: two decimals, never a fraction.
+
+Every surface reads that one decision:
+- **The panel:** each row of «שיפועים» reads «AB: 1 · זווית עם ציר ה-x: 45°».
+- **The ask:** `ANGLE_WITH_X_HE/EN` reads the short form «הזווית בין הישר l1 לציר ה-x», the exam's own
+  «הזווית שבין הישר l1 ובין הכיוון החיובי של ציר ה-x», and "the angle between line l1 and the x-axis",
+  over a named line or a segment.
+- **The click menu:** a line's questions gain the angle, after the operator's three.
+
+Panel and ask are one decision over two direction readers. A lock compares them on the same segment.
+
+**Deviation from the plan.** The plan asked for "one row for the ask in `catalogAnalytic.ts`". The analytic
+catalog holds STATEMENTS (the LLM may emit only those, and its guard builds every entry and asserts it
+draws), and a question draws nothing. So the question is taught where analytic teaches questions: the
+click-to-measure menu.
+
+**Consequences.** `src-analytic/app/lineAngle.ts` (new), `app/ask.ts`, `app/measurable.ts`, `App.tsx` (the
+slope row), `i18n/index.ts` (`angleWithX`). Locks: `issue-1322-line-angle.test.ts` (14: the fold including
+the 0/180 seam, the exam's two phrasings plus English, a vertical segment answering 90°, an undetermined line
+answering "not determined", and the panel's decision equal to the ask's on one segment), and the #1139 menu
+lock extended with the fourth question.
