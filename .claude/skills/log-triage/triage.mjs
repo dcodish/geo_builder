@@ -8,9 +8,12 @@
  * MUST be run with vite-node (it imports the TS parsers/builders):
  *   npx vite-node .claude/skills/log-triage/triage.mjs --app 3d
  *   npx vite-node .claude/skills/log-triage/triage.mjs --app 2d --days 30
- *   npx vite-node .claude/skills/log-triage/triage.mjs --app both --no-fetch
+ *   npx vite-node .claude/skills/log-triage/triage.mjs --app analytic
+ *   npx vite-node .claude/skills/log-triage/triage.mjs --no-fetch          (--app all is the default)
  *
- * Prod events (ADR-3D-016): /var/www/geo-proxy/events.jsonl (2-D) + events-3d.jsonl (3-D).
+ * Prod events (ADR-3D-016, #1243): /var/www/geo-proxy/events.jsonl (2-D), events-<id>.jsonl for every other
+ * product — the list and the filenames come from products.json via ./apps.ts (#1362), never a literal.
+ * A registered product with no adapter below (complex: it posts no events yet) is REPORTED as such.
  * Each `submit` line: { serverTs, iph(hashed IP), ev, sid, rel, utterance, locale, source, result }.
  * Outcome classification MIRRORS server/admin.ts (outcomeOf2D / outcomeOf3D).
  *
@@ -82,12 +85,17 @@ import { replay, nameCentreFacts, renameFacts, autoNamedLabels } from '../../../
 import { parse3 } from '../../../src3d/parser/parse3.ts';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from '../../../src3d/parser/scope3.ts';
 import { derive3 } from '../../../src3d/store/store3.ts';
+// #1362 — analytic: the dashboard's OWN classifier (one taxonomy, the operator's 2026-09-24 ruling) and the
+// product's own replay, which calls the App's `decideSubmit` rather than mirroring it.
+import { outcomeOfAnalytic } from '../../../server/admin.ts';
+import { replayAnalyticSession } from '../../../src-analytic/app/triageReplay.ts';
+import { triagePlan, remoteEventsFile, localEventsFile } from './apps.ts';
 
 // ---- args ----------------------------------------------------------------
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
 const has = (k) => argv.includes(k);
-const app = opt('--app', 'both');
+const app = opt('--app', 'all');
 const days = Number(opt('--days', '0')) || 0;
 const server = opt('--server', 'root@themathbible.com');
 const remoteDir = opt('--remote-dir', '/var/www/geo-proxy');
@@ -105,9 +113,11 @@ const reportsDir = path.join(repoRoot, 'reports'); // gitignored
 mkdirSync(cacheDir, { recursive: true });
 mkdirSync(reportsDir, { recursive: true });
 
-const APPS = app === 'both' ? ['2d', '3d'] : [app];
-const REMOTE = { '2d': 'events.jsonl', '3d': 'events-3d.jsonl' };
-const LOCAL = { '2d': path.join(cacheDir, 'prod-events-2d.jsonl'), '3d': path.join(cacheDir, 'prod-events-3d.jsonl') };
+// #1362: from the registry (./apps.ts), the same derivation the server's event router uses — never a literal.
+const PLAN = triagePlan(app);
+const APPS = PLAN.apps;
+const REMOTE = Object.fromEntries(APPS.map((a) => [a, remoteEventsFile(a)]));
+const LOCAL = Object.fromEntries(APPS.map((a) => [a, path.join(cacheDir, localEventsFile(a))]));
 
 // ---- outcome classification (mirror of server/admin.ts) ------------------
 function outcome2D(e) {
@@ -125,16 +135,37 @@ function outcome3D(e) {
   if (r === 'not-understood') return 'not-understood';
   return 'refused';
 }
-const classify = (a, e) => (a === '2d' ? outcome2D(e) : outcome3D(e));
-// buckets that carry a "what's missing" signal, in priority order
-const INTERESTING = ['not-understood', 'llm-built', 'refused', 'out-of-scope'];
+/**
+ * One ADAPTER per product — the five former `a === '2d' ? … : …` branches, as data (#1362). A product
+ * missing here is listed by ./apps.ts as silent and reported, so an adapter can never be forgotten
+ * without the report saying so.
+ */
+const ADAPTERS = {
+  '2d': { name: 'Geo Builder (2-D)', classify: outcome2D, session: (evs) => session2d(evs) },
+  '3d': { name: 'Space Builder (3-D)', classify: outcome3D, session: (evs) => session3d(evs) },
+  analytic: { name: 'Analytic Builder', classify: outcomeOfAnalytic, session: (evs) => replayAnalyticSession(evs, sessionBudgetMs) },
+};
+const classify = (a, e) => ADAPTERS[a].classify(e);
+// buckets that carry a "what's missing" signal, in priority order. `review` is analytic's ruled third
+// bucket (#1362): neither auto-filed nor discarded — listed so it is READ.
+const INTERESTING = ['not-understood', 'llm-built', 'refused', 'review', 'out-of-scope'];
 
 // ---- fetch ---------------------------------------------------------------
+/**
+ * Fetch one product's log. Returns null when it is there, or WHY it is not — a product whose file is
+ * missing is reported as having no data rather than crashing the run for every other product (#1362:
+ * analytic's file only exists once someone has used it since #1243 deployed).
+ */
 function fetch(a) {
-  if (noFetch) { if (!existsSync(LOCAL[a])) throw new Error(`--no-fetch but no cache at ${LOCAL[a]}`); return; }
+  if (noFetch) return existsSync(LOCAL[a]) ? null : `--no-fetch, and no local cache at ${path.relative(repoRoot, LOCAL[a])}`;
   const src = `${server}:${remoteDir}/${REMOTE[a]}`;
   process.stderr.write(`fetching ${src}\n`);
-  execFileSync('scp', ['-q', src, LOCAL[a]], { stdio: ['ignore', 'ignore', 'inherit'] });
+  try {
+    execFileSync('scp', ['-q', src, LOCAL[a]], { stdio: ['ignore', 'ignore', 'inherit'] });
+    return null;
+  } catch {
+    return `could not fetch ${src} — no events on the server yet, or no SSH access`;
+  }
 }
 
 // ---- load + dedup --------------------------------------------------------
@@ -533,7 +564,7 @@ function verifyAll(a, events, state) {
     const reusable = !reverify && prior && prior.n === evs.length && !prior.outs.some((o) => OPEN.has(o.now));
     let outs;
     if (reusable) { outs = prior.outs; cached++; }
-    else { outs = (a === '2d' ? session2d : session3d)(evs); replayed++; }
+    else { outs = ADAPTERS[a].session(evs); replayed++; }
     state.sessions[sid] = { n: evs.length, rev: reusable ? prior.rev : headRev, at: reusable ? prior.at : new Date().toISOString(), outs };
     outs.forEach((o, i) => {
       if (evs[i].ev !== 'submit') return; // `action` rows exist only to degrade the prefix, never to be judged
@@ -679,7 +710,7 @@ function reportFor(a) {
   saveState(a, state);
   saveSurfaced(surfaced);
 
-  const NAME = a === '2d' ? 'Geo Builder (2-D)' : 'Space Builder (3-D)';
+  const NAME = ADAPTERS[a].name;
   const row = (c, i) => `| ${i + 1} | ${c.users} | ${c.count} | \`${norm(c.u).replace(/\|/g, '\\|').slice(0, 120)}\` | ${c.bucket} | ${c.verify.detail || ''} | ${c.locales.join('/')} |`;
   const tbl = (arr, cols) => [`| # | users | subs | utterance | logged | ${cols} | loc |`, `|--:|--:|--:|---|---|---|---|`, ...arr.slice(0, top).map(row)].join('\n') + (arr.length > top ? `\n_(+${arr.length - top} more)_` : '');
   // The carried-over table earns one extra column: how long this has been sitting there unactioned.
@@ -724,14 +755,27 @@ function reportFor(a) {
 }
 
 // ---- run -----------------------------------------------------------------
-for (const a of APPS) fetch(a);
+const unavailable = {};
+for (const a of APPS) {
+  const why = fetch(a);
+  if (why) unavailable[a] = why;
+}
 let out = `# log-triage — generated ${new Date().toISOString().slice(0, 10)}\n`;
 out += `> **▶ LIVE is the worklist.** Every utterance is re-run through the App's real submit path — store ops →\n`;
 out += `> \`parse\` WITH the session's figure as context → clarify → the pre-LLM out-of-scope register → the honesty\n`;
 out += `> gates → replay (ADR-346, issue #35). So already-fixed, guided-refusal, would-escalate and\n`;
 out += `> unreplayable-prefix items are separated out and are NOT gaps. Cluster the LIVE rows by intent and recommend.\n`;
+// #1362 — NO DATA is said out loud. A product with no adapter, or whose log could not be read, gets a
+// line instead of an absent section: an empty worklist and an unread product must never look alike.
+for (const id of PLAN.silent) {
+  out += `\n# ${id} — NOT TRIAGED: this builder posts no usage events yet (#1243), so there is no data to read. This is not "no failures".\n`;
+}
 const verdictMaps = {};
 for (const a of APPS) {
+  if (unavailable[a]) {
+    out += `\n# ${ADAPTERS[a].name} — NO DATA: ${unavailable[a]}. This is not "no failures".\n`;
+    continue;
+  }
   const r = reportFor(a);
   out += r.md;
   verdictMaps[a] = r.verdictMap ?? {};
@@ -744,6 +788,7 @@ writeFileSync(file, out);
 // an offline run still writes the local file and the report; the dashboard states data age itself.
 if (!noVerify) {
   for (const a of APPS) {
+    if (unavailable[a]) continue;
     const payload = { app: a, rev: headRev, generatedAt: new Date().toISOString(), verdicts: verdictMaps[a] };
     const vfile = path.join(cacheDir, `triage-verdicts-${a}.json`);
     writeFileSync(vfile, JSON.stringify(payload));
