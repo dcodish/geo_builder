@@ -60,7 +60,7 @@ import { planeChipsByFact } from './store/planeChips';
 import { paramChipsByFact } from './store/paramChips';
 import { collectWedges, competingArcSymbols } from './render/wedges';
 import { displayModeOf } from '../shell/displayMode';
-import { FactRowText3, factRowDir3, inputPreviewNode3 } from './render/FactRow3';
+import { FactRowText3, factRowText3, inputPreviewNode3 } from './render/FactRow3';
 import { VecMath } from './render/VecMath';
 
 /** #492/#425: the student's own statements, quoted and comma-joined, for a refusal that names the
@@ -1030,26 +1030,26 @@ export default function App3() {
                     },
                   }
                 : {}),
-              content: (
-                <span className="flex min-w-0 items-center gap-2">
-                  {f.cmds.some((c) => c.type === 'claim') && derived.status[f.id] === 'ok' ? (
-                    <span className="text-xs font-bold text-emerald-600" title={t('facts.claimVerified')}>
-                      ✓
-                    </span>
-                  ) : (
-                    statusDot(derived.status[f.id])
-                  )}
-                  <span
-                    dir={factRowDir3(f, new Set(derived.construction.vectors.keys()))}
-                    className="min-w-0 flex-1 truncate text-sm"
-                  >
-                    {/* #900 (ADR-3D-216): the routing lives in FactRow3, not in this callback — a decision
-                        inside a `rows={facts.map(...)}` ternary is one no test can reach. #934
-                        (ADR-3D-228): and neither is the row's DIRECTION — this was `dir="auto"`, which
-                        keys off the first strong character, so every fact opening with a Latin label
-                        took an LTR base and its Hebrew words swapped. */}
-                    <FactRowText3 f={f} vecNames={new Set(derived.construction.vectors.keys())} />
+              // #934 (ADR-3D-228) → #1401 (ADR-W-088): the row's DIRECTION is the shared chrome's now,
+              // derived with `textDir3` from this text — this callback used to set `dir` itself.
+              text: factRowText3(f, new Set(derived.construction.vectors.keys())),
+              lead:
+                f.cmds.some((c) => c.type === 'claim') && derived.status[f.id] === 'ok' ? (
+                  <span className="text-xs font-bold text-emerald-600" title={t('facts.claimVerified')}>
+                    ✓
                   </span>
+                ) : (
+                  statusDot(derived.status[f.id])
+                ),
+              content: (
+                <span className="block min-w-0 truncate text-sm">
+                  {/* #900 (ADR-3D-216): the routing lives in FactRow3, not in this callback — a decision
+                      inside a `rows={facts.map(...)}` ternary is one no test can reach. */}
+                  <FactRowText3 f={f} vecNames={new Set(derived.construction.vectors.keys())} />
+                </span>
+              ),
+              trail: (planeChips.get(f.id) ?? []).length > 0 ? (
+                <>
                   {/* #842 (ADR-3D-192): the chip goes on the row that MATERIALISED the plane, not on
                       every row that mentions it. Provenance is derived from the fact list (the #769
                       pattern), so a relation stated about a plane the student already drew no longer
@@ -1065,9 +1065,10 @@ export default function App3() {
                       {(planeDisplay[name] ?? 'full') === 'full' ? t('facts.planeFace') : (planeDisplay[name] === 'face' ? t('facts.planeHide') : t('facts.planeFull'))}
                     </button>
                   ))}
-                </span>
-              ),
+                </>
+              ) : undefined,
             }))}
+            textDir={textDir3}
             emptyHint={t('facts.empty')}
             onToggle={toggle}
             toggleLabel={t('facts.toggleTitle')}

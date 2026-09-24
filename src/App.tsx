@@ -75,7 +75,7 @@ import { ShareSheet } from '../shell/frame/ShareSheet';
 import { applyDisplayMode, competingSymbols, paramChipsByFact } from '@/store/paramChips';
 import { displayModeOf } from '../shell/displayMode';
 import { questionLines } from '@/export/questionLines';
-import { bidiSegments, isolateLtrRuns } from '@/i18n/bidi';
+import { bidiSegments, isolateLtrRuns, textDir } from '@/i18n/bidi';
 // #742: the exports live in the TOP TOOL ROW now (ADR-W-024) — App rasterises the canvas svg itself.
 // #745: the rasteriser and the printed width are SHARED (shell/export/svgToPng), so every builder that
 // prints a figure prints it at one width and one ink weight. Two copies could drift; one cannot.
@@ -337,12 +337,8 @@ export default function App() {
   /** The locale `canonicalText` renders in — the same normalisation the submit pipeline uses (#450). */
   const canonLocale: 'he' | 'en' = i18n.language?.startsWith('he') ? 'he' : 'en';
 
-  // Base text direction for a mixed He/En string (geometry labels, numbers, and
-  // operators are Latin/neutral even inside Hebrew). `dir="auto"` keys only off
-  // the FIRST strong char, so a Hebrew phrase starting with a point label ("C
-  // במרחק…") wrongly gets an LTR base and reorders into garbage. Decide by
-  // content instead: any Hebrew letter ⇒ RTL base, else LTR.
-  const textDir = (s: string): 'rtl' | 'ltr' => (/[֐-׿]/.test(s) ? 'rtl' : 'ltr');
+  // Base text direction for a mixed He/En string: `textDir` from '@/i18n/bidi' (#118 / ADR-312 —
+  // decided by content, never `dir="auto"`). It lived here until #1401 made it callable.
 
   // Inline step editing: open the row as a text field pre-filled with its
   // phrasing, re-parse on confirm, and replace the whole step group in place
@@ -1650,7 +1646,7 @@ export default function App() {
                   readout (#39). */}
               <FactList
                 testId="step-list"
-                editDir={(s) => textDir(s)}
+                textDir={textDir}
                 rows={groups.map((g) => {
                   const anyOn = g.facts.some((f) => f.enabled);
                   const brokenFact = g.facts.find((f) => f.enabled && status[f.id] !== 'ok');
@@ -1676,15 +1672,22 @@ export default function App() {
                           },
                         }
                       : {}),
+                    // #1401 (ADR-W-088): the row's DIRECTION is the chrome's, from `text` — this
+                    // button carried `dir={textDir(label)}` itself, a decision the other builders
+                    // had to remember to copy (analytic did not).
+                    text: label,
+                    lead: (
+                      <span style={{ fontSize: 12, width: 16, textAlign: 'center', flexShrink: 0 }}>
+                        {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
+                      </span>
+                    ),
                     content: (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                        <span style={{ fontSize: 12, width: 16, textAlign: 'center', flexShrink: 0 }}>
-                          {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
-                        </span>
-                        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                          <button type="button" style={factLabel(state)} onClick={() => select(g.key)} dir={textDir(label)} title={state === 'broken' ? errText : undefined}>
-                            {hasMath(label) ? <MathText text={label} /> : label}
-                          </button>
+                      <button type="button" style={factLabel(state)} onClick={() => select(g.key)} title={state === 'broken' ? errText : undefined}>
+                        {hasMath(label) ? <MathText text={label} /> : label}
+                      </button>
+                    ),
+                    notes: (
+                      <>
                           {/* #786: the advisory on the row of the step that packed two givens — persistent, amber, the same sentence the input note showed. */}
                           {(() => {
                             const packed = packedByGroup.get(g.key);
@@ -1723,8 +1726,7 @@ export default function App() {
                               </strong>
                             </span>
                           )}
-                        </span>
-                      </span>
+                      </>
                     ),
                   };
                 })}
@@ -2486,7 +2488,8 @@ const bookLink: React.CSSProperties = {
 // rides the FactRow.selected flag, and brokenness reads from the ✗ mark + inline reason.
 function factLabel(state: 'ok' | 'disabled' | 'broken'): React.CSSProperties {
   return {
-    flex: 1,
+    display: 'block',
+    width: '100%',
     textAlign: 'start',
     border: 'none',
     background: 'transparent',

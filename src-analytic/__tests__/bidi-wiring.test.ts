@@ -85,7 +85,10 @@ describe('#1088 — every seam the siblings pass, this panel passes', () => {
     expect(passes('previewDir', 'textDir')).toBe(true);
   });
 
-  it('and so does the fact-list editor', () => {
-    expect(passes('editDir', 'textDir')).toBe(true);
+  it('and so does the fact list — its rows AND its editor', () => {
+    // #1401 (ADR-W-088): the optional `editDir` became the REQUIRED `textDir`, one decision for the
+    // edit box and the rows. The rows were the half analytic never passed («ABC = 90∠»); the behaviour
+    // lock for them is `render/__tests__/issue-1401-fact-row-dir.test.tsx`.
+    expect(passes('textDir', 'textDir')).toBe(true);
   });
 });

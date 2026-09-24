@@ -23,7 +23,27 @@ import { SymbolRow } from './SymbolRow';
 
 export interface FactRow {
   id: string;
+  /**
+   * #1401 (ADR-W-088) — the STATEMENT'S TEXT: the string whose CONTENT decides the row's base
+   * direction (the #118 / #934 rule — any Hebrew letter ⇒ RTL, else LTR). Required, so no builder
+   * can hand the chrome a row with no content direction: before this each caller decided (or did
+   * not) inside its own `rows={…}` callback, and analytic did not — «∠ABC = 90» inherited the
+   * app's RTL and its bidi-neutral `∠` landed at the far end («ABC = 90∠»).
+   *
+   * It must be the SAME string the product renders in `content` (or its source), or the container
+   * and its content disagree about what the row is.
+   */
+  text: string;
+  /** The statement's RENDERING. The chrome scopes it in an element carrying `dir` from `text`. */
   content: ReactNode;
+  /** Before the statement, OUTSIDE its direction scope (the product's status mark) — it follows
+   *  the UI's direction, so a mark does not change sides row by row. */
+  lead?: ReactNode;
+  /** After the statement, OUTSIDE its direction scope (e.g. 3-D's per-plane display chips). */
+  trail?: ReactNode;
+  /** Under the statement, OUTSIDE its direction scope (advisories, readouts). Each note carries
+   *  its own direction — a Hebrew sentence under an LTR statement is still a Hebrew sentence. */
+  notes?: ReactNode;
   /** The row's own error/annotation (e.g. "the engine could not read this"), rendered under it. */
   error?: ReactNode;
   disabled?: boolean;
@@ -65,10 +85,14 @@ export interface FactListProps {
   editValueOf?: (id: string) => string;
   onEditCommit?: (id: string, next: string) => boolean;
   editLabel?: string;
-  /** Direction for the editor box by CONTENT (the #118 lesson: dir="auto" keys off the first
-   *  strong character, and a Hebrew edit starting with a Latin label would take an LTR base).
-   *  Absent = auto (the math-first products). */
-  editDir?: (text: string) => 'rtl' | 'ltr';
+  /**
+   * The product's CONTENT direction (its bidi kit's `textDir`) — one decision for BOTH the row's
+   * statement and the edit-in-place box (#1401, ADR-W-088). Required: `dir="auto"` keys off the
+   * first strong character, so a Hebrew line opening with a Latin label takes an LTR base (#118),
+   * and an inherited RTL puts a leading neutral like `∠` at the far end (#1401). This replaces the
+   * optional `editDir`, whose absence meant `auto` in the box and nothing at all on the row.
+   */
+  textDir: (text: string) => 'rtl' | 'ltr';
   onDelete?: (id: string) => void;
   deleteLabel?: string;
   /** The list-zone actions (clear · counter · undo/redo …) — the product's row, one place. */
@@ -91,7 +115,7 @@ export function FactList({
   editValueOf,
   onEditCommit,
   editLabel,
-  editDir,
+  textDir,
   onDelete,
   deleteLabel,
   footer,
@@ -132,12 +156,13 @@ export function FactList({
                 style={toggle}
               />
             )}
+            {row.lead !== undefined && editing?.id !== row.id && <span style={leadStyle}>{row.lead}</span>}
             {editing?.id === row.id ? (
               <div style={editWrap}>
                 <input
                   ref={editRef}
                   autoFocus
-                  dir={editDir ? editDir(editing.text) : 'auto'}
+                  dir={textDir(editing.text)}
                   value={editing.text}
                   onChange={(e) => setEditing({ id: row.id, text: e.target.value })}
                   onKeyDown={(e) => {
@@ -162,10 +187,14 @@ export function FactList({
               </div>
             ) : (
               <div style={content}>
-                {row.content}
+                <div dir={textDir(row.text)} data-fact-text="">
+                  {row.content}
+                </div>
+                {row.notes !== undefined && <div style={notesStyle}>{row.notes}</div>}
                 {row.error && <div style={errorStyle}>{row.error}</div>}
               </div>
             )}
+            {row.trail !== undefined && editing?.id !== row.id && <span style={trailStyle}>{row.trail}</span>}
             <span style={rowActions}>
               {/* #937: the chip sits with the row's OTHER actions, before ✎/✕ — it is an affordance
                   on the statement, not part of the statement's text. It shows the form the student
@@ -244,6 +273,9 @@ const rowDisabled: CSSProperties = { opacity: 0.5 };
 const rowSelected: CSSProperties = { borderColor: '#f59e0b', background: '#fffbeb' };
 const toggle: CSSProperties = { flexShrink: 0, cursor: 'pointer' };
 const content: CSSProperties = { minWidth: 0, flex: 1 };
+const leadStyle: CSSProperties = { flexShrink: 0, display: 'flex', alignItems: 'center' };
+const trailStyle: CSSProperties = { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 };
+const notesStyle: CSSProperties = { display: 'flex', flexDirection: 'column' };
 const errorStyle: CSSProperties = { color: color.danger, fontSize: '0.8rem' };
 const editWrap: CSSProperties = { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 };
 const editBox: CSSProperties = {

@@ -1193,10 +1193,16 @@ export function App() {
                  * `QuickChips`' `display` follows.
                  */
                 content: <MathText text={analyticBidi.isolateLtrRuns(line)} />,
+                /**
+                 * #1401 (ADR-W-088): the row's base DIRECTION, from its content — the chrome sets it
+                 * with `textDir` below. Without it «∠ABC = 90» inherited the app's RTL, and `∠` (a
+                 * bidi neutral) resolved to the paragraph direction and landed at the far end.
+                 */
+                text: line,
                 error: d.faults.find((f) => f.index === i)?.detail,
               }))}
               emptyHint={t('factsEmpty')}
-              editDir={(s) => analyticBidi.textDir(s)}
+              textDir={analyticBidi.textDir}
               editValueOf={(id) => lines[Number(id)] ?? ''}
               onEditCommit={(id, next) => {
                 const i = Number(id);
