@@ -9,32 +9,66 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { isKnowledge, whyNotKnowledge } from '../../model/knowledge';
+import { type FigureClosure, knowledgeOf, whyNotKnowledge } from '../../model/knowledge';
 import { deriveLines } from '../../app/deriveLines';
 import { parseLineV2 } from '../../parser/rules';
 
+const re = (x: number) => ({ re: x, im: 0 });
+const closed = (configCount: number, completeness: FigureClosure['completeness'] = 'complete'): FigureClosure => ({
+  remainingDof: 0,
+  configCount,
+  completeness,
+});
+
+/**
+ * The predicate is asked with the value IN EVERY CONFIGURATION (#1427, ADR-CX-049). It used to be
+ * asked with a count — "exactly one configuration" — which printed a value that differs between two
+ * roots whenever the numeric tier had found only one of them, and withheld one they share.
+ */
 describe('the predicate itself', () => {
   it('an exactly carried value is knowledge however much else is free', () => {
-    expect(isKnowledge(true, { remainingDof: 3, enumeratedConfigCount: 7 })).toBe(true);
+    expect(knowledgeOf(true, { remainingDof: 3, configCount: 7, completeness: 'floor' }, []).known).toBe(true);
   });
 
   it('a closed figure with one configuration is knowledge', () => {
-    expect(isKnowledge(false, { remainingDof: 0, enumeratedConfigCount: 1 })).toBe(true);
+    expect(knowledgeOf(false, closed(1), [re(5)]).known).toBe(true);
   });
 
-  it.each([
-    [{ remainingDof: 1, enumeratedConfigCount: 1 }],
-    [{ remainingDof: 0, enumeratedConfigCount: 2 }],
-    [{ remainingDof: 2, enumeratedConfigCount: 3 }],
-  ])('%o is NOT knowledge', (closure) => {
-    expect(isKnowledge(false, closure)).toBe(false);
-    expect(whyNotKnowledge(closure).code).toBeTruthy();
+  it('a value the SAME in every configuration of a complete set is knowledge — however many there are', () => {
+    expect(knowledgeOf(false, closed(3), [re(2), re(2), re(2 + 1e-12)]).known).toBe(true);
+  });
+
+  it('a value that differs across a COMPLETE set is withheld as «differs between N configurations»', () => {
+    expect(knowledgeOf(false, closed(2), [re(3), re(-3)])).toEqual({
+      known: false,
+      why: { code: 'multi-config', configs: 2 },
+    });
+  });
+
+  it('a FLOOR is never read as invariant — agreeing or not, it withholds as «may have more than one possibility»', () => {
+    expect(knowledgeOf(false, closed(1, 'floor'), [re(2)])).toEqual({ known: false, why: { code: 'maybe-multi' } });
+    expect(knowledgeOf(false, closed(2, 'floor'), [re(-0.73), re(2.73)])).toEqual({
+      known: false,
+      why: { code: 'maybe-multi' },
+    });
+  });
+
+  it('remaining freedom outranks the configuration question', () => {
+    expect(knowledgeOf(false, { remainingDof: 1, configCount: 1, completeness: 'complete' }, [re(1)])).toEqual({
+      known: false,
+      why: { code: 'free-dof-remain' },
+    });
+  });
+
+  it('a value that cannot be evaluated in some configuration is not knowledge', () => {
+    expect(knowledgeOf(false, closed(2), [re(1), null])).toEqual({ known: false, why: { code: 'undetermined' } });
+    expect(knowledgeOf(false, closed(0), [])).toEqual({ known: false, why: { code: 'undetermined' } });
   });
 
   /** The reason has to describe the student's situation, so it can tell them what to do next. */
-  it('names remaining freedom and multiple configurations differently', () => {
-    expect(whyNotKnowledge({ remainingDof: 1, enumeratedConfigCount: 1 })).toEqual({ code: 'free-dof-remain' });
-    expect(whyNotKnowledge({ remainingDof: 0, enumeratedConfigCount: 4 })).toEqual({ code: 'multi-config', configs: 4 });
+  it('without a value in hand, names remaining freedom and "undetermined" differently', () => {
+    expect(whyNotKnowledge({ remainingDof: 1, configCount: 1, completeness: 'complete' })).toEqual({ code: 'free-dof-remain' });
+    expect(whyNotKnowledge(closed(4))).toEqual({ code: 'undetermined' });
   });
 });
 
@@ -87,12 +121,25 @@ describe('answers are given only when the figure forces them', () => {
     expect(d.knowledge[0].why?.code).toBe('multi-config');
   });
 
-  it('a driving measure closes the figure, and the panel then answers', () => {
+  /**
+   * #1427 (ADR-CX-049, operator ruling 2026-09-27) — this lock used to assert the perimeter PRINTS.
+   * The area given leaves z₂ at 90° or 270°: two drawings. The perimeter is 12 in both — but the
+   * numeric census that found them is a multi-start FLOOR (an area is not a polynomial in z₂), so
+   * nothing proves there is no third, and the ruled doctrine withholds it with the softer sentence.
+   * What still holds: the measure drives, the figure is closed (no «free DOF» reason), and both
+   * drawings are reachable through "show another configuration".
+   */
+  it('a driving measure closes the figure; over a census FLOOR the panel says «may have more than one possibility»', () => {
     const open = deriveLines(['z1 = 4', 'z2', '|z2| = 3', 'שטח Oz1z2']);
     expect(open.knowledge[0].value).toBeNull();
 
-    const closed = deriveLines(['z1 = 4', 'z2', '|z2| = 3', 'שטח Oz1z2 = 6', 'היקף Oz1z2']);
-    expect(closed.measures[0].status).toBe('holds');
-    expect(closed.knowledge[0].value).not.toBeNull();
+    const lines = ['z1 = 4', 'z2', '|z2| = 3', 'שטח Oz1z2 = 6', 'היקף Oz1z2'];
+    const closedFig = deriveLines(lines);
+    expect(closedFig.measures[0].status).toBe('holds');
+    expect(closedFig.knowledge[0]).toEqual({ label: 'היקף Oz1z2', value: null, why: { code: 'maybe-multi' } });
+    expect(closedFig.configCompleteness).toBe('floor');
+    expect(closedFig.canCycle).toBe(true);
+    const ims = [0, 1].map((s) => Math.sign(deriveLines(lines, s, s).points.find((p) => p.name === 'z2')!.z.im));
+    expect(new Set(ims)).toEqual(new Set([1, -1]));
   });
 });

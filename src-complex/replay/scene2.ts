@@ -64,6 +64,8 @@ export function whyText(w: Why, t: Translate): string {
       return t('whyMultiConfig', { configs: w.configs });
     case 'undetermined':
       return t('whyUndetermined');
+    case 'maybe-multi':
+      return t('whyMaybeMulti');
     case 'measure-uncomputable':
       return t('whyMeasureUncomputable', { src: w.src });
     case 'measure-holds':

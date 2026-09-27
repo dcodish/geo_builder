@@ -41,6 +41,8 @@ export type Why =
   | { readonly code: 'free-dof-remain' }
   | { readonly code: 'multi-config'; readonly configs: number }
   | { readonly code: 'undetermined' }
+  /** #1427 — the configuration set is only a census FLOOR: another solution may exist, so nothing is invariant yet */
+  | { readonly code: 'maybe-multi' }
   // --- measure verdicts (replay/derive2.ts stage 3e) ------------------------
   | { readonly code: 'measure-uncomputable'; readonly src: string }
   | { readonly code: 'measure-holds'; readonly src: string }

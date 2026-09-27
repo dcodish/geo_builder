@@ -3074,3 +3074,129 @@ Locks: `src-complex/__tests__/reserved-letter-1428.test.ts` (15: `namesUsed` per
 both orders with the exact Hebrew sentence, `z^2=4 · z^2=-4`, `w^2=4 · w^2=9`, `z^2=4 · z^3=8`,
 `z^2=2i · z=1+i` never «אינו מתיישב», `z^3=1 · |z|=2`, a genuine contradiction still `incompatible`,
 `z^3=8` alone, the #1396 member cases in both orders, `w^2 = z1`).
+
+---
+
+## ADR-CX-049 — Knowledge compares values across a COMPLETE configuration set; numeric roots are configurations (#1427)
+
+**Status:** accepted, 2026-09-27 (operator-approved plan, `auto-ok` 2026-09-27, with the wording ruling in
+the issue comment) · **Issue:** [#1427](https://github.com/dcodish/geo_builder/issues/1427) (bug, `P1`,
+`complex`) · round [#1469](https://github.com/dcodish/geo_builder/issues/1469) · **amends**
+[ADR-CX-014](#adr-cx-014) (the knowledge predicate) and [ADR-CX-006](#adr-cx-006)'s "branches are what
+"show another" walks"
+**Requirements:** [02d](02d-requirements-complex.md) FR-KN-1 (amended: invariance is asked over every
+configuration, and an incompletely known set is said to be one) · FR-CN-3 (amended: a numeric equation's
+other roots are configurations too) · **Design:** [04d](04d-design-complex.md), "Knowledge is decidable"
+(amended) and "The configuration set" (new) · **Ladder:** stages 3b and 5d, and 5b's walk
+([LADDER-CX](LADDER-CX.md))
+
+**What was seen.** An external review of prod, relayed by the operator: *"General equations show at most
+one solution … the tool then says Re(z) and |z| are 'not determined'"* and *"Invariant values are reported
+as undetermined, e.g. |z₁−z₂| when it's fixed"*. Triage found the worse half: `z1^2-4z1+13=0 · z2 = 2z1`
+printed **`Im(z1) = 3`** as fact at some seeds and `-3` at others.
+
+**Measured at pickup (`2f24b56c`, 24 seeds through `submitLine → deriveLines(lines, seed, seed, asks)`).**
+Every row of the issue's table reproduced unchanged, and the named cause is what fires:
+`z^2-4z+13=0` has `enumeratedConfigCount` 0, so Re(z), |z| and Im(z) all read «אינו נקבע», with the drawn
+point 2+3i at every seed and "show another" disabled. Adding `z2 = 2z1` makes the count 1, so Im(z1)
+printed `3` or `-3` by seed. `z1^2-4z1+6=0 · z2 = conj(z1)` printed ±1.41 by seed. The two distance figures
+printed −0.73/2.73 and −0.82/1.82 by seed. `z1 = 2 · |z2| = 1 · z2^2 = -1` (count 2) withheld |z1−z2| and
+Re(z2) as «הערך משתנה בין 2 התצורות», both false. `z^3-1=0` also had "show another" disabled.
+
+**Class.** *A quantity is judged printable by COUNTING the configurations instead of COMPARING its value
+across them, and the configurations counted are only tier 1's branches, because the numeric tier reports
+the one solution its start fell towards.* Every numeric-tier drive with more than one isolated solution is
+a member (polynomials, distances, areas), and every invariant over two or more configurations is the
+false-«differs» half.
+
+**Mechanism (stage 3b + stage 5d).**
+1. **The numeric tier reports a census.** Each kept tier-1 branch is now solved on its own (`systemFor` in
+   `replay/derive2.ts`). Its numeric system reports its distinct solutions and a completeness flag:
+   - **`complete`** when the free basis is ONE complex number z and some stated equation is a nonzero
+     holomorphic polynomial in z, or in z̄, since tier 1 may pick `z2` as the basis of `z2 = conj(z1)`.
+     The polynomial is READ off the AST (`solve/census.ts` `polyOf`), never fitted to samples. A name
+     enters only as `c·z^a` with a non-negative integer a, read off tier 1's exponent rows. Its roots
+     are every candidate (Durand–Kerner + Newton, `allRoots`, degree ≤ 12). Each root is windowed by the
+     filters and polished and verified against every live relation. A figure with no numeric system is
+     trivially complete.
+   - **`floor`** otherwise: a deterministic multi-start census (`censusStarts`, 8 starts per fold, at
+     least 2 per branch), keeping solves that converge and are isolated (full Jacobian rank). It is
+     deduplicated at 1e-3 of scale, the precision LM reaches on a root the residual only touches. At
+     1e-6, `6|sin θ| = 6` counted one drawing ten times.
+   **Configurations = kept branches × each branch's solutions.** A branch whose numeric system has none is
+   not a configuration, and only when no branch has one is the failed solve drawn, so stage 3e still names
+   the given. `configIndex` walks the whole list in a seed-free canonical order (direction, then modulus,
+   of the drawn numbers), so "show another" steps through every drawing. `canCycle` reads the total
+   (`Derived2.configCount`). `enumeratedConfigCount` stays the tier-1 count.
+2. **The predicate is the doctrine.** `knowledgeOf(carriedExactly, closure, valuesInEveryConfiguration)`
+   in `model/knowledge.ts` evaluates the asked value in EVERY configuration:
+   - it prints iff the set is `complete` and every value agrees (relative 1e-6), with the gauge pinned as
+     before (`remainingDof > 0` is still «free DOF» first, and the gauge path is unchanged);
+   - it says «הערך משתנה בין N התצורות» only when the values measurably differ across a complete set;
+   - it withholds with the new `maybe-multi` whenever the set is a floor, in the operator's wording
+     «ייתכן שיש לערך כמה אפשרויות — הוא אינו נקבע בוודאות» / "This value may have more than one
+     possibility — it is not determined for certain";
+   - «אינו נקבע» stays for a value that is genuinely free or cannot be computed.
+   This is not ADR-421's sampling-variance shape. The configurations are enumerated, not sampled, and a
+   floor is never read as invariant.
+3. **One predicate, four callers.** Measure rows, ratio rows, expression rows and parameter rows all ask
+   `knowledgeOf`. Parameter-only expressions and parameter rows ask it with the solved-parameter closure,
+   because neither tier moves a solved parameter, so only a branch's sign can differ. The old
+   `isKnowledge(carried, {remainingDof, enumeratedConfigCount})` is deleted.
+
+**Decided at pickup.**
+- *Canonical order, not nearest-first.* The seed's own LM result made a poor list head: seeds can land on
+  different roots, so seed 1 could show the same root as seed 0 and the button would appear dead. The
+  seed-free order walks every configuration exactly once per cycle.
+- *The floor census has no deadline.* A timed census would draw a different configuration list on a
+  slower machine. It is bounded by a fixed number of starts instead (below).
+- *`otherRoots`' 1-D scan is off for census solves* (a `Tier2Options.alternatives` flag). It scanned
+  only ±50 around an unbounded angle, and one scan per start was the whole of a 12× slowdown at first
+  measurement. The spread starts are the census.
+
+**What changes for a student.** `z^2-4z+13=0` answers Re(z) = 2 and |z| ≈ 3.61, withholds Im(z) as
+«משתנה בין 2 התצורות», and "show another" now alternates 2+3i / 2−3i (it was disabled). Im(z1) after
+`z2 = 2z1` is never printed. `z1 = 2 · |z2| = 1 · z2^2 = -1` answers |z1−z2| ≈ 2.24 and Re(z2) = 0.
+`z^3-1=0` draws its three roots in turn and answers |z| = 1. **Withdrawn:** a value over a figure closed
+by a non-polynomial numeric given (an area, a distance) no longer prints, even when it is in fact
+invariant. `z1 = 4 · z2 · |z2| = 3 · שטח Oz1z2 = 6 · היקף Oz1z2` printed 12 and now reads «ייתכן שיש לערך
+כמה אפשרויות», per the ruling. Both drawings (z2 = ±3i) are now reachable. **The first drawing can
+change** for a figure with several numeric roots: `z^3-1=0` now opens on z = 1 (it opened on −½ + (√3∕2)i),
+and the distance-to-a-real-point figure opens on 1+√3.
+
+**Sibling check (docs/17 §1).** The class has members in both siblings. Neither is fixed here (different
+product, lane and log):
+- **analytic**, `src-analytic/engine/evaluate.ts` `isKnowledge`, compares values, correctly, but over up to
+  3 *sampled* distinct seeds (`distinctConfigSeeds`). That is a floor read as complete, which is the
+  P1 half: a configuration the seeds missed can differ.
+- **3-D**, `src3d/engine/evaluate.ts` `paramIsKnowledge`, is `branches.length === 1`. It counts instead
+  of comparing, which is the false-«differs» half: an invariant over two roots is withheld.
+- 2-D has no knowledge panel of this shape.
+Both are owed issues, filed by the round.
+
+**Cost (docs/17 §7), measured, median of 60 folds, before → after.** The hardest locked scenarios do not
+move: `2b-capstone` 1.37 → 1.37 ms, capstone-area 0.90 → 0.81 ms. A complete polynomial figure costs
+`poly-2` 0.34 → 0.40 ms. A floor figure is dearer: `dist-real` 0.36 → 0.78 ms (2.2×) and the area-driven
+closure 0.94 → 1.42 ms (1.5×). **These floor-figure multipliers are above the 2× line docs/17 §7 reserves
+for operator sign-off**, in absolute terms under half a millisecond. Submit through the gate over the
+fixture corpus and the issue rows (82 lines): average 1.29 → 1.42 ms per line, p95 3.09 → 4.11 ms.
+Worst-case multiplier: 1 LM solve per kept branch (was 1 per fold), plus max(8, 2·branches) census starts
+per fold, each at most 120 LM iterations × (n+1) residual evaluations. The polynomial path adds ≤ 500
+Durand–Kerner sweeps of degree ≤ 12 and one polish solve per root. The failure path does no census: a
+branch whose solve fails is not censused.
+
+**Seed sweep.** 24 seeds × (13 fixtures + 12 sequences: the example, the §2b capstone family and the
+issue's rows) is 600/600 pairs green before and after, and 25/25 sequences are whole at all 24 seeds both
+times (untranslated, contradiction, unsatisfied and emptied all empty).
+
+**Consequences.** `solve/census.ts` (new: `polyOf`, `allRoots`, `degreeOf`, `censusStarts`), `solve/tier2.ts`
+(`alternatives` option), `replay/derive2.ts` (`systemFor` per branch, the census, the configuration list,
+`configCount` / `configCompleteness`, the rows through `knowledgeOf`), `model/knowledge.ts` (`knowledgeOf`,
+`Completeness`, `FigureClosure` now `{remainingDof, configCount, completeness}`), `model/why.ts` (`maybe-multi`),
+`replay/scene2.ts`, `i18n/index.ts` (`whyMaybeMulti`, both locales). Locks:
+`__tests__/knowledge-invariance-1427.test.ts` (the four issue locks at 24 seeds through `submitLine`, entry
+order, the conj orientation, the circle–circle floor, z³ − 1, a degree-1 sum, a quadrant filter pruning a
+root, the sentence in both locales), `solve/__tests__/census.test.ts` (the reader's refusals, every root,
+a repeated root counted once, seed-free starts), `solve/__tests__/knowledge.test.ts` (the predicate's new
+API; the driving-measure lock moved to the ruled doctrine). There are four fixtures,
+`knowledge-{roots-shared,quadratic,branch-invariant,floor-withheld}-1427.complex.json`.
