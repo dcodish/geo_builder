@@ -36,6 +36,15 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
 - **FR-GP-3 (Must)** — **A display transform never reaches the parser or the engine.** The
   polar↔cartesian toggle and the `n` stepper are **view state** — outside the store and outside undo — so
   changing how a number is *shown* can never change what was *stated*. *(ADR-CX-001 D3.)*
+- **FR-GP-4 (Should)** — **The cartesian view reads in radicals, not decimals, when each part is
+  readable.** `2cis120` reads «z₁ = -1+√3i», `2cis45` reads «√2+√2i», and `z^5 = 100`'s real root
+  reads «⁵√100». Each part (real, imaginary) is judged on its own: a part that needs **at most one** root
+  sign stays exact; a part that needs **two or more** (a nested root «√(2+√2)», a sum «(√6+√2)/4», a
+  root times a sum «⁵√100·(√5-1)/4») is shown as a decimal. One label carries one sign, so if EITHER part
+  is a decimal the whole reading is the decimal with `≈` (`cis18` reads «≈ 0.95+0.31i»). A value with no
+  radical form this product knows (cos 20°) keeps its decimal with `≈`, so the display never invents an
+  exact value. A part that is zero is not written: «-2», «2i», never «-2+0i». The polar view is
+  unaffected. *(Operator, #1404 and its 2026-09-25 ruling; realised — [ADR-CX-046](06d-decisions-complex.md#adr-cx-046).)*
 
 ## Exactness and configuration
 

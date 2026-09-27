@@ -20,9 +20,9 @@ describe('the cartesian reading (stage 5d, second view)', () => {
     expect(d.points[0].readingCart).toBe('z₁ = 3+4i');
   });
 
-  it('a polar definition reads its cartesian form at display precision: 2cis120 ≈ -1+1.73i', () => {
+  it('a polar definition reads its cartesian form in radicals: 2cis120 = -1+√3i (#1404)', () => {
     const d = deriveLines(['z1 = 2cis120'], 0, 0);
-    expect(d.points[0].readingCart).toBe('z₁ ≈ -1+1.73i');
+    expect(d.points[0].readingCart).toBe('z₁ = -1+√3i');
   });
 
   it('the NO-GUESS rule binds in the cartesian lens too — undetermined reads as the bare name', () => {
