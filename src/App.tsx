@@ -16,6 +16,8 @@ import { useStore } from 'zustand';
 // suite chrome (ADR-W-019; BOUNDARIES.json src -> shell edge flipped with this import).
 import { AppFrame } from '../shell/frame/AppFrame';
 import { privacyDeclaration } from './ui/privacy';
+import { aboutContent } from './ui/about';
+import { AboutBody } from '../shell/frame/about';
 import type { QueryNote } from '@/engine/valuesPanel';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
@@ -1148,34 +1150,11 @@ export default function App() {
     }
   };
 
-  // The About content, composed ONCE: the frame's About modal shows it (suite chrome), and the
-  // first-load intro modal below shows the same node (2-D pedagogy: auto-opens for a new student,
-  // dismiss persisted). The old footer's contact line lives here now — the footer retired with the
-  // frame adoption, like 3-D's did in B3.
-  const aboutBody = (
-    <>
-      <p style={{ marginTop: 0 }}>{t('about.lead')}</p>
-      <ul style={{ margin: '8px 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {(t('about.points', { returnObjects: true }) as string[]).map((p) => (
-          <li key={p}>{p}</li>
-        ))}
-      </ul>
-      <div style={{ fontWeight: 600, marginTop: 12 }}>{t('about.tryTitle')}</div>
-      <ol style={{ margin: '6px 0 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {(t('about.trySteps', { returnObjects: true }) as string[]).map((s) => (
-          <li key={s} dir={textDir(s)} style={{ fontSize: 13, color: pal.primaryInk }}>
-            {s}
-          </li>
-        ))}
-      </ol>
-      <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12, color: pal.muted }}>
-        {t('footer.by')} <strong style={{ color: '#334155' }}>{t('footer.name')}</strong> · {t('footer.contact')}:{' '}
-        <a href="mailto:david.codish@gmail.com" style={{ color: '#2563eb', textDecoration: 'none' }}>
-          david.codish@gmail.com
-        </a>
-      </p>
-    </>
-  );
+  // The About content, declared ONCE (#1477, ADR-W-091): the frame's About modal renders it (suite
+  // chrome), and the first-load intro modal below renders the same declaration through the same shell
+  // layout (2-D pedagogy: auto-opens for a new student, dismiss persisted). The credit line that
+  // replaced the old footer is part of the shared layout now, not JSX in this file.
+  const about = aboutContent(t);
 
   return (
     /* B3-2d (#668): the LAST product adopts the shared frame — suite bar (switcher, language,
@@ -1257,7 +1236,7 @@ export default function App() {
       about={{
         label: t('header.about'),
         title: t('about.title'),
-        body: aboutBody,
+        content: about,
         privacy: privacyDeclaration(t),
         closeLabel: t('about.close'),
       }}
@@ -2232,7 +2211,7 @@ export default function App() {
           </button>
         }
       >
-        {aboutBody}
+        <AboutBody content={about} />
         {/* The in-app privacy note (NFR-SE-3 / ADR-278) — the deploy README alone is not user-facing. */}
         <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12, color: pal.muted }}>{privacyDeclaration(t).text}</p>
       </Modal>

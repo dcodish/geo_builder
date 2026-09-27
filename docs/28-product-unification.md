@@ -932,6 +932,11 @@ the fixture measures the other side itself by walking the bundle's import graph 
 entry — an import-reachability scan, not a text grep of `App*.tsx`, so moving a sink into a new file
 cannot hide it.
 
+`about-content-rows.ts` (#1477, [ADR-W-091](06w-decisions-workspace.md#adr-w-091)) holds a DECLARATION to
+the product's BEHAVIOUR. The callable is `aboutContent(t)`, and the product also passes a step runner
+over its real submit gate, so every «try this» line the About shows must build in sequence on an empty
+canvas. The runner must return one verdict per step: an early return is a fault, never a pass.
+
 ## 5d. The sequence gate ([ADR-W-076](06w-decisions-workspace.md#adr-w-076))
 
 *Never reorder the letters of a point sequence — the sequence IS the statement.* One algorithm,

@@ -339,3 +339,24 @@ the §5c meta-lock plus a roster net that fails a registered builder with no loc
 What the lock does not check: whether the TEXT describes each declared sink. That stays reviewed prose,
 per product and per locale. The lock guarantees that wiring a sink forces the declaration to change, and
 that change is where the text gets reviewed.
+
+## The About content is a declaration ([ADR-W-091](06w-decisions-workspace.md#adr-w-091))
+
+`AppFrameAbout.content` is an `AboutContent` (`shell/frame/about.tsx`), not free JSX: `{ lead, points,
+tryTitle, trySteps, credit: { by, name, contact, email } }`. `AboutBody` renders the one layout. It shows
+the lead, the points as bullets, the try title, one line per try step with its direction taken from its
+content (`makeBidi().textDir`, marked `data-about-step`), and the credit line. It uses design tokens
+only. The frame's About modal renders it, followed by the privacy note and the build stamp. 2-D's
+first-load intro renders the same `AboutBody`. Each product builds its declaration in one callable,
+`<tree>/ui/about.ts` → `aboutContent(t)`. The words are the product's own. The credit's address is
+the suite's single copy in `products.json` → `contact.email`.
+
+The declaration is checked, not trusted. `shell/__tests__/fixtures/about-content-rows.ts` holds each
+builder to a non-empty lead and try title, at least 3 points and 2 try steps in he and en, and a complete
+credit. It then submits every try step through the product's REAL submit gate, in order, from an empty
+canvas. The step is submitted as a student types it, with bidi isolates stripped. The runner must answer
+once per step, and the shared layout must render every section. Each tree has a thin lock
+(`<tree>/__tests__/about-content-1477.test.ts`); 2-D's also pins its text byte-for-byte against the
+pre-#1477 About. `shell/__tests__/about-content.test.ts` is the §5c meta-lock plus a roster net.
+
+What the lock does not check: whether the words are good. That is prose, per product and per locale.

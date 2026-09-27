@@ -22,6 +22,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { color, fs, radius } from '../theme';
+import { AboutBody, type AboutContent } from './about';
 import { Modal } from './Modal';
 import type { PrivacyDeclaration } from './privacy';
 import { ProductSwitcher, type RosterEntry } from './Switcher';
@@ -30,7 +31,9 @@ export interface AppFrameAbout {
   /** The overflow entry's label (e.g. «אודות»). */
   label: string;
   title: string;
-  body: ReactNode;
+  /** The About content as a DECLARATION (#1477, ADR-W-091): the parts, never free JSX, so every
+   *  builder's About carries the same sections — lead, points, «try this» steps and the credit. */
+  content: AboutContent;
   /** The in-app privacy note (NFR-SE-3). Required — a public builder without one is the gap. A
    *  DECLARATION, not a string (#1426, ADR-W-090): the text plus the sinks it discloses, so the
    *  §5c privacy lock can hold the note to the product's real wiring. */
@@ -157,7 +160,7 @@ export function AppFrame({
           </button>
         }
       >
-        {about.body}
+        <AboutBody content={about.content} />
         <p style={privacyStyle}>{about.privacy.text}</p>
         {buildStamp && <p style={stampStyle}>{buildStamp}</p>}
       </Modal>
