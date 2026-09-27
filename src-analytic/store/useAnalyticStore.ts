@@ -103,7 +103,7 @@ export type InputError =
   | { key: 'does-not-exist'; detail: string; existing?: string }
   | { key: 'ring-contradicts-noun'; detail: string }
   /** A vertex that does not name an angle on its own — no shape through it, or several (#1049). */
-  | { key: 'ambiguous-angle'; detail: string }
+  | { key: 'ambiguous-angle'; detail: string; example?: string }
   /** A shape named by its noun alone, where the figure has no such shape or several (#1049). */
   | { key: 'ambiguous-shape'; detail: string }
   /** «האלכסון הראשי» where the shape distinguishes no principal diagonal (#1070). */

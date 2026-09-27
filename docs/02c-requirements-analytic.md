@@ -890,6 +890,19 @@ and defective spellings the 2-D tool reads: «מעויין» is «מעוין», 
 both languages: the figure honours them at every configuration, and each consumes a degree of freedom.
 Three letters name the angle; a lone vertex still names only a right angle (R60).
 
+**R115 amendment (2026-09-25, [ADR-AG-158](06c-decisions-analytic.md#adr-ag-158),
+[#1407](https://github.com/dcodish/geo_builder/issues/1407)).** A lone vertex names an angle of ANY size, and on
+either side of a ratio: «זווית C = 60», «זוית C=200», «∠C = 60», «angle C is 60», «זווית B = זווית C»,
+«∠B = 2∠C». When the figure draws exactly TWO distinct edges at the vertex (shape sides and segments
+together, a side drawn twice counting once) it means the angle between them, and the sentence means exactly
+what its three-letter form means: «זוית C=200» after «משולש ABC» is refused as a given no triangle can meet,
+as «זווית ACB = 200» is. Belonging to several shapes does not make a vertex ambiguous: after «משולש ABC» ·
+«מרובע ABCD», «זווית B = 60» is ∠ABC and «זווית D = 60» is ∠ADC (operator ruling, 2026-09-27; 2-D's rule).
+When MORE than two edges meet there (C and A in that figure), the tool refuses and names a real three-letter
+angle to write instead («זווית ACB»), and that sentence builds; when fewer than two meet there, it refuses
+and asks for three letters. Restating the same angle in three letters, in either ray order,
+is recognised as already known.
+
 **R116 — a line's angle with the positive x-axis is shown and can be asked**
 ([ADR-AG-154](06c-decisions-analytic.md#adr-ag-154), [#1322](https://github.com/dcodish/geo_builder/issues/1322)).
 Beside each slope the panel prints the angle α the line makes with the positive x-axis (m = tan α), in

@@ -27,7 +27,7 @@
  * representation, not two.
  */
 import type { DerivedRule } from './derived';
-import type { Constraint, Direction } from './solve';
+import type { AngleName, Constraint, Direction } from './solve';
 import type { Expr } from './expr';
 
 export type Id = string;
@@ -186,6 +186,20 @@ export type Fact =
    * «זווית ABC ישרה» needs none of this and lowers to a constraint in the parser, as it should.
    */
   | (FactBase & { t: 'right-angle'; id: Id })
+  /**
+   * «זווית C = 60» · «∠B = ∠C» — an angle given a VALUE, or set in ratio to another, where at least one
+   * side names its angle by the VERTEX ALONE (#1407, ADR-AG-158).
+   *
+   * The `right-angle` fact with a value: the lone vertex is resolved at M1 by the SAME resolver, so its
+   * rays are the one shape's sides at the vertex, and the line then lowers to exactly the `angle` /
+   * `angle-ratio` constraint its three-letter twin («זווית ACB = 60») lowers to in the parser. Where the
+   * vertex is in no shape, or in several, it is refused with the three-letter form it needs.
+   */
+  | (FactBase & {
+      t: 'vertex-angle';
+      left: AngleName;
+      rhs: { t: 'value'; value: Expr } | { t: 'angle'; of: AngleName; k: Expr };
+    })
   /**
    * «שטח הדלתון הוא 24» — a shape named by its NOUN, with no vertices (#1049).
    *

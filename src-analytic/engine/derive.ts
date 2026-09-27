@@ -30,6 +30,8 @@ export interface LineFault {
   expected?: ApplyError['expected'];
   /** For a second naming: WHO already holds the position, so the refusal shows it (#1153). */
   holder?: ApplyError['holder'];
+  /** For an ambiguous one-letter angle: the three-letter name to write instead (#1407). */
+  example?: ApplyError['example'];
 }
 
 /**
@@ -87,10 +89,10 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   const reported = new Set<string>();
   errors.forEach((e, i) => {
     if (!e) return;
-    const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null]);
+    const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example });
   });
 
   /**

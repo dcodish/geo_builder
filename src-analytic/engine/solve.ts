@@ -77,6 +77,18 @@ export interface AngleRef {
   b: Id;
 }
 
+/**
+ * An angle as the student NAMED it (#1407): three points, or the VERTEX ALONE («זווית C = 60»).
+ *
+ * A lone vertex names an angle only relative to a figure, so it is never a constraint by itself: the
+ * `vertex-angle` fact carries it to M1 (`apply`), which reads the two rays off the one shape through
+ * the vertex — the same resolution a one-letter right angle has had since #1049.
+ */
+export type AngleName = AngleRef | { v: Id; a?: undefined; b?: undefined };
+
+/** Is this name already an angle (three points), needing no figure to resolve? */
+export const isAngleRef = (n: AngleName): n is AngleRef => n.a !== undefined && n.b !== undefined;
+
 /** The unsigned angle at `v` between the rays to `a` and `b`, in RADIANS — null when a ray has no length. */
 function angleAt(v: Pt, a: Pt, b: Pt): number | null {
   const ux = a.x - v.x;
@@ -303,6 +315,12 @@ export function canonicalConstraint(k: Constraint): string {
     const [p, q] = [[k.a, k.b].sort().join(','), [k.c, k.d].sort().join(',')].sort();
     return `perpendicular|${p}|${q}`;
   }
+  // An angle is the same angle whichever ray is named first: «∠ACB» is «∠BCA» (#1407). Without this a
+  // one-letter angle, whose rays come off the ring in ring order, and its three-letter twin would be two
+  // givens where the student stated one.
+  const ray = (r: AngleRef): AngleRef => { const [a, b] = [r.a, r.b].sort(); return { v: r.v, a, b }; };
+  if (k.t === 'angle') return JSON.stringify({ ...k, at: ray(k.at) });
+  if (k.t === 'angle-ratio') return JSON.stringify({ ...k, left: ray(k.left), right: ray(k.right) });
   return JSON.stringify(k);
 }
 
