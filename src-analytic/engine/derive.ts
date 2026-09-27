@@ -11,7 +11,7 @@ import { reportedDof } from './carriers';
 import { drawableAt, viewBox, type Figure } from './evaluate';
 import type { Box } from './curves';
 import { parseLine, type ParseFailure } from '../parser/parseAnalytic';
-import { EMPTY_CONSTRUCTION, namesObject, objectById, type Construction, type Fact } from './types';
+import { EMPTY_CONSTRUCTION, diameterCircleId, namesObject, objectById, type Construction, type Fact } from './types';
 import { SOLVE_TOL } from './solve';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
@@ -198,6 +198,11 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   const lineOf = new Map<string, number>();
   facts.forEach((f, i) => {
     if (namesObject(f) && !lineOf.has(f.id)) lineOf.set(f.id, owner[i]);
+    // «BD קוטר» names the circle it creates without an id of its own (#1324) — the one formula M1 mints it by.
+    if (f.t === 'diameter-of') {
+      const id = diameterCircleId(f.a, f.b);
+      if (!lineOf.has(id)) lineOf.set(id, owner[i]);
+    }
   });
   /**
    * VACANCY NEEDS A PREDICATE (#1058).

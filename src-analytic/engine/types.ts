@@ -239,6 +239,21 @@ export type Fact =
    */
   | (FactBase & { t: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string })
   /**
+   * «מעגל ABD» · «המעגל העובר דרך A, B ו-D» · «נתון מעגל שקוטרו BD» — a circle COMPUTED from points
+   * (#1464, #1324, ADR-AG-160). `name` is the student's own name for it, absent for an anonymous one.
+   */
+  | (FactBase & { t: 'circle-thru'; id: Id; def: CircleDef; name?: string })
+  /**
+   * «BD קוטר במעגל» — a diameter, stated about a circle that may or may not exist yet (#1324).
+   *
+   * Which circle it means is a question about the construction, so M1 answers it (the 2-D
+   * `circleOnDiameter` / `diameter` split, ported as a decision): with NO circle to attach to — or a
+   * defining phrase («שקוטרו», «במעגל חדש», "with diameter") — it CREATES the circle on the diameter;
+   * with one circle it attaches to, it is a statement ABOUT that circle. `circle` is the id of a circle
+   * the sentence named, absent for «במעגל».
+   */
+  | (FactBase & { t: 'diameter-of'; a: Id; b: Id; define: boolean; circle?: Id })
+  /**
    * «המעגל משיק לציר ה-x» — tangency stated about the ONE circle in the figure (#1060).
    *
    * The contextual sibling of `area-of` and `meet-of`, and the third of its shape: which circle
@@ -355,7 +370,29 @@ export type GeoObject =
    * `name` is how the student refers to it («ישר l3»), so a crossing can name it; absent for an
    * anonymous line.
    */
-  | { kind: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string };
+  | { kind: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string }
+  /**
+   * A circle COMPUTED FROM POINTS (#1464, #1324, [ADR-AG-160](../../docs/06c-decisions-analytic.md#adr-ag-160))
+   * — «מעגל ABD», the circle through three points, and «BD קוטר במעגל», the circle on a diameter.
+   *
+   * The third constructive curve, after `circle-at` and `line-at`, and like them it carries **no freedom
+   * of its own**: the circumcircle of three placed points and the circle whose centre is a segment's
+   * midpoint are closed forms, so `evaluate` computes it and nothing is solved. Operator ruling
+   * 2026-09-27 (#1464): computed, not lowered to a free circle plus three incidences — that lowering is a
+   * SOLVED circle (a free centre and radius the descent must find; ADR-AG-159 measured the cost), and it
+   * needs a centre letter the student never wrote (#1167: no letter is invented). The centre is shown by
+   * its coordinates; a student who wants a letter writes «O מרכז המעגל».
+   *
+   * Three collinear points, or a diameter whose ends coincide, have no circle: a VACANCY at that
+   * configuration, never a circle drawn through a guess.
+   */
+  | { kind: 'circle-thru'; id: Id; def: CircleDef; name?: string };
+
+/** How a computed circle is determined (#1464, #1324). */
+export type CircleDef = { t: 'through'; pts: [Id, Id, Id] } | { t: 'diameter'; a: Id; b: Id };
+
+/** The points a computed circle is defined from, in the student's order. */
+export const circleDefPoints = (d: CircleDef): Id[] => (d.t === 'through' ? [...d.pts] : [d.a, d.b]);
 
 export type PointObject = Extract<GeoObject, { kind: 'point' }>;
 export type CurveObject = Extract<GeoObject, { kind: 'curve' }>;
@@ -375,9 +412,20 @@ export const isCurve = (o: GeoObject): o is CurveObject => o.kind === 'curve';
  * was silently treated as naming an object and collided with the point it merely mentions. A
  * positive list gets the new kind wrong in the safe direction: excluded until it says otherwise.
  */
-export type NamingFact = Extract<Fact, { t: 'point' | 'curve' | 'derived' | 'segment' | 'polygon' }>;
+export type NamingFact = Extract<Fact, { t: 'point' | 'curve' | 'derived' | 'segment' | 'polygon' | 'circle-thru' }>;
 export const namesObject = (f: Fact): f is NamingFact =>
-  f.t === 'point' || f.t === 'curve' || f.t === 'derived' || f.t === 'segment' || f.t === 'polygon';
+  f.t === 'point' ||
+  f.t === 'curve' ||
+  f.t === 'derived' ||
+  f.t === 'segment' ||
+  f.t === 'polygon' ||
+  f.t === 'circle-thru';
+
+/**
+ * The id of the circle «BD קוטר» CREATES (#1324) — one formula for M1, which mints it, and for `derive`, which
+ * must blame a vacancy of it on the line that said it. Sorted, so «DB קוטר» is the same circle.
+ */
+export const diameterCircleId = (a: Id, b: Id): Id => `circle-diam-${[a, b].sort().join('')}`;
 export const isDerived = (o: GeoObject): o is DerivedObject => o.kind === 'derived';
 export const isFree = (o: GeoObject): o is Extract<GeoObject, { kind: 'free' }> => o.kind === 'free';
 
@@ -492,7 +540,20 @@ export type Selector =
    * one home. A slope is its first member; a length, an area or a coordinate would be further members
    * with their own reader, never a fourth value keyword in the slope rule (the #1201 shape).
    */
-  | { kind: 'sign'; q: Quantity; positive: boolean };
+  | { kind: 'sign'; q: Quantity; positive: boolean }
+  /**
+   * «x_B > x_D» · «שיעור ה-x של B גדול משיעור ה-x של D» · «y_A < 0» — A COORDINATE COMPARED (#1462, ADR-AG-161).
+   *
+   * The exam's standard way of choosing a root: the kite's B and D are the two roots of one pair of
+   * equations, and «שיעור ה-x של B גדול משיעור ה-x של D» says which is which. D7's kind 2 — it consumes no
+   * freedom (the rest of the givens pin both points; this picks the ORDER), so it is a selector inside
+   * validity, and `drawableAt` walks to a configuration where it holds.
+   *
+   * `axis-side` («B על החלק החיובי של ציר x», «ברביע») is this comparison against 0, and is judged and
+   * seeded through the same function (`compareOf`, `evaluate.ts`) — one mechanism with two spellings in
+   * the data, never a third sign rule. `rhs` is another point or a value; a value may carry a parameter.
+   */
+  | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr } };
 
 /** A quantity the figure DERIVES — never a symbol the student declared (that is a domain, kind 1). */
 export type Quantity = { k: 'slope'; u: Direction };
@@ -526,7 +587,11 @@ export function curveByName(c: Construction, name: string): GeoObject | undefine
   return c.objects.find(
     (o) =>
       (o.kind === 'curve' && (o.label.name === name || o.id === `line-${name}` || o.id === `circle-${name}`)) ||
-      (o.kind === 'line-at' && (o.name === name || o.id === `line-${name}`)),
+      (o.kind === 'line-at' && (o.name === name || o.id === `line-${name}`)) ||
+      // A computed circle by the name the student gave it (#1464), and a circle stated by its centre by
+      // that centre's letter — «A על המעגל O» after «נתון מעגל O» (#1464 step 3).
+      (o.kind === 'circle-thru' && (o.name === name || o.id === `circle-${name}`)) ||
+      (o.kind === 'circle-at' && o.id === `circle-at-${name}`),
   );
 }
 

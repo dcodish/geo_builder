@@ -36,7 +36,9 @@ describe('#1272 — a rule that matched a noun and never read the tail answers n
     // «שיפוע הישר AB הוא חיובי» left this table with #1323 (ADR-AG-144): the SIGN of a slope is a
     // sentence the tool now reads, so it is no longer a claim the rule never read — see below.
     ['שטח המשולש ABC הוא גדול', 'the area rule claimed a Hebrew word'],
-    ['שיעור ה-x של A הוא שלילי', 'the component rule claimed a Hebrew word'],
+    // «שיעור ה-x של A הוא שלילי» left this table with #1462 (ADR-AG-161): the SIGN of a coordinate is now
+    // read — see below. A Hebrew word that is still no value keeps the component rule's row.
+    ['שיעור ה-x של A הוא בערך חמש', 'the component rule claimed a Hebrew word'],
     ['האלכסון הראשי: משהו', 'the diagonal-equation rule claimed a Hebrew word'],
     // the connective spelt with an en dash, and an unread name at a line-equation tail
     ['מעגל I – x^2+y^2=9', 'an en dash is never a sign'],
@@ -47,6 +49,13 @@ describe('#1272 — a rule that matched a noun and never read the tail answers n
     expect(reachesFallback(v), `${line}: the seam fires`).toBe(true);
     // the refusal is about the student's own sentence, never about a fragment the reader cut
     expect(v.kind === 'refused' && v.error.detail, line).toBe(line);
+  });
+
+  it('«שיעור ה-x של A הוא שלילי» is UNDERSTOOD since #1462 — x_A < 0, refused only for the point it names', () => {
+    // The #1323 shape one quantity over: the sign of a coordinate is a comparison with 0 (ADR-AG-161). With
+    // no A the honest answer is the missing point, and the seam does not fire for a sentence the tool read.
+    expect(codeOf('שיעור ה-x של A הוא שלילי')).toBe('unknown-reference');
+    expect(reachesFallback(verdictOf('שיעור ה-x של A הוא שלילי'))).toBe(false);
   });
 
   it('«שיפוע הישר AB הוא חיובי» is UNDERSTOOD since #1323 — a sign selector, refused only for the points it names', () => {

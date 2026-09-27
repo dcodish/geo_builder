@@ -909,6 +909,26 @@ Beside each slope the panel prints the angle α the line makes with the positive
 [0°, 180°) so a negative slope reads obtuse, 90° for a vertical line, and only when the givens fix it.
 «הזווית בין הישר l1 לציר ה-x» (and the exam's «…ובין הכיוון החיובי של ציר ה-x») asks the same number.
 
+**R117 — a circle can be stated by the points it passes through, or by its diameter**
+([ADR-AG-160](06c-decisions-analytic.md#adr-ag-160), [#1464](https://github.com/dcodish/geo_builder/issues/1464),
+[#1324](https://github.com/dcodish/geo_builder/issues/1324)). «מעגל ABD», «המעגל העובר דרך הנקודות A, B ו-D» and
+«המעגל החוסם את המשולש ABD» draw the circle through the three points; «BD קוטר במעגל» and «נתון מעגל שקוטרו BD» draw
+the circle whose diameter is BD. Neither needs an equation, and neither invents a centre letter the student did
+not write — the panel shows the centre by its coordinates and prints the equation whenever the points are fixed
+(operator ruling, 2026-09-27: the circle is COMPUTED from its points). The circle follows its points: it adds no
+freedom, moves nothing already drawn, and «הציגו תצורה אחרת» carries it along. When the figure already has a circle,
+«BD קוטר במעגל» is a statement ABOUT that circle (both ends on it and its centre at their midpoint, or — for a
+circle through three points — the right angle at the third); a defining phrase («שקוטרו», «במעגל חדש») always makes
+a new one. Three collinear points, a repeated letter, several unnamed circles, or a circle known only by its
+equation are each refused by name — never a circle drawn through a guess.
+
+**R118 — a comparison of coordinates chooses the configuration**
+([ADR-AG-161](06c-decisions-analytic.md#adr-ag-161), [#1462](https://github.com/dcodish/geo_builder/issues/1462)).
+«שיעור ה-x של B גדול משיעור ה-x של D», `x_B > x_D`, `B_x > D_x`, `x_B > 3`, `y_A < 0` and «שיעור ה-x של B חיובי» are
+givens like any other: where the rest of the question leaves two drawings, the figure shows the one the comparison
+names, at every configuration «הציגו תצורה אחרת» offers — so a student never has to solve the condition by hand to
+get the right figure. It consumes no freedom. A comparison no drawing can satisfy is refused, naming the sentence.
+
 **R114 — the tool never accepts a sentence a textbook would not print; it teaches the one it would**
 ([ADR-AG-150](06c-decisions-analytic.md#adr-ag-150),
 [#1353](https://github.com/dcodish/geo_builder/issues/1353), implementing

@@ -139,6 +139,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'circles',
     family: 'F5',
+    featured: true,
     he: 'נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9',
     en: 'circle I: (x-3)^2+(y-4)^2=9',
   },
@@ -157,7 +158,50 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9',
     en: 'circle 1: (x-3)^2+(y-4)^2=9',
   },
-  { category: 'circles', family: 'F5', he: 'משוואת המעגל x^2+y^2-2ax-2x=0', en: 'the circle x^2+y^2-2ax-2x=0' },
+  { category: 'circles', family: 'F5', featured: true, he: 'משוואת המעגל x^2+y^2-2ax-2x=0', en: 'the circle x^2+y^2-2ax-2x=0' },
+
+  // --- F5 · circles COMPUTED from points (#1464, #1324, ADR-AG-160) ---
+  // The operator's own kite words from prod session j73pikxb, each `not-handled` until this: the circle
+  // through three points (three spellings — the run, the verb, the circumscribed noun) and the circle on a
+  // diameter (the statement and the defining «שקוטרו»). No equation and no centre letter: both are computed.
+  {
+    category: 'circles',
+    family: 'F5',
+    featured: true,
+    he: 'מעגל ABD',
+    en: 'circle ABD',
+    needs: ['A(1,7)', 'B(7,7)', 'D(1,1)'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    featured: true,
+    he: 'המעגל העובר דרך הנקודות A, B ו-D',
+    en: 'the circle through the points A, B and D',
+    needs: ['A(1,7)', 'B(7,7)', 'D(1,1)'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'המעגל החוסם את המשולש ABD',
+    en: 'the circumcircle of triangle ABD',
+    needs: ['A(1,7)', 'B(7,7)', 'D(1,1)'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    featured: true,
+    he: 'BD קוטר במעגל',
+    en: 'BD is a diameter of the circle',
+    needs: ['B(7,7)', 'D(1,1)'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'נתון מעגל שקוטרו BD',
+    en: 'the circle with diameter BD',
+    needs: ['B(7,7)', 'D(1,1)'],
+  },
 
   // --- F6 · conics by equation (canonical only — D6/§2a) ---
   { category: 'conics', family: 'F6', he: 'נתונה פרבולה קנונית שמשוואתה y^2=54x', en: 'canonical parabola y^2=54x' },
@@ -173,7 +217,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'ellipse x^2/9+y^2/16=1',
   },
 
-  { category: 'circles', family: 'F5', he: '(x-3)^2+(y-4)^2=9', en: '(x-3)^2+(y-4)^2=9' },
+  { category: 'circles', family: 'F5', featured: true, he: '(x-3)^2+(y-4)^2=9', en: '(x-3)^2+(y-4)^2=9' },
   { category: 'conics', family: 'F6', he: 'y^2=54x', en: 'y^2=54x' },
   { category: 'conics', family: 'F6', he: 'x^2/9+y^2/16=1', en: 'x^2/9+y^2/16=1' },
 
@@ -344,6 +388,31 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'x של A הוא 5',
     en: 'the x-coordinate of A is 5',
   },
+
+  /**
+   * --- a coordinate COMPARED (#1462, ADR-AG-161) — the exam's way of choosing a root ---
+   *
+   * The symbolic row is the panel's own `x_A` notation and the spelling the LLM already emitted for the
+   * operator unprompted; the Hebrew row is the exam's sentence. A comparison with a VALUE is the plan's
+   * `x_B > 3` / `y_A < 0` pair. Each row builds in a context where it holds, because a reference card
+   * whose example refuses would be teaching a refusal.
+   */
+  {
+    category: 'points',
+    family: 'F1',
+    he: 'x_B > x_D',
+    en: 'x_B > x_D',
+    needs: ['B(7,7)', 'D(1,1)'],
+  },
+  {
+    category: 'points',
+    family: 'F1',
+    he: 'שיעור ה-x של B גדול משיעור ה-x של D',
+    en: 'the x-coordinate of B is greater than that of D',
+    needs: ['B(7,7)', 'D(1,1)'],
+  },
+  { category: 'points', family: 'F1', he: 'x_B > 3', en: 'x_B > 3', needs: ['B(7,7)'] },
+  { category: 'points', family: 'F1', he: 'y_A < 0', en: 'y_A < 0', needs: ['A(1,-2)'] },
   {
     category: 'points',
     family: 'F1',

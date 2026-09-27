@@ -22,7 +22,7 @@ import { isAngleRef, type AngleName, type Constraint, type Direction } from '../
 import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS, directionSymbol } from '../engine/carriers';
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
-import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id } from '../engine/types';
+import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, EN_SHAPE, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 
 /**
@@ -1327,6 +1327,257 @@ function parseCircleAt(line: string): RuleOutcome {
   }
   return null;
 }
+
+/**
+ * A CIRCLE COMPUTED FROM POINTS — through three of them, or on a diameter (#1464, #1324, ADR-AG-160).
+ *
+ * Operator, prod session `j73pikxb` on the kite: «מעגל BDA», «מעגל שעובר בנקודות ABD», «BD קוטר», «DB קוטר
+ * במעגל» — every one `not-handled`, and so were the LLM's own translations. The capability half-existed
+ * behind a four-line workaround («נתון מעגל O» + three «על המעגל»); the operator ruled (2026-09-27, #1464)
+ * that the circle is COMPUTED from its points instead — no solve, no invented centre letter.
+ *
+ * Runs after `parseCircleAt` and before `matchCurve`, for `parseCircleAt`'s reason: `matchCurve`'s tail is
+ * `(.+)`, and it would read «ABD» or «שקוטרו BD» as an equation.
+ *
+ * The pieces are written out, not stemmed (this tree's recurring one-spelling trap, `src-analytic/CLAUDE.md`):
+ * the verb «עובר / עוברת / שעובר / העובר», the preposition «דרך / ב», the optional «(ה)נקודות», and a point
+ * list the exam writes three ways («ABD», «A, B, D», «A, B ו-D»).
+ */
+/** Three point names, however the exam separates them — «ABD», «A, B, D», «A, B ו-D», «A B and D». */
+function threePoints(run: string): [Id, Id, Id] | null {
+  const bare = run
+    .replace(/\s+(?:and|ו-?)\s*(?=[A-Z])/g, ' ')
+    .replace(/(?:^|[\s,])ו-?(?=[A-Z])/g, ' ')
+    .replace(/[\s,]+/g, '');
+  if (!new RegExp(`^(?:${NAME}){3}$`).test(bare)) return null;
+  const ns = splitNames(bare);
+  return ns.length === 3 ? [ns[0], ns[1], ns[2]] : null;
+}
+/** The point list's own text: names, commas, spaces and the conjunction — nothing else. */
+const POINT_LIST = `([A-Z0-9,\\s]+?(?:(?:\\s+and\\s+|\\s*ו-?\\s*)${NAME})?)`;
+/** A circle's own name, when the student gives one («מעגל I העובר דרך…») — the numerals `matchCurve` uses. */
+const THRU_NAME = `(?:\\s+(${CIRCLE_NUMERALS}))?`;
+
+const THRU_HE = new RegExp(
+  `^${HE_GIVEN}ה?מעגל${THRU_NAME}\\s+(?:ש|ה)?עובר(?:ת)?\\s+(?:דרך|ב)\\s*(?:ה?נקודות\\s+)?${POINT_LIST}$`,
+);
+const THRU_EN = new RegExp(
+  `^(?:the\\s+|a\\s+)?circle${THRU_NAME}\\s+(?:that\\s+)?(?:passing\\s+|passes\\s+|going\\s+)?through\\s+(?:the\\s+points\\s+)?${POINT_LIST}$`,
+  'i',
+);
+/** «מעגל ABD» — the three points as the circle's own name. One letter is a CENTRE («מעגל O», #1060). */
+const THRU_BARE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+(${NAME}${NAME}${NAME})$|^(?:the\\s+)?circle\\s+(${NAME}${NAME}${NAME})$`);
+/**
+ * The circumscribed circle, in the two voices that MEAN it: the circle CIRCUMSCRIBES («חוסם») the triangle,
+ * or the triangle is INSCRIBED («חסום») in the circle. The other two pairings — «מעגל חסום במשולש», «משולש
+ * חוסם מעגל» — are the INCIRCLE, and are deliberately not matched (2-D's #31 / #38: the container marker
+ * «ב» and the verb must agree, and a rule that read the letters alone built the converse).
+ */
+const CIRCUM_HE = new RegExp(
+  `^${HE_GIVEN}ה?מעגל${THRU_NAME}\\s+(?:ה)?חוסם\\s+(?:את\\s+)?(?:ה?משולש\\s+)?(${NAME}${NAME}${NAME})$` +
+    `|^${HE_GIVEN}(?:ה?משולש\\s+)?(${NAME}${NAME}${NAME})\\s+חסום\\s+ב(?:ה)?מעגל${THRU_NAME}$`,
+);
+const CIRCUM_EN = new RegExp(
+  `^(?:the\\s+)?circumcircle\\s+of\\s+(?:the\\s+)?(?:triangle\\s+)?(${NAME}${NAME}${NAME})$` +
+    `|^(?:the\\s+|a\\s+)?circle\\s+circumscribing\\s+(?:the\\s+)?(?:triangle\\s+)?(${NAME}${NAME}${NAME})$` +
+    `|^(?:the\\s+)?(?:triangle\\s+)?(${NAME}${NAME}${NAME})\\s+is\\s+inscribed\\s+in\\s+(?:a|the)\\s+circle$`,
+  'i',
+);
+
+/**
+ * «BD קוטר במעגל» — a DIAMETER (#1324). The sentence names the two ends and, optionally, the circle; WHICH
+ * circle it means is decided at M1 (`diameter-of`), because the parser is pure over one line.
+ *
+ * A defining phrase CREATES the circle whatever the figure holds — 2-D's `DEFINE` set, ported: «שקוטרו»,
+ * «של מעגל» (a circle, indefinite), «במעגל חדש», "with diameter", "a new circle". «של המעגל» / «במעגל» are
+ * the definite reading and attach to the figure's circle when it has one.
+ */
+const DIAM_HE = new RegExp(
+  `^${HE_GIVEN}(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?קוטר` +
+    `(?:\\s+(ב|של\\s+)(ה)?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?(\\s+ה?חדש)?)?$`,
+);
+/** «קוטר BD במעגל» — the noun first, the same statement. */
+const DIAM_NOUN_FIRST_HE = new RegExp(
+  `^${HE_GIVEN}(?:ה)?קוטר\\s+(${NAME})(${NAME})\\s+(ב|של\\s+)(ה)?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?(\\s+ה?חדש)?$`,
+);
+/** «נתון מעגל שקוטרו BD» — the circle DEFINED by its diameter, always a new circle. */
+const DIAM_DEFINE_HE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+ש(?:ה)?קוטר(?:ו|\\s+שלו)(?:\\s+(?:הוא|היא))?\\s+(${NAME})(${NAME})$`);
+const DIAM_EN = new RegExp(
+  `^(?:the\\s+)?(?:segment\\s+)?(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+diameter` +
+    `(?:\\s+of\\s+(the\\s+|a\\s+(new\\s+)?)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?)?$`,
+);
+const DIAM_DEFINE_EN = new RegExp(`^(?:the\\s+|a\\s+)?circle\\s+(?:with|on)\\s+(?:the\\s+|a\\s+)?diameter\\s+(${NAME})(${NAME})$`, 'i');
+
+function parseCircleThru(line: string): RuleOutcome {
+  const thru = THRU_HE.exec(line) ?? THRU_EN.exec(line);
+  const bare = thru ? null : THRU_BARE.exec(line);
+  const circumHe = thru || bare ? null : CIRCUM_HE.exec(line);
+  const circumEn = thru || bare || circumHe ? null : CIRCUM_EN.exec(line);
+  if (thru || bare || circumHe || circumEn) {
+    // Group layout: THRU_* (name, list) · THRU_BARE (he run, en run) · CIRCUM_HE (name, run | run, name)
+    // · CIRCUM_EN (run | run | run) — no name in English.
+    const name = thru?.[1] ?? circumHe?.[1] ?? circumHe?.[4];
+    const run = thru
+      ? thru[2]
+      : bare
+        ? (bare[1] ?? bare[2])
+        : circumHe
+          ? (circumHe[2] ?? circumHe[3])
+          : (circumEn![1] ?? circumEn![2] ?? circumEn![3]);
+    const pts = threePoints(run);
+    if (!pts) return null;
+    // «מעגל III» is a circle's NUMERAL name, not three points I, I, I: a run that repeats a letter in the
+    // bare form falls through to the rules that own it. The other forms name points explicitly, and a
+    // repeat there is the student's to be told about (`repeated-vertex`, at M1).
+    if (bare && new Set(pts).size < 3) return null;
+    const id = name ? `circle-${name}` : `circle-thru-${[...pts].sort().join('')}`;
+    return made([{ t: 'circle-thru', id, def: { t: 'through', pts }, ...(name ? { name } : {}), src: line }]);
+  }
+
+  const define = DIAM_DEFINE_HE.exec(line) ?? DIAM_DEFINE_EN.exec(line);
+  if (define) {
+    return made([{ t: 'diameter-of', a: define[1], b: define[2], define: true, src: line }]);
+  }
+  const he = DIAM_HE.exec(line) ?? DIAM_NOUN_FIRST_HE.exec(line);
+  if (he) {
+    const [, a, b, prep, article, circle, fresh] = he;
+    // «של מעגל» — OF A circle, indefinite — defines one; «במעגל חדש» says so outright.
+    const isDefine = Boolean(fresh) || (prep !== undefined && prep.startsWith('של') && !article);
+    return made([{ t: 'diameter-of', a, b, define: isDefine, ...(circle ? { circle } : {}), src: line }]);
+  }
+  const en = DIAM_EN.exec(line);
+  if (en) {
+    const [, a, b, det, fresh, circle] = en;
+    const isDefine = Boolean(fresh) || (det !== undefined && /^a\s/i.test(det));
+    return made([{ t: 'diameter-of', a, b, define: isDefine, ...(circle ? { circle } : {}), src: line }]);
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// A COORDINATE COMPARED — «x_B > x_D», «שיעור ה-x של B גדול משיעור ה-x של D» (#1462, ADR-AG-161)
+// ---------------------------------------------------------------------------
+
+/**
+ * Operator, prod session `j73pikxb`, on the kite: «שיעור ה- x של נקודה B גדול משיעור ה- x של נקודה D» and then
+ * «B_x>D_x» — both `not-handled`, and the LLM's own translation `x_B > x_D` too. The operator then typed
+ * `B(7,7)`: he solved the exercise's condition by hand to get the figure. It is the exam's standard way of
+ * choosing a root, so it is a construct, not one sentence: a point's coordinate compared with another
+ * point's, or with a value. It lowers to the `coord-compare` selector, which `axis-side` already is at 0.
+ *
+ * The symbolic atom is the panel's own notation (`x_A`, #1127) plus the two spellings the operator typed
+ * (`B_x`) and the bare run `xB` the component rule already reads. Both sides must name the SAME axis —
+ * «x_B > y_D» compares two different things and is left to the rules below, which refuse it honestly.
+ */
+const COORD_ATOM = `(?:([xy])\\s*_\\s*\\{?\\s*(${NAME})\\s*\\}?|(${NAME})\\s*_\\s*\\{?\\s*([xy])\\s*\\}?|([xy])(${NAME}))`;
+const COMPARE_SYM = new RegExp(`^${HE_GIVEN}${COORD_ATOM}\\s*(>|<)\\s*(.+)$`);
+/** One side of a symbolic comparison as `{axis, id}`, from `COORD_ATOM`'s three alternatives. */
+function atomOf(m: RegExpExecArray | RegExpMatchArray, at: number): { axis: 'x' | 'y'; id: Id } | null {
+  if (m[at]) return { axis: m[at] as 'x' | 'y', id: m[at + 1] };
+  if (m[at + 2]) return { axis: m[at + 3] as 'x' | 'y', id: m[at + 2] };
+  if (m[at + 4]) return { axis: m[at + 4] as 'x' | 'y', id: m[at + 5] };
+  return null;
+}
+const COORD_ATOM_ONLY = new RegExp(`^${COORD_ATOM}$`);
+
+/**
+ * The Hebrew sentence. «שיעור», «ערך» and «קואורדינטה/ת» are the corpus nouns (#1127's list), the bare
+ * «x של B» is the same form without the noun, and the comparative is written out in both genders
+ * («שיעור» is masculine, «קואורדינטה» feminine) — `קטן` ends in a FINAL nun, `קטנה` in a medial one, the
+ * `נתונ(ה|ים)` trap this tree keeps recording. «מ» is a prefix («משיעור», «מ-3»), so it is matched as one.
+ */
+const HE_COORD = `(?:(?:ה?שיעור|ה?ערך|ה?קואורדינט[הת])\\s+ה?-?\\s*([xy])|([xy]))\\s+(?:של\\s+)?(?:ה?נקודה\\s+)?(${NAME})`;
+const COMPARE_HE = new RegExp(
+  `^${HE_GIVEN}${HE_COORD}\\s+(?:(?:הוא|היא)\\s+)?(גדול|גדולה|קטן|קטנה)(?:\\s+יותר)?\\s+מ-?\\s*(.+)$`,
+);
+/** The RIGHT side of the Hebrew comparison, after «מ»: another point's coordinate, or a value. */
+const HE_RHS_COORD = new RegExp(
+  `^(?:(?:ה?שיעור|ה?ערך|ה?קואורדינט[הת])\\s+ה?-?\\s*([xy])\\s+(?:של\\s+)?|([xy])\\s+של\\s+|(?:זה|זו)\\s+של\\s+)(?:ה?נקודה\\s+)?(${NAME})$`,
+);
+/** «שיעור ה-x של B חיובי» — the comparison with 0, in the sign words. */
+const SIGN_HE = new RegExp(`^${HE_GIVEN}${HE_COORD}\\s+(?:(?:הוא|היא)\\s+)?(חיובי|חיובית|שלילי|שלילית)$`);
+const COMPARE_EN = new RegExp(
+  `^(?:the\\s+)?([xy])[- ]?(?:value|coordinate|coord)\\s+of\\s+(?:point\\s+)?(${NAME})\\s+is\\s+(greater|larger|bigger|less|smaller)\\s+than\\s+(.+)$`,
+  'i',
+);
+const EN_RHS_COORD = new RegExp(
+  `^(?:(?:the\\s+)?([xy])[- ]?(?:value|coordinate|coord)\\s+of\\s+|that\\s+of\\s+)(?:point\\s+)?(${NAME})$`,
+  'i',
+);
+
+/**
+ * A value on the right: a number or an expression in the parameters — never the plane's own `x`/`y`,
+ * which would make «x_B > x» a curve rather than a comparison. «אפס» is the one number word the corpus
+ * writes here.
+ */
+function compareValue(src: string): Expr | null {
+  const s = trim(src).replace(/^אפס$/, '0').replace(/^zero$/i, '0');
+  const e = parseExpr(s);
+  if (!e) return null;
+  return symbolsOf(e).some((sym) => RESERVED_SYMBOLS.has(sym)) ? null : e;
+}
+
+function compareFacts(id: Id, axis: 'x' | 'y', greater: boolean, rhs: CoordCompareRhs, line: string): ParseResult {
+  if ('point' in rhs && rhs.point === id) return { ok: false, code: 'repeated-vertex', detail: line };
+  return made([{ t: 'selector', sel: { kind: 'coord-compare', id, axis, greater, rhs }, src: line }]);
+}
+type CoordCompareRhs = Extract<Selector, { kind: 'coord-compare' }>['rhs'];
+
+function parseCompare(line: string): RuleOutcome {
+  const sym = COMPARE_SYM.exec(line);
+  if (sym) {
+    const lhs = atomOf(sym, 1);
+    const op = sym[7];
+    const rest = trim(sym[8]);
+    if (!lhs) return null;
+    const other = COORD_ATOM_ONLY.exec(rest);
+    if (other) {
+      const r = atomOf(other, 1);
+      // Two different axes are two different quantities: not this construct.
+      if (!r || r.axis !== lhs.axis) return null;
+      return compareFacts(lhs.id, lhs.axis, op === '>', { point: r.id }, line);
+    }
+    const v = compareValue(rest);
+    return v ? compareFacts(lhs.id, lhs.axis, op === '>', { value: v }, line) : null;
+  }
+
+  const he = COMPARE_HE.exec(line);
+  if (he) {
+    const axis = (he[1] ?? he[2]) as 'x' | 'y';
+    const id = he[3];
+    const greater = he[4].startsWith('גדול');
+    const rest = trim(he[5]);
+    const other = HE_RHS_COORD.exec(rest);
+    if (other) {
+      const ax = other[1] ?? other[2];
+      if (ax && ax !== axis) return null;
+      return compareFacts(id, axis, greater, { point: other[3] }, line);
+    }
+    const v = compareValue(rest);
+    return v ? compareFacts(id, axis, greater, { value: v }, line) : null;
+  }
+
+  const sign = SIGN_HE.exec(line);
+  if (sign) {
+    const axis = (sign[1] ?? sign[2]) as 'x' | 'y';
+    return compareFacts(sign[3], axis, sign[4].startsWith('חיובי'), { value: { kind: 'num', value: 0 } }, line);
+  }
+
+  const en = COMPARE_EN.exec(line);
+  if (en) {
+    const axis = en[1].toLowerCase() as 'x' | 'y';
+    const greater = /greater|larger|bigger/i.test(en[3]);
+    const rest = trim(en[4]);
+    const other = EN_RHS_COORD.exec(rest);
+    if (other) {
+      if (other[1] && other[1].toLowerCase() !== axis) return null;
+      return compareFacts(en[2], axis, greater, { point: other[2] }, line);
+    }
+    const v = compareValue(rest);
+    return v ? compareFacts(en[2], axis, greater, { value: v }, line) : null;
+  }
+  return null;
+}
 /**
  * The SHAPE a sentence named, as a fact, so that naming it draws it (#1080).
  *
@@ -2568,6 +2819,10 @@ export function parseLine(raw: string): ParseResult {
   const param = parseParamHe(line) ?? parseParamEn(line) ?? parseInequality(line);
   if (param) return { ok: true, facts: [param] };
 
+  // A coordinate compared (#1462) — after the parameter domains, whose atoms are single symbols.
+  const compared = parseCompare(line);
+  if (compared) return compared;
+
   /**
    * A circle stated by its CENTRE runs before `matchCurve` (#1060), because that rule’s tail is
    * `(.+)` and it would read the centre letter as an equation — the #1059 shape, which the Hebrew
@@ -2575,6 +2830,10 @@ export function parseLine(raw: string): ParseResult {
    */
   const centred = parseCircleAt(line);
   if (centred) return centred;
+
+  // A circle COMPUTED from points (#1464, #1324) — before `matchCurve` for the same reason.
+  const computed = parseCircleThru(line);
+  if (computed) return computed;
 
   /**
    * THE RATIO FAMILY RUNS BEFORE `matchCurve` (#1124).

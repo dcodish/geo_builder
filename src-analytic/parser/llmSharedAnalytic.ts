@@ -42,6 +42,14 @@ export const PROMPT_EXAMPLES_ANALYTIC: PromptExampleAnalytic[] = [
   { freeform: 'draw the median from A to BC in triangle ABC', steps: ['משולש ABC', 'AD תיכון לצלע BC'] },
   // A circle by its equation, and by its centre — two different sentences, both supported.
   { freeform: 'מעגל שמשוואתו x^2+y^2=25', steps: ['נתון מעגל שמשוואתו x^2+y^2=25'] },
+  // A circle COMPUTED from points (#1464, #1324): through three named points, or on a diameter. The
+  // operator's prod session emitted «circle through B, D, A» and «נתון מעגל שקוטרו DB» — neither parsed
+  // then; these are the canonical lines they meant.
+  { freeform: 'the circle that passes through the vertices B, D and A', steps: ['מעגל BDA'] },
+  { freeform: 'DB is a diameter of that circle', steps: ['DB קוטר במעגל'] },
+  // A coordinate compared chooses the configuration (#1462) — the model already wrote `x_B > x_D`
+  // unprompted for the operator; a direction word is the same comparison.
+  { freeform: 'B נמצאת מימין ל-D', steps: ['x_B > x_D'] },
   // A parameter is a DOMAIN, not a constraint (D7 kind 1) — the student's «a>0» is the whole line.
   { freeform: 'let a be a positive parameter', steps: ['a > 0'] },
   // ADR-052, the cardinal sin, in this tool's vocabulary: an unstated coordinate is not invented.
