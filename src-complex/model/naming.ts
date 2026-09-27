@@ -62,9 +62,18 @@ export type RootsMode =
  *
  * **Existing indexed names no longer change the reading** (#1367): they are the solutions' own names, and
  * whether the student's `zₖ` agrees with solution k is decided by the solve, not avoided here.
+ *
+ * **An INDEXED letter is a number, never a solution set** (#1434, ADR-CX-050). `z₁` in exam notation is
+ * one specific number, and its "solutions" would be named `z₁₁, z₁₂…` — the doubled subscript the
+ * paragraph above calls a different number. So `z1^2 − 4z1 + 13 = 0` states that z₁ is a root (one
+ * point, whose roots are the configurations «show another» walks, ADR-CX-049), and so does `z1^3 = 8`
+ * typed cold, which used to enumerate into z₁₁, z₁₂, z₁₃.
  */
 export const rootsMode = (varName: string, priorNames: ReadonlySet<string>, grounded: boolean): RootsMode =>
-  priorNames.has(varName) || !grounded ? 'constrain' : 'enumerate';
+  priorNames.has(varName) || !grounded || isIndexed(varName) ? 'constrain' : 'enumerate';
+
+/** `z1`, `w12` — a name that already carries an index. */
+const isIndexed = (name: string): boolean => /\d$/.test(name);
 
 /** Subscript the trailing digits, the way the exam prints them: `z1` → `z₁`, `z10` → `z₁₀`. */
 export const prettyName = (name: string): string =>

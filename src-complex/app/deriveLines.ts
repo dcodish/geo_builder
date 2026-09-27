@@ -21,7 +21,20 @@ import type { SequenceStatement } from '../model/sequence';
 import { type RootsMode, rootsMode } from '../model/naming';
 import { refsOf } from '../model/expr';
 import { paramSigns } from '../model/paramSign';
-import { type RootsEquation, solutionSetConstraints, solutionSetConstraintsPlaced, solutionSetNames } from '../model/solutionSet';
+import {
+  type PolyEquation,
+  type PowerEquation,
+  type RootsEquation,
+  coefficientRefs,
+  isClosedPoly,
+  polySetConstraints,
+  solutionSetConstraints,
+  solutionSetConstraintsPlaced,
+  solutionSetNames,
+} from '../model/solutionSet';
+import { solutionNames } from '../model/naming';
+import { type PolySolutions, polySolutions } from '../solve/polySet';
+import { evaluate as evalValue, exact as exactValue } from '../value/value';
 import { type Tier1Result, isTurnUnknown, solveTier1 } from '../solve/tier1';
 import { linearize } from '../solve/logpolar';
 import { type ExpVec, eq as modEq, mul as modMul, pow as modPow } from '../value/modulus';
@@ -189,13 +202,18 @@ export function lowerLines(
    * #694 — every enumeration by its letter, so a later SELECTION can name the set's members with the
    * SAME function that named them in the first place, never a second naming convention.
    */
-  const rootsByLetter = new Map<string, { eq: RootsEquation; mode: RootsMode }>();
+  const rootsByLetter = new Map<string, { eq: RootsEquation; mode: RootsMode; names: string[] }>();
   /**
    * #1396 — enumerating sets whose pins wait for the rest of the figure: WHICH root a stated member
    * occupies can only be read once the other lines are solved, and a member may be stated after the
    * equation (order independence, ADR-CX-042 item 3). `at` keeps the rows where the line put them.
    */
-  const pendingSets: { eq: RootsEquation; at: number }[] = [];
+  const pendingSets: PendingSet[] = [];
+  /**
+   * #1434 — every ENUMERATED set by its reserved letter, with the names of its members: what a question
+   * about the letter itself («Re(z)», «|z|») is asked over (ADR-CX-050).
+   */
+  const solutionSets = new Map<string, readonly string[]>();
 
   lines.forEach((raw, idx) => {
     const r = parseLineV2(raw, scope);
@@ -234,18 +252,30 @@ export function lowerLines(
     // The letter itself is declared only in `constrain` mode — otherwise it is RESERVED, standing for
     // the whole set, and drawing a point for it would plot the sampler's guess at "the solutions".
     for (const eq of r.line.roots) {
-      const grounded = refsOf(eq.rhs).every((n) => mentioned.has(n));
+      /**
+       * #1434 — a POLYNOMIAL is grounded when its coefficients are closed numbers and its roots could be
+       * computed: only then does the equation have solutions to NAME (see `isClosedPoly`). Every other
+       * polynomial keeps the ordinary reading, one point whose roots are its configurations (ADR-CX-049).
+       */
+      const solved =
+        eq.shape === 'poly' && isClosedPoly(eq) ? polySolutions(eq, new Map([...atoms, ...r.line.atoms])) : null;
+      const grounded = eq.shape === 'power' ? coefficientRefs(eq).every((n) => mentioned.has(n)) : solved !== null;
       const mode = rootsMode(eq.varName, mentioned, grounded);
-      if (mode === 'enumerate') pendingSets.push({ eq, at: constraints.length });
-      else constraints.push(...solutionSetConstraints(eq, mode));
-      declared.push(...solutionSetNames(eq, mode));
+      const names = solutionSetNames(eq, mode, solved?.values.length ?? eq.n);
+      if (mode === 'enumerate') {
+        if (eq.shape === 'power') pendingSets.push({ eq, at: constraints.length });
+        else pendingSets.push({ eq, solved: solved!, at: constraints.length });
+        for (const [k, v] of solved?.atoms ?? []) atoms.set(k, v);
+        solutionSets.set(eq.varName, names);
+      } else constraints.push(...solutionSetConstraints(eq, mode));
+      declared.push(...names);
       // the bare letter stays reserved in every mode: `z` is related to `z₁..zₙ`
       mentioned.add(eq.varName);
-      for (const n of solutionSetNames(eq, mode)) mentioned.add(n);
+      for (const n of names) mentioned.add(n);
       // …but only an ENUMERATION makes the letter mean the set rather than a number. In `constrain`
       // mode `z` IS the number the equation is about, and a later line may say more about it.
       if (mode !== 'constrain') reserved.set(eq.varName, eq.src);
-      rootsByLetter.set(eq.varName, { eq, mode });
+      rootsByLetter.set(eq.varName, { eq, mode, names });
     }
     /**
      * #694 — a SELECTION names its candidate set from the enumeration in scope.
@@ -258,7 +288,7 @@ export function lowerLines(
     for (const sel of r.line.selections) {
       const enums = [...reserved.keys()];
       const only = enums.length === 1 ? rootsByLetter.get(enums[0]) : undefined;
-      selections.push({ ...sel, candidates: only ? solutionSetNames(only.eq, only.mode) : [] });
+      selections.push({ ...sel, candidates: only ? only.names : [] });
       mentioned.add(sel.name);
     }
     // #1428 — "mentioned" is every name the line uses (the ADR-CX-021 D3 reading), through the one helper
@@ -290,7 +320,7 @@ export function lowerLines(
     for (const [k, v] of r.line.atoms) atoms.set(k, v);
   });
 
-  placeSolutionSets(pendingSets, constraints, filters, measures, objects);
+  placeSolutionSets(pendingSets, constraints, filters, measures, objects, atoms);
 
   // #1405 — «u מספר מרוכב» beside `u^5 = 32`: u is the SET u₁..u₅, and a free point named u would be
   // the phantom ADR-CX-024 reserves the letter against
@@ -313,6 +343,7 @@ export function lowerLines(
     exprQueries,
     sequences,
     selections,
+    solutionSets,
   };
 }
 
@@ -331,7 +362,7 @@ export function namesUsed(l: ParsedLine): string[] {
   const out = new Set<string>(l.declares);
   for (const e of l.roots) {
     out.add(e.varName);
-    for (const n of refsOf(e.rhs)) out.add(n);
+    for (const n of coefficientRefs(e)) out.add(n);
   }
   for (const c of l.constraints) for (const n of [...refsOf(c.lhs), ...refsOf(c.rhs)]) out.add(n);
   for (const f of l.filters) out.add(f.name);
@@ -409,12 +440,18 @@ function realSlotConflict(raw: string, declaredBy: ReadonlyMap<string, string>):
  * - a member that is stated but FREE (`|z1| = 2`, a quadrant): which root it is would be a
  *   configuration choice, and the plan left that to the operator, so it keeps today's reading.
  */
+/** An enumerating set waiting for its placement: the power family, or a polynomial with its roots (#1434). */
+type PendingSet =
+  | { readonly eq: PowerEquation; readonly at: number }
+  | { readonly eq: PolyEquation; readonly solved: PolySolutions; readonly at: number };
+
 function placeSolutionSets(
-  pending: readonly { eq: RootsEquation; at: number }[],
+  pending: readonly PendingSet[],
   constraints: Constraint[],
   filters: readonly BranchFilter[],
   measures: readonly MeasureRelation[],
   objects: readonly FigureObject[],
+  atoms: ReadonlyMap<string, number>,
 ): void {
   if (pending.length === 0) return;
   // ADR-CX-045 — the same sign-by-use reading the fold takes, so a sign-free parameter is not read as
@@ -426,7 +463,13 @@ function placeSolutionSets(
   for (const f of filters) mentioned.add(f.name);
   for (const m of measures) for (const p of m.points) mentioned.add(p);
   // splice from the back so earlier positions stay valid
-  for (const { eq, at } of [...pending].sort((a, b) => b.at - a.at)) {
+  for (const set of [...pending].sort((a, b) => b.at - a.at)) {
+    if ('solved' in set) {
+      const placed = t1.inconsistent ? undefined : polyPlacement(set.eq.varName, set.solved, t1, mentioned, atoms);
+      constraints.splice(set.at, 0, ...polySetConstraints(set.eq, set.solved.values, placed));
+      continue;
+    }
+    const { eq, at } = set;
     const placed = t1.inconsistent ? null : placement(eq, t1, mentioned, signed);
     constraints.splice(at, 0, ...(placed ? solutionSetConstraintsPlaced(eq, placed) : solutionSetConstraints(eq, 'enumerate')));
   }
@@ -447,7 +490,7 @@ const exactArg = (t1: Tier1Result, name: string): Angle | null => {
 
 /** Which root each stated member occupies, or null when the index lowering must stand (see above). */
 function placement(
-  eq: RootsEquation,
+  eq: PowerEquation,
   t1: Tier1Result,
   mentioned: ReadonlySet<string>,
   signed: ReadonlySet<string>,
@@ -490,4 +533,34 @@ function placement(
   // every member already on its own index root: the index lowering IS this placement
   if (members.every((m) => placed.get(m) === sols.indexOf(m))) return null;
   return placed;
+}
+
+/**
+ * #1434 — which root each stated member of an enumerated POLYNOMIAL occupies, by set membership (the
+ * #1396 rule, ADR-CX-044): a member DETERMINED exactly by the rest of the figure that lies on a root
+ * claims it. A member that is free, or that lies on no root, keeps its index root — so a wrong member
+ * contradicts the set and the gate refuses it naming the student's statement, exactly as for `X^n`.
+ */
+function polyPlacement(
+  letter: string,
+  solved: PolySolutions,
+  t1: Tier1Result,
+  mentioned: ReadonlySet<string>,
+  atoms: ReadonlyMap<string, number>,
+): Map<string, number> | undefined {
+  const placed = new Map<string, number>();
+  for (const m of solutionNames(letter, solved.values.length).filter((s) => mentioned.has(s))) {
+    const mm = t1.knownModulus.get(m);
+    const ma = exactArg(t1, m);
+    if (!mm || !ma) continue;
+    const at = evalValue(exactValue(mm, ma), atoms);
+    if (!at) continue;
+    const j = solved.numeric.findIndex(
+      (r, k) =>
+        ![...placed.values()].includes(k) &&
+        Math.hypot(r.re - at.re, r.im - at.im) <= 1e-9 * Math.max(1, Math.hypot(r.re, r.im)),
+    );
+    if (j >= 0) placed.set(m, j);
+  }
+  return placed.size > 0 ? placed : undefined;
 }

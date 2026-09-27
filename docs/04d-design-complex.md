@@ -118,6 +118,23 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   ([ADR-CX-044](06d-decisions-complex.md#adr-cx-044)): `lowerLines` holds each set's rows back, tier 1
   solves the rest of the figure once, and a DETERMINED member off its index root keeps its own root while
   the unstated names take the rest. In every other case the index pins above are emitted unchanged.
+- **An equation is about its letter in every spelling** ([ADR-CX-050](06d-decisions-complex.md#adr-cx-050)).
+  The roots SHAPE is read off the syntax tree by one function, `asRootsEquation` in
+  `model/solutionSet.ts`, in three forms: `X^n = expr`; the same equation spelled `c·X^n + rest = 0`
+  (lowered to `X^n = −rest/c`, so it IS the power shape and every ADR-CX-005 reading applies); and a
+  polynomial in X of degree 2..4 (`PolyEquation`, G1). A fresh, un-indexed letter over a polynomial with
+  CLOSED coefficients enumerates: `solve/polySet.ts` takes every root from the census's root finder
+  (`allRoots`, one root finder in the tree), orders them seed-free by direction then modulus, and lifts
+  each into the exact carriers when some power |r|ᵏ (k ≤ 4) is rational (direction: a nice turn, or an
+  angle atom shared ± with a mirror root). `Xₖ = root` is then an ordinary definition. A root no carrier
+  holds is a numeric definition, which stage 3a **places** rather than searches (a name a closed number
+  defines is not a free coordinate). A stated member claims its root by set membership. An indexed
+  letter never enumerates (no z₁₁). Anything else keeps the ordinary equation, and ADR-CX-049's census.
+- **A question about a set's letter is asked of every member** ([ADR-CX-050](06d-decisions-complex.md#adr-cx-050)).
+  `lowerLines` publishes each enumerated set (`FoldInput.solutionSets`, letter → members), and stage 5d
+  substitutes each member into the asked expression and hands every value, in every configuration, to
+  the one predicate `knowledgeOf`. Values that differ inside one drawing are the set's own spread and
+  read `multi-solution`, naming the first member.
 - **A line's names are read by ONE helper** ([ADR-CX-048](06d-decisions-complex.md#adr-cx-048)).
   `declares` lists only the names a line CREATES. `X^n = …` carries its letter in `roots` alone, so a
   check that read `declares` let a second equation on a reserved letter through as a phantom point.

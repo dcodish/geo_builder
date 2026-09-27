@@ -14,6 +14,7 @@
 
 import { FORMULA_TABLE } from '../formulas/table';
 import type { Prop, Translate, Why } from '../model/why';
+import { prettyName } from '../model/naming';
 import type { Derived2 } from './derive2';
 
 /**
@@ -66,6 +67,8 @@ export function whyText(w: Why, t: Translate): string {
       return t('whyUndetermined');
     case 'maybe-multi':
       return t('whyMaybeMulti');
+    case 'multi-solution':
+      return t('whyMultiSolution', { solutions: w.solutions, first: prettyName(w.first) });
     case 'measure-uncomputable':
       return t('whyMeasureUncomputable', { src: w.src });
     case 'measure-holds':

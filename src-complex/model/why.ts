@@ -43,6 +43,11 @@ export type Why =
   | { readonly code: 'undetermined' }
   /** #1427 — the configuration set is only a census FLOOR: another solution may exist, so nothing is invariant yet */
   | { readonly code: 'maybe-multi' }
+  /**
+   * #1434 — a question about a solution SET's letter («Re(z)» after z² − 4z + 13 = 0) whose members
+   * give different answers; `first` names one member the student can ask about instead
+   */
+  | { readonly code: 'multi-solution'; readonly solutions: number; readonly first: string }
   // --- measure verdicts (replay/derive2.ts stage 3e) ------------------------
   | { readonly code: 'measure-uncomputable'; readonly src: string }
   | { readonly code: 'measure-holds'; readonly src: string }

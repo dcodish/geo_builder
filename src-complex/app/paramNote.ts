@@ -41,7 +41,7 @@ function exprsOf(raw: string): Expr[] {
     ...l.constraints.flatMap((c) => [c.lhs, c.rhs]),
     ...l.measures.map((m) => m.rhs),
     ...l.objects.flatMap((o) => (o.kind === 'circle' ? [o.radius] : [])),
-    ...l.roots.map((e) => e.rhs),
+    ...l.roots.flatMap((e) => (e.shape === 'poly' ? [e.lhs, e.rhs] : [e.rhs])),
   ];
 }
 

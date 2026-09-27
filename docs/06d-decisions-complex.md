@@ -3200,3 +3200,135 @@ root, the sentence in both locales), `solve/__tests__/census.test.ts` (the reade
 a repeated root counted once, seed-free starts), `solve/__tests__/knowledge.test.ts` (the predicate's new
 API; the driving-measure lock moved to the ruled doctrine). There are four fixtures,
 `knowledge-{roots-shared,quadratic,branch-invariant,floor-withheld}-1427.complex.json`.
+
+---
+
+## ADR-CX-050 — An equation about one letter reads as a solution set in every spelling, and a polynomial names all its roots (#1434)
+
+**Status:** accepted, 2026-09-27 (operator-approved plan, `auto-ok` 2026-09-27 for arm 1; arm 2 approved by the
+operator during the round #1469 play session, «i approve part2») · **Issue:**
+[#1434](https://github.com/dcodish/geo_builder/issues/1434) (feature, `P2`, `complex`) · round
+[#1478](https://github.com/dcodish/geo_builder/issues/1478) · **amends** [ADR-CX-005](#adr-cx-005) (mode 1 in
+every spelling; an indexed letter never enumerates), [ADR-CX-042](#adr-cx-042) / [ADR-CX-044](#adr-cx-044) (the
+membership rule now covers polynomial sets) and [ADR-CX-049](#adr-cx-049) (a fresh-letter polynomial is no
+longer one point with several configurations) · **builds** G1 of [ADR-CX-007](#adr-cx-007)
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-6 (amended: every spelling, polynomials up to degree
+4, indexed letters, questions on the set letter) and FR-CN-3 (the example moves to the indexed letter) ·
+**Design:** [04d](04d-design-complex.md), "An equation is about its letter in every spelling" and "A question
+about a set's letter is asked of every member" (both new) · **Ladder:** stages 0d′, 3a and 5d
+([LADDER-CX](LADDER-CX.md))
+
+**What was reported.** An external review of prod, relayed by the operator: *"General equations show at most one
+solution. z²−4z+13=0 shows one of its two roots, and z³−1=0 one of its three."* Playing round #1469, the operator
+asked of `z^2-4z+13=0`: *«gives one solution. arent there 2?»*
+
+**Measured at pickup (`cab06da2`, 24 seeds through `submitLine → deriveLines`).** One claim of the issue had moved:
+since #1427 (ADR-CX-049) `z^3-1=0` and `z^2-4z+13=0` are no longer seed-dependent, and "show another" walks their
+roots (3 and 2 configurations). The reported defect stands: each still draws ONE point `z`, while `z^3 = 1` draws
+z₁, z₂, z₃. `z^3+8=0` and `2z^3 = 16` likewise drew one point. `z^2 - (1+i)z + 2i + 2 = 0` (the G1 corpus
+witness) drew one point per configuration. `z^3 = 1` then `Re(z)`, `|z|` read «אינו נקבע».
+
+**Class.** *An equation about one letter reached the solution-set reading only in the one spelling `X^n = expr`.*
+The parser's roots shape matched a power on the left of `=` and nothing else, so the same equation in another
+spelling (arm 1) and every other polynomial in the letter (arm 2, G1, never built) fell to the ordinary equation.
+
+**The mechanism.**
+1. **One shape reader, three forms** (`asRootsEquation`, `model/solutionSet.ts`, stage 0d′). `X^n = expr` as
+   before, now requiring the right side to be free of X. `c·X^n + rest = 0`: the letter occurs in exactly one
+   term, so the equation IS `X^n = −rest/c` and is emitted as the power shape, constants folded to the literal
+   the student would have typed (`foldConstants`, now exported from `exprParse`). Every ADR-CX-005 reading, the
+   #1396 membership and the #1428 reservation then apply unchanged. And a polynomial in X of degree 2..4
+   (`PolyEquation`, read structurally by `degreeIn`). In the last two forms the letter's LEADING power stands on
+   the left, as the exam writes «פתרו את המשוואה», so `w = z^2` keeps its reading (it defines w).
+2. **A closed polynomial on a fresh letter enumerates** (`deriveLines`, `solve/polySet.ts`). "Grounded" for a
+   polynomial means closed coefficients (no other name, no parameter) and roots that could be computed. The
+   roots come from the census's own root finder (`allRoots`, Durand–Kerner + Newton). There is one root finder
+   in the tree, not two. They are ordered seed-free by direction in [0°, 360°), then modulus (`z₁ = 2+3i`,
+   `z₂ = 2−3i`). A repeated root is one solution. Each `Xₖ` is **defined** as its root. A general polynomial
+   has no tier-1 constellation to pin its roots to each other the way `X^n` has, so the definition is the
+   lowering.
+3. **The exact recognizer** (`lift`). A root is carried exactly when some |r|ᵏ, k ≤ 4, is a rational with a
+   denominator ≤ 1000 (agreement to 1e-10 relative): |2+3i| = √13, |2+√2i| = √6, a root of unity 1. Its
+   direction is a rational turn when one fits (denominator ≤ 24, the value layer's own bound). Otherwise it is
+   an angle atom bound to its degrees, the carrier a typed `3+4i` already uses. The atom is shared as `±atom +
+   a nice turn` by every root at a mirror direction, so `z₂ = conj(z₁)` and, over `z⁴ + 10z² + 169 = 0`,
+   `z₁·z₂ = −13` are decided exactly. The lifted value must evaluate back onto the root, or it is not used. A
+   root no small power makes exact (1+√2) is a numeric definition.
+4. **A name a closed number defines is placed, not searched** (`systemFor`, stage 3a). Without this, two
+   numeric roots were two complex unknowns in the census basis, too wide for the polynomial certificate, and
+   `z^2 - 2z - 1 = 0` read every value as «may have more than one possibility». A deferred `name = closed`
+   places the name when tier 1 left it free in BOTH halves. Its residual stays live as the stage-3e check.
+5. **Membership** (`polyPlacement`). A stated member that tier 1 determines and that lies on a root claims it.
+   It keeps its own statement plus the check `p(Xₘ) = 0`, because defining it again would state one number
+   through two angle atoms. The unstated names take the other roots in order. A member on no root keeps its
+   index root and the gate refuses, naming the student's statement.
+6. **An indexed letter is one number** (`rootsMode`). `z1^2-4z1+13=0` states that z₁ is a root (the ADR-CX-049
+   reading: one point, two configurations). `z1^3 = 8` typed cold, which enumerated into z₁₁, z₁₂, z₁₃ (the
+   doubled subscript ADR-CX-021 calls a different number), is now the same one-point reading.
+7. **A question about the set's letter is asked of every member** (stage 5d). `lowerLines` publishes each
+   enumerated set (`FoldInput.solutionSets`). An expression row naming one set letter substitutes each member,
+   evaluates in every configuration, and asks `knowledgeOf`. Values that differ inside one drawing are the
+   set's own spread, a new `Why` `multi-solution` («הערך שונה בין 2 הפתרונות — שאלו על פתרון אחד, למשל z₁»).
+
+**Decided at pickup.**
+- *Asks on the letter.* The coordinator asked to follow the existing roots-family behaviour for `z^3 = 1`, and
+  the operator asked that `Re(z)` / `|z|` over `z²−4z+13=0` still answer 2 / √13. Those conflict: `z^3 = 1`
+  answered «אינו נקבע» to every question on z. One rule serves both. The letter names the set (#1428), so a
+  question about it is a question about every solution. `z^3 = 1` now answers `|z| = 1`, and its `Re(z)`
+  differs between the 3 solutions. The per-root questions (`Re(z1)`, `|z1|` = √13) answer as for any number.
+- *Degree 5 or more, non-binomial* (`z^5 + z + 1 = 0`) keeps the ADR-CX-049 reading: one point z and five
+  configurations, `complete`. That is G1's stated bound. A binomial of any degree is the power shape.
+- *A polynomial whose coefficients name another number or a parameter* keeps the ordinary reading. Its roots
+  are not numbers until the figure is solved. **Owed a successor issue** (not built here, docs/17 §8 rule on
+  parked arms).
+- *Roots with no exact carrier* read as bare names on the canvas, like every numeric-tier point (the no-guess
+  rule of ADR-CX-015). Their questions answer (`Re(z1) = 2.41`).
+- *Locks amended, each measured on the baseline first.* `knowledge-invariance-1427` lock 2 asserted one point
+  z with two drawings. It now asserts z₁ = 2+3i and z₂ = 2−3i in one drawing, with Re(z) = 2 and |z| = 3.61
+  unchanged and Im(z) as `multi-solution`. Its `z³ − 1 = 0` case now counts one configuration of three named
+  points. Its filter case (`z^2-4z+13=0 · z ברביע הראשון`) is refused as a reserved letter, like
+  `z^3 = 1 · z ברביע הראשון` on the baseline. The case keeps its subject, a numeric root pruned like a branch,
+  through `z1^2-4z1+13=0 · z1 ברביע הראשון`. `tier2.test` asserted that `z1 = 3+4i · z2 = 0 · אורך z1z2 = 99`
+  drags z2 off 0 and reports both lines. z2 = 0 is now placed, so only the newest statement is reported. That
+  lock's own comment calls this the right behaviour, pending stage 3d.
+
+**What changes for a student.** `z^2-4z+13=0` draws z₁ = 2+3i and z₂ = 2−3i together, with |z₁| = √13 exact.
+`z^3-1=0`, `z^3+8=0` and `2z^3 = 16` draw the same named roots as `z^3 = …`. A quartic draws its four roots.
+«הציגו תצורה אחרת» is disabled for these figures, because every root is already on screen. `Re(z)` after
+`z^3 = 1` now says the value differs between the 3 solutions instead of «אינו נקבע», and `|z|` prints 1.
+**Behaviour changes:** after a fresh-letter polynomial, a statement on the bare letter (`z ברביע הראשון`, `z = 1`)
+is refused as naming the equation's solutions. `z1^3 = 8` typed cold is now one point with three configurations
+instead of z₁₁, z₁₂, z₁₃.
+
+**Sibling check (docs/17 §1).** 2-D and 3-D have no solution-set letters. Analytic has no `X^n = …`
+enumeration. No sibling issue is owed for the class. **A pre-existing member of a neighbouring class, found and
+not fixed here:** two TYPED literals whose directions are unrelated angle atoms cannot be related exactly.
+`z1 = 2+3i · z2 = -2+3i · z1*z2 = -13` is refused as «incompatible» on the baseline and after this change,
+although the given is true. The roots lifted here avoid it by sharing atoms (item 3). The typed-literal case is
+owed an issue.
+
+**Cost (docs/17 §7), measured, median of 80 folds, before → after.** `z^2-4z+13=0` 0.44 → 0.40 ms,
+`z^3-1=0` 0.37 → 0.29 ms, quartic 0.36 → 0.36 ms, `z^2-2z-1=0` 0.23 → 0.21 ms, the 2b capstone 1.86 → 1.70 ms.
+An enumerated polynomial has no numeric census, so the census no longer runs for these lines. Submit through the gate over the
+fixture corpus and the issue rows (103 lines, two runs each): average 1.14–1.16 → 1.13–1.17 ms per line, p95
+4.52–4.75 → 4.48–4.57 ms. Worst-case multiplier: one Durand–Kerner of degree ≤ 4 per polynomial line per fold
+(≤ 500 sweeps), plus one tier-1 solve for the placement, which `X^n` sets already pay.
+
+**Seed sweep.** 24 seeds × (23 fixtures + 19 sequences: the issue's rows, both member orders, the quartics, the
+corpus witness, the irrational and degree-5 cases, #1427's rows) is 1008/1008 pairs green before and after.
+42/42 sequences are whole at all 24 seeds both times (untranslated, contradiction, unsatisfied and emptied all
+empty).
+
+**Consequences.** `model/solutionSet.ts` (`RootsEquation` is `PowerEquation | PolyEquation`; `asRootsEquation`
+reads three forms; `degreeIn`, `coefficientRefs`, `isClosedPoly`, `polySetConstraints`, `substitute`),
+`model/naming.ts` (`rootsMode`: indexed letters), `solve/polySet.ts` (new), `app/deriveLines.ts` (the
+polynomial set, `polyPlacement`, `solutionSets`, `namesUsed` via `coefficientRefs`), `app/paramNote.ts`,
+`parser/rules.ts` and `parser/exprParse.ts` (folding the moved constant), `replay/derive2.ts` (`pinned` at 3a,
+`setRow` at 5d), `model/why.ts`, `replay/scene2.ts` and `i18n/index.ts` (`multi-solution`, both locales),
+`parser/catalog.ts` (two rows: `z^3 - 1 = 0` under F8, `z^2 - 4z + 13 = 0` opening the G1 guide section).
+Locks: `__tests__/all-roots-1434.test.ts` (37: the issue locks at 24 seeds through `submitLine`, the three
+arm-1 spellings against their canonical forms, the member in both orders, a grounded coefficient, a quartic,
+two conjugate pairs related exactly, the corpus witness, both-sides spelling, √6, irrational roots answered, a
+wrong member refused, an existing letter verified, indexed letters, degree 5, set-letter questions, the
+sentence in both locales, the shape reader, the lift). Six fixtures: `all-roots-{quadratic,
+binomial-spelling, member, member-poly, quartic, corpus-witness}-1434.complex.json`.

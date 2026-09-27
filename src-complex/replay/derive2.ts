@@ -56,6 +56,7 @@ import {
 } from '../model/measure';
 import { type Completeness, type KnowledgeRow, knowledgeOf, realValue, whyNotKnowledge } from '../model/knowledge';
 import { prettyName } from '../model/naming';
+import { substitute } from '../model/solutionSet';
 import type { SequenceKind, SequenceStatement } from '../model/sequence';
 import { type SurfacedFormula, surfacedFormulas } from '../formulas/table';
 import { type Bound, solveResiduals } from '../solve/tier2';
@@ -365,6 +366,12 @@ export interface FoldInput {
   readonly aliases?: ReadonlyMap<string, string>;
   /** #694 — «z0 is the solution in the fourth quadrant»: bind a new name to a member of the set. */
   readonly selections?: readonly ResolvedSelection[];
+  /**
+   * #1434 (ADR-CX-050) — each ENUMERATED solution set, by its reserved letter: `z → [z1, z2]` after
+   * `z^2 - 4z + 13 = 0`. The letter is drawn as no point (it stands for the set), so a question about it
+   * — «Re(z)», «|z|» — is asked of every member, and prints only when the members agree.
+   */
+  readonly solutionSets?: ReadonlyMap<string, readonly string[]>;
 }
 
 /**
@@ -414,6 +421,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     sequences = [],
     aliases = new Map<string, string>(),
     selections = [],
+    solutionSets = new Map<string, readonly string[]>(),
   } = input;
   /**
    * #688 — DRIVE OR CHECK. Tier 1 is solved once to learn what the OTHER lines determined; a claim whose
@@ -646,15 +654,38 @@ export function foldConstraints(input: FoldInput): Derived2 {
      * reported VIOLATED, because the one point the measure could have moved was not in the vector tier 2
      * was allowed to move. A point that is free enough to draw is free enough to drive.
      */
+    /**
+     * #1434 (ADR-CX-050) — a name a CLOSED NUMBER defines is determined, not a coordinate to search.
+     *
+     * `z1 = (a number with no exact carrier)` — an enumerated polynomial root like 1+√2, whose modulus
+     * no exponent vector carries — reaches this tier as a definition over no unknown at all. Left in
+     * the free basis it was one more complex unknown for the census, and two of them already make the
+     * basis too wide for the polynomial certificate: `z² − 2z − 1 = 0` would read every value as
+     * «may have more than one possibility» while each root is a stated number. So the definition places
+     * the name, the way tier 1 places a name an exact value defines, and its residual stays live as the
+     * stage-3e check. Only a name tier 1 left free in BOTH halves is placed here — a half tier 1
+     * determined is a given this must not override.
+     */
+    const pinned = new Map<string, Cx>();
+    const closedEnv: Env = { at: () => undefined, param: () => undefined, atoms: sample };
+    for (const c of t1.deferred) {
+      if ((c.kind ?? 'eq') !== 'eq') continue;
+      const [name, value] =
+        c.lhs.t === 'ref' && isClosed(c.rhs) ? [c.lhs.name, c.rhs] : c.rhs.t === 'ref' && isClosed(c.lhs) ? [c.rhs.name, c.lhs] : [null, null];
+      if (name === null || value === null || pinned.has(name)) continue;
+      if (t1.modulus.determined.has(name) || t1.argument.determined.has(name) || branch?.angles.has(name)) continue;
+      const v = evalComplex(value, closedEnv);
+      if (v && Number.isFinite(v.re) && Number.isFinite(v.im)) pinned.set(name, v);
+    }
     const freeModNames = [
       ...new Set([...t1.modulus.free, ...drawnNames.filter((n) => !t1.modulus.determined.has(n))]),
-    ];
+    ].filter((n) => !pinned.has(n));
     const freeArgNames = [
       ...new Set([
         ...t1.argument.free.filter((n) => !isTurnUnknown(n) && !isSignUnknown(n)),
         ...drawnNames.filter((n) => !t1.argument.determined.has(n) && !branch?.angles.has(n)),
       ]),
-    ].filter((n) => !isTurnUnknown(n));
+    ].filter((n) => !isTurnUnknown(n) && !pinned.has(n));
     const freeParamNames = [...sample.keys()].filter((p) => !literalSample.has(p) && !solvedParams.has(p));
 
     /**
@@ -689,6 +720,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
     };
 
     const modulusOf = (name: string, st: State): { value: number; exact: ExpVec | null } => {
+      const at = pinned.get(name);
+      if (at) return { value: Math.hypot(at.re, at.im), exact: null };
       const d = t1.modulus.determined.get(name);
       if (!d) return { value: st.mod.get(name) ?? sampleModulus(name), exact: null };
       const base = evalMod(d.konst, magnitudes(st.par));
@@ -700,6 +733,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
     };
 
     const argumentOf = (name: string, st: State): { deg: number; exact: Angle | null } => {
+      const at = pinned.get(name);
+      if (at) return { deg: (Math.atan2(at.im, at.re) * 180) / Math.PI, exact: null };
       const fixed = branch?.angles.get(name);
       if (fixed) {
         const deg = toDegrees(fixed, st.par);
@@ -1239,6 +1274,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
   /** the one predicate, asked of a quantity given as "its value in this configuration" */
   const judge = (carriedExactly: boolean, valueIn: (env: Env) => Cx | null) =>
     knowledgeOf(carriedExactly, closure, configEnvs.map(valueIn));
+  /** #1434 — the same predicate, over SEVERAL values per configuration (a solution set's members) */
+  const judgeAll = (valuesIn: (env: Env) => (Cx | null)[]) =>
+    knowledgeOf(false, closure, configEnvs.flatMap(valuesIn));
   /**
    * The closure a quantity over SOLVED parameters is judged against: it cannot move with a free
    * direction or a numeric root (neither tier moves a solved parameter), so only the configurations'
@@ -1406,7 +1444,42 @@ export function foldConstraints(input: FoldInput): Derived2 {
     return knowledgeOf(false, exactClosure, configEnvs.map((env) => evalComplex(e, env))).known ? round2(here.re) : null;
   };
 
+  /**
+   * #1434 (ADR-CX-050) — a question about a SOLUTION SET's letter: `Re(z)` after `z^2 − 4z + 13 = 0`.
+   *
+   * The letter names every solution at once, so the question has one answer exactly when every
+   * solution gives the same one — the knowledge doctrine asked over the members as well as over the
+   * configurations, through the same predicate. `Re(z) = 2` and `|z| = √13` print; `Im(z)` is ±3
+   * and says it differs between the solutions, naming the first so the student can ask about one.
+   * A question naming two sets at once has no single reading and is not answered.
+   */
+  const setRow = (q: ExprQuery, letters: readonly string[]): KnowledgeRow => {
+    if (letters.length !== 1) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
+    const members = solutionSets.get(letters[0]) ?? [];
+    const each = members.map((m) => substitute(q.expr, letters[0], m));
+    const here = each.length ? evalComplex(each[0], finalEnv) : null;
+    if (!here) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
+    const verdict = judgeAll((env) => each.map((e) => evalComplex(e, env)));
+    if (verdict.known) {
+      const real = Math.abs(here.im) <= 1e-9 * Math.max(1, Math.hypot(here.re, here.im));
+      return {
+        label: q.src,
+        value: real ? round2(here.re) : `${round2(here.re)}${here.im < 0 ? '-' : '+'}${round2(Math.abs(here.im))}i`,
+        why: null,
+      };
+    }
+    // the members differ within ONE drawing: that is the set's own spread, not a choice of configuration
+    const inOne = each.map((e) => evalComplex(e, finalEnv));
+    const spread = inOne.some((v) => !v || Math.hypot(v.re - here.re, v.im - here.im) > 1e-6 * Math.max(1, Math.hypot(here.re, here.im)));
+    if (spread) {
+      return { label: q.src, value: null, why: { code: 'multi-solution', solutions: members.length, first: members[0] } };
+    }
+    return { label: q.src, value: null, why: verdict.why };
+  };
+
   const exprRows: KnowledgeRow[] = exprQueries.map((q) => {
+    const setLetters = refsOf(q.expr).filter((n) => solutionSets.has(n));
+    if (setLetters.length > 0) return setRow(q, setLetters);
     // #1389 — a question about the PARAMETERS alone («r», «9r», «r^2») is answered exactly whenever
     // the givens solve every parameter it mentions, whatever else in the figure is still free
     const exactParam = paramOnlyValue(q.expr);
@@ -1931,3 +2004,6 @@ function collectParams(c: Constraint): string[] {
 }
 
 
+
+/** #1434 — an expression that names no number and no parameter: a closed constant. */
+const isClosed = (e: Expr): boolean => refsOf(e).length === 0 && paramsOf(e).length === 0;
