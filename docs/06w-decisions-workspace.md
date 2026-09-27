@@ -4668,3 +4668,78 @@ with a forward reference was not measured here, as ADR-3D-257 also recorded.
 `src3d/__tests__/issue-1339-forward-creating-row.test.ts`,
 `src-analytic/__tests__/issue-1340-forward-derived-point.test.ts`. Each drives its product's real store
 the way the list reaches that shape.
+
+## ADR-W-090 — The privacy note is a DECLARATION of the product's data sinks, held to its real wiring by one cross-product lock (#1426)
+
+**Status:** accepted, 2026-09-27 · **Issue:** [#1426](https://github.com/dcodish/geo_builder/issues/1426) (bug, `P1`, `workspace` + `analytic`) · operator ruling 2026-09-27 (/decisions pass): *"Fix + add AI clause"* · round [#1469](https://github.com/dcodish/geo_builder/issues/1469)
+**Requirements:** [03](03-nonfunctional-requirements.md) NFR-SE-3 (extended: every builder's note names every sink; the four notes tabled) · **Design:** [04w](04w-design-shell.md) "The privacy note is a declaration" · [28](28-product-unification.md) §5c (a new live instance)
+
+**The report.** An external review of prod found 2-D logging every step to `/api/log` and saying so. It did
+not check the other builders. Triage did. Analytic's note read «המשפטים שאתם מקלידים נשמרים בדפדפן שלכם» /
+"The statements you type stay in your own browser." Since #1243/#1363 (2026-09-22), `logAnalytic`'s prod
+branch posts every final submission through `makeUsagePoster({ tool: 'analytic' })`, and unrecognised
+statements go to the model fallback (`llmAnalytic.ts`). The note was false for five days in production.
+No note in any builder mentioned the external AI service.
+
+**Class.** *A statement to the student about where their input goes is free prose, and the sinks are
+code; nothing held one to the other.* `AppFrame` required a privacy STRING, so a builder could not ship
+without a note, but any note would do. #1243 added a sink and "inherited the posture" in code only.
+Complex's pending usage emitter would have falsified complex's note in exactly the same way.
+
+**Decision.**
+
+1. `AppFrameAbout.privacy` is `PrivacyDeclaration = { text; discloses: ReadonlyArray<DataSink> }`, with
+   `DataSink = 'usage-log' | 'llm' | 'share-store'` (`shell/frame/privacy.ts`). Shell stays product-free:
+   no strings, no product names. Each product's declaration is one callable, `<tree>/ui/privacy.ts` →
+   `privacyDeclaration(t)`. `AppFrame` uses it, and so does 2-D's first-load intro, which rendered the
+   note a second time from a raw `t()`.
+2. **The wired set is MEASURED.** `shell/__tests__/fixtures/privacy-disclosure-rows.ts` walks the bundle's
+   import graph from the real entry (`products.json` → `devUrl` page → module script). It follows static,
+   dynamic, re-export and `new URL(…, import.meta.url)` worker edges across the tree and `shell/`, and
+   collects `…api/<name>` endpoints from string and template literals. Comments do not count. One table,
+   `SINK_OF_ENDPOINT`, classifies every endpoint: `log` → usage-log, `parse` → llm, `share` → share-store,
+   `config` → named non-sink. An unclassified endpoint fails, because "not in the table" must never read
+   as "carries no student data".
+3. **The rows** (§5c): wired ⊆ declared (this is what enforces the AI clause wherever the fallback is
+   wired); declared ⊆ wired (an over-claiming note is also false); every endpoint classified; text
+   non-empty in he and en with no two sentences glued; and the scan EXERCISED, meaning it entered the
+   tree beyond the entry file. A thin lock per tree calls the shared suite with the product's real
+   declaration through its real i18n. `shell/__tests__/privacy-disclosure.test.ts` is the meta-lock.
+   It runs the faults function on broken subjects, including analytic's shipped glued sentence. It
+   runs the scanner on a miniature tree with known wiring: a comment-only mention, an orphan file, a
+   package import, and dynamic, re-export and worker edges. It also runs a roster net that fails any
+   registered builder without a lock.
+4. **Text.** Analytic's he and en notes take the 2-D/3-D posture: no sign-up; typed statements (math
+   text only) kept a few days with an anonymous visitor id, never the IP; the AI clause; the share
+   clause. The operator's arm 4 adds «משפטים שהכלי לא הבין נשלחים לעיבוד בשירות בינה מלאכותית חיצוני.» /
+   "Statements the tool does not understand are sent for processing to an external AI service." to
+   2-D, 3-D and analytic. Complex's Hebrew note lost its glued join («…לשמור.כשאתם…»).
+
+**Measured at pickup (divergences from the issue table).** Complex is not sink-free. It reaches
+`shell/session/shortLink` (`api/share`), and its note already discloses that truthfully. So complex
+declares `['share-store']`, not an empty list, and its extra lock asserts no `usage-log` and no `llm`. It
+also reaches `api/config` (the operator's switcher config, a GET carrying only the tool id), which is why
+the table has a named non-sink. Both English glued joins the issue named already had their space; only
+the two Hebrew notes were glued. The class grep found no other glued sentence joins in any tree's
+strings.
+
+**Proof the lock bites.** Restoring analytic's pre-fix text and declaring `['share-store']` fails the
+analytic lock with five faults. In each locale: `WIRES 'llm' (api/parse in
+src-analytic/parser/llmAnalytic.ts)` and `WIRES 'usage-log' (api/log in
+src-analytic/debug/sessionLogAnalytic.ts)`. In he: `two sentences are glued … בדפדפן שלכם.כשאתם …`.
+
+**What it does not check.** Whether the TEXT describes each declared sink. That is per-locale prose and
+stays reviewed. The lock only guarantees that wiring a sink forces the declaration, and with it a review
+of the text.
+
+**Sibling products.** All four builders are covered by the same lock. That is the class fix; there is no
+per-product sibling left to file. The server (`server/`) ships no note of its own. Its posture is
+NFR-SE-3.
+
+**Consequences.** `shell/frame/privacy.ts` (new), `shell/frame/AppFrame.tsx`,
+`src/ui/privacy.ts`, `src3d/ui/privacy.ts`, `src-complex/ui/privacy.ts`, `src-analytic/ui/privacy.ts` (new),
+the four `App*.tsx`, the he/en notes in all four trees. Locks:
+`shell/__tests__/privacy-disclosure.test.ts`, `shell/__tests__/fixtures/privacy-disclosure-rows.ts`, and
+`<tree>/__tests__/privacy-disclosure-1426.test.ts` ×4. Visible change: the About modal's privacy line in
+2-D, 3-D and analytic gains the AI sentence; analytic's note is rewritten; complex's Hebrew note gains a
+space.

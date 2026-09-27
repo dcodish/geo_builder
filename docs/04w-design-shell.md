@@ -317,3 +317,25 @@ chips), `notes` (advisories and readouts, each with its own `dir`) and `error`. 
 decides WHICH string is the statement (3-D: `factRowText3`) and HOW it is typeset. Shell only decides
 that the direction comes from that string. The rows and checks live in
 `shell/__tests__/fixtures/fact-row-dir-rows.tsx`, and each tree runs them against its own `textDir`.
+
+## The privacy note is a declaration ([ADR-W-090](06w-decisions-workspace.md#adr-w-090))
+
+`AppFrameAbout.privacy` is `{ text, discloses }` (`shell/frame/privacy.ts`), not a string. `discloses`
+lists every place a student's input can leave the browser for: `usage-log` (the server usage log),
+`llm` (the model fallback, an external AI service) and `share-store` (the short-link store). Each
+product builds its declaration in one callable, `<tree>/ui/privacy.ts` → `privacyDeclaration(t)`, used
+by `AppFrame` and by 2-D's first-load intro. The wording stays the product's own; shell holds no
+string.
+
+The declaration is checked, not trusted. `shell/__tests__/fixtures/privacy-disclosure-rows.ts` walks the
+product's bundle from its real entry (`products.json` → the page → its module script) through every
+import it can reach, across the tree and `shell/`, and collects the server endpoints (`…api/<name>`)
+named in string or template literals. `SINK_OF_ENDPOINT` classifies each endpoint once: a sink, or a
+named non-sink (`config`). Wired and declared must be equal, both ways. An endpoint nobody classified
+fails, and so does a scan that never entered the tree. Each tree has a thin lock
+(`<tree>/__tests__/privacy-disclosure-1426.test.ts`). `shell/__tests__/privacy-disclosure.test.ts` is
+the §5c meta-lock plus a roster net that fails a registered builder with no lock.
+
+What the lock does not check: whether the TEXT describes each declared sink. That stays reviewed prose,
+per product and per locale. The lock guarantees that wiring a sink forces the declaration to change, and
+that change is where the text gets reviewed.

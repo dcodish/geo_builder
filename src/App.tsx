@@ -15,6 +15,7 @@ import { useStore } from 'zustand';
 // The shared frame (B3-2d #668): the deliberate src -> shell adoption — the LAST product joins the
 // suite chrome (ADR-W-019; BOUNDARIES.json src -> shell edge flipped with this import).
 import { AppFrame } from '../shell/frame/AppFrame';
+import { privacyDeclaration } from './ui/privacy';
 import type { QueryNote } from '@/engine/valuesPanel';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
@@ -1257,7 +1258,7 @@ export default function App() {
         label: t('header.about'),
         title: t('about.title'),
         body: aboutBody,
-        privacy: t('about.privacy'),
+        privacy: privacyDeclaration(t),
         closeLabel: t('about.close'),
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
@@ -2233,7 +2234,7 @@ export default function App() {
       >
         {aboutBody}
         {/* The in-app privacy note (NFR-SE-3 / ADR-278) — the deploy README alone is not user-facing. */}
-        <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12, color: pal.muted }}>{t('about.privacy')}</p>
+        <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12, color: pal.muted }}>{privacyDeclaration(t).text}</p>
       </Modal>
 
       {/* "עזרה" — a short guide + the full command reference, in two tabs. */}

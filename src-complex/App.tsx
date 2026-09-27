@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppFrame } from '../shell/frame/AppFrame';
+import { privacyDeclaration } from './ui/privacy';
 import { inputPreviewNodeCx } from './ui/inputPreviewNodeCx';
 import { Banner } from '../shell/frame/Banner';
 import { AskLane } from '../shell/frame/AskLane';
@@ -578,7 +579,7 @@ export function App() {
         label: t('menuAbout'),
         title: t('aboutTitle'),
         body: <p style={{ marginTop: 0 }}>{t('aboutLead')}</p>,
-        privacy: t('privacy'),
+        privacy: privacyDeclaration(t),
         closeLabel: t('aboutClose'),
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
