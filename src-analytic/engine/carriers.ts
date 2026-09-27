@@ -34,7 +34,7 @@
 import { curveParentOf, parentsOf } from './derived';
 import { evalExpr, exprText, symbolsOf, type Env } from './expr';
 import { constraintRefs, dirRefs, freeDirectionSymbol } from './solve';
-import { UNBOUNDED, type Construction, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
+import { UNBOUNDED, circleDefPoints, type Construction, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
 
 /**
  * The plane's own coordinates. A curve is the zero set of `f(x, y; params)`, so `x` and `y` occur
@@ -100,6 +100,9 @@ export function carrierOf(o: GeoObject): Carrier | null {
     // determines. A construction that adds freedom would be asserting something nobody stated.
     case 'line-at':
       return null;
+    // A circle COMPUTED from points (#1464, #1324): a closed form of points counted where they live.
+    case 'circle-thru':
+      return null;
     default: {
       const unclassified: never = o;
       throw new Error(`object kind carries no DOF classification: ${JSON.stringify(unclassified)}`);
@@ -139,6 +142,9 @@ export function symbolDeps(o: GeoObject): string[] {
         const sym = freeDirectionSymbol(o.dir);
         return sym === null ? [] : [sym];
       }
+      // Defined by reference alone (#1464): no expression, nothing to register.
+      case 'circle-thru':
+        return [];
       default: {
         const unwalked: never = o;
         throw new Error(`object kind declares no symbol dependencies: ${JSON.stringify(unwalked)}`);
@@ -178,6 +184,9 @@ export function objectDeps(o: GeoObject): Id[] {
     // before this line can be drawn (#1093).
     case 'line-at':
       return [o.through, ...dirRefs(o.dir)];
+    // Its defining points — all placed before the circle can be computed (#1464).
+    case 'circle-thru':
+      return circleDefPoints(o.def);
     default: {
       const undeclared: never = o;
       throw new Error(`object kind declares no dependencies: ${JSON.stringify(undeclared)}`);

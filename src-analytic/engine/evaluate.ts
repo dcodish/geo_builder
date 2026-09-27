@@ -11,7 +11,7 @@
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
 import { isDirectionSymbol, paramRegister, usedSymbols } from './carriers';
-import { constructionOf, evalRule, type Construction as RuleConstruction, type Pt } from './derived';
+import { circumcentre, constructionOf, evalRule, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
@@ -435,6 +435,33 @@ export function carrierSystem(
 }
 
 /**
+ * A `circle-thru` as the `NumCurve` it is in this configuration (#1464, #1324, ADR-AG-160).
+ *
+ * The circumcircle of three placed points, or the circle whose centre is a diameter's midpoint — closed
+ * forms, so nothing is solved and the circle carries no freedom. `derived.ts`'s `circumcentre` is the one
+ * circumcentre in the tree, so this circle and «O מפגש האנכים האמצעיים» cannot disagree.
+ *
+ * `null` is a VACANCY, as for the other constructive curves: an unplaced point, three collinear points, or
+ * a diameter whose ends coincide has no circle at this configuration.
+ */
+export function circleThruCurve(o: Extract<GeoObject, { kind: 'circle-thru' }>, at: (id: Id) => Pt | null): NumCurve | null {
+  if (o.def.t === 'through') {
+    const [p, q, s] = o.def.pts.map(at);
+    if (!p || !q || !s) return null;
+    const ctr = circumcentre(p, q, s);
+    if (!ctr) return null;
+    const r = Math.hypot(p.x - ctr.x, p.y - ctr.y);
+    return Number.isFinite(r) && r > 0 ? { kind: 'circle', cx: ctr.x, cy: ctr.y, r } : null;
+  }
+  const a = at(o.def.a);
+  const b = at(o.def.b);
+  if (!a || !b) return null;
+  const r = Math.hypot(a.x - b.x, a.y - b.y) / 2;
+  if (!(r > 0) || !Number.isFinite(r)) return null;
+  return { kind: 'circle', cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, r };
+}
+
+/**
  * A `line-at` as the `NumCurve` it is in this configuration (#1093; #1319 for the free direction).
  *
  * One reading for the object walk AND the curve resolver, so a line constructed through a point can be
@@ -504,6 +531,8 @@ export function curveAtOf(c: Construction, env: Env, at?: (id: Id) => Pt | null)
     // A line CONSTRUCTED through a point is a curve to every constraint that names one (#1319) — the
     // exam's «A נקודת החיתוך של הישר l4 עם הישר 1» is an incidence on a `line-at`.
     if (o.kind === 'line-at') return at ? lineAtCurve(c, env, at, o) : null;
+    // A circle computed from points (#1464): a curve to every constraint and crossing that names one.
+    if (o.kind === 'circle-thru') return at ? circleThruCurve(o, at) : null;
     if (o.kind !== 'curve') return null;
     const res = resolveCurve(o.curve, env);
     return res.ok ? res.curve : null;
@@ -572,6 +601,35 @@ function figureDofOf(c: Construction, sys: CarrierSystem, x: number[]): number {
  * solve already produced, and a configuration that fails them asks for a different seed rather than
  * reporting a contradiction (D7 kind 2).
  */
+/** A coordinate comparison, whichever spelling stated it (#1462). */
+export type CoordCompare = Extract<Selector, { kind: 'coord-compare' }>;
+
+/**
+ * ONE COMPARISON, TWO SPELLINGS IN THE DATA (#1462, ADR-AG-161).
+ *
+ * `axis-side` («B על החלק החיובי של ציר x», «C ברביע השלישי», #1033/#1071) is a coordinate compared with 0,
+ * so it is read as exactly that: the judge and the seeding below see one kind. Keeping the old kind in
+ * the data costs nothing and moves no lock; growing a third sign mechanism beside it would be the drift
+ * the plan forbids.
+ */
+export function compareOf(s: Selector): CoordCompare | null {
+  if (s.kind === 'coord-compare') return s;
+  if (s.kind === 'axis-side') {
+    return { kind: 'coord-compare', id: s.id, axis: s.axis, greater: s.positive, rhs: { value: { kind: 'num', value: 0 } } };
+  }
+  return null;
+}
+
+/** The right-hand side's value in this configuration — `null` while a named point is unplaced. */
+function rhsOf(cmp: CoordCompare, at: (id: Id) => Pt | null, env: Env): number | null {
+  if ('point' in cmp.rhs) {
+    const q = at(cmp.rhs.point);
+    return q ? (cmp.axis === 'x' ? q.x : q.y) : null;
+  }
+  const v = evalExpr(cmp.rhs.value, env);
+  return Number.isFinite(v) ? v : null;
+}
+
 /**
  * WHICH selectors fail here (#1268) — so a refusal blames the sentence whose selector failed, not every
  * sentence that happens to carry one. `derive` blamed every selector line when any failed, which named
@@ -679,10 +737,14 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       const atFn = (id: Id) => at.get(id) ?? null;
       return nthHolds(p, s.nth, s.pair, atFn, curveAtOf(c, env, atFn));
     }
-    if (s.kind === 'axis-side') {
-      const v = s.axis === 'x' ? p.x : p.y;
-      return s.positive ? v > 0 : v < 0;
+    const cmp = compareOf(s);
+    if (cmp) {
+      const lhs = cmp.axis === 'x' ? p.x : p.y;
+      const rhs = rhsOf(cmp, (id) => at.get(id) ?? null, env);
+      if (rhs === null) return true; // an operand that is not placed yet judges nothing, as above
+      return cmp.greater ? lhs > rhs : lhs < rhs;
     }
+    if (s.kind !== 'between') return true;
     const a = at.get(s.a);
     const b = at.get(s.b);
     if (!a || !b) return true;
@@ -984,14 +1046,36 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
       seeded.set(k.id, { x: pa.x + inside * dx, y: pa.y + inside * dy });
     }
   }
-  for (const sel of c.selectors) {
-    if (sel.kind !== 'axis-side') continue;
+  /**
+   * …and a COMPARISON between two points seeds their ORDER (#1462, ADR-AG-161) — the same lesson for a pair.
+   *
+   * «x_B > x_D»: where both points are free and the seed put them the wrong way round, their seeded
+   * positions are SWAPPED — the magnitudes the seed chose are kept, so «הציגו תצורה אחרת» still moves the
+   * figure, and the descent starts in the basin the sentence names (the kite's B and D are the two roots
+   * of one pair of equations; each goes to the nearer one). Against a VALUE — `axis-side` is the value 0 —
+   * the coordinate is folded to the named side of it, keeping its distance, exactly as #1071 did.
+   * A start, never a verdict: the post-hoc judge keeps the last word.
+   */
+  for (const s0 of c.selectors) {
+    const sel = compareOf(s0);
+    if (!sel) continue;
     const at0 = seeded.get(sel.id);
     if (!at0) continue;
-    const v = sel.axis === 'x' ? at0.x : at0.y;
-    // A coordinate that sampled to zero is in NEITHER half-plane; the selector is strict, so nudge.
-    const mag = Math.abs(v) < 1e-6 ? 1 : Math.abs(v);
-    const want = sel.positive ? mag : -mag;
+    const coord = (p: Pt) => (sel.axis === 'x' ? p.x : p.y);
+    if ('point' in sel.rhs) {
+      const other = seeded.get(sel.rhs.point);
+      if (!other) continue;
+      if (sel.greater ? coord(at0) > coord(other) : coord(at0) < coord(other)) continue;
+      seeded.set(sel.id, other);
+      seeded.set(sel.rhs.point, at0);
+      continue;
+    }
+    const v = evalExpr(sel.rhs.value, env);
+    if (!Number.isFinite(v)) continue;
+    // A coordinate that sampled onto the value is on NEITHER side; the comparison is strict, so nudge.
+    const d = coord(at0) - v;
+    const mag = Math.abs(d) < 1e-6 ? 1 : Math.abs(d);
+    const want = v + (sel.greater ? mag : -mag);
     seeded.set(sel.id, sel.axis === 'x' ? { x: want, y: at0.y } : { x: at0.x, y: want });
   }
   /**
@@ -1058,8 +1142,34 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
   const ownFree = new Set(ids);
   const selectorsHoldAt = (system: CarrierSystem, x: number[]): boolean =>
     c.selectors.length === 0 || failingSelectors(c, system.positionsAt(x), system.envAt(x)).length === 0;
-  const separatedFrom = (system: CarrierSystem, x: number[]): number[][] =>
-    deflatedStarts(system, x, collapsedPairs(c, system.positionsAt(x), ownFree), 120);
+  const separatedFrom = (system: CarrierSystem, x: number[]): number[][] => [
+    ...swappedStarts(system, x),
+    ...deflatedStarts(system, x, collapsedPairs(c, system.positionsAt(x), ownFree), 120),
+  ];
+  /**
+   * A comparison between two FREE points that holds the wrong way round (#1462): the two points swapped is
+   * the configuration the sentence names wherever the pair is interchangeable (the kite's B and D), and
+   * it is one polish away. Where they are not interchangeable the polish goes elsewhere and the judge
+   * rejects it — a start, never a verdict.
+   */
+  const swappedStarts = (system: CarrierSystem, x: number[]): number[][] => {
+    const pos = system.positionsAt(x);
+    const env0 = system.envAt(x);
+    const failing = failingSelectors(c, pos, env0);
+    const m = system.asMap(x);
+    let swapped = false;
+    for (const s of failing) {
+      const cmp = compareOf(s);
+      if (!cmp || !('point' in cmp.rhs)) continue;
+      const p = m.get(cmp.id);
+      const q = m.get(cmp.rhs.point);
+      if (!p || !q) continue;
+      m.set(cmp.id, q);
+      m.set(cmp.rhs.point, p);
+      swapped = true;
+    }
+    return swapped ? [system.toVec(m, env0)] : [];
+  };
 
   if ((ids.length > 0 || sys.syms.length > 0) && c.constraints.length > 0) {
     // Through `carrierSystem` (#1137) so the locus tracer walks the SAME residuals this solves.
@@ -1478,6 +1588,17 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
         if (curve) {
           curves.push({ id: o.id, label: { name: o.name ?? '', kind: 'line' }, curve, stated: true });
         } else vacant.push({ id: o.id, reason: 'vacant' });
+        break;
+      }
+
+      /**
+       * «מעגל ABD» · «BD קוטר במעגל» — a circle computed from placed points (#1464, #1324). The same
+       * resolver the constraints are measured against (`curveAtOf`), so the circle drawn is the circle judged.
+       */
+      case 'circle-thru': {
+        const curve = circleThruCurve(o, at);
+        if (curve) curves.push({ id: o.id, label: { name: o.name ?? '', kind: 'circle' }, curve, stated: true });
+        else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
 

@@ -137,6 +137,10 @@ function existingKey(error: InputError): string {
     'curve:circle': 'kindCircle',
     'curve:parabola': 'kindParabola',
     'curve:ellipse': 'kindEllipse',
+    // The constructive curves are a circle and a line to the student, however they were stated (#1464).
+    'circle-at': 'kindCircle',
+    'circle-thru': 'kindCircle',
+    'line-at': 'kindLine',
     'derived:midpoint': 'kindMidpoint',
     'derived:centroid': 'kindCentroid',
     'derived:incentre': 'kindIncentre',
@@ -2165,5 +2169,7 @@ function openCurveText(d: ReturnType<typeof derive>, id: string): string {
   // with a trailing `- 0` it never wrote.
   if (o?.kind === 'curve') return curveEquationText(o.curve.eq);
   if (o?.kind === 'circle-at') return `O(${o.centre}), r = ${exprText(o.r)}`;
+  // A computed circle (#1464, #1324) is written as what defines it: ⊙ through its points, ⌀ its diameter.
+  if (o?.kind === 'circle-thru') return o.def.t === 'through' ? `⊙${o.def.pts.join('')}` : `⌀${o.def.a}${o.def.b}`;
   return '—';
 }

@@ -889,6 +889,42 @@ about it.
 **Tangency is one equation**: the distance from the centre to the axis is the radius. Unsigned, so the
 circle may sit on either side of the axis — the student said which axis, not which side.
 
+### A circle computed from points ([ADR-AG-160](06c-decisions-analytic.md#adr-ag-160))
+
+`circle-thru` is the third constructive curve, after `circle-at` and `line-at`, and the simplest: **no freedom
+and no parameter at all.**
+
+```
+מעגל ABD / המעגל העובר דרך A, B ו-D   →  circle-thru {through: [A, B, D]}     (circumcentre, closed form)
+BD קוטר במעגל / נתון מעגל שקוטרו BD    →  diameter-of → circle-thru {diameter: B, D}   (midpoint, |BD|/2)
+```
+
+`circleThruCurve` (evaluate.ts) is the one resolver, used by `curveAtOf` — so incidences, crossings,
+«O מרכז המעגל» and the ask lane see the circle — and by the object walk that draws it; it calls `derived.ts`'s
+`circumcentre`, so this circle and «מפגש האנכים האמצעיים» cannot disagree. Unplaced points, three collinear
+points or coinciding diameter ends are a vacancy, reported as `does-not-exist` once the figure has no freedom
+left (the ADR-AG-008 predicate). `carrierOf` answers `null`, `symbolDeps` nothing, `objectDeps` the defining
+points. Operator ruling (2026-09-27, #1464): computed rather than lowered to «נתון מעגל O» plus three incidences,
+because that lowering is a SOLVED circle (ADR-AG-159 measured its cost) and needs a centre letter nobody wrote.
+
+**Which circle «BD קוטר» means is an M1 question** (`diameter-of`, apply.ts) — 2-D's `circleOnDiameter` /
+`diameter` split, ported as a decision. A defining phrase, or no circle to attach to: create. A named circle, or
+the figure's one circle (by the FIT's kind — `curveKindOf`, the one kind test `on-kind` also uses): a statement
+about it — a `circle-at` gets both ends on it and `derived-at(centre, midpoint)`; a three-point `circle-thru`
+through both ends gets `rightAngleAt` the third (Thales, exact both ways); the same diameter is `known`; a circle
+known only by its equation has no centre point to state, and is `out-of-scope`. Several circles and none
+named: `ambiguous-shape`.
+
+### A coordinate compared ([ADR-AG-161](06c-decisions-analytic.md#adr-ag-161))
+
+`coord-compare {id, axis, greater, rhs: {point} | {value: Expr}}` is a selector (D7 kind 2). `axis-side` is the
+same comparison against 0: `compareOf` reads both kinds, and the judge (`failingSelectors`) and the seeding go
+through it — one mechanism, two spellings in the data. Seeding: against a value the coordinate is folded to the
+named side keeping its distance (exactly #1071's fold at 0); between two free points in the wrong order their
+seeded positions are SWAPPED. After the solve, a converged solution with the pair the wrong way round gets a
+swapped restart (`swappedStarts`) beside the deflation restarts of ADR-AG-159 — the kite's B and D are
+interchangeable roots, so the swap is one polish away. The post-hoc judge keeps the last word.
+
 ## Born after the chassis
 
 This is the **first builder created after `shell/` existed**, and the difference shows in what it did
@@ -1188,7 +1224,7 @@ ordinary free point at a sampled position, drawn on a canvas while the panel cal
 | ref kind | must resolve to | asked by |
 | --- | --- | --- |
 | point | something positional | `constraintRefs` |
-| curve | something with a shape — `curve`, `circle-at`, `line-at` | `constraintCurveRefs` |
+| curve | something with a shape — `curve`, `circle-at`, `line-at`, `circle-thru` | `constraintCurveRefs` |
 
 They stay **separate functions**. Merging them would have made the point check reject every curve
 reference as "not a point" — the opposite defect, and a worse one.

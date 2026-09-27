@@ -24,6 +24,9 @@ import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, shapeRow
 import { evalExpr, type Env } from './expr';
 import {
   EMPTY_CONSTRUCTION,
+  circleDefPoints,
+  curveByName,
+  diameterCircleId,
   isPositional,
   namesObject,
   objectById,
@@ -114,6 +117,13 @@ export type ApplyErrorCode =
    * student takes, never a silent substitution.
    */
   | 'already-named'
+  /**
+   * The two PARSER refusals a construction can also reach at M1 (#1464, #1324), with the parser's own
+   * messages: «מעגל AAB» names the same point twice (`repeated-vertex`), and «BD קוטר במעגל I» over a circle
+   * known only by its equation is understood but has no centre point to state the midpoint of (`out-of-scope`).
+   */
+  | 'repeated-vertex'
+  | 'out-of-scope'
   /** A stated given the solve could not satisfy — reported, never drawn as if it held. */
   | 'unsatisfiable';
 
@@ -268,6 +278,8 @@ export type ExistingKind =
   /** A circle stated by its CENTRE rather than by an equation (#1060). */
   | 'circle-at'
   | 'line-at'
+  /** A circle COMPUTED from points (#1464). */
+  | 'circle-thru'
   | `derived:${string}`;
 
 export function existingKindOf(o: GeoObject): ExistingKind {
@@ -280,6 +292,8 @@ export function existingKindOf(o: GeoObject): ExistingKind {
       return 'circle-at';
     case 'line-at':
       return 'line-at';
+    case 'circle-thru':
+      return 'circle-thru';
     default:
       return o.kind;
   }
@@ -337,13 +351,34 @@ export function statedName(id: Id): string {
  * curve at evaluation, and each is a legitimate carrier. A POINT is not, and neither is a polygon —
  * naming one where a curve belongs is the same mistake as naming a curve that does not exist.
  */
-const CURVE_BEARING: ReadonlySet<string> = new Set(['curve', 'circle-at', 'line-at']);
+const CURVE_BEARING: ReadonlySet<string> = new Set(['curve', 'circle-at', 'line-at', 'circle-thru']);
 
 /** The probe environment for restatement comparison — see `sameNumbers`. */
 const PROBE_ENVS: Env[] = [
   { a: 1.7, b: 2.3, k: 1.3, m: 0.7, n: 2.1, p: 1.9, r: 1.1, t: 2.7 },
   { a: 3.1, b: 1.1, k: 2.9, m: 1.3, n: 0.9, p: 3.3, r: 2.3, t: 1.3 },
 ];
+
+/**
+ * WHAT KIND OF CURVE an object is — one answer for every contextual reference (#1057, #1324).
+ *
+ * The kind of an ANONYMOUS conic is not declared — it comes from the FIT (02c R6: the noun is optional
+ * "because the fit already knows the kind"). So «x²/9 + y²/4 = 1» carries no `curve.kind` at all, and
+ * matching on the declaration alone would find no ellipse in a figure that plainly has one. Resolved
+ * against a PROBE environment, the same device `sameNumbers` uses: a conic's KIND does not turn on the
+ * value of its parameters in any form the corpus writes. A circle stated by its centre or computed from
+ * points IS a circle, however it was stated.
+ *
+ * Lifted out of `on-kind` when «BD קוטר במעגל» needed the same question (#1324): a second copy that read
+ * the declaration only missed «(x-3)^2+(y-4)^2=9» — measured — and treated the figure as circle-less.
+ */
+function curveKindOf(o: GeoObject): string | null {
+  if (o.kind === 'circle-at' || o.kind === 'circle-thru') return 'circle';
+  if (o.kind !== 'curve') return null;
+  if (o.curve.kind) return o.curve.kind;
+  const probe = resolveCurve(o.curve, PROBE_ENVS[0]);
+  return probe.ok ? probe.curve.kind : null;
+}
 
 /**
  * Do two expressions denote the same value? Compared NUMERICALLY at several parameter probes
@@ -1022,6 +1057,89 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     }
 
     /**
+     * «מעגל ABD» · «נתון מעגל שקוטרו BD» — a circle COMPUTED from points (#1464, #1324, ADR-AG-160).
+     *
+     * The third constructive curve, with `circle-at`'s and `line-at`'s discipline: every point it is
+     * defined from must already exist (never invented — #1028), a name already holding another kind is a
+     * clash, and a restatement is absorbed. The points must be DIFFERENT: «מעגל AAB» names no circle, and
+     * saying so here names the sentence rather than drawing a vacancy the student cannot explain.
+     */
+    case 'circle-thru': {
+      const pts = circleDefPoints(f.def);
+      for (const id of pts) {
+        const p = objectById(c, id);
+        if (!p || !isPositional(p)) return { ok: false, error: unknownRef(id) };
+      }
+      if (new Set(pts).size !== pts.length) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
+      const prior = objectById(c, f.id);
+      if (prior) {
+        if (prior.kind !== 'circle-thru') {
+          return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };
+        }
+        return { ok: true, effect: 'known', next: c };
+      }
+      return {
+        ok: true,
+        effect: 'created',
+        next: { ...c, objects: [...c.objects, { kind: 'circle-thru', id: f.id, def: f.def, ...(f.name ? { name: f.name } : {}) }] },
+      };
+    }
+
+    /**
+     * «BD קוטר במעגל» — which circle, answered from the construction (#1324; 2-D's `circleOnDiameter` /
+     * `diameter` precedence, ported as a decision).
+     *
+     * - A DEFINING phrase («שקוטרו», «במעגל חדש», "with diameter"), or no circle to attach to: the
+     *   sentence CREATES the circle on the diameter — the bagrut opener.
+     * - A circle named, or the one circle in the figure: the sentence is ABOUT it (M1). Lowered exactly:
+     *   a circle on a centre point → both ends on it and the centre at their midpoint; a circle through
+     *   three points two of which are the ends → the right angle at the third (Thales, both directions);
+     *   the circle already on this diameter → known. A circle known only by its equation has no centre
+     *   point to state the midpoint of, and is refused BY NAME (`out-of-scope`) — never dropped.
+     * - Several circles and none named: refused as ambiguous, never a pick.
+     */
+    case 'diameter-of': {
+      for (const id of [f.a, f.b]) {
+        const p = objectById(c, id);
+        if (!p || !isPositional(p)) return { ok: false, error: unknownRef(id) };
+      }
+      if (f.a === f.b) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
+      // By the fit, not the declaration (`curveKindOf`): «(x-3)^2+(y-4)^2=9» declares no kind and IS a circle.
+      const isCircle = (o: GeoObject) => curveKindOf(o) === 'circle';
+      let host: GeoObject | undefined;
+      if (f.circle !== undefined) {
+        host = objectById(c, `circle-${f.circle}`) ?? objectById(c, `circle-at-${f.circle}`) ?? curveByName(c, f.circle);
+        if (!host || !isCircle(host)) return { ok: false, error: unknownRef(`circle-${f.circle}`) };
+      } else if (!f.define) {
+        const circles = c.objects.filter(isCircle);
+        if (circles.length > 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+        host = circles[0];
+      }
+      if (!host) {
+        const [a, b] = [f.a, f.b];
+        return applyFact(c, { t: 'circle-thru', id: diameterCircleId(a, b), def: { t: 'diameter', a, b }, src: f.src });
+      }
+      const on = (id: Id): Fact => ({ t: 'constraint', k: { t: 'on-curve', id, curve: host!.id }, src: f.src });
+      if (host.kind === 'circle-at') {
+        return applyAll(c, [
+          on(f.a),
+          on(f.b),
+          { t: 'constraint', k: { t: 'derived-at', id: host.centre, rule: { t: 'midpoint', a: f.a, b: f.b } }, src: f.src },
+        ]);
+      }
+      if (host.kind === 'circle-thru') {
+        if (host.def.t === 'diameter') {
+          const same = [host.def.a, host.def.b].sort().join() === [f.a, f.b].sort().join();
+          if (same) return { ok: true, effect: 'known', next: c };
+        } else if (host.def.pts.includes(f.a) && host.def.pts.includes(f.b)) {
+          const third = host.def.pts.find((p) => p !== f.a && p !== f.b)!;
+          return applyFact(c, { t: 'constraint', k: rightAngleAt(third, f.a, f.b), src: f.src });
+        }
+      }
+      return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+    }
+
+    /**
      * «המעגל משיק לציר ה-x» — the circle resolved from the figure (#1060).
      *
      * The same contextual resolution as `area-of` and `meet-of`: one circle makes it unambiguous,
@@ -1050,14 +1168,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
        * Resolved against a PROBE environment, the same device `sameNumbers` uses here: a conic's KIND
        * does not turn on the value of its parameters in any form the corpus writes.
        */
-      const kindOf = (o: GeoObject): string | null => {
-        if (o.kind === 'circle-at') return 'circle';
-        if (o.kind !== 'curve') return null;
-        if (o.curve.kind) return o.curve.kind;
-        const probe = resolveCurve(o.curve, PROBE_ENVS[0]);
-        return probe.ok ? probe.curve.kind : null;
-      };
-      const matches = c.objects.filter((o) => kindOf(o) === f.kind);
+      const matches = c.objects.filter((o) => curveKindOf(o) === f.kind);
       if (matches.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
       return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: matches[0].id }, src: f.src });
     }
@@ -1141,7 +1252,10 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
             ? f.sel.ids
             : f.sel.kind === 'sign'
               ? dirRefs(f.sel.q.u)
-              : [f.sel.id, f.sel.a, f.sel.b];
+              : f.sel.kind === 'coord-compare'
+                ? // Both points of «x_B > x_D» must exist (#1462); a value names none.
+                  [f.sel.id, ...('point' in f.sel.rhs ? [f.sel.rhs.point] : [])]
+                : [f.sel.id, f.sel.a, f.sel.b];
       for (const id of refs) {
         const o = objectById(c, id);
         if (!o || !isPositional(o)) {
