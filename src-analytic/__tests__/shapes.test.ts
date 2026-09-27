@@ -147,9 +147,13 @@ describe('#1049 — an unstated choice is a DISCRETE degree of freedom, and it C
     expect(at(['A(0,0)', 'B(4,0)', 'C(0,3)', 'זווית A ישרה']).d.faults.map((f) => f.code)).toEqual([
       'ambiguous-angle',
     ]);
-    expect(at(['משולש ABC', 'מרובע ABCD', 'זווית B ישרה']).d.faults.map((f) => f.code)).toEqual([
+    // #1407 operator ruling (2026-09-27, ADR-AG-158 amendment): the DISTINCT EDGES at the vertex decide,
+    // never the number of shapes holding it. C has CA, CB, CD here, so it names no single angle; B has only
+    // BA and BC in both shapes, so «זווית B ישרה» is ∠ABC and builds.
+    expect(at(['משולש ABC', 'מרובע ABCD', 'זווית C ישרה']).d.faults.map((f) => f.code)).toEqual([
       'ambiguous-angle',
     ]);
+    expect(at(['משולש ABC', 'מרובע ABCD', 'זווית B ישרה']).d.faults).toEqual([]);
   });
 });
 

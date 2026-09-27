@@ -156,9 +156,10 @@ export interface ApplyError {
   holder?: Id;
   /**
    * The THREE-LETTER name an ambiguous one-letter angle needs (#1407, ADR-AG-158) — «ACB» for «זווית C»
-   * when C is a vertex of two shapes. Read off the first shape through the vertex, rays sorted, so the
-   * student's own line with the letter replaced by this name is a line the tool builds. Absent when the
-   * vertex is in NO shape: there is no pair of rays to teach, and inventing one would be a guess.
+   * when more than two edges meet at C. Read off the first shape through the vertex (else its first two
+   * edges), rays sorted, so the student's own line with the letter replaced by this name is a line the tool
+   * builds. Absent when FEWER than two edges meet there: there is no pair of rays to teach, and inventing one
+   * would be a guess.
    */
   example?: string;
 }
@@ -188,15 +189,42 @@ function unknownRef(id: Id): ApplyError {
 }
 
 /**
+ * The figure's DISTINCT EDGES at a vertex — every drawn segment and every shape side through it, one entry per
+ * other end (#1407 ruling, 2026-09-27). The port of 2-D's `pointNeighbors` (`src/engine/step.ts`): a side
+ * stated twice, by two shapes or by a shape and a segment, is ONE edge, because it is one line on the page.
+ * Sorted, so a caller that reads a pair off it gets the ray order the parser gives the three-letter twin.
+ */
+function edgesAt(c: Construction, v: Id): Id[] {
+  const out = new Set<Id>();
+  for (const o of c.objects) {
+    if (o.kind === 'segment') {
+      if (o.a === v && o.b !== v) out.add(o.b);
+      else if (o.b === v && o.a !== v) out.add(o.a);
+    } else if (o.kind === 'polygon') {
+      const ring = o.vertices;
+      ring.forEach((p, i) => {
+        if (p !== v) return;
+        for (const q of [ring[(i - 1 + ring.length) % ring.length], ring[(i + 1) % ring.length]]) {
+          if (q !== v) out.add(q);
+        }
+      });
+    }
+  }
+  return [...out].sort();
+}
+
+/**
  * A lone VERTEX resolved to the angle it names in this figure (#1049, #1407) — the ONE resolver behind
  * «זווית B ישרה», «זווית C = 60» and «∠B = ∠C».
  *
- * The angle at a vertex of a ring is the one between its two NEIGHBOURS — the figure's own convention,
- * and the only reading that is right for a quadrilateral as well as a triangle. So the vertex must be in
- * exactly ONE shape; in none, or in several, it names no single angle, and the refusal says so and
- * (where a shape exists) names the three-letter form that does — never a pick of rays. A name that is
- * already three letters passes through untouched. Rays are sorted, so the result is the same object the
- * parser builds for the three-letter twin.
+ * 2-D's rule (`src/parser/parse.ts`, the bare-vertex angle: `nb.length !== 2` → `ambiguous-angle`), by
+ * operator ruling on #1407 (2026-09-27): a lone vertex names an angle exactly when the figure draws TWO
+ * distinct edges at it — {@link edgesAt}, the union over every shape and segment. How many SHAPES hold the
+ * vertex is not the question: after «משולש ABC» · «מרובע ABCD», B has BA and BC in both, so «זווית B» can
+ * only be ∠ABC. With more than two edges (C there: CA, CB, CD) the vertex has several angles, and the
+ * refusal names a real one in three letters (`example`): the first shape's angle through the vertex, else
+ * the first two edges. With fewer than two there are no arms yet, and it refuses with no example — any pair
+ * would be a guess. A name that is already three letters passes through untouched.
  */
 function resolveAngleName(
   c: Construction,
@@ -206,27 +234,28 @@ function resolveAngleName(
   if (isAngleRef(n)) return { ok: true, ref: n };
   const host = objectById(c, n.v);
   if (!host || !isPositional(host)) return { ok: false, error: unknownRef(n.v) };
-  const rays = (ring: Id[]): [Id, Id] => {
-    const i = ring.indexOf(n.v);
-    const [a, b] = [ring[(i - 1 + ring.length) % ring.length], ring[(i + 1) % ring.length]].sort();
-    return [a, b];
-  };
-  const rings = c.objects.filter(
-    (g) => g.kind === 'polygon' && g.vertices.includes(n.v),
-  ) as PolygonObject[];
-  if (rings.length !== 1) {
-    const taught = rings[0] ? rays(rings[0].vertices) : null;
-    return {
-      ok: false,
-      error: {
-        code: 'ambiguous-angle',
-        detail: src,
-        ...(taught ? { example: `${statedName(taught[0])}${statedName(n.v)}${statedName(taught[1])}` } : {}),
-      },
-    };
+  const edges = edgesAt(c, n.v);
+  if (edges.length === 2) return { ok: true, ref: { v: n.v, a: edges[0], b: edges[1] } };
+  let taught: [Id, Id] | null = null;
+  if (edges.length > 2) {
+    const ring = (c.objects.find((g) => g.kind === 'polygon' && g.vertices.includes(n.v)) as PolygonObject | undefined)
+      ?.vertices;
+    if (ring) {
+      const i = ring.indexOf(n.v);
+      const pair = [ring[(i - 1 + ring.length) % ring.length], ring[(i + 1) % ring.length]].sort();
+      taught = [pair[0], pair[1]];
+    } else {
+      taught = [edges[0], edges[1]];
+    }
   }
-  const [a, b] = rays(rings[0].vertices);
-  return { ok: true, ref: { v: n.v, a, b } };
+  return {
+    ok: false,
+    error: {
+      code: 'ambiguous-angle',
+      detail: src,
+      ...(taught ? { example: `${statedName(taught[0])}${statedName(n.v)}${statedName(taught[1])}` } : {}),
+    },
+  };
 }
 
 /** What a name already holds, in terms the student can recognise — see `ApplyError.existing`. */

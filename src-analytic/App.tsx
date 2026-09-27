@@ -912,7 +912,7 @@ export function App() {
           'does-not-exist': 'errDoesNotExist',
           'ring-contradicts-noun': 'errRingContradictsNoun',
           // #1407 — a vertex in SEVERAL shapes gets the three-letter name it needs; in none, the general form.
-          'ambiguous-angle': error.key === 'ambiguous-angle' && error.example ? 'errAmbiguousAngleShapes' : 'errAmbiguousAngle',
+          'ambiguous-angle': error.key === 'ambiguous-angle' && error.example ? 'errAmbiguousAngleArms' : 'errAmbiguousAngle',
           'ambiguous-shape': 'errAmbiguousShape',
           'undistinguished-diagonal': 'errNoPrincipalDiagonal',
           'already-named': 'errAlreadyNamed',

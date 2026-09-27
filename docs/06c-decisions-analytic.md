@@ -7712,7 +7712,7 @@ paragraph.
 
 ## ADR-AG-158 — A one-letter angle takes a value and a ratio: «זווית C = 60», «∠B = ∠C», and «זוית C=200» is refused as unsatisfiable (#1407, arm 2)
 
-**Status:** accepted, 2026-09-25 · **Issue:** [#1407](https://github.com/dcodish/geo_builder/issues/1407) (arm 2 of 3, feature, `P2`, `analytic`; arm 1 is [ADR-AG-155](#adr-ag-155), already on main) · round [#1408](https://github.com/dcodish/geo_builder/issues/1408) · PR route
+**Status:** accepted, 2026-09-25; amended 2026-09-27 by operator ruling (see *Amendment* below) · **Issue:** [#1407](https://github.com/dcodish/geo_builder/issues/1407) (arm 2 of 3, feature, `P2`, `analytic`; arm 1 is [ADR-AG-155](#adr-ag-155), already on main) · round [#1408](https://github.com/dcodish/geo_builder/issues/1408) · PR route
 **Requirements:** [02c](02c-requirements-analytic.md) R115 amendment (a lone vertex names an angle of any size, and in a ratio) · **Design:** [04c](04c-design-analytic.md#relations-and-the-direction-resolver-adr-ag-024), the *Angles* paragraph (the one vertex resolver)
 
 **What the operator saw.** Playing round #1397 T19: *"writing זוית C=200 is not recognized"*. Arm 1 taught the
@@ -7730,8 +7730,9 @@ sentence and nothing in the next.
 
 **The decision.**
 1. **One resolver** (`resolveAngleName`, `engine/apply.ts`), extracted from the `right-angle` case: a lone
-   vertex names the angle between its two NEIGHBOURS in the ONE shape through it; in no shape or in several it
-   is `ambiguous-angle`. Both the `right-angle` fact and the new `vertex-angle` fact call it.
+   vertex names the angle between the TWO distinct edges the figure draws at it; with more or fewer it is
+   `ambiguous-angle` (as amended 2026-09-27; the first cut counted the shapes through the vertex). Both the
+   `right-angle` fact and the new `vertex-angle` fact call it.
 2. **One new fact**, `vertex-angle {left, rhs}` (`engine/types.ts`), where either side is an `AngleName`: three
    letters or the vertex alone (`engine/solve.ts`). The parser emits it only when some side is a lone vertex;
    three letters on every side still lower to the constraint in the parser, unchanged. At M1 each lone side is
@@ -7744,7 +7745,7 @@ sentence and nothing in the next.
 4. **An angle is the same angle in either ray order.** `canonicalConstraint` sorts each angle's rays, so
    «זווית ACB = 60» after «זווית C = 60» (or «∠BCA = 60» after «∠ACB = 60») is `already-known`: one given, not
    two. The lone-vertex rays come off the ring in ring order, which is what surfaced this.
-5. **The refusal teaches a form that builds.** When the vertex is in SEVERAL shapes, `ambiguous-angle` carries
+5. **The refusal teaches a form that builds.** When MORE than two edges meet at the vertex (amended; first cut: when it is in several shapes), `ambiguous-angle` carries
    `example`, the three-letter name read off the first shape through it (rays sorted), and the message is
    «הקודקוד שייך ליותר מצורה אחת … כתבו את הזווית בשלוש אותיות, והקודקוד באמצע — למשל «זווית ABC»». The lock
    rewrites the student's own line with that name and drives it through `decideSubmit`: it is accepted. A
@@ -7776,3 +7777,33 @@ quadrilateral; the restatement in either ray order `already-known`; 60° at C ov
 of «הציגו תצורה אחרת»; the equality over 24 seeds; the ambiguous vertex refused with «ABC» and the taught line
 accepted, five spellings; no rays taught for a vertex in no shape; the right angle unchanged; two letters not
 read; the two catalog rows through the gate). No solver change: the rows are #1331's, so no seed-rate change.
+
+**Amendment — 2026-09-27, operator ruling on #1407 (the distinct edges decide, not the shapes).** Playing round
+#1408 T64 on PR #1420, «משולש ABC» · «מרובע ABCD» · «זווית B = 60» was refused with «הקודקוד שייך ליותר מצורה
+אחת». The operator: *"B has no confusion here and should be accepted"*. B has the same two edges, BA and BC, in
+both shapes, so «זווית B» can only mean ∠ABC. The first cut resolved by counting the SHAPES that hold the vertex,
+a criterion taken from the round's plan and asserted by its play sheet; both were wrong.
+- **The rule is 2-D's.** `src/parser/parse.ts` (the bare-vertex angle, `nb.length !== 2` → `ambiguous-angle`)
+  reads `pointNeighbors` (`src/engine/step.ts`): the union of edges at the vertex over every segment and every
+  polygon side, deduplicated. Analytic now ports it as `edgesAt`. Exactly two edges are the rays; more than two
+  is `ambiguous-angle` with an `example`; fewer than two (no arms yet: no edge, or a single segment) is
+  `ambiguous-angle` with none, as 2-D clarifies for any count but two. A side stated twice (two shapes, or a
+  shape and a segment) is one edge.
+- **On the ruling's figure:** B (BA, BC) → ∠ABC; D (DA, DC) → ∠ADC; C (CA, CB, CD) → refused, teaching «ACB»;
+  A (AB, AC, AD) → refused, teaching «BAC». The example is the first shape's angle at the vertex (rays sorted),
+  else the first two edges, so it always names a real angle, and the lock drives the taught line through
+  `decideSubmit`.
+- **Segments count, as in 2-D.** «A(0,0)» · «B(4,0)» · «C(0,3)» · «הקטע AB» · «הקטע AC» · «זווית A = 90» reads
+  ∠BAC: it is `already-follows` (the coordinates make it right), and «זווית A = 60» is `unsatisfiable`. Without
+  the two segments the same line is `ambiguous-angle`, since A has no arms.
+- **The ratio and equality forms** use the same resolver per side: «∠B = ∠D» builds as «∠ABC = ∠ADC»; «∠B = ∠C» is
+  refused at C, teaching «ACB», and «∠B = ∠ACB» builds. «זווית B ישרה» follows the same rule.
+- **The message** no longer blames the shape count: `errAmbiguousAngleShapes` is renamed `errAmbiguousAngleArms`
+  and says more than two sides meet at the vertex.
+- **Lock additions** (`issue-1407-one-letter-angle.test.ts`, 41): the four-vertex table in five spellings for
+  acceptance and four for refusal (each taught line built); the ratio form; the segment-only case (and one edge
+  shared by a shape and a segment, and three segments teaching «BAC»); fewer than two edges teaching nothing; the
+  message in both locales. The single-triangle, right-angle and 200° locks are unchanged. One #1049 lock on main
+  (`shapes.test.ts`, «זווית B ישרה» after «משולש ABC» · «מרובע ABCD» refused) asserted the overruled criterion; it
+  now asserts the ruling: that line builds, and «זווית C ישרה» on the same figure is the ambiguous one.
+- **Requirements:** 02c R115 amendment (the criterion). **Design:** 04c *Angles* paragraph (`edgesAt`).

@@ -8,9 +8,10 @@
  * `not-handled` and escalated, while «זווית ACB = 200» was refused `unsatisfiable`.
  *
  * The mechanism is the one «זווית B ישרה» has used since #1049: a lone vertex is resolved at M1 against the
- * ONE shape through it, and the line then lowers to exactly the constraint its three-letter twin lowers
- * to. Where the vertex is in several shapes the refusal names the three-letter form, and that TAUGHT line
- * is driven through the real gate here (a taught remedy is a hypothesis).
+ * TWO distinct edges the figure draws at it (2-D's rule, by operator ruling 2026-09-27), and the line then
+ * lowers to exactly the constraint its three-letter twin lowers to. Where more than two edges meet the
+ * refusal names a real three-letter angle, and that TAUGHT line is driven through the real gate here (a
+ * taught remedy is a hypothesis).
  */
 import { describe, expect, it } from 'vitest';
 import { decideSubmit, reachesFallback } from '../app/submit';
@@ -114,45 +115,89 @@ describe('#1407 — the figure HOLDS the stated angle, over 24 seeds and «הצ�
   });
 });
 
-describe('#1407 — an ambiguous vertex is refused with the three-letter form, and the TAUGHT line builds', () => {
+/**
+ * Operator ruling, 2026-09-27 (#1407, playing round #1408 T64): *"B has no confusion here and should be
+ * accepted"*. A lone vertex is ambiguous only when the figure draws MORE THAN TWO distinct edges at it (the
+ * union over every shape and segment) — 2-D's rule (`src/parser/parse.ts`, `nb.length !== 2`) — never
+ * because the vertex is in several shapes. The ruling's own table, on its own figure.
+ */
+describe('#1407 ruling — the distinct edges at the vertex decide, not the number of shapes', () => {
   const TWO = ['משולש ABC', 'מרובע ABCD'];
 
-  it.each(['זווית B = 60', 'זוית B = 60', '∠B = 60', 'זווית B ישרה', '∠B = ∠C'])(
-    '«%s» with B in two shapes → ambiguous-angle naming «ABC», and the line rewritten to it is accepted',
-    (line) => {
-      const v = decideSubmit(line, TWO, 0);
-      expect(v.kind).toBe('refused');
-      if (v.kind !== 'refused' || v.error.key !== 'ambiguous-angle') throw new Error(JSON.stringify(v));
-      expect(v.error.example).toBe('ABC');
-      expect(reachesFallback(v)).toBe(false);
-      // The student does what the message says: replace the lone vertex with the three letters it names,
-      // and again for a second lone vertex (C is in both shapes too), until the line is accepted.
-      let taught = line;
-      let verdict = v as ReturnType<typeof decideSubmit>;
-      for (let round = 0; round < 2 && verdict.kind === 'refused'; round += 1) {
-        if (verdict.error.key !== 'ambiguous-angle' || !verdict.error.example) throw new Error(JSON.stringify(verdict));
-        const ex = verdict.error.example;
-        const vertex = ex.slice(1, -1);
-        taught = taught.replace(new RegExp(`(?<![A-Z])${vertex}(?![A-Z0-9])`), ex);
-        verdict = decideSubmit(taught, TWO, 0);
-      }
-      expect(verdict.kind, taught).toBe('record');
-    },
-  );
-
-  it('a vertex in NO shape is refused too, and invents no rays to teach', () => {
-    const v = decideSubmit('זווית B = 60', ['A(0,0)', 'B(4,0)', 'C(1,3)'], 0);
-    expect(v.kind === 'refused' && v.error.key).toBe('ambiguous-angle');
-    expect(v.kind === 'refused' && 'example' in v.error ? v.error.example : undefined).toBeUndefined();
+  it.each([
+    ['זווית B = 60', 'זווית ABC = 60'],
+    ['זוית B = 60', 'זווית ABC = 60'],
+    ['∠B = 60', '∠ABC = 60'],
+    ['זווית B ישרה', 'זווית ABC ישרה'],
+    ['זווית D = 60', 'זווית ADC = 60'],
+  ])('«%s»: B (BA, BC) and D (DA, DC) have two edges across both shapes → accepted, meaning «%s»', (lone, three) => {
+    const v = decideSubmit(lone, TWO, 0);
+    expect(v.kind, JSON.stringify(v)).toBe('record');
+    expect(reachesFallback(v)).toBe(false);
+    expect(meaning([...TWO, lone])).toBe(meaning([...TWO, three]));
   });
 
-  it('the message carries the three-letter name, in both locales', () => {
+  it.each([
+    ['זווית C = 60', 'ACB'],
+    ['∠C = 60', 'ACB'],
+    ['זווית C ישרה', 'ACB'],
+    ['זווית A = 60', 'BAC'],
+  ])('«%s»: three edges meet there → ambiguous-angle teaching «%s», and the taught line builds', (line, ex) => {
+    const v = decideSubmit(line, TWO, 0);
+    if (v.kind !== 'refused' || v.error.key !== 'ambiguous-angle') throw new Error(JSON.stringify(v));
+    expect(v.error.example).toBe(ex);
+    expect(reachesFallback(v)).toBe(false);
+    // The student does what the message says: the lone letter becomes the taught three letters.
+    const vertex = ex.slice(1, -1);
+    const taught = line.replace(new RegExp(`(?<![A-Z])${vertex}(?![A-Z0-9])`), ex);
+    expect(decideSubmit(taught, TWO, 0).kind, taught).toBe('record');
+  });
+
+  it('the RATIO form uses the same predicate: «∠B = ∠D» is accepted, «∠B = ∠C» refused at C, and the taught line for C builds', () => {
+    expect(decideSubmit('∠B = ∠D', TWO, 0).kind).toBe('record');
+    expect(meaning([...TWO, '∠B = ∠D'])).toBe(meaning([...TWO, '∠ABC = ∠ADC']));
+    expect(decideSubmit('∠B = 2∠D', TWO, 0).kind).toBe('record');
+    const v = decideSubmit('∠B = ∠C', TWO, 0);
+    if (v.kind !== 'refused' || v.error.key !== 'ambiguous-angle') throw new Error(JSON.stringify(v));
+    expect(v.error.example).toBe('ACB');
+    expect(decideSubmit('∠B = ∠ACB', TWO, 0).kind).toBe('record');
+  });
+
+  it('edges from separately drawn SEGMENTS count as 2-D counts them: two segments at A give ∠BAC', () => {
+    const SEG = ['A(0,0)', 'B(4,0)', 'C(0,3)', 'הקטע AB', 'הקטע AC'];
+    // The coordinates already make ∠BAC right, so 90 follows from them and 60 cannot hold — both read ∠BAC.
+    const v = decideSubmit('זווית A = 90', SEG, 0);
+    expect(v.kind, JSON.stringify(v)).toBe('already-follows');
+    expect(reachesFallback(v)).toBe(false);
+    const w = decideSubmit('זווית A = 60', SEG, 0);
+    expect(w.kind === 'refused' && w.error.key, JSON.stringify(w)).toBe('unsatisfiable');
+    // Without the segments A has no arms, and the same line is ambiguous.
+    const bare = decideSubmit('זווית A = 90', SEG.slice(0, 3), 0);
+    expect(bare.kind === 'refused' && bare.error.key).toBe('ambiguous-angle');
+    // A segment and a shape side on the same line are ONE edge.
+    expect(decideSubmit('זווית B = 60', ['משולש ABC', 'הקטע AB'], 0).kind).toBe('record');
+    // A third segment at A makes it ambiguous, and the example is two real edges.
+    const three = decideSubmit('זווית A = 60', ['A(0,0)', 'B(4,0)', 'C(0,3)', 'D(-2,-2)', 'הקטע AB', 'הקטע AC', 'הקטע AD'], 0);
+    if (three.kind !== 'refused' || three.error.key !== 'ambiguous-angle') throw new Error(JSON.stringify(three));
+    expect(three.error.example).toBe('BAC');
+  });
+
+  it('fewer than two edges is refused too, and invents no rays to teach — no edge, or a single segment', () => {
+    for (const lines of [['A(0,0)', 'B(4,0)', 'C(1,3)'], ['A(0,0)', 'B(4,0)', 'C(1,3)', 'הקטע AB']]) {
+      const v = decideSubmit('זווית B = 60', lines, 0);
+      expect(v.kind === 'refused' && v.error.key, lines.join(' · ')).toBe('ambiguous-angle');
+      expect(v.kind === 'refused' && 'example' in v.error ? v.error.example : undefined).toBeUndefined();
+    }
+  });
+
+  it('the message carries the three-letter name, in both locales, and no longer blames the shape count', () => {
     for (const lng of ['he', 'en']) {
       const text = analyticI18n
-        .t('errAmbiguousAngleShapes', { lng, detail: 'זווית B = 60', example: 'ABC' })
+        .t('errAmbiguousAngleArms', { lng, detail: 'זווית C = 60', example: 'ACB' })
         .replace(/[⁦-⁩]/g, ''); // the bidi isolates the locale wraps round Latin runs
-      expect(text, lng).toContain('ABC');
-      expect(text, lng).toContain('זווית B = 60');
+      expect(text, lng).toContain('ACB');
+      expect(text, lng).toContain('זווית C = 60');
+      expect(text, lng).not.toMatch(/יותר מצורה אחת|more than one shape/);
     }
   });
 });

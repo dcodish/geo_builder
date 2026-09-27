@@ -520,9 +520,11 @@ rows of the solve (`angle`, `angle-ratio`), each the unsigned angle difference o
 `perpendicular` row a right angle lowers to. They are not directions and never reach the resolver below.
 *A lone vertex* ([ADR-AG-158](06c-decisions-analytic.md#adr-ag-158)) is an `AngleName` without rays. The parser
 never lowers it: a line with a lone vertex on either side becomes a `vertex-angle` fact, and at M1 the one
-vertex resolver `resolveAngleName` (also behind `right-angle`) reads the rays off the ONE shape through the
-vertex, sorted, then applies the same `angle` / `angle-ratio` row the three-letter twin lowers to. In several
-shapes it is `ambiguous-angle` with an `example` three-letter name; in none, `ambiguous-angle` with none.
+vertex resolver `resolveAngleName` (also behind `right-angle`) reads the vertex's DISTINCT EDGES (`edgesAt`:
+every segment and shape side through it, deduplicated, sorted — the port of 2-D's `pointNeighbors`); exactly
+two are the rays, and the same `angle` / `angle-ratio` row the three-letter twin lowers to applies. More than
+two is `ambiguous-angle` with an `example` three-letter name (the first shape's angle there, else the first
+two edges); fewer than two, `ambiguous-angle` with none. The number of shapes holding the vertex is not read.
 `canonicalConstraint` sorts each angle's rays, so either ray order is one given.
 
 Four things in this grammar have a direction:
