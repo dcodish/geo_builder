@@ -326,6 +326,21 @@ line × plane 90° spellings) through `operandPairKnee`, gated on the verifier's
 (`relDeviation` ≤ `DIRECTION_REL_TOL`), and it is not gated on the data panel. A dihedral knee carries no
 `planeN` — both its arms are fixed by the seam, so the legibility rotation must not touch them.
 
+**Dihedral construction ([ADR-3D-265](06b-decisions-3d.md#adr-3d-265)).** `dihedralConstruction` (same
+module) extends `dihedralGeometry` with a FOOT chosen from a meaningful point — a point run's vertex off the
+seam (inside the shared edge first, then the face over the base via `solidBaseRings`, then the first-named
+plane), else a named point on a non-run plane, else the geometry's own foot with `legLen: null`. The chip
+state is `dihedralShown: Record<factId, true>` (`store/dihedralChips.ts`, the #937 `displayMode` shape:
+undoable, pruned to live facts, saved by fact INDEX as `dihedralConstruction`, carried by the session and
+share-link payloads); `dihedralChipsByFact` derives chip ownership from the fact list (ok rows whose command
+states a planar × planar `plane-rel` angle / ⟂, or the legacy `plane-angle`). App3 passes the switched-on
+pairs to `buildScene3` (`dihedralShown`), which emits `Scene3.constructions` (dashed legs, the foot, an
+edge extension, the foot's letter), pushes the two seam knees (and a third at 90°) into the knee lane and
+the stated arc into the arc lane — and the other lanes CEDE a constructed pair (`rightAngles3`'s
+`constructed` argument, the two dihedral arc lanes' `pairKey` check), so the angle is marked once. Not
+panel-gated. The foot's letter is a render-time DISPLAY LABEL from `engine/freeLetter.ts` (the builder's one
+free-letter pool, shared with `midpoint-auto`), never a fact.
+
 **Row direction ([ADR-3D-228](06b-decisions-3d.md#adr-3d-228)).** A display row's base direction is a
 CONTENT decision and comes from `textDir3` — the shared seam 2-D's box and the shared `InputArea`
 preview already use — never from `dir="auto"`, which keys off the first strong character and so gives an

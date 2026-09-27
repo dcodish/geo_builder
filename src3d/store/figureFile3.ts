@@ -15,6 +15,7 @@ import { stripFormatControls } from '../../shell/bidi';
 import { figureTooLarge } from '../../shell/save';
 import { displayModeFromIndexed, displayModeToIndexed, type DisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import type { Command3 } from '../engine/types';
+import { dihedralShownFromIndexed, dihedralShownToIndexed, type DihedralShownMap } from './dihedralChips';
 import type { Fact3 } from './store3';
 
 /** Bumped to 2 by #509: `symExprs` changed shape (one symbol → an affine term list). A v1 file is
@@ -38,6 +39,8 @@ export interface FigureFile3 {
   /** #937 — the parameter DISPLAY choice. Keyed by the fact's INDEX, not its id: a load re-parses
    *  the utterances into fresh ids, so position is the only handle that survives the file. */
   displayMode?: Record<string, DisplayMode>;
+  /** #1476 (ADR-3D-265) — the rows whose «הצג בניה» chip is ON, by fact INDEX (the #937 reason). */
+  dihedralConstruction?: number[];
 }
 
 /** #318 + #395 (ADR-3D-108): a named plane's patch display — 'full' (default: the growing
@@ -144,8 +147,10 @@ export function serializeFigure3(
   /** #937 (ADR-W-047): the parameter DISPLAY choice, keyed by the valuing fact's id. Written only
    *  when non-empty, so an untouched figure's file is byte-identical to before. */
   displayMode: DisplayModeMap = {},
+  /** #1476 (ADR-3D-265): the dihedral-construction chips that are on. Written only when non-empty. */
+  dihedralShown: DihedralShownMap = {},
 ): string {
-  return JSON.stringify(figureFile3Of(facts, seed, name, queries, planeDisplay, displayMode, new Date()), null, 2);
+  return JSON.stringify(figureFile3Of(facts, seed, name, queries, planeDisplay, displayMode, new Date(), dihedralShown), null, 2);
 }
 
 /** The envelope both writers share. `savedAt` is a Date for the file and absent for a link — see
@@ -158,6 +163,7 @@ function figureFile3Of(
   planeDisplay: PlaneDisplayMode3Map,
   displayMode: DisplayModeMap,
   savedAt: Date | null,
+  dihedralShown: DihedralShownMap = {},
 ): FigureFile3 {
   return {
     schemaVersion: SCHEMA_VERSION_3D,
@@ -171,6 +177,10 @@ function figureFile3Of(
     ...(() => {
       const indexed = displayModeToIndexed(displayMode, facts.map((f) => f.id));
       return Object.keys(indexed).length ? { displayMode: indexed } : {};
+    })(),
+    ...(() => {
+      const on = dihedralShownToIndexed(dihedralShown, facts.map((f) => f.id));
+      return on.length ? { dihedralConstruction: on } : {};
     })(),
   };
 }
@@ -193,8 +203,9 @@ export function serializeFigure3ForLink(
   queries: string[] = [],
   planeDisplay: PlaneDisplayMode3Map = {},
   displayMode: DisplayModeMap = {},
+  dihedralShown: DihedralShownMap = {},
 ): string {
-  return JSON.stringify(figureFile3Of(facts, seed, name, queries, planeDisplay, displayMode, null));
+  return JSON.stringify(figureFile3Of(facts, seed, name, queries, planeDisplay, displayMode, null, dihedralShown));
 }
 
 export type LoadResult3 =
@@ -205,6 +216,8 @@ export type LoadResult3 =
       queries: string[];
       planeDisplay: PlaneDisplayMode3Map;
       displayMode: DisplayModeMap;
+      /** #1476 (ADR-3D-265): the rows whose dihedral-construction chip is on. */
+      dihedralShown: DihedralShownMap;
       /** The name the envelope carried. PROVENANCE for a file (the FILENAME wins, issue #42) — but a
        *  RESTORED session (#1238) has no filename, so it is the only name it can take. */
       name?: string;
@@ -281,6 +294,7 @@ export function deserializeFigure3(text: string): LoadResult3 {
     queries,
     planeDisplay,
     displayMode: displayModeFromIndexed(file.displayMode, facts.map((f) => f.id)),
+    dihedralShown: dihedralShownFromIndexed(file.dihedralConstruction, facts.map((f) => f.id)),
     ...(typeof file.name === "string" ? { name: file.name } : {}),
   };
 }

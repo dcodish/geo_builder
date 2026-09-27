@@ -160,7 +160,14 @@ function wedgeKey(m: RightAngle3, scale: number): string {
  * `scale` is the figure's radius — tolerances are relative to it so the result is
  * independent of how large the drawing happens to be.
  */
-export function rightAngles3(c: Construction3, resolved: Resolved3, scale: number): RightAngle3[] {
+export function rightAngles3(
+  c: Construction3,
+  resolved: Resolved3,
+  scale: number,
+  /** #1476 (ADR-3D-265): operand pairs whose dihedral CONSTRUCTION is on — it marks their right angle
+   *  at its own foot, so the seam-midpoint knee here would be a second mark for the same angle. */
+  constructed: readonly { a: Operand3; b: Operand3 }[] = [],
+): RightAngle3[] {
   const pos = resolved.positions;
   const s = Math.max(scale, 1e-6);
   const segPairs: SegPair[] = [];
@@ -319,7 +326,10 @@ export function rightAngles3(c: Construction3, resolved: Resolved3, scale: numbe
   }
   if (operandPairs.length) {
     const center = pos.size ? centroid3([...pos.values()]) : v3(0, 0, 0);
+    const pairKey = (a: Operand3, b: Operand3) => [JSON.stringify(a), JSON.stringify(b)].sort().join('~');
+    const ceded = new Set(constructed.map((d) => pairKey(d.a, d.b)));
     for (const pr of operandPairs) {
+      if (ceded.has(pairKey(pr.a, pr.b))) continue;
       const m = operandPairKnee(pr.a, pr.b, c, resolved, center, s);
       if (m) out.push(m);
     }

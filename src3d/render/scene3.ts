@@ -19,7 +19,9 @@ import type { Construction3, Id, Operand3, Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
 import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
-import { dihedralGeometry } from './dihedral';
+import { dihedralConstruction, dihedralGeometry, solidBaseRings } from './dihedral';
+import { firstFreeLetter } from '../engine/freeLetter';
+import type { DihedralPair3 } from '../store/dihedralChips';
 import { isRightAngleValue, meetingPoint, rightAngles3 } from './rightAngles';
 import { collectWedges } from './wedges';
 import { statedLengths } from '../engine/dataView';
@@ -166,6 +168,21 @@ export interface SceneMeasure3 {
   text: string;
 }
 
+/**
+ * #1476 (ADR-3D-265): the construction that MEASURES a stated angle between planes, drawn while its
+ * row's «הצג בניה» chip is on — the two legs ⟂ the seam (dashed), an extension of the seam when the foot
+ * lies beyond the drawn edge, and the meeting point with its free letter. The knees and the arc between
+ * the legs ride the ordinary `marks` / `angles` lanes.
+ */
+export interface SceneDihedral3 {
+  segs: { x1: number; y1: number; x2: number; y2: number }[];
+  foot: { x: number; y: number };
+  /** The meeting point's display letter; null when a named point already sits there. */
+  label: string | null;
+  labelX: number;
+  labelY: number;
+}
+
 export interface Scene3 {
   points: ScenePoint3[];
   edges: SceneEdge3[];
@@ -182,6 +199,8 @@ export interface Scene3 {
   measures: SceneMeasure3[];
   /** #483 — determined-but-unnamed line∩plane crossings the student can click to name. */
   crossings: SceneCrossing3[];
+  /** #1476 — the dihedral constructions whose chip is on. */
+  constructions: SceneDihedral3[];
 }
 
 export interface Viewport {
@@ -406,6 +425,9 @@ export function buildScene3(
   /** #937 (ADR-W-047): which form a VALUED parameter shows — the student's choice, made on the fact
    *  row that valued it. Absent ⇒ the value, which is this builder's behaviour before #937. */
   symbolDisplay?: (sym: string) => 'letter' | 'value',
+  /** #1476 (ADR-3D-265): the plane × plane angles whose «הצג בניה» chip is on — each drawn as its
+   *  construction (foot on the seam, two legs ⟂ it), whatever the data panel's state (ruling 2). */
+  dihedralShown: readonly DihedralPair3[] = [],
 ): Scene3 {
   const positions = resolved.positions;
   const frame = cameraFrame(cam);
@@ -472,6 +494,9 @@ export function buildScene3(
     }
   }
   const h = radius * 0.8;
+  /** #1476: an unordered operand pair's identity — a constructed pair's arc/knee is the construction's. */
+  const pairKey = (a: Operand3, b: Operand3) => [JSON.stringify(a), JSON.stringify(b)].sort().join('~');
+  const constructed = new Set(dihedralShown.map((d) => pairKey(d.a, d.b)));
   const patchFrame = new Map<string, { center: Vec3; e1: Vec3; e2: Vec3 }>();
   for (const { n1, n2, line, focus } of pairLines) {
     for (const name of [n1, n2]) {
@@ -621,6 +646,8 @@ export function buildScene3(
       : [],
   );
   for (const g of statedDihedrals) {
+    // #1476: a pair whose construction is on draws its arc AT the construction's foot, below — once
+    if (constructed.has(pairKey({ kind: 'plane-named', name: g.p1 }, { kind: 'plane-named', name: g.p2 }))) continue;
     // #1475 (ADR-3D-264): a RIGHT dihedral is drawn as a knee (rightAngles3), never an arc labelled
     // «90°» — the #307 rule, which the vertex lane below already obeys
     if (isRightAngleValue(g.deg)) continue;
@@ -775,6 +802,7 @@ export function buildScene3(
       // #1475 (ADR-3D-264): a stated RIGHT angle between objects is the knee's (rightAngles3, drawn
       // whether or not this panel is open) — never an arc labelled «90°» (#307)
       if (pr.deg !== undefined && isRightAngleValue(pr.deg)) continue;
+      if (constructed.has(pairKey(pr.a, pr.b))) continue; // #1476: the construction draws this one
       const key =[JSON.stringify(pr.a), JSON.stringify(pr.b)].sort().join('~') + '~' + pr.text;
       if (seenArc.has(key)) continue;
       seenArc.add(key);
@@ -794,6 +822,80 @@ export function buildScene3(
       const probe = objectAngleArc(ga, gb, { ...opts, r: h * 0.38 });
       // Sides that are OBJECTS have no arm, so no clamp — the pixel size governs alone.
       if (probe) wAngles.push({ v: probe.v, mk: (r) => objectAngleArc(ga, gb, { ...opts, r }), clamp: null, text: pr.text });
+    }
+  }
+
+  /**
+   * #1476 (ADR-3D-265) — THE DIHEDRAL CONSTRUCTION, for every pair whose chip is on.
+   *
+   * Geometry is `dihedralConstruction` (./dihedral — the one dihedral geometry, extended with the
+   * meaningful-point foot). Drawn only where the stated angle HOLDS on this figure (the #1439 predicate):
+   * a construction is a picture of a true measurement, so it cannot be drawn for one that is false. The
+   * arc between the legs is the stated value (or letter, or a knee at 90°), through the same pixel-sized
+   * lane as every other arc; the two knees against the seam ride the knee lane.
+   */
+  const wConstr: { foot: Vec3; p: Vec3 | null; armP: Vec3; armQ: Vec3; legLen: number | null; ext: [Vec3, Vec3] | null; label: string | null }[] = [];
+  const wConstrKnees: { vertex: Vec3; u1: Vec3; u2: Vec3 }[] = [];
+  if (dihedralShown.length) {
+    const atC = (id: Id) => positions.get(id) ?? null;
+    const absC = { lines: resolved.lines, planes: resolved.planes };
+    const baseRings = solidBaseRings(c.solids);
+    const seenC = new Set<string>();
+    const lettersUsed = new Set<string>();
+    for (const pr of dihedralShown) {
+      const key = pairKey(pr.a, pr.b);
+      if (seenC.has(key)) continue;
+      seenC.add(key);
+      const ga = resolveOperand(pr.a, c, absC)(atC);
+      const gb = resolveOperand(pr.b, c, absC)(atC);
+      if (!ga || !gb) continue;
+      const right = pr.rel === 'perp' || (pr.deg !== undefined && isRightAngleValue(pr.deg));
+      if (right || pr.deg !== undefined) {
+        const dev = relDeviation(right ? 'perp' : 'angle', right ? undefined : pr.deg, ga, gb);
+        if (dev === null || dev > DIRECTION_REL_TOL) continue;
+      }
+      const dc = dihedralConstruction(pr.a, pr.b, ga, gb, { at: atC, points: positions, center, baseRings });
+      if (!dc) continue;
+      let armQ = dc.armQ;
+      // the drawn wedge must be the STATED one: between it and its supplement (the arc lanes' rule)
+      if (pr.deg !== undefined && !right) {
+        const drawn = (Math.acos(Math.max(-1, Math.min(1, dot3(dc.armP, armQ)))) * 180) / Math.PI;
+        if (Math.abs(drawn - pr.deg) > Math.abs(180 - drawn - pr.deg)) armQ = scale3(armQ, -1);
+      }
+      // the seam arm of the two knees points along the drawn edge, so they sit ON it
+      let seamArm = dc.seamDir;
+      if (dc.edge) {
+        const mid = lerp3(dc.edge[0], dc.edge[1], 0.5);
+        if (dot3(sub3(mid, dc.foot), seamArm) < 0) seamArm = scale3(seamArm, -1);
+      }
+      wConstrKnees.push({ vertex: dc.foot, u1: dc.armP, u2: seamArm }, { vertex: dc.foot, u1: armQ, u2: seamArm });
+      const armLen = dc.legLen;
+      if (right) wConstrKnees.push({ vertex: dc.foot, u1: dc.armP, u2: armQ });
+      else {
+        const foot = dc.foot;
+        const armP = dc.armP;
+        wAngles.push({
+          v: foot,
+          mk: (r) => wedgeArc(foot, armP, armQ, r),
+          clamp: armLen !== null ? { arm: armLen, u1: armP, u2: armQ } : null,
+          text: degText(pr.deg, pr.label),
+        });
+      }
+      // a foot beyond the drawn shared edge: extend the edge to it, so the leg meets something drawn
+      let ext: [Vec3, Vec3] | null = null;
+      if (dc.edge) {
+        const [e0, e1] = dc.edge;
+        const t = dot3(sub3(dc.foot, e0), normalize3(sub3(e1, e0)));
+        if (t < -1e-9) ext = [e0, dc.foot];
+        else if (t > dist3(e0, e1) + 1e-9) ext = [e1, dc.foot];
+      }
+      // Ruling 3: the meeting point is NAMED — the first letter free in the figure (the builder's own
+      // convention, engine/freeLetter), unless a named point already sits there. A DISPLAY label: it
+      // never becomes a fact, so a letter the student types later simply takes it and this re-chooses.
+      const atPoint = [...positions.values()].some((q) => dist3(q, dc.foot) <= 1e-6 * Math.max(1, radius));
+      const label = atPoint ? null : firstFreeLetter((l) => c.points.has(l) || lettersUsed.has(l));
+      if (label) lettersUsed.add(label);
+      wConstr.push({ foot: dc.foot, p: dc.point?.at ?? null, armP: dc.armP, armQ, legLen: armLen, ext, label });
     }
   }
 
@@ -944,7 +1046,9 @@ export function buildScene3(
   // from the shared collector; the legs are built in WORLD space along the two arm directions and
   // projected below, so the knee lies in the plane of the arms and foreshortens with the orbit.
   // Their SIZE, however, is a screen quantity — see below, after the fit.
-  const wedges = rightAngles3(c, resolved, radius);
+  // #1476: a pair whose construction is on marks its right angle AT the construction's foot (below)
+  const wedges = rightAngles3(c, resolved, radius, dihedralShown);
+  wedges.push(...wConstrKnees);
   // #397: the witness meets its plane/line at a genuine right angle — mark it with the same
   // knee pipeline (screen-sized, foreshortening-preserving, in-plane arm legibility-rotated).
   for (const wt of wWitnesses) {
@@ -969,10 +1073,12 @@ export function buildScene3(
     ...wAngles.map((a) => a.v),
     ...wCurves.flatMap((cu) => cu.pts),
     ...wWitnesses.flatMap((wt) => [wt.a, wt.b]), // #397: the witness stays in frame
+    // #1476: the construction's foot and legs stay in frame (a fallback leg is sized after the fit)
+    ...wConstr.flatMap((w) => [w.foot, ...(w.legLen !== null ? [add3(w.foot, scale3(w.armQ, w.legLen))] : [])]),
   ].map(projOf);
   const all = [...proj.values(), ...extras];
   if (all.length === 0) {
-    return { points: [], edges: [], vectors: [], axes: [], planes: [], lines: [], marks: [], seams: [], angles: [], curves: [], witnesses: [], measures: [], crossings: [] };
+    return { points: [], edges: [], vectors: [], axes: [], planes: [], lines: [], marks: [], seams: [], angles: [], curves: [], witnesses: [], measures: [], crossings: [], constructions: [] };
   }
 
   const xs = all.map((p) => p.x);
@@ -1269,5 +1375,35 @@ export function buildScene3(
     return { line: k.line, plane: k.plane, x: s.x, y: s.y };
   });
 
-  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves, witnesses, measures, crossings };
+  /**
+   * #1476 — the constructions, in pixels. A fallback leg (no meaningful point — equation planes) has no
+   * world length of its own, so it is an ANNOTATION sized on screen (`LEG_PX`, the #374/#935 rule).
+   */
+  const LEG_PX = 64;
+  const constructions: SceneDihedral3[] = wConstr.map((w) => {
+    const len = w.legLen ?? LEG_PX / k;
+    const endP = w.p ?? add3(w.foot, scale3(w.armP, len));
+    const endQ = add3(w.foot, scale3(w.armQ, len));
+    const f = w2s(w.foot);
+    const seg = (x: Vec3, y: Vec3) => {
+      const a = w2s(x);
+      const b = w2s(y);
+      return { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
+    };
+    const segs = [seg(endP, w.foot), seg(w.foot, endQ), ...(w.ext ? [seg(w.ext[0], w.ext[1])] : [])];
+    // the letter goes OPPOSITE the two legs, so it never sits inside the wedge it names
+    const dp = w2s(endP);
+    const dq = w2s(endQ);
+    const unit = (x: number, y: number) => {
+      const L = Math.hypot(x, y);
+      return L > 1e-9 ? { x: x / L, y: y / L } : { x: 0, y: 0 };
+    };
+    const u = unit(dp.x - f.x, dp.y - f.y);
+    const v = unit(dq.x - f.x, dq.y - f.y);
+    let away = unit(-(u.x + v.x), -(u.y + v.y));
+    if (away.x === 0 && away.y === 0) away = { x: 0, y: 1 };
+    return { segs, foot: f, label: w.label, labelX: f.x + away.x * LABEL_OFFSET, labelY: f.y + away.y * LABEL_OFFSET };
+  });
+
+  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves, witnesses, measures, crossings, constructions };
 }

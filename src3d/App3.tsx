@@ -58,6 +58,7 @@ import { auditLoad3 } from './store/loadAudit3';
 import { useStore } from 'zustand';
 import { derive3, redo3, undo3, useGeo3, type Fact3, type FactStatus3, type StoreError3 } from './store/store3';
 import { planeChipsByFact } from './store/planeChips';
+import { dihedralChipsByFact, shownDihedrals } from './store/dihedralChips';
 import { paramChipsByFact } from './store/paramChips';
 import { collectWedges, competingArcSymbols } from './render/wedges';
 import { displayModeOf } from '../shell/displayMode';
@@ -296,6 +297,8 @@ export default function App3() {
   const togglePlaneDisplay = useGeo3((s) => s.togglePlaneDisplay);
   const displayMode = useGeo3((s) => s.displayMode);
   const toggleDisplayMode = useGeo3((s) => s.toggleDisplayMode);
+  const dihedralShown = useGeo3((s) => s.dihedralShown);
+  const toggleDihedralShown = useGeo3((s) => s.toggleDihedralShown);
   const reportLoadError = useGeo3((s) => s.reportLoadError);
 
   const submitSteps = useGeo3((s) => s.submitSteps);
@@ -326,6 +329,13 @@ export default function App3() {
     () => planeChipsByFact(facts, (id) => derived.status[id] === 'ok'),
     [facts, derived.status],
   );
+  // #1476 (ADR-3D-265): the «הצג בניה» chip — on the row that STATES an angle between two planes, and
+  // only while that row is `ok` (a refuted angle does not hold, so there is nothing true to construct).
+  const dihedralChips = useMemo(
+    () => dihedralChipsByFact(facts, (id) => derived.status[id] === 'ok'),
+    [facts, derived.status],
+  );
+  const dihedralPairs = useMemo(() => shownDihedrals(dihedralChips, dihedralShown), [dihedralChips, dihedralShown]);
 
   /**
    * #937 (ADR-3D-233 / ADR-W-047) — the parameter DISPLAY chips.
@@ -439,7 +449,7 @@ export default function App3() {
       name = (window.prompt(t('actions.saveNamePrompt')) ?? '').trim();
       if (name) setFigureName(name);
     }
-    const blob = new Blob([serializeFigure3(facts, seed, name || undefined, queries, planeDisplay, displayMode)], { type: 'application/json' });
+    const blob = new Blob([serializeFigure3(facts, seed, name || undefined, queries, planeDisplay, displayMode, dihedralShown)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -456,7 +466,7 @@ export default function App3() {
     if (!f) return;
     const r = deserializeFigure3(await f.text());
     if (r.ok) {
-      loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode);
+      loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode, r.dihedralShown);
       setFigureName(figureNameFromFileName3(f.name)); // the FILENAME names the figure (issue #42)
       noteLoadOutcome(r.facts, r.seed);
     } else reportLoadError(r.reason);
@@ -1051,8 +1061,21 @@ export default function App3() {
                   <FactRowText3 f={f} vecNames={new Set(derived.construction.vectors.keys())} />
                 </span>
               ),
-              trail: (planeChips.get(f.id) ?? []).length > 0 ? (
+              trail: (planeChips.get(f.id) ?? []).length > 0 || dihedralChips.has(f.id) ? (
                 <>
+                  {/* #1476 (ADR-3D-265): show / hide the construction that measures this row's angle */}
+                  {dihedralChips.has(f.id) && (
+                    <button
+                      type="button"
+                      data-testid="dihedral-chip"
+                      aria-pressed={!!dihedralShown[f.id]}
+                      title={t('facts.dihedralTitle')}
+                      onClick={() => toggleDihedralShown(f.id)}
+                      className={`shrink-0 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[11px] leading-4 hover:border-blue-400 hover:text-blue-700 ${dihedralShown[f.id] ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                    >
+                      {dihedralShown[f.id] ? t('facts.dihedralHide') : t('facts.dihedralShow')}
+                    </button>
+                  )}
                   {/* #842 (ADR-3D-192): the chip goes on the row that MATERIALISED the plane, not on
                       every row that mentions it. Provenance is derived from the fact list (the #769
                       pattern), so a relation stated about a plane the student already drew no longer
@@ -1107,6 +1130,7 @@ export default function App3() {
               showWitnesses={showWitness}
               showObjectAngles={showData}
               symbolDisplay={symbolDisplay}
+              dihedralShown={dihedralPairs}
               coordLabels={showData && dataPanel ? dataPanel.pointCoords : undefined}
               width={canvasSize.w}
               height={canvasSize.h}

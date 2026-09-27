@@ -343,6 +343,20 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   2026-09-27). Drawn only where the right angle holds on the drawn figure, so a refused statement leaves
   no knee. *(Realised — [ADR-3D-264](06b-decisions-3d.md#adr-3d-264), #1475;
   `issue-1475-plane-knee.test.ts`.)*
+- **FR-RD-11 (Should)** — **«הצג בניה»: the construction that measures an angle between planes.** Every
+  fact row that states an angle between two planes (a value, a letter, or «ניצב») carries a chip, **off by
+  default**. When on, the canvas draws the plane angle that measures the dihedral: a meeting point on the
+  planes' common line, and from it a perpendicular to that line in each plane, with the stated angle
+  marked between them (a knee at 90°) and a knee against the common line on each leg. The first leg comes
+  from a **meaningful point** — a vertex of a triangle/face plane not on the common line (the one whose
+  foot falls inside the shared edge; on a tie, the face over the base — the apex S of «הפאה SBC»), else a
+  named point lying on a plane; with neither (equation planes) a default point and legs of a fixed on-screen
+  length. The meeting point is **named with the first free letter** (not any point's letter; re-chosen when
+  the student later uses it; gone with the chip) — a display name, never a fact. Drawn even while «ארגון
+  נתונים» is closed; only while the angle holds, so a refused angle offers no chip. Undoable, saved with
+  the figure, carried by a share link, and removed with its row (operator rulings 2026-09-27).
+  *(Realised — [ADR-3D-265](06b-decisions-3d.md#adr-3d-265), #1476;
+  `issue-1476-dihedral-construction.test.ts`.)*
 
 ## Coverage
 
