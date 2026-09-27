@@ -20,7 +20,7 @@ import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
 import { apart } from './crossings';
-import { dirVector, freeRank, residual, resolveChoices, solveLM, solveMultiStart, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
+import { dirVector, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
 import { drawnPieceOver } from './extent';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { curveByName, inDomain, isFree, objectById, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type Selector } from './types';
@@ -577,26 +577,49 @@ function figureDofOf(c: Construction, sys: CarrierSystem, x: number[]): number {
  * sentence that happens to carry one. `derive` blamed every selector line when any failed, which named
  * «משולש ABC» (its vertices' `distinct`) beside the crossing sentence that was actually impossible.
  */
-function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[] {
-  /**
-   * The scale the DISTINCT test is measured against (#1077).
-   *
-   * Relative, because an absolute epsilon would be a magnitude this product never stated
-   * (ADR-052) and would mean something different on a figure spanning 3 units and one spanning
-   * 300.
-   *
-   * A HUNDREDTH of the span, measured rather than guessed: a thousandth was tried first and let
-   * through a parallelogram whose `A` and `B` were 0.009 apart on a figure spanning 5 — about one
-   * pixel, which is a collapsed figure to the student even though the numbers differ. The threshold
-   * is about what a reader can SEE, so it is set where seeing stops.
-   */
+/**
+ * The scale the DISTINCT test is measured against (#1077).
+ *
+ * Relative, because an absolute epsilon would be a magnitude this product never stated
+ * (ADR-052) and would mean something different on a figure spanning 3 units and one spanning
+ * 300.
+ *
+ * A HUNDREDTH of the span, measured rather than guessed: a thousandth was tried first and let
+ * through a parallelogram whose `A` and `B` were 0.009 apart on a figure spanning 5 — about one
+ * pixel, which is a collapsed figure to the student even though the numbers differ. The threshold
+ * is about what a reader can SEE, so it is set where seeing stops.
+ *
+ * One function for the judge and for the solve's separation restart (#1463), so the solve moves a
+ * point exactly when the judge would have rejected it.
+ */
+function apartOf(at: Map<Id, Pt>): number {
   const xs = [...at.values()];
   const span = xs.length < 2 ? 1 : Math.max(
     1e-9,
     Math.max(...xs.map((p) => p.x)) - Math.min(...xs.map((p) => p.x)),
     Math.max(...xs.map((p) => p.y)) - Math.min(...xs.map((p) => p.y)),
   );
-  const apart = span * 1e-2;
+  return span * 1e-2;
+}
+
+/**
+ * The points a crossing is a SIBLING of (#1113) — every other point whose incidence signature matches.
+ * Shared by the judge and the separation restart (#1463).
+ */
+function crossingSiblings(c: Construction, id: Id, at: Map<Id, Pt>): Id[] {
+  const sig = (q: Id) =>
+    JSON.stringify(
+      c.constraints
+        .filter((k) => 'id' in k && (k as { id?: Id }).id === q)
+        .map((k) => JSON.stringify({ ...k, id: '' }))
+        .sort(),
+    );
+  const mine = sig(id);
+  return [...at.keys()].filter((other) => other !== id && sig(other) === mine);
+}
+
+function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[] {
+  const apart = apartOf(at);
 
   const holds = (s: Selector): boolean => {
     /**
@@ -642,17 +665,7 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
      * that made the ring dedupe re-offer a taken crossing.
      */
     if (s.kind === 'crossing-distinct') {
-      const sig = (id: Id) =>
-        JSON.stringify(
-          c.constraints
-            .filter((k) => 'id' in k && (k as { id?: Id }).id === id)
-            .map((k) => JSON.stringify({ ...k, id: '' }))
-            .sort(),
-        );
-      const mine = sig(s.id);
-      for (const other of at.keys()) {
-        if (other === s.id) continue;
-        if (sig(other) !== mine) continue;
+      for (const other of crossingSiblings(c, s.id, at)) {
         const q = at.get(other)!;
         if (Math.hypot(p.x - q.x, p.y - q.y) < apart) return false;
       }
@@ -689,6 +702,111 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
     return t >= -1e-9 && t <= 1 + 1e-9;
   };
   return c.selectors.filter((s) => !holds(s));
+}
+
+/**
+ * THE PAIRS THAT HAVE COLLAPSED, and which member of each may move (#1463).
+ *
+ * `distinct` (#1077) and `crossing-distinct` (#1113) judge a configuration where two points that must
+ * differ sit together. Both describe the same geometry: two points carrying the SAME incidences — the
+ * kite's B and D (on the diagonal's line, 6 from A), two crossings of one pair — so the equations have
+ * two roots and nothing in them says the points take different ones. A least-squares descent that starts
+ * them on the same side sends both to the nearer root, and the collapsed pair is an exact solution of
+ * every stated constraint. The LATER-named point is the mover when both are free, so the student's first
+ * point keeps its root. Judged with `apartOf`, so a pair is collapsed exactly when `failingSelectors`
+ * would reject it.
+ */
+function collapsedPairs(c: Construction, at: Map<Id, Pt>, free: ReadonlySet<Id>): Array<{ mover: Id; partner: Id }> {
+  const apart = apartOf(at);
+  const pairs: Array<[Id, Id]> = [];
+  for (const s of c.selectors) {
+    if (s.kind === 'distinct') {
+      for (let i = 0; i < s.ids.length; i += 1) {
+        for (let j = i + 1; j < s.ids.length; j += 1) pairs.push([s.ids[i], s.ids[j]]);
+      }
+    } else if (s.kind === 'crossing-distinct') {
+      for (const other of crossingSiblings(c, s.id, at)) pairs.push([other, s.id]);
+    }
+  }
+  const out: Array<{ mover: Id; partner: Id }> = [];
+  const moving = new Set<Id>();
+  for (const [a, b] of pairs) {
+    const pa = at.get(a);
+    const pb = at.get(b);
+    if (!pa || !pb || Math.hypot(pa.x - pb.x, pa.y - pb.y) >= apart) continue;
+    const mover = free.has(b) && !moving.has(b) ? b : free.has(a) && !moving.has(a) ? a : null;
+    if (mover === null) continue;
+    moving.add(mover);
+    out.push({ mover, partner: mover === b ? a : b });
+  }
+  return out;
+}
+
+/**
+ * DEFLATION — the other root, found without knowing where it is (#1463).
+ *
+ * Where the partner's other root lies cannot be read off the figure: measured, a restart mirrored through
+ * the rest of the figure separated the kite at some seeds and never separated two crossings of `y = 2x`
+ * with a circle, and pushes of one figure span fell back into the taken root (the chord is longer than
+ * the figure the solver sees). So the restart does not guess a position; it changes the EQUATIONS. The
+ * residuals are multiplied by `1 + (s / d)²` for each collapsed pair, `d` the distance between its two
+ * points and `s` the figure's span: far from the collapse the factor is 1 and every root of the stated
+ * constraints is still a root, while at the collapse it grows faster than the residuals vanish, so the
+ * collapsed configuration stops being a solution and the descent is carried to one where the pair differs.
+ * That is the classical deflation of a known root, applied to the one thing the selector says —
+ * these two points are different — and it states no magnitude (`s` is the figure's own scale).
+ *
+ * The deflated solve is a START, never a result: its values are polished against the real residuals by
+ * the caller, and the selectors judge that. Four starts, the mover nudged a twentieth of the span along
+ * each axis, because at exactly `d = 0` the factor has no direction.
+ */
+const DEFLATION_NUDGE = 0.05;
+function deflatedStarts(
+  system: CarrierSystem,
+  x: number[],
+  pairs: ReadonlyArray<{ mover: Id; partner: Id }>,
+  maxIter: number,
+): number[][] {
+  if (pairs.length === 0) return [];
+  const pos = system.positionsAt(x);
+  const s = apartOf(pos) * 1e2;
+  const deflated = (v: number[]): number[] => {
+    const r = system.residualsAt(v);
+    const p = system.positionsAt(v);
+    let m = 1;
+    for (const { mover, partner } of pairs) {
+      const a = p.get(mover);
+      const b = p.get(partner);
+      if (!a || !b) continue;
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      m *= 1 + (s * s) / Math.max(d * d, 1e-24);
+    }
+    return r.map((q) => q * m);
+  };
+  const out: number[][] = [];
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const m = system.asMap(x);
+    for (const { mover } of pairs) {
+      const p = m.get(mover);
+      if (p) m.set(mover, { x: p.x + DEFLATION_NUDGE * s * dx, y: p.y + DEFLATION_NUDGE * s * dy });
+    }
+    // Only the MOVERS are taken from the deflated solve. Deflation scales every residual, so the rest of
+    // the figure can wander in it (measured: the kite's C went to x = −3630, and the radius went negative
+    // — a vacant circle whose incidences cannot be judged). The mover's new root is what was sought; the
+    // rest restarts from the collapsed solution, which already satisfies everything else.
+    const deflatedValues = solveLM(system.toVec(m, system.envAt(x)), deflated, maxIter).values;
+    const moved = system.asMap(deflatedValues);
+    const start = system.asMap(x);
+    for (const { mover } of pairs) {
+      const p = moved.get(mover);
+      if (p) start.set(mover, p);
+    }
+    out.push(system.toVec(start, system.envAt(x)));
+    // …and the whole deflated solution after it: where the rest of the figure had to move WITH the mover
+    // (the plain kite, whose C follows B and D), the transplant alone starts it from a stale place.
+    out.push(deflatedValues);
+  }
+  return out;
 }
 
 /** The free vertices, in a stable order — the solver's unknown vector is two entries each. */
@@ -922,6 +1040,27 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
   const stageOne = carrierSystem(c, env, { params: 'fixed' });
   let converged = false;
 
+  /**
+   * THE SELECTORS STEER WHICH CONVERGED START IS TAKEN (#1463) — the #1071 / #1268 lesson for the
+   * judges that are not about one point's region.
+   *
+   * A selector used to meet the solve only afterwards: the first start that converged was THE figure,
+   * and a configuration the selectors rejected was repaired, if at all, by `drawableAt` walking to
+   * another seed. Measured on the operator's kite: B and D collapsed at 44 of 64 raw seeds, and with a
+   * circle through A, B, D added the forward walk reached ONE configuration in the whole 24-seed window
+   * — «הציגו תצורה אחרת» had nothing to show, and the one it kept was the exercise's excluded branch.
+   *
+   * Now a converged solution the selectors reject is a fallback, not the answer: the search restarts
+   * from the other root (`deflatedStarts` — the collapse deflated out of the equations) and then from its remaining starts, and takes the first
+   * solution the selectors accept. Nothing is refused that was drawn before — with no preferred
+   * solution found, the fallback is today's figure and the post-hoc judge still has the last word.
+   */
+  const ownFree = new Set(ids);
+  const selectorsHoldAt = (system: CarrierSystem, x: number[]): boolean =>
+    c.selectors.length === 0 || failingSelectors(c, system.positionsAt(x), system.envAt(x)).length === 0;
+  const separatedFrom = (system: CarrierSystem, x: number[]): number[][] =>
+    deflatedStarts(system, x, collapsedPairs(c, system.positionsAt(x), ownFree), 120);
+
   if ((ids.length > 0 || sys.syms.length > 0) && c.constraints.length > 0) {
     // Through `carrierSystem` (#1137) so the locus tracer walks the SAME residuals this solves.
     const solved = sys;
@@ -969,6 +1108,7 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
     // STAGE ONE — the vertices, parameters fixed at their sample. With no parameters the two vectors
     // are the same vector, and stage one IS the solve.
     let firstEffort: Map<Id, Pt> | null = null;
+    let stageOneFallback: SolveResult | null = null;
     if (ids.length > 0) {
       // With parameters in the figure, stage one is a QUESTION — can the vertices alone do it? — and
       // a question with a bounded budget: a vertex-only solve that converges does so in a few dozen
@@ -979,9 +1119,24 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
       // A figure with no parameters keeps the multi-start as it always was.
       const budget = solved.syms.length > 0 ? 40 : 120;
       const vertexStarts = solved.syms.length > 0 ? [starts[0]] : starts;
-      const first = solveMultiStart(vertexStarts.map((m) => stageOne.toVec(m)), stageOne.residualsAt, budget);
+      const first = solvePreferring(
+        vertexStarts.map((m) => stageOne.toVec(m)),
+        stageOne.residualsAt,
+        budget,
+        () => true,
+        (x) => selectorsHoldAt(stageOne, x),
+        // With parameters, stage one is only a question (see below) and stage two — where a parameter can
+        // move to fit the other root — does the deflation; paying for it twice cost the page 10× (#1463).
+        (x) => (solved.syms.length > 0 ? [] : separatedFrom(stageOne, x)),
+      );
       firstEffort = stageOne.asMap(first.values);
-      if (first.ok || solved.syms.length === 0) {
+      // A converged stage one the selectors reject is not the answer while a parameter could still move
+      // (#1463): at the seed's radius only the COLLAPSED kite fits the circle, and the configuration the
+      // selectors accept needs the radius to change. Stage two is tried with the parameters free, and this
+      // solution is its fallback — so a figure no configuration rescues draws exactly what it drew.
+      const stageOneRejected = first.ok && solved.syms.length > 0 && !selectorsHoldAt(stageOne, first.values);
+      if (stageOneRejected) stageOneFallback = { ...first, values: solved.toVec(firstEffort, env) };
+      if ((first.ok && !stageOneRejected) || solved.syms.length === 0) {
         converged = true;
         free = firstEffort;
         solvedVec = solved.toVec(free, env);
@@ -1024,7 +1179,11 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
       for (let salt = 1; salt <= 3; salt += 1) {
         attempts.push(foldSignSelectors(c, { ...env, ...sampleEnv(c, seed + 1000 * salt) }));
       }
-      const state: { best: SolveResult | null; accepted: boolean } = { best: null, accepted: false };
+      const state: { best: SolveResult | null; accepted: boolean; fallback: SolveResult | null } = {
+        best: null,
+        accepted: false,
+        fallback: stageOneFallback,
+      };
       const walk = (start: Map<Id, Pt>, attempt: Env): SolveResult => {
         let x = solved.toVec(start, attempt);
         for (let i = 1; i <= c.constraints.length; i += 1) {
@@ -1035,7 +1194,22 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
       };
       const consider = (r: SolveResult): boolean => {
         if (r.ok && admissible(r.values)) {
-          state.best = r;
+          // The selector preference (#1463): a solution they reject is the fallback, and the other
+          // root is tried once from it — one solve, not another walk, so the cost of a figure whose
+          // selectors cannot hold here stays what it was.
+          let chosen: SolveResult | null = selectorsHoldAt(solved, r.values) ? r : null;
+          if (!chosen) {
+            state.fallback ??= r;
+            for (const x1 of separatedFrom(solved, r.values)) {
+              const r1 = solveLM(x1, solved.residualsAt);
+              if (r1.ok && admissible(r1.values) && selectorsHoldAt(solved, r1.values)) {
+                chosen = r1;
+                break;
+              }
+            }
+          }
+          if (!chosen) return true; // converged: stop the attempts exactly as before; the fallback stands
+          state.best = chosen;
           state.accepted = true;
           return true;
         }
@@ -1080,6 +1254,10 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
             if (found) break;
           }
         }
+      }
+      if (!state.accepted && state.fallback) {
+        state.best = state.fallback;
+        state.accepted = true;
       }
       if (!state.accepted) {
         const vecs: number[][] = [];

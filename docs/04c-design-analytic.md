@@ -171,6 +171,18 @@ contradicts its noun and its tolerance sits two orders of magnitude under the ug
 3° triangle is ugly but true. `minInteriorAngleOf` measures how open the rings are and decides
 nothing. Folding them into one number would turn a preference into a refusal and assert a given the
 student never gave.
+
+**The solve prefers what the selectors accept, one level below the sweep ([ADR-AG-159](06c-decisions-analytic.md#adr-ag-159), #1463).**
+Inside one seed, `evaluate`'s multi-start (`solvePreferring`) keeps a converged solution the selectors
+reject as a *fallback* and goes on: first from `separationMoves` — the free member of each collapsed
+`distinct` / `crossing-distinct` pair restarted at its position mirrored through the centroid of the rest
+of the figure, the other root of a pair that shares its incidences — then from the remaining starts. The
+first solution the selectors accept wins; with none, the fallback is exactly what the old first-converged
+multi-start returned, so the preference can change WHICH valid configuration a seed draws and can never
+turn a drawn figure into a refused one. Stage two (the parameter walk) takes the same preference with one
+extra solve, never another walk, so its cost on a figure whose selectors cannot hold is unchanged. This is
+2-D's `solutionAccepted`-inside-`multiStartSolve` shape; without it the sweep above was the only repair,
+and a figure whose raw solve mostly collapsed reached ONE configuration in the whole window.
 ## Where a fault is raised, and why ORDER matters there ([ADR-AG-129](06c-decisions-analytic.md#adr-ag-129))
 
 `derive` raises its faults in a fixed order, and the order is load-bearing rather than incidental: a

@@ -47,16 +47,33 @@ describe('#1083 — the gate samples DRAWABLE configurations', () => {
   });
 
   it('and the raw configurations it used to judge were ones the tool rejects', () => {
-    // The measurement that found it: three raw seeds put C in three different places, and NONE of
-    // them was a figure this tool would show.
-    const c = derive(KITE, 0).construction;
-    for (const seed of [0, 1, 2]) {
-      expect(evaluate(c, seed).selectorsOk, `seed ${seed}`).toBe(false);
+    // The measurement that found it: three raw seeds (0–2) put C in three different places, and NONE
+    // of them was a figure this tool would show.
+    //
+    // #1463 moved the raw half: the solve now PREFERS a converged configuration the selectors accept
+    // (this figure's raw seeds went from 4/24 whole to 23/24 — B and D no longer collapse), so the
+    // operator's own figure no longer exhibits it. The claim is kept on a figure whose raw solve still
+    // fails at some seeds (a circle through three kite vertices: the other half is a separate basin):
+    // wherever the raw attempt is not whole, the gate must judge what the tool DRAWS there.
+    const whole = (f: ReturnType<typeof evaluate>) => f.selectorsOk && f.unsatisfied.length === 0;
+    const own = derive(KITE, 0).construction;
+    let ownWhole = 0;
+    for (let seed = 0; seed < 24; seed += 1) if (whole(evaluate(own, seed))) ownWhole += 1;
+    expect(ownWhole, 'raw whole seeds on the operator’s figure, since #1463').toBeGreaterThanOrEqual(20);
+
+    const c = derive(
+      ['דלתון ABCD', 'AB=AD', 'CB=CD', 'A(1,7)', 'משוואת הקטע BD היא y=x', 'נקודה C נמצאת על הישר y=-2x+17', 'AB=6', 'נתון מעגל O', 'A על המעגל', 'B על המעגל', 'D על המעגל'],
+      0,
+    ).construction;
+    let exercised = 0;
+    for (let seed = 0; seed < 24; seed += 1) {
+      if (whole(evaluate(c, seed))) continue;
+      exercised += 1;
+      // While the drawable figure at that same seed is one the student can see.
+      expect(whole(drawableAt(c, seed)), `drawable ${seed}`).toBe(true);
     }
-    // While the drawable figure at those same seeds is one the student can see.
-    for (const seed of [0, 1, 2]) {
-      expect(drawableAt(c, seed).selectorsOk, `drawable ${seed}`).toBe(true);
-    }
+    // An exercised-counter, so the loop cannot pass by checking nothing.
+    expect(exercised).toBeGreaterThan(0);
   });
 
   it('a figure with no selectors is unaffected — the same figure, the same answer', () => {

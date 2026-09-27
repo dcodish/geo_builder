@@ -978,6 +978,54 @@ export function solveMultiStart(
   return best ?? { values: starts[0] ? [...starts[0]] : [], ok: residuals(starts[0] ?? []).length === 0, worst: 0 };
 }
 
+/**
+ * THE MULTI-START, WITH A PREFERENCE AMONG CONVERGED STARTS (#1463).
+ *
+ * `solveMultiStart` returns the first start that converges. That is right when every solution of the
+ * residuals is a figure the tool would draw — and wrong when a post-solve judge (a selector: `distinct`,
+ * a crossing's sibling, an ordinal) will reject some of them, because the first converged start then
+ * decides the configuration and a judge that only rejects can be left with nothing (the #1071 lesson).
+ *
+ * So a converged, `accept`ed solve that `prefer` rejects is kept as the FALLBACK and the search goes on:
+ * first from `restartFrom` (a targeted start the caller derives from the rejected solution — the other
+ * root), then from the remaining starts. The first preferred solution wins; if none is found the fallback
+ * is returned, which is exactly what `solveMultiStart` returned — so the preference can change which
+ * valid configuration is drawn, and can never turn a converged figure into a refused one.
+ *
+ * Worst case: every start plus `restartFrom`'s list ONCE, each `maxIter` — paid only by a figure
+ * whose judge rejects its first converged start.
+ */
+export function solvePreferring(
+  starts: readonly number[][],
+  residuals: (x: number[]) => number[],
+  maxIter: number,
+  accept: (x: number[]) => boolean,
+  prefer: (x: number[]) => boolean,
+  restartFrom: (x: number[]) => readonly number[][],
+): SolveResult {
+  let fallback: SolveResult | null = null;
+  let best: SolveResult | null = null;
+  for (const x0 of starts) {
+    const r = solveLM(x0, residuals, maxIter);
+    if (r.ok && accept(r.values)) {
+      if (prefer(r.values)) return r;
+      // The targeted restarts are taken from the FIRST rejected solution only: a second collapsed
+      // solution deflates to the same other root, and paying for it again is the failure path costing
+      // more than the success path (docs/17 §7).
+      const first = fallback === null;
+      fallback ??= r;
+      if (!first) continue;
+      for (const x1 of restartFrom(r.values)) {
+        const r1 = solveLM(x1, residuals, maxIter);
+        if (r1.ok && accept(r1.values) && prefer(r1.values)) return r1;
+      }
+      continue;
+    }
+    if (!best || r.worst < best.worst) best = { ...r, ok: false };
+  }
+  return fallback ?? best ?? { values: starts[0] ? [...starts[0]] : [], ok: residuals(starts[0] ?? []).length === 0, worst: 0 };
+}
+
 /** Gaussian elimination with partial pivoting. `null` when the system is singular to working
  *  precision — which the caller answers by damping harder rather than by inventing a step. */
 function gaussian(A: number[][], n: number): number[] | null {
