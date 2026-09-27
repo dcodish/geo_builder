@@ -22,7 +22,7 @@ import {
   sequenceConstraints,
 } from '../model/sequence';
 import { type FigureObject, isOrigin, objectDeclares } from '../model/figure';
-import { type RootsEquation, asRootsEquation } from '../model/solutionSet';
+import { type RootsEquation, asRootsEquation, coefficientRefs } from '../model/solutionSet';
 import type { Selection } from '../model/constraint';
 import {
   MEASURE_ARITY,
@@ -54,6 +54,7 @@ import {
   type ComplexScope,
   NO_SCOPE,
   canonName,
+  foldConstants,
   isComplexName,
   isDeclarableName,
   isPointLabel,
@@ -494,11 +495,15 @@ const equation: Rule = (s, scope) => {
   const barred = lhs.t === 'abs' || rhs.t === 'abs';
   if (barred && other.t !== 'ref' && hasBareComplexRef(other)) return null;
   const modulusOnly = barred && other.t !== 'ref';
-  // `X^n = rhs` on a bare letter: report the SHAPE and let the fold read it, because which of
-  // ADR-CX-005's three modes it is depends on what earlier lines mentioned (#680, model/solutionSet.ts).
-  const roots = modulusOnly ? null : asRootsEquation(lhs, rhs, s);
-  if (roots) {
-    return { ...empty(), atoms, roots: [roots], declares: refNames(rhs), claims: [claimAll(s)] };
+  // `X^n = rhs` on a bare letter — or the same equation in another spelling, or a polynomial in the
+  // letter (#1434): report the SHAPE and let the fold read it, because which of ADR-CX-005's modes it is
+  // depends on what earlier lines mentioned (#680, model/solutionSet.ts).
+  const shaped = modulusOnly ? null : asRootsEquation(lhs, rhs, s);
+  if (shaped) {
+    // a power equation reached from another spelling carries `−rest / c`: folded, it is the literal the
+    // student would have typed as `z^3 = 1`, so both spellings reach the exact tier alike
+    const roots: RootsEquation = shaped.shape === 'power' ? { ...shaped, rhs: foldConstants(shaped.rhs, atoms) } : shaped;
+    return { ...empty(), atoms, roots: [roots], declares: coefficientRefs(roots), claims: [claimAll(s)] };
   }
   return {
     ...empty(),

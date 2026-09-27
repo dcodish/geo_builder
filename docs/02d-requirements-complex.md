@@ -58,8 +58,9 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
 - **FR-CN-3 (Must)** — **Branches are the exam's «כל האפשרויות».** The integer `k` in an angle equation
   enumerates a real solution set, and "show another configuration" walks that set — so a question asking
   for *all* possibilities can be seen, not just described. **A numeric equation's roots are
-  configurations too**: `z² − 4z + 13 = 0` is two drawings, and the button walks both. *(Amended —
-  [ADR-CX-049](06d-decisions-complex.md#adr-cx-049).)*
+  configurations too**: `z1² − 4z1 + 13 = 0` (one NUMBER z₁ that is a root) is two drawings, and the
+  button walks both. *(Amended — [ADR-CX-049](06d-decisions-complex.md#adr-cx-049); the fresh-letter
+  `z² − 4z + 13 = 0` is a solution set since [ADR-CX-050](06d-decisions-complex.md#adr-cx-050), FR-CN-6.)*
 - **FR-CN-4 (Must)** — **A default is a starting value, never a fixed one.** An unstated magnitude is a
   free degree of freedom: it must move on "another configuration" or when a later given forces it. Free
   DOF has **one** definition — the nullspace dimension — read by the cue, the knowledge gates and the
@@ -71,7 +72,13 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md).)*
 - **FR-CN-6 (Must)** — **The solutions of an equation on a bare letter ARE its indexed names.** `z³ = 8`
   plots z₁, z₂, z₃ (in argument order from the principal solution), every one a name the student can
-  write in the next sentence. A number the student already named z₂ is a claim that it is ONE OF the
+  write in the next sentence. **The spelling does not matter**: `z³ − 8 = 0`, `z³ + 8 = 0`, `2z³ = 16`
+  read exactly as `z³ = …`. **A polynomial equation up to degree 4** in a fresh letter, with number
+  coefficients, is a solution set too: `z² − 4z + 13 = 0` plots z₁ = 2+3i and z₂ = 2−3i (in argument
+  order), exactly where the roots allow — `|z₁| = √13`. A repeated root is one solution. A letter
+  that already carries an index (`z1² − 4z1 + 13 = 0`) is ONE number, never a set, so no doubled
+  subscript (z₁₁) is ever printed. A polynomial whose coefficients name other numbers or parameters, or
+  of degree 5 or more, keeps the one-point reading of FR-CN-3. A number the student already named z₂ is a claim that it is ONE OF the
   solutions (set membership, [ADR-CX-044](06d-decisions-complex.md#adr-cx-044)): if it is, it keeps its
   place and the unstated names take the remaining solutions in argument order; if it is not, the
   equation is **refused**, naming the student's statement, in either entry order. So a question that states z₁, z₂… and then solves an equation over them is refused
@@ -80,8 +87,11 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   or a second equation such as `z^3 = 1` after `z^3 = 8`) is **refused**, and the refusal says that the
   letter names that equation's solutions. It never says the two statements contradict each other.
   Combining two equations on one letter is not offered (operator ruling on #1428, 2026-09-27; #1466).
+  A QUESTION about the bare letter (`Re(z)`, `|z|`) is asked of every solution: it prints when they all
+  agree (`|z| = 1` for `z³ = 1`, `Re(z) = 2` for `z² − 4z + 13 = 0`), and otherwise says the value
+  differs between the solutions and names one to ask about.
   *(Realised — [ADR-CX-042](06d-decisions-complex.md#adr-cx-042),
-  [ADR-CX-048](06d-decisions-complex.md#adr-cx-048).)*
+  [ADR-CX-048](06d-decisions-complex.md#adr-cx-048); amended — [ADR-CX-050](06d-decisions-complex.md#adr-cx-050), #1434.)*
 
 - **FR-CN-7 (Must)** — **A real parameter's sign follows its use.** A parameter that stands as a
   SIZE — a modulus (`|z1| = 9r`), anything inside `|…|`, a circle's radius, a measure's value, a scale

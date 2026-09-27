@@ -432,7 +432,7 @@ function constValue(e: Expr): { re: number; im: number } | null {
  * exact about it. (The S3 bridge did this; the parser has to do it too, and the conjugates claim is
  * what caught that it did not.)
  */
-function foldConstants(e: Expr, atoms: Map<string, number>): Expr {
+export function foldConstants(e: Expr, atoms: Map<string, number>): Expr {
   const k = constValue(e);
   if (k) {
     const re = fromNumber(k.re, 10_000, 1e-9);

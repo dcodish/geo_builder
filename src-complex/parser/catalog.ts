@@ -129,6 +129,22 @@ export const CATALOG: readonly CatalogEntry[] = [
     descEn: 'an equation — every solution is plotted',
   },
   {
+    // #1434 (ADR-CX-050) — the same equation in its other spellings: z^n ± c = 0, c·z^n = rhs
+    family: 'F8',
+    he: 'z^3 - 1 = 0',
+    en: 'z^3 - 1 = 0',
+    descHe: 'אותה משוואה בכתיב אחר — הפתרונות z₁, z₂, z₃ כמו ב-z^3 = 1',
+    descEn: 'the same equation spelled differently — solutions z₁, z₂, z₃ as for z^3 = 1',
+  },
+  {
+    // #1434 (ADR-CX-050) — G1: a polynomial of degree ≤ 4 in a fresh letter, with closed coefficients
+    family: 'G1',
+    he: 'z^2 - 4z + 13 = 0',
+    en: 'z^2 - 4z + 13 = 0',
+    descHe: 'משוואה פולינומית עד מעלה 4 — כל הפתרונות מצוירים ונקראים z₁, z₂…',
+    descEn: 'a polynomial equation up to degree 4 — every solution is plotted and named z₁, z₂…',
+  },
+  {
     family: 'F8',
     he: 'z1^3 = z3',
     en: 'z1^3 = z3',

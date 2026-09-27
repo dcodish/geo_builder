@@ -49,7 +49,8 @@ describe('CATALOG — every specimen parses, in both languages', () => {
 
   it('reports MEASURED coverage — which families actually work today', () => {
     // this is the honest number, and it is deliberately much smaller than the contract
-    expect(coveredFamilies()).toEqual(['F1', 'F12', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'G7', 'G8']);
+    // #1434 (ADR-CX-050): G1 — polynomial equations — joined the measured set
+    expect(coveredFamilies()).toEqual(['F1', 'F12', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'G1', 'G7', 'G8']);
     expect(Object.keys(FAMILY_TITLE).length).toBeGreaterThan(coveredFamilies().length);
   });
 });

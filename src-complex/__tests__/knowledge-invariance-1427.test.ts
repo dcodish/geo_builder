@@ -57,7 +57,14 @@ describe('#1427 lock 1 — z1²−4z1+13=0 · z2 = 2z1: Im(z1) is ±3, never pri
   });
 });
 
-describe('#1427 lock 2 — z²−4z+13=0: Re and |z| print, Im is withheld, both roots are drawings', () => {
+/**
+ * #1434 (ADR-CX-050) amends this lock, per the operator's arm-2 ruling (2026-09-27): the two roots are
+ * no longer two DRAWINGS of one point z but two NAMED points z₁, z₂ in one drawing. The rows the lock
+ * exists for do not move — Re(z) = 2 and |z| ≈ 3.61 print at every seed — and Im(z) is still withheld,
+ * now saying it differs between the two SOLUTIONS (one drawing holds both, so «configurations» would
+ * be false).
+ */
+describe('#1427 lock 2 — z²−4z+13=0: Re and |z| print, Im is withheld, both roots are drawn', () => {
   beforeEach(() => feed(['z^2-4z+13=0'], ['Re(z)', '|z|', 'Im(z)']));
 
   it('Re(z) = 2 and |z| = √13 ≈ 3.61 at every seed', () => {
@@ -65,22 +72,18 @@ describe('#1427 lock 2 — z²−4z+13=0: Re and |z| print, Im is withheld, both
     for (const r of rows('|z|')) expect(r.value).toBe('3.61');
   });
 
-  it('Im(z) is withheld as «differs between the 2 configurations»', () => {
-    for (const r of rows('Im(z)')) expect(r.why).toEqual({ code: 'multi-config', configs: 2 });
+  it('Im(z) is withheld as «differs between the 2 solutions», naming z₁ to ask about', () => {
+    for (const r of rows('Im(z)')) expect(r.why).toEqual({ code: 'multi-solution', solutions: 2, first: 'z1' });
   });
 
-  it('"show another configuration" is enabled, the set is complete, and both roots are reachable', () => {
+  it('both roots are drawn at once, named z₁ = 2+3i and z₂ = 2−3i, at every seed', () => {
     const d = at(0);
-    expect(d.canCycle).toBe(true);
-    expect(d.configCount).toBe(2);
+    expect(d.configCount).toBe(1);
     expect(d.configCompleteness).toBe('complete');
-    const drawn = new Set(
-      SEEDS.map((s) => {
-        const z = at(s).points.find((p) => p.name === 'z')!.z;
-        return `${Math.round(z.re)}${z.im < 0 ? '-' : '+'}${Math.round(Math.abs(z.im))}i`;
-      }),
-    );
-    expect(drawn).toEqual(new Set(['2+3i', '2-3i']));
+    for (const s of SEEDS) {
+      const pts = at(s).points.filter((p) => p.name !== 'o');
+      expect(pts.map((p) => p.readingCart)).toEqual(['z₁ = 2+3i', 'z₂ = 2-3i']);
+    }
   });
 });
 
@@ -124,11 +127,12 @@ describe('#1427 — the class, beyond the four reported sequences', () => {
     for (const r of rows('Re(z2)')) expect(r.why).toEqual({ code: 'maybe-multi' });
   });
 
-  it('z³ − 1 = 0: three configurations, |z| = 1 prints, Re(z) differs', () => {
+  it('z³ − 1 = 0 (#1434: now the three named roots of z³ = 1): |z| = 1 prints, Re(z) differs between them', () => {
     feed(['z^3-1=0'], ['|z|', 'Re(z)']);
-    expect(at(0).configCount).toBe(3);
+    expect(at(0).configCount).toBe(1);
+    expect(at(0).points.filter((p) => p.name !== 'o').map((p) => p.name)).toEqual(['z1', 'z2', 'z3']);
     for (const r of rows('|z|')) expect(r.value).toBe('1');
-    for (const r of rows('Re(z)')) expect(r.why).toEqual({ code: 'multi-config', configs: 3 });
+    for (const r of rows('Re(z)')) expect(r.why).toEqual({ code: 'multi-solution', solutions: 3, first: 'z1' });
   });
 
   it('a degree-1 polynomial is a complete set of ONE: z1 + z2 = 5+2i prints Re(z2) = 2', () => {
@@ -139,10 +143,13 @@ describe('#1427 — the class, beyond the four reported sequences', () => {
     expect(row(0, 'Im(z2)').value).toBe('-2');
   });
 
-  it('a filter prunes a root exactly as it prunes a branch: in the first quadrant, Im(z) = 3 is knowledge', () => {
-    feed(['z^2-4z+13=0', 'z ברביע הראשון'], ['Im(z)']);
+  // #1434 — the bare letter of `z^2-4z+13=0` now names the solution SET, so a filter on it is refused as a
+  // reserved letter (as after `z^3 = 1`); the lock keeps its subject — a numeric root pruned like a
+  // branch — through the letter that still reads as ONE number, an indexed one (ADR-CX-050)
+  it('a filter prunes a root exactly as it prunes a branch: in the first quadrant, Im(z1) = 3 is knowledge', () => {
+    feed(['z1^2-4z1+13=0', 'z1 ברביע הראשון'], ['Im(z1)']);
     expect(at(0).configCount).toBe(1);
-    for (const r of rows('Im(z)')) expect(r.value).toBe('3');
+    for (const r of rows('Im(z1)')) expect(r.value).toBe('3');
   });
 });
 

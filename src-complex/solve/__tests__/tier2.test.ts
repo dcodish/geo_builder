@@ -158,10 +158,14 @@ describe('an arithmetic sequence now SOLVES, through the same tier', () => {
    * given drag an established point off its stated value. `z2` moving away from 0 here is a collateral
    * casualty, and LADDER-CX stage 3d/`cx3:refuse` records it as pending rather than done.
    */
-  it('conflicting givens: BOTH are reported, and neither disappears', () => {
+  // #1434 (ADR-CX-050): `z2 = 0` is a CLOSED definition, so it places z2 instead of leaving it to the
+  // search — the newest statement is the one reported, and the earlier figure is no longer dragged
+  it('conflicting givens: the measure is reported violated, and z2 = 0 is not dragged off its value', () => {
     const d = deriveLines(['z1 = 3+4i', 'z2 = 0', 'אורך z1z2 = 99']);
     expect(d.measures[0].status).toBe('violated');
-    expect(d.unsatisfied).toContain('z2 = 0');
+    expect(d.unsatisfied).toEqual(['אורך z1z2 = 99']);
+    const z2 = d.points.find((p) => p.name === 'z2')!.z;
+    expect(Math.hypot(z2.re, z2.im)).toBeLessThan(1e-9);
   });
 
   /**
