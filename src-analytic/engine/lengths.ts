@@ -20,7 +20,7 @@
  * parameter — `2a·AB` keeps its `a`.
  */
 import { evalExpr, normalizeMath, parseExpr, symbolsOf, type Env, type Expr } from './expr';
-import { RESERVED_SYMBOLS } from './carriers';
+import { RESERVED_SYMBOLS, mentionsPlane } from './carriers';
 import type { Pt } from './derived';
 import type { Id } from './types';
 
@@ -340,14 +340,15 @@ export function parseLengthExpr(src: string): LengthExpr | null {
   });
   if (terms.length === 0) return null;
   const expr = parseExpr(encoded);
-  if (!expr) return null;
+  // A length never mentions the plane: `y` here means the sentence was an equation (#1496) — decline it.
+  if (!expr || mentionsPlane(expr)) return null;
   return { expr, terms };
 }
 
 /** A length expression that is only a number — the right-hand side of `AB = 10`. */
 export function constantLengthExpr(src: string): LengthExpr | null {
   const expr = parseExpr(normalizeMath(src));
-  return expr ? { expr, terms: [] } : null;
+  return expr && !mentionsPlane(expr) ? { expr, terms: [] } : null;
 }
 
 /**

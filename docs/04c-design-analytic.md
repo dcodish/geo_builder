@@ -284,6 +284,8 @@ The plane's own variables are excepted so «y - 2x = 0» stays an equation, and 
 term is a sign. The seam itself keys on `reachesFallback(verdict)` in `app/submit.ts` — refused ∧
 `not-handled` — the one predicate `App.tsx` and the locks share; its width never changed.
 
+**A value never mentions the plane ([ADR-AG-163](06c-decisions-analytic.md#adr-ag-163), #1496).** Every slot that reads a student's VALUE — a length (`parseLengthExpr`, `constantLengthExpr`), a slope, an area, an angle and its ratio, a coordinate and a comparison — reads it through one check, `mentionsPlane` (`carriers.ts`): `x` and `y` are the plane's variables, so a value that uses one is an equation and the slot declines (lengths) or refuses (`valueExpr`, `bad-equation`). And `equationExpr` refuses a capital as a symbol: a capital is a point's name, never a parameter. Together they close what the ≥3-letter word test (#1068, #1321) cannot see — «side AB is y=x-4» after the noun is stripped leaves the two-letter «is».
+
 ## A given’s connective, and who gets the sentence ([ADR-AG-127](06c-decisions-analytic.md#adr-ag-127))
 
 **One vocabulary for "is".** `COPULA_WORDS` — «הוא/היא/הם/הן/שווה [ל-]» — is the single source in

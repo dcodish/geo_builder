@@ -20,7 +20,13 @@
 import type { DerivedRule } from '../engine/derived';
 import { isAngleRef, type AngleName, type Constraint, type Direction } from '../engine/solve';
 import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
-import { RESERVED_SYMBOLS, directionSymbol } from '../engine/carriers';
+import { RESERVED_SYMBOLS, directionSymbol, mentionsPlane } from '../engine/carriers';
+
+/** A student's VALUE — a number or an expression in parameters, never the plane's x/y (#1496, `mentionsPlane`). */
+function valueExpr(src: string): Expr | null {
+  const e = parseExpr(normalizeMath(src));
+  return e && !mentionsPlane(e) ? e : null;
+}
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, EN_SHAPE, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
@@ -312,6 +318,16 @@ export function equationExpr(src: string): Expr | null {
   const a = parseExpr(parts[0]);
   const b = parseExpr(parts[1]);
   if (!a || !b) return null;
+  /**
+   * A CAPITAL IS A POINT'S NAME, NEVER A PARAMETER (#1496, ADR-AG-163).
+   *
+   * Parameters in this grammar are lowercase (`k הוא פרמטר`, `2ax`, `y^2=2px`); a capital letter is what
+   * names a point (`NAME`). So an "equation" whose symbols include a capital is prose or a point reference
+   * read letter by letter: «AB is y=x-4», once the length rule declined it, came here as the curve
+   * `A·B·i·s·y = x−4` — four invented parameters and the stated line nowhere. Declining sends it to
+   * `not-handled` and the LLM seam, which is what #1068 intended for words.
+   */
+  if ([...symbolsOf(a), ...symbolsOf(b)].some((s) => /^[A-Z]/.test(s))) return null;
   return { kind: 'sub', a, b };
 }
 
@@ -1512,9 +1528,7 @@ const EN_RHS_COORD = new RegExp(
  */
 function compareValue(src: string): Expr | null {
   const s = trim(src).replace(/^אפס$/, '0').replace(/^zero$/i, '0');
-  const e = parseExpr(s);
-  if (!e) return null;
-  return symbolsOf(e).some((sym) => RESERVED_SYMBOLS.has(sym)) ? null : e;
+  return valueExpr(s);
 }
 
 function compareFacts(id: Id, axis: 'x' | 'y', greater: boolean, rhs: CoordCompareRhs, line: string): ParseResult {
@@ -2284,7 +2298,7 @@ function parseConstraint(raw: string): RuleOutcome {
   if (slope && claimable(slope[2])) {
     const u = direction(slope[1]);
     if (!u) return refuse('bad-operand', line);
-    const value = parseExpr(normalizeMath(slope[2]));
+    const value = valueExpr(slope[2]);
     if (!value) return refuse('bad-equation', trim(slope[2]));
     return made([{ t: 'constraint', k: { t: 'slope', u, value }, src: line }]);
   }
@@ -2306,7 +2320,7 @@ function parseConstraint(raw: string): RuleOutcome {
    * an area as one term among others) has no such value, so it stays here, where it belongs.
    */
   const areaGiven = AREA_HE.exec(line) ?? AREA_EN.exec(line);
-  const areaGivenValue = areaGiven ? parseExpr(normalizeMath(areaGiven[3])) : null;
+  const areaGivenValue = areaGiven ? valueExpr(areaGiven[3]) : null;
   const lengthEq = areaGivenValue ? null : LENGTH_EQ.exec(line);
   if (lengthEq) {
     const left = parseLengthExpr(lengthEq[1]);
@@ -2336,7 +2350,7 @@ function parseConstraint(raw: string): RuleOutcome {
     // A word that is not a shape noun means this is not an area sentence about a figure — leave
     // it rather than refuse it, which is the rule contract for "not my sentence".
     if (noun && !shapeRow(noun)) return null;
-    const value = parseExpr(normalizeMath(valueSrc));
+    const value = valueExpr(valueSrc);
     if (!value) return refuse('bad-equation', trim(valueSrc));
     if (run) {
       const ids = splitNames(run);
@@ -2554,7 +2568,7 @@ function parseConstraint(raw: string): RuleOutcome {
       const [, kSrc, p2, v2, q2] = other;
       const right = angleNameOf(p2, v2, q2);
       if (!right) return refuse('repeated-vertex', line);
-      const k = parseExpr(kSrc ?? '1');
+      const k = valueExpr(kSrc ?? '1');
       if (!k) return refuse('bad-equation', rhs);
       // Three letters on both sides need no figure; a lone vertex on either side is resolved at M1.
       if (isAngleRef(left) && isAngleRef(right)) {
@@ -2566,7 +2580,7 @@ function parseConstraint(raw: string): RuleOutcome {
     // A word on the right («חדה», «acute») is not a value this rule reads — leave the sentence to
     // whoever owns it rather than answer with an equation error.
     if (claimable(valueSrc)) {
-      const value = parseExpr(normalizeMath(valueSrc));
+      const value = valueExpr(valueSrc);
       if (!value) return refuse('bad-equation', valueSrc);
       if (isAngleRef(left)) return made([{ t: 'constraint', k: { t: 'angle', at: left, value }, src: line }]);
       return made([{ t: 'vertex-angle', left, rhs: { t: 'value', value }, src: line }]);
@@ -2597,7 +2611,7 @@ function parseConstraint(raw: string): RuleOutcome {
     COMPONENT_SUB.exec(line);
   if (comp && claimable(comp[3])) {
     const [, axis, id, valueSrc] = comp;
-    const value = parseExpr(normalizeMath(valueSrc));
+    const value = valueExpr(valueSrc);
     if (!value) return refuse('bad-equation', trim(valueSrc));
     // It DECLARES, like every rule that names a point and says where it is (#1069). The other
     // component is simply absent, which is what leaves it free.

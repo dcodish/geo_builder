@@ -7912,3 +7912,23 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 **Sibling audit.** *Analytic:* stage one fixes the parameters at their sample (in-domain by construction) and cannot leave a domain; the thin-ring re-solve (ADR-AG-143) only judges collapse and draws nothing. *Products:* 2-D and 3-D declare no parameter domains in their solves (a length is a positive quantity by construction there, not a declared symbol). Nothing to file.
 
 **Consequences.** `engine/evaluate.ts` (stage two's best effort). Lock: `issue-1493-domain-effort.test.ts`.
+
+## ADR-AG-163 — A value never mentions the plane, and a capital is never a parameter (#1496)
+
+**Status:** accepted · 2026-09-27 · P1, operator fix-now in session (built with #1495, #1281)
+
+**Requirements:** none (internal) — the honesty invariant already promises that a given parses to a constraint, escalates or errors, and never vanishes. · **Design:** [04c](04c-design-analytic.md#the-parsers-rule-contract-adr-ag-017), "A value never mentions the plane"
+
+**Context.** «side AB is y=x-4» was accepted as the length equation `|AB|·i·s·y = x−4`: the free `i`, `s` absorbed it, the stated line was honoured nowhere, `faults: []`. Re-measured at pickup on `main` @ `5a9eec1a`: identical, and so for «segment AB is y=x-4» and «AB is y=x-4».
+
+**The plan's cause is stale; the measured one.** The plan said the word test (#1068) guards one branch only. Since #1321 it lives in the tokenizer every value passes through — and it does fire, on nothing: the length rule strips the noun «side» first (`LENGTH_NOUN`, «אורך AB» is «AB»), leaving «AB is y», and «is» has two letters — under the ruled ≥3 boundary that keeps `2abc` a legal product. A length of letters cannot be told from a word by its length. Its SEMANTICS can: `x` and `y` are the plane's variables, so an expression that uses one is an equation, never a length, an area, a slope, an angle or a coordinate's value.
+
+**Decision.**
+1. **`mentionsPlane`** (`carriers.ts`, beside `RESERVED_SYMBOLS`) is the one predicate. `parseLengthExpr` and `constantLengthExpr` DECLINE an expression that mentions the plane (fall through, #1068's intent), and the parser's `valueExpr` — now the only reader of a student's value — refuses one at every value slot: slope, area (both rules), angle, angle ratio, coordinate component, coordinate comparison. The sweep is complete: the parser's remaining `parseExpr` calls read an equation (where the plane belongs) or a point's coordinates (which already refuse a plane variable, `reserved-coordinate`).
+2. **A capital is a point's name, never a parameter** (`equationExpr`). Once the length rule declined «AB is y=x-4», the bare-equation branch read it as the curve `A·B·i·s·y = x−4` with four invented parameters. Parameters in this grammar are lowercase; measured over every equation in the analytic tests and the catalog, a capital appears only in a name or prefix («AB:», «circle I:», `x_A`), never inside an equation's own text.
+
+**Measured.** The three spellings → `not-handled` (in a figure: a refusal, never a silent green line). Guards unchanged: `AB = 5`, `AB=k`, `2AB = 3CD`, `AB = 4√5`, `x_A = 5`, `y=2abc+1`, a slope, an area. Analytic tree green.
+
+**Sibling audit.** *Analytic:* above. *Products:* 2-D and 3-D have no juxtaposition-product expression grammar over free letters (lengths and angles there are numbers or named symbols), so the class cannot occur. Nothing to file. #1495 is the English spelling that should BUILD «the side BC lies on the line y=x-4»; it is a different sentence from «side AB is y=x-4», which stays not understood.
+
+**Consequences.** `engine/carriers.ts` (`mentionsPlane`), `engine/lengths.ts`, `parser/parseAnalytic.ts` (`valueExpr`, `equationExpr`). Lock: `issue-1496-value-never-mentions-plane.test.ts`.

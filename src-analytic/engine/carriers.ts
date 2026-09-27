@@ -32,7 +32,7 @@
  * is earned — and this function is what will fail first and say so.
  */
 import { curveParentOf, parentsOf } from './derived';
-import { evalExpr, exprText, symbolsOf, type Env } from './expr';
+import { evalExpr, exprText, symbolsOf, type Env, type Expr } from './expr';
 import { constraintRefs, dirRefs, freeDirectionSymbol } from './solve';
 import { UNBOUNDED, circleDefPoints, type Construction, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
 
@@ -42,6 +42,17 @@ import { UNBOUNDED, circleDefPoints, type Construction, type GeoObject, type Id,
  * would make every circle a 2-DOF family of nothing.
  */
 export const RESERVED_SYMBOLS: ReadonlySet<string> = new Set(['x', 'y']);
+
+/**
+ * A VALUE NEVER MENTIONS THE PLANE (#1496, ADR-AG-163).
+ *
+ * `x` and `y` are the plane's variables, so an expression that uses one is an EQUATION, never a length, an
+ * area, a slope, an angle or a coordinate's value. Juxtaposition (`2ab`) makes every letter a symbol, and a
+ * value slot that accepted `y` read «side AB is y=x-4» as the length equation `|AB|·i·s·y = x−4` — satisfied
+ * by the free i and s, the stated line dropped, faults `[]`. The word test (#1068, #1321) cannot see it: after
+ * the noun is stripped, «is» is two letters. This is the semantic test every value slot shares.
+ */
+export const mentionsPlane = (e: Expr): boolean => symbolsOf(e).some((s) => RESERVED_SYMBOLS.has(s));
 
 /**
  * The kind of freedom an object carries *itself* — as opposed to the freedom it inherits from the
