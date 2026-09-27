@@ -193,17 +193,8 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
-      "circle",
-    ],
-    "text": "circle through A B C",
-    "winner": "circumcircle",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
       "lineMeetsCircle",
       "lineLineIntersection",
-      "circumcircle",
     ],
     "text": "the circle through A B C cuts CE at D",
     "winner": "circumcircleMeetsSegment",
@@ -1519,6 +1510,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "lang": "he",
     "text": "A על מעגל O",
     "winner": "pointOnCircle",
+  },
+  {
+    "lang": "en",
+    "text": "the circle passes through A",
+    "winner": "circle",
+  },
+  {
+    "lang": "he",
+    "text": "המעגל עובר דרך A",
+    "winner": "circle",
   },
   {
     "lang": "en",

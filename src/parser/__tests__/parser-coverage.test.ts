@@ -260,6 +260,19 @@ describe('parser coverage — supported phrasings parse to the right commands', 
   }
 });
 
+// #1438 (ADR-548): the three spellings of a through-statement about the DRAWN circle — a reference, lowered
+// to membership exactly like «A על המעגל». Context-bearing, so they sit outside the context-free PARSES table.
+describe('parser coverage — «המעגל עובר דרך A» over a drawn circle binds it (#1438)', () => {
+  const ctx = { circles: ['O'], points: ['O', 'A'] };
+  for (const u of ['המעגל עובר דרך A', 'המעגל עובר דרך הנקודה A', 'המעגל עובר בנקודה A', 'the circle passes through A']) {
+    it(`"${u}" → point-on-circle A on circle O`, () => {
+      const r = parse(u, ctx);
+      expect(r.ok, `"${u}" should parse`).toBe(true);
+      if (r.ok) expect(r.commands).toEqual([{ type: 'point-on-circle', id: 'A', circle: 'circle-O' }]);
+    });
+  }
+});
+
 describe('compound "<place a point> such that <condition>" parses BOTH halves', () => {
   for (const u of [
     'point F on the extension of AD such that CF⊥DF',

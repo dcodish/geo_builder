@@ -1754,6 +1754,14 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "name-center",
     ],
   },
+  "the circle passes through A": {
+    "en": [
+      "circle-through",
+    ],
+    "he": [
+      "circle-through",
+    ],
+  },
   "the circle through A B C cuts CE at D": {
     "en": [
       "circumcircle",

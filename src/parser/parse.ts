@@ -4424,6 +4424,101 @@ const concentricCircles: Rule = (s, ctx) => {
   ];
 };
 
+/**
+ * #1438 ([ADR-548](../../docs/06-decisions.md#adr-548)) — the THROUGH clause of a circle statement, read
+ * WHOLE: every spelling of the carrier («[ה]עובר[ת] דרך X», «דרך הנקודה X», «עובר בנקודה X», "passes
+ * through [the] point X") and every label of its LIST («A ו-B», «A, B ו-C», "A and B"). The old
+ * `through\s+X` read took the FIRST label only and let the rest ride as "residue for the membership
+ * post-passes" — which claimed only the 3-point form, so «… עובר דרך A ו-B» committed with B gone.
+ * Case-SENSITIVE on purpose: a list member must be an uppercase label, so "A and a line" never reads
+ * the article `a` as a point. The first label may be lowercase (the #779 guard owns that residue).
+ */
+const THROUGH_CLAUSE = new RegExp(
+  String.raw`(?:(?:that\s+)?(?:[Pp]ass(?:es|ing)?\s+)?(?:[וש]-?)?(?:ה?עוברת?\s*)?(?:[Tt]hrough|THROUGH|דרך)\s+(?:the\s+)?(?:points?\s+|ה?נקוד(?:ה|ות)\s+)?|(?:[וש]-?)?ה?עוברת?\s+ב-?\s*ה?נקוד(?:ה|ות)\s+|[Pp]ass(?:es|ing)?\s+(?:at|by)\s+(?:the\s+)?points?\s+)` +
+    String.raw`([A-Za-z]\d*(?![A-Za-z\d])(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)[A-Z]\d*(?![A-Za-z\d]))*)`,
+);
+const throughClause = (s: string): { labels: Id[]; text: string } | null => {
+  const m = s.match(THROUGH_CLAUSE);
+  if (!m) return null;
+  return { labels: (m[1].match(/[A-Za-z]\d*/g) ?? []).map(up), text: m[0] };
+};
+
+/** A DEFINITE circle noun — «המעגל» (with the ו/ש conjunction prefixes) / "the circle" — the ADR-029
+ *  reference form, as opposed to the indefinite «מעגל» / "a circle" that introduces one. */
+const DEFINITE_CIRCLE = /(?<![א-ת])[וש]?המעגל(?![א-ת])|\bthe\s+circle\b/i;
+
+/**
+ * #1438 ([ADR-548](../../docs/06-decisions.md#adr-548)) — is this through-statement a REFERENCE to a circle
+ * the figure already has? ADR-029 (introduce-vs-resolve) asked that question of every circle-CONSUMING
+ * rule but never of the circle DEFINITION rules, so «מעגל O · נקודה A · המעגל עובר דרך A» minted a
+ * second circle through A (centre P, green) while circle O stayed where it was. A statement about an
+ * existing circle is lowered to MEMBERSHIP on it (M1, docs/17 §4) — never re-created:
+ *  - a NAMED centre whose circle already exists («מעגל O עובר דרך A» over a drawn O — the re-definition
+ *    replaced O's fact in place and broke the figure whenever A was typed after O);
+ *  - a DEFINITE «המעגל»/"the circle" with ≥1 circle drawn → the shared resolver (circumscribing,
+ *    directional, the single circle, the membership tie-break), and beside several circles it cannot
+ *    bind → ASK which (`ambiguous-circle-ref`), never a silent pick and never a third circle.
+ * Null ⇒ not a reference: an indefinite «מעגל העובר דרך A», a fresh named centre, or «המעגל» with no
+ * circle drawn yet — the DEFINITION path keeps those.
+ */
+const circleThroughReference = (s: string, ctx: ParseContext, named: string | null): { center: string } | Clarify | null => {
+  const circles = (ctx.circles ?? []).filter((c) => !c.startsWith('~'));
+  if (circles.length === 0) return null;
+  if (named) {
+    const N = /^[A-Z]/.test(named) ? up(named) : null;
+    return N && circles.some((c) => up(c) === N) ? { center: N } : null;
+  }
+  if (!DEFINITE_CIRCLE.test(s)) return null;
+  const hit = circumscribingRef(s, ctx) ?? directionalCircleRef(s, ctx) ?? existingCircleRef(s, ctx);
+  if (hit) return { center: hit };
+  return { clarify: 'ambiguous-circle-ref', centers: circles.map((c) => (c.startsWith('@ctr-') ? c.slice(5) : c)) };
+};
+
+/**
+ * #1438 — lower a through-statement about an EXISTING circle exactly like «X [ו-Y] על המעגל»: one
+ * `point-on-circle` per label of the through list (the apply-side membership — idempotent for a point
+ * already on it, a conversion for a free one, a contradiction the verifier names for a point stated on
+ * the other side). A stated NUMERIC size rides along as `set-radius` on the same circle. Everything the
+ * path reads is stripped and ANY residue defers (the ADR-024 leftover guard, fail-closed per #779): a
+ * second clause is another rule's, never silently dropped. The ambiguity question is asked only once
+ * the sentence is otherwise fully read — a compound the path cannot own escalates as before.
+ */
+const lowerThroughReference = (
+  s: string,
+  ctx: ParseContext,
+  thr: { labels: Id[]; text: string },
+  named: string | null,
+  r: ReturnType<typeof parseRadius>,
+): AnyCommand[] | Clarify | null => {
+  const ref = circleThroughReference(s, ctx, named);
+  if (!ref) return null;
+  if (r.symbolic) return null; // a radius SYMBOL on a reference is a naming statement — not this path's
+  const rest = s
+    .replace(thr.text, ' ')
+    .replace(new RegExp(CIRCUM_REF_SRC, 'i'), ' ')
+    .replace(/ה?מעגל\s+ה?(?:ימני|שמאלי)|\bthe\s+(?:right|left)(?:-hand)?\s+circle\b/gi, ' ')
+    .replace(/circles?|[ושבל]?ה?מעגל\w*/gi, ' ')
+    .replace(named ? new RegExp(String.raw`(?<![A-Za-z\d])${named}(?![A-Za-z\d])`, 'g') : /,^/, ' ')
+    .replace(/cent(?:er|re)(?:e?d)?(?:\s+at)?|around|סביב|[ושה]{0,2}מרכז[והי]?|עם\s+מרכז/gi, ' ')
+    .replace(r.numeric ? /[ושב]{0,2}(?:רדיוס|היק[פף]|שטח|קוטר)[והם]?|radius|circumference|perimeter|diameter|area|π|√|ס["״']?מ|מ["״']?מ|שווה(?:\s+ל-?)?/gi : /,^/, ' ')
+    .replace(r.numeric ? rx(NUM, 'g') : /,^/, ' ')
+    .replace(REQUEST_WORDS, ' ')
+    .replace(FILLER, ' ')
+    .replace(/(?<![א-ת])(?:גם|הוא|היא|אכן)(?![א-ת])/g, ' ')
+    .replace(/[.,:;·=?!/-]/g, ' ')
+    .trim();
+  if (rest) return null;
+  if ('clarify' in ref) return ref;
+  const centre = up(ref.center);
+  // A label that IS the centre is not a point on its circle — the sentence says something else; defer.
+  if (thr.labels.some((l) => l === centre) || new Set(thr.labels).size !== thr.labels.length) return null;
+  const circ = circleId(ref.center);
+  return [
+    ...(r.numeric ? [{ type: 'set-radius' as const, circle: circ, value: r.radius }] : []),
+    ...thr.labels.map((id) => ({ type: 'point-on-circle' as const, id, circle: circ })),
+  ];
+};
+
 /** "circle centered at O radius 5" / "circle O radius R" / "מעגל שמרכזו O רדיוסו 5". */
 const circle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
@@ -4432,13 +4527,24 @@ const circle: Rule = (s, ctx) => {
   // incircle utterance. Defer the incircle phrasing to the `incircle` rule.
   if (isCircleInPolygon(s)) return null;
   const r = parseRadius(s);
-  const thrM = s.match(/(?:through|העובר\s*דרך|דרך)\s+([A-Za-z]\d*)\b/i);
+  // #1438: the through clause read WHOLE (every carrier spelling, every label of its list) — see THROUGH_CLAUSE.
+  const thr = throughClause(s);
+  const thrM = thr ? thr.labels[0] : null;
   const centered = /cent(?:er|re)d?|around|מרכז\w*|סביב/i.test(s);
   // The centre the student named ("circle O" / "centered at O"), or null. «מעגל עם מרכז O» / "circle
   // with centre O" (#184 — a verbatim prod form circleCenter doesn't read) is added LOCALLY: widening
   // circleCenter itself would touch every consumer (e.g. nameCenter's «מרכז המעגל הוא P»).
   const withCentreM = s.match(/(?:עם\s+מרכז|with\s+cent(?:er|re))\s+([A-Za-z]\d*)\b/i);
   const named = circleCenter(s) ?? (withCentreM ? withCentreM[1] : null);
+  // #1438 (ADR-548): a through-statement about a circle the figure ALREADY has is a REFERENCE — lowered to
+  // membership on it, exactly like «X [ו-Y] על המעגל». Asked BEFORE the definition path, which would mint
+  // a second circle (the ADR-029 introduce-vs-resolve question, finally asked of the definition rule).
+  // A reference the path cannot fully read defers whole — it must never fall through to a definition.
+  if (thr) {
+    const asRef = lowerThroughReference(s, ctx, thr, named, r);
+    if (asRef) return asRef;
+    if (circleThroughReference(s, ctx, named)) return null;
+  }
   // «דרך X» / "through X" is a circle DEFINITION only when no OTHER construct owns the through (#180):
   // «דרך A עובר משיק למעגל» is a TANGENT through A, and claiming it here minted a phantom circle
   // through A while silently dropping the stated tangent — the same "a reference is not a definition"
@@ -4451,16 +4557,24 @@ const circle: Rule = (s, ctx) => {
       // #779: consume "centered" WHOLE — the old `d?` tail left the fragment "ed", harmless before,
       // read as residue by the lowercase-token guard below ("circle centered at M through B").
       .replace(/cent(?:er|re)(?:e?d)?(?:\s+at)?|around|מרכז\w*|סביב/gi, ' ')
-      .replace(/(?:that\s+)?(?:pass(?:es|ing)?\s+)?(?:ו-?)?(?:ה?עוברת?\s*)?(?:through|דרך)\s+[A-Za-z]\d*\b/gi, ' ')
+      .replace(thr!.text, ' ')
       .replace(named ? new RegExp(String.raw`\b${named}\b`, 'gi') : /,^/, ' ')
       .replace(FILLER, ' ');
     if (SHAPE_LEFTOVER.test(rest) || INTERSECT_KW.test(rest) || /הישר|(?<![א-ת])ישר(?![א-ת])|\bline\b|(?<![א-ת])קו(?![א-ת])/i.test(rest)) return null;
     // #779 — a residual LOWERCASE letter token is a label this path would silently CASE-FOLD and drop
     // («circle through a b c» reached here after the 3-point rule declined the lowercase run, and
-    // committed `through: A` with b, c gone). UPPERCASE residue stays allowed — «circle through
-    // A, B, C» deliberately leaves B, C here for the membership post-passes to claim (the shipped
-    // circumcircle route), so only the case-fold class defers.
+    // committed `through: A` with b, c gone).
     if (/(?<![A-Za-zא-ת\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/.test(rest)) return null;
+    // #1438 (ADR-548) — the UPPERCASE twin, closed. It used to be let through "for the membership
+    // post-passes to claim", but no post-pass claims a through-list label: «מעגל העובר דרך A ו-B» over a
+    // drawn A, B committed a circle through A with B silently gone (droppedNewLabels is blind to an
+    // EXISTING label). A definition lowers exactly ONE through point (`circle-through`); a 3-point list is
+    // the circumcircle (its own rule, before this one); anything else is not this path's — fail closed.
+    if (thr!.labels.length > 1) return null;
+    if (/(?<![A-Za-z\d])[A-Z]\d*(?![A-Za-z\d])/.test(rest)) return null;
+    // A stated SIZE beside the through point is two givens this path would split — the plain `circle`
+    // return below keeps the size and drops the through point. Fail closed rather than drop either.
+    if (r.numeric || r.symbolic) return null;
   }
   // `centered` alone is NOT a circle definition unless a centre is actually NAMED ("מעגל שמרכזו O"):
   // a REFERENCE to an existing circle's centre — "מרכז המעגל" / "the centre of the circle", no letter —
@@ -4509,7 +4623,7 @@ const circle: Rule = (s, ctx) => {
   // An UNNAMED centre is auto-assigned and HIDDEN unless used (FR-RN-8); a named centre is shown.
   const center = named ?? freeLabel([...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K']);
   const auto = !named;
-  if (thrM && !r.numeric && !r.symbolic) return [{ type: 'circle-through', id: circleId(center), center: up(center), through: up(thrM[1]), ...(auto ? { autoCenter: true } : {}) }];
+  if (thrM && !r.numeric && !r.symbolic) return [{ type: 'circle-through', id: circleId(center), center: up(center), through: up(thrM), ...(auto ? { autoCenter: true } : {}) }];
   // No NUMERIC size was stated ⇒ the radius is a free DOF seeded at the default, not a fixed value
   // (ADR-052, the no-assumptions principle): the student gave a circle, not a size. A SYMBOLIC radius
   // "R" is an UNKNOWN magnitude too — also free — that R then DENOTES; R is left UNVALUED (no set-var)
@@ -4544,6 +4658,9 @@ const circle: Rule = (s, ctx) => {
  * so the construction rules — and the honesty gates behind them — own the utterance.
  */
 const sizeStatementLeftover = (s: string): boolean =>
+  // #1438 (ADR-548): a THROUGH clause is a construction statement too — «המעגל עובר דרך A ברדיוס 3»
+  // resized the circle and silently dropped «עובר דרך A». The `circle` rule reads both givens.
+  throughClause(s) !== null ||
   SHAPE_LEFTOVER.test(
     s
       .replace(/radius|radii|רדיוס\S*|circles?|מעגל\w*|circumference|perimeter|area|שהיקפו|היקפו|היקף|ששטחו|שטחו|שטח|נתון|הוא|=/gi, ' ')
@@ -8152,7 +8269,12 @@ const circumcircle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
   if (!/through|circumscrib|חוסם|דרך/i.test(s)) return null; // the 3-point cue (חוסם circumscribes ≠ חסום inscribed)
   if (circleCenter(s)) return null; // a named centre ⇒ it's a centre-based circle, not a circumcircle
-  const rest = s.replace(/circles?|מעגל|circumscrib\w*|through|דרך|חוסם|את|of|the|around|triangle|משולש|מרובע/gi, ' ');
+  const rest = s
+    .replace(/circles?|מעגל|circumscrib\w*|through|דרך|חוסם|את|of|the|around|triangle|משולש|מרובע/gi, ' ')
+    // #1438 (ADR-548): a LIST-spelled run — «A, B ו-C», "A, B and C" — is the same three points as the
+    // spaced «A B C». Unread, the separators hid the run and the `circle` rule committed a circle through
+    // A alone with B and C dropped. Only separators BETWEEN uppercase labels are normalised.
+    .replace(/(?<=(?<![A-Za-z])[A-Z]\d*)(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)(?=[A-Z]\d*(?![A-Za-z]))/g, ' ');
   // #83 ([ADR-291](docs/06-decisions.md#adr-291), M1): a circumscription stated about points that ALREADY
   // ride a circle RESOLVES it — reveal the existing (auto-hidden) circle, never mint a coincident
   // duplicate + duplicate constraint (the ADR-099/ADR-115 family, circumscribes-edition). This also
@@ -8162,6 +8284,10 @@ const circumcircle: Rule = (s, ctx) => {
     const existing = circleContaining(ctx, stated);
     if (existing) return [{ type: 'show-circle', id: circleId(existing) }];
   }
+  // #1438 (ADR-548): the DEFINITE through-statement «המעגל עובר דרך A, B ו-C» beside a drawn circle is a
+  // REFERENCE to it (ADR-029), not a new circumcircle — the `circle` rule lowers it to membership (or asks
+  // which circle). A circumscription («המעגל החוסם…») is a self-identifying description and stays here.
+  if (!/circumscrib|חוסם/i.test(s) && throughClause(s) && circleThroughReference(s, ctx, null)) return null;
   // "circle through A B C D" — FOUR existing points: a unique circle can't pass through four arbitrary
   // points, so draw the circumcircle of three and make the fourth concyclic by driving a free DOF
   // (ADR-041). Only when all four already exist (else it's a fresh on-circle placement, not this rule).

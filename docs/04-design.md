@@ -791,3 +791,23 @@ post-commit configuration search. The inventory is an assertion, not prose
 
 The rule the table encodes: **a seam that ADDS a requirement back searches; one that only relaxes need
 not.** Deleting a whole statement only relaxes. Re-enabling, and deleting one fact of a group, do not.
+
+## A through-statement about a drawn circle is a reference ([ADR-548](06-decisions.md#adr-548))
+
+The circle DEFINITION rules (`circle`, `circumcircle` in `src/parser/parse.ts`) now ask ADR-029's
+introduce-vs-resolve question before they mint anything, through one predicate,
+`circleThroughReference`: a through-statement is a REFERENCE when its centre is named and that circle
+exists, or when it says the definite «המעגל» / "the circle" and at least one circle is drawn. A reference
+resolves through the same seam every circle-consuming rule uses (`circumscribingRef` →
+`directionalCircleRef` → `existingCircleRef`, including the ADR-443 membership tie-break); several
+circles it cannot bind return the typed `ambiguous-circle-ref` ask.
+
+A reference lowers to one `point-on-circle` per through label — the lowering «X על המעגל» already has, so
+the apply-side M1 membership (idempotent, converting, or named as a contradiction) is shared, not copied.
+A stated numeric size rides along as `set-radius`. The path strips everything it reads and defers on any
+residue, so a second clause is never swallowed.
+
+The through clause is read by one reader, `throughClause` (every carrier spelling and every label of a
+list). A definition lowers exactly one through point; a longer list is the circumcircle (whose own rule
+now reads list separators) or it fails closed. The old "uppercase residue for the post-passes" allowance
+is gone: no post-pass ever claimed it.

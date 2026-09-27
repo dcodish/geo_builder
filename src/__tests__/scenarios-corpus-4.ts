@@ -46,6 +46,8 @@ import type { AnyCommand, Id, Vec } from '@/engine';
 
 import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-harness';
+import { ctxOf } from './scenario-pipeline';
+import { parse } from '@/parser';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -2745,6 +2747,42 @@ export const SCENARIOS_4: Scenario[] = [
         shapes.add(dist(A, B).toFixed(2));
       }
       expect(shapes.size, 'the configurations are genuinely different').toBeGreaterThanOrEqual(3);
+    },
+  },
+  {
+    id: 'definite-circle-passes-through-binds-existing',
+    title:
+      '#1438 / ADR-548: «המעגל עובר דרך A» after «מעגל O» puts A on circle O — it used to draw a SECOND circle through A (green), drop «ו-B», or refuse naming a «P» the student never typed',
+    guards:
+      "External review of prod, relayed by the operator 2026-09-27: «מעגל O · נקודה A · המעגל עובר דרך A» committed `circle-through circle-P` — two circles, O not through A, every row green. The definite «המעגל» is an ADR-029 REFERENCE, but the circle DEFINITION rule never asked the introduce-vs-resolve question: it stripped «מעגל\\w*», minted a fresh centre, and let the through list's other labels ride as residue no post-pass claimed. Now a through-statement about a drawn circle lowers exactly like «X [ו-Y] על המעגל». Asserted: the reviewer's sequence keeps ONE circle with A on circle O; the «ו-B» variant puts A AND B on it; beside two circles it ASKS (`ambiguous-circle-ref`) instead of minting a third; «E נקודה מחוץ למעגל» then «המעגל עובר דרך E» is a contradiction the verifier names (E, circle O) — the same surface as «E על המעגל»; with A undefined nothing named «P» appears. Spellings, the named-existing twin and the residue hole are in src/parser/__tests__/definite-circle-through-1438.test.ts.",
+    steps: ['מעגל O', 'נקודה A', 'המעגל עובר דרך A'],
+    check(fig) {
+      allStepsOk(fig);
+      const onO = (f: typeof fig, id: string) => {
+        const c = f.circles.get('circle-O')!;
+        expect(Math.abs(dist(f.positions.get(id)!, c.center) - c.r), `${id} is on circle O`).toBeLessThan(1e-6);
+      };
+      expect([...fig.circles.keys()], 'one circle only — no circle P').toEqual(['circle-O']);
+      onO(fig, 'A');
+      // «ו-B»: every label of the through list lands on the circle — B was silently dropped.
+      const two = replay(factsOf(['משולש ABC', 'מעגל O', 'המעגל עובר דרך A ו-B']));
+      allStepsOk(two);
+      expect([...two.circles.keys()]).toEqual(['circle-O']);
+      onO(two, 'A');
+      onO(two, 'B');
+      // Two circles and no way to tell which: ASK, never a third circle.
+      const amb = parse('המעגל עובר דרך A', ctxOf(factsOf(['מעגל O', 'מעגל P', 'נקודה A'])));
+      expect(amb).toMatchObject({ ok: false, reason: 'ambiguous-circle-ref', centers: ['O', 'P'] });
+      // A point stated OUTSIDE, then said to be on the circle: the contradiction is named.
+      const side = replay(factsOf(['מעגל O', 'E נקודה מחוץ למעגל', 'המעגל עובר דרך E']));
+      expect([...side.circles.keys()]).toEqual(['circle-O']);
+      expect(side.violations.some((v) => v.relation === 'circle-side' && v.ids.includes('E') && v.ids.includes('circle-O')), 'E outside vs on circle O is named').toBe(true);
+      // A never introduced: it is created ON circle O; nothing called P exists anywhere.
+      const fresh = replay(factsOf(['מעגל O', 'המעגל עובר דרך A']));
+      allStepsOk(fresh);
+      expect([...fresh.circles.keys()]).toEqual(['circle-O']);
+      expect([...fresh.positions.keys()].some((k) => /P/.test(k)), 'no «P» anywhere').toBe(false);
+      onO(fresh, 'A');
     },
   },
 ];
