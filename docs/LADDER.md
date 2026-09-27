@@ -15,9 +15,10 @@ _Instrumentation: `StepResult.ladder` (an ordered string trace of the stages tra
 | 0e | `metricImpossibility` — a pinned distance longer than the shortest pinned PATH between its endpoints ([ADR-417](06-decisions.md#adr-417); as-found, recorded here by ADR-538) | `pre:impossible` | yes |
 | 0f | `angleSumImpossibility` — a declared polygon's stated interior angles summing past its own (n − 2)·180° ([ADR-538](06-decisions.md#adr-538)) | `pre:impossible` | yes |
 | 0g | `boundImpossibility` — a stated BOUND and a stated VALUE of the same measure that exclude each other, strictness respected ([ADR-541](06-decisions.md#adr-541)) | `pre:impossible` | yes |
+| 0g′ | `sideImpossibility` — a stated SIDE (inside/outside a circle or polygon, same/different sides of a line) and a statement that STRUCTURALLY puts the point elsewhere: on the circle, its centre (outside), a vertex / edge / edge midpoint of the region, on the line, or the opposite side. Reads the construction's side REQUIREMENT records plus the incoming command's own asserted objects, so both orders are one case ([ADR-549](06-decisions.md#adr-549)) | `pre:impossible` | yes |
 
-All three provers are SOUND one way only: a violation proves impossibility and refuses before the ladder;
-passing proves nothing. The same three run inside the classifier's `constraintIsPending` (stage 5), so a
+All four provers are SOUND one way only: a violation proves impossibility and refuses before the ladder;
+passing proves nothing. The same four run inside the classifier's `constraintIsPending` (stage 5), so a
 proven contradiction is never filed as ADR-104's pending state — and, because they run before anything
 mutates, the refusal is also the CHEAP path (#1335 measured 19.6 s → 2.2 s on its own sequence).
 

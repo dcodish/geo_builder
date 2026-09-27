@@ -235,6 +235,22 @@
       "areaOf": "שטח(",
       "perimeterOf": "היקף("
     },
+    "stmt": {
+      "centreOfCircle": "הוא מרכז המעגל",
+      "midpointOf": "היא אמצע",
+      "vertexOf": "היא קדקוד של",
+      "differentSidesOf": "בצדדים שונים של",
+      "sameSideOf": "באותו צד של",
+      "outsideCircle": "מחוץ למעגל",
+      "insideCircle": "בתוך המעגל",
+      "onCircle": "על המעגל",
+      "outsideTriangle": "מחוץ למשולש",
+      "insideTriangle": "בתוך המשולש",
+      "outsidePolygon": "מחוץ למצולע",
+      "insidePolygon": "בתוך המצולע",
+      "onSegment": "על הקטע",
+      "onLine": "על הישר"
+    },
     "overConstrained": "לא ניתן: הנתון {{what}} סותר נתון קודם — אי אפשר לקיים את שניהם יחד.",
     "overConstrained_said": "לא ניתן: «{{said}}» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.",
     "overConstrained_said_vs": "לא ניתן: «{{said}}» סותר את «{{other}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.",

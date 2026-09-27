@@ -235,6 +235,22 @@
       "areaOf": "area(",
       "perimeterOf": "perimeter("
     },
+    "stmt": {
+      "centreOfCircle": "is the centre of circle",
+      "midpointOf": "is the midpoint of",
+      "vertexOf": "is a vertex of",
+      "differentSidesOf": "on different sides of",
+      "sameSideOf": "on the same side of",
+      "outsideCircle": "outside circle",
+      "insideCircle": "inside circle",
+      "onCircle": "on circle",
+      "outsideTriangle": "outside triangle",
+      "insideTriangle": "inside triangle",
+      "outsidePolygon": "outside polygon",
+      "insidePolygon": "inside polygon",
+      "onSegment": "on segment",
+      "onLine": "on line"
+    },
     "overConstrained": "Can't do that: {{what}} contradicts an earlier given — they can't both hold.",
     "overConstrained_said": "Can't do that: «{{said}}» contradicts an earlier given — they can't both hold. The reason: {{what}}.",
     "overConstrained_said_vs": "Can't do that: «{{said}}» contradicts «{{other}}» — they can't both hold. The reason: {{what}}.",

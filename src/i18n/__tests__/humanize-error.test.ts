@@ -294,3 +294,39 @@ describe('#983 — the diagonal refusals humanise the string the ENGINE emits', 
     expect(shown).not.toMatch(/[a-z]{2,}/);
   });
 });
+
+/**
+ * #1470 (ADR-549) — the SIDE-STATEMENT vocabulary is fully translated. The wire is ADR-540's
+ * `impossible: X contradicts Y`, with both halves the student's own worded statements; every phrase
+ * `sideImpossibility` can emit is listed here, and the #413 property holds for each.
+ */
+describe('#1470 — a side contradiction reads fully in Hebrew', () => {
+  const STATEMENTS = [
+    'E on circle O',
+    'E outside circle O',
+    'E inside circle O',
+    'O is the centre of circle O',
+    'E on segment AB',
+    'E on line AB',
+    'M is the midpoint of AB',
+    'A is a vertex of ABC',
+    'E outside triangle ABC',
+    'E inside triangle ABC',
+    'E outside polygon ABCD',
+    'E inside polygon ABCD',
+    'C, D on different sides of AB',
+    'C, D on the same side of AB',
+  ];
+  for (const st of STATEMENTS) {
+    it(`«${st}»`, () => {
+      const shown = humanizeError(`impossible: «${st}» contradicts «E outside circle O»`, t);
+      expect(hasHebrew(shown)).toBe(true);
+      expect(shown, `«${shown}» leaks English`).not.toMatch(/[a-z]{2,}/);
+    });
+  }
+  it('the operator’s sequence renders as one sentence naming both statements', () => {
+    expect(humanizeError('impossible: «E on circle O» contradicts «E outside circle O»', t).replace(/[⁦-⁩]/g, '')).toBe(
+      'לא ייתכן: «E על המעגל O» סותר את «E מחוץ למעגל O» — שני הנתונים אינם יכולים להתקיים יחד באף שרטוט. בדקו את הנתונים.',
+    );
+  });
+});

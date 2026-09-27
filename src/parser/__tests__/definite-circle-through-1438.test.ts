@@ -69,11 +69,17 @@ describe('#1438 — the issue table: a definite «המעגל» over a drawn circ
   });
 
   it('E stated outside, then «המעגל עובר דרך E» → the same named contradiction as «E על המעגל»', () => {
-    for (const line of ['המעגל עובר דרך E', 'E על המעגל']) {
-      const fig = replay(factsOf(['מעגל O', 'E נקודה מחוץ למעגל', line] as never));
+    // #1470 (ADR-549) overrules the amber this lock used to assert: the two statements cannot both hold,
+    // so the incidence is REFUSED at stage 0g′ naming both — for both spellings alike, which is what this
+    // lock is for (the spelling binds circle O exactly as «E על המעגל» does).
+    const errors = ['המעגל עובר דרך E', 'E על המעגל'].map((line) => {
+      const facts = factsOf(['מעגל O', 'E נקודה מחוץ למעגל', line] as never);
+      const fig = replay(facts);
       expect([...fig.circles.keys()], line).toEqual(['circle-O']);
-      expect(fig.violations.map((v) => [v.relation, ...v.ids]), line).toContainEqual(['circle-side', 'E', 'circle-O']);
-    }
+      return fig.status[facts[facts.length - 1].id];
+    });
+    expect(errors[0]).toBe('impossible: «E on circle O» contradicts «E outside circle O»');
+    expect(errors[1]).toBe(errors[0]);
   });
 });
 

@@ -811,3 +811,29 @@ The through clause is read by one reader, `throughClause` (every carrier spellin
 list). A definition lowers exactly one through point; a longer list is the circumcircle (whose own rule
 now reads list separators) or it fails closed. The old "uppercase residue for the post-passes" allowance
 is gone: no post-pass ever claimed it.
+
+## A stated side is a requirement record, checked at stage 0g′ ([ADR-549](06-decisions.md#adr-549))
+
+- **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`) — `circle-side`,
+  `polygon-side`, `line-side`. ONE definition of which commands state a side, `recordRequirement`
+  (`engine/requirements.ts`), is called by `applyCommand` (so every probe carries the records) and by
+  `applyStep` / `applyCoupledStep`'s single `withRequirements` stamp on an accepted result — so a record
+  survives every ladder rebuild (M1 reinterpretations, recruiter trials, ownership passes) without any of
+  them knowing the field. Absent when no side was stated, so every other figure is byte-identical.
+- **Prover.** `sideImpossibility(probed, cmd)` (`engine/sideFeasibility.ts`) at stage 0g′, after the
+  bound prover, and inside `constraintIsPending` beside the other three. It is STRUCTURAL: it reads which
+  object a point is (a rider, a crossing, a midpoint, a foot, a vertex), what defines a circle (its
+  through-point, its circumcentre's three points), `coincide` classes, and the constraints an M1 lowering
+  leaves (`length-radius`, `|OE| = r` against a stated radius, an `equal` radius pair, `collinear` /
+  `collinear-order`). The incoming command's own claim is read from its structural probe on an empty
+  construction, the `introducedPointIds` idiom — so a statement about an existing point, which `applyCommand`
+  alone may not reflect (`point-on-segment` on an existing id), is still seen.
+- **Message.** `impossible: «X» contradicts «Y»`, the NEW statement first — ADR-540's wire shape, rendered
+  by the same `errors.boundImpossible` sentence; the side vocabulary (`on circle`, `outside triangle`,
+  `on different sides of`, …) is translated by `STATEMENT_WORDS` in `i18n/humanizeError.ts` under
+  `errors.stmt.*`, with the #413 no-English property locked.
+- **Strict outside (#1487).** `pointOutsidePolygon(p, verts, margin)` (`engine/geometry.ts`) is the mirror
+  of the strict-inside test: not inside AND clear of every edge. The verifier and apply's seeding both use
+  it, with the same margins as their inside tests.
+- **Parser.** `regionSideFallback` no longer declines a region's own vertex («A בתוך המשולש ABC»): it
+  parses, and the prover refuses it with the reason, instead of «I didn't understand».

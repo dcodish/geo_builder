@@ -989,9 +989,25 @@ export type Constraint =
   | MeasureSumConstraint
   | LengthProductConstraint;
 
+/**
+ * A stated SIDE of a region, kept as a REQUIREMENT RECORD on the construction (#1470,
+ * [ADR-549](docs/06-decisions.md#adr-549)) — the ADR-254 family («E מחוץ למעגל», «E בתוך המשולש ABC»,
+ * «C ו-D בצדדים שונים של AB»). A side is an inequality with nothing to drive, so it pushes no
+ * constraint; before this record it survived only as a fact COMMAND, which the step ladder never sees —
+ * and the sampler hint (`FreePoint.region`) vanishes the moment M1 turns the point into an on-circle
+ * rider. Recorded by the three apply cases ({@link recordRequirement}); read by the stage-0g′ prover
+ * `sideImpossibility`, which refuses a later (or earlier) statement that structurally contradicts it.
+ */
+export type SideRequirement =
+  | { kind: 'circle-side'; id: Id; circle: Id; side: 'inside' | 'outside' }
+  | { kind: 'polygon-side'; id: Id; poly: Id[]; side: 'inside' | 'outside' }
+  | { kind: 'line-side'; a: Id; b: Id; subjects: Id[]; rel: 'different' | 'same' };
+
 export interface Construction {
   objects: GeoObject[];
   constraints: Constraint[];
+  /** Stated sides (#1470, ADR-549) — absent when none was stated, so every figure without one is unchanged. */
+  requirements?: SideRequirement[];
 }
 
 /** Commands the engine applies. The parser (Phase 4) will produce these. */

@@ -14,7 +14,7 @@
 
 import type { Command, Constraint, Construction, Id, Polygon, Vec } from './types';
 import type { ResolvedCircle } from './evaluate';
-import { angleDeg, dist, isRingDiagonal, pointInPolygon, polygonArea } from './geometry';
+import { angleDeg, dist, isRingDiagonal, pointInPolygon, pointOutsidePolygon, polygonArea } from './geometry';
 import { angleOffSpans, angleOnSpans, drawnArcSpans, type ArcSpan } from './arcs';
 import { constraintRefs, describeConstraint, isSatisfied, residual, residualTolerance } from './solve';
 import { formatMeasure } from '../format';
@@ -414,7 +414,8 @@ export function checkGivens(
     const cx = vs.reduce((s, v) => s + v.x, 0) / vs.length;
     const cy = vs.reduce((s, v) => s + v.y, 0) / vs.length;
     const rspan = Math.max(...vs.map((v) => dist(v, { x: cx, y: cy })));
-    const ok = cmd.side === 'inside' ? pointInPolygon(p, vs, rspan * 0.01) : !pointInPolygon(p, vs);
+    // #1487 (ADR-549): the boundary is neither side — outside is STRICT with the same clearance as inside.
+    const ok = cmd.side === 'inside' ? pointInPolygon(p, vs, rspan * 0.01) : pointOutsidePolygon(p, vs, rspan * 0.01);
     if (!ok) {
       const polyName = cmd.poly.join('');
       violations.push({
