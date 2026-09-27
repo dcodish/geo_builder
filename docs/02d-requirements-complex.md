@@ -57,7 +57,9 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   *(Operator authority.)*
 - **FR-CN-3 (Must)** — **Branches are the exam's «כל האפשרויות».** The integer `k` in an angle equation
   enumerates a real solution set, and "show another configuration" walks that set — so a question asking
-  for *all* possibilities can be seen, not just described.
+  for *all* possibilities can be seen, not just described. **A numeric equation's roots are
+  configurations too**: `z² − 4z + 13 = 0` is two drawings, and the button walks both. *(Amended —
+  [ADR-CX-049](06d-decisions-complex.md#adr-cx-049).)*
 - **FR-CN-4 (Must)** — **A default is a starting value, never a fixed one.** An unstated magnitude is a
   free degree of freedom: it must move on "another configuration" or when a later given forces it. Free
   DOF has **one** definition — the nullspace dimension — read by the cue, the knowledge gates and the
@@ -100,6 +102,11 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   configuration, with its gauge pinned. **The figure shows everything; the panel prints only what was
   asked for, and only what is known.** A value true of the current drawing but not forced by the givens
   is not printed. *(The product's statement of the suite rule [FR-DP-3](02w-requirements-workspace.md).)*
+  Invariance is ASKED, never counted: the value is compared across every configuration, so a value two
+  roots share prints (`Re z = 2`) and one they do not is withheld as differing. When the tool cannot
+  prove it has found every configuration it says so — «ייתכן שיש לערך כמה אפשרויות — הוא אינו נקבע
+  בוודאות» — and prints nothing. *(Amended — operator ruling 2026-09-27,
+  [ADR-CX-049](06d-decisions-complex.md#adr-cx-049).)*
 - **FR-KN-2 (Must)** — **A claim is the student's answer: verified, never obeyed.** A claim never
   reshapes the figure to become true.
 - **FR-KN-3 (Must)** — **A claim gets one of THREE verdicts, and the third is not optional:**

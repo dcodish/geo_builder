@@ -54,11 +54,12 @@ import {
   type ExprQuery,
   measureOf,
 } from '../model/measure';
-import { type KnowledgeRow, isKnowledge, whyNotKnowledge } from '../model/knowledge';
+import { type Completeness, type KnowledgeRow, knowledgeOf, realValue, whyNotKnowledge } from '../model/knowledge';
 import { prettyName } from '../model/naming';
 import type { SequenceKind, SequenceStatement } from '../model/sequence';
 import { type SurfacedFormula, surfacedFormulas } from '../formulas/table';
 import { type Bound, solveResiduals } from '../solve/tier2';
+import { type PolyContext, allRoots, censusStarts, degreeOf, polyOf } from '../solve/census';
 import {
   type Env,
   type ResidualSpec,
@@ -277,6 +278,14 @@ export interface Derived2 {
    * this button must not be able to disagree about how free the figure is.
    */
   readonly canCycle: boolean;
+  /**
+   * #1427 (ADR-CX-049) — how many VALID configurations the fold holds: tier-1 kept branches × the
+   * numeric tier's distinct solutions. What "show another" walks and what `canCycle` reads.
+   * `enumeratedConfigCount` stays the tier-1 count.
+   */
+  readonly configCount: number;
+  /** whether {@link configCount} is provably every configuration (`complete`) or a census floor */
+  readonly configCompleteness: Completeness;
   /** the filter that emptied the configuration set, when one did */
   readonly emptiedBy: BranchFilter | null;
   /** the student's ANSWERS, checked against the figure the givens produced — never drivers */
@@ -313,6 +322,13 @@ const magnitudes = (m: ReadonlyMap<string, number>): Map<string, number> =>
   new Map([...m].map(([k, v]) => [k, Math.abs(v)]));
 
 const HALF_TURN = fromTurns(rat(1, 2));
+
+/**
+ * #1427 — how many multi-start solves the n-D census may spend over ALL branches of one fold. Split
+ * evenly (at least 4 per branch), fixed rather than timed so the configuration set is deterministic:
+ * a timed census would draw a different list on a slower machine.
+ */
+const CENSUS_STARTS = 8;
 
 /**
  * Everything a fold reads, named rather than ordered.
@@ -419,9 +435,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
   const driveRows = claimDriveRows(assertions, t1Base);
   const t1 = driveRows.length ? solveTier1([...constraints, ...driveRows], signed) : t1Base;
 
-  const sample = new Map(literalSample);
+  const baseSample = new Map(literalSample);
   for (const c of constraints) {
-    for (const p of collectParams(c)) if (!sample.has(p)) sample.set(p, paramSample(p, seed));
+    for (const p of collectParams(c)) if (!baseSample.has(p)) baseSample.set(p, paramSample(p, seed));
   }
   // An OBJECT or a MEASURE can be the only mention of a parameter — «המעגל שמרכזו O ורדיוסו r» and
   // «אורך z1z2 = 15r» each name `r` where no constraint does. Sampling only what the constraints
@@ -429,30 +445,30 @@ export function foldConstraints(input: FoldInput): Derived2 {
   // (it silently did not drive): the same omission, surfacing two different ways.
   for (const o of objects) {
     if (o.kind !== 'circle') continue;
-    for (const p of paramsOf(o.radius)) if (!sample.has(p)) sample.set(p, paramSample(p, seed));
+    for (const p of paramsOf(o.radius)) if (!baseSample.has(p)) baseSample.set(p, paramSample(p, seed));
   }
   for (const m of measures) {
-    for (const p of paramsOf(m.rhs)) if (!sample.has(p)) sample.set(p, paramSample(p, seed));
+    for (const p of paramsOf(m.rhs)) if (!baseSample.has(p)) baseSample.set(p, paramSample(p, seed));
   }
   /**
    * #1366 — a parameter the givens DETERMINE is drawn at its solved value, and is not a free DOF.
    *
-   * `z1 = 3+4i` with `|z1| = 9r` solves `r = 5/9` (tier 1's `params`). Left at its seed sample, `r`
+   * `z1 = 3+4i` with `|z1| = 9r` solves `r = 5/9` (tier 1's `params`). Left at its seed baseSample, `r`
    * would print as free, and tier 2 — which may move every free parameter — could drive it off 5/9 to
    * satisfy some other given, silently breaking the one that pinned it. A parameter determined in terms
    * of other, still-free parameters follows them: their samples are taken first, then it is computed.
    */
   const solvedParams = new Set<string>();
   for (const [p, d] of t1.params.determined) {
-    let v = evalMod(d.konst, magnitudes(sample));
+    let v = evalMod(d.konst, magnitudes(baseSample));
     if (v === null) continue;
-    for (const [fn, c] of d.coefs) v *= Math.pow(Math.abs(sample.get(fn) ?? paramSample(fn, seed)), toNumber(c));
+    for (const [fn, c] of d.coefs) v *= Math.pow(Math.abs(baseSample.get(fn) ?? paramSample(fn, seed)), toNumber(c));
     if (!Number.isFinite(v) || v <= 0) continue;
-    sample.set(p, v);
+    baseSample.set(p, v);
     solvedParams.add(p);
   }
 
-  const { kept, emptiedBy } = filterBranches(t1.branches, filterList, sample);
+  const { kept, emptiedBy } = filterBranches(t1.branches, filterList, baseSample);
   const enumeratedConfigCount = kept.length;
   /**
    * EXISTENCE, asked separately from the count (#698, ADR-CX-034).
@@ -464,26 +480,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * sets `emptiedBy` only in that case, never for an empty input).
    */
   const hasConfiguration = enumeratedConfigCount > 0 || (!t1.inconsistent && emptiedBy === null);
-  const index = enumeratedConfigCount ? ((configIndex % enumeratedConfigCount) + enumeratedConfigCount) % enumeratedConfigCount : 0;
-  const branch: Branch | undefined = kept[index];
 
-  /**
-   * ADR-CX-045 — GIVE EACH SIGN-FREE PARAMETER ITS SIGN in this configuration. One tier 1 carries (it
-   * appears in an exact equation) takes the sign the BRANCH chose — `u^5 = -32` enumerates exactly one,
-   * s = ½, so u = −2. One only the numeric tier sees (`a` in `a + b·i`) starts at a per-seed sign and
-   * tier 2 may move it through zero. The magnitude is untouched: it is still the sample or the exact
-   * solve above.
-   */
-  const branchSign = (p: string): 1 | -1 => {
-    const a = branch?.angles.get(signUnknown(p));
-    return a !== undefined && sameDirection(a, HALF_TURN) ? -1 : 1;
-  };
-  for (const p of signed) {
-    const v = sample.get(p);
-    if (v === undefined) continue;
-    const sgn = t1.signedParams.includes(p) ? branchSign(p) : paramSignSample(p, seed);
-    sample.set(p, sgn * Math.abs(v));
-  }
   /**
    * The sign of a parameter as KNOWLEDGE: the direction every kept configuration agrees on, or null when
    * they differ (`u^2 = 4` is u = ±2). A size, or a sign-free parameter no exact equation reaches, has
@@ -507,288 +504,523 @@ export function foldConstraints(input: FoldInput): Derived2 {
   };
 
   /**
-   * SAMPLE THE FREE DEGREES OF FREEDOM, then draw everything.
+   * ONE TIER-1 BRANCH, SOLVED — its numeric system, its census, and the readers over it (#1427).
    *
-   * The first version plotted only numbers whose magnitude the givens forced, and so drew NOTHING for
-   * any partially-specified figure — which is every figure while the student is still typing. That
-   * conflated two different rules. «Do not print an unknown value as knowledge» is right and is kept,
-   * at the LABEL. «Do not draw it» is wrong: the standing product rule is *always visualise*
-   * ([ADR-CX-001](../../docs/06d-decisions-complex.md#adr-cx-001) D3), and
-   * [ADR-052](../../docs/06-decisions.md#adr-052) permits a default as a **starting** value precisely
-   * so the figure can exist — provided it moves when the configuration changes, which it does, because
-   * the sample is keyed on the seed that "show another configuration" advances.
+   * Everything from here to the numeric solve depends on which branch is drawn: the sign each
+   * sign-free parameter takes, the windows a filter leaves on the free directions, the free basis
+   * itself. It used to run once, for the ONE branch on screen, so the numeric tier never saw the
+   * other branches and never reported its own other roots — and the knowledge gate, which must ask
+   * about EVERY valid configuration, could only count them. Now each kept branch is solved, and each
+   * reports the distinct solutions it has (`census`) and whether that list is provably all of them.
    */
-  /**
-   * THE ANGULAR WINDOW a filter leaves open for a FREE direction.
-   *
-   * An inequality prunes enumerated branches — but a direction the givens never pin is not a branch,
-   * it is a sampled degree of freedom, and pruning cannot reach it. «z1 ברביע הראשון» on its own is
-   * exactly that case, and it drew z1 on the +Re axis: a point on an axis is in NO quadrant, so the
-   * figure contradicted its own given while every check passed, because nothing had asked the sample
-   * to respect the filter.
-   *
-   * So a filter does two jobs, not one: it PRUNES the configurations the equations produced, and it
-   * BOUNDS the sampling of what they left free. Both are the same statement about the same direction.
-   *
-   * And it must do the second job on the coordinate the sampler actually MOVES, which is not always the
-   * name the student wrote — see `solve/window.ts`. Keying the window by the stated name reached the
-   * filter only while that name was the pivot; a name elimination made dependent was reached by neither
-   * this map nor the branch pruner, and the given was silently dropped (#690, ADR-CX-025).
-   */
-  const windows = new Map<string, { min: number; max: number }>();
-  const narrow = (name: string, min: number, max: number): void => {
-    const prev = windows.get(name);
-    windows.set(name, { min: Math.max(prev?.min ?? -Infinity, min), max: Math.min(prev?.max ?? Infinity, max) });
-  };
-
-  /**
-   * The affine form the linear tier left for a direction: `arg(name) = K + Σ c·arg(basis)`.
-   *
-   * The turn unknowns are folded into `K` because the branch has already chosen them — they are a
-   * constant here, not a coordinate anything may move. Mirrors `argumentOf` below, which is the
-   * function this must agree with: if the two ever disagreed, the window would bound one number while
-   * the figure drew another.
-   */
-  const affineArgOf = (name: string): AffineArg | null => {
-    const d = t1.argument.determined.get(name);
-    if (!d) return null;
-    let konstDeg = toDegrees(d.konst, sample);
-    if (konstDeg === null) return null;
-    const terms = new Map<string, number>();
-    for (const [fn, c] of d.coefs) {
-      const coef = toNumber(c);
-      if (isTurnUnknown(fn)) konstDeg += coef * Number(branch?.k.get(fn) ?? 0n) * 360;
-      else terms.set(fn, (terms.get(fn) ?? 0) + coef);
-    }
-    return { konstDeg, terms };
-  };
-
-  for (const f of filterList) {
-    const stated = statedWindow(f);
-    if (stated === null) continue;
-    // a direction the BRANCH fixed is already handled by pruning — bounding it would bound nothing
-    if (branch?.angles.has(f.name)) continue;
-    const affine = affineArgOf(f.name);
-    if (affine === null) {
-      // the name is in the free basis: the window is about the coordinate itself, as it always was
-      narrow(f.name, stated.min, stated.max);
-      continue;
-    }
-    // …otherwise it is DEPENDENT, and the window belongs on the basis coordinate that carries it
-    const projected = projectWindow(stated, affine, (n) => windows.get(n));
-    // `null` means it is not expressible as one interval — stage 3e verifies it instead of dropping it
-    if (projected !== null) narrow(projected.name, projected.min, projected.max);
-  }
-
-  /**
-   * Sample a free direction, STRICTLY inside its window when it has one.
-   *
-   * Strictly, because a quadrant is an open region: 0° and 90° are on the axes and belong to neither
-   * neighbour. The 0.12–0.88 inset also keeps the drawn point clear of the boundary, so a student can
-   * see which quadrant it is in rather than having to judge a point sitting on a ray.
-   */
-  const sampleArgDeg = (name: string): number => {
-    const t = (paramSample(`arg ${name}`, seed) - 0.6) / 1.8; // 0 .. 1, deterministic per seed
-    const w = windows.get(name);
-    if (!w || !Number.isFinite(w.min) || !Number.isFinite(w.max)) {
-      const lo = Number.isFinite(w?.min ?? NaN) ? w!.min : 0;
-      const hi = Number.isFinite(w?.max ?? NaN) ? w!.max : 360;
-      return lo + (0.12 + 0.76 * t) * (hi - lo);
-    }
-    return w.min + (0.12 + 0.76 * t) * (w.max - w.min);
-  };
-
-  const sampleModulus = (name: string): number => 0.8 + paramSample(`|${name}|`, seed);
-
-  /**
-   * THE FREE BASIS — the coordinates tier 1 could not remove, and the only ones tier 2 may move.
-   *
-   * Three kinds, and the third is easy to get wrong: the sample map holds both the real PARAMETERS the
-   * student named (`r`, `d`) and the opaque ANGLE ATOMS a cartesian literal introduced. The atoms are
-   * not free — `arg(3+4i)` is a fixed number the value layer carries symbolically — so optimising over
-   * them would let the solver "satisfy" an area given by quietly redefining what `3+4i` means.
-   */
-  const drawnNames = [...new Set([...t1.names, ...declaredNames])];
-
-  /**
-   * The free basis is taken over the DRAWN names, not over the constraint names.
-   *
-   * Tier 1 only ever sees names a constraint mentions, so a number the student merely declared — «z2»
-   * on its own line, or a vertex an object named — was absent from `t1.modulus.free`. It was still
-   * drawn, at an ad-hoc sample. The consequence was subtle and bad: «אורך z1z2 = 5» with z2 free
-   * reported VIOLATED, because the one point the measure could have moved was not in the vector tier 2
-   * was allowed to move. A point that is free enough to draw is free enough to drive.
-   */
-  const freeModNames = [
-    ...new Set([...t1.modulus.free, ...drawnNames.filter((n) => !t1.modulus.determined.has(n))]),
-  ];
-  const freeArgNames = [
-    ...new Set([
-      ...t1.argument.free.filter((n) => !isTurnUnknown(n) && !isSignUnknown(n)),
-      ...drawnNames.filter((n) => !t1.argument.determined.has(n) && !branch?.angles.has(n)),
-    ]),
-  ].filter((n) => !isTurnUnknown(n));
-  const freeParamNames = [...sample.keys()].filter((p) => !literalSample.has(p) && !solvedParams.has(p));
-
-  /**
-   * THE PUBLISHED FREE-DOF LIST — derived from the basis above, not from `t1.freeDof`.
-   *
-   * [ADR-CX-006](../../docs/06d-decisions-complex.md#adr-cx-006) makes the free-DOF count ONE
-   * definition, read by the cue, the knowledge gates and the sampler alike. Publishing tier 1's list
-   * while tier 2 optimised over a different (larger) basis was two definitions of one quantity, and
-   * they drifted exactly where it hurts: «z2» declared but unconstrained is genuinely free, tier 1
-   * never saw it, so the figure reported ZERO degrees of freedom — and the knowledge panel, asking
-   * that same count, then printed a sampled area as though the givens forced it.
-   *
-   * Real parameters are in the list because they are free by the same rule: `r` unstated is a free
-   * magnitude, and a measure in `r` is not a number until something pins it.
-   */
-  const freeDofNames = [
-    ...freeModNames.map((n) => `|${n}|`),
-    ...freeArgNames.map((n) => `arg ${n}`),
-    ...freeParamNames,
-  ];
-
-  interface State {
-    readonly mod: ReadonlyMap<string, number>;
-    readonly arg: ReadonlyMap<string, number>;
-    readonly par: ReadonlyMap<string, number>;
-  }
-
-  const initial: State = {
-    mod: new Map(freeModNames.map((n) => [n, sampleModulus(n)])),
-    arg: new Map(freeArgNames.map((n) => [n, sampleArgDeg(n)])),
-    par: new Map(sample),
-  };
-
-  const modulusOf = (name: string, st: State): { value: number; exact: ExpVec | null } => {
-    const d = t1.modulus.determined.get(name);
-    if (!d) return { value: st.mod.get(name) ?? sampleModulus(name), exact: null };
-    const base = evalMod(d.konst, magnitudes(st.par));
-    if (base === null) return { value: sampleModulus(name), exact: null };
-    let v = base;
-    for (const [fn, c] of d.coefs) v *= Math.pow(st.mod.get(fn) ?? 1, toNumber(c));
-    // #1389 — a solved parameter inside the exact modulus is substituted: `18r` with r = 5/9 reads 10
-    return { value: v, exact: d.coefs.size === 0 ? substituteSolvedParams(d.konst, t1.paramValues) : null };
-  };
-
-  const argumentOf = (name: string, st: State): { deg: number; exact: Angle | null } => {
-    const fixed = branch?.angles.get(name);
-    if (fixed) {
-      const deg = toDegrees(fixed, st.par);
-      if (deg !== null) return { deg, exact: fixed };
-    }
-    const d = t1.argument.determined.get(name);
-    if (!d) return { deg: st.arg.get(name) ?? sampleArgDeg(name), exact: null };
-    let deg = toDegrees(d.konst, st.par);
-    if (deg === null) return { deg: sampleArgDeg(name), exact: null };
-    for (const [fn, c] of d.coefs) {
-      const turn = branch?.k.get(fn);
-      deg += toNumber(c) * (isTurnUnknown(fn) ? Number(turn ?? 0n) * 360 : (st.arg.get(fn) ?? 0));
-    }
-    return { deg, exact: null };
-  };
-
-  const positionsOf = (st: State): Map<string, Cx> => {
-    const out = new Map<string, Cx>([[ORIGIN, { re: 0, im: 0 }]]);
-    for (const name of drawnNames) {
-      const m = modulusOf(name, st);
-      const a = argumentOf(name, st);
-      if (Number.isFinite(m.value) && Number.isFinite(a.deg)) out.set(name, cPolar(m.value, a.deg));
-    }
-    return out;
-  };
-
-  const envFor = (st: State): Env => {
-    const pos = positionsOf(st);
-    // `st.par` carries the literal ANGLE ATOMS as well as the real parameters — both are numbers the
-    // residuals need, and keeping them in one map is what lets a `5+2i` literal be evaluated at all
-    return { at: (n) => pos.get(n), param: (p) => st.par.get(p), atoms: st.par };
-  };
-
-  // --- TIER 2: drive the free basis to satisfy what tier 1 could not read ----
-  const specs: ResidualSpec[] = [
-    ...t1.deferred.map((c, i) => deferredResidual(c, i)),
-    ...measures.map((m, i) => measureResidual(m, i)),
-  ];
-  /**
-   * Only relations that can be EVALUATED join the residual vector — its length has to be constant for
-   * the minimiser — and the ones that cannot are **collected and reported**.
-   *
-   * They used to be dropped here in silence. A stated equation the engine could not read then produced
-   * nothing at all: no drive, no refusal, no row — a figure that ignored a given while looking finished,
-   * which is the silent-drop class the whole tree is built to refuse (`src-complex/CLAUDE.md`:
-   * *nothing stated is ever silently dropped*). `undecided` is a distinct answer from `unsatisfied` and
-   * is now shown as one.
-   */
-  const initialEnv = envFor(initial);
-  const live: { spec: ResidualSpec; width: number }[] = [];
-  const undecided: string[] = [];
-  for (const spec of specs) {
-    const v = spec.values(initialEnv);
-    if (v !== null) live.push({ spec, width: v.length });
-    else if (spec.key.startsWith('deferred')) undecided.push(spec.describe);
-  }
-
-  const encode = (st: State): number[] => [
-    ...freeModNames.map((n) => st.mod.get(n) ?? 1),
-    ...freeArgNames.map((n) => st.arg.get(n) ?? 0),
-    ...freeParamNames.map((n) => st.par.get(n) ?? 1),
-  ];
-
-  const decode = (x: readonly number[]): State => {
-    const mod = new Map<string, number>();
-    const arg = new Map<string, number>();
-    const par = new Map(sample);
-    let i = 0;
-    for (const n of freeModNames) mod.set(n, x[i++]);
-    for (const n of freeArgNames) arg.set(n, x[i++]);
-    for (const n of freeParamNames) par.set(n, x[i++]);
-    return { mod, arg, par };
-  };
-
-  const evaluateAt = (x: readonly number[]): number[] => {
-    const env = envFor(decode(x));
-    const out: number[] = [];
-    for (const { spec, width } of live) {
-      const v = spec.values(env);
-      // a relation that stops being evaluable mid-search is far from satisfied, never zero — and the
-      // vector must keep its length, or the minimiser is solving a different problem each step
-      if (v === null) out.push(...new Array<number>(width).fill(1e6));
-      else out.push(...v);
-    }
-    return out;
-  };
-
-  const bounds: Bound[] = [
-    // a modulus is a length: strictly positive, or the point is the origin and its direction is a lie
-    ...freeModNames.map(() => ({ lo: 1e-6 })),
-    ...freeArgNames.map((n) => {
-      const w = windows.get(n);
-      return {
-        lo: w && Number.isFinite(w.min) ? w.min + 1e-6 : undefined,
-        hi: w && Number.isFinite(w.max) ? w.max - 1e-6 : undefined,
-      };
-    }),
+  const systemFor = (branch: Branch | undefined, censusStartCount: number) => {
+    const sample = new Map(baseSample);
     /**
-     * ADR-CX-045 — a SIZE parameter (`r` in `|z1| = 9r`) is a positive magnitude; a sign-free one an
-     * exact equation carries keeps the sign its branch chose (the branch owns it, and tier 2 crossing
-     * zero would draw a figure the enumeration never produced); a sign-free one only this tier sees
-     * (`a`, `b` in `a + b·i`) is any real, unbounded.
+     * ADR-CX-045 — GIVE EACH SIGN-FREE PARAMETER ITS SIGN in this configuration. One tier 1 carries (it
+     * appears in an exact equation) takes the sign the BRANCH chose — `u^5 = -32` enumerates exactly one,
+     * s = ½, so u = −2. One only the numeric tier sees (`a` in `a + b·i`) starts at a per-seed sign and
+     * tier 2 may move it through zero. The magnitude is untouched: it is still the sample or the exact
+     * solve above.
      */
-    ...freeParamNames.map((p): Bound => {
-      if (!signed.has(p)) return { lo: 1e-6 };
-      if (!t1.signedParams.includes(p)) return {};
-      return (sample.get(p) ?? 1) < 0 ? { hi: -1e-6 } : { lo: 1e-6 };
-    }),
-  ];
+    const branchSign = (p: string): 1 | -1 => {
+      const a = branch?.angles.get(signUnknown(p));
+      return a !== undefined && sameDirection(a, HALF_TURN) ? -1 : 1;
+    };
+    for (const p of signed) {
+      const v = sample.get(p);
+      if (v === undefined) continue;
+      const sgn = t1.signedParams.includes(p) ? branchSign(p) : paramSignSample(p, seed);
+      sample.set(p, sgn * Math.abs(v));
+    }
 
-  const solved =
-    live.length > 0 && !t1.inconsistent
-      ? solveResiduals(evaluateAt, encode(initial), { bounds })
-      : null;
+    /**
+     * SAMPLE THE FREE DEGREES OF FREEDOM, then draw everything.
+     *
+     * The first version plotted only numbers whose magnitude the givens forced, and so drew NOTHING for
+     * any partially-specified figure — which is every figure while the student is still typing. That
+     * conflated two different rules. «Do not print an unknown value as knowledge» is right and is kept,
+     * at the LABEL. «Do not draw it» is wrong: the standing product rule is *always visualise*
+     * ([ADR-CX-001](../../docs/06d-decisions-complex.md#adr-cx-001) D3), and
+     * [ADR-052](../../docs/06-decisions.md#adr-052) permits a default as a **starting** value precisely
+     * so the figure can exist — provided it moves when the configuration changes, which it does, because
+     * the sample is keyed on the seed that "show another configuration" advances.
+     */
+    /**
+     * THE ANGULAR WINDOW a filter leaves open for a FREE direction.
+     *
+     * An inequality prunes enumerated branches — but a direction the givens never pin is not a branch,
+     * it is a sampled degree of freedom, and pruning cannot reach it. «z1 ברביע הראשון» on its own is
+     * exactly that case, and it drew z1 on the +Re axis: a point on an axis is in NO quadrant, so the
+     * figure contradicted its own given while every check passed, because nothing had asked the sample
+     * to respect the filter.
+     *
+     * So a filter does two jobs, not one: it PRUNES the configurations the equations produced, and it
+     * BOUNDS the sampling of what they left free. Both are the same statement about the same direction.
+     *
+     * And it must do the second job on the coordinate the sampler actually MOVES, which is not always the
+     * name the student wrote — see `solve/window.ts`. Keying the window by the stated name reached the
+     * filter only while that name was the pivot; a name elimination made dependent was reached by neither
+     * this map nor the branch pruner, and the given was silently dropped (#690, ADR-CX-025).
+     */
+    const windows = new Map<string, { min: number; max: number }>();
+    const narrow = (name: string, min: number, max: number): void => {
+      const prev = windows.get(name);
+      windows.set(name, { min: Math.max(prev?.min ?? -Infinity, min), max: Math.min(prev?.max ?? Infinity, max) });
+    };
 
-  const state = solved ? decode(solved.x) : initial;
+    /**
+     * The affine form the linear tier left for a direction: `arg(name) = K + Σ c·arg(basis)`.
+     *
+     * The turn unknowns are folded into `K` because the branch has already chosen them — they are a
+     * constant here, not a coordinate anything may move. Mirrors `argumentOf` below, which is the
+     * function this must agree with: if the two ever disagreed, the window would bound one number while
+     * the figure drew another.
+     */
+    const affineArgOf = (name: string): AffineArg | null => {
+      const d = t1.argument.determined.get(name);
+      if (!d) return null;
+      let konstDeg = toDegrees(d.konst, sample);
+      if (konstDeg === null) return null;
+      const terms = new Map<string, number>();
+      for (const [fn, c] of d.coefs) {
+        const coef = toNumber(c);
+        if (isTurnUnknown(fn)) konstDeg += coef * Number(branch?.k.get(fn) ?? 0n) * 360;
+        else terms.set(fn, (terms.get(fn) ?? 0) + coef);
+      }
+      return { konstDeg, terms };
+    };
+
+    for (const f of filterList) {
+      const stated = statedWindow(f);
+      if (stated === null) continue;
+      // a direction the BRANCH fixed is already handled by pruning — bounding it would bound nothing
+      if (branch?.angles.has(f.name)) continue;
+      const affine = affineArgOf(f.name);
+      if (affine === null) {
+        // the name is in the free basis: the window is about the coordinate itself, as it always was
+        narrow(f.name, stated.min, stated.max);
+        continue;
+      }
+      // …otherwise it is DEPENDENT, and the window belongs on the basis coordinate that carries it
+      const projected = projectWindow(stated, affine, (n) => windows.get(n));
+      // `null` means it is not expressible as one interval — stage 3e verifies it instead of dropping it
+      if (projected !== null) narrow(projected.name, projected.min, projected.max);
+    }
+
+    /**
+     * Sample a free direction, STRICTLY inside its window when it has one.
+     *
+     * Strictly, because a quadrant is an open region: 0° and 90° are on the axes and belong to neither
+     * neighbour. The 0.12–0.88 inset also keeps the drawn point clear of the boundary, so a student can
+     * see which quadrant it is in rather than having to judge a point sitting on a ray.
+     */
+    const sampleArgDeg = (name: string): number => {
+      const t = (paramSample(`arg ${name}`, seed) - 0.6) / 1.8; // 0 .. 1, deterministic per seed
+      const w = windows.get(name);
+      if (!w || !Number.isFinite(w.min) || !Number.isFinite(w.max)) {
+        const lo = Number.isFinite(w?.min ?? NaN) ? w!.min : 0;
+        const hi = Number.isFinite(w?.max ?? NaN) ? w!.max : 360;
+        return lo + (0.12 + 0.76 * t) * (hi - lo);
+      }
+      return w.min + (0.12 + 0.76 * t) * (w.max - w.min);
+    };
+
+    const sampleModulus = (name: string): number => 0.8 + paramSample(`|${name}|`, seed);
+
+    /**
+     * THE FREE BASIS — the coordinates tier 1 could not remove, and the only ones tier 2 may move.
+     *
+     * Three kinds, and the third is easy to get wrong: the sample map holds both the real PARAMETERS the
+     * student named (`r`, `d`) and the opaque ANGLE ATOMS a cartesian literal introduced. The atoms are
+     * not free — `arg(3+4i)` is a fixed number the value layer carries symbolically — so optimising over
+     * them would let the solver "satisfy" an area given by quietly redefining what `3+4i` means.
+     */
+    const drawnNames = [...new Set([...t1.names, ...declaredNames])];
+
+    /**
+     * The free basis is taken over the DRAWN names, not over the constraint names.
+     *
+     * Tier 1 only ever sees names a constraint mentions, so a number the student merely declared — «z2»
+     * on its own line, or a vertex an object named — was absent from `t1.modulus.free`. It was still
+     * drawn, at an ad-hoc sample. The consequence was subtle and bad: «אורך z1z2 = 5» with z2 free
+     * reported VIOLATED, because the one point the measure could have moved was not in the vector tier 2
+     * was allowed to move. A point that is free enough to draw is free enough to drive.
+     */
+    const freeModNames = [
+      ...new Set([...t1.modulus.free, ...drawnNames.filter((n) => !t1.modulus.determined.has(n))]),
+    ];
+    const freeArgNames = [
+      ...new Set([
+        ...t1.argument.free.filter((n) => !isTurnUnknown(n) && !isSignUnknown(n)),
+        ...drawnNames.filter((n) => !t1.argument.determined.has(n) && !branch?.angles.has(n)),
+      ]),
+    ].filter((n) => !isTurnUnknown(n));
+    const freeParamNames = [...sample.keys()].filter((p) => !literalSample.has(p) && !solvedParams.has(p));
+
+    /**
+     * THE PUBLISHED FREE-DOF LIST — derived from the basis above, not from `t1.freeDof`.
+     *
+     * [ADR-CX-006](../../docs/06d-decisions-complex.md#adr-cx-006) makes the free-DOF count ONE
+     * definition, read by the cue, the knowledge gates and the sampler alike. Publishing tier 1's list
+     * while tier 2 optimised over a different (larger) basis was two definitions of one quantity, and
+     * they drifted exactly where it hurts: «z2» declared but unconstrained is genuinely free, tier 1
+     * never saw it, so the figure reported ZERO degrees of freedom — and the knowledge panel, asking
+     * that same count, then printed a sampled area as though the givens forced it.
+     *
+     * Real parameters are in the list because they are free by the same rule: `r` unstated is a free
+     * magnitude, and a measure in `r` is not a number until something pins it.
+     */
+    const freeDofNames = [
+      ...freeModNames.map((n) => `|${n}|`),
+      ...freeArgNames.map((n) => `arg ${n}`),
+      ...freeParamNames,
+    ];
+
+    interface State {
+      readonly mod: ReadonlyMap<string, number>;
+      readonly arg: ReadonlyMap<string, number>;
+      readonly par: ReadonlyMap<string, number>;
+    }
+
+    const initial: State = {
+      mod: new Map(freeModNames.map((n) => [n, sampleModulus(n)])),
+      arg: new Map(freeArgNames.map((n) => [n, sampleArgDeg(n)])),
+      par: new Map(sample),
+    };
+
+    const modulusOf = (name: string, st: State): { value: number; exact: ExpVec | null } => {
+      const d = t1.modulus.determined.get(name);
+      if (!d) return { value: st.mod.get(name) ?? sampleModulus(name), exact: null };
+      const base = evalMod(d.konst, magnitudes(st.par));
+      if (base === null) return { value: sampleModulus(name), exact: null };
+      let v = base;
+      for (const [fn, c] of d.coefs) v *= Math.pow(st.mod.get(fn) ?? 1, toNumber(c));
+      // #1389 — a solved parameter inside the exact modulus is substituted: `18r` with r = 5/9 reads 10
+      return { value: v, exact: d.coefs.size === 0 ? substituteSolvedParams(d.konst, t1.paramValues) : null };
+    };
+
+    const argumentOf = (name: string, st: State): { deg: number; exact: Angle | null } => {
+      const fixed = branch?.angles.get(name);
+      if (fixed) {
+        const deg = toDegrees(fixed, st.par);
+        if (deg !== null) return { deg, exact: fixed };
+      }
+      const d = t1.argument.determined.get(name);
+      if (!d) return { deg: st.arg.get(name) ?? sampleArgDeg(name), exact: null };
+      let deg = toDegrees(d.konst, st.par);
+      if (deg === null) return { deg: sampleArgDeg(name), exact: null };
+      for (const [fn, c] of d.coefs) {
+        const turn = branch?.k.get(fn);
+        deg += toNumber(c) * (isTurnUnknown(fn) ? Number(turn ?? 0n) * 360 : (st.arg.get(fn) ?? 0));
+      }
+      return { deg, exact: null };
+    };
+
+    const positionsOf = (st: State): Map<string, Cx> => {
+      const out = new Map<string, Cx>([[ORIGIN, { re: 0, im: 0 }]]);
+      for (const name of drawnNames) {
+        const m = modulusOf(name, st);
+        const a = argumentOf(name, st);
+        if (Number.isFinite(m.value) && Number.isFinite(a.deg)) out.set(name, cPolar(m.value, a.deg));
+      }
+      return out;
+    };
+
+    const envFor = (st: State): Env => {
+      const pos = positionsOf(st);
+      // `st.par` carries the literal ANGLE ATOMS as well as the real parameters — both are numbers the
+      // residuals need, and keeping them in one map is what lets a `5+2i` literal be evaluated at all
+      return { at: (n) => pos.get(n), param: (p) => st.par.get(p), atoms: st.par };
+    };
+
+    // --- TIER 2: drive the free basis to satisfy what tier 1 could not read ----
+    const specs: ResidualSpec[] = [
+      ...t1.deferred.map((c, i) => deferredResidual(c, i)),
+      ...measures.map((m, i) => measureResidual(m, i)),
+    ];
+    /**
+     * Only relations that can be EVALUATED join the residual vector — its length has to be constant for
+     * the minimiser — and the ones that cannot are **collected and reported**.
+     *
+     * They used to be dropped here in silence. A stated equation the engine could not read then produced
+     * nothing at all: no drive, no refusal, no row — a figure that ignored a given while looking finished,
+     * which is the silent-drop class the whole tree is built to refuse (`src-complex/CLAUDE.md`:
+     * *nothing stated is ever silently dropped*). `undecided` is a distinct answer from `unsatisfied` and
+     * is now shown as one.
+     */
+    const initialEnv = envFor(initial);
+    const live: { spec: ResidualSpec; width: number }[] = [];
+    const undecided: string[] = [];
+    for (const spec of specs) {
+      const v = spec.values(initialEnv);
+      if (v !== null) live.push({ spec, width: v.length });
+      else if (spec.key.startsWith('deferred')) undecided.push(spec.describe);
+    }
+
+    const encode = (st: State): number[] => [
+      ...freeModNames.map((n) => st.mod.get(n) ?? 1),
+      ...freeArgNames.map((n) => st.arg.get(n) ?? 0),
+      ...freeParamNames.map((n) => st.par.get(n) ?? 1),
+    ];
+
+    const decode = (x: readonly number[]): State => {
+      const mod = new Map<string, number>();
+      const arg = new Map<string, number>();
+      const par = new Map(sample);
+      let i = 0;
+      for (const n of freeModNames) mod.set(n, x[i++]);
+      for (const n of freeArgNames) arg.set(n, x[i++]);
+      for (const n of freeParamNames) par.set(n, x[i++]);
+      return { mod, arg, par };
+    };
+
+    const evaluateAt = (x: readonly number[]): number[] => {
+      const env = envFor(decode(x));
+      const out: number[] = [];
+      for (const { spec, width } of live) {
+        const v = spec.values(env);
+        // a relation that stops being evaluable mid-search is far from satisfied, never zero — and the
+        // vector must keep its length, or the minimiser is solving a different problem each step
+        if (v === null) out.push(...new Array<number>(width).fill(1e6));
+        else out.push(...v);
+      }
+      return out;
+    };
+
+    const bounds: Bound[] = [
+      // a modulus is a length: strictly positive, or the point is the origin and its direction is a lie
+      ...freeModNames.map(() => ({ lo: 1e-6 })),
+      ...freeArgNames.map((n) => {
+        const w = windows.get(n);
+        return {
+          lo: w && Number.isFinite(w.min) ? w.min + 1e-6 : undefined,
+          hi: w && Number.isFinite(w.max) ? w.max - 1e-6 : undefined,
+        };
+      }),
+      /**
+       * ADR-CX-045 — a SIZE parameter (`r` in `|z1| = 9r`) is a positive magnitude; a sign-free one an
+       * exact equation carries keeps the sign its branch chose (the branch owns it, and tier 2 crossing
+       * zero would draw a figure the enumeration never produced); a sign-free one only this tier sees
+       * (`a`, `b` in `a + b·i`) is any real, unbounded.
+       */
+      ...freeParamNames.map((p): Bound => {
+        if (!signed.has(p)) return { lo: 1e-6 };
+        if (!t1.signedParams.includes(p)) return {};
+        return (sample.get(p) ?? 1) < 0 ? { hi: -1e-6 } : { lo: 1e-6 };
+      }),
+    ];
+
+    const solved =
+      live.length > 0 && !t1.inconsistent
+        ? solveResiduals(evaluateAt, encode(initial), { bounds })
+        : null;
+
+    // --- STAGE 3b: the census — every distinct solution this branch's numeric system has (#1427) ---
+    const lmState = solved ? decode(solved.x) : initial;
+    const n = freeModNames.length + freeArgNames.length + freeParamNames.length;
+    const scaleOf = (z: Cx): number => Math.max(1, Math.hypot(z.re, z.im));
+    /**
+     * Two solutions are ONE configuration when every drawn number sits in the same place. `tol` is
+     * the solve's own precision, not the print's: a root the residual only TOUCHES (`6|sin θ| = 6`)
+     * converges to ~1e-5, and a tighter test counted one drawing eight times. Polynomial roots are
+     * Newton-polished to machine precision, so they are compared at 1e-6.
+     */
+    const sameDrawing = (a: State, b: State, tol = 1e-6): boolean => {
+      const pa = positionsOf(a);
+      const pb = positionsOf(b);
+      for (const [name, z] of pa) {
+        const w = pb.get(name);
+        if (!w || Math.hypot(z.re - w.re, z.im - w.im) > tol * scaleOf(z)) return false;
+      }
+      return true;
+    };
+    /** the n-D census compares at the precision LM reaches on a touching root */
+    const FLOOR_TOL = 1e-3;
+    /** a candidate the census keeps: polished onto the system, verified against EVERY live relation */
+    const settle = (x: readonly number[]): State | null => {
+      const polished = solveResiduals(evaluateAt, x, { bounds, restarts: 0, alternatives: false });
+      if (polished.solved && sameDrawing(decode(polished.x), decode(x))) return decode(polished.x);
+      return evaluateAt(x).every((r) => Math.abs(r) <= 1e-8) ? decode(x) : null;
+    };
+
+    /**
+     * The 1-unknown POLYNOMIAL certificate: the free basis is one complex number z (its modulus and
+     * its argument), and some stated equation is a nonzero holomorphic polynomial in z — or in z̄,
+     * which is the same certificate read in the other orientation (tier 1 may have chosen `z2` as the
+     * basis of `z2 = conj(z1)`, and then `z1² − 4z1 + 6 = 0` is a polynomial in z̄₂). Its roots are
+     * then EVERY candidate — the fundamental theorem of algebra, not a search — and the census is
+     * complete. `null` when the figure is not of that shape.
+     */
+    const polynomialCensus = (): State[] | null => {
+      if (freeParamNames.length > 0 || freeModNames.length !== 1 || freeArgNames.length !== 1) return null;
+      const z = freeModNames[0];
+      if (freeArgNames[0] !== z) return null;
+      const here = positionsOf(lmState);
+      const zAt = here.get(z);
+      if (!zAt || Math.hypot(zAt.re, zAt.im) < 1e-9) return null;
+      /** how a drawn name depends on z: |w| ∝ |z|^a and arg w = const + b·arg z */
+      const exponents = (name: string): { a: number; b: number } | null => {
+        if (name === z) return { a: 1, b: 1 };
+        const dm = t1.modulus.determined.get(name);
+        if (!dm) return null;
+        let a = 0;
+        for (const [fn, c] of dm.coefs) {
+          if (fn !== z) return null;
+          a = toNumber(c);
+        }
+        let b = 0;
+        if (!branch?.angles.has(name)) {
+          const da = t1.argument.determined.get(name);
+          if (!da) return null;
+          for (const [fn, c] of da.coefs) {
+            if (isTurnUnknown(fn) || isSignUnknown(fn)) continue;
+            if (fn !== z) return null;
+            b = toNumber(c);
+          }
+        }
+        return { a, b };
+      };
+      const involvesName = (name: string): boolean => {
+        const e = exponents(name);
+        return e === null || e.a !== 0 || e.b !== 0;
+      };
+      const hereEnv = envFor(lmState);
+      const cmul = (x: Cx, y: Cx): Cx => ({ re: x.re * y.re - x.im * y.im, im: x.re * y.im + x.im * y.re });
+
+      /** the roots of the lowest-degree polynomial certificate in `t` (t = z, or t = z̄), as z values */
+      const rootsIn = (orientation: 1 | -1): Cx[] | null => {
+        const tAt = orientation === 1 ? zAt : { re: zAt.re, im: -zAt.im };
+        const ctx: PolyContext = {
+          involves: (e) => refsOf(e).some(involvesName),
+          constant: (e) => evalComplex(e, hereEnv),
+          monomial: (name) => {
+            const e = exponents(name);
+            // w = c·t^a exactly when the modulus and the argument move together in this orientation
+            if (!e || e.a !== orientation * e.b || !Number.isInteger(e.a) || e.a < 0) return null;
+            const w = here.get(name);
+            if (!w) return null;
+            let tp: Cx = { re: 1, im: 0 };
+            for (let i = 0; i < e.a; i++) tp = cmul(tp, tAt);
+            const d = tp.re * tp.re + tp.im * tp.im;
+            return { a: e.a, c: { re: (w.re * tp.re + w.im * tp.im) / d, im: (w.im * tp.re - w.re * tp.im) / d } };
+          },
+        };
+        let best: Cx[] | null = null;
+        for (const c of t1.deferred) {
+          if ((c.kind ?? 'eq') !== 'eq') continue;
+          const poly = polyOf({ t: 'sub', l: c.lhs, r: c.rhs }, ctx);
+          if (!poly || degreeOf(poly) < 1) continue;
+          const roots = allRoots(poly);
+          if (best === null || roots.length < best.length) best = roots;
+        }
+        return best && best.map((t) => (orientation === 1 ? t : { re: t.re, im: -t.im }));
+      };
+
+      const roots = rootsIn(1) ?? rootsIn(-1);
+      if (roots === null) return null;
+      const w = windows.get(z);
+      const out: State[] = [];
+      for (const r of roots) {
+        const mod = Math.max(Math.hypot(r.re, r.im), 1e-9);
+        let deg = (Math.atan2(r.im, r.re) * 180) / Math.PI;
+        if (w && Number.isFinite(w.min) && Number.isFinite(w.max)) {
+          const fit = [-720, -360, 0, 360, 720].map((k) => deg + k).find((d) => d > w.min && d < w.max);
+          if (fit === undefined) continue; // the filter prunes this root, exactly as it prunes a branch
+          deg = fit;
+        } else deg = ((deg % 360) + 360) % 360;
+        const st = settle([mod, deg]);
+        if (st && !out.some((o) => sameDrawing(o, st))) out.push(st);
+      }
+      return out;
+    };
+
+    /** The n-D FLOOR: deterministic multi-start, kept only where the solve is isolated. */
+    const multiStartCensus = (): State[] => {
+      const out: State[] = solved && solved.solved ? [lmState] : [];
+      const kinds = [
+        ...freeModNames.map(() => 'mod' as const),
+        ...freeArgNames.map(() => 'arg' as const),
+        ...freeParamNames.map(() => 'par' as const),
+      ];
+      for (const x0 of censusStarts(kinds, bounds, censusStartCount)) {
+        const r = solveResiduals(evaluateAt, x0, { bounds, restarts: 0, alternatives: false });
+        if (!r.solved || consumedDimensions(evaluateAt, r.x) !== n) continue;
+        const st = decode(r.x);
+        if (!out.some((o) => sameDrawing(o, st, FLOOR_TOL))) out.push(st);
+      }
+      return out;
+    };
+
+    /** a deterministic order, so "show another configuration" walks one list whatever the seed */
+    const ordered = (sts: State[]): State[] => {
+      const keyOf = (st: State): number[] => {
+        const pos = positionsOf(st);
+        return drawnNames.flatMap((name) => {
+          const p = pos.get(name);
+          if (!p) return [];
+          const deg = (((Math.atan2(p.im, p.re) * 180) / Math.PI) % 360 + 360) % 360;
+          return [Math.round(deg * 1e4) / 1e4, Math.round(Math.hypot(p.re, p.im) * 1e6) / 1e6];
+        });
+      };
+      const keys = new Map(sts.map((s) => [s, keyOf(s)]));
+      return [...sts].sort((a, b) => {
+        const ka = keys.get(a)!;
+        const kb = keys.get(b)!;
+        for (let i = 0; i < Math.min(ka.length, kb.length); i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
+        return 0;
+      });
+    };
+
+    let states: State[];
+    let completeness: Completeness = 'complete';
+    if (t1.inconsistent || live.length === 0 || n === 0) {
+      // nothing numeric to be plural about: the check passed or it did not
+      states = !solved || solved.solved ? [lmState] : [];
+    } else {
+      const poly = polynomialCensus();
+      if (poly !== null) states = ordered(poly);
+      else {
+        completeness = 'floor';
+        const isolated = solved !== null && solved.solved && consumedDimensions(evaluateAt, solved.x) === n;
+        // a continuum is one member per sample — the seed moves along it; an isolated solve is censused
+        states = !solved || !solved.solved ? [] : isolated ? ordered(multiStartCensus()) : [lmState];
+      }
+    }
+    return {
+      branch, sample, freeModNames, freeArgNames, freeParamNames, freeDofNames, live, undecided, drawnNames,
+      modulusOf, argumentOf, positionsOf, envFor, evaluateAt, encode, states, completeness, fallback: lmState,
+    };
+  };
+
+  /**
+   * THE CONFIGURATION SET — every kept branch times the numeric solutions it holds (#1427).
+   *
+   * A branch whose numeric system has no solution is not a configuration: it is left out, so
+   * cycling only ever draws figures that satisfy every given. Only when NO branch has one is the
+   * failed solve drawn — the stage-3e backstop then names the given it could not satisfy, which is
+   * what the acceptance gate reads to refuse the line.
+   */
+  const branchList: (Branch | undefined)[] = kept.length ? [...kept] : [undefined];
+  const startsPerBranch = Math.max(2, Math.floor(CENSUS_STARTS / branchList.length));
+  const systems = branchList.map((b) => systemFor(b, startsPerBranch));
+  const valid = systems.flatMap((sys) => sys.states.map((st) => ({ sys, state: st })));
+  const configs = valid.length
+    ? valid
+    : (() => {
+        const sys = systems[((configIndex % systems.length) + systems.length) % systems.length];
+        return [{ sys, state: sys.fallback }];
+      })();
+  const configCount = valid.length;
+  const completeness: Completeness = systems.every((s) => s.completeness === 'complete') ? 'complete' : 'floor';
+  const index = ((configIndex % configs.length) + configs.length) % configs.length;
+  const shown = configs[index];
+  const {
+    branch, sample, freeParamNames, freeDofNames, live, undecided, drawnNames,
+    modulusOf, argumentOf, envFor, evaluateAt, encode,
+  } = shown.sys;
+  type State = (typeof shown)['state'];
+
+  const state: State = shown.state;
   // the solved parameter values must reach everything downstream, objects included
   for (const [k, v] of state.par) sample.set(k, v);
 
@@ -991,15 +1223,28 @@ export function foldConstraints(input: FoldInput): Derived2 {
   /**
    * STAGE 5d — the only place a number the engine computed reaches a string.
    *
-   * Every row asks {@link isKnowledge} first. A measure over a figure that still has freedom, or that
-   * differs between configurations, prints no number at all: the answer to «what is the area?» is then
-   * «the givens do not determine it yet», which is a real answer and is shown as one.
+   * Every row asks {@link knowledgeOf} first — with the asked value evaluated in EVERY configuration
+   * of the set (#1427). A measure over a figure that still has freedom, or that differs between
+   * configurations, prints no number at all: the answer to «what is the area?» is then «the givens do
+   * not determine it yet», which is a real answer and is shown as one.
    */
-  const drivenCount = solved ? consumedDimensions(evaluateAt, solved.x) : 0;
+  const drivenCount = live.length > 0 && !t1.inconsistent ? consumedDimensions(evaluateAt, encode(state)) : 0;
   const closure = {
     remainingDof: Math.max(0, freeDofNames.length - drivenCount),
-    enumeratedConfigCount,
+    configCount,
+    completeness,
   };
+  /** every configuration's environment, the one on screen included — what "invariant" is asked over */
+  const configEnvs: Env[] = valid.length ? valid.map((c) => c.sys.envFor(c.state)) : [];
+  /** the one predicate, asked of a quantity given as "its value in this configuration" */
+  const judge = (carriedExactly: boolean, valueIn: (env: Env) => Cx | null) =>
+    knowledgeOf(carriedExactly, closure, configEnvs.map(valueIn));
+  /**
+   * The closure a quantity over SOLVED parameters is judged against: it cannot move with a free
+   * direction or a numeric root (neither tier moves a solved parameter), so only the configurations'
+   * own values — a branch's sign — decide it.
+   */
+  const exactClosure = { remainingDof: 0, configCount, completeness: 'complete' as const };
   /**
    * IS THE ONE REMAINING FREEDOM A PURE **GAUGE**? — «הביעו באמצעות r», answered.
    *
@@ -1154,7 +1399,11 @@ export function foldConstraints(input: FoldInput): Derived2 {
       }
     }
     const here = evalComplex(e, finalEnv);
-    return here ? round2(here.re) : null;
+    if (!here) return null;
+    // #1427 — the one predicate, over every configuration. A SOLVED parameter is exact and the numeric
+    // tier never moves it (it is not in the free basis), so neither the free directions nor the numeric
+    // census can change it: only a branch's sign can, and that is what the comparison sees.
+    return knowledgeOf(false, exactClosure, configEnvs.map((env) => evalComplex(e, env))).known ? round2(here.re) : null;
   };
 
   const exprRows: KnowledgeRow[] = exprQueries.map((q) => {
@@ -1170,16 +1419,19 @@ export function foldConstraints(input: FoldInput): Derived2 {
     // free — «|z2|» with |z2| = 18r and r = 5/9 is 10 even while arg z2 is open (#1389 step 3)
     if (q.expr.t === 'abs' && q.expr.e.t === 'ref') {
       const known = t1.knownModulus.get(q.expr.e.name);
-      if (known && !isParametric(known)) return { label: q.src, value: fmtMod(known), why: null };
+      if (known && !isParametric(known) && judge(true, () => null).known) {
+        return { label: q.src, value: fmtMod(known), why: null };
+      }
     }
     const here = evalComplex(q.expr, finalEnv);
     if (!here) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
     const real = Math.abs(here.im) <= 1e-9 * Math.max(1, Math.hypot(here.re, here.im));
     const show = (z: Cx): string =>
       real ? round2(z.re) : `${round2(z.re)}${z.im < 0 ? '-' : '+'}${round2(Math.abs(z.im))}i`;
-    if (isKnowledge(false, closure)) return { label: q.src, value: show(here), why: null };
+    const verdict = judge(false, (env) => evalComplex(q.expr, env));
+    if (verdict.known) return { label: q.src, value: show(here), why: null };
     if (!shapeFixed || !gaugeName || !real) {
-      return { label: q.src, value: null, why: whyNotKnowledge(closure) };
+      return { label: q.src, value: null, why: verdict.why };
     }
     const turned = symmetries.find((s) => s.kind === 'turn');
     if (turned) {
@@ -1217,19 +1469,23 @@ export function foldConstraints(input: FoldInput): Derived2 {
     .map((p) => {
       const v = solvedParams.has(p) ? t1.paramValues.get(p) : undefined;
       if (!v) return { name: p, value: null };
-      // ADR-CX-045 — the sign is part of the value: u = −2 for `u^5 = -32`, u = ±2 for `u^2 = 4`
+      // ADR-CX-045 — the sign is part of the value: u = −2 for `u^5 = -32`, u = ±2 for `u^2 = 4`.
+      // #1427: asked through the one predicate, over the parameter's value in every configuration
       const sgn = signKnowledge(p);
-      const prefix = sgn === null ? '±' : sameDirection(sgn, HALF_TURN) ? '-' : '';
+      const verdict = knowledgeOf(false, exactClosure, configEnvs.map((env) => realValue(env.param(p) ?? null)));
+      const differs = !verdict.known && verdict.why.code === 'multi-config';
+      const prefix = differs || sgn === null ? '±' : sameDirection(sgn, HALF_TURN) ? '-' : '';
       return { name: p, value: `${prefix}${fmtMod(v)}` };
     });
 
   const knowledge: KnowledgeRow[] = queries.map((q) => {
     const value = measureAt(finalEnv, q);
     if (value === null) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
-    if (isKnowledge(false, closure)) return { label: q.src, value: round2(value), why: null };
+    const verdict = judge(false, (env) => realValue(measureAt(env, q)));
+    if (verdict.known) return { label: q.src, value: round2(value), why: null };
     const expressed = expressMeasure(q.kind, q.points, value);
     if (expressed) return { label: q.src, value: expressed, why: null };
-    return { label: q.src, value: null, why: whyNotKnowledge(closure) };
+    return { label: q.src, value: null, why: verdict.why };
   });
 
   /**
@@ -1248,7 +1504,12 @@ export function foldConstraints(input: FoldInput): Derived2 {
       return { label: r.src, value: null, why: whyNotKnowledge(closure) };
     }
     const value = top / bottom;
-    if (isKnowledge(false, closure)) return { label: r.src, value: round2(value), why: null };
+    const verdict = judge(false, (env) => {
+      const a = measureAt(env, r.numerator);
+      const b = measureAt(env, r.denominator);
+      return a === null || b === null || Math.abs(b) < 1e-12 ? null : realValue(a / b);
+    });
+    if (verdict.known) return { label: r.src, value: round2(value), why: null };
     const invariant =
       shapeFixed &&
       symmetries.every((s) => {
@@ -1259,7 +1520,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
       });
     return invariant
       ? { label: r.src, value: round2(value), why: null }
-      : { label: r.src, value: null, why: whyNotKnowledge(closure) };
+      : { label: r.src, value: null, why: verdict.why };
   });
 
   return {
@@ -1281,7 +1542,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
     undecided,
     knowledge: [...knowledge, ...ratioRows, ...exprRows],
     params: t1.inconsistent ? [] : params,
-    canCycle: enumeratedConfigCount > 1 || closure.remainingDof > 0,
+    configCount,
+    configCompleteness: completeness,
+    canCycle: configCount > 1 || closure.remainingDof > 0,
     emptiedBy,
     claims: verifyClaims(assertions, t1, branch),
     formulas: t1.inconsistent ? [] : surfacedFormulas(constraints, enumeratedConfigCount),

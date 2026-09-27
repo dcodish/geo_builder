@@ -43,6 +43,11 @@ export interface Tier2Options {
   readonly maxIterations?: number;
   /** how many jittered restarts to try when the first descent stalls */
   readonly restarts?: number;
+  /**
+   * Scan for the other roots of a 1-D system (default true). The stage-3b census (#1427) turns it off:
+   * it spreads its own starts over the whole box, and a scan per start is its cost, not its coverage.
+   */
+  readonly alternatives?: boolean;
 }
 
 export interface Tier2Result {
@@ -108,7 +113,7 @@ export function solveResiduals(
     if (norm(attempt.residuals) < norm(best.residuals)) best = attempt;
   }
 
-  const alternatives = n === 1 ? otherRoots(f, best.x[0], opts.bounds?.[0]) : [];
+  const alternatives = n === 1 && opts.alternatives !== false ? otherRoots(f, best.x[0], opts.bounds?.[0]) : [];
   return { ...best, alternatives };
 }
 

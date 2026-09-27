@@ -33,9 +33,18 @@ This is the product's one genuinely new core, and it is why the tree could ship 
 - **Free DOF is the nullspace dimension** — **one** definition, read by the DOF cue, the knowledge gates
   and the sampler alike. Three consumers of one number cannot disagree with each other, which is exactly
   how a "default masquerading as fixed" hides in a system with three definitions.
-- **Knowledge is decidable.** Whether a value is forced is a question about the nullspace, not a
-  sampling heuristic — so [`FR-KN-1`](02d-requirements-complex.md) ("a number printed on screen is
-  knowledge") has an exact test behind it.
+- **Knowledge is decidable.** Whether a value is forced is a question about the nullspace and the
+  configuration set, not a sampling heuristic — so [`FR-KN-1`](02d-requirements-complex.md) ("a number
+  printed on screen is knowledge") has an exact test behind it: `knowledgeOf` evaluates the value in
+  every configuration and prints iff the set is complete and they agree
+  ([ADR-CX-049](06d-decisions-complex.md#adr-cx-049)).
+- **The configuration set** is tier 1's kept branches × each branch's numeric solutions
+  ([ADR-CX-049](06d-decisions-complex.md#adr-cx-049)). `foldConstraints` solves every kept branch
+  (`systemFor`); stage 3b's census (`solve/census.ts`) reports each system's distinct solutions and
+  whether they are all of them. A polynomial read structurally off the AST in the one complex unknown
+  (or its conjugate) is a completeness certificate. A deterministic multi-start is only a floor. The
+  list has a seed-free canonical order, so the configuration index walks every drawing, and
+  `configCount` feeds `canCycle`.
 
 ## Shape
 
