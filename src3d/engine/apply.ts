@@ -13,6 +13,7 @@ import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
 import { diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { claimPointIds, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
+import { firstFreeLetter } from './freeLetter';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
@@ -1268,8 +1269,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // freeLabel pattern, copied per docs/20 §12 (M first — the letter students use for midpoints).
       const missingMid = missingPoint(c, [cmd.a, cmd.b]);
       if (missingMid) return { ok: false, error: missingMid };
-      const pool = [...'MNKLPQRSTUVWXYZGHIJ'];
-      const label = pool.find((l) => !c.points.has(l));
+      // #1476: the pool is shared with the dihedral construction's meeting point (./freeLetter)
+      const label = firstFreeLetter((l) => c.points.has(l));
       if (!label) return { ok: false, error: { code: 'already-defined', id: 'M' } }; // 19 letters taken — practically unreachable
       return applyCommand3(c, { type: 'point-on-segment3', id: label, a: cmd.a, b: cmd.b, t: 0.5 });
     }

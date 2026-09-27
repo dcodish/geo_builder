@@ -7,6 +7,7 @@
 
 import { useMemo, useRef, useState, type PointerEvent as RPointerEvent, type WheelEvent as RWheelEvent } from 'react';
 import type { PlaneDisplayMode3Map } from '../store/figureFile3';
+import type { DihedralPair3 } from '../store/dihedralChips';
 import type { Resolved3 } from '../engine/evaluate';
 import type { Construction3 } from '../engine/types';
 import { HOME_CAMERA, MAX_PITCH, VIEW_PRESETS, VIEW_PRESET_ORDER, type Camera3, type ViewPreset } from './camera';
@@ -36,6 +37,8 @@ export interface Figure3Props {
   showObjectAngles?: boolean;
   /** #937 (ADR-W-047): which form a VALUED parameter shows — the student's per-row choice. */
   symbolDisplay?: (sym: string) => 'letter' | 'value';
+  /** #1476 (ADR-3D-265): the plane × plane angles whose «הצג בניה» chip is on — drawn as their construction. */
+  dihedralShown?: readonly DihedralPair3[];
   /** #483: a determined-but-unnamed ℓ∩π crossing was clicked — the App names it through the normal
    *  submit path. Absent = the offer is not drawn at all, which keeps this component a pure view. */
   onNameCrossing?: (c: SceneCrossing3) => void;
@@ -97,7 +100,7 @@ const ltr = (s: string) => `⁦${s}⁩`;
  */
 const CANVAS_DIR = { direction: 'ltr' } as const;
 
-export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay, showWitnesses = true, showObjectAngles = false, symbolDisplay, onNameCrossing, onRenamePoint, renameText, crossingLabel, presetLabels }: Figure3Props) {
+export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay, showWitnesses = true, showObjectAngles = false, symbolDisplay, dihedralShown, onNameCrossing, onRenamePoint, renameText, crossingLabel, presetLabels }: Figure3Props) {
   /**
    * #5 — the HOME camera for THIS figure. A purely planar figure is read face-on (`planarNormal` /
    * `faceOnView`, engine/defaultView); everything else keeps the ¾ textbook view. Derived from the
@@ -139,8 +142,8 @@ export default function Figure3({ construction, resolved, width = 640, height = 
   const view = cam ?? home;
 
   const scene = useMemo(
-    () => buildScene3(construction, resolved, view, { width, height }, zoom, planeDisplay, showWitnesses, showObjectAngles, symbolDisplay),
-    [construction, resolved, view, width, height, zoom, planeDisplay, showWitnesses, showObjectAngles, symbolDisplay],
+    () => buildScene3(construction, resolved, view, { width, height }, zoom, planeDisplay, showWitnesses, showObjectAngles, symbolDisplay, dihedralShown),
+    [construction, resolved, view, width, height, zoom, planeDisplay, showWitnesses, showObjectAngles, symbolDisplay, dihedralShown],
   );
 
   const onPointerDown = (e: RPointerEvent<SVGSVGElement>) => {
@@ -315,6 +318,35 @@ export default function Figure3({ construction, resolved, width = 640, height = 
           >
             {ltr(m.text)}
           </text>
+        ))}
+        {/* #1476 (ADR-3D-265): the construction that MEASURES a dihedral — the two legs ⟂ the seam
+            (dashed: auxiliary, the witness convention), the meeting point, and its free letter. The
+            letter is drawn in the point-label style but lighter: it is a name offered for the foot,
+            not a point the student stated. */}
+        {scene.constructions.map((cn, i) => (
+          <g key={`dihedral-${i}`} data-testid="dihedral-construction">
+            {cn.segs.map((sg, j) => (
+              <line key={j} x1={sg.x1} y1={sg.y1} x2={sg.x2} y2={sg.y2} stroke="#d97706" strokeWidth={1.5} strokeDasharray="5 4" strokeLinecap="round" />
+            ))}
+            <circle cx={cn.foot.x} cy={cn.foot.y} r={2.6} fill="#b45309" />
+            {cn.label && (
+              <text
+                data-testid="dihedral-foot-label"
+                x={cn.labelX}
+                y={cn.labelY}
+                fontSize={14}
+                fontFamily="ui-sans-serif, system-ui, sans-serif"
+                fill="#b45309"
+                stroke="#ffffff"
+                strokeWidth={3}
+                paintOrder="stroke"
+                textAnchor="middle"
+                dominantBaseline="middle"
+              >
+                {cn.label}
+              </text>
+            )}
+          </g>
         ))}
         {scene.angles.map((a, i) => (
           <g key={`angle-${i}`} data-testid="plane-angle">

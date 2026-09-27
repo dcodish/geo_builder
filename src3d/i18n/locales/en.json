@@ -61,6 +61,9 @@
     "claimVerified": "The claim was verified against the figure",
     "planeFace": "Face only",
     "planeFull": "Full plane",
+    "dihedralShow": "Show construction",
+    "dihedralHide": "Hide construction",
+    "dihedralTitle": "Show how the angle between the planes is formed: a point on the line of intersection and a perpendicular to it in each plane",
     "planeToggleTitle": "Plane {{name}} display — click cycles full → face → hidden",
     "paramDisplayTitle": "Show {{sym}} instead of the value, or the other way round",
     "planeHide": "Hide plane"

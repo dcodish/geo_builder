@@ -10676,3 +10676,84 @@ seam-perpendicular unit arms in each plane and `null` for parallel planes.
 right angle stated between two planes — by «ניצב» or by «90» — is now marked on the figure with the
 textbook right-angle mark at the planes' common line, always, and never as an arc reading «90°»; the same
 for a line at 90° to a plane.
+
+## ADR-3D-265 — «הצג בניה»: a chip on a plane-angle row draws the construction that measures it, from a meaningful point, with the meeting point named by a free letter (#1476)
+
+**Status:** accepted, 2026-09-27 · **Issue:** [#1476](https://github.com/dcodish/geo_builder/issues/1476) (feature, `P2`, `3d`) · round [#1478](https://github.com/dcodish/geo_builder/issues/1478) · PR route · operator rulings 2026-09-27 (on the angle's row; draws with «ארגון נתונים» closed; the meeting point gets a free letter; tie → the face over the base)
+**Requirements:** [02b](02b-requirements-3d.md) — **FR-RD-11** added (the dihedral construction chip) · **Design:** [04b](04b-design-3d.md) — *Rendering* gains the *Dihedral construction* paragraph · **LADDER stage:** none (render + display state only — no parse, apply, solve or verify change)
+
+**The request.** Operator, playing round #1469: *"when showing angle between planes, I want to be able to see
+the exact formation of the angle. so I want to see the perpendicular lines to the ישר חיתוך on the planes …
+through a chip in the input panel like we currently have for showing the planes … if we can put a
+perpendicular line from a meaningful point, we should do that instead of some random point. for instance in
+an angle between 2 triangle planes, we would maybe do it from the 3rd node."*
+
+**What existed (measured, `26768c51` = #1475's branch).** Both dihedral lanes drew an ARC only — the named-
+plane one always, the point-run one behind «ארגון נתונים» (ADR-3D-185) — at a foot the student never sees
+constructed (the shared edge's midpoint, or the seam point nearest the figure centre). No leg, no foot.
+
+**The decision.**
+1. **Geometry — extend the one dihedral module, never a second one.** `dihedralConstruction(a, b, ga, gb,
+   ctx)` in `src3d/render/dihedral.ts` calls `dihedralGeometry` for the seam and the material-oriented arms
+   and adds only the FOOT, chosen from a meaningful point (one rule, in order): (1) point-run planes → a
+   vertex of either run not on the seam; a vertex whose foot falls strictly inside the shared edge beats
+   one on its endpoints, which beats one outside; then the **face over the base** (ruling 4 — the base is a
+   solid's `faces[0]`, or a prism's disjoint opposite ring, `solidBaseRings` — and a run lying on one, so a
+   cube's «המישור ABC» is the base); then the first-named plane;
+   then the foot nearest the default focus; then the letter. (2) Leg 2 is raised at the SAME foot in the
+   other plane, as long as leg 1. (3) A plane that is not a point run → a named point lying on it, off the
+   seam. (4) Fallback (equation planes, no points) → `dihedralGeometry`'s own foot, `legLen: null`, and the
+   scene sizes the legs on screen (`LEG_PX = 64`, the #374 / #935 annotation rule).
+   Measured over 24 seeds: pyramid SABC face↔base 60° → S every seed, foot inside BC every seed;
+   tetrahedron ABCD, ABC ∠ ACD 70° → D every seed (both feet inside AC in most seeds — the tie-break decides).
+2. **Drawing** (`buildScene3`, new trailing parameter `dihedralShown: DihedralPair3[]`, new `Scene3.constructions`):
+   two dashed legs (the witness convention — auxiliary ink in amber), a dot at the foot, an extension of the
+   shared edge when the foot lies beyond it, **two knees** at the foot against the seam, and between the legs
+   the stated value's arc (the one pixel-sized arc lane, the stated / supplement pick — so where the apex overhangs the base and the
+   interior dihedral is the obtuse supplement of the stated angle, leg 2 points out of the base, drawing the
+   angle that was stated — `degText` so a letter or
+   #937's choice reads as everywhere else) — or a third knee when the angle is right. **Only where the stated
+   angle holds** on the drawn figure (`relDeviation` ≤ `DIRECTION_REL_TOL`, the #1439 predicate). The
+   construction OWNS its pair's mark: the named-plane arc, the panel-gated object-angle arc and #1475's
+   seam-midpoint knee (`rightAngles3`, new optional `constructed` argument) skip a pair whose chip is on, so
+   the angle is marked once, at the constructed foot. **Not panel-gated** (ruling 2): it is its own lane.
+3. **The meeting point's letter (ruling 3) is a DISPLAY LABEL, derived at render time** — decided here as
+   the ruling asked. It is the first letter of the builder's free-letter pool (`engine/freeLetter.ts` —
+   `'MNKLPQRSTUVWXYZGHIJ'`, **moved** there from its inline copy in `apply.ts`'s `midpoint-auto`, which now
+   calls it, so the convention has one home) that no point uses and no other shown construction took; no
+   letter when a named point already sits at the foot (the cube's corner foot, or a student-built `M`).
+   Because it never becomes a fact: turning the chip off removes it; a letter the student types later takes
+   it and the foot is re-lettered on the next render (M → N); it is never in the fact list, the save file or
+   undo, and ADR-052 is untouched (it asserts nothing the question did not state — it names a point the
+   construction makes). Cost of the choice: a student cannot type «SM» against it; to reason with the foot
+   they build it («SM הגובה לצלע BC במשולש SBC», #8), exactly as before.
+4. **The chip and its state** (`src3d/store/dihedralChips.ts`). `dihedralChipsByFact(facts, isOk)` —
+   derived from the fact list (the #769 / #842 pattern): a row owns the chip iff a command states an angle
+   between two PLANAR operands (`plane-rel` `angle` with a value or a letter, or `perp`; the legacy
+   `plane-angle`), and only while the row is `ok` — a refused angle offers none (and a typed refusal never
+   becomes a row at all). State `dihedralShown: Record<factId, true>` in the #937 `displayMode` shape: off by
+   default, toggled by `toggleDihedralShown` (pruned to live facts on every toggle and load), in `partialize`
+   / `equality` so it is undoable, saved as `dihedralConstruction: number[]` (fact INDICES — a load mints
+   fresh ids) and written only when non-empty, carried by `sessionPersist3` and `shareLink3`. The chip is an
+   inline button in the row's `trail` beside the plane chips, «הצג בניה» / «הסתר בניה» (he + en).
+5. **Sibling audit.** 2-D (`src/`) has no planes; analytic has no dihedral; complex has no planes — class not
+   present. Inside 3-D, a line × plane angle has no seam and is not this feature.
+
+**Cost (M3).** Nothing unless a chip is on; then one `resolveOperand` pair, one `relDeviation` and a sort
+over the runs' vertices (or the figure's points for a named plane) per shown pair per scene build.
+
+**Locks.** `src3d/__tests__/issue-1476-dihedral-construction.test.ts` (all through `submit` → `derive3` →
+the chip derivation → `buildScene3` / `dihedralConstruction`): chip ownership (angle / ⟂ / lettered rows own
+one, the solid row does not, a non-ok row owns nothing, a refused line never becomes a row); off by default;
+tetrahedron ABCD — leg from B or D with the foot inside AC, arms ⟂ AC, leg 2 in the other plane, the legs'
+angle = 70°, one «70°» arc with the panel CLOSED, two knees; the tie → D and pyramid → S with F inside BC,
+**each over 24 seeds**; equation planes (54.74°) — fallback foot, screen-sized legs, the named-plane arc
+cedes so «54.74°» draws once; a named point on a named plane → its foot (rule 3); a right dihedral → three
+knees and the #1475 knee cedes (cube ABC ⟂ ABB': leg from B', foot at B, no new letter); the free letter is M after `פירמידה SABC`, goes with the chip, and becomes N
+after «M אמצע AB»; undo, save → load, share link, restored session; the chip goes with its fact.
+
+**Consequences.** For a student: every row that states an angle between two planes has a «הצג בניה» chip.
+Pressing it draws how that angle is formed — a point on the planes' common line, named with the next free
+letter, and from it a perpendicular to that line in each plane (from the apex / the third vertex when there
+is one) — with the angle marked between them, whether or not «ארגון נתונים» is open. Off by default; kept by
+undo, save, share link.

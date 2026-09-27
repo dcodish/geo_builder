@@ -28,7 +28,7 @@ export function shareLinkFor3(): ShareLinkResult {
   const s = useGeo3.getState();
   if (s.facts.length === 0) return { ok: false, reason: 'empty' };
   const name = s.figureName.trim();
-  const payload = serializeFigure3ForLink(s.facts, s.seed, name || undefined, s.queries, s.planeDisplay, s.displayMode);
+  const payload = serializeFigure3ForLink(s.facts, s.seed, name || undefined, s.queries, s.planeDisplay, s.displayMode, s.dihedralShown);
   const url = figureLinkUrl(appBaseUrl(import.meta.env.BASE_URL), payload);
   return linkFits(url) ? { ok: true, url } : { ok: false, reason: 'too-long', length: url.length };
 }
@@ -40,7 +40,7 @@ export function shareLinkFor3(): ShareLinkResult {
 export function openShared3(payload: string) {
   const r = deserializeFigure3(payload);
   if (!r.ok) return r;
-  useGeo3.getState().loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode);
+  useGeo3.getState().loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode, r.dihedralShown);
   useGeo3.temporal.getState().clear(); // a link arrives with no earlier session to undo back to
   return r;
 }

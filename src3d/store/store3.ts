@@ -28,6 +28,7 @@ import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { stripFormatControls } from '../../shell/bidi';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
+import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, freeDims } from '../engine/apply';
 import { spaceDiagonals, diagonalClaimVerdict } from '../engine/baseShapes';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
@@ -826,6 +827,13 @@ export interface Geo3State {
    */
   displayMode: DisplayModeMap;
   toggleDisplayMode: (factId: string) => void;
+  /**
+   * #1476 (ADR-3D-265): the rows whose «הצג בניה» chip is ON — the foot on the seam and the two
+   * perpendiculars that measure an angle between planes. Keyed by the STATING fact, off by default; a
+   * display choice, never a fact — undoable and saved exactly like `displayMode`.
+   */
+  dihedralShown: DihedralShownMap;
+  toggleDihedralShown: (factId: string) => void;
   /** The figure's NAME (issue #42) - shown on the page, used as the save filename, derived from the
    *  loaded file's name. Session metadata: NOT in the undo history (partialize is facts+seed only);
    *  reset by `clear`. */
@@ -834,7 +842,7 @@ export interface Geo3State {
   resample: () => void;
   dismissError: () => void;
   /** Load a deserialised figure — ONE undoable set (never destructive: undo restores the prior session). */
-  loadFigure: (facts: Fact3[], seed: number, queries?: string[], planeDisplay?: PlaneDisplayMode3Map, displayMode?: DisplayModeMap) => void;
+  loadFigure: (facts: Fact3[], seed: number, queries?: string[], planeDisplay?: PlaneDisplayMode3Map, displayMode?: DisplayModeMap, dihedralShown?: DihedralShownMap) => void;
   /** Surface a file-load refusal through the normal error banner. */
   reportLoadError: (reason: 'bad-file' | 'newer-schema' | 'too-large') => void;
 }
@@ -1016,6 +1024,7 @@ export const useGeo3 = create<Geo3State>()(
       queries: [],
       planeDisplay: {},
       displayMode: {},
+      dihedralShown: {},
       figureName: '',
       lastError: null,
       lastNotice: null,
@@ -1151,7 +1160,7 @@ export const useGeo3 = create<Geo3State>()(
         });
         return { ok: true };
       },
-      clear: () => set({ facts: [], queries: [], planeDisplay: {}, displayMode: {}, figureName: '', lastError: null, lastNotice: null }),
+      clear: () => set({ facts: [], queries: [], planeDisplay: {}, displayMode: {}, dihedralShown: {}, figureName: '', lastError: null, lastNotice: null }),
 
       // A query is a QUESTION about the figure, never a fact (ADR-3D-057): it never enters replay.
       // Duplicates are dropped (asking twice adds nothing); trimmed; capped so the panel stays sane.
@@ -1185,6 +1194,12 @@ export const useGeo3 = create<Geo3State>()(
         set({ displayMode: pruneDisplayMode(toggleDisplayMode(displayMode, factId), facts.map((f) => f.id)) });
       },
 
+      // #1476: the same shape — pruned to the live facts on every flip
+      toggleDihedralShown: (factId) => {
+        const { facts, dihedralShown } = get();
+        set({ dihedralShown: pruneDihedralShown(toggleDihedralShown(dihedralShown, factId), facts.map((f) => f.id)) });
+      },
+
       setFigureName: (name) => set({ figureName: name }),
 
       // "show another configuration": the next seed whose configuration still satisfies every stated
@@ -1199,20 +1214,21 @@ export const useGeo3 = create<Geo3State>()(
 
       dismissError: () => set({ lastError: null }),
 
-      loadFigure: (facts, seed, queries = [], planeDisplay = {}, displayMode = {}) =>
+      loadFigure: (facts, seed, queries = [], planeDisplay = {}, displayMode = {}, dihedralShown = {}) =>
         // #937: a file saved before the chip shipped carries no map, so it loads showing values —
         // today's behaviour, no migration, and the load audit stays green.
-        set({ facts, seed, queries, planeDisplay, displayMode: pruneDisplayMode(displayMode, facts.map((f) => f.id)), lastError: null }),
+        set({ facts, seed, queries, planeDisplay, displayMode: pruneDisplayMode(displayMode, facts.map((f) => f.id)), dihedralShown: pruneDihedralShown(dihedralShown, facts.map((f) => f.id)), lastError: null }),
 
       reportLoadError: (reason) => set({ lastError: { code: reason } }),
     }),
     {
       // History tracks the durable inputs only; lastError is transient UI state,
       // and `equality` keeps error-only sets from pushing duplicate snapshots.
-      partialize: (s) => ({ facts: s.facts, seed: s.seed, queries: s.queries, planeDisplay: s.planeDisplay, displayMode: s.displayMode }) as Geo3State,
+      partialize: (s) => ({ facts: s.facts, seed: s.seed, queries: s.queries, planeDisplay: s.planeDisplay, displayMode: s.displayMode, dihedralShown: s.dihedralShown }) as Geo3State,
       equality: (past, current) =>
         past.facts === current.facts && past.seed === current.seed && past.queries === current.queries &&
-        past.planeDisplay === current.planeDisplay && past.displayMode === current.displayMode,
+        past.planeDisplay === current.planeDisplay && past.displayMode === current.displayMode &&
+        past.dihedralShown === current.dihedralShown,
     },
   ),
 );

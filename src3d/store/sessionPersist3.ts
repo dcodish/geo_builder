@@ -25,7 +25,7 @@ export function sessionPayload3(): string | null {
   const s = useGeo3.getState();
   if (s.facts.length === 0) return null;
   const name = s.figureName.trim();
-  return serializeFigure3(s.facts, s.seed, name || undefined, s.queries, s.planeDisplay, s.displayMode);
+  return serializeFigure3(s.facts, s.seed, name || undefined, s.queries, s.planeDisplay, s.displayMode, s.dihedralShown);
 }
 
 /** Persist the current session, unless it is empty. */
@@ -48,6 +48,7 @@ export function startSessionPersist3(): () => void {
       s.queries !== p.queries ||
       s.planeDisplay !== p.planeDisplay ||
       s.displayMode !== p.displayMode ||
+      s.dihedralShown !== p.dihedralShown ||
       s.figureName !== p.figureName
     )
       persistSession3();
@@ -71,7 +72,7 @@ export function forgetSession3(): void {
 export function restoreSession3(payload: string) {
   const r = deserializeFigure3(payload);
   if (!r.ok) return r;
-  useGeo3.getState().loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode);
+  useGeo3.getState().loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode, r.dihedralShown);
   // A restore is a load, not a replay of the student's keystrokes: there is no session behind it
   // for undo to return to.
   useGeo3.temporal.getState().clear();
