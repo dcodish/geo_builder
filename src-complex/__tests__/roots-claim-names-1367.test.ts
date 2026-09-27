@@ -68,6 +68,9 @@ describe('#1367 — a member that is NOT its solution refuses, naming the studen
   // index matching; the ruling chose "accept it, and name the rest" over "keep refusing".
   it('SET membership (#1396): «z1 = 2cis120» is a cube root of 8, so it is accepted even though it is not solution 1', () => {
     expect(play(['z1 = 2cis120', 'z^3 = 8'])).toEqual([true, true]);
+    // a FRESH figure: in the same session the second «z^3 = 8» is a second equation on the reserved
+    // letter, which #1428 refuses — before it, it slipped through and drew a phantom fourth point z
+    store().resetSession();
     expect(play(['z2 = 2cis240', 'z^3 = 8'])).toEqual([true, true]);
   });
 });

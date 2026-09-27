@@ -109,6 +109,11 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   ([ADR-CX-044](06d-decisions-complex.md#adr-cx-044)): `lowerLines` holds each set's rows back, tier 1
   solves the rest of the figure once, and a DETERMINED member off its index root keeps its own root while
   the unstated names take the rest. In every other case the index pins above are emitted unchanged.
+- **A line's names are read by ONE helper** ([ADR-CX-048](06d-decisions-complex.md#adr-cx-048)).
+  `declares` lists only the names a line CREATES. `X^n = …` carries its letter in `roots` alone, so a
+  check that read `declares` let a second equation on a reserved letter through as a phantom point.
+  Any question of the form *does this line touch name N?* (the reserved-letter clash, the `mentioned` set
+  `rootsMode` asks) reads `namesUsed(line)` in `app/deriveLines.ts`, never `declares`.
 - **A display transform never reaches the parser or the engine.** The polar↔cartesian toggle and the `n`
   stepper are view state, outside the store and outside undo. So changing how a number is *shown* can
   never change what was *stated* — a class of bug that is otherwise very hard to see.
@@ -125,7 +130,9 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   or decimal, and drops a zero part.
 - **The engine states WHAT happened; the reading layer words it.** Verdicts carry structured reason codes
   (`model/why.ts`), so the same fact reads correctly in Hebrew and English and the wording can improve
-  without touching the engine.
+  without touching the engine. **A refusal carries its reason too** ([ADR-CX-048](06d-decisions-complex.md#adr-cx-048)):
+  a line the fold set aside reaches the strip with its `why` (`refusalWhy` → `InputError` `refused`,
+  worded by `app/errorText.ts`), never as the generic «אינו מתיישב עם», which asserts a contradiction.
 
 ## Claims — three verdicts, and why the third is not optional
 

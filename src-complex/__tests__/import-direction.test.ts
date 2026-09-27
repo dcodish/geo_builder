@@ -40,8 +40,9 @@ const MAY_IMPORT: Record<string, readonly string[]> = {
   // the store is STATE. It reaches nothing but the types it stores — the submit path, the gate and
   // session persistence all live in `app/` (ADR-CX-023), and the cutover removed the second, in-store
   // path that made this list four entries longer. `shell` is the LoadAudit type it stores
-  // (shell/save, ADR-W-019) — the shared contract sits below every product layer.
-  store: ['value', 'shell'],
+  // (shell/save, ADR-W-019) — the shared contract sits below every product layer. `model` is the
+  // `Why` code a refusal carries so the strip words the real reason (#1428, ADR-CX-048).
+  store: ['value', 'model', 'shell'],
   scene: ['value', 'model', 'solve', 'replay'],
   render: ['value', 'scene'],
   parser: ['value', 'model'],

@@ -19,6 +19,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Banner } from '../../shell/frame/Banner';
 import { submitLine } from '../app/submit';
+import { errorText } from '../app/errorText';
 import { useComplexStore } from '../store/useComplexStore';
 import { complexI18n } from '../i18n';
 import { stripFormatControls } from '../../shell/bidi';
@@ -39,10 +40,16 @@ describe('#655 — the operator’s sequence', () => {
     expect(submitLine('z ברביע הראשון')).toBe(false);
   });
 
+  // #1428 (ADR-CX-048): the refusal carries the fold's reason — `z` names the solution SET of
+  // «z^3 = 8» — rather than the generic «incompatible»; it still names the statement owning the letter
   it('the refusal NAMES the statement it conflicts with (ADR-276)', () => {
     submitLine('z^3 = 8');
     submitLine('z ברביע הראשון');
-    expect(store().lastError).toEqual({ key: 'incompatible', detail: 'z^3 = 8' });
+    expect(store().lastError).toEqual({
+      key: 'refused',
+      detail: 'z ברביע הראשון',
+      why: { code: 'reserved-letter', letter: 'z', equation: 'z^3 = 8' },
+    });
   });
 
   it('KEEP-PRIOR — the refused line does not join the session', () => {
@@ -55,8 +62,8 @@ describe('#655 — the operator’s sequence', () => {
   it('the message is a real sentence naming the student’s own line, not internal state', () => {
     submitLine('z^3 = 8');
     submitLine('z ברביע הראשון');
-    const e = store().lastError!;
-    const msg = t('errIncompatible', { detail: e.detail });
+    const e = useComplexStore.getState().lastError!;
+    const msg = errorText(e, t);
     expect(msg).toContain('z^3 = 8');
     expect(msg).not.toMatch(/configCount|enumerated|null|undefined/);
   });

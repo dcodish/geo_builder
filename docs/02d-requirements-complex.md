@@ -74,7 +74,12 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   place and the unstated names take the remaining solutions in argument order; if it is not, the
   equation is **refused**, naming the student's statement, in either entry order. So a question that states z₁, z₂… and then solves an equation over them is refused
   unless those numbers are its solutions (operator ruling, #1367, with the §2b part ד cost shown).
-  *(Realised — [ADR-CX-042](06d-decisions-complex.md#adr-cx-042).)*
+  The bare letter then names the SET, not a number: any later line that uses it (`z = 1+i`, `|z| = 2`,
+  or a second equation such as `z^3 = 1` after `z^3 = 8`) is **refused**, and the refusal says that the
+  letter names that equation's solutions. It never says the two statements contradict each other.
+  Combining two equations on one letter is not offered (operator ruling on #1428, 2026-09-27; #1466).
+  *(Realised — [ADR-CX-042](06d-decisions-complex.md#adr-cx-042),
+  [ADR-CX-048](06d-decisions-complex.md#adr-cx-048).)*
 
 - **FR-CN-7 (Must)** — **A real parameter's sign follows its use.** A parameter that stands as a
   SIZE — a modulus (`|z1| = 9r`), anything inside `|…|`, a circle's radius, a measure's value, a scale

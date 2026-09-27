@@ -94,21 +94,27 @@ const broke = (before: Violations, after: Violations): boolean =>
   [...after.untranslated].some((u) => !before.untranslated.has(u));
 
 /**
- * #1405 — did the change put a letter declared complex where only a real number can stand?
+ * Did the change leave a statement the fold could not use — and if so, the refusal that says WHY.
  *
- * A dedicated refusal rather than the generic «incompatible», because the generic blame names the
- * OTHER line and says nothing about why the two cannot hold together. This one names the statement
- * that uses the letter as a size or an angle in BOTH entry orders (the declaration typed after
- * `|z1| = 9r`, or `|z1| = 9r` typed after the declaration), and the message says a size is real.
+ * The fold already knows the reason for every line it sets aside (`untranslated[].why`), and the gate
+ * carries it to the student rather than falling through to the differential blame. That blame answers
+ * a different question — *which earlier line, removed, lets this one in?* — and its sentence,
+ * «אינו מתיישב עם», asserts a CONTRADICTION. For a set-aside line there may be none: `z = 1+i` after
+ * `z^2 = 2i` is refused because `z` names the solution set, while 1+i is one of its members (#1428).
+ * One rule for every such reason, so a new `why` code reaches the strip without a new branch here:
+ *
+ * - `declared-complex-real` (#1405) keeps its dedicated sentence, which names the letter and says a
+ *   size is real — in BOTH entry orders, because `u.src` is whichever statement uses the letter;
+ * - every other reason is worded by the reading seam (`whyText`) under `refused`, naming the
+ *   statement it is about — `reserved-letter` today, which names the equation that owns the letter.
  */
-function complexAsReal(before: Derived2, after: Derived2): InputError | null {
+function refusalWhy(before: Derived2, after: Derived2): InputError | null {
   const had = new Set(before.untranslated.map((u) => u.src));
-  for (const u of after.untranslated) {
-    if (u.why.code === 'declared-complex-real' && !had.has(u.src)) {
-      return { key: 'complex-as-real', detail: u.src, letter: u.why.letter };
-    }
-  }
-  return null;
+  const u = after.untranslated.find((x) => !had.has(x.src));
+  if (!u) return null;
+  return u.why.code === 'declared-complex-real'
+    ? { key: 'complex-as-real', detail: u.src, letter: u.why.letter }
+    : { key: 'refused', detail: u.src, why: u.why };
 }
 
 /** #1405 — the letter families the given lines declare complex. */
@@ -152,8 +158,8 @@ export function acceptLine(lines: readonly string[], raw: string, seed: number):
   for (let ds = 0; ds < CONFIG_TRIES; ds++) {
     if (!broke(before, violationsOf(fold(next, seed + ds)))) return { ok: true, seed: seed + ds };
   }
-  const typeClash = complexAsReal(beforeD, fold(next, seed));
-  if (typeClash) return { ok: false, error: typeClash };
+  const known = refusalWhy(beforeD, fold(next, seed));
+  if (known) return { ok: false, error: known };
 
   for (let i = 0; i < lines.length; i++) {
     const without = lines.filter((_, k) => k !== i);
@@ -192,8 +198,8 @@ function gateChange(
   for (let ds = 0; ds < CONFIG_TRIES; ds++) {
     if (!broke(was, violationsOf(fold(after, seed + ds)))) return { ok: true, seed: seed + ds };
   }
-  const typeClash = complexAsReal(wasD, fold(after, seed));
-  if (typeClash) return { ok: false, error: typeClash };
+  const known = refusalWhy(wasD, fold(after, seed));
+  if (known) return { ok: false, error: known };
   for (const candidate of before) {
     if (candidate === changed) continue;
     const b2 = violationsOf(fold(before.filter((l) => l !== candidate), seed));
