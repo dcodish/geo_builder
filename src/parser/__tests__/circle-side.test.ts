@@ -14,7 +14,6 @@ import { describe, expect, it } from 'vitest';
 import { parse, buildParseCtx } from '@/parser';
 import { replay, meetsRequirements } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
-import { checkGivens } from '@/engine';
 import type { AnyCommand } from '@/engine';
 
 /** A one-circle figure (centre O, free radius) — the context the implicit forms parse against. */
@@ -127,15 +126,18 @@ describe('engine + verifier — the side is honoured, sampled, and checked', () 
     expect(fig.violations).toEqual([]);
   });
 
-  it('a contradicted side is flagged amber by the verifier (figure.v.outsideCircle), not silently dropped', () => {
-    // D is a determined on-circle point — stating it is OUTSIDE cannot be honoured; the verifier reports.
+  it('a side contradicting the point’s own incidence is REFUSED naming both statements (#1470, ADR-549)', () => {
+    // D rides the circle — stating it OUTSIDE cannot be honoured by any figure. ADR-254 read this as an
+    // amber verifier warning; the operator's 2026-09-27 ruling («conflicting inputs that cannot exist are
+    // always rejected») makes it a stage-0g′ refusal: the side fact fails, the prior figure is kept.
     const facts = factsFor(['מעגל O רדיוס 5', 'D על המעגל', 'D מחוץ למעגל']);
     const fig = replay(facts);
-    const v = checkGivens(
-      facts.map((f) => f.cmd) as Parameters<typeof checkGivens>[0],
-      fig.positions,
-      fig.circles,
-    );
-    expect(v.some((x) => x.relation === 'circle-side' && x.messageKey === 'figure.v.outsideCircle')).toBe(true);
+    expect(fig.status[facts[2].id]).toBe('impossible: «D outside circle O» contradicts «D on circle O»');
+    expect(fig.status[facts[1].id]).toBe('ok');
+    const c = fig.circles.get('circle-O')!;
+    const D = fig.positions.get('D')!;
+    expect(Math.hypot(D.x - c.center.x, D.y - c.center.y)).toBeCloseTo(c.r, 6); // still on the circle
+    // and the verifier does not ALSO report the refused side (a refused fact is not a given in force)
+    expect(fig.violations).toEqual([]);
   });
 });

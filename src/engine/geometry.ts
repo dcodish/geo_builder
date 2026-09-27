@@ -79,6 +79,30 @@ export function pointInPolygon(p: Vec, verts: Vec[], margin = 0): boolean {
   return true;
 }
 
+/**
+ * Is `p` STRICTLY outside the polygon `verts` — not inside, and at least `margin` clear of every edge?
+ *
+ * #1487 ([ADR-549](../../docs/06-decisions.md#adr-549)): "outside" used to be `!pointInPolygon(p, vs)`,
+ * so a point exactly ON an edge — neither inside nor outside — read as outside, and «E על AB» ·
+ * «E מחוץ למשולש ABC» drew silent green. The boundary now belongs to neither side, with the same
+ * clearance the strict-inside test demands: the two tests are mirror images.
+ */
+export function pointOutsidePolygon(p: Vec, verts: Vec[], margin = 0): boolean {
+  const n = verts.length;
+  if (n < 3) return true;
+  if (pointInPolygon(p, verts)) return false;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const a = verts[i], b = verts[j];
+    const d = sub(b, a);
+    const dd = d.x * d.x + d.y * d.y;
+    const t = dd < 1e-18 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * d.x + (p.y - a.y) * d.y) / dd));
+    const foot = { x: a.x + t * d.x, y: a.y + t * d.y };
+    // `<=` — at margin 0 a point exactly on an edge is still not outside.
+    if (dist(p, foot) <= margin) return false;
+  }
+  return true;
+}
+
 /** Reflect point p across the line through a and b (a degenerate a≈b returns p). */
 export function reflectAcross(p: Vec, a: Vec, b: Vec): Vec {
   const d = sub(b, a);

@@ -2754,7 +2754,7 @@ export const SCENARIOS_4: Scenario[] = [
     title:
       '#1438 / ADR-548: «המעגל עובר דרך A» after «מעגל O» puts A on circle O — it used to draw a SECOND circle through A (green), drop «ו-B», or refuse naming a «P» the student never typed',
     guards:
-      "External review of prod, relayed by the operator 2026-09-27: «מעגל O · נקודה A · המעגל עובר דרך A» committed `circle-through circle-P` — two circles, O not through A, every row green. The definite «המעגל» is an ADR-029 REFERENCE, but the circle DEFINITION rule never asked the introduce-vs-resolve question: it stripped «מעגל\\w*», minted a fresh centre, and let the through list's other labels ride as residue no post-pass claimed. Now a through-statement about a drawn circle lowers exactly like «X [ו-Y] על המעגל». Asserted: the reviewer's sequence keeps ONE circle with A on circle O; the «ו-B» variant puts A AND B on it; beside two circles it ASKS (`ambiguous-circle-ref`) instead of minting a third; «E נקודה מחוץ למעגל» then «המעגל עובר דרך E» is a contradiction the verifier names (E, circle O) — the same surface as «E על המעגל»; with A undefined nothing named «P» appears. Spellings, the named-existing twin and the residue hole are in src/parser/__tests__/definite-circle-through-1438.test.ts.",
+      "External review of prod, relayed by the operator 2026-09-27: «מעגל O · נקודה A · המעגל עובר דרך A» committed `circle-through circle-P` — two circles, O not through A, every row green. The definite «המעגל» is an ADR-029 REFERENCE, but the circle DEFINITION rule never asked the introduce-vs-resolve question: it stripped «מעגל\\w*», minted a fresh centre, and let the through list's other labels ride as residue no post-pass claimed. Now a through-statement about a drawn circle lowers exactly like «X [ו-Y] על המעגל». Asserted: the reviewer's sequence keeps ONE circle with A on circle O; the «ו-B» variant puts A AND B on it; beside two circles it ASKS (`ambiguous-circle-ref`) instead of minting a third; «E נקודה מחוץ למעגל» then «המעגל עובר דרך E» is the same contradiction as «E על המעגל» — since #1470 (ADR-549) REFUSED at stage 0g′ naming both statements, where it read amber before; with A undefined nothing named «P» appears. Spellings, the named-existing twin and the residue hole are in src/parser/__tests__/definite-circle-through-1438.test.ts.",
     steps: ['מעגל O', 'נקודה A', 'המעגל עובר דרך A'],
     check(fig) {
       allStepsOk(fig);
@@ -2773,16 +2773,95 @@ export const SCENARIOS_4: Scenario[] = [
       // Two circles and no way to tell which: ASK, never a third circle.
       const amb = parse('המעגל עובר דרך A', ctxOf(factsOf(['מעגל O', 'מעגל P', 'נקודה A'])));
       expect(amb).toMatchObject({ ok: false, reason: 'ambiguous-circle-ref', centers: ['O', 'P'] });
-      // A point stated OUTSIDE, then said to be on the circle: the contradiction is named.
-      const side = replay(factsOf(['מעגל O', 'E נקודה מחוץ למעגל', 'המעגל עובר דרך E']));
+      // A point stated OUTSIDE, then said to be on the circle: the contradiction is named — and, since
+      // #1470 (ADR-549), refused keep-prior rather than committed amber.
+      const sideFacts = factsOf(['מעגל O', 'E נקודה מחוץ למעגל', 'המעגל עובר דרך E']);
+      const side = replay(sideFacts);
       expect([...side.circles.keys()]).toEqual(['circle-O']);
-      expect(side.violations.some((v) => v.relation === 'circle-side' && v.ids.includes('E') && v.ids.includes('circle-O')), 'E outside vs on circle O is named').toBe(true);
+      expect(side.status[sideFacts[2].id], 'E outside vs on circle O is named').toBe('impossible: «E on circle O» contradicts «E outside circle O»');
       // A never introduced: it is created ON circle O; nothing called P exists anywhere.
       const fresh = replay(factsOf(['מעגל O', 'המעגל עובר דרך A']));
       allStepsOk(fresh);
       expect([...fresh.circles.keys()]).toEqual(['circle-O']);
       expect([...fresh.positions.keys()].some((k) => /P/.test(k)), 'no «P» anywhere').toBe(false);
       onO(fresh, 'A');
+    },
+  },
+  {
+    id: 'stated-side-vs-incidence-refused-1470',
+    title:
+      '#1470 + #1487 / ADR-549: «E נקודה מחוץ למעגל» then «המעגל עובר דרך E» is REFUSED naming both statements — a stated side and a statement that puts the point elsewhere cannot both hold (was amber, and silent green for a point on an edge «מחוץ למשולש»)',
+    guards:
+      "Found in fix round #1469 (#1438); operator ruling 2026-09-27: \"we should always reject conflicting inputs that cannot exist so we should reject all cases\". A stated SIDE (inside/outside a circle or polygon, same/different sides of a line) pushed no constraint and survived only as a fact command, so no stage-0 prover ever compared it with an incidence: the pair committed with an amber verifier warning, and «E על AB» · «E מחוץ למשולש ABC» drew SILENT GREEN because the outside test had no boundary tolerance (#1487). Sides are now requirement records on the construction and the stage-0g′ prover `sideImpossibility` refuses, keep-prior, every STRUCTURAL contradiction: on-circle vs inside/outside, the centre stated outside, a vertex / edge point / edge midpoint stated inside or outside, inside vs outside, a subject on the line it is said to lie off, the same pair on the same and on different sides — both entry orders, both incidence spellings, English too. Structural only: the satisfiable controls at the end (a stated distance, another point, another circle, an extension, a centre inside, a diagonal's midpoint inside, the tangent and secant macros' external apex) all still build clean. The prover's unit lock is src/engine/__tests__/side-feasibility.test.ts; the submit path is src/app/__tests__/issue-1470-side-refusal.test.ts.",
+    steps: ['מעגל O', 'E נקודה מחוץ למעגל', 'המעגל עובר דרך E'],
+    expectViolations: true,
+    check: (fig) => {
+      const entries = Object.entries(fig.status);
+      expect(entries.slice(0, -1).every(([, st]) => st === 'ok'), 'the prior statements stand').toBe(true);
+      expect(String(entries[entries.length - 1]![1])).toBe('impossible: «E on circle O» contradicts «E outside circle O»');
+      expect(fig.pending, 'a proven contradiction is never a pending info state').toBe(false);
+      expect(fig.violations, 'the refused incidence is not a given in force — nothing amber').toEqual([]);
+      // keep-prior: E is still where its side statement put it — strictly outside circle O
+      const c = fig.circles.get('circle-O')!;
+      expect(dist(at(fig, 'E'), c.center)).toBeGreaterThan(c.r);
+
+      // The class: every structural member, each refused on its LAST line with both statements named.
+      const REFUSED: [string[], string][] = [
+        [['מעגל O', 'E נקודה מחוץ למעגל', 'E על המעגל'], 'impossible: «E on circle O» contradicts «E outside circle O»'],
+        [['מעגל O', 'E בתוך המעגל', 'E על המעגל'], 'impossible: «E on circle O» contradicts «E inside circle O»'],
+        [['מעגל O', 'E בתוך המעגל', 'המעגל עובר דרך E'], 'impossible: «E on circle O» contradicts «E inside circle O»'],
+        [['מעגל O', 'E על המעגל', 'E נקודה מחוץ למעגל'], 'impossible: «E outside circle O» contradicts «E on circle O»'],
+        [['מעגל O', 'E על המעגל', 'E בתוך המעגל'], 'impossible: «E inside circle O» contradicts «E on circle O»'],
+        [['מעגל O', 'E מחוץ למעגל', 'E בתוך המעגל'], 'impossible: «E inside circle O» contradicts «E outside circle O»'],
+        [['circle O', 'E outside the circle', 'E on the circle'], 'impossible: «E on circle O» contradicts «E outside circle O»'],
+        [['מעגל O', 'O מחוץ למעגל'], 'impossible: «O outside circle O» contradicts «O is the centre of circle O»'],
+        [['משולש ABC', 'E על AB', 'E מחוץ למשולש ABC'], 'impossible: «E outside triangle ABC» contradicts «E on segment AB»'],
+        [['משולש ABC', 'E מחוץ למשולש ABC', 'E על AB'], 'impossible: «E on segment AB» contradicts «E outside triangle ABC»'],
+        [['משולש ABC', 'E על AB', 'E בתוך המשולש ABC'], 'impossible: «E inside triangle ABC» contradicts «E on segment AB»'],
+        [['משולש ABC', 'E בתוך המשולש ABC', 'E מחוץ למשולש ABC'], 'impossible: «E outside triangle ABC» contradicts «E inside triangle ABC»'],
+        [['משולש ABC', 'A בתוך המשולש ABC'], 'impossible: «A inside triangle ABC» contradicts «A is a vertex of ABC»'],
+        [['משולש ABC', 'A מחוץ למשולש ABC'], 'impossible: «A outside triangle ABC» contradicts «A is a vertex of ABC»'],
+        [['משולש ABC', 'M אמצע AB', 'M מחוץ למשולש ABC'], 'impossible: «M outside triangle ABC» contradicts «M is the midpoint of AB»'],
+        [['קטע AB', 'C ו-D בצדדים שונים של AB', 'C על AB'], 'impossible: «C on segment AB» contradicts «C, D on different sides of AB»'],
+        [['קטע AB', 'C על AB', 'C ו-D בצדדים שונים של AB'], 'impossible: «C, D on different sides of AB» contradicts «C on segment AB»'],
+        [['ישר AB', 'C על הישר AB', 'C ו-D בצדדים שונים של AB'], 'impossible: «C, D on different sides of AB» contradicts «C on line AB»'],
+        [['קטע AB', 'C ו-D באותו צד של AB', 'D על AB'], 'impossible: «D on segment AB» contradicts «C, D on the same side of AB»'],
+        [['קטע AB', 'C ו-D באותו צד של AB', 'C ו-D בצדדים שונים של AB'], 'impossible: «C, D on different sides of AB» contradicts «C, D on the same side of AB»'],
+      ];
+      for (const [steps, message] of REFUSED) {
+        const facts = factsOf(steps);
+        const r = replay(facts);
+        const label = steps.join(' · ');
+        // one LINE may lower to several facts («E על AB» = the segment + the rider), sharing a group
+        const groupOf = (f: (typeof facts)[number]) => f.group ?? f.id;
+        const lastGroup = groupOf(facts[facts.length - 1]);
+        const lastLine = facts.filter((f) => groupOf(f) === lastGroup);
+        expect(facts.filter((f) => groupOf(f) !== lastGroup).every((f) => r.status[f.id] === 'ok'), `${label}: the prior statements stand`).toBe(true);
+        expect(lastLine.map((f) => r.status[f.id]), label).toEqual(lastLine.map(() => message));
+        expect(r.pending, `${label}: never pending`).toBe(false);
+      }
+
+      // Satisfiable combinations run through the SAME prover and must still build clean.
+      const CONTROLS: string[][] = [
+        ['מעגל O', 'E מחוץ למעגל', 'EO = 10'],
+        ['מעגל O', 'E על המעגל', 'F מחוץ למעגל'],
+        ['מעגל O', 'מעגל P', 'E מחוץ למעגל O', 'E על מעגל P'],
+        ['מעגל O', 'O בתוך המעגל'],
+        ['משולש ABC', 'E מחוץ למשולש ABC', 'E על המשך AB'],
+        ['ריבוע ABCD', 'M אמצע AC', 'M בתוך הריבוע ABCD'],
+        ['קטע AB', 'מעגל O', 'C ו-D בצדדים שונים של AB', 'C על מעגל O'],
+        ['מעגל O', 'מנקודה E מחוץ למעגל O ישר חותך את המעגל בנקודות A ו-B'],
+        ['מעגל O', 'AD חותך את מעגל O בנקודה B'],
+        ['מעגל O', 'מנקודה A יוצאים שני משיקים למעגל O'],
+        ['מעגל O', 'PA משיק למעגל בנקודה A'],
+      ];
+      for (const steps of CONTROLS) {
+        const facts = factsOf(steps);
+        const r = replay(facts);
+        const label = steps.join(' · ');
+        expect(facts.map((f) => r.status[f.id]), label).toEqual(facts.map(() => 'ok'));
+        expect(r.violations, label).toEqual([]);
+      }
     },
   },
 ];

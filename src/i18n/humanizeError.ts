@@ -75,10 +75,36 @@ const DESC_WORDS: [RegExp, string][] = [
   [/\bperimeter\(/g, 'errors.desc.perimeterOf'],
 ];
 
-/** Replace every English word of the constraint vocabulary with its translation. Pure; unknown text passes through. */
+/**
+ * #1470 ([ADR-549](../../docs/06-decisions.md#adr-549)) — the vocabulary of the SIDE STATEMENTS
+ * `sideImpossibility` names (`E on circle O`, `E outside triangle ABC`, `C, D on different sides of AB`).
+ * Its wire message is the ADR-540 `impossible: X contradicts Y` shape, and both halves are the student's
+ * own statements — so, like a constraint description, they are translated here, word group by word group,
+ * and the same #413 property holds: no English word survives (`humanize-error.test.ts`). Longest-first
+ * where one phrase could begin another.
+ */
+const STATEMENT_WORDS: [RegExp, string][] = [
+  [/\bis the centre of circle\b/g, 'errors.stmt.centreOfCircle'],
+  [/\bis the midpoint of\b/g, 'errors.stmt.midpointOf'],
+  [/\bis a vertex of\b/g, 'errors.stmt.vertexOf'],
+  [/\bon different sides of\b/g, 'errors.stmt.differentSidesOf'],
+  [/\bon the same side of\b/g, 'errors.stmt.sameSideOf'],
+  [/\boutside circle\b/g, 'errors.stmt.outsideCircle'],
+  [/\binside circle\b/g, 'errors.stmt.insideCircle'],
+  [/\bon circle\b/g, 'errors.stmt.onCircle'],
+  [/\boutside triangle\b/g, 'errors.stmt.outsideTriangle'],
+  [/\binside triangle\b/g, 'errors.stmt.insideTriangle'],
+  [/\boutside polygon\b/g, 'errors.stmt.outsidePolygon'],
+  [/\binside polygon\b/g, 'errors.stmt.insidePolygon'],
+  [/\bon segment\b/g, 'errors.stmt.onSegment'],
+  [/\bon line\b/g, 'errors.stmt.onLine'],
+];
+
+/** Replace every English word of the constraint (and side-statement) vocabulary with its translation. Pure; unknown text passes through. */
 export function translateConstraintWords(s: string, t: Translate): string {
   let out = s;
   for (const [re, key] of DESC_WORDS) out = out.replace(re, () => t(key));
+  for (const [re, key] of STATEMENT_WORDS) out = out.replace(re, () => t(key));
   return out;
 }
 

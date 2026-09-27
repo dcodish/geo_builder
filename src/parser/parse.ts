@@ -11041,7 +11041,9 @@ function regionSideFallback(s: string, ctx: ParseContext): ParseResult | null {
     .match(/^([A-Z]\d*)$/);
   if (one) {
     const id = up(one[1]);
-    if (poly.includes(id)) return null;
+    // A VERTEX of the region stated inside/outside it («A בתוך המשולש ABC») is a real statement, and an
+    // impossible one: it parses like any other, and the stage-0g′ prover refuses it naming both
+    // statements (#1470, ADR-549). Declining it here read as «I didn't understand» — the wrong refusal.
     return { ok: true, commands: [...prefix, { type: 'point-polygon-side', id, poly, side }] };
   }
   // (b) the head is a full statement of its own ("הנקודה E נמצאת על מעגל O") — parse it and attach the

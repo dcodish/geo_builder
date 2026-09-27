@@ -25,6 +25,8 @@ import {
   metricImpossibility,
   metricImpossibilityError,
 } from './metricFeasibility';
+import { sideImpossibility, sideImpossibilityError } from './sideFeasibility';
+import { recordRequirement, requirementsField } from './requirements';
 import { degeneratePolygons, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
 import { applySeed, freeDofs } from './sample';
 import { constraintKey, constraintRefs, describeConstraint, solvedOnSegmentCandidates } from './solve';
@@ -807,8 +809,25 @@ function danglingCircleError(prev: Construction, cmd: Command): string | null {
   return null;
 }
 
+/**
+ * #1470 (ADR-549): a committed figure carries the side records its statements made. Stamped HERE, once,
+ * on every accepted result — the ladder's many rebuild paths (M1 reinterpretations, recruiter trials,
+ * ownership passes) construct fresh figures and need not know the field exists.
+ */
+function withRequirements(r: StepResult, prev: Construction, cmds: Command[]): StepResult {
+  if (!r.ok) return r;
+  const reqs = recordRequirement(prev.requirements, ...cmds);
+  if (!reqs.length && !r.construction.requirements) return r;
+  const { requirements: _drop, ...rest } = r.construction;
+  return { ...r, construction: { ...rest, ...requirementsField(reqs) } };
+}
+
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
+  return withRequirements(applyStepLadder(prev, cmd), prev, [cmd]);
+}
+
+function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   const trace: string[] = []; // the ladder trace (docs/LADDER.md) — diagnostic only
   const prevEval = evaluate(prev);
   const prevPositions = prevEval.ok ? prevEval.positions : new Map<Id, Vec>();
@@ -853,6 +872,15 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   const boundErr = boundImpossibility(probed.constraints);
   if (boundErr) {
     return { ok: false, error: boundImpossibilityError(boundErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  }
+
+  // #1470 + #1487 (ADR-549), stage 0g′: a stated SIDE and a statement that structurally puts the point
+  // elsewhere — «E מחוץ למעגל» · «E על המעגל», a vertex or an edge point «מחוץ למשולש», a subject on the
+  // very line it is said to lie off. Both orders are one case (the records ride the probe; the incoming
+  // claim is read from the command itself). STRUCTURAL only, so a satisfiable pair is never refused.
+  const sideErr = sideImpossibility(probed, cmd);
+  if (sideErr) {
+    return { ok: false, error: sideImpossibilityError(sideErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
 
   // #966 (ADR-499) — A ROLE CLAIM IS CHECKED AGAINST THE FIGURE THAT IS ALREADY THERE.
@@ -976,6 +1004,10 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
  * composition to mirror. A run of ONE is just `applyStep`, so nothing outside a multi-constraint macro moves.
  */
 export function applyCoupledStep(prev: Construction, cmds: Command[]): StepResult {
+  return withRequirements(applyCoupledStepLadder(prev, cmds), prev, cmds);
+}
+
+function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult {
   const trace: string[] = []; // the ladder trace (docs/LADDER.md) — diagnostic only
   const prevEval = evaluate(prev);
   const prevPositions = prevEval.ok ? prevEval.positions : new Map<Id, Vec>();

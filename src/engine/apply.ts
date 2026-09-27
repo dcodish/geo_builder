@@ -11,8 +11,9 @@
 import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, Vec } from './types';
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
-import { add, dist, lineLineIntersect, pointInPolygon, reflectAcross, ringSimple, scale, sub } from './geometry';
+import { add, dist, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringSimple, scale, sub } from './geometry';
 import { constraintKey, constraintRefs } from './solve';
+import { recordRequirement, requirementsField } from './requirements';
 
 /**
  * A constraint either *drives* a free DOF or *checks* the figure (ADR-012/014).
@@ -1439,7 +1440,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       const cy = known ? verts.reduce((s, v) => s + v.y, 0) / verts.length : 0;
       const rspan = known ? Math.max(...verts.map((v) => dist(v, { x: cx, y: cy }))) : 5;
       const onSide = (p: Vec): boolean =>
-        !known || (cmd.side === 'inside' ? pointInPolygon(p, verts, rspan * 0.06) : !pointInPolygon(p, verts));
+        !known || (cmd.side === 'inside' ? pointInPolygon(p, verts, rspan * 0.06) : pointOutsidePolygon(p, verts, rspan * 0.06)); // #1487: outside is STRICT, mirroring inside
       const seedSpot = (): Vec => {
         const others = [...pos.values()];
         // golden-angle spins at a few radius tiers around the centroid — the stated side + general position
@@ -2390,7 +2391,8 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     }
   }
 
-  return { objects, constraints };
+  // #1470 (ADR-549): a stated side is carried as a requirement record — the stage-0g′ prover reads it.
+  return { objects, constraints, ...requirementsField(recordRequirement(prev.requirements, cmd)) };
 }
 
 /**
