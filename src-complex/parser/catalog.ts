@@ -45,6 +45,15 @@ export const CATALOG: readonly CatalogEntry[] = [
     descEn: 'declare a complex number — z and w names need no declaration',
   },
   {
+    // #1405 (ADR-CX-047): any other letter is a real parameter until it is declared — then u, u1, u2…
+    // are complex in every line, before or after this one
+    family: 'F1',
+    he: 'u מספר מרוכב',
+    en: 'u is a complex number',
+    descHe: 'אות אחרת כמספר מרוכב — בלי ההצהרה u הוא מספר ממשי',
+    descEn: 'another letter as a complex number — without this, u is a real number',
+  },
+  {
     family: 'F2',
     featured: true,
     he: 'z1 = 3+4i',

@@ -124,7 +124,7 @@ family" rather than "outside the tested strings".
 
 ## ADR-CX-004 — Implicit typing by the exam's naming convention (2026-08-14)
 
-**Status:** Accepted (operator ruling, same day)
+**Status:** Accepted (operator ruling, same day) · **amended by [ADR-CX-047](#adr-cx-047)** (#1405): «u מספר מרוכב» declares another letter family complex for the whole figure, and a declaration is a type, never an existing number
 
 **Context.** Operator: *"z and w are complex numbers — so if I just write z or z2 or z10 or w1 it
 should be a complex number without having to specify it."* The bagrut's naming convention is
@@ -2795,3 +2795,97 @@ languages through the real `submitLine` at 24/24 seeds, the quadrant really held
 staying positive, including mixed use), `accepted-line-visible-1390.test.ts`'s `u^5 = -32` row FLIPPED
 with a comment naming this ruling, and fixtures `param-sign-modulus-1387`, `param-sign-quadrant-1387`
 and `param-sign-odd-power-1406`.
+
+## ADR-CX-047 — «u מספר מרוכב» is a TYPE, read over the whole figure; a letter read as real says so (#1405)
+
+**Status:** accepted, 2026-09-25 (the operator's own proposal on #1405, armed `auto-ok` 2026-09-24 with the
+wording delegated to the round) · **Issue:** [#1405](https://github.com/dcodish/geo_builder/issues/1405)
+(feature, `P3`, `complex`) · round [#1408](https://github.com/dcodish/geo_builder/issues/1408) · **amends**
+[ADR-CX-004](#adr-cx-004) (a name outside z/w can be declared complex) and the F1 row of docs/27 §10
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-8 (new): a letter declared complex is complex in
+every line, and a letter read as real says so · **Design:** [04d](04d-design-complex.md), "A declaration is
+a type, read before any line" · **Ladder:** stage 0b′ (new) and 0e ([LADDER-CX](LADDER-CX.md))
+
+**What the operator saw.** Playing round #1397 T12: *"u^5=32 is accepted. the data panel shows u=2. maybe
+there should be a message saying that if the user meant the u is complex it needs to be defined. so we have
+a line u מספר מרוכב and system will know to treat it as so."*
+
+**Measured at pickup (`7234e7be`).** The declaration sentence already parsed (F1), and read as an
+EXISTENCE: «u מספר מרוכב» drew a free point u. It changed nothing about what u meant in any other line, so
+`u מספר מרוכב · u^5 = 32` drew a free point u at a sampled position AND showed the real parameter `u = 2`.
+That is one letter with two unrelated meanings, and the reversed order did the same. For z the existence
+reading let the order decide: `z מספר מרוכב · z^3 = 8` drew ONE root (ADR-CX-005's "constrain" reading of
+an existing letter), and `z^3 = 8 · z מספר מרוכב` was refused. `|z1| = 9r · r מספר מרוכב` was accepted,
+drawing a free complex r beside the real parameter r = 5/9.
+
+**Class.** *A type statement («X is a complex number») is lowered as an existence statement. It creates a
+number named X instead of typing the letter, so it never changes how other lines read X, and the reading of
+`X^n = …` depends on which side of it the declaration was typed.*
+
+**The mechanism.**
+1. **A declaration is a TYPE** (`ParsedLine.typed`, separate from `declares`). The spelled form of F1
+   («u מספר מרוכב», «u ו-v מספרים מרוכבים», «u is a complex number») reports the names it types. Each must
+   be a name a number can have: the parameter floor (one letter, optionally indexed; ADR-CX-040), and not
+   `i` or `o`, the unit and the origin. `i מספר מרוכב` and `ab מספר מרוכב` are now refused.
+2. **Read before any line** (`complexScopeOf`, stage 0b′). `lowerLines` collects the declared letter
+   FAMILIES first (`u1` declares the u family, as z1 belongs to the z family) and parses every line with
+   them (`parseLineV2(raw, scope)`, threaded to `isComplexName` and `parseExpr`). The pre-scan cannot
+   disagree with itself: the declaration rule is first in the rule list, and its spelled form reads no
+   name's type. z and w are complex already, so declaring them adds nothing to the scope.
+3. **A type is not an existence.** A typed name does not count as "mentioned" for `rootsMode`, and it does
+   not clash with a letter an enumeration reserved. So `u^5 = 32` enumerates u₁..u₅ on either side of the
+   declaration. The typed name is drawn as a free number only when no enumeration took the letter, so
+   «u מספר מרוכב» alone still draws u (the F1 behaviour).
+4. **A declared letter where only a real can stand is a conflict, and it is named.** The grammar already
+   refused a complex name outside `|…|` in a magnitude relation (`|z1| = 9w`) and as an angle
+   (`2cis z2`). It did not refuse one as a circle's radius or a measure's value: at base
+   `המעגל שמרכזו z1 ורדיוסו w` was accepted (measured), with no w drawn. Both slots now ask the same
+   `hasBareComplexRef` question. A line that parses without the declarations and fails with them is
+   reported as `declared-complex-real`, never as "not understood", and the gate refuses with its own key
+   `complex-as-real`, naming the statement that uses the letter as a size or an angle **in both entry
+   orders**. «r מספר מרוכב» after `|z1| = 9r` and `|z1| = 9r` after «r מספר מרוכב» both name `|z1| = 9r`.
+5. **The teaching note** (`app/paramNote.ts`, `realParamNotes`). A SOLVED real parameter gets one note,
+   under the first line that uses it: «u נקרא כמספר ממשי (u = 2). אם u מרוכב, כתבו: u מספר מרוכב» /
+   «u is read as a real number (u = 2). If u is complex, write: u is a complex number». It is a note, never
+   a refusal. **It is offered only when the declaration it teaches passes the real gate on that figure**,
+   so `|z1| = 9r` (r = 5/9, a size) gets no note teaching a sentence that would be refused. A free
+   parameter (`a + b·i`) gets none, because nothing has been read yet. The wording is the round's, per the
+   operator's delegation, shortened from the proposal («אם u מרוכב» for «אם u הוא מספר מרוכב»).
+
+**Decided at pickup (the plan's open edges).**
+- *Declaring z or w:* no note. The type does not change, and the declaration draws the name as a bare
+  `z1` line does. The order dependence above is gone for z too.
+- *Deleting or muting the declaration row:* the scope is re-read from the active lines on every fold, so
+  u is a real parameter again and `u = 2` returns.
+- *A declared letter as a scale factor* (`z2 = u·z1`) is a legitimate complex product, NOT a conflict.
+  Only the slots that must be real (a size, an angle) conflict.
+- *The ask lane* reads a question with the same scope, so a question and a given cannot read one letter
+  two ways.
+
+**What changes for a student.** `u מספר מרוכב` beside `u^5 = 32`, in either order, draws the five roots
+u₁..u₅, where before it drew a stray point u and the real value u = 2. `u^5 = 32` alone still gives u = 2
+(and `u^5 = -32` gives u = −2, ADR-CX-045), now with the note. **`z מספר מרוכב · z^3 = 8` now draws three
+roots, not one**, because the declaration no longer makes z an existing number. A circle radius or a
+length given as a complex name is now refused.
+
+**Sibling check.** 3-D and analytic have no complex type. Their parameter declarations («t פרמטר חיובי»,
+«a is a positive parameter») are SIGN statements, and 3-D applies them as filters over every fact
+(`c.paramSigns` in `src3d/engine/evaluate.ts`) whatever the entry order. The class is not present there.
+2-D has no parameters. No sibling issue is owed.
+
+**Cost.** One extra scope-free parse of each line per fold (the pre-scan), and a second parse only for a
+line that fails under the scope. The note runs the acceptance gate once per SOLVED parameter per figure
+change, memoised in the App. No new solve and no sampling loop.
+
+**Consequences.** `src-complex/parser/exprParse.ts` (`ComplexScope`, `familyOf`, `isComplexName(name,
+scope)`, `isDeclarableName`, `parseExpr(…, scope)`), `src-complex/parser/rules.ts` (`typed`, the scope
+threaded through the rules, the radius and measure type check), `src-complex/app/deriveLines.ts`
+(`complexScopeOf`, the typed-name handling, `realSlotConflict`), `src-complex/app/submit.ts`
+(`complexAsReal`, `parseInFigure`, the scoped ask reading), `src-complex/app/askLane.ts`,
+`src-complex/app/paramNote.ts` (new), `src-complex/App.tsx` (the note on the fact row, the error's letter),
+`model/why.ts`, `replay/scene2.ts`, `i18n/index.ts`, and the F1 catalog row «u מספר מרוכב» / «u is a
+complex number». Locks: `declare-complex-1405.test.ts` (30: both orders in both languages, the family
+rule, a u sequence, delete and mute, z's order independence, the note and its exact wording in both
+locales, the note's remedy passing the gate, no note for a size or a free parameter, the refusal in both
+orders plus a radius, a length and an angle, an edit into the conflict, `i`/`o`/`ab` refused, the catalog
+row), and fixture `declare-complex-after-1405.complex.json` (the declaration typed AFTER `u^5 = 32`).
