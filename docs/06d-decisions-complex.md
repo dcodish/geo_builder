@@ -2992,3 +2992,85 @@ rule, a u sequence, delete and mute, z's order independence, the note and its ex
 locales, the note's remedy passing the gate, no note for a size or a free parameter, the refusal in both
 orders plus a radius, a length and an angle, an edit into the conflict, `i`/`o`/`ab` refused, the catalog
 row), and fixture `declare-complex-after-1405.complex.json` (the declaration typed AFTER `u^5 = 32`).
+
+## ADR-CX-048 — A reserved letter is checked against every name a line USES, and the refusal says why (#1428)
+
+**Status:** accepted, 2026-09-27 (operator ruling on #1428: "Refuse now, file combine", arms 1 + 2, `auto-ok`
+2026-09-27) · **Issue:** [#1428](https://github.com/dcodish/geo_builder/issues/1428) (bug, `P1`, `complex`) ·
+round [#1469](https://github.com/dcodish/geo_builder/issues/1469) · **amends** [ADR-CX-024](#adr-cx-024) (the
+reservation) and [ADR-CX-047](#adr-cx-047) (`complexAsReal` becomes one arm of the general rule)
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-6: the bare letter names the solution set, and
+every later line that uses it, a second equation included, is refused with the reason · **Design:**
+[04d](04d-design-complex.md), "A line's names are read by ONE helper" and "The engine states WHAT happened"
+· **Ladder:** stages 0d′ and 0e ([LADDER-CX](LADDER-CX.md))
+
+**What was reported.** An external review of prod, relayed by the operator: *"Sharing the variable z across
+equations is inconsistent. One equation is rejected as a contradiction while another, equally
+contradictory, is accepted."*
+
+**Measured at pickup (`2f24b56c`, through `submitLine`).** Every row of the issue reproduced:
+`z^3 = 1 · z^3 = 8` was accepted and drew the cube roots of 1 plus a separate z = 2, with no error.
+`z^2 = 4 · z^2 = -4` did the same (a phantom z = 2i), and so did `w^2 = 4 · w^2 = 9` (w = 3). `z^2 = 4 · z^3 = 8`
+drew z₁, z₂ and a separate z. `z^3 = 1 · |z| = 2` was refused, as the issue said, but with
+«אינו מתיישב עם "z^3 = 1"». So were `z^2 = 2i · z = 1+i` and `z^3 = 8 · w^2 = z`, although 1+i IS a root
+of 2i and nothing in the second line contradicts the first.
+
+**Root cause.** `lowerLines`' reserved-letter check read `r.line.declares`. A power equation's letter is not
+in `declares`, because the parser reports it only in `roots` (`z^3 = 8` → declares `[]`, roots `z`). So a
+second `X^n = …` skipped the reservation. `rootsMode` then saw z as already mentioned and returned
+`constrain`, and the equation became a constraint on a NEW point z, unrelated to the reserved set. Every
+other shape of line puts z into `declares` and was refused. **Class:** *a check that asks "does this line
+touch letter L?" read the list of names the line CREATES instead of the names it USES.*
+
+The wording half is a second instance of one class. The gate turned every set-aside line into the generic
+differential blame, «אינו מתיישב עם», which asserts a contradiction. #1405 had already carved out one
+reason (`declared-complex-real`) as a dedicated branch. Every other reason the fold knows was still lost.
+
+**The mechanism.**
+1. **`namesUsed(line)`** (`app/deriveLines.ts`): declares ∪ each roots letter ∪ the refs of each roots
+   right-hand side ∪ the refs of constraints, filter names, measure points and values, query and ratio
+   points, expression-query refs and sequence terms. Selections are left out, because the name a
+   selection binds is new by definition. A type declaration (`typed`) is left out, because a type is not a
+   use (ADR-CX-047). The reserved-letter clash check reads it.
+2. **The other declares-only read goes through it too.** `mentioned`, the set `rootsMode` asks, was fed
+   `declares` plus roots right-hand sides, while its own contract (ADR-CX-021 D3) says "defined,
+   constrained, or merely referred to". It now reads `namesUsed`. Measured over the 373 parseable lines
+   of the fixtures, the example and every string in the complex tests: the helper adds a name beyond the
+   old reads only for `o`, which `mentioned` already holds. The change has no effect on that corpus.
+3. **A set-aside line's refusal carries the fold's `why`** (`refusalWhy` in `app/submit.ts`, replacing
+   `complexAsReal`, for typed lines and for toggle/edit alike). `declared-complex-real` keeps its
+   dedicated key and sentence. Every other reason becomes `{ key: 'refused', detail, why }`, and the strip
+   words it through `whyText`: «המשפט "z^3 = 8" לא נוסף — z מסמן את פתרונות המשוואה «z^3 = 1» — התייחסו
+   לפתרונות עצמם». A new `why` code reaches the student without a new branch in the gate.
+4. **The sentence is one function.** `ERROR_KEY` and `errParams` moved from `App.tsx` to `app/errorText.ts`
+   (`errorText(e, t)`), which the strip, the load audit and the locks all call. The store may now import
+   `model` types (the `Why` it holds), and the import-direction guard lists that edge.
+
+**Decided at pickup.**
+- `z^2 = 4 · z^3 = 8` is consistent (z = 2 satisfies both) and is still refused. Combining a second
+  equation with the first, by intersecting the sets or selecting a root, is the operator's #1466.
+- A genuine contradiction that involves no reserved letter (`z = 1+i · z^3 = 8`: z exists first, so the
+  equation constrains it) keeps «אינו מתיישב עם», naming the other line.
+- Three earlier locks asserted the old shape. Two expected `incompatible` for a reserved-letter refusal
+  (`issue-655`, `solution-sets` #680). They now expect `refused` naming the same equation. One
+  (`roots-claim-names-1367`) played two `… · z^3 = 8` figures in ONE session. Measured on the baseline,
+  its second `z^3 = 8` drew a phantom fourth point `z`, so it was green on this bug. It now resets
+  between the two figures.
+
+**What changes for a student.** A second equation on a letter already solved (`z^3 = 1` then `z^3 = 8`) is
+refused instead of drawing a stray point. Every refusal about a reserved letter now says that the letter
+names the earlier equation's solutions, instead of claiming the two statements contradict each other.
+
+**Sibling check.** 2-D and 3-D have no solution-set letters, so the reservation does not exist there.
+Analytic has no `X^n = …` enumeration. No sibling issue is owed.
+
+**Cost.** One extra walk over a parsed line's arrays per line per fold. No new solve.
+
+**Consequences.** `src-complex/app/deriveLines.ts` (`namesUsed`, the clash check, `mentioned`),
+`src-complex/app/submit.ts` (`refusalWhy`), `src-complex/app/errorText.ts` (new),
+`src-complex/store/useComplexStore.ts` (`InputError` `refused`), `src-complex/App.tsx`,
+`src-complex/i18n/index.ts` (`errRefused`), the import-direction guard (store → model).
+Locks: `src-complex/__tests__/reserved-letter-1428.test.ts` (15: `namesUsed` per shape, `z^3=1 · z^3=8` in
+both orders with the exact Hebrew sentence, `z^2=4 · z^2=-4`, `w^2=4 · w^2=9`, `z^2=4 · z^3=8`,
+`z^2=2i · z=1+i` never «אינו מתיישב», `z^3=1 · |z|=2`, a genuine contradiction still `incompatible`,
+`z^3=8` alone, the #1396 member cases in both orders, `w^2 = z1`).

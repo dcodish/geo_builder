@@ -218,7 +218,10 @@ export function lowerLines(
       if (!declared.includes(n)) typedOnly.add(n);
       declared.push(n);
     }
-    const clash = r.line.declares.find((n) => reserved.has(n));
+    // #1428 — EVERY name the line uses, not only what it declares: `z^3 = 8` after `z^3 = 1` declares
+    // nothing (its letter lives in `roots`), and reading `declares` alone let it through to constrain a
+    // second, unrelated point named z beside the reserved set
+    const clash = namesUsed(r.line).find((n) => reserved.has(n));
     if (clash !== undefined) {
       untranslated.push({
         factId: `line-${idx}`,
@@ -258,9 +261,8 @@ export function lowerLines(
       selections.push({ ...sel, candidates: only ? solutionSetNames(only.eq, only.mode) : [] });
       mentioned.add(sel.name);
     }
-    for (const n of [...r.line.declares, ...r.line.roots.flatMap((e) => refsOf(e.rhs))]) {
-      mentioned.add(n);
-    }
+    // #1428 — "mentioned" is every name the line uses (the ADR-CX-021 D3 reading), through the one helper
+    for (const n of namesUsed(r.line)) mentioned.add(n);
     /**
      * #791 — a BINDING is an equation of two bare refs, one z/w number and one point label:
      * «z1 = A» (either order). The tie constraint stays — the exact tier makes the two names one
@@ -312,6 +314,37 @@ export function lowerLines(
     sequences,
     selections,
   };
+}
+
+/**
+ * #1428 ([ADR-CX-048](../../docs/06d-decisions-complex.md#adr-cx-048)) — every name a parsed line USES.
+ *
+ * `declares` is only the names a line brings into existence, and a line can use a name without
+ * declaring it: `X^n = …` carries its letter in `roots` alone, and a filter, a measure or a question
+ * names points it does not create. A check that asks *does this line touch letter L?* must read this,
+ * never `declares` — reading `declares` is how a second equation on a reserved letter slipped past the
+ * reservation and drew a phantom point. Selections are left out: the name they bind is NEW by
+ * definition, and the set they pick from is supplied by the fold, not named by the line. A TYPE
+ * declaration (`typed`) is left out too: a type is not a use (ADR-CX-047).
+ */
+export function namesUsed(l: ParsedLine): string[] {
+  const out = new Set<string>(l.declares);
+  for (const e of l.roots) {
+    out.add(e.varName);
+    for (const n of refsOf(e.rhs)) out.add(n);
+  }
+  for (const c of l.constraints) for (const n of [...refsOf(c.lhs), ...refsOf(c.rhs)]) out.add(n);
+  for (const f of l.filters) out.add(f.name);
+  for (const m of l.measures) {
+    for (const p of m.points) out.add(p);
+    for (const n of refsOf(m.rhs)) out.add(n);
+  }
+  for (const q of [...l.queries, ...l.ratios.flatMap((r) => [r.numerator, r.denominator])]) {
+    for (const p of q.points) out.add(p);
+  }
+  for (const q of l.exprQueries) for (const n of refsOf(q.expr)) out.add(n);
+  for (const s of l.sequences) for (const t of s.terms) out.add(t.name);
+  return [...out];
 }
 
 /**

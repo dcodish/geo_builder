@@ -72,11 +72,14 @@ describe('#680 — an enumerating equation draws its whole solution set', () => 
     expect(submitLine('z^3 = 8')).toBe(true);
     expect(submitLine('z = 1+i')).toBe(false);
     const err = store().lastError;
-    // v2 reads a second mention as a GIVEN (ADR-CX-009 §1), so the refusal is `incompatible` rather
-    // than the prototype's `duplicate-name`; what matters is that it quotes the STATEMENT owning the
-    // letter and never internal state.
-    expect(err?.key).toBe('incompatible');
-    expect(err?.detail).toContain('z^3');
+    // #1428 (ADR-CX-048): the refusal carries the fold's reason (`reserved-letter`) rather than the
+    // generic `incompatible` — 1+i may well be a member, so «cannot hold together» would be false.
+    // What matters is unchanged: it quotes the STATEMENT owning the letter and never internal state.
+    expect(err).toEqual({
+      key: 'refused',
+      detail: 'z = 1+i',
+      why: { code: 'reserved-letter', letter: 'z', equation: 'z^3 = 8' },
+    });
     expect(store().lines).toEqual(['z^3 = 8']);
   });
 
@@ -88,7 +91,7 @@ describe('#680 — an enumerating equation draws its whole solution set', () => 
   it('and a WINDOW on the reserved letter is refused too, not answered with a phantom', () => {
     expect(submitLine('z^3 = 8')).toBe(true);
     expect(submitLine('90 < arg z < 180')).toBe(false);
-    expect(store().lastError?.detail).toContain('z^3');
+    expect(store().lastError).toMatchObject({ key: 'refused', why: { code: 'reserved-letter', equation: 'z^3 = 8' } });
     // the figure is the solution set and nothing else — no fourth point called `z`
     expect(build('z^3 = 8').points.map((p) => p.name).sort()).toEqual(['z1', 'z2', 'z3']);
   });

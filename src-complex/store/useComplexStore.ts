@@ -25,6 +25,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import type { LoadAudit } from '../../shell/save';
 import type { Cx } from '../value/value';
+import type { Why } from '../model/why';
 import { stripFormatControls } from '../../shell/bidi';
 
 export type InputError =
@@ -51,6 +52,12 @@ export type InputError =
    * number can stand (a size or an angle). `detail` is that statement, in either entry order.
    */
   | { key: 'complex-as-real'; detail: string; letter: string }
+  /**
+   * #1428 — the fold could not use the statement `detail`, for a reason it KNOWS (`why`): a reserved
+   * letter, today. The strip words that reason; the generic «incompatible» would claim a contradiction
+   * that may not exist (`z = 1+i` after `z^2 = 2i` — 1+i IS a root).
+   */
+  | { key: 'refused'; detail: string; why: Why }
   /** v2 read part of the line and could not account for the rest — it names the student's own words */
   | { key: 'unaccounted'; detail: string };
 

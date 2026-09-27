@@ -43,31 +43,14 @@ import { v2Claims, v2Contradiction, v2Formulas, v2Freedom, v2Labels, v2Measures,
 import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
 import { useStore } from 'zustand';
-import { useComplexStore, type InputError } from './store/useComplexStore';
+import { useComplexStore } from './store/useComplexStore';
 import { SYMBOLS } from './ui/symbols';
 import { AskText } from './ui/askText';
 import { RadicalText } from './render/radicalText';
 import { complexBidi } from './i18n';
 import registry from '../products.json';
 import { EXAMPLE_LINES } from './app/example';
-
-
-const ERROR_KEY: Record<InputError['key'], string> = {
-  'not-handled': 'errNotHandled',
-  'parse-error': 'errParse',
-  'duplicate-name': 'errDuplicate',
-  'wrong-app': 'errWrongApp',
-  'newer-version': 'errNewerVersion',
-  'too-large': 'errTooLarge',
-  incompatible: 'errIncompatible',
-  impossible: 'errImpossible',
-  unaccounted: 'errUnaccounted',
-  'complex-as-real': 'errComplexAsReal',
-};
-
-/** An error's interpolation values: its detail, and the letter when the error names one (#1405). */
-const errParams = (e: InputError): Record<string, string> =>
-  'letter' in e ? { detail: e.detail, letter: e.letter } : { detail: e.detail };
+import { errorText } from './app/errorText';
 
 export function App() {
   const { t, i18n } = useTranslation();
@@ -500,7 +483,7 @@ export function App() {
       {loadAudit.failed.map((f, idx) => (
         <div key={`${idx}-${f.line}`} style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
           <code dir="ltr">{f.line}</code>
-          <span>— {t(ERROR_KEY[f.reason.key], errParams(f.reason))}</span>
+          <span>— {errorText(f.reason, t)}</span>
         </div>
       ))}
     </Banner>
@@ -688,7 +671,7 @@ export function App() {
               {/* No quick strip above the box (operator ruling 2026-08-18: "expensive screen
                   space") — the curated commands live on the CLEAN CANVAS (QuickChips below). */}
               {lastError && (
-                <Banner kind="error">{t(ERROR_KEY[lastError.key], errParams(lastError))}</Banner>
+                <Banner kind="error">{errorText(lastError, t)}</Banner>
               )}
             </InputArea>
             {/*

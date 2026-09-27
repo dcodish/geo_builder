@@ -37,6 +37,8 @@ const he = {
   errUnaccounted: 'הבנתי חלק מהשורה, אבל לא את: {{detail}}',
   // #1405 — a letter declared complex, used where only a real number can stand
   errComplexAsReal: 'המשפט לא נוסף — {{letter}} הוגדר כמספר מרוכב, אבל "{{detail}}" משתמש בו כמספר ממשי (גודל או זווית)',
+  // #1428 — a statement the figure cannot use, with the reason the fold knows (whyText)
+  errRefused: 'המשפט "{{detail}}" לא נוסף — {{reason}}',
   errWrongApp: 'הקובץ שייך לכלי אחר ({{detail}}) — כאן נטענים קבצים של בונה המרוכבים בלבד',
   errNewerVersion: 'הקובץ נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב',
   errTooLarge: 'הקובץ גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{detail}} משפטים',
@@ -243,6 +245,7 @@ const en: typeof he = {
   errImpossible: 'Statement not added — it cannot hold at all: "{{detail}}"',
   errUnaccounted: 'I read part of the line, but not: {{detail}}',
   errComplexAsReal: 'Statement not added — {{letter}} is declared a complex number, but "{{detail}}" uses it as a real number (a size or an angle)',
+  errRefused: 'Statement "{{detail}}" not added — {{reason}}',
   errWrongApp: 'This file belongs to another tool ({{detail}}) — only Complex Builder files load here',
   errNewerVersion: 'This file was saved by a newer version of the tool — refresh the page and try again',
   errTooLarge: 'This file is too large to open — a figure can hold up to {{detail}} statements',
