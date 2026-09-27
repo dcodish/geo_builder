@@ -9,7 +9,16 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { type CartPart, composeCartesian, exactCartesianParts, numericPart } from '../cartesian';
+import {
+  type CartPart,
+  MAX_ROOT_SIGNS_PER_PART,
+  composeCartesian,
+  exactCartesianParts,
+  numericPart,
+  readableCartesianParts,
+  rootSigns,
+} from '../cartesian';
+import { exact as exactValue, formatCartesian } from '../value';
 import * as A from '../angle';
 import * as M from '../modulus';
 import { rat } from '../rational';
@@ -138,6 +147,72 @@ describe('exact cartesian parts — the three radical families, every turn, ever
     expect(show(two, [3, 4])).toBe('-2i');
     expect(show(M.one(), [1, 4])).toBe('i');
     expect(show(M.pow(M.fromInt(100), rat(1, 5)), [1, 5])).toBe('⁵√100·(√5-1)/4+(⁵√100·√(10+2√5)/4)i'); // 72°
+  });
+});
+
+describe('the printing policy — at most one root sign per part (operator ruling, 2026-09-25)', () => {
+  const two = M.fromInt(2);
+  const readable = (mod: M.ExpVec, t: [number, number]) => {
+    const p = readableCartesianParts(mod, A.fromTurns(rat(t[0], t[1])));
+    return p ? composeCartesian(p.re, p.im) : null;
+  };
+
+  it('counts the root signs a spelling prints', () => {
+    expect(rootSigns('-1')).toBe(0);
+    expect(rootSigns('√3')).toBe(1);
+    expect(rootSigns('⁵√100')).toBe(1);
+    expect(rootSigns('∛2')).toBe(1);
+    expect(rootSigns('√(2+√2)')).toBe(2);
+    expect(rootSigns('(√6+√2)/4')).toBe(2);
+    expect(rootSigns('⁵√100·(√5-1)/4')).toBe(2);
+  });
+
+  it("the ruling's table", () => {
+    expect(readable(two, [1, 3])).toBe('-1+√3i'); // 2cis120 — unchanged
+    expect(readable(two, [1, 8])).toBe('√2+√2i'); // 2cis45 — unchanged
+    expect(readable(two, [1, 16])).toBeNull(); // 2cis22.5 — nested: decimal
+    const r5 = M.pow(M.fromInt(100), rat(1, 5));
+    expect(readable(r5, [0, 1])).toBe('⁵√100'); // z^5 = 100: z₁ stays
+    for (const k of [1, 2, 3, 4]) expect(readable(r5, [k, 5]), `z${k + 1}`).toBeNull(); // z₂…z₅ decimal
+    expect(readable(two, [1, 2])).toBe('-2'); // zero parts: unchanged
+    expect(readable(two, [1, 4])).toBe('2i');
+  });
+
+  it('the MIXED case cis18: re needs two signs, im one — the WHOLE reading falls back', () => {
+    const exact = exactCartesianParts(M.one(), A.fromTurns(rat(1, 20)))!;
+    expect(rootSigns(exact.re.text)).toBe(2);
+    expect(rootSigns(exact.im.text)).toBe(1);
+    expect(readable(M.one(), [1, 20])).toBeNull();
+  });
+
+  it('the count is on the PRINTED form: √2·cis15° folds to one sign per part and stays exact', () => {
+    expect(readable(M.one(), [1, 24])).toBeNull(); // (√6+√2)/4 — two signs
+    expect(readable(M.pow(two, rat(1, 2)), [1, 24])).toBe('(√3+1)/2+((√3-1)/2)i');
+  });
+
+  it('as a class: every family turn × modulus is exact-and-readable iff each part has ≤ 1 sign', () => {
+    let checked = 0;
+    let kept = 0;
+    for (const den of [24, 20, 16]) {
+      for (const [, mod] of MODULI) {
+        for (const t of turnsIn(den)) {
+          const exact = exactCartesianParts(mod, A.fromTurns(t))!;
+          const ok = [exact.re, exact.im].every((p) => p.zero || rootSigns(p.text) <= MAX_ROOT_SIGNS_PER_PART);
+          const got = readableCartesianParts(mod, A.fromTurns(t));
+          expect(got).toEqual(ok ? exact : null);
+          if (ok) kept++;
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBe(MODULI.length * (24 + 20 + 16));
+    expect(kept).toBeGreaterThan(0);
+    expect(kept).toBeLessThan(checked); // both arms of the policy really fire
+  });
+
+  it('formatCartesian (the value layer) follows the same policy', () => {
+    expect(formatCartesian(exactValue(two, A.fromTurns(rat(1, 3))))).toBe('-1+√3i');
+    expect(formatCartesian(exactValue(two, A.fromTurns(rat(1, 16))))).not.toContain('√');
   });
 });
 

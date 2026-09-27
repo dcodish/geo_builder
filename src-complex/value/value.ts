@@ -44,7 +44,7 @@ import {
   toRadians,
   zero as angZero,
 } from './angle';
-import { composeCartesian, exactCartesianParts, numericPart } from './cartesian';
+import { composeCartesian, numericPart, readableCartesianParts } from './cartesian';
 import { type Rat, ZERO, cmp, isZero as ratIsZero, mul as ratMul, rat, add as ratAdd, fromNumber, toNumber } from './rational';
 
 /** A plain numeric complex number — the shadow every value can be evaluated to. */
@@ -270,11 +270,12 @@ export function formatPolar(v: Value, sample?: ReadonlyMap<string, number>): str
 
 /**
  * `1+i`, `-2`, `-1+√3i` — the cartesian form, through the ONE composer (`./cartesian`, #1404):
- * exact radical parts when the carriers give them, float-noise-free decimals otherwise.
+ * exact radical parts when the carriers give them and each part prints at most one root sign,
+ * float-noise-free decimals otherwise.
  */
 export function formatCartesian(v: Value, sample?: ReadonlyMap<string, number>): string {
   if (isExact(v)) {
-    const parts = exactCartesianParts(v.mod, v.arg);
+    const parts = readableCartesianParts(v.mod, v.arg);
     if (parts) return composeCartesian(parts.re, parts.im);
   }
   const n = evaluate(v, sample);

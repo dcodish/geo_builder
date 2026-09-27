@@ -11,7 +11,9 @@
  *    real-radical form this layer knows: multiples of 15° (√2, √3, (√6±√2)/4), of 18°
  *    ((√5±1)/4, √(10±2√5)/4) and of 22.5° (√(2±√2)/2). Anything else — cos 20°, an angle atom, a
  *    parametric modulus — answers `null`, and the caller keeps its `≈` decimal. The display never
- *    invents an exact value: a table hit is the ONLY way to an exact part.
+ *    invents an exact value: a table hit is the ONLY way to an exact part. Whether an exact part is
+ *    also PRINTED is a separate policy, {@link readableCartesianParts}: at most one root sign per part
+ *    (operator ruling, 2026-09-25), else the whole reading is the `≈` decimal.
  * 2. **How is a pair of parts composed?** ONE composer, {@link composeCartesian}, for exact and
  *    decimal parts alike: a part that is zero is DROPPED («-2», «2i», never «-2+0i» or «0+2i»), a unit
  *    imaginary part reads `i`, and an imaginary part that is a fraction or a sum is parenthesised
@@ -253,6 +255,38 @@ export function exactCartesianParts(mod: ExpVec, arg: Angle): { re: CartPart; im
   const re = partOf(cosOf(deg), split);
   const im = partOf(sinOf(deg), split);
   return re && im ? { re, im } : null;
+}
+
+/**
+ * How many ROOT SIGNS a spelling prints: every `√`, `∛` and `ⁿ√` (an index is a superscript before a
+ * `√`, so the `√` is what is counted). `√(2+√2)` is two, `⁵√100·(√5-1)/4` is two, `-1` is none.
+ */
+export function rootSigns(text: string): number {
+  return (text.match(/[√∛∜]/g) ?? []).length;
+}
+
+/** The most root signs one part may print and stay exact (operator ruling on #1404, 2026-09-25). */
+export const MAX_ROOT_SIGNS_PER_PART = 1;
+
+/**
+ * THE printing policy for the cartesian reading — what every surface (canvas label, panel row,
+ * `formatCartesian`) asks, never {@link exactCartesianParts} directly. The table still decides whether
+ * a part is exact at all; this decides whether the exact form is READABLE:
+ *
+ * - each part (real, imaginary) is judged on its own — at most ONE root sign stays exact
+ *   (`-1+√3i`, `√2+√2i`, `⁵√100`);
+ * - a part needing two or more (`√(2+√2)`, `(√6+√2)/4`, `⁵√100·(√5-1)/4`) is not printed exactly;
+ * - and one label carries one sign, `=` or `≈`, so if EITHER part fails the whole reading falls back
+ *   to the decimal with `≈` (the mixed case `cis18°`: never an `=` over a rounded part, never an exact
+ *   part under an `≈`).
+ *
+ * Null means "print the decimal": the caller's `≈` path.
+ */
+export function readableCartesianParts(mod: ExpVec, arg: Angle): { re: CartPart; im: CartPart } | null {
+  const parts = exactCartesianParts(mod, arg);
+  if (!parts) return null;
+  const readable = (p: CartPart) => p.zero || rootSigns(p.text) <= MAX_ROOT_SIGNS_PER_PART;
+  return readable(parts.re) && readable(parts.im) ? parts : null;
 }
 
 /**

@@ -2798,12 +2798,15 @@ and `param-sign-odd-power-1406`.
 
 ## ADR-CX-046 — The cartesian view reads in radicals: «-1+√3i», not «-1+1.73i» (#1404)
 
-**Status:** accepted, 2026-09-25 (operator request 2026-09-24; open choice delegated to the round) ·
+**Status:** accepted, 2026-09-25 (operator request 2026-09-24; the nested-roots choice settled by the
+operator's ruling of 2026-09-25, below) ·
 **Issue:** [#1404](https://github.com/dcodish/geo_builder/issues/1404) (feature, `P3`, `complex`) · round
 [#1408](https://github.com/dcodish/geo_builder/issues/1408) · **extends** #703's cartesian reading
 **Requirements:** [02d](02d-requirements-complex.md) FR-GP-4 (new): the cartesian view reads in
-radicals whenever the value has a radical closed form, and a zero part is not written · **Design:**
-[04d](04d-design-complex.md), "The cartesian spelling is the value layer's, and it is exact by TABLE" ·
+radicals when each part needs at most one root sign, else the whole reading is the `≈` decimal, and a
+zero part is not written · **Design:** [04d](04d-design-complex.md), "The cartesian spelling is the
+value layer's, and it is exact by TABLE" (the table decides exactness, `readableCartesianParts` decides
+printing) ·
 **Ladder:** stage 5d ([LADDER-CX](LADDER-CX.md))
 
 **What was asked.** The operator, playing `z1 = 2cis120 · z^3 = 8` in the cartesian view: *"when
@@ -2833,20 +2836,46 @@ and `z1 = 2i` read «0+2i» — float noise from `2·sin 180°` printed as a coo
    part is dropped («-2», «2i», `0` when both are). An imaginary magnitude that is a fraction, a sum or
    a product with a residual root is parenthesised before its `i` («1/2+(√3/2)i»), so `√3/2i` can never
    read as `√3/(2i)`.
-3. The reading's order of preference is exact radicals (`=`) → integers within float noise (`=`, which
-   keeps `3+4i`) → decimals (`≈`). The no-guess rule is unchanged: a sampled value reads as the bare
+3. **The printing policy** (`readableCartesianParts`, the operator's ruling below). The table decides
+   whether a part is exact; the policy decides whether the exact form is printed. Every surface asks
+   the policy, never the table: the stage-5d reading (canvas label and panel row are that one string)
+   and `value.formatCartesian`.
+4. The reading's order of preference is exact radicals (`=`, when the policy allows) → integers within
+   float noise (`=`, which keeps `3+4i`) → decimals (`≈`). The no-guess rule is unchanged: a sampled value reads as the bare
    name. The polar reading is unchanged.
 
-**Round decision, overturnable by the operator: nested square roots ARE shown.** The issue left open
-whether `√(2+√2)` and `√(10+2√5)/4` should print or stay decimal; the operator delegated open plan
-choices to the round (#1404 comment, 2026-09-24). They print, because the request was radicals over
-decimals. Reverting is one line: drop the 18°/22.5° rows (keys `18`, `45/2`, `54`, `135/2`) from the
-`COS` table and those turns fall back to `≈`.
+**Operator ruling, 2026-09-25 — at most ONE root sign per part.** The round first printed nested roots
+(its own call, the choice having been delegated). Playing `z^5 = 100` on the PR, the operator read
+«⁵√100·(√5-1)/4+(⁵√100·√(10+2√5)/4)i» and ruled: *"this is becoming hard to read. we need a rule - if
+there is only 1 root symbol in the real and/or in the imaginary part, we leave the root symbol but if
+there is more, we use decimal"*. So each part is judged on its own, counting the radical signs (`√`,
+`∛`, `ⁿ√`) its exact form would PRINT — after the modulus is folded in, so `√2·cis15°` reads
+«(√3+1)/2+((√3-1)/2)i» (one sign per part) while `cis15°`'s «(√6+√2)/4» (two) does not. A part with two
+or more is not printed exactly.
 
-**Typography chosen here (also overturnable).** Radicals are juxtaposed the way `modulus.format` already
+| case | reads |
+|---|---|
+| `z1 = 2cis120` | «-1+√3i» (unchanged) |
+| `z1 = 2cis45` | «√2+√2i» (unchanged) |
+| `z1 = 2cis22.5` | «≈ 1.85+0.77i» — a nested root is two signs |
+| `z^5 = 100` | z₁ «⁵√100» stays; z₂…z₅ are decimals (z₂ «≈ 0.78+2.39i») |
+| `-2`, `2i`, `u^5 = -32 · z1 = u` | «-2», «2i», «-2» (unchanged) |
+| the polar view | unchanged |
+
+**The MIXED case** (one part qualifies, the other does not — `z1 = cis18`: real part `√(10+2√5)/4`, two
+signs; imaginary part `(√5-1)/4`, one) was left open by the ruling with a recommendation the operator
+did not overrule, and this ADR implements it: **if either part becomes a decimal, the whole reading is the
+decimal with «≈»** («z₁ ≈ 0.95+0.31i»). One label carries one sign: an `=` over a rounded part states a
+false equality, and «≈ 0.95+((√5-1)/4)i» would put an exact part under an `≈`.
+
+The `COS` table rows for 15°/18°/36°/22.5° STAY — they still decide whether a part is exact at all, and
+their forms remain printable where the modulus folds them to one sign; only the printing policy
+changed.
+
+**Typography chosen here (overturnable).** Radicals are juxtaposed the way `modulus.format` already
 spells a modulus (`2√2`, `3⁵√100`), a residual root joins the rest with `·`, and a sum over a common
-denominator is written `(√6+√2)/4`. The canvas label for a fifth root is long
-(«z₂ = ⁵√100·(√5-1)/4+(⁵√100·√(10+2√5)/4)i»); that is the price of "n-sqrt if we need".
+denominator is written `(√3+1)/2`. The long fifth-root label the round first shipped is what the
+ruling above removed.
 
 **Sibling check.** Grepped `src3d/` and `src-analytic/` for a cis/polar carrier: none, and 2-D has no
 complex numbers, so the class (a closed form carried but spelled from its float in one view) has no
@@ -2857,13 +2886,17 @@ member in a sibling product. Checked `src-complex/` for other `a+bi` spellings: 
 hundred). No solve, no sampling loop.
 
 **Consequences.** `src-complex/value/cartesian.ts` (new), `src-complex/value/value.ts`
-(`formatCartesian` through the composer), `src-complex/replay/derive2.ts` (`readingCartOf`). Locks:
+(`formatCartesian` through the composer and the policy), `src-complex/replay/derive2.ts`
+(`readingCartOf`, through the policy). Locks:
 `value/__tests__/cartesian-1404.test.ts` (every multiple of 15°, 18° and 22.5° × eight modulus shapes,
 spelling re-read by an independent evaluator and checked against `r·cos θ`, `r·sin θ`; turns outside
 the families, atoms and parametric moduli give no exact part; the composer's zero rule on the decimal
-path) and `__tests__/exact-cartesian-1404.test.tsx` (the operator's sequence through the real
-`submitLine` gate, `2cis45`, `2cis22.5`, `2cis18`, `z^5 = 100`, `2cis20` staying `≈`, a sampled point
-staying bare, `-2`, `2i`, `u^5 = -32 · z1 = u` → «-2», and canvas = panel). `cartesian-view.test.tsx`'s
+path; and the printing policy — `rootSigns`, the ruling's table, the mixed `cis18`, `√2·cis15°` folding
+to one sign, every family turn × modulus exact-and-printed iff each part has ≤ 1 sign, and
+`formatCartesian` on the same policy) and `__tests__/exact-cartesian-1404.test.tsx` (the operator's
+sequence through the real `submitLine` gate, `2cis45`, `2cis22.5` → «≈», `cis18` → «≈» with polar
+unchanged, `z^5 = 100` → z₁ «⁵√100» and z₂…z₅ decimals, `2cis20` staying `≈`, a sampled point staying
+bare, `-2`, `2i`, `u^5 = -32 · z1 = u` → «-2», and canvas = panel). `cartesian-view.test.tsx`'s
 `2cis120` row FLIPPED from «≈ -1+1.73i» to «= -1+√3i» by this ruling.
 
 ## ADR-CX-047 — «u מספר מרוכב» is a TYPE, read over the whole figure; a letter read as real says so (#1405)

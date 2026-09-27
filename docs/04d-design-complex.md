@@ -117,8 +117,12 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   `r·sin θ` from the exact carriers (modulus exponent vector, argument in turns) for the turns whose
   cosine has a real-radical form — multiples of 15°, 18° and 22.5° — splitting the modulus into a
   rational factor, a square-root factor folded into the terms, and a residual higher root spelled by
-  the one modulus formatter. A float is never "recognised" as a radical. ONE composer
-  (`composeCartesian`) spells every `a+bi` in the product, exact or decimal, and drops a zero part.
+  the one modulus formatter. A float is never "recognised" as a radical. The table decides whether a
+  part is EXACT; a separate printing policy, `readableCartesianParts`, decides whether it is PRINTED —
+  at most one root sign per part, and if either part fails the whole reading is the `≈` decimal. Every
+  surface (the stage-5d reading shared by canvas and panel, `value.formatCartesian`) asks the policy,
+  never the table directly. ONE composer (`composeCartesian`) spells every `a+bi` in the product, exact
+  or decimal, and drops a zero part.
 - **The engine states WHAT happened; the reading layer words it.** Verdicts carry structured reason codes
   (`model/why.ts`), so the same fact reads correctly in Hebrew and English and the wording can improve
   without touching the engine.

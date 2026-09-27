@@ -46,16 +46,28 @@ describe('#1404 — the cartesian view shows radicals, not decimals', () => {
     expect(play(['z1 = 2cis45']).cart.get('z1')).toBe('z₁ = √2+√2i');
   });
 
-  it('a nested root is shown (the round decision in ADR-CX-046): 2cis22.5 and 2cis18', () => {
-    expect(play(['z1 = 2cis22.5']).cart.get('z1')).toBe('z₁ = √(2+√2)+√(2-√2)i');
-    store().resetSession();
-    expect(play(['z1 = 2cis18']).cart.get('z1')).toBe('z₁ = √(10+2√5)/2+((√5-1)/2)i');
+  // The operator's ruling (2026-09-25): a part that needs TWO OR MORE root signs is a decimal, and
+  // one label carries one sign — so any such part makes the whole reading «≈».
+  it('a nested root is TWO signs per part, so 2cis22.5 reads as a decimal with ≈', () => {
+    expect(play(['z1 = 2cis22.5']).cart.get('z1')).toBe('z₁ ≈ 1.85+0.77i');
   });
 
-  it('an n-th-root modulus multiplies the radicals: z^5 = 100', () => {
-    const { cart } = play(['z^5 = 100']);
+  it('the MIXED case: cis18 has one readable part and one not — the whole reading is ≈', () => {
+    const { cart, polar } = play(['z1 = cis18']);
+    expect(cart.get('z1')).toBe('z₁ ≈ 0.95+0.31i');
+    expect(cart.get('z1')).not.toContain('√');
+    expect(polar.get('z1')).toBe('z₁ = 1·cis18°');
+  });
+
+  it('z^5 = 100: z₁ keeps its one root sign «⁵√100», z₂…z₅ are decimals', () => {
+    const { cart, polar } = play(['z^5 = 100']);
     expect(cart.get('z1')).toBe('z₁ = ⁵√100');
-    expect(cart.get('z2')).toBe('z₂ = ⁵√100·(√5-1)/4+(⁵√100·√(10+2√5)/4)i');
+    for (const n of ['z2', 'z3', 'z4', 'z5']) {
+      expect(cart.get(n), n).toMatch(/^z. ≈ -?[0-9.]+[+-][0-9.]+i$/);
+    }
+    expect(cart.get('z2')).toBe('z₂ ≈ 0.78+2.39i');
+    // polar is untouched by the ruling
+    expect(polar.get('z2')).toContain('⁵√100');
   });
 
   it('cos 20° has no radical form, so 2cis20 KEEPS ≈ — the display never invents an exact value', () => {
