@@ -39,10 +39,10 @@ function chips() {
   return { d, chips: dihedralChipsByFact(st().facts, (id) => d.status[id] === 'ok') };
 }
 
-/** The scene exactly as the canvas gets it, with the data panel CLOSED (ruling 2). */
+/** The scene exactly as the canvas gets it — panel-independent since #1486 (ADR-3D-266), so this is the panel-CLOSED canvas (ruling 2). */
 function scene() {
   const { d, chips: ch } = chips();
-  return buildScene3(d.construction, d.resolved, HOME_CAMERA, VIEW, 1, {}, true, false, undefined, shownDihedrals(ch, st().dihedralShown));
+  return buildScene3(d.construction, d.resolved, HOME_CAMERA, VIEW, 1, {}, true, undefined, shownDihedrals(ch, st().dihedralShown));
 }
 
 const lastId = () => st().facts[st().facts.length - 1].id;
