@@ -177,7 +177,9 @@ export function formatBranches(branches: number[]): string | null {
   if (sorted.length === 2 && Math.abs(sorted[0] + sorted[1]) <= 1e-6 * Math.max(1, Math.abs(sorted[1]))) {
     return `±${cleanMag(Math.abs(sorted[1]))}`;
   }
-  return `{${sorted.map(cleanMag).join(', ')}}`;
+  // #1440 (ADR-3D-262): never point-free — `Array.map` passes the INDEX as `cleanMag`'s optional
+  // `decimals`, which rounded root 0 to 0 dp and root 1 to 1 dp («t = {0, 2.6}» for −0.23 and 2.63).
+  return `{${sorted.map((x) => cleanMag(x)).join(', ')}}`;
 }
 
 export const coordStr = (v: Vec3): string => `(${cleanMag(v.x)}, ${cleanMag(v.y)}, ${cleanMag(v.z)})`;

@@ -10471,3 +10471,44 @@ they are filed rather than fixed here:
 would take the opt-out marker.
 
 **Consequences.** Two test files are hoisted and there is one new lint. Nothing changes for students.
+
+## ADR-3D-262 — A parameter's root set rounds every root the same way: no point-free iterator call into a function with an optional 2nd/3rd parameter (#1440)
+
+**Status:** accepted, 2026-09-27 · **Issue:** [#1440](https://github.com/dcodish/geo_builder/issues/1440) (bug, `P1`, `3d`) · round [#1469](https://github.com/dcodish/geo_builder/issues/1469)
+**Requirements:** none (internal) · **Design:** none (internal)
+
+**Symptom.** After `A(1,4,-3)` · `B(2t,t,1)` · `|AB| = 6`, asking `t` answered `{0, 2.6}` and the data panel
+read `t = {0, 2.6}`. The resolved roots are −0.22828… and 2.62828…, so the student was shown a «0» that is not
+a solution. With `|AB| = 7` it read `{-1, 3.4}` for −0.954 and 3.354. Live since ADR-3D-119 (2026-08-09).
+
+**Root cause.** `formatBranches` (`src3d/engine/dataView.ts`, shared by the panel and the query lane since
+#480) wrote `sorted.map(cleanMag)`. `Array.map` calls its callback as `(value, index, array)`, and
+`cleanMag(x, decimals = 2)` takes the INDEX as `decimals`: root 0 was rounded to 0 places, root 1 to 1, root 2
+to 2. The one-root and `±` paths call `cleanMag(x)` directly and were never affected. Nothing errors and the
+types check, because an index is a number.
+
+**The class.** A point-free iterator callback (`.map(fn)`, `.forEach(fn)`, `.filter(fn)`, …) into any function
+whose 2nd or 3rd parameter is optional or defaulted: the iterator silently fills it with the index or the
+array. A generic scan of `src`, `src3d`, `src-complex`, `src-analytic` and `shell` (every declaration with an
+optional 2nd/3rd parameter, about 120 of them, by name, not only `clean*`/`fmt*`/`format*`/`round*`) finds
+exactly this one call site.
+
+**The decision.**
+1. `sorted.map((x) => cleanMag(x))`.
+2. **The class is enforced across the workspace.** `server/__tests__/point-free-optional-arg-hygiene.test.ts`
+   collects every function/arrow declaration whose 2nd or 3rd parameter is `p?:` or `p = …`, and fails on any
+   point-free iterator call of one of those names in the shipping trees. It runs in every product lane, like
+   `regex-escape-hygiene`. It carries a self-test of the detector (both directions) and a floor: it must read
+   more than 200 files, find more than 50 such declarations, and find `cleanMag` among them, so it cannot pass
+   by checking nothing. Matching by name is conservative: a same-named function elsewhere also trips it, and
+   the lambda is the fix either way. At the base it names exactly `dataView.ts .map(cleanMag)`.
+
+**Locks.** `src3d/__tests__/issue-1440-format-branches.test.ts`: `formatBranches([-0.228, 2.628])` →
+`{-0.23, 2.63}` in both input orders; a three-root case; the exact, `±` and single-root forms unchanged; the
+operator's exact sequence through the real `submit` → `answerQuery` / `dataView` path (`t` → `{-0.23, 2.63}`,
+and `|AB| = 7` → `{-0.95, 3.35}`), with the panel row equal to `t = ` plus the query answer. The lock is a
+hand-authored test rather than a fixture, because the defect is a printed value; a fixture asserts only that
+the facts build and verify, which they already did. Both new test files fail on the old line.
+
+**Consequences.** One line in `dataView.ts`, and one new workspace lint. For students: a parameter with two or
+more roots now shows every root at the same precision (two decimal places when it has no exact form).
