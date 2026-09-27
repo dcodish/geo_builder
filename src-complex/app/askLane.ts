@@ -14,6 +14,7 @@
 import { parseLineV2 } from '../parser/rules';
 import { askArtifacts } from './deriveLines';
 import type { KnowledgeRow } from '../model/knowledge';
+import type { ComplexScope } from '../parser/exprParse';
 
 export interface AskRow {
   /** the question as the student typed it — what the row displays */
@@ -24,10 +25,15 @@ export interface AskRow {
   readonly row: KnowledgeRow | null;
 }
 
-export function askRowsOf(asks: readonly string[], knowledge: readonly KnowledgeRow[]): AskRow[] {
+export function askRowsOf(
+  asks: readonly string[],
+  knowledge: readonly KnowledgeRow[],
+  /** #1405 — the figure's declared complex letters: the lane lowering reads a question with them too */
+  scope?: ComplexScope,
+): AskRow[] {
   const consumed = new Set<number>();
   return asks.map((text) => {
-    const r = parseLineV2(text.trim());
+    const r = parseLineV2(text.trim(), scope);
     if (!r.ok) return { text, note: 'unreadable', row: null };
     // the ONE reading of a line as a question (askArtifacts) — the lane lowering uses the same,
     // so the row model and the fold cannot disagree about what was asked

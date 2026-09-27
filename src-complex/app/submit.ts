@@ -40,7 +40,8 @@
 
 import { readEnvelope, type LoadAudit } from '../../shell/save';
 import { parseLineV2 } from '../parser/rules';
-import { askArtifacts } from './deriveLines';
+import { askArtifacts, complexScopeOf } from './deriveLines';
+import type { ComplexScope } from '../parser/exprParse';
 import type { Derived2 } from '../replay/derive2';
 import { type InputError, type SavedSession, useComplexStore } from '../store/useComplexStore';
 import { deriveLines } from './deriveLines';
@@ -92,6 +93,40 @@ const broke = (before: Violations, after: Violations): boolean =>
   [...after.unsatisfied].some((u) => !before.unsatisfied.has(u)) ||
   [...after.untranslated].some((u) => !before.untranslated.has(u));
 
+/**
+ * #1405 — did the change put a letter declared complex where only a real number can stand?
+ *
+ * A dedicated refusal rather than the generic «incompatible», because the generic blame names the
+ * OTHER line and says nothing about why the two cannot hold together. This one names the statement
+ * that uses the letter as a size or an angle in BOTH entry orders (the declaration typed after
+ * `|z1| = 9r`, or `|z1| = 9r` typed after the declaration), and the message says a size is real.
+ */
+function complexAsReal(before: Derived2, after: Derived2): InputError | null {
+  const had = new Set(before.untranslated.map((u) => u.src));
+  for (const u of after.untranslated) {
+    if (u.why.code === 'declared-complex-real' && !had.has(u.src)) {
+      return { key: 'complex-as-real', detail: u.src, letter: u.why.letter };
+    }
+  }
+  return null;
+}
+
+/** #1405 — the letter families the given lines declare complex. */
+const scopeOf = (lines: readonly string[]): ComplexScope => new Set(complexScopeOf(lines).keys());
+
+/**
+ * Can the grammar read this line at all, in this figure? (#1405)
+ *
+ * Read against the figure's declared letters, because `u1, u2, u3 סדרה הנדסית` reads only once u is
+ * complex. And read WITHOUT them as well, because a line that uses a declared letter as a size
+ * (`|z1| = 9r` after «r מספר מרוכב») is not unreadable: it is a conflict, and the gate names it. So a
+ * line is refused here only when neither reading exists, and then with the plain reading's reason.
+ */
+function parseInFigure(line: string, lines: readonly string[]): ReturnType<typeof parseLineV2> {
+  const scoped = parseLineV2(line, scopeOf(lines));
+  return scoped.ok ? scoped : parseLineV2(line);
+}
+
 export type Verdict =
   /** accepted, in this configuration — the caller records the seed so the figure shown is the one that fit */
   | { readonly ok: true; readonly seed: number }
@@ -111,11 +146,14 @@ export type Verdict =
  */
 export function acceptLine(lines: readonly string[], raw: string, seed: number): Verdict {
   const next = [...lines, raw];
-  const before = violationsOf(fold(lines, seed));
+  const beforeD = fold(lines, seed);
+  const before = violationsOf(beforeD);
 
   for (let ds = 0; ds < CONFIG_TRIES; ds++) {
     if (!broke(before, violationsOf(fold(next, seed + ds)))) return { ok: true, seed: seed + ds };
   }
+  const typeClash = complexAsReal(beforeD, fold(next, seed));
+  if (typeClash) return { ok: false, error: typeClash };
 
   for (let i = 0; i < lines.length; i++) {
     const without = lines.filter((_, k) => k !== i);
@@ -149,10 +187,13 @@ function gateChange(
   seed: number,
   changed: string,
 ): Verdict {
-  const was = violationsOf(fold(before, seed));
+  const wasD = fold(before, seed);
+  const was = violationsOf(wasD);
   for (let ds = 0; ds < CONFIG_TRIES; ds++) {
     if (!broke(was, violationsOf(fold(after, seed + ds)))) return { ok: true, seed: seed + ds };
   }
+  const typeClash = complexAsReal(wasD, fold(after, seed));
+  if (typeClash) return { ok: false, error: typeClash };
   for (const candidate of before) {
     if (candidate === changed) continue;
     const b2 = violationsOf(fold(before.filter((l) => l !== candidate), seed));
@@ -205,7 +246,7 @@ export function editLine(index: number, raw: string): boolean {
   const { lines, disabled, seed } = st();
   const line = raw.trim();
   if (index < 0 || index >= lines.length || line === '') return false;
-  const parsed = parseLineV2(line);
+  const parsed = parseInFigure(line, activeOf(lines, disabled));
   if (!parsed.ok) {
     st().setError(
       parsed.reason === 'unaccounted'
@@ -243,8 +284,8 @@ export type AskReading =
   | { readonly kind: 'statement' }
   | { readonly kind: 'unreadable' };
 
-export function readAsk(raw: string): AskReading {
-  const parsed = parseLineV2(raw.trim());
+export function readAsk(raw: string, scope?: ComplexScope): AskReading {
+  const parsed = parseLineV2(raw.trim(), scope);
   if (!parsed.ok) return { kind: 'unreadable' };
   const a = askArtifacts(parsed.line);
   if (!a) return { kind: 'statement' };
@@ -273,7 +314,7 @@ export function submitQuery(raw: string): boolean {
 export function submitLine(raw: string): boolean {
   const st = () => useComplexStore.getState();
   const line = raw.trim();
-  const parsed = parseLineV2(line);
+  const parsed = parseInFigure(line, activeLines());
   if (!parsed.ok) {
     st().setError(
       parsed.reason === 'unaccounted'
@@ -289,7 +330,9 @@ export function submitLine(raw: string): boolean {
    * is where a question LIVES. This routing is also the load-path migration: old save files carry
    * ask lines in `lines`, and replaying them through this very function files them in the lane.
    */
-  const ask = readAsk(line).kind;
+  // #1405: read against the figure's declared letters — a bare `u` is a question about a real
+  // parameter, and a statement once u is declared complex
+  const ask = readAsk(line, scopeOf(activeLines())).kind;
   if (ask === 'measure' || ask === 'ratio' || ask === 'expr') {
     st().addQuery(line);
     st().clearError();
