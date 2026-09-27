@@ -4743,3 +4743,76 @@ the four `App*.tsx`, the he/en notes in all four trees. Locks:
 `<tree>/__tests__/privacy-disclosure-1426.test.ts` ×4. Visible change: the About modal's privacy line in
 2-D, 3-D and analytic gains the AI sentence; analytic's note is rewritten; complex's Hebrew note gains a
 space.
+
+## ADR-W-091 — The About content is a DECLARATION with one shared layout, and every builder's try steps must build (#1477)
+
+**Status:** accepted, 2026-09-27 · **Issue:** [#1477](https://github.com/dcodish/geo_builder/issues/1477) (feature, `P3`, `workspace`) · operator ruling 2026-09-27: *"i dont want to approve text - just make it include what the 2d has."* · round #1478
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-11 (new: every builder's About carries the same sections, and its sample lines build) · **Design:** [04w](04w-design-shell.md) "The About content is a declaration" · [28](28-product-unification.md) §5c (a new live instance)
+
+**The report.** The operator, playing round #1469: *"the text on the 2d tool is more detailed then the rest
+of the tools so we should add to the other tools content like the 2d has"*. Measured on `cab06da2`: 2-D's
+About had a lead, three points, a «try this» title with three sample lines (bidi-safe per line) and a
+credit line (author and contact). 3-D and complex had one `<p>{t('aboutLead')}</p>`. Analytic had a plain
+string.
+
+**Class.** `AppFrameAbout.body` was a free `ReactNode`, so the About STRUCTURE was not a shell contract.
+Each builder hand-wrote it and only the first wrote the full version. It is the #1426 shape
+([ADR-W-090](#adr-w-090)): the frame took free content where it should take a declaration. It is also
+the "third copy is the shared one" smell. The 2-D copy carried literal colours (`#334155`, `#2563eb`)
+and the contact address inline.
+
+**Decision.**
+
+1. `AppFrameAbout.body` → `content: AboutContent` (`shell/frame/about.tsx`):
+   `{ lead; points; tryTitle; trySteps; credit: { by; name; contact; email } }`. `AboutBody` renders one
+   layout: lead, bullets, the try title, then one line per step with its direction taken from its
+   content, then the credit. The layout uses design tokens only. `AppFrame` renders it, and so does 2-D's
+   first-load intro modal, so the two cannot drift. Shell holds no strings and no product names
+   (ADR-W-016 rule 2).
+2. **The credit's words are each product's i18n. The address has one copy**, in `products.json` →
+   `contact.email`, which every product already imports for the roster. It is not a translation.
+3. **Each product declares its About in one callable**, `<tree>/ui/about.ts` → `aboutContent(t)`
+   (docs/28 §5c rule 1). 2-D maps its existing keys (`about.lead`, `about.points`, `about.tryTitle`,
+   `about.trySteps`, `footer.*`). 3-D, complex and analytic add `aboutPoints`, `aboutTryTitle`,
+   `aboutTrySteps` and `creditBy/Name/Contact` in he and en. Analytic's `aboutBody` becomes `aboutLead`.
+   The existing leads are kept.
+4. **Content, per the ruling** (not an operator review item): the same kinds of points as 2-D's. Who it
+   is for, one given at a time with the figure adapting, and draws-not-solves. Each builder also gets the
+   alternative-configurations point, since all three have «הציגו תצורה אחרת». 3-D adds that the figure
+   can be rotated. Complex adds that a claim that does not hold is marked. Try steps (he; en in the
+   locale): 3-D `קובייה ABCDA'B'C'D'` · `M אמצע BB'` · `O מפגש האלכסונים של הפאה ABCD`; complex
+   `z1 = 3+4i` · `z2 = 2cis150` · `w = z1*z2`; analytic `נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9` ·
+   `נתונה הנקודה A(2,6)` · `נתון הישר l1: y=x`.
+5. **The lock** (§5c): `shell/__tests__/fixtures/about-content-rows.ts` → `aboutContentFaults` /
+   `aboutContentSuite`. It checks he AND en declared; a non-empty lead and try title; at least 3 points
+   and 2 try steps, none empty or repeated; a complete credit whose address is the registry's. **Every
+   try step builds**: the product's runner submits the steps, with bidi isolates stripped, through its
+   real gate, in order, from an empty canvas. 2-D uses `gateVerdict`. 3-D uses the store's `submit`
+   (`decideSubmit3`). Complex uses `submitLine`. Analytic uses `decideSubmit`, which must return
+   `record`. The runner must return one verdict per step, so an early return fails. The shared layout
+   must render every section, with one `data-about-step` line per step, its content, and its direction.
+   Thin per-tree locks: `<tree>/__tests__/about-content-1477.test.ts` ×4. Meta-lock and roster net:
+   `shell/__tests__/about-content.test.ts`.
+
+**Measured at pickup.** The issue's suggested third 3-D step, `הזווית בין המישור ABC למישור A'BC`, is
+`not-understood` on an empty cube + midpoint (so are `הקטע MC'` and `הישר MC'`). The steps were replaced
+with two featured catalog rows that build. That replacement is the lock's first catch, and restoring the
+suggested line fails the 3-D lock with `try step 3 … is REFUSED by the submit gate:
+{"code":"not-understood"}`. 2-D's displayed he steps carry bidi isolates (`ריבוע ⁦ABCD⁩`), which is why
+the runner strips format controls before the gate.
+
+**2-D is byte-identical.** The pre-#1477 inline JSX was rendered and stripped of markup, per locale.
+`src/__tests__/about-content-1477.test.ts` pins that text against the new `AboutBody`. The only visual
+changes are the credit name's colour (`#334155` → token `ink`) and the link colour, which is now the
+`primary` token (the same value). The list markers are now stated as none. The first smoke run showed bullets and numbers in complex and analytic and none in 2-D and 3-D, because the consumer stylesheets reset lists differently. 2-D's look is the one kept.
+
+**What it does not check.** Whether the WORDS are good. That is per-locale prose, and the operator ruled
+it out of review. The lock guarantees the sections exist and the sample lines build.
+
+**Sibling products.** All four builders are covered by the same lock, so there is no per-product sibling
+to file.
+
+**Consequences.** `shell/frame/about.tsx` (new), `shell/frame/AppFrame.tsx`, `products.json`
+(`contact`), `<tree>/ui/about.ts` ×4 (new), the four `App*.tsx`, and the 3-D/complex/analytic he+en
+locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible change: the About modal in
+3-D, complex and analytic now shows points, a «try this» sequence and the credit. 2-D is unchanged.

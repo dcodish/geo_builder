@@ -102,8 +102,20 @@ const he = {
   pinned: 'הכול נקבע על-ידי הנתונים',
   about: 'אודות',
   aboutTitle: 'גאומטריה אנליטית',
-  aboutBody:
+  aboutLead:
     'כלי לשרטוט שאלות גאומטריה אנליטית: מקלידים את הנתונים כלשונם, והכלי משרטט את הצורה. הכלי אינו פותר את השאלה.',
+  // #1477 (ADR-W-091): the About DECLARATION's parts — the same sections as 2-D's About.
+  aboutPoints: [
+    'מיועד לתלמידי תיכון הנבחנים בגאומטריה אנליטית לבגרות, וגם למורים שצריכים לשרטט במערכת צירים במהירות ובפשטות.',
+    'מוסיפים נתון אחד בכל פעם — נקודות, ישרים, מעגלים — והשרטוט מסתגל ככל שמצטברים נתונים.',
+    'כשהנתונים מאפשרים יותר משרטוט אחד, «הציגו תצורה אחרת» מציג שרטוט אחר שגם הוא מקיים את כל הנתונים.',
+    'הכלי משרטט את הצורה לפי מה שתיארתם — הוא אינו פותר שאלות.',
+  ],
+  aboutTryTitle: 'הזינו את נתוני השאלה כפי שמופיעים בשאלה:',
+  aboutTrySteps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'נתונה הנקודה A(2,6)', 'נתון הישר l1: y=x'],
+  creditBy: 'פותח על־ידי',
+  creditName: 'ד"ר דוד קודיש',
+  creditContact: 'לשאלות',
   privacy:
     'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. לצורך שיפור הכלי נשמרים המשפטים שהקלדתם (טקסט מתמטי בלבד) עם מזהה מבקר אנונימי — ללא כתובת ה-IP — למספר ימים בלבד.' +
     ' משפטים שהכלי לא הבין נשלחים לעיבוד בשירות בינה מלאכותית חיצוני.' +
@@ -340,8 +352,20 @@ const en: typeof he = {
   pinned: 'Everything is fixed by the givens',
   about: 'About',
   aboutTitle: 'Analytic Geometry',
-  aboutBody:
+  aboutLead:
     'A tool for drawing analytic-geometry questions: type the givens as the exam words them and the tool draws the figure. It does not solve the question.',
+  // #1477 (ADR-W-091): the About DECLARATION's parts — the same sections as 2-D's About.
+  aboutPoints: [
+    'For high-school students preparing for the analytic-geometry matriculation (bagrut), and for teachers who need to sketch on a coordinate plane quickly and simply.',
+    'Add one given at a time — points, lines, circles — and the figure adapts as the givens accumulate.',
+    'When the givens allow more than one figure, “Show another configuration” draws a different one that also satisfies every given.',
+    'It draws the figure from what you describe — it does not solve problems.',
+  ],
+  aboutTryTitle: 'Enter the given data exactly as it appears in the question:',
+  aboutTrySteps: ['circle I: (x-3)^2+(y-4)^2=9', 'point A(2,6)', 'line l1: y=x'],
+  creditBy: 'Developed by',
+  creditName: 'Dr. David Codish',
+  creditContact: 'Questions',
   privacy:
     'Privacy: no sign-up and no personal details are collected. To improve the tool, the statements you type (math text only) are kept for a few days with an anonymous visitor id — your IP address is never stored.' +
     ' Statements the tool does not understand are sent for processing to an external AI service.' +

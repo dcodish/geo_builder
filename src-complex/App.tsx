@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { privacyDeclaration } from './ui/privacy';
+import { aboutContent } from './ui/about';
 import { inputPreviewNodeCx } from './ui/inputPreviewNodeCx';
 import { Banner } from '../shell/frame/Banner';
 import { AskLane } from '../shell/frame/AskLane';
@@ -561,7 +562,7 @@ export function App() {
       about={{
         label: t('menuAbout'),
         title: t('aboutTitle'),
-        body: <p style={{ marginTop: 0 }}>{t('aboutLead')}</p>,
+        content: aboutContent(t),
         privacy: privacyDeclaration(t),
         closeLabel: t('aboutClose'),
       }}

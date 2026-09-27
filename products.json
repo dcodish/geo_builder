@@ -10,6 +10,10 @@
     "devUrl is where `npm run dev` serves the same app."
   ],
   "version": 1,
+  "contact": {
+    "$comment": "The suite's author contact, ONE copy (#1477, ADR-W-091): every builder's About credit line links it. The credit's words are each product's i18n; the address is not a translation, so it lives here, beside the roster every product already imports.",
+    "email": "david.codish@gmail.com"
+  },
   "products": [
     {
       "id": "2d",

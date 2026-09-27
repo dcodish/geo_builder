@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import registry from '../products.json';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { privacyDeclaration } from './ui/privacy';
+import { aboutContent } from './ui/about';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
 import { InputArea } from '../shell/frame/InputArea';
@@ -1055,7 +1056,7 @@ export function App() {
       about={{
         label: t('about'),
         title: t('aboutTitle'),
-        body: t('aboutBody'),
+        content: aboutContent(t),
         privacy: privacyDeclaration(t),
         closeLabel: t('close'),
       }}

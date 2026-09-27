@@ -71,6 +71,12 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   ([NFR-US-4](03-nonfunctional-requirements.md)). *(D10.)*
 - **FR-SU-10 (Should)** — **The figure's name is one component**, mounted identically everywhere, so
   naming, renaming and the saved-file name agree across builders. *(Realised — `FigureName.tsx`.)*
+- **FR-SU-11 (Should)** — **Every builder's About says the same kinds of things:** what the tool is,
+  who it is for, that the figure builds one given at a time and adapts, that it draws and does not
+  solve, alternative configurations where the builder has them, a «try this» sequence, and the author
+  credit — in Hebrew and English. **Every sample line builds** when typed in order on an empty
+  canvas. *(Realised — `shell/frame/about.tsx`, [ADR-W-091](06w-decisions-workspace.md#adr-w-091),
+  #1477.)*
 
 ## The data panel and the ask lane
 

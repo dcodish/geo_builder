@@ -11,6 +11,21 @@
   "aboutLabel": "About",
   "aboutTitle": "About this tool",
   "aboutLead": "A tool for building the figure of a space-geometry question: enter the givens line by line — solids, points, vectors — and the figure builds and orbits in front of you. It draws and verifies the givens; it never solves the question.",
+  "aboutPoints": [
+    "For high-school students preparing for the solid-geometry matriculation (bagrut), and for teachers who need to sketch a solid quickly and simply.",
+    "Add one given at a time — the figure adapts as the givens accumulate. You can rotate the figure and look at it from any direction.",
+    "When the givens allow more than one figure, “Show another configuration” draws a different one that also satisfies every given.",
+    "It draws the figure from what you describe and checks the givens — it does not solve problems."
+  ],
+  "aboutTryTitle": "Enter the given data exactly as it appears in the question:",
+  "aboutTrySteps": [
+    "cube ABCDA'B'C'D'",
+    "M is the midpoint of BB'",
+    "O is the intersection of the diagonals of face ABCD"
+  ],
+  "creditBy": "Developed by",
+  "creditName": "Dr. David Codish",
+  "creditContact": "Questions",
   "aboutClose": "Close",
   "input": {
     "placeholder": "Type a given, e.g.: cube ABCD",

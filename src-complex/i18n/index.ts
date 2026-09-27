@@ -83,6 +83,18 @@ const he = {
   aboutTitle: 'על הכלי',
   aboutLead:
     'כלי לבניית הציור של שאלת מספרים מרוכבים: מקלידים את הנתונים שורה-שורה, והציור נבנה ומתעדכן תוך כדי. הכלי מצייר ובודק את הנתונים — הוא אינו פותר את השאלה.',
+  // #1477 (ADR-W-091): the About DECLARATION's parts — the same sections as 2-D's About.
+  aboutPoints: [
+    'מיועד לתלמידי תיכון הלומדים מספרים מרוכבים לבגרות, וגם למורים שצריכים להציג מספרים במישור גאוס במהירות ובפשטות.',
+    'מוסיפים נתון אחד בכל פעם — והציור מסתגל ככל שמצטברים נתונים.',
+    'כשהנתונים מאפשרים יותר מציור אחד, «הציגו תצורה אחרת» מציג ציור אחר שגם הוא מקיים את כל הנתונים.',
+    'הכלי מצייר את הציור לפי מה שתיארתם ובודק את הנתונים — טענה שאינה מתקיימת מסומנת, והכלי אינו פותר שאלות.',
+  ],
+  aboutTryTitle: 'הזינו את נתוני השאלה כפי שמופיעים בשאלה:',
+  aboutTrySteps: ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2'],
+  creditBy: 'פותח על־ידי',
+  creditName: 'ד"ר דוד קודיש',
+  creditContact: 'לשאלות',
   aboutClose: 'סגירה',
   privacy:
     'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. העבודה נשמרת בדפדפן שלכם ובקבצים שאתם בוחרים לשמור.' +
@@ -291,6 +303,18 @@ const en: typeof he = {
   aboutTitle: 'About this tool',
   aboutLead:
     'A tool for building the figure of a complex-numbers question: enter the givens line by line and the figure forms and adapts as you go. It draws and verifies the givens — it never solves the question.',
+  // #1477 (ADR-W-091): the About DECLARATION's parts — the same sections as 2-D's About.
+  aboutPoints: [
+    'For high-school students learning complex numbers for the matriculation (bagrut), and for teachers who need to show numbers on the Gauss plane quickly and simply.',
+    'Add one given at a time — the figure adapts as the givens accumulate.',
+    'When the givens allow more than one figure, “Show another configuration” draws a different one that also satisfies every given.',
+    'It draws the figure from what you describe and checks the givens — a claim that does not hold is marked, and it does not solve problems.',
+  ],
+  aboutTryTitle: 'Enter the given data exactly as it appears in the question:',
+  aboutTrySteps: ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2'],
+  creditBy: 'Developed by',
+  creditName: 'Dr. David Codish',
+  creditContact: 'Questions',
   aboutClose: 'Close',
   privacy:
     'Privacy: no registration, and no personal data is collected. Your work is stored in your browser and in files you choose to save.' +
