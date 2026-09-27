@@ -14,7 +14,7 @@
 import { openCrossings3 } from '../engine/crossings3';
 import { cleanMag } from '../engine/dataView';
 import { freeDofCount3, hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
-import { distanceWitness, resolveOperand, type OperandGeom } from '../engine/operands';
+import { DIRECTION_REL_TOL, distanceWitness, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
 import type { Construction3, Id, Operand3, Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
@@ -610,11 +610,30 @@ export function buildScene3(
     text: string;
   };
   const wAngles: WedgeSpec3[] = [];
-  for (const g of c.planeAngles) {
+  /**
+   * #1439 (ADR-3D-263): the dihedral arc is drawn from a stated angle between two NAMED planes only when
+   * that angle HOLDS on the drawn figure — the claim verifier's own predicate (`relDeviation` under
+   * `DIRECTION_REL_TOL`), asked of the resolved planes. A pinned relation holds at its root; a claim holds
+   * iff it is true. Before #1439 the arc read a list nothing verified, so «z = 3» and «x + y + z = 1» at
+   * a stated 30° drew an arc labelled «30°» over a true 54.74° dihedral — a number on the canvas that was
+   * not knowledge. The object-angle lane below skips these, so the arc is drawn once.
+   */
+  const statedDihedrals = c.claims.flatMap((cl) =>
+    cl.type === 'plane-rel' && cl.rel === 'angle' && cl.deg !== undefined && cl.a.kind === 'plane-named' && cl.b.kind === 'plane-named'
+      ? [{ p1: cl.a.name, p2: cl.b.name, deg: cl.deg }]
+      : [],
+  );
+  for (const g of statedDihedrals) {
     const pair = pairLines.find((p) => (p.n1 === g.p1 && p.n2 === g.p2) || (p.n1 === g.p2 && p.n2 === g.p1));
     if (!pair) continue;
     const pl1 = resolved.planes.get(g.p1)!;
     const pl2 = resolved.planes.get(g.p2)!;
+    // through the ONE operand seam the verifier resolves by (claims.ts, `plane-rel`)
+    const planeGeom = (name: string) =>
+      resolveOperand({ kind: 'plane-named', name }, c, { lines: resolved.lines, planes: resolved.planes })((id) => positions.get(id) ?? null);
+    const [ga, gb] = [planeGeom(g.p1), planeGeom(g.p2)];
+    const dev = ga && gb ? relDeviation('angle', g.deg, ga, gb) : null;
+    if (dev === null || dev > DIRECTION_REL_TOL) continue;
     const d = normalize3(pair.line.dir);
     const u1 = normalize3(cross3(pl1.n, d));
     let u2 = normalize3(cross3(pl2.n, d));
@@ -730,7 +749,8 @@ export function buildScene3(
     // `degText` — the one reading rule, hoisted above so the vertex arcs and these share it (#923)
     const pairs: { a: Operand3; b: Operand3; text: string; deg?: number }[] = [
       ...c.claims.flatMap((cl) =>
-        cl.type === 'plane-rel' && cl.rel === 'angle'
+        // #1439: a valued angle between two NAMED planes is the dihedral lane's (above), drawn unconditionally
+        cl.type === 'plane-rel' && cl.rel === 'angle' && !(cl.deg !== undefined && cl.a.kind === 'plane-named' && cl.b.kind === 'plane-named')
           ? [{ a: cl.a, b: cl.b, text: degText(cl.deg, cl.label), deg: cl.deg }]
           : cl.type === 'line-rel' && cl.rel === 'angle'
             ? [{ a: cl.op, b: { kind: 'line' as const, name: cl.line }, text: degText(cl.deg, cl.label), deg: cl.deg }]

@@ -65,10 +65,17 @@
       "utterance": "הזווית בין המישורים π1 ו-π2 היא 45",
       "cmds": [
         {
-          "type": "plane-angle",
-          "p1": "π1",
-          "p2": "π2",
-          "deg": 45
+          "type": "plane-rel",
+          "rel": "angle",
+          "deg": 45,
+          "a": {
+            "kind": "plane-named",
+            "name": "π1"
+          },
+          "b": {
+            "kind": "plane-named",
+            "name": "π2"
+          }
         }
       ]
     },

@@ -2423,7 +2423,20 @@ const angleBetweenPlanes: Rule = (s) => {
     ),
   );
   if (!m) return null;
-  return [{ type: 'plane-angle', p1: canonicalPlane(m[1]), p2: canonicalPlane(m[3]), deg: +m[5] }];
+  // #1439 (ADR-3D-263): ONE lowering for every plane × plane angle — the `plane-rel` that `planeRelAngle`
+  // emits for the other spellings, so the two rules read this sentence IDENTICALLY (the shadow matrix
+  // sees no divergence). The relation — not the rule that happened to read it — decides whether it pins
+  // the parameter or is a verified claim (`planePinningRels`). This rule stays only as the owner of
+  // its looser spellings (no verb, «ל» without «בין», the plural noun on one side).
+  return [
+    {
+      type: 'plane-rel',
+      rel: 'angle',
+      deg: +m[5],
+      a: { kind: 'plane-named', name: canonicalPlane(m[1]) },
+      b: { kind: 'plane-named', name: canonicalPlane(m[3]) },
+    },
+  ];
 };
 
 /** `מ-A מורידים אנך למישור π1 החותך אותו בנקודה B` / `from A drop a perpendicular to plane π1, it cuts it at B`. */
@@ -2972,7 +2985,7 @@ const lineRelGiven: Rule = (s0) => {
  * S2 (#378, ADR-3D-103): a stated ANGLE VALUE where one side is a NAMED LINE — «הזווית בין הישר l1
  * לבין המישור ACD היא 30», «הזווית בין l1 לבין l2 היא 60», «the angle between AB and line l1 is 45».
  * Requires a line-kind side, so `linePlaneAngle` (segment×point-run, its lowering frozen) and
- * `angleBetweenPlanes` (π×π param-root) keep their cells; a valueless "what is the angle" query
+ * `angleBetweenPlanes` (π×π, a plane-rel since #1439) keep their cells; a valueless "what is the angle" query
  * stays not-handled (outside the reproduce-and-verify charter).
  */
 const lineRelAngle: Rule = (s) => {
@@ -4210,8 +4223,8 @@ const tetraAltitude: Rule = (s) => {
  * «הזווית בין המישור ABC לבין המישור ABD היא 60», «המישורים מתלכדים».
  *
  * Ownership (first-match-wins): every rule with a FROZEN lowering runs earlier and keeps its cell —
- * `linePerpPlane` (ℓ⟂π), `planeLinePerp` (point-run ⟂ ℓ), `angleBetweenPlanes` (π×π angle, the
- * param-root 2022-Q2 form) and `segPlaneRel` (segment × point-run, either order). What
+ * `linePerpPlane` (ℓ⟂π), `planeLinePerp` (point-run ⟂ ℓ), `angleBetweenPlanes` (π×π angle — the same
+ * `plane-rel` since #1439) and `segPlaneRel` (segment × point-run, either order). What
  * reaches here is exactly the matrix's unfilled plane cells, so the rule DEFERS unless a plane is
  * present and no earlier owner applies.
  */
@@ -4331,13 +4344,12 @@ const planeRelAngle: Rule = (s) => {
   // `linePlaneAngle` owns SEGMENT × point-run (its `line-plane-angle` lowering is frozen). Deferring
   // here rather than relying on rule order keeps the two from being a divergent shadow pair at all.
   if ((a.op.kind === 'segment' && b.op.kind === 'plane-run') || (b.op.kind === 'segment' && a.op.kind === 'plane-run')) return null;
-  // …and by the same discipline, `angleBetweenPlanes` owns NAMED π × NAMED π with a NUMERIC value: its
-  // `plane-angle` lowering is the one the parameter root-find and branch choice ride on. Teaching the
-  // operand seam the plural noun (#522) made this rule able to claim «הזווית בין המישורים π1 ו-π2 היא
-  // 45» for the first time, and the shadow-matrix HARD gate caught the pair immediately — the winner
-  // was unchanged, but two rules that read one sentence differently is a trap waiting on rule order.
-  // The LABELLED form is NOT that cell (`angleBetweenPlanes` reads numbers only), so it stays here.
-  if (a.op.kind === 'plane-named' && b.op.kind === 'plane-named' && !ANGLE_LABEL_RE.test(m[3])) return null;
+  // #1439 (ADR-3D-263): NAMED π × NAMED π is no longer deferred. It used to be, because
+  // `angleBetweenPlanes` lowered it to a separate `plane-angle` list and two rules reading one sentence
+  // differently is a trap waiting on rule order (the shadow-matrix gate, #522). That deferral is also
+  // what made «הזווית בין המישור π1 לבין המישור π2 היא 45» `not-understood`: this rule is the only one
+  // that reads the «X לבין Y» frame, and it bowed out. Both rules now emit the same `plane-rel`, so
+  // there is nothing to defer to — whichever reads the sentence, it means one thing.
   const canon = (op: Operand3): Operand3 => (op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) } : op);
   // #523: a Greek NAME states which measure the question is about, not a value — mark, never drive
   if (ANGLE_LABEL_RE.test(m[3])) return [{ type: 'plane-rel', rel: 'angle', label: m[3], a: canon(a.op), b: canon(b.op) }];

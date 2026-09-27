@@ -68,9 +68,10 @@ describe('planes and points', () => {
 });
 
 describe('relations and constructions', () => {
+  // #1439 (ADR-3D-263): ONE plane-rel for every plane × plane angle (was the separate `plane-angle`)
   it('the angle between the planes', () => {
-    expect(cmds('הזווית בין המישורים π1 ו-π2 היא 45')).toEqual([{ type: 'plane-angle', p1: 'π1', p2: 'π2', deg: 45 }]);
-    expect(cmds('the angle between planes π1 and π2 is 45')).toEqual([{ type: 'plane-angle', p1: 'π1', p2: 'π2', deg: 45 }]);
+    expect(cmds('הזווית בין המישורים π1 ו-π2 היא 45')).toEqual([{ type: 'plane-rel', rel: 'angle', deg: 45, a: { kind: 'plane-named', name: 'π1' }, b: { kind: 'plane-named', name: 'π2' } }]);
+    expect(cmds('the angle between planes π1 and π2 is 45')).toEqual([{ type: 'plane-rel', rel: 'angle', deg: 45, a: { kind: 'plane-named', name: 'π1' }, b: { kind: 'plane-named', name: 'π2' } }]);
   });
 
   it('perpendicular dropped to a plane / to the line', () => {

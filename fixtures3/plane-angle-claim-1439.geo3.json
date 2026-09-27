@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-09-27T11:31:12.581Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "המישור π1: z = 3",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π1",
+          "plane": {
+            "cx": {
+              "k": 0,
+              "p": 0
+            },
+            "cy": {
+              "k": 0,
+              "p": 0
+            },
+            "cz": {
+              "k": 1,
+              "p": 0
+            },
+            "d": {
+              "k": -3,
+              "p": 0
+            },
+            "src": "z = 3"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "המישור π2: x + y + z = 1",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π2",
+          "plane": {
+            "cx": {
+              "k": 1,
+              "p": 0
+            },
+            "cy": {
+              "k": 1,
+              "p": 0
+            },
+            "cz": {
+              "k": 1,
+              "p": 0
+            },
+            "d": {
+              "k": -1,
+              "p": 0
+            },
+            "src": "x + y + z = 1"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "הזווית בין המישורים π1 ו-π2 היא 54.7356",
+      "cmds": [
+        {
+          "type": "plane-rel",
+          "rel": "angle",
+          "deg": 54.7356,
+          "a": {
+            "kind": "plane-named",
+            "name": "π1"
+          },
+          "b": {
+            "kind": "plane-named",
+            "name": "π2"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "המישור π3: x + mz = 0",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π3",
+          "plane": {
+            "cx": {
+              "k": 1,
+              "p": 0
+            },
+            "cy": {
+              "k": 0,
+              "p": 0
+            },
+            "cz": {
+              "k": 0,
+              "p": 1
+            },
+            "d": {
+              "k": 0,
+              "p": 0
+            },
+            "src": "x + mz = 0"
+          },
+          "param": "m"
+        }
+      ]
+    },
+    {
+      "utterance": "π1 ניצב ל-π3",
+      "cmds": [
+        {
+          "type": "plane-rel",
+          "rel": "perp",
+          "a": {
+            "kind": "plane-named",
+            "name": "π1"
+          },
+          "b": {
+            "kind": "plane-named",
+            "name": "π3"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "A(1,0,0) נמצאת על אחד המישורים",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "type": "on-planes",
+          "id": "A",
+          "plane": "any"
+        }
+      ]
+    }
+  ]
+}

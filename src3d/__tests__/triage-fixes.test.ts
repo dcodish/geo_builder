@@ -48,7 +48,7 @@ describe('ADR-3D-026 — prod-triage fixes (parse)', () => {
   it('plane-equation phrasings: unnamed, no-colon, singular-מישור angle', () => {
     expect(cmd('המישור x-y+z=1')[0]).toMatchObject({ type: 'plane3', name: 'π' });
     expect(cmd('המישור π2 x-y+z=1')[0]).toMatchObject({ type: 'plane3', name: 'π2' });
-    expect(cmd('הזווית בין מישור π1 ו-π2 היא 45')[0]).toMatchObject({ type: 'plane-angle', deg: 45 });
+    expect(cmd('הזווית בין מישור π1 ו-π2 היא 45')[0]).toMatchObject({ type: 'plane-rel', rel: 'angle', deg: 45 }); // #1439: the plane-rel lowering
     // regressions: the colon form + a point-run plane must be unchanged
     expect(cmd('המישור π1: z-3=0')[0]).toMatchObject({ type: 'plane3', name: 'π1' });
     expect(cmd('מישור ABC')[0]).toMatchObject({ type: 'plane-through' });

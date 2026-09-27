@@ -4,7 +4,7 @@
  */
 
 import { exprPointIds, exprVectorNames } from './vecExpr';
-import { isAbsolute, isPlanar, lineDirCarriesParam, planeNormalCarriesParam, sameOperand } from './operands';
+import { isAbsolute, isPlanar, lineDirCarriesParam, planeNormalCarriesParam, planePinningRels, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
@@ -149,7 +149,6 @@ function clone(c: Construction3): Construction3 {
     planes: new Map(c.planes),
     lines: new Map(c.lines),
     param: c.param,
-    planeAngles: [...c.planeAngles],
     memberships: [...c.memberships],
     linePerps: [...c.linePerps],
     onLines: [...c.onLines],
@@ -545,7 +544,8 @@ function adoptParamForCarrier(c: Construction3, carrier: { kind: 'line' | 'plane
 function releaseParamToPivot(c: Construction3): Construction3 | null {
   const sym = c.param;
   if (!sym) return c;
-  if (c.planeAngles.length > 0 || c.linePerps.length > 0 || c.lineRels.length > 0 || c.paramGivens.length > 0) return null;
+  // #1439: a plane × plane relation that pins the parameter is read by the SAME predicate the root-find uses
+  if (planePinningRels(c).length > 0 || c.linePerps.length > 0 || c.lineRels.length > 0 || c.paramGivens.length > 0) return null;
   for (const def of c.points.values()) if (def.kind === 'coord-sym') return null;
   const next = clone(c);
   delete next.param;
@@ -2101,17 +2101,22 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'plane-angle': {
+      // #1439 (ADR-3D-263): a LOAD-COMPAT ALIAS. The parser lowers every plane × plane angle to ONE
+      // `plane-rel {rel:'angle'}`; a figure saved before #1439 still carries this command and is lowered
+      // to that same relation here, so an old file lands in the lane where the angle pins the parameter
+      // when a normal carries it and is a VERIFIED claim otherwise — never the old list that, with no
+      // parameter in play, nothing checked. The unknown-plane refusal is kept verbatim (the operand
+      // resolver has its own code for it; an old file keeps the message it always had).
       for (const p of [cmd.p1, cmd.p2]) {
         if (!c.planes.has(p)) return { ok: false, error: { code: 'unknown-plane', id: p } };
-        // #487 honest boundary: an angle given between planes drives the PARAMETER machinery, which
-        // reads equations — a FREE plane has none, and its placeholder would fabricate roots. Pinning a
-        // free plane's orientation to a stated dihedral angle is the follow-up on the issue, not silent
-        // wrongness here.
-        if (c.planes.get(p)!.free) return { ok: false, error: { code: 'plane-not-determined', id: p } };
       }
-      const next = clone(c);
-      next.planeAngles.push(cmd);
-      return { ok: true, next };
+      return applyCommand3Inner(c, {
+        type: 'plane-rel',
+        rel: 'angle',
+        deg: cmd.deg,
+        a: { kind: 'plane-named', name: cmd.p1 },
+        b: { kind: 'plane-named', name: cmd.p2 },
+      });
     }
 
     case 'on-planes': {

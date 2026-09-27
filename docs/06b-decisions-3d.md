@@ -10512,3 +10512,100 @@ the facts build and verify, which they already did. Both new test files fail on 
 
 **Consequences.** One line in `dataView.ts`, and one new workspace lint. For students: a parameter with two or
 more roots now shows every root at the same precision (two decimal places when it has no exact form).
+
+## ADR-3D-263 — A relation between two equation planes is routed by whether a normal carries the parameter, never by its word: a stated plane angle is checked (#1439)
+
+**Status:** accepted, 2026-09-27 · **Issue:** [#1439](https://github.com/dcodish/geo_builder/issues/1439) (bug, `P1`, `3d`) · round [#1469](https://github.com/dcodish/geo_builder/issues/1469) · plan approved by the operator 2026-09-27 (/decisions pass, `auto-ok`)
+**Requirements:** [02b](02b-requirements-3d.md) — **FR-CL-1** gains the plane-relation sentence (the promise was already made; this realises it for the angle between equation planes) · **Design:** [04b](04b-design-3d.md) — *Relations as a disposition map* gains the operand-routing paragraph · **LADDER stage:** none new — the existing parameter root-find (`evaluate`: `pinningGivens` / `paramRoots` / `chooseParam`) gains a pinning kind, and the store's claim judge is unchanged
+
+**The report.** External review of prod, relayed by the operator: *"False plane-angle claims are accepted for
+planes given by equations. For z=3 and x+y+z=1, both 45° and 30° are accepted; the true angle is 54.74°."*
+
+**Measured at the round's base (`2f24b56c`), through `submit` → `derive3` → `buildScene3`:**
+- `π1: z = 3`, `π2: x + y + z = 1`, «הזווית בין המישורים π1 ו-π2 היא X» → **ok** for X = 45, 30, 0, 90 and
+  54.7356, and the scene drew an arc labelled with X. English the same.
+- «הזווית בין המישור π1 לבין המישור π2 היא 45» → `not-understood`.
+- A parameter on a THIRD plane (`π2: x + mz − 1 = 0`) and the TRUE angle between π1 and π3 → **`no-roots`**.
+- `π1: z = 0`, `π2: x + mz = 0`, «π1 ניצב ל-π2» → **`claim-refuted`**, although m = 0 satisfies it; the angle
+  form of the same pair drives m = ±1. The ∥ form (`π2: mx + z − 5 = 0`) → `claim-refuted` likewise.
+
+The plan's diagnosis is what fires; nothing had moved since it was written.
+
+**Class.** *A relation between two NAMED equation planes is routed by its relation word, not by whether a
+normal carries the parameter.* The angle form lowered to `plane-angle` → `c.planeAngles`, a list read only by
+the parameter machinery and the renderer. With no parameter (`chooseParam` returns null) the given was
+checked by nothing and drawn as knowledge; with the parameter elsewhere the root-find ran over a constant and
+fabricated `no-roots`. The ⟂ / ∥ forms lowered to `plane-rel` → claim only, so a normal carrying the parameter
+was judged at a sampled value instead of being root-found. The line column already had the right rule
+(`paramPinningLineRels`: a relation pins iff a referenced direction carries the parameter); the plane column
+was never given it.
+
+**Why no test caught it.** The #845 sweep's probe for `angle|plane-named|plane-named` used POINT-RUN planes
+(«המישור ABC»), so it exercised `plane-run|plane-run`; `relation-battery.test.ts` parked the cell in
+`BATTERY_PENDING` behind the 2022-Q2 gate, whose planes carry a parameter — the one configuration where the
+angle was checked.
+
+**The decision (the approved plan, all six steps).**
+1. **One lowering.** Every plane × plane angle parses to one `plane-rel {rel:'angle'}`. `angleBetweenPlanes`
+   stays as the owner of its looser spellings and now emits that same command; `planeRelAngle` no longer
+   defers the named × named cell, which is what makes «המישור π1 לבין המישור π2» understood. The two rules
+   read one sentence identically, so the shadow matrix is unchanged. `plane-angle` remains only as a
+   **load-compat alias**: `apply` lowers it to the same `plane-rel`, so an old `.geo3.json` lands in the
+   checked lane. `Construction3.planeAngles` is gone.
+2. **`planePinningRels(c)`** (`operands.ts`), the `paramPinningLineRels` shape: a ⟂ / ∥ / valued angle between
+   two named equation planes **pins the parameter** iff one side's normal carries `c.param`; a free plane (it
+   pins the PLANE) and a pin-symbol plane (#801, the pivot's letter) are excluded. The `plane-rel` apply
+   records the claim for every instance, so the claim is always the final arbiter. `pinningGivens`,
+   `paramRoots`, `satisfiesAllPins` and `releaseParamToPivot` read this one predicate; the residual
+   (`planeRelParamResidual`) is the line twin's on two normals — ⟂ `n1·n2` (sign change), ∥ `|n1×n2|` (touch
+   zero), angle `|cos| − cos θ`, the undirected reading `relDeviation` verifies by.
+3. **Relation table:** `angle|perp|parallel × plane-named|plane-named` → `['param-root', 'claim']`.
+4. **Renderer:** the dihedral arc is drawn from a stated named × named angle only when it **holds on the drawn
+   figure** — `relDeviation` under the verifier's own bar, now one constant (`DIRECTION_REL_TOL`, shared by
+   `claims.ts`). A pinned angle holds at its root, a claim holds iff true; a refused angle carried by a loaded
+   file draws nothing. The object-angle lane skips these so the arc is drawn once.
+5. **The probe** now uses equation planes; the cell moves out of `BATTERY_PENDING` into a battery row that
+   carries an absolute × absolute true/false pair for **every** `plane-named|plane-named` cell (angle, ⟂, ∥,
+   coincident, distance).
+6. **Sibling products.** *2-D (`src/`)* has no planes, so the class cannot occur. *Analytic geometry*
+   (`src-analytic/`) is 2-D analytic and has no dihedral angle. *Complex* has no planes. Nothing to file.
+
+A snapped root now folds `−0` to `0` (`snapAndDedupe`): a root approached from below snapped to `−0`, and the
+parameter's value is shown to the student.
+
+**Sibling audit inside 3-D (docs/17 §1).** Grepped every consumer of the parameter machinery and of
+`plane-rel` claims. Found and **not fixed here** (outside the approved plan — reported to the round):
+- `coincident|plane-named|plane-named` with the parameter in a plane: `π1: z = 1`, `π2: mx + z − 1 = 0`,
+  «π1 מתלכד עם π2» → `claim-refuted`, although m = 0 satisfies it. Same class; coincidence also reads the
+  OFFSET, so the pin predicate is "the plane's equation carries it", not "the normal carries it", and its
+  residual is two-dimensional — it needs its own small plan.
+- `distance|plane-named|plane-named` with the parameter in an offset is the same shape and was not measured.
+- Mixed `plane-run × plane-named` relations with a parameter-carrying equation plane remain claim-only, as the
+  line column's gauge × absolute cells do (the S3 disposition); not in this class, which is absolute × absolute.
+- A stated angle to a FREE plane keeps its `plane-not-determined` refusal (the store guard now owns it; the
+  alias no longer needs its own copy).
+
+**Cost (M3).** No new sampler and no new loop over seeds. The root-find for a pinning angle now also runs the
+touch-zero scan the line twin runs (one extra 2 500-step scan per pinning relation) so a 0° / 90° angle,
+where `|cos| − cos θ` only touches zero, is found; `planePinningRels` is a linear pass over the claims. The
+2022-Q2 scenario and every `fixtures3/` session replay green with unchanged roots.
+
+**Locks.** `src3d/__tests__/issue-1439-plane-angle-claim.test.ts` (24 tests): (a) the reviewer's planes at
+45/30/0/90 → `claim-refuted`, at 54.7356 → ok; (b) English; (c) «X לבין Y», mirrored slots and the singular
+noun behave identically, and every spelling lowers to the one `plane-rel`; (d) the parameter on a third plane:
+a true angle is ok in both entry orders, the parameter stays free, a false one is refused; (e) ⟂ pins m = 0,
+∥ pins m = 0, the angle form drives m = ±1, an unsatisfiable ∥ is the honest `no-roots` naming the statement;
+(f) 2022-Q2 unchanged (a = ±1, membership selects −1; 95° stays `no-roots`); (g) a refused angle carried by a
+loaded file draws no «°» label and is flagged, a true and a pinned angle keep theirs; the alias applies to the
+same claims, an old file with a false `plane-angle` loads and is flagged, an unknown plane keeps its
+refusal. `relation-battery.test.ts` gains the five-cell true/false row. Fixture
+`plane-angle-claim-1439.geo3.json` (the true angle in both spellings, the parameter on a third plane, the ⟂
+that pins m). `planes-2022-q2.geo3.json` carries the new lowering (the parser-drift net), and four parse
+assertions moved from `plane-angle` to `plane-rel`.
+
+**Consequences.** `engine/operands.ts` (`planePinningRels`, `DIRECTION_REL_TOL`), `engine/evaluate.ts`,
+`engine/apply.ts`, `engine/types.ts`, `engine/claims.ts`, `engine/relationTable.ts`, `parser/parse3.ts`,
+`render/scene3.ts`. For a student: a wrong angle between two planes given by equations is now refused instead
+of drawn with the wrong number; «הזווית בין המישור π1 לבין המישור π2 היא …» is understood; a true angle is no
+longer refused because the parameter lives on another plane; and «π1 ניצב ל-π2» / «π1 מקביל ל-π2» over a
+parameter now solve for it.
