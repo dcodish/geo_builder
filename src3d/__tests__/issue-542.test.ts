@@ -83,7 +83,11 @@ describe('#542 — the ONE arc builder, in world space', () => {
   });
 });
 
-describe('#542 — every angle record kind reaches the builder, and the gate holds', () => {
+describe('#542 — every angle record kind reaches the builder (panel-independent since #1486)', () => {
+  // #1486 (ADR-3D-266, operator ruling A): ADR-3D-185's «ארגון נתונים» gate is GONE — every record this
+  // lane reads is a stated angle, and a stated given is visible on the figure. `buildScene3` no longer
+  // takes a panel flag at all, so the one scene below is what the canvas draws with the panel CLOSED
+  // (and open). These rows used to assert «nothing with the panel shut»; they now assert the mark.
   const build = (lines: string[]) => {
     useGeo3.setState({ facts: [], seed: 0, lastError: null });
     useGeo3.temporal.getState().clear();
@@ -91,41 +95,32 @@ describe('#542 — every angle record kind reaches the builder, and the gate hol
     const st = useGeo3.getState();
     for (const f of st.facts) expect(derive3(st.facts, st.seed).status[f.id], f.utterance).toBe('ok');
     const d = derive3(st.facts, st.seed);
-    return {
-      off: buildScene3(d.construction, d.resolved, HOME_CAMERA, VIEW, 1),
-      on: buildScene3(d.construction, d.resolved, HOME_CAMERA, VIEW, 1, {}, true, true),
-    };
+    return buildScene3(d.construction, d.resolved, HOME_CAMERA, VIEW, 1);
   };
 
   // the operator's own four rows, from the #542 report
   it('a driven DIHEDRAL (plane-rel claim) — «הזווית בין הפאה SBC לבסיס ABCD היא 60»', () => {
-    const { off, on } = build(['פירמידה SABCD שבסיסה ריבוע', 'הזווית בין הפאה SBC לבסיס ABCD היא 60']);
-    expect(off.angles).toHaveLength(0);
-    expect(on.angles.map((a) => a.text)).toEqual(['60°']);
+    const s = build(['פירמידה SABCD שבסיסה ריבוע', 'הזווית בין הפאה SBC לבסיס ABCD היא 60']);
+    expect(s.angles.map((a) => a.text)).toEqual(['60°']);
   });
 
   it('a pinned LINE↔PLANE angle (line-rel claim) — «זווית בין ישר ℓ למישור π=45»', () => {
-    const { off, on } = build(['מישור π', 'x=(1,2,3)+t(2,0,2)', 'זווית בין ישר ℓ למישור π=45']);
-    expect(off.angles).toHaveLength(0);
-    expect(on.angles.map((a) => a.text)).toEqual(['45°']);
+    const s = build(['מישור π', 'x=(1,2,3)+t(2,0,2)', 'זווית בין ישר ℓ למישור π=45']);
+    expect(s.angles.map((a) => a.text)).toEqual(['45°']);
   });
 
   it('a NAMED dihedral (relMark) draws the NAME and no number — the ADR-3D-030 knowledge rule', () => {
-    const { off, on } = build(["קובייה ABCDA'B'C'D'", "הזווית בין המישור ABB'A' למישור ABCD היא α"]);
-    expect(off.angles).toHaveLength(0);
-    expect(on.angles.map((a) => a.text)).toEqual(['α']);
-    expect(on.angles[0].text).not.toMatch(/\d/); // never a single-seed number
+    const s = build(["קובייה ABCDA'B'C'D'", "הזווית בין המישור ABB'A' למישור ABCD היא α"]);
+    expect(s.angles.map((a) => a.text)).toEqual(['α']);
+    expect(s.angles[0].text).not.toMatch(/\d/); // never a single-seed number
   });
 
-  it('the VERTEX baseline is NOT gated — it draws with the panel shut, exactly as before', () => {
-    const { off, on } = build(['פירמידה SABCD שבסיסה ריבוע', '∠SAB = α']);
-    expect(off.angles.map((a) => a.text)).toEqual(['α']);
-    expect(on.angles.map((a) => a.text)).toEqual(['α']);
+  it('the VERTEX baseline draws as it always did', () => {
+    const s = build(['פירמידה SABCD שבסיסה ריבוע', '∠SAB = α']);
+    expect(s.angles.map((a) => a.text)).toEqual(['α']);
   });
 
-  it('a figure with no stated angle draws none either way', () => {
-    const { off, on } = build(['פירמידה SABCD שבסיסה ריבוע']);
-    expect(off.angles).toHaveLength(0);
-    expect(on.angles).toHaveLength(0);
+  it('a figure with no stated angle draws none', () => {
+    expect(build(['פירמידה SABCD שבסיסה ריבוע']).angles).toHaveLength(0);
   });
 });

@@ -48,7 +48,7 @@ const arcs = (): string[] => {
     for (const [factId, chip] of chips) if (chip.sym === sym) return displayModeOf(st.displayMode, factId);
     return 'value';
   };
-  return buildScene3(c, resolve3(c, st.seed), HOME_CAMERA, { width: 640, height: 460 }, 1, {}, true, false, symbolDisplay).angles.map((a) => a.text);
+  return buildScene3(c, resolve3(c, st.seed), HOME_CAMERA, { width: 640, height: 460 }, 1, {}, true, symbolDisplay).angles.map((a) => a.text);
 };
 
 /** fact id → chip, exactly as App3 derives it. */

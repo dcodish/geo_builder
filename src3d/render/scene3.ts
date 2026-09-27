@@ -418,10 +418,6 @@ export function buildScene3(
   planeDisplay: Record<string, 'face' | 'full' | 'hidden'> = {},
   /** #397 (ADR-3D-108): draw the closest-point WITNESS of every stated distance (dashed + value). */
   showWitnesses = true,
-  /** #542 (ADR-3D-185): draw the arcs of angles whose SIDES ARE OBJECTS. Operator's explicit request —
-   *  these appear only while «ארגון נתונים» is open, so the canvas stays clean by default. The VERTEX
-   *  arcs (#94 and the stated-vangle marks) are NOT gated and keep drawing unconditionally. */
-  showObjectAngles = false,
   /** #937 (ADR-W-047): which form a VALUED parameter shows — the student's choice, made on the fact
    *  row that valued it. Absent ⇒ the value, which is this builder's behaviour before #937. */
   symbolDisplay?: (sym: string) => 'letter' | 'value',
@@ -765,10 +761,15 @@ export function buildScene3(
    * #542 (ADR-3D-185) — every angle whose SIDES ARE OBJECTS, through the ONE builder above.
    *
    * The three record kinds that carry such an angle are normalized to an operand PAIR here and then
-   * share a single geometry; none of them gets an arc builder of its own. Gated on the data panel at
-   * the operator's request — the vertex arcs above are not.
+   * share a single geometry; none of them gets an arc builder of its own.
+   *
+   * #1486 (ADR-3D-266, operator ruling A) — NOT gated on the data panel. ADR-3D-185 drew these only
+   * while «ארגון נתונים» was open; every record this lane reads is a STATED angle (a value or a name the
+   * student typed — measured: nothing unstated reaches it), so the gate hid givens while the vertex
+   * arcs, the equation-plane arcs (#1439) and the knees (#1475) of the same kind of statement showed.
+   * A stated given is visible on the figure (the honesty invariant), so the gate is gone, not narrowed.
    */
-  if (showObjectAngles) {
+  {
     const atA = (id: Id) => positions.get(id) ?? null;
     const absA = { lines: resolved.lines, planes: resolved.planes };
     // `degText` — the one reading rule, hoisted above so the vertex arcs and these share it (#923)
@@ -789,6 +790,19 @@ export function buildScene3(
         b: { kind: 'plane-run' as const, ids: mk.plane },
         text: mk.label,
         deg: undefined,
+      })),
+      // #1486: the VALUED twin of the record above — «הזווית בין SA למישור ABCD היא 50» lowers to a
+      // `line-plane-angle` pin (a free-dim solid: it drives) or claim (it verifies), and this lane read
+      // only the lettered form, so the valued one drew nothing with the panel open or closed. Same
+      // normalization as its twin (#319's frozen lowering reaches the builder through its own record).
+      ...[
+        ...c.scalarPins.flatMap((sp) => (sp.kind === 'line-plane-angle' ? [sp] : [])),
+        ...c.claims.flatMap((cl) => (cl.type === 'line-plane-angle' ? [cl] : [])),
+      ].map((r) => ({
+        a: { kind: 'segment' as const, a: r.a, b: r.b },
+        b: { kind: 'plane-run' as const, ids: r.plane },
+        text: degText(r.deg, undefined),
+        deg: r.deg,
       })),
     ];
     /** the operand's own material, so the arc is drawn on the side the student can see */

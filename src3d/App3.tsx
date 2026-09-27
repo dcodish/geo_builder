@@ -1129,7 +1129,6 @@ export default function App3() {
               resolved={derived.resolved}
               planeDisplay={planeDisplay}
               showWitnesses={showWitness}
-              showObjectAngles={showData}
               symbolDisplay={symbolDisplay}
               dihedralShown={dihedralPairs}
               coordLabels={showData && dataPanel ? dataPanel.pointCoords : undefined}

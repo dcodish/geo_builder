@@ -10757,3 +10757,80 @@ Pressing it draws how that angle is formed — a point on the planes' common lin
 letter, and from it a perpendicular to that line in each plane (from the apex / the third vertex when there
 is one) — with the angle marked between them, whether or not «ארגון נתונים» is open. Off by default; kept by
 undo, save, share link.
+
+## ADR-3D-266 — A stated angle between objects is always marked: the #542 panel gate is removed, and the valued segment × plane angle reaches the arc lane (#1486)
+
+**Status:** accepted, 2026-09-27 · **Issue:** [#1486](https://github.com/dcodish/geo_builder/issues/1486) (bug, `3d`) · round [#1488](https://github.com/dcodish/geo_builder/issues/1488) · operator ruling (A) 2026-09-27 (`auto-ok`) · **Amends:** [ADR-3D-185](#adr-3d-185) (its gate)
+**Requirements:** [02b](02b-requirements-3d.md) — **FR-RD-12** added (a stated angle between objects is always marked, panel open or closed) · **Design:** [04b](04b-design-3d.md) — *Rendering* gains *The object-angle lane is not panel-gated*; the `showObjectAngles` seam mention removed · **LADDER stage:** none (render only — no parse, apply, solve or verify change)
+
+**The report.** Operator, playing round #1478 (PR #1484 T10, and again T12): *«without pressing הצג בניה the
+angle did not show»* — `פירמידה SABC` · `הזווית בין הפאה SBC לבסיס ABC היא 60` with «ארגון נתונים» closed
+drew no arc.
+
+**Measured on `c321bb5f` (`submit` → `derive3` → `buildScene3`), panel closed / open:**
+
+| figure | record | closed | open |
+| --- | --- | --- | --- |
+| pyramid SABC · face SBC ↔ base ABC = 60 | `plane-rel` claim + pin | nothing | «60°» |
+| same, «… היא β» | `relMarks` | nothing | «β» |
+| `מישור π` · a line · «זווית בין ישר ℓ למישור π=45» | `line-rel` claim | nothing | «45°» |
+| cube · «הזווית בין AC' למישור ABCD היא α» | `linePlaneMarks` | nothing | «α» |
+| square pyramid · «הזווית בין SA למישור ABCD היא 50» | `line-plane-angle` **pin** | nothing | **nothing** |
+| box · «הזווית בין AC' למישור ABCD היא 30» | `line-plane-angle` pin | nothing | **nothing** |
+| cube · «הזווית בין AC' למישור ABCD היא 35.264» | `line-plane-angle` **claim** | nothing | **nothing** |
+
+**Class (docs/17 §1).** *A stated angle between two OBJECTS is hidden from the figure by a display gate that
+the same statement about vertices, equation planes or right angles does not pass through* — the honesty
+invariant «everything the student stated is visible on the figure» held for some spellings of an angle and
+not others. ADR-3D-185 gated the object-angle lane on the data panel at the operator's 2026-08-11 request;
+since then #1439 (equation-plane arcs), #1475 (knees) and #1476 (the construction) each ruled «always
+show», leaving this lane the only one that hid a given. **A second member of the class** surfaced in the
+measurement: the VALUED segment × point-run angle (`line-plane-angle`, a pin on a free-dim solid, a claim
+otherwise) was never read by the lane at all — it normalized only the LETTERED twin (`linePlaneMarks`) —
+so it drew nothing even with the panel open.
+
+**What was behind the gate (the ruling asked this to be measured).** The lane reads exactly four record
+kinds: `plane-rel` angle claims (apply records one only with a `deg`; a letter goes to `relMarks`),
+`line-rel` angle claims (likewise), `relMarks` and `linePlaneMarks` (a letter the student typed). Every one
+is produced only by a student statement (`apply.ts` `plane-rel` / `line-rel` / `line-plane-angle` cases);
+no macro, derivation or solver step creates them. **Nothing unstated was behind the gate, so the gate is
+removed, not narrowed** — ruling (A) and (B) coincide, as the issue predicted.
+
+**The decision.**
+1. `buildScene3` loses its `showObjectAngles` parameter; the object-angle lane runs unconditionally.
+   `Figure3` loses the prop and `App3` stops passing `showData` to it. The canvas now depends on the data
+   panel only through `coordLabels` (the point coordinates the panel computes).
+2. The lane's operand-pair normalization gains the valued `line-plane-angle` record (pins and claims),
+   exactly as its lettered twin is normalized (segment × plane-run), read through `degText` like every
+   other arc. No new builder — the one `objectAngleArc` draws it at the segment's crossing with the plane.
+3. Unchanged by construction: a right value still skips the arc lane (the #1475 knee is its mark, which
+   already read `line-plane-angle` at 90°); a pair whose «הצג בניה» chip is on still skips the lane
+   (`pairKey`, #1476), so its angle is marked exactly once, at the constructed foot; a valued angle between
+   two NAMED planes stays in the #1439 lane with its truth check.
+4. **Sibling audit.** *Inside 3-D:* the vertex arcs (`collectWedges`) and the seg-angle crossing arcs were
+   never gated; the knee lane and the construction were ungated by #1475/#1476; the witness lane has its own
+   student toggle (`showWitnesses`), not the panel. *Sibling products:* 2-D (`src/`), analytic and complex
+   draw no angle between objects and have no data-panel-gated canvas mark. Nothing to file.
+
+**Cost (M3).** For a figure with such an angle, one `resolveOperand` pair and one `objectAngleArc` probe
+per stated pair per scene build — previously paid only with the panel open. No sampler, no solve.
+
+**Locks.** `src3d/__tests__/issue-1486-stated-angle-shows.test.ts` (all through `submit` → `derive3` →
+`buildScene3`, with the chips derived as App3 derives them; there is no panel input left to set): the
+operator's T10/T12 lines draw one «60°» arc with no chip, sitting at the shared edge BC (nearer its
+midpoint than A); the named «β» draws its letter; the named-line × named-plane «45°»; the valued
+segment × face «50°» (a pin) at A, and «35.264°» on a cube (a claim); the lettered «α» (`linePlaneMarks`);
+90° stays the knee with no arc; chip on → one «60°» (the construction's), chip off → the free arc returns;
+a right dihedral with the chip off is one knee. **Locks that encoded the old gate, inverted:**
+`issue-542.test.ts` — its four report rows now assert the mark from the one (panel-independent) scene
+instead of «nothing with the panel shut»; `issue-1475-plane-knee.test.ts` — the 45° point-run dihedral
+«keeps its (panel-gated) arc» now asserts the arc with the panel closed, and the panel-open/closed pairs of
+the knee rows collapse to one scene (they were identical calls once the flag is gone);
+`issue-1476-dihedral-construction.test.ts` and `issue-937-param-display-chip.test.ts` drop the positional
+flag. #1476's «one arc with the chip on» lock is unchanged and is now a real lock (before, the lane it
+guards against was off in that scene).
+
+**Consequences.** For a student: an angle they stated between a face and a base, a line and a plane, or
+two planes named by points — with a number or a letter — now appears on the figure as soon as it is typed,
+without opening «ארגון נתונים» or pressing «הצג בניה»; and a stated angle between a segment and a face
+(«הזווית בין SA למישור ABCD היא 50») is drawn at all, which it never was.

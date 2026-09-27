@@ -30,9 +30,10 @@ function build(...lines: string[]) {
   return derive3(st().facts, st().seed);
 }
 
-/** The scene with the data panel CLOSED (the default) or open. */
-function scene(d: ReturnType<typeof derive3>, panelOpen = false) {
-  return buildScene3(d.construction, d.resolved, HOME_CAMERA, VIEW, 1, {}, true, panelOpen);
+/** The scene as the canvas draws it. Since #1486 (ADR-3D-266) nothing in it depends on the data panel —
+ *  `buildScene3` takes no panel flag — so this one scene is the panel-closed AND the panel-open canvas. */
+function scene(d: ReturnType<typeof derive3>) {
+  return buildScene3(d.construction, d.resolved, HOME_CAMERA, VIEW, 1);
 }
 
 const NAMED_1 = 'המישור π1: z = 0';
@@ -42,8 +43,8 @@ const CUBE = "קובייה ABCDA'B'C'D'";
 describe('#1475 — a right angle between planes draws a knee', () => {
   beforeEach(() => st().clear());
 
-  it.each([false, true])('named planes «π1 ניצב ל-π2» → one knee, no arc (panel open: %s)', (open) => {
-    const s = scene(build(NAMED_1, NAMED_2, 'π1 ניצב ל-π2'), open);
+  it('named planes «π1 ניצב ל-π2» → one knee, no arc', () => {
+    const s = scene(build(NAMED_1, NAMED_2, 'π1 ניצב ל-π2'));
     expect(s.marks).toHaveLength(1);
     expect(s.angles).toHaveLength(0);
   });
@@ -53,7 +54,7 @@ describe('#1475 — a right angle between planes draws a knee', () => {
   });
 
   it('named planes stated at 90° → a knee and NO arc labelled «90°»', () => {
-    const s = scene(build(NAMED_1, NAMED_2, 'הזווית בין המישורים π1 ו-π2 היא 90'), true);
+    const s = scene(build(NAMED_1, NAMED_2, 'הזווית בין המישורים π1 ו-π2 היא 90'));
     expect(s.marks).toHaveLength(1);
     expect(s.angles.map((a) => a.text)).not.toContain('90°');
   });
@@ -66,21 +67,19 @@ describe('#1475 — a right angle between planes draws a knee', () => {
 
   it("point-run «המישור ABC ניצב למישור ABB'» → a knee with the data panel CLOSED (ruling: always shows)", () => {
     const d = build(CUBE, "המישור ABC ניצב למישור ABB'");
-    expect(scene(d, false).marks).toHaveLength(1);
-    expect(scene(d, true).marks).toHaveLength(1);
-    expect(scene(d, true).angles).toHaveLength(0);
+    expect(scene(d).marks).toHaveLength(1);
+    expect(scene(d).angles).toHaveLength(0);
   });
 
   it("point-run, mirrored «המישור ABB' ניצב למישור ABC» → the same knee", () => {
     expect(scene(build(CUBE, "המישור ABB' ניצב למישור ABC")).marks).toHaveLength(1);
   });
 
-  it('point-run stated at 90° → a knee whatever the panel, and no «90°» arc even with it open', () => {
+  it('point-run stated at 90° → a knee, and no «90°» arc (the object-angle lane is ungated since #1486)', () => {
     const d = build(CUBE, "הזווית בין המישור ABC למישור ABB' היא 90");
-    expect(scene(d, false).marks).toHaveLength(1);
-    const open = scene(d, true);
-    expect(open.marks).toHaveLength(1);
-    expect(open.angles.map((a) => a.text)).not.toContain('90°');
+    const s = scene(d);
+    expect(s.marks).toHaveLength(1);
+    expect(s.angles.map((a) => a.text)).not.toContain('90°');
   });
 
   it('the cube knee sits on the shared edge AB, its arms ⟂ the seam and lying in each face', () => {
@@ -116,11 +115,10 @@ describe('#1475 — what must NOT draw a knee', () => {
     expect(s.marks).toHaveLength(0);
   });
 
-  it("a 45° dihedral between point runs keeps its (panel-gated) arc and draws no knee", () => {
+  it("a 45° dihedral between point runs keeps its arc — drawn with the panel closed since #1486 — and draws no knee", () => {
     const d = build(CUBE, "הזווית בין המישור ABC למישור ABC' היא 45");
-    expect(scene(d, true).angles.map((a) => a.text).join('|')).toBe('45°');
-    expect(scene(d, true).marks).toHaveLength(0);
-    expect(scene(d, false).angles).toHaveLength(0);
+    expect(scene(d).angles.map((a) => a.text).join('|')).toBe('45°');
+    expect(scene(d).marks).toHaveLength(0);
   });
 
   it('a REFUSED ⟂ (claim-refuted) draws no knee', () => {
@@ -137,11 +135,11 @@ describe('#1475 — what must NOT draw a knee', () => {
       return { id: `f${i}`, utterance, cmds: p.commands, enabled: true };
     });
     const d = derive3(facts, 0);
-    expect(scene(d, true).marks).toHaveLength(0);
+    expect(scene(d).marks).toHaveLength(0);
   });
 
   it("parallel planes «המישור ABC מקביל למישור A'B'C'» draw no mark", () => {
-    expect(scene(build(CUBE, "המישור ABC מקביל למישור A'B'C'"), true).marks).toHaveLength(0);
+    expect(scene(build(CUBE, "המישור ABC מקביל למישור A'B'C'")).marks).toHaveLength(0);
   });
 });
 

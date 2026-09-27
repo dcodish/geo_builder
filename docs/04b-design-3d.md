@@ -118,7 +118,7 @@ else, exactly as the clause does. See [ADR-3D-231](06b-decisions-3d.md#adr-3d-23
 **A VALUED parameter's two forms compete on one surface, and the student picks.** `degText` is the one
 rule for what an arc reads, so it is also where the choice lands: a symbol whose valuing row is set to
 `letter` reads its letter instead of its value, and everything else is byte-identical. The resolver
-rides the `App3 → Figure3 → buildScene3` seam that `planeDisplay` and `showObjectAngles` already use.
+rides the `App3 → Figure3 → buildScene3` seam that `planeDisplay` already uses.
 Which rows OFFER the choice is derived, never listed: `collectWedges` (moved out of `buildScene3` so the
 fact list can read it too — one collection, two readers) yields the wedges, `competingArcSymbols` picks
 those carrying BOTH a label and a value, and `store/paramChips.ts` puts the chip on the enabled fact
@@ -340,6 +340,14 @@ the stated arc into the arc lane — and the other lanes CEDE a constructed pair
 `constructed` argument, the two dihedral arc lanes' `pairKey` check), so the angle is marked once. Not
 panel-gated. The foot's letter is a render-time DISPLAY LABEL from `engine/freeLetter.ts` (the builder's one
 free-letter pool, shared with `midpoint-auto`), never a fact.
+
+**The object-angle lane is not panel-gated ([ADR-3D-266](06b-decisions-3d.md#adr-3d-266)).** `buildScene3`'s
+object-angle lane (one `objectAngleArc` over an operand pair, ADR-3D-185) reads only STATED records —
+`plane-rel` / `line-rel` angle claims, `relMarks`, `linePlaneMarks` and the valued `line-plane-angle` pin or
+claim — so it draws unconditionally; the former `showObjectAngles` flag (fed from «ארגון נתונים») is gone
+from `buildScene3`, `Figure3` and `App3`. Nothing the canvas draws depends on the data panel's state except
+the coordinate labels it feeds (`coordLabels`). A right value still cedes to the knee, and a constructed
+pair still cedes to its construction.
 
 **Row direction ([ADR-3D-228](06b-decisions-3d.md#adr-3d-228)).** A display row's base direction is a
 CONTENT decision and comes from `textDir3` — the shared seam 2-D's box and the shared `InputArea`

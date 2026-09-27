@@ -357,6 +357,15 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   the figure, carried by a share link, and removed with its row (operator rulings 2026-09-27).
   *(Realised — [ADR-3D-265](06b-decisions-3d.md#adr-3d-265), #1476;
   `issue-1476-dihedral-construction.test.ts`.)*
+- **FR-RD-12 (Must)** — **A stated angle between OBJECTS is always marked on the figure.** An angle the
+  student stated between two planes («הזווית בין הפאה SBC לבסיס ABC היא 60»), between a line or segment
+  and a plane («זווית בין ישר ℓ למישור π = 45», «הזווית בין SA למישור ABCD היא 50»), or NAMED with a
+  letter («… היא α») draws its arc and its value — or its letter — on the canvas **whether «ארגון נתונים»
+  is open or closed**, like a vertex angle, an angle between equation planes, and the FR-RD-10 knee. This
+  reverses the #542 panel gate for givens (operator ruling 2026-09-27): a stated given is visible on the
+  figure. At 90° it is the knee (FR-RD-10); with the FR-RD-11 chip on, the construction's arc replaces it,
+  so the angle is marked once. *(Realised — [ADR-3D-266](06b-decisions-3d.md#adr-3d-266), #1486;
+  `issue-1486-stated-angle-shows.test.ts`.)*
 
 ## Coverage
 
