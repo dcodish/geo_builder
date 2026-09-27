@@ -90,7 +90,10 @@ describe('clause fallback — shape declaration + stated equal pair in ONE utter
   });
 
   it('list-comma constructions stay whole-rule-owned (never split)', () => {
-    expect(types('circle through A, B, C')).toEqual(['circle-through']);
+    // #1438 (ADR-548): whole-rule-owned, and now READ whole — the circumcircle of all three. This line
+    // used to assert ['circle-through'], which was a circle through A alone with B and C silently dropped
+    // (measured on the pre-change base: the same sentence over a drawn triangle committed green).
+    expect(types('circle through A, B, C')).toEqual(['circumcircle']);
     expect(cmds('F, G, H on AB, AC, CB').filter((c) => c.type === 'point-on-segment')).toHaveLength(3);
     expect(types('D = חיתוך AK ו-CL')).toContain('line-line-intersection');
     // the multiStatement givens list is untouched (still the early rule)
