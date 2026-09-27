@@ -27,8 +27,10 @@
  */
 
 import type { Resolved3, ResolvedPlane } from '../engine/evaluate';
-import type { Construction3, Id, Positions3, VecAtom } from '../engine/types';
-import { add3, cross3, dist3, dot3, newellNormal, norm3, normalize3, scale3, sub3, type Vec3 } from '../engine/vec3';
+import { DIRECTION_REL_TOL, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
+import type { Construction3, Id, Operand3, Positions3, VecAtom } from '../engine/types';
+import { add3, centroid3, cross3, dist3, dot3, newellNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
+import { dihedralAnchors, dihedralGeometry } from './dihedral';
 import { planeBasis, projectOntoPlane } from './planeGeom';
 
 /** A right angle to mark: its vertex and the two unit arm directions, in WORLD space. */
@@ -186,11 +188,21 @@ export function rightAngles3(c: Construction3, resolved: Resolved3, scale: numbe
     // right angle and stop DRAWING it — the claim arm below no longer sees it.
     else if (sp.kind === 'seg-angle' && isRight(sp.deg)) segPairs.push({ a: sp.a1, b: sp.b1, c: sp.a2, d: sp.b2 });
     else if (sp.kind === 'seg-perp-plane') addPlaneRun(sp.a, sp.b, sp.plane);
+    // #1475: «הזווית בין AA' למישור ABC היא 90» is the ⟂ above spelled as a value — same wedge
+    else if (sp.kind === 'line-plane-angle' && isRight(sp.deg)) addPlaneRun(sp.a, sp.b, sp.plane);
   }
+  const operandPairs: { a: Operand3; b: Operand3 }[] = [];
   for (const cl of [...c.claims, ...c.paramGivens]) {
     if (cl.type === 'cos-angle-eq' && isPerpCos(cl.cos)) addAtoms(cl.u, cl.v);
     else if (cl.type === 'angle-seg-eq' && isRight(cl.deg)) segPairs.push({ a: cl.a1, b: cl.b1, c: cl.a2, d: cl.b2 });
     else if (cl.type === 'perp-plane') addPlaneRun(cl.seg[0], cl.seg[1], cl.plane);
+    else if (cl.type === 'line-plane-angle' && isRight(cl.deg)) addPlaneRun(cl.a, cl.b, cl.plane);
+    // #1475 (ADR-3D-264): a right angle stated through the general OPERAND relation — «π1 ניצב ל-π2»,
+    // «המישור ABC ניצב למישור ABB'», «הזווית בין המישורים π1 ו-π2 היא 90», «AA' ניצב ל-π1» — was a
+    // record kind this sweep never read (the ADR-3D-093/097/109 enumeration class, one more member), so
+    // the only given whose whole content is a right angle between two planes drew nothing.
+    else if (cl.type === 'plane-rel' && (cl.rel === 'perp' || (cl.rel === 'angle' && isRight(cl.deg ?? NaN))))
+      operandPairs.push({ a: cl.a, b: cl.b });
   }
   for (const sp of c.symbolPins) {
     if (sp.rel === 'seg-perp') segPairs.push({ a: sp.a, b: sp.b, c: sp.c, d: sp.d });
@@ -234,6 +246,12 @@ export function rightAngles3(c: Construction3, resolved: Resolved3, scale: numbe
   for (const r of c.lineRels) {
     const perp = r.rel === 'perp' || (r.rel === 'angle' && isRight(r.deg ?? NaN));
     if (!perp) continue;
+    // #1475: a PLANE operand («הזווית בין הישר ℓ1 למישור π1 היא 90») is a line × plane right angle —
+    // the operand-pair knee below, not the segment × line crossing this loop computes
+    if (isPlanarOperand(r.op)) {
+      operandPairs.push({ a: { kind: 'line', name: r.line }, b: r.op });
+      continue;
+    }
     const pair =
       r.op.kind === 'segment' ? ([r.op.a, r.op.b] as [Id, Id])
       : r.op.kind === 'vector' ? atomPair({ kind: 'named', name: r.op.name }, c)
@@ -299,6 +317,13 @@ export function rightAngles3(c: Construction3, resolved: Resolved3, scale: numbe
     const u2 = inPlaneDir(sp.plane, vertex, pos);
     if (u1 && u2) out.push({ vertex, u1, u2, planeN: sp.plane.n });
   }
+  if (operandPairs.length) {
+    const center = pos.size ? centroid3([...pos.values()]) : v3(0, 0, 0);
+    for (const pr of operandPairs) {
+      const m = operandPairKnee(pr.a, pr.b, c, resolved, center, s);
+      if (m) out.push(m);
+    }
+  }
 
   const seen = new Set<string>();
   return out.filter((m) => {
@@ -307,6 +332,58 @@ export function rightAngles3(c: Construction3, resolved: Resolved3, scale: numbe
     seen.add(k);
     return true;
   });
+}
+
+const isPlanarOperand = (op: Operand3): boolean =>
+  op.kind === 'plane-named' || op.kind === 'plane-run' || op.kind === 'plane-coord';
+
+/**
+ * #1475 (ADR-3D-264) — the knee of a stated right angle between two OBJECTS, at least one a plane.
+ *
+ * Drawn only where the right angle HOLDS on the drawn figure — the verifier's own predicate
+ * (`relDeviation` under `DIRECTION_REL_TOL`, the #1439 rule for the dihedral arc), so a refuted or
+ * loaded-false statement never leaves a knee. Two geometries, chosen by what the operands ARE:
+ *  - **plane × plane** — at the seam, arms in each plane ⟂ to the seam ({@link dihedralGeometry}, the
+ *    arc lanes' own helper). No `planeN`: both arms are fixed by the seam, neither is free to rotate.
+ *  - **line-ish × plane** — at the crossing, the line's direction and an in-plane arm (`planeN`, like
+ *    every ⟂-to-plane knee above). A SEGMENT must genuinely reach the plane (the R³ honesty rule).
+ * Anything else (two line-ish sides) is not this producer's — the segment-pair / line lanes own it.
+ */
+function operandPairKnee(a: Operand3, b: Operand3, c: Construction3, resolved: Resolved3, center: Vec3, scale: number): RightAngle3 | null {
+  const pos = resolved.positions;
+  const at = (id: Id) => pos.get(id) ?? null;
+  const abs = { lines: resolved.lines, planes: resolved.planes };
+  const ga = resolveOperand(a, c, abs)(at);
+  const gb = resolveOperand(b, c, abs)(at);
+  if (!ga || !gb) return null;
+  const dev = relDeviation('perp', undefined, ga, gb);
+  if (dev === null || dev > DIRECTION_REL_TOL) return null;
+
+  const dh = dihedralGeometry(ga, gb, { ...dihedralAnchors(a, b, at), center });
+  if (dh) return { vertex: dh.foot, u1: dh.u1, u2: dh.u2 };
+
+  const planar = (g: OperandGeom) => !!g.normal && g.d !== undefined && !g.dir;
+  const linear = (g: OperandGeom) => !!g.dir && !!g.point;
+  const [lop, lg, pg] = linear(ga) && planar(gb) ? [a, ga, gb] : linear(gb) && planar(ga) ? [b, gb, ga] : [null, null, null];
+  if (!lop || !lg || !pg) return null;
+  const nn = norm3(pg.normal!);
+  if (nn < EPS) return null;
+  const pl: ResolvedPlane = { n: scale3(pg.normal!, 1 / nn), d: pg.d! / nn };
+  const ends = lop.kind === 'segment' ? ([lop.a, lop.b] as [Id, Id]) : lop.kind === 'vector' ? atomPair({ kind: 'named', name: lop.name }, c) : null;
+  let vertex: Vec3 | null;
+  let u1: Vec3 | null;
+  if (ends) {
+    vertex = segMeetsPlane(ends[0], ends[1], pl, pos, scale);
+    u1 = vertex ? armDir(ends[0], ends[1], vertex, pos) : null;
+  } else {
+    const denom = dot3(pl.n, lg.dir!);
+    if (Math.abs(denom) < EPS) return null;
+    vertex = add3(lg.point!, scale3(lg.dir!, -(dot3(pl.n, lg.point!) + pl.d) / denom));
+    u1 = normalize3(lg.dir!);
+  }
+  if (!vertex || !u1) return null;
+  const u2 = inPlaneDir(pl, vertex, pos);
+  return u2 ? { vertex, u1, u2, planeN: pl.n } : null;
 }
 
 /** An in-plane direction to lay the knee's second leg along: toward the figure's bulk. */

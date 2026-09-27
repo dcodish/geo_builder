@@ -334,6 +334,15 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   the knee, never an arc labelled 90°. The mark follows the meeting, not the spelling. *(Realised —
   [ADR-3D-222](06b-decisions-3d.md#adr-3d-222), #917; `issue-923-917.test.ts`,
   `box-seg-angle-cross-917.geo3.json`.)*
+- **FR-RD-10 (Must)** — **A stated right angle against a PLANE is the knee.** «π1 ניצב ל-π2», «המישור
+  ABC ניצב למישור ABB'», «הזווית בין המישורים π1 ו-π2 היא 90» — and the line × plane spellings at 90°
+  («הזווית בין AA' למישור ABC היא 90», «הזווית בין הישר ℓ1 למישור π1 היא 90») — draw the textbook knee:
+  for two planes at the seam, one arm in each plane perpendicular to the seam; for a line and a plane at
+  their crossing. Never nothing, and never an arc labelled «90°». Named and point-run planes alike, and
+  **always shown** — not gated by «ארגון נתונים», as a ⟂ between segments is not (operator ruling
+  2026-09-27). Drawn only where the right angle holds on the drawn figure, so a refused statement leaves
+  no knee. *(Realised — [ADR-3D-264](06b-decisions-3d.md#adr-3d-264), #1475;
+  `issue-1475-plane-knee.test.ts`.)*
 
 ## Coverage
 

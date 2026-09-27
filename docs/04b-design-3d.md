@@ -316,6 +316,16 @@ fit; its points do not, since they are chosen from `k`. **Every annotation this 
 in pixels** — the knee (#374), the witness and vector and axis and point labels, the crossing dots, and
 now the arc, which was the last world-sized one.
 
+**One dihedral geometry ([ADR-3D-264](06b-decisions-3d.md#adr-3d-264)).** Everything drawn about the
+angle between two planes reads `dihedralGeometry` (`render/dihedral.ts`): the foot on the seam (nearest
+the centroid of the vertices two point runs share — the shared edge's midpoint — else nearest the
+figure's centre) and the two unit arms, each in its own plane and ⟂ to the seam, oriented into each run's
+material (`dihedralAnchors`). The named-plane arc, the object-angle arc and the right-angle knee all call
+it. A RIGHT value never reaches an arc lane: `rightAngles3` reads every `plane-rel` ⟂ / 90° claim (and the
+line × plane 90° spellings) through `operandPairKnee`, gated on the verifier's own predicate
+(`relDeviation` ≤ `DIRECTION_REL_TOL`), and it is not gated on the data panel. A dihedral knee carries no
+`planeN` — both its arms are fixed by the seam, so the legibility rotation must not touch them.
+
 **Row direction ([ADR-3D-228](06b-decisions-3d.md#adr-3d-228)).** A display row's base direction is a
 CONTENT decision and comes from `textDir3` — the shared seam 2-D's box and the shared `InputArea`
 preview already use — never from `dir="auto"`, which keys off the first strong character and so gives an

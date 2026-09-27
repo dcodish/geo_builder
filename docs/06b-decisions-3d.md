@@ -10609,3 +10609,70 @@ assertions moved from `plane-angle` to `plane-rel`.
 of drawn with the wrong number; «הזווית בין המישור π1 לבין המישור π2 היא …» is understood; a true angle is no
 longer refused because the parameter lives on another plane; and «π1 ניצב ל-π2» / «π1 מקביל ל-π2» over a
 parameter now solve for it.
+
+## ADR-3D-264 — A stated right angle against a plane is a knee: one dihedral geometry, and the knee collector reads the operand relations (#1475)
+
+**Status:** accepted, 2026-09-27 · **Issue:** [#1475](https://github.com/dcodish/geo_builder/issues/1475) (bug, `P2`, `3d`) · round [#1478](https://github.com/dcodish/geo_builder/issues/1478) · plan approved by the operator 2026-09-27 (`auto-ok`; ruling: the knee always shows, not gated by «ארגון נתונים»)
+**Requirements:** [02b](02b-requirements-3d.md) — **FR-RD-10** added (a stated right angle against a plane is the knee, always shown) · **Design:** [04b](04b-design-3d.md) — *Rendering* gains the *One dihedral geometry* paragraph · **LADDER stage:** none (render only — no solve, apply or verify change)
+
+**The report.** Operator, playing round #1469: *"π1 ניצב ל-π2 should show a knee. same is 90 degrees."*
+
+**Measured on `cab06da2` (`submit` → `derive3` → `buildScene3`), panel closed / open:**
+- `π1: z = 0` · `π2: x = 0` · «π1 ניצב ל-π2» → no knee, no arc.
+- same planes · «הזווית בין המישורים π1 ו-π2 היא 90» → an arc labelled «90°», no knee.
+- cube · «המישור ABC ניצב למישור ABB'» → nothing, either way.
+- cube · «הזווית בין המישור ABC למישור ABB' היא 90» → nothing closed; an arc «90°» open.
+- control `AB ⊥ AC` → knee.
+- **Beyond the report (same class):** cube · «הזווית בין AA' למישור ABC היא 90» → nothing (the ⟂ spelling of
+  the same fact knees); `π1: z = 0` · `ℓ1` along z · «הזווית בין הישר ℓ1 למישור π1 היא 90» → nothing.
+
+**Class (docs/17 §1).** *A stated right angle whose side is a PLANE, recorded through a relation the knee
+collector does not enumerate (`plane-rel` ⟂/90°, `line-plane-angle` at 90°, `line-rel` at 90° with a plane
+operand), draws no knee — and the arc lanes, which never skipped a right value, drew «90°» instead.* It is
+the ADR-3D-093 / 097 / 109 enumeration class once more: `rightAngles3` reads a hand-listed set of record
+kinds, and the general operand relation (S3, #378) was never added to it. Separately, the two dihedral arc
+lanes each computed the seam foot and arms, differently (nearest-centre vs shared-edge midpoint), and the
+knee had no copy at all.
+
+**The decision (the plan, steps 1–4, step 3 resolved "always").**
+1. **One helper**, `dihedralGeometry(ga, gb, { shared?, center, toward? }) → { foot, u1, u2, seamDir,
+   seamAnchor } | null` in `src3d/render/dihedral.ts`, plus `dihedralAnchors(a, b, at)` which supplies the
+   vertices two point runs share and each run's material. The named-plane arc (`statedDihedrals`), the
+   object-angle arc (`objectAngleArc`) and the knee all call it. Exported with a general API because #1476
+   (the dihedral construction chip, ADR-3D-265) builds on it.
+2. **The knee.** `rightAngles3` collects `plane-rel` claims (and `paramGivens`) with `rel: 'perp'` or a 90°
+   `angle`, and `lineRels` with a planar operand, into operand pairs, and `operandPairKnee` draws them:
+   plane × plane at the dihedral foot with the two seam-perpendicular arms (**no `planeN`** — both arms are
+   fixed by the seam; the legibility rotation, which assumes an arbitrary in-plane arm, must not move one),
+   line-ish × plane at the crossing with the line and an in-plane arm (`planeN`, as every ⟂-to-plane knee).
+   A segment must genuinely reach the plane (the R³ honesty rule). **Only where the right angle holds on
+   the drawn figure** — `relDeviation('perp') ≤ DIRECTION_REL_TOL`, the verifier's predicate (#1439) — so a
+   refused ⟂, or a false one carried by a loaded file, draws nothing. `line-plane-angle` at 90° (pin or
+   claim) joins the existing segment × point-run wedge list, beside `seg-perp-plane`.
+3. **Gating: always** (operator ruling). The knee is in `rightAngles3`, which is not panel-gated, so a
+   point-run ⟂ draws with «ארגון נתונים» closed. Both arc lanes skip a right value (`isRightAngleValue`),
+   the rule the vertex lane already obeyed — so no «90°» arc under the knee, panel open or closed.
+4. **Sibling audit.** *Inside 3-D:* line × plane ⟂ spelled with «ניצב» already knees (`linePerps`,
+   `planeLinePerps`, `seg-perp-plane`); its **90° spellings did not** and are fixed here (above). `plane-rel`
+   `parallel` draws no mark (measured; correct — there is no angle). A coordinate plane operand («π1 ניצב
+   למישור [xz]») knees through the same path. **Not fixed (different class — reported to the round):** two
+   NAMED LINES stated ⟂ («ℓ1 ניצב ל-ℓ2», or at 90°) draw no knee even when they meet — the `lineRels` loop
+   handles only segment / vector operands; the fix needs the meeting / skew rule for two unbounded lines.
+   *Sibling products:* 2-D (`src/`) has no planes; analytic (`src-analytic/`) has no dihedral; complex has no
+   planes. Nothing to file there.
+
+**Cost (M3).** No sampler, no seeds, no solve. One `resolveOperand` pair and one `relDeviation` per stated
+right-angle relation per scene build.
+
+**Locks.** `src3d/__tests__/issue-1475-plane-knee.test.ts` (18 tests, all through `submit`): the four
+reported plane rows draw one knee and no «90°» arc (panel closed and open); mirrored slots; English; the
+point-run knee with the panel **closed**; the cube knee's geometry (on AB's midpoint, arms ⟂ AB, ⟂ each
+other, pointing into ABC and ABB', no `planeN`); a 45° dihedral keeps its arc and draws no knee (named, and
+point-run behind the panel — #1439's locks unchanged); a refused ⟂ and a loaded false ⟂ draw no knee;
+parallel planes draw nothing; the two line × plane 90° siblings knee; `dihedralGeometry` returns
+seam-perpendicular unit arms in each plane and `null` for parallel planes.
+
+**Consequences.** `render/dihedral.ts` (new), `render/rightAngles.ts`, `render/scene3.ts`. For a student: a
+right angle stated between two planes — by «ניצב» or by «90» — is now marked on the figure with the
+textbook right-angle mark at the planes' common line, always, and never as an arc reading «90°»; the same
+for a line at 90° to a plane.

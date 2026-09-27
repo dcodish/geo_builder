@@ -19,6 +19,7 @@ import type { Construction3, Id, Operand3, Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
 import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
+import { dihedralGeometry } from './dihedral';
 import { isRightAngleValue, meetingPoint, rightAngles3 } from './rightAngles';
 import { collectWedges } from './wedges';
 import { statedLengths } from '../engine/dataView';
@@ -338,8 +339,6 @@ export function objectAngleArc(
   opts: { shared: Vec3[]; toward: { a: Vec3 | null; b: Vec3 | null }; center: Vec3; r: number; deg?: number },
 ): { pts: Vec3[]; label: Vec3; v: Vec3 } | null {
   const { shared, toward, center, r, deg } = opts;
-  const orient = (u: Vec3, focus: Vec3, mat: Vec3 | null): Vec3 =>
-    mat && dot3(u, sub3(mat, focus)) < 0 ? scale3(u, -1) : u;
 
   const arcAt = (focus: Vec3, a1: Vec3, a2: Vec3): { pts: Vec3[]; label: Vec3; v: Vec3 } | null => {
     let u2 = a2;
@@ -363,13 +362,11 @@ export function objectAngleArc(
 
   // ---- plane × plane
   if (ga.normal && gb.normal && ga.d !== undefined && gb.d !== undefined) {
-    const seam = intersectPlanes({ n: ga.normal, d: ga.d }, { n: gb.normal, d: gb.d });
-    if (!seam) return null; // parallel or coincident — there is no dihedral to draw
-    const focus = projectOntoLine(shared.length ? centroid3(shared) : center, seam);
-    const u1 = normalize3(cross3(normalize3(ga.normal), seam.dir));
-    const u2 = normalize3(cross3(normalize3(gb.normal), seam.dir));
-    if (norm3(u1) < 1e-9 || norm3(u2) < 1e-9) return null;
-    return arcAt(focus, orient(u1, focus, toward.a), orient(u2, focus, toward.b));
+    // #1475 (ADR-3D-264): the ONE dihedral geometry — foot on the seam, arms ⟂ seam, oriented into
+    // each operand's material — shared with the named-plane arc and the right-angle knee
+    const dh = dihedralGeometry(ga, gb, { shared, center, toward });
+    if (!dh) return null; // parallel or coincident — there is no dihedral to draw
+    return arcAt(dh.foot, dh.u1, dh.u2);
   }
 
   // ---- line-ish × plane (either way round)
@@ -624,22 +621,23 @@ export function buildScene3(
       : [],
   );
   for (const g of statedDihedrals) {
-    const pair = pairLines.find((p) => (p.n1 === g.p1 && p.n2 === g.p2) || (p.n1 === g.p2 && p.n2 === g.p1));
-    if (!pair) continue;
-    const pl1 = resolved.planes.get(g.p1)!;
-    const pl2 = resolved.planes.get(g.p2)!;
+    // #1475 (ADR-3D-264): a RIGHT dihedral is drawn as a knee (rightAngles3), never an arc labelled
+    // «90°» — the #307 rule, which the vertex lane below already obeys
+    if (isRightAngleValue(g.deg)) continue;
     // through the ONE operand seam the verifier resolves by (claims.ts, `plane-rel`)
     const planeGeom = (name: string) =>
       resolveOperand({ kind: 'plane-named', name }, c, { lines: resolved.lines, planes: resolved.planes })((id) => positions.get(id) ?? null);
     const [ga, gb] = [planeGeom(g.p1), planeGeom(g.p2)];
     const dev = ga && gb ? relDeviation('angle', g.deg, ga, gb) : null;
     if (dev === null || dev > DIRECTION_REL_TOL) continue;
-    const d = normalize3(pair.line.dir);
-    const u1 = normalize3(cross3(pl1.n, d));
-    let u2 = normalize3(cross3(pl2.n, d));
+    // #1475: the ONE dihedral geometry (./dihedral) — the knee and the object-angle arc read it too
+    const dh = dihedralGeometry(ga!, gb!, { center });
+    if (!dh) continue; // parallel — no seam, no dihedral to draw
+    const u1 = dh.u1;
+    let u2 = dh.u2;
     const deg = (Math.acos(Math.max(-1, Math.min(1, dot3(u1, u2)))) * 180) / Math.PI;
     if (Math.abs(deg - g.deg) > Math.abs(180 - deg - g.deg)) u2 = scale3(u2, -1);
-    const focus = pair.focus;
+    const focus = dh.foot;
     const mk = (r: number) => {
       const pts: Vec3[] = [];
       for (let s = 0; s <= 12; s++) {
@@ -774,7 +772,10 @@ export function buildScene3(
     };
     const seenArc = new Set<string>();
     for (const pr of pairs) {
-      const key = [JSON.stringify(pr.a), JSON.stringify(pr.b)].sort().join('~') + '~' + pr.text;
+      // #1475 (ADR-3D-264): a stated RIGHT angle between objects is the knee's (rightAngles3, drawn
+      // whether or not this panel is open) — never an arc labelled «90°» (#307)
+      if (pr.deg !== undefined && isRightAngleValue(pr.deg)) continue;
+      const key =[JSON.stringify(pr.a), JSON.stringify(pr.b)].sort().join('~') + '~' + pr.text;
       if (seenArc.has(key)) continue;
       seenArc.add(key);
       const ga = resolveOperand(pr.a, c, absA)(atA);
