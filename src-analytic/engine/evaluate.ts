@@ -1289,10 +1289,33 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
       for (let salt = 1; salt <= 3; salt += 1) {
         attempts.push(foldSignSelectors(c, { ...env, ...sampleEnv(c, seed + 1000 * salt) }));
       }
+      /**
+       * THE BEST EFFORT IS ALWAYS INSIDE THE DECLARED DOMAINS (#1493, ADR-AG-162).
+       *
+       * When nothing converges admissibly, the figure is the best EFFORT — and the effort used to be the
+       * lowest residual found anywhere, including outside a parameter's declared domain. That is exactly
+       * where a contradiction goes to hide: «a > 0 · A(a,0) · A על הישר x=-3» drew a = −3 with no fault, and
+       * a circle whose incidences could not all hold drove its radius negative, went VACANT, and every
+       * «על המעגל» on it read as met (a vacancy judges nothing, ADR-AG-008). A domain filters roots; when it
+       * has filtered them all, the given is refused — so the effort drawn is the best one INSIDE the domains,
+       * where the check below can see the given fail and name it. The baseline is the attempt's own start:
+       * sampled inside every domain, so an admissible effort always exists.
+       */
+      const baseVec = solved.toVec(firstEffort ?? seeded, env);
+      const baseline: SolveResult = {
+        values: baseVec,
+        ok: false,
+        worst: Math.max(0, ...solved.residualsAt(baseVec).map((v) => Math.abs(v))),
+      };
       const state: { best: SolveResult | null; accepted: boolean; fallback: SolveResult | null } = {
-        best: null,
+        best: admissible(baseVec) ? baseline : null,
         accepted: false,
         fallback: stageOneFallback,
+      };
+      /** Record an unaccepted attempt as the best effort — only if it respects the domains (#1493). */
+      const recordEffort = (r: SolveResult) => {
+        if (!admissible(r.values)) return;
+        if (!state.best || r.worst < state.best.worst) state.best = { ...r, ok: false };
       };
       const walk = (start: Map<Id, Pt>, attempt: Env): SolveResult => {
         let x = solved.toVec(start, attempt);
@@ -1323,7 +1346,7 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
           state.accepted = true;
           return true;
         }
-        if (!state.best || r.worst < state.best.worst) state.best = { ...r, ok: false };
+        recordEffort(r);
         return false;
       };
       for (const [j, attempt] of attempts.entries()) {
@@ -1374,7 +1397,11 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
         if (firstEffort) vecs.push(solved.toVec(firstEffort, env));
         vecs.push(...starts.map((m) => solved.toVec(m, env)));
         const r = solveMultiStart(vecs, solved.residualsAt, 120, admissible);
-        if (r.ok || !state.best || r.worst < state.best.worst) state.best = r;
+        // `solveMultiStart` returns its lowest residual whatever its domain; only an admissible one may be drawn.
+        if (r.ok && admissible(r.values)) state.best = r;
+        else recordEffort(r);
+        // Only reachable if even the start left a domain (a sign folded outside one): keep the old answer.
+        if (!state.best) state.best = r;
       }
       const res = state.best!;
       free = solved.asMap(res.values);

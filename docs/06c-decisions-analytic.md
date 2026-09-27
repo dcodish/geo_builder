@@ -7892,3 +7892,23 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 **Sibling audit.** *Analytic:* `axis-side`'s two readers now route through `compareOf`; `between`/`sign`/`crossing-*` are untouched. *Products:* 2-D chooses a branch by a stored configuration index and has no coordinate grammar (coordinates are this product's subject); 3-D has no coordinate-comparison statements. Nothing to file.
 
 **Consequences.** `engine/types.ts` (`coord-compare`); `engine/evaluate.ts` (`compareOf`, `rhsOf`, the seeding, `swappedStarts`); `engine/apply.ts` (the selector's references); `parser/parseAnalytic.ts` (`parseCompare`); `parser/catalogAnalytic.ts`; `parser/llmSharedAnalytic.ts`; `__tests__/issue-1272-claim-gate.test.ts`. Lock: `issue-1464-1324-1462-kite-exercise.test.ts`.
+
+## ADR-AG-162 — The drawn best effort stays inside every declared parameter domain: a given that holds only outside one is refused, never met there (#1493)
+
+**Status:** accepted · 2026-09-27 · P1, operator fix-now in session
+
+**Requirements:** none (internal) — 02c already promises that a stated given is never silently dropped and that a figure is never drawn green for givens that cannot hold. · **Design:** [04c](04c-design-analytic.md#the-configuration-search-validity-then-preference-adr-ag-128), "The best effort stays inside the declared domains"
+
+**Context.** Found while building #1324 (ADR-AG-160): «נתון מעגל O» · «A/B/D על המעגל» · «O אמצע BD» over givens that cannot hold (A(0,4), B(−3,0), D(3,0): the midpoint fixes r = 3, A is 4 away) built with `faults: []`. Re-measured at pickup on `main` @ `bbd334c4`: identical — `r_O = −1.0068`, `vacant: [circle-at-O]`, no fault; and the same through the new «BD קוטר במעגל» spelling.
+
+**The class is wider than the issue.** Measured on the way: «a > 0 · A(a,0) · A על הישר x=-3» drew **a = −3 with no fault** — no circle, no vacancy, just a declared domain silently left. Class: *when no configuration satisfies both the givens and the declared parameter domains, stage two drew its out-of-domain attempt as the figure.* The vacant circle is the same defect wearing a second mask: at a negative radius the circle does not exist, an incidence on a vacancy judges nothing (ADR-AG-008, right for a legitimate vacancy), so the residuals the student's sentences produce vanish and the post-hoc check had nothing to report.
+
+**Root cause.** Stage two's `admissible` (the domains and the sign selectors, ADR-AG-144) decided which converged result is ACCEPTED, but not which unaccepted result is DRAWN: `consider` recorded any attempt as the best effort, and the last-resort `solveMultiStart` returns its lowest residual whatever its domain — and outside the domain that residual was 0.
+
+**Decision.** The best effort is chosen among admissible results only (`recordEffort`), and the final multi-start's result is taken only if admissible. The baseline effort is the attempt's own start — sampled inside every domain (`sampleParam`), so an admissible effort always exists; only if even the start left a domain does the old answer stand. When none meets the givens, the figure keeps a real circle / an in-domain parameter, the check measures the givens against it, and they are refused on their own lines — the existing honest path. The domain still FILTERS a pin's roots silently where an admissible root exists (D7 kind 1, unchanged).
+
+**Measured.** The issue's case → `unsatisfiable` on its incidence and midpoint lines, `r_O > 0`, nothing vacant; the diameter spelling → refused on its lines; the sibling → `unsatisfiable` on «A על הישר x=-3», `a > 0`. Controls unchanged: the feasible circle (A(0,3)), `a > 0` with x = 3, a parameter with NO domain taking −3, and the issue's own control (a stated centre) still refused on the same three lines. Corpus sweep (every 4+-line sequence in the analytic tests, 223 figures × 24 seeds): the only change is the two #1493 figures, 24/24 "whole" (the lie) → refused; time 5.53 s → 5.48 s.
+
+**Sibling audit.** *Analytic:* stage one fixes the parameters at their sample (in-domain by construction) and cannot leave a domain; the thin-ring re-solve (ADR-AG-143) only judges collapse and draws nothing. *Products:* 2-D and 3-D declare no parameter domains in their solves (a length is a positive quantity by construction there, not a declared symbol). Nothing to file.
+
+**Consequences.** `engine/evaluate.ts` (stage two's best effort). Lock: `issue-1493-domain-effort.test.ts`.

@@ -172,6 +172,8 @@ contradicts its noun and its tolerance sits two orders of magnitude under the ug
 nothing. Folding them into one number would turn a preference into a refusal and assert a given the
 student never gave.
 
+**The best effort stays inside the declared domains ([ADR-AG-162](06c-decisions-analytic.md#adr-ag-162), #1493).** When stage two accepts nothing, the figure is its best EFFORT — chosen among ADMISSIBLE results only (the domains and sign selectors, `admissible`), with the attempt's own in-domain start as the baseline. An out-of-domain effort is never drawn: outside a domain a contradiction can hide (a negative radius makes the circle vacant and its incidences judge nothing; `a > 0` silently becomes −3). Inside the domains the check measures the givens and names the ones that fail.
+
 **The solve prefers what the selectors accept, one level below the sweep ([ADR-AG-159](06c-decisions-analytic.md#adr-ag-159), #1463).**
 Inside one seed, `evaluate`'s multi-start (`solvePreferring`) keeps a converged solution the selectors
 reject as a *fallback* and goes on: first from `separationMoves` — the free member of each collapsed
