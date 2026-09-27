@@ -684,6 +684,10 @@ to tell them apart, set at the M1 boundary; `evaluate` keeps both, because the s
 draws only the stated ones. Restating a carrier's equation on its own line **promotes** it — one
 object, now drawn, reported as a change rather than as a restatement.
 
+### Incidence in every order ([ADR-AG-164](06c-decisions-analytic.md#adr-ag-164), #1281, #1495)
+
+`parseIncidence` is a NORMALISER, not a rule with its own lowering: it classifies the subject (a point name, a coordinate pair, or a two-point side with its noun) and the object (a two-point line, an equation, a named line, «ישר העובר דרך P», or a curve) and rewrites the sentence into the one the grammar reads — «P על הישר CD», «משוואת הצלע BC היא …», «דרך P עובר ישר l3» — parsed by the rule that owns it (`viaCanonical`). Two spellings therefore produce the same facts by construction. Whether «דרך P עובר ישר l3» creates the line or states an incidence on an existing one is M1's (`line-at` in apply.ts). A coordinate point leaves the parser as a `MINT_PREFIX` placeholder and is named in `derive.resolveMints` over the whole list — the student's own letter at those coordinates first, else the next free `P₁`, `P₂` — and `Derivation.minted` feeds the row note.
+
 ## A cevian lowers to its WHOLE definition ([ADR-AG-109](06c-decisions-analytic.md#adr-ag-109))
 
 «AD תיכון לצלע BC» and «AD גובה לצלע BC» are conjunctions, and the rule emits every half:

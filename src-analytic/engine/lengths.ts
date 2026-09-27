@@ -113,7 +113,7 @@ const PLACEHOLDER_BASE = 0xe000;
  * inside the match. A run of three or more capitals (`ABC`) now yields nothing here, which is right:
  * it is a polygon, and the area frame that owns it already runs first.
  */
-const LENGTH_TOKEN = /(?<![A-Za-z])([A-Z][0-9]?)([A-Z][0-9]?)(?![A-Za-z])/g;
+const LENGTH_TOKEN = /(?<![A-Za-z])([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)(?![A-Za-z])/g;
 
 /**
  * `AB + BC` → an expression over placeholders, plus the pairs they stand for.
@@ -233,7 +233,7 @@ const SYMBOLIC_DISTANCE: Array<[RegExp, string]> = [
   // d(A,B) — the comma is required, or `d(x)` of a function would be claimed
   [new RegExp(String.raw`\bd\s*\(\s*(${SYM_OPERAND})\s*,\s*(${SYM_OPERAND})\s*\)`, 'g'), 'המרחק בין $1 ל-$2'],
   // |AB| — the bars are the absolute-value notation for a length, and only a POINT PAIR is a length
-  [new RegExp(String.raw`\|\s*([A-Z][0-9]?)\s*([A-Z][0-9]?)\s*\|`, 'g'), 'המרחק בין $1 ל-$2'],
+  [new RegExp(String.raw`\|\s*([A-Z][0-9₀-₉]?)\s*([A-Z][0-9₀-₉]?)\s*\|`, 'g'), 'המרחק בין $1 ל-$2'],
 ];
 
 /**
@@ -252,7 +252,7 @@ const SYMBOLIC_DISTANCE: Array<[RegExp, string]> = [
  * the area token: a noun stripped too early would leave «בין A ל-B» with no frame left to read it.
  */
 const LENGTH_NOUN = new RegExp(
-  String.raw`(?:ה?אורך|ה?מרחק|[Ll]ength(?:\s+of)?|[Dd]istance)\s+(?:ה?(?:קטע|צלע|ישר)\s+)?(?=[A-Z][0-9]?[A-Z][0-9]?\b)|(?:ה?(?:קטע|צלע)|[Ss]egment|[Ss]ide)\s+(?=[A-Z][0-9]?[A-Z][0-9]?\b)`,
+  String.raw`(?:ה?אורך|ה?מרחק|[Ll]ength(?:\s+of)?|[Dd]istance)\s+(?:ה?(?:קטע|צלע|ישר)\s+)?(?=[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?\b)|(?:ה?(?:קטע|צלע)|[Ss]egment|[Ss]ide)\s+(?=[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?\b)`,
   'g',
 );
 
@@ -270,9 +270,9 @@ const LENGTH_NOUN = new RegExp(
  */
 const PARALLEL_SINE = 1e-6;
 
-const IS_POINT = /^[A-Z][0-9]?$/;
+const IS_POINT = /^[A-Z][0-9₀-₉]?$/;
 
-const AREA_TOKEN = /(?:שטח|[Aa]rea\s+of)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9]?){3,})/g;
+const AREA_TOKEN = /(?:שטח|[Aa]rea\s+of)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9₀-₉]?){3,})/g;
 
 export function parseLengthExpr(src: string): LengthExpr | null {
   const terms: MeasureTerm[] = [];
@@ -324,7 +324,7 @@ export function parseLengthExpr(src: string): LengthExpr | null {
   // A length noun in front of a bare pair adds nothing to it — «אורך AB» IS «AB» (#1128).
   const withNouns = withPL.replace(LENGTH_NOUN, '');
   const withAreas = withNouns.replace(AREA_TOKEN, (_m, run: string) => {
-    const ids = run.match(/[A-Z][0-9]?/g) ?? [];
+    const ids = run.match(/[A-Z][0-9₀-₉]?/g) ?? [];
     const key = ids.join();
     const at = terms.findIndex((t) => t.kind === 'area' && t.ids.join() === key);
     const i = at >= 0 ? at : terms.push({ kind: 'area', ids }) - 1;

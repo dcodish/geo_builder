@@ -134,6 +134,34 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'N is on line 3',
     needs: ['k הוא פרמטר', 'נתון הישר 3: (k+1)x+2y-12+5k=0', 'N(-2,4)'],
   },
+  /**
+   * --- INCIDENCE IN THE EXAM'S OTHER ORDERS (#1281, #1495, ADR-AG-164) ---
+   *
+   * The line first («ישר 3 עובר דרך הנקודה N» — the operator's own sentence, which pins k), a SIDE as the
+   * subject («הצלע BC נמצאת על הישר y=x-4», the operator's report), and a point by its coordinates alone,
+   * which the tool names (P₁) and says so on the row.
+   */
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'ישר 3 עובר דרך הנקודה N',
+    en: 'line 3 passes through the point N',
+    needs: ['k הוא פרמטר', 'נתון הישר 3: (k+1)x+2y-12+5k=0', 'N(-2,4)'],
+  },
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'הצלע BC נמצאת על הישר y=x-4',
+    en: 'the side BC lies on the line y=x-4',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'הישר CD עובר דרך הנקודה (-3,7)',
+    en: 'the line CD passes through the point (-3,7)',
+    needs: ['C(-5,5)', 'נקודה D'],
+  },
 
   // --- F5 · circles by equation ---
   {

@@ -929,6 +929,15 @@ givens like any other: where the rest of the question leaves two drawings, the f
 names, at every configuration «הציגו תצורה אחרת» offers — so a student never has to solve the condition by hand to
 get the right figure. It consumes no freedom. A comparison no drawing can satisfy is refused, naming the sentence.
 
+**R119 — incidence reads in the exam's orders, over its operands**
+([ADR-AG-164](06c-decisions-analytic.md#adr-ag-164), [#1281](https://github.com/dcodish/geo_builder/issues/1281),
+[#1495](https://github.com/dcodish/geo_builder/issues/1495)). A point on a line may be said with the LINE first («הישר CD עובר דרך P»,
+«ישר 3 עובר דרך הנקודה N», «CD מכיל את P»), with a SIDE as the subject («הצלע BC נמצאת על הישר y=x-4», «האלכסון BD
+מונח על הישר y=x», «הבסיס CD נמצא על ישר העובר דרך …»), and with a point given only by its COORDINATES («הנקודה
+(-3,7)») — each means exactly what the point-first sentence means. A point given only by coordinates is named by
+the tool from a reserved set (P₁, P₂, …) unless the student already named a point there, and the row says the tool
+named it. A side on a circle is refused by name.
+
 **R114 — the tool never accepts a sentence a textbook would not print; it teaches the one it would**
 ([ADR-AG-150](06c-decisions-analytic.md#adr-ag-150),
 [#1353](https://github.com/dcodish/geo_builder/issues/1353), implementing

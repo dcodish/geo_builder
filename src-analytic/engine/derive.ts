@@ -10,7 +10,8 @@ import { fold, existingKindOf, type ApplyError } from './apply';
 import { reportedDof } from './carriers';
 import { drawableAt, viewBox, type Figure } from './evaluate';
 import type { Box } from './curves';
-import { parseLine, type ParseFailure } from '../parser/parseAnalytic';
+import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
+import { evalExpr } from './expr';
 import { EMPTY_CONSTRUCTION, diameterCircleId, namesObject, objectById, type Construction, type Fact } from './types';
 import { SOLVE_TOL } from './solve';
 
@@ -63,6 +64,12 @@ export interface Derivation {
   faults: LineFault[];
   /** One entry per input line, positionally — what that line actually did. */
   outcomes: LineOutcome[];
+  /**
+   * THE NAMES THE TOOL GAVE (#1281, the #1263 ruling) — one entry per point a line stated only by its
+   * coordinates, with the line that stated it. The fact list shows it on that row, so the list never implies
+   * the student wrote a name the tool chose.
+   */
+  minted: Array<{ index: number; id: string }>;
 }
 
 export function derive(lines: readonly string[], seed = 0): Derivation {
@@ -71,6 +78,7 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   /** Which line produced each fact, so an apply refusal can be blamed on the right one. */
   const owner: number[] = [];
 
+  const parsed: Fact[] = [];
   lines.forEach((line, index) => {
     const r = parseLine(line);
     if (!r.ok) {
@@ -78,10 +86,12 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
       return;
     }
     for (const f of r.facts) {
-      facts.push(f);
+      parsed.push(f);
       owner.push(index);
     }
   });
+  const { facts: resolved, minted } = resolveMints(parsed, owner);
+  facts.push(...resolved);
 
   // The LINE is the fold's unit of application (#1242, ADR-AG-133): every fact of a faulted line carries
   // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
@@ -364,7 +374,59 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   });
   for (const f of faults) outcomes[f.index] = "faulted";
 
-  return { construction, figure, box: viewBox(figure), seed, faults, outcomes };
+  return { construction, figure, box: viewBox(figure), seed, faults, outcomes, minted };
+}
+
+/** `n` in subscript digits — `P₁`, `P₁₂`. */
+const subscript = (n: number): string => String(n).replace(/[0-9]/g, (d) => String.fromCharCode(0x2080 + Number(d)));
+
+/**
+ * NAMING A POINT THE STUDENT GAVE ONLY BY ITS COORDINATES (#1281; operator ruling #1263, 2026-09-20: *mint a
+ * reserved letter, and say so*; build ruling 2026-09-27, #1281).
+ *
+ * The parser marks such a point with a placeholder (`MINT_PREFIX` + its coordinates' text). Resolved HERE, over
+ * the whole list and in order, because only the list knows what is taken: the SAME coordinates are one point;
+ * a point the student already stated at exactly those coordinates keeps THEIR letter (the #1270 rule — a
+ * student's letter wins); otherwise the next free reserved name, P₁, P₂, … — subscripted, so it is a letter a
+ * student does not reach for first, and `NAME` reads it back. Earlier names never move when a line is added, so
+ * the figure stays stable. Pure over the list, like everything `derive` does.
+ */
+function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[]; minted: Array<{ index: number; id: string }> } {
+  const text = JSON.stringify(facts);
+  if (!text.includes(MINT_PREFIX)) return { facts, minted: [] };
+  const used = new Set<string>(text.match(/"[A-Z][0-9₀-₉]?"/g)?.map((q) => q.slice(1, -1)) ?? []);
+  const numeric = (f: Fact): [number, number] | null => {
+    if (f.t !== 'point') return null;
+    const x = evalExpr(f.x, {});
+    const y = evalExpr(f.y, {});
+    return Number.isFinite(x) && Number.isFinite(y) ? [x, y] : null;
+  };
+  const names = new Map<string, string>();
+  const minted: Array<{ index: number; id: string }> = [];
+  let n = 0;
+  facts.forEach((f, i) => {
+    if (f.t !== 'point' || !f.id.startsWith(MINT_PREFIX) || names.has(f.id)) return;
+    const at = numeric(f);
+    const own = at
+      ? facts.slice(0, i).find((g) => {
+          if (g.t !== 'point' || g.id.startsWith(MINT_PREFIX)) return false;
+          const q = numeric(g);
+          return q !== null && Math.abs(q[0] - at[0]) < 1e-12 && Math.abs(q[1] - at[1]) < 1e-12;
+        })
+      : undefined;
+    if (own && own.t === 'point') {
+      names.set(f.id, own.id);
+      return;
+    }
+    let name: string;
+    do name = `P${subscript(++n)}`;
+    while (used.has(name));
+    used.add(name);
+    names.set(f.id, name);
+    minted.push({ index: owner[i], id: name });
+  });
+  const out = JSON.parse(text.replace(/"@mint:[^"]*"/g, (q) => JSON.stringify(names.get(JSON.parse(q) as string) ?? JSON.parse(q)))) as Fact[];
+  return { facts: out, minted };
 }
 
 export const EMPTY_DERIVATION: Derivation = {
@@ -374,4 +436,5 @@ export const EMPTY_DERIVATION: Derivation = {
   seed: 0,
   faults: [],
   outcomes: [],
+  minted: [],
 };

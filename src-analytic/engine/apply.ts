@@ -1037,6 +1037,22 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         return { ok: false, error: unknownRef(f.through) };
       }
       const prior = objectById(c, f.id);
+      /**
+       * «הישר l3 עובר דרך N» — an EXISTING line through a point is an incidence, not a second line (#1281, M1).
+       *
+       * A free-direction `line-at` states only "this line passes through that point". When the named line
+       * already exists — stated by its equation, or built through another point — the sentence is a statement
+       * ABOUT it and lowers to the point's incidence: the exam's «ישר 3 עובר דרך הנקודה N», which is what pins
+       * the parameter of a line `(k+1)x+2y-12+5k=0`. It used to be refused as a name clash (an equation line)
+       * or absorbed as `known` while N was never put on the line (a line-at through another point).
+       */
+      if (prior && f.dir.k === 'free') {
+        const isLine = prior.kind === 'line-at' || curveKindOf(prior) === 'line';
+        if (isLine) {
+          if (prior.kind === 'line-at' && prior.through === f.through) return { ok: true, effect: 'known', next: c };
+          return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.through, curve: prior.id }, src: f.src });
+        }
+      }
       if (prior) {
         if (prior.kind !== 'line-at') {
           return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };
@@ -1713,7 +1729,7 @@ function normalizeDomain(d: Domain): Record<string, unknown> {
  * happens to be — so the endpoints are compared, never the string.
  */
 function segmentOverSameEnds(c: Construction, curveId: Id): boolean {
-  const m = /^line-([A-Z][0-9]?)([A-Z][0-9]?)$/.exec(curveId);
+  const m = /^line-([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)$/.exec(curveId);
   if (!m) return false;
   const [, a, b] = m;
   return c.objects.some(

@@ -146,10 +146,10 @@ export interface Answer {
  * A compound expression is arithmetic the student assembled, not one named move, and the technique
  * table has nothing honest to say about it. The trace explains a ROW; it does not narrate a sum.
  */
-const BARE_LENGTH = /^(?:ה?(?:קטע|צלע|אורך)\s+)?[A-Z][0-9]?[A-Z][0-9]?$/;
+const BARE_LENGTH = /^(?:ה?(?:קטע|צלע|אורך)\s+)?[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?$/;
 
 /** A single point's name, which is a question about its coordinates. */
-const POINT_ONLY = /^[A-Z][0-9]?$/;
+const POINT_ONLY = /^[A-Z][0-9₀-₉]?$/;
 
 /**
  * «שיפוע הישר l1» — the third thing the operator named for a line (#1048).

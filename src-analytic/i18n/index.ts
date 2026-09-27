@@ -28,6 +28,8 @@ const he = {
   language: 'English',
   emptyTitle: 'התחילו לשרטט',
   emptyHint: 'הבחינה לא מדפיסה שרטוט — הקלידו את הנתונים והכלי ישרטט אותם',
+  // #1281 — the name the tool gave a point stated only by its coordinates (the #1263 ruling: say so).
+  mintedNote: 'הכלי קרא לנקודה {{name}}',
   factsEmpty: 'אין עדיין נתונים.',
   factCount: '{{count}} נתונים',
   another: 'הציגו תצורה אחרת',
@@ -300,6 +302,8 @@ const en: typeof he = {
   language: 'עברית',
   emptyTitle: 'Start drawing',
   emptyHint: 'The exam prints no figure — type the givens and the tool draws them',
+  // #1281 — the name the tool gave a point stated only by its coordinates (the #1263 ruling: say so).
+  mintedNote: 'named {{name}} by the tool',
   factsEmpty: 'No givens yet.',
   factCount: '{{count}} givens',
   another: 'Show another configuration',

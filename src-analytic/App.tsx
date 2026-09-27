@@ -1185,7 +1185,19 @@ export function App() {
                  * shows what the student wrote rather than a re-serialisation — the same rule
                  * `QuickChips`' `display` follows.
                  */
-                content: <MathText text={analyticBidi.isolateLtrRuns(line)} />,
+                content: (
+                  <>
+                    <MathText text={analyticBidi.isolateLtrRuns(line)} />
+                    {/* #1281 — a name the TOOL chose is said on the row that caused it (the #1263 ruling). */}
+                    {d.minted
+                      .filter((m) => m.index === i)
+                      .map((m) => (
+                        <span key={m.id} style={{ color: color.muted, fontSize: fs.small, marginInlineStart: 8 }}>
+                          {t('mintedNote', { name: m.id })}
+                        </span>
+                      ))}
+                  </>
+                ),
                 /**
                  * #1401 (ADR-W-088): the row's base DIRECTION, from its content — the chrome sets it
                  * with `textDir` below. Without it «∠ABC = 90» inherited the app's RTL, and `∠` (a

@@ -34,7 +34,7 @@ export interface NamedLine {
 }
 
 /** A name spells a segment when it is two DIFFERENT letters — «AB», never «AA». */
-const PAIR = /^([A-Z][0-9]?)([A-Z][0-9]?)$/;
+const PAIR = /^([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)$/;
 
 /** The two point ids a name spells, or `null` when the name is not a pair of letters. */
 export function asPair(name: string): [Id, Id] | null {

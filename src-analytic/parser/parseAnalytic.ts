@@ -254,7 +254,7 @@ const COPULA_WORDS = 'הוא|היא|הם|הן|שווה(?:\\s*ל\\s*-?)?';
 const HE_IS = `(?:\\s*(?:${COPULA_WORDS}))?`;
 
 /** A point/vertex name: a capital letter with an optional digit subscript (`F1`, `D2`). */
-const NAME = '[A-Z][0-9]?';
+const NAME = '[A-Z][0-9₀-₉]?';
 /**
  * A NUMERAL naming a line — the exam's own «הישר 1» / «הישר I» (#1298, #1318; ADR-AG-144).
  *
@@ -278,13 +278,13 @@ const LINE_NUMERAL_RE = /^(?:I|II|III|IV|V|[1-9])$/;
  * line through the points I and V is not a sentence the corpus writes, and it is still sayable by its
  * points («הישר העובר דרך I ו-V» is #1281's converse).
  */
-const LINE_NAME = `(?:[ℓl][0-9]?|${LINE_NUMERAL}(?=[\\s:]|$)|[A-Z][0-9]?[A-Z][0-9]?)`;
+const LINE_NAME = `(?:[ℓl][0-9]?|${LINE_NUMERAL}(?=[\\s:]|$)|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)`;
 /**
  * The name slot of the NOUN-LESS forms («משוואת AB היא …», «AB: …») keeps the pre-numeral token: with
  * the noun dropped, a Roman numeral is a CIRCLE («משוואת I היא x²+y²=9», #1072) and the circle branch
  * below owns it. A numeral names a LINE only where the student wrote the line noun.
  */
-const LINE_NAME_PLAIN = '(?:[ℓl][0-9]?|[A-Z][0-9]?[A-Z][0-9]?)';
+const LINE_NAME_PLAIN = '(?:[ℓl][0-9]?|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)';
 
 /**
  * How a numeral-named line is CALLED — «ישר 1» / «line 1» — the #1216 circle precedent («מעגל 1»),
@@ -768,7 +768,7 @@ function anonIndex(eqSrc: string): string {
 /** Two or more point names running together — `AB`, `ABC`, `ABCD`. */
 const NAME_RUN = `(?:${NAME})+`;
 
-const splitNames = (run: string): string[] => run.match(/[A-Z][0-9]?/g) ?? [];
+const splitNames = (run: string): string[] => run.match(/[A-Z][0-9₀-₉]?/g) ?? [];
 
 /**
  * The concurrency points, keyed by the role noun the corpus uses.
@@ -964,7 +964,7 @@ const INTERSECT_EN = new RegExp(
  * and «הישר l1» mean here exactly what they mean there, and cannot drift.
  */
 /** The nouns that mean the DRAWN piece rather than the infinite line (#1168, ADR-AG-111’s pair). */
-const BOUNDED_NOUN = /^(?:ה?צלע|ה?קטע|(?:the\s+)?(?:side|segment))\s/i;
+const BOUNDED_NOUN = /^(?:ה?צלע|ה?קטע|ה?בסיס|(?:the\s+)?(?:side|segment|base))\s/i;
 
 function incidenceOn(operand: string, id: Id): Constraint | null {
   const axis = AXIS_HE.exec(trim(operand)) ?? AXIS_EN.exec(trim(operand));
@@ -1143,7 +1143,7 @@ function parseDerived(line: string): RuleOutcome {
     if (role) {
       // The shape may be named with its vertices or only by its noun; the trailing run of names is
       // the figure when it is there, and the NOUN carries it otherwise.
-      const shape = /([A-Z][0-9]?){3,}$/.exec(trim(subject));
+      const shape = /([A-Z][0-9₀-₉]?){3,}$/.exec(trim(subject));
       if (shape) {
         const v = splitNames(shape[0]);
         if (v.length !== role.n) return refuse('bad-arity', line);
@@ -1240,7 +1240,8 @@ const SHAPE_EN = new RegExp(`^(?:the\\s+)?([a-z]+(?:[- ][a-z]+){0,2})\\s+(${NAME
  * claim on it. An `=`-bearing line reaches `parseConstraint` first, which is what keeps «AB = 5» a
  * LENGTH rather than a segment.
  */
-const SEGMENT_HE = new RegExp(`^${HE_GIVEN}(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})$`);
+// «הבסיס CD» names a side exactly as «הצלע CD» does — a trapezoid's side, in the exam's word (#1281).
+const SEGMENT_HE = new RegExp(`^${HE_GIVEN}(?:ה?(?:קטע|צלע|בסיס)\\s+)?(${NAME})(${NAME})$`);
 const SEGMENT_EN = new RegExp(`^(?:(?:segment|side)\\s+)?(${NAME})(${NAME})$`, 'i');
 
 /**
@@ -1976,7 +1977,7 @@ const NAMED_LINE = new RegExp(`^(?:ה?ישר\\s+|[Ll]ine\\s+)?([ℓl][0-9]?)$|^(
  * would quietly start accepting `ab` as two vertices.
  */
 const TWO_POINTS = new RegExp(
-  `^(?:ה?(?:צלע|קטע|ישר)\\s+|[Ss]ide\\s+|[Ss]egment\\s+|[Ll]ine\\s+)?(${NAME})(${NAME})$`,
+  `^(?:ה?(?:צלע|קטע|ישר|בסיס)\\s+|[Ss]ide\\s+|[Ss]egment\\s+|[Bb]ase\\s+|[Ll]ine\\s+)?(${NAME})(${NAME})$`,
 );
 
 function direction(phrase: string): Direction | null {
@@ -2849,6 +2850,10 @@ export function parseLine(raw: string): ParseResult {
   const computed = parseCircleThru(line);
   if (computed) return computed;
 
+  // Incidence in every order and over every operand (#1281, #1495) — normalised to the sentences below.
+  const incidence = parseIncidence(line);
+  if (incidence) return incidence;
+
   /**
    * THE RATIO FAMILY RUNS BEFORE `matchCurve` (#1124).
    *
@@ -3163,4 +3168,188 @@ export function parseLine(raw: string): ParseResult {
   }
 
   return { ok: false, code: 'not-handled', detail: line };
+}
+
+// ---------------------------------------------------------------------------
+// INCIDENCE IN EVERY ORDER AND OVER EVERY OPERAND (#1281, #1495, ADR-AG-164)
+// ---------------------------------------------------------------------------
+
+/**
+ * One relation, many sentences. «P על הישר CD» was the only way to say a point lies on a line; the exam also
+ * writes the LINE first («הישר CD עובר דרך P», «ישר 3 עובר דרך הנקודה N»), a SIDE as the subject («הצלע BC
+ * נמצאת על הישר y=x-4», «האלכסון BD מונח על הישר y=x», «הבסיס CD נמצא על ישר העובר דרך …»), and a point by its
+ * COORDINATES with no letter («הנקודה (-3,7)»). Every one was `not-handled` while the relation, its residual
+ * and its solve all existed.
+ *
+ * So these are NORMALISED, in one place, into the sentences the grammar already reads — «P על …»,
+ * «משוואת הצלע BC היא …», «דרך P עובר ישר l3» — and those sentences are parsed by the rules that own them.
+ * Two spellings of one relation then produce the IDENTICAL facts by construction, which is what the locks
+ * assert, and no second lowering exists to drift (docs/17: a normalisation at the rule, never a regex per
+ * phrasing).
+ */
+
+/** A point given by its coordinates — «(-3,7)», «(2, a)» — the two values, as the exam writes them. */
+const COORD_PAIR = String.raw`\(\s*([^(),;]+?)\s*[,;]\s*([^(),;]+?)\s*\)`;
+const COORD_ONLY = new RegExp(`^${COORD_PAIR}$`);
+/**
+ * THE PLACEHOLDER a coordinate-only point carries out of the parser (#1281, the #1263 ruling).
+ *
+ * The parser is pure over one line and cannot know which reserved name is free, or whether the student has
+ * already stated a point at those coordinates — `derive` resolves it over the whole list (`resolveMints`).
+ * The key is the coordinates' own text, so the same point stated twice is one point.
+ */
+export const MINT_PREFIX = '@mint:';
+/** A name no student writes and no mint takes — the stand-in while a canonical sentence is parsed. */
+const MINT_SENTINEL = 'Z₀';
+
+type PointSlot = { name: Id } | { x: Expr; y: Expr; key: string };
+
+/** A point slot: a name, or a coordinate pair, with the optional noun «(ה)נקודה» / "point". */
+function pointSlot(raw: string): PointSlot | null {
+  const t = trim(raw)
+    .replace(/^ה?נקודה\s+/, '')
+    .replace(/^(?:the\s+)?point\s+/i, '');
+  if (new RegExp(`^${NAME}$`).test(t)) return { name: t };
+  const m = COORD_ONLY.exec(t);
+  if (!m) return null;
+  const x = valueExpr(m[1]);
+  const y = valueExpr(m[2]);
+  if (!x || !y) return null;
+  const key = `${normalizeMath(m[1]).replace(/\s+/g, '')},${normalizeMath(m[2]).replace(/\s+/g, '')}`;
+  return { x, y, key };
+}
+
+/**
+ * Parse the canonical sentence(s) `build` writes for the slot's point, and re-attribute every fact to the
+ * student's own line. A coordinate slot is parsed through the sentinel name and re-labelled with its mint
+ * placeholder, preceded by the point itself — so the canonical rules never learn that a mint exists.
+ */
+function viaCanonical(line: string, slot: PointSlot | null, build: (p: Id) => string[]): RuleOutcome {
+  const p = slot && 'name' in slot ? slot.name : MINT_SENTINEL;
+  const facts: Fact[] = [];
+  for (const s of build(p)) {
+    const r = parseLine(s);
+    if (!r.ok) return null;
+    facts.push(...r.facts);
+  }
+  let out: Fact[] = facts.map((f) => ({ ...f, src: line }));
+  if (slot && !('name' in slot)) {
+    const id = `${MINT_PREFIX}${slot.key}`;
+    out = JSON.parse(JSON.stringify(out).split(JSON.stringify(MINT_SENTINEL)).join(JSON.stringify(id))) as Fact[];
+    out.unshift({ t: 'point', id, x: slot.x, y: slot.y, src: line });
+  }
+  return made(out);
+}
+
+/** What a line-phrase names, in the grammar's own terms. */
+type LineObject =
+  | { k: 'pair'; noun: string; a: Id; b: Id }
+  | { k: 'named'; name: string }
+  | { k: 'eq'; src: string }
+  | { k: 'through'; slot: PointSlot }
+  | { k: 'curve' };
+
+/** English nouns onto the Hebrew noun the canonical sentence carries (a base is a side, #1281). */
+const NOUN_OF: Record<string, string> = { line: 'הישר', side: 'הצלע', segment: 'הקטע', base: 'הצלע' };
+function heNoun(noun: string | undefined): string {
+  if (!noun) return 'הישר';
+  const n = noun.trim().replace(/^the\s+/i, '').toLowerCase();
+  if (NOUN_OF[n]) return NOUN_OF[n];
+  if (/בסיס/.test(n)) return 'הצלע';
+  return /^ה/.test(n) ? n : `ה${n}`;
+}
+
+const OBJ_PAIR = new RegExp(
+  `^((?:ה?(?:ישר|צלע|קטע|בסיס))|(?:[Tt]he\\s+)?(?:[Ll]ine|[Ss]ide|[Ss]egment|[Bb]ase))?\\s*(${NAME})(${NAME})$`,
+);
+const OBJ_NAMED = new RegExp(`^(?:ה?ישר|(?:[Tt]he\\s+)?[Ll]ine)\\s+(${FREE_LINE_NAME})$|^([ℓl][0-9]?)$`);
+const OBJ_CURVE = /^(?:ה?(?:מעגל|פרבולה|אליפסה)|(?:the\s+|a\s+)?(?:circle|parabola|ellipse))(?:\s|$)/i;
+const OBJ_EQ = /^(?:ה?ישר\s+|(?:the\s+)?line\s+)?([^=]+=[^=]+)$/i;
+/** «ישר העובר דרך הנקודה (-3,7)» · «ישר שעובר ב-P» · "a line through P" — a line given by one point. */
+const OBJ_THROUGH = /^(?:ה?ישר\s+(?:ה|ש)?עובר(?:ת)?\s+(?:דרך|ב-?)\s*|(?:a\s+|the\s+)?line\s+(?:that\s+)?(?:passes\s+|passing\s+|going\s+)?through\s+)(.+)$/i;
+
+function lineObject(raw: string): LineObject | null {
+  const t = trim(raw);
+  if (OBJ_CURVE.test(t)) return { k: 'curve' };
+  const through = OBJ_THROUGH.exec(t);
+  if (through) {
+    const slot = pointSlot(through[1]);
+    return slot ? { k: 'through', slot } : null;
+  }
+  const pair = OBJ_PAIR.exec(t);
+  if (pair && pair[2] !== pair[3]) return { k: 'pair', noun: heNoun(pair[1]), a: pair[2], b: pair[3] };
+  const named = OBJ_NAMED.exec(t);
+  if (named) return { k: 'named', name: named[1] ?? named[2] };
+  const eq = OBJ_EQ.exec(t);
+  if (eq) return { k: 'eq', src: trim(eq[1]) };
+  return null;
+}
+
+/** «הישר CD עובר דרך P» · «CD מכיל את P» · «ישר 3 עובר בנקודה N» · "the line CD passes through P". */
+const CONVERSE_HE = new RegExp(`^${HE_GIVEN}(.+?)\\s+(?:עובר(?:ת)?\\s+(?:דרך|ב-?)\\s*|מכיל(?:ה)?\\s+את\\s+)(.+)$`);
+const CONVERSE_EN = /^(.+?)\s+(?:passes\s+through|goes\s+through|contains)\s+(.+)$/i;
+
+/** «הצלע BC נמצאת על …» · «האלכסון BD מונח על …» · "the side BC lies on …" — a SIDE as the subject (#1495). */
+const SIDE_ON_HE = new RegExp(
+  `^${HE_GIVEN}(?:(ה?(?:צלע|קטע|בסיס|ישר|אלכסון))\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:(?:נמצא|נמצאת|מונח|מונחת)\\s+)?על\\s+(.+)$`,
+);
+const SIDE_ON_EN = new RegExp(
+  `^(?:[Tt]he\\s+)?(?:(side|segment|base|diagonal|line)\\s+)?(${NAME})(${NAME})\\s+(?:lies|is|lie)\\s+on\\s+(.+)$`,
+);
+/** The noun «משוואת …» takes for the side: a side, a segment, a line or a diagonal (a base is a side). */
+function eqNounOf(noun: string | undefined): string {
+  const n = (noun ?? '').replace(/^ה/, '').toLowerCase();
+  if (n === 'קטע' || n === 'segment') return 'הקטע';
+  if (n === 'ישר' || n === 'line') return 'הישר';
+  if (n === 'אלכסון' || n === 'diagonal') return 'האלכסון';
+  return 'הצלע';
+}
+
+/** «הנקודה (-3,7) על הישר CD» · "the point (2,5) lies on the line l1" — a coordinate as the subject. */
+const COORD_ON_HE = new RegExp(`^${HE_GIVEN}(?:ה?נקודה\\s+)?(${COORD_PAIR})\\s+(?:(?:הוא|היא)\\s+)?(?:נמצא(?:ת)?\\s+)?על\\s+(.+)$`);
+const COORD_ON_EN = new RegExp(`^(?:the\\s+)?(?:point\\s+)?(${COORD_PAIR})\\s+(?:is\\s+|lies\\s+)?on\\s+(.+)$`, 'i');
+/** «נתונה הנקודה (-3,7)» — a point by its coordinates alone; the tool names it (#1263 ruling). */
+const COORD_POINT = new RegExp(`^${HE_GIVEN}(?:ה?נקודה\\s+|(?:the\\s+)?point\\s+)?(${COORD_PAIR})$`, 'i');
+
+function parseIncidence(line: string): RuleOutcome {
+  const bare = COORD_POINT.exec(line);
+  if (bare) {
+    const slot = pointSlot(bare[1]);
+    return slot && !('name' in slot) ? viaCanonical(line, slot, (p) => [`נקודה ${p}`]) : null;
+  }
+
+  const coordOn = COORD_ON_HE.exec(line) ?? COORD_ON_EN.exec(line);
+  if (coordOn) {
+    const slot = pointSlot(coordOn[1]);
+    const rest = coordOn[4];
+    if (!slot) return null;
+    return viaCanonical(line, slot, (p) => [`${p} על ${rest}`]);
+  }
+
+  const side = SIDE_ON_HE.exec(line) ?? SIDE_ON_EN.exec(line);
+  if (side && side[2] !== side[3]) {
+    const [, noun, a, b, objectText] = side;
+    const obj = lineObject(objectText);
+    if (!obj) return null;
+    // A side lies on a LINE. On a circle or a parabola it is a chord — a different sentence («BC מיתר»).
+    if (obj.k === 'curve') return { ok: false, code: 'out-of-scope', detail: line };
+    const drawn = noun && /ישר|line/i.test(noun) ? [] : [`${/קטע|segment/i.test(noun ?? '') ? 'הקטע' : 'הצלע'} ${a}${b}`];
+    if (obj.k === 'eq') return viaCanonical(line, null, () => [`משוואת ${eqNounOf(noun)} ${a}${b} היא ${obj.src}`]);
+    if (obj.k === 'named') return viaCanonical(line, null, () => [`${a} על הישר ${obj.name}`, `${b} על הישר ${obj.name}`, ...drawn]);
+    if (obj.k === 'through') return viaCanonical(line, obj.slot, (p) => [`${p} על הישר ${a}${b}`, ...drawn]);
+    // «הצלע BC נמצאת על הישר DE» — two collinear pairs; the grammar has no sentence for it yet.
+    return null;
+  }
+
+  const conv = CONVERSE_HE.exec(line) ?? CONVERSE_EN.exec(line);
+  if (conv) {
+    const obj = lineObject(conv[1]);
+    const slot = pointSlot(conv[2]);
+    if (!obj || !slot || obj.k === 'curve' || obj.k === 'through') return null;
+    if (obj.k === 'pair') return viaCanonical(line, slot, (p) => [`${p} על ${obj.noun} ${obj.a}${obj.b}`]);
+    // A NAMED line: «דרך P עובר ישר l3» — M1 decides whether it is an incidence on the existing line or a new one.
+    if (obj.k === 'named') return viaCanonical(line, slot, (p) => [`דרך ${p} עובר ישר ${obj.name}`]);
+    return viaCanonical(line, slot, (p) => [`${p} על הישר ${obj.src}`]);
+  }
+  return null;
 }
