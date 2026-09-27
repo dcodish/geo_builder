@@ -164,6 +164,7 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'perp|plane-named|plane-named',
       'parallel|plane-named|plane-named',
       'coincident|plane-named|plane-named',
+      'angle|plane-named|plane-named', // #1439 (ADR-3D-263): out of PENDING — its row is below
       'perp|segment|plane-named',
       'parallel|segment|plane-named',
       'angle|segment|plane-named',
@@ -194,7 +195,6 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'angle|segment|segment', // adr-3d-032 / V7
       'angle|segment|vector', // V8-f suites
       'angle|vector|vector', // V8-f suites
-      'angle|plane-named|plane-named', // scenarios3 2022-Q2 gate
       'on|point|plane-named', // ADR-3D-015 suites
       'on|point|segment', // V0 suites
       // S2: the vector twins ride the SAME operand seam + residual branch as the covered segment
@@ -422,6 +422,35 @@ describe('the battery — supported cells exercised end-to-end', () => {
     for (const u of ['המישור π1: z = 0', 'המישור π2: z - 3 = 0', 'π1 ניצב ל-π2']) submit(u);
     expect(state().lastError, 'a false ⟂ is refused, not drawn').not.toBeNull();
   });
+
+  /**
+   * #1439 (ADR-3D-263) — EVERY `plane-named|plane-named` cell, ABSOLUTE × ABSOLUTE, with a true AND a
+   * false instance. The row above carried ⟂ both ways but ∥ and coincident only true, and the ANGLE cell
+   * had no row at all — parked in BATTERY_PENDING behind a 2022-Q2 gate whose planes carry a parameter,
+   * so the no-parameter instance (checked by nothing, drawn as knowledge) was never exercised. A cell is
+   * only honest when its false statement is refused, so each gets its pair here.
+   */
+  it.each([
+    ['angle', ['המישור π1: z = 3', 'המישור π2: x + y + z = 1'], 'הזווית בין המישורים π1 ו-π2 היא 54.7356', 'הזווית בין המישורים π1 ו-π2 היא 45'],
+    ['perp', ['המישור π1: z = 0', 'המישור π2: x + y = 1'], 'π1 ניצב ל-π2', 'π1 ניצב ל-π2', ['המישור π1: z = 0', 'המישור π2: x + z = 1']],
+    ['parallel', ['המישור π1: x + y + z = 1', 'המישור π2: 2x + 2y + 2z = 7'], 'π1 מקביל ל-π2', 'π1 מקביל ל-π2', ['המישור π1: x + y + z = 1', 'המישור π2: x + y - z = 7']],
+    ['coincident', ['המישור π1: x + y + z = 1', 'המישור π2: 2x + 2y + 2z = 2'], 'π1 מתלכד עם π2', 'π1 מתלכד עם π2', ['המישור π1: x + y + z = 1', 'המישור π2: x + y + z = 4']],
+    ['distance', ['המישור π1: z = 0', 'המישור π2: z = 5'], 'המרחק בין המישור π1 לבין המישור π2 הוא 5', 'המרחק בין המישור π1 לבין המישור π2 הוא 3'],
+  ] as [string, string[], string, string, string[]?][])(
+    '%s|plane-named|plane-named — absolute × absolute: the true statement verifies, the false one is refused',
+    (rel, setup, trueLine, falseLine, falseSetup) => {
+      for (const u of setup) submit(u);
+      expect(state().lastError, `${rel}: setup`).toBeNull();
+      submit(trueLine);
+      expect(state().lastError, `${rel}: «${trueLine}» is true and verifies`).toBeNull();
+      expect(state().facts).toHaveLength(setup.length + 1);
+      state().clear();
+      for (const u of falseSetup ?? setup) submit(u);
+      submit(falseLine);
+      expect(state().lastError, `${rel}: «${falseLine}» is false and must be refused`).toEqual({ code: 'claim-refuted' });
+      expect(state().facts).toHaveLength((falseSetup ?? setup).length);
+    },
+  );
 
   it('gauge × ABSOLUTE plane — claim-gated: a true statement verifies on a frame-pinned figure', () => {
     // These cells have no drive (the figure would have to MOVE — the pivot lane, #386). They are

@@ -8,7 +8,7 @@
  */
 
 import { lineAtParam, planeAtParam, resolve3, type Resolved3 } from './evaluate';
-import { containmentDeviation, lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
+import { containmentDeviation, DIRECTION_REL_TOL, lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { atomVec, evalExpr } from './vecExpr';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { bisectorDir3, cross3, dist3, dot3, runNormal, norm3, normalize3, sub3, v3, type Vec3 } from './vec3';
@@ -165,7 +165,7 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
             claim.rel === 'contained'
             ? containmentDeviation(ga, gb, figureExtent(pos))
             : relDeviation(claim.rel, claim.deg, ga, gb);
-      return dev !== null && dev <= 1e-4;
+      return dev !== null && dev <= DIRECTION_REL_TOL;
     }
     case 'distance-rel': {
       // S5 (#378): one geometry function, shared with the drive residual and the query lane.

@@ -43,7 +43,11 @@ const PENDING_PROBES: Record<string, string[]> = {
     'נסמן: AB = u, CD = v',
     'קוסינוס הזווית בין הוקטורים u ו-v הוא 1/2',
   ],
-  'angle|plane-named|plane-named': ['פירמידה משולשת ABCD', 'הזווית בין המישור ABC למישור ACD היא 60'],
+  // #1439 (ADR-3D-263): this probe used POINT-RUN planes («המישור ABC»), so it exercised
+  // `plane-run|plane-run` and never the cell it is keyed by — which is how a stated angle between two
+  // EQUATION planes went unchecked. The cell is NAMED × NAMED: two planes by equation, a TRUE angle
+  // (z = 0 and x + z = 0 meet at 45°). Its false twin is refused in the battery row.
+  'angle|plane-named|plane-named': ['המישור π1: z = 0', 'המישור π2: x + z = 0', 'הזווית בין המישורים π1 ו-π2 היא 45'],
   'on|point|plane-named': ['פירמידה משולשת ABCD', 'E על המישור ABC'],
   'on|point|segment': ['פירמידה משולשת ABCD', 'E על AB'],
   'perp|vector|line': ['פירמידה משולשת', 'l1:x=(0,0,0)+t(1,2,3)', 'נסמן: AB = u', 'u מאונך לישר l1'],

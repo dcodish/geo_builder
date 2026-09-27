@@ -25,7 +25,9 @@ import {
   mutualSides,
   MUTUAL_VERIFY_TOL,
   planeNormalCarriesParam,
+  planePinningRels,
   planeSym3,
+  type PlanePinRel3,
   resolveOperand,
   symMemberDrives,
 } from './operands';
@@ -511,7 +513,8 @@ function touchZeroRoots(g: (a: number) => number): number[] {
 const snapAndDedupe = (roots: number[]): number[] => {
   const out: number[] = [];
   for (const r of roots) {
-    const snapped = Math.abs(r - Math.round(r)) < 1e-6 ? Math.round(r) : r;
+    // `+ 0` folds a snapped −0 (a root approached from below) to 0 — the value is shown to the student (#1439)
+    const snapped = Math.abs(r - Math.round(r)) < 1e-6 ? Math.round(r) + 0 : r;
     if (!out.some((x) => Math.abs(x - snapped) < 1e-5)) out.push(snapped);
   }
   return out.sort((a, b) => a - b);
@@ -570,11 +573,26 @@ function lineRelParamResidual(c: Construction3, r: Construction3['lineRels'][num
   return Math.abs(cos) - (planar ? Math.sin(target) : Math.cos(target));
 }
 
-/** Does the parameter value satisfy EVERY pinning given (angles + ⟂s)? */
+/** #1439 (ADR-3D-263): the SIGNED residual of a plane × plane relation at parameter value `a` — 0 ⟺ the
+ *  relation holds. The line twin's shape ({@link lineRelParamResidual}) on two normals: ⟂ is n1·n2 (a
+ *  sign change), ∥ is |n1 × n2| (non-negative — touch-zero), and the angle is |cos| − cos(target), the
+ *  undirected ≤ 90° reading `relDeviation` verifies by — so a pinned root and its recorded claim can
+ *  never disagree. */
+function planeRelParamResidual(c: Construction3, r: PlanePinRel3, a: number): number {
+  const n1 = planeAt(c, r.p1, a).n;
+  const n2 = planeAt(c, r.p2, a).n;
+  const den = norm3(n1) * norm3(n2);
+  if (den < 1e-12) return NaN;
+  if (r.rel === 'perp') return dot3(n1, n2) / den;
+  if (r.rel === 'parallel') return norm3(cross3(n1, n2)) / den;
+  return planesCos(c, r.p1, r.p2, a) - Math.cos(((r.deg ?? 0) * Math.PI) / 180);
+}
+
+/** Does the parameter value satisfy EVERY pinning given (plane relations + ⟂s + line relations)? */
 function satisfiesAllPins(c: Construction3, a: number): boolean {
-  for (const g of c.planeAngles) {
-    const cos = planesCos(c, g.p1, g.p2, a);
-    if (Number.isNaN(cos) || Math.abs(cos - Math.cos((g.deg * Math.PI) / 180)) > 1e-6) return false;
+  for (const r of planePinningRels(c)) {
+    const res = planeRelParamResidual(c, r, a);
+    if (Number.isNaN(res) || Math.abs(res) > 1e-5) return false;
   }
   for (const g of paramLinePerps(c)) {
     const r = perpResidual(c, g.line, g.plane, a);
@@ -603,7 +621,7 @@ const paramLinePerps = (c: Construction3): Construction3['linePerps'] =>
  *  VALUE on the parameter («m = 2») pins it like any other given — counted here, so the DOF cue, the
  *  root-find gate and the store's blame attribution all see it as one. */
 export const pinningGivens = (c: Construction3): number =>
-  c.planeAngles.length + paramLinePerps(c).length + paramPinningLineRels(c).length +
+  planePinningRels(c).length + paramLinePerps(c).length + paramPinningLineRels(c).length +
   (c.param !== undefined && symbolValueOf(c, c.param) !== undefined ? 1 : 0);
 
 /**
@@ -619,9 +637,11 @@ export function paramRoots(c: Construction3): number[] {
   const stated = c.param !== undefined ? symbolValueOf(c, c.param) : undefined;
   if (stated !== undefined) return satisfiesAllPins(c, stated) ? [stated] : [];
   const candidates: number[] = [];
-  for (const g of c.planeAngles) {
-    const target = Math.cos((g.deg * Math.PI) / 180);
-    candidates.push(...signChangeRoots((a) => planesCos(c, g.p1, g.p2, a) - target));
+  for (const r of planePinningRels(c)) {
+    // the line twin's belt-and-braces: sign-change for crossings (⟂, a generic angle), touch-zero for
+    // the non-negative forms (∥, and the 0° / 90° angle endpoints where |cos| − target only touches)
+    const f = (a: number) => planeRelParamResidual(c, r, a);
+    candidates.push(...signChangeRoots(f), ...touchZeroRoots((a) => Math.abs(f(a))));
   }
   for (const g of paramLinePerps(c)) {
     candidates.push(...touchZeroRoots((a) => perpResidual(c, g.line, g.plane, a)));
@@ -674,7 +694,7 @@ export const onLineHolds3 = (p: Vec3, ln: ResolvedLine): boolean =>
   norm3(cross3(sub3(p, ln.anchor), ln.dir)) <= 1e-7 * Math.max(norm3(sub3(p, ln.anchor)) * norm3(ln.dir), 1);
 
 /**
- * Pick the parameter's value for this seed: an explicit `branch` on a plane-angle
+ * Pick the parameter's value for this seed: an explicit `branch` on a line ⟂ plane given
  * wins; otherwise a membership given (`on one of the planes`) SELECTS the root
  * where it holds (the 2022-Q2 flow); otherwise the seed cycles the roots ("show
  * another configuration" = the other branch); an unpinned parameter is a FREE
@@ -702,7 +722,7 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number): { va
   const pool = signed.length > 0 ? signed : roots; // an unsatisfiable sign is refused downstream, not here
   const pick = (branches: number[], value: number) => ({ value, roots, branches });
 
-  const explicit = [...c.planeAngles, ...paramLinePerps(c)].find((g) => g.branch !== undefined)?.branch;
+  const explicit = paramLinePerps(c).find((g) => g.branch !== undefined)?.branch;
   if (explicit !== undefined) {
     const chosen = pool[((explicit % pool.length) + pool.length) % pool.length];
     return pick([chosen], chosen); // the student named the configuration — one branch, by their choice

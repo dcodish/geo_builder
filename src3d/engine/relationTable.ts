@@ -74,7 +74,7 @@ const CELLS: Record<string, CellStatus> = {
   'perp|line|line': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2: symbolic dir pins; numeric verifies (ADR-3D-103)' },
   'perp|plane-run|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
   'perp|plane-run|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
-  'perp|plane-named|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): absolute×absolute — the claim is the whole answer' },
+  'perp|plane-named|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: '#1439 (ADR-3D-263): planePinningRels — pins the parameter iff a normal carries it, else a verified claim' },
   'perp|vector|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
   'perp|vector|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
 
@@ -97,7 +97,7 @@ const CELLS: Record<string, CellStatus> = {
   'parallel|vector|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
   'parallel|plane-run|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
   'parallel|plane-run|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
-  'parallel|plane-named|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): absolute×absolute — the claim is the whole answer' },
+  'parallel|plane-named|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: '#1439 (ADR-3D-263): planePinningRels — pins the parameter iff a normal carries it, else a verified claim' },
 
   // ---- skew / intersecting / coincident (mutual positions) — S4 (#378, ADR-3D-104) -----
   //
@@ -145,7 +145,7 @@ const CELLS: Record<string, CellStatus> = {
   'angle|line|segment': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2 (ADR-3D-103)' },
   'angle|line|vector': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2 (ADR-3D-103)' },
   'angle|line|line': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2 (ADR-3D-103)' },
-  'angle|plane-named|plane-named': { status: 'supported', actions: ['param-root'], note: 'planeAngles — the 2022-Q2 45°' },
+  'angle|plane-named|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: '#1439 (ADR-3D-263): planePinningRels (the 2022-Q2 45° pins a) — else a verified claim' },
   'angle|plane-run|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
   'angle|plane-run|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
 

@@ -180,6 +180,50 @@ export const lineSym3 = (c: Construction3, name: string): string | null => {
 /** #801: the plane edition of {@link lineSym3}. */
 export const planeSym3 = (c: Construction3, name: string): string | null => c.planes.get(name)?.sym ?? null;
 
+/** A direction relation between two NAMED EQUATION planes that pins the figure parameter (#1439). */
+export interface PlanePinRel3 {
+  rel: 'perp' | 'parallel' | 'angle';
+  deg?: number;
+  p1: string;
+  p2: string;
+}
+
+/**
+ * #1439 (ADR-3D-263) — the plane × plane twin of `paramPinningLineRels`: which stated relations between
+ * two NAMED equation planes PIN the figure parameter. The rule is the line column's, applied to the
+ * plane column: a ⟂ / ∥ / angle between named planes pins the parameter iff one side's NORMAL carries
+ * it (the offset alone cannot change a direction relation). Every other instance is a CLAIM, verified by
+ * `relDeviation` on the finished figure — the `plane-rel` apply records that claim for every instance,
+ * so no relation between equation planes can escape verification whatever lane it solves in.
+ *
+ * Before #1439 this was decided by the RELATION WORD: «הזווית בין המישורים» went to a list only the
+ * parameter machinery read (so with no parameter it was checked by nothing, and with the parameter on a
+ * THIRD plane it root-found a constant into `no-roots`), while «ניצב» / «מקביל» went to the claim lane
+ * even when a normal carried the parameter (so a satisfiable ⟂ was judged at a sampled value).
+ *
+ * Excluded, each for the reason the line twin excludes it: a FREE plane (the relation pins the PLANE —
+ * `resolveFreePlane` — never the parameter; its placeholder carries none), and a PIN-SYMBOL plane (#801:
+ * its letter is the pivot's, so rooting the algebraic parameter over it reads the wrong lane's letter).
+ * A LABELLED angle («היא α») names a measure and is never recorded as a claim, so it never appears here.
+ */
+export function planePinningRels(c: Construction3): PlanePinRel3[] {
+  if (!c.param) return [];
+  const out: PlanePinRel3[] = [];
+  for (const cl of c.claims) {
+    if (cl.type !== 'plane-rel') continue;
+    if (cl.rel !== 'perp' && cl.rel !== 'parallel' && cl.rel !== 'angle') continue;
+    if (cl.rel === 'angle' && cl.deg === undefined) continue;
+    if (cl.a.kind !== 'plane-named' || cl.b.kind !== 'plane-named') continue;
+    const [p1, p2] = [cl.a.name, cl.b.name];
+    const d1 = c.planes.get(p1);
+    const d2 = c.planes.get(p2);
+    if (!d1 || !d2 || d1.free || d2.free || d1.sym || d2.sym) continue;
+    if (!planeNormalCarriesParam(c, p1) && !planeNormalCarriesParam(c, p2)) continue;
+    out.push({ rel: cl.rel, ...(cl.deg !== undefined ? { deg: cl.deg } : {}), p1, p2 });
+  }
+  return out;
+}
+
 /**
  * #801 (ADR-3D-174) — the stated MEMBERSHIPS whose carrier is a pin-symbol object («A on ℓ» where ℓ is
  * «x = (8,-1,-1) + t(k+1,0,k-3)» and the pivot owns k). They can only be driven INSIDE the pivot: the
@@ -264,6 +308,11 @@ const characteristic = (g: OperandGeom): { v: Vec3; planar: boolean } | null =>
  * direction as side B). The stated ANGLE follows the same split: between two lines or two planes it
  * is the ordinary \|cos\|, between a line and a plane it is the formula sheet's sin β = \|n·u\|/(\|n\|\|u\|).
  */
+/** #1439 (ADR-3D-263): the bar a `relDeviation` must clear for a stated direction relation to HOLD —
+ *  one constant, read by the claim verifier and by the renderer's dihedral arc, so an arc can never be
+ *  drawn for an angle the verifier would refuse. */
+export const DIRECTION_REL_TOL = 1e-4;
+
 export function relDeviation(
   rel: 'perp' | 'parallel' | 'angle',
   deg: number | undefined,

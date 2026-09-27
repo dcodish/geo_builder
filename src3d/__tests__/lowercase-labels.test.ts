@@ -75,6 +75,6 @@ describe('#181 — NO THEFT: the case-significant lanes are untouched', () => {
   });
 
   it('plane-angle English phrasing is untouched', () => {
-    expect(cmds('the angle between the planes π1 and π2 is 45')).toEqual([{ type: 'plane-angle', p1: 'π1', p2: 'π2', deg: 45 }]);
+    expect(cmds('the angle between the planes π1 and π2 is 45')).toEqual([{ type: 'plane-rel', rel: 'angle', deg: 45, a: { kind: 'plane-named', name: 'π1' }, b: { kind: 'plane-named', name: 'π2' } }]); // #1439: the plane-rel lowering
   });
 });

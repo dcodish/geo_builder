@@ -808,13 +808,18 @@ export interface FreeLineCommand {
   name: string;
 }
 
-/** `הזווית בין המישורים היא 45°` — PINS the parameter (its roots are the figure's branches). */
+/**
+ * #1439 (ADR-3D-263) — a LOAD-COMPAT ALIAS only. The parser no longer emits it: every plane × plane
+ * angle lowers to ONE `plane-rel {rel:'angle'}`, whose routing (pin the parameter iff a normal carries
+ * it, else a verified claim) lives in `planePinningRels`. A `.geo3.json` saved before #1439 still
+ * carries this command, and `apply` lowers it to that same `plane-rel` — so an old file can never
+ * reach a lane where the angle is checked by nothing.
+ */
 export interface PlaneAngleCommand {
   type: 'plane-angle';
   p1: string;
   p2: string;
   deg: number;
-  branch?: number;
 }
 
 /** `A נמצאת על אחד המישורים` — membership given; with `'any'` it also SELECTS the branch (2022-Q2).
@@ -1215,11 +1220,9 @@ export interface Construction3 {
   lines: Map<string, Line3Def>;
   /** V2 — the single symbolic parameter's letter, once one appears. */
   param?: string;
-  /** V2 — the stated angle-between-planes givens (they pin the parameter). */
-  planeAngles: PlaneAngleCommand[];
   /** V2 — membership givens (verify; `'any'` also selects the parameter branch). */
   memberships: OnPlanesCommand[];
-  /** V3 — line ⟂ plane givens (they pin the parameter, like planeAngles). */
+  /** V3 — line ⟂ plane givens (they pin the parameter, like a plane-rel between equation planes — #1439). */
   linePerps: LinePerpPlaneCommand[];
   /** V3 — membership givens on lines (verified). */
   onLines: OnLineCommand[];
@@ -1380,7 +1383,6 @@ export const emptyConstruction3 = (): Construction3 => ({
   redundantShapes: [],
   planes: new Map(),
   lines: new Map(),
-  planeAngles: [],
   memberships: [],
   linePerps: [],
   onLines: [],

@@ -264,6 +264,11 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   figure's placement against the axes, a never-positioned point) that no drive honours is refused as
   *not yet determined*, naming that part, and never as wrong
   ([ADR-3D-260](06b-decisions-3d.md#adr-3d-260) — one rule; #508, #552, #512 and #1311 are its carriers).
+  **A relation between two planes given by equations** (an angle, ⟂, ∥) is checked the same way: it is
+  refused when false and its value is drawn only when it holds. When a plane's equation carries the
+  figure's parameter in its normal, the relation instead **pins the parameter** (its roots are the figure's
+  configurations), and a parameter on some other plane never affects it
+  ([ADR-3D-263](06b-decisions-3d.md#adr-3d-263), #1439).
 - **FR-CL-2 (Must)** — **No claim can escape by hiding inside a composite.** Every claim is recorded on
   the construction and verified on evaluation, so a claim arriving as part of a larger command is checked
   like any other. *(Realised — `Construction3.claims`, verified in `derive3`.)* A **role noun** is a claim

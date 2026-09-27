@@ -233,6 +233,18 @@ const SEEDED: SeededCorpus = {
   // one-line form (refused `unknown-point: A`) now builds the same figure. Green replay + no drift.
   'free-vector-length-1311.geo3.json': ['וקטור AB', 'אורך AB = 5'],
   'free-vector-length-oneline-1311.geo3.json': ['וקטור AB = 5'],
+  // #1439 (ADR-3D-263) — the reviewer's planes with the TRUE dihedral (the false 45/30/0 are refused and
+  // cannot be saved), the «X לבין Y» spelling that was not-understood, and the parameter on a THIRD plane
+  // that used to turn a true angle into `no-roots`; then a ⟂ whose normal carries m, which pins m = 0, and a point on one of the planes.
+  'plane-angle-claim-1439.geo3.json': [
+    'המישור π1: z = 3',
+    'המישור π2: x + y + z = 1',
+    'הזווית בין המישורים π1 ו-π2 היא 54.7356',
+    'הזווית בין המישור π1 לבין המישור π2 היא 54.7356',
+    'המישור π3: x + mz = 0',
+    'π1 ניצב ל-π3',
+    'A(1,0,0) נמצאת על אחד המישורים', // a point, so the net has positions to check (A is on π2)
+  ],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

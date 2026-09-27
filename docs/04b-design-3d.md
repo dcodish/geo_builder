@@ -165,6 +165,16 @@ list rather than against intuition.
 `operands.ts` resolves operand *thunks*, so a rule names what it wants without knowing how that operand
 will be produced.
 
+**A relation's lane is decided by its OPERANDS, never by its word** (#1439,
+[ADR-3D-263](06b-decisions-3d.md#adr-3d-263)). Between two absolute objects a relation either pins the
+figure parameter or is a claim, and the deciding question is whether a referenced direction carries the
+parameter — `paramPinningLineRels` for the line column, `planePinningRels` for plane × plane. Every such
+relation also records its claim, so whatever lane it solves in, the verifier is the final arbiter. The plane
+column once decided by the word instead: «הזווית בין המישורים» went to a list only the root-find read (with
+no parameter, checked by nothing and drawn as knowledge), while «ניצב» / «מקביל» went to the claim lane even
+when a normal carried the parameter. A number the renderer prints from such a relation is drawn only when
+the relation holds on the drawn figure, through the verifier's own tolerance (`DIRECTION_REL_TOL`).
+
 **A declared action must hold for every spelling of its row, and the SHAPE of a pin kind is not a
 semantic rule.** `'angle|segment|segment'` declared `drive-dims` while `apply.ts` delivered it only when
 `claim.a1 === claim.a2` — not a geometric condition, but the shape of the one pin kind that existed
