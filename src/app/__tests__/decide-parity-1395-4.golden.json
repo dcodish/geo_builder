@@ -122,6 +122,7 @@
  "scenario:bisector-reads-the-triangle-operand-1285": "55b6949acbc3b3e5",
  "scenario:bare-midsegment-binds-the-triangle-and-cycles-1368": "3218f1034555a471",
  "scenario:bound-with-its-value-on-the-boundary-samples-1351": "146b9ad2bb43b04a",
+ "scenario:definite-circle-passes-through-binds-existing": "093d0a6367d27c8b",
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",
  "fixture:defining-interaction.geo.json": "453b283f490e90b0",
  "fixture:equilateral-inscribed.geo.json": "d8a2b3c24fc515b8",
