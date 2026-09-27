@@ -24,7 +24,8 @@ import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { MAX_FIGURE_STATEMENTS, figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { applySwitcherConfig, configOf, readToolConfig, type ToolConfig } from '../shell/switcherConfig';
-import { deriveLines } from './app/deriveLines';
+import { complexScopeOf, deriveLines } from './app/deriveLines';
+import { realParamNotes } from './app/paramNote';
 import { askRowsOf } from './app/askLane';
 import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, submitQuery, toggleLine } from './app/submit';
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
@@ -61,7 +62,12 @@ const ERROR_KEY: Record<InputError['key'], string> = {
   incompatible: 'errIncompatible',
   impossible: 'errImpossible',
   unaccounted: 'errUnaccounted',
+  'complex-as-real': 'errComplexAsReal',
 };
+
+/** An error's interpolation values: its detail, and the letter when the error names one (#1405). */
+const errParams = (e: InputError): Record<string, string> =>
+  'letter' in e ? { detail: e.detail, letter: e.letter } : { detail: e.detail };
 
 export function App() {
   const { t, i18n } = useTranslation();
@@ -331,7 +337,23 @@ export function App() {
   // #789: the ask lane rides the fold as QUESTIONS — its entries can never constrain the figure
   const derived2 = useMemo(() => deriveLines(active, seed, seed, queries), [active, seed, queries]);
   // …and each saved question resolves to its answer (or its reason) against the current figure
-  const askRows = useMemo(() => askRowsOf(queries, derived2.knowledge), [queries, derived2]);
+  const askRows = useMemo(
+    () => askRowsOf(queries, derived2.knowledge, new Set(complexScopeOf(active).keys())),
+    [queries, derived2, active],
+  );
+  /**
+   * #1405 — the teaching note on a letter read as a real number, keyed by its row in the FULL list
+   * (the notes are computed over the active lines the figure was folded from).
+   */
+  const paramNotes = useMemo(() => {
+    const activeIdx = lines.map((_, i) => i).filter((i) => !disabled.includes(i));
+    const byRow = new Map<number, { name: string; value: string }[]>();
+    for (const n of realParamNotes(active, derived2, seed)) {
+      const row = activeIdx[n.line];
+      byRow.set(row, [...(byRow.get(row) ?? []), n]);
+    }
+    return byRow;
+  }, [lines, disabled, active, derived2, seed]);
   const [askText, setAskText] = useState('');
   const askRef = useRef<HTMLInputElement | null>(null);
 
@@ -478,7 +500,7 @@ export function App() {
       {loadAudit.failed.map((f, idx) => (
         <div key={`${idx}-${f.line}`} style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
           <code dir="ltr">{f.line}</code>
-          <span>— {t(ERROR_KEY[f.reason.key], { detail: f.reason.detail })}</span>
+          <span>— {t(ERROR_KEY[f.reason.key], errParams(f.reason))}</span>
         </div>
       ))}
     </Banner>
@@ -666,7 +688,7 @@ export function App() {
               {/* No quick strip above the box (operator ruling 2026-08-18: "expensive screen
                   space") — the curated commands live on the CLEAN CANVAS (QuickChips below). */}
               {lastError && (
-                <Banner kind="error">{t(ERROR_KEY[lastError.key], { detail: lastError.detail })}</Banner>
+                <Banner kind="error">{t(ERROR_KEY[lastError.key], errParams(lastError))}</Banner>
               )}
             </InputArea>
             {/*
@@ -690,6 +712,16 @@ export function App() {
                     })()
                   : undefined,
                 disabled: disabled.includes(i),
+                // #1405 — a NOTE, never an error: the line is accepted and the real reading stands
+                notes: paramNotes.has(i) ? (
+                  <>
+                    {paramNotes.get(i)!.map((n) => (
+                      <div key={n.name} dir={i18n.dir()} style={{ color: '#64748b', fontSize: '0.85em' }}>
+                        {t('noteRealParam', { name: n.name, value: n.value })}
+                      </div>
+                    ))}
+                  </>
+                ) : undefined,
               }))}
               textDir={complexBidi.textDir}
               emptyHint={t('emptyHint')}

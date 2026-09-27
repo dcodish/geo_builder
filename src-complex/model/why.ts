@@ -48,7 +48,9 @@ export type Why =
   // --- lines the fold could not use (app/deriveLines.ts) --------------------
   | { readonly code: 'line-unaccounted'; readonly items: string }
   | { readonly code: 'line-unrecognized' }
-  | { readonly code: 'reserved-letter'; readonly letter: string; readonly equation: string };
+  | { readonly code: 'reserved-letter'; readonly letter: string; readonly equation: string }
+  /** #1405 — a letter declared complex («declaration») sits where only a real number can (a size, an angle) */
+  | { readonly code: 'declared-complex-real'; readonly letter: string; readonly declaration: string };
 
 /**
  * The translate seam the reading layer receives — shaped like the product i18n's `t`, so the App

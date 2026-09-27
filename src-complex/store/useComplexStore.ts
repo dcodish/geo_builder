@@ -46,6 +46,11 @@ export type InputError =
    * about a statement — the honesty invariant this product is built on forbids exactly that.
    */
   | { key: 'impossible'; detail: string }
+  /**
+   * #1405 — a letter declared complex («u מספר מרוכב») and a statement that uses it where only a real
+   * number can stand (a size or an angle). `detail` is that statement, in either entry order.
+   */
+  | { key: 'complex-as-real'; detail: string; letter: string }
   /** v2 read part of the line and could not account for the rest — it names the student's own words */
   | { key: 'unaccounted'; detail: string };
 

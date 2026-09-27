@@ -92,6 +92,15 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   through the existing integrality check. Tier 2 bounds a size `> 0`, holds a tier-1 sign to its branch,
   and leaves a tier-2-only sign-free parameter (`a + b·i`) unbounded, with a per-seed starting sign.
   Stage 5d prints the sign (`-2`, `±2`) and reads a free sign-free magnitude as `|u|`.
+- **A declaration is a type, read before any line** ([ADR-CX-047](06d-decisions-complex.md#adr-cx-047)).
+  `isComplexName` takes a SCOPE, the letter families the figure declared complex, and the per-line
+  parser is handed it by `lowerLines`, which reads every declaration first (`complexScopeOf`). That is
+  what makes a declaration order-independent without making the parser stateful. A declaration reports
+  `typed`, never `declares`: it types a letter and creates no number, so it neither grounds nor clashes
+  with an enumeration of the same letter. A line that reads without the scope and fails with it is a
+  declared letter in a real slot, and it is reported against the declaration (`declared-complex-real`)
+  and refused by the gate with the statement named (`complex-as-real`). The teaching note on a solved
+  parameter (`app/paramNote.ts`) is offered only when the declaration it teaches passes that same gate.
 - **A solution set claims its names** ([ADR-CX-042](06d-decisions-complex.md#adr-cx-042)). `X^n = …` on a fresh
   letter lowers to X₁ pinned to the principal root and Xₖ pinned `(k−1)/n` of a turn from it — always,
   whether or not the student already holds some Xₖ. That makes claiming the name the consistency
