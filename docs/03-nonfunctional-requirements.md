@@ -53,7 +53,16 @@ For capabilities that are expensive (extra LLM spend) or commercial (premium/pai
 
 - **NFR-SE-1** — The Claude API key is **never shipped to the browser**; all API calls go through a server-side proxy that holds the key.
 - **NFR-SE-2** — The proxy is gated (e.g. a per-class access code) and rate-limited per client, so an exposed endpoint cannot be abused to run up cost.
-- **NFR-SE-3** — No accounts, no names, no student personal identifiers. The server keeps a **minimal usage-event log** for product improvement ([ADR-179](06-decisions.md#adr-179), [ADR-278](06-decisions.md#adr-278)): the typed utterance (math text only), locale/outcome, and a salted-HMAC **visitor hash — never the raw IP**. Retention is **finite by default** (`EVENTS_RETENTION_DAYS`; default 7 days, operator ladder 7→~30 with real traffic) and the salt never falls back to a committed constant (unset ⇒ random per-boot). A short privacy note is shown **in-app** (2-D About modal, 3-D footer). Figure persistence (FR-HS-4) is local to the browser; verbose debug logs (figure snapshots) are dev-only, never written in production.
+- **NFR-SE-3** — No accounts, no names, no student personal identifiers. The server keeps a **minimal usage-event log** for product improvement ([ADR-179](06-decisions.md#adr-179), [ADR-278](06-decisions.md#adr-278)): the typed utterance (math text only), locale/outcome, and a salted-HMAC **visitor hash — never the raw IP**. Retention is **finite by default** (`EVENTS_RETENTION_DAYS`; default 7 days, operator ladder 7→~30 with real traffic) and the salt never falls back to a committed constant (unset ⇒ random per-boot). A short privacy note is shown **in-app** in **every** builder, in the About modal the shared frame opens from the suite bar (`shell/frame/AppFrame.tsx`), and it **names every place the student's input can leave the browser for** — the usage log, the model fallback (an external AI service that receives the statements the tool did not understand), the short-link store. Where each note lives, and what it must disclose, is measured from the product's wiring by the privacy-disclosure lock ([ADR-W-090](06w-decisions-workspace.md#adr-w-090)):
+
+  | builder | note (he + en) | declaration | discloses (2026-09-27) |
+  | --- | --- | --- | --- |
+  | 2-D | `src/i18n/locales/{he,en}.json` → `about.privacy` (also the first-load intro) | `src/ui/privacy.ts` | usage log · AI fallback · share store |
+  | 3-D | `src3d/i18n/locales/{he,en}.json` → `privacy` | `src3d/ui/privacy.ts` | usage log · AI fallback · share store |
+  | complex | `src-complex/i18n/index.ts` → `privacy` | `src-complex/ui/privacy.ts` | share store only — the work stays in the browser |
+  | analytic | `src-analytic/i18n/index.ts` → `privacy` | `src-analytic/ui/privacy.ts` | usage log · AI fallback · share store |
+
+  Figure persistence (FR-HS-4) is local to the browser; verbose debug logs (figure snapshots) are dev-only, never written in production.
 
 ## Accessibility
 

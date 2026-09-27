@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import { useTranslation } from 'react-i18next';
 // The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
 import { AppFrame } from '../shell/frame/AppFrame';
+import { privacyDeclaration } from './ui/privacy';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
@@ -827,7 +828,7 @@ export default function App3() {
         label: t('aboutLabel'),
         title: t('aboutTitle'),
         body: <p style={{ marginTop: 0 }}>{t('aboutLead')}</p>,
-        privacy: t('privacy'),
+        privacy: privacyDeclaration(t),
         closeLabel: t('aboutClose'),
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}

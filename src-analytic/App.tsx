@@ -14,6 +14,7 @@ import { useStore } from 'zustand';
 import { useTranslation } from 'react-i18next';
 import registry from '../products.json';
 import { AppFrame } from '../shell/frame/AppFrame';
+import { privacyDeclaration } from './ui/privacy';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
 import { InputArea } from '../shell/frame/InputArea';
@@ -1055,7 +1056,7 @@ export function App() {
         label: t('about'),
         title: t('aboutTitle'),
         body: t('aboutBody'),
-        privacy: t('privacy'),
+        privacy: privacyDeclaration(t),
         closeLabel: t('close'),
       }}
     >

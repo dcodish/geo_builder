@@ -105,8 +105,9 @@ const he = {
   aboutBody:
     'כלי לשרטוט שאלות גאומטריה אנליטית: מקלידים את הנתונים כלשונם, והכלי משרטט את הצורה. הכלי אינו פותר את השאלה.',
   privacy:
-    'המשפטים שאתם מקלידים נשמרים בדפדפן שלכם.' +
-    'כשאתם לוחצים «העתק קישור», השרטוט ותמונה שלו נשמרים בשרת כדי שהקישור יעבוד — בלי שם ובלי פרטים אישיים, ומי שיש לו את הקישור יכול לפתוח אותו.',
+    'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. לצורך שיפור הכלי נשמרים המשפטים שהקלדתם (טקסט מתמטי בלבד) עם מזהה מבקר אנונימי — ללא כתובת ה-IP — למספר ימים בלבד.' +
+    ' משפטים שהכלי לא הבין נשלחים לעיבוד בשירות בינה מלאכותית חיצוני.' +
+    ' כשאתם לוחצים «העתק קישור», השרטוט ותמונה שלו נשמרים בשרת כדי שהקישור יעבוד — בלי שם ובלי פרטים אישיים, ומי שיש לו את הקישור יכול לפתוח אותו.',
   close: 'סגור',
   switcherLabel: 'בחירת כלי',
   switcherMore: 'עוד',
@@ -342,7 +343,8 @@ const en: typeof he = {
   aboutBody:
     'A tool for drawing analytic-geometry questions: type the givens as the exam words them and the tool draws the figure. It does not solve the question.',
   privacy:
-    'The statements you type stay in your own browser.' +
+    'Privacy: no sign-up and no personal details are collected. To improve the tool, the statements you type (math text only) are kept for a few days with an anonymous visitor id — your IP address is never stored.' +
+    ' Statements the tool does not understand are sent for processing to an external AI service.' +
     ' When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.',
   close: 'Close',
   switcherLabel: 'Choose a tool',

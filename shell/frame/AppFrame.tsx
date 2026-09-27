@@ -23,6 +23,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { color, fs, radius } from '../theme';
 import { Modal } from './Modal';
+import type { PrivacyDeclaration } from './privacy';
 import { ProductSwitcher, type RosterEntry } from './Switcher';
 
 export interface AppFrameAbout {
@@ -30,8 +31,10 @@ export interface AppFrameAbout {
   label: string;
   title: string;
   body: ReactNode;
-  /** The in-app privacy note (NFR-SE-3). Required — a public builder without one is the gap. */
-  privacy: string;
+  /** The in-app privacy note (NFR-SE-3). Required — a public builder without one is the gap. A
+   *  DECLARATION, not a string (#1426, ADR-W-090): the text plus the sinks it discloses, so the
+   *  §5c privacy lock can hold the note to the product's real wiring. */
+  privacy: PrivacyDeclaration;
   closeLabel: string;
 }
 
@@ -155,7 +158,7 @@ export function AppFrame({
         }
       >
         {about.body}
-        <p style={privacyStyle}>{about.privacy}</p>
+        <p style={privacyStyle}>{about.privacy.text}</p>
         {buildStamp && <p style={stampStyle}>{buildStamp}</p>}
       </Modal>
     </>

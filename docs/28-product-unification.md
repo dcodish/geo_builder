@@ -926,6 +926,11 @@ the decision into its own function. That is what went red in #1315, on a refacto
    is caught. It calls the same `xFaults`, never its own copy.
 
 Live instances: `issue-1152-preview-rows.ts` (the input preview) and `issue-1296-rows.ts` (bidi run spans).
+`privacy-disclosure-rows.ts` (#1426, [ADR-W-090](06w-decisions-workspace.md#adr-w-090)) applies the pattern
+to a subject that is WIRING rather than behaviour: the product's callable is `privacyDeclaration(t)`, and
+the fixture measures the other side itself by walking the bundle's import graph from the product's real
+entry — an import-reachability scan, not a text grep of `App*.tsx`, so moving a sink into a new file
+cannot hide it.
 
 ## 5d. The sequence gate ([ADR-W-076](06w-decisions-workspace.md#adr-w-076))
 
