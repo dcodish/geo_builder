@@ -2249,6 +2249,53 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     }
   }
 
+  /**
+   * THE GAUGE IS NOT A CONFIGURATION (#1421, ADR-3D-272 — operator ruling 2026-09-27, twice:
+   * "keep it flat on the floor").
+   *
+   * A figure with nothing fixing it in space has six rigid-motion values, and once a driven given
+   * ran the solve, «הציגו תצורה אחרת» resampled them with the real freedom — the operator's
+   * triangle (|AB| = 5, |AC| = 3) tumbled edge-on to the camera at 3 of 4 seeds and AB drew
+   * SHORTER than AC. Turning the whole figure changes nothing a student stated or could state
+   * (ADR-052: do not sample what cannot matter), so an UNANCHORED figure is normalised after
+   * every solve to the canonical placement a lone triangle already keeps: first point at the
+   * origin, first edge along +x, the first three points' plane on the floor (z = 0, third point
+   * at y > 0). One rigid motion (det +1 — never a reflection) applied to every position, plane
+   * and line, so every relation survives verbatim; configurations change the SHAPE alone.
+   * Anything anchored — coordinates, pins, equation planes/lines, frame relations, solids,
+   * revolutions, circles — is untouched.
+   */
+  if (
+    !hasAbsoluteFrameObject(c) &&
+    absolutePointCount(c) === 0 &&
+    c.solids.length === 0 &&
+    c.revolutions.length === 0 &&
+    c.circles3.length === 0
+  ) {
+    const ordered = [...c.points.keys()].map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
+    let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = null;
+    for (let i = 1; i < ordered.length && !frame; i += 1) {
+      const d1 = sub3(ordered[i], ordered[0]);
+      if (norm3(d1) < 1e-9) continue;
+      for (let j = i + 1; j < ordered.length; j += 1) {
+        const d2 = sub3(ordered[j], ordered[0]);
+        const nRaw = cross3(d1, d2);
+        if (norm3(nRaw) < 1e-9) continue;
+        const e1 = normalize3(d1);
+        const n = normalize3(nRaw);
+        frame = { p0: ordered[0], e1, e2: cross3(n, e1), n };
+        break;
+      }
+    }
+    if (frame) {
+      const { p0, e1, e2, n } = frame;
+      const rot = (v: Vec3): Vec3 => v3(dot3(v, e1), dot3(v, e2), dot3(v, n));
+      for (const [id, p] of pos) pos.set(id, rot(sub3(p, p0)));
+      for (const [name, pl] of planes) planes.set(name, { n: rot(pl.n), d: pl.d + dot3(pl.n, p0) });
+      for (const [name, ln] of lines) lines.set(name, { ...ln, anchor: rot(sub3(ln.anchor, p0)), dir: rot(ln.dir) });
+    }
+  }
+
   return {
     positions: pos,
     planes,
