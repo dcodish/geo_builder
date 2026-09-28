@@ -551,7 +551,9 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
           !(c.scaleGivens.includes(claim) && scaleGivenActive(c))
         ) {
           const exactlyCheckable = scaleGivenActive(c) && freeDims(c) === 0;
-          const pivotLane = claim.type === 'volume-poly' && c.scaleGivens.length === 0 && scalePinned(c);
+          // #1447: an AREA claim mirrored by its driving pin joins the volume's pivot lane — the
+          // pin drove the free dims toward the statement, and this verification is its arbiter.
+          const pivotLane = (claim.type === 'volume-poly' || claim.type === 'area-eq') && c.scaleGivens.length === 0 && scalePinned(c);
           if (!exactlyCheckable && !pivotLane) {
             status[owner.factId] = { code: 'size-on-solid' };
             break;

@@ -157,6 +157,10 @@ export type ScalarPin =
    */
   | { kind: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // DC⃗ = 3·AB⃗
   | { kind: 'length'; a: Id; b: Id; value: number } // |DC| = 4
+  // #1447 — a VOLUME/AREA with free dims DRIVES like a length (operator ruling 2026-09-27: a later
+  // magnitude may move free shape dims; #754 restricts only the FIRST). The claim stays the arbiter.
+  | { kind: 'volume3'; noun: SolidNoun; ids: Id[]; value: number } // נפח הפירמידה ABCD = 12, driving
+  | { kind: 'area3'; ids: [Id, Id, Id]; value: number } // שטח ABC = 4.5, driving
   | { kind: 'vangle'; vertex: Id; p: Id; q: Id; deg: number } // ∠ADC = 120
   // #909 — the angle between two SEGMENTS that need not meet («הזווית בין A'C לבין BC' היא 70»).
   // `vangle` is shaped as vertex+two rays and cannot express it, which is why the drive used to be
