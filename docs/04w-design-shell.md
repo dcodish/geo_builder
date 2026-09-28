@@ -368,3 +368,7 @@ What the lock does not check: whether the words are good. That is prose, per pro
 ## The palette face and the typed comparison ([ADR-W-095](06w-decisions-workspace.md#adr-w-095))
 
 A `SymbolSpec` whose face (`label`) is one character inserts exactly that character, or carries `keyboardForm` saying why not. `shell/__tests__/fixtures/palette-faces.ts` checks it, and every product runs it over its own palette. The store-side ingest (ADR-W-029) is `ingestTypedText` in `bidi.ts`: `stripFormatControls` and then `foldComparisons` (`>=` → `≥`, `<=` → `≤`, a bare two-character operator only). Every product store records through it, analytic's included, which had no ingest boundary before. The parsers keep only the strip; every grammar reads both spellings the same way.
+
+## Student-facing text ([ADR-W-096](06w-decisions-workspace.md#adr-w-096))
+
+`shell/studentText.ts` `studentFacingViolations(values, { typed, names })` judges the VALUES a message interpolates, never its template, since a template may quote a worked example. A value may name what the student typed (case-insensitive) or what the figure shows; an id-shaped token (`~x`, `@x`, `#x`, `kind-Id`), an untyped English word, or an unknown capital label is a violation. Each product runs it over its own refusal corpus through its own humanizer. 3-D's is `src3d/i18n/errorText3.ts`; the other three are #1522.

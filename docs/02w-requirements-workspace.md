@@ -58,7 +58,7 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   `ToolButton.tsx`; D4 as amended by #706.)*
 - **FR-SU-5 (Must)** — **One voice for refusals and notices.** A refusal, a warning and a notice look and
   read the same in every builder; error text names the conflicting *statement*, never internal state.
-  *(Realised — `shell/frame/Banner.tsx`.)*
+  *(Realised — `shell/frame/Banner.tsx`.)* A message may interpolate only what the student typed or the figure shows — never an engine id or noun. *(Checked — [ADR-W-096](06w-decisions-workspace.md#adr-w-096); 3-D locked, the rest #1522.)*
 - **FR-SU-6 (Should)** — **Every figure action lives under the canvas**, not scattered between header and
   sidebar. *(Realised — D7.)*
 - **FR-SU-7 (Should)** — **A manual screen per builder, in one chrome.** Each builder documents its own
