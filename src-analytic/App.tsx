@@ -843,8 +843,17 @@ export function App() {
         setError({ key: 'llm-busy', detail: raw });
         return;
       }
-      // 'none' and 'rejected' alike: the student keeps the refusal about their own sentence. Naming
-      // the model's rejected line would report internal state for words they never typed.
+      /**
+       * 'rejected' is no longer worded as «not understood» (#1336): the tool DID understand — the
+       * escape ran and produced a completion the tool declined — and telling the student their
+       * sentence was unintelligible sends them rewriting words that were never the problem. The
+       * note says the honest middle; the model's line itself stays out (#1251), and 'none' keeps
+       * the original refusal, which for a genuinely unread sentence is the true answer.
+       */
+      if (out.kind === 'rejected') {
+        setError({ key: 'llm-understood-unsupported', detail: raw });
+        return;
+      }
       setError(original);
     } finally {
       clearTimeout(timer);
@@ -906,6 +915,7 @@ export function App() {
           'crossing-already-named': 'errCrossingAlreadyNamed',
           'self-crossing': 'errSelfCrossing',
           'llm-busy': 'errLlmBusy',
+          'llm-understood-unsupported': 'errLlmUnderstood',
           'bad-operand': 'errBadOperand',
           'conflicting-restatement': 'errConflict',
           'name-kind-clash': 'errNameClash',

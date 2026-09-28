@@ -88,6 +88,8 @@ export type InputError =
    * they find out what happened.
    */
   | { key: 'llm-busy'; detail: string }
+  // #1336: the escape ran and the tool declined its completion — understood, not unintelligible.
+  | { key: 'llm-understood-unsupported'; detail: string }
   /** A relation whose verb was understood and whose operand was not (#1052). */
   | { key: 'bad-operand'; detail: string }
   /** The statement contradicts what an earlier statement already fixed. */

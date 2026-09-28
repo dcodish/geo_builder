@@ -204,6 +204,9 @@ const he = {
   // that their sentence was wrong: the tool did not get as far as looking at it.
   errLlmBusy:
     'השירות עמוס כרגע ולא הצלחתי לבדוק את המשפט "{{detail}}". אפשר לנסות שוב בעוד רגע, או לנסח אותו באחת הצורות שמופיעות ברשימת הפקודות.',
+  // #1336: the escape ran and the tool declined its completion — the sentence WAS understood.
+  errLlmUnderstood:
+    'הבנתי את המשפט "{{detail}}", אבל הכלי עדיין לא תומך במהלך הזה. אפשר לנסח אחרת, או להיעזר ברשימת הפקודות.',
   thinking: 'חושב…',
   errBadOperand:
     'הבנתי את היחס במשפט "{{detail}}", אבל לא זיהיתי את אחד האגפים. אפשר לציין שני קודקודים (AB), ' +
@@ -449,6 +452,8 @@ const en: typeof he = {
     'The two lines in "{{detail}}" are the same line, and a line has no intersection with itself, so the sentence defines no point. If you meant some point on that line, write for example "P on line AB".',
   errLlmBusy:
     'The service is busy, so I could not check "{{detail}}". Try again in a moment, or write it in one of the forms listed in the commands panel.',
+  errLlmUnderstood:
+    'I understood "{{detail}}", but the tool does not support this move yet. Try another phrasing, or the commands panel.',
   thinking: 'Thinking…',
   errBadOperand:
     'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +

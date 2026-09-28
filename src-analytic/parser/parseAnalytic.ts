@@ -535,7 +535,7 @@ const CIRCLE_NUMERAL_RUN = '(?:(I|II|III|IV|V|[1-5])(?=[\\s:]))?';
 function matchCurve(line: string): CurveHit | null {
   // --- line: «נתון הישר ℓ1: 4y-3x-20=0» · «משוואת הישר AC היא y=-2x+8» · «הישר x=-4» ---
   const heLineNamed = line.match(
-    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?(${HE_LINE})\\s+(${LINE_NAME})${HE_IS}\\s*:?\\s*(.+)$`),
+    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?(${HE_LINE})\\s+(${LINE_NAME})${HE_IS}(?:\\s+[-–](?=\\s))?\\s*:?\\s*(.+)$`),
   );
   if (heLineNamed) {
     return {
@@ -682,7 +682,7 @@ function matchCurve(line: string): CurveHit | null {
 
   // --- circle: «נתון מעגל I שמשוואתו …» · «משוואת המעגל …» ---
   const heCircle = line.match(
-    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s*${CIRCLE_NUMERAL_RUN}\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
+    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s*${CIRCLE_NUMERAL_RUN}(?:\\s+[-–](?=\\s))?\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
   );
   if (heCircle) {
     const numeral = heCircle[1] ?? '';
@@ -708,7 +708,7 @@ function matchCurve(line: string): CurveHit | null {
     };
   }
 
-  const enCircle = line.match(new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s*${CIRCLE_NUMERAL_RUN}\\s*:?\\s*(?:is\\s+)?(.+)$`));
+  const enCircle = line.match(new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s*${CIRCLE_NUMERAL_RUN}(?:\\s+[-–](?=\\s))?\\s*:?\\s*(?:is\\s+)?(.+)$`));
   if (enCircle) {
     const numeral = enCircle[1] ?? '';
     return {
@@ -736,15 +736,42 @@ function matchCurve(line: string): CurveHit | null {
    * namespaces, and the figure would hold two objects for one parabola — exactly the duplication
    * #1037 removed for lines and circles.
    */
-  const heParabola = line.match(new RegExp(`^${HE_GIVEN}ה?פרבולה(?:\\s+קנונית)?\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`));
-  if (heParabola) return { id: `curve-${anonIndex(heParabola[1])}`, name: '', kind: 'parabola', eqSrc: heParabola[1] };
-  const enParabola = line.match(/^(?:the\s+)?(?:canonical\s+)?parabola\s*:?\s*(?:is\s+)?(.+)$/i);
-  if (enParabola) return { id: `curve-${anonIndex(enParabola[1])}`, name: '', kind: 'parabola', eqSrc: enParabola[1] };
-
-  const heEllipse = line.match(new RegExp(`^${HE_GIVEN}ה?אליפסה(?:\\s+קנונית)?\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`));
-  if (heEllipse) return { id: `curve-${anonIndex(heEllipse[1])}`, name: '', kind: 'ellipse', eqSrc: heEllipse[1] };
-  const enEllipse = line.match(/^(?:the\s+)?(?:canonical\s+)?ellipse\s*:?\s*(?:is\s+)?(.+)$/i);
-  if (enEllipse) return { id: `curve-${anonIndex(enEllipse[1])}`, name: '', kind: 'ellipse', eqSrc: enEllipse[1] };
+  /**
+   * A parabola or an ellipse may be NAMED, exactly as a circle may (#1271, ADR-AG-170).
+   *
+   * Operator: *"since we can have more than 1 parabola on a diagram, we need to support things
+   * like «נתונה פרבולה I - y^2=2x»"*, and the 2026-09-20 ruling widened it: *"we need to support
+   * all such forms of writing."* ONE clause per language for both conics — a third copy per kind
+   * is the #1233/#1267 shape — with the connective set the textbook actually prints
+   * («שמשוואתה», «:», «-», «היא»), the numeral optional (anonymous keeps its content id), and the
+   * noun's gender NOT enforced: «נתון פרבולה» meant the parabola.
+   */
+  const heConic = line.match(
+    new RegExp(`^${HE_GIVEN}ה?(פרבולה|אליפסה)(?:\\s+קנונית)?\\s*${CIRCLE_NUMERAL_RUN}(?:\\s+[-–](?=\\s))?\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
+  );
+  if (heConic) {
+    const kind = heConic[1] === 'פרבולה' ? 'parabola' : 'ellipse';
+    const numeral = heConic[2] ?? '';
+    return {
+      id: numeral ? `${kind}-${numeral}` : `curve-${anonIndex(heConic[3])}`,
+      name: numeral ? `${heConic[1]} ${numeral}` : '',
+      kind,
+      eqSrc: heConic[3],
+    };
+  }
+  const enConic = line.match(
+    new RegExp(`^(?:the\\s+)?(?:canonical\\s+)?(parabola|ellipse)\\s*${CIRCLE_NUMERAL_RUN}(?:\\s+[-–](?=\\s))?\\s*:?\\s*(?:is\\s+|whose equation is\\s+)?(.+)$`, 'i'),
+  );
+  if (enConic) {
+    const kind = enConic[1].toLowerCase() as 'parabola' | 'ellipse';
+    const numeral = enConic[2] ?? '';
+    return {
+      id: numeral ? `${kind}-${numeral}` : `curve-${anonIndex(enConic[3])}`,
+      name: numeral ? `${kind} ${numeral}` : '',
+      kind,
+      eqSrc: enConic[3],
+    };
+  }
 
   return null;
 }
@@ -981,6 +1008,15 @@ function incidenceOn(operand: string, id: Id): Constraint | null {
    */
   const circle = /^ה?מעגל\s+(I|II|III|IV|V)$/.exec(trim(operand)) ?? /^(?:the\s+)?circle\s+(I|II|III|IV|V)$/i.exec(trim(operand));
   if (circle) return { t: 'on-curve', id, curve: `circle-${circle[1]}` };
+  // A NAMED parabola/ellipse operand (#1271) — «הפרבולה I», resolved to the id the naming clause
+  // mints, so «P על הפרבולה I» and a crossing with it reach THAT conic, never a second object.
+  const conic =
+    /^ה?(פרבולה|אליפסה)\s+(I|II|III|IV|V|[1-5])$/.exec(trim(operand)) ??
+    /^(?:the\s+)?(parabola|ellipse)\s+(I|II|III|IV|V|[1-5])$/i.exec(trim(operand));
+  if (conic) {
+    const kind = /פרבולה|parabola/i.test(conic[1]) ? 'parabola' : 'ellipse';
+    return { t: 'on-curve', id, curve: `${kind}-${conic[2]}` };
+  }
 
   const dir = direction(trim(operand));
   if (dir?.k === 'curve') return { t: 'on-curve', id, curve: dir.id };
@@ -2618,6 +2654,17 @@ function parseConstraint(raw: string): RuleOutcome {
       return made([
         { t: 'declare', id, src: line },
         { t: 'constraint', k: { t: 'on-curve', id, curve: dir.id }, src: line },
+      ]);
+    }
+
+    // «P על הפרבולה I» (#1271) — the point-on sentence reads a NAMED conic exactly as the
+    // crossing operand does, onto the id the naming clause mints.
+    const named = /^(I|II|III|IV|V|[1-5])$/.exec(operand);
+    if (named && /פרבולה|אליפסה|parabola|ellipse|מעגל|circle/i.test(noun ?? '')) {
+      const kind = /פרבולה|parabola/i.test(noun!) ? 'parabola' : /אליפסה|ellipse/i.test(noun!) ? 'ellipse' : 'circle';
+      return made([
+        { t: 'declare', id, src: line },
+        { t: 'constraint', k: { t: 'on-curve', id, curve: `${kind}-${named[1]}` }, src: line },
       ]);
     }
 
