@@ -58,6 +58,9 @@ const he = {
   symMul: 'כפל',
   symDist: 'מרחק בין שתי נקודות',
   anotherConfig: 'הציגו תצורה אחרת', // #739: ONE wording for the row, every tool
+  // #1452: the row's undo/redo had no keys and printed «undo»/«redo» in both languages — the siblings' wording
+  undo: 'בטל',
+  redo: 'בצע שוב',
   // #742 / ADR-W-024: the canvas cluster + the top-row image exports — the 2-D wording, every tool.
   resetView: 'איפוס תצוגה',
   copyImage: 'העתיקו תמונה',
@@ -278,6 +281,8 @@ const en: typeof he = {
   symMul: 'multiply',
   symDist: 'distance between two points',
   anotherConfig: 'Show another configuration',
+  undo: 'Undo',
+  redo: 'Redo',
   // #742 / ADR-W-024: the canvas cluster + the top-row image exports — the 2-D wording, every tool.
   resetView: 'Reset view',
   copyImage: 'Copy image',

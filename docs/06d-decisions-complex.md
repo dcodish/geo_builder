@@ -3348,3 +3348,17 @@ binomial-spelling, member, member-poly, quartic, corpus-witness}-1434.complex.js
 3. **The literal-atom bridge** — an off-axis `a+bi` literal (`2+3i`) carries its argument as an opaque atom, so `(mod, arg)` alone could not recover the pair. `fromCartesian` now REGISTERS the exact rational pair on the atom name (`value/angle.ts`; a name re-registered with a different pair is poisoned to null — exactness never guesses), and `gaussianRationalParts` reads it back for a single ±1-coefficient atom with quarter-turn offsets (·i rotations, conjugates). Everything outside the field — parameters, free points, non-quarter turns, irrational tables — answers null and the ≈ decimal stands.
 
 **Consequences.** `src-complex/value/rational.ts` (`sqrtExact`), `src-complex/value/angle.ts` (atom registry), `src-complex/value/value.ts` (`fromCartesian` registers), `src-complex/value/cartesian.ts` (`gaussianRationalParts`, `ratPart`), `src-complex/model/knowledge.ts` (`approx`), `src-complex/replay/derive2.ts` (the composers, `evalGauss`/`exactAnswer`, every row maker), `src-complex/App.tsx` (≈ rendering). Lock: `src-complex/__tests__/issue-1436-exact-ask.test.ts` — the reviewer's exact case (2√2), √5 through the atom bridge, exact complex/product/quotient answers, the integer and fraction spellings under `=`, and the irrational ≈ floor.
+
+## ADR-CX-054 — Undo/redo read in Hebrew, and every product's literal i18n keys are guarded (#1452)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27), batch-approved the same day · round #1517. Numbered 054 beside the round's other complex branches (052–053, 055).
+
+**Requirements:** none (internal — the standing rule that every user-facing string goes through `t()` and reads in the UI language) · **Design:** none (internal)
+
+**Context.** The complex Builder's undo/redo row read «undo / redo» in the Hebrew UI while the other three tools read «בטל / בצע שוב». `App.tsx` has called `t('undo')` / `t('redo')` since #1099, and neither key existed in either complex locale, so i18next printed the key name in both languages. This is the #882 class. The shared literal-key audit (#1372) ran only for 2-D and 3-D, on the belief that `const en: typeof he` covered the TS-object locales. That only keeps the two locales in step with each other; it cannot see a key missing from both.
+
+**Decision.** Add `undo`/`redo` to both complex locales with the siblings' wording. Run the shared `i18nKeyAudit` for complex AND analytic (analytic is clean today, but was unguarded), each with the "can fail" half, and correct the audit's header so the false belief is not repeated.
+
+**Measured.** On main `d3f08a4c` the complex audit reports exactly `App.tsx: undo`, `App.tsx: redo`. On the branch both products report none.
+
+**Consequences.** `src-complex/i18n/index.ts`, `shell/__tests__/fixtures/i18n-keys.ts` (comment). Locks: `src-complex/__tests__/i18n-keys-1452.test.ts`, `src-analytic/__tests__/i18n-keys-1452.test.ts`.
