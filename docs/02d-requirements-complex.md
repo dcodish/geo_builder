@@ -51,6 +51,10 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   triangle z1z2z3) is one of the numbers asked about and still counts. A polygon with nothing else to count
   shows no strip. *(Realised — [ADR-CX-053](06d-decisions-complex.md#adr-cx-053), #1425.)*
 
+- **FR-GP-6 (Must)** — **The grid covers what is on screen.** In both views the gridlines, rings, rays and
+  axis numbers span the whole visible canvas, at every zoom and on a canvas wider than it is tall, and
+  their step grows as the view zooms out. *(Realised — [ADR-W-094](06w-decisions-workspace.md#adr-w-094), #1465.)*
+
 ## Exactness and configuration
 
 - **FR-CN-1 (Must)** — **The multiplicative core is answered EXACTLY, not numerically.** Products,

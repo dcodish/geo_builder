@@ -13,6 +13,7 @@
 
 import type { Scene } from '../scene/scene';
 import { RadicalTspans } from './radicalText';
+import { visibleGrid } from './visibleGrid';
 
 /**
  * THE PLANE'S FALLBACK SIZE (#1104) — a first-paint default, never the drawing surface.
@@ -120,14 +121,9 @@ export function PolarPlane({
   const X = (x: number) => W / 2 + x * k;
   const Y = (y: number) => H / 2 - y * k;
   const cart = mode === 'cart';
-  /** The cartesian gridline positions — the same nice step the rings use, mirrored to negatives. */
-  const cartSteps = (() => {
-    if (!cart) return [];
-    const step = scene.grid.rings[0] ?? 1;
-    const out: number[] = [];
-    for (let v = step; v <= scene.extent; v += step) out.push(v, -v);
-    return out;
-  })();
+  // #1465 (ADR-W-094): the grid covers the VISIBLE window (it grows as the view zooms out), never
+  // only the content box the scene was fitted to
+  const grid = visibleGrid(W, H, k);
 
   /** An SVG arc from `fromDeg` to `toDeg` at radius `r`, the short way round when under a half turn. */
   const arcPath = (r: number, fromDeg: number, toDeg: number): string => {
@@ -144,15 +140,15 @@ export function PolarPlane({
       {showGrid && !cart && (
         <g>
           {/* concentric rings — constant modulus, the polar answer to a cartesian grid line */}
-          {scene.grid.rings.map((r) => (
+          {grid.rings.map((r) => (
             <circle key={`ring${r}`} cx={X(0)} cy={Y(0)} r={r * k} fill="none" stroke={INK.grid} strokeWidth={1} />
           ))}
           {/* angular rays — constant argument */}
           {scene.grid.rays.map((d) => {
-            const [x, y] = polar(scene.extent, d);
+            const [x, y] = polar(grid.reach, d);
             return <line key={`ray${d}`} x1={X(0)} y1={Y(0)} x2={X(x)} y2={Y(y)} stroke={INK.grid} strokeWidth={1} />;
           })}
-          {scene.grid.rings.map((r) => (
+          {grid.rings.map((r) => (
             <text key={`rl${r}`} x={X(r) + 3} y={Y(0) - 4} fontSize={10} fill={INK.faint}>
               {r}
             </text>
@@ -160,7 +156,7 @@ export function PolarPlane({
           {scene.grid.rays
             .filter((d) => d % 90 !== 0)
             .map((d) => {
-              const [x, y] = polar(scene.extent * 0.94, d);
+              const [x, y] = polar(grid.labelRadius, d);
               return (
                 <text key={`rd${d}`} x={X(x)} y={Y(y)} fontSize={9} fill={INK.faint} textAnchor="middle">
                   {d}°
@@ -173,18 +169,18 @@ export function PolarPlane({
         <g data-testid="cart-grid">
           {/* #703 — the CARTESIAN grid: x/y gridlines at the same nice step the rings use, with
               numeric ticks on both axes (the Im ticks read as multiples of i on the axis). */}
-          {cartSteps.map((v) => (
+          {grid.xs.map((v) => (
             <line key={`gx${v}`} x1={X(v)} y1={0} x2={X(v)} y2={H} stroke={INK.grid} strokeWidth={1} />
           ))}
-          {cartSteps.map((v) => (
+          {grid.ys.map((v) => (
             <line key={`gy${v}`} x1={0} y1={Y(v)} x2={W} y2={Y(v)} stroke={INK.grid} strokeWidth={1} />
           ))}
-          {cartSteps.map((v) => (
+          {grid.xs.map((v) => (
             <text key={`tx${v}`} x={X(v) + 2} y={Y(0) + 12} fontSize={10} fill={INK.faint}>
               {v}
             </text>
           ))}
-          {cartSteps.map((v) => (
+          {grid.ys.map((v) => (
             <text key={`ty${v}`} x={X(0) + 4} y={Y(v) - 2} fontSize={10} fill={INK.faint}>
               {v}i
             </text>

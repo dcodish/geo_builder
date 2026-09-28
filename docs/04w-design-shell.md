@@ -360,3 +360,7 @@ once per step, and the shared layout must render every section. Each tree has a 
 pre-#1477 About. `shell/__tests__/about-content.test.ts` is the §5c meta-lock plus a roster net.
 
 What the lock does not check: whether the words are good. That is prose, per product and per locale.
+
+## The grid step ([ADR-W-094](06w-decisions-workspace.md#adr-w-094))
+
+`shell/ticks.ts` holds the one "nice step" rule (1, 2 or 5 × 10ⁿ) and the tick values across a range. Analytic re-exports `tickStep` from it, so its grid is byte-identical by construction. The complex Builder grids its VISIBLE window with it (`render/visibleGrid`), replacing a private copy with different thresholds. A §5c lock (`shell/__tests__/ticks-1465.test.ts`) fails if any product tree defines its own `tickStep`/`niceStep`.

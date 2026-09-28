@@ -42,6 +42,11 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   `resolveObjects` publishes a polygon's `cornerNames` (its vertex names minus the members of any
   enumerated solution set), and `regionsOf` leaves those out of `members`. The region still shades; the App
   strip renders only when `members` is non-empty.
+
+- **The grid is the renderer's, sized to the visible window** ([ADR-W-094](06w-decisions-workspace.md#adr-w-094)).
+  The scene has no W, H or zoom, so it publishes only the ray angles. `render/visibleGrid(W, H, k)` computes
+  the cartesian step and lines, the rings out to the visible corner, and the ray reach, through the shared
+  `shell/ticks` rule.
 - **Knowledge is decidable.** Whether a value is forced is a question about the nullspace and the
   configuration set, not a sampling heuristic — so [`FR-KN-1`](02d-requirements-complex.md) ("a number
   printed on screen is knowledge") has an exact test behind it: `knowledgeOf` evaluates the value in

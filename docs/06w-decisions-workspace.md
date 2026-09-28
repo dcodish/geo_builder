@@ -4851,3 +4851,20 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 **Measured.** 4 locks (`issue-1363-1243-events-sink.test.ts`): the no-env path is module-relative and absolute (never cwd-rooted), the env var wins, one-submit-per-submission, refusals counted with their result. The live probe run above is the mechanism's own proof.
 
 **Consequences.** `server/toolRouting.ts`, `scripts/deploy-preflight.mjs`, `src-complex/debug/sessionLogComplex.ts` (new), `src-complex/app/submit.ts`. **Proxy redeploy required** (with #1297's, one push).
+
+## ADR-W-094 — One grid-step rule in shell/, and the complex grid sized to the visible window (#1465)
+
+**Status:** accepted · 2026-09-28 · operator report («when i press zoom out, the grid doesnt adapt and axis done either», 2026-09-27), batch-approved the same day · round #1517 (a `complex` issue; the ADR is workspace-level because the rule moves to `shell/`).
+
+**Requirements:** docs/02d FR-GP-6 (new) · **Design:** docs/04w — the grid step; docs/04d — the grid is the renderer's
+
+**Context.** In the complex Builder, zooming out left the grid and its numbers in the middle of an empty canvas, and even at zoom 1 the grid stopped short of the sides of a wide canvas. `PolarPlane` drew gridlines from the first step to the scene's content-fit `extent`, and rings to the same bound, so zoom changed only the scale. Analytic already grids its visible range with a 1/2/5 `tickStep`. The complex scene kept a private `niceStep` with different thresholds: two copies of one rule.
+
+**Decision.**
+- `shell/ticks.ts` owns `tickStep(span, target)` and `tickValues(min, max, step)`. Analytic re-exports `tickStep` from it (the same function object, so its grid is byte-identical by construction).
+- The complex grid is computed in the renderer from the visible window, `(W/2)/k` by `(H/2)/k`, by `render/visibleGrid`. That gives one cartesian step for both axes from the wider span (≤ 12 intervals), rings to the visible corner at their own nice step, rays to that corner, and angle labels inside the shorter half-extent. The scene keeps only the ray angles; its `rings` and `niceStep` are removed.
+- A §5c lock fails if any product tree defines its own `tickStep` / `niceStep`.
+
+**Measured.** On main `d3f08a4c` at zoom 0.25 on a 900×500 canvas, for «z1 = 2cis22.5» the cartesian grid ran −2…2 inside a visible window of ±18 by ±10. On the branch the gridlines reach within one step of every edge at zoom 1, 0.5 and 0.25, the step grows as zoom falls, and the rendered SVG labels the outermost ticks and draws the outer ring at the corner.
+
+**Consequences.** `shell/ticks.ts` (new), `src-analytic/render/scene.ts` (re-export), `src-complex/render/visibleGrid.ts` (new), `src-complex/render/PolarPlane.tsx`, `src-complex/scene/scene.ts` (grid slimmed). Locks: `src-complex/__tests__/issue-1465-zoom-grid.test.tsx`, `shell/__tests__/ticks-1465.test.ts`, `src-analytic/__tests__/ticks-shared-1465.test.ts`.
