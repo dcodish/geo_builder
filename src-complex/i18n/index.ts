@@ -97,7 +97,7 @@ const he = {
   creditContact: 'לשאלות',
   aboutClose: 'סגירה',
   privacy:
-    'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. העבודה נשמרת בדפדפן שלכם ובקבצים שאתם בוחרים לשמור.' +
+    'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. לצורך שיפור הכלי נשמרים המשפטים שהקלדתם (טקסט מתמטי בלבד) עם מזהה מבקר אנונימי — ללא כתובת ה-IP — למספר ימים בלבד. העבודה נשמרת בדפדפן שלכם ובקבצים שאתם בוחרים לשמור.' +
     ' כשאתם לוחצים «העתק קישור», השרטוט ותמונה שלו נשמרים בשרת כדי שהקישור יעבוד — בלי שם ובלי פרטים אישיים, ומי שיש לו את הקישור יכול לפתוח אותו.',
   // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
   loadAuditTitle: 'הקובץ נטען חלקית: {{restored}} מתוך {{total}} שורות נוספו. שורות שלא נוספו:',
@@ -317,7 +317,7 @@ const en: typeof he = {
   creditContact: 'Questions',
   aboutClose: 'Close',
   privacy:
-    'Privacy: no registration, and no personal data is collected. Your work is stored in your browser and in files you choose to save.' +
+    'Privacy: no registration, and no personal data is collected. To improve the tool, the statements you type (math text only) are kept for a few days with an anonymous visitor id — your IP address is never stored. Your work is stored in your browser and in files you choose to save.' +
     ' When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.',
   // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
   loadAuditTitle: 'The file loaded partially: {{restored}} of {{total}} lines were added. Lines not added:',
