@@ -8022,4 +8022,3 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 **Measured.** 6 locks (`issue-1297-hebrew-fact.test.ts` product-side; `issue-1297-locale-prompt.test.ts` server-side, on the sanctioned import direction): the He prompt carries only the He column + the hard rule, the En prompt only En, the no-locale prompt byte-compatible; rows display the sentence with part markers, annotations follow their lines through removal, drop on edit, and survive save→restore.
 
 **Consequences.** `server/llm/harness.ts` (locale through `PromptSpec.vocabulary`/`buildSystemPrompt`/`buildRequest`), `server/parseHandler.ts` (`body.locale`), `parser/llmSharedAnalytic.ts` (one-column vocab), `parser/llmAnalytic.ts` + `App.tsx` (locale sent; `recordLlmLines`; row display), `store/useAnalyticStore.ts` (`spokenFor` + envelope field). **Proxy redeploy required.**
->>>>>>> fix/1297-hebrew-fact

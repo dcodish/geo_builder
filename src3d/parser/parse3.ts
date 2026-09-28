@@ -1851,10 +1851,17 @@ const heightOfSolid: Rule = (s) => {
     return [{ type: 'height-to-face', id: seg[2], from: seg[1], face: [faceM[1], faceM[2], faceM[3]] }];
   }
   const m =
-    s.match(/^(?:המקצוע\s+|הצלע\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?(?:גובה|אנך)(?:\s+(?:בפירמידה|במנסרה|הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?\s*$/) ??
-    s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+is\s+the\s+(?:height|altitude)(?:\s+of\s+the\s+(?:pyramid|prism))?\s*$/i);
+    s.match(/^(?:המקצוע\s+|הצלע\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?(?:גובה|אנך)(?:\s+(?:בפירמידה|במנסרה|הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?(?:\s*,?\s*(?:\1\2\s*)?(?:ואורכו|אורכו|הוא|=)\s*(\d+(?:\.\d+)?))?\s*$/) ??
+    s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+is\s+the\s+(?:height|altitude)(?:\s+of\s+the\s+(?:pyramid|prism))?(?:\s*,?\s*(?:and\s+its\s+length\s+is|=)\s*(\d+(?:\.\d+)?))?\s*$/i) ??
+    // #1448: the noun-first named spelling — «גובה הפירמידה SO = 4».
+    s.match(/^ה?גובה\s+(?:הפירמידה|המנסרה)\s+([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:,?\s*(?:הוא|=)\s*(\d+(?:\.\d+)?))?\s*$/);
   if (!m) return null;
-  return [{ type: 'seg-plane-rel', rel: 'perp', a: m[1], b: m[2], plane: [] }];
+  const role: Command3 = { type: 'seg-plane-rel', rel: 'perp', a: m[1], b: m[2], plane: [] };
+  // #1448: the value rides the same sentence — the claim the two-line spelling always stated.
+  if (m[3] !== undefined) {
+    return [role, { type: 'claim', claim: { type: 'length-eq', a: m[1], b: m[2], value: Number(m[3]) } }];
+  }
+  return [role];
 };
 
 /** #72: `חץ A'C` / `arrow A'C` — draw the pair as an UNNAMED ink arrow (the named-basis lane
@@ -1909,33 +1916,47 @@ const heightFromApex: Rule = (s) => {
   const SOLID = String.raw`(?:ה|ל|של\s+ה)?(?:פירמידה|מנסרה|חרוט|גוף)`;
   const IMP = String.raw`(?:(?:שרטטו?|ציירו?|העבירו?|נעביר|הוסיפו?)\s+(?:את\s+)?)?`;
   const FROM = String.raw`(?:ש?יוצא\s+)?מ-?\s*(?:נקודה\s+|ה?קודקוד\s+)?`;
+  // #1448: the phrase may carry its VALUE — «גובה הפירמידה 4», «הוא 4», «= 4» — the two-line
+  // spelling («SO גובה הפירמידה» then «SO = 4») compressed into the sentence the review typed.
+  const VAL = `(?:\\s*,?\\s*(?:הוא\\s+|שווה\\s+ל-?\\s*|=\\s*|is\\s+)?(?<len>\\d+(?:\\.\\d+)?))?`;
   const m =
     s.match(
       new RegExp(
         `^${IMP}ה?גובה(?<solid>\\s+${SOLID})?` +
           `(?:\\s+${FROM}(?<from>[A-Z]\\d*'?))?` +
-          `(?:\\s+ל-?\\s*ה?בסיס(?<baseSolid>\\s+ה?(?:פירמידה|מנסרה|חרוט|גוף))?(?:\\s+(?<b1>[A-Z]\\d*'?)(?<b2>[A-Z]\\d*'?)(?<b3>[A-Z]\\d*'?))?)?\\s*$`,
+          `(?:\\s+ל-?\\s*ה?בסיס(?<baseSolid>\\s+ה?(?:פירמידה|מנסרה|חרוט|גוף))?(?:\\s+(?<b1>[A-Z]\\d*'?)(?<b2>[A-Z]\\d*'?)(?<b3>[A-Z]\\d*'?))?)?${VAL}\\s*$`,
       ),
     ) ??
     s.match(
       new RegExp(
         `^(?:draw\\s+)?(?:a\\s+|the\\s+)?(?:height|altitude)(?<solid>\\s+(?:of|to)\\s+(?:the\\s+)?(?:pyramid|prism|cone|solid))?` +
           `(?:\\s+(?:that\\s+goes\\s+)?from\\s+(?:point\\s+|(?:the\\s+)?vertex\\s+)?(?<from>[A-Z]\\d*'?))?` +
-          `(?:\\s+to\\s+(?:the\\s+)?base(?<baseSolid>\\s+of\\s+the\\s+(?:pyramid|prism|cone|solid))?(?:\\s+(?<b1>[A-Z]\\d*'?)(?<b2>[A-Z]\\d*'?)(?<b3>[A-Z]\\d*'?))?)?\\s*$`,
+          `(?:\\s+to\\s+(?:the\\s+)?base(?<baseSolid>\\s+of\\s+the\\s+(?:pyramid|prism|cone|solid))?(?:\\s+(?<b1>[A-Z]\\d*'?)(?<b2>[A-Z]\\d*'?)(?<b3>[A-Z]\\d*'?))?)?${VAL}\\s*$`,
         'i',
       ),
     );
   if (!m?.groups) return null;
-  const { solid, from, b1, b2, b3 } = m.groups;
+  const { solid, from, b1, b2, b3, len } = m.groups;
   const face = b1 && b2 && b3 ? [b1, b2, b3] : undefined;
   // the base clause is present iff the utterance said בסיס/base at all — a named face implies it
   const saidBase = /ל-?\s*ה?בסיס|to\s+(?:the\s+)?base/i.test(s);
-  if (!solid && !saidBase) return null; // the #467 bare form — guidance, never a guess
+  // the #467 bare form stays guidance — but «הגובה הוא 4» (#1448) STATES a given, so a bare
+  // height that carries its value is real input; apply still holds the one-solid guard.
+  if (!solid && !saidBase && len === undefined) return null;
   if (face && new Set(face).size !== 3) return null;
   // #503 apex-less: only the pyramid's height names a derivable apex — «גובה המנסרה» is not a
   // vertex-to-base perpendicular and must keep escalating rather than guess a vertex (ADR-052).
-  if (!from && !/פירמידה|pyramid/i.test(solid ?? '')) return null;
-  return [{ type: 'perp-to-base', ...(from ? { from } : {}), ...(face ? { face } : {}) }];
+  // A VALUED height with no solid noun («הגובה הוא 4», #1448) goes through: apply derives the one
+  // pyramid's apex and refuses `bad-solid` honestly for anything else.
+  if (!from && !/פירמידה|pyramid/i.test(solid ?? '') && !(len !== undefined && !solid)) return null;
+  return [
+    {
+      type: 'perp-to-base',
+      ...(from ? { from } : {}),
+      ...(face ? { face } : {}),
+      ...(len !== undefined ? { len: Number(len) } : {}),
+    },
+  ];
 };
 
 /** A bare auxiliary segment: `AM` / `קטע AM` / `segment CA'` — plus the #72 prod forms: the

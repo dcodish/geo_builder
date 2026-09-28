@@ -1029,7 +1029,9 @@ export type Command3 =
   // #503 (ADR-3D-142): `from` is optional — the APEX-LESS «גובה הפירמידה» derives the apex at apply
   // from the single solid's vertex layout (base ids first, apex LAST — the baseRingOf convention);
   // a solid with no derivable apex (prism/box) refuses `bad-solid`, never a guess.
-  | { type: 'perp-to-base'; from?: Id; face?: Id[] }
+  // `len` (#1448): «גובה הפירמידה 4» — the height phrase carrying its own value. The foot's letter
+  // is minted at apply, so the length claim must chain THERE, on apex→foot, not in the parser.
+  | { type: 'perp-to-base'; from?: Id; face?: Id[]; len?: number }
   // V8-f (G6): cos of the angle between two operands = a value. `cos∠ACB = 3/4`
   // (vertex ⇒ pairs) · `קוסינוס הזווית בין הוקטורים w ו-u הוא √35/10` (named vectors).
   | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number; soft?: boolean }
