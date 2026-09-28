@@ -1566,7 +1566,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         }
       }
       if (!foot) return { ok: false, error: { code: 'already-defined', id: 'foot' } };
-      return applyCommand3(c, { type: 'height-to-face', id: foot, from, face });
+      const made = applyCommand3(c, { type: 'height-to-face', id: foot, from, face });
+      // #1448: «גובה הפירמידה 4» — the phrase carried its value; the claim lands on apex→foot,
+      // whose letter exists only now. The same two commands the two-line spelling always was.
+      if (!made.ok || cmd.len === undefined) return made;
+      return applyCommand3(made.next, { type: 'claim', claim: { type: 'length-eq', a: from, b: foot, value: cmd.len } });
     }
 
     case 'point-in-span': {

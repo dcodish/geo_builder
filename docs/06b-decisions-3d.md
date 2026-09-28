@@ -10968,3 +10968,17 @@ line via the triangle's structure, and its solver has ADR-413's zero-area gate a
 **Consequences.** For a student: «SM⊥ABC» where M is a point of the plane now draws a real perpendicular
 standing out of the plane, whose length is theirs to state — and stating it works. A statement that
 could only be satisfied by flattening a solid to zero area is now refused instead of drawn flat.
+
+## ADR-3D-270 — The height noun takes a value: «גובה הפירמידה 4» in one sentence (#1448)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1510
+
+**Requirements:** none (a spelling of an existing capability) · **Design:** this entry
+
+**Context.** Every one-sentence spelling of a valued height was «not understood» while the two-line form («SO גובה הפירמידה» then «SO = 4») worked — a two-spellings bug across eight spellings, also reported for 2-D (#1443, its own item).
+
+**Decision.** The phrase carries its value, lowering to exactly what the two-line spelling always was. (1) The APEX-LESS forms («גובה הפירמידה 4», «הוא 4», «= 4», the bare «הגובה הוא 4» — a valued bare height is a real given, and apply keeps the one-solid/`bad-solid` guards) ride a `len` on `perp-to-base`; the length claim chains at APPLY on apex→foot, because the foot's letter is minted there. (2) The NAMED forms («SO גובה הפירמידה, SO = 4» — the repeated pair backreferenced so «XY = 4» can never attach to SO — «ואורכו 4», the noun-first «גובה הפירמידה SO = 4») lower parser-side to the role command plus the `length-eq` claim. A value-less bare «הגובה» stays #467's guidance. The #1394 parity golden re-recorded (+4 sequences, additions only — this ADR is the behaviour change it names).
+
+**Measured.** 10 locks (`issue-1448-height-value.test.ts`): all eight spellings build with |apex−foot| = 4, the two-line form unchanged, the bare noun still guidance. 3-D lane 285 files / 5308 green.
+
+**Consequences.** `parser/parse3.ts` (`heightFromApex` value tail; `heightOfSolid` value + noun-first forms), `engine/types.ts` + `engine/apply.ts` (`perp-to-base.len`, the chained claim), the parity golden. Lock: `issue-1448-height-value.test.ts`.
