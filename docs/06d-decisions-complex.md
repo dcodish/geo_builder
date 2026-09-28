@@ -3332,3 +3332,19 @@ two conjugate pairs related exactly, the corpus witness, both-sides spelling, �
 wrong member refused, an existing letter verified, indexed letters, degree 5, set-letter questions, the
 sentence in both locales, the shape reader, the lift). Six fixtures: `all-roots-{quadratic,
 binomial-spelling, member, member-poly, quartic, corpus-witness}-1434.complex.json`.
+
+## ADR-CX-051 — ask answers: exact where the operands carry it, ≈ where they do not (#1436)
+
+**Requirements:** docs/05d §ask lane — an answer recognised exact prints in exact form alone; a rounded decimal prints with ≈ (operator rulings 2026-09-27 on #1436 and #1460 «exact only (today)»)
+**Design:** docs/11d §stage 5d / value layer
+
+**Reported.** External review of prod: «|z₁−z₂| … fixed at 2√2» printed «= 2.83» — a rounded decimal under an `=`. The point READINGS already followed the exact/≈ rule (ADR-CX-046); the ask lane's answers did not.
+
+**Class.** Every KnowledgeRow spelled its number through bare `round2` with an unconditional `=` — expr asks, set-letter asks, measure asks, ratios, param-only expressions, gauge coefficients. Two defects in one seam: no exactness marker (dishonest `=`), and no exact carriage even where the operands were exact.
+
+**Decision.**
+1. **The ≈ floor** — `KnowledgeRow.approx`, set by the one pair of answer composers (`numAnswer`/`cxAnswer`): a spelling that IS the value («5», «2.5») keeps `=`; a rounded one carries `approx` and the App prints `≈`. Applied at every row maker (expr, set, measure, ratio, param-only, gauge — the gauge's whole-number snap stays the established float-noise policy, only a genuinely lossy 4-decimal print marks ≈).
+2. **Bounded exact arithmetic over the Gaussian rationals** (no CAS — the ADR-CX-006 boundary): when every operand of an ask is exactly carried and Gaussian-RATIONAL, sums, differences, products, quotients and small integer powers (≤ 4) are evaluated in the field; `|…|` heads are √(rational), spelled by the ONE modulus formatter («2√2», «√5»), and complex answers go through the one cartesian composer («-1-2i», exact fractions as «5/2»). Exactness never bypasses the knowledge gate — the exact lane runs only after `verdict.known`.
+3. **The literal-atom bridge** — an off-axis `a+bi` literal (`2+3i`) carries its argument as an opaque atom, so `(mod, arg)` alone could not recover the pair. `fromCartesian` now REGISTERS the exact rational pair on the atom name (`value/angle.ts`; a name re-registered with a different pair is poisoned to null — exactness never guesses), and `gaussianRationalParts` reads it back for a single ±1-coefficient atom with quarter-turn offsets (·i rotations, conjugates). Everything outside the field — parameters, free points, non-quarter turns, irrational tables — answers null and the ≈ decimal stands.
+
+**Consequences.** `src-complex/value/rational.ts` (`sqrtExact`), `src-complex/value/angle.ts` (atom registry), `src-complex/value/value.ts` (`fromCartesian` registers), `src-complex/value/cartesian.ts` (`gaussianRationalParts`, `ratPart`), `src-complex/model/knowledge.ts` (`approx`), `src-complex/replay/derive2.ts` (the composers, `evalGauss`/`exactAnswer`, every row maker), `src-complex/App.tsx` (≈ rendering). Lock: `src-complex/__tests__/issue-1436-exact-ask.test.ts` — the reviewer's exact case (2√2), √5 through the atom bridge, exact complex/product/quotient answers, the integer and fraction spellings under `=`, and the irrational ≈ floor.
