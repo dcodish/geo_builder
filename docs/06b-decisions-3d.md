@@ -11024,3 +11024,15 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 **Measured.** 4 locks (`issue-1421-gauge.test.ts`): the operator's T35 figure sits A-at-origin / AB-along-+x / C-on-floor at every sampled seed with the stated lengths exact; the SHAPE (the angle at A) still varies; a coordinate injection and a cube are untouched. 3-D lane 285 files / 5302 green on first run.
 
 **Consequences.** `engine/evaluate.ts` (the normalisation block). Lock: `issue-1421-gauge.test.ts`.
+
+## ADR-3D-277 — «t הוא פרמטר» is understood: the unsigned declaration (#1451)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1517. Numbered 277 beside the round's parallel branches (273–276).
+
+**Requirements:** none (internal — a two-spellings gap; no promise changed) · **Design:** docs/04b — the parameter lanes
+
+**Context.** «t הוא פרמטר חיובי» lowered `param-sign` while the unsigned «t הוא פרמטר» / «t פרמטר» / "t is a parameter" were `not-understood` — the two-spellings bug, burning an LLM call per attempt.
+
+**Decision.** A `param-decl` command from the same rule (the sign arm keeps byte-priority): an ACKNOWLEDGMENT sharing param-sign's owner gate — `symbolOwnersOf` non-empty ⇒ idempotently absorbed (the statement is true; the figure is unchanged); no owner ⇒ the honest `unknown-symbol`, exactly as the signed form refuses. Saveable like its sibling (the COMMAND_SAVEABLE totality caught the omission at `tsc`).
+
+**Consequences.** `src3d/engine/types.ts` (`ParamDeclCommand`), `src3d/engine/apply.ts` (the gate case), `src3d/parser/parse3.ts` (the unsigned arm), `src3d/store/figureFile3.ts` (saveable). Lock: `issue-1451-param-decl.test.ts` — four spellings, both orders through the store, the signed neighbour untouched. The #1394 submit-parity golden gains exactly one key (the lock's own four-spelling sequence, which the parity corpus harvests from test files); no recorded sequence drifted.

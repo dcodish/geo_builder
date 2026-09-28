@@ -603,6 +603,14 @@ export interface ParamSignCommand {
   positive: boolean;
 }
 
+/** #1451 — the UNSIGNED declaration «t הוא פרמטר» / «t פרמטר» / "t is a parameter": an
+ *  acknowledgment sharing param-sign's owner gate — idempotent ok for a letter the figure carries,
+ *  the honest `unknown-symbol` for one it does not. */
+export interface ParamDeclCommand {
+  type: 'param-decl';
+  sym: string;
+}
+
 /** `נתון: v = (10,-5,0)` — inject a value for a DECLARED vector (the V4 pivot).
  *  #794 (ADR-3D-168): components take the SAME grammar as point3 — a number, a null
  *  (a bare placeholder letter: that component does not constrain), or an affine
@@ -982,6 +990,7 @@ export type Command3 =
   // it PINS THE SCALE — a free-dim figure is driven to it, a determined one verifies (M1).
   | { type: 'distance-rel'; a: Operand3; b: Operand3; value: number }
   | ParamSignCommand
+  | ParamDeclCommand
   | Plane3Command
   | FreePlaneCommand
   | FreeLineCommand
