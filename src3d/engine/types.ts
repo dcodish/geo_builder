@@ -40,7 +40,8 @@ export type Operand3 =
   | { kind: 'segment'; a: Id; b: Id }
   | { kind: 'vector'; name: string }
   | { kind: 'line'; name: string }
-  | { kind: 'plane-run'; ids: Id[] }
+  /** #1485: `face` — the student named it «הפאה/הבסיס» (face/base), which sets its drawn default. */
+  | { kind: 'plane-run'; ids: Id[]; face?: true }
   | { kind: 'plane-named'; name: string }
   // #512: the ABSOLUTE-frame operands. A coordinate plane was legal in exactly ONE grammatical
   // position — the #324 rule's private tail, whose subject must be a point-ring — so «A על מישור [xy]»,
@@ -1275,6 +1276,10 @@ export interface Construction3 {
   componentSigns: { target: ComponentTarget; axis: 'x' | 'y' | 'z'; positive: boolean }[];
   /** V4 — planes through points, name → ids (resolved from positions after the pivot). */
   pointPlanes: Map<string, Id[]>;
+  /** #1485 (ADR-3D-278): point-run planes whose FIRST mention called them a face or a base — they draw
+   *  as the face polygon by default ({@link defaultPlaneDisplay3}). Derived from the facts, so a saved
+   *  file needs no new field. */
+  faceNamed: Set<string>;
   /** V5 — named lines through two points, resolved from final positions. */
   pointLines: Map<string, { a: Id; b: Id }>;
   /** V8-b — planes defined by a ⊥/∥ relation to an edge, resolved from final positions. */
@@ -1389,6 +1394,15 @@ export const freeCoordKey = (id: Id, axis: 'x' | 'y' | 'z'): string => `${id}@${
  * (the #508 `freePlanesOf` discipline) rather than a switch over claim kinds, so a claim kind added later
  * cannot escape either reader — the apply-time drive routing and the store's not-determined guard.
  */
+/**
+ * #1485 (ADR-3D-278): a plane's display when the student has not toggled it. A plane first named as a
+ * face or base («הפאה SBC», «הבסיס ABC») shows only that face; every other plane shows in full
+ * (ADR-3D-077). The ONE source of the default — the renderer, the toggle cycle and the panel labels
+ * all read it, so "absent = default" stays a single convention.
+ */
+export const defaultPlaneDisplay3 = (c: Pick<Construction3, 'faceNamed'>, name: string): 'face' | 'full' =>
+  c.faceNamed.has(name) ? 'face' : 'full';
+
 export function claimPointIds(c: Construction3, claim: unknown): Id[] {
   const out = new Set<Id>();
   const walk = (v: unknown): void => {
@@ -1428,6 +1442,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   riderNames: [],
   componentSigns: [],
   pointPlanes: new Map(),
+  faceNamed: new Set(),
   pointLines: new Map(),
   relPlanes: new Map(),
   revolutions: [],

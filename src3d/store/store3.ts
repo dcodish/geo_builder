@@ -37,7 +37,8 @@ import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLine
 import { verifyClaim } from '../engine/claims';
 import { dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
-import { claimPointIds, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type Positions3 } from '../engine/types';
+import { meaningKey } from '../engine/operands';
+import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
 import { parse3, parseRename3 } from '../parser/parse3';
 
@@ -907,7 +908,7 @@ export interface Geo3State {
  * matters — a command list is a sequence, and two different orderings are not obviously the same claim.
  */
 const sameStatement = (a: readonly Command3[], b: readonly Command3[]): boolean =>
-  a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
+  a.length === b.length && meaningKey(a) === meaningKey(b); // #1485: «הפאה SBC» restates «המישור SBC»
 
 /**
  * #926 (ADR-3D-220, ADR-W-044) — what a change to ONE row did to the OTHERS. A delete, a mute or an edit
@@ -1228,13 +1229,16 @@ export const useGeo3 = create<Geo3State>()(
       // #318 + #395 (ADR-3D-108): cycle a named plane's patch full → face → hidden → full. The
       // record keeps only non-default entries — cycling back to 'full' DELETES the key, so a saved
       // file never carries redundant defaults and "absent = full" stays the single convention.
+      // #1485 (ADR-3D-278): "absent" means the plane's OWN default — 'face' for a plane first named
+      // as a face or base — so the cycle starts from that and deletes the key on returning to it.
       togglePlaneDisplay: (name) => {
-        const cur = get().planeDisplay;
+        const { planeDisplay: cur, facts, seed } = get();
+        const dflt = defaultPlaneDisplay3(derive3(facts, seed).construction, name);
         const next = { ...cur };
-        const mode = cur[name] ?? 'full';
-        if (mode === 'full') next[name] = 'face';
-        else if (mode === 'face') next[name] = 'hidden';
-        else delete next[name];
+        const mode = cur[name] ?? dflt;
+        const after = mode === 'full' ? 'face' : mode === 'face' ? 'hidden' : 'full';
+        if (after === dflt) delete next[name];
+        else next[name] = after;
         set({ planeDisplay: next });
       },
 

@@ -105,7 +105,12 @@ export function readOperand(raw: string): ReadOperand | null {
   }
   if (LINE_ONLY.test(t)) return { op: { kind: 'line', name: t }, noun };
   if (PLANE_ONLY.test(t)) return { op: { kind: 'plane-named', name: t.replace(/\s+/g, '') }, noun };
-  if (RUN_3_4.test(t)) return { op: { kind: 'plane-run', ids: t.match(new RegExp(LABEL.source, 'g'))! }, noun };
+  if (RUN_3_4.test(t)) {
+    const ids = t.match(new RegExp(LABEL.source, 'g'))!;
+    // #1485: «הפאה/הבסיס» is the same plane as «המישור», but it asks to see only the face.
+    const face = nm !== null && /פא[הות]|בסיס|face|base/i.test(nm[0]);
+    return { op: face ? { kind: 'plane-run', ids, face: true } : { kind: 'plane-run', ids }, noun };
+  }
   const seg = t.match(SEG);
   if (seg) return seg[1] === seg[2] ? null : { op: { kind: 'segment', a: seg[1], b: seg[2] }, noun };
   if (POINT.test(t)) return { op: { kind: 'point', id: t }, noun };

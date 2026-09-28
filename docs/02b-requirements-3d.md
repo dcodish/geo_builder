@@ -377,6 +377,11 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   figure. At 90° it is the knee (FR-RD-10); with the FR-RD-11 chip on, the construction's arc replaces it,
   so the angle is marked once. *(Realised — [ADR-3D-266](06b-decisions-3d.md#adr-3d-266), #1486;
   `issue-1486-stated-angle-shows.test.ts`.)*
+- **FR-RD-13 (Must)** — **A face or base the student NAMED shows as that face.** A plane first mentioned
+  as «הפאה SBC» / «הבסיס ABC» (en *the face / the base*) draws only its polygon by default; «המישור SBC»
+  keeps the full patch. The first mention decides, and the «מישורים» toggle in the data panel still
+  switches either one; the choice survives undo, save/load and share. *(Realised —
+  [ADR-3D-278](06b-decisions-3d.md#adr-3d-278), #1485; `issue-1485-face-default.test.ts`.)*
 
 ## Coverage
 

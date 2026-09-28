@@ -119,6 +119,13 @@ else, exactly as the clause does. See [ADR-3D-231](06b-decisions-3d.md#adr-3d-23
 rule for what an arc reads, so it is also where the choice lands: a symbol whose valuing row is set to
 `letter` reads its letter instead of its value, and everything else is byte-identical. The resolver
 rides the `App3 → Figure3 → buildScene3` seam that `planeDisplay` already uses.
+
+**A plane's display default is DERIVED, not stored.** `planeDisplay` holds only the student's toggles;
+an absent key means the plane's own default, which `defaultPlaneDisplay3(c, name)` reads from
+`Construction3.faceNamed` — the point-run planes whose first mention was a face/base noun (the operand
+carries `face: true`, and `materializePlaneRun` records it only where it creates the plane). The
+renderer, the store's toggle cycle and both panel labels read that one helper, so a save file needs no
+new field: the default re-derives from the facts on load. See [ADR-3D-278](06b-decisions-3d.md#adr-3d-278) (#1485).
 Which rows OFFER the choice is derived, never listed: `collectWedges` (moved out of `buildScene3` so the
 fact list can read it too — one collection, two readers) yields the wedges, `competingArcSymbols` picks
 those carrying BOTH a label and a value, and `store/paramChips.ts` puts the chip on the enabled fact
