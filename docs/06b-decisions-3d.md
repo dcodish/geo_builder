@@ -10968,3 +10968,17 @@ line via the triangle's structure, and its solver has ADR-413's zero-area gate a
 **Consequences.** For a student: «SM⊥ABC» where M is a point of the plane now draws a real perpendicular
 standing out of the plane, whose length is theirs to state — and stating it works. A statement that
 could only be satisfied by flattening a solid to zero area is now refused instead of drawn flat.
+
+## ADR-3D-271 — The ask lane's knowledge gate sees every lane (#1450)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1510
+
+**Requirements:** none (internal) · **Design:** this entry
+
+**Context.** Asking «k» answered «הנקודות האלו אינן בציור» — a note about points, for a letter — while the panel printed «k = 2»; four more gate misses measured (positive-parameter figures, a free injected vector, a cone's stated height read «תלוי בקנה המידה», the distance between two equation planes likewise).
+
+**Decision.** (1) **A symbol prefers the panel's own params row** (`dataView(...).params` — the #481 rule: one decision, two surfaces), falling through to the generic path for the ratio lane («AE = t·AS»), whose «depends on α» and scale-free behaviour are untouched; a symbol that cannot be measured notes `undetermined`, never the points-worded `unavailable`. (2) **Three missing members join `scaleKnown3`** (the #517 "private enumeration of absolute sources" class): a revolution solid's STATED dim, a pair of stated-equation planes (numeric coefficients, no free/sym), and a numeric pair injection («AB = (1,2,3)») — each fixes real sizes in the world's own units. The detached-solid gauge warning stands verbatim: a free cube's edge still answers nothing. (3) **A stable vector answers its components** through `atomVec` (both atom kinds), gated on `scaleKnown3`. (4) The stability epsilons (the vector check and `stableNums`) widen to 1e-4 relative — the pin/pivot solves leave ~5e-6 wobble (measured), which 1e-6 read as seed-variation; genuine variation is orders larger.
+
+**Measured.** 6 locks (`issue-1450-ask-gate.test.ts`): the five review rows answer their values with the k-row asserted EQUAL to the panel's own text; the free cube and the unstated symbol stay honestly withheld. 3-D lane 285 files / 5304 green (the ratio-t suite caught the first, fall-through-less attempt — kept).
+
+**Consequences.** `engine/queries.ts` (symbol preference + note, vector stability answer, epsilons), `engine/evaluate.ts` (`scaleKnown3` members). Lock: `issue-1450-ask-gate.test.ts`.

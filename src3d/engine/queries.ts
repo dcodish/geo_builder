@@ -472,7 +472,9 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
   const stableNums = (vals: (number | null)[]): number | null => {
     if (vals.some((v) => v === null || !Number.isFinite(v))) return null;
     const nums = vals as number[];
-    return nums.every((v) => Math.abs(v - nums[0]) <= 1e-6 * Math.max(1, Math.abs(nums[0]))) ? nums[0] : null;
+    // 1e-4 (#1450): the pivot/pin solves leave ~5e-6 relative wobble (measured on the injected
+    // free vector), which 1e-6 read as seed-variation; genuine variation is orders larger.
+    return nums.every((v) => Math.abs(v - nums[0]) <= 1e-4 * Math.max(1, Math.abs(nums[0]))) ? nums[0] : null;
   };
 
   // #480 — the algebraic lane's parameter is answered from its BRANCH SET, not by sampling. The generic
@@ -486,12 +488,43 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
     const shown = formatBranches(branches);
     return shown ? { text, answer: shown } : { text, answer: null, note: 'undetermined' };
   }
+  /**
+   * EVERY OTHER SYMBOL answers from the panel's own params row (#1450 — the #481 rule: one
+   * decision, two surfaces). The old fall-through sent a pivot-lane «k» to the generic numeric
+   * path and out its POINTS note — «הנקודות האלו אינן בציור» about a letter, while the panel one
+   * column over printed «k = 2». A symbol the panel does not know is honestly undetermined, in a
+   * note about a symbol, never about points.
+   */
+  if (q.kind === 'symbol') {
+    const row = dataView(c, seed).params.find((p) => p.sym === q.sym);
+    if (row && !row.open) return { text, answer: row.text };
+    // No panel row, or an open one — fall THROUGH: the ratio lane («AE = t·AS») measures t on
+    // the generic path, and #1450's fix there is only the NOTE (a symbol is never 'points').
+  }
 
   if (q.kind === 'vector') {
     const posArr = seeds.map((s) => resolve3(c, s).positions);
     if (atomVec(c, q.a, posArr[0]) === null) return { text, answer: null, note: 'unavailable' };
     const forms = vectorForms(c, q.a, posArr, seeds);
     if (forms.length) return { text, answer: forms.join('  =  ') };
+    /**
+     * The PANEL's own vector row is the fallback (#1450, the #481 rule): a free injected vector
+     * («וקטור AB» + «AB = (1,2,3)») is B−A = (1,2,3) at every seed and the panel prints it, while
+     * `vectorForms` — built for the named-basis lane — answered nothing and the ask said
+     * «undetermined» about a value one column over.
+     */
+    // Resolved through atomVec — the SAME resolver both atom kinds (a named arrow, a bare
+    // pair) already go through — and gated on the scale being knowledge: a detached solid's
+    // edge components are the frozen gauge, seed-stable without being knowledge.
+    if (scaleKnown3(c)) {
+      const per = posArr.map((pos) => atomVec(c, q.a, pos));
+      if (per.every((d): d is Vec3 => d !== null)) {
+        const s0 = per[0]!;
+        // 1e-4: the pin solve leaves ~5e-6 wobble (measured); real seed-variation is O(1).
+        const stable = per.every((d) => norm3(sub3(d!, s0)) <= 1e-4 * Math.max(1, norm3(s0)));
+        if (stable) return { text, answer: coordStr(s0) };
+      }
+    }
     // undetermined — but does it settle once a free named parameter α is fixed? Then «depends on α».
     const pin = pinFreeMeasures(c);
     if (pin && vectorForms(pin.c, q.a, seeds.map((s) => resolve3(pin.c, s).positions), seeds).length) {
@@ -567,7 +600,10 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
     const r = resolve3(c, s);
     return evalQuery(c, q, r.positions, { lines: r.lines, planes: r.planes });
   });
-  if (vals.some((v) => v === null || !Number.isFinite(v))) return { text, answer: null, note: 'unavailable' };
+  if (vals.some((v) => v === null || !Number.isFinite(v)))
+    // #1450: a SYMBOL that cannot be measured is 'undetermined' — 'unavailable' is worded about
+    // points («הנקודות האלו אינן בציור»), which is how asking «k» blamed letters that were fine.
+    return { text, answer: null, note: q.kind === 'symbol' ? 'undetermined' : 'unavailable' };
   const nums = vals as number[];
   const val0 = stableNums(vals);
   if (val0 === null) {
