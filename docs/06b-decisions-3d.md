@@ -11024,3 +11024,17 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 **Measured.** 4 locks (`issue-1421-gauge.test.ts`): the operator's T35 figure sits A-at-origin / AB-along-+x / C-on-floor at every sampled seed with the stated lengths exact; the SHAPE (the angle at A) still varies; a coordinate injection and a cube are untouched. 3-D lane 285 files / 5302 green on first run.
 
 **Consequences.** `engine/evaluate.ts` (the normalisation block). Lock: `issue-1421-gauge.test.ts`.
+
+## ADR-3D-273 — A failing fact is atomic, and a red row's message is its latest attempt (#1413)
+
+**Status:** accepted · 2026-09-28 · found by round #1408 (noted unresolved in ADR-3D-259) · round #1517
+
+**Requirements:** none (internal — the honesty invariant: an error names the conflicting statement, never a stale one) · **Design:** docs/04b — the in-order fold
+
+**Context.** «M אמצע SX» edited above its pyramid stayed red naming «unknown point S» — a letter the pyramid now declares; the letter actually missing is X. A red row kept the error from its first, in-order application. ADR-3D-259 tried refreshing from the retry's dry run and WITHDREW it: `applyFact` committed a failing fact's earlier commands, so the dry run answered «already defined» for the row's own commands. Re-measured at pickup (tip `d3f08a4c`): reproduced exactly (`{code: 'unknown-point', id: 'S'}`).
+
+**Decision.** (1) **A failing fact is ATOMIC** — the analytic line-atomicity arriving in 3-D: `applyFact` builds on a probe (`applyCommand3` is pure) and the figure advances only when the whole fact holds, so a half-applied statement leaves no orphans and attribution runs only on success. (2) **The refresh**: after the #926/#1327/#1339 retry fixpoint, every still-red row is re-judged against the COMPLETED figure (`retryError`, the same dry run the retry gate uses — `retryWouldSucceed` reshaped to return the verdict) and its status replaced with the latest error. The retry's healing behaviour is unchanged and locked.
+
+**Measured.** The reported sequence now names X; re-declaring X heals the row (ADR-3D-259 kept); a refused midpoint leaves no orphan point. The full 3-D lane (291 files / 5,330 tests, the #1394 parity golden included) is green on the FIRST run — the atomicity change altered no locked figure.
+
+**Consequences.** `src3d/store/store3.ts` (`applyFact` atomic; `retryError`; the refresh pass). Lock: `issue-1413-stale-error.test.ts` — the exact edit sequence, the healing control, the no-orphan guard.

@@ -338,20 +338,26 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
    * fact owns its additions exactly as an in-order one does (the 2-D `recordOwnership` discipline).
    */
   const applyFact = (f: Fact3): FactStatus3 => {
-    let st: FactStatus3 = 'ok';
     const claimsBefore = c.claims.length;
     const pinsBefore = pivotPinKey(c);
     const coordPinsBefore = c.pins.length + c.vectorPins.length;
     const paramPinsBefore = paramPinKey(c);
+    /**
+     * #1413 — A FAILING FACT IS ATOMIC: it commits NOTHING (the analytic line-atomicity, arriving
+     * here). Before this, a fact that failed on its Nth command had already committed the earlier
+     * ones, so (a) a half-applied statement left orphan objects in the figure, and (b) a red row's
+     * retry dry-run read "already defined" for its OWN earlier commands — which is what blocked
+     * refreshing a stale error (ADR-3D-259's withdrawn attempt). `applyCommand3` is pure, so the
+     * fact builds on a probe and the figure advances only when the whole fact holds.
+     */
+    let probe = c;
     for (const cmd of f.cmds) {
       if (droppedSoft(cmd)) continue; // an explicit ∠=90 on this triangle superseded the soft default
-      const r = applyCommand3(c, cmd);
-      if (!r.ok) {
-        st = r.error;
-        break;
-      }
-      c = r.next;
+      const r = applyCommand3(probe, cmd);
+      if (!r.ok) return r.error;
+      probe = r.next;
     }
+    c = probe;
     // count-delta attribution: EVERY claim recorded while this fact applied belongs to
     // it — including claims composite commands create indirectly (none can escape)
     if (c.claims.length > claimsBefore) claimOwners.push({ factId: f.id, from: claimsBefore, to: c.claims.length });
@@ -360,7 +366,7 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     if (pivotPinKey(c) !== pinsBefore) pinOwnerIds.add(f.id);
     if (c.pins.length + c.vectorPins.length > coordPinsBefore) coordPinOwnerIds.add(f.id);
     if (paramPinKey(c) !== paramPinsBefore) paramPinOwners.push(f.id);
-    return st;
+    return 'ok';
   };
   for (const f of facts) {
     if (!f.enabled) {
@@ -397,25 +403,40 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
   // have depended on a point that did not exist. The rule is now one sentence — a red row is retried
   // iff its dry run succeeds — and a row whose reference nothing declares still fails the dry run and
   // stays red.
-  const retryWouldSucceed = (f: Fact3): boolean => {
+  /** The dry run's verdict against the CURRENT figure: null = the fact would apply cleanly. */
+  const retryError = (f: Fact3): FactStatus3 | null => {
     let probe = c;
     for (const cmd of f.cmds) {
       if (droppedSoft(cmd)) continue;
       const r = applyCommand3(probe, cmd);
-      if (!r.ok) return false;
+      if (!r.ok) return r.error;
       probe = r.next;
     }
-    return true;
+    return null;
   };
   for (let pass = 0; pass < facts.length; pass++) {
     let progressed = false;
     for (const f of facts) {
       if (typeof status[f.id] === 'string') continue; // ok, or disabled — never touched
-      if (!retryWouldSucceed(f)) continue; // still unsatisfiable against the completed figure — stays red
+      if (retryError(f) !== null) continue; // still unsatisfiable against the completed figure — stays red
       status[f.id] = applyFact(f);
       progressed = true;
     }
     if (!progressed) break;
+  }
+  /**
+   * #1413 — A RED ROW'S MESSAGE IS ITS LATEST ATTEMPT, never its first. After the fixpoint, a row
+   * that stays red is re-judged against the COMPLETED figure and its status refreshed: «M אמצע SX»
+   * edited above its pyramid used to keep «unknown point S» from its in-order application, while S
+   * is on the canvas and the letter actually missing is X — a stale message names a statement the
+   * figure no longer conflicts with (the honesty invariant). Atomicity above is what makes this dry
+   * run honest: a failing fact commits nothing, so its own earlier commands cannot answer
+   * «already defined» to the retry.
+   */
+  for (const f of facts) {
+    if (typeof status[f.id] === 'string') continue; // ok, or disabled
+    const latest = retryError(f);
+    if (latest !== null) status[f.id] = latest;
   }
   // #978 (ADR-3D-246): the VERIFIER arm of the «אלכסון» claim (#859 / ADR-3D-203). The apply moment
   // judges the claim only when ONE solid holds both letters; with two solids on the canvas, or a pair the
