@@ -1314,8 +1314,8 @@ this loci and both should appear since they are the answer together and not just
 set with several connected components — the two lines through a point tangent to a circle, the two
 parallels at distance d — is drawn whole (every component its own curve, each labelled with its own
 part of the answer), named in the plural («שני ישרים»), and equated with **every** component's
-equation («שני ישרים · y = 0 · 3x + 4y = 0») — the same row at every configuration, never the
-component the seed happened to land on. The gates above apply to the UNION: the equations print only
+equation, one per line ([#1508](https://github.com/dcodish/geo_builder/issues/1508)) — the same row
+at every configuration, never the component the seed happened to land on. The gates above apply to the UNION: the equations print only
 when the whole set came back the same, and a parameterised union still answers kinds alone. One
 component's equation printed as *the* locus is a confident claim about a strict subset — the one
 thing this product may not do.

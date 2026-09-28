@@ -1151,7 +1151,9 @@ is a list of components, `Answer.locus` carries one drawn curve per component (e
 own equation on a union), and the determinacy gate compares **unions**: components matched order-free
 by snapped equation first and kind second (`agreeingUnion`), any mismatch → kinds only, kind
 multisets that do not pair → nothing. The row is ordered canonically so it reads the same at every
-seed. For a single component all of this reduces byte-for-byte to the previous behaviour.
+seed, and a union's equations go one per line (#1508 — `\n` in the value, split and typeset per line
+at the answer row, the #1221 rule). For a single component all of this reduces byte-for-byte to the
+previous behaviour.
 
 The fit itself may not out-claim its data (#1500 defect 2, #1224's class): `fitLine` zeroes a normal
 component below its own angular noise (`√(lo/hi)` of the two spread eigenvalues), and `normalized`'s

@@ -36,10 +36,11 @@ const onY0 = (p: { x: number; y: number }) => Math.abs(p.y) < 0.02 * Math.max(1,
 const onL2 = (p: { x: number; y: number }) => Math.abs(3 * p.x + 4 * p.y) < 0.05 * Math.max(1, Math.hypot(p.x, p.y));
 
 describe('#1500 — the union is the answer, at every configuration', () => {
-  it("the operator's exact figure: BOTH equations, the same row, at every seed of a 24-seed sweep", () => {
+  it("the operator's exact figure: BOTH equations, one per line (#1508), at every seed of a 24-seed sweep", () => {
     for (let seed = 0; seed < SEEDS; seed += 1) {
       const a = answer(SEQ, seed);
-      expect(a.value, `seed ${seed}`).toBe('שני ישרים · 3x + 4y = 0 · y = 0');
+      // Each equation on its own line — the operator's ruling on the first play of this fix (#1508).
+      expect(a.value, `seed ${seed}`).toBe('שני ישרים:\n3x + 4y = 0\ny = 0');
     }
   });
 

@@ -334,9 +334,13 @@ export function ask(
       ? kindWord(rowParts[0].kind, rowParts.length)
       : rowParts.map((p) => kindWord(p.kind, 1)).join(' · ');
     const eqs = rowParts.map((p) => p.eq).filter((e): e is string => e !== null);
+    // A union's equations go ONE PER LINE (#1508 — operator, playing #1500's fix: "where there are
+    // 2 answers, each on a separate line"); the single-component row keeps its exact shape.
+    const value =
+      eqs.length === 0 ? kindPart : eqs.length === 1 ? `${kindPart} · ${eqs[0]}` : `${kindPart}:\n${eqs.join('\n')}`;
     return {
       question,
-      value: eqs.length > 0 ? `${kindPart} · ${eqs.join(' · ')}` : kindPart,
+      value,
       locus: {
         components: res.components.map((cp, i) => ({
           points: cp.trace.points,
