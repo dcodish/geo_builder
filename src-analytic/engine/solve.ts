@@ -99,6 +99,13 @@ function angleAt(v: Pt, a: Pt, b: Pt): number | null {
   return Math.atan2(Math.abs(ux * wy - uy * wx), ux * wx + uy * wy);
 }
 
+/**
+ * The LINE a tangency names (#1501): a curve the figure holds, or the line through two named
+ * points. `label` on the curve member is the student's own spelling — «l1», «3x+4y=0» — so a
+ * refusal and the constraint list can quote their statement, never an internal id.
+ */
+export type TangentLineRef = { kind: 'curve'; id: Id; label: string } | { kind: 'points'; a: Id; b: Id };
+
 export type Constraint =
   /** `A(6,4)` on a point that is not free to be replaced — one or both coordinates pinned. */
   | { t: 'coord'; id: Id; x?: Expr; y?: Expr }
@@ -253,6 +260,19 @@ export type Constraint =
    */
   | { t: 'tangent-axis'; centre: Id; r: Expr; axis: 'x' | 'y' }
   /**
+   * A circle TOUCHES a LINE — «מעגל M משיק לישר l1», «מעגל M משיק לישר 3x+4y=0» (#1501).
+   *
+   * The general member of the tangency class #1060 opened with the axes: the distance from the
+   * centre to the line IS the radius — the formula sheet's |a·x₀ + b·y₀ + c| / √(a² + b²) = r,
+   * which is exactly one equation and exactly the sentence a student is handed instead of a
+   * number.
+   *
+   * `line` is either a CURVE the figure holds — a named line, or one minted inline from the
+   * sentence's own equation — or the line through two named POINTS: «משיק לישר AB» constrains
+   * against the line those points currently span, read exactly as `on-line-2pt` reads it.
+   */
+  | { t: 'tangent-line'; centre: Id; r: Expr; line: TangentLineRef }
+  /**
    * A DERIVATION RESTATED ABOUT AN EXISTING POINT — «M אמצע AB» when `M` is already the y-axis crossing
    * (#1320, ADR-AG-144; #1046's converse, which the M1 boundary never got).
    *
@@ -319,6 +339,13 @@ export function canonicalConstraint(k: Constraint): string {
   // one-letter angle, whose rays come off the ring in ring order, and its three-letter twin would be two
   // givens where the student stated one.
   const ray = (r: AngleRef): AngleRef => { const [a, b] = [r.a, r.b].sort(); return { v: r.v, a, b }; };
+  // A tangency's identity is its centre and its line: the pair reading is undirected («משיק לישר
+  // AB» is «משיק לישר BA»), and the curve member's label is the student's SPELLING, not part of
+  // what was stated — «לישר l1» and «ולישר l1» must compare equal (#1501).
+  if (k.t === 'tangent-line') {
+    const line = k.line.kind === 'points' ? `p:${[k.line.a, k.line.b].sort().join(',')}` : `c:${k.line.id}`;
+    return `tangent-line|${k.centre}|${line}`;
+  }
   if (k.t === 'angle') return JSON.stringify({ ...k, at: ray(k.at) });
   if (k.t === 'angle-ratio') return JSON.stringify({ ...k, left: ray(k.left), right: ray(k.right) });
   return JSON.stringify(k);
@@ -358,6 +385,10 @@ export function constraintRefs(k: Constraint): Id[] {
     // are involved, and a carrier any option could move must be searched over.
     case 'tangent-axis':
       return [k.centre];
+    // The pair reading moves its two points exactly as `on-line-2pt` does; a curve line moves
+    // nothing here — its own freedom lives in the parameter register, not in a point.
+    case 'tangent-line':
+      return k.line.kind === 'points' ? [k.centre, k.line.a, k.line.b] : [k.centre];
     case 'derived-at':
       return [k.id, ...parentsOf(k.rule)];
     case 'choice':
@@ -422,6 +453,8 @@ export function describeConstraint(k: Constraint): string {
       return `${k.id} על ${k.a}${k.b}`;
     case 'tangent-axis':
       return `${k.centre} משיק לציר ${k.axis}`;
+    case 'tangent-line':
+      return `${k.centre} משיק ל-${k.line.kind === 'curve' ? k.line.label : `${k.line.a}${k.line.b}`}`;
     case 'derived-at':
       return `${k.id} = ${describeRule(k.rule)}`;
     case 'choice':
@@ -460,6 +493,10 @@ export function constraintCurveRefs(k: Constraint): Id[] {
   switch (k.t) {
     case 'on-curve':
       return [k.curve];
+    // The line of a tangency must exist to be touched — «משיק לישר l7» on a figure with no l7 is
+    // the defect this function was built for (#1150), one constraint kind later (#1501).
+    case 'tangent-line':
+      return k.line.kind === 'curve' ? [k.line.id] : [];
     case 'relation':
       return [...ofDir(k.u), ...ofDir(k.v)];
     case 'slope':
@@ -755,6 +792,32 @@ export function residual(
       // below the x-axis touches it exactly as one above does, and demanding a sign would assert
       // a side the student never gave (ADR-052). Which side is a SELECTOR’s business, not this.
       const d = k.axis === 'x' ? Math.abs(p[0].y) : Math.abs(p[0].x);
+      return [d - radius];
+    }
+    case 'tangent-line': {
+      const radius = evalExpr(k.r, env);
+      if (!Number.isFinite(radius)) return null; // an unbound radius judges nothing
+      let a: number;
+      let b: number;
+      let cc: number;
+      if (k.line.kind === 'curve') {
+        const cv = curveAt?.(k.line.id) ?? null;
+        // Only a LINE can be touched this way — a curve of another kind is refused at the apply
+        // boundary, so answering "cannot be judged" here is a vacancy, never a silent drop.
+        if (!cv || cv.kind !== 'line') return null;
+        ({ a, b, c: cc } = cv);
+      } else {
+        // `p` is [centre, a, b], the order `constraintRefs` gives — the line through the pair.
+        const [, q, s] = p;
+        a = s.y - q.y;
+        b = -(s.x - q.x);
+        cc = (s.x - q.x) * q.y - (s.y - q.y) * q.x;
+      }
+      const n = Math.hypot(a, b);
+      if (n < 1e-12) return null; // a degenerate pair names no line to touch
+      // The DISTANCE from the centre to the line IS the radius. Unsigned like `tangent-axis`:
+      // which side the circle sits on is a SELECTOR's business, not a given (ADR-052).
+      const d = Math.abs(a * p[0].x + b * p[0].y + cc) / n;
       return [d - radius];
     }
     case 'derived-at': {

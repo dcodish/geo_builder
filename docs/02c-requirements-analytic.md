@@ -938,6 +938,16 @@ get the right figure. It consumes no freedom. A comparison no drawing can satisf
 the tool from a reserved set (P₁, P₂, …) unless the student already named a point there, and the row says the tool
 named it. A side on a circle is refused by name.
 
+**R120 — a circle can be pinned by tangency to a LINE, in every order**
+([ADR-AG-165](06c-decisions-analytic.md#adr-ag-165), [#1501](https://github.com/dcodish/geo_builder/issues/1501);
+the line member of R70's tangency). «מעגל M משיק לישר l1», «מעגל M משיק לישרים l1 ו-l2», «מעגל M משיק לישר
+3x+4y=0» (the sentence supplies the line), «משיק לישר AB» (the line through two named points), the contextual
+«המעגל משיק לישר l1», and the line first — «הישר l1 משיק למעגל M», «הישרים l1 ו-l2 משיקים למעגל» — all say the
+same thing: the distance from the centre to that line is the radius. Axes and lines mix in one list («משיק לציר
+ה-x ולישר l1»). Which SIDE of the line the circle sits on is not asserted, because the student did not say.
+Tangency to a line the figure does not hold is refused naming the line; tangency about a circle known only by
+its equation, and circle-to-circle tangency, are refused by name — never dropped, never guessed.
+
 **R114 — the tool never accepts a sentence a textbook would not print; it teaches the one it would**
 ([ADR-AG-150](06c-decisions-analytic.md#adr-ag-150),
 [#1353](https://github.com/dcodish/geo_builder/issues/1353), implementing

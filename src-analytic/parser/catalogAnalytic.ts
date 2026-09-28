@@ -200,10 +200,12 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'circle ABD',
     needs: ['A(1,7)', 'B(7,7)', 'D(1,1)'],
   },
+  // Unfeatured for #1501 (provisional, flagged for the operator): its sibling spelling «מעגל ABD»
+  // stays featured, and the tangency rows the operator's report named take the two seats — the
+  // #1347 lint holds a capped section to exactly six.
   {
     category: 'circles',
     family: 'F5',
-    featured: true,
     he: 'המעגל העובר דרך הנקודות A, B ו-D',
     en: 'the circle through the points A, B and D',
     needs: ['A(1,7)', 'B(7,7)', 'D(1,1)'],
@@ -231,6 +233,38 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['B(7,7)', 'D(1,1)'],
   },
 
+  // --- F5 · tangency — how the corpus pins a circle WITHOUT giving its radius (#1060 axes,
+  // #1501 lines). These rows are also what teaches the LLM lane the vocabulary: neither half was
+  // in the catalog before #1501, so the fallback could never emit a tangency at all.
+  { category: 'circles', family: 'F5', he: 'מעגל O משיק לציר ה-x', en: 'circle O is tangent to the x-axis' },
+  { category: 'circles', family: 'F5', he: 'המעגל O משיק לשני הצירים', en: 'circle O is tangent to both axes' },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'מעגל M משיק לישר l1',
+    en: 'circle M is tangent to line l1',
+    needs: ['נתון הישר l1: y=2x+5'],
+  },
+  // The operator's own two sentences (2026-09-28, #1501) carry the flag — the #1275 rule that a
+  // reported row is pulled into the guide's cap; which six of the section's featured rows show is
+  // #1347's open pedagogy question.
+  {
+    category: 'circles',
+    family: 'F5',
+    featured: true,
+    he: 'מעגל M משיק לישרים l1 ו-l2',
+    en: 'circle M is tangent to lines l1 and l2',
+    needs: ['נתון הישר l1: y=2x+5', 'נתון הישר l2: y=-x+1'],
+  },
+  { category: 'circles', family: 'F5', featured: true, he: 'מעגל M משיק לישר 3x+4y=0', en: 'circle M is tangent to line 3x+4y=0' },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'הישר l1 משיק למעגל M',
+    en: 'the line l1 is tangent to the circle M',
+    needs: ['נתון הישר l1: y=2x+5', 'נתון מעגל M'],
+  },
+
   // --- F6 · conics by equation (canonical only — D6/§2a) ---
   { category: 'conics', family: 'F6', he: 'נתונה פרבולה קנונית שמשוואתה y^2=54x', en: 'canonical parabola y^2=54x' },
   // `p`, not `a` (#1022). It is not an arbitrary parameter name in this topic: the 5-unit formula
@@ -245,7 +279,9 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'ellipse x^2/9+y^2/16=1',
   },
 
-  { category: 'circles', family: 'F5', featured: true, he: '(x-3)^2+(y-4)^2=9', en: '(x-3)^2+(y-4)^2=9' },
+  // Unfeatured for #1501 (provisional, flagged for the operator): the named form of the same
+  // equation capability — «נתון מעגל I שמשוואתו …» — stays featured.
+  { category: 'circles', family: 'F5', he: '(x-3)^2+(y-4)^2=9', en: '(x-3)^2+(y-4)^2=9' },
   { category: 'conics', family: 'F6', he: 'y^2=54x', en: 'y^2=54x' },
   { category: 'conics', family: 'F6', he: 'x^2/9+y^2/16=1', en: 'x^2/9+y^2/16=1' },
 

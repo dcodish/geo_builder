@@ -27,7 +27,7 @@
  * representation, not two.
  */
 import type { DerivedRule } from './derived';
-import type { AngleName, Constraint, Direction } from './solve';
+import type { AngleName, Constraint, Direction, TangentLineRef } from './solve';
 import type { Expr } from './expr';
 
 export type Id = string;
@@ -259,8 +259,13 @@ export type Fact =
    * The contextual sibling of `area-of` and `meet-of`, and the third of its shape: which circle
    * it means is a question about the construction, so M1 answers it and refuses when the answer
    * is not exactly one.
+   *
+   * #1501 widened WHAT is touched and WHO is named: `lines` carries line targets beside the axes
+   * («המעגל משיק לישר l1»), and `circle` carries the subject of the line-first order — «הישר l1
+   * משיק למעגל M» names its circle, so M1 resolves that name instead of demanding the figure hold
+   * exactly one.
    */
-  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'> })
+  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: TangentLineRef[]; circle?: string })
   /**
    * «הנקודה A נמצאת על האליפסה» — a point on a curve named only by its KIND (#1057).
    *

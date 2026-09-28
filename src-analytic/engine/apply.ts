@@ -374,6 +374,9 @@ const PROBE_ENVS: Env[] = [
  */
 function curveKindOf(o: GeoObject): string | null {
   if (o.kind === 'circle-at' || o.kind === 'circle-thru') return 'circle';
+  // A line CONSTRUCTED through a point is a line, however it was stated (#1501; the `on-curve`
+  // M1 arm carried this as a local special case before it lived here).
+  if (o.kind === 'line-at') return 'line';
   if (o.kind !== 'curve') return null;
   if (o.curve.kind) return o.curve.kind;
   const probe = resolveCurve(o.curve, PROBE_ENVS[0]);
@@ -821,6 +824,17 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         return { ok: false, error: unknownRef(missingCurve) };
       }
       /**
+       * A tangent-LINE must name a LINE (#1501). The residual answers "cannot be judged" for a
+       * curve of another kind, and an unjudged constraint is a given that vanished in silence —
+       * the same honesty hole #1150 closed for a curve that does not exist. «משיק ל-x^2+y^2=9»
+       * is a circle-to-circle tangency, which is its own capability, refused BY NAME until it is
+       * built.
+       */
+      if (f.k.t === 'tangent-line' && f.k.line.kind === 'curve') {
+        const o = objectById(c, f.k.line.id);
+        if (o && curveKindOf(o) !== 'line') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      }
+      /**
        * A STATEMENT MEETS THE TOOL'S OWN ASSUMPTION (#1159) — decided before the duplicate absorb,
        * because to the absorb the two look identical, and that is the whole defect.
        *
@@ -1047,7 +1061,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
        * or absorbed as `known` while N was never put on the line (a line-at through another point).
        */
       if (prior && f.dir.k === 'free') {
-        const isLine = prior.kind === 'line-at' || curveKindOf(prior) === 'line';
+        const isLine = curveKindOf(prior) === 'line'; // a `line-at` answers 'line' here too (#1501)
         if (isLine) {
           if (prior.kind === 'line-at' && prior.through === f.through) return { ok: true, effect: 'known', next: c };
           return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.through, curve: prior.id }, src: f.src });
@@ -1190,17 +1204,42 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'tangent-of': {
-      const circles = c.objects.filter((o) => o.kind === 'circle-at');
-      if (circles.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
-      const circle = circles[0] as Extract<GeoObject, { kind: 'circle-at' }>;
-      return applyAll(
-        c,
-        f.axes.map((axis) => ({
+      let host: GeoObject | undefined;
+      if (f.circle !== undefined) {
+        // The line-first order names its circle — «הישר l1 משיק למעגל M» (#1501). The same lookup
+        // chain as `diameter-of`: a numeral id, a centre-letter id, or the student's own name.
+        host =
+          objectById(c, `circle-${f.circle}`) ??
+          objectById(c, `circle-at-${f.circle}`) ??
+          curveByName(c, f.circle);
+        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(`circle-${f.circle}`) };
+      } else {
+        // By the fit, not the declaration: «המעגל» about an equation circle still finds ITS circle,
+        // and the honest answer below is `out-of-scope`, not "which circle?" (#1501).
+        const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+        if (circles.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+        host = circles[0];
+      }
+      /**
+       * Tangency pins the RADIUS against the CENTRE, so it needs a circle that has both to pull
+       * on. A circle known only by its equation, or computed from its points, has neither free —
+       * the given cannot be honoured, and it is refused BY NAME (`out-of-scope`), never dropped
+       * (the `diameter-of` rule, one case up).
+       */
+      if (host.kind !== 'circle-at') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      const circle = host;
+      return applyAll(c, [
+        ...f.axes.map((axis) => ({
           t: 'constraint' as const,
           k: { t: 'tangent-axis' as const, centre: circle.centre, r: circle.r, axis },
           src: f.src,
         })),
-      );
+        ...(f.lines ?? []).map((line) => ({
+          t: 'constraint' as const,
+          k: { t: 'tangent-line' as const, centre: circle.centre, r: circle.r, line },
+          src: f.src,
+        })),
+      ]);
     }
 
     case 'area-of': {

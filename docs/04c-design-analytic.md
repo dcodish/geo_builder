@@ -897,6 +897,29 @@ about it.
 **Tangency is one equation**: the distance from the centre to the axis is the radius. Unsigned, so the
 circle may sit on either side of the axis — the student said which axis, not which side.
 
+### Tangent to a line ([ADR-AG-165](06c-decisions-analytic.md#adr-ag-165))
+
+`tangent-line {centre, r, line}` is the general member of the same equation — the formula sheet's
+|a·x₀ + b·y₀ + c| / √(a² + b²) = r — and keeps the axis member's disciplines unchanged: unsigned
+(which side is a selector's business, ADR-052), one equation, one degree consumed.
+
+`line` is a `TangentLineRef`: a **curve** in the figure (a named line `line-l1`, a constructed
+`line-at`, or one the tangency sentence itself minted from an inline equation — the «A על הישר
+y=2x» precedent, `stated: false`, content id) or the line through two named **points** («משיק לישר
+AB», the `on-line-2pt` reading). The residual resolves the curve member through `curveAt` at every
+iterate, so a line whose own coefficients still carry parameters is touched wherever this
+configuration put it.
+
+One target parser (`tangentTargets`) serves every sentence shape, so orders cannot drift — the
+ADR-AG-164 rule applied to tangency: the circle first («מעגל M משיק לישרים l1 ו-l2»), the
+contextual circle («המעגל משיק לישר l1»), the line first («הישר l1 משיק למעגל M», the plural
+subject), axes and lines mixed in one list. A target the grammar cannot read declines the whole
+sentence to the escalation seam — «משיק למעגל K» (circle-to-circle) is a different capability.
+Honesty is held at the apply boundary: a named line that does not exist is `unknown-reference`
+(the ADR-AG-083 check, which `constraintCurveRefs` feeds), a minted equation that fits a circle is
+`out-of-scope` by name, and tangency about a circle with no centre point or radius parameter — an
+equation circle, a computed `circle-thru` — is `out-of-scope`, never dropped.
+
 ### A circle computed from points ([ADR-AG-160](06c-decisions-analytic.md#adr-ag-160))
 
 `circle-thru` is the third constructive curve, after `circle-at` and `line-at`, and the simplest: **no freedom
