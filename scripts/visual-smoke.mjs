@@ -208,7 +208,7 @@ export async function dismissModal(page) {
  * of a page that failed to paint are the same file, and only this check separates them from a real
  * screenshot of the app.
  */
-async function auditImages(browser, files) {
+export async function auditImages(browser, files) {
   const page = await browser.newPage();
   const verdicts = [];
   for (const file of files) {

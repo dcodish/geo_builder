@@ -28,7 +28,8 @@
     "check:siblings": "node scripts/check-sibling-safety.mjs",
     "smoke:visual": "node scripts/visual-smoke.mjs",
     "test:docs": "node scripts/doc-gate.mjs",
-    "test:coverage": "vitest run src/ --coverage --coverage.provider=v8 --coverage.reporter=text-summary --coverage.reporter=json-summary --coverage.include='src/**/*.ts' --coverage.include='src/**/*.tsx' --coverage.exclude='src/**/__tests__/**'"
+    "test:coverage": "vitest run src/ --coverage --coverage.provider=v8 --coverage.reporter=text-summary --coverage.reporter=json-summary --coverage.include='src/**/*.ts' --coverage.include='src/**/*.tsx' --coverage.exclude='src/**/__tests__/**'",
+    "playsheet": "node scripts/play-sheet-drive.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",

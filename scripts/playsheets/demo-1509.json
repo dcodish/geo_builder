@@ -1,0 +1,53 @@
+{
+  "name": "demo-1509",
+  "title": "גיליון הדגמה 28.9",
+  "cases": [
+    {
+      "id": "T1",
+      "title": "מקום גיאומטרי עם שתי תשובות — שני הישרים מופיעים, כל משוואה בשורה",
+      "class": "look",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "lines": ["משולש OMG", "O(0,0)", "M(2,6)", "MH גובה לצלע OG", "MH=6"],
+      "asks": ["המקום הגיאומטרי של G"],
+      "cycles": 2,
+      "expect": ["שני ישרים", "3x + 4y = 0", "y = 0"],
+      "lookFor": "שני ישרים מצוירים ומתויגים; בשורה — «שני ישרים:» ואז כל משוואה בשורה משלה; לא משתנה בין תצורות",
+      "before": "קו אחד בלבד, לפעמים בלי משוואה"
+    },
+    {
+      "id": "T2",
+      "title": "מעגל משיק לצלע — נקודת ההשקה על הצלע עצמה",
+      "class": "look",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "lines": ["A(0,0)", "B(4,0)", "מעגל M משיק לצלע AB"],
+      "cycles": 2,
+      "lookFor": "המעגל נוגע ב-AB בין A ל-B בכל תצורה",
+      "before": "המשפט טופל כמו «לישר AB» — ההשקה יכלה לצאת מהקטע"
+    },
+    {
+      "id": "T3",
+      "title": "השקה לישר שלא קיים — סירוב שקורא לישר בשמו",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "lines": ["מעגל M משיק לישר l7"],
+      "expectRefusal": "l7",
+      "lookFor": "סירוב שמזכיר את l7 — לא ציור ולא שקט",
+      "before": "unchanged"
+    },
+    {
+      "id": "T4",
+      "title": "מקום גיאומטרי עם תשובה אחת — ללא שינוי",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "lines": ["A(0,0)", "B(8,0)", "נקודה M", "MA = MB"],
+      "asks": ["המקום הגיאומטרי של M"],
+      "expect": ["ישר · x - 4 = 0"],
+      "lookFor": "בדיוק «ישר · x - 4 = 0», קו אחד",
+      "before": "unchanged"
+    }
+  ]
+}

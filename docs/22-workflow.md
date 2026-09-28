@@ -138,6 +138,15 @@ issue ([ADR-W-068](06w-decisions-workspace.md#adr-w-068--every-fix-round-ends-wi
 the issue stays the durable ledger, all three copies carry the same case list, and the operator plays the
 batch in one sitting and **closes the round issue as the validation signal**. Open P1s or a stale `in-round` issue stop a
 round before it starts — a P1 is never taken silently, and there is never a second live round.
+
+**Since [ADR-W-092](06w-decisions-workspace.md#adr-w-092) the sheet is PRE-PLAYED.** The round writes a
+tracked spec (`scripts/playsheets/<round>.json`) and runs `npm run playsheet -- --sheet <spec>` before
+publishing: every case is driven in a real browser (utterances typed, asks asked, «הציגו תצורה אחרת»
+pressed), the screenshots are audited and READ by the session, and a mechanically red case goes back to
+its fix — the operator never receives a red sheet. Each case is classed **🎮 play** (operator judgment) ·
+**👁 look** (judge from the embedded screenshot) · **✅ verified** (record only); the driver's
+`report.html` with the screenshots IS the published artifact's play-sheet half, and the operator's
+sitting covers 🎮 fully, 👁 by eye, ✅ not at all.
 `/status-update`'s "Waiting on you" section surfaces the whole loop: plans awaiting `auto-ok`, PRs
 awaiting play, rounds in flight, rounds awaiting validation.
 

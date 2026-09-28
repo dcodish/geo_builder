@@ -4816,3 +4816,24 @@ to file.
 (`contact`), `<tree>/ui/about.ts` ×4 (new), the four `App*.tsx`, and the 3-D/complex/analytic he+en
 locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible change: the About modal in
 3-D, complex and analytic now shows points, a «try this» sequence and the credit. 2-D is unchanged.
+
+## ADR-W-092 — Pre-played play sheets: the session drives every case in a browser first; the operator plays only what needs judgment (#1509)
+
+**Status:** accepted · 2026-09-28 · operator ruling in session: *"can we do something about my need to test so much? … approved. lets do this mechanism first so i reduce the load of testing from myself."*
+
+**Requirements:** none (workflow) · **Design:** [22-workflow.md §2d](22-workflow.md) + this entry; CLAUDE.md Rule 5 amended.
+
+**Context.** Rule 5's play gate bundled three different jobs into the operator's hands: *does it build* (already headless through the real `parse → replay` path plus the locks), *does it look right on screen* (the bulk of the operator's typing), and *is it right for a student* (genuinely his). Sheets of 30–100 cases made the middle job the bottleneck of every round — and the session was already proven able to do it (2026-08-31 Playwright; 2026-09-28: the #1500/#1503 fixes were browser-verified on dev AND prod by the session before the operator ever typed, and his replay then found only a judgment call, #1508).
+
+**Decision.**
+1. **Every play case is DRIVEN in a real browser before the sheet ships** — `scripts/play-sheet-drive.mjs` (`npm run playsheet -- --sheet <spec>`): types the utterances, asks the asks, presses «הציגו תצורה אחרת», captures screenshots, audits them (`visual-smoke`'s `judgeCapture` — evidence produced is not evidence read), and the SESSION reads the images. A case that fails mechanically exits the run non-zero and goes back to the fix; **the operator never receives a red sheet.**
+2. **Every case carries a CLASS**: 🎮 `play` — needs the operator's hands/judgment (new interactions, pedagogy, feel); 👁 `look` — the operator judges from the embedded screenshot, no typing; ✅ `verified` — on the sheet for the record. The report presents 🎮 first.
+3. **The sheet ships as `report.html`** (self-contained, RTL, both themes, screenshots embedded by relative reference), published for the operator; the CHAT report keeps rule 5's numbered list and copy-pasteable utterances for the 🎮 cases. Specs are tracked (`scripts/playsheets/*.json`, including the operator's exact sequences and the refusal cases with `expectRefusal` — polarity flipped so an untested refusal cannot pass); outputs are per-machine evidence (`reports/playsheets/`, gitignored like `reports/screens/`, ADR-W-008).
+4. **Text expectations are matched with bidi isolates stripped** (U+2066–2069 etc.) — measured 2026-09-28: a prod probe reported a visible row as missing because the renderer isolates LTR runs.
+5. `/fix-round`'s published round report becomes this report. The browser half stays a local gate (ADR-W-005), the pure half (`scripts/lib/play-sheet-core.mjs`: validation, matcher, verdicts, rendering) is locked by `scripts/__tests__/play-sheet-core.test.ts`.
+
+**What this does NOT change.** Rule 5's contract otherwise stands: numbered cases, one check per number, a server named and curl-checked on every case, refusal cases numbered, Heads-up first. The operator's ruling remains the finish line — ✅/👁 shift the *mechanical* evidence to the session, never the judgment.
+
+**Measured.** Demo sheet `demo-1509` over the day's two deployed fixes: 4 cases driven green on the live dev server (locus union incl. ask + two config cycles; tangent-to-side; the l7 refusal; the single-locus counter-case), 11 screenshots captured, audited and read; 15 unit locks on the pure half.
+
+**Consequences.** `scripts/play-sheet-drive.mjs` (new), `scripts/lib/play-sheet-core.mjs` (new), `scripts/visual-smoke.mjs` (`auditImages` exported), `scripts/playsheets/` (tracked specs), `package.json` (`playsheet`), CLAUDE.md Rule 5, docs/22 §2d. Lock: `scripts/__tests__/play-sheet-core.test.ts`.

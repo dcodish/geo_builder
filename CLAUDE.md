@@ -114,6 +114,12 @@ summary, not prose. The operator works down it without opening any other documen
 4. **A REFUSAL case gets its own number** — the easiest thing to leave untested.
 5. **Every server named is RUNNING and `curl`-checked**; one port per unmerged PR, from its own
    worktree. A list pointing at a dead port is not a finished report.
+6. **Every case is PRE-PLAYED before the sheet ships** ([ADR-W-092](docs/06w-decisions-workspace.md#adr-w-092)):
+   the session drives it in a real browser (`npm run playsheet -- --sheet <spec>`), reads the
+   screenshots, and a mechanically red case goes back to the fix — the operator never receives one.
+   Cases are classed **🎮 play** (needs the operator's hands/judgment) · **👁 look** (judge from the
+   embedded screenshot, no typing) · **✅ verified** (record only); the published `report.html`
+   carries the evidence, and the chat report keeps the 🎮 utterances copy-pasteable per rule 3.
 
 Enforced by the `Stop` hook [`scripts/ensure-test-server.mjs`](scripts/ensure-test-server.mjs), which fails
 OPEN — a broken hook must never wedge a session.
