@@ -282,7 +282,36 @@ const pivotPinKey = (c: Construction3): string => {
 const paramPinKey = (c: Construction3): string =>
   [pinningGivens(c), c.paramGivens.length, c.param !== undefined ? symbolValueOf(c, c.param) ?? '' : ''].join('|');
 
+/**
+ * #1422 — THE FOLD-MEMO RULE ARRIVES IN 3-D. This store's header records why derive3 was never
+ * cached: V0 figures were cheap. ADR-3D-260 (#1311) made every derive SOLVE the free-point rider
+ * lane, and one «הציגו תצורה אחרת» press then paid it at least twice (`seedForRequirements`
+ * derives the candidate, the view derives it again) — measured ~500 ms per press on
+ * «וקטור AB · אורך AB = 5». The memo is keyed on the facts ARRAY IDENTITY (every store action
+ * builds a new array — the same property the 2-D `lastViewDelta` self-invalidation states) and the
+ * seed; a WeakMap, so a session's figures are dropped with them. Callers treat `Derived3` as
+ * read-only already (it is shared across the render tree within one commit). Bounded per figure:
+ * a seed sweep touches many seeds, and 32 entries cover the ADR-3D-053 search window.
+ */
+const deriveMemo3 = new WeakMap<readonly Fact3[], Map<number, Derived3>>();
+
 export function derive3(facts: Fact3[], seed: number): Derived3 {
+  const per = deriveMemo3.get(facts);
+  const hit = per?.get(seed);
+  if (hit) return hit;
+  const out = derive3Uncached(facts, seed);
+  const m = per ?? new Map<number, Derived3>();
+  if (!per) deriveMemo3.set(facts, m);
+  m.set(seed, out);
+  if (m.size > 32) m.delete(m.keys().next().value as number);
+  return out;
+}
+
+/** #1422 — the memo's counter lock seam (the 2-D `conflictSearchStats` idiom): one press must
+ *  cost exactly one uncached derive, asserted by count, never by clock. */
+export const deriveStats3 = { uncached: 0 };
+function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
+  deriveStats3.uncached++;
   let c: Construction3 = emptyConstruction3();
   const status: Record<string, FactStatus3> = {};
   const claimOwners: { factId: string; from: number; to: number }[] = [];
