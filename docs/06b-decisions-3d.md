@@ -11052,3 +11052,17 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 **Out of scope, filed:** «AB = (1,2,3)» (a component PIN) still reads 6 — the pin runs through the 7-DOF gauge allowance a solidless figure has no gauge for; #1519, with the fix direction and the locks to check. The issue's second half (the ~1.7 s coordinate pin) moved to #1422 by the triage comment.
 
 **Consequences.** `src3d/engine/solve3.ts` (`blockRiderIdx`, the widened probe), `src3d/engine/evaluate.ts` (the subtraction spans the sum). Lock: `issue-1415-vector-dof.test.ts` — 6 → 5 on the reported figure, the cube control, and the not-locked component case recorded in place.
+
+## ADR-3D-275 — One press, one solve: derive3 is memoised on (facts, seed) (#1422)
+
+**Status:** accepted · 2026-09-28 · operator, round #1408 T32 (*"takes it a long time to find a new config"*) · round #1517. Numbered 275 beside the round's parallel branches (273 = #1413, 274 = #1415).
+
+**Requirements:** none (internal — perf; no promise changed) · **Design:** docs/04b — the store's derive; LADDER unchanged (the memo wraps the whole derive, no stage moves)
+
+**Context.** The store's header records why `derive3` was never cached: V0 figures were cheap. ADR-3D-260 made every derive SOLVE the free-point rider lane, and one «הציגו תצורה אחרת» press paid it at least twice — `seedForRequirements` derives the candidate seed, the view derives it again — measured ~500 ms per press on «וקטור AB · אורך AB = 5» and ~1.7 s for the #1415-moved coordinate pin. Re-measured at pickup: the table stood.
+
+**Decision.** The 2-D fold-memo rule arrives: `derive3` memoises on the facts ARRAY IDENTITY (every store action builds a new array — the property 2-D's `lastViewDelta` self-invalidation states) and the seed, in a WeakMap so figures drop with their session; 32 entries per figure cover the ADR-3D-053 seed-search window. `deriveStats3.uncached` is the counter-lock seam (the 2-D `conflictSearchStats` idiom): **one press costs exactly one uncached derive**, asserted by count, never by clock.
+
+**Measured, and the residual stated honestly.** Presses: ~500 ms → **~330 ms** (exactly one solve; the view's derive and every same-view consumer are free). The coordinate pin: ~1.7 s → **~1.05 s**, all of it ONE multistart solve. The plan's deeper candidates were examined and declined: (b) probe-only-mentioned-points does not apply to the reported members (both points are mentioned); (c) warm-starting is already effectively true for submits (a free coordinate's rider anchors at its sampled position) and biasing the RESAMPLE's start would trade the sampled variety ADR-052 requires; any multistart narrowing risks the 24/24 rate ADR-3D-260's locks hold, which the plan forbids trading. If the residual single-solve still reads slow in play, that is a new, separately-measured issue.
+
+**Consequences.** `src3d/store/store3.ts` (`deriveMemo3`, `derive3Uncached`, `deriveStats3`). Locks: `issue-1422-derive-memo.test.ts` — one uncached derive per press ×5, shared-object identity, the two staleness guards; ADR-3D-260's own locks unchanged (the lane).
