@@ -847,7 +847,8 @@ export function App() {
                     ))}
                   </div>
                 )}
-                {polarScene.regions.map((rg) => (
+                {/* #1425: a polygon with nothing else to count shows no strip (its corners are not counted) */}
+                {polarScene.regions.filter((rg) => rg.members.length > 0).map((rg) => (
                   <div key={rg.key} className="region-count" dir="rtl">
                     {t('regionCounts', {
                       label: rg.label,

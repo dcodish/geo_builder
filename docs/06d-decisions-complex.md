@@ -3364,3 +3364,17 @@ binomial-spelling, member, member-poly, quartic, corpus-witness}-1434.complex.js
 **Measured.** Smallest triangle corner ≥ 20° at 24/24 seeds (was 3°–43°). «מרובע ABCD» is convex with every corner > 20° at 24/24. «A = 0 · B = 4 · משולש ABC» still honours A and B.
 
 **Consequences.** `src-complex/replay/derive2.ts` (`polygonShapeStart` and the start). Lock: `issue-1424-polygon-shape.test.ts`.
+
+## ADR-CX-053 — The region count leaves out the polygon's own corners (#1425)
+
+**Status:** accepted · 2026-09-28 · operator report («why is this behavior», 2026-09-25/27), batch-approved 2026-09-27 · round #1517. Numbered 053 beside the round's other complex branches (052, 054–055).
+
+**Requirements:** docs/02d FR-GP-5 (new) · **Design:** docs/04d — the region count excludes a polygon's own corners
+
+**Context.** Under a lone «משולש ABC» the strip read «ABC: 0 בפנים · 3 על המצולע · 0 בחוץ». `regionsOf` (ADR-CX-016) counted every plotted number against a stated polygon, including the polygon's own vertices, which lie on it by definition. The count exists for the §2b question «how many of the solutions are inside / on / outside», and those are the OTHER numbers.
+
+**Decision.** `resolveObjects` publishes each polygon's `cornerNames`: its vertex names minus the members of any enumerated solution set (the fold's `solutionSets`). `regionsOf` leaves those names out of `members` and so out of the counts. The region still shades its interior; the App strip renders only when something is counted. The plan's open case is settled by identity: a vertex that is also a solution («z^3 = 8», then «המשולש z1z2z3») is one of the numbers the question counts, so it stays and reads as on. Measured on the branch, before deciding: an equation's solutions are plotted under their own indexed names (`w^5 = 32` → w1…w5), separate from the polygon's letters, so the §2b shape is unaffected.
+
+**Measured.** «משולש ABC» → no members, no strip (was on 3). «משולש ABC · z1 = 0» → z1 only. The §2b capstone fixture: «Oz1z2z3» counts z4 (out) and «Oz2z3z4» counts z1 (out); each previously also counted its own three corners. «z^3 = 8 · המשולש z1z2z3» → on 3.
+
+**Consequences.** `src-complex/replay/derive2.ts` (`cornerNames`), `src-complex/scene/region.ts`, `src-complex/App.tsx` (the strip gate). Lock: `issue-1425-region-count.test.ts`.

@@ -37,6 +37,11 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   start for a polygon whose every vertex is fully free (both halves, no quadrant window, not the origin) is
   `polygonShapeStart`: a jittered regular n-gon with a per-seed centre, size and rotation. Only the start
   changes: the free basis, the DOF count and the solve are untouched, so a given still moves a vertex.
+
+- **The region count excludes a polygon's own corners** ([ADR-CX-053](06d-decisions-complex.md#adr-cx-053)).
+  `resolveObjects` publishes a polygon's `cornerNames` (its vertex names minus the members of any
+  enumerated solution set), and `regionsOf` leaves those out of `members`. The region still shades; the App
+  strip renders only when `members` is non-empty.
 - **Knowledge is decidable.** Whether a value is forced is a question about the nullspace and the
   configuration set, not a sampling heuristic — so [`FR-KN-1`](02d-requirements-complex.md) ("a number
   printed on screen is knowledge") has an exact test behind it: `knowledgeOf` evaluates the value in

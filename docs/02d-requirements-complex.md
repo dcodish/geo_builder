@@ -45,6 +45,11 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   radical form this product knows (cos 20°) keeps its decimal with `≈`, so the display never invents an
   exact value. A part that is zero is not written: «-2», «2i», never «-2+0i». The polar view is
   unaffected. *(Operator, #1404 and its 2026-09-25 ruling; realised — [ADR-CX-046](06d-decisions-complex.md#adr-cx-046).)*
+- **FR-GP-5 (Must)** — **The inside/on/outside count is of the OTHER numbers.** A stated polygon shades
+  its interior, and the strip under the canvas counts the plotted numbers against it, never its own corners
+  (they lie on it by definition). A corner that is also a solution of an equation («z^3 = 8», then the
+  triangle z1z2z3) is one of the numbers asked about and still counts. A polygon with nothing else to count
+  shows no strip. *(Realised — [ADR-CX-053](06d-decisions-complex.md#adr-cx-053), #1425.)*
 
 ## Exactness and configuration
 
