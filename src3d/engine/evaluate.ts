@@ -1251,6 +1251,38 @@ export function scaleKnown3(c: Construction3): boolean {
   // rescale uses, so "we print sizes" and "the drawing honours the stated size" cannot disagree.
   if (scaleGivenActive(c)) return true;
   if (scalePinned(c)) return true;
+  /**
+   * A REVOLUTION solid's stated dims are absolute lengths (#1450 — the #517 "private enumeration
+   * of absolute sources" class, two members that were missing): «רדיוס הבסיס 5 וגובהו 12» states
+   * real sizes, and the query lane answered «תלוי בקנה המידה» for the 12 the student had just
+   * typed. Likewise a figure of EQUATION planes: «π1: z=3» and «π2: z=1» place absolute planes,
+   * and the distance between them is 2 in the world's own units.
+   */
+  // A stated component INJECTION («AB = (1,2,3)», a pairPin with real numbers) fixes |AB| —
+  // the third missing #517 member the review's own figure hit.
+  for (const pin of c.pairPins) {
+    if ([pin.x, pin.y, pin.z].some((v) => typeof v === 'number')) return true;
+  }
+  for (const rev of c.revolutions) {
+    // A STATED dim only — an unstated radius/height is sampled per seed and is exactly the
+    // similarity freedom this gate exists to withhold.
+    if (typeof rev.radius === 'number' || typeof rev.height === 'number') return true;
+  }
+  // A stated component INJECTION («AB = (1,2,3)», a pairPin with real numbers) fixes |AB| —
+  // the third missing #517 member, and the review's own free-vector figure.
+  for (const pin of c.pairPins) {
+    if ([pin.x, pin.y, pin.z].some((v) => typeof v === 'number')) return true;
+  }
+  if (c.planes.size >= 2 && c.solids.length === 0 && c.revolutions.length === 0) {
+    // Two STATED-equation planes (numeric coefficients — not free, not pin-symbol, not
+    // parameter-carrying) fix real distances in the world's own units: «π1: z=3», «π2: z=1».
+    let absolute = 0;
+    for (const [, def] of c.planes) {
+      const numeric = [def.cx, def.cy, def.cz, def.d].every((e) => !e.p);
+      if (!def.free && !def.sym && numeric) absolute += 1;
+    }
+    if (absolute >= 2) return true;
+  }
   // TWO absolute points state the distances among them — but only a figure with NO solid can take
   // that as figure-wide scale knowledge: a solid's first dim is the frozen similarity gauge, so a
   // DETACHED cube's |AB| = 1 is seed-stable without being knowledge, and a categorical (per-figure)
