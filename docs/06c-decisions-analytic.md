@@ -8022,3 +8022,15 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 **Measured.** 6 locks (`issue-1297-hebrew-fact.test.ts` product-side; `issue-1297-locale-prompt.test.ts` server-side, on the sanctioned import direction): the He prompt carries only the He column + the hard rule, the En prompt only En, the no-locale prompt byte-compatible; rows display the sentence with part markers, annotations follow their lines through removal, drop on edit, and survive save→restore.
 
 **Consequences.** `server/llm/harness.ts` (locale through `PromptSpec.vocabulary`/`buildSystemPrompt`/`buildRequest`), `server/parseHandler.ts` (`body.locale`), `parser/llmSharedAnalytic.ts` (one-column vocab), `parser/llmAnalytic.ts` + `App.tsx` (locale sent; `recordLlmLines`; row display), `store/useAnalyticStore.ts` (`spokenFor` + envelope field). **Proxy redeploy required.**
+
+## ADR-AG-174 — «הנקודה» is optional in the distance grammar, and the contextual form resolves by rewrite (#1431)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1517. Numbered 174 beside the round's parallel branch (173 = #1423).
+
+**Requirements:** [02c](02c-requirements-analytic.md) — ask/given parity for a spelling · **Design:** [04c](04c-design-analytic.md) — the one measure-term atom
+
+**Context.** «המרחק של הנקודה A מהישר l1» was unreadable as an ask and not-handled as a given while «המרחק של A מהישר l1» answered 4 — the optional-subject-noun trap (`הנקודה A ≡ A`, the #1134/#1151 shape); «מרחק A מ-l1» (construct state) was unreadable too. Re-measured at pickup: the issue's table stood.
+
+**Decision.** (1) The `NOUN` slot of the ONE distance atom (`engine/lengths.ts`, the #1151 frames) gains the point nouns («נקודה», «קדקוד», En "point"), so the ask and the given read the spelling by construction — no per-surface copy. (2) The construct state joins as a fourth frame (empty opener; the «מ-» join still required, so a bare «מרחק AB» length is never claimed). (3) The ruled contextual form («המרחק של הנקודה מהישר», no letters — operator 2026-09-27): answers exactly when the figure holds ONE point and ONE line, by REWRITING into the lettered sentence at the ask entry and falling through to the one distance lane (the ADR-W-053 synonym rule the symbolic d_{AB} spellings follow); otherwise a new `contextual` answer field carries the counts and the App names the ambiguity — never «לא הבנתי».
+
+**Consequences.** `src-analytic/engine/lengths.ts` (`NOUN`, the construct frame), `src-analytic/app/ask.ts` (the contextual rewrite + `Answer.contextual`), `src-analytic/App.tsx` + `src-analytic/i18n/index.ts` (the ambiguity wording, he+en). Lock: `issue-1431-distance-noun.test.ts` — every reported spelling × both surfaces, the contextual answer and its two-point refusal, the bare-pair control.
