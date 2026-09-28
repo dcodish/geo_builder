@@ -45,6 +45,9 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   radical form this product knows (cos 20°) keeps its decimal with `≈`, so the display never invents an
   exact value. A part that is zero is not written: «-2», «2i», never «-2+0i». The polar view is
   unaffected. *(Operator, #1404 and its 2026-09-25 ruling; realised — [ADR-CX-046](06d-decisions-complex.md#adr-cx-046).)*
+- **FR-GP-6 (Must)** — **The grid covers what is on screen.** In both views the gridlines, rings, rays and
+  axis numbers span the whole visible canvas, at every zoom and on a canvas wider than it is tall, and
+  their step grows as the view zooms out. *(Realised — [ADR-W-094](06w-decisions-workspace.md#adr-w-094), #1465.)*
 
 ## Exactness and configuration
 
