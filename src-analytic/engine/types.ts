@@ -267,6 +267,17 @@ export type Fact =
    */
   | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: TangentLineRef[]; circle?: string })
   /**
+   * «רדיוס המעגל (I|O)? הוא 5» — the radius stated as its own given (#1432). WHICH circle is M1's
+   * question (`circle` as the sentence named it, or the contextual one); what it does depends on
+   * the host: a free `circle-at` radius is PINNED (the sym substituted, its param retired), a
+   * determined radius is a restatement checked at the probe environments.
+   */
+  | (FactBase & { t: 'radius-of'; circle?: string; value: Expr })
+  /** «F מוקד הפרבולה» (#1432) — names the focus; M1 resolves THE parabola, the centre's pattern. */
+  | (FactBase & { t: 'focus-of'; id: Id })
+  /** «משוואת המדריך היא x=-2» (#1432) — a claim checked against the parabola's own directrix. */
+  | (FactBase & { t: 'directrix-eq'; eq: Expr; eqSrc: string })
+  /**
    * «הנקודה A נמצאת על האליפסה» — a point on a curve named only by its KIND (#1057).
    *
    * F2 corpus vocabulary (docs/19 §4a), and the fourth contextual reference: which curve it

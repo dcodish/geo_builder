@@ -32,6 +32,7 @@ import { isVerticalLine } from '../engine/lines';
 import { asPair, lineNamed } from './lines';
 import { angleText, lineAngleOf } from './lineAngle';
 import { curveParts, locusEquation } from './curveText';
+import { ellipseFoci, parabolaDirectrix, parabolaFocus } from '../engine/curves';
 
 /** The question is EXACTLY one point-to-line distance, for the same reason `BARE_LENGTH` exists. */
 const POINT_LINE_ONLY = /^(?:ה?מרחק|[Dd]istance)\s+\S.*$/;
@@ -404,6 +405,72 @@ export function ask(
       return l && !isVerticalLine(l.a, l.b) ? -l.a / l.b : null;
     });
     return { question, value: k.known ? fmt(k.value) : null };
+  }
+
+  /**
+   * --- the measure ROLES (#1432): perimeter, radius, focus, directrix, foci ---
+   *
+   * External review: *"The Ask box is narrow. It can't answer radius, focus, … perimeter."* The
+   * values were always computed (the panel's folded detail, #1212); no ask reached them. Each
+   * reads through the SAME atoms the panel prints from, gated by the same knowledge rules.
+   */
+  const perim =
+    /^ה?היקף\s+(?:של\s+)?(?:ה?משולש\s+|ה?מרובע\s+|ה?מצולע\s+)?((?:[A-Z][0-9₀-₉]?){3,})$/.exec(text) ??
+    /^(?:the\s+)?perimeter\s+of\s+(?:the\s+)?(?:triangle\s+|quadrilateral\s+)?((?:[A-Z][0-9₀-₉]?){3,})$/i.exec(text);
+  if (perim) {
+    // The perimeter IS the sum of the sides, and the compound-length ask already answers sums —
+    // one delegation, so «היקף ABC» and «AB+BC+CA» cannot disagree.
+    const names = perim[1].match(/[A-Z][0-9₀-₉]?/g) ?? [];
+    const expr = names.map((p, i) => `${p}${names[(i + 1) % names.length]}`).join('+');
+    return { ...ask(d, expr, fmt, kindWord), question };
+  }
+  const radiusAsk =
+    /^(?:מה\s+)?ה?רדיוס(?:\s+של)?(?:\s+ה?מעגל)?(?:\s+(I|II|III|IV|V|[1-5]|[A-Z]))?$/.exec(text) ??
+    /^(?:the\s+)?radius(?:\s+of)?(?:\s+the\s+circle)?(?:\s+(I|II|III|IV|V|[1-5]|[A-Z]))?$/i.exec(text);
+  if (radiusAsk) {
+    const nm = radiusAsk[1];
+    const cid = nm
+      ? (objectById(d.construction, `circle-${nm}`) ? `circle-${nm}` : `circle-at-${nm}`)
+      : null;
+    const k = isKnowledge(d.construction, (f) => {
+      const host = cid
+        ? f.curves.find((q) => q.id === cid)
+        : f.curves.filter((q) => q.curve.kind === 'circle').length === 1
+          ? f.curves.find((q) => q.curve.kind === 'circle')
+          : undefined;
+      return host && host.curve.kind === 'circle' ? host.curve.r : null;
+    });
+    return { question, value: k.known ? fmt(k.value) : null };
+  }
+  const roleAsk =
+    /^(?:מה\s+)?ה?(מוקד|מדריך)(?:\s+(?:של\s+)?ה?פרבולה)?$/.exec(text) ??
+    /^(?:the\s+)?(focus|directrix)(?:\s+of)?(?:\s+the\s+parabola)?$/i.exec(text);
+  const fociAsk = /^(?:מה\s+)?ה?מוקדי(?:ם)?(?:\s+(?:של\s+)?ה?אליפסה)?$/.exec(text) ?? /^(?:the\s+)?foci(?:\s+of)?(?:\s+the\s+ellipse)?$/i.exec(text);
+  if (roleAsk || fociAsk) {
+    // THE parabola / THE ellipse: the one whose curve is knowledge — a parameterised conic has no
+    // invariant focus, and that is `value: null` in the lane's own honest wording.
+    const wantKind = fociAsk ? 'ellipse' : 'parabola';
+    const hosts = d.construction.objects
+      .filter((o) => o.kind === 'curve')
+      .map((o) => knownCurve(d.construction, o.id))
+      .filter((cv): cv is NonNullable<typeof cv> => cv !== null && cv.kind === wantKind);
+    if (hosts.length === 1) {
+      const cv = hosts[0];
+      if (fociAsk && cv.kind === 'ellipse') {
+        const [f1, f2] = ellipseFoci(cv);
+        return { question, value: `(${fmt(f1.x)}, ${fmt(f1.y)}), (${fmt(f2.x)}, ${fmt(f2.y)})` };
+      }
+      if (roleAsk && cv.kind === 'parabola') {
+        if (roleAsk[1].toLowerCase().includes('מדריך') || roleAsk[1].toLowerCase() === 'directrix') {
+          const dline = parabolaDirectrix(cv);
+          if (dline.kind === 'line') return { question, value: `x = ${fmt(-dline.c / dline.a)}` };
+        } else {
+          const fp = parabolaFocus(cv);
+          return { question, value: `(${fmt(fp.x)}, ${fmt(fp.y)})` };
+        }
+      }
+    }
+    return { question, value: null };
   }
 
   // --- a curve, by name: its equation ---

@@ -55,6 +55,8 @@ export function sameDerivation(a: DerivedRule, b: DerivedRule): boolean {
       return b.t === 'diagonals' && sameRing(a.v, b.v);
     case 'circle-centre':
       return b.t === 'circle-centre' && a.curve === b.curve;
+    case 'parabola-focus':
+      return b.t === 'parabola-focus' && a.curve === b.curve;
     default: {
       /**
        * EXHAUSTIVE on purpose. A new `DerivedRule` must decide whether two of its instances are the

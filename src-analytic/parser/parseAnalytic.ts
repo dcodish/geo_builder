@@ -1292,11 +1292,13 @@ function polygonId(vertices: string[]): string {
  *  the one-spelling gate is this tree's recurring trap (`src-analytic/CLAUDE.md`). */
 const HE_TANGENT_VERB = '(?:ה|ו|ש)?משיק(?:ה|ים|ות)?';
 
+// The optional RADIUS tail (#1432): «נתון מעגל O שרדיוסו 5», «מעגל שמרכזו O ורדיוסו 5» — the
+// radius arrives at creation, so the circle is born with 2 degrees of freedom, not 3.
 const CIRCLE_AT_HE = new RegExp(
-  `^${HE_GIVEN}ה?מעגל\\s+(?:ש?מרכזו\\s+)?(${NAME})(?:\\s+${HE_TANGENT_VERB}\\s+ל(.+))?$`
+  `^${HE_GIVEN}ה?מעגל\\s+(?:ש?מרכזו\\s+)?(${NAME})(?:\\s+[שו]?רדיוסו\\s+(\\S+))?(?:\\s+${HE_TANGENT_VERB}\\s+ל(.+))?$`
 );
 const CIRCLE_AT_EN = new RegExp(
-  `^(?:the\\s+)?circle\\s+(?:cent(?:re|er)d\\s+at\\s+)?(${NAME})(?:\\s+(?:is\\s+|which\\s+is\\s+)?tangent\\s+to\\s+(.+))?$`
+  `^(?:the\\s+)?circle\\s+(?:cent(?:re|er)d\\s+at\\s+)?(${NAME})(?:\\s+with\\s+radius\\s+(\\S+))?(?:\\s+(?:is\\s+|which\\s+is\\s+)?tangent\\s+to\\s+(.+))?$`
 ,  'i',
 );
 
@@ -1398,13 +1400,14 @@ function tangentTargets(tail: string, src: string): TangentTargets | null {
  * The minted-curve facts come FIRST: a tangency constraint may name a line its own sentence
  * created, and the apply boundary checks the curve exists before the constraint lands (#1150).
  */
-function circleAtFacts(centre: Id, targets: TangentTargets, line: string): Fact[] {
+function circleAtFacts(centre: Id, targets: TangentTargets, line: string, rStated?: Expr): Fact[] {
   const sym = `r_${centre}`;
-  const r: Expr = { kind: 'sym', name: sym };
+  // A STATED radius (#1432) is a literal from birth — no free sym, no param, one less DOF.
+  const r: Expr = rStated ?? { kind: 'sym', name: sym };
   return [
     ...targets.facts,
     { t: 'declare', id: centre, src: line },
-    { t: 'param', sym, domain: { ...UNBOUNDED, min: 0, minOpen: true }, src: line },
+    ...(rStated ? [] : [{ t: 'param' as const, sym, domain: { ...UNBOUNDED, min: 0, minOpen: true }, src: line }]),
     { t: 'circle-at', id: `circle-at-${centre}`, centre, r, src: line },
     ...targets.axes.map((axis) => ({
       t: 'constraint' as const,
@@ -1421,14 +1424,48 @@ function circleAtFacts(centre: Id, targets: TangentTargets, line: string): Fact[
 
 const NO_TARGETS: TangentTargets = { axes: [], lines: [], facts: [] };
 
+/**
+ * THE MEASURE-ROLE GIVENS (#1432) — radius, focus, directrix, each sayable as its own sentence.
+ *
+ * The values were always computed (the panel's folded detail shows them, #1212); no grammar
+ * reached them on either surface. Which OBJECT each sentence means is M1's question, so each
+ * lowers to a fact the apply boundary resolves — the «O מרכז המעגל» pattern.
+ */
+function parseMeasureRoles(line: string): RuleOutcome {
+  const radius =
+    new RegExp(`^${HE_GIVEN}ה?רדיוס\\s+(?:של\\s+)?ה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?\\s+(?:הוא|היא|=)\\s*(.+)$`).exec(line) ??
+    new RegExp(`^the\\s+radius\\s+of\\s+(?:the\\s+)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?\\s+(?:is|=)\\s*(.+)$`, 'i').exec(line);
+  if (radius && claimable(radius[2])) {
+    const value = valueExpr(radius[2]);
+    if (!value) return refuse('bad-equation', trim(radius[2]));
+    return made([{ t: 'radius-of', ...(radius[1] ? { circle: radius[1] } : {}), value, src: line }]);
+  }
+  const focus =
+    new RegExp(`^${HE_GIVEN}(${NAME})${HE_IS}\\s*ה?מוקד\\s+(?:של\\s+)?ה?פרבולה$`).exec(line) ??
+    new RegExp(`^(${NAME})\\s+is\\s+the\\s+focus\\s+of\\s+the\\s+parabola$`, 'i').exec(line);
+  if (focus) return made([{ t: 'focus-of', id: focus[1], src: line }]);
+  const directrix =
+    new RegExp(`^${HE_GIVEN}משוואת\\s+ה?מדריך\\s+(?:היא|הוא)\\s+(.+)$`).exec(line) ??
+    /^the\s+equation\s+of\s+the\s+directrix\s+is\s+(.+)$/i.exec(line);
+  if (directrix) {
+    const eq = equationExpr(directrix[1]);
+    if (!eq) return refuse('bad-equation', trim(directrix[1]));
+    return made([{ t: 'directrix-eq', eq, eqSrc: trim(directrix[1]), src: line }]);
+  }
+  return null;
+}
+
 function parseCircleAt(line: string): RuleOutcome {
   const named = CIRCLE_AT_HE.exec(line) ?? CIRCLE_AT_EN.exec(line);
   if (named) {
     // The tangency phrase is optional: «נתון מעגל O» alone is a circle with a free centre and a
-    // free radius, which is 3 degrees of freedom and an honest figure.
-    const targets = named[2] === undefined ? NO_TARGETS : tangentTargets(named[2], line);
+    // free radius, which is 3 degrees of freedom and an honest figure. A stated radius (#1432)
+    // pins that freedom at birth — a literal Expr instead of the free sym, no param minted.
+    const rValue = named[2] !== undefined ? valueExpr(named[2]) : null;
+    if (named[2] !== undefined && !rValue) return refuse('bad-equation', named[2]);
+    const targets = named[3] === undefined ? NO_TARGETS : tangentTargets(named[3], line);
     // A tail this grammar cannot read — «משיק למעגל K» — is not this rule's sentence.
-    if (targets) return made(circleAtFacts(named[1], targets, line));
+    if (targets) return made(circleAtFacts(named[1], targets, line, rValue ?? undefined));
   }
   const bare = CIRCLE_TANGENT_HE.exec(line) ?? CIRCLE_TANGENT_EN.exec(line);
   if (bare) {
@@ -2960,6 +2997,9 @@ export function parseLine(raw: string): ParseResult {
    */
   const centred = parseCircleAt(line);
   if (centred) return centred;
+
+  const roles = parseMeasureRoles(line);
+  if (roles) return roles;
 
   // A circle COMPUTED from points (#1464, #1324) — before `matchCurve` for the same reason.
   const computed = parseCircleThru(line);

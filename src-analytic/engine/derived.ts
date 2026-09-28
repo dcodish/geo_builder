@@ -54,7 +54,11 @@ export type DerivedRule =
    * an object, precisely so an unnamed centre spends no letter; here the letter is the student`s
    * own and belongs in the id space like any other point they introduced.
    */
-  | { t: 'circle-centre'; curve: Id };
+  | { t: 'circle-centre'; curve: Id }
+  /** «F מוקד הפרבולה» (#1432) — the focus read off the resolved parabola, the circle-centre
+   *  pattern one conic over: a closed form over a CURVE parent, existing only because the student
+   *  named it (the unnamed focus is #1218's chip, no letter spent). */
+  | { t: 'parabola-focus'; curve: Id };
 
 /** The ids a rule is defined in terms of. EXHAUSTIVE — see the union's docblock. */
 export function parentsOf(r: DerivedRule): Id[] {
@@ -71,6 +75,7 @@ export function parentsOf(r: DerivedRule): Id[] {
     // Its parent is a CURVE, not a point — see `curveParentOf`. Returning the curve id here would
     // send it through every check that assumes a parent is positional.
     case 'circle-centre':
+    case 'parabola-focus':
       return [];
     default: {
       const unparented: never = r;
@@ -96,6 +101,8 @@ export function ruleLabel(r: DerivedRule): string {
       return `מפגש האלכסונים ${r.v.join('')}`;
     case 'circle-centre':
       return 'מרכז המעגל';
+    case 'parabola-focus':
+      return 'מוקד הפרבולה';
     default: {
       const unlabelled: never = r;
       throw new Error(`derived rule has no label: ${JSON.stringify(unlabelled)}`);
@@ -225,7 +232,7 @@ export function diagonalMeet(a: Pt, b: Pt, c: Pt, d: Pt): Pt | null {
  * sentence or admit an invalid one.
  */
 export function curveParentOf(r: DerivedRule): Id | null {
-  return r.t === 'circle-centre' ? r.curve : null;
+  return r.t === 'circle-centre' || r.t === 'parabola-focus' ? r.curve : null;
 }
 
 export function evalRule(
@@ -244,6 +251,14 @@ export function evalRule(
       // state the figure already knows how to report. Never a fallback position.
       if (!c || c.kind !== 'circle' || c.cx === undefined || c.cy === undefined) return null;
       return { x: c.cx, y: c.cy };
+    }
+    case 'parabola-focus': {
+      // The same vacancy discipline as the centre: not a parabola here, no focus here (#1432).
+      // y² = 2px → focus (p/2, 0) — `curves.ts`'s own closed form, INLINED because curves.ts
+      // (via evaluate) already depends on this module and an import back would be a cycle.
+      const c = curveAt?.(r.curve) as { kind?: string; p?: number } | null;
+      if (!c || c.kind !== 'parabola' || typeof c.p !== 'number') return null;
+      return { x: c.p / 2, y: 0 };
     }
     case 'midpoint':
       return midpoint(p[0], p[1]);
@@ -437,7 +452,9 @@ export function constructionOf(
 
     // A centre has no SCAFFOLDING: there are no auxiliary lines a student would draw to find it,
     // because reading it off the equation is the whole method. Its own mark is the answer.
+    // The focus likewise: read off the equation, no auxiliary lines.
     case 'circle-centre':
+    case 'parabola-focus':
       return null;
 
     default: {

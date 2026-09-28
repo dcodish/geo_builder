@@ -238,6 +238,9 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // in the catalog before #1501, so the fallback could never emit a tangency at all.
   { category: 'circles', family: 'F5', he: 'מעגל O משיק לציר ה-x', en: 'circle O is tangent to the x-axis' },
   { category: 'circles', family: 'F5', he: 'המעגל O משיק לשני הצירים', en: 'circle O is tangent to both axes' },
+  // #1432 — the radius as a given, and the focus as a namable point (ADR-AG-169). Not featured.
+  { category: 'circles', family: 'F5', he: 'נתון מעגל O שרדיוסו 5', en: 'circle O with radius 5' },
+  { category: 'derived', family: 'F16', he: 'F מוקד הפרבולה', en: 'F is the focus of the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x'] },
   {
     category: 'circles',
     family: 'F5',

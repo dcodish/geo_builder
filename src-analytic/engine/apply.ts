@@ -1242,6 +1242,91 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       ]);
     }
 
+    case 'radius-of': {
+      // The tangent-of name→circle chain, so the family cannot drift (#1432).
+      let host: GeoObject | undefined;
+      if (f.circle !== undefined) {
+        host = objectById(c, `circle-${f.circle}`) ?? objectById(c, `circle-at-${f.circle}`) ?? curveByName(c, f.circle);
+        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(`circle-${f.circle}`) };
+      } else {
+        const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+        if (circles.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+        host = circles[0];
+      }
+      if (host.kind === 'circle-at') {
+        const r = host.r as { kind?: string; name?: string };
+        if (r && r.kind === 'sym' && r.name) {
+          /**
+           * The radius was FREE and the student just gave it — the sym is SUBSTITUTED with the
+           * stated value and its parameter retired (when nothing else reads it), so the DOF cue
+           * drops by exactly the freedom the sentence consumed. A substitution rather than a
+           * solver row: the radius is not solved for, it is now a given, and replay reapplies
+           * this deterministically (the fold is pure over the fact list).
+           */
+          const sym = r.name;
+          const objects = c.objects.map((o) => (o === host ? { ...o, r: f.value } : o));
+          const restText = JSON.stringify({ objects, constraints: c.constraints });
+          const params = restText.includes(`"${sym}"`) ? c.params : c.params.filter((p) => p.sym !== sym);
+          return { ok: true, next: { ...c, objects: objects as typeof c.objects, params }, effect: 'narrowed' };
+        }
+        // A radius already carried by the object: a RESTATEMENT, judged at the probes.
+        return sameNumbers(host.r, f.value)
+          ? { ok: true, next: c, effect: 'known' }
+          : { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+      }
+      if (host.kind === 'curve') {
+        // An equation circle's radius is determined by its equation — the sentence is a claim.
+        const agrees = PROBE_ENVS.every((env) => {
+          const rc = resolveCurve(host!.kind === 'curve' ? host!.curve : { eq: undefined as never }, env);
+          const v = evalExpr(f.value as Parameters<typeof evalExpr>[0], env);
+          return rc.ok && rc.curve.kind === 'circle' && Number.isFinite(v) && Math.abs(rc.curve.r - v) <= 1e-9 * Math.max(1, rc.curve.r, Math.abs(v));
+        });
+        return agrees
+          ? { ok: true, next: c, effect: 'known' }
+          : { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+      }
+      // A computed circle (circle-thru): its radius follows from solved points, which this
+      // boundary cannot see — refused by name, never silently dropped.
+      return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+    }
+
+    case 'focus-of': {
+      // THE parabola, exactly as «O מרכז המעגל» resolves the circle — the centre's pattern (#1432).
+      const parabolas = c.objects.filter((o) => curveKindOf(o) === 'parabola');
+      if (parabolas.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+      return applyFact(c, { t: 'derived', id: f.id, rule: { t: 'parabola-focus', curve: parabolas[0].id }, src: f.src });
+    }
+
+    case 'directrix-eq': {
+      const parabolas = c.objects.filter((o) => curveKindOf(o) === 'parabola' && o.kind === 'curve');
+      if (parabolas.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+      const host = parabolas[0] as GeoObject & { kind: 'curve' };
+      // The directrix of y² = 2px is x = −p/2. Computed per probe: a p that MOVES across probes
+      // is parameter-dependent — pinning the parameter from the directrix is not built, and the
+      // honest answer is a loud refusal, never a false «conflict» (#1432).
+      const cs: number[] = [];
+      const given: number[] = [];
+      for (const env of PROBE_ENVS) {
+        const pc = resolveCurve(host.curve, env);
+        const gl = resolveCurve({ eq: f.eq }, env);
+        if (!pc.ok || pc.curve.kind !== 'parabola' || !gl.ok || gl.curve.kind !== 'line') {
+          return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+        }
+        // Normalise the given line to x = value: a directrix is vertical in the canonical frame.
+        if (Math.abs(gl.curve.b) > 1e-9 * Math.max(1, Math.abs(gl.curve.a))) {
+          return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+        }
+        cs.push(-pc.curve.p / 2);
+        given.push(-gl.curve.c / gl.curve.a);
+      }
+      const varies = Math.abs(cs[0] - cs[1]) > 1e-9 * Math.max(1, Math.abs(cs[0]));
+      if (varies) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      const agrees = cs.every((v, i) => Math.abs(v - given[i]) <= 1e-9 * Math.max(1, Math.abs(v)));
+      return agrees
+        ? { ok: true, next: c, effect: 'known' }
+        : { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+    }
+
     case 'area-of': {
       const rings = c.objects.filter(
         (o) => o.kind === 'polygon' && o.noun === f.noun,
