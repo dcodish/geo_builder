@@ -1735,6 +1735,17 @@ export function App() {
                     */}
                     {a.missing ? (
                       `${a.question} — ${t(a.missing.kind === 'point' ? 'askMissingPoint' : 'askMissingCurve', { name: a.missing.name })}`
+                    ) : a.contextual ? (
+                      /* #1431 — the contextual «המרחק של הנקודה מהישר» could not resolve: name WHICH
+                         noun is ambiguous (or absent), never «לא הבנתי» */
+                      `${a.question} — ${t(
+                        a.contextual.points !== 1 && a.contextual.lines !== 1
+                          ? 'askContextualBoth'
+                          : a.contextual.points !== 1
+                            ? 'askContextualPoint'
+                            : 'askContextualLine',
+                        { points: a.contextual.points, lines: a.contextual.lines },
+                      )}`
                     ) : a.unreadable ? (
                       `${a.question} — ${t('askUnreadable')}`
                     ) : (

@@ -77,6 +77,10 @@ const he = {
   askLinesCross:
     'הישרים נחתכים, ולכן אין ביניהם מרחק אחד — הוא אפס בנקודת החיתוך וגדל ככל שמתרחקים ממנה. מרחק מוגדר רק בין ישרים מקבילים. אפשר לשאול על המרחק מנקודה לישר, למשל «המרחק מ-A לישר l1», או לסמן את נקודת החיתוך עצמה.',
   askUnreadable: 'לא הבנתי את השאלה',
+  // #1431 — the contextual distance could not resolve; name which noun to letter
+  askContextualPoint: 'יש {{points}} נקודות בציור — כתבו את שם הנקודה (למשל «המרחק של A מהישר»)',
+  askContextualLine: 'יש {{lines}} ישרים בציור — כתבו את שם הישר (למשל «המרחק של הנקודה מהישר l1»)',
+  askContextualBoth: 'בציור {{points}} נקודות ו-{{lines}} ישרים — כתבו את השמות (למשל «המרחק של A מהישר l1»)',
   /** #1111 — the sentence was understood; the figure has no such object. The LETTER is the point. */
   askMissingPoint: 'אין בשרטוט נקודה בשם {{name}}',
   askMissingCurve: 'אין בשרטוט ישר או מעגל בשם {{name}}',
@@ -341,6 +345,9 @@ const en: typeof he = {
   askLinesCross:
     'the lines intersect, so there is no single distance between them — it is zero at the crossing and grows away from it. A distance is defined only between PARALLEL lines. You can ask for the distance from a point to a line, for example "the distance from A to line l1", or name the crossing point itself.',
   askUnreadable: 'I did not understand the question',
+  askContextualPoint: 'the figure has {{points}} points — name the point (e.g. "המרחק של A מהישר")',
+  askContextualLine: 'the figure has {{lines}} lines — name the line (e.g. "המרחק של הנקודה מהישר l1")',
+  askContextualBoth: 'the figure has {{points}} points and {{lines}} lines — name them (e.g. "המרחק של A מהישר l1")',
   askMissingPoint: 'there is no point {{name}} in your figure',
   askMissingCurve: 'there is no line or circle named {{name}} in your figure',
   paletteShow: 'Symbols',

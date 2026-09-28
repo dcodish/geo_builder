@@ -29,7 +29,7 @@ import { curveByName, objectById, type Id } from '../engine/types';
 import { ANGLE_STEM_HE } from '../engine/shapes';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { isVerticalLine } from '../engine/lines';
-import { asPair, lineNamed } from './lines';
+import { asPair, lineNamed, lineNamesOf } from './lines';
 import { angleText, lineAngleOf } from './lineAngle';
 import { curveParts, locusEquation } from './curveText';
 
@@ -57,6 +57,9 @@ export interface Answer {
    * Here the conflicting statement is in hand, so it is carried rather than discarded.
    */
   missing?: { name: string; kind: 'point' | 'curve' };
+  /** #1431 — the CONTEXTUAL «המרחק של הנקודה מהישר» could not resolve: the counts name the ambiguity
+   *  (zero or several points/lines), so the wording can say WHICH noun to letter. */
+  contextual?: { points: number; lines: number };
   /**
    * THE FIGURE DETERMINES THE ANSWER, AND THE ANSWER IS THAT THERE IS NONE (#1223).
    *
@@ -250,8 +253,28 @@ export function ask(
   // plural is locale exactly as the singular is. The seam WIDENS, it is not forked.
   kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind'], count: number) => string = (k) => k,
 ): Answer {
-  const text = question.trim();
+  let text = question.trim();
   if (!text) return { question, value: null, unreadable: true };
+
+  /**
+   * #1431 — THE CONTEXTUAL DISTANCE: «המרחק של הנקודה מהישר», no letters at all.
+   *
+   * Operator ruling (2026-09-27): it answers exactly when the figure holds ONE point and ONE line —
+   * then the nouns are unambiguous references — and otherwise refuses NAMING the ambiguity, never
+   * «לא הבנתי». Resolved by REWRITING into the lettered sentence and falling through to the one
+   * distance lane below, so the contextual spelling can never drift from its lettered synonym
+   * (the ADR-W-053 rule the symbolic d_{AB} spellings already follow).
+   */
+  const ctx = /^ה?מרחק\s+(?:של\s+)?ה(?:נקודה|קדקוד)\s+(?:מ[ןהת]?[-\s]?|מן\s+)ה?(?:ישר|קו)$/.exec(text);
+  if (ctx) {
+    const lineNames = lineNamesOf(d.construction);
+    const pts = d.figure.points;
+    if (pts.length === 1 && lineNames.length === 1) {
+      text = `המרחק של ${pts[0].id} מהישר ${lineNames[0]}`;
+    } else {
+      return { question, value: null, contextual: { points: pts.length, lines: lineNames.length } };
+    }
+  }
 
   /**
    * --- «המקום הגיאומטרי של P» — the locus lane (#1137) ---
