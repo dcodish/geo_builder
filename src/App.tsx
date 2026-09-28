@@ -37,7 +37,7 @@ import type { ViewDelta, ViewDeltaItem } from '@/store/geoStore';
 import { unstatedChoiceText } from '@/ui/unstatedChoice';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, stepLabel } from '@/parser';
 import { Figure } from '@/render';
-import { crossingCommands } from '@/engine';
+import { crossingCommands, crossingUtterance } from '@/engine';
 import { independentConstructs } from '@/app/independence';
 import type { Crossing } from '@/engine';
 import { MathText, hasMath } from '../shell/math';
@@ -957,10 +957,8 @@ export default function App() {
       }
     }
     if (!id) return; // A–Z all taken (won't happen in practice)
-    // The lowering itself lives in `crossingCommands` (ADR-379) — one seam, shared with the tests.
-    const operands = x.line1 ? `${x.line1} ${he ? 'ו-' : 'and '}${x.c}${x.d}` : `${x.a}${x.b} ${he ? 'ו-' : 'and '}${x.c}${x.d}`;
-    const utterance = he ? `${id} = חיתוך ${operands}` : `${id} = intersection of ${operands}`;
-    executeMany(crossingCommands(x, id), utterance);
+    // Both lowerings live in `inkCrossings` (ADR-379; #1489) — one seam each, shared with the tests.
+    executeMany(crossingCommands(x, id), crossingUtterance(x, id, he ? 'he' : 'en', construction));
   }
 
   // Highlight every object introduced by the selected step (all its commands).
