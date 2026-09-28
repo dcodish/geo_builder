@@ -33,6 +33,10 @@ This is the product's one genuinely new core, and it is why the tree could ship 
 - **Free DOF is the nullspace dimension** — **one** definition, read by the DOF cue, the knowledge gates
   and the sampler alike. Three consumers of one number cannot disagree with each other, which is exactly
   how a "default masquerading as fixed" hides in a system with three definitions.
+- **The region count excludes a polygon's own corners** ([ADR-CX-053](06d-decisions-complex.md#adr-cx-053)).
+  `resolveObjects` publishes a polygon's `cornerNames` (its vertex names minus the members of any
+  enumerated solution set), and `regionsOf` leaves those out of `members`. The region still shades; the App
+  strip renders only when `members` is non-empty.
 - **Knowledge is decidable.** Whether a value is forced is a question about the nullspace and the
   configuration set, not a sampling heuristic — so [`FR-KN-1`](02d-requirements-complex.md) ("a number
   printed on screen is knowledge") has an exact test behind it: `knowledgeOf` evaluates the value in

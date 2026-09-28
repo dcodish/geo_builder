@@ -3348,3 +3348,17 @@ binomial-spelling, member, member-poly, quartic, corpus-witness}-1434.complex.js
 3. **The literal-atom bridge** — an off-axis `a+bi` literal (`2+3i`) carries its argument as an opaque atom, so `(mod, arg)` alone could not recover the pair. `fromCartesian` now REGISTERS the exact rational pair on the atom name (`value/angle.ts`; a name re-registered with a different pair is poisoned to null — exactness never guesses), and `gaussianRationalParts` reads it back for a single ±1-coefficient atom with quarter-turn offsets (·i rotations, conjugates). Everything outside the field — parameters, free points, non-quarter turns, irrational tables — answers null and the ≈ decimal stands.
 
 **Consequences.** `src-complex/value/rational.ts` (`sqrtExact`), `src-complex/value/angle.ts` (atom registry), `src-complex/value/value.ts` (`fromCartesian` registers), `src-complex/value/cartesian.ts` (`gaussianRationalParts`, `ratPart`), `src-complex/model/knowledge.ts` (`approx`), `src-complex/replay/derive2.ts` (the composers, `evalGauss`/`exactAnswer`, every row maker), `src-complex/App.tsx` (≈ rendering). Lock: `src-complex/__tests__/issue-1436-exact-ask.test.ts` — the reviewer's exact case (2√2), √5 through the atom bridge, exact complex/product/quotient answers, the integer and fraction spellings under `=`, and the irrational ≈ floor.
+
+## ADR-CX-053 — The region count leaves out the polygon's own corners (#1425)
+
+**Status:** accepted · 2026-09-28 · operator report («why is this behavior», 2026-09-25/27), batch-approved 2026-09-27 · round #1517. Numbered 053 beside the round's other complex branches (052, 054–055).
+
+**Requirements:** docs/02d FR-GP-5 (new) · **Design:** docs/04d — the region count excludes a polygon's own corners
+
+**Context.** Under a lone «משולש ABC» the strip read «ABC: 0 בפנים · 3 על המצולע · 0 בחוץ». `regionsOf` (ADR-CX-016) counted every plotted number against a stated polygon, including the polygon's own vertices, which lie on it by definition. The count exists for the §2b question «how many of the solutions are inside / on / outside», and those are the OTHER numbers.
+
+**Decision.** `resolveObjects` publishes each polygon's `cornerNames`: its vertex names minus the members of any enumerated solution set (the fold's `solutionSets`). `regionsOf` leaves those names out of `members` and so out of the counts. The region still shades its interior; the App strip renders only when something is counted. The plan's open case is settled by identity: a vertex that is also a solution («z^3 = 8», then «המשולש z1z2z3») is one of the numbers the question counts, so it stays and reads as on. Measured on the branch, before deciding: an equation's solutions are plotted under their own indexed names (`w^5 = 32` → w1…w5), separate from the polygon's letters, so the §2b shape is unaffected.
+
+**Measured.** «משולש ABC» → no members, no strip (was on 3). «משולש ABC · z1 = 0» → z1 only. The §2b capstone fixture: «Oz1z2z3» counts z4 (out) and «Oz2z3z4» counts z1 (out); each previously also counted its own three corners. «z^3 = 8 · המשולש z1z2z3» → on 3.
+
+**Consequences.** `src-complex/replay/derive2.ts` (`cornerNames`), `src-complex/scene/region.ts`, `src-complex/App.tsx` (the strip gate). Lock: `issue-1425-region-count.test.ts`.

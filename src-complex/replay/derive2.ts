@@ -157,6 +157,13 @@ export interface DerivedObject {
   readonly radius?: number;
   /** every position it rests on is FORCED by the givens */
   readonly known: boolean;
+  /**
+   * #1425 (ADR-CX-053) — a polygon's OWN corners: the vertex names that are not also members of an
+   * enumerated solution set. They lie on the polygon by definition, so the inside/on/outside count
+   * leaves them out. A vertex that IS a solution («z^3 = 8», then the triangle z1z2z3) is one of the
+   * numbers the question counts, so it is not listed here and still counts as on.
+   */
+  readonly cornerNames?: readonly string[];
 }
 
 /**
@@ -1701,7 +1708,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
   return {
     contradiction: t1.inconsistent,
     points,
-    objects: t1.inconsistent ? [] : resolveObjects(objects, points, sample),
+    objects: t1.inconsistent ? [] : resolveObjects(objects, points, sample, solutionSets),
     sequences: t1.inconsistent ? [] : resolveSequences(sequences, points),
     rotations: t1.inconsistent ? [] : resolveRotations(constraints, points),
     enumeratedConfigCount,
@@ -1781,7 +1788,9 @@ function resolveObjects(
   objects: readonly FigureObject[],
   points: readonly DerivedPoint[],
   sample: ReadonlyMap<string, number>,
+  solutionSets: ReadonlyMap<string, readonly string[]> = new Map(),
 ): DerivedObject[] {
+  const solutionMembers = new Set([...solutionSets.values()].flat());
   const at = new Map<string, Cx>([[ORIGIN, { re: 0, im: 0 }]]);
   const forced = new Map<string, boolean>([[ORIGIN, true]]);
   for (const p of points) {
@@ -1799,8 +1808,12 @@ function resolveObjects(
     const label = names.map((n) => (n === ORIGIN ? 'O' : n)).join('');
     const key = `${o.kind}-${label}-${i}`;
 
-    if (o.kind === 'segment' || o.kind === 'polygon') {
+    if (o.kind === 'segment') {
       out.push({ kind: o.kind, key, label, vertices, known });
+      return;
+    }
+    if (o.kind === 'polygon') {
+      out.push({ kind: o.kind, key, label, vertices, known, cornerNames: names.filter((n) => !solutionMembers.has(n)) });
       return;
     }
     if (o.kind === 'circle') {
