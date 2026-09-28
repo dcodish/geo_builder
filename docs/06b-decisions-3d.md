@@ -11038,3 +11038,17 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 **Measured.** The reported sequence now names X; re-declaring X heals the row (ADR-3D-259 kept); a refused midpoint leaves no orphan point. The full 3-D lane (291 files / 5,330 tests, the #1394 parity golden included) is green on the FIRST run — the atomicity change altered no locked figure.
 
 **Consequences.** `src3d/store/store3.ts` (`applyFact` atomic; `retryError`; the refresh pass). Lock: `issue-1413-stale-error.test.ts` — the exact edit sequence, the healing control, the no-orphan guard.
+
+## ADR-3D-274 — The DOF cue counts what a given consumed on a free vector (#1415)
+
+**Status:** accepted · 2026-09-28 · round #1408's follow-up on ADR-3D-260 · round #1517. Numbered 274 beside the round's parallel branch (273 = #1413).
+
+**Requirements:** none (internal — the cue's honesty; no promise changed) · **Design:** docs/04b — the count reads the resolution (ADR-3D-124 discipline)
+
+**Context.** After «וקטור AB» · «אורך AB = 5» the cue still said 6. Measured at pickup: two independent halves. (1) The ADR-3D-248 consumption probe (`scalarConsumedAt`) nudged only the SHAPE DIMS — on a solidless figure `nDims = 0`, so the length's consumption read 0. (2) Even a measured consumption never reached the free-point block: the cue subtracted `consumed` inside the dims-only clamp, and `freeT` (where the six block-enrolled coordinates live) was added after it.
+
+**Decision.** (1) The rank probe spans the shape dims AND the block-enrolled (`free3`/`partial`) rider coordinates — exactly the refinement ADR-3D-204's own note reserved for this issue. Riders of other kinds stay out (the cue already riderTs-subtracts them; probing them would double-subtract). (2) The consumption is reported in TWO parts — `dims` (the #990 rank, unchanged) and `block` (the MARGINAL rank the block coordinates add) — and the cue subtracts each from the term that counts it, each clamped on its own. The first cut folded them into one number subtracted across the sum, and the 3-D lane caught it on its first run: an over-pinned figure's deficit ate an unrelated rider's genuine freedom (the #820 lock) and the #774 mixed-run cue drifted. Measured: «וקטור AB» 6 → with the length 5 (`block = 1`); both prior locks byte-green.
+
+**Out of scope, filed:** «AB = (1,2,3)» (a component PIN) still reads 6 — the pin runs through the 7-DOF gauge allowance a solidless figure has no gauge for; #1519, with the fix direction and the locks to check. The issue's second half (the ~1.7 s coordinate pin) moved to #1422 by the triage comment.
+
+**Consequences.** `src3d/engine/solve3.ts` (`blockRiderIdx`, the widened probe), `src3d/engine/evaluate.ts` (the subtraction spans the sum). Lock: `issue-1415-vector-dof.test.ts` — 6 → 5 on the reported figure, the cube control, and the not-locked component case recorded in place.
