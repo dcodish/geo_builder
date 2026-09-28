@@ -18,7 +18,7 @@
  * Unmatched input returns `not-handled`, which is the seam where the LLM fallback escalates.
  */
 import type { DerivedRule } from '../engine/derived';
-import { isAngleRef, type AngleName, type Constraint, type Direction } from '../engine/solve';
+import { isAngleRef, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS, directionSymbol, mentionsPlane } from '../engine/carriers';
 
@@ -1271,10 +1271,12 @@ function polygonId(vertices: string[]): string {
 }
 
 /**
- * A CIRCLE GIVEN BY ITS CENTRE, and its tangency to the axes (#1060).
+ * A CIRCLE GIVEN BY ITS CENTRE, and its tangency — to the axes (#1060) and to LINES (#1501).
  *
  * Operator, 2026-09-15: *"we need to support מעגל O משיק לציר x and all verses of the axis
  * tangency"*. Measured then: 0 of 11 phrasings, every one refused as a bad equation.
+ * Operator, 2026-09-28: *"we need to support tangents — מעגל M משיק לישרים l1 ו- l2, מעגל M משיק
+ * לישר 3x+4y=0, and variants"*. Measured then: 0 of 8 phrasings, every one `not-handled`.
  *
  * Tangency to an axis is how the corpus pins a circle WITHOUT giving its radius — «מעגל המשיק
  * לציר ה-x» says r = |y_O|, which is exactly one equation and exactly the sentence a student is
@@ -1286,61 +1288,174 @@ function polygonId(vertices: string[]): string {
  * #1019 made an undeclared parameter sample negative, which is right for a coefficient and wrong
  * for a length.
  */
+/** «משיק» in its full inflection run, with the relative ה-, the conjunctive ו- and the ש- prefix —
+ *  the one-spelling gate is this tree's recurring trap (`src-analytic/CLAUDE.md`). */
+const HE_TANGENT_VERB = '(?:ה|ו|ש)?משיק(?:ה|ים|ות)?';
+
 const CIRCLE_AT_HE = new RegExp(
-  `^${HE_GIVEN}ה?מעגל\\s+(?:ש?מרכזו\\s+)?(${NAME})(?:\\s+(?:ה?משיק|ומשיק)\\s+ל(?:ה?ציר\\s+ה?-?\\s*([xy])|שני\\s+ה?צירים|(?:the\\s+)?([xy])[- ]axis|both\\s+axes))?$`
+  `^${HE_GIVEN}ה?מעגל\\s+(?:ש?מרכזו\\s+)?(${NAME})(?:\\s+${HE_TANGENT_VERB}\\s+ל(.+))?$`
 );
 const CIRCLE_AT_EN = new RegExp(
-  `^(?:the\\s+)?circle\\s+(?:cent(?:re|er)d\\s+at\\s+)?(${NAME})(?:\\s+is\\s+tangent\\s+to\\s+(?:ה?ציר\\s+ה?-?\\s*([xy])|שני\\s+ה?צירים|(?:the\\s+)?([xy])[- ]axis|both\\s+axes))?$`
+  `^(?:the\\s+)?circle\\s+(?:cent(?:re|er)d\\s+at\\s+)?(${NAME})(?:\\s+(?:is\\s+|which\\s+is\\s+)?tangent\\s+to\\s+(.+))?$`
 ,  'i',
 );
 
 /** The CONTEXTUAL form — the one circle the student has drawn: «המעגל משיק לציר ה-x». */
-const CIRCLE_TANGENT_HE = new RegExp(
-  `^${HE_GIVEN}ה?מעגל\\s+(?:ה?משיק|ומשיק)\\s+ל(?:ה?ציר\\s+ה?-?\\s*([xy])|שני\\s+ה?צירים|(?:the\\s+)?([xy])[- ]axis|both\\s+axes)$`
+const CIRCLE_TANGENT_HE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+${HE_TANGENT_VERB}\\s+ל(.+)$`);
+const CIRCLE_TANGENT_EN = new RegExp(`^(?:the\\s+)?circle\\s+is\\s+tangent\\s+to\\s+(.+)$`, 'i');
+
+/**
+ * The LINE-FIRST order — «הישר l1 משיק למעגל M», «הישרים l1 ו-l2 משיקים למעגל» (#1501).
+ *
+ * The subject is the same target list the circle-first order takes after «ל», resolved by the same
+ * function, so the two orders cannot drift — the #1281/#1495 rule (incidence in every order),
+ * applied to tangency. The circle may be named (its letter or numeral) or contextual.
+ */
+const LINE_TANGENT_HE = new RegExp(
+  `^${HE_GIVEN}(.+?)\\s+${HE_TANGENT_VERB}\\s+לה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?$`
 );
-const CIRCLE_TANGENT_EN = new RegExp(
-  `^(?:the\\s+)?circle\\s+is\\s+tangent\\s+to\\s+(?:ה?ציר\\s+ה?-?\\s*([xy])|שני\\s+ה?צירים|(?:the\\s+)?([xy])[- ]axis|both\\s+axes)$`
+const LINE_TANGENT_EN = new RegExp(
+  `^(?:the\\s+)?lines?\\s+(.+?)\\s+(?:is|are)\\s+tangent\\s+to\\s+(?:the\\s+)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?$`
 ,  'i',
 );
 
-/** Which axes a matched tangency phrase names — one, or both. */
-function axesOf(m: RegExpExecArray, from: number): Array<'x' | 'y'> {
-  const named = (m[from] ?? m[from + 1]) as string | undefined;
-  if (named) return [named.toLowerCase() as 'x' | 'y'];
-  // «שני הצירים» / «both axes» — the phrase matched but named no single axis.
-  return m[0] && /שני|both/i.test(m[0]) ? ['x', 'y'] : [];
+/** What one tangency sentence touches: axes (#1060), lines (#1501), and the facts inline
+ *  equations mint. */
+interface TangentTargets {
+  axes: Array<'x' | 'y'>;
+  lines: TangentLineRef[];
+  facts: Fact[];
+}
+
+/**
+ * The TARGETS of a tangency phrase — the one resolution for every order and every sentence shape.
+ *
+ * Pieces are joined by «ו-», a comma, or "and"; an equation contains none of those, so the split
+ * cannot cut one apart. Each piece is an axis («ציר ה-x», «שני הצירים»), a NAMED line («ישר l1»,
+ * «הישר 3» — a numeral needs its noun, #1298), a TWO-POINT line («ישר AB», the pair reading), or
+ * an inline EQUATION («ישר 3x+4y=0», «ישר שמשוואתו y=2x») — which mints the curve exactly as
+ * «A על הישר y=2x» does, `stated: false`, under the content id that keeps restating idempotent.
+ *
+ * A piece this grammar cannot read declines the WHOLE sentence (`null`) — «משיק למעגל K» is
+ * circle-to-circle tangency, a different capability, and guessing half a target list would build
+ * half the student's given.
+ */
+function tangentTargets(tail: string, src: string): TangentTargets | null {
+  const out: TangentTargets = { axes: [], lines: [], facts: [] };
+  const pieces = trim(tail)
+    .split(/\s*,\s*|\s+ו-?(?=\S)|\s+and\s+/i)
+    .map(trim)
+    .filter(Boolean);
+  if (pieces.length === 0) return null;
+  for (const raw of pieces) {
+    // A later conjunct repeats the preposition — «ולישר l1», «לציר ה-y» — strip it before the noun.
+    const piece = raw.replace(/^ל-?\s*/, '');
+    if (/^(?:שני\s+ה?צירים|both\s+axes)$/i.test(piece)) {
+      out.axes.push('x', 'y');
+      continue;
+    }
+    const axis = /^ה?ציר\s+ה?-?\s*([xy])$/.exec(piece) ?? /^(?:the\s+)?([xy])[- ]axis$/i.exec(piece);
+    if (axis) {
+      out.axes.push(axis[1].toLowerCase() as 'x' | 'y');
+      continue;
+    }
+    // WHICH noun the piece used, read BEFORE the strip discards it (#1503): «צלע»/«קטע»/«בסיס»
+    // bounds the tangency to the side itself — the #1168 class, the noun decides the extent.
+    // `BOUNDED_NOUN` is the one list, so incidence and tangency cannot disagree on what is bounded.
+    const boundedNoun = BOUNDED_NOUN.test(piece);
+    const bare = piece
+      .replace(/^(?:ה?ישרים|ה?ישר|ה?צלע|ה?קטע|ה?בסיס|(?:the\s+)?(?:lines?|side|segment|base))\s+/i, '')
+      .replace(new RegExp(`^${HE_EQ_OF}\\s+`), '');
+    const hadNoun = bare !== piece;
+    const named = /^([ℓl][0-9]?)$/.exec(bare) ?? (hadNoun ? LINE_NUMERAL_RE.exec(bare) : null);
+    if (named) {
+      out.lines.push({ kind: 'curve', id: `line-${named[0]}`, label: named[0] });
+      continue;
+    }
+    const pts = TWO_POINT_NAME.exec(bare);
+    if (pts && pts[1] !== pts[2]) {
+      out.lines.push({ kind: 'points', a: pts[1], b: pts[2], ...(boundedNoun ? { bounded: true as const } : {}) });
+      continue;
+    }
+    if (bare.includes('=')) {
+      const eq = equationExpr(bare);
+      if (eq && symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
+        const cid = `curve-${anonIndex(bare)}`;
+        out.facts.push({ t: 'curve', id: cid, label: { name: '', eqSrc: trim(bare) }, curve: { eq }, stated: false, src });
+        out.lines.push({ kind: 'curve', id: cid, label: trim(bare) });
+        continue;
+      }
+    }
+    return null; // a target this rule cannot read — decline the sentence, never guess half of it
+  }
+  return out;
 }
 
 /**
  * The facts a circle-on-a-point lowers to: the centre as a free vertex, a positive radius, and the
  * circle itself. Shared by the named and the contextual forms so the two cannot drift.
+ *
+ * The minted-curve facts come FIRST: a tangency constraint may name a line its own sentence
+ * created, and the apply boundary checks the curve exists before the constraint lands (#1150).
  */
-function circleAtFacts(centre: Id, axes: Array<'x' | 'y'>, line: string): Fact[] {
+function circleAtFacts(centre: Id, targets: TangentTargets, line: string): Fact[] {
   const sym = `r_${centre}`;
   const r: Expr = { kind: 'sym', name: sym };
   return [
+    ...targets.facts,
     { t: 'declare', id: centre, src: line },
     { t: 'param', sym, domain: { ...UNBOUNDED, min: 0, minOpen: true }, src: line },
     { t: 'circle-at', id: `circle-at-${centre}`, centre, r, src: line },
-    ...axes.map((axis) => ({
+    ...targets.axes.map((axis) => ({
       t: 'constraint' as const,
       k: { t: 'tangent-axis' as const, centre, r, axis },
       src: line,
     })),
+    ...targets.lines.map((ref) => ({
+      t: 'constraint' as const,
+      k: { t: 'tangent-line' as const, centre, r, line: ref },
+      src: line,
+    })),
   ];
 }
+
+const NO_TARGETS: TangentTargets = { axes: [], lines: [], facts: [] };
 
 function parseCircleAt(line: string): RuleOutcome {
   const named = CIRCLE_AT_HE.exec(line) ?? CIRCLE_AT_EN.exec(line);
   if (named) {
     // The tangency phrase is optional: «נתון מעגל O» alone is a circle with a free centre and a
     // free radius, which is 3 degrees of freedom and an honest figure.
-    return made(circleAtFacts(named[1], axesOf(named, 2), line));
+    const targets = named[2] === undefined ? NO_TARGETS : tangentTargets(named[2], line);
+    // A tail this grammar cannot read — «משיק למעגל K» — is not this rule's sentence.
+    if (targets) return made(circleAtFacts(named[1], targets, line));
   }
   const bare = CIRCLE_TANGENT_HE.exec(line) ?? CIRCLE_TANGENT_EN.exec(line);
   if (bare) {
     // No centre named: the sentence is about the one circle in the figure, which only M1 knows.
-    return made([{ t: 'tangent-of', axes: axesOf(bare, 1), src: line }]);
+    const targets = tangentTargets(bare[1], line);
+    if (targets) {
+      return made([
+        ...targets.facts,
+        { t: 'tangent-of', axes: targets.axes, ...(targets.lines.length ? { lines: targets.lines } : {}), src: line },
+      ]);
+    }
+  }
+  const flipped = LINE_TANGENT_HE.exec(line) ?? LINE_TANGENT_EN.exec(line);
+  if (flipped) {
+    const targets = tangentTargets(flipped[1], line);
+    if (targets) {
+      return made([
+        ...targets.facts,
+        {
+          t: 'tangent-of',
+          axes: targets.axes,
+          ...(targets.lines.length ? { lines: targets.lines } : {}),
+          ...(flipped[2] ? { circle: flipped[2] } : {}),
+          src: line,
+        },
+      ]);
+    }
   }
   return null;
 }
