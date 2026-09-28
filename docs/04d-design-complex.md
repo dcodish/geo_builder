@@ -33,6 +33,10 @@ This is the product's one genuinely new core, and it is why the tree could ship 
 - **Free DOF is the nullspace dimension** — **one** definition, read by the DOF cue, the knowledge gates
   and the sampler alike. Three consumers of one number cannot disagree with each other, which is exactly
   how a "default masquerading as fixed" hides in a system with three definitions.
+- **A free polygon starts as a shape** ([ADR-CX-052](06d-decisions-complex.md#adr-cx-052)). The tier-2
+  start for a polygon whose every vertex is fully free (both halves, no quadrant window, not the origin) is
+  `polygonShapeStart`: a jittered regular n-gon with a per-seed centre, size and rotation. Only the start
+  changes: the free basis, the DOF count and the solve are untouched, so a given still moves a vertex.
 - **Knowledge is decidable.** Whether a value is forced is a question about the nullspace and the
   configuration set, not a sampling heuristic — so [`FR-KN-1`](02d-requirements-complex.md) ("a number
   printed on screen is knowledge") has an exact test behind it: `knowledgeOf` evaluates the value in

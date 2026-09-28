@@ -66,7 +66,9 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   DOF has **one** definition — the nullspace dimension — read by the cue, the knowledge gates and the
   sampler alike, so the three can never disagree. *(The complex form of [ADR-052](06-decisions.md#adr-052).)*
   A sign-free parameter's SIGN is part of its freedom (FR-CN-7): it is sampled, never assumed positive.
-  *(Amended — [ADR-CX-045](06d-decisions-complex.md#adr-cx-045).)*
+  *(Amended — [ADR-CX-045](06d-decisions-complex.md#adr-cx-045).)* A free polygon's starting drawing
+  reads as the shape it names: «משולש ABC» is never a sliver and «מרובע ABCD» is convex, while every vertex
+  stays free. *(Amended — [ADR-CX-052](06d-decisions-complex.md#adr-cx-052), #1424.)*
 - **FR-CN-5 (Must)** — **A second mention of a name is a GIVEN, not a redefinition.** Re-stating `z1`
   adds information about the existing number; it never silently replaces it. *(Realised —
   [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md).)*

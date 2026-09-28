@@ -306,6 +306,33 @@ const paramSample = (name: string, seed: number): number => {
 };
 
 /**
+ * #1424 (ADR-CX-052) — A FREE POLYGON IS SAMPLED AS A SHAPE, NOT VERTEX BY VERTEX.
+ *
+ * «משולש ABC» drew a sliver at 10 of 24 configurations: each free vertex took its own modulus and
+ * argument, and nothing kept three independent draws from landing nearly in a line. 2-D never does this
+ * (ADR-253: default placements land in general position). The START for n fully free vertices is a
+ * regular n-gon (centre, size, rotation, all per seed) with each vertex jittered by a bounded amount, so
+ * the drawing reads as the shape it names. Only the starting DISTRIBUTION changes (ADR-052): every
+ * vertex stays a free coordinate, «show another configuration» still moves it, and any given still moves
+ * it wherever the solve needs.
+ *
+ * `u(key)` is a deterministic 0..1 draw per key. Jitter bounds: ±22% of the vertex spacing in angle and
+ * ±18% in radius, which keeps a triangle's smallest corner well above 20°.
+ */
+export function polygonShapeStart(n: number, u: (key: string) => number): Cx[] {
+  const center = cPolar(0.3 + 0.9 * u('centre |c|'), 360 * u('centre arg'));
+  const size = 1.1 + 0.7 * u('size');
+  const rot = 360 * u('rotation');
+  const step = 360 / n;
+  return Array.from({ length: n }, (_, i) => {
+    const deg = rot + i * step + (u(`jitter arg ${i}`) - 0.5) * 0.44 * step;
+    const r = size * (1 + (u(`jitter |r| ${i}`) - 0.5) * 0.36);
+    const p = cPolar(r, deg);
+    return { re: center.re + p.re, im: center.im + p.im };
+  });
+}
+
+/**
  * ADR-CX-045 — the STARTING sign of a sign-free parameter that no exact equation reaches (`a` in
  * `z1 = a + b·i`). A start, never a fixed value (ADR-052): the sign is part of the parameter's freedom,
  * so "show another configuration" varies it. Seed 0 — the first drawing — starts positive, the
@@ -718,6 +745,26 @@ export function foldConstraints(input: FoldInput): Derived2 {
       arg: new Map(freeArgNames.map((n) => [n, sampleArgDeg(n)])),
       par: new Map(sample),
     };
+    // #1424 (ADR-CX-052): a polygon whose EVERY vertex is fully free (both halves, no window, not the
+    // origin, not already placed by an earlier polygon) starts as a shape. The first polygon to claim a
+    // vertex places it; a vertex any given reaches is left to the per-name sample and the solve.
+    {
+      const fullyFree = (n: string) =>
+        n !== ORIGIN && freeModNames.includes(n) && freeArgNames.includes(n) && !windows.has(n) && !pinned.has(n);
+      const shaped = new Set<string>();
+      objects.forEach((o, oi) => {
+        if (o.kind !== 'polygon') return;
+        const vs = [...new Set(o.points)];
+        if (vs.length < 3 || !vs.every((v) => fullyFree(v) && !shaped.has(v))) return;
+        const u = (key: string) => (paramSample(`polygon ${oi} ${key}`, seed) - 0.6) / 1.8;
+        polygonShapeStart(vs.length, u).forEach((p, i) => {
+          const deg = (Math.atan2(p.im, p.re) * 180) / Math.PI;
+          (initial.mod as Map<string, number>).set(vs[i], Math.hypot(p.re, p.im));
+          (initial.arg as Map<string, number>).set(vs[i], (deg + 360) % 360);
+          shaped.add(vs[i]);
+        });
+      });
+    }
 
     const modulusOf = (name: string, st: State): { value: number; exact: ExpVec | null } => {
       const at = pinned.get(name);
