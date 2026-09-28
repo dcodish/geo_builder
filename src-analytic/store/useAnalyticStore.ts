@@ -119,8 +119,10 @@ export type InputError =
    * The refusal names the holder so the student sees the collision, not a scolding about their letter.
    */
   | { key: 'already-named'; detail: string; holder?: string }
-  /** A given the figure cannot satisfy (#1016). */
-  | { key: 'unsatisfiable'; detail: string }
+  /** A given the figure cannot satisfy (#1016). #1423: when the refused line RESTATES an existing
+   *  letter, `reusedId` names it and `definedBy` carries the student's own line that defines it —
+   *  the refusal then says the letter is the problem, with the fresh-letter remedy. */
+  | { key: 'unsatisfiable'; detail: string; reusedId?: string; definedBy?: string }
   /**
    * A save file this tool will not load (#1087) — and WHICH of the three reasons, because they send
    * the student to three different places: another builder's file, a newer version of this one, or

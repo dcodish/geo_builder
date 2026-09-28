@@ -8022,3 +8022,17 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 **Measured.** 6 locks (`issue-1297-hebrew-fact.test.ts` product-side; `issue-1297-locale-prompt.test.ts` server-side, on the sanctioned import direction): the He prompt carries only the He column + the hard rule, the En prompt only En, the no-locale prompt byte-compatible; rows display the sentence with part markers, annotations follow their lines through removal, drop on edit, and survive save→restore.
 
 **Consequences.** `server/llm/harness.ts` (locale through `PromptSpec.vocabulary`/`buildSystemPrompt`/`buildRequest`), `server/parseHandler.ts` (`body.locale`), `parser/llmSharedAnalytic.ts` (one-column vocab), `parser/llmAnalytic.ts` + `App.tsx` (locale sent; `recordLlmLines`; row display), `store/useAnalyticStore.ts` (`spokenFor` + envelope field). **Proxy redeploy required.**
+
+## ADR-AG-173 — A refusal about a reused letter names the letter, and its defining sentence (#1423)
+
+**Status:** accepted · 2026-09-28 · operator, playing round #1408 (T41: *"there is a refusal but there is an intersect to select"*) · round #1517
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the honesty invariant for refusals (a refusal names the conflicting statement) · **Design:** [04c](04c-design-analytic.md) — the submit verdict's context fields
+
+**Context.** His P was already the second crossing of AB. By the #1046 lowering a line reusing an existing letter is a STATEMENT about that point, so «P נקודת החיתוך … של הצלע CA» asserts something false and is rightly refused — but the refusal said only «לא נמצאה תצורה שבה מתקיים: "P …"», naming the new line alone, beside a visibly free crossing. Re-measured at pickup (tip `d3f08a4c`): the issue's whole table stood — the fresh letter records, and the three P-reuse statement kinds (crossing, coordinates, midpoint) all refuse with `unsatisfiable` + the new line only.
+
+**Decision.** At the ONE submit chokepoint (`app/submit.ts`, the fault return every typed line passes), a refused line whose SUBJECT id already exists gains `reusedId` + `definedBy` — the id, and the student's own earliest line that introduces it (`subjectIdsOf` over the parsed facts: placed points, derived points, declarations, on-object riders; polygon vertices count as introducers for the definer scan). Decided structurally, never by sentence kind, so every point sentence — present and future — gets it. The App renders the reused wording: «P כבר מוגדרת: "…". המשפט "…" סותר את ההגדרה הקיימת — לנקודה חדשה בחרו אות אחרת» (`errUnsatisfiableReused`, both locales). The engine's refusal itself is unchanged (the logic was always right; the message was not).
+
+**Measured.** The operator's exact canvas (from `logs/debug-log-analytic.jsonl`, session `m49ph672`): both his refused lines now carry `reusedId: P` + `definedBy` = his own AB-crossing sentence; so do «P(1,1)» and «P אמצע AC» (the class). The taught remedy drives: «S …» records. Neighbours held: a TRUE reused-letter statement stays absorbed (#1046), `crossing-already-named` keeps its own holder-naming refusal (ADR-AG-157).
+
+**Consequences.** `src-analytic/app/submit.ts` (`subjectIdsOf`, `definingLineOf`, the enriched fault return), `src-analytic/store/useAnalyticStore.ts` (the `unsatisfiable` variant's optional fields), `src-analytic/App.tsx` (key pick), `src-analytic/i18n/index.ts` (`errUnsatisfiableReused`, he+en). Lock: `issue-1423-reused-letter.test.ts` — his exact sequence, the class (coordinates, midpoint), the driving remedy, and the three neighbours.

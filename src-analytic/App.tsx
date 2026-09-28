@@ -932,14 +932,15 @@ export function App() {
           'ambiguous-shape': 'errAmbiguousShape',
           'undistinguished-diagonal': 'errNoPrincipalDiagonal',
           'already-named': 'errAlreadyNamed',
-          'unsatisfiable': 'errUnsatisfiable',
+          // #1423 — a refusal that restates an existing letter says the LETTER is the problem
+          'unsatisfiable': error.key === 'unsatisfiable' && 'reusedId' in error && error.reusedId ? 'errUnsatisfiableReused' : 'errUnsatisfiable',
           // A save file this tool will not open, named by WHICH of the three reasons (#1087).
           'load-foreign': 'errLoadForeign',
           'load-newer': 'errLoadNewer',
           'load-too-large': 'errLoadTooLarge',
           'load-unreadable': 'errLoadUnreadable',
         }[error.key],
-        { detail: error.detail, max: MAX_FIGURE_STATEMENTS, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '', example: 'example' in error ? (error.example ?? '') : '' },
+        { detail: error.detail, max: MAX_FIGURE_STATEMENTS, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '', example: 'example' in error ? (error.example ?? '') : '', reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '', definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '' },
       )
     : null;
 
