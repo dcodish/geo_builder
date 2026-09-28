@@ -573,7 +573,13 @@ export function App() {
    * a family added later has no translation and shows its own name, which is visibly wrong rather
    * than silently missing.
    */
-  const locusKind = useCallback((kind: string) => t(`locus.${kind}`), [t]);
+  // `count` pluralises a UNION answer (#1500) — «שני ישרים» — with a counted fallback for a size
+  // no key names yet: visibly crude rather than silently singular.
+  const locusKind = useCallback(
+    (kind: string, count = 1) =>
+      count <= 1 ? t(`locus.${kind}`) : t(`locus.${kind}.${count}`, { defaultValue: `${count} × ${t(`locus.${kind}`)}` }),
+    [t],
+  );
 
   const answers = useMemo<Answer[]>(
     // #1212 removed `describeCurve` (imported now); #1137's `locusKind` stays — it is locale.

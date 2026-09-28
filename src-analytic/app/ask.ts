@@ -126,7 +126,14 @@ export interface Answer {
    * Decoration, like `mark`: no id, no letter, never in the fact list, and an ask never mutates the
    * figure (02c R24).
    */
-  locus?: { points: Array<{ x: number; y: number }>; closed: boolean };
+  /**
+   * ONE ENTRY PER CONNECTED COMPONENT since #1500 — a solution set can be a union (the two tangent
+   * lines through a point, two parallels at distance d), and the answer is all of it: *"there should
+   * be 2 lines … both should appear since they are the answer together"* (operator, 2026-09-28).
+   * `label` carries the component's own equation on a multi-part answer, so the canvas can say which
+   * line is which; a single component keeps the row's whole value as its label, as before.
+   */
+  locus?: { components: Array<{ points: Array<{ x: number; y: number }>; closed: boolean; label?: string }> };
   /**
    * Is the mark currently DRAWN? (#1118, operator ruling 2026-09-16.)
    *
@@ -239,7 +246,9 @@ export function ask(
   d: Derivation,
   question: string,
   fmt: (v: number) => string,
-  kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind']) => string = (k) => k,
+  // `count` joined the seam for #1500 — a union answer pluralises the kind («שני ישרים»), and the
+  // plural is locale exactly as the singular is. The seam WIDENS, it is not forked.
+  kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind'], count: number) => string = (k) => k,
 ): Answer {
   const text = question.trim();
   if (!text) return { question, value: null, unreadable: true };
@@ -275,7 +284,10 @@ export function ask(
      * back to describing a figure nobody is looking at.
      */
     const res = locusOf(d.construction, name, [d.seed, d.seed + 1], d.box);
-    if (!res || !res.shape) {
+    // Every component must carry a gated shape, or nothing honest is known about the set — the
+    // pre-#1500 `!res.shape` rule, over the union.
+    const shapes = res && res.components.every((cp) => cp.shape !== null) ? res.components.map((cp) => cp.shape!) : null;
+    if (!res || !shapes) {
       /**
        * A DETERMINED POINT'S LOCUS IS THAT POINT, OR THAT FINITE SET (#1227, ADR-AG-136).
        *
@@ -305,13 +317,34 @@ export function ask(
       // figure does not determine this», and it is the honest one here too.
       return { question, value: null };
     }
-    const eq = locusEquation(res.shape, fmt);
+    const parts = shapes.map((s) => ({ kind: s.curve.kind, eq: locusEquation(s, fmt) }));
+    /**
+     * The ROW reads the same at every seed (#1500): which component the walk found first depends on
+     * where the seed put the point, so the row's parts are ordered canonically — the drawn
+     * components keep their own order, and each carries its own label below.
+     */
+    const rowParts = [...parts].sort((p, q) =>
+      p.kind !== q.kind ? (p.kind < q.kind ? -1 : 1) : (p.eq ?? '') < (q.eq ?? '') ? -1 : 1,
+    );
+    const oneKind = rowParts.every((p) => p.kind === rowParts[0].kind);
+    // The KIND always — pluralised over a union («שני ישרים»); the EQUATIONS only when the two
+    // configurations agreed on the whole set (ADR-AG-072 §4, §5, over the union since #1500).
+    // «מעגל» on its own is a complete, true answer — and it is what חורף 25 actually asks for.
+    const kindPart = oneKind
+      ? kindWord(rowParts[0].kind, rowParts.length)
+      : rowParts.map((p) => kindWord(p.kind, 1)).join(' · ');
+    const eqs = rowParts.map((p) => p.eq).filter((e): e is string => e !== null);
     return {
       question,
-      // The KIND always; the EQUATION only when the two configurations agreed on it (ADR-AG-072 §4,
-      // §5). «מעגל» on its own is a complete, true answer — and it is what חורף 25 actually asks for.
-      value: eq ? `${kindWord(res.shape.curve.kind)} · ${eq}` : kindWord(res.shape.curve.kind),
-      locus: { points: res.trace.points, closed: res.trace.closed },
+      value: eqs.length > 0 ? `${kindPart} · ${eqs.join(' · ')}` : kindPart,
+      locus: {
+        components: res.components.map((cp, i) => ({
+          points: cp.trace.points,
+          closed: cp.trace.closed,
+          // On a union, each drawn curve says which part of the answer it is.
+          ...(res.components.length > 1 ? { label: parts[i].eq ?? kindWord(parts[i].kind, 1) } : {}),
+        })),
+      },
     };
   }
 

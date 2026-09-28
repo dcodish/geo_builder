@@ -206,9 +206,17 @@ function normalized(k: Conic): Conic | null {
   const vals = [k.A, k.B, k.C, k.D, k.E, k.F];
   const scale = Math.max(...vals.map(Math.abs));
   if (scale < 1e-12) return null;
-  // A square coefficient counts as present when it is not negligible against the whole equation —
-  // the same relative test `classify` applies, so the two agree about which family this is.
-  const sig = (v: number) => Math.abs(v) > 1e-9 * scale;
+  /**
+   * A coefficient counts as present when the FIT could actually resolve it (#1500 defect 2 —
+   * #1224's class: no stage may assert precision the trace never promised). This bar was `1e-9`,
+   * borrowed from `classify`'s exact-probe test — but these coefficients are least squares over a
+   * few hundred sampled points, which never resolves nine orders of magnitude. Measured: a trace
+   * along `y = 0` fits `D ≈ 2e-8` of pure corrector noise, the 1e-9 bar believed it, the noise
+   * became the MONIC LEAD, and `E` inflated to ~5e7 — a garbage equation that even snapped (a big
+   * integer is a rational with denominator 1). Exam coefficients live within a few orders of each
+   * other; 1e-6 keeps every real lead and rejects what only noise put there.
+   */
+  const sig = (v: number) => Math.abs(v) > 1e-6 * scale;
   // A LINE has no square term, so "monic" there means the first present of `x`, `y` — which is how a
   // line is written: `x − 4 = 0`, not `−0.25x + 1 = 0`. Same rule, one degree down.
   const lead = sig(k.A)
@@ -288,6 +296,30 @@ function fitLine(pts: readonly LocusPt[]): Conic | null {
    */
   const hi = (tr + disc) / 2;
   if (hi < 1e-18 || lo > 1e-10 * hi) return null;
+  /**
+   * THE NORMAL MAY NOT CARRY MORE PRECISION THAN THE FIT HAS (#1500 defect 2 — #1224's class, one
+   * function earlier: "the snap may not demand precision the trace never promised", and neither may
+   * the fit ASSERT it).
+   *
+   * The direction's own uncertainty is what the two eigenvalues say it is: the spread across the
+   * line over the spread along it, `√(lo/hi)`. A normal component BELOW that is the corrector's
+   * noise, not the line's direction — measured on «המקום הגיאומטרי של G» (#1500): a trace along
+   * `y = 0` with ~1e−7 wobble fits a normal of `(≈1.5e−8, 1)`, `normalized()` then believes the
+   * 1.5e−8 is a real lead (its bar is 1e−9), and the printed candidate is `x + 64029472y = 0` —
+   * garbage that even SNAPS, because a big integer is a rational with denominator 1. Zeroing the
+   * noise component makes the fit say what it knows: `y = 0`. Eight× the noise scale, for margin
+   * measured 4× above the worst observed component; a slip past the bar is still caught by the
+   * determinacy gate, exactly as before.
+   */
+  const angNoise = Math.sqrt(Math.max(lo, 0) / hi);
+  const bar = Math.max(8 * angNoise, 1e-6);
+  if (Math.abs(nx) < bar) {
+    nx = 0;
+    ny = Math.sign(ny) || 1;
+  } else if (Math.abs(ny) < bar) {
+    ny = 0;
+    nx = Math.sign(nx) || 1;
+  }
   return { A: 0, B: 0, C: 0, D: nx, E: ny, F: -(nx * cx + ny * cy) };
 }
 
@@ -388,6 +420,10 @@ export function shapeOfTrace(pts: readonly LocusPt[]): LocusShape | null {
  * points, lines and constraints, and holds no notation.
  */
 
+/** The existing coefficient comparison — two snapped equations describe the same set. */
+const sameConic = (a: Conic, b: Conic): boolean =>
+  (['A', 'B', 'C', 'D', 'E', 'F'] as const).every((k) => Math.abs(a[k] - b[k]) < 1e-6);
+
 /**
  * THE DETERMINACY GATE — a two-seed SET comparison, and it is the honesty gate (ADR-AG-072 §4).
  *
@@ -404,17 +440,63 @@ export function shapeOfTrace(pts: readonly LocusPt[]): LocusShape | null {
  *   (`src-analytic/CLAUDE.md` rule 2).
  *
  * Side effect, and a good one: «הציגו תצורה אחרת» then makes that circle GROW with `a` on screen.
+ *
+ * SINCE #1500 the gate compares UNIONS, because a solution set can have several connected components
+ * — the two tangent lines through a point, the two parallels at distance d — and the tracer now
+ * covers each one. The previous single-shape comparison conflated a third case with "different set":
+ * two components of the SAME determinate set. Same-branch neighbours printed one component's equation
+ * as the whole answer (a confident equation for a strict subset — the one thing this product may not
+ * do), cross-branch neighbours suppressed a perfectly determinate answer to a bare kind. This is
+ * #1176's conflation shape one level up ("could not measure" ≠ "different set"; "different component"
+ * ≠ "different set").
+ *
+ * The matching is ORDER-FREE — which component a walk found first depends on the seed — pairing by
+ * equal snapped equation first (two components of one kind are told apart only by their coefficients)
+ * and by kind alone after. The verdict, aligned with `a`:
+ *
+ * - every pair matches with equal equations → the shapes stand, equations included;
+ * - kinds pair up but any equation differs, or a count mismatch → the KINDS only (a parameterised
+ *   union still refuses the equation — the honesty rule is untouched);
+ * - the kinds do not even pair up (equal counts) → `null`, nothing is invariant.
+ *
+ * For a single component this is exactly the pre-#1500 verdict, byte for byte.
  */
+export function agreeingUnion(a: readonly LocusShape[], b: readonly LocusShape[]): LocusShape[] | null {
+  // A count mismatch means one configuration's discovery saw a component the other's did not — the
+  // kinds of the SHOWN set are measured fits, but no union equality can be claimed.
+  if (a.length !== b.length) return a.map((s) => ({ curve: s.curve }));
+  const used = new Set<number>();
+  const pair: number[] = new Array(a.length).fill(-1);
+  a.forEach((sa, i) => {
+    const j = b.findIndex(
+      (sb, jj) =>
+        !used.has(jj) && sb.curve.kind === sa.curve.kind && !!sa.conic && !!sb.conic && sameConic(sa.conic, sb.conic),
+    );
+    if (j >= 0) {
+      pair[i] = j;
+      used.add(j);
+    }
+  });
+  a.forEach((sa, i) => {
+    if (pair[i] >= 0) return;
+    const j = b.findIndex((sb, jj) => !used.has(jj) && sb.curve.kind === sa.curve.kind);
+    if (j >= 0) {
+      pair[i] = j;
+      used.add(j);
+    }
+  });
+  // The KINDS must pair up, or nothing is invariant and there is nothing honest to say.
+  if (pair.some((j) => j < 0)) return null;
+  const allAgree = a.every((sa, i) => !!sa.conic && !!b[pair[i]].conic && sameConic(sa.conic, b[pair[i]].conic!));
+  return allAgree ? [...a] : a.map((s) => ({ curve: s.curve }));
+}
+
+/** The single-trace convenience the gate grew out of — `agreeingUnion` over one component each. */
 export function agreeingShape(a: readonly LocusPt[], b: readonly LocusPt[]): LocusShape | null {
   const sa = shapeOfTrace(a);
   if (!sa) return null;
   const sb = shapeOfTrace(b);
-  // The KIND must agree, or nothing is invariant and there is nothing honest to say.
-  if (!sb || sb.curve.kind !== sa.curve.kind) return null;
-  if (!sa.conic || !sb.conic) return { curve: sa.curve };
-  // Both snapped. Same set ⇒ the equation is knowledge; different ⇒ the kind alone.
-  const same = (['A', 'B', 'C', 'D', 'E', 'F'] as const).every(
-    (k) => Math.abs(sa.conic![k] - sb.conic![k]) < 1e-6,
-  );
-  return same ? sa : { curve: sa.curve };
+  if (!sb) return null;
+  const u = agreeingUnion([sa], [sb]);
+  return u ? u[0] : null;
 }

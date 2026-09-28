@@ -1307,6 +1307,19 @@ seeds it must come back the same curve. Where a parameter moves the set, as in �
 asserting one sample's `a` as a given (P3, [ADR-052](06-decisions.md#adr-052)) or deriving a symbolic
 form, which is the NO-CAS boundary.
 
+**The locus is the whole solution set, components and all**
+([ADR-AG-166](06c-decisions-analytic.md#adr-ag-166),
+[#1500](https://github.com/dcodish/geo_builder/issues/1500); operator: *"there should be 2 lines for
+this loci and both should appear since they are the answer together and not just one of them"*). A
+set with several connected components — the two lines through a point tangent to a circle, the two
+parallels at distance d — is drawn whole (every component its own curve, each labelled with its own
+part of the answer), named in the plural («שני ישרים»), and equated with **every** component's
+equation («שני ישרים · y = 0 · 3x + 4y = 0») — the same row at every configuration, never the
+component the seed happened to land on. The gates above apply to the UNION: the equations print only
+when the whole set came back the same, and a parameterised union still answers kinds alone. One
+component's equation printed as *the* locus is a confident claim about a strict subset — the one
+thing this product may not do.
+
 **R25a — the object the student asked for is ON SCREEN**
 ([ADR-AG-120](06c-decisions-analytic.md#adr-ag-120),
 [#1198](https://github.com/dcodish/geo_builder/issues/1198)). The view is fitted to everything that

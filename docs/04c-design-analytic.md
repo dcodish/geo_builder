@@ -1137,6 +1137,28 @@ and would suppress the feature. The locus's gate asks the same question one leve
 anywhere, which is the point. A rule written as "if the figure has a free parameter" would be a patch
 wearing a rule's clothes, and would also be wrong on a parameter the locus happens not to depend on.
 
+### The set can be a UNION, and the tracer covers every component ([ADR-AG-166](06c-decisions-analytic.md#adr-ag-166), #1500)
+
+Continuation can only ever cover the connected component its start is on — the two tangent lines
+through O meet only at the degenerate G=O, so no walk crosses over. So `locusOf` DISCOVERS the other
+components from the configurations the lane already samples: each sample's free positions are
+**corrected onto the shown configuration's system** (`solveLM` under the shown env and resolved
+choices — #1176's rule: the canvas may not draw a curve belonging to a figure nobody is looking at),
+and a corrected sample landing off every held polyline (distance relative to the walk box) seeds one
+more walk. Bounded — `2·COMPARE_TRIES` probes, a walk only on a new landing, an overlapping re-trace
+dropped — never an open sweep (docs/17 §7; measured ≤ ~20ms per ask against ~10ms before). `LocusResult`
+is a list of components, `Answer.locus` carries one drawn curve per component (each labelled with its
+own equation on a union), and the determinacy gate compares **unions**: components matched order-free
+by snapped equation first and kind second (`agreeingUnion`), any mismatch → kinds only, kind
+multisets that do not pair → nothing. The row is ordered canonically so it reads the same at every
+seed. For a single component all of this reduces byte-for-byte to the previous behaviour.
+
+The fit itself may not out-claim its data (#1500 defect 2, #1224's class): `fitLine` zeroes a normal
+component below its own angular noise (`√(lo/hi)` of the two spread eigenvalues), and `normalized`'s
+"is this coefficient present" bar is `1e-6` of scale, not `1e-9` — least squares over a few hundred
+sampled points never resolves nine orders, and believing noise as the monic lead printed
+`x + 64029472y = 0` for `y = 0` (a big integer snaps — denominator 1).
+
 ### The fit is a claim, so it is checked — against the trace, not against a student
 
 `sweep → least-squares fit over the four kinds → snap to rationals → RE-VERIFY the snapped equation

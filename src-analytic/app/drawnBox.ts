@@ -38,7 +38,7 @@ import type { Box } from '../engine/curves';
 export interface DrawnAnswer {
   /** A collapsed answer is not on the canvas — framing for it would zoom out for something invisible. */
   shown?: boolean;
-  locus?: { points: Array<{ x: number; y: number }> };
+  locus?: { components: Array<{ points: Array<{ x: number; y: number }> }> };
 }
 
 /**
@@ -49,6 +49,6 @@ export interface DrawnAnswer {
  * bit would re-frame the canvas under a student who had deliberately zoomed.
  */
 export function drawnBox(figure: Figure, figureOwn: Box, answers: readonly DrawnAnswer[]): Box {
-  const trace = answers.flatMap((a) => (a.shown && a.locus ? a.locus.points : []));
+  const trace = answers.flatMap((a) => (a.shown && a.locus ? a.locus.components.flatMap((cp) => cp.points) : []));
   return trace.length === 0 ? figureOwn : viewBox(figure, 0.15, trace);
 }

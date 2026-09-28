@@ -106,7 +106,7 @@ describe('#1224 — a locus states its equation whatever its slope or scale', ()
      * catch by itself, because it is true everywhere.
      */
     const d = derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 0);
-    const pts = locusOf(d.construction, 'M', [0, 1], d.box)?.trace.points ?? [];
+    const pts = locusOf(d.construction, 'M', [0, 1], d.box)?.components[0]?.trace.points ?? [];
     expect(pts.length).toBeGreaterThan(1);
     expect(snapAndVerify({ A: 0, B: 0, C: 0, D: 1, E: 0, F: -40 }, pts)).toBeNull();
   });

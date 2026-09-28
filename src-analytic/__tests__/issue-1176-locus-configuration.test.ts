@@ -60,7 +60,7 @@ describe('#1176 — the point lies on its own locus', () => {
       const { res, pt } = tracedFor(PARAM_CIRCLE, seed, 'P');
       expect(res, `no locus at seed ${seed}`).toBeTruthy();
       expect(pt, `no P at seed ${seed}`).toBeTruthy();
-      const { cx, cy, r } = circleOf(res!.trace.points);
+      const { cx, cy, r } = circleOf(res!.components[0].trace.points);
       const dist = Math.hypot(pt!.x - cx, pt!.y - cy);
       // Within 2% of the radius — the trace is a polyline, so its mean radius is not exact.
       expect(Math.abs(dist - r), `seed ${seed}: P is ${dist.toFixed(1)} from a circle of r ${r.toFixed(1)}`)
@@ -72,8 +72,8 @@ describe('#1176 — the point lies on its own locus', () => {
     for (let seed = 0; seed < 6; seed += 1) {
       const { res, pt } = tracedFor(PARAM_LINE, seed, 'M');
       if (!res) continue; // a configuration with no drawable locus is not this test's business
-      const xs = res.trace.points.map((q) => q.x);
-      const ys = res.trace.points.map((q) => q.y);
+      const xs = res.components[0].trace.points.map((q: {x:number;y:number}) => q.x);
+      const ys = res.components[0].trace.points.map((q: {x:number;y:number}) => q.y);
       const along = Math.max(...ys) - Math.min(...ys);
       const across = Math.max(...xs) - Math.min(...xs);
       /**
@@ -97,7 +97,7 @@ describe('#1176 — the point lies on its own locus', () => {
   it('successive configurations trace DIFFERENT circles', () => {
     const radii = [0, 1, 2, 3].map((seed) => {
       const { res } = tracedFor(PARAM_CIRCLE, seed, 'P');
-      return circleOf(res!.trace.points).r;
+      return circleOf(res!.components[0].trace.points).r;
     });
     expect(new Set(radii.map((r) => r.toFixed(1))).size, `radii were ${radii.map((r) => r.toFixed(1))}`)
       .toBeGreaterThan(1);
@@ -170,7 +170,7 @@ describe('#1176 — the point lies on its own locus', () => {
      * not describe the trace must come back `null` however loose the snap was.
      */
     const d = derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 0);
-    const pts = (locusOf(d.construction, 'M', [0, 1], d.box) as ReturnType<typeof locusOf>)?.trace?.points ?? [];
+    const pts = (locusOf(d.construction, 'M', [0, 1], d.box) as ReturnType<typeof locusOf>)?.components[0]?.trace.points ?? [];
     expect(pts.length, 'the trace exists').toBeGreaterThan(1);
     // `x = 40` is nowhere near this locus; no tolerance may let it through.
     expect(snapAndVerify({ A: 0, B: 0, C: 0, D: 1, E: 0, F: -40 }, pts)).toBeNull();
