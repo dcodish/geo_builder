@@ -3348,3 +3348,19 @@ binomial-spelling, member, member-poly, quartic, corpus-witness}-1434.complex.js
 3. **The literal-atom bridge** — an off-axis `a+bi` literal (`2+3i`) carries its argument as an opaque atom, so `(mod, arg)` alone could not recover the pair. `fromCartesian` now REGISTERS the exact rational pair on the atom name (`value/angle.ts`; a name re-registered with a different pair is poisoned to null — exactness never guesses), and `gaussianRationalParts` reads it back for a single ±1-coefficient atom with quarter-turn offsets (·i rotations, conjugates). Everything outside the field — parameters, free points, non-quarter turns, irrational tables — answers null and the ≈ decimal stands.
 
 **Consequences.** `src-complex/value/rational.ts` (`sqrtExact`), `src-complex/value/angle.ts` (atom registry), `src-complex/value/value.ts` (`fromCartesian` registers), `src-complex/value/cartesian.ts` (`gaussianRationalParts`, `ratPart`), `src-complex/model/knowledge.ts` (`approx`), `src-complex/replay/derive2.ts` (the composers, `evalGauss`/`exactAnswer`, every row maker), `src-complex/App.tsx` (≈ rendering). Lock: `src-complex/__tests__/issue-1436-exact-ask.test.ts` — the reviewer's exact case (2√2), √5 through the atom bridge, exact complex/product/quotient answers, the integer and fraction spellings under `=`, and the irrational ≈ floor.
+
+## ADR-CX-052 — A free polygon is sampled as a shape, not vertex by vertex (#1424)
+
+**Status:** accepted · 2026-09-28 · operator report («why is this behavior», 2026-09-25/27), batch-approved 2026-09-27 · round #1517. Numbered 052 beside the round's other complex branches (053–055).
+
+**Requirements:** docs/02d FR-CN-4 (amended: a free polygon's start reads as its shape) · **Design:** docs/04d — a free polygon starts as a shape
+
+**Context.** «משולש ABC» drew a thin sliver. Its three vertices are six free values, and each vertex took its own modulus and argument, so nothing kept three independent draws from landing nearly in a line. Measured on main `d3f08a4c` at seeds 0–23, the smallest corner was 3°–43°, and 10 of 24 were under 15°. The quadrilateral at seed 0 was not even convex. 2-D places a bare shape in general position (ADR-253).
+
+**Decision.** Where tier 2's starting state is built, a polygon whose EVERY vertex is fully free (free modulus and argument, no quadrant window, not the origin, not already placed by an earlier polygon) takes its start from `polygonShapeStart`. That is a regular n-gon with a per-seed centre, size and rotation, and each vertex jittered by ±22% of the spacing in angle and ±18% in radius. Every vertex stays a free coordinate: the free basis, the published DOF list (6 for a triangle, 8 for a quadrilateral) and the solve are untouched. «show another configuration» still moves every vertex, and a given still moves one wherever the solve needs. Only the starting distribution changes, which ADR-052 permits.
+
+**Rejected.** A minimum-angle rejection loop over the per-vertex draws: it keeps the wrong distribution and adds a retry count to the seed contract.
+
+**Measured.** Smallest triangle corner ≥ 20° at 24/24 seeds (was 3°–43°). «מרובע ABCD» is convex with every corner > 20° at 24/24. «A = 0 · B = 4 · משולש ABC» still honours A and B.
+
+**Consequences.** `src-complex/replay/derive2.ts` (`polygonShapeStart` and the start). Lock: `issue-1424-polygon-shape.test.ts`.
