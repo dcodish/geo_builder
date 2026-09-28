@@ -10968,3 +10968,17 @@ line via the triangle's structure, and its solver has ADR-413's zero-area gate a
 **Consequences.** For a student: «SM⊥ABC» where M is a point of the plane now draws a real perpendicular
 standing out of the plane, whose length is theirs to state — and stating it works. A statement that
 could only be satisfied by flattening a solid to zero area is now refused instead of drawn flat.
+
+## ADR-3D-272 — The gauge is not a configuration: an unanchored figure keeps the floor (#1421)
+
+**Status:** accepted · 2026-09-28 · operator rulings 2026-09-27 (Option A, and again in the /decisions pass: *"Keep it flat on the floor"*) · round #1510
+
+**Requirements:** none (internal) · **Design:** this entry
+
+**Context.** T35: *"image is not proportional"* — |AB| = 5 drew shorter than |AC| = 3. The 3-D figure was exactly right; the whole triangle tumbled edge-on to the camera at 3 of 4 seeds, because once a driven given ran the solve, the six rigid-motion values rode «הציגו תצורה אחרת» with the real freedom. The class: every free planar figure in 3-D carrying a driven given.
+
+**Decision.** One gauge normalisation at the END of `resolve3`, exactly for UNANCHORED figures (no `hasAbsoluteFrameObject`, no absolute points, no solids, no revolutions, no circles): a rigid motion (det +1, never a reflection) sends the first point to the origin, the first edge along +x, and the first three points' plane to the floor (third point at y > 0), applied to every position, plane and line so relations survive verbatim. Configurations change the SHAPE alone; the camera still orbits. The plan's step 1 (measure which stage sets the orientation) became moot by construction — a terminal normalisation is indifferent to the source of the tumble.
+
+**Measured.** 4 locks (`issue-1421-gauge.test.ts`): the operator's T35 figure sits A-at-origin / AB-along-+x / C-on-floor at every sampled seed with the stated lengths exact; the SHAPE (the angle at A) still varies; a coordinate injection and a cube are untouched. 3-D lane 285 files / 5302 green on first run.
+
+**Consequences.** `engine/evaluate.ts` (the normalisation block). Lock: `issue-1421-gauge.test.ts`.
