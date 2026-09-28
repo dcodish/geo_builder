@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 79d8e913-3646-42eb-939a-24700cb56522
-  modified: 2026-09-21T01:39:16.857Z
+  modified: 2026-09-28T10:58:22.919Z
 ---
 
 Writing file content through a Bash heredoc in this harness **corrupts it silently**. Two distinct
@@ -65,6 +65,18 @@ python -c "import io; s=io.open(PATH,encoding='utf-8').read(); print(chr(0x2066)
 
 That one line is what caught both. The general form: after a scripted edit that carries Unicode, grep the
 file for the literal code point you meant to write as an escape.
+
+**A fifth mode — PowerShell `Get-Content -Raw | .Replace() | Set-Content` mojibakes Hebrew (2026-09-28, #1504):**
+`Get-Content` without `-Encoding utf8` reads a BOM-less UTF-8 file through the ANSI codepage, so every
+Hebrew character arrives as two Latin-1 bytes; `Set-Content -Encoding utf8` then faithfully encodes the
+garbage. The round-trip was done only to substitute an issue number into an issue body, and `gh issue
+create` filed the mojibake — the tool printed the issue URL, success as ever. Caught only because the
+harness diffed the file afterwards; repaired with `gh issue edit --body-file` from a Write-tool file.
+
+**How to apply:** never round-trip a UTF-8 file through PowerShell string surgery. Substitute
+placeholders by rewriting the whole file with the **Write tool** (it's one call), or read/write with
+`-Encoding utf8` on BOTH ends if a script is unavoidable — and after filing anything user-visible from a
+scripted file, `gh issue view --json body` the Hebrew line back.
 
 Related: [[gh-body-at-dash-eats-issues]] — same class, same lesson (the tool reports success while the
 content is gone).
