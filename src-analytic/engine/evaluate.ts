@@ -182,6 +182,11 @@ function pointAtId(c: Construction, env: Env, id: Id): Pt | null {
   return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
+/** How many half-spans past the stated figure the SOLVE may roam (#1492) — generous: the locus
+ *  walk uses 4 view-halves and every corpus solution sits well inside; beyond it the arena barrier
+ *  turns the descent around. */
+const ARENA_ROOM = 2;
+
 function searchSpan(c: Construction, env: Env): Span {
   const xs: number[] = [];
   const ys: number[] = [];
@@ -427,9 +432,33 @@ export function carrierSystem(
       const e = envAt(x);
       const pos = positionsAt(x);
       const at = (id: Id) => pos.get(id) ?? null;
-      return c.constraints.flatMap(
+      const rows = c.constraints.flatMap(
         (k) => residual(k, at, e, curveAtOf(c, e, at), lineAtOf(c, e, at)) ?? [0],
       );
+      /**
+       * THE ARENA BARRIER (#1492). `length-eq`'s operand-relative residual has a ZERO AT
+       * INFINITY — on the kite, `CB = CD` with C sliding out tends to a constant over an
+       * unbounded denominator, and the descent followed it to C = (−3081, 6179), "satisfied" at
+       * 3.9e-4. Re-normalising the residual itself was measured and rejected: the operand form
+       * is load-bearing three ways (a ratio contradiction stays scale-free so «ריבוע ABCD» +
+       * «AB = 2BC» cannot buy progress by shrinking; the blame attribution of #1334 and the
+       * root order of #1259 both read the reached configuration). So the residual semantics stay
+       * byte-identical, and the SEARCH is told the truth it already believes: solutions live in
+       * the arena the seeder samples. One extra row per movable carrier — zero anywhere within
+       * `ARENA_ROOM` half-spans of the stated figure (every legitimate corpus figure, with room),
+       * a true distance beyond it — so a walk toward the asymptote turns uphill and comes home.
+       * Search guidance only: the VERDICT sites never see these rows, so what counts as satisfied
+       * is untouched.
+       */
+      const sp = searchSpan(c, e);
+      const cx = (sp.x.lo + sp.x.hi) / 2;
+      const cy = (sp.y.lo + sp.y.hi) / 2;
+      const R = ARENA_ROOM * Math.max(sp.x.hi - sp.x.lo, sp.y.hi - sp.y.lo, 2) / 2;
+      for (const id of ids) {
+        const p = pos.get(id);
+        rows.push(p ? Math.max(0, (Math.hypot(p.x - cx, p.y - cy) - R) / R) : 0);
+      }
+      return rows;
     },
   };
 }
