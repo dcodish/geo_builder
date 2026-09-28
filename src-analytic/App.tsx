@@ -160,6 +160,8 @@ export function App() {
     queries,
     setQueries,
     recordLine,
+    recordLlmLines,
+    spokenFor,
     removeLine,
     replaceLine,
     clearAll,
@@ -811,7 +813,7 @@ export function App() {
     const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS_ANALYTIC);
     try {
       const out = await runFallback(raw, lines, seed, (utterance, context) =>
-        llmParseAnalytic(utterance, context, { signal: ctl.signal }),
+        llmParseAnalytic(utterance, context, { signal: ctl.signal, locale: i18n.language === 'en' ? 'en' : 'he' }),
       );
       /**
        * THE ESCALATION'S OUTCOME (#1300) — the event that could not be answered when #1297 was triaged.
@@ -835,7 +837,9 @@ export function App() {
         ...(out.kind === 'busy' ? { why: out.why } : {}),
       });
       if (out.kind === 'lines') {
-        for (const l of out.lines) recordLine(l);
+        // #1297 (operator ruling 2026-09-27, 'student's words now'): the rows DISPLAY the sentence
+        // the student typed; the machine lines stay the stored truth so replay is unchanged.
+        recordLlmLines(raw, out.lines);
         setDraft('');
         return;
       }
@@ -1193,7 +1197,8 @@ export function App() {
                  */
                 content: (
                   <>
-                    <MathText text={analyticBidi.isolateLtrRuns(line)} />
+                    {/* #1297: a fallback-built row shows the STUDENT's sentence, never model output. */}
+                    <MathText text={analyticBidi.isolateLtrRuns(spokenFor[i] ?? line)} />
                     {/* #1281 — a name the TOOL chose is said on the row that caused it (the #1263 ruling). */}
                     {d.minted
                       .filter((m) => m.index === i)

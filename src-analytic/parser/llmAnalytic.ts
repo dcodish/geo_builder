@@ -34,7 +34,9 @@ export const LLM_TIMEOUT_MS_ANALYTIC = 15_000;
 export async function llmParseAnalytic(
   utterance: string,
   context: string,
-  opts: { signal?: AbortSignal; fetchImpl?: typeof fetch } = {},
+  // `locale` (#1297): the session's language, so the proxy renders a one-language prompt and the
+  // model answers in the language the student is working in.
+  opts: { signal?: AbortSignal; fetchImpl?: typeof fetch; locale?: 'he' | 'en' } = {},
 ): Promise<LlmStepsOutcome | null> {
   const doFetch = opts.fetchImpl ?? globalThis.fetch;
   if (typeof doFetch !== 'function') return null;
@@ -44,7 +46,7 @@ export async function llmParseAnalytic(
     const res = await doFetch(`${import.meta.env.BASE_URL}api/parse`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ utterance, context, tool: 'analytic' }),
+      body: JSON.stringify({ utterance, context, tool: 'analytic', ...(opts?.locale ? { locale: opts.locale } : {}) }),
       signal: opts.signal,
     });
     if (!res.ok) {

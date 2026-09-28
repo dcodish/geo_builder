@@ -8009,3 +8009,17 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 **Measured.** The issue's 18-row table green through real `parse → derive`; 23 locks (`issue-1429-curve-operand.test.ts`) including the identity arm both ways, the ambiguous refusals, #1175/#1255 unchanged, and no refusal containing `curve-anon`.
 
 **Consequences.** `parser/parseAnalytic.ts` (`incidenceOn` widened + delegation, `INTERSECT_JOIN`, `intersectionSpellings`, `withLineNoun`, `ROMAN_OF_DIGIT`), `engine/solve.ts` (`on-curve.eqSrc/eq`, canonical key), `engine/apply.ts` (`resolveCurveByEq`, the on-curve resolution step, `crossing-kind`), `engine/types.ts`, `parser/catalogAnalytic.ts`. Lock: `issue-1429-curve-operand.test.ts`.
+## ADR-AG-172 — The fallback teaches the session's language: a one-locale prompt, and rows that show the student's own sentence (#1297)
+
+**Status:** accepted · 2026-09-28 · operator rulings 2026-09-24 (*"nothing should be in english if data was entered in hebrew"*) and 2026-09-27 (*"student's words now, form later"* — the proper-form-beside split to #1468) · round #1510. Numbered 172 beside the round's parallel branches.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R104 family (the escape's promise) · **Design:** [04c](04c-design-analytic.md) fallback
+
+**Context.** One Hebrew sentence, escalated; the model wrote three English canonical rows into a Hebrew session's fact list — valid, parsed, committed, and taught. The language of the recorded line was the one thing in the lane still resting on prompt discipline (one soft sentence), which #1251's own ADR argues safety must never do.
+
+**Decision.** Two structural changes. (1) **The prompt speaks one language**: the client sends its session `locale`; the shared harness (`buildSystemPrompt`) renders ONE vocabulary column and a HARD language rule for it; analytic's `vocabulary(locale)` implements the column; an old caller (no locale — 2-D/3-D today) keeps its prompt byte-identical, so the sibling byte-identity locks stand. The proxy widens (`parseHandler` reads `body.locale`), which makes this a proxy deploy. (2) **No model output is ever displayed as a row**: the store gains `spokenFor` — per line index, the student's own sentence — written by `recordLlmLines`, index-maintained through remove/edit (an edited row shows the editor's text), persisted in the save envelope as an optional field (old files restore clean), and the fact panel displays it over the machine line. The machine lines stay the stored truth: **replay is pure over the lines exactly as before** — which is why the sentence is an annotation and not the stored line (the student's refused sentence cannot replay; that is what the fallback was for).
+
+**Measured.** 6 locks (`issue-1297-hebrew-fact.test.ts` product-side; `issue-1297-locale-prompt.test.ts` server-side, on the sanctioned import direction): the He prompt carries only the He column + the hard rule, the En prompt only En, the no-locale prompt byte-compatible; rows display the sentence with part markers, annotations follow their lines through removal, drop on edit, and survive save→restore.
+
+**Consequences.** `server/llm/harness.ts` (locale through `PromptSpec.vocabulary`/`buildSystemPrompt`/`buildRequest`), `server/parseHandler.ts` (`body.locale`), `parser/llmSharedAnalytic.ts` (one-column vocab), `parser/llmAnalytic.ts` + `App.tsx` (locale sent; `recordLlmLines`; row display), `store/useAnalyticStore.ts` (`spokenFor` + envelope field). **Proxy redeploy required.**
+>>>>>>> fix/1297-hebrew-fact
