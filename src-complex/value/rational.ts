@@ -114,3 +114,17 @@ export function fromNumber(x: number, maxDen = 10_000, tol = 1e-9): Rat | null {
 
 /** `3`, `-1/2`, `7/8` — plain text; the UI typesets it. */
 export const format = (a: Rat): string => (a.d === 1n ? `${a.n}` : `${a.n}/${a.d}`);
+
+/** The exact square root, when there is one: both numerator and denominator perfect squares (#1436). */
+export function sqrtExact(a: Rat): Rat | null {
+  const isqrt = (n: bigint): bigint | null => {
+    if (n < 0n) return null;
+    let r = BigInt(Math.floor(Math.sqrt(Number(n))));
+    while (r * r > n) r--;
+    while ((r + 1n) * (r + 1n) <= n) r++;
+    return r * r === n ? r : null;
+  };
+  const n = isqrt(a.n);
+  const d = isqrt(a.d);
+  return n !== null && d !== null ? rat(n, d) : null;
+}

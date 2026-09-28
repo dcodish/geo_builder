@@ -27,9 +27,9 @@
 import { fmtNum } from '../../shell/format';
 import type { Cx } from '../value/value';
 import { cPolar, evaluate, exact, formatPolar } from '../value/value';
-import { rat, toNumber } from '../value/rational';
-import { composeCartesian, numericPart, readableCartesianParts } from '../value/cartesian';
-import { type ExpVec, evaluate as evalMod, format as fmtMod, isOne as modIsOne, isParametric } from '../value/modulus';
+import { type Rat, rat, toNumber, add as ratAdd, sub as ratSub, mul as ratMul, div as ratDiv, neg as ratNeg, isZero as ratIsZero, sqrtExact } from '../value/rational';
+import { composeCartesian, gaussianRationalParts, numericPart, ratPart, readableCartesianParts } from '../value/cartesian';
+import { type ExpVec, evaluate as evalMod, format as fmtMod, fromRational as modFromRational, pow as modPow, isOne as modIsOne, isParametric } from '../value/modulus';
 import {
   type Angle,
   add as angAdd,
@@ -1372,7 +1372,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     kind: MeasureQuery['kind'],
     names: readonly string[],
     value: number,
-  ): string | null => {
+  ): { value: string; approx?: true } | null => {
     if (!shapeFixed) return null;
     const degree = kind === 'area' ? 2 : 1;
     for (const s of symmetries) {
@@ -1385,11 +1385,11 @@ export function foldConstraints(input: FoldInput): Derived2 {
     }
     if (!gaugeName) {
       // no unit to express it in: the number itself is the same in every configuration
-      return freeParamNames.length === 0 ? round2(value) : null;
+      return freeParamNames.length === 0 ? numAnswer(value) : null;
     }
     const unit = state.par.get(gaugeName);
     if (!unit || !Number.isFinite(unit)) return null;
-    return `${fmtCoefficient(value / unit ** degree)}${gaugeName}${degree === 2 ? '²' : ''}`;
+    return { value: `${fmtCoefficient(value / unit ** degree)}${gaugeName}${degree === 2 ? '²' : ''}`, ...coeffApprox(value / unit ** degree) };
   };
 
   const measureAt = (env: Env, q: MeasureQuery): number | null => {
@@ -1415,7 +1415,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * complex number (the ordinary path answers it), `null` when a parameter it names is still free,
    * else the formatted exact value. It is exact through `linearize`, so `9r` with r = 5/9 prints 5.
    */
-  const paramOnlyValue = (e: Expr): string | null | undefined => {
+  const paramOnlyValue = (e: Expr): { value: string; approx?: true } | null | undefined => {
     if (refsOf(e).length > 0) return undefined;
     const names = paramsOf(e);
     if (names.length === 0) return undefined;
@@ -1432,8 +1432,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
       }
       const v = substituteSolvedParams(form.uConst, t1.paramValues);
       if (paramsOf(e).every((p) => !v.has(p))) {
-        if (sameDirection(dir, angZero())) return fmtMod(v);
-        if (sameDirection(dir, HALF_TURN)) return `-${fmtMod(v)}`;
+        if (sameDirection(dir, angZero())) return { value: fmtMod(v) };
+        if (sameDirection(dir, HALF_TURN)) return { value: `-${fmtMod(v)}` };
       }
     }
     const here = evalComplex(e, finalEnv);
@@ -1441,7 +1441,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     // #1427 — the one predicate, over every configuration. A SOLVED parameter is exact and the numeric
     // tier never moves it (it is not in the free basis), so neither the free directions nor the numeric
     // census can change it: only a branch's sign can, and that is what the comparison sees.
-    return knowledgeOf(false, exactClosure, configEnvs.map((env) => evalComplex(e, env))).known ? round2(here.re) : null;
+    return knowledgeOf(false, exactClosure, configEnvs.map((env) => evalComplex(e, env))).known ? numAnswer(here.re) : null;
   };
 
   /**
@@ -1462,11 +1462,10 @@ export function foldConstraints(input: FoldInput): Derived2 {
     const verdict = judgeAll((env) => each.map((e) => evalComplex(e, env)));
     if (verdict.known) {
       const real = Math.abs(here.im) <= 1e-9 * Math.max(1, Math.hypot(here.re, here.im));
-      return {
-        label: q.src,
-        value: real ? round2(here.re) : `${round2(here.re)}${here.im < 0 ? '-' : '+'}${round2(Math.abs(here.im))}i`,
-        why: null,
-      };
+      // #1436 — the substituted members carry exact values, so the set's one answer can be exact too
+      const ex = exactAnswer(each[0]);
+      if (ex !== null) return { label: q.src, value: ex, why: null };
+      return { label: q.src, ...cxAnswer(here, real), why: null };
     }
     // the members differ within ONE drawing: that is the set's own spread, not a choice of configuration
     const inOne = each.map((e) => evalComplex(e, finalEnv));
@@ -1475,6 +1474,105 @@ export function foldConstraints(input: FoldInput): Derived2 {
       return { label: q.src, value: null, why: { code: 'multi-solution', solutions: members.length, first: members[0] } };
     }
     return { label: q.src, value: null, why: verdict.why };
+  };
+
+  /**
+   * #1436 — BOUNDED EXACT ARITHMETIC over the Gaussian rationals (operator rulings 2026-09-27 on
+   * #1436/#1460: an answer recognised exact prints in exact form alone; otherwise ≈ decimal).
+   *
+   * When every operand of an ask is a Gaussian RATIONAL — an exactly-carried point (`1+i`), a
+   * literal, `i` — sums, differences, products and quotients stay in the field, so the answer is
+   * carried exactly with no CAS (the ADR-CX-006 boundary: bounded integer work). `|…|` of such a
+   * value is √(rational), spelled by the ONE modulus formatter («2√2», «√5»). Anything outside the
+   * field — a parameter, a free point, an angle with no rational cartesian form — answers null and
+   * the decimal ≈ path stands. Exactness never bypasses the knowledge gate: this runs only after
+   * `verdict.known`.
+   */
+  type Gauss = { re: Rat; im: Rat };
+  const gaussOfRef = (name: string): Gauss | null => {
+    if (solutionSets.has(name)) return null;
+    const m = modulusOf(name, state);
+    const a = argumentOf(name, state);
+    return m.exact && a.exact ? gaussianRationalParts(m.exact, a.exact) : null;
+  };
+  const gaussSqrt = sqrtExact; // exact only when both halves are perfect squares — else the caller keeps ≈
+  const evalGauss = (e: Expr): Gauss | null => {
+    switch (e.t) {
+      case 'num':
+        return { re: e.v, im: rat(0) };
+      case 'i':
+        return { re: rat(0), im: rat(1) };
+      case 'val':
+        return e.v.kind === 'zero' ? { re: rat(0), im: rat(0) } : e.v.kind === 'exact' ? gaussianRationalParts(e.v.mod, e.v.arg) : null;
+      case 'ref':
+        return gaussOfRef(e.name);
+      case 'param':
+        return null;
+      case 'neg': {
+        const g = evalGauss(e.e);
+        return g && { re: ratNeg(g.re), im: ratNeg(g.im) };
+      }
+      case 'conj': {
+        const g = evalGauss(e.e);
+        return g && { re: g.re, im: ratNeg(g.im) };
+      }
+      case 'add':
+      case 'sub': {
+        const l = evalGauss(e.l);
+        const r = evalGauss(e.r);
+        if (!l || !r) return null;
+        const op = e.t === 'add' ? ratAdd : ratSub;
+        return { re: op(l.re, r.re), im: op(l.im, r.im) };
+      }
+      case 'mul': {
+        const l = evalGauss(e.l);
+        const r = evalGauss(e.r);
+        if (!l || !r) return null;
+        return { re: ratSub(ratMul(l.re, r.re), ratMul(l.im, r.im)), im: ratAdd(ratMul(l.re, r.im), ratMul(l.im, r.re)) };
+      }
+      case 'div': {
+        const l = evalGauss(e.l);
+        const r = evalGauss(e.r);
+        if (!l || !r) return null;
+        const s = ratAdd(ratMul(r.re, r.re), ratMul(r.im, r.im));
+        if (ratIsZero(s)) return null;
+        return {
+          re: ratDiv(ratAdd(ratMul(l.re, r.re), ratMul(l.im, r.im)), s),
+          im: ratDiv(ratSub(ratMul(l.im, r.re), ratMul(l.re, r.im)), s),
+        };
+      }
+      case 'pow': {
+        // small non-negative INTEGER powers only — repeated multiplication; roots keep their ≈
+        if (e.exp.d !== 1n || e.exp.n < 0n || e.exp.n > 4n) return null;
+        const b = evalGauss(e.base);
+        if (!b) return null;
+        let acc: Gauss = { re: rat(1), im: rat(0) };
+        for (let k = 0n; k < e.exp.n; k++) {
+          acc = { re: ratSub(ratMul(acc.re, b.re), ratMul(acc.im, b.im)), im: ratAdd(ratMul(acc.re, b.im), ratMul(acc.im, b.re)) };
+        }
+        return acc;
+      }
+      case 'abs': {
+        // exact inside a larger expression only when √(re²+im²) is itself rational
+        const g = evalGauss(e.e);
+        if (!g) return null;
+        const root = gaussSqrt(ratAdd(ratMul(g.re, g.re), ratMul(g.im, g.im)));
+        return root === null ? null : { re: root, im: rat(0) };
+      }
+    }
+  };
+  /** The exact spelling of a whole ask, or null: `|…|` heads go to the modulus formatter (2√2). */
+  const exactAnswer = (e: Expr): string | null => {
+    if (e.t === 'abs') {
+      const g = evalGauss(e.e);
+      if (g) {
+        const s = ratAdd(ratMul(g.re, g.re), ratMul(g.im, g.im));
+        return ratIsZero(s) ? '0' : fmtMod(modPow(modFromRational(s), rat(1, 2)));
+      }
+      return null;
+    }
+    const g = evalGauss(e);
+    return g ? composeCartesian(ratPart(g.re), ratPart(g.im)) : null;
   };
 
   const exprRows: KnowledgeRow[] = exprQueries.map((q) => {
@@ -1486,7 +1584,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     if (exactParam !== undefined) {
       return exactParam === null
         ? { label: q.src, value: null, why: whyNotKnowledge(closure) }
-        : { label: q.src, value: exactParam, why: null };
+        : { label: q.src, ...exactParam, why: null };
     }
     // Knowledge rule 1 (model/knowledge.ts): a modulus CARRIED EXACTLY is knowledge whatever else is
     // free — «|z2|» with |z2| = 18r and r = 5/9 is 10 even while arg z2 is open (#1389 step 3)
@@ -1499,10 +1597,13 @@ export function foldConstraints(input: FoldInput): Derived2 {
     const here = evalComplex(q.expr, finalEnv);
     if (!here) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
     const real = Math.abs(here.im) <= 1e-9 * Math.max(1, Math.hypot(here.re, here.im));
-    const show = (z: Cx): string =>
-      real ? round2(z.re) : `${round2(z.re)}${z.im < 0 ? '-' : '+'}${round2(Math.abs(z.im))}i`;
     const verdict = judge(false, (env) => evalComplex(q.expr, env));
-    if (verdict.known) return { label: q.src, value: show(here), why: null };
+    if (verdict.known) {
+      // #1436 — a recognised-exact answer prints in exact form alone («2√2», «-2+2i»); else ≈ decimal
+      const ex = exactAnswer(q.expr);
+      if (ex !== null) return { label: q.src, value: ex, why: null };
+      return { label: q.src, ...cxAnswer(here, real), why: null };
+    }
     if (!shapeFixed || !gaugeName || !real) {
       return { label: q.src, value: null, why: verdict.why };
     }
@@ -1523,11 +1624,12 @@ export function foldConstraints(input: FoldInput): Derived2 {
     }
     const unit = state.par.get(gaugeName);
     if (!unit || !Number.isFinite(unit)) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
-    if (degree === 0) return { label: q.src, value: round2(here.re), why: null };
+    if (degree === 0) return { label: q.src, ...numAnswer(here.re), why: null };
     const power = degree === 1 ? '' : degree === 2 ? '²' : `^${degree}`;
     return {
       label: q.src,
       value: `${fmtCoefficient(here.re / unit ** degree)}${gaugeName}${power}`,
+      ...coeffApprox(here.re / unit ** degree),
       why: null,
     };
   });
@@ -1555,9 +1657,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
     const value = measureAt(finalEnv, q);
     if (value === null) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
     const verdict = judge(false, (env) => realValue(measureAt(env, q)));
-    if (verdict.known) return { label: q.src, value: round2(value), why: null };
+    if (verdict.known) return { label: q.src, ...numAnswer(value), why: null };
     const expressed = expressMeasure(q.kind, q.points, value);
-    if (expressed) return { label: q.src, value: expressed, why: null };
+    if (expressed) return { label: q.src, ...expressed, why: null };
     return { label: q.src, value: null, why: verdict.why };
   });
 
@@ -1582,7 +1684,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
       const b = measureAt(env, r.denominator);
       return a === null || b === null || Math.abs(b) < 1e-12 ? null : realValue(a / b);
     });
-    if (verdict.known) return { label: r.src, value: round2(value), why: null };
+    if (verdict.known) return { label: r.src, ...numAnswer(value), why: null };
     const invariant =
       shapeFixed &&
       symmetries.every((s) => {
@@ -1592,7 +1694,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
         return Math.abs(a / b - value) <= 1e-6 * Math.max(1, Math.abs(value));
       });
     return invariant
-      ? { label: r.src, value: round2(value), why: null }
+      ? { label: r.src, ...numAnswer(value), why: null }
       : { label: r.src, value: null, why: verdict.why };
   });
 
@@ -1879,12 +1981,38 @@ function circumcircle(a: Cx, b: Cx, c: Cx): { center: Cx; r: number } | null {
 const round2 = (x: number): string => `${Math.round(x * 100) / 100}`;
 
 /**
+ * #1436 — the ≈ honesty floor, decided where the number is spelled (the stage-5d readings' own
+ * rule): a decimal whose spelling IS the value («5», «2.5») keeps `=`; a rounded spelling
+ * («2.83» for 2√2) carries `approx`, and the reading layer prints `≈`.
+ */
+const numAnswer = (x: number): { value: string; approx?: true } => {
+  const text = round2(x);
+  return Math.abs(Number(text) - x) <= 1e-9 * Math.max(1, Math.abs(x)) ? { value: text } : { value: text, approx: true };
+};
+
+/** The complex twin — the same spelling the decimal path always used, judged part by part. */
+const cxAnswer = (z: Cx, real: boolean): { value: string; approx?: true } => {
+  if (real) return numAnswer(z.re);
+  const re = numAnswer(z.re);
+  const im = numAnswer(Math.abs(z.im));
+  return { value: `${re.value}${z.im < 0 ? '-' : '+'}${im.value}i`, ...(re.approx || im.approx ? { approx: true as const } : {}) };
+};
+
+/**
  * The coefficient of a gauge expression: `15r`, not `15.0000001r`, and `r` rather than `1r`.
  *
  * A whole number that the minimiser reached to within a hair is printed as the whole number — the exam
  * answer is `15r`, and a student who typed the given cannot be shown their own figure as `14.999998r`.
  * The snap is deliberately tight: it corrects float noise, it never rounds a value into a lie.
  */
+/** #1436 — approx marker for a gauge coefficient: set only when the 4-decimal print lost value
+ *  (the whole-number snap is the established float-noise policy, not a rounding). */
+const coeffApprox = (c: number): { approx?: true } => {
+  const near = Math.round(c);
+  if (Math.abs(c - near) <= 1e-6 * Math.max(1, Math.abs(c))) return {};
+  return Math.round(c * 1e4) / 1e4 === c ? {} : { approx: true };
+};
+
 function fmtCoefficient(c: number): string {
   const near = Math.round(c);
   const v = Math.abs(c - near) <= 1e-6 * Math.max(1, Math.abs(c)) ? near : Math.round(c * 1e4) / 1e4;

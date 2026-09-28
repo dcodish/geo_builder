@@ -51,6 +51,13 @@ export interface KnowledgeRow {
    * exactly when `value` is present: a printed number needs no excuse.
    */
   readonly why: Why | null;
+  /**
+   * #1436 — the ≈ honesty floor: set when `value` is a ROUNDED DECIMAL of a quantity it does not
+   * spell exactly, so the reading layer prints `≈` instead of `=` (the same rule stage 5d's
+   * readings follow). Absent/false means the spelling IS the value — an integer, an exact
+   * fraction, or an exact radical form.
+   */
+  readonly approx?: boolean;
 }
 
 import type { Why } from './why';

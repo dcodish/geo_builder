@@ -959,7 +959,8 @@ export function App() {
                         {r.note !== null ? (
                           <span style={{ color: '#94a3b8' }}> — {t(r.note === 'statement' ? 'askIsStatement' : 'askUnreadable')}</span>
                         ) : r.row!.value !== null ? (
-                          <span style={{ fontWeight: 600 }}> = {r.row!.value}</span>
+                          /* #1436 — a rounded decimal answers with ≈; = is reserved for the exact value */
+                          <span style={{ fontWeight: 600 }}> {r.row!.approx ? '≈' : '='} {r.row!.value}</span>
                         ) : (
                           <span style={{ color: '#94a3b8' }}> — {r.row!.why ? whyText(r.row!.why, t) : ''}</span>
                         )}
