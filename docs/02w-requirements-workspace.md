@@ -50,7 +50,7 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   the machine registry ([`products.json`](../products.json)) rather than from code. A builder marked not
   enabled **never appears in a shipped page** — the promise that no chip can point at a 404. *(Realised —
   `shell/frame/Switcher.tsx`, [ADR-W-021](06w-decisions-workspace.md#adr-w-021); the analytic builder is
-  `enabled: false` + `devOnly`, [ADR-AG-007](06c-decisions-analytic.md).)*
+  `enabled: false` + `devOnly`, [ADR-AG-007](06c-decisions-analytic.md).)* On a phone, where the strip scrolls inside itself, the **current** builder's tab is always in view. *(#1458, [ADR-W-097](06w-decisions-workspace.md#adr-w-097).)*
 - **FR-SU-3 (Must)** — **One three-zone workbench:** input, canvas, and an **opt-in** data panel on its
   own side. The zones do not move between builders. *(Realised — `shell/frame/Workbench.tsx`; D1.)*
 - **FR-SU-4 (Should)** — **One header and tool row.** Primary session actions are visible; secondary ones

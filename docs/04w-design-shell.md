@@ -360,3 +360,7 @@ once per step, and the shared layout must render every section. Each tree has a 
 pre-#1477 About. `shell/__tests__/about-content.test.ts` is the §5c meta-lock plus a roster net.
 
 What the lock does not check: whether the words are good. That is prose, per product and per locale.
+
+## The current tool is in view on a phone ([ADR-W-097](06w-decisions-workspace.md#adr-w-097))
+
+`Switcher` holds a ref on its `aria-current` segment and, on mount and whenever the active tool changes, calls `scrollIntoView({ inline: 'nearest', block: 'nearest' })`. That moves nothing when the tab is already visible, and the browser handles the RTL scroll direction. The visual smoke opens every product at 390×844 and fails if that tab's rectangle is not inside the strip.
