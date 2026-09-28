@@ -1069,6 +1069,39 @@ export function buildScene3(
     if (wt.wedge) wedges.push(wt.wedge);
   }
 
+  /**
+   * A LINE'S DRAWN EXTENT CONTAINS EVERY ANCHOR ON IT (#1490, ADR-3D-269).
+   *
+   * Operator, playing T20: *"the line doesnt reach the plane"* — ℓ was clipped to the figure's
+   * neighbourhood while the stated 45° arc's vertex (ℓ ∩ π) sat ~80 px past its drawn end: an arc
+   * marking a crossing the line never visibly reaches. One rule in the clipping step, not a
+   * special case in the angle lane: every point the scene anchors to a line — an angle vertex, a
+   * knee, a named point — pulls that line's range out to itself, plus a margin so the anchor is
+   * never at the very tip. A line with nothing anchored past the neighbourhood keeps its old
+   * endpoints exactly.
+   */
+  {
+    const margin = radius * 0.15;
+    const anchorPts: Vec3[] = [...wAngles.map((w) => w.v), ...wedges.map((w) => w.vertex), ...worldPts];
+    for (const l of wLines) {
+      const along = sub3(l.b, l.a);
+      if (norm3(along) < 1e-9) continue;
+      const dir = normalize3(along);
+      const mid = scale3(add3(l.a, l.b), 0.5);
+      let lo = dot3(sub3(l.a, mid), dir);
+      let hi = dot3(sub3(l.b, mid), dir);
+      for (const p of anchorPts) {
+        const t = dot3(sub3(p, mid), dir);
+        // ON the line, to a tolerance scaled like everything else here — never a nearby point.
+        if (dist3(p, add3(mid, scale3(dir, t))) > radius * 0.02) continue;
+        lo = Math.min(lo, t - margin);
+        hi = Math.max(hi, t + margin);
+      }
+      l.a = add3(mid, scale3(dir, lo));
+      l.b = add3(mid, scale3(dir, hi));
+    }
+  }
+
   // ---- projection + isotropic fit (over the points AND the auxiliary geometry)
   const projOf = (p: Vec3): { x: number; y: number } => {
     const q = project3(p, frame);

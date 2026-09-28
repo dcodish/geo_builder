@@ -10968,3 +10968,17 @@ line via the triangle's structure, and its solver has ADR-413's zero-area gate a
 **Consequences.** For a student: «SM⊥ABC» where M is a point of the plane now draws a real perpendicular
 standing out of the plane, whose length is theirs to state — and stating it works. A statement that
 could only be satisfied by flattening a solid to zero area is now refused instead of drawn flat.
+
+## ADR-3D-269 — A line's drawn extent contains every anchor on it (#1490)
+
+**Status:** accepted · 2026-09-28 · operator, playing round #1488 T20 (*"the line doesnt reach the plane"*) · round #1510
+
+**Requirements:** none (internal render) · **Design:** this entry
+
+**Context.** A named line draws clipped to the figure's neighbourhood (`radius·1.1` about the centre's projection). The scene then ANCHORS marks on the line wherever the geometry puts them — measured on T20's figure, the stated 45° arc's vertex (ℓ ∩ π) sat ~80 px beyond ℓ's drawn end: an arc marking a crossing the line never visibly reaches. The class: a line's drawn extent ignored the anchors drawn on it (angle vertices, knees, named points).
+
+**Decision.** One rule in the clipping step, after every anchor source exists (`wAngles`, the knee `wedges`, `worldPts`): each anchor lying ON a drawn line (within `radius·0.02` of it) pulls that line's parameter range out to itself plus a `radius·0.15` margin, so no anchor sits at the very tip. A line with nothing anchored past the neighbourhood keeps its endpoints exactly. Applied in world space before projection, so every consumer (label placement, bbox users downstream) sees one extent.
+
+**Measured.** The T20 sequence: every point of the 45° arc within the drawn segment (was ~80 px beyond; lock verified red pre-fix); the bare-line figure's drawn length unchanged within bounds.
+
+**Consequences.** `src3d/render/scene3.ts` (the widening block). Lock: `issue-1490-line-reach.test.ts`.
