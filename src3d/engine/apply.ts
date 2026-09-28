@@ -14,7 +14,7 @@ import { resolveSolidSubject } from './solidSubject';
 import { diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { claimPointIds, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import { firstFreeLetter } from './freeLetter';
-import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
+import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, ScalarPin, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
   // #305 (ADR-3D-090): every quad pyramid is a 4-ring + apex, whatever its base or top
@@ -1655,10 +1655,52 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           next.claims.push(cl);
           return { ok: true, next };
         }
+        /**
+         * #1447 — A MAGNITUDE ON FREE DIMS DRIVES, whatever its power and whatever the entry order.
+         *
+         * «פירמידה ישרה SABCD · AB = 3 · נפח הפירמידה = 12» answered `claim-refuted` — the height
+         * is free and 4 satisfies it, so refuting against the sampled height is ADR-052's cardinal
+         * sin. The class (docs/17 M2 law i): a magnitude's ability to drive depended on its POWER
+         * (length vs area/volume — only length had a pin kind) and on ENTRY ORDER (#754's rescale
+         * owning the size made a later length fall to the claim lane). Ruled 2026-09-27: a LATER
+         * volume/area may move free shape dims — #754 restricts only the FIRST magnitude.
+         *
+         * One arm for the three magnitude powers (`magnitudeScalarPin`). When a scale given is in
+         * force it is DEMOTED to its own pin, so both magnitudes drive together and the rescale
+         * lane empties — the two mechanisms can never double-apply. A volume/area keeps its claim
+         * (the final verification stays the arbiter, the ADR-3D-030 pattern); a length keeps its
+         * historical no-claim pin shape byte-identical.
+         */
+        const magnitudeScalarPin = (cl: Claim3): ScalarPin | null =>
+          cl.type === 'length-eq'
+            ? { kind: 'length', a: cl.a, b: cl.b, value: cl.value }
+            : cl.type === 'area-eq'
+              ? { kind: 'area3', ids: cl.ids, value: cl.value }
+              : cl.type === 'volume-poly'
+                ? { kind: 'volume3', noun: cl.noun, ids: cl.ids, value: cl.value }
+                : null;
+        // …never over a SYMBOL-defined point (SN=k·SC): the pivot does not position it (ADR-3D-030,
+        // the same entry rule as the coords arm above), so its residual could never close and a true
+        // magnitude would read refuted. Such a statement stays with the claim arbiter below.
+        const symbolDefined = claimPointIds(c, cmd.claim).some((id) => c.vecDefs.some((vd) => vd.symbol && vd.unknown === id));
+        const mag = symbolDefined ? null : magnitudeScalarPin(cmd.claim);
+        if (mag && freeDims(c) > 0) {
+          if (c.scaleGivens.length > 0) {
+            next.scaleGivens = [];
+            for (const g of c.scaleGivens) {
+              const gp = magnitudeScalarPin(g);
+              if (gp) next.scalarPins.push(gp); // its claim is already recorded — the arbiter stays
+            }
+          }
+          next.scalarPins.push(mag);
+          if (cmd.claim.type !== 'length-eq') next.claims.push(cmd.claim);
+          return { ok: true, next };
+        }
         // #754: once a scale given is in force the rescale owns the figure's size — a second
         // length must not ALSO enter the pivot as a scale-fixing pin (the two mechanisms would
         // double-apply); it falls through to the claim lane, where the store refuses it honestly
-        // against still-free dims and checks it exactly against a rigid one.
+        // against still-free dims and checks it exactly against a rigid one. (#1447: with free
+        // dims the demotion above now takes it; this arm keeps the free3-only reach.)
         if (cmd.claim.type === 'length-eq' && c.scaleGivens.length === 0) {
           next.scalarPins.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
           return { ok: true, next };

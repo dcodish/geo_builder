@@ -17,6 +17,7 @@
  */
 
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
+import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { carrierParams3 } from './carriers';
 import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
@@ -260,6 +261,8 @@ const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
   distance: true, // S5 (#378): a distance is an absolute size — it fixes the scale
   'mag-rel': false, // #393/#335: a RATIO of expression magnitudes — both sides scale together
   'mag-val': true, // #393/#335: |expr| = value is an absolute size, like `length`/`distance`
+  volume3: true, // #1447: an absolute size (scales as s³)
+  area3: true, // #1447: an absolute size (scales as s²)
 };
 
 export function scalePinned(c: Construction3): boolean {
@@ -820,6 +823,19 @@ export function solvePivot(
           continue;
         }
         out.push(l.x - r.x, l.y - r.y, l.z - r.z);
+      } else if (pin.kind === 'volume3') {
+        // #1447 — the volume DRIVES the free dims. Measured in the same lane frame as `length`
+        // (laneAt), through the SAME resolver the claim verifier uses (`subjectVolume`), so the
+        // drive targets exactly what the arbiter checks. Signed difference — crosses zero.
+        const subject = resolveSolidSubject(c, pin.noun, pin.ids);
+        const v = subjectVolume(subject, { get: (id: Id) => laneAt(id) ?? undefined } as unknown as Map<Id, Vec3>);
+        out.push(v === null ? 10 : v - pin.value);
+      } else if (pin.kind === 'area3') {
+        // #1447 — the triangle area drives: |cross|/2 − value.
+        const a = laneAt(pin.ids[0]);
+        const b = laneAt(pin.ids[1]);
+        const d3 = laneAt(pin.ids[2]);
+        out.push(a && b && d3 ? norm3(cross3(sub3(b, a), sub3(d3, a))) / 2 - pin.value : 10);
       } else if (pin.kind === 'mag-rel') {
         // #393/#335 (ADR-3D-107): |e1| − c·|e2| over vector EXPRESSIONS — the expression twin of
         // length-rel, same signed-difference form (a difference of magnitudes crosses zero).
