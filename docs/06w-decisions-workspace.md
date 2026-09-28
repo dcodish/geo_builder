@@ -4905,3 +4905,17 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 **Scope held back, and filed.** The plan's per-product locks for 2-D, complex and analytic are #1522. Complex and analytic have no humanizer unit (their text is built inline in `App.tsx`, as 3-D's was), so each needs the same extraction first. 2-D's values-panel leak is #1442, not a refusal.
 
 **Consequences.** `shell/studentText.ts` (new), `src3d/i18n/errorText3.ts` (moved + the two rules), `src3d/App3.tsx` (imports it), both 3-D locales (`err.baseNeedsOneSolid`, `solidNoun.*`). Lock: `src3d/__tests__/student-text-1455.test.ts`. The #1394 parity golden gains two keys harvested from this lock's own arrays; 0 recorded hashes changed or lost (checked by value).
+
+## ADR-W-097 — The current tool's tab is always in view on a phone (#1458)
+
+**Status:** accepted · 2026-09-29 · external prod review relayed by the operator («The active tab is cut off in the top nav», 2026-09-27), batch-approved the same day · round #1517. Numbered 097 beside the round's parallel workspace branches (094–096).
+
+**Requirements:** docs/02w FR-SU-2 (a sentence added: the current builder's tab is in view on a phone) · **Design:** docs/04w — the current tool is in view on a phone
+
+**Context.** At 390×844 the switcher strip is 570px of content in a 348px strip that scrolls inside itself (#737), and nothing scrolled the current tool into it. Measured on main `d3f08a4c` through the real page: analytic's own tab sat at −198…−42 in a strip at 20…370, wholly off-screen, and complex's was half-clipped. The student could not see which tool they were in.
+
+**Decision.** In the shell `Switcher`, for all four products: a ref on the `aria-current` segment and an effect on the active id that calls `scrollIntoView({ inline: 'nearest', block: 'nearest' })`. `nearest` moves nothing when the tab is already visible (so desktop is untouched) and never scrolls the page vertically. The browser resolves the RTL scroll direction, which a hand-set `scrollLeft` would have to special-case.
+
+**Lock.** `scripts/visual-smoke.mjs` opens every product at 390×844, fails if the current tab's rectangle is not inside the strip, and keeps the capture. Without the fix it fails on analytic with exactly the measured «−198…−42 in a strip 20…370»; with it, every product passes.
+
+**Consequences.** `shell/frame/Switcher.tsx`, `scripts/visual-smoke.mjs`.

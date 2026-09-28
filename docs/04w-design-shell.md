@@ -372,3 +372,7 @@ A `SymbolSpec` whose face (`label`) is one character inserts exactly that charac
 ## Student-facing text ([ADR-W-096](06w-decisions-workspace.md#adr-w-096))
 
 `shell/studentText.ts` `studentFacingViolations(values, { typed, names })` judges the VALUES a message interpolates, never its template, since a template may quote a worked example. A value may name what the student typed (case-insensitive) or what the figure shows; an id-shaped token (`~x`, `@x`, `#x`, `kind-Id`), an untyped English word, or an unknown capital label is a violation. Each product runs it over its own refusal corpus through its own humanizer. 3-D's is `src3d/i18n/errorText3.ts`; the other three are #1522.
+
+## The current tool is in view on a phone ([ADR-W-097](06w-decisions-workspace.md#adr-w-097))
+
+`Switcher` holds a ref on its `aria-current` segment and, on mount and whenever the active tool changes, calls `scrollIntoView({ inline: 'nearest', block: 'nearest' })`. That moves nothing when the tab is already visible, and the browser handles the RTL scroll direction. The visual smoke opens every product at 390×844 and fails if that tab's rectangle is not inside the strip.
