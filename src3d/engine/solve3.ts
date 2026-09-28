@@ -17,7 +17,8 @@
  */
 
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
-import { evalAffine, freeCoordKey, hasFreePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind } from './types';
+import { carrierParams3 } from './carriers';
+import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, bisectorDir3, cross3, dist3, dot3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -448,18 +449,33 @@ export function solvePivot(
   // what the given leaves free still varies with the seed, ADR-052) and started there — `spread: false`:
   // a rider's root sits anywhere on its host, but a coordinate has no host to spread across. Membership
   // is the same measured probe below, so a free point no residual reads solves exactly as before.
+  //
+  // #1498: the candidates come from the ONE carrier table (`carrierParams3`) — the same enumeration
+  // `freeDofCount3` counts, so a sampled carrier the count knows can no longer be missing from the
+  // lane (the drift that left «נקודה E במישור ABC»'s two in-plane parameters unknowable). A `zero`-
+  // anchored parameter is an OFFSET from the sampled seat (placement adds it there), so an undriven
+  // figure stays byte-identical; `bis-dist` is the rider's sampled distance from its ray's apex.
   let riders: { id: string; t0: number; lo: number; hi: number; spread: boolean }[] = [];
-  for (const [id, def] of c.points) {
-    if (def.kind === 'on-segment' && def.t === undefined) riders.push({ id, t0: riderSampleT(seed, id, def.a, def.b), lo: 0, hi: 1, spread: true });
-    else if (def.kind === 'scaled-offset' && def.k === undefined) riders.push({ id, t0: offsetSampleK(seed, id), lo: 1e-3, hi: Infinity, spread: true });
-  }
-  if (hasFreePoint3(c)) {
-    const sampled = evalCanonical(dims0);
+  {
+    let sampledPos: Positions3 | null = null;
+    const sampledAt = (): Positions3 => (sampledPos ??= evalCanonical(dims0));
     for (const [id, def] of c.points) {
-      const p = def.kind === 'free3' ? sampled.get(id) : undefined;
-      if (!p) continue;
-      for (const axis of ['x', 'y', 'z'] as const)
-        riders.push({ id: freeCoordKey(id, axis), t0: p[axis], lo: -Infinity, hi: Infinity, spread: false });
+      for (const cp of carrierParams3(c, id, def)) {
+        if (!cp.drivable) continue;
+        let t0: number | null = null;
+        if (cp.t0 === 'seg' && def.kind === 'on-segment') t0 = riderSampleT(seed, id, def.a, def.b);
+        else if (cp.t0 === 'offset') t0 = offsetSampleK(seed, id);
+        else if (cp.t0 === 'zero') t0 = 0;
+        else if (cp.t0 === 'bis-dist' && def.kind === 'bisector-ray') {
+          const p = sampledAt().get(id);
+          const o = sampledAt().get(def.apex);
+          t0 = p && o ? dist3(p, o) : null;
+        } else if (cp.t0 === 'coord-x' || cp.t0 === 'coord-y' || cp.t0 === 'coord-z') {
+          const p = sampledAt().get(id);
+          t0 = p ? p[cp.t0.slice(-1) as 'x' | 'y' | 'z'] : null;
+        }
+        if (t0 !== null) riders.push({ id: cp.key, t0, lo: cp.lo, hi: cp.hi, spread: cp.spread });
+      }
     }
   }
   /** The trial rider parameters at `x` — `undefined` when the lane is empty (every path stays bit-identical). */
@@ -553,14 +569,25 @@ export function solvePivot(
     const dims = x.slice(7, 7 + nDims);
     const override = coupled ? new Map(coupled.syms.map((s, i) => [s, x[7 + nDims + i]])) : undefined;
     const pos = evalCanonical(dims, override, riderMap(x));
+    /**
+     * #1498 — THE frame accessor for every residual: a point is read in the frame the DRAWN figure
+     * will put it in (`gaugeFramePoint3`, the final placement's own rule). Every residual family
+     * below used `applyGauge` unconditionally, so any pin relating a gauge-frame point to a Lane-A
+     * absolute one (a typed coordinate, an equation-plane rider) compared two different frames — the
+     * residual could never reach zero, and the pivot refused the student's true given.
+     */
+    const laneAt = (id: Id): Vec3 | null => {
+      const p = pos.get(id);
+      if (!p) return null;
+      return gaugeFramePoint3(c, c.points.get(id)) ? applyGauge(p, g) : p;
+    };
     const out: number[] = [];
     for (const pin of pointPins) {
-      const p = pos.get(pin.id);
-      if (!p) {
+      const q = laneAt(pin.id);
+      if (!q) {
         out.push(10, 10, 10);
         continue;
       }
-      const q = applyGauge(p, g);
       // #325: a symbolic component's target is evaluated at the trial pin-symbol values
       const tx = compTarget(pin.x, x);
       const ty = compTarget(pin.y, x);
@@ -571,14 +598,14 @@ export function solvePivot(
     }
     for (const pin of vecPins) {
       const def = c.vectors.get(pin.name);
-      const a = def && pos.get(def.from);
-      const b = def && pos.get(def.to);
+      const a = def && laneAt(def.from);
+      const b = def && laneAt(def.to);
       if (!a || !b) {
         out.push(10, 10, 10);
         continue;
       }
-      // a vector transforms without the translation
-      const w = sub3(applyGauge(b, g), applyGauge(a, g));
+      // a vector transforms without the translation; each endpoint in its own lane's frame (#1498)
+      const w = sub3(b, a);
       // #794: a component's target may be symbolic (evaluated at the trial pin-symbol
       // values) or null (a placeholder letter — unconstrained), exactly as point pins.
       const tx = compTarget(pin.x, x);
@@ -589,13 +616,13 @@ export function solvePivot(
       if (tz !== null) out.push(w.z - tz);
     }
     for (const pin of c.pairPins) {
-      const a = pos.get(pin.a);
-      const b = pos.get(pin.b);
+      const a = laneAt(pin.a);
+      const b = laneAt(pin.b);
       if (!a || !b) {
         out.push(10, 10, 10);
         continue;
       }
-      const w = sub3(applyGauge(b, g), applyGauge(a, g));
+      const w = sub3(b, a);
       const tx = compTarget(pin.x, x);
       const ty = compTarget(pin.y, x);
       const tz = compTarget(pin.z, x);
@@ -614,19 +641,17 @@ export function solvePivot(
     for (const pin of c.planePins) {
       const nn = Math.max(Math.hypot(pin.cx, pin.cy, pin.cz), 1e-12);
       for (const id of pin.ids) {
-        const p = pos.get(id);
-        if (!p || symbolTainted.has(id)) continue;
-        const def = c.points.get(id);
-        const absolute = def?.kind === 'coord' || (def?.kind === 'on-plane' && !c.pointPlanes.has(def.plane));
-        const q = absolute ? p : applyGauge(p, g);
+        if (symbolTainted.has(id)) continue;
+        // #1498: the ONE lane rule (`laneAt`) — this site's inline `coord || on-plane-off-run`
+        // approximation treated every other Lane-A kind as gauge-frame.
+        const q = laneAt(id);
+        if (!q) continue;
         out.push((q.x * pin.cx + q.y * pin.cy + q.z * pin.cz + pin.d) / nn);
       }
     }
-    // scalar givens (V7 T2): lengths / vertex angles / dot products / seg-⟂/∥-plane
-    const at = (id: string): Vec3 | null => {
-      const p = pos.get(id);
-      return p ? applyGauge(p, g) : null;
-    };
+    // scalar givens (V7 T2): lengths / vertex angles / dot products / seg-⟂/∥-plane — all through
+    // the one frame accessor (#1498).
+    const at = laneAt;
     // #324 (ADR-3D-079): a ring's relation to a COORDINATE plane/axis. Absolute-frame
     // residuals (like injections). `share`/`perp` are normalized by the ring's extent /
     // the normal's length so shrinking the figure can never zero them "for free" (the
@@ -1126,6 +1151,14 @@ export function solvePivot(
       // FLAT kinds are excluded by construction — `polygon3/4/5` are the 2-D vector lane and are
       // coplanar on purpose.
       if (!FLAT_SOLID_KINDS.has(solid.kind) && pts.length >= 4 && maxD > 1e-12 && offPlaneSpread(pts) <= 1e-4 * maxD) return true;
+      // #1499 — the #872 gate's zero-AREA face, for the NON-flat kinds only. A 3-D solid's ring
+      // driven collinear is never a figure. A FLAT solid (the 2-D vector lane) is deliberately NOT
+      // rejected here: a student can FORCE its ring collinear («מרובע ABCD» then «AB מתלכד עם CD»),
+      // and FR-RD-7's rule is that a forced-flat figure is DRAWN, never refused — so the flat kinds'
+      // collapse is judged after the solve (`collapsedRing` below): a pool whose every solution
+      // collapsed retries with the dims frozen and prefers a non-collapsed figure, and keeps the
+      // collapsed one only when nothing else satisfies the givens (then the collapse was stated).
+      if (!FLAT_SOLID_KINDS.has(solid.kind) && pts.length >= 3 && maxD > 1e-12 && norm3(runNormal(pts)) <= 1e-4 * maxD * maxD) return true;
     }
     // #820: a candidate that slid a rider OFF its host segment is not a figure either — «K על SB»
     // is a given like any other, so a solution reaching the relation at t = 1.4 has not satisfied
@@ -1153,6 +1186,56 @@ export function solvePivot(
     riders = riders.filter((_, i) => reads[i]);
   }
   const nRider = riders.length;
+
+  /**
+   * #1499 — THE FROZEN-DIMS FAILURE-PATH RETRY (the V8-c / ADR-3D-030 retry shape, one lane over).
+   *
+   * A statement whose own free carriers can absorb it — «SM ⊥ ABC» with S free — is satisfiable by
+   * moving the carriers alone, for ANY shape of the solid. But the joint [gauge | dims | riders]
+   * solve owns a collapse attractor the carriers-only problem does not have: LM flattened the
+   * sampled triangle (both angular residuals vanish on a collinear ring — ADR-3D-212), and at seeds
+   * where that basin captured EVERY start the degeneracy gate left 0 solutions, which `store3`
+   * reports as the student's contradiction. So when the joint solve finds nothing and the figure
+   * carries enrolled riders, re-solve with the dims FROZEN at the seed's sample — the same
+   * solvePivot, with dims0 baked into the evaluation and an empty dims vector, so the unknowns are
+   * [gauge | riders] and the collapse basin does not exist. Success keeps the sampled shape
+   * untouched (M2: the statement's own carriers absorb it; existing points stay put). A recursion
+   * cannot recurse: the inner call has no dims to freeze.
+   */
+  const retryFrozenDims = (): PivotResult[] =>
+    nRider > 0 && nDims > 0 && !probe && !coupled
+      ? solvePivot(c, (_d, ov, rt) => evalCanonical(dims0, ov, rt), [], seed, undefined, undefined, undefined, lines).map((r) => ({ ...r, dims: [...dims0] }))
+      : [];
+
+  /**
+   * #1499 — did this solution COLLAPSE a flat solid's ring to zero area? A flat kind's collapse
+   * cannot be rejected inside `degenerate` (a stated coincidence may FORCE it, and FR-RD-7 says a
+   * forced-flat figure is drawn) — so it is judged on the accepted pool instead: when EVERY solution
+   * flattened a ring and the figure carries enrolled riders, the frozen-dims retry is offered the
+   * problem the collapse basin cannot reach, and its non-collapsed figure is preferred. Evaluated
+   * from the result's own record (dims + riderTs), so the joint solve's and the retry's solutions
+   * are judged by one predicate despite their different unknown vectors.
+   */
+  const collapsedRing = (r: PivotResult): boolean => {
+    const pos = evalCanonical(r.dims, undefined, r.riderTs ? new Map(Object.entries(r.riderTs)) : undefined);
+    for (const solid of c.solids) {
+      if (!FLAT_SOLID_KINDS.has(solid.kind)) continue;
+      const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
+      if (pts.length < 3) continue;
+      let maxD = 0;
+      for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) maxD = Math.max(maxD, norm3(sub3(pts[j], pts[i])));
+      if (maxD > 1e-12 && norm3(runNormal(pts)) <= 1e-4 * maxD * maxD) return true;
+    }
+    return false;
+  };
+  /** The retry trigger above, applied to a candidate pool; [] means "keep what you have". */
+  const preferUncollapsed = (rs: PivotResult[]): PivotResult[] => {
+    if (rs.length === 0 || nRider === 0 || nDims === 0 || probe || coupled) return [];
+    if (!c.solids.some((s) => FLAT_SOLID_KINDS.has(s.kind))) return [];
+    if (!rs.every(collapsedRing)) return [];
+    const frozen = retryFrozenDims();
+    return frozen.length > 0 && !frozen.every(collapsedRing) ? frozen : [];
+  };
 
   if (invariantOnly) {
     // #820: with a rider in the lane there IS something to flex, so the immediate answer below does
@@ -1218,17 +1301,19 @@ export function solvePivot(
       if (!best || r.err < best.err) best = r;
       if (best.err < 1e-22) break;
     }
-    if (!best) return [];
+    if (!best) return retryFrozenDims();
     const primary = fd(best.x).reduce((s, v) => s + v * v, 0);
     // acceptance: the regulariser's pull stops LM at a primary floor of ~(REG·dims)² —
     // 1e-10 sits above that equilibrium and far under the 2e-5 claim tolerance
-    if (primary >= 1e-10) return [];
-    return [{
+    if (primary >= 1e-10) return retryFrozenDims();
+    const invSol: PivotResult[] = [{
       transform: (p) => p, mirror: false, dims: best.x.slice(0, nDims), err: primary,
       ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, best!.x[nDims + i]])) } : {}),
       scalarConsumed: scalarConsumedAt([0, 0, 0, 0, 0, 0, 0, ...best.x], false), // #990
       x: [0, 0, 0, 0, 0, 0, 0, ...best.x],
     }];
+    const uncollapsed = preferUncollapsed(invSol); // #1499: a flat ring the solve collapsed, retried
+    return uncollapsed.length > 0 ? uncollapsed : invSol;
   }
 
   // #518 (ADR-3D-133): the gauge's SCALE gets a seed-dependent SOFT ANCHOR, like every other DOF the
@@ -1323,9 +1408,8 @@ export function solvePivot(
     return (id) => {
       const p = pos.get(id);
       if (!p) return undefined;
-      const def = c.points.get(id);
-      const absolute = def?.kind === 'coord' || (def?.kind === 'on-plane' && !c.pointPlanes.has(def.plane));
-      return absolute ? p : applyGauge(p, g);
+      // #1498: the one lane rule — see `gaugeFramePoint3`
+      return gaugeFramePoint3(c, c.points.get(id)) ? applyGauge(p, g) : p;
     };
   };
   if (probe) {
@@ -1680,6 +1764,17 @@ export function solvePivot(
       results.length = 0;
       results.push(...out);
     }
+  }
+  // #1499: the joint solve found nothing — try the statement's own carriers with the shape frozen.
+  if (results.length === 0) {
+    const frozen = retryFrozenDims();
+    if (frozen.length > 0) return frozen;
+  }
+  // #1499: …or it found only figures that collapse a flat solid's ring — prefer a figure that
+  // satisfies the givens without the collapse, and keep the flat one only when nothing else does.
+  {
+    const uncollapsed = preferUncollapsed(results);
+    if (uncollapsed.length > 0) return uncollapsed;
   }
   return results;
 }

@@ -881,6 +881,43 @@ function riderRatioRetarget(c: Construction3, cmd: Command3): Command3 | null {
  * A placeholder is a point the student never positioned: one minted free by a bare segment (#840), or
  * re-homed onto a plane by a relation (#839). A rider the student STATED is not one.
  */
+/**
+ * #1499 — is `q` STRUCTURALLY in the plane of point-run `run`? True only when its definition forces
+ * it there at every seed: it is a member of the run, or derived solely from points that are (a
+ * midpoint or rider on a chord, a diagonal crossing, a centroid, a parallelogram corner, a plane
+ * cut, a rider declared on that same run). Position-free on purpose — apply never sees coordinates,
+ * and a numeric answer would let a one-seed coincidence change what a statement means (docs/17
+ * §2.2). Conservative: an unlisted kind answers false, which keeps ADR-3D-146's foot behaviour.
+ */
+export function structurallyOnRun3(c: Construction3, run: Id[], q: Id, seen: Set<Id> = new Set()): boolean {
+  if (run.includes(q)) return true;
+  if (seen.has(q)) return false;
+  seen.add(q);
+  const def = c.points.get(q);
+  if (!def) return false;
+  const all = (ids: Id[]): boolean => ids.every((x) => structurallyOnRun3(c, run, x, seen));
+  switch (def.kind) {
+    case 'on-segment':
+    case 'bisector-seg':
+      return all([def.a, def.b]);
+    case 'foot-seg':
+    case 'plane-cut':
+      return all([def.a, def.b]); // both lie on the carrier segment a–b
+    case 'centroid':
+      return all(def.of);
+    case 'parallelogram-point':
+      return all([def.opp, def.n1, def.n2]);
+    case 'scaled-offset':
+      return all([def.anchor, def.from, def.to]);
+    case 'on-plane': {
+      const ids = c.pointPlanes.get(def.plane);
+      return !def.side && !!ids && all(ids);
+    }
+    default:
+      return false;
+  }
+}
+
 function placeholderYields(c: Construction3, cmd: Command3): Construction3 | null {
   const id = (cmd as { id?: unknown }).id;
   if (typeof id !== 'string') return null;
@@ -2455,6 +2492,29 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         const known = c.points.has(cmd.a) ? cmd.a : c.points.has(cmd.b) ? cmd.b : null;
         if (cmd.rel === 'perp' && known !== null && plane.length >= 3) {
           const foot = known === cmd.a ? cmd.b : cmd.a;
+          /**
+           * #1499 — ADR-3D-146's "uniquely determines the foot" premise holds only when the known
+           * endpoint sits OFF the plane. When it lies IN the plane (M, a rectangle's diagonal
+           * crossing, then «SM ⊥ ABC») the foot of the perpendicular from it is ITSELF, so the
+           * funnel minted the new letter on top of the known one — S = M, a zero segment drawn
+           * green for a ⟂ it cannot carry, and «|SM| = 4» then refused as a contradiction.
+           *
+           * What such a statement determines is the new point's DIRECTION only: it lies on the
+           * normal through the known point, its height and side unstated — one free DOF each
+           * (ADR-052), never a default. So the letter is minted `free3` and the ⟂ lands as the
+           * DRIVING pin, whose residuals the #820/#1311 rider lane satisfies by moving the free
+           * coordinates; a later «|SM| = 4» drives the height the same way. Membership is decided
+           * STRUCTURALLY (apply is position-free by design): a point derived only from the run's
+           * own members is in its plane at every seed, and a coincidence at one sample never
+           * flips a statement's meaning (docs/17 §2.2).
+           */
+          if (structurallyOnRun3(c, plane, known)) {
+            const next = clone(c);
+            next.points.set(foot, { kind: 'free3' });
+            next.scalarPins.push({ kind: 'seg-perp-plane', a: cmd.a, b: cmd.b, plane });
+            if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]);
+            return { ok: true, next };
+          }
           return applyCommand3(c, { type: 'height-to-face', id: foot, from: known, face: plane });
         }
         return { ok: false, error: missing };

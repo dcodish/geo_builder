@@ -1347,6 +1347,26 @@ export interface Construction3 {
 /** #1311 (ADR-3D-260): does the figure hold a never-positioned (`free3`) point — DOF the pivot can drive? */
 export const hasFreePoint3 = (c: Construction3): boolean => [...c.points.values()].some((def) => def.kind === 'free3');
 
+/** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
+export const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'bisector-ray', 'foot-seg', 'reflect-line', 'parallelogram-point', 'scaled-offset', 'right-pyramid-apex', 'right-apex', 'free3']);
+
+/**
+ * #1498 — DOES THE PIVOT'S GAUGE APPLY TO THIS POINT? Asked in ONE place.
+ *
+ * The final placement pass (`applySolutions`) has always answered it with this exact rule; the
+ * in-solve residual accessor (`at` in solve3) answered it with "yes, always", so any pin relating a
+ * gauge-frame point to an ABSOLUTE one (a typed coordinate, an equation-plane rider) compared two
+ * different frames — the residual could never reach zero, the pivot reported 0 solutions, and
+ * `store3` blamed the student's newest true statement (`givens-contradict`). Two other sites carried
+ * hand-rolled approximations of the rule (`coord || on-plane-off-run`) that silently treated every
+ * remaining Lane-A kind (`partial`, `foot-plane`, `foot-line`, `line-plane`, `rev-point`, `on-line`)
+ * as gauge-frame. One predicate, one lane rule; a residual now sees exactly the frame the drawn
+ * figure will be in.
+ */
+export function gaugeFramePoint3(c: Construction3, def: PointDef | undefined): boolean {
+  return !!def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
+}
+
 export const freeCoordKey = (id: Id, axis: 'x' | 'y' | 'z'): string => `${id}@${axis}`;
 
 /**

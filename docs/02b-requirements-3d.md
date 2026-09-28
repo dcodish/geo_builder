@@ -101,6 +101,15 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   clarification's own sentence untrue, and a single reading is not a guess.
   *(Realised — [ADR-3D-239](06b-decisions-3d.md#adr-3d-239), #866; the earlier members of the family are
   ADR-3D-131, #836's main-diagonal ask, and #467's ambiguous height.)*
+- **FR-SP-12 (Must)** — **A ⟂-to-plane statement with ONE new letter creates exactly what it
+  determines.** When the known endpoint sits **off** the plane («SO גובה הפירמידה»), the new letter is
+  the foot of the perpendicular, on the plane ([ADR-3D-146](06b-decisions-3d.md#adr-3d-146), #579). When
+  it lies **in** the plane — decided structurally, never off a sampled drawing — the statement fixes only
+  a *direction*, so the new letter is a free point on the normal through the known one: its height and
+  side are free DOF that vary across configurations until a later given (a length, a coordinate) drives
+  them ([FR-SP-2](#the-space-model)/[FR-SP-3](#the-space-model)). It is never minted **on** the known
+  point: a zero segment drawn green asserts a perpendicular the figure does not have.
+  *(Realised — [ADR-3D-268](06b-decisions-3d.md#adr-3d-268), #1499.)*
 
 ## Vectors — the geometric lane
 
@@ -261,9 +270,11 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   (`claim-refuted`) when it is wrong**. A claim must never reshape the figure to become true — that would
   make the tool agree with the student instead of checking them. **A claim is only ever judged against
   what the student stated.** A statement about a part the tool sampled (a free plane, a free line, the
-  figure's placement against the axes, a never-positioned point) that no drive honours is refused as
+  figure's placement against the axes, a never-positioned point, a rider on a plane, a line or a
+  bisector ray, a partly-given coordinate) that no drive honours is refused as
   *not yet determined*, naming that part, and never as wrong
-  ([ADR-3D-260](06b-decisions-3d.md#adr-3d-260) — one rule; #508, #552, #512 and #1311 are its carriers).
+  ([ADR-3D-260](06b-decisions-3d.md#adr-3d-260) — one rule; #508, #552, #512 and #1311 are its carriers,
+  and [ADR-3D-267](06b-decisions-3d.md#adr-3d-267) delivers the drive for the remaining point carriers).
   **A relation between two planes given by equations** (an angle, ⟂, ∥) is checked the same way: it is
   refused when false and its value is drawn only when it holds. When a plane's equation carries the
   figure's parameter in its normal, the relation instead **pins the parameter** (its roots are the figure's

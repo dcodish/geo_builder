@@ -606,6 +606,40 @@ across seeds (the three-valued verdict #909 deferred is not built).
 **Not driven yet:** a length on a free point after a solid's scale given (#754 owns the size; the rule makes
 it honest), and the DOF cue still counts a driven free vector's six coordinates as free (fail-open).
 
+## The sampled-carrier table and the one frame rule (#1498, [ADR-3D-267](06b-decisions-3d.md#adr-3d-267))
+
+**The frame rule.** Whether the pivot's similarity applies to a point is asked in one place —
+`gaugeFramePoint3` (types.ts, beside `GAUGE_KINDS`): gauge-frame kinds ride the gauge, Lane-A absolute
+points (typed coordinates, an equation-plane rider) do not. The final placement always answered it this
+way; every in-solve residual family now reads points through one accessor (`laneAt` in `residualsFor`)
+built on the same predicate, so a residual sees exactly the frame the drawn figure will be in. The
+drift this closes: the residual accessor gauged *everything*, so a pin relating a solid vertex to a
+typed coordinate compared two frames and refused a true given as the student's contradiction.
+
+**The carrier table.** `carrierParams3` (`engine/carriers.ts`) is the one enumeration of every sampled
+point-DOF: per kind, its rider-lane keys, bounds, anchor seeding, and drivability. Both readers fold it —
+`freeDofCount3` (the count) and the pivot's rider-lane candidates (the drive) — so a carrier can no
+longer be counted yet undrivable (the ADR-052 conformance smell; before, `on-plane`, `on-line`,
+`bisector-ray` and `partial` were counted and never enrolled). Plane/line riders enroll as **offsets from
+their sampled seat** (0 = the seat, so an undriven figure is byte-identical); a bisector rider as its
+distance from the apex (positive — the ray's bound); a `partial`'s stated sign given becomes its lane
+bound. Recorded as not-drivable in the table itself: a side-point's height (its side bound is not
+static) and riders of free planes/lines (#557 re-seats them after the pivot). Enrollment stays the
+measured probe.
+
+**The ⟂-from-an-in-plane-point disposition** (#1499, [ADR-3D-268](06b-decisions-3d.md#adr-3d-268)). The
+`seg-plane-rel` one-new-letter funnel asks `structurallyOnRun3` — position-free, recursive: is the known
+endpoint forced into the run's plane by its definition? Off-plane keeps ADR-3D-146's foot; in-plane mints
+the new letter `free3` with the ⟂ as the driving pin, height and side free (two residuals, three
+coordinates). Two solver guards keep that honest: `degenerate()` rejects a NON-flat solid's ring driven
+to zero AREA (Newell ≤ 1e-4·span² — 2-D ADR-413's rule in R³), while a FLAT solid's collapse — which a
+student may legitimately FORCE («AB מתלכד עם CD» on a quad; FR-RD-7 draws a forced-flat figure) — is
+judged on the accepted pool: when every solution flattened a ring and riders are enrolled, a
+**frozen-dims retry** re-solves with the shape fixed at the seed's sample, where the collapse basin does
+not exist and only the statement's own carriers move; its non-collapsed figure is preferred, and the
+flat one stands only when nothing else satisfies the givens. The same retry also answers a joint solve
+that finds nothing at all.
+
 ## The data panel has two kinds of row (#1196, [ADR-3D-254](06b-decisions-3d.md#adr-3d-254))
 
 Every field of `DataPanel` used to be a **measurement** — coordinates, a vector's components and
