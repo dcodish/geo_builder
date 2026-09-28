@@ -204,7 +204,20 @@ export type Constraint =
    * It is the first member of the `on-curve` carrier family `carriers.ts` named in slice A and
    * left empty.
    */
-  | { t: 'on-curve'; id: Id; curve: Id }
+  | {
+      t: 'on-curve';
+      id: Id;
+      curve: Id;
+      /**
+       * The operand's own EQUATION, when the sentence named the curve that way (#1429). Carried so
+       * the apply boundary can resolve it to an existing curve with the same equation (the
+       * ADR-AG-023/#1342 identity class) or mint it `stated: false` — and STRIPPED there, so the
+       * applied constraint is one statement however the curve was spelled. Never part of
+       * {@link canonicalConstraint}'s key.
+       */
+      eqSrc?: string;
+      eq?: unknown;
+    }
   /**
    * `D` is collinear with `a` and `b` — «D על הישר BC», «D על הצלע BC» (#1069, #1073).
    *
@@ -365,6 +378,9 @@ export function canonicalConstraint(k: Constraint): string {
         : `c:${k.line.id}`;
     return `tangent-line|${k.centre}|${line}`;
   }
+  // The equation fields are SPELLING (#1429) — apply strips them, but a raw constraint compared
+  // before that must not read as a different statement than its applied twin.
+  if (k.t === 'on-curve') return `on-curve|${k.id}|${k.curve}`;
   if (k.t === 'angle') return JSON.stringify({ ...k, at: ray(k.at) });
   if (k.t === 'angle-ratio') return JSON.stringify({ ...k, left: ray(k.left), right: ray(k.right) });
   return JSON.stringify(k);

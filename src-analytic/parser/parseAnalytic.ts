@@ -948,8 +948,15 @@ function ordinalOf(line: string): 0 | 1 | null {
   if (en) return en[1].toLowerCase() === 'first' ? 0 : 1;
   return null;
 }
+/**
+ * THE CONNECTIVE ADMITS THE CLITIC «ו» AS IT IS WRITTEN (#1429). The old form demanded whitespace
+ * on both sides (`\s+ו-?\s+`), so «ו-l2» and «והישר l2» — the two commonest spellings — never
+ * matched and the whole sentence fell to `not-handled`. The lookahead keeps «ונקודה…» prose out:
+ * the clitic joins an operand only when an operand follows it.
+ */
+const INTERSECT_JOIN = '(?:\\s+עם\\s+|\\s+ו\\s+|\\s+ו-\\s*|\\s+ו(?=ה|ל|צ|מ|פ|א))';
 const INTERSECT_HE = new RegExp(
-  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה?נקודת|ה?נקודות)?\\s*ה?חיתוך\\s*${NTH_HE}\\s*(?:של\\s+)?(.+?)\\s+(?:עם|ו-?)\\s+(.+)$`
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה?נקודת|ה?נקודות)?\\s*ה?חיתוך\\s*${NTH_HE}\\s*(?:של\\s+)?(.+?)${INTERSECT_JOIN}(.+)$`
 );
 const INTERSECT_EN = new RegExp(
   `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+(?:first\\s+|second\\s+|other\\s+)?intersection\\s+(?:point\\s+)?of\\s+(.+?)\\s+(?:and|with)\\s+(.+)$`
@@ -966,7 +973,14 @@ const INTERSECT_EN = new RegExp(
 /** The nouns that mean the DRAWN piece rather than the infinite line (#1168, ADR-AG-111’s pair). */
 const BOUNDED_NOUN = /^(?:ה?צלע|ה?קטע|ה?בסיס|(?:the\s+)?(?:side|segment|base))\s/i;
 
-function incidenceOn(operand: string, id: Id): Constraint | null {
+/** A CONTEXTUAL operand — «המעגל», «הפרבולה» with no name: which curve is M1's question (#1429). */
+type KindOperand = { t: 'kind'; kind: 'circle' | 'parabola' | 'ellipse' };
+
+/** «המעגל 1» and «המעגל I» are one circle (#1429): the digit maps onto the Roman id the mint uses. */
+const ROMAN_OF_DIGIT: Record<string, string> = { '1': 'I', '2': 'II', '3': 'III', '4': 'IV', '5': 'V' };
+const asRoman = (n: string) => ROMAN_OF_DIGIT[n] ?? n;
+
+function incidenceOn(operand: string, id: Id): Constraint | KindOperand | null {
   const axis = AXIS_HE.exec(trim(operand)) ?? AXIS_EN.exec(trim(operand));
   if (axis) {
     return axis[1].toLowerCase() === 'x'
@@ -974,13 +988,25 @@ function incidenceOn(operand: string, id: Id): Constraint | null {
       : { t: 'on-line', id, a: 1, b: 0, c: 0 };
   }
   /**
+   * A CONTEXTUAL kind noun (#1429) — «עם המעגל» in a crossing. `ON_KIND` could read the whole
+   * sentence «P על המעגל» and nothing could read the same reference as an OPERAND, which is the
+   * three-resolvers defect this issue names. Answered here as a marker the caller lowers to the
+   * fold-resolved fact, so the crossing and the point-on sentence share one M1 resolution.
+   */
+  const kindWord = /^ה(מעגל|פרבולה|אליפסה)$/.exec(trim(operand)) ?? /^(?:the\s+)?(circle|parabola|ellipse)$/i.exec(trim(operand));
+  if (kindWord) {
+    const kind = KIND_NOUNS[kindWord[1].toLowerCase()];
+    if (kind && kind !== 'line') return { t: 'kind', kind: kind as KindOperand['kind'] };
+  }
+  /**
    * A CIRCLE by its numeral — «המעגל I». `direction()` resolves lines and axes, because that is all a
    * RELATION can be about; an incidence can be about any curve, so the naming forms `matchCurve`
    * mints are mapped here to the same ids it mints. Same id, or the two rules would build two objects
    * for one circle (the ADR-AG-023 defect).
    */
-  const circle = /^ה?מעגל\s+(I|II|III|IV|V)$/.exec(trim(operand)) ?? /^(?:the\s+)?circle\s+(I|II|III|IV|V)$/i.exec(trim(operand));
-  if (circle) return { t: 'on-curve', id, curve: `circle-${circle[1]}` };
+  const circle =
+    /^ה?מעגל\s+(I|II|III|IV|V|[1-5])$/.exec(trim(operand)) ?? /^(?:the\s+)?circle\s+(I|II|III|IV|V|[1-5])$/i.exec(trim(operand));
+  if (circle) return { t: 'on-curve', id, curve: `circle-${asRoman(circle[1])}` };
 
   const dir = direction(trim(operand));
   if (dir?.k === 'curve') return { t: 'on-curve', id, curve: dir.id };
@@ -1023,13 +1049,22 @@ function incidenceOn(operand: string, id: Id): Constraint | null {
   if (bare.includes('=')) {
     const eq = equationExpr(bare);
     if (eq && symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
-      return { t: 'on-curve', id, curve: `curve-${anonIndex(bare)}` };
+      /**
+       * The equation RIDES the constraint (#1429): the apply boundary resolves it to an EXISTING
+       * curve with the same equation (a named circle referenced by its equation is THAT circle,
+       * ADR-AG-023/#1342), and mints the curve `stated: false` when the figure has none — so this
+       * operand never again refuses `unknown-reference` with a `curve-anon…` id the student never
+       * wrote (#1145's class).
+       */
+      return { t: 'on-curve', id, curve: `curve-${anonIndex(bare)}`, eqSrc: bare, eq };
     }
   }
   return null;
 }
 
 function parseIntersection(line: string): RuleOutcome {
+  const spelled = intersectionSpellings(line);
+  if (spelled) return spelled;
   const m = INTERSECT_HE.exec(line) ?? INTERSECT_EN.exec(line);
   if (!m) return null;
   const [, id, leftSrc, rightSrc] = m;
@@ -1037,12 +1072,31 @@ function parseIntersection(line: string): RuleOutcome {
   // #1286 (ADR-AG-135): a crossing's incidences are marked as such — the drawn extent bounds the
   // SOLUTION set for a crossing only (the operator's T11 ruling and ruling (a) were about this
   // sentence); a cevian's foot or a point «על הישר» keeps the line reading its own ruling gave it.
-  const asCrossing = (k: ReturnType<typeof incidenceOn>) => (k && k.t === 'on-line-2pt' ? { ...k, crossing: true as const } : k);
+  const asCrossing = (k: Constraint | KindOperand | null) =>
+    k && k.t === 'on-line-2pt' ? { ...k, crossing: true as const } : k;
   const left = asCrossing(incidenceOn(leftSrc, id));
   const right = asCrossing(incidenceOn(rightSrc, id));
   // The verb was understood and an operand was not — #1052’s refusal, which names the formats that
   // do work rather than calling the whole sentence unintelligible.
   if (!left || !right) return refuse('bad-operand', line);
+  /**
+   * A CONTEXTUAL operand — «עם המעגל» (#1429) — lowers to the fold-resolved `on-kind` fact, the
+   * SAME resolution «P על המעגל» has always had, so the crossing and the point-on sentence cannot
+   * disagree about which circle «המעגל» means. An ORDINAL over an unresolved operand is refused:
+   * the sentence names a root order this rule cannot see yet, and guessing one would name the
+   * wrong crossing silently.
+   */
+  if (left.t === 'kind' || right.t === 'kind') {
+    if (ordinalOf(line) !== null) return refuse('bad-operand', line);
+    const side = (k: Constraint | KindOperand): Fact =>
+      k.t === 'kind' ? { t: 'on-kind', id, kind: k.kind, src: line } : { t: 'constraint', k, src: line };
+    return made([
+      { t: 'declare', id, src: line },
+      side(left),
+      side(right),
+      { t: 'selector', sel: { kind: 'crossing-distinct', id }, src: line },
+    ]);
+  }
   /**
    * THE CROSSING THE STUDENT NAMED IS A POINT THEY ALREADY HAVE (#1175).
    *
@@ -1101,6 +1155,64 @@ function parseIntersection(line: string): RuleOutcome {
       : { t: 'selector', sel: { kind: 'crossing-nth', id, nth: ordinal, pair: [left, right] }, src: line },
   ]);
 }
+/**
+ * THE CROSSING'S OTHER SPELLINGS (#1429) — each normalised to the canonical «E נקודת החיתוך של X
+ * עם Y» and re-parsed (`viaCanonical`, the #1495 seam), so one rule owns the semantics:
+ *
+ * - the DISTRIBUTIVE plural: «E נקודת החיתוך של הישרים l1 ו-l2» reads as «…של הישר l1 עם הישר l2»;
+ * - the BARE plural: «E נקודת החיתוך של הישרים» — which two lines is M1's question (`crossing-kind`);
+ * - the VERB forms: «הישרים l1 ו-l2 נחתכים בנקודה E», «הישר l1 חותך את הישר l2 בנקודה E» — the
+ *   subject-order normalisation #1281/#1239 established.
+ *
+ * «…בנקודות A ו-B» (both crossings in one sentence) is NOT here: the plan's own open question —
+ * whether A,B take the canonical root order or a cycling choice — is the operator's (#1512).
+ */
+function intersectionSpellings(line: string): RuleOutcome {
+  const ordWord = (s: string | undefined) => (s ? ` ${s.replace(/^ה?/, 'ה')}` : '');
+  const HEAD = `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה?נקודת|ה?נקודות)?\\s*ה?חיתוך\\s*(ה?ראשונה|ה?שניי?ה|ה?אחרת)?\\s*`;
+  const dist =
+    new RegExp(`${HEAD}(?:של\\s+)?ה?ישרים\\s+(\\S+)\\s+ו-?\\s*(\\S+)$`).exec(line) ??
+    new RegExp(`^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+()intersection\\s+of\\s+(?:the\\s+)?lines\\s+(\\S+)\\s+and\\s+(\\S+)$`, 'i').exec(line);
+  if (dist) {
+    const [, id, ord, a, b] = dist;
+    return viaCanonical(line, null, () => [`${id} נקודת החיתוך${ordWord(ord)} של הישר ${a} עם הישר ${b}`]);
+  }
+  const bare = new RegExp(`${HEAD}(?:של\\s+)?ה?ישרים$`).exec(line) ??
+    new RegExp(`^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+()intersection\\s+of\\s+the\\s+lines$`, 'i').exec(line);
+  if (bare) {
+    // WHICH two lines is a question about the figure — M1 answers it (exactly two, else refuse),
+    // exactly as «המעגל» resolves for the one circle.
+    if (bare[2]) return refuse('bad-operand', line); // an ordinal over unresolved lines names nothing
+    return made([
+      { t: 'declare', id: bare[1], src: line },
+      { t: 'crossing-kind', id: bare[1], kind: 'line', src: line },
+      { t: 'selector', sel: { kind: 'crossing-distinct', id: bare[1] }, src: line },
+    ]);
+  }
+  const meet =
+    new RegExp(`^(.+?)${INTERSECT_JOIN}(.+?)\\s+נחתכ(?:ים|ות)\\s+ב?נקודה\\s+(${NAME})$`).exec(line) ??
+    new RegExp(`^(.+?)\\s+and\\s+(.+?)\\s+intersect\\s+at\\s+(?:point\\s+)?(${NAME})$`, 'i').exec(line);
+  if (meet) {
+    const [, a, b, id] = meet;
+    return viaCanonical(line, null, () => [`${id} נקודת החיתוך של ${withLineNoun(a)} עם ${withLineNoun(b)}`]);
+  }
+  const cuts =
+    new RegExp(`^(.+?)\\s+חות(?:ך|כת|כים|כות)\\s+את\\s+(.+?)\\s+ב?נקודה\\s+(${NAME})$`).exec(line) ??
+    new RegExp(`^(.+?)\\s+(?:cuts|intersects)\\s+(.+?)\\s+at\\s+(?:point\\s+)?(${NAME})$`, 'i').exec(line);
+  if (cuts) {
+    const [, a, b, id] = cuts;
+    return viaCanonical(line, null, () => [`${id} נקודת החיתוך של ${withLineNoun(a)} עם ${withLineNoun(b)}`]);
+  }
+  return null;
+}
+
+/** A bare token («l1», «AB») gets its noun back for the canonical spelling; a PLURAL noun that
+ *  distributed over the pair («הישרים l1») is normalised to its singular; a full phrase passes. */
+function withLineNoun(s: string): string {
+  const t = trim(s).replace(/^ה?ישרים\s+/, 'הישר ');
+  return /^[ℓl][0-9]?$/.test(t) || /^[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?$/.test(t) ? `הישר ${t}` : t;
+}
+
 function parseDerived(line: string): RuleOutcome {
   const crossing = parseIntersection(line);
   if (crossing) return crossing;
@@ -2600,24 +2712,39 @@ function parseConstraint(raw: string): RuleOutcome {
     const [, id, noun, operandRaw] = on;
     const operand = trim(operandRaw);
     const bounded = /צלע|קטע|side|segment/i.test(noun ?? '');
-    const dir = direction(`${noun ?? ''} ${operand}`.trim()) ?? direction(operand);
-
-    if (dir?.k === 'points') {
-      const facts: Fact[] = [
-        { t: 'declare', id, src: line },
-        { t: 'constraint', k: { t: 'on-line-2pt', id, a: dir.a, b: dir.b }, src: line },
-      ];
-      // The bound, and ONLY when the noun carried one — the operator's ruling.
-      if (bounded) {
-        facts.push({ t: 'selector', sel: { kind: 'between', id, a: dir.a, b: dir.b }, src: line });
-      }
-      return made(facts);
-    }
-
-    if (dir?.k === 'curve') {
+    /**
+     * ONE OPERAND RESOLVER (#1429). This handler, the crossing operand and «P על המעגל» each
+     * hand-rolled "which curve does this name" and each knew a different subset — «P על המעגל I»
+     * was `not-handled` while the same operand in a crossing resolved. `incidenceOn` is now the
+     * one answer; what stays here is what genuinely differs BY SENTENCE: a bounded noun in a
+     * point-on sentence is a `between` SELECTOR (the #1069/#1168 ruling), not the crossing's
+     * hard extent, so the flag is lifted off the constraint and re-expressed as the selector.
+     */
+    const k = incidenceOn(`${noun ?? ''} ${operand}`.trim(), id) ?? incidenceOn(operand, id);
+    if (k && k.t === 'kind') {
       return made([
         { t: 'declare', id, src: line },
-        { t: 'constraint', k: { t: 'on-curve', id, curve: dir.id }, src: line },
+        { t: 'on-kind', id, kind: k.kind, src: line },
+      ]);
+    }
+    // A bare AXIS operand keeps belonging to the ON_AXIS rule below, which also reads the
+    // positive/negative-part clause — one owner for that whole sentence family.
+    if (k && k.t !== 'on-line') {
+      if (k.t === 'on-line-2pt') {
+        const { bounded: _basin, ...rest } = k;
+        const facts: Fact[] = [
+          { t: 'declare', id, src: line },
+          { t: 'constraint', k: rest, src: line },
+        ];
+        // The bound, and ONLY when the noun carried one — the operator's ruling.
+        if (bounded) {
+          facts.push({ t: 'selector', sel: { kind: 'between', id, a: rest.a, b: rest.b }, src: line });
+        }
+        return made(facts);
+      }
+      return made([
+        { t: 'declare', id, src: line },
+        { t: 'constraint', k, src: line },
       ]);
     }
 
@@ -2631,27 +2758,8 @@ function parseConstraint(raw: string): RuleOutcome {
      * The same plane-variables test the bare-equation branch uses, for the same reason: without it
      * «P is on the line to nowhere» would mint a curve out of prose (#1068).
      */
-    const eq = operand.includes('=') ? equationExpr(operand) : null;
-    if (eq && symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
-      const cid = `curve-${anonIndex(operand)}`;
-      return made([
-        /**
-         * NOT stated (#1076): this line exists to put a point on a line, not to draw the line.
-         *
-         * It still carries `eqSrc` (#1149). An anonymous curve's identity IS its equation
-         * (ADR-AG-056), and this was the one mint that dropped the text the student had just
-         * written — so a line introduced as a carrier and later stated became a line nobody could
-         * name, offering no crossing ring where the same two lines stated outright offer one.
-         *
-         * No `kind` is asserted: the noun that reached this branch may be «ישר», but the fit is
-         * what classifies the curve, and claiming a kind we have not established would be a second
-         * source of truth for it.
-         */
-        { t: 'curve', id: cid, label: { name: '', eqSrc: operand }, curve: { eq }, stated: false, src: line },
-        { t: 'declare', id, src: line },
-        { t: 'constraint', k: { t: 'on-curve', id, curve: cid }, src: line },
-      ]);
-    }
+    // The inline-equation operand is `incidenceOn`'s eq branch now — one resolver (#1429); the
+    // apply boundary owns mint-or-match, so «B על הישר y=x» beside a stated l1: y=x is ON l1.
     // An AXIS operand belongs to the rule below, which already owns that sentence; anything else is
     // not a thing a point can be on. Fall through rather than returning — a `return null` here would
     // exit `parseConstraint` entirely and skip the area, cevian and axis rules that follow.
