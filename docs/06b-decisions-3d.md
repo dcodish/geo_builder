@@ -11024,3 +11024,24 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 **Measured.** 4 locks (`issue-1421-gauge.test.ts`): the operator's T35 figure sits A-at-origin / AB-along-+x / C-on-floor at every sampled seed with the stated lengths exact; the SHAPE (the angle at A) still varies; a coordinate injection and a cube are untouched. 3-D lane 285 files / 5302 green on first run.
 
 **Consequences.** `engine/evaluate.ts` (the normalisation block). Lock: `issue-1421-gauge.test.ts`.
+
+## ADR-3D-278 — A plane named as a face or base draws as that face by default (#1485)
+
+**Status:** accepted · 2026-09-28 · operator ruling 2026-09-27 (option A, «1485 - i agree») · round #1517. Amends ADR-3D-077's default («absent means full»). Numbered 278 beside the round's parallel branches (273–277).
+
+**Requirements:** docs/02b FR-RD-13 (new) · **Design:** docs/04b — the plane-display default is derived (`defaultPlaneDisplay3`), not stored
+
+**Context.** «הזווית בין הפאה SBC לבסיס ABC היא 60» drew SBC and ABC as full plane patches. The operator: «when we say פאה and בסיס and give letters, only the area of those letters should be colored». The parser read «הפאה/הבסיס» as operand nouns (#524) but collapsed them to `'plane'`, so «הפאה SBC» and «המישור SBC» produced identical commands. Every materialised plane then took ADR-3D-077's `'full'` default. ADR-3D-197 («a relation never owns a plane») left the student only the data-panel toggle.
+
+**Decision.** The noun sets the default; ownership is unchanged (ADR-3D-197 stands).
+- `readOperand` marks a point-run operand introduced by a face/base noun (He פאה/פאות/בסיס, En face/base) with `face: true`.
+- `materializePlaneRun` records the name in `Construction3.faceNamed` **only where it creates the plane**, so the first mention decides: «מישור SBC» and then «הפאה SBC» stays full, and the reverse order stays a face.
+- `defaultPlaneDisplay3(c, name)` is the one reader of that set. `buildScene3`, the store's `togglePlaneDisplay` and both panel labels resolve `planeDisplay[name] ?? default`. The cycle keeps its order (full → face → hidden) and starts from the plane's default; it deletes the key when it returns to that default. "Absent = the default" stays the single convention, and an explicit `'full'` on a face-default plane is an ordinary stored value.
+
+- **The noun is display, never identity.** The flag rides the operand, so everything that compares operands or statements by their JSON reads it through one rule: `operandKey` / `meaningKey` (operands.ts) drop `face: true` (another command's `face` id list is kept). They are used by the scene and knee-lane pair keys, the arc dedupe, the pin/claim dedupe (`dedupDeep`) and the store's already-stated check. So «המישור SBC…» after «הפאה SBC…» is still already stated, and one relation named both ways is one pair. `sameOperand` already compared ids only. #524's lock («הפאה SBC … is the same statement») asserted deep-equal commands; it now asserts the same meaning (`meaningKey`) plus the carried flag, the intent it always had.
+
+**Rejected.** (B) Plane chips on the relation row. This reverses ADR-3D-197 and reopens plane ownership; the operator chose (A).
+
+**Measured.** On main `d3f08a4c`, the reported sequence drew SBC and ABC with 4-corner patches. On the fix they draw 3-corner faces; the «המישור» spelling still draws 4.
+
+**Consequences.** `src3d/parser/operandToken.ts` (the flag), `src3d/engine/types.ts` (operand field, `faceNamed`, `defaultPlaneDisplay3`), `src3d/engine/apply.ts` (clone + record at creation), `src3d/render/scene3.ts`, `src3d/store/store3.ts` (the cycle), `src3d/App3.tsx` (labels). Save files are unchanged because the default re-derives from the facts. The #1476 construction legs never read the display mode. Lock: `issue-1485-face-default.test.ts` (his sentence → faces; «המישור» → full; the English nouns; first mention decides; the toggle cycle, save/load and undo). The #1394 submit-parity golden is re-recorded for exactly one sequence, «פירמידה SABCD שבסיסה ריבוע · הזווית בין הפאה SBC לבסיס ABCD היא 60», whose two operands now carry `face: true` (the recorded commands; no error or notice changed), and gains one key the corpus harvests from this lock's own id array.

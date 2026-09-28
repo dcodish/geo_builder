@@ -28,6 +28,7 @@ import registry from '../products.json';
 import { dataView, panelIsEmpty } from './engine/dataView';
 import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
+import { defaultPlaneDisplay3 } from './engine/types';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
 import { bidiSegments3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
@@ -320,6 +321,8 @@ export default function App3() {
   const canvasHost = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ w: 640, h: 460 });
   const derived = useMemo(() => derive3(facts, seed), [facts, seed]);
+  /** #1485: the label names the NEXT mode in the cycle, starting from the plane's own default. */
+  const planeMode = (name: string) => planeDisplay[name] ?? defaultPlaneDisplay3(derived.construction, name);
   const dof = useMemo(() => freeDofCount3(derived.construction, derived.resolved), [derived]);
   const notices = derived.notices; // #305 (ADR-3D-090): non-error "here is what changed" messages
   // #842 (ADR-3D-192): which row owns each plane's display chip — derived from the fact list, so a
@@ -1089,7 +1092,7 @@ export default function App3() {
                       onClick={() => togglePlaneDisplay(name)}
                       className="shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] leading-4 text-slate-500 hover:border-blue-400 hover:text-blue-700"
                     >
-                      {(planeDisplay[name] ?? 'full') === 'full' ? t('facts.planeFace') : (planeDisplay[name] === 'face' ? t('facts.planeHide') : t('facts.planeFull'))}
+                      {planeMode(name) === 'full' ? t('facts.planeFace') : (planeMode(name) === 'face' ? t('facts.planeHide') : t('facts.planeFull'))}
                     </button>
                   ))}
                 </>
@@ -1253,9 +1256,9 @@ export default function App3() {
                           onClick={() => togglePlaneDisplay(name)}
                           className="shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] leading-4 text-slate-500 hover:border-blue-400 hover:text-blue-700"
                         >
-                          {(planeDisplay[name] ?? 'full') === 'full'
+                          {planeMode(name) === 'full'
                             ? t('facts.planeFace')
-                            : planeDisplay[name] === 'face'
+                            : planeMode(name) === 'face'
                               ? t('facts.planeHide')
                               : t('facts.planeFull')}
                         </button>

@@ -4,7 +4,7 @@
  */
 
 import { exprPointIds, exprVectorNames } from './vecExpr';
-import { isAbsolute, isPlanar, lineDirCarriesParam, planeNormalCarriesParam, planePinningRels, sameOperand } from './operands';
+import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, planeNormalCarriesParam, planePinningRels, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
@@ -160,6 +160,7 @@ function clone(c: Construction3): Construction3 {
     riderNames: [...c.riderNames],
     componentSigns: [...c.componentSigns],
     pointPlanes: new Map(c.pointPlanes),
+    faceNamed: new Set(c.faceNamed),
     pointLines: new Map(c.pointLines),
     relPlanes: new Map(c.relPlanes),
     revolutions: [...c.revolutions],
@@ -683,17 +684,21 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
  *  is the same idempotence for the constraints, at the one PUSH chokepoint (the apply wrapper). */
 const dedupDeep = <T>(arr: T[]): T[] => {
   const seen = new Set<string>();
-  return arr.filter((x) => { const k = JSON.stringify(x); return seen.has(k) ? false : (seen.add(k), true); });
+  return arr.filter((x) => { const k = meaningKey(x); return seen.has(k) ? false : (seen.add(k), true); });
 };
 
 /** #584 (ADR-3D-148, the #383/ADR-3D-109 rule made ONE rule): a statement that references an
  *  EXPLICIT point-run plane materialises it as a drawn plane — the patch then exists, grows, and
  *  carries the full/face/hidden display cycle like any stated «מישור XYZ». Idempotent; a same-named
  *  equation plane wins (never shadow a `planes` entry). Mutates `next` (call on a clone). */
-function materializePlaneRun(next: Construction3, ids: Id[]): void {
+function materializePlaneRun(next: Construction3, ids: Id[], face = false): void {
   if (ids.length < 3) return;
   const name = ids.join('');
-  if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...ids]);
+  if (!next.pointPlanes.has(name) && !next.planes.has(name)) {
+    next.pointPlanes.set(name, [...ids]);
+    // #1485: recorded only where the plane is CREATED — the first mention decides its default.
+    if (face) next.faceNamed.add(name);
+  }
 }
 
 /** The coefficient a ratio statement puts between its two pairs: a number, or the LETTER the student
@@ -1894,7 +1899,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (cmd.op.kind === 'segment') drawAtom(next, { kind: 'pair', from: cmd.op.a, to: cmd.op.b });
       // #383 (ADR-3D-109): a POINT-RUN operand is materialised as a drawn plane (the S3 rule,
       // plane-rel's exact block) — so the patch exists and grows to the line's crossing.
-      if (cmd.op.kind === 'plane-run') materializePlaneRun(next, cmd.op.ids);
+      if (cmd.op.kind === 'plane-run') materializePlaneRun(next, cmd.op.ids, cmd.op.face === true);
       // #523: a LABELLED angle NAMES the measure the question is about — «…היא α» states no value, so
       // it must not drive and must not be verified as a claim; it marks, and the panel derives its
       // degrees when the angle is seed-stable. Same semantics #319 gave the (segment × point-run)
@@ -1926,7 +1931,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // display toggle already enumerated mutual-rel runs — the toggle now has a patch behind it)
       for (const op of [cmd.a, cmd.b]) {
         if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
-        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids);
+        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids, op.face === true);
       }
 
       // (1) the REQUIREMENT — always. It carries `skew` entirely, and the open half (really meeting,
@@ -1954,7 +1959,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // exists to grow toward the other operand (#383 — a stated relation must leave a visible trace)
       for (const op of [cmd.a, cmd.b]) {
         if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
-        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids);
+        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids, op.face === true);
       }
       // #523: a LABELLED angle NAMES the measure rather than stating one — it marks, never drives or
       // verifies (the #319 semantics, now reachable from every operand pairing).
@@ -2012,7 +2017,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const next = clone(c);
       for (const op of [cmd.a, cmd.b]) {
         if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
-        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids);
+        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids, op.face === true);
       }
       // A distance carries UNITS, so it is meaningful against an absolute object too — but the
       // gauge×absolute DRIVE is the pivot's lane (#386); those instances stay claim-verified.
