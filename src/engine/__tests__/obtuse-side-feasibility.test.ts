@@ -13,8 +13,10 @@ import { obtuseSideImpossibility, obtuseSideImpossibilityError } from '../metric
 import { applyStep } from '../step';
 import { lower } from '../lower';
 import type { Command, Construction, Constraint, GeoObject } from '../types';
-import { factsOf } from '../../__tests__/scenario-pipeline';
-import { replay } from '@/replay/core';
+import { ctxOf, factsOf } from '../../__tests__/scenario-pipeline';
+import { dryRunOutcome, replay, seatRescue } from '@/replay/core';
+import { trialFacts } from '@/store/geoStore';
+import { parse } from '@/parser';
 
 const con = (arr: Constraint[]) => arr;
 const D = (a: string, b: string, value: number): Constraint => ({ type: 'distance', a, b, value });
@@ -134,5 +136,46 @@ describe('#1441 — the reported sequences through applyStep', () => {
   it('control: «משולש ישר זווית ABC · AB=5 · BC=4» builds green (nothing newly refused)', () => {
     const fig = replay(factsOf(['משולש ישר זווית ABC', 'AB=5', 'BC=4'] as never));
     expect(fig.lastError).toBeNull();
+  });
+});
+
+/**
+ * #1441 arm 3 (ADR-551 Am. 1) — THE SEAT YIELDS AT THE GATE. The pre-ladder proof turned the
+ * reviewer's figure from a 19 s PENDING into an instant error, and the submit gate then REFUSED a
+ * default-seat figure the designed ADR-445 rescue admits (caught by the round-#1510 pre-played
+ * sheet, case T11). The gate consults the SAME seat sweep as `findValidConfig` (one helper), so a
+ * seat-curable error commits — the post-commit autoResolve lands the reseat — while a pinned seat
+ * keeps its honest refusal.
+ */
+describe('#1441 arm 3 — the seat yields at the gate (ADR-551 Am. 1)', () => {
+  const cmdsOf = (facts: ReturnType<typeof factsOf>, line: string) => {
+    const p = parse(line, ctxOf(facts));
+    expect(p.ok, `«${line}» parses`).toBe(true);
+    return p.ok ? [...p.commands] : [];
+  };
+
+  it('default seat: «BC=4» is PRODUCED at the gate — never refused', () => {
+    const facts = factsOf(['משולש ישר זווית ABC', 'AB=3'] as never);
+    expect(dryRunOutcome(facts, cmdsOf(facts, 'BC=4'), 0).produced).toBe(true);
+  });
+
+  it('the shared sweep finds the reseat the autoResolve applies, stated lengths exact', () => {
+    const facts = factsOf(['משולש ישר זווית ABC', 'AB=3'] as never);
+    const all = trialFacts(facts, cmdsOf(facts, 'BC=4'));
+    const found = seatRescue(all, Date.now() + 10_000);
+    expect(found, 'a flipped seat admits the whole figure').not.toBeNull();
+    const fig = replay(found!.facts, found!.seed);
+    expect(fig.lastError).toBeNull();
+    const p = fig.positions;
+    const d = (a: string, b: string) => Math.hypot(p.get(a)!.x - p.get(b)!.x, p.get(a)!.y - p.get(b)!.y);
+    expect(d('A', 'B')).toBeCloseTo(3, 3);
+    expect(d('B', 'C')).toBeCloseTo(4, 3);
+  });
+
+  it('an EXPLICIT seat still refuses at the gate — the sweep never flips a stated 90°', () => {
+    const facts = factsOf(['משולש ABC', 'זווית C = 90', 'AB=3'] as never);
+    const out = dryRunOutcome(facts, cmdsOf(facts, 'BC=4'), 0);
+    expect(out.produced).toBe(false);
+    expect(!out.produced && out.reason).toBe('error');
   });
 });

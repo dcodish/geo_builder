@@ -2113,28 +2113,12 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     // ~5 s ordered here; the suite's Infinity budget masked exactly this, which is why the
     // production-budget lock in scenarios-props-budget.test.ts carries the figure). Cost when no
     // unpinned right-triangle exists: zero (the list is empty).
-    const pinnedRA = explicitRightAngleVerts(facts);
-    const rtFacts = facts
-      .map((f, i) => ({ f, i }))
-      .filter(({ f }) => f.enabled && f.cmd.type === 'right-triangle' && !f.cmd.ids.some((id) => pinnedRA.has(id)))
-      .slice(0, 2); // bound the combinatorics, like the branch tier
-    for (const { f, i } of rtFacts) {
-      const cur = (f.cmd as { rot?: 1 | 2 }).rot ?? 0;
-      for (const rot of ([1, 2, 0] as const).filter((r) => r !== cur)) {
-        const fc = facts.map((g, idx) => {
-          if (idx !== i) return g;
-          const { rot: _prev, ...rest } = g.cmd as Extract<typeof g.cmd, { type: 'right-triangle' }>;
-          return { ...g, cmd: rot === 0 ? rest : { ...rest, rot } } as Fact;
-        });
-        for (let s = 0; s < 6; s++) {
-          if (Date.now() > deadline) return null;
-          if (meetsRequirements(fc, s)) {
-            lastConfigTier = 'seat';
-            return { facts: fc, seed: s };
-          }
-        }
-      }
+    const seatFound = seatRescue(facts, deadline);
+    if (seatFound) {
+      lastConfigTier = 'seat';
+      return seatFound;
     }
+    if (Date.now() > deadline) return null;
     // Discrete REFLECTION alternatives (#441). The sweep above varies only the CONTINUOUS jitter — the
     // base seed — while the reflection mask lives in the seed's HIGH bits (`REFLECT_STRIDE`). So a
     // requirement that needs a MIRROR configuration is unreachable by that sweep however many seeds it
@@ -2360,6 +2344,36 @@ export function viewUsable(d: Derived): boolean {
  * through to the new-label check and then to the **LLM escalation**; a restatement the tool understood
  * perfectly must never reach the model. Routed straight to «כבר קיים» instead.
  */
+/**
+ * The SEAT sweep alone (#566/ADR-445's seat tier, extracted for #1441 arm 3): flip each UNPINNED
+ * right-triangle seat via the solve-chosen `rot` and accept the first rewritten fact list meeting
+ * every requirement at some low seed. ONE helper shared by `findValidConfig`'s seat tier and the
+ * submit gate's seat-curable test (`dryRunOutcome`), so the two can never disagree about which
+ * failures belong to the unstated seat. Zero cost when no unpinned right-triangle exists.
+ */
+export function seatRescue(facts: Fact[], deadline: number): { facts: Fact[]; seed: number } | null {
+  const pinnedRA = explicitRightAngleVerts(facts);
+  const rtFacts = facts
+    .map((f, i) => ({ f, i }))
+    .filter(({ f }) => f.enabled && f.cmd.type === 'right-triangle' && !f.cmd.ids.some((id) => pinnedRA.has(id)))
+    .slice(0, 2); // bound the combinatorics, like the branch tier
+  for (const { f, i } of rtFacts) {
+    const cur = (f.cmd as { rot?: 1 | 2 }).rot ?? 0;
+    for (const rot of ([1, 2, 0] as const).filter((r) => r !== cur)) {
+      const fc = facts.map((g, idx) => {
+        if (idx !== i) return g;
+        const { rot: _prev, ...rest } = g.cmd as Extract<typeof g.cmd, { type: 'right-triangle' }>;
+        return { ...g, cmd: rot === 0 ? rest : { ...rest, rot } } as Fact;
+      });
+      for (let s = 0; s < 6; s++) {
+        if (Date.now() > deadline) return null;
+        if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
+      }
+    }
+  }
+  return null;
+}
+
 export type StepOutcome = { produced: true } | { produced: false; reason: 'error' | 'empty' | 'implied'; detail?: string };
 
 /**
@@ -2445,7 +2459,19 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
   // #926: a `set-var` whose letter nothing binds YET is marked in the fold (a pending row with its reason,
   // never a silent ✓) but is still data the student may state first — it commits as data-only below.
   const errored = trial.find((f) => after.status[f.id] !== 'ok' && !(f.cmd.type === 'set-var' && after.pending));
-  if (errored) return { produced: false, reason: 'error', detail: after.status[errored.id] };
+  if (errored) {
+    // #1441 arm 3 (ADR-551 Am. 1): an error the unstated right-angle SEAT cures is not a refusal.
+    // The pre-ladder proof turned this figure's old seat-invariant PENDING classification into an
+    // instant error, and refusing here would pin a seat the student never stated (ADR-163/445/481:
+    // the seat yields). When flipping an unpinned seat admits the whole trial figure — the same
+    // sweep as `findValidConfig`'s seat tier, one shared helper — the step COMMITS at the current
+    // seed (the ADR-510 "accept the flash" transaction shape) and the post-commit `autoResolve`
+    // lands the reseat off-thread: the same rescue the old PENDING path always reached, minus the
+    // ~20 s ladder burn. An explicitly pinned seat leaves the sweep empty, so an honest refusal
+    // (the obtuse-side message naming both givens) stands unchanged.
+    if (seatRescue(all, Date.now() + 1500)) return { produced: true };
+    return { produced: false, reason: 'error', detail: after.status[errored.id] };
+  }
   // "Built something" = added a shape/constraint/label, OR RESHAPED the figure — a step like "diameter AB"
   // on a cyclic quad adds no new object (it converts a vertex to an antipode and re-places the others), so
   // a count-only check wrongly reads it as empty. A moved/added point at the SAME seed means it took effect.

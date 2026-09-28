@@ -1537,8 +1537,8 @@ export default function App() {
             )}
             {/* role="status" / aria-live (F6): a screen-reader student must HEAR that a step failed or
                 was partial — these appear after the submit completes, outside their focus. */}
-            {inputNote && <span role="status" aria-live="polite" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(inputNote)}>{inputNote}</span>}
-            {renameNote && <span role="status" aria-live="polite" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(renameNote)}>{renameNote}</span>}
+            {inputNote && <span role="status" aria-live="polite" data-refusal="gate" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(inputNote)}>{inputNote}</span>}
+            {renameNote && <span role="status" aria-live="polite" data-refusal="gate" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(renameNote)}>{renameNote}</span>}
             {llmDropped.length > 0 && (
               <span role="status" aria-live="polite" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(llmDropped[0])}>
                 {t('input.partial')}: {llmDropped.join('; ')}
