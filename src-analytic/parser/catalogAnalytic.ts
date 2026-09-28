@@ -264,6 +264,16 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'the line l1 is tangent to the circle M',
     needs: ['נתון הישר l1: y=2x+5', 'נתון מעגל M'],
   },
+  // Circle-to-circle tangency (#1504) — the operator's T9 report; external/internal cycles, and
+  // «מבחוץ»/«מבפנים» pin the touch. Not featured: the six featured seats are #1347's pedagogy call.
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'מעגל M משיק למעגל K',
+    en: 'circle M is tangent to circle K',
+    needs: ['נתון מעגל K'],
+  },
+  { category: 'circles', family: 'F5', he: 'המעגלים משיקים מבחוץ', en: 'the circles are tangent externally', needs: ['נתון מעגל K', 'נתון מעגל M'] },
 
   // --- F6 · conics by equation (canonical only — D6/§2a) ---
   { category: 'conics', family: 'F6', he: 'נתונה פרבולה קנונית שמשוואתה y^2=54x', en: 'canonical parabola y^2=54x' },

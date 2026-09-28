@@ -951,6 +951,16 @@ of the line the circle sits on is not asserted, because the student did not say.
 Tangency to a line the figure does not hold is refused naming the line; tangency about a circle known only by
 its equation, and circle-to-circle tangency, are refused by name — never dropped, never guessed.
 
+**R121 — two circles can be stated tangent, and which touch is a configuration until the student says**
+([ADR-AG-167](06c-decisions-analytic.md#adr-ag-167), [#1504](https://github.com/dcodish/geo_builder/issues/1504);
+the circle member of R120's family). «מעגל M משיק למעגל K», the contextual «המעגל משיק למעגל K», the flipped
+«המעגל I משיק למעגל M», the plural «המעגלים משיקים (זה לזה)», and the mixed list («משיק לציר ה-x ולמעגל K»)
+all state one equation: the distance between the centres is the radii's sum (touching outside) or the radii's
+absolute difference (touching inside). Which touch is an UNSTATED configuration — «הציגו תצורה אחרת» cycles
+between them — until «מבחוץ»/«מבפנים» (externally/internally) pins it. Both circles must carry a centre and a
+radius to pull on; tangency about an equation circle or a computed circle is refused by name, an unknown circle
+by its name, and a circle is never tangent to itself.
+
 **R114 — the tool never accepts a sentence a textbook would not print; it teaches the one it would**
 ([ADR-AG-150](06c-decisions-analytic.md#adr-ag-150),
 [#1353](https://github.com/dcodish/geo_builder/issues/1353), implementing

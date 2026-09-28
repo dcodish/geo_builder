@@ -267,6 +267,17 @@ export type Fact =
    */
   | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: TangentLineRef[]; circle?: string })
   /**
+   * Two CIRCLES touch — «מעגל M משיק למעגל K», «המעגלים משיקים» (#1504).
+   *
+   * `a`/`b` are the circles as the sentence NAMED them (a centre letter, a numeral, the
+   * student's own name) — which circle each name means is a question about the construction,
+   * so M1 resolves both through the `tangent-of` lookup chain; an absent name is the
+   * contextual reading (with one name: "the one other circle"; with none: "the exactly two").
+   * `branch` is present only when the student said which touch («מבחוץ»/«מבפנים») — absent,
+   * the apply boundary lowers to a `choice` over both (#1049, ADR-052).
+   */
+  | (FactBase & { t: 'tangent-circles'; a?: string; b?: string; branch?: 'external' | 'internal' })
+  /**
    * «הנקודה A נמצאת על האליפסה» — a point on a curve named only by its KIND (#1057).
    *
    * F2 corpus vocabulary (docs/19 §4a), and the fourth contextual reference: which curve it

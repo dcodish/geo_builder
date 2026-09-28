@@ -1324,8 +1324,15 @@ const LINE_TANGENT_EN = new RegExp(
 interface TangentTargets {
   axes: Array<'x' | 'y'>;
   lines: TangentLineRef[];
+  /** CIRCLE targets (#1504) — the other circle by the name the sentence used (letter or
+   *  numeral; a numeral names an equation circle, which the apply boundary refuses by name),
+   *  with the touch branch when the student said it («מבחוץ»/«מבפנים»). */
+  circles: Array<{ name: string; branch?: 'external' | 'internal' }>;
   facts: Fact[];
 }
+
+/** A branch word riding a circle piece or a plural-subject sentence — which touch it is. */
+const TANGENT_BRANCH = { מבחוץ: 'external', externally: 'external', מבפנים: 'internal', internally: 'internal' } as const;
 
 /**
  * The TARGETS of a tangency phrase — the one resolution for every order and every sentence shape.
@@ -1336,12 +1343,13 @@ interface TangentTargets {
  * an inline EQUATION («ישר 3x+4y=0», «ישר שמשוואתו y=2x») — which mints the curve exactly as
  * «A על הישר y=2x» does, `stated: false`, under the content id that keeps restating idempotent.
  *
- * A piece this grammar cannot read declines the WHOLE sentence (`null`) — «משיק למעגל K» is
- * circle-to-circle tangency, a different capability, and guessing half a target list would build
- * half the student's given.
+ * A CIRCLE piece — «מעגל K», «המעגל I», "circle K", optionally with its touch branch
+ * («מבחוץ»/«מבפנים») — is circle-to-circle tangency (#1504); it rides `circles` and resolves at
+ * the apply boundary. A piece this grammar cannot read still declines the WHOLE sentence
+ * (`null`) — guessing half a target list would build half the student's given.
  */
 function tangentTargets(tail: string, src: string): TangentTargets | null {
-  const out: TangentTargets = { axes: [], lines: [], facts: [] };
+  const out: TangentTargets = { axes: [], lines: [], circles: [], facts: [] };
   const pieces = trim(tail)
     .split(/\s*,\s*|\s+ו-?(?=\S)|\s+and\s+/i)
     .map(trim)
@@ -1357,6 +1365,17 @@ function tangentTargets(tail: string, src: string): TangentTargets | null {
     const axis = /^ה?ציר\s+ה?-?\s*([xy])$/.exec(piece) ?? /^(?:the\s+)?([xy])[- ]axis$/i.exec(piece);
     if (axis) {
       out.axes.push(axis[1].toLowerCase() as 'x' | 'y');
+      continue;
+    }
+    // A CIRCLE piece (#1504) — read before the line nouns, because it carries its own noun. The
+    // name may be a letter or a numeral (a numeral names an equation circle, refused by name at
+    // the apply boundary — the ADR-AG-165 discipline, unchanged).
+    const circ =
+      new RegExp(`^ה?מעגל\\s+(${NAME}|${CIRCLE_NUMERALS})(?:\\s+(מבחוץ|מבפנים))?$`).exec(piece) ??
+      new RegExp(`^(?:the\\s+)?circle\\s+(${NAME}|${CIRCLE_NUMERALS})(?:\\s+(externally|internally))?$`, 'i').exec(piece);
+    if (circ) {
+      const word = circ[2]?.toLowerCase() as keyof typeof TANGENT_BRANCH | undefined;
+      out.circles.push({ name: circ[1], ...(word ? { branch: TANGENT_BRANCH[word] } : {}) });
       continue;
     }
     // WHICH noun the piece used, read BEFORE the strip discards it (#1503): «צלע»/«קטע»/«בסיס»
@@ -1416,10 +1435,19 @@ function circleAtFacts(centre: Id, targets: TangentTargets, line: string): Fact[
       k: { t: 'tangent-line' as const, centre, r, line: ref },
       src: line,
     })),
+    // A circle target names the OTHER circle (#1504) — which circle the name means is M1's
+    // question, so the fact carries the names and the apply boundary resolves both.
+    ...targets.circles.map((t) => ({
+      t: 'tangent-circles' as const,
+      a: centre,
+      b: t.name,
+      ...(t.branch ? { branch: t.branch } : {}),
+      src: line,
+    })),
   ];
 }
 
-const NO_TARGETS: TangentTargets = { axes: [], lines: [], facts: [] };
+const NO_TARGETS: TangentTargets = { axes: [], lines: [], circles: [], facts: [] };
 
 function parseCircleAt(line: string): RuleOutcome {
   const named = CIRCLE_AT_HE.exec(line) ?? CIRCLE_AT_EN.exec(line);
@@ -1437,7 +1465,17 @@ function parseCircleAt(line: string): RuleOutcome {
     if (targets) {
       return made([
         ...targets.facts,
-        { t: 'tangent-of', axes: targets.axes, ...(targets.lines.length ? { lines: targets.lines } : {}), src: line },
+        // «המעגל משיק למעגל K» — the contextual subject rides `a: undefined`; M1 reads it as
+        // the one OTHER circle (#1504). `tangent-of` is emitted only when it has work.
+        ...targets.circles.map((t) => ({
+          t: 'tangent-circles' as const,
+          b: t.name,
+          ...(t.branch ? { branch: t.branch } : {}),
+          src: line,
+        })),
+        ...(targets.axes.length + targets.lines.length > 0 || targets.circles.length === 0
+          ? [{ t: 'tangent-of' as const, axes: targets.axes, ...(targets.lines.length ? { lines: targets.lines } : {}), src: line }]
+          : []),
       ]);
     }
   }
@@ -1447,15 +1485,36 @@ function parseCircleAt(line: string): RuleOutcome {
     if (targets) {
       return made([
         ...targets.facts,
-        {
-          t: 'tangent-of',
-          axes: targets.axes,
-          ...(targets.lines.length ? { lines: targets.lines } : {}),
-          ...(flipped[2] ? { circle: flipped[2] } : {}),
+        // «המעגל I משיק למעגל M» — a circle SUBJECT before a named (or contextual) circle (#1504).
+        ...targets.circles.map((t) => ({
+          t: 'tangent-circles' as const,
+          a: t.name,
+          ...(flipped[2] ? { b: flipped[2] } : {}),
+          ...(t.branch ? { branch: t.branch } : {}),
           src: line,
-        },
+        })),
+        ...(targets.axes.length + targets.lines.length > 0 || targets.circles.length === 0
+          ? [
+              {
+                t: 'tangent-of' as const,
+                axes: targets.axes,
+                ...(targets.lines.length ? { lines: targets.lines } : {}),
+                ...(flipped[2] ? { circle: flipped[2] } : {}),
+                src: line,
+              },
+            ]
+          : []),
       ]);
     }
+  }
+  // The PLURAL subject — «המעגלים משיקים (זה לזה) (מבחוץ)», "the circles are tangent" (#1504):
+  // no name at all, so M1 resolves the exactly-two reading, and a branch word collapses the touch.
+  const both =
+    new RegExp(`^${HE_GIVEN}(?:שני\\s+)?ה?מעגלים\\s+${HE_TANGENT_VERB}(?:\\s+זה\\s+לזה)?(?:\\s+(מבחוץ|מבפנים))?$`).exec(line) ??
+    /^(?:the\s+)?(?:two\s+)?circles\s+are\s+tangent(?:\s+to\s+each\s+other)?(?:\s+(externally|internally))?$/i.exec(line);
+  if (both) {
+    const word = both[1]?.toLowerCase() as keyof typeof TANGENT_BRANCH | undefined;
+    return made([{ t: 'tangent-circles', ...(word ? { branch: TANGENT_BRANCH[word] } : {}), src: line }]);
   }
   return null;
 }

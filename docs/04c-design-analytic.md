@@ -923,7 +923,16 @@ AB» and «משיק לצלע AB» are different givens, and keeps the pair undir
 One target parser (`tangentTargets`) serves every sentence shape, so orders cannot drift — the
 ADR-AG-164 rule applied to tangency: the circle first («מעגל M משיק לישרים l1 ו-l2»), the
 contextual circle («המעגל משיק לישר l1»), the line first («הישר l1 משיק למעגל M», the plural
-subject), axes and lines mixed in one list. A target the grammar cannot read declines the whole
+subject), axes and lines mixed in one list.
+
+A CIRCLE piece (#1504, ADR-AG-167) makes the target list's third member: «מעגל M משיק למעגל K»
+lowers to `tangent-circles {a, b, branch?}` — the names as the sentence spelled them, resolved at
+the apply boundary through the `tangent-of`/`diameter-of` lookup chain, both required to be
+`circle-at` (an equation circle or `circle-thru` refuses `out-of-scope` by name). The constraint
+`tangent-circle {centre, r, other, otherR, branch}` is one row — |MK| − (r+R) or |MK| − |r−R| —
+and the sentence without «מבחוץ»/«מבפנים» lowers to `choice[external, internal]` (#1049), so the
+two touches cycle under «הציגו תצורה אחרת» and a branch word collapses the choice.
+`canonicalConstraint` keys the undirected pair plus the branch. A target the grammar cannot read declines the whole
 sentence to the escalation seam — «משיק למעגל K» (circle-to-circle) is a different capability.
 Honesty is held at the apply boundary: a named line that does not exist is `unknown-reference`
 (the ADR-AG-083 check, which `constraintCurveRefs` feeds), a minted equation that fits a circle is
