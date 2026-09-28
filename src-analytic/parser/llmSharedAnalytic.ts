@@ -63,9 +63,13 @@ export const PROMPT_EXAMPLES_ANALYTIC: PromptExampleAnalytic[] = [
   { freeform: 'find the area under the curve between x=1 and x=4', steps: [] },
 ];
 
-/** The catalog rendered as the model's vocabulary — English and Hebrew side by side, one per line. */
-const vocabOf = (entries: readonly CatalogEntryAnalytic[]): string =>
-  entries.map((c) => `- ${c.en}   |   ${c.he}`).join('\n');
+/** The catalog rendered as the model's vocabulary — one LOCALE's column when the session names one
+ *  (#1297: a bilingual list invited answers in either language, and the fact list taught English in
+ *  a Hebrew session), both side by side for an old caller. */
+const vocabOf = (entries: readonly CatalogEntryAnalytic[], locale?: 'he' | 'en'): string =>
+  entries
+    .map((c) => (locale === 'he' ? `- ${c.he}` : locale === 'en' ? `- ${c.en}` : `- ${c.en}   |   ${c.he}`))
+    .join('\n');
 
 /**
  * THIS PRODUCT'S HALF OF THE PROMPT (#1359) - data only.
@@ -117,6 +121,6 @@ export const PROMPT_SPEC_ANALYTIC = {
     '- If the request cannot be expressed with the supported forms, return an EMPTY list. An honest refusal',
     '  is better than an approximation.',
   ],
-  vocabulary: () => vocabOf(COMMAND_CATALOG_ANALYTIC),
+  vocabulary: (locale?: 'he' | 'en') => vocabOf(COMMAND_CATALOG_ANALYTIC, locale),
   examples: PROMPT_EXAMPLES_ANALYTIC,
 };

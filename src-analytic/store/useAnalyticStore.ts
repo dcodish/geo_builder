@@ -33,6 +33,10 @@ export interface SavedAnalyticSession {
   lines: string[];
   seed: number;
   name?: string;
+  /** Per line INDEX: the student's own sentence, where the line was built by the AI fallback
+   *  (#1297). The stored line stays the machine spelling — replay is pure over the lines — and
+   *  this is what the row DISPLAYS, so no model output is ever shown as the row. */
+  spokenFor?: Record<number, string>;
 }
 
 /**
@@ -131,6 +135,8 @@ export type InputError =
 interface AnalyticState {
   /** The student's lines, in order. The one source of truth. */
   lines: string[];
+  /** #1297 — see {@link SavedAnalyticSession.spokenFor}. Keys follow the lines' indices. */
+  spokenFor: Record<number, string>;
   /**
    * The figure's NAME (#1087) — what a save is called, and nothing else.
    *
@@ -199,7 +205,9 @@ interface AnalyticState {
    */
   serialize: () => SavedAnalyticSession;
   /** Replace the session with a loaded one. */
-  restore: (session: { lines: string[]; seed?: number; name?: string }) => void;
+  restore: (session: { lines: string[]; seed?: number; name?: string; spokenFor?: Record<number, string> }) => void;
+  /** Record the fallback's machine lines under the student's OWN sentence (#1297). */
+  recordLlmLines: (spoken: string, lines: string[]) => void;
   setNotice: (n: string | null) => void;
 }
 
@@ -207,6 +215,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   temporal(
     (set, get) => ({
   lines: [],
+  spokenFor: {},
   seed: 0,
   name: '',
   loadAudit: null,
@@ -216,13 +225,34 @@ export const useAnalyticStore = create<AnalyticState>()(
   queries: [],
 
   recordLine: (line) => set((s) => ({ lines: [...s.lines, line], error: null, notice: null })),
-  removeLine: (index) => set((s) => ({ lines: s.lines.filter((_, i) => i !== index), error: null, notice: null })),
+  recordLlmLines: (spoken, ls) =>
+    set((s) => {
+      const spokenFor = { ...s.spokenFor };
+      ls.forEach((_, k) => {
+        spokenFor[s.lines.length + k] = ls.length > 1 ? `${spoken} (${k + 1}/${ls.length})` : spoken;
+      });
+      return { lines: [...s.lines, ...ls], spokenFor, error: null, notice: null };
+    }),
+  removeLine: (index) =>
+    set((s) => {
+      const spokenFor: Record<number, string> = {};
+      for (const [k, v] of Object.entries(s.spokenFor)) {
+        const i = Number(k);
+        if (i < index) spokenFor[i] = v;
+        else if (i > index) spokenFor[i - 1] = v; // keys follow their lines when an earlier row goes
+      }
+      return { lines: s.lines.filter((_, i) => i !== index), spokenFor, error: null, notice: null };
+    }),
   replaceLine: (index, next) =>
-    set((s) => ({ lines: s.lines.map((l, i) => (i === index ? next : l)), error: null, notice: null })),
+    set((s) => {
+      // An EDITED row shows what the student typed into the editor — the annotation is stale.
+      const { [index]: _gone, ...spokenFor } = s.spokenFor;
+      return { lines: s.lines.map((l, i) => (i === index ? next : l)), spokenFor, error: null, notice: null };
+    }),
   clearAll: () =>
     // The QUERIES go with the lines (#1110): a reading of a figure that no longer exists is a lie,
     // and «נקה הכל» is the clearest case of the figure no longer existing.
-    set({ lines: [], error: null, notice: null, seed: 0, name: '', loadAudit: null, queries: [] }),
+    set({ lines: [], spokenFor: {}, error: null, notice: null, seed: 0, name: '', loadAudit: null, queries: [] }),
 
   /**
    * The three gestures, as store actions (ADR-AG-067's decisions, now over the stored record).
@@ -253,18 +283,19 @@ export const useAnalyticStore = create<AnalyticState>()(
   setLoadAudit: (loadAudit) => set({ loadAudit }),
 
   serialize: () => {
-    const { lines, seed, name } = get();
+    const { lines, seed, name, spokenFor } = get();
     return {
       app: ANALYTIC_APP,
       version: ANALYTIC_SAVE_VERSION,
       lines: [...lines],
       seed,
       ...(name.trim() ? { name: name.trim() } : {}),
+      ...(Object.keys(spokenFor).length ? { spokenFor: { ...spokenFor } } : {}),
     };
   },
 
-  restore: ({ lines, seed, name }) =>
-    set({ lines: [...lines], seed: seed ?? 0, name: name ?? '', error: null, notice: null }),
+  restore: ({ lines, seed, name, spokenFor }) =>
+    set({ lines: [...lines], spokenFor: spokenFor ?? {}, seed: seed ?? 0, name: name ?? '', error: null, notice: null }),
     }),
     {
       /**
