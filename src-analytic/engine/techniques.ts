@@ -189,3 +189,52 @@ export function tracePointLine(
     `${fmt(Math.abs(line.b))}·${co(p.y)} ${plus(line.c)}| / √(${co(line.a)}² + ${co(line.b)}²)`
   );
 }
+
+/**
+ * THE ANGLE AT A VERTEX, WITH ITS WORKING (#1409) — the operator's 2026-09-27 ruling, verbatim:
+ * *"if its an angle where m=tanx would work, use that, if not, use law of cosine"*.
+ *
+ * - **Slope method** whenever it works: both arms have a defined slope (neither vertical) and
+ *   1 + m₁m₂ ≠ 0 (not perpendicular). The formula yields the ACUTE angle between the lines; when
+ *   ∠XVY is obtuse the trace adds the «180° − α» step, so the working always ends on the answer.
+ * - **Law of cosines** otherwise (a vertical arm, or perpendicular arms): the three lengths, then
+ *   cos∠XVY = (a² + b² − c²)/(2ab).
+ *
+ * The value is the caller's (the same `angleAt` the residual constrains); only the WORKING is
+ * built here, per statement per row (#1221), substituted at the level the operator ruled (#1053).
+ * Null when a ray has no length — a zero-length arm has no angle and no honest working.
+ */
+export function traceAngle(v: TracePoint, a: TracePoint, b: TracePoint, deg: number, fmt: (n: number) => string): string | null {
+  const dx1 = a.x - v.x;
+  const dy1 = a.y - v.y;
+  const dx2 = b.x - v.x;
+  const dy2 = b.y - v.y;
+  if (Math.hypot(dx1, dy1) < 1e-12 || Math.hypot(dx2, dy2) < 1e-12) return null;
+  const name = `∠${a.id}${v.id}${b.id}`;
+  if (!isVertical(dx1, dy1) && !isVertical(dx2, dy2)) {
+    const m1 = dy1 / dx1;
+    const m2 = dy2 / dx2;
+    const denom = 1 + m1 * m2;
+    // #1276's rule: relative, never a raw epsilon on a magnitude-carrying number
+    if (Math.abs(denom) > 1e-9 * Math.max(1, Math.abs(m1 * m2))) {
+      const tanTheta = Math.abs((m1 - m2) / denom);
+      const acute = (Math.atan(tanTheta) * 180) / Math.PI;
+      const rows = [
+        `m(${v.id}${a.id}) = ${fmt(m1)}, m(${v.id}${b.id}) = ${fmt(m2)}`,
+        `tan α = |(m₁ - m₂)/(1 + m₁·m₂)| = |(${fmt(m1)} - (${fmt(m2)}))/(1 + ${fmt(m1)}·(${fmt(m2)}))| = ${fmt(tanTheta)}`,
+        `α = ${fmt(acute)}°`,
+      ];
+      if (deg > 90 + 1e-9) rows.push(`${name} קהה: ${name} = 180° - ${fmt(acute)}° = ${fmt(deg)}°`);
+      return rows.join('\n');
+    }
+  }
+  const aLen = Math.hypot(dx1, dy1);
+  const bLen = Math.hypot(dx2, dy2);
+  const cLen = Math.hypot(b.x - a.x, b.y - a.y);
+  const cosV = (aLen * aLen + bLen * bLen - cLen * cLen) / (2 * aLen * bLen);
+  return [
+    `|${v.id}${a.id}| = ${fmt(aLen)}, |${v.id}${b.id}| = ${fmt(bLen)}, |${a.id}${b.id}| = ${fmt(cLen)}`,
+    `cos ${name} = (|${v.id}${a.id}|² + |${v.id}${b.id}|² - |${a.id}${b.id}|²)/(2·|${v.id}${a.id}|·|${v.id}${b.id}|) = ${fmt(cosV)}`,
+    `${name} = ${fmt(deg)}°`,
+  ].join('\n');
+}

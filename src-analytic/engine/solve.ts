@@ -89,8 +89,9 @@ export type AngleName = AngleRef | { v: Id; a?: undefined; b?: undefined };
 /** Is this name already an angle (three points), needing no figure to resolve? */
 export const isAngleRef = (n: AngleName): n is AngleRef => n.a !== undefined && n.b !== undefined;
 
-/** The unsigned angle at `v` between the rays to `a` and `b`, in RADIANS — null when a ray has no length. */
-function angleAt(v: Pt, a: Pt, b: Pt): number | null {
+/** The unsigned angle at `v` between the rays to `a` and `b`, in RADIANS — null when a ray has no length.
+ *  EXPORTED for #1409: the ask lane answers with the SAME function the angle residual constrains. */
+export function angleAt(v: Pt, a: Pt, b: Pt): number | null {
   const ux = a.x - v.x;
   const uy = a.y - v.y;
   const wx = b.x - v.x;

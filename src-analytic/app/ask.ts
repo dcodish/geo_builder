@@ -27,9 +27,11 @@ import { locusOf } from '../engine/locus';
 
 import { curveByName, objectById, type Id } from '../engine/types';
 import { ANGLE_STEM_HE } from '../engine/shapes';
-import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
+import { traceAngle, traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { isVerticalLine } from '../engine/lines';
 import { asPair, lineNamed } from './lines';
+import { readAngleAsk } from '../parser/parseAnalytic';
+import { angleAt } from '../engine/solve';
 import { angleText, lineAngleOf } from './lineAngle';
 import { curveParts, locusEquation } from './curveText';
 
@@ -371,6 +373,36 @@ export function ask(
    * Before the equation rule, because «שיפוע הישר l1» and «משוואת הישר l1» are different
    * questions about the same object and only the leading noun separates them.
    */
+  /**
+   * --- an ANGLE by three letters (#1409): «זווית BMC», «∠BMC», «גודל הזווית ABC», "angle ABC" ---
+   *
+   * Sayable ⇒ askable (02c R23): #1331 made the three-letter angle a GIVEN through the parser's own
+   * atoms, and this arm reads the SAME atoms (`readAngleAsk`), so a spelling the given accepts is
+   * askable by construction. The value comes from the SAME `angleAt` the angle residual constrains
+   * (a round trip: «זווית ABC = 60» asked back prints 60°), through the same honesty gate as every
+   * value arm — an open figure answers open, never a sampled number (ADR-052). The working follows
+   * the operator's 2026-09-27 ruling: the slope method where it works, else the law of cosines.
+   */
+  const ang = readAngleAsk(text);
+  if (ang) {
+    for (const id of [ang.a, ang.v, ang.b]) {
+      if (!objectById(d.construction, id)) return { question, value: null, missing: { name: id, kind: 'point' } };
+    }
+    const readDeg = (f: Figure) => {
+      const P = (n: string) => f.points.find((q) => q.id === n);
+      const [pa, pv, pb] = [P(ang.a), P(ang.v), P(ang.b)];
+      if (!pa || !pv || !pb) return null;
+      const r = angleAt(pv, pa, pb);
+      return r === null ? null : (r * 180) / Math.PI;
+    };
+    const k = isKnowledge(d.construction, readDeg);
+    if (!k.known) return { question, value: null };
+    const P = (n: string) => d.figure.points.find((q) => q.id === n);
+    const [pa, pv, pb] = [P(ang.a), P(ang.v), P(ang.b)];
+    const trace = pa && pv && pb ? traceAngle(pv, pa, pb, k.value, fmt) : null;
+    return { question, value: angleText(k.value), ...(trace ? { trace } : {}) };
+  }
+
   // --- a line's angle with the positive x-axis (#1322) ---
   const ax = ANGLE_WITH_X_HE.exec(text) ?? ANGLE_WITH_X_EN.exec(text);
   if (ax) {

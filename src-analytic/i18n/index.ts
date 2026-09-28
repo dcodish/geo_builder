@@ -44,7 +44,7 @@ const he = {
   secSlopes: 'שיפועים',
   // The ASK lane (#1027) — the panel's own input: two surfaces, one grammar.
   // Short enough to READ in the panel's column — a placeholder clipped at its start teaches nothing.
-  askPlaceholder: 'שאלו: AB, שטח ABC',
+  askPlaceholder: 'שאלו: AB, שטח ABC, זווית ABC',
   askAdd: 'שאל',
   /** The ✕ that retires a measurement and the height it drew (#1118). */
   askTraceLabel: 'איך מגיעים לזה',
@@ -322,7 +322,7 @@ const en: typeof he = {
   secEquations: 'Equations',
   secLengths: 'Lengths',
   secSlopes: 'Slopes',
-  askPlaceholder: 'Ask: AB, area of ABC',
+  askPlaceholder: 'Ask: AB, area of ABC, angle ABC',
   askAdd: 'Ask',
   askTraceLabel: 'how this is reached',
   askTraceToggle: 'show or hide the working',
