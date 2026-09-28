@@ -4868,3 +4868,23 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 **Measured.** On main `d3f08a4c` at zoom 0.25 on a 900×500 canvas, for «z1 = 2cis22.5» the cartesian grid ran −2…2 inside a visible window of ±18 by ±10. On the branch the gridlines reach within one step of every edge at zoom 1, 0.5 and 0.25, the step grows as zoom falls, and the rendered SVG labels the outermost ticks and draws the outer ring at the corner.
 
 **Consequences.** `shell/ticks.ts` (new), `src-analytic/render/scene.ts` (re-export), `src-complex/render/visibleGrid.ts` (new), `src-complex/render/PolarPlane.tsx`, `src-complex/scene/scene.ts` (grid slimmed). Locks: `src-complex/__tests__/issue-1465-zoom-grid.test.tsx`, `shell/__tests__/ticks-1465.test.ts`, `src-analytic/__tests__/ticks-shared-1465.test.ts`.
+
+## ADR-W-095 — A symbol button types its face, and a typed comparison records as its symbol (#1348)
+
+**Status:** accepted · 2026-09-28 · operator report («when user types >= the symbol in the input panel needs to be the combined symbol», round #1345 T3), armed under the clear-plan ruling · round #1517. Numbered 095 beside the round's parallel #1465 branch (094).
+
+**Requirements:** docs/02w FR-SU-12 (new) · **Design:** docs/04w — the palette face and the typed comparison
+
+**Context.** The step row read `BC>=10` where the student meant `BC ≥ 10`. The row faithfully echoes what was typed; the defect is upstream. Analytic's `≥` button inserted `>=` (its face said one thing and its payload another, and likewise `≤`→`<=`, `²`→`^2`, `³`→`^3`, `·`→`*`, with complex's `·` the same). 2-D had a `<` button but no `≥`, so the student typed `>=` by hand, and nothing folded it: the fact, the save file, the export and the log kept the keyboard form. The payloads were chosen because "everything offered must parse" (#511), but that premise is stale. Measured on main `d3f08a4c`: 2-D and analytic read `≥`/`≤` and `>=`/`<=` identically, complex's argument bounds read both the same, and analytic reads `²`, `³`, `·` as `^2`, `^3`, `*`. 3-D reads neither comparison form.
+
+**Decision.**
+- **The face is the payload.** Analytic's five and complex's `·` now insert their glyph. 2-D gains `≤`/`≥` beside `<`, and complex gains them for argument bounds. 3-D gains none, because its grammar has no inequality to offer. `SymbolSpec.keyboardForm` is the explicit, reasoned exemption (none needed today). A shared check (`palette-faces.ts`) runs per product.
+- **The typed comparison is recorded as its symbol.** `foldComparisons` (`>=`→`≥`, `<=`→`≤`, only as a bare two-character operator, so `<=>` and `>==` are untouched) runs inside `ingestTypedText`, the ADR-W-029 store-side ingest, which every product store now calls. Analytic gains that boundary, since it had none: it lacked even the format-control strip the other three apply.
+- **The bidi run.** `≤` and `≥` join `<` in the run core: the shared `BASE_CORE` (complex, analytic) and 2-D's own `CORE`, whose guard requires every palette character to be core. 3-D keeps its copy unchanged, since it offers no comparison button and its grammar records none. That 2-D and 3-D each keep a private copy of the core is pre-existing debt, not widened here.
+- **Baselines.** The 2-D decide-parity shard 4 changes exactly one recorded line: the operator's own sequence «משולש ABC · BC>=10 …» now records `BC≥10`, with identical commands. The 3-D #1394 golden gains one key harvested from this ADR's own lock; no recorded 3-D sequence drifted.
+
+**Deviation from plan.** The plan folded at the parser boundary too. The parsers keep only the strip: every grammar reads both spellings identically (measured), so a parser-side fold would change nothing a student sees and would widen the change to every parse.
+
+**Measured.** 2-D «משולש ABC · BC>=10» records `BC≥10`. Every product's one-character buttons insert their own glyph. Both palette parse guards build their templates with the glyphs through the real grammar.
+
+**Consequences.** `shell/bidi.ts` (`foldComparisons`, `ingestTypedText`), `shell/symbols.ts` (`keyboardForm`), the four stores and two file loaders, three palettes, complex tooltips. Locks: `shell/__tests__/fold-comparisons-1348.test.ts`, `palette-faces-1348.test.ts` in each product, `src/__tests__/typed-ge-1348.test.ts`, and the updated analytic/complex palette guards.

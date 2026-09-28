@@ -26,7 +26,7 @@ import { buildNotices3, type BuildNotice3 } from '../engine/notices';
 import { normalizeLabel3, renameFacts3, renamePlaneDisplay3, renameQueries3, type RenameResult3 } from './rename3';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
-import { stripFormatControls } from '../../shell/bidi';
+import { ingestTypedText } from '../../shell/bidi';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, freeDims } from '../engine/apply';
@@ -1004,7 +1004,7 @@ export function decideSubmit3(
   raw: string,
   newId: () => string = () => nanoid(8),
 ): Verdict3 {
-  const utterance = stripFormatControls(raw); // #751 (ADR-W-029) — the store-side ingest invariant
+  const utterance = ingestTypedText(raw); // #751 (ADR-W-029) — the store-side ingest invariant
   // #578 (ADR-3D-211): «שנה שם E ל-O» is a rewrite of HISTORY, not a statement about the figure,
   // so it is read BEFORE the grammar and never becomes a fact. Intercepted here rather than in
   // App3 because this is where the fact list lives — and because a refusal must carry its own
@@ -1105,7 +1105,7 @@ export const useGeo3 = create<Geo3State>()(
       },
 
       submitSteps: (utterance, steps) => {
-        utterance = stripFormatControls(utterance); // #751 (ADR-W-029)
+        utterance = ingestTypedText(utterance); // #751 (ADR-W-029)
         const all: Command3[] = [];
         for (const step of steps) {
           const p = parse3(step);
@@ -1149,7 +1149,7 @@ export const useGeo3 = create<Geo3State>()(
       },
 
       replaceFact: (factId, utterance) => {
-        utterance = stripFormatControls(utterance); // #751 (ADR-W-029)
+        utterance = ingestTypedText(utterance); // #751 (ADR-W-029)
         const { facts, seed } = get();
         const old = facts.find((f) => f.id === factId);
         if (!old) return false;

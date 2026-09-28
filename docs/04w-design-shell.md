@@ -364,3 +364,7 @@ What the lock does not check: whether the words are good. That is prose, per pro
 ## The grid step ([ADR-W-094](06w-decisions-workspace.md#adr-w-094))
 
 `shell/ticks.ts` holds the one "nice step" rule (1, 2 or 5 × 10ⁿ) and the tick values across a range. Analytic re-exports `tickStep` from it, so its grid is byte-identical by construction. The complex Builder grids its VISIBLE window with it (`render/visibleGrid`), replacing a private copy with different thresholds. A §5c lock (`shell/__tests__/ticks-1465.test.ts`) fails if any product tree defines its own `tickStep`/`niceStep`.
+
+## The palette face and the typed comparison ([ADR-W-095](06w-decisions-workspace.md#adr-w-095))
+
+A `SymbolSpec` whose face (`label`) is one character inserts exactly that character, or carries `keyboardForm` saying why not. `shell/__tests__/fixtures/palette-faces.ts` checks it, and every product runs it over its own palette. The store-side ingest (ADR-W-029) is `ingestTypedText` in `bidi.ts`: `stripFormatControls` and then `foldComparisons` (`>=` → `≥`, `<=` → `≤`, a bare two-character operator only). Every product store records through it, analytic's included, which had no ingest boundary before. The parsers keep only the strip; every grammar reads both spellings the same way.

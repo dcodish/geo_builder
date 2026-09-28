@@ -56,6 +56,8 @@ const he = {
   symDeg: 'מעלות',
   symPow: 'חזקה',
   symMul: 'כפל',
+  symLe: 'קטן או שווה',
+  symGe: 'גדול או שווה',
   symDist: 'מרחק בין שתי נקודות',
   anotherConfig: 'הציגו תצורה אחרת', // #739: ONE wording for the row, every tool
   // #1452: the row's undo/redo had no keys and printed «undo»/«redo» in both languages — the siblings' wording
@@ -279,6 +281,8 @@ const en: typeof he = {
   symDeg: 'degrees',
   symPow: 'power',
   symMul: 'multiply',
+  symLe: 'less than or equal',
+  symGe: 'greater than or equal',
   symDist: 'distance between two points',
   anotherConfig: 'Show another configuration',
   undo: 'Undo',
