@@ -663,7 +663,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return null;
     }
     case 'volume-eq':
-    case 'lateral-area-eq': {
+    case 'lateral-area-eq':
+    case 'surface-area-eq': {
       const matches = c.revolutions.filter((r) => r.kind === claim.solid);
       if (matches.length !== 1) return { code: 'no-such-solid', id: claim.solid };
       const r = matches[0];

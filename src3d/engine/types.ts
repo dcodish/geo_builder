@@ -90,6 +90,7 @@ export type Claim3 =
   | { type: 'length-ratio'; a1: Id; b1: Id; a2: Id; b2: Id; p: number; q: number } // A'K : A'C = 2 : 3
   | { type: 'volume-eq'; solid: string; value: number } // נפח החרוט = 100π (value in world units³, π parsed)
   | { type: 'lateral-area-eq'; solid: string; value: number } // שטח המעטפת של החרוט = 65π
+  | { type: 'surface-area-eq'; solid: string; value: number } // #1449: שטח הפנים של החרוט = 90π (lateral + base)
   | { type: 'lines-rel'; a1: Id; b1: Id; a2: Id; b2: Id; rel: 'skew' | 'parallel' | 'intersect' } // NK ו-PL מצטלבים (V7 T3)
   // #766/#765 (ADR-3D-169): the SUBJECT is resolved against the declared figure, not assumed from the
   // letter count. `noun` is the definite noun the student wrote ('any' when they wrote none); `ids` is
