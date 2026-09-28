@@ -1359,8 +1359,12 @@ function tangentTargets(tail: string, src: string): TangentTargets | null {
       out.axes.push(axis[1].toLowerCase() as 'x' | 'y');
       continue;
     }
+    // WHICH noun the piece used, read BEFORE the strip discards it (#1503): «צלע»/«קטע»/«בסיס»
+    // bounds the tangency to the side itself — the #1168 class, the noun decides the extent.
+    // `BOUNDED_NOUN` is the one list, so incidence and tangency cannot disagree on what is bounded.
+    const boundedNoun = BOUNDED_NOUN.test(piece);
     const bare = piece
-      .replace(/^(?:ה?ישרים|ה?ישר|ה?צלע|ה?קטע|(?:the\s+)?(?:lines?|side|segment))\s+/i, '')
+      .replace(/^(?:ה?ישרים|ה?ישר|ה?צלע|ה?קטע|ה?בסיס|(?:the\s+)?(?:lines?|side|segment|base))\s+/i, '')
       .replace(new RegExp(`^${HE_EQ_OF}\\s+`), '');
     const hadNoun = bare !== piece;
     const named = /^([ℓl][0-9]?)$/.exec(bare) ?? (hadNoun ? LINE_NUMERAL_RE.exec(bare) : null);
@@ -1370,7 +1374,7 @@ function tangentTargets(tail: string, src: string): TangentTargets | null {
     }
     const pts = TWO_POINT_NAME.exec(bare);
     if (pts && pts[1] !== pts[2]) {
-      out.lines.push({ kind: 'points', a: pts[1], b: pts[2] });
+      out.lines.push({ kind: 'points', a: pts[1], b: pts[2], ...(boundedNoun ? { bounded: true as const } : {}) });
       continue;
     }
     if (bare.includes('=')) {

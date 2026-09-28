@@ -944,7 +944,10 @@ the line member of R70's tangency). «מעגל M משיק לישר l1», «מע�
 3x+4y=0» (the sentence supplies the line), «משיק לישר AB» (the line through two named points), the contextual
 «המעגל משיק לישר l1», and the line first — «הישר l1 משיק למעגל M», «הישרים l1 ו-l2 משיקים למעגל» — all say the
 same thing: the distance from the centre to that line is the radius. Axes and lines mix in one list («משיק לציר
-ה-x ולישר l1»). Which SIDE of the line the circle sits on is not asserted, because the student did not say.
+ה-x ולישר l1»). A BOUNDED noun bounds the tangency ([#1503](https://github.com/dcodish/geo_builder/issues/1503)):
+«משיק לצלע AB» (or «קטע», «בסיס», side/segment/base) means the touch point lies on the side itself — a circle
+touching only the side's extension does not satisfy it — while «משיק לישר AB» keeps the infinite line. Which SIDE
+of the line the circle sits on is not asserted, because the student did not say.
 Tangency to a line the figure does not hold is refused naming the line; tangency about a circle known only by
 its equation, and circle-to-circle tangency, are refused by name — never dropped, never guessed.
 

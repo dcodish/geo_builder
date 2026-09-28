@@ -910,6 +910,16 @@ AB», the `on-line-2pt` reading). The residual resolves the curve member through
 iterate, so a line whose own coefficients still carry parameters is touched wherever this
 configuration put it.
 
+The points member carries the NOUN's extent (#1503, the #1168 class — the noun decides the
+extent): `tangentTargets` reads `BOUNDED_NOUN` (the one list incidence uses — «צלע»/«קטע»/«בסיס»,
+side/segment/base) before stripping it, and a bounded pair sets `bounded: true` on the ref. The
+residual then adds the `on-line-2pt` crossing-arm extent rows applied to the tangency FOOT — with
+`t` the centre's projection parameter onto A→B, rows `max(0, −t)·|AB|` and `max(0, t−1)·|AB|` pull
+the touch point inside the side. The rows are HARD: for tangency the bound restricts the solution
+set (a circle tangent to the extension is not tangent to the side), unlike the basin-only bounded
+readings of a cevian's foot or «על הצלע». `canonicalConstraint` keys `bounded`, because «משיק לישר
+AB» and «משיק לצלע AB» are different givens, and keeps the pair undirected.
+
 One target parser (`tangentTargets`) serves every sentence shape, so orders cannot drift — the
 ADR-AG-164 rule applied to tangency: the circle first («מעגל M משיק לישרים l1 ו-l2»), the
 contextual circle («המעגל משיק לישר l1»), the line first («הישר l1 משיק למעגל M», the plural

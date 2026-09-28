@@ -104,7 +104,21 @@ function angleAt(v: Pt, a: Pt, b: Pt): number | null {
  * points. `label` on the curve member is the student's own spelling — «l1», «3x+4y=0» — so a
  * refusal and the constraint list can quote their statement, never an internal id.
  */
-export type TangentLineRef = { kind: 'curve'; id: Id; label: string } | { kind: 'points'; a: Id; b: Id };
+export type TangentLineRef =
+  | { kind: 'curve'; id: Id; label: string }
+  | {
+      kind: 'points';
+      a: Id;
+      b: Id;
+      /**
+       * The student said «צלע»/«קטע»/«בסיס», not «ישר» (#1503) — the noun decides the extent, the
+       * #1168 class. UNLIKE `on-line-2pt.bounded` (a basin choice), this is a HARD bound on the
+       * solution set: a circle tangent to a side's EXTENSION is not tangent to the side, so the
+       * residual gains extent rows on the tangency foot, and bounded/unbounded are different
+       * statements ({@link canonicalConstraint} keys them apart).
+       */
+      bounded?: true;
+    };
 
 export type Constraint =
   /** `A(6,4)` on a point that is not free to be replaced — one or both coordinates pinned. */
@@ -343,7 +357,12 @@ export function canonicalConstraint(k: Constraint): string {
   // AB» is «משיק לישר BA»), and the curve member's label is the student's SPELLING, not part of
   // what was stated — «לישר l1» and «ולישר l1» must compare equal (#1501).
   if (k.t === 'tangent-line') {
-    const line = k.line.kind === 'points' ? `p:${[k.line.a, k.line.b].sort().join(',')}` : `c:${k.line.id}`;
+    // `bounded` IS part of the key (#1503): «משיק לישר AB» and «משיק לצלע AB» are different givens —
+    // one admits a touch on the extension, the other forbids it — so neither may absorb the other.
+    const line =
+      k.line.kind === 'points'
+        ? `p:${[k.line.a, k.line.b].sort().join(',')}${k.line.bounded ? '|bounded' : ''}`
+        : `c:${k.line.id}`;
     return `tangent-line|${k.centre}|${line}`;
   }
   if (k.t === 'angle') return JSON.stringify({ ...k, at: ray(k.at) });
@@ -818,6 +837,22 @@ export function residual(
       // The DISTANCE from the centre to the line IS the radius. Unsigned like `tangent-axis`:
       // which side the circle sits on is a SELECTOR's business, not a given (ADR-052).
       const d = Math.abs(a * p[0].x + b * p[0].y + cc) / n;
+      if (k.line.kind === 'points' && k.line.bounded) {
+        /**
+         * A BOUNDED pair — «משיק לצלע AB» (#1503) — bounds the SOLUTION set: a circle touching only
+         * the side's extension is not tangent to the side, so the touch point must lie ON the piece.
+         * The `on-line-2pt` crossing-arm mechanism, applied to the FOOT: `t` is the projection
+         * parameter of the centre onto A→B, which is where the tangency touches; two more rows, each
+         * the distance the foot sits beyond an end along the line — zero anywhere within the side, a
+         * true distance outside it, so the solve pulls the touch inside and a tangency that only the
+         * extension satisfies is UNSATISFIED rather than drawn green. Hard rows, no extent tolerance:
+         * this is a bound on which figures exist, not on which root comes up first — the operator
+         * reading «משיק לצלע» otherwise changes these rows (said on #1503).
+         */
+        const [, q, s] = p;
+        const t = segmentParam(q, s, p[0])!; // n > 0 above ⇒ never null
+        return [d - radius, Math.max(0, -t) * n, Math.max(0, t - 1) * n];
+      }
       return [d - radius];
     }
     case 'derived-at': {
