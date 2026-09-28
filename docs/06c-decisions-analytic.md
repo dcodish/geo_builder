@@ -8022,3 +8022,17 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 **Measured.** 6 locks (`issue-1297-hebrew-fact.test.ts` product-side; `issue-1297-locale-prompt.test.ts` server-side, on the sanctioned import direction): the He prompt carries only the He column + the hard rule, the En prompt only En, the no-locale prompt byte-compatible; rows display the sentence with part markers, annotations follow their lines through removal, drop on edit, and survive save→restore.
 
 **Consequences.** `server/llm/harness.ts` (locale through `PromptSpec.vocabulary`/`buildSystemPrompt`/`buildRequest`), `server/parseHandler.ts` (`body.locale`), `parser/llmSharedAnalytic.ts` (one-column vocab), `parser/llmAnalytic.ts` + `App.tsx` (locale sent; `recordLlmLines`; row display), `store/useAnalyticStore.ts` (`spokenFor` + envelope field). **Proxy redeploy required.**
+
+## ADR-AG-175 — Every ask arm consults the option set, by calling the panel's decision (#1433)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1517. Numbered 175 beside the round's parallel branches (173 = #1423, 174 = #1431).
+
+**Requirements:** [02c](02c-requirements-analytic.md) — «cannot be computed» must never stand beside a panel that lists the options · **Design:** [04c](04c-design-analytic.md) — one knowledge decision per surface pair
+
+**Context.** With two valid configurations, asking «C» answered «לא ניתן לחשב מהנתונים» while the panel listed both of C's positions; «AC» and «משוואת הישר AC» likewise. #1227 (ADR-AG-136) fixed this false absence for the locus question only. Class: *each ask arm owned its own knowledge gate.* Re-measured at pickup: the issue's whole table stood.
+
+**Decision.** (1) The panel's point decision is EXTRACTED to `app/pointText.ts` — value → #1036 option set (drawn one bracketed) → #1226 stated expression → #1023 line dependency → half-pinned → open dash — and the ask's point arm now CALLS it, so the two surfaces answer the same text by construction (the #1102 locks-must-call rule). (2) One scalar option gate (`scalarText`): a value when forced, else the resolution-aware set joined «או», else null; the measure arm and the slope arm ride it. (3) The equation arm answers its option set deduped by the RENDERED equation (coefficients are homogeneous, so raw triples may differ for one line); a set collapsing to one text stays null — a single «option» would claim what the knowledge gate withheld. `askNoValue` is thereby reserved for a figure that determines nothing finite.
+
+**Measured.** The reported figure: «C» → «[(1, -5)] או (3, 3)», «AC» → «3.16 או 5.83», the equation → both equations. Controls: a free point stays open; a determined figure answers its single value with no «או».
+
+**Consequences.** `src-analytic/app/pointText.ts` (new — the extracted decision + `scalarText`), `src-analytic/app/ask.ts` (point/slope/equation/measure arms), `src-analytic/App.tsx` (imports the moved decision). Lock: `issue-1433-known-options.test.ts` — the reported rows, the surfaces-agree assertion (calling, not reproducing), and the two gates that must not loosen.

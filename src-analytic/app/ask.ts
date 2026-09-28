@@ -30,6 +30,7 @@ import { ANGLE_STEM_HE } from '../engine/shapes';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { isVerticalLine } from '../engine/lines';
 import { asPair, lineNamed } from './lines';
+import { pointText, scalarText } from './pointText';
 import { angleText, lineAngleOf } from './lineAngle';
 import { curveParts, locusEquation } from './curveText';
 
@@ -359,10 +360,14 @@ export function ask(
     if (!o) return { question, value: null, missing: { name: text, kind: 'point' } };
     const kx = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === text)?.x ?? null);
     const ky = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === text)?.y ?? null);
-    return {
-      question,
-      value: kx.known && ky.known ? `(${fmt(kx.value)}, ${fmt(ky.value)})` : null,
-    };
+    /**
+     * #1433 — THE PANEL'S OWN DECISION, one seam (`app/pointText.ts`). Asking «C» with two valid
+     * positions answered «לא ניתן לחשב מהנתונים» while the panel row beside it listed both options —
+     * a false sentence. The dash alone (a truly open point) keeps the lane's `value: null`, worded
+     * open/uncomputable as before.
+     */
+    const t = pointText(d, text, kx, ky, fmt);
+    return { question, value: t === '—' ? null : t };
   }
 
   /**
@@ -403,7 +408,14 @@ export function ask(
       const l = lineNamed(f, name);
       return l && !isVerticalLine(l.a, l.b) ? -l.a / l.b : null;
     });
-    return { question, value: k.known ? fmt(k.value) : null };
+    if (k.known) return { question, value: fmt(k.value) };
+    // #1433 — a two-configuration slope answers its option set, like every other value arm.
+    const opts = scalarText(d.construction, (f) => {
+      const l = lineNamed(f, name);
+      if (!l || isVerticalLine(l.a, l.b) || Math.abs(l.b) < 1e-12) return null;
+      return -l.a / l.b;
+    }, fmt);
+    return { question, value: opts };
   }
 
   // --- a curve, by name: its equation ---
@@ -439,9 +451,26 @@ export function ask(
         const b0 = d.figure.points.find((q) => q.id === pair[1]);
         if (a0 && b0) trace = traceLine2pt(a0, b0, fmt);
       }
+      /**
+       * #1433 — a two-configuration line answers its equation OPTIONS. Deduped by the RENDERED
+       * equation (coefficients are homogeneous, so raw triples may differ for one line); a set
+       * that collapses to one text stays null — the knowledge gate withheld it, and a single
+       * "option" would claim what the gate refused.
+       */
+      const eqOpts = known
+        ? null
+        : (() => {
+            const set = knownOptions(d.construction, (f) => {
+              const l = lineNamed(f, name);
+              return l ? [l.a, l.b, l.c] : null;
+            });
+            if (!set) return null;
+            const texts = [...new Set(set.map(([a2, b2, c2]) => curveParts({ kind: 'line', a: a2, b: b2, c: c2 }).equation))];
+            return texts.length > 1 ? texts.join(' או ') : null;
+          })();
       return {
         question,
-        value: known ? curveParts({ kind: 'line', a: ka.value, b: kb.value, c: kc.value }).equation : null,
+        value: known ? curveParts({ kind: 'line', a: ka.value, b: kb.value, c: kc.value }).equation : eqOpts,
         ...(trace ? { trace } : {}),
       };
     }
@@ -516,15 +545,15 @@ export function ask(
   if (crossing) return { question, value: null, fact: 'lines-cross' };
 
 
-  const k = isKnowledge(d.construction, (f) =>
+  const readMeasure = (f: Figure) =>
     evalLengthExpr(
       measure,
       (id) => f.points.find((q) => q.id === id) ?? null,
       f.env,
       // The NAMED line this configuration drew (#1048) — see `lineNamed`.
       (nm) => lineNamed(f, nm),
-    ),
-  );
+    );
+  const k = isKnowledge(d.construction, readMeasure);
   /**
    * A PLAIN DISTANCE gets its formula (#1053).
    *
@@ -566,7 +595,8 @@ export function ask(
   }
   return {
     question,
-    value: k.known ? fmt(k.value) : null,
+    // #1433 — a measure with a finite option set answers it («3.16 או 5.83»), the panel's own rule.
+    value: k.known ? fmt(k.value) : scalarText(d.construction, readMeasure, fmt),
     ...(trace ? { trace } : {}),
     ...(mark ? { mark } : {}),
   };
