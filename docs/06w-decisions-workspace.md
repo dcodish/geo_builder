@@ -4837,3 +4837,17 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 **Measured.** Demo sheet `demo-1509` over the day's two deployed fixes: 4 cases driven green on the live dev server (locus union incl. ask + two config cycles; tangent-to-side; the l7 refusal; the single-locus counter-case), 11 screenshots captured, audited and read; 15 unit locks on the pure half.
 
 **Consequences.** `scripts/play-sheet-drive.mjs` (new), `scripts/lib/play-sheet-core.mjs` (new), `scripts/visual-smoke.mjs` (`auditImages` exported), `scripts/playsheets/` (tracked specs), `package.json` (`playsheet`), CLAUDE.md Rule 5, docs/22 §2d. Lock: `scripts/__tests__/play-sheet-core.test.ts`.
+
+## ADR-W-093 — Every product's events sink is real: a fallback that cannot target `/`, a preflight that probes the sink, and complex collects (#1363, #1243)
+
+**Status:** accepted · 2026-09-28 · round #1510
+
+**Requirements:** none (internal) · **Design:** RUNBOOK (deploy preflight) + this entry
+
+**Context.** Analytic usage events were accepted with 204 and written NOWHERE (no env var; the fallback resolved against systemd's default cwd `/`; the write failure rightly swallowed) — `/log-triage` read "no analytic activity", indistinguishable from "no failures" (the ADR-W-077 trap, the #903 wiring class). Re-measured at pickup: prod's analytic sink had since been wired (the probe lands in `events-analytic.jsonl`), and **complex** was the remaining product with no collection at all — no client emitter, no env var.
+
+**Decision.** (1) **The fallback resolves beside the MODULE** (`toolRouting.eventsLogPathForId`): a product missing its env line lands directly beside `events.jsonl` (no subdirectory — `appendFile` creates files, never directories), so a future product with no env var still collects; the env var still wins. (2) **The preflight probes the SINK** (`deploy-preflight.mjs`): one probe event per enabled product posted to its live endpoint, read back server-side by its sid (kept under the 16-char sid truncation, which ate the first probe), each row `MATCHES live` or `SINK UNREACHABLE — a 204 that writes nothing`, and any unreachable sink fails the preflight exactly as a stale artifact does. Run live at build time: 2-D, 3-D, analytic MATCH; **complex UNREACHABLE — the guard naming prod's real remaining gap on its first run.** (3) **Complex emits** (`src-complex/debug/sessionLogComplex.ts`, the sibling shape over the shared `shell/usageLog` poster, `tool: 'complex'`): one lean submit per FINAL submission with its result, session announced lazily, wired at `submitLine`'s four outcomes. (4) The prod env line for complex (`EVENTS_COMPLEX_LOG_PATH`) is a **deploy step** — optional once (1) ships, listed for the next deploy.
+
+**Measured.** 4 locks (`issue-1363-1243-events-sink.test.ts`): the no-env path is module-relative and absolute (never cwd-rooted), the env var wins, one-submit-per-submission, refusals counted with their result. The live probe run above is the mechanism's own proof.
+
+**Consequences.** `server/toolRouting.ts`, `scripts/deploy-preflight.mjs`, `src-complex/debug/sessionLogComplex.ts` (new), `src-complex/app/submit.ts`. **Proxy redeploy required** (with #1297's, one push).
