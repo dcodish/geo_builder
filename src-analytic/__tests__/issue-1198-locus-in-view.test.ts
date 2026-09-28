@@ -46,7 +46,7 @@ function frameAt(seed: number, shown = true) {
   const d = derive(LINES, seed);
   const a = ask(d, LOCUS_Q, (v) => String(+v.toFixed(4)), (k) => k);
   const answers = [{ shown, locus: a.locus }];
-  return { d, trace: a.locus?.points ?? [], box: drawnBox(d.figure, d.box, answers) };
+  return { d, trace: a.locus?.components[0]?.points ?? [], box: drawnBox(d.figure, d.box, answers) };
 }
 
 const contains = (b: Box, ps: Array<{ x: number; y: number }>) =>

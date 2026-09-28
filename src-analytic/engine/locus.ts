@@ -32,7 +32,7 @@
  * outward in both directions, to the view box or to closure.
  */
 import { carrierSystem, drawableAt, viewBox, type CarrierSystem } from './evaluate';
-import { agreeingShape, shapeOfTrace, type LocusShape } from './locusFit';
+import { agreeingUnion, shapeOfTrace, type LocusShape } from './locusFit';
 import { resolveChoices, solveLM, SOLVE_TOL } from './solve';
 import type { Env } from './expr';
 import type { Pt } from './derived';
@@ -323,11 +323,53 @@ export function hasLocus(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>
  * freedom is not one-dimensional, or the point named does not move. Each of those is a true answer
  * and none of them is a curve.
  */
-export interface LocusResult {
-  /** The polyline to draw — the configuration the student is looking at. */
+export interface LocusComponent {
+  /** The polyline to draw — one connected component, at the configuration the student is looking at. */
   trace: LocusTrace;
-  /** What it is. Absent when the two configurations do not even agree on the FAMILY. */
+  /**
+   * What this component is, GATED (ADR-AG-072 §4 across the union since #1500). `null` on every
+   * component when the configurations do not even agree on the families — nothing honest to say.
+   */
   shape: LocusShape | null;
+}
+
+/**
+ * THE LOCUS IS THE FULL SOLUTION SET (#1500) — a list of connected components, not one curve.
+ *
+ * Continuation can only ever cover the component its start is on: the two lines through O tangent
+ * to a circle meet only at the degenerate G=O, so no walk crosses over — and the previous single-
+ * polyline result drew, named and equated the component the seed landed on as the whole answer.
+ * Any construction whose 1-DOF solution set is a union hits that class: tangent-line pairs,
+ * distance-d-from-a-line (two parallels), |dist| equalities with sign branches.
+ *
+ * `components[0]` is the component the SHOWN point lies on; the rest were discovered from the other
+ * sampled configurations (see `locusOf`).
+ */
+export interface LocusResult {
+  components: LocusComponent[];
+}
+
+/** How much of a candidate trace may overlap the components already held before it is a duplicate. */
+const DISCOVERY_OVERLAP = 0.5;
+
+/** The distance from `p` to the nearest point of the polyline `pts` (segment-wise). */
+function distToPolyline(p: Pt, pts: readonly Pt[]): number {
+  if (pts.length === 0) return Infinity;
+  let best = Infinity;
+  for (let i = 0; i < pts.length; i += 1) {
+    const a = pts[i];
+    if (i + 1 < pts.length) {
+      const b = pts[i + 1];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len2 = dx * dx + dy * dy;
+      const t = len2 > 1e-24 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0;
+      best = Math.min(best, Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy)));
+    } else {
+      best = Math.min(best, Math.hypot(p.x - a.x, p.y - a.y));
+    }
+  }
+  return best;
 }
 
 export function locusOf(
@@ -336,8 +378,18 @@ export function locusOf(
   seeds: readonly [number, number] = [0, 1],
   bounds?: TraceOptions['bounds'],
 ): LocusResult | null {
-  const traceAt = (seed: number): LocusTrace | null => {
-    const f = drawableAt(c, seed);
+  // One drawable figure per configuration — discovery and the gate visit the same seeds, so the
+  // solves are shared rather than repeated.
+  const figures = new Map<number, ReturnType<typeof drawableAt>>();
+  const figAt = (seed: number) => {
+    let f = figures.get(seed);
+    if (!f) {
+      f = drawableAt(c, seed);
+      figures.set(seed, f);
+    }
+    return f;
+  };
+  const freeStart = (f: ReturnType<typeof drawableAt>): Map<Id, Pt> | null => {
     const start = new Map<Id, Pt>();
     for (const o of c.objects) {
       if (!isFree(o)) continue;
@@ -345,34 +397,114 @@ export function locusOf(
       if (!p) return null; // a carrier with no position — nothing to walk from
       start.set(o.id, { x: p.x, y: p.y });
     }
-    /**
-     * THE WALK GOES WIDER THAN THE FRAME — the frame itself is untouched.
-     *
-     * ADR-AG-072 §9 keeps the view box driven by the stated objects so that *an infinite locus never
-     * inflates the frame*, and that stands. But tracing only INSIDE the frame turned out to break two
-     * things at once, measured on «A(0,0)» «נקודה M» «MA = 5»: the box is about five units across, so
-     * the circle of radius 5 was traced as a **23° arc** — too little of a curve to identify (one
-     * seed's arc snapped to `x² + y² = 25` and the other's would not, so the determinacy gate reported
-     * «shape only» about a locus that is perfectly determinate), and too little to show the student
-     * the answer they asked for.
-     *
-     * So the walk is given room and the RENDERER clips, which is what it does with every other object.
-     * A closed locus is then traced whole — it is a finite curve and closure ends the walk anyway — and
-     * an unbounded one still stops at a bound rather than running away.
-     */
+    return start;
+  };
+  /**
+   * THE WALK GOES WIDER THAN THE FRAME — the frame itself is untouched.
+   *
+   * ADR-AG-072 §9 keeps the view box driven by the stated objects so that *an infinite locus never
+   * inflates the frame*, and that stands. But tracing only INSIDE the frame turned out to break two
+   * things at once, measured on «A(0,0)» «נקודה M» «MA = 5»: the box is about five units across, so
+   * the circle of radius 5 was traced as a **23° arc** — too little of a curve to identify (one
+   * seed's arc snapped to `x² + y² = 25` and the other's would not, so the determinacy gate reported
+   * «shape only» about a locus that is perfectly determinate), and too little to show the student
+   * the answer they asked for.
+   *
+   * So the walk is given room and the RENDERER clips, which is what it does with every other object.
+   * A closed locus is then traced whole — it is a finite curve and closure ends the walk anyway — and
+   * an unbounded one still stops at a bound rather than running away.
+   */
+  const roomOf = (f: ReturnType<typeof drawableAt>) => {
     const box = bounds ?? viewBox(f);
     const cx = (box.minX + box.maxX) / 2;
     const cy = (box.minY + box.maxY) / 2;
     const halfW = Math.max((box.maxX - box.minX) / 2, 1e-6) * WALK_ROOM;
     const halfH = Math.max((box.maxY - box.minY) / 2, 1e-6) * WALK_ROOM;
-    return traceLocus(c, f.env, id, start, {
-      bounds: { minX: cx - halfW, minY: cy - halfH, maxX: cx + halfW, maxY: cy + halfH },
-      seed,
-    });
+    return { minX: cx - halfW, minY: cy - halfH, maxX: cx + halfW, maxY: cy + halfH };
   };
 
-  const first = traceAt(seeds[0]);
-  if (!first || first.points.length < 2) return null;
+  // The configurations the gate visits.
+  const sampleSeeds = Array.from({ length: COMPARE_TRIES }, (_, i) => seeds[1] + i);
+  /**
+   * The configurations DISCOVERY probes (#1500) — a solve each, never a walk unless a probe lands
+   * off every held component, and never an open sweep (docs/17 §7). Wider than the gate's list
+   * because a probe is ~100× cheaper than a full trace, and MEASURED necessary: on the operator's
+   * own figure the branch split is ~7:3, so three probes miss the second line at 1 of 10 seeds —
+   * which is the reported nondeterminism surviving in miniature. Six probes cover every seed
+   * measured.
+   */
+  const discoverySeeds = Array.from({ length: 2 * COMPARE_TRIES }, (_, i) => seeds[1] + i);
+
+  /**
+   * EVERY component of the solution set at `seed`'s configuration (#1500).
+   *
+   * The walk from the shown position covers its own component; the other sampled configurations
+   * say where else the same constraints can put the point. Each sample's free positions are
+   * CORRECTED ONTO THIS CONFIGURATION's system first (`solveLM` under this seed's env and resolved
+   * choices), so every polyline returned belongs to the figure being shown — a parameterised
+   * figure's other sample lands back on THIS configuration's set, never its own (#1176's rule:
+   * the canvas may not draw a curve belonging to a figure nobody is looking at). A corrected
+   * sample landing off every component held so far seeds one more walk; a trace that mostly
+   * overlaps what is already held is the same component reached again, and is dropped.
+   */
+  const componentsAt = (seed: number): LocusTrace[] | null => {
+    const f = figAt(seed);
+    const start = freeStart(f);
+    if (!start) return null;
+    const room = roomOf(f);
+    const first = traceLocus(c, f.env, id, start, { bounds: room, seed });
+    if (!first || first.points.length < 2) return null;
+    const comps = [first];
+    const resolved: Construction = { ...c, constraints: resolveChoices(c.constraints, seed) };
+    const sys = carrierSystem(resolved, f.env, { params: 'fixed' });
+    if (sys.ids.length === 0) return comps;
+    const near = Math.hypot(room.maxX - room.minX, room.maxY - room.minY) / 100;
+    for (const s of discoverySeeds) {
+      if (s === seed) continue;
+      const st = freeStart(figAt(s));
+      if (!st) continue;
+      const x = sys.toVec(st);
+      if (x.some((v) => !Number.isFinite(v))) continue;
+      const sol = solveLM(x, sys.residualsAt, 40);
+      if (!sol.ok) continue;
+      const pos = sys.positionsAt(sol.values);
+      const p = pos.get(id);
+      if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+      if (comps.some((t) => distToPolyline(p, t.points) < near)) continue;
+      const start2 = new Map<Id, Pt>();
+      let complete = true;
+      for (const key of start.keys()) {
+        const q = pos.get(key);
+        if (!q || !Number.isFinite(q.x) || !Number.isFinite(q.y)) {
+          complete = false;
+          break;
+        }
+        start2.set(key, { x: q.x, y: q.y });
+      }
+      if (!complete) continue;
+      const extra = traceLocus(c, f.env, id, start2, { bounds: room, seed });
+      if (!extra || extra.points.length < 2) continue;
+      // The same component reached from farther out walks back into view and re-traces it — drop it.
+      const overlapping = extra.points.filter((q) => comps.some((t) => distToPolyline(q, t.points) < near)).length;
+      if (overlapping > extra.points.length * DISCOVERY_OVERLAP) continue;
+      comps.push(extra);
+    }
+    return comps;
+  };
+
+  const primary = componentsAt(seeds[0]);
+  if (!primary) return null;
+
+  // The shown point's own component must measure or there is nothing honest to say (the pre-#1500
+  // rule, unchanged); an EXTRA component that will not measure is dropped rather than poisoning the
+  // whole answer — the result degrades to what the tracer answered before discovery existed.
+  const primaryShape = shapeOfTrace(primary[0].points);
+  if (!primaryShape) return { components: [{ trace: primary[0], shape: null }] };
+  const held: Array<{ trace: LocusTrace; shape: LocusShape }> = [{ trace: primary[0], shape: primaryShape }];
+  for (const t of primary.slice(1)) {
+    const s = shapeOfTrace(t.points);
+    if (s) held.push({ trace: t, shape: s });
+  }
 
   /**
    * THE COMPARISON SAMPLE MUST BE MEASURABLE, not merely different (#1176).
@@ -390,18 +522,23 @@ export function locusOf(
    * equation on a configuration that measured perfectly well.
    *
    * So the comparison advances past a configuration it cannot measure, bounded. It never widens what
-   * counts as agreement: two traces that both measure and DISAGREE still print the kind alone.
+   * counts as agreement: two unions that both measure and DISAGREE still print the kinds alone —
+   * `agreeingUnion` (#1500) is where the verdict lives.
    */
-  let shape = shapeOfTrace(first.points);
-  for (let step = 1; step <= COMPARE_TRIES; step += 1) {
-    const other = traceAt(seeds[1] + step - 1);
-    if (!other || other.points.length < 2) continue;
-    // A neighbour with no measurable shape is skipped, not counted as a disagreement.
-    if (!shapeOfTrace(other.points)) continue;
-    shape = agreeingShape(first.points, other.points);
-    break;
+  for (const s of sampleSeeds) {
+    const other = componentsAt(s);
+    if (!other) continue;
+    const otherShapes = other.map((t) => shapeOfTrace(t.points)).filter((x): x is LocusShape => x !== null);
+    if (otherShapes.length === 0) continue;
+    const verdict = agreeingUnion(
+      held.map((h) => h.shape),
+      otherShapes,
+    );
+    if (verdict === null) return { components: held.map((h) => ({ trace: h.trace, shape: null })) };
+    return { components: held.map((h, i) => ({ trace: h.trace, shape: verdict[i] })) };
   }
-  return { trace: first, shape };
+  // No measurable comparison at all: the fitted shapes stand ungated — the pre-existing behaviour.
+  return { components: held };
 }
 
 export { SOLVE_TOL as LOCUS_SOLVE_TOL };

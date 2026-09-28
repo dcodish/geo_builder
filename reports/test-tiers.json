@@ -47,6 +47,8 @@
     "src3d/__tests__/book-coordinate-givens.test.ts",
     "src3d/__tests__/exam-2026-2.test.ts",
     "src3d/__tests__/issue-1311-free-pair-length-drive.test.ts",
+    "src3d/__tests__/issue-1498-frame-and-carrier-drive.test.ts",
+    "src3d/__tests__/issue-1499-perp-from-in-plane-point.test.ts",
     "src3d/__tests__/issue-814.test.ts",
     "src3d/__tests__/issue-815.test.ts",
     "src3d/__tests__/issue-816.test.ts",

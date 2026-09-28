@@ -111,4 +111,12 @@ export const drawnLoci = (
 ): Array<{ points: Array<{ x: number; y: number }>; closed: boolean; label?: string }> =>
   rows
     .filter((a) => a.locus && a.shown !== false)
-    .map((a) => ({ points: a.locus!.points, closed: a.locus!.closed, label: a.value ?? undefined }));
+    // One drawn curve per CONNECTED COMPONENT (#1500). A single-component locus keeps the row's
+    // whole value as its label, as before; a union labels each curve with its own part.
+    .flatMap((a) =>
+      a.locus!.components.map((cp, i) => ({
+        points: cp.points,
+        closed: cp.closed,
+        label: cp.label ?? (i === 0 ? (a.value ?? undefined) : undefined),
+      })),
+    );

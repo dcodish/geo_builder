@@ -10834,3 +10834,137 @@ guards against was off in that scene).
 two planes named by points — with a number or a letter — now appears on the figure as soon as it is typed,
 without opening «ארגון נתונים» or pressing «הצג בניה»; and a stated angle between a segment and a face
 («הזווית בין SA למישור ABCD היא 50») is drawn at all, which it never was.
+
+## ADR-3D-267 — One frame rule for every residual, and one carrier table for every sampled point-DOF (#1498)
+
+**Status:** accepted, 2026-09-28 · **Issue:** [#1498](https://github.com/dcodish/geo_builder/issues/1498) (bug, `P1`, `3d`; prod session `uhqzlqgk`, 2026-09-28)
+**Requirements:** [02b](02b-requirements-3d.md) — **FR-CL-1**'s sampled-part list gains the remaining point carriers · **Design:** [04b](04b-design-3d.md#the-sampled-carrier-table-and-the-one-frame-rule-1498-adr-3d-267) (new section) · **LADDER stage:** solve — the pivot's residual frame and its unknown set; no parse or apply change.
+
+**The report.** «ABC משולש», vectors u/v, A/B/D by coordinates, «AD=(2/3)u+(1/3)v», «נקודה E במישור ABC»
+(the LLM lane), then «ABEC מלבן» → `givens-contradict` naming the student's own coordinates. The givens
+force C = (0,5,−1), ∠BAC = 90°, and the rectangle's corner E = B+C−A = (−3,5,2) in plane ABC — a true
+statement refused as a contradiction, the honesty class.
+
+**Two root causes, each a two-copies drift.**
+
+1. **The frame rule.** The pivot's final placement has one rule for "does the similarity apply to this
+   point": gauge-frame kinds ride it, Lane-A absolute points (typed coordinates, an equation-plane rider)
+   do not. The in-solve residual accessor (`at` in `solve3`) had drifted to "gauge everything", and the
+   point/vector/pair-pin loops applied the gauge unconditionally, so any pin relating a gauge-frame point
+   to an absolute one compared **two different frames** — the residual could never reach zero, the pivot
+   reported 0 solutions, and `store3` blamed the newest statement. Two further sites (`atFor`, the
+   plane-pin loop) carried a hand-rolled `coord || on-plane-off-run` approximation that silently treated
+   every remaining Lane-A kind (`partial`, `foot-plane`, `foot-line`, `line-plane`, `rev-point`,
+   `on-line`) as gauge-frame. **Decision:** `gaugeFramePoint3` (types.ts, beside `GAUGE_KINDS`) is the one
+   predicate; `laneAt` inside `residualsFor` is the one accessor every residual family reads through, and
+   the final placement, `gaugePlacedIds3` and `atFor` call the same predicate. A residual now sees exactly
+   the frame the drawn figure will be in.
+
+2. **The carrier table.** The #820 rider lane (ADR-3D-204: *a sampled parameter is a pivot unknown, so a
+   stated given drives it*) and `freeDofCount3` each kept their own enumeration of carrier kinds, and they
+   drifted: the count knew `on-plane` (2), `on-line` (1), `bisector-ray` (1) and `partial` (n) while the
+   lane enrolled only `on-segment`, `scaled-offset` and `free3` — a DOF that is **counted but can never be
+   driven**, the ADR-052 conformance smell in its solver form (the exact smell `CLAUDE.md` names for 2-D as
+   `rawMovableDof` vs `freeDofs`). E's two in-plane parameters were unknowable, so the rectangle's angle
+   pins were judged against the sampler's guess. **Decision:** `carrierParams3` (`engine/carriers.ts`) is
+   the one table — per point kind, its lane keys, bounds, anchor seeding, and drivability — and **both**
+   `freeDofCount3` and the lane's candidate list fold it, so a carrier added later reaches the count and
+   the lane together or not at all. An `on-plane`/`on-line` rider's parameters are **offsets from the
+   sampled seat** (0 = the seat), so an undriven figure is byte-identical and ADR-052's seed variation is
+   the anchor itself; a `bisector-ray`'s parameter is its distance from the apex (positive — the ray's own
+   bound); a `partial`'s stated sign given becomes its lane **bound**, so no drive can carry the component
+   across the side the student stated. Deliberately **not drivable, recorded in the table itself**: an
+   `on-plane` side-point's height (its stay-on-the-stated-side bound depends on the sampled height, which
+   the lane's static bounds cannot hold), and riders of FREE planes/lines (the free subtree re-seats its
+   dependents after the pivot, #557, which would discard a driven value). Enrollment stays the lane's
+   measured probe — a figure whose riders nothing reads solves bit-identically.
+
+**Class fix, measured.** The battery (issue-1498 lock) covers both causes and their crossings: all four
+corners typed (rectangle/parallelogram/⟂/length/∥); a stated rider driven by the shape line, by
+«|AE| = 3», by «AE ⊥ AB», and by typed coordinates onto the rider; the operator's exact ten lines; the
+stability invariant (the shape line moves no existing point); and the refusals that were **correct** stay
+refused («ABEC ריבוע» — |AB| ≠ |AC|; «E אמצע/על BC» + מקבילית). 24-seed whole-rate on the operator's
+sequence: **24/24** (before: 0/24 — refused at every seed).
+
+**Sibling audit.** *2-D:* no placement gauge exists; the count-vs-drive smell is already named in
+`CLAUDE.md` as `rawMovableDof` vs `freeDofs` with its own conformance rule — nothing new to file.
+*Analytic/complex:* no similarity pivot, no rider lane (grep `applyGauge|riderTs` — engine-local to
+`src3d`). Nothing filed.
+
+**Cost (M3/§7).** No new sampler and no new loop: the lane grows candidate rows only for figures that
+hold the new carrier kinds, and the probe drops unread ones before the solve. The one frame rule adds a
+map lookup per residual point read. Measured on the two heaviest rider-lane lock files
+(`issue-820-rider-drive` + `issue-1311-free-pair-length-drive`, 20 tests): 157.2 s before, 156.9 s
+after — no measurable cost. The #1499 frozen-dims retry runs only on a failure or an all-collapsed
+pool, at most one extra solve (the V8-c multiplier).
+
+**Consequences.** For a student: a point they placed «במישור ABC» (or on a line, or on a bisector) now
+**moves to satisfy** what they state about it next — a shape, a length, a perpendicular, coordinates —
+exactly as a point on a segment has since #820; and any true statement tying their figure to typed
+coordinates no longer comes back as a contradiction.
+
+## ADR-3D-268 — A ⟂ from an IN-PLANE point mints a free point on the normal, and a collapse to zero area is not a figure (#1499)
+
+**Status:** accepted, 2026-09-28 · **Issue:** [#1499](https://github.com/dcodish/geo_builder/issues/1499) (bug, `P1`, `3d`; the #1498 prod session) · amends [ADR-3D-146](#adr-3d-146)
+**Requirements:** [02b](02b-requirements-3d.md) — **FR-SP-12** added (what a one-new-letter ⟂-to-plane statement creates) · **Design:** [04b](04b-design-3d.md#the-sampled-carrier-table-and-the-one-frame-rule-1498-adr-3d-267) (the same section's second half) · **LADDER stage:** apply (the `seg-plane-rel` disposition) + solve (the degeneracy gate and a failure-path retry).
+
+**The report.** After #1498's figure, «M מפגש אלכסונים במלבן ABEC» then «SM⊥ABC» → all green, and
+**S drawn exactly on M**: a zero segment presented as a perpendicular. «|SM| = 4» then refused
+`givens-contradict` with no conflicting statement to name.
+
+**Root cause.** ADR-3D-146's funnel (one new letter on a ⟂-to-plane statement ⇒ `height-to-face`, the
+foot) rests on *"uniquely determines the foot"* — true only when the known endpoint sits **off** the
+plane («SO גובה הפירמידה»). When it lies **in** the plane, the foot of the perpendicular from it is
+itself, so the funnel minted a degenerate point. What the statement determines there is the new point's
+**direction** only: it lies on the normal through the known point, height and side unstated.
+
+**Decision, three parts.**
+
+1. **The disposition asks where the known endpoint is — structurally.** `structurallyOnRun3` (apply.ts):
+   a point is in the run's plane when it is a member, or derived solely from points that are (a rider or
+   midpoint on a chord, a diagonal crossing, a centroid, a parallelogram corner, a plane cut, a rider
+   declared on that same run) — recursive, memoized, and **position-free**, because apply never sees
+   coordinates and a one-seed coincidence must not change what a statement means (docs/17 §2.2). An
+   unlisted kind answers false, keeping ADR-3D-146's foot for every case it was right about. In-plane ⇒
+   the new letter is minted `free3` and the ⟂ lands as the **driving** `seg-perp-plane` pin, which the
+   #820/#1311 rider lane satisfies by moving the free coordinates: two residuals on three coordinates, so
+   the height stays a free sampled DOF that varies with the seed and flips side across configurations
+   (ADR-052 — never a default), and a later «|SM| = 4» drives it like any stated length (#1311).
+
+2. **Zero AREA is a collapse the solver must not INVENT (the #872 gate's missing face).** The joint
+   [gauge | dims | riders] solve owns an attractor the statement never licensed: LM flattened the
+   sampled triangle **collinear** — both angular residuals vanish on a collinear ring — and the
+   #872/ADR-3D-212 degeneracy gate could not see it (its pairwise test needs coincident vertices; its
+   off-plane test needs 4 vertices and skips flat kinds). For a NON-flat solid, `degenerate()` now
+   rejects a ring whose Newell normal is ≤ 1e-4·span². A FLAT solid (the 2-D vector lane) is
+   deliberately **not** rejected there: a student can FORCE its ring collinear («מרובע ABCD» then
+   «AB מתלכד עם CD» — a locked battery cell), and FR-RD-7 rules that a forced-flat figure is drawn,
+   never refused. So the flat kinds are judged on the accepted **pool** instead (`collapsedRing` /
+   `preferUncollapsed`): when every solution flattened a ring and the figure carries enrolled riders,
+   the frozen-dims retry (part 3) is offered the problem, its non-collapsed figure is preferred, and
+   the flat figure stands only when nothing else satisfies the givens — then the collapse was stated,
+   not invented. 2-D's ADR-413 `collapsedPolygon` is the same rule with the same exception.
+
+3. **The frozen-dims failure-path retry (the V8-c / ADR-3D-030 retry shape).** At seeds where the collapse
+   basin captured *every* start, rejecting the collapse left 0 solutions — a false refusal of a
+   satisfiable statement. So when the joint solve finds nothing and the figure carries enrolled riders,
+   `solvePivot` re-solves **with the dims frozen at the seed's sample** (the same function, dims baked
+   into the evaluation, unknowns [gauge | riders]) — the collapse basin does not exist there, and success
+   moves only what the statement's own carriers own (M2), so existing points stay put. The failure path
+   costs at most one extra solve, the same multiplier as the existing V8-c and plane-drive retries; a
+   recursion cannot recurse (the inner call has no dims to freeze).
+
+**Measured.** issue-1499 lock: the operator's eleven lines (S ≠ M, SM ⊥ ABC exact, at five seeds); the
+minimal «ABC משולש», «M אמצע BC», «SM⊥ABC» in both spellings; the height varying across seeds; «|SM| = 4»
+driving (with and without typed coordinates); #579's «SO גובה הפירמידה» unchanged (O stays the foot, on
+the base); both-endpoints-unknown still refused. 24-seed whole-rate: operator sequence **24/24**, minimal
++ «|SM| = 4» **24/24**.
+
+**Sibling audit.** *2-D:* ADR-263's «CD גובה לצלע AB» drops a foot onto a **segment**, where the known
+vertex on the carrier is the degenerate twin — but 2-D's altitude rule refuses a vertex on its own base
+line via the triangle's structure, and its solver has ADR-413's zero-area gate already; nothing filed.
+*Analytic/complex:* no ⟂-creation funnel (grep `height-to-face|foot-face` — `src3d` only). Nothing filed.
+
+**Consequences.** For a student: «SM⊥ABC» where M is a point of the plane now draws a real perpendicular
+standing out of the plane, whose length is theirs to state — and stating it works. A statement that
+could only be satisfied by flattening a solid to zero area is now refused instead of drawn flat.

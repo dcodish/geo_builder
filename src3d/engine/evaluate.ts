@@ -34,7 +34,8 @@ import {
 import { applyGauge, scalePinned, solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3 } from './vecExpr';
-import { absolutePointCount, freeCoordKey, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
+import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
+import { carrierParams3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
@@ -808,18 +809,20 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   }
   let freeT = 0;
   for (const [id, def] of c.points) {
-    // #820 (ADR-3D-204): a rider the PIVOT drove is no longer free — the given that named it consumed
-    // the DOF, and `pivot.riderTs` is the resolution's own record of what it solved rather than a
-    // second opinion about it (the ADR-3D-124 rule that closed the ADR-052 conformance smell for
-    // free planes: the count and the sampling share one source).
-    if (def.kind === 'on-segment' && def.t === undefined && resolved.pivot?.riderTs?.[id] === undefined) freeT++;
-    // #985 (ADR-3D-244): a scaled-offset corner whose ratio was never stated — one free DOF, unless the pivot drove it.
-    if (def.kind === 'scaled-offset' && def.k === undefined && resolved.pivot?.riderTs?.[id] === undefined) freeT++;
-    if (def.kind === 'free3') freeT += 3; // #774: a mixed-run minted point — three genuine free DOFs
-    if (def.kind === 'on-plane') freeT += def.side ? 3 : 2; // a plane rider slides in-plane; a side point also floats
-    if (def.kind === 'on-line') freeT += 1; // a line rider slides along its line (ADR-3D-031)
-    if (def.kind === 'bisector-ray') freeT += 1; // #343: how far along the bisector was never stated
-    if (def.kind === 'partial') freeT += [def.x, def.y, def.z].filter((v) => v === null).length; // each unstated component is a free DOF (ADR-3D-094)
+    // #1498: the point-carrier DOFs come from the ONE carrier table (`carrierParams3`) — the same
+    // enumeration the pivot's rider lane enrolls from, so the count and the lane can never drift
+    // apart again (the ADR-3D-124 rule: the count and the sampling share one source).
+    //
+    // #820 (ADR-3D-204): a rider the PIVOT drove is no longer free — the given that named it
+    // consumed the DOF, and `pivot.riderTs` is the resolution's own record of what it solved. The
+    // subtraction deliberately keeps #1311's shipped shape for `free3` (and its `partial` twin):
+    // their coordinates enroll as a BLOCK whenever any residual reads one, so "enrolled" overstates
+    // "consumed" there — refining that is #1415's rank-probe territory, not this count's.
+    for (const cp of carrierParams3(c, id, def)) {
+      const blockEnrolled = def.kind === 'free3' || def.kind === 'partial';
+      if (!blockEnrolled && resolved.pivot?.riderTs?.[cp.key] !== undefined) continue;
+      freeT++;
+    }
   }
   const param = c.param && pinningGivens(c) === 0 && c.paramGivens.length === 0 ? 1 : 0;
   // #487 (ADR-3D-124): a FREE plane's remaining sampled DOFs, reported by the resolution itself —
@@ -1078,8 +1081,8 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
   return planes.get(name) ?? planeFromPointRun(c, name, pos) ?? relPlaneFromPositions(c, name, pos);
 }
 
-/** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'bisector-ray', 'foot-seg', 'reflect-line', 'parallelogram-point', 'scaled-offset', 'right-pyramid-apex', 'right-apex', 'free3']);
+// #1498: GAUGE_KINDS + gaugeFramePoint3 moved to types.ts — the lane rule is asked in ONE place,
+// shared with solve3's residual accessor (which had drifted to "gauge everything").
 
 /**
  * #367: is anything in the figure stated in ABSOLUTE coordinates — a typed parametric line, a plane
@@ -1155,7 +1158,7 @@ export function translationGaugeFree3(c: Construction3): boolean {
 export function gaugePlacedIds3(c: Construction3): Id[] {
   const ids: Id[] = [];
   for (const [id, def] of c.points) {
-    if (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane))) ids.push(id);
+    if (gaugeFramePoint3(c, def)) ids.push(id);
   }
   return ids;
 }
@@ -1531,7 +1534,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
               const def = c.points.get(id);
               // the same gauge rule the chosen solution below uses — an equation-plane point is
               // Lane-A absolute and must NOT be transformed, or every branch would look distinct
-              const gauge = def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
+              const gauge = gaugeFramePoint3(c, def);
               // Stored ONE ENTRY PER POOL SOLUTION, in pool order, deliberately NOT deduplicated:
               // `pointRoots[a][i]` and `pointRoots[b][i]` must describe the same configuration, or a
               // consumer asking about the VECTOR a→b would pair positions from different branches.
@@ -1547,7 +1550,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
           const def = c.points.get(id);
           // an on-plane point rides the gauge iff its plane is a POINT-run plane (the run's
           // points are gauge-frame); an equation plane is Lane-A absolute — no transform
-          const gauge = def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
+          const gauge = gaugeFramePoint3(c, def);
           if (gauge) pos.set(id, chosen.transform(q));
           else pos.set(id, q);
         }
@@ -1648,7 +1651,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       // parameter / an equation-plane rider) is FROZEN at its final position
       const frozenOf = (id: Id): { ok: boolean; frozen?: Vec3 } => {
         const def = c.points.get(id);
-        const gauge = def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
+        const gauge = gaugeFramePoint3(c, def);
         const fin = pos.get(id);
         if (gauge) return { ok: true };
         return fin && Number.isFinite(fin.x) && Number.isFinite(fin.y) && Number.isFinite(fin.z)
@@ -2289,7 +2292,7 @@ function evaluateSolidsAndPoints(
   // insertion order (the reference segment, or O) — deferred here, placed in a 2nd pass once it exists.
   const deferredSegPins: [Id, number][] = [];
   const placeOnPlaneRider = (id: Id, def: Extract<PointDef, { kind: 'on-plane' }>): void =>
-    seatOnPlaneRider(c, seed, pos, planes, id, def);
+    seatOnPlaneRider(c, seed, pos, planes, id, def, riderTOverride);
   for (const [id, def] of c.points) {
     if (def.kind === 'solid-vertex' || def.kind === 'coord' || def.kind === 'rev-point') continue;
     if (def.kind === 'on-segment') {
@@ -2314,6 +2317,10 @@ function evaluateSolidsAndPoints(
       const comp = (ax: 'x' | 'y' | 'z'): number => {
         const fixed = def[ax];
         if (fixed !== null) return fixed;
+        // #1498: a null component the PIVOT drove is placed where the pivot put it (the free3
+        // pattern one carrier over — same key, same lane).
+        const driven = riderTOverride?.get(freeCoordKey(id, ax));
+        if (driven !== undefined) return driven;
         const sg = c.signGivens.find((g) => g.id === id && g.axis === ax);
         const mag = sample(seed, `partial-${ax}-${id}`, 0.3, 1.05) * spread;
         const sgn = sg ? (sg.positive ? 1 : -1) : sample(seed, `partialsgn-${ax}-${id}`, -1, 1) >= 0 ? 1 : -1;
@@ -2337,7 +2344,7 @@ function evaluateSolidsAndPoints(
       };
       pos.set(id, v3(comp3('x'), comp3('y'), comp3('z')));
     } else if (def.kind === 'on-line') {
-      seatOnLineRider(seed, pos, lines, id, def);
+      seatOnLineRider(seed, pos, lines, id, def, riderTOverride);
     } else if (def.kind === 'plane-cut') {
       // V8-b (G2): the point where a plane crosses segment a–b (the plane may be an
       // equation, a point-run, or a ⊥/∥ rel-plane — resolved from current positions)
@@ -2484,7 +2491,9 @@ function evaluateSolidsAndPoints(
       const placed = [...pos.values()];
       let spread = 1.2;
       for (const q of placed) spread = Math.max(spread, dist3(q, O));
-      pos.set(id, add3(O, scale3(u, sample(seed, `bisray-t-${id}`, 0.25, 0.8) * spread)));
+      // #1498: a DRIVEN rider's parameter is its absolute distance from the apex (the carrier
+      // table's `bis-dist` — positive, so it stays on the ray), else the seed's sample.
+      pos.set(id, add3(O, scale3(u, riderTOverride?.get(id) ?? sample(seed, `bisray-t-${id}`, 0.25, 0.8) * spread)));
     } else if (def.kind === 'bisector-seg') {
       // V8-f (G11): D on segment a–b, its t root-found so ray apex→D bisects ∠(a)(apex)(b).
       // f(t) = cos(apex→P(t), apex→a) − cos(apex→P(t), apex→b) is monotone on [0,1]
@@ -2638,6 +2647,7 @@ function seatOnPlaneRider(
   planes: Map<string, ResolvedPlane>,
   id: Id,
   def: Extract<PointDef, { kind: 'on-plane' }>,
+  riderTOverride?: ReadonlyMap<Id, number>,
 ): void {
   const pl = planes.get(def.plane) ?? planeFromPointRun(c, def.plane, pos);
   if (!pl) return; // degenerate/unplaced plane — flagged downstream (not-coplanar)
@@ -2683,6 +2693,13 @@ function seatOnPlaneRider(
     const up = nn.z < -1e-9 ? scale3(nn, -1) : nn;
     p = add3(p, scale3(up, def.side * sample(seed, `onplane-h-${id}`, 0.45, 1.05) * spread));
   }
+  // #1498: a DRIVEN rider (the carrier table's `id@u`/`id@v` lane entries) is offset from its
+  // sampled seat along the seat's own in-plane basis — (0, 0) is exactly the undriven seat, so a
+  // figure whose rider nothing reads is byte-identical, and the pivot's soft anchor at zero keeps an
+  // under-determined rider varying with the seed (ADR-052).
+  const du = riderTOverride?.get(`${id}@u`);
+  const dv = riderTOverride?.get(`${id}@v`);
+  if (du !== undefined || dv !== undefined) p = add3(p, add3(scale3(e1, du ?? 0), scale3(e2, dv ?? 0)));
   pos.set(id, p);
 }
 
@@ -2695,6 +2712,7 @@ function seatOnLineRider(
   lines: Map<string, ResolvedLine>,
   id: Id,
   def: Extract<PointDef, { kind: 'on-line' }>,
+  riderTOverride?: ReadonlyMap<Id, number>,
 ): void {
   const ln = lines.get(def.line);
   if (!ln || norm3(ln.dir) < 1e-12) return; // unresolved/degenerate line — flagged downstream
@@ -2705,7 +2723,9 @@ function seatOnLineRider(
   let spread = 1.2;
   for (const q of placed) spread = Math.max(spread, dist3(q, centre));
   const t = sample(seed, `online-t-${id}`, -0.85, 0.85) * spread;
-  pos.set(id, add3(centre, scale3(u, t)));
+  // #1498: a DRIVEN rider slides from its sampled seat along the line (0 = the seat; see the
+  // carrier table) — a line is infinite both ways, so the offset is unbounded.
+  pos.set(id, add3(centre, scale3(u, t + (riderTOverride?.get(id) ?? 0))));
 }
 
 /**

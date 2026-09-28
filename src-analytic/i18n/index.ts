@@ -153,6 +153,12 @@ const he = {
   'locus.circle': 'מעגל',
   'locus.parabola': 'פרבולה',
   'locus.ellipse': 'אליפסה',
+  // A UNION answer pluralises its kind (#1500) — «שני ישרים · y = 0 · 3x + 4y = 0». Two is the size
+  // the corpus produces (tangent pairs, two parallels); a larger union falls back to a counted form.
+  'locus.line.2': 'שני ישרים',
+  'locus.circle.2': 'שני מעגלים',
+  'locus.parabola.2': 'שתי פרבולות',
+  'locus.ellipse.2': 'שתי אליפסות',
   errNoPrincipalDiagonal:
     'בצורה הזאת אין אלכסון ראשי ואלכסון משני — ההבחנה הזאת קיימת רק בצורות כמו דלתון: "{{detail}}". אפשר לציין את האלכסון לפי הקודקודים, למשל «משוואת האלכסון AC היא y=2x».',
   errAmbiguousShape:
@@ -399,6 +405,10 @@ const en: typeof he = {
   'locus.circle': 'circle',
   'locus.parabola': 'parabola',
   'locus.ellipse': 'ellipse',
+  'locus.line.2': 'two lines',
+  'locus.circle.2': 'two circles',
+  'locus.parabola.2': 'two parabolas',
+  'locus.ellipse.2': 'two ellipses',
   errNoPrincipalDiagonal:
     'This shape has no principal and secondary diagonal — that distinction exists only for shapes ' +
     'like a kite: "{{detail}}". Name the diagonal by its vertices instead, for example "the ' +

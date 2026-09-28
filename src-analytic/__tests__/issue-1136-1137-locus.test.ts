@@ -108,9 +108,9 @@ describe('#1137 — the tracer walks the figure’s remaining freedom', () => {
     const d = derive(BISECTOR, 0);
     const res = locusOf(d.construction, 'M', [0, 1], d.box);
     expect(res).toBeTruthy();
-    expect(res!.trace.points.length).toBeGreaterThan(20);
+    expect(res!.components[0].trace.points.length).toBeGreaterThan(20);
     // EVERY traced point is equidistant from A and B, and sits on x = 4.
-    for (const p of res!.trace.points) {
+    for (const p of res!.components[0].trace.points) {
       expect(Math.hypot(p.x - 0, p.y - 0)).toBeCloseTo(Math.hypot(p.x - 8, p.y - 0), 4);
       expect(p.x).toBeCloseTo(4, 4);
     }
@@ -120,12 +120,12 @@ describe('#1137 — the tracer walks the figure’s remaining freedom', () => {
     const d = derive(WINTER25, 0);
     const res = locusOf(d.construction, 'P', [0, 1], d.box);
     expect(res).toBeTruthy();
-    expect(res!.trace.points.length).toBeGreaterThan(20);
-    for (const p of res!.trace.points) {
+    expect(res!.components[0].trace.points.length).toBeGreaterThan(20);
+    for (const p of res!.components[0].trace.points) {
       expect(Math.hypot(p.x - 16, p.y)).toBeCloseTo(25, 3);
     }
     // A circle CLOSES — the walk came back, which is what tells an ellipse from a parabola.
-    expect(res!.trace.closed).toBe(true);
+    expect(res!.components[0].trace.closed).toBe(true);
   });
 
   /**
@@ -154,7 +154,7 @@ describe('#1137 — the determinacy gate (ADR-AG-072 §4, §5)', () => {
     const a = answer(BISECTOR, 'המקום הגיאומטרי של M');
     expect(a.unreadable).toBeUndefined();
     expect(a.value).toBe('ישר · x - 4 = 0');
-    expect(a.locus!.points.length).toBeGreaterThan(20);
+    expect(a.locus!.components[0].points.length).toBeGreaterThan(20);
   });
 
   it('חורף 25 is determinate: «מעגל» AND (x − 16)² + y² = 25² (#1187 — was 625)', () => {
@@ -179,7 +179,7 @@ describe('#1137 — the determinacy gate (ADR-AG-072 §4, §5)', () => {
     const a = answer(['A(-9a,0)', 'B(41a,0)', 'נקודה P', 'PA מאונך ל-PB'], 'המקום הגיאומטרי של P');
     expect(a.value).toBe('מעגל');
     // The KIND is shown, so the curve is still drawn — a shape-only answer is an answer.
-    expect(a.locus!.points.length).toBeGreaterThan(20);
+    expect(a.locus!.components[0].points.length).toBeGreaterThan(20);
   });
 
   it('a parameterised bisector, likewise: «ישר» with no equation', () => {

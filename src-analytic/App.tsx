@@ -573,7 +573,13 @@ export function App() {
    * a family added later has no translation and shows its own name, which is visibly wrong rather
    * than silently missing.
    */
-  const locusKind = useCallback((kind: string) => t(`locus.${kind}`), [t]);
+  // `count` pluralises a UNION answer (#1500) — «שני ישרים» — with a counted fallback for a size
+  // no key names yet: visibly crude rather than silently singular.
+  const locusKind = useCallback(
+    (kind: string, count = 1) =>
+      count <= 1 ? t(`locus.${kind}`) : t(`locus.${kind}.${count}`, { defaultValue: `${count} × ${t(`locus.${kind}`)}` }),
+    [t],
+  );
 
   const answers = useMemo<Answer[]>(
     // #1212 removed `describeCurve` (imported now); #1137's `locusKind` stays — it is locale.
@@ -1726,33 +1732,39 @@ export function App() {
                     ) : a.unreadable ? (
                       `${a.question} — ${t('askUnreadable')}`
                     ) : (
-                      <MathText
-                        text={analyticBidi.isolateLtrRuns(
-                          /**
-                           * A VERTICAL SLOPE IS AN ANSWER, NOT A FAILURE (#1223).
-                           *
-                           * `a.fact` is checked before the `figureIsOpen` guess, because that guess
-                           * only ever chooses between two kinds of *absence* and this is neither. It
-                           * reuses `slopeVertical` — the string the «שיפועים» section already prints
-                           * for a vertical segment — so the two surfaces cannot come to disagree
-                           * about what a vertical thing's slope is.
-                           */
-                          `${a.question}${a.value && a.value.includes('=') ? ':' : ' ='} ${
-                            a.value ??
-                            (a.fact === 'vertical'
-                              ? t('slopeVertical')
-                              : a.fact === 'lines-cross'
-                                ? t('askLinesCross')
-                                : a.fact === 'points' && a.points
-                                  ? /* #1227 (ADR-AG-136): a determined point's locus IS the point(s) — the
-                                       locus lane's own grammar, «נקודה · (4, 3)» beside «ישר · x = 4» */
-                                    `${a.points.length === 1 ? t('askPointOne') : a.points.length === 2 ? t('askPointTwo') : t('askPointMany', { count: a.points.length })} · ${a.points
-                                      .map((p) => `(${fmt(p.x)}, ${fmt(p.y)})`)
-                                      .join(', ')}`
-                                  : t(figureIsOpen(d) ? 'askOpen' : 'askNoValue'))
-                          }`,
-                        )}
-                      />
+                      /**
+                       * A VERTICAL SLOPE IS AN ANSWER, NOT A FAILURE (#1223).
+                       *
+                       * `a.fact` is checked before the `figureIsOpen` guess, because that guess
+                       * only ever chooses between two kinds of *absence* and this is neither. It
+                       * reuses `slopeVertical` — the string the «שיפועים» section already prints
+                       * for a vertical segment — so the two surfaces cannot come to disagree
+                       * about what a vertical thing's slope is.
+                       *
+                       * A union locus carries `\n` between its equations (#1508 — "where there are
+                       * 2 answers, each on a separate line"), so the row renders per line, each
+                       * typeset independently — the #1221 rule the trace rows below already follow.
+                       */
+                      `${a.question}${a.value && a.value.includes('=') ? ':' : ' ='} ${
+                        a.value ??
+                        (a.fact === 'vertical'
+                          ? t('slopeVertical')
+                          : a.fact === 'lines-cross'
+                            ? t('askLinesCross')
+                            : a.fact === 'points' && a.points
+                              ? /* #1227 (ADR-AG-136): a determined point's locus IS the point(s) — the
+                                   locus lane's own grammar, «נקודה · (4, 3)» beside «ישר · x = 4» */
+                                `${a.points.length === 1 ? t('askPointOne') : a.points.length === 2 ? t('askPointTwo') : t('askPointMany', { count: a.points.length })} · ${a.points
+                                  .map((p) => `(${fmt(p.x)}, ${fmt(p.y)})`)
+                                  .join(', ')}`
+                              : t(figureIsOpen(d) ? 'askOpen' : 'askNoValue'))
+                      }`
+                        .split('\n')
+                        .map((line, k) => (
+                          <div key={k}>
+                            <MathText text={analyticBidi.isolateLtrRuns(line)} />
+                          </div>
+                        ))
                     )}
 
                     {/*
