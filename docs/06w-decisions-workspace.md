@@ -4851,3 +4851,18 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 **Measured.** 4 locks (`issue-1363-1243-events-sink.test.ts`): the no-env path is module-relative and absolute (never cwd-rooted), the env var wins, one-submit-per-submission, refusals counted with their result. The live probe run above is the mechanism's own proof.
 
 **Consequences.** `server/toolRouting.ts`, `scripts/deploy-preflight.mjs`, `src-complex/debug/sessionLogComplex.ts` (new), `src-complex/app/submit.ts`. **Proxy redeploy required** (with #1297's, one push).
+
+## ADR-W-098 — One wording for one state in every builder, and the first-visit About in all four (#1453)
+
+**Status:** accepted · 2026-09-29 · external prod review relayed by the operator; the wording is the operator's own "Explicit set" ruling (2026-09-27) · round #1517. Numbered 098 beside the round's parallel workspace branches (094–097). Stacked on #1452 (complex's undo/redo keys, which this lock reads).
+
+**Requirements:** docs/02w FR-SU-1 (one wording for one state; the first-visit About) · **Design:** docs/04w — one wording per role, and the first-visit About
+
+**Context.** Measured on main `d3f08a4c`, one state had four wordings («✓ נקבע במלואו» / «✓ הציור נקבע במלואו על ידי הנתונים» / «הצורה נקבעה במלואה» / «הכול נקבע על-ידי הנתונים»), the DOF count three («דרגות חופש: N» / «דרגות חופש שטרם נקבעו: N» / «N דרגות חופש»), the busy state three («עובדים על זה...», «מחשב…», «חושב…»), and the ask button three («חשב», «שאל», «שאלו»). Only 2-D opened About on a first visit, through its own private modal beside the frame's.
+
+**Decision.**
+- **The ruled set, in every builder.** He: «✓ הציור נקבע במלואו על ידי הנתונים» · «דרגות חופש: N» · «חושב…» (both of 2-D's busy strings) · «שאלו». En: "✓ The figure is fully determined by the givens" · "Degrees of freedom: N" · "Working…" · "Ask".
+- **The lock**, since shell holds no strings: `shell/__tests__/suite-vocabulary.test.ts` maps nine roles to each product's keys, reads the four locales by file (no test may import two product trees), and requires one wording per role and language, anchored to the ruled text. There are no exceptions for the ruled roles. Complex has no busy surface (no asynchronous path), which is recorded as absent with its reason, not as a different wording.
+- **The first-visit About** is `AppFrameAbout.autoOpenKey`: opt-in, one localStorage key per product, written on close, and on in all four. 2-D's private first-load modal (the same About content in a second `Modal`) is retired into it, keeping its `geo_intro_seen` key so a returning 2-D student is not shown it again. The privacy note is therefore seen at least once in every builder (#1426). The flag goes through the ONE storage door (`shell/session/persist`: `flagSeen` / `markSeen`, the same wrapped accessor as the session), because #1238's rule allows no other storage access inside `shell/`; the complex lane caught the first cut reading localStorage in AppFrame.
+
+**Consequences.** The four locales; `shell/frame/AppFrame.tsx` (`autoOpenKey`); the four Apps (the key); `src/App.tsx` (the private modal removed). Lock: `shell/__tests__/suite-vocabulary.test.ts`.

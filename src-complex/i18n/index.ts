@@ -203,7 +203,7 @@ const he = {
   contraArgument: 'ארגומנט',
   freedomNone: 'אין תצורה תקפה',
   freedomCount: 'דרגות חופש: {{n}}',
-  freedomPinned: 'הצורה נקבעה במלואה',
+  freedomPinned: '✓ הציור נקבע במלואו על ידי הנתונים', // #1453 (ADR-W-098): the suite's one wording
   stripUnsatisfied: 'לא מתקיים בתצורה הזו',
   // #887 (docs/10 guideline 8) — zero, many and no-set are three different things and read as three
   // different sentences. A "many" result is usually the exam asking for «שתי האפשרויות»: information,
@@ -421,8 +421,8 @@ const en: typeof he = {
   contraModulus: 'modulus',
   contraArgument: 'argument',
   freedomNone: 'no valid configuration',
-  freedomCount: 'degrees of freedom: {{n}}',
-  freedomPinned: 'the figure is fully determined',
+  freedomCount: 'Degrees of freedom: {{n}}',
+  freedomPinned: '✓ The figure is fully determined by the givens',
   stripUnsatisfied: 'does not hold in this configuration',
   selectionMany: 'more than one solution lies in quadrant {{quadrant}} ({{names}}) — say which one, or the answer is «both possibilities»',
   selectionNone: 'none of the solutions lies in quadrant {{quadrant}}',

@@ -30,7 +30,7 @@
   "input": {
     "placeholder": "Type a given, e.g.: cube ABCD",
     "add": "Add",
-    "thinking": "Thinking…"
+    "thinking": "Working…"
   },
   "catalog": {
     "title": "All supported commands",
@@ -43,7 +43,7 @@
   },
   "cue": {
     "determined": "✓ The figure is fully determined by the givens",
-    "free": "Degrees of freedom not yet pinned: {{n}}"
+    "free": "Degrees of freedom: {{n}}"
   },
   "actions": {
     "undo": "Undo",
@@ -225,7 +225,7 @@
   },
   "query": {
     "placeholder": "ask… e.g. AE (vector), |AE|, w·v, ∠SAB, area ABC",
-    "add": "Calc",
+    "add": "Ask",
     "remove": "remove",
     "note": {
       "notUnderstood": "not recognised — try A, plane ABC, w·v, |AB|, ∠SAB, area ABC, volume SABCD",

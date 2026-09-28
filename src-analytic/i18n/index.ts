@@ -45,7 +45,7 @@ const he = {
   // The ASK lane (#1027) — the panel's own input: two surfaces, one grammar.
   // Short enough to READ in the panel's column — a placeholder clipped at its start teaches nothing.
   askPlaceholder: 'שאלו: AB, שטח ABC',
-  askAdd: 'שאל',
+  askAdd: 'שאלו', // #1453 (ADR-W-098): the suite's one wording
   /** The ✕ that retires a measurement and the height it drew (#1118). */
   askTraceLabel: 'איך מגיעים לזה',
   askTraceToggle: 'הצגה/הסתרה של דרך החישוב',
@@ -100,8 +100,8 @@ const he = {
   angleWithX: 'זווית עם ציר ה-x',
   secParams: 'פרמטרים',
   paramUnused: '(לא בשימוש בשרטוט)',
-  freeDof: '{{count}} דרגות חופש',
-  pinned: 'הכול נקבע על-ידי הנתונים',
+  freeDof: 'דרגות חופש: {{count}}',
+  pinned: '✓ הציור נקבע במלואו על ידי הנתונים',
   about: 'אודות',
   aboutTitle: 'גאומטריה אנליטית',
   aboutLead:
@@ -358,8 +358,8 @@ const en: typeof he = {
   angleWithX: 'angle with the x-axis',
   secParams: 'Parameters',
   paramUnused: '(not used by the figure)',
-  freeDof: '{{count}} degrees of freedom',
-  pinned: 'Everything is fixed by the givens',
+  freeDof: 'Degrees of freedom: {{count}}',
+  pinned: '✓ The figure is fully determined by the givens',
   about: 'About',
   aboutTitle: 'Analytic Geometry',
   aboutLead:
@@ -449,7 +449,7 @@ const en: typeof he = {
     'The two lines in "{{detail}}" are the same line, and a line has no intersection with itself, so the sentence defines no point. If you meant some point on that line, write for example "P on line AB".',
   errLlmBusy:
     'The service is busy, so I could not check "{{detail}}". Try again in a moment, or write it in one of the forms listed in the commands panel.',
-  thinking: 'Thinking…',
+  thinking: 'Working…',
   errBadOperand:
     'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +
     'a side (side AB), a line (line l1) or an axis (the x-axis).',

@@ -1073,6 +1073,7 @@ export function App() {
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
         closeLabel: t('close'),
+        autoOpenKey: 'analytic_intro_seen', // #1453 (ADR-W-098): first visit opens About, in every builder
       }}
     >
       {/*
