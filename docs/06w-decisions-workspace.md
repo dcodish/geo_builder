@@ -4851,3 +4851,20 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 **Measured.** 4 locks (`issue-1363-1243-events-sink.test.ts`): the no-env path is module-relative and absolute (never cwd-rooted), the env var wins, one-submit-per-submission, refusals counted with their result. The live probe run above is the mechanism's own proof.
 
 **Consequences.** `server/toolRouting.ts`, `scripts/deploy-preflight.mjs`, `src-complex/debug/sessionLogComplex.ts` (new), `src-complex/app/submit.ts`. **Proxy redeploy required** (with #1297's, one push).
+
+## ADR-W-096 — A message names only what the student can see: one shared check (#1455)
+
+**Status:** accepted · 2026-09-29 · external prod review relayed by the operator («Never show internal names (tanmid, @ctr, cone, pyramid, base)», 2026-09-27), batch-approved the same day · round #1517. Numbered 096 beside the round's parallel #1465/#1348 branches (094, 095).
+
+**Requirements:** docs/02w FR-SU-5 (a sentence added: no engine id or noun is ever interpolated) · **Design:** docs/04w — student-facing text; docs/17 §3 — a new chokepoint row
+
+**Context.** The honesty invariant says an error names the student's statement, never internal state. It had leaked in all four builders, each fixed locally with no shared check: 2-D `~tanmid-OE` / `@ctr-O`, analytic `curve-anon…` / `circle-Z`, complex `#sz5_N`, and 3-D, where 28 `err.*` strings interpolate `{{id}}` straight from the engine.
+
+**Decision.**
+- **One check** in `shell/studentText.ts`, product-free. It judges the VALUES a message interpolates, never the template (a template may quote a worked example such as «תיבה ABCDA'B'C'D'»), because every leak so far arrived as a value. A value may name what the student typed (case-insensitive: «זווית sdb» makes D theirs) or any name the figure shows. An id-shaped token, an English word the student did not type, or a capital label that is neither typed nor drawn is a violation.
+- **3-D first, because it was measured.** `errorText` moved out of `App3.tsx` into `src3d/i18n/errorText3.ts` (a byte-for-byte move) so a test can drive it. Replaying all 1582 sequences the 3-D suite states found exactly two leaks. (1) The `base` sentinel, which «גובה הפירמידה» / «אנך לבסיס» resolve against, reached «המישור «base» לא הוגדר» in 28 sequences whenever the figure had no single solid. It now gets its own sentence covering both "no solid yet" and "several solids". (2) An engine solid noun reached «אין בציור בדיוק גוף אחד מסוג «pyramid»»; it is now the student's word («פירמידה», «חרוט»…). `student-text-1455.test.ts` locks the whole corpus, with a can-fail half.
+- **The chokepoint is registered** (docs/17 §3): every value a refusal or notice interpolates.
+
+**Scope held back, and filed.** The plan's per-product locks for 2-D, complex and analytic are #1522. Complex and analytic have no humanizer unit (their text is built inline in `App.tsx`, as 3-D's was), so each needs the same extraction first. 2-D's values-panel leak is #1442, not a refusal.
+
+**Consequences.** `shell/studentText.ts` (new), `src3d/i18n/errorText3.ts` (moved + the two rules), `src3d/App3.tsx` (imports it), both 3-D locales (`err.baseNeedsOneSolid`, `solidNoun.*`). Lock: `src3d/__tests__/student-text-1455.test.ts`. The #1394 parity golden gains two keys harvested from this lock's own arrays; 0 recorded hashes changed or lost (checked by value).

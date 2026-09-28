@@ -159,7 +159,8 @@
     "notADiagonal": "«{{pair}}» is not a diagonal of the solid — it is an edge. A diagonal joins non-adjacent vertices.",
     "notASpaceDiagonal": "«{{pair}}» is not a MAIN diagonal — it is a face diagonal. A main diagonal passes through the solid, joining opposite vertices.",
     "dependentsBroken": "«{{cause}}» was changed or removed, so {{items}} no longer takes effect — what it refers to is not defined any more. The row stays in the list and takes effect again once the definition is back",
-    "ambiguousVectorLengthRatio": "vector or length? write |{{a1}}{{b1}}| = {{c}}|{{a2}}{{b2}}| for lengths, or {{a1}}{{b1}}→ = {{c}}{{a2}}{{b2}}→ for vectors"
+    "ambiguousVectorLengthRatio": "vector or length? write |{{a1}}{{b1}}| = {{c}}|{{a2}}{{b2}}| for lengths, or {{a1}}{{b1}}→ = {{c}}{{a2}}{{b2}}→ for vectors",
+    "baseNeedsOneSolid": "\"The base\" is the base of a solid, and the figure does not have exactly one solid (none yet, or more than one). Declare the solid, or name the plane by its letters"
   },
   "examples": {
     "title": "Examples",
@@ -308,5 +309,16 @@
     "copyButton": "Copy",
     "storeFull": "The share space on the server is full — this is the long link, and it works",
     "offline": "Could not make a short link — this is the long link, and it works"
+  },
+  "solidNoun": {
+    "pyramid": "pyramid",
+    "tetra": "tetrahedron",
+    "cube": "cube",
+    "box": "box",
+    "prism": "prism",
+    "cone": "cone",
+    "cylinder": "cylinder",
+    "sphere": "sphere",
+    "any": "solid"
   }
 }

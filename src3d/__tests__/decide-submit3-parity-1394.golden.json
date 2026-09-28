@@ -1538,6 +1538,8 @@
  "suite:[\"תיבה ABCDA1B1C1D1\"]": "65c73ed561ba4afc",
  "suite:[\"S\",\"A\",\"B\"]": "d39f9c6ebd260d5a",
  "suite:[\"תיכוני משולש SAB נפגשים בנקודה P\",\"CD גובה במשולש ABC\",\"CD תיכון במשולש ABC\"]": "dc12df05d33e23ac",
+ "suite:[\"lastError\"]": "8ac05d3b6f1d8ae2",
+ "suite:[\"pyramid\"]": "e84bba4416b2adfb",
  "suite:[\"פירמידה SABC\",\"P מפגש התיכונים של משולש SAB\",\"CS=w\",\"CB=v\",\"CA=u\",\"AM=t*AB\",\"|w|=2\",\"|u|=1\",\"|v|=1\",\"∠SCB=α\",\"∠BCA=α\",\"∠SCA=α\",\"0<α<90\",\"AB⊥PM\",\"EM=k*CM\",\"מישור BCS\"]": "8356bc7e474e1e89",
  "suite:[\"טטראדר ABCD\",\"tetrahedron PQRS\"]": "581e37e76a9b1d37",
  "suite:[\"A\",\"B\",\"C\",\"D\",\"E\"]": "3ad75a65e3b22bd9",
