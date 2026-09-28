@@ -1850,11 +1850,13 @@ const heightOfSolid: Rule = (s) => {
     if (!seg) return null;
     return [{ type: 'height-to-face', id: seg[2], from: seg[1], face: [faceM[1], faceM[2], faceM[3]] }];
   }
+  // The value slots compose from the UNUM atom (the docs/24 S2.1 lexical ratchet), so these three
+  // are built RegExps rather than literals.
   const m =
-    s.match(/^(?:המקצוע\s+|הצלע\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?(?:גובה|אנך)(?:\s+(?:בפירמידה|במנסרה|הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?(?:\s*,?\s*(?:\1\2\s*)?(?:ואורכו|אורכו|הוא|=)\s*(\d+(?:\.\d+)?))?\s*$/) ??
-    s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+is\s+the\s+(?:height|altitude)(?:\s+of\s+the\s+(?:pyramid|prism))?(?:\s*,?\s*(?:and\s+its\s+length\s+is|=)\s*(\d+(?:\.\d+)?))?\s*$/i) ??
+    s.match(new RegExp(String.raw`^(?:המקצוע\s+|הצלע\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?(?:גובה|אנך)(?:\s+(?:בפירמידה|במנסרה|הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?(?:\s*,?\s*(?:\1\2\s*)?(?:ואורכו|אורכו|הוא|=)\s*(${UNUM}))?\s*$`)) ??
+    s.match(new RegExp(String.raw`^([A-Z]\d*'?)([A-Z]\d*'?)\s+is\s+the\s+(?:height|altitude)(?:\s+of\s+the\s+(?:pyramid|prism))?(?:\s*,?\s*(?:and\s+its\s+length\s+is|=)\s*(${UNUM}))?\s*$`, 'i')) ??
     // #1448: the noun-first named spelling — «גובה הפירמידה SO = 4».
-    s.match(/^ה?גובה\s+(?:הפירמידה|המנסרה)\s+([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:,?\s*(?:הוא|=)\s*(\d+(?:\.\d+)?))?\s*$/);
+    s.match(new RegExp(String.raw`^ה?גובה\s+(?:הפירמידה|המנסרה)\s+([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:,?\s*(?:הוא|=)\s*(${UNUM}))?\s*$`));
   if (!m) return null;
   const role: Command3 = { type: 'seg-plane-rel', rel: 'perp', a: m[1], b: m[2], plane: [] };
   // #1448: the value rides the same sentence — the claim the two-line spelling always stated.
@@ -1918,7 +1920,7 @@ const heightFromApex: Rule = (s) => {
   const FROM = String.raw`(?:ש?יוצא\s+)?מ-?\s*(?:נקודה\s+|ה?קודקוד\s+)?`;
   // #1448: the phrase may carry its VALUE — «גובה הפירמידה 4», «הוא 4», «= 4» — the two-line
   // spelling («SO גובה הפירמידה» then «SO = 4») compressed into the sentence the review typed.
-  const VAL = `(?:\\s*,?\\s*(?:הוא\\s+|שווה\\s+ל-?\\s*|=\\s*|is\\s+)?(?<len>\\d+(?:\\.\\d+)?))?`;
+  const VAL = String.raw`(?:\s*,?\s*(?:הוא\s+|שווה\s+ל-?\s*|=\s*|is\s+)?(?<len>${UNUM}))?`;
   const m =
     s.match(
       new RegExp(

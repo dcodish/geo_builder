@@ -616,7 +616,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   },
   {
     category: 'points',
-    family: 'F2',
+    family: 'F3',
     he: 'P על המעגל I',
     en: 'P on circle I',
     needs: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9'],
