@@ -15,6 +15,8 @@
 import type { SymbolSpec } from '../../shell/symbols';
 
 export const SYMBOLS: readonly SymbolSpec[] = [
+  // #1435 — the reviewer's «no √ input»: wraps the selection (`3+1` → `√(3+1)`), like conj
+  { label: '√', titleKey: 'symSqrt', before: '√(', after: ')' },
   { label: 'z̄', titleKey: 'symConj', before: 'conj(', after: ')' },
   { label: '|z|', titleKey: 'symAbs', before: '|', after: '|' },
   { label: '1/z', titleKey: 'symInv', before: '1/(', after: ')' },

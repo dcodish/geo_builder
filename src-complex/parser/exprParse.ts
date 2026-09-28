@@ -18,8 +18,9 @@
 import { type Expr, I, abs, add, conj, div, mul, neg, num, param, pow, ref, sub, val } from '../model/expr';
 import { fromNumber, rat, type Rat } from '../value/rational';
 import { evaluate, exact, fromCartesian } from '../value/value';
-import { fromDegrees } from '../value/angle';
-import { one as modOne } from '../value/modulus';
+import { fromRadicalParts, radicalOfModulus } from '../value/cartesian';
+import { fromDegrees, isExactRational } from '../value/angle';
+import { one as modOne, fromRational as modFromRational, pow as modPow } from '../value/modulus';
 
 /**
  * A CAPITAL letter is a POINT LABEL (#791, ADR-CX-033) — the exam's figure register: «הנקודות A ו-B
@@ -123,6 +124,8 @@ type Tok =
   | { t: 'proj'; v: 're' | 'im'; at: number; len: number }
   /** `d_{z1z2}` / `d_{AB}` — the textbook's distance form (#791): exactly two point atoms */
   | { t: 'dist'; a: string; b: string; at: number; len: number }
+  /** #1435 — an n-th-root sign: √ (2), ∛ (3), ∜ (4), or a superscript-prefixed ⁿ√ */
+  | { t: 'root'; n: bigint; at: number; len: number }
   | { t: 'op'; v: string; at: number; len: number };
 
 // `cis` and `conj` end on a non-LETTER, not on a word boundary. `\b` does not fire between `cis` and
@@ -130,7 +133,7 @@ type Tok =
 // with an invented parameter, and printed as `2cis150`.
 // `d_{…}` sits BEFORE the general name alternative, or the lexer would read the bare `d` as a
 // parameter and refuse the line at the `_`.
-const TOKEN = /\s+|conj(?![A-Za-z])|cis(?![A-Za-z])|re(?=\s*\()|im(?=\s*\()|d_\{[^{}]*\}|[A-Za-z][A-Za-z]*\d*|\d+(?:\.\d+)?|[()|^*/+\-]/giu;
+const TOKEN = /\s+|conj(?![A-Za-z])|cis(?![A-Za-z])|re(?=\s*\()|im(?=\s*\()|sqrt(?=\s*\()|[⁰¹²³⁴⁵⁶⁷⁸⁹]*[√∛∜]|d_\{[^{}]*\}|[A-Za-z][A-Za-z]*\d*|\d+(?:\.\d+)?|[()|^*/+\-]/giu;
 
 /**
  * The two point atoms inside `d_{…}`, or null when the braces hold anything else. Atoms are the run
@@ -145,6 +148,20 @@ function distAtoms(inner: string): [string, string] | null {
   const a = canon(m[1]);
   const b = canon(m[2]);
   return a === b ? null : [a, b];
+}
+
+/** The root INDEX a radical token states: `√` is 2, `∛` 3, `∜` 4, `ⁿ√` its superscript run. */
+const SUPERSCRIPT = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+function rootIndexOf(text: string): bigint | null {
+  const glyph = text[text.length - 1];
+  const prefix = text.slice(0, -1);
+  if (prefix) {
+    if (glyph !== '√') return null; // an index belongs to √ alone — ⁵∛ is not a thing
+    let n = 0n;
+    for (const ch of prefix) n = n * 10n + BigInt(SUPERSCRIPT.indexOf(ch));
+    return n >= 2n ? n : null;
+  }
+  return glyph === '√' ? 2n : glyph === '∛' ? 3n : 4n;
 }
 
 function lex(src: string, from: number, to: number): Tok[] | null {
@@ -162,7 +179,12 @@ function lex(src: string, from: number, to: number): Tok[] | null {
     if (low === 'conj') out.push({ t: 'conj', at, len });
     else if (low === 're' || low === 'im') out.push({ t: 'proj', v: low, at, len });
     else if (low === 'cis') out.push({ t: 'cis', at, len });
-    else if (low === 'i') out.push({ t: 'i', at, len });
+    else if (low === 'sqrt') out.push({ t: 'root', n: 2n, at, len });
+    else if (/[√∛∜]$/.test(text)) {
+      const n = rootIndexOf(text);
+      if (n === null) return null; // ⁰√ / ¹√ — no such root
+      out.push({ t: 'root', n, at, len });
+    } else if (low === 'i') out.push({ t: 'i', at, len });
     else if (/^d_\{/i.test(text)) {
       const atoms = distAtoms(text.slice(3, -1));
       if (!atoms) return null; // braces holding anything but two distinct points refuse the span
@@ -243,6 +265,7 @@ export function parseExpr(
             t.t === 'i' ||
             t.t === 'conj' ||
             t.t === 'proj' ||
+            t.t === 'root' ||
             (t.t === 'op' && (t.v === '(' || (t.v === '|' && absDepth === 0))))
         ) {
           const r = parsePower();
@@ -305,6 +328,40 @@ export function parseExpr(
     if (t.t === 'i') {
       i++;
       return I;
+    }
+    /**
+     * #1435 — a radical: `√3`, `sqrt(3)`, `√(x)`, `⁵√100`, `√2cis45`, `√z1`.
+     *
+     * A root of a RATIONAL LITERAL is an exact magnitude — the modulus layer's own exponent
+     * vector — so `√3 + i` can fold to `2·cis30°` and `√2cis45` stays a tier-1 literal (`√-` of a
+     * negative never arises here: the lexer's numbers are unsigned and a `-` refuses the radicand).
+     * Any other radicand is the n-th root as the power the grammar already has (`pow(x, 1/n)`).
+     */
+    if (t.t === 'root') {
+      i++;
+      const n = t.n;
+      const exactRoot = (v: Rat): Expr => (v.n === 0n ? num(rat(0)) : val(exact(modPow(modFromRational(v), rat(1n, n)), fromDegrees(rat(0)))));
+      const nx = peek();
+      if (nx?.t === 'num') {
+        i++;
+        if (peek()?.t === 'cis') {
+          i++;
+          const a = parseUnary();
+          if (!a) return null;
+          const deg = signedDegrees(a);
+          return deg && nx.v.n !== 0n ? val(exact(modPow(modFromRational(nx.v), rat(1n, n)), fromDegrees(deg))) : null;
+        }
+        return exactRoot(nx.v);
+      }
+      if (isOp('(')) {
+        i++;
+        const e = parseSum();
+        if (!e || !isOp(')')) return null;
+        i++;
+        return e.t === 'num' ? exactRoot(e.v) : pow(e, rat(1n, n));
+      }
+      const e = parseAtom();
+      return e ? pow(e, rat(1n, n)) : null;
     }
     if (t.t === 'cis') {
       i++;
@@ -380,6 +437,109 @@ export function parseExpr(
   return foldConstants(result, atoms);
 }
 
+/**
+ * #1435 — a constant subtree as a GAUSSIAN-RADICAL pair: `a·√k + b·√m·i`, one square-free radical
+ * term per axis, carried exactly. Null whenever a node leaves that shape (two incompatible radicals
+ * on one axis, a residual higher root, a name). The `pow` case is deliberately absent — a root of a
+ * literal already arrives as an exact `val` from the parser.
+ */
+type RadPart = { c: Rat; k: bigint };
+type RadPair = { re: RadPart; im: RadPart };
+const RZERO: RadPart = { c: rat(0), k: 1n };
+
+function radicalValue(e: Expr): RadPair | null {
+  const one = (c: Rat, k: bigint): RadPart => ({ c, k });
+  const addParts = (a: RadPart, b: RadPart, sign: 1n | -1n): RadPart | null => {
+    const bc = sign === 1n ? b.c : rat(-b.c.n, b.c.d);
+    if (a.c.n === 0n) return { c: bc, k: b.k };
+    if (b.c.n === 0n) return a;
+    if (a.k !== b.k) return null;
+    const c = rat(a.c.n * bc.d + bc.n * a.c.d, a.c.d * bc.d);
+    return { c, k: a.k };
+  };
+  const mulParts = (a: RadPart, b: RadPart): RadPart => {
+    if (a.c.n === 0n || b.c.n === 0n) return RZERO;
+    const g = ((x: bigint, y: bigint): bigint => {
+      let p = x < 0n ? -x : x;
+      let q = y < 0n ? -y : y;
+      while (q) [p, q] = [q, p % q];
+      return p;
+    })(a.k, b.k);
+    return { c: rat(a.c.n * b.c.n * g, a.c.d * b.c.d), k: (a.k / g) * (b.k / g) };
+  };
+  const mulPairs = (l: RadPair, r: RadPair): RadPair | null => {
+    const re = addParts(mulParts(l.re, r.re), mulParts(l.im, r.im), -1n);
+    const im = addParts(mulParts(l.re, r.im), mulParts(l.im, r.re), 1n);
+    return re && im ? { re, im } : null;
+  };
+  switch (e.t) {
+    case 'num':
+      return { re: one(e.v, 1n), im: RZERO };
+    case 'i':
+      return { re: RZERO, im: one(rat(1), 1n) };
+    case 'val': {
+      if (e.v.kind === 'zero') return { re: RZERO, im: RZERO };
+      if (e.v.kind !== 'exact' || !isExactRational(e.v.arg)) return null;
+      const m = radicalOfModulus(e.v.mod);
+      if (!m) return null;
+      const quarter = ratMulLocal(fracLocal(e.v.arg.turns), rat(4));
+      if (quarter.d !== 1n) return null;
+      let re: RadPart = m;
+      let im: RadPart = RZERO;
+      for (let q = 0n; q < quarter.n; q++) [re, im] = [{ c: rat(-im.c.n, im.c.d), k: im.k }, re];
+      return { re, im };
+    }
+    case 'neg': {
+      const x = radicalValue(e.e);
+      return x && { re: { c: rat(-x.re.c.n, x.re.c.d), k: x.re.k }, im: { c: rat(-x.im.c.n, x.im.c.d), k: x.im.k } };
+    }
+    case 'conj': {
+      const x = radicalValue(e.e);
+      return x && { re: x.re, im: { c: rat(-x.im.c.n, x.im.c.d), k: x.im.k } };
+    }
+    case 'add':
+    case 'sub': {
+      const l = radicalValue(e.l);
+      const r = radicalValue(e.r);
+      if (!l || !r) return null;
+      const s = e.t === 'add' ? 1n : -1n;
+      const re = addParts(l.re, r.re, s as 1n | -1n);
+      const im = addParts(l.im, r.im, s as 1n | -1n);
+      return re && im ? { re, im } : null;
+    }
+    case 'mul': {
+      const l = radicalValue(e.l);
+      const r = radicalValue(e.r);
+      return l && r ? mulPairs(l, r) : null;
+    }
+    case 'div': {
+      const l = radicalValue(e.l);
+      const r = radicalValue(e.r);
+      if (!l || !r) return null;
+      // 1/(a+bi) = conj / |·|², and |·|² = a²k + b²m is rational
+      const s = rat(
+        r.re.c.n * r.re.c.n * r.re.k * r.im.c.d * r.im.c.d + r.im.c.n * r.im.c.n * r.im.k * r.re.c.d * r.re.c.d,
+        r.re.c.d * r.re.c.d * r.im.c.d * r.im.c.d,
+      );
+      if (s.n === 0n) return null;
+      const invS = rat(s.d, s.n);
+      const inv: RadPair = {
+        re: { c: ratMulLocal(r.re.c, invS), k: r.re.k },
+        im: { c: ratMulLocal(rat(-r.im.c.n, r.im.c.d), invS), k: r.im.k },
+      };
+      return mulPairs(l, inv);
+    }
+    default:
+      return null;
+  }
+}
+const ratMulLocal = (a: Rat, b: Rat): Rat => rat(a.n * b.n, a.d * b.d);
+const fracLocal = (a: Rat): Rat => {
+  let n = a.n % a.d;
+  if (n < 0n) n += a.d;
+  return rat(n, a.d);
+};
+
 /** The numeric value of a subtree that mentions no name, or null. */
 function constValue(e: Expr): { re: number; im: number } | null {
   switch (e.t) {
@@ -441,6 +601,15 @@ export function foldConstants(e: Expr, atoms: Map<string, number>): Expr {
       const lit = fromCartesian(re, im);
       if (lit.atomBinding) atoms.set(lit.atomBinding.atom, lit.atomBinding.degrees);
       return val(lit.value);
+    }
+    // #1435 — a constant with RADICAL parts (`√3 + i`, `(1+i)√2`): carried exactly through the
+    // Gaussian-radical walk and recognized against the angle table. `√3 + i` folds to 2·cis30°,
+    // so a stated radical literal is as exact as `3+4i` — the plan's «exact modulus 2, argument
+    // 30°». A direction the table does not know stays a compound (numeric tier), never a guess.
+    const rp = radicalValue(e);
+    if (rp) {
+      const lit = fromRadicalParts(rp.re, rp.im);
+      if (lit) return val(exact(lit.mod, lit.arg));
     }
   }
   switch (e.t) {

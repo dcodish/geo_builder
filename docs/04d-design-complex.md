@@ -79,6 +79,13 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   claimed — as a parameter — so the line balanced perfectly while meaning something the student never
   wrote. A grammar where juxtaposition means multiplication needs both: every span claimed, and a
   floor on what a claim may invent.
+- **A radical is a token, and a radical LITERAL is a value** ([ADR-CX-052](06d-decisions-complex.md#adr-cx-052)).
+  «√» / «∛» / «∜» / «ⁿ√» / «sqrt(» lex as one root token; a root of a rational literal becomes an exact
+  value on the modulus exponent vector (so «√2cis45» stays a tier-1 literal), and any other radicand is
+  the power the grammar already has (`pow(x, 1/n)` — no new AST kind). A constant with RADICAL parts
+  («√3 + i») folds through the Gaussian-radical walk and the angle table, **verified symbolically**
+  against the candidate turn before any exact value is claimed — the fold never invents exactness the
+  table cannot prove.
 - **A parameter lives in the modulus CONSTANT, and the leftover rows are read over the parameters**
   ([ADR-CX-041](06d-decisions-complex.md#adr-cx-041)). `9r` is `{3:2, r:1}` in the constant, never an
   unknown, because every parametric answer (`15r`) reads that encoding. So a given that DETERMINES `r`

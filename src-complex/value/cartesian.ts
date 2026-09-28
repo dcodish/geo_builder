@@ -26,9 +26,9 @@
  * arithmetic is bounded integer work on these three shapes (the ADR-CX-006 boundary).
  */
 
-import { type Rat, ONE, add, floor, frac, isZero, mul, neg, rat, sub, toNumber } from './rational';
-import { type ExpVec, evaluate as evalMod, format as fmtMod, isPrimeAtom } from './modulus';
-import { type Angle, isExactRational } from './angle';
+import { type Rat, ONE, add, eq as eqRat, floor, frac, fromNumber, isZero, mul, neg, rat, sub, toNumber } from './rational';
+import { type ExpVec, evaluate as evalMod, format as fmtMod, fromRational as fromRationalVec, isPrimeAtom, pow as modPowVec } from './modulus';
+import { type Angle, fromTurns as fromTurnsAngle, isExactRational } from './angle';
 
 /** `a + b√d` under a square root — the nested radicand of the 18° and 22.5° families. */
 interface Nest {
@@ -322,4 +322,55 @@ export function composeCartesian(re: CartPart, im: CartPart): string {
   if (im.zero) return reSigned;
   if (re.zero) return `${im.negative ? '-' : ''}${imText}`;
   return `${reSigned}${im.negative ? '-' : '+'}${imText}`;
+}
+
+/**
+ * #1435 — the RADICAL pair recognizer, the inverse direction of {@link exactCartesianParts}: given
+ * `a·√k + b·√m·i` (each part one square-free radical term), find the exact polar value it is. The
+ * modulus is √(a²k + b²m) — rational under the root, the modulus layer's own vector — and the
+ * argument candidate comes from the numeric direction at the table's nice-turn denominators, then
+ * is VERIFIED symbolically: the candidate turn's own exact cartesian parts must reproduce the
+ * stated terms exactly. No verification, no value — the display never invents an exact form.
+ * `√3 + i` → mod 2, arg 30°; `1 + i` → √2 · 45°; a direction outside the table answers null.
+ */
+export function fromRadicalParts(
+  reIn: { c: Rat; k: bigint },
+  imIn: { c: Rat; k: bigint },
+): { mod: ExpVec; arg: Angle } | null {
+  // normalize each part: square-free k, zero spelled {0, 1}
+  const norm = (p: { c: Rat; k: bigint }): { c: Rat; k: bigint } | null => {
+    if (isZero(p.c)) return { c: p.c, k: 1n };
+    if (p.k < 1n) return null;
+    const m = squareRoot(p.k);
+    return { c: mul(p.c, rat(m)), k: p.k / (m * m) };
+  };
+  const re = norm(reIn);
+  const im = norm(imIn);
+  if (!re || !im) return null;
+  const mod2 = add(mul(mul(re.c, re.c), rat(re.k)), mul(mul(im.c, im.c), rat(im.k)));
+  if (isZero(mod2)) return null;
+  const modVec = modPowVec(fromRationalVec(mod2), rat(1, 2));
+  const x = toNumber(re.c) * Math.sqrt(Number(re.k));
+  const y = toNumber(im.c) * Math.sqrt(Number(im.k));
+  const deg = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+  const turns = fromNumber(deg / 360, 24, 1e-9);
+  if (!turns) return null;
+  // the symbolic verification: the candidate turn must spell the stated terms EXACTLY
+  const split = splitModulus(modVec);
+  if (!split || split.residual !== null) return null;
+  const matches = (terms: Term[] | null, want: { c: Rat; k: bigint }): boolean => {
+    if (terms === null) return false;
+    const scaled = collect(terms.map((t) => scaleTerm(t, split.q, split.s)));
+    if (isZero(want.c)) return scaled.length === 0;
+    return scaled.length === 1 && scaled[0].nest === null && scaled[0].k === want.k && eqRat(scaled[0].c, want.c);
+  };
+  const degRat = mul(turns, rat(360));
+  if (!matches(cosOf(degRat), re) || !matches(sinOf(degRat), im)) return null;
+  return { mod: modVec, arg: fromTurnsAngle(turns) };
+}
+
+/** #1435 — a modulus as one radical term `q·√s`, or null (parametric, or a residual higher root). */
+export function radicalOfModulus(mod: ExpVec): { c: Rat; k: bigint } | null {
+  const split = splitModulus(mod);
+  return split && split.residual === null ? { c: split.q, k: split.s } : null;
 }

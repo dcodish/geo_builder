@@ -3332,3 +3332,18 @@ two conjugate pairs related exactly, the corpus witness, both-sides spelling, �
 wrong member refused, an existing letter verified, indexed letters, degree 5, set-letter questions, the
 sentence in both locales, the shape reader, the lift). Six fixtures: `all-roots-{quadratic,
 binomial-spelling, member, member-poly, quartic, corpus-witness}-1434.complex.json`.
+
+## ADR-CX-052 — √ is input: radicals lex, and a radical literal is an exact value (#1435)
+
+**Requirements:** docs/02d FR-LN-4 (new) — radicals are input, carried exactly; √ palette chip
+**Design:** docs/04d §Design rules — «a radical is a token, and a radical literal is a value»
+
+**Reported.** External review of prod: "No √ input, and results are decimals only." `z1 = √3 + i`, `sqrt(3)`, `√(x)`, `|z1| = √2`, `z1 = √2cis45`, `w = (z1/√2)^4` all `not-handled`; the palette offered no √. docs/27 §5.2 names `w = (z₁/√2)^{4n}` (2022 חורף) and `|z|·i + 2z = √3` (2015 חורף / 2013 קיץ). Planned, never built — a feature.
+
+**Decision.**
+1. **Lexing:** `√` / `∛` / `∜` / superscript-indexed `ⁿ√` / `sqrt(` are one `root` token (`exprParse.ts` TOKEN + `rootIndexOf`); a root sign starts an implicit product like a name, so «2√3», «i√3», «1 + √3i» read.
+2. **A root of a RATIONAL literal is an exact value** on the modulus layer's own exponent vector — `√2cis45` is `val(exact(2^{1/2}, 45°))`, tier-1 monomial, and `|z1| = √2` pins the modulus exactly. Any other radicand is `pow(x, 1/n)` — the node the grammar already had, no new AST kind. `√` of a negative or of «שורש 3» (the word — the 2-D #246 ruling: taught, not parsed) refuses.
+3. **A radical SUM folds to the exact polar value it is.** `foldConstants` gains a Gaussian-radical walk (`radicalValue`: one square-free radical term per axis, closed under ±, ·, ÷, conj) and `value/cartesian.ts` gains `fromRadicalParts`: modulus √(a²k + b²m), argument candidate from the numeric direction at the table denominators, then **verified symbolically** — the candidate turn's own exact cartesian parts must reproduce the stated terms, or no exact value is claimed. `√3 + i` is `2·cis30°`; a direction outside the table stays a compound (numeric tier), never a guess.
+4. **Palette:** √ wrap-selection chip (`ui/symbols.ts` + `symSqrt` i18n), proof template in the palette lock. Catalog row under F2.
+
+**Consequences.** `src-complex/parser/exprParse.ts` (lexer, root atom, radical fold), `src-complex/value/cartesian.ts` (`fromRadicalParts`, `radicalOfModulus`), `src-complex/ui/symbols.ts`, `src-complex/i18n/index.ts`, `src-complex/parser/catalog.ts`, docs 02d/04d. Locks: `src-complex/__tests__/issue-1435-sqrt-input.test.ts` — every reviewer spelling; `√3 + i` reads `2·cis30°` exactly; `√2cis45` keeps `√2`; `|z1| = √2` pins; the 2022-חורף `(z1/√2)^4` answers −1; the 2015-חורף equation builds; the word-form and negative-radicand refusals. Palette lock extended (`symbols-module.test.ts`).

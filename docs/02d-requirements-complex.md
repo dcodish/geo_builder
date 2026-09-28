@@ -154,6 +154,11 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
 - **FR-LN-2 (Must)** — **A refusal names the student's statement**, never internal state
   ([FR-SU-5](02w-requirements-workspace.md)), and reads correctly in an RTL sentence with LTR
   mathematics inside it ([FR-WI-2](02w-requirements-workspace.md)).
+- **FR-LN-4 (Must)** — **Radicals are input, carried exactly.** «√3 + i», «sqrt(3)», «√(x)», «ⁿ√x» and
+  «√2cis45» parse; a root of a rational literal is an exact magnitude (the modulus exponent vector), so
+  «√3 + i» IS 2·cis30° and «|z₁| = √2» pins the modulus exactly — never a decimal approximation of a
+  stated radical. The √ palette chip wraps the selection. The word form «שורש 3» is taught, not parsed
+  (the 2-D #246 ruling). *(#1435; realised — [ADR-CX-052](06d-decisions-complex.md#adr-cx-052).)*
 - **FR-LN-3 (Should)** — **Series are in scope**, being part of the corpus question rather than an
   extension of it. *(docs/27 §2.)*
 

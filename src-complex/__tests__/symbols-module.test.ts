@@ -25,6 +25,7 @@ const TEMPLATES: Record<
   string,
   { value: string; sel: [number, number]; complete?: string; expected: string }
 > = {
+  symSqrt: { value: 'z1 = 3', sel: [5, 6], expected: 'z1 = √(3)' },
   symConj: { value: 'w = z1', sel: [4, 6], expected: 'w = conj(z1)' },
   symAbs: { value: 'w = z1', sel: [4, 6], expected: 'w = |z1|' },
   symInv: { value: 'w = z1', sel: [4, 6], expected: 'w = 1/(z1)' },
