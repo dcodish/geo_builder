@@ -26,6 +26,7 @@ import { AboutBody, type AboutContent } from './about';
 import { Modal } from './Modal';
 import type { PrivacyDeclaration } from './privacy';
 import { ProductSwitcher, type RosterEntry } from './Switcher';
+import { flagSeen, markSeen } from '../session/persist';
 
 export interface AppFrameAbout {
   /** The overflow entry's label (e.g. «אודות»). */
@@ -39,6 +40,12 @@ export interface AppFrameAbout {
    *  §5c privacy lock can hold the note to the product's real wiring. */
   privacy: PrivacyDeclaration;
   closeLabel: string;
+  /**
+   * #1453 (ADR-W-098): open the About once, on a visitor's first load, and remember it under this
+   * key (each product its own). Opt-in, so the frame never decides it for a product; the operator's
+   * ruling turns it on in all four, so the privacy note is seen at least once.
+   */
+  autoOpenKey?: string;
 }
 
 export interface AppFrameProps {
@@ -83,6 +90,16 @@ export function AppFrame({
   children,
 }: AppFrameProps) {
   const [aboutOpen, setAboutOpen] = useState(false);
+  const autoOpenKey = about.autoOpenKey;
+  useEffect(() => {
+    if (!autoOpenKey) return;
+    if (!flagSeen(autoOpenKey)) setAboutOpen(true);
+  }, [autoOpenKey]);
+  const closeAbout = () => {
+    setAboutOpen(false);
+    if (!autoOpenKey) return;
+    markSeen(autoOpenKey);
+  };
 
   /**
    * THE LANGUAGE TOGGLE AND THE DIRECTION FLIP ARE THE FRAME'S — suite-level chrome by the level
@@ -152,10 +169,10 @@ export function AppFrame({
       {children}
       <Modal
         open={aboutOpen}
-        onClose={() => setAboutOpen(false)}
+        onClose={closeAbout}
         title={about.title}
         footer={
-          <button type="button" style={closeBtnStyle} onClick={() => setAboutOpen(false)}>
+          <button type="button" style={closeBtnStyle} onClick={closeAbout}>
             {about.closeLabel}
           </button>
         }

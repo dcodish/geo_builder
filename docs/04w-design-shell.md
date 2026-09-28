@@ -376,3 +376,7 @@ A `SymbolSpec` whose face (`label`) is one character inserts exactly that charac
 ## The current tool is in view on a phone ([ADR-W-097](06w-decisions-workspace.md#adr-w-097))
 
 `Switcher` holds a ref on its `aria-current` segment and, on mount and whenever the active tool changes, calls `scrollIntoView({ inline: 'nearest', block: 'nearest' })`. That moves nothing when the tab is already visible, and the browser handles the RTL scroll direction. The visual smoke opens every product at 390×844 and fails if that tab's rectangle is not inside the strip.
+
+## One wording per role, and the first-visit About ([ADR-W-098](06w-decisions-workspace.md#adr-w-098))
+
+Shell holds no strings, so the suite vocabulary is held by a lock, not a module: `shell/__tests__/suite-vocabulary.test.ts` maps nine roles (determined, DOF count, busy, ask, undo, redo, clear-all, show-another, About) to each product's key(s), reads the four locales by file, and requires one wording per role in each language, anchored to the operator's ruled text. A product without a surface (complex has no busy state) is recorded as absent with its reason. The first-visit About is `AppFrameAbout.autoOpenKey`: opt-in, one localStorage key per product, written on close. 2-D's private first-load modal is retired into it, keeping its `geo_intro_seen` key.

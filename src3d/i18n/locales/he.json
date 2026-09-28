@@ -43,7 +43,7 @@
   },
   "cue": {
     "determined": "✓ הציור נקבע במלואו על ידי הנתונים",
-    "free": "דרגות חופש שטרם נקבעו: {{n}}"
+    "free": "דרגות חופש: {{n}}"
   },
   "actions": {
     "undo": "בטל",
@@ -226,7 +226,7 @@
   },
   "query": {
     "placeholder": "שאלה… למשל AE (וקטור), |AE|, w·v, ∠SAB, שטח ABC",
-    "add": "חשב",
+    "add": "שאלו",
     "remove": "הסר",
     "note": {
       "notUnderstood": "לא זוהה — נסו A, מישור ABC, w·v, |AB|, ∠SAB, שטח ABC, נפח SABCD",

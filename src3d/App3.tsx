@@ -681,6 +681,7 @@ export default function App3() {
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
         closeLabel: t('aboutClose'),
+        autoOpenKey: 'geo3d_intro_seen', // #1453 (ADR-W-098): first visit opens About, in every builder
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
       /* #1238: the offer sits in the frame's banner region, above the workbench — and is gone the

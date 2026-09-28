@@ -583,6 +583,7 @@ export function App() {
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
         closeLabel: t('aboutClose'),
+        autoOpenKey: 'complex_intro_seen', // #1453 (ADR-W-098): first visit opens About, in every builder
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
       /* #1238: the offer outranks the load audit for the one render where both could exist — an
