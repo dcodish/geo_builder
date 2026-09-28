@@ -295,3 +295,108 @@ export function boundImpossibility(constraints: Constraint[]): BoundImpossibilit
 export function boundImpossibilityError(m: BoundImpossibility): string {
   return `impossible: ${m.value} contradicts ${m.bound}`;
 }
+
+/**
+ * OBTUSE-SIDE FEASIBILITY (#1441, ADR-551) — the fourth member: a pinned angle ≥ 90° at a vertex
+ * makes the side OPPOSITE it the strictly longest side of its triangle (law of cosines with
+ * cos θ ≤ 0: |PQ|² = |VP|² + |VQ|² − 2·|VP||VQ|·cos θ ≥ |VP|² + |VQ|²), so a pinned leg that
+ * reaches or exceeds a pinned opposite side is impossible in the plane — no placement, no free
+ * DOF. Without this the recruit ladder burned ~20 s proving «משולש ישר זווית ABC · AB=3 · BC=4»
+ * numerically (the ADR-417 shape again), and a COLD worker blew its 12 s search budget.
+ *
+ * The pinned-angle sources are read from what the construction IS, never from coordinates:
+ *  - a stated `angle` constraint whose value keeps the true inter-ray angle ≥ 90° (values are
+ *    taken in [90°, 270°]: past 270° the geometric wedge is acute again; `arcOf` is excluded —
+ *    a measure on a circle is not the angle at a figure vertex, the ADR-538 exclusion);
+ *  - a `perpendicular` constraint whose two segments share an endpoint (the ADR-223 shape);
+ *  - a structural right angle: a `perp-offset` vertex anchored at its own `from` (how
+ *    `right-triangle` seats its knee), and a `foot` — the perpendicular from a point onto a line
+ *    is at 90° to that line at the foot.
+ *
+ * Same one-way soundness as the three members above: a strict excess PROVES impossibility and
+ * refuses before the ladder; passing proves nothing. Equality passes (leg = hypotenuse is the
+ * degenerate zero-other-leg limit — the flat-figure rule the metric member also follows). The
+ * DEFAULT right-triangle seat is deliberately NOT special-cased here: refusing the step at an
+ * impossible seat is exactly what lets the ADR-445 seat search reseat in milliseconds instead of
+ * after a 20 s ladder burn, while an EXPLICIT «זווית C = 90» pins the seat (ADR-445's own pin
+ * set) so no reseat is tried and this refusal surfaces to the student — both plan arms fall out
+ * of the existing machinery once the proof is fast.
+ */
+export interface ObtuseSideImpossibility {
+  /** the vertex carrying the pinned ≥ 90° angle */
+  vertex: Id;
+  /** that angle, in degrees, as stated (90 for the structural sources) */
+  deg: number;
+  /** the side opposite the angle — the one that must be strictly longest — in the STATED letter order */
+  hypA: Id;
+  hypB: Id;
+  hypLen: number;
+  /** the offending leg (vertex to an arm end), in the STATED letter order */
+  legA: Id;
+  legB: Id;
+  legLen: number;
+}
+
+export function obtuseSideImpossibility(
+  objects: readonly GeoObject[],
+  constraints: Constraint[],
+): ObtuseSideImpossibility | null {
+  // Pinned lengths — the same admission rule as the metric member: numeric `distance` only, the
+  // tightest value when an edge is stated twice (a second, smaller value is its own contradiction,
+  // reported by the ordinary solver; the smaller keeps this verdict sound). The stated letter order
+  // rides along so the refusal names the segments the way the student wrote them.
+  const key = (a: Id, b: Id) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const len = new Map<string, { a: Id; b: Id; len: number }>();
+  for (const con of constraints) {
+    if (con.type !== 'distance' || !Number.isFinite(con.value) || con.value <= 0 || con.a === con.b) continue;
+    const k = key(con.a, con.b);
+    const prev = len.get(k);
+    if (prev === undefined || con.value < prev.len) len.set(k, { a: con.a, b: con.b, len: con.value });
+  }
+  if (len.size < 2) return null; // a leg and its opposite side need two pinned lengths
+
+  const wedges: { v: Id; p: Id; q: Id; deg: number }[] = [];
+  for (const con of constraints) {
+    if (con.type === 'angle' && !con.arcOf && Number.isFinite(con.value) && con.value >= 90 - TOL && con.value <= 270 + TOL) {
+      wedges.push({ v: con.vertex, p: con.ray1, q: con.ray2, deg: con.value });
+    } else if (con.type === 'perpendicular') {
+      // a→b ⊥ c→d sharing an endpoint: the right angle sits at the shared point, between the others.
+      for (const [v, p, v2, q] of [
+        [con.a, con.b, con.c, con.d],
+        [con.a, con.b, con.d, con.c],
+        [con.b, con.a, con.c, con.d],
+        [con.b, con.a, con.d, con.c],
+      ] as [Id, Id, Id, Id][]) {
+        if (v === v2) wedges.push({ v, p, q, deg: 90 });
+      }
+    }
+  }
+  for (const o of objects) {
+    if (o.kind === 'perp-offset' && o.from === o.anchor) wedges.push({ v: o.anchor, p: o.to, q: o.id, deg: 90 });
+    if (o.kind === 'foot') {
+      wedges.push({ v: o.id, p: o.from, q: o.a, deg: 90 });
+      wedges.push({ v: o.id, p: o.from, q: o.b, deg: 90 });
+    }
+  }
+
+  for (const w of wedges) {
+    if (w.v === w.p || w.v === w.q || w.p === w.q) continue;
+    const hyp = len.get(key(w.p, w.q));
+    if (hyp === undefined) continue;
+    for (const legEnd of [w.p, w.q]) {
+      const leg = len.get(key(w.v, legEnd));
+      if (leg !== undefined && leg.len > hyp.len * (1 + TOL) + TOL) {
+        return { vertex: w.v, deg: w.deg, hypA: hyp.a, hypB: hyp.b, hypLen: hyp.len, legA: leg.a, legB: leg.b, legLen: leg.len };
+      }
+    }
+  }
+  return null;
+}
+
+/** The wire message; `humanizeError` maps it to the student's language (#413/ADR-416). */
+export function obtuseSideImpossibilityError(m: ObtuseSideImpossibility): string {
+  return (
+    `impossible: the angle at ${m.vertex} is ${numText(m.deg)}°, so |${m.hypA}${m.hypB}| must be the longest side, ` +
+    `but |${m.hypA}${m.hypB}| = ${numText(m.hypLen)} and |${m.legA}${m.legB}| = ${numText(m.legLen)}`
+  );
+}

@@ -14,7 +14,7 @@
  */
 
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { angleSumImpossibility, boundImpossibility, metricImpossibility } from '@/engine/metricFeasibility';
+import { angleSumImpossibility, boundImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
@@ -1550,6 +1550,10 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   // free), which is not whether it can reach zero; a bound and a value of the same measure that
   // exclude each other cannot be rescued by any later given.
   if (boundImpossibility(probe.constraints)) return false;
+  // #1441: the obtuse-side member — a pinned leg past the side opposite a pinned ≥ 90° angle. The
+  // residual moves (the figure still flexes), which is not whether it can reach zero; the law of
+  // cosines proves it cannot.
+  if (obtuseSideImpossibility(probe.objects, probe.constraints)) return false;
   // #1470 (ADR-549): the side twin — a stated side and a statement that structurally puts the point
   // elsewhere. No later given can move a point off the circle it rides.
   if (cmds.some((cmd) => sideImpossibility(probe, cmd))) return false;
