@@ -120,6 +120,7 @@ const COMMAND_SAVEABLE: Record<Command3['type'], boolean> = {
   'line-plane-angle': true,
   'line-projection': true,
   'param-sign': true,
+  'param-decl': true, // #1451: an acknowledgment — saveable like its signed sibling
   'perp-to-base': true,
   'plane-cut': true,
   'point-on-circle3': true,

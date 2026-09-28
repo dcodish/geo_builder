@@ -11082,3 +11082,15 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 **The lane caught two things.** (a) `exam-2026-2`'s «נפח הפירמידה SENB = 108», which is true, was refuted: SENB names N, a SYMBOL-defined point (SN = k·SC) that the pivot never positions (ADR-3D-030), so its volume residual could not close. The arm now applies the coords arm's own entry rule: a magnitude over a symbol-defined point stays with the claim arbiter, which verifies it exactly as before. (b) #754's lock «a later |AB| = 4 after the volume refuses `size-on-solid`» asserted the limitation this ADR removes (its own comment read "not built"). Per the 2026-09-27 ruling it now asserts the drive: both magnitudes hold, all facts ok, |AB| = 4 across seeds.
 
 **Consequences.** `src3d/engine/types.ts` (the pin kinds), `src3d/engine/solve3.ts` (residuals + the scale table), `src3d/engine/apply.ts` (the magnitude arm + demotion + the symbol-defined exclusion), `src3d/store/store3.ts` (the pivot lane). Locks: `issue-1447-volume-drive.test.ts` (the table across seeds, the reversed order, the two gates); `issue-754.test.ts` (the later-length case, re-pointed); `exam-2026-2.test.ts` (the symbol-defined volume, unchanged and green).
+
+## ADR-3D-277 — «t הוא פרמטר» is understood: the unsigned declaration (#1451)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1517. Numbered 277 beside the round's parallel branches (273–276).
+
+**Requirements:** none (internal — a two-spellings gap; no promise changed) · **Design:** docs/04b — the parameter lanes
+
+**Context.** «t הוא פרמטר חיובי» lowered `param-sign` while the unsigned «t הוא פרמטר» / «t פרמטר» / "t is a parameter" were `not-understood` — the two-spellings bug, burning an LLM call per attempt.
+
+**Decision.** A `param-decl` command from the same rule (the sign arm keeps byte-priority): an ACKNOWLEDGMENT sharing param-sign's owner gate — `symbolOwnersOf` non-empty ⇒ idempotently absorbed (the statement is true; the figure is unchanged); no owner ⇒ the honest `unknown-symbol`, exactly as the signed form refuses. Saveable like its sibling (the COMMAND_SAVEABLE totality caught the omission at `tsc`).
+
+**Consequences.** `src3d/engine/types.ts` (`ParamDeclCommand`), `src3d/engine/apply.ts` (the gate case), `src3d/parser/parse3.ts` (the unsigned arm), `src3d/store/figureFile3.ts` (saveable). Lock: `issue-1451-param-decl.test.ts` — four spellings, both orders through the store, the signed neighbour untouched. The #1394 submit-parity golden gains exactly one key (the lock's own four-spelling sequence, which the parity corpus harvests from test files); no recorded sequence drifted.

@@ -2063,6 +2063,16 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    case 'param-decl': {
+      // #1451 — «t הוא פרמטר», no sign: an ACKNOWLEDGMENT sharing param-sign's owner gate. A
+      // letter the figure carries (parameter, pin symbol, vec-def ratio, a named free component)
+      // is already a parameter — the statement is true and idempotently absorbed; a letter no
+      // mechanism owns keeps the honest `unknown-symbol` refusal, exactly as the signed form does.
+      const declOwners = symbolOwnersOf(c, cmd.sym);
+      if (declOwners.length === 0) return { ok: false, error: { code: 'unknown-symbol', id: cmd.sym } };
+      return { ok: true, next: c };
+    }
+
     case 'param-sign': {
       // #325: the sign given also applies to a PIN symbol (`t פרמטר חיובי` after `B(2t,t,k)`) —
       // it selects among pivot solutions the way it selects among root branches for c.param.
