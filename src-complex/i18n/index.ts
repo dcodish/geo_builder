@@ -56,6 +56,8 @@ const he = {
   symDeg: 'מעלות',
   symPow: 'חזקה',
   symMul: 'כפל',
+  symLe: 'קטן או שווה',
+  symGe: 'גדול או שווה',
   symDist: 'מרחק בין שתי נקודות',
   anotherConfig: 'הציגו תצורה אחרת', // #739: ONE wording for the row, every tool
   // #742 / ADR-W-024: the canvas cluster + the top-row image exports — the 2-D wording, every tool.
@@ -276,6 +278,8 @@ const en: typeof he = {
   symDeg: 'degrees',
   symPow: 'power',
   symMul: 'multiply',
+  symLe: 'less than or equal',
+  symGe: 'greater than or equal',
   symDist: 'distance between two points',
   anotherConfig: 'Show another configuration',
   // #742 / ADR-W-024: the canvas cluster + the top-row image exports — the 2-D wording, every tool.

@@ -77,6 +77,10 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   credit — in Hebrew and English. **Every sample line builds** when typed in order on an empty
   canvas. *(Realised — `shell/frame/about.tsx`, [ADR-W-091](06w-decisions-workspace.md#adr-w-091),
   #1477.)*
+- **FR-SU-12 (Must)** — **A symbol button types the symbol on its face**, and a comparison is recorded as
+  its mathematical symbol whichever way it was entered: the `≥` button inserts `≥`, and a typed `>=` is
+  recorded (row, save file, export, log) as `≥`. A button may insert a keyboard form only when its
+  grammar does not read the glyph, and must say so. *(Realised — [ADR-W-095](06w-decisions-workspace.md#adr-w-095), #1348.)*
 
 ## The data panel and the ask lane
 

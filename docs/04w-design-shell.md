@@ -360,3 +360,7 @@ once per step, and the shared layout must render every section. Each tree has a 
 pre-#1477 About. `shell/__tests__/about-content.test.ts` is the §5c meta-lock plus a roster net.
 
 What the lock does not check: whether the words are good. That is prose, per product and per locale.
+
+## The palette face and the typed comparison ([ADR-W-095](06w-decisions-workspace.md#adr-w-095))
+
+A `SymbolSpec` whose face (`label`) is one character inserts exactly that character, or carries `keyboardForm` saying why not. `shell/__tests__/fixtures/palette-faces.ts` checks it, and every product runs it over its own palette. The store-side ingest (ADR-W-029) is `ingestTypedText` in `bidi.ts`: `stripFormatControls` and then `foldComparisons` (`>=` → `≥`, `<=` → `≤`, a bare two-character operator only). Every product store records through it, analytic's included, which had no ingest boundary before. The parsers keep only the strip; every grammar reads both spellings the same way.
