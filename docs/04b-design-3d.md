@@ -326,6 +326,16 @@ line × plane 90° spellings) through `operandPairKnee`, gated on the verifier's
 (`relDeviation` ≤ `DIRECTION_REL_TOL`), and it is not gated on the data panel. A dihedral knee carries no
 `planeN` — both its arms are fixed by the seam, so the legibility rotation must not touch them.
 
+**Line × plane construction ([ADR-3D-280](06b-decisions-3d.md#adr-3d-280)).** The same chip, state and
+scene lane serve a line × plane angle: `dihedralsStatedBy` also yields a `line-rel` angle over a planar
+operand and a `line-plane-angle`, normalized exactly as the object-angle arc lane normalizes them (so its
+`pairKey` cede still works), and `buildScene3` dispatches on the resolved geometry. A line-ish × planar
+pair goes to `linePlaneConstruction` (dihedral.ts): X the crossing, P a named point on the line off the
+plane (else `fallbackLen` along it), H its foot. The scene emits PH and XH dashed, the knee at H into the
+knee lane, the arc at X into the arc lane, and H (plus an unnamed P) as `SceneDihedral3.extra` points. Only
+pairs a construction was actually DRAWN for cede their stated knee (`drawnConstr`), so a right line × plane
+pair, which constructs nothing, keeps its knee.
+
 **Dihedral construction ([ADR-3D-265](06b-decisions-3d.md#adr-3d-265)).** `dihedralConstruction` (same
 module) extends `dihedralGeometry` with a FOOT chosen from a meaningful point — a point run's vertex off the
 seam (inside the shared edge first, then the face over the base via `solidBaseRings`, then the first-named
