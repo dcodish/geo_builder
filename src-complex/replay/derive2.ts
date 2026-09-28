@@ -47,6 +47,7 @@ import { paramSigns } from '../model/paramSign';
 import type { Claim as Assertion, CheckedClaim } from '../model/claim';
 import { type FigureObject, ORIGIN, objectPoints } from '../model/figure';
 import {
+  type ArgQuery,
   type CheckedMeasure,
   type MeasureQuery,
   type MeasureRelation,
@@ -356,6 +357,8 @@ export interface FoldInput {
   readonly ratios?: readonly RatioQuery[];
   /** bare expressions the student asked the value of */
   readonly exprQueries?: readonly ExprQuery[];
+  /** «arg w» — argument questions (#1437), answered from the exact argument carrier */
+  readonly argQueries?: readonly ArgQuery[];
   /** stated sequences, kept as STATEMENTS as well as constraints — the spiral is drawn from these */
   readonly sequences?: readonly SequenceStatement[];
   /**
@@ -418,6 +421,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     queries = [],
     ratios = [],
     exprQueries = [],
+    argQueries = [],
     sequences = [],
     aliases = new Map<string, string>(),
     selections = [],
@@ -1533,6 +1537,35 @@ export function foldConstraints(input: FoldInput): Derived2 {
   });
 
   /**
+   * #1437 — the ARGUMENT rows: «arg w», answered from the exact argument carrier (the same place
+   * the polar reading takes it from), under the #1427 knowledge predicate — the direction must be
+   * the same in every configuration. A free direction and an unstated name read honestly open,
+   * never a sampled number; a solution-set letter reports its spread as the set rows do.
+   */
+  const argRows: KnowledgeRow[] = argQueries.map((q) => {
+    if (solutionSets.has(q.name)) {
+      const members = solutionSets.get(q.name) ?? [];
+      return { label: q.src, value: null, why: { code: 'multi-solution', solutions: members.length, first: members[0] } };
+    }
+    const a = argumentOf(q.name, state);
+    if (!a.exact || !Number.isFinite(a.deg)) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
+    const verdict = knowledgeOf(
+      false,
+      exactClosure,
+      configEnvs.map((env) => {
+        const v = env.at(q.name);
+        if (!v) return null;
+        const m = Math.hypot(v.re, v.im);
+        return m < 1e-12 ? null : { re: v.re / m, im: v.im / m };
+      }),
+    );
+    if (!verdict.known) return { label: q.src, value: null, why: verdict.why };
+    // a DIRECTION, folded into one turn — the plotted point's rule, not the winding carrier's
+    const deg = ((a.deg % 360) + 360) % 360;
+    return { label: q.src, value: `${fmtNum(deg)}°`, why: null };
+  });
+
+  /**
    * The parameters section (#1389/#1390): every parameter the figure mentions, in first-seen order.
    * The value comes only from tier 1's exact solve, so a parameter is printed exactly when the givens
    * force it, and reads free otherwise.
@@ -1613,7 +1646,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     unsatisfied,
     refusalReasons,
     undecided,
-    knowledge: [...knowledge, ...ratioRows, ...exprRows],
+    knowledge: [...knowledge, ...ratioRows, ...exprRows, ...argRows],
     params: t1.inconsistent ? [] : params,
     configCount,
     configCompleteness: completeness,

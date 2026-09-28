@@ -3332,3 +3332,14 @@ two conjugate pairs related exactly, the corpus witness, both-sides spelling, �
 wrong member refused, an existing letter verified, indexed letters, degree 5, set-letter questions, the
 sentence in both locales, the shape reader, the lift). Six fixtures: `all-roots-{quadratic,
 binomial-spelling, member, member-poly, quartic, corpus-witness}-1434.complex.json`.
+
+## ADR-CX-053 — «arg w» is askable: the argument question (#1437)
+
+**Requirements:** docs/02d FR-KN-0 (new) — everything the polar reading can say is askable
+**Design:** docs/04d — the ask lane's one-definition seam (`askArtifacts`), unchanged; a new query KIND, not a new lane
+
+**Reported.** External review of prod: "an 'arg w' query" is missing — `readAsk('arg w')` was `unreadable` while `|w|`, `Re(w)`, `w^2` all read, and the GIVEN «arg w = 45» parses. Cause: `arg` existed only as the F4 relation sentence; asks ride the expression grammar, and arg is not an `Expr` head (log-polar carries no additive closure for it) — sayable-but-not-askable.
+
+**Decision.** An `ArgQuery { name, src }` kind through the SAME lane as every other question: a parser rule («arg w» / «arg(w)» / «הארגומנט של w», the existing `ARG_KW` vocabulary, after the relation/inequality rules have claimed their `=`/`<`) → `askArtifacts` → the fold input → a knowledge row. The answer comes from the exact argument carrier — the same place the polar reading takes it from — folded to one turn (a direction, not a winding), printed in degrees, under the #1427 knowledge predicate (the unit direction compared across every configuration). A free direction and an unstated name read honestly open; a solution-set letter reports its spread as `multi-solution`, naming the first member. `readAsk` gains the `'arg'` kind, and the two routing sites now route by EXCLUSION (`!== 'statement' && !== 'unreadable'`), so a future ask kind cannot silently miss the lane.
+
+**Consequences.** `src-complex/model/measure.ts` (`ArgQuery`), `src-complex/parser/rules.ts` (rule + `ParsedLine.argQueries`), `src-complex/app/deriveLines.ts` (threading), `src-complex/app/submit.ts` (`readAsk` + exclusion routing), `src-complex/app/askLane.ts` (row matching), `src-complex/replay/derive2.ts` (`argRows`), catalog row, docs 02d. Lock: `src-complex/__tests__/issue-1437-arg-ask.test.ts` — the three spellings; lane routing (never a fact); the relation stays a statement; 45° / 150° answers; the free-direction and unstated-name withholdings; the set spread.

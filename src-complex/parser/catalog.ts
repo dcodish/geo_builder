@@ -285,6 +285,13 @@ export const CATALOG: readonly CatalogEntry[] = [
     descHe: 'ביטוי בשורה משלו — שאלה, שנענית רק אם הנתונים קובעים את הערך',
     descEn: 'a bare expression — a question, answered only when the givens force the value',
   },
+  {
+    family: 'F7',
+    he: 'arg w',
+    en: 'arg w',
+    descHe: 'שאלת ארגומנט — גם «arg(w)» ו«הארגומנט של w»; נענית כשהכיוון קבוע בכל תצורה',
+    descEn: 'the argument question — also «arg(w)» and «the argument of w»; answered when the direction is fixed in every configuration',
+  },
   // #791 (ADR-CX-033) — the point-label register: capitals are points, case-sensitively
   {
     family: 'F2',

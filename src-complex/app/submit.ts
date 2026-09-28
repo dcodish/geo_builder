@@ -286,7 +286,7 @@ export function editLine(index: number, raw: string): boolean {
  * honestly reads "not determined".
  */
 export type AskReading =
-  | { readonly kind: 'measure' | 'ratio' | 'expr' }
+  | { readonly kind: 'measure' | 'ratio' | 'expr' | 'arg' }
   | { readonly kind: 'statement' }
   | { readonly kind: 'unreadable' };
 
@@ -295,7 +295,7 @@ export function readAsk(raw: string, scope?: ComplexScope): AskReading {
   if (!parsed.ok) return { kind: 'unreadable' };
   const a = askArtifacts(parsed.line);
   if (!a) return { kind: 'statement' };
-  return { kind: a.queries.length ? 'measure' : a.ratios.length ? 'ratio' : 'expr' };
+  return { kind: a.queries.length ? 'measure' : a.ratios.length ? 'ratio' : a.argQueries.length ? 'arg' : 'expr' };
 }
 
 /**
@@ -339,7 +339,7 @@ export function submitLine(raw: string): boolean {
   // #1405: read against the figure's declared letters — a bare `u` is a question about a real
   // parameter, and a statement once u is declared complex
   const ask = readAsk(line, scopeOf(activeLines())).kind;
-  if (ask === 'measure' || ask === 'ratio' || ask === 'expr') {
+  if (ask !== 'statement' && ask !== 'unreadable') {
     st().addQuery(line);
     st().clearError();
     return true;
@@ -391,7 +391,7 @@ export function hydrateSession(data: unknown): boolean {
     // mute in the lane model, so a muted saved ask migrates like an enabled one.
     if (savedDisabled.has(i)) {
       const kind = readAsk(line).kind;
-      if (kind === 'measure' || kind === 'ratio' || kind === 'expr') st().addQuery(line);
+      if (kind !== 'statement' && kind !== 'unreadable') st().addQuery(line);
       else st().recordDisabledLine(line);
       return;
     }

@@ -39,7 +39,7 @@ export function askRowsOf(
     // so the row model and the fold cannot disagree about what was asked
     const a = askArtifacts(r.line);
     if (!a) return { text, note: 'statement', row: null };
-    const srcs = [...a.queries, ...a.ratios, ...a.exprQueries].map((q) => q.src);
+    const srcs = [...a.queries, ...a.ratios, ...a.exprQueries, ...a.argQueries].map((q) => q.src);
     const at = knowledge.findIndex((k, i) => !consumed.has(i) && srcs.includes(k.label));
     // no match can only mean the fold was not given this lane (a caller bug) — read as unreadable
     // rather than inventing an answer

@@ -113,6 +113,11 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
 
 ## Knowledge and claims
 
+- **FR-KN-0 (Must)** — **Everything the polar reading can say is askable.** «arg w» (also «arg(w)»,
+  «הארגומנט של w») is a question like «|w|»: answered from the exact argument carrier when the
+  direction is fixed in every configuration, withheld (with the reason) for a free direction, and a
+  solution-set letter reports its spread. *(#1437; realised — [ADR-CX-053](06d-decisions-complex.md#adr-cx-053).)*
+
 - **FR-KN-1 (Must)** — **A number printed on screen is knowledge**: invariant across every valid
   configuration, with its gauge pinned. **The figure shows everything; the panel prints only what was
   asked for, and only what is known.** A value true of the current drawing but not forced by the givens

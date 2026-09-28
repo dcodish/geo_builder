@@ -69,6 +69,9 @@ export const ORDINALS: readonly (readonly [RegExp, 1 | 2 | 3 | 4])[] = [
 /** «ארגומנט» / «זווית» / `arg` — the argument of a number. */
 export const ARG_KW = String.raw`(?:${HE_PREFIX}ארגומנט|${HE_PREFIX}זו?וית|arg)`;
 
+/** #1437 — the genitive connective a question may carry: «הארגומנט של w». */
+export const OF_KW = String.raw`של`;
+
 /** «ערך מוחלט» / «גודל» / `abs` — spoken forms of the modulus; `|z|` is handled by the operator. */
 export const ABS_KW = String.raw`(?:${HE_PREFIX}ערך ${HE_PREFIX}מוחלט|${HE_PREFIX}גודל|abs)`;
 

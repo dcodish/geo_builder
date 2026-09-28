@@ -16,7 +16,7 @@ import type { Why } from '../model/why';
 import type { BranchFilter, Constraint } from '../model/constraint';
 import type { Claim as Assertion } from '../model/claim';
 import type { FigureObject } from '../model/figure';
-import type { ExprQuery, MeasureQuery, MeasureRelation, RatioQuery } from '../model/measure';
+import type { ArgQuery, ExprQuery, MeasureQuery, MeasureRelation, RatioQuery } from '../model/measure';
 import type { SequenceStatement } from '../model/sequence';
 import { type RootsMode, rootsMode } from '../model/naming';
 import { refsOf } from '../model/expr';
@@ -77,6 +77,7 @@ export function deriveLines(
     queries: [...(lowered.queries ?? []), ...lane.queries],
     ratios: [...(lowered.ratios ?? []), ...lane.ratios],
     exprQueries: [...(lowered.exprQueries ?? []), ...lane.exprQueries],
+    argQueries: [...(lowered.argQueries ?? []), ...lane.argQueries],
     configIndex,
     seed,
   });
@@ -95,10 +96,12 @@ export function lowerAsks(asks: readonly string[], scope: ComplexScope = NO_SCOP
   queries: MeasureQuery[];
   ratios: RatioQuery[];
   exprQueries: ExprQuery[];
+  argQueries: ArgQuery[];
 } {
   const queries: MeasureQuery[] = [];
   const ratios: RatioQuery[] = [];
   const exprQueries: ExprQuery[] = [];
+  const argQueries: ArgQuery[] = [];
   for (const raw of asks) {
     const r = parseLineV2(raw.trim(), scope);
     if (!r.ok) continue;
@@ -107,8 +110,9 @@ export function lowerAsks(asks: readonly string[], scope: ComplexScope = NO_SCOP
     queries.push(...a.queries);
     ratios.push(...a.ratios);
     exprQueries.push(...a.exprQueries);
+    argQueries.push(...a.argQueries);
   }
-  return { queries, ratios, exprQueries };
+  return { queries, ratios, exprQueries, argQueries };
 }
 
 /**
@@ -125,6 +129,7 @@ export function askArtifacts(l: ParsedLine): {
   queries: MeasureQuery[];
   ratios: RatioQuery[];
   exprQueries: ExprQuery[];
+  argQueries: ArgQuery[];
 } | null {
   const bareSegment =
     l.objects.length === 1 &&
@@ -134,14 +139,14 @@ export function askArtifacts(l: ParsedLine): {
       l.exprQueries.length === 0;
   if (bareSegment) {
     const seg = l.objects[0] as { kind: 'segment'; points: readonly string[]; src: string };
-    return { queries: [{ kind: 'length', points: seg.points, src: seg.src }], ratios: [], exprQueries: [] };
+    return { queries: [{ kind: 'length', points: seg.points, src: seg.src }], ratios: [], exprQueries: [], argQueries: [] };
   }
   const states =
     l.constraints.length + l.filters.length + l.assertions.length +
     l.objects.length + l.measures.length + l.sequences.length + l.roots.length;
   if (states > 0) return null;
-  if (l.queries.length + l.ratios.length + l.exprQueries.length === 0) return null;
-  return { queries: [...l.queries], ratios: [...l.ratios], exprQueries: [...l.exprQueries] };
+  if (l.queries.length + l.ratios.length + l.exprQueries.length + l.argQueries.length === 0) return null;
+  return { queries: [...l.queries], ratios: [...l.ratios], exprQueries: [...l.exprQueries], argQueries: [...l.argQueries] };
 }
 
 /**
@@ -169,6 +174,7 @@ export function lowerLines(
   const queries: MeasureQuery[] = [];
   const ratios: RatioQuery[] = [];
   const exprQueries: ExprQuery[] = [];
+  const argQueries: ArgQuery[] = [];
   const sequences: SequenceStatement[] = [];
   const atoms = new Map<string, number>();
   const untranslated: Untranslated[] = [];
@@ -316,6 +322,7 @@ export function lowerLines(
     queries.push(...r.line.queries);
     ratios.push(...r.line.ratios);
     exprQueries.push(...r.line.exprQueries);
+    argQueries.push(...r.line.argQueries);
     sequences.push(...r.line.sequences);
     for (const [k, v] of r.line.atoms) atoms.set(k, v);
   });
@@ -341,6 +348,7 @@ export function lowerLines(
     queries,
     ratios,
     exprQueries,
+    argQueries,
     sequences,
     selections,
     solutionSets,
