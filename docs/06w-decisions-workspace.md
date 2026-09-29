@@ -4977,3 +4977,21 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 **Measured.** The three locks for 2-D, 3-D and complex were red on the pre-change content (16 hits in total), and all four are green after. The shell meta-lock catches every shipped spelling and passes the curriculum phrases, including «פרבולה קנונית» and «דרגות חופש».
 
 **Consequences.** `shell/frame/ManualScreen.tsx`; `src/parser/catalog.ts`, `src-complex/parser/catalog.ts`, `src-complex/i18n/index.ts`, `src3d/i18n/locales/en.json`. Locks: `shell/__tests__/guide-jargon-1456.test.ts` and `issue-1456-guide-jargon.test.ts` in each of the four trees. `src-complex/__tests__/i18n-readings-716.test.ts` asserts the new refusal text.
+
+## ADR-W-102 — A test body never waits on a module load: the #1305 lint, workspace-wide (#1417)
+
+**Status:** accepted · 2026-09-29 · filed by fix-round #1408 (item #1305) and operator-approved in the 2026-09-27 /decisions batch · round #1571.
+
+**Requirements:** none (internal) · **Design:** docs/08 — a test body never waits on a module load, or on the machine
+
+**Context.** #1305 (ADR-3D-261) found that a test which does `await import('../x')` inside its body pays the module's transform against the 5 s per-test timeout. Alone that is ~50 ms; under the full suite every worker's module requests queue on one shared vite-node server, so the test times out on some runs only. The fix and a lint were deliberately 3-D only (docs/17 §1) and the other trees were filed here. Measured at `842ede39` with the lint lifted to every tree: **12 in-body imports in 9 files**, 2-D (general-position, issue-777-incomplete-comparative — missed by the issue's list, scope, two-circle-family ×2, verb-gate, session-offer-1238), complex (window, no-session-restore-919 ×2) and server (issue-1359-prompt-lane). Separately, `server/__tests__/deploy-preflight.test.ts` timed out three times in busy full-suite runs on 2026-09-29 (comment on #1417). It has no in-body import. Its two slow tests each ran `proxyInputs`, an in-memory esbuild bundle of the proxy's 33 first-party modules. Measured: 0.1–0.8 s alone and warm, but 4.7 s, 6.1 s and 12.6 s while other worktrees were installing and testing. The cost scales with the whole machine's load.
+
+**Decision.**
+- **Hoist.** Every in-body import becomes a static import at the top of its file, and a test that no longer awaits anything drops `async`. Same assertions, same test counts per file.
+- **Deliberate late imports go to a hook.** `no-session-restore-919` imports ON PURPOSE: its subject is that importing the store with a populated storage key reads nothing, so the import must run after the fake storage exists and cannot be static. It moves from the `it` body to a `beforeAll` with a 60 s timeout; the marker `// load-in-body-ok: <reason>` sits on each import line, and `afterAll` removes the fake storage, as the old `finally` did.
+- **Machine-bound setup runs once, in a hook.** deploy-preflight builds the bundle once in a `beforeAll` (120 s timeout) and both tests read the result. That also halves the work.
+- **The lint is lifted, not copied.** `src3d/__tests__/test-imports-at-collection.test.ts` moves to `server/__tests__/`, the workspace-lint home that runs in every lane, and walks all seven test trees, so it also judges test files added later. The detector now blanks string contents and trailing comments before matching, so fixture TEXT that spells `import('./lazy')` (shell's privacy-disclosure scan) is not a load, and its message tells the author exactly how to fix a hit. It fails on `842ede39` with the 12 sites listed and passes after.
+
+**Not linted, stated.** The deploy-preflight shape (heavy work in a body) cannot be read from source; it is documented in docs/08, not guarded.
+
+**Consequences.** The nine test files above, plus `server/__tests__/deploy-preflight.test.ts` and `server/__tests__/test-imports-at-collection.test.ts` (moved from src3d/ and widened), and `src3d/__tests__/free-line.test.ts` (comment pointer). ADR-3D-261's "3-D only" scope is superseded by this record.

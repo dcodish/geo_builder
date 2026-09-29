@@ -14,7 +14,7 @@
  *
  * This suite has no network and no deploy: it builds in memory and reads the repo.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,8 +25,19 @@ import { proxyInputs, proxyBuildOptions } from '../build.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 describe('#1130 — the proxy bundle is WIDER than server/', () => {
-  it('the old rule is unsound: most of the bundle comes from outside server/', async () => {
-    const inputs: string[] = await proxyInputs(root);
+  /**
+   * `proxyInputs` runs a real in-memory esbuild bundle of the proxy (~33 first-party modules). Measured
+   * 2026-09-29 (#1417): 0.1-0.8 s warm and alone, but 4.7 s, 6.1 s and 12.6 s on a machine where other
+   * worktrees were installing and testing — the per-test 5 s timeout was being charged a cost that
+   * scales with the whole MACHINE's load, which is why this file timed out only in busy full-suite runs.
+   * So the bundle is built ONCE, here, under its own generous timeout, and both tests read the result.
+   */
+  let inputs: string[] = [];
+  beforeAll(async () => {
+    inputs = await proxyInputs(root);
+  }, 120_000);
+
+  it('the old rule is unsound: most of the bundle comes from outside server/', () => {
     const outside = inputs.filter((p) => !p.startsWith('server/'));
 
     // An oracle with nothing to check passes by checking nothing.
@@ -41,8 +52,7 @@ describe('#1130 — the proxy bundle is WIDER than server/', () => {
     expect(outside.length).toBeGreaterThan(inputs.length / 2);
   });
 
-  it('a change in ANY product tree can change the proxy — which is why the rule could not work', async () => {
-    const inputs: string[] = await proxyInputs(root);
+  it('a change in ANY product tree can change the proxy — which is why the rule could not work', () => {
     /**
      * The concrete shape of the trap: the 2-D and 3-D catalogs are the LLM's own vocabulary and they
      * are compiled into the proxy. Editing a catalog row is a change no one would call a "server
