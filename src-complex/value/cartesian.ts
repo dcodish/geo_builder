@@ -28,7 +28,7 @@
 
 import { type Rat, ONE, add, div, eq as eqRat, floor, frac, fromNumber, isOne as ratIsOne, isZero, mul, neg, rat, sqrtExact, sub, toNumber } from './rational';
 import { type ExpVec, evaluate as evalMod, format as fmtMod, fromRational as fromRationalVec, isPrimeAtom, pow as modPowVec } from './modulus';
-import { type Angle, fromTurns as fromTurnsAngle, gaussianAtomOf, isExactRational } from './angle';
+import { type Angle, type LiteralPair, type RadicalTerm, fromTurns as fromTurnsAngle, isExactRational, literalAtomOf, registerLiteralAtom } from './angle';
 
 /** `a + b√d` under a square root — the nested radicand of the 18° and 22.5° families. */
 interface Nest {
@@ -248,7 +248,14 @@ function partOf(terms: Term[] | null, split: ModSplit): CartPart | null {
  * Null is an honest answer: the caller prints its decimal with `≈`.
  */
 export function exactCartesianParts(mod: ExpVec, arg: Angle): { re: CartPart; im: CartPart } | null {
-  if (!isExactRational(arg)) return null;
+  if (!isExactRational(arg)) {
+    // #1435 — a LITERAL atom's pair is known exactly (`1+√2i`, `2+3i`), whatever its turn
+    const t = literalAtomTerms(mod, arg);
+    if (!t) return null;
+    const re = partOf(t.re, UNIT_SPLIT);
+    const im = partOf(t.im, UNIT_SPLIT);
+    return re && im ? { re, im } : null;
+  }
   const split = splitModulus(mod);
   if (!split) return null;
   const deg = mul(arg.turns, rat(360));
@@ -389,22 +396,12 @@ export function gaussianRationalParts(mod: ExpVec, arg: Angle): { re: Rat; im: R
   // is rational and the residual turn is a quarter-turn multiple (·i per quarter). `2+3i` itself,
   // its conjugate (coefficient −1) and its ±i/−1 rotations all land here.
   if (arg.atoms.size === 1) {
-    const [[name, coef]] = [...arg.atoms.entries()];
-    const conj = ratIsOne(neg(coef));
-    if (!ratIsOne(coef) && !conj) return null;
-    const g = gaussianAtomOf(name);
-    if (!g) return null;
-    const split = splitModulus(mod);
-    if (!split || split.residual !== null) return null;
-    const quarter = mul(frac(arg.turns), rat(4));
-    if (quarter.d !== 1n) return null;
-    const s = add(mul(g.re, g.re), mul(g.im, g.im));
-    const k = sqrtExact(div(mul(mul(split.q, split.q), rat(split.s)), s));
-    if (k === null) return null;
-    let re = mul(k, g.re);
-    let im = mul(k, conj ? neg(g.im) : g.im);
-    for (let i = 0n; i < quarter.n; i++) [re, im] = [neg(im), re];
-    return { re, im };
+    const t = literalAtomTerms(mod, arg);
+    if (!t) return null;
+    const ratOfTerms = (ts: Term[]): Rat | null => (ts.length === 0 ? rat(0) : ts.length === 1 && ts[0].k === 1n ? ts[0].c : null);
+    const re = ratOfTerms(t.re);
+    const im = ratOfTerms(t.im);
+    return re !== null && im !== null ? { re, im } : null;
   }
   if (!isExactRational(arg)) return null;
   const split = splitModulus(mod);
@@ -429,4 +426,96 @@ export function ratPart(x: Rat): CartPart {
   const negative = x.n < 0n;
   const n = negative ? -x.n : x.n;
   return { zero: false, negative, text: x.d === 1n ? `${n}` : `${n}/${x.d}`, value: toNumber(x) };
+}
+
+/** The unit modulus split — terms that are already scaled. */
+const UNIT_SPLIT: ModSplit = { q: ONE, s: 1n, residual: null, residualValue: 1 };
+
+/**
+ * #1435 — the exact terms of `mod·cis(arg)` when `arg` is a single LITERAL atom (coefficient ±1 —
+ * the literal or its conjugate) plus a quarter-turn multiple: the value is
+ * `mod·cis(turns)·(pair)/|pair|`, carried exactly whenever `mod/|pair|` is rational. Shared by the
+ * cartesian display and the Gaussian-rational ask arithmetic (#1436), so both read one registry.
+ */
+function literalAtomTerms(mod: ExpVec, arg: Angle): { re: Term[]; im: Term[] } | null {
+  if (arg.atoms.size !== 1) return null;
+  const [[name, coef]] = [...arg.atoms.entries()];
+  const conj = ratIsOne(neg(coef));
+  if (!ratIsOne(coef) && !conj) return null;
+  const g = literalAtomOf(name);
+  if (!g) return null;
+  const split = splitModulus(mod);
+  if (!split || split.residual !== null) return null;
+  const quarter = mul(frac(arg.turns), rat(4));
+  if (quarter.d !== 1n) return null;
+  const s = add(mul(mul(g.re.c, g.re.c), rat(g.re.k)), mul(mul(g.im.c, g.im.c), rat(g.im.k)));
+  if (isZero(s)) return null;
+  const k = sqrtExact(div(mul(mul(split.q, split.q), rat(split.s)), s));
+  if (k === null) return null;
+  const termsOf = (t: RadicalTerm, sign: Rat): Term[] => (isZero(t.c) ? [] : [T(mul(mul(k, sign), t.c), t.k)]);
+  let re = termsOf(g.re, ONE);
+  let im = termsOf(g.im, conj ? rat(-1) : ONE);
+  for (let i = 0n; i < quarter.n; i++) [re, im] = [negTerms(im), re];
+  return { re, im };
+}
+
+/** A radical term normalised: square-free `k`, zero spelled `{0, 1}`; null for a negative radicand. */
+function normTerm(p: RadicalTerm): RadicalTerm | null {
+  if (isZero(p.c)) return { c: p.c, k: 1n };
+  if (p.k < 1n) return null;
+  const m = squareRoot(p.k);
+  return { c: mul(p.c, rat(m)), k: p.k / (m * m) };
+}
+
+/**
+ * #1435 — `mod·cis(arg)` as ONE radical term per part (`c·√k`), when the angle is an exact table
+ * turn and each part collects to a single term with no nest (`2·cis60°` → `1 + √3·i`,
+ * `√2·cis45°` → `1 + i`). Null otherwise — the Gaussian-radical walk in the parser treats null as
+ * "not a radical literal", never as a guess.
+ */
+export function radicalPartsOf(mod: ExpVec, arg: Angle): LiteralPair | null {
+  if (!isExactRational(arg)) return null;
+  const split = splitModulus(mod);
+  if (!split || split.residual !== null) return null;
+  const deg = mul(arg.turns, rat(360));
+  const one = (terms: Term[] | null): RadicalTerm | null => {
+    if (terms === null) return null;
+    const scaled = collect(terms.map((t) => scaleTerm(t, split.q, split.s)));
+    if (scaled.length === 0) return { c: rat(0), k: 1n };
+    return scaled.length === 1 && scaled[0].nest === null ? { c: scaled[0].c, k: scaled[0].k } : null;
+  };
+  const re = one(cosOf(deg));
+  const im = one(sinOf(deg));
+  return re && im ? { re, im } : null;
+}
+
+/**
+ * #1435 (ADR-CX-056 amendment 1) — a closed RADICAL literal (`a·√k + b·√m·i`, at least one part
+ * irrational) as the exact value it is. ALWAYS a value: the modulus `√(a²k + b²m)` is rational
+ * under the root, so it is exact on the modulus layer's own vector, and the argument is the angle
+ * table's turn when {@link fromRadicalParts} verifies one (`√3 + i` → `2·cis30°`), otherwise a
+ * LITERAL ATOM carrying the exact pair — exactly how `3+4i` is carried (`fromCartesian`), so
+ * `1 + √2i` reads `√3`, `≈ cis54.74°` and `= 1+√2i`. `atom` names the atom and its degrees
+ * for the caller's sample; null when the table answered. Null overall only for a zero or a
+ * malformed pair.
+ */
+export function radicalLiteral(
+  reIn: RadicalTerm,
+  imIn: RadicalTerm,
+): { mod: ExpVec; arg: Angle; atom: { name: string; degrees: number } | null } | null {
+  const re = normTerm(reIn);
+  const im = normTerm(imIn);
+  if (!re || !im) return null;
+  const table = fromRadicalParts(re, im);
+  if (table) return { ...table, atom: null };
+  const mod2 = add(mul(mul(re.c, re.c), rat(re.k)), mul(mul(im.c, im.c), rat(im.k)));
+  if (isZero(mod2)) return null;
+  const mod = modPowVec(fromRationalVec(mod2), rat(1, 2));
+  const x = toNumber(re.c) * Math.sqrt(Number(re.k));
+  const y = toNumber(im.c) * Math.sqrt(Number(im.k));
+  const degrees = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+  const text = composeCartesian(partOf(isZero(re.c) ? [] : [T(re.c, re.k)], UNIT_SPLIT)!, partOf(isZero(im.c) ? [] : [T(im.c, im.k)], UNIT_SPLIT)!);
+  const name = `∠(${text})`;
+  registerLiteralAtom(name, { re, im });
+  return { mod, arg: { turns: rat(0), atoms: new Map([[name, ONE]]) }, atom: { name, degrees } };
 }

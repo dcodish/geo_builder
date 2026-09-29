@@ -208,13 +208,41 @@ export function formatPi(a: Angle): string | null {
  * later registered with a DIFFERENT pair is poisoned to null — exactness must never guess. Readers
  * get the pair back and can carry `mod·cis(atom)` as the Gaussian rational it always was.
  */
-const GAUSSIAN_ATOMS = new Map<string, { re: Rat; im: Rat } | null>();
+/**
+ * #1435 (ADR-CX-056 amendment 1) — the registry holds the literal's EXACT CARTESIAN PAIR, one
+ * square-free radical term per part (`c·√k`): a Gaussian rational (`2+3i`) is the `k = 1` case, and
+ * a radical literal whose direction the angle table does not know (`1+√2i`) registers the same way.
+ * One registry, one poisoning rule — the pair behind a literal atom is known exactly or not at all.
+ */
+export interface RadicalTerm {
+  readonly c: Rat;
+  /** square-free, ≥ 1 */
+  readonly k: bigint;
+}
+export interface LiteralPair {
+  readonly re: RadicalTerm;
+  readonly im: RadicalTerm;
+}
+const LITERAL_ATOMS = new Map<string, LiteralPair | null>();
 
-export function registerGaussianAtom(name: string, re: Rat, im: Rat): void {
-  const prev = GAUSSIAN_ATOMS.get(name);
-  if (prev === undefined) GAUSSIAN_ATOMS.set(name, { re, im });
-  else if (prev !== null && !(ratEq(prev.re, re) && ratEq(prev.im, im))) GAUSSIAN_ATOMS.set(name, null);
+const sameTerm = (a: RadicalTerm, b: RadicalTerm): boolean => a.k === b.k && ratEq(a.c, b.c);
+
+export function registerLiteralAtom(name: string, pair: LiteralPair): void {
+  const prev = LITERAL_ATOMS.get(name);
+  if (prev === undefined) LITERAL_ATOMS.set(name, pair);
+  else if (prev !== null && !(sameTerm(prev.re, pair.re) && sameTerm(prev.im, pair.im))) LITERAL_ATOMS.set(name, null);
 }
 
-export const gaussianAtomOf = (name: string): { re: Rat; im: Rat } | null =>
-  GAUSSIAN_ATOMS.get(name) ?? null;
+export function registerGaussianAtom(name: string, re: Rat, im: Rat): void {
+  registerLiteralAtom(name, { re: { c: re, k: 1n }, im: { c: im, k: 1n } });
+}
+
+/** The exact pair behind a literal atom — radical parts allowed — or null. */
+export const literalAtomOf = (name: string): LiteralPair | null => LITERAL_ATOMS.get(name) ?? null;
+
+/** The RATIONAL pair behind a literal atom (`k = 1` on both parts), or null. */
+export const gaussianAtomOf = (name: string): { re: Rat; im: Rat } | null => {
+  const p = literalAtomOf(name);
+  const rational = (t: RadicalTerm): boolean => t.k === 1n || isZero(t.c);
+  return p && rational(p.re) && rational(p.im) ? { re: p.re.c, im: p.im.c } : null;
+};

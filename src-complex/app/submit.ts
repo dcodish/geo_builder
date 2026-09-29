@@ -133,6 +133,28 @@ function parseInFigure(line: string, lines: readonly string[]): ReturnType<typeo
   return scoped.ok ? scoped : parseLineV2(line);
 }
 
+/**
+ * #1435 (ADR-CX-056 amendment 1) — the #246 teaching refusal, ported from 2-D. «שורש 3» itself reads
+ * (the orthography chokepoint makes the word before a number the √ sign — 2-D #105); what is left is
+ * the word form the chokepoint deliberately does not rewrite, «שורש של 3». Such a line is refused
+ * with the √ spelling spelled out FOR it, and only when that spelling really reads (a taught remedy
+ * must drive — the #1156 lesson): the suggestion is parsed by the same grammar before it is offered.
+ */
+const WORD_ROOT = /שורש\s+של\s*(?=[\d(])/g;
+export function wordRootSuggestion(line: string, lines: readonly string[]): string | null {
+  if (!WORD_ROOT.test(line)) return null;
+  WORD_ROOT.lastIndex = 0;
+  const suggestion = line.replace(WORD_ROOT, '√');
+  return parseInFigure(suggestion, lines).ok ? suggestion : null;
+}
+
+/** THE refusal for a line the grammar could not read — one wording for every entry point. */
+function unreadRefusal(parsed: Extract<ReturnType<typeof parseLineV2>, { ok: false }>, line: string, lines: readonly string[]): InputError {
+  if (parsed.reason === 'unaccounted') return { key: 'unaccounted', detail: parsed.items.join(', ') };
+  const suggestion = wordRootSuggestion(line, lines);
+  return suggestion ? { key: 'word-root', detail: line, suggestion } : { key: 'not-handled', detail: line };
+}
+
 export type Verdict =
   /** accepted, in this configuration — the caller records the seed so the figure shown is the one that fit */
   | { readonly ok: true; readonly seed: number }
@@ -254,11 +276,7 @@ export function editLine(index: number, raw: string): boolean {
   if (index < 0 || index >= lines.length || line === '') return false;
   const parsed = parseInFigure(line, activeOf(lines, disabled));
   if (!parsed.ok) {
-    st().setError(
-      parsed.reason === 'unaccounted'
-        ? { key: 'unaccounted', detail: parsed.items.join(', ') }
-        : { key: 'not-handled', detail: line },
-    );
+    st().setError(unreadRefusal(parsed, line, activeOf(lines, disabled)));
     return false;
   }
   if (disabled.includes(index)) {
@@ -322,11 +340,7 @@ export function submitLine(raw: string): boolean {
   const line = raw.trim();
   const parsed = parseInFigure(line, activeLines());
   if (!parsed.ok) {
-    st().setError(
-      parsed.reason === 'unaccounted'
-        ? { key: 'unaccounted', detail: parsed.items.join(', ') }
-        : { key: 'not-handled', detail: line },
-    );
+    st().setError(unreadRefusal(parsed, line, activeLines()));
     return false;
   }
 

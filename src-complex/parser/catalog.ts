@@ -65,8 +65,8 @@ export const CATALOG: readonly CatalogEntry[] = [
     family: 'F2',
     he: 'z1 = √3 + i',
     en: 'z1 = √3 + i',
-    descHe: 'שורש בנתון — √3, sqrt(3), √(x), ⁿ√x — נישא במדויק (z₁ = 2·cis30°)',
-    descEn: 'a radical in a given — √3, sqrt(3), √(x), ⁿ√x — carried exactly (z₁ = 2·cis30°)',
+    descHe: 'שורש בנתון — √3, sqrt(3), √(x), ³√8, «שורש 3» — נישא במדויק (z₁ = 2·cis30°; z₁ = 1+√2i)',
+    descEn: 'a radical in a given — √3, sqrt(3), √(x), ³√8, «שורש 3» — carried exactly (z₁ = 2·cis30°; z₁ = 1+√2i)',
   },
   {
     family: 'F2',

@@ -16,7 +16,14 @@ import type { SymbolSpec } from '../../shell/symbols';
 
 export const SYMBOLS: readonly SymbolSpec[] = [
   // #1435 — the reviewer's «no √ input»: wraps the selection (`3+1` → `√(3+1)`), like conj
-  { label: '√', titleKey: 'symSqrt', before: '√(', after: ')' },
+  {
+    label: '√',
+    titleKey: 'symSqrt',
+    before: '√(',
+    after: ')',
+    // #1348: the face is typed — with the parentheses that keep a SELECTED sum under one root
+    keyboardForm: 'the √ glyph plus parentheses: a wrapped selection (3+1 → √(3+1)) must stay one radicand',
+  },
   { label: 'z̄', titleKey: 'symConj', before: 'conj(', after: ')' },
   { label: '|z|', titleKey: 'symAbs', before: '|', after: '|' },
   { label: '1/z', titleKey: 'symInv', before: '1/(', after: ')' },

@@ -99,7 +99,14 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   the power the grammar already has (`pow(x, 1/n)` — no new AST kind). A constant with RADICAL parts
   («√3 + i») folds through the Gaussian-radical walk and the angle table, **verified symbolically**
   against the candidate turn before any exact value is claimed — the fold never invents exactness the
-  table cannot prove.
+  table cannot prove. **The exact walk decides before the float read-back** (amendment 1): a pair it
+  recognises is a Gaussian rational (`fromCartesian`) or a radical literal (`radicalLiteral` — the
+  table's turn, else a LITERAL ATOM carrying the exact pair in the one literal-atom registry, as
+  `3+4i` is carried), and the float read-back never runs over a root. The cartesian reading of a
+  literal atom comes from that registry (`literalAtomTerms`), not from the polar label. `cis`
+  attaches after any operand at one point (`withCis`); a closed negative radicand refuses at the root
+  atom; the orthography chokepoint reads an opening superscript before √ as the index and the word
+  «שורש» before a number as √, and the submit seam teaches «שורש של N».
 - **A parameter lives in the modulus CONSTANT, and the leftover rows are read over the parameters**
   ([ADR-CX-041](06d-decisions-complex.md#adr-cx-041)). `9r` is `{3:2, r:1}` in the constant, never an
   unknown, because every parametric answer (`15r`) reads that encoding. So a given that DETERMINES `r`

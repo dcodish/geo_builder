@@ -1214,9 +1214,11 @@ export function foldConstraints(input: FoldInput): Derived2 {
           display,
           z: cPolar(m.value, a.deg),
           known: m.exact !== null && a.exact !== null,
-          // #1404 — the SAME exactness condition as the polar `exactLabel`: both carriers exact;
-          // the printing policy (≤ one root sign per part) is the value layer's, not ours
-          exactParts: m.exact && a.exact && exactLabel !== null ? readableCartesianParts(m.exact, a.exact) : null,
+          // #1404 — both carriers exact; the printing policy (≤ one root sign per part) is the value
+          // layer's, not ours. #1435 — no longer gated on the POLAR label: a literal atom (`1+√2i`,
+          // `2+3i`) has no closed polar form yet its cartesian pair is known exactly, and the value
+          // layer answers only for a registered literal pair, never for a free or sampled atom.
+          exactParts: m.exact && a.exact ? readableCartesianParts(m.exact, a.exact) : null,
         }),
         exactLabel,
         cyclePeriod: cycle === null ? null : Number(cycle),
