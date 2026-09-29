@@ -133,6 +133,11 @@ LLM. See also R44 on what identifies an unnamed curve.)*
 «נתונה אליפסה שמשוואתה x²/9−y²/16=1» must still answer "that is a hyperbola, and this tool does not
 draw those" — the diagnosis that a bare equation cannot produce, because there is no stated expectation
 to contradict.
+*(**BUILT** 2026-09-29 by [ADR-AG-170 Am. 1](06c-decisions-analytic.md#adr-ag-170-amendment-1--2026-09-29-pre-play-one-noun-table-one-numeral-the-noun-checked-one-connective-grammar),
+for every noun × every family, named and anonymous: «נתונה פרבולה I שמשוואתה x²+y²=16» is refused with
+«המשוואה … מתארת מעגל, לא פרבולה» and nothing is drawn. The hyperbola case keeps the generic scope wording.
+One pair is ACCEPTED by operator ruling (2026-09-29, Am. 2): a circle under the ellipse noun is the
+a = b ellipse — «נתונה אליפסה I שמשוואתה x²+y²=16» records as ellipse I, with coinciding foci.)*
 
 **R8 — Coordinates are written `A(2,6)`.** *(Operator ruling: comma, not semicolon.)*
 **OPEN:** the exam prints `A(3;5)`. Does the semicolon *parse* (with the comma as the taught form, the
@@ -344,6 +349,20 @@ No worked formula (operator, 2026-09-29, reversing the 2026-09-27 ruling: the ta
 is outside the curriculum). Under the answer: «ניתן להשתמש בשיפועי הישרים או במשפט הקוסינוסים», with
 the law-of-cosines half only when all three vertices are known. An angle the student STATED is answered with no hint at all. *(#1409, #1525; realised —
 [ADR-AG-176](06c-decisions-analytic.md#adr-ag-176) Am. 1.)*
+
+**R122 — Radius, focus, directrix and perimeter are sayable and askable in the exam's spellings, and a
+stated value outside its quantity's range is refused.** The radius is a given at creation («נתון מעגל O
+שרדיוסו 5», «ברדיוס 5», «שאורך רדיוסו 5», «נתון מעגל שמרכזו (2,3) ורדיוסו 5») and afterwards («רדיוס
+המעגל (הוא|שווה|=)? 5», «אורך הרדיוס הוא 5», «המעגל ברדיוס 5»); the perimeter is a real given that fixes
+one degree of freedom («היקף המשולש ABC הוא 12», «היקף ABC = 12», «ההיקף הוא 12» over the one polygon);
+the focus names or places a point («F מוקד הפרבולה», «מוקד הפרבולה הוא F», «מוקד הפרבולה הוא (2,0)» —
+which pins a parameterised parabola); the directrix is a checked claim («מדריך הפרבולה הוא x=-2», «ישר
+המדריך x=-2»). Every role is askable in the same words, behind any opener («מהו», «מצא את», "what
+is") and closer («?»), which every ask accepts. A radius of zero or less is refused naming the
+sentence and the bound («חייב להיות גדול מ-0»), never drawn as a vanished circle. A role with no host,
+or several, is refused (or answered) naming the host to define or name — never with an unrelated
+example. «R=5»/«r=5» are not radius givens (a letter is a point or a parameter). *(#1432; realised —
+[ADR-AG-169](06c-decisions-analytic.md#adr-ag-169) Am. 1.)*
 
 **R24 — An ask is a DRY-RUN construction: built internally, evaluated, discarded.** It must never
 mutate the figure. The 2-D tool's `dryRunOutcome` already has this shape (apply on top of the current
@@ -788,6 +807,12 @@ object's name. «משוואת AB היא y=2x» ≡ «משוואת הישר AB ה
 each pair is **one object**, because a name is an identity (R44). The name's own shape says what was
 named — a two-point run or the `ℓ` device is a line, a Roman numeral is a circle — while the KIND still
 comes from the fit, so the id records what the student called it and the classifier decides what it is.
+A curve named by a numeral — line, circle, parabola or ellipse, 1–9 or I–IX — keeps the notation the
+student used, and «1» and «I» are ONE name: once «ישר 1» exists, «ישר I» (naming it again or referring
+to it) is REFUSED with a note that the two are the same name and a request to keep the notation already
+in use — never a second object, never a silent merge (operator ruling 2026-09-29,
+[ADR-AG-170 Am. 2](06c-decisions-analytic.md); this supersedes ADR-AG-168's reading of «המעגל 1» as
+«המעגל I»).
 
 **R52 — a length the figure KNOWS is shown, on the surface that matches its provenance**
 ([ADR-AG-028](06c-decisions-analytic.md#adr-ag-028)). Every drawn segment's length appears in the data
@@ -964,6 +989,25 @@ touching only the side's extension does not satisfy it — while «משיק לי
 of the line the circle sits on is not asserted, because the student did not say.
 Tangency to a line the figure does not hold is refused naming the line; tangency about a circle known only by
 its equation, and circle-to-circle tangency, are refused by name — never dropped, never guessed.
+
+**R122 — two circles can be stated tangent, and which touch is a configuration until the student says**
+([ADR-AG-167](06c-decisions-analytic.md#adr-ag-167), [#1504](https://github.com/dcodish/geo_builder/issues/1504);
+the circle member of R120's family). «מעגל M משיק למעגל K», the contextual «המעגל משיק למעגל K», the flipped
+«המעגל I משיק למעגל M», the plural «המעגלים משיקים (זה לזה)», and the mixed list («משיק לציר ה-x ולמעגל K»)
+all state one equation: the distance between the centres is the radii's sum (touching outside) or the radii's
+absolute difference (touching inside). Which touch is an UNSTATED configuration — «הציגו תצורה אחרת» cycles
+between them — until «מבחוץ»/«מבפנים» (externally/internally) pins it. Both circles must carry a centre and a
+radius to pull on; tangency about an equation circle or a computed circle is refused by name, an unknown circle
+by its name, and a circle is never tangent to itself.
+*Amendment 1 (2026-09-29, pre-play).* Every way a student names the two circles reads: «מעגל O ומעגל M משיקים»,
+«המעגל O והמעגל M משיקים», «(ה)מעגלים O ו-M משיקים» (also «O וM»), and "circle O and circle M are tangent" /
+"circles O and M are tangent". The branch word is one list — מבחוץ / חיצונית / externally, מבפנים / פנימית /
+internally — and may stand after the verb, after the target or at the end, with «זה לזה» in either order. «…בנקודה T»
+names the touch point, drawn where the circles meet. A word that has no circle-to-circle relation to attach to
+(«משיק לציר ה-x מבחוץ») is refused, never dropped. Two circles with the SAME centre are never tangent (operator
+ruling): the sentence is refused. A given that could only hold with a circle of radius zero — «מבחוץ» and then
+«מבפנים», or a centre ON the axis it is said to be tangent to — is refused on the sentence that completed the
+contradiction, never drawn with an invisible circle.
 
 **R114 — the tool never accepts a sentence a textbook would not print; it teaches the one it would**
 ([ADR-AG-150](06c-decisions-analytic.md#adr-ag-150),

@@ -88,6 +88,8 @@ const he = {
   /** #1111 — the sentence was understood; the figure has no such object. The LETTER is the point. */
   askMissingPoint: 'אין בשרטוט נקודה בשם {{name}}',
   askMissingCurve: 'אין בשרטוט ישר או מעגל בשם {{name}}',
+  // Ruling 2026-09-29 — a numeral asked in the notation the figure does not use.
+  askNumeralNotation: '{{name}} ו-{{used}} הם אותו שם — בשרטוט הזה הוא נכתב {{used}}. כתבו {{used}}, כדי לא לערבב שתי כתיבות.',
   paletteShow: 'סמלים',
   // #1129 — one per palette chip, so every button says what it is rather than repeating its glyph.
   symSq: 'בריבוע',
@@ -153,6 +155,19 @@ const he = {
   errUnknownRefPoint: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
   errUnknownRefLine: 'הישר {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
   errUnknownRefCircle: 'המעגל {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
+  // #1514 pre-play — a named conic is a noun of its own; it was reported as a missing POINT with its raw id.
+  errUnknownRefParabola: 'הפרבולה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
+  errUnknownRefEllipse: 'האליפסה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
+  // 02c R7 (#1514 pre-play) — the noun and the equation name different families; never drawn.
+  errKindMismatch:
+    'המשוואה במשפט "{{detail}}" מתארת {{existing}}, לא {{claimed}}. בדקו את המשוואה, או כתבו את שם הצורה שהיא מתארת.',
+  // Several NAMED candidates for a contextual reference (#1514 + #1432, chosen by hostKey): the sentence
+  // names them and shows the student's own line with the first name in it.
+  'errHost.named':
+    'בשרטוט יש יותר מעצם אחד מהסוג הזה ({{candidates}}), ולכן לא ברור לאיזה מהם הכוונה ב-"{{detail}}". כתבו את השם, למשל «{{example}}».',
+  // Operator ruling 2026-09-29 — a digit and a Roman numeral are one name; the notations are not mixed.
+  errNumeralNotation:
+    '{{numNoun}} {{holder}} ו{{numNoun}} {{detail}} הם אותו שם — הכלי קורא ספרה ומספר רומי כשם אחד. כדי לא לערבב שתי כתיבות, כתבו {{numNoun}} {{holder}}, כמו בשורות הקודמות.',
   errAlreadyNamed: 'כבר יש שם לנקודה הזו: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
   // #1423 — the letter is the problem, named with the student's own defining sentence and the remedy
@@ -173,6 +188,38 @@ const he = {
     'בצורה הזאת אין אלכסון ראשי ואלכסון משני — ההבחנה הזאת קיימת רק בצורות כמו דלתון: "{{detail}}". אפשר לציין את האלכסון לפי הקודקודים, למשל «משוואת האלכסון AC היא y=2x».',
   errAmbiguousShape:
     'בשרטוט הזה אין צורה אחת שאפשר לקרוא לה כך: "{{detail}}". אפשר לציין את הקודקודים, למשל «שטח הדלתון ABCD הוא 24».',
+  // #1432 am. 1 — a contextual reference with no host, or several: the remedy follows the HOST the
+  // sentence needed (name the circle, draw the parabola first), never the kite-area example above,
+  // which stays for the polygon-noun sentences it was written for.
+  'errHost.none.circle': 'אין בשרטוט מעגל שהמשפט יכול להתייחס אליו: "{{detail}}". הגדירו קודם מעגל, למשל «נתון מעגל O».',
+  'errHost.many.circle': 'יש בשרטוט יותר ממעגל אחד, ולא ברור לאיזה מהם המשפט מתייחס: "{{detail}}". כתבו במשפט את שם המעגל, למשל «המעגל I».',
+  'errHost.none.parabola': 'אין בשרטוט פרבולה שהמשפט יכול להתייחס אליה: "{{detail}}". הגדירו קודם את הפרבולה, למשל «נתונה פרבולה שמשוואתה y^2=8x».',
+  'errHost.many.parabola': 'יש בשרטוט יותר מפרבולה אחת, ולא ברור לאיזו מהן המשפט מתייחס: "{{detail}}".',
+  'errHost.none.ellipse': 'אין בשרטוט אליפסה שהמשפט יכול להתייחס אליה: "{{detail}}". הגדירו קודם את האליפסה, למשל «נתונה אליפסה שמשוואתה x^2/25+y^2/9=1».',
+  'errHost.many.ellipse': 'יש בשרטוט יותר מאליפסה אחת, ולא ברור לאיזו מהן המשפט מתייחס: "{{detail}}".',
+  'errHost.none.line': 'אין בשרטוט ישר שהמשפט יכול להתייחס אליו: "{{detail}}". הגדירו קודם את הישר, למשל «הישר l1: y=2x+1».',
+  'errHost.many.line': 'יש בשרטוט יותר מישר אחד, ולא ברור לאיזה מהם המשפט מתייחס: "{{detail}}". כתבו במשפט את שם הישר, למשל «הישר l1».',
+  'errHost.none.polygon': 'אין בשרטוט מצולע שהמשפט יכול להתייחס אליו: "{{detail}}". כתבו את הקודקודים, למשל «היקף המשולש ABC הוא 12».',
+  'errHost.many.polygon': 'יש בשרטוט יותר ממצולע אחד כזה, ולא ברור לאיזה מהם המשפט מתייחס: "{{detail}}". כתבו את הקודקודים, למשל «היקף המשולש ABC הוא 12».',
+  'errHost.pair.line': 'המשפט מתייחס לשני ישרים בלי לתת להם שמות, ובשרטוט יש {{found}}: "{{detail}}". כתבו את שמות הישרים, למשל «E נקודת החיתוך של הישרים l1 ו-l2».',
+  'errHost.pair.circle': 'המשפט מתייחס לשני מעגלים בלי לתת להם שמות, ובשרטוט יש {{found}}: "{{detail}}". כתבו את שמות המעגלים, למשל «E נקודת החיתוך של המעגלים I ו-II».',
+  // #1432 am. 1 — a stated value outside the range its quantity allows («רדיוס המעגל הוא -3»).
+  errOutOfDomain: 'הערך במשפט "{{detail}}" אינו אפשרי כאן — הוא חייב להיות {{range}}.',
+  'range.gt': 'גדול מ-{{v}}',
+  'range.ge': 'לפחות {{v}}',
+  'range.lt': 'קטן מ-{{v}}',
+  'range.le': 'לכל היותר {{v}}',
+  'range.ne': 'שונה מ-{{v}}',
+  'range.and': ' ו',
+  // #1432 am. 1 — the ask twin: a role question («רדיוס המעגל», «מוקד הפרבולה», «ההיקף») whose host is absent or plural.
+  'askHost.none.circle': 'אין בשרטוט מעגל',
+  'askHost.many.circle': 'יש בשרטוט יותר ממעגל אחד — כתבו את שם המעגל, למשל «רדיוס המעגל I»',
+  'askHost.none.parabola': 'אין בשרטוט פרבולה',
+  'askHost.many.parabola': 'יש בשרטוט יותר מפרבולה אחת',
+  'askHost.none.ellipse': 'אין בשרטוט אליפסה',
+  'askHost.many.ellipse': 'יש בשרטוט יותר מאליפסה אחת',
+  'askHost.none.polygon': 'אין בשרטוט מצולע כזה — כתבו את הקודקודים, למשל «היקף ABC»',
+  'askHost.many.polygon': 'יש בשרטוט יותר ממצולע אחד כזה — כתבו את הקודקודים, למשל «היקף ABC»',
   errAmbiguousAngle:
     'האות אחת לא מספיקה כדי לדעת באיזו זווית מדובר: "{{detail}}". אפשר לכתוב את שלוש האותיות, והקודקוד באמצע, למשל «זווית ABC», או לציין קודם את הצורה שבה הקודקוד נמצא.',
   errAmbiguousAngleArms:
@@ -214,6 +261,9 @@ const he = {
   // that their sentence was wrong: the tool did not get as far as looking at it.
   errLlmBusy:
     'השירות עמוס כרגע ולא הצלחתי לבדוק את המשפט "{{detail}}". אפשר לנסות שוב בעוד רגע, או לנסח אותו באחת הצורות שמופיעות ברשימת הפקודות.',
+  // #1336: the escape ran and the tool declined its completion — the sentence WAS understood.
+  errLlmUnderstood:
+    'הבנתי את המשפט "{{detail}}", אבל הכלי עדיין לא תומך במהלך הזה. אפשר לנסח אחרת, או להיעזר ברשימת הפקודות.',
   thinking: 'חושב…',
   errBadOperand:
     'הבנתי את היחס במשפט "{{detail}}", אבל לא זיהיתי את אחד האגפים. אפשר לציין שני קודקודים (AB), ' +
@@ -228,6 +278,19 @@ const he = {
   kindCircle: 'מעגל',
   kindParabola: 'פרבולה',
   kindEllipse: 'אליפסה',
+  // The definite noun a student writes before a curve's name — «הפרבולה I» (#1514 pre-play).
+  numNounPoint: 'נקודה',
+  numNounLine: 'ישר',
+  numNounCircle: 'מעגל',
+  numNounParabola: 'פרבולה',
+  numNounEllipse: 'אליפסה',
+  numNounCurve: 'עצם',
+  nounThePoint: 'הנקודה',
+  nounTheLine: 'הישר',
+  nounTheCircle: 'המעגל',
+  nounTheParabola: 'הפרבולה',
+  nounTheEllipse: 'האליפסה',
+  nounTheCurve: 'העצם',
   kindMidpoint: 'אמצע קטע',
   kindCentroid: 'מפגש התיכונים',
   kindIncentre: 'מפגש חוצי הזוויות',
@@ -356,6 +419,7 @@ const en: typeof he = {
   askContextualBoth: 'the figure has {{points}} points and {{lines}} lines — name them (e.g. "המרחק של A מהישר l1")',
   askMissingPoint: 'there is no point {{name}} in your figure',
   askMissingCurve: 'there is no line or circle named {{name}} in your figure',
+  askNumeralNotation: '{{name}} and {{used}} are the same name — this figure writes it {{used}}. Write {{used}}, to keep one notation.',
   paletteShow: 'Symbols',
   symSq: 'squared',
   symSqrt: 'square root',
@@ -414,6 +478,14 @@ const en: typeof he = {
   errUnknownRefPoint: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefLine: 'The line {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefCircle: 'The circle {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errUnknownRefParabola: 'The parabola {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errUnknownRefEllipse: 'The ellipse {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errKindMismatch:
+    'The equation in "{{detail}}" describes {{existing}}, not {{claimed}}. Check the equation, or name the shape it describes.',
+  'errHost.named':
+    'The figure has more than one of these ({{candidates}}), so it is not clear which one "{{detail}}" means. Write its name — for example "{{example}}".',
+  errNumeralNotation:
+    '"{{numNoun}} {{holder}}" and "{{numNoun}} {{detail}}" are the same name — the tool reads a digit and a Roman numeral as one name. To keep one notation, write "{{numNoun}} {{holder}}", as in the earlier lines.',
   errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
   errUnsatisfiableReused: '{{reusedId}} is already defined: "{{definedBy}}". "{{detail}}" contradicts that definition — pick another letter for a new point.',
@@ -431,6 +503,33 @@ const en: typeof he = {
     'equation of diagonal AC is y=2x".',
   errAmbiguousShape:
     'No single shape in this figure answers to that: "{{detail}}". Name its vertices — for example "the area of kite ABCD is 24".',
+  'errHost.none.circle': 'There is no circle in your figure for this sentence to refer to: "{{detail}}". Define a circle first, e.g. "circle O".',
+  'errHost.many.circle': 'Your figure has more than one circle, so it is unclear which one this sentence means: "{{detail}}". Name the circle, e.g. "circle I".',
+  'errHost.none.parabola': 'There is no parabola in your figure for this sentence to refer to: "{{detail}}". Define the parabola first, e.g. "parabola y^2=8x".',
+  'errHost.many.parabola': 'Your figure has more than one parabola, so it is unclear which one this sentence means: "{{detail}}".',
+  'errHost.none.ellipse': 'There is no ellipse in your figure for this sentence to refer to: "{{detail}}". Define the ellipse first, e.g. "ellipse x^2/25+y^2/9=1".',
+  'errHost.many.ellipse': 'Your figure has more than one ellipse, so it is unclear which one this sentence means: "{{detail}}".',
+  'errHost.none.line': 'There is no line in your figure for this sentence to refer to: "{{detail}}". Define the line first, e.g. "line l1: y=2x+1".',
+  'errHost.many.line': 'Your figure has more than one line, so it is unclear which one this sentence means: "{{detail}}". Name the line, e.g. "line l1".',
+  'errHost.none.polygon': 'There is no polygon in your figure for this sentence to refer to: "{{detail}}". Write its vertices, e.g. "the perimeter of triangle ABC is 12".',
+  'errHost.many.polygon': 'Your figure has more than one such polygon, so it is unclear which one this sentence means: "{{detail}}". Write its vertices, e.g. "the perimeter of triangle ABC is 12".',
+  'errHost.pair.line': 'This sentence refers to two unnamed lines, and your figure has {{found}}: "{{detail}}". Name the lines, e.g. "E is the intersection of lines l1 and l2".',
+  'errHost.pair.circle': 'This sentence refers to two unnamed circles, and your figure has {{found}}: "{{detail}}". Name the circles, e.g. "E is the intersection of circles I and II".',
+  errOutOfDomain: 'The value in "{{detail}}" is not possible here — it must be {{range}}.',
+  'range.gt': 'greater than {{v}}',
+  'range.ge': 'at least {{v}}',
+  'range.lt': 'less than {{v}}',
+  'range.le': 'at most {{v}}',
+  'range.ne': 'different from {{v}}',
+  'range.and': ' and ',
+  'askHost.none.circle': 'there is no circle in your figure',
+  'askHost.many.circle': 'your figure has more than one circle — name it, e.g. "radius of circle I"',
+  'askHost.none.parabola': 'there is no parabola in your figure',
+  'askHost.many.parabola': 'your figure has more than one parabola',
+  'askHost.none.ellipse': 'there is no ellipse in your figure',
+  'askHost.many.ellipse': 'your figure has more than one ellipse',
+  'askHost.none.polygon': 'there is no such polygon in your figure — write its vertices, e.g. "perimeter of ABC"',
+  'askHost.many.polygon': 'your figure has more than one such polygon — write its vertices, e.g. "perimeter of ABC"',
   errAmbiguousAngle:
     'One letter is not enough to say which angle is meant: "{{detail}}". Write all three letters, the vertex ' +
     'in the middle — for example "angle ABC" — or state the shape the vertex belongs to first.',
@@ -465,6 +564,8 @@ const en: typeof he = {
     'The two lines in "{{detail}}" are the same line, and a line has no intersection with itself, so the sentence defines no point. If you meant some point on that line, write for example "P on line AB".',
   errLlmBusy:
     'The service is busy, so I could not check "{{detail}}". Try again in a moment, or write it in one of the forms listed in the commands panel.',
+  errLlmUnderstood:
+    'I understood "{{detail}}", but the tool does not support this move yet. Try another phrasing, or the commands panel.',
   thinking: 'Working…',
   errBadOperand:
     'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +
@@ -479,6 +580,18 @@ const en: typeof he = {
   kindCircle: 'a circle',
   kindParabola: 'a parabola',
   kindEllipse: 'an ellipse',
+  numNounPoint: 'point',
+  numNounLine: 'line',
+  numNounCircle: 'circle',
+  numNounParabola: 'parabola',
+  numNounEllipse: 'ellipse',
+  numNounCurve: 'object',
+  nounThePoint: 'the point',
+  nounTheLine: 'the line',
+  nounTheCircle: 'the circle',
+  nounTheParabola: 'the parabola',
+  nounTheEllipse: 'the ellipse',
+  nounTheCurve: 'the object',
   kindMidpoint: 'a midpoint',
   kindCentroid: 'the centroid',
   kindIncentre: 'the incentre',

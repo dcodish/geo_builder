@@ -28,10 +28,9 @@ const codeOf = (line: string) => {
 
 describe('#1272 — a rule that matched a noun and never read the tail answers not-handled, and the seam fires', () => {
   it.each([
-    // the three measured losses of the escape (issue body, f8cb9c3a)
-    ['פרבולה I: y^2=2x', 'bad-equation about «I: y^2=2x»'],
-    ['נתון מעגל I - x^2+y^2=16', 'the dash read as a sign: a hyperbola labelled circle → out-of-scope'],
-    ['נתונה פרבולה I - y^2=2x', 'the dash read as a sign → out-of-scope'],
+    // «פרבולה I: y^2=2x», «נתון מעגל I - x^2+y^2=16», «נתונה פרבולה I - y^2=2x» and the en-dash
+    // «מעגל I – x^2+y^2=9» LEFT this table with #1271 (ADR-AG-170): a conic carries a name and the
+    // spaced dash is a connective, so the sentences the escape used to lose now parse — see below.
     // the same class at the other claiming sites — a Hebrew word is not an expression
     // «שיפוע הישר AB הוא חיובי» left this table with #1323 (ADR-AG-144): the SIGN of a slope is a
     // sentence the tool now reads, so it is no longer a claim the rule never read — see below.
@@ -40,8 +39,6 @@ describe('#1272 — a rule that matched a noun and never read the tail answers n
     // read — see below. A Hebrew word that is still no value keeps the component rule's row.
     ['שיעור ה-x של A הוא בערך חמש', 'the component rule claimed a Hebrew word'],
     ['האלכסון הראשי: משהו', 'the diagonal-equation rule claimed a Hebrew word'],
-    // the connective spelt with an en dash, and an unread name at a line-equation tail
-    ['מעגל I – x^2+y^2=9', 'an en dash is never a sign'],
     ['משוואת הישר l1 היא AB: y=2x', 'a name the rule did not consume, then a colon'],
   ])('«%s» — %s', (line) => {
     const v = verdictOf(line);
@@ -49,6 +46,13 @@ describe('#1272 — a rule that matched a noun and never read the tail answers n
     expect(reachesFallback(v), `${line}: the seam fires`).toBe(true);
     // the refusal is about the student's own sentence, never about a fragment the reader cut
     expect(v.kind === 'refused' && v.error.detail, line).toBe(line);
+  });
+
+  it('the naming spellings PARSE since #1271 (ADR-AG-170) — the escape no longer pays for them', () => {
+    for (const line of ['פרבולה I: y^2=2x', 'נתון מעגל I - x^2+y^2=16', 'נתונה פרבולה I - y^2=2x', 'מעגל I – x^2+y^2=9']) {
+      expect(parseLine(line).ok, line).toBe(true);
+      expect(codeOf(line), line).toBe('record');
+    }
   });
 
   it('«שיעור ה-x של A הוא שלילי» is UNDERSTOOD since #1462 — x_A < 0, refused only for the point it names', () => {

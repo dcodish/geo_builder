@@ -26,15 +26,33 @@ import { isKnowledge, knownCurve, knownOptions, type Figure } from '../engine/ev
 import { locusOf } from '../engine/locus';
 
 import { curveByName, objectById, type Id } from '../engine/types';
+import { numeralCurveId, numeralTwin, statedName, type NumeralKind } from '../engine/names';
+
+/**
+ * A curve name the figure does not have — and, when it is a NUMERAL the figure holds in the OTHER
+ * notation («הישר I» asked of «ישר 1»), the notation in use (operator ruling 2026-09-29): the ask lane
+ * answers "you wrote I, this figure writes 1" exactly as the input refuses the mix, never "no such line".
+ */
+function missingCurve(d: Derivation, name: string): { name: string; kind: 'curve'; used?: string } {
+  const ids = d.construction.objects.map((o) => o.id);
+  const kinds: NumeralKind[] = ['line', 'circle', 'parabola', 'ellipse'];
+  for (const k of kinds) {
+    const twin = numeralTwin(ids, numeralCurveId(k, name));
+    if (twin) return { name, kind: 'curve', used: statedName(twin) };
+  }
+  return { name, kind: 'curve' };
+}
 import { ANGLE_STEM_HE } from '../engine/shapes';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { isVerticalLine } from '../engine/lines';
 import { asPair, lineNamed, lineNamesOf } from './lines';
 import { pointText, scalarText } from './pointText';
-import { readAngleAsk } from '../parser/parseAnalytic';
+import { readAngleAsk, readRoleRef, type RoleRef } from '../parser/parseAnalytic';
 import { angleAt } from '../engine/solve';
 import { angleText, lineAngleOf } from './lineAngle';
-import { curveParts, locusEquation } from './curveText';
+import { curveParts, directrixText, locusEquation } from './curveText';
+import { ellipseFoci, parabolaFocus } from '../engine/curves';
+import { ringsNamed } from '../engine/shapes';
 
 /** The question is EXACTLY one point-to-line distance, for the same reason `BARE_LENGTH` exists. */
 const POINT_LINE_ONLY = /^(?:ה?מרחק|[Dd]istance)\s+\S.*$/;
@@ -59,7 +77,7 @@ export interface Answer {
    * CLAUDE.md's standing rule: error messages name the conflicting STATEMENT, never internal state.
    * Here the conflicting statement is in hand, so it is carried rather than discarded.
    */
-  missing?: { name: string; kind: 'point' | 'curve' };
+  missing?: { name: string; kind: 'point' | 'curve'; used?: string };
   /** #1431 — the CONTEXTUAL «המרחק של הנקודה מהישר» could not resolve: the counts name the ambiguity
    *  (zero or several points/lines), so the wording can say WHICH noun to letter. */
   contextual?: { points: number; lines: number };
@@ -93,6 +111,12 @@ export interface Answer {
    * A token, for the same reason as `fact`: this module holds no locale.
    */
   hint?: 'angle-methods' | 'angle-slopes';
+  /**
+   * THE ROLE'S HOST IS ABSENT OR PLURAL (#1432 am. 1) — «מוקד הפרבולה» with no parabola, «רדיוס המעגל» over two
+   * circles, «ההיקף» over no polygon. Not `null` (the figure does not fix it) and not `unreadable`: the question
+   * was understood, and the figure has no single object it can be about. The component words the remedy.
+   */
+  host?: { kind: 'circle' | 'parabola' | 'ellipse' | 'polygon'; found: number };
   /**
    * THE POINT SET a degenerate locus answers with (#1227, ADR-AG-136): «המקום הגיאומטרי של M» on a
    * determined M is M's position, or its finite set of positions — one entry per resolution-aware
@@ -221,15 +245,15 @@ const EQUATION_OF = /^(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+(?:ה?(?:יש
  * name of a line they forgot to draw. Exactly one spelling worked, and it was not the exam's.
  *
  * The locus row already answers with an EQUATION when it knows one, so «המקום הגיאומטרי של B» and
- * «משוואת המקום הגיאומטרי של B» are one question, not two. The lead-ins are admitted INTO this pattern
- * — no second branch, no pre-stripping — so the spellings share one code path (ADR-W-053), and they
- * are ENUMERATED, never `.*`: the imperative/interrogative openers a student writes («מצא את»,
- * «מצאי את», «חשב את», «מהו», «מה הוא», «מהי», «find», «what is»), then the equation-of prefix. This
- * pattern sits ABOVE `EQUATION_OF` and must stay there; the anti-widening lock in
+ * «משוואת המקום הגיאומטרי של B» are one question, not two: the equation-of prefix is admitted INTO this
+ * pattern, so the spellings share one code path (ADR-W-053). The imperative/interrogative OPENERS
+ * («מצא את», «מהו», «find», "what is") used to be enumerated here too; #1432 am. 1 hoisted them into
+ * `normaliseAsk`, which strips them before EVERY rule — the same enumerated list, never `.*`, and now
+ * no rule lists it again. This pattern sits ABOVE `EQUATION_OF` and must stay there; the anti-widening lock in
  * `issue-1301-locus-question-spellings.test.ts` is what makes the greedier pattern safe.
  */
 const LOCUS_OF =
-  /^(?:(?:מצא(?:י|ו)?|חשב(?:י|ו)?)\s+את\s+|מה(?:ו|י)\s+|מה\s+ה(?:וא|יא)\s+|[Ff]ind\s+|[Ww]hat\s+is\s+)?(?:(?:ה?משוואת|[Tt]he\s+equation\s+of|[Ee]quation\s+of)\s+)?(?:ה?מקום\s+ה?גי?אומטרי|[Tt]he\s+locus|[Ll]ocus)\s+(?:של\s+|of\s+)?(?:ה?נקודה\s+)?(.+)$/;
+  /^(?:(?:ה?משוואת|[Tt]he\s+equation\s+of|[Ee]quation\s+of)\s+)?(?:ה?מקום\s+ה?גי?אומטרי|[Tt]he\s+locus|[Ll]ocus)\s+(?:של\s+|of\s+)?(?:ה?נקודה\s+)?(.+)$/;
 
 /**
  * Answer one question against the figure the student has built.
@@ -263,7 +287,8 @@ export function ask(
   // plural is locale exactly as the singular is. The seam WIDENS, it is not forked.
   kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind'], count: number) => string = (k) => k,
 ): Answer {
-  let text = question.trim();
+  // The wrapper a student puts round a question («מהו …», «מצא את …», «…?») is not the question (#1432 am. 1).
+  let text = normaliseAsk(question);
   if (!text) return { question, value: null, unreadable: true };
 
   /**
@@ -455,7 +480,7 @@ export function ask(
   const ax = ANGLE_WITH_X_HE.exec(text) ?? ANGLE_WITH_X_EN.exec(text);
   if (ax) {
     const name = ax[1].trim();
-    if (!lineNamed(d.figure, name)) return { question, value: null, missing: { name, kind: 'curve' } };
+    if (!lineNamed(d.figure, name)) return { question, value: null, missing: missingCurve(d, name) };
     // A line `ax + by + c = 0` runs along (−b, a); a vertical one answers 90° rather than failing.
     const angle = lineAngleOf(d.construction, (f) => {
       const l = lineNamed(f, name);
@@ -468,7 +493,7 @@ export function ask(
   if (sl) {
     const name = sl[1].trim();
     const line = lineNamed(d.figure, name);
-    if (!line) return { question, value: null, missing: { name, kind: 'curve' } };
+    if (!line) return { question, value: null, missing: missingCurve(d, name) };
     /**
      * A vertical line HAS no slope, and that is an answer about the figure rather than a failure.
      *
@@ -493,6 +518,19 @@ export function ask(
     return { question, value: opts };
   }
 
+  /**
+   * --- the measure ROLES (#1432): perimeter, radius, focus, directrix, foci ---
+   *
+   * External review: *"The Ask box is narrow. It can't answer radius, focus, … perimeter."* The
+   * values were always computed (the panel's folded detail, #1212); no ask reached them. The ROLE
+   * PHRASE is read by `readRoleRef` — the same reader the givens compose (am. 1), so «אורך הרדיוס»,
+   * «שיעורי המוקד», «ישר המדריך», «משוואת מדריך הפרבולה», «היקף המלבן ABCD» are askable because they
+   * are sayable. Each value reads through the SAME atoms the panel prints from, gated by the same
+   * knowledge rules; a role whose host the figure lacks, or holds several of, says so (`host`).
+   */
+  const role = readRoleRef(text);
+  if (role) return roleAnswer(d, role, question, fmt, kindWord);
+
   // --- a curve, by name: its equation ---
   const eq = EQUATION_OF.exec(text);
   if (eq) {
@@ -514,7 +552,7 @@ export function ask(
      */
     if (!curve) {
       const here = lineNamed(d.figure, name);
-      if (!here) return { question, value: null, missing: { name, kind: 'curve' } };
+      if (!here) return { question, value: null, missing: missingCurve(d, name) };
       const ka = isKnowledge(d.construction, (f) => lineNamed(f, name)?.a ?? null);
       const kb = isKnowledge(d.construction, (f) => lineNamed(f, name)?.b ?? null);
       const kc = isKnowledge(d.construction, (f) => lineNamed(f, name)?.c ?? null);
@@ -592,7 +630,7 @@ export function ask(
   const missingLine = measure.terms
     .flatMap((t) => (t.kind === 'point-line' ? [t.line] : t.kind === 'line-line' ? [t.u, t.v] : []))
     .find((name) => !lineNamed(d.figure, name));
-  if (missingLine !== undefined) return { question, value: null, missing: { name: missingLine, kind: 'curve' } };
+  if (missingLine !== undefined) return { question, value: null, missing: missingCurve(d, missingLine) };
 
     /**
    * TWO LINES THAT CROSS HAVE NO SINGLE DISTANCE (#1205).
@@ -675,6 +713,92 @@ export function ask(
     ...(trace ? { trace } : {}),
     ...(mark ? { mark } : {}),
   };
+}
+
+/**
+ * THE ASK LANE'S OPENERS, NORMALISED ONCE (#1432 amendment 1).
+ *
+ * The pre-play found every new role ask readable bare and unreadable behind «מהו», «מצא את» or a
+ * trailing «?» — and measured the same of «AB», «שיפוע AB», «משוואת הישר AB»: only the locus ask
+ * (#1301) admitted openers, because `LOCUS_OF` enumerated them INSIDE its own pattern. The
+ * interrogative and imperative wrapper is not part of any question's grammar, so it is removed here,
+ * before every rule, and no rule lists it again. ENUMERATED, never `.*` (the #1301 anti-widening
+ * rule): «מצא/מצאי/מצאו את», «חשב/חשבי/חשבו את», «מהו/מהי/מהם/מהן», «מה הוא/היא/הם/הן», a bare
+ * «מה», "find", "calculate", "compute", "what is/are"; and after the question a «?» or «= ?».
+ */
+const ASK_OPENER =
+  /^(?:(?:מצא(?:י|ו)?|חשב(?:י|ו)?)\s+את\s+|מה(?:ו|י|ם|ן)\s+|מה\s+ה(?:וא|יא|ם|ן)\s+|מה\s+|(?:find|calculate|compute)\s+|what\s+(?:is|are)\s+)/i;
+const ASK_CLOSER = /\s*(?:=\s*)?[?？]\s*$|\s*=\s*$/;
+export function normaliseAsk(question: string): string {
+  let t = question.trim().replace(ASK_CLOSER, '').trim();
+  const open = ASK_OPENER.exec(t);
+  if (open && open[0].length < t.length) t = t.slice(open[0].length).trim();
+  return t;
+}
+
+/** The host a role needs, counted in the figure the student is looking at. */
+function hostsOf(d: Derivation, kind: 'circle' | 'parabola' | 'ellipse'): Array<{ id: Id }> {
+  return d.figure.curves.filter((q) => q.curve.kind === kind);
+}
+
+/** One role question answered — see the role block in `ask`. */
+function roleAnswer(
+  d: Derivation,
+  role: RoleRef,
+  question: string,
+  fmt: (v: number) => string,
+  kindWord: Parameters<typeof ask>[3],
+): Answer {
+  if (role.role === 'perimeter') {
+    // The perimeter IS the sum of the sides, and the compound-length ask already answers sums —
+    // one delegation, so «היקף ABC» and «AB+BC+CA» cannot disagree. Without vertices, the ring is
+    // the one `ringsNamed` finds — the same answer the perimeter GIVEN resolves by.
+    let ids = role.ids;
+    if (!ids) {
+      const rings = ringsNamed(d.construction.objects, role.noun) as Array<{ vertices: Id[] }>;
+      if (rings.length !== 1) return { question, value: null, host: { kind: 'polygon', found: rings.length } };
+      ids = rings[0].vertices;
+    }
+    const expr = ids.map((p, i) => `${p}${ids![(i + 1) % ids!.length]}`).join('+');
+    return { ...ask(d, expr, fmt, kindWord), question };
+  }
+  if (role.role === 'radius') {
+    let cid: Id;
+    if (role.circle) {
+      const named = [numeralCurveId('circle', role.circle), `circle-at-${role.circle}`].find((id) => objectById(d.construction, id));
+      const byName = named ?? curveByName(d.construction, role.circle)?.id;
+      if (!byName) return { question, value: null, missing: missingCurve(d, role.circle) };
+      cid = byName;
+    } else {
+      const circles = hostsOf(d, 'circle');
+      if (circles.length !== 1) return { question, value: null, host: { kind: 'circle', found: circles.length } };
+      cid = circles[0].id;
+    }
+    const k = isKnowledge(d.construction, (f) => {
+      const host = f.curves.find((q) => q.id === cid);
+      return host && host.curve.kind === 'circle' ? host.curve.r : null;
+    });
+    return { question, value: k.known ? fmt(k.value) : null };
+  }
+  // Focus, foci, directrix: THE parabola / THE ellipse. A parameterised conic has no invariant focus,
+  // and that is `value: null` in the lane's own honest wording — a different answer from "there is none".
+  const wantKind = role.role === 'foci' || (role.role === 'focus' && role.host === 'ellipse') ? 'ellipse' : 'parabola';
+  const hosts = hostsOf(d, wantKind);
+  if (hosts.length !== 1) return { question, value: null, host: { kind: wantKind, found: hosts.length } };
+  const cv = knownCurve(d.construction, hosts[0].id);
+  if (!cv) return { question, value: null };
+  if (cv.kind === 'ellipse') {
+    const [f1, f2] = ellipseFoci(cv);
+    return { question, value: `(${fmt(f1.x)}, ${fmt(f1.y)}), (${fmt(f2.x)}, ${fmt(f2.y)})` };
+  }
+  if (cv.kind === 'parabola') {
+    // The directrix in the one role-line wording the panel prints (am. 1) — derived from the line
+    // itself, so no orientation is assumed here.
+    if (role.role === 'directrix') return { question, value: directrixText(cv) };
+    const fp = parabolaFocus(cv);
+    return { question, value: `(${fmt(fp.x)}, ${fmt(fp.y)})` };
+  }
+  return { question, value: null };
 }
 
 /**

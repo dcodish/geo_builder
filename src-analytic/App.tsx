@@ -33,8 +33,10 @@ import { color, fs } from '../shell/theme';
 import { reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
 import { decideSubmit, reachesFallback } from './app/submit';
+import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { runFallback } from './app/fallback';
 import { panelKnowledge } from './app/panelRows';
+import { hostKey } from './app/hostKey';
 import { angleText, lineAngleOf } from './app/lineAngle';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
 import { domainText } from './engine/types';
@@ -75,6 +77,7 @@ import { ShareSheet } from '../shell/frame/ShareSheet';
 import { loadAnalyticSession } from './app/loadSession';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
+
 
 declare const __BUILD__: string;
 
@@ -118,39 +121,8 @@ const CANVAS_FALLBACK = { w: 720, h: 720 };
 /** Never build a scene smaller than this — below it the tick labels collide. Mirrors 2-D's floor. */
 const CANVAS_MIN = 320;
 
-/**
- * The locale key describing WHAT a clashing name already holds (#1046).
- *
- * The engine hands over a token (`derived:centroid`, `curve:ellipse`) and never a sentence, so the
- * description is rendered here, in the student's language, from the construct's own corpus noun.
- * An unrecognised token falls back to the generic noun rather than printing itself: a message
- * leaking `derived:centroid` at a student would be internal state, which the honesty invariants
- * forbid outright.
- */
-function existingKey(error: InputError): string {
-  const token = 'existing' in error ? error.existing : undefined;
-  const byToken: Record<string, string> = {
-    point: 'kindPoint',
-    free: 'kindFree',
-    segment: 'kindSegment',
-    polygon: 'kindPolygon',
-    'curve:line': 'kindLine',
-    'curve:circle': 'kindCircle',
-    'curve:parabola': 'kindParabola',
-    'curve:ellipse': 'kindEllipse',
-    // The constructive curves are a circle and a line to the student, however they were stated (#1464).
-    'circle-at': 'kindCircle',
-    'circle-thru': 'kindCircle',
-    'line-at': 'kindLine',
-    'derived:midpoint': 'kindMidpoint',
-    'derived:centroid': 'kindCentroid',
-    'derived:incentre': 'kindIncentre',
-    'derived:orthocentre': 'kindOrthocentre',
-    'derived:circumcentre': 'kindCircumcentre',
-    'derived:diagonals': 'kindDiagonalMeet',
-  };
-  return (token && byToken[token]) || 'kindObject';
-}
+// `existingKey` and the refusal key table moved to `app/errorText.ts` (#1514 pre-play), so a lock can
+// render exactly what the student reads.
 
 export function App() {
   const { t, i18n } = useTranslation();
@@ -848,8 +820,17 @@ export function App() {
         setError({ key: 'llm-busy', detail: raw });
         return;
       }
-      // 'none' and 'rejected' alike: the student keeps the refusal about their own sentence. Naming
-      // the model's rejected line would report internal state for words they never typed.
+      /**
+       * 'rejected' is no longer worded as «not understood» (#1336): the tool DID understand — the
+       * escape ran and produced a completion the tool declined — and telling the student their
+       * sentence was unintelligible sends them rewriting words that were never the problem. The
+       * note says the honest middle; the model's line itself stays out (#1251), and 'none' keeps
+       * the original refusal, which for a genuinely unread sentence is the true answer.
+       */
+      if (out.kind === 'rejected') {
+        setError({ key: 'llm-understood-unsupported', detail: raw });
+        return;
+      }
       setError(original);
     } finally {
       clearTimeout(timer);
@@ -897,53 +878,7 @@ export function App() {
     });
   }, [d, view, canvasSize, answers]);
 
-  const errorText = error
-    ? t(
-        {
-          'not-handled': 'errNotHandled',
-          'bad-equation': 'errBadEquation',
-          'out-of-scope': 'errOutOfScope',
-          'reserved-coordinate': 'errReservedCoordinate',
-          'bad-arity': 'errBadArity',
-          'repeated-vertex': 'errRepeatedVertex',
-          'degenerate-role': 'errDegenerateRole',
-          'apex-not-a-vertex': 'errApexNotAVertex',
-          'crossing-already-named': 'errCrossingAlreadyNamed',
-          'self-crossing': 'errSelfCrossing',
-          'llm-busy': 'errLlmBusy',
-          'bad-operand': 'errBadOperand',
-          'conflicting-restatement': 'errConflict',
-          'name-kind-clash': 'errNameClash',
-          // #1179 — the noun follows the KIND the statement expected, not a single point-shaped
-          // sentence. `expected` is the token the engine carries; an id with no prefix (and so no
-          // kind) falls to the kind-free wording rather than guessing.
-          'unknown-reference':
-            error.key === 'unknown-reference' && error.expected
-              ? {
-                  point: 'errUnknownRefPoint',
-                  line: 'errUnknownRefLine',
-                  circle: 'errUnknownRefCircle',
-                  curve: 'errUnknownRef',
-                }[error.expected]
-              : 'errUnknownRef',
-          'does-not-exist': 'errDoesNotExist',
-          'ring-contradicts-noun': 'errRingContradictsNoun',
-          // #1407 — a vertex in SEVERAL shapes gets the three-letter name it needs; in none, the general form.
-          'ambiguous-angle': error.key === 'ambiguous-angle' && error.example ? 'errAmbiguousAngleArms' : 'errAmbiguousAngle',
-          'ambiguous-shape': 'errAmbiguousShape',
-          'undistinguished-diagonal': 'errNoPrincipalDiagonal',
-          'already-named': 'errAlreadyNamed',
-          // #1423 — a refusal that restates an existing letter says the LETTER is the problem
-          'unsatisfiable': error.key === 'unsatisfiable' && 'reusedId' in error && error.reusedId ? 'errUnsatisfiableReused' : 'errUnsatisfiable',
-          // A save file this tool will not open, named by WHICH of the three reasons (#1087).
-          'load-foreign': 'errLoadForeign',
-          'load-newer': 'errLoadNewer',
-          'load-too-large': 'errLoadTooLarge',
-          'load-unreadable': 'errLoadUnreadable',
-        }[error.key],
-        { detail: error.detail, max: MAX_FIGURE_STATEMENTS, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '', example: 'example' in error ? (error.example ?? '') : '', reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '', definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '' },
-      )
-    : null;
+  const errorText = error ? errorTextOf(error, t as unknown as Translate) : null;
 
   // The DOF cue (02c P4 — an under-determined figure is drawn, and its openness is VISIBLE).
   // Counted from the register, not from the declarations, so an undeclared parameter is reported
@@ -1736,7 +1671,7 @@ export function App() {
                       that happen to return equations.
                     */}
                     {a.missing ? (
-                      `${a.question} — ${t(a.missing.kind === 'point' ? 'askMissingPoint' : 'askMissingCurve', { name: a.missing.name })}`
+                      `${a.question} — ${t(a.missing.used ? 'askNumeralNotation' : a.missing.kind === 'point' ? 'askMissingPoint' : 'askMissingCurve', { name: a.missing.name, used: a.missing.used })}`
                     ) : a.contextual ? (
                       /* #1431 — the contextual «המרחק של הנקודה מהישר» could not resolve: name WHICH
                          noun is ambiguous (or absent), never «לא הבנתי» */
@@ -1748,6 +1683,9 @@ export function App() {
                             : 'askContextualLine',
                         { points: a.contextual.points, lines: a.contextual.lines },
                       )}`
+                    ) : a.host ? (
+                      /* #1432 am. 1 — a role question whose host is absent or plural: say which, never «לא הבנתי» */
+                      `${a.question} — ${t(hostKey('askHost', a.host))}`
                     ) : a.unreadable ? (
                       `${a.question} — ${t('askUnreadable')}`
                     ) : (

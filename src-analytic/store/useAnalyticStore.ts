@@ -13,6 +13,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import type { LoadAudit } from '../../shell/save';
 import { ingestTypedText } from '../../shell/bidi';
+import type { RefKind } from '../engine/names';
 
 /**
  * WHOSE save file this is, and which format (#1087).
@@ -93,6 +94,8 @@ export type InputError =
    * they find out what happened.
    */
   | { key: 'llm-busy'; detail: string }
+  // #1336: the escape ran and the tool declined its completion — understood, not unintelligible.
+  | { key: 'llm-understood-unsupported'; detail: string }
   /** A relation whose verb was understood and whose operand was not (#1052). */
   | { key: 'bad-operand'; detail: string }
   /** The statement contradicts what an earlier statement already fixed. */
@@ -103,14 +106,23 @@ export type InputError =
    */
   | { key: 'name-kind-clash'; detail: string; existing?: string }
   /** A construction that refers to a point the figure does not have yet (#1028). */
-  | { key: 'unknown-reference'; detail: string; expected?: 'point' | 'line' | 'circle' | 'curve' }
+  | { key: 'unknown-reference'; detail: string; expected?: RefKind }
+  /**
+   * The noun and the equation name different families (02c R7, #1514 pre-play) — «פרבולה I שמשוואתה
+   * x^2+y^2=16». `existing` is what the equation describes (`curve:<kind>`), `expected` the noun written.
+   */
+  | { key: 'kind-mismatch'; detail: string; existing?: string; expected?: RefKind }
   /** A construct that cannot exist in this figure, which has no freedom left to try (#1058). */
   | { key: 'does-not-exist'; detail: string; existing?: string }
   | { key: 'ring-contradicts-noun'; detail: string }
   /** A vertex that does not name an angle on its own — no shape through it, or several (#1049). */
   | { key: 'ambiguous-angle'; detail: string; example?: string }
   /** A shape named by its noun alone, where the figure has no such shape or several (#1049). */
-  | { key: 'ambiguous-shape'; detail: string }
+  | { key: 'ambiguous-shape'; detail: string; host?: { kind: string; found: number; need?: number; candidates?: string[] } }
+  /** «ישר I» where the figure's line is «ישר 1» (ruling 2026-09-29): typed numeral, the one in use, the kind. */
+  | { key: 'numeral-notation'; detail: string; holder?: string; expected?: RefKind }
+  /** #1432 am. 1 — a stated value outside its symbol's domain («רדיוס המעגל הוא -3»), with the bound. */
+  | { key: 'out-of-domain'; detail: string; domain?: { min?: number; minOpen?: boolean; max?: number; maxOpen?: boolean; exclude?: number[] } }
   /** «האלכסון הראשי» where the shape distinguishes no principal diagonal (#1070). */
   | { key: 'undistinguished-diagonal'; detail: string }
   /**

@@ -16,14 +16,18 @@
  * lands, and nowhere else.
  */
 import { fitConic } from './conic';
-import { resolveCurve } from './curves';
-import { curveParentOf, parentsOf, type DerivedRule } from './derived';
+import { numeralCurveId, numeralTwin, refKindOf, statedName, type RefKind } from './names';
+import { parabolaDirectrix, resolveCurve } from './curves';
+import { parseLengthExpr } from './lengths';
+import { curveParentsOf, parentsOf, type DerivedRule } from './derived';
 import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, type AngleName, type AngleRef } from './solve';
-import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, shapeRow } from './shapes';
-import { evalExpr, type Env } from './expr';
+import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, ringsNamed, shapeRow } from './shapes';
+import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
+import { RESERVED_SYMBOLS } from './carriers';
 import {
   EMPTY_CONSTRUCTION,
+  inDomain,
   circleDefPoints,
   curveByName,
   diameterCircleId,
@@ -98,6 +102,13 @@ export type ApplyErrorCode =
    */
   | 'ambiguous-shape'
   /**
+   * A numeral name written in the OTHER notation from the one the figure already uses — «ישר I» when
+   * the line is «ישר 1» (operator ruling 2026-09-29, ADR-AG-170 Am. 2). «1» and «I» are ONE name, so
+   * this is never a second object; and it is never silently merged either: the student is asked to
+   * keep one notation. `detail` is the numeral they typed, `holder` the one in use, `expected` the kind.
+   */
+  | 'numeral-notation'
+  /**
    * «האלכסון הראשי» in a shape whose noun distinguishes no principal diagonal (#1070).
    *
    * A kite has one — its axis of symmetry is a fact about the figure. A plain quadrilateral, a
@@ -124,8 +135,38 @@ export type ApplyErrorCode =
    */
   | 'repeated-vertex'
   | 'out-of-scope'
+  /**
+   * A STATED value substituted into a symbol whose domain it violates (#1432 amendment 1) — «רדיוס
+   * המעגל הוא -3», «שרדיוסו 0». The radius symbol carries `{min: 0, minOpen}` and the substitution
+   * used to drop it unchecked, so the circle vanished with no message. Checked at the ONE seam every
+   * stated-value substitution passes (`substituteStated`), for any domained symbol; `domain` carries
+   * the bound for the locale to word.
+   */
+  | 'out-of-domain'
   /** A stated given the solve could not satisfy — reported, never drawn as if it held. */
   | 'unsatisfiable';
+
+/**
+ * WHICH OBJECT a contextual reference needed, and how many the figure holds (#1432 amendment 1).
+ *
+ * `ambiguous-shape` used to carry only the sentence, so every contextual refusal — «רדיוס המעגל הוא
+ * 5» with no circle, «F מוקד הפרבולה» with no parabola — taught the kite-area example the message was
+ * written for. The host KIND is what picks the remedy (name the circle, draw the parabola first);
+ * `need` is 2 for the crossing of two unnamed curves, else 1. Absent for the polygon-noun sites
+ * (area, meet), whose kite example is the right remedy.
+ */
+export interface HostRef {
+  kind: 'circle' | 'parabola' | 'ellipse' | 'line' | 'polygon';
+  found: number;
+  need?: number;
+  /**
+   * How the student can call each object FOUND, when there are several named curves to choose from
+   * (#1514 pre-play, merged into this one seam): its name («I», «II») or, unnamed, its equation — both
+   * of which the operand resolver reads back — so the refusal names them and shows the student's own
+   * sentence with a name in it («P על הפרבולה I»).
+   */
+  candidates?: string[];
+}
 
 export interface ApplyError {
   code: ApplyErrorCode;
@@ -172,6 +213,82 @@ export interface ApplyError {
    * would be a guess.
    */
   example?: string;
+  /** For `ambiguous-shape`: the kind the reference needed and how many the figure holds (#1432 am. 1). */
+  host?: HostRef;
+  /** For `out-of-domain`: the bound the stated value violates (#1432 am. 1). */
+  domain?: Domain;
+}
+
+/** How a found curve can be called in a sentence — its name, or (unnamed) its equation. */
+function callable(o: GeoObject): string {
+  if (o.kind === 'curve' && o.id.startsWith('curve-')) return o.label.eqSrc ?? '';
+  if (o.kind === 'circle-thru' && o.name) return o.name;
+  return statedName(o.id);
+}
+
+/**
+ * THE ONE REFUSAL for a contextual reference that found `found` objects of `kind` where it needed
+ * `need` (default 1) — #1432's host seam, which #1514's ambiguous-curve refusal now rides: pass the
+ * objects themselves and, when more than one was found, the refusal carries how to CALL each.
+ */
+function noHost(detail: string, kind: HostRef['kind'], found: number | readonly GeoObject[], need?: number): ApplyError {
+  const n = typeof found === 'number' ? found : found.length;
+  const candidates = typeof found === 'number' || n < 2 ? [] : found.map(callable).filter((x) => x !== '');
+  return {
+    code: 'ambiguous-shape',
+    detail,
+    host: { kind, found: n, ...(need !== undefined ? { need } : {}), ...(candidates.length ? { candidates } : {}) },
+  };
+}
+
+/**
+ * THE ONE SEAM A STATED VALUE PASSES ON ITS WAY INTO A DOMAINED SYMBOL (#1432 amendment 1).
+ *
+ * A symbol declared with a domain — a circle's free radius `r_O` (> 0), a parameter «a > 0» — may
+ * be REPLACED by a value the student states. The replacement is only honest if the value lies in
+ * the domain: «רדיוס המעגל הוא -3» substituted −3 for a symbol that promised a positive radius, and
+ * the circle vanished from the canvas with no message. So every such substitution asks here first:
+ *
+ * - a CONSTANT is checked exactly — outside the domain is `out-of-domain`, naming the statement;
+ * - a lone PARAMETER («שרדיוסו a») inherits the domain: it is merged into that parameter's own
+ *   declaration (the `param` merge «a הוא פרמטר» · «a>0» already uses), and an empty intersection
+ *   («a<0» · «שרדיוסו a») is refused — the parameter can then never make the value admissible;
+ * - any other parametric expression is judged at the probe environments: admissible at none of
+ *   them is refused; admissible at some is accepted, because the domain of `2a` is not a thing this
+ *   seam can carry back onto `a` (named in ADR-AG-169 am. 1 as not built).
+ *
+ * ONE domain predicate (`inDomain`, `types.ts`) serves both judges of a radius: this seam judges a
+ * STATED value, so it calls it with the default floor 0 — the exact bound, «0» is not > 0; the
+ * solve's judge (`openBoundFloor`, #1504 am. 1) passes the solver resolution, because a SOLVED value
+ * parked within it of the bound is the bound. Same predicate, the floor says whose number it is.
+ *
+ * Returns the construction with the parameter narrowed (or unchanged), or the refusal.
+ */
+function admitStated(
+  c: Construction,
+  domain: Domain | undefined,
+  value: Expr,
+  src: string,
+): { ok: true; next: Construction } | { ok: false; error: ApplyError } {
+  if (!domain || (domain.min === undefined && domain.max === undefined && !domain.exclude?.length)) return { ok: true, next: c };
+  const refuse = { ok: false as const, error: { code: 'out-of-domain' as const, detail: src, domain } };
+  const syms = symbolsOf(value).filter((s) => !RESERVED_SYMBOLS.has(s));
+  if (syms.length === 0) {
+    return inDomain(domain, evalExpr(value, {})) ? { ok: true, next: c } : refuse;
+  }
+  if (value.kind === 'sym') {
+    // The ONE domain merge («a הוא פרמטר» · «a>0»), not a second copy of it.
+    const r = applyFact(c, { t: 'param', sym: value.name, domain, src });
+    if (!r.ok) return r;
+    const merged = r.next.params.find((p) => p.sym === value.name)?.domain;
+    const empty =
+      merged?.min !== undefined &&
+      merged.max !== undefined &&
+      (merged.min > merged.max || (merged.min === merged.max && (merged.minOpen || merged.maxOpen)));
+    return empty ? refuse : { ok: true, next: r.next };
+  }
+  const somewhere = PROBE_ENVS.some((env) => inDomain(domain, evalExpr(value, env)));
+  return somewhere ? { ok: true, next: c } : refuse;
 }
 
 /**
@@ -184,18 +301,23 @@ export interface ApplyError {
  * An ANONYMOUS curve (`curve-<hash>`) gets the kind-free wording: it has no name the student wrote, so
  * there is no noun that would be true.
  */
-export type RefKind = 'point' | 'line' | 'circle' | 'curve';
+// The table itself lives in `names.ts` (#1514 pre-play): it knew `line-`/`circle-` only, so a named
+// parabola was called a POINT and printed as its raw id. Re-exported so every caller keeps its import.
+export { refKindOf, statedName, type RefKind } from './names';
 
-export function refKindOf(id: Id): RefKind {
-  if (id.startsWith('line-')) return 'line';
-  if (id.startsWith('circle-')) return 'circle';
-  if (id.startsWith('curve-')) return 'curve';
-  return 'point';
+/**
+ * The refusal for a numeral name typed in the notation the figure does NOT use (ruling 2026-09-29),
+ * or null when `id` has no twin. Asked at the two places a numeral name meets the figure: where it
+ * fails to resolve (`unknownRef`) and where it is minted (the top of `applyFact`).
+ */
+function notationMix(c: Construction, id: Id): ApplyError | null {
+  const twin = numeralTwin(c.objects.map((o) => o.id), id);
+  return twin ? { code: 'numeral-notation', detail: statedName(id), holder: statedName(twin), expected: refKindOf(id) } : null;
 }
 
 /** The one refusal for "the figure has no such thing", naming it the student's way and by its kind. */
-function unknownRef(id: Id): ApplyError {
-  return { code: 'unknown-reference', detail: statedName(id), expected: refKindOf(id) };
+function unknownRef(c: Construction, id: Id): ApplyError {
+  return notationMix(c, id) ?? { code: 'unknown-reference', detail: statedName(id), expected: refKindOf(id) };
 }
 
 /**
@@ -243,7 +365,7 @@ function resolveAngleName(
 ): { ok: true; ref: AngleRef } | { ok: false; error: ApplyError } {
   if (isAngleRef(n)) return { ok: true, ref: n };
   const host = objectById(c, n.v);
-  if (!host || !isPositional(host)) return { ok: false, error: unknownRef(n.v) };
+  if (!host || !isPositional(host)) return { ok: false, error: unknownRef(c, n.v) };
   const edges = edgesAt(c, n.v);
   if (edges.length === 2) return { ok: true, ref: { v: n.v, a: edges[0], b: edges[1] } };
   let taught: [Id, Id] | null = null;
@@ -339,10 +461,7 @@ export type ApplyOutcome =
  * An ANONYMOUS curve (`curve-<hash>`) is deliberately left alone: there is no student name to
  * recover, and printing the hash's tail would be a different wrong word rather than the right one.
  */
-export function statedName(id: Id): string {
-  const m = /^(?:line|circle)-(.+)$/.exec(id);
-  return m ? m[1] : id;
-}
+// `statedName` — see `names.ts`, the one table (re-exported above).
 
 /**
  * The object kinds that HAVE a shape — what an `on-curve` or a curve direction may name (#1150).
@@ -526,6 +645,12 @@ function maxCrossings(a: string | null, b: string | null): number | null {
 }
 
 export function applyFact(c: Construction, f: Fact): ApplyOutcome {
+  // NAMING a numeral curve in the other notation («נתון ישר I …» after «ישר 1») — the mint half of
+  // ruling 2; the reference half is `unknownRef`. Only a NEW id can mix: restating «ישר 1» is its own id.
+  if ((f.t === 'curve' || f.t === 'circle-thru' || f.t === 'line-at') && !objectById(c, f.id)) {
+    const mix = notationMix(c, f.id);
+    if (mix) return { ok: false, error: mix };
+  }
   switch (f.t) {
     case 'param': {
       const prior = c.params.find((p) => p.sym === f.sym);
@@ -851,7 +976,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         return !o || !isPositional(o);
       });
       if (missing !== undefined) {
-        return { ok: false, error: unknownRef(missing) };
+        return { ok: false, error: unknownRef(c, missing) };
       }
       /**
        * …AND THE CURVES IT NAMES (#1150). Same rule, the half that was missing.
@@ -873,7 +998,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         return !o || !CURVE_BEARING.has(o.kind);
       });
       if (missingCurve !== undefined) {
-        return { ok: false, error: unknownRef(missingCurve) };
+        return { ok: false, error: unknownRef(c, missingCurve) };
       }
       /**
        * A tangent-LINE must name a LINE (#1501). The residual answers "cannot be judged" for a
@@ -1068,7 +1193,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'circle-at': {
       const centre = objectById(c, f.centre);
       if (!centre || !isPositional(centre)) {
-        return { ok: false, error: unknownRef(f.centre) };
+        return { ok: false, error: unknownRef(c, f.centre) };
       }
       const prior = objectById(c, f.id);
       if (prior) {
@@ -1100,7 +1225,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'line-at': {
       const through = objectById(c, f.through);
       if (!through || !isPositional(through)) {
-        return { ok: false, error: unknownRef(f.through) };
+        return { ok: false, error: unknownRef(c, f.through) };
       }
       const prior = objectById(c, f.id);
       /**
@@ -1150,7 +1275,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       const pts = circleDefPoints(f.def);
       for (const id of pts) {
         const p = objectById(c, id);
-        if (!p || !isPositional(p)) return { ok: false, error: unknownRef(id) };
+        if (!p || !isPositional(p)) return { ok: false, error: unknownRef(c, id) };
       }
       if (new Set(pts).size !== pts.length) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
       const prior = objectById(c, f.id);
@@ -1183,18 +1308,18 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'diameter-of': {
       for (const id of [f.a, f.b]) {
         const p = objectById(c, id);
-        if (!p || !isPositional(p)) return { ok: false, error: unknownRef(id) };
+        if (!p || !isPositional(p)) return { ok: false, error: unknownRef(c, id) };
       }
       if (f.a === f.b) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
       // By the fit, not the declaration (`curveKindOf`): «(x-3)^2+(y-4)^2=9» declares no kind and IS a circle.
       const isCircle = (o: GeoObject) => curveKindOf(o) === 'circle';
       let host: GeoObject | undefined;
       if (f.circle !== undefined) {
-        host = objectById(c, `circle-${f.circle}`) ?? objectById(c, `circle-at-${f.circle}`) ?? curveByName(c, f.circle);
-        if (!host || !isCircle(host)) return { ok: false, error: unknownRef(`circle-${f.circle}`) };
+        host = objectById(c, numeralCurveId('circle', f.circle)) ?? objectById(c, `circle-at-${f.circle}`) ?? curveByName(c, f.circle);
+        if (!host || !isCircle(host)) return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
       } else if (!f.define) {
         const circles = c.objects.filter(isCircle);
-        if (circles.length > 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+        if (circles.length > 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
         host = circles[0];
       }
       if (!host) {
@@ -1239,7 +1364,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'on-kind': {
       const point = objectById(c, f.id);
       if (!point || !isPositional(point)) {
-        return { ok: false, error: unknownRef(f.id) };
+        return { ok: false, error: unknownRef(c, f.id) };
       }
       /**
        * The kind of an ANONYMOUS conic is not declared — it comes from the FIT (02c R6: the noun is
@@ -1251,7 +1376,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
        * does not turn on the value of its parameters in any form the corpus writes.
        */
       const matches = c.objects.filter((o) => curveKindOf(o) === f.kind);
-      if (matches.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+      if (matches.length !== 1) return { ok: false, error: noHost(f.src, f.kind, matches) };
       return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: matches[0].id }, src: f.src });
     }
 
@@ -1260,9 +1385,9 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       // kind lower to the incidences the spelled-out sentence carries; anything else refuses. The
       // `on-kind` rule, one arity up, resolved by the same fit-level kind test.
       const point = objectById(c, f.id);
-      if (!point || !isPositional(point)) return { ok: false, error: unknownRef(f.id) };
+      if (!point || !isPositional(point)) return { ok: false, error: unknownRef(c, f.id) };
       const pair = c.objects.filter((o) => curveKindOf(o) === f.kind);
-      if (pair.length !== 2) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+      if (pair.length !== 2) return { ok: false, error: noHost(f.src, f.kind, pair.length, 2) };
       return applyAll(
         c,
         pair.map((o) => ({ t: 'constraint' as const, k: { t: 'on-curve' as const, id: f.id, curve: o.id }, src: f.src })),
@@ -1275,15 +1400,15 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         // The line-first order names its circle — «הישר l1 משיק למעגל M» (#1501). The same lookup
         // chain as `diameter-of`: a numeral id, a centre-letter id, or the student's own name.
         host =
-          objectById(c, `circle-${f.circle}`) ??
+          objectById(c, numeralCurveId('circle', f.circle)) ??
           objectById(c, `circle-at-${f.circle}`) ??
           curveByName(c, f.circle);
-        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(`circle-${f.circle}`) };
+        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
       } else {
         // By the fit, not the declaration: «המעגל» about an equation circle still finds ITS circle,
         // and the honest answer below is `out-of-scope`, not "which circle?" (#1501).
         const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
-        if (circles.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+        if (circles.length !== 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
         host = circles[0];
       }
       /**
@@ -1306,6 +1431,183 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
           src: f.src,
         })),
       ]);
+    }
+
+    case 'radius-of': {
+      // The tangent-of name→circle chain, so the family cannot drift (#1432). A creation sentence
+      // («נתון מעגל O שרדיוסו 5») names its own circle by id, so no name lookup can pick another.
+      let host: GeoObject | undefined;
+      if (f.circleId !== undefined) {
+        host = objectById(c, f.circleId);
+        if (!host) return { ok: false, error: unknownRef(c, f.circleId) };
+      } else if (f.circle !== undefined) {
+        host = objectById(c, numeralCurveId('circle', f.circle)) ?? objectById(c, `circle-at-${f.circle}`) ?? curveByName(c, f.circle);
+        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
+      } else {
+        const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+        if (circles.length !== 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
+        host = circles[0];
+      }
+      if (host.kind === 'circle-at') {
+        const r = host.r as { kind?: string; name?: string };
+        if (r && r.kind === 'sym' && r.name) {
+          /**
+           * The radius was FREE and the student just gave it — the sym is SUBSTITUTED with the
+           * stated value and its parameter retired (when nothing else reads it), so the DOF cue
+           * drops by exactly the freedom the sentence consumed. A substitution rather than a
+           * solver row: the radius is not solved for, it is now a given, and replay reapplies
+           * this deterministically (the fold is pure over the fact list).
+           *
+           * The value passes the symbol's DOMAIN first (am. 1): «רדיוס המעגל הוא -3» is refused
+           * naming the statement, where it used to be substituted and the circle silently vanished.
+           */
+          const sym = r.name;
+          const admitted = admitStated(c, c.params.find((p) => p.sym === sym)?.domain, f.value, f.src);
+          if (!admitted.ok) return admitted;
+          const base = admitted.next;
+          /**
+           * EVERYWHERE the symbol stands, not only on the circle (am. 1): a tangency stated with the
+           * circle («נתון מעגל O משיק לציר ה-x») carries `r_O` in its own constraint, and replacing the
+           * radius on the object alone left that constraint solving a different, still-free radius —
+           * the circle drawn at r = 5 while the tangency held for some other r.
+           */
+          const objects = substituteSym(base.objects, sym, f.value);
+          const constraints = substituteSym(base.constraints, sym, f.value);
+          const restText = JSON.stringify({ objects, constraints });
+          const params = restText.includes(`"${sym}"`) ? base.params : base.params.filter((p) => p.sym !== sym);
+          return { ok: true, next: { ...base, objects, constraints, params }, effect: 'narrowed' };
+        }
+        // A radius already carried by the object: a RESTATEMENT, judged at the probes.
+        return sameNumbers(host.r, f.value)
+          ? { ok: true, next: c, effect: 'known' }
+          : { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+      }
+      if (host.kind === 'curve') {
+        // An equation circle's radius is determined by its equation — the sentence is a claim.
+        const agrees = PROBE_ENVS.every((env) => {
+          const rc = resolveCurve(host!.kind === 'curve' ? host!.curve : { eq: undefined as never }, env);
+          const v = evalExpr(f.value as Parameters<typeof evalExpr>[0], env);
+          return rc.ok && rc.curve.kind === 'circle' && Number.isFinite(v) && Math.abs(rc.curve.r - v) <= 1e-9 * Math.max(1, rc.curve.r, Math.abs(v));
+        });
+        return agrees
+          ? { ok: true, next: c, effect: 'known' }
+          : { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+      }
+      // A computed circle (circle-thru): its radius follows from solved points, which this
+      // boundary cannot see — refused by name, never silently dropped.
+      return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+    }
+
+    case 'focus-of': {
+      // THE parabola, exactly as «O מרכז המעגל» resolves the circle — the centre's pattern (#1432).
+      // On a point that already exists («F(2,0)» first, or «מוקד הפרבולה הוא (2,0)», whose parser
+      // mints the point) the derived fact lowers to the `derived-at` constraint (M1): a fixed parabola
+      // judges it, a parameterised one is PINNED by it — «y²=2px» with focus (2,0) solves p = 4.
+      const parabolas = c.objects.filter((o) => curveKindOf(o) === 'parabola');
+      if (parabolas.length !== 1) return { ok: false, error: noHost(f.src, 'parabola', parabolas.length) };
+      return applyFact(c, { t: 'derived', id: f.id, rule: { t: 'parabola-focus', curve: parabolas[0].id }, src: f.src });
+    }
+
+    case 'directrix-eq': {
+      const parabolas = c.objects.filter((o) => curveKindOf(o) === 'parabola');
+      if (parabolas.length !== 1) return { ok: false, error: noHost(f.src, 'parabola', parabolas.length) };
+      const host = parabolas[0];
+      if (host.kind !== 'curve') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      /**
+       * The claim is judged LINE AGAINST LINE (am. 1): the parabola's own directrix
+       * (`parabolaDirectrix`, the one derivation the ask and the panel print from) against the
+       * stated line, as homogeneous triples — proportional means the same line, whatever its
+       * orientation, so no branch here assumes the directrix is vertical. Computed per probe: a
+       * directrix that MOVES across probes is parameter-dependent — pinning the parameter from the
+       * directrix is not built, and the honest answer is a loud refusal, never a false «conflict».
+       */
+      const own: Array<[number, number, number]> = [];
+      let agrees = true;
+      for (const env of PROBE_ENVS) {
+        const pc = resolveCurve(host.curve, env);
+        const gl = resolveCurve({ eq: f.eq }, env);
+        if (!pc.ok || pc.curve.kind !== 'parabola' || !gl.ok || gl.curve.kind !== 'line') {
+          return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+        }
+        const d = parabolaDirectrix(pc.curve);
+        if (d.kind !== 'line') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+        own.push([d.a, d.b, d.c]);
+        if (!sameLineTriple([d.a, d.b, d.c], [gl.curve.a, gl.curve.b, gl.curve.c])) agrees = false;
+      }
+      if (!sameLineTriple(own[0], own[1])) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      return agrees
+        ? { ok: true, next: c, effect: 'known' }
+        : { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+    }
+
+    case 'perimeter-of': {
+      /**
+       * «היקף המשולש הוא 12» / «ההיקף הוא 12» — the ring resolved from the figure (am. 1), the
+       * `area-of` discipline: one matching polygon lowers to the SIDE SUM «AB+BC+CA=12» would carry
+       * (the same `length-eq` constraint, so the perimeter is a real given consuming a DOF, and the
+       * ask «היקף ABC» — which delegates to that sum — reads it back); anything else refuses naming
+       * the host. A generic noun («משולש») matches every ring of its arity; «מצולע» or no noun, any ring.
+       */
+      const rings = ringsNamed(c.objects, f.noun) as PolygonObject[];
+      if (rings.length !== 1) return { ok: false, error: noHost(f.src, 'polygon', rings.length) };
+      const v = rings[0].vertices;
+      const left = parseLengthExpr(v.map((a, i) => `${a}${v[(i + 1) % v.length]}`).join('+'));
+      if (!left) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      return applyFact(c, { t: 'constraint', k: { t: 'length-eq', left, right: { expr: f.value, terms: [] } }, src: f.src });
+    }
+
+    case 'tangent-circles': {
+      // The same name→circle chain as `tangent-of`/`diameter-of`: a numeral id, a centre-letter
+      // id, or the student's own name — one chain, so the family cannot drift (#1504).
+      const byName = (name: string): GeoObject | undefined =>
+        objectById(c, numeralCurveId('circle', name)) ?? objectById(c, `circle-at-${name}`) ?? curveByName(c, name);
+      const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+      let a: GeoObject | undefined;
+      let b: GeoObject | undefined;
+      if (f.a !== undefined) {
+        a = byName(f.a);
+        if (!a || curveKindOf(a) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.a)) };
+      }
+      if (f.b !== undefined) {
+        b = byName(f.b);
+        if (!b || curveKindOf(b) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.b)) };
+      }
+      if (!a || !b) {
+        // The contextual readings: «המעגל משיק למעגל K» means the one OTHER circle; «המעגלים
+        // משיקים» means the exactly two. Anything else is a genuine "which circles?".
+        const rest = circles.filter((o) => o !== a && o !== b);
+        const need = (a ? 0 : 1) + (b ? 0 : 1);
+        // The host rides the refusal (#1432 am. 1): one name missing its partner is the circle none/many
+        // remedy; «המעגלים משיקים» over the wrong count is the unnamed-PAIR remedy.
+        if (rest.length !== need) return { ok: false, error: noHost(f.src, 'circle', rest.length, need === 2 ? 2 : undefined) };
+        if (!a) a = rest.shift();
+        if (!b) b = rest.shift();
+      }
+      // A circle is not tangent to itself — one circle named twice (or the contextual reading
+      // landing back on the named one) has no configuration.
+      if (a === b) return { ok: false, error: { code: 'unsatisfiable', detail: f.src } };
+      /**
+       * Tangency pins each RADIUS against each CENTRE, so BOTH circles need both to pull on —
+       * the `tangent-of` rule, applied twice. An equation circle or a computed `circle-thru` is
+       * refused by name (`out-of-scope`), never dropped.
+       */
+      if (a!.kind !== 'circle-at' || b!.kind !== 'circle-at') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      const mk = (branch: 'external' | 'internal') => ({
+        t: 'tangent-circle' as const,
+        centre: a!.centre,
+        r: a!.r,
+        other: b!.centre,
+        otherR: b!.r,
+        branch,
+      });
+      // A branch word collapses the choice (the «זווית B ישרה» pattern); without one, BOTH
+      // touches are admissible and «הציגו תצורה אחרת» cycles them (ADR-052, #1049).
+      const k = f.branch ? mk(f.branch) : { t: 'choice' as const, options: [mk('external'), mk('internal')] };
+      // «…בנקודה T» names the touch point — determined by the two circles, so a derived point (amendment 1).
+      const touch = f.at
+        ? [{ t: 'derived' as const, id: f.at, rule: { t: 'touch-point' as const, a: a!.id, b: b!.id }, src: f.src }]
+        : [];
+      return applyAll(c, [{ t: 'constraint', k, src: f.src }, ...touch]);
     }
 
     case 'area-of': {
@@ -1380,14 +1682,14 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       for (const id of refs) {
         const o = objectById(c, id);
         if (!o || !isPositional(o)) {
-          return { ok: false, error: unknownRef(id) };
+          return { ok: false, error: unknownRef(c, id) };
         }
       }
       // A sign about a NAMED line refers to a line the figure must have (#1323) — the #1150 rule for
       // the curve half of a reference, applied to the selector that names one.
       if (f.sel.kind === 'sign' && f.sel.q.u.k === 'curve') {
         const o = objectById(c, f.sel.q.u.id);
-        if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(f.sel.q.u.id) };
+        if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(c, f.sel.q.u.id) };
       }
       // Compared structurally: the union's members have different shapes, and a field-by-field test
       // would have to be extended by hand for each new kind — the drift ADR-043 names.
@@ -1443,11 +1745,12 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
        * same reason the point references are: «מעגל O שמשוואתו …» minting a centre of a circle the
        * figure does not have would be a point defined in terms of nothing.
        */
-      const curveRef = f.t === 'derived' ? curveParentOf(f.rule) : null;
-      if (curveRef !== null) {
+      for (const curveRef of f.t === 'derived' ? curveParentsOf(f.rule) : []) {
         const o = objectById(c, curveRef);
-        if (!o || o.kind !== 'curve') {
-          return { ok: false, error: unknownRef(curveRef) };
+        // A centre names an equation curve; a touch point names two circles of any construction (#1504).
+        const ok = f.t === 'derived' && f.rule.t === 'touch-point' ? !!o && curveKindOf(o) === 'circle' : !!o && o.kind === 'curve';
+        if (!ok) {
+          return { ok: false, error: unknownRef(c, curveRef) };
         }
       }
 
@@ -1489,7 +1792,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         }
         if (!declares) {
           // Named in the student's own words, never as internal state: the message says WHICH point.
-          return { ok: false, error: unknownRef(id) };
+          return { ok: false, error: unknownRef(c, id) };
         }
         base = { ...base, objects: [...base.objects, { kind: 'free', id }] };
       }
@@ -1593,6 +1896,29 @@ function sameReference(prior: GeoObject, f: Fact): boolean {
     return JSON.stringify(prior.rule) === JSON.stringify(f.rule);
   }
   return prior.kind === 'segment' || prior.kind === 'polygon';
+}
+
+/** Replace every `{ kind: 'sym', name: sym }` inside `x` with `value` — a structural substitution. */
+function substituteSym<T>(x: T, sym: string, value: Expr): T {
+  const walk = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === 'object') {
+      const o = v as Record<string, unknown>;
+      if (o.kind === 'sym' && o.name === sym && Object.keys(o).length === 2) return value;
+      return Object.fromEntries(Object.entries(o).map(([k, w]) => [k, walk(w)]));
+    }
+    return v;
+  };
+  return walk(x) as T;
+}
+
+/** Two lines as homogeneous triples: the same line when the triples are proportional. */
+function sameLineTriple(u: [number, number, number], v: [number, number, number]): boolean {
+  const nu = Math.hypot(...u);
+  const nv = Math.hypot(...v);
+  if (nu < 1e-12 || nv < 1e-12) return false;
+  const cross = (i: number, j: number) => u[i] * v[j] - u[j] * v[i];
+  return Math.max(Math.abs(cross(0, 1)), Math.abs(cross(0, 2)), Math.abs(cross(1, 2))) <= 1e-9 * nu * nv;
 }
 
 function pickTighter(

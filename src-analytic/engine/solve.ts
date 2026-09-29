@@ -32,7 +32,7 @@ import {
   lengthRefs,
   type LengthExpr,
 } from './lengths';
-import { curveParentOf, evalRule, parentsOf, type DerivedRule, type Pt } from './derived';
+import { curveParentsOf, evalRule, parentsOf, type DerivedRule, type Pt } from './derived';
 import type { Expr } from './expr';
 
 /**
@@ -301,6 +301,17 @@ export type Constraint =
    */
   | { t: 'tangent-line'; centre: Id; r: Expr; line: TangentLineRef }
   /**
+   * Two CIRCLES touch — «מעגל M משיק למעגל K» (#1504, the third member of the tangency family).
+   *
+   * One equation with a DISCRETE unstated choice: |MK| = r+R (external) or |MK| = |r−R|
+   * (internal). The sentence without a branch word lowers to a `choice` over both — the two
+   * configurations cycle under «הציגו תצורה אחרת», never a silently picked seat (ADR-052, the
+   * #1049 pattern) — and «מבחוץ»/«מבפנים» collapse it exactly as «זווית B ישרה» collapses a
+   * right-angle seat. Both circles arrive as centre+radius (`circle-at`), resolved at the apply
+   * boundary; a circle with neither free is refused there, never here.
+   */
+  | { t: 'tangent-circle'; centre: Id; r: Expr; other: Id; otherR: Expr; branch: 'external' | 'internal' }
+  /**
    * A DERIVATION RESTATED ABOUT AN EXISTING POINT — «M אמצע AB» when `M` is already the y-axis crossing
    * (#1320, ADR-AG-144; #1046's converse, which the M1 boundary never got).
    *
@@ -379,6 +390,12 @@ export function canonicalConstraint(k: Constraint): string {
         : `c:${k.line.id}`;
     return `tangent-line|${k.centre}|${line}`;
   }
+  // «מעגל M משיק למעגל K» is «מעגל K משיק למעגל M» — undirected; the BRANCH is part of the
+  // statement (externally and internally tangent are different givens, #1504).
+  if (k.t === 'tangent-circle') {
+    const [p, q] = [k.centre, k.other].sort();
+    return `tangent-circle|${p}|${q}|${k.branch}`;
+  }
   // The equation fields are SPELLING (#1429) — apply strips them, but a raw constraint compared
   // before that must not read as a different statement than its applied twin.
   if (k.t === 'on-curve') return `on-curve|${k.id}|${k.curve}`;
@@ -425,6 +442,9 @@ export function constraintRefs(k: Constraint): Id[] {
     // nothing here — its own freedom lives in the parameter register, not in a point.
     case 'tangent-line':
       return k.line.kind === 'points' ? [k.centre, k.line.a, k.line.b] : [k.centre];
+    // Both centres may move — either circle can give way to satisfy the touch.
+    case 'tangent-circle':
+      return [k.centre, k.other];
     case 'derived-at':
       return [k.id, ...parentsOf(k.rule)];
     case 'choice':
@@ -451,8 +471,12 @@ function describeRule(r: DerivedRule): string {
       return `מפגש האנכים האמצעיים ${r.v.join('')}`;
     case 'diagonals':
       return `מפגש האלכסונים ${r.v.join('')}`;
+    case 'parabola-focus':
+      return `מוקד ${r.curve}`;
     case 'circle-centre':
       return `מרכז ${r.curve}`;
+    case 'touch-point':
+      return `נקודת ההשקה של ${r.a} ו-${r.b}`;
     default: {
       const undescribed: never = r;
       throw new Error(`rule has no description: ${JSON.stringify(undescribed)}`);
@@ -491,6 +515,8 @@ export function describeConstraint(k: Constraint): string {
       return `${k.centre} משיק לציר ${k.axis}`;
     case 'tangent-line':
       return `${k.centre} משיק ל-${k.line.kind === 'curve' ? k.line.label : `${k.line.a}${k.line.b}`}`;
+    case 'tangent-circle':
+      return `מעגל ${k.centre} משיק למעגל ${k.other}${k.branch === 'internal' ? ' מבפנים' : ' מבחוץ'}`;
     case 'derived-at':
       return `${k.id} = ${describeRule(k.rule)}`;
     case 'choice':
@@ -537,10 +563,8 @@ export function constraintCurveRefs(k: Constraint): Id[] {
       return [...ofDir(k.u), ...ofDir(k.v)];
     case 'slope':
       return ofDir(k.u);
-    case 'derived-at': {
-      const parent = curveParentOf(k.rule);
-      return parent === null ? [] : [parent];
-    }
+    case 'derived-at':
+      return curveParentsOf(k.rule);
     case 'choice':
       return [...new Set(k.options.flatMap(constraintCurveRefs))];
     default:
@@ -871,6 +895,29 @@ export function residual(
         return [d - radius, Math.max(0, -t) * n, Math.max(0, t - 1) * n];
       }
       return [d - radius];
+    }
+    case 'tangent-circle': {
+      const r1 = evalExpr(k.r, env);
+      const r2 = evalExpr(k.otherR, env);
+      if (!Number.isFinite(r1) || !Number.isFinite(r2)) return null; // an unbound radius judges nothing
+      // The DISTANCE between the centres IS the radii's sum (external) or the radii's absolute
+      // difference (internal) — the formula sheet's two cases, one row each; which one holds is
+      // the `choice` resolved before this runs (#1049), never a judgement made here.
+      const [a, b] = p;
+      const d = Math.hypot(b.x - a.x, b.y - a.y);
+      const miss = d - (k.branch === 'external' ? r1 + r2 : Math.abs(r1 - r2));
+      /**
+       * CONCENTRIC CIRCLES ARE NOT TANGENT (operator ruling 2026-09-29, #1504 T19) — in every spelling,
+       * with or without a branch word. |MK| = |r−R| holds at d = 0 with r = R, which drew two
+       * identical circles as "internally tangent". Tangency presupposes a LINE OF CENTRES, so d > 0 is
+       * part of the relation — an open bound, judged like every open bound at the solver's resolution
+       * relative to the circles' own size (amendment 1, the `openBoundFloor` rule), never exactly.
+       * Inside that floor the row reports the larger of the miss and the gap to the floor: zero-free
+       * at d = 0, continuous at the floor, and pushing the centres apart where they are free.
+       */
+      const floor = SOLVE_RESOLUTION * Math.max(Math.abs(r1), Math.abs(r2), d);
+      if (d < floor) return [Math.max(Math.abs(miss), floor - d)];
+      return [miss];
     }
     case 'derived-at': {
       /**
