@@ -40,6 +40,7 @@
 import type { Construction, Id } from '../engine/types';
 import type { Figure } from '../engine/evaluate';
 import { asPair, lineByName, type NamedLine } from '../engine/lines';
+import { numeralCurveId } from '../engine/names';
 
 export { asPair, type NamedLine };
 
@@ -53,7 +54,7 @@ export { asPair, type NamedLine };
 export function lineNamed(f: Figure, name: string): NamedLine | null {
   return lineByName(
     name,
-    (n) => f.curves.find((c) => c.label.name === n || c.id === `line-${n}` || c.id === `circle-${n}`)?.curve ?? null,
+    (n) => f.curves.find((c) => c.label.name === n || c.id === `line-${n}` || c.id === numeralCurveId('circle', n))?.curve ?? null,
     (id) => f.points.find((q) => q.id === id) ?? null,
   );
 }

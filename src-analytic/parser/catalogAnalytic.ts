@@ -293,6 +293,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
 
   // --- F6 · conics by equation (canonical only — D6/§2a) ---
   { category: 'conics', family: 'F6', he: 'נתונה פרבולה קנונית שמשוואתה y^2=54x', en: 'canonical parabola y^2=54x' },
+  // A conic may be NAMED like a circle (#1271) — two parabolas in one figure are referable.
+  { category: 'conics', family: 'F6', he: 'נתונה פרבולה I שמשוואתה y^2=2x', en: 'parabola I: y^2=2x' },
   // `p`, not `a` (#1022). It is not an arbitrary parameter name in this topic: the 5-unit formula
   // sheet does NOT carry the parabola, so «y² = 2px, focus (p/2,0), directrix x = -p/2» is recited
   // from memory as a triple (docs/19 §3). A card offering `2ax` teaches a student to rename the one

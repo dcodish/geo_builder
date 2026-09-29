@@ -133,6 +133,11 @@ LLM. See also R44 on what identifies an unnamed curve.)*
 «נתונה אליפסה שמשוואתה x²/9−y²/16=1» must still answer "that is a hyperbola, and this tool does not
 draw those" — the diagnosis that a bare equation cannot produce, because there is no stated expectation
 to contradict.
+*(**BUILT** 2026-09-29 by [ADR-AG-170 Am. 1](06c-decisions-analytic.md#adr-ag-170-amendment-1--2026-09-29-pre-play-one-noun-table-one-numeral-the-noun-checked-one-connective-grammar),
+for every noun × every family, named and anonymous: «נתונה פרבולה I שמשוואתה x²+y²=16» is refused with
+«המשוואה … מתארת מעגל, לא פרבולה» and nothing is drawn. The hyperbola case keeps the generic scope wording.
+One pair is ACCEPTED by operator ruling (2026-09-29, Am. 2): a circle under the ellipse noun is the
+a = b ellipse — «נתונה אליפסה I שמשוואתה x²+y²=16» records as ellipse I, with coinciding foci.)*
 
 **R8 — Coordinates are written `A(2,6)`.** *(Operator ruling: comma, not semicolon.)*
 **OPEN:** the exam prints `A(3;5)`. Does the semicolon *parse* (with the comma as the taught form, the
@@ -802,6 +807,12 @@ object's name. «משוואת AB היא y=2x» ≡ «משוואת הישר AB ה
 each pair is **one object**, because a name is an identity (R44). The name's own shape says what was
 named — a two-point run or the `ℓ` device is a line, a Roman numeral is a circle — while the KIND still
 comes from the fit, so the id records what the student called it and the classifier decides what it is.
+A curve named by a numeral — line, circle, parabola or ellipse, 1–9 or I–IX — keeps the notation the
+student used, and «1» and «I» are ONE name: once «ישר 1» exists, «ישר I» (naming it again or referring
+to it) is REFUSED with a note that the two are the same name and a request to keep the notation already
+in use — never a second object, never a silent merge (operator ruling 2026-09-29,
+[ADR-AG-170 Am. 2](06c-decisions-analytic.md); this supersedes ADR-AG-168's reading of «המעגל 1» as
+«המעגל I»).
 
 **R52 — a length the figure KNOWS is shown, on the surface that matches its provenance**
 ([ADR-AG-028](06c-decisions-analytic.md#adr-ag-028)). Every drawn segment's length appears in the data

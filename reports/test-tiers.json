@@ -6,7 +6,7 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-09-28",
+  "updatedAt": "2026-09-29",
   "slow": [
     "src-analytic/__tests__/issue-1464-1324-1462-kite-exercise.test.ts",
     "src/__tests__/determined-prints-1.test.ts",
@@ -38,6 +38,7 @@
     "src/engine/__tests__/obligation-preservation.test.ts",
     "src/replay/__tests__/basin-ownership.test.ts",
     "src/replay/__tests__/issue-434-admissible-set.test.ts",
+    "src/replay/__tests__/issue-556-apex-region.test.ts",
     "src/replay/__tests__/issue-943-other-side.test.ts",
     "src/store/__tests__/issue-938-structural-edit-seed.test.ts",
     "src/theorems/__tests__/b-corpus.test.ts",
