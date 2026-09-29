@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildParseCtx, parse } from '@/parser';
 import { replay, useGeoStore } from '@/store/geoStore';
 import { geoSessionAdapter, restoreSession, sessionPayload } from '@/store/sessionPersist';
+import { loadFigureText } from '@/store/figureLoad';
 import { sessionOfferFaults } from '../../shell/__tests__/fixtures/session-offer-rows';
 import { installFakeStorage, uninstallFakeStorage } from '../../shell/__tests__/fixtures/fakeStorage';
 
@@ -92,7 +93,6 @@ describe('#1238 — a restored session is a LOAD, in this tree', () => {
     build(['משולש ABC']);
     const payload = sessionPayload() as string;
     build(['ריבוע KLMN']);
-    const { loadFigureText } = await import('@/store/figureLoad');
     const before = useGeoStore.temporal.getState().pastStates.length;
     await loadFigureText(payload); // no resetHistory — the file-picker path
     expect(useGeoStore.temporal.getState().pastStates.length).toBeGreaterThan(before - 1);
