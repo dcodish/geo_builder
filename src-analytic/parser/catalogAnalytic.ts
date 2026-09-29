@@ -728,4 +728,13 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'G is the intersection of the diagonals of quadrilateral ABCD',
     needs: ['A(-2,1)', 'B(4,5)', 'C(5,2)', 'D(-1,-2)'],
   },
+  // The same point with NO letters (#1283): the shape is the one quadrilateral the figure holds,
+  // resolved exactly as «האלכסונים נפגשים בנקודה O» is — and refused when there is none or several.
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'M מפגש האלכסונים',
+    en: 'M is the intersection of the diagonals',
+    needs: ['טרפז ABCD'],
+  },
 ];

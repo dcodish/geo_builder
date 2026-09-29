@@ -683,7 +683,12 @@ Two forms name something without naming its parts, and both are resolved at M1 b
 questions about the construction rather than about the sentence:
 
 - «זווית B ישרה» — the rays come from the shape `B` belongs to;
-- «שטח הדלתון הוא 24» — the ring is the one shape answering to that noun.
+- «שטח הדלתון הוא 24» — the ring is the one shape answering to that noun;
+- «M מפגש האלכסונים» / «האלכסונים נפגשים בנקודה M» — the ring is the one shape with the
+  construct's arity (`meet-of`). Both spellings hand their SUBJECT to ONE reader, `concurrencyOf`
+  (`parseAnalytic.ts`): letters → the derived point on that ring; a noun alone or nothing → `meet-of`.
+  A noun without letters is still checked against the construct's arity in the parser
+  ([ADR-AG-182](06c-decisions-analytic.md#adr-ag-182)).
 
 Each is unambiguous when exactly one object answers, and refused by name (`ambiguous-angle`,
 `ambiguous-shape`) when none or several do. Refusing the ambiguous case is what makes the
