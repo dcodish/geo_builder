@@ -573,7 +573,11 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
           // #1447: an AREA claim mirrored by its driving pin joins the volume's pivot lane — the
           // pin drove the free dims toward the statement, and this verification is its arbiter.
           const pivotLane = (claim.type === 'volume-poly' || claim.type === 'area-eq') && c.scaleGivens.length === 0 && scalePinned(c);
-          if (!exactlyCheckable && !pivotLane) {
+          // #1567 (ADR-3D-285): a magnitude recorded as a PIN'S ARBITER (`given: true`, `recordPinGiven`) is the
+          // same case — its own pin drove the figure's size, so the verification below is honest, and where the
+          // pivot found no placement the claim-level given rule defers to the pin-owner guard.
+          const pinArbiter = 'given' in claim && claim.given === true;
+          if (!exactlyCheckable && !pivotLane && !pinArbiter) {
             status[owner.factId] = { code: 'size-on-solid' };
             break;
           }

@@ -70,19 +70,19 @@ export interface SymTerm {
 }
 
 export type Claim3 =
-  | { type: 'length-rel'; a1: Id; b1: Id; a2: Id; b2: Id; c: number } // |a1b1| = c·|a2b2|
+  | { type: 'length-rel'; a1: Id; b1: Id; a2: Id; b2: Id; c: number; given?: true } // |a1b1| = c·|a2b2|
   | { type: 'volume-eq-poly'; ids1: Id[]; ids2: Id[] } // נפח SENB = נפח CENB (two tetra volumes equal)
   | { type: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // AM = ½u + ½v + 5/3·w
-  | { type: 'perp-plane'; seg: [Id, Id]; plane: [Id, Id, Id] } // CA' ⊥ plane BC'D
+  | { type: 'perp-plane'; seg: [Id, Id]; plane: [Id, Id, Id]; given?: true } // CA' ⊥ plane BC'D
   /**
    * #833 (ADR-3D-193): AB ∥ plane A'B'C'D'. The `perp` twin above has existed since #380; this one
    * did not, so on a DETERMINED figure a TRUE ∥ statement fell off the end of `seg-plane-rel` into a
    * bare `no-solution` — the relation table advertised `claim` for `parallel|segment|plane-run` and
    * nothing implemented it.
    */
-  | { type: 'par-plane'; seg: [Id, Id]; plane: [Id, Id, Id] }
+  | { type: 'par-plane'; seg: [Id, Id]; plane: [Id, Id, Id]; given?: true }
   | { type: 'collinear3'; ids: Id[] } // E, C, A' on one line
-  | { type: 'length-eq'; a: Id; b: Id; value: number } // AB = 3 (all points pinned ⇒ a CHECK)
+  | { type: 'length-eq'; a: Id; b: Id; value: number; given?: true } // AB = 3 (all points pinned ⇒ a CHECK)
   | { type: 'area-eq'; ids: [Id, Id, Id]; value: number } // שטח ABC = 4.5
   // #1546 (ADR-3D-282): a component is `null` when the statement left it UNSTATED or SYMBOLIC («B(3, n, p)»
   // checks x only) — the verifier compares the components that are present. The `A = (…)` claim spelling
@@ -92,7 +92,10 @@ export type Claim3 =
   | { type: 'coords-eq'; id: Id; x: number | null; y: number | null; z: number | null; given?: true } // A = (2, 0, -10)
   | { type: 'never-parallel'; line: string; plane: string } // ℓ ∦ π for EVERY parameter value (2024-Q2 א)
   | { type: 'plane-eq'; ids: Id[]; cx: number; cy: number; cz: number; d: number } // המישור KBC: x+2y+3z-26=0
-  | { type: 'angle-seg-eq'; a1: Id; b1: Id; a2: Id; b2: Id; deg: number } // הזווית בין A'C לבין BC' היא 90 (between lines, ≤90°)
+  | { type: 'angle-seg-eq'; a1: Id; b1: Id; a2: Id; b2: Id; deg: number; given?: true } // הזווית בין A'C לבין BC' היא 90 (between lines, ≤90°)
+  // #1567 (ADR-3D-285): `given?: true` on `length-eq` / `angle-seg-eq` / `cos-angle-eq` / `length-rel` / `perp-plane` / `par-plane`
+  // marks the ARBITER recorded beside a scalar pin (`recordPinGiven` in apply.ts) — the claim-level placed-figure
+  // rule's key in `holdsAt`, exactly as on `coords-eq` / `vec-val` / `dot-val`. A plain claim carries no flag.
   | { type: 'length-ratio'; a1: Id; b1: Id; a2: Id; b2: Id; p: number; q: number } // A'K : A'C = 2 : 3
   | { type: 'volume-eq'; solid: string; value: number } // נפח החרוט = 100π (value in world units³, π parsed)
   | { type: 'lateral-area-eq'; solid: string; value: number } // שטח המעטפת של החרוט = 65π
@@ -105,7 +108,7 @@ export type Claim3 =
   // V8-f (G6/G9/G10) — vector-relation givens VERIFIED on a determined figure. Each
   // operand is a VecAtom (a declared vector or a point pair), so `cos∠ACB` (vertex →
   // pairs) and `cos(u,v)` (named vectors) share one form.
-  | { type: 'cos-angle-eq'; u: VecAtom; v: VecAtom; cos: number } // cos∠ACB = 3/4 · cos(w,u) = √35/10
+  | { type: 'cos-angle-eq'; u: VecAtom; v: VecAtom; cos: number; given?: true } // cos∠ACB = 3/4 · cos(w,u) = √35/10
   // #305 (ADR-3D-090): the four ids lie on ONE circle — Ptolemy on the ring order A,B,C,D
   | { type: 'concyclic'; ids: Id[] }
   | { type: 'dot-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // u·v = v·w (a chained-equality link)
