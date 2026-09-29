@@ -219,6 +219,29 @@ export const isGenericNoun = (noun: string): boolean => {
   return !!row && row.givens(['A', 'B', 'C', 'D'].slice(0, row.arity)).length === 0;
 };
 
+/** The noun that names ANY polygon — «היקף המצולע», "the polygon" — and so selects by nothing. */
+export const ANY_POLYGON_NOUN = 'מצולע';
+
+/**
+ * WHICH RINGS a contextual shape noun names (#1432 am. 1) — «היקף המשולש», «ההיקף».
+ *
+ * One answer for the perimeter GIVEN (M1 `perimeter-of`) and the perimeter ASK, so the two cannot
+ * disagree on which polygon «המשולש» means. A specific noun matches its own rings; a GENERIC noun
+ * («משולש», «מרובע») every ring of its arity, since a right triangle is a triangle; «מצולע» or no
+ * noun, every ring.
+ */
+export function ringsNamed<T extends { kind: string; vertices?: readonly string[]; noun?: string }>(
+  objects: readonly T[],
+  noun: string | undefined,
+): T[] {
+  const row = noun && noun !== ANY_POLYGON_NOUN ? shapeRow(noun) : null;
+  return objects.filter(
+    (o) =>
+      o.kind === 'polygon' &&
+      (!row || o.noun === noun || (isGenericNoun(noun!) && (o.vertices?.length ?? 0) === row.arity)),
+  );
+}
+
 /**
  * Does `stated` name one of `choice`'s options?
  *

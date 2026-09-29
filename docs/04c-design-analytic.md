@@ -1658,3 +1658,35 @@ records the conflict rather than a session's choice between them.
 The lexicon is **not** in `shell/` yet. One implementation is not a pattern, and `shell/` carries no
 product strings ([ADR-W-016](06w-decisions-workspace.md#adr-w-016)) — the second slice (#778 (b)/(c))
 is where the shared shape becomes visible.
+
+## Measure roles: one reader, one ask normaliser, one substitution seam ([ADR-AG-169](06c-decisions-analytic.md#adr-ag-169) Am. 1)
+
+A measure ROLE — a circle's radius, a parabola's focus and directrix, an ellipse's foci, a polygon's
+perimeter — is a noun phrase the student uses on both surfaces. It is read **once**, by `readRoleRef`
+(`parser/parseAnalytic.ts`), and composed:
+
+- **the given** is `<role> <copula>? <value>`, in either order (`roleSplits`: the one `COPULA_WORDS`
+  set, `=`/`:`, or a value as the first/last token — «רדיוס המעגל 5», «F מוקד הפרבולה»);
+- **the ask** is the role phrase alone, after `normaliseAsk` (`app/ask.ts`) strips the enumerated
+  openers («מהו», «מצא את», "what is" …) and the closer («?», «= ?»). The normaliser runs before EVERY
+  ask rule, so no rule enumerates openers of its own.
+
+Which OBJECT a contextual role means is M1's question (the «O מרכז המעגל» pattern): `radius-of`,
+`focus-of`, `directrix-eq`, `perimeter-of`. A reference that finds no host, or several, refuses
+`ambiguous-shape` carrying `host: {kind, found, need?}`; `app/hostKey.ts` turns it into the refusal's
+and the ask row's remedy (`errHost.*`, `askHost.*`). The polygon-noun sites without a host keep the
+kite example.
+
+**The substitution seam.** A stated value that REPLACES a domained symbol — the free radius `r_O`
+(> 0) — passes `admitStated` (`engine/apply.ts`) first: a constant outside the domain refuses
+`out-of-domain` with the domain for the locale to word; a lone parameter inherits the domain through
+the one `param` merge; any other parametric value is refused only when no probe admits it. The
+substitution replaces the symbol in objects AND constraints (`substituteSym`), so a tangency stated
+with the circle solves the stated radius. The creation tail («שרדיוסו 5», «ברדיוס 5», «שאורך רדיוסו
+5») lowers to the same `radius-of`, applied last to its own circle by id.
+
+**Derived, never assumed.** The directrix prints through `roleLineText`/`directrixText`
+(`app/curveText.ts`) from the directrix LINE — the ask and the panel row share it — and the directrix
+given is judged line against line. The perimeter ask delegates to the side sum; the perimeter given
+lowers to the same `length-eq`; `ringsNamed` (`engine/shapes.ts`) resolves a noun-only perimeter for
+both.

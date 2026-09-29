@@ -471,6 +471,8 @@ function describeRule(r: DerivedRule): string {
       return `מפגש האנכים האמצעיים ${r.v.join('')}`;
     case 'diagonals':
       return `מפגש האלכסונים ${r.v.join('')}`;
+    case 'parabola-focus':
+      return `מוקד ${r.curve}`;
     case 'circle-centre':
       return `מרכז ${r.curve}`;
     case 'touch-point':

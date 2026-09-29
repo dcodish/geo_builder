@@ -55,6 +55,10 @@ export type DerivedRule =
    * own and belongs in the id space like any other point they introduced.
    */
   | { t: 'circle-centre'; curve: Id }
+  /** «F מוקד הפרבולה» (#1432) — the focus read off the resolved parabola, the circle-centre
+   *  pattern one conic over: a closed form over a CURVE parent, existing only because the student
+   *  named it (the unnamed focus is #1218's chip, no letter spent). */
+  | { t: 'parabola-focus'; curve: Id }
   /**
    * «מעגל M משיק למעגל K בנקודה T» — the point where two TANGENT circles touch (#1504, ADR-AG-167
    * amendment 1). Its parents are the two CIRCLES (like `circle-centre`, curves, not points).
@@ -81,6 +85,7 @@ export function parentsOf(r: DerivedRule): Id[] {
     // Its parent is a CURVE, not a point — see `curveParentOf`. Returning the curve id here would
     // send it through every check that assumes a parent is positional.
     case 'circle-centre':
+    case 'parabola-focus':
     case 'touch-point':
       return [];
     default: {
@@ -107,6 +112,8 @@ export function ruleLabel(r: DerivedRule): string {
       return `מפגש האלכסונים ${r.v.join('')}`;
     case 'circle-centre':
       return 'מרכז המעגל';
+    case 'parabola-focus':
+      return 'מוקד הפרבולה';
     case 'touch-point':
       return 'נקודת ההשקה';
     default: {
@@ -238,13 +245,13 @@ export function diagonalMeet(a: Pt, b: Pt, c: Pt, d: Pt): Pt | null {
  * sentence or admit an invalid one.
  */
 export function curveParentOf(r: DerivedRule): Id | null {
-  return r.t === 'circle-centre' ? r.curve : null;
+  return r.t === 'circle-centre' || r.t === 'parabola-focus' ? r.curve : null;
 }
 
 /** EVERY curve a rule is defined in terms of — one for a centre, two for a touch point (#1504).
  *  The existence check and the reference walk use this; provenance keeps the single-curve reading. */
 export function curveParentsOf(r: DerivedRule): Id[] {
-  if (r.t === 'circle-centre') return [r.curve];
+  if (r.t === 'circle-centre' || r.t === 'parabola-focus') return [r.curve];
   if (r.t === 'touch-point') return [r.a, r.b];
   return [];
 }
@@ -283,6 +290,14 @@ export function evalRule(
       // state the figure already knows how to report. Never a fallback position.
       if (!c || c.kind !== 'circle' || c.cx === undefined || c.cy === undefined) return null;
       return { x: c.cx, y: c.cy };
+    }
+    case 'parabola-focus': {
+      // The same vacancy discipline as the centre: not a parabola here, no focus here (#1432).
+      // y² = 2px → focus (p/2, 0) — `curves.ts`'s own closed form, INLINED because curves.ts
+      // (via evaluate) already depends on this module and an import back would be a cycle.
+      const c = curveAt?.(r.curve) as { kind?: string; p?: number } | null;
+      if (!c || c.kind !== 'parabola' || typeof c.p !== 'number') return null;
+      return { x: c.p / 2, y: 0 };
     }
     case 'touch-point': {
       const circle = (id: Id) => {
@@ -487,7 +502,9 @@ export function constructionOf(
 
     // A centre has no SCAFFOLDING: there are no auxiliary lines a student would draw to find it,
     // because reading it off the equation is the whole method. Its own mark is the answer.
+    // The focus likewise: read off the equation, no auxiliary lines.
     case 'circle-centre':
+    case 'parabola-focus':
       return null;
 
     // Its scaffolding would be the line of centres; the parents are curves, so none is drawn here.
