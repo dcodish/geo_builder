@@ -76,6 +76,13 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   component left symbolic or unstated is not checked. *(Gap: a satisfiable restatement on a rider or a
   partial point with no solid is refused rather than driven — named in ADR-3D-282.)* *(Realised —
   [ADR-3D-282](06b-decisions-3d.md#adr-3d-282), #1546; `issue-1546-silent-point-pin.test.ts`.)*
+  **A vector or dot product stated on existing points is honoured or refused, never ignored.** «u = (7,7,7)»
+  where u = AB is (2,0,0), «AB = (5,5,5)» or «AB = (5, n, p)» over typed A and B, and «u·v = 24» where u·v = 0
+  are refused with the same message as a false coordinate; on a cube or a free vector the statement still
+  moves the figure. A true restatement stays green, and a component left symbolic or unstated is not
+  checked. *(Gap: a length, angle, ratio or ⊥ given over typed points is still accepted unchecked while a
+  sphere, cone or cylinder of unstated size is on the canvas — #1567.)* *(Realised —
+  [ADR-3D-284](06b-decisions-3d.md#adr-3d-284), #1560; `issue-1560-vector-pin-claims.test.ts`.)*
 - **FR-SP-6 (Must)** — **A stated new label must land on the figure.** A decomposition that loses a point
   the student named is **refused, naming the label** — never committed with the point missing. A label
   that already exists is context, not a drop. *(Realised — `droppedNewLabels3`, `honesty3.test.ts`.)*

@@ -218,13 +218,20 @@ the relation holds on the drawn figure, through the verifier's own tolerance (`D
 A pin acts only where the pivot owns something that moves its object — a solid's gauge and dims, a pin
 symbol, a free rider. A coordinate point, a coord-sym point and a derived point are not pivot unknowns, so a
 pin on one is never solved against. Every pin family that can land on such an object therefore records the
-claim it drives toward (`coords-eq` for the existing-id `point3` pin, whose components are nullable: unstated
-or symbolic ones are unchecked). The given's claim (`given: true`, unlike the student's answer «K = (…)»)
-is judged on a PLACED figure only: at a configuration
-where the pivot found no placement it holds vacuously, and at the displayed seed the pin-owner guard gives
-the verdict (`injection-unsatisfiable`, newest owner only). Families that still pin with no arbiter
-(`inject-vector`, `inject-pair`, `dot-given`) are listed in ADR-3D-282's sweep, as is the missing drive for
-riders and partial points on a solid-free figure (the pivot's entry gate asks for a solid or a `free3` point).
+claim it drives toward: `coords-eq` for the existing-id `point3` pin, `vec-val` for `inject-vector` and
+`inject-pair` (one `VecAtom` form, so «u = (…)» and «AB = (…)» are one statement), `dot-val` for
+`dot-given` ([ADR-3D-284](06b-decisions-3d.md#adr-3d-284), #1560). Components are nullable: unstated or
+symbolic ones are unchecked, and a statement with no numeric component records no claim. A given's claim
+carries `given: true` (unlike the student's answer «K = (…)»), and **the placed-figure rule is a CLAIM-LEVEL
+rule**, at the head of `holdsAt`, not a case per kind: a `given` claim is judged on a PLACED figure only — at
+a configuration where the pivot found no placement it holds vacuously, and at the displayed seed the
+pin-owner guard gives the verdict (`injection-unsatisfiable` for a coordinate pin, `givens-contradict`
+naming the statements otherwise; newest owner only). A new pin family gains its arbiter by recording a claim
+with the flag. Still open: pins routed on `freeDims(c) > 0` alone (`length`, `vangle`/`seg-angle`,
+`length-rel`, `seg-perp/par-plane`) — `freeDims` counts a revolution's unstated size, which the pivot never
+drives, so with a free-size sphere, cone or cylinder on the canvas those givens reach a pin nothing reads
+(#1567, which reuses this rule); and the missing drive for riders and partial points on a solid-free figure
+(the pivot's entry gate asks for a solid or a `free3` point, ADR-3D-282).
 
 **A declared action must hold for every spelling of its row, and the SHAPE of a pin kind is not a
 semantic rule.** `'angle|segment|segment'` declared `drive-dims` while `apply.ts` delivered it only when

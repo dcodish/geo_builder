@@ -334,6 +334,21 @@ const firstAtomError = (c: Construction3, atoms: import('./types').VecAtom[]): E
   return null;
 };
 
+/**
+ * #1560 (ADR-3D-284) — THE PIN DRIVES, THE GIVEN'S CLAIM ARBITRATES, for every anchor-lane pin. A vector
+ * or dot-product given lowers to a pivot pin, and a pin is read only where the pivot runs (a solid, or a
+ * never-positioned point). Over typed points the pivot never runs, so without an arbiter «u = (7,7,7)» read
+ * green beside u = (2,0,0). The one recording seam for `inject-vector`, `inject-pair` and `dot-given`, so
+ * the three sites cannot drift: the claim carries the NUMERIC components only (a symbolic one is the
+ * pivot's to satisfy, `null` is unchecked, the ADR-3D-282 `coords-eq` rule), a statement with no numeric
+ * component records nothing, and every such claim is `given: true` — judged on a placed figure only
+ * (`holdsAt`'s claim-level rule), so the pin-owner guard keeps speaking where the pivot finds no placement.
+ */
+function recordPinGiven(next: Construction3, claim: Extract<Claim3, { type: 'vec-val' } | { type: 'dot-val' }>): void {
+  if (claim.type === 'vec-val' && claim.x === null && claim.y === null && claim.z === null) return;
+  next.claims.push({ ...claim, given: true });
+}
+
 /** Auto-draw a VecAtom's pair (idempotent) — named vectors already draw their own segment. */
 function drawAtom(next: Construction3, atom: import('./types').VecAtom): void {
   if (atom.kind === 'pair' && !hasSegment(next, atom.from, atom.to)) next.segments.push([atom.from, atom.to]);
@@ -639,6 +654,10 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
     case 'cos-angle-eq':
       return firstAtomError(c, [claim.u, claim.v]);
+    case 'vec-val': // #1560 (ADR-3D-284)
+      return firstAtomError(c, [claim.atom]);
+    case 'dot-val':
+      return firstAtomError(c, [claim.a, claim.b]);
     case 'dot-eq':
     case 'cos-eq':
       return firstAtomError(c, [claim.a, claim.b, claim.c, claim.d]);
@@ -2140,6 +2159,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp] =
         [comp(cmd.x, exprs[0]), comp(cmd.y, exprs[1]), comp(cmd.z, exprs[2])];
       next.vectorPins.push({ name: cmd.name, x: comps[0], y: comps[1], z: comps[2] });
+      recordPinGiven(next, { type: 'vec-val', atom: { kind: 'named', name: cmd.name }, x: cmd.x, y: cmd.y, z: cmd.z }); // #1560
       bindPartialNames(next, { kind: 'vector', name: cmd.name }, cmd.syms, comps); // #814
       return { ok: true, next };
     }
@@ -2827,6 +2847,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       }
       const next = clone(c);
       next.scalarPins.push({ kind: 'dot', v1: cmd.v1, v2: cmd.v2, value: cmd.value });
+      recordPinGiven(next, { type: 'dot-val', a: { kind: 'named', name: cmd.v1 }, b: { kind: 'named', name: cmd.v2 }, value: cmd.value }); // #1560
       return { ok: true, next };
     }
 
@@ -2843,6 +2864,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp] =
         [comp(cmd.x, exprs[0]), comp(cmd.y, exprs[1]), comp(cmd.z, exprs[2])];
       next.pairPins.push({ a: cmd.a, b: cmd.b, x: comps[0], y: comps[1], z: comps[2] });
+      recordPinGiven(next, { type: 'vec-val', atom: { kind: 'pair', from: cmd.a, to: cmd.b }, x: cmd.x, y: cmd.y, z: cmd.z }); // #1560
       bindPartialNames(next, { kind: 'pair', a: cmd.a, b: cmd.b }, cmd.syms, comps); // #814
       return { ok: true, next };
     }

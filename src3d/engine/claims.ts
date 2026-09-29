@@ -40,6 +40,21 @@ export function revolutionMeasure(rev: RevolutionObj, which: 'volume' | 'lateral
   return which === 'volume' ? Math.PI * r * r * h : which === 'lateral' ? 2 * Math.PI * r * h : 2 * Math.PI * r * (r + h);
 }
 
+/**
+ * #1546 (ADR-3D-282) — a stated triple against an actual vector (a point's position, or a vector's
+ * components, #1560). A null component is unstated (or owned by a pivot symbol) and is not checked. A fully
+ * stated triple keeps the one-vector tolerance byte-for-byte; a partial one compares each present component,
+ * scaled by its own magnitude.
+ */
+function componentsHold(w: Vec3, t: { x: number | null; y: number | null; z: number | null }): boolean {
+  if (t.x !== null && t.y !== null && t.z !== null) {
+    const target = v3(t.x, t.y, t.z);
+    return norm3(sub3(w, target)) <= REL_TOL * Math.max(norm3(target), 1);
+  }
+  const within = (v: number, s: number | null) => s === null || Math.abs(v - s) <= REL_TOL * Math.max(Math.abs(s), 1);
+  return within(w.x, t.x) && within(w.y, t.y) && within(w.z, t.z);
+}
+
 /** Seeds checked for every claim: the display seed plus fixed offsets (deterministic). */
 export const claimSeeds = (seed: number): number[] => [seed, seed + 1013, seed + 2027, seed + 4057];
 
@@ -48,6 +63,14 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
   // `resolve3(...).positions`, so taking the whole Resolved3 costs nothing and stops the claim lane
   // being blind to everything the figure resolves besides its points.
   const pos = resolved.positions;
+  // #1546 (ADR-3D-282), lifted to the CLAIM LEVEL by #1560 (ADR-3D-284): the arbiter of a GIVEN is judged
+  // on a PLACED figure only. Where the pivot found no placement at this configuration, the positions are the
+  // unsolved seed fallback — not a figure, so not evidence against the given. The store's pin-owner guard
+  // speaks for the displayed seed («no placement matches the given coordinates» / the givens contradict);
+  // another verification seed simply is not one. ONE rule for every `given: true` claim, not a copy per
+  // kind — the next pin family to gain an arbiter (#1567) inherits it by setting the flag. An ANSWER
+  // («K = (…)») carries no flag and keeps its verify-your-answer register (ADR-3D-075).
+  if ('given' in claim && claim.given && resolved.pivot !== null && resolved.pivot.solutions === 0) return true;
   switch (claim.type) {
     case 'vec-eq': {
       const l = evalExpr(claim.lhs, c, pos);
@@ -115,21 +138,24 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
     case 'coords-eq': {
       const p = pos.get(claim.id);
       if (!p) return false;
-      // #1546 (ADR-3D-282): the arbiter of a coordinate GIVEN is judged on a PLACED figure only. Where the
-      // pivot found no placement at this configuration, the positions are the unsolved seed fallback — not
-      // a figure, so not evidence against the given. The store's pin-owner guard speaks for the displayed
-      // seed («no placement matches the given coordinates»); another verification seed simply is not one.
-      // An ANSWER («K = (…)») keeps its claim register unchanged.
-      if (claim.given && resolved.pivot !== null && resolved.pivot.solutions === 0) return true;
+      // (the `given` placed-figure rule is at the head of `holdsAt` — #1560 lifted it to the claim level)
       // #1546 (ADR-3D-282): a null component is unstated (or owned by a pivot symbol) and is not checked.
       // A fully stated claim keeps its one-vector tolerance byte-for-byte; a partial one compares each
       // present component, scaled by its own magnitude.
-      if (claim.x !== null && claim.y !== null && claim.z !== null) {
-        const target = v3(claim.x, claim.y, claim.z);
-        return norm3(sub3(p, target)) <= REL_TOL * Math.max(norm3(target), 1);
-      }
-      const within = (v: number, t: number | null) => t === null || Math.abs(v - t) <= REL_TOL * Math.max(Math.abs(t), 1);
-      return within(p.x, claim.x) && within(p.y, claim.y) && within(p.z, claim.z);
+      return componentsHold(p, claim);
+    }
+    case 'vec-val': {
+      // #1560 (ADR-3D-284): the arbiter of «u = (…)» / «AB = (…)» — the same component rule as a point's
+      // coordinates, read through the one `atomVec` the claim lane shares (a named vector and a pair alike).
+      const w = atomVec(claim.atom, c, pos);
+      return w !== null && componentsHold(w, claim);
+    }
+    case 'dot-val': {
+      // #1560 (ADR-3D-284): the arbiter of «u·v = 24», at the `dot-eq` scale.
+      const u = atomVec(claim.a, c, pos);
+      const v = atomVec(claim.b, c, pos);
+      if (!u || !v) return false;
+      return Math.abs(dot3(u, v) - claim.value) <= REL_TOL * Math.max(norm3(u) * norm3(v), Math.abs(claim.value), 1);
     }
     case 'coord-plane-rel': {
       // #324 (ADR-3D-079): the ring's relation to a coordinate plane/axis on the FINAL figure.

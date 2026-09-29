@@ -109,6 +109,13 @@ export type Claim3 =
   // #305 (ADR-3D-090): the four ids lie on ONE circle — Ptolemy on the ring order A,B,C,D
   | { type: 'concyclic'; ids: Id[] }
   | { type: 'dot-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // u·v = v·w (a chained-equality link)
+  // #1560 (ADR-3D-284): the ARBITERS recorded beside the anchor-lane pins — «u = (…)» / «AB = (…)»
+  // (`inject-vector` / `inject-pair`, one `VecAtom` form) and «u·v = 24» (`dot-given`). The pin drives; the
+  // claim judges, exactly as `coords-eq` does for «B(3,7,8)». A component is `null` when the statement left
+  // it unstated or symbolic (the pivot's to satisfy) and is not checked. Always `given: true` today; the
+  // flag is the claim-level placed-figure rule's key (see `holdsAt`), not a per-kind carve-out.
+  | { type: 'vec-val'; atom: VecAtom; x: number | null; y: number | null; z: number | null; given?: true }
+  | { type: 'dot-val'; a: VecAtom; b: VecAtom; value: number; given?: true }
   | { type: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // ∠(a,b) = ∠(c,d) — AE makes equal angles with AB, AD
   // #872: apex→tip is the INTERNAL BISECTOR RAY of ∠(a·apex·b). Strictly stronger than the `cos-eq`
   // pair it replaced: equal arm angles alone is a whole plane of directions in R³.
