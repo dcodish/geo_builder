@@ -28,7 +28,7 @@ function valueExpr(src: string): Expr | null {
   return e && !mentionsPlane(e) ? e : null;
 }
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
-import { numeralCurveId, type NumeralKind } from '../engine/names';
+import { NUMERAL_ALT, ROMAN_ALT, numeralCurveId, type NumeralKind } from '../engine/names';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, EN_SHAPE, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 
@@ -268,8 +268,9 @@ const NAME = '[A-Z][0-9₀-₉]?';
  * with a digit that is a COEFFICIENT, and only the `x` after it says so. Without the lookahead the
  * numeral branch would claim `2` as the name and hand `x-y+8=0` to the student as their equation.
  */
-const LINE_NUMERAL = '(?:I|II|III|IV|V|[1-9])';
-const LINE_NUMERAL_RE = /^(?:I|II|III|IV|V|[1-9])$/;
+// ONE numeral table for every named curve (engine/names.ts, operator ruling 2026-09-29): 1–9 and I–IX.
+const LINE_NUMERAL = `(?:${NUMERAL_ALT})`;
+const LINE_NUMERAL_RE = new RegExp(`^${LINE_NUMERAL}$`);
 /**
  * A line name: `ℓ`, `ℓ1`, `l`, `l1`, a numeral, or a two-point run like `AC`.
  *
@@ -530,13 +531,13 @@ interface CurveHit {
  * paragraph above records.
  */
 /** The numerals themselves, for the lookahead that keeps a NAME from eating one (#1059). */
-const CIRCLE_NUMERALS = '(?:I|II|III|IV|V|[1-5])';
+const CIRCLE_NUMERALS = `(?:${NUMERAL_ALT})`;
 /**
  * What may FOLLOW a name in the name slot: a space, a colon, or a COMMA — «נתונה פרבולה I, שמשוואתה …»
  * (#1514 pre-play). The comma was missing, so the textbook's own punctuation refused `not-handled`.
  */
 const NUMERAL_SEP = '(?=[\\s:,])';
-const CIRCLE_NUMERAL_RUN = `(?:(I|II|III|IV|V|[1-5])${NUMERAL_SEP})?`;
+const CIRCLE_NUMERAL_RUN = `(?:(${NUMERAL_ALT})${NUMERAL_SEP})?`;
 /**
  * THE CONNECTIVE between a named curve and its equation — ONE grammar for every naming clause
  * (lines, circles, conics, a circle's centre letter), so a connective one clause accepts every clause
@@ -659,7 +660,7 @@ function matchCurve(line: string): CurveHit | null {
 
   /** The circle numeral with the noun dropped — «משוואת I היא x^2+y^2=9» (#1072). */
   const heCircleNoNoun = line.match(
-    new RegExp(`^${HE_GIVEN}${HE_EQ_OF}\\s+(I|II|III|IV|V)${HE_IS}\\s*:?\\s*(.+)$`),
+    new RegExp(`^${HE_GIVEN}${HE_EQ_OF}\\s+(${ROMAN_ALT})${HE_IS}\\s*:?\\s*(.+)$`),
   );
   if (heCircleNoNoun) {
     return {
@@ -1024,8 +1025,8 @@ function incidenceOn(operand: string, id: Id): Constraint | KindOperand | null {
    * nouns carry their own case: a whole-pattern `i` would read a lowercase `i` as the numeral I.
    */
   const named =
-    /^ה?(מעגל|פרבולה|אליפסה)\s+(I|II|III|IV|V|[1-5])$/.exec(trim(operand)) ??
-    /^(?:[Tt]he\s+)?([Cc]ircle|[Pp]arabola|[Ee]llipse)\s+(I|II|III|IV|V|[1-5])$/.exec(trim(operand));
+    new RegExp(`^ה?(מעגל|פרבולה|אליפסה)\\s+(${NUMERAL_ALT})$`).exec(trim(operand)) ??
+    new RegExp(`^(?:[Tt]he\\s+)?([Cc]ircle|[Pp]arabola|[Ee]llipse)\\s+(${NUMERAL_ALT})$`).exec(trim(operand));
   if (named) return { t: 'on-curve', id, curve: numeralCurveId(KIND_NOUNS[named[1].toLowerCase()] as NumeralKind, named[2]) };
 
   const dir = direction(trim(operand));

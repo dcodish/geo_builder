@@ -19,6 +19,8 @@ import { decideSubmit } from '../app/submit';
 import { errorText, type Translate } from '../app/errorText';
 import { refKindOf, statedName } from '../engine/names';
 import { analyticI18n } from '../i18n';
+import { ask } from '../app/ask';
+import { ellipseFoci } from '../engine/curves';
 
 const conicIds = (d: ReturnType<typeof derive>) => d.construction.objects.filter((o) => o.kind === 'curve').map((o) => o.id);
 
@@ -148,7 +150,8 @@ describe('Am. 1 · no refusal prints an internal id, and each curve kind has its
     ['parabola, another numeral', ['נתונה פרבולה I שמשוואתה y^2=8x', 'P על הפרבולה III'], 'parabola', 'הפרבולה III עדיין לא הוגדרה'],
     ['ellipse', ['P על האליפסה II'], 'ellipse', 'האליפסה II עדיין לא הוגדרה'],
     ['circle', ['P על המעגל II'], 'circle', 'המעגל II עדיין לא הוגדר'],
-    ['circle by digit', ['P על המעגל 2'], 'circle', 'המעגל II עדיין לא הוגדר'],
+    ['circle by digit', ['P על המעגל 2'], 'circle', 'המעגל 2 עדיין לא הוגדר'],
+    ['line by numeral', ['P על הישר IV'], 'line', 'הישר IV עדיין לא הוגדר'],
     ['line', ['A(0,0)', 'נקודה D היא חיתוך של l7 ו- l8'], 'line', 'הישר l7 עדיין לא הוגדר'],
     ['en parabola', ['P is on the parabola I'], 'parabola', null],
   ] as const)('%s', (_what, seq, kind, heText) => {
@@ -197,7 +200,8 @@ describe('Am. 1 · the noun is CHECKED against the equation (02c R7) — every n
     for (const form of [named, anonymous]) {
       const line = form[noun](EQ[fam]);
       const v = decideSubmit(line, [], 0);
-      if (noun === fam) {
+      // Ruling 2026-09-29: a circle IS the a = b ellipse — the one pair that records (Am. 2).
+      if (noun === fam || (noun === 'ellipse' && fam === 'circle')) {
         expect(v.kind, line).toBe('record');
         continue;
       }
@@ -216,32 +220,103 @@ describe('Am. 1 · the noun is CHECKED against the equation (02c R7) — every n
   });
 });
 
-describe('Am. 1 · one canonical numeral — «1» and «I» are one name, for every numeral-named kind', () => {
-  it.each([
-    ['parabola', 'נתונה פרבולה 1: y^2=2x', ['P על הפרבולה I', 'P על הפרבולה 1'], 'נתונה פרבולה I: y^2=2x', 'נתונה פרבולה I: y^2=8x'],
-    ['ellipse', 'נתונה אליפסה 2: x^2/9+y^2/4=1', ['P על האליפסה II', 'P על האליפסה 2'], 'נתונה אליפסה II: x^2/9+y^2/4=1', 'נתונה אליפסה II: x^2/25+y^2/4=1'],
-    ['circle', 'נתון מעגל 1: x^2+y^2=16', ['P על המעגל I', 'P על המעגל 1'], 'נתון מעגל I: x^2+y^2=16', 'נתון מעגל I: x^2+y^2=9'],
-  ])('%s: declared by digit, referred to by either spelling, restated as ONE object', (_k, declare, refs, same, other) => {
-    for (const ref of refs) {
-      const d = recordsAll([declare, ref]);
-      expect(d.construction.objects.filter((o) => o.kind === 'curve')).toHaveLength(1);
-      expect(d.faults).toEqual([]);
-    }
-    // The Roman restatement of the same equation is the same object, already known …
-    expect(decideSubmit(same, [declare], 0).kind).toBe('already-known');
-    // … and a different equation under the other spelling is a CONTRADICTION, never a second curve.
-    const v = decideSubmit(other, [declare], 0);
+describe('Am. 2 · «1» and «I» are ONE name — and mixing the notations is refused with a note (ruling 2026-09-29)', () => {
+  /** Per kind: how it is declared, and how a point is put on it, by numeral. */
+  const KINDS = [
+    { kind: 'line', noun: 'ישר', declare: (n: string) => `נתון ישר ${n}: y=2x`, on: (n: string) => `P על הישר ${n}` },
+    { kind: 'circle', noun: 'מעגל', declare: (n: string) => `נתון מעגל ${n}: x^2+y^2=16`, on: (n: string) => `P על המעגל ${n}` },
+    { kind: 'parabola', noun: 'פרבולה', declare: (n: string) => `נתונה פרבולה ${n}: y^2=2x`, on: (n: string) => `P על הפרבולה ${n}` },
+    { kind: 'ellipse', noun: 'אליפסה', declare: (n: string) => `נתונה אליפסה ${n}: x^2/9+y^2/4=1`, on: (n: string) => `P על האליפסה ${n}` },
+  ] as const;
+  const PAIRS = [['1', 'I'], ['2', 'II'], ['4', 'IV'], ['7', 'VII'], ['9', 'IX']] as const;
+  const cases = KINDS.flatMap((k) => PAIRS.flatMap(([d, r]) => [[k, d, r], [k, r, d]] as const));
+
+  it.each(cases)('%# %s: named «%s», the same notation keeps working', (k, used) => {
+    const d = recordsAll([k.declare(used), k.on(used)]);
+    expect(d.figure.curves.map((c) => c.id)).toEqual([`${k.kind}-${used}`]);
+    expect(d.faults).toEqual([]);
+  });
+
+  it.each(cases)('%# %s: named «%s», REFERRED to as «%s» — refused with the note, no second object', (k, used, typed) => {
+    const setup = [k.declare(used)];
+    const v = decideSubmit(k.on(typed), setup, 0);
+    expect(v.kind).toBe('refused');
+    if (v.kind !== 'refused') return;
+    expect(v.error).toMatchObject({ key: 'numeral-notation', detail: typed, holder: used, expected: k.kind });
+    const text = errorText(v.error, he).replace(/[⁦-⁩]/g, '');
+    expect(text).toContain(`${k.noun} ${used} ו${k.noun} ${typed} הם אותו שם`);
+    expect(text).toContain(`כתבו ${k.noun} ${used}`);
+    expect(errorText(v.error, en).replace(/[⁦-⁩]/g, '')).toContain('same name');
+  });
+
+  it.each(cases)('%# %s: named «%s», NAMED AGAIN as «%s» — refused, never minted as a second object', (k, used, typed) => {
+    const v = decideSubmit(k.declare(typed), [k.declare(used)], 0);
+    expect(v.kind === 'refused' && v.error.key).toBe('numeral-notation');
+  });
+
+  it('the neighbour sentence shapes reach the same refusal: a crossing, a relation, a centre, English', () => {
+    expect(refusal(['נתון ישר 1: y=2x', 'נתון ישר 2: y=-x', 'A נקודת החיתוך של הישר I עם הישר 2']).key).toBe('numeral-notation');
+    expect(refusal(['נתון ישר 1: y=2x', 'נתון ישר 2: y=-x+3', 'הישר 2 מקביל לישר I']).key).toBe('numeral-notation');
+    expect(refusal(['נתון מעגל 1 שמשוואתו x^2+y^2=9', 'O מרכז המעגל I']).key).toBe('numeral-notation');
+    expect(refusal(['circle 1: x^2+y^2=9', 'P is on circle I']).key).toBe('numeral-notation');
+    expect(refusal(['נתון הישר l1: y=0', 'נתונה פרבולה 1: y^2=2x', 'הישר l1 חותך את הפרבולה I בנקודה A']).key).toBe('numeral-notation');
+  });
+
+  it('the ask lane says the same thing about a question in the other notation', () => {
+    const d = derive(['נתון ישר 1: y=2x'], 0);
+    expect(ask(d, 'משוואת הישר 1', String).value).toBeTruthy();
+    expect(ask(d, 'משוואת הישר I', String).missing).toEqual({ name: 'I', kind: 'curve', used: '1' });
+  });
+
+  it('a Roman line numeral beyond V names a line (one table, 1–9 and I–IX)', () => {
+    const d = recordsAll(['נתון ישר VII: y=2x', 'P על הישר VII']);
+    expect(d.figure.curves.map((c) => [c.id, c.label.name])).toEqual([['line-VII', 'ישר VII']]);
+  });
+
+  it('the label and id keep the student’s own notation', () => {
+    const d = recordsAll(['נתונה פרבולה 1: y^2=2x']);
+    expect(d.figure.curves.map((c) => [c.id, c.label.name])).toEqual([['parabola-1', 'פרבולה 1']]);
+  });
+
+  it('the restatement in the same notation is still one object (already known / contradiction)', () => {
+    expect(decideSubmit('נתונה פרבולה 1: y^2=2x', ['נתונה פרבולה 1: y^2=2x'], 0).kind).toBe('already-known');
+    const v = decideSubmit('נתונה פרבולה 1: y^2=8x', ['נתונה פרבולה 1: y^2=2x'], 0);
     expect(v.kind === 'refused' && v.error.key).toBe('conflicting-restatement');
   });
+});
 
-  it('the label keeps the student’s own numeral', () => {
-    const d = recordsAll(['נתונה פרבולה 1: y^2=2x']);
-    expect(d.figure.curves.map((c) => [c.id, c.label.name])).toEqual([['parabola-I', 'פרבולה 1']]);
+describe('Am. 2 · an ellipse whose equation is a circle is ACCEPTED as the student’s ellipse (ruling 2026-09-29)', () => {
+  it.each([
+    'נתונה אליפסה I שמשוואתה x^2+y^2=16',
+    'נתונה אליפסה שמשוואתה x^2+y^2=16',
+    'האליפסה II: x^2/16+y^2/16=1',
+    'the ellipse I is x^2+y^2=16',
+  ])('«%s» records as an ELLIPSE with a = b', (line) => {
+    const d = recordsAll([line]);
+    expect(d.figure.curves.map((c) => c.curve)).toEqual([{ kind: 'ellipse', a: 4, b: 4 }]);
   });
 
-  it('a digit still names a LINE (#1257 ruling) — lines keep their own token, unchanged', () => {
-    const d = recordsAll(['משוואת ישר 1 היא 2x-y+8=0']);
-    expect(d.figure.curves.map((c) => c.id)).toEqual(['line-1']);
+  it('it behaves as the student’s ellipse: «P על האליפסה I», the contextual «P על האליפסה», a crossing', () => {
+    const e = 'נתונה אליפסה I שמשוואתה x^2+y^2=16';
+    for (const on of ['P על האליפסה I', 'P על האליפסה']) {
+      const p = pointOf(recordsAll([e, on]), 'P');
+      expect(Math.hypot(p.x, p.y)).toBeCloseTo(4, 6);
+    }
+    const a = pointOf(recordsAll([e, 'נתון הישר l1: y=0', 'הישר l1 חותך את האליפסה I בנקודה A']), 'A');
+    expect(Math.abs(a.x)).toBeCloseTo(4, 6);
+  });
+
+  it('its foci COINCIDE at the centre (c = √(a²−b²) = 0)', () => {
+    const d = recordsAll(['נתונה אליפסה I שמשוואתה x^2+y^2=16']);
+    const c = d.figure.curves[0].curve;
+    if (c.kind !== 'ellipse') throw new Error('not an ellipse');
+    expect(ellipseFoci(c).map((f) => [Math.abs(f.x), Math.abs(f.y)])).toEqual([[0, 0], [0, 0]]);
+  });
+
+  it('only that pair changed: an off-centre circle under the ellipse noun is still out of scope, and the circle noun over an ellipse is still refused', () => {
+    expect(refusal(['נתונה אליפסה שמשוואתה (x-1)^2+y^2=4']).key).toBe('out-of-scope');
+    expect(refusal(['נתון מעגל I שמשוואתו x^2/9+y^2/4=1']).key).toBe('kind-mismatch');
+    expect(refusal(['נתונה פרבולה I שמשוואתה x^2+y^2=16']).key).toBe('kind-mismatch');
   });
 });
 

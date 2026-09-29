@@ -74,6 +74,20 @@ export type ClassifyResult =
  */
 export function classify(k: Conic, expect?: NumCurve['kind']): ClassifyResult {
   const res = classifyFamily(k);
+  /**
+   * A CIRCLE IS THE a = b ELLIPSE (operator ruling 2026-09-29, ADR-AG-170 Am. 2): «נתונה אליפסה I
+   * שמשוואתה x^2+y^2=16» is accepted as the student's ellipse — it resolves AS an ellipse (a = b = r),
+   * so its name, «P על האליפסה I», crossings and the ellipse's own roles hold. Its foci coincide at the
+   * centre (c = √(a²−b²) = 0). The canonical-ellipse scope still applies: an off-centre circle under
+   * the ellipse noun is a translated ellipse. The only pair the ruling changed — every other
+   * noun/family mismatch below is still refused.
+   */
+  if (expect === 'ellipse' && res.ok && res.curve.kind === 'circle') {
+    const { cx, cy, r } = res.curve;
+    const scale = Math.max(1, r);
+    if (Math.abs(cx) > 1e-9 * scale || Math.abs(cy) > 1e-9 * scale) return { ok: false, reason: 'translated-conic' };
+    return { ok: true, curve: { kind: 'ellipse', a: r, b: r } };
+  }
   // ONE comparison for every noun × every family: the claim is checked HERE, where the family is
   // decided, so no naming clause and no future noun can skip it. A scope refusal (hyperbola,
   // translated, rotated) stays the more specific answer and is returned as it was.

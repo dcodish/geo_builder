@@ -16,7 +16,7 @@
  * lands, and nowhere else.
  */
 import { fitConic } from './conic';
-import { numeralCurveId, refKindOf, statedName, type RefKind } from './names';
+import { numeralCurveId, numeralTwin, refKindOf, statedName, type RefKind } from './names';
 import { resolveCurve } from './curves';
 import { curveParentOf, parentsOf, type DerivedRule } from './derived';
 import { sameDerivation } from './sameDerivation';
@@ -106,6 +106,13 @@ export type ApplyErrorCode =
    * so the refusal can name them and show the sentence with a name in it.
    */
   | 'ambiguous-curve'
+  /**
+   * A numeral name written in the OTHER notation from the one the figure already uses — «ישר I» when
+   * the line is «ישר 1» (operator ruling 2026-09-29, ADR-AG-170 Am. 2). «1» and «I» are ONE name, so
+   * this is never a second object; and it is never silently merged either: the student is asked to
+   * keep one notation. `detail` is the numeral they typed, `holder` the one in use, `expected` the kind.
+   */
+  | 'numeral-notation'
   /**
    * «האלכסון הראשי» in a shape whose noun distinguishes no principal diagonal (#1070).
    *
@@ -215,9 +222,19 @@ function ambiguousCurve(src: string, kind: RefKind, candidates: readonly GeoObje
   return { code: 'ambiguous-curve', detail: src, expected: kind, candidates: candidates.map(callable).filter((n) => n !== '') };
 }
 
+/**
+ * The refusal for a numeral name typed in the notation the figure does NOT use (ruling 2026-09-29),
+ * or null when `id` has no twin. Asked at the two places a numeral name meets the figure: where it
+ * fails to resolve (`unknownRef`) and where it is minted (the top of `applyFact`).
+ */
+function notationMix(c: Construction, id: Id): ApplyError | null {
+  const twin = numeralTwin(c.objects.map((o) => o.id), id);
+  return twin ? { code: 'numeral-notation', detail: statedName(id), holder: statedName(twin), expected: refKindOf(id) } : null;
+}
+
 /** The one refusal for "the figure has no such thing", naming it the student's way and by its kind. */
-function unknownRef(id: Id): ApplyError {
-  return { code: 'unknown-reference', detail: statedName(id), expected: refKindOf(id) };
+function unknownRef(c: Construction, id: Id): ApplyError {
+  return notationMix(c, id) ?? { code: 'unknown-reference', detail: statedName(id), expected: refKindOf(id) };
 }
 
 /**
@@ -265,7 +282,7 @@ function resolveAngleName(
 ): { ok: true; ref: AngleRef } | { ok: false; error: ApplyError } {
   if (isAngleRef(n)) return { ok: true, ref: n };
   const host = objectById(c, n.v);
-  if (!host || !isPositional(host)) return { ok: false, error: unknownRef(n.v) };
+  if (!host || !isPositional(host)) return { ok: false, error: unknownRef(c, n.v) };
   const edges = edgesAt(c, n.v);
   if (edges.length === 2) return { ok: true, ref: { v: n.v, a: edges[0], b: edges[1] } };
   let taught: [Id, Id] | null = null;
@@ -545,6 +562,12 @@ function maxCrossings(a: string | null, b: string | null): number | null {
 }
 
 export function applyFact(c: Construction, f: Fact): ApplyOutcome {
+  // NAMING a numeral curve in the other notation («נתון ישר I …» after «ישר 1») — the mint half of
+  // ruling 2; the reference half is `unknownRef`. Only a NEW id can mix: restating «ישר 1» is its own id.
+  if ((f.t === 'curve' || f.t === 'circle-thru' || f.t === 'line-at') && !objectById(c, f.id)) {
+    const mix = notationMix(c, f.id);
+    if (mix) return { ok: false, error: mix };
+  }
   switch (f.t) {
     case 'param': {
       const prior = c.params.find((p) => p.sym === f.sym);
@@ -870,7 +893,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         return !o || !isPositional(o);
       });
       if (missing !== undefined) {
-        return { ok: false, error: unknownRef(missing) };
+        return { ok: false, error: unknownRef(c, missing) };
       }
       /**
        * …AND THE CURVES IT NAMES (#1150). Same rule, the half that was missing.
@@ -892,7 +915,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         return !o || !CURVE_BEARING.has(o.kind);
       });
       if (missingCurve !== undefined) {
-        return { ok: false, error: unknownRef(missingCurve) };
+        return { ok: false, error: unknownRef(c, missingCurve) };
       }
       /**
        * A tangent-LINE must name a LINE (#1501). The residual answers "cannot be judged" for a
@@ -1087,7 +1110,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'circle-at': {
       const centre = objectById(c, f.centre);
       if (!centre || !isPositional(centre)) {
-        return { ok: false, error: unknownRef(f.centre) };
+        return { ok: false, error: unknownRef(c, f.centre) };
       }
       const prior = objectById(c, f.id);
       if (prior) {
@@ -1119,7 +1142,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'line-at': {
       const through = objectById(c, f.through);
       if (!through || !isPositional(through)) {
-        return { ok: false, error: unknownRef(f.through) };
+        return { ok: false, error: unknownRef(c, f.through) };
       }
       const prior = objectById(c, f.id);
       /**
@@ -1169,7 +1192,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       const pts = circleDefPoints(f.def);
       for (const id of pts) {
         const p = objectById(c, id);
-        if (!p || !isPositional(p)) return { ok: false, error: unknownRef(id) };
+        if (!p || !isPositional(p)) return { ok: false, error: unknownRef(c, id) };
       }
       if (new Set(pts).size !== pts.length) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
       const prior = objectById(c, f.id);
@@ -1202,7 +1225,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'diameter-of': {
       for (const id of [f.a, f.b]) {
         const p = objectById(c, id);
-        if (!p || !isPositional(p)) return { ok: false, error: unknownRef(id) };
+        if (!p || !isPositional(p)) return { ok: false, error: unknownRef(c, id) };
       }
       if (f.a === f.b) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
       // By the fit, not the declaration (`curveKindOf`): «(x-3)^2+(y-4)^2=9» declares no kind and IS a circle.
@@ -1210,7 +1233,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       let host: GeoObject | undefined;
       if (f.circle !== undefined) {
         host = objectById(c, numeralCurveId('circle', f.circle)) ?? objectById(c, `circle-at-${f.circle}`) ?? curveByName(c, f.circle);
-        if (!host || !isCircle(host)) return { ok: false, error: unknownRef(numeralCurveId('circle', f.circle)) };
+        if (!host || !isCircle(host)) return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
       } else if (!f.define) {
         const circles = c.objects.filter(isCircle);
         if (circles.length > 1) return { ok: false, error: ambiguousCurve(f.src, 'circle', circles) };
@@ -1258,7 +1281,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'on-kind': {
       const point = objectById(c, f.id);
       if (!point || !isPositional(point)) {
-        return { ok: false, error: unknownRef(f.id) };
+        return { ok: false, error: unknownRef(c, f.id) };
       }
       /**
        * The kind of an ANONYMOUS conic is not declared — it comes from the FIT (02c R6: the noun is
@@ -1279,7 +1302,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       // kind lower to the incidences the spelled-out sentence carries; anything else refuses. The
       // `on-kind` rule, one arity up, resolved by the same fit-level kind test.
       const point = objectById(c, f.id);
-      if (!point || !isPositional(point)) return { ok: false, error: unknownRef(f.id) };
+      if (!point || !isPositional(point)) return { ok: false, error: unknownRef(c, f.id) };
       const pair = c.objects.filter((o) => curveKindOf(o) === f.kind);
       if (pair.length !== 2) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
       return applyAll(
@@ -1297,7 +1320,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
           objectById(c, numeralCurveId('circle', f.circle)) ??
           objectById(c, `circle-at-${f.circle}`) ??
           curveByName(c, f.circle);
-        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(numeralCurveId('circle', f.circle)) };
+        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
       } else {
         // By the fit, not the declaration: «המעגל» about an equation circle still finds ITS circle,
         // and the honest answer below is `out-of-scope`, not "which circle?" (#1501).
@@ -1399,14 +1422,14 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       for (const id of refs) {
         const o = objectById(c, id);
         if (!o || !isPositional(o)) {
-          return { ok: false, error: unknownRef(id) };
+          return { ok: false, error: unknownRef(c, id) };
         }
       }
       // A sign about a NAMED line refers to a line the figure must have (#1323) — the #1150 rule for
       // the curve half of a reference, applied to the selector that names one.
       if (f.sel.kind === 'sign' && f.sel.q.u.k === 'curve') {
         const o = objectById(c, f.sel.q.u.id);
-        if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(f.sel.q.u.id) };
+        if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(c, f.sel.q.u.id) };
       }
       // Compared structurally: the union's members have different shapes, and a field-by-field test
       // would have to be extended by hand for each new kind — the drift ADR-043 names.
@@ -1466,7 +1489,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       if (curveRef !== null) {
         const o = objectById(c, curveRef);
         if (!o || o.kind !== 'curve') {
-          return { ok: false, error: unknownRef(curveRef) };
+          return { ok: false, error: unknownRef(c, curveRef) };
         }
       }
 
@@ -1508,7 +1531,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         }
         if (!declares) {
           // Named in the student's own words, never as internal state: the message says WHICH point.
-          return { ok: false, error: unknownRef(id) };
+          return { ok: false, error: unknownRef(c, id) };
         }
         base = { ...base, objects: [...base.objects, { kind: 'free', id }] };
       }

@@ -43,17 +43,16 @@ const outcome = (line: string): string => {
 
 describe('ADR-AG-118 — a digit names the circle (#1216)', () => {
   /**
-   * LOCK MOVED (#1514 pre-play, ADR-AG-170 Am. 1): the id is the CANONICAL Roman numeral — «מעגל 1»
-   * mints `circle-I` — because the reference side already read «המעגל 1» as `circle-I` (ADR-AG-168)
-   * and the two disagreed: «נתון מעגל 1 …» then «P על המעגל 1» was refused. The NAME keeps the
-   * student's digit, which is what the panel prints.
+   * The id keeps the student's NOTATION (operator ruling 2026-09-29, ADR-AG-170 Am. 2): «מעגל 1» is
+   * `circle-1`. «1» and «I» are one NAME — a later «המעגל I» is refused with a note asking to keep
+   * one notation, never a second circle — which is locked in `issue-1271-1336-conic-naming`.
    */
   it.each([
-    ['he, שמשוואתו', 'נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9', 'circle-I', 'מעגל 1'],
-    ['he, colon', 'נתון מעגל 1: (x-3)^2+(y-4)^2=9', 'circle-I', 'מעגל 1'],
-    ['he, a second circle', 'נתון מעגל 2 שמשוואתו x^2+y^2=25', 'circle-II', 'מעגל 2'],
-    ['en, is', 'circle 1 is (x-3)^2+(y-4)^2=9', 'circle-I', 'circle 1'],
-    ['en, colon', 'circle 1: (x-3)^2+(y-4)^2=9', 'circle-I', 'circle 1'],
+    ['he, שמשוואתו', 'נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9', 'circle-1', 'מעגל 1'],
+    ['he, colon', 'נתון מעגל 1: (x-3)^2+(y-4)^2=9', 'circle-1', 'מעגל 1'],
+    ['he, a second circle', 'נתון מעגל 2 שמשוואתו x^2+y^2=25', 'circle-2', 'מעגל 2'],
+    ['en, is', 'circle 1 is (x-3)^2+(y-4)^2=9', 'circle-1', 'circle 1'],
+    ['en, colon', 'circle 1: (x-3)^2+(y-4)^2=9', 'circle-1', 'circle 1'],
   ])('%s', (_what, line, id, name) => {
     const b = built(line);
     expect(b.faults, line).toEqual([]);
@@ -75,8 +74,7 @@ describe('ADR-AG-118 — a digit names the circle (#1216)', () => {
     const r = built(roman);
     expect(d.faults).toEqual(r.faults);
     expect(d.points).toEqual(r.points);
-    // One canonical id (#1514 pre-play): the digit and the Roman numeral are the SAME circle.
-    expect(d.curves.map((c) => c.id)).toEqual(r.curves.map((c) => c.id));
+    expect(d.curves.map((c) => c.id.replace(/1$/, 'N'))).toEqual(r.curves.map((c) => c.id.replace(/I$/, 'N')));
     expect(d.curves.map((c) => c.name.replace(/1$/, 'N'))).toEqual(r.curves.map((c) => c.name.replace(/I$/, 'N')));
   });
 });
@@ -128,9 +126,15 @@ describe('ADR-AG-118 — what did NOT move (#1059 is extended, not replaced)', (
   });
 
   /** The range is closed at 5, mirroring the Roman range — so 6 is outside it and says so. */
-  it('the numeral range is closed, exactly as the Roman one is', () => {
-    expect(outcome('נתון מעגל 6 שמשוואתו x^2+y^2=25')).not.toBe('ok');
-    expect(outcome('נתון מעגל 5 שמשוואתו x^2+y^2=25')).toBe('ok');
+  /**
+   * LOCK MOVED (ruling 2026-09-29, ADR-AG-170 Am. 2): ONE numeral table for every named curve, 1–9
+   * and I–IX, so every digit a name slot takes has its Roman twin — circles were 1–5 while lines were
+   * 1–9. The range is still CLOSED: a two-digit number is not a name.
+   */
+  it('the numeral range is closed, and the same for digits and Romans', () => {
+    expect(outcome('נתון מעגל 10 שמשוואתו x^2+y^2=25')).not.toBe('ok');
+    expect(outcome('נתון מעגל 9 שמשוואתו x^2+y^2=25')).toBe('ok');
+    expect(outcome('נתון מעגל IX שמשוואתו x^2+y^2=25')).toBe('ok');
   });
 
   /** A digit is not a point name, so a point sentence is untouched by any of this. */

@@ -121,6 +121,8 @@ export type InputError =
   | { key: 'ambiguous-shape'; detail: string }
   /** A curve named by its noun alone that picks out none or several (#1514 pre-play) — with the candidates. */
   | { key: 'ambiguous-curve'; detail: string; expected?: RefKind; candidates?: string[] }
+  /** «ישר I» where the figure's line is «ישר 1» (ruling 2026-09-29): typed numeral, the one in use, the kind. */
+  | { key: 'numeral-notation'; detail: string; holder?: string; expected?: RefKind }
   /** «האלכסון הראשי» where the shape distinguishes no principal diagonal (#1070). */
   | { key: 'undistinguished-diagonal'; detail: string }
   /**

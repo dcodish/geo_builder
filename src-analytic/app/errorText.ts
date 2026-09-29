@@ -72,6 +72,16 @@ const KIND_NOUN_KEY: Record<RefKind, string> = {
   curve: 'kindObject',
 };
 
+/** The BARE noun a numeral follows — «ישר 1», "line 1" (ruling 2026-09-29's note). */
+const NUMERAL_NOUN_KEY: Record<RefKind, string> = {
+  point: 'numNounPoint',
+  line: 'numNounLine',
+  circle: 'numNounCircle',
+  parabola: 'numNounParabola',
+  ellipse: 'numNounEllipse',
+  curve: 'numNounCurve',
+};
+
 /** The DEFINITE noun as a student writes it before a name — «הפרבולה» / "the parabola". */
 const THE_NOUN_KEY: Record<RefKind, string> = {
   point: 'nounThePoint',
@@ -125,6 +135,8 @@ export function errorText(error: InputError, t: Translate): string {
     'ambiguous-shape': 'errAmbiguousShape',
     // #1514 pre-play — a CURVE by its noun alone: several candidates are named, none is said so.
     'ambiguous-curve': candidates.length > 0 ? 'errAmbiguousCurve' : 'errNoSuchCurve',
+    // Ruling 2026-09-29 — «1» and «I» are one name; mixing the two notations is refused with a note.
+    'numeral-notation': 'errNumeralNotation',
     'undistinguished-diagonal': 'errNoPrincipalDiagonal',
     'already-named': 'errAlreadyNamed',
     // #1423 — a refusal that restates an existing letter says the LETTER is the problem
@@ -141,6 +153,7 @@ export function errorText(error: InputError, t: Translate): string {
     existing: t(existingKey(error)),
     claimed: t(KIND_NOUN_KEY[kind ?? 'curve']),
     noun: t(KIND_NOUN_KEY[kind ?? 'curve']),
+    numNoun: t(NUMERAL_NOUN_KEY[kind ?? 'curve']),
     candidates: candidates.map((n) => `${theNoun} ${n}`).join(', '),
     example: error.key === 'ambiguous-curve'
       ? (candidates.length > 0 ? ambiguousCurveExample(error.detail, theNoun, candidates[0]) : '')

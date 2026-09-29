@@ -88,6 +88,8 @@ const he = {
   /** #1111 — the sentence was understood; the figure has no such object. The LETTER is the point. */
   askMissingPoint: 'אין בשרטוט נקודה בשם {{name}}',
   askMissingCurve: 'אין בשרטוט ישר או מעגל בשם {{name}}',
+  // Ruling 2026-09-29 — a numeral asked in the notation the figure does not use.
+  askNumeralNotation: '{{name}} ו-{{used}} הם אותו שם — בשרטוט הזה הוא נכתב {{used}}. כתבו {{used}}, כדי לא לערבב שתי כתיבות.',
   paletteShow: 'סמלים',
   // #1129 — one per palette chip, so every button says what it is rather than repeating its glyph.
   symSq: 'בריבוע',
@@ -163,6 +165,9 @@ const he = {
   // («שטח הדלתון ABCD») is never taught for a parabola.
   errAmbiguousCurve:
     'בשרטוט יש יותר מעצם אחד מהסוג הזה ({{candidates}}), ולכן לא ברור לאיזה מהם הכוונה ב-"{{detail}}". כתבו את השם, למשל «{{example}}».',
+  // Operator ruling 2026-09-29 — a digit and a Roman numeral are one name; the notations are not mixed.
+  errNumeralNotation:
+    '{{numNoun}} {{holder}} ו{{numNoun}} {{detail}} הם אותו שם — הכלי קורא ספרה ומספר רומי כשם אחד. כדי לא לערבב שתי כתיבות, כתבו {{numNoun}} {{holder}}, כמו בשורות הקודמות.',
   errNoSuchCurve:
     'בשרטוט עדיין אין {{noun}}, ולכן המשפט "{{detail}}" לא מתייחס לשום עצם. כתבו קודם את משוואת ה{{noun}}.',
   errAlreadyNamed: 'כבר יש שם לנקודה הזו: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
@@ -244,6 +249,12 @@ const he = {
   kindParabola: 'פרבולה',
   kindEllipse: 'אליפסה',
   // The definite noun a student writes before a curve's name — «הפרבולה I» (#1514 pre-play).
+  numNounPoint: 'נקודה',
+  numNounLine: 'ישר',
+  numNounCircle: 'מעגל',
+  numNounParabola: 'פרבולה',
+  numNounEllipse: 'אליפסה',
+  numNounCurve: 'עצם',
   nounThePoint: 'הנקודה',
   nounTheLine: 'הישר',
   nounTheCircle: 'המעגל',
@@ -378,6 +389,7 @@ const en: typeof he = {
   askContextualBoth: 'the figure has {{points}} points and {{lines}} lines — name them (e.g. "המרחק של A מהישר l1")',
   askMissingPoint: 'there is no point {{name}} in your figure',
   askMissingCurve: 'there is no line or circle named {{name}} in your figure',
+  askNumeralNotation: '{{name}} and {{used}} are the same name — this figure writes it {{used}}. Write {{used}}, to keep one notation.',
   paletteShow: 'Symbols',
   symSq: 'squared',
   symSqrt: 'square root',
@@ -442,6 +454,8 @@ const en: typeof he = {
     'The equation in "{{detail}}" describes {{existing}}, not {{claimed}}. Check the equation, or name the shape it describes.',
   errAmbiguousCurve:
     'The figure has more than one of these ({{candidates}}), so it is not clear which one "{{detail}}" means. Write its name — for example "{{example}}".',
+  errNumeralNotation:
+    '"{{numNoun}} {{holder}}" and "{{numNoun}} {{detail}}" are the same name — the tool reads a digit and a Roman numeral as one name. To keep one notation, write "{{numNoun}} {{holder}}", as in the earlier lines.',
   errNoSuchCurve:
     'The figure does not have {{noun}} yet, so "{{detail}}" refers to nothing. State its equation first.',
   errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
@@ -511,6 +525,12 @@ const en: typeof he = {
   kindCircle: 'a circle',
   kindParabola: 'a parabola',
   kindEllipse: 'an ellipse',
+  numNounPoint: 'point',
+  numNounLine: 'line',
+  numNounCircle: 'circle',
+  numNounParabola: 'parabola',
+  numNounEllipse: 'ellipse',
+  numNounCurve: 'object',
   nounThePoint: 'the point',
   nounTheLine: 'the line',
   nounTheCircle: 'the circle',

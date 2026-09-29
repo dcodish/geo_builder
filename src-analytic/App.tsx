@@ -1669,7 +1669,7 @@ export function App() {
                       that happen to return equations.
                     */}
                     {a.missing ? (
-                      `${a.question} — ${t(a.missing.kind === 'point' ? 'askMissingPoint' : 'askMissingCurve', { name: a.missing.name })}`
+                      `${a.question} — ${t(a.missing.used ? 'askNumeralNotation' : a.missing.kind === 'point' ? 'askMissingPoint' : 'askMissingCurve', { name: a.missing.name, used: a.missing.used })}`
                     ) : a.contextual ? (
                       /* #1431 — the contextual «המרחק של הנקודה מהישר» could not resolve: name WHICH
                          noun is ambiguous (or absent), never «לא הבנתי» */

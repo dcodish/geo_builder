@@ -26,6 +26,22 @@ import { isKnowledge, knownCurve, knownOptions, type Figure } from '../engine/ev
 import { locusOf } from '../engine/locus';
 
 import { curveByName, objectById, type Id } from '../engine/types';
+import { numeralCurveId, numeralTwin, statedName, type NumeralKind } from '../engine/names';
+
+/**
+ * A curve name the figure does not have — and, when it is a NUMERAL the figure holds in the OTHER
+ * notation («הישר I» asked of «ישר 1»), the notation in use (operator ruling 2026-09-29): the ask lane
+ * answers "you wrote I, this figure writes 1" exactly as the input refuses the mix, never "no such line".
+ */
+function missingCurve(d: Derivation, name: string): { name: string; kind: 'curve'; used?: string } {
+  const ids = d.construction.objects.map((o) => o.id);
+  const kinds: NumeralKind[] = ['line', 'circle', 'parabola', 'ellipse'];
+  for (const k of kinds) {
+    const twin = numeralTwin(ids, numeralCurveId(k, name));
+    if (twin) return { name, kind: 'curve', used: statedName(twin) };
+  }
+  return { name, kind: 'curve' };
+}
 import { ANGLE_STEM_HE } from '../engine/shapes';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { isVerticalLine } from '../engine/lines';
@@ -59,7 +75,7 @@ export interface Answer {
    * CLAUDE.md's standing rule: error messages name the conflicting STATEMENT, never internal state.
    * Here the conflicting statement is in hand, so it is carried rather than discarded.
    */
-  missing?: { name: string; kind: 'point' | 'curve' };
+  missing?: { name: string; kind: 'point' | 'curve'; used?: string };
   /** #1431 — the CONTEXTUAL «המרחק של הנקודה מהישר» could not resolve: the counts name the ambiguity
    *  (zero or several points/lines), so the wording can say WHICH noun to letter. */
   contextual?: { points: number; lines: number };
@@ -455,7 +471,7 @@ export function ask(
   const ax = ANGLE_WITH_X_HE.exec(text) ?? ANGLE_WITH_X_EN.exec(text);
   if (ax) {
     const name = ax[1].trim();
-    if (!lineNamed(d.figure, name)) return { question, value: null, missing: { name, kind: 'curve' } };
+    if (!lineNamed(d.figure, name)) return { question, value: null, missing: missingCurve(d, name) };
     // A line `ax + by + c = 0` runs along (−b, a); a vertical one answers 90° rather than failing.
     const angle = lineAngleOf(d.construction, (f) => {
       const l = lineNamed(f, name);
@@ -468,7 +484,7 @@ export function ask(
   if (sl) {
     const name = sl[1].trim();
     const line = lineNamed(d.figure, name);
-    if (!line) return { question, value: null, missing: { name, kind: 'curve' } };
+    if (!line) return { question, value: null, missing: missingCurve(d, name) };
     /**
      * A vertical line HAS no slope, and that is an answer about the figure rather than a failure.
      *
@@ -514,7 +530,7 @@ export function ask(
      */
     if (!curve) {
       const here = lineNamed(d.figure, name);
-      if (!here) return { question, value: null, missing: { name, kind: 'curve' } };
+      if (!here) return { question, value: null, missing: missingCurve(d, name) };
       const ka = isKnowledge(d.construction, (f) => lineNamed(f, name)?.a ?? null);
       const kb = isKnowledge(d.construction, (f) => lineNamed(f, name)?.b ?? null);
       const kc = isKnowledge(d.construction, (f) => lineNamed(f, name)?.c ?? null);
@@ -592,7 +608,7 @@ export function ask(
   const missingLine = measure.terms
     .flatMap((t) => (t.kind === 'point-line' ? [t.line] : t.kind === 'line-line' ? [t.u, t.v] : []))
     .find((name) => !lineNamed(d.figure, name));
-  if (missingLine !== undefined) return { question, value: null, missing: { name: missingLine, kind: 'curve' } };
+  if (missingLine !== undefined) return { question, value: null, missing: missingCurve(d, missingLine) };
 
     /**
    * TWO LINES THAT CROSS HAVE NO SINGLE DISTANCE (#1205).
