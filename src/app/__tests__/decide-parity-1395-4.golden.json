@@ -121,7 +121,7 @@
  "scenario:angle-sum-contradiction-not-pending-1329": "cedac988e66e75c9",
  "scenario:bisector-reads-the-triangle-operand-1285": "55b6949acbc3b3e5",
  "scenario:bare-midsegment-binds-the-triangle-and-cycles-1368": "3218f1034555a471",
- "scenario:bound-with-its-value-on-the-boundary-samples-1351": "146b9ad2bb43b04a",
+ "scenario:bound-with-its-value-on-the-boundary-samples-1351": "e830e1fd5cb8910c",
  "scenario:definite-circle-passes-through-binds-existing": "093d0a6367d27c8b",
  "scenario:stated-side-vs-incidence-refused-1470": "8d1ec38e9cc51beb",
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",

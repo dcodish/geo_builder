@@ -30,7 +30,7 @@ export type { GivenViolation } from './verify';
 export { detectRelations, detectRelationsAcross, figureEdges, convergedSamples, requirementSamples, distinctSamples, isScaffoldId } from './relations';
 export { wellSpread, tightestWedge, SPREAD_MIN_DEG } from './spread';
 export type { RelationsResult, SegmentRef, AngleRef, DefiniteAngle, DefiniteLength, DetectOptions } from './relations';
-export { findInkCrossings, crossingCommands, crossingCounts, drawnCircles, drawnPointIds, resolveDrawnLines } from './inkCrossings';
+export { findInkCrossings, crossingCommands, crossingUtterance, crossingCounts, drawnCircles, drawnPointIds, resolveDrawnLines } from './inkCrossings';
 // #429 (ADR-423): which part of a circle carries ink — the arc twin of `resolveDrawnLines`.
 export {
   orientArc, drawnArcSpans, angleOnSpans, angleOffSpans, angleIntoSpans, drawnSign, norm2pi, atAngle,

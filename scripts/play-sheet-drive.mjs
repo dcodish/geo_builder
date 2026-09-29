@@ -26,7 +26,9 @@ import { caseVerdict, renderReport, validateSheet } from './lib/play-sheet-core.
 
 /** Where each product's ASK box lives — a distinctive substring of its placeholder, like
  *  `APPS[*].inputHint`. Read from the locales on 2026-09-28; a copy change fails loudly. */
-const ASK_HINTS = { '2d': '∠GBC', '3d': 'שאלה', complex: 'שטח Oz1z2', analytic: 'שאלו' };
+// complex: the placeholder wraps its examples in bidi ISOLATES («שטח ⁦Oz1z2⁩»), so a hint that
+// spans an isolate never substring-matches — keep each hint inside ONE run (round #1510, first contact).
+const ASK_HINTS = { '2d': '∠GBC', '3d': 'שאלה', complex: 'שטח', analytic: 'שאלו' };
 
 /** The configuration-cycling button, one label across the products. */
 const CYCLE_LABEL = 'הציגו תצורה אחרת';
@@ -88,7 +90,16 @@ async function driveCase(browser, spec, outDir, prefix) {
         await input.fill(line);
         await input.press('Enter');
         await waitForSettle(page);
-        const fresh = (await refusals(page)).filter((r) => !seen.has(r));
+        let fresh = (await refusals(page)).filter((r) => !seen.has(r));
+        if (fresh.length) {
+          // The ruled "accept the flash" transaction shape (ADR-510, operator 2026-09-11): a commit
+          // may show its error banner for a beat while the off-thread rescue lands. A refusal is what
+          // the student is LEFT looking at — so a seen refusal gets one settle-and-re-read, and only
+          // the ones still standing count (round #1510, sheet case T11).
+          await page.waitForTimeout(2500);
+          const still = new Set(await refusals(page));
+          fresh = fresh.filter((r) => still.has(r));
+        }
         fresh.forEach((r) => seen.add(r));
         steps.push({ line, refusals: fresh });
         if (fresh.length) await shoot(`refused-${steps.length}`);

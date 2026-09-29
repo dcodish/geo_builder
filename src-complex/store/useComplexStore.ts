@@ -26,7 +26,7 @@ import { temporal } from 'zundo';
 import type { LoadAudit } from '../../shell/save';
 import type { Cx } from '../value/value';
 import type { Why } from '../model/why';
-import { stripFormatControls } from '../../shell/bidi';
+import { ingestTypedText } from '../../shell/bidi';
 
 export type InputError =
   | { key: 'not-handled' | 'parse-error'; detail: string }
@@ -155,7 +155,7 @@ interface ComplexState {
  * the boundary of the module that owns the list, with the shared definition of the set — the
  * grammar strips the same set at its own boundary, for its own reason.
  */
-const cleanLine = (line: string): string => stripFormatControls(line);
+const cleanLine = (line: string): string => ingestTypedText(line);
 
 export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
   lines: [],

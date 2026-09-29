@@ -4,7 +4,7 @@
  */
 
 import { exprPointIds, exprVectorNames } from './vecExpr';
-import { isAbsolute, isPlanar, lineDirCarriesParam, planeNormalCarriesParam, planePinningRels, sameOperand } from './operands';
+import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, planeNormalCarriesParam, planePinningRels, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
@@ -14,7 +14,7 @@ import { resolveSolidSubject } from './solidSubject';
 import { diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { claimPointIds, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import { firstFreeLetter } from './freeLetter';
-import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
+import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, ScalarPin, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
   // #305 (ADR-3D-090): every quad pyramid is a 4-ring + apex, whatever its base or top
@@ -160,6 +160,7 @@ function clone(c: Construction3): Construction3 {
     riderNames: [...c.riderNames],
     componentSigns: [...c.componentSigns],
     pointPlanes: new Map(c.pointPlanes),
+    faceNamed: new Set(c.faceNamed),
     pointLines: new Map(c.pointLines),
     relPlanes: new Map(c.relPlanes),
     revolutions: [...c.revolutions],
@@ -663,7 +664,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return null;
     }
     case 'volume-eq':
-    case 'lateral-area-eq': {
+    case 'lateral-area-eq':
+    case 'surface-area-eq': {
       const matches = c.revolutions.filter((r) => r.kind === claim.solid);
       if (matches.length !== 1) return { code: 'no-such-solid', id: claim.solid };
       const r = matches[0];
@@ -683,17 +685,21 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
  *  is the same idempotence for the constraints, at the one PUSH chokepoint (the apply wrapper). */
 const dedupDeep = <T>(arr: T[]): T[] => {
   const seen = new Set<string>();
-  return arr.filter((x) => { const k = JSON.stringify(x); return seen.has(k) ? false : (seen.add(k), true); });
+  return arr.filter((x) => { const k = meaningKey(x); return seen.has(k) ? false : (seen.add(k), true); });
 };
 
 /** #584 (ADR-3D-148, the #383/ADR-3D-109 rule made ONE rule): a statement that references an
  *  EXPLICIT point-run plane materialises it as a drawn plane — the patch then exists, grows, and
  *  carries the full/face/hidden display cycle like any stated «מישור XYZ». Idempotent; a same-named
  *  equation plane wins (never shadow a `planes` entry). Mutates `next` (call on a clone). */
-function materializePlaneRun(next: Construction3, ids: Id[]): void {
+function materializePlaneRun(next: Construction3, ids: Id[], face = false): void {
   if (ids.length < 3) return;
   const name = ids.join('');
-  if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...ids]);
+  if (!next.pointPlanes.has(name) && !next.planes.has(name)) {
+    next.pointPlanes.set(name, [...ids]);
+    // #1485: recorded only where the plane is CREATED — the first mention decides its default.
+    if (face) next.faceNamed.add(name);
+  }
 }
 
 /** The coefficient a ratio statement puts between its two pairs: a number, or the LETTER the student
@@ -1566,7 +1572,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         }
       }
       if (!foot) return { ok: false, error: { code: 'already-defined', id: 'foot' } };
-      return applyCommand3(c, { type: 'height-to-face', id: foot, from, face });
+      const made = applyCommand3(c, { type: 'height-to-face', id: foot, from, face });
+      // #1448: «גובה הפירמידה 4» — the phrase carried its value; the claim lands on apex→foot,
+      // whose letter exists only now. The same two commands the two-line spelling always was.
+      if (!made.ok || cmd.len === undefined) return made;
+      return applyCommand3(made.next, { type: 'claim', claim: { type: 'length-eq', a: from, b: foot, value: cmd.len } });
     }
 
     case 'point-in-span': {
@@ -1651,10 +1661,52 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           next.claims.push(cl);
           return { ok: true, next };
         }
+        /**
+         * #1447 — A MAGNITUDE ON FREE DIMS DRIVES, whatever its power and whatever the entry order.
+         *
+         * «פירמידה ישרה SABCD · AB = 3 · נפח הפירמידה = 12» answered `claim-refuted` — the height
+         * is free and 4 satisfies it, so refuting against the sampled height is ADR-052's cardinal
+         * sin. The class (docs/17 M2 law i): a magnitude's ability to drive depended on its POWER
+         * (length vs area/volume — only length had a pin kind) and on ENTRY ORDER (#754's rescale
+         * owning the size made a later length fall to the claim lane). Ruled 2026-09-27: a LATER
+         * volume/area may move free shape dims — #754 restricts only the FIRST magnitude.
+         *
+         * One arm for the three magnitude powers (`magnitudeScalarPin`). When a scale given is in
+         * force it is DEMOTED to its own pin, so both magnitudes drive together and the rescale
+         * lane empties — the two mechanisms can never double-apply. A volume/area keeps its claim
+         * (the final verification stays the arbiter, the ADR-3D-030 pattern); a length keeps its
+         * historical no-claim pin shape byte-identical.
+         */
+        const magnitudeScalarPin = (cl: Claim3): ScalarPin | null =>
+          cl.type === 'length-eq'
+            ? { kind: 'length', a: cl.a, b: cl.b, value: cl.value }
+            : cl.type === 'area-eq'
+              ? { kind: 'area3', ids: cl.ids, value: cl.value }
+              : cl.type === 'volume-poly'
+                ? { kind: 'volume3', noun: cl.noun, ids: cl.ids, value: cl.value }
+                : null;
+        // …never over a SYMBOL-defined point (SN=k·SC): the pivot does not position it (ADR-3D-030,
+        // the same entry rule as the coords arm above), so its residual could never close and a true
+        // magnitude would read refuted. Such a statement stays with the claim arbiter below.
+        const symbolDefined = claimPointIds(c, cmd.claim).some((id) => c.vecDefs.some((vd) => vd.symbol && vd.unknown === id));
+        const mag = symbolDefined ? null : magnitudeScalarPin(cmd.claim);
+        if (mag && freeDims(c) > 0) {
+          if (c.scaleGivens.length > 0) {
+            next.scaleGivens = [];
+            for (const g of c.scaleGivens) {
+              const gp = magnitudeScalarPin(g);
+              if (gp) next.scalarPins.push(gp); // its claim is already recorded — the arbiter stays
+            }
+          }
+          next.scalarPins.push(mag);
+          if (cmd.claim.type !== 'length-eq') next.claims.push(cmd.claim);
+          return { ok: true, next };
+        }
         // #754: once a scale given is in force the rescale owns the figure's size — a second
         // length must not ALSO enter the pivot as a scale-fixing pin (the two mechanisms would
         // double-apply); it falls through to the claim lane, where the store refuses it honestly
-        // against still-free dims and checks it exactly against a rigid one.
+        // against still-free dims and checks it exactly against a rigid one. (#1447: with free
+        // dims the demotion above now takes it; this arm keeps the free3-only reach.)
         if (cmd.claim.type === 'length-eq' && c.scaleGivens.length === 0) {
           next.scalarPins.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
           return { ok: true, next };
@@ -1890,7 +1942,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (cmd.op.kind === 'segment') drawAtom(next, { kind: 'pair', from: cmd.op.a, to: cmd.op.b });
       // #383 (ADR-3D-109): a POINT-RUN operand is materialised as a drawn plane (the S3 rule,
       // plane-rel's exact block) — so the patch exists and grows to the line's crossing.
-      if (cmd.op.kind === 'plane-run') materializePlaneRun(next, cmd.op.ids);
+      if (cmd.op.kind === 'plane-run') materializePlaneRun(next, cmd.op.ids, cmd.op.face === true);
       // #523: a LABELLED angle NAMES the measure the question is about — «…היא α» states no value, so
       // it must not drive and must not be verified as a claim; it marks, and the panel derives its
       // degrees when the angle is seed-stable. Same semantics #319 gave the (segment × point-run)
@@ -1922,7 +1974,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // display toggle already enumerated mutual-rel runs — the toggle now has a patch behind it)
       for (const op of [cmd.a, cmd.b]) {
         if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
-        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids);
+        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids, op.face === true);
       }
 
       // (1) the REQUIREMENT — always. It carries `skew` entirely, and the open half (really meeting,
@@ -1950,7 +2002,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // exists to grow toward the other operand (#383 — a stated relation must leave a visible trace)
       for (const op of [cmd.a, cmd.b]) {
         if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
-        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids);
+        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids, op.face === true);
       }
       // #523: a LABELLED angle NAMES the measure rather than stating one — it marks, never drives or
       // verifies (the #319 semantics, now reachable from every operand pairing).
@@ -2008,13 +2060,23 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const next = clone(c);
       for (const op of [cmd.a, cmd.b]) {
         if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
-        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids);
+        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids, op.face === true);
       }
       // A distance carries UNITS, so it is meaningful against an absolute object too — but the
       // gauge×absolute DRIVE is the pivot's lane (#386); those instances stay claim-verified.
       if (!isAbsolute(cmd.a) && !isAbsolute(cmd.b)) next.scalarPins.push({ kind: 'distance', a: cmd.a, b: cmd.b, value: cmd.value });
       next.claims.push({ type: 'distance-rel', a: cmd.a, b: cmd.b, value: cmd.value });
       return { ok: true, next };
+    }
+
+    case 'param-decl': {
+      // #1451 — «t הוא פרמטר», no sign: an ACKNOWLEDGMENT sharing param-sign's owner gate. A
+      // letter the figure carries (parameter, pin symbol, vec-def ratio, a named free component)
+      // is already a parameter — the statement is true and idempotently absorbed; a letter no
+      // mechanism owns keeps the honest `unknown-symbol` refusal, exactly as the signed form does.
+      const declOwners = symbolOwnersOf(c, cmd.sym);
+      if (declOwners.length === 0) return { ok: false, error: { code: 'unknown-symbol', id: cmd.sym } };
+      return { ok: true, next: c };
     }
 
     case 'param-sign': {

@@ -86,9 +86,11 @@ export interface SceneModRing {
   readonly names: readonly string[];
 }
 
-/** The polar substrate: concentric rings and angular rays, at readable steps. */
+/**
+ * The polar substrate's angular rays. The RINGS (and the cartesian gridlines) are sized to the visible
+ * window, which only the renderer knows — `render/visibleGrid` (#1465, ADR-W-094).
+ */
 export interface ScenePolarGrid {
-  readonly rings: readonly number[];
   /** degrees, every `rayStepDeg` around the turn */
   readonly rays: readonly number[];
   readonly rayStepDeg: number;
@@ -167,12 +169,6 @@ export { prettyName };
  *  so it is named rather than left as a magic 3 inside the extent expression. */
 const EMPTY_FIGURE_EXTENT = 3;
 
-const niceStep = (raw: number): number => {
-  const mag = 10 ** Math.floor(Math.log10(raw));
-  const n = raw / mag;
-  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag;
-};
-
 const round = (x: number, places = 2): number => {
   const f = 10 ** places;
   const r = Math.round(x * f) / f;
@@ -224,10 +220,6 @@ export function buildScene(figure: SceneInput, display: SceneDisplay = {}): Scen
    */
   const content = [...magnitudes, ...reach].filter((r) => Number.isFinite(r) && r > 1e-9);
   const extent = (content.length ? Math.max(...content) : EMPTY_FIGURE_EXTENT) * 1.25;
-
-  const step = niceStep(extent / 4);
-  const rings: number[] = [];
-  for (let r = step; r <= extent; r += step) rings.push(round(r, 6));
 
   const rays: number[] = [];
   for (let d = 0; d < 360; d += RAY_STEP_DEG) rays.push(d);
@@ -294,7 +286,7 @@ export function buildScene(figure: SceneInput, display: SceneDisplay = {}): Scen
     rotations: rotationArcsOf(rotations, points),
     cycles: cyclesOf(points, display.n ?? 1),
     regions: regionsOf(objects, points),
-    grid: { rings, rays, rayStepDeg: RAY_STEP_DEG },
+    grid: { rays, rayStepDeg: RAY_STEP_DEG },
     extent,
   };
 }

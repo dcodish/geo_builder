@@ -275,6 +275,7 @@
     "src-analytic/i18n": "shell",
     "src-analytic/ui": "shell",
     "src-analytic/debug": "shell",
+    "src-complex/debug": "shell",
     "shell/seo": "shell",
     "src/seo": "shell",
     "src3d/seo": "shell",

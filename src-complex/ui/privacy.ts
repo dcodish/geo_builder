@@ -9,8 +9,8 @@
  */
 import type { DataSink, PrivacyDeclaration } from '../../shell/frame/privacy';
 
-/** The share store only. */
-export const PRIVACY_DISCLOSES: ReadonlyArray<DataSink> = ['share-store'];
+/** The server usage log (`debug/sessionLogComplex`, #1243) and the share store. */
+export const PRIVACY_DISCLOSES: ReadonlyArray<DataSink> = ['usage-log', 'share-store'];
 
 export function privacyDeclaration(t: (key: string) => string): PrivacyDeclaration {
   return { text: t('privacy'), discloses: PRIVACY_DISCLOSES };

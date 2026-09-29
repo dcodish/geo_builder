@@ -44,7 +44,11 @@ export function QuickChips({
       <div style={hintStyle}>{hint}</div>
       <div style={chipRow}>
         {commands.map((cmd) => (
-          <button key={cmd} type="button" style={chip} onClick={() => onPick(cmd)}>
+          // #1527: a chip's base direction is its own sentence's — RTL when it holds any Hebrew, else
+          // LTR (an English or pure-math example). Decided from the RAW command, not `dir="auto"`: the
+          // browser reads an isolated leading label («M אמצע BB'») as the first strong letter and
+          // turned that Hebrew sentence LTR. The math runs inside stay isolated by `display`.
+          <button key={cmd} type="button" dir={HEBREW.test(cmd) ? 'rtl' : 'ltr'} style={chip} onClick={() => onPick(cmd)}>
             {display ? display(cmd) : cmd}
           </button>
         ))}
@@ -58,6 +62,7 @@ export function QuickChips({
   );
 }
 
+const HEBREW = /[֐-׿]/;
 const wrap: CSSProperties = { textAlign: 'center', padding: '28px 12px', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' };
 const titleStyle: CSSProperties = { fontSize: fs.h1, fontWeight: 700, color: color.ink };
 const hintStyle: CSSProperties = { fontSize: fs.control, color: color.muted, marginBottom: 10 };
@@ -65,7 +70,6 @@ const chipRow: CSSProperties = { display: 'flex', gap: 12, justifyContent: 'cent
 const chip: CSSProperties = {
   fontFamily: 'ui-monospace, Consolas, monospace',
   fontSize: 16,
-  direction: 'ltr',
   padding: '13px 20px',
   borderRadius: 999,
   border: `1.5px solid ${color.primaryBorder}`,

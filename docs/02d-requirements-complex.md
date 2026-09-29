@@ -45,6 +45,15 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   radical form this product knows (cos 20°) keeps its decimal with `≈`, so the display never invents an
   exact value. A part that is zero is not written: «-2», «2i», never «-2+0i». The polar view is
   unaffected. *(Operator, #1404 and its 2026-09-25 ruling; realised — [ADR-CX-046](06d-decisions-complex.md#adr-cx-046).)*
+- **FR-GP-5 (Must)** — **The inside/on/outside count is of the OTHER numbers.** A stated polygon shades
+  its interior, and the strip under the canvas counts the plotted numbers against it, never its own corners
+  (they lie on it by definition). A corner that is also a solution of an equation («z^3 = 8», then the
+  triangle z1z2z3) is one of the numbers asked about and still counts. A polygon with nothing else to count
+  shows no strip. *(Realised — [ADR-CX-053](06d-decisions-complex.md#adr-cx-053), #1425.)*
+
+- **FR-GP-6 (Must)** — **The grid covers what is on screen.** In both views the gridlines, rings, rays and
+  axis numbers span the whole visible canvas, at every zoom and on a canvas wider than it is tall, and
+  their step grows as the view zooms out. *(Realised — [ADR-W-094](06w-decisions-workspace.md#adr-w-094), #1465.)*
 
 ## Exactness and configuration
 
@@ -66,7 +75,9 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   DOF has **one** definition — the nullspace dimension — read by the cue, the knowledge gates and the
   sampler alike, so the three can never disagree. *(The complex form of [ADR-052](06-decisions.md#adr-052).)*
   A sign-free parameter's SIGN is part of its freedom (FR-CN-7): it is sampled, never assumed positive.
-  *(Amended — [ADR-CX-045](06d-decisions-complex.md#adr-cx-045).)*
+  *(Amended — [ADR-CX-045](06d-decisions-complex.md#adr-cx-045).)* A free polygon's starting drawing
+  reads as the shape it names: «משולש ABC» is never a sliver and «מרובע ABCD» is convex, while every vertex
+  stays free. *(Amended — [ADR-CX-052](06d-decisions-complex.md#adr-cx-052), #1424.)*
 - **FR-CN-5 (Must)** — **A second mention of a name is a GIVEN, not a redefinition.** Re-stating `z1`
   adds information about the existing number; it never silently replaces it. *(Realised —
   [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md).)*
@@ -116,7 +127,7 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
 - **FR-KN-0 (Must)** — **Everything the polar reading can say is askable.** «arg w» (also «arg(w)»,
   «הארגומנט של w») is a question like «|w|»: answered from the exact argument carrier when the
   direction is fixed in every configuration, withheld (with the reason) for a free direction, and a
-  solution-set letter reports its spread. *(#1437; realised — [ADR-CX-053](06d-decisions-complex.md#adr-cx-053).)*
+  solution-set letter reports its spread. *(#1437; realised — [ADR-CX-055](06d-decisions-complex.md#adr-cx-055).)*
 
 - **FR-KN-1 (Must)** — **A number printed on screen is knowledge**: invariant across every valid
   configuration, with its gauge pinned. **The figure shows everything; the panel prints only what was

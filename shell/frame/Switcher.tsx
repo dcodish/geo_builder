@@ -66,6 +66,14 @@ export function ProductSwitcher({
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef<HTMLSpanElement>(null);
+
+  // #1458 (ADR-W-097): on a phone the strip scrolls inside itself (#737), and the CURRENT tool could sit
+  // wholly outside it (analytic at 390px: −198…−42). Bring it into the strip; `nearest` moves nothing
+  // when it is already visible, and the browser handles the RTL scroll direction.
+  useEffect(() => {
+    activeRef.current?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' });
+  }, [activeId]);
 
   useEffect(() => {
     if (!open) return;
@@ -90,7 +98,7 @@ export function ProductSwitcher({
     <nav ref={rootRef} aria-label={ariaLabel} style={strip}>
       {inline.map((entry) =>
         entry.id === activeId ? (
-          <span key={entry.id} aria-current="page" style={{ ...seg, ...segActive }}>
+          <span key={entry.id} ref={activeRef} aria-current="page" style={{ ...seg, ...segActive }}>
             {display(entry)}
           </span>
         ) : (

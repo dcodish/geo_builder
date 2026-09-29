@@ -37,7 +37,7 @@ const TEMPLATES: Record<
   string,
   { value: string; sel: [number, number]; complete?: string; expected: string; setup?: string[] }
 > = {
-  symSq: { value: 'x^2+y', sel: [5, 5], complete: '=25', expected: 'x^2+y^2=25' },
+  symSq: { value: 'x^2+y', sel: [5, 5], complete: '=25', expected: 'x^2+y²=25' }, // #1348: the button inserts the glyph on its face
   symSqrt: {
     value: 'AB = ',
     sel: [5, 5],
@@ -46,19 +46,19 @@ const TEMPLATES: Record<
     setup: ['A(0,0)', 'נקודה B'],
   },
   symEll: { value: 'נתון הישר 1: y=2x', sel: [10, 10], expected: 'נתון הישר ℓ1: y=2x' },
-  symLe: { value: 'a  5', sel: [2, 2], expected: 'a <= 5', setup: ['a הוא פרמטר חיובי'] },
-  symGe: { value: 'a  5', sel: [2, 2], expected: 'a >= 5', setup: ['a הוא פרמטר חיובי'] },
+  symLe: { value: 'a  5', sel: [2, 2], expected: 'a ≤ 5', setup: ['a הוא פרמטר חיובי'] },
+  symGe: { value: 'a  5', sel: [2, 2], expected: 'a ≥ 5', setup: ['a הוא פרמטר חיובי'] },
   symNe: { value: 'a  5', sel: [2, 2], expected: 'a ≠ 5', setup: ['a הוא פרמטר חיובי'] },
   symCube: {
     value: 'AB = 2',
     sel: [6, 6],
-    expected: 'AB = 2^3',
+    expected: 'AB = 2³',
     setup: ['A(0,0)', 'נקודה B'],
   },
   symMul: {
     value: 'AB = 25',
     sel: [6, 6],
-    expected: 'AB = 2*5',
+    expected: 'AB = 2·5',
     setup: ['A(0,0)', 'נקודה B'],
   },
   symPi: {
@@ -147,11 +147,12 @@ describe('the symbol palette parses — every offered button, through the real g
   it('the six original entries are unchanged', () => {
     const six = SYMBOLS.filter((s) => ['symSq', 'symSqrt', 'symEll', 'symLe', 'symGe', 'symNe'].includes(s.titleKey!));
     expect(six.map((s) => [s.label, s.before, s.after])).toEqual([
-      ['²', '^2', undefined],
+      // #1348 (ADR-W-095): changed ON PURPOSE — each face now inserts its own glyph
+      ['²', '²', undefined],
       ['√', '√', undefined],
       ['ℓ', 'ℓ', undefined],
-      ['≤', '<=', undefined],
-      ['≥', '>=', undefined],
+      ['≤', '≤', undefined],
+      ['≥', '≥', undefined],
       ['≠', '≠', undefined],
     ]);
   });
