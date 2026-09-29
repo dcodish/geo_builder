@@ -13,6 +13,7 @@ import { fmtAnalytic } from '../format';
 import { analyticBidi } from '../i18n/bidi';
 import type { Figure } from '../engine/evaluate';
 import type { CurveKind } from '../engine/types';
+import { tickStep } from '../../shell/ticks';
 
 export interface Transform {
   sx: (x: number) => number;
@@ -179,17 +180,8 @@ export interface SceneCrossing {
   sentence: string;
 }
 
-/**
- * A "nice" tick step — 1, 2 or 5 times a power of ten. Without this the grid labels drift into
- * things like 3.7, which no textbook axis has ever shown.
- */
-export function tickStep(span: number, target = 10): number {
-  const raw = span / target;
-  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
-  const norm = raw / mag;
-  const step = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
-  return step * mag;
-}
+// #1465 (ADR-W-094): the nice-step rule lives in shell/ticks, shared with the complex Builder's grid
+export { tickStep };
 
 function ticks(min: number, max: number, project: (v: number) => number): AxisTick[] {
   const step = tickStep(max - min);

@@ -95,6 +95,42 @@ for (const p of PRODUCTS) {
   add(what, localHtml ? bundleOf(localHtml) : null, bundleOf(remote(`cat ${p.live}`)));
 }
 
+/**
+ * THE EVENTS SINKS (#1363) — the wiring half the artifact hashes cannot see.
+ *
+ * Analytic answered 204 in prod while writing NOTHING: the env var was never created, the cwd
+ * fallback targeted `/logs`, and the write failure is (rightly) swallowed. Every artifact row was
+ * green throughout — a probe of the SINK is the only measurement that catches the class (#903's
+ * shape: a product's wiring is a deploy step, and nothing checked it). One probe event per enabled
+ * product, posted to its live endpoint, then read back from the server's own files by its sid.
+ */
+if (!offline) {
+  const registry = JSON.parse(readFileSync(resolve(root, 'products.json'), 'utf8'));
+  // sid is stored TRUNCATED to 16 chars (eventLog normalise) — keep the probe well under it.
+  const probeSid = `pf${Date.now().toString(36)}`;
+  const sinks = [];
+  for (const p of registry.products.filter((q) => q.enabled)) {
+    const url = `https://themathbible.com${p.url}api/log`;
+    const body = JSON.stringify({ tool: p.id === '2d' ? undefined : p.id, ev: 'session', sid: probeSid });
+    let code = 'ERR';
+    try {
+      code = execFileSync('curl', ['-s', '-o', '/dev/null', '-w', '%{http_code}', '-X', 'POST', '-H', 'content-type: application/json', '-d', body, url], { encoding: 'utf8' }).trim();
+    } catch { /* unreachable endpoint reads as ERR below */ }
+    sinks.push({ id: p.id, code });
+  }
+  // One server-side read for all probes: which event files carry the sid.
+  const landed = remote(`grep -l ${probeSid} /var/www/geo-proxy/events*.jsonl 2>/dev/null`) ?? '';
+  for (const s of sinks) {
+    const ok = s.code === '204' && landed.length > 0 && (s.id === '2d' ? landed.includes('events.jsonl') : landed.includes(`events-${s.id}`));
+    rows.push({
+      what: `events sink (${s.id})`,
+      status: ok ? 'MATCHES live' : `SINK UNREACHABLE — POST ${s.code}, ${landed ? `landed in: ${landed.split('\n').join(', ')}` : 'nothing written'}`,
+      local: null,
+      live: null,
+    });
+  }
+}
+
 const width = Math.max(...rows.map((r) => r.what.length));
 console.log(offline ? '\nDEPLOY PREFLIGHT (offline — local artifacts only)\n' : '\nDEPLOY PREFLIGHT\n');
 for (const r of rows) {
@@ -102,6 +138,8 @@ for (const r of rows) {
   if (r.status.startsWith('DIFFERS')) console.log(`  ${' '.repeat(width)}    local ${r.local}\n  ${' '.repeat(width)}    live  ${r.live}`);
 }
 
+const badSinks = rows.filter((r) => r.status.startsWith('SINK'));
+if (badSinks.length) console.log(`  ${badSinks.length} events sink(s) UNREACHABLE — a 204 that writes nothing; fix the env/wiring before trusting any usage number (#1363).`);
 const differs = rows.filter((r) => r.status.startsWith('DIFFERS'));
 const unbuilt = rows.filter((r) => r.status === 'NOT BUILT');
 const unknown = rows.filter((r) => r.status === 'UNKNOWN');
@@ -112,6 +150,9 @@ if (stale.length) console.log(`  ${stale.length} artifact(s) built BEFORE their 
 if (unknown.length) console.log(`  ${unknown.length} artifact(s) could not be read from ${HOST} — verdict incomplete.`);
 if (differs.length) {
   console.log(`  ${differs.length} artifact(s) DIFFER from live. Push exactly these; leave the rest alone.\n`);
+  process.exit(1);
+}
+if (badSinks.length) {
   process.exit(1);
 }
 if (unbuilt.length || unknown.length || stale.length) {

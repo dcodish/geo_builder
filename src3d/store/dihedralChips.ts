@@ -7,6 +7,9 @@
  *
  * ## Which rows
  *
+ * #1491 extends it to a LINE and a PLANE (a named line, or a segment, against a plane) — see
+ * `dihedralsStatedBy`; the rest of this note is the plane × plane case it started from.
+ *
  * A row owns the chip iff one of its commands states an angle between two PLANES — a `plane-rel` with
  * `rel: 'angle'` (a value or a letter) or `rel: 'perp'`, both operands planar (a point run, a named
  * plane, a coordinate plane), or the legacy `plane-angle` a pre-#1439 file carries. Derived from the
@@ -54,6 +57,31 @@ export function dihedralsStatedBy(cmd: Command3): DihedralPair3[] {
   }
   if (cmd.type === 'plane-angle') {
     return [{ a: { kind: 'plane-named', name: cmd.p1 }, b: { kind: 'plane-named', name: cmd.p2 }, rel: 'angle', deg: cmd.deg }];
+  }
+  // #1491 (ADR-3D-280): a LINE × PLANE angle owns the chip too — the construction is P on the line, its
+  // height to the plane, and the foot joined to the crossing. Normalized exactly as the scene's
+  // object-angle lane normalizes the same records, so the arc it draws gives way to the construction.
+  if (cmd.type === 'line-rel' && cmd.rel === 'angle' && planar(cmd.op)) {
+    return [
+      {
+        a: cmd.op,
+        b: { kind: 'line', name: cmd.line },
+        rel: 'angle',
+        ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}),
+        ...(cmd.label !== undefined ? { label: cmd.label } : {}),
+      },
+    ];
+  }
+  if (cmd.type === 'line-plane-angle') {
+    return [
+      {
+        a: { kind: 'segment', a: cmd.a, b: cmd.b },
+        b: { kind: 'plane-run', ids: cmd.plane },
+        rel: 'angle',
+        ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}),
+        ...(cmd.label !== undefined ? { label: cmd.label } : {}),
+      },
+    ];
   }
   return [];
 }

@@ -384,6 +384,31 @@ function curveKindOf(o: GeoObject): string | null {
 }
 
 /**
+ * WHICH EXISTING CURVE this equation denotes, if any (#1429 — the ADR-AG-023/#1342 identity
+ * class at the operand boundary). Resolved numerically at the probe environments, like every
+ * identity question here: two spellings of one equation are one curve, and a parameterised
+ * equation matches only a curve that agrees at EVERY probe. Only equation-stated objects can
+ * match — a `circle-at`'s equation is wherever the solve put it, which is not an identity.
+ */
+function resolveCurveByEq(c: Construction, eq: unknown): Id | null {
+  if (!eq) return null;
+  const close = (v: number, w: number) => Math.abs(v - w) <= 1e-9 * Math.max(1, Math.abs(v), Math.abs(w));
+  const same = (a: Record<string, unknown>, b: Record<string, unknown>): boolean =>
+    a.kind === b.kind &&
+    Object.entries(a).every(([key, v]) => typeof v !== 'number' || (typeof b[key] === 'number' && close(v, b[key] as number)));
+  for (const o of c.objects) {
+    if (o.kind !== 'curve') continue;
+    const match = PROBE_ENVS.every((env) => {
+      const mine = resolveCurve({ eq } as typeof o.curve, env);
+      const theirs = resolveCurve(o.curve, env);
+      return mine.ok && theirs.ok && same(mine.curve as unknown as Record<string, unknown>, theirs.curve as unknown as Record<string, unknown>);
+    });
+    if (match) return o.id;
+  }
+  return null;
+}
+
+/**
  * Do two expressions denote the same value? Compared NUMERICALLY at several parameter probes
  * rather than structurally, because `2a` and `a+a` are the same given written two ways and a
  * student who restates a fact in different words has not contradicted anything. Two probes make an
@@ -794,6 +819,33 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
      * המשולש ABC הוא 20» before ABC exists is a statement about nothing.
      */
     case 'constraint': {
+      /**
+       * AN EQUATION OPERAND RESOLVES TO THE CURVE IT DENOTES (#1429, the ADR-AG-023/#1342
+       * identity class). «…עם המעגל (x-3)²+(y-4)²=9» while circle I carries that equation is a
+       * reference to CIRCLE I, not a second circle — so an `on-curve` carrying its equation is
+       * matched against the figure's equation curves first, minted `stated: false` only when
+       * nothing matches, and the spelling fields are stripped so the applied constraint is the
+       * same statement however the curve was named. This is also what retires the
+       * `curve-anon…` `unknown-reference` leak (#1145's class): the id now always exists.
+       */
+      if (f.k.t === 'on-curve' && f.k.eqSrc !== undefined) {
+        const { eqSrc, eq, ...bare } = f.k;
+        const resolved = resolveCurveByEq(c, eq) ?? f.k.curve;
+        let host = c;
+        if (resolved === f.k.curve && !objectById(c, resolved) && eq) {
+          const mint = applyFact(c, {
+            t: 'curve',
+            id: resolved,
+            label: { name: '', eqSrc },
+            curve: { eq: eq as Parameters<typeof resolveCurve>[0]['eq'] },
+            stated: false,
+            src: f.src,
+          });
+          if (!mint.ok) return mint;
+          host = mint.next;
+        }
+        return applyFact(host, { t: 'constraint', k: { ...bare, curve: resolved }, src: f.src });
+      }
       const missing = constraintRefs(f.k).find((id) => {
         const o = objectById(c, id);
         return !o || !isPositional(o);
@@ -1201,6 +1253,20 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       const matches = c.objects.filter((o) => curveKindOf(o) === f.kind);
       if (matches.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
       return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: matches[0].id }, src: f.src });
+    }
+
+    case 'crossing-kind': {
+      // «E נקודת החיתוך של הישרים» (#1429): WHICH two is the figure's answer — exactly two of the
+      // kind lower to the incidences the spelled-out sentence carries; anything else refuses. The
+      // `on-kind` rule, one arity up, resolved by the same fit-level kind test.
+      const point = objectById(c, f.id);
+      if (!point || !isPositional(point)) return { ok: false, error: unknownRef(f.id) };
+      const pair = c.objects.filter((o) => curveKindOf(o) === f.kind);
+      if (pair.length !== 2) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+      return applyAll(
+        c,
+        pair.map((o) => ({ t: 'constraint' as const, k: { t: 'on-curve' as const, id: f.id, curve: o.id }, src: f.src })),
+      );
     }
 
     case 'tangent-of': {

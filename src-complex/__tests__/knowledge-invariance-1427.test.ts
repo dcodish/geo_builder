@@ -91,7 +91,7 @@ describe('#1427 lock 3 — z1 = 2 · |z2| = 1 · z2² = −1: invariants print a
   beforeEach(() => feed(['z1 = 2', '|z2| = 1', 'z2^2 = -1'], ['|z1-z2|', 'Re(z2)', 'Im(z2)']));
 
   it('|z1−z2| = √5 ≈ 2.24 and Re(z2) = 0 print — the «differs» sentence was false for both', () => {
-    for (const r of rows('|z1-z2|')) expect(r.value).toBe('2.24');
+    for (const r of rows('|z1-z2|')) expect(r.value).toBe('√5'); // #1436: the exact form this test's own title names
     for (const r of rows('Re(z2)')) expect(r.value).toBe('0');
   });
 

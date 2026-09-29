@@ -27,7 +27,7 @@
  */
 
 import type { Resolved3, ResolvedPlane } from '../engine/evaluate';
-import { DIRECTION_REL_TOL, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
+import { DIRECTION_REL_TOL, operandKey, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
 import type { Construction3, Id, Operand3, Positions3, VecAtom } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, newellNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
 import { dihedralAnchors, dihedralGeometry } from './dihedral';
@@ -326,7 +326,7 @@ export function rightAngles3(
   }
   if (operandPairs.length) {
     const center = pos.size ? centroid3([...pos.values()]) : v3(0, 0, 0);
-    const pairKey = (a: Operand3, b: Operand3) => [JSON.stringify(a), JSON.stringify(b)].sort().join('~');
+    const pairKey = (a: Operand3, b: Operand3) => [operandKey(a), operandKey(b)].sort().join('~');
     const ceded = new Set(constructed.map((d) => pairKey(d.a, d.b)));
     for (const pr of operandPairs) {
       if (ceded.has(pairKey(pr.a, pr.b))) continue;

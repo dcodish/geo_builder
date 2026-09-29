@@ -45,12 +45,12 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
 
 - **FR-SU-1 (Must)** — **One look.** Every builder renders the same design tokens and the same palette,
   so a student who learns one interface has learned all of them. *(Realised — `shell/theme.ts`;
-  rulings D2/D3, [docs/28 §4a](28-product-unification.md).)*
+  rulings D2/D3, [docs/28 §4a](28-product-unification.md).)* **One wording for one state**: «✓ הציור נקבע במלואו על ידי הנתונים», «דרגות חופש: N», «חושב…», the ask button «שאלו», and the undo/redo/clear/another/About row read the same in every builder (He and En), and the About opens once on a first visit in all four. *(Operator ruling 2026-09-27; realised — [ADR-W-098](06w-decisions-workspace.md#adr-w-098), #1453.)*
 - **FR-SU-2 (Must)** — **A visible builder switcher**, present in every builder, listing the suite from
   the machine registry ([`products.json`](../products.json)) rather than from code. A builder marked not
   enabled **never appears in a shipped page** — the promise that no chip can point at a 404. *(Realised —
   `shell/frame/Switcher.tsx`, [ADR-W-021](06w-decisions-workspace.md#adr-w-021); the analytic builder is
-  `enabled: false` + `devOnly`, [ADR-AG-007](06c-decisions-analytic.md).)*
+  `enabled: false` + `devOnly`, [ADR-AG-007](06c-decisions-analytic.md).)* On a phone, where the strip scrolls inside itself, the **current** builder's tab is always in view. *(#1458, [ADR-W-097](06w-decisions-workspace.md#adr-w-097).)*
 - **FR-SU-3 (Must)** — **One three-zone workbench:** input, canvas, and an **opt-in** data panel on its
   own side. The zones do not move between builders. *(Realised — `shell/frame/Workbench.tsx`; D1.)*
 - **FR-SU-4 (Should)** — **One header and tool row.** Primary session actions are visible; secondary ones
@@ -58,7 +58,7 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   `ToolButton.tsx`; D4 as amended by #706.)*
 - **FR-SU-5 (Must)** — **One voice for refusals and notices.** A refusal, a warning and a notice look and
   read the same in every builder; error text names the conflicting *statement*, never internal state.
-  *(Realised — `shell/frame/Banner.tsx`.)*
+  *(Realised — `shell/frame/Banner.tsx`.)* A message may interpolate only what the student typed or the figure shows — never an engine id or noun. *(Checked — [ADR-W-096](06w-decisions-workspace.md#adr-w-096); 3-D locked, the rest #1522.)*
 - **FR-SU-6 (Should)** — **Every figure action lives under the canvas**, not scattered between header and
   sidebar. *(Realised — D7.)*
 - **FR-SU-7 (Should)** — **A manual screen per builder, in one chrome.** Each builder documents its own
@@ -77,6 +77,10 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   credit — in Hebrew and English. **Every sample line builds** when typed in order on an empty
   canvas. *(Realised — `shell/frame/about.tsx`, [ADR-W-091](06w-decisions-workspace.md#adr-w-091),
   #1477.)*
+- **FR-SU-12 (Must)** — **A symbol button types the symbol on its face**, and a comparison is recorded as
+  its mathematical symbol whichever way it was entered: the `≥` button inserts `≥`, and a typed `>=` is
+  recorded (row, save file, export, log) as `≥`. A button may insert a keyboard form only when its
+  grammar does not read the glyph, and must say so. *(Realised — [ADR-W-095](06w-decisions-workspace.md#adr-w-095), #1348.)*
 
 ## The data panel and the ask lane
 

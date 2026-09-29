@@ -24,6 +24,7 @@ import { VOCABULARY_ANALYTIC, imperativeCandidates } from '../parser/scopeAnalyt
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
+import type { Fact } from '../engine/types';
 
 /** What the submit path decided. One of these, always — there is no fall-through. */
 export type SubmitVerdict =
@@ -74,6 +75,34 @@ const objectsGained = (before: Derivation, after: Derivation): number =>
   after.construction.objects.length - before.construction.objects.length +
   (after.construction.params.length - before.construction.params.length) +
   (after.construction.selectors.length - before.construction.selectors.length);
+
+/**
+ * #1423 — the POINT ids a parsed line takes as its SUBJECT, structurally (never by sentence kind):
+ * a placed point, a derived point (midpoint, crossing), a bare declaration, an on-object rider.
+ * This is what lets a refusal about a line that RESTATES an existing letter say so — «P …» when P
+ * is already the crossing of AB is a statement about that P (#1046), and «לא נמצאה תצורה» beside a
+ * visible free crossing reads as the figure's fault when the letter is the problem.
+ */
+const subjectIdsOf = (parsed: { facts: readonly Fact[] }): string[] =>
+  parsed.facts.flatMap((f) => {
+    if (f.t === 'point' || f.t === 'derived' || f.t === 'declare') return [f.id];
+    if (f.t === 'constraint' && (f.k.t === 'on-curve' || f.k.t === 'on-line-2pt')) return [(f.k as { id: string }).id];
+    return [];
+  });
+
+/** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
+const definingLineOf = (lines: readonly string[], id: string): string | null => {
+  for (const l of lines) {
+    const p = parseLine(l);
+    if (!p.ok) continue;
+    const ids = new Set<string>([
+      ...subjectIdsOf(p),
+      ...p.facts.flatMap((f) => (f.t === 'polygon' ? f.vertices : [])),
+    ]);
+    if (ids.has(id)) return l;
+  }
+  return null;
+};
 
 /**
  * Decide what `raw` does, given the lines already accepted.
@@ -154,9 +183,24 @@ export function decideSubmit(
     trial.faults.find((f) => f.index === lines.length) ??
     trial.faults.filter(appeared).map((f) => ({ ...f, index: lines.length, detail: line }))[0];
   if (fault) {
+    /**
+     * #1423 — WHEN THE REFUSED LINE RESTATES AN EXISTING LETTER, SAY SO (the honesty invariant:
+     * a refusal names the conflicting STATEMENT). «P נקודת החיתוך … של הצלע CA» with P already
+     * the crossing of AB is, by the #1046 lowering, a statement about THAT P — usually false, and
+     * rightly refused — but «לא נמצאה תצורה» beside a visible free crossing tells the student the
+     * figure is at fault when the letter is. Decided structurally at this one chokepoint (the
+     * line's subject id exists before it), never by sentence kind, so crossings, coordinates,
+     * midpoints and every future point sentence get it; the taught remedy (a fresh letter) is
+     * locked to actually record.
+     */
+    const reused = subjectIdsOf(parsed).find((id) => current.construction.objects.some((o) => o.id === id));
+    const definedBy = reused ? definingLineOf(lines, reused) : null;
     return {
       kind: 'refused',
-      error: { key: fault.code, detail: fault.detail, existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example } as InputError,
+      error: {
+        key: fault.code, detail: fault.detail, existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example,
+        ...(reused && definedBy ? { reusedId: reused, definedBy } : {}),
+      } as InputError,
     };
   }
 

@@ -99,8 +99,11 @@ export async function handleParse(
   let utterance = '';
   let context = '';
   let tool = '';
+  let locale: 'he' | 'en' | undefined;
   try {
-    const j = JSON.parse(body) as { utterance?: unknown; context?: unknown; tool?: unknown };
+    const j = JSON.parse(body) as { utterance?: unknown; context?: unknown; tool?: unknown; locale?: unknown };
+    // #1297: the session's language, so the prompt speaks ONE language. Optional — an old client omits it.
+    locale = j.locale === 'he' || j.locale === 'en' ? j.locale : undefined;
     utterance = String(j.utterance ?? '').slice(0, 400);
     context = String(j.context ?? '').slice(0, 1000);
     // An absent/empty `tool` is 2-D, as it always has been — the 2-D client does not send the field.
@@ -147,7 +150,7 @@ export async function handleParse(
     // Unreachable — the tool was validated before any spend (see PROMPT_SPECS above). Kept as a
     // typed floor so this stays a total function if the guard above is ever moved.
     if (!spec) return send(400, { error: 'unknown-tool' });
-    const request = buildRequest(spec, utterance, context);
+    const request = buildRequest(spec, utterance, context, locale);
     // The prompt builders own the request as PLAIN DATA and deliberately import no SDK types — they ship in
     // browser bundles, and `llmShared.ts` says so explicitly. Their `as const` therefore makes every array
     // readonly, which the SDK's mutable `string[]` fields reject. Widening is a boundary concern, so it

@@ -26,16 +26,16 @@ import type { SymbolSpec } from '../../shell/symbols';
 
 export const SYMBOLS: readonly SymbolSpec[] = [
   // The six that shipped inline, unchanged in label and in insert text.
-  { label: '²', titleKey: 'symSq', before: '^2' },
+  { label: '²', titleKey: 'symSq', before: '²' }, // #1348: the face IS the payload (the grammar reads ² as ^2)
   { label: '√', titleKey: 'symSqrt', before: '√' },
   { label: 'ℓ', titleKey: 'symEll', before: 'ℓ' },
-  { label: '≤', titleKey: 'symLe', before: '<=' },
-  { label: '≥', titleKey: 'symGe', before: '>=' },
+  { label: '≤', titleKey: 'symLe', before: '≤' },
+  { label: '≥', titleKey: 'symGe', before: '≥' },
   { label: '≠', titleKey: 'symNe', before: '≠' },
   // #1129 — free the day they were measured: `normalizeMath` maps `·⋅×` to `*`, and `³` is `^3`
   // exactly as `²` is `^2`.
-  { label: '³', titleKey: 'symCube', before: '^3' },
-  { label: '·', titleKey: 'symMul', before: '*' },
+  { label: '³', titleKey: 'symCube', before: '³' },
+  { label: '·', titleKey: 'symMul', before: '·' },
   /**
    * π, per the ruling. It is a `num` token in `expr.ts` rather than a free symbol — a symbol would
    * make «AB = 2π» a length the solver may choose.

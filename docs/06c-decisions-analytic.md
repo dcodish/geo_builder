@@ -7996,6 +7996,99 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 
 **Amendment (#1508, 2026-09-28, operator on the first play of this fix).** *"Where there are 2 answers, each on a separate line."* A union's equations go one per line — the row is «שני ישרים:» followed by each equation on its own row, rendered per line and typeset independently (the #1221 rule the trace rows already follow; `\n` in the value, split at the answer row). Single-component rows and kinds-only union rows byte-unchanged. Lock updated in `issue-1500-locus-union.test.ts`.
 
+## ADR-AG-168 — One curve-operand resolver: named, contextual, equation and plural spellings of «on» and «crossing» (#1429)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1510. Numbered 168 because 167 was minted the same day on `feat/1504-circle-tangency`.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R119 (crossing spellings noted) · **Design:** [04c](04c-design-analytic.md#a-point-on-an-object-and-the-carrier-that-holds-it-adr-ag-029-adr-ag-032)
+
+**Context.** *"«P על המעגל I» fails although «הנקודה P נמצאת על המעגל» works … the canvas even marks the intersections, but you can't name them."* Re-measured at pickup (round worktree @ `21ddb55f`): the issue's whole table stood — point-on-named-circle `not-handled` in six spellings; «ו-l2»/«והישר» never joined a crossing (the connective demanded spaces); the distributive «של הישרים l1 ו-l2», the bare «של הישרים», and both verb forms `not-handled`; an equation operand beside the NAMED circle carrying that equation refused `unknown-reference` leaking `curve-anon…` (#1145's class). Root cause, class first: **"which curve does this operand name" had three hand-written resolvers** — `incidenceOn` (crossings), the `ON_OBJECT` handler, `ON_KIND` — each knowing a different subset.
+
+**Decision.** (1) **`incidenceOn` is THE operand resolver** and the `ON_OBJECT` handler delegates to it; what stays per-sentence is what the rulings genuinely split: a bounded noun in a point-on sentence is a `between` selector (#1069/#1168), a crossing's is the hard extent (#1286). A contextual kind noun answers a `kind` marker that lowers to the same fold-resolved `on-kind` both sentences share; a numeral circle reads digits and Romans onto ONE id («המעגל 1» is «המעגל I»). (2) **The equation-identity arm** (ADR-AG-023/#1342): an equation operand rides the `on-curve` constraint (`eqSrc`/`eq`, spelling-only — stripped at apply, excluded from `canonicalConstraint`), and the apply boundary resolves it against the figure's equation curves at the probe environments (`resolveCurveByEq`), minting `stated: false` only when nothing matches — so «עם המעגל ‎(x-3)²+(y-4)²=9‎» beside circle I is a reference to I, and `curve-anon` ids no longer reach refusals. (3) **The connective** admits the clitic as written (`INTERSECT_JOIN`: «עם», «ו », «ו-», attached «והישר») with a lookahead keeping prose out. (4) **The other spellings normalise to the canonical sentence** (`intersectionSpellings` → `viaCanonical`, the #1495 seam): distributive plural, short form, both verb orders; the bare «של הישרים» lowers to the new M1 fact `crossing-kind` (exactly two of the kind, else `ambiguous-shape` — `on-kind`, one arity up). An ordinal over an unresolved operand refuses. (5) Catalog: the crossing sentence and «P על המעגל I» — NOT featured: the derived section's six seats are full and #1347 keeps them the operator's call (the rows feed the LLM grammar either way). **Not built, by the plan's own marker:** «…בנקודות A ו-B» — the two-letter assignment question is the operator's, filed as **#1512** (`needs-operator`).
+
+**Measured.** The issue's 18-row table green through real `parse → derive`; 23 locks (`issue-1429-curve-operand.test.ts`) including the identity arm both ways, the ambiguous refusals, #1175/#1255 unchanged, and no refusal containing `curve-anon`.
+
+**Consequences.** `parser/parseAnalytic.ts` (`incidenceOn` widened + delegation, `INTERSECT_JOIN`, `intersectionSpellings`, `withLineNoun`, `ROMAN_OF_DIGIT`), `engine/solve.ts` (`on-curve.eqSrc/eq`, canonical key), `engine/apply.ts` (`resolveCurveByEq`, the on-curve resolution step, `crossing-kind`), `engine/types.ts`, `parser/catalogAnalytic.ts`. Lock: `issue-1429-curve-operand.test.ts`.
+## ADR-AG-172 — The fallback teaches the session's language: a one-locale prompt, and rows that show the student's own sentence (#1297)
+
+**Status:** accepted · 2026-09-28 · operator rulings 2026-09-24 (*"nothing should be in english if data was entered in hebrew"*) and 2026-09-27 (*"student's words now, form later"* — the proper-form-beside split to #1468) · round #1510. Numbered 172 beside the round's parallel branches.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R104 family (the escape's promise) · **Design:** [04c](04c-design-analytic.md) fallback
+
+**Context.** One Hebrew sentence, escalated; the model wrote three English canonical rows into a Hebrew session's fact list — valid, parsed, committed, and taught. The language of the recorded line was the one thing in the lane still resting on prompt discipline (one soft sentence), which #1251's own ADR argues safety must never do.
+
+**Decision.** Two structural changes. (1) **The prompt speaks one language**: the client sends its session `locale`; the shared harness (`buildSystemPrompt`) renders ONE vocabulary column and a HARD language rule for it; analytic's `vocabulary(locale)` implements the column; an old caller (no locale — 2-D/3-D today) keeps its prompt byte-identical, so the sibling byte-identity locks stand. The proxy widens (`parseHandler` reads `body.locale`), which makes this a proxy deploy. (2) **No model output is ever displayed as a row**: the store gains `spokenFor` — per line index, the student's own sentence — written by `recordLlmLines`, index-maintained through remove/edit (an edited row shows the editor's text), persisted in the save envelope as an optional field (old files restore clean), and the fact panel displays it over the machine line. The machine lines stay the stored truth: **replay is pure over the lines exactly as before** — which is why the sentence is an annotation and not the stored line (the student's refused sentence cannot replay; that is what the fallback was for).
+
+**Measured.** 6 locks (`issue-1297-hebrew-fact.test.ts` product-side; `issue-1297-locale-prompt.test.ts` server-side, on the sanctioned import direction): the He prompt carries only the He column + the hard rule, the En prompt only En, the no-locale prompt byte-compatible; rows display the sentence with part markers, annotations follow their lines through removal, drop on edit, and survive save→restore.
+
+**Consequences.** `server/llm/harness.ts` (locale through `PromptSpec.vocabulary`/`buildSystemPrompt`/`buildRequest`), `server/parseHandler.ts` (`body.locale`), `parser/llmSharedAnalytic.ts` (one-column vocab), `parser/llmAnalytic.ts` + `App.tsx` (locale sent; `recordLlmLines`; row display), `store/useAnalyticStore.ts` (`spokenFor` + envelope field). **Proxy redeploy required.**
+
+## ADR-AG-176 — «זווית BMC» is askable: the angle ask arm, with the ruled working (#1409)
+
+**Status:** accepted · 2026-09-28 · operator 2026-09-24 (*"in data panel, i cannot ask for זווית BMC"*), trace method ruled 2026-09-27 (*"if its an angle where m=tanx would work, use that, if not, use law of cosine"*) · round #1517. Numbered 176 beside the round's parallel branches.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R121 (new) · **Design:** [04c](04c-design-analytic.md) — the ask lane's shared atoms
+
+**Context.** #1331 (ADR-AG-153) made the three-letter angle a GIVEN through the parser's own atoms; it added no ask arm, and nothing checked sayable ⇒ askable — the two surfaces drifted apart the first time a measure shipped without its twin. Re-measured at pickup: every angle spelling still `unreadable`.
+
+**Decision.** (1) `readAngleAsk` (parser) — the ask reference composed from the SAME atoms the given rules read (`ANGLE_NOUN_HE/EN` + `ANGLE_LETTERS`, plus the ask's optional «גודל» lead-in), so every spelling the given accepts is askable by construction; three letters only (a lone vertex needs the figure, #1407 — out of the ask's scope for now). (2) The value comes from the SAME `angleAt` the angle residual constrains (exported from `engine/solve.ts`) — «זווית ABC = 60» asked back prints exactly 60° (locked) — through `isKnowledge` like every value arm: open answers open, a missing letter gets #1111's outcome, formatted by the one `angleText`. (3) The WORKING per the ruling: `traceAngle` (`engine/techniques.ts`) — the slope method where both arms have a defined slope and 1 + m₁m₂ ≠ 0, with the «180° − α» row when obtuse; else the law of cosines with the three lengths; each branch's trace ends on the answer (locked per branch). (4) The sayable ⇒ askable CLASS GUARD: a curated walk over every value measure (length, area, point-line distance, slope, x-axis angle, angle) asserting none is `unreadable` on a determined figure — a new value measure joins the list in its own commit, which is the review point #1331 never had. The ask placeholder teaches «זווית ABC».
+
+**Deviations from the plan.** The plan's step 5 wanted the guard to WALK the catalog mechanically; the shipped guard is a curated list (the catalog rows do not machine-map to ask spellings), which holds the same line at the cost of one list entry per new measure — recorded here as the trade.
+
+**Consequences.** `src-analytic/parser/parseAnalytic.ts` (`readAngleAsk`), `src-analytic/engine/solve.ts` (`angleAt` exported), `src-analytic/engine/techniques.ts` (`traceAngle`), `src-analytic/app/ask.ts` (the arm), `src-analytic/i18n/index.ts` (placeholder), docs 02c R121. Lock: `issue-1409-angle-ask.test.ts` — every reported spelling, the honesty gates, the 60° round trip, the four trace branches ending on the answer, and the class guard.
+
+### ADR-AG-176 Am. 1 — a method hint replaces the worked angle trace (#1525)
+
+**Status:** accepted · 2026-09-29 · operator, playing round #1517 T26 on this PR: «tan α = |(m₁ - m₂)/(1 + m₁·m₂)| … this equation is not in the curriculum. I think we should not try to show the process … maybe just write a comment "ניתן להשתמש בשיפועי הישרים או במשפט הקוסינוסים" the part about the cosine law should show only if all 3 nodes are known.» Approved as #1525 the same day. **Reverses** the 2026-09-27 trace ruling this ADR was built on.
+
+**Requirements:** docs/02c R121 (amended) · **Design:** none (internal — the ask lane's answer gains a `hint` token, as `fact` did)
+
+**Decision.** The angle arm returns no `trace`. It returns a `hint` token instead: `angle-methods` when all three vertices are knowledge (both coordinates fixed across configurations, the same `isKnowledge` gate the answer passes), else `angle-slopes`, since the law of cosines needs the three lengths. The component words it through the locale (He «ניתן להשתמש בשיפועי הישרים או במשפט הקוסינוסים» / «ניתן להשתמש בשיפועי הישרים»; En mirrors), below the answer. `traceAngle` is deleted, not left unused. **A stated angle gets no hint** (operator, T33, same day: «if the angle is given in the input, there is no point explaining how to find it»): when a stated angle given exists at the asked vertex between the same two arms, in either order (the `angle` constraint the given lowers to), the answer is the value alone. The check reads the record, not the number, so a computed angle that equals a stated number keeps its hint.
+
+**Measured.** His case A(0,0), B(4,0), C(8,4), «זווית ABC»: 135°, the full hint, and no formula rows (driven on the PR server and read). An angle the givens fix while a vertex stays free (B, C, «משולש ABC», «זווית ABC = 60»): 60° with the slopes-only hint.
+
+**Consequences.** `src-analytic/app/ask.ts`, `src-analytic/App.tsx`, `src-analytic/i18n/index.ts`, `src-analytic/engine/techniques.ts` (`traceAngle` removed). Lock: `issue-1409-angle-ask.test.ts`, whose "ruled working" block is replaced by the hint cases.
+
+## ADR-AG-173 — A refusal about a reused letter names the letter, and its defining sentence (#1423)
+
+**Status:** accepted · 2026-09-28 · operator, playing round #1408 (T41: *"there is a refusal but there is an intersect to select"*) · round #1517
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the honesty invariant for refusals (a refusal names the conflicting statement) · **Design:** [04c](04c-design-analytic.md) — the submit verdict's context fields
+
+**Context.** His P was already the second crossing of AB. By the #1046 lowering a line reusing an existing letter is a STATEMENT about that point, so «P נקודת החיתוך … של הצלע CA» asserts something false and is rightly refused — but the refusal said only «לא נמצאה תצורה שבה מתקיים: "P …"», naming the new line alone, beside a visibly free crossing. Re-measured at pickup (tip `d3f08a4c`): the issue's whole table stood — the fresh letter records, and the three P-reuse statement kinds (crossing, coordinates, midpoint) all refuse with `unsatisfiable` + the new line only.
+
+**Decision.** At the ONE submit chokepoint (`app/submit.ts`, the fault return every typed line passes), a refused line whose SUBJECT id already exists gains `reusedId` + `definedBy` — the id, and the student's own earliest line that introduces it (`subjectIdsOf` over the parsed facts: placed points, derived points, declarations, on-object riders; polygon vertices count as introducers for the definer scan). Decided structurally, never by sentence kind, so every point sentence — present and future — gets it. The App renders the reused wording: «P כבר מוגדרת: "…". המשפט "…" סותר את ההגדרה הקיימת — לנקודה חדשה בחרו אות אחרת» (`errUnsatisfiableReused`, both locales). The engine's refusal itself is unchanged (the logic was always right; the message was not).
+
+**Measured.** The operator's exact canvas (from `logs/debug-log-analytic.jsonl`, session `m49ph672`): both his refused lines now carry `reusedId: P` + `definedBy` = his own AB-crossing sentence; so do «P(1,1)» and «P אמצע AC» (the class). The taught remedy drives: «S …» records. Neighbours held: a TRUE reused-letter statement stays absorbed (#1046), `crossing-already-named` keeps its own holder-naming refusal (ADR-AG-157).
+
+**Consequences.** `src-analytic/app/submit.ts` (`subjectIdsOf`, `definingLineOf`, the enriched fault return), `src-analytic/store/useAnalyticStore.ts` (the `unsatisfiable` variant's optional fields), `src-analytic/App.tsx` (key pick), `src-analytic/i18n/index.ts` (`errUnsatisfiableReused`, he+en). Lock: `issue-1423-reused-letter.test.ts` — his exact sequence, the class (coordinates, midpoint), the driving remedy, and the three neighbours.
+
+## ADR-AG-174 — «הנקודה» is optional in the distance grammar, and the contextual form resolves by rewrite (#1431)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1517. Numbered 174 beside the round's parallel branch (173 = #1423).
+
+**Requirements:** [02c](02c-requirements-analytic.md) — ask/given parity for a spelling · **Design:** [04c](04c-design-analytic.md) — the one measure-term atom
+
+**Context.** «המרחק של הנקודה A מהישר l1» was unreadable as an ask and not-handled as a given while «המרחק של A מהישר l1» answered 4 — the optional-subject-noun trap (`הנקודה A ≡ A`, the #1134/#1151 shape); «מרחק A מ-l1» (construct state) was unreadable too. Re-measured at pickup: the issue's table stood.
+
+**Decision.** (1) The `NOUN` slot of the ONE distance atom (`engine/lengths.ts`, the #1151 frames) gains the point nouns («נקודה», «קדקוד», En "point"), so the ask and the given read the spelling by construction — no per-surface copy. (2) The construct state joins as a fourth frame (empty opener; the «מ-» join still required, so a bare «מרחק AB» length is never claimed). (3) The ruled contextual form («המרחק של הנקודה מהישר», no letters — operator 2026-09-27): answers exactly when the figure holds ONE point and ONE line, by REWRITING into the lettered sentence at the ask entry and falling through to the one distance lane (the ADR-W-053 synonym rule the symbolic d_{AB} spellings follow); otherwise a new `contextual` answer field carries the counts and the App names the ambiguity — never «לא הבנתי».
+
+**Consequences.** `src-analytic/engine/lengths.ts` (`NOUN`, the construct frame), `src-analytic/app/ask.ts` (the contextual rewrite + `Answer.contextual`), `src-analytic/App.tsx` + `src-analytic/i18n/index.ts` (the ambiguity wording, he+en). Lock: `issue-1431-distance-noun.test.ts` — every reported spelling × both surfaces, the contextual answer and its two-point refusal, the bare-pair control.
+
+## ADR-AG-175 — Every ask arm consults the option set, by calling the panel's decision (#1433)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1517. Numbered 175 beside the round's parallel branches (173 = #1423, 174 = #1431).
+
+**Requirements:** [02c](02c-requirements-analytic.md) — «cannot be computed» must never stand beside a panel that lists the options · **Design:** [04c](04c-design-analytic.md) — one knowledge decision per surface pair
+
+**Context.** With two valid configurations, asking «C» answered «לא ניתן לחשב מהנתונים» while the panel listed both of C's positions; «AC» and «משוואת הישר AC» likewise. #1227 (ADR-AG-136) fixed this false absence for the locus question only. Class: *each ask arm owned its own knowledge gate.* Re-measured at pickup: the issue's whole table stood.
+
+**Decision.** (1) The panel's point decision is EXTRACTED to `app/pointText.ts` — value → #1036 option set (drawn one bracketed) → #1226 stated expression → #1023 line dependency → half-pinned → open dash — and the ask's point arm now CALLS it, so the two surfaces answer the same text by construction (the #1102 locks-must-call rule). (2) One scalar option gate (`scalarText`): a value when forced, else the resolution-aware set joined «או», else null; the measure arm and the slope arm ride it. (3) The equation arm answers its option set deduped by the RENDERED equation (coefficients are homogeneous, so raw triples may differ for one line); a set collapsing to one text stays null — a single «option» would claim what the knowledge gate withheld. `askNoValue` is thereby reserved for a figure that determines nothing finite.
+
+**Measured.** The reported figure: «C» → «[(1, -5)] או (3, 3)», «AC» → «3.16 או 5.83», the equation → both equations. Controls: a free point stays open; a determined figure answers its single value with no «או».
+
+**Consequences.** `src-analytic/app/pointText.ts` (new — the extracted decision + `scalarText`), `src-analytic/app/ask.ts` (point/slope/equation/measure arms), `src-analytic/App.tsx` (imports the moved decision). Lock: `issue-1433-known-options.test.ts` — the reported rows, the surfaces-agree assertion (calling, not reproducing), and the two gates that must not loosen.
+
 ## ADR-AG-169 — Radius, focus, directrix and perimeter: sayable and askable (#1432)
 
 **Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1510. Numbered 169 beside the round's parallel branches (167 on `feat/1504`, 168 on `fix/1429`).
