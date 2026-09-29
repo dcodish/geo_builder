@@ -376,6 +376,13 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   the figure, carried by a share link, and removed with its row (operator rulings 2026-09-27).
   *(Realised — [ADR-3D-265](06b-decisions-3d.md#adr-3d-265), #1476;
   `issue-1476-dihedral-construction.test.ts`.)*
+  **Line × plane** (#1491): a row stating an angle between a line (a named line or a segment) and a plane
+  carries the same chip. When on it draws a point P on the line (the segment's own endpoint off the plane —
+  S for «SA», C' for «AC'» — else a named point lying on the line, else a default point), its height PH to
+  the plane with a knee at H, and the projection XH from the crossing X, with the stated angle marked at X.
+  An unnamed X or H takes the first free letter, as above. At exactly 90° P, H and X are collinear, so the
+  chip draws nothing extra and the right-angle knee stays (operator ruling 2026-09-27). *(Realised —
+  [ADR-3D-280](06b-decisions-3d.md#adr-3d-280); `issue-1491-line-plane-construction.test.ts`.)*
 - **FR-RD-12 (Must)** — **A stated angle between OBJECTS is always marked on the figure.** An angle the
   student stated between two planes («הזווית בין הפאה SBC לבסיס ABC היא 60»), between a line or segment
   and a plane («זווית בין ישר ℓ למישור π = 45», «הזווית בין SA למישור ABCD היא 50»), or NAMED with a
