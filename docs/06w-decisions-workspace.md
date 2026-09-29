@@ -4995,3 +4995,30 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 **Not linted, stated.** The deploy-preflight shape (heavy work in a body) cannot be read from source; it is documented in docs/08, not guarded.
 
 **Consequences.** The nine test files above, plus `server/__tests__/deploy-preflight.test.ts` and `server/__tests__/test-imports-at-collection.test.ts` (moved from src3d/ and widened), and `src3d/__tests__/free-line.test.ts` (comment pointer). ADR-3D-261's "3-D only" scope is superseded by this record.
+
+
+## ADR-W-103 — The deploy preflight probes every ROUTE the confs declare (#1279, amends ADR-W-058)
+
+**Status:** accepted · 2026-09-29 · fix round #1571 · bug → main.
+
+**Requirements:** none (internal — an operating procedure). **Design:** [RUNBOOK](RUNBOOK.md) § *Standard deploy* (the preflight paragraph). **Product:** workspace.
+
+**Context.** On 2026-09-20 every row of `deploy:preflight` read MATCHES while `/analytic-builder/api/parse` answered 404: `deploy/apache-analytic-builder.conf` existed from the builder's first deploy and had never been pasted into Plesk, so the analytic LLM fallback shipped dead for four days. It was the second time (#903: `/complex-builder/api/*` 404 for a month). The preflight measured the bundles and the proxy, never the path between them, and every consumer's degraded path keeps a missing route silent.
+
+**Decision.** The preflight probes every route live and fails on a broken one.
+
+- **The route list is derived, not written.** For each product `products.json` enables, its `deploy/apache-<prefix>.conf` is read and every `ProxyPass <public> http://127.0.0.1:8788<tail>` line becomes one probe. A new conf line adds a probe on the next run. An enabled product with no conf is its own BROKEN row.
+- **One probe shape per proxy handler**, keyed by the backend tail as `server/standalone.ts` dispatches it. Each shape is the answer Apache's static handler cannot give: `api/parse`, `api/log` and `api/share` → `405`; `api/config?tool=preflight-probe` → `204`; a dashboard tail → `200` with its login form; `/g/<id>` → `404` **with** `x-robots-tag: noindex` (a dead share id is a proxy 404 too, so the status alone cannot tell routed from not). A tail with no shape is BROKEN, so a new handler cannot ship unprobed.
+- **No probe can reach the model.** Every probe is a bodiless GET. `handleParse`'s first statement refuses a non-POST with 405 (`server/parseHandler.ts`), before the API-key check, the per-IP rate limiter, the body read, the daily counter and the SDK import. The share upload has the same first-statement 405, so no share is written. The brief's suggested probe, a POST with an empty body answered 400, also stops before the model, but it passes the rate limiter first and spends a slot; the GET stops earlier.
+- **The verdict is one pure function**, `preflightVerdict(rows)` in `scripts/preflight-targets.mjs`. It was extracted from the script's tail, so the lock calls the exact decision that sets the exit code. A BROKEN route exits 1; a probe whose request failed is UNKNOWN, which counts as an incomplete verdict and also exits 1.
+
+**Measured.** The first live run (2026-09-29, read-only) put 18 of 19 routes at MATCHES and caught **one real BROKEN route**: `GET /analytic-builder/admin -> 404`, Plesk's own error page. The `/admin-analytic` ProxyPass added by #1362 (ADR-W-083) is in the conf and was never pasted into the GUI field. It is the same class, found on the check's first run. `/3d-builder/admin` and `/geo-builder/admin` answer 200. The conf is correct; the fix is the operator's Plesk paste.
+
+**Locks.** `server/__tests__/preflight-routes.test.ts`:
+1. The route list comes from the real confs, and a temp conf for a fifth product adds probes line by line; a missing conf is reported.
+2. The real proxy (`server/standalone.ts`, booted in-process with the API key SET and the Anthropic SDK mocked to throw on import) is sent every probe through an Apache-emulating fetch, which strips the prefix exactly as ProxyPass does. All routes read MATCHES, `preflightVerdict().code === 0`, and the SDK was imported zero times.
+3. The 2026-09-20 shape: drop `/analytic-builder/api/parse` from the emulated Apache and that route alone reads BROKEN, and the verdict exits 1.
+4. A bare 404 on `/g/` (no `x-robots-tag`) reads BROKEN.
+5. An unreachable host reads UNKNOWN and exits 1.
+
+**Not changed.** `ci.yml` still ignores `deploy/**` (DOCS.json `ciPathCoverage.uncovered`). A conf-only commit therefore runs no CI, but the preflight reads the confs at deploy time, which is where this check acts.
