@@ -2864,4 +2864,36 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'overconstrained-names-the-completing-statement-1203',
+    title: '#1203: a later line that breaks an earlier given is the statement named — «AC = 6» סותר את «α = 50», never an innocent older given',
+    guards:
+      "Operator ruling 2026-09-20 (option (b)): a statement that makes an EARLIER given infeasible may still commit, with the earlier row marked, but the message names the NEW statement. ADR-508's counterpart search could only look backwards, so it named «זווית ACB = 30» — a given that held together with «AC = 6» a moment earlier — while «α = 50», the line that completed the contradiction, sat green. Measured on the pre-change tip through runSubmit: «α = 50» commits and the status tail was [vs #4]. The search now tries the LATER statements first, latest first (ADR-554). Row 9 is «α = 50» (the triangle is row 0, «AB=4» rows 1–2, «זווית ABC = α» row 3, «זווית ACB = 30» rows 4–6, «AC = 6» rows 7–8). The message-level assertion (real Hebrew locale) and the latest-that-restores lock live in replay/__tests__/issue-1203-forward-blame.test.ts.",
+    steps: ['משולש ABC', 'AB=4', 'זווית ABC = α', 'זווית ACB = 30', 'AC = 6', 'α = 50'],
+    check(fig) {
+      expect(fig.lastError, 'the earlier given is the broken row, naming the later line').toMatch(/^over-constrained: \|AC\| = 6 cannot hold \[vs #9\]$/);
+      // behaviour unchanged: the completing line itself holds
+      expect(Object.entries(fig.status).filter(([id]) => id.startsWith('g5.')).every(([, st]) => st === 'ok'), '«α = 50» commits green').toBe(true);
+    },
+  },
+  {
+    id: 'quarter-circle-conflict-names-no-innocent-given-1203',
+    title: '#1203: the operator’s quarter circles on «ABC משולש ישר זוית · AC=15 · BC=10» — CAB is refused as its own statement; ABC names no innocent earlier given',
+    guards:
+      "The operator's exact sequences from #1203. «רבע מעגל CAB» (two unequal pinned radii) is refused, and the refusal's subject is the quarter's own statement — every row carrying the banner string is the quarter's (group g3), the three givens stay green. «רבע מעגל ABC» commits and the banner used to read «BC=10» סותר את «AC=15» — two of his own consistent givens, with the quarter green. Re-measured at pickup (2026-09-29): since ADR-551 (#1441) the committed case is caught by the obtuse-side proof, which states the right angle at A and the two lengths and names no counterpart; this lock holds that it never regresses to naming «AC=15». The later-statement attribution itself is locked by overconstrained-names-the-completing-statement-1203.",
+    steps: ['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'רבע מעגל CAB'],
+    check(fig) {
+      expect(fig.lastError).toMatch(/^over-constrained: .+ cannot hold/);
+      const owners = Object.entries(fig.status).filter(([, st]) => st === fig.lastError).map(([id]) => id);
+      expect(owners.length).toBeGreaterThan(0);
+      expect(owners.every((id) => id.startsWith('g3.')), 'the refusal is the quarter statement’s own').toBe(true);
+      expect(Object.entries(fig.status).filter(([id]) => !id.startsWith('g3.')).every(([, st]) => st === 'ok'), 'the three givens stand').toBe(true);
+
+      const facts = factsOf(['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'רבע מעגל ABC']);
+      const abc = replay(facts);
+      expect(abc.lastError, '«רבע מעגל ABC» is flagged').not.toBeNull();
+      expect(abc.lastError as string, 'never «BC=10» contradicts «AC=15»').not.toMatch(/\[vs #1\]$/);
+      expect(abc.lastError as string).toMatch(/^impossible: the angle at A is 90°/);
+    },
+  },
 ];

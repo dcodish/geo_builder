@@ -185,7 +185,10 @@ src/
                    statuses live by index and a dry-run trial shares the committed fold; the fold names
                    none when no single earlier statement's removal restores feasibility, and the
                    `_said` wording stands. The search itself runs in the fold's attribution pass (next
-                   bullet), only on a refused statement, through its own memo, never nested
+                   bullet), only on a refused statement, through its own memo, never nested. It tries the
+                   statements AFTER the failing one first, latest first (ADR-554, #1203) — a later
+                   line can commit while an earlier row goes ✗, and the latest statement whose
+                   removal lets that row hold is the one that broke it — then the earlier ones
                  - WHICH row owns it is decided one layer down (ADR-492, #956): `computeFold` runs an
                    attribution pass after the deferral/poisoning/HOIST have settled, moving a refusal
                    from the row that SHAPED a constraint to the row that VALUED its symbol when that
