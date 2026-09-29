@@ -961,6 +961,9 @@ export function buildScene3(
   // predicate this replaced — "nothing pins the parameter" — was a proxy that held only while every pin had
   // a single root; the operator's `ℓ ∥ π1` pins m to ±√2, whereupon the echo printed one branch's numbers
   // and CHANGED them on "show another configuration".
+  // #1474 (ADR-3D-283): this is the ONE derived use of `paramIsKnowledge` that is exact — a line whose
+  // numbers carry m (k + p·m, p ≠ 0) has different numbers on every branch, so "one branch" IS
+  // "invariant" for this question. Every other derived value asks `knowledgeSamples3` instead.
   const paramUnforced = !!c.param && !paramIsKnowledge(resolved.param);
   // #611 (ADR-3D-157): the rule the two branches above were each a special case of.
   //
