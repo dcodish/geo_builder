@@ -1816,6 +1816,14 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         const comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp] =
           [comp(cmd.x, exprs[0]), comp(cmd.y, exprs[1]), comp(cmd.z, exprs[2])];
         next.pins.push({ id: cmd.id, x: comps[0], y: comps[1], z: comps[2] });
+        // #1546 (ADR-3D-282): the pin is the DRIVER; a recorded claim is the FINAL ARBITER (the ADR-3D-030
+        // pattern its siblings — plane pins, coord-plane-rel, on-line, the `A = (…)` twin — already follow).
+        // A pin acts only where the pivot owns something that moves the point (a solid's gauge and dims, a
+        // pin symbol); on a coordinate, coord-sym or derived point nothing moves, and without the claim a
+        // false restatement read green over a figure that contradicts it. The claim carries the NUMERIC
+        // components only — a symbolic one («B(2t, t, k)») is the pivot's to satisfy, and null is unchecked.
+        if (cmd.x !== null || cmd.y !== null || cmd.z !== null)
+          next.claims.push({ type: 'coords-eq', id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z });
         bindPartialNames(next, { kind: 'point', id: cmd.id }, cmd.syms, comps); // #814
         return { ok: true, next };
       }

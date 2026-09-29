@@ -115,8 +115,20 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
     case 'coords-eq': {
       const p = pos.get(claim.id);
       if (!p) return false;
-      const target = v3(claim.x, claim.y, claim.z);
-      return norm3(sub3(p, target)) <= REL_TOL * Math.max(norm3(target), 1);
+      // #1546 (ADR-3D-282): a coordinate claim is judged on a PLACED figure only. Where the pivot found no
+      // placement at this configuration, the positions are the unsolved seed fallback — not a figure, so
+      // not evidence against the statement. The store's pin-owner guard speaks for the displayed seed
+      // («no placement matches the given coordinates»); another verification seed simply is not one.
+      if (resolved.pivot !== null && resolved.pivot.solutions === 0) return true;
+      // #1546 (ADR-3D-282): a null component is unstated (or owned by a pivot symbol) and is not checked.
+      // A fully stated claim keeps its one-vector tolerance byte-for-byte; a partial one compares each
+      // present component, scaled by its own magnitude.
+      if (claim.x !== null && claim.y !== null && claim.z !== null) {
+        const target = v3(claim.x, claim.y, claim.z);
+        return norm3(sub3(p, target)) <= REL_TOL * Math.max(norm3(target), 1);
+      }
+      const within = (v: number, t: number | null) => t === null || Math.abs(v - t) <= REL_TOL * Math.max(Math.abs(t), 1);
+      return within(p.x, claim.x) && within(p.y, claim.y) && within(p.z, claim.z);
     }
     case 'coord-plane-rel': {
       // #324 (ADR-3D-079): the ring's relation to a coordinate plane/axis on the FINAL figure.

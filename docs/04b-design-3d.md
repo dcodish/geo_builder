@@ -214,6 +214,17 @@ no parameter, checked by nothing and drawn as knowledge), while «ניצב» / �
 when a normal carried the parameter. A number the renderer prints from such a relation is drawn only when
 the relation holds on the drawn figure, through the verifier's own tolerance (`DIRECTION_REL_TOL`).
 
+**A pin is a driver; the claim beside it is the arbiter** ([ADR-3D-282](06b-decisions-3d.md#adr-3d-282), #1546).
+A pin acts only where the pivot owns something that moves its object — a solid's gauge and dims, a pin
+symbol, a free rider. A coordinate point, a coord-sym point and a derived point are not pivot unknowns, so a
+pin on one is never solved against. Every pin family that can land on such an object therefore records the
+claim it drives toward (`coords-eq` for the existing-id `point3` pin, whose components are nullable: unstated
+or symbolic ones are unchecked). A coordinate claim is judged on a PLACED figure only: at a configuration
+where the pivot found no placement it holds vacuously, and at the displayed seed the pin-owner guard gives
+the verdict (`injection-unsatisfiable`, newest owner only). Families that still pin with no arbiter
+(`inject-vector`, `inject-pair`, `dot-given`) are listed in ADR-3D-282's sweep, as is the missing drive for
+riders and partial points on a solid-free figure (the pivot's entry gate asks for a solid or a `free3` point).
+
 **A declared action must hold for every spelling of its row, and the SHAPE of a pin kind is not a
 semantic rule.** `'angle|segment|segment'` declared `drive-dims` while `apply.ts` delivered it only when
 `claim.a1 === claim.a2` — not a geometric condition, but the shape of the one pin kind that existed
