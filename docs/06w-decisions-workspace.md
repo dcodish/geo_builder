@@ -4934,3 +4934,15 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 - **The first-visit About** is `AppFrameAbout.autoOpenKey`: opt-in, one localStorage key per product, written on close, and on in all four. 2-D's private first-load modal (the same About content in a second `Modal`) is retired into it, keeping its `geo_intro_seen` key so a returning 2-D student is not shown it again. The privacy note is therefore seen at least once in every builder (#1426). The flag goes through the ONE storage door (`shell/session/persist`: `flagSeen` / `markSeen`, the same wrapped accessor as the session), because #1238's rule allows no other storage access inside `shell/`; the complex lane caught the first cut reading localStorage in AppFrame.
 
 **Consequences.** The four locales; `shell/frame/AppFrame.tsx` (`autoOpenKey`); the four Apps (the key); `src/App.tsx` (the private modal removed). Lock: `shell/__tests__/suite-vocabulary.test.ts`.
+
+## ADR-W-099 — An example chip takes its own sentence's direction (#1527)
+
+**Status:** accepted · 2026-09-29 · operator report, live after `prod/2026-09-29` («on the main pages of the tools, the examples are not showin trl (bidi) - need to fix this now») · fixed the same day.
+
+**Requirements:** none (internal — the standing RTL rule: Hebrew reads right-to-left, with the math runs isolated) · **Design:** none (internal)
+
+**Context.** The shared `QuickChips` (the empty-canvas examples, every builder) gave each chip a fixed `direction: ltr`. Each product isolates the math runs inside the chip with its bidi kit, but the chip's own base direction was forced LTR, so every Hebrew example read in the wrong order («נתון הישר l1: y=x» as «l1: y=x נתון הישר») in all four builders.
+
+**Decision.** A chip's `dir` is decided from its RAW command: `rtl` when it holds any Hebrew letter, else `ltr` (an English-locale or pure-math example such as complex's «w1 = 3+4i»). `dir="auto"` was tried and measured wrong in the browser: a Hebrew sentence that OPENS with an isolated label («M אמצע BB'», 3-D) resolved LTR, because the isolated letter was read as the first strong character.
+
+**Measured.** Real-browser capture of each builder's empty canvas at the fix: every Hebrew chip `rtl` (2-D, 3-D including «M אמצע BB'» and «K על AA' כך ש-…», analytic), complex's four math chips `ltr`; the captures read right-to-left. Lock: `shell/__tests__/quick-chips.test.tsx` (a Hebrew chip, a Hebrew chip opening with a label, a math chip and an English chip → `rtl, rtl, ltr, ltr`; no fixed direction), red on the previous code.
