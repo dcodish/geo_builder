@@ -1577,6 +1577,35 @@ precisely why the correction #1084 made for the button never reached the gate.
 The tolerance is untouched: the defect was never that the spread was measured too finely, it was that
 there was no spread to measure.
 
+### One configuration pool, completed after the render ([ADR-AG-180](06c-decisions-analytic.md#adr-ag-180), #1473)
+
+**Distinct configurations are still not the knowledge sample.** "The first three configurations that differ"
+answers *does it vary?*: with any continuous DOF every seed is distinct, all three samples go to the
+continuous family, and a discrete root (which side of AB an area puts C) is never varied. So every gate —
+`isKnowledge`, `knownCurve`, `knownOptions` — reads **`configurationPool(c)`**: the drawable figures at seeds
+0..23, one object per construction (WeakMap), filled lazily through `drawableAt`'s own per-seed cache.
+`distinctConfigSeeds` remains what «הציגו תצורה אחרת» walks.
+
+**Two modes, one verdict.** Off the page the first gate fills the pool. On the page `App.tsx` calls
+`configurationPool(d.construction).defer()`: a deferred gate pays only the floor the render always paid (the
+distinct walk), then reads what is already evaluated — differing ⇒ open now; invariant so far ⇒
+**pending** (`{ known: false, pending: true }`). `knownOptions` fills the pool only for a value already seen
+to take two values (the walk the render paid before #1473). Pending is reported to `settled(fn)`, the probe
+every multi-gate row composes under (`askSettled` wraps the whole ask lane once), and the row prints «בודק…».
+`app/poolScheduler.ts` completes the pool one seed per idle slice and re-renders; it runs from a **layout**
+effect keyed on the derivation, so a pool the render's own walk completed settles before paint, and its
+cleanup abandons the old figure's pool. Verdicts never depend on the machine — only when they appear does.
+The perf lock counts `evaluateStats.uncached` (memo misses), never milliseconds.
+
+**The resolution arm reads the figure's scale.** `spread ≤ SOLVE_RESOLUTION · max(|value|, smallest span of the
+figures read)` — `SOLVE_RESOLUTION` is a fraction of the figure's extent (the residuals are scale-normalised);
+the smallest span, so one flung free point cannot widen it.
+
+**The conic memo.** `curveFromEquation` is memoised per `Expr` (WeakMap) by the exact values of the symbols
+the equation reads (`-0` ≠ `0`) and the expected kind, capped at 512 keys; results are frozen because they
+are shared. `__setConicMemo(false)` is the identity lock's seam. It removed ~45% of evaluation time on the
+heaviest line (a parameter-free equation refitted in every Jacobian column).
+
 ## The session trace ([ADR-AG-131](06c-decisions-analytic.md#adr-ag-131))
 
 `src-analytic/debug/sessionLogAnalytic.ts` fire-and-forgets one JSON line per event to the shared Vite dev

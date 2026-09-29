@@ -35,12 +35,13 @@ export function angleWithXAxis(dx: number, dy: number): number {
 }
 
 /** The angle as KNOWLEDGE: a number only when every valid configuration agrees on it. */
-export function lineAngleOf(c: Construction, read: DirectionReader): { known: true; deg: number } | { known: false } {
+export function lineAngleOf(c: Construction, read: DirectionReader): { known: true; deg: number } | { known: false; pending?: true } {
   const k = isKnowledge(c, (f) => {
     const v = read(f);
     return v === null ? null : angleWithXAxis(v.dx, v.dy);
   });
-  return k.known ? { known: true, deg: k.value } : { known: false };
+  // #1473: a PENDING verdict stays pending — the surface shows «בודק…», never the open dash as if settled.
+  return k.known ? { known: true, deg: k.value } : k.pending ? { known: false, pending: true } : { known: false };
 }
 
 /** The one spelling of an angle on screen — two decimals (#723), with the degree sign. */

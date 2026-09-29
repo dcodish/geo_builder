@@ -9,7 +9,7 @@
  * shared chassis existed ([docs/28 §5](../docs/28-product-unification.md) Phase 4), and mounting
  * rather than re-deriving the chrome is the whole return on that work.
  */
-import { useCallback, useMemo, useState, useRef, useEffect, type ChangeEvent, type CSSProperties } from 'react';
+import { useCallback, useMemo, useState, useRef, useEffect, useLayoutEffect, type ChangeEvent, type CSSProperties } from 'react';
 import { useStore } from 'zustand';
 import { useTranslation } from 'react-i18next';
 import registry from '../products.json';
@@ -36,12 +36,13 @@ import { decideEdit, decideSubmit, decideToggle, reachesFallback } from './app/s
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { runFallback } from './app/fallback';
-import { panelKnowledge } from './app/panelRows';
+import { panelKnowledge, segmentKnowledge } from './app/panelRows';
+import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
-import { angleText, lineAngleOf } from './app/lineAngle';
+import { angleText } from './app/lineAngle';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
 import { domainText } from './engine/types';
-import { isKnowledge, knownCurve } from './engine/evaluate';
+import { configurationPool, knownCurve, settled } from './engine/evaluate';
 import { pointText as pointTextOf } from './app/pointText';
 import { drawnBox as composeDrawnBox } from './app/drawnBox';
 import { SYMBOLS } from './ui/symbols';
@@ -60,12 +61,12 @@ import { analyticBidi } from './i18n';
 import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
 import { AskLane } from '../shell/frame/AskLane';
-import { ask, figureIsOpen, type Answer } from './app/ask';
+import { askSettled, figureIsOpen, type Answer } from './app/ask';
 import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
 import { anotherConfiguration } from './app/another';
 import { offersOf, pointAt } from './engine/crossings';
-import { VERTICAL_TOL, verticality } from './engine/lines';
+import { VERTICAL_TOL } from './engine/lines';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
 import { forgetSessionAn, offeredSessionAn, restoreSessionAn, startSessionPersistAn } from './app/sessionPersistAn';
@@ -520,7 +521,26 @@ export function App() {
    */
   const active = useMemo(() => activeOf(lines, disabled), [lines, disabled]);
   const rows = useMemo(() => rowOf(lines.length, disabled), [lines.length, disabled]);
-  const d = useMemo(() => derive(active, seed), [active, seed]);
+  const d = useMemo(() => {
+    const out = derive(active, seed);
+    // #1473 (ADR-AG-180, operator ruling B′): the page's knowledge gates judge only what is already
+    // evaluated and answer «בודק…» for the rest; the pool completes AFTER the render (effect below).
+    configurationPool(out.construction).defer();
+    return out;
+  }, [active, seed]);
+
+  /**
+   * THE POOL COMPLETES AFTER THE RENDER (#1473). One seed per idle slice; a re-render when it completes,
+   * so every «בודק…» settles to its verdict. The cleanup ABANDONS the loop when the figure changes — the
+   * old construction's pool is never advanced again and its completion never lands on the new figure.
+   *
+   * A LAYOUT effect, not a plain one: on most lines the render's own option walk (`knownOptions` for an
+   * open point — the walk it has always paid) completes the pool mid-render, after earlier rows already
+   * read pending. Settling that before paint means the student never sees a one-frame «בודק…» flash on a
+   * line whose answer was in hand; only a line whose pool genuinely completes after the render shows it.
+   */
+  const [poolTick, setPoolTick] = useState(0);
+  useLayoutEffect(() => completePoolAfterRender(configurationPool(d.construction), () => setPoolTick((n) => n + 1)), [d]);
 
   /**
    * THE FIGURE SNAPSHOT (#1300) — the sibling effect, over this product's own source of truth.
@@ -569,8 +589,10 @@ export function App() {
 
   const answers = useMemo<Answer[]>(
     // #1212 removed `describeCurve` (imported now); #1137's `locusKind` stays — it is locale.
-    () => queries.map((q) => ({ ...ask(d, q.sentence, fmt, locusKind), shown: q.shown })),
-    [queries, d, fmt, locusKind],
+    // #1473: `askSettled` — an answer whose gates still wait for the pool is «בודק…», never a value.
+    () => queries.map((q) => ({ ...askSettled(d, q.sentence, fmt, locusKind), shown: q.shown })),
+    // poolTick: the pool completed, re-read the gates
+    [queries, d, fmt, locusKind, poolTick],
   );
 
   /**
@@ -887,7 +909,8 @@ export function App() {
       // `offersOf` so the click path is callable from a test (#1268).
       crossings: offersOf(d.figure, d.construction),
     });
-  }, [d, view, canvasSize, answers]);
+    // poolTick: the pool completed, re-read the gates (#1473)
+  }, [d, view, canvasSize, answers, poolTick]);
 
   const errorText = error ? errorTextOf(error, t as unknown as Translate) : null;
 
@@ -897,7 +920,12 @@ export function App() {
   const freeCount = reportedDof(d.construction, d.figure.carrierDof);
   // #1289 — the panel's knowledge gates, decided ONCE (app/panelRows.ts) and rendered below; the
   // corpus invariant "freedom in the panel ⇒ something in it is unknown" asks the same function.
-  const knows = useMemo(() => panelKnowledge(d), [d]);
+  // poolTick: the pool completed, re-read the gates (#1473)
+  const knows = useMemo(() => panelKnowledge(d), [d, poolTick]);
+  // #1473 — the slope and length rows' gates, one callable decision like `panelKnowledge`.
+  // poolTick, as above
+  const segs = useMemo(() => segmentKnowledge(d), [d, poolTick]);
+  const checking = t('checking');
 
   // NO `suiteActions`: AppFrame renders the language toggle AND the About button itself, using this
   // product's own `language` key. Passing a toggle here put two «English» buttons on the suite bar.
@@ -1458,9 +1486,12 @@ export function App() {
                 rows: knows.params.map(({ sym, domain, used, k }) => {
                   // A symbol nothing reads is never asked of the gate (#1343): it is not part of any
                   // configuration, and one sample of it is not knowledge — it printed «m = -3.46» once.
+                  // #1473: a value not yet read over the whole pool is «בודק…», never its domain as if open.
                   const text = k.known
                     ? `${sym} = ${fmtAnalytic(k.value)}`
-                    : `${domainText(sym, domain)}${used ? '' : ` ${t('paramUnused')}`}`;
+                    : k.pending
+                      ? `${sym} = ${checking}`
+                      : `${domainText(sym, domain)}${used ? '' : ` ${t('paramUnused')}`}`;
                   return <span key={sym}><ValueRow text={text} /></span>;
                 }),
               },
@@ -1472,9 +1503,11 @@ export function App() {
                   // The honesty gate (ADR-AG-003 §2): a coordinate is printed only when it is
                   // KNOWLEDGE — the same value at every seed — never one sample's number.
                   const p = { id };
+                  // #1473: pending anywhere in the row's decision → «בודק…», never a provisional number.
+                  const row = settled(() => pointTextOf(d, p.id, kx, ky, fmt));
                   return (
                     <span key={p.id}>
-                      <ValueRow text={`${p.id} = ${pointTextOf(d, p.id, kx, ky, fmt)}`} />
+                      <ValueRow text={`${p.id} = ${row.pending ? checking : row.value}`} />
                     </span>
                   );
                 }),
@@ -1517,7 +1550,7 @@ export function App() {
                  * would have to be set correctly at every mint site, and the name already answers
                  * truthfully at all of them.
                  */
-                rows: knows.curves.map(({ id, known }) => {
+                rows: knows.curves.map(({ id, known, pending }) => {
                   const c = d.figure.curves.find((cu) => cu.id === id)!;
                   // The SAME honesty gate the point rows use: an equation prints only when every
                   // coefficient is invariant across the free DOFs. A parabola whose `a` is still
@@ -1563,7 +1596,7 @@ export function App() {
                   const parts = known ? curveParts(known, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }) : null;
                   return (
                     <span key={c.id}>
-                      <ValueRow text={namedRow(name, parts ? parts.equation : openCurveText(d, c.id))} />
+                      <ValueRow text={namedRow(name, parts ? parts.equation : pending ? checking : openCurveText(d, c.id))} />
                       {parts?.details && (
                         <details style={askTraceBox} open>
                           <summary style={askTraceToggle} title={t('curveDetailsToggle')}>
@@ -1605,33 +1638,20 @@ export function App() {
                  * knowledge too — «אנכי» is an answer, not an absence, and it is what «BC מקביל לציר
                  * ה-y» tells the student.
                  */
-                rows: uniqueSegments(d.figure.segments).map((seg) => {
+                // #1473 — the gates are `segmentKnowledge` (app/panelRows.ts), the page's one decision; the
+                // row renders from it. Vertical is judged on the DIRECTION (#1078/#1276); the angle is the
+                // ask lane's own `lineAngleOf` (#1322). Any verdict still PENDING makes the row «בודק…».
+                rows: segs.map((seg) => {
                   const [a, b] = seg.ends;
-                  const read = (f: typeof d.figure) => {
-                    const p1 = f.points.find((q) => q.id === a);
-                    const p2 = f.points.find((q) => q.id === b);
-                    return p1 && p2 ? { dx: p2.x - p1.x, dy: p2.y - p1.y } : null;
-                  };
-                  // Vertical is judged on the DIRECTION, not on the quotient: dy/dx is Infinity there
-                  // and `isKnowledge` would call an infinity "not finite" and print nothing.
-                  // #1276: this row was RIGHT and alone — the ratio and its tolerance moved to
-                  // `engine/lines` so the trace and the equation printers ask the same question.
-                  const vertical = isKnowledge(d.construction, (f) => {
-                    const v = read(f);
-                    return v === null ? null : verticality(v.dx, v.dy);
-                  });
-                  // #1322 — beside the slope, the angle it makes with the positive x-axis (m = tan α). The
-                  // SAME decision the ask lane answers from (`lineAngleOf`), gated the same way.
-                  const angle = lineAngleOf(d.construction, read);
+                  const { vertical, angle, slope } = seg;
+                  const isVertical = vertical.known && vertical.value < VERTICAL_TOL;
+                  const pending = (!vertical.known && vertical.pending) || (!angle.known && angle.pending) || (!isVertical && !slope.known && slope.pending);
+                  if (pending) return <span key={seg.id}><ValueRow text={`${a}${b}: ${checking}`} /></span>;
                   const angleSuffix = ` · ${t('angleWithX')}: ${angle.known ? angleText(angle.deg) : '—'}`;
-                  if (vertical.known && vertical.value < VERTICAL_TOL) {
+                  if (isVertical) {
                     return <span key={seg.id}><ValueRow text={`${a}${b}: ${t('slopeVertical')}${angleSuffix}`} /></span>;
                   }
-                  const k = isKnowledge(d.construction, (f) => {
-                    const v = read(f);
-                    return v === null || Math.abs(v.dx) < 1e-12 ? null : v.dy / v.dx;
-                  });
-                  return <span key={seg.id}><ValueRow text={`${a}${b}: ${k.known ? fmt(k.value) : '—'}${angleSuffix}`} /></span>;
+                  return <span key={seg.id}><ValueRow text={`${a}${b}: ${slope.known ? fmt(slope.value) : '—'}${angleSuffix}`} /></span>;
                 }),
               },
               {
@@ -1649,15 +1669,11 @@ export function App() {
                  * Gated exactly as the coordinate and equation rows are. A length that still moves
                  * with a free DOF prints `—`, never one seed’s sample.
                  */
-                rows: uniqueSegments(d.figure.segments).map((s) => {
+                rows: segs.map((s) => {
                   const [a, b] = s.ends;
-                  const k = isKnowledge(d.construction, (f) => {
-                    const p1 = f.points.find((q) => q.id === a);
-                    const p2 = f.points.find((q) => q.id === b);
-                    return p1 && p2 ? Math.hypot(p2.x - p1.x, p2.y - p1.y) : null;
-                  });
+                  const k = s.length;
                   return (
-                    <span key={s.id}><ValueRow text={`${a}${b} = ${k.known ? fmt(k.value) : '—'}`} /></span>
+                    <span key={s.id}><ValueRow text={`${a}${b} = ${k.known ? fmt(k.value) : k.pending ? checking : '—'}`} /></span>
                   );
                 }),
               },
@@ -1718,6 +1734,9 @@ export function App() {
                       `${a.question} — ${t(hostKey('askHost', a.host))}`
                     ) : a.unreadable ? (
                       `${a.question} — ${t('askUnreadable')}`
+                    ) : a.pending ? (
+                      /* #1473 — a gate this answer reads still waits for the configuration pool: «בודק…», never a provisional value */
+                      `${a.question} = ${checking}`
                     ) : (
                       /**
                        * A VERTICAL SLOPE IS AN ANSWER, NOT A FAILURE (#1223).
@@ -1917,22 +1936,6 @@ export function App() {
   );
 }
 
-/**
- * One row per PAIR of endpoints (#1065).
- *
- * A polygon emits one drawn piece per side, and a student who also states «הקטע AB» would
- * otherwise see `AB` twice. The length is a property of the two points, not of how many things
- * happen to be drawn between them.
- */
-function uniqueSegments(segments: readonly { id: string; ends: [string, string] }[]) {
-  const seen = new Set<string>();
-  return segments.filter((s) => {
-    const key = [...s.ends].sort().join('\u0000');
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
 
 
 /**

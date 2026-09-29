@@ -9,6 +9,7 @@
   "updatedAt": "2026-09-29",
   "slow": [
     "src-analytic/__tests__/issue-1464-1324-1462-kite-exercise.test.ts",
+    "src-analytic/__tests__/issue-1473-pool-invariant.test.ts",
     "src/__tests__/determined-prints-1.test.ts",
     "src/__tests__/determined-prints-2.test.ts",
     "src/__tests__/determined-prints-3.test.ts",

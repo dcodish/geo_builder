@@ -14,7 +14,7 @@
  * translated parabola or ellipse, and a hyperbola are all REFUSED by name. Twenty exams contain
  * none of them; a student who types one deserves to be told, not to be mis-drawn.
  */
-import { evalExpr, type Env, type Expr } from './expr';
+import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import type { NumCurve } from './types';
 
 export interface Conic {
@@ -146,8 +146,63 @@ function classifyFamily(k: Conic): ClassifyResult {
   return { ok: true, curve: { kind: 'ellipse', a: Math.sqrt(a2), b: Math.sqrt(b2) } };
 }
 
+/**
+ * THE CONIC MEMO (#1473, ADR-AG-180) — `curveFromEquation` is pure over (the equation, the values of the
+ * symbols it reads, the expected kind), and it was recomputed on every residual call: a CPU profile of
+ * the 572 exam's heaviest line put ~45% of all evaluation time in `resolveCurve → curveFromEquation →
+ * fitConic`, refitting an equation with no parameter at all, inside every column of the
+ * finite-difference Jacobian. Memoised per `Expr` (weakly, so it lives as long as the construction that
+ * holds the equation), keyed by the EXACT values read — `-0` kept apart from `0`, a missing symbol apart
+ * from any number — so the output is bit-identical by construction. A perf change, not a solver change:
+ * the #1473 lock asserts the figures are identical with the memo off (`__setConicMemo(false)`).
+ *
+ * The result is FROZEN, because it is now shared: a caller that mutated a returned curve would change
+ * every later answer for that equation. None does (checked when this landed); freezing makes a future
+ * one throw instead of corrupting silently.
+ */
+let conicMemoOn = true;
+/** Test seam: the memo off, to prove it changes no figure. */
+export function __setConicMemo(on: boolean): void {
+  conicMemoOn = on;
+}
+/** Test-visible: how many conics were actually FITTED (a memo miss, or the memo off). */
+export const conicStats = { fits: 0 };
+
+const CONIC_MEMO_CAP = 512;
+const symbolsMemo = new WeakMap<Expr, readonly string[]>();
+const conicMemo = new WeakMap<Expr, Map<string, ClassifyResult>>();
+
+const numKey = (v: number) => (Object.is(v, -0) ? '-0' : String(v));
+
 /** The two steps together, for the common case. */
 export function curveFromEquation(eq: Expr, env: Env, expect?: NumCurve['kind']): ClassifyResult {
+  if (!conicMemoOn || typeof eq !== 'object' || eq === null) return fitAndClassify(eq, env, expect);
+  let syms = symbolsMemo.get(eq);
+  if (!syms) {
+    // x and y are the probe coordinates `fitConic` supplies itself; nothing else reaches the result.
+    syms = symbolsOf(eq).filter((s) => s !== 'x' && s !== 'y');
+    symbolsMemo.set(eq, syms);
+  }
+  let key = expect ?? '';
+  for (const s of syms) key += `|${Object.prototype.hasOwnProperty.call(env, s) ? numKey(env[s]) : 'u'}`;
+  let perEq = conicMemo.get(eq);
+  if (!perEq) {
+    perEq = new Map();
+    conicMemo.set(eq, perEq);
+  }
+  const hit = perEq.get(key);
+  if (hit) return hit;
+  const out = fitAndClassify(eq, env, expect);
+  if (out.ok) Object.freeze(out.curve);
+  Object.freeze(out);
+  // A parameterised equation under a solve sees a new value per iterate; bound it rather than grow.
+  if (perEq.size >= CONIC_MEMO_CAP) perEq.clear();
+  perEq.set(key, out);
+  return out;
+}
+
+function fitAndClassify(eq: Expr, env: Env, expect?: NumCurve['kind']): ClassifyResult {
+  conicStats.fits += 1;
   const k = fitConic(eq, env);
   if (!k) return { ok: false, reason: 'vacant' };
   return classify(k, expect);
