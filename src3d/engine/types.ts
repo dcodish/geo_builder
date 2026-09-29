@@ -84,7 +84,10 @@ export type Claim3 =
   | { type: 'collinear3'; ids: Id[] } // E, C, A' on one line
   | { type: 'length-eq'; a: Id; b: Id; value: number } // AB = 3 (all points pinned ⇒ a CHECK)
   | { type: 'area-eq'; ids: [Id, Id, Id]; value: number } // שטח ABC = 4.5
-  | { type: 'coords-eq'; id: Id; x: number; y: number; z: number } // A = (2, 0, -10)
+  // #1546 (ADR-3D-282): a component is `null` when the statement left it UNSTATED or SYMBOLIC («B(3, n, p)»
+  // checks x only) — the verifier compares the components that are present. The `A = (…)` claim spelling
+  // always carries all three.
+  | { type: 'coords-eq'; id: Id; x: number | null; y: number | null; z: number | null } // A = (2, 0, -10)
   | { type: 'never-parallel'; line: string; plane: string } // ℓ ∦ π for EVERY parameter value (2024-Q2 א)
   | { type: 'plane-eq'; ids: Id[]; cx: number; cy: number; cz: number; d: number } // המישור KBC: x+2y+3z-26=0
   | { type: 'angle-seg-eq'; a1: Id; b1: Id; a2: Id; b2: Id; deg: number } // הזווית בין A'C לבין BC' היא 90 (between lines, ≤90°)

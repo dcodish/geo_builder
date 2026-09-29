@@ -70,6 +70,12 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   Genuinely false statements (four typed points that span no such plane; two frame statements that
   contradict each other) are still refused. *(Realised — [ADR-3D-281](06b-decisions-3d.md#adr-3d-281),
   #1550; `issue-1550.test.ts`, `fixtures3/coord-frame-axis-drive-1550.geo3.json`.)*
+  **A coordinate restated on an existing point is honoured or refused, never ignored.** «B(3,7,8)» after
+  «B(0,7,8)» — or «M(3, n, p)» on a midpoint that sits at x = 1 — is refused and names the statement, exactly
+  as «B = (3,7,8)» is; on a solid it moves the figure instead. A true restatement stays green, and a
+  component left symbolic or unstated is not checked. *(Gap: a satisfiable restatement on a rider or a
+  partial point with no solid is refused rather than driven — named in ADR-3D-282.)* *(Realised —
+  [ADR-3D-282](06b-decisions-3d.md#adr-3d-282), #1546; `issue-1546-silent-point-pin.test.ts`.)*
 - **FR-SP-6 (Must)** — **A stated new label must land on the figure.** A decomposition that loses a point
   the student named is **refused, naming the label** — never committed with the point missing. A label
   that already exists is context, not a drop. *(Realised — `droppedNewLabels3`, `honesty3.test.ts`.)*
