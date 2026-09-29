@@ -41,11 +41,19 @@ describe('a claim is verified, and never moves the figure', () => {
     expect(verdicts('z1 = 2i', 'z2 = -2i', 'z1 ו-z2 צמודים')).toEqual(['holds']);
   });
 
+  it('#1481 — typed Gaussian literals share ONE exact basis: 3+4i and 3−4i are decided conjugates', () => {
+    // 3+4i = (2+i)² and 3−4i = (2−i)², so their arguments are ±2·∠(2+i) and cancel exactly. This was
+    // «unknown» while every literal carried its own opaque atom.
+    expect(verdicts('z1 = 3+4i', 'z2 = 3-4i', 'z1 ו-z2 צמודים')).toEqual(['holds']);
+    // certified atoms that do not cancel refute it as a theorem — |3+4i| = |4+3i| but they are not conjugates
+    expect(verdicts('z1 = 3+4i', 'z2 = 4+3i', 'z1 ו-z2 צמודים')).toEqual(['refuted']);
+  });
+
   it('an OPAQUE angle makes conjugacy unknown — never refuted, which is the costly direction', () => {
-    // 3+4i and 3-4i ARE conjugates, but each carries its own opaque base angle and nothing in the
-    // exact core can prove one is the negative of the other. Saying "refuted" would tell a student
-    // their correct answer is wrong; saying "unknown" is the truth about what we can decide.
-    expect(verdicts('z1 = 3+4i', 'z2 = 3-4i', 'z1 ו-z2 צמודים')).toEqual(['unknown']);
+    // 1+√2i and 1−√2i ARE conjugates, but each radical literal carries its own opaque atom and nothing
+    // in the exact core relates them. Saying "refuted" would tell a student their correct answer is
+    // wrong; saying "unknown" is the truth about what we can decide.
+    expect(verdicts('z1 = 1+√2i', 'z2 = 1-√2i', 'z1 ו-z2 צמודים')).toEqual(['unknown']);
   });
 
   /**

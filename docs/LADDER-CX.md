@@ -40,7 +40,7 @@ conjugation — **no addition**) become two ℚ-linear systems over the log-pola
 | 1c | argument system: elimination over ℚ in **turns**, carrying the integer unknowns `k` — except a `principal` row, which drops its `k` because a solution set's labelling is a convention, not a configuration ([ADR-CX-021](06d-decisions-complex.md#adr-cx-021)) | `cx1:arg` |
 | 1d | **branch enumeration** — solve the `k` family modulo one turn; the result IS the configuration set. A **sign-free real parameter** contributes its sign as an argument unknown pinned by `2·s − k = 0` (0 or ½ turn), enumerated with the rest; its magnitude stays in the modulus constant ([ADR-CX-045](06d-decisions-complex.md#adr-cx-045)) | `cx1:branch` |
 | 1e | publish the **nullspace dimension as the free-DOF count** — one definition, read by the DOF cue, the knowledge gates and the sampler alike | `cx1:dof` |
-| — | an inconsistent linear system is an honest contradiction naming the conflicting statements | `cx1:refuse` |
+| — | an inconsistent linear system is an honest contradiction naming the conflicting statements. The argument half's `0 = c` leftover and its turn-integrality checks are **three-valued** (`zeroness`, [ADR-CX-057](06d-decisions-complex.md#adr-cx-057)): a constant over certified Gaussian-prime atoms is decided exactly; an opaque atom is decided at its fixed degrees or reported **undecided** (the row's own statement joins the fold's `undecided`), never a contradiction | `cx1:refuse` |
 
 ## Stage 2 — the inequality filter
 
@@ -87,7 +87,9 @@ solution. The cue reports the difference.
 
 Claims never drive. Decided exactly where stage 1 covers the value — real iff `2θ ≡ 0` turns, pure
 imaginary iff `2θ ≡ 1/2`, conjugates iff moduli equal and arguments sum to zero, for-all-n and
-minimal-n by congruence on turns — and by the sampled knowledge discipline otherwise.
+minimal-n by congruence on turns — and by the sampled knowledge discipline otherwise. Each exact
+decision reads the ONE three-valued `zeroness` stage 1 reads ([ADR-CX-057](06d-decisions-complex.md#adr-cx-057)):
+an undecidable direction is `unknown`, never refuted.
 
 | # | Step | Trace token |
 |---|---|---|

@@ -46,6 +46,7 @@ import {
   zero as angZero,
 } from './angle';
 import { composeCartesian, numericPart, readableCartesianParts } from './cartesian';
+import { type AtomBinding, gaussianDirection } from './gaussian';
 import { type Rat, ZERO, cmp, isZero as ratIsZero, mul as ratMul, rat, add as ratAdd, fromNumber, toNumber } from './rational';
 
 /** A plain numeric complex number — the shadow every value can be evaluated to. */
@@ -216,11 +217,14 @@ const NICE_TURN_DEN = 24;
 export interface CartesianLiteral {
   readonly value: Value;
   /**
-   * Present when the argument could not be recognised as a rational number of turns: the argument is
-   * an opaque ATOM and this is the numeric degrees it stands for. The caller binds it into the sample.
-   * The MODULUS is still exact — `|3+4i| = 5` exactly — which is the half that usually matters.
+   * The angle ATOMS the argument carries, each with the numeric degrees it stands for; the caller
+   * binds every one into the sample. Empty when the argument is a rational number of turns. Since
+   * #1481 (ADR-CX-057) a Gaussian-rational literal's atoms are the CERTIFIED atoms of its Gaussian
+   * prime factors (`value/gaussian.ts`), so `3+4i` is `2·∠(2+i)` and `3−4i` is `−2·∠(2+i)` — one
+   * basis for every literal, in which relations between literals are exact. The MODULUS was always
+   * exact — `|3+4i| = 5` — with no recognition step.
    */
-  readonly atomBinding?: { readonly atom: string; readonly degrees: number };
+  readonly atomBindings: readonly AtomBinding[];
 }
 
 /**
@@ -230,35 +234,34 @@ export interface CartesianLiteral {
  * exact, so `1+i` is `√2` and `3+4i` is `5` with no recognition step at all. Only the argument may
  * need an atom, and only when it is not a multiple of 15°.
  */
-export function fromCartesian(re: Rat, im: Rat, label = ''): CartesianLiteral {
-  if (ratIsZero(re) && ratIsZero(im)) return { value: ZERO_VALUE };
+export function fromCartesian(re: Rat, im: Rat): CartesianLiteral {
+  if (ratIsZero(re) && ratIsZero(im)) return { value: ZERO_VALUE, atomBindings: [] };
 
   const sq = ratAdd(ratMul(re, re), ratMul(im, im));
   const mod = modPow(fromRational(sq), rat(1, 2));
 
   // The axis cases are exact with no recognition: 0, 90, 180, 270 degrees.
-  if (ratIsZero(im)) return { value: exact(mod, fromTurns(cmp(re, ZERO) > 0 ? rat(0) : rat(1, 2))) };
-  if (ratIsZero(re)) return { value: exact(mod, fromTurns(cmp(im, ZERO) > 0 ? rat(1, 4) : rat(3, 4))) };
+  if (ratIsZero(im)) return { value: exact(mod, fromTurns(cmp(re, ZERO) > 0 ? rat(0) : rat(1, 2))), atomBindings: [] };
+  if (ratIsZero(re)) return { value: exact(mod, fromTurns(cmp(im, ZERO) > 0 ? rat(1, 4) : rat(3, 4))), atomBindings: [] };
 
   const deg = cArgDeg({ re: toNumber(re), im: toNumber(im) });
   const turns = fromNumber(deg / 360, NICE_TURN_DEN, 1e-12);
-  if (turns) return { value: exact(mod, fromTurns(turns)) };
+  if (turns) return { value: exact(mod, fromTurns(turns)), atomBindings: [] };
 
-  const atom = label ? `∠${label}` : `∠(${fmtRatPair(re, im)})`;
-  // #1436 — the exact rational pair exists exactly HERE; register it so the ask lane can carry
-  // `mod·cis(atom)` as the Gaussian rational it is (`|z1-z2|` → √5 for 2+3i, not «≈ 2.24»).
+  // #1481 (ADR-CX-057) — the direction in the certified basis of Gaussian primes: exact, and in ONE
+  // basis with every other literal, so a true relation between literals is decided true.
+  const g = gaussianDirection(re, im);
+  if (g) return { value: exact(mod, g.arg), atomBindings: g.bindings };
+
+  // Past the factorisation budget: an OPAQUE atom carrying the exact pair (#1436's registry), which
+  // the three-valued `zeroness` decides numerically or leaves unknown — never assumed independent.
+  const atom = `∠(${re.n}/${re.d}+${im.n}/${im.d}i)`;
   registerGaussianAtom(atom, re, im);
   return {
     value: exact(mod, { turns: ZERO, atoms: new Map([[atom, rat(1)]]) }),
-    atomBinding: { atom, degrees: deg },
+    atomBindings: [{ atom, degrees: deg }],
   };
 }
-
-const fmtRatPair = (re: Rat, im: Rat): string => {
-  const r = toNumber(re);
-  const i = toNumber(im);
-  return `${r}${i < 0 ? '-' : '+'}${Math.abs(i)}i`;
-};
 
 // ---------------------------------------------------------------------------
 // Display

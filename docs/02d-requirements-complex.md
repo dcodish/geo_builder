@@ -121,6 +121,14 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   figure SOLVED as a real parameter carries a note under its first line saying so and teaching the
   declaration, and only when that declaration would be accepted. *(Operator proposal, #1405; realised —
   [ADR-CX-047](06d-decisions-complex.md#adr-cx-047).)*
+- **FR-CN-9 (Must)** — **A true given is never refused as a contradiction, and «could not decide» is
+  never «wrong».** Typed numbers relate to each other exactly: «z1 = 2+3i · z2 = -2+3i · z1·z2 = -13» is
+  accepted, and so is every true product, quotient, power, conjugate, rotation and rational rescale of
+  typed numbers; a false one is still refused, naming an earlier line. A claim over exactly-typed
+  numbers is decided exactly — «w ממשי» for w = (2+3i)(2−3i) holds, 3+4i and 3−4i are conjugates. When
+  the engine genuinely cannot decide (a direction with no exact relation to the others, such as
+  1+√2i), a given is accepted and listed as undecided, and a claim reads «unknown» — never a refusal,
+  never ✗. *(#1481, operator ruling P1; realised — [ADR-CX-057](06d-decisions-complex.md#adr-cx-057).)*
 
 ## Knowledge and claims
 

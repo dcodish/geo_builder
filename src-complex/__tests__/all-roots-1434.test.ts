@@ -260,7 +260,9 @@ describe('#1434 — the roots and their exact lift (solve/polySet.ts)', () => {
   it('a conjugate pair shares ONE angle atom, negated', () => {
     const r = solve('z^2 - 4z + 13 = 0');
     expect(r.values.every(isExact)).toBe(true);
-    expect([...r.atoms.keys()]).toEqual(['∠z1']);
+    // #1481: 2±3i are Gaussian rationals, so the shared atom is the certified one of 3+2i — the SAME
+    // atom a typed «z1 = 2+3i» carries
+    expect([...r.atoms.keys()]).toEqual(['∠(3+2i)']);
   });
 
   it('roots of unity lift to rational turns with no atom at all', () => {

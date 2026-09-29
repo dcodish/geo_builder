@@ -276,17 +276,19 @@ describe('value — the exactness rule is structural', () => {
 
 describe('cartesian literals keep the modulus exact even when the angle is not', () => {
   it('1+i is exactly √2·cis45° — no recognition needed for the modulus', () => {
-    const { value, atomBinding } = V.fromCartesian(rat(1), rat(1));
-    expect(atomBinding).toBeUndefined();
+    const { value, atomBindings } = V.fromCartesian(rat(1), rat(1));
+    expect(atomBindings).toEqual([]);
     expect(V.formatPolar(value)).toBe('√2·cis45°');
   });
 
-  it('3+4i has modulus exactly 5 and an ATOM for its argument, honestly reported', () => {
-    const { value, atomBinding } = V.fromCartesian(rat(3), rat(4), 'z1');
+  it('3+4i has modulus exactly 5 and its argument in the certified Gaussian-prime basis (#1481)', () => {
+    const { value, atomBindings } = V.fromCartesian(rat(3), rat(4));
     expect(V.isExact(value) && M.format(value.mod)).toBe('5');
-    expect(atomBinding?.atom).toBe('∠z1');
-    expect(atomBinding?.degrees).toBeCloseTo(53.13010235415598, 9);
-    // |z1³| = 125 exactly, even though arg z1 is opaque
+    // 3+4i = (2+i)², so arg = 2·∠(2+i), and ∠(2+i) is bound to its degrees
+    expect(atomBindings.map((b) => b.atom)).toEqual(['∠(2+i)']);
+    expect(atomBindings[0].degrees).toBeCloseTo(53.13010235415598 / 2, 9);
+    expect(V.isExact(value) && value.arg.atoms.get('∠(2+i)')).toEqual(rat(2));
+    // |z1³| = 125 exactly, whatever the argument carries
     expect(M.format((V.pow(value, rat(3)) as { mod: M.ExpVec }).mod)).toBe('125');
   });
 
@@ -298,8 +300,8 @@ describe('cartesian literals keep the modulus exact even when the angle is not',
 
   it('a 15°-grid angle is recognised; a non-nice one is not invented', () => {
     const nice = V.fromCartesian(rat(1), rat(-1));
-    expect(nice.atomBinding).toBeUndefined();
+    expect(nice.atomBindings).toEqual([]);
     expect(V.formatPolar(nice.value)).toBe('√2·cis315°');
-    expect(V.fromCartesian(rat(2), rat(1)).atomBinding).toBeDefined();
+    expect(V.fromCartesian(rat(2), rat(1)).atomBindings.length).toBe(1);
   });
 });

@@ -25,7 +25,8 @@
 
 import { type Expr, refsOf } from '../model/expr';
 import type { PolyEquation } from '../model/solutionSet';
-import { type Angle, fromTurns } from '../value/angle';
+import { type Angle, fromTurns, isCertifiedAtom } from '../value/angle';
+import { gaussianDirection } from '../value/gaussian';
 import { fromRational, pow as modPow } from '../value/modulus';
 import { fromNumber, rat } from '../value/rational';
 import { type Cx, type Value, ZERO_VALUE, cArgDeg, evaluate, exact, numeric } from '../value/value';
@@ -99,7 +100,7 @@ function lift(r: Cx, atomName: string, bound: Map<string, number>, scale: number
   const mod = exactModulus(m);
   if (!mod) return numeric(r.re, r.im);
   const deg = directionOf(r);
-  const arg = exactDirection(deg, atomName, bound);
+  const arg = gaussianRootDirection(r, bound) ?? exactDirection(deg, atomName, bound);
   const v = exact(mod, arg);
   // the lift must land back on the root it came from
   const back = evaluate(v, bound);
@@ -117,8 +118,27 @@ function exactModulus(m: number) {
 }
 
 /**
+ * #1481 (ADR-CX-057) — a root that is numerically a GAUSSIAN RATIONAL takes the certified direction
+ * a typed literal of the same number takes (`value/gaussian.ts`), so the stated `z1 = 2+3i` and the
+ * root 2+3i of `z² − 4z + 13` carry THE SAME angle, and every relation between them is exact. The
+ * recognition is `lift`'s own (denominator ≤ 1000, 1e-10), and the lifted value is still re-evaluated
+ * against the root by the caller.
+ */
+function gaussianRootDirection(r: Cx, bound: Map<string, number>): Angle | null {
+  const re = fromNumber(r.re, 1000, 1e-10);
+  const im = fromNumber(r.im, 1000, 1e-10);
+  if (!re || !im) return null;
+  const g = gaussianDirection(re, im);
+  if (!g) return null;
+  for (const b of g.bindings) bound.set(b.atom, b.degrees);
+  return g.arg;
+}
+
+/**
  * A direction as a rational number of turns when it is a nice one, else an atom — reusing, negated, the
- * atom of a root already lifted at the mirror direction, so a conjugate pair is exactly conjugate.
+ * OPAQUE atom of a root already lifted at the mirror direction, so a conjugate pair is exactly conjugate.
+ * Since #1481 this is the path for roots that are NOT Gaussian rationals only; a certified atom is
+ * never reused for one (it would claim a Gaussian-prime relation the root does not have).
  */
 function exactDirection(deg: number, atomName: string, bound: Map<string, number>): Angle {
   const turns = fromNumber(deg / 360, NICE_TURN_DEN, 1e-12);
@@ -126,6 +146,7 @@ function exactDirection(deg: number, atomName: string, bound: Map<string, number
   // ±atom + a nice turn: −2+3i is ½ turn − ∠(2+3i), so (2+3i)(−2+3i) = −13 is decided exactly, not
   // refused as two unrelated symbols that happen to sum to 180°
   for (const [atom, d] of bound) {
+    if (isCertifiedAtom(atom)) continue;
     for (const sign of [1, -1] as const) {
       const offset = fromNumber((((deg - sign * d) / 360) % 1 + 1) % 1, NICE_TURN_DEN, 1e-12);
       if (offset) return { turns: offset, atoms: new Map([[atom, rat(sign)]]) };

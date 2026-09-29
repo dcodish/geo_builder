@@ -503,7 +503,7 @@ function placeSolutionSets(
   // ADR-CX-045 — the same sign-by-use reading the fold takes, so a sign-free parameter is not read as
   // positive here and negative there
   const { signed } = paramSigns({ constraints, objects, measures });
-  const t1 = solveTier1(constraints, signed);
+  const t1 = solveTier1(constraints, signed, atoms);
   const mentioned = new Set<string>();
   for (const c of constraints) for (const n of [...refsOf(c.lhs), ...refsOf(c.rhs)]) mentioned.add(n);
   for (const f of filters) mentioned.add(f.name);

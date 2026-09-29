@@ -667,7 +667,7 @@ export function foldConstants(e: Expr, atoms: Map<string, number>): Expr {
         // a closed zero stays as written (its children still fold, below)
         if (rp.re.c.n !== 0n || rp.im.c.n !== 0n) {
           const lit = fromCartesian(rp.re.c, rp.im.c);
-          if (lit.atomBinding) atoms.set(lit.atomBinding.atom, lit.atomBinding.degrees);
+          for (const b of lit.atomBindings) atoms.set(b.atom, b.degrees);
           return val(lit.value);
         }
       } else {
@@ -684,7 +684,7 @@ export function foldConstants(e: Expr, atoms: Map<string, number>): Expr {
       const im = fromNumber(k.im, 10_000, 1e-9);
       if (re && im && !(re.n === 0n && im.n === 0n)) {
         const lit = fromCartesian(re, im);
-        if (lit.atomBinding) atoms.set(lit.atomBinding.atom, lit.atomBinding.degrees);
+        for (const b of lit.atomBindings) atoms.set(b.atom, b.degrees);
         return val(lit.value);
       }
     }
