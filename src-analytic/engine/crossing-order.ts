@@ -27,7 +27,7 @@
  * solve on the root the sentence names (`evaluate.ts`).
  */
 import type { Pt } from './derived';
-import type { Constraint } from './solve';
+import { SOLVE_RESOLUTION, type Constraint } from './solve';
 import type { Id, NumCurve } from './types';
 
 /** A straight line with a DIRECTION: the point `p0` on it nearest the origin, and the way it is walked. */
@@ -192,10 +192,59 @@ export function nthHolds(
   pair: readonly [Constraint, Constraint],
   at: (id: Id) => Pt | null,
   curveAt: (id: Id) => NumCurve | null,
+  both = false,
 ): boolean {
+  if (both && !meetsTwice(pair, at, curveAt)) return false;
   const o = orderedCrossings(pair, at, curveAt);
   if (!o || o.roots.length === 0 || o.touching) return true;
   if (nth >= o.roots.length) return false;
   const dist = o.roots.map((r) => Math.hypot(r.x - p.x, r.y - p.y));
   return dist.every((v, i) => i === nth || dist[nth] <= v);
+}
+
+/** A conic's own size — the scale its crossings are told apart at (a circle's radius, a conic's larger axis). */
+function conicSize(cu: NumCurve): number {
+  if (cu.kind === 'circle') return Math.abs(cu.r);
+  if (cu.kind === 'ellipse') return Math.max(Math.abs(cu.a), Math.abs(cu.b));
+  if (cu.kind === 'parabola') return Math.abs(cu.p);
+  return 0;
+}
+
+/**
+ * DOES THE PAIR MEET IN TWO POINTS? — what «…בנקודות A ו-B» states beyond its two ordinals (#1512,
+ * [ADR-AG-185](../../docs/06c-decisions-analytic.md#adr-ag-185)).
+ *
+ * `true` when it cannot be judged here (an anchor not placed yet, a curve vacant at this parameter value)
+ * — the incidences' own residuals report a pair that misses, and blaming it twice would be wrong.
+ * Otherwise the pair must be a straight and a conic (the only pair with a canonical order: two straights
+ * meet once, and two conics have none this module defines — ADR-AG-157's limit, so the ruling's "A the
+ * first root" names nothing there), and its two roots must be TWO POINTS: not a tangency, and apart by
+ * more than the solver's resolution relative to the conic's size and the anchors' spread. That floor is
+ * the `openBoundFloor` rule (ADR-AG-167 am. 1): a descent that approached a double root stops within
+ * √SOLVE_TOL of it, so an exact test would let a solve that merely drifted near tangency through as two
+ * crossings — measured, a free radius driven onto the line gave two letters 1e-3 apart on a radius-2
+ * circle. It states no magnitude (ADR-052): the scale is the figure's own.
+ */
+export function meetsTwice(
+  pair: readonly [Constraint, Constraint],
+  at: (id: Id) => Pt | null,
+  curveAt: (id: Id) => NumCurve | null,
+): boolean {
+  const s = sideOf(pair[0], at, curveAt);
+  const t = sideOf(pair[1], at, curveAt);
+  if (!s || !t) return true;
+  if (s.k === t.k) return false;
+  const straight = s.k === 'straight' ? s.w : (t as { k: 'straight'; w: Walk }).w;
+  const conic = s.k === 'conic' ? s.curve : (t as { k: 'conic'; curve: NumCurve }).curve;
+  const { roots, touching } = conicMeet(straight, conic);
+  if (touching || roots.length < 2) return false;
+  const anchors = pair
+    .flatMap((k) => (k.t === 'on-line-2pt' ? [at(k.a), at(k.b)] : []))
+    .filter((q): q is Pt => q !== null);
+  const spread = anchors.length > 1
+    ? Math.max(...anchors.map((q) => q.x)) - Math.min(...anchors.map((q) => q.x)) +
+      Math.max(...anchors.map((q) => q.y)) - Math.min(...anchors.map((q) => q.y))
+    : 0;
+  const scale = Math.max(conicSize(conic), spread, 1e-9);
+  return Math.hypot(roots[0].x - roots[1].x, roots[0].y - roots[1].y) > SOLVE_RESOLUTION * scale;
 }

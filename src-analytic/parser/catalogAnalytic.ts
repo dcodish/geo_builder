@@ -642,6 +642,15 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'E is the intersection of line l1 and line l2',
     needs: ['נתון הישר l1: y=4', 'נתון הישר l2: y=x'],
   },
+  // BOTH crossings in one sentence (#1512, ADR-AG-185): the first letter takes the first root of the
+  // canonical order, the second letter the second — the operator's ruling (a), never cycled.
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'הישר l1 חותך את המעגל I בנקודות A ו-B',
+    en: 'line l1 cuts circle I at points A and B',
+    needs: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'נתון הישר l1: y=4'],
+  },
   {
     category: 'points',
     family: 'F3',

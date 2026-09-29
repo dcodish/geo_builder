@@ -774,7 +774,7 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
      */
     if (s.kind === 'crossing-nth') {
       const atFn = (id: Id) => at.get(id) ?? null;
-      return nthHolds(p, s.nth, s.pair, atFn, curveAtOf(c, env, atFn));
+      return nthHolds(p, s.nth, s.pair, atFn, curveAtOf(c, env, atFn), s.both === true);
     }
     const cmp = compareOf(s);
     if (cmp) {

@@ -1343,6 +1343,15 @@ keeps its line's number, and naming the one beyond the side is refused on that s
 commits the word for the root under it, and a ring is never re-numbered once its sibling is taken.
 «הציגו תצורה אחרת» never swaps a crossing the sentence named; a sentence without an ordinal still leaves
 the choice open, and both roots stay listed and reachable for it (R72).
+**Amended by [ADR-AG-185](06c-decisions-analytic.md#adr-ag-185) (#1512): both crossings in ONE sentence.**
+«הישר l1 חותך את המעגל I בנקודות A ו-B» and «A ו-B נקודות החיתוך של הישר l1 עם המעגל I» (and the plural
+verb «…נחתכים בנקודות A ו-B», and English) name both crossings at once: the FIRST letter is the first root
+of the order above and the second letter the second — the operator's ruling, exactly what the two ordinal
+sentences would say. The assignment is fixed: «הציגו תצורה אחרת» never swaps it, and a student who wants
+the other assignment swaps the letters in the sentence (the points stay; the letters move). The sentence
+states TWO points, so a pair that does not meet in two points is refused on that sentence — a line that
+misses the conic or touches it, two straight lines (which meet once), and two conics (which have no order
+this tool defines).
 
 **R86 — a measurement can be reached by CLICKING, and a distance is shown as a construction**
 ([ADR-AG-066](06c-decisions-analytic.md#adr-ag-066)). Clicking a point or a line offers the questions
