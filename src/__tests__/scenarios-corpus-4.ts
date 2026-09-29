@@ -48,6 +48,7 @@ import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-harness';
 import { ctxOf } from './scenario-pipeline';
 import { parse } from '@/parser';
+import { computeValues } from '@/replay/core';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -2862,6 +2863,24 @@ export const SCENARIOS_4: Scenario[] = [
         expect(facts.map((f) => r.status[f.id]), label).toEqual(facts.map(() => 'ok'));
         expect(r.violations, label).toEqual([]);
       }
+    },
+  },
+  {
+    id: 'values-panel-names-circles-1442',
+    title:
+      '#1442 / ADR-552: the values panel never prints an internal circle id — the tangent construction\'s hidden helper circle has no row, and an unnamed circle is «the circle» (was «רדיוס ~tanmid-OE», «רדיוס @ctr-O»)',
+    guards:
+      'External review of prod (relayed 2026-09-27): «Internal object names leak into the values panel, for example «~tanmid-OE» and «@ctr-O».» The radii loop iterated every circle, hidden scaffolding included, and labelled each by its centre id — for the tangent from E that printed the hidden Thales circle («רדיוס ~tanmid-OE = 6.5», its area and circumference), and an unnamed circle printed «רדיוס @ctr-O». Circles are now named through one seam (engine/circleRef): drawn circles only, a visible centre by its letter, an unnamed one as «המעגל» or its ADR-342 token. The wording and the fixtures-wide class lock are in src/__tests__/values-panel-labels-1442.test.ts.',
+    steps: ['מעגל O ברדיוס 5', 'משיק מנקודה E למעגל', 'OE=13'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const rows = computeValues(factsOf(['מעגל O ברדיוס 5', 'משיק מנקודה E למעגל', 'OE=13'])).rows;
+      expect(rows.filter((r) => /[~@]/.test(r.label)).map((r) => r.label), 'no internal id in any label').toEqual([]);
+      const radii = rows.filter((r) => r.kind === 'radius');
+      expect(radii.map((r) => [r.circle, r.value.toFixed(2)]), 'circle O only — the hidden helper circle prints nothing').toEqual([[{ via: 'centre', name: 'O' }, '5.00']]);
+      // the unnamed-circle twin: the only circle, centre anonymous — named as «the circle», never @ctr-O
+      const bare = computeValues(factsOf(['מעגל ברדיוס 3'])).rows.filter((r) => r.kind === 'radius');
+      expect(bare.map((r) => [r.circle, r.label, r.value.toFixed(2)])).toEqual([[{ via: 'sole' }, '', '3.00']]);
     },
   },
 ];
