@@ -29,6 +29,10 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #1474 (ADR-3D-283) — figure B: m ∈ {−2, 0, 4}, three branches. The withheld π5 angle (60° at m = −2,
+  // 30° at the others) is asserted in issue-1474-branch-coverage.test.ts; this is the build + drift net. «A» (ℓ ∩ π5 — the origin on
+  // every branch) gives the net a point to place.
+  'param-three-branches-1474.geo3.json': ['הישר ℓ: x = (0,0,0) + t(1,m,1)', 'המישור π: mx + y + z + 2 = 0', 'הזווית בין הישר ℓ למישור π היא 30°', 'המישור π5: x - y = 0', 'A נקודת החיתוך של ℓ עם π5'],
   // #1550 (ADR-3D-281) — the operator's line: a coordinate-frame relation that is true only after the figure
   // TURNS, stated on an unanchored box. The essence is "this now builds green and verifies" (before: refused
   // «הטענה לא מתקיימת בציור»); the 24-seed geometry and the family live in issue-1550.test.ts.

@@ -337,6 +337,22 @@ rows are touched. The store's `remove` / `toggle` / `replaceFact` fold before an
 fold's own per-row status, never on a second dependency walk, so the symbol lanes and the point lanes
 are one class. `replaceFact` still returns `true` for a committed edit; the report is `lastError`.
 
+**Knowledge samples — seeds cover the gauge, enumeration covers the branches ([ADR-3D-283](06b-decisions-3d.md#adr-3d-283), #1474).**
+Every knowledge lane — the ask lane (`answerQuery`), the data panel (`dataView`), the claim verifier
+(`verifyClaim`) — takes its samples from ONE sampler, `knowledgeSamples3(c, baseSeeds)` in
+`evaluate.ts`: each base seed × every value of `paramConfigValues3` (the parameter's effective branch
+pool, the list «הציגו תצורה אחרת» cycles), each configuration resolved at its base seed's gauge with an
+explicit `resolve3(c, s, { paramValue })`. The base-seed lists (`querySeeds3`, `panelSeeds3`,
+`claimSeeds`) are unchanged and sample only the GAUGE — placement, free dims, an unpinned m. **Never rely
+on seed offsets for branch coverage**: `chooseParam` picks `pool[seed % n]`, and the old offsets
+(1013, 2027, 3041 — all ≡ 2 mod 3) covered every two-root pool by accident, two of three roots, and three
+of four. Every agreement gate reads the whole sample array (`every`), never a fixed `[0]/[1]/[2]`.
+`paramIsKnowledge` answers only for m's OWN value (and the per-line echo, where it is exact); it is not a
+proxy for a derived object. The crossing offer (`openCrossings3`) asks its own question per crossing —
+the same point in every configuration at the drawing's gauge (`Resolved3.seed`): the branch pool for a
+pinned m, probe values (`openParamProbes3`) for an unpinned one — memoised per resolve so an orbit frame
+never re-resolves. Cost: ×n resolves per panel/ask for an n-root figure, ×1 for 0/1-root figures.
+
 ## Rendering
 
 Orthographic orbit, with hidden edges dashed the way a textbook draws them, decided by **numeric outward

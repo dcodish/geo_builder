@@ -6,8 +6,9 @@
  * more than one presentation exists, ALL are shown.
  *
  * Honesty gate (the multi-sample discipline): every displayed value is computed at
- * THREE seeds and shown only when it agrees across them — an under-determined
- * quantity (which varies with the sample) never masquerades as data (ADR-052).
+ * THREE seeds × every branch of the figure parameter (#1474, `knowledgeSamples3`) and shown
+ * only when it agrees across ALL of them — an under-determined quantity (which varies with the
+ * sample or the branch) never masquerades as data (ADR-052).
  *
  * This deliberately leans toward showing DERIVED results (the operator's call,
  * overriding the reproduce-don't-solve default for data-organization pedagogy) —
@@ -15,7 +16,7 @@
  */
 
 import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
-import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
+import { knowledgeSamples3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { angleMarkText, figureSymbolsOf, symbolOwnersOf } from './types';
 import { COMBINING_ARROW } from '../lexicon/marks3';
@@ -460,10 +461,13 @@ export function basisDecompose(basis: { from: Id; to: Id }[], posArr: Positions3
     return nBasisSolve(dirs as Vec3[], sub3(q, p));
   });
   if (per.some((x) => !x)) return null;
-  const [c0, c1, c2] = per as [number, number, number][];
+  // #1474: EVERY sample, not the first three — the ask lane passes four seeds × every parameter branch,
+  // and a fixed-arity check silently dropped the rest (the fourth seed was never compared).
+  const all = per as [number, number, number][];
+  const c0 = all[0];
   const agree = (u: number[], v: number[]) => u.every((x, i) => Math.abs(x - v[i]) < 2e-3);
-  if (!agree(c0, c1) || !agree(c0, c2)) return null;
-  return c0.map((x, i) => (x + c1[i] + c2[i]) / 3) as [number, number, number];
+  if (!all.every((ci) => agree(c0, ci))) return null;
+  return c0.map((_, i) => all.reduce((sum, ci) => sum + ci[i], 0) / all.length) as [number, number, number];
 }
 
 /**
@@ -485,7 +489,7 @@ export function parametricDecomp(c: Construction3, from: Id, to: Id, seeds: numb
   if (basisEntries.length < 1) return null; // 1–2 declared vectors are a real basis for a planar/collinear figure (#311)
   const basis = basisEntries.map(([, d]) => d);
   const names = basisEntries.map(([n]) => n);
-  const posArr = seeds.map((s) => resolve3(c, s).positions);
+  const posArr = knowledgeSamples3(c, seeds).map((r) => r.positions); // #1474: every branch, never a modulus
   // a def whose OWN vector decomposes to stable coefficients is determined — its symbol does not vary.
   // `basisDecompose` already answers exactly this (it is why a pinned `AS` prints numerically), so the
   // predicate is a reuse of the shared sample set, never a second sampler (M3).
@@ -496,7 +500,7 @@ export function parametricDecomp(c: Construction3, from: Id, to: Id, seeds: numb
   if (syms.length !== 1) return null; // 0 → nothing parametric; ≥2 → genuinely two-parameter (#301), never faked
   const sym = syms[0];
   const at = (kv: number): [number, number, number] | null => {
-    const posArr = seeds.map((s) => resolve3({ ...c, symbolPins: [...c.symbolPins.filter((p) => p.sym !== sym.vd.symbol), { rel: 'value', value: kv, sym: sym.vd.symbol! }] }, s).positions);
+    const posArr = knowledgeSamples3({ ...c, symbolPins: [...c.symbolPins.filter((p) => p.sym !== sym.vd.symbol), { rel: 'value', value: kv, sym: sym.vd.symbol! }] }, seeds).map((r) => r.positions);
     return basisDecompose(basis, posArr, from, to);
   };
   const c0 = at(0);
@@ -556,9 +560,14 @@ export function statedLengths(c: Construction3): Map<string, number> {
   return out;
 }
 
+/** The panel's base seeds — the GAUGE sample; #1474: `knowledgeSamples3` adds every parameter branch at each. */
+export const panelSeeds3 = (seed: number): number[] => [seed, seed + 1013, seed + 2027];
+
 export function dataView(c: Construction3, seed: number): DataPanel {
-  const seeds = [seed, seed + 1013, seed + 2027];
-  const resolved = seeds.map((s) => resolve3(c, s));
+  const seeds = panelSeeds3(seed);
+  // #1474 (ADR-3D-283): the seeds cover the gauge, `knowledgeSamples3` every parameter branch at each —
+  // so every agreement gate below reads ALL of `resolved`, never a fixed [0]/[1]/[2].
+  const resolved = knowledgeSamples3(c, seeds);
   const positions = resolved.map((r) => r.positions);
   /**
    * #827 — the VECTOR lane needs the same branch guard the point lane got, for the same reason.
@@ -590,7 +599,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     });
     if (ds.some((d) => !d)) return null;
     if (!branchStablePair(a, b)) return null;
-    return sameVec(ds[0]!, ds[1]!) && sameVec(ds[0]!, ds[2]!) ? ds[0]! : null;
+    return ds.every((d) => sameVec(ds[0]!, d!)) ? ds[0]! : null;
   };
 
   // an absolute frame exists only when something was injected — otherwise every
@@ -980,8 +989,8 @@ export function dataView(c: Construction3, seed: number): DataPanel {
         return ga && gb ? distanceBetween(ga, gb) : null;
       });
       if (ds.some((d) => d === null)) continue;
-      const [d0, d1, d2] = ds as number[];
-      if (Math.abs(d0 - d1) > 1e-4 * Math.max(d0, 1) || Math.abs(d0 - d2) > 1e-4 * Math.max(d0, 1)) continue;
+      const d0 = (ds as number[])[0];
+      if ((ds as number[]).some((d) => Math.abs(d0 - d) > 1e-4 * Math.max(d0, 1))) continue;
       relations.push(`d(${opLabel(a)}, ${opLabel(b)}) = ${cleanMag(d0)}`);
     }
   }
@@ -1016,8 +1025,8 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       return (Math.acos(Math.max(-1, Math.min(1, dot3(u1, u2) / (n1 * n2)))) * 180) / Math.PI;
     });
     if (degs.some((d) => d === null)) continue;
-    const [g0, g1, g2] = degs as number[];
-    if (Math.abs(g0 - g1) > 0.05 || Math.abs(g0 - g2) > 0.05) continue; // seed-varying → not knowledge, no value
+    const g0 = (degs as number[])[0];
+    if ((degs as number[]).some((g) => Math.abs(g0 - g) > 0.05)) continue; // seed-varying → not knowledge, no value
     // #986: the row names the statement the student made — «2α = 60°», never «α = 60°» beside an
     // «α = 30°» from a mark wearing the same letter with a different coefficient.
     relations.push(`${angleMarkText(mk) || `∠${mk.p}${mk.vertex}${mk.q}`} = ${cleanNum(g0)}°`);
@@ -1090,7 +1099,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
           const scale = Math.max(...roots.map(rootScale));
           return roots.every((q) => rootsAgree(q[ax], roots[0][ax], scale));
         });
-      const stableAx = axes.map((ax) => near(ps[0]![ax], ps[1]![ax]) && near(ps[0]![ax], ps[2]![ax]) && branchAgrees(ax));
+      const stableAx = axes.map((ax) => ps.every((p) => near(ps[0]![ax], p![ax])) && branchAgrees(ax));
       const nStable = stableAx.filter(Boolean).length;
       if (nStable === 3) {
         const cs = coordStr(ps[0]!);

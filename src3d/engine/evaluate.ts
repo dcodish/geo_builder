@@ -395,6 +395,12 @@ export interface Resolved3 {
    *  parameter, a pin symbol and a named component — every kind of letter EXCEPT this one. Published by
    *  the code that picks the root, so the two can never disagree about which value was used. */
   ratioSymbols: Record<string, number>;
+  /**
+   * #1474 (ADR-3D-283) — the seed this configuration was resolved at: its GAUGE key. A consumer that
+   * asks "is this value the same in the figure's OTHER configurations?" re-resolves at this seed with
+   * an explicit `paramValue`, so the comparison moves the parameter's branch and nothing else.
+   */
+  seed: number;
   /** V6 — resolved solids of revolution (world centre/apex + numeric radius/height) for the renderer. */
   revolutions: { kind: 'cylinder' | 'cone' | 'sphere'; center: Vec3; apex?: Vec3; r: number; h: number }[];
   /** V8-i — resolved circles in R³ (world centre + unit normal + radius + in-plane basis) for the renderer + on-circle checks. */
@@ -677,6 +683,12 @@ export function paramRoots(c: Construction3): number[] {
  * branch's components asserts a magnitude the student never gave ([ADR-052](docs/06-decisions.md#adr-052)).
  * Conversely a sign given can cut two roots down to one, and that IS knowledge — which is why this reads
  * `branches` (post-selection) and not `roots` (raw candidates).
+ *
+ * #1474 (ADR-3D-283) — SCOPE: this answers for m's OWN value, and for the per-line echo (a line whose
+ * numbers carry m has different numbers on every branch, so "one branch" is exactly "invariant" there).
+ * It is NOT a proxy for any DERIVED object: an angle, a coordinate or a crossing can be the same on every
+ * branch although m is not forced, or differ although it is. A derived value is knowledge iff it agrees
+ * across {@link knowledgeSamples3}, which enumerates the branches instead of asking this.
  */
 export const paramIsKnowledge = (param: Resolved3['param']): boolean =>
   !!param && Number.isFinite(param.value) && param.branches.length === 1;
@@ -708,15 +720,14 @@ export const onLineHolds3 = (p: Vec3, ln: ResolvedLine): boolean =>
  * another configuration" = the other branch); an unpinned parameter is a FREE
  * DOF, sampled (ADR-052 — never a silent fixed default).
  */
-function chooseParam(c: Construction3, coordPos: Positions3, seed: number): { value: number; roots: number[]; branches: number[] } | null {
+function chooseParam(c: Construction3, coordPos: Positions3, seed: number, paramValue?: number): { value: number; roots: number[]; branches: number[] } | null {
   if (!c.param) return null;
   const roots = paramRoots(c);
   if (pinningGivens(c) === 0) {
     // an UNPINNED parameter is a free sampled DOF — a stated sign (ADR-3D-032,
     // `k הוא פרמטר חיובי`) constrains the sample's half-line, never flags it
-    const sign = c.paramSigns.find(() => true);
-    const range: [number, number] = sign ? (sign.positive ? [0.3, 3] : [-3, -0.3]) : [-3, 3];
-    return { value: sample(seed, `param-${c.param}`, range[0], range[1]), roots: [], branches: [] };
+    const range = openParamRange3(c);
+    return { value: paramValue ?? sample(seed, `param-${c.param}`, range[0], range[1]), roots: [], branches: [] };
   }
   if (roots.length === 0) return { value: NaN, roots, branches: [] }; // no-roots — surfaced as an honest error
 
@@ -750,8 +761,19 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number): { va
       if (names.some((name) => onPlane(p, planeAt(c, name, root)))) return pick([root], root);
     }
   }
-  return pick(pool, pool[seed % pool.length]);
+  // #1474: an explicit configuration (a knowledge sampler enumerating the pool) wins over the seed's pick
+  return pick(pool, paramValue !== undefined ? nearestBranch(pool, paramValue) : pool[seed % pool.length]);
 }
+
+/** The half-line an UNPINNED parameter is sampled on — a stated sign narrows it (ADR-3D-032). */
+function openParamRange3(c: Construction3): [number, number] {
+  const sign = c.paramSigns.find(() => true);
+  return sign ? (sign.positive ? [0.3, 3] : [-3, -0.3]) : [-3, 3];
+}
+
+/** #1474: the pool entry an explicit configuration value names (exact for a value read off the pool). */
+const nearestBranch = (pool: number[], v: number): number =>
+  pool.reduce((best, t) => (Math.abs(t - v) < Math.abs(best - v) ? t : best), pool[0]);
 
 function footOnPlane(from: Vec3, pl: ResolvedPlane): Vec3 {
   const t = (dot3(pl.n, from) + pl.d) / dot3(pl.n, pl.n);
@@ -1364,7 +1386,7 @@ export function pivotFamilies3(c: Construction3): PivotFamily3[] {
 }
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
-export function resolve3(c: Construction3, seed: number): Resolved3 {
+export function resolve3(c: Construction3, seed: number, opts: { paramValue?: number } = {}): Resolved3 {
   const pos: Positions3 = new Map<Id, Vec3>();
 
   // coordinate points don't depend on anything — place them first (membership branch-selection reads them)
@@ -1372,7 +1394,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     if (def.kind === 'coord') pos.set(id, v3(def.x, def.y, def.z));
   }
 
-  const param = c.param ? chooseParam(c, pos, seed) : null;
+  const param = c.param ? chooseParam(c, pos, seed, opts.paramValue) : null;
   const a = param && Number.isFinite(param.value) ? param.value : 0;
 
   // ADR-3D-032: coord-sym points (`M(k,1,3)`) are absolute like coord points, at the
@@ -1459,7 +1481,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     const pool0 = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
     const pool = pool0.length > 0 ? pool0 : roots;
     if (pool.length > 0) {
-      const value = pool[seed % pool.length];
+      const value = opts.paramValue !== undefined ? nearestBranch(pool, opts.paramValue) : pool[seed % pool.length]; // #1474
       for (const [id, d] of c.points) {
         if (d.kind === 'coord-sym') pos.set(id, v3(linVal(d.x, value), linVal(d.y, value), linVal(d.z, value)));
       }
@@ -2393,7 +2415,54 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     placementSampled,
     placementSampledParts,
     ratioSymbols: Object.fromEntries(ratioSymbols),
+    seed,
   };
+}
+
+/**
+ * #1474 (ADR-3D-283) — THE PARAMETER'S CONFIGURATION SET at this seed: the effective branch pool
+ * (post-selection — the same list `chooseParam`/`pinParam` draw from and «הציגו תצורה אחרת» cycles).
+ * `[]` when there is no parameter and when it is UNPINNED (the seeds already sample a free m, so nothing
+ * needs enumerating) or contradictory (no roots). `r` is the resolve at `seed`, passed when the caller
+ * already holds it so the pool costs nothing extra.
+ */
+export function paramConfigValues3(c: Construction3, seed: number, r: Resolved3 = resolve3(c, seed)): number[] {
+  if (!c.param || !r.param || !Number.isFinite(r.param.value)) return [];
+  return [...r.param.branches];
+}
+
+/**
+ * #1474 (ADR-3D-283) — THE KNOWLEDGE SAMPLE SET: every base seed × every configuration of the parameter.
+ *
+ * A derived value is knowledge only when it agrees across the configurations the givens allow. The
+ * seeds cover the GAUGE (placement, free dims, an unpinned m); they never cover the BRANCHES — those are
+ * reached here by enumeration, never by `seed % n` at fixed offsets. The offsets covered a two-root pool
+ * by arithmetic accident and silently skipped a root of three or four, so a value that differs on the
+ * skipped branch printed as fact (figure B: 30° at m ∈ {0, 4}, 60° at m = −2).
+ *
+ * Every lane keeps its own base-seed list (so 0- and 1-root figures resolve exactly as before), and a
+ * configuration is resolved at its base seed's gauge with an explicit `paramValue` — the comparison
+ * moves the branch and nothing else. The one sampler for the ask lane, the panel and the claim verifier
+ * (docs/17 M3): do not reach configurations any other way.
+ */
+export function knowledgeSamples3(c: Construction3, baseSeeds: readonly number[]): Resolved3[] {
+  return baseSeeds.flatMap((s) => {
+    const r0 = resolve3(c, s);
+    const vals = paramConfigValues3(c, s, r0);
+    if (vals.length <= 1) return [r0];
+    return vals.map((v) => (v === r0.param!.value ? r0 : resolve3(c, s, { paramValue: v })));
+  });
+}
+
+/**
+ * #1474 — values an UNPINNED parameter is probed at, for a consumer that must judge invariance under m
+ * at ONE gauge (the crossing offer: the drawing's own dots). Drawn from the same half-line the free
+ * sample uses, at fixed seed offsets. `[]` for a pinned (use {@link paramConfigValues3}) or absent one.
+ */
+export function openParamProbes3(c: Construction3, seed: number): number[] {
+  if (!c.param || pinningGivens(c) > 0 || c.paramGivens.length > 0) return [];
+  const [lo, hi] = openParamRange3(c);
+  return [1013, 2027, 3041].map((o) => sample(seed + o, `param-${c.param}`, lo, hi));
 }
 
 /** Evaluate every point's world position. Parents always precede children (apply enforces it). */

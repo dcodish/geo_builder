@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-09-29T16:47:37.183Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "הישר ℓ: x = (0,0,0) + t(1,m,1)",
+      "cmds": [
+        {
+          "type": "line3",
+          "name": "ℓ",
+          "anchor": [
+            {
+              "k": 0,
+              "p": 0
+            },
+            {
+              "k": 0,
+              "p": 0
+            },
+            {
+              "k": 0,
+              "p": 0
+            }
+          ],
+          "dir": [
+            {
+              "k": 1,
+              "p": 0
+            },
+            {
+              "k": 0,
+              "p": 1
+            },
+            {
+              "k": 1,
+              "p": 0
+            }
+          ],
+          "src": "x = (0,0,0) + t·(1,m,1)",
+          "param": "m"
+        }
+      ]
+    },
+    {
+      "utterance": "המישור π: mx + y + z + 2 = 0",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π",
+          "plane": {
+            "cx": {
+              "k": 0,
+              "p": 1
+            },
+            "cy": {
+              "k": 1,
+              "p": 0
+            },
+            "cz": {
+              "k": 1,
+              "p": 0
+            },
+            "d": {
+              "k": 2,
+              "p": 0
+            },
+            "src": "mx + y + z + 2 = 0"
+          },
+          "param": "m"
+        }
+      ]
+    },
+    {
+      "utterance": "הזווית בין הישר ℓ למישור π היא 30°",
+      "cmds": [
+        {
+          "type": "line-rel",
+          "rel": "angle",
+          "deg": 30,
+          "op": {
+            "kind": "plane-named",
+            "name": "π"
+          },
+          "line": "ℓ"
+        }
+      ]
+    },
+    {
+      "utterance": "המישור π5: x - y = 0",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π5",
+          "plane": {
+            "cx": {
+              "k": 1,
+              "p": 0
+            },
+            "cy": {
+              "k": -1,
+              "p": 0
+            },
+            "cz": {
+              "k": 0,
+              "p": 0
+            },
+            "d": {
+              "k": 0,
+              "p": 0
+            },
+            "src": "x - y = 0"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "A נקודת החיתוך של ℓ עם π5",
+      "cmds": [
+        {
+          "type": "line-plane-point",
+          "id": "A",
+          "line": "ℓ",
+          "plane": "π5"
+        }
+      ]
+    }
+  ]
+}

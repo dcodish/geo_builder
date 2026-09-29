@@ -268,6 +268,14 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   parameter cannot be satisfied, the figure **refuses and names the statement** — it never invents a
   nearby value to keep drawing. The discrimination is the *residual*, not the wording: only a genuinely
   impossible figure refuses. *(Realised — `refusal-honesty.test.ts`.)*
+- **FR-EQ-4 (Must)** — **A value is shown only when it is the same in EVERY configuration.** When a
+  pinned parameter has several roots, an answer (the ask lane), a data-panel row, a verified claim and an
+  offered crossing dot are each judged against **every root the student can cycle** with «הציגו תצורה
+  אחרת» — never against a subset — so pressing the button can never turn a withheld value into a fact.
+  A value that is the same on every root (an angle equal at m = ±√2) is answered; one that differs on
+  any root is withheld. A crossing dot is offered by its own invariance: a crossing that does not move
+  with the parameter is offered even when the parameter itself is not forced. *(Realised —
+  [ADR-3D-283](06b-decisions-3d.md#adr-3d-283), #1474; `issue-1474-branch-coverage.test.ts`.)*
 
 ## Claims — the student's answer, never a driver
 

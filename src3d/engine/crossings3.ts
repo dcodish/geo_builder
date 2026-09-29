@@ -14,7 +14,7 @@
  * the same question without a second implementation of it.
  */
 
-import { paramIsKnowledge, type Resolved3 } from './evaluate';
+import { openParamProbes3, paramConfigValues3, resolve3, type Resolved3 } from './evaluate';
 import type { Construction3, Id } from './types';
 import { add3, dist3, dot3, norm3, scale3, sub3, type Vec3 } from './vec3';
 
@@ -66,13 +66,18 @@ export function namedPointAt(point: Vec3, placed: Iterable<[Id, Vec3]>): Id | nu
  * Every line∩plane crossing the givens DETERMINE and no existing point already occupies.
  *
  * The honesty gate is one condition, and it is the whole reason this is not a pure geometry helper:
- * **a parameter the givens do not force moves the crossing between configurations**, so offering a dot
- * there would invite the student to name a point that is an artefact of which branch we happened to
- * draw — the ADR-052 sin, in the shape [ADR-3D-118](docs/06b-decisions-3d.md) fixed for the canvas echo.
- * The operator's own figure is exactly that case twice over: with `ℓ ∥ π1` and m = ±√2 there is no
- * crossing at all (parallel), and with the parameter unpinned the line itself is a sample. Reusing
- * `paramIsKnowledge` means the dot and the echo can never disagree about whether the figure is
- * determined.
+ * **a crossing is offered only when it is the same point in EVERY configuration of the figure's
+ * parameter** — otherwise the dot would invite the student to name an artefact of which branch we
+ * happened to draw (the ADR-052 sin). The operator's own figure is that case twice over: with `ℓ ∥ π1`
+ * and m = ±√2 there is no crossing at all (parallel), and with the parameter unpinned the line itself
+ * moves with m.
+ *
+ * #1474 (ADR-3D-283) — the gate is asked PER CROSSING. It used to be the whole-figure proxy "is m's value
+ * forced?" (`paramIsKnowledge`), which withheld every dot on a figure that merely CONTAINED an unforced
+ * m-line — a box's edges crossing `x = 1` vanished the moment an unrelated ℓ2 ∥ π1 was typed — and also
+ * withheld `(m,0,0)+t(1,0,0)` ∩ `x = 3`, which is (3,0,0) for every m. Now each crossing is computed in
+ * every configuration (the branch pool, or probe values of an unpinned m, all at this drawing's gauge
+ * seed) and offered iff it EXISTS in all of them and they AGREE.
  *
  * "Already named" is decided by POSITION rather than by looking for a `line-plane-point` command, so a
  * point that arrived some other way (a coordinate, a rider, a solid's vertex) also suppresses the offer.
@@ -92,15 +97,58 @@ export function namedPointAt(point: Vec3, placed: Iterable<[Id, Vec3]>): Id | nu
  * one writes there.
  */
 export function openCrossings3(c: Construction3, resolved: Resolved3): Crossing3[] {
-  // an unforced parameter makes every algebraic object a sample of itself — nothing here is knowledge
-  if (c.param && !paramIsKnowledge(resolved.param)) return [];
+  // Memoised on the resolve: the scene rebuilds on every orbit frame, and the per-crossing gate
+  // re-resolves the figure's other configurations — that cost belongs to the figure, not the camera.
+  const hit = memo.get(resolved);
+  if (hit && hit.c === c) return hit.out;
+  const out = computeCrossings3(c, resolved);
+  memo.set(resolved, { c, out });
+  return out;
+}
 
+const memo = new WeakMap<Resolved3, { c: Construction3; out: Crossing3[] }>();
+
+/**
+ * #1474 — the figure's configurations at THIS drawing's gauge: the drawing itself plus the parameter's
+ * other branches (a pinned m) or probe values (an unpinned m), each re-resolved at `resolved.seed` so
+ * only m moves. `null` when the givens admit no parameter value at all — nothing is knowledge then.
+ */
+function configurations3(c: Construction3, resolved: Resolved3): Resolved3[] | null {
+  if (!c.param || !resolved.param) return [resolved];
+  const drawn = resolved.param.value;
+  if (!Number.isFinite(drawn)) return null;
+  const pool = paramConfigValues3(c, resolved.seed, resolved);
+  const others = (pool.length > 0 ? pool : openParamProbes3(c, resolved.seed)).filter((v) => v !== drawn);
+  return [resolved, ...others.map((v) => resolve3(c, resolved.seed, { paramValue: v }))];
+}
+
+function computeCrossings3(c: Construction3, resolved: Resolved3): Crossing3[] {
+  const configs = configurations3(c, resolved);
+  if (!configs) return [];
+  const [drawn, ...others] = configs.map((r) => rawCrossings3(c, r));
   const out: Crossing3[] = [];
+  for (const [key, k] of drawn) {
+    const scale = Math.max(1, norm3(k.point));
+    // THE GATE (#1474): the same point in every configuration — it exists in each, and they agree
+    const invariant = others.every((m) => {
+      const o = m.get(key);
+      return o !== undefined && dist3(o.point, k.point) <= NAMED_TOL * scale;
+    });
+    if (!invariant) continue;
+    if (namedPointAt(k.point, resolved.positions) !== null) continue; // already a named point (#769: the shared judgement)
+    if (out.some((o) => dist3(o.point, k.point) <= NAMED_TOL * scale)) continue; // one dot per location
+    out.push(k);
+  }
+  return out;
+}
 
-  for (const carrier of crossingCarriers3(c, resolved)) {
+/** Every carrier×plane crossing of ONE configuration, keyed by the pair — before any offer filtering. */
+function rawCrossings3(c: Construction3, r: Resolved3): Map<string, Crossing3> {
+  const out = new Map<string, Crossing3>();
+  for (const carrier of crossingCarriers3(c, r)) {
     const len = norm3(carrier.dir);
     if (len < 1e-9) continue;
-    for (const [plane, pl] of resolved.planes) {
+    for (const [plane, pl] of r.planes) {
       const nLen = norm3(pl.n);
       if (nLen < 1e-9) continue;
       const denom = dot3(pl.n, carrier.dir);
@@ -114,10 +162,7 @@ export function openCrossings3(c: Construction3, resolved: Resolved3): Crossing3
       if (carrier.bounded && !(t > 1e-9 && t < 1 - 1e-9)) continue;
       const point = add3(carrier.anchor, scale3(carrier.dir, t));
       if (!Number.isFinite(point.x) || !Number.isFinite(point.y) || !Number.isFinite(point.z)) continue;
-      const scale = Math.max(1, norm3(point));
-      if (namedPointAt(point, resolved.positions) !== null) continue; // already a named point (#769: the shared judgement)
-      if (out.some((k) => dist3(k.point, point) <= NAMED_TOL * scale)) continue; // one dot per location
-      out.push({ line: carrier.name, plane, point });
+      out.set(JSON.stringify([carrier.name, plane]), { line: carrier.name, plane, point });
     }
   }
   return out;

@@ -7,7 +7,7 @@
  * 2-D tool's relation detection uses, applied to answers.
  */
 
-import { lineAtParam, planeAtParam, resolve3, type Resolved3 } from './evaluate';
+import { knowledgeSamples3, lineAtParam, planeAtParam, type Resolved3 } from './evaluate';
 import { CLAIM_REL_TOL, containmentDeviation, coordPlaneRelHolds, DIRECTION_REL_TOL, lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { atomVec, evalExpr } from './vecExpr';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
@@ -361,7 +361,12 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
   }
 }
 
-/** True iff the claim holds in EVERY sampled configuration. */
+/**
+ * True iff the claim holds in EVERY sampled configuration — every claim seed × every branch of the
+ * parameter (#1474, ADR-3D-283: `claimSeeds` reach the branches only by `seed % n`, which missed a
+ * four-root pool's index s+2, so a claim false on exactly that branch read as verified).
+ */
 export function verifyClaim(claim: Claim3, c: Construction3, seed: number): boolean {
-  return claimSeeds(seed).every((s) => holdsAt(claim, c, resolve3(c, s)));
+  // one base seed at a time, so a refuted claim still stops at the first failing seed (docs/17 §7)
+  return claimSeeds(seed).every((s) => knowledgeSamples3(c, [s]).every((r) => holdsAt(claim, c, r)));
 }
