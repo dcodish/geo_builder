@@ -58,7 +58,17 @@ export type DerivedRule =
   /** «F מוקד הפרבולה» (#1432) — the focus read off the resolved parabola, the circle-centre
    *  pattern one conic over: a closed form over a CURVE parent, existing only because the student
    *  named it (the unnamed focus is #1218's chip, no letter spent). */
-  | { t: 'parabola-focus'; curve: Id };
+  | { t: 'parabola-focus'; curve: Id }
+  /**
+   * «מעגל M משיק למעגל K בנקודה T» — the point where two TANGENT circles touch (#1504, ADR-AG-167
+   * amendment 1). Its parents are the two CIRCLES (like `circle-centre`, curves, not points).
+   *
+   * Determined, not solved: tangent circles share exactly one point, on the line of centres at
+   * distance r from either centre. Which SIDE of K it sits on is read off the figure — the candidate
+   * `K ± r_K·û` whose distance to M is r_M — so the rule follows whichever touch (external or
+   * internal) the configuration chose, including an unstated one cycled by «הציגו תצורה אחרת».
+   */
+  | { t: 'touch-point'; a: Id; b: Id };
 
 /** The ids a rule is defined in terms of. EXHAUSTIVE — see the union's docblock. */
 export function parentsOf(r: DerivedRule): Id[] {
@@ -76,6 +86,7 @@ export function parentsOf(r: DerivedRule): Id[] {
     // send it through every check that assumes a parent is positional.
     case 'circle-centre':
     case 'parabola-focus':
+    case 'touch-point':
       return [];
     default: {
       const unparented: never = r;
@@ -103,6 +114,8 @@ export function ruleLabel(r: DerivedRule): string {
       return 'מרכז המעגל';
     case 'parabola-focus':
       return 'מוקד הפרבולה';
+    case 'touch-point':
+      return 'נקודת ההשקה';
     default: {
       const unlabelled: never = r;
       throw new Error(`derived rule has no label: ${JSON.stringify(unlabelled)}`);
@@ -235,11 +248,37 @@ export function curveParentOf(r: DerivedRule): Id | null {
   return r.t === 'circle-centre' || r.t === 'parabola-focus' ? r.curve : null;
 }
 
+/** EVERY curve a rule is defined in terms of — one for a centre, two for a touch point (#1504).
+ *  The existence check and the reference walk use this; provenance keeps the single-curve reading. */
+export function curveParentsOf(r: DerivedRule): Id[] {
+  if (r.t === 'circle-centre' || r.t === 'parabola-focus') return [r.curve];
+  if (r.t === 'touch-point') return [r.a, r.b];
+  return [];
+}
+
+/**
+ * Where two tangent circles touch — `null` when they are concentric (no line of centres) or one
+ * is not resolvable here. See the `touch-point` rule.
+ */
+export function touchPoint(
+  k: { cx: number; cy: number; r: number },
+  m: { cx: number; cy: number; r: number },
+): Pt | null {
+  const d = Math.hypot(m.cx - k.cx, m.cy - k.cy);
+  if (!(d > 0) || !(k.r > 0) || !(m.r > 0)) return null;
+  const ux = (m.cx - k.cx) / d;
+  const uy = (m.cy - k.cy) / d;
+  const near = { x: k.cx + k.r * ux, y: k.cy + k.r * uy };
+  const far = { x: k.cx - k.r * ux, y: k.cy - k.r * uy };
+  const miss = (p: Pt) => Math.abs(Math.hypot(p.x - m.cx, p.y - m.cy) - m.r);
+  return miss(near) <= miss(far) ? near : far;
+}
+
 export function evalRule(
   r: DerivedRule,
   at: (id: Id) => Pt | null,
   /** The resolved curves, for the one rule that needs them. Absent means "no curve is available". */
-  curveAt?: (id: Id) => { kind?: string; cx?: number; cy?: number } | null,
+  curveAt?: (id: Id) => { kind?: string; cx?: number; cy?: number; r?: number } | null,
 ): Pt | null {
   const ps = parentsOf(r).map(at);
   if (ps.some((p) => p === null)) return null;
@@ -259,6 +298,17 @@ export function evalRule(
       const c = curveAt?.(r.curve) as { kind?: string; p?: number } | null;
       if (!c || c.kind !== 'parabola' || typeof c.p !== 'number') return null;
       return { x: c.p / 2, y: 0 };
+    }
+    case 'touch-point': {
+      const circle = (id: Id) => {
+        const c = curveAt?.(id);
+        return c && c.kind === 'circle' && c.cx !== undefined && c.cy !== undefined && c.r !== undefined
+          ? { cx: c.cx, cy: c.cy, r: c.r }
+          : null;
+      };
+      const k = circle(r.a);
+      const m = circle(r.b);
+      return k && m ? touchPoint(k, m) : null;
     }
     case 'midpoint':
       return midpoint(p[0], p[1]);
@@ -455,6 +505,10 @@ export function constructionOf(
     // The focus likewise: read off the equation, no auxiliary lines.
     case 'circle-centre':
     case 'parabola-focus':
+      return null;
+
+    // Its scaffolding would be the line of centres; the parents are curves, so none is drawn here.
+    case 'touch-point':
       return null;
 
     default: {

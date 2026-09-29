@@ -171,9 +171,13 @@ describe('#1501 — refusals, never silent drops', () => {
     expect(d.faults.map((f) => f.code)).toEqual(['out-of-scope']);
   });
 
-  it('circle-to-circle tangency by NAME stays not-handled — the escalation seam, not a guess', () => {
+  it('circle-to-circle tangency BUILDS since #1504 — the scope cut this suite froze was lifted by the operator', () => {
+    // This lock used to assert `not-handled`: ADR-AG-165 pre-declared circle tangency its own
+    // capability, and the honest refusal was the pass condition. The operator's T9 report on that
+    // refusal WAS the go-ahead (#1504, ADR-AG-167), so the seam now builds — asserted here so the
+    // hand-off is recorded where the refusal was, and locked in depth by its own suite.
     const d = derive(['נתון מעגל K', 'מעגל M משיק למעגל K'], 0);
-    expect(d.faults.map((f) => f.code)).toEqual(['not-handled']);
+    expect(d.faults).toEqual([]);
   });
 });
 

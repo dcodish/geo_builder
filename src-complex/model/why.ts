@@ -48,6 +48,11 @@ export type Why =
    * give different answers; `first` names one member the student can ask about instead
    */
   | { readonly code: 'multi-solution'; readonly solutions: number; readonly first: string }
+  /**
+   * #1437 amendment — «arg w» where w is KNOWN to be 0: the argument does not exist, and no given can
+   * supply one. Distinct from 'undetermined', which would tell the student to add a given that cannot exist.
+   */
+  | { readonly code: 'arg-of-zero' }
   // --- measure verdicts (replay/derive2.ts stage 3e) ------------------------
   | { readonly code: 'measure-uncomputable'; readonly src: string }
   | { readonly code: 'measure-holds'; readonly src: string }

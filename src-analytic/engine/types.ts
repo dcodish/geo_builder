@@ -54,11 +54,23 @@ export interface Domain {
 
 export const UNBOUNDED: Domain = {};
 
-export function inDomain(d: Domain, v: number): boolean {
+/**
+ * Is `v` inside the domain?
+ *
+ * `floor` is how close to an OPEN bound (or an excluded value) a value may sit and still count as
+ * the bound itself (#1504, ADR-AG-167 amendment 1). A strict inequality judged EXACTLY is judged at
+ * a precision the solver does not have: «מעגל M משיק למעגל K מבחוץ» then «…מבפנים» forces r = 0,
+ * and a descent converging toward that contradiction parks at r ≈ 8.6e-11 — which `v <= 0` calls
+ * positive, so a circle of radius zero was drawn green. The solve's judge passes the figure's
+ * SOLVER RESOLUTION (relative to its span, `openBoundFloor` in evaluate.ts); a value inside it is
+ * the bound, as far as this solver can tell. `0` keeps the exact judgement for callers that are not
+ * judging a solved value (sampling, the panel).
+ */
+export function inDomain(d: Domain, v: number, floor = 0): boolean {
   if (!Number.isFinite(v)) return false;
-  if (d.min !== undefined && (d.minOpen ? v <= d.min : v < d.min)) return false;
-  if (d.max !== undefined && (d.maxOpen ? v >= d.max : v > d.max)) return false;
-  if (d.exclude?.some((e) => Math.abs(v - e) < 1e-9)) return false;
+  if (d.min !== undefined && (d.minOpen ? v <= d.min + floor : v < d.min)) return false;
+  if (d.max !== undefined && (d.maxOpen ? v >= d.max - floor : v > d.max)) return false;
+  if (d.exclude?.some((e) => Math.abs(v - e) < Math.max(1e-9, floor))) return false;
   return true;
 }
 
@@ -285,6 +297,18 @@ export type Fact =
   | (FactBase & { t: 'focus-of'; id: Id })
   /** «משוואת המדריך היא x=-2» (#1432) — a claim checked against the parabola's own directrix. */
   | (FactBase & { t: 'directrix-eq'; eq: Expr; eqSrc: string })
+  /**
+   * Two CIRCLES touch — «מעגל M משיק למעגל K», «המעגלים משיקים» (#1504).
+   *
+   * `a`/`b` are the circles as the sentence NAMED them (a centre letter, a numeral, the
+   * student's own name) — which circle each name means is a question about the construction,
+   * so M1 resolves both through the `tangent-of` lookup chain; an absent name is the
+   * contextual reading (with one name: "the one other circle"; with none: "the exactly two").
+   * `branch` is present only when the student said which touch («מבחוץ»/«מבפנים») — absent,
+   * the apply boundary lowers to a `choice` over both (#1049, ADR-052). `at` names the touch
+   * point when the sentence did («…בנקודה T») — a `touch-point` derived point (amendment 1).
+   */
+  | (FactBase & { t: 'tangent-circles'; a?: string; b?: string; branch?: 'external' | 'internal'; at?: Id })
   /**
    * «E נקודת החיתוך של הישרים» — a crossing whose operands are named only by their KIND (#1429).
    *

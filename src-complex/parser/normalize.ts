@@ -21,7 +21,19 @@
  * keeps it deliberately — with the transforms named and the round-trip property now asserted.
  */
 
-import { ARG_KW, CONJ_OF_KW, IM_OF_KW, NAME, RE_OF_KW, RECIPROCAL_OF_KW } from './lexicon';
+import {
+  ABS_KW,
+  ARG_KW,
+  CONJ_OF_KW,
+  IM_OF_KW,
+  NAME,
+  NUMBER_NOUN_KW,
+  OF_KW,
+  QUESTION_MARK,
+  QUESTION_OPENER_KW,
+  RE_OF_KW,
+  RECIPROCAL_OF_KW,
+} from './lexicon';
 
 /** Superscript digits become an explicit power: `Z₂³` → `z2^3`. */
 const SUPERSCRIPTS: Record<string, string> = {
@@ -73,6 +85,12 @@ const TRANSFORMS: readonly { readonly why: string; readonly apply: (s: string) =
     apply: (s) => s.replace(/([a-zA-Z])[̄̅](\w*)/g, 'conj($1$2)'),
   },
   {
+    // #1437 amendment — «הארגומנט של המספר w» says «הארגומנט של w»: the noun names what w IS and adds
+    // nothing, so it goes here, once, for every genitive operator (arg, |…|, conj, Re, Im, 1/…)
+    why: 'a genitive names its number without the noun «המספר»',
+    apply: (s) => s.replace(new RegExp(`(${OF_KW})\\s+${NUMBER_NOUN_KW}\\s+(?=${NAME}\\b)`, 'giu'), '$1 '),
+  },
+  {
     // «הצמוד של z1» and «conj(z1)» are the same operation spelled two ways — one spelling problem,
     // fixed where the combining overline is fixed, so no rule downstream needs to know both.
     why: 'a word-spelled operator becomes its function form',
@@ -81,7 +99,12 @@ const TRANSFORMS: readonly { readonly why: string; readonly apply: (s: string) =
         .replace(new RegExp(`${CONJ_OF_KW}\\s+(${NAME})`, 'giu'), 'conj($1)')
         .replace(new RegExp(`${RECIPROCAL_OF_KW}\\s+(${NAME})`, 'giu'), '1/($1)')
         .replace(new RegExp(`${RE_OF_KW}\\s+(${NAME})`, 'giu'), 're($1)')
-        .replace(new RegExp(`${IM_OF_KW}\\s+(${NAME})`, 'giu'), 'im($1)'),
+        .replace(new RegExp(`${IM_OF_KW}\\s+(${NAME})`, 'giu'), 'im($1)')
+        // #1437 amendment — «הערך המוחלט של w» is «|w|», the sibling of «הארגומנט של w»
+        .replace(
+          new RegExp(`${ABS_KW}(?:\\s*\\(\\s*(${NAME})\\s*\\)|\\s+(?:${OF_KW}\\s+)?(${NAME})(?![\\w(]))`, 'giu'),
+          (_m, paren: string | undefined, bare: string | undefined) => `|${paren ?? bare}|`,
+        ),
   },
   {
     /**
@@ -108,9 +131,35 @@ const TRANSFORMS: readonly { readonly why: string; readonly apply: (s: string) =
     why: 'a Greek parameter letter is its Latin spelling',
     apply: (s) => s.replace(/[θαβφ]/g, (c) => GREEK[c]),
   },
+  {
+    /**
+     * «שורש 3» / «שורש(3)» is `√3` — the 2-D #105 operator ruling (ADR-318), ported: the word
+     * before a number or a parenthesis IS the root sign, so every expression path inherits it. Only
+     * there: «שורש של 3» and the roots-of-an-equation register («שורשי המשוואה») are untouched, and
+     * a word form that still cannot be read gets the #246 teaching refusal at the submit seam.
+     */
+    why: 'the word «שורש» before a number or a parenthesis is the root sign',
+    apply: (s) => s.replace(/שורש\s*(?=[\d(])/g, '√'),
+  },
   { why: 'the multiplication dot and cross are `*`', apply: (s) => s.replace(/[·×]/g, '*') },
   { why: 'the Unicode minus is a hyphen', apply: (s) => s.replace(/−/g, '-') },
   { why: 'the division sign is a slash', apply: (s) => s.replace(/÷/g, '/') },
+  {
+    /**
+     * #1435 — `³√8` is the cube root of 8: a superscript run that runs straight into `√` is the
+     * root's INDEX (`ⁿ√` is one root token in the expression lexer) — UNLESS it is attached to an
+     * operand, where a superscript is always that operand's power: `x³`, `z1³`, `2³√8` = 2^3·√8.
+     * «Attached» is the one test the power rewrites already imply: right after a letter, a digit
+     * (subscripts included — `z₂³√8`) or a closing parenthesis. This rewrites the attached case to a
+     * power + product; the power rewrites below then skip any run still followed by `√` (an index).
+     */
+    why: 'a superscript attached to an operand before √ is its power; otherwise it is the root index',
+    apply: (s) =>
+      s.replace(
+        /(?<=[A-Za-z0-9)₀₁₂₃₄₅₆₇₈₉])[⁰¹²³⁴⁵⁶⁷⁸⁹]+(?=√)/g,
+        (run) => `^${[...run].map((c) => SUPERSCRIPTS[c]).join('')}*`,
+      ),
+  },
   {
     // `Z₂³Z₄` is z2^3 TIMES z4: like a subscript run, a superscript run followed by a name ends it
     why: 'a superscript run followed by a name is an implicit product',
@@ -121,9 +170,9 @@ const TRANSFORMS: readonly { readonly why: string; readonly apply: (s: string) =
       ),
   },
   {
-    why: 'superscript digits are an explicit power',
+    why: 'superscript digits are an explicit power (a root index before √ excepted)',
     apply: (s) =>
-      s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, (run) => `^${[...run].map((c) => SUPERSCRIPTS[c]).join('')}`),
+      s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+(?![⁰¹²³⁴⁵⁶⁷⁸⁹]*√)/g, (run) => `^${[...run].map((c) => SUPERSCRIPTS[c]).join('')}`),
   },
   {
     // `Z₁Z₄` is a PRODUCT of two names, never the identifier `z1z4` — a subscript run ends a name
@@ -141,6 +190,24 @@ export function normalize(raw: string): string {
   let s = raw;
   for (const t of TRANSFORMS) s = t.apply(s);
   return s;
+}
+
+/**
+ * #1437 amendment — THE QUESTION FRAME, removed: «מהו |w|?» → «|w|», or `null` when the line carries
+ * no frame (so the caller knows there is no second reading to try).
+ *
+ * Deliberately NOT a transform above: a transform applies to statements too, and «|w| = 3?» — a
+ * student asking whether something holds — must never become the given «|w| = 3». Only the ask
+ * reader (`parseAsk` in app/deriveLines.ts) calls this, and it keeps the stripped reading only when
+ * it is a pure question.
+ */
+export function questionBody(raw: string): string | null {
+  const s = normalize(raw);
+  const body = s
+    .replace(new RegExp(`^${QUESTION_OPENER_KW}\\s+`, 'iu'), '')
+    .replace(new RegExp(`\\s*${QUESTION_MARK}\\s*$`, 'u'), '')
+    .trim();
+  return body === s || body === '' ? null : body;
 }
 
 /** The transform list, for the test that asserts the contract rather than restating it. */

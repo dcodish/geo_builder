@@ -935,8 +935,40 @@ AB» and «משיק לצלע AB» are different givens, and keeps the pair undir
 One target parser (`tangentTargets`) serves every sentence shape, so orders cannot drift — the
 ADR-AG-164 rule applied to tangency: the circle first («מעגל M משיק לישרים l1 ו-l2»), the
 contextual circle («המעגל משיק לישר l1»), the line first («הישר l1 משיק למעגל M», the plural
-subject), axes and lines mixed in one list. A target the grammar cannot read declines the whole
-sentence to the escalation seam — «משיק למעגל K» (circle-to-circle) is a different capability.
+subject), axes and lines mixed in one list.
+
+A CIRCLE piece (#1504, ADR-AG-167) makes the target list's third member: «מעגל M משיק למעגל K»
+lowers to `tangent-circles {a, b, branch?}` — the names as the sentence spelled them, resolved at
+the apply boundary through the `tangent-of`/`diameter-of` lookup chain, both required to be
+`circle-at` (an equation circle or `circle-thru` refuses `out-of-scope` by name). The constraint
+`tangent-circle {centre, r, other, otherR, branch}` is one row — |MK| − (r+R) or |MK| − |r−R| —
+and the sentence without «מבחוץ»/«מבפנים» lowers to `choice[external, internal]` (#1049), so the
+two touches cycle under «הציגו תצורה אחרת» and a branch word collapses the choice.
+`canonicalConstraint` keys the undirected pair plus the branch. A target the grammar cannot read declines the whole
+sentence to the escalation seam.
+
+**One reader per role (ADR-AG-167 amendment 1).** `parseCircleAt` splits a tangency sentence at its verb and reads each
+part ONCE: `readCircleSubject` answers which circle(s) the sentence is about — `one` (named «מעגל M», «מעגל שמרכזו M»,
+"circle M"; contextual «המעגל») or `pair` (conjoined «מעגל O ומעגל M», plural-named «המעגלים O ו-M» / «O וM», unnamed
+«(שני) המעגלים», and the English twins); `tangentTargets` reads every target list AND the line-first order's object (an
+unnamed «למעגל» is the contextual circle); `TANGENT_BRANCH` is the one branch-word table (מבחוץ/חיצונית/externally,
+מבפנים/פנימית/internally), and `peelMods` takes a branch word, «זה לזה» or «בנקודה T» off either end of the sentence or
+straight after the verb, in any order. A modifier must land on a circle-to-circle relation (a sentence-level branch
+distributes to the circle targets; «בנקודה T» needs exactly one relation; «זה לזה» needs a pair subject) — one with
+nothing to land on declines the sentence rather than vanish. A named subject introduces its circle(s), exactly as the
+singular always did; a pair with a target list makes EACH circle tangent to it.
+
+**The touch point** («…בנקודה T») is a `touch-point {a, b}` derived rule whose parents are the two CIRCLES
+(`curveParentsOf`): `K ± r_K·û`, the candidate whose distance to M is r_M — so it follows whichever touch the
+configuration drew. 0 DOF; a letter that already exists becomes a condition on it (`derived-at`, #1320).
+
+**Open bounds are judged at the solver's resolution.** `inDomain(d, v, floor)`: the stage-two admissibility test passes
+`openBoundFloor` = `SOLVE_RESOLUTION` × the figure's scale (point spread, or the largest parameter magnitude when
+larger), so a radius the givens force to zero (it converges to ~1e-10) reads as ON the bound `r > 0`, the attempt is
+inadmissible, and the best admissible effort leaves the contradicting given unsatisfied — refused on its sentence.
+Sampling and display keep the exact judgement (`floor = 0`). The tangency residual carries its own precondition the same
+way: centres closer than the resolution (relative to the radii) report the gap, so concentric circles are never
+tangent (operator ruling 2026-09-29).
 Honesty is held at the apply boundary: a named line that does not exist is `unknown-reference`
 (the ADR-AG-083 check, which `constraintCurveRefs` feeds), a minted equation that fits a circle is
 `out-of-scope` by name, and tangency about a circle with no centre point or radius parameter — an
