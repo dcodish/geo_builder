@@ -17,6 +17,7 @@ import { parse3 } from '../parser/parse3';
 import { dataView } from '../engine/dataView';
 import { derive3, useGeo3 } from '../store/store3';
 import { cross3, dot3, norm3, sub3 } from '../engine/vec3';
+import { meaningKey } from '../engine/operands';
 
 const state = () => useGeo3.getState();
 const submit = (u: string) => state().submit(u);
@@ -61,15 +62,18 @@ describe('#524 — «פאה» / «בסיס» name the planes of a dihedral', () 
     'הזווית בין הפאה SBC למישור ABC היא 60',
     'הזווית בין המישור SBC לבסיס ABC היא 60',
   ])('«%s» is the same statement', (u) => {
-    expect(cmds(u), u).toEqual(cmds(CANON));
+    // #1485 (ADR-3D-278): the SAME geometry — the face noun adds only a display flag (`face: true`),
+    // which sets how the plane is drawn by default, never which plane it is
+    expect(meaningKey(cmds(u)), u).toBe(meaningKey(cmds(CANON)));
+    expect(JSON.stringify(cmds(u)), 'the face noun is carried').toContain('"face":true');
   });
 
   it('the English mirrors', () => {
-    expect(cmds('the angle between face SBC and base ABC is 60')).toEqual(cmds(CANON));
+    expect(meaningKey(cmds('the angle between face SBC and base ABC is 60'))).toBe(meaningKey(cmds(CANON)));
   });
 
   it('the PREDICATE agrees with a feminine subject («הפאה … מאונכת»)', () => {
-    expect(cmds('הפאה SBC מאונכת לבסיס ABC')).toEqual(cmds('המישור SBC מאונך למישור ABC'));
+    expect(meaningKey(cmds('הפאה SBC מאונכת לבסיס ABC'))).toBe(meaningKey(cmds('המישור SBC מאונך למישור ABC')));
   });
 });
 

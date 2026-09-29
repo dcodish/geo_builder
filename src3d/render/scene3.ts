@@ -14,8 +14,8 @@
 import { openCrossings3 } from '../engine/crossings3';
 import { cleanMag } from '../engine/dataView';
 import { freeDofCount3, hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
-import { DIRECTION_REL_TOL, distanceWitness, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
-import type { Construction3, Id, Operand3, Positions3 } from '../engine/types';
+import { DIRECTION_REL_TOL, distanceWitness, operandKey, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
+import { defaultPlaneDisplay3, type Construction3, type Id, type Operand3, type Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
 import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
@@ -491,7 +491,7 @@ export function buildScene3(
   }
   const h = radius * 0.8;
   /** #1476: an unordered operand pair's identity — a constructed pair's arc/knee is the construction's. */
-  const pairKey = (a: Operand3, b: Operand3) => [JSON.stringify(a), JSON.stringify(b)].sort().join('~');
+  const pairKey = (a: Operand3, b: Operand3) => [operandKey(a), operandKey(b)].sort().join('~');
   const constructed = new Set(dihedralShown.map((d) => pairKey(d.a, d.b)));
   const patchFrame = new Map<string, { center: Vec3; e1: Vec3; e2: Vec3 }>();
   for (const { n1, n2, line, focus } of pairLines) {
@@ -517,7 +517,8 @@ export function buildScene3(
   for (const [name, pl] of resolved.planes) {
     // #395 (ADR-3D-108): a HIDDEN plane draws no patch (and no label/seam below) — the RELATION
     // stays enforced in the engine; only the ink is suppressed, per the operator's show/hide ask.
-    if (planeDisplay[name] === 'hidden') continue;
+    const mode = planeDisplay[name] ?? defaultPlaneDisplay3(c, name); // #1485: a face-named plane defaults to its face
+    if (mode === 'hidden') continue;
     // #318 'face' display: the patch IS the defining point-run polygon — no growing extents, no
     // fold-anchored frame. Only a point-run plane has a face to show; an equation plane (or an
     // unplaced run) falls through to the 'full' patch unchanged.
@@ -525,7 +526,7 @@ export function buildScene3(
     // edges and is a legitimate plane (operator ruling), but inking B→B'→D→D' would draw a crossed
     // bowtie — a self-crossing the student never stated. A run stated in a non-crossing order is
     // unchanged by the reorder, so every existing face patch draws exactly as before.
-    if (planeDisplay[name] === 'face') {
+    if (mode === 'face') {
       const run = c.pointPlanes.get(name);
       const facePts = run?.map((id) => positions.get(id));
       if (facePts && facePts.length >= 3 && facePts.every((p): p is Vec3 => p !== undefined)) {
@@ -817,7 +818,7 @@ export function buildScene3(
       // whether or not this panel is open) — never an arc labelled «90°» (#307)
       if (pr.deg !== undefined && isRightAngleValue(pr.deg)) continue;
       if (constructed.has(pairKey(pr.a, pr.b))) continue; // #1476: the construction draws this one
-      const key =[JSON.stringify(pr.a), JSON.stringify(pr.b)].sort().join('~') + '~' + pr.text;
+      const key = pairKey(pr.a, pr.b) + '~' + pr.text;
       if (seenArc.has(key)) continue;
       seenArc.add(key);
       const ga = resolveOperand(pr.a, c, absA)(atA);

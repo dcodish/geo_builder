@@ -26,7 +26,7 @@ import { buildNotices3, type BuildNotice3 } from '../engine/notices';
 import { normalizeLabel3, renameFacts3, renamePlaneDisplay3, renameQueries3, type RenameResult3 } from './rename3';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
-import { stripFormatControls } from '../../shell/bidi';
+import { ingestTypedText } from '../../shell/bidi';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, freeDims } from '../engine/apply';
@@ -37,7 +37,8 @@ import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLine
 import { verifyClaim } from '../engine/claims';
 import { dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
-import { claimPointIds, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type Positions3 } from '../engine/types';
+import { meaningKey } from '../engine/operands';
+import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
 import { parse3, parseRename3 } from '../parser/parse3';
 
@@ -282,7 +283,36 @@ const pivotPinKey = (c: Construction3): string => {
 const paramPinKey = (c: Construction3): string =>
   [pinningGivens(c), c.paramGivens.length, c.param !== undefined ? symbolValueOf(c, c.param) ?? '' : ''].join('|');
 
+/**
+ * #1422 — THE FOLD-MEMO RULE ARRIVES IN 3-D. This store's header records why derive3 was never
+ * cached: V0 figures were cheap. ADR-3D-260 (#1311) made every derive SOLVE the free-point rider
+ * lane, and one «הציגו תצורה אחרת» press then paid it at least twice (`seedForRequirements`
+ * derives the candidate, the view derives it again) — measured ~500 ms per press on
+ * «וקטור AB · אורך AB = 5». The memo is keyed on the facts ARRAY IDENTITY (every store action
+ * builds a new array — the same property the 2-D `lastViewDelta` self-invalidation states) and the
+ * seed; a WeakMap, so a session's figures are dropped with them. Callers treat `Derived3` as
+ * read-only already (it is shared across the render tree within one commit). Bounded per figure:
+ * a seed sweep touches many seeds, and 32 entries cover the ADR-3D-053 search window.
+ */
+const deriveMemo3 = new WeakMap<readonly Fact3[], Map<number, Derived3>>();
+
 export function derive3(facts: Fact3[], seed: number): Derived3 {
+  const per = deriveMemo3.get(facts);
+  const hit = per?.get(seed);
+  if (hit) return hit;
+  const out = derive3Uncached(facts, seed);
+  const m = per ?? new Map<number, Derived3>();
+  if (!per) deriveMemo3.set(facts, m);
+  m.set(seed, out);
+  if (m.size > 32) m.delete(m.keys().next().value as number);
+  return out;
+}
+
+/** #1422 — the memo's counter lock seam (the 2-D `conflictSearchStats` idiom): one press must
+ *  cost exactly one uncached derive, asserted by count, never by clock. */
+export const deriveStats3 = { uncached: 0 };
+function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
+  deriveStats3.uncached++;
   let c: Construction3 = emptyConstruction3();
   const status: Record<string, FactStatus3> = {};
   const claimOwners: { factId: string; from: number; to: number }[] = [];
@@ -338,20 +368,26 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
    * fact owns its additions exactly as an in-order one does (the 2-D `recordOwnership` discipline).
    */
   const applyFact = (f: Fact3): FactStatus3 => {
-    let st: FactStatus3 = 'ok';
     const claimsBefore = c.claims.length;
     const pinsBefore = pivotPinKey(c);
     const coordPinsBefore = c.pins.length + c.vectorPins.length;
     const paramPinsBefore = paramPinKey(c);
+    /**
+     * #1413 — A FAILING FACT IS ATOMIC: it commits NOTHING (the analytic line-atomicity, arriving
+     * here). Before this, a fact that failed on its Nth command had already committed the earlier
+     * ones, so (a) a half-applied statement left orphan objects in the figure, and (b) a red row's
+     * retry dry-run read "already defined" for its OWN earlier commands — which is what blocked
+     * refreshing a stale error (ADR-3D-259's withdrawn attempt). `applyCommand3` is pure, so the
+     * fact builds on a probe and the figure advances only when the whole fact holds.
+     */
+    let probe = c;
     for (const cmd of f.cmds) {
       if (droppedSoft(cmd)) continue; // an explicit ∠=90 on this triangle superseded the soft default
-      const r = applyCommand3(c, cmd);
-      if (!r.ok) {
-        st = r.error;
-        break;
-      }
-      c = r.next;
+      const r = applyCommand3(probe, cmd);
+      if (!r.ok) return r.error;
+      probe = r.next;
     }
+    c = probe;
     // count-delta attribution: EVERY claim recorded while this fact applied belongs to
     // it — including claims composite commands create indirectly (none can escape)
     if (c.claims.length > claimsBefore) claimOwners.push({ factId: f.id, from: claimsBefore, to: c.claims.length });
@@ -360,7 +396,7 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     if (pivotPinKey(c) !== pinsBefore) pinOwnerIds.add(f.id);
     if (c.pins.length + c.vectorPins.length > coordPinsBefore) coordPinOwnerIds.add(f.id);
     if (paramPinKey(c) !== paramPinsBefore) paramPinOwners.push(f.id);
-    return st;
+    return 'ok';
   };
   for (const f of facts) {
     if (!f.enabled) {
@@ -397,25 +433,40 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
   // have depended on a point that did not exist. The rule is now one sentence — a red row is retried
   // iff its dry run succeeds — and a row whose reference nothing declares still fails the dry run and
   // stays red.
-  const retryWouldSucceed = (f: Fact3): boolean => {
+  /** The dry run's verdict against the CURRENT figure: null = the fact would apply cleanly. */
+  const retryError = (f: Fact3): FactStatus3 | null => {
     let probe = c;
     for (const cmd of f.cmds) {
       if (droppedSoft(cmd)) continue;
       const r = applyCommand3(probe, cmd);
-      if (!r.ok) return false;
+      if (!r.ok) return r.error;
       probe = r.next;
     }
-    return true;
+    return null;
   };
   for (let pass = 0; pass < facts.length; pass++) {
     let progressed = false;
     for (const f of facts) {
       if (typeof status[f.id] === 'string') continue; // ok, or disabled — never touched
-      if (!retryWouldSucceed(f)) continue; // still unsatisfiable against the completed figure — stays red
+      if (retryError(f) !== null) continue; // still unsatisfiable against the completed figure — stays red
       status[f.id] = applyFact(f);
       progressed = true;
     }
     if (!progressed) break;
+  }
+  /**
+   * #1413 — A RED ROW'S MESSAGE IS ITS LATEST ATTEMPT, never its first. After the fixpoint, a row
+   * that stays red is re-judged against the COMPLETED figure and its status refreshed: «M אמצע SX»
+   * edited above its pyramid used to keep «unknown point S» from its in-order application, while S
+   * is on the canvas and the letter actually missing is X — a stale message names a statement the
+   * figure no longer conflicts with (the honesty invariant). Atomicity above is what makes this dry
+   * run honest: a failing fact commits nothing, so its own earlier commands cannot answer
+   * «already defined» to the retry.
+   */
+  for (const f of facts) {
+    if (typeof status[f.id] === 'string') continue; // ok, or disabled
+    const latest = retryError(f);
+    if (latest !== null) status[f.id] = latest;
   }
   // #978 (ADR-3D-246): the VERIFIER arm of the «אלכסון» claim (#859 / ADR-3D-203). The apply moment
   // judges the claim only when ONE solid holds both letters; with two solids on the canvas, or a pair the
@@ -501,7 +552,9 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
           !(c.scaleGivens.includes(claim) && scaleGivenActive(c))
         ) {
           const exactlyCheckable = scaleGivenActive(c) && freeDims(c) === 0;
-          const pivotLane = claim.type === 'volume-poly' && c.scaleGivens.length === 0 && scalePinned(c);
+          // #1447: an AREA claim mirrored by its driving pin joins the volume's pivot lane — the
+          // pin drove the free dims toward the statement, and this verification is its arbiter.
+          const pivotLane = (claim.type === 'volume-poly' || claim.type === 'area-eq') && c.scaleGivens.length === 0 && scalePinned(c);
           if (!exactlyCheckable && !pivotLane) {
             status[owner.factId] = { code: 'size-on-solid' };
             break;
@@ -855,7 +908,7 @@ export interface Geo3State {
  * matters — a command list is a sequence, and two different orderings are not obviously the same claim.
  */
 const sameStatement = (a: readonly Command3[], b: readonly Command3[]): boolean =>
-  a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
+  a.length === b.length && meaningKey(a) === meaningKey(b); // #1485: «הפאה SBC» restates «המישור SBC»
 
 /**
  * #926 (ADR-3D-220, ADR-W-044) — what a change to ONE row did to the OTHERS. A delete, a mute or an edit
@@ -951,7 +1004,7 @@ export function decideSubmit3(
   raw: string,
   newId: () => string = () => nanoid(8),
 ): Verdict3 {
-  const utterance = stripFormatControls(raw); // #751 (ADR-W-029) — the store-side ingest invariant
+  const utterance = ingestTypedText(raw); // #751 (ADR-W-029) — the store-side ingest invariant
   // #578 (ADR-3D-211): «שנה שם E ל-O» is a rewrite of HISTORY, not a statement about the figure,
   // so it is read BEFORE the grammar and never becomes a fact. Intercepted here rather than in
   // App3 because this is where the fact list lives — and because a refusal must carry its own
@@ -1052,7 +1105,7 @@ export const useGeo3 = create<Geo3State>()(
       },
 
       submitSteps: (utterance, steps) => {
-        utterance = stripFormatControls(utterance); // #751 (ADR-W-029)
+        utterance = ingestTypedText(utterance); // #751 (ADR-W-029)
         const all: Command3[] = [];
         for (const step of steps) {
           const p = parse3(step);
@@ -1096,7 +1149,7 @@ export const useGeo3 = create<Geo3State>()(
       },
 
       replaceFact: (factId, utterance) => {
-        utterance = stripFormatControls(utterance); // #751 (ADR-W-029)
+        utterance = ingestTypedText(utterance); // #751 (ADR-W-029)
         const { facts, seed } = get();
         const old = facts.find((f) => f.id === factId);
         if (!old) return false;
@@ -1176,13 +1229,16 @@ export const useGeo3 = create<Geo3State>()(
       // #318 + #395 (ADR-3D-108): cycle a named plane's patch full → face → hidden → full. The
       // record keeps only non-default entries — cycling back to 'full' DELETES the key, so a saved
       // file never carries redundant defaults and "absent = full" stays the single convention.
+      // #1485 (ADR-3D-278): "absent" means the plane's OWN default — 'face' for a plane first named
+      // as a face or base — so the cycle starts from that and deletes the key on returning to it.
       togglePlaneDisplay: (name) => {
-        const cur = get().planeDisplay;
+        const { planeDisplay: cur, facts, seed } = get();
+        const dflt = defaultPlaneDisplay3(derive3(facts, seed).construction, name);
         const next = { ...cur };
-        const mode = cur[name] ?? 'full';
-        if (mode === 'full') next[name] = 'face';
-        else if (mode === 'face') next[name] = 'hidden';
-        else delete next[name];
+        const mode = cur[name] ?? dflt;
+        const after = mode === 'full' ? 'face' : mode === 'face' ? 'hidden' : 'full';
+        if (after === dflt) delete next[name];
+        else next[name] = after;
         set({ planeDisplay: next });
       },
 

@@ -3184,8 +3184,14 @@ const paramSign: Rule = (s) => {
     s.match(/^(?:ה?פרמטר\s+)?([a-w])\s+(?:הוא\s+)?(?:פרמטר\s+|מספר\s+)?(חיובי|שלילי)$/) ??
     s.match(/^(?:the\s+parameter\s+)?([a-w])\s+is\s+(?:a\s+)?(positive|negative)(?:\s+(?:parameter|number))?$/i) ??
     s.match(/^([a-w])\s*([<>])\s*0$/);
-  if (!m) return null;
-  return [{ type: 'param-sign', sym: m[1], positive: /^(?:חיובי|positive|>)$/i.test(m[2]) }];
+  if (m) return [{ type: 'param-sign', sym: m[1], positive: /^(?:חיובי|positive|>)$/i.test(m[2]) }];
+  // #1451 — the UNSIGNED declaration: «t הוא פרמטר», «t פרמטר», "t is a parameter". The signed
+  // spelling worked while the plain one burned an LLM call per attempt — the two-spellings bug.
+  const d =
+    s.match(/^([a-w])\s+(?:הוא\s+)?פרמטר$/) ??
+    s.match(/^([a-w])\s+is\s+(?:a\s+)?parameter$/i);
+  if (d) return [{ type: 'param-decl', sym: d[1] }];
+  return null;
 };
 
 /** Standalone `v = (10,-5,0)` — a single vector injection.

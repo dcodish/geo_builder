@@ -134,3 +134,25 @@ export function clearSession(spec: SessionSpec): void {
     /* nothing to do — the offer is already dismissed in memory */
   }
 }
+
+/**
+ * #1453 (ADR-W-098) — a per-viewer "already seen" FLAG (the first-visit About), through the same one
+ * door as the session. A flag is not a session and never expires; it only remembers that this browser
+ * has seen something once. Unavailable storage reads as "not seen" and the write is dropped, so a
+ * private window simply sees the About again.
+ */
+export function flagSeen(key: string): boolean {
+  try {
+    return storage()?.getItem(key) != null;
+  } catch {
+    return false;
+  }
+}
+
+export function markSeen(key: string): void {
+  try {
+    storage()?.setItem(key, '1');
+  } catch {
+    /* full or blocked — the flag is a convenience */
+  }
+}

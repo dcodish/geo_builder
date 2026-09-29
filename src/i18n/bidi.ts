@@ -35,7 +35,8 @@ const HEBREW_LETTER = /[א-ת]/;
  * for CORE: `AB = x²` trimmed to `AB = x`, orphaning the `²`. `__tests__/bidi.test.ts` now asserts the
  * palette is a SUBSET of this class, so adding a button without teaching bidi about it fails the suite.
  */
-const CORE = /[A-Za-z0-9^_~<≅²³½¾·Α-ω|∠∡∢⊥∥△▲√⌢°]/;
+// #1348 (ADR-W-095): ≤ ≥ are palette buttons now, relation glyphs like <
+const CORE = /[A-Za-z0-9^_~<≤≥≅²³½¾·Α-ω|∠∡∢⊥∥△▲√⌢°]/;
 
 /**
  * Delimiters that HUG a run and belong inside the isolate with it — `(1, 2, -3)`, `("AB")`.

@@ -3348,3 +3348,47 @@ binomial-spelling, member, member-poly, quartic, corpus-witness}-1434.complex.js
 3. **The literal-atom bridge** — an off-axis `a+bi` literal (`2+3i`) carries its argument as an opaque atom, so `(mod, arg)` alone could not recover the pair. `fromCartesian` now REGISTERS the exact rational pair on the atom name (`value/angle.ts`; a name re-registered with a different pair is poisoned to null — exactness never guesses), and `gaussianRationalParts` reads it back for a single ±1-coefficient atom with quarter-turn offsets (·i rotations, conjugates). Everything outside the field — parameters, free points, non-quarter turns, irrational tables — answers null and the ≈ decimal stands.
 
 **Consequences.** `src-complex/value/rational.ts` (`sqrtExact`), `src-complex/value/angle.ts` (atom registry), `src-complex/value/value.ts` (`fromCartesian` registers), `src-complex/value/cartesian.ts` (`gaussianRationalParts`, `ratPart`), `src-complex/model/knowledge.ts` (`approx`), `src-complex/replay/derive2.ts` (the composers, `evalGauss`/`exactAnswer`, every row maker), `src-complex/App.tsx` (≈ rendering). Lock: `src-complex/__tests__/issue-1436-exact-ask.test.ts` — the reviewer's exact case (2√2), √5 through the atom bridge, exact complex/product/quotient answers, the integer and fraction spellings under `=`, and the irrational ≈ floor.
+
+## ADR-CX-052 — A free polygon is sampled as a shape, not vertex by vertex (#1424)
+
+**Status:** accepted · 2026-09-28 · operator report («why is this behavior», 2026-09-25/27), batch-approved 2026-09-27 · round #1517. Numbered 052 beside the round's other complex branches (053–055).
+
+**Requirements:** docs/02d FR-CN-4 (amended: a free polygon's start reads as its shape) · **Design:** docs/04d — a free polygon starts as a shape
+
+**Context.** «משולש ABC» drew a thin sliver. Its three vertices are six free values, and each vertex took its own modulus and argument, so nothing kept three independent draws from landing nearly in a line. Measured on main `d3f08a4c` at seeds 0–23, the smallest corner was 3°–43°, and 10 of 24 were under 15°. The quadrilateral at seed 0 was not even convex. 2-D places a bare shape in general position (ADR-253).
+
+**Decision.** Where tier 2's starting state is built, a polygon whose EVERY vertex is fully free (free modulus and argument, no quadrant window, not the origin, not already placed by an earlier polygon) takes its start from `polygonShapeStart`. That is a regular n-gon with a per-seed centre, size and rotation, and each vertex jittered by ±22% of the spacing in angle and ±18% in radius. Every vertex stays a free coordinate: the free basis, the published DOF list (6 for a triangle, 8 for a quadrilateral) and the solve are untouched. «show another configuration» still moves every vertex, and a given still moves one wherever the solve needs. Only the starting distribution changes, which ADR-052 permits.
+
+**Rejected.** A minimum-angle rejection loop over the per-vertex draws: it keeps the wrong distribution and adds a retry count to the seed contract.
+
+**Measured.** Smallest triangle corner ≥ 20° at 24/24 seeds (was 3°–43°). «מרובע ABCD» is convex with every corner > 20° at 24/24. «A = 0 · B = 4 · משולש ABC» still honours A and B.
+
+**Consequences.** `src-complex/replay/derive2.ts` (`polygonShapeStart` and the start). Lock: `issue-1424-polygon-shape.test.ts`.
+
+## ADR-CX-053 — The region count leaves out the polygon's own corners (#1425)
+
+**Status:** accepted · 2026-09-28 · operator report («why is this behavior», 2026-09-25/27), batch-approved 2026-09-27 · round #1517. Numbered 053 beside the round's other complex branches (052, 054–055).
+
+**Requirements:** docs/02d FR-GP-5 (new) · **Design:** docs/04d — the region count excludes a polygon's own corners
+
+**Context.** Under a lone «משולש ABC» the strip read «ABC: 0 בפנים · 3 על המצולע · 0 בחוץ». `regionsOf` (ADR-CX-016) counted every plotted number against a stated polygon, including the polygon's own vertices, which lie on it by definition. The count exists for the §2b question «how many of the solutions are inside / on / outside», and those are the OTHER numbers.
+
+**Decision.** `resolveObjects` publishes each polygon's `cornerNames`: its vertex names minus the members of any enumerated solution set (the fold's `solutionSets`). `regionsOf` leaves those names out of `members` and so out of the counts. The region still shades its interior; the App strip renders only when something is counted. The plan's open case is settled by identity: a vertex that is also a solution («z^3 = 8», then «המשולש z1z2z3») is one of the numbers the question counts, so it stays and reads as on. Measured on the branch, before deciding: an equation's solutions are plotted under their own indexed names (`w^5 = 32` → w1…w5), separate from the polygon's letters, so the §2b shape is unaffected.
+
+**Measured.** «משולש ABC» → no members, no strip (was on 3). «משולש ABC · z1 = 0» → z1 only. The §2b capstone fixture: «Oz1z2z3» counts z4 (out) and «Oz2z3z4» counts z1 (out); each previously also counted its own three corners. «z^3 = 8 · המשולש z1z2z3» → on 3.
+
+**Consequences.** `src-complex/replay/derive2.ts` (`cornerNames`), `src-complex/scene/region.ts`, `src-complex/App.tsx` (the strip gate). Lock: `issue-1425-region-count.test.ts`.
+
+## ADR-CX-054 — Undo/redo read in Hebrew, and every product's literal i18n keys are guarded (#1452)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27), batch-approved the same day · round #1517. Numbered 054 beside the round's other complex branches (052–053, 055).
+
+**Requirements:** none (internal — the standing rule that every user-facing string goes through `t()` and reads in the UI language) · **Design:** none (internal)
+
+**Context.** The complex Builder's undo/redo row read «undo / redo» in the Hebrew UI while the other three tools read «בטל / בצע שוב». `App.tsx` has called `t('undo')` / `t('redo')` since #1099, and neither key existed in either complex locale, so i18next printed the key name in both languages. This is the #882 class. The shared literal-key audit (#1372) ran only for 2-D and 3-D, on the belief that `const en: typeof he` covered the TS-object locales. That only keeps the two locales in step with each other; it cannot see a key missing from both.
+
+**Decision.** Add `undo`/`redo` to both complex locales with the siblings' wording. Run the shared `i18nKeyAudit` for complex AND analytic (analytic is clean today, but was unguarded), each with the "can fail" half, and correct the audit's header so the false belief is not repeated.
+
+**Measured.** On main `d3f08a4c` the complex audit reports exactly `App.tsx: undo`, `App.tsx: redo`. On the branch both products report none.
+
+**Consequences.** `src-complex/i18n/index.ts`, `shell/__tests__/fixtures/i18n-keys.ts` (comment). Locks: `src-complex/__tests__/i18n-keys-1452.test.ts`, `src-analytic/__tests__/i18n-keys-1452.test.ts`.
