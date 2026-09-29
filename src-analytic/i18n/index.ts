@@ -306,6 +306,8 @@ const he = {
   // «הציגו תצורה אחרת» found none — an answer about the figure, not a failure (#1084).
   noticeOnlyConfiguration: 'זו התצורה היחידה שמצאתי — הנתונים שכתבתם קובעים את השרטוט.',
   noticeAlreadyKnown: 'זה כבר ידוע מהנתונים שכתבתם, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
+  // #1350 (operator ruling 2026-09-22) — the line IS recorded; this is about identity, never an error.
+  noticeNameReadsAs: 'שימו לב: הישר {{detail}} והישר {{holder}} הם שני ישרים שונים — השמות נקראים דומה, אבל כל שם מתייחס לישר שלו.',
   // A different sentence from «כבר ידוע» on purpose (#1063): the student did NOT repeat themselves —
   // they stated something the figure had already settled, which is a thing worth telling them.
   // ── The session chrome (#1087): one vocabulary across the suite, so a student who learned
@@ -606,6 +608,7 @@ const en: typeof he = {
   kindDiagonalMeet: 'the intersection of the diagonals',
   noticeOnlyConfiguration: 'This is the only configuration I found — your givens fix the figure.',
   noticeAlreadyKnown: 'That is already known from what you have written, so I did not add another row: "{{detail}}"',
+  noticeNameReadsAs: 'Note: line {{detail}} and line {{holder}} are two different lines — the names read alike, but each one refers to its own line.',
   save: 'Save',
   load: 'Load',
   namePlaceholder: 'Figure name (optional)',

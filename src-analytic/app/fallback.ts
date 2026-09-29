@@ -30,7 +30,7 @@
  * forbids firing a live call without the operator. Nothing in this module reaches the network.
  */
 
-import { decideSubmit, type SubmitVerdict } from './submit';
+import { decideSubmit, type RecordNotice, type SubmitVerdict } from './submit';
 import { derive } from '../engine/derive';
 import type { LlmStepsOutcome } from '../parser/llmAnalytic';
 import { restoreStatedSequencesAnalytic } from '../parser/honestyAnalytic';
@@ -47,7 +47,7 @@ export type FallbackOutcome =
    * so the caller can log them: both siblings do, and it is how #536 was diagnosed at all — without it
    * a `source:'llm'` submit that was silently corrected is indistinguishable from one that was not.
    */
-  | { kind: 'lines'; lines: string[]; restored?: string[] }
+  | { kind: 'lines'; lines: string[]; restored?: string[]; notice?: RecordNotice }
   /**
    * The model answered and at least one line would be refused. Nothing is recorded, and the caller
    * keeps the ORIGINAL refusal rather than reporting the model's line — the student never wrote it,
@@ -106,6 +106,8 @@ export async function runFallback(
   // Re-decide each line against the figure as it would stand after the ones before it — the same
   // incremental path the student walks, so a later line may legitimately depend on an earlier one.
   const accepted: string[] = [];
+  // #1350 — a line the model named («ישר 3» beside «l3») earns the same notice a typed one does.
+  let notice: RecordNotice | undefined;
   for (const step of gated.lines) {
     const soFar = [...lines, ...accepted];
     const verdict: SubmitVerdict = decideSubmit(step, soFar, seed, derive(soFar, seed));
@@ -115,8 +117,13 @@ export async function runFallback(
     }
     // `already-known` / `already-follows` contribute nothing but are not failures: the model restated
     // something true. Drop the line and keep going rather than recording a duplicate.
-    if (verdict.kind === 'record') accepted.push(verdict.line);
+    if (verdict.kind === 'record') {
+      accepted.push(verdict.line);
+      notice ??= verdict.notice;
+    }
   }
 
-  return accepted.length ? { kind: 'lines', lines: accepted, ...(gated.restored.length ? { restored: gated.restored } : {}) } : { kind: 'none' };
+  return accepted.length
+    ? { kind: 'lines', lines: accepted, ...(gated.restored.length ? { restored: gated.restored } : {}), ...(notice ? { notice } : {}) }
+    : { kind: 'none' };
 }

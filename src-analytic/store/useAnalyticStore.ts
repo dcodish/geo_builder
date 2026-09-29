@@ -188,7 +188,12 @@ interface AnalyticState {
    */
   queries: AskedQuestion[];
 
-  recordLine: (line: string) => void;
+  /**
+   * Record an accepted line. `notice` is what the SAME commit shows (#1350): recording clears the
+   * transient surfaces, so a notice earned by the line it rides on must travel with it, never be set
+   * before it.
+   */
+  recordLine: (line: string, notice?: string | null) => void;
   removeLine: (index: number) => void;
   replaceLine: (index: number, next: string) => void;
   /** #1548 — record the muted set the submit path decided on. */
@@ -236,7 +241,8 @@ interface AnalyticState {
   /** Replace the session with a loaded one. */
   restore: (session: { lines: string[]; seed?: number; name?: string; spokenFor?: Record<number, string>; disabled?: number[] }) => void;
   /** Record the fallback's machine lines under the student's OWN sentence (#1297). */
-  recordLlmLines: (spoken: string, lines: string[]) => void;
+  /** `notice` travels in the commit, as `recordLine`'s does (#1350). */
+  recordLlmLines: (spoken: string, lines: string[], notice?: string | null) => void;
   setNotice: (n: string | null) => void;
 }
 
@@ -255,14 +261,14 @@ export const useAnalyticStore = create<AnalyticState>()(
   queries: [],
 
   // #1348 (ADR-W-095): the store-side ingest (ADR-W-029) — every line this store records passes it
-  recordLine: (line) => set((s) => ({ lines: [...s.lines, ingestTypedText(line)], error: null, notice: null })),
-  recordLlmLines: (spoken, ls) =>
+  recordLine: (line, notice = null) => set((s) => ({ lines: [...s.lines, ingestTypedText(line)], error: null, notice })),
+  recordLlmLines: (spoken, ls, notice = null) =>
     set((s) => {
       const spokenFor = { ...s.spokenFor };
       ls.forEach((_, k) => {
         spokenFor[s.lines.length + k] = ls.length > 1 ? `${spoken} (${k + 1}/${ls.length})` : spoken;
       });
-      return { lines: [...s.lines, ...ls.map(ingestTypedText)], spokenFor, error: null, notice: null };
+      return { lines: [...s.lines, ...ls.map(ingestTypedText)], spokenFor, error: null, notice };
     }),
   removeLine: (index) =>
     set((s) => {
