@@ -53,6 +53,11 @@ export type InputError =
    */
   | { key: 'complex-as-real'; detail: string; letter: string }
   /**
+   * #1435 — a root written with the WORD («שורש של 3»): taught, with `suggestion` — the line in the
+   * √ spelling, which the grammar has already read (the 2-D #246 guidance).
+   */
+  | { key: 'word-root'; detail: string; suggestion: string }
+  /**
    * #1428 — the fold could not use the statement `detail`, for a reason it KNOWS (`why`): a reserved
    * letter, today. The strip words that reason; the generic «incompatible» would claim a contradiction
    * that may not exist (`z = 1+i` after `z^2 = 2i` — 1+i IS a root).

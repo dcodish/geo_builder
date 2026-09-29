@@ -22,6 +22,7 @@ const ERROR_KEY: Record<InputError['key'], string> = {
   unaccounted: 'errUnaccounted',
   'complex-as-real': 'errComplexAsReal',
   refused: 'errRefused',
+  'word-root': 'errWordRoot',
 };
 
 /**
@@ -29,7 +30,9 @@ const ERROR_KEY: Record<InputError['key'], string> = {
  * worded reason when the refusal carries the fold's `why` (#1428).
  */
 const errParams = (e: InputError, t: Translate): Record<string, string> =>
-  'letter' in e
+  'suggestion' in e
+    ? { detail: e.detail, suggestion: e.suggestion }
+    : 'letter' in e
     ? { detail: e.detail, letter: e.letter }
     : 'why' in e
       ? { detail: e.detail, reason: whyText(e.why, t) }
