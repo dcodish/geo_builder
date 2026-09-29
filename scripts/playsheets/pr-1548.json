@@ -8,6 +8,7 @@
       "class": "look",
       "product": "analytic",
       "base": "http://localhost:5182",
+      "path": "/analytic.html",
       "lines": [
         "A(0,0)",
         "B(4,0)",
@@ -25,6 +26,7 @@
       "class": "look",
       "product": "analytic",
       "base": "http://localhost:5182",
+      "path": "/analytic.html",
       "lines": [
         "A(0,0)",
         "B(4,0)",
@@ -48,6 +50,7 @@
       "class": "look",
       "product": "analytic",
       "base": "http://localhost:5182",
+      "path": "/analytic.html",
       "lines": [
         "A(0,0)",
         "B(4,0)",
@@ -70,6 +73,7 @@
       "class": "play",
       "product": "analytic",
       "base": "http://localhost:5182",
+      "path": "/analytic.html",
       "lines": [
         "A(0,0)",
         "B(4,0)",
