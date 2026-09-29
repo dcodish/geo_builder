@@ -69,6 +69,8 @@ export function whyText(w: Why, t: Translate): string {
       return t('whyMaybeMulti');
     case 'multi-solution':
       return t('whyMultiSolution', { solutions: w.solutions, first: prettyName(w.first) });
+    case 'arg-of-zero':
+      return t('whyArgOfZero');
     case 'measure-uncomputable':
       return t('whyMeasureUncomputable', { src: w.src });
     case 'measure-holds':

@@ -33,7 +33,7 @@
  */
 import { isolateRtlName } from '../../shell/bidi';
 import { fmtAnalytic, fractionClearingFactor } from '../format';
-import { ellipseFoci, parabolaFocus } from '../engine/curves';
+import { ellipseFoci, parabolaDirectrix, parabolaFocus } from '../engine/curves';
 import { isVerticalLine } from '../engine/lines';
 import { evalExpr, exprText, isConstant, symbolsOf, type Expr } from '../engine/expr';
 import type { NumCurve } from '../engine/types';
@@ -250,6 +250,16 @@ export function curveEquationText(eq: Expr): string {
  * `y = -x/2 + 7/2`. The sign, the `1`-suppression and the zero-suppression are still `term`'s rules,
  * read off its own output rather than re-decided.
  */
+/**
+ * A ROLE LINE — a directrix, an axis — the way the exam writes it (#1432 am. 1): `x = −2` when vertical, else
+ * the explicit `y = …`. Derived from the LINE, never from the conic's orientation, so the ask and the panel
+ * print the right directrix whichever way a parabola opens: the ask used to print `x = −c/a` for every
+ * directrix, true only while every parabola in scope opened sideways.
+ */
+export function roleLineText(a: number, b: number, c: number): string {
+  return explicitLineText(a, b, c) ?? `x = ${fmt(-c / a)}`;
+}
+
 export function explicitLineText(a: number, b: number, c: number): string | null {
   // #1276: RELATIVELY — `|b| < 1e-12` called a line vertical only when its coefficient was exactly
   // zero, so a solved vertical line printed an explicit form with a slope of a billion instead.
@@ -387,6 +397,12 @@ const at = (nameAt: NameAt | undefined, x: number, y: number, coords: string): s
 /** Who sits at a position, if anyone — `pointAt(figure, …)`, supplied by the caller. */
 export type NameAt = (x: number, y: number) => string | null;
 
+/** A parabola's directrix, in the one role-line wording — shared by the panel row and the ask. */
+export function directrixText(c: NumCurve & { kind: 'parabola' }): string {
+  const d = parabolaDirectrix(c);
+  return d.kind === 'line' ? roleLineText(d.a, d.b, d.c) : '';
+}
+
 export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): CurveParts {
   switch (c.kind) {
     case 'line': {
@@ -417,7 +433,8 @@ export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): Cu
       const mag = fmt(Math.abs(k)) === fmt(1) ? '' : fmt(Math.abs(k));
       return {
         equation: `y² = ${k < 0 ? '-' : ''}${mag}x`,
-        details: `${at(nameAt, f.x, 0, `${fmt(f.x)}, 0`)}, x = ${fmt(-c.p / 2)}`,
+        // The focus and the directrix from their own derivations — no coordinate assumed (#1432 am. 1).
+        details: `${at(nameAt, f.x, f.y, `${fmt(f.x)}, ${fmt(f.y)}`)}, ${directrixText(c)}`,
       };
     }
     case 'ellipse': {

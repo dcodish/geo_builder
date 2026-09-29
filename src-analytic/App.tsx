@@ -36,6 +36,7 @@ import { decideEdit, decideSubmit, decideToggle, reachesFallback } from './app/s
 import { activeOf, rowOf } from './app/active';
 import { runFallback } from './app/fallback';
 import { panelKnowledge } from './app/panelRows';
+import { hostKey, rangeText } from './app/hostKey';
 import { angleText, lineAngleOf } from './app/lineAngle';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
 import { domainText } from './engine/types';
@@ -76,6 +77,7 @@ import { ShareSheet } from '../shell/frame/ShareSheet';
 import { loadAnalyticSession } from './app/loadSession';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
+
 
 declare const __BUILD__: string;
 
@@ -941,7 +943,12 @@ export function App() {
           'ring-contradicts-noun': 'errRingContradictsNoun',
           // #1407 — a vertex in SEVERAL shapes gets the three-letter name it needs; in none, the general form.
           'ambiguous-angle': error.key === 'ambiguous-angle' && error.example ? 'errAmbiguousAngleArms' : 'errAmbiguousAngle',
-          'ambiguous-shape': 'errAmbiguousShape',
+          // #1432 am. 1 — the remedy follows the HOST the reference needed; the polygon-noun sites (no host) keep the kite example.
+          'ambiguous-shape':
+            error.key === 'ambiguous-shape' && error.host
+              ? hostKey('errHost', error.host)
+              : 'errAmbiguousShape',
+          'out-of-domain': 'errOutOfDomain',
           'undistinguished-diagonal': 'errNoPrincipalDiagonal',
           'already-named': 'errAlreadyNamed',
           // #1423 — a refusal that restates an existing letter says the LETTER is the problem
@@ -952,7 +959,7 @@ export function App() {
           'load-too-large': 'errLoadTooLarge',
           'load-unreadable': 'errLoadUnreadable',
         }[error.key],
-        { detail: error.detail, max: MAX_FIGURE_STATEMENTS, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '', example: 'example' in error ? (error.example ?? '') : '', reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '', definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '' },
+        { detail: error.detail, max: MAX_FIGURE_STATEMENTS, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '', example: 'example' in error ? (error.example ?? '') : '', reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '', definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '', found: 'host' in error && error.host ? error.host.found : 0, range: 'domain' in error && error.domain ? rangeText(error.domain, t) : '' },
       )
     : null;
 
@@ -1778,6 +1785,9 @@ export function App() {
                             : 'askContextualLine',
                         { points: a.contextual.points, lines: a.contextual.lines },
                       )}`
+                    ) : a.host ? (
+                      /* #1432 am. 1 — a role question whose host is absent or plural: say which, never «לא הבנתי» */
+                      `${a.question} — ${t(hostKey('askHost', a.host))}`
                     ) : a.unreadable ? (
                       `${a.question} — ${t('askUnreadable')}`
                     ) : (

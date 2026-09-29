@@ -651,13 +651,37 @@ function rhsOf(cmp: CoordCompare, at: (id: Id) => Pt | null, env: Env): number |
  * point exactly when the judge would have rejected it.
  */
 function apartOf(at: Map<Id, Pt>): number {
+  return spanOf(at) * 1e-2;
+}
+
+/** The figure's extent — the larger coordinate spread of its points (1 with fewer than two). */
+function spanOf(at: Map<Id, Pt>): number {
   const xs = [...at.values()];
-  const span = xs.length < 2 ? 1 : Math.max(
+  return xs.length < 2 ? 1 : Math.max(
     1e-9,
     Math.max(...xs.map((p) => p.x)) - Math.min(...xs.map((p) => p.x)),
     Math.max(...xs.map((p) => p.y)) - Math.min(...xs.map((p) => p.y)),
   );
-  return span * 1e-2;
+}
+
+/**
+ * HOW CLOSE TO AN OPEN BOUND A SOLVED VALUE MAY SIT AND STILL BE THE BOUND (#1504, ADR-AG-167 amendment 1).
+ *
+ * «r > 0» judged exactly let a radius the givens force to ZERO through as 8.6e-11 — a contradiction
+ * («מבחוץ» then «מבפנים»; a centre on the axis it is tangent to) drawn green, the circle invisible.
+ * The bound is judged at the SOLVER'S RESOLUTION instead (`SOLVE_RESOLUTION`, the operator-ruled
+ * "indistinguishable by this solver" of ADR-AG-136), relative to the figure's scale — its point spread,
+ * or its largest parameter magnitude when that is larger (a circle's radius is part of its extent) —
+ * so it states no magnitude (ADR-052) and a value the descent merely APPROACHED the bound with is
+ * the bound. One function, so every open bound the solve judges uses the same floor.
+ */
+export function openBoundFloor(at: Map<Id, Pt>, env: Env, syms: readonly string[]): number {
+  let scale = spanOf(at);
+  for (const sym of syms) {
+    const v = Math.abs(env[sym]);
+    if (Number.isFinite(v) && v > scale) scale = v;
+  }
+  return SOLVE_RESOLUTION * scale;
 }
 
 /**
@@ -1261,7 +1285,10 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
       // root with the wrong sign is not the one the sentence names; the post-hoc check keeps the last word.
       const admissible = (x: number[]) => {
         const e = solved.envAt(x);
-        if (!solved.syms.every((sym) => inDomain(domains.get(sym) ?? {}, e[sym]))) return false;
+        // An open bound is judged at the solver's resolution, never exactly (#1504): a radius the
+        // givens drive to zero converges to ~1e-10 and must not read as positive.
+        const floor = openBoundFloor(solved.positionsAt(x), e, solved.syms);
+        if (!solved.syms.every((sym) => inDomain(domains.get(sym) ?? {}, e[sym], floor))) return false;
         for (const sel of c.selectors) {
           if (sel.kind !== 'sign') continue;
           const sym = freeAngleOf(c, sel);
