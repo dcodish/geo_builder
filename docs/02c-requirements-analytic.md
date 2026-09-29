@@ -279,6 +279,15 @@ is knowledge when it is invariant across *every* free DOF. Otherwise a number tr
 we happened to pick prints as a fact. *(Consequence, mine — and a live risk: today the gate
 re-evaluates across seeds.)*
 
+> **Now the rule** ([ADR-AG-180](06c-decisions-analytic.md#adr-ag-180), #1473 — the live risk fired: an
+> area-12 triangle printed `C = (x_C, −4)` beside a canvas drawing y = +4). "Invariant across every
+> admissible configuration" is judged over **one configuration pool** — the 24 drawable configurations every
+> knowledge gate reads (a coordinate, a parameter, a curve's coefficients, and the option set), never a
+> smaller sample sized for "does it vary?". The pool is sampled, not proven; the escalation path is exact
+> per-object enumeration, never a smaller pool. **On the page, a value not yet confirmed over the whole pool
+> shows «בודק…» — never a provisional number** (operator ruling 2026-09-29, B′): the figure draws at once,
+> the check completes after the render, and the row settles to its value, its options or «—».
+
 **R17 — A stated shape noun may narrow a parameter's domain.** «נתונה אליפסה שמשוואתה x²+a·y²=1» plausibly
 means "the values of `a` that make this an ellipse" — a fourth way of writing a domain, alongside
 [ADR-AG-005](06c-decisions-analytic.md#adr-ag-005) D7's three. **OPEN:** intended, or should a stated

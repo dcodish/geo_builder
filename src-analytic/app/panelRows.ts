@@ -1,5 +1,7 @@
 import type { Derivation } from '../engine/derive';
-import { isKnowledge, knownCurve } from '../engine/evaluate';
+import { isKnowledge, knownCurve, settled, type Figure, type Knowledge } from '../engine/evaluate';
+import { VERTICAL_TOL, verticality } from '../engine/lines';
+import { lineAngleOf } from './lineAngle';
 import { isDirectionSymbol, paramRegister, usedSymbols } from '../engine/carriers';
 import { type ParamDecl, positionalOf } from '../engine/types';
 
@@ -54,15 +56,21 @@ export const panelListsCurve = (c: PanelCurve): boolean => c.stated || c.label.n
  * that breaks it ([ADR-W-053](../../docs/06w-decisions-workspace.md)). So the decisions live here, the
  * panel renders from them, and `panel-freedom-invariant-1289.test.ts` asks the same function.
  */
-export type PanelKnown = { known: true; value: number } | { known: false };
+/**
+ * A row's verdict. `pending` (#1473, ADR-AG-180) is the page's third state: the configuration pool is
+ * still completing after the render, and a value it has so far read as invariant is not yet knowledge —
+ * the row shows «בודק…», never the provisional number. Off the page (every lock) the pool is filled
+ * first and nothing is ever pending.
+ */
+export type PanelKnown = Knowledge;
 
 export interface PanelKnowledge {
   /** each non-direction parameter; a symbol nothing reads is never asked of the gate (#1343) */
   readonly params: readonly { sym: string; domain: ParamDecl['domain']; used: boolean; k: PanelKnown }[];
   /** each positional object's coordinates (ADR-AG-003 §2) */
   readonly points: readonly { id: string; x: PanelKnown; y: PanelKnown }[];
-  /** each LISTED curve, with its equation when every coefficient is invariant, else null */
-  readonly curves: readonly { id: string; known: ReturnType<typeof knownCurve> }[];
+  /** each LISTED curve, with its equation when every coefficient is invariant, else null; `pending` = not yet settled (#1473) */
+  readonly curves: readonly { id: string; known: ReturnType<typeof knownCurve>; pending: boolean }[];
 }
 
 export function panelKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): PanelKnowledge {
@@ -81,8 +89,75 @@ export function panelKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): 
       x: isKnowledge(c, (f) => f.points.find((q) => q.id === p.id)?.x ?? null),
       y: isKnowledge(c, (f) => f.points.find((q) => q.id === p.id)?.y ?? null),
     })),
-    curves: d.figure.curves.filter(panelListsCurve).map((cu) => ({ id: cu.id, known: knownCurve(c, cu.id) })),
+    curves: d.figure.curves.filter(panelListsCurve).map((cu) => {
+      const s = settled(() => knownCurve(c, cu.id));
+      return { id: cu.id, known: s.value, pending: s.pending };
+    }),
   };
+}
+
+/**
+ * One row per PAIR of endpoints (#1065).
+ *
+ * A polygon emits one drawn piece per side, and a student who also states «הקטע AB» would
+ * otherwise see `AB` twice. The length is a property of the two points, not of how many things
+ * happen to be drawn between them.
+ *
+ * Moved here from `App.tsx` with the rows' gates (#1473).
+ */
+export function uniqueSegments<S extends { id: string; ends: [string, string] }>(segments: readonly S[]): S[] {
+  const seen = new Set<string>();
+  return segments.filter((s) => {
+    const key = [...s.ends].sort().join('\u0000');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * THE SLOPE AND LENGTH ROWS' KNOWLEDGE (#1473 — extracted from `App.tsx`, where each row called the gates
+ * inline, for the reason `panelKnowledge` was: the #1473 perf lock must CALL the page's synchronous
+ * knowledge path, not re-implement it). Per unique drawn segment: is it vertical (judged on the DIRECTION,
+ * #1078/#1276 — dy/dx is Infinity there), its slope, its angle with the x-axis (#1322, the ask lane's own
+ * `lineAngleOf`) and its length (#1065). Each verdict may be PENDING on the page.
+ */
+export interface SegmentKnowledge {
+  readonly id: string;
+  readonly ends: [string, string];
+  readonly vertical: PanelKnown;
+  readonly slope: PanelKnown;
+  readonly angle: ReturnType<typeof lineAngleOf>;
+  readonly length: PanelKnown;
+}
+
+export function segmentKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): SegmentKnowledge[] {
+  const c = d.construction;
+  return uniqueSegments(d.figure.segments).map((seg) => {
+    const [a, b] = seg.ends;
+    const read = (f: Figure) => {
+      const p1 = f.points.find((q) => q.id === a);
+      const p2 = f.points.find((q) => q.id === b);
+      return p1 && p2 ? { dx: p2.x - p1.x, dy: p2.y - p1.y } : null;
+    };
+    const vertical = isKnowledge(c, (f) => {
+      const v = read(f);
+      return v === null ? null : verticality(v.dx, v.dy);
+    });
+    const angle = lineAngleOf(c, read);
+    const isVert = vertical.known && vertical.value < VERTICAL_TOL;
+    const slope: PanelKnown = isVert
+      ? { known: false }
+      : isKnowledge(c, (f) => {
+          const v = read(f);
+          return v === null || Math.abs(v.dx) < 1e-12 ? null : v.dy / v.dx;
+        });
+    const length = isKnowledge(c, (f) => {
+      const v = read(f);
+      return v === null ? null : Math.hypot(v.dx, v.dy);
+    });
+    return { id: seg.id, ends: seg.ends, vertical, slope, angle, length };
+  });
 }
 
 /** Does the panel print at least one quantity as UNKNOWN? (the #1289 invariant's right-hand side) */

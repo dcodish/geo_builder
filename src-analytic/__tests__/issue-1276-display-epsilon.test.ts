@@ -118,7 +118,8 @@ describe('#1276 — one verticality answer, not five', () => {
 
   it('the slopes panel asks the SHARED question rather than its own', () => {
     // ADR-W-053: the lock reads the caller, because the defect was two surfaces deciding separately.
-    const app = readFileSync(resolve(__dirname, '../App.tsx'), 'utf8');
+    // #1473 moved the slope rows' gates into `segmentKnowledge` (app/panelRows.ts), which App renders from.
+    const app = readFileSync(resolve(__dirname, '../App.tsx'), 'utf8') + readFileSync(resolve(__dirname, '../app/panelRows.ts'), 'utf8');
     expect(app).toContain('verticality(v.dx, v.dy)');
     expect(app).toContain('VERTICAL_TOL');
     expect(app).not.toMatch(/Math\.abs\(v\.dx\) \/ Math\.max/); // the inline copy is gone

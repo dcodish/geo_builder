@@ -971,6 +971,14 @@ function foldSignSelectors(c: Construction, env: Env): Env {
  * shares, so the memo lives exactly as long as the figure it describes.
  */
 const evaluateMemo = new WeakMap<Construction, Map<number, Figure>>();
+
+/**
+ * How many evaluations were actually COMPUTED (a memo miss) — the operation count the #1473 perf lock
+ * budgets (ADR-AG-180). Counted, never timed: a wall-clock lock is a lock on the machine. Test-visible
+ * only; nothing in the product reads it.
+ */
+export const evaluateStats = { uncached: 0 };
+
 export function evaluate(raw: Construction, seed = 0): Figure {
   let perSeed = evaluateMemo.get(raw);
   if (!perSeed) {
@@ -979,6 +987,7 @@ export function evaluate(raw: Construction, seed = 0): Figure {
   }
   const hit = perSeed.get(seed);
   if (hit) return hit;
+  evaluateStats.uncached += 1;
   const out = evaluateUncached(raw, seed);
   perSeed.set(seed, out);
   return out;
@@ -1978,6 +1987,14 @@ const distinctCache = new WeakMap<Construction, Map<number, number[]>>();
  *
  * Returns fewer than `count` when the figure genuinely has fewer distinct configurations — a
  * determined figure returns one — which is exactly what a caller needs to know.
+ *
+ * **It is no longer the knowledge gate's sample (#1473, ADR-AG-180, amending the #1282 note).** "The first
+ * three configurations that differ" answers *does this vary?*, not *what does the figure admit?*: any
+ * continuous DOF — the triangle's own sliding vertex, an unrelated «נקודה Z» — makes every seed a new
+ * signature, so all three samples are spent on the continuous family and the DISCRETE choice (which root
+ * of an area, which crossing) is never varied. Three seeds in one basin then read a two-root value as
+ * invariant. The gates judge the {@link configurationPool} instead; this stays what «הציגו תצורה אחרת»
+ * walks, and what the render path already pays for (the pool's synchronous floor).
  */
 export function distinctConfigSeeds(c: Construction, count = 3, tries = DISTINCT_TRIES): number[] {
   let perCount = distinctCache.get(c);
@@ -2001,17 +2018,194 @@ export function distinctConfigSeeds(c: Construction, count = 3, tries = DISTINCT
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// The configuration pool — ONE set every knowledge gate judges (#1473, ADR-AG-180)
+// ---------------------------------------------------------------------------
+
+/**
+ * How many drawable configurations the pool holds: the budget `knownOptions` has always read, measured
+ * (#1036: a root reached 5 times in 24 seeds), and the same one `derive` and «תצורה אחרת» search. Never
+ * shrink it to make a line faster — on the #1473 corpus, 12 seeds still printed a two-root value as
+ * fact; the cost belongs off the render path (below), not out of the sample.
+ */
+export const POOL_SIZE = 24;
+
+/**
+ * THE CONFIGURATION POOL (#1473, ADR-AG-180) — the drawable figures at seeds `0..POOL_SIZE−1`, one per
+ * construction, shared by every gate that asks "is this knowledge?" or "what options does it take?".
+ *
+ * Operator, 2026-09-29 (on #1473's measurement): the panel printed `C = (x_C, −4)` for a triangle of area
+ * 12 on a base of 6 while «הציגו תצורה אחרת» drew C at y = +4. `isKnowledge` read three *distinct*
+ * configurations (#1282), `knownCurve` three *raw* seeds, and `knownOptions` twenty-four — three gates,
+ * three pools, and a value could be "known" to one while another listed its second root. **The class: a
+ * knowledge gate reads a sample sized for "does it vary?" and treats it as the complete configuration
+ * set.** One pool, read by all three, makes "the value" and "the option set" two readings of one set.
+ *
+ * It is SAMPLED, never proven (analytic has no CAS, ADR-AG-001 D1): a root the seeds reach less than
+ * about once in 24 can still hide. Measured 0 such cases over 1154 corpus figures; the escalation path is
+ * exact per-object enumeration (as `crossings.ts meetConic` does for curve crossings), never a blanket
+ * withhold.
+ *
+ * ## Filled lazily, and — on the page — AFTER the render (operator ruling, option B′)
+ *
+ * It shares `drawableAt`'s per-seed cache, so a seed any gate or the distinct walk already evaluated costs
+ * nothing. Off the page (tests, the corpus locks, any caller that did not {@link ConfigurationPool.defer}
+ * it) the first gate FILLS it and answers the settled verdict. On the page, `App.tsx` defers the pool of
+ * the derivation it renders: the gates then judge only the seeds already evaluated, a value those seeds
+ * read as invariant answers PENDING (the panel shows «בודק…», never a provisional number), a value they
+ * already see differ is open at once, and `app/poolScheduler.ts` completes the pool in idle slices and
+ * re-renders. The render path therefore spends no evaluation the pool adds — the #1473 perf lock counts it.
+ */
+export interface ConfigurationPool {
+  /** The seeds already evaluated, ascending. */
+  ready(): number[];
+  /** Every seed `0..POOL_SIZE−1` is evaluated: the verdicts are settled. */
+  complete(): boolean;
+  /** Evaluate the next missing seed (one slice of the idle loop). Returns `complete()`. */
+  step(): boolean;
+  /** Evaluate every missing seed now. */
+  fill(): void;
+  /** The page's mode: gates answer PENDING from a partial pool instead of filling it. */
+  defer(): void;
+  readonly deferred: boolean;
+  /** A gate answered pending on this pool — the page owes a re-render when it completes. */
+  readonly pendingShown: boolean;
+}
+
+class Pool implements ConfigurationPool {
+  deferred = false;
+  pendingShown = false;
+  private done = false;
+  constructor(private readonly c: Construction) {}
+  private has(seed: number): boolean {
+    return drawableCache.get(this.c)?.has(`${seed}:0`) ?? false;
+  }
+  ready(): number[] {
+    const out: number[] = [];
+    for (let s = 0; s < POOL_SIZE; s += 1) if (this.has(s)) out.push(s);
+    return out;
+  }
+  complete(): boolean {
+    if (this.done) return true;
+    for (let s = 0; s < POOL_SIZE; s += 1) if (!this.has(s)) return false;
+    this.done = true;
+    return true;
+  }
+  step(): boolean {
+    for (let s = 0; s < POOL_SIZE; s += 1) {
+      if (!this.has(s)) {
+        drawableAt(this.c, s);
+        return this.complete();
+      }
+    }
+    return this.complete();
+  }
+  fill(): void {
+    if (this.done) return;
+    for (let s = 0; s < POOL_SIZE; s += 1) drawableAt(this.c, s);
+    this.done = true;
+  }
+  defer(): void {
+    this.deferred = true;
+  }
+  notePending(): void {
+    this.pendingShown = true;
+    if (pendingProbe) pendingProbe.hit = true;
+  }
+}
+
+const poolCache = new WeakMap<Construction, Pool>();
+
+export function configurationPool(c: Construction): ConfigurationPool {
+  return poolOf(c);
+}
+function poolOf(c: Construction): Pool {
+  let p = poolCache.get(c);
+  if (!p) {
+    p = new Pool(c);
+    poolCache.set(c, p);
+  }
+  return p;
+}
+
+/**
+ * WAS ANY GATE PENDING while this ran? (#1473) — how a surface that composes one row from several gates
+ * learns it must show «בודק…» instead of the row. Every gate that answers pending reports it here, so a
+ * row cannot forget a gate: the ask lane's dozen arms are wrapped once, at the call, not per arm.
+ * Synchronous and re-entrant; a nested probe also marks its enclosing one.
+ */
+let pendingProbe: { hit: boolean } | null = null;
+export function settled<T>(fn: () => T): { value: T; pending: boolean } {
+  const outer = pendingProbe;
+  const mine = { hit: false };
+  pendingProbe = mine;
+  try {
+    return { value: fn(), pending: mine.hit };
+  } finally {
+    pendingProbe = outer;
+    if (outer && mine.hit) outer.hit = true;
+  }
+}
+
+/** A caller holding a pending verdict it did not just compute (a point row's `kx`) reports it. */
+export function reportPending(c: Construction): void {
+  poolOf(c).notePending();
+}
+
+/** A knowledge verdict. `pending` is never a value: the pool has not been read to the end. */
+export type Knowledge = { known: true; value: number } | { known: false; pending?: true };
+
+/**
+ * The seeds a DEFAULT gate reads, or `null` for "fill and read all". On a deferred pool, first the
+ * synchronous floor the render path has always paid — `distinctConfigSeeds`, which walks seeds 0..k and
+ * so guarantees 0, 1 and 2 — then whatever is already evaluated. Never a seed of its own.
+ */
+function poolSeeds(c: Construction): { pool: Pool; seeds: number[] } {
+  const pool = poolOf(c);
+  if (!pool.deferred) {
+    pool.fill();
+    return { pool, seeds: pool.ready() };
+  }
+  distinctConfigSeeds(c);
+  return { pool, seeds: pool.ready() };
+}
+
+/** The verdict before it is reported — `knownCurve` asks per coefficient and reports once. */
+function knowledgeOf(c: Construction, read: (f: Figure) => number | null): Knowledge {
+  const { pool, seeds } = poolSeeds(c);
+  const v = judge(c, read, seeds);
+  // Invariant over a PARTIAL pool is not knowledge yet; differing already is open for good (a superset
+  // of the seeds can only widen the spread).
+  if (v.known && !pool.complete()) return { known: false, pending: true };
+  return v;
+}
+
 export function isKnowledge(
   c: Construction,
   read: (f: Figure) => number | null,
-  seeds: readonly number[] = distinctConfigSeeds(c),
+  seeds?: readonly number[],
+): Knowledge {
+  if (seeds) return judge(c, read, seeds);
+  const v = knowledgeOf(c, read);
+  if (!v.known && v.pending) poolOf(c).notePending();
+  return v;
+}
+
+function judge(
+  c: Construction,
+  read: (f: Figure) => number | null,
+  seeds: readonly number[],
 ): { known: true; value: number } | { known: false } {
   const vals: number[] = [];
+  let span = Infinity;
   for (const s of seeds) {
-    const v = read(drawableAt(c, s));
+    const f = drawableAt(c, s);
+    const v = read(f);
     if (v === null || !Number.isFinite(v)) return { known: false };
     vals.push(v);
+    span = Math.min(span, figureSpan(f));
   }
+  if (vals.length === 0) return { known: false };
   const scale = Math.max(1, ...vals.map(Math.abs));
   const spread = Math.max(...vals) - Math.min(...vals);
   /**
@@ -2034,9 +2228,35 @@ export function isKnowledge(
    * value-identity bar — so the value the givens fix exactly (M = (4, 0)) read as unknown while
    * `knownOptions` read it as four cases. Two values the solver cannot tell apart are one value; the
    * midpoint of the cluster is the honest number to print, and it rounds to the exact one.
+   *
+   * **Relative to the FIGURE's scale, as `SOLVE_RESOLUTION` is defined** (#1473, ADR-AG-180 — the same
+   * reading `openBoundFloor` already takes). The residuals are scale-normalised, so where a descent stops
+   * near a double root is a fraction of the figure's extent, not of the value's own magnitude. The arm
+   * scaled by the VALUE, and three samples hid it: over the full pool, M = (4, 0)'s y lands anywhere in
+   * ±0.0018 — 4.6e-4 of the figure's span of 8, well inside the resolution, but 1.16× the resolution of a
+   * value whose own magnitude is ~0. A value-IDENTITY bar (the arm above) is a different question and
+   * stays value-scaled.
+   *
+   * The SMALLEST span over the configurations read, never the largest: one seed that flings a free point
+   * thousands of units out (measured: M at y = −2340 on «MA = MB») must not widen the bar for every other
+   * value — a real second root sits O(span) away, 300× this floor at the figure's own scale.
    */
-  if (spread <= SOLVE_RESOLUTION * scale) return { known: true, value: (Math.max(...vals) + Math.min(...vals)) / 2 };
+  if (spread <= SOLVE_RESOLUTION * Math.max(scale, span)) return { known: true, value: (Math.max(...vals) + Math.min(...vals)) / 2 };
   return { known: false };
+}
+
+/** A figure's extent — the larger coordinate spread of its points (1 with fewer than two); `spanOf` for a drawn figure. */
+function figureSpan(f: Figure): number {
+  const ps = f.points;
+  if (ps.length < 2) return 1;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const p of ps) {
+    if (p.x < x0) x0 = p.x;
+    if (p.x > x1) x1 = p.x;
+    if (p.y < y0) y0 = p.y;
+    if (p.y > y1) y1 = p.y;
+  }
+  return Math.max(1e-9, x1 - x0, y1 - y0);
 }
 
 
@@ -2086,6 +2306,31 @@ export function knownOptions(
   read: (f: Figure) => number[] | null,
   seeds = OPTION_SEEDS,
 ): number[][] | null {
+  /**
+   * THE POOL (#1473). The default sample IS the configuration pool, so the option set and the
+   * `isKnowledge` verdict read one set. On a deferred pool (the page), what is already evaluated is
+   * read first: a value absent anywhere is not a set (final); a value that already takes two values
+   * is what this walk has always been called for, so the pool is filled — the walk the render path
+   * paid before #1473; a value that has so far taken ONE value is pending, and no seed is spent.
+   */
+  if (seeds === OPTION_SEEDS) {
+    const pool = poolOf(c);
+    if (pool.deferred && !pool.complete()) {
+      const seen: number[][] = [];
+      for (const s of pool.ready()) {
+        const v = read(drawableAt(c, s));
+        if (v === null || v.some((n) => !Number.isFinite(n))) return null;
+        seen.push(v);
+      }
+      const scale0 = Math.max(1, ...seen.flat().map(Math.abs));
+      const varies = seen.some((v) => v.some((n, i) => Math.abs(n - seen[0][i]) > SAME_VALUE_EPS * scale0));
+      if (!varies) {
+        pool.notePending();
+        return null;
+      }
+    }
+    pool.fill();
+  }
   const samples: number[][] = [];
   for (let seed = 0; seed < seeds; seed += 1) {
     const v = read(drawableAt(c, seed));
@@ -2143,30 +2388,41 @@ export function knownOptions(
 export function knownCurve(
   c: Construction,
   id: Id,
-  seeds: readonly number[] = [0, 1, 2],
+  /**
+   * Default: the {@link configurationPool} (#1473). It was `[0, 1, 2]` — raw drawable seeds, not even
+   * distinct configurations — so a line through a two-root point («דרך P עובר ישר מאונך לציר ה-x», P a
+   * circle's crossing with the x-axis) printed `x = 0` from seeds that all resolved to one root.
+   */
+  seeds?: readonly number[],
 ): NumCurve | null {
   const read = (f: Figure) => f.curves.find((q) => q.id === id)?.curve ?? null;
   // The SAME figures the gate judges (ADR-AG-126): the value returned is read from the drawable
   // configuration at the first seed, never from a raw seed the tool would not show — measured on the
   // 572 figure, the raw seed 0 had not converged and its slope was 5e-5 off the one every drawable
   // configuration agreed on (#1317).
-  const first = read(drawableAt(c, seeds[0]));
+  const first = read(drawableAt(c, seeds ? seeds[0] : 0));
   if (!first) return null;
+  let pending = false;
   for (const field of Object.keys(first) as Array<keyof NumCurve>) {
     if (typeof first[field] !== 'number') continue; // `kind` — the discriminant, not a coefficient
-    const k = isKnowledge(
-      c,
-      (f) => {
-        const cur = read(f);
-        // A curve that is a DIFFERENT family at another seed is not knowledge either: the shape
-        // itself varies, which is 02c R13's third row and strictly worse than a moving coefficient.
-        if (!cur || cur.kind !== first.kind) return null;
-        const v = (cur as Record<string, unknown>)[field as string];
-        return typeof v === 'number' ? v : null;
-      },
-      seeds,
-    );
-    if (!k.known) return null;
+    const readField = (f: Figure) => {
+      const cur = read(f);
+      // A curve that is a DIFFERENT family at another seed is not knowledge either: the shape
+      // itself varies, which is 02c R13's third row and strictly worse than a moving coefficient.
+      if (!cur || cur.kind !== first.kind) return null;
+      const v = (cur as Record<string, unknown>)[field as string];
+      return typeof v === 'number' ? v : null;
+    };
+    const k = seeds ? isKnowledge(c, readField, seeds) : knowledgeOf(c, readField);
+    if (k.known) continue;
+    // One coefficient already seen to move makes the whole equation OPEN, whatever the rest still
+    // await — so pending is reported only when nothing is open.
+    if (!k.pending) return null;
+    pending = true;
+  }
+  if (pending) {
+    poolOf(c).notePending();
+    return null;
   }
   return first;
 }

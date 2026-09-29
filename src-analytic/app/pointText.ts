@@ -9,9 +9,10 @@
  */
 import type { derive } from '../engine/derive';
 import { exprText } from '../engine/expr';
-import { isKnowledge, knownCurve, knownOptions } from '../engine/evaluate';
+import { isKnowledge, knownCurve, knownOptions, reportPending } from '../engine/evaluate';
 
-type Know = { known: boolean; value?: number };
+/** A coordinate's verdict; `pending` = not yet read over the whole configuration pool (#1473). */
+type Know = { known: boolean; value?: number; pending?: boolean };
 
 export function pointText(
   d: ReturnType<typeof derive>,
@@ -42,6 +43,17 @@ export function pointText(
         return drawn ? `[${text}]` : text;
       })
       .join(' או ');
+  }
+
+  /**
+   * NOT YET SETTLED (#1473, ADR-AG-180): a coordinate the partial configuration pool reads as invariant
+   * is pending, and nothing below may stand in for it — not the half-pinned form (which would print the
+   * pending coordinate's sibling as if the row were settled) and not the dash (which would claim
+   * "open"). Reported to the enclosing `settled` probe; the row shows «בודק…» until the pool completes.
+   */
+  if (kx.pending || ky.pending) {
+    reportPending(d.construction);
+    return '—';
   }
 
   /**

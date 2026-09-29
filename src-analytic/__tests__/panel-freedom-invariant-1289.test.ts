@@ -24,34 +24,16 @@
  * Measured when it landed: 531 figures built, 237 with freedom, **0 violations**.
  */
 import { describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { derive } from '../engine/derive';
 import { reportedDof } from '../engine/carriers';
 import { panelKnowledge, panelShowsUnknown } from '../app/panelRows';
-import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
+import { analyticCorpus } from './analyticCorpus';
 
 const HERE = __dirname;
-const STR = String.raw`'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"`;
-const ARRAY = new RegExp(String.raw`\[\s*((?:${STR})(?:\s*,\s*(?:${STR}))*)\s*,?\s*\]`, 'g');
-const ITEM = new RegExp(STR, 'g');
-
-/** Every string-array literal in the analytic tests, plus every catalog entry with its context. */
-function corpus(): string[][] {
-  const seqs = new Map<string, string[]>();
-  for (const f of readdirSync(HERE).filter((n) => /\.tsx?$/.test(n))) {
-    const src = readFileSync(path.join(HERE, f), 'utf8');
-    for (const m of src.matchAll(ARRAY)) {
-      const items = [...m[1].matchAll(ITEM)].map((x) => x[0].slice(1, -1).replace(/\\(['"\\])/g, '$1'));
-      seqs.set(JSON.stringify(items), items);
-    }
-  }
-  for (const e of COMMAND_CATALOG_ANALYTIC) {
-    const s = [...(e.needs ?? []), e.he];
-    seqs.set(JSON.stringify(s), s);
-  }
-  return [...seqs.values()];
-}
+// The harvest moved to `analyticCorpus.ts` so the #1473 knowledge-pool invariant sweeps the same set.
+const corpus = analyticCorpus;
 
 /** Every GREEN figure with freedom whose panel prints nothing as unknown. */
 function violations(seqs: readonly string[][]): { bad: string[]; free: number } {

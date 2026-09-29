@@ -22,7 +22,7 @@
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
-import { isKnowledge, knownCurve, knownOptions, type Figure } from '../engine/evaluate';
+import { isKnowledge, knownCurve, knownOptions, settled, type Figure } from '../engine/evaluate';
 import { locusOf } from '../engine/locus';
 
 import { curveByName, objectById, type Id } from '../engine/types';
@@ -61,6 +61,12 @@ const POINT_LINE_ONLY = /^(?:ה?מרחק|[Dd]istance)\s+\S.*$/;
 export interface Answer {
   /** The student's own words, so the row says what was asked. */
   question: string;
+  /**
+   * NOT YET SETTLED (#1473, ADR-AG-180): a gate this answer consulted is still waiting for the
+   * configuration pool to complete after the render. The row says «בודק…» and carries nothing else —
+   * no value, no mark, no trace — until it settles, so no provisional number reaches the student.
+   */
+  pending?: boolean;
   /** The answer, already formatted — or `null` when the figure does not determine it. */
   value: string | null;
   /** The question was not understood at all, which is different from having no answer. */
@@ -279,6 +285,16 @@ const LOCUS_OF =
  * means a caller that forgets shows `circle` rather than «מעגל»: visibly wrong rather than silently
  * absent, which is the direction this tree prefers to fail in.
  */
+/**
+ * THE ASK LANE AS THE PAGE CALLS IT (#1473): the answer, or PENDING when any gate it consulted is still
+ * waiting for the configuration pool. Wrapped once HERE rather than per arm, so an arm added later cannot
+ * forget it — every gate reports pending to the `settled` probe.
+ */
+export function askSettled(...args: Parameters<typeof ask>): Answer {
+  const s = settled(() => ask(...args));
+  return s.pending ? { question: args[1], value: null, pending: true } : s.value;
+}
+
 export function ask(
   d: Derivation,
   question: string,

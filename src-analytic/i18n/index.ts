@@ -71,6 +71,9 @@ const he = {
   // Three different answers, because they are three different situations.
   askOpen: 'עדיין לא נקבע מהנתונים',
   askNoValue: 'לא ניתן לחשב מהנתונים',
+  // #1473 (ADR-AG-180) — a value not yet confirmed over every configuration: shown while the check
+  // completes after the render, never as a provisional number.
+  checking: 'בודק…',
   // #1227 (ADR-AG-136) — a determined point's locus is that point, or that finite set: the locus lane's
   // own grammar («נקודה · (4, 3)» beside «ישר · x = 4»), never «לא ניתן לחשב».
   askPointOne: 'נקודה',
@@ -410,6 +413,7 @@ const en: typeof he = {
   askRemove: 'Remove this measurement',
   askOpen: 'not fixed by the givens yet',
   askNoValue: 'cannot be computed from the givens',
+  checking: 'checking…',
   askPointOne: 'a point',
   askPointTwo: 'two points',
   askPointMany: '{{count}} points',
