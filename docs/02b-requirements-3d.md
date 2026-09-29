@@ -311,7 +311,13 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   refused when false and its value is drawn only when it holds. When a plane's equation carries the
   figure's parameter in its normal, the relation instead **pins the parameter** (its roots are the figure's
   configurations), and a parameter on some other plane never affects it
-  ([ADR-3D-263](06b-decisions-3d.md#adr-3d-263), #1439).
+  ([ADR-3D-263](06b-decisions-3d.md#adr-3d-263), #1439). The same holds for **every closed relation between
+  two objects given by equations or coordinates** — two planes coinciding, a line lying in a plane, two lines
+  meeting or coinciding, a distance between any two of them: when an object carries the parameter in what the
+  relation reads (a normal or offset, a direction or anchor), the relation **determines the parameter**, and
+  when no value of it can satisfy the relation the refusal names the statement rather than calling it wrong.
+  A relation that holds **for every value** of the parameter determines nothing — the parameter stays free
+  and «הציגו תצורה אחרת» varies it ([ADR-3D-286](06b-decisions-3d.md#adr-3d-286), #1472).
 - **FR-CL-2 (Must)** — **No claim can escape by hiding inside a composite.** Every claim is recorded on
   the construction and verified on evaluation, so a claim arriving as part of a larger command is checked
   like any other. *(Realised — `Construction3.claims`, verified in `derive3`.)* A **role noun** is a claim

@@ -840,7 +840,7 @@ export interface FreeLineCommand {
 /**
  * #1439 (ADR-3D-263) — a LOAD-COMPAT ALIAS only. The parser no longer emits it: every plane × plane
  * angle lowers to ONE `plane-rel {rel:'angle'}`, whose routing (pin the parameter iff a normal carries
- * it, else a verified claim) lives in `planePinningRels`. A `.geo3.json` saved before #1439 still
+ * it, else a verified claim) lives in `paramPinningRels` (#1472). A `.geo3.json` saved before #1439 still
  * carries this command, and `apply` lowers it to that same `plane-rel` — so an old file can never
  * reach a lane where the angle is checked by nothing.
  */
@@ -1367,8 +1367,8 @@ export interface Construction3 {
   planeLinePerps: { ids: Id[]; line: string; statedAsPlane?: true }[];
   /** S2 (#378, ADR-3D-103): ∥/⟂/angle relations with a NAMED LINE on one side. Routed per instance
    *  by the frame classifier over `op` (`isAbsolute`, engine/operands.ts): gauge op → a pivot residual
-   *  (the planeLinePerps stage); absolute op → a parameter root-find when a direction carries the
-   *  figure parameter, else verify-only (the recorded claim is always the final arbiter). */
+   *  (the planeLinePerps stage); absolute op → a parameter root-find when an operand carries the
+   *  figure parameter in what the relation reads (`paramPinningRels`, #1472), else verify-only (the recorded claim is always the final arbiter). */
   lineRels: { rel: 'perp' | 'parallel' | 'angle' | 'contained'; deg?: number; op: Operand3; line: string; statedAsPlane?: true }[];
 }
 

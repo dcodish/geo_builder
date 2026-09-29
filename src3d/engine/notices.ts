@@ -16,7 +16,7 @@
  */
 
 import { CYCLIC_MEMBER, CYCLIC_MEMBER_NAME, QUAD_PYRAMIDS } from './baseShapes';
-import { isSelfDetermined, lineDirCarriesParam, operandLabel, planeNormalCarriesParam } from './operands';
+import { claimPinsParam, isSelfDetermined, lineDirCarriesParam, operandLabel, planeNormalCarriesParam } from './operands';
 import type { QuadBase } from './baseShapes';
 import { cross3, dot3, norm3, sub3 } from './vec3';
 import type { Vec3 } from './vec3';
@@ -307,7 +307,10 @@ function alreadyKnown(c: Construction3, samples: readonly Resolved3[]): BuildNot
       if (!pair) continue;
       const [a, b] = pair;
       if (!isSelfDetermined(c, a) || !isSelfDetermined(c, b)) continue;
-      if (carriesParam(a) || carriesParam(b)) continue;
+      // #1472 (ADR-3D-286): a relation that READS a position carrying the parameter pins it too («π2: z − m = 0»
+      // coinciding with π1 fixes m) — the one pin predicate decides, beside the direction test kept for the
+      // relations that never pin (skew) yet constrain the sampled parameter
+      if (claimPinsParam(c, cl) || carriesParam(a) || carriesParam(b)) continue;
       out.push({ kind: 'already-known', rel: 'objects', subject: operandLabel(a), object: operandLabel(b) });
     }
   }

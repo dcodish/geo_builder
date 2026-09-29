@@ -2449,7 +2449,7 @@ const angleBetweenPlanes: Rule = (s) => {
   // #1439 (ADR-3D-263): ONE lowering for every plane × plane angle — the `plane-rel` that `planeRelAngle`
   // emits for the other spellings, so the two rules read this sentence IDENTICALLY (the shadow matrix
   // sees no divergence). The relation — not the rule that happened to read it — decides whether it pins
-  // the parameter or is a verified claim (`planePinningRels`). This rule stays only as the owner of
+  // the parameter or is a verified claim (`paramPinningRels`, #1472). This rule stays only as the owner of
   // its looser spellings (no verb, «ל» without «בין», the plural noun on one side).
   return [
     {
