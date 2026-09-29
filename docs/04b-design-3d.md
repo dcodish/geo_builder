@@ -264,6 +264,14 @@ vanished from the panel while «p = 3» survived. What varies per owner kind is 
 PRICED, and that lives with the panel, one branch each, each using the resolver that already exists. The
 knowledge discipline is shared and unchanged: an undetermined letter reads `?` in every lane.
 
+**The ask lane reads a measure question WITH THE STATEMENT GRAMMAR.** `angleAskOperands` and
+`revolutionAskOf` (parse3.ts) parse the question plus a placeholder `= 1` and keep only the relation it
+lowers to: the two operands of an angle, or the solid and measure of a revolution claim. `parseQuery`
+turns those into `angle-ops` (measured by `angleBetweenOperands`, the verifier's own reading) and `rev`
+(measured by `revolutionMeasure` in claims.ts, the verifier's own formulas). A spelling the statement
+lane learns is therefore askable the same day, and the check and the answer share one geometry. The older
+point-run angle heads stay first and keep their answers. See [ADR-3D-279](06b-decisions-3d.md#adr-3d-279) (#1449).
+
 ## Claims
 
 Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape by

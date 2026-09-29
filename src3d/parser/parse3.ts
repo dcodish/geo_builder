@@ -3364,10 +3364,22 @@ const REV_KIND: Record<string, 'cylinder' | 'cone' | 'sphere'> = {
 const volumeClaim: Rule = (s) => {
   const m =
     s.match(new RegExp(`^נפח\\s+ה?(חרוט|גליל|כדור)\\s*(?:הוא\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
-    s.match(new RegExp(`^the\\s+volume\\s+of\\s+the\\s+(cone|cylinder|sphere)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`));
+    s.match(new RegExp(`^(?:the\\s+)?volume\\s+of\\s+(?:the\\s+)?(cone|cylinder|sphere)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`, 'i'));
   if (!m) return null;
   const value = +m[2] * (m[3] ? Math.PI : 1);
-  return [{ type: 'claim', claim: { type: 'volume-eq', solid: REV_KIND[m[1]], value } }];
+  return [{ type: 'claim', claim: { type: 'volume-eq', solid: REV_KIND[m[1].toLowerCase()], value } }];
+};
+
+/** #1449 (ADR-3D-279): `שטח הפנים של החרוט = 90π` / `the surface area of the cylinder = 42π` — the
+ *  TOTAL surface of a cone or cylinder (lateral + base(s)). A sphere's «שטח הפנים» is its only surface,
+ *  so it stays with `lateralAreaClaim` below (the same number either way). */
+const surfaceAreaClaim: Rule = (s) => {
+  const m =
+    s.match(new RegExp(`^שטח\\s+ה?פנים(?:\\s+הכולל)?\\s+של\\s+ה?(חרוט|גליל)\\s*(?:הוא\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
+    s.match(new RegExp(`^(?:the\\s+)?(?:total\\s+)?surface\\s+area\\s+of\\s+(?:the\\s+)?(cone|cylinder)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`, 'i'));
+  if (!m) return null;
+  const value = +m[2] * (m[3] ? Math.PI : 1);
+  return [{ type: 'claim', claim: { type: 'surface-area-eq', solid: REV_KIND[m[1].toLowerCase()], value } }];
 };
 
 /** `שטח המעטפת של החרוט = 65π` (cone/cylinder) / `שטח הפנים של הכדור = 36π` (sphere) — lateral/surface area claims. */
@@ -3375,11 +3387,11 @@ const lateralAreaClaim: Rule = (s) => {
   const m =
     s.match(new RegExp(`^שטח\\s+המעטפת\\s+של\\s+ה?(חרוט|גליל)\\s*(?:הוא\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
     s.match(new RegExp(`^שטח\\s+הפנים\\s+של\\s+ה?(כדור)\\s*(?:הוא\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
-    s.match(new RegExp(`^the\\s+lateral\\s+area\\s+of\\s+the\\s+(cone|cylinder)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
-    s.match(new RegExp(`^the\\s+surface\\s+area\\s+of\\s+the\\s+(sphere)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`));
+    s.match(new RegExp(`^(?:the\\s+)?lateral\\s+area\\s+of\\s+(?:the\\s+)?(cone|cylinder)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`, 'i')) ??
+    s.match(new RegExp(`^(?:the\\s+)?surface\\s+area\\s+of\\s+(?:the\\s+)?(sphere)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`, 'i'));
   if (!m) return null;
   const value = +m[2] * (m[3] ? Math.PI : 1);
-  return [{ type: 'claim', claim: { type: 'lateral-area-eq', solid: REV_KIND[m[1]], value } }];
+  return [{ type: 'claim', claim: { type: 'lateral-area-eq', solid: REV_KIND[m[1].toLowerCase()], value } }];
 };
 
 // --- V7 T3: exam terminology sugar ---
@@ -4448,6 +4460,7 @@ export const RULES: Rule[] = [
   revolutionSolid,
   volumeClaim,
   lateralAreaClaim,
+  surfaceAreaClaim, // #1449: the total surface of a cone/cylinder
   parametricLine, // before planeByEquation: both carry `:`, but ℓ ≠ π so either order is safe — kept explicit
   planeByEquation,
   freePlaneDecl, // #487: AFTER planeByEquation — a name followed by an equation is never stolen (this rule demands END after the name)
@@ -4668,4 +4681,45 @@ export function parseRename3(raw: string): { from: string; to: string } | null {
   const from = m[1].toUpperCase();
   const to = m[2].toUpperCase();
   return from === to ? null : { from, to };
+}
+
+/**
+ * #1449 (ADR-3D-279) — THE ASK FORM OF A STATED ANGLE IS THE STATEMENT WITHOUT ITS VALUE.
+ *
+ * «הזווית בין המישורים π1 ו-π2 היא 54.74» was checked and accepted, while the same words as a question
+ * answered «לא זוהה»: the ask lane kept its own point-run-only copy of the angle frames, so every
+ * spelling the statement lane learned (named planes, named lines, the plural «המישורים X ו-Y»,
+ * #1439's frames) stayed sayable but not askable. Rather than a second grammar, the question is read BY
+ * the statement grammar with a placeholder value, and the angle relation it lowers to names the two
+ * objects asked about. A spelling the statement lane reads is askable by construction.
+ */
+export function angleAskOperands(raw: string): { a: Operand3; b: Operand3 } | null {
+  const q = raw.replace(/\s*[?？]\s*$/, '').trim();
+  if (!q) return null;
+  const r = parse3(`${q} = 1`);
+  if (!r.ok || r.commands.length !== 1) return null;
+  const cmd = r.commands[0];
+  if (cmd.type === 'plane-rel' && cmd.rel === 'angle') return { a: cmd.a, b: cmd.b };
+  if (cmd.type === 'line-rel' && cmd.rel === 'angle') return { a: { kind: 'line', name: cmd.line }, b: cmd.op };
+  if (cmd.type === 'line-plane-angle') return { a: { kind: 'segment', a: cmd.a, b: cmd.b }, b: { kind: 'plane-run', ids: cmd.plane } };
+  return null;
+}
+
+/**
+ * #1449 (ADR-3D-279) — the ask form of a solid-of-revolution measure, read the same way as
+ * {@link angleAskOperands}: «נפח החרוט» is «נפח החרוט = 100π» without its value. A sphere's
+ * «שטח הפנים» lowers to `lateral-area-eq` (its only surface), which measures the same number.
+ */
+export function revolutionAskOf(raw: string): { solid: string; measure: 'volume' | 'lateral' | 'surface' } | null {
+  const q = raw.replace(/\s*[?？]\s*$/, '').trim();
+  if (!q) return null;
+  const r = parse3(`${q} = 1`);
+  if (!r.ok || r.commands.length !== 1) return null;
+  const cmd = r.commands[0];
+  if (cmd.type !== 'claim') return null;
+  const cl = cmd.claim;
+  if (cl.type === 'volume-eq') return { solid: cl.solid, measure: 'volume' };
+  if (cl.type === 'lateral-area-eq') return { solid: cl.solid, measure: 'lateral' };
+  if (cl.type === 'surface-area-eq') return { solid: cl.solid, measure: 'surface' };
+  return null;
 }

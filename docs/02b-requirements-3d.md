@@ -296,6 +296,14 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   `issue-1163-ratio-separators.test.ts`. The 2-D sibling this restores parity with is `segmentRatio`.)*
 - **FR-CL-3 (Must)** — **A refusal names the student's statement, not internal state**
   ([FR-SU-5](02w-requirements-workspace.md)).
+- **FR-CL-4 (Must)** — **A measure the student can STATE, they can ASK.** Every angle between objects
+  (planes by name or by points, named lines, the plural «הזווית בין המישורים X ו-Y») and every
+  solid-of-revolution measure (volume, lateral area, total surface) that the tool checks as a given is
+  answered as a question with the value dropped: «הזווית בין המישורים π1 ו-π2» → 54.74°, «נפח החרוט» →
+  100π. A revolution measure is written as a multiple of π. An object the figure lacks gets a note naming
+  an object; an unstated size is undetermined (ADR-052). *(Realised —
+  [ADR-3D-279](06b-decisions-3d.md#adr-3d-279), #1449; `issue-1449-ask-lane.test.ts`, whose catalog walk
+  is the class guard.)*
 
 ## Rendering
 

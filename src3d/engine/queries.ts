@@ -17,7 +17,9 @@ import { SHAPE_SUBJ } from '../lexicon/nouns3';
 import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, decompStr, formatBranches, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr, planeSymbols } from './dataView';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
-import { distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
+import { angleBetweenOperands, distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
+import { revolutionMeasure } from './claims';
+import { angleAskOperands, revolutionAskOf } from '../parser/parse3';
 import { readOperand } from '../parser/operandToken';
 import { figureSymbolsOf } from './types';
 import type { Construction3, Id, Operand3, Positions3, Requirement3 } from './types';
@@ -28,6 +30,11 @@ type Atom = { named: string } | { pair: [Id, Id] };
 type Query =
   | { kind: 'line-plane'; a: Id; b: Id; plane: Id[] } // #319: «הזווית בין SB למישור ABC» — the angle itself
   | { kind: 'plane-plane'; p1: Id[]; p2: Id[] } // #319: «הזווית בין מישור ABC למישור SBC» (dihedral, acute)
+  // #1449 (ADR-3D-279): any other angle between two OBJECTS — named planes and lines, the plural frame —
+  // read by the statement grammar (`angleAskOperands`) and measured by the verifier's own reading.
+  | { kind: 'angle-ops'; a: Operand3; b: Operand3 }
+  // #1449: a solid of revolution's volume / lateral / total surface, from its stated sizes.
+  | { kind: 'rev'; solid: string; measure: 'volume' | 'lateral' | 'surface' }
   | { kind: 'dot'; a: Atom; b: Atom }
   | { kind: 'length'; a: Atom }
   | { kind: 'vector'; a: Atom } // the VECTOR itself — its u/v/w decomposition (+ coords when a frame exists)
@@ -119,6 +126,17 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
     if (pp) return { kind: 'plane-plane', p1: pp[1].match(new RegExp(PT, 'g'))!, p2: pp[2].match(new RegExp(PT, 'g'))! };
   }
 
+  // #1449 (ADR-3D-279) — SAYABLE ⇒ ASKABLE. Every angle and revolution measure the statement lane reads
+  // («…היא 54.74», «נפח החרוט = 100π») is askable with its value dropped: the question is read BY the
+  // statement grammar, so the two lanes cannot drift apart again. The point-run heads above keep their
+  // established answers; this catches every spelling they never had.
+  {
+    const ops = angleAskOperands(s);
+    if (ops) return { kind: 'angle-ops', a: ops.a, b: ops.b };
+    const rev = revolutionAskOf(s);
+    if (rev) return { kind: 'rev', solid: rev.solid, measure: rev.measure };
+  }
+
   // S5 (#378) — DISTANCE, valueless: «המרחק בין D למישור ABC» / «distance between D and plane ABC».
   // The stated form (with a value) is the `distanceGiven` FACT rule; this is the question.
   {
@@ -139,6 +157,16 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
     const a = atomOf(c, angVec[1]);
     const b = atomOf(c, angVec[2]);
     if (a && b) return { kind: 'angle-vec', a, b };
+  }
+  // #1449: «∠(π1,π2)» / «∠(ℓ1,π1)» — the same notation over planes and lines, through the shared
+  // operand reader. Only a plane or named line qualifies here: vectors and point pairs keep the
+  // `angle-vec` head above, whose answer shape is established.
+  {
+    const m = s.match(/^(?:∠|∢|זו?וית|angle)\s*\(\s*([^,()]+?)\s*,\s*([^,()]+?)\s*\)$/i);
+    const oa = m ? readOperand(m[1]) : null;
+    const ob = m ? readOperand(m[2]) : null;
+    const objectish = (k: Operand3['kind']) => k === 'plane-named' || k === 'plane-run' || k === 'line' || k === 'plane-coord' || k === 'axis';
+    if (oa && ob && (objectish(oa.op.kind) || objectish(ob.op.kind))) return { kind: 'angle-ops', a: oa.op, b: ob.op };
   }
   if (angM || /^∠/.test(s)) {
     const body = s.replace(/^(?:∠|∢|זו?וית|the\s+angle|angle|of|של|בין)\s*/gi, '').replace(/\s+/g, '');
@@ -286,6 +314,16 @@ function solveSymbol(c: Construction3, sym: string, pos: Positions3): number | n
  * different answers to one sentence. One resolver now serves both — a query names no noun, so it asks
  * with `'any'` and the letters decide.
  */
+/** #1449: a measure that is a multiple of π, written the exam's way — «100π», «π», «50π/3»; a
+ *  coefficient with no clean form falls back to the decimal, never a rounded «33.33π». */
+function piMultiple(v: number): string {
+  const k = cleanNum(v / Math.PI);
+  if (/^-?\d+$/.test(k)) return k === '1' ? 'π' : `${k}π`;
+  const f = k.match(/^(-?\d+)\/(\d+)$/);
+  if (f) return `${f[1] === '1' ? '' : f[1]}π/${f[2]}`;
+  return cleanNum(v);
+}
+
 function solidVolume(c: Construction3, ids: Id[], pos: Positions3): number | null {
   return subjectVolume(resolveSolidSubject(c, 'any', ids), pos);
 }
@@ -330,6 +368,15 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCt
     }
     case 'line-plane':
       return linePlaneAngleAt(pos, q.a, q.b, q.plane);
+    case 'angle-ops': {
+      const ctx = abs ?? { lines: new Map(), planes: new Map() };
+      const at = (id: Id) => pos.get(id) ?? null;
+      const ga = resolveOperand(q.a, c, ctx)(at);
+      const gb = resolveOperand(q.b, c, ctx)(at);
+      return ga && gb ? angleBetweenOperands(ga, gb) : null;
+    }
+    case 'rev':
+      return null; // answered in answerQuery (an exact multiple of π, from stated sizes)
     case 'plane-plane': {
       const ps1 = q.p1.map((id) => pos.get(id));
       const ps2 = q.p2.map((id) => pos.get(id));
@@ -596,6 +643,15 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
     return par ? { text, answer: standard, rows: [standard, par] } : { text, answer: standard };
   }
 
+  // #1449 — a solid of revolution answers from its STATED sizes through the claim verifier's formulas,
+  // written as the exam writes it (100π). An unstated size is a free DOF (ADR-052), so undetermined.
+  if (q.kind === 'rev') {
+    const matches = c.revolutions.filter((r) => r.kind === q.solid);
+    if (matches.length !== 1) return { text, answer: null, note: 'noObject' };
+    const v = revolutionMeasure(matches[0], q.measure);
+    return v === null ? { text, answer: null, note: 'undetermined' } : { text, answer: piMultiple(v) };
+  }
+
   const vals = seeds.map((s) => {
     const r = resolve3(c, s);
     return evalQuery(c, q, r.positions, { lines: r.lines, planes: r.planes });
@@ -603,7 +659,8 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
   if (vals.some((v) => v === null || !Number.isFinite(v)))
     // #1450: a SYMBOL that cannot be measured is 'undetermined' — 'unavailable' is worded about
     // points («הנקודות האלו אינן בציור»), which is how asking «k» blamed letters that were fine.
-    return { text, answer: null, note: q.kind === 'symbol' ? 'undetermined' : 'unavailable' };
+    // #1449: an angle between OBJECTS that are not all in the figure names objects, not points.
+    return { text, answer: null, note: q.kind === 'symbol' ? 'undetermined' : q.kind === 'angle-ops' ? 'noObject' : 'unavailable' };
   const nums = vals as number[];
   const val0 = stableNums(vals);
   if (val0 === null) {
@@ -619,8 +676,8 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
   }
   // angles and a free PARAMETER «t» (an affine ratio along a segment) are scale-invariant — knowledge
   // whenever they are stable, no scale needed. A dot/length/area/volume still needs the scale pinned.
-  const scaleFree = q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'symbol' || q.kind === 'line-plane' || q.kind === 'plane-plane';
+  const scaleFree = q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'symbol' || q.kind === 'line-plane' || q.kind === 'plane-plane' || q.kind === 'angle-ops';
   if (!scaleFree && !scaleKnown3(c) && Math.abs(nums[0]) > 1e-9) return { text, answer: null, note: 'scale' };
-  const isAngle = q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'line-plane' || q.kind === 'plane-plane';
+  const isAngle = q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'line-plane' || q.kind === 'plane-plane' || q.kind === 'angle-ops';
   return { text, answer: `${cleanNum(nums[0])}${isAngle ? '°' : ''}` };
 }

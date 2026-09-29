@@ -11025,6 +11025,27 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 
 **Consequences.** `engine/evaluate.ts` (the normalisation block). Lock: `issue-1421-gauge.test.ts`.
 
+## ADR-3D-279 — A measure the student can state, they can ask: the ask lane reads questions with the statement grammar (#1449)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27), batch-approved in the /decisions pass; the operator re-reported the plane-angle case while playing round #1469 (T4) · round #1517 · feature → PR. Numbered 279 beside the round's parallel branches (273–278).
+
+**Requirements:** docs/02b FR-CL-4 (new) · **Design:** docs/04b — the ask lane reads measure questions through the statement grammar
+
+**Context.** «הזווית בין המישורים π1 ו-π2 היא 54.74» was checked and accepted, but the question «הזווית בין המישורים π1 ו-π2» answered «לא זוהה». The same held for named lines («הזווית בין הישר ℓ1 לבין המישור π1»), the plural frame over point-run planes («הזווית בין המישורים ABC ו-A'BC»), `∠(π1,π2)`, and every solid-of-revolution measure («נפח החרוט», «שטח המעטפת של החרוט»). `parseQuery` kept its own point-run-only copy of the angle frames, and its volume heads resolved only polyhedra. Each spelling the statement lane learned (#1439's frames, named operands) stayed sayable but not askable.
+
+**Decision.** One grammar, read two ways.
+- `angleAskOperands(q)` and `revolutionAskOf(q)` (parse3.ts) parse `q = 1` and keep only what the relation names: the operands of a `plane-rel` / `line-rel` / `line-plane-angle` angle, or the solid and measure of a `volume-eq` / `lateral-area-eq` / `surface-area-eq` claim. Any other lowering reads as "not this kind of question", so a vertex angle or a polyhedron volume still reaches its own head.
+- `parseQuery` answers them as `angle-ops`, measured by `angleBetweenOperands` (the verifier's reading: acute, `asin` for line × plane), and `rev`, measured by `revolutionMeasure`. That function is extracted from the claim verifier, so what the tool checks and what it answers cannot differ. `∠(X,Y)` over planes and lines reads through `readOperand`. The older point-run heads stay first, byte-identical.
+- A revolution answer is written as a multiple of π («100π», «π/3»), the way the exam and the student's own claim write it.
+- The total surface of a cone or cylinder («שטח הפנים של החרוט», «the surface area of the cylinder») was neither sayable nor askable. It is now a claim kind (`surface-area-eq`) and therefore askable, and the catalog carries it. The English volume/lateral frames accept an optional «the» on both nouns.
+- A new note, `noObject` («אין בציור עצם כזה»), covers an angle over an object the figure lacks, or a revolution that isn't there. The old `unavailable` note is worded about points.
+
+**Rejected.** Widening the private point-run regexes in `parseQuery` to named operands: a second grammar is exactly what drifted.
+
+**Measured.** On main `d3f08a4c`, all 21 measured asks answered `notUnderstood`. On the branch: 54.74° for all six named-plane forms (with and without the stated given), 35.26° for the four named-line forms, 45° for both cube spellings, and cone 100π / 65π / 90π, cylinder 36π / 24π / 42π, sphere 36π / 36π.
+
+**Consequences.** `src3d/parser/parse3.ts` (the two readers, `surfaceAreaClaim`, the widened En frames), `src3d/engine/queries.ts` (the kinds, heads, `piMultiple`, the note), `src3d/engine/claims.ts` (`revolutionMeasure`, the new claim case), `src3d/engine/apply.ts` + `types.ts` (the claim kind), the catalog row, both locales. Lock: `issue-1449-ask-lane.test.ts`. Its catalog walk (every catalog statement of an angle between objects or a revolution measure is read by the ask readers with its value dropped) is the class guard. Gate notes: the #1394 submit-parity golden was re-recorded and checked BY VALUE (the catalog row shifts later indices): 0 of 1566 recorded hashes lost, 10 added (the new row He/En and 8 sequences this lock's arrays contribute). The parser shadow-matrix snapshot gains exactly the new row's two entries, won by `surfaceAreaClaim`, shadowing nothing.
+
 ## ADR-3D-280 — «הצג בניה» for a line × plane angle: a point on the line, its height, and the foot joined to the crossing (#1491)
 
 **Status:** accepted · 2026-09-28 · operator request playing round #1488 (T20, 2026-09-27), plan approved the same day with the 90° ruling · round #1517 · feature → PR. Numbered 280 beside the round's parallel branches (273–279).
