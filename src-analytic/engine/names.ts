@@ -95,6 +95,14 @@ export function numeralCurveId(kind: NumeralKind, numeral: string): Id {
   return `${kind}-${numeral}`;
 }
 
+/**
+ * THE id of a named LINE — every line name the grammar reads: a numeral («ישר 1» → `line-1`), a
+ * letter name («l3» → `line-l3`) or a two-point run («AB» → `line-AB`) (#1529, ADR-AG-179). For a
+ * numeral it is exactly `numeralCurveId('line', n)`; the point is that no site spells the prefix itself,
+ * so a guard can hold every curve-name id to this file.
+ */
+export const lineIdOf = (name: string): Id => numeralCurveId('line', name);
+
 /** The notation-free identity of a numeral-named curve id («line-1» and «line-I» → `line-I`); null for any other id. */
 export function numeralKey(id: Id): string | null {
   const m = /^(line|circle|parabola|ellipse)-(.+)$/.exec(id);

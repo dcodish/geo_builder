@@ -29,7 +29,7 @@
 import type { DerivedRule } from './derived';
 import type { AngleName, Constraint, Direction, TangentLineRef } from './solve';
 import type { Expr } from './expr';
-import { numeralCurveId } from './names';
+import { lineIdOf, numeralCurveId } from './names';
 
 export type Id = string;
 
@@ -647,11 +647,11 @@ export function curveByName(c: Construction, name: string): GeoObject | undefine
       // through the one id function the naming clause mints with (#1271, #1514 pre-play).
       (o.kind === 'curve' &&
         (o.label.name === name ||
-          o.id === `line-${name}` ||
+          o.id === lineIdOf(name) ||
           o.id === numeralCurveId('circle', name) ||
           o.id === numeralCurveId('parabola', name) ||
           o.id === numeralCurveId('ellipse', name))) ||
-      (o.kind === 'line-at' && (o.name === name || o.id === `line-${name}`)) ||
+      (o.kind === 'line-at' && (o.name === name || o.id === lineIdOf(name))) ||
       // A computed circle by the name the student gave it (#1464), and a circle stated by its centre by
       // that centre's letter — «A על המעגל O» after «נתון מעגל O» (#1464 step 3).
       (o.kind === 'circle-thru' && (o.name === name || o.id === numeralCurveId('circle', name))) ||

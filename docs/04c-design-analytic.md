@@ -460,7 +460,13 @@ builds every numeral token of the grammar, for lines, circles, parabolas and ell
 `numeralCurveId(kind, n)` is the id of every numeral-named curve and KEEPS the student's notation
 (`line-1`, `circle-I`), used by the naming clauses, the operand resolver, `curveByName` and every
 circle lookup in `apply.ts`; `numeralKey` is the notation-free identity («1» and «I» are one NAME), and
-`numeralTwin` finds an object named by the same numeral in the other notation. `apply.ts` asks it at
+`numeralTwin` finds an object named by the same numeral in the other notation. `lineIdOf(name)` is the id of
+every NAMED line (a numeral, `l3`, a two-point `AB`), so no site spells a curve-name prefix itself — a guard
+in `issue-1529-numeral-ids.test.ts` holds every `line-`/`circle-`/`parabola-`/`ellipse-` id construction to
+`names.ts` ([ADR-AG-179](06c-decisions-analytic.md#adr-ag-179)). The REVERSE direction goes through the same
+file: `crossings.ts` words a numeral-named curve from its id (`refKindOf` + `statedName`, «הפרבולה I»), never
+from its label, which carries the noun in the language it was typed in; and the centre rule's circle slot
+reads the numeral table (a numeral after the noun, a single capital as before). `apply.ts` asks it at
 the two places a numeral name meets the figure — where a new id is minted (top of `applyFact`) and
 where a reference fails to resolve (`unknownRef`) — and refuses `numeral-notation` (the operator's
 2026-09-29 ruling: never a second object, never a silent merge; the ask lane's `missingCurve` says

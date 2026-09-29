@@ -1476,7 +1476,11 @@ both would invent a given the student never stated (ADR-052).
 ([#1109](https://github.com/dcodish/geo_builder/issues/1109)).
 
 «O מרכז המעגל I» · «O is the centre of circle I», and the same sentence offered by clicking the centre
-mark that R31 already draws.
+mark that R31 already draws. **Any numeral the circle was named by works** — «O מרכז מעגל 1», «O מרכז המעגל II»,
+"O is the centre of circle 2" — in the notation the circle was declared in (the other notation gets the
+notation note, R51's ruling) ([#1529](https://github.com/dcodish/geo_builder/issues/1529), ADR-AG-179).
+Every ring offered on a numeral-named line, circle, parabola or ellipse — centre or crossing — is a
+sentence that records.
 
 **It names; it never asserts.** The letter attaches to the point the circle already determines and
 commits no constraint and no degree of freedom — so on «נתון מעגל O משיק לציר x» the centre keeps its
