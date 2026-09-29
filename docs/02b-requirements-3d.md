@@ -64,6 +64,12 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   written from. A drive available for one phrasing and not its synonym refutes the student on the
   strength of how they wrote it. *(Realised for the angle family — [ADR-3D-217](06b-decisions-3d.md#adr-3d-217),
   #909; `seg-angle-drive-909.test.ts`.)*
+  **A relation to the COORDINATE FRAME drives a free figure on its own.** «מישור ABCD מקביל לציר z»,
+  «…מאונך למישור xy», «…מקביל למישור xz», «המרובע ABCD מונח במישור [xz]» turn a figure nothing else
+  anchors until the statement holds — it is never refused because the default drawing happens to lie flat.
+  Genuinely false statements (four typed points that span no such plane; two frame statements that
+  contradict each other) are still refused. *(Realised — [ADR-3D-281](06b-decisions-3d.md#adr-3d-281),
+  #1550; `issue-1550.test.ts`, `fixtures3/coord-frame-axis-drive-1550.geo3.json`.)*
 - **FR-SP-6 (Must)** — **A stated new label must land on the figure.** A decomposition that loses a point
   the student named is **refused, naming the label** — never committed with the point missing. A label
   that already exists is context, not a drop. *(Realised — `droppedNewLabels3`, `honesty3.test.ts`.)*
@@ -397,6 +403,14 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   keeps the full patch. The first mention decides, and the «מישורים» toggle in the data panel still
   switches either one; the choice survives undo, save/load and share. *(Realised —
   [ADR-3D-278](06b-decisions-3d.md#adr-3d-278), #1485; `issue-1485-face-default.test.ts`.)*
+- **FR-RD-14 (Must)** — **A plane's display chip lives on the FIRST row that mentions it.** The first
+  fact row whose sentence names a drawn plane — a declaration («מישור ABCD») or a relation («מישור ABCD
+  מקביל לציר z», «BE מוכל במישור ABCD») — carries that plane's chip («פאה בלבד» …). Later rows that
+  mention the same plane carry none: one chip per plane. Deleting that row moves the chip to the next row
+  that mentions the plane; a refused (amber) row carries none. The «מישורים» section of the data panel
+  still toggles every drawn plane. *(Operator ruling 2026-09-29 on #1550, amending the #847 ruling of
+  2026-08-31. Realised — [ADR-3D-281](06b-decisions-3d.md#adr-3d-281); `issue-1550.test.ts`,
+  `issue-842.test.ts`, `issue-847.test.ts`.)*
 
 ## Coverage
 

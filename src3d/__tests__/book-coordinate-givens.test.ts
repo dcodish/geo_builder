@@ -243,14 +243,20 @@ describe('#324 — verify on a DETERMINED figure (the claim is the arbiter)', ()
 
 describe('#324 — the statement alone DRIVES a free figure', () => {
   beforeEach(reset);
-  it('«הבסיס ABCD מונח על מישור שמקביל למישור [xy]» on a bare box: base exactly horizontal', () => {
+  it('«הבסיס ABCD מונח על מישור שמקביל למישור [xz]» on a bare box: the box TURNS until the base is ∥ [xz]', () => {
+    // #1550 (ADR-3D-281): this lock used [xy] — a relation the canonical placement ALREADY satisfies (the
+    // base is drawn horizontal), so it passed with no drive at all and could never catch the drive being
+    // missing (it wasn't triggered when the relation was the only pin). [xz] is FALSE in the canonical
+    // placement, so this can only pass by driving. Asserted first, so the lock cannot go vacuous again.
     submit('תיבה');
-    submit('הבסיס ABCD מונח על מישור שמקביל למישור [xy]');
+    const ys0 = ['A', 'B', 'C', 'D'].map((id) => derive3(state().facts, 0).positions.get(id)!.y);
+    expect(Math.max(...ys0) - Math.min(...ys0), 'the canonical base is NOT ∥ [xz]').toBeGreaterThan(0.1);
+    submit('הבסיס ABCD מונח על מישור שמקביל למישור [xz]');
     expect(err()).toBeNull();
-    for (const seed of [0, 1]) {
+    for (let seed = 0; seed < 24; seed++) {
       const d = derive3(state().facts, seed);
-      const zs = ['A', 'B', 'C', 'D'].map((id) => d.positions.get(id)!.z);
-      expect(Math.max(...zs) - Math.min(...zs), `seed ${seed}`).toBeLessThan(1e-6);
+      const ys = ['A', 'B', 'C', 'D'].map((id) => d.positions.get(id)!.y);
+      expect(Math.max(...ys) - Math.min(...ys), `seed ${seed}`).toBeLessThan(1e-6);
     }
   });
   it('the bare «הבסיס» resolves to THE solid\'s base ring; with no solid it refuses honestly', () => {

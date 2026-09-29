@@ -50,20 +50,24 @@ describe('#842 step 3 — only the row that MATERIALISED the plane offers its to
     expect(chipRows()).toEqual([['מישור ABCD', 'ABCD']]);
   });
 
-  it('SUPERSEDED by #847 — a relation that is the only mention gets NO chip either', () => {
+  it('#1550 (ADR-3D-281) — a relation that is the only mention carries the chip again', () => {
     // This file originally locked the opposite: the containment kept the chip because nothing else
     // had declared the plane. That was clause 2 of ADR-3D-192 — an inference, not the operator's
     // instruction — and they rejected it on sight (a relation is a statement ABOUT a plane, never a
     // declaration of one). The reachability it protected now lives in the data panel's planes
     // section (ADR-3D-197). Kept as a test, inverted, so the superseded behaviour cannot creep back.
+    // #1550 then AMENDED #847 on the operator's ruling (2026-09-29, "the first place where a plane is
+    // mentioned"): the first row that names the plane carries its chip, whatever kind of sentence it is —
+    // so this is inverted once more.
     build(["קובייה ABCDA'B'C'D'", 'E אמצע AC', 'BE מוכל במישור ABCD']);
-    expect(chipRows()).toEqual([]);
+    expect(chipRows()).toEqual([['BE מוכל במישור ABCD', 'ABCD']]);
   });
 
-  it('the DECLARING row wins even when a relation named the plane first', () => {
-    // Order must not decide ownership: whoever declares the plane owns its chip, wherever they sit.
+  it('#1550 — the FIRST mention wins, even when a declaration comes later', () => {
+    // Was: "the declaring row wins". The operator's 2026-09-29 ruling makes order decide: one chip per
+    // plane, on its first mention; the later declaration carries none.
     build(["קובייה ABCDA'B'C'D'", 'E אמצע AC', 'BE מוכל במישור ABCD', 'מישור ABCD']);
-    expect(chipRows()).toEqual([['מישור ABCD', 'ABCD']]);
+    expect(chipRows()).toEqual([['BE מוכל במישור ABCD', 'ABCD']]);
   });
 
   it('the rule is not containment-only — a ∥ row does not toggle a plane another row drew', () => {

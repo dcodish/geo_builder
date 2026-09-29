@@ -8,7 +8,7 @@
  */
 
 import { lineAtParam, planeAtParam, resolve3, type Resolved3 } from './evaluate';
-import { containmentDeviation, DIRECTION_REL_TOL, lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
+import { CLAIM_REL_TOL, containmentDeviation, coordPlaneRelHolds, DIRECTION_REL_TOL, lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { atomVec, evalExpr } from './vecExpr';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { bisectorDir3, cross3, dist3, dot3, runNormal, norm3, normalize3, sub3, v3, type Vec3 } from './vec3';
@@ -18,7 +18,7 @@ import type { Claim3, Construction3, RevolutionObj } from './types';
  *  NUMERIC pivot carries the finite-difference-Jacobian floor (~1e-6 in loosely
  *  conditioned, unpinned directions) — 2e-5 sits far above that noise and far below
  *  any wrong bagrut answer (which differs by ≥ 0.5). */
-const REL_TOL = 2e-5;
+const REL_TOL = CLAIM_REL_TOL; // #1550: one number, shared with the pivot's frame-drive trigger
 
 /**
  * #1449 (ADR-3D-279): a solid of revolution's measure from its STATED radius and height. The one
@@ -119,21 +119,9 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       return norm3(sub3(p, target)) <= REL_TOL * Math.max(norm3(target), 1);
     }
     case 'coord-plane-rel': {
-      // #324 (ADR-3D-079): the ring's relation to a coordinate plane/axis on the FINAL figure
-      const ps = claim.ids.map((id) => pos.get(id));
-      if (ps.some((p) => !p)) return false;
-      const ring = ps as { x: number; y: number; z: number }[];
-      let extent = 0;
-      for (let i = 1; i < ring.length; i++) extent = Math.max(extent, norm3(sub3(ring[i], ring[0])));
-      const tol = REL_TOL * Math.max(extent, 1);
-      if (claim.mode === 'share') return ring.every((p) => Math.abs(p[claim.axis] - ring[0][claim.axis]) <= tol);
-      if (claim.mode === 'zero') return ring.every((p) => Math.abs(p[claim.axis]) <= tol);
-      const n = runNormal(ring.map((p) => v3(p.x, p.y, p.z)));
-      const nn = norm3(n);
-      if (nn < 1e-12) return false; // the ring does not span a plane at all
-      if (Math.abs(n[claim.axis]) > REL_TOL * nn) return false;
-      if (claim.mode === 'contains') return Math.abs(dot3(n, ring[0])) <= REL_TOL * nn * Math.max(extent, 1);
-      return true;
+      // #324 (ADR-3D-079): the ring's relation to a coordinate plane/axis on the FINAL figure.
+      // #1550: the predicate is shared with the pivot's drive trigger — one meaning, two readers.
+      return coordPlaneRelHolds(claim.ids.map((id) => pos.get(id)), claim.axis, claim.mode, REL_TOL);
     }
     case 'plane-line-perp': {
       // #375: the point-run plane's normal must be PARALLEL to the line's direction (the plane ⟂ the

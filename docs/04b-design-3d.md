@@ -120,6 +120,16 @@ rule for what an arc reads, so it is also where the choice lands: a symbol whose
 `letter` reads its letter instead of its value, and everything else is byte-identical. The resolver
 rides the `App3 → Figure3 → buildScene3` seam that `planeDisplay` already uses.
 
+**Which row carries a plane's chip is DERIVED, not stored (#1550, [ADR-3D-281](06b-decisions-3d.md#adr-3d-281),
+amending ADR-3D-197).** `store/planeChips.ts`: the FIRST `ok` fact whose sentence names a drawn plane
+carries its chip — declaration or relation; later mentions carry none; delete that row and the next
+mentioning row inherits it. "Which planes does this sentence name" is ONE structural function,
+`planesNamedBy` — plane operands (`plane-run` / `plane-named`) at any depth, a field named `plane`, a
+declaration's `name`, and the bare `ids` of the four kinds whose id list IS a plane — never a switch over
+command types. `App3` passes status (#847: an amber row owns nothing) and the figure's drawn planes (a
+plane the sentence only measures against has no chip). The data panel's «מישורים» section still lists
+every drawn plane with the same toggle.
+
 **A plane's display default is DERIVED, not stored.** `planeDisplay` holds only the student's toggles;
 an absent key means the plane's own default, which `defaultPlaneDisplay3(c, name)` reads from
 `Construction3.faceNamed` — the point-run planes whose first mention was a face/base noun (the operand
@@ -160,6 +170,28 @@ A figure's placement, rotation and scale are a **gauge** — free unless somethi
 licenses [`FR-SP-4`](02b-requirements-3d.md): a number may be drawn only if it survives the gauge being
 resampled. Without the funnel the engine could not distinguish "this length is 5" from "this length is 5
 *in the drawing I happen to have chosen*", and printing the second is dishonest.
+
+**The pivot's residual families are ONE list (#1550, [ADR-3D-281](06b-decisions-3d.md#adr-3d-281)).**
+`pivotFamilies3(c)` (evaluate.ts) names every residual family `solvePivot` consumes and the LANE that
+solves it: `anchor` (injections and scalar givens — step 1, the normal solve), `plane-eq` (step 3, the
+equation-plane drive), `frame` (step 3b — a figure ring or operand against the ABSOLUTE frame: a named
+line, a coordinate plane or axis; satisfied by turning the figure), `membership` (step 4, the
+transactional membership drive). The pivot's entry gate and every step's trigger read that list, so a
+family can no longer be admitted without a solve lane — `coordPlanePins` was, for two months, and a
+coordinate-frame given on a figure nothing else anchored solved nothing. A row's `drivesAlone` says
+whether its presence alone (no anchor) triggers the lane; `false` is FAILURE PATH ONLY — the lane runs
+when the relation is unmet on the current placement, so a figure that already satisfies it is untouched.
+The coordinate-frame row is failure-path: its unmet test is the claim's own predicate
+(`coordPlaneRelHolds`, operands.ts) at the claim's own tolerance (`CLAIM_REL_TOL`), so "the drive
+thinks it holds" ⟺ "the verifier accepts it". `issue-1550.test.ts` locks totality structurally: every
+`c.*Pins` / `figure*(c)` family `solve3.ts` reads must be a registry row.
+
+**The #512 frame verdict is per placement COMPONENT.** `placementSampledParts` publishes whether the funnel
+sampled the translation and the rotation separately (`placementSampled` is their disjunction). A frame
+claim is softened to `placement-not-fixed` only when a component it READS was sampled: an operand
+reference («BD' ⊥ מישור [xy]») reads the whole placement, as before; the ring form's ∥ / ⟂ reads only
+the rotation, which its own drive solved — so when it fails, the givens contradict each other and the
+refusal says so rather than asking for a placing given that would not help.
 
 ## Relations as a disposition map
 

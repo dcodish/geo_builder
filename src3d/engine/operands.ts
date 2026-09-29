@@ -252,6 +252,43 @@ export function symMemberDrives(c: Construction3): { id: Id; sym: string; line?:
   return out;
 }
 
+/** The claim verifier's tolerance (claims.ts `REL_TOL`), exported so a drive trigger that asks "would the
+ *  claim refute this?" asks it at exactly the claim's threshold (#1550). */
+export const CLAIM_REL_TOL = 2e-5;
+
+/**
+ * #1550 (ADR-3D-281) — does a point RING stand in its stated relation to a COORDINATE plane or
+ * axis? ONE answer for the pivot's drive trigger and the claim verifier, so the drive can never think a
+ * relation holds that the verifier then refutes (the {@link lineRelDeviation} rule, frame edition).
+ *
+ * `share` — every point has the same `axis` coordinate (∥ the coordinate plane ⟂ that axis);
+ * `zero` — that coordinate is 0 for every point (lies ON the coordinate plane);
+ * `perp` — the ring's normal ⟂ e_axis (∥ that axis / ⟂ the coordinate plane it pierces);
+ * `contains` — `perp` and the ring's plane passes through the origin.
+ *
+ * A missing point, or a ring that spans no plane (for the normal-based modes), does not hold.
+ */
+export function coordPlaneRelHolds(
+  pts: readonly (Vec3 | null | undefined)[],
+  axis: 'x' | 'y' | 'z',
+  mode: 'share' | 'zero' | 'perp' | 'contains',
+  tol: number,
+): boolean {
+  if (pts.some((p) => !p)) return false;
+  const ring = (pts as Vec3[]).map((p) => v3(p.x, p.y, p.z));
+  let extent = 0;
+  for (let i = 1; i < ring.length; i++) extent = Math.max(extent, norm3(sub3(ring[i], ring[0])));
+  const t = tol * Math.max(extent, 1);
+  if (mode === 'share') return ring.every((p) => Math.abs(p[axis] - ring[0][axis]) <= t);
+  if (mode === 'zero') return ring.every((p) => Math.abs(p[axis]) <= t);
+  const n = runNormal(ring);
+  const nn = norm3(n);
+  if (nn < 1e-12) return false; // the ring does not span a plane at all
+  if (Math.abs(n[axis]) > tol * nn) return false;
+  if (mode === 'contains') return Math.abs(dot3(n, ring[0])) <= tol * nn * Math.max(extent, 1);
+  return true;
+}
+
 /**
  * S2 (#378, ADR-3D-103): the scalar MISALIGNMENT of a line-rel instance — 0 ⟺ the relation holds
  * exactly, `null` when the geometry is degenerate/unresolvable. ONE answer for every consumer

@@ -160,19 +160,31 @@ const linesOf = (claim: unknown): string[] => {
  * claim is a statement about where the figure SITS, so it can only be judged once the placement is
  * fixed. Same structural walk as {@link freePlanesOf}, for the same reason: a claim kind added later
  * must not escape the guard.
+ *
+ * #1550 (ADR-3D-281) — and WHICH part of the placement it reads. The frame appears in two shapes: as an
+ * OPERAND («BD' ⊥ מישור [xy]», «A על מישור [xy]») and as a bare `axis` field (the ring form «מישור ABCD
+ * מקביל לציר z», a `coord-plane-rel` claim). The walk used to see only the first, so the ring form fell
+ * through to `claim-refuted`. An operand reads the placement as a whole (`frame` — the #512 rule,
+ * unchanged). The ring form states its own meaning in `mode`: ∥ / ⟂ (`share`, `perp`) read only which way
+ * the ring FACES (`rotation`); lying ON a coordinate plane / through the origin (`zero`, `contains`) reads
+ * where it sits too (`translation`). The split matters because the ring form DRIVES the rotation: when the
+ * drive could not satisfy it, the givens contradict each other, and "fix a placement first" would be false
+ * advice (measured: «ABCD ∥ xy» then «ABB'A' ∥ xy» on a box).
  */
-const refsCoordFrame = (claim: unknown): boolean => {
-  let found = false;
+const coordFrameReads = (claim: unknown): ('frame' | 'rotation' | 'translation')[] => {
+  const out = new Set<'frame' | 'rotation' | 'translation'>();
   const walk = (v: unknown): void => {
-    if (found) return;
     if (Array.isArray(v)) return v.forEach(walk);
     if (!v || typeof v !== 'object') return;
     const o = v as Record<string, unknown>;
-    if (o.kind === 'plane-coord' || o.kind === 'axis') found = true;
-    else for (const val of Object.values(o)) walk(val);
+    if (o.kind === 'plane-coord' || o.kind === 'axis') out.add('frame');
+    else if (o.axis === 'x' || o.axis === 'y' || o.axis === 'z') {
+      out.add('rotation');
+      if (o.mode === 'zero' || o.mode === 'contains') out.add('translation');
+    } else for (const val of Object.values(o)) walk(val);
   };
   walk(claim);
-  return found;
+  return [...out];
 };
 
 /**
@@ -206,7 +218,13 @@ function sampledCarrierVerdict(claim: Claim3, c: Construction3, resolved: Resolv
     { reads: linesOf, sampled: (l) => (resolved.freeLineDofs.get(l) ?? 0) > 0, verdict: (id) => ({ code: 'line-not-determined', id }) },
     // #512 — the COORDINATE FRAME: «BD' ⊥ מישור [xy]» is satisfiable (rotate the box), so while the landing
     // funnel sampled the placement the claim is about where the figure sits, which nothing stated fixed
-    { reads: (cl) => (refsCoordFrame(cl) ? ['frame'] : []), sampled: () => resolved.placementSampled, verdict: () => ({ code: 'placement-not-fixed' }) },
+    // #1550: per COMPONENT the claim reads — a ring's ∥/⟂ to the frame reads only the rotation, which its own
+    // drive solves; failing there is a contradiction among the givens, never "fix a placement first"
+    {
+      reads: coordFrameReads,
+      sampled: (part) => (part === 'frame' ? resolved.placementSampled : resolved.placementSampledParts[part as 'rotation' | 'translation']),
+      verdict: () => ({ code: 'placement-not-fixed' }),
+    },
     // #1311 — a NEVER-POSITIONED point: its three coordinates are samples (ADR-052), not givens
     { reads: (cl) => claimPointIds(c, cl), sampled: (id) => c.points.get(id)?.kind === 'free3', verdict: (id) => ({ code: 'point-not-determined', id }) },
   ];

@@ -29,6 +29,10 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #1550 (ADR-3D-281) — the operator's line: a coordinate-frame relation that is true only after the figure
+  // TURNS, stated on an unanchored box. The essence is "this now builds green and verifies" (before: refused
+  // «הטענה לא מתקיימת בציור»); the 24-seed geometry and the family live in issue-1550.test.ts.
+  'coord-frame-axis-drive-1550.geo3.json': ["תיבה ABCDA'B'C'D'", 'מישור ABCD מקביל לציר z'],
   // #963 (ADR-3D-238) — point-in-plane membership through the CONTAINMENT frame, both frames and both
   // languages. The lock is "these sentences build and the figure verifies", so it is a fixture rather
   // than a hand-authored scenario: it also nets any parser drift on the eight spellings the issue

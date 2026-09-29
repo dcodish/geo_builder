@@ -17,6 +17,11 @@
  * gets its toggle in the data panel's planes section instead. Both are locked below — the removal
  * and the reachability it would otherwise cost (#821: *"the user has the option of disabling it
  * through the input panel"*).
+ *
+ * AMENDED by #1550 (ADR-3D-281, operator ruling 2026-09-29, *"the first place where a plane is
+ * mentioned"*): the first row that names a plane carries its chip, relation or declaration. The
+ * non-ok half of #847 stands unchanged. The two assertions that locked "a relation never owns a plane"
+ * are INVERTED below rather than deleted, so neither ruling can drift back unnoticed.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
@@ -43,9 +48,10 @@ const chips = () => {
 describe('#847 — a non-ok row carries no plane chip', () => {
   beforeEach(reset);
 
-  it("the operator's sequence: the containment row never carries a chip, amber or green", () => {
+  it("the operator's sequence: the containment row carries the chip while green, and loses it when amber", () => {
     build(["קובייה ABCDA'B'C'D'", 'E אמצע AC', 'BE מוכל במישור ABCD']);
-    expect(chips(), 'a relation states something ABOUT a plane; it does not declare one').toEqual([]);
+    // #1550 inverts #847's "never": the containment is the FIRST row to name ABCD, so it owns the chip
+    expect(chips(), 'the first mention of the plane carries its chip').toEqual([['BE מוכל במישור ABCD', 'ABCD']]);
 
     const eRow = st().facts.find((f) => f.utterance.includes('אמצע'))!;
     st().remove(eRow.id);
@@ -64,10 +70,13 @@ describe('#847 — a non-ok row carries no plane chip', () => {
     expect([...d.resolved.planes.keys()], 'the plane the relation materialised is drawn').toContain('ABCD');
   });
 
-  it('no relation family carries a chip — not ∥, ⟂, distances or claims either', () => {
-    // Restricting the rule to containment would special-case the one input that was reported.
+  it('INVERTED by #1550 — a ∥ that first names two planes carries BOTH chips (one row, two planes)', () => {
+    // Was: "no relation family carries a chip". The rule is not containment-only in either direction.
     build(["קובייה ABCDA'B'C'D'", "ABCD מקביל למישור A'B'C'D'"]);
-    expect(chips()).toEqual([]);
+    expect(chips()).toEqual([
+      ["ABCD מקביל למישור A'B'C'D'", 'ABCD'],
+      ["ABCD מקביל למישור A'B'C'D'", "A'B'C'D'"],
+    ]);
   });
 
   it('a DECLARED plane keeps its chip on its own row, even when a relation about it fails', () => {

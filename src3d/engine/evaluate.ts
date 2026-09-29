@@ -16,6 +16,8 @@ import { sample } from './rng';
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { defaultViewFrame } from './defaultView';
 import {
+  CLAIM_REL_TOL,
+  coordPlaneRelHolds,
   isAbsolute,
   lineDirCarriesParam,
   figureExtent,
@@ -408,6 +410,11 @@ export interface Resolved3 {
    *  where the figure SITS, so refuting it on a placement the tool invented is a false accusation
    *  (ADR-3D-138's class). Derived by the funnel itself, so it cannot disagree with what was sampled. */
   placementSampled: boolean;
+  /** #1550 (ADR-3D-281) — the same answer PER COMPONENT. A claim that reads only which way the figure
+   *  FACES («מישור ABCD מקביל לציר z») is about the rotation; when a drive solved the rotation, that claim
+   *  failing is a contradiction among the givens, never an unfixed placement — even while the unstated
+   *  translation is still sampled. Same derivation as `placementSampled` (its disjunction). */
+  placementSampledParts: { translation: boolean; rotation: boolean };
 }
 
 const linVal = (e: LinExpr, a: number): number => e.k + e.p * a;
@@ -1298,6 +1305,64 @@ export function scaleKnown3(c: Construction3): boolean {
   return absolutePointCount(c) >= 2 && c.solids.length === 0;
 }
 
+/**
+ * ADR-3D-033 (M1): a side-less membership statement about a NAMED plane is a GIVEN the figure's free
+ * DOFs must satisfy — drivable when the carrier is a point-run plane (it rides the figure) or a numeric
+ * equation plane. `'any'` keeps its branch-SELECTION semantics (chooseParam); a side statement is an
+ * inequality (sampled + verified). #487: a FREE plane's membership never drives the FIGURE — the plane
+ * has the free DOFs, and its resolution passes through the members by construction.
+ */
+function drivableMemberships3(c: Construction3): Construction3['memberships'] {
+  return c.memberships.filter(
+    (m) => !m.side && m.plane !== 'any' && (c.pointPlanes.has(m.plane) || (c.planes.has(m.plane) && !c.planes.get(m.plane)!.free)),
+  );
+}
+
+/**
+ * #1550 (ADR-3D-281) — THE PIVOT'S RESIDUAL FAMILIES, ONE LIST.
+ *
+ * The pivot was entered through one hand-written disjunction of pin families and SOLVED through five
+ * others (step 1's `hasOtherPins`, step 3's plane pins, step 3b's frame relations, step 4's memberships).
+ * `coordPlanePins` sat in the first list and in none of the second: a coordinate-frame given on a figure
+ * nothing else anchored entered the pivot, solved nothing, and the canonical placement stood — so
+ * «מישור ABCD מקביל לציר z» on a box was refuted as the student's error. The gate and the triggers now
+ * read THIS list, so a family can no longer be admitted without a solve lane.
+ *
+ * Each row is one residual family `solvePivot` consumes, tagged with the LANE that solves it:
+ *  - `anchor`     — step 1, the normal solve (injections and scalar givens place the figure);
+ *  - `plane-eq`   — step 3, the equation-plane drive (ADR-3D-030);
+ *  - `frame`      — step 3b, a figure-derived operand against the ABSOLUTE frame (a named line, a
+ *                   coordinate plane/axis): satisfied by ROTATING the figure;
+ *  - `membership` — step 4, the transactional membership drive (ADR-3D-033, #801).
+ * `drivesAlone`: with no anchor present, the family's mere presence triggers its lane's solve. `false`
+ * means FAILURE PATH ONLY — the lane solves only when the relation is unmet on the current placement, so
+ * a figure that already satisfies it is untouched (the stability promise, ADR-3D-079's own lanes).
+ * `source` names what `solvePivot` reads, for the totality lock (`issue-1550.test.ts`).
+ */
+export type PivotLane3 = 'anchor' | 'plane-eq' | 'frame' | 'membership';
+export interface PivotFamily3 {
+  key: 'pins' | 'vectorPins' | 'pairPins' | 'scalarPins' | 'planePins' | 'coordPlanePins' | 'planeLinePerps' | 'lineRels' | 'memberships' | 'symDrives';
+  source: string;
+  lane: PivotLane3;
+  present: boolean;
+  drivesAlone: boolean;
+}
+export function pivotFamilies3(c: Construction3): PivotFamily3[] {
+  return [
+    { key: 'pins', source: 'c.pins', lane: 'anchor', present: c.pins.length > 0, drivesAlone: true },
+    { key: 'vectorPins', source: 'c.vectorPins', lane: 'anchor', present: c.vectorPins.length > 0, drivesAlone: true },
+    { key: 'pairPins', source: 'c.pairPins', lane: 'anchor', present: c.pairPins.length > 0, drivesAlone: true },
+    { key: 'scalarPins', source: 'c.scalarPins', lane: 'anchor', present: c.scalarPins.length > 0, drivesAlone: true },
+    { key: 'planePins', source: 'c.planePins', lane: 'plane-eq', present: c.planePins.length > 0, drivesAlone: true },
+    // failure path only: a frame relation the canonical placement already satisfies keeps it verbatim
+    { key: 'coordPlanePins', source: 'c.coordPlanePins', lane: 'frame', present: c.coordPlanePins.length > 0, drivesAlone: false },
+    { key: 'planeLinePerps', source: 'figurePlaneLinePerps', lane: 'frame', present: figurePlaneLinePerps(c).length > 0, drivesAlone: true },
+    { key: 'lineRels', source: 'figureLineRels', lane: 'frame', present: figureLineRels(c).some((r) => !isAbsolute(r.op)), drivesAlone: true },
+    { key: 'memberships', source: 'members', lane: 'membership', present: drivableMemberships3(c).length > 0, drivesAlone: false },
+    { key: 'symDrives', source: 'members', lane: 'membership', present: symMemberDrives(c).length > 0, drivesAlone: false },
+  ];
+}
+
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number): Resolved3 {
   const pos: Positions3 = new Map<Id, Vec3>();
@@ -1422,12 +1487,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   // figure's free DOFs must satisfy — drivable when the carrier is a point-run plane
   // (it rides the figure) or a numeric equation plane. `'any'` keeps its branch-SELECTION
   // semantics (chooseParam); a side statement is an inequality (sampled + verified).
-  const drivableMemberships = c.memberships.filter(
-    // #487: a FREE plane's membership never drives the FIGURE — the plane has the free DOFs, and its
-    // resolution passes through the members by construction. Driving the figure toward a sampled
-    // orientation would invert the relationship (the plane is the unknown, not the solid).
-    (m) => !m.side && m.plane !== 'any' && (c.pointPlanes.has(m.plane) || (c.planes.has(m.plane) && !c.planes.get(m.plane)!.free)),
-  );
+  const drivableMemberships = drivableMemberships3(c);
 
   // S2 (#378, ADR-3D-103): the gauge-lane line relations (a figure operand against an absolute
   // named line) — they drive the pivot exactly like planeLinePerps. Absolute-lane entries never
@@ -1470,11 +1530,11 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   // #801: the memberships a pin-symbol carrier owns — drivable only INSIDE the pivot (operands.ts)
   const symDrives = symMemberDrives(c);
   const warm: { x?: number[]; mirror?: boolean } = {}; // the applied solution's vector — the drive's warm start (ADR-3D-033)
+  // #1550: the entry gate and every solve trigger below read ONE family list (see `pivotFamilies3`)
+  const families = pivotFamilies3(c).filter((f) => f.present);
+  const laneRows = (lane: PivotLane3): PivotFamily3[] => families.filter((f) => f.lane === lane);
   if (
-    (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0 ||
-      c.planePins.length > 0 || c.coordPlanePins.length > 0 || figPlanePerps.length > 0 ||
-      gaugeLineRels.length > 0 || drivableMemberships.length > 0 ||
-      symDrives.length > 0) && // #815: a pin-symbol membership with NO pin beside it enters the pivot too
+    families.length > 0 && // #815: a pin-symbol membership with NO pin beside it enters the pivot too
     // #1311 (ADR-3D-260): a figure with no solid still has DOF to drive when it holds a never-positioned
     // point — the vectors unit's «וקטור AB» is exactly that figure, and a given naming it must move it.
     (c.solids.length > 0 || hasFreePoint3(c))
@@ -1611,7 +1671,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     // point dragged onto the plane, the rest of the figure off it); membership is
     // checked below, and the recorded claim is the final arbiter either way.
     const cNoPlanes = c.planePins.length > 0 ? { ...c, planePins: [] } : c;
-    const hasOtherPins = c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0;
+    const hasOtherPins = laneRows('anchor').length > 0;
 
     // 1) the normal solve — no symbol unknowns, so bit-identical to the pre-V8-c path.
     if (hasOtherPins) applySolutions(solvePivot(cNoPlanes, EC, dims0, seed, undefined, undefined, undefined, lines));
@@ -1633,7 +1693,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     //    WITH the plane pins so the equation drives the free gauge/dims. If the joint
     //    solve finds nothing, the pinned figure stands and the recorded claim refutes
     //    the equation (the student-answer semantics, `claim-refuted`).
-    if (c.planePins.length > 0) {
+    if (laneRows('plane-eq').length > 0) {
       const unmet = c.planePins.some((pin) => {
         const nn = Math.max(Math.hypot(pin.cx, pin.cy, pin.cz), 1e-12);
         return pin.ids.some((id) => {
@@ -1654,28 +1714,41 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     //     relation is then the only thing orienting it) or when the pinned solve leaves it unmet. If
     //     the joint solve finds nothing, the prior figure stands and the recorded claim refuses
     //     honestly (`claim-refuted`) rather than a silently wrong drawing.
-    if (figPlanePerps.length > 0 || gaugeLineRels.length > 0) {
-      const unmet =
-        figPlanePerps.some((pin) => {
-          const ring = pin.ids.map((id) => pos.get(id));
-          const ln = lines.get(pin.line);
-          if (ring.some((p) => !p) || !ln) return true;
-          const n = runNormal(ring as Vec3[]);
-          const den = norm3(n) * norm3(ln.dir);
-          return den < 1e-12 || norm3(cross3(n, ln.dir)) / den > 1e-4;
-        }) ||
+    //
+    //     #1550 (ADR-3D-281): the COORDINATE-FRAME relation («מישור ABCD מקביל לציר z») is the
+    //     same class — a figure ring against the absolute frame, satisfied by turning the figure — and
+    //     is solved here. It is failure-path only (`drivesAlone: false`): a figure whose canonical
+    //     placement already satisfies it is never re-solved. Its unmet test is the CLAIM's own predicate
+    //     at the claim's own tolerance, so "the drive thinks it holds" ⟺ "the verifier accepts it".
+    const frameRows = laneRows('frame');
+    if (frameRows.length > 0) {
+      const frameUnmet: Record<string, () => boolean> = {
+        planeLinePerps: () =>
+          figPlanePerps.some((pin) => {
+            const ring = pin.ids.map((id) => pos.get(id));
+            const ln = lines.get(pin.line);
+            if (ring.some((p) => !p) || !ln) return true;
+            const n = runNormal(ring as Vec3[]);
+            const den = norm3(n) * norm3(ln.dir);
+            return den < 1e-12 || norm3(cross3(n, ln.dir)) / den > 1e-4;
+          }),
         // S2 (#378): a gauge-lane line relation left unmet is the same trigger. A line that only
         // resolves post-pivot (a through-line) is not drivable here — the recorded claim is its
         // arbiter — so it never counts as unmet.
-        gaugeLineRels.some((pin) => {
-          const ln = lines.get(pin.line);
-          if (!ln) return false;
-          const geom = resolveOperand(pin.op, c, { lines, planes })((id) => pos.get(id) ?? null);
-          if (!geom) return true;
-          const dev = lineRelDeviation(pin.rel, pin.deg, geom, ln, figureExtent(pos));
-          return dev === null || dev > 1e-4;
-        });
-      if (!hasOtherPins || unmet) {
+        lineRels: () =>
+          gaugeLineRels.some((pin) => {
+            const ln = lines.get(pin.line);
+            if (!ln) return false;
+            const geom = resolveOperand(pin.op, c, { lines, planes })((id) => pos.get(id) ?? null);
+            if (!geom) return true;
+            const dev = lineRelDeviation(pin.rel, pin.deg, geom, ln, figureExtent(pos));
+            return dev === null || dev > 1e-4;
+          }),
+        coordPlanePins: () =>
+          c.coordPlanePins.some((pin) => !coordPlaneRelHolds(pin.ids.map((id) => pos.get(id)), pin.axis, pin.mode, CLAIM_REL_TOL)),
+      };
+      const unmet = frameRows.some((f) => frameUnmet[f.key]());
+      if ((!hasOtherPins && frameRows.some((f) => f.drivesAlone)) || unmet) {
         const retry = solvePivot(c, EC, dims0, seed, undefined, undefined, undefined, lines);
         if (retry.length > 0) applySolutions(retry);
         else if (!hasOtherPins) pivot = { solutions: 0, chosen: -1, err: Infinity };
@@ -1744,7 +1817,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     //    stage, the same experiment and the same rollback. Their residual is the only one that cannot
     //    be lowered beforehand: the carrier is re-derived from the CANDIDATE symbol value each
     //    evaluation, exactly as a run carrier is re-derived from the candidate positions.
-    if (drivableMemberships.length > 0 || symDrives.length > 0) {
+    if (laneRows('membership').length > 0) {
       pinParam();
       resolveLatePlanes();
       const unmetMembership = (): boolean =>
@@ -1957,7 +2030,11 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   // ABSOLUTE frame («BD' ⊥ [xy]») is a claim about where the figure SITS; if the placement it is
   // measured against was invented here rather than fixed by a given, refuting it accuses the student
   // of a wrong statement on the strength of an arbitrary choice — ADR-3D-138's class exactly.
-  const placementSampled = (translationFree || rotationFree) && c.solids.length > 0 && hasAbsoluteFrameObject(c);
+  const placementSampledParts = {
+    translation: translationFree && c.solids.length > 0 && hasAbsoluteFrameObject(c),
+    rotation: rotationFree && c.solids.length > 0 && hasAbsoluteFrameObject(c),
+  };
+  const placementSampled = placementSampledParts.translation || placementSampledParts.rotation;
   if ((translationFree || rotationFree || spinAxis) && c.solids.length > 0 && hasAbsoluteFrameObject(c)) {
     const gaugeIds = gaugePlacedIds3(c);
     if (gaugeIds.length > 0) {
@@ -2314,6 +2391,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     freePlaneDofs,
     freeLineDofs,
     placementSampled,
+    placementSampledParts,
     ratioSymbols: Object.fromEntries(ratioSymbols),
   };
 }

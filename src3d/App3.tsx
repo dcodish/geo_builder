@@ -162,13 +162,12 @@ export default function App3() {
   const planeMode = (name: string) => planeDisplay[name] ?? defaultPlaneDisplay3(derived.construction, name);
   const dof = useMemo(() => freeDofCount3(derived.construction, derived.resolved), [derived]);
   const notices = derived.notices; // #305 (ADR-3D-090): non-error "here is what changed" messages
-  // #842 (ADR-3D-192): which row owns each plane's display chip — derived from the fact list, so a
-  // relation row never offers to toggle a plane another row drew.
-  // #847: a row that is not `ok` owns nothing — it materialised no plane. Status is part of the
-  // question, so it is part of the derivation's input.
+  // #842 (ADR-3D-192) → #1550 (ADR-3D-281): which row owns each plane's display chip — the FIRST ok row
+  // whose sentence names the plane, declaration or relation; one chip per plane. Derived from the fact list.
+  // #847: a row that is not `ok` owns nothing. #1550: a plane the figure does not draw has no chip.
   const planeChips = useMemo(
-    () => planeChipsByFact(facts, (id) => derived.status[id] === 'ok'),
-    [facts, derived.status],
+    () => planeChipsByFact(facts, (id) => derived.status[id] === 'ok', (name) => derived.resolved.planes.has(name)),
+    [facts, derived.status, derived.resolved.planes],
   );
   // #1476 (ADR-3D-265): the «הצג בניה» chip — on the row that STATES an angle between two planes, and
   // only while that row is `ok` (a refuted angle does not hold, so there is nothing true to construct).
@@ -918,10 +917,8 @@ export default function App3() {
                       {dihedralShown[f.id] ? t('facts.dihedralHide') : t('facts.dihedralShow')}
                     </button>
                   )}
-                  {/* #842 (ADR-3D-192): the chip goes on the row that MATERIALISED the plane, not on
-                      every row that mentions it. Provenance is derived from the fact list (the #769
-                      pattern), so a relation stated about a plane the student already drew no longer
-                      offers "hide plane" as its only affordance. */}
+                  {/* #842 → #1550 (ADR-3D-281): the chip goes on the FIRST row that names the plane, never
+                      on every row that mentions it — one chip per plane, derived from the fact list. */}
                   {(planeChips.get(f.id) ?? []).map((name) => (
                     <button
                       key={name}
