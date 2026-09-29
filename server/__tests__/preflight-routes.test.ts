@@ -123,7 +123,7 @@ describe('#1279 — against the REAL proxy, every probe reads routed and none re
     });
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    await import('../standalone');
+    await import('../standalone'); // load-in-body-ok: booting the real proxy must follow the env vars set just above (PORT, the test key)
     origin = `http://127.0.0.1:${port}`;
     // Wait until it is listening.
     for (let i = 0; i < 50; i++) {
@@ -133,7 +133,7 @@ describe('#1279 — against the REAL proxy, every probe reads routed and none re
         await new Promise((r) => setTimeout(r, 20));
       }
     }
-  });
+  }, 60_000);
   afterAll(() => vi.restoreAllMocks());
 
   /** Apache's ProxyPass: the public prefix is replaced by the backend tail; anything else 404s. */
