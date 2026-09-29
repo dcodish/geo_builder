@@ -120,6 +120,12 @@ summary, not prose. The operator works down it without opening any other documen
    Cases are classed **🎮 play** (needs the operator's hands/judgment) · **👁 look** (judge from the
    embedded screenshot, no typing) · **✅ verified** (record only); the published `report.html`
    carries the evidence, and the chat report keeps the 🎮 utterances copy-pasteable per rule 3.
+7. **Every capability is tested in the words STUDENTS use, not the builder's spelling**
+   ([ADR-W-101](docs/06w-decisions-workspace.md#adr-w-101)): before writing its cases, sweep ≥10 student
+   phrasings on the branch AND `main` (order, conjoined subjects, synonyms, copulas, connectives, question
+   openers «מהו/מצא את», a trailing «?», «נתון כי», digits/Roman, Hebrew/English). The sheet then carries
+   ≥3 distinct wordings per `capability` and a `sweep` row whose failed phrasings are fixed or filed.
+   `validateSheet` refuses a sheet that does not.
 
 Enforced by the `Stop` hook [`scripts/ensure-test-server.mjs`](scripts/ensure-test-server.mjs), which fails
 OPEN — a broken hook must never wedge a session.

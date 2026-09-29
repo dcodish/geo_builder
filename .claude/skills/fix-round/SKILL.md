@@ -1,6 +1,6 @@
 ---
 name: fix-round
-description: Execute a batch of operator-approved (auto-ok) fix plans autonomously — pick up to 20 work items off the queue by priority, fix each at the root in its own worktree under the full gates, land bugs on main and features as PRs, escalate instead of patching when a plan fails contact with the code, and finish with ONE round issue (awaiting-play) plus a published HTML report carrying the batch play sheet. Use when the operator says to run a fix round, "run the loop", clear the queue, or work through the auto-ok'd issues. Never run uninvoked, and never as a substitute for triage — it executes plans, it does not write them.
+description: Execute a batch of operator-approved (auto-ok) fix plans autonomously — pick up to 30 work items off the queue by priority, fix each at the root in its own worktree under the full gates, land bugs on main and features as PRs, escalate instead of patching when a plan fails contact with the code, and finish with ONE round issue (awaiting-play) plus a published HTML report carrying the batch play sheet. Use when the operator says to run a fix round, "run the loop", clear the queue, or work through the auto-ok'd issues. Never run uninvoked, and never as a substitute for triage — it executes plans, it does not write them.
 ---
 
 # Fix round — autonomous execution of triaged, operator-approved fix plans
@@ -45,18 +45,18 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
 - **Bundle** issues sharing one root cause or mechanism into a single work item (the plans say
   so when it's true — same class, same chokepoint). Bundling is encouraged when it is the right
   fix shape; the cap below never forbids a correct bundle.
-- **Cap: up to 20 work items** per round — one number, no band (a bundle counts as ONE item) —
+- **Cap: up to 30 work items** per round ([ADR-W-101](../../../docs/06w-decisions-workspace.md#adr-w-101), 2026-09-29; it was 20) — one number, no band (a bundle counts as ONE item) —
   [ADR-W-067](../../../docs/06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028). **Fewer is always fine**: the cap is not a
   quota, and a round with two eligible items runs rather than waits to fill up. Priority order
   P2 → P3 within eligibility; value density (per the /status-update rubric) breaks ties.
-  **Price the sitting before composing big:** ~30 min/item measured, so a full 20 is an 8–11 hour
+  **Price the sitting before composing big:** ~30 min/item measured, so a full 30 is a 12–16 hour
   run — that is the unattended overnight shape ([ADR-W-054](../../../docs/06w-decisions-workspace.md));
   an attended round composes to what the operator can play in one go.
 - **Spread one chokepoint across rounds:** more than ~2 items touching the same chokepoint — they
   rebase over each other and each one's full-suite run can break the previous one's scenario — means
   composing the rest into the NEXT round, not reconciling repeatedly inside this one. **This does NOT
   scale with the cap** (it is a property of the chokepoint, not of the round) and is usually what holds
-  a composition below 20 — say so at composition time rather than discovering it at item 14.
+  a composition below 30 — say so at composition time rather than discovering it at item 14.
 - **Announce the composition** — one line per item (issues, plan gist, route bug/feature) —
   before any code. This is the round's contract; anything not listed is not touched.
 - **Open the round issue NOW, not at the end** ([ADR-W-013](../../../docs/06w-decisions-workspace.md)) —
@@ -97,14 +97,31 @@ Sequential, one item at a time (parallel items in one tree overwrite each other)
    registry, no special-casing the reported input. A plan that says "not measured past the above" is
    a hypothesis, however confidently it is phrased — treat its mechanism as something to verify
    first, not as a specification.
-4. **Per-item gates, no exceptions:** ADR entry in the product's log; per-fix unit test; the
+4. **Sweep the students' wording before writing a single case** ([ADR-W-101](../../../docs/06w-decisions-workspace.md#adr-w-101) — operator,
+   2026-09-29: *"ensure that each testing uses different versions of wording like a real student would do"*).
+   For each new capability, measure **≥10 phrasings** a student or a bagrut text would use, through the real
+   submit/ask path, on the item's tip **and** on `main`. Vary:
+   - word order («ABC משולש»)
+   - named, conjoined and plural subjects («מעגל O ומעגל M משיקים», «המעגלים O ו-M»)
+   - synonyms and typos the product folds
+   - copulas (הוא/היא/הינו/=/none) and connectives (שמשוואתו/:/-/a comma)
+   - question openers («מהו/מה/מצא את/חשב את») and a trailing «?»
+   - «נתון»/«נתון כי»/«נתון:», with or without ה-
+   - digits vs Roman numerals, Hebrew and English
+   - the textbook's own sentence
+
+   A phrasing that fails is **fixed** when it is this item's class; otherwise **file** a successor issue. It is
+   never quietly dropped. Record the result as the sheet's `sweep` row (`tried`, `accepted`, `gaps`) and the
+   phrasings table in the ledger. The builder's own spelling is the one phrasing guaranteed to pass: five
+   all-green PR sheets went 37/100 red on 2026-09-29 the moment students' phrasings were tried.
+5. **Per-item gates, no exceptions:** ADR entry in the product's log; per-fix unit test; the
    regression lock per standing rule 4 (fixtures-first — a `.geo.json` fixture when the essence
    is "builds green and verifies", a scenario in the LAST corpus chunk when a bespoke assertion
    is needed); `tsc -b` + build clean; the PRODUCT LANE green (`npm run test:run:3d` /
    `test:run:2d`) plus the item's own locks. The FULL suite is the BATCH gate (Step 3), not a
    per-item one ([ADR-W-034](../../../docs/06w-decisions-workspace.md)). **Never overlap suite
    runs** — a lane or a full suite runs alone; overlapping doubled every gate in round #822.
-5. **Commits reference the round:** every item commit carries `Fixes #NN` AND mentions the
+6. **Commits reference the round:** every item commit carries `Fixes #NN` AND mentions the
    round issue (`round #RR`) — from any commit you can find the round, from the round every
    commit.
 
@@ -154,13 +171,13 @@ landing-policy decision needs (#543).
 
 **Stop condition — escalations reaching A QUARTER OF THE ITEMS ATTEMPTED, minimum 2, finalize the round**
 ([ADR-W-067](../../../docs/06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028)). So: 2 of the first 8, 3 of 12,
-5 of 20 — and a single escalation never stops a round. Land what is already done, finalize the ledger
+5 of 20, 8 of 30 — and a single escalation never stops a round. Land what is already done, finalize the ledger
 honestly (remaining picked items go to **Skipped** with "round stopped on the escalation rate: N of M
 attempted"), and report. A failure rate that far above the measured ~10% baseline says the QUEUE's plans
 are going stale — that is a triage signal, and grinding through the rest is exactly the loop pressure the
 escalation exit exists to relieve. This is a stop, not a failure; the stats line records it.
 
-The threshold is a RATE, not the old flat "second escalation", because at 20 items two escalations IS the
+The threshold is a RATE, not the old flat "second escalation", because at 20–30 items two escalations IS the
 healthy baseline — an absolute stop would truncate most rounds around item 12 and the cap would have moved
 on paper only.
 
@@ -225,6 +242,21 @@ The page carries two halves, in this order:
 2. **The play sheet** — the numbered cases **exactly as standing rule 5 specifies them**, `T1…Tn`
    continuous, grouped by route (batch on `main` first, then one section per PR), each with its
    **Server** URL *with its path*, the Hebrew utterances, **Look for**, **Before**.
+
+**The sheet is PRE-PLAYED before it is published — the round does the operator's testing for him**
+([ADR-W-092](../../../docs/06w-decisions-workspace.md#adr-w-092), [ADR-W-101](../../../docs/06w-decisions-workspace.md#adr-w-101)).
+1. **Write the spec.** Commit it at `scripts/playsheets/<round>.json` (format: `scripts/lib/play-sheet-core.mjs`).
+   Each case is `play`/`look`/`verified`, names its `capability` or `guard`, and gives its server `base`
+   (+ `path`). Refusal cases use `expectRefusal`. Each capability carries its Step 2 `sweep` row.
+2. **Start every server the sheet names.** Batch on 5173, one port per PR from its own worktree, launched
+   detached. `curl` each one, and verify it serves the item's code by a runtime identifier.
+3. **Drive it:** `npm run playsheet -- --sheet scripts/playsheets/<round>.json --out <dir>`. The validator
+   refuses a sheet whose capabilities are tested in fewer than 3 wordings or have no sweep.
+4. **READ the screenshots** of every 👁/🎮 case (and spot-check ✅). A mechanically red case goes back to its
+   fix. **The operator never receives a red sheet**, and the driver's `report.html` is this page's
+   play-sheet half.
+
+Only 🎮 cases are left for his hands. 👁 he judges from the embedded image; ✅ he does not touch.
 
 Two things the page must actually do, because they are why it exists:
 

@@ -94,7 +94,7 @@ decides how much can be closed in one session.
 The operator-invoked batch loop that replaces one-at-a-time fix dispatch. Full procedure:
 **`.claude/skills/fix-round/SKILL.md`**; the contract in one paragraph:
 
-A round picks **up to 20 work items** (a bundle of issues sharing one root cause counts as
+A round picks **up to 30 work items** ([ADR-W-101](06w-decisions-workspace.md#adr-w-101), 2026-09-29; 20 before) (a bundle of issues sharing one root cause counts as
 one item; fewer is always fine — the cap is not a quota — [ADR-W-067](06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028), which
 consumed a nineteen-round measured escalation rate of 9.8% and a measured ~30 min/item to replace
 [ADR-W-028](06w-decisions-workspace.md)'s 5–8, itself a replacement for ADR-W-012's untested Phase-1 3–5) from
@@ -122,9 +122,9 @@ docs/17 escalation template goes on the issue, `auto-ok` → `needs-operator`, a
 and escalations reaching **a quarter of the items attempted, minimum 2**, finalize the round (land what is
 done, the rest to Skipped), because a failure rate that far above the ~10% baseline is a triage signal about
 the QUEUE rather than something to grind through — an absolute “second escalation” would simply BE the
-baseline once a round is 20 items long (ADR-W-067). More than ~2 items on one chokepoint is composed into
+baseline once a round is 20–30 items long (ADR-W-067, ADR-W-101). More than ~2 items on one chokepoint is composed into
 the next round instead, since they rebase over each other — that rule does NOT scale with the cap, and is
-usually what holds a composition below 20.
+usually what holds a composition below 30.
 The round finishes by finalizing the round issue — per-item evidence (commit, ADR ids, gate record, a
 required *deviations-from-plan* line), landed/PR'd/escalated/**skipped** sections, the batch play sheet
 (Hebrew utterances per item, **split into batch/landed-on-`main` and individual/PR sections** — the PRs
@@ -147,6 +147,15 @@ its fix — the operator never receives a red sheet. Each case is classed **🎮
 **👁 look** (judge from the embedded screenshot) · **✅ verified** (record only); the driver's
 `report.html` with the screenshots IS the published artifact's play-sheet half, and the operator's
 sitting covers 🎮 fully, 👁 by eye, ✅ not at all.
+
+**Since [ADR-W-101](06w-decisions-workspace.md#adr-w-101) the cases are in STUDENTS' words.** Before writing an
+item's cases the round sweeps ≥10 phrasings of each new capability through the real path, on the branch AND
+`main`: word order, conjoined subjects, synonyms, copulas, connectives, question openers «מהו/מצא את», a trailing
+«?», «נתון כי», digits/Roman, Hebrew/English. A failing phrasing is fixed when it is the item's class, else
+filed. Every case names its `capability` (or is a `guard`, with the reason one wording is the point); each
+capability appears in ≥3 distinct wordings and carries a `sweep` row (tried / accepted / gaps). `validateSheet`
+refuses a sheet that breaks this, and the report shows the sweep table. The builder's own spelling is the one
+phrasing guaranteed to pass, which is how five all-green PR sheets went 37/100 red on 2026-09-29.
 `/status-update`'s "Waiting on you" section surfaces the whole loop: plans awaiting `auto-ok`, PRs
 awaiting play, rounds in flight, rounds awaiting validation.
 

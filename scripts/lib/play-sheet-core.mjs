@@ -17,6 +17,31 @@
  * one (the `judgeCapture` split in `visual-smoke.mjs`, followed).
  */
 
+/**
+ * THE WORDING RULE (#1558, ADR-W-101). Operator, 2026-09-29: *"ensure that each testing uses
+ * different versions of wording like a real student would do."* Five PR sheets written from each
+ * builder's own spelling went 37/100 red once a student's phrasings were tried — the builder's
+ * spelling is the one phrasing guaranteed to work. So a sheet does not ship until:
+ *
+ *   - every case says what it tests: a `capability` (new behaviour) or a `guard` (why one wording is
+ *     the point — an unchanged-behaviour regression, a chrome click, the operator's exact sequence);
+ *   - every capability is exercised in at least MIN_WORDINGS genuinely different phrasings;
+ *   - every capability carries a `sweep` row: how many student phrasings were measured headlessly
+ *     (at least MIN_SWEEP), how many were accepted, and — when any failed — the `gaps` (a successor
+ *     issue or a stated reason), so a failing phrasing is never silently left out of the sheet.
+ *
+ * A sheet written before the rule sets `legacy: true` — visibly, never by default.
+ */
+export const MIN_WORDINGS = 3;
+export const MIN_SWEEP = 10;
+
+/** The phrasing a case actually tests: its last ask when it asks, else its last line. */
+export function phrasingOf(c) {
+  const src = Array.isArray(c?.asks) && c.asks.length ? c.asks : c?.lines;
+  const last = Array.isArray(src) && src.length ? src[src.length - 1] : '';
+  return stripBidi(last).replace(/\s+/g, ' ').trim();
+}
+
 /** The classes, in the order the report presents them: the operator's work first. */
 export const CASE_CLASSES = ['play', 'look', 'verified'];
 
@@ -81,6 +106,52 @@ export function validateSheet(sheet, products) {
         });
     }
   }
+  if (sheet.legacy !== true) problems.push(...wordingProblems(sheet));
+  return problems;
+}
+
+/** The wording rule (see MIN_WORDINGS above). Pure; returns problems as strings. */
+function wordingProblems(sheet) {
+  const problems = [];
+  const byCap = new Map();
+  for (const c of sheet.cases) {
+    const at = `case ${c?.id ?? '(no id)'}`;
+    const cap = typeof c.capability === 'string' ? c.capability.trim() : '';
+    const guard = typeof c.guard === 'string' ? c.guard.trim() : '';
+    if (cap && guard) problems.push(`${at}: a case is a \`capability\` OR a \`guard\`, not both`);
+    else if (!cap && !guard)
+      problems.push(`${at}: name the \`capability\` it tests, or say why one wording is the point (\`guard\`) — ADR-W-101`);
+    if (cap) {
+      if (!byCap.has(cap)) byCap.set(cap, []);
+      byCap.get(cap).push(c);
+    }
+  }
+  const sweep = Array.isArray(sheet.sweep) ? sheet.sweep : [];
+  if (sheet.sweep !== undefined && !Array.isArray(sheet.sweep)) problems.push('sheet: `sweep` must be a list of rows');
+  const rowOf = new Map(sweep.filter((r) => r && typeof r.capability === 'string').map((r) => [r.capability.trim(), r]));
+  for (const [cap, cases] of byCap) {
+    const wordings = new Set(cases.map(phrasingOf).filter(Boolean));
+    if (wordings.size < MIN_WORDINGS)
+      problems.push(
+        `capability «${cap}»: ${wordings.size} distinct wording(s) across ${cases.length} case(s) — a student says it at least ${MIN_WORDINGS} ways; add cases in their words (ADR-W-101)`,
+      );
+    const row = rowOf.get(cap);
+    if (!row) {
+      problems.push(`capability «${cap}»: no \`sweep\` row — measure how students phrase it before writing its cases (ADR-W-101)`);
+      continue;
+    }
+    const { tried, accepted } = row;
+    if (!Number.isInteger(tried) || tried < MIN_SWEEP)
+      problems.push(`capability «${cap}»: sweep tried ${tried ?? 'nothing'} — at least ${MIN_SWEEP} student phrasings`);
+    if (!Number.isInteger(accepted) || accepted < 0 || (Number.isInteger(tried) && accepted > tried))
+      problems.push(`capability «${cap}»: sweep \`accepted\` must be a count between 0 and \`tried\``);
+    else if (Number.isInteger(tried) && accepted < tried && !(Array.isArray(row.gaps) && row.gaps.some((g) => String(g).trim())))
+      problems.push(
+        `capability «${cap}»: ${tried - accepted} phrasing(s) failed the sweep but no \`gaps\` say where they went (a fix, a successor issue, or a reason)`,
+      );
+  }
+  for (const cap of rowOf.keys())
+    if (!byCap.has(cap)) problems.push(`sweep row «${cap}» names a capability no case tests`);
   return problems;
 }
 
@@ -129,6 +200,20 @@ const afterSteps = (after) =>
     )
     .join('\n');
 
+/** The sweep table (#1558): how many ways a student would say each capability were measured. */
+function sweepHtml(sheet) {
+  if (sheet.legacy === true || !Array.isArray(sheet.sweep) || sheet.sweep.length === 0) return '';
+  const wordings = (cap) =>
+    new Set(sheet.cases.filter((c) => c.capability === cap).map(phrasingOf).filter(Boolean)).size;
+  const rows = sheet.sweep
+    .map(
+      (r) =>
+        `<tr><td>${esc(r.capability)}</td><td>${esc(r.tried)}</td><td>${esc(r.accepted)}</td><td>${wordings(r.capability)}</td><td>${esc((r.gaps ?? []).join(' · ') || '—')}</td></tr>`,
+    )
+    .join('');
+  return `<section><h2>ניסוחים של תלמידים — כמה דרכים נבדקו לכל יכולת</h2><div class="table-wrap"><table class="sweep"><thead><tr><th>יכולת</th><th>ניסוחים שנמדדו</th><th>התקבלו</th><th>ניסוחים שונים בגיליון</th><th>פערים</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+}
+
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
 
@@ -152,6 +237,7 @@ export function renderReport({ sheet, results, generatedAt }) {
       .join('');
     return `<article class="case ${ok ? 'ok' : 'bad'}" id="${esc(c.id)}">
 <h3><span class="badge ${esc(c.class)}">${CLASS_META[c.class].icon} ${CLASS_META[c.class].he}</span> ${esc(c.id)} · ${esc(c.title)}</h3>
+${c.capability ? `<p class="cap">יכולת: ${esc(c.capability)} · ניסוח: «${esc(phrasingOf(c))}»</p>` : c.guard ? `<p class="cap">בדיקת יציבות: ${esc(c.guard)}</p>` : ''}
 <p class="server">שרת: <a href="${esc(c.base)}${esc(c.path ?? '')}" target="_blank" rel="noopener">${esc(c.base)}${esc(c.path ?? '')}</a></p>
 <pre class="lines" dir="rtl">${esc([...c.lines, ...(c.asks ?? [])].join('\n'))}</pre>
 ${afterSteps(c.after)}<p><strong>מה בודקים:</strong> ${esc(c.lookFor)}</p>
@@ -193,6 +279,10 @@ section{display:flex;flex-direction:column;gap:16px}
 border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
 .case.ok{border-inline-start-color:var(--ok)}.case.bad{border-inline-start-color:var(--bad)}
 .case h3{margin:0;font-size:1rem}
+.cap{margin:0;font-size:.85rem;color:var(--muted)}
+.table-wrap{overflow-x:auto}
+table.sweep{border-collapse:collapse;font-size:.9rem;width:100%}
+table.sweep th,table.sweep td{border:1px solid var(--line);padding:4px 8px;text-align:start;vertical-align:top}
 .badge{font-size:.78rem;border-radius:999px;padding:2px 10px;color:#fff;margin-inline-end:6px;white-space:nowrap}
 .badge.play{background:var(--chip-play)}.badge.look{background:var(--chip-look)}.badge.verified{background:var(--chip-verified)}
 .server,.before{margin:0;font-size:.9rem;color:var(--muted)}
@@ -212,6 +302,7 @@ border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
 <li>🎮 ${byClass.get('play').length}</li><li>👁 ${byClass.get('look').length}</li><li>✅ ${byClass.get('verified').length}</li>
 ${failures.length ? `<li class="fail">✗ ${failures.length} מקרים נכשלו מכנית — לא לשחק לפני תיקון</li>` : '<li>כל המקרים עברו את הבדיקה המכנית</li>'}
 </ul>
+${sweepHtml(sheet)}
 ${CASE_CLASSES.map(section).join('\n')}
 </main>`;
 }

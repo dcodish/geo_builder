@@ -3420,6 +3420,8 @@ The question put to him was short: **when «D = חיתוך AB ו-BC» draws the 
 
 ## ADR-W-067 — The fix-round cap is 20 items, and the escalation stop becomes a RATE (#1290, amends ADR-W-028)
 
+> **Amended by [ADR-W-101](#adr-w-101) (2026-09-29, #1558): the cap is 30.** The escalation stop (a quarter of the items attempted, minimum 2) and the chokepoint rule stand.
+
 **Status:** accepted, 2026-09-20 · **Amends:** [ADR-W-028](#adr-w-028--the-fix-round-cap-is-58-items-with-stop-conditions-35-was-a-phase-1-number-that-has-now-been-measured-767) (which amended [ADR-W-012](#adr-w-012--fix-round-autonomous-execution-of-operator-approved-fix-plans-543-544))
 · **Issue:** [#1290](https://github.com/dcodish/geo_builder/issues/1290) · operator: *"I want to change the number of issues a fix round can fix to about 20"*
 **Requirements:** none (internal) · **Design:** none (internal) — this is a workflow contract; the product promises nothing about round size.
@@ -4819,6 +4821,8 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 
 ## ADR-W-092 — Pre-played play sheets: the session drives every case in a browser first; the operator plays only what needs judgment (#1509)
 
+> **Amended by [ADR-W-101](#adr-w-101) (2026-09-29, #1558): every capability is tested in the words students use.** A measured sweep of at least 10 phrasings, at least 3 distinct wordings on the sheet, and a `sweep` row with the gaps, enforced by `validateSheet`.
+
 **Status:** accepted · 2026-09-28 · operator ruling in session: *"can we do something about my need to test so much? … approved. lets do this mechanism first so i reduce the load of testing from myself."*
 
 **Requirements:** none (workflow) · **Design:** [22-workflow.md §2d](22-workflow.md) + this entry; CLAUDE.md Rule 5 amended.
@@ -4960,3 +4964,41 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 **Decision.** A chip's label is rendered through that same `mathHtml`, after the product's bidi isolation (`display`), so it shows exactly the math its click produces. The chip font follows the app's text font, since typeset MathML beside monospace text read as two styles. Unchanged: the click still submits the RAW command (#751, ADR-W-029), and a chip's direction is still #1527's rule (Hebrew RTL, math LTR). Scope is the shared renderer's: powers, fractions, roots and `_{}` subscripts; a bare index such as complex's `w1` stays as typed, as it does in 2-D and analytic fact rows.
 
 **Measured.** Real-browser captures of the four empty canvases: analytic «(x−3)²+(y−4)²=9» and «y²=54x» typeset, complex «z⁵ = w²» typeset, every Hebrew chip still RTL, and clicking a chip submits its raw text. Lock: `shell/__tests__/quick-chips.test.tsx` (a power renders `<math>` with no literal `^`, the Hebrew stays text, the click yields the raw command).
+
+## ADR-W-101 — A play sheet tests each capability in the words students use (a measured sweep, enforced by the validator), and the fix-round cap is 30 (#1558, amends ADR-W-067 and ADR-W-092)
+
+**Status:** accepted · 2026-09-29 · operator request: *"make these changes and ensure that each testing uses different versions of wording like a real student would do. and increase to 30"* · feature → PR.
+
+**Requirements:** none (workflow) · **Design:** this entry; [22-workflow.md §2d](22-workflow.md); CLAUDE.md Rule 5 item 7; `.claude/skills/fix-round/SKILL.md` Step 2 and Step 5b; `scripts/lib/play-sheet-core.mjs` (the wording rule).
+
+**Context.** ADR-W-092 made the session drive every case in a browser before the operator sees a sheet. It did not say which words a case types, and in practice they were the builder's own: the spelling the grammar was written for, which is the one phrasing guaranteed to pass. On 2026-09-29 the operator played PR #1511's pre-played, all-green sheet, and his first sentence, «מעגל O ומעגל M משיקים מבחוץ», was not understood. A headless sweep of about 100 student phrasings per PR, over the five open PRs, then turned their sheets **37/100 red**. Three of the reds were honesty-class: a degenerate radius drawn green, a negative radius accepted, and an internal id shown in a refusal. All three sat one phrasing away from the spelling the sheets tested. A second gap: the fix-round skill never named the pre-play, only "standing rule 5 governs", so a round honoured ADR-W-092 by inheritance rather than by its own steps.
+
+**Decision.**
+1. **Every capability a sheet tests is swept first.** Before writing its cases, an item measures how students would say the new capability, at least **10 phrasings** through the real submit/ask path, on the branch **and** on `main`. The dimensions to vary:
+   - word order
+   - named, conjoined and plural subjects
+   - synonyms
+   - copulas (הוא/היא/הינו/=/none)
+   - connectives (שמשוואתו/:/-/comma)
+   - question openers (מהו/מה/מצא את/חשב את) and a trailing «?»
+   - «נתון»/«נתון כי»/«נתון:»
+   - with or without ה-
+   - digits vs Roman numerals
+   - Hebrew and English
+   - the textbook's own phrasing
+
+   A phrasing that fails is **fixed** when it is the item's class, or **recorded as a gap** with its successor issue. It is never quietly left out.
+2. **The sheet proves it, mechanically** (`validateSheet`, so the driver refuses to run a sheet that breaks the rule):
+   - Every case names the `capability` it tests, or is a `guard` that says why one wording is the point (an unchanged-behaviour regression, a chrome click, the operator's exact sequence).
+   - Every capability is exercised in **at least 3 distinct wordings**, compared after whitespace and bidi normalisation. The builder typing one spelling three times does not count.
+   - Every capability carries a `sweep` row: phrasings **tried** (≥10), **accepted**, and the **gaps** (required whenever accepted < tried).
+   - The published report renders the sweep table, and each case shows its capability and the wording it tried, so the operator sees how much of students' language was measured.
+   - A sheet written before this rule opts out only visibly, with `legacy: true`. The four tracked sheets (`demo-1509`, `round-1510`, `round-1517`, `pr-1548`) are marked.
+3. **The fix-round skill states both steps itself.** Step 2 gains the sweep as a per-item gate, and Step 5b the browser pre-play (`npm run playsheet`, the screenshots read). Rule 5 still governs; the skill no longer relies on the reader following the reference.
+4. **The cap is 30 work items** (was 20, ADR-W-067). Fewer is always fine. The escalation stop stays a **rate**: a quarter of the items attempted, minimum 2, so 8 of 30. The ~2-items-per-chokepoint rule does not scale with the cap and still usually holds a composition below it. At the measured ~30 min per item, a full 30 is a 12–16 hour run: the unattended overnight shape (ADR-W-054). An attended round still composes to what the operator can play in one sitting.
+
+**What this does NOT change.** ADR-W-092's classes and red-sheet rule, rule 5's numbering and servers, the full-suite batch gate (ADR-W-034), and the one-live-round rule. The sweep measures phrasings; it does not license building them. A failing phrasing outside the item's class is filed, not fixed in the round.
+
+**Measured.** The five-PR sweep of 2026-09-29: 37 red of 100 cases before the fix pass, 151/151 green after it, with every capability tested in at least 3 wordings. Locks: `scripts/__tests__/play-sheet-core.test.ts` (#1558 block, 10 tests: distinct-wording counting through the bidi/whitespace strip; asks judged by their asks; sweep presence, size and gaps; capability/guard exclusivity; the legacy opt-out; the report's table).
+
+**What would reverse it.** If rounds start filing more successor issues from sweeps than they close, the sweep is finding real language gaps faster than the queue can absorb them. That is a signal to schedule a grammar-coverage pass, not to shrink the sweep.
