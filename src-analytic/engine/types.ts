@@ -272,7 +272,15 @@ export type Fact =
    * the host: a free `circle-at` radius is PINNED (the sym substituted, its param retired), a
    * determined radius is a restatement checked at the probe environments.
    */
-  | (FactBase & { t: 'radius-of'; circle?: string; value: Expr })
+  | (FactBase & { t: 'radius-of'; circle?: string; circleId?: Id; value: Expr })
+  /**
+   * «היקף המשולש הוא 12» — a perimeter whose polygon is named by its NOUN alone, or not at all
+   * («ההיקף הוא 12»), #1432 amendment 1. Which polygon is M1's question — the `area-of` rule: one
+   * matching ring lowers to the side-sum `length-eq` «AB+BC+CA=12» would carry, anything else refuses.
+   * `noun` absent or «מצולע» matches any ring. With the vertices spelled out the parser lowers straight
+   * to the side sum and never mints this fact.
+   */
+  | (FactBase & { t: 'perimeter-of'; noun?: string; value: Expr })
   /** «F מוקד הפרבולה» (#1432) — names the focus; M1 resolves THE parabola, the centre's pattern. */
   | (FactBase & { t: 'focus-of'; id: Id })
   /** «משוואת המדריך היא x=-2» (#1432) — a claim checked against the parabola's own directrix. */

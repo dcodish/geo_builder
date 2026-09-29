@@ -345,6 +345,20 @@ is outside the curriculum). Under the answer: «ניתן להשתמש בשיפו
 the law-of-cosines half only when all three vertices are known. An angle the student STATED is answered with no hint at all. *(#1409, #1525; realised —
 [ADR-AG-176](06c-decisions-analytic.md#adr-ag-176) Am. 1.)*
 
+**R122 — Radius, focus, directrix and perimeter are sayable and askable in the exam's spellings, and a
+stated value outside its quantity's range is refused.** The radius is a given at creation («נתון מעגל O
+שרדיוסו 5», «ברדיוס 5», «שאורך רדיוסו 5», «נתון מעגל שמרכזו (2,3) ורדיוסו 5») and afterwards («רדיוס
+המעגל (הוא|שווה|=)? 5», «אורך הרדיוס הוא 5», «המעגל ברדיוס 5»); the perimeter is a real given that fixes
+one degree of freedom («היקף המשולש ABC הוא 12», «היקף ABC = 12», «ההיקף הוא 12» over the one polygon);
+the focus names or places a point («F מוקד הפרבולה», «מוקד הפרבולה הוא F», «מוקד הפרבולה הוא (2,0)» —
+which pins a parameterised parabola); the directrix is a checked claim («מדריך הפרבולה הוא x=-2», «ישר
+המדריך x=-2»). Every role is askable in the same words, behind any opener («מהו», «מצא את», "what
+is") and closer («?»), which every ask accepts. A radius of zero or less is refused naming the
+sentence and the bound («חייב להיות גדול מ-0»), never drawn as a vanished circle. A role with no host,
+or several, is refused (or answered) naming the host to define or name — never with an unrelated
+example. «R=5»/«r=5» are not radius givens (a letter is a point or a parameter). *(#1432; realised —
+[ADR-AG-169](06c-decisions-analytic.md#adr-ag-169) Am. 1.)*
+
 **R24 — An ask is a DRY-RUN construction: built internally, evaluated, discarded.** It must never
 mutate the figure. The 2-D tool's `dryRunOutcome` already has this shape (apply on top of the current
 facts without committing), so it is copied rather than invented. It rides the ask channel

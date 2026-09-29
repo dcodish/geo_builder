@@ -241,6 +241,9 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // #1432 — the radius as a given, and the focus as a namable point (ADR-AG-169). Not featured.
   { category: 'circles', family: 'F5', he: 'נתון מעגל O שרדיוסו 5', en: 'circle O with radius 5' },
   { category: 'derived', family: 'F16', he: 'F מוקד הפרבולה', en: 'F is the focus of the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x'] },
+  // #1432 am. 1 — the bagrut's centre-by-coordinates circle, and the perimeter as a real given. Not featured.
+  { category: 'circles', family: 'F5', he: 'נתון מעגל שמרכזו (2,3) ורדיוסו 5', en: 'circle centred at (2,3) with radius 5' },
+  { category: 'relations', family: 'F20', he: 'היקף המשולש ABC הוא 12', en: 'the perimeter of triangle ABC is 12', needs: ['A(0,0)', 'B(3,0)', 'נקודה C'] },
   {
     category: 'circles',
     family: 'F5',

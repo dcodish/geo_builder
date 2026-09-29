@@ -29,7 +29,7 @@ function valueExpr(src: string): Expr | null {
 }
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
-import { ANGLE_STEM_HE, EN_SHAPE, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
+import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 
 /**
  * Why a line did not become facts.
@@ -1404,15 +1404,29 @@ function polygonId(vertices: string[]): string {
  *  the one-spelling gate is this tree's recurring trap (`src-analytic/CLAUDE.md`). */
 const HE_TANGENT_VERB = '(?:ה|ו|ש)?משיק(?:ה|ים|ות)?';
 
-// The optional RADIUS tail (#1432): «נתון מעגל O שרדיוסו 5», «מעגל שמרכזו O ורדיוסו 5» — the
-// radius arrives at creation, so the circle is born with 2 degrees of freedom, not 3.
+/**
+ * THE RADIUS TAIL — every way the exam attaches a radius to a circle it is creating (#1432, am. 1):
+ * «שרדיוסו 5», «ורדיוסו 5», «שאורך רדיוסו 5», «ברדיוס 5», «באורך רדיוס 5», «עם רדיוס 5», each with
+ * the optional copula («שרדיוסו הוא 5», «ורדיוסו = 5»). ONE atom, read by the creation rule and by the
+ * post-hoc «המעגל ברדיוס 5», so a spelling admitted in one is admitted in the other.
+ */
+const RADIUS_TAIL_HE = `(?:[שו]?(?:אורך\\s+)?רדיוסו|ב(?:אורך\\s+)?רדיוס|עם\\s+רדיוס(?:\\s+של)?)\\s*(?:(?:${COPULA_WORDS})\\s*|=\\s*)?(\\S+)`;
+const RADIUS_TAIL_EN = `(?:(?:and\\s+)?with\\s+(?:a\\s+)?radius(?:\\s+of)?|(?:and\\s+)?(?:whose\\s+)?radius(?:\\s+is)?)\\s*=?\\s*(\\S+)`;
+/**
+ * THE CENTRE — a letter, a letter with its coordinates «O(2,3)», or coordinates alone «(2,3)» (the
+ * bagrut's «מעגל שמרכזו (2,3) ורדיוסו 5»), with the optional «בנקודה». The coordinate text is read by
+ * `pointSlot` at the rule, which owns what a coordinate pair may hold.
+ */
+const CENTRE_SLOT = `(?:(${NAME})\\s*(\\([^()]*\\))?|(\\([^()]*\\)))`;
 const CIRCLE_AT_HE = new RegExp(
-  `^${HE_GIVEN}ה?מעגל\\s+(?:ש?מרכזו\\s+)?(${NAME})(?:\\s+[שו]?רדיוסו\\s+(\\S+))?(?:\\s+${HE_TANGENT_VERB}\\s+ל(.+))?$`
+  `^${HE_GIVEN}ה?מעגל\\s+(?:ש?מרכזו\\s+(?:(?:הוא|ב)\\s*)?(?:ה?נקודה\\s+)?)?${CENTRE_SLOT}(?:\\s+${RADIUS_TAIL_HE})?(?:\\s+${HE_TANGENT_VERB}\\s+ל(.+))?$`
 );
 const CIRCLE_AT_EN = new RegExp(
-  `^(?:the\\s+)?circle\\s+(?:cent(?:re|er)d\\s+at\\s+)?(${NAME})(?:\\s+with\\s+radius\\s+(\\S+))?(?:\\s+(?:is\\s+|which\\s+is\\s+)?tangent\\s+to\\s+(.+))?$`
+  `^(?:the\\s+)?circle\\s+(?:(?:cent(?:re|er)d\\s+at|with\\s+(?:its\\s+)?cent(?:re|er)(?:\\s+at)?|whose\\s+cent(?:re|er)\\s+is)\\s+(?:the\\s+point\\s+)?)?${CENTRE_SLOT}(?:\\s+${RADIUS_TAIL_EN})?(?:\\s+(?:is\\s+|which\\s+is\\s+)?tangent\\s+to\\s+(.+))?$`
 ,  'i',
 );
+/** «המעגל ברדיוס 5», «המעגל I ברדיוס 5» — the tail on a circle that already exists (post-hoc). */
+const CIRCLE_RADIUS_TAIL_HE = new RegExp(`^${HE_GIVEN}ה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?\\s+${RADIUS_TAIL_HE}$`);
 
 /** The CONTEXTUAL form — the one circle the student has drawn: «המעגל משיק לציר ה-x». */
 const CIRCLE_TANGENT_HE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+${HE_TANGENT_VERB}\\s+ל(.+)$`);
@@ -1514,12 +1528,11 @@ function tangentTargets(tail: string, src: string): TangentTargets | null {
  */
 function circleAtFacts(centre: Id, targets: TangentTargets, line: string, rStated?: Expr): Fact[] {
   const sym = `r_${centre}`;
-  // A STATED radius (#1432) is a literal from birth — no free sym, no param, one less DOF.
-  const r: Expr = rStated ?? { kind: 'sym', name: sym };
+  const r: Expr = { kind: 'sym', name: sym };
   return [
     ...targets.facts,
     { t: 'declare', id: centre, src: line },
-    ...(rStated ? [] : [{ t: 'param' as const, sym, domain: { ...UNBOUNDED, min: 0, minOpen: true }, src: line }]),
+    { t: 'param', sym, domain: { ...UNBOUNDED, min: 0, minOpen: true }, src: line },
     { t: 'circle-at', id: `circle-at-${centre}`, centre, r, src: line },
     ...targets.axes.map((axis) => ({
       t: 'constraint' as const,
@@ -1531,38 +1544,178 @@ function circleAtFacts(centre: Id, targets: TangentTargets, line: string, rState
       k: { t: 'tangent-line' as const, centre, r, line: ref },
       src: line,
     })),
+    /**
+     * A STATED radius (#1432) is the SAME given the post-hoc «רדיוס המעגל הוא 5» is — so it lowers to
+     * the same `radius-of` fact, applied to this very circle LAST — after the tangencies, so the substitution reaches their `r` too — instead of a literal slipped past the
+     * radius's domain (am. 1: «שרדיוסו -3» was accepted and the circle vanished). The substitution
+     * seam checks the domain and retires the parameter: born with 2 DOF, not 3, as before.
+     */
+    ...(rStated ? [{ t: 'radius-of' as const, circleId: `circle-at-${centre}`, value: rStated, src: line }] : []),
   ];
 }
 
 const NO_TARGETS: TangentTargets = { axes: [], lines: [], facts: [] };
 
+// ---------------------------------------------------------------------------
+// THE MEASURE ROLES — one reader per role, shared by the given and the ask (#1432, amendment 1)
+// ---------------------------------------------------------------------------
+
 /**
- * THE MEASURE-ROLE GIVENS (#1432) — radius, focus, directrix, each sayable as its own sentence.
+ * What a ROLE PHRASE names — «רדיוס המעגל I», «מוקד הפרבולה», «ישר המדריך», «היקף המשולש ABC».
  *
- * The values were always computed (the panel's folded detail shows them, #1212); no grammar
- * reached them on either surface. Which OBJECT each sentence means is M1's question, so each
- * lowers to a fact the apply boundary resolves — the «O מרכז המעגל» pattern.
+ * The pre-play of PR #1513 found every role readable in exactly one spelling: «רדיוס המעגל הוא 5»
+ * worked and «רדיוס המעגל 5», «אורך הרדיוס הוא 5» did not; «מדריך הפרבולה» answered and «משוואת
+ * המדריך» reported a missing curve named «המדריך». The class was one hand-written regex per sentence,
+ * each admitting its own subset. So the NOUN PHRASE is read here, once, and both surfaces compose it:
+ * the given is `<role> <copula>? <value>` in either order (`parseMeasureRoles`), the ask is the role
+ * phrase alone after the ask lane's opener normaliser (`app/ask.ts`). A spelling admitted by one is
+ * admitted by the other by construction — the sayable ⇒ askable rule (02c R23).
+ */
+export type RoleRef =
+  | { role: 'radius'; circle?: string }
+  | { role: 'focus'; host?: 'parabola' | 'ellipse' }
+  | { role: 'foci' }
+  | { role: 'directrix' }
+  | { role: 'perimeter'; noun?: string; ids?: Id[] };
+
+/** The shape nouns, longest first so «משולש ישר זווית» is not read as «משולש» — DERIVED from the registry. */
+const ROLE_SHAPE_HE = [...Object.keys(SHAPES), ANY_POLYGON_NOUN]
+  .sort((a, b) => b.length - a.length)
+  .map((k) => k.replace(/ /g, '[\\s-]+'))
+  .join('|');
+const ROLE_SHAPE_EN = [...Object.keys(EN_SHAPE), 'polygon'].sort((a, b) => b.length - a.length).join('|');
+const ROLE_RUN = `((?:${NAME}){3,})`;
+const ROLE_CIRCLE_HE = `(?:\\s+(?:של\\s+)?ה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?)?`;
+const ROLE_CIRCLE_EN = `(?:\\s+of\\s+(?:the\\s+)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?)?`;
+
+const ROLE_RADIUS_HE = new RegExp(`^(?:ה?אורך\\s+(?:של\\s+)?)?ה?רדיוס${ROLE_CIRCLE_HE}$`);
+const ROLE_RADIUS_EN = new RegExp(`^(?:the\\s+)?(?:length\\s+of\\s+(?:the\\s+)?)?radius${ROLE_CIRCLE_EN}$`, 'i');
+const ROLE_FOCUS_HE = /^(?:ה?שיעורי\s+)?ה?מוקד(?:\s+(?:של\s+)?ה?(פרבולה|אליפסה))?$/;
+const ROLE_FOCUS_EN = /^(?:the\s+)?(?:coordinates\s+of\s+(?:the\s+)?)?focus(?:\s+of\s+(?:the\s+)?(parabola|ellipse))?$/i;
+const ROLE_FOCI_HE = /^(?:ה?שיעורי\s+)?ה?מוקדי(?:ם)?(?:\s+(?:של\s+)?ה?אליפסה)?$/;
+const ROLE_FOCI_EN = /^(?:the\s+)?(?:coordinates\s+of\s+(?:the\s+)?)?foci(?:\s+of\s+(?:the\s+)?ellipse)?$/i;
+const ROLE_DIRECTRIX_HE = /^(?:ה?משוואת\s+)?(?:ה?ישר\s+)?ה?מדריך(?:\s+(?:של\s+)?ה?פרבולה)?$/;
+const ROLE_DIRECTRIX_EN = /^(?:the\s+)?(?:equation\s+of\s+(?:the\s+)?)?directrix(?:\s+of\s+(?:the\s+)?parabola)?$/i;
+const ROLE_PERIMETER_HE = new RegExp(`^ה?היקף(?:\\s+(?:של\\s+)?(?:ה?(${ROLE_SHAPE_HE})(?=\\s|$))?\\s*(?:${ROLE_RUN})?)?$`);
+const ROLE_PERIMETER_EN = new RegExp(
+  `^(?:the\\s+)?perimeter(?:\\s+(?:of\\s+)?(?:(?:the\\s+)?(${ROLE_SHAPE_EN})(?=\\s|$))?\\s*(?:${ROLE_RUN})?)?$`,
+  'i',
+);
+
+export function readRoleRef(raw: string): RoleRef | null {
+  const text = trim(raw);
+  const radius = ROLE_RADIUS_HE.exec(text) ?? ROLE_RADIUS_EN.exec(text);
+  if (radius) return { role: 'radius', ...(radius[1] ? { circle: radius[1] } : {}) };
+  const focus = ROLE_FOCUS_HE.exec(text) ?? ROLE_FOCUS_EN.exec(text);
+  if (focus) {
+    const host = focus[1] ? (/אליפסה|ellipse/i.test(focus[1]) ? 'ellipse' : 'parabola') : undefined;
+    return { role: 'focus', ...(host ? { host } : {}) };
+  }
+  if (ROLE_FOCI_HE.test(text) || ROLE_FOCI_EN.test(text)) return { role: 'foci' };
+  if (ROLE_DIRECTRIX_HE.test(text) || ROLE_DIRECTRIX_EN.test(text)) return { role: 'directrix' };
+  const per = ROLE_PERIMETER_HE.exec(text) ?? ROLE_PERIMETER_EN.exec(text);
+  if (per) {
+    // «היקף» must name SOMETHING or nothing at all — «היקף גדול» is not a perimeter reference.
+    const [, nounSrc, run] = per;
+    // The English pattern is case-blind for its words; a vertex run is capitals or it is no run.
+    if (run && splitNames(run).join('') !== run) return null;
+    const plain = nounSrc ? normalizeShapeNoun(nounSrc) : undefined;
+    const noun = plain ? (/^polygon$/i.test(plain) ? ANY_POLYGON_NOUN : EN_SHAPE[plain.toLowerCase()] ?? plain) : undefined;
+    return { role: 'perimeter', ...(noun ? { noun } : {}), ...(run ? { ids: splitNames(run) } : {}) };
+  }
+  return null;
+}
+
+/** A scalar the student states for a radius or a perimeter — a number or a parameter expression, never a point name. */
+function roleScalar(src: string): Expr | null {
+  const t = trim(src);
+  if (!claimable(t) || /[A-Z]/.test(t)) return null;
+  return valueExpr(t);
+}
+
+/**
+ * THE WAYS A ROLE GIVEN SPLITS INTO ITS TWO SIDES — in order of preference.
+ *
+ * A copula («הוא», «היא», «שווה ל-», «=», «:», "is") where there is one; else the value is the last
+ * or the first token («רדיוס המעגל 5», «ישר המדריך x=-2», «F מוקד הפרבולה»). Both orders of each
+ * split are tried, because the exam writes «מוקד הפרבולה הוא F» and «הנקודה F היא מוקד הפרבולה».
+ * The role side must read as a role phrase EXACTLY (`readRoleRef` is anchored), so no split can
+ * steal a sentence that merely contains the noun.
+ */
+function roleSplits(body: string): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  const add = (m: RegExpExecArray | null) => {
+    if (m) out.push([m[1], m[2]], [m[2], m[1]]);
+  };
+  add(new RegExp(`^(.+?)\\s+(?:${COPULA_WORDS}|is|equals)\\s*(.+)$`, 'i').exec(body));
+  add(/^(.+?)\s*[=:]\s*(.+)$/.exec(body));
+  add(/^(.+?)\s+(\([^()]*\)|\S+)$/.exec(body));
+  add(/^(\([^()]*\)|\S+)\s+(.+)$/.exec(body));
+  return out;
+}
+
+/**
+ * THE MEASURE-ROLE GIVENS (#1432, amendment 1) — radius, focus, directrix and perimeter, each
+ * sayable as its own sentence in every order and copula the reader admits.
+ *
+ * Which OBJECT a contextual role means is M1's question, so each lowers to a fact the apply
+ * boundary resolves (the «O מרכז המעגל» pattern) — except a perimeter with its vertices spelled
+ * out, which lowers straight to the side sum «AB+BC+CA=12» carries, plus the polygon it names (the
+ * area rule's #1080 ruling: naming a shape draws it).
  */
 function parseMeasureRoles(line: string): RuleOutcome {
-  const radius =
-    new RegExp(`^${HE_GIVEN}ה?רדיוס\\s+(?:של\\s+)?ה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?\\s+(?:הוא|היא|=)\\s*(.+)$`).exec(line) ??
-    new RegExp(`^the\\s+radius\\s+of\\s+(?:the\\s+)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?\\s+(?:is|=)\\s*(.+)$`, 'i').exec(line);
-  if (radius && claimable(radius[2])) {
-    const value = valueExpr(radius[2]);
-    if (!value) return refuse('bad-equation', trim(radius[2]));
-    return made([{ t: 'radius-of', ...(radius[1] ? { circle: radius[1] } : {}), value, src: line }]);
+  const tail = CIRCLE_RADIUS_TAIL_HE.exec(line);
+  if (tail && roleScalar(tail[2])) {
+    return made([{ t: 'radius-of', ...(tail[1] ? { circle: tail[1] } : {}), value: roleScalar(tail[2])!, src: line }]);
   }
-  const focus =
-    new RegExp(`^${HE_GIVEN}(${NAME})${HE_IS}\\s*ה?מוקד\\s+(?:של\\s+)?ה?פרבולה$`).exec(line) ??
-    new RegExp(`^(${NAME})\\s+is\\s+the\\s+focus\\s+of\\s+the\\s+parabola$`, 'i').exec(line);
-  if (focus) return made([{ t: 'focus-of', id: focus[1], src: line }]);
-  const directrix =
-    new RegExp(`^${HE_GIVEN}משוואת\\s+ה?מדריך\\s+(?:היא|הוא)\\s+(.+)$`).exec(line) ??
-    /^the\s+equation\s+of\s+the\s+directrix\s+is\s+(.+)$/i.exec(line);
-  if (directrix) {
-    const eq = equationExpr(directrix[1]);
-    if (!eq) return refuse('bad-equation', trim(directrix[1]));
-    return made([{ t: 'directrix-eq', eq, eqSrc: trim(directrix[1]), src: line }]);
+  const body = trim(line)
+    .replace(/^נתו(?:ן|נה|נים|נות)\s+(?:כי\s+|ש(?=\S))?/, '')
+    .replace(/^(?:it\s+is\s+)?given\s+(?:that\s+)?/i, '');
+  for (const [roleSide, valueSide] of roleSplits(body)) {
+    const ref = readRoleRef(roleSide);
+    if (!ref) continue;
+    const value = trim(valueSide);
+    switch (ref.role) {
+      case 'radius': {
+        const v = roleScalar(value);
+        if (!v) continue;
+        return made([{ t: 'radius-of', ...(ref.circle ? { circle: ref.circle } : {}), value: v, src: line }]);
+      }
+      case 'perimeter': {
+        const v = roleScalar(value);
+        if (!v) continue;
+        if (!ref.ids) return made([{ t: 'perimeter-of', ...(ref.noun ? { noun: ref.noun } : {}), value: v, src: line }]);
+        const ids = ref.ids;
+        if (hasRepeat(ids)) return refuse('repeated-vertex', line);
+        const shape = namedShapeFacts(ref.noun && ref.noun !== ANY_POLYGON_NOUN ? ref.noun : undefined, ids, line);
+        if (shape === 'bad-arity') return refuse('bad-arity', line);
+        const left = parseLengthExpr(ids.map((a, i) => `${a}${ids[(i + 1) % ids.length]}`).join('+'));
+        const right = constantLengthExpr(value);
+        if (!left || !right) continue;
+        return made([...shape, { t: 'constraint', k: { t: 'length-eq', left, right }, src: line }]);
+      }
+      case 'focus': {
+        const slot = pointSlot(value);
+        if (!slot) continue;
+        // An ellipse's focus is a derived point the engine has no rule for yet — understood, and
+        // refused by name rather than guessed (ADR-AG-169 am. 1, not built).
+        if (ref.host === 'ellipse') return refuse('out-of-scope', line);
+        if ('name' in slot) return made([{ t: 'focus-of', id: slot.name, src: line }]);
+        // «מוקד הפרבולה הוא (2,0)»: the coordinates become a point (the tool names it, #1263) that IS
+        // the focus — a fixed parabola judges it, a parameterised one is pinned by it (M1).
+        return viaCanonical(line, slot, (p) => [`${p} מוקד הפרבולה`]);
+      }
+      case 'directrix': {
+        const src = value.replace(/^(?:ה?ישר\s+)?(?:ש?משוואתו\s+)?/, '').replace(/^(?:the\s+)?line\s+/i, '');
+        if (!src.includes('=')) continue;
+        const eq = equationExpr(src);
+        if (!eq) return refuse('bad-equation', trim(src));
+        return made([{ t: 'directrix-eq', eq, eqSrc: trim(src), src: line }]);
+      }
+      case 'foci':
+        // «F1 ו-F2 מוקדי האליפסה» — naming two role points in one sentence is not built (am. 1).
+        return refuse('out-of-scope', line);
+    }
   }
   return null;
 }
@@ -1572,12 +1725,27 @@ function parseCircleAt(line: string): RuleOutcome {
   if (named) {
     // The tangency phrase is optional: «נתון מעגל O» alone is a circle with a free centre and a
     // free radius, which is 3 degrees of freedom and an honest figure. A stated radius (#1432)
-    // pins that freedom at birth — a literal Expr instead of the free sym, no param minted.
-    const rValue = named[2] !== undefined ? valueExpr(named[2]) : null;
-    if (named[2] !== undefined && !rValue) return refuse('bad-equation', named[2]);
-    const targets = named[3] === undefined ? NO_TARGETS : tangentTargets(named[3], line);
+    // pins that freedom at birth, through the same `radius-of` given the post-hoc sentence carries.
+    const [, name, nameCoords, coordsOnly, rSrc, tangentTail] = named;
+    const rValue = rSrc !== undefined ? roleScalar(rSrc) : null;
+    if (rSrc !== undefined && !rValue) return refuse('bad-equation', rSrc);
+    const targets = tangentTail === undefined ? NO_TARGETS : tangentTargets(tangentTail, line);
     // A tail this grammar cannot read — «משיק למעגל K» — is not this rule's sentence.
-    if (targets) return made(circleAtFacts(named[1], targets, line, rValue ?? undefined));
+    if (targets) {
+      if (coordsOnly !== undefined) {
+        // «נתון מעגל שמרכזו (2,3) ורדיוסו 5» — the centre by its coordinates alone: the tool names the
+        // point (#1263) and the canonical sentence carries the rest, so the two spellings are one.
+        const slot = pointSlot(coordsOnly);
+        if (!slot || 'name' in slot) return null;
+        return viaCanonical(line, slot, (p) => [
+          `נתון מעגל ${p}${rSrc !== undefined ? ` שרדיוסו ${rSrc}` : ''}${tangentTail !== undefined ? ` משיק ל${tangentTail}` : ''}`,
+        ]);
+      }
+      // «שמרכזו O(2,3)» — the centre's coordinates stated in the same breath: the point first.
+      const placed = nameCoords !== undefined ? parseLine(`${name}${nameCoords}`) : null;
+      if (placed && !placed.ok) return placed;
+      return made([...(placed?.ok ? placed.facts : []), ...circleAtFacts(name, targets, line, rValue ?? undefined)].map((f) => ({ ...f, src: line })));
+    }
   }
   const bare = CIRCLE_TANGENT_HE.exec(line) ?? CIRCLE_TANGENT_EN.exec(line);
   if (bare) {
@@ -3498,7 +3666,9 @@ function viaCanonical(line: string, slot: PointSlot | null, build: (p: Id) => st
   let out: Fact[] = facts.map((f) => ({ ...f, src: line }));
   if (slot && !('name' in slot)) {
     const id = `${MINT_PREFIX}${slot.key}`;
-    out = JSON.parse(JSON.stringify(out).split(JSON.stringify(MINT_SENTINEL)).join(JSON.stringify(id))) as Fact[];
+    // EMBEDDED too, not only whole strings (#1432 am. 1): a circle centred on a coordinate point carries the
+    // placeholder inside its own ids — `circle-at-Z₀`, `r_Z₀` — and they must follow the point's name.
+    out = JSON.parse(JSON.stringify(out).split(MINT_SENTINEL).join(JSON.stringify(id).slice(1, -1))) as Fact[];
     out.unshift({ t: 'point', id, x: slot.x, y: slot.y, src: line });
   }
   return made(out);
