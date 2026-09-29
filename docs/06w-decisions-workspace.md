@@ -4960,3 +4960,20 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 **Decision.** A chip's label is rendered through that same `mathHtml`, after the product's bidi isolation (`display`), so it shows exactly the math its click produces. The chip font follows the app's text font, since typeset MathML beside monospace text read as two styles. Unchanged: the click still submits the RAW command (#751, ADR-W-029), and a chip's direction is still #1527's rule (Hebrew RTL, math LTR). Scope is the shared renderer's: powers, fractions, roots and `_{}` subscripts; a bare index such as complex's `w1` stays as typed, as it does in 2-D and analytic fact rows.
 
 **Measured.** Real-browser captures of the four empty canvases: analytic «(x−3)²+(y−4)²=9» and «y²=54x» typeset, complex «z⁵ = w²» typeset, every Hebrew chip still RTL, and clicking a chip submits its raw text. Lock: `shell/__tests__/quick-chips.test.tsx` (a power renders `<math>` with no literal `^`, the Hebrew stays text, the click yields the raw command).
+
+## ADR-W-101 — The guide speaks the student's language: one shared jargon lint (#1456)
+
+**Status:** accepted · 2026-09-29 · external prod review relayed by the operator («Keep developer jargon out ('§2b', 'אלימינציה', 'שכבה נומרית')», 2026-09-27), batch-approved the same day · round #1571.
+
+**Requirements:** docs/02w FR-SU-7 (a sentence added: the guide carries no developer vocabulary) · **Design:** docs/04w — the guide speaks student
+
+**Context.** The guides are written by the people who built the tools, and they drifted into their words. Measured at pickup on `842ede39` by running the new rule over every catalog row and both locales of all four builders: complex 8 hits — «נפתרת באלימינציה, לא באיטרציה», «המהלך של §2b» / "the §2b move", «נפתרת בשכבה הנומרית» / "the numeric tier solves it", and the refusal «הדקדוק לא מזהה את השורה הזו» / "the grammar does not recognize this line"; 2-D 7 hits, all in the English guide — "(#760)", "(#775)", "(#554)", "(issue #151)", "2 DOF", "a free DOF" twice; 3-D 1 hit, an English refusal naming "the solver"; analytic 0 («פרבולה קנונית» is the curriculum's term). Every product had caught such strings by hand, when at all — nothing named the class.
+
+**Decision.**
+- **Rewritten in student language, both locales.** Complex: «משוואה כללית — המספרים והצמודים שלהם, בכל אחד מהאגפים», «שטח — קובע את הזווית שעוד לא נקבעה», «סדרה חשבונית — ההפרש בין כל שני איברים סמוכים קבוע», and the refusal «השורה לא זוהתה — נסו אחד מהניסוחים במדריך» (which now points at the guide it belongs to). 2-D English: the issue numbers dropped, "Incremental form (#554)" → "Step by step", "a free DOF" → "left free", "2 DOF" → "2 degrees of freedom" (the Hebrew already said «דרגות חופש», which is the curriculum's phrase). 3-D English: "for the solver to pin it in" → "there is nothing to anchor it to", matching the Hebrew.
+- **One rule, in the chrome.** `guideJargon` / `guideJargonIn` in `shell/frame/ManualScreen.tsx`, product-free: each pattern names a class, never a string from one guide; Hebrew stems match inside a prefixed word. `allow` exempts an exact token for a future curriculum collision; it is unused.
+- **A lock per builder**, because `shell/` may never import a product tree: each hands the rule its catalog, section titles and whole he/en locale. The whole locale, not only the guide keys, because the refusal that sends a student to the guide is where the complex leak sat, and a key-list would rot the way the featured flag did (#1347).
+
+**Measured.** The three locks for 2-D, 3-D and complex were red on the pre-change content (16 hits in total), and all four are green after. The shell meta-lock catches every shipped spelling and passes the curriculum phrases, including «פרבולה קנונית» and «דרגות חופש».
+
+**Consequences.** `shell/frame/ManualScreen.tsx`; `src/parser/catalog.ts`, `src-complex/parser/catalog.ts`, `src-complex/i18n/index.ts`, `src3d/i18n/locales/en.json`. Locks: `shell/__tests__/guide-jargon-1456.test.ts` and `issue-1456-guide-jargon.test.ts` in each of the four trees. `src-complex/__tests__/i18n-readings-716.test.ts` asserts the new refusal text.

@@ -200,7 +200,7 @@ const he = {
   whyMeasureHolds: '«{{src}}» — מתקיים בציור',
   whyMeasureViolated: '«{{src}}» — אינו מתקיים בתצורה הזו',
   whyLineUnaccounted: 'לא הובן: {{items}}',
-  whyLineUnrecognized: 'הדקדוק לא מזהה את השורה הזו',
+  whyLineUnrecognized: 'השורה לא זוהתה — נסו אחד מהניסוחים במדריך',
   whyReservedLetter: '{{letter}} מסמן את פתרונות המשוואה «{{equation}}» — התייחסו לפתרונות עצמם',
   whyDeclaredComplexReal: '{{letter}} הוגדר כמספר מרוכב («{{declaration}}»), ולכן אינו יכול לשמש כאן כגודל או כזווית',
   // #716 — the honesty strip and the freedom cue (composed in scene2 / App, worded here)
@@ -424,7 +424,7 @@ const en: typeof he = {
   whyMeasureHolds: '«{{src}}» — holds in the figure',
   whyMeasureViolated: '«{{src}}» — does not hold in this configuration',
   whyLineUnaccounted: 'not understood: {{items}}',
-  whyLineUnrecognized: 'the grammar does not recognize this line',
+  whyLineUnrecognized: 'this line was not recognized — try one of the phrasings in the guide',
   whyReservedLetter: '{{letter}} names the solutions of «{{equation}}» — refer to the solutions themselves',
   whyDeclaredComplexReal: '{{letter}} is declared a complex number («{{declaration}}»), so it cannot be a size or an angle here',
   // #716 — the honesty strip and the freedom cue
