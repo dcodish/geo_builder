@@ -477,9 +477,10 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * ONCE here, over everything the figure states, and read by both tiers.
    */
   const { signed } = paramSigns({ constraints, objects, measures });
-  const t1Base = solveTier1(constraints, signed);
+  // #1481 — the literal atoms' degrees are fixed constants: tier 1 decides an opaque atom with them
+  const t1Base = solveTier1(constraints, signed, literalSample);
   const driveRows = claimDriveRows(assertions, t1Base);
-  const t1 = driveRows.length ? solveTier1([...constraints, ...driveRows], signed) : t1Base;
+  const t1 = driveRows.length ? solveTier1([...constraints, ...driveRows], signed, literalSample) : t1Base;
 
   const baseSample = new Map(literalSample);
   for (const c of constraints) {
@@ -1814,7 +1815,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
     drivenDof: drivenCount,
     unsatisfied,
     refusalReasons,
-    undecided,
+    // #1481 — tier 1's undecided argument rows first (an opaque atom that cancels numerically), then
+    // the numeric tier's unevaluable relations; one list, one strip row each
+    undecided: [...new Set([...t1.undecided, ...undecided])],
     knowledge: [...knowledge, ...ratioRows, ...exprRows, ...argRows],
     params: t1.inconsistent ? [] : params,
     configCount,

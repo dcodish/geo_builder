@@ -246,3 +246,73 @@ export const gaussianAtomOf = (name: string): { re: Rat; im: Rat } | null => {
   const rational = (t: RadicalTerm): boolean => t.k === 1n || isZero(t.c);
   return p && rational(p.re) && rational(p.im) ? { re: p.re.c, im: p.im.c } : null;
 };
+
+/**
+ * #1481 (ADR-CX-057) — CERTIFIED atoms: the direction of a canonical Gaussian prime `πₚ = x+yi`
+ * (`x > y > 0`, `x² + y² = p`, `p ≡ 1 mod 4`), minted by `value/gaussian.ts` for every Gaussian-
+ * rational literal. Their defining property is a THEOREM, not an assumption: the set `{∠πₚ}` is
+ * ℚ-linearly independent modulo rational turns (unique factorisation in ℤ[i], since `πₚ` and `π̄ₚ`
+ * are not associates). So an angle whose atoms are all certified is a whole number of turns only
+ * when it carries no atom at all — the syntactic test the tier-1 decision always made is, over
+ * these atoms, exact.
+ *
+ * Every other atom is OPAQUE (a polynomial root whose direction is not Gaussian-rational, a radical
+ * literal, an over-budget literal): nothing is known about how it relates to the others.
+ */
+interface CertifiedAtom {
+  readonly x: bigint;
+  readonly y: bigint;
+  readonly degrees: number;
+}
+const CERTIFIED_ATOMS = new Map<string, CertifiedAtom>();
+
+/** The name of the certified atom of the canonical prime `x+yi`. Deterministic, content-derived. */
+export const certifiedAtomName = (x: bigint, y: bigint): string => `∠(${x}+${y === 1n ? '' : y}i)`;
+
+/** Register the canonical prime `x+yi`'s atom; returns its name. Idempotent by construction. */
+export function registerCertifiedAtom(x: bigint, y: bigint): string {
+  const name = certifiedAtomName(x, y);
+  if (!CERTIFIED_ATOMS.has(name)) {
+    CERTIFIED_ATOMS.set(name, { x, y, degrees: (Math.atan2(Number(y), Number(x)) * 180) / Math.PI });
+    // the literal registry reads it too: `(x+yi)/|x+yi|` is the unit this atom stands for
+    registerGaussianAtom(name, rat(x), rat(y));
+  }
+  return name;
+}
+
+export const isCertifiedAtom = (name: string): boolean => CERTIFIED_ATOMS.has(name);
+
+/** The canonical prime behind a certified atom, or null for an opaque one. */
+export function certifiedAtomOf(name: string): { x: bigint; y: bigint; degrees: number } | null {
+  return CERTIFIED_ATOMS.get(name) ?? null;
+}
+
+/**
+ * #1481 (ADR-CX-057) — IS THIS ANGLE A WHOLE NUMBER OF TURNS? Three answers, because one of them is
+ * honest only as "unknown".
+ *
+ *   - no atom: decided by the turns;
+ *   - only certified atoms (necessarily with a nonzero coefficient): `'nonzero'`, a theorem;
+ *   - an opaque atom: evaluated at the atoms' BOUND degrees — they are fixed constants of the
+ *     figure, never samples — and a residue of at least {@link ZERONESS_TOLERANCE_TURNS} is
+ *     `'nonzero'`; anything closer, or an unbound atom, is `'unknown'`.
+ *
+ * `'unknown'` is never a contradiction and never a refutation. This is the ONE place an angle is
+ * compared with zero; the tier-1 leftover, its integrality checks and the claim verifiers all read it.
+ */
+export type Zeroness = 'zero' | 'nonzero' | 'unknown';
+
+/** The engineering constant behind an opaque decision: one billionth of a turn (ADR-CX-057). */
+export const ZERONESS_TOLERANCE_TURNS = 1e-9;
+
+export function zeroness(a: Angle, bound: ReadonlyMap<string, number> = new Map()): Zeroness {
+  if (a.atoms.size === 0) return isInt(a.turns) ? 'zero' : 'nonzero';
+  if ([...a.atoms.keys()].every(isCertifiedAtom)) return 'nonzero';
+  let turns = toNumber(frac(a.turns));
+  for (const [name, c] of a.atoms) {
+    const deg = bound.get(name) ?? CERTIFIED_ATOMS.get(name)?.degrees;
+    if (deg === undefined) return 'unknown';
+    turns += (toNumber(c) * deg) / 360;
+  }
+  return Math.abs(turns - Math.round(turns)) >= ZERONESS_TOLERANCE_TURNS ? 'nonzero' : 'unknown';
+}

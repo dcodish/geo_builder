@@ -22,18 +22,31 @@ export interface VectorOps<V> {
   sub(a: V, b: V): V;
   scale(a: V, k: Rat): V;
   isZero(a: V): boolean;
+  /**
+   * #1481 (ADR-CX-057) — a THREE-valued test, for a carrier whose zero test cannot always be decided
+   * (an angle carrying an opaque atom). Absent means {@link isZero} decides. An `'unknown'` constant
+   * row is never an inconsistency: it is returned in `undecidedRows`.
+   */
+  zeroness?(a: V): 'zero' | 'nonzero' | 'unknown';
 }
 
 /** `Σ coef[name]·name = rhs`. */
 export interface Row<V> {
   readonly coef: ReadonlyMap<string, Rat>;
   readonly rhs: V;
+  /**
+   * #1481 — PROVENANCE: the statements this row was combined from. Elimination unions it, so a row
+   * that ends as an undecided `0 = c` can name the givens it came from rather than internal state.
+   */
+  readonly srcs?: readonly string[];
 }
 
 /** A determined unknown, as a constant plus a combination of the FREE unknowns. */
 export interface Determined<V> {
   readonly konst: V;
   readonly coefs: ReadonlyMap<string, Rat>;
+  /** #1481 — the statements the pivot row was combined from (see {@link Row.srcs}) */
+  readonly srcs?: readonly string[];
 }
 
 export interface LinearSolution<V> {
@@ -51,6 +64,11 @@ export interface LinearSolution<V> {
    * a modulus), and only the caller can say whether `0 = 9r/5` is a contradiction or an equation in `r`.
    */
   readonly leftover: readonly Row<V>[];
+  /**
+   * #1481 (ADR-CX-057) — `0 = c` rows whose constant {@link VectorOps.zeroness} could NOT decide.
+   * Neither consistent-by-fiat nor a contradiction: the caller reports them as undecided statements.
+   */
+  readonly undecidedRows: readonly Row<V>[];
 }
 
 /**
@@ -62,7 +80,8 @@ export interface LinearSolution<V> {
  */
 export function solveLinear<V>(rows: readonly Row<V>[], unknowns: readonly string[], ops: VectorOps<V>): LinearSolution<V> {
   // mutable working copy
-  const work = rows.map((r) => ({ coef: new Map(r.coef), rhs: r.rhs }));
+  const work = rows.map((r) => ({ coef: new Map(r.coef), rhs: r.rhs, srcs: r.srcs ?? [] }));
+  const union = (a: readonly string[], b: readonly string[]): string[] => [...new Set([...a, ...b])];
   const pivotRowOf = new Map<string, number>();
   const usedRows = new Set<number>();
 
@@ -85,7 +104,7 @@ export function solveLinear<V>(rows: readonly Row<V>[], unknowns: readonly strin
       const nv = ratDiv(v, pc);
       if (!ratIsZero(nv)) norm.set(n, nv);
     }
-    work[pivot] = { coef: norm, rhs: ops.scale(work[pivot].rhs, ratDiv(rat(1), pc)) };
+    work[pivot] = { coef: norm, rhs: ops.scale(work[pivot].rhs, ratDiv(rat(1), pc)), srcs: work[pivot].srcs };
 
     // eliminate u from every other row
     for (let i = 0; i < work.length; i++) {
@@ -98,15 +117,24 @@ export function solveLinear<V>(rows: readonly Row<V>[], unknowns: readonly strin
         if (ratIsZero(nv)) next.delete(n);
         else next.set(n, nv);
       }
-      work[i] = { coef: next, rhs: ops.sub(work[i].rhs, ops.scale(work[pivot].rhs, c)) };
+      work[i] = {
+        coef: next,
+        rhs: ops.sub(work[i].rhs, ops.scale(work[pivot].rhs, c)),
+        srcs: union(work[i].srcs, work[pivot].srcs),
+      };
     }
 
     pivotRowOf.set(u, pivot);
     usedRows.add(pivot);
   }
 
-  // a row with no coefficients left and a non-zero constant is `0 = c`
-  const leftover = work.filter((r) => r.coef.size === 0 && !ops.isZero(r.rhs));
+  // a row with no coefficients left and a non-zero constant is `0 = c`; one whose constant cannot be
+  // decided is reported, never counted as either (#1481)
+  const decide = (v: V): 'zero' | 'nonzero' | 'unknown' =>
+    ops.zeroness ? ops.zeroness(v) : ops.isZero(v) ? 'zero' : 'nonzero';
+  const empties = work.filter((r) => r.coef.size === 0);
+  const leftover = empties.filter((r) => decide(r.rhs) === 'nonzero');
+  const undecidedRows = empties.filter((r) => decide(r.rhs) === 'unknown');
   const inconsistent = leftover.length > 0;
 
   const free = unknowns.filter((u) => !pivotRowOf.has(u));
@@ -118,10 +146,10 @@ export function solveLinear<V>(rows: readonly Row<V>[], unknowns: readonly strin
       // after full reduction the survivors are free unknowns; move them to the other side
       coefs.set(n, ratMul(v, rat(-1)));
     }
-    determined.set(u, { konst: work[i].rhs, coefs });
+    determined.set(u, { konst: work[i].rhs, coefs, srcs: work[i].srcs });
   }
 
-  return { inconsistent, determined, free, rank: pivotRowOf.size, leftover };
+  return { inconsistent, determined, free, rank: pivotRowOf.size, leftover, undecidedRows };
 }
 
 /** Evaluate a determined unknown once the free unknowns have values. */

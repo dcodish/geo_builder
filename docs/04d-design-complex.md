@@ -25,6 +25,19 @@ This is the product's one genuinely new core, and it is why the tree could ship 
 ([`FR-CN-2`](02d-requirements-complex.md), bounded linear algebra over two vector spaces,
 [ADR-CX-006](06d-decisions-complex.md)).
 
+**The argument space has a basis that really is independent** ([ADR-CX-057](06d-decisions-complex.md#adr-cx-057),
+[`FR-CN-9`](02d-requirements-complex.md)). An angle is rational turns plus a ℚ-combination of atoms,
+and "carries an atom, so it is not a whole number of turns" is only sound when the atoms are
+independent. So every Gaussian-rational literal is minted in the basis of the **canonical Gaussian
+primes** (`value/gaussian.ts`): `arg(a+bi) = k/4 + m/8 + Σ (eₚ − ēₚ)·∠πₚ`, read off the factorisation of
+`a+bi` in ℤ[i] — bounded trial division, no CAS. These **certified** atoms are ℚ-independent modulo
+rational turns (unique factorisation), so relations between literals (`(2+3i)(−2+3i) = −13`) are exact
+equalities and a surviving certified atom is nonzero by theorem. Every other atom is **opaque** (a
+radical literal, a non-Gaussian polynomial root, an over-budget literal), and ONE three-valued test,
+`zeroness` in `value/angle.ts`, decides it numerically at the atom's fixed degrees or answers
+`unknown` — which the tier-1 leftover reports as undecided and the claim verifiers read as `unknown`,
+never as a contradiction or a refutation.
+
 ## Three consequences that fall out of the same choice
 
 - **Branches are integer unknowns.** The `k` in an angle equation is the exam's «כל האפשרויות»; in

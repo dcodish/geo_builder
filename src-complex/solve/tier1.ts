@@ -24,7 +24,7 @@ import type { Constraint } from '../model/constraint';
 export type { Constraint } from '../model/constraint';
 import { type LogPolarForm, argumentRow, isSignUnknown, linearize, modulusRow, paramOfSignUnknown } from './logpolar';
 import { type LinearSolution, type Row, type VectorOps, solveLinear } from './linear';
-import { type Rat, isInt, mul as ratMul, rat, toNumber } from '../value/rational';
+import { type Rat, mul as ratMul, rat, toNumber } from '../value/rational';
 import {
   type ExpVec,
   div as modDiv,
@@ -44,6 +44,7 @@ import {
   scale as angScale,
   sub as angSub,
   zero as angZero,
+  zeroness,
   format as fmtAngle,
 } from '../value/angle';
 
@@ -60,16 +61,27 @@ const MOD_OPS: VectorOps<ExpVec> = {
   isZero: modIsOne,
 };
 
-const ANG_OPS: VectorOps<Angle> = {
+/**
+ * The argument carrier's operations, closed over the figure's BOUND atom degrees.
+ *
+ * A whole number of turns IS zero as a direction — so a residual row of `0 = 1 turn` is consistent,
+ * not a contradiction. Getting this wrong would refuse satisfiable systems whose equations happen to
+ * be dependent modulo a full rotation.
+ *
+ * #1481 (ADR-CX-057) — and a constant carrying atoms is decided by `zeroness`, three-valued: over
+ * CERTIFIED atoms (the Gaussian-prime basis every rational literal is minted in) "carries an atom"
+ * is a theorem of "nonzero"; over an OPAQUE atom it is decided numerically at the atoms' fixed
+ * degrees or left unknown. It used to be `isExactRational(a) && isInt(a.turns)` — which assumed
+ * every atom independent, and refused `(2+3i)(−2+3i) = −13` as a contradiction.
+ */
+const angOps = (bound: ReadonlyMap<string, number>): VectorOps<Angle> => ({
   zero: angZero,
   add: angAdd,
   sub: angSub,
   scale: angScale,
-  // A whole number of turns IS zero as a direction — so a residual row of `0 = 1 turn` is consistent,
-  // not a contradiction. Getting this wrong would refuse satisfiable systems whose equations happen to
-  // be dependent modulo a full rotation.
-  isZero: (a) => isExactRational(a) && isInt(a.turns),
-};
+  isZero: (a) => zeroness(a, bound) === 'zero',
+  zeroness: (a) => zeroness(a, bound),
+});
 
 /** One enumerated configuration: the integer turn choices, and the arguments they determine. */
 export interface Branch {
@@ -123,6 +135,14 @@ export interface Tier1Result {
    * enumerated direction; its magnitude lives in `params` / `paramValues` exactly as a size's does.
    */
   readonly signedParams: readonly string[];
+  /**
+   * #1481 (ADR-CX-057) — statements (their `src`) whose argument half reduced to a constant the
+   * three-valued `zeroness` could not decide: an opaque atom that cancels numerically. Undecided is
+   * not violated — the fold lists them, the gate does not refuse on them.
+   */
+  readonly undecided: readonly string[];
+  /** the atom degrees this solve decided with — the claim verifiers read the same ones */
+  readonly atomDegrees: ReadonlyMap<string, number>;
 }
 
 const BRANCH_BUDGET = 2048;
@@ -139,7 +159,13 @@ const lcm = (a: bigint, b: bigint): bigint => {
  * the *numbers* in terms of the *turn choices* rather than the other way round. That is what leaves a
  * clean finite family to enumerate.
  */
-export function solveTier1(constraints: readonly Constraint[], signed: ReadonlySet<string> = new Set()): Tier1Result {
+export function solveTier1(
+  constraints: readonly Constraint[],
+  signed: ReadonlySet<string> = new Set(),
+  atomDegrees: ReadonlyMap<string, number> = new Map(),
+): Tier1Result {
+  const ANG_OPS = angOps(atomDegrees);
+  const undecided = new Set<string>();
   const modRows: Row<ExpVec>[] = [];
   const argRows: Row<Angle>[] = [];
   const deferred: Constraint[] = [];
@@ -189,7 +215,11 @@ export function solveTier1(constraints: readonly Constraint[], signed: ReadonlyS
        * numeric tier. That boundary is deliberate, not incidental.
        */
       const dir = argumentRow(lf, rf);
-      if (dir.coef.size === 0 && !ANG_OPS.isZero(dir.rhs)) impossible.push(c.src);
+      if (dir.coef.size === 0) {
+        const z = ANG_OPS.zeroness!(dir.rhs);
+        if (z === 'nonzero') impossible.push(c.src);
+        else if (z === 'unknown') undecided.add(c.src);
+      }
       continue; // a magnitude given says nothing about direction
     }
 
@@ -209,7 +239,7 @@ export function solveTier1(constraints: readonly Constraint[], signed: ReadonlyS
     if (a.coef.size === 0 && ANG_OPS.isZero(rhs) && !c.principal) continue;
     if (k) kNames.push(k);
     for (const n of coef.keys()) if (isSignUnknown(n) && !signNames.includes(n)) signNames.push(n);
-    argRows.push({ coef, rhs });
+    argRows.push({ coef, rhs, srcs: [c.src] });
   }
 
   /**
@@ -231,7 +261,11 @@ export function solveTier1(constraints: readonly Constraint[], signed: ReadonlyS
   const params = solveParams(modulus.leftover);
   const paramValues = solvedParamValues(params);
 
-  const { branches, truncated, integralityFailed } = enumerateBranches(argument, kNames);
+  const { branches, truncated, integralityFailed, undecidedSrcs } = enumerateBranches(argument, kNames, ANG_OPS);
+  // a row is reported by its OWN statement (the first of its provenance): the earlier rows it was
+  // combined with were pivots, defined and decided, and naming them would blame a plain "z1 = 1+√2i"
+  for (const r of argument.undecidedRows) if (r.srcs?.length) undecided.add(r.srcs[0]);
+  for (const src of undecidedSrcs) undecided.add(src);
 
   const inconsistent = params.inconsistent
     ? 'modulus'
@@ -264,6 +298,8 @@ export function solveTier1(constraints: readonly Constraint[], signed: ReadonlyS
     params,
     paramValues,
     signedParams: signNames.map(paramOfSignUnknown),
+    undecided: [...undecided],
+    atomDegrees,
   };
 }
 
@@ -345,7 +381,15 @@ function solveParams(leftover: readonly Row<ExpVec>[]): LinearSolution<ExpVec> {
 function enumerateBranches(
   argument: LinearSolution<Angle>,
   kNames: readonly string[],
-): { branches: Branch[]; truncated: boolean; integralityFailed: boolean } {
+  ops: VectorOps<Angle>,
+): { branches: Branch[]; truncated: boolean; integralityFailed: boolean; undecidedSrcs: readonly string[] } {
+  /** #1481 — a turn-unknown whose integrality `zeroness` cannot decide: accepted, and reported */
+  const undecidedSrcs = new Set<string>();
+  const whole = (a: Angle, srcs: readonly string[] | undefined): boolean => {
+    const z = ops.zeroness!(a);
+    if (z === 'unknown' && srcs?.length) undecidedSrcs.add(srcs[0]);
+    return z !== 'nonzero';
+  };
   const determined = [...argument.determined.entries()].filter(([n]) => !isTurnUnknown(n));
   /**
    * Turn-unknowns the elimination SOLVED FOR. These are the reason enumeration is not just a product
@@ -378,10 +422,10 @@ function enumerateBranches(
    */
   for (const [, d] of determinedK) {
     if (d.coefs.size > 0) continue;
-    if (!isExactRational(d.konst) || !isInt(d.konst.turns)) return { branches: [], truncated: false, integralityFailed: true };
+    if (!whole(d.konst, d.srcs)) return { branches: [], truncated: false, integralityFailed: true, undecidedSrcs: [] };
   }
 
-  if (determined.length === 0) return { branches: [], truncated: false, integralityFailed: false };
+  if (determined.length === 0) return { branches: [], truncated: false, integralityFailed: false, undecidedSrcs: [...undecidedSrcs] };
 
   let total = 1n;
   for (const a of active) total *= a.period;
@@ -412,7 +456,7 @@ function enumerateBranches(
     for (const [, d] of determinedK) {
       const v = resolve(d, kMap);
       if (v === null) continue;
-      if (!isExactRational(v) || !isInt(v.turns)) {
+      if (!whole(v, d.srcs)) {
         anyIntegralityRejection = true;
         return;
       }
@@ -448,7 +492,12 @@ function enumerateBranches(
 
   // Every assignment refuted by integrality means the argument equations cannot hold together: two
   // directions that differ by a non-whole number of turns are simply different directions.
-  return { branches, truncated, integralityFailed: branches.length === 0 && anyIntegralityRejection };
+  return {
+    branches,
+    truncated,
+    integralityFailed: branches.length === 0 && anyIntegralityRejection,
+    undecidedSrcs: [...undecidedSrcs],
+  };
 }
 
 /** Degrees for a branch's angle, when it is free of symbolic atoms — for tests and traces. */

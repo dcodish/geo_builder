@@ -83,10 +83,17 @@ describe('F12 — a claim about every power, decided by congruence', () => {
     expect(d.claims[0].verdict.status).toBe('holds');
   });
 
-  it('an argument with no closed form is UNKNOWN, never refuted', () => {
-    // 53.13° is not a rational part of a turn: the question is undecidable, and refusing a true claim
-    // would tell a student their correct answer is wrong
+  it('#1481 — the argument of a Gaussian literal is decided exactly: (3+4i)^(4n) is never real', () => {
+    // arg(3+4i) = 2·∠(2+i), a certified atom: no nonzero multiple of it is a rational turn (a theorem),
+    // so «real for every n» is false — refuted exactly, where it used to be withheld as unknown
     const d = deriveLines(['w = 3+4i', 'לכל n טבעי, w^(4n) ממשי']);
+    expect(d.claims[0].verdict.status).toBe('refuted');
+  });
+
+  it('an argument with no closed form (an OPAQUE atom) is UNKNOWN, never refuted', () => {
+    // 1+√2i is a radical literal whose direction has no exact relation to anything: undecidable, and
+    // refusing a true claim would tell a student their correct answer is wrong
+    const d = deriveLines(['w = 1+√2i', 'לכל n טבעי, w^(4n) ממשי']);
     expect(d.claims[0].verdict.status).toBe('unknown');
   });
 });

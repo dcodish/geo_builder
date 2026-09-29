@@ -28,7 +28,16 @@
 
 import { type Rat, ONE, add, div, eq as eqRat, floor, frac, fromNumber, isOne as ratIsOne, isZero, mul, neg, rat, sqrtExact, sub, toNumber } from './rational';
 import { type ExpVec, evaluate as evalMod, format as fmtMod, fromRational as fromRationalVec, isPrimeAtom, pow as modPowVec } from './modulus';
-import { type Angle, type LiteralPair, type RadicalTerm, fromTurns as fromTurnsAngle, isExactRational, literalAtomOf, registerLiteralAtom } from './angle';
+import {
+  type Angle,
+  type LiteralPair,
+  type RadicalTerm,
+  certifiedAtomOf,
+  fromTurns as fromTurnsAngle,
+  isExactRational,
+  literalAtomOf,
+  registerLiteralAtom,
+} from './angle';
 
 /** `a + b√d` under a square root — the nested radicand of the 18° and 22.5° families. */
 interface Nest {
@@ -391,11 +400,11 @@ export function radicalOfModulus(mod: ExpVec): { c: Rat; k: bigint } | null {
  * rationals are closed under it, and √(rational) at the end is the modulus formatter's own job.
  */
 export function gaussianRationalParts(mod: ExpVec, arg: Angle): { re: Rat; im: Rat } | null {
-  // A single LITERAL atom (the direction of a stated off-axis `a+bi`, registered at mint time):
-  // the value is `mod · cis(turns) · (a+bi)/|a+bi|`, Gaussian rational again whenever `mod/|a+bi|`
-  // is rational and the residual turn is a quarter-turn multiple (·i per quarter). `2+3i` itself,
-  // its conjugate (coefficient −1) and its ±i/−1 rotations all land here.
-  if (arg.atoms.size === 1) {
+  // LITERAL atoms: the CERTIFIED Gaussian-prime atoms every rational literal is minted in (#1481 —
+  // any integer combination: `1+7i` is `⅜ − 2·∠(2+i)`), or a single opaque literal atom with
+  // coefficient ±1 (#1436). The value is `mod · cis(turns) · G/|G|` for a Gaussian integer G, and a
+  // Gaussian rational whenever `mod/|G|` is rational.
+  if (arg.atoms.size >= 1) {
     const t = literalAtomTerms(mod, arg);
     if (!t) return null;
     const ratOfTerms = (ts: Term[]): Rat | null => (ts.length === 0 ? rat(0) : ts.length === 1 && ts[0].k === 1n ? ts[0].c : null);
@@ -438,6 +447,7 @@ const UNIT_SPLIT: ModSplit = { q: ONE, s: 1n, residual: null, residualValue: 1 }
  * cartesian display and the Gaussian-rational ask arithmetic (#1436), so both read one registry.
  */
 function literalAtomTerms(mod: ExpVec, arg: Angle): { re: Term[]; im: Term[] } | null {
+  if (arg.atoms.size > 0 && [...arg.atoms.keys()].every((n) => certifiedAtomOf(n) !== null)) return certifiedTerms(mod, arg);
   if (arg.atoms.size !== 1) return null;
   const [[name, coef]] = [...arg.atoms.entries()];
   const conj = ratIsOne(neg(coef));
@@ -457,6 +467,49 @@ function literalAtomTerms(mod: ExpVec, arg: Angle): { re: Term[]; im: Term[] } |
   let im = termsOf(g.im, conj ? rat(-1) : ONE);
   for (let i = 0n; i < quarter.n; i++) [re, im] = [negTerms(im), re];
   return { re, im };
+}
+
+/** The largest total prime exponent {@link certifiedTerms} multiplies out — bounded integer work. */
+const MAX_CERTIFIED_EXPONENT = 64n;
+
+/**
+ * #1481 (ADR-CX-057) — the exact terms of `mod·cis(arg)` when every atom of `arg` is CERTIFIED (a
+ * canonical Gaussian prime `πₚ`) with an integer coefficient, and the turns are a multiple of ⅛:
+ * `Π (πₚ/|πₚ|)^{cₚ} · cis(m/8)` is `G/|G|` for the Gaussian integer
+ * `G = Π πₚ^{cₚ⁺} · π̄ₚ^{cₚ⁻} · (1+i)^m`, so the value is `k·G` with `k = mod/|G|` — exact whenever k
+ * is rational. The rational parts `k·Re G`, `k·Im G` are the Gaussian rational the literal always was.
+ */
+function certifiedTerms(mod: ExpVec, arg: Angle): { re: Term[]; im: Term[] } | null {
+  let ga = 1n;
+  let gb = 0n;
+  let norm = ONE;
+  let total = 0n;
+  const times = (x: bigint, y: bigint): void => {
+    [ga, gb] = [ga * x - gb * y, ga * y + gb * x];
+  };
+  for (const [name, c] of arg.atoms) {
+    const p = certifiedAtomOf(name);
+    if (!p || c.d !== 1n) return null;
+    const e = c.n < 0n ? -c.n : c.n;
+    total += e;
+    if (total > MAX_CERTIFIED_EXPONENT) return null;
+    for (let i = 0n; i < e; i++) {
+      times(p.x, c.n > 0n ? p.y : -p.y);
+      norm = mul(norm, rat(p.x * p.x + p.y * p.y));
+    }
+  }
+  const eighths = mul(frac(arg.turns), rat(8));
+  if (eighths.d !== 1n) return null;
+  for (let i = 0n; i < eighths.n; i++) {
+    times(1n, 1n);
+    norm = mul(norm, rat(2));
+  }
+  const split = splitModulus(mod);
+  if (!split || split.residual !== null) return null;
+  const k = sqrtExact(div(mul(mul(split.q, split.q), rat(split.s)), norm));
+  if (k === null) return null;
+  const termOf = (x: bigint): Term[] => (x === 0n ? [] : [T(mul(k, rat(x)))]);
+  return { re: termOf(ga), im: termOf(gb) };
 }
 
 /** A radical term normalised: square-free `k`, zero spelled `{0, 1}`; null for a negative radicand. */

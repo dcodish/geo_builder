@@ -69,7 +69,9 @@ describe('#1427 lock 2 — z²−4z+13=0: Re and |z| print, Im is withheld, both
 
   it('Re(z) = 2 and |z| = √13 ≈ 3.61 at every seed', () => {
     for (const r of rows('Re(z)')) expect(r.value).toBe('2');
-    for (const r of rows('|z|')) expect(r.value).toBe('3.61');
+    // #1481: the roots 2±3i now carry the certified Gaussian direction, so the ask lane's exact
+    // arithmetic (ADR-CX-051) reads them — the exact form this test's own title names
+    for (const r of rows('|z|')) expect(r.value).toBe('√13');
   });
 
   it('Im(z) is withheld as «differs between the 2 solutions», naming z₁ to ask about', () => {
