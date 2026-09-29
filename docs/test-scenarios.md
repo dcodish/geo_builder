@@ -18,6 +18,17 @@ context threading, rule ordering, the store replay/grouping) the unit tests don'
 the live figure as context). A step that goes through the LLM is stored as the *canonical
 commands* it produced (from the log), since the LLM is mocked in tests.
 
+**A step that is expected to be REFUSED** ([#1288](https://github.com/dcodish/geo_builder/issues/1288),
+[ADR-555](06-decisions.md#adr-555)) stays in `steps` exactly as he typed it, and is declared in the
+scenario's `refusedSteps`: `{ step, reason, with?, why }` — `step` is its 1-based position in `steps`,
+`reason` the parser refusal it must produce (any `ok: false` reason except `not-handled`, which is an
+escalation and is recorded as an `{ llm: … }` step instead), `with` optional payload fields that must match
+(e.g. `{ holder: 'B', id: 'D' }`), and `why` the ruling. The harness (`scenarioFacts` → `factsOf`) asserts
+it, never skips it: a listed step that **parses**, or is refused for another reason, fails the scenario —
+so a row cannot outlive the ruling it documents — and a refusal **without** a row fails it as before. The
+refused sentence commits nothing (as in the app), keeps its typed-step number, and the replay continues;
+`check` then asserts the figure the student is left with. Self-test: `src/__tests__/refused-steps-1288.test.ts`.
+
 ---
 
 ## Scenarios
@@ -1158,7 +1169,7 @@ over all four (ADR-041).
 
 ### `existing-point-statements-lower-to-constraints` — a statement about an existing point is a constraint, never "already defined" (M1, ADR-231)
 **Steps**: `טרפז ABCD חסום במעגל` · `טרפז BCED` · `המשכי CE ו CD נפגשים בנקודה A` · `BA` · `AC` · `O מרכז מעגל חסום במשולש ABC` · `O על ED`
-**Guards against:** operator prod session `fn34ptei` (2026-07-06): "O על ED" and the incircle re-statement both crashed `'O' is already defined` — in EITHER entry order — the fifth reported member of the ADR-075/099/115/119/124 class. The ADR-028/050 reinterpretation mechanism was gated (param-carrier-only, no recruit on the conflict branch); M1 widens it to any existing point, adds the standard recruit failure path, and reports the RELATION on failure. This exact sequence contains a genuinely degenerate step (CE and CD share C), so the lock asserts the honest-error class: no status ever matches "already defined", the failure names the relation (`cannot hold`), no hidden `~` ids leak, and the prior figure is preserved. Satisfiable members are locked in `redefine-existing-point.test.ts`.
+**Guards against:** operator prod session `fn34ptei` (2026-07-06): "O על ED" and the incircle re-statement both crashed `'O' is already defined` — in EITHER entry order — the fifth reported member of the ADR-075/099/115/119/124 class. The ADR-028/050 reinterpretation mechanism was gated (param-carrier-only, no recruit on the conflict branch); M1 widens it to any existing point, adds the standard recruit failure path, and reports the RELATION on failure. This exact sequence contains a genuinely degenerate step (CE and CD share C, so they meet AT C) — since ADR-531 that step is refused by name, and since #1288 (ADR-555) it is carried as he typed it and declared in `refusedSteps` (`crossing-already-named`, holder C, new name A); between 2026-09-20 and #1288 it was carried as an invented twin «המשכי CE ו BD». The lock asserts the honest-error class, now produced by the later placement «O מרכז מעגל חסום במשולש ABC»: no status ever matches "already defined", the failure names the relation (`cannot hold`), no hidden `~` ids leak, and the prior figure is preserved. Satisfiable members are locked in `redefine-existing-point.test.ts`.
 
 ### `q11-sizes-last-order-independence` — the reversed Q11 builds to the same closed form (ADR-231)
 **Steps**: `שני מעגלים O1 ו O2 משיקים מבחוץ` · `A על מעגל O1` · `C על מעגל O2` · `AC עובר דרך O1 ו O2` · `מנקודה B יוצאים שני משיקים למעגל O2 בנקודות C ו D` · `A נמצא על המשך BD` · `היקף מעגל O1 הוא 6π` · `שטח מעגל O2 = 81π`
@@ -1456,7 +1467,7 @@ over all four (ADR-041).
 
 **Guards against:** operator, playing round #942 T2 (2026-09-08). With «ריבוע DEFG חסום במשולש ABC» on the canvas, `D` was already the square's vertex, so «D = חיתוך AB ו-BC» must be refused — and it is. What he was shown named NEITHER statement: «לא ניתן: הנתון D מתלכדת עם הנקודה שנבנתה לה סותר נתון קודם» put a paraphrase of the LOWERED CONSTRAINT in the subject position and left the conflicting given as «נתון קודם», so the three remedies it offers (reorder, reword, smaller steps) were all guesses and none was the actual fix. CLAUDE.md's honesty invariant is that an error names the conflicting *statement*, never internal state. ADR-487 lands the operator's half A — the student's own sentence becomes the subject, the engine fragment becomes the reason clause — across the whole `saysSubject` class rather than the one template that reported it. **Asserts** the ATTRIBUTION the echo depends on: the banner's `lastError` is owned by exactly one typed step, the last one, and the three earlier steps stay `ok` — so a change that re-attributes the failure would quote the wrong sentence at the student instead of failing silently. The message rendering itself (both locales, the class ratchet, the no-utterance fallback and the deliberately-unswept templates) is locked in `src/i18n/__tests__/humanize-error-said.test.ts`.
 
-### ~~`shared-endpoint-intersection-is-not-a-near-miss-944`~~ — REMOVED 2026-09-20 (ADR-531, #1274)
+### ~~`shared-endpoint-intersection-is-not-a-near-miss-944`~~ — REMOVED 2026-09-20 (ADR-531, #1274); the sequence is back as `shared-endpoint-crossing-refused-944` (#1288)
 
 **Why it is gone:** this scenario asserted that «משולש ABC» + «D = חיתוך AB ו-BC» builds — `D` minted at `B`, «B=D» on the canvas, the requirement gate agreeing. The operator **reversed that ruling** (*"we refuse the B=D"*): the sentence is now refused at the parser, naming `B`, so it can never become a fact and the scenario cannot be replayed. Its replacement coverage is a REFUSAL, which the corpus harness cannot express ([#1288](https://github.com/dcodish/geo_builder/issues/1288)) — so it lives in `src/app/__tests__/issue-1274-crossing-already-named.test.ts` (the full refusal surface through the real submit path) and `src/__tests__/issue-944-shared-endpoint.test.ts` (the refusal, plus ADR-489's engine exemption, still locked at the unit level because `rename` and `merge` can still reach that shape). See [ADR-531](06-decisions.md#adr-531) for the reversal and its file-by-file cost.
 
@@ -1562,3 +1573,9 @@ over all four (ADR-041).
 ### `quarter-circle-conflict-names-no-innocent-given-1203` — the operator's quarter circles on a right triangle with AC=15, BC=10 (#1203, ADR-554)
 
 **Guards against:** the reported banner «BC=10» סותר את «AC=15» on «רבע מעגל ABC», and a quarter with two unequal pinned radii being drawn. «רבע מעגל CAB» is refused as the quarter's own statement with the three givens standing; «רבע מעגל ABC» is flagged by the obtuse-side proof (ADR-551), which states the right angle at A, and never names «AC=15» as the counterpart.
+
+### `shared-endpoint-crossing-refused-944` — «D = חיתוך AB ו-BC» is refused naming B, and the corpus says so (#944 → ADR-531, #1288 / ADR-555)
+
+**Steps**: `משולש ABC` · `D = חיתוך AB ו-BC` (**refused**: `crossing-already-named`, holder B, new name D)
+
+**Guards against:** the #944 sequence, restored as the operator typed it. It first shipped as a build (ADR-489: D minted at B, «B=D» on the canvas); on 2026-09-20 the operator reversed that — *"we refuse the B=D"* (ADR-531) — and the scenario was deleted, because the harness could not express a refusal (#1288). The refusal is now the behaviour under test, declared in `refusedSteps`: a change that lets the sentence build again, or refuses it for a different reason or naming a different point, turns this red. **Asserts** the triangle before it stays green with no violation and that nothing named D exists. The submit-path surface (message text in both languages, every spelling) is in `src/app/__tests__/issue-1274-crossing-already-named.test.ts`.

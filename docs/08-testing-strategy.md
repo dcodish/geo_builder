@@ -127,6 +127,12 @@ produces nothing — and shows an input note instead, keeping the text in the bo
 on exactly one thing, and it is the thing that matters: **a scenario can lock a state the UI cannot
 reach**, and its refusal appears only as a replay status the scenario then asserts on.
 
+One refusal kind IS expressible in the corpus: a **parser** refusal (a deterministic `ok: false` other
+than `not-handled`). A scenario keeps the refused sentence in `steps` as typed and declares it in
+`refusedSteps` ([ADR-555](06-decisions.md#adr-555), #1288); `factsOf` asserts the declared reason (a listed
+step that parses, or is refused otherwise, fails; an unlisted refusal fails) and commits nothing for it.
+Gate refusals that happen AFTER a successful parse stay with `gateVerdict` below.
+
 `src/__tests__/submit-gate.ts` is the ONE answer to *"would the app accept this line here?"*:
 
 - `gateVerdict(facts, utterance, seed)` → `commit` | `noop` | `refused{reason}` — the deterministic
