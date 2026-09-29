@@ -1554,3 +1554,11 @@ over all four (ADR-041).
 ### `values-panel-names-circles-1442` — the values panel never prints an internal circle id (#1442, ADR-552)
 
 **Guards against:** internal circle ids in the values panel. External review of prod (relayed 2026-09-27): «~tanmid-OE» and «@ctr-O» appeared as row labels. The radii loop iterated every circle — the tangent construction's hidden Thales circle included — and labelled each by its centre id, which for an unnamed circle is the ADR-342 anonymous `@ctr-O`. Asserted: «מעגל O ברדיוס 5 · משיק מנקודה E למעגל · OE=13» builds green, no row label carries `~` or `@`, and the only radius row is circle O's (5) — the helper circle prints nothing; «מעגל ברדיוס 3» prints one radius row named as the sole circle (3). The wording («רדיוס המעגל», «רדיוס מעגל O») and the class lock over every saved fixture are in `src/__tests__/values-panel-labels-1442.test.ts`.
+
+### `overconstrained-names-the-completing-statement-1203` — «α = 50» breaks the earlier «AC = 6» and is the statement the banner names (#1203, ADR-554)
+
+**Guards against:** an over-constrained message that blames an innocent older given. A later line can commit green while an EARLIER row goes ✗; ADR-508's counterpart search looked only backwards, so on «משולש ABC · AB=4 · זווית ABC = α · זווית ACB = 30 · AC = 6 · α = 50» it said «AC = 6» סותר את «זווית ACB = 30» — two givens that held together a moment before. The search now tries the later statements first, latest first, and the tail is `[vs #9]` («α = 50»). Operator ruling 2026-09-20, option (b): the line still commits and the earlier row stays marked — only the words change. The Hebrew message, the latest-that-restores lock and the sector sibling are in `src/replay/__tests__/issue-1203-forward-blame.test.ts`.
+
+### `quarter-circle-conflict-names-no-innocent-given-1203` — the operator's quarter circles on a right triangle with AC=15, BC=10 (#1203, ADR-554)
+
+**Guards against:** the reported banner «BC=10» סותר את «AC=15» on «רבע מעגל ABC», and a quarter with two unequal pinned radii being drawn. «רבע מעגל CAB» is refused as the quarter's own statement with the three givens standing; «רבע מעגל ABC» is flagged by the obtuse-side proof (ADR-551), which states the right angle at A, and never names «AC=15» as the counterpart.
