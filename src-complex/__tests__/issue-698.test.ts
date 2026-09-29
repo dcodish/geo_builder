@@ -25,7 +25,7 @@ describe('#698 — the freedom head-line reports EXISTENCE, not the enumeration 
     [['|z1| = 5'], 'דרגות חופש: 1'],
     [['z1 מספר מרוכב', 'z2 מספר מרוכב'], 'דרגות חופש: 4'],
     [['arg z1 = 30'], 'דרגות חופש: 1'],
-    [['z1 = 3+4i'], 'הצורה נקבעה במלואה'],
+    [['z1 = 3+4i'], '✓ הציור נקבע במלואו על ידי הנתונים'], // #1453: the suite's one wording
   ];
 
   it.each(rows)('%s → %s', (lines, expected) => {

@@ -45,6 +45,17 @@ describe('QuickChips', () => {
     expect(picked).toEqual([]); // the first render was never clicked
   });
 
+  it('#1527 — a chip takes its own sentence\'s direction, never a forced LTR', () => {
+    // A fixed `direction: ltr` laid every Hebrew example out left-to-right on all four empty canvases
+    // («נתון הישר l1: y=x» read as «l1: y=x נתון הישר»); and `dir="auto"` got a sentence OPENING with an
+    // isolated label wrong («M אמצע BB'» came out LTR in the browser).
+    const commands = ['נתון הישר l1: y=x', "M אמצע BB'", 'w1 = 3+4i', 'triangle ABC'];
+    const html = renderToStaticMarkup(QuickChips({ title: 't', hint: 'h', commands, display: kit.isolateLtrRuns, onPick: () => {} }));
+    const dirs = (html.match(/<button[^>]*>/g) ?? []).map((b) => /dir="(\w+)"/.exec(b)?.[1]);
+    expect(dirs).toEqual(['rtl', 'rtl', 'ltr', 'ltr']);
+    expect(html).not.toMatch(/direction:\s*ltr/);
+  });
+
   it('without `display` the label IS the command — an unisolated product still works', () => {
     const html = renderToStaticMarkup(QuickChips({ title: 't', hint: 'h', commands: RAW, onPick: () => {} }));
     expect(CONTROLS.test(html)).toBe(false);

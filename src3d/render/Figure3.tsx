@@ -344,6 +344,28 @@ export default function Figure3({ construction, resolved, width = 640, height = 
                 {cn.label}
               </text>
             )}
+            {cn.extra.map((ex, j) => (
+              <g key={`x${j}`}>
+                <circle cx={ex.x} cy={ex.y} r={2.6} fill="#b45309" />
+                {ex.label && (
+                  <text
+                    data-testid="dihedral-foot-label"
+                    x={ex.labelX}
+                    y={ex.labelY}
+                    fontSize={14}
+                    fontFamily="ui-sans-serif, system-ui, sans-serif"
+                    fill="#b45309"
+                    stroke="#ffffff"
+                    strokeWidth={3}
+                    paintOrder="stroke"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                  >
+                    {ex.label}
+                  </text>
+                )}
+              </g>
+            ))}
           </g>
         ))}
         {scene.angles.map((a, i) => (

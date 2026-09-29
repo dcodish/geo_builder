@@ -30,6 +30,7 @@ import { complexScopeOf, deriveLines } from './app/deriveLines';
 import { realParamNotes } from './app/paramNote';
 import { askRowsOf } from './app/askLane';
 import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, submitQuery, toggleLine } from './app/submit';
+import { logComplex } from './debug/sessionLogComplex';
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
 // This tree is why the rule exists: #919 removed a seam here that re-submitted stored lines on every load.
 import { forgetSessionCx, offeredSessionCx, restoreSessionCx, startSessionPersistCx } from './app/sessionPersistCx';
@@ -431,9 +432,26 @@ export function App() {
     [derived2],
   );
 
+  /**
+   * Submit one line AND count it (#1243) — at the APP boundary, like the siblings, so the load
+   * replay (`hydrateSession`, which walks `submitLine` too) never counts as user submissions.
+   */
+  const submitCounted = (raw: string): boolean => {
+    const ok = submitLine(raw);
+    const err = useComplexStore.getState().lastError;
+    logComplex({
+      kind: 'input',
+      utterance: raw.trim(),
+      locale: i18n.language,
+      source: 'grammar',
+      result: ok ? 'ok' : (err?.key ?? 'refused'),
+    });
+    return ok;
+  };
+
   const submit = () => {
     if (input.trim() === '') return;
-    if (submitLine(input)) setInput('');
+    if (submitCounted(input)) setInput('');
   };
 
   /**
@@ -565,6 +583,7 @@ export function App() {
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
         closeLabel: t('aboutClose'),
+        autoOpenKey: 'complex_intro_seen', // #1453 (ADR-W-098): first visit opens About, in every builder
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
       /* #1238: the offer outranks the load audit for the one render where both could exist — an
@@ -631,7 +650,7 @@ export function App() {
                 hint={t('emptyHintChips')}
                 commands={quickCommands}
                 display={(c) => complexBidi.inputPreview(c) ?? c}
-                onPick={(c) => submitLine(c)}
+                onPick={(c) => submitCounted(c)}
               />
             ) : undefined
           }
@@ -724,7 +743,7 @@ export function App() {
                 /* #739: נקה הכל moved to the under-canvas row (the one place it lives in every
                    tool); the footer keeps the example and the count. */
                 <>
-                  <button onClick={() => EXAMPLE_LINES.forEach((l) => submitLine(l))}>{t('example')}</button>
+                  <button onClick={() => EXAMPLE_LINES.forEach((l) => submitCounted(l))}>{t('example')}</button>
                   <span className="count">{t('factCount', { count: lines.length })}</span>
                 </>
               }
@@ -829,7 +848,8 @@ export function App() {
                     ))}
                   </div>
                 )}
-                {polarScene.regions.map((rg) => (
+                {/* #1425: a polygon with nothing else to count shows no strip (its corners are not counted) */}
+                {polarScene.regions.filter((rg) => rg.members.length > 0).map((rg) => (
                   <div key={rg.key} className="region-count" dir="rtl">
                     {t('regionCounts', {
                       label: rg.label,
@@ -959,7 +979,8 @@ export function App() {
                         {r.note !== null ? (
                           <span style={{ color: '#94a3b8' }}> — {t(r.note === 'statement' ? 'askIsStatement' : 'askUnreadable')}</span>
                         ) : r.row!.value !== null ? (
-                          <span style={{ fontWeight: 600 }}> = {r.row!.value}</span>
+                          /* #1436 — a rounded decimal answers with ≈; = is reserved for the exact value */
+                          <span style={{ fontWeight: 600 }}> {r.row!.approx ? '≈' : '='} {r.row!.value}</span>
                         ) : (
                           <span style={{ color: '#94a3b8' }}> — {r.row!.why ? whyText(r.row!.why, t) : ''}</span>
                         )}
@@ -1037,7 +1058,7 @@ export function App() {
               description: i18n.language === 'he' ? e.descHe : e.descEn,
               onTry: () => {
                 setManualOpen(false);
-                submitLine(raw); // the RAW sentence is what the grammar reads — never the isolated form
+                submitCounted(raw); // the RAW sentence is what the grammar reads — never the isolated form
               },
             };
           }),

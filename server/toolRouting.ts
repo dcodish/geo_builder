@@ -35,6 +35,7 @@
  *   Those files exist in production with real data in them.
  */
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import registry from '../products.json';
 
 /** Every registered product id, in registry order. The one source; nothing here restates it. */
@@ -72,7 +73,16 @@ export function eventsEnvVar(id: string): string {
  */
 export function eventsLogPathForId(id: string): string | null {
   if (!PRODUCT_IDS.includes(id)) return null;
-  return process.env[eventsEnvVar(id)] || path.resolve(process.cwd(), 'logs', eventsFileName(id));
+  /**
+   * The fallback resolves beside THIS MODULE, never `process.cwd()` (#1363). The service runs with
+   * systemd's default cwd `/`, so the old fallback for a product missing its env var targeted
+   * `/logs/…` — unwritable, and the failure swallowed into a 204: analytic collected NOTHING in
+   * prod while every probe looked green. Beside the bundle, a missing env var lands next to
+   * `events.jsonl` where its siblings live — directly beside the bundle, no subdirectory, because
+   * `appendFile` creates files and never directories, so a future product with no env line still collects.
+   */
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  return process.env[eventsEnvVar(id)] || path.resolve(here, eventsFileName(id));
 }
 
 /**

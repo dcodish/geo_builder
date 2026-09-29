@@ -179,7 +179,9 @@ const LENGTH_TOKEN = /(?<![A-Za-z])([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)(?![A
  */
 const OPERAND = String.raw`[A-Za-zℓ][0-9]?[A-Z]?[0-9]?`;
 /** An optional noun before either operand -- «המרחק מ-C לישר AB». */
-const NOUN = String.raw`(?:ה?(?:ישר|קטע|צלע)\s+|(?:the\s+)?line\s+)?`;
+// #1431: the POINT nouns join the slot — «המרחק של הנקודה A מהישר l1» is the same sentence with
+// the optional subject noun (`הנקודה A ≡ A`, the #1134/#1151 shape), for the ask and the given alike.
+const NOUN = String.raw`(?:ה?(?:ישר|קטע|צלע|נקודה|קדקוד)\s+|(?:the\s+)?(?:line|point)\s+)?`;
 /**
  * The noun, with its ARTICLE — Hebrew's is a prefix (`ה?מרחק`) and English's is a separate word.
  *
@@ -204,6 +206,9 @@ const DISTANCE_FRAMES: RegExp[] = [
   frame(String.raw`של\s+|of\s+`, String.raw`מ-?|from\s+`),
   frame(String.raw`בין\s+|between\s+`, String.raw`לבין\s+|א?ל-?|and\s+`),
   frame(String.raw`מ-?|from\s+`, String.raw`לבין\s+|א?ל-?|to\s+`),
+  // #1431: the construct state — «מרחק A מ-l1», no opener. The join is still required, so a bare
+  // «מרחק AB» (a length noun) is never claimed. Last, most general.
+  frame(String.raw``, String.raw`מ-?|from\s+`),
 ];
 
 /**

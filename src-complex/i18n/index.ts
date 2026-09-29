@@ -57,8 +57,13 @@ const he = {
   symDeg: 'מעלות',
   symPow: 'חזקה',
   symMul: 'כפל',
+  symLe: 'קטן או שווה',
+  symGe: 'גדול או שווה',
   symDist: 'מרחק בין שתי נקודות',
   anotherConfig: 'הציגו תצורה אחרת', // #739: ONE wording for the row, every tool
+  // #1452: the row's undo/redo had no keys and printed «undo»/«redo» in both languages — the siblings' wording
+  undo: 'בטל',
+  redo: 'בצע שוב',
   // #742 / ADR-W-024: the canvas cluster + the top-row image exports — the 2-D wording, every tool.
   resetView: 'איפוס תצוגה',
   copyImage: 'העתיקו תמונה',
@@ -98,7 +103,7 @@ const he = {
   creditContact: 'לשאלות',
   aboutClose: 'סגירה',
   privacy:
-    'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. העבודה נשמרת בדפדפן שלכם ובקבצים שאתם בוחרים לשמור.' +
+    'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. לצורך שיפור הכלי נשמרים המשפטים שהקלדתם (טקסט מתמטי בלבד) עם מזהה מבקר אנונימי — ללא כתובת ה-IP — למספר ימים בלבד. העבודה נשמרת בדפדפן שלכם ובקבצים שאתם בוחרים לשמור.' +
     ' כשאתם לוחצים «העתק קישור», השרטוט ותמונה שלו נשמרים בשרת כדי שהקישור יעבוד — בלי שם ובלי פרטים אישיים, ומי שיש לו את הקישור יכול לפתוח אותו.',
   // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
   loadAuditTitle: 'הקובץ נטען חלקית: {{restored}} מתוך {{total}} שורות נוספו. שורות שלא נוספו:',
@@ -201,7 +206,7 @@ const he = {
   contraArgument: 'ארגומנט',
   freedomNone: 'אין תצורה תקפה',
   freedomCount: 'דרגות חופש: {{n}}',
-  freedomPinned: 'הצורה נקבעה במלואה',
+  freedomPinned: '✓ הציור נקבע במלואו על ידי הנתונים', // #1453 (ADR-W-098): the suite's one wording
   stripUnsatisfied: 'לא מתקיים בתצורה הזו',
   // #887 (docs/10 guideline 8) — zero, many and no-set are three different things and read as three
   // different sentences. A "many" result is usually the exam asking for «שתי האפשרויות»: information,
@@ -278,8 +283,12 @@ const en: typeof he = {
   symDeg: 'degrees',
   symPow: 'power',
   symMul: 'multiply',
+  symLe: 'less than or equal',
+  symGe: 'greater than or equal',
   symDist: 'distance between two points',
   anotherConfig: 'Show another configuration',
+  undo: 'Undo',
+  redo: 'Redo',
   // #742 / ADR-W-024: the canvas cluster + the top-row image exports — the 2-D wording, every tool.
   resetView: 'Reset view',
   copyImage: 'Copy image',
@@ -319,7 +328,7 @@ const en: typeof he = {
   creditContact: 'Questions',
   aboutClose: 'Close',
   privacy:
-    'Privacy: no registration, and no personal data is collected. Your work is stored in your browser and in files you choose to save.' +
+    'Privacy: no registration, and no personal data is collected. To improve the tool, the statements you type (math text only) are kept for a few days with an anonymous visitor id — your IP address is never stored. Your work is stored in your browser and in files you choose to save.' +
     ' When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.',
   // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
   loadAuditTitle: 'The file loaded partially: {{restored}} of {{total}} lines were added. Lines not added:',
@@ -418,8 +427,8 @@ const en: typeof he = {
   contraModulus: 'modulus',
   contraArgument: 'argument',
   freedomNone: 'no valid configuration',
-  freedomCount: 'degrees of freedom: {{n}}',
-  freedomPinned: 'the figure is fully determined',
+  freedomCount: 'Degrees of freedom: {{n}}',
+  freedomPinned: '✓ The figure is fully determined by the givens',
   stripUnsatisfied: 'does not hold in this configuration',
   selectionMany: 'more than one solution lies in quadrant {{quadrant}} ({{names}}) — say which one, or the answer is «both possibilities»',
   selectionNone: 'none of the solutions lies in quadrant {{quadrant}}',

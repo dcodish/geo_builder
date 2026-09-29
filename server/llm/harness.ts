@@ -96,8 +96,11 @@ export interface PromptSpec {
   intro: (toolName: string) => string[];
   /** The product's rule lines, VERBATIM and in order — one array entry per prompt line. */
   rules: string[];
-  /** The supported canonical forms, already rendered as `- en   |   he` lines. */
-  vocabulary: () => string;
+  /** The supported canonical forms, already rendered as `- en   |   he` lines — or, when the
+   *  caller names the session LOCALE (#1297), that locale's column alone: a bilingual vocabulary
+   *  invites the model to answer in either language, and the recorded fact list is a teaching
+   *  surface. A spec that ignores the argument keeps its old prompt byte-identical. */
+  vocabulary: (locale?: 'he' | 'en') => string;
   /** How the tool describes itself to the model. Product-specific — see {@link buildStepsTool}. */
   toolDescription: string;
   /** How the `steps` array describes itself to the model. Also product-specific. */
@@ -114,15 +117,19 @@ export function renderExample(e: PromptExample): string {
  * The prompt SKELETON, which was identical in all three copies: intro → rules → vocabulary →
  * examples. Only the parts a product supplies differ.
  */
-export function buildSystemPrompt(spec: PromptSpec): string {
+export function buildSystemPrompt(spec: PromptSpec, locale?: 'he' | 'en'): string {
   return [
     ...spec.intro(TOOL_NAME),
     '',
     'Rules:',
     ...spec.rules,
+    // #1297: the session's language is a HARD rule when the caller states it — the soft 'same
+    // language as the student' line was measured dropped for equation-bearing steps, and the
+    // fact list taught English in a Hebrew session.
+    ...(locale ? [`- The student's session is in ${locale === 'he' ? 'Hebrew' : 'English'}. Output EVERY step in that language.`] : []),
     '',
-    'Supported canonical forms (English | Hebrew):',
-    spec.vocabulary(),
+    locale ? `Supported canonical forms (${locale === 'he' ? 'Hebrew' : 'English'}):` : 'Supported canonical forms (English | Hebrew):',
+    spec.vocabulary(locale),
     '',
     'Examples (freeform → steps):',
     ...spec.examples.map(renderExample),
@@ -130,11 +137,11 @@ export function buildSystemPrompt(spec: PromptSpec): string {
 }
 
 /** The full Messages-API request body (model, tool, forced tool_choice, message). Pure + testable. */
-export function buildRequest(spec: PromptSpec, utterance: string, context: string) {
+export function buildRequest(spec: PromptSpec, utterance: string, context: string, locale?: 'he' | 'en') {
   return {
     model: LLM_MODEL,
     max_tokens: LLM_MAX_TOKENS,
-    system: buildSystemPrompt(spec),
+    system: buildSystemPrompt(spec, locale),
     tools: [buildStepsTool(spec)],
     tool_choice: { type: 'tool' as const, name: TOOL_NAME },
     messages: [{ role: 'user' as const, content: `${context}\n\nStudent request: "${utterance}"` }],

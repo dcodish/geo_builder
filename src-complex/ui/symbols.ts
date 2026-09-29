@@ -26,7 +26,10 @@ export const SYMBOLS: readonly SymbolSpec[] = [
   { label: 'i', titleKey: 'symI', before: 'i' },
   { label: '°', titleKey: 'symDeg', before: '°' },
   { label: 'xⁿ', titleKey: 'symPow', before: '^' },
-  { label: '·', titleKey: 'symMul', before: '*' },
+  { label: '·', titleKey: 'symMul', before: '·' }, // #1348: the face IS the payload (the grammar reads · as *)
+  // #1348: the argument bounds («arg z1 ≤ 45») — the grammar reads the glyph as it reads <= / >=
+  { label: '≤', titleKey: 'symLe', before: '≤' },
+  { label: '≥', titleKey: 'symGe', before: '≥' },
   // #791/#525 — the operator's distance chip: wraps the selection (or leaves the caret) inside
   { label: 'd_{}', titleKey: 'symDist', before: 'd_{', after: '}' },
   { label: 'θ', titleKey: 'symTheta', before: 'θ' },

@@ -29,7 +29,10 @@ import { curveByName, objectById, type Id } from '../engine/types';
 import { ANGLE_STEM_HE } from '../engine/shapes';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { isVerticalLine } from '../engine/lines';
-import { asPair, lineNamed } from './lines';
+import { asPair, lineNamed, lineNamesOf } from './lines';
+import { pointText, scalarText } from './pointText';
+import { readAngleAsk } from '../parser/parseAnalytic';
+import { angleAt } from '../engine/solve';
 import { angleText, lineAngleOf } from './lineAngle';
 import { curveParts, locusEquation } from './curveText';
 
@@ -57,6 +60,9 @@ export interface Answer {
    * Here the conflicting statement is in hand, so it is carried rather than discarded.
    */
   missing?: { name: string; kind: 'point' | 'curve' };
+  /** #1431 — the CONTEXTUAL «המרחק של הנקודה מהישר» could not resolve: the counts name the ambiguity
+   *  (zero or several points/lines), so the wording can say WHICH noun to letter. */
+  contextual?: { points: number; lines: number };
   /**
    * THE FIGURE DETERMINES THE ANSWER, AND THE ANSWER IS THAT THERE IS NONE (#1223).
    *
@@ -80,6 +86,13 @@ export interface Answer {
    * teaches the concept, while 0 lets the misconception stand.
    */
   fact?: 'vertical' | 'lines-cross' | 'points';
+  /**
+   * #1525 — A METHOD HINT instead of a worked trace (operator, 2026-09-29: the tan-difference formula
+   * *"is not in the curriculum … maybe just write a comment «ניתן להשתמש בשיפועי הישרים או במשפט
+   * הקוסינוסים» — the part about the cosine law should show only if all 3 nodes are known"*).
+   * A token, for the same reason as `fact`: this module holds no locale.
+   */
+  hint?: 'angle-methods' | 'angle-slopes';
   /**
    * THE POINT SET a degenerate locus answers with (#1227, ADR-AG-136): «המקום הגיאומטרי של M» on a
    * determined M is M's position, or its finite set of positions — one entry per resolution-aware
@@ -250,8 +263,28 @@ export function ask(
   // plural is locale exactly as the singular is. The seam WIDENS, it is not forked.
   kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind'], count: number) => string = (k) => k,
 ): Answer {
-  const text = question.trim();
+  let text = question.trim();
   if (!text) return { question, value: null, unreadable: true };
+
+  /**
+   * #1431 — THE CONTEXTUAL DISTANCE: «המרחק של הנקודה מהישר», no letters at all.
+   *
+   * Operator ruling (2026-09-27): it answers exactly when the figure holds ONE point and ONE line —
+   * then the nouns are unambiguous references — and otherwise refuses NAMING the ambiguity, never
+   * «לא הבנתי». Resolved by REWRITING into the lettered sentence and falling through to the one
+   * distance lane below, so the contextual spelling can never drift from its lettered synonym
+   * (the ADR-W-053 rule the symbolic d_{AB} spellings already follow).
+   */
+  const ctx = /^ה?מרחק\s+(?:של\s+)?ה(?:נקודה|קדקוד)\s+(?:מ[ןהת]?[-\s]?|מן\s+)ה?(?:ישר|קו)$/.exec(text);
+  if (ctx) {
+    const lineNames = lineNamesOf(d.construction);
+    const pts = d.figure.points;
+    if (pts.length === 1 && lineNames.length === 1) {
+      text = `המרחק של ${pts[0].id} מהישר ${lineNames[0]}`;
+    } else {
+      return { question, value: null, contextual: { points: pts.length, lines: lineNames.length } };
+    }
+  }
 
   /**
    * --- «המקום הגיאומטרי של P» — the locus lane (#1137) ---
@@ -359,10 +392,14 @@ export function ask(
     if (!o) return { question, value: null, missing: { name: text, kind: 'point' } };
     const kx = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === text)?.x ?? null);
     const ky = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === text)?.y ?? null);
-    return {
-      question,
-      value: kx.known && ky.known ? `(${fmt(kx.value)}, ${fmt(ky.value)})` : null,
-    };
+    /**
+     * #1433 — THE PANEL'S OWN DECISION, one seam (`app/pointText.ts`). Asking «C» with two valid
+     * positions answered «לא ניתן לחשב מהנתונים» while the panel row beside it listed both options —
+     * a false sentence. The dash alone (a truly open point) keeps the lane's `value: null`, worded
+     * open/uncomputable as before.
+     */
+    const t = pointText(d, text, kx, ky, fmt);
+    return { question, value: t === '—' ? null : t };
   }
 
   /**
@@ -371,6 +408,49 @@ export function ask(
    * Before the equation rule, because «שיפוע הישר l1» and «משוואת הישר l1» are different
    * questions about the same object and only the leading noun separates them.
    */
+  /**
+   * --- an ANGLE by three letters (#1409): «זווית BMC», «∠BMC», «גודל הזווית ABC», "angle ABC" ---
+   *
+   * Sayable ⇒ askable (02c R23): #1331 made the three-letter angle a GIVEN through the parser's own
+   * atoms, and this arm reads the SAME atoms (`readAngleAsk`), so a spelling the given accepts is
+   * askable by construction. The value comes from the SAME `angleAt` the angle residual constrains
+   * (a round trip: «זווית ABC = 60» asked back prints 60°), through the same honesty gate as every
+   * value arm — an open figure answers open, never a sampled number (ADR-052). No worked trace
+   * (#1525, reversing the 2026-09-27 ruling): the answer carries a method HINT, and the law of cosines
+   * is offered only when all three vertices are knowledge — its three lengths need them.
+   */
+  const ang = readAngleAsk(text);
+  if (ang) {
+    for (const id of [ang.a, ang.v, ang.b]) {
+      if (!objectById(d.construction, id)) return { question, value: null, missing: { name: id, kind: 'point' } };
+    }
+    const readDeg = (f: Figure) => {
+      const P = (n: string) => f.points.find((q) => q.id === n);
+      const [pa, pv, pb] = [P(ang.a), P(ang.v), P(ang.b)];
+      if (!pa || !pv || !pb) return null;
+      const r = angleAt(pv, pa, pb);
+      return r === null ? null : (r * 180) / Math.PI;
+    };
+    const k = isKnowledge(d.construction, readDeg);
+    if (!k.known) return { question, value: null };
+    const vertexKnown = (id: string) =>
+      (['x', 'y'] as const).every(
+        (c) => isKnowledge(d.construction, (f: Figure) => f.points.find((q) => q.id === id)?.[c] ?? null).known,
+      );
+    // #1525 (operator, 2026-09-29): «if the angle is given in the input, there is no point explaining
+    // how to find it» — a STATED angle at this vertex between these two arms (either order) gets no hint.
+    // Read from the record the given lowers to, so a computed angle that equals a number stays hinted.
+    const stated = d.construction.constraints.some(
+      (c) =>
+        c.t === 'angle' &&
+        c.at.v === ang.v &&
+        ((c.at.a === ang.a && c.at.b === ang.b) || (c.at.a === ang.b && c.at.b === ang.a)),
+    );
+    if (stated) return { question, value: angleText(k.value) };
+    const allKnown = [ang.a, ang.v, ang.b].every(vertexKnown);
+    return { question, value: angleText(k.value), hint: allKnown ? 'angle-methods' : 'angle-slopes' };
+  }
+
   // --- a line's angle with the positive x-axis (#1322) ---
   const ax = ANGLE_WITH_X_HE.exec(text) ?? ANGLE_WITH_X_EN.exec(text);
   if (ax) {
@@ -403,7 +483,14 @@ export function ask(
       const l = lineNamed(f, name);
       return l && !isVerticalLine(l.a, l.b) ? -l.a / l.b : null;
     });
-    return { question, value: k.known ? fmt(k.value) : null };
+    if (k.known) return { question, value: fmt(k.value) };
+    // #1433 — a two-configuration slope answers its option set, like every other value arm.
+    const opts = scalarText(d.construction, (f) => {
+      const l = lineNamed(f, name);
+      if (!l || isVerticalLine(l.a, l.b) || Math.abs(l.b) < 1e-12) return null;
+      return -l.a / l.b;
+    }, fmt);
+    return { question, value: opts };
   }
 
   // --- a curve, by name: its equation ---
@@ -439,9 +526,26 @@ export function ask(
         const b0 = d.figure.points.find((q) => q.id === pair[1]);
         if (a0 && b0) trace = traceLine2pt(a0, b0, fmt);
       }
+      /**
+       * #1433 — a two-configuration line answers its equation OPTIONS. Deduped by the RENDERED
+       * equation (coefficients are homogeneous, so raw triples may differ for one line); a set
+       * that collapses to one text stays null — the knowledge gate withheld it, and a single
+       * "option" would claim what the gate refused.
+       */
+      const eqOpts = known
+        ? null
+        : (() => {
+            const set = knownOptions(d.construction, (f) => {
+              const l = lineNamed(f, name);
+              return l ? [l.a, l.b, l.c] : null;
+            });
+            if (!set) return null;
+            const texts = [...new Set(set.map(([a2, b2, c2]) => curveParts({ kind: 'line', a: a2, b: b2, c: c2 }).equation))];
+            return texts.length > 1 ? texts.join(' או ') : null;
+          })();
       return {
         question,
-        value: known ? curveParts({ kind: 'line', a: ka.value, b: kb.value, c: kc.value }).equation : null,
+        value: known ? curveParts({ kind: 'line', a: ka.value, b: kb.value, c: kc.value }).equation : eqOpts,
         ...(trace ? { trace } : {}),
       };
     }
@@ -516,15 +620,15 @@ export function ask(
   if (crossing) return { question, value: null, fact: 'lines-cross' };
 
 
-  const k = isKnowledge(d.construction, (f) =>
+  const readMeasure = (f: Figure) =>
     evalLengthExpr(
       measure,
       (id) => f.points.find((q) => q.id === id) ?? null,
       f.env,
       // The NAMED line this configuration drew (#1048) — see `lineNamed`.
       (nm) => lineNamed(f, nm),
-    ),
-  );
+    );
+  const k = isKnowledge(d.construction, readMeasure);
   /**
    * A PLAIN DISTANCE gets its formula (#1053).
    *
@@ -566,7 +670,8 @@ export function ask(
   }
   return {
     question,
-    value: k.known ? fmt(k.value) : null,
+    // #1433 — a measure with a finite option set answers it («3.16 או 5.83»), the panel's own rule.
+    value: k.known ? fmt(k.value) : scalarText(d.construction, readMeasure, fmt),
     ...(trace ? { trace } : {}),
     ...(mark ? { mark } : {}),
   };

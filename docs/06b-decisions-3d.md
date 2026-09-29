@@ -10968,3 +10968,193 @@ line via the triangle's structure, and its solver has ADR-413's zero-area gate a
 **Consequences.** For a student: «SM⊥ABC» where M is a point of the plane now draws a real perpendicular
 standing out of the plane, whose length is theirs to state — and stating it works. A statement that
 could only be satisfied by flattening a solid to zero area is now refused instead of drawn flat.
+
+## ADR-3D-269 — A line's drawn extent contains every anchor on it (#1490)
+
+**Status:** accepted · 2026-09-28 · operator, playing round #1488 T20 (*"the line doesnt reach the plane"*) · round #1510
+
+**Requirements:** none (internal render) · **Design:** this entry
+
+**Context.** A named line draws clipped to the figure's neighbourhood (`radius·1.1` about the centre's projection). The scene then ANCHORS marks on the line wherever the geometry puts them — measured on T20's figure, the stated 45° arc's vertex (ℓ ∩ π) sat ~80 px beyond ℓ's drawn end: an arc marking a crossing the line never visibly reaches. The class: a line's drawn extent ignored the anchors drawn on it (angle vertices, knees, named points).
+
+**Decision.** One rule in the clipping step, after every anchor source exists (`wAngles`, the knee `wedges`, `worldPts`): each anchor lying ON a drawn line (within `radius·0.02` of it) pulls that line's parameter range out to itself plus a `radius·0.15` margin, so no anchor sits at the very tip. A line with nothing anchored past the neighbourhood keeps its endpoints exactly. Applied in world space before projection, so every consumer (label placement, bbox users downstream) sees one extent.
+
+**Measured.** The T20 sequence: every point of the 45° arc within the drawn segment (was ~80 px beyond; lock verified red pre-fix); the bare-line figure's drawn length unchanged within bounds.
+
+**Consequences.** `src3d/render/scene3.ts` (the widening block). Lock: `issue-1490-line-reach.test.ts`.
+
+## ADR-3D-270 — The height noun takes a value: «גובה הפירמידה 4» in one sentence (#1448)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1510
+
+**Requirements:** none (a spelling of an existing capability) · **Design:** this entry
+
+**Context.** Every one-sentence spelling of a valued height was «not understood» while the two-line form («SO גובה הפירמידה» then «SO = 4») worked — a two-spellings bug across eight spellings, also reported for 2-D (#1443, its own item).
+
+**Decision.** The phrase carries its value, lowering to exactly what the two-line spelling always was. (1) The APEX-LESS forms («גובה הפירמידה 4», «הוא 4», «= 4», the bare «הגובה הוא 4» — a valued bare height is a real given, and apply keeps the one-solid/`bad-solid` guards) ride a `len` on `perp-to-base`; the length claim chains at APPLY on apex→foot, because the foot's letter is minted there. (2) The NAMED forms («SO גובה הפירמידה, SO = 4» — the repeated pair backreferenced so «XY = 4» can never attach to SO — «ואורכו 4», the noun-first «גובה הפירמידה SO = 4») lower parser-side to the role command plus the `length-eq` claim. A value-less bare «הגובה» stays #467's guidance. The #1394 parity golden re-recorded (+4 sequences, additions only — this ADR is the behaviour change it names).
+
+**Measured.** 10 locks (`issue-1448-height-value.test.ts`): all eight spellings build with |apex−foot| = 4, the two-line form unchanged, the bare noun still guidance. 3-D lane 285 files / 5308 green.
+
+**Consequences.** `parser/parse3.ts` (`heightFromApex` value tail; `heightOfSolid` value + noun-first forms), `engine/types.ts` + `engine/apply.ts` (`perp-to-base.len`, the chained claim), the parity golden. Lock: `issue-1448-height-value.test.ts`.
+
+## ADR-3D-271 — The ask lane's knowledge gate sees every lane (#1450)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1510
+
+**Requirements:** none (internal) · **Design:** this entry
+
+**Context.** Asking «k» answered «הנקודות האלו אינן בציור» — a note about points, for a letter — while the panel printed «k = 2»; four more gate misses measured (positive-parameter figures, a free injected vector, a cone's stated height read «תלוי בקנה המידה», the distance between two equation planes likewise).
+
+**Decision.** (1) **A symbol prefers the panel's own params row** (`dataView(...).params` — the #481 rule: one decision, two surfaces), falling through to the generic path for the ratio lane («AE = t·AS»), whose «depends on α» and scale-free behaviour are untouched; a symbol that cannot be measured notes `undetermined`, never the points-worded `unavailable`. (2) **Three missing members join `scaleKnown3`** (the #517 "private enumeration of absolute sources" class): a revolution solid's STATED dim, a pair of stated-equation planes (numeric coefficients, no free/sym), and a numeric pair injection («AB = (1,2,3)») — each fixes real sizes in the world's own units. The detached-solid gauge warning stands verbatim: a free cube's edge still answers nothing. (3) **A stable vector answers its components** through `atomVec` (both atom kinds), gated on `scaleKnown3`. (4) The stability epsilons (the vector check and `stableNums`) widen to 1e-4 relative — the pin/pivot solves leave ~5e-6 wobble (measured), which 1e-6 read as seed-variation; genuine variation is orders larger.
+
+**Measured.** 6 locks (`issue-1450-ask-gate.test.ts`): the five review rows answer their values with the k-row asserted EQUAL to the panel's own text; the free cube and the unstated symbol stay honestly withheld. 3-D lane 285 files / 5304 green (the ratio-t suite caught the first, fall-through-less attempt — kept).
+
+**Consequences.** `engine/queries.ts` (symbol preference + note, vector stability answer, epsilons), `engine/evaluate.ts` (`scaleKnown3` members). Lock: `issue-1450-ask-gate.test.ts`.
+
+## ADR-3D-272 — The gauge is not a configuration: an unanchored figure keeps the floor (#1421)
+
+**Status:** accepted · 2026-09-28 · operator rulings 2026-09-27 (Option A, and again in the /decisions pass: *"Keep it flat on the floor"*) · round #1510
+
+**Requirements:** none (internal) · **Design:** this entry
+
+**Context.** T35: *"image is not proportional"* — |AB| = 5 drew shorter than |AC| = 3. The 3-D figure was exactly right; the whole triangle tumbled edge-on to the camera at 3 of 4 seeds, because once a driven given ran the solve, the six rigid-motion values rode «הציגו תצורה אחרת» with the real freedom. The class: every free planar figure in 3-D carrying a driven given.
+
+**Decision.** One gauge normalisation at the END of `resolve3`, exactly for UNANCHORED figures (no `hasAbsoluteFrameObject`, no absolute points, no solids, no revolutions, no circles): a rigid motion (det +1, never a reflection) sends the first point to the origin, the first edge along +x, and the first three points' plane to the floor (third point at y > 0), applied to every position, plane and line so relations survive verbatim. Configurations change the SHAPE alone; the camera still orbits. The plan's step 1 (measure which stage sets the orientation) became moot by construction — a terminal normalisation is indifferent to the source of the tumble.
+
+**Measured.** 4 locks (`issue-1421-gauge.test.ts`): the operator's T35 figure sits A-at-origin / AB-along-+x / C-on-floor at every sampled seed with the stated lengths exact; the SHAPE (the angle at A) still varies; a coordinate injection and a cube are untouched. 3-D lane 285 files / 5302 green on first run.
+
+**Consequences.** `engine/evaluate.ts` (the normalisation block). Lock: `issue-1421-gauge.test.ts`.
+
+## ADR-3D-279 — A measure the student can state, they can ask: the ask lane reads questions with the statement grammar (#1449)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27), batch-approved in the /decisions pass; the operator re-reported the plane-angle case while playing round #1469 (T4) · round #1517 · feature → PR. Numbered 279 beside the round's parallel branches (273–278).
+
+**Requirements:** docs/02b FR-CL-4 (new) · **Design:** docs/04b — the ask lane reads measure questions through the statement grammar
+
+**Context.** «הזווית בין המישורים π1 ו-π2 היא 54.74» was checked and accepted, but the question «הזווית בין המישורים π1 ו-π2» answered «לא זוהה». The same held for named lines («הזווית בין הישר ℓ1 לבין המישור π1»), the plural frame over point-run planes («הזווית בין המישורים ABC ו-A'BC»), `∠(π1,π2)`, and every solid-of-revolution measure («נפח החרוט», «שטח המעטפת של החרוט»). `parseQuery` kept its own point-run-only copy of the angle frames, and its volume heads resolved only polyhedra. Each spelling the statement lane learned (#1439's frames, named operands) stayed sayable but not askable.
+
+**Decision.** One grammar, read two ways.
+- `angleAskOperands(q)` and `revolutionAskOf(q)` (parse3.ts) parse `q = 1` and keep only what the relation names: the operands of a `plane-rel` / `line-rel` / `line-plane-angle` angle, or the solid and measure of a `volume-eq` / `lateral-area-eq` / `surface-area-eq` claim. Any other lowering reads as "not this kind of question", so a vertex angle or a polyhedron volume still reaches its own head.
+- `parseQuery` answers them as `angle-ops`, measured by `angleBetweenOperands` (the verifier's reading: acute, `asin` for line × plane), and `rev`, measured by `revolutionMeasure`. That function is extracted from the claim verifier, so what the tool checks and what it answers cannot differ. `∠(X,Y)` over planes and lines reads through `readOperand`. The older point-run heads stay first, byte-identical.
+- A revolution answer is written as a multiple of π («100π», «π/3»), the way the exam and the student's own claim write it.
+- The total surface of a cone or cylinder («שטח הפנים של החרוט», «the surface area of the cylinder») was neither sayable nor askable. It is now a claim kind (`surface-area-eq`) and therefore askable, and the catalog carries it. The English volume/lateral frames accept an optional «the» on both nouns.
+- A new note, `noObject` («אין בציור עצם כזה»), covers an angle over an object the figure lacks, or a revolution that isn't there. The old `unavailable` note is worded about points.
+
+**Rejected.** Widening the private point-run regexes in `parseQuery` to named operands: a second grammar is exactly what drifted.
+
+**Measured.** On main `d3f08a4c`, all 21 measured asks answered `notUnderstood`. On the branch: 54.74° for all six named-plane forms (with and without the stated given), 35.26° for the four named-line forms, 45° for both cube spellings, and cone 100π / 65π / 90π, cylinder 36π / 24π / 42π, sphere 36π / 36π.
+
+**Consequences.** `src3d/parser/parse3.ts` (the two readers, `surfaceAreaClaim`, the widened En frames), `src3d/engine/queries.ts` (the kinds, heads, `piMultiple`, the note), `src3d/engine/claims.ts` (`revolutionMeasure`, the new claim case), `src3d/engine/apply.ts` + `types.ts` (the claim kind), the catalog row, both locales. Lock: `issue-1449-ask-lane.test.ts`. Its catalog walk (every catalog statement of an angle between objects or a revolution measure is read by the ask readers with its value dropped) is the class guard. Gate notes: the #1394 submit-parity golden was re-recorded and checked BY VALUE (the catalog row shifts later indices): 0 of 1566 recorded hashes lost, 10 added (the new row He/En and 8 sequences this lock's arrays contribute). The parser shadow-matrix snapshot gains exactly the new row's two entries, won by `surfaceAreaClaim`, shadowing nothing.
+
+## ADR-3D-280 — «הצג בניה» for a line × plane angle: a point on the line, its height, and the foot joined to the crossing (#1491)
+
+**Status:** accepted · 2026-09-28 · operator request playing round #1488 (T20, 2026-09-27), plan approved the same day with the 90° ruling · round #1517 · feature → PR. Numbered 280 beside the round's parallel branches (273–279).
+
+**Requirements:** docs/02b FR-RD-11 (extended to line × plane) · **Design:** docs/04b — the line × plane construction
+
+**Context.** The operator, on a stated line × plane angle: «i would also want to see a builder for showing how the angle is calculated so we take a point on the line (ideally we have a point given) and draw a height to the plane and connect it with the intersection point». #1476 (ADR-3D-265) built the «הצג בניה» chip for plane × plane angles only.
+
+**Decision.** Generalise #1476's chip; add no second chip family.
+- **Rows.** `dihedralsStatedBy` also yields a `line-rel` angle whose operand is planar (a named line against a plane) and a `line-plane-angle` (a segment against a point-run plane), normalized exactly as the scene's object-angle arc lane normalizes the same records. So that lane's `pairKey` cede lets the free arc give way to the construction, and the angle is marked once. State, undo, save/load, share and pruning are #1476's, unchanged.
+- **Geometry.** `linePlaneConstruction` (dihedral.ts): X is the line's crossing with the plane. P is the segment's own endpoint off the plane (S for «SA», C' for «AC'»), else a named point lying on the line (nearest X, then the letter), else a point `fallbackLen` along the line toward the figure. H is P's foot. It returns null for a parallel line (no crossing) and a perpendicular one (collinear).
+- **Scene.** `buildScene3` dispatches on the resolved geometry: a line-ish × planar pair draws PH and XH dashed, a knee at H, and the stated arc at X. An unnamed X or H takes the first free letter (#1476's display-name rule); a named point there keeps its name. `SceneDihedral3` gains `extra` points for H and an unnamed P.
+- **90°.** Per the ruling, P, H and X are collinear, so nothing is constructed. The knee lane now cedes only pairs a construction was actually drawn for (`drawnConstr`, previously every switched-on pair), so the stated knee stays.
+
+**Rejected.** A separate chip family for line × plane: two sets of state, save keys and prune rules for one gesture.
+
+**Deviation from plan.** The fallback P sits `0.6 × the figure radius` from X in world units, not a fixed on-screen distance. The knee and arc lanes take world vertices before the pixel scale is known; the view fits the figure, so the result is close to a fixed on-screen length.
+
+**Measured.** On main `d3f08a4c`, a line × plane angle row owned no chip. On the branch: ℓ × π = 45 draws PH ⟂ π, XH in π, one «45°» and a knee at H, with X and H lettered. Pyramid «SA × ABCD = 50» takes P = S and X = A with no new letter. Cube «AC' × ABCD = 35.264» takes P = C', H = C, X = A with no new letters. At 90° nothing extra is drawn and the knee stays.
+
+**Consequences.** `src3d/store/dihedralChips.ts` (rows), `src3d/render/dihedral.ts` (`linePlaneConstruction`), `src3d/render/scene3.ts` (the dispatch, `extra`, `drawnConstr`), `src3d/render/Figure3.tsx` (draws `extra`). Lock: `issue-1491-line-plane-construction.test.ts`: the rows, off by default, the three figures' geometry through the scene's own function, the 90° ruling, undo and save/load.
+
+## ADR-3D-273 — A failing fact is atomic, and a red row's message is its latest attempt (#1413)
+
+**Status:** accepted · 2026-09-28 · found by round #1408 (noted unresolved in ADR-3D-259) · round #1517
+
+**Requirements:** none (internal — the honesty invariant: an error names the conflicting statement, never a stale one) · **Design:** docs/04b — the in-order fold
+
+**Context.** «M אמצע SX» edited above its pyramid stayed red naming «unknown point S» — a letter the pyramid now declares; the letter actually missing is X. A red row kept the error from its first, in-order application. ADR-3D-259 tried refreshing from the retry's dry run and WITHDREW it: `applyFact` committed a failing fact's earlier commands, so the dry run answered «already defined» for the row's own commands. Re-measured at pickup (tip `d3f08a4c`): reproduced exactly (`{code: 'unknown-point', id: 'S'}`).
+
+**Decision.** (1) **A failing fact is ATOMIC** — the analytic line-atomicity arriving in 3-D: `applyFact` builds on a probe (`applyCommand3` is pure) and the figure advances only when the whole fact holds, so a half-applied statement leaves no orphans and attribution runs only on success. (2) **The refresh**: after the #926/#1327/#1339 retry fixpoint, every still-red row is re-judged against the COMPLETED figure (`retryError`, the same dry run the retry gate uses — `retryWouldSucceed` reshaped to return the verdict) and its status replaced with the latest error. The retry's healing behaviour is unchanged and locked.
+
+**Measured.** The reported sequence now names X; re-declaring X heals the row (ADR-3D-259 kept); a refused midpoint leaves no orphan point. The full 3-D lane (291 files / 5,330 tests, the #1394 parity golden included) is green on the FIRST run — the atomicity change altered no locked figure.
+
+**Consequences.** `src3d/store/store3.ts` (`applyFact` atomic; `retryError`; the refresh pass). Lock: `issue-1413-stale-error.test.ts` — the exact edit sequence, the healing control, the no-orphan guard.
+
+## ADR-3D-274 — The DOF cue counts what a given consumed on a free vector (#1415)
+
+**Status:** accepted · 2026-09-28 · round #1408's follow-up on ADR-3D-260 · round #1517. Numbered 274 beside the round's parallel branch (273 = #1413).
+
+**Requirements:** none (internal — the cue's honesty; no promise changed) · **Design:** docs/04b — the count reads the resolution (ADR-3D-124 discipline)
+
+**Context.** After «וקטור AB» · «אורך AB = 5» the cue still said 6. Measured at pickup: two independent halves. (1) The ADR-3D-248 consumption probe (`scalarConsumedAt`) nudged only the SHAPE DIMS — on a solidless figure `nDims = 0`, so the length's consumption read 0. (2) Even a measured consumption never reached the free-point block: the cue subtracted `consumed` inside the dims-only clamp, and `freeT` (where the six block-enrolled coordinates live) was added after it.
+
+**Decision.** (1) The rank probe spans the shape dims AND the block-enrolled (`free3`/`partial`) rider coordinates — exactly the refinement ADR-3D-204's own note reserved for this issue. Riders of other kinds stay out (the cue already riderTs-subtracts them; probing them would double-subtract). (2) The consumption is reported in TWO parts — `dims` (the #990 rank, unchanged) and `block` (the MARGINAL rank the block coordinates add) — and the cue subtracts each from the term that counts it, each clamped on its own. The first cut folded them into one number subtracted across the sum, and the 3-D lane caught it on its first run: an over-pinned figure's deficit ate an unrelated rider's genuine freedom (the #820 lock) and the #774 mixed-run cue drifted. Measured: «וקטור AB» 6 → with the length 5 (`block = 1`); both prior locks byte-green.
+
+**Out of scope, filed:** «AB = (1,2,3)» (a component PIN) still reads 6 — the pin runs through the 7-DOF gauge allowance a solidless figure has no gauge for; #1519, with the fix direction and the locks to check. The issue's second half (the ~1.7 s coordinate pin) moved to #1422 by the triage comment.
+
+**Consequences.** `src3d/engine/solve3.ts` (`blockRiderIdx`, the widened probe), `src3d/engine/evaluate.ts` (the subtraction spans the sum). Lock: `issue-1415-vector-dof.test.ts` — 6 → 5 on the reported figure, the cube control, and the not-locked component case recorded in place.
+
+## ADR-3D-275 — One press, one solve: derive3 is memoised on (facts, seed) (#1422)
+
+**Status:** accepted · 2026-09-28 · operator, round #1408 T32 (*"takes it a long time to find a new config"*) · round #1517. Numbered 275 beside the round's parallel branches (273 = #1413, 274 = #1415).
+
+**Requirements:** none (internal — perf; no promise changed) · **Design:** docs/04b — the store's derive; LADDER unchanged (the memo wraps the whole derive, no stage moves)
+
+**Context.** The store's header records why `derive3` was never cached: V0 figures were cheap. ADR-3D-260 made every derive SOLVE the free-point rider lane, and one «הציגו תצורה אחרת» press paid it at least twice — `seedForRequirements` derives the candidate seed, the view derives it again — measured ~500 ms per press on «וקטור AB · אורך AB = 5» and ~1.7 s for the #1415-moved coordinate pin. Re-measured at pickup: the table stood.
+
+**Decision.** The 2-D fold-memo rule arrives: `derive3` memoises on the facts ARRAY IDENTITY (every store action builds a new array — the property 2-D's `lastViewDelta` self-invalidation states) and the seed, in a WeakMap so figures drop with their session; 32 entries per figure cover the ADR-3D-053 seed-search window. `deriveStats3.uncached` is the counter-lock seam (the 2-D `conflictSearchStats` idiom): **one press costs exactly one uncached derive**, asserted by count, never by clock.
+
+**Measured, and the residual stated honestly.** Presses: ~500 ms → **~330 ms** (exactly one solve; the view's derive and every same-view consumer are free). The coordinate pin: ~1.7 s → **~1.05 s**, all of it ONE multistart solve. The plan's deeper candidates were examined and declined: (b) probe-only-mentioned-points does not apply to the reported members (both points are mentioned); (c) warm-starting is already effectively true for submits (a free coordinate's rider anchors at its sampled position) and biasing the RESAMPLE's start would trade the sampled variety ADR-052 requires; any multistart narrowing risks the 24/24 rate ADR-3D-260's locks hold, which the plan forbids trading. If the residual single-solve still reads slow in play, that is a new, separately-measured issue.
+
+**Consequences.** `src3d/store/store3.ts` (`deriveMemo3`, `derive3Uncached`, `deriveStats3`). Locks: `issue-1422-derive-memo.test.ts` — one uncached derive per press ×5, shared-object identity, the two staleness guards; ADR-3D-260's own locks unchanged (the lane).
+
+## ADR-3D-276 — A volume or area on free dims drives, whatever the entry order (#1447)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27); step-4 ruling answered in the same pass (*a later volume/area may move free shape dims*) · round #1517. Numbered 276 beside the round's parallel branches (273–275).
+
+**Requirements:** none (internal — ADR-052's own rule: a satisfiable given is never refuted against a sampled value) · **Design:** docs/04b — the M1 scalar-pin family; LADDER stage unchanged (the pins join the existing pivot solve)
+
+**Context.** «פירמידה ישרה SABCD · AB = 3 · נפח הפירמידה = 12» answered «הטענה לא מתקיימת בציור» though the free height satisfies it at 4; the box twin likewise; the reversed order hit «size-on-solid». Class (docs/17 M2 law i): a magnitude's ability to DRIVE depended on its power — only length had a scalar-pin kind, so volume/area fell to the claim lane and were verified against the sampled height — and on entry order (#754's rescale owned the size once a scale given was in force). Re-measured at pickup: the issue's whole table stood.
+
+**Decision.** (1) Two ScalarPin kinds — `volume3` (through the SAME `resolveSolidSubject`/`subjectVolume` the claim verifier uses, so the drive targets exactly what the arbiter checks) and `area3` (|cross|/2); both fix the scale (s³/s²). (2) ONE magnitude arm in apply's free-dims branch (`magnitudeScalarPin` over the three powers): a volume/area pins AND claims (ADR-3D-030 — the claim stays the arbiter); a length keeps its historical no-claim pin byte-identical. (3) ORDER SYMMETRY: a scale given in force is DEMOTED to its own pin when a later magnitude arrives on free dims — the rescale lane empties, both drive, and the two mechanisms can never double-apply. (4) The store's pivot lane admits the pinned `area-eq` beside `volume-poly`. `volume-eq`/`lateral-area-eq` (revolution solids) are NOT scale-given kinds and stay on their existing lanes — out of the measured scope, recorded here as the boundary.
+
+**Measured.** All six table rows now honest: the three driving sequences green with V = 12/12/60 exact across seeds; the reversed order green (demotion); a volume alone still rescales (#754's lock); the impossible cube volume is refused at the gate.
+
+**The lane caught two things.** (a) `exam-2026-2`'s «נפח הפירמידה SENB = 108», which is true, was refuted: SENB names N, a SYMBOL-defined point (SN = k·SC) that the pivot never positions (ADR-3D-030), so its volume residual could not close. The arm now applies the coords arm's own entry rule: a magnitude over a symbol-defined point stays with the claim arbiter, which verifies it exactly as before. (b) #754's lock «a later |AB| = 4 after the volume refuses `size-on-solid`» asserted the limitation this ADR removes (its own comment read "not built"). Per the 2026-09-27 ruling it now asserts the drive: both magnitudes hold, all facts ok, |AB| = 4 across seeds.
+
+**Consequences.** `src3d/engine/types.ts` (the pin kinds), `src3d/engine/solve3.ts` (residuals + the scale table), `src3d/engine/apply.ts` (the magnitude arm + demotion + the symbol-defined exclusion), `src3d/store/store3.ts` (the pivot lane). Locks: `issue-1447-volume-drive.test.ts` (the table across seeds, the reversed order, the two gates); `issue-754.test.ts` (the later-length case, re-pointed); `exam-2026-2.test.ts` (the symbol-defined volume, unchanged and green).
+
+## ADR-3D-277 — «t הוא פרמטר» is understood: the unsigned declaration (#1451)
+
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1517. Numbered 277 beside the round's parallel branches (273–276).
+
+**Requirements:** none (internal — a two-spellings gap; no promise changed) · **Design:** docs/04b — the parameter lanes
+
+**Context.** «t הוא פרמטר חיובי» lowered `param-sign` while the unsigned «t הוא פרמטר» / «t פרמטר» / "t is a parameter" were `not-understood` — the two-spellings bug, burning an LLM call per attempt.
+
+**Decision.** A `param-decl` command from the same rule (the sign arm keeps byte-priority): an ACKNOWLEDGMENT sharing param-sign's owner gate — `symbolOwnersOf` non-empty ⇒ idempotently absorbed (the statement is true; the figure is unchanged); no owner ⇒ the honest `unknown-symbol`, exactly as the signed form refuses. Saveable like its sibling (the COMMAND_SAVEABLE totality caught the omission at `tsc`).
+
+**Consequences.** `src3d/engine/types.ts` (`ParamDeclCommand`), `src3d/engine/apply.ts` (the gate case), `src3d/parser/parse3.ts` (the unsigned arm), `src3d/store/figureFile3.ts` (saveable). Lock: `issue-1451-param-decl.test.ts` — four spellings, both orders through the store, the signed neighbour untouched. The #1394 submit-parity golden gains exactly one key (the lock's own four-spelling sequence, which the parity corpus harvests from test files); no recorded sequence drifted.
+
+## ADR-3D-278 — A plane named as a face or base draws as that face by default (#1485)
+
+**Status:** accepted · 2026-09-28 · operator ruling 2026-09-27 (option A, «1485 - i agree») · round #1517. Amends ADR-3D-077's default («absent means full»). Numbered 278 beside the round's parallel branches (273–277).
+
+**Requirements:** docs/02b FR-RD-13 (new) · **Design:** docs/04b — the plane-display default is derived (`defaultPlaneDisplay3`), not stored
+
+**Context.** «הזווית בין הפאה SBC לבסיס ABC היא 60» drew SBC and ABC as full plane patches. The operator: «when we say פאה and בסיס and give letters, only the area of those letters should be colored». The parser read «הפאה/הבסיס» as operand nouns (#524) but collapsed them to `'plane'`, so «הפאה SBC» and «המישור SBC» produced identical commands. Every materialised plane then took ADR-3D-077's `'full'` default. ADR-3D-197 («a relation never owns a plane») left the student only the data-panel toggle.
+
+**Decision.** The noun sets the default; ownership is unchanged (ADR-3D-197 stands).
+- `readOperand` marks a point-run operand introduced by a face/base noun (He פאה/פאות/בסיס, En face/base) with `face: true`.
+- `materializePlaneRun` records the name in `Construction3.faceNamed` **only where it creates the plane**, so the first mention decides: «מישור SBC» and then «הפאה SBC» stays full, and the reverse order stays a face.
+- `defaultPlaneDisplay3(c, name)` is the one reader of that set. `buildScene3`, the store's `togglePlaneDisplay` and both panel labels resolve `planeDisplay[name] ?? default`. The cycle keeps its order (full → face → hidden) and starts from the plane's default; it deletes the key when it returns to that default. "Absent = the default" stays the single convention, and an explicit `'full'` on a face-default plane is an ordinary stored value.
+
+- **The noun is display, never identity.** The flag rides the operand, so everything that compares operands or statements by their JSON reads it through one rule: `operandKey` / `meaningKey` (operands.ts) drop `face: true` (another command's `face` id list is kept). They are used by the scene and knee-lane pair keys, the arc dedupe, the pin/claim dedupe (`dedupDeep`) and the store's already-stated check. So «המישור SBC…» after «הפאה SBC…» is still already stated, and one relation named both ways is one pair. `sameOperand` already compared ids only. #524's lock («הפאה SBC … is the same statement») asserted deep-equal commands; it now asserts the same meaning (`meaningKey`) plus the carried flag, the intent it always had.
+
+**Rejected.** (B) Plane chips on the relation row. This reverses ADR-3D-197 and reopens plane ownership; the operator chose (A).
+
+**Measured.** On main `d3f08a4c`, the reported sequence drew SBC and ABC with 4-corner patches. On the fix they draw 3-corner faces; the «המישור» spelling still draws 4.
+
+**Consequences.** `src3d/parser/operandToken.ts` (the flag), `src3d/engine/types.ts` (operand field, `faceNamed`, `defaultPlaneDisplay3`), `src3d/engine/apply.ts` (clone + record at creation), `src3d/render/scene3.ts`, `src3d/store/store3.ts` (the cycle), `src3d/App3.tsx` (labels). Save files are unchanged because the default re-derives from the facts. The #1476 construction legs never read the display mode. Lock: `issue-1485-face-default.test.ts` (his sentence → faces; «המישור» → full; the English nouns; first mention decides; the toggle cycle, save/load and undo). The #1394 submit-parity golden is re-recorded for exactly one sequence, «פירמידה SABCD שבסיסה ריבוע · הזווית בין הפאה SBC לבסיס ABCD היא 60», whose two operands now carry `face: true` (the recorded commands; no error or notice changed), and gains one key the corpus harvests from this lock's own id array.

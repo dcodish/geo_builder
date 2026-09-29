@@ -47,7 +47,7 @@ describe('#960 — the verdicts, measured', () => {
   it('a contradiction is refused as `error` and never becomes a fact', () => {
     const v = verdictAfter(['משולש ABC', 'BC = 4', 'AC = 5', 'זווית ABC = 90', 'AB = x'], 'x = 8');
     expect(v).toMatchObject({ kind: 'refused', reason: 'error' });
-    expect((v as { detail?: string }).detail ?? '').toMatch(/cannot hold/);
+    expect((v as { detail?: string }).detail ?? '').toMatch(/cannot hold|impossible: the angle at/);
   });
 
   it('re-typing an existing shape is a friendly no-op, never an escalation (ADR-156)', () => {

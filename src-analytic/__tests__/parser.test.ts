@@ -488,8 +488,10 @@ describe('#1068 — English prose containing = is not an equation', () => {
       expect(kindOf(line), line).toBe('not-handled');
     }
     // And the three that flipped are now a POINT ON A LINE, not a curve minted out of prose.
+    // Since #1429 the mint moved to the APPLY boundary (mint-or-match, ADR-AG-168), so the parse
+    // leads with the declare and the equation rides the constraint.
     for (const line of ['P is on the line y=x', 'the point P is on the line y=x', 'P lies on y=x']) {
-      expect(kindOf(line), line).toBe('ok:curve'); // the line object, followed by the incidence
+      expect(kindOf(line), line).toBe('ok:declare'); // then the on-curve carrying eqSrc
     }
   });
 

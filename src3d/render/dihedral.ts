@@ -249,3 +249,75 @@ export function solidBaseRings(solids: readonly { faces: Id[][] }[]): Id[][] {
     return f0 ? [f0, ...(f1 && !f1.some((id) => f0.includes(id)) ? [f1] : [])] : [];
   });
 }
+
+/**
+ * #1491 (ADR-3D-280) — THE CONSTRUCTION THAT MEASURES A LINE × PLANE ANGLE, the operator's words: "take
+ * a point on the line (ideally we have a point given) and draw a height to the plane and connect it with
+ * the intersection point". The angle PXH at the crossing X, between the line and its projection XH, IS
+ * the angle between the line and the plane.
+ *
+ *  - **X** — the line's crossing with the plane (the point the object-angle arc is centred on).
+ *  - **P** — a NAMED point on the line, off the plane: a segment's own endpoint (S for «SA», C' for
+ *    «AC'»), else any figure point lying on the line; the nearest to X wins, then the letter. With none
+ *    (a bare equation line), P is `fallbackLen` along the line from X, on the side facing `center`.
+ *  - **H** — P's foot on the plane.
+ *
+ * `null` when the pair is not line × plane, the line is parallel to the plane (no crossing), or
+ * perpendicular to it (P, H and X collinear: there is nothing to construct, and the right angle is the
+ * knee's — operator ruling 2026-09-27).
+ */
+export interface LinePlaneConstruction {
+  cross: Vec3;
+  point: { id: Id | null; at: Vec3 };
+  foot: Vec3;
+}
+
+export function linePlaneConstruction(
+  a: Operand3,
+  b: Operand3,
+  ga: OperandGeom,
+  gb: OperandGeom,
+  ctx: { at: (id: Id) => Vec3 | null; points: Iterable<[Id, Vec3]>; center: Vec3; fallbackLen: number },
+): LinePlaneConstruction | null {
+  const lineSide = ga.dir && ga.point && !ga.normal ? 0 : gb.dir && gb.point && !gb.normal ? 1 : -1;
+  if (lineSide < 0) return null;
+  const ln = lineSide === 0 ? ga : gb;
+  const pl = lineSide === 0 ? gb : ga;
+  const lineOp = lineSide === 0 ? a : b;
+  if (!pl.normal || pl.d === undefined) return null;
+  const nn = norm3(pl.normal);
+  if (nn < 1e-12) return null;
+  const n = scale3(pl.normal, 1 / nn);
+  const d = pl.d / nn;
+  const L = normalize3(ln.dir!);
+  const denom = dot3(n, L);
+  if (Math.abs(denom) < 1e-9) return null; // parallel: no crossing, the angle is 0
+  if (norm3(sub3(L, scale3(n, denom))) < 1e-9) return null; // perpendicular: the knee's, nothing to construct
+  const cross = add3(ln.point!, scale3(L, -(dot3(n, ln.point!) + d) / denom));
+  const heightOf = (p: Vec3) => dot3(n, p) + d;
+  const footOf = (p: Vec3) => sub3(p, scale3(n, heightOf(p)));
+
+  const pts = [...ctx.points];
+  const scaleRef = Math.max(1, norm3(ctx.center), ...pts.map(([, p]) => dist3(p, ctx.center)));
+  const eps = 1e-6 * scaleRef;
+  const onLine = (p: Vec3) => norm3(cross3(sub3(p, cross), L)) <= eps;
+  const own = lineOp.kind === 'segment' ? [lineOp.a, lineOp.b] : [];
+  const cands = [
+    ...own.flatMap((id) => {
+      const p = ctx.at(id);
+      return p ? [{ id, at: p, own: true }] : [];
+    }),
+    ...pts.filter(([id, p]) => !own.includes(id) && onLine(p)).map(([id, p]) => ({ id, at: p, own: false })),
+  ].filter((q) => Math.abs(heightOf(q.at)) > eps);
+  cands.sort(
+    (x, y) =>
+      Number(y.own) - Number(x.own) ||
+      dist3(x.at, cross) - dist3(y.at, cross) ||
+      (x.id < y.id ? -1 : x.id > y.id ? 1 : 0),
+  );
+  const best = cands[0];
+  if (best) return { cross, point: { id: best.id, at: best.at }, foot: footOf(best.at) };
+  const dir = dot3(L, sub3(ctx.center, cross)) < 0 ? scale3(L, -1) : L;
+  const at = add3(cross, scale3(dir, ctx.fallbackLen));
+  return { cross, point: { id: null, at }, foot: footOf(at) };
+}

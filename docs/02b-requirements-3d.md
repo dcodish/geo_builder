@@ -296,6 +296,14 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   `issue-1163-ratio-separators.test.ts`. The 2-D sibling this restores parity with is `segmentRatio`.)*
 - **FR-CL-3 (Must)** — **A refusal names the student's statement, not internal state**
   ([FR-SU-5](02w-requirements-workspace.md)).
+- **FR-CL-4 (Must)** — **A measure the student can STATE, they can ASK.** Every angle between objects
+  (planes by name or by points, named lines, the plural «הזווית בין המישורים X ו-Y») and every
+  solid-of-revolution measure (volume, lateral area, total surface) that the tool checks as a given is
+  answered as a question with the value dropped: «הזווית בין המישורים π1 ו-π2» → 54.74°, «נפח החרוט» →
+  100π. A revolution measure is written as a multiple of π. An object the figure lacks gets a note naming
+  an object; an unstated size is undetermined (ADR-052). *(Realised —
+  [ADR-3D-279](06b-decisions-3d.md#adr-3d-279), #1449; `issue-1449-ask-lane.test.ts`, whose catalog walk
+  is the class guard.)*
 
 ## Rendering
 
@@ -368,6 +376,13 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   the figure, carried by a share link, and removed with its row (operator rulings 2026-09-27).
   *(Realised — [ADR-3D-265](06b-decisions-3d.md#adr-3d-265), #1476;
   `issue-1476-dihedral-construction.test.ts`.)*
+  **Line × plane** (#1491): a row stating an angle between a line (a named line or a segment) and a plane
+  carries the same chip. When on it draws a point P on the line (the segment's own endpoint off the plane —
+  S for «SA», C' for «AC'» — else a named point lying on the line, else a default point), its height PH to
+  the plane with a knee at H, and the projection XH from the crossing X, with the stated angle marked at X.
+  An unnamed X or H takes the first free letter, as above. At exactly 90° P, H and X are collinear, so the
+  chip draws nothing extra and the right-angle knee stays (operator ruling 2026-09-27). *(Realised —
+  [ADR-3D-280](06b-decisions-3d.md#adr-3d-280); `issue-1491-line-plane-construction.test.ts`.)*
 - **FR-RD-12 (Must)** — **A stated angle between OBJECTS is always marked on the figure.** An angle the
   student stated between two planes («הזווית בין הפאה SBC לבסיס ABC היא 60»), between a line or segment
   and a plane («זווית בין ישר ℓ למישור π = 45», «הזווית בין SA למישור ABCD היא 50»), or NAMED with a
@@ -377,6 +392,11 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   figure. At 90° it is the knee (FR-RD-10); with the FR-RD-11 chip on, the construction's arc replaces it,
   so the angle is marked once. *(Realised — [ADR-3D-266](06b-decisions-3d.md#adr-3d-266), #1486;
   `issue-1486-stated-angle-shows.test.ts`.)*
+- **FR-RD-13 (Must)** — **A face or base the student NAMED shows as that face.** A plane first mentioned
+  as «הפאה SBC» / «הבסיס ABC» (en *the face / the base*) draws only its polygon by default; «המישור SBC»
+  keeps the full patch. The first mention decides, and the «מישורים» toggle in the data panel still
+  switches either one; the choice survives undo, save/load and share. *(Realised —
+  [ADR-3D-278](06b-decisions-3d.md#adr-3d-278), #1485; `issue-1485-face-default.test.ts`.)*
 
 ## Coverage
 

@@ -337,6 +337,14 @@ draws it**; the same sentence typed into the data panel **is calculated and not 
 not the wording, decides. One catalog therefore serves both lanes — a real economy, and it means every
 construct the tool can build is automatically a construct it can be asked about.
 
+**R121 — A three-letter ANGLE is askable, with a method hint.** «זווית BMC» (also «∠BMC»,
+«גודל הזווית BMC», "angle BMC") answers in the data panel through the SAME atoms the given rules
+read (#1331) — sayable ⇒ askable by construction — with the honesty gate every value arm passes.
+No worked formula (operator, 2026-09-29, reversing the 2026-09-27 ruling: the tan-difference formula
+is outside the curriculum). Under the answer: «ניתן להשתמש בשיפועי הישרים או במשפט הקוסינוסים», with
+the law-of-cosines half only when all three vertices are known. An angle the student STATED is answered with no hint at all. *(#1409, #1525; realised —
+[ADR-AG-176](06c-decisions-analytic.md#adr-ag-176) Am. 1.)*
+
 **R24 — An ask is a DRY-RUN construction: built internally, evaluated, discarded.** It must never
 mutate the figure. The 2-D tool's `dryRunOutcome` already has this shape (apply on top of the current
 facts without committing), so it is copied rather than invented. It rides the ask channel
@@ -931,7 +939,13 @@ get the right figure. It consumes no freedom. A comparison no drawing can satisf
 
 **R119 — incidence reads in the exam's orders, over its operands**
 ([ADR-AG-164](06c-decisions-analytic.md#adr-ag-164), [#1281](https://github.com/dcodish/geo_builder/issues/1281),
-[#1495](https://github.com/dcodish/geo_builder/issues/1495)). A point on a line may be said with the LINE first («הישר CD עובר דרך P»,
+[#1495](https://github.com/dcodish/geo_builder/issues/1495); the operand vocabulary unified by
+[ADR-AG-168](06c-decisions-analytic.md#adr-ag-168), [#1429](https://github.com/dcodish/geo_builder/issues/1429):
+«P על המעגל I» in every spelling, digits and Roman numerals one circle, the crossing sentence with the clitic
+as written («ו-l2», «והישר l2»), the distributive «של הישרים l1 ו-l2», the bare «של הישרים» resolved to the
+exactly-two, both verb orders («נחתכים בנקודה E», «חותך את … בנקודה E»), a contextual «עם המעגל», and an
+equation operand meaning THE existing curve that carries it — never a second copy and never an internal id in
+a refusal. «…בנקודות A ו-B» awaits the operator's root-assignment ruling, #1512). A point on a line may be said with the LINE first («הישר CD עובר דרך P»,
 «ישר 3 עובר דרך הנקודה N», «CD מכיל את P»), with a SIDE as the subject («הצלע BC נמצאת על הישר y=x-4», «האלכסון BD
 מונח על הישר y=x», «הבסיס CD נמצא על ישר העובר דרך …»), and with a point given only by its COORDINATES («הנקודה
 (-3,7)») — each means exactly what the point-first sentence means. A point given only by coordinates is named by
