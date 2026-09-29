@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { buildParseCtx, droppedGivenVerbs, parse } from '@/parser';
-import { replay, type Fact } from '@/store/geoStore';
+import { replay, viewUsable, type Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
 
 let n = 0;
@@ -103,8 +103,7 @@ describe('#82 — NO THEFT: legitimate lowerings pass', () => {
 });
 
 describe('#85 (ADR-293) — viewUsable, the never-blank predicate', () => {
-  it('usable / empty / non-finite states classify correctly', async () => {
-    const { viewUsable } = await import('@/store/geoStore');
+  it('usable / empty / non-finite states classify correctly', () => {
     const mk = (pts: [string, { x: number; y: number }][]) =>
       ({ positions: new Map(pts) }) as Parameters<typeof viewUsable>[0];
     expect(viewUsable(mk([['A', { x: 1, y: 2 }]]))).toBe(true);

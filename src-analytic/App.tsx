@@ -32,10 +32,10 @@ import { curveDetailsKey, curveEquationText, curveParts, namedRow } from './app/
 import { color, fs } from '../shell/theme';
 import { reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
-import { decideEdit, decideSubmit, decideToggle, reachesFallback } from './app/submit';
+import { commitRecord, decideEdit, decideSubmit, decideToggle, noticeText, reachesFallback } from './app/submit';
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
-import { runFallback } from './app/fallback';
+import { fallbackRefusal, runFallback } from './app/fallback';
 import { panelKnowledge, segmentKnowledge } from './app/panelRows';
 import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
@@ -785,7 +785,9 @@ export function App() {
         setDraft('');
         return;
       case 'record':
-        recordLine(verdict.line);
+        // #1350 — the notice rides IN the commit that records the line: `recordLine` clears the
+        // transient surfaces, so a notice set before it would be erased by the very line that earned it.
+        commitRecord(verdict, recordLine, t);
         setDraft('');
         return;
       /**
@@ -845,26 +847,17 @@ export function App() {
       if (out.kind === 'lines') {
         // #1297 (operator ruling 2026-09-27, 'student's words now'): the rows DISPLAY the sentence
         // the student typed; the machine lines stay the stored truth so replay is unchanged.
-        recordLlmLines(raw, out.lines);
+        recordLlmLines(raw, out.lines, noticeText(out.notice, t));
         setDraft('');
         return;
       }
-      if (out.kind === 'busy') {
-        setError({ key: 'llm-busy', detail: raw });
-        return;
-      }
       /**
-       * 'rejected' is no longer worded as «not understood» (#1336): the tool DID understand — the
-       * escape ran and produced a completion the tool declined — and telling the student their
-       * sentence was unintelligible sends them rewriting words that were never the problem. The
-       * note says the honest middle; the model's line itself stays out (#1251), and 'none' keeps
-       * the original refusal, which for a genuinely unread sentence is the true answer.
+       * Anything else leaves the figure as it was and says why, decided by `fallbackRefusal`: a throttle
+       * is «busy»; a completion the tool READ and declined is the honest middle (#1336) rather than «not
+       * understood»; and a completion that is not a command at all — #1278's English prose — keeps the
+       * student's ORIGINAL refusal, since nothing was understood and the tool may well support the move.
        */
-      if (out.kind === 'rejected') {
-        setError({ key: 'llm-understood-unsupported', detail: raw });
-        return;
-      }
-      setError(original);
+      setError(fallbackRefusal(out, raw, original));
     } finally {
       clearTimeout(timer);
       setThinking(false);

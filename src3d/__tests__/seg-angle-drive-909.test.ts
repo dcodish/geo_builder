@@ -65,7 +65,10 @@ describe("#909 — «הזווית בין A'C לבין BC' היא 70» DRIVES the
   it('lowers to a seg-angle PIN — the drive lane, not the claim lane', () => {
     const { construction } = build([BOX, "הזווית בין A'C לבין BC' היא 70"]);
     expect(construction.scalarPins).toEqual([{ kind: 'seg-angle', a1: "A'", b1: 'C', a2: 'B', b2: "C'", deg: 70 }]);
-    expect(construction.claims.filter((c) => c.type === 'angle-seg-eq')).toHaveLength(0);
+    // #1567 (ADR-3D-285): the pin records its ARBITER beside it (`given: true`) — never a plain claim-lane claim
+    expect(construction.claims.filter((c) => c.type === 'angle-seg-eq')).toEqual([
+      { type: 'angle-seg-eq', a1: "A'", b1: 'C', a2: 'B', b2: "C'", deg: 70, given: true },
+    ]);
   });
 
   it('THE CLASS — every disjoint segment pair drives, on every carrier', () => {

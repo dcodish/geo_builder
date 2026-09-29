@@ -134,6 +134,9 @@ src/
                    FILTERS, enumerated instead: every letter the student named is a quantity, so it gets
                    a row (natun when valued, nigzar when the figure forces it) and is askable by name
                    through the `var` query. One lane feeds both seams - never a second enumeration.
+                 - circles are named through `circleRef` (ADR-552, #1442): drawn circles only (a hidden
+                   scaffold circle gets no row), a visible centre by its letter, an unnamed one as
+                   "the circle" or its ADR-342 token; `render/valueRowText` words every row label.
   parser/        parse.ts (deterministic bilingual grammar, ordered rules + post-pass chokepoints +
                  honesty gates), catalog, context (buildParseCtx — the docs/17 §3b registry), scope,
                  llm/llmShared (the LLM-fallback seam; re-parse + gate battery)
@@ -185,7 +188,10 @@ src/
                    statuses live by index and a dry-run trial shares the committed fold; the fold names
                    none when no single earlier statement's removal restores feasibility, and the
                    `_said` wording stands. The search itself runs in the fold's attribution pass (next
-                   bullet), only on a refused statement, through its own memo, never nested
+                   bullet), only on a refused statement, through its own memo, never nested. It tries the
+                   statements AFTER the failing one first, latest first (ADR-554, #1203) — a later
+                   line can commit while an earlier row goes ✗, and the latest statement whose
+                   removal lets that row hold is the one that broke it — then the earlier ones
                  - WHICH row owns it is decided one layer down (ADR-492, #956): `computeFold` runs an
                    attribution pass after the deferral/poisoning/HOIST have settled, moving a refusal
                    from the row that SHAPED a constraint to the row that VALUED its symbol when that

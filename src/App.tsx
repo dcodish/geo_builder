@@ -90,6 +90,7 @@ import { figureStatus } from '@/app/figureStatus';
 import { runEditCommit, runSetGroupEnabled } from '@/app/editPipeline';
 import { subscribeFigureNotes } from '@/app/figureNotes';
 import { anonPointDescriptor, visibleCoincidences } from '@/render/pointDescriptions';
+import { valueRowText } from '@/render/valueRowText';
 import { humanizeError, translateParams } from '@/i18n/humanizeError';
 import { otherUtteranceForError, utteranceForError } from '@/app/errorSubject';
 /**
@@ -1875,10 +1876,8 @@ export default function App() {
                         }}
                       >
                         <bdi style={{ direction: 'ltr' }}>
-                          {r.kind === 'radius' ? t('values.radius', { c: r.label })
-                            : r.kind === 'area' ? t('values.area', { ids: r.label })
-                            : r.kind === 'perimeter' ? t('values.perimeter', { ids: r.label })
-                            : r.label}
+                          {/* #1442 (ADR-552): one wording seam — a circle row names the circle, never its centre id */}
+                          {valueRowText(r, (k, p) => t(k, p) as string)}
                         </bdi>
                         <span>=</span>
                         <MathValue value={r.value} exact={r.exact} degrees={r.kind === 'angle'} unit={r.unit} />

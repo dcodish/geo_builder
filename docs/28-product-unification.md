@@ -526,6 +526,12 @@ strip and the whole surface in 3-D and complex are new.
 > on the empty canvas and in the manual, and that is now the ruling for every product. The empty-state
 > half of D9b stands unchanged.
 
+> **3-D realisation, 2026-09-29 (#1446, [ADR-3D-288](06b-decisions-3d.md#adr-3d-288)).** Two of the four
+> 3-D chips («M אמצע BB'», «K על AA' כך ש-AK = 2KA'») presumed a solid and were refused on the very
+> canvas they were shown on. "See build without data entry" means **every empty-state chip builds on an
+> empty canvas**; in 3-D that is locked over the rendered list (`empty-chips-1446.test.ts`), as 2-D's
+> `examples-build.test.ts` already locks its own.
+
 ### D10 — Tablet: **the data panel becomes an overlay in portrait; canvas and input stay side by side**
 
 Bounded by an existing ruling: **NFR-US-4** — tablets in scope (touch, pinch-zoom, +/− buttons),

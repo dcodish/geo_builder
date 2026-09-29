@@ -127,6 +127,12 @@ produces nothing — and shows an input note instead, keeping the text in the bo
 on exactly one thing, and it is the thing that matters: **a scenario can lock a state the UI cannot
 reach**, and its refusal appears only as a replay status the scenario then asserts on.
 
+One refusal kind IS expressible in the corpus: a **parser** refusal (a deterministic `ok: false` other
+than `not-handled`). A scenario keeps the refused sentence in `steps` as typed and declares it in
+`refusedSteps` ([ADR-555](06-decisions.md#adr-555), #1288); `factsOf` asserts the declared reason (a listed
+step that parses, or is refused otherwise, fails; an unlisted refusal fails) and commits nothing for it.
+Gate refusals that happen AFTER a successful parse stay with `gateVerdict` below.
+
 `src/__tests__/submit-gate.ts` is the ONE answer to *"would the app accept this line here?"*:
 
 - `gateVerdict(facts, utterance, seed)` → `commit` | `noop` | `refused{reason}` — the deterministic
@@ -309,3 +315,17 @@ assumed, and its failure direction is a false alarm rather than a false green.
 Legitimately assertion-free files — the env-gated triage report tools, whose deliverable is a written
 report — are waived **by name, each with its reason**. A guard with no escape hatch gets disabled the
 first time it is inconvenient, and a waiver with no reason is as good as no guard.
+
+### A test body never waits on a module load, or on the machine ([ADR-W-102](06w-decisions-workspace.md#adr-w-102))
+
+A test's 5 s timeout must pay only for the test's own work. Two things break that under full-suite load
+while passing alone: a module loaded inside the body (`await import('…')` in an `it`, whose transform queues
+on the shared vite-node server behind every other worker), and a body that runs whole-machine-bound work
+such as an in-memory esbuild bundle. Both time out on some busy runs and never alone.
+
+`server/__tests__/test-imports-at-collection.test.ts` walks every tree and fails any indented dynamic
+`import('…')` in code; its failure message says how to fix the hit (hoist it to a static import). An
+import that must happen late on purpose goes in a `beforeAll`/`beforeEach` with an explicit timeout and a
+`// load-in-body-ok: <reason>` marker on the line. Heavy shared setup (the deploy-preflight bundle) is
+built once in a `beforeAll` with its own timeout, not per test; that second shape has no lint, because
+"heavy" cannot be read from the source.

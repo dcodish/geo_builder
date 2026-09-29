@@ -59,12 +59,22 @@ Deploy **only committed state on `main`** ([docs/22 §5](22-workflow.md)).
 ([ADR-W-058](06w-decisions-workspace.md#adr-w-058), [#1130](https://github.com/dcodish/geo_builder/issues/1130)):
 
 ```sh
-npm run deploy:preflight      # builds the proxy, reads the live artifacts, prints what is stale
+npm run deploy:preflight      # builds the proxy, reads the live artifacts, probes every live route, prints what is stale or broken
 ```
 
 It names each artifact `MATCHES live`, `DIFFERS — push required` or `STALE BUILD` (built before its own source last changed — rebuild, then re-run; [ADR-W-061](06w-decisions-workspace.md#adr-w-061)), and **exits non-zero whenever
 anything differs** so the verdict cannot be skimmed past on the way to the commands below. Push
 exactly what it names; leave the rest alone.
+
+**It also probes every ROUTE** ([ADR-W-103](06w-decisions-workspace.md#adr-w-103), #1279) — on 2026-09-20 every hash
+was green while `/analytic-builder/api/parse` answered 404, because its conf was never pasted into Plesk.
+The route list is **read from the tracked confs** (every `ProxyPass` line in the `deploy/apache-*.conf` of
+each product `products.json` enables — never a list kept by hand), so a new conf line is probed the next
+run. Each probe is a **bodiless GET** that the proxy answers before any model call (`api/parse`, `api/log`
+and `api/share` → `405`, the handler's first statement; `api/config?tool=…` → `204`; a dashboard → its
+login form; `/g/<id>` → `404` carrying `x-robots-tag: noindex`), so it spends nothing and writes nothing.
+A route answering Apache's plain 404 reads `BROKEN — … not routed` and **the preflight exits non-zero**;
+the fix is always the Plesk paste below, never an edit to `vhost_ssl.conf`.
 
 > **The rule this replaced was *"did `server/` change?"*, and it was not merely fragile — it was
 > unsound.** Measured: 20 of the proxy bundle's 26 first-party modules live OUTSIDE `server/`

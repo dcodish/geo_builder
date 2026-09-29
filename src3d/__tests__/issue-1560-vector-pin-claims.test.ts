@@ -216,10 +216,13 @@ describe('#1560 — structural: each anchor-lane pin records its given claim bes
  * THE CLASS INVARIANT. Fold every sequence the 3-D suite already knows (fixtures3, the catalog, every string
  * array in `src3d/__tests__` — the #1394 harvest) plus this file's rows at APPLY level: a fact that adds a
  * vector, pair or dot pin while the pivot never runs on the figure must also add a claim — or it is a given
- * nobody reads. The exercised counter keeps it from passing by checking nothing. The sibling #1567 widens
- * this to every pin family (length / angle / ratio / ⊥ pins routed on a revolution's free dims).
+ * nobody reads. The exercised counter keeps it from passing by checking nothing.
+ *
+ * #1567 (ADR-3D-285) widened it to EVERY pin family: point, vector and pair pins, every scalar pin (length,
+ * angle, ratio, ⊥/∥-to-plane — the four sites once routed on a revolution's free dims — and the rest), plane
+ * and coordinate-plane pins. The #1567 lock's whole sequences (issue-1567-pin-arbiters.test.ts) are harvested.
  */
-describe('#1560 — invariant: no anchor-lane pin without an arbiter where the pivot never runs', () => {
+describe('#1560/#1567 — invariant: no pin of any family without an arbiter where the pivot never runs', () => {
   const HERE = __dirname;
   const FIXTURES = path.resolve(HERE, '../../fixtures3');
   const STR = String.raw`'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"`;
@@ -248,9 +251,11 @@ describe('#1560 — invariant: no anchor-lane pin without an arbiter where the p
     return out;
   };
 
-  const pinCount = (c: Construction3) => c.vectorPins.length + c.pairPins.length + c.scalarPins.filter((p) => p.kind === 'dot').length;
-  const statesANumber = (cmd: Command3) =>
-    cmd.type === 'dot-given' || ((cmd.type === 'inject-vector' || cmd.type === 'inject-pair') && (cmd.x !== null || cmd.y !== null || cmd.z !== null));
+  const pinCount = (c: Construction3) =>
+    c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length + c.planePins.length + c.coordPlanePins.length;
+  // a coordinate/vector statement with NO numeric component states nothing to check (ADR-3D-282/284)
+  const statesNothing = (cmd: Command3) =>
+    (cmd.type === 'inject-vector' || cmd.type === 'inject-pair' || cmd.type === 'point3') && cmd.x === null && cmd.y === null && cmd.z === null;
 
   it('every such fact records a claim (exercised on at least the nine reported rows)', () => {
     let exercised = 0;
@@ -269,7 +274,7 @@ describe('#1560 — invariant: no anchor-lane pin without an arbiter where the p
           probe = r.next;
         }
         if (!ok) continue; // a failing fact commits nothing (#1413)
-        if (pinCount(probe) > pinCount(c) && p.commands.some(statesANumber)) pinFacts.push({ line, claimed: probe.claims.length > c.claims.length });
+        if (pinCount(probe) > pinCount(c) && !p.commands.some(statesNothing)) pinFacts.push({ line, claimed: probe.claims.length > c.claims.length });
         c = probe;
       }
       if (pinFacts.length === 0) continue;
@@ -280,7 +285,9 @@ describe('#1560 — invariant: no anchor-lane pin without an arbiter where the p
       }
     }
     expect(offenders).toEqual([]);
-    // the nine reported rows (M1–M9) and the five true restatements (G1–G5); the harvested corpus adds 0 today
-    expect(exercised).toBeGreaterThanOrEqual(14);
+    // #1560: the nine reported rows (M1–M9) and the five true restatements (G1–G5). #1567: its nine refused
+    // rows (R1–R9), six true restatements (G1–G6) and the already-paired ratio control (C3) — 30 from the two
+    // locks; the harvested corpus adds 7 more (37 measured 2026-09-29)
+    expect(exercised).toBeGreaterThanOrEqual(30);
   }, 120_000);
 });

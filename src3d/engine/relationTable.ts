@@ -74,7 +74,7 @@ const CELLS: Record<string, CellStatus> = {
   'perp|line|line': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2: symbolic dir pins; numeric verifies (ADR-3D-103)' },
   'perp|plane-run|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
   'perp|plane-run|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
-  'perp|plane-named|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: '#1439 (ADR-3D-263): planePinningRels — pins the parameter iff a normal carries it, else a verified claim' },
+  'perp|plane-named|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: '#1439 (ADR-3D-263) / #1472 (ADR-3D-286): paramPinningRels — pins the parameter iff a normal carries it and it does not hold for every value, else a verified claim' },
   'perp|vector|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
   'perp|vector|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
 
@@ -97,7 +97,7 @@ const CELLS: Record<string, CellStatus> = {
   'parallel|vector|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
   'parallel|plane-run|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
   'parallel|plane-run|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
-  'parallel|plane-named|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: '#1439 (ADR-3D-263): planePinningRels — pins the parameter iff a normal carries it, else a verified claim' },
+  'parallel|plane-named|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: '#1439 (ADR-3D-263) / #1472 (ADR-3D-286): paramPinningRels — pins the parameter iff a normal carries it and it does not hold for every value, else a verified claim' },
 
   // ---- skew / intersecting / coincident (mutual positions) — S4 (#378, ADR-3D-104) -----
   //
@@ -111,20 +111,20 @@ const CELLS: Record<string, CellStatus> = {
   'skew|line|line': { status: 'supported', actions: ['claim'], note: 'S4: both absolute — nothing to gate, the claim is the answer' },
   'intersecting|segment|segment': { status: 'supported', actions: ['drive-dims', 'requirement', 'claim'], note: 'נחתכים — coplanarity drives, within-extent gates' },
   'intersecting|segment|line': { status: 'supported', actions: ['requirement', 'claim'], note: 'S4: claim-gated — the gauge×absolute drive is #386' },
-  'intersecting|line|line': { status: 'supported', actions: ['claim'], note: 'S4: both absolute' },
+  'intersecting|line|line': { status: 'supported', actions: ['param-root', 'claim'], note: '#1472 (ADR-3D-286): paramPinningRels — pins the parameter iff an anchor or direction carries it (the open half, not parallel, filters the roots), else a verified claim' },
   'coincident|segment|segment': { status: 'supported', actions: ['drive-dims', 'requirement', 'claim'], note: 'מתלכדים — S4' },
   'coincident|segment|line': { status: 'supported', actions: ['requirement', 'claim'], note: 'S4: claim-gated — see #386' },
-  'coincident|line|line': { status: 'supported', actions: ['claim'], note: 'S4: both absolute' },
+  'coincident|line|line': { status: 'supported', actions: ['param-root', 'claim'], note: '#1472 (ADR-3D-286): paramPinningRels — pins the parameter iff an anchor or direction carries it, else a verified claim' },
 
   'coincident|plane-run|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
   'coincident|plane-run|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
-  'coincident|plane-named|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): absolute×absolute — the claim is the whole answer' },
+  'coincident|plane-named|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: '#1472 (ADR-3D-286): paramPinningRels — pins the parameter iff a coefficient (normal or offset) carries it, else a verified claim' },
 
   // ---- contains (an object lying IN a plane / ON a line) ------------------------------
   'contains|plane-run|segment': { status: 'planned', slice: 'S3', note: 'a segment lying in a plane' },
   'contains|plane-named|segment': { status: 'planned', slice: 'S3' },
   'contains|plane-run|line': { status: 'planned', slice: 'S3', note: 'מוכל' },
-  'contains|plane-named|line': { status: 'planned', slice: 'S3' },
+  'contains|plane-named|line': { status: 'supported', actions: ['param-root', 'claim'], note: '#1472 (ADR-3D-286): paramPinningRels — «ℓ מוכל במישור π» / «π מכיל את ℓ» (the line-rel `contained`): direction AND position; pins the parameter iff either side carries it, else a verified claim' },
 
   // ---- point membership ----------------------------------------------------------------
   'on|point|plane-run': { status: 'supported', actions: ['rider', 'drive-gauge', 'claim'], note: 'ADR-3D-015/033' },
@@ -145,17 +145,17 @@ const CELLS: Record<string, CellStatus> = {
   'angle|line|segment': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2 (ADR-3D-103)' },
   'angle|line|vector': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2 (ADR-3D-103)' },
   'angle|line|line': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2 (ADR-3D-103)' },
-  'angle|plane-named|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: '#1439 (ADR-3D-263): planePinningRels (the 2022-Q2 45° pins a) — else a verified claim' },
+  'angle|plane-named|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: '#1439 (ADR-3D-263) / #1472 (ADR-3D-286): paramPinningRels (the 2022-Q2 45° pins a) — else a verified claim' },
   'angle|plane-run|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
   'angle|plane-run|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
 
   // ---- distance with a value -----------------------------------------------------------
   'distance|point|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S5 (ADR-3D-106): drives when both operands ride the gauge; PINS THE SCALE (it carries units)' },
-  'distance|point|plane-named': { status: 'supported', actions: ['claim'], note: 'S5 (ADR-3D-106): claim-gated — the gauge×absolute drive is #386' },
-  'distance|point|line': { status: 'supported', actions: ['claim'], note: 'S5 (ADR-3D-106): claim-gated — the gauge×absolute drive is #386' },
-  'distance|line|line': { status: 'supported', actions: ['claim'], note: 'S5: two ABSOLUTE lines — the claim is the answer (2010-Q3)' },
+  'distance|point|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: '#1472 (ADR-3D-286): paramPinningRels — a COORDINATE point against a plane carrying the parameter pins it; a figure (gauge) point stays claim-gated, #386' },
+  'distance|point|line': { status: 'supported', actions: ['param-root', 'claim'], note: '#1472 (ADR-3D-286): paramPinningRels — a COORDINATE point against a line carrying the parameter pins it; a figure (gauge) point stays claim-gated, #386' },
+  'distance|line|line': { status: 'supported', actions: ['param-root', 'claim'], note: '#1472 (ADR-3D-286): paramPinningRels — pins the parameter iff a line carries it (the skew gap and the parallel branch are both scanned), else a verified claim (2010-Q3)' },
   'distance|plane-run|plane-named': { status: 'supported', actions: ['claim'], note: 'S5 (ADR-3D-106): claim-gated — the gauge×absolute drive is #386' },
-  'distance|plane-named|plane-named': { status: 'supported', actions: ['claim'], note: 'S5: both absolute' },
+  'distance|plane-named|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: '#1472 (ADR-3D-286): paramPinningRels — pins the parameter iff a coefficient carries it, else a verified claim' },
   'distance|plane-run|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S5 (ADR-3D-106): drives when both operands ride the gauge; PINS THE SCALE (it carries units)' },
   'distance|point|segment': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S5 (ADR-3D-106): drives when both operands ride the gauge; PINS THE SCALE (it carries units)' },
   'distance|segment|segment': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S5 (ADR-3D-106): drives when both operands ride the gauge; PINS THE SCALE (it carries units) — skew segments' },
