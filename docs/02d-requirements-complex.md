@@ -173,6 +173,20 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
 - **FR-LN-2 (Must)** — **A refusal names the student's statement**, never internal state
   ([FR-SU-5](02w-requirements-workspace.md)), and reads correctly in an RTL sentence with LTR
   mathematics inside it ([FR-WI-2](02w-requirements-workspace.md)).
+- **FR-LN-4 (Must)** — **Radicals are input, carried exactly.** «√3 + i», «sqrt(3)», «√(x)», «³√8» /
+  «ⁿ√x» and «√2cis45» parse; a root of a rational literal is an exact magnitude (the modulus exponent
+  vector), so «√3 + i» IS 2·cis30° and «|z₁| = √2» pins the modulus exactly — never a decimal
+  approximation of a stated radical. **A closed radical literal always reads with a value**: one radical
+  term per part («1 + √2i», «√5 + 2i», «(1+√2i)/3») is a known number — exact cartesian form, exact
+  modulus, and the argument in degrees when the angle table has no exact turn — exactly as «3+4i» is.
+  **A root sign over a negative number refuses in every spelling** («√-3», «√(-3)», «√(0-4)», «∛(-8)»);
+  the imaginary number is written «i√3». «cis» follows ANY modulus («√(2)cis45», «(√2)cis45»,
+  «sqrt(2) cis 45»). A superscript that opens an operand before √ is the root's index («³√8»); one
+  attached to an operand stays its power («x³», «2³√8»). The word «שורש» before a number or a
+  parenthesis is the √ sign («שורש 3», the 2-D #105 ruling); «שורש של 3» is refused with the √
+  spelling of the student's own line and a pointer to the √ button (the 2-D #246 guidance). The √
+  palette chip wraps the selection. *(#1435; realised — [ADR-CX-056](06d-decisions-complex.md#adr-cx-056),
+  amendment 1.)*
 - **FR-LN-3 (Should)** — **Series are in scope**, being part of the corpus question rather than an
   extension of it. *(docs/27 §2.)*
 

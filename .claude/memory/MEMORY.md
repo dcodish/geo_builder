@@ -69,3 +69,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [LLM-lane convergence plan](llm-lane-convergence-plan.md) — the 2026-09-22 four-step plan: steps 1-2 shipped, #1243 is COLLECTION not evidence, and #1355 waits on #1362 + a deploy
 - [Promo video plan (parked)](promo-video-plan.md) — Hebrew teacher-facing Instagram/WhatsApp videos: format, storyboard, pipeline, open questions; parked 2026-09-27, not priority
 - [PR servers have no LLM key](pr-servers-have-no-llm-key.md) — a PR worktree has no .env.local, so the fallback answers "none" in ~3 ms and reads as "not escalated"; by operator ruling they STAY keyless (cost, and it exposes grammar gaps) — say so on the sheet, never copy .env.local (2026-09-24 #1407)
+- [Play sheets sweep the phrasings](playsheets-sweep-the-phrasings.md) — a PR sheet tests what a student would type, measured on branch AND main, not the builder's one spelling (2026-09-29, #1511 → 37 red across 5 PRs)

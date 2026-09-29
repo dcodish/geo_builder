@@ -45,7 +45,7 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
 
 - **FR-SU-1 (Must)** — **One look.** Every builder renders the same design tokens and the same palette,
   so a student who learns one interface has learned all of them. *(Realised — `shell/theme.ts`;
-  rulings D2/D3, [docs/28 §4a](28-product-unification.md).)* **One wording for one state**: «✓ הציור נקבע במלואו על ידי הנתונים», «דרגות חופש: N», «חושב…», the ask button «שאלו», and the undo/redo/clear/another/About row read the same in every builder (He and En), and the About opens once on a first visit in all four. *(Operator ruling 2026-09-27; realised — [ADR-W-098](06w-decisions-workspace.md#adr-w-098), #1453.)*
+  rulings D2/D3, [docs/28 §4a](28-product-unification.md).)* **One wording for one state**: «✓ הציור נקבע במלואו על ידי הנתונים», «דרגות חופש: N», «חושב…», the ask button «שאלו», and the undo/redo/clear/another/About row read the same in every builder (He and En), and the About opens once on a first visit in all four. *(Operator ruling 2026-09-27; realised — [ADR-W-098](06w-decisions-workspace.md#adr-w-098), #1453.)* The empty-canvas example chips show their math typeset, like the fact rows. *(#1530, [ADR-W-100](06w-decisions-workspace.md#adr-w-100).)*
 - **FR-SU-2 (Must)** — **A visible builder switcher**, present in every builder, listing the suite from
   the machine registry ([`products.json`](../products.json)) rather than from code. A builder marked not
   enabled **never appears in a shipped page** — the promise that no chip can point at a 404. *(Realised —

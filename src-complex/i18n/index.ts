@@ -39,6 +39,8 @@ const he = {
   errComplexAsReal: 'המשפט לא נוסף — {{letter}} הוגדר כמספר מרוכב, אבל "{{detail}}" משתמש בו כמספר ממשי (גודל או זווית)',
   // #1428 — a statement the figure cannot use, with the reason the fold knows (whyText)
   errRefused: 'המשפט "{{detail}}" לא נוסף — {{reason}}',
+  // #1435 — the 2-D #246 guidance (input.scope.word-root), in this tool's words: the √ spelling, and the button
+  errWordRoot: 'כתבו את השורש עם הסמל √ — יש כפתור √ בלוח «סמלים». למשל "{{suggestion}}" במקום "{{detail}}".',
   errWrongApp: 'הקובץ שייך לכלי אחר ({{detail}}) — כאן נטענים קבצים של בונה המרוכבים בלבד',
   errNewerVersion: 'הקובץ נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב',
   errTooLarge: 'הקובץ גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{detail}} משפטים',
@@ -48,6 +50,7 @@ const he = {
   implicitLabel: 'נוצר מעצם האזכור — חופשי, נדגם מחדש ב«הציגו תצורה אחרת»',
   drivenLabel: 'מכוון על-ידי הנתונים — לחלופות: "הציגו תצורה אחרת"',
   factCount: '{{count}} משפטים',
+  symSqrt: 'שורש',
   symConj: 'צמוד',
   symAbs: 'ערך מוחלט',
   symInv: 'הופכי',
@@ -266,6 +269,7 @@ const en: typeof he = {
   errUnaccounted: 'I read part of the line, but not: {{detail}}',
   errComplexAsReal: 'Statement not added — {{letter}} is declared a complex number, but "{{detail}}" uses it as a real number (a size or an angle)',
   errRefused: 'Statement "{{detail}}" not added — {{reason}}',
+  errWordRoot: 'Write the root with the √ symbol — there is a √ button under «Symbols». E.g. "{{suggestion}}" instead of "{{detail}}".',
   errWrongApp: 'This file belongs to another tool ({{detail}}) — only Complex Builder files load here',
   errNewerVersion: 'This file was saved by a newer version of the tool — refresh the page and try again',
   errTooLarge: 'This file is too large to open — a figure can hold up to {{detail}} statements',
@@ -274,6 +278,7 @@ const en: typeof he = {
   implicitLabel: 'created by reference — free, resampled by "Show another configuration"',
   drivenLabel: 'driven by the givens — use "Show another configuration"',
   factCount: '{{count}} statements',
+  symSqrt: 'square root',
   symConj: 'conjugate',
   symAbs: 'absolute value',
   symInv: 'reciprocal',
