@@ -1606,7 +1606,9 @@ distinct walk), then reads what is already evaluated — differing ⇒ open now;
 **pending** (`{ known: false, pending: true }`). `knownOptions` fills the pool only for a value already seen
 to take two values (the walk the render paid before #1473). Pending is reported to `settled(fn)`, the probe
 every multi-gate row composes under (`askSettled` wraps the whole ask lane once), and the row prints «בודק…».
-`app/poolScheduler.ts` completes the pool one seed per idle slice and re-renders; it runs from a **layout**
+`app/poolScheduler.ts` completes the pool one seed per slice — a plain macrotask (`scheduler.postTask`, else
+`MessageChannel`, else `setTimeout(0)`), never `requestIdleCallback`: Chromium grants no idle period while the
+loop keeps posting work, so every seed waited out the idle timeout (ADR-AG-180 Am. 1) — and re-renders; it runs from a **layout**
 effect keyed on the derivation, so a pool the render's own walk completed settles before paint, and its
 cleanup abandons the old figure's pool. Verdicts never depend on the machine — only when they appear does.
 The perf lock counts `evaluateStats.uncached` (memo misses), never milliseconds.

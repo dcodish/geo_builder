@@ -17,7 +17,7 @@ import { configurationPool, isKnowledge, knownCurve, knownOptions, POOL_SIZE, ty
 import { panelKnowledge } from '../app/panelRows';
 import { pointText } from '../app/pointText';
 import { ask } from '../app/ask';
-import { completePoolAfterRender, type SliceScheduler } from '../app/poolScheduler';
+import { completePoolAfterRender, yieldScheduler, type SliceScheduler } from '../app/poolScheduler';
 
 const fmt = (v: number) => String(Math.round(v * 100) / 100);
 const readPt = (id: string, k: 'x' | 'y') => (f: Figure) => f.points.find((p) => p.id === id)?.[k] ?? null;
@@ -208,4 +208,28 @@ describe('#1473 — the after-render loop is abandoned when the figure changes',
     completePoolAfterRender(pool, () => (n += 1), manual().sched);
     expect(n).toBe(0); // nothing showed pending: no re-render owed
   });
+
+  it('the page scheduler YIELDS between seeds and never waits for idle (browser pre-play: 20 of 21 idle slices fired by timeout)', async () => {
+    const g = globalThis as { requestIdleCallback?: unknown };
+    const had = g.requestIdleCallback;
+    g.requestIdleCallback = () => {
+      throw new Error('the pool must not wait for an idle period');
+    };
+    try {
+      const { pool } = deferredWithPending(CASE_A);
+      const done = new Promise<void>((resolve) => completePoolAfterRender(pool, resolve)); // default scheduler
+      await done;
+      expect(pool.complete()).toBe(true);
+      // …and a cancelled macrotask never runs its slice
+      const other = deferredWithPending([...CASE_A, 'נקודה Z']);
+      let ran = 0;
+      const h = yieldScheduler.schedule(() => (ran += 1));
+      yieldScheduler.cancel(h);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(ran).toBe(0);
+      expect(other.pool.complete()).toBe(false);
+    } finally {
+      g.requestIdleCallback = had;
+    }
+  }, 60_000);
 });
