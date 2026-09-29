@@ -227,11 +227,16 @@ rule**, at the head of `holdsAt`, not a case per kind: a `given` claim is judged
 a configuration where the pivot found no placement it holds vacuously, and at the displayed seed the
 pin-owner guard gives the verdict (`injection-unsatisfiable` for a coordinate pin, `givens-contradict`
 naming the statements otherwise; newest owner only). A new pin family gains its arbiter by recording a claim
-with the flag. Still open: pins routed on `freeDims(c) > 0` alone (`length`, `vangle`/`seg-angle`,
-`length-rel`, `seg-perp/par-plane`) — `freeDims` counts a revolution's unstated size, which the pivot never
-drives, so with a free-size sphere, cone or cylinder on the canvas those givens reach a pin nothing reads
-(#1567, which reuses this rule); and the missing drive for riders and partial points on a solid-free figure
-(the pivot's entry gate asks for a solid or a `free3` point, ADR-3D-282).
+with the flag. The scalar pins join the same seam ([ADR-3D-285](06b-decisions-3d.md#adr-3d-285), #1567):
+`length` records `length-eq`, `seg-angle` records `angle-seg-eq` (the angle between lines, |cos|),
+`vangle` records the SIGNED `cos-angle-eq` over its two rays (the vertex angle, 0–180°, the quantity the pin
+drives), `length-rel` records `length-rel`, and `seg-perp/par-plane` records `perp-plane`/`par-plane` — so
+routing on `freeDims(c) > 0`, which counts a revolution's unstated size the pivot never drives, decides only
+whether a pin is ADDED, never whether the statement is judged. The store's `size-on-solid` boundary exempts a
+magnitude recorded as a pin's arbiter (its own pin drove the size), as it already exempted #1447's
+volume/area pivot lane. Still open: the missing drive for riders and partial points on a solid-free figure
+(the pivot's entry gate asks for a solid or a `free3` point, ADR-3D-282), and a revolution's size driven by a
+stated length (#1569).
 
 **A declared action must hold for every spelling of its row, and the SHAPE of a pin kind is not a
 semantic rule.** `'angle|segment|segment'` declared `drive-dims` while `apply.ts` delivered it only when

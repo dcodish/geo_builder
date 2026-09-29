@@ -356,7 +356,10 @@ function alreadyKnown(c: Construction3, samples: readonly Resolved3[]): BuildNot
       if (cl.type !== 'perp-plane' && cl.type !== 'par-plane') continue;
       const rel = cl.type === 'perp-plane' ? ('perp' as const) : ('parallel' as const);
       // A relation that DROVE the figure is information, not a consequence — never reported.
-      if (pinned.has(`${cl.seg[0]}${cl.seg[1]}|${cl.plane.join('')}`)) continue;
+      // #1567 (ADR-3D-285): a pin now records its ARBITER beside it (`given: true`) — that claim IS the driving
+      // relation, whatever run length the pin's plane was spelled with (the key below compares the pin's full run
+      // against the claim's three ids, so a four-letter face never matched).
+      if (cl.given || pinned.has(`${cl.seg[0]}${cl.seg[1]}|${cl.plane.join('')}`)) continue;
       if (samples.length > 0 && !samples.every((r) => relationHoldsInEveryBranch(r, cl.seg, cl.plane, rel))) continue;
       out.push({ kind: 'already-known', rel, subject: cl.seg.join(''), object: statedPlaneName(c, cl.plane) });
     }

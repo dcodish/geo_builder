@@ -80,9 +80,14 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   where u = AB is (2,0,0), «AB = (5,5,5)» or «AB = (5, n, p)» over typed A and B, and «u·v = 24» where u·v = 0
   are refused with the same message as a false coordinate; on a cube or a free vector the statement still
   moves the figure. A true restatement stays green, and a component left symbolic or unstated is not
-  checked. *(Gap: a length, angle, ratio or ⊥ given over typed points is still accepted unchecked while a
-  sphere, cone or cylinder of unstated size is on the canvas — #1567.)* *(Realised —
-  [ADR-3D-284](06b-decisions-3d.md#adr-3d-284), #1560; `issue-1560-vector-pin-claims.test.ts`.)*
+  checked. *(Realised — [ADR-3D-284](06b-decisions-3d.md#adr-3d-284), #1560; `issue-1560-vector-pin-claims.test.ts`.)*
+  **A length, angle, length ratio or ⊥/∥-to-plane given is judged whatever else is on the canvas.** With a
+  sphere or cone of unstated size present, «|AB| = 5» where |AB| is 2, «|AB| = 3|AD|», «הזווית BAD היא 40»
+  where the angle is 90°, and «AE ⊥ BCD» / «AE ∥ BCD» that do not hold are refused with the same message
+  as a false coordinate, and a true one stays green. «|SO| = 4» on a cone whose height was never stated is
+  refused too (operator ruling 2026-09-29): a stated length does not yet set a revolution's size (#1569). On
+  a solid the same statement still drives the solid. *(Realised — [ADR-3D-285](06b-decisions-3d.md#adr-3d-285),
+  #1567; `issue-1567-pin-arbiters.test.ts`.)*
 - **FR-SP-6 (Must)** — **A stated new label must land on the figure.** A decomposition that loses a point
   the student named is **refused, naming the label** — never committed with the point missing. A label
   that already exists is context, not a drop. *(Realised — `droppedNewLabels3`, `honesty3.test.ts`.)*
