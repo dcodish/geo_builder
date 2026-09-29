@@ -380,3 +380,7 @@ A `SymbolSpec` whose face (`label`) is one character inserts exactly that charac
 ## One wording per role, and the first-visit About ([ADR-W-098](06w-decisions-workspace.md#adr-w-098))
 
 Shell holds no strings, so the suite vocabulary is held by a lock, not a module: `shell/__tests__/suite-vocabulary.test.ts` maps nine roles (determined, DOF count, busy, ask, undo, redo, clear-all, show-another, About) to each product's key(s), reads the four locales by file, and requires one wording per role in each language, anchored to the operator's ruled text. A product without a surface (complex has no busy state) is recorded as absent with its reason. The first-visit About is `AppFrameAbout.autoOpenKey`: opt-in, one localStorage key per product, written on close. 2-D's private first-load modal is retired into it, keeping its `geo_intro_seen` key.
+
+## The example chips' math ([ADR-W-100](06w-decisions-workspace.md#adr-w-100))
+
+`QuickChips` renders each label through `shell/math`'s `mathHtml` after the product's `display` (bidi isolation), so a chip shows the same typeset math as the fact row its click creates; the click still submits the raw command (ADR-W-029).

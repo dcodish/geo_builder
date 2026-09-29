@@ -4946,3 +4946,15 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 **Decision.** A chip's `dir` is decided from its RAW command: `rtl` when it holds any Hebrew letter, else `ltr` (an English-locale or pure-math example such as complex's «w1 = 3+4i»). `dir="auto"` was tried and measured wrong in the browser: a Hebrew sentence that OPENS with an isolated label («M אמצע BB'», 3-D) resolved LTR, because the isolated letter was read as the first strong character.
 
 **Measured.** Real-browser capture of each builder's empty canvas at the fix: every Hebrew chip `rtl` (2-D, 3-D including «M אמצע BB'» and «K על AA' כך ש-…», analytic), complex's four math chips `ltr`; the captures read right-to-left. Lock: `shell/__tests__/quick-chips.test.tsx` (a Hebrew chip, a Hebrew chip opening with a label, a math chip and an English chip → `rtl, rtl, ltr, ltr`; no fixed direction), red on the previous code.
+
+## ADR-W-100 — The example chips show typeset math (#1530)
+
+**Status:** accepted · 2026-09-29 · operator request («I want the chips to show mathml»), right after #1527 · feature → PR.
+
+**Requirements:** docs/02w FR-SU-1 (the chips show the math the way the fact rows do) · **Design:** docs/04w — the example chips' math
+
+**Context.** The empty-canvas example chips (`shell/frame/QuickChips`, all four builders) showed their commands as typed, in a monospace code font: `(x-3)^2+(y-4)^2=9`, `y^2=54x`, `z^5 = w^2`. The fact rows the same commands create already typeset them through the shared `shell/math` renderer (ADR-W-040).
+
+**Decision.** A chip's label is rendered through that same `mathHtml`, after the product's bidi isolation (`display`), so it shows exactly the math its click produces. The chip font follows the app's text font, since typeset MathML beside monospace text read as two styles. Unchanged: the click still submits the RAW command (#751, ADR-W-029), and a chip's direction is still #1527's rule (Hebrew RTL, math LTR). Scope is the shared renderer's: powers, fractions, roots and `_{}` subscripts; a bare index such as complex's `w1` stays as typed, as it does in 2-D and analytic fact rows.
+
+**Measured.** Real-browser captures of the four empty canvases: analytic «(x−3)²+(y−4)²=9» and «y²=54x» typeset, complex «z⁵ = w²» typeset, every Hebrew chip still RTL, and clicking a chip submits its raw text. Lock: `shell/__tests__/quick-chips.test.tsx` (a power renders `<math>` with no literal `^`, the Hebrew stays text, the click yields the raw command).
