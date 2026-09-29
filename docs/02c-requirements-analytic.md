@@ -1163,7 +1163,7 @@ circle shows its centre, because in analytic geometry the centre is always part 
 mark appears whenever the circle does; the VALUE beside it appears only when the givens fix it, so a
 circle whose centre rides a parameter is marked and left unlabelled rather than labelled with one
 sample's coordinates. The centre owns no letter — it is part of the circle, not a point the student
-named.
+named. *(Amended by R123: a CANONICAL circle's centre is the point `O`.)*
 **R64 — a shape is never drawn collapsed** ([ADR-AG-039](06c-decisions-analytic.md#adr-ag-039)). The
 vertices of a shape are distinct points, and a configuration that puts two of them in the same place
 is not shown — «דלתון ABCD» never draws `B` and `D` together, however well that would satisfy its
@@ -1835,3 +1835,16 @@ neighbouring ones would each say something untrue about a sentence whose triangl
 «תיכון מ-A לצלע BC» with no letter for the foot. Those need the FIGURE to say what the cevian reaches
 or need the tool to mint a name, and this parser reads one sentence with no figure in hand
 ([#1240](https://github.com/dcodish/geo_builder/issues/1240), and #1222's apex-fronted arm).
+
+**R123 — a canonical circle's centre is the point O, unless a letter is already there**
+([ADR-AG-184](06c-decisions-analytic.md#adr-ag-184), [#1270](https://github.com/dcodish/geo_builder/issues/1270)).
+*(Operator, 2026-09-20: "for canonical circles only, the center is O automatically unless user mentioed a letter. user can change this later anyway".)*
+
+A circle stated by an equation centred on the origin — «x²+y²=16», «נתון מעגל 1 שמשוואתו x²+y²=25»,
+«x²+y²=r²» — gets its centre as a REAL point `O`: drawn, in the points list, and usable by name in a
+later sentence («הקטע OA», «משולש AOB»). The circle's row reads `O(0, 0), r = 4` and says the tool chose
+the name («הכלי קרא לנקודה O»). It is a default, and it yields: a point the student stated at the origin
+names the centre instead (`A(0,0)` → `A(0, 0), r = 4`, in either order); a centre the student named keeps
+their letter; a point `O` the student defined elsewhere (`O(5,5)`) keeps the letter and the centre shows
+its coordinates alone — never a second `O` and never an invented `O₁`. A translated circle, a parabola's
+focus and an ellipse's foci are unchanged: coordinates alone.

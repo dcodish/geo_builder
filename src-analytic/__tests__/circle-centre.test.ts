@@ -57,8 +57,11 @@ describe('#1059 — a letter after «מעגל» is the CENTRE', () => {
     const { d, p } = at(['the circle K whose equation is (x-1)^2+(y-2)^2=9']);
     expect(d.faults).toEqual([]);
     expect([p.K.x, p.K.y]).toEqual([1, 2]);
+    // «I» names the circle, never its centre: no point `I`. The `O` beside it is the TOOL's name for a
+    // canonical circle's centre (#1270, ADR-AG-184) — LOCK MOVED from `['circle-I']` by that ruling.
     expect(derive(['circle I: x^2+y^2=9'], 0).construction.objects.map((o) => o.id)).toEqual([
       'circle-I',
+      'O',
     ]);
   });
 

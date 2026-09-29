@@ -1728,6 +1728,9 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
        */
       if (f.t === 'derived') {
         const standing = objectById(c, f.id);
+        // A name the TOOL offers (#1270, ADR-AG-184) never takes a letter that is already held, and is
+        // never a condition on its holder: the default yields, and the figure is left as it was (M4).
+        if (standing && f.auto) return { ok: true, effect: 'known', next: c };
         // The SAME derivation restated is absorbed, as it always was (#1045) — a condition that repeats
         // the definition adds nothing and must not count as a new given.
         if (standing && standing.kind === 'derived' && sameReference(standing, f)) {
