@@ -211,9 +211,16 @@ will be produced.
 
 **A relation's lane is decided by its OPERANDS, never by its word** (#1439,
 [ADR-3D-263](06b-decisions-3d.md#adr-3d-263)). Between two absolute objects a relation either pins the
-figure parameter or is a claim, and the deciding question is whether a referenced direction carries the
-parameter — `paramPinningLineRels` for the line column, `planePinningRels` for plane × plane. Every such
-relation also records its claim, so whatever lane it solves in, the verifier is the final arbiter. The plane
+figure parameter or is a claim, and the deciding question is whether an operand carries the parameter **in
+what the relation reads** ([ADR-3D-286](06b-decisions-3d.md#adr-3d-286), #1472): ⟂ / ∥ / an angle read
+directions (a normal, a line's direction); coincidence, containment, intersection and distance read
+positions too (a plane's offset, a line's anchor, a coordinate point). One list, `paramPinningRels`, read
+from the recorded claims (`claimPinsParam`, `operandCarriesParam`), feeds the root-find, and each pin's
+residual is the verifier's own function on the operands rebuilt at the candidate value (`operandAtParam`),
+with the verifier's predicate filtering the roots (the open half of «נחתכים», a distance's parallel branch).
+A relation whose residual vanishes at every scan sample holds for every value and is **not** a pin (the
+identity guard) — the parameter stays a sampled DOF. Every such relation also records its claim, so whatever
+lane it solves in, the verifier is the final arbiter. The plane
 column once decided by the word instead: «הזווית בין המישורים» went to a list only the root-find read (with
 no parameter, checked by nothing and drawn as knowledge), while «ניצב» / «מקביל» went to the claim lane even
 when a normal carried the parameter. A number the renderer prints from such a relation is drawn only when

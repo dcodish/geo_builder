@@ -4,7 +4,7 @@
  */
 
 import { exprPointIds, exprVectorNames } from './vecExpr';
-import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, planeNormalCarriesParam, planePinningRels, sameOperand } from './operands';
+import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, paramPinningRels, planeNormalCarriesParam, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
@@ -571,8 +571,9 @@ function adoptParamForCarrier(c: Construction3, carrier: { kind: 'line' | 'plane
 function releaseParamToPivot(c: Construction3): Construction3 | null {
   const sym = c.param;
   if (!sym) return c;
-  // #1439: a plane × plane relation that pins the parameter is read by the SAME predicate the root-find uses
-  if (planePinningRels(c).length > 0 || c.linePerps.length > 0 || c.lineRels.length > 0 || c.paramGivens.length > 0) return null;
+  // #1439 / #1472 (ADR-3D-286): a relation that pins the parameter is read by the SAME predicate the root-find
+  // uses — so a coincidence, containment, crossing or distance that pins it keeps the letter in this lane
+  if (paramPinningRels(c).length > 0 || c.linePerps.length > 0 || c.lineRels.length > 0 || c.paramGivens.length > 0) return null;
   for (const def of c.points.values()) if (def.kind === 'coord-sym') return null;
   const next = clone(c);
   delete next.param;

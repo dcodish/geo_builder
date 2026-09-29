@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-09-29T21:35:27.029Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "המישור π1: z = 1",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π1",
+          "plane": {
+            "cx": {
+              "k": 0,
+              "p": 0
+            },
+            "cy": {
+              "k": 0,
+              "p": 0
+            },
+            "cz": {
+              "k": 1,
+              "p": 0
+            },
+            "d": {
+              "k": -1,
+              "p": 0
+            },
+            "src": "z = 1"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "המישור π2: mx + z - 1 = 0",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π2",
+          "plane": {
+            "cx": {
+              "k": 0,
+              "p": 1
+            },
+            "cy": {
+              "k": 0,
+              "p": 0
+            },
+            "cz": {
+              "k": 1,
+              "p": 0
+            },
+            "d": {
+              "k": -1,
+              "p": 0
+            },
+            "src": "mx + z - 1 = 0"
+          },
+          "param": "m"
+        }
+      ]
+    },
+    {
+      "utterance": "π1 מתלכד עם π2",
+      "cmds": [
+        {
+          "type": "plane-rel",
+          "rel": "coincident",
+          "a": {
+            "kind": "plane-named",
+            "name": "π1"
+          },
+          "b": {
+            "kind": "plane-named",
+            "name": "π2"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "הנקודה A נמצאת על המישור π2",
+      "cmds": [
+        {
+          "type": "on-planes",
+          "id": "A",
+          "plane": "π2"
+        }
+      ]
+    }
+  ]
+}
