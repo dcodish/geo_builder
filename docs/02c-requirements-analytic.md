@@ -1244,6 +1244,11 @@ row carries «הציגו תצורה אחרת» as its one accent with «בטל �
 same row, in the same order, as every other builder. **A step can always be taken back:** undo and
 redo cover adding, editing, deleting and clearing, and because the session is the line list, an undone
 figure is re-derived rather than restored.
+**The givens list offers the suite's three row operations** ([ADR-AG-177](06c-decisions-analytic.md#adr-ag-177),
+docs/28 D6): a checkbox MUTES a given — the row stays, the figure is drawn as if it had never been said —
+alongside ✎ edit in place and ✕ delete. Un-muting a given that the figure has since contradicted is refused,
+naming that given, and the row stays muted. A muted given is saved, shared and restored muted, and undo
+takes a mute back.
 
 
 **R82 — the givens list is typeset, like the data panel**

@@ -32,7 +32,8 @@ import { curveDetailsKey, curveEquationText, curveParts, namedRow } from './app/
 import { color, fs } from '../shell/theme';
 import { reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
-import { decideSubmit, reachesFallback } from './app/submit';
+import { decideEdit, decideSubmit, decideToggle, reachesFallback } from './app/submit';
+import { activeOf, rowOf } from './app/active';
 import { runFallback } from './app/fallback';
 import { panelKnowledge } from './app/panelRows';
 import { angleText, lineAngleOf } from './app/lineAngle';
@@ -163,6 +164,8 @@ export function App() {
     recordLine,
     recordLlmLines,
     spokenFor,
+    disabled,
+    setDisabled,
     removeLine,
     replaceLine,
     clearAll,
@@ -538,7 +541,14 @@ export function App() {
    */
   const [showConstruction, setShowConstruction] = useState(false);
 
-  const d = useMemo(() => derive(lines, seed), [lines, seed]);
+  /**
+   * #1548 (docs/28 D6): the figure is folded from the ACTIVE lines — a muted row stays in the list and
+   * out of the figure. Every consumer below that takes "the lines" takes `active`; only the fact list
+   * shows the whole list, and `rows` translates a derivation's active index back to its row.
+   */
+  const active = useMemo(() => activeOf(lines, disabled), [lines, disabled]);
+  const rows = useMemo(() => rowOf(lines.length, disabled), [lines.length, disabled]);
+  const d = useMemo(() => derive(active, seed), [active, seed]);
 
   /**
    * THE FIGURE SNAPSHOT (#1300) — the sibling effect, over this product's own source of truth.
@@ -553,8 +563,9 @@ export function App() {
    * neither is a figure change. Measured: three identical snapshots per change before the dedupe.
    */
   useEffect(() => {
-    logAnalyticFigure({ seed, lines, faults: d.faults, outcomes: d.outcomes });
-  }, [d, lines, seed]);
+    // #1548: the muted set is part of the reconstruction — the faults index the ACTIVE lines.
+    logAnalyticFigure({ seed, lines, ...(disabled.length ? { disabled } : {}), faults: d.faults, outcomes: d.outcomes });
+  }, [d, lines, disabled, seed]);
 
   /**
    * THE ANSWERS ARE DERIVED (#1110), never stored.
@@ -731,7 +742,7 @@ export function App() {
    * path that no longer existed.
    */
   const submit = (raw: string) => {
-    const verdict = decideSubmit(raw, lines, seed, d);
+    const verdict = decideSubmit(raw, active, seed, d);
     /**
      * THE TRACE (#1300) — one line per submitted utterance, including the ones that fail.
      *
@@ -813,7 +824,7 @@ export function App() {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS_ANALYTIC);
     try {
-      const out = await runFallback(raw, lines, seed, (utterance, context) =>
+      const out = await runFallback(raw, active, seed, (utterance, context) =>
         llmParseAnalytic(utterance, context, { signal: ctl.signal, locale: i18n.language === 'en' ? 'en' : 'he' }),
       );
       /**
@@ -1204,7 +1215,7 @@ export function App() {
                     <MathText text={analyticBidi.isolateLtrRuns(spokenFor[i] ?? line)} />
                     {/* #1281 — a name the TOOL chose is said on the row that caused it (the #1263 ruling). */}
                     {d.minted
-                      .filter((m) => m.index === i)
+                      .filter((m) => rows[m.index] === i)
                       .map((m) => (
                         <span key={m.id} style={{ color: color.muted, fontSize: fs.small, marginInlineStart: 8 }}>
                           {t('mintedNote', { name: m.id })}
@@ -1218,15 +1229,34 @@ export function App() {
                  * bidi neutral) resolved to the paragraph direction and landed at the far end.
                  */
                 text: line,
-                error: d.faults.find((f) => f.index === i)?.detail,
+                // #1548: a derivation indexes the ACTIVE lines; a muted row is not in it and carries no fault
+                error: d.faults.find((f) => rows[f.index] === i)?.detail,
+                disabled: disabled.includes(i),
               }))}
               emptyHint={t('factsEmpty')}
               textDir={analyticBidi.textDir}
+              /**
+               * #1548 — THE MUTE CHECKBOX (docs/28 D6), the shared chrome's own control: it renders
+               * because this handler exists. Muting always applies; un-muting faces the typed-line gate
+               * (`decideToggle`) and, refused, the row stays muted and the error surface names why.
+               */
+              onToggle={(id) => {
+                const i = Number(id);
+                const verdict = decideToggle(i, lines, disabled, seed, d);
+                logAnalytic({
+                  kind: 'action',
+                  action: 'toggle',
+                  detail: `${i}:${disabled.includes(i) ? 'on' : 'off'}`,
+                  ...(verdict.kind === 'refused' ? { result: verdict.error.key } : {}),
+                });
+                if (verdict.kind === 'refused') setError(verdict.error);
+                else setDisabled(verdict.disabled);
+              }}
+              toggleLabel={t('factToggle')}
               editValueOf={(id) => lines[Number(id)] ?? ''}
               onEditCommit={(id, next) => {
                 const i = Number(id);
-                const trial = derive(lines.map((l, j) => (j === i ? next : l)), seed);
-                if (trial.faults.some((f) => f.index === i)) return false;
+                if (!decideEdit(i, next, lines, disabled, seed)) return false;
                 // #1300 — an edit rewrites a line in place, so a replay without it diverges silently.
                 logAnalytic({ kind: 'action', action: 'edit', detail: `${i}:${next}` });
                 replaceLine(i, next);
@@ -1406,7 +1436,7 @@ export function App() {
                  * operator's own figure, while the DOF cue beside it said the figure still had
                  * freedom. When nothing differs, saying so beats redrawing in silence.
                  */
-                const next = anotherConfiguration(lines, seed);
+                const next = anotherConfiguration(active, seed);
                 // #1300: the seed IS the configuration, so a replay that loses this press redraws a
                 // different figure from the one the report is about.
                 logAnalytic({ kind: 'action', action: 'show-another', detail: next.found ? next.seed : 'none' });

@@ -57,6 +57,25 @@ describe('#1509 — sheet validation', () => {
     expect(problems.some((p: string) => p.includes('asks are not supported'))).toBe(true);
   });
 
+  it('#1548 — after-steps are a row toggle (1-based) or one more utterance, nothing else', () => {
+    const ok = { ...CASE, after: [{ toggle: 2 }, { type: 'B(0,3)' }] };
+    expect(validateSheet({ name: 'x', cases: [ok] }, PRODUCTS)).toEqual([]);
+    for (const bad of [[{ toggle: 0 }], [{ toggle: 1.5 }], [{ type: '' }], [{ toggle: 1, type: 'x' }], [{ click: 1 }], 'x']) {
+      const problems = validateSheet({ name: 'x', cases: [{ ...CASE, after: bad }] }, PRODUCTS);
+      expect(problems.length, JSON.stringify(bad)).toBe(1);
+    }
+  });
+
+  it('#1548 — the report shows a toggle as an instruction and a typed step as its own paste block', () => {
+    const html = renderReport({
+      sheet: { name: 'a', title: 't', cases: [{ ...CASE, after: [{ toggle: 2 }, { type: 'B(0,3)' }] }] },
+      results: [{ id: 'T1', problems: [], shots: [] }],
+      generatedAt: '2026-09-29 12:00',
+    });
+    expect(html).toContain('תיבת הסימון בשורה 2');
+    expect(html).toMatch(/<pre class="lines" dir="rtl">B\(0,3\)<\/pre>/);
+  });
+
   it('unknown class, unknown product, duplicate ids — each is its own problem', () => {
     const problems = validateSheet(
       { name: 'x', cases: [{ ...CASE, class: 'meh' }, { ...CASE, product: 'nope' }, { ...CASE }] },

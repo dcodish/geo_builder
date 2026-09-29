@@ -14,6 +14,8 @@
 import { derive } from '../engine/derive';
 import { logAnalytic } from '../debug/sessionLogAnalytic';
 import { useAnalyticStore } from '../store/useAnalyticStore';
+import { parseLine } from '../parser/parseAnalytic';
+import { activeOf, rowOf } from './active';
 
 /**
  * Restore a validated envelope's body, then AUDIT it (#1087): the lines are re-parsed on the way
@@ -30,12 +32,25 @@ export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackN
     lines: savedLines,
     seed: typeof envelope.seed === 'number' ? envelope.seed : 0,
     name: typeof envelope.name === 'string' ? envelope.name : fallbackName,
+    disabled: Array.isArray(envelope.disabled) ? envelope.disabled.filter((d): d is number => typeof d === 'number') : [],
   });
-  const replayed = derive(savedLines, 0);
-  st.setLoadAudit({
-    total: savedLines.length,
-    failed: replayed.faults.map((f) => ({ line: savedLines[f.index] ?? '', reason: f.code })),
-  });
+  /**
+   * #1548 — a MUTED line loads muted, so the audit replays the figure the student will actually see:
+   * the ACTIVE lines, with each fault translated back to its row. A muted line is not in that figure,
+   * but it is still the student's sentence, so one that no longer PARSES is named too — it would be
+   * refused the moment they un-mute it, and the drift net is exactly for that.
+   */
+  const { disabled } = useAnalyticStore.getState(); // the restored set, already range-checked
+  const rows = rowOf(savedLines.length, disabled);
+  const replayed = derive(activeOf(savedLines, disabled), 0);
+  const failed = [
+    ...replayed.faults.map((f) => ({ line: savedLines[rows[f.index]] ?? '', reason: f.code })),
+    ...disabled.flatMap((i) => {
+      const r = parseLine(savedLines[i] ?? '');
+      return r.ok ? [] : [{ line: savedLines[i] ?? '', reason: r.code }];
+    }),
+  ];
+  st.setLoadAudit({ total: savedLines.length, failed });
   // #1300 — a load REPLACES the figure, so a replay that misses it continues from the wrong one. The
   // audit's own result rides along: a file that stopped loading is the parser-drift signal this trace
   // exists to make visible.
@@ -43,7 +58,7 @@ export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackN
     kind: 'action',
     action: 'load',
     detail: `${savedLines.length} lines`,
-    result: replayed.faults.length ? `${replayed.faults.length} failed` : 'ok',
+    result: failed.length ? `${failed.length} failed` : 'ok',
   });
-  return { lines: savedLines, failed: replayed.faults.length };
+  return { lines: savedLines, failed: failed.length };
 }

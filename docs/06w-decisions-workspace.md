@@ -4838,6 +4838,8 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 
 **Consequences.** `scripts/play-sheet-drive.mjs` (new), `scripts/lib/play-sheet-core.mjs` (new), `scripts/visual-smoke.mjs` (`auditImages` exported), `scripts/playsheets/` (tracked specs), `package.json` (`playsheet`), CLAUDE.md Rule 5, docs/22 §2d. Lock: `scripts/__tests__/play-sheet-core.test.ts`.
 
+> **Amendment — row toggles (#1548, 2026-09-29).** A case may carry `after`: an ordered list of `{ "toggle": <row, 1-based> }` (clicks that fact-list row's checkbox — the shared chrome's `li > input[type=checkbox]`) and `{ "type": "<utterance>" }` steps, run after `lines`. A refused toggle (an un-mute the figure contradicts) reports like a refused line, so `expectRefusal` matches it. The report renders a toggle as an instruction and each typed step as its own copy-paste block. Built for the analytic mute checkbox, whose whole behaviour is a click the driver could not make.
+
 ## ADR-W-093 — Every product's events sink is real: a fallback that cannot target `/`, a preflight that probes the sink, and complex collects (#1363, #1243)
 
 **Status:** accepted · 2026-09-28 · round #1510

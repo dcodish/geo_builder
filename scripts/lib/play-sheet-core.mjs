@@ -70,6 +70,16 @@ export function validateSheet(sheet, products) {
     if (c.asks && products[c.product] && !products[c.product].askHint)
       problems.push(`${at}: asks are not supported for ${c.product} (no ask-box descriptor)`);
     if (c.expectRefusal && c.expect) problems.push(`${at}: expectRefusal and expect are one or the other`);
+    if (c.after !== undefined) {
+      if (!Array.isArray(c.after)) problems.push(`${at}: \`after\` must be a list of steps`);
+      else
+        c.after.forEach((st, k) => {
+          const ok =
+            (st && Number.isInteger(st.toggle) && st.toggle >= 1 && Object.keys(st).length === 1) ||
+            (st && typeof st.type === 'string' && st.type.trim() !== '' && Object.keys(st).length === 1);
+          if (!ok) problems.push(`${at}: after[${k}] must be { "toggle": <row, 1-based> } or { "type": "<utterance>" }`);
+        });
+    }
   }
   return problems;
 }
@@ -105,6 +115,20 @@ export function caseVerdict(spec, drive) {
   return problems;
 }
 
+/**
+ * #1548 — the steps AFTER the typed lines, in order: a row's checkbox, or one more utterance. A
+ * toggle is an instruction, not an utterance, so it never enters a copy-paste block; each typed
+ * line keeps its own block so the operator can still paste it.
+ */
+const afterSteps = (after) =>
+  (after ?? [])
+    .map((st) =>
+      st.toggle !== undefined
+        ? `<p class="step">☐ לחצו על תיבת הסימון בשורה ${esc(st.toggle)} ברשימת הנתונים</p>`
+        : `<pre class="lines" dir="rtl">${esc(st.type)}</pre>`,
+    )
+    .join('\n');
+
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
 
@@ -130,7 +154,7 @@ export function renderReport({ sheet, results, generatedAt }) {
 <h3><span class="badge ${esc(c.class)}">${CLASS_META[c.class].icon} ${CLASS_META[c.class].he}</span> ${esc(c.id)} · ${esc(c.title)}</h3>
 <p class="server">שרת: <a href="${esc(c.base)}${esc(c.path ?? '')}" target="_blank" rel="noopener">${esc(c.base)}${esc(c.path ?? '')}</a></p>
 <pre class="lines" dir="rtl">${esc([...c.lines, ...(c.asks ?? [])].join('\n'))}</pre>
-<p><strong>מה בודקים:</strong> ${esc(c.lookFor)}</p>
+${afterSteps(c.after)}<p><strong>מה בודקים:</strong> ${esc(c.lookFor)}</p>
 ${c.before ? `<p class="before"><strong>לפני:</strong> ${esc(c.before)}</p>` : ''}
 <p class="verdict">${ok ? '✓ נבדק מכנית וויזואלית על ידי הכלי' : `✗ ${esc(r ? r.problems.join(' · ') : 'לא הורץ')}`}</p>
 ${shots ? `<div class="shots">${shots}</div>` : ''}

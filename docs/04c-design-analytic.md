@@ -1539,8 +1539,8 @@ storing:
 | kind | carries |
 | --- | --- |
 | `input` | the utterance, the locale, `source: 'parser' \| 'llm'`, the verdict as `result`, `intermediate` on a parser step that is about to escalate, and on the LLM path the **steps the model returned** |
-| `figure` | `seed`, `lines`, the per-line `faults` and `outcomes` |
-| `action` | `clear`, `undo`, `redo`, `show-another` (with the resulting seed), `edit`, `delete`, `load` (with the audit's result) |
+| `figure` | `seed`, `lines`, `disabled` when any line is muted, the per-line `faults` and `outcomes` (indexed in the ACTIVE lines) |
+| `action` | `clear`, `undo`, `redo`, `show-another` (with the resulting seed), `edit`, `delete`, `toggle` (`index:on\|off`, with the refusal's key when an un-mute is refused), `load` (with the audit's result) |
 
 A blank submit writes nothing — there is no utterance to reconstruct, and a stray Enter is not an event.
 
