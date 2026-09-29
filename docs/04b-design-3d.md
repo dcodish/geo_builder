@@ -37,7 +37,12 @@ productive pattern in this tree precisely because the seam exists.
 `normalize3` is the one boundary every rule reads: format controls stripped, primes and minus unified,
 script transitions split — and lowercase labels uplifted by `upliftLowercaseLabels`, the ONE chokepoint,
 only in positions an anchor proves are labels (the angle glyph/word, a point/vertex noun, the head of a
-coordinate definition). New label-demanding positions join that function, never a rule. What no anchor
+coordinate definition, the single-letter subject of a midpoint statement — [ADR-3D-287](06b-decisions-3d.md#adr-3d-287)).
+New label-demanding positions join that function, never a rule. **An auto-name arm consumes the whole
+utterance** (ADR-3D-287): a rule that INVENTS a point's name (`midpoint-auto`, the one such arm in
+`parse3`) matches a full anchored frame — the noun phrase and its two labels, nothing else — never a count
+of label tokens, so a word it does not own declines the line instead of being read around. The frame
+(`MID_HE`/`MID_EN`) is spelled once and shared by the rule and the anchor. What no anchor
 proves is left to the #353 convention nudge in `scope3.ts` (`upperCasedLabelCandidate3`, consulted by
 `App3` before the LLM seam), which teaches the spelling rather than guessing it.
 
