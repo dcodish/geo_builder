@@ -14,7 +14,8 @@
  * path — the store resets on refresh — so post-commit + file-load are the event's only reach-points.)
  */
 import type { Fact } from '@/store/geoStore';
-import type { FoldNode } from '@/replay/core';
+import { seatRelocations, type FoldNode } from '@/replay/core';
+import type { Id } from '@/engine';
 
 export interface ViewResolveFound {
   facts: Fact[];
@@ -37,6 +38,11 @@ export interface ResolveViewDeps {
   /** The search exhausted with the view still failing — surface `figure.noValidConfig` (ADR-445);
    *  the figure stays (keep-prior forever would hide the student's own committed given). */
   onExhausted(): void;
+  /** #1444 (ADR-556): the applied view put a right angle on a DIFFERENT vertex than the one the student
+   *  was looking at (the ADR-445 seat tier). The seat was unstated, but a student reads the default as a
+   *  given — so the move is announced, never silent (operator ruling 2026-09-27). Called AFTER
+   *  `applyView`: the fact change clears the figure notes (#1338), and this note belongs to the new view. */
+  onSeatMoved(vertices: Id[]): void;
   isCancelled(err: unknown): boolean;
 }
 
@@ -48,7 +54,11 @@ export async function runViewResolve(deps: ResolveViewDeps): Promise<void> {
   deps.setPending(true);
   try {
     const r = await deps.autoResolve(st.facts, st.seed);
-    if (r && r !== 'ok') deps.applyView(r);
+    if (r && r !== 'ok') {
+      deps.applyView(r);
+      const moved = seatRelocations(st.facts, r.facts);
+      if (moved.length) deps.onSeatMoved(moved);
+    }
     else if (r === null) deps.onExhausted();
   } catch (err) {
     if (!deps.isCancelled(err)) throw err;

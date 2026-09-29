@@ -640,6 +640,18 @@ knowledge gates ask "is this the same in every configuration?", and the pool is 
   list, never in the submit path. A rewrite that is INFEASIBLE pays the recruiter ladder to conclude it
   (the #259 class — 96 s deadline-free on the quarter-circle figure); in prod the 5 s sample budget cuts
   that and the figure falls to the not-determined branch above.
+- **The status cue reads the same pool (#1444, [ADR-556](06-decisions.md#adr-556)).** `figureDeterminacy`
+  (`replay/core.ts`) returns the pool's `determined` flag and the number of DISTINCT shapes in it — two
+  samples are one configuration when every labelled pairwise distance agrees up to one common scale (a mirror
+  or a re-placement is the same drawing; a different third side is not). It rides `detectAll`, i.e. the
+  always-on post-fact sweep the crossing dots already pay for — no new sampler, nothing in the submit path —
+  into the store's `determinacy` slot (facts-keyed, like `crossings`). `figureStatus` (`app/figureStatus.ts`)
+  maps it: count > 0 → the DOF count; count 0 and one configuration → «✓ … נקבע במלואו»; otherwise «נקבע עד
+  כדי בחירת תצורה»; no verdict yet → no claim.
+- **A moved seat is announced (#1444).** `runViewResolve` compares the right-angle vertex of the facts it
+  started from with the facts it applied (`seatRelocations`, through the same `rtEffectiveIds` the knee is
+  drawn with) and, AFTER `applyView` (the fact change clears the figure notes, #1338), calls `onSeatMoved`;
+  the App sets `figure.seatMoved` on the note channel `figure.noValidConfig` uses.
 ## The submit transaction: facts commit, the seed resolves after (#364, [ADR-510](06-decisions.md#adr-510))
 
 - **The commit** (`commitCommands` / `replaceGroup`, `store/geoStore.ts`) is the facts alone, in one zundo

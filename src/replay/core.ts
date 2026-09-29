@@ -471,6 +471,30 @@ function rtEffectiveIds(cmd: Extract<AnyCommand, { type: 'right-triangle' }>, re
 }
 
 /**
+ * #1444 ([ADR-556](docs/06-decisions.md#adr-556)) — WHERE A VIEW REWRITE MOVED A RIGHT ANGLE.
+ *
+ * The right-angle seat of «משולש ישר זווית ABC» is unstated (ADR-445/481), so the config search may
+ * move it when the default seat cannot hold (`seatRescue`). A student reads the default as a given, so
+ * a move they did not ask for must be ANNOUNCED (operator ruling 2026-09-27). This is the one question
+ * "which right angles sit on a different vertex in `after` than in `before`" — read off the facts
+ * both views are derived from, through the SAME {@link rtEffectiveIds} the lowering and the knee use,
+ * so the vertex named is the vertex drawn. Returns the new vertices, in fact order; empty when no seat
+ * moved (a branch, reflection or seed rewrite never touches `rot`).
+ */
+export function seatRelocations(before: Fact[], after: Fact[]): Id[] {
+  const was = new Map<string, Id>();
+  for (const f of before) if (f.enabled && f.cmd.type === 'right-triangle') was.set(f.id, rtEffectiveIds(f.cmd)[2]);
+  const out: Id[] = [];
+  for (const f of after) {
+    if (!f.enabled || f.cmd.type !== 'right-triangle') continue;
+    const prev = was.get(f.id);
+    const now = rtEffectiveIds(f.cmd)[2];
+    if (prev !== undefined && prev !== now) out.push(now);
+  }
+  return out;
+}
+
+/**
  * #943 ([ADR-508](docs/06-decisions.md#adr-508)) — the drop-one search's OWN memo, apart from `foldCache`:
  * a refusal's search folds a handful of trial prefixes, and letting them into the 8-entry main cache
  * would evict the figure's own fold (seconds on a hard figure) to store throwaways. Keyed by content
@@ -2857,6 +2881,47 @@ export function forcedCrossingKeys(samples: Omit<SharedSamples, "determined"> & 
   return forced;
 }
 
+/**
+ * #1444 ([ADR-556](docs/06-decisions.md#adr-556)) — IS THE FIGURE FULLY DETERMINED, OR ONLY UP TO A CHOICE
+ * OF CONFIGURATION?
+ *
+ * The status line used to read `freeDofCount === 0`, a count of CONTINUOUS freedom only, so it said «נקבע
+ * במלואו» while the values panel — which reads the shared pool — withheld the third side: «משולש ישר זווית
+ * ABC · AB=3 · BC=4» has two admissible seats (AC = √7 and AC = 5). The status now asks the pool the values
+ * panel asks (M3, one sampler): `determined` is the pool's own ADR-509 flag (count 0 AND the admissible
+ * set complete), and `configurations` counts the pool's DISTINCT shapes.
+ *
+ * Two samples are the same configuration when every labelled pairwise distance agrees up to one common
+ * scale (normalised by the largest): a mirror image or a re-placement is the same drawing to a student, a
+ * different third side is not. Only meaningful when `determined` — an under-determined pool is continuous,
+ * and the caller shows the DOF count instead.
+ */
+export interface Determinacy { determined: boolean; configurations: number }
+const CONFIG_REL_TOL = 1e-4;
+export function figureDeterminacy(shared: Pick<SharedSamples, 'samples' | 'determined'>): Determinacy {
+  const pool = shared.samples;
+  if (!pool.length) return { determined: shared.determined, configurations: 0 };
+  const ids = [...pool[0].keys()].filter((id) => pool.every((pos) => pos.has(id))).sort();
+  const signature = (pos: Map<Id, Vec>): number[] => {
+    const d: number[] = [];
+    for (let i = 0; i < ids.length; i++) {
+      const p = pos.get(ids[i])!;
+      for (let j = i + 1; j < ids.length; j++) {
+        const q = pos.get(ids[j])!;
+        d.push(Math.hypot(p.x - q.x, p.y - q.y));
+      }
+    }
+    const span = d.reduce((m, x) => (x > m ? x : m), 1e-12);
+    return d.map((x) => x / span);
+  };
+  const reps: number[][] = [];
+  for (const pos of pool) {
+    const sig = signature(pos);
+    if (!reps.some((r) => r.every((x, k) => Math.abs(x - sig[k]) <= CONFIG_REL_TOL))) reps.push(sig);
+  }
+  return { determined: shared.determined, configurations: reps.length };
+}
+
 // Sample collection is budgeted like every other search loop (E2): a failing seed's solve costs ~10× a
 // converging one (all restarts run to exhaustion) and is then DROPPED by convergedSamples anyway — on the
 // ADR-123 heavy figure the unbudgeted loop was ~50 s of mostly-discarded work. Past the deadline, detection
@@ -2898,6 +2963,8 @@ export interface DetectAllResult {
   shapes: ShapesResult;
   /** The forced ink crossings (ADR-380) — a `Set` so it survives the worker's structured clone as-is. */
   crossings: Set<string>;
+  /** #1444 (ADR-556): how determined the figure is, read off the SAME pool — see {@link figureDeterminacy}. */
+  determinacy: Determinacy;
 }
 
 /**
@@ -2929,6 +2996,7 @@ export function detectAll(facts: Fact[]): DetectAllResult {
     relations: detectRelationsAcross(shared.constructions, { positions: shared.samples, determined: shared.determined }),
     shapes: classifyShapesFromSamples(shared.constructions[0], shared.samples),
     crossings: forcedCrossingKeys(shared),
+    determinacy: figureDeterminacy(shared),
   };
 }
 

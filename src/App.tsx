@@ -86,6 +86,7 @@ import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { runSubmit } from '@/app/submitPipeline';
 import { runViewResolve } from '@/app/resolveView';
+import { figureStatus } from '@/app/figureStatus';
 import { runEditCommit, runSetGroupEnabled } from '@/app/editPipeline';
 import { subscribeFigureNotes } from '@/app/figureNotes';
 import { anonPointDescriptor, visibleCoincidences } from '@/render/pointDescriptions';
@@ -157,6 +158,7 @@ export default function App() {
   const clearRelations = useGeoStore((s) => s.clearRelations);
   const shapes = useGeoStore((s) => s.shapes);
   const crossings = useGeoStore((s) => s.crossings);
+  const determinacy = useGeoStore((s) => s.determinacy);
   const detectShapes = useGeoStore((s) => s.detectShapes);
   const clearShapes = useGeoStore((s) => s.clearShapes);
   const clear = useGeoStore((s) => s.clear);
@@ -744,6 +746,7 @@ export default function App() {
         // #566 (ADR-445): an EXHAUSTED search is never silent — the figure stays (keep-prior forever
         // would hide a committed given); the note says the drawing could not honour everything at once.
         onExhausted: () => setInputNote(t('figure.noValidConfig')),
+        onSeatMoved: (vertices) => setInputNote(t('figure.seatMoved', { vertex: vertices.join(', ') })),
         isCancelled,
       });
     } finally {
@@ -1746,13 +1749,11 @@ export default function App() {
               }}
               showLabel={t('panelShow')}
               hideLabel={t('panelHide')}
-              status={
-                facts.length > 0
-                  ? freeDofCount(construction) > 0
-                    ? t('actions.dof', { count: freeDofCount(construction) })
-                    : `✓ ${t('actions.determined')}`
-                  : undefined
-              }
+              status={(() => {
+                // #1444 (ADR-556): the pool's verdict, not the continuous count alone — see figureStatus.
+                const s = figureStatus(facts.length, freeDofCount(construction), determinacy?.facts === facts ? determinacy : null);
+                return s ? t(s.key, s.count === undefined ? undefined : { count: s.count }) : undefined;
+              })()}
               sections={[]}
             >
           {facts.length === 0 && <span style={{ fontSize: 12, color: '#94a3b8' }}>{t('values.emptyFigure')}</span>}

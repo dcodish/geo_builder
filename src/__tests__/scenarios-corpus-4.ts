@@ -48,6 +48,8 @@ import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-harness';
 import { ctxOf } from './scenario-pipeline';
 import { parse } from '@/parser';
+import { figureDeterminacy, findValidConfig, searchAnotherView, seatRelocations, sharedSamples } from '@/replay/core';
+import { figureStatus } from '@/app/figureStatus';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -2862,6 +2864,40 @@ export const SCENARIOS_4: Scenario[] = [
         expect(facts.map((f) => r.status[f.id]), label).toEqual(facts.map(() => 'ok'));
         expect(r.violations, label).toEqual([]);
       }
+    },
+  },
+  {
+    id: 'right-angle-seat-move-announced-1444',
+    title:
+      '#1444 / ADR-556: «משולש ישר זווית ABC» · «AB=3, BC=4» — the right angle moves to A ANNOUNCED, and the status reads «נקבע עד כדי בחירת תצורה», never «נקבע במלואו»',
+    guards:
+      "External review of prod, relayed 2026-09-27: the default seat (C) cannot hold — the hypotenuse AB = 3 is shorter than the leg BC = 4 — so the ADR-445 seat tier moved the right angle to A (AC = √7) with nothing said, and the status read «✓ נקבע במלואו» (`freeDofCount === 0`, continuous freedom only) while the values panel withheld AC because seat B (AC = 5) is admissible too. Operator ruling 2026-09-27 (\"Announce + honest status\"): the move is announced naming the vertex (`seatRelocations` in `runViewResolve` → `onSeatMoved`), and the status reads the shared pool's verdict (`figureDeterminacy` → `figureStatus`). The harness folds at ONE seed without the app's view search, so this lock runs the search itself; the submit-door path is src/app/__tests__/issue-1444-seat-notice.test.ts.",
+    steps: ['משולש ישר זווית ABC', 'AB=3, BC=4'],
+    expectViolations: true,
+    check: (fig) => {
+      // the precondition, so the lock keeps meaning: at the default seat the lengths are refused
+      const last = Object.entries(fig.status).filter(([id]) => id.startsWith('g1'));
+      expect(last.length).toBeGreaterThan(0);
+      expect(last.every(([, st]) => String(st).startsWith('impossible:')), 'the default seat C cannot hold').toBe(true);
+      const facts = factsOf(['משולש ישר זווית ABC', 'AB=3, BC=4']);
+      const found = findValidConfig(facts, 0);
+      expect(found, 'the seat tier finds a real figure').not.toBeNull();
+      expect(seatRelocations(facts, found!.facts), 'the move the student is told about').toEqual(['A']);
+      const moved = replay(found!.facts, found!.seed);
+      expect(dist(at(moved, 'A'), at(moved, 'C'))).toBeCloseTo(Math.sqrt(7), 4);
+      const verdict = figureDeterminacy(sharedSamples(found!.facts));
+      expect(verdict, 'two admissible seats: AC = √7 and AC = 5').toEqual({ determined: true, configurations: 2 });
+      expect(figureStatus(found!.facts.length, freeDofCount(moved.construction), verdict)).toEqual({ key: 'actions.determinedUpToConfig' });
+      // «הציגו תצורה אחרת» reaches seat B — the 3-4-5
+      const next = searchAnotherView(found!.facts, found!.seed);
+      expect(next).not.toBeNull();
+      const atB = replay(next!.facts, next!.seed);
+      expect(dist(at(atB, 'A'), at(atB, 'C'))).toBeCloseTo(5, 4);
+      // guard: a plain 3-4-5 whose default seat holds — nothing moves, one configuration, «נקבע במלואו»
+      const plain = factsOf(['משולש ישר זווית ABC', 'AB=5, BC=4, AC=3']);
+      const plainFound = findValidConfig(plain, 0);
+      expect(seatRelocations(plain, plainFound!.facts)).toEqual([]);
+      expect(figureStatus(plain.length, freeDofCount(replay(plain).construction), figureDeterminacy(sharedSamples(plain)))).toEqual({ key: 'actions.determined' });
     },
   },
 ];
