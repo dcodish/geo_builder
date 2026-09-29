@@ -81,3 +81,45 @@ export function newestSource(root, dirs) {
 export function isStale(builtMs, newestSourceMs) {
   return builtMs > 0 && newestSourceMs > builtMs;
 }
+
+/**
+ * THE VERDICT — the summary lines and the exit code, as a pure function of the preflight's rows.
+ *
+ * Extracted from the script's tail (#1279) so a lock can CALL the decision that sets the exit code
+ * rather than re-state it: a lock that reproduces a decision stays green through the change that
+ * breaks it. Exit 1 whenever anything differs, a sink or route is broken, or the measurement is
+ * incomplete; 0 only when every row MATCHES.
+ *
+ * @param {{ what: string, status: string }[]} rows
+ * @param {string} host  named in the "could not be read" line
+ * @returns {{ lines: string[], code: 0 | 1 }}
+ */
+export function preflightVerdict(rows, host) {
+  const lines = [];
+  const badSinks = rows.filter((r) => r.status.startsWith('SINK'));
+  if (badSinks.length) lines.push(`  ${badSinks.length} events sink(s) UNREACHABLE — a 204 that writes nothing; fix the env/wiring before trusting any usage number (#1363).`);
+  // #1279: a route answering Apache's 404 — the app is live and the path its fallback calls is not.
+  const brokenRoutes = rows.filter((r) => r.status.startsWith('BROKEN'));
+  if (brokenRoutes.length) lines.push(`  ${brokenRoutes.length} route(s) BROKEN — the app is live and its server path is not; a student gets the degraded path silently (#1279). Paste the conf into Plesk.`);
+  const unknownRoutes = rows.filter((r) => r.what.startsWith('route ') && r.status.startsWith('UNKNOWN'));
+  const differs = rows.filter((r) => r.status.startsWith('DIFFERS'));
+  const unbuilt = rows.filter((r) => r.status === 'NOT BUILT');
+  const unknown = rows.filter((r) => r.status === 'UNKNOWN');
+  const stale = rows.filter((r) => r.status.startsWith('STALE'));
+  lines.push('');
+  if (unbuilt.length) lines.push(`  ${unbuilt.length} artifact(s) NOT BUILT — build them before reading this verdict.`);
+  if (stale.length) lines.push(`  ${stale.length} artifact(s) built BEFORE their own source changed — they cannot be compared. Build, then re-run.`);
+  if (unknownRoutes.length) lines.push(`  ${unknownRoutes.length} route(s) could not be probed — verdict incomplete.`);
+  if (unknown.length) lines.push(`  ${unknown.length} artifact(s) could not be read from ${host} — verdict incomplete.`);
+  if (differs.length) {
+    lines.push(`  ${differs.length} artifact(s) DIFFER from live. Push exactly these; leave the rest alone.\n`);
+    return { lines, code: 1 };
+  }
+  if (badSinks.length || brokenRoutes.length) return { lines, code: 1 };
+  if (unbuilt.length || unknown.length || stale.length || unknownRoutes.length) {
+    lines.push('  Nothing measured as stale, but the measurement is incomplete — do not read this as "all current".\n');
+    return { lines, code: 1 };
+  }
+  lines.push('  Everything live matches what this tree builds. Nothing to push.\n');
+  return { lines, code: 0 };
+}
