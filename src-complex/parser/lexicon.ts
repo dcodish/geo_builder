@@ -67,13 +67,31 @@ export const ORDINALS: readonly (readonly [RegExp, 1 | 2 | 3 | 4])[] = [
 ];
 
 /** «ארגומנט» / «זווית» / `arg` — the argument of a number. */
-export const ARG_KW = String.raw`(?:${HE_PREFIX}ארגומנט|${HE_PREFIX}זו?וית|arg)`;
+export const ARG_KW = String.raw`(?:${HE_PREFIX}ארגומנט|${HE_PREFIX}זו?וית|(?:the\s+)?argument|arg)`;
 
-/** #1437 — the genitive connective a question may carry: «הארגומנט של w». */
-export const OF_KW = String.raw`של`;
+/** #1437 — the genitive connective a question may carry: «הארגומנט של w» / «the argument of w». */
+export const OF_KW = String.raw`(?:של|of)`;
+
+/**
+ * #1437 amendment — the NOUN a genitive may insert before a name: «הארגומנט של **המספר** w»,
+ * «the argument of **the complex number** w». It names the kind of thing w is and says nothing
+ * else, so the orthography chokepoint drops it (see normalize.ts) and no rule spells it.
+ */
+export const NUMBER_NOUN_KW = String.raw`(?:${HE_PREFIX}${MEM}ספר(?:\s+${HE_PREFIX}${MEM}רוכב)?|(?:the\s+)?(?:complex\s+)?number)`;
+
+/**
+ * #1437 amendment — THE QUESTION FRAME: the opener a student puts before a question («מהו |w|»,
+ * «חשבו את arg w», «what is Re(w)») and the mark after it («|w|?», «|w| = ?»). One spelling each,
+ * read by one function (`questionBody` in normalize.ts) that the ask reader alone calls — a statement
+ * never passes through it, so «|w| = 3?» can never be recorded as a given.
+ * Imperatives in every person the exam and students use: חשב/חשבי/חשבו, מצא/מצאי/מצאו.
+ */
+export const QUESTION_OPENER_KW = String.raw`(?:מה(?:ו|י|\s+הוא|\s+היא)?|כמה(?:\s+(?:הוא|היא|זה))?|(?:חשב|חשבי|חשבו|מצא|מצאי|מצאו)(?:\s+את)?|what\s+is|what's|find|compute|calculate|evaluate)`;
+/** The trailing question mark, with the «= ?» blank a worksheet leaves — Latin, full-width and Arabic marks. */
+export const QUESTION_MARK = String.raw`(?:=\s*)?[?？؟]+`;
 
 /** «ערך מוחלט» / «גודל» / `abs` — spoken forms of the modulus; `|z|` is handled by the operator. */
-export const ABS_KW = String.raw`(?:${HE_PREFIX}ערך ${HE_PREFIX}מוחלט|${HE_PREFIX}גודל|abs)`;
+export const ABS_KW = String.raw`(?:${HE_PREFIX}ערך ${HE_PREFIX}מוחלט|${HE_PREFIX}גודל|(?:the\s+)?(?:modulus|absolute\s+value)|abs)`;
 
 /** «מספר מרוכב» / «complex number» — the declaration noun. */
 export const COMPLEX_KW = String.raw`(?:${HE_PREFIX}${MEM}ספר${HE_SUFFIX} ${HE_PREFIX}${MEM}רוכב${HE_SUFFIX}|complex numbers?)`;

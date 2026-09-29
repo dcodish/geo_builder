@@ -40,7 +40,7 @@
 
 import { readEnvelope, type LoadAudit } from '../../shell/save';
 import { parseLineV2 } from '../parser/rules';
-import { askArtifacts, complexScopeOf } from './deriveLines';
+import { complexScopeOf, parseAsk } from './deriveLines';
 import type { ComplexScope } from '../parser/exprParse';
 import type { Derived2 } from '../replay/derive2';
 import { type InputError, type SavedSession, useComplexStore } from '../store/useComplexStore';
@@ -291,9 +291,8 @@ export type AskReading =
   | { readonly kind: 'unreadable' };
 
 export function readAsk(raw: string, scope?: ComplexScope): AskReading {
-  const parsed = parseLineV2(raw.trim(), scope);
+  const { parsed, ask: a } = parseAsk(raw, scope);
   if (!parsed.ok) return { kind: 'unreadable' };
-  const a = askArtifacts(parsed.line);
   if (!a) return { kind: 'statement' };
   return { kind: a.queries.length ? 'measure' : a.ratios.length ? 'ratio' : a.argQueries.length ? 'arg' : 'expr' };
 }
@@ -320,15 +319,6 @@ export function submitQuery(raw: string): boolean {
 export function submitLine(raw: string): boolean {
   const st = () => useComplexStore.getState();
   const line = raw.trim();
-  const parsed = parseInFigure(line, activeLines());
-  if (!parsed.ok) {
-    st().setError(
-      parsed.reason === 'unaccounted'
-        ? { key: 'unaccounted', detail: parsed.items.join(', ') }
-        : { key: 'not-handled', detail: line },
-    );
-    return false;
-  }
 
   /**
    * #789 — a QUESTION typed in the givens box is routed to the ask lane, never recorded as a fact.
@@ -343,6 +333,18 @@ export function submitLine(raw: string): boolean {
     st().addQuery(line);
     st().clearError();
     return true;
+  }
+
+  // #1437 amendment: the question is read FIRST, because a framed question («מהו |w|», «|w|?») is
+  // not a statement the grammar reads — refusing it here as unparseable would never reach the lane
+  const parsed = parseInFigure(line, activeLines());
+  if (!parsed.ok) {
+    st().setError(
+      parsed.reason === 'unaccounted'
+        ? { key: 'unaccounted', detail: parsed.items.join(', ') }
+        : { key: 'not-handled', detail: line },
+    );
+    return false;
   }
 
   // the gate reads the ACTIVE figure — a muted line must not veto a new statement (B5)

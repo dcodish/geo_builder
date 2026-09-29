@@ -282,14 +282,14 @@ export const CATALOG: readonly CatalogEntry[] = [
     family: 'F7',
     he: '|z1-z2|',
     en: '|z1-z2|',
-    descHe: 'ביטוי בשורה משלו — שאלה, שנענית רק אם הנתונים קובעים את הערך',
-    descEn: 'a bare expression — a question, answered only when the givens force the value',
+    descHe: 'ביטוי בשורה משלו — שאלה, שנענית רק אם הנתונים קובעים את הערך; אפשר גם «מהו |z1-z2|» או «|z1-z2|?»',
+    descEn: 'a bare expression — a question, answered only when the givens force the value; «what is |z1-z2|» and «|z1-z2|?» work too',
   },
   {
     family: 'F7',
     he: 'arg w',
     en: 'arg w',
-    descHe: 'שאלת ארגומנט — גם «arg(w)» ו«הארגומנט של w»; נענית כשהכיוון קבוע בכל תצורה',
+    descHe: 'שאלת ארגומנט — גם «arg(w)», «הארגומנט של w» ו«מהו הארגומנט של w?»; נענית כשהכיוון קבוע בכל תצורה',
     descEn: 'the argument question — also «arg(w)» and «the argument of w»; answered when the direction is fixed in every configuration',
   },
   // #791 (ADR-CX-033) — the point-label register: capitals are points, case-sensitively

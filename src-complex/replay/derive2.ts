@@ -1703,6 +1703,17 @@ export function foldConstraints(input: FoldInput): Derived2 {
       const members = solutionSets.get(q.name) ?? [];
       return { label: q.src, value: null, why: { code: 'multi-solution', solutions: members.length, first: members[0] } };
     }
+    /**
+     * A number KNOWN to be 0 has no argument at all — not an open one. Asked by the SAME predicate
+     * the «|w|» row answers with (the value in every configuration), so arg says "0 has no
+     * direction" exactly when |w| prints 0; a w that is merely undetermined keeps the open reason,
+     * because a given CAN still settle it.
+     */
+    const zero = judge(false, (env) => env.at(q.name) ?? null);
+    const here = finalEnv.at(q.name);
+    if (zero.known && here && Math.hypot(here.re, here.im) < 1e-12) {
+      return { label: q.src, value: null, why: { code: 'arg-of-zero' } };
+    }
     const a = argumentOf(q.name, state);
     if (!a.exact || !Number.isFinite(a.deg)) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
     const verdict = knowledgeOf(

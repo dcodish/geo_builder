@@ -11,8 +11,7 @@
  * the NORMALIZED line (rules stamp `src` from their normalized input) — with consumption, so two
  * questions that normalize alike each get their own row.
  */
-import { parseLineV2 } from '../parser/rules';
-import { askArtifacts } from './deriveLines';
+import { parseAsk } from './deriveLines';
 import type { KnowledgeRow } from '../model/knowledge';
 import type { ComplexScope } from '../parser/exprParse';
 
@@ -33,11 +32,10 @@ export function askRowsOf(
 ): AskRow[] {
   const consumed = new Set<number>();
   return asks.map((text) => {
-    const r = parseLineV2(text.trim(), scope);
+    // the ONE reading of a line as a question (parseAsk: the question frame removed, then
+    // askArtifacts) — the lane lowering uses the same, so the row model and the fold cannot disagree
+    const { parsed: r, ask: a } = parseAsk(text, scope);
     if (!r.ok) return { text, note: 'unreadable', row: null };
-    // the ONE reading of a line as a question (askArtifacts) — the lane lowering uses the same,
-    // so the row model and the fold cannot disagree about what was asked
-    const a = askArtifacts(r.line);
     if (!a) return { text, note: 'statement', row: null };
     const srcs = [...a.queries, ...a.ratios, ...a.exprQueries, ...a.argQueries].map((q) => q.src);
     const at = knowledge.findIndex((k, i) => !consumed.has(i) && srcs.includes(k.label));

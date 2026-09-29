@@ -127,7 +127,10 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
 - **FR-KN-0 (Must)** — **Everything the polar reading can say is askable.** «arg w» (also «arg(w)»,
   «הארגומנט של w») is a question like «|w|»: answered from the exact argument carrier when the
   direction is fixed in every configuration, withheld (with the reason) for a free direction, and a
-  solution-set letter reports its spread. *(#1437; realised — [ADR-CX-055](06d-decisions-complex.md#adr-cx-055).)*
+  solution-set letter reports its spread; the argument of a number KNOWN to be 0 says 0 has no
+  direction, never «not determined». Every question may carry a frame — «מהו …», «חשבו את …», «what is …»
+  before, «?» / «= ?» after — for every ask kind alike, and a statement in a frame is never recorded as a
+  given. *(#1437; realised — [ADR-CX-055](06d-decisions-complex.md#adr-cx-055), Amendment 1.)*
 
 - **FR-KN-1 (Must)** — **A number printed on screen is knowledge**: invariant across every valid
   configuration, with its gauge pinned. **The figure shows everything; the panel prints only what was

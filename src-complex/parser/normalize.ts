@@ -21,7 +21,19 @@
  * keeps it deliberately — with the transforms named and the round-trip property now asserted.
  */
 
-import { ARG_KW, CONJ_OF_KW, IM_OF_KW, NAME, RE_OF_KW, RECIPROCAL_OF_KW } from './lexicon';
+import {
+  ABS_KW,
+  ARG_KW,
+  CONJ_OF_KW,
+  IM_OF_KW,
+  NAME,
+  NUMBER_NOUN_KW,
+  OF_KW,
+  QUESTION_MARK,
+  QUESTION_OPENER_KW,
+  RE_OF_KW,
+  RECIPROCAL_OF_KW,
+} from './lexicon';
 
 /** Superscript digits become an explicit power: `Z₂³` → `z2^3`. */
 const SUPERSCRIPTS: Record<string, string> = {
@@ -73,6 +85,12 @@ const TRANSFORMS: readonly { readonly why: string; readonly apply: (s: string) =
     apply: (s) => s.replace(/([a-zA-Z])[̄̅](\w*)/g, 'conj($1$2)'),
   },
   {
+    // #1437 amendment — «הארגומנט של המספר w» says «הארגומנט של w»: the noun names what w IS and adds
+    // nothing, so it goes here, once, for every genitive operator (arg, |…|, conj, Re, Im, 1/…)
+    why: 'a genitive names its number without the noun «המספר»',
+    apply: (s) => s.replace(new RegExp(`(${OF_KW})\\s+${NUMBER_NOUN_KW}\\s+(?=${NAME}\\b)`, 'giu'), '$1 '),
+  },
+  {
     // «הצמוד של z1» and «conj(z1)» are the same operation spelled two ways — one spelling problem,
     // fixed where the combining overline is fixed, so no rule downstream needs to know both.
     why: 'a word-spelled operator becomes its function form',
@@ -81,7 +99,12 @@ const TRANSFORMS: readonly { readonly why: string; readonly apply: (s: string) =
         .replace(new RegExp(`${CONJ_OF_KW}\\s+(${NAME})`, 'giu'), 'conj($1)')
         .replace(new RegExp(`${RECIPROCAL_OF_KW}\\s+(${NAME})`, 'giu'), '1/($1)')
         .replace(new RegExp(`${RE_OF_KW}\\s+(${NAME})`, 'giu'), 're($1)')
-        .replace(new RegExp(`${IM_OF_KW}\\s+(${NAME})`, 'giu'), 'im($1)'),
+        .replace(new RegExp(`${IM_OF_KW}\\s+(${NAME})`, 'giu'), 'im($1)')
+        // #1437 amendment — «הערך המוחלט של w» is «|w|», the sibling of «הארגומנט של w»
+        .replace(
+          new RegExp(`${ABS_KW}(?:\\s*\\(\\s*(${NAME})\\s*\\)|\\s+(?:${OF_KW}\\s+)?(${NAME})(?![\\w(]))`, 'giu'),
+          (_m, paren: string | undefined, bare: string | undefined) => `|${paren ?? bare}|`,
+        ),
   },
   {
     /**
@@ -141,6 +164,24 @@ export function normalize(raw: string): string {
   let s = raw;
   for (const t of TRANSFORMS) s = t.apply(s);
   return s;
+}
+
+/**
+ * #1437 amendment — THE QUESTION FRAME, removed: «מהו |w|?» → «|w|», or `null` when the line carries
+ * no frame (so the caller knows there is no second reading to try).
+ *
+ * Deliberately NOT a transform above: a transform applies to statements too, and «|w| = 3?» — a
+ * student asking whether something holds — must never become the given «|w| = 3». Only the ask
+ * reader (`parseAsk` in app/deriveLines.ts) calls this, and it keeps the stripped reading only when
+ * it is a pure question.
+ */
+export function questionBody(raw: string): string | null {
+  const s = normalize(raw);
+  const body = s
+    .replace(new RegExp(`^${QUESTION_OPENER_KW}\\s+`, 'iu'), '')
+    .replace(new RegExp(`\\s*${QUESTION_MARK}\\s*$`, 'u'), '')
+    .trim();
+  return body === s || body === '' ? null : body;
 }
 
 /** The transform list, for the test that asserts the contract rather than restating it. */
