@@ -30,6 +30,7 @@ import {
   type MeasureQuery,
   type MeasureRelation,
   type RatioQuery,
+  type ArgQuery,
   type ExprQuery,
 } from '../model/measure';
 import { rat } from '../value/rational';
@@ -66,6 +67,7 @@ import {
   AREA_KW,
   ARG_KW,
   ARITHMETIC_KW,
+  OF_KW,
   CENTER_KW,
   BETWEEN_KW,
   EQUATES_KW,
@@ -136,6 +138,8 @@ export interface ParsedLine {
   readonly ratios: RatioQuery[];
   /** a bare expression: «what is this value?» — answered only when it is knowledge */
   readonly exprQueries: ExprQuery[];
+  /** «arg w» — the argument question (#1437), answered from the exact argument carrier */
+  readonly argQueries: ArgQuery[];
   /** stated sequences as STATEMENTS — what the series pictures are drawn from (F9) */
   readonly sequences: SequenceStatement[];
   /**
@@ -190,6 +194,7 @@ const empty = (): ParsedLine => ({
   queries: [],
   ratios: [],
   exprQueries: [],
+  argQueries: [],
   sequences: [],
   roots: [],
   selections: [],
@@ -314,6 +319,20 @@ const quadrantGiven: Rule = (s) => {
  * Emitted as an argument-only constraint, because a direction given says nothing about magnitude —
  * writing it as a full equation would invent the half the student did not state (ADR-052).
  */
+/**
+ * #1437 — «arg w» / «arg(w)» / «הארגומנט של w»: the ARGUMENT question. Sayable-but-not-askable was
+ * the defect: `arg` existed only as the F4 relation sentence, and asks ride the expression grammar,
+ * which has no arg head (log-polar carries no additive closure for it) — so the ask register could
+ * not say the one quantity this product is built around. A question never creates a point: the name
+ * is span bookkeeping only, and an undefined name reads honestly open.
+ */
+const argumentQuery: Rule = (s) => {
+  const m = s.match(rx(`^${ARG_KW}\\s*(?:${OF_KW}\\s+)?\\(?\\s*(${NAME})\\s*\\)?$`));
+  if (!m) return null;
+  const name = canonName(m[1]);
+  return { ...empty(), argQueries: [{ name, src: s }], declares: [name], claims: [claimAll(s)] };
+};
+
 const argumentRelation: Rule = (s) => {
   const two = s.match(rx(`^${ARG_KW}\\s*(${NAME})\\s*([+-])\\s*${ARG_KW}\\s*(${NAME})\\s*=\\s*(-?\\d+)$`));
   if (two) {
@@ -1095,6 +1114,8 @@ export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = 
   { name: 'circle-centre-radius', rule: circleByCenterRadius },
   { name: 'named-shape', rule: namedShape },
   { name: 'argument-relation', rule: argumentRelation },
+  // #1437: the bare-argument QUESTION, after the relation/inequality forms have claimed their '='/'<'
+  { name: 'argument-query', rule: argumentQuery },
   { name: 'equation', rule: equation },
   // last: a bare glued run is a figure only when nothing else read the line as maths
   { name: 'bare-run', rule: bareRun },

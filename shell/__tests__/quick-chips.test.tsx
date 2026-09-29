@@ -56,6 +56,23 @@ describe('QuickChips', () => {
     expect(html).not.toMatch(/direction:\s*ltr/);
   });
 
+  it('#1530 — the label is typeset math (MathML), and the click still submits the RAW command', () => {
+    const cmds = ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'z^5 = w^2'];
+    const html = renderToStaticMarkup(QuickChips({ title: 't', hint: 'h', commands: cmds, display: kit.isolateLtrRuns, onPick: () => {} }));
+    const buttons = html.match(/<button[\s\S]*?<\/button>/g) ?? [];
+    expect(buttons).toHaveLength(2);
+    for (const b of buttons) {
+      expect(b).toContain('<math');
+      expect(b, 'no literal caret left').not.toContain('^');
+    }
+    expect(buttons[0]).toContain('נתון מעגל'); // the Hebrew stays text
+    const onPick = vi.fn();
+    const tree = QuickChips({ title: 't', hint: 'h', commands: cmds, display: kit.isolateLtrRuns, onPick }) as { props: { children: unknown[] } };
+    const row = (tree.props.children as { props: { children: unknown } }[])[2];
+    (row.props.children as { props: { onClick: () => void } }[]).forEach((b) => b.props.onClick());
+    expect(onPick.mock.calls.map((c) => c[0])).toEqual(cmds);
+  });
+
   it('without `display` the label IS the command — an unisolated product still works', () => {
     const html = renderToStaticMarkup(QuickChips({ title: 't', hint: 'h', commands: RAW, onPick: () => {} }));
     expect(CONTROLS.test(html)).toBe(false);

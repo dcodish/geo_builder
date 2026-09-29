@@ -127,3 +127,15 @@ export const measureOf = (
     }
   }
 };
+
+/**
+ * #1437 — «arg w»: the ARGUMENT question. Its own kind rather than an `Expr` head, because arg is
+ * not one of the six operations the expression core carries (log-polar has no additive closure for
+ * it) — it is answered directly from the exact argument carrier, the same place the polar reading
+ * takes it from.
+ */
+export interface ArgQuery {
+  /** the complex NAME asked about (`w`, `z1`) — a question never creates a point */
+  readonly name: string;
+  readonly src: string;
+}
