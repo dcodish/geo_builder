@@ -28,7 +28,7 @@ function valueExpr(src: string): Expr | null {
   return e && !mentionsPlane(e) ? e : null;
 }
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
-import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, numeralCurveId, type NumeralKind } from '../engine/names';
+import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, numeralCurveId, type NumeralKind } from '../engine/names';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 
@@ -555,7 +555,7 @@ function matchCurve(line: string): CurveHit | null {
   );
   if (heLineNamed) {
     return {
-      id: `line-${heLineNamed[2]}`,
+      id: lineIdOf(heLineNamed[2]),
       name: lineNameOf(heLineNamed[2], 'he'),
       kind: 'line',
       eqSrc: heLineNamed[3],
@@ -584,7 +584,7 @@ function matchCurve(line: string): CurveHit | null {
   );
   if (heNamedNoNoun) {
     return {
-      id: `line-${heNamedNoNoun[1]}`,
+      id: lineIdOf(heNamedNoNoun[1]),
       name: lineNameOf(heNamedNoNoun[1], 'he'),
       kind: 'line',
       eqSrc: heNamedNoNoun[2],
@@ -626,7 +626,7 @@ function matchCurve(line: string): CurveHit | null {
     const colonEq = tail.includes('=') ? equationExpr(tail) : null;
     if (colonEq && symbolsOf(colonEq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
       return {
-        id: `line-${heNamedColon[1]}`,
+        id: lineIdOf(heNamedColon[1]),
         name: lineNameOf(heNamedColon[1], 'he'),
         kind: 'line',
         eqSrc: tail,
@@ -652,7 +652,7 @@ function matchCurve(line: string): CurveHit | null {
    * vertices."* Found while adding the «through a point» construction, which the bug swallowed.
    */
   const enLine = line.match(new RegExp(`^(?:[Tt]he\\s+)?[Ll]ine\\s+(${LINE_NAME})\\s*:?\\s*(?:is\\s+)?(.+)$`));
-  if (enLine) return { id: `line-${enLine[1]}`, name: lineNameOf(enLine[1], 'en'), kind: 'line', eqSrc: enLine[2] };
+  if (enLine) return { id: lineIdOf(enLine[1]), name: lineNameOf(enLine[1], 'en'), kind: 'line', eqSrc: enLine[2] };
   const enLineBare = line.match(/^(?:the\s+)?line\s+(.+=.+)$/i);
   if (enLineBare) {
     return { id: `curve-${anonIndex(enLineBare[1])}`, name: '', kind: 'line', eqSrc: enLineBare[1] };
@@ -893,11 +893,18 @@ const MIDPOINT_EN = new RegExp(
  * have no `DerivedRule`, so each would be new engine work rather than a spelling. Circle-only, said out
  * loud, per the issue's step 5.
  */
+/*
+ * The CIRCLE slot reads the one numeral table (#1529, ADR-AG-179). It read `NAME` only, which is a
+ * capital letter — so «I» and «V» worked by the accident of being letters, and «1», «2» and «II»–«IX»
+ * were `not-handled`, while `centresOf` offered exactly those sentences as rings (a click that
+ * fails, ADR-AG-054). NAME first, so a single capital keeps its old reading (and its old id); a
+ * numeral only after the noun, because a numeral needs its noun (#1298).
+ */
 const CENTRE_HE = new RegExp(
-  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מרכז\\s+(?:ה?מעגל\\s+)?(${NAME})$`,
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מרכז\\s+(?:(?:ה?מעגל\\s+)?(${NAME})|ה?מעגל\\s+(${NUMERAL_ALT}))$`,
 );
 const CENTRE_EN = new RegExp(
-  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+cent(?:re|er)\\s+of\\s+(?:circle\\s+)?(${NAME})$`,
+  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+cent(?:re|er)\\s+of\\s+(?:(?:circle\\s+)?(${NAME})|circle\\s+(${NUMERAL_ALT}))$`,
   'i',
 );
 
@@ -1254,7 +1261,10 @@ function parseDerived(line: string): RuleOutcome {
    */
   const centre = CENTRE_HE.exec(line) ?? CENTRE_EN.exec(line);
   if (centre) {
-    const [, id, circleName] = centre;
+    const [, id, letter, numeral] = centre;
+    // The EN rule is `i`-flagged for its words; a numeral is case-sensitive (the [IVX] trap, ADR-AG-006).
+    if (numeral !== undefined && !isNumeralName(numeral)) return refuse('not-handled', line);
+    const circleName = letter ?? numeral;
     return made([{ t: 'derived', id, rule: { t: 'circle-centre', curve: numeralCurveId('circle', circleName) }, src: line }]);
   }
 
@@ -1539,7 +1549,7 @@ function tangentTargets(tail: string, src: string): TangentTargets | null {
     const hadNoun = bare !== piece;
     const named = /^([ℓl][0-9]?)$/.exec(bare) ?? (hadNoun ? LINE_NUMERAL_RE.exec(bare) : null);
     if (named) {
-      out.lines.push({ kind: 'curve', id: `line-${named[0]}`, label: named[0] });
+      out.lines.push({ kind: 'curve', id: lineIdOf(named[0]), label: named[0] });
       continue;
     }
     const pts = TWO_POINT_NAME.exec(bare);
@@ -2712,7 +2722,7 @@ function direction(phrase: string): Direction | null {
   const axis = AXIS_HE.exec(p) ?? AXIS_EN.exec(p);
   if (axis) return { k: 'axis', axis: axis[1].toLowerCase() === 'x' ? 'x' : 'y' };
   const named = NAMED_LINE.exec(p);
-  if (named) return { k: 'curve', id: `line-${named[1] ?? named[2]}` };
+  if (named) return { k: 'curve', id: lineIdOf(named[1] ?? named[2]) };
   const pts = TWO_POINTS.exec(p);
   // A two-letter run reads as its two POINTS even when fronted by «הישר», and that is deliberate:
   // «הישר AC» relates the direction A→C whether or not a `line-AC` object was ever stated, so the
@@ -2815,7 +2825,7 @@ function parseThroughLine(line: string): RuleOutcome {
     const name = token ? lineNameOf(token, he ? 'he' : 'en') : undefined;
     // Named: the name IS the identity, like every named line. Anonymous: content-derived from the
     // anchor, so the same construction stated twice is one object (ADR-AG-023).
-    const id = token ? `line-${token}` : `curve-${anonIndex(`through:${through}:free`)}`;
+    const id = token ? lineIdOf(token) : `curve-${anonIndex(`through:${through}:free`)}`;
     return made([
       { t: 'declare', id: through, src: line },
       {

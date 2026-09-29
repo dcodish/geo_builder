@@ -16,7 +16,7 @@
  * lands, and nowhere else.
  */
 import { fitConic } from './conic';
-import { numeralCurveId, numeralTwin, refKindOf, statedName, type RefKind } from './names';
+import { lineIdOf, numeralCurveId, numeralTwin, refKindOf, statedName, type RefKind } from './names';
 import { parabolaDirectrix, resolveCurve } from './curves';
 import { parseLengthExpr } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule } from './derived';
@@ -1171,7 +1171,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       const [p, q] = shapeRow(ring.noun!)!.principalDiagonal!(ring.vertices);
       // The SECONDARY diagonal is the other one: the two vertices the principal does not join.
       const [a, b] = f.principal ? [p, q] : ring.vertices.filter((x) => x !== p && x !== q);
-      const id = `line-${a}${b}`;
+      const id = lineIdOf(`${a}${b}`);
       return applyAll(c, [
         // STATED (#1076): the student asked for this diagonal by giving its equation, so it is part
         // of the figure they are drawing, not a carrier minted to hold something else.

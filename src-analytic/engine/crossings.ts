@@ -18,6 +18,7 @@
 import type { Figure } from './evaluate';
 import type { Construction, CurveKind, Id, NumCurve } from './types';
 import { objectById } from './types';
+import { numeralKey, refKindOf, statedName } from './names';
 import { isPolygonSide, withinSegment } from './extent';
 import { conicMeet, walkOfCoefficients, walkThrough, type Walk } from './crossing-order';
 
@@ -160,6 +161,14 @@ function words(c: Construction, id: Id, classified?: CurveKind): string | null {
    */
   if (o.kind === 'segment') return `${isPolygonSide(c, o.a, o.b) ? 'הצלע' : 'הקטע'} ${o.a}${o.b}`;
   if (o.kind === 'curve') {
+    /**
+     * A NUMERAL-NAMED curve is referred to from its ID, through `names.ts` (#1529, ADR-AG-179): the noun
+     * of its kind and the numeral the student wrote — «הישר 1», «הפרבולה I», «המעגל 2». The label cannot
+     * be used: it carries the noun in the language it was TYPED in («ישר 1», "circle 1"), so composing
+     * from it wrote «הישר ישר 1» and «הישר פרבולה I» — every ring on a named line or conic was a click
+     * that failed (`bad-operand`), because this branch knew only the Roman circles I–V.
+     */
+    if (numeralKey(o.id)) return `${CONIC_NOUN[refKindOf(o.id)]} ${statedName(o.id)}`;
     const name = o.label.name;
     /**
      * A LINE GIVEN BY ITS EQUATION names itself (#1092).
@@ -197,7 +206,7 @@ function words(c: Construction, id: Id, classified?: CurveKind): string | null {
      * refuses — a latent bug that could not surface while circles were excluded from the crossing
      * search altogether, and did the moment they were let in.
      */
-    if (o.curve.kind === 'circle' || /^(I|II|III|IV|V)$/.test(name)) {
+    if (o.curve.kind === 'circle') {
       return name.startsWith('מעגל') ? `ה${name}` : `המעגל ${name}`;
     }
     return `הישר ${name}`;
@@ -434,10 +443,10 @@ export function centresOf(figure: Figure, letter: string): Namable[] {
      * exactly what ADR-AG-048's «two surfaces, one grammar» rule is for: an offered sentence the parser
      * cannot read back is a ring whose click fails, and ADR-AG-054 says that is worse than no ring.
      */
-    const PREFIX = 'circle-';
-    if (!cu.id.startsWith(PREFIX)) continue; // not named the way the grammar refers to a circle
-    const name = cu.id.slice(PREFIX.length);
-    if (!name) continue;
+    // Named the way the grammar refers to a circle: by its numeral, read through `names.ts` (#1529) —
+    // a hand-sliced `circle-` prefix read `circle-at-O` as a circle called «at-O».
+    if (!numeralKey(cu.id) || refKindOf(cu.id) !== 'circle') continue;
+    const name = statedName(cu.id);
 
     // Already named: a point sits on the centre, whatever route put it there. Same question the
     // description layer asks, and now literally the same function (#1167).
