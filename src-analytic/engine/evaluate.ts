@@ -19,7 +19,6 @@ import { pairKey, pinnedLengths } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
-import { apart } from './crossings';
 import { dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
 import { drawnPieceOver } from './extent';
 import { nthHolds, orderedCrossings } from './crossing-order';
@@ -666,7 +665,38 @@ function rhsOf(cmp: CoordCompare, at: (id: Id) => Pt | null, env: Env): number |
  * point exactly when the judge would have rejected it.
  */
 function apartOf(at: Map<Id, Pt>): number {
-  return spanOf(at) * 1e-2;
+  return spanOf(at) * VISIBLE_FRACTION;
+}
+
+/**
+ * WHERE SEEING STOPS, as a fraction of the extent it is measured against (#1077, #1526). One constant for
+ * the `distinct` judge and for the display's separation preference, so "these two points read as one" is
+ * decided by one number.
+ */
+export const VISIBLE_FRACTION = 1e-2;
+
+/**
+ * THE PAIRS OF NAMED POINTS A STUDENT WOULD SEE ON TOP OF EACH OTHER in this drawing (#1273, #1526,
+ * ADR-AG-181) — the one question the display's separation preference asks, exported so its locks CALL it.
+ *
+ * Measured against the FRAME the figure is drawn in (`viewBox`, unpadded), at {@link VISIBLE_FRACTION}:
+ * what reads as "on top" is a fraction of the canvas, not of the points' own spread — a figure of two
+ * points has a point spread equal to their distance, so a spread-relative ruler can never flag it, and a
+ * circle of radius 5 with two points 0.03 apart shows them stacked whatever the points' spread.
+ *
+ * #1526 is why it is not `crossings.apart()`: that is the IDENTITY tolerance ("is this the same crossing",
+ * a millionth of the span), and borrowed as the display's ruler it let «Y נמצאת על הישר y=x» open 0.025
+ * from V on a frame of 4 — two labels on one dot — because 0.025 is not the same point.
+ */
+export function stackedPairs(f: Figure): Array<[Id, Id]> {
+  const b = viewBox(f, 0);
+  const near = Math.max(b.maxX - b.minX, b.maxY - b.minY) * VISIBLE_FRACTION;
+  const ps = f.points;
+  const out: Array<[Id, Id]> = [];
+  for (let i = 0; i < ps.length; i += 1)
+    for (let j = i + 1; j < ps.length; j += 1)
+      if (Math.hypot(ps[i].x - ps[j].x, ps[i].y - ps[j].y) < near) out.push([ps[i].id, ps[j].id]);
+  return out;
 }
 
 /** The figure's extent — the larger coordinate spread of its points (1 with fewer than two). */
@@ -1855,18 +1885,18 @@ export function drawableAt(
    * configuration wins outright; a stacked one is REMEMBERED and used only if nothing else turns up
    * inside the budget. So it is a preference below validity and never a requirement — a figure whose
    * every configuration stacks two labels (the coincidence the givens FORCE) is still drawn, and refusing
-   * such a statement at its source is #1254's half. The tolerance is `apart()`'s — relative to the figure's
-   * own span, the ruler the click-path rings already use to ask "is there a point here" (ADR-AG-021).
-   * Display only, like `spread`: the knowledge gates must keep every admissible configuration.
+   * such a statement at its source is #1254's half. Display only, like `spread`: the knowledge gates must
+   * keep every admissible configuration.
+   *
+   * **The ruler is the SEEING one, {@link stackedPairs} (#1526, ADR-AG-181).** It was `crossings.apart()`,
+   * the identity tolerance (a millionth of the span): a free point riding a carrier that passes through an
+   * existing point — «Y נמצאת על הישר y=x» beside V(0,0) — was sampled 0.025 from V on a frame of 4, which
+   * is not the same point and so passed, while the student saw one dot with two names. Every free point
+   * (a line, circle or curve rider, or none) and every derived one is kept apart by this one test, because
+   * it judges the drawing, not the sampler that produced it. Still a preference: a coincidence the givens
+   * force («שיעור ה-x של Y הוא 0») stacks at every seed and is drawn from the remembered tier.
    */
-  const separated = (f: Figure) => {
-    const near = apart(f);
-    const ps = f.points;
-    for (let i = 0; i < ps.length; i += 1)
-      for (let j = i + 1; j < ps.length; j += 1)
-        if (Math.hypot(ps[i].x - ps[j].x, ps[i].y - ps[j].y) < near) return false;
-    return true;
-  };
+  const separated = (f: Figure) => stackedPairs(f).length === 0;
   const preferred = (f: Figure) => whole(f) && (!preferSpread || (spread(f) && separated(f)));
 
   const first = evaluate(c, seed);

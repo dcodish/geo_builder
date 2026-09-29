@@ -50,6 +50,8 @@ export { expandInscribe, inscribePlacements, inscribeVariantCount } from './insc
 export type { InscribeShape, InscribeCmd } from './inscribe';
 export { variantCountOf, cyclableVariant, withVariant, variantVertices } from './variants';
 export { computeValuesPanel, queryLabel, valueText } from './valuesPanel';
+export { circleRefs, isDrawnCircle } from './circleRef';
+export type { CircleRef } from './circleRef';
 export type { QueryInput, QueryNote, QueryRow, ValueQuery } from './valuesPanel';
 export type { ValueRow, AreaClassRow, ValuesPanelResult } from './valuesPanel';
 

@@ -28,7 +28,7 @@ function valueExpr(src: string): Expr | null {
   return e && !mentionsPlane(e) ? e : null;
 }
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
-import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, numeralCurveId, type NumeralKind } from '../engine/names';
+import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, type NumeralKind } from '../engine/names';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 
@@ -288,13 +288,8 @@ const LINE_NAME = `(?:[ℓl][0-9]?|${LINE_NUMERAL}(?=[\\s:,]|$)|[A-Z][0-9₀-₉
  */
 const LINE_NAME_PLAIN = '(?:[ℓl][0-9]?|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)';
 
-/**
- * How a numeral-named line is CALLED — «ישר 1» / «line 1» — the #1216 circle precedent («מעגל 1»),
- * so the panel row reads the way the exam does and the student's own token still resolves (the id is
- * `line-1`, and every by-name lookup matches the id as well as the name).
- */
-const lineNameOf = (token: string, lang: 'he' | 'en'): string =>
-  LINE_NUMERAL_RE.test(token) ? `${lang === 'he' ? 'ישר' : 'line'} ${token}` : token;
+// How a numeral-named line is CALLED («ישר 1» / «line 1») is `lineNameOf` in engine/names.ts (#1350), so
+// `nameReading` inverts it from the same table.
 
 /**
  * A line name that is TWO POINT NAMES — `AB`, `A1B2` — as opposed to an arbitrary one like `ℓ1`.
@@ -786,6 +781,8 @@ function anonIndex(eqSrc: string): string {
 
 /** Two or more point names running together — `AB`, `ABC`, `ABCD`. */
 const NAME_RUN = `(?:${NAME})+`;
+/** The English shape nouns, longest first — DERIVED from the registry (read by the concurrency and measure roles). */
+const ROLE_SHAPE_EN = [...Object.keys(EN_SHAPE), 'polygon'].sort((a, b) => b.length - a.length).join('|');
 
 const splitNames = (run: string): string[] => run.match(/[A-Z][0-9₀-₉]?/g) ?? [];
 
@@ -908,12 +905,33 @@ const CENTRE_EN = new RegExp(
   'i',
 );
 
-/** `M מפגש התיכונים במשולש ABC` · `G מפגש האלכסונים במרובע ABCD`. */
-const CONCURRENCY_HE = new RegExp(
-  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מפגש\\s+(.+?)\\s+ב-?\\s*(?:ה?([א-ת]+(?:[- ][א-ת]+){0,2})\\s+)?(${NAME_RUN})$`,
-);
+/**
+ * `M מפגש התיכונים במשולש ABC` · `G מפגש האלכסונים במרובע ABCD` · `M מפגש האלכסונים במרובע` ·
+ * `M מפגש האלכסונים` (#1283).
+ *
+ * Only the POINT and the head word are read here; everything after «מפגש» is the SUBJECT, read by
+ * `concurrencyOf` — the same reader the verb form's subject goes through. The shape tail used to be
+ * part of this regex and REQUIRED its letters, so the noun phrase could resolve its shape only from
+ * the sentence while the verb form resolved it from the figure: two spellings #1070 calls identical,
+ * two mechanisms, and «M מפגש האלכסונים» went to the LLM.
+ */
+const CONCURRENCY_HE = new RegExp(`^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מפגש\\s+(.+)$`);
 const CONCURRENCY_EN = new RegExp(
-  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+(?:intersection\\s+of\\s+the\\s+)?(.+?)\\s+of\\s+(?:(triangle|quadrilateral)\\s+)?(${NAME_RUN})$`,
+  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+(?:(?:intersection|meeting)(?:\\s+point)?\\s+of\\s+(?:the\\s+)?)?(.+)$`,
+  'i',
+);
+
+/**
+ * WHAT A CONCURRENCY ROLE IS OF — the tail after the role noun, in either form (#1283).
+ *
+ * «אלכסוני המרובע ABCD» · «האלכסונים במרובע ABCD» · «האלכסונים במרובע» · «האלכסונים» ·
+ * «the diagonals of quadrilateral ABCD» · «the diagonals of the quadrilateral» · «the diagonals».
+ * The shape NOUN and its LETTERS are each optional: letters name the ring; a noun alone (or
+ * nothing) leaves the ring to the figure, resolved at M1 (`meet-of`).
+ */
+const ROLE_OF_HE = new RegExp(`^\\s*(?:(?:ב-?|של)\\s*)?(?:ה?([א-ת]+(?:[- ][א-ת]+){0,2}))?\\s*(${NAME_RUN})?$`);
+const ROLE_OF_EN = new RegExp(
+  `^\\s*(?:of\\s+)?(?:the\\s+)?(?:(${ROLE_SHAPE_EN})(?=\\s|$))?\\s*(${NAME_RUN})?$`,
   'i',
 );
 
@@ -1328,6 +1346,61 @@ function withLineNoun(s: string): string {
   return /^[ℓl][0-9]?$/.test(t) || /^[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?$/.test(t) ? `הישר ${t}` : t;
 }
 
+/**
+ * THE ONE READER for a concurrency point, whichever form names it (#1283).
+ *
+ * «אלכסוני המרובע נפגשים בנקודה M» and «M מפגש האלכסונים במרובע» say the identical thing (#1070),
+ * so both hand their SUBJECT here and get one answer: letters → the derived point on that ring
+ * (and the ring itself, #1080); no letters → `meet-of`, the ring resolved against the figure at M1,
+ * refused there when the figure has none or several. Two readers is what let the spellings drift.
+ *
+ * A NOUN without letters is still checked (#1042): «מפגש התיכונים במרובע» names a four-vertex
+ * shape for a three-vertex construct, and is refused for arity rather than read as whichever
+ * triangle the figure holds. `null` = not a concurrency sentence, including one that would drop a
+ * stated name the tail does not account for (the leftover guard, ADR-024).
+ */
+function concurrencyOf(id: Id, subject: string, line: string): RuleOutcome {
+  let role: (typeof ROLES)[number] | undefined;
+  let hit: RegExpExecArray | null = null;
+  for (const r of ROLES) {
+    hit = r.he.exec(subject) ?? r.en.exec(subject);
+    if (hit) {
+      role = r;
+      break;
+    }
+  }
+  if (!role || !hit) return null;
+  if (/[A-Z]/.test(subject.slice(0, hit.index))) return null;
+  const rest = subject.slice(hit.index + hit[0].length);
+  const of = ROLE_OF_HE.exec(rest) ?? ROLE_OF_EN.exec(rest);
+  if (!of) return null;
+  const [, noun, run] = of;
+  const stated = arityOf(noun);
+  if (stated !== null && stated !== role.n) return refuse('bad-arity', line);
+  // No letters: the shape is whichever one the figure has, which only M1 can say.
+  if (!run) return made([{ t: 'meet-of', role: role.t, arity: role.n, id, src: line }]);
+  const v = splitNames(run);
+  /**
+   * Three ways this sentence can be wrong about its own vertices, and all three were falling
+   * through to `not-handled` or, worse, building (#1042):
+   *
+   *  - the count disagrees with the CONSTRUCT — «מפגש התיכונים במשולש ABCD» (a centroid takes 3);
+   *  - the count disagrees with the NOUN the student wrote — checked above, letters or not;
+   *  - a label repeats.
+   */
+  if (v.length !== role.n) return refuse('bad-arity', line);
+  if (hasRepeat(v)) return refuse('repeated-vertex', line);
+  const rule: DerivedRule =
+    role.t === 'diagonals'
+      ? { t: 'diagonals', v: [v[0], v[1], v[2], v[3]] }
+      : ({ t: role.t, v: [v[0], v[1], v[2]] } as DerivedRule);
+  // The shape the sentence named is drawn too (#1080) — «במשולש ABC» is the student telling us
+  // there is a triangle, not only which points the centroid is of.
+  const shape = namedShapeFacts(noun, v, line);
+  if (shape === 'bad-arity') return refuse('bad-arity', line);
+  return made([...shape, { t: 'derived', id, rule, src: line }]);
+}
+
 function parseDerived(line: string): RuleOutcome {
   const crossing = parseIntersection(line);
   if (crossing) return crossing;
@@ -1364,65 +1437,17 @@ function parseDerived(line: string): RuleOutcome {
     return made([{ t: 'diagonal-eq', principal, eq, src: line }]);
   }
 
+  // «אלכסוני המרובע ABCD נפגשים בנקודה O» — the VERB form (#1070). Not a concurrency subject («הישרים
+  // נפגשים בנקודה O») answers `null` and the rules after this one get the sentence.
   const meet = MEET_HE.exec(line) ?? MEET_EN.exec(line);
   if (meet) {
-    const [, subject, id] = meet;
-    const role = ROLES.find((r) => r.he.test(subject) || r.en.test(subject));
-    // Not a concurrency subject — «הישרים נפגשים בנקודה O» is a different sentence and this rule
-    // has no claim on it. Declining leaves it to the rules after this one.
-    if (role) {
-      // The shape may be named with its vertices or only by its noun; the trailing run of names is
-      // the figure when it is there, and the NOUN carries it otherwise.
-      const shape = /([A-Z][0-9₀-₉]?){3,}$/.exec(trim(subject));
-      if (shape) {
-        const v = splitNames(shape[0]);
-        if (v.length !== role.n) return refuse('bad-arity', line);
-        if (hasRepeat(v)) return refuse('repeated-vertex', line);
-        const rule: DerivedRule =
-          role.t === 'diagonals'
-            ? { t: 'diagonals', v: [v[0], v[1], v[2], v[3]] }
-            : ({ t: role.t, v: [v[0], v[1], v[2]] } as DerivedRule);
-        return made([{ t: 'derived', id, rule, src: line }]);
-      }
-      // No vertices: the shape is whichever one the figure has, which only M1 can say.
-      return made([{ t: 'meet-of', role: role.t, arity: role.n, id, src: line }]);
-    }
+    const found = concurrencyOf(meet[2], meet[1], line);
+    if (found) return found;
   }
 
+  // «O מפגש האלכסונים במרובע ABCD» — the NOUN form, through the same reader (#1283).
   const con = CONCURRENCY_HE.exec(line) ?? CONCURRENCY_EN.exec(line);
-  if (con) {
-    const [, id, roleSrc, noun, run] = con;
-    const role = ROLES.find((r) => r.he.test(roleSrc) || r.en.test(roleSrc));
-    if (!role) return null; // an unknown role noun is not this rule's business — let it fall through
-    const v = splitNames(run);
-    /**
-     * Three ways this sentence can be wrong about its own vertices, and all three were falling
-     * through to `not-handled` or, worse, building (#1042):
-     *
-     *  - the count disagrees with the CONSTRUCT — «מפגש התיכונים במשולש ABCD» (a centroid takes 3);
-     *  - the count disagrees with the NOUN the student wrote — the noun was skipped by the regex,
-     *    so «מפגש התיכונים במרובע ABC» built a centroid and silently ignored the word «מרובע»;
-     *  - a label repeats.
-     *
-     * The first two are one refusal to the student ("the vertices and the shape do not agree") and
-     * two different mistakes in the code, which is why both are checked here rather than only the
-     * one the reported case happened to hit.
-     */
-    const stated = arityOf(noun);
-    if (v.length !== role.n || (stated !== null && stated !== role.n)) {
-      return refuse('bad-arity', line);
-    }
-    if (hasRepeat(v)) return refuse('repeated-vertex', line);
-    const rule: DerivedRule =
-      role.t === 'diagonals'
-        ? { t: 'diagonals', v: [v[0], v[1], v[2], v[3]] }
-        : { t: role.t, v: [v[0], v[1], v[2]] } as DerivedRule;
-    // The shape the sentence named is drawn too (#1080) — «במשולש ABC» is the student telling us
-    // there is a triangle, not only which points the centroid is of.
-    const shape = namedShapeFacts(noun, v, line);
-    if (shape === 'bad-arity') return refuse('bad-arity', line);
-    return made([...shape, { t: 'derived', id, rule, src: line }]);
-  }
+  if (con) return concurrencyOf(con[1], con[2], line);
 
   return null;
 }
@@ -1732,7 +1757,6 @@ const ROLE_SHAPE_HE = [...Object.keys(SHAPES), ANY_POLYGON_NOUN]
   .sort((a, b) => b.length - a.length)
   .map((k) => k.replace(/ /g, '[\\s-]+'))
   .join('|');
-const ROLE_SHAPE_EN = [...Object.keys(EN_SHAPE), 'polygon'].sort((a, b) => b.length - a.length).join('|');
 const ROLE_RUN = `((?:${NAME}){3,})`;
 const ROLE_CIRCLE_HE = `(?:\\s+(?:של\\s+)?ה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?)?`;
 const ROLE_CIRCLE_EN = `(?:\\s+of\\s+(?:the\\s+)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?)?`;

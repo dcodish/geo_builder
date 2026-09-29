@@ -10,7 +10,7 @@
  * even when a normal carried the parameter, so a satisfiable «π1 ניצב ל-π2» was judged at a sampled m.
  *
  * Every assertion here drives the REAL path (`submit` → `derive3`, `parse3`, `buildScene3`,
- * `deserializeFigure3`, `planePinningRels`) — no decision is re-implemented in this file.
+ * `deserializeFigure3`, `paramPinningRels`) — no decision is re-implemented in this file.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3, type Fact3 } from '../store/store3';
@@ -19,7 +19,7 @@ import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
 import { deserializeFigure3 } from '../store/figureFile3';
 import { applyCommand3 } from '../engine/apply';
-import { planePinningRels } from '../engine/operands';
+import { paramPinningRels } from '../engine/operands';
 import { emptyConstruction3, type Command3, type Construction3 } from '../engine/types';
 
 const st = () => useGeo3.getState();
@@ -113,7 +113,7 @@ describe('#1439 — the parameter is pinned only by a relation whose normal carr
     expect(st().facts).toHaveLength(4);
     // the parameter stays a FREE sampled DOF — the angle does not pin it (ADR-052)
     expect(derived().resolved.param).toMatchObject({ name: 'm', roots: [], branches: [] });
-    expect(planePinningRels(derived().construction)).toEqual([]);
+    expect(paramPinningRels(derived().construction)).toEqual([]);
   });
 
   it('(d) entry order does not matter — the parameter plane stated AFTER the angle', () => {

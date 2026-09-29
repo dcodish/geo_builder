@@ -1054,6 +1054,11 @@ tool says «כבר ידוע» instead of drawing it twice. Identity is the EQUAT
 to mint. Naming a line that had no name is not a restatement: it records, and the panel calls the line by
 the student's name from then on. A line has ONE name, so a second one is refused naming the holder (the
 R-#1153 rule, for curves). Two lines that are genuinely different — however close — stay two lines.
+**Names are compared as a student READS them** ([ADR-AG-183](06c-decisions-analytic.md#adr-ag-183),
+[#1350](https://github.com/dcodish/geo_builder/issues/1350)): «l3» and «ישר 3» are different lines to the
+tool, but a student reads both as "line 3". Both are kept — the exam prints both conventions — and the moment
+the second is named the tool says they are two different lines (a notice, never a refusal). The reading is
+`lN ⇄ N` (with `ℓ` and the Roman numeral); `m3` or `k1` read as their own names.
 
 **R111 — a word the tool does not know is REFUSED in a value slot, never absorbed as parameters**
 ([ADR-AG-145](06c-decisions-analytic.md#adr-ag-145),
@@ -1110,7 +1115,11 @@ refused with the format that would work, never resolved by guessing which two ra
 **R62 — a diagonal is an object, and a concurrency point has a verb**
 ([ADR-AG-037](06c-decisions-analytic.md#adr-ag-037)). «אלכסוני המרובע ABCD נפגשים בנקודה O» builds
 the same figure as «O מפגש האלכסונים במרובע ABCD», in the construct state the sentence form actually
-uses, and with the vertices optional when the figure has one shape to mean. «משוואת האלכסון AC היא
+uses, and with the vertices optional when the figure has one shape to mean — **in both forms**: «M מפגש
+האלכסונים», «M מפגש האלכסונים במרובע» and «אלכסוני המרובע נפגשים בנקודה M» all mean the one quadrilateral
+drawn, and are refused (never guessed) when the figure has none or several; a shape noun written without
+letters is still checked against the construct («מפגש התיכונים במרובע» is refused for arity)
+([ADR-AG-182](06c-decisions-analytic.md#adr-ag-182)). «משוואת האלכסון AC היא
 y=2x» is «משוואת הישר AC היא y=2x». **«האלכסון הראשי» and «האלכסון המשני» resolve only where the
 shape noun distinguishes them** — a kite does, a parallelogram and a rhombus do not — and elsewhere
 are refused by name rather than guessed.
@@ -1156,7 +1165,7 @@ quietly redrawn.
 
 **R60 — two positions the solver cannot tell apart are ONE position, and a determined point's locus is that point** ([ADR-AG-136](06c-decisions-analytic.md#adr-ag-136)). *(Operator, 2026-09-20 on #1259: "a cluster inside solver resolution is not an option set"; 2026-09-19 on #1227: "saying M cannot be calculated is wrong … refer to the location of point M".)* At a tangency the solves land within the solver's own resolution of one another; the panel prints ONE point there, never a list of near-identical "cases" with magnitudes nobody gave — the tolerance is derived from the solve's own stopping rule, `10·√SOLVE_TOL` of scale. And «המקום הגיאומטרי של M» on a determined M answers M's position («נקודה · (4, 0)») or its finite set («שתי נקודות · (4, −3), (4, 3)») in the locus lane's own grammar; «לא ניתן לחשב מהנתונים» is reserved for what the givens genuinely do not fix, and «עדיין לא נקבע» for an open figure.
 
-**R61 — two distinct named points are never opened on top of each other** ([ADR-W-072](06w-decisions-workspace.md#adr-w-072), [ADR-AG-138](06c-decisions-analytic.md#adr-ag-138)). *(Operator, 2026-09-20, T18: "even if they do fall on the same point by chance … the system should not show them on top of each other. It should automatically look for a different config and show them differently"; the same rule in every builder.)* Where a configuration keeps the figure's named points apart, the tool opens on it by itself. A preference below validity, never a requirement: a figure whose every configuration stacks two labels is still drawn — refusing such a statement is R43/#1254's job — and the tolerance is the figure's own span, never an absolute number.
+**R61 — two distinct named points are never opened on top of each other** ([ADR-W-072](06w-decisions-workspace.md#adr-w-072), [ADR-AG-138](06c-decisions-analytic.md#adr-ag-138)). *(Operator, 2026-09-20, T18: "even if they do fall on the same point by chance … the system should not show them on top of each other. It should automatically look for a different config and show them differently"; the same rule in every builder.)* Where a configuration keeps the figure's named points apart, the tool opens on it by itself. A preference below validity, never a requirement: a figure whose every configuration stacks two labels is still drawn — refusing such a statement is R43/#1254's job — and the tolerance is the figure's own span, never an absolute number. **"On top of each other" is what the student SEES** ([#1526](https://github.com/dcodish/geo_builder/issues/1526), [ADR-AG-181](06c-decisions-analytic.md#adr-ag-181)): two points closer than a hundredth of the drawn frame count as stacked, not only two at the identical position — so a point riding a line, circle or curve that passes through an existing point («Y נמצאת על הישר y=x» beside V(0,0)) is never opened on it unless the givens force it there.
 
 **R61 — a circle marks its centre** ([ADR-AG-036](06c-decisions-analytic.md#adr-ag-036)). Every drawn
 circle shows its centre, because in analytic geometry the centre is always part of the figure. The

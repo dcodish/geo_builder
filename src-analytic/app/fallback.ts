@@ -30,10 +30,11 @@
  * forbids firing a live call without the operator. Nothing in this module reaches the network.
  */
 
-import { decideSubmit, type SubmitVerdict } from './submit';
+import { decideSubmit, type RecordNotice, type SubmitVerdict } from './submit';
 import { derive } from '../engine/derive';
 import type { LlmStepsOutcome } from '../parser/llmAnalytic';
 import { restoreStatedSequencesAnalytic } from '../parser/honestyAnalytic';
+import type { InputError } from '../store/useAnalyticStore';
 
 export type FallbackOutcome =
   /** The proxy was throttled. The caller says "busy", never "I did not understand". */
@@ -47,7 +48,7 @@ export type FallbackOutcome =
    * so the caller can log them: both siblings do, and it is how #536 was diagnosed at all — without it
    * a `source:'llm'` submit that was silently corrected is indistinguishable from one that was not.
    */
-  | { kind: 'lines'; lines: string[]; restored?: string[] }
+  | { kind: 'lines'; lines: string[]; restored?: string[]; notice?: RecordNotice }
   /**
    * The model answered and at least one line would be refused. Nothing is recorded, and the caller
    * keeps the ORIGINAL refusal rather than reporting the model's line — the student never wrote it,
@@ -106,6 +107,8 @@ export async function runFallback(
   // Re-decide each line against the figure as it would stand after the ones before it — the same
   // incremental path the student walks, so a later line may legitimately depend on an earlier one.
   const accepted: string[] = [];
+  // #1350 — a line the model named («ישר 3» beside «l3») earns the same notice a typed one does.
+  let notice: RecordNotice | undefined;
   for (const step of gated.lines) {
     const soFar = [...lines, ...accepted];
     const verdict: SubmitVerdict = decideSubmit(step, soFar, seed, derive(soFar, seed));
@@ -115,8 +118,37 @@ export async function runFallback(
     }
     // `already-known` / `already-follows` contribute nothing but are not failures: the model restated
     // something true. Drop the line and keep going rather than recording a duplicate.
-    if (verdict.kind === 'record') accepted.push(verdict.line);
+    if (verdict.kind === 'record') {
+      accepted.push(verdict.line);
+      notice ??= verdict.notice;
+    }
   }
 
-  return accepted.length ? { kind: 'lines', lines: accepted, ...(gated.restored.length ? { restored: gated.restored } : {}) } : { kind: 'none' };
+  return accepted.length
+    ? { kind: 'lines', lines: accepted, ...(gated.restored.length ? { restored: gated.restored } : {}), ...(notice ? { notice } : {}) }
+    : { kind: 'none' };
+}
+
+/**
+ * WHAT THE STUDENT READS when the fallback recorded nothing (#1278, ADR-AG-186) — the one decision
+ * `App.tsx` makes about an outcome, extracted so the app and the lock ask the same function.
+ *
+ * - `busy`: a throttle, never the student's fault.
+ * - `rejected` with a REAL refusal key: the model produced a line the tool READ and declined, so the
+ *   sentence was understood and the move is unsupported — the honest middle (#1336, ADR-AG-170).
+ * - `rejected` with `not-handled`: the model's "line" is not a command at all (#1278's first live call
+ *   answered «a line through (2,3) with slope 4» in English prose). The tool understood NOTHING — neither
+ *   the student's sentence nor the model's — and «understood, not supported» would claim both a reading
+ *   that never happened and a missing capability that exists. The student keeps the ORIGINAL refusal,
+ *   which is about words they actually wrote.
+ * - `none`: the model judged it inexpressible, or the transport failed — the original refusal too.
+ */
+export function fallbackRefusal(
+  out: Exclude<FallbackOutcome, { kind: 'lines' }>,
+  raw: string,
+  original: InputError,
+): InputError {
+  if (out.kind === 'busy') return { key: 'llm-busy', detail: raw };
+  if (out.kind === 'rejected' && out.code !== 'not-handled') return { key: 'llm-understood-unsupported', detail: raw };
+  return original;
 }

@@ -19,17 +19,24 @@ import {
   CLAIM_REL_TOL,
   coordPlaneRelHolds,
   isAbsolute,
-  lineDirCarriesParam,
   figureExtent,
   lineRelDeviation,
   lineSym3,
   mutualHolds,
   mutualSides,
   MUTUAL_VERIFY_TOL,
-  planeNormalCarriesParam,
-  planePinningRels,
+  containmentDeviation,
+  DIRECTION_REL_TOL,
+  distanceBetween,
+  isBoundedOperand,
+  paramPinningRels,
+  planeCoincidenceDeviation,
   planeSym3,
-  type PlanePinRel3,
+  pointOnOperand,
+  relDeviation,
+  relSignedResidual,
+  type OperandGeom,
+  type ParamPinRel3,
   resolveOperand,
   symMemberDrives,
 } from './operands';
@@ -40,7 +47,7 @@ import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, open
 import { carrierParams3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
-import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
+import type { Construction3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind } from './types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3,
   bisectorDir3} from './vec3';
@@ -455,14 +462,6 @@ export function lineAtParam(c: Construction3, name: string, a: number): Resolved
   return planePlaneLine(planeAt(c, def.p1, a), planeAt(c, def.p2, a));
 }
 
-/** cos of the angle between two planes (formula-sheet form: |n1·n2|/(|n1||n2|)); NaN when degenerate. */
-function planesCos(c: Construction3, p1: string, p2: string, a: number): number {
-  const r1 = planeAt(c, p1, a);
-  const r2 = planeAt(c, p2, a);
-  const denom = norm3(r1.n) * norm3(r2.n);
-  return denom < 1e-12 ? NaN : Math.abs(dot3(r1.n, r2.n)) / denom;
-}
-
 const SCAN_LO = -25;
 const SCAN_HI = 25;
 const SCAN_STEP = 0.02;
@@ -534,6 +533,169 @@ const snapAndDedupe = (roots: number[]): number[] => {
   return out.sort((a, b) => a - b);
 };
 
+/**
+ * #1472 (ADR-3D-286) — an ABSOLUTE operand's geometry at parameter value `a`, in exactly the
+ * {@link OperandGeom} shape `resolveOperand` hands the claim verifier (a plane: normal + offset; a line:
+ * anchor + direction; a coordinate point: its point; the coordinate frame: its fixed geometry). The pin's
+ * residual is the verifier's own function on these, so the root-find judges what the verifier judges.
+ * `null` for an operand the root-find cannot rebuild without the figure (see `isParamPinOperand`).
+ */
+function operandAtParam(c: Construction3, op: Operand3, a: number): OperandGeom | null {
+  switch (op.kind) {
+    case 'plane-named': {
+      const def = c.planes.get(op.name);
+      if (!def || def.free) return null;
+      const pl = planeAt(c, op.name, a);
+      return { normal: pl.n, d: pl.d };
+    }
+    case 'line': {
+      const ln = lineAtParam(c, op.name, a);
+      return ln ? { point: ln.anchor, dir: ln.dir } : null;
+    }
+    case 'point': {
+      const def = c.points.get(op.id);
+      return def?.kind === 'coord' ? { point: v3(def.x, def.y, def.z) } : null;
+    }
+    case 'plane-coord':
+    case 'axis':
+      return resolveOperand(op, c, { lines: new Map(), planes: new Map() })(() => null);
+    default:
+      return null;
+  }
+}
+
+/** The root tolerance: a candidate value is a root when every pin's residual is within it there. */
+const PIN_TOL = 1e-5;
+
+/**
+ * #1472 (ADR-3D-286) — one pinning given in ROOT-FIND form.
+ *
+ *  - `scans` — CONTINUOUS residuals whose zeros include every value at which the relation holds; each is
+ *    scanned with sign-change bisection and the touch-zero minima scan. The first is the PRIMARY one (the
+ *    identity guard reads it). Continuity is the point: the verifier's classifiers normalise by the
+ *    anchor gap or switch branch at exact parallelism, so a zero can be a single point no grid lands on.
+ *  - `holds` — the verdict at a candidate: the primary residual within {@link PIN_TOL} AND, where the
+ *    verifier's predicate has more to it (the open half of «נחתכים», a distance's parallel branch), that
+ *    predicate itself. So a root is never offered that the recorded claim would then refuse.
+ *  - `key` — the given's content (the claim plus its operands' definitions), for the identity memo.
+ */
+interface ParamPinProbe {
+  scans: ((a: number) => number)[];
+  holds: (a: number) => boolean;
+  key: string;
+}
+
+const nanIfNull = (v: number | null | undefined): number => (v === null || v === undefined ? NaN : v);
+
+/** The definitions a pin's operands are built from — part of its identity-memo key. */
+function operandDefsKey(c: Construction3, op: Operand3): unknown {
+  if (op.kind === 'plane-named') return c.planes.get(op.name);
+  if (op.kind === 'point') return c.points.get(op.id);
+  if (op.kind === 'line') {
+    const def = c.lines.get(op.name);
+    return def?.kind === 'plane-plane' ? [def, c.planes.get(def.p1), c.planes.get(def.p2)] : def;
+  }
+  return op;
+}
+
+function relPinProbe(c: Construction3, pin: ParamPinRel3): ParamPinProbe {
+  const geoms = (a: number): [OperandGeom, OperandGeom] | null => {
+    const ga = operandAtParam(c, pin.a, a);
+    const gb = operandAtParam(c, pin.b, a);
+    return ga && gb ? [ga, gb] : null;
+  };
+  const via = (f: (ga: OperandGeom, gb: OperandGeom) => number | null) => (a: number): number => {
+    const g = geoms(a);
+    return g ? nanIfNull(f(g[0], g[1])) : NaN;
+  };
+  const within = (f: (a: number) => number) => (a: number): boolean => {
+    const r = f(a);
+    return !Number.isNaN(r) && Math.abs(r) <= PIN_TOL;
+  };
+  const key = JSON.stringify([c.param, pin.claim, operandDefsKey(c, pin.a), operandDefsKey(c, pin.b)]);
+  const cl = pin.claim;
+  // the linear side of a containment / distance pairing (its point is what lies in, or stands off, the other)
+  const split = (ga: OperandGeom, gb: OperandGeom): [OperandGeom, OperandGeom] => (gb.dir && !ga.dir ? [gb, ga] : [ga, gb]);
+  const gapFrom = (ga: OperandGeom, gb: OperandGeom): number | null => {
+    const [lin, other] = split(ga, gb);
+    const p = pointOnOperand(lin);
+    return p ? distanceBetween({ point: p }, other) : null;
+  };
+
+  if ((cl.type === 'plane-rel' || cl.type === 'line-rel') && (cl.rel === 'perp' || cl.rel === 'parallel' || cl.rel === 'angle')) {
+    const rel = cl.rel;
+    // ⟂ / ∥ / angle: the verifier's direction reading, signed so a crossing is found by bisection
+    const f = via((ga, gb) => relSignedResidual(rel, cl.deg, ga, gb));
+    return { scans: [f], holds: within(f), key };
+  }
+  if (cl.type === 'plane-rel' && cl.rel === 'coincident') {
+    const f = via((ga, gb) => planeCoincidenceDeviation(ga, gb, 1));
+    return { scans: [f], holds: within(f), key };
+  }
+  if ((cl.type === 'plane-rel' || cl.type === 'line-rel') && cl.rel === 'contained') {
+    // direction AND position: parallel, and a point of the contained side on the other — continuous in the
+    // parameter, where `containmentDeviation` measures the gap only once exactly parallel
+    const f = via((ga, gb) => {
+      const par = relDeviation('parallel', undefined, ga, gb);
+      const gap = gapFrom(ga, gb);
+      return par === null || gap === null ? null : Math.hypot(par, gap);
+    });
+    const verdict = via((ga, gb) => containmentDeviation(ga, gb, 1));
+    return { scans: [f], holds: (a) => within(f)(a) && verdict(a) <= DIRECTION_REL_TOL, key };
+  }
+  if (cl.type === 'mutual-rel' && cl.rel !== 'skew') {
+    const rel = cl.rel;
+    const f = via((ga, gb) => {
+      if (rel === 'parallel') return relDeviation('parallel', undefined, ga, gb);
+      // coincident: parallel, and one line's anchor on the other; intersecting: the common-perpendicular gap
+      if (rel === 'coincident') {
+        const par = relDeviation('parallel', undefined, ga, gb);
+        const gap = ga.point ? distanceBetween({ point: ga.point }, gb) : null;
+        return par === null || gap === null ? null : Math.hypot(par, gap);
+      }
+      return distanceBetween(ga, gb);
+    });
+    const verdict = (a: number): boolean => {
+      const g = geoms(a);
+      if (!g) return false;
+      // the verifier's own predicate — for «נחתכים» it carries the open half (not parallel) as well
+      const sides = [
+        { geom: g[0], bounded: isBoundedOperand(pin.a) },
+        { geom: g[1], bounded: isBoundedOperand(pin.b) },
+      ] as const;
+      return mutualHolds(rel, sides[0], sides[1], MUTUAL_VERIFY_TOL);
+    };
+    return { scans: [f], holds: (a) => within(f)(a) && verdict(a), key };
+  }
+  // distance-rel: the verifier's `distanceBetween` minus the stated value. Between two directional or
+  // planar sides a gap exists only while they are PARALLEL, so `distanceBetween` jumps there; the second
+  // scan measures the parallel branch continuously (parallel, and the gap as if parallel) to find it.
+  const value = cl.type === 'distance-rel' ? cl.value : 0;
+  const f1 = via((ga, gb) => {
+    const d = distanceBetween(ga, gb);
+    return d === null ? null : d - value;
+  });
+  const scans = [f1];
+  const isPointOp = (op: Operand3) => op.kind === 'point';
+  if (!isPointOp(pin.a) && !isPointOp(pin.b)) {
+    scans.push(
+      via((ga, gb) => {
+        const par = relDeviation('parallel', undefined, ga, gb);
+        const gap = gapFrom(ga, gb);
+        return par === null || gap === null ? null : Math.hypot(par, gap - value);
+      }),
+    );
+  }
+  return {
+    scans,
+    holds: (a) => {
+      const r = f1(a);
+      return !Number.isNaN(r) && Math.abs(r) <= PIN_TOL * Math.max(1, Math.abs(value));
+    },
+    key,
+  };
+}
+
 /** The perpendicularity residual |dir(m) × n(m)| (0 ⟺ the line is ⟂ to the plane). */
 function perpResidual(c: Construction3, line: string, plane: string, a: number): number {
   const ln = lineAtParam(c, line, a);
@@ -542,132 +704,116 @@ function perpResidual(c: Construction3, line: string, plane: string, a: number):
   return norm3(cross3(ln.dir, pl.n));
 }
 
-/** S2 (#378): the ABSOLUTE-lane line relations that can actually PIN the parameter — both sides
- *  are absolute AND a referenced direction carries it. An absolute pair with no parameter
- *  dependence is a pure claim (its residual is constant in `a` — root-finding over it would
- *  either flood or fabricate a `no-roots` refusal for a parameter it cannot constrain). */
-function paramPinningLineRels(c: Construction3): Construction3['lineRels'] {
-  if (!c.param) return [];
-  return c.lineRels.filter((r) => {
-    if (!isAbsolute(r.op)) return false;
-    // #487: a relation whose plane operand is FREE pins the PLANE (resolveFreePlane), never the
-    // parameter — even when the line side carries it. «l(m) ∥ π2» leaves m free and turns π2 to l;
-    // rooting over the placeholder here would fabricate a pin on a plane that has no equation.
-    if (r.op.kind === 'plane-named' && c.planes.get(r.op.name)?.free) return false;
-    // #552: the same routing with the LINE side free — the relation pins the free line, never the
-    // parameter (and a free line's def carries nothing for `lineAtParam` to read).
-    if (isFreeLine3(c, r.line) || (r.op.kind === 'line' && isFreeLine3(c, r.op.name))) return false;
-    const opCarries = r.op.kind === 'line' ? lineDirCarriesParam(c, r.op.name) : r.op.kind === 'plane-named' && planeNormalCarriesParam(c, r.op.name);
-    return lineDirCarriesParam(c, r.line) || opCarries;
-  });
+function perpPinProbe(c: Construction3, g: Construction3['linePerps'][number]): ParamPinProbe {
+  const f = (a: number) => perpResidual(c, g.line, g.plane, a);
+  const key = JSON.stringify([c.param, 'line-perp', g, operandDefsKey(c, { kind: 'line', name: g.line }), c.planes.get(g.plane)]);
+  return { scans: [f], holds: (a) => { const r = f(a); return !Number.isNaN(r) && r <= PIN_TOL; }, key };
 }
 
-/** S2 (#378): the SIGNED residual of an absolute-lane line relation at parameter value `a` —
- *  0 ⟺ the relation holds. Perp (line×line) and ∥ (line×plane) cross zero with a sign change;
- *  ∥ (line×line) is non-negative (touch-zero); the angle forms are |cos| − target. */
-function lineRelParamResidual(c: Construction3, r: Construction3['lineRels'][number], a: number): number {
-  const ln = lineAtParam(c, r.line, a);
-  if (!ln) return NaN;
-  let other: Vec3 | null = null;
-  let planar = false;
-  if (r.op.kind === 'line') {
-    other = lineAtParam(c, r.op.name, a)?.dir ?? null;
-  } else if (r.op.kind === 'plane-named') {
-    other = planeAt(c, r.op.name, a).n;
-    planar = true;
+/**
+ * #1472 (ADR-3D-286) — THE IDENTITY GUARD. A relation whose residual is within {@link PIN_TOL} at EVERY
+ * finite point of the scan grid holds for every value of the parameter, so it constrains nothing: it is
+ * not a pin. Without this the touch-zero scan accepted every grid point — «π1: z = 0 · π2: mx + y = 0 ·
+ * π1 ⟂ π2» gave 2 500 "roots", drew m = −25 and cycled 2 500 identical configurations; «l ⊂ π» with the
+ * line in the plane for every m additionally froze the verifier for minutes (every claim × every branch).
+ * The parameter stays a free sampled DOF (ADR-052) and the recorded claim verifies on any sample.
+ *
+ * Cost: a relation that is NOT an identity exits at its first sample off zero; an identity costs one grid
+ * pass, memoised on the given's content (claim + operand definitions), so it is paid once per figure.
+ */
+const identityMemo = new Map<string, boolean>();
+function holdsForEveryValue(probe: ParamPinProbe): boolean {
+  const hit = identityMemo.get(probe.key);
+  if (hit !== undefined) return hit;
+  const f = probe.scans[0];
+  const N = Math.round((SCAN_HI - SCAN_LO) / SCAN_STEP);
+  let finite = 0;
+  let identity = true;
+  for (let i = 0; i <= N; i++) {
+    const r = f(SCAN_LO + i * SCAN_STEP);
+    if (Number.isNaN(r)) continue;
+    finite++;
+    if (Math.abs(r) > PIN_TOL) {
+      identity = false;
+      break;
+    }
   }
-  if (!other) return NaN;
-  const den = norm3(other) * norm3(ln.dir);
-  if (den < 1e-12) return NaN;
-  const cos = dot3(other, ln.dir) / den;
-  const sin = norm3(cross3(other, ln.dir)) / den;
-  if (r.rel === 'perp') return planar ? sin : cos;
-  if (r.rel === 'parallel') return planar ? cos : sin;
-  const target = ((r.deg ?? 0) * Math.PI) / 180;
-  return Math.abs(cos) - (planar ? Math.sin(target) : Math.cos(target));
-}
-
-/** #1439 (ADR-3D-263): the SIGNED residual of a plane × plane relation at parameter value `a` — 0 ⟺ the
- *  relation holds. The line twin's shape ({@link lineRelParamResidual}) on two normals: ⟂ is n1·n2 (a
- *  sign change), ∥ is |n1 × n2| (non-negative — touch-zero), and the angle is |cos| − cos(target), the
- *  undirected ≤ 90° reading `relDeviation` verifies by — so a pinned root and its recorded claim can
- *  never disagree. */
-function planeRelParamResidual(c: Construction3, r: PlanePinRel3, a: number): number {
-  const n1 = planeAt(c, r.p1, a).n;
-  const n2 = planeAt(c, r.p2, a).n;
-  const den = norm3(n1) * norm3(n2);
-  if (den < 1e-12) return NaN;
-  if (r.rel === 'perp') return dot3(n1, n2) / den;
-  if (r.rel === 'parallel') return norm3(cross3(n1, n2)) / den;
-  return planesCos(c, r.p1, r.p2, a) - Math.cos(((r.deg ?? 0) * Math.PI) / 180);
-}
-
-/** Does the parameter value satisfy EVERY pinning given (plane relations + ⟂s + line relations)? */
-function satisfiesAllPins(c: Construction3, a: number): boolean {
-  for (const r of planePinningRels(c)) {
-    const res = planeRelParamResidual(c, r, a);
-    if (Number.isNaN(res) || Math.abs(res) > 1e-5) return false;
-  }
-  for (const g of paramLinePerps(c)) {
-    const r = perpResidual(c, g.line, g.plane, a);
-    if (Number.isNaN(r) || r > 1e-5) return false;
-  }
-  for (const r of paramPinningLineRels(c)) {
-    const res = lineRelParamResidual(c, r, a);
-    if (Number.isNaN(res) || Math.abs(res) > 1e-5) return false;
-  }
-  return true;
+  const out = identity && finite > 0;
+  identityMemo.set(probe.key, out);
+  if (identityMemo.size > 512) identityMemo.delete(identityMemo.keys().next().value as string);
+  return out;
 }
 
 /** #487 (ADR-3D-124): «ℓ ⊥ π2» on a FREE plane pins the PLANE (its normal ∥ the line), never the
  *  parameter — the free plane's placeholder carries no parameter and must not enter the root-finds,
  *  where `planeAt` would read `z = 0`. One filter, shared by every parameter-machinery consumer.
  *  #552 extends it symmetrically: a FREE line's relation pins the LINE (`resolveFreeLine`), and its
- *  placeholder-less def has no direction for the residual to read. */
+ *  placeholder-less def has no direction for the residual to read.
+ *  #1472 (ADR-3D-286): a ⟂ that holds for EVERY parameter value pins nothing (the identity guard). */
 const paramLinePerps = (c: Construction3): Construction3['linePerps'] =>
   // #801 (ADR-3D-174) joins the same filter for the same reason: an object whose numbers are in a PIN
   // symbol is the pivot's, so rooting the algebraic parameter over it would read the wrong lane's letter.
   c.linePerps.filter(
-    (g) => !c.planes.get(g.plane)?.free && !isFreeLine3(c, g.line) && !planeSym3(c, g.plane) && !lineSym3(c, g.line),
+    (g) =>
+      !c.planes.get(g.plane)?.free && !isFreeLine3(c, g.line) && !planeSym3(c, g.plane) && !lineSym3(c, g.line) &&
+      !(c.param !== undefined && holdsForEveryValue(perpPinProbe(c, g))),
   );
+
+/**
+ * #1472 (ADR-3D-286) — EVERY given that pins the parameter, in root-find form: the relations of
+ * `paramPinningRels` (one list — plane × plane, line × plane, line × line, point × object; direction and
+ * position readings) and the line ⟂ plane givens, each minus the ones that hold for every value.
+ * `pinningGivens`, `paramRoots` and `satisfiesAllPins` all read this, so the count the store blames by,
+ * the DOF cue and the roots cannot disagree about what pins.
+ */
+function paramPinProbes(c: Construction3): ParamPinProbe[] {
+  if (!c.param) return [];
+  const rels = paramPinningRels(c).map((pin) => relPinProbe(c, pin)).filter((p) => !holdsForEveryValue(p));
+  return [...rels, ...paramLinePerps(c).map((g) => perpPinProbe(c, g))];
+}
+
+/** Does the parameter value satisfy EVERY pinning given? */
+const satisfiesAllPins = (probes: ParamPinProbe[], a: number): boolean => probes.every((p) => p.holds(a));
 
 /** How many givens pin the parameter (none ⇒ it is a free sampled DOF). #902 (ADR-3D-219): a stated
  *  VALUE on the parameter («m = 2») pins it like any other given — counted here, so the DOF cue, the
  *  root-find gate and the store's blame attribution all see it as one. */
 export const pinningGivens = (c: Construction3): number =>
-  planePinningRels(c).length + paramLinePerps(c).length + paramPinningLineRels(c).length +
-  (c.param !== undefined && symbolValueOf(c, c.param) !== undefined ? 1 : 0);
+  paramPinProbes(c).length + (c.param !== undefined && symbolValueOf(c, c.param) !== undefined ? 1 : 0);
+
+/** A candidate root, snapped to an integer when it is one to within the scan's accuracy (`+ 0` folds a
+ *  snapped −0, a root approached from below, to 0 — the value is shown to the student, #1439). */
+const snapRoot = (r: number): number => (Math.abs(r - Math.round(r)) < 1e-6 ? Math.round(r) + 0 : r);
 
 /**
  * All parameter values satisfying EVERY pinning given — 1-DOF numeric root-finding
- * only (the docs/20 D3 boundary): sign-change bisection for angle givens, minima
- * scan for ⟂ givens (a non-negative residual), then cross-filtered so a root must
- * satisfy the whole set.
+ * only (the docs/20 D3 boundary): every scan of every given is searched by sign-change bisection and
+ * the touch-zero minima scan, each candidate is SNAPPED and then cross-filtered, so a root must satisfy
+ * the whole set at the very value the figure is drawn at (#1472: the verifier then judges that value).
  */
 export function paramRoots(c: Construction3): number[] {
-  if (pinningGivens(c) === 0) return [];
+  const probes = paramPinProbes(c);
   // #902: a stated value is the ONLY candidate — and it must still satisfy every geometric pinning
   // given, or the set is contradictory (the honest `no-roots`, blamed on the newest pinning statement).
   const stated = c.param !== undefined ? symbolValueOf(c, c.param) : undefined;
-  if (stated !== undefined) return satisfiesAllPins(c, stated) ? [stated] : [];
+  if (stated !== undefined) return satisfiesAllPins(probes, stated) ? [stated] : [];
+  if (probes.length === 0) return [];
+  // #1472: the roots are a function of the pinning givens' CONTENT alone (each probe's key is its claim plus
+  // its operands' definitions), and a figure is resolved at every seed × every branch by the knowledge
+  // sampler — so the scan runs once per pin set, not once per resolve
+  const key = probes.map((p) => p.key).join('\n');
+  const hit = rootsMemo.get(key);
+  if (hit) return [...hit];
   const candidates: number[] = [];
-  for (const r of planePinningRels(c)) {
-    // the line twin's belt-and-braces: sign-change for crossings (⟂, a generic angle), touch-zero for
-    // the non-negative forms (∥, and the 0° / 90° angle endpoints where |cos| − target only touches)
-    const f = (a: number) => planeRelParamResidual(c, r, a);
-    candidates.push(...signChangeRoots(f), ...touchZeroRoots((a) => Math.abs(f(a))));
+  for (const p of probes) {
+    for (const f of p.scans) candidates.push(...signChangeRoots(f), ...touchZeroRoots((a) => Math.abs(f(a))));
   }
-  for (const g of paramLinePerps(c)) {
-    candidates.push(...touchZeroRoots((a) => perpResidual(c, g.line, g.plane, a)));
-  }
-  for (const r of paramPinningLineRels(c)) {
-    // sign-change catches crossings; touch-zero catches the non-negative forms (∥ of two lines)
-    // and double roots — the paramGivens belt-and-braces pattern
-    const f = (a: number) => lineRelParamResidual(c, r, a);
-    candidates.push(...signChangeRoots(f), ...touchZeroRoots((a) => Math.abs(f(a))));
-  }
-  return snapAndDedupe(candidates.filter((a) => satisfiesAllPins(c, a)));
+  const roots = snapAndDedupe(candidates.map(snapRoot).filter((a) => satisfiesAllPins(probes, a)));
+  rootsMemo.set(key, roots);
+  if (rootsMemo.size > 256) rootsMemo.delete(rootsMemo.keys().next().value as string);
+  return [...roots];
 }
+const rootsMemo = new Map<string, number[]>();
 
 /**
  * #479 — is the figure parameter's VALUE knowledge, i.e. forced by the givens rather than picked for

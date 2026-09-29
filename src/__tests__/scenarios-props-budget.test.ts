@@ -15,7 +15,7 @@ describe('reported scenarios — config search succeeds under the app PRODUCTION
   it('[shared-endpoint-extension-either-side-default] findValidConfig resolves the eew5ezi5 figure within 2500ms', () => {
     const sc = SCENARIOS.find((s) => s.id === 'shared-endpoint-extension-either-side-default')!;
     // structuredClone defeats the replay purity memo, so the search pays COLD replays like a live session.
-    const facts = structuredClone(factsOf(sc.steps)) as Fact[];
+    const facts = structuredClone(factsOf(sc.steps, sc.refusedSteps)) as Fact[];
     const found = findValidConfig(facts, 0, 2500);
     expect(found, 'the app-budgeted config search finds a valid configuration').not.toBeNull();
     // The letter-order side is unachievable on this figure, so the found config lives on the RELAXED
@@ -52,8 +52,8 @@ describe('config searches get a generous budget off the main thread (issue #87)'
     // The shared-endpoint figure (issue #19) needs a real search: seed 0 fails the extension order, so
     // findValidConfig must sweep. An expired budget can't sweep ⇒ null; the worker budget resolves it.
     const sc = SCENARIOS.find((s) => s.id === 'shared-endpoint-extension-either-side-default')!;
-    expect(findValidConfig(structuredClone(factsOf(sc.steps)) as Fact[], 0, -1), 'expired budget gives up').toBeNull();
-    expect(findValidConfig(structuredClone(factsOf(sc.steps)) as Fact[], 0, WORKER_SEARCH_BUDGET_MS), 'worker budget resolves it').not.toBeNull();
+    expect(findValidConfig(structuredClone(factsOf(sc.steps, sc.refusedSteps)) as Fact[], 0, -1), 'expired budget gives up').toBeNull();
+    expect(findValidConfig(structuredClone(factsOf(sc.steps, sc.refusedSteps)) as Fact[], 0, WORKER_SEARCH_BUDGET_MS), 'worker budget resolves it').not.toBeNull();
   });
 
   it('[#566 / ADR-445 Am. 1] the seat tier finds the rescue BEFORE the reflection tier runs', () => {

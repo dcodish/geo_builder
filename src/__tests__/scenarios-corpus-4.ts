@@ -48,6 +48,7 @@ import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-harness';
 import { ctxOf } from './scenario-pipeline';
 import { parse } from '@/parser';
+import { computeValues } from '@/replay/core';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -794,17 +795,25 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'existing-point-statements-lower-to-constraints',
     title: 'a statement about an EXISTING point is a constraint, never an "already defined" conflict (M1, ADR-231)',
     guards:
-      'operator prod session `fn34ptei` (2026-07-06): after "טרפז ABCD חסום במעגל" auto-created circle-O with centre O, "O מרכז מעגל חסום במשולש ABC" and "O על ED" both crashed \'O\' is already defined — and the mirrored order crashed the same way, so the figure was unbuildable in ANY order. Root cause (the recurring ADR-075/099/115/119/124 class): the ADR-028/050 reinterpretation mechanism was GATED — point-on-segment required the existing point to own a free param DOF, placements gave up without a free param ancestor, and the conflict branch never recruited. Fix (M1): any existing GeoPoint lowers to its defining incidences (collinear + the stated within/beyond order for על; a hidden-target coincidence for placements), the conflict branch gets the same recruitFreeDofs failure path as typed constraints, and an unsatisfiable statement reports the RELATION (honest over-constraint), never a redefinition conflict. This exact sequence contains a genuinely degenerate step (המשכי CE ו CD share C, so their crossing cannot be a distinct A) — the lock asserts the honest-error CLASS, not a buildable figure; the satisfiable members are locked in redefine-existing-point.test.ts. STEP 3 CHANGED 2026-09-20 (ADR-531, #1274): he typed «המשכי CE ו CD נפגשים בנקודה A», and since the operator ruled that a crossing whose carriers share a letter is REFUSED BY NAME, that sentence no longer reaches the fold at all — the corpus harness has no way to express "this step is expected to be refused" (#1288), so the step is carried here as its non-degenerate twin «המשכי CE ו BD», which redefines the same existing A and still produces the honest over-constraint this scenario exists to lock. His original sentence is covered as a refusal in issue-1274-crossing-already-named.test.ts.',
+      'operator prod session `fn34ptei` (2026-07-06): after "טרפז ABCD חסום במעגל" auto-created circle-O with centre O, "O מרכז מעגל חסום במשולש ABC" and "O על ED" both crashed \'O\' is already defined — and the mirrored order crashed the same way, so the figure was unbuildable in ANY order. Root cause (the recurring ADR-075/099/115/119/124 class): the ADR-028/050 reinterpretation mechanism was GATED — point-on-segment required the existing point to own a free param DOF, placements gave up without a free param ancestor, and the conflict branch never recruited. Fix (M1): any existing GeoPoint lowers to its defining incidences (collinear + the stated within/beyond order for על; a hidden-target coincidence for placements), the conflict branch gets the same recruitFreeDofs failure path as typed constraints, and an unsatisfiable statement reports the RELATION (honest over-constraint), never a redefinition conflict. This exact sequence contains a genuinely degenerate step (המשכי CE ו CD share C, so their crossing cannot be a distinct A) — the lock asserts the honest-error CLASS, not a buildable figure; the satisfiable members are locked in redefine-existing-point.test.ts. STEP 3 IS A DECLARED REFUSAL since 2026-09-29 (#1288, ADR-555): the operator ruled (ADR-531, #1274) that a crossing whose carriers share a letter is REFUSED BY NAME, so «המשכי CE ו CD נפגשים בנקודה A» never reaches the fold — CE and CD meet at C. From 2026-09-20 until the harness could say so, the step was carried as an invented twin «המשכי CE ו BD»; it is his own sentence again, with its refusal asserted in `refusedSteps`. The honest over-constraint this scenario exists to lock is still produced — by the later placement «O מרכז מעגל חסום במשולש ABC», measured on the exact sequence.',
     steps: [
       'טרפז ABCD חסום במעגל',
       'טרפז BCED',
-      'המשכי CE ו BD נפגשים בנקודה A',
+      'המשכי CE ו CD נפגשים בנקודה A',
       'BA',
       'AC',
       'O מרכז מעגל חסום במשולש ABC',
       'O על ED',
     ],
-    expectViolations: true, // the degenerate meet + the un-flexed collinear are intentionally rejected — prior figure kept
+    refusedSteps: [
+      {
+        step: 3,
+        reason: 'crossing-already-named',
+        with: { holder: 'C', id: 'A' },
+        why: 'ADR-531 (#1274): CE and CD share C, so their crossing IS C — refused by name, never minted as a second point',
+      },
+    ],
+    expectViolations: true, // the un-flexed placement is intentionally rejected — prior figure kept
     check(fig) {
       // The class assertion: NO step may report a redefinition conflict — every failure names the relation.
       for (const [id, st] of Object.entries(fig.status)) {
@@ -2862,6 +2871,77 @@ export const SCENARIOS_4: Scenario[] = [
         expect(facts.map((f) => r.status[f.id]), label).toEqual(facts.map(() => 'ok'));
         expect(r.violations, label).toEqual([]);
       }
+    },
+  },
+  {
+    id: 'values-panel-names-circles-1442',
+    title:
+      '#1442 / ADR-552: the values panel never prints an internal circle id — the tangent construction\'s hidden helper circle has no row, and an unnamed circle is «the circle» (was «רדיוס ~tanmid-OE», «רדיוס @ctr-O»)',
+    guards:
+      'External review of prod (relayed 2026-09-27): «Internal object names leak into the values panel, for example «~tanmid-OE» and «@ctr-O».» The radii loop iterated every circle, hidden scaffolding included, and labelled each by its centre id — for the tangent from E that printed the hidden Thales circle («רדיוס ~tanmid-OE = 6.5», its area and circumference), and an unnamed circle printed «רדיוס @ctr-O». Circles are now named through one seam (engine/circleRef): drawn circles only, a visible centre by its letter, an unnamed one as «המעגל» or its ADR-342 token. The wording and the fixtures-wide class lock are in src/__tests__/values-panel-labels-1442.test.ts.',
+    steps: ['מעגל O ברדיוס 5', 'משיק מנקודה E למעגל', 'OE=13'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const rows = computeValues(factsOf(['מעגל O ברדיוס 5', 'משיק מנקודה E למעגל', 'OE=13'])).rows;
+      expect(rows.filter((r) => /[~@]/.test(r.label)).map((r) => r.label), 'no internal id in any label').toEqual([]);
+      const radii = rows.filter((r) => r.kind === 'radius');
+      expect(radii.map((r) => [r.circle, r.value.toFixed(2)]), 'circle O only — the hidden helper circle prints nothing').toEqual([[{ via: 'centre', name: 'O' }, '5.00']]);
+      // the unnamed-circle twin: the only circle, centre anonymous — named as «the circle», never @ctr-O
+      const bare = computeValues(factsOf(['מעגל ברדיוס 3'])).rows.filter((r) => r.kind === 'radius');
+      expect(bare.map((r) => [r.circle, r.label, r.value.toFixed(2)])).toEqual([[{ via: 'sole' }, '', '3.00']]);
+    },
+  },
+  {
+    id: 'overconstrained-names-the-completing-statement-1203',
+    title: '#1203: a later line that breaks an earlier given is the statement named — «AC = 6» סותר את «α = 50», never an innocent older given',
+    guards:
+      "Operator ruling 2026-09-20 (option (b)): a statement that makes an EARLIER given infeasible may still commit, with the earlier row marked, but the message names the NEW statement. ADR-508's counterpart search could only look backwards, so it named «זווית ACB = 30» — a given that held together with «AC = 6» a moment earlier — while «α = 50», the line that completed the contradiction, sat green. Measured on the pre-change tip through runSubmit: «α = 50» commits and the status tail was [vs #4]. The search now tries the LATER statements first, latest first (ADR-554). Row 9 is «α = 50» (the triangle is row 0, «AB=4» rows 1–2, «זווית ABC = α» row 3, «זווית ACB = 30» rows 4–6, «AC = 6» rows 7–8). The message-level assertion (real Hebrew locale) and the latest-that-restores lock live in replay/__tests__/issue-1203-forward-blame.test.ts.",
+    steps: ['משולש ABC', 'AB=4', 'זווית ABC = α', 'זווית ACB = 30', 'AC = 6', 'α = 50'],
+    check(fig) {
+      expect(fig.lastError, 'the earlier given is the broken row, naming the later line').toMatch(/^over-constrained: \|AC\| = 6 cannot hold \[vs #9\]$/);
+      // behaviour unchanged: the completing line itself holds
+      expect(Object.entries(fig.status).filter(([id]) => id.startsWith('g5.')).every(([, st]) => st === 'ok'), '«α = 50» commits green').toBe(true);
+    },
+  },
+  {
+    id: 'quarter-circle-conflict-names-no-innocent-given-1203',
+    title: '#1203: the operator’s quarter circles on «ABC משולש ישר זוית · AC=15 · BC=10» — CAB is refused as its own statement; ABC names no innocent earlier given',
+    guards:
+      "The operator's exact sequences from #1203. «רבע מעגל CAB» (two unequal pinned radii) is refused, and the refusal's subject is the quarter's own statement — every row carrying the banner string is the quarter's (group g3), the three givens stay green. «רבע מעגל ABC» commits and the banner used to read «BC=10» סותר את «AC=15» — two of his own consistent givens, with the quarter green. Re-measured at pickup (2026-09-29): since ADR-551 (#1441) the committed case is caught by the obtuse-side proof, which states the right angle at A and the two lengths and names no counterpart; this lock holds that it never regresses to naming «AC=15». The later-statement attribution itself is locked by overconstrained-names-the-completing-statement-1203.",
+    steps: ['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'רבע מעגל CAB'],
+    check(fig) {
+      expect(fig.lastError).toMatch(/^over-constrained: .+ cannot hold/);
+      const owners = Object.entries(fig.status).filter(([, st]) => st === fig.lastError).map(([id]) => id);
+      expect(owners.length).toBeGreaterThan(0);
+      expect(owners.every((id) => id.startsWith('g3.')), 'the refusal is the quarter statement’s own').toBe(true);
+      expect(Object.entries(fig.status).filter(([id]) => !id.startsWith('g3.')).every(([, st]) => st === 'ok'), 'the three givens stand').toBe(true);
+
+      const facts = factsOf(['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'רבע מעגל ABC']);
+      const abc = replay(facts);
+      expect(abc.lastError, '«רבע מעגל ABC» is flagged').not.toBeNull();
+      expect(abc.lastError as string, 'never «BC=10» contradicts «AC=15»').not.toMatch(/\[vs #1\]$/);
+      expect(abc.lastError as string).toMatch(/^impossible: the angle at A is 90°/);
+    },
+  },
+  {
+    id: 'shared-endpoint-crossing-refused-944',
+    title: '#944 → ADR-531: «D = חיתוך AB ו-BC» is REFUSED naming B — the crossing of two sides that share B is B itself',
+    guards:
+      "the #944 sequence (found while verifying #942's play case, 2026-09-08), restored to the corpus as the operator typed it (#1288, ADR-555). It first shipped as a BUILD (ADR-489: D minted at B, «B=D» on the canvas); on 2026-09-20 the operator reversed that — \"we refuse the B=D\" (ADR-531, #1274) — and the old scenario was deleted because the harness could not express a refusal. Now the refusal IS the behaviour under test: step 2 is declared in refusedSteps with the payload the student's message is built from (holder B, new name D), so a change that lets the sentence build again, or refuses it for another reason, turns this red. The triangle before it stays intact and nothing named D exists. The full submit-path surface (message text, both languages, every spelling) stays in issue-1274-crossing-already-named.test.ts.",
+    steps: ['משולש ABC', 'D = חיתוך AB ו-BC'],
+    refusedSteps: [
+      {
+        step: 2,
+        reason: 'crossing-already-named',
+        with: { holder: 'B', id: 'D' },
+        why: 'ADR-531 (#1274): AB and BC share B, so their crossing IS B — refused by name ("we refuse the B=D")',
+      },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the triangle carries no violated given').toEqual([]);
+      expect(fig.positions.has('D'), 'the refused sentence minted nothing — there is no second point at B').toBe(false);
+      for (const id of ['A', 'B', 'C']) expect(fig.positions.has(id), `the triangle keeps ${id}`).toBe(true);
     },
   },
 ];

@@ -17,6 +17,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { parse } from '../index';
+import heLocale from '../../i18n/locales/he.json';
+import enLocale from '../../i18n/locales/en.json';
 
 const r = (u: string) => parse(u, {});
 
@@ -83,9 +85,9 @@ describe('#777 — the ask does not spread', () => {
 });
 
 describe('#777 — i18n', () => {
-  it('both languages carry the ask, and it names both slots', async () => {
-    const he = (await import('../../i18n/locales/he.json')).default as unknown as { input: Record<string, string> };
-    const en = (await import('../../i18n/locales/en.json')).default as unknown as { input: Record<string, string> };
+  it('both languages carry the ask, and it names both slots', () => {
+    const he = heLocale as unknown as { input: Record<string, string> };
+    const en = enLocale as unknown as { input: Record<string, string> };
     for (const [lang, j] of [
       ['he', he],
       ['en', en],
