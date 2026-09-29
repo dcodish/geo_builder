@@ -448,14 +448,17 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   elsewhere the convention is taught, never guessed.** Point labels are uppercase by convention, and 3-D
   carries case-significant tokens 2-D lacks (axes x/y/z, parameters k/m/t, vector names u/v/w, R vs r,
   ℓ), so a blanket case-fold is not available. A lowercase run **parses like its uppercase twin** in a
-  position only a label can occupy — after the angle glyph/word or a point/vertex noun (#181), or at the
-  head of a coordinate definition («c(p²,0,1)», #924). An un-anchored lowercase run («ab = 5»,
+  position only a label can occupy — after the angle glyph/word or a point/vertex noun (#181), at the
+  head of a coordinate definition («c(p²,0,1)», #924), or as the single-letter SUBJECT of a midpoint
+  statement («x אמצע SA», «x is the midpoint of SA», #1523 — axis letters included, since an axis is never
+  a midpoint). A sentence that auto-names a point («אמצע SA») does so only when it says nothing else: a
+  word it cannot read declines the line, never vanishes from it. An un-anchored lowercase run («ab = 5»,
   «ac ⊥ bd», «תיבה abcd») is **taught** — the corrected spelling is shown (#353) — and is never sent to
   the paid fallback. The case-significant lanes are byte-unchanged: `t(m-2,m,m+2)` in a line equation is
   the parameter, «נקודה x» stays the student's to disambiguate. *(Realised —
   [ADR-3D-039](06b-decisions-3d.md#adr-3d-039), [ADR-3D-092](06b-decisions-3d.md#adr-3d-092),
-  [ADR-3D-223](06b-decisions-3d.md#adr-3d-223); `lowercase-labels.test.ts`, `lowercase-nudge.test.ts`,
-  `issue-924.test.ts`. Whether a SOLID noun should become an anchor — «תיבה abcda'b'c'd'», a run the
+  [ADR-3D-223](06b-decisions-3d.md#adr-3d-223), [ADR-3D-287](06b-decisions-3d.md#adr-3d-287); `lowercase-labels.test.ts`, `lowercase-nudge.test.ts`,
+  `issue-924.test.ts`, `issue-1523-autoname-whole-utterance.test.ts`. Whether a SOLID noun should become an anchor — «תיבה abcda'b'c'd'», a run the
   nudge cannot lift — is escalated on #924: two rulings collide there.)*
 
 ## Non-goals
