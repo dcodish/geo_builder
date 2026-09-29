@@ -174,7 +174,10 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
   diagnose. FR-SL-7's long link remains as the offline fallback and whenever the store cannot be
   reached. *(Realised — [ADR-W-081](06w-decisions-workspace.md#adr-w-081), #1374. Operator ruling
   2026-09-23: 2 GB allocated, usage tracked on the admin dashboard rather than by push alert;
-  measured at ~50 KB a share, so ~40,000 shares.)*
+  measured at ~50 KB a share, so ~40,000 shares.)* The operator is **warned before it fills**: the
+  admin dashboard shows a banner from 80% of the allocation, red from 95%, saying what refuses at 100%,
+  and every store-full refusal writes a line to the proxy journal. No lower cap and no eviction — a
+  warning only, by operator ruling. *(Realised — [ADR-W-104](06w-decisions-workspace.md#adr-w-104), #1380.)*
 - **FR-SL-9 (Must)** — **An arriving figure is bounded.** A link, a short link, a file or a restored
   session is input from someone else, so its size is checked on ARRIVAL — never trusted because the
   sender's tool would not have emitted it. A figure over a stated ceiling (characters, inflated bytes,
