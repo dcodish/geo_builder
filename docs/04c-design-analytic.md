@@ -1756,3 +1756,21 @@ with the circle solves the stated radius. The creation tail («שרדיוסו 5�
 given is judged line against line. The perimeter ask delegates to the side sum; the perimeter given
 lowers to the same `length-eq`; `ringsNamed` (`engine/shapes.ts`) resolves a noun-only perimeter for
 both.
+
+## The LLM lane's prompt: derive, never invent; never prose ([ADR-AG-186](06c-decisions-analytic.md#adr-ag-186))
+
+The fallback prompt (`parser/llmSharedAnalytic.ts`) states **both halves of ADR-052**. A value nothing
+the student said determines is never supplied; a value their own data DETERMINES is not an invention and
+may be written into a line. The canonical case is a line by a point and a slope, written in point-slope
+form with the stated numbers copied (`הישר y-3=4(x-2)`) — the equation layer evaluates that form as it
+stands, so neither the model nor the student does arithmetic, and the line reads back as what was
+typed. Every step must be a catalogue command; prose is refused as if the answer were empty.
+
+The catalogue is the model's vocabulary, so a construct with no row has no pattern: the point-and-slope
+line has one (F3), and so does the named-point form (F19: a free-direction line through the point,
+then its slope).
+
+**What the student reads when nothing recorded** is one pure decision, `fallbackRefusal`
+(`app/fallback.ts`): a throttle is «busy»; a completion the tool READ and declined is «understood, not
+supported» (ADR-AG-170); a completion that is not a command at all (`not-handled`), or no answer, keeps
+the student's ORIGINAL refusal — nothing was understood, and the move may well be supported.
