@@ -188,7 +188,7 @@ export function decidePreParse(utterance: string, view: DecideView): Verdict2D |
 }
 
 /** The categories answered with guidance BEFORE the model (ADR-289; #1357 added `unrelated`). */
-export const PRE_LLM = new Set(['analytic', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point', 'unnamed-sides', 'compound-relation', 'unrelated']);
+export const PRE_LLM = new Set(['analytic', 'coordinate-point', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point', 'unnamed-sides', 'compound-relation', 'unrelated']);
 
 /** The parse-and-dry-run half. Assumes {@link decidePreParse} returned `null` for this utterance. */
 export async function decideFromParse(
@@ -404,11 +404,11 @@ export async function decideFromParse(
       : 'input.tangentsExhaustedAny';
     return refuse('guided', { source: 'parser', result: `tangents-exhausted:${r.kind}` }, { key: msgKey });
   }
-  // Analytic / coordinate-geometry terminology (axes, coordinates, slope, line equations) — a DIFFERENT
-  // tool. This one builds synthetic constructions; a coordinate-geometry tool is planned separately.
-  // Refuse immediately with the pedagogical "wrong tool" message and tag it `scope:analytic` — never spend
-  // an LLM call on input that can never build. (Runs only on a failed grammar parse; a coordinate free-point
-  // like "A = (3,5)" parses via `freePoint` and never reaches here.)
+  // Analytic / coordinate-geometry input (axes, coordinates, slope, line equations — and, since #1245, a
+  // point PLACED at coordinates, «E=(-1,7)») — a DIFFERENT tool: the live analytic Builder. Refuse
+  // immediately with the pointer message and tag it `scope:<category>` — never spend an LLM call on input
+  // that can never build here. (Runs only on a failed grammar parse; the coordinate rule is withdrawn, so
+  // «A = (3,5)» now fails the parse and lands here — ADR-553.)
   if (!r.ok) {
     const oos = classifyOutOfScope(utterance);
     // #43 (ADR-289): the whole GUIDANCE register short-circuits BEFORE the LLM — none of these

@@ -655,7 +655,7 @@ describe('theorem matchers (real pipeline)', () => {
       expect(ids).toEqual(expect.arrayContaining([105, 107, 108, 109]));
     });
     it('a stated line THROUGH the centre cutting the circle twice is a stated diameter (103/104)', () => {
-      const ids = surfaced('circle O', 'point A at (12,0)', 'the line AO cuts circle O at C and D');
+      const ids = surfaced('circle O', 'A outside circle O', 'the line AO cuts circle O at C and D'); // #1245: was «point A at (12,0)»
       expect(ids).toEqual(expect.arrayContaining([103, 104]));
     });
     it('a stated arc EQUALITY announces the central-angle correspondence (92)', () => {

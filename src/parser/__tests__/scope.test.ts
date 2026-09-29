@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { classifyOutOfScope, looksCompound, looksLikeLatex, wordRootMagnitude } from '../scope';
 import { parse } from '../parse';
 
-describe('classifyOutOfScope — analytic / coordinate geometry (a different, planned tool)', () => {
+describe('classifyOutOfScope — analytic / coordinate geometry (the live analytic Builder)', () => {
   for (const he of [
     'ציר ה-x',
     'ציר y',
@@ -37,6 +37,19 @@ describe('classifyOutOfScope — analytic / coordinate geometry (a different, pl
   }
   it('exposes the i18n message key', () =>
     expect(classifyOutOfScope('the y axis')?.messageKey).toBe('input.scope.analytic'));
+});
+
+// #1245 (ADR-553): placing a point AT coordinates is withdrawn from 2-D — every spelling is its own register
+// family, answered with the analytic Builder's spelling. (It used to be the `freePoint` rule, and these two
+// rows used to sit in the "does NOT steal" list below as SUPPORTED constructions.)
+describe('classifyOutOfScope — a point placed at coordinates (#1245)', () => {
+  for (const u of ['A = (3, 5)', 'point B at (1, 2)', 'E=(-1,7)', 'E(-1,7)', 'נקודה A ב-(0,0)', 'הנקודה E=(-1,7)', 'A at 0,0']) {
+    it(u, () => expect(classifyOutOfScope(u)).toEqual({ category: 'coordinate-point', messageKey: 'input.scope.coordinate-point' }));
+  }
+  // A segment pair's second letter is never read as a point: the label must stand alone.
+  for (const u of ['AB = (4-0)', 'BC = 6, CA = 8', 'AB = 3,5', 'DF:FC = 1:2']) {
+    it(`not a coordinate point: ${u}`, () => expect(classifyOutOfScope(u)?.category).not.toBe('coordinate-point'));
+  }
 });
 
 describe('looksCompound — several statements packed into one line (advise breaking up)', () => {
@@ -105,8 +118,6 @@ describe('classifyOutOfScope — does NOT steal a genuine construction gap', () 
     'E נקודת החיתוך של AO עם המעגל', // an intersection point
     '∠GEC=∠CHA', // angle equality (a real relation we support / should)
     'נקודה D על AB', // a plain point-on-segment
-    'A = (3, 5)', // coordinate free-point placement — SUPPORTED (freePoint grammar); must NOT read as analytic
-    'point B at (1, 2)',
     'AB = 4', // a length given — the "= number" must not trip the line-equation pattern
     'BC = 6, CA = 8',
     'circle O radius 5',

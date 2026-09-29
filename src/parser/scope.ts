@@ -11,9 +11,12 @@
  *     don't let "alternate angles" inflate the real-gap count).
  *
  * Categories (all surfaced by the tool elsewhere or simply not its job):
+ *   - `coordinate-point` — a point PLACED at coordinates («E=(-1,7)», «נקודה A ב-(0,0)», "point A at (0,0)",
+ *     «E(-1,7)»). Withdrawn from 2-D by operator ruling (#1245, ADR-553): it is the analytic Builder's
+ *     construct, and the message teaches that tool's spelling, `E(-1,7)`, and its URL.
  *   - `analytic`       — analytic / coordinate geometry: axes, coordinates, slope, line equations, origin.
- *     This tool builds SYNTHETIC constructions; a separate coordinate-geometry tool is planned. `App.submit`
- *     short-circuits this category BEFORE the LLM call (it can never build — no reason to spend a call).
+ *     This tool builds SYNTHETIC constructions; the live analytic Builder does these (#1162). Both analytic
+ *     categories short-circuit BEFORE the LLM call (`PRE_LLM` — they can never build here).
  *   - `angle-relation` — named angle relationships / theorem names (alternate/corresponding/co-interior
  *     angles, Pythagoras, Thales…). The tool DETECTS and surfaces these (Phase 6); they're never typed.
  *   - `proof`          — "prove / show that / הוכח". The tool draws figures, it doesn't write proofs.
@@ -28,6 +31,8 @@ import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 
 export type ScopeCategory =
   | 'analytic'
+  // #1245 (ADR-553): a point placed AT COORDINATES — the analytic Builder's construct, withdrawn from 2-D.
+  | 'coordinate-point'
   | 'angle-relation'
   | 'proof'
   | 'compute'
@@ -65,6 +70,17 @@ interface ScopeRule {
   category: Exclude<ScopeCategory, 'unrelated'>; // 'unrelated' is the no-signal fallback, not a keyword rule
   patterns: RegExp[];
 }
+
+/**
+ * #1245 (ADR-553) — the COORDINATE-PLACEMENT spellings, as one vocabulary. A coordinate is a signed decimal
+ * (ASCII or Unicode minus); a pair is two of them in parentheses. The label must stand alone
+ * (`(?<![A-Za-z\d])`), so a segment pair's second letter («AB = (4-0)») can never read as a point.
+ */
+const COORD = String.raw`[-−+]?\s*\d+(?:\.\d+)?`;
+const COORD_PAIR = String.raw`\(\s*${COORD}\s*[,;]\s*${COORD}\s*\)`;
+const COORD_LABEL = String.raw`(?<![A-Za-z\d])[A-Za-z]\d*`;
+/** the joiners a student puts between the label and the pair: «=», «:», "at", "is at", «ב-», «בנקודה» */
+const COORD_JOIN = String.raw`(?:=|:|\bis\s+at\b|\bat\b|ב-?|בנקודה)`;
 
 const RULES: ScopeRule[] = [
   {
@@ -117,24 +133,37 @@ const RULES: ScopeRule[] = [
     ],
   },
   {
+    // #1245 (ADR-553, operator ruling 2026-09-21: "withdraw all of it"): a point PLACED at coordinates.
+    // 2-D used to build it (the `freePoint` rule, now withdrawn); it is the analytic Builder's construct,
+    // so every spelling — the analytic one «E(-1,7)» included — gets ONE answer that names the live tool
+    // and teaches its spelling. Placed BEFORE `analytic` so a coordinate LIST («נקודה A(1,4) B(1,1)») gets
+    // the same answer as a single point. Three shapes:
+    //  1. a label, an optional joiner, a parenthesised pair — «E=(-1,7)», «A(3,5)», «נקודה A ב-(0,0)»;
+    //  2. a label, a REQUIRED joiner, a bare pair — «A = 3,4», "A at 0,0" (the withdrawn rule's paren-less form);
+    //  3. a point noun with a pair later in the sentence — «הנקודה E נמצאת ב-(-1,7)», "point E is at (-1,7)".
+    // No supported construction carries a numeric coordinate pair (the catalog no-theft guard checks it),
+    // and this classifier only ever sees a FAILED parse.
+    category: 'coordinate-point',
+    patterns: [
+      new RegExp(String.raw`${COORD_LABEL}\s*${COORD_JOIN}?\s*${COORD_PAIR}`, 'i'),
+      new RegExp(String.raw`${COORD_LABEL}\s*${COORD_JOIN}\s*${COORD}\s*,\s*${COORD}(?![\d.])`, 'i'),
+      new RegExp(String.raw`(?:נקוד|\bpoints?\b)[^()]*${COORD_PAIR}`, 'i'),
+    ],
+  },
+  {
     // Analytic / coordinate geometry — a DIFFERENT tool. This one builds synthetic constructions on a
-    // free canvas (no axes); axes, coordinates, slopes and line equations belong to a coordinate-geometry
-    // tool that's planned separately. Placed FIRST so "the slope of AB" / "calculate the slope" surface the
+    // free canvas (no axes); axes, coordinates, slopes and line equations belong to the live analytic
+    // Builder (#1162 — the message names it). Placed early so "the slope of AB" / "calculate the slope" surface the
     // helpful "wrong tool" message rather than the generic compute refusal. Patterns are kept SPECIFIC so a
     // real construction is never mislabelled: the Hebrew stems ("ציר"/"שיפוע"/"קואורדינ") and English words
     // ("axis"/"slope"/"coordinate"/"origin"/"cartesian") appear in NO supported construct, and the numeric
     // line-equation form requires BOTH `y =` and an `x` term (so a given like "AB = 4" can't trip it).
-    // NOTE: placing a free point AT coordinates ("A = (3,5)") stays supported — the `freePoint` grammar
-    // rule builds it, so it never reaches this classifier (which runs only on a FAILED parse).
+    // A point placed AT coordinates («A = (3,5)», a coordinate list) is the `coordinate-point` rule above.
     category: 'analytic',
     patterns: [
       // #109: the axis letter may be UPPERCASE («ציר X» — this pattern carries no `i` flag, so `[xy]` alone
       // missed it), and a coordinate GRID («רשת X Y») is the same frame by another name.
-      /מערכת\s*צירים|ראשית\s*הצירים|צירים|ציר\s+ה|ציר\s*[-]?\s*[xyXY]|רשת\s*[-]?\s*[xyXY]|שיפוע|קואורדינ|שיעורי\s+ה|שיעור\S*\s*ה?-?\s*[xyXY]|משוואת?\s+ה?(?:ישר|קו|פונקצי)|קרטזי/, // axes / origin / slope / coordinates ("שיעורי הנקודה" / "שיעור ה-x") / line-equation / cartesian / grid
-      // #109: a LIST of points given by absolute coordinates — «נקודה A(1,4) B(1,1) C(5,1)». Two or more
-      // pairs, so the single «A = (3,5)» free point (which parses deliberately) is untouched; and this
-      // classifier only ever runs on a FAILED parse, so it can never intercept that rule.
-      /[A-Z]\d*\s*\(\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*\)[\s,]*[A-Z]\d*\s*\(\s*-?\d+(?:\.\d+)?\s*,/,
+      /מערכת\s*צירים|ראשית\s*הצירים|צירים|ציר\s+ה|ציר\s*[-]?\s*[xyXY]|רשת\s*[-]?\s*[xyXY]|שיפוע|קואורדינ|שיעורי\s+(?:ה|נקוד)|שיעור\S*\s*ה?-?\s*[xyXY]|משוואת?\s+ה?(?:ישר|קו|פונקצי)|קרטזי/, // axes / origin / slope / coordinates ("שיעורי הנקודה" / "שיעורי נקודות" #1162 / "שיעור ה-x") / line-equation / cartesian / grid
       /\b[xy][-\s]?axis\b|\baxes\b|\baxis\b|\bslope\b|\bcoordinate(?:s)?\b|\bcartesian\b|\borigin\b|equation\s+of\s+(?:the\s+)?(?:line|curve|function)/i,
       /(?:^|[^A-Za-z])[yY]\s*=\s*[-+\d.\s/*]*[xX](?![A-Za-z])/, // a line equation "y = 2x + 3" / "y = -x" (needs both y= and an x term)
     ],

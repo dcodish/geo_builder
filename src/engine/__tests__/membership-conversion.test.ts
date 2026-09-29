@@ -16,13 +16,18 @@ const ctxOf = (facts: Fact[]) => {
   const { construction, positions } = replay(facts);
   return buildParseCtx(construction, positions);
 };
-const factsOf = (steps: string[]): Fact[] => {
+/** A step is an utterance, or an engine command (a PINNED point — #1245 withdrew its typed spelling). */
+const factsOf = (steps: (string | AnyCommand)[]): Fact[] => {
   const facts: Fact[] = [];
   let g = 0;
   for (const step of steps) {
+    const group = `g${g++}`;
+    if (typeof step !== 'string') {
+      facts.push({ id: `${group}.${facts.length}`, utterance: '(command)', group, cmd: step, enabled: true });
+      continue;
+    }
     const r = parse(step, ctxOf(facts));
     if (!r.ok) throw new Error(`step did not parse: ${step}`);
-    const group = `g${g++}`;
     for (const cmd of r.commands as AnyCommand[]) facts.push({ id: `${group}.${facts.length}`, utterance: step, group, cmd, enabled: true });
   }
   return facts;
@@ -112,7 +117,7 @@ describe('membership conversion (#236, ADR-384)', () => {
   });
 
   it('a PINNED point is never converted — the membership stays a constraint on the stated stretch', () => {
-    const facts = factsOf(['AB', 'נקודה E ב-(2,3)', 'E על AB']);
+    const facts = factsOf(['AB', { type: 'free-point', id: 'E', x: 2, y: 3 }, 'E על AB']);
     expect(objOf(facts, 'E').kind, 'a stated coordinate is a given (ADR-052)').toBe('free-point');
     const fig = replay(facts);
     expect(fig.construction.constraints.some((c) => c.type === 'collinear')).toBe(true);

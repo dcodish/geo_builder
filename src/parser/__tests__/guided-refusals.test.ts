@@ -22,15 +22,20 @@ describe('#109 — the wrong-product and wrong-frame classes', () => {
     }
   });
 
-  it('coordinate / analytic input gets the future-tool answer', () => {
-    for (const u of ['הקודקוד A נמצא על ציר y', 'קודקוד B על ציר x', 'D מונח על ציר ה-Y', 'ציר X', 'רשת X Y', 'מערכת צירים', 'מערכת צירים קרטזית', 'נקודה A(1,4) B(1,1) C(5,1), D(7,1)', 'the x-axis', 'slope of AB']) {
+  it('coordinate / analytic input gets the analytic-Builder answer', () => {
+    for (const u of ['הקודקוד A נמצא על ציר y', 'קודקוד B על ציר x', 'D מונח על ציר ה-Y', 'ציר X', 'רשת X Y', 'מערכת צירים', 'מערכת צירים קרטזית', 'the x-axis', 'slope of AB']) {
       expect(cat(u), u).toBe('analytic');
     }
+    // #1245 (ADR-553): a coordinate LIST is points placed at coordinates — the same answer as one point
+    expect(cat('נקודה A(1,4) B(1,1) C(5,1), D(7,1)')).toBe('coordinate-point');
   });
 
   it('the messages carry the operator’s two decisions', () => {
     expect(i18n.t('input.scope.cross-app'), 'names the 3-D tool').toContain('3d-builder');
-    expect(i18n.t('input.scope.analytic'), 'promises the future tool').toMatch(/לעתיד|מתוכנן/);
+    // #1162 (ADR-553): this row used to assert the message PROMISED a future tool («מתוכנן לעתיד»); the
+    // analytic Builder is live, so the promise was false in prod. The message now names the tool.
+    expect(i18n.t('input.scope.analytic'), 'names the live analytic tool').toContain('analytic-builder');
+    expect(i18n.t('input.scope.analytic'), 'no longer calls it planned').not.toMatch(/לעתיד|מתוכנן/);
   });
 
   it('does NOT mislabel a real 2-D construction', () => {
