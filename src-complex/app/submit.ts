@@ -40,7 +40,7 @@
 
 import { readEnvelope, type LoadAudit } from '../../shell/save';
 import { parseLineV2 } from '../parser/rules';
-import { askArtifacts, complexScopeOf } from './deriveLines';
+import { complexScopeOf, parseAsk } from './deriveLines';
 import type { ComplexScope } from '../parser/exprParse';
 import type { Derived2 } from '../replay/derive2';
 import { type InputError, type SavedSession, useComplexStore } from '../store/useComplexStore';
@@ -304,16 +304,15 @@ export function editLine(index: number, raw: string): boolean {
  * honestly reads "not determined".
  */
 export type AskReading =
-  | { readonly kind: 'measure' | 'ratio' | 'expr' }
+  | { readonly kind: 'measure' | 'ratio' | 'expr' | 'arg' }
   | { readonly kind: 'statement' }
   | { readonly kind: 'unreadable' };
 
 export function readAsk(raw: string, scope?: ComplexScope): AskReading {
-  const parsed = parseLineV2(raw.trim(), scope);
+  const { parsed, ask: a } = parseAsk(raw, scope);
   if (!parsed.ok) return { kind: 'unreadable' };
-  const a = askArtifacts(parsed.line);
   if (!a) return { kind: 'statement' };
-  return { kind: a.queries.length ? 'measure' : a.ratios.length ? 'ratio' : 'expr' };
+  return { kind: a.queries.length ? 'measure' : a.ratios.length ? 'ratio' : a.argQueries.length ? 'arg' : 'expr' };
 }
 
 /**
@@ -338,11 +337,6 @@ export function submitQuery(raw: string): boolean {
 export function submitLine(raw: string): boolean {
   const st = () => useComplexStore.getState();
   const line = raw.trim();
-  const parsed = parseInFigure(line, activeLines());
-  if (!parsed.ok) {
-    st().setError(unreadRefusal(parsed, line, activeLines()));
-    return false;
-  }
 
   /**
    * #789 — a QUESTION typed in the givens box is routed to the ask lane, never recorded as a fact.
@@ -353,10 +347,18 @@ export function submitLine(raw: string): boolean {
   // #1405: read against the figure's declared letters — a bare `u` is a question about a real
   // parameter, and a statement once u is declared complex
   const ask = readAsk(line, scopeOf(activeLines())).kind;
-  if (ask === 'measure' || ask === 'ratio' || ask === 'expr') {
+  if (ask !== 'statement' && ask !== 'unreadable') {
     st().addQuery(line);
     st().clearError();
     return true;
+  }
+
+  // #1437 amendment: the question is read FIRST, because a framed question («מהו |w|», «|w|?») is
+  // not a statement the grammar reads — refusing it here as unparseable would never reach the lane
+  const parsed = parseInFigure(line, activeLines());
+  if (!parsed.ok) {
+    st().setError(unreadRefusal(parsed, line, activeLines()));
+    return false;
   }
 
   // the gate reads the ACTIVE figure — a muted line must not veto a new statement (B5)
@@ -405,7 +407,7 @@ export function hydrateSession(data: unknown): boolean {
     // mute in the lane model, so a muted saved ask migrates like an enabled one.
     if (savedDisabled.has(i)) {
       const kind = readAsk(line).kind;
-      if (kind === 'measure' || kind === 'ratio' || kind === 'expr') st().addQuery(line);
+      if (kind !== 'statement' && kind !== 'unreadable') st().addQuery(line);
       else st().recordDisabledLine(line);
       return;
     }

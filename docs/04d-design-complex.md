@@ -163,6 +163,11 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   substitutes each member into the asked expression and hands every value, in every configuration, to
   the one predicate `knowledgeOf`. Values that differ inside one drawing are the set's own spread and
   read `multi-solution`, naming the first member.
+- **A line is read as a QUESTION by ONE reader** ([ADR-CX-055](06d-decisions-complex.md#adr-cx-055) A1).
+  `parseAsk` in `app/deriveLines.ts` is called by `readAsk`, the lane lowering and the panel row model;
+  it removes the question frame (`questionBody`, `parser/normalize.ts`) once, before any ask rule runs,
+  and keeps the stripped reading only when it is a pure question. The frame is not an orthography
+  transform, because a transform reaches statements too.
 - **A line's names are read by ONE helper** ([ADR-CX-048](06d-decisions-complex.md#adr-cx-048)).
   `declares` lists only the names a line CREATES. `X^n = …` carries its letter in `roots` alone, so a
   check that read `declares` let a second equation on a reserved letter through as a phantom point.
