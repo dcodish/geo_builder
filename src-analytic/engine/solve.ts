@@ -692,8 +692,20 @@ function shoelace(ps: Pt[]): number {
  *
  * Returns `null` when a referenced point is absent — the caller treats that as "cannot be judged"
  * rather than as "satisfied", which is the difference between an honest report and a false green.
+ *
+ * **Every row is TAGGED by kind (#1556, ADR-AG-178).** `eq` rows are equations — zero on the
+ * solution set and nowhere else nearby, so each independent one removes a degree of freedom. `bound`
+ * rows are ONE-SIDED — a hinge `max(0, …)` that is identically zero on a whole region and says which
+ * part of the solution set is admissible (the bounded side of #1503, the bounded crossing of #1286).
+ * The solve needs both: it minimises their concatenation (`residual`). The freedom COUNT may read only
+ * the equations (`equalityResidual` → `freeRank`): a bound removes no dimension, but when the solve
+ * parks a point exactly on its boundary, the central difference straddles the kink and reads the
+ * hinge as a half-slope equation — a phantom rank. That is how «משיק לצלע CD» removed two degrees of
+ * freedom and the fourth side's tangency was dismissed as already following (#1556). The tag lives
+ * HERE, at the producer, so no consumer has to know which arm emits a clamp.
+ *
  */
-export function residual(
+export function residualRows(
   k: Constraint,
   at: (id: Id) => Pt | null,
   env: Env,
@@ -721,7 +733,7 @@ export function residual(
    * cannot resolve names hands nothing, and those operands report "cannot be judged".
    */
   lineAt?: (name: string) => { a: number; b: number; c: number } | null,
-): number[] | null {
+): ResidualRows | null {
   const pts = constraintRefs(k).map(at);
   if (pts.some((p) => p === null)) return null;
   const p = pts as Pt[];
@@ -732,23 +744,23 @@ export function residual(
       const out: number[] = [];
       if (k.x !== undefined) out.push(p[0].x - evalExpr(k.x, env));
       if (k.y !== undefined) out.push(p[0].y - evalExpr(k.y, env));
-      return out;
+      return { eq: out };
     }
     case 'area': {
       const target = evalExpr(k.value, env);
       const area = Math.abs(shoelace(p)) / 2;
       // Relative to the target, so a figure of area 20 and one of area 2000 converge alike.
-      return [(area - target) / Math.max(1, Math.abs(target))];
+      return { eq: [(area - target) / Math.max(1, Math.abs(target))] };
     }
     case 'midpoint': {
       const [m, a, b] = p;
       const scale = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
-      return [(m.x - (a.x + b.x) / 2) / scale, (m.y - (a.y + b.y) / 2) / scale];
+      return { eq: [(m.x - (a.x + b.x) / 2) / scale, (m.y - (a.y + b.y) / 2) / scale] };
     }
     case 'on-line': {
       const n = Math.hypot(k.a, k.b);
       if (n < 1e-12) return null;
-      return [(k.a * p[0].x + k.b * p[0].y + k.c) / n];
+      return { eq: [(k.a * p[0].x + k.b * p[0].y + k.c) / n] };
     }
     case 'perpendicular': {
       const [a, b, c, d] = p;
@@ -756,7 +768,7 @@ export function residual(
       const v = { x: d.x - c.x, y: d.y - c.y };
       const n = Math.hypot(u.x, u.y) * Math.hypot(v.x, v.y);
       if (n < 1e-12) return null;
-      return [(u.x * v.x + u.y * v.y) / n];
+      return { eq: [(u.x * v.x + u.y * v.y) / n] };
     }
     case 'angle': {
       // `p` is [v, a, b], the order `constraintRefs` gives. The difference in radians over π, so the row
@@ -765,7 +777,7 @@ export function residual(
       const theta = angleAt(v, a, b);
       const deg = evalExpr(k.value, env);
       if (theta === null || !Number.isFinite(deg)) return null;
-      return [(theta - (deg * Math.PI) / 180) / Math.PI];
+      return { eq: [(theta - (deg * Math.PI) / 180) / Math.PI] };
     }
     case 'angle-ratio': {
       const [v1, a1, b1, v2, a2, b2] = p;
@@ -773,7 +785,7 @@ export function residual(
       const right = angleAt(v2, a2, b2);
       const ratio = evalExpr(k.k, env);
       if (left === null || right === null || !Number.isFinite(ratio)) return null;
-      return [(left - ratio * right) / Math.PI];
+      return { eq: [(left - ratio * right) / Math.PI] };
     }
     case 'relation': {
       const u = dirVector(k.u, at, curveAt, env);
@@ -781,7 +793,7 @@ export function residual(
       if (!u || !v) return null;
       // Both unit, so each product is already in [-1, 1] and needs no further scaling. Parallel
       // drives the CROSS product to zero, perpendicular the DOT — the only difference between them.
-      return [k.rel === 'parallel' ? u.x * v.y - u.y * v.x : u.x * v.x + u.y * v.y];
+      return { eq: [k.rel === 'parallel' ? u.x * v.y - u.y * v.x : u.x * v.x + u.y * v.y] };
     }
     case 'slope': {
       const u = dirVector(k.u, at, curveAt, env);
@@ -796,7 +808,7 @@ export function residual(
        *
        * Normalised by the unit direction, so a stated slope reads the same on any scale of figure.
        */
-      return [u.y - m * u.x];
+      return { eq: [u.y - m * u.x] };
     }
     case 'length-eq': {
       // `lineAt` threaded through (#1201): a point-to-line term is unresolvable without it, and an
@@ -809,7 +821,7 @@ export function residual(
        * thousands and one measured in units must converge alike, and a raw difference would let
        * the larger figure dominate a joint solve purely because its numbers are bigger.
        */
-      return [(l - r) / Math.max(1, Math.abs(l), Math.abs(r))];
+      return { eq: [(l - r) / Math.max(1, Math.abs(l), Math.abs(r))] };
     }
     case 'on-curve': {
       const c = curveAt?.(k.curve) ?? null;
@@ -819,7 +831,7 @@ export function residual(
        * normalised and zero exactly on the curve. Reusing it is what keeps "is this point on this
        * line" and "does this line pass through this point" one answer rather than two.
        */
-      return [curveResidual(c, p[0].x, p[0].y)];
+      return { eq: [curveResidual(c, p[0].x, p[0].y)] };
     }
     case 'on-line-2pt': {
       const [d, a, b] = p;
@@ -831,7 +843,7 @@ export function residual(
       // the base length. Zero exactly on the line, and a true distance, so it is comparable with
       // every other residual here without further scaling.
       const off = ((d.x - a.x) * uy - (d.y - a.y) * ux) / n;
-      if (!(k.bounded && k.crossing)) return [off];
+      if (!(k.bounded && k.crossing)) return { eq: [off] };
       /**
        * A bounded CROSSING is on the PIECE, not the line (#1286, ADR-AG-135): the drawn extent decides
        * which roots exist. Two more rows, each the distance the point sits BEYOND an end along the line —
@@ -843,7 +855,7 @@ export function residual(
        * cevian's foot and a point «על הישר» on the infinite line.
        */
       const t = segmentParam(a, b, d)!; // n > 0 above ⇒ never null
-      return [off, Math.max(0, -SEGMENT_EXTENT_TOL - t) * n, Math.max(0, t - 1 - SEGMENT_EXTENT_TOL) * n];
+      return { eq: [off], bound: [Math.max(0, -SEGMENT_EXTENT_TOL - t) * n, Math.max(0, t - 1 - SEGMENT_EXTENT_TOL) * n] };
     }
     case 'tangent-axis': {
       const radius = evalExpr(k.r, env);
@@ -852,7 +864,7 @@ export function residual(
       // below the x-axis touches it exactly as one above does, and demanding a sign would assert
       // a side the student never gave (ADR-052). Which side is a SELECTOR’s business, not this.
       const d = k.axis === 'x' ? Math.abs(p[0].y) : Math.abs(p[0].x);
-      return [d - radius];
+      return { eq: [d - radius] };
     }
     case 'tangent-line': {
       const radius = evalExpr(k.r, env);
@@ -892,9 +904,9 @@ export function residual(
          */
         const [, q, s] = p;
         const t = segmentParam(q, s, p[0])!; // n > 0 above ⇒ never null
-        return [d - radius, Math.max(0, -t) * n, Math.max(0, t - 1) * n];
+        return { eq: [d - radius], bound: [Math.max(0, -t) * n, Math.max(0, t - 1) * n] };
       }
-      return [d - radius];
+      return { eq: [d - radius] };
     }
     case 'tangent-circle': {
       const r1 = evalExpr(k.r, env);
@@ -916,8 +928,8 @@ export function residual(
        * at d = 0, continuous at the floor, and pushing the centres apart where they are free.
        */
       const floor = SOLVE_RESOLUTION * Math.max(Math.abs(r1), Math.abs(r2), d);
-      if (d < floor) return [Math.max(Math.abs(miss), floor - d)];
-      return [miss];
+      if (d < floor) return { eq: [Math.max(Math.abs(miss), floor - d)] };
+      return { eq: [miss] };
     }
     case 'derived-at': {
       /**
@@ -934,7 +946,7 @@ export function residual(
       const ys = parents.map((q) => q.y);
       const spread = parents.length > 1 ? Math.max(...xs) - Math.min(...xs) + Math.max(...ys) - Math.min(...ys) : 0;
       const scale = Math.max(1, spread);
-      return [(p[0].x - target.x) / scale, (p[0].y - target.y) / scale];
+      return { eq: [(p[0].x - target.x) / scale, (p[0].y - target.y) / scale] };
     }
     /**
      * A discrete choice HAS no residual, by construction (#1049).
@@ -951,6 +963,27 @@ export function residual(
       throw new Error(`constraint has no residual: ${JSON.stringify(unmeasured)}`);
     }
   }
+}
+
+/**
+ * A constraint's residual rows, split by kind (#1556, ADR-AG-178): `eq` are equations, `bound` are
+ * one-sided hinges (ADR-AG-005 D7's lesson at the row level — an admissibility bound is not a
+ * constraint on the dimension of the solution set). See {@link residualRows}.
+ */
+export interface ResidualRows {
+  eq: number[];
+  bound?: number[];
+}
+
+/** Every row, equations first and bounds after — what the SOLVE minimises. */
+export function residual(...args: Parameters<typeof residualRows>): number[] | null {
+  const r = residualRows(...args);
+  return r && (r.bound ? [...r.eq, ...r.bound] : r.eq);
+}
+
+/** The EQUATION rows only — what the freedom count ranks (`freeRank`, #1556). */
+export function equalityResidual(...args: Parameters<typeof residualRows>): number[] | null {
+  return residualRows(...args)?.eq ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1221,8 +1254,12 @@ function gaussian(A: number[][], n: number): number[] | null {
  * Computed as `carriers − rank(J)` from the numerical Jacobian at the solution, so **dependent
  * constraints do not over-count**: stating the same area twice, or a constraint implied by others,
  * removes no additional freedom and the rank reflects that where a simple subtraction would not.
+ *
+ * **It must be handed EQUATION rows only** (`equalityResidual`, #1556, ADR-AG-178). A one-sided bound
+ * row differentiated at its boundary is a half-slope, and a rank counts it as an equation it is not.
  */
-export function freeRank(x: number[], residuals: (v: number[]) => number[]): number {
+export function freeRank(x: number[], equalities: (v: number[]) => number[]): number {
+  const residuals = equalities;
   const n = x.length;
   const m = residuals(x).length;
   if (n === 0 || m === 0) return n;

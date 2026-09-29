@@ -20,7 +20,7 @@ import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
 import { apart } from './crossings';
-import { dirVector, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
+import { dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
 import { drawnPieceOver } from './extent';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { curveByName, inDomain, isFree, objectById, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type Selector } from './types';
@@ -364,6 +364,11 @@ export interface CarrierSystem {
   positionsAt: (x: number[]) => Map<Id, Pt>;
   /** The constraint residuals there. Empty when the figure states none. */
   residualsAt: (x: number[]) => number[];
+  /**
+   * The EQUATION rows only — `residualsAt` without the one-sided bound rows (#1556, ADR-AG-178). What the
+   * freedom count ranks; the solve and the locus walk keep `residualsAt`, where a bound must bite.
+   */
+  equalitiesAt: (x: number[]) => number[];
 }
 
 /**
@@ -431,6 +436,14 @@ export function carrierSystem(
       const at = (id: Id) => pos.get(id) ?? null;
       return c.constraints.flatMap(
         (k) => residual(k, at, e, curveAtOf(c, e, at), lineAtOf(c, e, at)) ?? [0],
+      );
+    },
+    equalitiesAt: (x) => {
+      const e = envAt(x);
+      const pos = positionsAt(x);
+      const at = (id: Id) => pos.get(id) ?? null;
+      return c.constraints.flatMap(
+        (k) => equalityResidual(k, at, e, curveAtOf(c, e, at), lineAtOf(c, e, at)) ?? [0],
       );
     },
   };
@@ -593,7 +606,7 @@ function figureDofOf(c: Construction, sys: CarrierSystem, x: number[]): number {
   const n = 2 * sys.ids.length + sys.syms.length;
   if (n === 0) return 0;
   if (c.constraints.length === 0) return n;
-  return freeRank(x, sys.residualsAt);
+  return freeRank(x, sys.equalitiesAt);
 }
 
 /**

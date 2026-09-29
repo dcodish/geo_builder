@@ -953,6 +953,14 @@ set (a circle tangent to the extension is not tangent to the side), unlike the b
 readings of a cevian's foot or «על הצלע». `canonicalConstraint` keys `bounded`, because «משיק לישר
 AB» and «משיק לצלע AB» are different givens, and keeps the pair undirected.
 
+**The extent rows are BOUNDS, and the freedom count does not rank them** ([ADR-AG-178](06c-decisions-analytic.md#adr-ag-178), #1556).
+`residualRows` returns each constraint's rows tagged `{ eq, bound }`: the two hinge rows above (and
+the bounded crossing's two) are `bound`, everything else is `eq`. The solve minimises both
+(`residual` concatenates them); `carrierDofOf` ranks `eq` alone (`CarrierSystem.equalitiesAt` →
+`freeRank`). A bound removes no dimension, and a hinge differentiated exactly at its kink — where the
+solve likes to park a touch point, at a side's end — reads as a half-slope equation and would remove
+one. The locus walk keeps the full rows: there a boundary is where the trace ends.
+
 One target parser (`tangentTargets`) serves every sentence shape, so orders cannot drift — the
 ADR-AG-164 rule applied to tangency: the circle first («מעגל M משיק לישרים l1 ו-l2»), the
 contextual circle («המעגל משיק לישר l1»), the line first («הישר l1 משיק למעגל M», the plural
