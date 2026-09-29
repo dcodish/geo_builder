@@ -40,7 +40,8 @@ export type Operand3 =
   | { kind: 'segment'; a: Id; b: Id }
   | { kind: 'vector'; name: string }
   | { kind: 'line'; name: string }
-  | { kind: 'plane-run'; ids: Id[] }
+  /** #1485: `face` — the student named it «הפאה/הבסיס» (face/base), which sets its drawn default. */
+  | { kind: 'plane-run'; ids: Id[]; face?: true }
   | { kind: 'plane-named'; name: string }
   // #512: the ABSOLUTE-frame operands. A coordinate plane was legal in exactly ONE grammatical
   // position — the #324 rule's private tail, whose subject must be a point-ring — so «A על מישור [xy]»,
@@ -90,6 +91,7 @@ export type Claim3 =
   | { type: 'length-ratio'; a1: Id; b1: Id; a2: Id; b2: Id; p: number; q: number } // A'K : A'C = 2 : 3
   | { type: 'volume-eq'; solid: string; value: number } // נפח החרוט = 100π (value in world units³, π parsed)
   | { type: 'lateral-area-eq'; solid: string; value: number } // שטח המעטפת של החרוט = 65π
+  | { type: 'surface-area-eq'; solid: string; value: number } // #1449: שטח הפנים של החרוט = 90π (lateral + base)
   | { type: 'lines-rel'; a1: Id; b1: Id; a2: Id; b2: Id; rel: 'skew' | 'parallel' | 'intersect' } // NK ו-PL מצטלבים (V7 T3)
   // #766/#765 (ADR-3D-169): the SUBJECT is resolved against the declared figure, not assumed from the
   // letter count. `noun` is the definite noun the student wrote ('any' when they wrote none); `ids` is
@@ -157,6 +159,10 @@ export type ScalarPin =
    */
   | { kind: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // DC⃗ = 3·AB⃗
   | { kind: 'length'; a: Id; b: Id; value: number } // |DC| = 4
+  // #1447 — a VOLUME/AREA with free dims DRIVES like a length (operator ruling 2026-09-27: a later
+  // magnitude may move free shape dims; #754 restricts only the FIRST). The claim stays the arbiter.
+  | { kind: 'volume3'; noun: SolidNoun; ids: Id[]; value: number } // נפח הפירמידה ABCD = 12, driving
+  | { kind: 'area3'; ids: [Id, Id, Id]; value: number } // שטח ABC = 4.5, driving
   | { kind: 'vangle'; vertex: Id; p: Id; q: Id; deg: number } // ∠ADC = 120
   // #909 — the angle between two SEGMENTS that need not meet («הזווית בין A'C לבין BC' היא 70»).
   // `vangle` is shaped as vertex+two rays and cannot express it, which is why the drive used to be
@@ -603,6 +609,14 @@ export interface ParamSignCommand {
   positive: boolean;
 }
 
+/** #1451 — the UNSIGNED declaration «t הוא פרמטר» / «t פרמטר» / "t is a parameter": an
+ *  acknowledgment sharing param-sign's owner gate — idempotent ok for a letter the figure carries,
+ *  the honest `unknown-symbol` for one it does not. */
+export interface ParamDeclCommand {
+  type: 'param-decl';
+  sym: string;
+}
+
 /** `נתון: v = (10,-5,0)` — inject a value for a DECLARED vector (the V4 pivot).
  *  #794 (ADR-3D-168): components take the SAME grammar as point3 — a number, a null
  *  (a bare placeholder letter: that component does not constrain), or an affine
@@ -982,6 +996,7 @@ export type Command3 =
   // it PINS THE SCALE — a free-dim figure is driven to it, a determined one verifies (M1).
   | { type: 'distance-rel'; a: Operand3; b: Operand3; value: number }
   | ParamSignCommand
+  | ParamDeclCommand
   | Plane3Command
   | FreePlaneCommand
   | FreeLineCommand
@@ -1029,7 +1044,9 @@ export type Command3 =
   // #503 (ADR-3D-142): `from` is optional — the APEX-LESS «גובה הפירמידה» derives the apex at apply
   // from the single solid's vertex layout (base ids first, apex LAST — the baseRingOf convention);
   // a solid with no derivable apex (prism/box) refuses `bad-solid`, never a guess.
-  | { type: 'perp-to-base'; from?: Id; face?: Id[] }
+  // `len` (#1448): «גובה הפירמידה 4» — the height phrase carrying its own value. The foot's letter
+  // is minted at apply, so the length claim must chain THERE, on apex→foot, not in the parser.
+  | { type: 'perp-to-base'; from?: Id; face?: Id[]; len?: number }
   // V8-f (G6): cos of the angle between two operands = a value. `cos∠ACB = 3/4`
   // (vertex ⇒ pairs) · `קוסינוס הזווית בין הוקטורים w ו-u הוא √35/10` (named vectors).
   | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number; soft?: boolean }
@@ -1260,6 +1277,10 @@ export interface Construction3 {
   componentSigns: { target: ComponentTarget; axis: 'x' | 'y' | 'z'; positive: boolean }[];
   /** V4 — planes through points, name → ids (resolved from positions after the pivot). */
   pointPlanes: Map<string, Id[]>;
+  /** #1485 (ADR-3D-278): point-run planes whose FIRST mention called them a face or a base — they draw
+   *  as the face polygon by default ({@link defaultPlaneDisplay3}). Derived from the facts, so a saved
+   *  file needs no new field. */
+  faceNamed: Set<string>;
   /** V5 — named lines through two points, resolved from final positions. */
   pointLines: Map<string, { a: Id; b: Id }>;
   /** V8-b — planes defined by a ⊥/∥ relation to an edge, resolved from final positions. */
@@ -1374,6 +1395,15 @@ export const freeCoordKey = (id: Id, axis: 'x' | 'y' | 'z'): string => `${id}@${
  * (the #508 `freePlanesOf` discipline) rather than a switch over claim kinds, so a claim kind added later
  * cannot escape either reader — the apply-time drive routing and the store's not-determined guard.
  */
+/**
+ * #1485 (ADR-3D-278): a plane's display when the student has not toggled it. A plane first named as a
+ * face or base («הפאה SBC», «הבסיס ABC») shows only that face; every other plane shows in full
+ * (ADR-3D-077). The ONE source of the default — the renderer, the toggle cycle and the panel labels
+ * all read it, so "absent = default" stays a single convention.
+ */
+export const defaultPlaneDisplay3 = (c: Pick<Construction3, 'faceNamed'>, name: string): 'face' | 'full' =>
+  c.faceNamed.has(name) ? 'face' : 'full';
+
 export function claimPointIds(c: Construction3, claim: unknown): Id[] {
   const out = new Set<Id>();
   const walk = (v: unknown): void => {
@@ -1413,6 +1443,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   riderNames: [],
   componentSigns: [],
   pointPlanes: new Map(),
+  faceNamed: new Set(),
   pointLines: new Map(),
   relPlanes: new Map(),
   revolutions: [],

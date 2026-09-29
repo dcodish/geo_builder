@@ -24,6 +24,8 @@ import {
   boundImpossibilityError,
   metricImpossibility,
   metricImpossibilityError,
+  obtuseSideImpossibility,
+  obtuseSideImpossibilityError,
 } from './metricFeasibility';
 import { sideImpossibility, sideImpossibilityError } from './sideFeasibility';
 import { recordRequirement, requirementsField } from './requirements';
@@ -872,6 +874,16 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   const boundErr = boundImpossibility(probed.constraints);
   if (boundErr) {
     return { ok: false, error: boundImpossibilityError(boundErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  }
+
+  // #1441 (ADR-551): the fourth member — a pinned angle ≥ 90° makes its opposite side the strictly
+  // longest, so a pinned leg reaching past a pinned opposite side is impossible. Proven here so the
+  // refusal is instant (measured ~20 s of ladder burn on «משולש ישר זווית ABC · AB=3 · BC=4») and so
+  // the ADR-445 seat search meets fast failures instead of a budget-blowing sweep. Same one-way
+  // soundness: a violation proves impossibility; passing proves nothing.
+  const obtuseErr = obtuseSideImpossibility(probed.objects, probed.constraints);
+  if (obtuseErr) {
+    return { ok: false, error: obtuseSideImpossibilityError(obtuseErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
 
   // #1470 + #1487 (ADR-549), stage 0g′: a stated SIDE and a statement that structurally puts the point

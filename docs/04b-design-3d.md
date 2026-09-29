@@ -119,6 +119,13 @@ else, exactly as the clause does. See [ADR-3D-231](06b-decisions-3d.md#adr-3d-23
 rule for what an arc reads, so it is also where the choice lands: a symbol whose valuing row is set to
 `letter` reads its letter instead of its value, and everything else is byte-identical. The resolver
 rides the `App3 → Figure3 → buildScene3` seam that `planeDisplay` already uses.
+
+**A plane's display default is DERIVED, not stored.** `planeDisplay` holds only the student's toggles;
+an absent key means the plane's own default, which `defaultPlaneDisplay3(c, name)` reads from
+`Construction3.faceNamed` — the point-run planes whose first mention was a face/base noun (the operand
+carries `face: true`, and `materializePlaneRun` records it only where it creates the plane). The
+renderer, the store's toggle cycle and both panel labels read that one helper, so a save file needs no
+new field: the default re-derives from the facts on load. See [ADR-3D-278](06b-decisions-3d.md#adr-3d-278) (#1485).
 Which rows OFFER the choice is derived, never listed: `collectWedges` (moved out of `buildScene3` so the
 fact list can read it too — one collection, two readers) yields the wedges, `competingArcSymbols` picks
 those carrying BOTH a label and a value, and `store/paramChips.ts` puts the chip on the enabled fact
@@ -257,6 +264,14 @@ vanished from the panel while «p = 3» survived. What varies per owner kind is 
 PRICED, and that lives with the panel, one branch each, each using the resolver that already exists. The
 knowledge discipline is shared and unchanged: an undetermined letter reads `?` in every lane.
 
+**The ask lane reads a measure question WITH THE STATEMENT GRAMMAR.** `angleAskOperands` and
+`revolutionAskOf` (parse3.ts) parse the question plus a placeholder `= 1` and keep only the relation it
+lowers to: the two operands of an angle, or the solid and measure of a revolution claim. `parseQuery`
+turns those into `angle-ops` (measured by `angleBetweenOperands`, the verifier's own reading) and `rev`
+(measured by `revolutionMeasure` in claims.ts, the verifier's own formulas). A spelling the statement
+lane learns is therefore askable the same day, and the check and the answer share one geometry. The older
+point-run angle heads stay first and keep their answers. See [ADR-3D-279](06b-decisions-3d.md#adr-3d-279) (#1449).
+
 ## Claims
 
 Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape by
@@ -325,6 +340,16 @@ it. A RIGHT value never reaches an arc lane: `rightAngles3` reads every `plane-r
 line × plane 90° spellings) through `operandPairKnee`, gated on the verifier's own predicate
 (`relDeviation` ≤ `DIRECTION_REL_TOL`), and it is not gated on the data panel. A dihedral knee carries no
 `planeN` — both its arms are fixed by the seam, so the legibility rotation must not touch them.
+
+**Line × plane construction ([ADR-3D-280](06b-decisions-3d.md#adr-3d-280)).** The same chip, state and
+scene lane serve a line × plane angle: `dihedralsStatedBy` also yields a `line-rel` angle over a planar
+operand and a `line-plane-angle`, normalized exactly as the object-angle arc lane normalizes them (so its
+`pairKey` cede still works), and `buildScene3` dispatches on the resolved geometry. A line-ish × planar
+pair goes to `linePlaneConstruction` (dihedral.ts): X the crossing, P a named point on the line off the
+plane (else `fallbackLen` along it), H its foot. The scene emits PH and XH dashed, the knee at H into the
+knee lane, the arc at X into the arc lane, and H (plus an unnamed P) as `SceneDihedral3.extra` points. Only
+pairs a construction was actually DRAWN for cede their stated knee (`drawnConstr`), so a right line × plane
+pair, which constructs nothing, keeps its knee.
 
 **Dihedral construction ([ADR-3D-265](06b-decisions-3d.md#adr-3d-265)).** `dihedralConstruction` (same
 module) extends `dihedralGeometry` with a FOOT chosen from a meaningful point — a point run's vertex off the

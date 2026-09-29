@@ -257,6 +257,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'claims', he: 'ℓ אינו מקביל ל-π1 לכל m', en: 'ℓ is not parallel to plane π1 for every m' },
   { category: 'claims', he: 'נפח החרוט = 100π', en: 'the volume of the cone = 100π' },
   { category: 'claims', he: 'שטח המעטפת של החרוט = 65π', en: 'the lateral area of the cone = 65π' },
+  // #1449 (ADR-3D-279): the TOTAL surface (lateral + base) — sayable, and so askable
+  { category: 'claims', he: 'שטח הפנים של החרוט = 90π', en: 'the surface area of the cone = 90π' },
   // --- V7: vector relations & exam terminology ---
   { category: 'points', he: "A'K = 4/5 DN", en: "A'K = 4/5 DN" },
   { category: 'points', he: "DF = (k/2)DB + kDC'", en: "DF = (k/2)DB + kDC'" },

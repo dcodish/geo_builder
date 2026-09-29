@@ -26,9 +26,9 @@
  * arithmetic is bounded integer work on these three shapes (the ADR-CX-006 boundary).
  */
 
-import { type Rat, ONE, add, floor, frac, isZero, mul, neg, rat, sub, toNumber } from './rational';
+import { type Rat, ONE, add, div, floor, frac, isOne as ratIsOne, isZero, mul, neg, rat, sqrtExact, sub, toNumber } from './rational';
 import { type ExpVec, evaluate as evalMod, format as fmtMod, isPrimeAtom } from './modulus';
-import { type Angle, isExactRational } from './angle';
+import { type Angle, gaussianAtomOf, isExactRational } from './angle';
 
 /** `a + b√d` under a square root — the nested radicand of the 18° and 22.5° families. */
 interface Nest {
@@ -322,4 +322,60 @@ export function composeCartesian(re: CartPart, im: CartPart): string {
   if (im.zero) return reSigned;
   if (re.zero) return `${im.negative ? '-' : ''}${imText}`;
   return `${reSigned}${im.negative ? '-' : '+'}${imText}`;
+}
+
+/**
+ * The parts as exact RATIONALS, when `mod·cis(arg)` is a GAUSSIAN RATIONAL — `1+i`, `-2`, `3/2·i`
+ * (#1436). The modulus's √-factor must fold completely into the angle's own radical terms (`√2` into
+ * cos 45° = √2/2), leaving a single pure-rational term per part; any surviving root, nest or residual
+ * higher root answers null. Null is honest: the caller keeps its `≈` decimal. This is what lets the
+ * ask lane do bounded exact arithmetic (sums, differences, products) without a CAS — the Gaussian
+ * rationals are closed under it, and √(rational) at the end is the modulus formatter's own job.
+ */
+export function gaussianRationalParts(mod: ExpVec, arg: Angle): { re: Rat; im: Rat } | null {
+  // A single LITERAL atom (the direction of a stated off-axis `a+bi`, registered at mint time):
+  // the value is `mod · cis(turns) · (a+bi)/|a+bi|`, Gaussian rational again whenever `mod/|a+bi|`
+  // is rational and the residual turn is a quarter-turn multiple (·i per quarter). `2+3i` itself,
+  // its conjugate (coefficient −1) and its ±i/−1 rotations all land here.
+  if (arg.atoms.size === 1) {
+    const [[name, coef]] = [...arg.atoms.entries()];
+    const conj = ratIsOne(neg(coef));
+    if (!ratIsOne(coef) && !conj) return null;
+    const g = gaussianAtomOf(name);
+    if (!g) return null;
+    const split = splitModulus(mod);
+    if (!split || split.residual !== null) return null;
+    const quarter = mul(frac(arg.turns), rat(4));
+    if (quarter.d !== 1n) return null;
+    const s = add(mul(g.re, g.re), mul(g.im, g.im));
+    const k = sqrtExact(div(mul(mul(split.q, split.q), rat(split.s)), s));
+    if (k === null) return null;
+    let re = mul(k, g.re);
+    let im = mul(k, conj ? neg(g.im) : g.im);
+    for (let i = 0n; i < quarter.n; i++) [re, im] = [neg(im), re];
+    return { re, im };
+  }
+  if (!isExactRational(arg)) return null;
+  const split = splitModulus(mod);
+  if (!split || split.residual !== null) return null;
+  const deg = mul(arg.turns, rat(360));
+  const ratOf = (terms: Term[] | null): Rat | null => {
+    if (terms === null) return null;
+    const scaled = collect(terms.map((t) => scaleTerm(t, split.q, split.s)));
+    if (scaled.length === 0) return rat(0);
+    if (scaled.length > 1) return null;
+    const t = scaled[0];
+    return t.k === 1n && t.nest === null ? t.c : null;
+  };
+  const re = ratOf(cosOf(deg));
+  const im = ratOf(sinOf(deg));
+  return re !== null && im !== null ? { re, im } : null;
+}
+
+/** A CartPart from an exact rational — `5`, `5/2` — for {@link composeCartesian} (#1436). */
+export function ratPart(x: Rat): CartPart {
+  if (isZero(x)) return ZERO_PART;
+  const negative = x.n < 0n;
+  const n = negative ? -x.n : x.n;
+  return { zero: false, negative, text: x.d === 1n ? `${n}` : `${n}/${x.d}`, value: toNumber(x) };
 }

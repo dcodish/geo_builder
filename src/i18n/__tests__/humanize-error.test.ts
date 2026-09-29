@@ -31,6 +31,10 @@ const CASES: { raw: string; contains: string[] }[] = [
   // same measure that exclude each other. Both halves are the student's own sentences.
   { raw: 'impossible: |BC| = 4 contradicts |BC| > 10', contains: ['|BC| = 4', '|BC| > 10'] },
   { raw: 'impossible: ∠ABC = 40° contradicts ∠ABC > 100°', contains: ['∠ABC = 40°', '∠ABC > 100°'] },
+  // metricFeasibility.ts (#1441) — the obtuse-side member, BOTH wordings: the hypotenuse sentence at
+  // exactly 90° and the general longest-side sentence for an obtuse angle.
+  { raw: 'impossible: the angle at C is 90°, so |AB| must be the longest side, but |AB| = 3 and |CB| = 4', contains: ['|AB| = 3', '|CB| = 4', 'C'] },
+  { raw: 'impossible: the angle at B is 120°, so |AC| must be the longest side, but |AC| = 5 and |BA| = 7', contains: ['120°', '|AC| = 5', '|BA| = 7'] },
   // core.ts (#926) — a variable whose defining step was removed, muted or failed. Same finding.
   { raw: 'variable α is not defined by any statement (the step that defined it was removed, muted or failed)', contains: ['α'] },
   // step.ts danglingCircleError (#186) — a reference to a circle that doesn't exist

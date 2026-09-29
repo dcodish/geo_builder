@@ -200,3 +200,21 @@ export function formatPi(a: Angle): string | null {
   const num = n === 1n ? 'π' : `${n}π`;
   return k.d === 1n ? `${sign}${num}` : `${sign}${num}/${k.d}`;
 }
+
+/**
+ * #1436 — the GAUSSIAN DIRECTIONS behind literal atoms. `fromCartesian` mints an atom for an
+ * off-axis `a+bi` whose direction has no nice turn; the exact rational pair is known at that moment
+ * and nowhere else, so it is registered here, keyed by the atom's (content-derived) name. A name
+ * later registered with a DIFFERENT pair is poisoned to null — exactness must never guess. Readers
+ * get the pair back and can carry `mod·cis(atom)` as the Gaussian rational it always was.
+ */
+const GAUSSIAN_ATOMS = new Map<string, { re: Rat; im: Rat } | null>();
+
+export function registerGaussianAtom(name: string, re: Rat, im: Rat): void {
+  const prev = GAUSSIAN_ATOMS.get(name);
+  if (prev === undefined) GAUSSIAN_ATOMS.set(name, { re, im });
+  else if (prev !== null && !(ratEq(prev.re, re) && ratEq(prev.im, im))) GAUSSIAN_ATOMS.set(name, null);
+}
+
+export const gaussianAtomOf = (name: string): { re: Rat; im: Rat } | null =>
+  GAUSSIAN_ATOMS.get(name) ?? null;

@@ -200,6 +200,15 @@ export const PATTERNS: Pattern[] = [
     key: 'errors.boundImpossible',
     params: (m) => ({ value: m[1], bound: m[2] }),
   },
+  // metricFeasibility.ts (#1441) — `impossible: the angle at C is 90°, so |AB| must be the longest side, but |AB| = 3 and |CB| = 4`
+  // The right angle gets the curriculum's own word («היתר», the hypotenuse); an obtuse angle states
+  // the general principle — the side opposite the largest angle is the longest.
+  {
+    re: /^impossible: the angle at (\S+) is (\S+)°, so \|(\S+?)\| must be the longest side, but \|\S+?\| = (\S+) and \|(\S+?)\| = (\S+)$/,
+    key: 'errors.hypotenuseImpossible',
+    keyOf: (m) => (m[2] === '90' ? 'errors.hypotenuseImpossible' : 'errors.obtuseSideImpossible'),
+    params: (m) => ({ v: m[1], deg: m[2], hyp: m[3], hypVal: m[4], leg: m[5], legVal: m[6] }),
+  },
   // step.ts danglingCircleError (#186) — `circle 'O2' is not defined`
   { re: /^circle '(.+)' is not defined$/, key: 'errors.unknownCircle', params: (m) => ({ center: m[1] }) },
 

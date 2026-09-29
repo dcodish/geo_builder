@@ -44,7 +44,9 @@ const MAY_IMPORT: Record<string, readonly string[]> = {
   // `Why` code a refusal carries so the strip words the real reason (#1428, ADR-CX-048).
   store: ['value', 'model', 'shell'],
   scene: ['value', 'model', 'solve', 'replay'],
-  render: ['value', 'scene'],
+  // `shell` is the grid-step rule (shell/ticks, #1465, ADR-W-094): the plane's grid is sized to the visible
+  // window, which only the renderer knows, with the step rule analytic grids by — defined once, below both.
+  render: ['value', 'scene', 'shell'],
   parser: ['value', 'model'],
   // `app` is the ONLY layer that may compose the parser with replay: parser names what the student
   // said, replay folds constraints into a figure, and neither may reach for the other. The guard

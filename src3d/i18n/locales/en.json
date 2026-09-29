@@ -30,7 +30,7 @@
   "input": {
     "placeholder": "Type a given, e.g.: cube ABCD",
     "add": "Add",
-    "thinking": "Thinking…"
+    "thinking": "Working…"
   },
   "catalog": {
     "title": "All supported commands",
@@ -43,7 +43,7 @@
   },
   "cue": {
     "determined": "✓ The figure is fully determined by the givens",
-    "free": "Degrees of freedom not yet pinned: {{n}}"
+    "free": "Degrees of freedom: {{n}}"
   },
   "actions": {
     "undo": "Undo",
@@ -159,7 +159,8 @@
     "notADiagonal": "«{{pair}}» is not a diagonal of the solid — it is an edge. A diagonal joins non-adjacent vertices.",
     "notASpaceDiagonal": "«{{pair}}» is not a MAIN diagonal — it is a face diagonal. A main diagonal passes through the solid, joining opposite vertices.",
     "dependentsBroken": "«{{cause}}» was changed or removed, so {{items}} no longer takes effect — what it refers to is not defined any more. The row stays in the list and takes effect again once the definition is back",
-    "ambiguousVectorLengthRatio": "vector or length? write |{{a1}}{{b1}}| = {{c}}|{{a2}}{{b2}}| for lengths, or {{a1}}{{b1}}→ = {{c}}{{a2}}{{b2}}→ for vectors"
+    "ambiguousVectorLengthRatio": "vector or length? write |{{a1}}{{b1}}| = {{c}}|{{a2}}{{b2}}| for lengths, or {{a1}}{{b1}}→ = {{c}}{{a2}}{{b2}}→ for vectors",
+    "baseNeedsOneSolid": "\"The base\" is the base of a solid, and the figure does not have exactly one solid (none yet, or more than one). Declare the solid, or name the plane by its letters"
   },
   "examples": {
     "title": "Examples",
@@ -225,11 +226,12 @@
   },
   "query": {
     "placeholder": "ask… e.g. AE (vector), |AE|, w·v, ∠SAB, area ABC",
-    "add": "Calc",
+    "add": "Ask",
     "remove": "remove",
     "note": {
       "notUnderstood": "not recognised — try A, plane ABC, w·v, |AB|, ∠SAB, area ABC, volume SABCD",
       "unavailable": "those points aren't in the figure",
+      "noObject": "that object isn't in the figure",
       "undetermined": "not determined by the givens",
       "noFrame": "no coordinate system, so no equation — what IS known about the plane is shown. For an equation, state one point's coordinates (e.g. A(0,0,0)) or a plane/line equation",
       "scale": "depends on the figure's scale (pin a size)",
@@ -308,5 +310,16 @@
     "copyButton": "Copy",
     "storeFull": "The share space on the server is full — this is the long link, and it works",
     "offline": "Could not make a short link — this is the long link, and it works"
+  },
+  "solidNoun": {
+    "pyramid": "pyramid",
+    "tetra": "tetrahedron",
+    "cube": "cube",
+    "box": "box",
+    "prism": "prism",
+    "cone": "cone",
+    "cylinder": "cylinder",
+    "sphere": "sphere",
+    "any": "solid"
   }
 }

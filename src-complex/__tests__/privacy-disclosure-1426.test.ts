@@ -16,10 +16,10 @@ const declare = (lng: string) => privacyDeclaration(complexI18n.getFixedT(lng));
 
 privacyDisclosureSuite('complex', declare);
 
-describe('#1426 — complex declares no usage log and no model fallback', () => {
-  it('its note still discloses only the share store', () => {
+describe('#1426 — complex declares its sinks: the usage log since #1243, and still no model fallback', () => {
+  it('usage-log is declared (the emitter is wired now) and llm is not (none exists)', () => {
     const { discloses } = declare('he');
-    expect(discloses).not.toContain('usage-log');
+    expect(discloses).toContain('usage-log');
     expect(discloses).not.toContain('llm');
   });
 });

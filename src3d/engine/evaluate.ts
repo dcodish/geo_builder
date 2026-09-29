@@ -386,7 +386,7 @@ export interface Resolved3 {
    *  the pool holds more than one solution, since that is the only case where a coordinate can be a
    *  branch choice. A coordinate is knowledge only when these agree; without it, a deterministic
    *  branch pick reads seed-stable and prints as fact. */
-  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this). */ scalarConsumed?: () => number } | null;
+  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this). */ scalarConsumed?: () => { dims: number; block: number } } | null;
   /** #930 (ADR-3D-236) — each vec-def RATIO symbol's solved value («SN = k·SC» → k), so a consumer can
    *  read what the branch pick actually chose. The sign verifier needs it: without it a correctly
    *  honoured «k חיובי» reported `sign-unsatisfiable`, because the verifier knew how to read a figure
@@ -867,13 +867,20 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     // #990 (ADR-3D-248): what the scalar pins CONSUME is measured by the resolution (the rank of their
     // residuals' response to the dims), not inferred from their count — a pin the corner's construction
     // already satisfies consumes nothing. The count is the fallback only where no solution recorded it.
-    const consumed = resolved.pivot.scalarConsumed?.() ?? c.scalarPins.length;
+    const sc = resolved.pivot.scalarConsumed?.();
+    const consumed = sc?.dims ?? c.scalarPins.length;
+    const blockConsumed = sc?.block ?? 0;
     // #370 (ADR-3D-247 — the 2026-08-13 ruling "count them"): when the placement is SAMPLED (an absolute
     // object on the canvas, the translation gauge still free — `placementSampled3`, the sampler's own
     // predicate, so the count and the sampling share one source) the 6 placement DOFs are real: only the
     // scale is still gauge, so the allowance absolute pins consume before they cost shape drops from 7 to 1.
     const placement = placementSampled3(c) ? 6 : 0;
-    return Math.max(0, dims + placement - Math.max(0, pinCount - (7 - placement)) - consumed) + freeT + param;
+    // #1415: the scalar pins' consumption is measured in TWO parts and each subtracts from the term
+    // that counts it — `dims` (the #990 number, unchanged) inside the dims clamp, and `block` (the
+    // MARGINAL rank over the block-enrolled free-point coordinates) from `freeT`, clamped on its
+    // own. On «וקטור AB» · «אורך AB = 5» the length consumes one of the six; an over-pinned solid's
+    // deficit can no longer eat an unrelated rider's genuine freedom (the #820 lock's line).
+    return Math.max(0, dims + placement - Math.max(0, pinCount - (7 - placement)) - consumed) + Math.max(0, freeT - blockConsumed) + param;
   }
   // #370: a floating figure beside an absolute object — its placement is sampled, and counted.
   return dims + (placementSampled3(c) ? 6 : 0) + freeT + param;
@@ -1251,6 +1258,38 @@ export function scaleKnown3(c: Construction3): boolean {
   // rescale uses, so "we print sizes" and "the drawing honours the stated size" cannot disagree.
   if (scaleGivenActive(c)) return true;
   if (scalePinned(c)) return true;
+  /**
+   * A REVOLUTION solid's stated dims are absolute lengths (#1450 — the #517 "private enumeration
+   * of absolute sources" class, two members that were missing): «רדיוס הבסיס 5 וגובהו 12» states
+   * real sizes, and the query lane answered «תלוי בקנה המידה» for the 12 the student had just
+   * typed. Likewise a figure of EQUATION planes: «π1: z=3» and «π2: z=1» place absolute planes,
+   * and the distance between them is 2 in the world's own units.
+   */
+  // A stated component INJECTION («AB = (1,2,3)», a pairPin with real numbers) fixes |AB| —
+  // the third missing #517 member the review's own figure hit.
+  for (const pin of c.pairPins) {
+    if ([pin.x, pin.y, pin.z].some((v) => typeof v === 'number')) return true;
+  }
+  for (const rev of c.revolutions) {
+    // A STATED dim only — an unstated radius/height is sampled per seed and is exactly the
+    // similarity freedom this gate exists to withhold.
+    if (typeof rev.radius === 'number' || typeof rev.height === 'number') return true;
+  }
+  // A stated component INJECTION («AB = (1,2,3)», a pairPin with real numbers) fixes |AB| —
+  // the third missing #517 member, and the review's own free-vector figure.
+  for (const pin of c.pairPins) {
+    if ([pin.x, pin.y, pin.z].some((v) => typeof v === 'number')) return true;
+  }
+  if (c.planes.size >= 2 && c.solids.length === 0 && c.revolutions.length === 0) {
+    // Two STATED-equation planes (numeric coefficients — not free, not pin-symbol, not
+    // parameter-carrying) fix real distances in the world's own units: «π1: z=3», «π2: z=1».
+    let absolute = 0;
+    for (const [, def] of c.planes) {
+      const numeric = [def.cx, def.cy, def.cz, def.d].every((e) => !e.p);
+      if (!def.free && !def.sym && numeric) absolute += 1;
+    }
+    if (absolute >= 2) return true;
+  }
   // TWO absolute points state the distances among them — but only a figure with NO solid can take
   // that as figure-wide scale knowledge: a solid's first dim is the frozen similarity gauge, so a
   // DETACHED cube's |AB| = 1 is seed-stable without being knowledge, and a categorical (per-figure)
@@ -2214,6 +2253,53 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       const k = Math.pow(stated / m0, 1 / power);
       for (const [id, p] of pos) pos.set(id, v3(p.x * k, p.y * k, p.z * k));
       for (const [name, pl] of planes) planes.set(name, { n: pl.n, d: pl.d * k });
+    }
+  }
+
+  /**
+   * THE GAUGE IS NOT A CONFIGURATION (#1421, ADR-3D-272 — operator ruling 2026-09-27, twice:
+   * "keep it flat on the floor").
+   *
+   * A figure with nothing fixing it in space has six rigid-motion values, and once a driven given
+   * ran the solve, «הציגו תצורה אחרת» resampled them with the real freedom — the operator's
+   * triangle (|AB| = 5, |AC| = 3) tumbled edge-on to the camera at 3 of 4 seeds and AB drew
+   * SHORTER than AC. Turning the whole figure changes nothing a student stated or could state
+   * (ADR-052: do not sample what cannot matter), so an UNANCHORED figure is normalised after
+   * every solve to the canonical placement a lone triangle already keeps: first point at the
+   * origin, first edge along +x, the first three points' plane on the floor (z = 0, third point
+   * at y > 0). One rigid motion (det +1 — never a reflection) applied to every position, plane
+   * and line, so every relation survives verbatim; configurations change the SHAPE alone.
+   * Anything anchored — coordinates, pins, equation planes/lines, frame relations, solids,
+   * revolutions, circles — is untouched.
+   */
+  if (
+    !hasAbsoluteFrameObject(c) &&
+    absolutePointCount(c) === 0 &&
+    c.solids.length === 0 &&
+    c.revolutions.length === 0 &&
+    c.circles3.length === 0
+  ) {
+    const ordered = [...c.points.keys()].map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
+    let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = null;
+    for (let i = 1; i < ordered.length && !frame; i += 1) {
+      const d1 = sub3(ordered[i], ordered[0]);
+      if (norm3(d1) < 1e-9) continue;
+      for (let j = i + 1; j < ordered.length; j += 1) {
+        const d2 = sub3(ordered[j], ordered[0]);
+        const nRaw = cross3(d1, d2);
+        if (norm3(nRaw) < 1e-9) continue;
+        const e1 = normalize3(d1);
+        const n = normalize3(nRaw);
+        frame = { p0: ordered[0], e1, e2: cross3(n, e1), n };
+        break;
+      }
+    }
+    if (frame) {
+      const { p0, e1, e2, n } = frame;
+      const rot = (v: Vec3): Vec3 => v3(dot3(v, e1), dot3(v, e2), dot3(v, n));
+      for (const [id, p] of pos) pos.set(id, rot(sub3(p, p0)));
+      for (const [name, pl] of planes) planes.set(name, { n: rot(pl.n), d: pl.d + dot3(pl.n, p0) });
+      for (const [name, ln] of lines) lines.set(name, { ...ln, anchor: rot(sub3(ln.anchor, p0)), dir: rot(ln.dir) });
     }
   }
 

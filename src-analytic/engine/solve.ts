@@ -89,8 +89,9 @@ export type AngleName = AngleRef | { v: Id; a?: undefined; b?: undefined };
 /** Is this name already an angle (three points), needing no figure to resolve? */
 export const isAngleRef = (n: AngleName): n is AngleRef => n.a !== undefined && n.b !== undefined;
 
-/** The unsigned angle at `v` between the rays to `a` and `b`, in RADIANS — null when a ray has no length. */
-function angleAt(v: Pt, a: Pt, b: Pt): number | null {
+/** The unsigned angle at `v` between the rays to `a` and `b`, in RADIANS — null when a ray has no length.
+ *  EXPORTED for #1409: the ask lane answers with the SAME function the angle residual constrains. */
+export function angleAt(v: Pt, a: Pt, b: Pt): number | null {
   const ux = a.x - v.x;
   const uy = a.y - v.y;
   const wx = b.x - v.x;
@@ -204,7 +205,20 @@ export type Constraint =
    * It is the first member of the `on-curve` carrier family `carriers.ts` named in slice A and
    * left empty.
    */
-  | { t: 'on-curve'; id: Id; curve: Id }
+  | {
+      t: 'on-curve';
+      id: Id;
+      curve: Id;
+      /**
+       * The operand's own EQUATION, when the sentence named the curve that way (#1429). Carried so
+       * the apply boundary can resolve it to an existing curve with the same equation (the
+       * ADR-AG-023/#1342 identity class) or mint it `stated: false` — and STRIPPED there, so the
+       * applied constraint is one statement however the curve was spelled. Never part of
+       * {@link canonicalConstraint}'s key.
+       */
+      eqSrc?: string;
+      eq?: unknown;
+    }
   /**
    * `D` is collinear with `a` and `b` — «D על הישר BC», «D על הצלע BC» (#1069, #1073).
    *
@@ -382,6 +396,9 @@ export function canonicalConstraint(k: Constraint): string {
     const [p, q] = [k.centre, k.other].sort();
     return `tangent-circle|${p}|${q}|${k.branch}`;
   }
+  // The equation fields are SPELLING (#1429) — apply strips them, but a raw constraint compared
+  // before that must not read as a different statement than its applied twin.
+  if (k.t === 'on-curve') return `on-curve|${k.id}|${k.curve}`;
   if (k.t === 'angle') return JSON.stringify({ ...k, at: ray(k.at) });
   if (k.t === 'angle-ratio') return JSON.stringify({ ...k, left: ray(k.left), right: ray(k.right) });
   return JSON.stringify(k);

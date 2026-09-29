@@ -35,7 +35,7 @@ describe('the freedom cue (panel head-line)', () => {
 
   it('a fully determined figure says so', () => {
     const d = deriveLines(['z1 = 3+4i'], 0, 0);
-    expect(v2Freedom(d, t)).toBe('הצורה נקבעה במלואה');
+    expect(v2Freedom(d, t)).toBe('✓ הציור נקבע במלואו על ידי הנתונים'); // #1453: the suite's one wording
   });
 });
 

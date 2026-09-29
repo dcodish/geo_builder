@@ -688,6 +688,18 @@ object, now drawn, reported as a change rather than as a restatement.
 
 `parseIncidence` is a NORMALISER, not a rule with its own lowering: it classifies the subject (a point name, a coordinate pair, or a two-point side with its noun) and the object (a two-point line, an equation, a named line, «ישר העובר דרך P», or a curve) and rewrites the sentence into the one the grammar reads — «P על הישר CD», «משוואת הצלע BC היא …», «דרך P עובר ישר l3» — parsed by the rule that owns it (`viaCanonical`). Two spellings therefore produce the same facts by construction. Whether «דרך P עובר ישר l3» creates the line or states an incidence on an existing one is M1's (`line-at` in apply.ts). A coordinate point leaves the parser as a `MINT_PREFIX` placeholder and is named in `derive.resolveMints` over the whole list — the student's own letter at those coordinates first, else the next free `P₁`, `P₂` — and `Derivation.minted` feeds the row note.
 
+**The OPERAND vocabulary is one resolver** ([ADR-AG-168](06c-decisions-analytic.md#adr-ag-168), #1429):
+`incidenceOn` answers "which curve does this operand name" for the crossing sentence AND the point-on
+handler, which delegates to it — axis, named line, numeral circle (digits and Romans on one id), the
+two-point pair with its noun, an inline equation, and the contextual kind noun («המעגל»), which lowers to
+the same fold-resolved `on-kind` everywhere. What stays per-sentence is what the rulings split: a bounded
+noun is a `between` selector in a point-on sentence and the hard extent in a crossing. An EQUATION operand
+carries `eqSrc`/`eq` on the `on-curve` constraint (spelling only — stripped at apply, outside the canonical
+key), and the apply boundary resolves it to the existing curve carrying that equation (`resolveCurveByEq`,
+probe-environment identity) or mints `stated: false`; `curve-anon` ids therefore never reach a refusal. The
+crossing's other spellings — the clitic as written, the distributive and bare plurals (`crossing-kind`,
+exactly-two at M1), both verb orders — normalise onto the canonical sentence through `intersectionSpellings`.
+
 ## A cevian lowers to its WHOLE definition ([ADR-AG-109](06c-decisions-analytic.md#adr-ag-109))
 
 «AD תיכון לצלע BC» and «AD גובה לצלע BC» are conjunctions, and the rule emits every half:
