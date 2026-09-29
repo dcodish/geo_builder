@@ -384,3 +384,7 @@ Shell holds no strings, so the suite vocabulary is held by a lock, not a module:
 ## The example chips' math ([ADR-W-100](06w-decisions-workspace.md#adr-w-100))
 
 `QuickChips` renders each label through `shell/math`'s `mathHtml` after the product's `display` (bidi isolation), so a chip shows the same typeset math as the fact row its click creates; the click still submits the raw command (ADR-W-029).
+
+## The guide speaks student ([ADR-W-101](06w-decisions-workspace.md#adr-w-101))
+
+`ManualScreen.tsx` exports `guideJargon(text, allow?)` — the jargon tokens in one string, by CLASS: a design-doc section (`§2b`), an issue number (`#760`), a decision id, `DOF`, and the machinery's names in English (tier, layer, grammar, parser, engine, solver, LLM, regex, fallback) and Hebrew (שכבה, דקדוק, מנוע, פרסר, אלימינציה, איטרציה — stems, so a prefixed «בשכבה» is caught). `guideJargonIn(content)` walks any object to every string leaf and reports `path: «token» in «text»`, so a new catalog field or locale key is linted the day it lands. Each product's lock hands it its own catalog, section titles and whole he/en locale and expects `[]` (the #1347 shape: the chrome owns the rule, the product owns the question). `allow` names an exact token, for the day a curriculum word collides with a stem; none does today.

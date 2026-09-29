@@ -121,7 +121,7 @@
     "notOnLine": "«{{id}}» is not on the line — check the givens",
     "pointCoincides": "the point you asked for is «{{with}}» — a point already in the figure. The geometry is right, but there is no new point here to call «{{id}}»; if you meant another point, check the segment or plane you named",
     "symbolicNewPoint": "A new point «{{id}}» needs numeric coordinates — letters are only allowed for a point already in the figure",
-    "powerNeedsSolid": "A power in a coordinate of «{{id}}» needs a solid in the figure for the solver to pin it in — without one the tool cannot hold it, and it will not drop it silently. Add a solid first (say «box ABCDA'B'C'D'») and «C(p²,p,0)» will build.",
+    "powerNeedsSolid": "A power in a coordinate of «{{id}}» is possible only in a figure that has a solid — without one there is nothing to anchor it to, and the tool will not drop it silently. Add a solid first (say «box ABCDA'B'C'D'») and «C(p²,p,0)» will build.",
     "injectionUnsatisfiable": "No placement of the solid matches the given coordinates — check the givens",
     "givensContradict": "The givens contradict each other — no figure satisfies «{{stated}}» together with {{others}}",
     "givensContradictAlone": "The givens contradict each other — no figure satisfies «{{stated}}» together with the rest of the givens",
@@ -166,12 +166,8 @@
     "title": "Examples",
     "ex1": "cube ABCD",
     "ex2": "right triangular prism ABC",
-    "ex3": "M is the midpoint of BB'",
-    "ex4": "K on AA' such that AK = 2KA'",
-    "ex5": "denote AB = u, AD = v, AA' = w",
-    "ex6": "CA' is perpendicular to plane BC'D",
-    "ex7": "plane π1: z - 3 = 0",
-    "ex8": "A(2,-2,6) is on one of the planes"
+    "ex3": "right pyramid ABCDS with a square base",
+    "ex4": "plane π1: z - 3 = 0"
   },
   "manual": {
     "button": "Guide",

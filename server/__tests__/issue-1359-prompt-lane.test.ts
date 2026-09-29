@@ -19,6 +19,7 @@ import { buildRequest, buildSystemPrompt, buildStepsTool, extractSteps, LLM_MODE
 import { PROMPT_SPEC_2D } from '../../src/parser/llmShared';
 import { PROMPT_SPEC_3D } from '../../src3d/parser/llmShared3';
 import { PROMPT_SPEC_ANALYTIC } from '../../src-analytic/parser/llmSharedAnalytic';
+import { LLM_TOOLS } from '../parseHandler';
 
 /** Every product that escalates, by the same key the proxy dispatches on. */
 const SPECS: Record<string, PromptSpec> = {
@@ -114,8 +115,7 @@ describe('#1359 — one request lane, every product', () => {
     });
   }
 
-  it('the registry here matches the one the proxy dispatches on', async () => {
-    const { LLM_TOOLS } = await import('../parseHandler');
+  it('the registry here matches the one the proxy dispatches on', () => {
     expect(Object.keys(SPECS).sort()).toEqual([...LLM_TOOLS].sort());
   });
 

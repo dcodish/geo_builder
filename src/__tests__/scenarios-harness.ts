@@ -40,12 +40,12 @@ import type { Derived, Fact } from '@/store/geoStore';
 import { freeDofs, freeDofCount } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 import { factsOf, replayFacts } from './scenario-pipeline';
-import type { Step } from './scenario-pipeline';
+import type { Step, RefusedStep } from './scenario-pipeline';
 
 // The pipeline core (Step/ctxOf/factsOf/replayFacts) moved VERBATIM to ./scenario-pipeline.ts (#567) so
 // headless tools can run it without vitest; re-exported here so every existing import site is unchanged.
 export { ctxOf, factsOf, replayFacts } from './scenario-pipeline';
-export type { Step } from './scenario-pipeline';
+export type { Step, RefusedStep, Refusal } from './scenario-pipeline';
 
 export interface Scenario {
   id: string;
@@ -57,6 +57,25 @@ export interface Scenario {
   /** Opt out of the blanket "the figure satisfies its stated givens" assertion (rare — only when a
    *  scenario intentionally builds a figure the verifier flags, e.g. a documented known-limitation). */
   expectViolations?: boolean;
+  /** #1288 (ADR-555): steps of the operator's exact sequence that are EXPECTED to be refused by the parser,
+   *  each with the refusal it must produce. Asserted, never skipped: a listed step that parses, or is refused
+   *  for another reason, fails the scenario; an unlisted refusal fails it as before. See `RefusedStep`. */
+  refusedSteps?: RefusedStep[];
+}
+
+/**
+ * #1288 (ADR-555) — THE whole-scenario entry point: the scenario's facts through the real parse→fact path,
+ * with its declared refusals asserted. Every corpus consumer that replays a SCENARIO calls this, not
+ * `factsOf(sc.steps)` (which would, correctly, fail on a refused step it was not told about). A row that
+ * points past the end of the sequence is a typo, and is refused here.
+ */
+export function scenarioFacts(sc: Pick<Scenario, 'id' | 'steps' | 'refusedSteps'>): Fact[] {
+  for (const row of sc.refusedSteps ?? []) {
+    if (!Number.isInteger(row.step) || row.step < 1 || row.step > sc.steps.length) {
+      throw new Error(`[${sc.id}] refusedSteps: step ${row.step} is outside the sequence (1..${sc.steps.length})`);
+    }
+  }
+  return factsOf(sc.steps, sc.refusedSteps);
 }
 
 /** Replay a scenario through the real parse→fact→replay path and return the derived figure. */

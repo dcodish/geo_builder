@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { classifyOutOfScope, looksCompound, looksLikeLatex, wordRootMagnitude } from '../scope';
 import { parse } from '../parse';
+import { COMMAND_CATALOG } from '../catalog';
 
 describe('classifyOutOfScope — analytic / coordinate geometry (the live analytic Builder)', () => {
   for (const he of [
@@ -181,8 +182,7 @@ describe('#43 — bare-point: a lone label still gets guidance', () => {
 });
 
 describe('#43 — NO THEFT: every supported catalog example stays unclassified (a real construction must never get a guidance brush-off)', () => {
-  it('the whole catalog classifies null in both locales', async () => {
-    const { COMMAND_CATALOG } = await import('../catalog');
+  it('the whole catalog classifies null in both locales', () => {
     for (const entry of COMMAND_CATALOG) {
       if (!entry.supported) continue;
       for (const u of [entry.he, entry.en]) {

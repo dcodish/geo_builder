@@ -40,6 +40,7 @@
     "src/engine/__tests__/membership-conversion.test.ts",
     "src/engine/__tests__/obligation-preservation.test.ts",
     "src/replay/__tests__/basin-ownership.test.ts",
+    "src/replay/__tests__/issue-1203-forward-blame.test.ts",
     "src/replay/__tests__/issue-434-admissible-set.test.ts",
     "src/replay/__tests__/issue-556-apex-region.test.ts",
     "src/replay/__tests__/issue-943-other-side.test.ts",
@@ -51,6 +52,7 @@
     "src3d/__tests__/issue-1311-free-pair-length-drive.test.ts",
     "src3d/__tests__/issue-1498-frame-and-carrier-drive.test.ts",
     "src3d/__tests__/issue-1499-perp-from-in-plane-point.test.ts",
+    "src3d/__tests__/issue-1560-vector-pin-claims.test.ts",
     "src3d/__tests__/issue-814.test.ts",
     "src3d/__tests__/issue-815.test.ts",
     "src3d/__tests__/issue-816.test.ts",
@@ -62,6 +64,7 @@
     "src3d/__tests__/named-parametric-line.test.ts",
     "src3d/__tests__/plane-eq-drive.test.ts",
     "src3d/__tests__/right-apex.test.ts",
-    "src3d/__tests__/scenarios3.test.ts"
+    "src3d/__tests__/scenarios3.test.ts",
+    "src3d/__tests__/symbol-pin-collapse.test.ts"
   ]
 }

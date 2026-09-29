@@ -26,6 +26,11 @@
  * the normal state) but so the verdict cannot be skimmed past on the way to the scp commands. The
  * lesson this encodes: evidence produced is not evidence read.
  *
+ * **Routes too (#1279, ADR-W-103).** Every `ProxyPass` line in the enabled products' `deploy/apache-*.conf`
+ * is probed live (a bodiless GET the proxy answers before any model call — see `preflight-routes.mjs`).
+ * A route answering Apache's 404 is BROKEN and fails the run: on 2026-09-20 every hash here was green
+ * while `/analytic-builder/api/parse` 404'd, because the conf was never pasted into Plesk.
+ *
  * It reads. It never writes to the server, never restarts anything, and never deploys.
  */
 import { execFileSync } from 'node:child_process';
@@ -33,7 +38,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PRODUCTS, isStale, newestSource } from './preflight-targets.mjs';
+import { PRODUCTS, isStale, newestSource, preflightVerdict } from './preflight-targets.mjs';
+import { routeRows } from './preflight-routes.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const HOST = process.env.GEO_DEPLOY_HOST ?? 'root@themathbible.com';
@@ -131,6 +137,12 @@ if (!offline) {
   }
 }
 
+/** THE ROUTES (#1279) — read from the tracked confs, probed live. Offline has nothing to probe. */
+if (!offline) {
+  const origin = process.env.GEO_DEPLOY_ORIGIN ?? 'https://themathbible.com';
+  for (const r of await routeRows({ root, origin })) rows.push({ ...r, local: null, live: null });
+}
+
 const width = Math.max(...rows.map((r) => r.what.length));
 console.log(offline ? '\nDEPLOY PREFLIGHT (offline — local artifacts only)\n' : '\nDEPLOY PREFLIGHT\n');
 for (const r of rows) {
@@ -138,25 +150,8 @@ for (const r of rows) {
   if (r.status.startsWith('DIFFERS')) console.log(`  ${' '.repeat(width)}    local ${r.local}\n  ${' '.repeat(width)}    live  ${r.live}`);
 }
 
-const badSinks = rows.filter((r) => r.status.startsWith('SINK'));
-if (badSinks.length) console.log(`  ${badSinks.length} events sink(s) UNREACHABLE — a 204 that writes nothing; fix the env/wiring before trusting any usage number (#1363).`);
-const differs = rows.filter((r) => r.status.startsWith('DIFFERS'));
-const unbuilt = rows.filter((r) => r.status === 'NOT BUILT');
-const unknown = rows.filter((r) => r.status === 'UNKNOWN');
-const stale = rows.filter((r) => r.status.startsWith('STALE'));
-console.log('');
-if (unbuilt.length) console.log(`  ${unbuilt.length} artifact(s) NOT BUILT — build them before reading this verdict.`);
-if (stale.length) console.log(`  ${stale.length} artifact(s) built BEFORE their own source changed — they cannot be compared. Build, then re-run.`);
-if (unknown.length) console.log(`  ${unknown.length} artifact(s) could not be read from ${HOST} — verdict incomplete.`);
-if (differs.length) {
-  console.log(`  ${differs.length} artifact(s) DIFFER from live. Push exactly these; leave the rest alone.\n`);
-  process.exit(1);
-}
-if (badSinks.length) {
-  process.exit(1);
-}
-if (unbuilt.length || unknown.length || stale.length) {
-  console.log('  Nothing measured as stale, but the measurement is incomplete — do not read this as "all current".\n');
-  process.exit(1);
-}
-console.log('  Everything live matches what this tree builds. Nothing to push.\n');
+// The verdict is a pure function of the rows (`preflightVerdict`), so a lock can call the exact
+// decision that sets this exit code (#1279) instead of re-stating it.
+const verdict = preflightVerdict(rows, HOST);
+for (const line of verdict.lines) console.log(line);
+process.exit(verdict.code);

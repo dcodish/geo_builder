@@ -64,6 +64,8 @@ For capabilities that are expensive (extra LLM spend) or commercial (premium/pai
 
   Figure persistence (FR-HS-4) is local to the browser; verbose debug logs (figure snapshots) are dev-only, never written in production.
 
+- **NFR-SE-4** — **Defence in depth on every served page** ([ADR-W-104](06w-decisions-workspace.md#adr-w-104), #1380). Every builder's prefix and the `/g/` share page answer with `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` (no other site may frame a builder or a dashboard) and `Referrer-Policy: strict-origin-when-cross-origin`, set in the tracked `deploy/apache-*.conf` — scoped to our prefixes, never vhost-wide, because the vhost is shared with other apps. A Content-Security-Policy (`script-src 'self'`) is carried **Report-Only** until measured clean, and is promoted to enforcing only in a separate, deliberate change: a wrong enforcing policy blanks the live app. Every value a server-rendered page interpolates is HTML-escaped, whatever guarantee elsewhere seems to make it safe.
+
 ## Accessibility
 
 - **NFR-AC-1** — Sufficient color contrast and legible label sizes for classroom/projector use.

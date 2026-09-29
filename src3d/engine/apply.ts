@@ -4,7 +4,7 @@
  */
 
 import { exprPointIds, exprVectorNames } from './vecExpr';
-import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, planeNormalCarriesParam, planePinningRels, sameOperand } from './operands';
+import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, paramPinningRels, planeNormalCarriesParam, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
@@ -343,8 +343,18 @@ const firstAtomError = (c: Construction3, atoms: import('./types').VecAtom[]): E
  * pivot's to satisfy, `null` is unchecked, the ADR-3D-282 `coords-eq` rule), a statement with no numeric
  * component records nothing, and every such claim is `given: true` — judged on a placed figure only
  * (`holdsAt`'s claim-level rule), so the pin-owner guard keeps speaking where the pivot finds no placement.
+ *
+ * #1567 (ADR-3D-285) — the same seam for the SCALAR pins a length, an angle, a length ratio or a ⊥/∥-to-plane
+ * lowers to (`length`, `vangle`/`seg-angle`, `length-rel`, `seg-perp/par-plane`). Those sites chose "pin"
+ * OR "claim" on `freeDims(c) > 0`, and `freeDims` counts a sphere's or cone's unstated size, which the pivot
+ * never drives: «|AB| = 5» beside |AB| = 2 became a pin nothing read, and read green. A pin now always
+ * records its arbiter, so whether a statement is JUDGED no longer depends on a count of free dimensions.
  */
-function recordPinGiven(next: Construction3, claim: Extract<Claim3, { type: 'vec-val' } | { type: 'dot-val' }>): void {
+type PinGivenClaim = Extract<
+  Claim3,
+  { type: 'vec-val' } | { type: 'dot-val' } | { type: 'length-eq' } | { type: 'angle-seg-eq' } | { type: 'cos-angle-eq' } | { type: 'length-rel' } | { type: 'perp-plane' } | { type: 'par-plane' }
+>;
+function recordPinGiven(next: Construction3, claim: PinGivenClaim): void {
   if (claim.type === 'vec-val' && claim.x === null && claim.y === null && claim.z === null) return;
   next.claims.push({ ...claim, given: true });
 }
@@ -561,8 +571,9 @@ function adoptParamForCarrier(c: Construction3, carrier: { kind: 'line' | 'plane
 function releaseParamToPivot(c: Construction3): Construction3 | null {
   const sym = c.param;
   if (!sym) return c;
-  // #1439: a plane × plane relation that pins the parameter is read by the SAME predicate the root-find uses
-  if (planePinningRels(c).length > 0 || c.linePerps.length > 0 || c.lineRels.length > 0 || c.paramGivens.length > 0) return null;
+  // #1439 / #1472 (ADR-3D-286): a relation that pins the parameter is read by the SAME predicate the root-find
+  // uses — so a coincidence, containment, crossing or distance that pins it keeps the letter in this lane
+  if (paramPinningRels(c).length > 0 || c.linePerps.length > 0 || c.lineRels.length > 0 || c.paramGivens.length > 0) return null;
   for (const def of c.points.values()) if (def.kind === 'coord-sym') return null;
   const next = clone(c);
   delete next.param;
@@ -1719,6 +1730,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           }
           next.scalarPins.push(mag);
           if (cmd.claim.type !== 'length-eq') next.claims.push(cmd.claim);
+          else recordPinGiven(next, cmd.claim); // #1567 (ADR-3D-285): the length pin records its arbiter
           return { ok: true, next };
         }
         // #754: once a scale given is in force the rescale owns the figure's size — a second
@@ -1728,6 +1740,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // dims the demotion above now takes it; this arm keeps the free3-only reach.)
         if (cmd.claim.type === 'length-eq' && c.scaleGivens.length === 0) {
           next.scalarPins.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
+          recordPinGiven(next, cmd.claim); // #1567 (ADR-3D-285)
           return { ok: true, next };
         }
         /**
@@ -1797,6 +1810,18 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
             : null;
           if (shared) next.scalarPins.push({ kind: 'vangle', ...shared, deg });
           else next.scalarPins.push({ kind: 'seg-angle', a1, b1, a2, b2, deg });
+          // #1567 (ADR-3D-285): the angle pin records its arbiter — one that judges the SAME quantity the pin
+          // drives. `vangle` is the signed vertex angle (0–180°), so its arbiter is the signed `cos-angle-eq` over
+          // the two rays; `angle-seg-eq` measures the angle between LINES (≤ 90°, the `seg-angle` pin's |cos|) and
+          // would refute a true «∠DAB = 120».
+          if (shared)
+            recordPinGiven(next, {
+              type: 'cos-angle-eq',
+              u: { kind: 'pair', from: shared.vertex, to: shared.p },
+              v: { kind: 'pair', from: shared.vertex, to: shared.q },
+              cos: Math.cos((deg * Math.PI) / 180),
+            });
+          else recordPinGiven(next, cmd.claim);
           return { ok: true, next };
         }
       }
@@ -2609,10 +2634,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         }
         return { ok: false, error: missing };
       }
-      // V7 T2: on a figure with FREE dims the relation is a DRIVING given (M1)
+      // V7 T2: on a figure with FREE dims the relation is a DRIVING given (M1) — and, #1567 (ADR-3D-285), the pin
+      // records its arbiter: the free dims may be a revolution's size, which no pivot drives.
       if (freeDims(c) > 0) {
         const next = clone(c);
         next.scalarPins.push({ kind: cmd.rel === 'perp' ? 'seg-perp-plane' : 'seg-par-plane', a: cmd.a, b: cmd.b, plane });
+        if (plane.length >= 3)
+          recordPinGiven(next, { type: cmd.rel === 'perp' ? 'perp-plane' : 'par-plane', seg: [cmd.a, cmd.b], plane: [plane[0], plane[1], plane[2]] });
         if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]);
         return { ok: true, next };
       }
@@ -2676,6 +2704,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       }
       if (freeDims(next) > 0) {
         next.scalarPins.push({ kind: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c });
+        recordPinGiven(next, { type: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c }); // #1567 (ADR-3D-285)
         return { ok: true, next };
       }
       next.claims.push({ type: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c });

@@ -65,6 +65,8 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'coincident|plane-run|plane-run',
       'coincident|segment|line',
       'coincident|segment|segment',
+      // #1472 (ADR-3D-286): «ℓ מוכל במישור π» — measured to parse and verify, and now pins the parameter
+      'contains|plane-named|line',
       // S5 (#378, ADR-3D-106): the distance family
       'distance|line|line',
       'distance|plane-named|plane-named',
@@ -185,6 +187,8 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'distance|segment|line',
       'distance|segment|plane-run',
       'distance|segment|segment',
+      // #1472 (ADR-3D-286) — the containment cell, out of `planned`; its param-root row is below
+      'contains|plane-named|line',
     ]);
     const BATTERY_PENDING = new Set([
       // S1 seeds the harness with 7 rows; these supported cells are exercised by their own
@@ -679,6 +683,34 @@ describe('the battery — supported cells exercised end-to-end', () => {
     submit('AB מאונך לישר l1');
     expect(state().lastError).toBeNull();
     expect(cue()).toBeLessThanOrEqual(before);
+  });
+});
+
+/**
+ * #1472 (ADR-3D-286) — the POSITION relations between absolute objects are param-root cells: a relation pins
+ * the parameter iff an operand it reads carries it. Each cell gets a TRUE pair (it pins, the figure verifies)
+ * and a FALSE one (no value exists — the honest `no-roots`, naming the statement).
+ */
+describe('the battery — #1472 position relations pin the parameter', () => {
+  beforeEach(() => state().clear());
+  const PAIRS: [string, string[], string, number[], string][] = [
+    ['coincident|plane-named|plane-named', ['המישור π1: z = 1', 'המישור π2: mx + z - 1 = 0'], 'π1 מתלכד עם π2', [0], 'המישור π2: mx + z - 2 = 0'],
+    ['distance|plane-named|plane-named', ['המישור π1: z = 1', 'המישור π2: z - m = 0'], 'המרחק בין π1 לבין π2 הוא 3', [-2, 4], 'המישור π2: mx + y = 0'],
+    ['coincident|line|line', ['l1:x=(0,0,0)+t(1,0,0)', 'l2:x=(0,m,0)+t(1,0,0)'], 'l1 מתלכד עם l2', [0], 'l2:x=(0,1,m)+t(1,0,0)'],
+    ['intersecting|line|line', ['l1:x=(0,0,0)+t(1,0,0)', 'l2:x=(0,0,m)+t(0,1,0)'], 'l1 ו-l2 נחתכים', [0], 'l2:x=(0,1,m)+t(1,0,0)'],
+    ['distance|line|line', ['l1:x=(0,0,0)+t(1,0,0)', 'l2:x=(0,0,m)+t(0,1,0)'], 'המרחק בין l1 לבין l2 הוא 2', [-2, 2], 'l2:x=(0,0,0)+t(1,m,0)'],
+    ['distance|point|plane-named', ['הנקודה A(0, 0, 0)', 'המישור π: z - m = 0'], 'המרחק בין A למישור π הוא 2', [-2, 2], 'המישור π: mx + y = 0'],
+    ['distance|point|line', ['הנקודה A(0, 0, 0)', 'l:x=(0,m,0)+t(1,0,0)'], 'המרחק בין A לישר l הוא 2', [-2, 2], 'l:x=(0,0,0)+t(1,m,0)'],
+    ['contains|plane-named|line', ['l:x=(1,0,1)+t(0,1,0)', 'המישור π: mx + z - 1 = 0'], 'הישר l מוכל במישור π', [0], 'המישור π: mx + y + 2 = 0'],
+  ];
+  it.each(PAIRS)('%s — true: pins m; false: no-roots', (cell, setup, rel, roots, falseSecond) => {
+    expect(cellStatus(...(cell.split('|') as Parameters<typeof cellStatus>))).toMatchObject({ status: 'supported', actions: ['param-root', 'claim'] });
+    for (const u of [...setup, rel]) submit(u);
+    expect(state().lastError).toBeNull();
+    expect(derive3(state().facts, 0).resolved.param?.roots).toEqual(roots);
+    state().clear();
+    for (const u of [setup[0], falseSecond, rel]) submit(u);
+    expect(state().lastError).toMatchObject({ code: 'no-roots', stated: rel });
   });
 });
 

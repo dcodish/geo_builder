@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SCENARIOS, factsOf, replayFacts, sweepSeeds, roundTripProps, newRoundTripCounters, gateProps, dofHonesty, degeneracyHonesty } from './scenarios-corpus';
+import { SCENARIOS, scenarioFacts, replayFacts, sweepSeeds, roundTripProps, newRoundTripCounters, gateProps, dofHonesty, degeneracyHonesty } from './scenarios-corpus';
 
 // Slice 3/8 of the end-to-end scenario corpus (issue #60): membership is index % 8 === 2.
 // Same tests, same assertions as the old single-file loop — sharded so vitest's per-FILE parallelism
@@ -19,7 +19,7 @@ describe('reported scenarios — end-to-end replay of real bug reports (slice 3/
   for (const [i, sc] of SCENARIOS.entries()) {
     if (i % 8 !== 2) continue;
     it(`[${sc.id}] ${sc.title}`, () => {
-      const facts = factsOf(sc.steps);
+      const facts = scenarioFacts(sc);
       const fig = replayFacts(facts);
       sc.check(fig);
       // Every scenario must also SATISFY ITS STATED GIVENS (the ADR-053 verifier, now comprehensive):

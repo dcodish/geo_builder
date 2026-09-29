@@ -94,6 +94,68 @@ export function featuredShortfall(entries: readonly ManualEntry[], cap?: number)
   return Math.max(0, cap - entries.filter((e) => e.featured).length);
 }
 
+/**
+ * The workspace's own vocabulary, as it leaks into a guide (#1456, [ADR-W-101](../../docs/06w-decisions-workspace.md#adr-w-101)).
+ *
+ * A guide is written by the people who built the tool, so it drifts into THEIR words: a design-doc
+ * section («המהלך של §2b»), an issue number ("(#760)"), a decision id, "2 DOF", and the names of the
+ * machinery — the grammar, the parser, the engine, the numeric tier/layer, and how it solves
+ * («נפתרת באלימינציה, לא באיטרציה»). A student reads none of these as mathematics; each one is a
+ * sentence of the guide the student cannot use. Found in the complex and 2-D guides by an external
+ * review of prod; each product had fixed it (when at all) by hand.
+ *
+ * Each pattern names a CLASS, never a string from one guide. Hebrew stems match inside a word, so a
+ * prefix («בשכבה», «הדקדוק», «באלימינציה») cannot slip past. A curriculum term is never jargon — the
+ * patterns are chosen so none matches one («פרבולה קנונית», «מספר מדומה», «משוואה ריבועית»); `allow`
+ * exists for the day a product's curriculum word collides with a stem, and names the exact token.
+ */
+const GUIDE_JARGON: readonly RegExp[] = [
+  /§\s*\d+[a-z]?/gu, // a design-doc section
+  /#\d+/gu, // an issue / PR number
+  /\bADR\b(?:-[A-Z0-9]+)*/gu, // a decision id
+  /\bDOFs?\b/giu, // "degrees of freedom", abbreviated the way the code spells it
+  /\b(?:tiers?|layers?|grammar|parsers?|engines?|solvers?|LLM|regex|fallback)\b/giu, // the machinery, in English
+  /[א-ת]*(?:שכבה|שכבת|שכבות|דקדוק|מנוע|פרסר|פארסר|אלימינציה|איטרציה|רגקס)[א-ת]*/gu, // …and in Hebrew
+];
+
+/**
+ * The jargon tokens in one guide string — empty when a student can read it all.
+ *
+ * Product-free: each product runs it over its OWN guide content (catalog examples and descriptions,
+ * section titles, the guide's framing and the refusal that points at the guide), because `shell/` may
+ * never import a product tree (ADR-W-016 rule 2) — the #1347 `featuredShortfall` shape.
+ */
+export function guideJargon(text: string, allow: readonly string[] = []): string[] {
+  const hits: string[] = [];
+  for (const re of GUIDE_JARGON) {
+    for (const m of text.matchAll(re)) if (!allow.includes(m[0])) hits.push(m[0]);
+  }
+  return hits;
+}
+
+/**
+ * Every jargon token anywhere in a product's guide content, as `path: «token» in «text»` lines.
+ *
+ * `content` is whatever the product hands over — its catalog rows, its section titles, its locale
+ * resources — walked to every string leaf, so a new field or key is linted the day it is added rather
+ * than the day someone remembers to list it. One walker for four products (the third-copy rule): a
+ * product's lock is one call and an `expect(...).toEqual([])`.
+ */
+export function guideJargonIn(content: Record<string, unknown>, allow: readonly string[] = []): string[] {
+  const out: string[] = [];
+  const walk = (v: unknown, path: string): void => {
+    if (typeof v === 'string') {
+      for (const tok of guideJargon(v, allow)) out.push(`${path}: «${tok}» in «${v}»`);
+    } else if (Array.isArray(v)) {
+      v.forEach((x, i) => walk(x, `${path}[${i}]`));
+    } else if (v !== null && typeof v === 'object') {
+      for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`);
+    }
+  };
+  for (const [k, v] of Object.entries(content)) walk(v, k);
+  return out;
+}
+
 export function ManualScreen({ open, title, intro, sections, closeLabel, onClose, tryHint, sectionCap, moreNote, showAllLabel, showLessLabel }: ManualScreenProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   if (!open) return null;

@@ -80,6 +80,15 @@ const NOT_HANDLED: ParseResult3 = { ok: false, reason: 'not-handled' };
  * a run is uplifted only when it isn't an English function word ("angle of …", "point of intersection").
  * New label-demanding anchors join HERE — the one chokepoint — never per-rule.
  */
+/**
+ * #1523 (ADR-3D-287) — the MIDPOINT frame, spelled ONCE for its two readers: the `midpoint` rule and the
+ * subject anchor below. `(?!י)` keeps «אנך אמצעי» / «קטע אמצעים» out (#330).
+ *  - `MID_COPULA_HE` / `MID_HE`: «X [היא|הוא] [נקודת] [ה]אמצע …»
+ *  - `MID_EN`: "X is the midpoint of …" / "X is the middle (point) of …"
+ */
+const MID_COPULA_HE = String.raw`(?:(?:הוא|היא)\s+)?`;
+const MID_HE = String.raw`(?:ה?נקודת\s+)?ה?אמצע(?!י)`;
+const MID_EN = String.raw`[Mm]id(?:dle(?:\s+point)?|point)`;
 export const EN_STOP = new Set(['of', 'at', 'in', 'on', 'is', 'to', 'the', 'and', 'are', 'for', 'its', 'was', 'has', 'be', 'by', 'a', 'an', 'no', 'not', 'it', 'all', 'any', 'one', 'two']);
 function upliftLowercaseLabels(s: string): string {
   const LIST = String.raw`[A-Za-z][A-Za-z0-9']{0,5}(?:\s*(?:,|ו-?|\band\b)\s*[A-Za-z][A-Za-z0-9']{0,5})*(?![A-Za-z])`;
@@ -99,7 +108,22 @@ function upliftLowercaseLabels(s: string): string {
   return s
     .replace(new RegExp(String.raw`((?:[∠∡∢]|זו?וית|ה?קודקוד(?:ים)?|ה?נקוד(?:ה|ות))\s*)(${LIST})`, 'g'), (_m, pre: string, list: string) => `${pre}${upTokens(list, false)}`)
     .replace(new RegExp(String.raw`(\b(?:angle|points?|vert(?:ex|ices))\s+)(${LIST})`, 'gi'), (_m, pre: string, list: string) => `${pre}${upTokens(list, true)}`)
-    .replace(/^((?:נתונה\s+)?)([a-z]\d*'?)(?=\s*\([^()]*,[^()]*,[^()]*\))/, (m: string, pre: string, id: string) => (/^[xyz]$/.test(id) ? m : `${pre}${id.toUpperCase()}`));
+    .replace(/^((?:נתונה\s+)?)([a-z]\d*'?)(?=\s*\([^()]*,[^()]*,[^()]*\))/, (m: string, pre: string, id: string) => (/^[xyz]$/.test(id) ? m : `${pre}${id.toUpperCase()}`))
+    // #1523 (ADR-3D-287): the SUBJECT of a midpoint statement. «x אמצע SA» — a single letter before the
+    // midpoint frame — can only be the point being named: an axis, a parameter or a vector is never "the
+    // midpoint of SA". So this position is an anchor in #181's sense and the letter folds to its label,
+    // INCLUDING x/y/z (the lone-axis exemption exists for positions where an axis could stand; this is
+    // not one). Before this anchor the subject-less auto-name arm read the tail and silently threw the
+    // letter away, drawing the point under a letter the student never typed. (`HE_SUBJ` is declared
+    // further down; it is read only when this runs, after module init.)
+    .replace(
+      new RegExp(String.raw`^(${HE_SUBJ})([a-z]\d*'?)(?=\s+${MID_COPULA_HE}${MID_HE}\s)`),
+      (_m: string, pre: string, id: string) => `${pre}${id.toUpperCase()}`,
+    )
+    .replace(
+      new RegExp(String.raw`^((?:[Tt]he\s+)?(?:[Pp]oint\s+)?)([a-z]\d*'?)(?=\s+is\s+the\s+${MID_EN}\b)`),
+      (_m: string, pre: string, id: string) => `${pre}${id.toUpperCase()}`,
+    );
 }
 
 /** Normalise an utterance: strip invisible bidi/format controls, unify primes to `'`, strip vector
@@ -1087,6 +1111,10 @@ const volumePolyClaim: Rule = (s) => {
   return [{ type: 'claim', claim: { type: 'volume-poly', noun, ids, value: +m[3] } }];
 };
 
+/** #1523: what may stand between the midpoint noun and its two labels — «של», a segment noun. */
+const MID_OPERAND_HE = String.raw`(?:של\s+)?(?:ה?(?:קטע|צלע|מקצוע|אלכסון)\s+)?(?:של\s+)?`;
+const MID_OPERAND_EN = String.raw`(?:the\s+)?(?:(?:segment|edge|side|diagonal)\s+)?`;
+
 /** `M אמצע BC` / `M is the midpoint of BC` → on-segment t = ½.
  *  #225 (ADR-3D-048): the UN-named `אמצע BB'` / `midpoint of BB'` (2 tokens) lowers to
  *  `midpoint-auto` — the label is picked at APPLY, where the taken ids are known. */
@@ -1098,7 +1126,18 @@ const midpoint: Rule = (s) => {
   if (!/אמצע(?!י)/.test(s) && !/\b(midpoint|middle)\b/i.test(s)) return null;
   const toks = labelTokens(s);
   if (toks.length === 2) {
-    const [a, b] = toks;
+    // #1523 (ADR-3D-287): the SUBJECT-LESS arm invents the point's name, so it may fire only when the
+    // sentence is nothing BUT the midpoint noun phrase. Counting label tokens let it match any sentence
+    // that merely CONTAINED «אמצע» and two labels: «x אמצע SA» (a lowercase subject is not a label
+    // token), «hello אמצע SA», «אמצע SA הוא x», «אמצע AB = 3» all minted a fresh letter and dropped the
+    // rest without a word. A leading or trailing word this arm does not own means "not this rule" —
+    // the sentence declines (→ the guidance / fallback seam), it is never read around. A single-letter
+    // lowercase subject never reaches here: `normalize3` folds it at the midpoint anchor.
+    const whole =
+      s.match(new RegExp(String.raw`^${MID_HE}\s+${MID_OPERAND_HE}(${LBL})\s*(${LBL})\s*$`)) ??
+      s.match(new RegExp(String.raw`^(?:[Tt]he\s+)?${MID_EN}\s+of\s+${MID_OPERAND_EN}(${LBL})\s*(${LBL})\s*$`));
+    if (!whole) return null;
+    const [, a, b] = whole;
     if (a === b) return null;
     return [{ type: 'midpoint-auto', a, b }];
   }
@@ -2449,7 +2488,7 @@ const angleBetweenPlanes: Rule = (s) => {
   // #1439 (ADR-3D-263): ONE lowering for every plane × plane angle — the `plane-rel` that `planeRelAngle`
   // emits for the other spellings, so the two rules read this sentence IDENTICALLY (the shadow matrix
   // sees no divergence). The relation — not the rule that happened to read it — decides whether it pins
-  // the parameter or is a verified claim (`planePinningRels`). This rule stays only as the owner of
+  // the parameter or is a verified claim (`paramPinningRels`, #1472). This rule stays only as the owner of
   // its looser spellings (no verb, «ל» without «בין», the plural noun on one side).
   return [
     {

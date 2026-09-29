@@ -11,7 +11,7 @@
  * anchor and an existing point. Identity is kept when already generic.
  */
 import { describe, expect, it } from 'vitest';
-import { build } from '@/engine';
+import { build, evaluate } from '@/engine';
 import type { AnyCommand, Vec } from '@/engine';
 
 const d = (p: Vec, q: Vec) => Math.hypot(p.x - q.x, p.y - q.y);
@@ -143,8 +143,7 @@ describe('#232 (ADR-378) — bare free points land in general position; default 
     expect(positions.get('D')).toEqual({ x: 8, y: 6 });
   });
 
-  it('the collector never certifies a BOTH-free default stack as a coincidence (the forcedness split)', async () => {
-    const { evaluate } = await import('@/engine');
+  it('the collector never certifies a BOTH-free default stack as a coincidence (the forcedness split)', () => {
     const ev = evaluate({
       objects: [
         { kind: 'free-point', id: 'A', x: 1, y: 1 },
