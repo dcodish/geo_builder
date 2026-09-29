@@ -157,6 +157,13 @@ export interface DerivedObject {
   readonly radius?: number;
   /** every position it rests on is FORCED by the givens */
   readonly known: boolean;
+  /**
+   * #1425 (ADR-CX-053) — a polygon's OWN corners: the vertex names that are not also members of an
+   * enumerated solution set. They lie on the polygon by definition, so the inside/on/outside count
+   * leaves them out. A vertex that IS a solution («z^3 = 8», then the triangle z1z2z3) is one of the
+   * numbers the question counts, so it is not listed here and still counts as on.
+   */
+  readonly cornerNames?: readonly string[];
 }
 
 /**
@@ -304,6 +311,33 @@ const paramSample = (name: string, seed: number): number => {
   for (const ch of `${name}@${seed}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
   return 0.6 + ((h >>> 0) % 181) / 100;
 };
+
+/**
+ * #1424 (ADR-CX-052) — A FREE POLYGON IS SAMPLED AS A SHAPE, NOT VERTEX BY VERTEX.
+ *
+ * «משולש ABC» drew a sliver at 10 of 24 configurations: each free vertex took its own modulus and
+ * argument, and nothing kept three independent draws from landing nearly in a line. 2-D never does this
+ * (ADR-253: default placements land in general position). The START for n fully free vertices is a
+ * regular n-gon (centre, size, rotation, all per seed) with each vertex jittered by a bounded amount, so
+ * the drawing reads as the shape it names. Only the starting DISTRIBUTION changes (ADR-052): every
+ * vertex stays a free coordinate, «show another configuration» still moves it, and any given still moves
+ * it wherever the solve needs.
+ *
+ * `u(key)` is a deterministic 0..1 draw per key. Jitter bounds: ±22% of the vertex spacing in angle and
+ * ±18% in radius, which keeps a triangle's smallest corner well above 20°.
+ */
+export function polygonShapeStart(n: number, u: (key: string) => number): Cx[] {
+  const center = cPolar(0.3 + 0.9 * u('centre |c|'), 360 * u('centre arg'));
+  const size = 1.1 + 0.7 * u('size');
+  const rot = 360 * u('rotation');
+  const step = 360 / n;
+  return Array.from({ length: n }, (_, i) => {
+    const deg = rot + i * step + (u(`jitter arg ${i}`) - 0.5) * 0.44 * step;
+    const r = size * (1 + (u(`jitter |r| ${i}`) - 0.5) * 0.36);
+    const p = cPolar(r, deg);
+    return { re: center.re + p.re, im: center.im + p.im };
+  });
+}
 
 /**
  * ADR-CX-045 — the STARTING sign of a sign-free parameter that no exact equation reaches (`a` in
@@ -718,6 +752,26 @@ export function foldConstraints(input: FoldInput): Derived2 {
       arg: new Map(freeArgNames.map((n) => [n, sampleArgDeg(n)])),
       par: new Map(sample),
     };
+    // #1424 (ADR-CX-052): a polygon whose EVERY vertex is fully free (both halves, no window, not the
+    // origin, not already placed by an earlier polygon) starts as a shape. The first polygon to claim a
+    // vertex places it; a vertex any given reaches is left to the per-name sample and the solve.
+    {
+      const fullyFree = (n: string) =>
+        n !== ORIGIN && freeModNames.includes(n) && freeArgNames.includes(n) && !windows.has(n) && !pinned.has(n);
+      const shaped = new Set<string>();
+      objects.forEach((o, oi) => {
+        if (o.kind !== 'polygon') return;
+        const vs = [...new Set(o.points)];
+        if (vs.length < 3 || !vs.every((v) => fullyFree(v) && !shaped.has(v))) return;
+        const u = (key: string) => (paramSample(`polygon ${oi} ${key}`, seed) - 0.6) / 1.8;
+        polygonShapeStart(vs.length, u).forEach((p, i) => {
+          const deg = (Math.atan2(p.im, p.re) * 180) / Math.PI;
+          (initial.mod as Map<string, number>).set(vs[i], Math.hypot(p.re, p.im));
+          (initial.arg as Map<string, number>).set(vs[i], (deg + 360) % 360);
+          shaped.add(vs[i]);
+        });
+      });
+    }
 
     const modulusOf = (name: string, st: State): { value: number; exact: ExpVec | null } => {
       const at = pinned.get(name);
@@ -1701,7 +1755,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
   return {
     contradiction: t1.inconsistent,
     points,
-    objects: t1.inconsistent ? [] : resolveObjects(objects, points, sample),
+    objects: t1.inconsistent ? [] : resolveObjects(objects, points, sample, solutionSets),
     sequences: t1.inconsistent ? [] : resolveSequences(sequences, points),
     rotations: t1.inconsistent ? [] : resolveRotations(constraints, points),
     enumeratedConfigCount,
@@ -1781,7 +1835,9 @@ function resolveObjects(
   objects: readonly FigureObject[],
   points: readonly DerivedPoint[],
   sample: ReadonlyMap<string, number>,
+  solutionSets: ReadonlyMap<string, readonly string[]> = new Map(),
 ): DerivedObject[] {
+  const solutionMembers = new Set([...solutionSets.values()].flat());
   const at = new Map<string, Cx>([[ORIGIN, { re: 0, im: 0 }]]);
   const forced = new Map<string, boolean>([[ORIGIN, true]]);
   for (const p of points) {
@@ -1799,8 +1855,12 @@ function resolveObjects(
     const label = names.map((n) => (n === ORIGIN ? 'O' : n)).join('');
     const key = `${o.kind}-${label}-${i}`;
 
-    if (o.kind === 'segment' || o.kind === 'polygon') {
+    if (o.kind === 'segment') {
       out.push({ kind: o.kind, key, label, vertices, known });
+      return;
+    }
+    if (o.kind === 'polygon') {
+      out.push({ kind: o.kind, key, label, vertices, known, cornerNames: names.filter((n) => !solutionMembers.has(n)) });
       return;
     }
     if (o.kind === 'circle') {

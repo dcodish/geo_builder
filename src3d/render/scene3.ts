@@ -14,12 +14,12 @@
 import { openCrossings3 } from '../engine/crossings3';
 import { cleanMag } from '../engine/dataView';
 import { freeDofCount3, hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
-import { DIRECTION_REL_TOL, distanceWitness, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
-import type { Construction3, Id, Operand3, Positions3 } from '../engine/types';
+import { DIRECTION_REL_TOL, distanceWitness, operandKey, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
+import { defaultPlaneDisplay3, type Construction3, type Id, type Operand3, type Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
 import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
-import { dihedralConstruction, dihedralGeometry, solidBaseRings } from './dihedral';
+import { dihedralConstruction, dihedralGeometry, linePlaneConstruction, solidBaseRings } from './dihedral';
 import { firstFreeLetter } from '../engine/freeLetter';
 import type { DihedralPair3 } from '../store/dihedralChips';
 import { isRightAngleValue, meetingPoint, rightAngles3 } from './rightAngles';
@@ -181,6 +181,8 @@ export interface SceneDihedral3 {
   label: string | null;
   labelX: number;
   labelY: number;
+  /** #1491: further marked points — a line × plane construction's foot H (and an unnamed P). */
+  extra: { x: number; y: number; label: string | null; labelX: number; labelY: number }[];
 }
 
 export interface Scene3 {
@@ -491,7 +493,7 @@ export function buildScene3(
   }
   const h = radius * 0.8;
   /** #1476: an unordered operand pair's identity — a constructed pair's arc/knee is the construction's. */
-  const pairKey = (a: Operand3, b: Operand3) => [JSON.stringify(a), JSON.stringify(b)].sort().join('~');
+  const pairKey = (a: Operand3, b: Operand3) => [operandKey(a), operandKey(b)].sort().join('~');
   const constructed = new Set(dihedralShown.map((d) => pairKey(d.a, d.b)));
   const patchFrame = new Map<string, { center: Vec3; e1: Vec3; e2: Vec3 }>();
   for (const { n1, n2, line, focus } of pairLines) {
@@ -517,7 +519,8 @@ export function buildScene3(
   for (const [name, pl] of resolved.planes) {
     // #395 (ADR-3D-108): a HIDDEN plane draws no patch (and no label/seam below) — the RELATION
     // stays enforced in the engine; only the ink is suppressed, per the operator's show/hide ask.
-    if (planeDisplay[name] === 'hidden') continue;
+    const mode = planeDisplay[name] ?? defaultPlaneDisplay3(c, name); // #1485: a face-named plane defaults to its face
+    if (mode === 'hidden') continue;
     // #318 'face' display: the patch IS the defining point-run polygon — no growing extents, no
     // fold-anchored frame. Only a point-run plane has a face to show; an equation plane (or an
     // unplaced run) falls through to the 'full' patch unchanged.
@@ -525,7 +528,7 @@ export function buildScene3(
     // edges and is a legitimate plane (operator ruling), but inking B→B'→D→D' would draw a crossed
     // bowtie — a self-crossing the student never stated. A run stated in a non-crossing order is
     // unchanged by the reorder, so every existing face patch draws exactly as before.
-    if (planeDisplay[name] === 'face') {
+    if (mode === 'face') {
       const run = c.pointPlanes.get(name);
       const facePts = run?.map((id) => positions.get(id));
       if (facePts && facePts.length >= 3 && facePts.every((p): p is Vec3 => p !== undefined)) {
@@ -817,7 +820,7 @@ export function buildScene3(
       // whether or not this panel is open) — never an arc labelled «90°» (#307)
       if (pr.deg !== undefined && isRightAngleValue(pr.deg)) continue;
       if (constructed.has(pairKey(pr.a, pr.b))) continue; // #1476: the construction draws this one
-      const key =[JSON.stringify(pr.a), JSON.stringify(pr.b)].sort().join('~') + '~' + pr.text;
+      const key = pairKey(pr.a, pr.b) + '~' + pr.text;
       if (seenArc.has(key)) continue;
       seenArc.add(key);
       const ga = resolveOperand(pr.a, c, absA)(atA);
@@ -850,6 +853,10 @@ export function buildScene3(
    */
   const wConstr: { foot: Vec3; p: Vec3 | null; armP: Vec3; armQ: Vec3; legLen: number | null; ext: [Vec3, Vec3] | null; label: string | null }[] = [];
   const wConstrKnees: { vertex: Vec3; u1: Vec3; u2: Vec3 }[] = [];
+  const wLinePlane: { X: Vec3; H: Vec3; P: Vec3; pNamed: boolean; lx: string | null; lh: string | null }[] = [];
+  /** #1491: the pairs a construction was actually drawn for — only these cede their stated knee to it (a
+   *  right line × plane pair constructs nothing, so its knee must stay). */
+  const drawnConstr: DihedralPair3[] = [];
   if (dihedralShown.length) {
     const atC = (id: Id) => positions.get(id) ?? null;
     const absC = { lines: resolved.lines, planes: resolved.planes };
@@ -867,6 +874,35 @@ export function buildScene3(
       if (right || pr.deg !== undefined) {
         const dev = relDeviation(right ? 'perp' : 'angle', right ? undefined : pr.deg, ga, gb);
         if (dev === null || dev > DIRECTION_REL_TOL) continue;
+      }
+      // #1491 (ADR-3D-280): a LINE × PLANE angle — P on the line, its height PH to the plane, and the
+      // projection XH from the crossing. The angle PXH is the stated one; the knee at H is the height's.
+      const lineish = (g: typeof ga) => !!g.dir && !g.normal;
+      if (lineish(ga) !== lineish(gb)) {
+        if (right) continue; // P, H and X collinear: the knee lane marks it, nothing to construct (ruling 2026-09-27)
+        const lp = linePlaneConstruction(pr.a, pr.b, ga, gb, { at: atC, points: positions, center, fallbackLen: radius * 0.6 });
+        if (!lp) continue;
+        const X = lp.cross;
+        const H = lp.foot;
+        const P = lp.point.at;
+        const uP = normalize3(sub3(P, X));
+        const uH = normalize3(sub3(H, X));
+        wConstrKnees.push({ vertex: H, u1: normalize3(sub3(P, H)), u2: scale3(uH, -1) });
+        wAngles.push({
+          v: X,
+          mk: (r) => wedgeArc(X, uP, uH, r),
+          clamp: { arm: Math.min(dist3(P, X), dist3(H, X)), u1: uP, u2: uH },
+          text: degText(pr.deg, pr.label),
+        });
+        const letterAt = (q: Vec3): string | null => {
+          if ([...positions.values()].some((p) => dist3(p, q) <= 1e-6 * Math.max(1, radius))) return null;
+          const l = firstFreeLetter((x) => c.points.has(x) || lettersUsed.has(x));
+          if (l) lettersUsed.add(l);
+          return l;
+        };
+        wLinePlane.push({ X, H, P, pNamed: lp.point.id !== null, lx: letterAt(X), lh: letterAt(H) });
+        drawnConstr.push(pr);
+        continue;
       }
       const dc = dihedralConstruction(pr.a, pr.b, ga, gb, { at: atC, points: positions, center, baseRings });
       if (!dc) continue;
@@ -910,6 +946,7 @@ export function buildScene3(
       const label = atPoint ? null : firstFreeLetter((l) => c.points.has(l) || lettersUsed.has(l));
       if (label) lettersUsed.add(label);
       wConstr.push({ foot: dc.foot, p: dc.point?.at ?? null, armP: dc.armP, armQ, legLen: armLen, ext, label });
+      drawnConstr.push(pr);
     }
   }
 
@@ -1061,7 +1098,7 @@ export function buildScene3(
   // projected below, so the knee lies in the plane of the arms and foreshortens with the orbit.
   // Their SIZE, however, is a screen quantity — see below, after the fit.
   // #1476: a pair whose construction is on marks its right angle AT the construction's foot (below)
-  const wedges = rightAngles3(c, resolved, radius, dihedralShown);
+  const wedges = rightAngles3(c, resolved, radius, drawnConstr);
   wedges.push(...wConstrKnees);
   // #397: the witness meets its plane/line at a genuine right angle — mark it with the same
   // knee pipeline (screen-sized, foreshortening-preserving, in-plane arm legibility-rotated).
@@ -1449,8 +1486,41 @@ export function buildScene3(
     const v = unit(dq.x - f.x, dq.y - f.y);
     let away = unit(-(u.x + v.x), -(u.y + v.y));
     if (away.x === 0 && away.y === 0) away = { x: 0, y: 1 };
-    return { segs, foot: f, label: w.label, labelX: f.x + away.x * LABEL_OFFSET, labelY: f.y + away.y * LABEL_OFFSET };
+    return { segs, foot: f, label: w.label, labelX: f.x + away.x * LABEL_OFFSET, labelY: f.y + away.y * LABEL_OFFSET, extra: [] };
   });
+  // #1491 — the line × plane constructions: the height PH and the projection XH, dashed; X is the
+  // construction's vertex (`foot`), H (and a P that no named point marks) its extra points.
+  for (const w of wLinePlane) {
+    const s2 = (q: Vec3) => w2s(q);
+    const [x, hh, p] = [s2(w.X), s2(w.H), s2(w.P)];
+    const unit = (dx: number, dy: number) => {
+      const L = Math.hypot(dx, dy);
+      return L > 1e-9 ? { x: dx / L, y: dy / L } : { x: 0, y: 1 };
+    };
+    /** a label placed opposite the two directions it sits between, so it never lands in the wedge */
+    const awayFrom = (o: { x: number; y: number }, q1: { x: number; y: number }, q2: { x: number; y: number }) => {
+      const u = unit(q1.x - o.x, q1.y - o.y);
+      const v = unit(q2.x - o.x, q2.y - o.y);
+      const a = unit(-(u.x + v.x), -(u.y + v.y));
+      return { x: o.x + a.x * LABEL_OFFSET, y: o.y + a.y * LABEL_OFFSET };
+    };
+    const lX = awayFrom(x, p, hh);
+    const lH = awayFrom(hh, p, x);
+    constructions.push({
+      segs: [
+        { x1: p.x, y1: p.y, x2: hh.x, y2: hh.y },
+        { x1: x.x, y1: x.y, x2: hh.x, y2: hh.y },
+      ],
+      foot: x,
+      label: w.lx,
+      labelX: lX.x,
+      labelY: lX.y,
+      extra: [
+        { x: hh.x, y: hh.y, label: w.lh, labelX: lH.x, labelY: lH.y },
+        ...(w.pNamed ? [] : [{ x: p.x, y: p.y, label: null, labelX: p.x, labelY: p.y }]),
+      ],
+    });
+  }
 
   return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves, witnesses, measures, crossings, constructions };
 }

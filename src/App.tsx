@@ -17,7 +17,6 @@ import { useStore } from 'zustand';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { privacyDeclaration } from './ui/privacy';
 import { aboutContent } from './ui/about';
-import { AboutBody } from '../shell/frame/about';
 import type { QueryNote } from '@/engine/valuesPanel';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
@@ -49,9 +48,8 @@ import type { DetectedShape, Id, SimilarClass } from '@/engine';
 import { bookUrl } from '@/shapes/shapeCatalog';
 import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES_VISIBLE } from '@/theorems';
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
-import { Modal } from '@/ui/Modal';
 import { SYMBOL_SPECS } from '@/ui/symbols';
-import { btn, card as themeCard, color as pal, fs, sectionTitle } from '@/ui/theme';
+import { btn, card as themeCard, fs, sectionTitle } from '@/ui/theme';
 // #743: the under-canvas row's ONE look — the style contract lives in shell (seeded from this
 // tree's own btn.accent/btn.subtle, which the operator praised); every builder's row consumes it.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
@@ -208,7 +206,6 @@ export default function App() {
   const [fileAudit, setFileAudit] = useState<LoadAuditFinding[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null); // the hidden <input type=file> behind "load figure"
   const [manualOpen, setManualOpen] = useState(false); // the D9 manual SCREEN (B7) — catalog-backed
-  const [aboutOpen, setAboutOpen] = useState(false); // the "מה זה?" intro modal (first load + reopenable)
   // examplesOpen retired (operator 2026-08-18): no example strip above the input — the examples
   // live on the clean canvas (QuickChips) and in עזרה.
   // B6-2d: the נתונים panel — permanent column on wide screens (content collapsible), the same
@@ -276,23 +273,6 @@ export default function App() {
     [],
   );
 
-  // Show the "what is this?" intro once, on a visitor's first load (persisted in
-  // localStorage). It stays reopenable from the header button afterwards.
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem('geo_intro_seen')) setAboutOpen(true);
-    } catch {
-      /* private mode / no storage — just don't auto-open */
-    }
-  }, []);
-  function dismissAbout() {
-    setAboutOpen(false);
-    try {
-      localStorage.setItem('geo_intro_seen', '1');
-    } catch {
-      /* ignore */
-    }
-  }
 
   // Debug log (dev only): snapshot the fact list + per-fact status whenever the
   // figure changes (any submit / edit / delete / undo / clear / resample), so a
@@ -1237,6 +1217,7 @@ export default function App() {
         content: about,
         privacy: privacyDeclaration(t),
         closeLabel: t('about.close'),
+        autoOpenKey: 'geo_intro_seen', // #1453 (ADR-W-098): first visit opens About, in every builder
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
       /* #1238: the offer sits in the frame's banner region, above the workbench — the first thing
@@ -2196,23 +2177,6 @@ export default function App() {
         }
       />
 
-      {/* "מה זה?" — the FIRST-LOAD intro (dismiss persisted): the same About content the frame's
-          אודות button shows, auto-opened once for a new student. The footer retired with the frame
-          adoption (B3-2d) — its contact line lives inside the About body now. */}
-      <Modal
-        open={aboutOpen}
-        onClose={dismissAbout}
-        title={t('about.title')}
-        footer={
-          <button type="button" style={sendBtn} onClick={dismissAbout}>
-            {t('about.close')}
-          </button>
-        }
-      >
-        <AboutBody content={about} />
-        {/* The in-app privacy note (NFR-SE-3 / ADR-278) — the deploy README alone is not user-facing. */}
-        <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12, color: pal.muted }}>{privacyDeclaration(t).text}</p>
-      </Modal>
 
       {/* "עזרה" — a short guide + the full command reference, in two tabs. */}
       {/* THE MANUAL (B7 #672, D9): the עזרה modal graduated into the separate SCREEN — the guide
@@ -2311,7 +2275,6 @@ const subtleBtnOff: React.CSSProperties = rowSubtleOffStyle;
 const displayToggle: React.CSSProperties = { display: 'flex', gap: 6, alignItems: 'center', fontSize: fs.body, color: '#475569', cursor: 'pointer' };
 // symbolsToggle / input / chip / greekBtn retired with the shared InputArea (B4-2d): the box, the
 // palette buttons and the quick chips are shell chrome now.
-const sendBtn: React.CSSProperties = btn.primary;
 // helpExample / catHeading / cmdRow retired with the help modal (B7): the manual screen's chrome
 // renders the catalog now.
 const legend: React.CSSProperties = { display: 'flex', gap: 12, fontSize: 11, color: '#94a3b8', margin: '0 0 6px' };

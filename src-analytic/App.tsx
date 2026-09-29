@@ -38,7 +38,8 @@ import { panelKnowledge } from './app/panelRows';
 import { angleText, lineAngleOf } from './app/lineAngle';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
 import { domainText } from './engine/types';
-import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
+import { isKnowledge, knownCurve } from './engine/evaluate';
+import { pointText as pointTextOf } from './app/pointText';
 import { drawnBox as composeDrawnBox } from './app/drawnBox';
 import { SYMBOLS } from './ui/symbols';
 import { logAnalytic, logAnalyticFigure } from './debug/sessionLogAnalytic';
@@ -932,14 +933,15 @@ export function App() {
           'ambiguous-shape': 'errAmbiguousShape',
           'undistinguished-diagonal': 'errNoPrincipalDiagonal',
           'already-named': 'errAlreadyNamed',
-          'unsatisfiable': 'errUnsatisfiable',
+          // #1423 — a refusal that restates an existing letter says the LETTER is the problem
+          'unsatisfiable': error.key === 'unsatisfiable' && 'reusedId' in error && error.reusedId ? 'errUnsatisfiableReused' : 'errUnsatisfiable',
           // A save file this tool will not open, named by WHICH of the three reasons (#1087).
           'load-foreign': 'errLoadForeign',
           'load-newer': 'errLoadNewer',
           'load-too-large': 'errLoadTooLarge',
           'load-unreadable': 'errLoadUnreadable',
         }[error.key],
-        { detail: error.detail, max: MAX_FIGURE_STATEMENTS, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '', example: 'example' in error ? (error.example ?? '') : '' },
+        { detail: error.detail, max: MAX_FIGURE_STATEMENTS, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '', example: 'example' in error ? (error.example ?? '') : '', reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '', definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '' },
       )
     : null;
 
@@ -1073,6 +1075,7 @@ export function App() {
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
         closeLabel: t('close'),
+        autoOpenKey: 'analytic_intro_seen', // #1453 (ADR-W-098): first visit opens About, in every builder
       }}
     >
       {/*
@@ -1506,7 +1509,7 @@ export function App() {
                   const p = { id };
                   return (
                     <span key={p.id}>
-                      <ValueRow text={`${p.id} = ${pointText(d, p.id, kx, ky)}`} />
+                      <ValueRow text={`${p.id} = ${pointTextOf(d, p.id, kx, ky, fmt)}`} />
                     </span>
                   );
                 }),
@@ -1734,6 +1737,17 @@ export function App() {
                     */}
                     {a.missing ? (
                       `${a.question} — ${t(a.missing.kind === 'point' ? 'askMissingPoint' : 'askMissingCurve', { name: a.missing.name })}`
+                    ) : a.contextual ? (
+                      /* #1431 — the contextual «המרחק של הנקודה מהישר» could not resolve: name WHICH
+                         noun is ambiguous (or absent), never «לא הבנתי» */
+                      `${a.question} — ${t(
+                        a.contextual.points !== 1 && a.contextual.lines !== 1
+                          ? 'askContextualBoth'
+                          : a.contextual.points !== 1
+                            ? 'askContextualPoint'
+                            : 'askContextualLine',
+                        { points: a.contextual.points, lines: a.contextual.lines },
+                      )}`
                     ) : a.unreadable ? (
                       `${a.question} — ${t('askUnreadable')}`
                     ) : (
@@ -1970,103 +1984,7 @@ function fmt(v: number): string {
   return fmtAnalytic(v);
 }
 
-/**
- * What the givens SAY about a point, as the panel should read it (#1078).
- *
- * Operator, 2026-09-15: *"B should be something like (t,t) showing we collapsed the y based on the
- * x"*. Three answers, in order of how much the figure knows:
- *
- *  - both coordinates are knowledge → the numbers;
- *  - the point rides a LINE → the free coordinate as a symbol, and the other as the expression the
- *    line makes of it: `B = (x_B, x_B)` for `y = x`;
- *  - otherwise → the open row this always showed.
- *
- * The middle answer prints no VALUE, so it does not weaken ADR-AG-003 §2 — it names a dependency,
- * and it is strictly more honest than the dash, which said "unknown" where the truth was "unknown
- * in one coordinate and determined by it in the other".
- *
- * The component symbol is the point’s own (`x_B`), which is the convention #1032 set and the canvas
- * already prints. The operator wrote `(t,t)`; a shared `t` would say two different points on one
- * line were the same point, which is why this keeps the established form.
- */
-function pointText(
-  d: ReturnType<typeof derive>,
-  id: string,
-  kx: { known: boolean; value?: number },
-  ky: { known: boolean; value?: number },
-): string {
-  if (kx.known && ky.known) return `(${fmt(kx.value as number)}, ${fmt(ky.value as number)})`;
-
-  /**
-   * A DISCRETE SET of positions (#1036) — «הבחן בין שני מקרים», which the corpus asks about six
-   * times in the forty «lines and points» exercises.
-   *
-   * Asked SECOND, after the determined case and before the dependency: neither member is
-   * knowledge, but the set is, and printing one member alone would be the cardinal sin while
-   * printing nothing throws away the shape of the answer the exam is asking for.
-   */
-  const options = knownOptions(d.construction, (f) => {
-    const q = f.points.find((r) => r.id === id);
-    return q ? [q.x, q.y] : null;
-  });
-  if (options) {
-    // The DRAWN one is marked, which is what connects this row to «הציגו תצורה אחרת».
-    const here = d.figure.points.find((q) => q.id === id);
-    return options
-      .map((v) => {
-        const text = `(${fmt(v[0])}, ${fmt(v[1])})`;
-        const drawn = here && Math.hypot(here.x - v[0], here.y - v[1]) < 1e-6;
-        return drawn ? `[${text}]` : text;
-      })
-      .join(' או ');
-  }
-
-  /**
-   * A COORDINATE THE STUDENT WROTE IS SHOWN, EVEN WHEN IT IS NOT A NUMBER (#1226).
-   *
-   * Operator, playing T32 on «A(-9a,0)» / «B(41a,0)»: *"9a and 41a are still not shown on the canvas
-   * or data panel which is wrong."*
-   *
-   * The tool holds `A.x` as `mul(neg(9), sym a)` — his own `-9a`, exactly — and `exprText` has
-   * rendered it all along. The row printed `(x_A, 0)` instead: the tool's OWN symbol substituted for
-   * the student's expression, which is worse than the dash it replaced. *"Everything the student
-   * stated is visible on the figure"* is the invariant, and `-9a` was stated.
-   *
-   * This is #1023's fix for the other object kind, in its own words: *"it states no VALUE, so
-   * ADR-AG-003 §2 is untouched — it names the dependency, which is more than the dash said and less
-   * than a number."*
-   *
-   * Only a STATED point (`kind: 'point'`) with a non-numeric coordinate. A carrier point is `free`
-   * and a midpoint is `derived`, so neither the `(x_B, x_B)` reading below nor the derived rows can
-   * be reached by this branch — measured, not assumed.
-   */
-  const stated = d.construction.objects.find((o) => o.id === id);
-  if (stated?.kind === 'point' && (stated.x.kind !== 'num' || stated.y.kind !== 'num')) {
-    return `(${exprText(stated.x)}, ${exprText(stated.y)})`;
-  }
-
-  const on = d.construction.constraints.find(
-    (k) => k.t === 'on-curve' && k.id === id,
-  );
-  if (on && on.t === 'on-curve') {
-    // The SAME gate the curve rows use: a carrier whose coefficients still move says nothing here.
-    const line = knownCurve(d.construction, on.curve);
-    if (line && line.kind === 'line' && Math.abs(line.b) > 1e-12 && Math.abs(line.a) > 1e-12) {
-      const slope = -line.a / line.b;
-      const intercept = -line.c / line.b;
-      const sx = `x_${id}`;
-      const term = Math.abs(slope - 1) < 1e-12 ? sx : Math.abs(slope + 1) < 1e-12 ? `-${sx}` : `${fmt(slope)}·${sx}`;
-      const tail = Math.abs(intercept) < 1e-12 ? '' : intercept > 0 ? ` + ${fmt(intercept)}` : ` - ${fmt(-intercept)}`;
-      return `(${sx}, ${term}${tail})`;
-    }
-  }
-
-  // One coordinate pinned and the other open — «B על ציר ה-x» — reads the same way.
-  if (kx.known !== ky.known) {
-    return kx.known ? `(${fmt(kx.value as number)}, y_${id})` : `(x_${id}, ${fmt(ky.value as number)})`;
-  }
-  return '—';
-}
+// #1433: `pointText` moved to app/pointText.ts — the ask lane calls the same decision.
 
 
 /**

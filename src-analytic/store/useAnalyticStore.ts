@@ -12,6 +12,7 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import type { LoadAudit } from '../../shell/save';
+import { ingestTypedText } from '../../shell/bidi';
 
 /**
  * WHOSE save file this is, and which format (#1087).
@@ -119,8 +120,10 @@ export type InputError =
    * The refusal names the holder so the student sees the collision, not a scolding about their letter.
    */
   | { key: 'already-named'; detail: string; holder?: string }
-  /** A given the figure cannot satisfy (#1016). */
-  | { key: 'unsatisfiable'; detail: string }
+  /** A given the figure cannot satisfy (#1016). #1423: when the refused line RESTATES an existing
+   *  letter, `reusedId` names it and `definedBy` carries the student's own line that defines it —
+   *  the refusal then says the letter is the problem, with the fresh-letter remedy. */
+  | { key: 'unsatisfiable'; detail: string; reusedId?: string; definedBy?: string }
   /**
    * A save file this tool will not load (#1087) — and WHICH of the three reasons, because they send
    * the student to three different places: another builder's file, a newer version of this one, or
@@ -224,14 +227,15 @@ export const useAnalyticStore = create<AnalyticState>()(
 
   queries: [],
 
-  recordLine: (line) => set((s) => ({ lines: [...s.lines, line], error: null, notice: null })),
+  // #1348 (ADR-W-095): the store-side ingest (ADR-W-029) — every line this store records passes it
+  recordLine: (line) => set((s) => ({ lines: [...s.lines, ingestTypedText(line)], error: null, notice: null })),
   recordLlmLines: (spoken, ls) =>
     set((s) => {
       const spokenFor = { ...s.spokenFor };
       ls.forEach((_, k) => {
         spokenFor[s.lines.length + k] = ls.length > 1 ? `${spoken} (${k + 1}/${ls.length})` : spoken;
       });
-      return { lines: [...s.lines, ...ls], spokenFor, error: null, notice: null };
+      return { lines: [...s.lines, ...ls.map(ingestTypedText)], spokenFor, error: null, notice: null };
     }),
   removeLine: (index) =>
     set((s) => {
@@ -247,7 +251,7 @@ export const useAnalyticStore = create<AnalyticState>()(
     set((s) => {
       // An EDITED row shows what the student typed into the editor — the annotation is stale.
       const { [index]: _gone, ...spokenFor } = s.spokenFor;
-      return { lines: s.lines.map((l, i) => (i === index ? next : l)), spokenFor, error: null, notice: null };
+      return { lines: s.lines.map((l, i) => (i === index ? ingestTypedText(next) : l)), spokenFor, error: null, notice: null };
     }),
   clearAll: () =>
     // The QUERIES go with the lines (#1110): a reading of a figure that no longer exists is a lie,
@@ -295,7 +299,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   },
 
   restore: ({ lines, seed, name, spokenFor }) =>
-    set({ lines: [...lines], spokenFor: spokenFor ?? {}, seed: seed ?? 0, name: name ?? '', error: null, notice: null }),
+    set({ lines: lines.map(ingestTypedText), spokenFor: spokenFor ?? {}, seed: seed ?? 0, name: name ?? '', error: null, notice: null }),
     }),
     {
       /**

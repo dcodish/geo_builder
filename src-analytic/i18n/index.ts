@@ -45,7 +45,7 @@ const he = {
   // The ASK lane (#1027) — the panel's own input: two surfaces, one grammar.
   // Short enough to READ in the panel's column — a placeholder clipped at its start teaches nothing.
   askPlaceholder: 'שאלו: AB, שטח ABC, זווית ABC',
-  askAdd: 'שאל',
+  askAdd: 'שאלו', // #1453 (ADR-W-098): the suite's one wording
   /** The ✕ that retires a measurement and the height it drew (#1118). */
   askTraceLabel: 'איך מגיעים לזה',
   // #1525 (operator, 2026-09-29): a method hint for an asked angle — the cosine half only when all
@@ -81,6 +81,10 @@ const he = {
   askLinesCross:
     'הישרים נחתכים, ולכן אין ביניהם מרחק אחד — הוא אפס בנקודת החיתוך וגדל ככל שמתרחקים ממנה. מרחק מוגדר רק בין ישרים מקבילים. אפשר לשאול על המרחק מנקודה לישר, למשל «המרחק מ-A לישר l1», או לסמן את נקודת החיתוך עצמה.',
   askUnreadable: 'לא הבנתי את השאלה',
+  // #1431 — the contextual distance could not resolve; name which noun to letter
+  askContextualPoint: 'יש {{points}} נקודות בציור — כתבו את שם הנקודה (למשל «המרחק של A מהישר»)',
+  askContextualLine: 'יש {{lines}} ישרים בציור — כתבו את שם הישר (למשל «המרחק של הנקודה מהישר l1»)',
+  askContextualBoth: 'בציור {{points}} נקודות ו-{{lines}} ישרים — כתבו את השמות (למשל «המרחק של A מהישר l1»)',
   /** #1111 — the sentence was understood; the figure has no such object. The LETTER is the point. */
   askMissingPoint: 'אין בשרטוט נקודה בשם {{name}}',
   askMissingCurve: 'אין בשרטוט ישר או מעגל בשם {{name}}',
@@ -104,8 +108,8 @@ const he = {
   angleWithX: 'זווית עם ציר ה-x',
   secParams: 'פרמטרים',
   paramUnused: '(לא בשימוש בשרטוט)',
-  freeDof: '{{count}} דרגות חופש',
-  pinned: 'הכול נקבע על-ידי הנתונים',
+  freeDof: 'דרגות חופש: {{count}}',
+  pinned: '✓ הציור נקבע במלואו על ידי הנתונים',
   about: 'אודות',
   aboutTitle: 'גאומטריה אנליטית',
   aboutLead:
@@ -151,6 +155,8 @@ const he = {
   errUnknownRefCircle: 'המעגל {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
   errAlreadyNamed: 'כבר יש שם לנקודה הזו: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
+  // #1423 — the letter is the problem, named with the student's own defining sentence and the remedy
+  errUnsatisfiableReused: '{{reusedId}} כבר מוגדרת: "{{definedBy}}". המשפט "{{detail}}" סותר את ההגדרה הקיימת — לנקודה חדשה בחרו אות אחרת.',
   // The locus families (#1137) — keyed by the engine's own kind, so a family added later shows its
   // internal name rather than nothing at all.
   'locus.line': 'ישר',
@@ -345,6 +351,9 @@ const en: typeof he = {
   askLinesCross:
     'the lines intersect, so there is no single distance between them — it is zero at the crossing and grows away from it. A distance is defined only between PARALLEL lines. You can ask for the distance from a point to a line, for example "the distance from A to line l1", or name the crossing point itself.',
   askUnreadable: 'I did not understand the question',
+  askContextualPoint: 'the figure has {{points}} points — name the point (e.g. "המרחק של A מהישר")',
+  askContextualLine: 'the figure has {{lines}} lines — name the line (e.g. "המרחק של הנקודה מהישר l1")',
+  askContextualBoth: 'the figure has {{points}} points and {{lines}} lines — name them (e.g. "המרחק של A מהישר l1")',
   askMissingPoint: 'there is no point {{name}} in your figure',
   askMissingCurve: 'there is no line or circle named {{name}} in your figure',
   paletteShow: 'Symbols',
@@ -364,8 +373,8 @@ const en: typeof he = {
   angleWithX: 'angle with the x-axis',
   secParams: 'Parameters',
   paramUnused: '(not used by the figure)',
-  freeDof: '{{count}} degrees of freedom',
-  pinned: 'Everything is fixed by the givens',
+  freeDof: 'Degrees of freedom: {{count}}',
+  pinned: '✓ The figure is fully determined by the givens',
   about: 'About',
   aboutTitle: 'Analytic Geometry',
   aboutLead:
@@ -407,6 +416,7 @@ const en: typeof he = {
   errUnknownRefCircle: 'The circle {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
+  errUnsatisfiableReused: '{{reusedId}} is already defined: "{{definedBy}}". "{{detail}}" contradicts that definition — pick another letter for a new point.',
   'locus.line': 'line',
   'locus.circle': 'circle',
   'locus.parabola': 'parabola',
@@ -455,7 +465,7 @@ const en: typeof he = {
     'The two lines in "{{detail}}" are the same line, and a line has no intersection with itself, so the sentence defines no point. If you meant some point on that line, write for example "P on line AB".',
   errLlmBusy:
     'The service is busy, so I could not check "{{detail}}". Try again in a moment, or write it in one of the forms listed in the commands panel.',
-  thinking: 'Thinking…',
+  thinking: 'Working…',
   errBadOperand:
     'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +
     'a side (side AB), a line (line l1) or an axis (the x-axis).',

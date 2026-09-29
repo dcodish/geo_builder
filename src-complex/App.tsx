@@ -583,6 +583,7 @@ export function App() {
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
         closeLabel: t('aboutClose'),
+        autoOpenKey: 'complex_intro_seen', // #1453 (ADR-W-098): first visit opens About, in every builder
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
       /* #1238: the offer outranks the load audit for the one render where both could exist — an
@@ -847,7 +848,8 @@ export function App() {
                     ))}
                   </div>
                 )}
-                {polarScene.regions.map((rg) => (
+                {/* #1425: a polygon with nothing else to count shows no strip (its corners are not counted) */}
+                {polarScene.regions.filter((rg) => rg.members.length > 0).map((rg) => (
                   <div key={rg.key} className="region-count" dir="rtl">
                     {t('regionCounts', {
                       label: rg.label,

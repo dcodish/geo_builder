@@ -19,6 +19,12 @@ export interface SymbolSpec {
   before: string;
   /** Inserted after the selection — the wrapping half. Omitted = plain insert. */
   after?: string;
+  /**
+   * #1348 (ADR-W-095): WHY a one-character face inserts something else. A button promises the glyph on
+   * its face; one that types a keyboard form instead must say why here (the grammar does not read the
+   * glyph), or the palette lock fails.
+   */
+  keyboardForm?: string;
 }
 
 /**

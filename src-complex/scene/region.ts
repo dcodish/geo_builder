@@ -10,8 +10,12 @@
  * the picture; the exam's claim about the count (F12) is a separate thing this layer does not make —
  * it draws where things are, and a claim about them is checked at stage 4, never here.
  *
- * On-the-boundary is decided with a tolerance relative to the figure's own size, because a vertex of
- * the polygon is a plotted number and must come out `on` rather than as a coin toss between in and out.
+ * On-the-boundary is decided with a tolerance relative to the figure's own size, because a counted number
+ * can sit exactly on an edge or a corner and must come out `on` rather than as a coin toss between in and out.
+ *
+ * #1425 (ADR-CX-053): what is counted is the OTHER numbers — a polygon's own corners (`cornerNames`) lie on
+ * it by definition and are left out. A corner that is also a solution of an equation is one of the numbers
+ * the question asks about, so it still counts.
  */
 
 import type { Cx } from '../value/value';
@@ -62,7 +66,9 @@ export function regionsOf(
   return objects
     .filter((o) => o.kind === 'polygon' && o.vertices.length >= 3)
     .map((o) => {
-      const members = points.map((p) => {
+      // #1425 (ADR-CX-053): the polygon's own corners are on it by definition — not what is counted
+      const own = new Set(o.cornerNames ?? []);
+      const members = points.filter((p) => !own.has(p.name)).map((p) => {
         const onEdge = o.vertices.some((v, i) =>
           distanceToSegment(p.z, v, o.vertices[(i + 1) % o.vertices.length]) <= tol,
         );

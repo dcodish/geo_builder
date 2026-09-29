@@ -377,6 +377,27 @@ async function run() {
 
     if (pageErrors.length) problems.push(`${app}: ${pageErrors.length} uncaught page error(s) — first: ${pageErrors[0]}`);
     await page.close();
+
+    // #1458 (ADR-W-097): on a PHONE the switcher strip scrolls inside itself, and the current tool's tab
+    // must be inside what it shows (analytic at 390px sat at −198…−42 — wholly off the strip).
+    const phone = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await phone.goto(base + spec.urlPath, { waitUntil: 'networkidle' });
+    const tab = await phone.evaluate(() => {
+      const cur = document.querySelector('nav [aria-current="page"]');
+      const nav = cur?.closest('nav');
+      if (!cur || !nav) return null;
+      const a = cur.getBoundingClientRect();
+      const b = nav.getBoundingClientRect();
+      return { left: a.left, right: a.right, navLeft: b.left, navRight: b.right };
+    });
+    const phoneShot = path.join(outDir, `${String(++n).padStart(2, '0')}-phone-switcher.png`);
+    await phone.screenshot({ path: phoneShot });
+    record.shots.push(path.relative(repoRoot, phoneShot).replace(/\\/g, '/'));
+    allFiles.push(phoneShot);
+    if (!tab) problems.push(`${app}: at 390px the switcher shows no current-tool tab`);
+    else if (tab.left < tab.navLeft - 1 || tab.right > tab.navRight + 1)
+      problems.push(`${app}: at 390px the current tool's tab is cut off (${Math.round(tab.left)}…${Math.round(tab.right)} in a strip ${Math.round(tab.navLeft)}…${Math.round(tab.navRight)})`);
+    await phone.close();
   }
 
   // Every capture is read back before anything is reported.

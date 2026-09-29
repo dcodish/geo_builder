@@ -22,7 +22,7 @@
  */
 
 import { nanoid } from 'nanoid';
-import { stripFormatControls } from '../../shell/bidi';
+import { ingestTypedText } from '../../shell/bidi';
 import { displayModeToIndexed } from '../../shell/displayMode';
 import { figureTooLarge } from '../../shell/save';
 import type { AnyCommand, Id } from '@/engine';
@@ -182,7 +182,7 @@ function sanitizeFactIn(v: unknown): Fact | null {
     // #751 (ADR-W-029): a file saved before the ingest invariant carries the app's display
     // isolates in its utterances — clean on the way IN, which is what protects the saves
     // already in the wild (the fix upstream only stops NEW ones being made).
-    ...(typeof v.utterance === 'string' ? { utterance: stripFormatControls(v.utterance) } : {}),
+    ...(typeof v.utterance === 'string' ? { utterance: ingestTypedText(v.utterance) } : {}),
     ...(typeof v.group === 'string' ? { group: v.group } : {}),
     cmd: cmd as unknown as AnyCommand,
     // A hand-edited file may omit `enabled` — default to on (a saved fact was entered to be used).

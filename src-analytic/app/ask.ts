@@ -29,7 +29,8 @@ import { curveByName, objectById, type Id } from '../engine/types';
 import { ANGLE_STEM_HE } from '../engine/shapes';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { isVerticalLine } from '../engine/lines';
-import { asPair, lineNamed } from './lines';
+import { asPair, lineNamed, lineNamesOf } from './lines';
+import { pointText, scalarText } from './pointText';
 import { readAngleAsk } from '../parser/parseAnalytic';
 import { angleAt } from '../engine/solve';
 import { angleText, lineAngleOf } from './lineAngle';
@@ -59,6 +60,9 @@ export interface Answer {
    * Here the conflicting statement is in hand, so it is carried rather than discarded.
    */
   missing?: { name: string; kind: 'point' | 'curve' };
+  /** #1431 — the CONTEXTUAL «המרחק של הנקודה מהישר» could not resolve: the counts name the ambiguity
+   *  (zero or several points/lines), so the wording can say WHICH noun to letter. */
+  contextual?: { points: number; lines: number };
   /**
    * THE FIGURE DETERMINES THE ANSWER, AND THE ANSWER IS THAT THERE IS NONE (#1223).
    *
@@ -259,8 +263,28 @@ export function ask(
   // plural is locale exactly as the singular is. The seam WIDENS, it is not forked.
   kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind'], count: number) => string = (k) => k,
 ): Answer {
-  const text = question.trim();
+  let text = question.trim();
   if (!text) return { question, value: null, unreadable: true };
+
+  /**
+   * #1431 — THE CONTEXTUAL DISTANCE: «המרחק של הנקודה מהישר», no letters at all.
+   *
+   * Operator ruling (2026-09-27): it answers exactly when the figure holds ONE point and ONE line —
+   * then the nouns are unambiguous references — and otherwise refuses NAMING the ambiguity, never
+   * «לא הבנתי». Resolved by REWRITING into the lettered sentence and falling through to the one
+   * distance lane below, so the contextual spelling can never drift from its lettered synonym
+   * (the ADR-W-053 rule the symbolic d_{AB} spellings already follow).
+   */
+  const ctx = /^ה?מרחק\s+(?:של\s+)?ה(?:נקודה|קדקוד)\s+(?:מ[ןהת]?[-\s]?|מן\s+)ה?(?:ישר|קו)$/.exec(text);
+  if (ctx) {
+    const lineNames = lineNamesOf(d.construction);
+    const pts = d.figure.points;
+    if (pts.length === 1 && lineNames.length === 1) {
+      text = `המרחק של ${pts[0].id} מהישר ${lineNames[0]}`;
+    } else {
+      return { question, value: null, contextual: { points: pts.length, lines: lineNames.length } };
+    }
+  }
 
   /**
    * --- «המקום הגיאומטרי של P» — the locus lane (#1137) ---
@@ -368,10 +392,14 @@ export function ask(
     if (!o) return { question, value: null, missing: { name: text, kind: 'point' } };
     const kx = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === text)?.x ?? null);
     const ky = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === text)?.y ?? null);
-    return {
-      question,
-      value: kx.known && ky.known ? `(${fmt(kx.value)}, ${fmt(ky.value)})` : null,
-    };
+    /**
+     * #1433 — THE PANEL'S OWN DECISION, one seam (`app/pointText.ts`). Asking «C» with two valid
+     * positions answered «לא ניתן לחשב מהנתונים» while the panel row beside it listed both options —
+     * a false sentence. The dash alone (a truly open point) keeps the lane's `value: null`, worded
+     * open/uncomputable as before.
+     */
+    const t = pointText(d, text, kx, ky, fmt);
+    return { question, value: t === '—' ? null : t };
   }
 
   /**
@@ -455,7 +483,14 @@ export function ask(
       const l = lineNamed(f, name);
       return l && !isVerticalLine(l.a, l.b) ? -l.a / l.b : null;
     });
-    return { question, value: k.known ? fmt(k.value) : null };
+    if (k.known) return { question, value: fmt(k.value) };
+    // #1433 — a two-configuration slope answers its option set, like every other value arm.
+    const opts = scalarText(d.construction, (f) => {
+      const l = lineNamed(f, name);
+      if (!l || isVerticalLine(l.a, l.b) || Math.abs(l.b) < 1e-12) return null;
+      return -l.a / l.b;
+    }, fmt);
+    return { question, value: opts };
   }
 
   // --- a curve, by name: its equation ---
@@ -491,9 +526,26 @@ export function ask(
         const b0 = d.figure.points.find((q) => q.id === pair[1]);
         if (a0 && b0) trace = traceLine2pt(a0, b0, fmt);
       }
+      /**
+       * #1433 — a two-configuration line answers its equation OPTIONS. Deduped by the RENDERED
+       * equation (coefficients are homogeneous, so raw triples may differ for one line); a set
+       * that collapses to one text stays null — the knowledge gate withheld it, and a single
+       * "option" would claim what the gate refused.
+       */
+      const eqOpts = known
+        ? null
+        : (() => {
+            const set = knownOptions(d.construction, (f) => {
+              const l = lineNamed(f, name);
+              return l ? [l.a, l.b, l.c] : null;
+            });
+            if (!set) return null;
+            const texts = [...new Set(set.map(([a2, b2, c2]) => curveParts({ kind: 'line', a: a2, b: b2, c: c2 }).equation))];
+            return texts.length > 1 ? texts.join(' או ') : null;
+          })();
       return {
         question,
-        value: known ? curveParts({ kind: 'line', a: ka.value, b: kb.value, c: kc.value }).equation : null,
+        value: known ? curveParts({ kind: 'line', a: ka.value, b: kb.value, c: kc.value }).equation : eqOpts,
         ...(trace ? { trace } : {}),
       };
     }
@@ -568,15 +620,15 @@ export function ask(
   if (crossing) return { question, value: null, fact: 'lines-cross' };
 
 
-  const k = isKnowledge(d.construction, (f) =>
+  const readMeasure = (f: Figure) =>
     evalLengthExpr(
       measure,
       (id) => f.points.find((q) => q.id === id) ?? null,
       f.env,
       // The NAMED line this configuration drew (#1048) — see `lineNamed`.
       (nm) => lineNamed(f, nm),
-    ),
-  );
+    );
+  const k = isKnowledge(d.construction, readMeasure);
   /**
    * A PLAIN DISTANCE gets its formula (#1053).
    *
@@ -618,7 +670,8 @@ export function ask(
   }
   return {
     question,
-    value: k.known ? fmt(k.value) : null,
+    // #1433 — a measure with a finite option set answers it («3.16 או 5.83»), the panel's own rule.
+    value: k.known ? fmt(k.value) : scalarText(d.construction, readMeasure, fmt),
     ...(trace ? { trace } : {}),
     ...(mark ? { mark } : {}),
   };
