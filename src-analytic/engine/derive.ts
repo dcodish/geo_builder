@@ -6,7 +6,7 @@
  * that fails is reported with its own index and its own words — never dropped, and never blamed on
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
-import { fold, existingKindOf, type ApplyError } from './apply';
+import { fold, existingKindOf, type ApplyError, type ApplyNotice } from './apply';
 import { reportedDof } from './carriers';
 import { drawableAt, viewBox, type Figure } from './evaluate';
 import type { Box } from './curves';
@@ -74,6 +74,12 @@ export interface Derivation {
    * the student wrote a name the tool chose.
    */
   minted: Array<{ index: number; id: string }>;
+  /**
+   * WHAT A LINE THAT LANDED SHOULD TELL THE STUDENT (#1350, ADR-AG-183) — one entry per line whose
+   * statement was accepted with a notice (`applyFact`'s `ApplyNotice`), never on a faulted line. The
+   * submit path reads the new line's entry and carries it into the commit that records the line.
+   */
+  notices: Array<ApplyNotice & { index: number }>;
 }
 
 export function derive(lines: readonly string[], seed = 0): Derivation {
@@ -103,7 +109,7 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
 
   // The LINE is the fold's unit of application (#1242, ADR-AG-133): every fact of a faulted line carries
   // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
-  const { construction, errors, effects, constraintFact } = fold(facts, owner);
+  const { construction, errors, effects, constraintFact, notices: factNotices } = fold(facts, owner);
   // Said on the circle's row only when the name was actually GIVEN — a default that yielded to a letter
   // already in the figure named nothing, and the list must not claim it did (#1263's rule).
   for (const i of centred.offered) if (effects[i] === 'created') minted.push({ index: owner[i], id: CENTRE_LETTER });
@@ -397,7 +403,15 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   });
   for (const f of faults) outcomes[f.index] = "faulted";
 
-  return { construction, figure, box: viewBox(figure), seed, faults, outcomes, minted };
+  // One notice per line, and none on a line that faulted — a refusal already says everything (#1350).
+  const notices: Derivation['notices'] = [];
+  factNotices.forEach((n, i) => {
+    const index = owner[i];
+    if (!n || outcomes[index] === 'faulted' || notices.some((m) => m.index === index)) return;
+    notices.push({ ...n, index });
+  });
+
+  return { construction, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices };
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */
@@ -526,4 +540,5 @@ export const EMPTY_DERIVATION: Derivation = {
   faults: [],
   outcomes: [],
   minted: [],
+  notices: [],
 };

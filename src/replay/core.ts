@@ -1200,6 +1200,21 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
    * search runs when a fact is over-constrained, never on a green fold (the counter lock), through its own
    * memo (`foldForSearch`, so the figure's fold is never evicted), capped at the latest relevant
    * statements, and never nested (`attribute` is false inside a trial).
+   *
+   * #1203 ([ADR-554](docs/06-decisions.md#adr-554)) — THE SEARCH LOOKS FORWARD TOO, AND PREFERS THE
+   * LATEST. The failing statement is not always the one that turned the figure infeasible: a later
+   * statement can commit green while an EARLIER row goes ✗ — on «משולש ABC · AB=4 · זווית ABC = α ·
+   * זווית ACB = 30 · AC = 6», the line «α = 50» commits, and «AC = 6» (true a moment ago) is the row that
+   * no longer holds. Looking only backwards, the search could never name the statement that completed
+   * the contradiction and blamed an innocent older given instead («AC = 6» סותר את «זווית ACB = 30», with
+   * «α = 50» green). The operator's ruling (2026-09-20, option (b)): the figure still commits and the
+   * earlier row stays marked; the WORDS name the new statement. So the candidates are the statements
+   * AFTER the failing one, latest first — each trial folds the list up to that candidate's last row with
+   * the candidate removed — and only then the earlier ones, exactly as before. It is the ADR-492 prefix
+   * doctrine applied where ADR-508 declined to look: the latest statement whose absence lets the failing
+   * one hold is the one that completed the contradiction. Attribution only, same memo, same
+   * never-on-green guarantee; each direction keeps its own cap of 8, so an earlier counterpart named today
+   * is never starved by later lines.
    */
   if (attribute && hoistDepth === 0) {
     const ownerIdx = new Set(ownerByConKey.values());
@@ -1220,22 +1235,37 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       const fi = members[0];
       const reads = new Set(members.flatMap((i) => commandPointIds(facts[i].cmd)));
       const seen = new Set<string>();
-      const candidates: string[] = [];
-      for (let j = fi - 1; j >= 0 && candidates.length < 8; j--) {
+      const relevantAt = (j: number): boolean =>
+        ownerIdx.has(j) || lowerOne(facts[j].cmd, symtab).some((c) => introducedPointIds(c).some((id) => reads.has(id)));
+      // #1203 (ADR-554): LATER statements first, latest first — each with the index of its last row, so the
+      // trial runs to it — then the earlier ones exactly as ADR-508 searched them. One cap per direction.
+      const later: { gk: string; end: number }[] = [];
+      for (let j = facts.length - 1; j > gEnd && later.length < 8; j--) {
+        const g = facts[j];
+        if (!g.enabled) continue;
+        const gk = groupKey(g);
+        if (gk === own || seen.has(gk)) continue;
+        seen.add(gk); // scanning downwards, the first row met is the statement's LAST row
+        // No relevance pre-filter here: a later statement can complete the contradiction without owning a
+        // constraint or a point the failing one reads — «α = 50» values a symbol, «רדיוס המעגל הוא 3» sets a
+        // parameter — and the trial fold itself is the test. The cap bounds the cost.
+        later.push({ gk, end: j });
+      }
+      const earlier: { gk: string; end: number }[] = [];
+      for (let j = fi - 1; j >= 0 && earlier.length < 8; j--) {
         const g = facts[j];
         if (!g.enabled) continue;
         const gk = groupKey(g);
         if (gk === own || seen.has(gk)) continue;
         seen.add(gk);
-        const relevant = ownerIdx.has(j) || lowerOne(g.cmd, symtab).some((c) => introducedPointIds(c).some((id) => reads.has(id)));
-        if (relevant) candidates.push(gk);
+        if (relevantAt(j)) earlier.push({ gk, end: gEnd });
       }
-      for (const gk of candidates) {
+      for (const { gk, end } of [...later, ...earlier]) {
         // REMOVE the candidate, never disable it: a disabled statement still OWNS the points it introduced,
         // so its dependents cascade («D is no longer available») instead of minting afresh — the question
         // is "had this never been said", which only removal asks. Indices shift; the members' trial
-        // positions are their own minus the removed rows before them.
-        const prefix = facts.slice(0, gEnd + 1);
+        // positions are their own minus the removed rows before them (none, for a LATER candidate).
+        const prefix = facts.slice(0, Math.max(gEnd, end) + 1);
         const trial = prefix.filter((x) => groupKey(x) !== gk);
         const at = (i: number) => i - prefix.slice(0, i).filter((x) => groupKey(x) === gk).length;
         const node = foldForSearch(trial);

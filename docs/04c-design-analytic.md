@@ -152,7 +152,7 @@ has four tiers, strongest first:
 
 | tier | predicate | added by |
 | --- | --- | --- |
-| preferred | whole **and** every declared ring at least `SPREAD_MIN_DEG` open **and** no two named points at one place (`separated`, `apart()`'s relative ruler) | #1174, #1273 |
+| preferred | whole **and** every declared ring at least `SPREAD_MIN_DEG` open **and** no two named points at one place (`separated` = `stackedPairs(f)` empty: closer than `VISIBLE_FRACTION` (1/100) of the unpadded `viewBox` — the SEEING ruler, not `crossings.apart()`'s identity tolerance, ADR-AG-181) | #1174, #1273, #1526 |
 | whole, separated | whole and separated but narrow — remembered above a stacked whole one (the ADR-486 ranking, ported) | #1273 |
 | whole | selectors hold · nothing vacant · no ring contradicts its noun · **every given holds** (an unsatisfied constraint is a validity failure, not a preference — a point the solve parked on neither of its curves is not a configuration) · **and no declared ring holds only by the tolerance's slack**: a thin ring (`thinRingsOf`, min |sin θ| < `THIN_SIN_TOL`) is re-solved under `withToleranceFactor(TIGHT_TOLERANCE_FACTOR)` from the converged point, and a ring that collapses there is reported as unsatisfied on the last given touching it ([ADR-AG-143](06c-decisions-analytic.md#adr-ag-143), the ADR-537 port) | #1083, #1158/#1166, #1287 |
 | second best | the selectors hold, something named is missing | #1083 |
@@ -393,6 +393,18 @@ promotion, and references to a stated line go by name.
 **An absorbed statement's id is never rewritten.** The surviving object keeps the id its constraints
 already hold and gains the incoming `label.name`; `curveByName` matches a curve by `label.name` as well
 as by id, so every by-name reference resolves either way.
+
+**Identity by READING — the name axis** ([ADR-AG-183](06c-decisions-analytic.md#adr-ag-183), #1350). The two
+predicates above compare EQUATIONS; names are compared by what a student reads. `nameReading` (`names.ts`)
+maps a line name to its notation-free numeral («l3», «ℓ3», «ישר 3», «III» → `III`; «AB», «m3» → null), and
+`readingTwin` (`apply.ts`) asks, for a fact naming a line with a name NEW to the figure, whether another
+line's name reads the same. It runs in `applyFact` around `applyStatement` (so every arm that mints a named
+line — a stated equation, a line through a point — is covered once) and only on a statement that landed
+(`created`/`narrowed`). Its answer is an `ApplyNotice`, not an error: `fold` carries it per fact, `derive`
+per line (`Derivation.notices`), `decideSubmit`'s `record` verdict per new line, and the store's
+`recordLine(line, notice)` / `recordLlmLines(…, notice)` set it **in the same commit** — the record clears
+transient surfaces, so a notice set before it would be erased by the line that earned it. `commitRecord` /
+`noticeText` (`app/submit.ts`) are the one wording, called by `App.tsx` and by the lock.
 
 ## A letter run is not automatically a product ([ADR-AG-145](06c-decisions-analytic.md#adr-ag-145))
 
@@ -683,7 +695,12 @@ Two forms name something without naming its parts, and both are resolved at M1 b
 questions about the construction rather than about the sentence:
 
 - «זווית B ישרה» — the rays come from the shape `B` belongs to;
-- «שטח הדלתון הוא 24» — the ring is the one shape answering to that noun.
+- «שטח הדלתון הוא 24» — the ring is the one shape answering to that noun;
+- «M מפגש האלכסונים» / «האלכסונים נפגשים בנקודה M» — the ring is the one shape with the
+  construct's arity (`meet-of`). Both spellings hand their SUBJECT to ONE reader, `concurrencyOf`
+  (`parseAnalytic.ts`): letters → the derived point on that ring; a noun alone or nothing → `meet-of`.
+  A noun without letters is still checked against the construct's arity in the parser
+  ([ADR-AG-182](06c-decisions-analytic.md#adr-ag-182)).
 
 Each is unambiguous when exactly one object answers, and refused by name (`ambiguous-angle`,
 `ambiguous-shape`) when none or several do. Refusing the ambiguous case is what makes the
@@ -1769,3 +1786,21 @@ origin, names a canonical circle's centre itself, or DEFINES `O` (a `point` or `
 An `O` only DECLARED earlier («משולש AOB») is the fold's to see: `applyFact`'s derived arm absorbs an
 `auto` fact whose id is held as `known` — never lowered to #1320's `derived-at` condition. `minted`
 records `O` only when the fold CREATED it, which is what the row's `mintedNote` reads.
+
+## The LLM lane's prompt: derive, never invent; never prose ([ADR-AG-186](06c-decisions-analytic.md#adr-ag-186))
+
+The fallback prompt (`parser/llmSharedAnalytic.ts`) states **both halves of ADR-052**. A value nothing
+the student said determines is never supplied; a value their own data DETERMINES is not an invention and
+may be written into a line. The canonical case is a line by a point and a slope, written in point-slope
+form with the stated numbers copied (`הישר y-3=4(x-2)`) — the equation layer evaluates that form as it
+stands, so neither the model nor the student does arithmetic, and the line reads back as what was
+typed. Every step must be a catalogue command; prose is refused as if the answer were empty.
+
+The catalogue is the model's vocabulary, so a construct with no row has no pattern: the point-and-slope
+line has one (F3), and so does the named-point form (F19: a free-direction line through the point,
+then its slope).
+
+**What the student reads when nothing recorded** is one pure decision, `fallbackRefusal`
+(`app/fallback.ts`): a throttle is «busy»; a completion the tool READ and declined is «understood, not
+supported» (ADR-AG-170); a completion that is not a command at all (`not-handled`), or no answer, keeps
+the student's ORIGINAL refusal — nothing was understood, and the move may well be supported.

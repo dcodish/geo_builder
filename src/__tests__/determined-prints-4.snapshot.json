@@ -24,7 +24,6 @@
   "canvas ∠CBD = 90.00",
   "canvas ∠CBG = 90.00",
   "panel area O = 67.02",
-  "panel area ~tanmid-OA = 67.02",
   "panel length AB = 8.00",
   "panel length AC = 4.62",
   "panel length AD = 13.86",
@@ -37,9 +36,7 @@
   "panel length CO = 4.62",
   "panel length DO = 4.62",
   "panel perimeter O = 29.02",
-  "panel perimeter ~tanmid-OA = 29.02",
-  "panel radius O = 4.62",
-  "panel radius ~tanmid-OA = 4.62"
+  "panel radius O = 4.62"
  ],
  "sc:arc-midpoint-takes-the-drawn-arc": [],
  "sc:central-angle-valueless-and-valued": [
@@ -139,8 +136,6 @@
   "canvas ∠CBD = 53.13",
   "panel area O1 = 28.27",
   "panel area O2 = 254.47",
-  "panel area ~tanmid-O2A = 176.71",
-  "panel area ~tanmid-O2B = 318.09",
   "panel length AC = 24.00",
   "panel length AD = 12.00",
   "panel length AE = 6.00",
@@ -156,11 +151,7 @@
   "panel length O1O2 = 12.00",
   "panel perimeter O1 = 18.85",
   "panel perimeter O2 = 56.55",
-  "panel perimeter ~tanmid-O2A = 47.12",
-  "panel perimeter ~tanmid-O2B = 63.22",
   "panel radius O1 = 3.00",
-  "panel radius O2 = 9.00",
-  "panel radius ~tanmid-O2A = 7.50",
-  "panel radius ~tanmid-O2B = 10.06"
+  "panel radius O2 = 9.00"
  ]
 }

@@ -107,6 +107,6 @@ describe('#716 — the Hebrew wordings are unchanged', () => {
 
   it('an unreadable line', () => {
     const d = deriveLines(['שורה שאיננה נתון'], 0, 0);
-    expect(whyText(d.untranslated[0].why, tHe)).toBe('הדקדוק לא מזהה את השורה הזו');
+    expect(whyText(d.untranslated[0].why, tHe)).toBe('השורה לא זוהתה — נסו אחד מהניסוחים במדריך');
   });
 });

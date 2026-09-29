@@ -37,7 +37,12 @@ productive pattern in this tree precisely because the seam exists.
 `normalize3` is the one boundary every rule reads: format controls stripped, primes and minus unified,
 script transitions split — and lowercase labels uplifted by `upliftLowercaseLabels`, the ONE chokepoint,
 only in positions an anchor proves are labels (the angle glyph/word, a point/vertex noun, the head of a
-coordinate definition). New label-demanding positions join that function, never a rule. What no anchor
+coordinate definition, the single-letter subject of a midpoint statement — [ADR-3D-287](06b-decisions-3d.md#adr-3d-287)).
+New label-demanding positions join that function, never a rule. **An auto-name arm consumes the whole
+utterance** (ADR-3D-287): a rule that INVENTS a point's name (`midpoint-auto`, the one such arm in
+`parse3`) matches a full anchored frame — the noun phrase and its two labels, nothing else — never a count
+of label tokens, so a word it does not own declines the line instead of being read around. The frame
+(`MID_HE`/`MID_EN`) is spelled once and shared by the rule and the anchor. What no anchor
 proves is left to the #353 convention nudge in `scope3.ts` (`upperCasedLabelCandidate3`, consulted by
 `App3` before the LLM seam), which teaches the spelling rather than guessing it.
 
@@ -206,9 +211,16 @@ will be produced.
 
 **A relation's lane is decided by its OPERANDS, never by its word** (#1439,
 [ADR-3D-263](06b-decisions-3d.md#adr-3d-263)). Between two absolute objects a relation either pins the
-figure parameter or is a claim, and the deciding question is whether a referenced direction carries the
-parameter — `paramPinningLineRels` for the line column, `planePinningRels` for plane × plane. Every such
-relation also records its claim, so whatever lane it solves in, the verifier is the final arbiter. The plane
+figure parameter or is a claim, and the deciding question is whether an operand carries the parameter **in
+what the relation reads** ([ADR-3D-286](06b-decisions-3d.md#adr-3d-286), #1472): ⟂ / ∥ / an angle read
+directions (a normal, a line's direction); coincidence, containment, intersection and distance read
+positions too (a plane's offset, a line's anchor, a coordinate point). One list, `paramPinningRels`, read
+from the recorded claims (`claimPinsParam`, `operandCarriesParam`), feeds the root-find, and each pin's
+residual is the verifier's own function on the operands rebuilt at the candidate value (`operandAtParam`),
+with the verifier's predicate filtering the roots (the open half of «נחתכים», a distance's parallel branch).
+A relation whose residual vanishes at every scan sample holds for every value and is **not** a pin (the
+identity guard) — the parameter stays a sampled DOF. Every such relation also records its claim, so whatever
+lane it solves in, the verifier is the final arbiter. The plane
 column once decided by the word instead: «הזווית בין המישורים» went to a list only the root-find read (with
 no parameter, checked by nothing and drawn as knowledge), while «ניצב» / «מקביל» went to the claim lane even
 when a normal carried the parameter. A number the renderer prints from such a relation is drawn only when
@@ -227,11 +239,16 @@ rule**, at the head of `holdsAt`, not a case per kind: a `given` claim is judged
 a configuration where the pivot found no placement it holds vacuously, and at the displayed seed the
 pin-owner guard gives the verdict (`injection-unsatisfiable` for a coordinate pin, `givens-contradict`
 naming the statements otherwise; newest owner only). A new pin family gains its arbiter by recording a claim
-with the flag. Still open: pins routed on `freeDims(c) > 0` alone (`length`, `vangle`/`seg-angle`,
-`length-rel`, `seg-perp/par-plane`) — `freeDims` counts a revolution's unstated size, which the pivot never
-drives, so with a free-size sphere, cone or cylinder on the canvas those givens reach a pin nothing reads
-(#1567, which reuses this rule); and the missing drive for riders and partial points on a solid-free figure
-(the pivot's entry gate asks for a solid or a `free3` point, ADR-3D-282).
+with the flag. The scalar pins join the same seam ([ADR-3D-285](06b-decisions-3d.md#adr-3d-285), #1567):
+`length` records `length-eq`, `seg-angle` records `angle-seg-eq` (the angle between lines, |cos|),
+`vangle` records the SIGNED `cos-angle-eq` over its two rays (the vertex angle, 0–180°, the quantity the pin
+drives), `length-rel` records `length-rel`, and `seg-perp/par-plane` records `perp-plane`/`par-plane` — so
+routing on `freeDims(c) > 0`, which counts a revolution's unstated size the pivot never drives, decides only
+whether a pin is ADDED, never whether the statement is judged. The store's `size-on-solid` boundary exempts a
+magnitude recorded as a pin's arbiter (its own pin drove the size), as it already exempted #1447's
+volume/area pivot lane. Still open: the missing drive for riders and partial points on a solid-free figure
+(the pivot's entry gate asks for a solid or a `free3` point, ADR-3D-282), and a revolution's size driven by a
+stated length (#1569).
 
 **A declared action must hold for every spelling of its row, and the SHAPE of a pin kind is not a
 semantic rule.** `'angle|segment|segment'` declared `drive-dims` while `apply.ts` delivered it only when

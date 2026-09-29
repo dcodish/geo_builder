@@ -67,6 +67,7 @@ import { displayModeOf } from '../shell/displayMode';
 import { FactRowText3, factRowText3, inputPreviewNode3 } from './render/FactRow3';
 import { VecMath } from './render/VecMath';
 import { errorText3 } from './i18n/errorText3';
+import { emptyStateChips3 } from './emptyChips3';
 
 /**
  * #559 (ADR-3D-156): a MATH-ONLY data-panel row — `|u| = |v| = 2`, `N(6, 6, 6)`, a plane equation.
@@ -84,8 +85,6 @@ function MathRun({ children }: { children: React.ReactNode }) {
     </span>
   );
 }
-
-const EXAMPLE_KEYS = ['ex1', 'ex2', 'ex3', 'ex4', 'ex5', 'ex6', 'ex7', 'ex8'] as const;
 
 export default function App3() {
   const { t, i18n } = useTranslation();
@@ -733,7 +732,7 @@ export default function App3() {
           <QuickChips
             title={t('emptyTitle')}
             hint={t('emptyHintChips')}
-            commands={EXAMPLE_KEYS.slice(0, 4).map((k) => t(`examples.${k}`, { postProcess: [] }))}
+            commands={emptyStateChips3(t)}
             display={isolateLtrRuns3}
             onPick={(c) => void submitText(c)}
           />

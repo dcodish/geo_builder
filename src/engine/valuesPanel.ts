@@ -13,6 +13,7 @@
  */
 
 import { exactFormOf, formatExactText, formatMeasure, formatUnitText, type ExactForm, type UnitValue } from '@/format';
+import { circleRefs, type CircleRef } from './circleRef';
 import { figureEdges } from './relations';
 import { freeDofCount, scalePinned } from './sample';
 import { polygonArea } from './geometry';
@@ -35,6 +36,12 @@ export interface ValueRow {
    * prints it INSTEAD of `value`, which under a free similarity gauge is only the drawing's scale.
    */
   unit?: UnitValue;
+  /**
+   * #1442 (ADR-552): on a radius / circle-area / circumference row, HOW the circle is named — its centre's
+   * letter, «the circle» when it is the only one, or its ADR-342 reference token. The display layer words
+   * it (`valueRowText`); `label` then carries only that letter (empty for `sole`), never an internal id.
+   */
+  circle?: CircleRef;
 }
 
 /**
@@ -358,7 +365,7 @@ export function computeValuesPanel(
    * figure that is neither sized nor given a unit emits no magnitude at all — that silence IS the fix.
    */
   const magnitude = (
-    kind: ValueRow['kind'], ids: Id[], label: string, stated: boolean, pow: 1 | 2, f: Measure,
+    kind: ValueRow['kind'], ids: Id[], label: string, stated: boolean, pow: 1 | 2, f: Measure, circle?: CircleRef,
   ): void => {
     if (!sized && !useUnit) return;
     const vals = samplesOf(f);
@@ -367,7 +374,7 @@ export function computeValuesPanel(
     const u = unitCoefOf(f, pow);
     if (abs === null && u === null) return;
     const value = abs ?? vals.reduce((x, y) => x + y, 0) / vals.length;
-    rows.push({ kind, ids, label, value, exact: abs === null ? null : exactOrNull(value), stated, ...(u ? { unit: u } : {}) });
+    rows.push({ kind, ids, label, value, exact: abs === null ? null : exactOrNull(value), stated, ...(u ? { unit: u } : {}), ...(circle ? { circle } : {}) });
   };
 
   // ---- stated markers (נתון) from the construction's own constraints/objects --------------------
@@ -469,22 +476,30 @@ export function computeValuesPanel(
   }
 
   // ---- radii ------------------------------------------------------------------------------------
+  // #1442 (ADR-552): only circles the canvas DRAWS, each named through the one circle seam. A hidden scaffold
+  // circle (the tangent construction's Thales circle, centre `~tanmid-OE`) has no reference and prints no
+  // row; an unnamed circle is «the circle» or its ADR-342 token, never its anonymous centre id `@ctr-O`.
+  const refs = circleRefs(c);
   for (const o of c.objects) {
     if (o.kind !== 'circle') continue;
+    const ref = refs.get(o.id);
+    if (!ref) continue;
+    const name = ref.via === 'sole' ? '' : ref.name;
     const radiusAt = (_pos: Map<Id, Vec>, i: number) => circlesPerSample[i]?.get(o.id)?.r ?? null;
     // a STATED radius stays via 'length' (free/through/tangent are derived)
-    magnitude('radius', [o.center], o.center, o.radius.via === 'length', 1, radiusAt);
+    magnitude('radius', [o.center], name, o.radius.via === 'length', 1, radiusAt, ref);
     // The circle's area AND circumference ride the same knowledge — both are the same one-step derivation
     // from the same radius, so printing one and withholding the other read as an oversight (#414). ADR-228
     // already lowers a STATED circumference to a radius (r = C/2π); this is that constant forwards.
-    magnitude('area', [o.center], `(${o.center})`, false, 2, (pos, i) => {
+    const paren = ref.via === 'centre' ? `(${name})` : name;
+    magnitude('area', [o.center], paren, false, 2, (pos, i) => {
       const r = radiusAt(pos, i);
       return r === null ? null : Math.PI * r * r;
-    });
-    magnitude('perimeter', [o.center], `(${o.center})`, false, 1, (pos, i) => {
+    }, ref);
+    magnitude('perimeter', [o.center], paren, false, 1, (pos, i) => {
       const r = radiusAt(pos, i);
       return r === null ? null : 2 * Math.PI * r;
-    });
+    }, ref);
   }
 
   // ---- polygon areas + ratio classes ------------------------------------------------------------

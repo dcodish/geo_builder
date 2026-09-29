@@ -85,6 +85,26 @@ Layered, because a single throttle is bypassable:
 When the ceiling is hit the message must say so plainly — never "couldn't understand", which blames the
 student for an operator's budget.
 
+**The share store fills; it never evicts** (#1374). One IP at the share rate limit can fill the 2 GB
+allocation in hours, and by ruling the answer is visibility, not a new cap
+([ADR-W-104](06w-decisions-workspace.md#adr-w-104)): `storeFillLevel` (`shareStore.ts`) is the ONE
+threshold function — `ok` / `warn` from 80% / `critical` from 95% — and the dashboard's
+`shareFillBanner` calls it; a store-full 507 also writes `[geo-proxy] share refused: store-full …` to
+the journal, so a full store shows in `journalctl` with the dashboard closed.
+
+## Response headers, and the one server-rendered public page
+
+Security response headers (`nosniff`, `SAMEORIGIN`, `Referrer-Policy`, a **Report-Only** CSP) are set
+by **Apache**, in a `<Location>` block per builder prefix plus one for `/g/`, in the tracked
+`deploy/apache-*.conf` — not by `standalone.ts`, because most of what a builder serves (the static
+app) never reaches Node. They reach production only when the operator pastes the conf into Plesk.
+
+`/g/<id>` is the only public HTML the server renders, and it is written so a CSP can allow it without
+`'unsafe-inline'`: its one inline script is the constant `SHARE_HANDOFF_SCRIPT`, which follows the
+page's own fallback link rather than embedding the target, so one `'sha256-…'` source allows exactly it.
+A lock holds the conf's hash equal to that string's. The id is bound once, after `isShareId`, and every
+interpolation is escaped (NFR-SE-4) — ADR-W-104.
+
 ## The event sink and the dashboard
 
 The SPA fire-and-forgets one lean event per action (a `session` marker per page load, a `submit` per

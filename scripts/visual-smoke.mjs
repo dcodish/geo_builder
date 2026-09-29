@@ -55,7 +55,8 @@ export const APPS = {
   '3d': {
     urlPath: '/3d.html',
     inputHint: 'הקלידו נתון',
-    // he.json examples.ex1 / ex3 / ex5 — a solid, a derived point on it, and the vector notation.
+    // A solid, a derived point on it, and the vector notation (once he.json examples.ex1/ex3/ex5; the
+    // chips became self-contained in #1446, ADR-3D-288, so this sequence is now its own).
     // #934: plus a LATIN-FIRST rider row carrying Hebrew words on BOTH sides of a technical run.
     // That is the shape `dir="auto"` reordered — «K כך ש BB' על …» for a student who typed «K על
     // BB' כך ש…» — and no screenshot in this file held one, so five bidi fixes shipped past it.

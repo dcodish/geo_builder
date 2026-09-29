@@ -16,7 +16,7 @@
  * lands, and nowhere else.
  */
 import { fitConic } from './conic';
-import { lineIdOf, numeralCurveId, numeralTwin, refKindOf, statedName, type RefKind } from './names';
+import { bareLineName, lineIdOf, nameReading, numeralCurveId, numeralTwin, refKindOf, statedName, type RefKind } from './names';
 import { parabolaDirectrix, resolveCurve } from './curves';
 import { parseLengthExpr } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule } from './derived';
@@ -315,6 +315,60 @@ function notationMix(c: Construction, id: Id): ApplyError | null {
   return twin ? { code: 'numeral-notation', detail: statedName(id), holder: statedName(twin), expected: refKindOf(id) } : null;
 }
 
+/**
+ * A line's NAME TOKENS as the student wrote them (#1350): the name in its id («l3» of `line-l3`) and its
+ * display name with the line noun stripped («ישר 3» → «3»), so a line narrowed from an anonymous one
+ * still answers. Only LINES — «מעגל 3» is a different noun and reads as a different thing — and an
+ * anonymous curve's hash is no name at all.
+ */
+function lineTokens(id: Id, shown: string | undefined, isLine: boolean): string[] {
+  if (!isLine) return [];
+  const out = new Set<string>();
+  if (refKindOf(id) === 'line') out.add(statedName(id));
+  if (shown) out.add(bareLineName(shown));
+  return [...out];
+}
+const objectLineTokens = (o: GeoObject): string[] =>
+  o.kind === 'line-at'
+    ? lineTokens(o.id, o.name, true)
+    : o.kind === 'curve'
+      ? lineTokens(o.id, o.label.name, refKindOf(o.id) === 'line' || curveKindOf(o) === 'line')
+      : [];
+const factLineTokens = (f: Fact): string[] =>
+  f.t === 'line-at'
+    ? lineTokens(f.id, f.name, true)
+    : f.t === 'curve'
+      ? lineTokens(f.id, f.label.name, refKindOf(f.id) === 'line' || f.curve.kind === 'line' || f.label.kind === 'line')
+      : [];
+
+/**
+ * THE OTHER LINE THIS NAME READS AS (#1350, ADR-AG-183) — the question beside #1342's `already-named`,
+ * one axis over. That one asks *"does the figure hold THIS LINE under another name?"* (identity by
+ * content); this asks *"does the figure hold ANOTHER LINE under a name the student reads as this one?"*
+ * (identity by reading). The taken-name check compared TOKENS, so «הישר l3» then «הישר 3» recorded two
+ * lines both called "3" with nothing said.
+ *
+ * Answered only for a name NEW to the figure — a name already held is a restatement, which is its own
+ * id's business (`known`, a promotion, or `conflicting-restatement`) — and compared through
+ * `nameReading`, so no pair gets a rule of its own.
+ */
+function readingTwin(c: Construction, f: Fact): ApplyNotice | undefined {
+  if (f.t !== 'curve' && f.t !== 'line-at') return undefined;
+  const incoming = factLineTokens(f);
+  const readings = new Set(incoming.map(nameReading).filter((r): r is string => r !== null));
+  if (readings.size === 0) return undefined;
+  const others = c.objects.filter((o) => o.id !== f.id).map((o) => objectLineTokens(o));
+  if (others.some((tokens) => tokens.some((t) => incoming.includes(t)))) return undefined;
+  for (const tokens of others) {
+    const hit = tokens.find((t) => {
+      const r = nameReading(t);
+      return r !== null && readings.has(r);
+    });
+    if (hit) return { code: 'name-reads-as', detail: incoming[0], holder: hit };
+  }
+  return undefined;
+}
+
 /** The one refusal for "the figure has no such thing", naming it the student's way and by its kind. */
 function unknownRef(c: Construction, id: Id): ApplyError {
   return notationMix(c, id) ?? { code: 'unknown-reference', detail: statedName(id), expected: refKindOf(id) };
@@ -439,8 +493,23 @@ export function existingKindOf(o: GeoObject): ExistingKind {
  */
 export type LineEffect = 'created' | 'known' | 'narrowed';
 
+/**
+ * SOMETHING THE STUDENT SHOULD BE TOLD ABOUT A STATEMENT THAT LANDED (#1350, ADR-AG-183) — never a
+ * refusal: the statement is accepted and this rides along with it.
+ *
+ * `name-reads-as`: the line just named («הישר 3») reads, to a student, as the name of a DIFFERENT line
+ * the figure already holds («l3»). Both are kept — the exam prints both conventions (operator ruling
+ * 2026-09-22) — and the student is told they are two lines. `detail` is the new line's name as written,
+ * `holder` the existing line's; both are the student's own tokens, never an id.
+ */
+export interface ApplyNotice {
+  code: 'name-reads-as';
+  detail: string;
+  holder: string;
+}
+
 export type ApplyOutcome =
-  | { ok: true; next: Construction; effect: LineEffect }
+  | { ok: true; next: Construction; effect: LineEffect; notice?: ApplyNotice }
   | { ok: false; error: ApplyError };
 
 /**
@@ -644,7 +713,20 @@ function maxCrossings(a: string | null, b: string | null): number | null {
   return null;
 }
 
+/**
+ * Apply one fact — `applyStatement`'s verdict, plus what the student should be TOLD about a statement
+ * that landed (#1350). The notice is decided here, once, for every fact that names a line, because a
+ * named line is minted by several arms (a stated equation, a line through a point) and each one's
+ * answer is the same question.
+ */
 export function applyFact(c: Construction, f: Fact): ApplyOutcome {
+  const out = applyStatement(c, f);
+  if (!out.ok || out.effect === 'known') return out;
+  const notice = readingTwin(c, f);
+  return notice ? { ...out, notice } : out;
+}
+
+function applyStatement(c: Construction, f: Fact): ApplyOutcome {
   // NAMING a numeral curve in the other notation («נתון ישר I …» after «ישר 1») — the mint half of
   // ruling 2; the reference half is `unknownRef`. Only a NEW id can mix: restating «ישר 1» is its own id.
   if ((f.t === 'curve' || f.t === 'circle-thru' || f.t === 'line-at') && !objectById(c, f.id)) {
@@ -2020,6 +2102,8 @@ export interface FoldResult {
   effects: Array<LineEffect | null>;
   /** Per construction constraint, the index of the FACT that added it — see `fold` (#1079). */
   constraintFact: number[];
+  /** Per-fact NOTICE, positionally (#1350) — what a statement that landed should tell the student. */
+  notices: Array<ApplyNotice | null>;
 }
 
 /**
@@ -2071,6 +2155,7 @@ export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldR
         if (e) {
           r.errors[i] = e;
           r.effects[i] = null;
+          r.notices[i] = null;
         }
       });
       return r;
@@ -2083,6 +2168,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean): Fold
   let c = EMPTY_CONSTRUCTION;
   const errors: Array<ApplyError | null> = facts.map(() => null);
   const effects: Array<LineEffect | null> = facts.map(() => null);
+  const notices: Array<ApplyNotice | null> = facts.map(() => null);
   /**
    * Which FACT put each constraint in the construction (#1079).
    *
@@ -2097,7 +2183,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean): Fold
    * anything about it, so a future resolved reference is attributed with nothing to remember.
    */
   const constraintFact: number[] = [];
-  const commit = (i: number, next: Construction, effect: LineEffect) => {
+  const commit = (i: number, next: Construction, effect: LineEffect, notice?: ApplyNotice) => {
     const before = c.constraints;
     c = next;
     // Appended AND replaced: #1049’s choice collapse swaps a constraint in place, and the
@@ -2108,11 +2194,12 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean): Fold
     });
     errors[i] = null;
     effects[i] = effect;
+    notices[i] = notice ?? null;
   };
   facts.forEach((f, i) => {
     if (!include(i)) return;
     const out = applyFact(c, f);
-    if (out.ok) commit(i, out.next, out.effect);
+    if (out.ok) commit(i, out.next, out.effect, out.notice);
     else errors[i] = out.error;
   });
   // The deferral fixpoint: retry every still-failed fact — creating or not (#1340) — against the construction the
@@ -2126,7 +2213,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean): Fold
       if (failedOn.get(i) === c) return;
       const out = applyFact(c, f);
       if (out.ok) {
-        commit(i, out.next, out.effect);
+        commit(i, out.next, out.effect, out.notice);
         progressed = true;
       } else {
         errors[i] = out.error;
@@ -2135,7 +2222,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean): Fold
     });
     if (!progressed) break;
   }
-  return { construction: c, errors, effects, constraintFact };
+  return { construction: c, errors, effects, constraintFact, notices };
 }
 
 /**

@@ -29,6 +29,13 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #1472 (ADR-3D-286) — the operator's exact sequence: two planes that coincide for the right m. The essence is
+  // "this builds green and verifies" (before: refused «הטענה אינה מתקיימת» at all 24 seeds, m sampled); the
+  // class, the refusals and the identity guard live in issue-1472-param-position-pins.test.ts. «A» rides π2 so
+  // the net has a point to place.
+  'plane-coincident-param-1472.geo3.json': ['המישור π1: z = 1', 'המישור π2: mx + z - 1 = 0', 'π1 מתלכד עם π2', 'הנקודה A נמצאת על המישור π2'],
+  // #1472 — the two-root member of the class (row 4): a distance between planes, m ∈ {−2, 4}.
+  'plane-distance-param-1472.geo3.json': ['המישור π1: z = 1', 'המישור π2: z - m = 0', 'המרחק בין המישורים π1 ו-π2 הוא 3', 'הנקודה A נמצאת על המישור π2'],
   // #1474 (ADR-3D-283) — figure B: m ∈ {−2, 0, 4}, three branches. The withheld π5 angle (60° at m = −2,
   // 30° at the others) is asserted in issue-1474-branch-coverage.test.ts; this is the build + drift net. «A» (ℓ ∩ π5 — the origin on
   // every branch) gives the net a point to place.

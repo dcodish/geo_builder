@@ -124,3 +124,43 @@ export function numeralTwin(ids: Iterable<Id>, id: Id): Id | undefined {
 
 /** The other notation of a numeral («1» ↔ «I»), for tests and messages. */
 export const otherNotation = (n: string): string => (isDigitNumeral(n) ? ROMAN_OF_DIGIT[n] : (DIGIT_OF_ROMAN[n] ?? n));
+
+/** The line NOUN a numeral-named line is called by, per language — «ישר 1» / «line 1». */
+const LINE_NOUN = { he: 'ישר', en: 'line' } as const;
+const LINE_NOUN_RE = new RegExp(`^(?:${Object.values(LINE_NOUN).join('|')})\\s+`);
+
+/**
+ * How a numeral-named line is CALLED — «ישר 1» / «line 1» — the #1216 circle precedent («מעגל 1»),
+ * so the panel row reads the way the exam does and the student's own token still resolves (the id is
+ * `line-1`, and every by-name lookup matches the id as well as the name). Lifted from the parser
+ * (#1350) so `nameReading` can invert it from the same table.
+ */
+export const lineNameOf = (token: string, lang: 'he' | 'en'): string =>
+  isNumeralName(token) ? `${LINE_NOUN[lang]} ${token}` : token;
+
+/** A line name with its noun stripped — «ישר 3» → «3», «line 3» → «3», «l3» unchanged (#1350). */
+export const bareLineName = (name: string): string => name.replace(LINE_NOUN_RE, '');
+
+/**
+ * WHAT A LINE'S NAME READS AS TO A STUDENT (#1350, ADR-AG-183) — the notation-free numeral behind it,
+ * or null for a name that reads only as itself.
+ *
+ * The grammar has two naming schemes for one idea: the Latin line letter with an index («l3», «ℓ3») and
+ * the exam's numeral («ישר 3», ADR-AG-144). They are different TOKENS — different ids, and every
+ * reference resolves to its own line — but a student reads «l3» and «ישר 3» as the same name, because
+ * `ℓ` is the conventional letter for a line. So the comparison is made on what the name READS as:
+ *
+ *   «l3», «ℓ3», «3», «ישר 3», «line 3», «III»  →  `III`   (one reading, the numeral table's key)
+ *   «AB», «l», «m3», «k1»                        →  null    (their own names; nothing to confuse)
+ *
+ * The narrow reading is `lN ⇄ N` by operator ruling (2026-09-22): `l` is the line letter, and `m3` or
+ * `k1` read as their own names. A future scheme joins by teaching THIS function, never by a pair table.
+ * The numeral half is `asRoman`, the same key `numeralKey` uses — so «1» and «I» read alike here too,
+ * although that pair never reaches this question: mixing notations is refused first (`numeralTwin`).
+ */
+export function nameReading(name: string): string | null {
+  const bare = bareLineName(name);
+  const lettered = /^[ℓl]([1-9])$/.exec(bare);
+  const numeral = lettered ? lettered[1] : isNumeralName(bare) ? bare : null;
+  return numeral ? asRoman(numeral) : null;
+}
