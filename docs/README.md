@@ -73,6 +73,7 @@ tracked by [#904](https://github.com/dcodish/geo_builder/issues/904), not oversi
 | 10 | [Pedagogy](10-pedagogy.md) | The teaching charter, and the operator-editable principles catalog (byte-guarded) |
 | 11 | [Architecture as a Compiler](11-architecture-as-compiler.md) | The pipeline lens, revised 2026-07-24 after the docs/23 review corrected three stale premises |
 | 12 | [Letter Placement](12-letter-placement.md) | The two levers that decide a figure's lettering: naming order and orientation |
+| 30 | [How the tools are built](30-how-the-tools-are-built.md) | Outreach reference: the algorithms under all four builders, each pointed at its file, plus the LinkedIn post drafts |
 | 29 | [Complex formula sheet](29-complex-formula-reference.md) | The official formula sheet, transcribed. **Byte-matched against the formula table by a test** |
 
 ## Product plans
