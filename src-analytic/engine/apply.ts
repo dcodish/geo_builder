@@ -17,7 +17,7 @@
  */
 import { fitConic } from './conic';
 import { resolveCurve } from './curves';
-import { curveParentOf, parentsOf, type DerivedRule } from './derived';
+import { curveParentsOf, parentsOf, type DerivedRule } from './derived';
 import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, type AngleName, type AngleRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, shapeRow } from './shapes';
@@ -1308,6 +1308,58 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       ]);
     }
 
+    case 'tangent-circles': {
+      // The same name→circle chain as `tangent-of`/`diameter-of`: a numeral id, a centre-letter
+      // id, or the student's own name — one chain, so the family cannot drift (#1504).
+      const byName = (name: string): GeoObject | undefined =>
+        objectById(c, `circle-${name}`) ?? objectById(c, `circle-at-${name}`) ?? curveByName(c, name);
+      const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+      let a: GeoObject | undefined;
+      let b: GeoObject | undefined;
+      if (f.a !== undefined) {
+        a = byName(f.a);
+        if (!a || curveKindOf(a) !== 'circle') return { ok: false, error: unknownRef(`circle-${f.a}`) };
+      }
+      if (f.b !== undefined) {
+        b = byName(f.b);
+        if (!b || curveKindOf(b) !== 'circle') return { ok: false, error: unknownRef(`circle-${f.b}`) };
+      }
+      if (!a || !b) {
+        // The contextual readings: «המעגל משיק למעגל K» means the one OTHER circle; «המעגלים
+        // משיקים» means the exactly two. Anything else is a genuine "which circles?".
+        const rest = circles.filter((o) => o !== a && o !== b);
+        const need = (a ? 0 : 1) + (b ? 0 : 1);
+        if (rest.length !== need) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+        if (!a) a = rest.shift();
+        if (!b) b = rest.shift();
+      }
+      // A circle is not tangent to itself — one circle named twice (or the contextual reading
+      // landing back on the named one) has no configuration.
+      if (a === b) return { ok: false, error: { code: 'unsatisfiable', detail: f.src } };
+      /**
+       * Tangency pins each RADIUS against each CENTRE, so BOTH circles need both to pull on —
+       * the `tangent-of` rule, applied twice. An equation circle or a computed `circle-thru` is
+       * refused by name (`out-of-scope`), never dropped.
+       */
+      if (a!.kind !== 'circle-at' || b!.kind !== 'circle-at') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      const mk = (branch: 'external' | 'internal') => ({
+        t: 'tangent-circle' as const,
+        centre: a!.centre,
+        r: a!.r,
+        other: b!.centre,
+        otherR: b!.r,
+        branch,
+      });
+      // A branch word collapses the choice (the «זווית B ישרה» pattern); without one, BOTH
+      // touches are admissible and «הציגו תצורה אחרת» cycles them (ADR-052, #1049).
+      const k = f.branch ? mk(f.branch) : { t: 'choice' as const, options: [mk('external'), mk('internal')] };
+      // «…בנקודה T» names the touch point — determined by the two circles, so a derived point (amendment 1).
+      const touch = f.at
+        ? [{ t: 'derived' as const, id: f.at, rule: { t: 'touch-point' as const, a: a!.id, b: b!.id }, src: f.src }]
+        : [];
+      return applyAll(c, [{ t: 'constraint', k, src: f.src }, ...touch]);
+    }
+
     case 'area-of': {
       const rings = c.objects.filter(
         (o) => o.kind === 'polygon' && o.noun === f.noun,
@@ -1443,10 +1495,11 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
        * same reason the point references are: «מעגל O שמשוואתו …» minting a centre of a circle the
        * figure does not have would be a point defined in terms of nothing.
        */
-      const curveRef = f.t === 'derived' ? curveParentOf(f.rule) : null;
-      if (curveRef !== null) {
+      for (const curveRef of f.t === 'derived' ? curveParentsOf(f.rule) : []) {
         const o = objectById(c, curveRef);
-        if (!o || o.kind !== 'curve') {
+        // A centre names an equation curve; a touch point names two circles of any construction (#1504).
+        const ok = f.t === 'derived' && f.rule.t === 'touch-point' ? !!o && curveKindOf(o) === 'circle' : !!o && o.kind === 'curve';
+        if (!ok) {
           return { ok: false, error: unknownRef(curveRef) };
         }
       }
