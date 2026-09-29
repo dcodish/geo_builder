@@ -274,6 +274,16 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['נתון מעגל K'],
   },
   { category: 'circles', family: 'F5', he: 'המעגלים משיקים מבחוץ', en: 'the circles are tangent externally', needs: ['נתון מעגל K', 'נתון מעגל M'] },
+  // The operator's own spelling (#1504 pre-play): two named circles as ONE subject.
+  { category: 'circles', family: 'F5', he: 'מעגל O ומעגל M משיקים מבחוץ', en: 'circle O and circle M are tangent externally' },
+  // The touch point, named (#1504 amendment 1) — a derived point on the line of centres.
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'מעגל M משיק למעגל K בנקודה T',
+    en: 'circle M is tangent to circle K at T',
+    needs: ['נתון מעגל K'],
+  },
 
   // --- F6 · conics by equation (canonical only — D6/§2a) ---
   { category: 'conics', family: 'F6', he: 'נתונה פרבולה קנונית שמשוואתה y^2=54x', en: 'canonical parabola y^2=54x' },

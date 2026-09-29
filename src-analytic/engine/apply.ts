@@ -17,7 +17,7 @@
  */
 import { fitConic } from './conic';
 import { resolveCurve } from './curves';
-import { curveParentOf, parentsOf, type DerivedRule } from './derived';
+import { curveParentsOf, parentsOf, type DerivedRule } from './derived';
 import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, type AngleName, type AngleRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, shapeRow } from './shapes';
@@ -1353,7 +1353,11 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       // A branch word collapses the choice (the «זווית B ישרה» pattern); without one, BOTH
       // touches are admissible and «הציגו תצורה אחרת» cycles them (ADR-052, #1049).
       const k = f.branch ? mk(f.branch) : { t: 'choice' as const, options: [mk('external'), mk('internal')] };
-      return applyFact(c, { t: 'constraint', k, src: f.src });
+      // «…בנקודה T» names the touch point — determined by the two circles, so a derived point (amendment 1).
+      const touch = f.at
+        ? [{ t: 'derived' as const, id: f.at, rule: { t: 'touch-point' as const, a: a!.id, b: b!.id }, src: f.src }]
+        : [];
+      return applyAll(c, [{ t: 'constraint', k, src: f.src }, ...touch]);
     }
 
     case 'area-of': {
@@ -1491,10 +1495,11 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
        * same reason the point references are: «מעגל O שמשוואתו …» minting a centre of a circle the
        * figure does not have would be a point defined in terms of nothing.
        */
-      const curveRef = f.t === 'derived' ? curveParentOf(f.rule) : null;
-      if (curveRef !== null) {
+      for (const curveRef of f.t === 'derived' ? curveParentsOf(f.rule) : []) {
         const o = objectById(c, curveRef);
-        if (!o || o.kind !== 'curve') {
+        // A centre names an equation curve; a touch point names two circles of any construction (#1504).
+        const ok = f.t === 'derived' && f.rule.t === 'touch-point' ? !!o && curveKindOf(o) === 'circle' : !!o && o.kind === 'curve';
+        if (!ok) {
           return { ok: false, error: unknownRef(curveRef) };
         }
       }

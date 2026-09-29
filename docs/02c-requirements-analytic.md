@@ -974,6 +974,15 @@ absolute difference (touching inside). Which touch is an UNSTATED configuration 
 between them — until «מבחוץ»/«מבפנים» (externally/internally) pins it. Both circles must carry a centre and a
 radius to pull on; tangency about an equation circle or a computed circle is refused by name, an unknown circle
 by its name, and a circle is never tangent to itself.
+*Amendment 1 (2026-09-29, pre-play).* Every way a student names the two circles reads: «מעגל O ומעגל M משיקים»,
+«המעגל O והמעגל M משיקים», «(ה)מעגלים O ו-M משיקים» (also «O וM»), and "circle O and circle M are tangent" /
+"circles O and M are tangent". The branch word is one list — מבחוץ / חיצונית / externally, מבפנים / פנימית /
+internally — and may stand after the verb, after the target or at the end, with «זה לזה» in either order. «…בנקודה T»
+names the touch point, drawn where the circles meet. A word that has no circle-to-circle relation to attach to
+(«משיק לציר ה-x מבחוץ») is refused, never dropped. Two circles with the SAME centre are never tangent (operator
+ruling): the sentence is refused. A given that could only hold with a circle of radius zero — «מבחוץ» and then
+«מבפנים», or a centre ON the axis it is said to be tangent to — is refused on the sentence that completed the
+contradiction, never drawn with an invisible circle.
 
 **R114 — the tool never accepts a sentence a textbook would not print; it teaches the one it would**
 ([ADR-AG-150](06c-decisions-analytic.md#adr-ag-150),

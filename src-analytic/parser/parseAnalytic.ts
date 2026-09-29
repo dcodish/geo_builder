@@ -1383,68 +1383,70 @@ function polygonId(vertices: string[]): string {
 }
 
 /**
- * A CIRCLE GIVEN BY ITS CENTRE, and its tangency — to the axes (#1060) and to LINES (#1501).
+ * THE BRANCH WORDS — which touch two tangent circles make — ONE list for every position (#1504,
+ * ADR-AG-167 amendment 1).
  *
- * Operator, 2026-09-15: *"we need to support מעגל O משיק לציר x and all verses of the axis
- * tangency"*. Measured then: 0 of 11 phrasings, every one refused as a bad equation.
- * Operator, 2026-09-28: *"we need to support tangents — מעגל M משיק לישרים l1 ו- l2, מעגל M משיק
- * לישר 3x+4y=0, and variants"*. Measured then: 0 of 8 phrasings, every one `not-handled`.
- *
- * Tangency to an axis is how the corpus pins a circle WITHOUT giving its radius — «מעגל המשיק
- * לציר ה-x» says r = |y_O|, which is exactly one equation and exactly the sentence a student is
- * handed instead of a number. Without it they must do that algebra themselves and type the
- * finished equation, which is the student doing the part the figure was meant to show.
- *
- * The RADIUS is a parameter named after the centre — `r_O` — so it needs no resolution against
- * the figure and cannot collide with a student’s own single letters. It is declared POSITIVE:
- * #1019 made an undeclared parameter sample negative, which is right for a coefficient and wrong
- * for a length.
+ * The pre-play found the list written out three times, each copy with a different subset and a fixed
+ * position: «מבחוץ» read at the end of «משיק למעגל K מבחוץ» and not before the target («משיק מבחוץ
+ * למעגל K»), «חיצונית»/«פנימית» nowhere, «מבחוץ זה לזה» in one order only. Every reader below takes
+ * its word from THIS table, and a word may stand after the verb, after the target, or after the
+ * whole sentence.
  */
-/** «משיק» in its full inflection run, with the relative ה-, the conjunctive ו- and the ש- prefix —
- *  the one-spelling gate is this tree's recurring trap (`src-analytic/CLAUDE.md`). */
-const HE_TANGENT_VERB = '(?:ה|ו|ש)?משיק(?:ה|ים|ות)?';
+const TANGENT_BRANCH: Readonly<Record<string, 'external' | 'internal'>> = {
+  מבחוץ: 'external',
+  חיצונית: 'external',
+  externally: 'external',
+  מבפנים: 'internal',
+  פנימית: 'internal',
+  internally: 'internal',
+};
+const BRANCH_WORD = `(?:${Object.keys(TANGENT_BRANCH).join('|')})`;
+const branchOf = (word: string) => TANGENT_BRANCH[word.toLowerCase()];
+/** «זה לזה» — the reciprocal a PLURAL subject may carry; it adds nothing the plural did not say. */
+const RECIPROCAL = '(?:זה\\s+לזה|זו\\s+לזו|אחד\\s+לשני|to\\s+each\\s+other|to\\s+one\\s+another)';
+/** «בנקודה T» — the touch point named (amendment 1). */
+const CONTACT = `(?:ב(?:נקודה|נקודת\\s+ה?השקה|נקודת\\s+ה?מגע)\\s+|ב-|at\\s+(?:the\\s+)?(?:point\\s+)?)(${NAME})`;
 
-const CIRCLE_AT_HE = new RegExp(
-  `^${HE_GIVEN}ה?מעגל\\s+(?:ש?מרכזו\\s+)?(${NAME})(?:\\s+${HE_TANGENT_VERB}\\s+ל(.+))?$`
-);
-const CIRCLE_AT_EN = new RegExp(
-  `^(?:the\\s+)?circle\\s+(?:cent(?:re|er)d\\s+at\\s+)?(${NAME})(?:\\s+(?:is\\s+|which\\s+is\\s+)?tangent\\s+to\\s+(.+))?$`
-,  'i',
-);
+/** What a tangency sentence says ABOUT its relation, wherever it said it. */
+interface TangencyMods {
+  branch?: 'external' | 'internal';
+  reciprocal: boolean;
+  at?: Id;
+  /** Two different branch words, or two contact points — a sentence at odds with itself. */
+  clash: boolean;
+}
 
-/** The CONTEXTUAL form — the one circle the student has drawn: «המעגל משיק לציר ה-x». */
-const CIRCLE_TANGENT_HE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+${HE_TANGENT_VERB}\\s+ל(.+)$`);
-const CIRCLE_TANGENT_EN = new RegExp(`^(?:the\\s+)?circle\\s+is\\s+tangent\\s+to\\s+(.+)$`, 'i');
+/** Peel modifiers off the END (`tail`) or the START (`head`) of a fragment, in any order. */
+function peelMods(text: string, where: 'head' | 'tail', mods: TangencyMods): string {
+  const one = `(${BRANCH_WORD})|(${RECIPROCAL})|${CONTACT}`;
+  const re = where === 'tail' ? new RegExp(`\\s+(?:${one})$`, 'i') : new RegExp(`^(?:(${BRANCH_WORD})|(${RECIPROCAL}))(?:\\s+|$)`, 'i');
+  let rest = trim(text);
+  for (let m = re.exec(rest); m; m = re.exec(rest)) {
+    if (m[1]) {
+      const b = branchOf(m[1]);
+      if (mods.branch && mods.branch !== b) mods.clash = true;
+      mods.branch = b;
+    } else if (m[2]) mods.reciprocal = true;
+    else if (m[3]) {
+      if (mods.at && mods.at !== m[3]) mods.clash = true;
+      mods.at = m[3];
+    }
+    rest = trim(where === 'tail' ? rest.slice(0, m.index) : rest.slice(m[0].length));
+  }
+  return rest;
+}
 
-/**
- * The LINE-FIRST order — «הישר l1 משיק למעגל M», «הישרים l1 ו-l2 משיקים למעגל» (#1501).
- *
- * The subject is the same target list the circle-first order takes after «ל», resolved by the same
- * function, so the two orders cannot drift — the #1281/#1495 rule (incidence in every order),
- * applied to tangency. The circle may be named (its letter or numeral) or contextual.
- */
-const LINE_TANGENT_HE = new RegExp(
-  `^${HE_GIVEN}(.+?)\\s+${HE_TANGENT_VERB}\\s+לה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?$`
-);
-const LINE_TANGENT_EN = new RegExp(
-  `^(?:the\\s+)?lines?\\s+(.+?)\\s+(?:is|are)\\s+tangent\\s+to\\s+(?:the\\s+)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?$`
-,  'i',
-);
-
-/** What one tangency sentence touches: axes (#1060), lines (#1501), and the facts inline
- *  equations mint. */
+/** What one tangency sentence touches: axes (#1060), lines (#1501), circles (#1504), and the facts
+ *  inline equations mint. */
 interface TangentTargets {
   axes: Array<'x' | 'y'>;
   lines: TangentLineRef[];
   /** CIRCLE targets (#1504) — the other circle by the name the sentence used (letter or
    *  numeral; a numeral names an equation circle, which the apply boundary refuses by name),
-   *  with the touch branch when the student said it («מבחוץ»/«מבפנים»). */
-  circles: Array<{ name: string; branch?: 'external' | 'internal' }>;
+   *  with the touch branch when the student said it on the piece itself. */
+  circles: Array<{ name?: string; branch?: 'external' | 'internal' }>;
   facts: Fact[];
 }
-
-/** A branch word riding a circle piece or a plural-subject sentence — which touch it is. */
-const TANGENT_BRANCH = { מבחוץ: 'external', externally: 'external', מבפנים: 'internal', internally: 'internal' } as const;
 
 /**
  * The TARGETS of a tangency phrase — the one resolution for every order and every sentence shape.
@@ -1455,10 +1457,10 @@ const TANGENT_BRANCH = { מבחוץ: 'external', externally: 'external', מבפ�
  * an inline EQUATION («ישר 3x+4y=0», «ישר שמשוואתו y=2x») — which mints the curve exactly as
  * «A על הישר y=2x» does, `stated: false`, under the content id that keeps restating idempotent.
  *
- * A CIRCLE piece — «מעגל K», «המעגל I», "circle K", optionally with its touch branch
- * («מבחוץ»/«מבפנים») — is circle-to-circle tangency (#1504); it rides `circles` and resolves at
- * the apply boundary. A piece this grammar cannot read still declines the WHOLE sentence
- * (`null`) — guessing half a target list would build half the student's given.
+ * A CIRCLE piece — «מעגל K», «המעגל I», "circle K", optionally with a branch word from THE list —
+ * is circle-to-circle tangency (#1504); it rides `circles` and resolves at the apply boundary. A
+ * piece this grammar cannot read still declines the WHOLE sentence (`null`) — guessing half a
+ * target list would build half the student's given.
  */
 function tangentTargets(tail: string, src: string): TangentTargets | null {
   const out: TangentTargets = { axes: [], lines: [], circles: [], facts: [] };
@@ -1482,12 +1484,12 @@ function tangentTargets(tail: string, src: string): TangentTargets | null {
     // A CIRCLE piece (#1504) — read before the line nouns, because it carries its own noun. The
     // name may be a letter or a numeral (a numeral names an equation circle, refused by name at
     // the apply boundary — the ADR-AG-165 discipline, unchanged).
+    // Unnamed («למעגל», "the circle") it is the CONTEXTUAL circle — which one is M1's question.
     const circ =
-      new RegExp(`^ה?מעגל\\s+(${NAME}|${CIRCLE_NUMERALS})(?:\\s+(מבחוץ|מבפנים))?$`).exec(piece) ??
-      new RegExp(`^(?:the\\s+)?circle\\s+(${NAME}|${CIRCLE_NUMERALS})(?:\\s+(externally|internally))?$`, 'i').exec(piece);
+      new RegExp(`^ה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?(?:\\s+(${BRANCH_WORD}))?$`).exec(piece) ??
+      new RegExp(`^(?:the\\s+)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?(?:\\s+(${BRANCH_WORD}))?$`, 'i').exec(piece);
     if (circ) {
-      const word = circ[2]?.toLowerCase() as keyof typeof TANGENT_BRANCH | undefined;
-      out.circles.push({ name: circ[1], ...(word ? { branch: TANGENT_BRANCH[word] } : {}) });
+      out.circles.push({ ...(circ[1] ? { name: circ[1] } : {}), ...(circ[2] ? { branch: branchOf(circ[2]) } : {}) });
       continue;
     }
     // WHICH noun the piece used, read BEFORE the strip discards it (#1503): «צלע»/«קטע»/«בסיס»
@@ -1524,12 +1526,12 @@ function tangentTargets(tail: string, src: string): TangentTargets | null {
 
 /**
  * The facts a circle-on-a-point lowers to: the centre as a free vertex, a positive radius, and the
- * circle itself. Shared by the named and the contextual forms so the two cannot drift.
+ * circle itself. Shared by every subject that NAMES its centre letter, so they cannot drift.
  *
  * The minted-curve facts come FIRST: a tangency constraint may name a line its own sentence
  * created, and the apply boundary checks the curve exists before the constraint lands (#1150).
  */
-function circleAtFacts(centre: Id, targets: TangentTargets, line: string): Fact[] {
+function circleAtFacts(centre: Id, targets: TangentTargets, line: string, at?: Id): Fact[] {
   const sym = `r_${centre}`;
   const r: Expr = { kind: 'sym', name: sym };
   return [
@@ -1552,8 +1554,9 @@ function circleAtFacts(centre: Id, targets: TangentTargets, line: string): Fact[
     ...targets.circles.map((t) => ({
       t: 'tangent-circles' as const,
       a: centre,
-      b: t.name,
+      ...(t.name ? { b: t.name } : {}),
       ...(t.branch ? { branch: t.branch } : {}),
+      ...(at ? { at } : {}),
       src: line,
     })),
   ];
@@ -1561,74 +1564,222 @@ function circleAtFacts(centre: Id, targets: TangentTargets, line: string): Fact[
 
 const NO_TARGETS: TangentTargets = { axes: [], lines: [], circles: [], facts: [] };
 
-function parseCircleAt(line: string): RuleOutcome {
-  const named = CIRCLE_AT_HE.exec(line) ?? CIRCLE_AT_EN.exec(line);
-  if (named) {
-    // The tangency phrase is optional: «נתון מעגל O» alone is a circle with a free centre and a
-    // free radius, which is 3 degrees of freedom and an honest figure.
-    const targets = named[2] === undefined ? NO_TARGETS : tangentTargets(named[2], line);
-    // A tail this grammar cannot read — «משיק למעגל K» — is not this rule's sentence.
-    if (targets) return made(circleAtFacts(named[1], targets, line));
+/**
+ * THE SUBJECT of a circle sentence — ONE reader (#1504 amendment 1).
+ *
+ * Operator, on the pre-play: *«מעגל O ומעגל M משיקים מבחוץ»* — `not-handled`, while «המעגלים
+ * משיקים מבחוץ» built. The subject had been read by four separate patterns (the named circle, the
+ * contextual circle, the unnamed plural, the English), and each knew a different subset of the
+ * shapes a student writes. They are one question — WHICH circle(s) is this sentence about — so one
+ * reader answers it:
+ *
+ *  - `one` — «(ה)מעגל M», «מעגל שמרכזו M», "circle M", "the circle centred at M" (named), or
+ *    «המעגל» / "the circle" (contextual: the one circle the figure holds);
+ *  - `pair` — «מעגל O ומעגל M», «המעגל O והמעגל M», «(ה)מעגלים O ו-M» (also «O וM», «O, M»),
+ *    «(שני) המעגלים» unnamed, "circle O and circle M", "circles O and M", "the (two) circles".
+ */
+type CircleSubject = { kind: 'one'; name?: string } | { kind: 'pair'; names: string[] };
+
+const SUBJECT_ONE_HE = new RegExp(`^ה?מעגל(?:\\s+(?:ש?מרכזו\\s+)?(${NAME}))?$`);
+const SUBJECT_ONE_EN = new RegExp(`^(?:the\\s+|a\\s+)?circle(?:\\s+(?:cent(?:re|er)d\\s+at\\s+)?(${NAME}))?$`, 'i');
+const SUBJECT_PLURAL = new RegExp(`^(?:שני\\s+)?ה?מעגלים(?:\\s+(.+))?$|^(?:the\\s+)?(?:two\\s+)?circles(?:\\s+(.+))?$`, 'i');
+const NAME_PAIR = new RegExp(
+  `^(${NAME}|${CIRCLE_NUMERALS})\\s*(?:,|ו-?|\\s+and\\s+)\\s*(${NAME}|${CIRCLE_NUMERALS})$`,
+  'i',
+);
+
+function readCircleSubject(s: string): CircleSubject | null {
+  const one = SUBJECT_ONE_HE.exec(s) ?? SUBJECT_ONE_EN.exec(s);
+  if (one) return { kind: 'one', ...(one[1] ? { name: one[1] } : {}) };
+  const plural = SUBJECT_PLURAL.exec(s);
+  if (plural) {
+    const list = plural[1] ?? plural[2];
+    if (list === undefined) return { kind: 'pair', names: [] };
+    const pair = NAME_PAIR.exec(trim(list));
+    return pair ? { kind: 'pair', names: [pair[1], pair[2]] } : null;
   }
-  const bare = CIRCLE_TANGENT_HE.exec(line) ?? CIRCLE_TANGENT_EN.exec(line);
-  if (bare) {
-    // No centre named: the sentence is about the one circle in the figure, which only M1 knows.
-    const targets = tangentTargets(bare[1], line);
-    if (targets) {
-      return made([
-        ...targets.facts,
-        // «המעגל משיק למעגל K» — the contextual subject rides `a: undefined`; M1 reads it as
-        // the one OTHER circle (#1504). `tangent-of` is emitted only when it has work.
-        ...targets.circles.map((t) => ({
-          t: 'tangent-circles' as const,
-          b: t.name,
-          ...(t.branch ? { branch: t.branch } : {}),
-          src: line,
-        })),
-        ...(targets.axes.length + targets.lines.length > 0 || targets.circles.length === 0
-          ? [{ t: 'tangent-of' as const, axes: targets.axes, ...(targets.lines.length ? { lines: targets.lines } : {}), src: line }]
-          : []),
-      ]);
-    }
-  }
-  const flipped = LINE_TANGENT_HE.exec(line) ?? LINE_TANGENT_EN.exec(line);
-  if (flipped) {
-    const targets = tangentTargets(flipped[1], line);
-    if (targets) {
-      return made([
-        ...targets.facts,
-        // «המעגל I משיק למעגל M» — a circle SUBJECT before a named (or contextual) circle (#1504).
-        ...targets.circles.map((t) => ({
-          t: 'tangent-circles' as const,
-          a: t.name,
-          ...(flipped[2] ? { b: flipped[2] } : {}),
-          ...(t.branch ? { branch: t.branch } : {}),
-          src: line,
-        })),
-        ...(targets.axes.length + targets.lines.length > 0 || targets.circles.length === 0
-          ? [
-              {
-                t: 'tangent-of' as const,
-                axes: targets.axes,
-                ...(targets.lines.length ? { lines: targets.lines } : {}),
-                ...(flipped[2] ? { circle: flipped[2] } : {}),
-                src: line,
-              },
-            ]
-          : []),
-      ]);
-    }
-  }
-  // The PLURAL subject — «המעגלים משיקים (זה לזה) (מבחוץ)», "the circles are tangent" (#1504):
-  // no name at all, so M1 resolves the exactly-two reading, and a branch word collapses the touch.
-  const both =
-    new RegExp(`^${HE_GIVEN}(?:שני\\s+)?ה?מעגלים\\s+${HE_TANGENT_VERB}(?:\\s+זה\\s+לזה)?(?:\\s+(מבחוץ|מבפנים))?$`).exec(line) ??
-    /^(?:the\s+)?(?:two\s+)?circles\s+are\s+tangent(?:\s+to\s+each\s+other)?(?:\s+(externally|internally))?$/i.exec(line);
-  if (both) {
-    const word = both[1]?.toLowerCase() as keyof typeof TANGENT_BRANCH | undefined;
-    return made([{ t: 'tangent-circles', ...(word ? { branch: TANGENT_BRANCH[word] } : {}), src: line }]);
+  // Two singular circles joined — «מעגל O ומעגל M», "circle O and circle M".
+  const parts = s.split(/\s+ו-?\s*(?=ה?מעגל\s)|\s+and\s+(?=(?:the\s+)?circle\s)/i);
+  if (parts.length === 2) {
+    const names = parts.map((p) => (SUBJECT_ONE_HE.exec(trim(p)) ?? SUBJECT_ONE_EN.exec(trim(p)))?.[1]);
+    if (names[0] && names[1]) return { kind: 'pair', names: [names[0], names[1]] };
   }
   return null;
+}
+
+/** «משיק» in its full inflection run, with the relative ה-, the conjunctive ו- and the ש- prefix —
+ *  the one-spelling gate is this tree's recurring trap (`src-analytic/CLAUDE.md`). */
+const HE_TANGENT_VERB = '(?:ה|ו|ש)?משיק(?:ה|ים|ות)?';
+/** The sentence split at its VERB — the subject before it, the rest after (targets and modifiers). */
+const TANGENT_SPLIT_HE = new RegExp(`^(.+?)\\s+${HE_TANGENT_VERB}(?=\\s|$)\\s*(.*)$`);
+const TANGENT_SPLIT_EN = new RegExp(
+  `^(.+?)\\s+(?:(?:is|are|which\\s+is|that\\s+is)\\s+)?(?:(${BRANCH_WORD})\\s+)?tangent(?=\\s|$)\\s*(.*)$`,
+  'i',
+);
+/**
+ * A CIRCLE GIVEN BY ITS CENTRE, and every TANGENCY sentence — to the axes (#1060), to LINES
+ * (#1501) and to another CIRCLE (#1504) — read by one subject reader, one target reader and one
+ * modifier list.
+ *
+ * Operator, 2026-09-15: *"we need to support מעגל O משיק לציר x and all verses of the axis
+ * tangency"*. Operator, 2026-09-28: *"we need to support tangents — מעגל M משיק לישרים l1 ו- l2 …"*.
+ * Operator, 2026-09-29 (pre-play of #1504): *«מעגל O ומעגל M משיקים מבחוץ»*.
+ *
+ * Tangency to an axis is how the corpus pins a circle WITHOUT giving its radius — «מעגל המשיק
+ * לציר ה-x» says r = |y_O|, which is exactly one equation and exactly the sentence a student is
+ * handed instead of a number.
+ *
+ * The RADIUS is a parameter named after the centre — `r_O` — so it needs no resolution against
+ * the figure and cannot collide with a student's own single letters. It is declared POSITIVE:
+ * #1019 made an undeclared parameter sample negative, which is right for a coefficient and wrong
+ * for a length.
+ *
+ * The readings, in order: the subject as a CIRCLE subject (named ones create their circle, as
+ * «נתון מעגל M» does), else the LINE-FIRST order («הישר l1 משיק למעגל M» — the subject is a
+ * target list, read by the same `tangentTargets`, so the two orders cannot drift: #1281/#1495's
+ * incidence-in-every-order rule, applied to tangency). A modifier — a branch word, «זה לזה», «בנקודה
+ * T» — must land on a circle-to-circle relation; one that has none to land on declines the sentence
+ * rather than vanish (the honesty invariant: no stated word is silently dropped).
+ */
+function parseCircleAt(line: string): RuleOutcome {
+  const mods: TangencyMods = { reciprocal: false, clash: false };
+  const body = peelMods(line.replace(/^נתו(?:ן|נה|נים|נות)\s+/, ''), 'tail', mods);
+  const he = TANGENT_SPLIT_HE.exec(body);
+  const en = he ? null : TANGENT_SPLIT_EN.exec(body);
+  if (!he && !en) {
+    // No verb: «נתון מעגל O» alone — a circle with a free centre and a free radius (3 DOF).
+    const subject = readCircleSubject(body);
+    if (!subject || subject.kind !== 'one' || !subject.name) return null;
+    if (mods.branch || mods.reciprocal || mods.at) return null;
+    return made(circleAtFacts(subject.name, NO_TARGETS, line));
+  }
+  const isEn = en !== null;
+  const subjectText = trim((he ?? en)![1]);
+  // English may put its branch word before "tangent" ("is externally tangent to").
+  if (en?.[2]) peelMods(en[2], 'head', mods);
+  const rest = peelMods(he ? he[2] : en![3], 'head', mods);
+  if (mods.clash) return null;
+  // The object: Hebrew «ל…», English "to …". An empty rest is the plural's «המעגלים משיקים».
+  let objectText: string | null = null;
+  if (rest) {
+    const obj = isEn ? /^to\s+(.+)$/i.exec(rest) : /^(ל.+)$/.exec(rest);
+    if (!obj) return null;
+    objectText = obj[1];
+  }
+
+  const subject = readCircleSubject(subjectText);
+  const circleSubject = subject ? circleSubjectFacts(subject, objectText, mods, line) : null;
+  if (circleSubject) return made(circleSubject);
+  if (objectText === null) return null;
+
+  // THE LINE-FIRST ORDER — the subject is a target list, the object ONE circle (named or contextual),
+  // both read by the one target reader.
+  const object = tangentTargets(objectText, line);
+  if (!object || object.circles.length !== 1 || object.axes.length + object.lines.length + object.facts.length > 0) return null;
+  if (object.circles[0].branch) return null;
+  const targets = tangentTargets(subjectText, line);
+  if (!targets) return null;
+  const circles = withSentenceMods(targets.circles, mods);
+  if (!circles) return null;
+  const host = object.circles[0].name;
+  return made([
+    ...targets.facts,
+    // «המעגל I משיק למעגל M» — a circle SUBJECT before a named (or contextual) circle (#1504).
+    ...circles.map((t) => ({
+      t: 'tangent-circles' as const,
+      ...(t.name ? { a: t.name } : {}),
+      ...(host ? { b: host } : {}),
+      ...(t.branch ? { branch: t.branch } : {}),
+      ...(mods.at ? { at: mods.at } : {}),
+      src: line,
+    })),
+    ...(targets.axes.length + targets.lines.length > 0 || circles.length === 0
+      ? [
+          {
+            t: 'tangent-of' as const,
+            axes: targets.axes,
+            ...(targets.lines.length ? { lines: targets.lines } : {}),
+            ...(host ? { circle: host } : {}),
+            src: line,
+          },
+        ]
+      : []),
+  ]);
+}
+
+/**
+ * A SENTENCE-LEVEL modifier lands on the circle relations (#1504 amendment 1): a branch word said
+ * after the verb or after the whole target list applies to each circle target that did not carry
+ * its own; «בנקודה T» names ONE touch, so it needs exactly one circle relation; «זה לזה» belongs to
+ * a plural subject only. Anything that cannot land declines the sentence — `null`.
+ */
+function withSentenceMods(
+  circles: TangentTargets['circles'],
+  mods: TangencyMods,
+): TangentTargets['circles'] | null {
+  if (mods.reciprocal) return null;
+  if ((mods.branch || mods.at) && circles.length === 0) return null;
+  if (mods.at && circles.length !== 1) return null;
+  if (!mods.branch) return circles;
+  if (circles.some((t) => t.branch && t.branch !== mods.branch)) return null; // «…מבפנים … מבחוץ» — at odds with itself
+  return circles.map((t) => ({ ...t, branch: mods.branch }));
+}
+
+/** The facts for a sentence whose subject is a CIRCLE (or two) — `null` when it is not this reading. */
+function circleSubjectFacts(subject: CircleSubject, objectText: string | null, mods: TangencyMods, line: string): Fact[] | null {
+  const targets = objectText === null ? null : tangentTargets(objectText, line);
+  if (objectText !== null && !targets) return null;
+
+  if (subject.kind === 'one') {
+    if (!targets) return null; // «המעגל משיק» with nothing after it states nothing
+    const circles = withSentenceMods(targets.circles, mods);
+    if (!circles) return null;
+    const withMods = { ...targets, circles };
+    if (subject.name) return circleAtFacts(subject.name, withMods, line, mods.at);
+    // No centre named: the sentence is about the one circle in the figure, which only M1 knows.
+    // «המעגל משיק למעגל K» — the contextual subject rides `a: undefined`; M1 reads it as the one
+    // OTHER circle (#1504). `tangent-of` is emitted only when it has work.
+    return [
+      ...targets.facts,
+      ...circles.map((t) => ({
+        t: 'tangent-circles' as const,
+        ...(t.name ? { b: t.name } : {}),
+        ...(t.branch ? { branch: t.branch } : {}),
+        ...(mods.at ? { at: mods.at } : {}),
+        src: line,
+      })),
+      ...(targets.axes.length + targets.lines.length > 0 || circles.length === 0
+        ? [{ t: 'tangent-of' as const, axes: targets.axes, ...(targets.lines.length ? { lines: targets.lines } : {}), src: line }]
+        : []),
+    ];
+  }
+
+  // TWO circles. A named one is introduced by the sentence exactly as «מעגל M משיק…» introduces M
+  // (a numeral names an existing circle and introduces nothing).
+  const letters = subject.names.filter((n) => new RegExp(`^${NAME}$`).test(n));
+  const introduce = (t: TangentTargets) => letters.flatMap((n) => circleAtFacts(n, t, line));
+  if (targets) {
+    // «המעגלים O ו-M משיקים לציר ה-x» — EACH is tangent to the targets. Needs the names, and a
+    // numeral cannot carry its own circle facts; a touch point would not say which touch.
+    if (subject.names.length !== 2 || letters.length !== 2 || mods.reciprocal || mods.at) return null;
+    const circles = withSentenceMods(targets.circles, { ...mods, reciprocal: false });
+    if (!circles) return null;
+    const each = { ...targets, circles };
+    return [...targets.facts, ...introduce({ ...each, facts: [] })];
+  }
+  // «המעגלים (O ו-M) משיקים (זה לזה) (מבחוץ) (בנקודה T)» — the two circles touch each other.
+  const [a, b] = subject.names;
+  return [
+    ...introduce(NO_TARGETS),
+    {
+      t: 'tangent-circles' as const,
+      ...(a ? { a } : {}),
+      ...(b ? { b } : {}),
+      ...(mods.branch ? { branch: mods.branch } : {}),
+      ...(mods.at ? { at: mods.at } : {}),
+      src: line,
+    },
+  ];
 }
 
 /**

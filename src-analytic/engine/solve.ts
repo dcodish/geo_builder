@@ -32,7 +32,7 @@ import {
   lengthRefs,
   type LengthExpr,
 } from './lengths';
-import { curveParentOf, evalRule, parentsOf, type DerivedRule, type Pt } from './derived';
+import { curveParentsOf, evalRule, parentsOf, type DerivedRule, type Pt } from './derived';
 import type { Expr } from './expr';
 
 /**
@@ -473,6 +473,8 @@ function describeRule(r: DerivedRule): string {
       return `מפגש האלכסונים ${r.v.join('')}`;
     case 'circle-centre':
       return `מרכז ${r.curve}`;
+    case 'touch-point':
+      return `נקודת ההשקה של ${r.a} ו-${r.b}`;
     default: {
       const undescribed: never = r;
       throw new Error(`rule has no description: ${JSON.stringify(undescribed)}`);
@@ -559,10 +561,8 @@ export function constraintCurveRefs(k: Constraint): Id[] {
       return [...ofDir(k.u), ...ofDir(k.v)];
     case 'slope':
       return ofDir(k.u);
-    case 'derived-at': {
-      const parent = curveParentOf(k.rule);
-      return parent === null ? [] : [parent];
-    }
+    case 'derived-at':
+      return curveParentsOf(k.rule);
     case 'choice':
       return [...new Set(k.options.flatMap(constraintCurveRefs))];
     default:
@@ -903,7 +903,19 @@ export function residual(
       // the `choice` resolved before this runs (#1049), never a judgement made here.
       const [a, b] = p;
       const d = Math.hypot(b.x - a.x, b.y - a.y);
-      return [d - (k.branch === 'external' ? r1 + r2 : Math.abs(r1 - r2))];
+      const miss = d - (k.branch === 'external' ? r1 + r2 : Math.abs(r1 - r2));
+      /**
+       * CONCENTRIC CIRCLES ARE NOT TANGENT (operator ruling 2026-09-29, #1504 T19) — in every spelling,
+       * with or without a branch word. |MK| = |r−R| holds at d = 0 with r = R, which drew two
+       * identical circles as "internally tangent". Tangency presupposes a LINE OF CENTRES, so d > 0 is
+       * part of the relation — an open bound, judged like every open bound at the solver's resolution
+       * relative to the circles' own size (amendment 1, the `openBoundFloor` rule), never exactly.
+       * Inside that floor the row reports the larger of the miss and the gap to the floor: zero-free
+       * at d = 0, continuous at the floor, and pushing the centres apart where they are free.
+       */
+      const floor = SOLVE_RESOLUTION * Math.max(Math.abs(r1), Math.abs(r2), d);
+      if (d < floor) return [Math.max(Math.abs(miss), floor - d)];
+      return [miss];
     }
     case 'derived-at': {
       /**

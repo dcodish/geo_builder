@@ -193,7 +193,15 @@ export function decideSubmit(
      * midpoints and every future point sentence get it; the taught remedy (a fresh letter) is
      * locked to actually record.
      */
-    const reused = subjectIdsOf(parsed).find((id) => current.construction.objects.some((o) => o.id === id));
+    // A circle sentence about a circle that already EXISTS («מעגל M משיק למעגל K מבפנים» after «נתון
+    // מעגל M») mentions its centre to name the circle, not to define a new point there — so the
+    // "pick another letter" hint would blame the wrong line (#1504 amendment 1).
+    const restatedCentres = new Set(
+      parsed.facts.flatMap((f) => (f.t === 'circle-at' && current.construction.objects.some((o) => o.id === f.id) ? [f.centre] : [])),
+    );
+    const reused = subjectIdsOf(parsed).find(
+      (id) => !restatedCentres.has(id) && current.construction.objects.some((o) => o.id === id),
+    );
     const definedBy = reused ? definingLineOf(lines, reused) : null;
     return {
       kind: 'refused',
