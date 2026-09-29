@@ -1,0 +1,132 @@
+{
+  "name": "round-1568",
+  "title": "fix-round 2026-09-29 B — P1 #1560 (#1568)",
+  "cases": [
+    {
+      "id": "T1",
+      "title": "וקטור שגוי מעל נקודות עם שיעורים — נדחה (סירוב)",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": ["A(0,0,0)", "B(2,0,0)", "D(0,3,0)", "נסמן: AB = u, AD = v", "u = (7,7,7)"],
+      "expectRefusal": "הטענה לא מתקיימת",
+      "lookFor": "השורה האחרונה נדחית: «הטענה לא מתקיימת בציור — בדקו את החישוב»; AB נשאר מ-(0,0,0) ל-(2,0,0)",
+      "before": "התקבל בירוק, הציור לא השתנה"
+    },
+    {
+      "id": "T2",
+      "title": "הווקטור הנכון נשאר ירוק",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": ["A(0,0,0)", "B(2,0,0)", "D(0,3,0)", "נסמן: AB = u, AD = v", "u = (2,0,0)"],
+      "lookFor": "השורה האחרונה ירוקה",
+      "before": "ללא שינוי"
+    },
+    {
+      "id": "T3",
+      "title": "וקטור AB שגוי נדחה (סירוב)",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": ["A(0,0,0)", "B(2,0,0)", "AB = (5,5,5)"],
+      "expectRefusal": "הטענה לא מתקיימת",
+      "lookFor": "נדחה באותה הודעה; שום דבר לא זז",
+      "before": "התקבל בירוק"
+    },
+    {
+      "id": "T4",
+      "title": "וקטור שגוי שנכתב חלקית נדחה (סירוב)",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": ["A(0,0,0)", "B(2,0,0)", "AB = (5, n, p)"],
+      "expectRefusal": "הטענה לא מתקיימת",
+      "lookFor": "נדחה (x הוא 2, לא 5)",
+      "before": "התקבל בירוק"
+    },
+    {
+      "id": "T5",
+      "title": "BA בכיוון ההפוך נקרא נכון",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": ["A(0,0,0)", "B(2,0,0)", "BA = (-2,0,0)"],
+      "lookFor": "ירוק",
+      "before": "ללא שינוי"
+    },
+    {
+      "id": "T6",
+      "title": "מכפלה סקלרית שגויה נדחית (סירוב)",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": ["A(0,0,0)", "B(2,0,0)", "D(0,3,0)", "נסמן: AB = u, AD = v", "u·v = 24"],
+      "expectRefusal": "הטענה לא מתקיימת",
+      "lookFor": "נדחה באותה הודעה",
+      "before": "התקבל בירוק"
+    },
+    {
+      "id": "T7",
+      "title": "המכפלה הסקלרית הנכונה נשארת ירוקה",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": ["A(0,0,0)", "B(2,0,0)", "D(0,3,0)", "נסמן: AB = u, AD = v", "u·v = 0"],
+      "lookFor": "ירוק",
+      "before": "ללא שינוי"
+    },
+    {
+      "id": "T8",
+      "title": "על קובייה, וקטור עדיין מזיז את הקובייה",
+      "class": "look",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": ["קובייה ABCDA'B'C'D'", "AB = (2,1,2)"],
+      "lookFor": "ירוק, והקובייה מסתובבת כך ש-AB = (2,1,2) (מקצוע 3)",
+      "before": "ללא שינוי"
+    },
+    {
+      "id": "T9",
+      "title": "על קובייה, מכפלה סקלרית עדיין קובעת את הגודל",
+      "class": "look",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": ["קובייה ABCDA'B'C'D'", "נסמן: AB = u, AC' = v", "u·v = 9"],
+      "lookFor": "ירוק, ומקצוע הקובייה הוא 3",
+      "before": "ללא שינוי"
+    },
+    {
+      "id": "T10",
+      "title": "וקטור חופשי עדיין מקבל את הערך שנכתב",
+      "class": "look",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": ["וקטור AB", "AB = (5,5,5)"],
+      "lookFor": "ירוק, והחץ AB הוא (5,5,5)",
+      "before": "ללא שינוי"
+    },
+    {
+      "id": "T11",
+      "title": "קובייה קבועה בשיעורים עדיין דוחה וקטור בלתי אפשרי (סירוב)",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": ["קובייה ABCDA'B'C'D'", "A(0,0,0)", "B(2,0,0)", "AB = (5,5,5)"],
+      "expectRefusal": "סותרים",
+      "lookFor": "נדחה: «הנתונים סותרים זה את זה — אין גוף שמקיים את «AB = (5,5,5)» יחד עם A(0,0,0), B(2,0,0)»",
+      "before": "ללא שינוי"
+    },
+    {
+      "id": "T12",
+      "title": "וקטור לאמצע קטע נבדק גם הוא (סירוב)",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": ["A(0,0,0)", "C(2,0,0)", "M אמצע AC", "AM = (5,5,5)"],
+      "expectRefusal": "הטענה לא מתקיימת",
+      "lookFor": "נדחה: «הטענה לא מתקיימת בציור — בדקו את החישוב»",
+      "before": "התקבל בירוק"
+    }
+  ]
+}
