@@ -36,6 +36,7 @@ import { decideSubmit, reachesFallback } from './app/submit';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { runFallback } from './app/fallback';
 import { panelKnowledge } from './app/panelRows';
+import { hostKey } from './app/hostKey';
 import { angleText, lineAngleOf } from './app/lineAngle';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
 import { domainText } from './engine/types';
@@ -76,6 +77,7 @@ import { ShareSheet } from '../shell/frame/ShareSheet';
 import { loadAnalyticSession } from './app/loadSession';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
+
 
 declare const __BUILD__: string;
 
@@ -1681,6 +1683,9 @@ export function App() {
                             : 'askContextualLine',
                         { points: a.contextual.points, lines: a.contextual.lines },
                       )}`
+                    ) : a.host ? (
+                      /* #1432 am. 1 — a role question whose host is absent or plural: say which, never «לא הבנתי» */
+                      `${a.question} — ${t(hostKey('askHost', a.host))}`
                     ) : a.unreadable ? (
                       `${a.question} — ${t('askUnreadable')}`
                     ) : (

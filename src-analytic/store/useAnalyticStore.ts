@@ -118,11 +118,11 @@ export type InputError =
   /** A vertex that does not name an angle on its own — no shape through it, or several (#1049). */
   | { key: 'ambiguous-angle'; detail: string; example?: string }
   /** A shape named by its noun alone, where the figure has no such shape or several (#1049). */
-  | { key: 'ambiguous-shape'; detail: string }
-  /** A curve named by its noun alone that picks out none or several (#1514 pre-play) — with the candidates. */
-  | { key: 'ambiguous-curve'; detail: string; expected?: RefKind; candidates?: string[] }
+  | { key: 'ambiguous-shape'; detail: string; host?: { kind: string; found: number; need?: number; candidates?: string[] } }
   /** «ישר I» where the figure's line is «ישר 1» (ruling 2026-09-29): typed numeral, the one in use, the kind. */
   | { key: 'numeral-notation'; detail: string; holder?: string; expected?: RefKind }
+  /** #1432 am. 1 — a stated value outside its symbol's domain («רדיוס המעגל הוא -3»), with the bound. */
+  | { key: 'out-of-domain'; detail: string; domain?: { min?: number; minOpen?: boolean; max?: number; maxOpen?: boolean; exclude?: number[] } }
   /** «האלכסון הראשי» where the shape distinguishes no principal diagonal (#1070). */
   | { key: 'undistinguished-diagonal'; detail: string }
   /**

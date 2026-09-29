@@ -79,6 +79,8 @@ export const NUMERAL_ALT = `${ROMAN_ALT}|[1-9]`;
 const NUMERAL_RE = new RegExp(`^(?:${NUMERAL_ALT})$`);
 
 export const asRoman = (n: string): string => ROMAN_OF_DIGIT[n] ?? n;
+/** Is this token a curve's NUMERAL name («1», «I», «VII») — the one answer every reader asks. */
+export const isNumeralName = (token: string): boolean => NUMERAL_RE.test(token);
 const isDigitNumeral = (n: string) => n in ROMAN_OF_DIGIT;
 
 /**

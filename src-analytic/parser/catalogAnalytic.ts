@@ -238,6 +238,12 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // in the catalog before #1501, so the fallback could never emit a tangency at all.
   { category: 'circles', family: 'F5', he: 'מעגל O משיק לציר ה-x', en: 'circle O is tangent to the x-axis' },
   { category: 'circles', family: 'F5', he: 'המעגל O משיק לשני הצירים', en: 'circle O is tangent to both axes' },
+  // #1432 — the radius as a given, and the focus as a namable point (ADR-AG-169). Not featured.
+  { category: 'circles', family: 'F5', he: 'נתון מעגל O שרדיוסו 5', en: 'circle O with radius 5' },
+  { category: 'derived', family: 'F16', he: 'F מוקד הפרבולה', en: 'F is the focus of the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x'] },
+  // #1432 am. 1 — the bagrut's centre-by-coordinates circle, and the perimeter as a real given. Not featured.
+  { category: 'circles', family: 'F5', he: 'נתון מעגל שמרכזו (2,3) ורדיוסו 5', en: 'circle centred at (2,3) with radius 5' },
+  { category: 'relations', family: 'F20', he: 'היקף המשולש ABC הוא 12', en: 'the perimeter of triangle ABC is 12', needs: ['A(0,0)', 'B(3,0)', 'נקודה C'] },
   {
     category: 'circles',
     family: 'F5',
@@ -263,6 +269,26 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'הישר l1 משיק למעגל M',
     en: 'the line l1 is tangent to the circle M',
     needs: ['נתון הישר l1: y=2x+5', 'נתון מעגל M'],
+  },
+  // Circle-to-circle tangency (#1504) — the operator's T9 report; external/internal cycles, and
+  // «מבחוץ»/«מבפנים» pin the touch. Not featured: the six featured seats are #1347's pedagogy call.
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'מעגל M משיק למעגל K',
+    en: 'circle M is tangent to circle K',
+    needs: ['נתון מעגל K'],
+  },
+  { category: 'circles', family: 'F5', he: 'המעגלים משיקים מבחוץ', en: 'the circles are tangent externally', needs: ['נתון מעגל K', 'נתון מעגל M'] },
+  // The operator's own spelling (#1504 pre-play): two named circles as ONE subject.
+  { category: 'circles', family: 'F5', he: 'מעגל O ומעגל M משיקים מבחוץ', en: 'circle O and circle M are tangent externally' },
+  // The touch point, named (#1504 amendment 1) — a derived point on the line of centres.
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'מעגל M משיק למעגל K בנקודה T',
+    en: 'circle M is tangent to circle K at T',
+    needs: ['נתון מעגל K'],
   },
 
   // --- F6 · conics by equation (canonical only — D6/§2a) ---

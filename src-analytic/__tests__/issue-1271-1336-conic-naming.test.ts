@@ -16,7 +16,7 @@ import { derive } from '../engine/derive';
 import { parseLine } from '../parser/parseAnalytic';
 import { runFallback } from '../app/fallback';
 import { decideSubmit } from '../app/submit';
-import { errorText, type Translate } from '../app/errorText';
+import { HOST_KINDS, errorText, type Translate } from '../app/errorText';
 import { refKindOf, statedName } from '../engine/names';
 import { analyticI18n } from '../i18n';
 import { ask } from '../app/ask';
@@ -351,7 +351,8 @@ describe('Am. 1 · a curve named by its noun alone — the refusal names the can
   it('two named parabolas: names both, and teaches «P על הפרבולה I»', () => {
     const setup = ['נתונה פרבולה I שמשוואתה y^2=8x', 'נתונה פרבולה II שמשוואתה y^2=2x'];
     const e = refusal([...setup, 'P על הפרבולה']);
-    expect(e).toMatchObject({ key: 'ambiguous-curve', expected: 'parabola', candidates: ['I', 'II'] });
+    // One host seam (#1432 + #1514, merged): the refusal is ambiguous-shape carrying the host AND its candidates.
+    expect(e).toMatchObject({ key: 'ambiguous-shape', host: { kind: 'parabola', found: 2, candidates: ['I', 'II'] } });
     const text = errorText(e, he).replace(/[⁦-⁩]/g, '');
     expect(text).toContain('הפרבולה I, הפרבולה II');
     expect(text).toContain('«P על הפרבולה I»');
@@ -377,7 +378,7 @@ describe('Am. 1 · a curve named by its noun alone — the refusal names the can
 
   it('no parabola at all: says there is none, and never teaches a kite', () => {
     const text = errorText(refusal(['P על הפרבולה']), he).replace(/[⁦-⁩]/g, '');
-    expect(text).toContain('בשרטוט עדיין אין פרבולה');
+    expect(text).toContain('אין בשרטוט פרבולה');
     expect(text).not.toContain('דלתון');
   });
 
@@ -386,5 +387,65 @@ describe('Am. 1 · a curve named by its noun alone — the refusal names the can
     const text = errorText(e, en).replace(/[⁦-⁩]/g, '');
     expect(text).toContain('the parabola I, the parabola II');
     expect(text).toContain('"P is on the parabola I"');
+  });
+});
+
+describe('Merge with #1511 + #1513 — one host seam, one naming chokepoint', () => {
+  it('every host kind × arity has its refusal and ask keys, in both locales (exhaustive over HostRef)', () => {
+    for (const lng of ['he', 'en'] as const) {
+      const bundle = analyticI18n.getResourceBundle(lng, 'translation') as Record<string, unknown>;
+      for (const kind of Object.keys(HOST_KINDS)) {
+        for (const arity of ['none', 'many'] as const) {
+          expect(bundle[`errHost.${arity}.${kind}`], `${lng} errHost.${arity}.${kind}`).toBeTruthy();
+        }
+      }
+      expect(bundle['errHost.named'], `${lng} errHost.named`).toBeTruthy();
+    }
+  });
+
+  it('several NAMED hosts: #1513’s radius role gets #1514’s candidate sentence, and the taught line records', () => {
+    const setup = ['נתון מעגל I שמשוואתו x^2+y^2=9', 'נתון מעגל II שמשוואתו x^2+y^2=4'];
+    const e = refusal([...setup, 'רדיוס המעגל הוא 3']);
+    expect(e).toMatchObject({ key: 'ambiguous-shape', host: { kind: 'circle', found: 2, candidates: ['I', 'II'] } });
+    const text = errorText(e, he).replace(/[⁦-⁩]/g, '');
+    expect(text).toContain('«רדיוס המעגל I הוא 3»');
+    expect(decideSubmit('רדיוס המעגל I הוא 3', setup, 0).kind).not.toBe('refused');
+  });
+
+  it('a role whose sentence takes no name keeps #1513’s kind-specific remedy (no unreadable example taught)', () => {
+    const e = refusal(['נתונה פרבולה I: y^2=8x', 'נתונה פרבולה II: y^2=2x', 'F מוקד הפרבולה']);
+    expect(e).toMatchObject({ key: 'ambiguous-shape', host: { kind: 'parabola', found: 2 } });
+    expect((e as { host?: { candidates?: string[] } }).host?.candidates).toBeUndefined();
+  });
+
+  it('the notation rule holds for #1513’s named radius, given and asked', () => {
+    expect(refusal(['נתון מעגל 1 שמשוואתו x^2+y^2=4', 'רדיוס המעגל I הוא 2']).key).toBe('numeral-notation');
+    expect(decideSubmit('רדיוס המעגל 1 הוא 2', ['נתון מעגל 1 שמשוואתו x^2+y^2=4'], 0).kind).toBe('already-known');
+    const d = derive(['נתון מעגל 1 שמשוואתו x^2+y^2=4'], 0);
+    expect(ask(d, 'רדיוס המעגל 1', String).value).toBe('2');
+    expect(ask(d, 'רדיוס המעגל I', String).missing).toEqual({ name: 'I', kind: 'curve', used: '1' });
+  });
+
+  it('#1511’s circle subject reads a NUMERAL as the circle’s name — never a centre — so the notation rule holds there', () => {
+    const setup = ['נתון מעגל 1 שמשוואתו x^2+y^2=4', 'נתון מעגל II שמשוואתו (x-5)^2+y^2=9'];
+    for (const line of ['מעגל I ומעגל II משיקים', 'המעגלים I ו-II משיקים', 'המעגל I משיק למעגל II', 'המעגל I משיק לציר ה-x']) {
+      expect(refusal([...setup, line]).key, line).toBe('numeral-notation');
+    }
+    // Same notation: understood, and refused only for what it is (tangency of EQUATION circles is out of scope, #1504).
+    for (const line of ['מעגל 1 ומעגל II משיקים', 'המעגלים 1 ו-II משיקים']) {
+      expect(refusal([...setup, line]).key, line).toBe('out-of-scope');
+    }
+    // No phantom centre point «I» is ever minted from a numeral subject.
+    expect(parseLine('המעגלים I ו-II משיקים').ok && (parseLine('המעגלים I ו-II משיקים') as { facts: { t: string }[] }).facts.map((f) => f.t)).toEqual(['tangent-circles']);
+  });
+
+  it('a centre LETTER still introduces its circle (#1511 unchanged)', () => {
+    const d = recordsAll(['נתון מעגל O', 'נתון מעגל M', 'מעגל O ומעגל M משיקים']);
+    expect(d.figure.points.map((p) => p.id).sort()).toEqual(['M', 'O']);
+  });
+
+  it('#1513’s «מוקדי האליפסה» on the a = b ellipse: both foci at the centre', () => {
+    const d = derive(['נתונה אליפסה I שמשוואתה x^2+y^2=16'], 0);
+    expect(ask(d, 'מוקדי האליפסה', String).value).toBe('(0, 0), (0, 0)');
   });
 });

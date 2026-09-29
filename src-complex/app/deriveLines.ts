@@ -10,13 +10,14 @@
  * The import-direction guard caught the first version doing it inside `replay/` and was right to.
  */
 
-import { type ParsedLine, parseLineV2 } from '../parser/rules';
+import { type ParseOutcome, type ParsedLine, parseLineV2 } from '../parser/rules';
+import { questionBody } from '../parser/normalize';
 import { type ComplexScope, NO_SCOPE, familyOf, isPointLabel } from '../parser/exprParse';
 import type { Why } from '../model/why';
 import type { BranchFilter, Constraint } from '../model/constraint';
 import type { Claim as Assertion } from '../model/claim';
 import type { FigureObject } from '../model/figure';
-import type { ExprQuery, MeasureQuery, MeasureRelation, RatioQuery } from '../model/measure';
+import type { ArgQuery, ExprQuery, MeasureQuery, MeasureRelation, RatioQuery } from '../model/measure';
 import type { SequenceStatement } from '../model/sequence';
 import { type RootsMode, rootsMode } from '../model/naming';
 import { refsOf } from '../model/expr';
@@ -77,6 +78,7 @@ export function deriveLines(
     queries: [...(lowered.queries ?? []), ...lane.queries],
     ratios: [...(lowered.ratios ?? []), ...lane.ratios],
     exprQueries: [...(lowered.exprQueries ?? []), ...lane.exprQueries],
+    argQueries: [...(lowered.argQueries ?? []), ...lane.argQueries],
     configIndex,
     seed,
   });
@@ -95,20 +97,21 @@ export function lowerAsks(asks: readonly string[], scope: ComplexScope = NO_SCOP
   queries: MeasureQuery[];
   ratios: RatioQuery[];
   exprQueries: ExprQuery[];
+  argQueries: ArgQuery[];
 } {
   const queries: MeasureQuery[] = [];
   const ratios: RatioQuery[] = [];
   const exprQueries: ExprQuery[] = [];
+  const argQueries: ArgQuery[] = [];
   for (const raw of asks) {
-    const r = parseLineV2(raw.trim(), scope);
-    if (!r.ok) continue;
-    const a = askArtifacts(r.line);
+    const { ask: a } = parseAsk(raw, scope);
     if (!a) continue;
     queries.push(...a.queries);
     ratios.push(...a.ratios);
     exprQueries.push(...a.exprQueries);
+    argQueries.push(...a.argQueries);
   }
-  return { queries, ratios, exprQueries };
+  return { queries, ratios, exprQueries, argQueries };
 }
 
 /**
@@ -121,11 +124,51 @@ export function lowerAsks(asks: readonly string[], scope: ComplexScope = NO_SCOP
  * «z1z2» — is F6's segment STATEMENT in the givens box, but in the ask register it is the length
  * question about that segment, so here it reads as «אורך AB» does.
  */
-export function askArtifacts(l: ParsedLine): {
+export interface AskArtifacts {
   queries: MeasureQuery[];
   ratios: RatioQuery[];
   exprQueries: ExprQuery[];
-} | null {
+  argQueries: ArgQuery[];
+}
+
+/**
+ * #1437 amendment — THE ASK READER: one text line, read as a question. `readAsk`, the lane lowering
+ * and the panel's row model all call this, so the question FRAME is removed in one place before any
+ * ask rule runs — «מהו |w|», «Re(w)?», «חשבו את arg w», «|w| = ?» read as the bare question, for every
+ * ask kind at once (measure, ratio, expression, argument).
+ *
+ * The line is read as typed first; the frame-stripped body is tried only when that reading is not a
+ * question, and is kept only when the body IS a pure question — a statement in a question frame
+ * («|w| = 3?») stays a statement the givens gate refuses, never a given. Inside a frame a bare name
+ * («מהו w») is unambiguous: it asks the number's value, the way a bare run asks a length (#791).
+ */
+export function parseAsk(
+  raw: string,
+  scope: ComplexScope = NO_SCOPE,
+): { readonly parsed: ParseOutcome; readonly ask: AskArtifacts | null } {
+  const plain = parseLineV2(raw.trim(), scope);
+  const plainAsk = plain.ok ? askArtifacts(plain.line) : null;
+  if (plainAsk) return { parsed: plain, ask: plainAsk };
+  const body = questionBody(raw);
+  if (body === null) return { parsed: plain, ask: null };
+  const framed = parseLineV2(body, scope);
+  if (!framed.ok) return { parsed: plain.ok ? plain : framed, ask: null };
+  const ask = askArtifacts(framed.line) ?? bareNameValue(framed.line);
+  return ask ? { parsed: framed, ask } : { parsed: plain.ok ? plain : framed, ask: null };
+}
+
+/** A framed bare name («מהו w») — nothing stated, one name mentioned: the value question about it. */
+function bareNameValue(l: ParsedLine): AskArtifacts | null {
+  const said =
+    l.constraints.length + l.filters.length + l.assertions.length + l.objects.length +
+    l.measures.length + l.sequences.length + l.roots.length + l.queries.length + l.ratios.length +
+    l.exprQueries.length + l.argQueries.length;
+  if (said > 0 || l.declares.length !== 1) return null;
+  const name = l.declares[0];
+  return { queries: [], ratios: [], exprQueries: [{ expr: { t: 'ref', name }, src: name }], argQueries: [] };
+}
+
+export function askArtifacts(l: ParsedLine): AskArtifacts | null {
   const bareSegment =
     l.objects.length === 1 &&
     l.objects[0].kind === 'segment' &&
@@ -134,14 +177,14 @@ export function askArtifacts(l: ParsedLine): {
       l.exprQueries.length === 0;
   if (bareSegment) {
     const seg = l.objects[0] as { kind: 'segment'; points: readonly string[]; src: string };
-    return { queries: [{ kind: 'length', points: seg.points, src: seg.src }], ratios: [], exprQueries: [] };
+    return { queries: [{ kind: 'length', points: seg.points, src: seg.src }], ratios: [], exprQueries: [], argQueries: [] };
   }
   const states =
     l.constraints.length + l.filters.length + l.assertions.length +
     l.objects.length + l.measures.length + l.sequences.length + l.roots.length;
   if (states > 0) return null;
-  if (l.queries.length + l.ratios.length + l.exprQueries.length === 0) return null;
-  return { queries: [...l.queries], ratios: [...l.ratios], exprQueries: [...l.exprQueries] };
+  if (l.queries.length + l.ratios.length + l.exprQueries.length + l.argQueries.length === 0) return null;
+  return { queries: [...l.queries], ratios: [...l.ratios], exprQueries: [...l.exprQueries], argQueries: [...l.argQueries] };
 }
 
 /**
@@ -169,6 +212,7 @@ export function lowerLines(
   const queries: MeasureQuery[] = [];
   const ratios: RatioQuery[] = [];
   const exprQueries: ExprQuery[] = [];
+  const argQueries: ArgQuery[] = [];
   const sequences: SequenceStatement[] = [];
   const atoms = new Map<string, number>();
   const untranslated: Untranslated[] = [];
@@ -316,6 +360,7 @@ export function lowerLines(
     queries.push(...r.line.queries);
     ratios.push(...r.line.ratios);
     exprQueries.push(...r.line.exprQueries);
+    argQueries.push(...r.line.argQueries);
     sequences.push(...r.line.sequences);
     for (const [k, v] of r.line.atoms) atoms.set(k, v);
   });
@@ -341,6 +386,7 @@ export function lowerLines(
     queries,
     ratios,
     exprQueries,
+    argQueries,
     sequences,
     selections,
     solutionSets,

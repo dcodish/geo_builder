@@ -158,7 +158,7 @@ describe('#1324 — a circle from its diameter, and a diameter of an existing ci
     const eq = derive(['B(-3,0)', 'D(3,0)', '(x-3)^2+(y-4)^2=9', 'BD קוטר במעגל'], 0);
     expect(eq.faults.map((f) => [f.index, f.code])).toEqual([[3, 'out-of-scope']]);
     const two = derive(['A(0,4)', 'B(-3,0)', 'D(3,0)', 'מעגל ABD', '(x-3)^2+(y-4)^2=9', 'BD קוטר במעגל'], 0);
-    expect(two.faults.map((f) => [f.index, f.code])).toEqual([[5, 'ambiguous-curve']]);
+    expect(two.faults.map((f) => [f.index, f.code])).toEqual([[5, 'ambiguous-shape']]);
     // Ends that coincide have no circle.
     expect(derive(['A(0,0)', 'B(0,0)', 'BA קוטר'], 0).faults.map((f) => f.code)).toEqual(['does-not-exist']);
   });

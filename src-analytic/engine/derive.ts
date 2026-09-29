@@ -33,8 +33,9 @@ export interface LineFault {
   holder?: ApplyError['holder'];
   /** For an ambiguous one-letter angle: the three-letter name to write instead (#1407). */
   example?: ApplyError['example'];
-  /** For a curve named by its noun alone: how each candidate can be called (#1514 pre-play). */
-  candidates?: ApplyError['candidates'];
+  /** #1432 am. 1 — the host a contextual reference needed, and the bound a stated value broke. */
+  host?: ApplyError['host'];
+  domain?: ApplyError['domain'];
 }
 
 /**
@@ -101,10 +102,10 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   const reported = new Set<string>();
   errors.forEach((e, i) => {
     if (!e) return;
-    const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.candidates ?? null]);
+    const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, ...(e.candidates ? { candidates: e.candidates } : {}) });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain });
   });
 
   /**
@@ -439,7 +440,9 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
     names.set(f.id, name);
     minted.push({ index: owner[i], id: name });
   });
-  const out = JSON.parse(text.replace(/"@mint:[^"]*"/g, (q) => JSON.stringify(names.get(JSON.parse(q) as string) ?? JSON.parse(q)))) as Fact[];
+  // A placeholder is a whole id or the SUFFIX of one (#1432 am. 1 — `circle-at-@mint:2,3`, `r_@mint:2,3` for a
+  // circle centred on a coordinate point), so it is replaced up to the closing quote, never only as a whole string.
+  const out = JSON.parse(text.replace(/@mint:[^"]*/g, (q) => JSON.stringify(names.get(q) ?? q).slice(1, -1))) as Fact[];
   return { facts: out, minted };
 }
 

@@ -40,7 +40,7 @@
 
 import { readEnvelope, type LoadAudit } from '../../shell/save';
 import { parseLineV2 } from '../parser/rules';
-import { askArtifacts, complexScopeOf } from './deriveLines';
+import { complexScopeOf, parseAsk } from './deriveLines';
 import type { ComplexScope } from '../parser/exprParse';
 import type { Derived2 } from '../replay/derive2';
 import { type InputError, type SavedSession, useComplexStore } from '../store/useComplexStore';
@@ -131,6 +131,28 @@ const scopeOf = (lines: readonly string[]): ComplexScope => new Set(complexScope
 function parseInFigure(line: string, lines: readonly string[]): ReturnType<typeof parseLineV2> {
   const scoped = parseLineV2(line, scopeOf(lines));
   return scoped.ok ? scoped : parseLineV2(line);
+}
+
+/**
+ * #1435 (ADR-CX-056 amendment 1) — the #246 teaching refusal, ported from 2-D. «שורש 3» itself reads
+ * (the orthography chokepoint makes the word before a number the √ sign — 2-D #105); what is left is
+ * the word form the chokepoint deliberately does not rewrite, «שורש של 3». Such a line is refused
+ * with the √ spelling spelled out FOR it, and only when that spelling really reads (a taught remedy
+ * must drive — the #1156 lesson): the suggestion is parsed by the same grammar before it is offered.
+ */
+const WORD_ROOT = /שורש\s+של\s*(?=[\d(])/g;
+export function wordRootSuggestion(line: string, lines: readonly string[]): string | null {
+  if (!WORD_ROOT.test(line)) return null;
+  WORD_ROOT.lastIndex = 0;
+  const suggestion = line.replace(WORD_ROOT, '√');
+  return parseInFigure(suggestion, lines).ok ? suggestion : null;
+}
+
+/** THE refusal for a line the grammar could not read — one wording for every entry point. */
+function unreadRefusal(parsed: Extract<ReturnType<typeof parseLineV2>, { ok: false }>, line: string, lines: readonly string[]): InputError {
+  if (parsed.reason === 'unaccounted') return { key: 'unaccounted', detail: parsed.items.join(', ') };
+  const suggestion = wordRootSuggestion(line, lines);
+  return suggestion ? { key: 'word-root', detail: line, suggestion } : { key: 'not-handled', detail: line };
 }
 
 export type Verdict =
@@ -254,11 +276,7 @@ export function editLine(index: number, raw: string): boolean {
   if (index < 0 || index >= lines.length || line === '') return false;
   const parsed = parseInFigure(line, activeOf(lines, disabled));
   if (!parsed.ok) {
-    st().setError(
-      parsed.reason === 'unaccounted'
-        ? { key: 'unaccounted', detail: parsed.items.join(', ') }
-        : { key: 'not-handled', detail: line },
-    );
+    st().setError(unreadRefusal(parsed, line, activeOf(lines, disabled)));
     return false;
   }
   if (disabled.includes(index)) {
@@ -286,16 +304,15 @@ export function editLine(index: number, raw: string): boolean {
  * honestly reads "not determined".
  */
 export type AskReading =
-  | { readonly kind: 'measure' | 'ratio' | 'expr' }
+  | { readonly kind: 'measure' | 'ratio' | 'expr' | 'arg' }
   | { readonly kind: 'statement' }
   | { readonly kind: 'unreadable' };
 
 export function readAsk(raw: string, scope?: ComplexScope): AskReading {
-  const parsed = parseLineV2(raw.trim(), scope);
+  const { parsed, ask: a } = parseAsk(raw, scope);
   if (!parsed.ok) return { kind: 'unreadable' };
-  const a = askArtifacts(parsed.line);
   if (!a) return { kind: 'statement' };
-  return { kind: a.queries.length ? 'measure' : a.ratios.length ? 'ratio' : 'expr' };
+  return { kind: a.queries.length ? 'measure' : a.ratios.length ? 'ratio' : a.argQueries.length ? 'arg' : 'expr' };
 }
 
 /**
@@ -320,15 +337,6 @@ export function submitQuery(raw: string): boolean {
 export function submitLine(raw: string): boolean {
   const st = () => useComplexStore.getState();
   const line = raw.trim();
-  const parsed = parseInFigure(line, activeLines());
-  if (!parsed.ok) {
-    st().setError(
-      parsed.reason === 'unaccounted'
-        ? { key: 'unaccounted', detail: parsed.items.join(', ') }
-        : { key: 'not-handled', detail: line },
-    );
-    return false;
-  }
 
   /**
    * #789 — a QUESTION typed in the givens box is routed to the ask lane, never recorded as a fact.
@@ -339,10 +347,18 @@ export function submitLine(raw: string): boolean {
   // #1405: read against the figure's declared letters — a bare `u` is a question about a real
   // parameter, and a statement once u is declared complex
   const ask = readAsk(line, scopeOf(activeLines())).kind;
-  if (ask === 'measure' || ask === 'ratio' || ask === 'expr') {
+  if (ask !== 'statement' && ask !== 'unreadable') {
     st().addQuery(line);
     st().clearError();
     return true;
+  }
+
+  // #1437 amendment: the question is read FIRST, because a framed question («מהו |w|», «|w|?») is
+  // not a statement the grammar reads — refusing it here as unparseable would never reach the lane
+  const parsed = parseInFigure(line, activeLines());
+  if (!parsed.ok) {
+    st().setError(unreadRefusal(parsed, line, activeLines()));
+    return false;
   }
 
   // the gate reads the ACTIVE figure — a muted line must not veto a new statement (B5)
@@ -391,7 +407,7 @@ export function hydrateSession(data: unknown): boolean {
     // mute in the lane model, so a muted saved ask migrates like an enabled one.
     if (savedDisabled.has(i)) {
       const kind = readAsk(line).kind;
-      if (kind === 'measure' || kind === 'ratio' || kind === 'expr') st().addQuery(line);
+      if (kind !== 'statement' && kind !== 'unreadable') st().addQuery(line);
       else st().recordDisabledLine(line);
       return;
     }

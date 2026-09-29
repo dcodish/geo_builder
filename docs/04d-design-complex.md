@@ -93,6 +93,20 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   claimed — as a parameter — so the line balanced perfectly while meaning something the student never
   wrote. A grammar where juxtaposition means multiplication needs both: every span claimed, and a
   floor on what a claim may invent.
+- **A radical is a token, and a radical LITERAL is a value** ([ADR-CX-056](06d-decisions-complex.md#adr-cx-056)).
+  «√» / «∛» / «∜» / «ⁿ√» / «sqrt(» lex as one root token; a root of a rational literal becomes an exact
+  value on the modulus exponent vector (so «√2cis45» stays a tier-1 literal), and any other radicand is
+  the power the grammar already has (`pow(x, 1/n)` — no new AST kind). A constant with RADICAL parts
+  («√3 + i») folds through the Gaussian-radical walk and the angle table, **verified symbolically**
+  against the candidate turn before any exact value is claimed — the fold never invents exactness the
+  table cannot prove. **The exact walk decides before the float read-back** (amendment 1): a pair it
+  recognises is a Gaussian rational (`fromCartesian`) or a radical literal (`radicalLiteral` — the
+  table's turn, else a LITERAL ATOM carrying the exact pair in the one literal-atom registry, as
+  `3+4i` is carried), and the float read-back never runs over a root. The cartesian reading of a
+  literal atom comes from that registry (`literalAtomTerms`), not from the polar label. `cis`
+  attaches after any operand at one point (`withCis`); a closed negative radicand refuses at the root
+  atom; the orthography chokepoint reads an opening superscript before √ as the index and the word
+  «שורש» before a number as √, and the submit seam teaches «שורש של N».
 - **A parameter lives in the modulus CONSTANT, and the leftover rows are read over the parameters**
   ([ADR-CX-041](06d-decisions-complex.md#adr-cx-041)). `9r` is `{3:2, r:1}` in the constant, never an
   unknown, because every parametric answer (`15r`) reads that encoding. So a given that DETERMINES `r`
@@ -149,6 +163,11 @@ This is the product's one genuinely new core, and it is why the tree could ship 
   substitutes each member into the asked expression and hands every value, in every configuration, to
   the one predicate `knowledgeOf`. Values that differ inside one drawing are the set's own spread and
   read `multi-solution`, naming the first member.
+- **A line is read as a QUESTION by ONE reader** ([ADR-CX-055](06d-decisions-complex.md#adr-cx-055) A1).
+  `parseAsk` in `app/deriveLines.ts` is called by `readAsk`, the lane lowering and the panel row model;
+  it removes the question frame (`questionBody`, `parser/normalize.ts`) once, before any ask rule runs,
+  and keeps the stripped reading only when it is a pure question. The frame is not an orthography
+  transform, because a transform reaches statements too.
 - **A line's names are read by ONE helper** ([ADR-CX-048](06d-decisions-complex.md#adr-cx-048)).
   `declares` lists only the names a line CREATES. `X^n = …` carries its letter in `roots` alone, so a
   check that read `declares` let a second equation on a reserved letter through as a phantom point.

@@ -10,6 +10,8 @@
 import { MAX_FIGURE_STATEMENTS } from '../../shell/save';
 import type { RefKind } from '../engine/names';
 import type { InputError } from '../store/useAnalyticStore';
+import type { HostRef } from '../engine/apply';
+import { hostKey, rangeText } from './hostKey';
 
 /** The slice of i18next's `t` this needs — a key and its interpolation values, back a string. */
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -82,6 +84,12 @@ const NUMERAL_NOUN_KEY: Record<RefKind, string> = {
   curve: 'numNounCurve',
 };
 
+/**
+ * Every HOST kind a contextual reference can need (#1432's `HostRef`), exhaustive — so a new host kind
+ * cannot reach the refusal without its `errHost.*` keys (locked per kind × arity in the i18n test).
+ */
+export const HOST_KINDS: Record<HostRef['kind'], true> = { circle: true, parabola: true, ellipse: true, line: true, polygon: true };
+
 /** The DEFINITE noun as a student writes it before a name — «הפרבולה» / "the parabola". */
 const THE_NOUN_KEY: Record<RefKind, string> = {
   point: 'nounThePoint',
@@ -107,8 +115,11 @@ export function ambiguousCurveExample(detail: string, theNoun: string, name: str
 /** The sentence a student reads for `error`, in the locale `t` speaks. */
 export function errorText(error: InputError, t: Translate): string {
   const kind: RefKind | undefined = 'expected' in error ? error.expected : undefined;
-  const candidates = error.key === 'ambiguous-curve' ? (error.candidates ?? []) : [];
-  const theNoun = t(THE_NOUN_KEY[kind ?? 'curve']);
+  const host = error.key === 'ambiguous-shape' ? error.host : undefined;
+  const candidates = host?.candidates ?? [];
+  // The noun a candidate's name follows is the HOST's kind when a host is carried (a curve kind there).
+  const nounKind: RefKind = host && host.kind !== 'polygon' ? (host.kind as RefKind) : (kind ?? 'curve');
+  const theNoun = t(THE_NOUN_KEY[nounKind]);
   const key: string = {
     'not-handled': 'errNotHandled',
     'bad-equation': 'errBadEquation',
@@ -132,9 +143,11 @@ export function errorText(error: InputError, t: Translate): string {
     'ring-contradicts-noun': 'errRingContradictsNoun',
     // #1407 — a vertex in SEVERAL shapes gets the three-letter name it needs; in none, the general form.
     'ambiguous-angle': error.key === 'ambiguous-angle' && error.example ? 'errAmbiguousAngleArms' : 'errAmbiguousAngle',
-    'ambiguous-shape': 'errAmbiguousShape',
-    // #1514 pre-play — a CURVE by its noun alone: several candidates are named, none is said so.
-    'ambiguous-curve': candidates.length > 0 ? 'errAmbiguousCurve' : 'errNoSuchCurve',
+    // ONE chooser for "the reference found none / several of its host" (#1432 am. 1 + #1514): the host
+    // kind and arity pick the remedy; several NAMED candidates get the sentence that names them. The
+    // polygon-noun sites (no host) keep the kite example.
+    'ambiguous-shape': host ? hostKey('errHost', host) : 'errAmbiguousShape',
+    'out-of-domain': 'errOutOfDomain',
     // Ruling 2026-09-29 — «1» and «I» are one name; mixing the two notations is refused with a note.
     'numeral-notation': 'errNumeralNotation',
     'undistinguished-diagonal': 'errNoPrincipalDiagonal',
@@ -155,9 +168,11 @@ export function errorText(error: InputError, t: Translate): string {
     noun: t(KIND_NOUN_KEY[kind ?? 'curve']),
     numNoun: t(NUMERAL_NOUN_KEY[kind ?? 'curve']),
     candidates: candidates.map((n) => `${theNoun} ${n}`).join(', '),
-    example: error.key === 'ambiguous-curve'
-      ? (candidates.length > 0 ? ambiguousCurveExample(error.detail, theNoun, candidates[0]) : '')
+    example: candidates.length > 0
+      ? ambiguousCurveExample(error.detail, theNoun, candidates[0])
       : 'example' in error ? (error.example ?? '') : '',
+    found: host ? host.found : 0,
+    range: error.key === 'out-of-domain' && error.domain ? rangeText(error.domain, t) : '',
     holder: 'holder' in error ? (error.holder ?? '') : '',
     reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '',
     definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '',

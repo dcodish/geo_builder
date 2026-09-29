@@ -218,6 +218,7 @@ describe('span accounting is ENFORCING, not advisory', () => {
       'circle-centre-radius',
       'named-shape',
       'argument-relation',
+      'argument-query',
       'equation',
       // last of all: a bare glued run is a figure only when nothing read the line as maths
       'bare-run',
