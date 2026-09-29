@@ -122,3 +122,134 @@ describe('#1070 — the arity check reads the registry, not a fifth list of noun
     expect(codes(['משולש ABC', 'M מפגש התיכונים במשולש ABC'])).toEqual([]);
   });
 });
+
+/**
+ * #1283 — the noun phrase resolves its shape from the FIGURE too, through the ONE reader.
+ *
+ * Operator, 2026-09-20: «M מפגש האלכסונים במרובע ABCD» built — and dropping the four letters sent the
+ * same sentence to the LLM, while the verb form resolved it from the figure. The lock is the
+ * equivalence #1070 asserted, in EVERY spelling (letters / noun only / another noun / bare), for
+ * EVERY role, both forms — asserted on the placed point, because what must agree is the figure.
+ */
+describe('#1283 — letters, noun only, another noun, bare: one figure, every role, both forms', () => {
+  const CASES = [
+    { role: 'diagonals', fig: 'טרפז ABCD', free: 'האלכסונים', letters: 'ABCD', noun: 'מרובע', other: 'טרפז' },
+    { role: 'centroid', fig: 'משולש שווה שוקיים ABC', free: 'התיכונים', letters: 'ABC', noun: 'משולש', other: 'משולש שווה שוקיים' },
+    { role: 'incentre', fig: 'משולש שווה שוקיים ABC', free: 'חוצי הזוויות', letters: 'ABC', noun: 'משולש', other: 'משולש שווה שוקיים' },
+    { role: 'orthocentre', fig: 'משולש שווה שוקיים ABC', free: 'הגבהים', letters: 'ABC', noun: 'משולש', other: 'משולש שווה שוקיים' },
+    { role: 'circumcentre', fig: 'משולש שווה שוקיים ABC', free: 'האנכים האמצעיים', letters: 'ABC', noun: 'משולש', other: 'משולש שווה שוקיים' },
+  ];
+  for (const k of CASES) {
+    it(`${k.role}: all eight spellings place M at the same point`, () => {
+      const tails = [` ב${k.noun} ${k.letters}`, ` ב${k.noun}`, ` ב${k.other}`, ''];
+      const lines = [
+        ...tails.map((t) => `M מפגש ${k.free}${t}`),
+        ...tails.map((t) => `${k.free}${t} נפגשים בנקודה M`),
+      ];
+      const at = lines.map((line) => {
+        const d = derive([k.fig, line], 0);
+        expect({ line, faults: d.faults }).toEqual({ line, faults: [] });
+        const m = d.figure.points.find((p) => p.id === 'M');
+        expect(m, line).toBeDefined();
+        return m!;
+      });
+      for (const m of at.slice(1)) {
+        expect(m.x).toBeCloseTo(at[0].x, 9);
+        expect(m.y).toBeCloseTo(at[0].y, 9);
+      }
+    });
+  }
+
+  it('the operator\'s own table, verbatim — the noun forms no longer go to the LLM', () => {
+    for (const line of [
+      'אלכסוני המרובע ABCD נפגשים בנקודה M',
+      'אלכסוני המרובע נפגשים בנקודה M',
+      'אלכסוני הטרפז נפגשים בנקודה M',
+      'האלכסונים נפגשים בנקודה M',
+      'M מפגש האלכסונים במרובע ABCD',
+      'M מפגש האלכסונים במרובע',
+      'M מפגש האלכסונים בטרפז',
+      'M מפגש האלכסונים',
+    ]) {
+      expect({ line, codes: codes(['טרפז ABCD', line]) }).toEqual({ line, codes: [] });
+    }
+  });
+
+  it('reads the English noun phrase the same way', () => {
+    for (const line of [
+      'M is the intersection of the diagonals of quadrilateral ABCD',
+      'M is the intersection of the diagonals of the quadrilateral',
+      'M is the intersection of the diagonals',
+      'the diagonals of the quadrilateral meet at M',
+    ]) {
+      expect({ line, codes: codes(['טרפז ABCD', line]) }).toEqual({ line, codes: [] });
+    }
+    expect(codes(['משולש ABC', 'M is the centroid'])).toEqual([]);
+    expect(codes(['משולש ABC', 'M is the centroid of the triangle'])).toEqual([]);
+  });
+});
+
+describe('#1283 — a letter-less reference is refused, never guessed', () => {
+  it('no candidate ring: refused as ambiguous, in both forms', () => {
+    expect(codes(['משולש ABC', 'M מפגש האלכסונים'])).toEqual(['ambiguous-shape']);
+    expect(codes(['M מפגש האלכסונים במרובע'])).toEqual(['ambiguous-shape']);
+    expect(codes(['טרפז ABCD', 'M מפגש התיכונים'])).toEqual(['ambiguous-shape']);
+  });
+
+  it('several candidate rings: refused as ambiguous, in both forms', () => {
+    const two = ['מרובע ABCD', 'ריבוע EFGH'];
+    expect(codes([...two, 'M מפגש האלכסונים'])).toEqual(['ambiguous-shape']);
+    expect(codes([...two, 'M מפגש האלכסונים במרובע'])).toEqual(['ambiguous-shape']);
+    expect(codes([...two, 'האלכסונים נפגשים בנקודה M'])).toEqual(['ambiguous-shape']);
+    // …and the letters still say which one, exactly as before.
+    expect(codes([...two, 'M מפגש האלכסונים במרובע EFGH'])).toEqual([]);
+  });
+
+  it('a noun without letters is still checked for arity — against the construct, in both forms', () => {
+    // «מפגש התיכונים במרובע» names a four-vertex shape for a three-vertex construct. It used to be
+    // `not-handled`; read as "whichever triangle the figure has" it would drop the student's word.
+    expect(codes(['משולש ABC', 'M מפגש התיכונים במרובע'])).toEqual(['bad-arity']);
+    // The VERB form ignored its noun altogether: on a trapezoid «אלכסוני המשולש» built M silently.
+    expect(codes(['טרפז ABCD', 'אלכסוני המשולש נפגשים בנקודה M'])).toEqual(['bad-arity']);
+    expect(codes(['משולש ABC', 'אלכסוני המשולש נפגשים בנקודה M'])).toEqual(['bad-arity']);
+  });
+});
+
+describe('#1283 — the operator\'s session, and its letter-less twin', () => {
+  const SESSION = [
+    'טרפז ABCD',
+    'AB מקביל ל CD',
+    'A(5,8)',
+    'B(9,6)',
+    'M מפגש האלכסונים במרובע ABCD',
+    'AC',
+    'BD',
+    'MB:MD=1:4',
+    'שיעור ה- x של נקודה M הוא 7',
+    'נתונה הנקודה P(-3,7)',
+    'P על הישר CD',
+  ];
+  const TWIN = [
+    'טרפז ABCD',
+    'AB מקביל ל CD',
+    'A(5,8)',
+    'B(9,6)',
+    'M מפגש האלכסונים',
+    'AC',
+    'BD',
+    'MB:MD=1:4',
+    'שיעור ה- x של נקודה M הוא 7',
+    'נתונה הנקודה P(-3,7)',
+    'P על הישר CD',
+  ];
+  it('both build green, and M is the same point: (7,6)', () => {
+    for (const lines of [SESSION, TWIN]) {
+      const d = derive(lines, 0);
+      expect(d.faults).toEqual([]);
+      expect(d.figure.unsatisfied).toEqual([]);
+      const m = d.figure.points.find((p) => p.id === 'M')!;
+      expect(m.x).toBeCloseTo(7, 6);
+      expect(m.y).toBeCloseTo(6, 6);
+    }
+  });
+});

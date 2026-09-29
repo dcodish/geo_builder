@@ -8333,3 +8333,25 @@ The pre-played sheet (20 cases, 8 red) and the operator ruling of the same day. 
 **Measured after** (Playwright, headless; headed within ±15 ms): 572 exam draw/settle — line 5: 11 ms / 34 ms; line 8: 25 ms / 60 ms; line 11: 148 ms / 424 ms; every other line settles with the draw (draws 13–272 ms). kite + circle + Z: no line shows «בודק…»; the worst line («נקודה Z», line 12) draws in 1728 ms — the render's own option walk, unchanged by #1473 in kind (it completes the pool inside the render). 0 idle callbacks and 0 timeouts on every line.
 
 **Consequences.** `src-analytic/app/poolScheduler.ts` (`yieldScheduler` replaces `idleScheduler`). Locks: `issue-1473-knowledge-pool.test.ts` (the default scheduler completes the pool with `requestIdleCallback` stubbed to throw; a cancelled slice never runs), `issue-1473-mid-pool-render.test.tsx` (the canvas provenance is identical mid-check and settled on every 572 line).
+
+## ADR-AG-182 — One reader for a concurrency point: the noun phrase resolves its shape from the figure too (#1283)
+
+**Status:** accepted · 2026-09-29 · round #1571 · **Amends** [ADR-AG-037](#adr-ag-037) (#1070)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R62 — the "vertices optional" promise now holds for both forms, and a letter-less noun is still arity-checked · **Design:** [04c](04c-design-analytic.md) "Contextual references" — the `meet-of` bullet and `concurrencyOf`
+
+**Context.** Operator, 2026-09-20: «M מפגש האלכסונים במרובע ABCD» — his line built, but one spelling away the same sentence went to the LLM. Re-measured at pickup (`842ede39`) on «טרפז ABCD»: the four VERB spellings (letters / noun only / another noun / bare) all built M; of the four NOUN-PHRASE spellings only the one with letters did — «M מפגש האלכסונים במרובע», «…בטרפז» and «M מפגש האלכסונים» were `not-handled`, for every role (medians, altitudes, bisectors, perpendicular bisectors), and «M is the intersection of the diagonals» likewise. The same sweep found the mirror defect in the verb form: it never read its NOUN, so «אלכסוני המשולש נפגשים בנקודה M» on a trapezoid **built** M, dropping the student's word «משולש» (#1042's class).
+
+**Class.** *Two spellings of one statement were read by two readers, and only one of them could see the figure.* `CONCURRENCY_HE/EN` carried the shape tail inside the regex with its letters REQUIRED, so the noun phrase could resolve its ring only from the sentence; the verb form took the trailing letters or fell back to `meet-of` (M1, ADR-AG-037), ignoring its noun. ADR-AG-037 called them identical, and the equivalence held in the one spelling its lock used.
+
+**Decision.** One reader, `concurrencyOf(id, subject, line)` (`parseAnalytic.ts`), that both forms hand their subject to — the noun phrase after «מפגש» / "is the (intersection of the)", the verb form before «נפגשים/נחתכים/מצטלבים» / "meet". It finds the role (`ROLES`), reads the tail with `ROLE_OF_HE`/`ROLE_OF_EN` («המרובע ABCD», «במרובע», «של המרובע ABCD», "of (the) quadrilateral ABCD", nothing — noun and letters each optional), and then:
+1. a shape NOUN, letters or not, is checked against the construct's arity (`arityOf`, the registry) → `bad-arity`;
+2. letters → the derived point on that ring, plus the ring itself (#1080 — the verb form now draws the named shape too, as the noun phrase always did);
+3. no letters → `meet-of`, resolved at M1 against the one ring of that arity; none or several → `ambiguous-shape` (unchanged M1 code — the refusal the verb form already gave).
+A subject whose tail the reader cannot account for, or with a capital letter before the role, answers `null` (the ADR-024 leftover guard: a stated name is never silently dropped). `ROLE_SHAPE_EN` moved above its first user.
+
+**Not done, said out loud.** The M1 resolution stays by ARITY, as ADR-AG-037 built it: «M מפגש האלכסונים בטרפז» on a figure whose only quadrilateral is a square resolves to the square. Filtering by the noun would need a noun hierarchy (a square IS a rhombus IS a parallelogram…) — a ruling, not a fix. The refusal keeps ADR-AG-037's `errAmbiguousShape` text (the `HostRef` comment records the polygon-noun sites' choice).
+
+**Siblings.** 2-D already resolves the letter-less form from `ctx.polygons` (`specialPointMeet`) — the template. 3-D resolves «מפגש האלכסונים» with no letters to the base (`diagIntersection`'s base sentinel) — a different model (faces of a solid), not this class. No issue filed.
+
+**Consequences.** `src-analytic/parser/parseAnalytic.ts` (`concurrencyOf`, `ROLE_OF_HE/EN`, `CONCURRENCY_HE/EN` reduced to the head), `src-analytic/parser/catalogAnalytic.ts` (the letter-less row). Lock: `src-analytic/__tests__/diagonals.test.ts` — every role × four spellings × both forms place M at one point; the operator's table verbatim; English; zero/several candidates refused; noun-without-letters arity in both forms; the operator's 11-line session and its letter-less twin at M = (7, 6). 11 new tests, all red on `842ede39`.

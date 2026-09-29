@@ -1110,7 +1110,11 @@ refused with the format that would work, never resolved by guessing which two ra
 **R62 — a diagonal is an object, and a concurrency point has a verb**
 ([ADR-AG-037](06c-decisions-analytic.md#adr-ag-037)). «אלכסוני המרובע ABCD נפגשים בנקודה O» builds
 the same figure as «O מפגש האלכסונים במרובע ABCD», in the construct state the sentence form actually
-uses, and with the vertices optional when the figure has one shape to mean. «משוואת האלכסון AC היא
+uses, and with the vertices optional when the figure has one shape to mean — **in both forms**: «M מפגש
+האלכסונים», «M מפגש האלכסונים במרובע» and «אלכסוני המרובע נפגשים בנקודה M» all mean the one quadrilateral
+drawn, and are refused (never guessed) when the figure has none or several; a shape noun written without
+letters is still checked against the construct («מפגש התיכונים במרובע» is refused for arity)
+([ADR-AG-182](06c-decisions-analytic.md#adr-ag-182)). «משוואת האלכסון AC היא
 y=2x» is «משוואת הישר AC היא y=2x». **«האלכסון הראשי» and «האלכסון המשני» resolve only where the
 shape noun distinguishes them** — a kite does, a parallelogram and a rhombus do not — and elsewhere
 are refused by name rather than guessed.
