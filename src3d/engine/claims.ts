@@ -115,11 +115,12 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
     case 'coords-eq': {
       const p = pos.get(claim.id);
       if (!p) return false;
-      // #1546 (ADR-3D-282): a coordinate claim is judged on a PLACED figure only. Where the pivot found no
-      // placement at this configuration, the positions are the unsolved seed fallback — not a figure, so
-      // not evidence against the statement. The store's pin-owner guard speaks for the displayed seed
-      // («no placement matches the given coordinates»); another verification seed simply is not one.
-      if (resolved.pivot !== null && resolved.pivot.solutions === 0) return true;
+      // #1546 (ADR-3D-282): the arbiter of a coordinate GIVEN is judged on a PLACED figure only. Where the
+      // pivot found no placement at this configuration, the positions are the unsolved seed fallback — not
+      // a figure, so not evidence against the given. The store's pin-owner guard speaks for the displayed
+      // seed («no placement matches the given coordinates»); another verification seed simply is not one.
+      // An ANSWER («K = (…)») keeps its claim register unchanged.
+      if (claim.given && resolved.pivot !== null && resolved.pivot.solutions === 0) return true;
       // #1546 (ADR-3D-282): a null component is unstated (or owned by a pivot symbol) and is not checked.
       // A fully stated claim keeps its one-vector tolerance byte-for-byte; a partial one compares each
       // present component, scaled by its own magnitude.
@@ -377,8 +378,26 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
  * True iff the claim holds in EVERY sampled configuration — every claim seed × every branch of the
  * parameter (#1474, ADR-3D-283: `claimSeeds` reach the branches only by `seed % n`, which missed a
  * four-root pool's index s+2, so a claim false on exactly that branch read as verified).
+ *
+ * #1546 (ADR-3D-282) — every claim verifies at the SAME configurations, so a figure's samples are
+ * resolved once per (construction, seed), never once per claim: four coordinate claims on a pivot figure
+ * re-solved the pivot sixteen times per derive (the #863 sample-count lock caught it). Keyed on the
+ * construction's identity — `apply` clones, never mutates — like the store's derive memo (#1422).
  */
+const samplesMemo = new WeakMap<Construction3, Map<number, Resolved3[]>>();
+function samplesAt(c: Construction3, seed: number): Resolved3[] {
+  let per = samplesMemo.get(c);
+  if (!per) samplesMemo.set(c, (per = new Map()));
+  let r = per.get(seed);
+  if (!r) {
+    r = knowledgeSamples3(c, [seed]);
+    per.set(seed, r);
+    if (per.size > 16) per.delete(per.keys().next().value as number);
+  }
+  return r;
+}
+
 export function verifyClaim(claim: Claim3, c: Construction3, seed: number): boolean {
   // one base seed at a time, so a refuted claim still stops at the first failing seed (docs/17 §7)
-  return claimSeeds(seed).every((s) => knowledgeSamples3(c, [s]).every((r) => holdsAt(claim, c, r)));
+  return claimSeeds(seed).every((s) => samplesAt(c, s).every((r) => holdsAt(claim, c, r)));
 }
