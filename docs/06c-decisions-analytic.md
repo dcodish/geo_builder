@@ -8023,6 +8023,32 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 
 **Consequences.** `server/llm/harness.ts` (locale through `PromptSpec.vocabulary`/`buildSystemPrompt`/`buildRequest`), `server/parseHandler.ts` (`body.locale`), `parser/llmSharedAnalytic.ts` (one-column vocab), `parser/llmAnalytic.ts` + `App.tsx` (locale sent; `recordLlmLines`; row display), `store/useAnalyticStore.ts` (`spokenFor` + envelope field). **Proxy redeploy required.**
 
+## ADR-AG-176 — «זווית BMC» is askable: the angle ask arm, with the ruled working (#1409)
+
+**Status:** accepted · 2026-09-28 · operator 2026-09-24 (*"in data panel, i cannot ask for זווית BMC"*), trace method ruled 2026-09-27 (*"if its an angle where m=tanx would work, use that, if not, use law of cosine"*) · round #1517. Numbered 176 beside the round's parallel branches.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R121 (new) · **Design:** [04c](04c-design-analytic.md) — the ask lane's shared atoms
+
+**Context.** #1331 (ADR-AG-153) made the three-letter angle a GIVEN through the parser's own atoms; it added no ask arm, and nothing checked sayable ⇒ askable — the two surfaces drifted apart the first time a measure shipped without its twin. Re-measured at pickup: every angle spelling still `unreadable`.
+
+**Decision.** (1) `readAngleAsk` (parser) — the ask reference composed from the SAME atoms the given rules read (`ANGLE_NOUN_HE/EN` + `ANGLE_LETTERS`, plus the ask's optional «גודל» lead-in), so every spelling the given accepts is askable by construction; three letters only (a lone vertex needs the figure, #1407 — out of the ask's scope for now). (2) The value comes from the SAME `angleAt` the angle residual constrains (exported from `engine/solve.ts`) — «זווית ABC = 60» asked back prints exactly 60° (locked) — through `isKnowledge` like every value arm: open answers open, a missing letter gets #1111's outcome, formatted by the one `angleText`. (3) The WORKING per the ruling: `traceAngle` (`engine/techniques.ts`) — the slope method where both arms have a defined slope and 1 + m₁m₂ ≠ 0, with the «180° − α» row when obtuse; else the law of cosines with the three lengths; each branch's trace ends on the answer (locked per branch). (4) The sayable ⇒ askable CLASS GUARD: a curated walk over every value measure (length, area, point-line distance, slope, x-axis angle, angle) asserting none is `unreadable` on a determined figure — a new value measure joins the list in its own commit, which is the review point #1331 never had. The ask placeholder teaches «זווית ABC».
+
+**Deviations from the plan.** The plan's step 5 wanted the guard to WALK the catalog mechanically; the shipped guard is a curated list (the catalog rows do not machine-map to ask spellings), which holds the same line at the cost of one list entry per new measure — recorded here as the trade.
+
+**Consequences.** `src-analytic/parser/parseAnalytic.ts` (`readAngleAsk`), `src-analytic/engine/solve.ts` (`angleAt` exported), `src-analytic/engine/techniques.ts` (`traceAngle`), `src-analytic/app/ask.ts` (the arm), `src-analytic/i18n/index.ts` (placeholder), docs 02c R121. Lock: `issue-1409-angle-ask.test.ts` — every reported spelling, the honesty gates, the 60° round trip, the four trace branches ending on the answer, and the class guard.
+
+### ADR-AG-176 Am. 1 — a method hint replaces the worked angle trace (#1525)
+
+**Status:** accepted · 2026-09-29 · operator, playing round #1517 T26 on this PR: «tan α = |(m₁ - m₂)/(1 + m₁·m₂)| … this equation is not in the curriculum. I think we should not try to show the process … maybe just write a comment "ניתן להשתמש בשיפועי הישרים או במשפט הקוסינוסים" the part about the cosine law should show only if all 3 nodes are known.» Approved as #1525 the same day. **Reverses** the 2026-09-27 trace ruling this ADR was built on.
+
+**Requirements:** docs/02c R121 (amended) · **Design:** none (internal — the ask lane's answer gains a `hint` token, as `fact` did)
+
+**Decision.** The angle arm returns no `trace`. It returns a `hint` token instead: `angle-methods` when all three vertices are knowledge (both coordinates fixed across configurations, the same `isKnowledge` gate the answer passes), else `angle-slopes`, since the law of cosines needs the three lengths. The component words it through the locale (He «ניתן להשתמש בשיפועי הישרים או במשפט הקוסינוסים» / «ניתן להשתמש בשיפועי הישרים»; En mirrors), below the answer. `traceAngle` is deleted, not left unused. **A stated angle gets no hint** (operator, T33, same day: «if the angle is given in the input, there is no point explaining how to find it»): when a stated angle given exists at the asked vertex between the same two arms, in either order (the `angle` constraint the given lowers to), the answer is the value alone. The check reads the record, not the number, so a computed angle that equals a stated number keeps its hint.
+
+**Measured.** His case A(0,0), B(4,0), C(8,4), «זווית ABC»: 135°, the full hint, and no formula rows (driven on the PR server and read). An angle the givens fix while a vertex stays free (B, C, «משולש ABC», «זווית ABC = 60»): 60° with the slopes-only hint.
+
+**Consequences.** `src-analytic/app/ask.ts`, `src-analytic/App.tsx`, `src-analytic/i18n/index.ts`, `src-analytic/engine/techniques.ts` (`traceAngle` removed). Lock: `issue-1409-angle-ask.test.ts`, whose "ruled working" block is replaced by the hint cases.
+
 ## ADR-AG-173 — A refusal about a reused letter names the letter, and its defining sentence (#1423)
 
 **Status:** accepted · 2026-09-28 · operator, playing round #1408 (T41: *"there is a refusal but there is an intersect to select"*) · round #1517

@@ -3576,3 +3576,21 @@ function parseIncidence(line: string): RuleOutcome {
   }
   return null;
 }
+
+/**
+ * #1409 — THE ANGLE REFERENCE AN ASK NAMES: «זווית BMC», «הזווית BMC», «∠BMC», «angle BMC»,
+ * «גודל הזווית BMC». Composed from the SAME atoms the given rules read (`ANGLE_NOUN_HE/EN` +
+ * `ANGLE_LETTERS`, #1330/#1331), so every spelling the given accepts is askable by construction —
+ * the sayable ⇒ askable rule (02c R23). Three letters only: a lone vertex names an angle only
+ * relative to a figure (#1407) and stays out of the ask's scope for now. Null for a repeated
+ * letter, which names nothing.
+ */
+const ANGLE_ASK = new RegExp(String.raw`^(?:גודל\s+)?(?:${ANGLE_NOUN_HE}|${ANGLE_NOUN_EN})${ANGLE_LETTERS}$`, 'i');
+export function readAngleAsk(text: string): { a: string; v: string; b: string } | null {
+  const m = ANGLE_ASK.exec(text.trim());
+  if (!m) return null;
+  const [, p, v, q] = m;
+  if (!v || !q) return null;
+  if (p === v || v === q || p === q) return null;
+  return { a: p, v, b: q };
+}

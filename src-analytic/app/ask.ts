@@ -31,6 +31,8 @@ import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techni
 import { isVerticalLine } from '../engine/lines';
 import { asPair, lineNamed, lineNamesOf } from './lines';
 import { pointText, scalarText } from './pointText';
+import { readAngleAsk } from '../parser/parseAnalytic';
+import { angleAt } from '../engine/solve';
 import { angleText, lineAngleOf } from './lineAngle';
 import { curveParts, locusEquation } from './curveText';
 
@@ -84,6 +86,13 @@ export interface Answer {
    * teaches the concept, while 0 lets the misconception stand.
    */
   fact?: 'vertical' | 'lines-cross' | 'points';
+  /**
+   * #1525 — A METHOD HINT instead of a worked trace (operator, 2026-09-29: the tan-difference formula
+   * *"is not in the curriculum … maybe just write a comment «ניתן להשתמש בשיפועי הישרים או במשפט
+   * הקוסינוסים» — the part about the cosine law should show only if all 3 nodes are known"*).
+   * A token, for the same reason as `fact`: this module holds no locale.
+   */
+  hint?: 'angle-methods' | 'angle-slopes';
   /**
    * THE POINT SET a degenerate locus answers with (#1227, ADR-AG-136): «המקום הגיאומטרי של M» on a
    * determined M is M's position, or its finite set of positions — one entry per resolution-aware
@@ -399,6 +408,49 @@ export function ask(
    * Before the equation rule, because «שיפוע הישר l1» and «משוואת הישר l1» are different
    * questions about the same object and only the leading noun separates them.
    */
+  /**
+   * --- an ANGLE by three letters (#1409): «זווית BMC», «∠BMC», «גודל הזווית ABC», "angle ABC" ---
+   *
+   * Sayable ⇒ askable (02c R23): #1331 made the three-letter angle a GIVEN through the parser's own
+   * atoms, and this arm reads the SAME atoms (`readAngleAsk`), so a spelling the given accepts is
+   * askable by construction. The value comes from the SAME `angleAt` the angle residual constrains
+   * (a round trip: «זווית ABC = 60» asked back prints 60°), through the same honesty gate as every
+   * value arm — an open figure answers open, never a sampled number (ADR-052). No worked trace
+   * (#1525, reversing the 2026-09-27 ruling): the answer carries a method HINT, and the law of cosines
+   * is offered only when all three vertices are knowledge — its three lengths need them.
+   */
+  const ang = readAngleAsk(text);
+  if (ang) {
+    for (const id of [ang.a, ang.v, ang.b]) {
+      if (!objectById(d.construction, id)) return { question, value: null, missing: { name: id, kind: 'point' } };
+    }
+    const readDeg = (f: Figure) => {
+      const P = (n: string) => f.points.find((q) => q.id === n);
+      const [pa, pv, pb] = [P(ang.a), P(ang.v), P(ang.b)];
+      if (!pa || !pv || !pb) return null;
+      const r = angleAt(pv, pa, pb);
+      return r === null ? null : (r * 180) / Math.PI;
+    };
+    const k = isKnowledge(d.construction, readDeg);
+    if (!k.known) return { question, value: null };
+    const vertexKnown = (id: string) =>
+      (['x', 'y'] as const).every(
+        (c) => isKnowledge(d.construction, (f: Figure) => f.points.find((q) => q.id === id)?.[c] ?? null).known,
+      );
+    // #1525 (operator, 2026-09-29): «if the angle is given in the input, there is no point explaining
+    // how to find it» — a STATED angle at this vertex between these two arms (either order) gets no hint.
+    // Read from the record the given lowers to, so a computed angle that equals a number stays hinted.
+    const stated = d.construction.constraints.some(
+      (c) =>
+        c.t === 'angle' &&
+        c.at.v === ang.v &&
+        ((c.at.a === ang.a && c.at.b === ang.b) || (c.at.a === ang.b && c.at.b === ang.a)),
+    );
+    if (stated) return { question, value: angleText(k.value) };
+    const allKnown = [ang.a, ang.v, ang.b].every(vertexKnown);
+    return { question, value: angleText(k.value), hint: allKnown ? 'angle-methods' : 'angle-slopes' };
+  }
+
   // --- a line's angle with the positive x-axis (#1322) ---
   const ax = ANGLE_WITH_X_HE.exec(text) ?? ANGLE_WITH_X_EN.exec(text);
   if (ax) {
