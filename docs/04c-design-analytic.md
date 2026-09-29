@@ -451,18 +451,39 @@ standard this tree holds itself to after being bitten twice.
 `CIRCLE_NUMERALS` (the lookahead that keeps a centre NAME from eating a numeral) and
 `CIRCLE_NUMERAL_RUN` (the capture that becomes the circle's id and name) are the whole of it, and the
 Hebrew/English × centre/numeral rules take them. Widening the token to admit `[1-5]` is therefore the
-entire digit feature — `circle-1` and «מעגל 1» fall out of the existing id and label construction,
-and no rule learned a digit case of its own.
+entire digit feature — «מעגל 1» falls out of the existing id and label construction, and no rule learned
+a digit case of its own.
 
-The range 1–5 **mirrors the Roman range exactly**, so the two halves of the token share one
-justification instead of acquiring two. And the `(?=[\s:])` separator lookahead, which #1059 added
+**The numeral becomes an id in ONE function, and an id becomes a noun in ONE table**
+([ADR-AG-170 Am. 1 + Am. 2](06c-decisions-analytic.md)). `engine/names.ts`: ONE numeral table (1–9 ↔ I–IX)
+builds every numeral token of the grammar, for lines, circles, parabolas and ellipses alike;
+`numeralCurveId(kind, n)` is the id of every numeral-named curve and KEEPS the student's notation
+(`line-1`, `circle-I`), used by the naming clauses, the operand resolver, `curveByName` and every
+circle lookup in `apply.ts`; `numeralKey` is the notation-free identity («1» and «I» are one NAME), and
+`numeralTwin` finds an object named by the same numeral in the other notation. `apply.ts` asks it at
+the two places a numeral name meets the figure — where a new id is minted (top of `applyFact`) and
+where a reference fails to resolve (`unknownRef`) — and refuses `numeral-notation` (the operator's
+2026-09-29 ruling: never a second object, never a silent merge; the ask lane's `missingCurve` says
+the same; #1511's circle SUBJECT reader reads a numeral as the circle's name, never a centre — Am. 3). A contextual reference that finds none or several of its host is ONE refusal, `ambiguous-shape` + `HostRef` (#1432), whose `candidates` carry how to call each named curve found; `hostKey` picks the message. `refKindOf`/`statedName` read one prefix table, `refKindOf`/`statedName` read one prefix table,
+and `app/errorText.ts` turns a refusal into a sentence through tables typed exhaustive over `RefKind`.
+Circle, parabola and ellipse share ONE naming clause per language, and every naming clause (lines and
+centre letters too) shares one connective grammar, `NAMING_TAIL_HE`/`_EN` — comma, dash, «שמשוואתו»,
+copula, colon.
+
+The range is **1–9 and I–IX, one table** (Am. 2 — it was 1–5 for circles and 1–9/I–V for lines), so
+every digit a name slot accepts has its Roman twin. And the `(?=[\s:])` separator lookahead, which #1059 added
 to stop `[IVX]` swallowing the `x` of «המעגל x²+y²−2ax−2x=0», is what now also keeps «המעגל
 4x²+4y²=1» anonymous: the `x` after the digit is not a separator, so the numeral branch cannot claim
 the coefficient. One device, two traps.
 
 **`Curve.kind` is therefore an EXPECTATION, not an answer**, and optional. `classify` fits six
 coefficients and names the family; the expectation only lets a refusal be specific ("you wrote «אליפסה»
-and this is a hyperbola" — R7). Two consequences follow, and the second is the subtle one:
+and this is a hyperbola" — R7). Since ADR-AG-170 Am. 1 it is also CHECKED there: a fitted family other
+than the stated one is `kind-mismatch` (with the actual family), reported by `derive` as its own fault,
+so a circle is never drawn under the label «פרבולה I». The one exception is ruled (Am. 2): a circle
+under the ELLIPSE noun is the a = b ellipse — `classify` returns `{kind: 'ellipse', a: r, b: r}` for a
+circle centred at the origin (off-centre it is a translated ellipse, out of scope), so it resolves,
+is referred to and crossed as the student's ellipse, and its foci coincide at the centre. Two consequences follow, and the second is the subtle one:
 
 - an unnamed curve is identified by its equation alone (`curve-<hash>`, [R44](02c-requirements-analytic.md)),
   so the noun form and the bare form of one curve are one object;

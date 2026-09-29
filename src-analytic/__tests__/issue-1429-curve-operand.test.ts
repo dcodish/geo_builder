@@ -27,11 +27,18 @@ describe('#1429 — a point on a NAMED circle, every spelling', () => {
     'נקודה P על המעגל I',
     'הנקודה P נמצאת על המעגל I',
     'P on circle I',
-    'P על המעגל 1',
   ])('«%s» builds onto circle-I', (line) => {
     const d = derive([CIRCLE, line], 0);
     expect(d.faults).toEqual([]);
     // On THE named circle — not a second curve minted beside it (ADR-AG-023).
+    expect(curveIds(d)).toEqual(['circle-I']);
+  });
+
+  // LOCK MOVED (ruling 2026-09-29, ADR-AG-170 Am. 2): «P על המעגל 1» beside circle I is no longer
+  // read as circle I — mixing the two notations is refused with a note (locked in issue-1271-1336).
+  it('«P על המעגל 1» beside circle I is the notation refusal, never a second circle', () => {
+    const d = derive([CIRCLE, 'P על המעגל 1'], 0);
+    expect(d.faults.map((f) => f.code)).toEqual(['numeral-notation']);
     expect(curveIds(d)).toEqual(['circle-I']);
   });
 

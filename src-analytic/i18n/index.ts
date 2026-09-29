@@ -88,6 +88,8 @@ const he = {
   /** #1111 — the sentence was understood; the figure has no such object. The LETTER is the point. */
   askMissingPoint: 'אין בשרטוט נקודה בשם {{name}}',
   askMissingCurve: 'אין בשרטוט ישר או מעגל בשם {{name}}',
+  // Ruling 2026-09-29 — a numeral asked in the notation the figure does not use.
+  askNumeralNotation: '{{name}} ו-{{used}} הם אותו שם — בשרטוט הזה הוא נכתב {{used}}. כתבו {{used}}, כדי לא לערבב שתי כתיבות.',
   paletteShow: 'סמלים',
   // #1129 — one per palette chip, so every button says what it is rather than repeating its glyph.
   symSq: 'בריבוע',
@@ -153,6 +155,19 @@ const he = {
   errUnknownRefPoint: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
   errUnknownRefLine: 'הישר {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
   errUnknownRefCircle: 'המעגל {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
+  // #1514 pre-play — a named conic is a noun of its own; it was reported as a missing POINT with its raw id.
+  errUnknownRefParabola: 'הפרבולה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
+  errUnknownRefEllipse: 'האליפסה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
+  // 02c R7 (#1514 pre-play) — the noun and the equation name different families; never drawn.
+  errKindMismatch:
+    'המשוואה במשפט "{{detail}}" מתארת {{existing}}, לא {{claimed}}. בדקו את המשוואה, או כתבו את שם הצורה שהיא מתארת.',
+  // Several NAMED candidates for a contextual reference (#1514 + #1432, chosen by hostKey): the sentence
+  // names them and shows the student's own line with the first name in it.
+  'errHost.named':
+    'בשרטוט יש יותר מעצם אחד מהסוג הזה ({{candidates}}), ולכן לא ברור לאיזה מהם הכוונה ב-"{{detail}}". כתבו את השם, למשל «{{example}}».',
+  // Operator ruling 2026-09-29 — a digit and a Roman numeral are one name; the notations are not mixed.
+  errNumeralNotation:
+    '{{numNoun}} {{holder}} ו{{numNoun}} {{detail}} הם אותו שם — הכלי קורא ספרה ומספר רומי כשם אחד. כדי לא לערבב שתי כתיבות, כתבו {{numNoun}} {{holder}}, כמו בשורות הקודמות.',
   errAlreadyNamed: 'כבר יש שם לנקודה הזו: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
   // #1423 — the letter is the problem, named with the student's own defining sentence and the remedy
@@ -246,6 +261,9 @@ const he = {
   // that their sentence was wrong: the tool did not get as far as looking at it.
   errLlmBusy:
     'השירות עמוס כרגע ולא הצלחתי לבדוק את המשפט "{{detail}}". אפשר לנסות שוב בעוד רגע, או לנסח אותו באחת הצורות שמופיעות ברשימת הפקודות.',
+  // #1336: the escape ran and the tool declined its completion — the sentence WAS understood.
+  errLlmUnderstood:
+    'הבנתי את המשפט "{{detail}}", אבל הכלי עדיין לא תומך במהלך הזה. אפשר לנסח אחרת, או להיעזר ברשימת הפקודות.',
   thinking: 'חושב…',
   errBadOperand:
     'הבנתי את היחס במשפט "{{detail}}", אבל לא זיהיתי את אחד האגפים. אפשר לציין שני קודקודים (AB), ' +
@@ -260,6 +278,19 @@ const he = {
   kindCircle: 'מעגל',
   kindParabola: 'פרבולה',
   kindEllipse: 'אליפסה',
+  // The definite noun a student writes before a curve's name — «הפרבולה I» (#1514 pre-play).
+  numNounPoint: 'נקודה',
+  numNounLine: 'ישר',
+  numNounCircle: 'מעגל',
+  numNounParabola: 'פרבולה',
+  numNounEllipse: 'אליפסה',
+  numNounCurve: 'עצם',
+  nounThePoint: 'הנקודה',
+  nounTheLine: 'הישר',
+  nounTheCircle: 'המעגל',
+  nounTheParabola: 'הפרבולה',
+  nounTheEllipse: 'האליפסה',
+  nounTheCurve: 'העצם',
   kindMidpoint: 'אמצע קטע',
   kindCentroid: 'מפגש התיכונים',
   kindIncentre: 'מפגש חוצי הזוויות',
@@ -388,6 +419,7 @@ const en: typeof he = {
   askContextualBoth: 'the figure has {{points}} points and {{lines}} lines — name them (e.g. "המרחק של A מהישר l1")',
   askMissingPoint: 'there is no point {{name}} in your figure',
   askMissingCurve: 'there is no line or circle named {{name}} in your figure',
+  askNumeralNotation: '{{name}} and {{used}} are the same name — this figure writes it {{used}}. Write {{used}}, to keep one notation.',
   paletteShow: 'Symbols',
   symSq: 'squared',
   symSqrt: 'square root',
@@ -446,6 +478,14 @@ const en: typeof he = {
   errUnknownRefPoint: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefLine: 'The line {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefCircle: 'The circle {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errUnknownRefParabola: 'The parabola {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errUnknownRefEllipse: 'The ellipse {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errKindMismatch:
+    'The equation in "{{detail}}" describes {{existing}}, not {{claimed}}. Check the equation, or name the shape it describes.',
+  'errHost.named':
+    'The figure has more than one of these ({{candidates}}), so it is not clear which one "{{detail}}" means. Write its name — for example "{{example}}".',
+  errNumeralNotation:
+    '"{{numNoun}} {{holder}}" and "{{numNoun}} {{detail}}" are the same name — the tool reads a digit and a Roman numeral as one name. To keep one notation, write "{{numNoun}} {{holder}}", as in the earlier lines.',
   errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
   errUnsatisfiableReused: '{{reusedId}} is already defined: "{{definedBy}}". "{{detail}}" contradicts that definition — pick another letter for a new point.',
@@ -524,6 +564,8 @@ const en: typeof he = {
     'The two lines in "{{detail}}" are the same line, and a line has no intersection with itself, so the sentence defines no point. If you meant some point on that line, write for example "P on line AB".',
   errLlmBusy:
     'The service is busy, so I could not check "{{detail}}". Try again in a moment, or write it in one of the forms listed in the commands panel.',
+  errLlmUnderstood:
+    'I understood "{{detail}}", but the tool does not support this move yet. Try another phrasing, or the commands panel.',
   thinking: 'Working…',
   errBadOperand:
     'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +
@@ -538,6 +580,18 @@ const en: typeof he = {
   kindCircle: 'a circle',
   kindParabola: 'a parabola',
   kindEllipse: 'an ellipse',
+  numNounPoint: 'point',
+  numNounLine: 'line',
+  numNounCircle: 'circle',
+  numNounParabola: 'parabola',
+  numNounEllipse: 'ellipse',
+  numNounCurve: 'object',
+  nounThePoint: 'the point',
+  nounTheLine: 'the line',
+  nounTheCircle: 'the circle',
+  nounTheParabola: 'the parabola',
+  nounTheEllipse: 'the ellipse',
+  nounTheCurve: 'the object',
   kindMidpoint: 'a midpoint',
   kindCentroid: 'the centroid',
   kindIncentre: 'the incentre',

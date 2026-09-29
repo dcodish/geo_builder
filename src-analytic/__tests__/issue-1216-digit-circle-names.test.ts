@@ -42,6 +42,11 @@ const outcome = (line: string): string => {
 };
 
 describe('ADR-AG-118 — a digit names the circle (#1216)', () => {
+  /**
+   * The id keeps the student's NOTATION (operator ruling 2026-09-29, ADR-AG-170 Am. 2): «מעגל 1» is
+   * `circle-1`. «1» and «I» are one NAME — a later «המעגל I» is refused with a note asking to keep
+   * one notation, never a second circle — which is locked in `issue-1271-1336-conic-naming`.
+   */
   it.each([
     ['he, שמשוואתו', 'נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9', 'circle-1', 'מעגל 1'],
     ['he, colon', 'נתון מעגל 1: (x-3)^2+(y-4)^2=9', 'circle-1', 'מעגל 1'],
@@ -121,9 +126,15 @@ describe('ADR-AG-118 — what did NOT move (#1059 is extended, not replaced)', (
   });
 
   /** The range is closed at 5, mirroring the Roman range — so 6 is outside it and says so. */
-  it('the numeral range is closed, exactly as the Roman one is', () => {
-    expect(outcome('נתון מעגל 6 שמשוואתו x^2+y^2=25')).not.toBe('ok');
-    expect(outcome('נתון מעגל 5 שמשוואתו x^2+y^2=25')).toBe('ok');
+  /**
+   * LOCK MOVED (ruling 2026-09-29, ADR-AG-170 Am. 2): ONE numeral table for every named curve, 1–9
+   * and I–IX, so every digit a name slot takes has its Roman twin — circles were 1–5 while lines were
+   * 1–9. The range is still CLOSED: a two-digit number is not a name.
+   */
+  it('the numeral range is closed, and the same for digits and Romans', () => {
+    expect(outcome('נתון מעגל 10 שמשוואתו x^2+y^2=25')).not.toBe('ok');
+    expect(outcome('נתון מעגל 9 שמשוואתו x^2+y^2=25')).toBe('ok');
+    expect(outcome('נתון מעגל IX שמשוואתו x^2+y^2=25')).toBe('ok');
   });
 
   /** A digit is not a point name, so a point sentence is untouched by any of this. */

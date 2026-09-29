@@ -14,10 +14,15 @@ export interface HostLike {
   kind: string;
   found: number;
   need?: number;
+  /** How each found object can be called (#1514): several NAMED candidates get the sentence naming them. */
+  candidates?: readonly string[];
 }
 
 export function hostKey(surface: 'errHost' | 'askHost', host: HostLike): string {
   const arity = (host.need ?? 1) > 1 ? 'pair' : host.found === 0 ? 'none' : 'many';
+  // Several candidates the student can NAME: the kind-free sentence that lists them and shows their own
+  // sentence with the first name in it («P על הפרבולה I») — #1514's remedy, through this one chooser.
+  if (arity === 'many' && host.candidates && host.candidates.length > 0) return `${surface}.named`;
   return `${surface}.${arity}.${host.kind}`;
 }
 

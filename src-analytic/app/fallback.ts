@@ -53,7 +53,19 @@ export type FallbackOutcome =
    * keeps the ORIGINAL refusal rather than reporting the model's line — the student never wrote it,
    * so naming it would be reporting internal state (the honesty invariant on error messages).
    */
-  | { kind: 'rejected'; refusedStep: string };
+  | {
+      kind: 'rejected';
+      refusedStep: string;
+      /**
+       * WHY the tool declined the model's line (#1336) — the refusal key of the step's own verdict.
+       *
+       * Carried so the caller can say the honest middle: the student's sentence WAS understood and
+       * the tool could not honour the completion — «not understood» blamed a sentence the tool had
+       * read perfectly. The step text itself stays out of the message (#1251: never name a line the
+       * student did not write); the key names the CLASS, which is the tool's own state.
+       */
+      code?: string;
+    };
 
 /** What the model is told the figure already holds. Kept short — the proxy caps it at 1000 chars. */
 export function fallbackContext(lines: readonly string[]): string {
@@ -98,7 +110,8 @@ export async function runFallback(
     const soFar = [...lines, ...accepted];
     const verdict: SubmitVerdict = decideSubmit(step, soFar, seed, derive(soFar, seed));
     if (verdict.kind === 'refused' || verdict.kind === 'ignored') {
-      return { kind: 'rejected', refusedStep: step };
+      const code = verdict.kind === 'refused' ? (verdict.error as { key?: string }).key : undefined;
+      return { kind: 'rejected', refusedStep: step, ...(code ? { code } : {}) };
     }
     // `already-known` / `already-follows` contribute nothing but are not failures: the model restated
     // something true. Drop the line and keep going rather than recording a duplicate.

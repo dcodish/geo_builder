@@ -28,6 +28,7 @@ function valueExpr(src: string): Expr | null {
   return e && !mentionsPlane(e) ? e : null;
 }
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
+import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, numeralCurveId, type NumeralKind } from '../engine/names';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 
@@ -249,7 +250,7 @@ const HE_EQ_OF = '(?:ש?משוואת(?:ו|ה)?)';
  * «שווה» / «שווה ל-» is part of the set, not a separate case — `AREA_HE` already
  * treated it as one.
  */
-const COPULA_WORDS = 'הוא|היא|הם|הן|שווה(?:\\s*ל\\s*-?)?';
+const COPULA_WORDS = 'הוא|היא|הם|הן|הינו|הינה|הינם|הינן|שווה(?:\\s*ל\\s*-?)?';
 /** A copula as an OPTIONAL suffix of a noun phrase — the long-standing spelling, now sourced from the set. */
 const HE_IS = `(?:\\s*(?:${COPULA_WORDS}))?`;
 
@@ -267,8 +268,9 @@ const NAME = '[A-Z][0-9₀-₉]?';
  * with a digit that is a COEFFICIENT, and only the `x` after it says so. Without the lookahead the
  * numeral branch would claim `2` as the name and hand `x-y+8=0` to the student as their equation.
  */
-const LINE_NUMERAL = '(?:I|II|III|IV|V|[1-9])';
-const LINE_NUMERAL_RE = /^(?:I|II|III|IV|V|[1-9])$/;
+// ONE numeral table for every named curve (engine/names.ts, operator ruling 2026-09-29): 1–9 and I–IX.
+const LINE_NUMERAL = `(?:${NUMERAL_ALT})`;
+const LINE_NUMERAL_RE = new RegExp(`^${LINE_NUMERAL}$`);
 /**
  * A line name: `ℓ`, `ℓ1`, `l`, `l1`, a numeral, or a two-point run like `AC`.
  *
@@ -278,7 +280,7 @@ const LINE_NUMERAL_RE = /^(?:I|II|III|IV|V|[1-9])$/;
  * line through the points I and V is not a sentence the corpus writes, and it is still sayable by its
  * points («הישר העובר דרך I ו-V» is #1281's converse).
  */
-const LINE_NAME = `(?:[ℓl][0-9]?|${LINE_NUMERAL}(?=[\\s:]|$)|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)`;
+const LINE_NAME = `(?:[ℓl][0-9]?|${LINE_NUMERAL}(?=[\\s:,]|$)|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)`;
 /**
  * The name slot of the NOUN-LESS forms («משוואת AB היא …», «AB: …») keeps the pre-numeral token: with
  * the noun dropped, a Roman numeral is a CIRCLE («משוואת I היא x²+y²=9», #1072) and the circle branch
@@ -529,13 +531,27 @@ interface CurveHit {
  * paragraph above records.
  */
 /** The numerals themselves, for the lookahead that keeps a NAME from eating one (#1059). */
-const CIRCLE_NUMERALS = '(?:I|II|III|IV|V|[1-5])';
-const CIRCLE_NUMERAL_RUN = '(?:(I|II|III|IV|V|[1-5])(?=[\\s:]))?';
+const CIRCLE_NUMERALS = `(?:${NUMERAL_ALT})`;
+/**
+ * What may FOLLOW a name in the name slot: a space, a colon, or a COMMA — «נתונה פרבולה I, שמשוואתה …»
+ * (#1514 pre-play). The comma was missing, so the textbook's own punctuation refused `not-handled`.
+ */
+const NUMERAL_SEP = '(?=[\\s:,])';
+const CIRCLE_NUMERAL_RUN = `(?:(${NUMERAL_ALT})${NUMERAL_SEP})?`;
+/**
+ * THE CONNECTIVE between a named curve and its equation — ONE grammar for every naming clause
+ * (lines, circles, conics, a circle's centre letter), so a connective one clause accepts every clause
+ * accepts (#1514 pre-play: the conic clause lacked the «משוואת» prefix the circle had, and every
+ * clause lacked the comma). An optional comma, the dash («נתונה פרבולה I - y^2=2x»), «שמשוואתה», the
+ * copula (`COPULA_WORDS`), a colon — each optional, in the order the textbook writes them.
+ */
+const NAMING_TAIL_HE = `(?:\\s*,)?(?:\\s+[-–](?=\\s))?\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*`;
+const NAMING_TAIL_EN = '(?:\\s*,)?(?:\\s+[-–](?=\\s))?\\s*:?\\s*(?:is\\s+|whose equation is\\s+)?';
 
 function matchCurve(line: string): CurveHit | null {
   // --- line: «נתון הישר ℓ1: 4y-3x-20=0» · «משוואת הישר AC היא y=-2x+8» · «הישר x=-4» ---
   const heLineNamed = line.match(
-    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?(${HE_LINE})\\s+(${LINE_NAME})${HE_IS}\\s*:?\\s*(.+)$`),
+    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?(${HE_LINE})\\s+(${LINE_NAME})${NAMING_TAIL_HE}(.+)$`),
   );
   if (heLineNamed) {
     return {
@@ -644,11 +660,11 @@ function matchCurve(line: string): CurveHit | null {
 
   /** The circle numeral with the noun dropped — «משוואת I היא x^2+y^2=9» (#1072). */
   const heCircleNoNoun = line.match(
-    new RegExp(`^${HE_GIVEN}${HE_EQ_OF}\\s+(I|II|III|IV|V)${HE_IS}\\s*:?\\s*(.+)$`),
+    new RegExp(`^${HE_GIVEN}${HE_EQ_OF}\\s+(${ROMAN_ALT})${HE_IS}\\s*:?\\s*(.+)$`),
   );
   if (heCircleNoNoun) {
     return {
-      id: `circle-${heCircleNoNoun[1]}`,
+      id: numeralCurveId('circle', heCircleNoNoun[1]),
       name: `מעגל ${heCircleNoNoun[1]}`,
       kind: 'circle',
       eqSrc: heCircleNoNoun[2],
@@ -668,7 +684,7 @@ function matchCurve(line: string): CurveHit | null {
    * thing and the M1 id space has no collision in it.
    */
   const heCircleCentre = line.match(
-    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s+(?!${CIRCLE_NUMERALS}(?=[\\s:]))(${NAME})\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
+    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s+(?!${CIRCLE_NUMERALS}${NUMERAL_SEP})(${NAME})${NAMING_TAIL_HE}(.+)$`),
   );
   if (heCircleCentre) {
     return {
@@ -680,23 +696,45 @@ function matchCurve(line: string): CurveHit | null {
     };
   }
 
-  // --- circle: «נתון מעגל I שמשוואתו …» · «משוואת המעגל …» ---
-  const heCircle = line.match(
-    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s*${CIRCLE_NUMERAL_RUN}\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
+  /**
+   * ONE NAMING CLAUSE FOR EVERY NUMERAL-NAMED CURVE, per language (#1271, ADR-AG-170 + Amendment 1).
+   *
+   * «נתון מעגל I שמשוואתו …», «נתונה פרבולה I - y^2=2x», «משוואת האליפסה II: …». Before the #1514
+   * pre-play the circle and the conics each had a clause, and they had drifted exactly the way two
+   * copies drift: the circle's took the «משוואת» PREFIX and the conics' did not, so «משוואת הפרבולה I
+   * היא y^2=2x» was `not-handled` beside a working «משוואת המעגל I היא …». Now the noun is an
+   * alternation and the prefix, the numeral, the separators and the connective set are spelled once
+   * (`NAMING_TAIL`), so a spelling one curve accepts every curve accepts.
+   *
+   * Operator: *"since we can have more than 1 parabola on a diagram, we need to support things like
+   * «נתונה פרבולה I - y^2=2x»"*, widened 2026-09-20: *"we need to support all such forms of
+   * writing."* The numeral is optional (an anonymous curve keeps its content id — D6/#1026: two
+   * different unnamed parabolas are two objects, and restating one is still one), the noun's gender
+   * is not enforced («נתון פרבולה» meant the parabola), and the id goes through `numeralCurveId`, so
+   * «פרבולה 1» and «הפרבולה I» are one parabola (ADR-AG-168's circle policy, for every kind). The
+   * LABEL keeps the student's own numeral.
+   *
+   * The KIND recorded here is the student's CLAIM, not the answer: `classify` fits the equation and
+   * a mismatch — «פרבולה I שמשוואתה x^2+y^2=16» — is refused naming what the equation describes
+   * (02c R7, `kind-mismatch`).
+   */
+  const heNamed = line.match(
+    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?ה?(מעגל|פרבולה|אליפסה)(?:\\s+קנונית)?\\s*${CIRCLE_NUMERAL_RUN}${NAMING_TAIL_HE}(.+)$`),
   );
-  if (heCircle) {
-    const numeral = heCircle[1] ?? '';
+  if (heNamed) {
+    const kind = KIND_NOUNS[heNamed[1]] as NumeralKind;
+    const numeral = heNamed[2] ?? '';
     return {
-      id: numeral ? `circle-${numeral}` : `curve-${anonIndex(heCircle[2])}`,
-      name: numeral ? `מעגל ${numeral}` : '',
-      kind: 'circle',
-      eqSrc: heCircle[2],
+      id: numeral ? numeralCurveId(kind, numeral) : `curve-${anonIndex(heNamed[3])}`,
+      name: numeral ? `${heNamed[1]} ${numeral}` : '',
+      kind,
+      eqSrc: heNamed[3],
     };
   }
 
   // The English centre form, for the same reason and with the same numeral exclusion (#1059).
   const enCircleCentre = line.match(
-    new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s+(?!${CIRCLE_NUMERALS}(?=[\\s:]))(${NAME})\\s*:?\\s*(?:is\\s+|whose equation is\\s+)?(.+)$`),
+    new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s+(?!${CIRCLE_NUMERALS}${NUMERAL_SEP})(${NAME})${NAMING_TAIL_EN}(.+)$`),
   );
   if (enCircleCentre) {
     return {
@@ -708,43 +746,24 @@ function matchCurve(line: string): CurveHit | null {
     };
   }
 
-  const enCircle = line.match(new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s*${CIRCLE_NUMERAL_RUN}\\s*:?\\s*(?:is\\s+)?(.+)$`));
-  if (enCircle) {
-    const numeral = enCircle[1] ?? '';
+  /**
+   * The English twin — NOT `i`-flagged: a whole-pattern `i` lets the numeral alternation read a
+   * lowercase `i`/`v` as a name (the ADR-AG-006 / #1093 trap), so the words carry their own case.
+   */
+  const enNamed = line.match(
+    new RegExp(`^(?:[Tt]he\\s+)?(?:[Cc]anonical\\s+)?([Cc]ircle|[Pp]arabola|[Ee]llipse)\\s*${CIRCLE_NUMERAL_RUN}${NAMING_TAIL_EN}(.+)$`),
+  );
+  if (enNamed) {
+    const noun = enNamed[1].toLowerCase();
+    const kind = KIND_NOUNS[noun] as NumeralKind;
+    const numeral = enNamed[2] ?? '';
     return {
-      id: numeral ? `circle-${numeral}` : `curve-${anonIndex(enCircle[2])}`,
-      name: numeral ? `circle ${numeral}` : '',
-      kind: 'circle',
-      eqSrc: enCircle[2],
+      id: numeral ? numeralCurveId(kind, numeral) : `curve-${anonIndex(enNamed[3])}`,
+      name: numeral ? `${noun} ${numeral}` : '',
+      kind,
+      eqSrc: enNamed[3],
     };
   }
-
-  /**
-   * Conics are anonymous (D6 — the corpus never names them), so the id comes from the EQUATION,
-   * exactly as it already did for an unnamed line or circle (#1026).
-   *
-   * The fixed ids `parabola` / `ellipse` made two DIFFERENT parabolas collide on one name, and the
-   * collision was then reported as a policy («a figure holds one parabola and one ellipse») that
-   * nothing had actually decided — an id collision wearing a policy's clothes. A content id keeps
-   * the M1 absorb working (restating the same equation is still one object, which is what lets a
-   * later section of a question re-state an earlier given) while a different equation is a
-   * different object, because it is one.
-   *
-   * The namespace is `curve-`, shared with every other unnamed curve, because an anonymous curve is
-   * identified by its EQUATION and nothing else ([02c R44](../../docs/02c-requirements-analytic.md)).
-   * A kind prefix here would put «נתונה פרבולה שמשוואתה y^2=54x» and the bare «y^2=54x» in different
-   * namespaces, and the figure would hold two objects for one parabola — exactly the duplication
-   * #1037 removed for lines and circles.
-   */
-  const heParabola = line.match(new RegExp(`^${HE_GIVEN}ה?פרבולה(?:\\s+קנונית)?\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`));
-  if (heParabola) return { id: `curve-${anonIndex(heParabola[1])}`, name: '', kind: 'parabola', eqSrc: heParabola[1] };
-  const enParabola = line.match(/^(?:the\s+)?(?:canonical\s+)?parabola\s*:?\s*(?:is\s+)?(.+)$/i);
-  if (enParabola) return { id: `curve-${anonIndex(enParabola[1])}`, name: '', kind: 'parabola', eqSrc: enParabola[1] };
-
-  const heEllipse = line.match(new RegExp(`^${HE_GIVEN}ה?אליפסה(?:\\s+קנונית)?\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`));
-  if (heEllipse) return { id: `curve-${anonIndex(heEllipse[1])}`, name: '', kind: 'ellipse', eqSrc: heEllipse[1] };
-  const enEllipse = line.match(/^(?:the\s+)?(?:canonical\s+)?ellipse\s*:?\s*(?:is\s+)?(.+)$/i);
-  if (enEllipse) return { id: `curve-${anonIndex(enEllipse[1])}`, name: '', kind: 'ellipse', eqSrc: enEllipse[1] };
 
   return null;
 }
@@ -976,9 +995,8 @@ const BOUNDED_NOUN = /^(?:ה?צלע|ה?קטע|ה?בסיס|(?:the\s+)?(?:side|seg
 /** A CONTEXTUAL operand — «המעגל», «הפרבולה» with no name: which curve is M1's question (#1429). */
 type KindOperand = { t: 'kind'; kind: 'circle' | 'parabola' | 'ellipse' };
 
-/** «המעגל 1» and «המעגל I» are one circle (#1429): the digit maps onto the Roman id the mint uses. */
-const ROMAN_OF_DIGIT: Record<string, string> = { '1': 'I', '2': 'II', '3': 'III', '4': 'IV', '5': 'V' };
-const asRoman = (n: string) => ROMAN_OF_DIGIT[n] ?? n;
+// «המעגל 1» and «המעגל I» are one circle (#1429) — the digit→Roman map now lives in `engine/names.ts`
+// (`numeralCurveId`), shared by the mint and every reference site, for every numeral-named kind.
 
 function incidenceOn(operand: string, id: Id): Constraint | KindOperand | null {
   const axis = AXIS_HE.exec(trim(operand)) ?? AXIS_EN.exec(trim(operand));
@@ -999,14 +1017,17 @@ function incidenceOn(operand: string, id: Id): Constraint | KindOperand | null {
     if (kind && kind !== 'line') return { t: 'kind', kind: kind as KindOperand['kind'] };
   }
   /**
-   * A CIRCLE by its numeral — «המעגל I». `direction()` resolves lines and axes, because that is all a
-   * RELATION can be about; an incidence can be about any curve, so the naming forms `matchCurve`
-   * mints are mapped here to the same ids it mints. Same id, or the two rules would build two objects
-   * for one circle (the ADR-AG-023 defect).
+   * A CURVE by its numeral — «המעגל I», «הפרבולה 2», «the ellipse II». `direction()` resolves lines and
+   * axes, because that is all a RELATION can be about; an incidence can be about any curve, so the
+   * naming forms `matchCurve` mints are mapped here to the SAME ids, through the same
+   * `numeralCurveId` the mint uses (#1271, #1514 pre-play) — two id rules would build two objects for
+   * one curve (the ADR-AG-023 defect), which is exactly what «פרבולה 1» + «הפרבולה I» did. The English
+   * nouns carry their own case: a whole-pattern `i` would read a lowercase `i` as the numeral I.
    */
-  const circle =
-    /^ה?מעגל\s+(I|II|III|IV|V|[1-5])$/.exec(trim(operand)) ?? /^(?:the\s+)?circle\s+(I|II|III|IV|V|[1-5])$/i.exec(trim(operand));
-  if (circle) return { t: 'on-curve', id, curve: `circle-${asRoman(circle[1])}` };
+  const named =
+    new RegExp(`^ה?(מעגל|פרבולה|אליפסה)\\s+(${NUMERAL_ALT})$`).exec(trim(operand)) ??
+    new RegExp(`^(?:[Tt]he\\s+)?([Cc]ircle|[Pp]arabola|[Ee]llipse)\\s+(${NUMERAL_ALT})$`).exec(trim(operand));
+  if (named) return { t: 'on-curve', id, curve: numeralCurveId(KIND_NOUNS[named[1].toLowerCase()] as NumeralKind, named[2]) };
 
   const dir = direction(trim(operand));
   if (dir?.k === 'curve') return { t: 'on-curve', id, curve: dir.id };
@@ -1234,7 +1255,7 @@ function parseDerived(line: string): RuleOutcome {
   const centre = CENTRE_HE.exec(line) ?? CENTRE_EN.exec(line);
   if (centre) {
     const [, id, circleName] = centre;
-    return made([{ t: 'derived', id, rule: { t: 'circle-centre', curve: `circle-${circleName}` }, src: line }]);
+    return made([{ t: 'derived', id, rule: { t: 'circle-centre', curve: numeralCurveId('circle', circleName) }, src: line }]);
   }
 
   const diag = DIAGONAL_EQ_HE.exec(line) ?? DIAGONAL_EQ_EN.exec(line);
@@ -1767,7 +1788,8 @@ function parseMeasureRoles(line: string): RuleOutcome {
  * ברדיוס 5 משיק לציר ה-x» is one subject and one verb, not a second circle grammar beside this one.
  */
 type CircleSubject =
-  | { kind: 'one'; name?: string; placed?: string; coords?: string; radius?: string }
+  /** `numeral`: the name is a circle's NUMERAL («המעגל 1», «מעגל II») — a REFERENCE to that circle, never a centre. */
+  | { kind: 'one'; name?: string; placed?: string; coords?: string; radius?: string; numeral?: true }
   | { kind: 'pair'; names: string[] };
 
 const SUBJECT_ONE_HE = new RegExp(
@@ -1783,7 +1805,18 @@ const NAME_PAIR = new RegExp(
   'i',
 );
 
-function readCircleSubject(s: string): CircleSubject | null {
+/**
+ * A circle SUBJECT named by its NUMERAL — «המעגל 1», «מעגל II», "circle IV" (#1514 merge with #1511).
+ * The numeral is a circle's NAME (ADR-AG-118, the 2026-09-19 ruling: «I» leaves the centre unnamed), so
+ * it refers to the existing circle through `numeralCurveId` — and so the 1 ≡ I notation rule of
+ * 2026-09-29 holds here too — rather than being read by `CENTRE_SLOT` as a centre letter, which minted
+ * a second circle on a phantom point «I» beside the student's circle I.
+ */
+const SUBJECT_NUMERAL = new RegExp(`^(?:ה?מעגל|(?:the\\s+)?[Cc]ircle)\\s+(${NUMERAL_ALT})$`);
+
+function readCircleSubject(s: string, numerals = true): CircleSubject | null {
+  const num = numerals ? SUBJECT_NUMERAL.exec(trim(s)) : null;
+  if (num) return { kind: 'one', name: num[1], numeral: true };
   const one = SUBJECT_ONE_HE.exec(s) ?? SUBJECT_ONE_EN.exec(s);
   if (one) {
     const [, name, placed, coords, radius] = one;
@@ -1805,7 +1838,7 @@ function readCircleSubject(s: string): CircleSubject | null {
   // Two singular circles joined — «מעגל O ומעגל M», "circle O and circle M".
   const parts = s.split(/\s+ו-?\s*(?=ה?מעגל\s)|\s+and\s+(?=(?:the\s+)?circle\s)/i);
   if (parts.length === 2) {
-    const ms = parts.map((p) => SUBJECT_ONE_HE.exec(trim(p)) ?? SUBJECT_ONE_EN.exec(trim(p)));
+    const ms = parts.map((p) => SUBJECT_NUMERAL.exec(trim(p)) ?? SUBJECT_ONE_HE.exec(trim(p)) ?? SUBJECT_ONE_EN.exec(trim(p)));
     // A part carrying coordinates or a radius is DECLINED, never half-read (not built for the pair form).
     if (ms.some((m) => m && (m[2] || m[3] || m[4]))) return null;
     const names = ms.map((m) => m?.[1]);
@@ -1891,8 +1924,10 @@ function parseCircleAt(line: string): RuleOutcome {
   const he = TANGENT_SPLIT_HE.exec(body);
   const en = he ? null : TANGENT_SPLIT_EN.exec(body);
   if (!he && !en) {
-    // No verb: «נתון מעגל O» alone — a circle with a free centre and a free radius (3 DOF).
-    const subject = readCircleSubject(body);
+    // No verb: «נתון מעגל O» alone — a circle with a free centre and a free radius (3 DOF). A bare
+    // NUMERAL circle («נתון מעגל 1») is #1257's open named circle, not built: the numeral reader is off
+    // here, so the sentence keeps exactly the reading it had.
+    const subject = readCircleSubject(body, false);
     const gate = circleSubjectGate(subject, line);
     if (gate) return gate;
     if (!subject || subject.kind !== 'one' || (!subject.name && subject.radius === undefined)) return null;
@@ -1983,7 +2018,10 @@ function circleSubjectFacts(subject: CircleSubject, objectText: string | null, m
     const circles = withSentenceMods(targets.circles, mods);
     if (!circles) return null;
     const withMods = { ...targets, circles };
-    if (subject.name) return oneCircleFacts(subject, withMods, line, mods.at);
+    if (subject.name && !subject.numeral) return oneCircleFacts(subject, withMods, line, mods.at);
+    // A NUMERAL subject names an existing circle: it rides `a`/`circle` exactly as the line-first
+    // order's host does, and M1 resolves it through the one naming chokepoint.
+    const named = subject.numeral ? subject.name : undefined;
     // No centre named: the sentence is about the one circle in the figure, which only M1 knows.
     // «המעגל משיק למעגל K» — the contextual subject rides `a: undefined`; M1 reads it as the one
     // OTHER circle (#1504). `tangent-of` is emitted only when it has work.
@@ -1991,22 +2029,24 @@ function circleSubjectFacts(subject: CircleSubject, objectText: string | null, m
       ...targets.facts,
       ...circles.map((t) => ({
         t: 'tangent-circles' as const,
+        ...(named ? { a: named } : {}),
         ...(t.name ? { b: t.name } : {}),
         ...(t.branch ? { branch: t.branch } : {}),
         ...(mods.at ? { at: mods.at } : {}),
         src: line,
       })),
       ...(targets.axes.length + targets.lines.length > 0 || circles.length === 0
-        ? [{ t: 'tangent-of' as const, axes: targets.axes, ...(targets.lines.length ? { lines: targets.lines } : {}), src: line }]
+        ? [{ t: 'tangent-of' as const, axes: targets.axes, ...(targets.lines.length ? { lines: targets.lines } : {}), ...(named ? { circle: named } : {}), src: line }]
         : []),
       // «המעגל ברדיוס 5 משיק לציר ה-x» — the contextual radius LAST, so its substitution reaches the tangency (#1432 am. 1).
-      ...oneCircleFacts(subject, NO_TARGETS, line),
+      ...(subject.numeral ? [] : oneCircleFacts(subject, NO_TARGETS, line)),
     ];
   }
 
   // TWO circles. A named one is introduced by the sentence exactly as «מעגל M משיק…» introduces M
   // (a numeral names an existing circle and introduces nothing).
-  const letters = subject.names.filter((n) => new RegExp(`^${NAME}$`).test(n));
+  // A NUMERAL is a circle's name, never a centre letter — «I» included (the 2026-09-19 ruling).
+  const letters = subject.names.filter((n) => !isNumeralName(n) && new RegExp(`^${NAME}$`).test(n));
   const introduce = (t: TangentTargets) => letters.flatMap((n) => circleAtFacts(n, t, line));
   if (targets) {
     // «המעגלים O ו-M משיקים לציר ה-x» — EACH is tangent to the targets. Needs the names, and a
@@ -2134,7 +2174,7 @@ function parseCircleThru(line: string): RuleOutcome {
     // bare form falls through to the rules that own it. The other forms name points explicitly, and a
     // repeat there is the student's to be told about (`repeated-vertex`, at M1).
     if (bare && new Set(pts).size < 3) return null;
-    const id = name ? `circle-${name}` : `circle-thru-${[...pts].sort().join('')}`;
+    const id = name ? numeralCurveId('circle', name) : `circle-thru-${[...pts].sort().join('')}`;
     return made([{ t: 'circle-thru', id, def: { t: 'through', pts }, ...(name ? { name } : {}), src: line }]);
   }
 
