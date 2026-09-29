@@ -530,7 +530,7 @@ export function App() {
   }, [active, seed]);
 
   /**
-   * THE POOL COMPLETES AFTER THE RENDER (#1473). One seed per idle slice; a re-render when it completes,
+   * THE POOL COMPLETES AFTER THE RENDER (#1473). One seed per slice, yielding to the browser between seeds; a re-render when it completes,
    * so every «בודק…» settles to its verdict. The cleanup ABANDONS the loop when the figure changes — the
    * old construction's pool is never advanced again and its completion never lands on the new figure.
    *

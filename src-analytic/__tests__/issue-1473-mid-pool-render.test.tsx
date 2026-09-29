@@ -84,7 +84,7 @@ describe('#1473 — mid-pool, the page shows «בודק…» and never a number'
 
   it('a figure whose pool the render itself completes settles BEFORE paint (the layout effect), never after', () => {
     // An open point's option walk — the walk the render always paid — completes the pool mid-render, after
-    // earlier rows read pending. The page's layout effect then settles synchronously: no idle slice, no
+    // earlier rows read pending. The page's layout effect then settles synchronously: no slice, no
     // visible «בודק…». Asserted on the real render path + the real scheduler.
     const d = derive(['A(0,0)', 'B(4,0)', 'נקודה C'], 0);
     const pool = configurationPool(d.construction);
@@ -98,6 +98,22 @@ describe('#1473 — mid-pool, the page shows «בודק…» and never a number'
     expect(settledNow).toBe(1);
     const a = panelKnowledge(d).points.find((p) => p.id === 'A')!;
     expect(pointText(d, 'A', a.x, a.y, String)).toBe('(0, 0)');
+  });
+
+  it('the canvas point labels never read the pool: identical mid-check and settled on every 572 line', () => {
+    // Browser pre-play (round #1559): the canvas read «M(0, y_M)» while the panel said «בודק…». Measured:
+    // that label is `figure.provenance` — the point's OWN givens («M on the y-axis» fixes x = 0 and says
+    // nothing of y), computed inside `evaluate`, syntactically — so it is the same before, during and after
+    // the check, and the same as before #1473. It is not a partial-pool verdict. Locked so it stays one.
+    for (let n = 1; n <= PART_B.length; n += 1) {
+      const mid = derive(PART_B.slice(0, n), 0);
+      configurationPool(mid.construction).defer();
+      panelKnowledge(mid);
+      const during = JSON.stringify(mid.figure.provenance);
+      configurationPool(mid.construction).fill();
+      expect(JSON.stringify(mid.figure.provenance), `line ${n}`).toBe(during);
+      expect(JSON.stringify(derive(PART_B.slice(0, n), 0).figure.provenance), `line ${n}`).toBe(during);
+    }
   });
 
   it('App renders the pool’s completion from a LAYOUT effect, keyed on the derivation', () => {
