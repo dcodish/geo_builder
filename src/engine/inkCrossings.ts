@@ -412,3 +412,50 @@ export function crossingCommands(x: CrossingRef, id: Id): Command[] {
   // checked by the verifier's `meetOnSegment`) — byte-identical to what the typed meet form lowers to.
   return [{ type: 'line-line-intersection', id, a: x.a!, b: x.b!, c: x.c!, d: x.d!, onSeg: true }];
 }
+
+/**
+ * The TEXT a clicked crossing records (#1489) — {@link crossingCommands}' companion: one crossing, two
+ * lowerings, ONE module, so the fact row can never name fewer operand kinds than the commands handle
+ * (the old inline template in `markIntersection` knew segments and `line1` only, and interpolated the
+ * literal word `undefined` for every circle operand).
+ *
+ * Each operand is named in the catalog's own phrasing so the utterance stays a sentence the PARSER can
+ * read — the fixtures net re-parses saved utterances as its parser-drift differential, and a phrase the
+ * parser cannot read is skipped there, checked by nothing. The round-trip (parse → replay places the
+ * same point) is locked per pair kind by `issue-1489-crossing-utterance.test.ts`; a perpendicular- or
+ * parallel-line operand has no typed meet spelling today, so its (still readable) sentence rides the
+ * net's out-of-grammar skip lane, like an LLM-escalated step.
+ */
+export function crossingUtterance(x: CrossingRef, id: Id, lang: 'he' | 'en', c: Construction): string {
+  const he = lang === 'he';
+  const circleName = (cid: Id): string => {
+    const circ = c.objects.find((o) => o.kind === 'circle' && o.id === cid);
+    const center = circ?.kind === 'circle' ? circ.center : cid.replace(/^circle-/, '');
+    return he ? `מעגל ${center}` : `circle ${center}`;
+  };
+  const lineName = (lid: Id): string => {
+    const line = c.objects.find((o) => o.kind === 'line' && o.id === lid);
+    const spec = line?.kind === 'line' ? line.spec : undefined;
+    if (!spec) return he ? `הישר ${lid}` : `line ${lid}`; // drawn ink always has its object; stay readable regardless
+    switch (spec.via) {
+      case 'through':
+        return he ? `הישר ${spec.a}${spec.b}` : `line ${spec.a}${spec.b}`;
+      case 'tangent':
+        return he ? `המשיק בנקודה ${spec.at}` : `the tangent at ${spec.at}`;
+      case 'bisector':
+        return he ? `חוצה הזווית ${spec.p}${spec.vertex}${spec.q}` : `the bisector of angle ${spec.p}${spec.vertex}${spec.q}`;
+      case 'perpendicular':
+        return he ? `האנך ל-${spec.a}${spec.b} דרך ${spec.through}` : `the perpendicular to ${spec.a}${spec.b} through ${spec.through}`;
+      case 'parallel':
+        return he ? `המקביל ל-${spec.a}${spec.b} דרך ${spec.through}` : `the parallel to ${spec.a}${spec.b} through ${spec.through}`;
+    }
+  };
+  // Slot order is canonical (circle → line → segment, the #197 discipline above): operand 1 can be a
+  // circle, a line, or a segment; operand 2 is never a circle unless operand 1 is one too.
+  const op1 = x.circle1 ? circleName(x.circle1) : x.line1 ? lineName(x.line1) : `${x.a}${x.b}`;
+  const op2 = x.circle2 ? circleName(x.circle2) : x.line2 ? lineName(x.line2) : `${x.c}${x.d}`;
+  // Hebrew joins with «ו-» before a letter pair but absorbs the vav into a Hebrew word («ומעגל P»,
+  // «והמשיק בנקודה A») — the catalog's own spellings.
+  const joined = he ? `${op1} ${/^[A-Za-z]/.test(op2) ? 'ו-' : 'ו'}${op2}` : `${op1} and ${op2}`;
+  return he ? `${id} = חיתוך ${joined}` : `${id} = intersection of ${joined}`;
+}

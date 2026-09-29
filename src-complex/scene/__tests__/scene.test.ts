@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { deriveLines } from '../../app/deriveLines';
 import { v2Labels } from '../../replay/scene2';
 import { buildScene, prettyName } from '../scene';
+import { visibleGrid } from '../../render/visibleGrid';
 
 const scene = (...lines: string[]) => buildScene(deriveLines(lines));
 
@@ -83,7 +84,9 @@ describe('the polar substrate is readable', () => {
     expect(s.grid.rays).toContain(30);
     expect(s.grid.rays).toContain(45 + 45); // 90 is on the grid
     expect(s.grid.rays).toHaveLength(12);
-    expect(s.grid.rings.length).toBeGreaterThan(2);
+    // #1465: the rings are the renderer's, sized to the visible window (render/visibleGrid)
+    const k = 320 / 2 / s.extent;
+    expect(visibleGrid(320, 320, k).rings.length).toBeGreaterThan(2);
   });
 
   it('covers every point with padding', () => {

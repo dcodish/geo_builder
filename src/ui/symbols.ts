@@ -35,6 +35,8 @@ export const SYMBOLS: readonly MathSymbol[] = [
   { label: '≅', insert: '≅' }, // ABC ≅ DEF (congruent)
   { label: '~', insert: '~' }, // ABC ~ DEF (similar)
   { label: '<', insert: '<' }, // α < β (order between two named measures)
+  { label: '≤', insert: '≤' }, // #1348: BC ≤ 10, ∠ABC ≤ 40 — a bound, as the grammar reads it
+  { label: '≥', insert: '≥' }, // #1348: BC ≥ 10 — the button a student reached for and typed >= instead
   { label: 'S_{}', insert: 'S_{}', caret: 3 }, // area: S_{ABC} = 13 — caret lands between the braces
 ];
 

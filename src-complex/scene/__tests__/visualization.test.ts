@@ -163,16 +163,19 @@ describe('ValueCycle — the finite ring of directions a power visits', () => {
 });
 
 describe('Region — inside, on, outside (the docs/27 §2b ד counting picture)', () => {
-  it('places every plotted number against a stated polygon', () => {
+  it('places every OTHER plotted number against a stated polygon (#1425: its own corners are not counted)', () => {
     const d = deriveLines(['z1 = 4', 'z2 = 4i', 'w = 1+i', 'המשולש Oz1z2']);
     const [region] = buildScene(d).regions;
-    expect(region.counts).toEqual({ in: 1, on: 2, out: 0 });
+    expect(region.counts).toEqual({ in: 1, on: 0, out: 0 });
     expect(region.members.find((m) => m.name === 'w')!.where).toBe('in');
   });
 
-  it('a vertex of the polygon is ON it, never a coin toss between in and out', () => {
-    const d = deriveLines(['z1 = 4', 'z2 = 4i', 'המשולש Oz1z2']);
+  it('a counted number sitting exactly on a corner is ON it, never a coin toss between in and out', () => {
+    // #1425: the corners themselves are not counted, so the tolerance is exercised by a DIFFERENT
+    // number placed exactly at one («w = 4» sits on the corner z1) and on an edge («z3 = 2»)
+    const d = deriveLines(['z1 = 4', 'z2 = 4i', 'w = 4', 'z3 = 2', 'המשולש Oz1z2']);
     const [region] = buildScene(d).regions;
+    expect(region.members.map((m) => m.name).sort()).toEqual(['w', 'z3']);
     expect(region.members.every((m) => m.where === 'on')).toBe(true);
   });
 

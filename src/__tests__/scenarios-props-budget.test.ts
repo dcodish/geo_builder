@@ -91,3 +91,29 @@ describe('config searches get a generous budget off the main thread (issue #87)'
     expect(meetsRequirements(found!.facts, found!.seed)).toBe(true);
   });
 });
+
+/**
+ * #1441 — the obtuse-side proof keeps the right-triangle seat rescue inside the COLD worker budget.
+ * The external reviewer's «משולש ישר זווית ABC · AB=3 · BC=4»: before the proof, each impossible seat
+ * burned the recruit ladder (~20 s) and a cold `findValidConfig` returned NULL past its 12 s budget,
+ * so the worker reported `noValidConfig`. With the pre-ladder proof the impossible seats fail in
+ * milliseconds and the seat tier delivers the honest reseat (knee at A) cold. structuredClone defeats
+ * the replay memo, so this pays cold replays like the live worker; the REAL budget enforces itself —
+ * a regression past 12 s returns null and fails the first assertion.
+ */
+describe('[#1441] the reviewer’s right-triangle figure resolves cold under the worker budget', () => {
+  it('«משולש ישר זווית ABC · AB=3 · BC=4»: findValidConfig succeeds COLD, on the seat tier, with the stated lengths exact', () => {
+    const facts = structuredClone(factsOf(['משולש ישר זווית ABC', 'AB=3', 'BC=4'])) as Fact[];
+    const found = findValidConfig(facts, 0, WORKER_SEARCH_BUDGET_MS);
+    expect(found, 'the cold search finds the reseated figure within the worker budget').not.toBeNull();
+    expect(lastConfigTier, 'produced by the seat tier — the designed ADR-445 rescue').toBe('seat');
+    const fig = replay(found!.facts, found!.seed);
+    expect(fig.lastError).toBeNull();
+    const d = (a: string, b: string) => {
+      const p = at(fig, a), q = at(fig, b);
+      return Math.hypot(p.x - q.x, p.y - q.y);
+    };
+    expect(d('A', 'B'), '|AB| = 3 as stated').toBeCloseTo(3, 3);
+    expect(d('B', 'C'), '|BC| = 4 as stated').toBeCloseTo(4, 3);
+  });
+});

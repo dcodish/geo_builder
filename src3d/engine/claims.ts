@@ -12,13 +12,33 @@ import { containmentDeviation, DIRECTION_REL_TOL, lineRelDeviation, mutualHolds,
 import { atomVec, evalExpr } from './vecExpr';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { bisectorDir3, cross3, dist3, dot3, runNormal, norm3, normalize3, sub3, v3, type Vec3 } from './vec3';
-import type { Claim3, Construction3 } from './types';
+import type { Claim3, Construction3, RevolutionObj } from './types';
 
 /** Claim tolerance. Closed-form figures verify to ~1e-15; a figure placed by the V4
  *  NUMERIC pivot carries the finite-difference-Jacobian floor (~1e-6 in loosely
  *  conditioned, unpinned directions) — 2e-5 sits far above that noise and far below
  *  any wrong bagrut answer (which differs by ≥ 0.5). */
 const REL_TOL = 2e-5;
+
+/**
+ * #1449 (ADR-3D-279): a solid of revolution's measure from its STATED radius and height. The one
+ * formula set, shared by the claim verifier («נפח החרוט = 100π») and the ask lane («נפח החרוט»), so
+ * what the tool checks and what it answers cannot disagree. `null` when a size is unstated (free,
+ * ADR-052). `surface` is the total area (the lateral surface plus the base or bases); a sphere's
+ * lateral and total surfaces are the same.
+ */
+export function revolutionMeasure(rev: RevolutionObj, which: 'volume' | 'lateral' | 'surface'): number | null {
+  const r = rev.radius;
+  if (r === undefined) return null;
+  if (rev.kind === 'sphere') return which === 'volume' ? (4 / 3) * Math.PI * r ** 3 : 4 * Math.PI * r * r;
+  const h = rev.height;
+  if (h === undefined) return null;
+  if (rev.kind === 'cone') {
+    const slant = Math.hypot(r, h);
+    return which === 'volume' ? (Math.PI * r * r * h) / 3 : which === 'lateral' ? Math.PI * r * slant : Math.PI * r * (r + slant);
+  }
+  return which === 'volume' ? Math.PI * r * r * h : which === 'lateral' ? 2 * Math.PI * r * h : 2 * Math.PI * r * (r + h);
+}
 
 /** Seeds checked for every claim: the display seed plus fixed offsets (deterministic). */
 export const claimSeeds = (seed: number): number[] => [seed, seed + 1013, seed + 2027, seed + 4057];
@@ -205,17 +225,12 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       return Math.abs(norm3(sub3(b1, a1)) / len2 - claim.p / claim.q) <= REL_TOL * Math.max(claim.p / claim.q, 1);
     }
     case 'volume-eq':
-    case 'lateral-area-eq': {
+    case 'lateral-area-eq':
+    case 'surface-area-eq': {
       const rev = c.revolutions.find((r) => r.kind === claim.solid);
-      if (!rev || rev.radius === undefined) return false; // guarded upstream (no-such-solid / free-size-claim)
-      const r = rev.radius;
-      const h = rev.height ?? 0;
-      let actual: number;
-      if (claim.type === 'volume-eq') {
-        actual = rev.kind === 'sphere' ? (4 / 3) * Math.PI * r ** 3 : rev.kind === 'cone' ? (Math.PI * r * r * h) / 3 : Math.PI * r * r * h;
-      } else {
-        actual = rev.kind === 'sphere' ? 4 * Math.PI * r * r : rev.kind === 'cone' ? Math.PI * r * Math.hypot(r, h) : 2 * Math.PI * r * h;
-      }
+      // guarded upstream (no-such-solid / free-size-claim)
+      const actual = rev ? revolutionMeasure(rev, claim.type === 'volume-eq' ? 'volume' : claim.type === 'lateral-area-eq' ? 'lateral' : 'surface') : null;
+      if (actual === null) return false;
       return Math.abs(actual - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
     }
     case 'volume-poly': {

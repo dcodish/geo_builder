@@ -1850,11 +1850,20 @@ const heightOfSolid: Rule = (s) => {
     if (!seg) return null;
     return [{ type: 'height-to-face', id: seg[2], from: seg[1], face: [faceM[1], faceM[2], faceM[3]] }];
   }
+  // The value slots compose from the UNUM atom (the docs/24 S2.1 lexical ratchet), so these three
+  // are built RegExps rather than literals.
   const m =
-    s.match(/^(?:המקצוע\s+|הצלע\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?(?:גובה|אנך)(?:\s+(?:בפירמידה|במנסרה|הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?\s*$/) ??
-    s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+is\s+the\s+(?:height|altitude)(?:\s+of\s+the\s+(?:pyramid|prism))?\s*$/i);
+    s.match(new RegExp(String.raw`^(?:המקצוע\s+|הצלע\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?(?:גובה|אנך)(?:\s+(?:בפירמידה|במנסרה|הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?(?:\s*,?\s*(?:\1\2\s*)?(?:ואורכו|אורכו|הוא|=)\s*(${UNUM}))?\s*$`)) ??
+    s.match(new RegExp(String.raw`^([A-Z]\d*'?)([A-Z]\d*'?)\s+is\s+the\s+(?:height|altitude)(?:\s+of\s+the\s+(?:pyramid|prism))?(?:\s*,?\s*(?:and\s+its\s+length\s+is|=)\s*(${UNUM}))?\s*$`, 'i')) ??
+    // #1448: the noun-first named spelling — «גובה הפירמידה SO = 4».
+    s.match(new RegExp(String.raw`^ה?גובה\s+(?:הפירמידה|המנסרה)\s+([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:,?\s*(?:הוא|=)\s*(${UNUM}))?\s*$`));
   if (!m) return null;
-  return [{ type: 'seg-plane-rel', rel: 'perp', a: m[1], b: m[2], plane: [] }];
+  const role: Command3 = { type: 'seg-plane-rel', rel: 'perp', a: m[1], b: m[2], plane: [] };
+  // #1448: the value rides the same sentence — the claim the two-line spelling always stated.
+  if (m[3] !== undefined) {
+    return [role, { type: 'claim', claim: { type: 'length-eq', a: m[1], b: m[2], value: Number(m[3]) } }];
+  }
+  return [role];
 };
 
 /** #72: `חץ A'C` / `arrow A'C` — draw the pair as an UNNAMED ink arrow (the named-basis lane
@@ -1909,33 +1918,47 @@ const heightFromApex: Rule = (s) => {
   const SOLID = String.raw`(?:ה|ל|של\s+ה)?(?:פירמידה|מנסרה|חרוט|גוף)`;
   const IMP = String.raw`(?:(?:שרטטו?|ציירו?|העבירו?|נעביר|הוסיפו?)\s+(?:את\s+)?)?`;
   const FROM = String.raw`(?:ש?יוצא\s+)?מ-?\s*(?:נקודה\s+|ה?קודקוד\s+)?`;
+  // #1448: the phrase may carry its VALUE — «גובה הפירמידה 4», «הוא 4», «= 4» — the two-line
+  // spelling («SO גובה הפירמידה» then «SO = 4») compressed into the sentence the review typed.
+  const VAL = String.raw`(?:\s*,?\s*(?:הוא\s+|שווה\s+ל-?\s*|=\s*|is\s+)?(?<len>${UNUM}))?`;
   const m =
     s.match(
       new RegExp(
         `^${IMP}ה?גובה(?<solid>\\s+${SOLID})?` +
           `(?:\\s+${FROM}(?<from>[A-Z]\\d*'?))?` +
-          `(?:\\s+ל-?\\s*ה?בסיס(?<baseSolid>\\s+ה?(?:פירמידה|מנסרה|חרוט|גוף))?(?:\\s+(?<b1>[A-Z]\\d*'?)(?<b2>[A-Z]\\d*'?)(?<b3>[A-Z]\\d*'?))?)?\\s*$`,
+          `(?:\\s+ל-?\\s*ה?בסיס(?<baseSolid>\\s+ה?(?:פירמידה|מנסרה|חרוט|גוף))?(?:\\s+(?<b1>[A-Z]\\d*'?)(?<b2>[A-Z]\\d*'?)(?<b3>[A-Z]\\d*'?))?)?${VAL}\\s*$`,
       ),
     ) ??
     s.match(
       new RegExp(
         `^(?:draw\\s+)?(?:a\\s+|the\\s+)?(?:height|altitude)(?<solid>\\s+(?:of|to)\\s+(?:the\\s+)?(?:pyramid|prism|cone|solid))?` +
           `(?:\\s+(?:that\\s+goes\\s+)?from\\s+(?:point\\s+|(?:the\\s+)?vertex\\s+)?(?<from>[A-Z]\\d*'?))?` +
-          `(?:\\s+to\\s+(?:the\\s+)?base(?<baseSolid>\\s+of\\s+the\\s+(?:pyramid|prism|cone|solid))?(?:\\s+(?<b1>[A-Z]\\d*'?)(?<b2>[A-Z]\\d*'?)(?<b3>[A-Z]\\d*'?))?)?\\s*$`,
+          `(?:\\s+to\\s+(?:the\\s+)?base(?<baseSolid>\\s+of\\s+the\\s+(?:pyramid|prism|cone|solid))?(?:\\s+(?<b1>[A-Z]\\d*'?)(?<b2>[A-Z]\\d*'?)(?<b3>[A-Z]\\d*'?))?)?${VAL}\\s*$`,
         'i',
       ),
     );
   if (!m?.groups) return null;
-  const { solid, from, b1, b2, b3 } = m.groups;
+  const { solid, from, b1, b2, b3, len } = m.groups;
   const face = b1 && b2 && b3 ? [b1, b2, b3] : undefined;
   // the base clause is present iff the utterance said בסיס/base at all — a named face implies it
   const saidBase = /ל-?\s*ה?בסיס|to\s+(?:the\s+)?base/i.test(s);
-  if (!solid && !saidBase) return null; // the #467 bare form — guidance, never a guess
+  // the #467 bare form stays guidance — but «הגובה הוא 4» (#1448) STATES a given, so a bare
+  // height that carries its value is real input; apply still holds the one-solid guard.
+  if (!solid && !saidBase && len === undefined) return null;
   if (face && new Set(face).size !== 3) return null;
   // #503 apex-less: only the pyramid's height names a derivable apex — «גובה המנסרה» is not a
   // vertex-to-base perpendicular and must keep escalating rather than guess a vertex (ADR-052).
-  if (!from && !/פירמידה|pyramid/i.test(solid ?? '')) return null;
-  return [{ type: 'perp-to-base', ...(from ? { from } : {}), ...(face ? { face } : {}) }];
+  // A VALUED height with no solid noun («הגובה הוא 4», #1448) goes through: apply derives the one
+  // pyramid's apex and refuses `bad-solid` honestly for anything else.
+  if (!from && !/פירמידה|pyramid/i.test(solid ?? '') && !(len !== undefined && !solid)) return null;
+  return [
+    {
+      type: 'perp-to-base',
+      ...(from ? { from } : {}),
+      ...(face ? { face } : {}),
+      ...(len !== undefined ? { len: Number(len) } : {}),
+    },
+  ];
 };
 
 /** A bare auxiliary segment: `AM` / `קטע AM` / `segment CA'` — plus the #72 prod forms: the
@@ -3161,8 +3184,14 @@ const paramSign: Rule = (s) => {
     s.match(/^(?:ה?פרמטר\s+)?([a-w])\s+(?:הוא\s+)?(?:פרמטר\s+|מספר\s+)?(חיובי|שלילי)$/) ??
     s.match(/^(?:the\s+parameter\s+)?([a-w])\s+is\s+(?:a\s+)?(positive|negative)(?:\s+(?:parameter|number))?$/i) ??
     s.match(/^([a-w])\s*([<>])\s*0$/);
-  if (!m) return null;
-  return [{ type: 'param-sign', sym: m[1], positive: /^(?:חיובי|positive|>)$/i.test(m[2]) }];
+  if (m) return [{ type: 'param-sign', sym: m[1], positive: /^(?:חיובי|positive|>)$/i.test(m[2]) }];
+  // #1451 — the UNSIGNED declaration: «t הוא פרמטר», «t פרמטר», "t is a parameter". The signed
+  // spelling worked while the plain one burned an LLM call per attempt — the two-spellings bug.
+  const d =
+    s.match(/^([a-w])\s+(?:הוא\s+)?פרמטר$/) ??
+    s.match(/^([a-w])\s+is\s+(?:a\s+)?parameter$/i);
+  if (d) return [{ type: 'param-decl', sym: d[1] }];
+  return null;
 };
 
 /** Standalone `v = (10,-5,0)` — a single vector injection.
@@ -3335,10 +3364,22 @@ const REV_KIND: Record<string, 'cylinder' | 'cone' | 'sphere'> = {
 const volumeClaim: Rule = (s) => {
   const m =
     s.match(new RegExp(`^נפח\\s+ה?(חרוט|גליל|כדור)\\s*(?:הוא\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
-    s.match(new RegExp(`^the\\s+volume\\s+of\\s+the\\s+(cone|cylinder|sphere)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`));
+    s.match(new RegExp(`^(?:the\\s+)?volume\\s+of\\s+(?:the\\s+)?(cone|cylinder|sphere)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`, 'i'));
   if (!m) return null;
   const value = +m[2] * (m[3] ? Math.PI : 1);
-  return [{ type: 'claim', claim: { type: 'volume-eq', solid: REV_KIND[m[1]], value } }];
+  return [{ type: 'claim', claim: { type: 'volume-eq', solid: REV_KIND[m[1].toLowerCase()], value } }];
+};
+
+/** #1449 (ADR-3D-279): `שטח הפנים של החרוט = 90π` / `the surface area of the cylinder = 42π` — the
+ *  TOTAL surface of a cone or cylinder (lateral + base(s)). A sphere's «שטח הפנים» is its only surface,
+ *  so it stays with `lateralAreaClaim` below (the same number either way). */
+const surfaceAreaClaim: Rule = (s) => {
+  const m =
+    s.match(new RegExp(`^שטח\\s+ה?פנים(?:\\s+הכולל)?\\s+של\\s+ה?(חרוט|גליל)\\s*(?:הוא\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
+    s.match(new RegExp(`^(?:the\\s+)?(?:total\\s+)?surface\\s+area\\s+of\\s+(?:the\\s+)?(cone|cylinder)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`, 'i'));
+  if (!m) return null;
+  const value = +m[2] * (m[3] ? Math.PI : 1);
+  return [{ type: 'claim', claim: { type: 'surface-area-eq', solid: REV_KIND[m[1].toLowerCase()], value } }];
 };
 
 /** `שטח המעטפת של החרוט = 65π` (cone/cylinder) / `שטח הפנים של הכדור = 36π` (sphere) — lateral/surface area claims. */
@@ -3346,11 +3387,11 @@ const lateralAreaClaim: Rule = (s) => {
   const m =
     s.match(new RegExp(`^שטח\\s+המעטפת\\s+של\\s+ה?(חרוט|גליל)\\s*(?:הוא\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
     s.match(new RegExp(`^שטח\\s+הפנים\\s+של\\s+ה?(כדור)\\s*(?:הוא\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
-    s.match(new RegExp(`^the\\s+lateral\\s+area\\s+of\\s+the\\s+(cone|cylinder)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
-    s.match(new RegExp(`^the\\s+surface\\s+area\\s+of\\s+the\\s+(sphere)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`));
+    s.match(new RegExp(`^(?:the\\s+)?lateral\\s+area\\s+of\\s+(?:the\\s+)?(cone|cylinder)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`, 'i')) ??
+    s.match(new RegExp(`^(?:the\\s+)?surface\\s+area\\s+of\\s+(?:the\\s+)?(sphere)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`, 'i'));
   if (!m) return null;
   const value = +m[2] * (m[3] ? Math.PI : 1);
-  return [{ type: 'claim', claim: { type: 'lateral-area-eq', solid: REV_KIND[m[1]], value } }];
+  return [{ type: 'claim', claim: { type: 'lateral-area-eq', solid: REV_KIND[m[1].toLowerCase()], value } }];
 };
 
 // --- V7 T3: exam terminology sugar ---
@@ -4419,6 +4460,7 @@ export const RULES: Rule[] = [
   revolutionSolid,
   volumeClaim,
   lateralAreaClaim,
+  surfaceAreaClaim, // #1449: the total surface of a cone/cylinder
   parametricLine, // before planeByEquation: both carry `:`, but ℓ ≠ π so either order is safe — kept explicit
   planeByEquation,
   freePlaneDecl, // #487: AFTER planeByEquation — a name followed by an equation is never stolen (this rule demands END after the name)
@@ -4639,4 +4681,45 @@ export function parseRename3(raw: string): { from: string; to: string } | null {
   const from = m[1].toUpperCase();
   const to = m[2].toUpperCase();
   return from === to ? null : { from, to };
+}
+
+/**
+ * #1449 (ADR-3D-279) — THE ASK FORM OF A STATED ANGLE IS THE STATEMENT WITHOUT ITS VALUE.
+ *
+ * «הזווית בין המישורים π1 ו-π2 היא 54.74» was checked and accepted, while the same words as a question
+ * answered «לא זוהה»: the ask lane kept its own point-run-only copy of the angle frames, so every
+ * spelling the statement lane learned (named planes, named lines, the plural «המישורים X ו-Y»,
+ * #1439's frames) stayed sayable but not askable. Rather than a second grammar, the question is read BY
+ * the statement grammar with a placeholder value, and the angle relation it lowers to names the two
+ * objects asked about. A spelling the statement lane reads is askable by construction.
+ */
+export function angleAskOperands(raw: string): { a: Operand3; b: Operand3 } | null {
+  const q = raw.replace(/\s*[?？]\s*$/, '').trim();
+  if (!q) return null;
+  const r = parse3(`${q} = 1`);
+  if (!r.ok || r.commands.length !== 1) return null;
+  const cmd = r.commands[0];
+  if (cmd.type === 'plane-rel' && cmd.rel === 'angle') return { a: cmd.a, b: cmd.b };
+  if (cmd.type === 'line-rel' && cmd.rel === 'angle') return { a: { kind: 'line', name: cmd.line }, b: cmd.op };
+  if (cmd.type === 'line-plane-angle') return { a: { kind: 'segment', a: cmd.a, b: cmd.b }, b: { kind: 'plane-run', ids: cmd.plane } };
+  return null;
+}
+
+/**
+ * #1449 (ADR-3D-279) — the ask form of a solid-of-revolution measure, read the same way as
+ * {@link angleAskOperands}: «נפח החרוט» is «נפח החרוט = 100π» without its value. A sphere's
+ * «שטח הפנים» lowers to `lateral-area-eq` (its only surface), which measures the same number.
+ */
+export function revolutionAskOf(raw: string): { solid: string; measure: 'volume' | 'lateral' | 'surface' } | null {
+  const q = raw.replace(/\s*[?？]\s*$/, '').trim();
+  if (!q) return null;
+  const r = parse3(`${q} = 1`);
+  if (!r.ok || r.commands.length !== 1) return null;
+  const cmd = r.commands[0];
+  if (cmd.type !== 'claim') return null;
+  const cl = cmd.claim;
+  if (cl.type === 'volume-eq') return { solid: cl.solid, measure: 'volume' };
+  if (cl.type === 'lateral-area-eq') return { solid: cl.solid, measure: 'lateral' };
+  if (cl.type === 'surface-area-eq') return { solid: cl.solid, measure: 'surface' };
+  return null;
 }

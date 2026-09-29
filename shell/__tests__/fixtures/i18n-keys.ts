@@ -11,8 +11,9 @@
  * skips is returned so a caller can assert the guard still sees most of the surface rather than
  * quietly checking nothing.
  *
- * The trees with TS-object locales (complex, analytic) get this structurally from
- * `const en: typeof he` and do not need it; the JSON-locale trees (2-D, 3-D) do.
+ * Every tree needs it. The TS-object locales (complex, analytic) were once thought covered by
+ * `const en: typeof he`, but that only keeps the two locales in step with EACH OTHER — it cannot see a
+ * key missing from both, which is how complex shipped `t('undo')` printing «undo» in Hebrew (#1452).
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';

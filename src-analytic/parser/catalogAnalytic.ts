@@ -606,6 +606,23 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'O is the centre of circle I',
     needs: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9'],
   },
+  // The crossing sentence and the point-on-a-named-circle (#1429): neither had a catalog row, so
+  // the panel could not teach them and the LLM lane could not emit them — the discoverability half
+  // of the operand-resolver class.
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'E נקודת החיתוך של הישר l1 עם הישר l2',
+    en: 'E is the intersection of line l1 and line l2',
+    needs: ['נתון הישר l1: y=4', 'נתון הישר l2: y=x'],
+  },
+  {
+    category: 'points',
+    family: 'F3',
+    he: 'P על המעגל I',
+    en: 'P on circle I',
+    needs: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9'],
+  },
 
   // --- F16 · derived points over stated vertices (02c §8) ---
   {

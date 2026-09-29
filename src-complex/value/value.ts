@@ -38,6 +38,7 @@ import {
   fromTurns,
   isExactRational,
   neg as angNeg,
+  registerGaussianAtom,
   sameDirection,
   scale as angScale,
   sub as angSub,
@@ -244,6 +245,9 @@ export function fromCartesian(re: Rat, im: Rat, label = ''): CartesianLiteral {
   if (turns) return { value: exact(mod, fromTurns(turns)) };
 
   const atom = label ? `∠${label}` : `∠(${fmtRatPair(re, im)})`;
+  // #1436 — the exact rational pair exists exactly HERE; register it so the ask lane can carry
+  // `mod·cis(atom)` as the Gaussian rational it is (`|z1-z2|` → √5 for 2+3i, not «≈ 2.24»).
+  registerGaussianAtom(atom, re, im);
   return {
     value: exact(mod, { turns: ZERO, atoms: new Map([[atom, rat(1)]]) }),
     atomBinding: { atom, degrees: deg },

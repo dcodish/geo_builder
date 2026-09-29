@@ -17,6 +17,7 @@
  */
 
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
+import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { carrierParams3 } from './carriers';
 import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
@@ -197,7 +198,7 @@ export interface PivotResult {
   /** #990 (ADR-3D-248) — how many SHAPE dims the scalar pins jointly CONSUME at this solution: the numeric
    *  rank of the scalar residuals' response to a perturbation of each dim. Lazy and memoised — the cue is
    *  the only reader, so the residual evaluations happen on the display path, never on a submit. */
-  scalarConsumed?: () => number;
+  scalarConsumed?: () => { dims: number; block: number };
   err: number;
   /** The solved parameter vector [t, w, logScale, dims…] — the warm-start vehicle: a
    *  later DRIVE (ADR-3D-033) perturbs the pinned figure from here, so it lands in the
@@ -260,6 +261,8 @@ const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
   distance: true, // S5 (#378): a distance is an absolute size — it fixes the scale
   'mag-rel': false, // #393/#335: a RATIO of expression magnitudes — both sides scale together
   'mag-val': true, // #393/#335: |expr| = value is an absolute size, like `length`/`distance`
+  volume3: true, // #1447: an absolute size (scales as s³)
+  area3: true, // #1447: an absolute size (scales as s²)
 };
 
 export function scalePinned(c: Construction3): boolean {
@@ -456,10 +459,17 @@ export function solvePivot(
   // anchored parameter is an OFFSET from the sampled seat (placement adds it there), so an undriven
   // figure stays byte-identical; `bis-dist` is the rider's sampled distance from its ray's apex.
   let riders: { id: string; t0: number; lo: number; hi: number; spread: boolean }[] = [];
+  /** #1415 — the rider indices that belong to a BLOCK-ENROLLED point (`free3`/`partial`): their
+   *  coordinates are counted as free by the cue whether or not a residual drove them, so the
+   *  scalar-consumption rank probe must measure over them too (the refinement ADR-3D-204's note
+   *  reserved for this issue). Riders of other kinds are riderTs-subtracted by the cue already —
+   *  probing them here would double-subtract. */
+  const blockRiderIdx = new Set<number>();
   {
     let sampledPos: Positions3 | null = null;
     const sampledAt = (): Positions3 => (sampledPos ??= evalCanonical(dims0));
     for (const [id, def] of c.points) {
+      const blockEnrolled = def.kind === 'free3' || def.kind === 'partial';
       for (const cp of carrierParams3(c, id, def)) {
         if (!cp.drivable) continue;
         let t0: number | null = null;
@@ -474,7 +484,10 @@ export function solvePivot(
           const p = sampledAt().get(id);
           t0 = p ? p[cp.t0.slice(-1) as 'x' | 'y' | 'z'] : null;
         }
-        if (t0 !== null) riders.push({ id: cp.key, t0, lo: cp.lo, hi: cp.hi, spread: cp.spread });
+        if (t0 !== null) {
+          riders.push({ id: cp.key, t0, lo: cp.lo, hi: cp.hi, spread: cp.spread });
+          if (blockEnrolled) blockRiderIdx.add(riders.length - 1); // #1415
+        }
       }
     }
   }
@@ -541,27 +554,38 @@ export function solvePivot(
    * construction) contributes no row; two pins that move together (a rectangle's second and third right
    * angles) contribute one. Lazy + memoised: display-path only.
    */
-  const scalarConsumedAt = (x: number[], mirror: boolean): (() => number) => {
-    let memo: number | null = null;
+  const scalarConsumedAt = (x: number[], mirror: boolean): (() => { dims: number; block: number }) => {
+    let memo: { dims: number; block: number } | null = null;
     return () => {
       if (memo !== null) return memo;
-      if (c.scalarPins.length === 0 || nDims === 0) return (memo = 0);
+      // #1415: the probe measures over the shape dims AND the block-enrolled free-point
+      // coordinates («אורך AB = 5» on a free vector consumes ONE of the six) — but the two are
+      // REPORTED APART: `dims` is the rank over the shape dims alone (the #990 number, unchanged),
+      // and `block` is the MARGINAL rank the block coordinates add. The cue subtracts each from
+      // the term that counts it; folding them into one number let an over-pinned deficit eat an
+      // unrelated rider's genuine freedom (the #820 lock caught it).
+      const dimIdx = Array.from({ length: nDims }, (_, j) => 7 + j);
+      const blockIdx = [...blockRiderIdx].map((i) => riderBase + i);
+      if (c.scalarPins.length === 0 || dimIdx.length + blockIdx.length === 0) return (memo = { dims: 0, block: 0 });
       const f = residualsFor(mirror);
       f(x); // records the scalar row range for THIS residual layout
       const [s, e] = scalarRows;
-      if (e <= s) return (memo = 0);
-      const cols: number[][] = [];
-      for (let j = 0; j < nDims; j++) {
-        const h = 1e-4 * Math.max(1, Math.abs(x[7 + j])); // central difference: O(h²) error, round-off/h ≈ 1e-12
+      if (e <= s) return (memo = { dims: 0, block: 0 });
+      const colAt = (at: number): number[] => {
+        const h = 1e-4 * Math.max(1, Math.abs(x[at])); // central difference: O(h²) error, round-off/h ≈ 1e-12
         const xp = [...x];
-        xp[7 + j] += h;
+        xp[at] += h;
         const xm = [...x];
-        xm[7 + j] -= h;
+        xm[at] -= h;
         const rp = f(xp).slice(s, e);
         const rm = f(xm).slice(s, e);
-        cols.push(rp.map((v, i) => (v - rm[i]) / (2 * h)));
-      }
-      return (memo = numericRank(cols));
+        return rp.map((v, i) => (v - rm[i]) / (2 * h));
+      };
+      const dimCols = dimIdx.map(colAt);
+      const rankDims = dimCols.length ? numericRank(dimCols) : 0;
+      const allCols = [...dimCols, ...blockIdx.map(colAt)];
+      const rankAll = blockIdx.length ? numericRank(allCols) : rankDims;
+      return (memo = { dims: rankDims, block: Math.max(0, rankAll - rankDims) });
     };
   };
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
@@ -820,6 +844,19 @@ export function solvePivot(
           continue;
         }
         out.push(l.x - r.x, l.y - r.y, l.z - r.z);
+      } else if (pin.kind === 'volume3') {
+        // #1447 — the volume DRIVES the free dims. Measured in the same lane frame as `length`
+        // (laneAt), through the SAME resolver the claim verifier uses (`subjectVolume`), so the
+        // drive targets exactly what the arbiter checks. Signed difference — crosses zero.
+        const subject = resolveSolidSubject(c, pin.noun, pin.ids);
+        const v = subjectVolume(subject, { get: (id: Id) => laneAt(id) ?? undefined } as unknown as Map<Id, Vec3>);
+        out.push(v === null ? 10 : v - pin.value);
+      } else if (pin.kind === 'area3') {
+        // #1447 — the triangle area drives: |cross|/2 − value.
+        const a = laneAt(pin.ids[0]);
+        const b = laneAt(pin.ids[1]);
+        const d3 = laneAt(pin.ids[2]);
+        out.push(a && b && d3 ? norm3(cross3(sub3(b, a), sub3(d3, a))) / 2 - pin.value : 10);
       } else if (pin.kind === 'mag-rel') {
         // #393/#335 (ADR-3D-107): |e1| − c·|e2| over vector EXPRESSIONS — the expression twin of
         // length-rel, same signed-difference form (a difference of magnitudes crosses zero).

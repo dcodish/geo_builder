@@ -267,6 +267,14 @@ export type Fact =
    */
   | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: TangentLineRef[]; circle?: string })
   /**
+   * «E נקודת החיתוך של הישרים» — a crossing whose operands are named only by their KIND (#1429).
+   *
+   * WHICH two objects is a question about the construction, so M1 answers it: exactly two of the
+   * kind lower to the two incidences the spelled-out sentence would carry, anything else refuses
+   * `ambiguous-shape` — the `on-kind` rule, one arity up.
+   */
+  | (FactBase & { t: 'crossing-kind'; id: Id; kind: 'line' | 'circle' })
+  /**
    * «הנקודה A נמצאת על האליפסה» — a point on a curve named only by its KIND (#1057).
    *
    * F2 corpus vocabulary (docs/19 §4a), and the fourth contextual reference: which curve it
