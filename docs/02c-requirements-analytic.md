@@ -1054,6 +1054,11 @@ tool says «כבר ידוע» instead of drawing it twice. Identity is the EQUAT
 to mint. Naming a line that had no name is not a restatement: it records, and the panel calls the line by
 the student's name from then on. A line has ONE name, so a second one is refused naming the holder (the
 R-#1153 rule, for curves). Two lines that are genuinely different — however close — stay two lines.
+**Names are compared as a student READS them** ([ADR-AG-183](06c-decisions-analytic.md#adr-ag-183),
+[#1350](https://github.com/dcodish/geo_builder/issues/1350)): «l3» and «ישר 3» are different lines to the
+tool, but a student reads both as "line 3". Both are kept — the exam prints both conventions — and the moment
+the second is named the tool says they are two different lines (a notice, never a refusal). The reading is
+`lN ⇄ N` (with `ℓ` and the Roman numeral); `m3` or `k1` read as their own names.
 
 **R111 — a word the tool does not know is REFUSED in a value slot, never absorbed as parameters**
 ([ADR-AG-145](06c-decisions-analytic.md#adr-ag-145),

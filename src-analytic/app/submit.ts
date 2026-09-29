@@ -24,8 +24,12 @@ import { VOCABULARY_ANALYTIC, imperativeCandidates } from '../parser/scopeAnalyt
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
+import type { ApplyNotice } from '../engine/apply';
 import type { Fact } from '../engine/types';
 import { activeOf, rowOf } from './active';
+
+/** What a recorded line tells the student (#1350) — the engine's notice, without the line index. */
+export type RecordNotice = ApplyNotice;
 
 /** What the submit path decided. One of these, always — there is no fall-through. */
 export type SubmitVerdict =
@@ -37,8 +41,13 @@ export type SubmitVerdict =
   | { kind: 'already-known'; line: string }
   /** #1063 — the line is TRUE and the figure already settled it; it adds nothing to the list. */
   | { kind: 'already-follows'; line: string }
-  /** The line contributes. Record it. */
-  | { kind: 'record'; line: string }
+  /**
+   * The line contributes. Record it — and when the statement landed with something the student should
+   * be told (#1350: «ישר 3» beside an existing «l3» — two different lines), `notice` carries it so the
+   * caller shows it IN THE SAME COMMIT that records the line (`recordLine(line, notice)`): a notice set
+   * before the record would be cleared by it.
+   */
+  | { kind: 'record'; line: string; notice?: RecordNotice }
   /**
    * #1353 / ADR-W-030 — the line is an IMPERATIVE WRAPPER over a sentence the tool does understand.
    *
@@ -170,6 +179,11 @@ export function decideSubmit(
    * still folds. A refusal keeps the prior figure and names the student's own words.
    */
   const trial = derive([...lines, line], seed);
+  /** A `record` verdict carries the new line's notice, if the fold raised one (#1350). */
+  const raised = trial.notices.find((n) => n.index === lines.length);
+  const recorded: SubmitVerdict = raised
+    ? { kind: 'record', line, notice: { code: raised.code, detail: raised.detail, holder: raised.holder } }
+    : { kind: 'record', line };
   /**
    * WHICH fault is this line's (#1334, ADR-AG-143 — ADR-492's rule, at the one chokepoint every typed
    * line passes)? Its own, first. But a solver that cannot meet the whole set blames whichever
@@ -242,7 +256,7 @@ export function decideSubmit(
    * entailment test below on `gained === 0` and falls through to the same place.
    */
   if (trial.outcomes[lines.length] === 'created' && constraints === 0) {
-    return { kind: 'record', line };
+    return recorded;
   }
 
   /**
@@ -260,7 +274,7 @@ export function decideSubmit(
    * effect instead of inferring it from a count, and both members are one rule.
    */
   if (trial.outcomes[lines.length] === 'narrowed') {
-    return { kind: 'record', line };
+    return recorded;
   }
 
   /**
@@ -304,7 +318,7 @@ export function decideSubmit(
    */
   const assumptions = (d: Derivation) =>
     d.construction.constraints.filter((k) => k.t === 'relation' && k.assumed).length;
-  if (assumptions(trial) < assumptions(current)) return { kind: 'record', line };
+  if (assumptions(trial) < assumptions(current)) return recorded;
 
   const freedomBefore = reportedDof(current.construction, current.figure.carrierDof);
   const freedomAfter = reportedDof(trial.construction, trial.figure.carrierDof);
@@ -317,8 +331,30 @@ export function decideSubmit(
     return { kind: 'already-follows', line };
   }
 
-  return { kind: 'record', line };
+  return recorded;
 }
+
+/**
+ * RECORD A LINE, WITH WHAT IT TELLS THE STUDENT, IN ONE COMMIT (#1350, ADR-AG-183).
+ *
+ * The store's `recordLine` clears the transient surfaces — an error or notice is about the figure as it
+ * was — so a notice raised BY the line being recorded must travel inside that commit. Set before it, it
+ * is erased by the line that earned it; the lock drives this function, which is what `App.tsx` calls.
+ */
+export function commitRecord(
+  verdict: Extract<SubmitVerdict, { kind: 'record' }>,
+  recordLine: (line: string, notice?: string | null) => void,
+  t: NoticeT,
+): void {
+  recordLine(verdict.line, noticeText(verdict.notice, t));
+}
+
+/** The translate function a notice is worded with — `i18next`'s `t`, narrowed to what is used here. */
+export type NoticeT = (key: string, vars?: Record<string, string>) => string;
+
+/** A recorded line's notice, worded for the student — one wording for the typed and the LLM lanes (#1350). */
+export const noticeText = (n: RecordNotice | undefined, t: NoticeT): string | null =>
+  n ? t('noticeNameReadsAs', { detail: n.detail, holder: n.holder }) : null;
 
 /** What muting or un-muting a row decided (#1548). */
 export type ToggleVerdict =

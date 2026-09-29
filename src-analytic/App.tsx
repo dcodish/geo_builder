@@ -32,7 +32,7 @@ import { curveDetailsKey, curveEquationText, curveParts, namedRow } from './app/
 import { color, fs } from '../shell/theme';
 import { reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
-import { decideEdit, decideSubmit, decideToggle, reachesFallback } from './app/submit';
+import { commitRecord, decideEdit, decideSubmit, decideToggle, noticeText, reachesFallback } from './app/submit';
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { runFallback } from './app/fallback';
@@ -785,7 +785,9 @@ export function App() {
         setDraft('');
         return;
       case 'record':
-        recordLine(verdict.line);
+        // #1350 — the notice rides IN the commit that records the line: `recordLine` clears the
+        // transient surfaces, so a notice set before it would be erased by the very line that earned it.
+        commitRecord(verdict, recordLine, t);
         setDraft('');
         return;
       /**
@@ -845,7 +847,7 @@ export function App() {
       if (out.kind === 'lines') {
         // #1297 (operator ruling 2026-09-27, 'student's words now'): the rows DISPLAY the sentence
         // the student typed; the machine lines stay the stored truth so replay is unchanged.
-        recordLlmLines(raw, out.lines);
+        recordLlmLines(raw, out.lines, noticeText(out.notice, t));
         setDraft('');
         return;
       }

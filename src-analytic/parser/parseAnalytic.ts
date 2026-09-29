@@ -28,7 +28,7 @@ function valueExpr(src: string): Expr | null {
   return e && !mentionsPlane(e) ? e : null;
 }
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
-import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, numeralCurveId, type NumeralKind } from '../engine/names';
+import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, type NumeralKind } from '../engine/names';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 
@@ -288,13 +288,8 @@ const LINE_NAME = `(?:[ℓl][0-9]?|${LINE_NUMERAL}(?=[\\s:,]|$)|[A-Z][0-9₀-₉
  */
 const LINE_NAME_PLAIN = '(?:[ℓl][0-9]?|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)';
 
-/**
- * How a numeral-named line is CALLED — «ישר 1» / «line 1» — the #1216 circle precedent («מעגל 1»),
- * so the panel row reads the way the exam does and the student's own token still resolves (the id is
- * `line-1`, and every by-name lookup matches the id as well as the name).
- */
-const lineNameOf = (token: string, lang: 'he' | 'en'): string =>
-  LINE_NUMERAL_RE.test(token) ? `${lang === 'he' ? 'ישר' : 'line'} ${token}` : token;
+// How a numeral-named line is CALLED («ישר 1» / «line 1») is `lineNameOf` in engine/names.ts (#1350), so
+// `nameReading` inverts it from the same table.
 
 /**
  * A line name that is TWO POINT NAMES — `AB`, `A1B2` — as opposed to an arbitrary one like `ℓ1`.

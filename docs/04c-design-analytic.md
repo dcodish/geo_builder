@@ -394,6 +394,18 @@ promotion, and references to a stated line go by name.
 already hold and gains the incoming `label.name`; `curveByName` matches a curve by `label.name` as well
 as by id, so every by-name reference resolves either way.
 
+**Identity by READING — the name axis** ([ADR-AG-183](06c-decisions-analytic.md#adr-ag-183), #1350). The two
+predicates above compare EQUATIONS; names are compared by what a student reads. `nameReading` (`names.ts`)
+maps a line name to its notation-free numeral («l3», «ℓ3», «ישר 3», «III» → `III`; «AB», «m3» → null), and
+`readingTwin` (`apply.ts`) asks, for a fact naming a line with a name NEW to the figure, whether another
+line's name reads the same. It runs in `applyFact` around `applyStatement` (so every arm that mints a named
+line — a stated equation, a line through a point — is covered once) and only on a statement that landed
+(`created`/`narrowed`). Its answer is an `ApplyNotice`, not an error: `fold` carries it per fact, `derive`
+per line (`Derivation.notices`), `decideSubmit`'s `record` verdict per new line, and the store's
+`recordLine(line, notice)` / `recordLlmLines(…, notice)` set it **in the same commit** — the record clears
+transient surfaces, so a notice set before it would be erased by the line that earned it. `commitRecord` /
+`noticeText` (`app/submit.ts`) are the one wording, called by `App.tsx` and by the lock.
+
 ## A letter run is not automatically a product ([ADR-AG-145](06c-decisions-analytic.md#adr-ag-145))
 
 `expr.ts` multiplies by JUXTAPOSITION — that is the whole reason it is hand-written rather than a one-line
