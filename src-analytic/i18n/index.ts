@@ -48,6 +48,10 @@ const he = {
   askAdd: 'שאל',
   /** The ✕ that retires a measurement and the height it drew (#1118). */
   askTraceLabel: 'איך מגיעים לזה',
+  // #1525 (operator, 2026-09-29): a method hint for an asked angle — the cosine half only when all
+  // three vertices are known
+  askHintAngleMethods: 'ניתן להשתמש בשיפועי הישרים או במשפט הקוסינוסים',
+  askHintAngleSlopes: 'ניתן להשתמש בשיפועי הישרים',
   askTraceToggle: 'הצגה/הסתרה של דרך החישוב',
   /** A curve row's derived properties — centre, radius, foci, directrix — folded under its equation (#1212). */
   /**
@@ -325,6 +329,8 @@ const en: typeof he = {
   askPlaceholder: 'Ask: AB, area of ABC, angle ABC',
   askAdd: 'Ask',
   askTraceLabel: 'how this is reached',
+  askHintAngleMethods: 'You can use the slopes of the lines or the law of cosines',
+  askHintAngleSlopes: 'You can use the slopes of the lines',
   askTraceToggle: 'show or hide the working',
   curveDetailsCircle: "the circle's properties",
   curveDetailsParabola: "the parabola's properties",

@@ -54,39 +54,34 @@ describe('#1409 — the honesty gates', () => {
   });
 });
 
-describe('#1409 — the ruled working, one case per branch, ending on the answer', () => {
-  const lastNumber = (t: string) => {
-    const ms = [...t.matchAll(/= ([\d.]+)°$/gm)];
-    return ms.length ? ms[ms.length - 1][1] : null;
-  };
-
-  it('general (slope method): acute angle, tan formula shown', () => {
-    const d = derive(['V(0,0)', 'X(4,1)', 'Y(1,4)'], 0);
-    const a = ask(d, 'זווית XVY', fmt);
-    expect(a.trace).toContain('tan α');
-    expect(a.value).toBe(`${lastNumber(a.trace!)}°`);
+/**
+ * #1525 (operator, 2026-09-29, reversing the 2026-09-27 trace ruling): no worked formula — the
+ * tan-difference formula is outside the curriculum. A method HINT instead, with the law of cosines
+ * offered only when all three vertices are known.
+ */
+describe('#1525 — a method hint, never a worked formula', () => {
+  it('his T26 case: 135°, the full hint, and no formula rows', () => {
+    const a = ask(derive(['A(0,0)', 'B(4,0)', 'C(8,4)'], 0), 'זווית ABC', fmt);
+    expect(a.value).toBe('135°');
+    expect(a.trace).toBeUndefined();
+    expect(a.hint).toBe('angle-methods');
   });
 
-  it('obtuse: the slope method plus the 180° − α step', () => {
-    const d = derive(['V(0,0)', 'X(4,1)', 'Y(-4,1)'], 0);
-    const a = ask(d, 'זווית XVY', fmt);
-    expect(a.trace).toContain('tan α');
-    expect(a.trace).toContain('180°');
-    expect(a.value).toBe(`${lastNumber(a.trace!)}°`);
+  it.each([
+    [['V(0,0)', 'X(4,1)', 'Y(1,4)'], 'general'],
+    [['V(0,0)', 'X(0,5)', 'Y(3,1)'], 'a vertical arm'],
+    [['V(0,0)', 'X(2,2)', 'Y(-2,2)'], 'perpendicular arms'],
+  ])('%j (%s): no trace in any geometry', (lines) => {
+    const a = ask(derive(lines as string[], 0), 'זווית XVY', fmt);
+    expect(a.value).not.toBeNull();
+    expect(a.trace).toBeUndefined();
+    expect(a.hint).toBe('angle-methods');
   });
 
-  it('a vertical arm: the law of cosines', () => {
-    const d = derive(['V(0,0)', 'X(0,5)', 'Y(3,1)'], 0);
-    const a = ask(d, 'זווית XVY', fmt);
-    expect(a.trace).toContain('cos ∠XVY');
-    expect(a.value).toBe(`${lastNumber(a.trace!)}°`);
-  });
-
-  it('perpendicular arms: the law of cosines, answering 90°', () => {
-    const d = derive(['V(0,0)', 'X(2,2)', 'Y(-2,2)'], 0);
-    const a = ask(d, 'זווית XVY', fmt);
-    expect(a.trace).toContain('cos ∠XVY');
-    expect(a.value).toBe('90°');
+  it('an angle the givens fix while a vertex stays free: the slopes-only hint', () => {
+    const a = ask(derive(['B(0,0)', 'C(6,0)', 'משולש ABC', 'זווית ABC = 60'], 0), 'זווית ABC', fmt);
+    expect(a.value).toBe('60°');
+    expect(a.hint).toBe('angle-slopes');
   });
 });
 

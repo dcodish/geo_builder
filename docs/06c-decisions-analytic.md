@@ -8036,3 +8036,15 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 **Deviations from the plan.** The plan's step 5 wanted the guard to WALK the catalog mechanically; the shipped guard is a curated list (the catalog rows do not machine-map to ask spellings), which holds the same line at the cost of one list entry per new measure — recorded here as the trade.
 
 **Consequences.** `src-analytic/parser/parseAnalytic.ts` (`readAngleAsk`), `src-analytic/engine/solve.ts` (`angleAt` exported), `src-analytic/engine/techniques.ts` (`traceAngle`), `src-analytic/app/ask.ts` (the arm), `src-analytic/i18n/index.ts` (placeholder), docs 02c R121. Lock: `issue-1409-angle-ask.test.ts` — every reported spelling, the honesty gates, the 60° round trip, the four trace branches ending on the answer, and the class guard.
+
+### ADR-AG-176 Am. 1 — a method hint replaces the worked angle trace (#1525)
+
+**Status:** accepted · 2026-09-29 · operator, playing round #1517 T26 on this PR: «tan α = |(m₁ - m₂)/(1 + m₁·m₂)| … this equation is not in the curriculum. I think we should not try to show the process … maybe just write a comment "ניתן להשתמש בשיפועי הישרים או במשפט הקוסינוסים" the part about the cosine law should show only if all 3 nodes are known.» Approved as #1525 the same day. **Reverses** the 2026-09-27 trace ruling this ADR was built on.
+
+**Requirements:** docs/02c R121 (amended) · **Design:** none (internal — the ask lane's answer gains a `hint` token, as `fact` did)
+
+**Decision.** The angle arm returns no `trace`. It returns a `hint` token instead: `angle-methods` when all three vertices are knowledge (both coordinates fixed across configurations, the same `isKnowledge` gate the answer passes), else `angle-slopes`, since the law of cosines needs the three lengths. The component words it through the locale (He «ניתן להשתמש בשיפועי הישרים או במשפט הקוסינוסים» / «ניתן להשתמש בשיפועי הישרים»; En mirrors), below the answer. `traceAngle` is deleted, not left unused.
+
+**Measured.** His case A(0,0), B(4,0), C(8,4), «זווית ABC»: 135°, the full hint, and no formula rows (driven on the PR server and read). An angle the givens fix while a vertex stays free (B, C, «משולש ABC», «זווית ABC = 60»): 60° with the slopes-only hint.
+
+**Consequences.** `src-analytic/app/ask.ts`, `src-analytic/App.tsx`, `src-analytic/i18n/index.ts`, `src-analytic/engine/techniques.ts` (`traceAngle` removed). Lock: `issue-1409-angle-ask.test.ts`, whose "ruled working" block is replaced by the hint cases.

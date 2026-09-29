@@ -27,7 +27,7 @@ import { locusOf } from '../engine/locus';
 
 import { curveByName, objectById, type Id } from '../engine/types';
 import { ANGLE_STEM_HE } from '../engine/shapes';
-import { traceAngle, traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
+import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { isVerticalLine } from '../engine/lines';
 import { asPair, lineNamed } from './lines';
 import { readAngleAsk } from '../parser/parseAnalytic';
@@ -82,6 +82,13 @@ export interface Answer {
    * teaches the concept, while 0 lets the misconception stand.
    */
   fact?: 'vertical' | 'lines-cross' | 'points';
+  /**
+   * #1525 — A METHOD HINT instead of a worked trace (operator, 2026-09-29: the tan-difference formula
+   * *"is not in the curriculum … maybe just write a comment «ניתן להשתמש בשיפועי הישרים או במשפט
+   * הקוסינוסים» — the part about the cosine law should show only if all 3 nodes are known"*).
+   * A token, for the same reason as `fact`: this module holds no locale.
+   */
+  hint?: 'angle-methods' | 'angle-slopes';
   /**
    * THE POINT SET a degenerate locus answers with (#1227, ADR-AG-136): «המקום הגיאומטרי של M» on a
    * determined M is M's position, or its finite set of positions — one entry per resolution-aware
@@ -380,8 +387,9 @@ export function ask(
    * atoms, and this arm reads the SAME atoms (`readAngleAsk`), so a spelling the given accepts is
    * askable by construction. The value comes from the SAME `angleAt` the angle residual constrains
    * (a round trip: «זווית ABC = 60» asked back prints 60°), through the same honesty gate as every
-   * value arm — an open figure answers open, never a sampled number (ADR-052). The working follows
-   * the operator's 2026-09-27 ruling: the slope method where it works, else the law of cosines.
+   * value arm — an open figure answers open, never a sampled number (ADR-052). No worked trace
+   * (#1525, reversing the 2026-09-27 ruling): the answer carries a method HINT, and the law of cosines
+   * is offered only when all three vertices are knowledge — its three lengths need them.
    */
   const ang = readAngleAsk(text);
   if (ang) {
@@ -397,10 +405,12 @@ export function ask(
     };
     const k = isKnowledge(d.construction, readDeg);
     if (!k.known) return { question, value: null };
-    const P = (n: string) => d.figure.points.find((q) => q.id === n);
-    const [pa, pv, pb] = [P(ang.a), P(ang.v), P(ang.b)];
-    const trace = pa && pv && pb ? traceAngle(pv, pa, pb, k.value, fmt) : null;
-    return { question, value: angleText(k.value), ...(trace ? { trace } : {}) };
+    const vertexKnown = (id: string) =>
+      (['x', 'y'] as const).every(
+        (c) => isKnowledge(d.construction, (f: Figure) => f.points.find((q) => q.id === id)?.[c] ?? null).known,
+      );
+    const allKnown = [ang.a, ang.v, ang.b].every(vertexKnown);
+    return { question, value: angleText(k.value), hint: allKnown ? 'angle-methods' : 'angle-slopes' };
   }
 
   // --- a line's angle with the positive x-axis (#1322) ---

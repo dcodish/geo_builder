@@ -1823,6 +1823,12 @@ export function App() {
                         </div>
                       </details>
                     )}
+                    {/* #1525: a method hint in place of a worked trace (the angle ask) */}
+                    {a.hint && (
+                      <div style={askTrace} data-testid="ask-hint">
+                        {t(a.hint === 'angle-methods' ? 'askHintAngleMethods' : 'askHintAngleSlopes')}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
