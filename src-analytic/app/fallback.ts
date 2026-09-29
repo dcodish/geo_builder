@@ -34,6 +34,7 @@ import { decideSubmit, type RecordNotice, type SubmitVerdict } from './submit';
 import { derive } from '../engine/derive';
 import type { LlmStepsOutcome } from '../parser/llmAnalytic';
 import { restoreStatedSequencesAnalytic } from '../parser/honestyAnalytic';
+import type { InputError } from '../store/useAnalyticStore';
 
 export type FallbackOutcome =
   /** The proxy was throttled. The caller says "busy", never "I did not understand". */
@@ -126,4 +127,28 @@ export async function runFallback(
   return accepted.length
     ? { kind: 'lines', lines: accepted, ...(gated.restored.length ? { restored: gated.restored } : {}), ...(notice ? { notice } : {}) }
     : { kind: 'none' };
+}
+
+/**
+ * WHAT THE STUDENT READS when the fallback recorded nothing (#1278, ADR-AG-186) — the one decision
+ * `App.tsx` makes about an outcome, extracted so the app and the lock ask the same function.
+ *
+ * - `busy`: a throttle, never the student's fault.
+ * - `rejected` with a REAL refusal key: the model produced a line the tool READ and declined, so the
+ *   sentence was understood and the move is unsupported — the honest middle (#1336, ADR-AG-170).
+ * - `rejected` with `not-handled`: the model's "line" is not a command at all (#1278's first live call
+ *   answered «a line through (2,3) with slope 4» in English prose). The tool understood NOTHING — neither
+ *   the student's sentence nor the model's — and «understood, not supported» would claim both a reading
+ *   that never happened and a missing capability that exists. The student keeps the ORIGINAL refusal,
+ *   which is about words they actually wrote.
+ * - `none`: the model judged it inexpressible, or the transport failed — the original refusal too.
+ */
+export function fallbackRefusal(
+  out: Exclude<FallbackOutcome, { kind: 'lines' }>,
+  raw: string,
+  original: InputError,
+): InputError {
+  if (out.kind === 'busy') return { key: 'llm-busy', detail: raw };
+  if (out.kind === 'rejected' && out.code !== 'not-handled') return { key: 'llm-understood-unsupported', detail: raw };
+  return original;
 }
