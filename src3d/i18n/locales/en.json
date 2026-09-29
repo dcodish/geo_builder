@@ -166,12 +166,8 @@
     "title": "Examples",
     "ex1": "cube ABCD",
     "ex2": "right triangular prism ABC",
-    "ex3": "M is the midpoint of BB'",
-    "ex4": "K on AA' such that AK = 2KA'",
-    "ex5": "denote AB = u, AD = v, AA' = w",
-    "ex6": "CA' is perpendicular to plane BC'D",
-    "ex7": "plane π1: z - 3 = 0",
-    "ex8": "A(2,-2,6) is on one of the planes"
+    "ex3": "right pyramid ABCDS with a square base",
+    "ex4": "plane π1: z - 3 = 0"
   },
   "manual": {
     "button": "Guide",
