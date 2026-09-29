@@ -342,7 +342,7 @@ construct the tool can build is automatically a construct it can be asked about.
 read (#1331) — sayable ⇒ askable by construction — with the honesty gate every value arm passes.
 No worked formula (operator, 2026-09-29, reversing the 2026-09-27 ruling: the tan-difference formula
 is outside the curriculum). Under the answer: «ניתן להשתמש בשיפועי הישרים או במשפט הקוסינוסים», with
-the law-of-cosines half only when all three vertices are known. *(#1409, #1525; realised —
+the law-of-cosines half only when all three vertices are known. An angle the student STATED is answered with no hint at all. *(#1409, #1525; realised —
 [ADR-AG-176](06c-decisions-analytic.md#adr-ag-176) Am. 1.)*
 
 **R24 — An ask is a DRY-RUN construction: built internally, evaluated, discarded.** It must never

@@ -78,9 +78,21 @@ describe('#1525 — a method hint, never a worked formula', () => {
     expect(a.hint).toBe('angle-methods');
   });
 
-  it('an angle the givens fix while a vertex stays free: the slopes-only hint', () => {
-    const a = ask(derive(['B(0,0)', 'C(6,0)', 'משולש ABC', 'זווית ABC = 60'], 0), 'זווית ABC', fmt);
-    expect(a.value).toBe('60°');
+  it('a STATED angle asked back: the value, and no hint (operator, 2026-09-29, T33)', () => {
+    const d = derive(['B(0,0)', 'C(6,0)', 'משולש ABC', 'זווית ABC = 60'], 0);
+    for (const q of ['זווית ABC', 'זווית CBA']) {
+      const a = ask(d, q, fmt);
+      expect(a.value, q).toBe('60°');
+      expect(a.hint, q).toBeUndefined();
+      expect(a.trace, q).toBeUndefined();
+    }
+  });
+
+  it('a COMPUTED angle whose vertex is free: the slopes-only hint (no three known lengths)', () => {
+    // Y rides y = x in the first quadrant: ∠XVY is 45° at every configuration, Y itself is not fixed
+    const d = derive(['V(0,0)', 'X(4,0)', 'Y נמצאת על הישר y=x', 'Y ברביע הראשון'], 0);
+    const a = ask(d, 'זווית XVY', fmt);
+    expect(a.value).toBe('45°');
     expect(a.hint).toBe('angle-slopes');
   });
 });

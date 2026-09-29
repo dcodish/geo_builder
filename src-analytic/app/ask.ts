@@ -409,6 +409,16 @@ export function ask(
       (['x', 'y'] as const).every(
         (c) => isKnowledge(d.construction, (f: Figure) => f.points.find((q) => q.id === id)?.[c] ?? null).known,
       );
+    // #1525 (operator, 2026-09-29): «if the angle is given in the input, there is no point explaining
+    // how to find it» — a STATED angle at this vertex between these two arms (either order) gets no hint.
+    // Read from the record the given lowers to, so a computed angle that equals a number stays hinted.
+    const stated = d.construction.constraints.some(
+      (c) =>
+        c.t === 'angle' &&
+        c.at.v === ang.v &&
+        ((c.at.a === ang.a && c.at.b === ang.b) || (c.at.a === ang.b && c.at.b === ang.a)),
+    );
+    if (stated) return { question, value: angleText(k.value) };
     const allKnown = [ang.a, ang.v, ang.b].every(vertexKnown);
     return { question, value: angleText(k.value), hint: allKnown ? 'angle-methods' : 'angle-slopes' };
   }
