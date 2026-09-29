@@ -134,6 +134,9 @@ src/
                    FILTERS, enumerated instead: every letter the student named is a quantity, so it gets
                    a row (natun when valued, nigzar when the figure forces it) and is askable by name
                    through the `var` query. One lane feeds both seams - never a second enumeration.
+                 - circles are named through `circleRef` (ADR-552, #1442): drawn circles only (a hidden
+                   scaffold circle gets no row), a visible centre by its letter, an unnamed one as
+                   "the circle" or its ADR-342 token; `render/valueRowText` words every row label.
   parser/        parse.ts (deterministic bilingual grammar, ordered rules + post-pass chokepoints +
                  honesty gates), catalog, context (buildParseCtx — the docs/17 §3b registry), scope,
                  llm/llmShared (the LLM-fallback seam; re-parse + gate battery)
