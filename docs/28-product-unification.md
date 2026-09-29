@@ -398,6 +398,15 @@ a UI behaviour.
 > Locks: `src-complex/__tests__/fact-ops.test.ts` (10) + `src3d/store/__tests__/fact-edit3.test.ts`
 > (5). 2-D adopts the chrome when B3-2d/B2-2d flip its shell edge.
 
+> **Amendment — the fourth builder (#1548, 2026-09-29).** Analytic joined after B5 and mounted the chrome
+> with edit and delete only; the chrome's *no handler, no control* rule made the missing checkbox
+> invisible until the operator compared the four tools by eye. It now mutes like complex (`disabled:
+> number[]`, an active projection every figure consumer reads) with the 3-D refusal surface (a dependent
+> faults on its own row), per rulings (a)/(b) above ([ADR-AG-177](06c-decisions-analytic.md#adr-ag-177)).
+> **The row is now held mechanically:** `shell/__tests__/fact-list-ops-parity-1548.test.ts` requires every
+> builder's `<FactList>` to pass all three handlers, with a stated `EXEMPT` table — the §6 *unset fails*
+> rule for this one row, ahead of the full matrix.
+
 ### D7 — Canvas controls: **every figure action lives under the canvas**
 
 Both builders have viewport control already — 2-D's `Figure.tsx` carries a pan/zoom layer with

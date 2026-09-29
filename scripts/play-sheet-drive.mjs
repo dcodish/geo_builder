@@ -86,10 +86,8 @@ async function driveCase(browser, spec, outDir, prefix) {
       steps.push({ line: '(open page)', refusals: [`no input matching placeholder ${JSON.stringify(product.inputHint)}`] });
     } else {
       const seen = new Set(await refusals(page));
-      for (const line of spec.lines) {
-        await input.fill(line);
-        await input.press('Enter');
-        await waitForSettle(page);
+      /** One step's refusals: what is NEW on the page after it, read the ruled way (below). */
+      const freshRefusals = async () => {
         let fresh = (await refusals(page)).filter((r) => !seen.has(r));
         if (fresh.length) {
           // The ruled "accept the flash" transaction shape (ADR-510, operator 2026-09-11): a commit
@@ -101,10 +99,40 @@ async function driveCase(browser, spec, outDir, prefix) {
           fresh = fresh.filter((r) => still.has(r));
         }
         fresh.forEach((r) => seen.add(r));
+        return fresh;
+      };
+      const typeLine = async (line) => {
+        await input.fill(line);
+        await input.press('Enter');
+        await waitForSettle(page);
+        const fresh = await freshRefusals();
         steps.push({ line, refusals: fresh });
         if (fresh.length) await shoot(`refused-${steps.length}`);
-      }
+      };
+      for (const line of spec.lines) await typeLine(line);
       await shoot('built');
+
+      /**
+       * #1548 — steps AFTER the lines: a fact-list row's checkbox (1-based, the shared chrome's
+       * `li > input[type=checkbox]`), or one more utterance. A toggle that is refused (an un-mute the
+       * figure contradicts) reports like a refused line, so `expectRefusal` can match it.
+       */
+      for (const st of spec.after ?? []) {
+        if (st.type !== undefined) {
+          await typeLine(st.type);
+          continue;
+        }
+        const box = page.locator('li > input[type="checkbox"]').nth(st.toggle - 1);
+        if ((await box.count()) === 0) {
+          steps.push({ line: `(toggle row ${st.toggle})`, refusals: [`no checkbox on fact-list row ${st.toggle}`] });
+          break;
+        }
+        await box.click();
+        await waitForSettle(page);
+        const fresh = await freshRefusals();
+        steps.push({ line: `(toggle row ${st.toggle})`, refusals: fresh });
+        await shoot(`toggle-row-${st.toggle}`);
+      }
 
       for (const ask of spec.asks ?? []) {
         const box = page.getByPlaceholder(product.askHint).first();

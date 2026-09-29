@@ -39,6 +39,9 @@ export interface SavedAnalyticSession {
    *  (#1297). The stored line stays the machine spelling — replay is pure over the lines — and
    *  this is what the row DISPLAYS, so no model output is ever shown as the row. */
   spokenFor?: Record<number, string>;
+  /** #1548 — the MUTED lines' indexes (the D6 disable operation). Omitted when none, so a save
+   *  from before this field loads unchanged. A muted line is saved and loads muted. */
+  disabled?: number[];
 }
 
 /**
@@ -153,6 +156,15 @@ interface AnalyticState {
   /** #1297 — see {@link SavedAnalyticSession.spokenFor}. Keys follow the lines' indices. */
   spokenFor: Record<number, string>;
   /**
+   * THE MUTED LINES (#1548, docs/28 D6) — indexes into `lines`, the complex shape.
+   *
+   * Disable answers *"what if I hadn't said this?"*: the row stays, the figure is folded without it.
+   * `lines` stays the whole session and every figure consumer reads the ACTIVE projection
+   * (`app/active.ts`), so a muted line can never half-reach the fold. Whether a line may come BACK is
+   * the submit path's question (`decideToggle`) — this records the answer.
+   */
+  disabled: number[];
+  /**
    * The figure's NAME (#1087) — what a save is called, and nothing else.
    *
    * It is not a given and never reaches the parser: naming a drawing is not a statement about it.
@@ -179,6 +191,8 @@ interface AnalyticState {
   recordLine: (line: string) => void;
   removeLine: (index: number) => void;
   replaceLine: (index: number, next: string) => void;
+  /** #1548 — record the muted set the submit path decided on. */
+  setDisabled: (disabled: number[]) => void;
   clearAll: () => void;
   /**
    * Replace the question list. The GESTURES are decided in `app/answers.ts` and this records the
@@ -220,7 +234,7 @@ interface AnalyticState {
    */
   serialize: () => SavedAnalyticSession;
   /** Replace the session with a loaded one. */
-  restore: (session: { lines: string[]; seed?: number; name?: string; spokenFor?: Record<number, string> }) => void;
+  restore: (session: { lines: string[]; seed?: number; name?: string; spokenFor?: Record<number, string>; disabled?: number[] }) => void;
   /** Record the fallback's machine lines under the student's OWN sentence (#1297). */
   recordLlmLines: (spoken: string, lines: string[]) => void;
   setNotice: (n: string | null) => void;
@@ -231,6 +245,7 @@ export const useAnalyticStore = create<AnalyticState>()(
     (set, get) => ({
   lines: [],
   spokenFor: {},
+  disabled: [],
   seed: 0,
   name: '',
   loadAudit: null,
@@ -257,7 +272,9 @@ export const useAnalyticStore = create<AnalyticState>()(
         if (i < index) spokenFor[i] = v;
         else if (i > index) spokenFor[i - 1] = v; // keys follow their lines when an earlier row goes
       }
-      return { lines: s.lines.filter((_, i) => i !== index), spokenFor, error: null, notice: null };
+      // #1548: the muted indexes name POSITIONS, so they shift with their lines too (complex's rule)
+      const disabled = s.disabled.filter((d) => d !== index).map((d) => (d > index ? d - 1 : d));
+      return { lines: s.lines.filter((_, i) => i !== index), spokenFor, disabled, error: null, notice: null };
     }),
   replaceLine: (index, next) =>
     set((s) => {
@@ -265,10 +282,11 @@ export const useAnalyticStore = create<AnalyticState>()(
       const { [index]: _gone, ...spokenFor } = s.spokenFor;
       return { lines: s.lines.map((l, i) => (i === index ? ingestTypedText(next) : l)), spokenFor, error: null, notice: null };
     }),
+  setDisabled: (disabled) => set({ disabled: [...disabled].sort((a, b) => a - b), error: null, notice: null }),
   clearAll: () =>
     // The QUERIES go with the lines (#1110): a reading of a figure that no longer exists is a lie,
     // and «נקה הכל» is the clearest case of the figure no longer existing.
-    set({ lines: [], spokenFor: {}, error: null, notice: null, seed: 0, name: '', loadAudit: null, queries: [] }),
+    set({ lines: [], spokenFor: {}, disabled: [], error: null, notice: null, seed: 0, name: '', loadAudit: null, queries: [] }),
 
   /**
    * The three gestures, as store actions (ADR-AG-067's decisions, now over the stored record).
@@ -299,7 +317,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   setLoadAudit: (loadAudit) => set({ loadAudit }),
 
   serialize: () => {
-    const { lines, seed, name, spokenFor } = get();
+    const { lines, seed, name, spokenFor, disabled } = get();
     return {
       app: ANALYTIC_APP,
       version: ANALYTIC_SAVE_VERSION,
@@ -307,11 +325,21 @@ export const useAnalyticStore = create<AnalyticState>()(
       seed,
       ...(name.trim() ? { name: name.trim() } : {}),
       ...(Object.keys(spokenFor).length ? { spokenFor: { ...spokenFor } } : {}),
+      ...(disabled.length ? { disabled: [...disabled] } : {}),
     };
   },
 
-  restore: ({ lines, seed, name, spokenFor }) =>
-    set({ lines: lines.map(ingestTypedText), spokenFor: spokenFor ?? {}, seed: seed ?? 0, name: name ?? '', error: null, notice: null }),
+  restore: ({ lines, seed, name, spokenFor, disabled }) =>
+    set({
+      lines: lines.map(ingestTypedText),
+      spokenFor: spokenFor ?? {},
+      // #1548: only indexes that name a line survive a restore — a hand-edited file cannot mute a ghost
+      disabled: [...new Set(disabled ?? [])].filter((d) => Number.isInteger(d) && d >= 0 && d < lines.length).sort((a, b) => a - b),
+      seed: seed ?? 0,
+      name: name ?? '',
+      error: null,
+      notice: null,
+    }),
     }),
     {
       /**
@@ -326,9 +354,10 @@ export const useAnalyticStore = create<AnalyticState>()(
        */
       // The QUERIES ride along (#1110): undo must put back what the student was reading, not only the
       // figure — the same argument that puts `seed` here (E5/STO-5).
-      partialize: (s) => ({ lines: s.lines, seed: s.seed, queries: s.queries }) as AnalyticState,
+      // The MUTED set rides along too (#1548): muting is a step the student took, so undo takes it back.
+      partialize: (s) => ({ lines: s.lines, seed: s.seed, queries: s.queries, disabled: s.disabled }) as AnalyticState,
       // Without this, setting an error would push a history entry and undo would appear to do nothing.
-      equality: (a, b) => a.lines === b.lines && a.seed === b.seed && a.queries === b.queries,
+      equality: (a, b) => a.lines === b.lines && a.seed === b.seed && a.queries === b.queries && a.disabled === b.disabled,
       limit: 100,
     },
   ),

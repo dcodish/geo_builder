@@ -34,7 +34,8 @@ export function persistSessionAn(now: Date = new Date()): void {
 /** Start mirroring the session to storage. Returns the unsubscribe, for the caller's effect. */
 export function startSessionPersistAn(): () => void {
   return useAnalyticStore.subscribe((s, p) => {
-    if (s.lines !== p.lines || s.queries !== p.queries || s.seed !== p.seed || s.name !== p.name) persistSessionAn();
+    // #1548: a mute changes what the session restores as, so it persists like a line does
+    if (s.lines !== p.lines || s.disabled !== p.disabled || s.queries !== p.queries || s.seed !== p.seed || s.name !== p.name) persistSessionAn();
   });
 }
 

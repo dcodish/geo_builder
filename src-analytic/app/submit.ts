@@ -25,6 +25,7 @@ import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import type { Fact } from '../engine/types';
+import { activeOf, rowOf } from './active';
 
 /** What the submit path decided. One of these, always — there is no fall-through. */
 export type SubmitVerdict =
@@ -317,6 +318,80 @@ export function decideSubmit(
   }
 
   return { kind: 'record', line };
+}
+
+/** What muting or un-muting a row decided (#1548). */
+export type ToggleVerdict =
+  /** The muted set to record. */
+  | { kind: 'apply'; disabled: number[] }
+  /** Re-enabling would break the figure: the row stays muted, and the error names the statement. */
+  | { kind: 'refused'; error: InputError };
+
+/**
+ * MUTE / UN-MUTE A ROW (#1548, docs/28 D6 — the operation the other three builders already had).
+ *
+ * **Muting is always allowed.** It can only relax the figure. A line that depended on the muted one
+ * then faults on its OWN row — the honest counterfactual, reversible by un-muting — which is the
+ * ruling (a) shape for a builder whose rows carry their own status (3-D admits and flags).
+ *
+ * **Un-muting faces the gate a typed line faces**, because the line is re-entering a figure that may
+ * have moved on without it. It returns AT ITS POSITION (order is meaningful), and the rule is
+ * `decideSubmit`'s #1334 rule translated to a line that is not last: before the un-mute the figure
+ * was as it is; if the restored line faults, or a fault APPEARS that was not there before, the line
+ * is refused and the refusal names THIS sentence. A fault is compared by the sentence it sits on and
+ * its code, not by index — un-muting shifts every later active index by one.
+ *
+ * Pure over `(index, lines, disabled, seed, current)`; `current` is the caller's memoized derivation
+ * of the ACTIVE lines, exactly as `decideSubmit` takes it.
+ */
+export function decideToggle(
+  index: number,
+  lines: readonly string[],
+  disabled: readonly number[],
+  seed: number,
+  current: Derivation = derive(activeOf(lines, disabled), seed),
+): ToggleVerdict {
+  if (!disabled.includes(index)) return { kind: 'apply', disabled: [...disabled, index].sort((a, b) => a - b) };
+  const next = disabled.filter((d) => d !== index);
+  const before = activeOf(lines, disabled);
+  const after = activeOf(lines, next);
+  const at = rowOf(lines.length, next).indexOf(index);
+  const trial = derive(after, seed);
+  const was = new Set(current.faults.map((f) => `${before[f.index]}\u0000${f.code}`));
+  const fault =
+    trial.faults.find((f) => f.index === at) ??
+    trial.faults.find((f) => !was.has(`${after[f.index]}\u0000${f.code}`));
+  if (fault) {
+    return {
+      kind: 'refused',
+      error: {
+        key: fault.code, detail: lines[index], existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example,
+      } as InputError,
+    };
+  }
+  return { kind: 'apply', disabled: next };
+}
+
+/**
+ * EDIT A ROW IN PLACE — the decision `App.tsx` used to make inline, extracted so the muted case has
+ * a lock that calls it (#1548).
+ *
+ * An ACTIVE row keeps its pre-#1548 gate: the edited list must fold without a fault on that row.
+ * A MUTED row only rewrites its text (D6 ruling b): it is not in the figure, so there is nothing to
+ * gate against yet — the real gate runs when it is un-muted. It must still READ, so a muted row can
+ * never hold a sentence the tool refuses to parse.
+ */
+export function decideEdit(
+  index: number,
+  next: string,
+  lines: readonly string[],
+  disabled: readonly number[],
+  seed: number,
+): boolean {
+  if (disabled.includes(index)) return parseLine(next.trim()).ok;
+  const edited = lines.map((l, j) => (j === index ? next : l));
+  const at = rowOf(lines.length, disabled).indexOf(index);
+  return !derive(activeOf(edited, disabled), seed).faults.some((f) => f.index === at);
 }
 
 /**
