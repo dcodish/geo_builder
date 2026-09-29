@@ -162,8 +162,8 @@ export const CATALOG: readonly CatalogEntry[] = [
     family: 'F8',
     he: '-2z1 = conj(z3)',
     en: '-2z1 = conj(z3)',
-    descHe: 'משוואה כללית — נפתרת באלימינציה, לא באיטרציה',
-    descEn: 'a general equation — solved by elimination, not iteration',
+    descHe: 'משוואה כללית — המספרים והצמודים שלהם, בכל אחד מהאגפים',
+    descEn: 'a general equation — the numbers and their conjugates, on either side',
   },
   {
     family: 'F6',
@@ -205,8 +205,8 @@ export const CATALOG: readonly CatalogEntry[] = [
     family: 'F7',
     he: 'שטח Oz1z2z3 הוא 150r^2',
     en: 'area Oz1z2z3 is 150r^2',
-    descHe: 'שטח — מכוון את הזווית החופשית (המהלך של §2b)',
-    descEn: 'an area — it drives the free direction (the §2b move)',
+    descHe: 'שטח — קובע את הזווית שעוד לא נקבעה',
+    descEn: 'an area — it sets the angle that is not fixed yet',
   },
   {
     family: 'F7',
@@ -240,8 +240,8 @@ export const CATALOG: readonly CatalogEntry[] = [
     family: 'F9',
     he: 'z1, z2, z3 סדרה חשבונית',
     en: 'z1, z2, z3 are an arithmetic sequence',
-    descHe: 'סדרה חשבונית — חיבורית, ולכן נפתרת בשכבה הנומרית',
-    descEn: 'an arithmetic sequence — additive, so the numeric tier solves it',
+    descHe: 'סדרה חשבונית — ההפרש בין כל שני איברים סמוכים קבוע',
+    descEn: 'an arithmetic sequence — each term minus the one before it is the same',
   },
   {
     family: 'F12',
