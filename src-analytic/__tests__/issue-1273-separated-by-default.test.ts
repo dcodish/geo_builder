@@ -13,17 +13,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
-import { drawableAt, evaluate, knownOptions } from '../engine/evaluate';
-import { apart } from '../engine/crossings';
+import { drawableAt, evaluate, knownOptions, stackedPairs } from '../engine/evaluate';
 
 const LINES = ['A(3,4)', 'B(0,4)', 'משוואת המעגל x^2+y^2=25', 'P נקודת החיתוך של הישר AB עם המעגל x^2+y^2=25'];
 const at = (d: ReturnType<typeof derive>, id: string) => d.figure.points.find((p) => p.id === id)!;
-const stacked = (f: { points: { x: number; y: number }[] }) => {
-  const near = apart(f as never);
-  const ps = f.points;
-  for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) if (Math.hypot(ps[i].x - ps[j].x, ps[i].y - ps[j].y) < near) return true;
-  return false;
-};
+// CALLS the display's own decision (#1526 moved its ruler off `crossings.apart()`, the identity tolerance).
+const stacked = (f: Parameters<typeof stackedPairs>[0]) => stackedPairs(f).length > 0;
 
 describe('#1273 — the figure opens on a configuration that separates its named points', () => {
   it('the raw configuration at seed 2 stacks P on A — the measured baseline this lock protects against', () => {
@@ -57,9 +52,10 @@ describe('#1273 — the figure opens on a configuration that separates its named
     expect(shown.points).toHaveLength(2);
   });
 
-  it('the tolerance is the figure’s own — relative to its span, the ring filter’s ruler (ADR-AG-021)', () => {
-    const small = { points: [{ id: 'A', x: 0, y: 0 }, { id: 'B', x: 3, y: 0 }] };
-    const big = { points: [{ id: 'A', x: 0, y: 0 }, { id: 'B', x: 3000, y: 0 }] };
-    expect(apart(big as never) / apart(small as never)).toBeCloseTo(1000, 6);
+  it('the tolerance is the figure’s own — relative to its drawn frame, never absolute (ADR-052; #1526 for the ruler)', () => {
+    const small = { points: [{ id: 'A', x: 0, y: 0 }, { id: 'B', x: 3, y: 0 }, { id: 'C', x: 3.01, y: 0 }], curves: [] };
+    const big = { points: small.points.map((q) => ({ ...q, x: q.x * 1000 })), curves: [] };
+    expect(stacked(small as never)).toBe(true);
+    expect(stacked(big as never)).toBe(true);
   });
 });
