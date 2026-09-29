@@ -570,6 +570,17 @@ export const isBoundedOperand = (op: Operand3): boolean => op.kind === 'segment'
 
 /** Structural identity of two operands — `AB` and `BA` are the same segment. Used to refuse a
  *  relation stated between an object and itself, which asserts nothing. */
+/**
+ * #1485 (ADR-3D-278): an operand's IDENTITY as a string — its geometry only. A plane-run's `face` flag
+ * says how the student NAMED it («הפאה SBC»), which sets how it is drawn but never which plane it is, so
+ * «הפאה SBC» and «המישור SBC» key the same pair wherever pairs are matched.
+ */
+export const operandKey = (op: Operand3): string => meaningKey(op);
+
+/** The same rule for anything that CARRIES operands (a command, a pin, a claim): its JSON with the
+ *  display-only `face: true` dropped. Other commands' `face` is an id list, which is kept. */
+export const meaningKey = (x: unknown): string => JSON.stringify(x, (k, v) => (k === 'face' && v === true ? undefined : v));
+
 export function sameOperand(a: Operand3, b: Operand3): boolean {
   if (a.kind !== b.kind) return false;
   switch (a.kind) {

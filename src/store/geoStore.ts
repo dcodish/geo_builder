@@ -18,7 +18,7 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
-import { stripFormatControls } from '../../shell/bidi';
+import { ingestTypedText } from '../../shell/bidi';
 import type { ValuesPanelResult } from '@/engine/valuesPanel';
 import type { AnyCommand, Id, RelationsResult, ShapesResult, StatedShapeEquality } from '@/engine';
 import { branchCount, cyclableVariant, deepEqual, variantCountOf, withVariant } from '@/engine';
@@ -488,7 +488,7 @@ export interface GeoState {
  * (`shell/bidi`), because the two copies protect different things.
  */
 const cleanUtterance = (u: string | undefined): string | undefined =>
-  u === undefined ? undefined : stripFormatControls(u);
+  u === undefined ? undefined : ingestTypedText(u);
 
 /**
  * Fold ONE command into the fact list per the execute policy: idempotent duplicate (FR-EN-9 — re-issuing

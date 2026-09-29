@@ -360,3 +360,23 @@ once per step, and the shared layout must render every section. Each tree has a 
 pre-#1477 About. `shell/__tests__/about-content.test.ts` is the §5c meta-lock plus a roster net.
 
 What the lock does not check: whether the words are good. That is prose, per product and per locale.
+
+## The grid step ([ADR-W-094](06w-decisions-workspace.md#adr-w-094))
+
+`shell/ticks.ts` holds the one "nice step" rule (1, 2 or 5 × 10ⁿ) and the tick values across a range. Analytic re-exports `tickStep` from it, so its grid is byte-identical by construction. The complex Builder grids its VISIBLE window with it (`render/visibleGrid`), replacing a private copy with different thresholds. A §5c lock (`shell/__tests__/ticks-1465.test.ts`) fails if any product tree defines its own `tickStep`/`niceStep`.
+
+## The palette face and the typed comparison ([ADR-W-095](06w-decisions-workspace.md#adr-w-095))
+
+A `SymbolSpec` whose face (`label`) is one character inserts exactly that character, or carries `keyboardForm` saying why not. `shell/__tests__/fixtures/palette-faces.ts` checks it, and every product runs it over its own palette. The store-side ingest (ADR-W-029) is `ingestTypedText` in `bidi.ts`: `stripFormatControls` and then `foldComparisons` (`>=` → `≥`, `<=` → `≤`, a bare two-character operator only). Every product store records through it, analytic's included, which had no ingest boundary before. The parsers keep only the strip; every grammar reads both spellings the same way.
+
+## Student-facing text ([ADR-W-096](06w-decisions-workspace.md#adr-w-096))
+
+`shell/studentText.ts` `studentFacingViolations(values, { typed, names })` judges the VALUES a message interpolates, never its template, since a template may quote a worked example. A value may name what the student typed (case-insensitive) or what the figure shows; an id-shaped token (`~x`, `@x`, `#x`, `kind-Id`), an untyped English word, or an unknown capital label is a violation. Each product runs it over its own refusal corpus through its own humanizer. 3-D's is `src3d/i18n/errorText3.ts`; the other three are #1522.
+
+## The current tool is in view on a phone ([ADR-W-097](06w-decisions-workspace.md#adr-w-097))
+
+`Switcher` holds a ref on its `aria-current` segment and, on mount and whenever the active tool changes, calls `scrollIntoView({ inline: 'nearest', block: 'nearest' })`. That moves nothing when the tab is already visible, and the browser handles the RTL scroll direction. The visual smoke opens every product at 390×844 and fails if that tab's rectangle is not inside the strip.
+
+## One wording per role, and the first-visit About ([ADR-W-098](06w-decisions-workspace.md#adr-w-098))
+
+Shell holds no strings, so the suite vocabulary is held by a lock, not a module: `shell/__tests__/suite-vocabulary.test.ts` maps nine roles (determined, DOF count, busy, ask, undo, redo, clear-all, show-another, About) to each product's key(s), reads the four locales by file, and requires one wording per role in each language, anchored to the operator's ruled text. A product without a surface (complex has no busy state) is recorded as absent with its reason. The first-visit About is `AppFrameAbout.autoOpenKey`: opt-in, one localStorage key per product, written on close. 2-D's private first-load modal is retired into it, keeping its `geo_intro_seen` key.

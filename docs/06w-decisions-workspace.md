@@ -4851,3 +4851,86 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 **Measured.** 4 locks (`issue-1363-1243-events-sink.test.ts`): the no-env path is module-relative and absolute (never cwd-rooted), the env var wins, one-submit-per-submission, refusals counted with their result. The live probe run above is the mechanism's own proof.
 
 **Consequences.** `server/toolRouting.ts`, `scripts/deploy-preflight.mjs`, `src-complex/debug/sessionLogComplex.ts` (new), `src-complex/app/submit.ts`. **Proxy redeploy required** (with #1297's, one push).
+
+## ADR-W-094 — One grid-step rule in shell/, and the complex grid sized to the visible window (#1465)
+
+**Status:** accepted · 2026-09-28 · operator report («when i press zoom out, the grid doesnt adapt and axis done either», 2026-09-27), batch-approved the same day · round #1517 (a `complex` issue; the ADR is workspace-level because the rule moves to `shell/`).
+
+**Requirements:** docs/02d FR-GP-6 (new) · **Design:** docs/04w — the grid step; docs/04d — the grid is the renderer's
+
+**Context.** In the complex Builder, zooming out left the grid and its numbers in the middle of an empty canvas, and even at zoom 1 the grid stopped short of the sides of a wide canvas. `PolarPlane` drew gridlines from the first step to the scene's content-fit `extent`, and rings to the same bound, so zoom changed only the scale. Analytic already grids its visible range with a 1/2/5 `tickStep`. The complex scene kept a private `niceStep` with different thresholds: two copies of one rule.
+
+**Decision.**
+- `shell/ticks.ts` owns `tickStep(span, target)` and `tickValues(min, max, step)`. Analytic re-exports `tickStep` from it (the same function object, so its grid is byte-identical by construction).
+- The complex grid is computed in the renderer from the visible window, `(W/2)/k` by `(H/2)/k`, by `render/visibleGrid`. That gives one cartesian step for both axes from the wider span (≤ 12 intervals), rings to the visible corner at their own nice step, rays to that corner, and angle labels inside the shorter half-extent. The scene keeps only the ray angles; its `rings` and `niceStep` are removed.
+- A §5c lock fails if any product tree defines its own `tickStep` / `niceStep`.
+
+**Measured.** On main `d3f08a4c` at zoom 0.25 on a 900×500 canvas, for «z1 = 2cis22.5» the cartesian grid ran −2…2 inside a visible window of ±18 by ±10. On the branch the gridlines reach within one step of every edge at zoom 1, 0.5 and 0.25, the step grows as zoom falls, and the rendered SVG labels the outermost ticks and draws the outer ring at the corner.
+
+**Consequences.** `shell/ticks.ts` (new), `src-analytic/render/scene.ts` (re-export), `src-complex/render/visibleGrid.ts` (new), `src-complex/render/PolarPlane.tsx`, `src-complex/scene/scene.ts` (grid slimmed). Locks: `src-complex/__tests__/issue-1465-zoom-grid.test.tsx`, `shell/__tests__/ticks-1465.test.ts`, `src-analytic/__tests__/ticks-shared-1465.test.ts`.
+
+## ADR-W-095 — A symbol button types its face, and a typed comparison records as its symbol (#1348)
+
+**Status:** accepted · 2026-09-28 · operator report («when user types >= the symbol in the input panel needs to be the combined symbol», round #1345 T3), armed under the clear-plan ruling · round #1517. Numbered 095 beside the round's parallel #1465 branch (094).
+
+**Requirements:** docs/02w FR-SU-12 (new) · **Design:** docs/04w — the palette face and the typed comparison
+
+**Context.** The step row read `BC>=10` where the student meant `BC ≥ 10`. The row faithfully echoes what was typed; the defect is upstream. Analytic's `≥` button inserted `>=` (its face said one thing and its payload another, and likewise `≤`→`<=`, `²`→`^2`, `³`→`^3`, `·`→`*`, with complex's `·` the same). 2-D had a `<` button but no `≥`, so the student typed `>=` by hand, and nothing folded it: the fact, the save file, the export and the log kept the keyboard form. The payloads were chosen because "everything offered must parse" (#511), but that premise is stale. Measured on main `d3f08a4c`: 2-D and analytic read `≥`/`≤` and `>=`/`<=` identically, complex's argument bounds read both the same, and analytic reads `²`, `³`, `·` as `^2`, `^3`, `*`. 3-D reads neither comparison form.
+
+**Decision.**
+- **The face is the payload.** Analytic's five and complex's `·` now insert their glyph. 2-D gains `≤`/`≥` beside `<`, and complex gains them for argument bounds. 3-D gains none, because its grammar has no inequality to offer. `SymbolSpec.keyboardForm` is the explicit, reasoned exemption (none needed today). A shared check (`palette-faces.ts`) runs per product.
+- **The typed comparison is recorded as its symbol.** `foldComparisons` (`>=`→`≥`, `<=`→`≤`, only as a bare two-character operator, so `<=>` and `>==` are untouched) runs inside `ingestTypedText`, the ADR-W-029 store-side ingest, which every product store now calls. Analytic gains that boundary, since it had none: it lacked even the format-control strip the other three apply.
+- **The bidi run.** `≤` and `≥` join `<` in the run core: the shared `BASE_CORE` (complex, analytic) and 2-D's own `CORE`, whose guard requires every palette character to be core. 3-D keeps its copy unchanged, since it offers no comparison button and its grammar records none. That 2-D and 3-D each keep a private copy of the core is pre-existing debt, not widened here.
+- **Baselines.** The 2-D decide-parity shard 4 changes exactly one recorded line: the operator's own sequence «משולש ABC · BC>=10 …» now records `BC≥10`, with identical commands. The 3-D #1394 golden gains one key harvested from this ADR's own lock; no recorded 3-D sequence drifted.
+
+**Deviation from plan.** The plan folded at the parser boundary too. The parsers keep only the strip: every grammar reads both spellings identically (measured), so a parser-side fold would change nothing a student sees and would widen the change to every parse.
+
+**Measured.** 2-D «משולש ABC · BC>=10» records `BC≥10`. Every product's one-character buttons insert their own glyph. Both palette parse guards build their templates with the glyphs through the real grammar.
+
+**Consequences.** `shell/bidi.ts` (`foldComparisons`, `ingestTypedText`), `shell/symbols.ts` (`keyboardForm`), the four stores and two file loaders, three palettes, complex tooltips. Locks: `shell/__tests__/fold-comparisons-1348.test.ts`, `palette-faces-1348.test.ts` in each product, `src/__tests__/typed-ge-1348.test.ts`, and the updated analytic/complex palette guards.
+
+## ADR-W-096 — A message names only what the student can see: one shared check (#1455)
+
+**Status:** accepted · 2026-09-29 · external prod review relayed by the operator («Never show internal names (tanmid, @ctr, cone, pyramid, base)», 2026-09-27), batch-approved the same day · round #1517. Numbered 096 beside the round's parallel #1465/#1348 branches (094, 095).
+
+**Requirements:** docs/02w FR-SU-5 (a sentence added: no engine id or noun is ever interpolated) · **Design:** docs/04w — student-facing text; docs/17 §3 — a new chokepoint row
+
+**Context.** The honesty invariant says an error names the student's statement, never internal state. It had leaked in all four builders, each fixed locally with no shared check: 2-D `~tanmid-OE` / `@ctr-O`, analytic `curve-anon…` / `circle-Z`, complex `#sz5_N`, and 3-D, where 28 `err.*` strings interpolate `{{id}}` straight from the engine.
+
+**Decision.**
+- **One check** in `shell/studentText.ts`, product-free. It judges the VALUES a message interpolates, never the template (a template may quote a worked example such as «תיבה ABCDA'B'C'D'»), because every leak so far arrived as a value. A value may name what the student typed (case-insensitive: «זווית sdb» makes D theirs) or any name the figure shows. An id-shaped token, an English word the student did not type, or a capital label that is neither typed nor drawn is a violation.
+- **3-D first, because it was measured.** `errorText` moved out of `App3.tsx` into `src3d/i18n/errorText3.ts` (a byte-for-byte move) so a test can drive it. Replaying all 1582 sequences the 3-D suite states found exactly two leaks. (1) The `base` sentinel, which «גובה הפירמידה» / «אנך לבסיס» resolve against, reached «המישור «base» לא הוגדר» in 28 sequences whenever the figure had no single solid. It now gets its own sentence covering both "no solid yet" and "several solids". (2) An engine solid noun reached «אין בציור בדיוק גוף אחד מסוג «pyramid»»; it is now the student's word («פירמידה», «חרוט»…). `student-text-1455.test.ts` locks the whole corpus, with a can-fail half.
+- **The chokepoint is registered** (docs/17 §3): every value a refusal or notice interpolates.
+
+**Scope held back, and filed.** The plan's per-product locks for 2-D, complex and analytic are #1522. Complex and analytic have no humanizer unit (their text is built inline in `App.tsx`, as 3-D's was), so each needs the same extraction first. 2-D's values-panel leak is #1442, not a refusal.
+
+**Consequences.** `shell/studentText.ts` (new), `src3d/i18n/errorText3.ts` (moved + the two rules), `src3d/App3.tsx` (imports it), both 3-D locales (`err.baseNeedsOneSolid`, `solidNoun.*`). Lock: `src3d/__tests__/student-text-1455.test.ts`. The #1394 parity golden gains two keys harvested from this lock's own arrays; 0 recorded hashes changed or lost (checked by value).
+
+## ADR-W-097 — The current tool's tab is always in view on a phone (#1458)
+
+**Status:** accepted · 2026-09-29 · external prod review relayed by the operator («The active tab is cut off in the top nav», 2026-09-27), batch-approved the same day · round #1517. Numbered 097 beside the round's parallel workspace branches (094–096).
+
+**Requirements:** docs/02w FR-SU-2 (a sentence added: the current builder's tab is in view on a phone) · **Design:** docs/04w — the current tool is in view on a phone
+
+**Context.** At 390×844 the switcher strip is 570px of content in a 348px strip that scrolls inside itself (#737), and nothing scrolled the current tool into it. Measured on main `d3f08a4c` through the real page: analytic's own tab sat at −198…−42 in a strip at 20…370, wholly off-screen, and complex's was half-clipped. The student could not see which tool they were in.
+
+**Decision.** In the shell `Switcher`, for all four products: a ref on the `aria-current` segment and an effect on the active id that calls `scrollIntoView({ inline: 'nearest', block: 'nearest' })`. `nearest` moves nothing when the tab is already visible (so desktop is untouched) and never scrolls the page vertically. The browser resolves the RTL scroll direction, which a hand-set `scrollLeft` would have to special-case.
+
+**Lock.** `scripts/visual-smoke.mjs` opens every product at 390×844, fails if the current tab's rectangle is not inside the strip, and keeps the capture. Without the fix it fails on analytic with exactly the measured «−198…−42 in a strip 20…370»; with it, every product passes.
+
+**Consequences.** `shell/frame/Switcher.tsx`, `scripts/visual-smoke.mjs`.
+
+## ADR-W-098 — One wording for one state in every builder, and the first-visit About in all four (#1453)
+
+**Status:** accepted · 2026-09-29 · external prod review relayed by the operator; the wording is the operator's own "Explicit set" ruling (2026-09-27) · round #1517. Numbered 098 beside the round's parallel workspace branches (094–097). Stacked on #1452 (complex's undo/redo keys, which this lock reads).
+
+**Requirements:** docs/02w FR-SU-1 (one wording for one state; the first-visit About) · **Design:** docs/04w — one wording per role, and the first-visit About
+
+**Context.** Measured on main `d3f08a4c`, one state had four wordings («✓ נקבע במלואו» / «✓ הציור נקבע במלואו על ידי הנתונים» / «הצורה נקבעה במלואה» / «הכול נקבע על-ידי הנתונים»), the DOF count three («דרגות חופש: N» / «דרגות חופש שטרם נקבעו: N» / «N דרגות חופש»), the busy state three («עובדים על זה...», «מחשב…», «חושב…»), and the ask button three («חשב», «שאל», «שאלו»). Only 2-D opened About on a first visit, through its own private modal beside the frame's.
+
+**Decision.**
+- **The ruled set, in every builder.** He: «✓ הציור נקבע במלואו על ידי הנתונים» · «דרגות חופש: N» · «חושב…» (both of 2-D's busy strings) · «שאלו». En: "✓ The figure is fully determined by the givens" · "Degrees of freedom: N" · "Working…" · "Ask".
+- **The lock**, since shell holds no strings: `shell/__tests__/suite-vocabulary.test.ts` maps nine roles to each product's keys, reads the four locales by file (no test may import two product trees), and requires one wording per role and language, anchored to the ruled text. There are no exceptions for the ruled roles. Complex has no busy surface (no asynchronous path), which is recorded as absent with its reason, not as a different wording.
+- **The first-visit About** is `AppFrameAbout.autoOpenKey`: opt-in, one localStorage key per product, written on close, and on in all four. 2-D's private first-load modal (the same About content in a second `Modal`) is retired into it, keeping its `geo_intro_seen` key so a returning 2-D student is not shown it again. The privacy note is therefore seen at least once in every builder (#1426). The flag goes through the ONE storage door (`shell/session/persist`: `flagSeen` / `markSeen`, the same wrapped accessor as the session), because #1238's rule allows no other storage access inside `shell/`; the complex lane caught the first cut reading localStorage in AppFrame.
+
+**Consequences.** The four locales; `shell/frame/AppFrame.tsx` (`autoOpenKey`); the four Apps (the key); `src/App.tsx` (the private modal removed). Lock: `shell/__tests__/suite-vocabulary.test.ts`.

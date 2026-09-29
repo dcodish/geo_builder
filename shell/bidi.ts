@@ -37,7 +37,8 @@ const HEBREW_LETTER = /[א-ת]/;
 // itself it would combine with the preceding character in THIS source file (the src3d/i18n/bidi.ts
 // lesson).
 const VECTOR_ARROW = String.fromCharCode(0x20d7);
-const BASE_CORE = "A-Za-z0-9'′·<½¾²³ℓ" + VECTOR_ARROW + 'Α-ω|∠∡∢⊥∥△▲√⌢°';
+// #1348 (ADR-W-095): ≤ ≥ join < — a comparison the palette now inserts is a relation glyph like it
+const BASE_CORE = "A-Za-z0-9'′·<≤≥½¾²³ℓ" + VECTOR_ARROW + 'Α-ω|∠∡∢⊥∥△▲√⌢°';
 
 /**
  * Delimiters that HUG a run and belong inside the isolate with it — `(1, 2, -3)` is the shape
@@ -99,6 +100,26 @@ const FORMAT_CONTROLS = /[\u061C\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g
  */
 export function stripFormatControls(s: string): string {
   return s.replace(FORMAT_CONTROLS, '');
+}
+
+/**
+ * #1348 (ADR-W-095) — the keyboard spelling of a comparison becomes its mathematical symbol: `>=` → `≥`,
+ * `<=` → `≤`. «BC>=10» parsed and was honoured, but the recorded fact — the row, the save file, the
+ * export, the log — kept the keyboard shorthand. Every grammar that reads the ASCII form reads the glyph
+ * the same way (measured, all four products), so the fold changes what is recorded, never what it means.
+ * Only a bare two-character operator is folded: `<=>`, `>==`, `=<=` are left alone.
+ */
+export function foldComparisons(s: string): string {
+  return s.replace(/(?<![<>=!])>=(?![=>])/g, '≥').replace(/(?<![<>=!])<=(?![=>])/g, '≤');
+}
+
+/**
+ * THE STORE-SIDE INGEST (ADR-W-029, extended by #1348): what a product records from typed text — the
+ * format controls stripped and the comparisons folded. Every product store calls THIS, so the recorded
+ * fact is the same text whichever way it was entered.
+ */
+export function ingestTypedText(s: string): string {
+  return foldComparisons(stripFormatControls(s));
 }
 
 const FSI = '\u2068'; // FIRST STRONG ISOLATE

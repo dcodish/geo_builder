@@ -109,11 +109,17 @@ describe('#754 — the volume sibling: «נפח הפירמידה» is a GIVEN, n
     expect(scaleKnown3(derive3(state().facts, 0).construction)).toBe(true);
   });
 
-  it('a later size against still-free dims refuses honestly instead of accusing the student', () => {
+  it('a later size against still-free dims DRIVES them — both magnitudes hold (#1447, ruled 2026-09-27)', () => {
     submit('פירמידה ישרה מרובעת ABCDS');
     submit('נפח הפירמידה ABCD = 11');
-    submit('|AB| = 4'); // satisfiable, but pinning a shape dim is not built — refuse, never refute
-    expect(err()).toEqual({ code: 'size-on-solid' });
+    submit('|AB| = 4'); // satisfiable: the volume demotes to its own pin and the two drive together
+    expect(err()).toBeNull();
+    expect(state().facts).toHaveLength(3);
+    for (const seed of [0, 1, 2]) {
+      const d = derive3(state().facts, seed);
+      expect(Object.values(d.status).every((s) => s === 'ok'), `seed ${seed}: all facts ok`).toBe(true);
+      expect(dist3(d.positions.get('A')!, d.positions.get('B')!), `seed ${seed}: |AB|`).toBeCloseTo(4, 6);
+    }
   });
 });
 

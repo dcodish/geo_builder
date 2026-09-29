@@ -386,7 +386,7 @@ export interface Resolved3 {
    *  the pool holds more than one solution, since that is the only case where a coordinate can be a
    *  branch choice. A coordinate is knowledge only when these agree; without it, a deterministic
    *  branch pick reads seed-stable and prints as fact. */
-  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this). */ scalarConsumed?: () => number } | null;
+  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this). */ scalarConsumed?: () => { dims: number; block: number } } | null;
   /** #930 (ADR-3D-236) — each vec-def RATIO symbol's solved value («SN = k·SC» → k), so a consumer can
    *  read what the branch pick actually chose. The sign verifier needs it: without it a correctly
    *  honoured «k חיובי» reported `sign-unsatisfiable`, because the verifier knew how to read a figure
@@ -867,13 +867,20 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     // #990 (ADR-3D-248): what the scalar pins CONSUME is measured by the resolution (the rank of their
     // residuals' response to the dims), not inferred from their count — a pin the corner's construction
     // already satisfies consumes nothing. The count is the fallback only where no solution recorded it.
-    const consumed = resolved.pivot.scalarConsumed?.() ?? c.scalarPins.length;
+    const sc = resolved.pivot.scalarConsumed?.();
+    const consumed = sc?.dims ?? c.scalarPins.length;
+    const blockConsumed = sc?.block ?? 0;
     // #370 (ADR-3D-247 — the 2026-08-13 ruling "count them"): when the placement is SAMPLED (an absolute
     // object on the canvas, the translation gauge still free — `placementSampled3`, the sampler's own
     // predicate, so the count and the sampling share one source) the 6 placement DOFs are real: only the
     // scale is still gauge, so the allowance absolute pins consume before they cost shape drops from 7 to 1.
     const placement = placementSampled3(c) ? 6 : 0;
-    return Math.max(0, dims + placement - Math.max(0, pinCount - (7 - placement)) - consumed) + freeT + param;
+    // #1415: the scalar pins' consumption is measured in TWO parts and each subtracts from the term
+    // that counts it — `dims` (the #990 number, unchanged) inside the dims clamp, and `block` (the
+    // MARGINAL rank over the block-enrolled free-point coordinates) from `freeT`, clamped on its
+    // own. On «וקטור AB» · «אורך AB = 5» the length consumes one of the six; an over-pinned solid's
+    // deficit can no longer eat an unrelated rider's genuine freedom (the #820 lock's line).
+    return Math.max(0, dims + placement - Math.max(0, pinCount - (7 - placement)) - consumed) + Math.max(0, freeT - blockConsumed) + param;
   }
   // #370: a floating figure beside an absolute object — its placement is sampled, and counted.
   return dims + (placementSampled3(c) ? 6 : 0) + freeT + param;
