@@ -11025,6 +11025,28 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 
 **Consequences.** `engine/evaluate.ts` (the normalisation block). Lock: `issue-1421-gauge.test.ts`.
 
+## ADR-3D-280 — «הצג בניה» for a line × plane angle: a point on the line, its height, and the foot joined to the crossing (#1491)
+
+**Status:** accepted · 2026-09-28 · operator request playing round #1488 (T20, 2026-09-27), plan approved the same day with the 90° ruling · round #1517 · feature → PR. Numbered 280 beside the round's parallel branches (273–279).
+
+**Requirements:** docs/02b FR-RD-11 (extended to line × plane) · **Design:** docs/04b — the line × plane construction
+
+**Context.** The operator, on a stated line × plane angle: «i would also want to see a builder for showing how the angle is calculated so we take a point on the line (ideally we have a point given) and draw a height to the plane and connect it with the intersection point». #1476 (ADR-3D-265) built the «הצג בניה» chip for plane × plane angles only.
+
+**Decision.** Generalise #1476's chip; add no second chip family.
+- **Rows.** `dihedralsStatedBy` also yields a `line-rel` angle whose operand is planar (a named line against a plane) and a `line-plane-angle` (a segment against a point-run plane), normalized exactly as the scene's object-angle arc lane normalizes the same records. So that lane's `pairKey` cede lets the free arc give way to the construction, and the angle is marked once. State, undo, save/load, share and pruning are #1476's, unchanged.
+- **Geometry.** `linePlaneConstruction` (dihedral.ts): X is the line's crossing with the plane. P is the segment's own endpoint off the plane (S for «SA», C' for «AC'»), else a named point lying on the line (nearest X, then the letter), else a point `fallbackLen` along the line toward the figure. H is P's foot. It returns null for a parallel line (no crossing) and a perpendicular one (collinear).
+- **Scene.** `buildScene3` dispatches on the resolved geometry: a line-ish × planar pair draws PH and XH dashed, a knee at H, and the stated arc at X. An unnamed X or H takes the first free letter (#1476's display-name rule); a named point there keeps its name. `SceneDihedral3` gains `extra` points for H and an unnamed P.
+- **90°.** Per the ruling, P, H and X are collinear, so nothing is constructed. The knee lane now cedes only pairs a construction was actually drawn for (`drawnConstr`, previously every switched-on pair), so the stated knee stays.
+
+**Rejected.** A separate chip family for line × plane: two sets of state, save keys and prune rules for one gesture.
+
+**Deviation from plan.** The fallback P sits `0.6 × the figure radius` from X in world units, not a fixed on-screen distance. The knee and arc lanes take world vertices before the pixel scale is known; the view fits the figure, so the result is close to a fixed on-screen length.
+
+**Measured.** On main `d3f08a4c`, a line × plane angle row owned no chip. On the branch: ℓ × π = 45 draws PH ⟂ π, XH in π, one «45°» and a knee at H, with X and H lettered. Pyramid «SA × ABCD = 50» takes P = S and X = A with no new letter. Cube «AC' × ABCD = 35.264» takes P = C', H = C, X = A with no new letters. At 90° nothing extra is drawn and the knee stays.
+
+**Consequences.** `src3d/store/dihedralChips.ts` (rows), `src3d/render/dihedral.ts` (`linePlaneConstruction`), `src3d/render/scene3.ts` (the dispatch, `extra`, `drawnConstr`), `src3d/render/Figure3.tsx` (draws `extra`). Lock: `issue-1491-line-plane-construction.test.ts`: the rows, off by default, the three figures' geometry through the scene's own function, the 90° ruling, undo and save/load.
+
 ## ADR-3D-273 — A failing fact is atomic, and a red row's message is its latest attempt (#1413)
 
 **Status:** accepted · 2026-09-28 · found by round #1408 (noted unresolved in ADR-3D-259) · round #1517
