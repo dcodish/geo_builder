@@ -219,7 +219,8 @@ A pin acts only where the pivot owns something that moves its object — a solid
 symbol, a free rider. A coordinate point, a coord-sym point and a derived point are not pivot unknowns, so a
 pin on one is never solved against. Every pin family that can land on such an object therefore records the
 claim it drives toward (`coords-eq` for the existing-id `point3` pin, whose components are nullable: unstated
-or symbolic ones are unchecked). A coordinate claim is judged on a PLACED figure only: at a configuration
+or symbolic ones are unchecked). The given's claim (`given: true`, unlike the student's answer «K = (…)»)
+is judged on a PLACED figure only: at a configuration
 where the pivot found no placement it holds vacuously, and at the displayed seed the pin-owner guard gives
 the verdict (`injection-unsatisfiable`, newest owner only). Families that still pin with no arbiter
 (`inject-vector`, `inject-pair`, `dot-given`) are listed in ADR-3D-282's sweep, as is the missing drive for

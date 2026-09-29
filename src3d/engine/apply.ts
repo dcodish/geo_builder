@@ -1823,7 +1823,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // false restatement read green over a figure that contradicts it. The claim carries the NUMERIC
         // components only — a symbolic one («B(2t, t, k)») is the pivot's to satisfy, and null is unchecked.
         if (cmd.x !== null || cmd.y !== null || cmd.z !== null)
-          next.claims.push({ type: 'coords-eq', id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z });
+          next.claims.push({ type: 'coords-eq', id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z, given: true });
         bindPartialNames(next, { kind: 'point', id: cmd.id }, cmd.syms, comps); // #814
         return { ok: true, next };
       }
