@@ -58,6 +58,11 @@ export const PROMPT_EXAMPLES_ANALYTIC: PromptExampleAnalytic[] = [
   // ADR-052, the cardinal sin, in this tool's vocabulary: an unstated coordinate is not invented.
   // A point with nothing pinning it is still a point — it is NOT given made-up coordinates.
   { freeform: 'נקודה P כלשהי במישור', steps: ['נקודה P'] },
+  // …and its other half (#1278): a value the student's own numbers DETERMINE is not invented. A line by
+  // a point and a slope is written in point-slope form, the stated numbers copied rather than computed.
+  { freeform: 'ישר שעובר דרך הנקודה (-1,5) ושיפועו -2', steps: ['הישר y-5=-2(x+1)'] },
+  // With the point NAMED, the named point stays an object and the slope stays a given on the line.
+  { freeform: 'through the point A(2,3) passes a line l1 with slope 4', steps: ['A(2,3)', 'דרך A עובר ישר l1', 'שיפוע הישר l1 הוא 4'] },
   // The honest empty list: a request this tool cannot express at all. Coordinate geometry it does not
   // have is better refused than approximated — the student is told, rather than shown a wrong figure.
   { freeform: 'find the area under the curve between x=1 and x=4', steps: [] },
@@ -83,6 +88,8 @@ const vocabOf = (entries: readonly CatalogEntryAnalytic[], locale?: 'he' | 'en')
  * The rule lines below are VERBATIM what this product's prompt has always said. #1359 changed no
  * prompt text in any tool; harmonising the wording is a separate decision with its own risk, since
  * a prompt regression is invisible to every test.
+ *
+ * #1278 (ADR-AG-186) added the first new rules since: DERIVING is not INVENTING, and never prose.
  */
 export const PROMPT_SPEC_ANALYTIC = {
   toolDescription:
@@ -104,6 +111,17 @@ export const PROMPT_SPEC_ANALYTIC = {
     '  length, do not supply one: emit the form that leaves it open (`נקודה P`, a parameter, a bare',
     '  equation) rather than a made-up number. A figure asserting a given nobody gave is the worst',
     '  outcome this tool can produce — worse than refusing.',
+    // #1278 (ADR-AG-186) — ADR-052's OTHER half. The rule above says only what may not be supplied, and
+    // the first live call read it as «do not compute»: asked for a line through (2,3) with slope 4, the
+    // model answered English prose rather than write an equation whose intercept the student never typed.
+    '- DERIVING is not INVENTING. A value the student’s own data DETERMINES may be written into a line:',
+    '  a line through a stated point with a stated slope is fully given. Write it in point-slope form,',
+    '  copying the stated numbers as they were written — (2,3) and slope 4 is `הישר y-3=4(x-2)` /',
+    '  `the line y-3=4(x-2)` — rather than an equation you computed. Only a value NOTHING stated determines',
+    '  is forbidden.',
+    // #1278 — the answer that cost a paid call and produced nothing: «a line through (2,3) with slope 4».
+    '- Every step is a command line from the forms below — NEVER prose, a paraphrase of the request, or an',
+    '  explanation. A step no form below matches is refused, exactly as if the list were empty.',
     // ADR-AG-111, the operator's 2026-09-19 ruling: the noun decides the extent.
     '- THE NOUN DECIDES WHAT IS DRAWN. «הישר AB» / "the line AB" is the infinite line; «הצלע AB» and',
     '  «הקטע AB» are the bounded segment. Use the noun the student used — swapping them changes the figure.',

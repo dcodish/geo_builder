@@ -12,6 +12,50 @@ import { parse, buildParseCtx, impliedCircleBinding, impliedPointBinding } from 
 import { autoNamedLabels, replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, renameFacts } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
+import type { ParseResult } from '@/parser';
+
+/**
+ * #1288 (ADR-555) — a parse REFUSAL: a deterministic `ok: false` the student sees by name. `not-handled`
+ * is excluded on purpose: that is an ESCALATION to the LLM, captured as an `{ llm: … }` step, never a
+ * refusal a scenario may declare.
+ */
+export type Refusal = Exclude<Extract<ParseResult, { ok: false }>, { reason: 'not-handled' }>;
+
+/**
+ * #1288 (ADR-555) — a step of the operator's exact sequence that is EXPECTED to be refused. Declared on the
+ * scenario (`Scenario.refusedSteps`), asserted by `factsOf` — NON-VACUOUSLY: the listed step must be refused
+ * with this `reason` (and every field of `with`), and a step that is refused without a row fails the
+ * scenario exactly as before. A listed step that PARSES fails too, so a row can never outlive the ruling it
+ * documents (the `KNOWN_GATE_FALSE_BLOCKS` discipline). A refused step commits nothing, as in the app, and
+ * the replay continues without it; it still consumes its typed-step number, so an `edit.step` index keeps
+ * counting what the student typed.
+ */
+export interface RefusedStep {
+  /** 1-based position of the step in the scenario's `steps` array; it must be a STRING step. */
+  step: number;
+  /** The refusal the parser must return. */
+  reason: Refusal['reason'];
+  /** Optional: fields of the refusal payload that must match exactly (e.g. `{ holder: 'B', id: 'D' }`). */
+  with?: Record<string, unknown>;
+  /** The ruling that makes this a refusal (readable record; required so a row always says why). */
+  why: string;
+}
+
+/** Check a declared refusal against what the parser returned; returns the failure message, or null. */
+function refusalMismatch(row: RefusedStep, step: string, r: ParseResult): string | null {
+  const at = `refusedSteps row for step ${row.step} «${step}»`;
+  if (r.ok) {
+    return `${at}: expected a ${row.reason} refusal, but the step now PARSES (${r.commands.length} command(s)) — the ruling it documents no longer holds; delete the row and assert the built figure instead`;
+  }
+  if (r.reason !== row.reason) return `${at}: expected reason ${row.reason}, got ${JSON.stringify(r)}`;
+  for (const [k, v] of Object.entries(row.with ?? {})) {
+    const got = (r as Record<string, unknown>)[k];
+    if (JSON.stringify(got) !== JSON.stringify(v)) {
+      return `${at}: expected ${k} = ${JSON.stringify(v)}, got ${JSON.stringify(got)} (${JSON.stringify(r)})`;
+    }
+  }
+  return null;
+}
 
 export type Step =
   | string
@@ -33,9 +77,21 @@ export function ctxOf(facts: Fact[]) {
  *  `run`, the seed-sweep oracle, and the E7 round-trip properties (all via the harness — importing a
  *  .test.ts from another test would double-register every scenario), so all drive the exact pipeline the
  *  app does. */
-export function factsOf(steps: Step[]): Fact[] {
+export function factsOf(steps: Step[], refused: readonly RefusedStep[] = []): Fact[] {
   let facts: Fact[] = [];
   let g = 0;
+  // #1288: the declared refusals, by 1-based step position. A row beyond `steps` is ignored HERE so a
+  // PREFIX of a scenario (`steps.slice(0, i)`) replays with the scenario's own rows; `scenarioFacts` in the
+  // harness is the whole-scenario entry point and rejects an out-of-range row there.
+  const refusedAt = new Map<number, RefusedStep>();
+  for (const row of refused) {
+    if (refusedAt.has(row.step)) throw new Error(`refusedSteps: step ${row.step} is listed twice`);
+    refusedAt.set(row.step, row);
+    if (row.step >= 1 && row.step <= steps.length && typeof steps[row.step - 1] !== 'string') {
+      throw new Error(`refusedSteps: step ${row.step} is not a typed (string) step — only a typed sentence can be refused`);
+    }
+  }
+  let index = 0;
   const push = (group: string, utterance: string, cmd: AnyCommand) =>
     facts.push({ id: `${group}.${facts.length}`, utterance, group, cmd, enabled: true });
   // Mirror the app's per-step commit: a newly-appended cyclable variant's DEFAULT settles to the first
@@ -45,6 +101,7 @@ export function factsOf(steps: Step[]): Fact[] {
     facts = settleVariantDefaults(facts, (f) => f.group === group, 0);
   };
   for (const step of steps) {
+    index++;
     if (typeof step === 'object' && 'edit' in step) {
       // The app's ✎ path (ADR-241): parse against the PREFIX (facts before the edited group — the
       // context the replacement is replayed in), then splice in place. An edit adds no new step group.
@@ -108,6 +165,18 @@ export function factsOf(steps: Step[]): Fact[] {
           facts = rn.facts;
         }
         r = parse(step, ctxOf(facts));
+      }
+      const row = refusedAt.get(index);
+      if (row) {
+        // #1288: a DECLARED refusal — asserted, then skipped: a refused sentence never becomes a fact.
+        const bad = refusalMismatch(row, step, r);
+        if (bad) throw new Error(bad);
+        continue;
+      }
+      if (!r.ok && r.reason !== 'not-handled') {
+        throw new Error(
+          `scenario step was REFUSED (${JSON.stringify(r)}): ${JSON.stringify(step)} — if the refusal is the behaviour under test, declare it in the scenario's refusedSteps (#1288)`,
+        );
       }
       if (!r.ok) throw new Error(`scenario step did not parse (would escalate to the LLM): ${JSON.stringify(step)}`);
       for (const cmd of r.commands) push(group, step, cmd);

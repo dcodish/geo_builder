@@ -12,6 +12,8 @@ import { parse, buildParseCtx, droppedWordRelations } from '@/parser';
 import { replay } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
+import { findInkCrossings } from '@/engine';
+import { buildScene } from '@/render/scene';
 import { withVariant, variantCountOf } from '@/engine/variants';
 
 function buildFacts(steps: string[]): Fact[] {
@@ -273,9 +275,7 @@ describe('#197 Am. 6 — naming the tangents’ MEET', () => {
 });
 
 describe('#197 Am. 7 — the naming DOT at a drawn-line × segment crossing', () => {
-  it("the touch tangent's visible crossings with the two-touch tangents offer pick dots (the operator's red marks)", async () => {
-    const { buildScene } = await import('@/render/scene');
-    const { findInkCrossings } = await import('@/engine');
+  it("the touch tangent's visible crossings with the two-touch tangents offer pick dots (the operator's red marks)", () => {
     // The operator's exact figure: tangent circles, both two-touch tangents, then the touch tangent.
     const facts = buildFacts(['שני מעגלים משיקים מבחוץ', 'משיק משותף', 'משיק משותף', 'משיק משותף']);
     const fig = replay(facts);

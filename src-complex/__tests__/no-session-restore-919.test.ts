@@ -20,18 +20,26 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const ROOT = join(__dirname, '..', '..');
 
 describe('#919/#1238 — no builder restores a session at boot', () => {
-  it('a populated session key is ignored on import: the store, and the session module, read nothing', async () => {
+  /**
+   * The IMPORT is the act under test, so it cannot be a static import (a static import runs before any
+   * setup, i.e. before the populated storage exists). It runs here, in a hook with its own generous
+   * timeout, rather than inside the `it` body: a module load under full-suite load can take seconds, and
+   * a test body's 5 s budget must not pay it (#1417, ADR-W-102).
+   */
+  let reads = 0;
+  let useComplexStore!: typeof import('../store/useComplexStore').useComplexStore;
+  let offer!: typeof import('../app/sessionPersistCx');
+  beforeAll(async () => {
     const stored = JSON.stringify({ v: 1, savedAt: new Date().toISOString(), payload: '{"app":"complex-builder","version":1,"lines":["z = 1 + i"]}' });
     const store = new Map<string, string>([
       ['complex-proto-session', stored], // the DEAD key — nothing may resurrect it
       ['complex-builder:session', stored], // the live one — read only when the student asks
     ]);
-    let reads = 0;
     (globalThis as { localStorage?: unknown }).localStorage = {
       getItem: (k: string) => {
         reads++;
@@ -44,22 +52,24 @@ describe('#919/#1238 — no builder restores a session at boot', () => {
         store.delete(k);
       },
     };
-    try {
-      const { useComplexStore } = await import('../store/useComplexStore');
-      // Importing the OFFER module must be as inert as importing the store: the read happens in the
-      // app's mount effect, and only to decide whether to show a banner.
-      const offer = await import('../app/sessionPersistCx');
-      expect(useComplexStore.getState().lines).toEqual([]);
-      expect(reads, 'nothing in the product reads browser storage at IMPORT').toBe(0);
+    ({ useComplexStore } = await import('../store/useComplexStore')); // load-in-body-ok: importing with a populated key IS the test; hook timeout 60 s
+    // Importing the OFFER module must be as inert as importing the store: the read happens in the
+    // app's mount effect, and only to decide whether to show a banner.
+    offer = await import('../app/sessionPersistCx'); // load-in-body-ok: as above
+  }, 60_000);
+  afterAll(() => {
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+  });
 
-      // And the offer, when it IS asked for, reports rather than restores.
-      const found = offer.offeredSessionCx();
-      expect(reads, 'offeredSession reads — that is its job').toBeGreaterThan(0);
-      expect(found?.payload, 'it reports what could be restored').toContain('z = 1 + i');
-      expect(useComplexStore.getState().lines, 'and restores nothing by itself').toEqual([]);
-    } finally {
-      delete (globalThis as { localStorage?: unknown }).localStorage;
-    }
+  it('a populated session key is ignored on import: the store, and the session module, read nothing', () => {
+    expect(useComplexStore.getState().lines).toEqual([]);
+    expect(reads, 'nothing in the product reads browser storage at IMPORT').toBe(0);
+
+    // And the offer, when it IS asked for, reports rather than restores.
+    const found = offer.offeredSessionCx();
+    expect(reads, 'offeredSession reads — that is its job').toBeGreaterThan(0);
+    expect(found?.payload, 'it reports what could be restored').toContain('z = 1 + i');
+    expect(useComplexStore.getState().lines, 'and restores nothing by itself').toEqual([]);
   });
 
   it('the auto-restore seam is gone, not disabled', () => {

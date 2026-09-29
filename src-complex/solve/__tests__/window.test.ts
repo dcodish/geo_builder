@@ -10,6 +10,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { deriveLines } from '../../app/deriveLines';
+import { acceptLine } from '../../app/submit';
 import { argAbove, argBelow, quadrant } from '../filter';
 import { type AffineArg, projectWindow, statedWindow, violatesDeg } from '../window';
 
@@ -134,8 +135,7 @@ describe('#690 — a filter holds whatever ROLE elimination gives its name', () 
     expect(d.unsatisfied).toEqual(['z1 ברביע השני']);
   });
 
-  it('…and the acceptance gate therefore BLAMES that line instead of accepting it', async () => {
-    const { acceptLine } = await import('../../app/submit');
+  it('…and the acceptance gate therefore BLAMES that line instead of accepting it', () => {
     const verdict = acceptLine(['z1 = 3+4i'], 'z1 ברביע השני', 0);
     expect(verdict.ok).toBe(false);
   });

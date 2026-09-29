@@ -101,6 +101,13 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'lines', family: 'F3', he: 'דרך P עובר ישר', en: 'a line through P' },
   { category: 'lines', family: 'F3', he: 'דרך P עובר ישר l3', en: 'line l3 through P' },
   /**
+   * A line by a POINT AND A SLOPE (#1278, ADR-AG-186) — written in point-slope form, the stated numbers
+   * copied as given. The equation layer evaluates it as it stands (no CAS: nothing is simplified), so
+   * the textbook's own form needs no arithmetic from the student or from the LLM lane, which had no
+   * pattern for this construct and answered in prose.
+   */
+  { category: 'lines', family: 'F3', he: 'הישר y-3=4(x-2)', en: 'the line y-3=4(x-2)' },
+  /**
    * The exam names its lines by NUMERAL (#1298, #1318; ADR-AG-144 — operator ruling 2026-09-21: a digit
    * may name a line). «הישר 1» and «הישר I» declare and refer wherever a name works.
    */
@@ -423,6 +430,14 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'the slope of AB is 2',
     needs: ['משולש ABC'],
   },
+  /** The same construct with the point NAMED (#1278): a free-direction line through it, then its slope. */
+  {
+    category: 'relations',
+    family: 'F19',
+    he: 'שיפוע הישר l1 הוא 4',
+    en: 'the slope of line l1 is 4',
+    needs: ['A(2,3)', 'דרך A עובר ישר l1'],
+  },
   /**
    * The SIGN of a slope (#1323, ADR-AG-144) — the exam's «ושיפועו שלילי», which picks between two
    * configurations. A selector inside validity, never a value keyword in the slope rule.
@@ -727,5 +742,14 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     // quadrilateral and the English draws none.
     en: 'G is the intersection of the diagonals of quadrilateral ABCD',
     needs: ['A(-2,1)', 'B(4,5)', 'C(5,2)', 'D(-1,-2)'],
+  },
+  // The same point with NO letters (#1283): the shape is the one quadrilateral the figure holds,
+  // resolved exactly as «האלכסונים נפגשים בנקודה O» is — and refused when there is none or several.
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'M מפגש האלכסונים',
+    en: 'M is the intersection of the diagonals',
+    needs: ['טרפז ABCD'],
   },
 ];

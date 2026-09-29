@@ -19,7 +19,7 @@ import { derive3, useGeo3 } from '../store/store3';
 import { cross3, dot3, norm3, normalize3, sub3, type Vec3 } from '../engine/vec3';
 // #1305: every module a test uses is imported HERE, at collection — never `await import()` inside a
 // test body, where its load latency (queued on the shared vite-node server under full-suite load)
-// is charged to the 5 s per-test timeout. Locked by `test-imports-at-collection.test.ts`.
+// is charged to the 5 s per-test timeout. Locked workspace-wide by `server/__tests__/test-imports-at-collection.test.ts` (#1417).
 import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
 import { serializeFigure3, deserializeFigure3 } from '../store/figureFile3';

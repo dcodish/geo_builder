@@ -15,7 +15,7 @@
  * solved with the gauge frozen is decided by `isAbsolute` over its operands, never by its pin kind.
  */
 
-import type { ComponentTarget, Construction3, Id, MutualRel3, Operand3 } from './types';
+import type { Claim3, ComponentTarget, Construction3, Id, MutualRel3, Operand3 } from './types';
 import type { ResolvedLine, ResolvedPlane } from './evaluate';
 import { cross3, dot3, runNormal, norm3, sub3, v3, type Vec3 } from './vec3';
 
@@ -148,27 +148,58 @@ export function resolveOperand(op: Operand3, c: Construction3, abs: AbsoluteCtx)
   }
 }
 
+/**
+ * #1472 (ADR-3D-286) — what a relation READS of its operands: only their DIRECTIONS (⟂ / ∥ / an angle —
+ * a normal for a plane, a direction for a line), or their POSITIONS too (coincidence, containment,
+ * intersection, distance — which also read a plane's offset and a line's anchor).
+ */
+export type ParamReads = 'direction' | 'position';
+
+/**
+ * #1472 (ADR-3D-286) — does this operand's geometry, AS THE RELATION READS IT, carry the figure
+ * parameter? The one question behind every parameter pin: a relation pins the parameter iff an operand
+ * it reads depends on it (the #1439 rule, with the reading made explicit instead of assumed to be the
+ * direction).
+ *
+ * - an equation plane: its normal (`direction`), or any of `cx, cy, cz, d` (`position`);
+ * - a parametric line: its direction, or any anchor or direction component;
+ * - a plane∩plane line: either of its planes, read the same way;
+ * - everything else never carries it — a coordinate point is a constant, a figure object rides the gauge,
+ *   and the derived line kinds resolve later from other objects.
+ *
+ * A FREE plane or line carries no equation (#487/#552) and a PIN-SYMBOL object's letter is the pivot's
+ * (#801), so neither carries THE figure parameter.
+ */
+export function operandCarriesParam(c: Construction3, op: Operand3, reads: ParamReads): boolean {
+  if (op.kind === 'plane-named') {
+    const def = c.planes.get(op.name);
+    if (!def || def.free || def.sym) return false;
+    const es = reads === 'direction' ? [def.cx, def.cy, def.cz] : [def.cx, def.cy, def.cz, def.d];
+    return es.some((e) => e.p !== 0);
+  }
+  if (op.kind === 'line') {
+    const def = c.lines.get(op.name);
+    if (!def) return false;
+    if (def.kind === 'parametric') return !def.sym && (reads === 'direction' ? def.dir : [...def.anchor, ...def.dir]).some((e) => e.p !== 0);
+    if (def.kind === 'plane-plane')
+      return operandCarriesParam(c, { kind: 'plane-named', name: def.p1 }, reads) || operandCarriesParam(c, { kind: 'plane-named', name: def.p2 }, reads);
+    return false;
+  }
+  return false;
+}
+
 /** S2 (#378): does this equation plane's NORMAL carry the figure parameter? (The offset `d` alone
- *  cannot change a direction relation, so it deliberately does not count.) */
-export const planeNormalCarriesParam = (c: Construction3, name: string): boolean => {
-  const def = c.planes.get(name);
-  // #801 (ADR-3D-174): "carries THE FIGURE PARAMETER" means the ALGEBRAIC lane's letter. A plane whose
-  // coefficients are in a PIN symbol carries a letter the pivot owns, so it neither pins nor is pinned
-  // BY the root-find — routing it there would root-find over a value another mechanism already fixed.
-  return !!def && !def.sym && (def.cx.p !== 0 || def.cy.p !== 0 || def.cz.p !== 0);
-};
+ *  cannot change a direction relation, so it deliberately does not count.) #1472: the `direction` case
+ *  of {@link operandCarriesParam}. */
+export const planeNormalCarriesParam = (c: Construction3, name: string): boolean =>
+  operandCarriesParam(c, { kind: 'plane-named', name }, 'direction');
 
 /** S2 (#378): does this named line's DIRECTION carry the figure parameter? A parametric line's
  *  anchor alone doesn't count (∥/⟂/angle read the direction only); a plane∩plane line inherits
  *  from its planes' normals. Derived kinds (common-perp, projection, through) stay `false` —
- *  their relations live in the claim lane. */
-export const lineDirCarriesParam = (c: Construction3, name: string): boolean => {
-  const def = c.lines.get(name);
-  if (!def) return false;
-  if (def.kind === 'parametric') return !def.sym && def.dir.some((e) => e.p !== 0); // #801: the pin-symbol lane is not this one
-  if (def.kind === 'plane-plane') return planeNormalCarriesParam(c, def.p1) || planeNormalCarriesParam(c, def.p2);
-  return false;
-};
+ *  their relations live in the claim lane. #1472: the `direction` case of {@link operandCarriesParam}. */
+export const lineDirCarriesParam = (c: Construction3, name: string): boolean =>
+  operandCarriesParam(c, { kind: 'line', name }, 'direction');
 
 /** #801 (ADR-3D-174): the PIN SYMBOL a named line's numbers are written in — null when the line is not
  *  pin-symbol parametric (numeric, the algebraic lane's, or a derived kind). */
@@ -180,46 +211,95 @@ export const lineSym3 = (c: Construction3, name: string): string | null => {
 /** #801: the plane edition of {@link lineSym3}. */
 export const planeSym3 = (c: Construction3, name: string): string | null => c.planes.get(name)?.sym ?? null;
 
-/** A direction relation between two NAMED EQUATION planes that pins the figure parameter (#1439). */
-export interface PlanePinRel3 {
-  rel: 'perp' | 'parallel' | 'angle';
-  deg?: number;
-  p1: string;
-  p2: string;
+/**
+ * #1472 (ADR-3D-286) — a recorded relation between two ABSOLUTE objects that can pin the figure
+ * parameter: the claim itself (its kind and relation say which of the verifier's functions judges it),
+ * its two operands in a uniform `a`/`b` shape, and what it reads of them.
+ */
+export interface ParamPinRel3 {
+  claim: Extract<Claim3, { type: 'plane-rel' | 'line-rel' | 'mutual-rel' | 'distance-rel' }>;
+  a: Operand3;
+  b: Operand3;
+  reads: ParamReads;
 }
 
 /**
- * #1439 (ADR-3D-263) — the plane × plane twin of `paramPinningLineRels`: which stated relations between
- * two NAMED equation planes PIN the figure parameter. The rule is the line column's, applied to the
- * plane column: a ⟂ / ∥ / angle between named planes pins the parameter iff one side's NORMAL carries
- * it (the offset alone cannot change a direction relation). Every other instance is a CLAIM, verified by
- * `relDeviation` on the finished figure — the `plane-rel` apply records that claim for every instance,
- * so no relation between equation planes can escape verification whatever lane it solves in.
- *
- * Before #1439 this was decided by the RELATION WORD: «הזווית בין המישורים» went to a list only the
- * parameter machinery read (so with no parameter it was checked by nothing, and with the parameter on a
- * THIRD plane it root-found a constant into `no-roots`), while «ניצב» / «מקביל» went to the claim lane
- * even when a normal carried the parameter (so a satisfiable ⟂ was judged at a sampled value).
- *
- * Excluded, each for the reason the line twin excludes it: a FREE plane (the relation pins the PLANE —
- * `resolveFreePlane` — never the parameter; its placeholder carries none), and a PIN-SYMBOL plane (#801:
- * its letter is the pivot's, so rooting the algebraic parameter over it reads the wrong lane's letter).
- * A LABELLED angle («היא α») names a measure and is never recorded as a claim, so it never appears here.
+ * #1472 (ADR-3D-286) — may this operand take part in a parameter pin? Only objects whose geometry the
+ * root-find can rebuild at a candidate parameter value WITHOUT the figure: an equation plane, a
+ * parametric or plane∩plane line, a coordinate-given point, and the coordinate frame. A figure point, a
+ * segment or a point-run plane rides the gauge — gauge × absolute stays claim-gated (the #386 lane) —
+ * and free / pin-symbol objects belong to other mechanisms (#487, #552, #801).
  */
-export function planePinningRels(c: Construction3): PlanePinRel3[] {
+export function isParamPinOperand(c: Construction3, op: Operand3): boolean {
+  switch (op.kind) {
+    case 'plane-named': {
+      const def = c.planes.get(op.name);
+      return !!def && !def.free && !def.sym;
+    }
+    case 'line': {
+      const def = c.lines.get(op.name);
+      if (!def) return false;
+      if (def.kind === 'parametric') return !def.sym;
+      if (def.kind === 'plane-plane') return isParamPinOperand(c, { kind: 'plane-named', name: def.p1 }) && isParamPinOperand(c, { kind: 'plane-named', name: def.p2 });
+      return false;
+    }
+    case 'point':
+      return c.points.get(op.id)?.kind === 'coord';
+    case 'plane-coord':
+    case 'axis':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * #1472 (ADR-3D-286) — does this recorded claim PIN the figure parameter? It does iff it is a CLOSED
+ * relation between two {@link isParamPinOperand} objects and an operand carries the parameter in what
+ * the relation reads ({@link operandCarriesParam}). The #1439 / S2 rule ("a direction relation pins iff a
+ * direction carries it") is the `direction` case; coincidence, containment, intersection and distance
+ * read position. `skew` is open (an inequality) and a labelled angle states no value, so neither pins.
+ * `null` = not a pin (it stays a claim, verified at the sampled parameter).
+ */
+export function claimPinsParam(c: Construction3, cl: Claim3): ParamPinRel3 | null {
+  if (!c.param) return null;
+  let pin: ParamPinRel3;
+  if (cl.type === 'plane-rel') {
+    if (cl.rel === 'angle' && cl.deg === undefined) return null;
+    pin = { claim: cl, a: cl.a, b: cl.b, reads: cl.rel === 'coincident' || cl.rel === 'contained' ? 'position' : 'direction' };
+  } else if (cl.type === 'line-rel') {
+    if (cl.rel === 'angle' && cl.deg === undefined) return null;
+    pin = { claim: cl, a: { kind: 'line', name: cl.line }, b: cl.op, reads: cl.rel === 'contained' ? 'position' : 'direction' };
+  } else if (cl.type === 'mutual-rel') {
+    if (cl.rel === 'skew') return null;
+    pin = { claim: cl, a: cl.a, b: cl.b, reads: cl.rel === 'parallel' ? 'direction' : 'position' };
+  } else if (cl.type === 'distance-rel') {
+    pin = { claim: cl, a: cl.a, b: cl.b, reads: 'position' };
+  } else return null;
+  if (!isParamPinOperand(c, pin.a) || !isParamPinOperand(c, pin.b)) return null;
+  if (!operandCarriesParam(c, pin.a, pin.reads) && !operandCarriesParam(c, pin.b, pin.reads)) return null;
+  return pin;
+}
+
+/**
+ * #1472 (ADR-3D-286) — THE list of stated relations that pin the figure parameter: every recorded claim
+ * {@link claimPinsParam} admits. It replaces the two per-column lists (#1439's `planePinningRels` over
+ * plane × plane direction relations, S2's `paramPinningLineRels` over `c.lineRels`), which each tested
+ * "does a DIRECTION carry the parameter" — so every relation that reads POSITION (two planes coinciding,
+ * a line lying in a plane, two lines meeting, a distance) was judged at a SAMPLED parameter and refused
+ * although a value satisfying it existed (the #909 class).
+ *
+ * Read from the recorded claims, because `apply` records one for every relation between named objects
+ * (the M1 duality): the pin and the claim it pins cannot be two lists that drift. The root-find
+ * (`evaluate.ts`: `pinningGivens` / `paramRoots`) additionally drops a relation that holds for EVERY
+ * parameter value — that identity guard needs the residual, so it lives beside the residual.
+ */
+export function paramPinningRels(c: Construction3): ParamPinRel3[] {
   if (!c.param) return [];
-  const out: PlanePinRel3[] = [];
+  const out: ParamPinRel3[] = [];
   for (const cl of c.claims) {
-    if (cl.type !== 'plane-rel') continue;
-    if (cl.rel !== 'perp' && cl.rel !== 'parallel' && cl.rel !== 'angle') continue;
-    if (cl.rel === 'angle' && cl.deg === undefined) continue;
-    if (cl.a.kind !== 'plane-named' || cl.b.kind !== 'plane-named') continue;
-    const [p1, p2] = [cl.a.name, cl.b.name];
-    const d1 = c.planes.get(p1);
-    const d2 = c.planes.get(p2);
-    if (!d1 || !d2 || d1.free || d2.free || d1.sym || d2.sym) continue;
-    if (!planeNormalCarriesParam(c, p1) && !planeNormalCarriesParam(c, p2)) continue;
-    out.push({ rel: cl.rel, ...(cl.deg !== undefined ? { deg: cl.deg } : {}), p1, p2 });
+    const pin = claimPinsParam(c, cl);
+    if (pin) out.push(pin);
   }
   return out;
 }
@@ -368,6 +448,48 @@ export function relDeviation(
   if (rel === 'parallel') return mixed ? cos : sin;
   const target = ((deg ?? 0) * Math.PI) / 180;
   return Math.abs(cos - (mixed ? Math.sin(target) : Math.cos(target)));
+}
+
+/**
+ * #1472 (ADR-3D-286) — the SIGNED form of {@link relDeviation}: `|relSignedResidual| === relDeviation`
+ * for every pair. A root-find needs the sign — a ⟂ between two normals CROSSES zero (n1·n2 changes sign)
+ * where the unsigned deviation only touches it — and it must stay the verifier's own reading, so the
+ * pinned root and the recorded claim cannot disagree. Extracted from the two per-column copies the
+ * parameter root-find kept (#1439's plane × plane residual, S2's line residual), which were this function
+ * written twice.
+ */
+export function relSignedResidual(
+  rel: 'perp' | 'parallel' | 'angle',
+  deg: number | undefined,
+  a: OperandGeom,
+  b: OperandGeom,
+): number | null {
+  const ca = characteristic(a);
+  const cb = characteristic(b);
+  if (!ca || !cb) return null;
+  const den = norm3(ca.v) * norm3(cb.v);
+  if (den < 1e-12) return null;
+  const cosSigned = dot3(ca.v, cb.v) / den;
+  const sin = norm3(cross3(ca.v, cb.v)) / den;
+  const mixed = ca.planar !== cb.planar;
+  if (rel === 'perp') return mixed ? sin : cosSigned;
+  if (rel === 'parallel') return mixed ? cosSigned : sin;
+  const target = ((deg ?? 0) * Math.PI) / 180;
+  return Math.abs(cosSigned) - (mixed ? Math.sin(target) : Math.cos(target));
+}
+
+/**
+ * #1472 (ADR-3D-286) — a representative point ON an operand: its own point, or for a plane given by its
+ * equation alone the foot of the origin on it. Lets a position relation be measured as "how far is a point
+ * of one side from the other" in any pairing, without a case per kind.
+ */
+export function pointOnOperand(g: OperandGeom): Vec3 | null {
+  if (g.point) return g.point;
+  if (!g.normal || g.d === undefined) return null;
+  const n2 = dot3(g.normal, g.normal);
+  if (n2 < 1e-24) return null;
+  const k = -g.d / n2;
+  return v3(g.normal.x * k, g.normal.y * k, g.normal.z * k);
 }
 
 /**

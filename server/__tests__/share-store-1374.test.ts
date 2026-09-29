@@ -279,7 +279,8 @@ describe('#1374 — the share page sends the student where the builder really is
     const res = mockRes();
     const id = await shareOk({ ...GOOD, tool });
     await handleSharePage(mockReq('', 'GET', `/g/${id}`), res, { dir, origin: 'https://x', dev });
-    const m = /location\.replace\("([^"]+)"\)/.exec(String(res.body));
+    // #1380: the script is a constant that follows the fallback link, so the link IS its target.
+    const m = /<a id="go" href="([^"]+)"/.exec(String(res.body));
     return m?.[1] ?? '(no redirect)';
   };
 

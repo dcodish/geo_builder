@@ -80,9 +80,14 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   where u = AB is (2,0,0), «AB = (5,5,5)» or «AB = (5, n, p)» over typed A and B, and «u·v = 24» where u·v = 0
   are refused with the same message as a false coordinate; on a cube or a free vector the statement still
   moves the figure. A true restatement stays green, and a component left symbolic or unstated is not
-  checked. *(Gap: a length, angle, ratio or ⊥ given over typed points is still accepted unchecked while a
-  sphere, cone or cylinder of unstated size is on the canvas — #1567.)* *(Realised —
-  [ADR-3D-284](06b-decisions-3d.md#adr-3d-284), #1560; `issue-1560-vector-pin-claims.test.ts`.)*
+  checked. *(Realised — [ADR-3D-284](06b-decisions-3d.md#adr-3d-284), #1560; `issue-1560-vector-pin-claims.test.ts`.)*
+  **A length, angle, length ratio or ⊥/∥-to-plane given is judged whatever else is on the canvas.** With a
+  sphere or cone of unstated size present, «|AB| = 5» where |AB| is 2, «|AB| = 3|AD|», «הזווית BAD היא 40»
+  where the angle is 90°, and «AE ⊥ BCD» / «AE ∥ BCD» that do not hold are refused with the same message
+  as a false coordinate, and a true one stays green. «|SO| = 4» on a cone whose height was never stated is
+  refused too (operator ruling 2026-09-29): a stated length does not yet set a revolution's size (#1569). On
+  a solid the same statement still drives the solid. *(Realised — [ADR-3D-285](06b-decisions-3d.md#adr-3d-285),
+  #1567; `issue-1567-pin-arbiters.test.ts`.)*
 - **FR-SP-6 (Must)** — **A stated new label must land on the figure.** A decomposition that loses a point
   the student named is **refused, naming the label** — never committed with the point missing. A label
   that already exists is context, not a drop. *(Realised — `droppedNewLabels3`, `honesty3.test.ts`.)*
@@ -316,7 +321,13 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   refused when false and its value is drawn only when it holds. When a plane's equation carries the
   figure's parameter in its normal, the relation instead **pins the parameter** (its roots are the figure's
   configurations), and a parameter on some other plane never affects it
-  ([ADR-3D-263](06b-decisions-3d.md#adr-3d-263), #1439).
+  ([ADR-3D-263](06b-decisions-3d.md#adr-3d-263), #1439). The same holds for **every closed relation between
+  two objects given by equations or coordinates** — two planes coinciding, a line lying in a plane, two lines
+  meeting or coinciding, a distance between any two of them: when an object carries the parameter in what the
+  relation reads (a normal or offset, a direction or anchor), the relation **determines the parameter**, and
+  when no value of it can satisfy the relation the refusal names the statement rather than calling it wrong.
+  A relation that holds **for every value** of the parameter determines nothing — the parameter stays free
+  and «הציגו תצורה אחרת» varies it ([ADR-3D-286](06b-decisions-3d.md#adr-3d-286), #1472).
 - **FR-CL-2 (Must)** — **No claim can escape by hiding inside a composite.** Every claim is recorded on
   the construction and verified on evaluation, so a claim arriving as part of a larger command is checked
   like any other. *(Realised — `Construction3.claims`, verified in `derive3`.)* A **role noun** is a claim
@@ -453,14 +464,17 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   elsewhere the convention is taught, never guessed.** Point labels are uppercase by convention, and 3-D
   carries case-significant tokens 2-D lacks (axes x/y/z, parameters k/m/t, vector names u/v/w, R vs r,
   ℓ), so a blanket case-fold is not available. A lowercase run **parses like its uppercase twin** in a
-  position only a label can occupy — after the angle glyph/word or a point/vertex noun (#181), or at the
-  head of a coordinate definition («c(p²,0,1)», #924). An un-anchored lowercase run («ab = 5»,
+  position only a label can occupy — after the angle glyph/word or a point/vertex noun (#181), at the
+  head of a coordinate definition («c(p²,0,1)», #924), or as the single-letter SUBJECT of a midpoint
+  statement («x אמצע SA», «x is the midpoint of SA», #1523 — axis letters included, since an axis is never
+  a midpoint). A sentence that auto-names a point («אמצע SA») does so only when it says nothing else: a
+  word it cannot read declines the line, never vanishes from it. An un-anchored lowercase run («ab = 5»,
   «ac ⊥ bd», «תיבה abcd») is **taught** — the corrected spelling is shown (#353) — and is never sent to
   the paid fallback. The case-significant lanes are byte-unchanged: `t(m-2,m,m+2)` in a line equation is
   the parameter, «נקודה x» stays the student's to disambiguate. *(Realised —
   [ADR-3D-039](06b-decisions-3d.md#adr-3d-039), [ADR-3D-092](06b-decisions-3d.md#adr-3d-092),
-  [ADR-3D-223](06b-decisions-3d.md#adr-3d-223); `lowercase-labels.test.ts`, `lowercase-nudge.test.ts`,
-  `issue-924.test.ts`. Whether a SOLID noun should become an anchor — «תיבה abcda'b'c'd'», a run the
+  [ADR-3D-223](06b-decisions-3d.md#adr-3d-223), [ADR-3D-287](06b-decisions-3d.md#adr-3d-287); `lowercase-labels.test.ts`, `lowercase-nudge.test.ts`,
+  `issue-924.test.ts`, `issue-1523-autoname-whole-utterance.test.ts`. Whether a SOLID noun should become an anchor — «תיבה abcda'b'c'd'», a run the
   nudge cannot lift — is escalated on #924: two rulings collide there.)*
 
 ## Non-goals
