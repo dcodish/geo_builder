@@ -123,6 +123,25 @@ export async function storeUsage(dir = shareStorePath()): Promise<StoreUsage> {
   }
 }
 
+/**
+ * #1380 (ADR-W-104) — how FULL the store is, as the dashboard reports it.
+ *
+ * The operator ruled a warning only — no lower per-share cap, no daily ceiling, and the #1374
+ * never-evict rule stands. One IP at the per-IP rate limit can fill the 2 GB allocation in hours, so
+ * the operator must SEE the store approaching full: `warn` from 80%, `critical` from 95%. At 100%
+ * {@link handleShare} refuses new shares (507) and old links keep working.
+ *
+ * The admin banner CALLS this rather than re-deriving the thresholds (ADR-W-053).
+ */
+export const STORE_WARN_FRACTION = 0.8;
+export const STORE_CRITICAL_FRACTION = 0.95;
+export type StoreFillLevel = 'ok' | 'warn' | 'critical';
+export function storeFillLevel(u: Pick<StoreUsage, 'bytes' | 'maxBytes'>): StoreFillLevel {
+  if (!(u.maxBytes > 0)) return 'ok';
+  const frac = u.bytes / u.maxBytes;
+  return frac >= STORE_CRITICAL_FRACTION ? 'critical' : frac >= STORE_WARN_FRACTION ? 'warn' : 'ok';
+}
+
 export interface SharedFigure {
   /** The product this figure belongs to — decides which builder the link opens. */
   tool: string;
@@ -215,6 +234,9 @@ export async function handleShare(
   const incoming = Buffer.byteLength(fragment, 'utf8') + (png?.length ?? 0);
   if (usage.bytes + incoming > usage.maxBytes) {
     // FULL. Never evict — a link already sent must not stop working (#1374 ruling).
+    // #1380: say so in the JOURNAL too, so a full store is visible in `journalctl` even when nobody
+    // has the dashboard open. One line per refusal; the rate limiter already bounds how many.
+    console.error(`[geo-proxy] share refused: store-full (${usage.bytes}/${usage.maxBytes} bytes, incoming ${incoming})`);
     return json(res, 507, { error: 'store-full', bytes: usage.bytes, maxBytes: usage.maxBytes });
   }
 
@@ -269,7 +291,18 @@ function inflatesPastCeiling(fragment: string): boolean {
   }
 }
 
-/** HTML-escape for the few values that reach the page (a title the client supplied). */
+/**
+ * #1380 (ADR-W-104) — the `/g/` page's inline hand-off script, CONSTANT on purpose.
+ *
+ * It used to embed the target URL (`location.replace("<target>")`), so its bytes differed per share
+ * and no Content-Security-Policy could allow it except `'unsafe-inline'`. Now it reads the target
+ * from the page's own fallback link, so one `'sha256-…'` source in the `/g/` CSP
+ * (deploy/apache-geo-builder.conf) allows exactly this script and nothing else. A lock holds the
+ * conf's hash equal to this string's.
+ */
+export const SHARE_HANDOFF_SCRIPT = "location.replace(document.getElementById('go').href);";
+
+/** HTML-escape for EVERY value that reaches the page (#1380: not only the client's title). */
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
@@ -295,6 +328,7 @@ function builderUrl(tool: string, dev = false): string {
  *  - **a student**, who is sent straight on to the builder with the figure in the fragment, which
  *    is the path ADR-W-079 already proved. Both a `<meta http-equiv="refresh">` and a script, so
  *    the hand-off does not depend on JS running — an iOS in-app preview sandbox may not run it.
+ *    The script is the constant {@link SHARE_HANDOFF_SCRIPT} (#1380), so a CSP hash can allow it.
  *
  * `GET /g/<id>.png` serves the preview image itself.
  */
@@ -322,8 +356,14 @@ export async function handleSharePage(
    */
   res.setHeader('x-robots-tag', 'noindex');
 
-  if (tail.endsWith('.png')) {
-    const png = await readShareImage(tail.slice(0, -4), dir);
+  // #1380: the id is bound ONCE, here, and only after `isShareId` passed — the page used to
+  // interpolate the raw `tail`, safe only because a lookup far below happened to imply the check.
+  const isImage = tail.endsWith('.png');
+  const candidate = isImage ? tail.slice(0, -4) : tail;
+  const id = isShareId(candidate) ? candidate : null;
+
+  if (isImage) {
+    const png = id ? await readShareImage(id, dir) : null;
     if (!png) {
       res.statusCode = 404;
       return void res.end('not found');
@@ -335,8 +375,8 @@ export async function handleSharePage(
     return void res.end(png);
   }
 
-  const share = await readShare(tail, dir);
-  if (!share) {
+  const share = id ? await readShare(id, dir) : null;
+  if (!id || !share) {
     res.statusCode = 404;
     res.setHeader('content-type', 'text/html; charset=utf-8');
     // A dead id is a STUDENT-facing page, so it says something a student can act on, in their
@@ -354,7 +394,11 @@ export async function handleSharePage(
   const origin = opts.origin ?? process.env.PUBLIC_ORIGIN ?? 'https://themathbible.com';
   const target = `${origin}${builderUrl(share.tool, opts.dev)}#${share.fragment}`;
   const title = share.title ? esc(share.title) : 'שרטוט גאומטרי';
-  const image = `${origin}/g/${tail}.png`;
+  // Every interpolation below is escaped — the id is already alphabet-checked and the origin is
+  // operator config, but "safe because of a guarantee held elsewhere" is what #1380 removed.
+  const image = esc(`${origin}/g/${id}.png`);
+  const pageUrl = esc(`${origin}/g/${id}`);
+  const href = esc(target);
 
   res.statusCode = 200;
   res.setHeader('content-type', 'text/html; charset=utf-8');
@@ -370,14 +414,14 @@ export async function handleSharePage(
 <meta property="og:title" content="${title}">
 <meta property="og:description" content="שרטוט גאומטרי — לחצו לפתיחה ולעריכה">
 <meta property="og:image" content="${image}">
-<meta property="og:url" content="${origin}/g/${tail}">
+<meta property="og:url" content="${pageUrl}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="${image}">
-<meta http-equiv="refresh" content="0; url=${esc(target)}">
+<meta http-equiv="refresh" content="0; url=${href}">
 </head><body style="font-family:system-ui;margin:3rem auto;max-width:34rem;line-height:1.6;color:#0f172a">
 <p>פותח את השרטוט…</p>
-<p><a href="${esc(target)}">אם הדף לא נפתח, לחצו כאן</a></p>
-<script>location.replace(${JSON.stringify(target)});</script>
+<p><a id="go" href="${href}">אם הדף לא נפתח, לחצו כאן</a></p>
+<script>${SHARE_HANDOFF_SCRIPT}</script>
 </body></html>`,
   );
 }

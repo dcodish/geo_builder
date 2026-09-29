@@ -15,7 +15,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { storeUsage } from './shareStore';
+import { storeFillLevel, storeUsage } from './shareStore';
 import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -799,6 +799,33 @@ function shareCard(u: { bytes: number; shares: number; maxBytes: number } | null
   return card(u.shares, label);
 }
 
+/**
+ * #1380 (ADR-W-104) — the share store's FILL banner: amber from 80%, red from 95%.
+ *
+ * Operator ruling: a dashboard warning only — no new caps, and the #1374 never-evict rule stands. The
+ * banner says how full the store is and what happens at 100%, because the card alone is easy to miss
+ * and a full store silently stops every new short link. The thresholds are {@link storeFillLevel}'s —
+ * called here, never re-derived (ADR-W-053). Empty string below the warning line.
+ */
+export function shareFillBanner(u: { bytes: number; shares: number; maxBytes: number } | null): string {
+  if (!u) return '';
+  const level = storeFillLevel(u);
+  if (level === 'ok') return '';
+  const pct = u.maxBytes > 0 ? Math.floor((u.bytes / u.maxBytes) * 100) : 0;
+  const mb = (n: number) => (n / (1024 * 1024)).toFixed(0);
+  const style =
+    level === 'critical'
+      ? 'background:#fef2f2;border:1px solid #fecaca;color:#b91c1c'
+      : 'background:#fffbeb;border:1px solid #fde68a;color:#92400e';
+  const head = level === 'critical' ? 'מאגר השרטוטים המשותפים כמעט מלא' : 'מאגר השרטוטים המשותפים מתמלא';
+  return (
+    `<div class="share-fill share-fill-${level}" role="alert" style="${style};border-radius:8px;padding:10px 14px;margin:14px 0">` +
+    `<strong>${esc(head)} — ${esc(pct)}%</strong> (${esc(mb(u.bytes))} מ״ב מתוך ${esc(mb(u.maxBytes))} מ״ב, ${esc(u.shares)} שרטוטים). ` +
+    `במילוי מלא שיתוף חדש ייכשל (507) — קישורים שכבר נשלחו ימשיכו לעבוד, וגם הקישור הארוך (#) ממשיך לעבוד. ` +
+    `שום דבר לא נמחק אוטומטית; פינוי מקום או הגדלת <code dir="ltr">SHARE_STORE_MAX_BYTES</code> — ידנית.</div>`
+  );
+}
+
 function card(n: string | number, l: string): string {
   return `<div class="card"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`;
 }
@@ -1057,6 +1084,7 @@ function dashboard(
      </div>
      <div class="sub">טווח נתונים: ${esc(range)}${filtered ? ' · <b>מסונן</b>' : ''}</div>
      ${filterBar(base, releases, cur, presets)}
+     ${shareFillBanner(shares)}
      <div class="cards">
        ${card(s.visitors, 'מבקרים ייחודיים')}
        ${cardLink(s.sessions, 'כניסות (sessions)', `${esc(base)}${queryString(cur, { view: cur.view === 'sessions' ? undefined : 'sessions', sid: undefined })}`, cur.view === 'sessions')}
