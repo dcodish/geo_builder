@@ -56,6 +56,8 @@
     "src3d/__tests__/issue-816.test.ts",
     "src3d/__tests__/issue-820-rider-drive.test.ts",
     "src3d/__tests__/issue-827.test.ts",
+    "src3d/__tests__/issue-863-sample-hoist.test.ts",
+    "src3d/__tests__/issue-902.test.ts",
     "src3d/__tests__/member-drive.test.ts",
     "src3d/__tests__/named-parametric-line.test.ts",
     "src3d/__tests__/plane-eq-drive.test.ts",
