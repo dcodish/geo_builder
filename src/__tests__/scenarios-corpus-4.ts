@@ -794,17 +794,25 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'existing-point-statements-lower-to-constraints',
     title: 'a statement about an EXISTING point is a constraint, never an "already defined" conflict (M1, ADR-231)',
     guards:
-      'operator prod session `fn34ptei` (2026-07-06): after "טרפז ABCD חסום במעגל" auto-created circle-O with centre O, "O מרכז מעגל חסום במשולש ABC" and "O על ED" both crashed \'O\' is already defined — and the mirrored order crashed the same way, so the figure was unbuildable in ANY order. Root cause (the recurring ADR-075/099/115/119/124 class): the ADR-028/050 reinterpretation mechanism was GATED — point-on-segment required the existing point to own a free param DOF, placements gave up without a free param ancestor, and the conflict branch never recruited. Fix (M1): any existing GeoPoint lowers to its defining incidences (collinear + the stated within/beyond order for על; a hidden-target coincidence for placements), the conflict branch gets the same recruitFreeDofs failure path as typed constraints, and an unsatisfiable statement reports the RELATION (honest over-constraint), never a redefinition conflict. This exact sequence contains a genuinely degenerate step (המשכי CE ו CD share C, so their crossing cannot be a distinct A) — the lock asserts the honest-error CLASS, not a buildable figure; the satisfiable members are locked in redefine-existing-point.test.ts. STEP 3 CHANGED 2026-09-20 (ADR-531, #1274): he typed «המשכי CE ו CD נפגשים בנקודה A», and since the operator ruled that a crossing whose carriers share a letter is REFUSED BY NAME, that sentence no longer reaches the fold at all — the corpus harness has no way to express "this step is expected to be refused" (#1288), so the step is carried here as its non-degenerate twin «המשכי CE ו BD», which redefines the same existing A and still produces the honest over-constraint this scenario exists to lock. His original sentence is covered as a refusal in issue-1274-crossing-already-named.test.ts.',
+      'operator prod session `fn34ptei` (2026-07-06): after "טרפז ABCD חסום במעגל" auto-created circle-O with centre O, "O מרכז מעגל חסום במשולש ABC" and "O על ED" both crashed \'O\' is already defined — and the mirrored order crashed the same way, so the figure was unbuildable in ANY order. Root cause (the recurring ADR-075/099/115/119/124 class): the ADR-028/050 reinterpretation mechanism was GATED — point-on-segment required the existing point to own a free param DOF, placements gave up without a free param ancestor, and the conflict branch never recruited. Fix (M1): any existing GeoPoint lowers to its defining incidences (collinear + the stated within/beyond order for על; a hidden-target coincidence for placements), the conflict branch gets the same recruitFreeDofs failure path as typed constraints, and an unsatisfiable statement reports the RELATION (honest over-constraint), never a redefinition conflict. This exact sequence contains a genuinely degenerate step (המשכי CE ו CD share C, so their crossing cannot be a distinct A) — the lock asserts the honest-error CLASS, not a buildable figure; the satisfiable members are locked in redefine-existing-point.test.ts. STEP 3 IS A DECLARED REFUSAL since 2026-09-29 (#1288, ADR-555): the operator ruled (ADR-531, #1274) that a crossing whose carriers share a letter is REFUSED BY NAME, so «המשכי CE ו CD נפגשים בנקודה A» never reaches the fold — CE and CD meet at C. From 2026-09-20 until the harness could say so, the step was carried as an invented twin «המשכי CE ו BD»; it is his own sentence again, with its refusal asserted in `refusedSteps`. The honest over-constraint this scenario exists to lock is still produced — by the later placement «O מרכז מעגל חסום במשולש ABC», measured on the exact sequence.',
     steps: [
       'טרפז ABCD חסום במעגל',
       'טרפז BCED',
-      'המשכי CE ו BD נפגשים בנקודה A',
+      'המשכי CE ו CD נפגשים בנקודה A',
       'BA',
       'AC',
       'O מרכז מעגל חסום במשולש ABC',
       'O על ED',
     ],
-    expectViolations: true, // the degenerate meet + the un-flexed collinear are intentionally rejected — prior figure kept
+    refusedSteps: [
+      {
+        step: 3,
+        reason: 'crossing-already-named',
+        with: { holder: 'C', id: 'A' },
+        why: 'ADR-531 (#1274): CE and CD share C, so their crossing IS C — refused by name, never minted as a second point',
+      },
+    ],
+    expectViolations: true, // the un-flexed placement is intentionally rejected — prior figure kept
     check(fig) {
       // The class assertion: NO step may report a redefinition conflict — every failure names the relation.
       for (const [id, st] of Object.entries(fig.status)) {
@@ -2862,6 +2870,27 @@ export const SCENARIOS_4: Scenario[] = [
         expect(facts.map((f) => r.status[f.id]), label).toEqual(facts.map(() => 'ok'));
         expect(r.violations, label).toEqual([]);
       }
+    },
+  },
+  {
+    id: 'shared-endpoint-crossing-refused-944',
+    title: '#944 → ADR-531: «D = חיתוך AB ו-BC» is REFUSED naming B — the crossing of two sides that share B is B itself',
+    guards:
+      "the #944 sequence (found while verifying #942's play case, 2026-09-08), restored to the corpus as the operator typed it (#1288, ADR-555). It first shipped as a BUILD (ADR-489: D minted at B, «B=D» on the canvas); on 2026-09-20 the operator reversed that — \"we refuse the B=D\" (ADR-531, #1274) — and the old scenario was deleted because the harness could not express a refusal. Now the refusal IS the behaviour under test: step 2 is declared in refusedSteps with the payload the student's message is built from (holder B, new name D), so a change that lets the sentence build again, or refuses it for another reason, turns this red. The triangle before it stays intact and nothing named D exists. The full submit-path surface (message text, both languages, every spelling) stays in issue-1274-crossing-already-named.test.ts.",
+    steps: ['משולש ABC', 'D = חיתוך AB ו-BC'],
+    refusedSteps: [
+      {
+        step: 2,
+        reason: 'crossing-already-named',
+        with: { holder: 'B', id: 'D' },
+        why: 'ADR-531 (#1274): AB and BC share B, so their crossing IS B — refused by name ("we refuse the B=D")',
+      },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the triangle carries no violated given').toEqual([]);
+      expect(fig.positions.has('D'), 'the refused sentence minted nothing — there is no second point at B').toBe(false);
+      for (const id of ['A', 'B', 'C']) expect(fig.positions.has(id), `the triangle keeps ${id}`).toBe(true);
     },
   },
 ];

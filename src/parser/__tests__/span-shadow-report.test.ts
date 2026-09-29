@@ -61,7 +61,7 @@ describe('span-accounting shadow sweep (catalog corpus)', () => {
           if (typeof step !== 'string') continue;
           let prefix;
           try {
-            prefix = factsOf(sc.steps.slice(0, i));
+            prefix = factsOf(sc.steps.slice(0, i), sc.refusedSteps); // #1288: a declared refusal in the prefix is skipped
           } catch {
             break; // an earlier non-string step this offline mirror can't build — skip the rest
           }
