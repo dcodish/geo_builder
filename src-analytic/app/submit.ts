@@ -199,6 +199,7 @@ export function decideSubmit(
       kind: 'refused',
       error: {
         key: fault.code, detail: fault.detail, existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example,
+        ...(fault.candidates ? { candidates: fault.candidates } : {}),
         ...(reused && definedBy ? { reusedId: reused, definedBy } : {}),
       } as InputError,
     };

@@ -153,6 +153,18 @@ const he = {
   errUnknownRefPoint: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
   errUnknownRefLine: 'הישר {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
   errUnknownRefCircle: 'המעגל {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
+  // #1514 pre-play — a named conic is a noun of its own; it was reported as a missing POINT with its raw id.
+  errUnknownRefParabola: 'הפרבולה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
+  errUnknownRefEllipse: 'האליפסה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
+  // 02c R7 (#1514 pre-play) — the noun and the equation name different families; never drawn.
+  errKindMismatch:
+    'המשוואה במשפט "{{detail}}" מתארת {{existing}}, לא {{claimed}}. בדקו את המשוואה, או כתבו את שם הצורה שהיא מתארת.',
+  // A curve by its noun alone (#1514 pre-play) — its own keys, so the polygon remedy of errAmbiguousShape
+  // («שטח הדלתון ABCD») is never taught for a parabola.
+  errAmbiguousCurve:
+    'בשרטוט יש יותר מעצם אחד מהסוג הזה ({{candidates}}), ולכן לא ברור לאיזה מהם הכוונה ב-"{{detail}}". כתבו את השם, למשל «{{example}}».',
+  errNoSuchCurve:
+    'בשרטוט עדיין אין {{noun}}, ולכן המשפט "{{detail}}" לא מתייחס לשום עצם. כתבו קודם את משוואת ה{{noun}}.',
   errAlreadyNamed: 'כבר יש שם לנקודה הזו: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
   // #1423 — the letter is the problem, named with the student's own defining sentence and the remedy
@@ -231,6 +243,13 @@ const he = {
   kindCircle: 'מעגל',
   kindParabola: 'פרבולה',
   kindEllipse: 'אליפסה',
+  // The definite noun a student writes before a curve's name — «הפרבולה I» (#1514 pre-play).
+  nounThePoint: 'הנקודה',
+  nounTheLine: 'הישר',
+  nounTheCircle: 'המעגל',
+  nounTheParabola: 'הפרבולה',
+  nounTheEllipse: 'האליפסה',
+  nounTheCurve: 'העצם',
   kindMidpoint: 'אמצע קטע',
   kindCentroid: 'מפגש התיכונים',
   kindIncentre: 'מפגש חוצי הזוויות',
@@ -417,6 +436,14 @@ const en: typeof he = {
   errUnknownRefPoint: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefLine: 'The line {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefCircle: 'The circle {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errUnknownRefParabola: 'The parabola {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errUnknownRefEllipse: 'The ellipse {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errKindMismatch:
+    'The equation in "{{detail}}" describes {{existing}}, not {{claimed}}. Check the equation, or name the shape it describes.',
+  errAmbiguousCurve:
+    'The figure has more than one of these ({{candidates}}), so it is not clear which one "{{detail}}" means. Write its name — for example "{{example}}".',
+  errNoSuchCurve:
+    'The figure does not have {{noun}} yet, so "{{detail}}" refers to nothing. State its equation first.',
   errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
   errUnsatisfiableReused: '{{reusedId}} is already defined: "{{definedBy}}". "{{detail}}" contradicts that definition — pick another letter for a new point.',
@@ -484,6 +511,12 @@ const en: typeof he = {
   kindCircle: 'a circle',
   kindParabola: 'a parabola',
   kindEllipse: 'an ellipse',
+  nounThePoint: 'the point',
+  nounTheLine: 'the line',
+  nounTheCircle: 'the circle',
+  nounTheParabola: 'the parabola',
+  nounTheEllipse: 'the ellipse',
+  nounTheCurve: 'the object',
   kindMidpoint: 'a midpoint',
   kindCentroid: 'the centroid',
   kindIncentre: 'the incentre',

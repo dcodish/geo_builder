@@ -73,12 +73,12 @@ describe('#1057 — an ambiguous reference is REFUSED, and no ordinal is invente
     // The question #1057 was filed about. Inventing «האליפסה הראשונה» would put the student in front
     // of a phrase the exam never uses, which is what D8 exists to prevent.
     expect(codes(['x^2/9+y^2/4=1', 'x^2/16+y^2/9=1', 'הנקודה A נמצאת על האליפסה'])).toEqual([
-      'ambiguous-shape',
+      'ambiguous-curve',
     ]);
   });
 
   it('and no ellipse at all', () => {
-    expect(codes(['הנקודה A נמצאת על האליפסה'])).toEqual(['ambiguous-shape']);
+    expect(codes(['הנקודה A נמצאת על האליפסה'])).toEqual(['ambiguous-curve']);
   });
 
   it('while a circle and an ellipse together are each unambiguous', () => {

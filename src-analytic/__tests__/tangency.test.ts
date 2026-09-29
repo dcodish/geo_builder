@@ -111,10 +111,10 @@ describe('#1060 — the contextual form', () => {
   });
 
   it('and is refused when it names no single circle', () => {
-    expect(derive(['המעגל משיק לציר ה-x'], 0).faults.map((f) => f.code)).toEqual(['ambiguous-shape']);
+    expect(derive(['המעגל משיק לציר ה-x'], 0).faults.map((f) => f.code)).toEqual(['ambiguous-curve']);
     expect(
       derive(['נתון מעגל O', 'נתון מעגל K', 'המעגל משיק לציר ה-x'], 0).faults.map((f) => f.code),
-    ).toEqual(['ambiguous-shape']);
+    ).toEqual(['ambiguous-curve']);
   });
 });
 

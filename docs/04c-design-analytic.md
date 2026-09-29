@@ -451,8 +451,18 @@ standard this tree holds itself to after being bitten twice.
 `CIRCLE_NUMERALS` (the lookahead that keeps a centre NAME from eating a numeral) and
 `CIRCLE_NUMERAL_RUN` (the capture that becomes the circle's id and name) are the whole of it, and the
 Hebrew/English × centre/numeral rules take them. Widening the token to admit `[1-5]` is therefore the
-entire digit feature — `circle-1` and «מעגל 1» fall out of the existing id and label construction,
-and no rule learned a digit case of its own.
+entire digit feature — «מעגל 1» falls out of the existing id and label construction, and no rule learned
+a digit case of its own.
+
+**The numeral becomes an id in ONE function, and an id becomes a noun in ONE table**
+([ADR-AG-170 Am. 1](06c-decisions-analytic.md)). `engine/names.ts`: `numeralCurveId(kind, n)` is the
+canonical id of every numeral-named curve (circle, parabola, ellipse — Roman, so «1» and «I» are one
+object; the label keeps the student's spelling), used by the naming clause, the operand resolver,
+`curveByName` and every circle lookup in `apply.ts`; `refKindOf`/`statedName` read one prefix table,
+and `app/errorText.ts` turns a refusal into a sentence through tables typed exhaustive over `RefKind`.
+Circle, parabola and ellipse share ONE naming clause per language, and every naming clause (lines and
+centre letters too) shares one connective grammar, `NAMING_TAIL_HE`/`_EN` — comma, dash, «שמשוואתו»,
+copula, colon.
 
 The range 1–5 **mirrors the Roman range exactly**, so the two halves of the token share one
 justification instead of acquiring two. And the `(?=[\s:])` separator lookahead, which #1059 added
@@ -462,7 +472,9 @@ the coefficient. One device, two traps.
 
 **`Curve.kind` is therefore an EXPECTATION, not an answer**, and optional. `classify` fits six
 coefficients and names the family; the expectation only lets a refusal be specific ("you wrote «אליפסה»
-and this is a hyperbola" — R7). Two consequences follow, and the second is the subtle one:
+and this is a hyperbola" — R7). Since ADR-AG-170 Am. 1 it is also CHECKED there: a fitted family other
+than the stated one is `kind-mismatch` (with the actual family), reported by `derive` as its own fault,
+so a circle is never drawn under the label «פרבולה I». Two consequences follow, and the second is the subtle one:
 
 - an unnamed curve is identified by its equation alone (`curve-<hash>`, [R44](02c-requirements-analytic.md)),
   so the noun form and the bare form of one curve are one object;

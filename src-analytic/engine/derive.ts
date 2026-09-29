@@ -23,7 +23,7 @@ function incidenceIds(k: { t: string; id?: string }): string[] {
 
 export interface LineFault {
   index: number;
-  code: ParseFailure['code'] | ApplyError['code'];
+  code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch';
   detail: string;
   /** For a name clash: what the name already holds, as a token the locale renders (#1046). */
   existing?: ApplyError['existing'];
@@ -33,6 +33,8 @@ export interface LineFault {
   holder?: ApplyError['holder'];
   /** For an ambiguous one-letter angle: the three-letter name to write instead (#1407). */
   example?: ApplyError['example'];
+  /** For a curve named by its noun alone: how each candidate can be called (#1514 pre-play). */
+  candidates?: ApplyError['candidates'];
 }
 
 /**
@@ -99,10 +101,10 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   const reported = new Set<string>();
   errors.forEach((e, i) => {
     if (!e) return;
-    const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null]);
+    const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.candidates ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, ...(e.candidates ? { candidates: e.candidates } : {}) });
   });
 
   /**
@@ -296,6 +298,18 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   for (const v of figure.vacant) {
     const index = lineOf.get(v.id);
     if (index === undefined) continue; // no line owns it — nothing honest to say about it
+    /**
+     * THE NOUN SAID ONE FAMILY AND THE EQUATION IS ANOTHER (02c R7, #1514 pre-play) — refused naming
+     * both: `existing` is what the equation describes (the same `curve:<kind>` token a name clash
+     * renders), `expected` the noun the student wrote. Never drawn: a circle labelled «פרבולה I» on
+     * the canvas is a stated given silently contradicted.
+     */
+    if (v.reason === 'kind-mismatch' && v.actual) {
+      const o = objectById(construction, v.id);
+      const claimed = o && o.kind === 'curve' ? o.curve.kind : undefined;
+      faults.push({ index, code: 'kind-mismatch', detail: lines[index], existing: `curve:${v.actual}`, ...(claimed ? { expected: claimed } : {}) });
+      continue;
+    }
     if (v.reason !== 'vacant') {
       faults.push({ index, code: 'out-of-scope', detail: lines[index] });
       continue;

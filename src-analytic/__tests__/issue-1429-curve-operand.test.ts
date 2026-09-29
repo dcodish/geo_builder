@@ -41,7 +41,7 @@ describe('#1429 — a point on a NAMED circle, every spelling', () => {
     const p = named.figure.points.find((q) => q.id === 'P')!;
     expect(Math.hypot(p.x + 5, p.y - 2)).toBeCloseTo(1, 4);
     const ctx = derive([CIRCLE, CIRCLE2, 'P על המעגל'], 0);
-    expect(ctx.faults.map((f) => f.code)).toEqual(['ambiguous-shape']);
+    expect(ctx.faults.map((f) => f.code)).toEqual(['ambiguous-curve']);
   });
 });
 

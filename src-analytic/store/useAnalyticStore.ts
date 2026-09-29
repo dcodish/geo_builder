@@ -13,6 +13,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import type { LoadAudit } from '../../shell/save';
 import { ingestTypedText } from '../../shell/bidi';
+import type { RefKind } from '../engine/names';
 
 /**
  * WHOSE save file this is, and which format (#1087).
@@ -105,7 +106,12 @@ export type InputError =
    */
   | { key: 'name-kind-clash'; detail: string; existing?: string }
   /** A construction that refers to a point the figure does not have yet (#1028). */
-  | { key: 'unknown-reference'; detail: string; expected?: 'point' | 'line' | 'circle' | 'curve' }
+  | { key: 'unknown-reference'; detail: string; expected?: RefKind }
+  /**
+   * The noun and the equation name different families (02c R7, #1514 pre-play) — «פרבולה I שמשוואתה
+   * x^2+y^2=16». `existing` is what the equation describes (`curve:<kind>`), `expected` the noun written.
+   */
+  | { key: 'kind-mismatch'; detail: string; existing?: string; expected?: RefKind }
   /** A construct that cannot exist in this figure, which has no freedom left to try (#1058). */
   | { key: 'does-not-exist'; detail: string; existing?: string }
   | { key: 'ring-contradicts-noun'; detail: string }
@@ -113,6 +119,8 @@ export type InputError =
   | { key: 'ambiguous-angle'; detail: string; example?: string }
   /** A shape named by its noun alone, where the figure has no such shape or several (#1049). */
   | { key: 'ambiguous-shape'; detail: string }
+  /** A curve named by its noun alone that picks out none or several (#1514 pre-play) — with the candidates. */
+  | { key: 'ambiguous-curve'; detail: string; expected?: RefKind; candidates?: string[] }
   /** «האלכסון הראשי» where the shape distinguishes no principal diagonal (#1070). */
   | { key: 'undistinguished-diagonal'; detail: string }
   /**

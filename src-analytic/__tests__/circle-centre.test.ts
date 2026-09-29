@@ -63,12 +63,12 @@ describe('#1059 — a letter after «מעגל» is the CENTRE', () => {
   });
 
   it('says so when the curve has no centre to be', () => {
-    // «מעגל M שמשוואתו y=2x» fits a LINE, which has no centre. The point is then vacant in a figure
-    // with no freedom left, which is exactly #1058's reportable case — reached here without a new
-    // message, because the mechanism was already right.
-    expect(derive(['נתון מעגל M שמשוואתו y=2x'], 0).faults.map((f) => f.code)).toEqual([
-      'does-not-exist',
-    ]);
+    // «מעגל M שמשוואתו y=2x» fits a LINE, which has no centre. LOCK MOVED (#1514 pre-play, 02c R7):
+    // it was reported as the centre not existing (`does-not-exist`, #1058); the truer statement is
+    // that the noun and the equation disagree — «המשוואה … מתארת ישר, לא מעגל» — and it now says so.
+    // The centre's own vacancy (#1058) follows from the curve's and is reported after it; the refusal
+    // the student reads is the line's FIRST fault.
+    expect(derive(['נתון מעגל M שמשוואתו y=2x'], 0).faults.map((f) => f.code)[0]).toBe('kind-mismatch');
   });
 });
 

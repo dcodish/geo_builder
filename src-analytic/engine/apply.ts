@@ -16,6 +16,7 @@
  * lands, and nowhere else.
  */
 import { fitConic } from './conic';
+import { numeralCurveId, refKindOf, statedName, type RefKind } from './names';
 import { resolveCurve } from './curves';
 import { curveParentOf, parentsOf, type DerivedRule } from './derived';
 import { sameDerivation } from './sameDerivation';
@@ -98,6 +99,14 @@ export type ApplyErrorCode =
    */
   | 'ambiguous-shape'
   /**
+   * «P על הפרבולה» where the figure has no parabola, or several (#1514 pre-play) — a CURVE referred
+   * to by its noun alone. Its own code rather than `ambiguous-shape`, whose remedy teaches a
+   * polygon's vertices («שטח הדלתון ABCD הוא 24») and so taught a student with two parabolas to
+   * write about a kite. This one carries the CANDIDATES (`candidates`) and the noun (`expected`),
+   * so the refusal can name them and show the sentence with a name in it.
+   */
+  | 'ambiguous-curve'
+  /**
    * «האלכסון הראשי» in a shape whose noun distinguishes no principal diagonal (#1070).
    *
    * A kite has one — its axis of symmetry is a fact about the figure. A plain quadrilateral, a
@@ -172,6 +181,11 @@ export interface ApplyError {
    * would be a guess.
    */
   example?: string;
+  /**
+   * For `ambiguous-curve`: how the student can call each candidate — its name («I», «II») or, for
+   * an unnamed curve, its equation (`y^2=8x`), both of which the operand resolver reads back.
+   */
+  candidates?: string[];
 }
 
 /**
@@ -184,13 +198,21 @@ export interface ApplyError {
  * An ANONYMOUS curve (`curve-<hash>`) gets the kind-free wording: it has no name the student wrote, so
  * there is no noun that would be true.
  */
-export type RefKind = 'point' | 'line' | 'circle' | 'curve';
+// The table itself lives in `names.ts` (#1514 pre-play): it knew `line-`/`circle-` only, so a named
+// parabola was called a POINT and printed as its raw id. Re-exported so every caller keeps its import.
+export { refKindOf, statedName, type RefKind } from './names';
 
-export function refKindOf(id: Id): RefKind {
-  if (id.startsWith('line-')) return 'line';
-  if (id.startsWith('circle-')) return 'circle';
-  if (id.startsWith('curve-')) return 'curve';
-  return 'point';
+/**
+ * The refusal for a curve referred to by its NOUN alone when that noun picks out no single curve —
+ * naming every candidate the way the student can write it (#1514 pre-play).
+ */
+function ambiguousCurve(src: string, kind: RefKind, candidates: readonly GeoObject[]): ApplyError {
+  const callable = (o: GeoObject): string => {
+    if (o.kind === 'curve' && o.id.startsWith('curve-')) return o.label.eqSrc ?? '';
+    if (o.kind === 'circle-thru' && o.name) return o.name;
+    return statedName(o.id);
+  };
+  return { code: 'ambiguous-curve', detail: src, expected: kind, candidates: candidates.map(callable).filter((n) => n !== '') };
 }
 
 /** The one refusal for "the figure has no such thing", naming it the student's way and by its kind. */
@@ -339,10 +361,7 @@ export type ApplyOutcome =
  * An ANONYMOUS curve (`curve-<hash>`) is deliberately left alone: there is no student name to
  * recover, and printing the hash's tail would be a different wrong word rather than the right one.
  */
-export function statedName(id: Id): string {
-  const m = /^(?:line|circle)-(.+)$/.exec(id);
-  return m ? m[1] : id;
-}
+// `statedName` — see `names.ts`, the one table (re-exported above).
 
 /**
  * The object kinds that HAVE a shape — what an `on-curve` or a curve direction may name (#1150).
@@ -1190,11 +1209,11 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       const isCircle = (o: GeoObject) => curveKindOf(o) === 'circle';
       let host: GeoObject | undefined;
       if (f.circle !== undefined) {
-        host = objectById(c, `circle-${f.circle}`) ?? objectById(c, `circle-at-${f.circle}`) ?? curveByName(c, f.circle);
-        if (!host || !isCircle(host)) return { ok: false, error: unknownRef(`circle-${f.circle}`) };
+        host = objectById(c, numeralCurveId('circle', f.circle)) ?? objectById(c, `circle-at-${f.circle}`) ?? curveByName(c, f.circle);
+        if (!host || !isCircle(host)) return { ok: false, error: unknownRef(numeralCurveId('circle', f.circle)) };
       } else if (!f.define) {
         const circles = c.objects.filter(isCircle);
-        if (circles.length > 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+        if (circles.length > 1) return { ok: false, error: ambiguousCurve(f.src, 'circle', circles) };
         host = circles[0];
       }
       if (!host) {
@@ -1251,7 +1270,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
        * does not turn on the value of its parameters in any form the corpus writes.
        */
       const matches = c.objects.filter((o) => curveKindOf(o) === f.kind);
-      if (matches.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+      if (matches.length !== 1) return { ok: false, error: ambiguousCurve(f.src, f.kind, matches) };
       return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: matches[0].id }, src: f.src });
     }
 
@@ -1275,15 +1294,15 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         // The line-first order names its circle — «הישר l1 משיק למעגל M» (#1501). The same lookup
         // chain as `diameter-of`: a numeral id, a centre-letter id, or the student's own name.
         host =
-          objectById(c, `circle-${f.circle}`) ??
+          objectById(c, numeralCurveId('circle', f.circle)) ??
           objectById(c, `circle-at-${f.circle}`) ??
           curveByName(c, f.circle);
-        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(`circle-${f.circle}`) };
+        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(numeralCurveId('circle', f.circle)) };
       } else {
         // By the fit, not the declaration: «המעגל» about an equation circle still finds ITS circle,
         // and the honest answer below is `out-of-scope`, not "which circle?" (#1501).
         const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
-        if (circles.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+        if (circles.length !== 1) return { ok: false, error: ambiguousCurve(f.src, 'circle', circles) };
         host = circles[0];
       }
       /**

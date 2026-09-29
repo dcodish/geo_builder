@@ -42,12 +42,18 @@ const outcome = (line: string): string => {
 };
 
 describe('ADR-AG-118 — a digit names the circle (#1216)', () => {
+  /**
+   * LOCK MOVED (#1514 pre-play, ADR-AG-170 Am. 1): the id is the CANONICAL Roman numeral — «מעגל 1»
+   * mints `circle-I` — because the reference side already read «המעגל 1» as `circle-I` (ADR-AG-168)
+   * and the two disagreed: «נתון מעגל 1 …» then «P על המעגל 1» was refused. The NAME keeps the
+   * student's digit, which is what the panel prints.
+   */
   it.each([
-    ['he, שמשוואתו', 'נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9', 'circle-1', 'מעגל 1'],
-    ['he, colon', 'נתון מעגל 1: (x-3)^2+(y-4)^2=9', 'circle-1', 'מעגל 1'],
-    ['he, a second circle', 'נתון מעגל 2 שמשוואתו x^2+y^2=25', 'circle-2', 'מעגל 2'],
-    ['en, is', 'circle 1 is (x-3)^2+(y-4)^2=9', 'circle-1', 'circle 1'],
-    ['en, colon', 'circle 1: (x-3)^2+(y-4)^2=9', 'circle-1', 'circle 1'],
+    ['he, שמשוואתו', 'נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9', 'circle-I', 'מעגל 1'],
+    ['he, colon', 'נתון מעגל 1: (x-3)^2+(y-4)^2=9', 'circle-I', 'מעגל 1'],
+    ['he, a second circle', 'נתון מעגל 2 שמשוואתו x^2+y^2=25', 'circle-II', 'מעגל 2'],
+    ['en, is', 'circle 1 is (x-3)^2+(y-4)^2=9', 'circle-I', 'circle 1'],
+    ['en, colon', 'circle 1: (x-3)^2+(y-4)^2=9', 'circle-I', 'circle 1'],
   ])('%s', (_what, line, id, name) => {
     const b = built(line);
     expect(b.faults, line).toEqual([]);
@@ -69,7 +75,8 @@ describe('ADR-AG-118 — a digit names the circle (#1216)', () => {
     const r = built(roman);
     expect(d.faults).toEqual(r.faults);
     expect(d.points).toEqual(r.points);
-    expect(d.curves.map((c) => c.id.replace(/1$/, 'N'))).toEqual(r.curves.map((c) => c.id.replace(/I$/, 'N')));
+    // One canonical id (#1514 pre-play): the digit and the Roman numeral are the SAME circle.
+    expect(d.curves.map((c) => c.id)).toEqual(r.curves.map((c) => c.id));
     expect(d.curves.map((c) => c.name.replace(/1$/, 'N'))).toEqual(r.curves.map((c) => c.name.replace(/I$/, 'N')));
   });
 });
