@@ -16,6 +16,7 @@
  * have left the shared component still able to conflate the two, which is the defect.
  */
 import type { CSSProperties } from 'react';
+import { mathHtml } from '../math';
 import { color, fs } from '../theme';
 
 export function QuickChips({
@@ -49,7 +50,10 @@ export function QuickChips({
           // browser reads an isolated leading label («M אמצע BB'») as the first strong letter and
           // turned that Hebrew sentence LTR. The math runs inside stay isolated by `display`.
           <button key={cmd} type="button" dir={HEBREW.test(cmd) ? 'rtl' : 'ltr'} style={chip} onClick={() => onPick(cmd)}>
-            {display ? display(cmd) : cmd}
+            {/* #1530: the label is typeset (MathML) by the shared renderer the fact rows use, so the chip
+                shows the math the click will produce — `(x-3)^2` reads as a real power. The text is our
+                own command, escaped by `mathHtml`. */}
+            <span dangerouslySetInnerHTML={{ __html: mathHtml(display ? display(cmd) : cmd) }} />
           </button>
         ))}
       </div>
@@ -68,7 +72,8 @@ const titleStyle: CSSProperties = { fontSize: fs.h1, fontWeight: 700, color: col
 const hintStyle: CSSProperties = { fontSize: fs.control, color: color.muted, marginBottom: 10 };
 const chipRow: CSSProperties = { display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' };
 const chip: CSSProperties = {
-  fontFamily: 'ui-monospace, Consolas, monospace',
+  // #1530: the app's text font — typeset MathML beside a monospace code font read as two styles
+  fontFamily: 'inherit',
   fontSize: 16,
   padding: '13px 20px',
   borderRadius: 999,
