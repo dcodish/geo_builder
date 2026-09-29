@@ -500,7 +500,7 @@ describe('#559 — the data panel follows the app direction, per-row', () => {
   it('MathRun sets the direction on the CONTENT, never on the row', () => {
     // setting `dir` on the <li> would also reset its text-align to that direction's start — which is
     // precisely how the panel ended up with math on one edge and Hebrew on the other
-    const helper = app.slice(app.indexOf('function MathRun'), app.indexOf('const EXAMPLE_KEYS'));
+    const helper = app.slice(app.indexOf('function MathRun'), app.indexOf('export default function App3'));
     expect(helper).toContain('<span dir="ltr"');
   });
 

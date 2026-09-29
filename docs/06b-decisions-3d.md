@@ -11339,3 +11339,27 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 **Locks.** `src3d/__tests__/issue-1523-autoname-whole-utterance.test.ts` — his exact sequence through the store (X at SA's midpoint, every row ok, no invented letter); «x אמצע SA» with X taken → `claim-refuted`, nothing committed; twelve lowercase/uppercase twins (x, y, m, k, u, x1, x', «x היא», «x אמצע הקטע», «הנקודה x», "x is the midpoint of", "point x is the midpoint of"); the boundaries («נקודה x», «x אמצעי SA», «x על SA» unchanged by `normalize3`); six sentences that must never mint (xy, hello, "x midpoint of", «אמצע SA הוא x», «אמצע AB = 3», «נקודה אמצע SA»); nine auto-name spellings that still build; the catalog sweep with its exercised counter. Rule 4: 3-D has no scenario corpus and the essence is the student's letter, which a fixture's all-ok net cannot see, so this lock file is the regression coverage.
 
 **Consequences.** `src3d/parser/parse3.ts` only (`MID_COPULA_HE`/`MID_HE`/`MID_EN`/`MID_OPERAND_*`, the anchor in `upliftLowercaseLabels`, the `midpoint` rule's two-token arm). «נקודה אמצע SA» (ungrammatical; «נקודת האמצע של SA» still builds) and imperative-wrapped forms («סמן אמצע SA») no longer auto-name — the latter per ADR-W-030.
+
+## ADR-3D-288 — Every empty-state chip builds on the empty canvas it is shown on (#1446, Arm A)
+
+**Status:** accepted · 2026-09-29 · fix round #1571 · plan: the #1446 issue body, Arm A, operator-approved (auto-ok, 2026-09-27; scope re-confirmed 2026-09-29). Arm B (what a click on a figure-needing guide example does) is #1566, blocked on #1467, and is not touched here.
+
+**Requirements:** docs/28 D9b (unchanged promise — "the most popular commands that a user can click and see build without data entry"; a 3-D realisation note added) · **Design:** none (internal)
+
+**Context (re-measured on the worktree tip `842ede39` through `decideSubmit3`, matching the issue).** `App3` renders `EXAMPLE_KEYS.slice(0, 4)` only while `facts.length === 0`. ex1 «קובייה ABCD» and ex2 «מנסרה ישרה משולשת ABC» record; ex3 «M אמצע BB'» is refused `{"code":"unknown-point","id":"B"}`, and so is ex4 «K על AA' כך ש-AK = 2KA'» — in English too. Since the chips vanish once a figure exists, ex3/ex4 could never succeed from where they are offered.
+
+**Class.** *A chip list offered on an empty canvas held statements that presume a figure, and nothing asserted that a chip BUILDS — only the manual's parse gate (D9) existed, and the chips were a separate locale list it never read.* 2-D has had the equivalent lock since the start (`src/__tests__/examples-build.test.ts`); 3-D had none.
+
+**Decision.**
+1. **One source for the chips.** `src3d/emptyChips3.ts` exports `EMPTY_STATE_CHIP_KEYS` and `emptyStateChips3(t)`; `App3` renders `commands={emptyStateChips3(t)}`, and the lock reads the same function — never a copied list. The dead `EXAMPLE_KEYS` (ex5–ex8 were read by nothing) and their locale strings are removed.
+2. **Self-contained, representative chips (He and En), taken from the catalog's featured phrasings:** ex1 cube, ex2 right triangular prism (unchanged), ex3 «פירמידה ישרה ABCDS שבסיסה ריבוע» / "right pyramid ABCDS with a square base", ex4 «המישור π1: z - 3 = 0» / "plane π1: z - 3 = 0" — three solids and the equation lane, each starting a figure.
+
+**What the student sees.** On the empty 3-D canvas the four chips are now cube · triangular prism · square pyramid · the plane z = 3; each click draws a figure. Before, the third and fourth chips answered with an unknown-point refusal.
+
+**Rejected.** Loading a prerequisite solid before ex3/ex4 (a per-chip `context`): that is Arm B's mechanism (#1566), which waits on #1467's ruling; for a chip on an empty canvas a self-contained command is the simpler honest answer.
+
+**Sibling products.** 2-D: locked by `examples-build.test.ts`. Analytic: its four `QUICK_COMMANDS` are each a standalone given (circle, line, parabola, point). Complex: `EXAMPLE_LINES` includes `w = w1*w2` and `z^5 = w^2`; each returns `true` from `submitLine` on a cleared store, so no failure was measured, but no lock asserts it — noted, not filed here.
+
+**Locks.** `src3d/__tests__/empty-chips-1446.test.ts` — for `he` and `en`, every chip from `emptyStateChips3` records through `decideSubmit3` on `{facts: [], seed: 0}` and resolves at least one point, plane or line; the chips are distinct; `App3.tsx` renders `emptyStateChips3(t)`. Red on the pre-change strings (ex3 refused `unknown-point` in both locales). Rule 4: the essence is "each chip builds", which this lock asserts directly over the rendered list; no fixture.
+
+**Consequences.** `src3d/emptyChips3.ts` (new), `src3d/App3.tsx`, `src3d/i18n/locales/{he,en}.json` (`examples.ex3/ex4` rewritten, `ex5–ex8` removed), `src3d/__tests__/bidi3.test.ts` (its slice anchor moved from the removed `EXAMPLE_KEYS` to `export default function App3`), `scripts/visual-smoke.mjs` (comment only — its literal sequence is unchanged).
