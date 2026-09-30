@@ -654,7 +654,7 @@ knowledge gates ask "is this the same in every configuration?", and the pool is 
   display-seed search, the base replays) is the figure's own fold, already paid by the drawing and held by
   the fold memo — charging it made a second call on the same facts come back complete where the first was
   cut. The UI-thread submit gate's «כבר קיים» test (`impliedByPrior`) keeps its wall-clock bound
-  (`sharedSamples(facts, { deadlineMs })`) — an interactive check that fails open — and an incomplete pool
+  (`sharedSamples(facts, { deadlineMs })`) — an interactive check that fails open — on the narrow three-seed set (the widened set doubled its main-thread cost), and an incomplete pool
   is never served from the memo as if it were complete.
 - **The status cue reads the same pool (#1444, [ADR-556](06-decisions.md#adr-556)).** `figureDeterminacy`
   (`replay/core.ts`) returns the pool's `determined` flag, the number of DISTINCT shapes in it — two samples

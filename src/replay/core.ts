@@ -2815,7 +2815,7 @@ export function admissibleRewrites(facts: Fact[], c: Construction, cap = ADMISSI
   walk(0, []);
   return out;
 }
-export function samplingJobs(facts: Fact[]) {
+export function samplingJobs(facts: Fact[], opts: { wide?: boolean } = {}) {
   const configs = variantConfigs(facts);
   const seed0 = configs.length === 1 ? firstSatisfyingSeed(facts) : 0;
   const constructions = configs.map((vf) => replay(vf, configs.length === 1 ? seed0 : firstSatisfyingSeed(vf)).construction);
@@ -2852,7 +2852,7 @@ export function samplingJobs(facts: Fact[]) {
     // offer it. A root the solver reaches only at some seeds (the SSA triangle's second shape) is then in the
     // pool; a layout the button would never show (measured while building: an invalid per-seed evaluate on
     // the q4 chord figure withheld BC, which is 5.31 at every seed the button shows) is not.
-    for (let k = ADMISSIBLE_SEEDS; k < CONFIG_SEEDS; k++) {
+    for (let k = ADMISSIBLE_SEEDS; opts.wide !== false && k < CONFIG_SEEDS; k++) {
       const s = seed0 + k;
       jobs.push(() => {
         if (!meetsRequirements(facts, s)) return;
@@ -3072,12 +3072,17 @@ export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number } = {})
   const hit = memoHit(facts);
   if (hit && (hit.complete || opts.deadlineMs !== undefined)) return hit;
   sampleStats.sweeps++;
+  // The UI-thread gate samples the NARROW set (ADR-509's three seeds, no extra button seeds): measured while
+  // building ADR-558, the widened set doubled its main-thread cost on a determined figure (0.67 s → 1.32 s
+  // on a 3-4-5 restatement). Its narrow pool never replaces the knowledge memo.
+  const narrow = opts.deadlineMs !== undefined;
   // The budget bounds the JOBS — the samples themselves, each a freshly perturbed figure no memo can serve,
   // so the same input stops at the same job on every run. The setup (the display-seed search and the base
   // replays) is the figure's own fold, which the drawing already paid and the fold memo holds: charging it
   // would make the verdict depend on how warm the caches were (measured while building ADR-558 — a second
   // call on the same facts came back complete where the first was cut).
-  const { jobs, finish } = samplingJobs(facts);
+  const memoBefore = sampleMemo;
+  const { jobs, finish } = samplingJobs(facts, { wide: !narrow });
   const aborts0 = solveBudget.aborts;
   const runJobs = (stop: () => boolean) => {
     let ran = 0;
@@ -3094,7 +3099,9 @@ export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number } = {})
     const deadline = Date.now() + opts.deadlineMs;
     // Armed inside the solve ladder too (engine/solveBudget.ts, issue #59): a variant job builds NEW fact
     // content whose fold can hit the recruit ladder — the between-job check alone couldn't stop it.
-    return withSolveBudget(deadline, () => runJobs(() => Date.now() > deadline));
+    const pool = withSolveBudget(deadline, () => runJobs(() => Date.now() > deadline));
+    sampleMemo = memoBefore; // the narrow pool is this gate's alone
+    return pool;
   }
   const limit = work.done + POOL_WORK_CAP;
   return withWorkBudget(POOL_WORK_CAP, () => runJobs(() => work.done > limit));

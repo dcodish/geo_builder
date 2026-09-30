@@ -45,6 +45,15 @@ describe('#1599 — a determined figure is sampled over the configuration button
     expect(v.rows.find((r) => r.kind === 'length' && r.label === 'AB')?.value, 'the givens still print').toBeCloseTo(5, 6);
   });
 
+  it('the UI-thread «כבר קיים» gate keeps the NARROW set, and its pool never replaces the knowledge pool', () => {
+    // its own figure: a pool already cached (complete, wide) is fair for the gate to reuse, so start cold
+    const facts = factsOf(['משולש ABC', 'AB=6', 'AC=5', 'זווית ABC = 35']);
+    const narrow = sharedSamples(facts, { deadlineMs: Number.POSITIVE_INFINITY });
+    expect(narrow.samples.length, 'three seeds, no extra button seeds on the main thread').toBeLessThanOrEqual(3);
+    const wide = sharedSamples(facts);
+    expect(wide.samples.length, 'the knowledge pool still spans the button’s range').toBeGreaterThan(3);
+  });
+
   it('a genuinely unique determined figure still reads «נקבע במלואו»', () => {
     expect(statusOf(['משולש ישר זווית ABC', 'AB=5, BC=4, AC=3'])?.key).toBe('actions.determined');
   });
