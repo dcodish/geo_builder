@@ -20,6 +20,7 @@ import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY } from '@/engine';
+import { work, withWorkBudget } from '@/engine/solveBudget';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -2219,8 +2220,8 @@ export function searchResample(facts: Fact[], seed: number, onProgress?: (k: num
   let fallback = -1;
   /** #194: the first requirement-meeting but squashed candidate — the answer when nothing better shows. */
   let squashed = -1;
-  for (let k = 0; k < 24 && Date.now() <= deadline; k++) {
-    onProgress?.(k + 1, 24);
+  for (let k = 0; k < CONFIG_SEEDS && Date.now() <= deadline; k++) {
+    onProgress?.(k + 1, CONFIG_SEEDS);
     s += 1;
     const r = withSolveBudget(deadline, () => replay(facts, s));
     // Accept only a view that MEETS EVERY REQUIREMENT — the SAME bar the initial display uses — AND is a
@@ -2331,7 +2332,7 @@ export function searchAnotherView(
    */
   let coincident: { facts: Fact[]; seed: number } | null = null;
   let k = 0;
-  const total = combos.length * (hasDofs ? 4 : 1) + (hasDofs ? 24 : 0);
+  const total = combos.length * (hasDofs ? 4 : 1) + (hasDofs ? CONFIG_SEEDS : 0);
   for (const [b, v, r] of combos) {
     if (Date.now() > deadline) break;
     const fc = stepped(b, v, r);
@@ -2468,7 +2469,7 @@ export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0):
     // The order/bound family has no scale-invariant residual to test — fail open rather than guess.
     if (added.some((con) => isOrderConstraint(con))) return false;
 
-    const pool = sharedSamples(facts);
+    const pool = sharedSamples(facts, { deadlineMs: SAMPLE_BUDGET_MS }); // the UI-thread gate: on the clock (ADR-558)
     if (!pool.determined && pool.samples.length < IMPLIED_MIN_SAMPLES) return false;
     if (pool.samples.length === 0) return false;
 
@@ -2698,7 +2699,11 @@ export function variantConfigs(facts: Fact[]): Fact[][] {
  */
 /** The shared pool. `determined` (#434, ADR-509) is TRUE only when the count said 0 AND the pool is the figure’s
  *  COMPLETE admissible set — the flag the knowledge gates trust instead of the count alone. */
-export interface SharedSamples { constructions: Construction[]; samples: Map<Id, Vec>[]; determined: boolean }
+/**
+ * `complete` (#1601/#1599, ADR-558): every sampling job ran to the end within the deterministic work budget.
+ * An incomplete pool is evidence of nothing beyond the samples in hand, and its consumers SAY so.
+ */
+export interface SharedSamples { constructions: Construction[]; samples: Map<Id, Vec>[]; determined: boolean; complete: boolean }
 let sampleMemo: ({ facts: Fact[]; key: string } & SharedSamples) | null = null;
 /**
  * The sample sweep counter — the perf canary for the M3 "one sampler" law (the twin of
@@ -2726,11 +2731,24 @@ function memoHit(facts: Fact[]): SharedSamples | null {
  */
 const circlesOfSample = new WeakMap<Map<Id, Vec>, Map<Id, ResolvedCircle>>();
 /**
+ * #1599 (ADR-558): the construction each sample was evaluated FROM — a figure with shape variants (a kite's
+ * or an isosceles triangle's unchosen equal pair) samples one construction per variant, each with its own
+ * constraints, so a sample's precision is judged against ITS construction ({@link preciseSamples}).
+ */
+const constructionOfSample = new WeakMap<Map<Id, Vec>, Construction>();
+/**
  * #1444 (ADR-556): the SEED index (0, 1, 2 …) each sample of the pool was drawn at — the same side-table
  * discipline as {@link circlesOfSample}, so it survives every subset filter. {@link figureDeterminacy}
  * reads it to show a configuration count only when that count is the same at every sampled seed.
  */
 const seedOfSample = new WeakMap<Map<Id, Vec>, number>();
+/**
+ * #1599 (ADR-558): the samples of a DETERMINED figure taken at the widened seeds ({@link CONFIG_SEEDS} beyond
+ * {@link ADMISSIBLE_SEEDS}). They resample the CURRENT facts only — the branch/seat rewrites keep their three
+ * seeds — so they add shapes to the count but are not a whole sample of the admissible set, and the
+ * "same count at every seed" stability test ({@link figureDeterminacy}) leaves them out.
+ */
+const partialSeedSample = new WeakSet<Map<Id, Vec>>();
 /**
  * #434 ([ADR-509](docs/06-decisions.md#adr-509)): the bound on a DETERMINED figure's admissible set. The
  * discrete rewrites (every cyclable branch point's branches × the right-angle seat) are enumerated as a
@@ -2742,6 +2760,14 @@ export const ADMISSIBLE_REWRITE_CAP = 12;
  *  pool that distinguishes "seed-invariant" from "one sample agreeing with itself" (the ADR-424 class:
  *  a count of 0 that lies — «AB=BC=8» printed ∠ABC = 31° off one drawing; seed 1 says 21°, seed 3 39°). */
 export const ADMISSIBLE_SEEDS = 3;
+/**
+ * #1599 (ADR-558): the seeds «הציגו תצורה אחרת» resamples a figure at (`searchResample`, `searchAnotherView`)
+ * — and, per the operator's ruling, the seeds a DETERMINED figure's knowledge pool samples. A root the
+ * solver reaches only at some seeds (the SSA triangle's second shape: 2 of 24) is a configuration the
+ * button can show; a pool of 3 seeds printed the first shape's side as definite. One constant, so the
+ * button and the pool can never disagree about how far "another configuration" reaches.
+ */
+export const CONFIG_SEEDS = 24;
 /**
  * The DISCRETE rewrites of a determined figure's admissible set (#434, ADR-509) — the exact fact rewrites
  * «הציגו תצורה אחרת» applies ({@link searchAnotherView} / `cycleAlt`): every cyclable branch point stepped
@@ -2815,11 +2841,29 @@ export function samplingJobs(facts: Fact[]) {
           if (r.ok) {
             raw.push(r.positions);
             circlesOfSample.set(r.positions, r.circles);
+            constructionOfSample.set(r.positions, c);
             seedOfSample.set(r.positions, s);
           }
         }),
       );
   if (determined && rewrites) {
+    // #1599 (ADR-558): the CURRENT facts over the rest of the button's seed range, in the BUTTON's own form —
+    // a replay at that seed, kept only where `meetsRequirements` holds, exactly as «הציגו תצורה אחרת» would
+    // offer it. A root the solver reaches only at some seeds (the SSA triangle's second shape) is then in the
+    // pool; a layout the button would never show (measured while building: an invalid per-seed evaluate on
+    // the q4 chord figure withheld BC, which is 5.31 at every seed the button shows) is not.
+    for (let k = ADMISSIBLE_SEEDS; k < CONFIG_SEEDS; k++) {
+      const s = seed0 + k;
+      jobs.push(() => {
+        if (!meetsRequirements(facts, s)) return;
+        const fig = replay(facts, s);
+        raw.push(fig.positions);
+        circlesOfSample.set(fig.positions, fig.circles);
+        constructionOfSample.set(fig.positions, fig.construction);
+        seedOfSample.set(fig.positions, k);
+        if (rewrites.length > 1) partialSeedSample.add(fig.positions);
+      });
+    }
     for (const fc of rewrites.slice(1)) {
       for (let k = 0; k < ADMISSIBLE_SEEDS; k++) {
         const s = seed0 + k;
@@ -2828,6 +2872,8 @@ export function samplingJobs(facts: Fact[]) {
           const fig = replay(fc, s);
           raw.push(fig.positions);
           circlesOfSample.set(fig.positions, fig.circles);
+          constructionOfSample.set(fig.positions, fig.construction);
+        constructionOfSample.set(fig.positions, fig.construction);
           seedOfSample.set(fig.positions, k);
         });
       }
@@ -2852,15 +2898,15 @@ export function samplingJobs(facts: Fact[]) {
     // otherwise poison the ground-truth pool the relations/shapes layers share.
     // A point-free crossing statement (`segments-cross`, ADR-383) is fact-level like the extensions, so
     // its sample filter lives HERE (the store core), not in the object-level `requirementSamples`.
-    const within = requirementSamples(c0, distinctSamples(c0, converged)).filter((pos) => segmentsCrossWithin(facts, pos));
+    const within = requirementSamples(c0, distinctSamples(c0, preciseSamples(c0, converged))).filter((pos) => segmentsCrossWithin(facts, pos));
     const strict = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived));
     const key = foldKey(facts);
-    if (strict.length >= 2) return (sampleMemo = { facts, key, constructions, samples: strict, determined: complete_ });
+    if (strict.length >= 2) return (sampleMemo = { facts, key, constructions, samples: strict, determined: complete_, complete: complete && !overCap });
     // The ADR-267 preference ladder: when the letter-order side is unachievable (no strict samples), the
     // RELAXED shared-endpoint bar (ADR-142) is the figure's real validity — filter by it before giving up
     // to the unfiltered converged pool (which would count wrong-side samples as configurations).
     const relaxed = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived, true));
-    return (sampleMemo = { facts, key, constructions, samples: relaxed.length >= 2 ? relaxed : converged, determined: complete_ });
+    return (sampleMemo = { facts, key, constructions, samples: relaxed.length >= 2 ? relaxed : converged, determined: complete_, complete: complete && !overCap });
   };
   return { jobs, finish };
 }
@@ -2884,7 +2930,7 @@ export function samplingJobs(facts: Fact[]) {
  * configuration", and offering a dot that later vanishes is precisely the harm. A determined figure
  * (`freeDofCount === 0`) has ONE configuration, so its single sample IS every configuration.
  */
-export function forcedCrossingKeys(samples: Omit<SharedSamples, "determined"> & { determined?: boolean }): Set<string> {
+export function forcedCrossingKeys(samples: Omit<SharedSamples, "determined" | "complete"> & { determined?: boolean; complete?: boolean }): Set<string> {
   const { constructions, samples: pool } = samples;
   const c0 = constructions[0];
   if (!c0 || !pool.length) return new Set();
@@ -2925,11 +2971,19 @@ export function forcedCrossingKeys(samples: Omit<SharedSamples, "determined"> & 
  * where a configuration failed to build, or a shape that exists at one seed only, makes the count a
  * sampling accident, and the caller then says «more than one» without a number.
  */
-export interface Determinacy { determined: boolean; configurations: number; stable: boolean }
+export interface Determinacy {
+  determined: boolean;
+  configurations: number;
+  stable: boolean;
+  /** #1601/#1599 (ADR-558): the pool behind this verdict finished inside the work cap. Absent ⇒ complete
+   *  (a hand-built verdict); `figureDeterminacy` always sets it. */
+  complete?: boolean;
+}
 const CONFIG_REL_TOL = 1e-4;
-export function figureDeterminacy(shared: Pick<SharedSamples, 'samples' | 'determined'>): Determinacy {
+export function figureDeterminacy(shared: Pick<SharedSamples, 'samples' | 'determined'> & { complete?: boolean }): Determinacy {
   const pool = shared.samples;
-  if (!pool.length) return { determined: shared.determined, configurations: 0, stable: false };
+  const complete = shared.complete ?? true; // a hand-built pool is taken as given
+  if (!pool.length) return { determined: shared.determined, configurations: 0, stable: false, complete };
   const ids = [...pool[0].keys()].filter((id) => pool.every((pos) => pos.has(id))).sort();
   const signature = (pos: Map<Id, Vec>): number[] => {
     const d: number[] = [];
@@ -2954,11 +3008,12 @@ export function figureDeterminacy(shared: Pick<SharedSamples, 'samples' | 'deter
   // per seed: an untagged sample (a hand-built pool) is its own single group
   const bySeed = new Map<number, number[][]>();
   pool.forEach((pos, i) => {
+    if (partialSeedSample.has(pos)) return; // counted above, but not a whole-set seed (ADR-558)
     const k = seedOfSample.get(pos) ?? -1;
     (bySeed.get(k) ?? bySeed.set(k, []).get(k)!).push(sigs[i]);
   });
   const stable = [...bySeed.values()].every((g) => distinct(g) === configurations);
-  return { determined: shared.determined, configurations, stable };
+  return { determined: shared.determined, configurations, stable, complete };
 }
 
 // Sample collection is budgeted like every other search loop (E2): a failing seed's solve costs ~10× a
@@ -2967,24 +3022,82 @@ export function figureDeterminacy(shared: Pick<SharedSamples, 'samples' | 'deter
 // proceeds on the samples in hand (a smaller ground-truth pool — `samplesUsed` reports it); the FIRST job
 // always runs so there is never an empty pool for a buildable figure. Tests run deadline-free (E2).
 const SAMPLE_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 5000;
-export function sharedSamples(facts: Fact[]): SharedSamples {
+/**
+ * #1601/#1599 (ADR-558): the KNOWLEDGE pool's budget, in work units (`evaluateCore` calls), never seconds.
+ * The wall clock above made the same figure print «AC = 2x» on one run and nothing on the next; a work
+ * count stops at the same point on every device and every run, so a verdict is a function of the input
+ * alone. Operator ruling 2026-09-30: ~30 s on a school laptop, i.e. ~15 s on the dev PC — measured over the
+ * 347-scenario corpus (complete pools): p50 78k units, p90 1.1M, 11 figures above this cap. It applies in
+ * tests exactly as in the browser, which is the point: the suite now sees what the student sees.
+ */
+export const POOL_WORK_CAP = 4_000_000;
+/**
+ * The shared sample pool (M3 — one sampler). The knowledge consumers (the detect sweep, the values panel)
+ * call it bare and get the work-bounded pool, `complete` when every job finished inside the cap. The typed
+ * submit gate's «כבר קיים» test runs on the UI thread and keeps a WALL-CLOCK bound (`deadlineMs`) — an
+ * interactive check, which the ruling leaves on the clock; it fails open, so a cut pool only skips the
+ * courtesy note. A pool cut short is never served from the memo as if it were complete.
+ */
+/**
+ * #1599 (ADR-558): a sample is EVIDENCE only if it satisfies the figure's givens more tightly than the
+ * knowledge tests compare samples (1e-4 relative — the values panel's `REL_TOL`, the configuration count's
+ * `CONFIG_REL_TOL`). The solver ACCEPTS a solution inside its own tolerance (0.5° for an angle), so one
+ * sample in a pool can sit at the edge of it: measured on the q4 chord figure, 23 of 24 samples held «זווית
+ * EKO = זווית ABK» to ~1e-7° and one to 4e-4°, which moved BC by 2e-4 — enough to withhold a value that is
+ * 5.31 in every drawing the button shows, and to count a phantom second configuration. So a sample whose
+ * relative residual on any enforced or driven constraint exceeds `PRECISE_REL` (10× below the comparison
+ * tolerance) is dropped. Like its sibling filters it never strips the pool below 2 (a thin pool over-claims).
+ */
+const PRECISE_REL = 1e-5;
+function preciseSamples(c0: Construction, samples: Map<Id, Vec>[]): Map<Id, Vec>[] {
+  if (samples.length < 3) return samples;
+  const consOf = new Map<Construction, Constraint[]>();
+  const constraintsFor = (c: Construction) => {
+    let cons = consOf.get(c);
+    if (!cons) consOf.set(c, (cons = [...c.constraints, ...drivenConstraintsOf(c)].filter((k) => !isOrderConstraint(k))));
+    return cons;
+  };
+  const precise = samples.filter((pos) =>
+    constraintsFor(constructionOfSample.get(pos) ?? c0).every((con) => {
+      if (constraintRefs(con).some((id) => !pos.has(id))) return true; // not placed here — not this filter's call
+      const get = (id: Id) => pos.get(id) as Vec;
+      const r = residual(con, get);
+      return !Number.isFinite(r) || Math.abs(r) <= PRECISE_REL * Math.max(1, constraintScale(con, get));
+    }),
+  );
+  return precise.length >= 2 ? precise : samples;
+}
+
+export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number } = {}): SharedSamples {
   const hit = memoHit(facts);
-  if (hit) return hit;
+  if (hit && (hit.complete || opts.deadlineMs !== undefined)) return hit;
   sampleStats.sweeps++;
+  // The budget bounds the JOBS — the samples themselves, each a freshly perturbed figure no memo can serve,
+  // so the same input stops at the same job on every run. The setup (the display-seed search and the base
+  // replays) is the figure's own fold, which the drawing already paid and the fold memo holds: charging it
+  // would make the verdict depend on how warm the caches were (measured while building ADR-558 — a second
+  // call on the same facts came back complete where the first was cut).
   const { jobs, finish } = samplingJobs(facts);
-  const deadline = Date.now() + SAMPLE_BUDGET_MS;
-  // Armed inside the solve ladder too (engine/solveBudget.ts, issue #59): a variant job builds NEW fact
-  // content whose fold can hit the recruit ladder — the between-job check alone couldn't stop it.
-  return withSolveBudget(deadline, () => {
+  const aborts0 = solveBudget.aborts;
+  const runJobs = (stop: () => boolean) => {
     let ran = 0;
     for (let i = 0; i < jobs.length; i++) {
-      if (i > 0 && Date.now() > deadline) break;
+      if (i > 0 && stop()) break; // the first job always runs — never an empty pool for a buildable figure
       jobs[i]();
       ran++;
     }
-    // #434: a determined figure's admissible set must be COMPLETE to count (the sweep's `finish` fails closed).
-    return finish(ran === jobs.length);
-  });
+    // #434: a determined figure's admissible set must be COMPLETE to count (the sweep's `finish` fails closed);
+    // a job whose solve was aborted mid-ladder did not finish either.
+    return finish(ran === jobs.length && solveBudget.aborts === aborts0);
+  };
+  if (opts.deadlineMs !== undefined) {
+    const deadline = Date.now() + opts.deadlineMs;
+    // Armed inside the solve ladder too (engine/solveBudget.ts, issue #59): a variant job builds NEW fact
+    // content whose fold can hit the recruit ladder — the between-job check alone couldn't stop it.
+    return withSolveBudget(deadline, () => runJobs(() => Date.now() > deadline));
+  }
+  const limit = work.done + POOL_WORK_CAP;
+  return withWorkBudget(POOL_WORK_CAP, () => runJobs(() => work.done > limit));
 }
 // `sharedSamplesAsync` — the main-thread BATCHED sampler that yielded to the event loop every 4 samples —
 // was DELETED with #157 ([ADR-401](docs/06-decisions.md#adr-401)). Its yield granularity assumed cheap
@@ -3059,7 +3172,8 @@ export function computeValues(facts: Fact[], queries: QueryInput[] = []): Values
   // #929 (ADR-485): every letter the student named, from the SAME symbol table the unit lane reads —
   // enabled facts only, so deselecting the statement that named it removes its row with it.
   const symbols = symbolBindings(enabledCmds);
-  return computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter, unit, queries, symbols, shared.determined);
+  // #1601 (ADR-558): the panel SAYS when its pool was cut short, rather than reading as "nothing to derive".
+  return { ...computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter, unit, queries, symbols, shared.determined), complete: shared.complete };
 }
 
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */

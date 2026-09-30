@@ -21,6 +21,7 @@ export const solveBudget: { deadlineAt: number | null; aborts: number } = { dead
 
 /** Has the armed budget run out? (Never true when unarmed — the default, and always under tests.) */
 export function budgetExceeded(): boolean {
+  if (workExceeded()) return true;
   if (solveBudget.deadlineAt === null || Date.now() <= solveBudget.deadlineAt) return false;
   solveBudget.aborts++;
   return true;
@@ -34,5 +35,38 @@ export function withSolveBudget<T>(deadlineAt: number, fn: () => T): T {
     return fn();
   } finally {
     solveBudget.deadlineAt = prev;
+  }
+}
+
+/**
+ * #1601/#1599 (ADR-558): the WORK budget — the deterministic sibling of the wall clock above. Every
+ * `evaluateCore` is one work unit (`work.done`), so a budget of N units stops at the same point on every
+ * device and every run: the knowledge pool's verdicts can then never depend on how fast the machine was
+ * (the operator's ruling on #1601 — "same input, same answer"). The interactive searches keep the wall
+ * clock; only the knowledge pool is bounded this way.
+ */
+export const work: { done: number; limitAt: number | null } = { done: 0, limitAt: null };
+
+/** One unit of work (called by `evaluateCore`). */
+export function countWork(): void {
+  work.done++;
+}
+
+/** Has the armed WORK budget run out? Never true when unarmed. Counted as a ladder abort, like the clock. */
+export function workExceeded(): boolean {
+  if (work.limitAt === null || work.done <= work.limitAt) return false;
+  solveBudget.aborts++;
+  return true;
+}
+
+/** Arm a budget of `units` of work for `fn` (nested arms keep the tighter limit; always restored). */
+export function withWorkBudget<T>(units: number, fn: () => T): T {
+  const prev = work.limitAt;
+  const at = work.done + units;
+  work.limitAt = prev === null ? at : Math.min(prev, at);
+  try {
+    return fn();
+  } finally {
+    work.limitAt = prev;
   }
 }

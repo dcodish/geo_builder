@@ -2966,7 +2966,7 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(at(moved, 'A'), at(moved, 'C'))).toBeCloseTo(Math.sqrt(7), 4);
       expect(freeDofCount(moved.construction), 'no continuous freedom left').toBe(0);
       const verdict = figureDeterminacy(sharedSamples(found!.facts));
-      expect(verdict, 'two admissible shapes: AC = √7 and AC = 5, the same count at every sampled seed').toEqual({ determined: true, configurations: 2, stable: true });
+      expect(verdict, 'two admissible shapes: AC = √7 and AC = 5, the same count at every sampled seed').toEqual({ determined: true, configurations: 2, stable: true, complete: true });
       expect(figureStatus(found!.facts.length, 0, verdict)).toEqual({ key: 'actions.dofConfigs', n: 2 });
       // «הציגו תצורה אחרת» reaches the other shape — the 3-4-5
       const next = searchAnotherView(found!.facts, found!.seed);
@@ -3003,6 +3003,23 @@ export const SCENARIOS_4: Scenario[] = [
         expect(ac?.unit?.sym, `«${c}»: AC is printed in the student's unit`).toBe('x');
         expect(ac?.unit?.coef).toBeCloseTo(2, 6);
       }
+    },
+  },
+  {
+    id: 'ssa-triangle-two-shapes-status-and-values-1599',
+    title: '#1599 (ADR-558): the SSA triangle «AB=5 · AC=4 · ∠ABC=40» — the status says there is more than one configuration, and BC is not printed as definite',
+    guards:
+      "Escalated by the PR #1576 sweep (2026-09-30): two triangles fit this SSA data (BC = 6.212 or 1.449), yet the status read «✓ הציור נקבע במלואו» and the values panel printed BC = 6.212 as definite — the determined figure's knowledge pool sampled 3 seeds, and «הציגו תצורה אחרת» reaches the second shape only at a few seeds of its 24. Operator ruling 2026-09-30: sample the button's whole seed range. Locks the student-visible verdicts (status key, BC withheld, the givens still printed); the pool mechanics (work cap, completeness, determinism) are in src/__tests__/issue-1599-1601-knowledge-pool.test.ts.",
+    steps: ['משולש ABC', 'AB=5', 'AC=4', 'זווית ABC = 40'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC', 'AB=5', 'AC=4', 'זווית ABC = 40']);
+      const verdict = figureDeterminacy(sharedSamples(facts));
+      expect(verdict.configurations, 'both triangles are in the pool').toBeGreaterThan(1);
+      expect(figureStatus(facts.length, freeDofCount(fig.construction), verdict)?.key, 'never «נקבע במלואו»').toBe('actions.dofConfigsMany');
+      const rows = computeValues(facts).rows;
+      expect(rows.some((r) => r.kind === 'length' && r.label === 'BC'), 'BC is 6.212 in one shape and 1.449 in the other — withheld').toBe(false);
+      expect(rows.find((r) => r.kind === 'length' && r.label === 'AB')?.value, 'the givens still print').toBeCloseTo(5, 6);
     },
   },
 ];

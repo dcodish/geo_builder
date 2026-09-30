@@ -629,12 +629,16 @@ knowledge gates ask "is this the same in every configuration?", and the pool is 
   «AB=BC=8» read 0 and printed ∠ABC = 31°, one seed's accident). And a seed can never reach a BRANCH or a
   right-angle SEAT — the quarter-circle figure is rigid at each seat, yet the seat at B (admissible, one
   «הציגו תצורה אחרת» press away) gives |AB| = 11.18 against the printed 18.03. So the pool is now the
-  **admissible set**: seeds {s, s+1, s+2} of the current facts (through the same filter ladder), × every
+  **admissible set**: the current facts at every seed «הציגו תצורה אחרת» resamples (`CONFIG_SEEDS` = 24 —
+  [ADR-558](06-decisions.md#adr-558), #1599: at three seeds the SSA triangle's second shape, which the button
+  reaches at a few seeds of 24, was missing and its third side printed as definite), plus seeds {s, s+1, s+2} × every
   discrete rewrite «הציגו תצורה אחרת» applies — every cyclable branch point's branches crossed with the seat
   (`admissibleRewrites`) — kept only where `meetsRequirements` holds (the button's own bar). Reflection masks
   are subsumed by the seed axis (measured on the corpus); the `inscribe` variant stays out (ADR-262).
 - **Bounded, failing CLOSED.** The cross product is capped (`ADMISSIBLE_REWRITE_CAP`); over the cap, or when
-  the sample budget cuts the enumeration short, the pool is marked **not determined** and the gates fall
+  the WORK cap cuts the enumeration short (`POOL_WORK_CAP` `evaluateCore` calls over the sampling jobs —
+  never seconds, so the same input stops at the same job on every device; ADR-558), the pool is marked
+  **not determined** and `complete: false`, and the gates fall
   back to their ≥ 4 floor — values and dots withheld, relations still read off the samples in hand — exactly
   as an under-determined figure is treated. A partial set never prints a number the missing configuration
   refutes.
@@ -645,8 +649,13 @@ knowledge gates ask "is this the same in every configuration?", and the pool is 
   already existed; a genuinely determined figure's samples are identical and it prints as before.
 - **Cost:** a few replays per determined figure at panel/relations time in the worker, memoized per fact
   list, never in the submit path. A rewrite that is INFEASIBLE pays the recruiter ladder to conclude it
-  (the #259 class — 96 s deadline-free on the quarter-circle figure); in prod the 5 s sample budget cuts
-  that and the figure falls to the not-determined branch above.
+  (the #259 class — 96 s deadline-free on the quarter-circle figure); the work cap cuts that and the figure
+  falls to the not-determined branch above, and says so. The cap bounds the JOBS only: the setup (the
+  display-seed search, the base replays) is the figure's own fold, already paid by the drawing and held by
+  the fold memo — charging it made a second call on the same facts come back complete where the first was
+  cut. The UI-thread submit gate's «כבר קיים» test (`impliedByPrior`) keeps its wall-clock bound
+  (`sharedSamples(facts, { deadlineMs })`) — an interactive check that fails open — and an incomplete pool
+  is never served from the memo as if it were complete.
 - **The status cue reads the same pool (#1444, [ADR-556](06-decisions.md#adr-556)).** `figureDeterminacy`
   (`replay/core.ts`) returns the pool's `determined` flag, the number of DISTINCT shapes in it — two samples
   are one configuration when every labelled pairwise distance agrees up to one common scale (a mirror or a
@@ -657,8 +666,12 @@ knowledge gates ask "is this the same in every configuration?", and the pool is 
   the submit path — into the store's `determinacy` slot (facts-keyed, like `crossings`). `figureStatus`
   (`app/figureStatus.ts`) maps it, the configuration note ADDED to the count: DOF > 0 → «דרגות חופש: N»;
   DOF 0 with more than one shape → «דרגות חופש: 0 · יש N תצורות אפשריות — …» when stable, else «… יש יותר
-  מתצורה אחת — …»; DOF 0, one shape, pool complete → «✓ … נקבע במלואו»; DOF 0, one shape, pool incomplete →
-  the bare «דרגות חופש: 0»; no verdict yet → no claim.
+  מתצורה אחת — …»; DOF 0, one shape, pool complete → «✓ … נקבע במלואו»; DOF 0, one shape, pool cut by the
+  work cap → «דרגות חופש: 0 · האיור מורכב מדי כדי לבדוק אם יש לו תצורה נוספת» (ADR-558); no verdict yet →
+  «בודק…», claiming nothing. `stable` compares only the seeds that sampled the whole admissible set — the
+  extra current-facts seeds of ADR-558 add shapes to the count but are not whole-set samples. The values
+  panel carries the same `complete` flag and reads «האיור מורכב מדי לבדיקה מלאה — ייתכן שחסרים כאן ערכים»
+  instead of «אין עדיין ערכים קבועים …», which told the student to add sizes when the tool had run out.
 ## The submit transaction: facts commit, the seed resolves after (#364, [ADR-510](06-decisions.md#adr-510))
 
 - **The commit** (`commitCommands` / `replaceGroup`, `store/geoStore.ts`) is the facts alone, in one zundo

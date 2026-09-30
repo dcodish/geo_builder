@@ -160,10 +160,15 @@ retire.
 
 **M3 — One sampler, shared and budgeted.** Detection layers (shapes, relations, anything future) consume
 ONE shared, facts-keyed sample set; no layer runs its own `for (seed) evaluate` loop. Every search loop
-(seed sweeps, resample, config search) has a wall-clock budget, and a *failing* solve must cost no more
-than a small multiple of a succeeding one (divergence early-out). A determined figure (0 shape DOF,
-single variant) is sampled once, not N times. New solver features must state their worst-case
-multiplier (restarts × seeds × passes) in their ADR.
+has a budget: the INTERACTIVE searches (seed sweeps, resample, config search, the submit gate's
+«כבר קיים» test) a wall-clock budget; the shared KNOWLEDGE pool a deterministic WORK budget
+(`POOL_WORK_CAP` evaluations), because a verdict the student reads — a value, a relation, the
+configuration count — must be a function of the input alone, never of the machine's speed that moment
+(operator ruling 2026-09-30, [ADR-558](06-decisions.md#adr-558)); a pool the cap cuts SAYS so. A
+*failing* solve must cost no more than a small multiple of a succeeding one (divergence early-out). A
+determined figure (0 shape DOF, single variant) is sampled over its admissible set (ADR-509, ADR-558),
+not a sweep of independent seeds. New solver features must state their worst-case multiplier (restarts ×
+seeds × passes) in their ADR.
 
 **M4 — Defaults yield to statements (ADR-052 / ADR-114 / ADR-163).** Any unstated choice the engine
 makes (apex, right-angle vertex, equal pair, configuration) is soft: it must yield to an explicit

@@ -25,7 +25,7 @@ import {
   unit,
 } from './geometry';
 import { carriesBoundAim, constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates, withToleranceFactor } from './solve';
-import { budgetExceeded } from './solveBudget';
+import { budgetExceeded, countWork } from './solveBudget';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
 export interface ResolvedLine {
@@ -1259,6 +1259,7 @@ function evaluateUncached(c: Construction, resolve: (c: Construction) => Constru
 /** Exported for the DOF accountant's Jacobian (`dofRank.ts`): positions of a construction WITHOUT solving —
  *  every parameter at its stored value — which is what a finite difference over one parameter needs. */
 export function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): EvalResult {
+  countWork(); // ADR-558: one unit of the deterministic work budget
   const pos = new Map<Id, Vec>();
   const lines = new Map<Id, ResolvedLine>();
   const circles = new Map<Id, ResolvedCircle>();

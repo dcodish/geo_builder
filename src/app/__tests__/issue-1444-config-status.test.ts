@@ -183,27 +183,31 @@ describe('#1444 — guards: no configuration note where there is one shape, or w
 describe('#1444 — the pieces', () => {
   it('figureDeterminacy counts DISTINCT shapes (scale and mirror are not a new one) and says whether every seed agrees', () => {
     const found = findValidConfig(factsOf(REPORTED), 0)!;
-    expect(figureDeterminacy(sharedSamples(found.facts))).toEqual({ determined: true, configurations: 2, stable: true });
+    expect(figureDeterminacy(sharedSamples(found.facts))).toEqual({ determined: true, configurations: 2, stable: true, complete: true });
     // a square's determined pool varies in SCALE across seeds — still one configuration
-    expect(figureDeterminacy(sharedSamples(factsOf(['ריבוע ABCD'])))).toEqual({ determined: true, configurations: 1, stable: true });
+    expect(figureDeterminacy(sharedSamples(factsOf(['ריבוע ABCD'])))).toEqual({ determined: true, configurations: 1, stable: true, complete: true });
   }, 120_000);
 
   it('figureDeterminacy on a hand-built pool (no seed tags): one group; an empty pool claims nothing', () => {
     const tri = (cx: number) => new Map([['A', { x: 0, y: 0 }], ['B', { x: 4, y: 0 }], ['C', { x: cx, y: 3 }]]);
     // untagged (hand-built) samples form one group — stable by construction
-    expect(figureDeterminacy({ samples: [tri(1), tri(2)], determined: true })).toEqual({ determined: true, configurations: 2, stable: true });
-    expect(figureDeterminacy({ samples: [], determined: false })).toEqual({ determined: false, configurations: 0, stable: false });
+    expect(figureDeterminacy({ samples: [tri(1), tri(2)], determined: true })).toEqual({ determined: true, configurations: 2, stable: true, complete: true });
+    expect(figureDeterminacy({ samples: [], determined: false })).toEqual({ determined: false, configurations: 0, stable: false, complete: true });
   });
 
-  it('figureStatus: the verdict decides; the note is added to the count; pending claims nothing', () => {
+  it('figureStatus: the verdict decides; the note is added to the count; pending says «בודק…» (ADR-558)', () => {
     expect(figureStatus(0, 0, null)).toBeNull();
     expect(figureStatus(2, 3, null)).toEqual({ key: 'actions.dof', count: 3 });
-    expect(figureStatus(2, 0, null), 'the sweep has not answered yet').toBeNull();
+    expect(figureStatus(2, 0, null), 'the sweep has not answered yet — claims nothing, says it is coming (#1599 ruling)').toEqual({ key: 'actions.checking' });
     expect(figureStatus(2, 0, { determined: true, configurations: 1, stable: true })).toEqual({ key: 'actions.determined' });
     expect(figureStatus(2, 0, { determined: true, configurations: 3, stable: true })).toEqual({ key: 'actions.dofConfigs', n: 3 });
     expect(figureStatus(2, 0, { determined: true, configurations: 2, stable: false }), 'no number that could be wrong').toEqual({ key: 'actions.dofConfigsMany' });
     expect(figureStatus(2, 0, { determined: false, configurations: 2, stable: true }), 'an incomplete pool proves "more than one", never N').toEqual({ key: 'actions.dofConfigsMany' });
     expect(figureStatus(2, 0, { determined: false, configurations: 1, stable: true }), 'an incomplete pool is no proof of uniqueness').toEqual({ key: 'actions.dof', count: 0 });
+    // #1599/#1601 (ADR-558): a pool cut by the work cap SAYS so; a second shape it did find still counts
+    expect(figureStatus(2, 0, { determined: false, configurations: 1, stable: true, complete: false })).toEqual({ key: 'actions.dofTooComplex' });
+    expect(figureStatus(2, 0, { determined: false, configurations: 2, stable: true, complete: false })).toEqual({ key: 'actions.dofConfigsMany' });
+    expect(figureStatus(2, 4, { determined: false, configurations: 1, stable: true, complete: false }), 'DOF > 0: the count stands').toEqual({ key: 'actions.dof', count: 4 });
     expect(figureStatusParams({ key: 'actions.dofConfigs', n: 2 })).toEqual({ n: 2 });
     expect(figureStatusParams({ key: 'actions.dof', count: 0 })).toEqual({ count: 0 });
     expect(figureStatusParams({ key: 'actions.determined' })).toBeUndefined();
@@ -214,5 +218,10 @@ describe('#1444 — the pieces', () => {
     expect(strip(he('actions.dofConfigs', { n: 3 }))).toBe('דרגות חופש: 0 · יש 3 תצורות אפשריות — לחצו «הציגו תצורה אחרת»');
     expect(strip(he('actions.dofConfigsMany'))).toBe(MANY_HE);
     expect(strip(i18n.t('actions.dofConfigsMany', { lng: 'en' }))).toBe('Degrees of freedom: 0 · more than one configuration is possible — press «Show another configuration»');
+    // #1599/#1601 (ADR-558)
+    expect(strip(he('actions.checking'))).toBe('בודק…');
+    expect(strip(he('actions.dofTooComplex'))).toBe('דרגות חופש: 0 · האיור מורכב מדי כדי לבדוק אם יש לו תצורה נוספת');
+    expect(strip(he('values.incomplete'))).toBe('האיור מורכב מדי לבדיקה מלאה — ייתכן שחסרים כאן ערכים');
+    expect(strip(i18n.t('actions.dofTooComplex', { lng: 'en' }))).toBe('Degrees of freedom: 0 · the figure is too complex to check whether it has another configuration');
   });
 });

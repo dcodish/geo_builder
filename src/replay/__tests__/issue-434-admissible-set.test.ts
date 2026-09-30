@@ -15,7 +15,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { factsOf } from '@/__tests__/scenario-pipeline';
-import { admissibleRewrites, ADMISSIBLE_REWRITE_CAP, ADMISSIBLE_SEEDS, computeValues, detectAll, firstSatisfyingSeed, replay, samplingJobs, sharedSamples } from '@/replay/core';
+import { admissibleRewrites, ADMISSIBLE_REWRITE_CAP, ADMISSIBLE_SEEDS, CONFIG_SEEDS, computeValues, figureDeterminacy, detectAll, firstSatisfyingSeed, replay, samplingJobs, sharedSamples } from '@/replay/core';
 import { detectRelationsAcross, freeDofCount } from '@/engine';
 import type { Fact } from '@/store/geoStore';
 
@@ -105,7 +105,8 @@ describe('#434 — the BRANCH axis: the other tangent point is an admissible alt
   it('…and ∠BAD returns once «B ו-D באותו צד של AO» states the side', () => {
     const facts = factsOf([...tangent, 'B ו-D באותו צד של AO']);
     const pool = sharedSamples(facts);
-    expect(pool.samples.length, 'the mirror branch fails the side requirement and leaves the pool').toBe(ADMISSIBLE_SEEDS);
+    // #1599 (ADR-558): the pool now spans the button's seed range, so the lock is the MEANING, not a count
+    expect(figureDeterminacy(pool).configurations, 'the mirror branch fails the side requirement and leaves the pool').toBe(1);
     expect(canvasAngle(facts, 'A', 'B', 'D'), 'now knowledge').toBeDefined();
   });
 });
@@ -130,11 +131,12 @@ describe('#434 — failing CLOSED, and the paths that must not change', () => {
     expect(admissibleRewrites(facts, c, ADMISSIBLE_REWRITE_CAP)!.length).toBe(3);
   });
 
-  it('a bare square (rigid, no branch, no seat) keeps its right angles — one rewrite, three identical seeds', () => {
+  it('a bare square (rigid, no branch, no seat) keeps its right angles — one rewrite, every seed of the button’s range identical', () => {
     const facts = factsOf(['ריבוע ABCD', 'AC']);
     const pool = sharedSamples(facts);
     expect(pool.determined).toBe(true);
-    expect(pool.samples.length).toBe(ADMISSIBLE_SEEDS);
+    expect(pool.samples.length, '#1599 (ADR-558): the button’s whole seed range').toBe(CONFIG_SEEDS);
+    expect(figureDeterminacy(pool).configurations).toBe(1);
     expect(canvasAngle(facts, 'B', 'A', 'C')?.valueDeg).toBeCloseTo(90, 3);
   });
 

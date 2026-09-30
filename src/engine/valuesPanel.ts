@@ -227,6 +227,9 @@ export interface ValuesPanelResult {
   sampleCount: number;
   /** answers to the student's own questions (#477) — empty when none were asked. */
   queryRows: QueryRow[];
+  /** #1601 (ADR-558): false when the sample pool behind these rows was cut short by the work cap — the
+   *  panel then says so instead of reading as "nothing to derive". Absent ⇒ complete. */
+  complete?: boolean;
 }
 
 const REL_TOL = 1e-4;

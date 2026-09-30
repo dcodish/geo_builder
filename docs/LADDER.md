@@ -93,6 +93,8 @@ M4 pre-scans (soft-equal / right-angle reseat / trapezoid rotate / centre promot
 
 `firstSatisfyingSeed` (strict → relaxed extension bar → converged fallback, reflection-mask tiers in seed high bits) · `meetsRequirements` · `findValidConfig` (bounded branch combinatorics) · `searchResample` (shape-fingerprint difference). Budgets: worker 12 s (`WORKER_SEARCH_BUDGET_MS`), main-thread sync fallback 2.5 s, tests ∞. A budget-aborted fold is never cached.
 
+**The knowledge pool is not a view search** ([ADR-558](06-decisions.md#adr-558), #1599/#1601): `sharedSamples` runs its sampling jobs under a deterministic WORK budget (`POOL_WORK_CAP` `evaluateCore` calls, counted by `countWork`; the ladder's `budgetExceeded` honours it), never the clock, in tests exactly as in the browser, and marks the pool `complete` or not. A determined figure's current facts are sampled over the button's whole range (`CONFIG_SEEDS`, shared with `searchResample`), the extra seeds in the button's own form (replay + `meetsRequirements`). The UI-thread «כבר קיים» gate (`impliedByPrior`) keeps a wall-clock bound via `sharedSamples(facts, { deadlineMs })`. The filter ladder gains `preciseSamples` ahead of `distinctSamples`: a sample whose relative residual on any enforced or driven constraint exceeds 1e-5 is not evidence.
+
 ## The DOF accountant (`freeDofCount`, src/engine/sample.ts) — read at 2d′/the submit gate and by every knowledge gate
 
 Not a stage the ladder climbs, but the one number every stage's consumers read: `dryRunOutcome`'s `dofReduced` arm (the #156 guard), the «הכל נקבע» cue, the determined-figure fast path of the shared sample core, and the values-panel / relations knowledge gates. Its contract, since [ADR-536](06-decisions.md#adr-536) (#1264):

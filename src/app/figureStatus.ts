@@ -15,26 +15,28 @@
  *   - DOF 0, exactly one shape        → «✓ הציור נקבע במלואו על ידי הנתונים».
  * The verdict is the general {@link figureDeterminacy} — nothing here knows why there is a second shape.
  *
- * A DOF-0 pool that could not establish completeness (over the rewrite cap, or cut by the sample budget)
- * with one shape in hand is no proof of uniqueness: the line then reads the bare count «דרגות חופש: 0» —
- * true, and claiming nothing more. The verdict arrives a beat after the figure (the always-on detect sweep,
- * ADR-401); until then no determinedness is CLAIMED — the line is blank rather than a claim the pool may
- * contradict a moment later.
+ * A DOF-0 pool that could not establish completeness (over the rewrite cap, or cut by the work cap) with one
+ * shape in hand is no proof of uniqueness: #1599/#1601 ([ADR-558](../../docs/06-decisions.md#adr-558)) — the
+ * line SAYS so («… האיור מורכב מדי כדי לבדוק אם יש לו תצורה נוספת») rather than the bare count, which read as
+ * an ordinary answer. A second shape the pool DID find is a fact however the pool ended, so it still reads
+ * «יש יותר מתצורה אחת». The verdict arrives a beat after the figure (the always-on detect sweep, ADR-401);
+ * until then the line reads «בודק…» — no determinedness is claimed, and the student can see it is coming.
  */
 import type { Determinacy } from '@/replay/core';
 
 export type FigureStatus =
   | { key: 'actions.dof'; count: number }
   | { key: 'actions.dofConfigs'; n: number }
-  | { key: 'actions.dofConfigsMany' | 'actions.determined' };
+  | { key: 'actions.dofConfigsMany' | 'actions.determined' | 'actions.checking' | 'actions.dofTooComplex' };
 
 export function figureStatus(factCount: number, freeDof: number, verdict: Determinacy | null): FigureStatus | null {
   if (factCount === 0) return null;
   if (freeDof > 0) return { key: 'actions.dof', count: freeDof };
-  if (!verdict) return null; // pending — claim nothing yet
+  if (!verdict) return { key: 'actions.checking' }; // pending — claim nothing, and say it is coming (ADR-558)
   if (verdict.configurations > 1) {
     return verdict.determined && verdict.stable ? { key: 'actions.dofConfigs', n: verdict.configurations } : { key: 'actions.dofConfigsMany' };
   }
+  if (verdict.complete === false) return { key: 'actions.dofTooComplex' };
   return verdict.determined && verdict.configurations === 1 ? { key: 'actions.determined' } : { key: 'actions.dof', count: 0 };
 }
 

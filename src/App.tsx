@@ -1844,8 +1844,12 @@ export default function App() {
           )}
           {valuesLayer && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 10px' }}>
-              {valuesLayer.rows.length === 0 && valuesLayer.areaClasses.length === 0 && (
-                <span style={{ color: '#64748b', fontSize: 12 }}>{t('values.none')}</span>
+              {valuesLayer.complete === false ? (
+                <span style={{ color: '#b45309', fontSize: 12 }}>{t('values.incomplete')}</span>
+              ) : (
+                valuesLayer.rows.length === 0 && valuesLayer.areaClasses.length === 0 && (
+                  <span style={{ color: '#64748b', fontSize: 12 }}>{t('values.none')}</span>
+                )
               )}
               {(['given', 'derived'] as const).map((grp) => {
                 const rows = valuesLayer.rows.filter((r) => (grp === 'given') === r.stated);
