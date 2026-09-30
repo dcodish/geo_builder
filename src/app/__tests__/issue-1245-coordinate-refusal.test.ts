@@ -27,6 +27,7 @@ import { PRE_LLM, decideDeterministic2D } from '../decideDeterministic';
 import { replay, useGeoStore } from '@/store/geoStore';
 import { classifyOutOfScope } from '@/parser';
 import i18n from '@/i18n';
+import { studentFacingViolations } from '../../../shell/studentText';
 
 function makeDeps(locale: 'he' | 'en') {
   const calls = { notes: [] as string[], cleared: 0 };
@@ -143,14 +144,22 @@ describe('#1245 — every coordinate spelling is refused at the door and pointed
 });
 
 describe('#1245 — the message the operator approved', () => {
-  it('is his text, verbatim', () => {
-    // i18n wraps each Latin run in bidi isolates (the URL and E(-1,7) stay left-to-right inside Hebrew)
-    expect(COORD_HE.replace(/[\u2066-\u2069]/g, '')).toBe('מיקום נקודה לפי שיעורים נעשה בכלי הגאומטריה האנליטית: themathbible.com/analytic-builder — שם כותבים E(-1,7). כאן תארו את הצורה עצמה — למשל «משולש ABC» או «נקודה D על AB».');
+  it('is his text, verbatim (PR #1575 play feedback 2026-09-30: the switcher BUTTON, never a URL)', () => {
+    // i18n wraps each Latin run in bidi isolates (E(-1,7) stays left-to-right inside Hebrew)
+    expect(COORD_HE.replace(/[\u2066-\u2069]/g, '')).toBe('מיקום נקודה לפי שיעורים נעשה בכלי «גאומטריה אנליטית» — לחצו עליו בראש המסך. שם כותבים E(-1,7). כאן תארו את הצורה עצמה — למשל «משולש ABC» או «נקודה D על AB».');
   });
   it.each([['he', COORD_HE], ['en', COORD_EN]])('%s: shows E(-1,7) literally and never the `=` spelling', (_l, msg) => {
     expect(msg).toContain('E(-1,7)');
     expect(msg).not.toMatch(/[A-Z]\s*=\s*\(/); // «E=(-1,7)» beside «E(-1,7)» differs by one character
-    expect(msg).toContain('themathbible.com/analytic-builder');
+  });
+  it.each(['he', 'en'] as const)('%s: names the switcher button by the words the switcher renders, and no URL', (lng) => {
+    const msg = lng === 'he' ? COORD_HE : COORD_EN;
+    expect(msg).toContain(i18n.t('switcherAnalytic', { lng }) as string);
+    expect(msg).not.toMatch(/themathbible|https?:|\.com\b/);
+  });
+  it('he: the interpolated button words are student-facing (ADR-W-096) — nothing id-shaped, nothing untranslated', () => {
+    const values = ['switcherAnalytic', 'switcher3d'].map((k) => i18n.t(k, { lng: 'he' }) as string);
+    expect(studentFacingViolations(values, { typed: '', names: [] })).toEqual([]);
   });
 });
 
@@ -168,8 +177,9 @@ describe('#1162 — the analytic register points at the LIVE tool', () => {
     expect(r.notes).toEqual([ANALYTIC_HE]);
     expect(llmParseMock).not.toHaveBeenCalled();
   });
-  it('the message names the analytic Builder and no longer calls it planned', () => {
-    expect(ANALYTIC_HE).toContain('themathbible.com/analytic-builder');
+  it('the message names the analytic Builder switcher button and no longer calls it planned', () => {
+    expect(ANALYTIC_HE).toContain(`«${i18n.t('switcherAnalytic', { lng: 'he' })}»`);
+    expect(ANALYTIC_HE).not.toMatch(/themathbible|https?:/);
     expect(ANALYTIC_HE).not.toMatch(/מתוכנן|לעתיד|בינתיים/);
   });
 });
