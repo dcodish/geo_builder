@@ -162,7 +162,12 @@ export type Fact =
    * is the only layer that can see whether `seg-CE` is already there.
    */
   | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve; stated: boolean; inheritExtent?: true })
-  | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule })
+  /**
+   * `auto` (#1270, ADR-AG-184) — a name the TOOL gave, never the student: a canonical circle's centre
+   * called `O` by default. It yields to anything already holding the id (the fold absorbs it as
+   * `known`), where a student's own derivation of an existing point is a CONDITION on it (#1320).
+   */
+  | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule; auto?: true })
   | (FactBase & { t: 'segment'; id: Id; a: Id; b: Id })
   | (FactBase & { t: 'polygon'; id: Id; vertices: Id[]; noun?: string })
   /**

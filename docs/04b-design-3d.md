@@ -389,6 +389,19 @@ the same point in every configuration at the drawing's gauge (`Resolved3.seed`):
 pinned m, probe values (`openParamProbes3`) for an unpinned one — memoised per resolve so an orbit frame
 never re-resolves. Cost: ×n resolves per panel/ask for an n-root figure, ×1 for 0/1-root figures.
 
+**Two configurations print as two rows ([ADR-3D-289](06b-decisions-3d.md#adr-3d-289), #1506).** The
+panel's point loop still judges each coordinate per component (#827: seed agreement AND agreement across
+`pivot.pointRoots`). When a point is not fully determined, `twoConfigurations3` (`dataView.ts`, exported)
+asks the pool one more question: deduplicated per sample (`sameConfig`, 1e-3 of the point's size — the
+pool stores one entry per solution and repeats configurations), are there EXACTLY two members at every
+sample of `knowledgeSamples3`, the SAME two throughout, with the drawn position one of them? If so the
+`points` list carries `S₁(…)` / `S₂(…)` — each row one root printed whole through `coordStr`, never a
+component-wise mix — in place of the partial `S(?, 7/2, ?)` row, ordered canonically (larger on the first
+axis where they differ) so the labels never follow pool order or the drawn branch. `pointCoords` (the
+canvas label and the ask lane's point answer) is unchanged: the #827 partial form. Anything else — one
+member at some sample, three or more, a pair that moves with the seed (a continuum sampled twice) —
+returns `null` and the row stays the partial form.
+
 ## Rendering
 
 Orthographic orbit, with hidden edges dashed the way a textbook draws them, decided by **numeric outward
