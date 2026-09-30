@@ -12,6 +12,7 @@ import { drawableAt, viewBox, type Figure } from './evaluate';
 import type { Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
 import { evalExpr } from './expr';
+import { isCanonicalCircle } from './conic';
 import { EMPTY_CONSTRUCTION, diameterCircleId, namesObject, objectById, type Construction, type Fact } from './types';
 import { SOLVE_TOL } from './solve';
 
@@ -100,11 +101,18 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
     }
   });
   const { facts: resolved, minted } = resolveMints(parsed, owner);
-  facts.push(...resolved);
+  // The canonical circle's centre, named O by the tool (#1270) — inserted with its owning line, so the
+  // fold and every per-line rollup below see it as part of the circle's sentence.
+  const centred = nameCanonicalCentres(resolved, owner);
+  owner.splice(0, owner.length, ...centred.owner);
+  facts.push(...centred.facts);
 
   // The LINE is the fold's unit of application (#1242, ADR-AG-133): every fact of a faulted line carries
   // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
   const { construction, errors, effects, constraintFact, notices: factNotices } = fold(facts, owner);
+  // Said on the circle's row only when the name was actually GIVEN — a default that yielded to a letter
+  // already in the figure named nothing, and the list must not claim it did (#1263's rule).
+  for (const i of centred.offered) if (effects[i] === 'created') minted.push({ index: owner[i], id: CENTRE_LETTER });
   const reported = new Set<string>();
   errors.forEach((e, i) => {
     if (!e) return;
@@ -458,6 +466,70 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
   // circle centred on a coordinate point), so it is replaced up to the closing quote, never only as a whole string.
   const out = JSON.parse(text.replace(/@mint:[^"]*/g, (q) => JSON.stringify(names.get(q) ?? q).slice(1, -1))) as Fact[];
   return { facts: out, minted };
+}
+
+/**
+ * THE CANONICAL CIRCLE'S CENTRE IS CALLED O (#1270, ADR-AG-184 — amending ADR-AG-115).
+ *
+ * Operator, 2026-09-20: *"for canonical circles only, the center is O automatically unless user mentioned a
+ * letter. user can change this later anyway"*. So a stated circle whose equation is centred on the origin
+ * (`isCanonicalCircle` — a property of the equation, at every parameter value) gets its centre as a REAL
+ * point `O`, on the route a student-named centre already takes (#1059's `circle-centre` derivation). A
+ * real point, not a printed letter: #1167's defect was a letter with nothing behind it.
+ *
+ * It is a DEFAULT, and it yields (M4) — decided here, over the whole list, for the reason `resolveMints` is:
+ * only the list knows what is taken, in both directions of entry order.
+ *
+ *  1. a point the student stated AT the origin (`A(0,0)`, before or after the circle) — that point's letter
+ *     names the centre (ADR-AG-115's rule, which the panel applies by position);
+ *  2. the student named a canonical circle's centre themselves («נתון מעגל K שמשוואתו …», «K מרכז המעגל 1»)
+ *     — their letter;
+ *  3. the circle is not canonical — coordinates alone, unchanged («canonical only»);
+ *  4. the student DEFINED a point O anywhere (`O(5,5)`, «O אמצע AB») — no second O and no invented
+ *     `O₁`: the centre keeps its coordinates alone. An O merely DECLARED by an earlier sentence
+ *     («משולש AOB») is caught at the fold, where the offered fact finds the letter held and yields.
+ *
+ * A LATER sentence that only REFERS to O («משולש AOB», «הקטע OA») binds to this centre — that is the
+ * ruling's *"user can change this later"* made real: there is something to refer to.
+ *
+ * Returns the facts with the offered centre inserted right after its circle, the owner array to match, and
+ * which fact indices were offered (so `derive` can say so on the row only when the name was given).
+ */
+const CENTRE_LETTER = 'O';
+
+function nameCanonicalCentres(
+  facts: readonly Fact[],
+  owner: readonly number[],
+): { facts: Fact[]; owner: number[]; offered: number[] } {
+  const canonical = (f: Fact): boolean =>
+    f.t === 'curve' && f.curve.kind !== 'ellipse' && f.curve.kind !== 'parabola' && f.curve.kind !== 'line' && isCanonicalCircle(f.curve.eq);
+  const canonicalIds = new Set(facts.filter(canonical).map((f) => (f as { id: string }).id));
+  if (canonicalIds.size === 0) return { facts: [...facts], owner: [...owner], offered: [] };
+
+  const atOrigin = (f: Fact): boolean => {
+    if (f.t === 'point') {
+      const x = evalExpr(f.x, {});
+      const y = evalExpr(f.y, {});
+      return Number.isFinite(x) && Number.isFinite(y) && Math.abs(x) < 1e-12 && Math.abs(y) < 1e-12;
+    }
+    // Rule 2: a centre the student named, of a circle centred on the origin, occupies the origin.
+    return f.t === 'derived' && !f.auto && f.rule.t === 'circle-centre' && canonicalIds.has(f.rule.curve);
+  };
+  const definesLetter = (f: Fact): boolean => (f.t === 'point' || f.t === 'derived') && f.id === CENTRE_LETTER;
+  if (facts.some((f) => atOrigin(f) || definesLetter(f))) return { facts: [...facts], owner: [...owner], offered: [] };
+
+  const out: Fact[] = [];
+  const outOwner: number[] = [];
+  const offered: number[] = [];
+  facts.forEach((f, i) => {
+    out.push(f);
+    outOwner.push(owner[i]);
+    if (f.t !== 'curve' || !f.stated || !canonicalIds.has(f.id)) return;
+    offered.push(out.length);
+    out.push({ t: 'derived', id: CENTRE_LETTER, rule: { t: 'circle-centre', curve: f.id }, src: f.src, auto: true });
+    outOwner.push(owner[i]);
+  });
+  return { facts: out, owner: outOwner, offered };
 }
 
 export const EMPTY_DERIVATION: Derivation = {

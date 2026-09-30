@@ -1774,6 +1774,19 @@ given is judged line against line. The perimeter ask delegates to the side sum; 
 lowers to the same `length-eq`; `ringsNamed` (`engine/shapes.ts`) resolves a noun-only perimeter for
 both.
 
+## A canonical circle's centre is the tool's O ([ADR-AG-184](06c-decisions-analytic.md#adr-ag-184), #1270)
+
+A DEFAULT name, decided where `resolveMints` decides the tool's other names: in `derive`, over the whole
+resolved fact list, because only the list knows what is taken in both entry orders.
+`nameCanonicalCentres` inserts, right after each stated curve fact whose equation `isCanonicalCircle`
+(`engine/conic.ts` — structurally `A(x²+y²)+F=0` at two parameter probes, and real at one), a
+`{ t: 'derived', id: 'O', rule: circle-centre, auto: true }` owned by the circle's line — the route a
+student-named centre already takes. It inserts nothing when the list states a constant point at the
+origin, names a canonical circle's centre itself, or DEFINES `O` (a `point` or `derived` fact).
+An `O` only DECLARED earlier («משולש AOB») is the fold's to see: `applyFact`'s derived arm absorbs an
+`auto` fact whose id is held as `known` — never lowered to #1320's `derived-at` condition. `minted`
+records `O` only when the fold CREATED it, which is what the row's `mintedNote` reads.
+
 ## The LLM lane's prompt: derive, never invent; never prose ([ADR-AG-186](06c-decisions-analytic.md#adr-ag-186))
 
 The fallback prompt (`parser/llmSharedAnalytic.ts`) states **both halves of ADR-052**. A value nothing
