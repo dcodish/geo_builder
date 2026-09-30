@@ -69,5 +69,7 @@ which loads every session and has operator authority. One fact, one home — do 
 - [LLM-lane convergence plan](llm-lane-convergence-plan.md) — the 2026-09-22 four-step plan: steps 1-2 shipped, #1243 is COLLECTION not evidence, and #1355 waits on #1362 + a deploy
 - [Promo video plan (parked)](promo-video-plan.md) — Hebrew teacher-facing Instagram/WhatsApp videos: format, storyboard, pipeline, open questions; parked 2026-09-27, not priority
 - [PR servers have no LLM key](pr-servers-have-no-llm-key.md) — a PR worktree has no .env.local, so the fallback answers "none" in ~3 ms and reads as "not escalated"; by operator ruling they STAY keyless (cost, and it exposes grammar gaps) — say so on the sheet, never copy .env.local (2026-09-24 #1407)
+- [Play-sheet driver blind spots](playsheet-driver-blind-spots.md) — slow 2-D refusals (>2 s) and ⚠-channel notices read as false reds; verify by a timed probe on branch AND main, never "fix" them (round #1571)
+- [Plesk paste: read live first](plesk-paste-read-live-first.md) — read the live vhost_ssl.conf over ssh, hand him only the missing lines, and check his draft line by line before he applies (#1572, 2026-09-30)
 - [Canvas = inputs, panel = computed](canvas-inputs-panel-computed.md) — ADR-W-047, re-affirmed 2026-09-29 (#1563): never ask whether the canvas should show a derived value
 - [Play sheets sweep the phrasings](playsheets-sweep-the-phrasings.md) — a PR sheet tests what a student would type, measured on branch AND main, not the builder's one spelling (2026-09-29, #1511 → 37 red across 5 PRs)
