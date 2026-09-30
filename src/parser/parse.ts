@@ -1632,7 +1632,7 @@ const segment: Rule = (s) => {
  * "line CE passes through A" (collinear) all still reach their own rules first — and an orientation/style
  * adjective ("קו אופקי", "קו מקווקו") never matches (the two operands must be Latin labels), so it
  * escapes to the guidance-message classes (#43) instead of being mis-claimed as a segment. Runs LATE
- * (just before `freePoint`) as a catch-all, so anything with structure is claimed ahead of it.
+ * as a catch-all, so anything with structure is claimed ahead of it.
  */
 const bareSegment: Rule = (s) => {
   const m = s.trim().match(/^(?:line\s+|ישר\s+|הישר\s+|ה?קו\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)$/);
@@ -4195,17 +4195,10 @@ const collinearConstraint: Rule = (s) => {
   return null;
 };
 
-/** "point A at (0,0)" / "נקודה A ב-(0,0)" / "A = (3, 4)" */
-const freePoint: Rule = (s) => {
-  const m = s.match(
-    new RegExp(
-      String.raw`(?:point\s+|נקודה\s+|place\s+)?([A-Za-z]\d*)\s*(?:at|ב-?|=)\s*\(?\s*${num}\s*,\s*${num}\s*\)?`,
-      'i',
-    ),
-  );
-  if (!m) return null;
-  return [{ type: 'free-point', id: up(m[1]), x: parseFloat(m[2]), y: parseFloat(m[3]) }];
-};
+// #1245 (ADR-553): the coordinate `freePoint` rule — «point A at (0,0)» / «נקודה A ב-(0,0)» / «A = (3,4)» —
+// is WITHDRAWN. Placing a point by coordinates is analytic geometry, and it belongs to the analytic Builder
+// (`A(3,4)` there). The sentence now fails to parse and the scope register answers it (`coordinate-point`,
+// src/parser/scope.ts), pointing the student at that tool — pre-LLM, so no paid call can re-build it here.
 
 /**
  * "נקודה A" / "הוסף נקודה A" / "point A" / "add point A" — a BARE free point (2 DOF, ADR-052), NO
@@ -4215,8 +4208,8 @@ const freePoint: Rule = (s) => {
  * and the נקודה/point keyword is REQUIRED so a lone letter ("C") stays escalation. Idempotent via
  * `ifAbsent` — re-declaring is a no-op, and naming an existing point is a no-op statement (M1), never a
  * redefinition. `free: true` hands the DOFs to the sampler, so "show another configuration" moves it and a
- * later constraint (`AB=5`, `∠…`) recruits it. Runs after the coordinate `freePoint` (which owns the
- * `נקודה A ב-(0,0)` form) so an explicit placement is never swallowed as a bare point.
+ * later constraint (`AB=5`, `∠…`) recruits it. The coordinate form («נקודה A ב-(0,0)») is NOT a bare point:
+ * the `$` anchor leaves it unparsed, and the scope register refuses it (#1245, ADR-553 — analytic's syntax).
  */
 const bareFreePoint: Rule = (s, ctx) => {
   const m = s.match(/^\s*(?:הוסף\s+|add\s+)?(?:ה?נקודה|point)\s+([A-Za-z]\d*)\s*$/i);
@@ -9312,8 +9305,8 @@ const multiStatement: Rule = (s, ctx) => {
   return parsed.flatMap((r) => (r.ok ? r.commands : []));
 };
 
-// Order matters: the most specific keyword-anchored rules run first; the
-// coordinate rule (freePoint) is last because it's the loosest.
+// Order matters: the most specific keyword-anchored rules run first; the anchored catch-alls
+// (bareFreePoint, bareSegment) run last. (The coordinate `freePoint` rule is withdrawn — #1245, ADR-553.)
 //
 // ── #184: the unnamed-construct family (auto-name the derived point) ────────────────────────────
 // The engine already auto-names for median/altitude/foot; midpoint/diameter/tangent/centre/secant
@@ -9710,11 +9703,10 @@ export const RULES: Rule[] = [
   measurePower, // "AB = x²" / "3x^2" — before measureLength so the exponent isn't dropped
   measurePi, // "AB = 2π" — before measureLength so π isn't read as a free variable
   measureLength, // "AB = 3x" (symbolic) — before ratio/equal/distance
-  equalSegments, // "AB = CD" — before distance (numeric RHS) and freePoint (coord RHS)
+  equalSegments, // "AB = CD" — before distance (numeric RHS)
   distanceConstraint, // "AB = 6"
   pointByDistances,
-  freePoint,
-  bareFreePoint, // "נקודה A" / "point A" — a bare 2-DOF free point (no coords), after freePoint owns the coord form (#104)
+  bareFreePoint, // "נקודה A" / "point A" — a bare 2-DOF free point (no coords, #104); a coordinate form is refused by scope (#1245)
   bareLabelRunShape, // #505: a bare 3–4 letter run of NEW labels declares the shape («Abcd» → quadrilateral); 2 letters stay bareSegment's
   bareSegment, // LAST catch-all: a bare "AB" / "line AB" → draw the segment (after every keyword/structured rule)
   ambiguousCircleAsk, // #546 VERY LAST: an unbindable anonymous circle reference beside ≥2 circles ASKS instead of escalating — after every rule, so it steals nothing

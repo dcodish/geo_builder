@@ -1200,10 +1200,12 @@ export const SCENARIOS_3: Scenario[] = [
     guards:
       "the operator's input (session 0mjr1ots): the deterministic parser only knew the \"BD and OC intersect at A\" phrasing, not \"BD CUTS OC at A\" (the verb BETWEEN the two segments), so it escalated to the LLM — which rewrote it IN ENGLISH and lossily as \"point A on the extension of BD and on the extension of OC\"; the parser then matched only the first clause (A on BD's extension at t=1.3) and DROPPED the OC half, so A was a wrong point, not the intersection. Fixed by adding the cut-form to `lineLineIntersection` (seg1, cut verb, seg2, point → line∩line), so it parses deterministically, stays Hebrew, and places A correctly. (`extension`/`המשך` is irrelevant — two infinite lines meet at one point.)",
     steps: [
-      'point B at (0,0)',
-      'point D at (2,0)', // line BD = the x-axis
-      'point O at (3,2)',
-      'point C at (3,1)', // line OC = the vertical x=3
+      // #1245 (ADR-553): the typed «point B at (0,0)» spelling is withdrawn from 2-D (analytic owns it); the
+      // pins are the engine commands it lowered to, so the cut-form rule is still tested on the same lines.
+      { llm: [{ type: 'free-point', id: 'B', x: 0, y: 0 }] },
+      { llm: [{ type: 'free-point', id: 'D', x: 2, y: 0 }] }, // line BD = the x-axis
+      { llm: [{ type: 'free-point', id: 'O', x: 3, y: 2 }] },
+      { llm: [{ type: 'free-point', id: 'C', x: 3, y: 1 }] }, // line OC = the vertical x=3
       'המשך BD חותך את המשך OC בנקודה A', // A = line(B,D) ∩ line(O,C) = (3,0) — beyond BOTH segments
     ],
     check(fig) {

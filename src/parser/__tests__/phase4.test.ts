@@ -87,10 +87,16 @@ describe('parser — point by distances (he/en)', () => {
   it('hebrew', () => one('C במרחק 5 מ-A ו-5 מ-B', c));
 });
 
-describe('parser — free point (he/en)', () => {
-  it('english at (x,y)', () => one('point A at (0,0)', { type: 'free-point', id: 'A', x: 0, y: 0 }));
-  it('hebrew', () => one('נקודה B ב-(6,0)', { type: 'free-point', id: 'B', x: 6, y: 0 }));
-  it('equals form with negatives', () => one('A = (-3, 4)', { type: 'free-point', id: 'A', x: -3, y: 4 }));
+// #1245 (ADR-553): the coordinate free point is WITHDRAWN from 2-D — placing a point at coordinates is the
+// analytic Builder's construct. These three used to parse to a pinned `free-point`; the grammar now declines
+// them and the scope register answers (issue-1245-coordinate-refusal.test.ts drives the door).
+describe('parser — coordinate placement is withdrawn (he/en, #1245)', () => {
+  for (const u of ['point A at (0,0)', 'נקודה B ב-(6,0)', 'A = (-3, 4)']) {
+    it(u, () => {
+      const r = parse(u);
+      expect(r.ok, `«${u}» must not build a point in 2-D`).toBe(false);
+    });
+  }
 });
 
 describe('parser — angle constraint (he/en)', () => {
@@ -516,8 +522,7 @@ describe('parser — misparse defense (out-of-grammar must not half-parse)', () 
 describe('parser → engine (end to end)', () => {
   it('a typed sequence parses into commands the engine builds', () => {
     const utterances = [
-      'point A at (0,0)',
-      'point B at (6,0)',
+      'AB = 6', // #1245: was «point A at (0,0)» · «point B at (6,0)» — the stated length pins the same |AB|
       'C is 5 from A and 5 from B',
     ];
     const commands = utterances.flatMap((u) => {
@@ -540,8 +545,8 @@ describe('parser — coverage on the in-grammar sample', () => {
       'point G on AD at 40%',
       'C is 5 from A and 5 from B',
       'C במרחק 5 מ-A ו-5 מ-B',
-      'point A at (0,0)',
-      'נקודה B ב-(6,0)',
+      'point A', // #1245: the coordinate forms are withdrawn; the bare free point is the 2-D primitive
+      'נקודה B',
       'angle GAB = 37',
       'זווית GAB = 37',
     ];

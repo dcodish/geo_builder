@@ -193,17 +193,39 @@ describe('ADR-250/2 — a stated carrier is DRAWN (withCarrierSegments + lineMee
  * always correct — so every row asserts the parse AND `honestyGateReport(...).clean`.
  */
 describe('ADR-523 — a negative payload is not a dropped given (#1161)', () => {
-  const gate = (u: string): { x: number; y: number; clean: boolean; nums: number[] } => {
+  // #1245 (ADR-553) WITHDREW the construct these rows were measured on: 2-D no longer parses «E=(-1,7)».
+  // The class this file locks is the SCANNER, not `free-point`, so the rows are kept in two halves:
+  //  (1) a LIVE 2-D construct that carries a negative payload through the real parse → gate path, as
+  //      parity pairs — the variable binding «x = -4» (`set-var`), measured clean;
+  //  (2) the original coordinate rows, scanned against the command a faithful lowering carries — a pinned
+  //      `free-point` is still an engine command (a pre-#1245 save replays it), so the scanner must still
+  //      account a signed coordinate wherever it meets one.
+  const gate = (u: string): { value: number; clean: boolean; nums: number[] } => {
     const r = parse(u);
-    expect(r.ok).toBe(true);
+    expect(r.ok, u).toBe(true);
     if (!r.ok) throw new Error('unreachable');
-    const fp = r.commands.find((c) => c.type === 'free-point');
-    expect(fp).toBeDefined();
+    const sv = r.commands.find((c) => c.type === 'set-var');
+    expect(sv, u).toBeDefined();
     const report = honestyGateReport(u, r.commands, {});
-    return { x: (fp as { x: number }).x, y: (fp as { y: number }).y, clean: report.clean, nums: report.droppedNums };
+    return { value: (sv as { value: number }).value, clean: report.clean, nums: report.droppedNums };
   };
 
-  // the six rows measured on the issue, positive and negative side by side
+  // (1) positive and negative side by side, through the real parser
+  it.each([
+    ['x = 4', 4],
+    ['x = -4', -4],
+    ['α = 30', 30],
+    ['α = -30', -30],
+    ['a = 1.5', 1.5],
+    ['a = -1.5', -1.5],
+  ])('%s parses to its stated value AND clears the gate', (u, v) => {
+    const g = gate(u as string);
+    expect(g.value).toBe(v);
+    expect(g.nums).toEqual([]);
+    expect(g.clean).toBe(true);
+  });
+
+  // (2) the six rows measured on the issue, scanned against the lowering that carries them
   it.each([
     ['E=(1,7)', 1, 7],
     ['E=(-1,7)', -1, 7],
@@ -213,11 +235,11 @@ describe('ADR-523 — a negative payload is not a dropped given (#1161)', () => 
     ['A = (3,5)', 3, 5],
     ['A = (-3,-5)', -3, -5],
     ['הנקודה E=(-1,7)', -1, 7],
-  ])('%s parses to its stated coordinates AND clears the gate', (u, x, y) => {
-    const g = gate(u as string);
-    expect([g.x, g.y]).toEqual([x, y]);
-    expect(g.nums).toEqual([]);
-    expect(g.clean).toBe(true);
+  ])('%s — a signed coordinate is accounted by the command that carries it', (u, x, y) => {
+    const id = (u as string).match(/[A-Z]/)![0];
+    const report = honestyGateReport(u as string, [{ type: 'free-point', id, x, y } as AnyCommand], {});
+    expect(report.droppedNums).toEqual([]);
+    expect(report.clean).toBe(true);
   });
 
   // The class is the SCANNER, not `free-point` — an exemption for the reported construct would be the

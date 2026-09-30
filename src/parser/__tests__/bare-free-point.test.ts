@@ -4,7 +4,7 @@
  * DOF; prod log-triage 2026-07-13, ~4 distinct users.)
  */
 import { describe, it, expect } from 'vitest';
-import { parse } from '@/parser';
+import { classifyOutOfScope, parse } from '@/parser';
 import type { AnyCommand } from '@/engine';
 
 const cmds = (u: string, ctx?: Parameters<typeof parse>[1]): AnyCommand[] => {
@@ -26,11 +26,11 @@ describe('#104 — bare free point', () => {
     expect(fp('point G')!.id).toBe('G');
   });
 
-  it('the coordinate form «נקודה A ב-(0,0)» / «A = (3,4)» still PINS (not a bare free point)', () => {
-    const p = fp('נקודה A ב-(0,0)')!;
-    expect(p).toMatchObject({ id: 'A', x: 0, y: 0 });
-    expect(p.free).toBeUndefined(); // pinned, no free flag
-    expect(fp('A = (3, 4)')!.x).toBe(3);
+  it('the coordinate form «נקודה A ב-(0,0)» / «A = (3,4)» is NOT swallowed as a bare point — it is refused (#1245)', () => {
+    for (const u of ['נקודה A ב-(0,0)', 'A = (3, 4)', 'point A at (0,0)']) {
+      expect(parse(u).ok, `«${u}» builds nothing in 2-D`).toBe(false);
+      expect(classifyOutOfScope(u)?.category, u).toBe('coordinate-point');
+    }
   });
 
   it('a trailing relation is NOT swallowed — «נקודה A על AB» stays a point-on-segment', () => {

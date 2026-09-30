@@ -15,6 +15,10 @@ import { factsOf } from '@/__tests__/scenario-pipeline';
 import { replay } from '@/replay/core';
 import { meetingCarriers } from '@/engine/apply';
 import type { GeoObject, Vec } from '@/engine';
+import type { Step } from '@/__tests__/scenario-pipeline';
+
+/** A PINNED point, as the engine command (#1245 withdrew its typed spelling «נקודה A ב-(0,0)»). */
+const pin = (id: string, x: number, y: number): Step => ({ llm: [{ type: 'free-point', id, x, y }] });
 
 const at = (fig: ReturnType<typeof replay>, id: string): Vec => {
   const p = fig.positions.get(id);
@@ -68,7 +72,9 @@ describe('#260 — the operator’s two-host membership (the rider edition of th
   it('hosts the student PINNED apart still refuse honestly, naming the statement — never a moved given', () => {
     // All four endpoints are stated coordinates (givens, ADR-052): line CD meets line AB beyond B, and
     // nothing loose remains to re-seat — the refusal stands and names P's statement.
-    const facts = factsOf(['נקודה A ב-(0,0)', 'נקודה B ב-(5,0)', 'AB', 'P על AB', 'נקודה C ב-(9,0)', 'נקודה D ב-(9,3)', 'CD', 'P על CD']);
+    // #1245: the coordinate SPELLING is withdrawn from the 2-D grammar; a pinned point stays an engine
+    // command (a pre-#1245 save replays it), so the pins are given as commands.
+    const facts = factsOf([pin('A', 0, 0), pin('B', 5, 0), 'AB', 'P על AB', pin('C', 9, 0), pin('D', 9, 3), 'CD', 'P על CD']);
     const fig = replay(facts);
     expect(fig.lastError, 'refused').not.toBeNull();
     expect(fig.lastError, 'names the statement, not solver state').toMatch(/P/);
@@ -78,7 +84,7 @@ describe('#260 — the operator’s two-host membership (the rider edition of th
   });
 
   it('only ONE loose carrier: with C, D pinned the re-seat moves the segment that is still free (never a given)', () => {
-    const facts = factsOf(['AB', 'P על AB', 'נקודה C ב-(9,0)', 'נקודה D ב-(9,3)', 'CD', 'P על CD']);
+    const facts = factsOf(['AB', 'P על AB', pin('C', 9, 0), pin('D', 9, 3), 'CD', 'P על CD']);
     const fig = replay(facts);
     meetsBoth(fig, ['A', 'B'], ['C', 'D'], 'C,D pinned');
     expect(at(fig, 'C')).toEqual({ x: 9, y: 0 });
