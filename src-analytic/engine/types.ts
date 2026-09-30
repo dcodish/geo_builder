@@ -586,8 +586,13 @@ export type Selector =
    * A selector for `crossing-distinct`'s reasons: it consumes no freedom (the two incidences already
    * pin the point to a root) and "this root, not that one" is a region, not an equation. It is also why
    * «הציגו תצורה אחרת» cannot swap the named crossing: a configuration on the other root is not valid.
+   *
+   * `both` (#1512, ADR-AG-185) — the sentence named BOTH crossings («…בנקודות A ו-B»), so it also states
+   * that the pair HAS two: a tangency (one point), a pair with no canonical order (two straights meet
+   * once; two conics have no order this tool defines), or two roots within the solver's resolution does
+   * not hold. Without it a single ordinal keeps ADR-AG-157's reading, where a tangency satisfies both.
    */
-  | { kind: 'crossing-nth'; id: Id; nth: 0 | 1; pair: [Constraint, Constraint] }
+  | { kind: 'crossing-nth'; id: Id; nth: 0 | 1; pair: [Constraint, Constraint]; both?: true }
   /**
    * THE SIGN OF A DERIVED QUANTITY — «שיפוע הישר l1 שלילי» (#1323, ADR-AG-144).
    *
