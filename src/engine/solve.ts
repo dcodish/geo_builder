@@ -647,6 +647,49 @@ export function describeConstraint(con: Constraint): string {
  * computed (topological evaluation order). The result's length is the branch
  * count; an empty array means the constraint cannot be met on this segment.
  */
+/**
+ * #1602 (ADR-557): the EXACT roots of a direction condition (⟂ / ∥ / collinear) on a point riding a→b.
+ * Every vector the condition compares is affine in t when the rider is one of its endpoints, so the dot
+ * (⟂) or cross (∥, collinear) product is a polynomial of degree ≤ 2 — its sign-changing roots in [lo, hi]
+ * are the zero set the 257-step grid scan was bracketing, at one evaluation instead of ~320. That scan ran
+ * inside every step of any solve upstream of the point (~2 s per sample on the #1601 figure). Null — keep
+ * the scan — for any other constraint, or when the condition holds identically along the carrier.
+ */
+export function directionRoots(con: Constraint, self: Id, a: Vec, b: Vec, pos: Map<Id, Vec>, lo: number, hi: number): number[] | null {
+  if (con.type !== 'perpendicular' && con.type !== 'parallel' && con.type !== 'collinear') return null;
+  const d = sub(b, a);
+  // a point as p0 + t·p1
+  const at = (id: Id): [Vec, Vec] => (id === self ? [a, d] : [pos.get(id)!, { x: 0, y: 0 }]);
+  const vec = (from: Id, to: Id): [Vec, Vec] => {
+    const [f0, f1] = at(from);
+    const [t0, t1] = at(to);
+    return [sub(t0, f0), sub(t1, f1)];
+  };
+  const [u, v] = con.type === 'collinear' ? [vec(con.a, con.b), vec(con.a, con.c)] : [vec(con.a, con.b), vec(con.c, con.d)];
+  const [u0, u1] = u;
+  const [v0, v1] = v;
+  const dot = (p: Vec, q: Vec) => p.x * q.x + p.y * q.y;
+  const cross = (p: Vec, q: Vec) => p.x * q.y - p.y * q.x;
+  const op = con.type === 'perpendicular' ? dot : cross;
+  const q2 = op(u1, v1);
+  const q1 = op(u0, v1) + op(u1, v0);
+  const q0 = op(u0, v0);
+  const scaleQ = Math.max(Math.abs(q0), Math.abs(q1), Math.abs(q2));
+  if (scaleQ < 1e-18) return null; // identically satisfied — not a condition on t at all
+  const eps = 1e-12 * scaleQ;
+  let roots: number[];
+  if (Math.abs(q2) < eps) {
+    if (Math.abs(q1) < eps) return null;
+    roots = [-q0 / q1];
+  } else {
+    const disc = q1 * q1 - 4 * q2 * q0;
+    if (disc <= eps * scaleQ) return []; // no sign change: no root (a tangential touch is not one the scan found either)
+    const s = Math.sqrt(disc);
+    roots = [(-q1 - s) / (2 * q2), (-q1 + s) / (2 * q2)];
+  }
+  return roots.filter((t) => t >= lo && t <= hi).sort((x, y) => x - y);
+}
+
 export function solvedOnSegmentCandidates(
   p: SolvedOnSegmentPoint,
   pos: Map<Id, Vec>,
@@ -664,7 +707,8 @@ export function solvedOnSegmentCandidates(
   // An EXTENSION point (initial t outside [0,1]) may be placed beyond the segment — search a wide
   // range around it (e.g. the ⟂ foot from C lands past D). A point on the segment proper stays in [0,1].
   const ext = p.t0 !== undefined && (p.t0 < 0 || p.t0 > 1);
-  const roots = ext ? solveParam(f, Math.min(0, p.t0!) - 2, Math.max(1, p.t0!) + 2) : solveParam(f);
+  const [lo, hi] = ext ? [Math.min(0, p.t0!) - 2, Math.max(1, p.t0!) + 2] : [0, 1];
+  const roots = directionRoots(p.constraint, p.id, a, b, pos, lo, hi) ?? (ext ? solveParam(f, lo, hi) : solveParam(f));
   // Discard a DEGENERATE root that collapses the point onto another point the constraint references
   // (e.g. "CF ⟂ DF" with F on line AD has a spurious root at F = D, where DF has no direction). The
   // residual sign-flips there, so the root finder brackets it; we drop it so the real foot is used.

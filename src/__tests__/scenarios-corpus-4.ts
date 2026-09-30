@@ -50,6 +50,7 @@ import { ctxOf } from './scenario-pipeline';
 import { parse } from '@/parser';
 import { computeValues, figureDeterminacy, findValidConfig, searchAnotherView, sharedSamples } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
+import { drivenSolveStats } from '@/engine/evaluate';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -2975,6 +2976,33 @@ export const SCENARIOS_4: Scenario[] = [
       // guard: a plain 3-4-5 whose default seat holds — one shape, «נקבע במלואו»
       const plain = factsOf(['משולש ישר זווית ABC', 'AB=5, BC=4, AC=3']);
       expect(figureStatus(plain.length, freeDofCount(replay(plain).construction), figureDeterminacy(sharedSamples(plain)))).toEqual({ key: 'actions.determined' });
+    },
+  },
+  {
+    id: 'tangents-perpendicular-foot-values-1601',
+    title:
+      '#1601 / #1602 (ADR-557): the operator\'s «EC=x» figure — tangents from P, C the foot on the diameter DB, E = PD ∩ AC — shows «AC = 2x» every time, and its whole sample pool builds without the joint optimizer',
+    guards:
+      "Operator report from prod, 2026-09-30 (session js6xkokp): the same figure typed twice; the first time «EC=x» gave «AC = 2x», the second time nothing about AC. Measured: the wording did not matter (both runs draw E at the midpoint of AC). The values panel needs ≥ 4 agreeing samples, and each sample cost ~2 s because the tangent points A, B were driven by Nelder–Mead while C's root scan re-ran inside every optimizer step, so the 5 s budget cut the pool at 3 of 16. ADR-557: independent driven points are solved one at a time on the exact 1-D path (they went to the joint optimizer merely for being two), and a ⟂/∥ rider's roots are computed exactly instead of scanned; the pool now completes in ~0.2 s. The operator's run-2 line «נקודה P מחיוץ למעגל» (a typo, answered by the LLM with the same point-circle-side command) is spelled correctly here; the run-1 spelling «C על הקוטר DB» is checked in the same body. The class locks (both locales, the coupled common-tangent fallback, the exact-root equivalence sweep) are in src/__tests__/issue-1602-independent-carriers.test.ts.",
+    steps: ['מעגל O', 'נקודה P מחוץ למעגל', 'PA ו PB משיקים למעגל', 'המשך BO חותך את המעגל בנקודה D', 'PO', 'AD', 'C נמצאת על DB', 'AC⊥DB', 'PD חותך את AC בנקודה E', 'EC=x'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      for (const T of ['A', 'B']) {
+        const o = at(fig, 'O'), t = at(fig, T), p = at(fig, 'P');
+        expect(Math.abs((t.x - o.x) * (t.x - p.x) + (t.y - o.y) * (t.y - p.y)) / (dist(o, t) * dist(t, p)), `O${T} ⟂ P${T}`).toBeLessThan(1e-6);
+      }
+      expect(dist(at(fig, 'A'), at(fig, 'E'))).toBeCloseTo(dist(at(fig, 'E'), at(fig, 'C')), 6);
+      for (const c of ['C על הקוטר DB', 'C נמצאת על DB']) {
+        const facts = factsOf(['מעגל O', 'נקודה P מחוץ למעגל', 'PA ו PB משיקים למעגל', 'המשך BO חותך את המעגל בנקודה D', 'PO', 'AD', c, 'AC⊥DB', 'PD חותך את AC בנקודה E', 'EC=x']);
+        const before = drivenSolveStats.joint;
+        const v = computeValues(facts);
+        expect(drivenSolveStats.joint - before, `«${c}»: no sample needs the joint optimizer`).toBe(0);
+        expect(v.sampleCount, `«${c}»: the whole 16-sample pool survives`).toBe(16);
+        const ac = v.rows.find((r) => r.kind === 'length' && r.label === 'AC');
+        expect(ac?.unit?.sym, `«${c}»: AC is printed in the student's unit`).toBe('x');
+        expect(ac?.unit?.coef).toBeCloseTo(2, 6);
+      }
     },
   },
 ];

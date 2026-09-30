@@ -2452,8 +2452,18 @@ export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0):
     const labels = (l: MeasureLabels) => l.lengths.length + l.angles.length + l.areas.length;
     if (labels(after.labels) !== labels(before.labels)) return false;
 
-    const had = new Set(before.construction.constraints.map((con) => constraintKey(con)));
-    const added = after.construction.constraints.filter((con) => !had.has(constraintKey(con)));
+    // Every constraint the step contributes — the CHECK list and the DRIVEN ones alike (#1602, ADR-557).
+    // A new given that becomes a drive (an on-segment rider solved by it) never enters `constraints`, so
+    // reading only that list judged «AB משיק למעגל בנקודה F» on a cyclic GCHF "implied" by its redundant
+    // half («F on the circle», true by the concyclicity) and dropped the tangency itself.
+    const had = new Set([...before.construction.constraints, ...drivenConstraintsOf(before.construction)].map((con) => constraintKey(con)));
+    const seenAdded = new Set<string>();
+    const added = [...after.construction.constraints, ...drivenConstraintsOf(after.construction)].filter((con) => {
+      const key = constraintKey(con);
+      if (had.has(key) || seenAdded.has(key)) return false;
+      seenAdded.add(key);
+      return true;
+    });
     if (added.length === 0) return false;
     // The order/bound family has no scale-invariant residual to test — fail open rather than guess.
     if (added.some((con) => isOrderConstraint(con))) return false;

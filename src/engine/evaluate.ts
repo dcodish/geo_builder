@@ -184,17 +184,94 @@ export function resolveDriven(c: Construction): Construction {
 
   const carriers = paramCarriers;
   if (carriers.length === 0) return c;
+
+  // ONE driven DOF: a plain 1-D solve, with the branch index choosing among roots
+  // (so "show another configuration" can cycle them) — the ADR-028 base case.
+  if (carriers.length === 1) return solveOneParam(c, carriers[0], []) ?? c; // no root → keep default; the constraint check fails honestly
+
+  // SEVERAL driven DOFs that are NOT coupled (#1602, [ADR-557](docs/06-decisions.md#adr-557)): when no
+  // carrier's constraint reaches another carrier, each is its own 1-D problem. They used to go to the joint
+  // optimizer below merely for being more than one — two tangents from P («PA ו PB משיקים») became a 2-D
+  // Nelder–Mead whose every step re-evaluated the whole figure, ~2 s per sample. Solve them one at a time in
+  // dependency order through the SAME 1-D path, each kept off the carriers already placed (the joint gate's
+  // own non-degeneracy rule — two touch points from one P must not both take the near tangent). The result
+  // must pass the joint solver's STRICTEST accept (convex-required, orders, non-degenerate); anything short
+  // of that, and any genuinely coupled set (a common tangent's two touches), stays on the joint solver.
+  const order = independentCarrierOrder(c, carriers);
+  if (order) {
+    let cur: Construction | null = c;
+    const placed: Id[] = [];
+    for (const id of order) {
+      const carrier = cur.objects.find((o) => o.id === id) as Extract<GeoObject, { kind: 'on-circle' | 'on-segment' }>;
+      cur = solveOneParam(cur, carrier, placed);
+      if (!cur) break;
+      placed.push(id);
+    }
+    if (cur) {
+      const done = cur;
+      const cons = withOrderCons(carriers.map((o) => o.solve!.constraint), c);
+      if (solutionAccepted(c, () => done, [], cons, 1, true)) return done;
+    }
+  }
+
+  // SEVERAL coupled driven DOFs (e.g. "C = midpoint of OB" drives E while "|ED| = 7" drives D, and D's
+  // chord length depends on where E lands): route through the one generalized joint solver (R5 Pass 2 —
+  // [ADR-045](docs/06-decisions.md#adr-045)). resolveMixedCarriers carries the ported NEAR-FIRST local
+  // accept + full-range grid-scan seeding for these bounded parametric carriers, and uses the relative
+  // residual (un-gameable by collapse) + the coincide-exempt non-degeneracy gate.
+  return resolveMixedCarriers(c, carriers);
+}
+
+/**
+ * #1602 (ADR-557): the order to solve `carriers` one by one, or null when they are COUPLED. Carrier X needs
+ * carrier Y when Y is among the transitive parents (`objectParents`) of anything X's driving constraints
+ * reference — then Y must be placed first. A cycle (a common tangent's two touch points, each referencing
+ * the other) is a genuinely joint problem, and so is an `also` co-drive (ADR-229).
+ */
+function independentCarrierOrder(c: Construction, carriers: GeoObject[]): Id[] | null {
+  const byId = new Map(c.objects.map((o) => [o.id, o] as const));
+  const ids = new Set(carriers.map((o) => o.id));
+  const needs = new Map<Id, Set<Id>>();
+  for (const o of carriers) {
+    const sv = (o as { solve?: { constraint: Constraint; also?: Constraint[] } }).solve!;
+    if (sv.also?.length) return null;
+    const got = new Set<Id>();
+    const seen = new Set<Id>();
+    const queue = constraintRefs(sv.constraint).filter((r) => r !== o.id);
+    while (queue.length) {
+      const x = queue.shift()!;
+      if (seen.has(x)) continue;
+      seen.add(x);
+      if (x === o.id) return null; // its own constraint reads something built from it — leave it to the joint solve
+      if (ids.has(x)) got.add(x);
+      const p = byId.get(x);
+      if (p) queue.push(...objectParents(p));
+    }
+    needs.set(o.id, got);
+  }
+  const out: Id[] = [];
+  while (out.length < carriers.length) {
+    const next = carriers.find((o) => !out.includes(o.id) && [...needs.get(o.id)!].every((y) => out.includes(y)));
+    if (!next) return null; // a cycle — coupled
+    out.push(next.id);
+  }
+  return out;
+}
+
+/**
+ * The ADR-028 1-D solve of ONE driven parameter: every root of its constraint over the carrier's range,
+ * ordered (order-constraint preference, else nearness to the current value), `branch` picking among them.
+ * `avoid` (#1602): roots that would put the carrier ON one of these already-placed points are skipped, the
+ * joint solver's non-degeneracy rule carried over to a one-at-a-time solve. Null when no root exists.
+ */
+function solveOneParam(c: Construction, carrier: Extract<GeoObject, { kind: 'on-circle' | 'on-segment' }>, avoid: Id[]): Construction | null {
   // An on-circle carrier ranges over the full circle; an on-segment over its interior [0,1] — EXCEPT an
   // EXTENSION point ("E on the extension of DC", t>1), which lives BEYOND the segment by definition, so a
   // constraint that DRIVES it (e.g. ∠CAE=50 driving E) must search t>1, not clamp E back between the
   // endpoints (the operator's "E didn't stay after D/C"). (ADR-105.)
   const range = (o: { kind: string; extension?: boolean }): [number, number] =>
     o.kind === 'on-circle' ? [0, 2 * Math.PI] : o.extension ? [1.02, 12] : [0, 1];
-
-  // ONE driven DOF: a plain 1-D solve, with the branch index choosing among roots
-  // (so "show another configuration" can cycle them) — the ADR-028 base case.
-  if (carriers.length === 1) {
-    const carrier = carriers[0];
+  {
     const dir = carrier.solve!;
     const [lo, hi] = range(carrier);
     const f = (v: number): number => {
@@ -203,8 +280,23 @@ export function resolveDriven(c: Construction): Construction {
       for (const id of constraintRefs(dir.constraint)) if (!r.positions.has(id)) return NaN;
       return Math.abs(residual(dir.constraint, (id) => r.positions.get(id)!));
     };
-    const roots = drivenRoots(f, lo, hi, residualTolerance(dir.constraint));
-    if (roots.length === 0) return c; // unsolvable → keep default; the constraint check fails honestly
+    let roots = drivenRoots(f, lo, hi, residualTolerance(dir.constraint));
+    if (avoid.length && roots.length) {
+      const clear = (v: number): boolean => {
+        const r = evaluateCore(withParam(c, carrier.id, v), { skipConstraints: true });
+        if (!r.ok) return false;
+        const p = r.positions.get(carrier.id);
+        if (!p) return false;
+        let span = 1;
+        for (const q of r.positions.values()) span = Math.max(span, Math.abs(q.x), Math.abs(q.y));
+        return avoid.every((id) => {
+          const q = r.positions.get(id);
+          return !q || Math.hypot(p.x - q.x, p.y - q.y) >= 1e-3 * span;
+        });
+      };
+      roots = roots.filter(clear);
+    }
+    if (roots.length === 0) return null;
     // A one-sided ORDER constraint owns no carrier of its own (it rides the optimizer), so when one
     // references THIS carrier — e.g. an `extend-onto-circle`'s D, driven onto line AC by `collinear`
     // while `collinear-order` pins it BEYOND the 2nd letter — prefer the root that satisfies the order
@@ -241,13 +333,6 @@ export function resolveDriven(c: Construction): Construction {
     }
     return withParam(c, carrier.id, ordered[dir.branch % ordered.length]);
   }
-
-  // SEVERAL coupled driven DOFs (e.g. "C = midpoint of OB" drives E while "|ED| = 7" drives D, and D's
-  // chord length depends on where E lands): route through the one generalized joint solver (R5 Pass 2 —
-  // [ADR-045](docs/06-decisions.md#adr-045)). resolveMixedCarriers carries the ported NEAR-FIRST local
-  // accept + full-range grid-scan seeding for these bounded parametric carriers, and uses the relative
-  // residual (un-gameable by collapse) + the coincide-exempt non-degeneracy gate.
-  return resolveMixedCarriers(c, carriers);
 }
 
 /**
@@ -686,7 +771,11 @@ export function warmStartCarriers(to: Construction, from: Construction): Constru
  * vertices with the parametric and shape-scalar DOFs — so e.g. a rectangle's width (a free
  * vertex) and height (a perp-offset dist) solve together. Works in normalised coordinates.
  */
+/** #1602 (ADR-557): how often the joint optimizer ran — the operation-count lock's probe (never time). */
+export const drivenSolveStats = { joint: 0 };
+
 function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construction {
+  drivenSolveStats.joint++;
   // Solve a given carrier list: returns the chosen construction and whether a solution was ACCEPTED
   // (under `requireConvex`). Extra carriers with NO `solve` directive (recruited free polygon vertices)
   // contribute DOF but no constraint — they give the joint solve room to land on a CONVEX branch (ADR-097).

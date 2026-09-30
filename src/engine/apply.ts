@@ -12,7 +12,9 @@ import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, 
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
 import { add, dist, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringSimple, scale, sub } from './geometry';
-import { constraintKey, constraintRefs } from './solve';
+import { constraintKey, constraintRefs, residual, residualTolerance } from './solve';
+import { evaluateCore } from './evaluate';
+import { applySeed } from './sample';
 import { recordRequirement, requirementsField } from './requirements';
 
 /**
@@ -72,6 +74,16 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
   // carrier with it would root at every grid sample and land on a degenerate placement. Push as a
   // check (residual 0 ⇒ passes; a k≠1 same-sides product correctly fails instead).
   if ((con.type === 'measure-sum' || con.type === 'length-product') && isTautologicalMeasure(con)) {
+    constraints.push(con);
+    return;
+  }
+  // #1602 (ADR-557): the STRUCTURAL sibling of those two guards — a relation the construction already
+  // guarantees («C על הקוטר DB» restating D, O, B collinear when D was built on line BO). It constrains
+  // nothing, yet it claimed a carrier: the circle's free CENTRE, which pushed every later solve of the
+  // figure into the joint optimizer (~4 s per sample pool) and lost 7 of 16 seeds. Decided by what the
+  // relation MEANS — it holds at every sampled layout of the figure as built — never by a list of the
+  // object kinds that happen to imply it. Kept as a check (residual 0 ⇒ passes).
+  if (holdsByConstruction(objects, constraints, con)) {
     constraints.push(con);
     return;
   }
@@ -187,6 +199,29 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
   }
   // (4) Nothing free to move — a pure check (over-constraint detection).
   constraints.push(con);
+}
+
+/** Seeds at which {@link holdsByConstruction} lays the figure out: the current layout and two samples. */
+const TAUTOLOGY_SEEDS = [0, 1, 2];
+
+/**
+ * #1602 (ADR-557): does `con` hold at every probed layout of the figure as built — the structural
+ * evaluation only (no driven solve, no constraint enforced), at the current layout and two sampled ones?
+ * Then it is implied by construction and must not claim a carrier. A relation that merely happens to hold
+ * in the default drawing fails at a sampled layout and keeps its drive. Any layout that does not build, or
+ * a reference not yet placed, proves nothing (false).
+ */
+function holdsByConstruction(objects: GeoObject[], constraints: Constraint[], con: Constraint): boolean {
+  const refs = constraintRefs(con);
+  if (!refs.length || !refs.every((id) => objects.some((o) => o.id === id))) return false;
+  const c: Construction = { objects: [...objects], constraints: [...constraints] };
+  for (const seed of TAUTOLOGY_SEEDS) {
+    const r = evaluateCore(applySeed(c, seed), { skipConstraints: true });
+    if (!r.ok || !refs.every((id) => r.positions.has(id))) return false;
+    const v = residual(con, (id) => r.positions.get(id)!);
+    if (!Number.isFinite(v) || Math.abs(v) > residualTolerance(con)) return false;
+  }
+  return true;
 }
 
 function addObj(objects: GeoObject[], o: GeoObject): void {
