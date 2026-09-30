@@ -2847,6 +2847,21 @@ export function samplingJobs(facts: Fact[], opts: { wide?: boolean } = {}) {
         }),
       );
   if (determined && rewrites) {
+    for (const fc of rewrites.slice(1)) {
+      for (let k = 0; k < ADMISSIBLE_SEEDS; k++) {
+        const s = seed0 + k;
+        jobs.push(() => {
+          if (!meetsRequirements(fc, s)) return;
+          const fig = replay(fc, s);
+          raw.push(fig.positions);
+          circlesOfSample.set(fig.positions, fig.circles);
+          constructionOfSample.set(fig.positions, fig.construction);
+          seedOfSample.set(fig.positions, k);
+        });
+      }
+    }
+    // The extra seeds come AFTER the discrete rewrites: when the work cap cuts a pool, the alternatives most
+    // likely to contradict a value (a branch, a right-angle seat) must already be in it (ADR-558).
     // #1599 (ADR-558): the CURRENT facts over the rest of the button's seed range, in the BUTTON's own form —
     // a replay at that seed, kept only where `meetsRequirements` holds, exactly as «הציגו תצורה אחרת» would
     // offer it. A root the solver reaches only at some seeds (the SSA triangle's second shape) is then in the
@@ -2863,20 +2878,6 @@ export function samplingJobs(facts: Fact[], opts: { wide?: boolean } = {}) {
         seedOfSample.set(fig.positions, k);
         if (rewrites.length > 1) partialSeedSample.add(fig.positions);
       });
-    }
-    for (const fc of rewrites.slice(1)) {
-      for (let k = 0; k < ADMISSIBLE_SEEDS; k++) {
-        const s = seed0 + k;
-        jobs.push(() => {
-          if (!meetsRequirements(fc, s)) return;
-          const fig = replay(fc, s);
-          raw.push(fig.positions);
-          circlesOfSample.set(fig.positions, fig.circles);
-          constructionOfSample.set(fig.positions, fig.construction);
-        constructionOfSample.set(fig.positions, fig.construction);
-          seedOfSample.set(fig.positions, k);
-        });
-      }
     }
   }
   // Ground truth = VALID configurations only ([ADR-256](docs/06-decisions.md#adr-256)): a sample that
