@@ -30,7 +30,7 @@ import type { FigureFile } from './figureFile';
 export * from '@/replay/core';
 export * from '@/replay/viewDelta';
 import { replay, groupKey, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, commandPointIds, BRANCH_CYCLE_KINDS } from '@/replay/core';
-import type { DetectAllResult, Fact } from '@/replay/core';
+import type { DetectAllResult, Determinacy, Fact } from '@/replay/core';
 import { viewDelta } from '@/replay/viewDelta';
 import type { ViewDelta } from '@/replay/viewDelta';
 import { geoWork, geoValues, isCancelled } from './geoWork';
@@ -350,7 +350,7 @@ export interface GeoState {
   /** #1444 (ADR-556): how determined the figure is — fully, or only up to a choice of configuration — read
    *  off the SAME shared pool as the crossings and the values panel, and computed by the same always-on
    *  post-fact sweep. Same staleness contract: meaningful only while `facts` is the store's facts. */
-  determinacy: { determined: boolean; configurations: number; facts: Fact[] } | null;
+  determinacy: (Determinacy & { facts: Fact[] }) | null;
 
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
   execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;

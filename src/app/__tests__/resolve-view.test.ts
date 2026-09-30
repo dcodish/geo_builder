@@ -26,7 +26,6 @@ function fakeDeps(overrides: Partial<ResolveViewDeps> & { facts?: Fact[]; seed?:
     applyView: (f) => calls.applied.push(f),
     setPending: (on) => calls.pending.push(on),
     onExhausted: () => calls.exhausted++,
-    onSeatMoved: () => {},
     isCancelled: () => false,
     ...overrides,
   };

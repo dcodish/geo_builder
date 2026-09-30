@@ -86,7 +86,7 @@ import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { runSubmit } from '@/app/submitPipeline';
 import { runViewResolve } from '@/app/resolveView';
-import { figureStatus } from '@/app/figureStatus';
+import { figureStatus, figureStatusParams } from '@/app/figureStatus';
 import { runEditCommit, runSetGroupEnabled } from '@/app/editPipeline';
 import { subscribeFigureNotes } from '@/app/figureNotes';
 import { anonPointDescriptor, visibleCoincidences } from '@/render/pointDescriptions';
@@ -747,7 +747,6 @@ export default function App() {
         // #566 (ADR-445): an EXHAUSTED search is never silent — the figure stays (keep-prior forever
         // would hide a committed given); the note says the drawing could not honour everything at once.
         onExhausted: () => setInputNote(t('figure.noValidConfig')),
-        onSeatMoved: (vertices) => setInputNote(t('figure.seatMoved', { vertex: vertices.join(', ') })),
         isCancelled,
       });
     } finally {
@@ -1753,7 +1752,7 @@ export default function App() {
               status={(() => {
                 // #1444 (ADR-556): the pool's verdict, not the continuous count alone — see figureStatus.
                 const s = figureStatus(facts.length, freeDofCount(construction), determinacy?.facts === facts ? determinacy : null);
-                return s ? t(s.key, s.count === undefined ? undefined : { count: s.count }) : undefined;
+                return s ? t(s.key, figureStatusParams(s)) : undefined;
               })()}
               sections={[]}
             >

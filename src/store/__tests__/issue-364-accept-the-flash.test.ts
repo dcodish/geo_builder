@@ -55,7 +55,6 @@ async function resolveAfterCommit(): Promise<void> {
     onExhausted: () => {
       throw new Error('exhausted');
     },
-    onSeatMoved: () => {},
     isCancelled,
   });
 }

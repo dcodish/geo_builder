@@ -471,30 +471,6 @@ function rtEffectiveIds(cmd: Extract<AnyCommand, { type: 'right-triangle' }>, re
 }
 
 /**
- * #1444 ([ADR-556](docs/06-decisions.md#adr-556)) — WHERE A VIEW REWRITE MOVED A RIGHT ANGLE.
- *
- * The right-angle seat of «משולש ישר זווית ABC» is unstated (ADR-445/481), so the config search may
- * move it when the default seat cannot hold (`seatRescue`). A student reads the default as a given, so
- * a move they did not ask for must be ANNOUNCED (operator ruling 2026-09-27). This is the one question
- * "which right angles sit on a different vertex in `after` than in `before`" — read off the facts
- * both views are derived from, through the SAME {@link rtEffectiveIds} the lowering and the knee use,
- * so the vertex named is the vertex drawn. Returns the new vertices, in fact order; empty when no seat
- * moved (a branch, reflection or seed rewrite never touches `rot`).
- */
-export function seatRelocations(before: Fact[], after: Fact[]): Id[] {
-  const was = new Map<string, Id>();
-  for (const f of before) if (f.enabled && f.cmd.type === 'right-triangle') was.set(f.id, rtEffectiveIds(f.cmd)[2]);
-  const out: Id[] = [];
-  for (const f of after) {
-    if (!f.enabled || f.cmd.type !== 'right-triangle') continue;
-    const prev = was.get(f.id);
-    const now = rtEffectiveIds(f.cmd)[2];
-    if (prev !== undefined && prev !== now) out.push(now);
-  }
-  return out;
-}
-
-/**
  * #943 ([ADR-508](docs/06-decisions.md#adr-508)) — the drop-one search's OWN memo, apart from `foldCache`:
  * a refusal's search folds a handful of trial prefixes, and letting them into the 8-entry main cache
  * would evict the figure's own fold (seconds on a hard figure) to store throwaways. Keyed by content
@@ -2740,6 +2716,12 @@ function memoHit(facts: Fact[]): SharedSamples | null {
  */
 const circlesOfSample = new WeakMap<Map<Id, Vec>, Map<Id, ResolvedCircle>>();
 /**
+ * #1444 (ADR-556): the SEED index (0, 1, 2 …) each sample of the pool was drawn at — the same side-table
+ * discipline as {@link circlesOfSample}, so it survives every subset filter. {@link figureDeterminacy}
+ * reads it to show a configuration count only when that count is the same at every sampled seed.
+ */
+const seedOfSample = new WeakMap<Map<Id, Vec>, number>();
+/**
  * #434 ([ADR-509](docs/06-decisions.md#adr-509)): the bound on a DETERMINED figure's admissible set. The
  * discrete rewrites (every cyclable branch point's branches × the right-angle seat) are enumerated as a
  * cross product; a figure whose product exceeds this cap is treated as NOT determined and prints nothing
@@ -2823,6 +2805,7 @@ export function samplingJobs(facts: Fact[]) {
           if (r.ok) {
             raw.push(r.positions);
             circlesOfSample.set(r.positions, r.circles);
+            seedOfSample.set(r.positions, s);
           }
         }),
       );
@@ -2835,6 +2818,7 @@ export function samplingJobs(facts: Fact[]) {
           const fig = replay(fc, s);
           raw.push(fig.positions);
           circlesOfSample.set(fig.positions, fig.circles);
+          seedOfSample.set(fig.positions, k);
         });
       }
     }
@@ -2912,25 +2896,30 @@ export function forcedCrossingKeys(samples: Omit<SharedSamples, "determined"> & 
 }
 
 /**
- * #1444 ([ADR-556](docs/06-decisions.md#adr-556)) — IS THE FIGURE FULLY DETERMINED, OR ONLY UP TO A CHOICE
- * OF CONFIGURATION?
+ * #1444 ([ADR-556](docs/06-decisions.md#adr-556)) — IS THE FIGURE FULLY DETERMINED, OR IS THERE MORE THAN
+ * ONE SHAPE THE GIVENS ALLOW?
  *
- * The status line used to read `freeDofCount === 0`, a count of CONTINUOUS freedom only, so it said «נקבע
- * במלואו» while the values panel — which reads the shared pool — withheld the third side: «משולש ישר זווית
- * ABC · AB=3 · BC=4» has two admissible seats (AC = √7 and AC = 5). The status now asks the pool the values
- * panel asks (M3, one sampler): `determined` is the pool's own ADR-509 flag (count 0 AND the admissible
- * set complete), and `configurations` counts the pool's DISTINCT shapes.
+ * A degrees-of-freedom count measures CONTINUOUS freedom only: «משולש ישר זווית ABC · AB=3 · BC=4» reads 0
+ * and still has two shapes (the right angle at A, AC = √7, or at B, AC = 5). The status line asks the pool
+ * the values panel asks (M3, one sampler): `determined` is the pool's own ADR-509 flag (count 0 AND the
+ * admissible set complete), and `configurations` counts the pool's DISTINCT shapes. Nothing here knows
+ * WHY there is more than one — a right-angle seat, an SSA branch, a line–circle crossing choice and a
+ * second root are all just samples of the admissible set (the corpus sweep in the ADR groups them).
  *
  * Two samples are the same configuration when every labelled pairwise distance agrees up to one common
  * scale (normalised by the largest): a mirror image or a re-placement is the same drawing to a student, a
- * different third side is not. Only meaningful when `determined` — an under-determined pool is continuous,
- * and the caller shows the DOF count instead.
+ * different third side is not.
+ *
+ * `stable` (operator ruling 2026-09-30): the count is a number the student may be TOLD only when every
+ * sampled seed sees the same number of distinct shapes, and that number is the pool's total — a seed
+ * where a configuration failed to build, or a shape that exists at one seed only, makes the count a
+ * sampling accident, and the caller then says «more than one» without a number.
  */
-export interface Determinacy { determined: boolean; configurations: number }
+export interface Determinacy { determined: boolean; configurations: number; stable: boolean }
 const CONFIG_REL_TOL = 1e-4;
 export function figureDeterminacy(shared: Pick<SharedSamples, 'samples' | 'determined'>): Determinacy {
   const pool = shared.samples;
-  if (!pool.length) return { determined: shared.determined, configurations: 0 };
+  if (!pool.length) return { determined: shared.determined, configurations: 0, stable: false };
   const ids = [...pool[0].keys()].filter((id) => pool.every((pos) => pos.has(id))).sort();
   const signature = (pos: Map<Id, Vec>): number[] => {
     const d: number[] = [];
@@ -2944,12 +2933,22 @@ export function figureDeterminacy(shared: Pick<SharedSamples, 'samples' | 'deter
     const span = d.reduce((m, x) => (x > m ? x : m), 1e-12);
     return d.map((x) => x / span);
   };
-  const reps: number[][] = [];
-  for (const pos of pool) {
-    const sig = signature(pos);
-    if (!reps.some((r) => r.every((x, k) => Math.abs(x - sig[k]) <= CONFIG_REL_TOL))) reps.push(sig);
-  }
-  return { determined: shared.determined, configurations: reps.length };
+  const same = (r: number[], sig: number[]) => r.every((x, k) => Math.abs(x - sig[k]) <= CONFIG_REL_TOL);
+  const distinct = (sigs: number[][]) => {
+    const reps: number[][] = [];
+    for (const sig of sigs) if (!reps.some((r) => same(r, sig))) reps.push(sig);
+    return reps.length;
+  };
+  const sigs = pool.map(signature);
+  const configurations = distinct(sigs);
+  // per seed: an untagged sample (a hand-built pool) is its own single group
+  const bySeed = new Map<number, number[][]>();
+  pool.forEach((pos, i) => {
+    const k = seedOfSample.get(pos) ?? -1;
+    (bySeed.get(k) ?? bySeed.set(k, []).get(k)!).push(sigs[i]);
+  });
+  const stable = [...bySeed.values()].every((g) => distinct(g) === configurations);
+  return { determined: shared.determined, configurations, stable };
 }
 
 // Sample collection is budgeted like every other search loop (E2): a failing seed's solve costs ~10× a
