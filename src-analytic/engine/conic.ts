@@ -207,3 +207,40 @@ function fitAndClassify(eq: Expr, env: Env, expect?: NumCurve['kind']): Classify
   if (!k) return { ok: false, reason: 'vacant' };
   return classify(k, expect);
 }
+
+/**
+ * IS THIS EQUATION A CANONICAL CIRCLE — centred on the origin at EVERY value of its parameters (#1270,
+ * ADR-AG-184)?
+ *
+ * The question the operator's ruling turns on: *"for canonical circles only, the center is O
+ * automatically"*. It is a property of the EQUATION, not of one configuration: `x²+y²=r²` is canonical
+ * whatever r is, `x²+y²−2ax=0` is not, although at a = 0 its centre happens to be the origin. So the
+ * fit is read at two probe environments that give every parameter the equation uses a different
+ * value, and the circle must come out centred on (0, 0) at both. Two probes make an accidental
+ * agreement vanishingly unlikely without pretending to be a symbolic comparison (no CAS, ADR-AG-001).
+ * The test is STRUCTURAL — `A(x²+y²) + F = 0`, read off the exact fit — so it asks what the equation
+ * is, not whether one probe value happens to leave the circle real. It must be a circle the figure can
+ * HAVE, though: `x²+y²+1=0` is canonical in form and empty at every value (#1058's `does-not-exist`),
+ * and a centre of nothing would be a point defined in terms of nothing.
+ */
+export function isCanonicalCircle(eq: Expr): boolean {
+  const syms = symbolsOf(eq).filter((s) => s !== 'x' && s !== 'y');
+  const probes: Env[] = [0, 1].map((k) => Object.fromEntries(syms.map((s, i) => [s, 1.7 + 0.61 * i + 1.3 * k])));
+  const real = probes.some((env) => {
+    const res = curveFromEquation(eq, env);
+    return res.ok && res.curve.kind === 'circle';
+  });
+  return real && probes.every((env) => {
+    const k = fitConic(eq, env);
+    if (!k) return false;
+    const scale = Math.max(Math.abs(k.A), Math.abs(k.B), Math.abs(k.C), Math.abs(k.D), Math.abs(k.E), Math.abs(k.F));
+    // A(x² + y²) + F = 0: equal non-zero squares, and no xy, x or y term.
+    return (
+      !isZero(k.A, scale) &&
+      isZero(k.A - k.C, scale) &&
+      isZero(k.B, scale) &&
+      isZero(k.D, scale) &&
+      isZero(k.E, scale)
+    );
+  });
+}

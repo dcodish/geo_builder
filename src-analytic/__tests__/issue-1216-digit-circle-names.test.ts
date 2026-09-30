@@ -48,17 +48,19 @@ describe('ADR-AG-118 — a digit names the circle (#1216)', () => {
    * one notation, never a second circle — which is locked in `issue-1271-1336-conic-naming`.
    */
   it.each([
-    ['he, שמשוואתו', 'נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9', 'circle-1', 'מעגל 1'],
-    ['he, colon', 'נתון מעגל 1: (x-3)^2+(y-4)^2=9', 'circle-1', 'מעגל 1'],
-    ['he, a second circle', 'נתון מעגל 2 שמשוואתו x^2+y^2=25', 'circle-2', 'מעגל 2'],
-    ['en, is', 'circle 1 is (x-3)^2+(y-4)^2=9', 'circle-1', 'circle 1'],
-    ['en, colon', 'circle 1: (x-3)^2+(y-4)^2=9', 'circle-1', 'circle 1'],
-  ])('%s', (_what, line, id, name) => {
+    ['he, שמשוואתו', 'נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9', 'circle-1', 'מעגל 1', []],
+    ['he, colon', 'נתון מעגל 1: (x-3)^2+(y-4)^2=9', 'circle-1', 'מעגל 1', []],
+    // A CANONICAL circle's centre is the tool's O (#1270, ADR-AG-184) — LOCK MOVED from `[]` by that
+    // ruling. What this row guards is unchanged: the numeral «2» is a name, never a point.
+    ['he, a second circle', 'נתון מעגל 2 שמשוואתו x^2+y^2=25', 'circle-2', 'מעגל 2', ['O']],
+    ['en, is', 'circle 1 is (x-3)^2+(y-4)^2=9', 'circle-1', 'circle 1', []],
+    ['en, colon', 'circle 1: (x-3)^2+(y-4)^2=9', 'circle-1', 'circle 1', []],
+  ])('%s', (_what, line, id, name, points) => {
     const b = built(line);
     expect(b.faults, line).toEqual([]);
     expect(b.curves, line).toEqual([{ id, name }]);
-    // The whole point of a NAME rather than a centre: no point is created. «מעגל O» creates O.
-    expect(b.points, `${line} must create no point`).toEqual([]);
+    // The whole point of a NAME rather than a centre: the numeral creates no point. «מעגל O» creates O.
+    expect(b.points, `${line} must create no point of its own`).toEqual(points);
   });
 
   /**

@@ -6068,6 +6068,8 @@ A second flag (`drawn` beside `listed`) was considered and **rejected**: it woul
 `app/panelRows.ts` (new — the decision and its docblock), `App.tsx` (calls it).
 ## ADR-AG-115 — A described position is named by the point that occupies it, never by an invented letter (#1167)
 
+> **Amended by [ADR-AG-184](#adr-ag-184)** (#1270, operator 2026-09-20): a CANONICAL circle's centre is a real point `O` the tool declares, unless a letter is already there — so the "no letter at all" row below now holds for a non-canonical circle.
+
 **Requirements:** [02c](02c-requirements-analytic.md) — what the panel promises about the letters it prints: every letter it shows names something the student created. **Design:** [04c](04c-design-analytic.md) — the description layer asks the figure who is there. **LADDER stage:** presentation. No parse, engine or solver change. **Extends** ADR-AG-021's relative-tolerance rule; sibling of #1153 / #1126.
 
 **Operator, 2026-09-17**, with a screenshot:
@@ -8333,6 +8335,69 @@ The pre-played sheet (20 cases, 8 red) and the operator ruling of the same day. 
 **Measured after** (Playwright, headless; headed within ±15 ms): 572 exam draw/settle — line 5: 11 ms / 34 ms; line 8: 25 ms / 60 ms; line 11: 148 ms / 424 ms; every other line settles with the draw (draws 13–272 ms). kite + circle + Z: no line shows «בודק…»; the worst line («נקודה Z», line 12) draws in 1728 ms — the render's own option walk, unchanged by #1473 in kind (it completes the pool inside the render). 0 idle callbacks and 0 timeouts on every line.
 
 **Consequences.** `src-analytic/app/poolScheduler.ts` (`yieldScheduler` replaces `idleScheduler`). Locks: `issue-1473-knowledge-pool.test.ts` (the default scheduler completes the pool with `requestIdleCallback` stubbed to throw; a cancelled slice never runs), `issue-1473-mid-pool-render.test.tsx` (the canvas provenance is identical mid-check and settled on every 572 line).
+
+## ADR-AG-185 — «בנקודות A ו-B»: both crossings in one sentence take the canonical order (#1512)
+
+**Status:** accepted · 2026-09-30 · operator ruling 2026-09-29 on #1512, option **(a)** — *"arbitrary, and the user can change the letters if he wants"* · round #1571 · feature → PR
+
+**Requirements:** [02c](02c-requirements-analytic.md) R85 — amended: one sentence may name both crossings; first letter = first root, second = second; never cycled; a pair that does not meet twice is refused on the sentence · **Design:** [04c](04c-design-analytic.md) — "Both crossings in one sentence are the two ordinal sentences" (after the ADR-AG-157 paragraph)
+
+**Context.** Split from #1429's arm 4. «הישר l1 חותך את המעגל I בנקודות A ו-B» and «A ו-B נקודות החיתוך של הישר l1 עם המעגל I» were both `not-handled` (re-measured at `842ede39`), while the two ordinal sentences «A נקודת החיתוך הראשונה …» + «B נקודת החיתוך השנייה …» built. The open question was the letter assignment; the ruling fixed it to [ADR-AG-157](#adr-ag-157)'s canonical root order.
+
+**Decision.**
+1. **Lowering, no new rule semantics.** `bothCrossings` (called first in `intersectionSpellings`) reads the transitive verb («X חותך/חותכת/… את Y בנקודות A ו-B»), the plural verb («X ו-Y נחתכים בנקודות A ו-B»), the plural noun («[הנקודות] A ו-B [הן] נקודות החיתוך של X עם/ו-Y») and the English «X cuts/intersects/meets Y at [points] A and B», «X and Y intersect at A and B», «A and B are the intersection points of X and Y». Each lowers to the two ordinal sentences and re-parses them through `parseIntersection` — two declares, four incidences, two `crossing-nth` — all with the student's sentence as `src`. «בנקודות A ו-A» is `repeated-vertex`. A sub-sentence's owned refusal is returned with the whole sentence as detail; a `not-handled` one hands the line back to the chain.
+2. **The one thing the pair of ordinals does not say: TWO points.** Measured: on a tangent line (`y=7` on a radius-3 circle at (3,4)) the two ordinals both hold at the touch (`nthHolds` answers true at a tangency, by ADR-AG-157's design), and the figure drew A and B 1e-3 apart with `faults: []`; with a FREE radius, seed 1 drove r onto the line and drew A = B = (0, 2), green. So the two selectors carry `both: true` and `nthHolds` first asks `meetsTwice`: a straight and a conic (two straights meet once; two conics have no order this module defines, so "A the first root" names nothing), not touching, and roots apart by more than `SOLVE_RESOLUTION · max(conic size, anchors' spread)` — the `openBoundFloor` rule of ADR-AG-167 am. 1, because a descent that approaches a double root stops within √SOLVE_TOL of it. Unjudgeable here (an anchor unplaced, a curve vacant) is `true`, as for the ordinal itself. Validity carries it: a free figure walks past the tangent seed; a figure with no freedom gets `unsatisfiable` on this sentence («לא נמצאה תצורה שבה מתקיים: "…"»).
+3. **Rejected: a `distinct` selector on {A, B}.** Measured: it never fails when A and B are the figure's only points — its threshold is `1e-2 ×` the points' own spread, i.e. of their own distance. (That scale is a latent weakness of `distinct` in a figure with few points; it is not changed here — the kite and triangle callers carry more points — and is noted for a follow-up.)
+
+**Not built.**
+- **The contextual operand** «הישר l1 חותך את המעגל בנקודות A ו-B» (no name, one circle): refused `bad-operand`, as the single ordinal over a contextual operand already is (ADR-AG-157 — the pair is resolved at the fold, after the parser has built the selector). Enabling it means resolving an ordinal's pair at the M1 boundary — a mechanism change for both forms, not this sentence's.
+- **Two conics** («המעגל I חותך את המעגל II בנקודות A ו-B») are refused, not assigned: ADR-AG-157 defines no conic–conic order, and the ruling assigns by that order. Measured today: `unsatisfiable` plus the positional `crossing-already-named` fault on the same sentence (the solve settles both letters on one root). A conic–conic order is an operator question.
+
+**Measured after** (`derive`, this branch): both spellings and the four others build with A on `conicMeet`'s root 0 and B on root 1; on a figure with a free centre parameter and a free point, the same at each of 12 seeds (≥ 2 distinct centres) and across six «הציגו תצורה אחרת» presses; «הישר DC …» swaps P and Q against «הישר CD …»; editing the row to «…בנקודות C ו-B» puts C on A's root; tangent / miss / two lines → exactly one `unsatisfiable` on the sentence; the free-radius figure draws two letters > 0.1 apart at all 12 seeds. A single ordinal at a tangency still builds (unchanged).
+
+**Consequences.** `src-analytic/parser/parseAnalytic.ts` (`bothCrossings`, `BOTH_HE`, `BOTH_HE_NOUN`, `BOTH_EN`, `BOTH_EN_NOUN`, `PAIR_JOIN`), `src-analytic/engine/crossing-order.ts` (`meetsTwice`, `conicSize`, `nthHolds`'s `both` argument), `src-analytic/engine/types.ts` (`crossing-nth.both`), `src-analytic/engine/evaluate.ts` (passes it), `src-analytic/parser/catalogAnalytic.ts` (an F16 row, He + En). Lock: `src-analytic/__tests__/issue-1512-two-crossings.test.ts` (fails 18/19 on the base; 2/19 with the parser alone — the tangent and free-radius locks need `meetsTwice`).
+
+## ADR-AG-184 — A canonical circle's centre is the real point O, unless a letter is already there (#1270)
+
+**Status:** accepted · 2026-09-30 · operator ruling 2026-09-20 (#1252 T14) · feature → PR · round #1571
+
+**Requirements:** [02c](02c-requirements-analytic.md) R61 amended and R123 — a canonical circle's centre is named `O` by the tool, and the row says so · **Design:** [04c](04c-design-analytic.md) — "A canonical circle's centre is the tool's O" (`derive.nameCanonicalCentres`, `conic.isCanonicalCircle`, the `auto` derived fact) · **LADDER stage:** fold input (a derive-level pre-pass beside `resolveMints`); one yield arm at M1 (`apply.ts` derived). No parser, solver or render change.
+
+**Amends** [ADR-AG-115](#adr-ag-115) for one case. The rule is now *"a described position is named by the point that occupies it, and a canonical circle's centre is such a point"* — a narrowing of "no letter is invented", not a reversal.
+
+**Operator, 2026-09-20**, playing T14, verbatim:
+
+> *"for canonical circles only, the center is O automatically unless user mentioed a letter. user can change this later anyway"*
+
+**Context, re-measured at `842ede39`** (the issue's table, unchanged since `f8cb9c3a`): `x^2+y^2=16` → row `(0, 0), r = 4`, no point; `A(0,0)` · circle → `A(0, 0)`; «נתון מעגל O שמשוואתו x^2+y^2=16» → `O(0, 0)` and a real `O`; `(x-3)^2+(y-4)^2=9` → `(3, 4)`, no point; `O(5,5)` · circle → `(0, 0)` with `O` at (5,5); `y^2=54x` → `(27/2, 0)`, no point. Minting a real centre already worked on the student-named route (#1059's `circle-centre` derivation), so this extends that mechanism to fire by default rather than building a new one.
+
+**"Canonical" is the equation's property, read as the issue does:** centred on the origin, `A(x²+y²) + F = 0` — the Israeli usage for the circle whose centre is the origin. A translated circle `(x−a)²+(y−b)²=R²` is unchanged (the issue's row 4, «canonical only»).
+
+**Decision.**
+
+1. **A real point, not a printed letter.** A stated circle whose equation is canonical declares `O` as a `circle-centre` derived point, on exactly the route «נתון מעגל O שמשוואתו …» takes. #1167's defect was a letter with nothing behind it; here `pointAt` finds `O`, so the panel row follows with no special case, the centre ring is not offered (the position is taken), and a later sentence can refer to `O` («הקטע OA», «משולש AOB», «M אמצע OA») — the ruling's *"user can change this later"* made checkable.
+2. **`isCanonicalCircle(eq)`** (`engine/conic.ts`) decides canonicity STRUCTURALLY, off the exact six-coefficient fit, at two probe environments that give every parameter the equation uses a different value — so `x²+y²=r²` is canonical and `x²+y²−2ax=0` is not, although at a = 0 its centre is the origin. It must also be a circle the figure can have: `x²+y²+1=0` mints nothing (else #1058's `does-not-exist` is reported twice, once for a centre of nothing). No CAS (ADR-AG-001).
+3. **It is a DEFAULT and it yields (M4)**, decided over the WHOLE fact list in `derive.nameCanonicalCentres`, next to `resolveMints` and for its reason — only the list knows what is taken, in both directions of entry order:
+   1. a point stated AT the origin (`A(0,0)`, before *or after* the circle) — its letter names the centre (T13, unchanged; ADR-AG-115 by position);
+   2. the student named a canonical circle's centre («נתון מעגל K …», «K מרכז המעגל 1») — their letter, and a second concentric canonical circle does not mint `O` beside `K`;
+   3. the circle is not canonical — coordinates alone;
+   4. **the student DEFINED a point `O` anywhere** (`O(5,5)`, «O אמצע AB», either order) — no second `O` and no invented `O₁`: the centre keeps its coordinates alone. *This is the issue's own reading, not a ruling; the free-letter route is a one-line change if he wants it.*
+   An `O` merely DECLARED by an earlier sentence («משולש AOB» then the circle) is caught at the fold: the offered fact carries `auto: true`, and `applyFact`'s derived arm absorbs an `auto` fact whose id is already held as `known` — never as #1320's `derived-at` condition, which would silently assert that the triangle's `O` is the centre.
+4. **The row says the tool named it.** The offered fact rides the circle's own line, and `Derivation.minted` records `{ index, id: 'O' }` only when the fold actually CREATED it — so the fact list shows «הכלי קרא לנקודה O» (the existing `mintedNote`, #1263's rule: the list never implies the student wrote a name the tool chose), and a default that yielded claims nothing.
+
+**Scope is exactly "circles, canonical".** A parabola's focus and an ellipse's foci keep coordinates alone (T15); an ellipse noun over a circle's equation («נתונה אליפסה שמשוואתה x²+y²=16», ADR-AG-170 Am. 2) is an ellipse and mints nothing. `circle-at` / `circle-thru` / diameter circles are stated by points, not by an equation, and are out of scope.
+
+**Behaviour change, stated:** a LATER sentence that DEFINES `O` elsewhere (`O(5,5)` after the circle) takes the letter, and the circle's `O` label goes away (its row returns to `(0, 0), r = 4`). That is the default yielding to a statement; the alternative — refusing `O(5,5)` as contradicting a name the student never gave, or drawing two `O`s — is worse on both counts.
+
+**Not covered (measured gap, handed to the round for a successor issue):** a point that lands at the origin only through its DERIVATION is not a stated coordinate, so the list-level check cannot see it — measured, `x^2+y^2=16` · `A(-1,0)` · `B(1,0)` · «M אמצע AB» draws `O(0,0)` and `M(0,0)` stacked. Detecting it needs the evaluated figure (a re-fold keyed on the drawn positions), and a later line that makes a point coincide would then withdraw an `O` earlier lines may already reference — a question for the operator, not a default to pick here. R61 (ADR-W-072) does not help: that figure has no freedom to reopen.
+
+**Sibling audit.** The class — *a stated object's canonical position gets a default letter* — is a promise, not a defect. 2-D (`src/`): circles are named by their centre letter or a derived centre; there is no equation-stated circle, so no sibling. 3-D: no equation curves. Complex (`src-complex/`): the origin is labelled `O` as a display name of `ORIGIN` in `derive2.ts` — already the same convention, by a different route; nothing to file.
+
+**⚠ Locks moved by the ruling, recorded rather than quiet.** Four assertions encoded the pre-ruling "no letter" default on a canonical circle and now assert the amendment: `issue-1167-panel-names` (the "nobody there" row moves to a translated circle — the half of the rule that still holds — plus a new canonical row asserting `O(0, 0)`; the unoccupied `pointAt` row likewise), `issue-1216-digit-circle-names` («מעגל 2 … x²+y²=25» creates exactly `['O']`, the numeral still no point), `circle-centre` (`circle I: x²+y²=9` builds `['circle-I', 'O']`, still no point `I`). What each guards — that a numeral is a name and never a centre letter — is unchanged.
+
+**Lock.** `issue-1270-canonical-centre-o.test.ts` (46): the issue's six rows as the class, each asserting the row text AND which points exist; both entry orders for rules 1 and 4; every declaration path (anonymous, «משוואת המעגל», digit and Roman numerals, colon, English, parametric radius, `x²`); the minted note present only when given; `O` referable by later sentences and unmoved by them; the centre ring declined on a canonical numeral circle and still offered on a translated one; `isCanonicalCircle` over ten equations. 17 of its tests fail on `origin/main`'s `derive.ts`.
+
+**Consequences.** `engine/conic.ts` (`isCanonicalCircle`), `engine/derive.ts` (`nameCanonicalCentres`, minted filter), `engine/types.ts` (`auto?: true` on the derived fact), `engine/apply.ts` (the yield arm, 3 lines). Per-derive cost: one structural fit per stated curve fact (memoised conic fits), none on a list with no canonical circle.
 
 ## ADR-AG-181 — "On top of each other" is judged by the SEEING ruler, not the identity tolerance (#1526)
 
