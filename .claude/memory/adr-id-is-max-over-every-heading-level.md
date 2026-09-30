@@ -20,3 +20,10 @@ different items must be re-checked once more.
 **How to apply:** compute the max with the command above in the branch you are writing in, then re-run the docs gate
 (`npm run test:docs`) on the STAGING tip after merging all items — it is the one place a cross-branch collision shows.
 Related: [[gate-lines-are-read-not-matched]].
+
+**Renumbering your own ids: rewrite only your lines.** On 2026-09-30 I had pencilled ADR-3D-286/287 into
+code comments, found them taken, and ran `sed s/ADR-3D-286/ADR-3D-290/` over `src3d/` — which also rewrote 35
+EXISTING references to the real ADR-3D-286 (#1472) and ADR-3D-287 (#1523) in six files I never touched. Caught
+by `git status` listing files outside my change. Compute the id FIRST, before writing any comment; if you
+must renumber, restrict the rewrite to lines naming your own issue numbers, and check `git status` for
+untouched files.

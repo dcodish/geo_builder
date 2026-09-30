@@ -68,3 +68,11 @@ own name**, and it will keep pulling sessions back to work that is done.
   say in a comment why. That is the cheap fix that stops the next reader repeating it.
 - The arming comment often already states the true remaining scope — #1279's said "deploy:preflight probes
   each enabled product's routes", which was the real work all along.
+
+**5 — the ruling may sit on a SIBLING issue, and your fix can contradict it.** On 2026-09-30 I fixed #1590
+("the refusal message for a cone's «|SO| = 4» is false") by rewording the refusal. #1569's comment already
+held the operator's ruling *"there is no reason not to accept SO=4 and take it as given"*, and #1590's own
+ruling comment pointed to it. I shipped a refusal with better wording and did not flag the conflict; he
+caught it on the play sheet (T8: *"I thought we discussed this"*). Before shipping a fix, read the rulings
+on every issue the plan NAMES (the "sibling"/"successor" links), and if the fix leaves one of them
+contradicted, say so in the Heads-up as a ruling conflict — never ship past it silently.
