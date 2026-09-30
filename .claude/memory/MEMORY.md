@@ -73,3 +73,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Plesk paste: read live first](plesk-paste-read-live-first.md) — read the live vhost_ssl.conf over ssh, hand him only the missing lines, and check his draft line by line before he applies (#1572, 2026-09-30)
 - [Canvas = inputs, panel = computed](canvas-inputs-panel-computed.md) — ADR-W-047, re-affirmed 2026-09-29 (#1563): never ask whether the canvas should show a derived value
 - [Play sheets sweep the phrasings](playsheets-sweep-the-phrasings.md) — a PR sheet tests what a student would type, measured on branch AND main, not the builder's one spelling (2026-09-29, #1511 → 37 red across 5 PRs)
+- [Budgets must charge cache hits](budgets-must-charge-cache-hits.md) — a work-count budget is deterministic only if memo hits are charged their cost; lock determinism cold AND warm on a memo-heavy figure (ADR-558 → #1605, 2026-09-30)
