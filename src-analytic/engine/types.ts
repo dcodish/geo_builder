@@ -162,7 +162,12 @@ export type Fact =
    * is the only layer that can see whether `seg-CE` is already there.
    */
   | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve; stated: boolean; inheritExtent?: true })
-  | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule })
+  /**
+   * `auto` (#1270, ADR-AG-184) — a name the TOOL gave, never the student: a canonical circle's centre
+   * called `O` by default. It yields to anything already holding the id (the fold absorbs it as
+   * `known`), where a student's own derivation of an existing point is a CONDITION on it (#1320).
+   */
+  | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule; auto?: true })
   | (FactBase & { t: 'segment'; id: Id; a: Id; b: Id })
   | (FactBase & { t: 'polygon'; id: Id; vertices: Id[]; noun?: string })
   /**
@@ -581,8 +586,13 @@ export type Selector =
    * A selector for `crossing-distinct`'s reasons: it consumes no freedom (the two incidences already
    * pin the point to a root) and "this root, not that one" is a region, not an equation. It is also why
    * «הציגו תצורה אחרת» cannot swap the named crossing: a configuration on the other root is not valid.
+   *
+   * `both` (#1512, ADR-AG-185) — the sentence named BOTH crossings («…בנקודות A ו-B»), so it also states
+   * that the pair HAS two: a tangency (one point), a pair with no canonical order (two straights meet
+   * once; two conics have no order this tool defines), or two roots within the solver's resolution does
+   * not hold. Without it a single ordinal keeps ADR-AG-157's reading, where a tangency satisfies both.
    */
-  | { kind: 'crossing-nth'; id: Id; nth: 0 | 1; pair: [Constraint, Constraint] }
+  | { kind: 'crossing-nth'; id: Id; nth: 0 | 1; pair: [Constraint, Constraint]; both?: true }
   /**
    * THE SIGN OF A DERIVED QUANTITY — «שיפוע הישר l1 שלילי» (#1323, ADR-AG-144).
    *

@@ -225,6 +225,8 @@ start calling distinct lines identical, which is the defect it was introduced to
 
 **A pair's crossings have ONE order ([ADR-AG-157](06c-decisions-analytic.md#adr-ag-157), #1268).** `crossing-order.ts` owns it and three readers share it: the rings' `nth` (`crossingsOf`), the `crossing-nth` selector that judges a configuration, and the seeding that starts a named crossing on its root. A straight is a `Walk` — a point and a direction: `walkThrough(from, to)` for a straight named by two points (the letters' order), `walkOfCoefficients` for one given by coefficients (left to right, bottom to top when vertical). `conicMeet` substitutes the walk into the canonical conic and returns EVERY root, `t` ascending, plus whether it is a touch. The order is taken before the extent: `crossingsOf` numbers the unfiltered roots and only then applies `within` and the occupancy test, so a side's single ring carries its line's number and a taken ring never renumbers its sibling. An ordinal sentence lowers to `crossing-nth {id, nth, pair}` (its own two incidences, carried, because the point may gain others); a sentence without one keeps `crossing-distinct`. Validity is where the choice is enforced, so «הציגו תצורה אחרת» — which walks valid configurations — cannot reach the other root.
 
+**Both crossings in one sentence are the two ordinal sentences ([ADR-AG-185](06c-decisions-analytic.md#adr-ag-185), #1512).** `bothCrossings` (`parseAnalytic.ts`, inside `intersectionSpellings`) reads «X חותך את Y בנקודות A ו-B», «X ו-Y נחתכים בנקודות A ו-B», «A ו-B נקודות החיתוך של X עם Y» and their English forms, and lowers each to «A נקודת החיתוך הראשונה של X עם Y» + «B נקודת החיתוך השנייה של X עם Y», re-parsed by the one crossing rule — so it cannot drift from the form it abbreviates. The only thing it adds is `both: true` on the two `crossing-nth` selectors: the sentence states that the pair HAS two crossings, which `meetsTwice` (`crossing-order.ts`) judges — a straight and a conic, not touching, roots apart by more than `SOLVE_RESOLUTION` × the conic's size (the `openBoundFloor` rule; an exact test lets a solve that drifted near a double root through). A seed that fails it is not a configuration; a figure with no freedom left gets `unsatisfiable` on the sentence. A single ordinal carries no `both` and keeps ADR-AG-157's reading. A sub-sentence's owned refusal (`bad-operand` for the contextual «המעגל», whose ordinal ADR-AG-157 already refuses) is returned with the whole sentence as its detail.
+
 
 ## The parser's rule contract ([ADR-AG-017](06c-decisions-analytic.md#adr-ag-017))
 
@@ -1773,6 +1775,19 @@ with the circle solves the stated radius. The creation tail («שרדיוסו 5�
 given is judged line against line. The perimeter ask delegates to the side sum; the perimeter given
 lowers to the same `length-eq`; `ringsNamed` (`engine/shapes.ts`) resolves a noun-only perimeter for
 both.
+
+## A canonical circle's centre is the tool's O ([ADR-AG-184](06c-decisions-analytic.md#adr-ag-184), #1270)
+
+A DEFAULT name, decided where `resolveMints` decides the tool's other names: in `derive`, over the whole
+resolved fact list, because only the list knows what is taken in both entry orders.
+`nameCanonicalCentres` inserts, right after each stated curve fact whose equation `isCanonicalCircle`
+(`engine/conic.ts` — structurally `A(x²+y²)+F=0` at two parameter probes, and real at one), a
+`{ t: 'derived', id: 'O', rule: circle-centre, auto: true }` owned by the circle's line — the route a
+student-named centre already takes. It inserts nothing when the list states a constant point at the
+origin, names a canonical circle's centre itself, or DEFINES `O` (a `point` or `derived` fact).
+An `O` only DECLARED earlier («משולש AOB») is the fold's to see: `applyFact`'s derived arm absorbs an
+`auto` fact whose id is held as `known` — never lowered to #1320's `derived-at` condition. `minted`
+records `O` only when the fold CREATED it, which is what the row's `mintedNote` reads.
 
 ## The LLM lane's prompt: derive, never invent; never prose ([ADR-AG-186](06c-decisions-analytic.md#adr-ag-186))
 

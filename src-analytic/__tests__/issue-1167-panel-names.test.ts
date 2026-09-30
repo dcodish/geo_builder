@@ -46,9 +46,18 @@ describe('ADR-AG-115 — the panel names a position by who is there (#1167)', ()
   /**
    * Where nobody sits, NO letter is printed. Falling back to an invented one would be the defect
    * with a different spelling, so this is the row that makes the rule a rule.
+   *
+   * LOCK MOVED (#1270, ADR-AG-184 — the operator's amendment, 2026-09-20: *"for canonical circles
+   * only, the center is O automatically"*). This row used a CANONICAL circle, which now declares a REAL
+   * point O at its centre — so somebody does sit there, and the rule above names it. The "nobody there"
+   * half of the rule is unchanged and is asserted on a non-canonical circle instead.
    */
   it('a circle centred where no point sits names no letter at all', () => {
-    expect(details(['x^2+y^2=16'])).toBe('(0, 0), r = 4');
+    expect(details(['(x-3)^2+(y-4)^2=9'])).toBe('(3, 4), r = 3');
+  });
+
+  it('a canonical circle’s centre is the real point O the tool declared (#1270)', () => {
+    expect(details(['x^2+y^2=16'])).toBe('O(0, 0), r = 4');
   });
 
   /** The same rule at the parabola's focus — one of the three sites that were NOT reported. */
@@ -81,7 +90,8 @@ describe('ADR-AG-115 — the panel names a position by who is there (#1167)', ()
   });
 
   it('and about an unoccupied one', () => {
-    const d = derive(['x^2+y^2=16'], 0) as unknown as { figure: never };
-    expect(pointAt(d.figure, 0, 0)).toBeNull();
+    // LOCK MOVED (#1270): a canonical circle's centre is now occupied by O; a translated one is not.
+    const d = derive(['(x-3)^2+(y-4)^2=9'], 0) as unknown as { figure: never };
+    expect(pointAt(d.figure, 3, 4)).toBeNull();
   });
 });

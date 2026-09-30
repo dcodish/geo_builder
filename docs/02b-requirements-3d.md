@@ -294,6 +294,16 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   any root is withheld. A crossing dot is offered by its own invariance: a crossing that does not move
   with the parameter is offered even when the parameter itself is not forced. *(Realised —
   [ADR-3D-283](06b-decisions-3d.md#adr-3d-283), #1474; `issue-1474-branch-coverage.test.ts`.)*
+- **FR-EQ-4a (Should)** — **A point with EXACTLY TWO configurations lists both in the data panel.** When
+  the givens leave a point exactly two admissible positions — the same two at every sampled configuration
+  (S above or below the plane, «SM⊥ABC» + «|SM| = 4») — the panel prints one row per configuration,
+  «S₁(1.33, 7/2, 3.33)» and «S₂(−4.33, 7/2, −2.33)», each row a WHOLE admissible point (components are
+  never mixed across configurations), in a fixed order that does not change with the configuration on
+  screen. **Only two** (operator ruling 2026-09-29: *"many exams ask questions that have 2 options. but
+  not more than 2"*): three or more configurations, or a pair that moves with the sample, keep the «?»
+  form of FR-EQ-4. The canvas label keeps the «?» form too, because the node shows one configuration.
+  *(Realised — [ADR-3D-289](06b-decisions-3d.md#adr-3d-289), #1506;
+  `issue-1506-two-configurations.test.ts`.)*
 
 ## Claims — the student's answer, never a driver
 

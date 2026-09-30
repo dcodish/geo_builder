@@ -1210,10 +1210,12 @@ function parseIntersection(line: string): RuleOutcome {
  * - the VERB forms: «הישרים l1 ו-l2 נחתכים בנקודה E», «הישר l1 חותך את הישר l2 בנקודה E» — the
  *   subject-order normalisation #1281/#1239 established.
  *
- * «…בנקודות A ו-B» (both crossings in one sentence) is NOT here: the plan's own open question —
- * whether A,B take the canonical root order or a cycling choice — is the operator's (#1512).
+ * - BOTH CROSSINGS IN ONE SENTENCE (#1512): «הישר l1 חותך את המעגל I בנקודות A ו-B», «A ו-B נקודות
+ *   החיתוך של הישר l1 עם המעגל I» — see `bothCrossings`.
  */
 function intersectionSpellings(line: string): RuleOutcome {
+  const both = bothCrossings(line);
+  if (both) return both;
   const ordWord = (s: string | undefined) => (s ? ` ${s.replace(/^ה?/, 'ה')}` : '');
   const HEAD = `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה?נקודת|ה?נקודות)?\\s*ה?חיתוך\\s*(ה?ראשונה|ה?שניי?ה|ה?אחרת)?\\s*`;
   const dist =
@@ -1250,6 +1252,91 @@ function intersectionSpellings(line: string): RuleOutcome {
     return viaCanonical(line, null, () => [`${id} נקודת החיתוך של ${withLineNoun(a)} עם ${withLineNoun(b)}`]);
   }
   return null;
+}
+
+/**
+ * BOTH CROSSINGS NAMED IN ONE SENTENCE (#1512, [ADR-AG-185](../../docs/06c-decisions-analytic.md#adr-ag-185)).
+ *
+ * «הישר l1 חותך את המעגל I בנקודות A ו-B» / «A ו-B נקודות החיתוך של הישר l1 עם המעגל I» — and the
+ * plural verb «l1 והמעגל I נחתכים בנקודות A ו-B», and English. The operator's ruling, 2026-09-29, option
+ * (a): *"arbitrary, and the user can change the letters if he wants"* — the FIRST letter takes the first
+ * root of the pair's canonical order (`crossing-order.ts`, #1268) and the second letter the second. It is
+ * deterministic and never cycles under «הציגו תצורה אחרת»: a student who wants the other assignment
+ * swaps the letters in the sentence.
+ *
+ * ## No new mechanism — the ordinal sentences, twice
+ *
+ * That assignment is EXACTLY what «A נקודת החיתוך הראשונה של X עם Y» + «B נקודת החיתוך השנייה של X עם
+ * Y» already say, so the sentence is lowered to those two and each is re-parsed by the one crossing rule
+ * (`parseIntersection`): two declares, the four incidences, and a `crossing-nth` selector each. One rule
+ * owns the semantics, so the two-name form cannot drift from the ordinal form it abbreviates.
+ *
+ * ## One thing the two sentences do not say, and this one does
+ *
+ * The plural «נקודות» states TWO points. Two ordinal sentences on a tangent pair are both satisfied by
+ * the one touching point (`nthHolds` answers true at a tangency, where the crossings coincide), so the
+ * two letters would share a position with no fault — the one thing #1113 ruled may never happen. So both
+ * selectors carry `both`, and `meetsTwice` (`crossing-order.ts`) judges it: a tangency, two roots
+ * within the solver's resolution, two straights (which meet once) or two conics (which have no canonical
+ * order, so "A the first root" names nothing) is not a configuration of this sentence. A figure with
+ * freedom left walks past such a seed; one with none is reported by `derive` on THIS sentence as
+ * `unsatisfiable`. A pair that misses entirely is refused by its incidences, as the single-crossing
+ * form always was. (A `distinct` selector was measured and rejected: its threshold is relative to the
+ * points' own spread, and with A and B the only points that is their own distance — it never fails.)
+ *
+ * A sub-sentence's OWNED refusal is this sentence's refusal (with this sentence as its detail) — the
+ * rule read every word of it; only a `not-handled` sub-parse hands the line back to the chain.
+ */
+const PAIR_JOIN = '\\s+ו[-־]?\\s*';
+const BOTH_HE = [
+  // «X חותך את Y בנקודות A ו-B»
+  new RegExp(`^(.+?)\\s+חות(?:ך|כת|כים|כות)\\s+את\\s+(.+?)\\s+ב?נקודות\\s+(${NAME})${PAIR_JOIN}(${NAME})$`),
+  // «X ו-Y נחתכים בנקודות A ו-B»
+  new RegExp(`^(.+?)${INTERSECT_JOIN}(.+?)\\s+נחתכ(?:ים|ות)\\s+ב?נקודות\\s+(${NAME})${PAIR_JOIN}(${NAME})$`),
+];
+const BOTH_HE_NOUN = new RegExp(
+  `^(?:ה?נקודות\\s+)?(${NAME})${PAIR_JOIN}(${NAME})(?:\\s+(?:הן|הם))?\\s+ה?נקודות\\s+ה?חיתוך\\s+(?:של\\s+)?(.+?)${INTERSECT_JOIN}(.+)$`,
+);
+const BOTH_EN = [
+  new RegExp(`^(.+?)\\s+(?:cuts|intersects|meets)\\s+(.+?)\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})\\s+and\\s+(${NAME})$`, 'i'),
+  new RegExp(`^(.+?)\\s+and\\s+(.+?)\\s+(?:intersect|meet)\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})\\s+and\\s+(${NAME})$`, 'i'),
+];
+const BOTH_EN_NOUN = new RegExp(
+  `^(?:points\\s+)?(${NAME})\\s+and\\s+(${NAME})\\s+are\\s+the\\s+(?:two\\s+)?(?:intersection\\s+points|intersections|points\\s+of\\s+intersection)\\s+of\\s+(.+?)\\s+(?:and|with)\\s+(.+)$`,
+  'i',
+);
+
+function bothCrossings(line: string): RuleOutcome {
+  let hit: { a: Id; b: Id; x: string; y: string; he: boolean } | null = null;
+  for (const re of BOTH_HE) {
+    const m = re.exec(line);
+    if (m) { hit = { x: withLineNoun(m[1]), y: withLineNoun(m[2]), a: m[3], b: m[4], he: true }; break; }
+  }
+  const noun = hit ? null : BOTH_HE_NOUN.exec(line);
+  if (noun) hit = { a: noun[1], b: noun[2], x: withLineNoun(noun[3]), y: withLineNoun(noun[4]), he: true };
+  for (const re of hit ? [] : BOTH_EN) {
+    const m = re.exec(line);
+    if (m) { hit = { x: m[1], y: m[2], a: m[3], b: m[4], he: false }; break; }
+  }
+  const en = hit ? null : BOTH_EN_NOUN.exec(line);
+  if (en) hit = { a: en[1], b: en[2], x: en[3], y: en[4], he: false };
+  if (!hit) return null;
+  const { a, b, x, y, he } = hit;
+  if (a === b) return refuse('repeated-vertex', line); // «בנקודות A ו-A» names one point twice
+  const sentences = he
+    ? [`${a} נקודת החיתוך הראשונה של ${x} עם ${y}`, `${b} נקודת החיתוך השנייה של ${x} עם ${y}`]
+    : [`${a} is the first intersection of ${x} with ${y}`, `${b} is the second intersection of ${x} with ${y}`];
+  const facts: Fact[] = [];
+  for (const sentence of sentences) {
+    const r = parseLine(sentence);
+    if (!r.ok) return r.code === 'not-handled' ? null : ({ ...r, detail: line } as ParseResult);
+    facts.push(...r.facts);
+  }
+  return made(
+    facts.map((f) =>
+      f.t === 'selector' && f.sel.kind === 'crossing-nth' ? { ...f, sel: { ...f.sel, both: true as const }, src: line } : { ...f, src: line },
+    ),
+  );
 }
 
 /** A bare token («l1», «AB») gets its noun back for the canonical spelling; a PLURAL noun that

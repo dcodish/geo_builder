@@ -11279,6 +11279,30 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 
 **Consequences.** `src3d/engine/types.ts` (`vec-val`, `dot-val`), `src3d/engine/apply.ts` (`recordPinGiven`; the three cases; the claim-reference validator), `src3d/engine/claims.ts` (the claim-level `given` rule; `componentsHold`; two `holdsAt` cases). Saved files holding a false vector or dot given now load with a red row — the point of the fix.
 
+## ADR-3D-289 — A point with exactly two admissible configurations lists both in the data panel, one row per configuration (#1506)
+
+**Status:** accepted · 2026-09-30 · fix round #1571 · feature (PR) · plan: the #1506 issue body, narrowed by the "Operator ruling — 2026-09-29" comment (exactly 2; display form (b), one row per configuration). **Extends** [ADR-3D-194](#adr-3d-194) (#827's singleton rule) — unchanged for everything that is not exactly two.
+
+**Requirements:** docs/02b FR-EQ-4a (a point with exactly two configurations lists both) · **Design:** docs/04b — "Two configurations print as two rows" (`twoConfigurations3`)
+
+**Context (measured on the worktree tip `842ede39`).** #1499's T7 — the operator's #1499 sequence, then «|SM| = 4». The panel printed «S(?, 7/2, ?)» at seeds 0, 1, 5, 17; `pivot.pointRoots.S` held exactly the two positions (1.328, 3.5, 3.328) and (−4.328, 3.5, −2.328) at every one of the three panel samples, with repeats (pools of 3–5 entries).
+
+**Decision.**
+1. **One decision function**, `twoConfigurations3(samples)` in `dataView.ts`, over each sample's `pointRoots[id]` and drawn position: dedupe per sample at 1e-3 of the point's size; require exactly 2 distinct members at EVERY sample, the same 2 throughout, and the drawn position among them; else `null`. The tolerance is deliberately wider than `rootsAgree` (1e-4): that one decides whether a COORDINATE is knowledge, this one whether two pool entries are one configuration counted twice.
+2. **The row form is (b)**: `S₁(1.33, 7/2, 3.33)` / `S₂(-4.33, 7/2, -2.33)`, each printed WHOLE from one root, so a component is never paired across configurations. A component equal in both prints in each row. Canonical order: larger on the first axis where they differ.
+3. **Only the `points` list changes.** `pointCoords` (the canvas label, and the ask lane's point answer, which reads it) keeps the #827 partial form: the node shows one configuration.
+
+**Rejected.** (a) Inline «1.33 או −4.33» per component with a pairing footnote: it invites the mis-pairing the ruling warns about. Pool order or the drawn branch as the row order: S₁ would swap when «הציגו תצורה אחרת» is pressed.
+
+**Not built (named).**
+- **The ask lane** («מה הקואורדינטות של S?») still answers `S(?, 7/2, ?)`: it reads `pointCoords`, which this ADR leaves as it was. Extending the answer to the two rows is a separate display decision — not filed by this worker; the coordinator may file it.
+- **The #827 exam pyramid** (`D(3,p,0)`, `|u| = |v|` ⇒ p = ±4) is a genuine two-configuration figure that still prints «D(3, ?, 0)»: the pivot's pool found both roots at only 1 of the 3 panel samples (measured at seed 0: 2, 1, 1 distinct members). The rule's "same two at every sample" is doing its job; the pool's incompleteness is the solver's, out of this display-only scope.
+- **The side observation (sticky cycling).** Deduplication here is display-only and does not touch cycling. Measured on T7 through the store's `resample`: seeds 0…11 draw S at x = 1.33 once (seed 0) and x = −4.33 at the other eleven — «הציגו תצורה אחרת» almost never returns to the first configuration, because `chosen = pool[seed % pool.length]` indexes a pool with repeats and uneven multiplicity. Not fixed here.
+
+**Locks.** `src3d/__tests__/issue-1506-two-configurations.test.ts` (14): T7's two rows at seeds 0, 1, 17; each printed configuration admissible (|SM| = 4, SM ∥ ABC's normal); canonical order with both configurations drawn across the sweep; the canvas label still `(?, 7/2, ?)`; three «?» guards on real figures — a box with «C(p+q,1,0)» (9–26 pool members), a circle pair that moves with the seed (`|AC| = 5`, `|BC| = 3` over typed A, B ⇒ `C(4, ?, ?)`), and «SM⊥ABC» with no height; and seven unit cases of `twoConfigurations3` (dedup, order, three members, a single-solution sample, a moving pair, a drawn position outside the pair, no samples). With the pre-change `dataView.ts` the file fails 9 of 14. Rule 4: 3-D has no scenario corpus and the essence is a display row, not "builds green", so the lock file is the regression coverage; no fixture. The #827 locks are unchanged and green. The #1394 submit-parity golden: **0 existing sequence hashes changed**; +9 new keys, the string arrays of this lock.
+
+**Consequences.** `src3d/engine/dataView.ts` (`twoConfigurations3`, `sameConfig`, `configLabel`; the point loop). No locale strings: the subscript is a label, not text.
+
 ## ADR-3D-285 — Every scalar pin records its arbiter: a length, angle, ratio or ⊥/∥ given beside a sphere or cone of unstated size is judged (#1567)
 
 **Status:** accepted · 2026-09-29 · fix round #1571 · plan: the #1567 issue body, armed by the "Operator ruling — 2026-09-29" comment (option **A**: refuse now; the drive is #1569), auto-ok as transcription. Builds on [ADR-3D-284](#adr-3d-284)'s claim-level `given` rule, unchanged.
