@@ -30,7 +30,7 @@ import type { FigureFile } from './figureFile';
 export * from '@/replay/core';
 export * from '@/replay/viewDelta';
 import { replay, groupKey, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, commandPointIds, BRANCH_CYCLE_KINDS } from '@/replay/core';
-import type { DetectAllResult, Fact } from '@/replay/core';
+import type { DetectAllResult, Determinacy, Fact } from '@/replay/core';
 import { viewDelta } from '@/replay/viewDelta';
 import type { ViewDelta } from '@/replay/viewDelta';
 import { geoWork, geoValues, isCancelled } from './geoWork';
@@ -347,6 +347,10 @@ export interface GeoState {
    *  is computed for the current facts the renderer offers NO dots — an unverified candidate is exactly the
    *  one that vanishes on "show another configuration". */
   crossings: { forced: Set<string>; facts: Fact[] } | null;
+  /** #1444 (ADR-556): how determined the figure is — fully, or only up to a choice of configuration — read
+   *  off the SAME shared pool as the crossings and the values panel, and computed by the same always-on
+   *  post-fact sweep. Same staleness contract: meaningful only while `facts` is the store's facts. */
+  determinacy: (Determinacy & { facts: Fact[] }) | null;
 
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
   execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;
@@ -578,6 +582,7 @@ export const useGeoStore = create<GeoState>()(
       queries: [],
       shapes: null,
       crossings: null,
+      determinacy: null,
 
       execute: (cmd, utterance, group) => {
         commitCommands(get, set, [cmd], utterance, group);
@@ -772,7 +777,7 @@ export const useGeoStore = create<GeoState>()(
         if (get().crossings?.facts === facts) return;
         const r = await detectFor(facts, get);
         if (!r) return;
-        set({ crossings: { forced: r.crossings, facts } });
+        set({ crossings: { forced: r.crossings, facts }, determinacy: { ...r.determinacy, facts } });
       },
 
       cycleAlt: (pointId) => {

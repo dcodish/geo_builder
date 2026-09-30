@@ -371,6 +371,8 @@
     "deltaMore": "and {{count}} more",
     "dof": "Degrees of freedom: {{count}}",
     "determined": "✓ The figure is fully determined by the givens",
+    "dofConfigs": "Degrees of freedom: 0 · {{n}} configurations are possible — press «Show another configuration»",
+    "dofConfigsMany": "Degrees of freedom: 0 · more than one configuration is possible — press «Show another configuration»",
     "delete": "Delete",
     "toggle": "Include in the figure",
     "edit": "Edit in place",

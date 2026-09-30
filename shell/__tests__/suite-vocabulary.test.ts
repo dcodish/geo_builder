@@ -41,6 +41,12 @@ const valueOf = (p: Product, lang: Lang, key: string) =>
  */
 const ROLES: Record<string, Record<Product, string[] | null>> = {
   determined: { '2d': ['actions.determined'], '3d': ['cue.determined'], complex: ['freedomPinned'], analytic: ['pinned'] },
+  // #1444 (ADR-556): 0 DOF but more than one configuration — the note ADDED to the DOF count (operator
+  // ruling 2026-09-30), with a stable count N and without one. Only 2-D's cue reads a discrete admissible
+  // pool (the ruling was scoped to 2-D; "consistent across tools" is a workspace follow-up); a sibling
+  // whose cue gains that state adds its key here.
+  dofConfigs: { '2d': ['actions.dofConfigs'], '3d': null, complex: null, analytic: null },
+  dofConfigsMany: { '2d': ['actions.dofConfigsMany'], '3d': null, complex: null, analytic: null },
   dofCount: { '2d': ['actions.dof'], '3d': ['cue.free'], complex: ['freedomCount'], analytic: ['freeDof'] },
   // complex has no asynchronous path (no LLM, no deferred values), so it never shows a busy state
   busy: { '2d': ['input.loading', 'values.computing'], '3d': ['input.thinking'], complex: null, analytic: ['thinking'] },
@@ -55,6 +61,14 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
 /** The ruled wording (the "Explicit set", 2026-09-27) — the lock's anchor, not just "all equal". */
 const RULED: Record<string, Record<Lang, string>> = {
   determined: { he: '✓ הציור נקבע במלואו על ידי הנתונים', en: '✓ The figure is fully determined by the givens' },
+  dofConfigs: {
+    he: 'דרגות חופש: 0 · יש {{N}} תצורות אפשריות — לחצו «הציגו תצורה אחרת»',
+    en: 'Degrees of freedom: 0 · {{N}} configurations are possible — press «Show another configuration»',
+  },
+  dofConfigsMany: {
+    he: 'דרגות חופש: 0 · יש יותר מתצורה אחת — לחצו «הציגו תצורה אחרת»',
+    en: 'Degrees of freedom: 0 · more than one configuration is possible — press «Show another configuration»',
+  },
   dofCount: { he: 'דרגות חופש: {{N}}', en: 'Degrees of freedom: {{N}}' },
   busy: { he: 'חושב…', en: 'Working…' },
   askSubmit: { he: 'שאלו', en: 'Ask' },

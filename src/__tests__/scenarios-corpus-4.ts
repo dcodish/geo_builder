@@ -48,7 +48,8 @@ import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-harness';
 import { ctxOf } from './scenario-pipeline';
 import { parse } from '@/parser';
-import { computeValues } from '@/replay/core';
+import { computeValues, figureDeterminacy, findValidConfig, searchAnotherView, sharedSamples } from '@/replay/core';
+import { figureStatus } from '@/app/figureStatus';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -2942,6 +2943,38 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.violations, 'the triangle carries no violated given').toEqual([]);
       expect(fig.positions.has('D'), 'the refused sentence minted nothing — there is no second point at B').toBe(false);
       for (const id of ['A', 'B', 'C']) expect(fig.positions.has(id), `the triangle keeps ${id}`).toBe(true);
+    },
+  },
+  {
+    id: 'zero-dof-configurations-status-1444',
+    title:
+      '#1444 / ADR-556: «משולש ישר זווית ABC» · «AB=3, BC=4» — 0 DOF but TWO shapes: the status reads «דרגות חופש: 0 · יש 2 תצורות אפשריות …», never «נקבע במלואו»',
+    guards:
+      "External review of prod, relayed 2026-09-27: the default seat (C) cannot hold — the hypotenuse AB = 3 is shorter than the leg BC = 4 — so the ADR-445 seat tier draws the right angle at A (AC = √7), and the status read «✓ נקבע במלואו» (`freeDofCount === 0`, continuous freedom only) while the values panel withheld AC because seat B (AC = 5) is admissible too. Operator rulings 2026-09-30: no notice naming the vertex (it read as though A were forced); the configuration note is ADDED to the DOF report, its count from the general `figureDeterminacy` (stable across the pool) → `figureStatus`. The harness folds at ONE seed without the app's view search, so this lock runs the search itself; the submit-door path and one lock per measured cause are in src/app/__tests__/issue-1444-config-status.test.ts.",
+    steps: ['משולש ישר זווית ABC', 'AB=3, BC=4'],
+    expectViolations: true,
+    check: (fig) => {
+      // the precondition, so the lock keeps meaning: at the default seat the lengths are refused
+      const last = Object.entries(fig.status).filter(([id]) => id.startsWith('g1'));
+      expect(last.length).toBeGreaterThan(0);
+      expect(last.every(([, st]) => String(st).startsWith('impossible:')), 'the default seat C cannot hold').toBe(true);
+      const facts = factsOf(['משולש ישר זווית ABC', 'AB=3, BC=4']);
+      const found = findValidConfig(facts, 0);
+      expect(found, 'the seat tier finds a real figure').not.toBeNull();
+      const moved = replay(found!.facts, found!.seed);
+      expect(dist(at(moved, 'A'), at(moved, 'C'))).toBeCloseTo(Math.sqrt(7), 4);
+      expect(freeDofCount(moved.construction), 'no continuous freedom left').toBe(0);
+      const verdict = figureDeterminacy(sharedSamples(found!.facts));
+      expect(verdict, 'two admissible shapes: AC = √7 and AC = 5, the same count at every sampled seed').toEqual({ determined: true, configurations: 2, stable: true });
+      expect(figureStatus(found!.facts.length, 0, verdict)).toEqual({ key: 'actions.dofConfigs', n: 2 });
+      // «הציגו תצורה אחרת» reaches the other shape — the 3-4-5
+      const next = searchAnotherView(found!.facts, found!.seed);
+      expect(next).not.toBeNull();
+      const other = replay(next!.facts, next!.seed);
+      expect(dist(at(other, 'A'), at(other, 'C'))).toBeCloseTo(5, 4);
+      // guard: a plain 3-4-5 whose default seat holds — one shape, «נקבע במלואו»
+      const plain = factsOf(['משולש ישר זווית ABC', 'AB=5, BC=4, AC=3']);
+      expect(figureStatus(plain.length, freeDofCount(replay(plain).construction), figureDeterminacy(sharedSamples(plain)))).toEqual({ key: 'actions.determined' });
     },
   },
 ];
