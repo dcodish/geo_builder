@@ -130,7 +130,7 @@ describe('#232 (ADR-378) — bare free points land in general position; default 
   it("a student's explicit (pinned) placement stays verbatim — what they typed is a given", () => {
     const { positions } = build([
       { type: 'free-point', id: 'A', x: 3, y: 2, free: true },
-      { type: 'free-point', id: 'D', x: 3, y: 2 }, // explicit «נקודה D ב-(3,2)» — pinned
+      { type: 'free-point', id: 'D', x: 3, y: 2 }, // an explicit pin (the pre-#1245 «נקודה D ב-(3,2)»; a saved figure still replays it)
     ] as AnyCommand[]);
     expect(positions.get('D')).toEqual({ x: 3, y: 2 });
   });

@@ -6,7 +6,7 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-09-29",
+  "updatedAt": "2026-09-30",
   "slow": [
     "src-analytic/__tests__/issue-1464-1324-1462-kite-exercise.test.ts",
     "src-analytic/__tests__/issue-1473-perf-budget.test.ts",
@@ -52,6 +52,7 @@
     "src3d/__tests__/issue-1311-free-pair-length-drive.test.ts",
     "src3d/__tests__/issue-1498-frame-and-carrier-drive.test.ts",
     "src3d/__tests__/issue-1499-perp-from-in-plane-point.test.ts",
+    "src3d/__tests__/issue-1506-two-configurations.test.ts",
     "src3d/__tests__/issue-1560-vector-pin-claims.test.ts",
     "src3d/__tests__/issue-814.test.ts",
     "src3d/__tests__/issue-815.test.ts",

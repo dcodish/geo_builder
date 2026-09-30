@@ -117,8 +117,8 @@ const PARSES: [string, string][] = [
   ['מעגל חסום במשולש ABC', 'circle-through'],
   ['circle centered at I radius r inscribed in triangle ABC', 'circle-through'],
   // ── points ──
-  ['point A at (0,0)', 'free-point'],
-  ['נקודה A ב-(0,0)', 'free-point'],
+  ['point A', 'free-point'], // #1245: the coordinate forms («point A at (0,0)») are withdrawn — scope refuses them
+  ['נקודה A', 'free-point'],
   ['point E on AC', 'point-on-segment'],
   ['point E on AC at 40%', 'point-on-segment'],
   ['נקודה E על AC ב-40%', 'point-on-segment'],
