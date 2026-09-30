@@ -543,6 +543,70 @@ const rootsAgree = (a: number, b: number, scale: number): boolean =>
 const sameVec = (a: Vec3, b: Vec3) => near(a.x, b.x) && near(a.y, b.y) && near(a.z, b.z);
 
 /**
+ * #1506 (ADR-3D-289) — the dedup tolerance for "are these two pool entries the SAME configuration?".
+ *
+ * Wider than {@link rootsAgree} on purpose: that asks whether two roots agree on a COORDINATE (a
+ * knowledge claim, so it is tight); this asks whether two entries are one configuration counted twice
+ * (the pool holds byte-identical and solver-scattered repeats), and two genuinely different
+ * configurations are separated by far more than 1e-3 of the point's size.
+ */
+const CONFIG_DEDUP_REL = 1e-3;
+const sameConfig = (a: Vec3, b: Vec3): boolean => {
+  const tol = CONFIG_DEDUP_REL * Math.max(rootScale(a), rootScale(b));
+  return Math.abs(a.x - b.x) <= tol && Math.abs(a.y - b.y) <= tol && Math.abs(a.z - b.z) <= tol;
+};
+
+/** One sample's view of a point, for {@link twoConfigurations3}: the admissible pool's positions
+ *  (`pivot.pointRoots[id]`, absent when the pool holds one solution) and the position actually drawn. */
+export interface PointConfigSample3 {
+  roots: readonly Vec3[] | undefined;
+  drawn: Vec3;
+}
+
+/**
+ * #1506 (ADR-3D-289) — does the point have EXACTLY TWO admissible configurations, the same two at
+ * every sample? Returns them in canonical order, or `null` (the panel then keeps «?» exactly as the
+ * #827 gate prints it).
+ *
+ * Operator ruling (2026-09-29): *"2 options - yes - because many exams ask questions that have 2
+ * options. but not more than 2."* So:
+ *  - the pool is DEDUPLICATED per sample (`pointRoots` is stored one entry per solution, deliberately
+ *    not deduplicated — #827 — so it repeats configurations);
+ *  - exactly 2 distinct members at EVERY sample — a sample with one solution, or three or more, is
+ *    not "two configurations";
+ *  - the SAME two at every sample (seed × parameter branch) — a pair that moves with the seed is
+ *    gauge or a free DOF, not a finite answer the givens force;
+ *  - the drawn position is one of the two — the pool describes the figure on screen.
+ *
+ * The order is canonical — larger on the first axis where they differ — so S₁ and S₂ never swap
+ * with the pool order or with which configuration «הציגו תצורה אחרת» happens to be drawing.
+ * Each configuration is returned WHOLE: components are paired by root, never mixed across roots
+ * (S(1.33, ·, −2.33) is not an admissible point).
+ */
+export function twoConfigurations3(samples: readonly PointConfigSample3[]): [Vec3, Vec3] | null {
+  let pair: Vec3[] | null = null;
+  if (samples.length === 0) return null;
+  for (const { roots, drawn } of samples) {
+    if (!roots) return null;
+    const distinct: Vec3[] = [];
+    for (const q of roots) if (!distinct.some((d) => sameConfig(d, q))) distinct.push(q);
+    if (distinct.length !== 2) return null;
+    if (!distinct.some((d) => sameConfig(d, drawn))) return null;
+    if (!pair) pair = distinct;
+    else if (!pair.every((p) => distinct.some((d) => sameConfig(d, p)))) return null;
+  }
+  const [a, b] = pair!;
+  const tol = CONFIG_DEDUP_REL * Math.max(rootScale(a), rootScale(b));
+  for (const ax of ['x', 'y', 'z'] as const) {
+    if (Math.abs(a[ax] - b[ax]) > tol) return a[ax] > b[ax] ? [a, b] : [b, a];
+  }
+  return [a, b]; // unreachable: two distinct configurations differ on some axis
+}
+
+/** The row label of configuration k (1-based): `S₁`, `S₂`. */
+const configLabel = (id: Id, k: number): string => `${id}${String(k).replace(/\d/g, (d) => '₀₁₂₃₄₅₆₇₈₉'[+d])}`;
+
+/**
  * Stated magnitudes: |pair| = value, from driving pins and recorded claims.
  *
  * EXPORTED for the renderer (#918, ADR-3D-235): the canvas draws a stated length beside its segment,
@@ -1101,6 +1165,14 @@ export function dataView(c: Construction3, seed: number): DataPanel {
         });
       const stableAx = axes.map((ax) => ps.every((p) => near(ps[0]![ax], p![ax])) && branchAgrees(ax));
       const nStable = stableAx.filter(Boolean).length;
+      /**
+       * #1506 (ADR-3D-289) — EXACTLY TWO admissible configurations print both, one row each:
+       * «S₁(1.33, 7/2, 3.33)» / «S₂(−4.33, 7/2, −2.33)», in place of the «S(?, 7/2, ?)» row. The
+       * canvas label (`pointCoords`) keeps the #827 partial form: the node shows ONE configuration,
+       * and a component that is a branch choice is still not knowledge about the point on screen.
+       */
+      const two = nStable < 3 ? twoConfigurations3(resolved.map((r, k) => ({ roots: r.pivot?.pointRoots?.[id], drawn: ps[k]! }))) : null;
+      if (two) two.forEach((q, k) => points.push(`${configLabel(id, k + 1)}${coordStr(q)}`));
       if (nStable === 3) {
         const cs = coordStr(ps[0]!);
         pointCoords[id] = { text: cs, kind: 'fact' };
@@ -1116,7 +1188,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
         };
         const cs = `(${axes.map((ax, i) => (stableAx[i] ? cleanMag(ps[0]![ax]) : free(ax))).join(', ')})`;
         pointCoords[id] = { text: cs, kind: 'partial' };
-        points.push(`${id}${cs}`);
+        if (!two) points.push(`${id}${cs}`);
       }
       // no stable axis at all → no label (a sample coordinate is not knowledge)
     }
