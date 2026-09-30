@@ -3476,7 +3476,8 @@ const ANGLE_PRE_3 = String.raw`(?:∠|ה?זו?וית\s+|(?:the\s+)?angle\s+(?:at
  *  needs; it must never decide whether a statement is understood. */
 const ANGLE_COPULA_3 = String.raw`(?:היא|הוא|שווה\s*ל?\s*-?|equals?|is|=)`;
 
-/** `∠PC'C = 82.1` / `הזווית PC'C היא 90` — the vertex form lowers to the angle-between-segments claim.
+/** `∠PC'C = 82.1` / `הזווית PC'C היא 90` — the vertex form lowers to the VERTEX-angle claim (0–180°,
+ *  #1573 / ADR-3D-290), never the ≤ 90° line-angle claim `angleSegClaim` produces for «הזווית בין … ל-…».
  *  #251 (ADR-3D-049): also the `ישרה`/`is right` word-form (deg 90), and the SINGLE-VERTEX form
  *  (`זוית O ישרה`, `זווית O = 90`, `angle at O is right`) → `vertex-angle`, arms resolved at APPLY. */
 const vertexAngleClaim: Rule = (s0) => {
@@ -3492,7 +3493,7 @@ const vertexAngleClaim: Rule = (s0) => {
     return [
       { type: 'segment3', a: vertex, b: p },
       { type: 'segment3', a: vertex, b: q },
-      { type: 'claim', claim: { type: 'angle-seg-eq', a1: vertex, b1: p, a2: vertex, b2: q, deg: deg !== undefined ? +deg : 90 } },
+      { type: 'claim', claim: { type: 'vertex-angle-eq', vertex, p, q, deg: deg !== undefined ? +deg : 90 } },
     ];
   }
   const sv =

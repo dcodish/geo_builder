@@ -171,5 +171,10 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       return t('err.lineNotDetermined', { id: err.id });
     case 'point-not-determined':
       return t('err.pointNotDetermined', { id: err.id });
+    case 'given-not-drivable':
+      // #1590 (ADR-3D-291): the tool's limit, named as the tool's — never «check the computation»
+      return err.object.kind === 'point'
+        ? t('err.givenNotDrivablePoint', { id: err.object.id })
+        : t('err.givenNotDrivableSize', { solid: t(`solidNoun.${err.object.solid}`) });
   }
 }

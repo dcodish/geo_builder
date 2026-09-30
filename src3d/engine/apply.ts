@@ -14,6 +14,7 @@ import { resolveSolidSubject } from './solidSubject';
 import { diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { claimPointIds, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import { firstFreeLetter } from './freeLetter';
+import { carrierParams3 } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, ScalarPin, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
@@ -352,7 +353,7 @@ const firstAtomError = (c: Construction3, atoms: import('./types').VecAtom[]): E
  */
 type PinGivenClaim = Extract<
   Claim3,
-  { type: 'vec-val' } | { type: 'dot-val' } | { type: 'length-eq' } | { type: 'angle-seg-eq' } | { type: 'cos-angle-eq' } | { type: 'length-rel' } | { type: 'perp-plane' } | { type: 'par-plane' }
+  { type: 'vec-val' } | { type: 'dot-val' } | { type: 'length-eq' } | { type: 'angle-seg-eq' } | { type: 'vertex-angle-eq' } | { type: 'cos-angle-eq' } | { type: 'length-rel' } | { type: 'perp-plane' } | { type: 'par-plane' }
 >;
 function recordPinGiven(next: Construction3, claim: PinGivenClaim): void {
   if (claim.type === 'vec-val' && claim.x === null && claim.y === null && claim.z === null) return;
@@ -663,6 +664,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return missingPoint(c, claim.ids);
     case 'angle-seg-eq':
       return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
+    case 'vertex-angle-eq':
+      return missingPoint(c, [claim.vertex, claim.p, claim.q]);
     case 'cos-angle-eq':
       return firstAtomError(c, [claim.u, claim.v]);
     case 'vec-val': // #1560 (ADR-3D-284)
@@ -1332,7 +1335,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const [p, q] = [...nbrs];
       let r = applyCommand3(c, { type: 'segment3', a: cmd.vertex, b: p });
       if (r.ok) r = applyCommand3(r.next, { type: 'segment3', a: cmd.vertex, b: q });
-      if (r.ok) r = applyCommand3(r.next, { type: 'claim', claim: { type: 'angle-seg-eq', a1: cmd.vertex, b1: p, a2: cmd.vertex, b2: q, deg: cmd.deg } });
+      if (r.ok) r = applyCommand3(r.next, { type: 'claim', claim: { type: 'vertex-angle-eq', vertex: cmd.vertex, p, q, deg: cmd.deg } });
       return r;
     }
 
@@ -1634,7 +1637,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const refsCoordSym = (ids: Id[]): boolean => ids.some((id) => c.points.get(id)?.kind === 'coord-sym');
       if (
         (cmd.claim.type === 'length-eq' && refsCoordSym([cmd.claim.a, cmd.claim.b])) ||
-        (cmd.claim.type === 'angle-seg-eq' && refsCoordSym([cmd.claim.a1, cmd.claim.b1, cmd.claim.a2, cmd.claim.b2]))
+        (cmd.claim.type === 'angle-seg-eq' && refsCoordSym([cmd.claim.a1, cmd.claim.b1, cmd.claim.a2, cmd.claim.b2])) ||
+        (cmd.claim.type === 'vertex-angle-eq' && refsCoordSym([cmd.claim.vertex, cmd.claim.p, cmd.claim.q]))
       ) {
         next.paramGivens.push(cmd.claim);
         next.claims.push(cmd.claim);
@@ -1668,6 +1672,17 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // ≈2.34 the sampler invented and calling the student wrong. `freeDims` counts only a solid's dims,
       // so it answered "determined" for the vectors unit's whole first lesson. The predicate is the
       // statement's own reach (the points it names), never the figure's state (docs/17 §2.2).
+      // #1590 (ADR-3D-291): ADR-3D-075's COORDS TWIN, by the point's own reach. «D = (3,0,0)» on a point whose
+      // position still carries a sampled free parameter — an unstated coordinate, a rider's place, a coord-sym
+      // letter — is the same statement as «D(3,0,0)», a GIVEN about an under-determined point, not an answer to
+      // check. The branch below reaches that only where a solid or a free3 point opens it, so on a solid-free
+      // figure the `=` spelling fell to the answer lane and was refuted «בדקו את החישוב» while its twin was not.
+      // Both spellings now lower through the one existing-id `point3` path.
+      if (cmd.claim.type === 'coords-eq' && freeDims(c) === 0) {
+        const def = c.points.get(cmd.claim.id);
+        if (def && (def.kind === 'coord-sym' || (def.kind !== 'free3' && carrierParams3(c, cmd.claim.id, def).length > 0)))
+          return applyCommand3(c, { type: 'point3', id: cmd.claim.id, x: cmd.claim.x, y: cmd.claim.y, z: cmd.claim.z });
+      }
       if (freeDims(c) > 0 || claimPointIds(c, cmd.claim).some((id) => c.points.get(id)?.kind === 'free3')) {
         // #316 (ADR-3D-075): the COORDS twin — «D=(8,10,-12)» on an under-determined figure is the
         // same statement as «D(8,10,-12)» (one statement, one semantics, docs/17 §2.3; the `=` sign
@@ -1796,32 +1811,23 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // claim lane and was refuted against whichever figure the seed happened to produce, which
         // `relationTable`'s `'angle|segment|segment'` row already declared it must not be (`drive-dims`).
         // The shared-vertex case keeps routing to `vangle`: same quantity, better-conditioned residual.
+        // #1573 (ADR-3D-290): the pin is chosen by WHAT THE STATEMENT MEASURES, never by the shape of its
+        // letters. A vertex angle («∠DAB = 120») drives `vangle`, the signed angle between the two rays; an
+        // angle between two segments or lines («הזווית בין AC לבין AB היא 40») drives `seg-angle`, the ≤ 90°
+        // line angle, whether or not the segments share an endpoint. Both used to arrive as `angle-seg-eq`,
+        // and this site told them apart by a shared endpoint — so on a pinned figure a line angle was driven
+        // and judged as a vertex angle, and on a fixed one a vertex angle was judged as a line angle.
+        // #1567 (ADR-3D-285): each pin records its arbiter, which judges the SAME quantity the pin drives.
+        if (cmd.claim.type === 'vertex-angle-eq') {
+          const { vertex, p, q, deg } = cmd.claim;
+          next.scalarPins.push({ kind: 'vangle', vertex, p, q, deg });
+          recordPinGiven(next, cmd.claim);
+          return { ok: true, next };
+        }
         if (cmd.claim.type === 'angle-seg-eq') {
           const { a1, b1, a2, b2, deg } = cmd.claim;
-          // A SHARED endpoint — in any of its four spellings — is a vertex angle, so it takes the
-          // `vangle` form: the better-conditioned residual, and the one the renderer marks with an arc
-          // (scene3) or a knee (rightAngles). `a1 === a2` was the only spelling that used to reach it;
-          // «AC»/«BA» states the same angle at A and was refuted. One relation, one semantics.
-          const shared =
-            a1 === a2 ? { vertex: a1, p: b1, q: b2 }
-            : a1 === b2 ? { vertex: a1, p: b1, q: a2 }
-            : b1 === a2 ? { vertex: b1, p: a1, q: b2 }
-            : b1 === b2 ? { vertex: b1, p: a1, q: a2 }
-            : null;
-          if (shared) next.scalarPins.push({ kind: 'vangle', ...shared, deg });
-          else next.scalarPins.push({ kind: 'seg-angle', a1, b1, a2, b2, deg });
-          // #1567 (ADR-3D-285): the angle pin records its arbiter — one that judges the SAME quantity the pin
-          // drives. `vangle` is the signed vertex angle (0–180°), so its arbiter is the signed `cos-angle-eq` over
-          // the two rays; `angle-seg-eq` measures the angle between LINES (≤ 90°, the `seg-angle` pin's |cos|) and
-          // would refute a true «∠DAB = 120».
-          if (shared)
-            recordPinGiven(next, {
-              type: 'cos-angle-eq',
-              u: { kind: 'pair', from: shared.vertex, to: shared.p },
-              v: { kind: 'pair', from: shared.vertex, to: shared.q },
-              cos: Math.cos((deg * Math.PI) / 180),
-            });
-          else recordPinGiven(next, cmd.claim);
+          next.scalarPins.push({ kind: 'seg-angle', a1, b1, a2, b2, deg });
+          recordPinGiven(next, cmd.claim);
           return { ok: true, next };
         }
       }
@@ -2748,7 +2754,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           for (const mk of owner.marks) {
             if (!r.ok) return r;
             // #977: the mark's coefficient scales the value — «∠ABC = 2α» with «α = 30» is 60°.
-            r = applyCommand3(r.next, { type: 'claim', claim: { type: 'angle-seg-eq', a1: mk.vertex, b1: mk.p, a2: mk.vertex, b2: mk.q, deg: (mk.coef ?? 1) * cmd.value } });
+            r = applyCommand3(r.next, { type: 'claim', claim: { type: 'vertex-angle-eq', vertex: mk.vertex, p: mk.p, q: mk.q, deg: (mk.coef ?? 1) * cmd.value } });
           }
         } else if (owner.kind === 'component') {
           // #814's named free component: the value IS the coordinate given on that component — lowered

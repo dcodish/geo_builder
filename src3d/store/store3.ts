@@ -35,10 +35,11 @@ import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { scalePinned } from '../engine/solve3';
 import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
+import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
 import { meaningKey } from '../engine/operands';
-import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type Positions3 } from '../engine/types';
+import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
 import { parse3, parseRename3 } from '../parser/parse3';
 
@@ -187,6 +188,9 @@ const coordFrameReads = (claim: unknown): ('frame' | 'rotation' | 'translation')
   return [...out];
 };
 
+/** #1590: the claim is the ARBITER of a given the student stated (a pin's `given: true` record), not an answer. */
+const isStatedGiven = (claim: Claim3): boolean => 'given' in claim && claim.given === true;
+
 /**
  * THE NOT-DETERMINED RULE — one rule, of which #508, #552, #512 and #1311 are the carriers
  * ([ADR-3D-260](../../docs/06b-decisions-3d.md#adr-3d-260)).
@@ -227,6 +231,43 @@ function sampledCarrierVerdict(claim: Claim3, c: Construction3, resolved: Resolv
     },
     // #1311 — a NEVER-POSITIONED point: its three coordinates are samples (ADR-052), not givens
     { reads: (cl) => claimPointIds(c, cl), sampled: (id) => c.points.get(id)?.kind === 'free3', verdict: (id) => ({ code: 'point-not-determined', id }) },
+    // #1590 (ADR-3D-291) — a point with a FREE PARAMETER the resolution left sampled: an unstated coordinate
+    // («D על החלק החיובי של ציר ה-x»), a rider's position on its carrier, a coord-sym point's letter no given
+    // root-found. The drives own these only where they run (the pivot's rider lane needs a solid or a free3
+    // point; the param lane reads length/angle givens), so «D(3,0,0)» over a sampled x fails against a number
+    // the tool chose. Only a GIVEN the student STATED (a pin's `given: true` arbiter) reads these rows: it is refused
+    // naming the tool's limit, since its own coordinates are exactly what "pin it first" would ask for. An ANSWER
+    // («AE = 2·A'E» over a rider) keeps the verdict it always had — #1590 is about givens, not the answer register.
+    {
+      reads: (cl) => claimPointIds(c, cl),
+      sampled: (id) => {
+        const def = c.points.get(id);
+        if (!isStatedGiven(claim) || !def || def.kind === 'free3') return false; // free3: the row above
+        // a given the point's OWN stated data already contradicts is false as stated — the sampled freedom
+        // is not why it fails, so it keeps «check the computation» (`statedDataAdmits`)
+        if (!statedDataAdmits(c, claim, resolved.positions)) return false;
+        if (def.kind === 'coord-sym') return (resolved.param?.roots.length ?? 0) === 0;
+        const driven = resolved.pivot?.riderTs ?? {};
+        return carrierParams3(c, id, def).some((p) => !(p.key in driven));
+      },
+      verdict: (id) => ({ code: 'given-not-drivable', object: { kind: 'point', id } }),
+    },
+    // #1590 (ADR-3D-291) — a solid of revolution whose size was never stated: the pivot has no unknown for a
+    // revolution's radius or height (#1569 is that drive), so a statement reading the apex of a cone or
+    // cylinder of unstated height is judged against the sampled height.
+    {
+      reads: (cl) => claimPointIds(c, cl),
+      sampled: (id) => {
+        const def = c.points.get(id);
+        if (!isStatedGiven(claim) || def?.kind !== 'rev-point' || def.role !== 'apex') return false;
+        const rev = c.revolutions[def.rev];
+        return rev !== undefined && rev.kind !== 'sphere' && rev.height === undefined;
+      },
+      verdict: (id) => {
+        const def = c.points.get(id) as Extract<PointDef, { kind: 'rev-point' }>;
+        return { code: 'given-not-drivable', object: { kind: 'size', solid: c.revolutions[def.rev].kind } };
+      },
+    },
   ];
   for (const k of carriers) {
     const id = k.reads(claim).find(k.sampled);
@@ -363,6 +404,8 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
         explicitRightAngles.add(key3([cmd.u.from, cmd.u.to, cmd.v.to]));
       if (cmd.type === 'claim' && cmd.claim.type === 'angle-seg-eq' && Math.abs(cmd.claim.deg - 90) < 1e-9 && cmd.claim.a1 === cmd.claim.a2)
         explicitRightAngles.add(key3([cmd.claim.a1, cmd.claim.b1, cmd.claim.b2]));
+      if (cmd.type === 'claim' && cmd.claim.type === 'vertex-angle-eq' && Math.abs(cmd.claim.deg - 90) < 1e-9)
+        explicitRightAngles.add(key3([cmd.claim.vertex, cmd.claim.p, cmd.claim.q]));
       // an explicit |xy| = |zw| whose two pairs span exactly THREE labels names a triangle's side pair
       if (cmd.type === 'length-rel' && !cmd.soft && cmd.c === 1 && 'pair' in cmd.rhs) {
         const labels = new Set([cmd.a1, cmd.b1, ...cmd.rhs.pair]);

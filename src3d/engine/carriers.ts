@@ -1,4 +1,4 @@
-import type { Construction3, Id, PointDef } from './types';
+import type { Claim3, Construction3, Id, PointDef, Positions3 } from './types';
 import { freeCoordKey } from './types';
 
 /**
@@ -83,5 +83,63 @@ export function carrierParams3(c: Construction3, id: Id, def: PointDef): Carrier
       return [{ key: id, lo: 1e-3, hi: Infinity, spread: false, t0: 'bis-dist', drivable: true }];
     default:
       return [];
+  }
+}
+
+/**
+ * #1590 (ADR-3D-291) — CAN THE POINT'S OWN STATED DATA STILL ADMIT THIS COORDINATE GIVEN?
+ *
+ * A given that fails over a SAMPLED carrier is not proof the student is wrong: the tool chose the number it
+ * failed against. But a given can also contradict what the student already stated about the point — an x
+ * the definition fixed («B(1,t,2)» then «B(3,n,p)»), a side of an axis they stated («D על החלק החיובי של
+ * ציר ה-x» then «D(-3,0,0)»), a spot off the segment the rider was put on. Those are false as stated, and
+ * «check the computation» is the honest answer. This reads ONLY the point's definition and the positions of
+ * the points that definition names; it never solves, and it answers `true` ("cannot rule it out") for every
+ * claim or carrier kind it does not read — so it can only ever keep a refusal, never invent a green row.
+ */
+export function statedDataAdmits(c: Construction3, claim: Claim3, pos: Positions3): boolean {
+  if (claim.type !== 'coords-eq') return true;
+  const def = c.points.get(claim.id);
+  if (!def) return true;
+  const axes = (['x', 'y', 'z'] as const).filter((ax) => claim[ax] !== null);
+  const eq = (a: number, b: number) => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(a), Math.abs(b));
+  /** every stated component reached by ONE value of a single parameter, inside [lo, hi] */
+  const oneParam = (at: (ax: 'x' | 'y' | 'z') => { k: number; p: number }, lo: number, hi: number): boolean => {
+    let t: number | null = null;
+    for (const ax of axes) {
+      const { k, p } = at(ax);
+      const v = claim[ax]!;
+      if (Math.abs(p) < 1e-12) {
+        if (!eq(k, v)) return false; // a component the definition FIXES
+        continue;
+      }
+      const tx = (v - k) / p;
+      if (t !== null && !eq(t, tx)) return false;
+      t = tx;
+    }
+    return t === null || (t >= lo - 1e-9 && t <= hi + 1e-9);
+  };
+  switch (def.kind) {
+    case 'partial': {
+      const params = carrierParams3(c, claim.id, def);
+      return axes.every((ax) => {
+        if (def[ax] !== null) return eq(def[ax]!, claim[ax]!); // stated by the student already
+        const p = params.find((q) => q.t0 === `coord-${ax}`);
+        return !p || (claim[ax]! >= p.lo && claim[ax]! <= p.hi); // the side of the axis they stated
+      });
+    }
+    case 'coord-sym':
+      return oneParam((ax) => def[ax], -Infinity, Infinity);
+    case 'on-segment': {
+      if (def.t !== undefined) return true;
+      const a = pos.get(def.a), b = pos.get(def.b);
+      if (!a || !b) return true;
+      // an endpoint that is itself sampled moves the segment — its drawn place is no evidence
+      const sampledEnd = [def.a, def.b].some((e) => { const d = c.points.get(e); return !d || carrierParams3(c, e, d).length > 0; });
+      if (sampledEnd) return true;
+      return oneParam((ax) => ({ k: a[ax], p: b[ax] - a[ax] }), 0, 1); // on the segment the student named
+    }
+    default:
+      return true;
   }
 }

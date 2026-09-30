@@ -55,6 +55,34 @@ function componentsHold(w: Vec3, t: { x: number | null; y: number | null; z: num
   return within(w.x, t.x) && within(w.y, t.y) && within(w.z, t.z);
 }
 
+/** #1573 (ADR-3D-290): a stated angle holds when its measure is within this many degrees of the value. */
+export const ANGLE_TOL_DEG = 1e-3;
+
+/**
+ * #1573 (ADR-3D-290) — the angle AT `vertex` between the rays vertex→p and vertex→q, in degrees (0–180), or
+ * null where a ray is missing or degenerate. The one measure behind the `vertex-angle-eq` verifier AND the
+ * canvas arc's "does the stated value hold here" guard (#1592), so the two cannot disagree.
+ */
+export function vertexAngleDeg(pos: ReadonlyMap<string, Vec3>, vertex: string, p: string, q: string): number | null {
+  const v = pos.get(vertex), a = pos.get(p), b = pos.get(q);
+  if (!v || !a || !b) return null;
+  const u1 = sub3(a, v), u2 = sub3(b, v);
+  const den = norm3(u1) * norm3(u2);
+  if (den < 1e-12) return null;
+  return (Math.acos(Math.max(-1, Math.min(1, dot3(u1, u2) / den))) * 180) / Math.PI;
+}
+
+/** The angle between the LINES a1b1 and a2b2 — undirected, 0–90° (the textbook convention) — or null. The
+ *  `angle-seg-eq` verifier's measure, shared with the canvas's segment-angle arc (#1592). */
+export function lineAngleDeg(pos: ReadonlyMap<string, Vec3>, a1: string, b1: string, a2: string, b2: string): number | null {
+  const [p1, q1, p2, q2] = [a1, b1, a2, b2].map((id) => pos.get(id));
+  if (!p1 || !q1 || !p2 || !q2) return null;
+  const d1 = sub3(q1, p1), d2 = sub3(q2, p2);
+  const den = norm3(d1) * norm3(d2);
+  if (den < 1e-12) return null;
+  return (Math.acos(Math.min(1, Math.abs(dot3(d1, d2)) / den)) * 180) / Math.PI;
+}
+
 /** Seeds checked for every claim: the display seed plus fixed offsets (deterministic). */
 export const claimSeeds = (seed: number): number[] => [seed, seed + 1013, seed + 2027, seed + 4057];
 
@@ -234,15 +262,14 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       return ps.every((p) => Math.abs(dot3(n, p!) + claim.d) <= REL_TOL * Math.max(norm3(n) * (1 + norm3(p!)), 1));
     }
     case 'angle-seg-eq': {
-      const [a1, b1, a2, b2] = [claim.a1, claim.b1, claim.a2, claim.b2].map((id) => pos.get(id));
-      if (!a1 || !b1 || !a2 || !b2) return false;
-      const d1 = sub3(b1, a1);
-      const d2 = sub3(b2, a2);
-      const den = norm3(d1) * norm3(d2);
-      if (den < 1e-12) return false;
       // the angle between LINES: undirected, ≤ 90° (the textbook convention)
-      const deg = (Math.acos(Math.min(1, Math.abs(dot3(d1, d2)) / den)) * 180) / Math.PI;
-      return Math.abs(deg - claim.deg) <= 1e-3;
+      const deg = lineAngleDeg(pos, claim.a1, claim.b1, claim.a2, claim.b2);
+      return deg !== null && Math.abs(deg - claim.deg) <= ANGLE_TOL_DEG;
+    }
+    case 'vertex-angle-eq': {
+      // #1573 (ADR-3D-290): the angle AT the vertex, between the two rays — 0–180°
+      const deg = vertexAngleDeg(pos, claim.vertex, claim.p, claim.q);
+      return deg !== null && Math.abs(deg - claim.deg) <= ANGLE_TOL_DEG;
     }
     case 'length-ratio': {
       const [a1, b1, a2, b2] = [claim.a1, claim.b1, claim.a2, claim.b2].map((id) => pos.get(id));

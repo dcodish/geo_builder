@@ -79,13 +79,20 @@ const DRIVES: [string, string[]][] = [
   ['D3 a box and a sphere of unstated size', ["תיבה ABCDA'B'C'D'", 'כדור', '|AB| = 5']],
 ];
 
-describe('#1567 — a false given beside a sphere or cone of unstated size is refused (claim-refuted)', () => {
+/**
+ * #1590 (ADR-3D-291): R6/R7 are SATISFIABLE — the cone's height was never stated, so SO can be 4 — and are
+ * refused only because no drive can set a revolution's size yet (#1569). They stay refused, and say so as
+ * the tool's limit, never «check the computation» (operator ruling 2026-09-30: a false message is P1).
+ */
+const UNDRIVABLE = new Set(['R6 the axis of a cone whose height was never stated', 'R7 the same, the radius stated and the height not']);
+
+describe('#1567 — a given beside a sphere or cone of unstated size is refused unless the figure carries it', () => {
   for (const [title, seq] of REFUSED) {
     it(`${title}: «${seq[seq.length - 1]}»`, () => {
       const st = build(seq.slice(0, -1));
       const v = decideSubmit3(st, seq[seq.length - 1]);
       expect(v.kind).toBe('refused');
-      if (v.kind === 'refused') expect(v.error.code).toBe('claim-refuted');
+      if (v.kind === 'refused') expect(v.error.code).toBe(UNDRIVABLE.has(title) ? 'given-not-drivable' : 'claim-refuted');
     });
   }
 
@@ -149,12 +156,15 @@ describe('#1567 — structural: each of the four pin sites records its arbiter b
       pins: ['length'], claims: [{ type: 'length-eq', a: 'A', b: 'B', value: 5, given: true }],
     });
   });
-  it('a vertex angle → a `vangle` pin and a given SIGNED `cos-angle-eq` over its two rays (the quantity the pin drives)', () => {
-    const claim = { type: 'angle-seg-eq', a1: 'A', b1: 'B', a2: 'A', b2: 'D', deg: 120 } as const;
-    expect(added(c, { type: 'claim', claim })).toEqual({
-      pins: ['vangle'],
-      claims: [{ type: 'cos-angle-eq', u: { kind: 'pair', from: 'A', to: 'B' }, v: { kind: 'pair', from: 'A', to: 'D' }, cos: Math.cos((120 * Math.PI) / 180), given: true }],
-    });
+  // #1573 (ADR-3D-290): the pin follows what the statement MEASURES — a vertex angle is its own claim kind, and
+  // a line angle between segments that share an endpoint is still a line angle (it no longer turns into `vangle`)
+  it('a vertex angle → a `vangle` pin and a given `vertex-angle-eq` (the quantity the pin drives)', () => {
+    const claim = { type: 'vertex-angle-eq', vertex: 'A', p: 'B', q: 'D', deg: 120 } as const;
+    expect(added(c, { type: 'claim', claim })).toEqual({ pins: ['vangle'], claims: [{ ...claim, given: true }] });
+  });
+  it('a LINE angle between segments that share an endpoint → a `seg-angle` pin and a given `angle-seg-eq`', () => {
+    const claim = { type: 'angle-seg-eq', a1: 'A', b1: 'B', a2: 'A', b2: 'D', deg: 60 } as const;
+    expect(added(c, { type: 'claim', claim })).toEqual({ pins: ['seg-angle'], claims: [{ ...claim, given: true }] });
   });
   it('an angle between disjoint segments → a `seg-angle` pin and a given `angle-seg-eq`', () => {
     const claim = { type: 'angle-seg-eq', a1: 'A', b1: 'B', a2: 'C', b2: 'D', deg: 40 } as const;

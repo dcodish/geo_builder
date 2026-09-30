@@ -3,7 +3,7 @@
  *
  * A vertex arc is keyed by its WEDGE: the vertex plus the unordered pair of ray DIRECTIONS. Every
  * producer of a vertex angle feeds the same map — the stated values (`vangle` scalar pins, which are
- * driving givens, and recorded shared-apex angle claims, `paramGivens` included) and the #94 named-angle
+ * driving givens, and recorded `vertex-angle-eq` claims, `paramGivens` included) and the #94 named-angle
  * MARKERS («∠SDB» / «∠SDB = α», a pedagogical arc carrying a label and no number) — so a corner that
  * carries both a name and a value is ONE entry and draws ONE arc.
  *
@@ -70,7 +70,10 @@ export function collectWedges(c: Construction3, positions: Positions3): Wedge[] 
     return w;
   };
   for (const sp of c.scalarPins) if (sp.kind === 'vangle') wedgeOf(sp.vertex, sp.p, sp.q).deg ??= sp.deg;
-  for (const cl of c.claims) if (cl.type === 'angle-seg-eq' && cl.a1 === cl.a2) wedgeOf(cl.a1, cl.b1, cl.b2).deg ??= cl.deg;
+  // #1573 (ADR-3D-290): only a VERTEX angle is a value of this wedge. A line angle («הזווית בין AB לבין AD
+  // היא 45», `angle-seg-eq`) measures ≤ 90° whatever the corner is, so it is drawn by scene3's segment-angle
+  // lane on the ≤ 90° side; read here it would print «45°» over a 135° corner.
+  for (const cl of c.claims) if (cl.type === 'vertex-angle-eq') wedgeOf(cl.vertex, cl.p, cl.q).deg ??= cl.deg;
   for (const mk of c.angleMarks) {
     const w = wedgeOf(mk.vertex, mk.p, mk.q);
     // #986: the arc shows the EXPRESSION, not the binding letter — «2α», not «α» — while `sym` keeps

@@ -241,12 +241,19 @@ pin-owner guard gives the verdict (`injection-unsatisfiable` for a coordinate pi
 naming the statements otherwise; newest owner only). A new pin family gains its arbiter by recording a claim
 with the flag. The scalar pins join the same seam ([ADR-3D-285](06b-decisions-3d.md#adr-3d-285), #1567):
 `length` records `length-eq`, `seg-angle` records `angle-seg-eq` (the angle between lines, |cos|),
-`vangle` records the SIGNED `cos-angle-eq` over its two rays (the vertex angle, 0–180°, the quantity the pin
-drives), `length-rel` records `length-rel`, and `seg-perp/par-plane` records `perp-plane`/`par-plane` — so
+`vangle` records `vertex-angle-eq` (the vertex angle, 0–180°, the quantity the pin drives), `length-rel` records `length-rel`, and `seg-perp/par-plane` records `perp-plane`/`par-plane` — so
 routing on `freeDims(c) > 0`, which counts a revolution's unstated size the pivot never drives, decides only
 whether a pin is ADDED, never whether the statement is judged. The store's `size-on-solid` boundary exempts a
 magnitude recorded as a pin's arbiter (its own pin drove the size), as it already exempted #1447's
-volume/area pivot lane. Still open: the missing drive for riders and partial points on a solid-free figure
+volume/area pivot lane.
+
+**Two angle claims, chosen by the parser, never by apply** ([ADR-3D-290](06b-decisions-3d.md#adr-3d-290), #1573).
+A vertex-named angle («∠BAD», «זווית BAD», «זווית A», a valued angle mark) lowers to `vertex-angle-eq
+{vertex, p, q, deg}`; «הזווית בין … לבין …» over two point pairs lowers to `angle-seg-eq`. Apply routes by
+the kind — `vertex-angle-eq` → `vangle`, `angle-seg-eq` → `seg-angle`, whatever letters the segments share —
+and the claim, the coord-sym root-find (`paramGivens`), the wedge collection and the knees each read the
+quantity of their kind. `vertexAngleDeg` / `lineAngleDeg` / `ANGLE_TOL_DEG` in `claims.ts` are the one measure
+and tolerance, shared by the verifier and the canvas. Still open: the missing drive for riders and partial points on a solid-free figure
 (the pivot's entry gate asks for a solid or a `free3` point, ADR-3D-282), and a revolution's size driven by a
 stated length (#1569).
 
@@ -416,10 +423,14 @@ within ±1.5° per ray, so two spellings of one physical corner («∠EAS» and 
 wedge and draw one arc. Directions, not point ids, and a tolerance predicate, not a rounded key: rounding
 puts a quantization boundary mid-wedge and double-draws the corners that straddle it. A wedge whose points
 do not resolve falls back to id identity. Every producer — `vangle` pins,
-shared-apex `angle-seg-eq` claims, `angleMarks` — feeds it and it emits once per wedge, reading `degText`
+`vertex-angle-eq` claims, `angleMarks` — feeds it and it emits once per wedge, reading `degText`
 (the value once stated, the letter until then; the same rule the object-angle lane uses). A stated angle
-between two independent segments (`seg-angle`) is anchored on `meetingPoint` from `rightAngles.ts` — the
-one answer the knee uses for "do these meet" — and draws nothing for skew or off-ink pairs. `wedgeArc` is
+between two segments (every `angle-seg-eq` claim, which each `seg-angle` pin records as its arbiter — a shared
+endpoint included) is anchored on `meetingPoint` from `rightAngles.ts` — the one answer the knee uses for "do
+these meet" — drawn on its ≤ 90° side, and draws nothing for skew or off-ink pairs. **A stated value is painted
+only where it holds** ([ADR-3D-290](06b-decisions-3d.md#adr-3d-290), #1592): the vertex arc, the segment-angle
+arc and the stated knee each ask the verifier's own measure on the drawn positions first; a broken given shows
+no value (a marker's letter still shows), as the dihedral lane already did (ADR-3D-263). `wedgeArc` is
 the one arc geometry (13 points), and its RADIUS is a screen quantity
 ([ADR-3D-229](06b-decisions-3d.md#adr-3d-229)): a producer records the wedge and a builder, and the
 radius is chosen once after the viewport fit as `min(ARC_PX, ARM_FRAC × shortest PROJECTED arm) / k`,
@@ -723,7 +734,12 @@ travel a figure-width where a rider moves within `[0, 1]`, so its anchor equilib
 claim that reads a carrier whose freedom was sampled (a free plane, a free line, the frame placement, a
 free point, in that order) is refused naming the carrier, never `claim-refuted`. It is one loop over
 carrier rows; adding a carrier is adding a row, and it judges what a claim READS, not how its value varies
-across seeds (the three-valued verdict #909 deferred is not built).
+across seeds (the three-valued verdict #909 deferred is not built). Two rows read only a stated GIVEN (a
+`given: true` arbiter) and answer `given-not-drivable` — the tool's limit, named
+([ADR-3D-291](06b-decisions-3d.md#adr-3d-291), #1590): a point whose free parameter the resolution left
+sampled (`carrierParams3` keys the pivot did not drive, or a coord-sym letter with no root), unless
+`statedDataAdmits` (`carriers.ts`) finds the point's own definition already contradicts the given; and the
+apex of a cone or cylinder whose height was never stated. An answer keeps the register it had.
 
 **Not driven yet:** a length on a free point after a solid's scale given (#754 owns the size; the rule makes
 it honest), and the DOF cue still counts a driven free vector's six coordinates as free (fail-open).

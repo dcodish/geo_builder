@@ -13,6 +13,7 @@
 
 import { openCrossings3 } from '../engine/crossings3';
 import { cleanMag } from '../engine/dataView';
+import { ANGLE_TOL_DEG, lineAngleDeg, vertexAngleDeg } from '../engine/claims';
 import { freeDofCount3, hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
 import { DIRECTION_REL_TOL, distanceWitness, operandKey, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
 import { defaultPlaneDisplay3, type Construction3, type Id, type Operand3, type Positions3 } from '../engine/types';
@@ -733,7 +734,15 @@ export function buildScene3(
     if (d1 < 1e-9 || d2 < 1e-9) continue;
     const u1 = normalize3(sub3(p, v));
     const u2 = normalize3(sub3(q, v));
-    wAngles.push({ v, mk: (r) => wedgeArc(v, u1, u2, r), clamp: { arm: Math.min(d1, d2), u1, u2 }, text: degText(w.deg, w.label) });
+    // #1592 (ADR-3D-290): a stated value is painted only where it HOLDS on the drawn figure — the vertex-angle
+    // verifier's own measure and tolerance (the #1439 rule for the dihedral lane, applied to this one). A broken
+    // given («135» after D moved to make 45°) is marked on its row; the canvas shows no value at the wedge
+    // (operator ruling 2026-09-30). A marker's letter is still the student's name for the corner.
+    const measured = vertexAngleDeg(positions, w.vertex, w.p, w.q);
+    const holds = w.deg === undefined || (measured !== null && Math.abs(measured - w.deg) <= ANGLE_TOL_DEG);
+    const text = holds ? degText(w.deg, w.label) : (w.label ?? '');
+    if (!holds && !text) continue;
+    wAngles.push({ v, mk: (r) => wedgeArc(v, u1, u2, r), clamp: { arm: Math.min(d1, d2), u1, u2 }, text });
   }
 
   // ---- A STATED ANGLE BETWEEN TWO SEGMENTS THAT CROSS (#917, ADR-3D-222) ------------------------------
@@ -742,11 +751,16 @@ export function buildScene3(
   // בין AC' לבין BD' היא 55», two space diagonals crossing dead centre, drew nothing. The meeting point is
   // the SAME answer the knee uses (`meetingPoint` in rightAngles.ts — a shared endpoint, or a crossing
   // strictly inside both drawn spans); skew, parallel, or a crossing off the ink draws NOTHING — the R³
-  // honesty rule the operator confirmed for the skew pair. A right angle stays the knee's. A shared
-  // endpoint never reaches here (#909 normalizes all four spellings to `vangle`), so the arc above is
-  // untouched. Not keyed on the solid, on diagonals, or on where along the segments they cross.
-  for (const sp of c.scalarPins) {
-    if (sp.kind !== 'seg-angle' || isRightAngleValue(sp.deg)) continue;
+  // honesty rule the operator confirmed for the skew pair. A right angle stays the knee's. Not keyed on
+  // the solid, on diagonals, or on where along the segments they cross.
+  //
+  // #1573 (ADR-3D-290): read off the `angle-seg-eq` CLAIMS — every `seg-angle` pin records one as its arbiter
+  // (#1567), and a line angle on a fixed figure is only a claim — so a shared endpoint reaches here too and is
+  // drawn on its ≤ 90° side, the quantity it states. #1592: and only where it holds on the drawn figure.
+  for (const sp of c.claims) {
+    if (sp.type !== 'angle-seg-eq' || isRightAngleValue(sp.deg)) continue;
+    const measured = lineAngleDeg(positions, sp.a1, sp.b1, sp.a2, sp.b2);
+    if (measured === null || Math.abs(measured - sp.deg) > ANGLE_TOL_DEG) continue;
     const x = meetingPoint({ a: sp.a1, b: sp.b1, c: sp.a2, d: sp.b2 }, positions, radius);
     if (!x) continue;
     const ends = [sp.a1, sp.b1, sp.a2, sp.b2].map((id) => positions.get(id)!);
@@ -755,8 +769,9 @@ export function buildScene3(
     const u1 = arm(ends[0], ends[1]);
     let u2 = arm(ends[2], ends[3]);
     if (dot3(u1, u2) < 0) u2 = scale3(u2, -1); // the stated angle is the undirected (≤ 90°) one — show that wedge
-    const armLen = Math.min(...ends.map((e) => dist3(e, x)));
-    if (armLen < 1e-9) continue;
+    // a SHARED endpoint is itself the meeting point (#1573: that spelling now reaches this lane) — it is not an arm
+    const armLen = Math.min(...ends.map((e) => dist3(e, x)).filter((d) => d > 1e-9));
+    if (!Number.isFinite(armLen)) continue;
     wAngles.push({ v: x, mk: (r) => wedgeArc(x, u1, u2, r), clamp: { arm: armLen, u1, u2 }, text: degText(sp.deg, undefined) });
   }
 

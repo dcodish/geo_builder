@@ -32,6 +32,10 @@ import type { Construction3, Id, Operand3, Positions3, VecAtom } from '../engine
 import { add3, centroid3, cross3, dist3, dot3, newellNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
 import { dihedralAnchors, dihedralGeometry } from './dihedral';
 import { planeBasis, projectOntoPlane } from './planeGeom';
+import { ANGLE_TOL_DEG } from '../engine/claims';
+
+/** #1592: |cos| (or |sin| against a normal) within the stated-angle verifier's tolerance of a right angle. */
+const RIGHT_TOL = Math.sin((ANGLE_TOL_DEG * Math.PI) / 180);
 
 /** A right angle to mark: its vertex and the two unit arm directions, in WORLD space. */
 export interface RightAngle3 {
@@ -202,6 +206,7 @@ export function rightAngles3(
   for (const cl of [...c.claims, ...c.paramGivens]) {
     if (cl.type === 'cos-angle-eq' && isPerpCos(cl.cos)) addAtoms(cl.u, cl.v);
     else if (cl.type === 'angle-seg-eq' && isRight(cl.deg)) segPairs.push({ a: cl.a1, b: cl.b1, c: cl.a2, d: cl.b2 });
+    else if (cl.type === 'vertex-angle-eq' && isRight(cl.deg)) segPairs.push({ a: cl.vertex, b: cl.p, c: cl.vertex, d: cl.q });
     else if (cl.type === 'perp-plane') addPlaneRun(cl.seg[0], cl.seg[1], cl.plane);
     else if (cl.type === 'line-plane-angle' && isRight(cl.deg)) addPlaneRun(cl.a, cl.b, cl.plane);
     // #1475 (ADR-3D-264): a right angle stated through the general OPERAND relation — «π1 ניצב ל-π2»,
@@ -315,14 +320,18 @@ export function rightAngles3(
     if (!vertex) continue; // SKEW / non-meeting — never invent an intersection
     const u1 = armDir(seg.a, seg.b, vertex, pos);
     const u2 = armDir(seg.c, seg.d, vertex, pos);
-    if (u1 && u2 && norm3(cross3(u1, u2)) > 1e-6) out.push({ vertex, u1, u2 });
+    // #1592 (ADR-3D-290): a STATED right angle draws its knee only where it holds on the drawn figure — a
+    // broken «∠BAD = 90» is marked on its row, never by a knee over a corner that is not square.
+    if (u1 && u2 && norm3(cross3(u1, u2)) > 1e-6 && Math.abs(dot3(u1, u2)) <= RIGHT_TOL * norm3(u1) * norm3(u2)) out.push({ vertex, u1, u2 });
   }
   for (const sp of segPlanes) {
     const vertex = segMeetsPlane(sp.a, sp.b, sp.plane, pos, s);
     if (!vertex) continue;
     const u1 = armDir(sp.a, sp.b, vertex, pos);
     const u2 = inPlaneDir(sp.plane, vertex, pos);
-    if (u1 && u2) out.push({ vertex, u1, u2, planeN: sp.plane.n });
+    // #1592: …and a stated segment ⟂ plane only where the segment is along the plane's normal
+    const n = sp.plane.n;
+    if (u1 && u2 && norm3(cross3(u1, n)) <= RIGHT_TOL * norm3(u1) * norm3(n)) out.push({ vertex, u1, u2, planeN: n });
   }
   if (operandPairs.length) {
     const center = pos.size ? centroid3([...pos.values()]) : v3(0, 0, 0);

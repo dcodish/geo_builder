@@ -52,11 +52,10 @@
         {
           "type": "claim",
           "claim": {
-            "type": "angle-seg-eq",
-            "a1": "A",
-            "b1": "B",
-            "a2": "A",
-            "b2": "C",
+            "type": "vertex-angle-eq",
+            "vertex": "A",
+            "p": "B",
+            "q": "C",
             "deg": 90
           }
         }

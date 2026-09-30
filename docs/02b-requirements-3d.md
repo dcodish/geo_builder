@@ -64,6 +64,12 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   written from. A drive available for one phrasing and not its synonym refutes the student on the
   strength of how they wrote it. *(Realised for the angle family — [ADR-3D-217](06b-decisions-3d.md#adr-3d-217),
   #909; `seg-angle-drive-909.test.ts`.)*
+  **An angle sentence means one quantity on every figure.** «הזווית BAD היא θ» / «∠BAD = θ» is the angle AT A
+  between the rays to B and D (0–180°); «הזווית בין AB לבין AD היא θ» is the angle between the two lines
+  (≤ 90°). On typed points, on a solid the statement drives, and on a point with a parameter, the vertex form
+  accepts a true obtuse angle («135» where ∠BAD = 135°) and refuses its supplement; the line form accepts 45
+  on the same corner. *(Realised — [ADR-3D-290](06b-decisions-3d.md#adr-3d-290), #1573;
+  `issue-1573-vertex-angle-semantics.test.ts`.)*
   **A relation to the COORDINATE FRAME drives a free figure on its own.** «מישור ABCD מקביל לציר z»,
   «…מאונך למישור xy», «…מקביל למישור xz», «המרובע ABCD מונח במישור [xz]» turn a figure nothing else
   anchors until the statement holds — it is never refused because the default drawing happens to lie flat.
@@ -74,7 +80,8 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   «B(0,7,8)» — or «M(3, n, p)» on a midpoint that sits at x = 1 — is refused and names the statement, exactly
   as «B = (3,7,8)» is; on a solid it moves the figure instead. A true restatement stays green, and a
   component left symbolic or unstated is not checked. *(Gap: a satisfiable restatement on a rider or a
-  partial point with no solid is refused rather than driven — named in ADR-3D-282.)* *(Realised —
+  partial point with no solid is refused rather than driven — named in ADR-3D-282, the drive is #1561; the
+  refusal says it is the tool's limit, never «בדקו את החישוב», below.)* *(Realised —
   [ADR-3D-282](06b-decisions-3d.md#adr-3d-282), #1546; `issue-1546-silent-point-pin.test.ts`.)*
   **A vector or dot product stated on existing points is honoured or refused, never ignored.** «u = (7,7,7)»
   where u = AB is (2,0,0), «AB = (5,5,5)» or «AB = (5, n, p)» over typed A and B, and «u·v = 24» where u·v = 0
@@ -88,6 +95,13 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   refused too (operator ruling 2026-09-29): a stated length does not yet set a revolution's size (#1569). On
   a solid the same statement still drives the solid. *(Realised — [ADR-3D-285](06b-decisions-3d.md#adr-3d-285),
   #1567; `issue-1567-pin-arbiters.test.ts`.)*
+  **A refusal never tells a student who may be right that they miscalculated.** A given the tool cannot yet
+  make hold — «|SO| = 4» on a cone of unstated height, «D(3,0,0)» on a point stated to lie on the positive
+  x-axis, a spot on the segment a rider was put on, the free coordinate of a point with a parameter — is
+  refused with «הכלי עדיין לא יודע …, ולכן הוא לא נוסף — זו מגבלה של הכלי», naming the point or the solid.
+  «בדקו את החישוב» is kept for a given the student's own data contradicts: a typed point restated elsewhere,
+  a coordinate the definition fixes, the wrong side of a stated axis, a spot off the rider's segment. *(Realised —
+  [ADR-3D-291](06b-decisions-3d.md#adr-3d-291), #1590; `issue-1590-given-not-drivable.test.ts`.)*
 - **FR-SP-6 (Must)** — **A stated new label must land on the figure.** A decomposition that loses a point
   the student named is **refused, naming the label** — never committed with the point missing. A label
   that already exists is context, not a drop. *(Realised — `droppedNewLabels3`, `honesty3.test.ts`.)*
@@ -371,6 +385,11 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   *(Realised — [ADR-3D-221](06b-decisions-3d.md#adr-3d-221), #923; `issue-923-917.test.ts`,
   `pyramid-named-valued-angle-923.geo3.json`. The identity of a wedge is by point ids; the
   alternate-spelling collapse 2-D does by ray direction is filed separately.)*
+- **FR-RD-15 (Must)** — **A stated angle is painted only where it holds.** A value on an arc, and a right-angle
+  knee, appear only while the drawn figure satisfies the given. When an edit breaks it («הזווית BAD היא 135»,
+  then D moved so the corner is 45°) the row is marked broken and the canvas shows **no value** at that corner
+  (operator ruling 2026-09-30). A line angle is drawn on its ≤ 90° side. *(Realised — [ADR-3D-290](06b-decisions-3d.md#adr-3d-290),
+  #1592; `issue-1573-vertex-angle-semantics.test.ts`. The dihedral lane already did — ADR-3D-263.)*
 - **FR-RD-6 (Should)** — **A parameter the student VALUED offers a display choice; one they never
   valued is never replaced.** A bagrut question is worked in parts: part 1 reasons with «α» and a later
   part supplies 70, so which form belongs on the figure depends on where in the question the student

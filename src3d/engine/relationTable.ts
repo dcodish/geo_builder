@@ -135,7 +135,7 @@ const CELLS: Record<string, CellStatus> = {
   'on|point|segment': { status: 'supported', actions: ['rider', 'claim'], note: 'point-on-segment3, V0; numeric t verifies (ADR-3D-047)' },
 
   // ---- angle with a value --------------------------------------------------------------
-  'angle|segment|segment': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'vangle / angle-seg-eq' },
+  'angle|segment|segment': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'vertex angle: vangle / vertex-angle-eq; line angle: seg-angle / angle-seg-eq (ADR-3D-290)' },
   'angle|segment|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'cos-angle with value (V8-f)' },
   'angle|vector|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'cos∠(u,v), V8-f' },
   'angle|segment|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'line-plane-angle, ADR-3D-027' },

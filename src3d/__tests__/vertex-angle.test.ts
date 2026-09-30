@@ -37,7 +37,7 @@ describe('ADR-3D-049 — parse forms', () => {
       commands: [
         { type: 'segment3', a: 'B', b: 'A' },
         { type: 'segment3', a: 'B', b: 'C' },
-        { type: 'claim', claim: { type: 'angle-seg-eq', deg: 90 } },
+        { type: 'claim', claim: { type: 'vertex-angle-eq', vertex: 'B', p: 'A', q: 'C', deg: 90 } }, // #1573
       ],
     });
     expect(parse3('∠ABC = 90')).toMatchObject({ ok: true }); // the numeric triple stays byte-equivalent

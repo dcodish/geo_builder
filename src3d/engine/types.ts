@@ -93,6 +93,11 @@ export type Claim3 =
   | { type: 'never-parallel'; line: string; plane: string } // ℓ ∦ π for EVERY parameter value (2024-Q2 א)
   | { type: 'plane-eq'; ids: Id[]; cx: number; cy: number; cz: number; d: number } // המישור KBC: x+2y+3z-26=0
   | { type: 'angle-seg-eq'; a1: Id; b1: Id; a2: Id; b2: Id; deg: number; given?: true } // הזווית בין A'C לבין BC' היא 90 (between lines, ≤90°)
+  // #1573 (ADR-3D-290): the angle AT a vertex — «∠BAD = 135», «הזווית BAD היא 135» — measured between the
+  // two RAYS vertex→p and vertex→q, 0–180°. Its own kind because it is a different statement from the line
+  // angle above: both used to lower to `angle-seg-eq`, and apply guessed which was meant from the figure's
+  // state (a pinned figure read the vertex angle, a fixed one the ≤90° line angle — docs/17 §2.3).
+  | { type: 'vertex-angle-eq'; vertex: Id; p: Id; q: Id; deg: number; given?: true } // ∠BAD = 135
   // #1567 (ADR-3D-285): `given?: true` on `length-eq` / `angle-seg-eq` / `cos-angle-eq` / `length-rel` / `perp-plane` / `par-plane`
   // marks the ARBITER recorded beside a scalar pin (`recordPinGiven` in apply.ts) — the claim-level placed-figure
   // rule's key in `holdsAt`, exactly as on `coords-eq` / `vec-val` / `dot-val`. A plain claim carries no flag.
@@ -385,7 +390,7 @@ export interface PointOnSegment3Command {
 /**
  * #251 (ADR-3D-049): `זוית O ישרה` / `זווית O = 90` — a stated angle named by its VERTEX alone.
  * The two arms are resolved at APPLY from the figure's edges at the vertex (parse3 is
- * context-free); exactly two distinct neighbors ⇒ the ordinary angle-seg-eq lowering,
+ * context-free); exactly two distinct neighbors ⇒ the ordinary vertex-angle-eq lowering,
  * otherwise the honest `ambiguous-angle` refusal (the 2-D ADR-164 pattern, apply-time edition).
  */
 export interface VertexAngleCommand {
@@ -1728,6 +1733,11 @@ export type EngineError3 =
   | { code: 'plane-not-determined'; id: string } // #487: this construct needs a plane with a stated equation — π is still free
   | { code: 'line-not-determined'; id: string } // #552: a claim judged against a free line whose relevant DOF is still sampled — pin it first, never accuse
   | { code: 'point-not-determined'; id: string } // #1311: a claim judged against a never-positioned (free3) point the drive does not pin — pin it first, never accuse
+  // #1590 (ADR-3D-291): a stated GIVEN that fails because it reads a freedom the tool SAMPLED and no drive can
+  // move yet — a point's free parameter (`point`, the point's id) or a solid of revolution's unstated size
+  // (`size`, the revolution's kind). The given may well hold; the tool cannot make it hold, so it is refused
+  // naming the tool's limit, never «check the computation» (the student did not miscalculate).
+  | { code: 'given-not-drivable'; object: { kind: 'point'; id: string } | { kind: 'size'; solid: RevolutionKind } }
   | { code: 'claim-refuted' } // the stated answer does not hold in the figure
   // #512: a relation to the COORDINATE FRAME judged against a placement the funnel sampled — the
   // statement may well be satisfiable; what is missing is a given that fixes where the figure sits.

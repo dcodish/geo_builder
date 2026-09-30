@@ -56,7 +56,8 @@ describe('#977 — the copula and the angle noun are shared, so no cell is missi
     it.each(COPULAS)(`${naming} «%s» 40 — a NUMBER still claims`, (copula) => {
       const r = parse3(`${naming} ${copula} 40`);
       expect(r.ok).toBe(true);
-      if (r.ok) expect(r.commands.find((c) => c.type === 'claim')).toMatchObject({ claim: { type: 'angle-seg-eq', deg: 40 } });
+      // #1573 (ADR-3D-290): a vertex-named angle is the VERTEX angle (0–180°), never the ≤ 90° line angle
+      if (r.ok) expect(r.commands.find((c) => c.type === 'claim')).toMatchObject({ claim: { type: 'vertex-angle-eq', vertex: 'B', deg: 40 } });
     });
 
     it.each(COPULAS)(`${naming} «%s» 2α — a COEFFICIENT + symbol marks with its coefficient`, (copula) => {

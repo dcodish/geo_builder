@@ -134,20 +134,21 @@ describe('#909 — all four SHARED-ENDPOINT spellings state one angle', () => {
     }
   });
 
-  it('all four normalize to ONE vangle pin at the shared vertex — same pin, so the arc is drawn', () => {
-    const expected = { kind: 'vangle', vertex: 'A', deg: 40 };
+  // #1573 (ADR-3D-290): a LINE angle stays a line angle whatever its letters share. These four used to normalize
+  // to `vangle` — the vertex angle, a narrower target than the ≤ 90° statement — because vertex sentences also
+  // arrived as `angle-seg-eq` and this was where the two were told apart. Vertex sentences now carry their own
+  // kind, so the line angle drives its own quantity; each spelling is ONE `seg-angle` pin, and the arc is drawn
+  // at A by the segment-angle lane (issue-923-917's T2).
+  it('all four drive ONE seg-angle pin over the student’s own two segments', () => {
     for (const u of ['הזווית בין AC לבין AB היא 40', 'הזווית בין AC לבין BA היא 40', 'הזווית בין CA לבין AB היא 40', 'הזווית בין CA לבין BA היא 40']) {
       const { construction } = build([BOX, u]);
       expect(construction.scalarPins, u).toHaveLength(1);
-      expect(construction.scalarPins[0], u).toMatchObject(expected);
-      // the two rays are B and C in some order — the vertex is what must not drift
-      const pin = construction.scalarPins[0] as { p: string; q: string };
-      expect([pin.p, pin.q].sort(), u).toEqual(['B', 'C']);
+      expect(construction.scalarPins[0], u).toMatchObject({ kind: 'seg-angle', deg: 40 });
     }
   });
 
-  it('UNCHANGED GUARD — the a1 === a2 route is byte-identical to before the fix', () => {
-    const { st, construction } = build([BOX, 'הזווית בין AC לבין AB היא 40']);
+  it('a vertex-named angle on the same figure still drives the VERTEX angle (`vangle`)', () => {
+    const { st, construction } = build([BOX, 'הזווית CAB היא 40']);
     expect(st.lastError).toBeNull();
     expect(construction.scalarPins).toEqual([{ kind: 'vangle', vertex: 'A', p: 'C', q: 'B', deg: 40 }]);
   });

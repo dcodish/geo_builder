@@ -1618,6 +1618,17 @@ export function resolve3(c: Construction3, seed: number, opts: { paramValue?: nu
         const den = norm3(u) * norm3(w);
         return den < 1e-12 ? NaN : Math.abs(dot3(u, w)) / den - Math.cos((cl.deg * Math.PI) / 180);
       }
+      if (cl.type === 'vertex-angle-eq') {
+        // #1573 (ADR-3D-290): the SIGNED angle between the two rays — the quantity its verifier measures
+        const v = symAt(cl.vertex, t);
+        const p = symAt(cl.p, t);
+        const q = symAt(cl.q, t);
+        if (!v || !p || !q) return NaN;
+        const u = sub3(p, v);
+        const w = sub3(q, v);
+        const den = norm3(u) * norm3(w);
+        return den < 1e-12 ? NaN : dot3(u, w) / den - Math.cos((cl.deg * Math.PI) / 180);
+      }
       return NaN;
     };
     const fns = c.paramGivens.map(residual);
