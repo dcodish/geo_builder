@@ -11,7 +11,7 @@
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
 import { isDirectionSymbol, paramRegister, usedSymbols } from './carriers';
-import { circumcentre, constructionOf, evalRule, type Construction as RuleConstruction, type Pt } from './derived';
+import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
@@ -459,6 +459,20 @@ export function carrierSystem(
  * a diameter whose ends coincide has no circle at this configuration.
  */
 export function circleThruCurve(o: Extract<GeoObject, { kind: 'circle-thru' }>, at: (id: Id) => Pt | null): NumCurve | null {
+  /**
+   * THE INSCRIBED CIRCLE (#1619 B2, ADR-AG-194) — centre where the bisectors meet (`incircleCentre`), radius
+   * its distance to the first side. A degenerate or non-convex ring has none: a vacancy, as above.
+   */
+  if (o.def.t === 'incircle') {
+    const vs = o.def.pts.map(at);
+    if (vs.some((p) => !p)) return null;
+    const ctr = incircleCentre(vs as Pt[]);
+    if (!ctr) return null;
+    const foot = footOn(ctr, vs[0]!, vs[1]!);
+    if (!foot) return null;
+    const r = Math.hypot(ctr.x - foot.x, ctr.y - foot.y);
+    return Number.isFinite(r) && r > 0 ? { kind: 'circle', cx: ctr.x, cy: ctr.y, r } : null;
+  }
   if (o.def.t === 'through') {
     const [p, q, s] = o.def.pts.map(at);
     if (!p || !q || !s) return null;
@@ -795,6 +809,27 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       if (Math.abs(v.x) < 1e-9 * Math.hypot(v.x, v.y)) return false;
       const positive = v.x * v.y > 0;
       return s.positive ? positive : !positive;
+    }
+    /**
+     * EVERY ANGLE ACUTE (#1619 B2, ADR-AG-194) — at each vertex the two sides make a positive dot product.
+     * A right angle is not acute: judged at the solver's resolution, relative to the sides, so a determined
+     * right triangle is refused rather than passed on a rounding.
+     */
+    if (s.kind === 'acute') {
+      const ps = s.ids.map((id) => at.get(id));
+      if (ps.some((p) => !p)) return true; // an absent vertex judges nothing, as below
+      const n = ps.length;
+      for (let i = 0; i < n; i += 1) {
+        const v = ps[i]!;
+        const p = ps[(i + n - 1) % n]!;
+        const q = ps[(i + 1) % n]!;
+        const ux = p.x - v.x;
+        const uy = p.y - v.y;
+        const wx = q.x - v.x;
+        const wy = q.y - v.y;
+        if (ux * wx + uy * wy <= SOLVE_RESOLUTION * Math.hypot(ux, uy) * Math.hypot(wx, wy)) return false;
+      }
+      return true;
     }
     if (s.kind === 'distinct') {
       const ps = s.ids.map((id) => at.get(id));

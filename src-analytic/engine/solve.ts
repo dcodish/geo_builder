@@ -477,6 +477,8 @@ function describeRule(r: DerivedRule): string {
       return `מרכז ${r.curve}`;
     case 'touch-point':
       return `נקודת ההשקה של ${r.a} ו-${r.b}`;
+    case 'side-touch':
+      return `נקודת ההשקה של ${r.circle} עם ${r.a}${r.b}`;
     default: {
       const undescribed: never = r;
       throw new Error(`rule has no description: ${JSON.stringify(undescribed)}`);

@@ -257,6 +257,29 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['B(7,7)', 'D(1,1)'],
   },
 
+  // --- F5 · inscribed and circumscribed (#1619 B2, #1554, ADR-AG-194) ---
+  // The 471 exams' own openers: a polygon of any noun inscribed in a circle (bare, on a centre, by its
+  // equation), the acute triangle, «בר חסימה», and the converse — the incircle and its touch points.
+  // Unfeatured: this section's six are chosen (#1347), and these join its tail.
+  { category: 'circles', family: 'F5', he: 'מרובע ABCD חסום במעגל', en: 'quadrilateral ABCD is inscribed in a circle' },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'המשולש ABC חסום במעגל שמרכזו M',
+    en: 'triangle ABC is inscribed in a circle with centre M',
+  },
+  { category: 'circles', family: 'F5', he: 'במעגל חסום משולש חד זוויות ABC', en: 'acute triangle ABC is inscribed in a circle' },
+  { category: 'circles', family: 'F5', he: 'מרובע ABCD בר חסימה', en: 'cyclic quadrilateral ABCD' },
+  { category: 'circles', family: 'F5', he: 'מעגל חסום במשולש ABC', en: 'the incircle of triangle ABC' },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה',
+    en: 'the sides AB, BC and CA touch the circle at D, E and F respectively',
+    needs: ['מעגל חסום במשולש ABC'],
+  },
+  { category: 'circles', family: 'F5', he: 'מעגל חסום במרובע ABCD', en: 'a circle inscribed in quadrilateral ABCD' },
+
   // --- F5 · tangency — how the corpus pins a circle WITHOUT giving its radius (#1060 axes,
   // #1501 lines). These rows are also what teaches the LLM lane the vocabulary: neither half was
   // in the catalog before #1501, so the fallback could never emit a tangency at all.
