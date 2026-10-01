@@ -34,6 +34,7 @@ import {
   circleDefPoints,
   curveByName,
   diameterCircleId,
+  incircleId,
   isPositional,
   namesObject,
   objectById,
@@ -783,6 +784,10 @@ function circleNamed(
  * Only made when there is no circle, so its one id never meets another.
  */
 const TOUCHED_CIRCLE_ID: Id = 'circle-touched';
+
+/** A ring's canonical polygon id — the smallest rotation of it and of its reverse (the parser's `polygonId`). */
+const ringId = (v: readonly Id[]): Id =>
+  `poly-${[[...v], [...v].reverse()].flatMap((b) => b.map((_, i) => [...b.slice(i), ...b.slice(0, i)].join(''))).sort()[0]}`;
 function touchedCircleFacts(src: string): Fact[] {
   const sym = (part: string): Expr => ({ kind: 'sym', name: toolSymbol(TOUCHED_CIRCLE_ID, part) });
   const sq = (e: Expr): Expr => ({ kind: 'pow', a: e, b: { kind: 'num', value: 2 } });
@@ -1974,6 +1979,24 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
          * it, B1's rule) — no tool-chosen letter. A tangency this lowering cannot honour on such a circle (an axis
          * with no touch point named, which only a centre POINT can carry) keeps the no-circle refusal.
          */
+        /*
+         * …and when the touch list named EVERY side of one ring as a side (ADR-AG-198 Am. 1), the only circle
+         * tangent to all of them at points on them is the ring's INCIRCLE — so it is created closed form (B2's
+         * `incircle`, with a quadrilateral's Pitot given), exactly as «במשולש … חסום מעגל» typed first creates it,
+         * never as a free circle a joint solve must fit against a free ring (measured: ~400 ms per evaluation).
+         */
+        if (circles.length === 0 && f.ring && f.at !== undefined) {
+          const v = f.ring;
+          const id = incircleId(ringId(v));
+          const pitot: Fact[] =
+            v.length === 4
+              ? [{ t: 'constraint', k: { t: 'length-eq', left: parseLengthExpr(`${v[0]}${v[1]}+${v[2]}${v[3]}`)!, right: parseLengthExpr(`${v[1]}${v[2]}+${v[3]}${v[0]}`)! }, src: f.src }]
+              : [];
+          const created = applyAll(c, [...pitot, { t: 'circle-thru', id, def: { t: 'incircle', pts: v }, src: f.src }]);
+          if (!created.ok) return created;
+          const bound = applyFact(created.next, { ...f, circleId: id });
+          return bound.ok ? { ...bound, effect: 'created' } : bound;
+        }
         if (circles.length === 0 && (f.at !== undefined || f.axes.length === 0)) {
           const created = applyAll(c, touchedCircleFacts(f.src));
           if (!created.ok) return created;

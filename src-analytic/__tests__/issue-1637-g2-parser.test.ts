@@ -21,7 +21,7 @@ import { describe, expect, it } from 'vitest';
 import { decideSubmit } from '../app/submit';
 import { errorText } from '../app/errorText';
 import { derive } from '../engine/derive';
-import type { Figure } from '../engine/evaluate';
+import { evaluateStats, type Figure } from '../engine/evaluate';
 import { analyticI18n } from '../i18n';
 import { distributeClauses } from '../parser/frameAnalytic';
 import { parseLine } from '../parser/parseAnalytic';
@@ -294,5 +294,57 @@ describe('ruling (b) on #1619 — a tangency with no circle creates it, its cent
     expect(derive(['נתון מעגל שמרכזו O', 'AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה'], 0).figure.curves.filter((c) => c.curve.kind === 'circle')).toHaveLength(1);
     const e = refusal('AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה', ['נתון מעגל שמרכזו O', 'נתון מעגל שמרכזו M']);
     expect(e).toMatchObject({ key: 'ambiguous-shape', host: { kind: 'circle', found: 2 } });
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+describe('ADR-AG-198 Am. 1 — a touch list over EVERY side of one ring creates the incircle of that ring, closed form', () => {
+  const BASE = ['משולש AOB ישר זווית', 'O ראשית הצירים', 'הצלע AO נמצאת על ציר ה-x', 'הצלע BO נמצאת על ציר ה-y'];
+  const TOUCH = 'הצלעות AO, BO ו-AB משיקות למעגל בנקודות D, E ו-F בהתאמה';
+  const INCIRCLE_FIRST = [...BASE, 'במשולש AOB חסום מעגל שמרכזו C', TOUCH];
+
+  it('the measured sequence: no free circle to fit — the computed incircle, and a bounded work budget (#1473 pattern)', () => {
+    const cur = derive(BASE, 0);
+    let e0 = evaluateStats.uncached;
+    expect(decideSubmit(TOUCH, BASE, 0, cur).kind).toBe('record');
+    expect(evaluateStats.uncached - e0).toBeLessThanOrEqual(3);
+    e0 = evaluateStats.uncached;
+    const d = derive([...BASE, TOUCH], 0);
+    expect(evaluateStats.uncached - e0).toBeLessThanOrEqual(3);
+    expect(d.faults).toEqual([]);
+    // The structure that makes each evaluation cheap: a closed-form incircle, no tool symbols in the solve.
+    expect(d.construction.objects.find((o) => o.kind === 'circle-thru')).toMatchObject({ id: 'circle-in-ABO', def: { t: 'incircle' } });
+    expect(d.construction.objects.some((o) => o.id === 'circle-touched')).toBe(false);
+    expect(d.construction.params.some((q) => q.sym.startsWith('θ_'))).toBe(false);
+  });
+
+  it('the same figure as «במשולש AOB חסום מעגל שמרכזו C» typed first, at 24 seeds', () => {
+    for (let seed = 0; seed < 24; seed += 1) {
+      const a = derive([...BASE, TOUCH], seed);
+      const b = derive(INCIRCLE_FIRST, seed);
+      expect(a.faults, `seed ${seed}`).toEqual([]);
+      expect(b.faults, `seed ${seed}`).toEqual([]);
+      const pa = pts(a.figure);
+      const pb = pts(b.figure);
+      for (const id of ['A', 'O', 'B', 'D', 'E', 'F']) expect(near(pa[id].x, pb[id].x, 1e-9) && near(pa[id].y, pb[id].y, 1e-9), `${id} seed ${seed}`).toBe(true);
+      expect(a.figure.curves.filter((c) => c.curve.kind === 'circle')).toHaveLength(1);
+    }
+  });
+
+  it('3/5 with the touch line first: whole at 24/24 seeds, the printed figure', () => {
+    const printed = corpus('3/5');
+    const touchFirst = [...printed.slice(0, 3), printed[4], printed[3], ...printed.slice(5)];
+    for (let seed = 0; seed < 24; seed += 1) {
+      const d = derive(touchFirst, seed);
+      expect(d.faults.length === 0 && d.figure.unsatisfied.length === 0 && d.figure.ringFaults.length === 0 && d.figure.selectorsOk, `seed ${seed}`).toBe(true);
+      const q = pts(d.figure);
+      expect(near(q.A.x, -8, 1e-6) && near(q.B.y, 6, 1e-6) && near(q.C.x, -2, 1e-6) && near(q.C.y, 2, 1e-6), `seed ${seed}`).toBe(true);
+    }
+  });
+
+  it('a touch list over a SUBSET of the sides keeps the general circle (it is not the incircle)', () => {
+    const d = derive([...BASE, 'הצלעות AO ו-BO משיקות למעגל בנקודות D ו-E בהתאמה'], 0);
+    expect(d.faults).toEqual([]);
+    expect(d.construction.objects.some((o) => o.id === 'circle-touched')).toBe(true);
   });
 });
