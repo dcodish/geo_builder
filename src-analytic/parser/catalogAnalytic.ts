@@ -99,6 +99,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { featured: true, category: 'lines', family: 'F3', he: 'נתון הישר l1: 4y-3x-20=0', en: 'line l1: 4y-3x-20=0' },
   { featured: true, category: 'lines', family: 'F3', he: 'משוואת הישר AC היא y=-2x+8', en: 'the line AC is y=-2x+8' },
   { featured: true, category: 'lines', family: 'F3', he: 'הישר x=-4', en: 'the line x=-4' },
+  // The LINE through two named points, drawn (#1639, ADR-AG-198) — «הישר AB» the line, where «הקטע AB» is the segment.
+  { category: 'lines', family: 'F3', he: 'הישר AB', en: 'the line AB', needs: ['A(0,0)', 'B(4,3)'] },
   { category: 'lines', family: 'F3', he: 'הישר y=x', en: 'the line y=x' },
 
   // The noun is OPTIONAL for an equation (02c R6, #1037) — the fit names the family, and the

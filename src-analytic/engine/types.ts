@@ -169,7 +169,29 @@ export type Fact =
    * `known`), where a student's own derivation of an existing point is a CONDITION on it (#1320).
    */
   | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule; auto?: true })
-  | (FactBase & { t: 'segment'; id: Id; a: Id; b: Id })
+  /**
+   * `ref` (#1639, ADR-AG-198) — the segment is drawn by a sentence that REFERS to its ends («AC קוטר במעגל»), so
+   * the ends must already exist: it never introduces them, as the bare «AC» line (which NAMES the segment) does.
+   */
+  | (FactBase & { t: 'segment'; id: Id; a: Id; b: Id; ref?: true })
+  /**
+   * «הישר BC» — THE LINE through two named points, DRAWN (#1639, ADR-AG-198): the line-noun twin of the
+   * segment a bare «BC» declares. A sentence that names a line draws it, whichever relation it states, and
+   * the line is the `line-at` through `a` along `a→b` (0 DOF, closed form). M1 decides what it adds: nothing
+   * when the figure already has that line (stated by its equation, or drawn) or draws a piece over the pair
+   * (ADR-AG-135's ruling (a): the figure is the authority), the line otherwise. A later «משוואת הישר BC היא
+   * …» states THIS line's equation — the curve takes the line's place, never a second object beside it.
+   */
+  | (FactBase & { t: 'line-2pt'; a: Id; b: Id })
+  /**
+   * The EXTENT of a bare pair in an incidence (#1636, #1640, ADR-AG-198) — «CD עובר דרך מרכז המעגל», «O על
+   * BC». The noun decides when there is one («הצלע/הקטע» the segment, «הישר» the line); with none the pair
+   * inherits the extent of the object it refers to, and only M1 can see that: when the figure draws a piece
+   * over `a`–`b` at the time of the statement, the point lies BETWEEN them (the `between` selector «הצלע BC»
+   * carries); when it draws none, the line reading stands and this adds nothing. A piece drawn LATER never
+   * narrows it — the extent belongs to the statement.
+   */
+  | (FactBase & { t: 'extent-of'; id: Id; a: Id; b: Id })
   | (FactBase & { t: 'polygon'; id: Id; vertices: Id[]; noun?: string })
   /**
    * A statement that must HOLD rather than an object that exists (#1016) — «שטח המשולש ABC הוא 20».
@@ -367,7 +389,11 @@ export type Fact =
    * `create` is that statement's facts, lowered by the parser from the canonical creation sentence («נתון
    * מעגל שמרכזו O», «נתון מעגל O שמשוואתו …»), so the creation has one lowering, not a second copy here.
    */
-  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[] })
+  /*
+   * `circleId` (ADR-AG-198) — the circle by id, for a statement M1 itself bound (the incircle sentence naming the
+   * centre of the circle it found already drawn).
+   */
+  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[]; circleId?: Id })
   /**
    * A sentence that uses «מרכז המעגל» as a POINT (#1619 B1) — «CD עובר דרך מרכז המעגל». The parser lowers
    * the sentence with `CENTRE_SENTINEL` in the centre's place; M1 resolves which point the centre IS and
@@ -400,7 +426,12 @@ export type Fact =
    *
    * `about` carries `CIRCLE_SENTINEL` in the circle's place; M1 writes the resolved circle's id in.
    */
-  | (FactBase & { t: 'the-circle'; create: Fact[]; about: Fact[]; match?: { centre: Id } | { eq: Expr } })
+  /*
+   * `match: { inscribed }` (#1619 ruling b, ADR-AG-198) — «במשולש AOB חסום מעגל»: the circle the figure already
+   * states TANGENT TO EVERY SIDE of that ring (the touch sentence typed first created it) is this circle; with
+   * none, the sentence states the computed incircle as before.
+   */
+  | (FactBase & { t: 'the-circle'; create: Fact[]; about: Fact[]; match?: { centre: Id } | { eq: Expr } | { inscribed: Id[] } })
   /**
    * «משוואת המעגל היא …» about a circle the figure ALREADY HAS (#1633, ADR-AG-196) — a statement about it,
    * never a second circle: an equation circle must be this equation (else `conflicting-restatement`), a circle

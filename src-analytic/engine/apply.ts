@@ -24,7 +24,8 @@ import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, ringsNamed, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
-import { RESERVED_SYMBOLS } from './carriers';
+import { RESERVED_SYMBOLS, toolSymbol } from './carriers';
+import { drawnPieceOver, isPolygonSide } from './extent';
 import {
   CENTRE_SENTINEL,
   CIRCLE_SENTINEL,
@@ -626,8 +627,15 @@ function circleByName(c: Construction, name: string): GeoObject | undefined {
  */
 function theCircle(
   c: Construction,
-  match: { centre: Id } | { eq: Expr } | undefined,
+  match: { centre: Id } | { eq: Expr } | { inscribed: Id[] } | undefined,
 ): { t: 'bind'; host: GeoObject } | { t: 'create' } | { t: 'ambiguous'; circles: GeoObject[] } {
+  if (match && 'inscribed' in match) {
+    // The circle already stated tangent to every side of the ring (ADR-AG-198) — exactly one binds, else create.
+    const ring = match.inscribed;
+    const sides = ring.map((p, i) => [p, ring[(i + 1) % ring.length]] as const);
+    const hosts = c.objects.filter((o) => curveKindOf(o) === 'circle' && sides.every(([a, b]) => statedTangentToSide(c, o.id, a, b)));
+    return hosts.length === 1 ? { t: 'bind', host: hosts[0] } : { t: 'create' };
+  }
   if (match && 'centre' in match) {
     const host = circleByName(c, match.centre);
     return host && curveKindOf(host) === 'circle' ? { t: 'bind', host } : { t: 'create' };
@@ -641,6 +649,19 @@ function theCircle(
   if (circles.length === 0) return { t: 'create' };
   if (circles.length === 1) return { t: 'bind', host: circles[0] };
   return { t: 'ambiguous', circles };
+}
+
+/**
+ * Does the figure STATE circle `id` tangent to the side `a`–`b`? The touch lowering's own mark (the radius at the
+ * touch point perpendicular to the side, `applyTouchAt`) or the touch-free tangency over that pair (ADR-AG-198).
+ */
+function statedTangentToSide(c: Construction, id: Id, a: Id, b: Id): boolean {
+  const same = (d: Direction) => d.k === 'points' && [d.a, d.b].sort().join() === [a, b].sort().join();
+  return c.constraints.some(
+    (k) =>
+      (k.t === 'relation' && k.rel === 'perpendicular' && k.u.k === 'radius' && k.u.circle === id && same(k.v)) ||
+      (k.t === 'tangent-curve' && k.circle === id && k.line.kind === 'points' && same({ k: 'points', a: k.line.a, b: k.line.b })),
+  );
 }
 
 /**
@@ -752,6 +773,34 @@ function circleNamed(
  * SELECTORS the sentence carries (the ends distinct; a bounded noun's `between`, «הקטע CD») are emitted by
  * the parser beside this fact, where `derive` can blame a configuration that fails one on the line.
  */
+/**
+ * THE CIRCLE A TANGENCY SENTENCE STATES when the figure has none (#1619 ruling b, ADR-AG-198) — its centre
+ * UNNAMED. An equation circle `(x−a)² + (y−b)² = r²` whose centre coordinates and radius are the tool's own
+ * free symbols (`toolSymbol`): 3 DOF the sentence's touches then consume, sampled and solved like any free
+ * vertex, kept out of the parameter rows (the free direction's discipline), the radius positive. It is an
+ * ordinary circle from here on — «המעגל» binds to it, «O מרכז המעגל» names its centre through the derived
+ * `circle-centre` an equation circle's centre already has (B1), its equation prints once the givens fix it.
+ * Only made when there is no circle, so its one id never meets another.
+ */
+const TOUCHED_CIRCLE_ID: Id = 'circle-touched';
+function touchedCircleFacts(src: string): Fact[] {
+  const sym = (part: string): Expr => ({ kind: 'sym', name: toolSymbol(TOUCHED_CIRCLE_ID, part) });
+  const sq = (e: Expr): Expr => ({ kind: 'pow', a: e, b: { kind: 'num', value: 2 } });
+  const eq: Expr = {
+    kind: 'sub',
+    a: {
+      kind: 'add',
+      a: sq({ kind: 'sub', a: { kind: 'sym', name: 'x' }, b: sym('a') }),
+      b: sq({ kind: 'sub', a: { kind: 'sym', name: 'y' }, b: sym('b') }),
+    },
+    b: sq(sym('r')),
+  };
+  return [
+    { t: 'param', sym: toolSymbol(TOUCHED_CIRCLE_ID, 'r'), domain: { min: 0, minOpen: true }, src },
+    { t: 'curve', id: TOUCHED_CIRCLE_ID, label: { name: '', kind: 'circle' }, curve: { kind: 'circle', eq }, stated: true, src },
+  ];
+}
+
 function applyTouchAt(
   c: Construction,
   host: GeoObject,
@@ -1014,6 +1063,26 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'curve': {
+      /*
+       * THE DRAWN LINE BC GETS ITS EQUATION (#1639, ADR-AG-198): «הישר BC» drew the line through B and C (a
+       * `line-at` along B→C, `line-2pt`); «משוואת הישר BC היא …» is a statement about THAT line, so the stated
+       * curve takes its place under the same id — the sentence's own incidences put B and C on it — never a name
+       * clash, and never a second line beside the first.
+       */
+      const drawnLine = objectById(c, f.id);
+      if (
+        drawnLine?.kind === 'line-at' &&
+        drawnLine.dir.k === 'points' &&
+        !drawnLine.perp &&
+        f.id === lineIdOf(`${drawnLine.dir.a}${drawnLine.dir.b}`)
+      ) {
+        const out = applyFact({ ...c, objects: c.objects.filter((o) => o !== drawnLine) }, f);
+        if (!out.ok) return out;
+        // In the drawn line's PLACE, so whatever was stated after it still follows it (declaration order, ADR-AG-013).
+        const objects = out.next.objects.filter((o) => o.id !== f.id);
+        objects.splice(c.objects.indexOf(drawnLine), 0, out.next.objects.find((o) => o.id === f.id)!);
+        return { ...out, next: { ...out.next, objects } };
+      }
       const found = priorOf(c, f);
       if (found && 'clash' in found) {
         return {
@@ -1226,6 +1295,17 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       });
       if (missing !== undefined) {
         return { ok: false, error: unknownRef(c, missing) };
+      }
+      /**
+       * THE FIGURE IS THE AUTHORITY ON A CROSSING'S EXTENT — AS IT STOOD WHEN THE SENTENCE WAS SAID (ADR-AG-135
+       * ruling (a), made per-statement by ADR-AG-198, #1640). A crossing on a pair the figure already DRAWS as a
+       * piece is on that piece, whatever noun the sentence used; this used to be decided at evaluation over the
+       * WHOLE construction, so a piece drawn LATER — a bare «BC» typed to see it — narrowed an earlier «הישר BC»
+       * that carries O outside B–C, and the line refused `unsatisfiable`. Decided here, against the figure before
+       * this statement, it is a property of the statement: a later piece never re-reads it.
+       */
+      if (f.k.t === 'on-line-2pt' && f.k.crossing && !f.k.bounded && drawnPieceOver(c, f.k.a, f.k.b)) {
+        return applyFact(c, { ...f, k: { ...f.k, bounded: true } });
       }
       /**
        * …AND THE CURVES IT NAMES (#1150). Same rule, the half that was missing.
@@ -1673,6 +1753,23 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (bound.t === 'ambiguous') return { ok: false, error: noHost(f.src, 'circle', bound.circles) };
       if (bound.t === 'create') return applyAll(c, f.create);
       const about = JSON.parse(JSON.stringify(f.about).split(CIRCLE_SENTINEL).join(bound.host.id)) as Fact[];
+      /*
+       * The incircle sentence bound to the circle a touch sentence CREATED (ADR-AG-198): that circle had no
+       * definition but its touches — three free symbols the solve had to find — and this sentence says what it
+       * is. It becomes the computed incircle under the SAME id, so every touch already stated about it keeps its
+       * referent, and its free symbols leave the figure (the closed form replaces a solve, ADR-AG-160's reason).
+       */
+      const incircle = f.match && 'inscribed' in f.match ? f.create.find((g) => g.t === 'circle-thru' && g.def.t === 'incircle') : undefined;
+      if (incircle?.t === 'circle-thru' && bound.host.id === TOUCHED_CIRCLE_ID) {
+        const own = (sym: string) => sym.startsWith(toolSymbol(TOUCHED_CIRCLE_ID, ''));
+        const defined: Construction = {
+          ...c,
+          params: c.params.filter((p) => !own(p.sym)),
+          objects: c.objects.map((o) => (o.id === TOUCHED_CIRCLE_ID ? { kind: 'circle-thru', id: o.id, def: incircle.def } : o)),
+        };
+        const out = applyAll(defined, about);
+        return out.ok ? { ...out, effect: 'narrowed' } : out;
+      }
       return applyAll(c, about);
     }
 
@@ -1727,7 +1824,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       const create = (): ApplyOutcome =>
         f.create ? applyAll(c, f.create) : { ok: false, error: { code: 'out-of-scope', detail: f.src } };
       let host: GeoObject | undefined;
-      if (f.eq !== undefined) {
+      if (f.circleId !== undefined) {
+        host = objectById(c, f.circleId);
+        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, f.circleId) };
+      } else if (f.eq !== undefined) {
         const id = resolveCurveByEq(c, f.eq);
         if (!id) return create();
         host = objectById(c, id);
@@ -1867,6 +1967,19 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         // By the fit, not the declaration: «המעגל» about an equation circle still finds ITS circle,
         // and the honest answer below is `out-of-scope`, not "which circle?" (#1501).
         const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+        /*
+         * NO CIRCLE YET: THE SENTENCE STATES IT (#1619 ruling b, ADR-AG-198 — ADR-AG-196's none → create, extended
+         * to the tangency readers). «AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה» typed before any circle is how the
+         * exam introduces its circle; the circle is created with its centre UNNAMED (a later «O מרכז המעגל» names
+         * it, B1's rule) — no tool-chosen letter. A tangency this lowering cannot honour on such a circle (an axis
+         * with no touch point named, which only a centre POINT can carry) keeps the no-circle refusal.
+         */
+        if (circles.length === 0 && (f.at !== undefined || f.axes.length === 0)) {
+          const created = applyAll(c, touchedCircleFacts(f.src));
+          if (!created.ok) return created;
+          const bound = applyFact(created.next, { ...f, circleId: TOUCHED_CIRCLE_ID });
+          return bound.ok ? { ...bound, effect: 'created' } : bound;
+        }
         if (circles.length !== 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
         host = circles[0];
       }
@@ -2154,6 +2267,51 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       });
     }
 
+    /**
+     * «הישר BC» — the line through two named points, DRAWN (#1639, ADR-AG-198). A REFERENCE to its points
+     * (the sentence that names a line about points it does not introduce fails on them first; the bare
+     * «הישר BC» line declares them before this fact). What it adds is decided here, against the figure:
+     *  - the line already in the figure — stated by its equation (a carrier is PROMOTED: the student now
+     *    asks to see it, the #1076 rule), or drawn — is `known`;
+     *  - a piece the figure already draws over the pair (a segment, a polygon side) is the line's drawn
+     *    extent — ADR-AG-135's ruling (a), the figure is the authority — so nothing is added;
+     *  - otherwise the `line-at` through `a` along `a→b`, named by the pair so a later sentence finds it.
+     */
+    case 'line-2pt': {
+      for (const id of [f.a, f.b]) {
+        const p = objectById(c, id);
+        if (!p || !isPositional(p)) return { ok: false, error: unknownRef(c, id) };
+      }
+      if (f.a === f.b) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
+      const prior = objectById(c, lineIdOf(`${f.a}${f.b}`)) ?? objectById(c, lineIdOf(`${f.b}${f.a}`));
+      if (prior?.kind === 'curve') {
+        if (prior.stated) return { ok: true, effect: 'known', next: c };
+        return { ok: true, effect: 'created', next: { ...c, objects: c.objects.map((o) => (o === prior ? { ...prior, stated: true } : o)) } };
+      }
+      if (prior?.kind === 'line-at') return { ok: true, effect: 'known', next: c };
+      if (prior) return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };
+      if (drawnPieceOver(c, f.a, f.b)) return { ok: true, effect: 'known', next: c };
+      return applyFact(c, {
+        t: 'line-at',
+        id: lineIdOf(`${f.a}${f.b}`),
+        through: f.a,
+        dir: { k: 'points', a: f.a, b: f.b },
+        perp: false,
+        name: `${f.a}${f.b}`,
+        src: f.src,
+      });
+    }
+
+    /**
+     * A bare pair's extent in an incidence (#1636, #1640, ADR-AG-198) — inherited from what the figure draws
+     * over the pair NOW: a drawn piece puts the point between its ends (the `between` selector «הצלע BC»
+     * carries, so a point that cannot lie on the piece is refused on this line); no piece leaves the line.
+     */
+    case 'extent-of': {
+      if (f.id === f.a || f.id === f.b || !drawnPieceOver(c, f.a, f.b)) return { ok: true, effect: 'known', next: c };
+      return applyFact(c, { t: 'selector', sel: { kind: 'between', id: f.id, a: f.a, b: f.b }, src: f.src });
+    }
+
     /** Introduce a named but unplaced point; harmless and absorbed if it already exists. */
     case 'declare': {
       const o = objectById(c, f.id);
@@ -2299,7 +2457,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * which inverts how every exam sentence is written — the same argument that made a shape noun
        * introduce its vertices.
        */
-      const declares = f.t === 'polygon' || f.t === 'segment';
+      // A segment a sentence draws while REFERRING to its ends (`ref`, #1639) introduces nothing.
+      const declares = f.t === 'polygon' || (f.t === 'segment' && !f.ref);
       let base = c;
       for (const id of refs) {
         const o = objectById(base, id);
@@ -2317,6 +2476,13 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         base = { ...base, objects: [...base.objects, { kind: 'free', id }] };
       }
       c = base;
+
+      /*
+       * A SEGMENT OVER A SIDE THE FIGURE ALREADY DRAWS IS THAT SIDE (#1639, ADR-AG-198) — one edge on the page,
+       * #1407's `edgesAt` rule. Every sentence that names a pair now draws it, so «AB ∥ CD» in a parallelogram
+       * names two sides that are already there: it draws nothing new, and the line is judged on what it states.
+       */
+      if (f.t === 'segment' && !objectById(c, f.id) && isPolygonSide(c, f.a, f.b)) return { ok: true, effect: 'known', next: c };
 
       const found = priorOf(c, f);
       if (found && 'clash' in found) {

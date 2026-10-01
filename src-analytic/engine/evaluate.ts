@@ -20,7 +20,6 @@ import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
 import { dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
-import { drawnPieceOver } from './extent';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { curveByName, inDomain, isFree, objectById, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type Selector } from './types';
 
@@ -1099,18 +1098,14 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
    * count, the satisfaction check, the provenance — then sees an ordinary constraint and never
    * learns that discrete freedom exists.
    */
-  /**
-   * THE FIGURE IS THE AUTHORITY on a straight's extent (#1286, ADR-AG-135 — operator ruling (a),
-   * 2026-09-20): an incidence on a pair the figure DRAWS as a piece — a segment object, a polygon side —
-   * is bounded whatever noun the sentence used. «הישר CA» on a triangle side denotes that side and
-   * yields the root on it; «הישר» keeps its infinite reading only where the letters name nothing drawn.
-   * Resolved here, once, like the discrete choices above, so the solve, the validity check and the
-   * knowledge gate all see one truth. The parser's noun stays a hint, never the decision.
+  /*
+   * THE FIGURE IS THE AUTHORITY on a crossing's extent (#1286, ADR-AG-135 ruling (a)) — decided at the M1
+   * boundary since ADR-AG-198 (#1640), against the figure AS IT STOOD when the crossing was stated
+   * (`apply.ts`, the `constraint` case): resolved here over the whole construction, a piece drawn later
+   * narrowed an earlier statement. The constraints arrive already bounded; the solve, the validity check
+   * and the knowledge gate still see one truth.
    */
-  const bound = raw.constraints.map((k) =>
-    k.t === 'on-line-2pt' && k.crossing && !k.bounded && drawnPieceOver(raw, k.a, k.b) ? { ...k, bounded: true } : k,
-  );
-  const c: Construction = { ...raw, constraints: resolveChoices(bound, seed) };
+  const c: Construction = { ...raw, constraints: resolveChoices(raw.constraints, seed) };
   let env = foldSignSelectors(c, sampleEnv(c, seed));
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];

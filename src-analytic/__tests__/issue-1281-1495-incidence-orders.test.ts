@@ -32,6 +32,20 @@ describe('#1495 — a SIDE as the subject lowers to exactly the side-equation se
     ['the side BC lies on the line y=x-4', 'משוואת הצלע BC היא y=x-4'],
   ])('«%s» ≡ «%s»', (a, b) => expect(factsOf(a)).toEqual(factsOf(b)));
 
+  /*
+   * The converse names its subject pair, so it DRAWS it (#1639, ADR-AG-198) — by its noun: «הישר CD» the line, a
+   * bare «CD» the segment. And a bare «CD» is no longer rewritten as «הישר CD» (#1636): it is «P על CD», whose
+   * extent M1 inherits from the figure.
+   */
+  const line = { t: 'line-2pt', a: 'C', b: 'D', src: '' };
+  const segment = { t: 'segment', id: 'seg-CD', a: 'C', b: 'D', ref: true, src: '' };
+  it.each([
+    ['הישר CD עובר דרך P', 'P על הישר CD', line],
+    ['הישר CD מכיל את P', 'P על הישר CD', line],
+    ['the line CD passes through P', 'P על הישר CD', line],
+    ['CD עובר דרך P', 'P על CD', segment],
+  ] as const)('«%s» ≡ «%s» + the piece it names', (a, b, piece) => expect(factsOf(a)).toEqual([...factsOf(b), piece]));
+
   it('the operator’s line builds, with B and C on the line at every configuration', () => {
     const d = derive(['משולש ABC', 'הצלע BC נמצאת על הישר y=x-4'], 0);
     expect(d.faults).toEqual([]);
@@ -75,10 +89,6 @@ describe('#1495 — a SIDE as the subject lowers to exactly the side-equation se
 
 describe('#1281 — the converse word order, a coordinate operand, and «בסיס»', () => {
   it.each([
-    ['הישר CD עובר דרך P', 'P על הישר CD'],
-    ['CD עובר דרך P', 'P על הישר CD'],
-    ['הישר CD מכיל את P', 'P על הישר CD'],
-    ['the line CD passes through P', 'P על הישר CD'],
     ['הישר l3 עובר דרך הנקודה N', 'דרך N עובר ישר l3'],
     ['הישר l3 עובר בנקודה N', 'דרך N עובר ישר l3'],
     ['ישר 3 עובר דרך הנקודה N', 'דרך N עובר ישר 3'], // the operator's
