@@ -1886,3 +1886,5 @@ A line is accepted whole or not at all; the row recorded is the line as typed. A
 What the student is asked to **prove** («הוכיחו כי …», «הראו כי …», "prove that …") is never drawn. The tool answers that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and asks for only what the question gives.
 
 A right trapezoid («טרפז ישר זווית») does not decide which leg is perpendicular. A stated right angle decides it, and until one is stated it is a configuration «הציגו תצורה אחרת» cycles.
+
+*R124, amended 2026-10-01:* the subject noun may drop the copula («משולש ABC ישר זווית»); the origin may be used as an unnamed point («… דרך ראשית הצירים»), and it is called O unless that letter is already taken. What the tool TEACHES (its command list and examples) is one fact per line, even where it accepts the exam's bracketed or comma-joined forms.

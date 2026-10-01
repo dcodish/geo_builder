@@ -164,6 +164,11 @@ export function originClauses(line: string): string[] | null {
     const p = inner[3];
     return [`${p}(0,0)`, line.replace(inner[0], `${inner[1]}${inner[2] ? 'בנקודה ' : ''}${p}`)];
   }
+  // The origin used as an UNNAMED point (#1628) — «הצלע AB עוברת דרך ראשית הצירים». It is the coordinate
+  // point (0,0), which the rule owning the sentence already reads in a point slot; the mint names it O
+  // when that letter is free (`resolveMints`, the ADR-AG-184 convention).
+  const bare = new RegExp(`(\\s)(ב)?${ORIGIN_HE}(?=\\s|,|$)`).exec(line);
+  if (bare) return [line.replace(bare[0], `${bare[1]}${bare[2] ? 'בנקודה ' : ''}(0,0)`)];
   return null;
 }
 
@@ -264,7 +269,13 @@ export function shapeClauses(line: string): string[] | null {
 
   // «(ה)<noun>? <letters> הוא|היא <predicate>» — the predicate is a shape noun, or an adjective the
   // subject noun completes («המשולש AOB הוא ישר זווית» → משולש ישר זווית).
-  const pred = new RegExp(`^(?:(?:ה)?(${SHAPE_HE})\\s+)?${LETTERS}\\s+(?:הוא|היא|הנו|הינו)\\s+(.+)$`).exec(head);
+  // The copula is optional when a subject noun is present (#1626): Hebrew drops it routinely, so «מרובע ABCO
+  // טרפז ישר זוית» and «משולש ABC ישר זווית» are the same sentences as with «הוא». Without a noun there is
+  // nothing to complete an adjective, so «ABC ישר זווית» still needs one. The predicate must resolve through
+  // the registry either way, so an unknown word («משולש ABC פיל») never reads as a shape.
+  const pred =
+    new RegExp(`^(?:(?:ה)?(${SHAPE_HE})\\s+)?${LETTERS}\\s+(?:הוא|היא|הנו|הינו)\\s+(.+)$`).exec(head) ??
+    new RegExp(`^(?:ה)?(${SHAPE_HE})\\s+${LETTERS}\\s+(.+)$`).exec(head);
   if (pred) {
     const predicate = pred[3].trim();
     const key = shapeKey(predicate) ?? (pred[1] ? shapeKey(`${normalizeShapeNoun(pred[1])} ${predicate}`) : null);

@@ -229,3 +229,51 @@ describe('#1618 — the 471 questions the frame completes build their figure', (
     }
   });
 });
+
+/**
+ * #1626 — the operator's play of T1: «מרובע ABCO הוא טרפז ישר זוית» worked, the same sentence WITHOUT «הוא»
+ * was refused. Hebrew drops the copula; with a subject noun present the predicate reads either way.
+ */
+describe('#1626 — the shape predicate does not need «הוא»', () => {
+  it.each([
+    ['מרובע ABCO טרפז ישר זוית', 'טרפז ישר זווית ABCO'],
+    ['המרובע ABCO טרפז ישר זוית', 'טרפז ישר זווית ABCO'],
+    ['משולש ABC ישר זווית', 'משולש ישר זווית ABC'],
+    ['המרובע ABCD מלבן', 'מלבן ABCD'],
+    ['המשולש ABC שווה שוקיים', 'משולש שווה שוקיים ABC'],
+  ])('%s ≡ %s', (framed, canonical) => same(framed, canonical));
+
+  it('an unknown predicate word still never reads as a shape', () => {
+    expect(parseLine('משולש ABC פיל').ok).toBe(false);
+  });
+  it('without a subject noun an adjective has nothing to complete', () => {
+    expect(parseLine('ABC ישר זווית').ok).toBe(false);
+  });
+});
+
+/**
+ * #1628 — the operator's play of T4: «הצלע AB עוברת דרך ראשית הצירים» (no letter) was not recognized. The
+ * unnamed origin is the coordinate point (0,0), named O when that letter is free.
+ */
+describe('#1628 — the origin as an unnamed point', () => {
+  it('the reported line builds, through (0,0), and the tool names the point O', () => {
+    const d = derive(['ריבוע ABCD', 'הצלע AB עוברת דרך ראשית הצירים']);
+    expect(d.faults).toEqual([]);
+    expect(d.minted).toEqual([{ index: 1, id: 'O' }]);
+    const o = d.figure.points.find((p) => p.id === 'O')!;
+    expect([o.x, o.y]).toEqual([0, 0]);
+  });
+  it('it is the same figure as the named spelling', () => {
+    const bare = derive(['ריבוע ABCD', 'הצלע AB עוברת דרך ראשית הצירים']);
+    const named = derive(['ריבוע ABCD', 'הצלע AB עוברת דרך ראשית הצירים, O']);
+    expect(bare.figure.points.map((p) => [p.id, p.x, p.y])).toEqual(named.figure.points.map((p) => [p.id, p.x, p.y]));
+  });
+  it('when O already names another point, the origin is never a second O', () => {
+    const d = derive(['O(1,1)', 'ריבוע ABCD', 'הצלע AB עוברת דרך ראשית הצירים']);
+    expect(d.faults).toEqual([]);
+    expect(d.minted.map((m) => m.id)).toEqual(['P₁']);
+  });
+  it('«ראשית הצירים» alone states nothing', () => {
+    expect(parseLine('ראשית הצירים').ok).toBe(false);
+  });
+});

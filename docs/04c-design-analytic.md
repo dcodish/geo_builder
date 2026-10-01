@@ -1827,3 +1827,5 @@ raw → orthography → proof-target? → readLine(depth 0) → parseClause
 - **`unwrap` runs to a fixpoint** (bounded), because frames nest: «וידוע כי …», «נתון בנוסף: … (ראה ציור)».
 
 **Not here:** the imperative wrapper («הוסף …») is still taught by `decideSubmit` before `parseLine` runs (ADR-AG-150). A proof target is refused inside `parseLine` (`proof-target`), so the teaching path's parse of «כי …» fails, and «הראו כי …» reaches the refusal rather than a lesson. A role noun («השוק BC») is not folded; that boundary belongs to ADR-AG-119.
+
+*Amended 2026-10-01 (#1626, #1628):* `shapeClauses` tries the predicate with the copula first, then without it, and the copula-less form requires a subject noun. `originClauses` rewrites an unnamed «(ב)ראשית הצירים» to the slot `(0,0)` («בנקודה (0,0)»); the name comes from `resolveMints`, which prefers O for the origin when no point holds the letter.

@@ -456,7 +456,11 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
       return;
     }
     let name: string;
-    do name = `P${subscript(++n)}`;
+    // The ORIGIN is O when that letter is free (#1628) — the exam's own name for it, and the same default
+    // that yields as the canonical circle's centre (ADR-AG-184): a point the student already called O keeps
+    // the letter, and the origin then falls back to P₁… like any other coordinate point.
+    if (at && at[0] === 0 && at[1] === 0 && !used.has(CENTRE_LETTER)) name = CENTRE_LETTER;
+    else do name = `P${subscript(++n)}`;
     while (used.has(name));
     used.add(name);
     names.set(f.id, name);

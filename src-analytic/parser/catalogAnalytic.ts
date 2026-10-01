@@ -775,12 +775,18 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'A and B are on the x-axis and the y-axis respectively',
     needs: ['נקודה A', 'נקודה B'],
   },
-  { category: 'points', family: 'F1', he: 'AB = 20, AC = 15', en: 'AB = 20, AC = 15', needs: ['A(0,0)', 'נקודה B', 'נקודה C'] },
+  /*
+   * ONE FACT PER LINE is what the tool TEACHES (operator ruling on #1618, 2026-10-01: "we can still accept it
+   * but the expectation is that these are separate lines"). The exam's bracketed form «טרפז ישר זווית ABCD
+   * (AB ∥ CD, ∢D = 90°)» and two givens on one line («AB = 20, AC = 15») are ACCEPTED — the frame reads them
+   * and the locks in issue-1618-sentence-frame.test.ts hold that — but no catalog row shows them.
+   */
   {
     category: 'shapes',
     family: 'F17',
-    he: 'טרפז ישר זווית ABCD (AB ∥ CD, ∢D = 90°)',
-    en: 'right trapezoid ABCD (AB ∥ CD, ∠D = 90°)',
+    he: '∢C = 90°',
+    en: '∠C = 90°',
+    needs: ['טרפז ישר זווית ABCO'],
   },
   { category: 'shapes', family: 'F17', he: 'המרובע ABCO הוא טרפז ישר זווית', en: 'ABCO is a right trapezoid' },
   {
