@@ -24,6 +24,7 @@ import { VOCABULARY_ANALYTIC, imperativeCandidates } from '../parser/scopeAnalyt
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
+import { holdsInEveryConfiguration } from '../engine/evaluate';
 import type { ApplyNotice } from '../engine/apply';
 import type { Fact } from '../engine/types';
 import { activeOf, rowOf } from './active';
@@ -320,13 +321,31 @@ export function decideSubmit(
     d.construction.constraints.filter((k) => k.t === 'relation' && k.assumed).length;
   if (assumptions(trial) < assumptions(current)) return recorded;
 
+  /**
+   * …and the FOURTH condition, over CONFIGURATIONS (#1629, ADR-AG-188): the line's constraints hold in
+   * EVERY configuration of the CURRENT figure, not merely in the trial's.
+   *
+   * The first condition is measured on the TRIAL, which `derive` re-searches until the new constraint
+   * holds — so for a given that merely SELECTS among discrete configurations it is true by
+   * construction. The freedom test cannot catch it either: mirror images at 0 DOF have no continuous
+   * freedom to lose. Operator, 2026-10-01: a square with two mirror drawings answered «זה כבר נובע»
+   * for «שיפוע הצלע BC הוא -1/2» AND for «+1/2», and kept drawing the one the given rules out.
+   *
+   * "Already follows" is knowledge about a statement, so it is judged where every knowledge gate is
+   * judged — the configuration pool (ADR-AG-180), read by `holdsInEveryConfiguration`, not a sampler
+   * of its own. Last, because it is the only condition that can cost evaluations.
+   */
   const freedomBefore = reportedDof(current.construction, current.figure.carrierDof);
   const freedomAfter = reportedDof(trial.construction, trial.figure.carrierDof);
   if (
     parsed.facts.length > 0 &&
     gained === 0 &&
     trial.figure.unsatisfied.length === 0 &&
-    freedomAfter === freedomBefore
+    freedomAfter === freedomBefore &&
+    holdsInEveryConfiguration(
+      current.construction,
+      trial.construction.constraints.filter((_, at) => trial.constraintLine[at] === lines.length),
+    )
   ) {
     return { kind: 'already-follows', line };
   }

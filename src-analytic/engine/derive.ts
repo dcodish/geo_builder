@@ -80,6 +80,12 @@ export interface Derivation {
    * submit path reads the new line's entry and carries it into the commit that records the line.
    */
   notices: Array<ApplyNotice & { index: number }>;
+  /**
+   * WHICH LINE STATED EACH CONSTRAINT (#1629, ADR-AG-188) — positionally over `construction.constraints`,
+   * the fold's own attribution (`constraintFact`) carried to the line. The submit gate reads the new
+   * line's constraints from it to ask whether they hold in every configuration of the current figure.
+   */
+  constraintLine: number[];
 }
 
 export function derive(lines: readonly string[], seed = 0): Derivation {
@@ -411,7 +417,8 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
     notices.push({ ...n, index });
   });
 
-  return { construction, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices };
+  const constraintLine = construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]]));
+  return { construction, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices, constraintLine };
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */
@@ -541,4 +548,5 @@ export const EMPTY_DERIVATION: Derivation = {
   outcomes: [],
   minted: [],
   notices: [],
+  constraintLine: [],
 };

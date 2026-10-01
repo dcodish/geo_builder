@@ -1866,3 +1866,9 @@ names the centre instead (`A(0,0)` → `A(0, 0), r = 4`, in either order); a cen
 their letter; a point `O` the student defined elsewhere (`O(5,5)`) keeps the letter and the centre shows
 its coordinates alone — never a second `O` and never an invented `O₁`. A translated circle, a parabola's
 focus and an ellipse's foci are unchanged: coordinates alone.
+
+**R125 — "already follows" is said only about a given that is true in EVERY configuration of the figure**
+([ADR-AG-188](06c-decisions-analytic.md#adr-ag-188), [#1629](https://github.com/dcodish/geo_builder/issues/1629)). *(Narrows R54.)*
+*(Operator, 2026-10-01, on «נתון: שיפוע הצלע BC הוא -1/2»: "T4 — fails on last statement". The tool answered «זה כבר נובע» and kept drawing the square whose slope is +1/2.)*
+
+When the givens admit more than one drawing (mirror images, two roots) even with no freedom left, a given that holds in one drawing and fails in another **chooses** between them. It is not redundant. It is recorded like any other given, its row appears, and the figure moves to a drawing that satisfies it. «הציגו תצורה אחרת» then stays within the drawings it allows. On the square from exam 15 Q5, «שיפוע הצלע BC הוא -1/2» records and draws B(2,4), C(10,0), while «…הוא 1/2» records and draws the mirror B(−2,4), C(−10,0). «זה כבר נובע מהנתונים שכתבתם» is kept for a given that is true in every drawing, such as «אורך הצלע AB הוא √80» on the same square. When the tool cannot tell, it records the line: an extra row costs nothing, but a dropped given contradicts the figure.
