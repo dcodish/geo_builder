@@ -9,7 +9,7 @@
 import { fold, existingKindOf, type ApplyError, type ApplyNotice } from './apply';
 import { reportedDof } from './carriers';
 import { drawableAt, viewBox, type Figure } from './evaluate';
-import type { Box } from './curves';
+import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
@@ -120,7 +120,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
 
   // The LINE is the fold's unit of application (#1242, ADR-AG-133): every fact of a faulted line carries
   // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
-  const { construction: folded, errors, effects, constraintFact, notices: factNotices } = fold(facts, owner);
+  const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices } = fold(facts, owner);
   const construction: Construction = Object.keys(seedNames).length > 0 ? { ...folded, seedNames: { ...seedNames } } : folded;
   // Said on the circle's row only when the name was actually GIVEN — a default that yielded to a letter
   // already in the figure named nothing, and the list must not claim it did (#1263's rule).
@@ -177,6 +177,13 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     const failing = new Set((figure.selectorsFailing ?? []).map((s) => JSON.stringify(s)));
     facts.forEach((f, i) => {
       if (f.t === 'selector' && (failing.size === 0 || failing.has(JSON.stringify(f.sel)))) blamed.add(owner[i]);
+    });
+    // A selector M1 BUILT from a contextual sentence («B נמצאת מחוץ למעגל», #1619 B1) has no `selector`
+    // fact of its own — it is blamed on the line the fold recorded as adding it.
+    construction.selectors.forEach((s, at) => {
+      const fact = selectorFact[at];
+      if (fact === undefined || facts[fact]?.t === 'selector') return;
+      if (failing.size === 0 || failing.has(JSON.stringify(s))) blamed.add(owner[fact]);
     });
     for (const index of blamed) {
       faults.push({ index, code: 'unsatisfiable', detail: lines[index] });
@@ -534,12 +541,28 @@ function nameCanonicalCentres(
   const canonicalIds = new Set(facts.filter(canonical).map((f) => (f as { id: string }).id));
   if (canonicalIds.size === 0) return { facts: [...facts], owner: [...owner], offered: [] };
 
+  /**
+   * Rule 2 for the CONTEXTUAL naming «P מרכז המעגל» (#1598, #1619 B1): the sentence names the centre of the
+   * one circle, so when the list states exactly one circle and it is this canonical one, the student's letter
+   * is the name and no O is offered beside it. With an equation («P מרכז המעגל x^2+y^2=16») it is the circle
+   * of that equation. Any other circle in the list makes «המעגל» ambiguous — M1 refuses that sentence, and the
+   * default stands.
+   */
+  const isCircleFact = (f: Fact): boolean => {
+    if (f.t === 'circle-at' || f.t === 'circle-thru' || f.t === 'diameter-of') return true;
+    if (f.t !== 'curve') return false;
+    if (f.curve.kind) return f.curve.kind === 'circle';
+    const r = resolveCurve(f.curve, {});
+    return r.ok && r.curve.kind === 'circle';
+  };
+  const circleFacts = new Set(facts.filter(isCircleFact).map((f) => ('id' in f ? f.id : JSON.stringify(f))));
   const atOrigin = (f: Fact): boolean => {
     if (f.t === 'point') {
       const x = evalExpr(f.x, {});
       const y = evalExpr(f.y, {});
       return Number.isFinite(x) && Number.isFinite(y) && Math.abs(x) < 1e-12 && Math.abs(y) < 1e-12;
     }
+    if (f.t === 'centre-of') return f.eq !== undefined ? isCanonicalCircle(f.eq) : circleFacts.size === 1 && canonicalIds.size === 1;
     // Rule 2: a centre the student named, of a circle centred on the origin, occupies the origin.
     return f.t === 'derived' && !f.auto && f.rule.t === 'circle-centre' && canonicalIds.has(f.rule.curve);
   };

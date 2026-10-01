@@ -29,6 +29,7 @@
 import type { DerivedRule } from './derived';
 import type { AngleName, Constraint, Direction, TangentLineRef } from './solve';
 import type { Expr } from './expr';
+import type { LengthExpr } from './lengths';
 import { lineIdOf, numeralCurveId } from './names';
 
 export type Id = string;
@@ -330,7 +331,42 @@ export type Fact =
    * means is a question about the construction, so M1 answers it, and refuses where the figure
    * holds none or several of that kind.
    */
-  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind });
+  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind; circle?: string })
+  /*
+   * `circle` on `on-kind` (#1619 B1): «A על מעגל M» — the circle named by its CENTRE LETTER (or numeral),
+   * resolved at M1 through the one name chain (`circleByName`), where the bare kind means the one circle.
+   */
+  /**
+   * «O מרכז המעגל» · «P מרכז המעגל x^2+y^2=16» (#1598, #1619 B1) — NAMES the centre of the contextual
+   * circle, or of the circle with this equation. Which circle is M1's question; what the name lowers to
+   * depends on how that circle was stated (a derived centre of an equation circle, the circumcentre of a
+   * computed one, the centre point a centred circle already has), and with NO circle at all it creates one
+   * on this centre — the `diameter-of` precedent (#1324): a sentence about «המעגל» that finds none states it.
+   * `create` is that statement's facts, lowered by the parser from the canonical creation sentence («נתון
+   * מעגל שמרכזו O», «נתון מעגל O שמשוואתו …»), so the creation has one lowering, not a second copy here.
+   */
+  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[] })
+  /**
+   * A sentence that uses «מרכז המעגל» as a POINT (#1619 B1) — «CD עובר דרך מרכז המעגל». The parser lowers
+   * the sentence with `CENTRE_SENTINEL` in the centre's place; M1 resolves which point the centre IS and
+   * applies the facts with that name. One mechanism for every sentence that names the centre by its role.
+   */
+  | (FactBase & { t: 'via-centre'; facts: Fact[]; phrase: string })
+  /**
+   * «B נמצאת מחוץ למעגל» · «… בתוך המעגל» · «E נמצאת על הקשת הקטנה AC» (#1619 B1) — a REGION of the
+   * contextual (or named) circle. M1 resolves the circle and lowers to the `sign` selector over its
+   * `power` / `arc-side` quantity; an arc also puts its point and the chord's ends on the circle.
+   */
+  | (FactBase & { t: 'circle-region'; id: Id; region: 'outside' | 'inside' | 'minor-arc' | 'major-arc'; a?: Id; b?: Id; circle?: string })
+  /**
+   * «אורך הקטע AB שווה לרדיוס המעגל» (#1619 B1) — the radius equals a MEASURED length. The `radius-of`
+   * resolution, with a length on the other side: M1 lowers it to the `length-eq` whose right side is the
+   * circle's own radius expression.
+   */
+  | (FactBase & { t: 'radius-length'; circle?: string; length: LengthExpr });
+
+/** The stand-in a `via-centre` sentence carries for «מרכז המעגל» — a name no student writes (#1619 B1). */
+export const CENTRE_SENTINEL = 'Z₁';
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list
@@ -634,8 +670,20 @@ export type Selector =
    */
   | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr } };
 
-/** A quantity the figure DERIVES — never a symbol the student declared (that is a domain, kind 1). */
-export type Quantity = { k: 'slope'; u: Direction };
+/**
+ * A quantity the figure DERIVES — never a symbol the student declared (that is a domain, kind 1).
+ *
+ * `power` and `arc-side` (#1619 B1, ADR-AG-193) are the circle's two REGIONS, each the sign of a derived
+ * quantity and so members here rather than a fourth selector kind (the #1201 shape the slope member warned
+ * against): «B נמצאת מחוץ למעגל» is the POWER of B with respect to the circle, |PC|² − r², positive; «E על
+ * הקשת הקטנה AC» is E on the side of the chord AC away from the centre — `arc-side` is the product of the two
+ * sides, positive on the MAJOR arc's side. Both consume no freedom (a region, `between`'s kind), and
+ * `circle` is the id M1 resolved, never a name.
+ */
+export type Quantity =
+  | { k: 'slope'; u: Direction }
+  | { k: 'power'; p: Id; circle: Id }
+  | { k: 'arc-side'; p: Id; a: Id; b: Id; circle: Id };
 
 export const EMPTY_CONSTRUCTION: Construction = {
   params: [],

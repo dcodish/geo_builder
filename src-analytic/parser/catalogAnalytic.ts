@@ -315,6 +315,61 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['נתון מעגל K'],
   },
 
+  // The 4-point questions' circle sentences (#1619 B1, ADR-AG-193) — the exam's own wording about the
+  // circle it has: points on it, its axis crossings, its centre placed, its regions. Not featured: the six
+  // featured seats are #1347's pedagogy call.
+  { category: 'circles', family: 'F5', he: 'המעגל עובר דרך A', en: 'the circle passes through A', needs: ['נתון מעגל שמרכזו M'] },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'המעגל חותך את ציר ה-x בנקודות B ו-C',
+    en: 'the circle cuts the x-axis at points B and C',
+    needs: ['נתון מעגל שמרכזו M'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'המעגל חותך את החלק החיובי של ציר ה-x בנקודה A',
+    en: 'the circle cuts the positive x-axis at A',
+    needs: ['נתון מעגל שמרכזו M'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'B היא אחת מנקודות החיתוך של המעגל עם ציר ה-y',
+    en: 'B is one of the intersection points of the circle with the y-axis',
+    needs: ['נתון מעגל שמרכזו M'],
+  },
+  { category: 'circles', family: 'F5', he: 'מרכז המעגל M נמצא על ציר ה-y', en: 'the centre of the circle, M, is on the y-axis', needs: ['נתון מעגל שמרכזו M'] },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'הנקודה B נמצאת מחוץ למעגל',
+    en: 'B is outside the circle',
+    needs: ['נתון מעגל שמרכזו M(0,0)', 'רדיוס המעגל הוא 5'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'הנקודה E נמצאת על הקשת הקטנה AC',
+    en: 'E is on the minor arc AC',
+    needs: ['נתון מעגל שמרכזו M(0,0)', 'רדיוס המעגל הוא 5', 'A(5,0)', 'C(0,5)'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'אורך הקטע AB שווה לרדיוס המעגל',
+    en: 'AB equals the radius of the circle',
+    needs: ['נתון מעגל שמרכזו M', 'A(0,0)', 'B(3,4)'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'CD עובר דרך מרכז המעגל',
+    en: 'CD passes through the centre of the circle',
+    needs: ['נתון מעגל שמרכזו M', 'C(1,2)', 'D(4,6)'],
+  },
+
   // --- F6 · conics by equation (canonical only — D6/§2a) ---
   { category: 'conics', family: 'F6', he: 'נתונה פרבולה קנונית שמשוואתה y^2=54x', en: 'canonical parabola y^2=54x' },
   // A conic may be NAMED like a circle (#1271) — two parabolas in one figure are referable.
@@ -664,6 +719,9 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'O is the centre of circle I',
     needs: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9'],
   },
+  // The centre of the circle the figure HAS, named — contextually or by its equation (#1598, ADR-AG-193).
+  { category: 'derived', family: 'F16', he: 'O מרכז המעגל', en: 'O is the centre of the circle', needs: ['(x-3)^2+(y-4)^2=9'] },
+  { category: 'derived', family: 'F16', he: 'P מרכז המעגל x^2+y^2=16', en: 'P is the centre of the circle x^2+y^2=16', needs: ['O(5,5)', 'x^2+y^2=16'] },
   // The crossing sentence and the point-on-a-named-circle (#1429): neither had a catalog row, so
   // the panel could not teach them and the LLM lane could not emit them — the discoverability half
   // of the operand-resolver class.
@@ -690,6 +748,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'P on circle I',
     needs: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9'],
   },
+  // A circle named by its CENTRE LETTER (#1619 B1) — the exam's «מעגל M».
+  { category: 'points', family: 'F3', he: 'A על מעגל M', en: 'A is on circle M', needs: ['נתון מעגל שמרכזו M'] },
 
   // --- F16 · derived points over stated vertices (02c §8) ---
   {

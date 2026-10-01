@@ -402,9 +402,10 @@ export interface Namable {
  *
  *  - a point already sits there (the student named it earlier, by this route or another);
  *  - the circle was stated BY its centre letter («מעגל O שמשוואתו …», #1059), so the letter IS the name;
- *  - the circle is anonymous, so there is no «המעגל ‹name›» to write — a sentence that cannot round-trip
- *    must not be offered (ADR-AG-048's «two surfaces, one grammar», and ADR-AG-054's rule that a ring
- *    whose click fails is worse than no ring).
+ *  - (until #1598) the circle is anonymous, so there was no «המעגל ‹name›» to write — a sentence that
+ *    cannot round-trip must not be offered (ADR-AG-048's «two surfaces, one grammar», and ADR-AG-054's
+ *    rule that a ring whose click fails is worse than no ring). Since #1598 / ADR-AG-193 an anonymous
+ *    circle IS writable — by its equation — so it is offered with that sentence.
  *
  * It travels the crossing's road rather than forking it: the same `Namable` shape, the same `freeLetter`,
  * and the sentence is what the parser reads back — never a point minted behind the grammar's back.
@@ -430,10 +431,30 @@ export function pointAt(figure: Figure, x: number, y: number): string | null {
 
 export function centresOf(figure: Figure, letter: string): Namable[] {
   const out: Namable[] = [];
+  const circles = figure.curves.filter((cu) => cu.stated && cu.curve.kind === 'circle');
   for (const cu of figure.curves) {
     if (!cu.stated) continue;
     const circle = cu.curve as { kind: string; cx?: number; cy?: number };
     if (circle.kind !== 'circle' || circle.cx === undefined || circle.cy === undefined) continue;
+    // Already named: a point sits on the centre, whatever route put it there (#1167).
+    if (pointAt(figure, circle.cx, circle.cy) !== null) continue;
+
+    /**
+     * AN UNNAMED CIRCLE'S CENTRE IS NAMED BY ITS EQUATION (#1598, #1619 B1). «P מרכז המעגל x^2+y^2=16» is a
+     * sentence the grammar now reads back (the `centre-of` fact, resolved by the ADR-AG-023/#1342 identity),
+     * so the ring that used to be withheld for want of a sentence is offered with this one. A circle with
+     * neither a numeral nor an equation of its own (a computed circle) is named contextually when it is the
+     * figure's only circle — «P מרכז המעגל» — and offered nothing when it is one of several.
+     */
+    const eqSrc = cu.id.startsWith('curve-') ? cu.label.eqSrc : undefined;
+    if (eqSrc) {
+      out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence: `${letter} מרכז המעגל ${eqSrc}` });
+      continue;
+    }
+    if (!numeralKey(cu.id) && circles.length === 1 && cu.id.startsWith('circle-thru-')) {
+      out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence: `${letter} מרכז המעגל` });
+      continue;
+    }
 
     /**
      * The student's own letter comes from the ID, not from `label.name`.
@@ -447,11 +468,6 @@ export function centresOf(figure: Figure, letter: string): Namable[] {
     // a hand-sliced `circle-` prefix read `circle-at-O` as a circle called «at-O».
     if (!numeralKey(cu.id) || refKindOf(cu.id) !== 'circle') continue;
     const name = statedName(cu.id);
-
-    // Already named: a point sits on the centre, whatever route put it there. Same question the
-    // description layer asks, and now literally the same function (#1167).
-    if (pointAt(figure, circle.cx, circle.cy) !== null) continue;
-
     out.push({
       id: `centre-${cu.id}`,
       x: circle.cx,
