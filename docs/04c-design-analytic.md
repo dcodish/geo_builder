@@ -1808,3 +1808,19 @@ supported» (ADR-AG-170); a completion that is not a command at all (`not-handle
 the student's ORIGINAL refusal — nothing was understood, and the move may well be supported.
 
 **The entailment test is judged over CONFIGURATIONS, not over the trial ([ADR-AG-188](06c-decisions-analytic.md#adr-ag-188), #1629).** The trial derivation re-searches seeds until the new line holds, so "the given holds in the trial" is true for any given that merely *selects* among discrete configurations. The "freedom did not drop" condition cannot catch this, because mirror images at 0 DOF have no freedom to lose. The gate therefore has a fourth condition, checked last because it is the only one that costs evaluations. The constraints the new line stated (`Derivation.constraintLine`, the fold's own `constraintFact` attribution carried to the line) must hold in every figure of the CURRENT construction's configuration pool (`evaluate.holdsInEveryConfiguration`). That is the same pool, the same residual and the same `SATISFIED_EPS` that `isKnowledge`, `knownOptions`, `knownCurve` and `unsatisfied` use. A residual that cannot be judged reads as "not entailed", so the line records. The pool is filled on demand. On the page, `poolScheduler` has usually completed it already, and if it has not, one submit pays the at most 24 cached evaluations the idle loop would have spent.
+
+## One decision for the view after any change ([ADR-AG-190](06c-decisions-analytic.md#adr-ag-190), #1624)
+
+The App's box effect (keyed on the drawn box and the seed) makes one call, `viewAfterChange(from, view, to,
+change, surface)` in `render/view.ts`, whatever changed the figure: `change` is `'configuration'` when the
+«הציגו תצורה אחרת» button set `carryFrameRef`, else `'figure'`. The function is pure box arithmetic.
+Its candidate is the carried window for a press (`carryWindow`, ADR-AG-137) and the current relative view
+otherwise; it returns the candidate itself when `boxContains(viewBox(to, candidate, surface), to)` — the
+drawn box is already padded (`engine/evaluate.ts` `viewBox`, plus shown traces via `app/drawnBox.ts`), so
+containment includes the margin. Otherwise it returns `viewShowing(union, to, surface)`, the view whose
+window contains the union of the candidate window and the drawn box: centre = the union's centre, and the
+zoom solved from `max(halfY, halfX / aspect)` exactly as `carryWindow` inverts `viewBox`'s aspect step —
+the window only grows, the scale stays one isotropic number. The single non-union branch is #1225's: for
+`'figure'`, a candidate through which `figureIsVisible` (≥ 50% per axis) fails returns `INITIAL_VIEW`.
+`figureIsVisible` is therefore now only the "has it left" test; the "is it shown" test is containment.
+The decision is in `render/view.ts` rather than inline in `App.tsx` so the locks call it (ADR-W-053).

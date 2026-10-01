@@ -8516,3 +8516,41 @@ A subject whose tail the reader cannot account for, or with a capital letter bef
 **Not built.** The pool is SAMPLED, never proven (ADR-AG-001 D1, as ADR-AG-180 states). A configuration that the 24 seeds reach less than about once in 24 could still hide, and a given that rules out only that configuration would then still read as "already follows". The escalation path is the one ADR-AG-180 names (exact per-object enumeration), not a larger sample.
 
 **Consequences.** `src-analytic/engine/evaluate.ts` (`holdsInEveryConfiguration`), `src-analytic/engine/derive.ts` (`Derivation.constraintLine`, set on `EMPTY_DERIVATION` too) and `src-analytic/app/submit.ts` (the fourth condition). Lock: `issue-1629-selecting-given.test.ts` (9 tests). 6 of its 9 tests fail on the pre-change code: every «±1/2 records» case, at each of the three seeds. The premise, the post-record pool and the √80 control pass both before and after.
+
+## ADR-AG-190 — The whole shape is always on the canvas: keep the frame while the figure fits, widen it to the union when it does not (#1624)
+
+**Status:** accepted · 2026-10-01 · fix session on #1624 (auto-ok 2026-10-01, ADR-W-014)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R127** (new) — and R25a's "re-fits only when the new configuration has largely left it" sentence is superseded for a press · **Design:** [04c](04c-design-analytic.md) — "One decision for the view after any change" · **LADDER stage:** view state; no engine, solve or display change.
+
+**Amends** [ADR-AG-137](#adr-ag-137) (#1262) and **completes** [ADR-AG-103](#adr-ag-103) (#1225): one notion of when the view may move, now with the figure's visibility as its invariant.
+
+**Operator, 2026-10-01** (playing PR #1625, «דלתון ABCD» + «הציגו תצורה אחרת», A and B on the canvas, the other two vertices off it): *"when i press show new config, the image jumps and sometimes i dont see the full image on canvas due to the position it put the shape. we should have a rule that the full shape is always in the canvas. we can play with the ratio of axis but the image needs to be in window"*.
+
+**Context — measured before.** The App's rule replayed through the real seed walk (`anotherConfiguration`), 24 presses from seed 0, 1200×800 surface — presses that left at least one vertex off the canvas:
+
+```
+טרפז ABCD 13   דלתון ABCD 4   מקבילית ABCD 11   מלבן ABCD 3   ריבוע ABCD 2
+מעוין ABCD 1   מרובע ABCD 22  משולש ABC 18
+```
+
+And on #1262's own figure («A(-9a,0)» · «B(41a,0)» · «נקודה P» · «PA מאונך ל-PB»), the constant frame ADR-AG-137 measured as its success left **B off the canvas at 4 of 7 presses** (seeds 2, 3, 6, 7) — its lock asserted the width was constant and never asked whether the figure was in it.
+
+**Root cause.** #1262 carried the frame across a press and kept it whenever `figureIsVisible` said the new figure was *largely* (≥ 50% per axis) inside. That predicate is #1225's, and it answers *has the figure LEFT the view* — the right question for deciding to re-centre, the wrong one for deciding the figure is shown. "Largely" admitted every configuration half outside the kept frame; nothing anywhere asked whether the WHOLE figure was in view. Not a configuration-button special case: the fact path (`figureIsVisible(box, v) ? v : INITIAL_VIEW`) had the same hole for a student who had zoomed or panned.
+
+**Decision — the ruled rule, at one chokepoint.** `viewAfterChange(from, view, to, change, surface)` (`render/view.ts`, pure) is the decision the App's box effect takes for every trigger — a new line, an edit, an undo/redo, a shown or collapsed trace (`change: 'figure'`), and «הציגו תצורה אחרת» (`change: 'configuration'`):
+
+1. **The candidate frame.** On a press, the window the student was looking at, carried (`carryWindow`, #1262 — unchanged). On anything else, the view as it stands (relative to the figure, so the default view follows it, as before).
+2. **Keep it while the whole drawn box fits** — returned as the same object, so a press whose configuration fits does not move the frame (#1262's guarantee) and a fitting fact is a React no-op (#1225's loop guard). The drawn box is the figure's padded box plus any shown trace (ADR-AG-120), so "fits" includes the existing margin.
+3. **Otherwise widen to the union** of the candidate window and the drawn box — the smallest move that shows the whole figure. The window the student had stays inside the new one, so a press never shrinks the frame, never jumps sideways, and never re-fits from nothing.
+4. **One exception, kept from #1225, never on a press:** after a fact/edit/undo, a figure that has LARGELY left the view (the student panned or zoomed elsewhere) re-fits — the union would be mostly empty paper, and the operator asked for exactly that re-centring (*"pressing the center button does the work but this should be automatic"*).
+
+**Isotropic only — option (a).** The widened window is reached through the zoom alone; both axes keep one scale, so a right angle still looks right. Option (b), unequal x/y scales (the operator's *"we can play with the ratio of axis"*), is still an open question to him and is **not built**.
+
+**Accepted cost, stated.** Because a press never shrinks the frame, after a configuration much larger than the rest the frame stays large and later small configurations draw small. ↺ (re-centre) resets it — the same escape hatch ADR-AG-137 named, now for the opposite case.
+
+**Measured after.** The same sweep: 0 presses with a vertex or segment end outside the view, for all nine nouns (the eight above plus «טרפז ישר זווית ABCD»); every fitting press leaves the frame byte-identical; no press shrinks it. #1262's figure: the frame widens at seeds 2, 3 and 6 and then holds; B is inside at every press. Driven in a browser (`scripts/playsheets/fix-1624.json`, 1600×950): «טרפז ABCD», «דלתון ABCD», «מרובע ABCD», five presses each — all four vertices on the canvas in every screenshot; a fitting press kept the axes where they were.
+
+**Consequences.** `render/view.ts` (+`viewAfterChange`, `boxContains`, `FigureChange`; `carryWindow` now delegates to a shared `viewShowing`, behaviour unchanged). `App.tsx` (the box effect calls the one decision; `carryWindow`/`figureIsVisible` no longer imported there). Locks: `issue-1624-figure-in-view.test.ts` (14 — the 24-press sweep per noun: every point and segment end inside, a fitting press keeps the frame, no press shrinks it, the student's window stays inside; and the fact path: default view unchanged, a zoom still showing the whole figure survives, a partial view widens, a figure that has left re-fits, a press never re-fits). Pre-change (the old rule through the same seam): 11 of 14 red. `issue-1262-frame-stays.test.ts`: the sweep row MOVED, not deleted — it now calls `viewAfterChange` (it replayed the rule inline) and asserts no lurch (every frame contains the last) plus the whole figure inside; the escape-hatch row is retitled (a press now widens). #1225's predicate locks unchanged.
+
+---

@@ -1872,3 +1872,19 @@ focus and an ellipse's foci are unchanged: coordinates alone.
 *(Operator, 2026-10-01, on «נתון: שיפוע הצלע BC הוא -1/2»: "T4 — fails on last statement". The tool answered «זה כבר נובע» and kept drawing the square whose slope is +1/2.)*
 
 When the givens admit more than one drawing (mirror images, two roots) even with no freedom left, a given that holds in one drawing and fails in another **chooses** between them. It is not redundant. It is recorded like any other given, its row appears, and the figure moves to a drawing that satisfies it. «הציגו תצורה אחרת» then stays within the drawings it allows. On the square from exam 15 Q5, «שיפוע הצלע BC הוא -1/2» records and draws B(2,4), C(10,0), while «…הוא 1/2» records and draws the mirror B(−2,4), C(−10,0). «זה כבר נובע מהנתונים שכתבתם» is kept for a given that is true in every drawing, such as «אורך הצלע AB הוא √80» on the same square. When the tool cannot tell, it records the line: an extra row costs nothing, but a dropped given contradicts the figure.
+
+**R127 — the whole figure is always on the canvas**
+([ADR-AG-190](06c-decisions-analytic.md#adr-ag-190), [#1624](https://github.com/dcodish/geo_builder/issues/1624)).
+*(Operator, 2026-10-01: "we should have a rule that the full shape is always in the canvas. we can play with the ratio of axis but the image needs to be in window".)*
+
+After any change — a new line, an edit, an undo, «הציגו תצורה אחרת» — every drawn point and every drawn
+segment of the figure is inside the canvas, with the usual margin. The frame does not move for a change
+that already fits, so pressing through configurations still flips transparencies on one projector (R25a);
+when a configuration does not fit, the frame widens just enough to show it — the window the student was
+looking at stays inside the new one, so a press never shrinks the frame, never jumps sideways and never
+re-fits from nothing. A figure that has largely left a panned or zoomed view after a new line is
+re-centred (R101's rule, #1225). Both axes keep one scale: a square still looks square. *(Supersedes, for a
+press, R25a's "re-fits only when the new configuration has largely left it". Unequal axis scales are an
+open question to the operator and not part of this requirement.)*
+
+---
