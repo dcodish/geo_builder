@@ -21,7 +21,7 @@ import { parabolaDirectrix, resolveCurve } from './curves';
 import { parseLengthExpr } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule } from './derived';
 import { sameDerivation } from './sameDerivation';
-import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, type AngleName, type AngleRef } from './solve';
+import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, ringsNamed, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { RESERVED_SYMBOLS } from './carriers';
@@ -34,6 +34,7 @@ import {
   isPositional,
   namesObject,
   objectById,
+  tangentLineId,
   type Construction,
   type Curve,
   type CurveObject,
@@ -651,6 +652,77 @@ function priorOf(
   return prior.kind === f.t ? { same: prior } : { clash: true, prior };
 }
 
+/** A tangent OBJECT (#1619 B3): the line built at a touch point, perpendicular to the radius there. */
+const isTangentObject = (o: GeoObject): boolean => o.kind === 'line-at' && o.dir.k === 'radius' && o.perp;
+
+/**
+ * THE CIRCLE A NAME MEANS — the `tangent-of`/`diameter-of` chain (a numeral id, a centre-letter id, the
+ * student's own name), or the ONE circle in the figure when no name was said. Shared so the tangency
+ * family cannot drift (#1619 B3).
+ */
+function circleNamed(
+  c: Construction,
+  name: string | undefined,
+  src: string,
+): { ok: true; o: GeoObject } | { ok: false; error: ApplyError } {
+  if (name !== undefined) {
+    const o = objectById(c, numeralCurveId('circle', name)) ?? objectById(c, `circle-at-${name}`) ?? curveByName(c, name);
+    if (!o || curveKindOf(o) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', name)) };
+    return { ok: true, o };
+  }
+  const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+  if (circles.length !== 1) return { ok: false, error: noHost(src, 'circle', circles) };
+  return { ok: true, o: circles[0] };
+}
+
+/**
+ * A TANGENCY AT A NAMED POINT (#1619 B3, #1430, ADR-AG-195) — «המעגל משיק לציר ה-x בנקודה A», «הישר BC משיק
+ * למעגל בנקודה B», «הקטע CD משיק למעגל בנקודה A».
+ *
+ * Tangent at A ⇔ A is on the circle, A is on the line, and the line is perpendicular to the radius at A —
+ * three equations, and they say tangency exactly (a line through a point of a circle, perpendicular to the
+ * radius there, meets it nowhere else). Lowered to those three statements, so nothing new is solved: the
+ * incidences are the ones «A על המעגל» and «A על הישר BC» carry, and the perpendicularity is the relation
+ * «⊥» over the radius DIRECTION. Because the radius is read off the RESOLVED circle, it holds for a circle
+ * stated by its equation, by its centre, or computed from points — where the no-point tangency
+ * (`tangent-line`, distance = radius) needs a free radius to pull on.
+ *
+ * A touch point that IS an end of the named line («הישר BC משיק … בנקודה B») is on it already. The
+ * SELECTORS the sentence carries (the ends distinct; a bounded noun's `between`, «הקטע CD») are emitted by
+ * the parser beside this fact, where `derive` can blame a configuration that fails one on the line.
+ */
+function applyTouchAt(
+  c: Construction,
+  host: GeoObject,
+  at: Id,
+  axes: ReadonlyArray<'x' | 'y'>,
+  lines: readonly TangentLineRef[],
+  src: string,
+): ApplyOutcome {
+  if (axes.length + lines.length !== 1) return { ok: false, error: { code: 'out-of-scope', detail: src } };
+  const facts: Fact[] = [{ t: 'constraint', k: { t: 'on-curve', id: at, curve: host.id }, src }];
+  let dir: Direction;
+  if (axes.length === 1) {
+    const axis = axes[0];
+    dir = { k: 'axis', axis };
+    const onAxis: Constraint = axis === 'x' ? { t: 'on-line', id: at, a: 0, b: 1, c: 0 } : { t: 'on-line', id: at, a: 1, b: 0, c: 0 };
+    facts.push({ t: 'constraint', k: onAxis, src });
+  } else {
+    const line = lines[0];
+    if (line.kind === 'curve') {
+      dir = { k: 'curve', id: line.id };
+      facts.push({ t: 'constraint', k: { t: 'on-curve', id: at, curve: line.id }, src });
+    } else {
+      dir = { k: 'points', a: line.a, b: line.b };
+      if (at !== line.a && at !== line.b) {
+        facts.push({ t: 'constraint', k: { t: 'on-line-2pt', id: at, a: line.a, b: line.b, ...(line.bounded ? { bounded: true } : {}) }, src });
+      }
+    }
+  }
+  facts.push({ t: 'constraint', k: { t: 'relation', rel: 'perpendicular', u: { k: 'radius', circle: host.id, at }, v: dir }, src });
+  return applyAll(c, facts);
+}
+
 /**
  * Apply several facts as ONE statement (#1070).
  *
@@ -1099,7 +1171,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * is a circle-to-circle tangency, which is its own capability, refused BY NAME until it is
        * built.
        */
-      if (f.k.t === 'tangent-line' && f.k.line.kind === 'curve') {
+      if ((f.k.t === 'tangent-line' || f.k.t === 'tangent-curve') && f.k.line.kind === 'curve') {
         const o = objectById(c, f.k.line.id);
         if (o && curveKindOf(o) !== 'line') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
       }
@@ -1467,8 +1539,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * Resolved against a PROBE environment, the same device `sameNumbers` uses here: a conic's KIND
        * does not turn on the value of its parameters in any form the corpus writes.
        */
-      const matches = c.objects.filter((o) => curveKindOf(o) === f.kind);
-      if (matches.length !== 1) return { ok: false, error: noHost(f.src, f.kind, matches) };
+      // «המשיק» — the one tangent OBJECT (#1619 B3): a line built at a touch point, never any line.
+      const matches = c.objects.filter((o) => (f.kind === 'tangent' ? isTangentObject(o) : curveKindOf(o) === f.kind));
+      if (matches.length !== 1) return { ok: false, error: noHost(f.src, f.kind === 'tangent' ? 'line' : f.kind, matches) };
       return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: matches[0].id }, src: f.src });
     }
 
@@ -1488,7 +1561,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
 
     case 'tangent-of': {
       let host: GeoObject | undefined;
-      if (f.circle !== undefined) {
+      if (f.circleId !== undefined) {
+        host = objectById(c, f.circleId);
+        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, f.circleId) };
+      } else if (f.circle !== undefined) {
         // The line-first order names its circle — «הישר l1 משיק למעגל M» (#1501). The same lookup
         // chain as `diameter-of`: a numeral id, a centre-letter id, or the student's own name.
         host =
@@ -1503,13 +1579,23 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (circles.length !== 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
         host = circles[0];
       }
+      // THE TOUCH POINT NAMED (#1619 B3, ADR-AG-195): any circle — the radius reads the resolved one.
+      if (f.at !== undefined) return applyTouchAt(c, host, f.at, f.axes, f.lines ?? [], f.src);
       /**
-       * Tangency pins the RADIUS against the CENTRE, so it needs a circle that has both to pull
-       * on. A circle known only by its equation, or computed from its points, has neither free —
-       * the given cannot be honoured, and it is refused BY NAME (`out-of-scope`), never dropped
-       * (the `diameter-of` rule, one case up).
+       * A circle the figure DETERMINES — stated by its equation, or computed from points (#1430 step 1,
+       * ADR-AG-195): the distance from ITS centre to the line is ITS radius, both read off the resolved
+       * circle (`tangent-curve`), so the freedom consumed is the line's («y=kx+1» pins k). An AXIS has no
+       * freedom to give, so a determined circle touching one is a claim this rule does not judge — refused
+       * BY NAME (`out-of-scope`), never dropped (the `diameter-of` rule, one case up).
        */
-      if (host.kind !== 'circle-at') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      if (host.kind !== 'circle-at') {
+        if (f.axes.length > 0) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+        const circleId = host.id;
+        return applyAll(
+          c,
+          (f.lines ?? []).map((line) => ({ t: 'constraint' as const, k: { t: 'tangent-curve' as const, circle: circleId, line }, src: f.src })),
+        );
+      }
       const circle = host;
       return applyAll(c, [
         ...f.axes.map((axis) => ({
@@ -1522,6 +1608,44 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           k: { t: 'tangent-line' as const, centre: circle.centre, r: circle.r, line },
           src: f.src,
         })),
+      ]);
+    }
+
+    /**
+     * «המשיק למעגל בנקודה A» — the tangent line as an OBJECT (#1619 B3, ADR-AG-195). The circle is
+     * resolved by the `tangent-of` chain; A lies on it, and the line through A is perpendicular to the
+     * radius there — a `line-at` on the radius direction turned a quarter, 0 DOF, closed form.
+     */
+    case 'tangent-line-at': {
+      const host = circleNamed(c, f.circle, f.src);
+      if (!host.ok) return host;
+      return applyAll(c, [
+        { t: 'constraint', k: { t: 'on-curve', id: f.at, curve: host.o.id }, src: f.src },
+        { t: 'line-at', id: tangentLineId(f.at), through: f.at, dir: { k: 'radius', circle: host.o.id, at: f.at }, perp: true, src: f.src },
+      ]);
+    }
+
+    /**
+     * «משוואת המשיק היא 4x+3y=40» — WHICH tangent is the figure's answer (#1619 B3): the one tangent object
+     * (the equation is then a given about it — the line through its touch point AND tangent there, the
+     * same lowering «משוואת המשיק בנקודה A היא …» carries), none (the stated line is tangent to the circle,
+     * «הישר … משיק למעגל»), several (refused, never a pick).
+     */
+    case 'tangent-eq': {
+      const tangents = c.objects.filter(isTangentObject);
+      if (tangents.length > 1) return { ok: false, error: noHost(f.src, 'line', tangents) };
+      const id = f.id;
+      if (tangents.length === 1) {
+        const t = tangents[0] as Extract<GeoObject, { kind: 'line-at' }>;
+        const circleId = t.dir.k === 'radius' ? t.dir.circle : undefined;
+        return applyAll(c, [
+          { t: 'curve', id, label: { name: '', eqSrc: f.eqSrc }, curve: { eq: f.eq }, stated: false, src: f.src },
+          { t: 'tangent-of', axes: [], lines: [{ kind: 'curve', id, label: f.eqSrc }], ...(circleId ? { circleId } : {}), at: t.through, src: f.src },
+        ]);
+      }
+      return applyAll(c, [
+        { t: 'curve', id, label: { name: '', eqSrc: f.eqSrc, kind: 'line' }, curve: { kind: 'line', eq: f.eq }, stated: true, src: f.src },
+        { t: 'tangent-of', axes: [], lines: [{ kind: 'curve', id, label: f.eqSrc }], ...(f.circle !== undefined ? { circle: f.circle } : {}), src: f.src },
       ]);
     }
 

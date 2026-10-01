@@ -314,6 +314,34 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'circle M is tangent to circle K at T',
     needs: ['נתון מעגל K'],
   },
+  // Tangency AT a named point, the tangent as an object, and chords (#1619 B3, #1430, ADR-AG-195) — the
+  // 471 booklet's own sentences. Not featured: which rows take the section's six seats is #1347's call.
+  { category: 'circles', family: 'F5', he: 'המעגל משיק לציר ה-x בנקודה A', en: 'the circle is tangent to the x-axis at the point A', needs: ['נתון מעגל שמרכזו M(6,10)'] },
+  { category: 'circles', family: 'F5', he: 'הישר BC משיק למעגל בנקודה B', en: 'the line BC is tangent to the circle at B', needs: ['נתון מעגל x^2+y^2=25', 'B(3,4)'] },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה',
+    en: 'AB and BC are tangent to the circle at the points A and C respectively',
+    needs: ['נתון מעגל שמרכזו O(-2,1)', 'B(8,11)'],
+  },
+  { category: 'circles', family: 'F5', he: 'המשיק למעגל בנקודה A', en: 'the tangent to the circle at A', needs: ['נתון מעגל x^2+y^2=25', 'A(3,4)'] },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'משוואת המשיק למעגל בנקודה A היא 3x+4y=25',
+    en: 'the equation of the tangent to the circle at A is 3x+4y=25',
+    needs: ['נתון מעגל x^2+y^2=25', 'A(3,4)'],
+  },
+  { category: 'circles', family: 'F5', he: 'דרך P עובר משיק למעגל', en: 'a tangent to the circle passes through P', needs: ['נתון מעגל x^2+y^2=25', 'P(10,0)'] },
+  { category: 'circles', family: 'F5', he: 'AB מיתר במעגל', en: 'AB is a chord of the circle', needs: ['נתון מעגל x^2+y^2=25'] },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'במעגל המיתרים AC ו-BD נפגשים בנקודה E',
+    en: 'in the circle the chords AC and BD meet at E',
+    needs: ['נתון מעגל x^2+y^2=25'],
+  },
 
   // --- F6 · conics by equation (canonical only — D6/§2a) ---
   { category: 'conics', family: 'F6', he: 'נתונה פרבולה קנונית שמשוואתה y^2=54x', en: 'canonical parabola y^2=54x' },

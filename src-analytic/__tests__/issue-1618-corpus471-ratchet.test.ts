@@ -31,7 +31,7 @@ interface CorpusQuestion {
 const CORPUS: CorpusQuestion[] = JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'corpus471.json'), 'utf8'));
 
 /** The floors. Raise them in the commit that earns them; never lower them. */
-const FLOOR = { lines: 143, questions: 5 };
+const FLOOR = { lines: 153, questions: 7 };
 
 function measure() {
   let lines = 0;
