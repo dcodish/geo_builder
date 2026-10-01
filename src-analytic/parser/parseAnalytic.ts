@@ -29,7 +29,7 @@ function valueExpr(src: string): Expr | null {
 }
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, type NumeralKind } from '../engine/names';
-import { CENTRE_SENTINEL, UNBOUNDED, circleDefPoints, diameterCircleId, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
+import { CENTRE_SENTINEL, CIRCLE_SENTINEL, UNBOUNDED, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 import {
   centreClauses,
@@ -506,6 +506,12 @@ interface CurveHit {
   kind: CurveKind;
   eqSrc: string;
   /**
+   * «משוואת המעגל היא …» — the equation of THE circle, definite and unnamed (#1633, ADR-AG-196): a statement
+   * about the circle the figure has when it has one, lowered through `the-circle`; only with none is it the
+   * circle's own creation.
+   */
+  contextual?: boolean;
+  /**
    * WHAT THE NOUN SAID THE OBJECT IS (#1234) — `'line'` infinite, `'segment'` bounded, `undefined`
    * when the student wrote no noun and the extent must be inherited from what the figure already
    * holds. `direction()` deliberately discards the noun, so routing the operand through it alone
@@ -566,6 +572,13 @@ const CIRCLE_NUMERAL_RUN = `(?:(${NUMERAL_ALT})${NUMERAL_SEP})?`;
  */
 const NAMING_TAIL_HE = `(?:\\s*,)?(?:\\s+[-–](?=\\s))?\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*`;
 const NAMING_TAIL_EN = '(?:\\s*,)?(?:\\s+[-–](?=\\s))?\\s*:?\\s*(?:is\\s+|whose equation is\\s+)?';
+
+/**
+ * «משוואת המעגל היא …» · «נתונה משוואת המעגל: …» — the equation PREDICATED of THE circle (#1633, ADR-AG-196): a
+ * copula or a colon after «המעגל». Without one («משוואת המעגל x²+y²=25», the catalog's naming form) the phrase
+ * names a circle by its equation and keeps creating it.
+ */
+const CONTEXTUAL_CIRCLE_EQ_HE = new RegExp(`^${HE_GIVEN}${HE_EQ_OF}\\s+המעגל(?:\\s+הנתון)?\\s*(?::|\\s(?:היא|הוא)(?=[\\s:]))`);
 
 function matchCurve(line: string): CurveHit | null {
   // --- line: «נתון הישר ℓ1: 4y-3x-20=0» · «משוואת הישר AC היא y=-2x+8» · «הישר x=-4» ---
@@ -748,6 +761,7 @@ function matchCurve(line: string): CurveHit | null {
       name: numeral ? `${heNamed[1]} ${numeral}` : '',
       kind,
       eqSrc: heNamed[3],
+      ...(kind === 'circle' && !numeral && CONTEXTUAL_CIRCLE_EQ_HE.test(line) ? { contextual: true } : {}),
     };
   }
 
@@ -955,7 +969,7 @@ function centreOfCircle(line: string): RuleOutcome {
   // numeral, and would create a circle with no centre named at all.
   const created = (sentence: string): Fact[] | undefined => {
     const r = parseClause(sentence);
-    if (!r.ok || !r.facts.some((f) => (f.t === 'derived' || f.t === 'circle-at' || f.t === 'declare') && ('centre' in f ? f.centre : f.id) === id)) return undefined;
+    if (!r.ok || !r.facts.flatMap(factsWithin).some((f) => (f.t === 'derived' || f.t === 'circle-at' || f.t === 'declare') && ('centre' in f ? f.centre : f.id) === id)) return undefined;
     return r.facts.map((f) => ({ ...f, src: line }));
   };
   if (tail === undefined) {
@@ -2798,8 +2812,11 @@ function cyclicHost(tail: string | undefined, vertices: Id[], line: string): Cir
     const id = numeralCurveId('circle', t);
     return { facts: [{ t: 'circle-thru', id, def: { t: 'through', pts }, name: t, src: line }], id, through: pts };
   }
-  const r = parseClause(`מעגל ${t}`);
-  if (!r.ok) return r.code === 'not-handled' ? null : r;
+  const parsed = parseClause(`מעגל ${t}`);
+  if (!parsed.ok) return parsed.code === 'not-handled' ? null : parsed;
+  // The circle the tail describes, as its creation: a described circle comes back wrapped (`the-circle`,
+  // ADR-AG-196), and the inscribed sentence decides the binding for the whole statement itself.
+  const r = { facts: parsed.facts.flatMap((f): Fact[] => (f.t === 'the-circle' ? f.create : [f])) };
   const makers = r.facts.filter(
     (f) =>
       f.t === 'circle-at' ||
@@ -2824,7 +2841,31 @@ function cyclicFacts(noun: string | undefined, run: string, tail: string | undef
   const on = shape.vertices
     .filter((v) => !host.through.includes(v))
     .map((id): Fact => ({ t: 'constraint', k: { t: 'on-curve', id, curve: host.id }, src: line }));
-  return made([...shape.facts, ...host.facts, ...on].map((f) => ({ ...f, src: line })));
+  const created = [...host.facts, ...on].map((f) => ({ ...f, src: line }));
+  /*
+   * WHICH circle (ADR-AG-196): «חסום במעגל» with no description is THE circle — the figure's one circle when
+   * it has one; a circle the sentence describes («שמרכזו M», «שמשוואתו …») is that circle when the figure
+   * already holds it. Bound, every vertex is ON it — the statement the sentence makes about that circle.
+   * «במעגל חדש» and a numeral name say which circle outright, and keep their own reading.
+   */
+  const t = tail?.trim();
+  const maker = host.facts.find((g) => g.t === 'circle-at' || g.t === 'curve');
+  // A centre letter the description names — «שמרכזו M», or «M שמשוואתו …» (the letter is the centre, #1059).
+  const centre =
+    maker?.t === 'circle-at'
+      ? maker.centre
+      : host.facts.find((g): g is Extract<Fact, { t: 'derived' }> => g.t === 'derived' && g.rule.t === 'circle-centre')?.id;
+  const match = !t ? undefined : centre ? { centre } : maker?.t === 'curve' ? { eq: maker.curve.eq } : null;
+  if (match === null || (t && /^ה?חדש$/.test(t))) return made([...shape.facts.map((g) => ({ ...g, src: line })), ...created]);
+  // Bound to a circle the figure has, an equation in the description is a statement about it too (#1633).
+  const about: Fact[] = [
+    ...(maker?.t === 'curve' ? [{ t: 'circle-eq' as const, circleId: CIRCLE_SENTINEL, eq: maker.curve.eq, src: line }] : []),
+    ...shape.vertices.map((id): Fact => ({ t: 'constraint', k: { t: 'on-curve', id, curve: CIRCLE_SENTINEL }, src: line })),
+  ];
+  return made([
+    ...shape.facts.map((g) => ({ ...g, src: line })),
+    { t: 'the-circle', create: created, about, ...(match ? { match } : {}), src: line },
+  ]);
 }
 
 /**
@@ -2982,7 +3023,22 @@ function parseCircleThru(line: string): RuleOutcome {
     // repeat there is the student's to be told about (`repeated-vertex`, at M1).
     if (bare && new Set(pts).size < 3) return null;
     const id = name ? numeralCurveId('circle', name) : `circle-thru-${[...pts].sort().join('')}`;
-    return made([{ t: 'circle-thru', id, def: { t: 'through', pts }, ...(name ? { name } : {}), src: line }]);
+    const creation: Fact = { t: 'circle-thru', id, def: { t: 'through', pts }, ...(name ? { name } : {}), src: line };
+    /*
+     * «המעגל עובר דרך הנקודות A, B ו-C» — THE circle as the subject of a predicate (ADR-AG-196): three
+     * statements about the figure's one circle when it has one, the circle through the three when it has
+     * none. «מעגל העובר דרך …» / «נתון מעגל ש…» describe a circle and keep creating it.
+     */
+    if (thru && !name && /^(?:המעגל\s+עובר(?:ת)?\s|the\s+circle\s+passes\s)/i.test(line)) {
+      // Bound, it is «A על המעגל» three times: each point introduced and put on THE circle (B1's reading of
+      // the one-point sentence).
+      const about = pts.flatMap((p): Fact[] => [
+        { t: 'declare', id: p, src: line },
+        { t: 'constraint', k: { t: 'on-curve', id: p, curve: CIRCLE_SENTINEL }, src: line },
+      ]);
+      return made([{ t: 'the-circle', create: [creation], about, src: line }]);
+    }
+    return made([creation]);
   }
 
   const define = DIAM_DEFINE_HE.exec(line) ?? DIAM_DEFINE_EN.exec(line);
@@ -4665,9 +4721,7 @@ function parseClause(raw: string): ParseResult {
           { t: 'constraint', k: { t: 'on-curve', id: named[2], curve: curve.id }, src: line },
         ]
       : [];
-    return {
-      ok: true,
-      facts: [
+    const curveFacts: Fact[] = [
         {
           t: 'curve',
           id: curve.id,
@@ -4686,8 +4740,17 @@ function parseClause(raw: string): ParseResult {
         ...through,
         ...boundedSeg,
         ...centre,
-      ],
-    };
+    ];
+    /*
+     * The equation of THE circle (#1633, ADR-AG-196): about the figure's one circle when it has one. A circle
+     * described by its centre letter («נתון מעגל M שמשוואתו …», «משוואת המעגל M היא …») is the circle the figure
+     * already has on that centre when it has one — the same statement, matched by the centre.
+     */
+    if (curve.contextual || curve.centre) {
+      const about: Fact[] = [{ t: 'circle-eq', circleId: CIRCLE_SENTINEL, eq, src: line }];
+      return made([{ t: 'the-circle', create: curveFacts, about, ...(curve.centre ? { match: { centre: curve.centre } } : {}), src: line }]);
+    }
+    return { ok: true, facts: curveFacts };
   }
 
   /**

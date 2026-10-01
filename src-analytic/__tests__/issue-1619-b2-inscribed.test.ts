@@ -33,13 +33,23 @@ const near = (a: number, b: number, tol = 1e-5) => Math.abs(a - b) <= tol * Math
 /** A figure that may be shown as satisfying its givens. */
 const whole = (d: ReturnType<typeof derive>) =>
   d.faults.length === 0 && d.figure.unsatisfied.length === 0 && d.figure.ringFaults.length === 0 && d.figure.selectorsOk;
+/** A fact without its source line, at every depth (a `the-circle` carries facts of its own — ADR-AG-196). */
+const stripSrc = (v: unknown): unknown =>
+  Array.isArray(v)
+    ? v.map(stripSrc)
+    : v && typeof v === 'object'
+      ? Object.fromEntries(Object.entries(v).filter(([k]) => k !== 'src').map(([k, x]) => [k, stripSrc(x)]))
+      : v;
 /** Facts without their source line — two spellings of one statement must lower to the same facts. */
 const factsOf = (lines: string[]): unknown[] =>
   lines.flatMap((l) => {
     const r = parseLine(l);
     if (!r.ok) throw new Error(`${l}: ${r.code}`);
-    return r.facts.map(({ src: _src, ...rest }: Fact) => rest);
+    return r.facts.map((x: Fact) => stripSrc(x));
   });
+/** The circle the sentence binds to or states (ADR-AG-196): `create` with no circle, `about` with one. */
+const SENT = '⟨the-circle⟩';
+const onAll = (ids: string[], curve: string) => ids.map((id) => ({ t: 'constraint', k: { t: 'on-curve', id, curve } }));
 
 describe('#1619 B2 — the 471 corpus questions build the exam`s own figure', () => {
   it('1/5 — «מרובע ABCD חסום במעגל שמשוואתו …»: A, B, C and the free D all on (x−2)² + (y+2)² = 100', () => {
@@ -137,25 +147,43 @@ describe('#1619 B2 — every spelling lowers to the sentences it is made of', ()
       expect(factsOf([l]), l).toEqual(base);
   });
 
+  // ADR-AG-196: «חסום במעגל» is THE circle — the figure's one circle when it has one (every vertex on it),
+  // the computed circle through the first three when it has none.
   it('the bare circle is computed through the first three vertices and the fourth is ON it', () => {
     expect(factsOf(['מרובע ABCD חסום במעגל'])).toEqual([
       ...factsOf(['מרובע ABCD']),
-      { t: 'circle-thru', id: 'circle-thru-ABC', def: { t: 'through', pts: ['A', 'B', 'C'] } },
-      { t: 'constraint', k: { t: 'on-curve', id: 'D', curve: 'circle-thru-ABC' } },
+      {
+        t: 'the-circle',
+        create: [
+          { t: 'circle-thru', id: 'circle-thru-ABC', def: { t: 'through', pts: ['A', 'B', 'C'] } },
+          { t: 'constraint', k: { t: 'on-curve', id: 'D', curve: 'circle-thru-ABC' } },
+        ],
+        about: onAll(['A', 'B', 'C', 'D'], SENT),
+      },
     ]);
   });
 
   it('a circle the sentence introduces is read by the circle rules: on a centre, by its equation, on a diameter', () => {
-    const on = (ids: string[], curve: string) => ids.map((id) => ({ t: 'constraint', k: { t: 'on-curve', id, curve } }));
+    const on = onAll;
+    // A circle the sentence DESCRIBES binds to a circle with that centre / that equation, else is stated (ADR-AG-196).
     expect(factsOf(['המרובע ABCD חסום במעגל שמרכזו M'])).toEqual([
-      ...factsOf(['מרובע ABCD', 'מעגל שמרכזו M']),
-      ...on(['A', 'B', 'C', 'D'], 'circle-at-M'),
+      ...factsOf(['מרובע ABCD']),
+      {
+        t: 'the-circle',
+        create: [...factsOf(['מעגל שמרכזו M']), ...on(['A', 'B', 'C', 'D'], 'circle-at-M')],
+        about: on(['A', 'B', 'C', 'D'], SENT),
+        match: { centre: 'M' },
+      },
     ]);
     const eq = factsOf(['מעגל שמשוואתו (x−2)² + (y+2)² = 100']);
     expect(factsOf(['מרובע ABCD חסום במעגל שמשוואתו (x−2)² + (y+2)² = 100'])).toEqual([
       ...factsOf(['מרובע ABCD']),
-      ...eq,
-      ...on(['A', 'B', 'C', 'D'], (eq[0] as { id: string }).id),
+      {
+        t: 'the-circle',
+        create: [...eq, ...on(['A', 'B', 'C', 'D'], (eq[0] as { id: string }).id)],
+        about: [{ t: 'circle-eq', circleId: SENT, eq: (eq[0] as { curve: { eq: unknown } }).curve.eq }, ...on(['A', 'B', 'C', 'D'], SENT)],
+        match: { eq: (eq[0] as { curve: { eq: unknown } }).curve.eq },
+      },
     ]);
     expect(factsOf(['משולש ABC חסום במעגל שקוטרו AC'])).toEqual([
       ...factsOf(['משולש ABC', 'מעגל שקוטרו AC']),
@@ -192,11 +220,14 @@ describe('#1619 B2 — every spelling lowers to the sentences it is made of', ()
     expect(factsOf(['הצלע AC היא קוטר במעגל'])).toEqual(factsOf(['AC קוטר במעגל']));
   });
 
+  // Integration (ADR-AG-196): the plural touch has ONE lowering — B3's tangency at a named point, one
+  // `tangent-of` with its `at` per side; «צלעות» bounds each to its side. The incircle's closed-form touch
+  // point is that lowering's incircle branch (issue-1619-integration.test.ts locks the figure).
   it('the touch list is one touch per side, paired by «בהתאמה»', () => {
-    expect(factsOf(['הצלעות AO, BO ו-AB משיקות למעגל בנקודות D, E ו-F בהתאמה'])).toEqual([
-      { t: 'touch-at', a: 'A', b: 'O', at: 'D', bounded: true },
-      { t: 'touch-at', a: 'B', b: 'O', at: 'E', bounded: true },
-      { t: 'touch-at', a: 'A', b: 'B', at: 'F', bounded: true },
+    expect(factsOf(['הצלעות AO, BO ו-AB משיקות למעגל בנקודות D, E ו-F בהתאמה']).filter((x) => (x as Fact).t === 'tangent-of')).toEqual([
+      { t: 'tangent-of', axes: [], lines: [{ kind: 'points', a: 'A', b: 'O', bounded: true }], at: 'D' },
+      { t: 'tangent-of', axes: [], lines: [{ kind: 'points', a: 'B', b: 'O', bounded: true }], at: 'E' },
+      { t: 'tangent-of', axes: [], lines: [{ kind: 'points', a: 'A', b: 'B', bounded: true }], at: 'F' },
     ]);
     expect(factsOf(['the sides AB, BC and CA touch the circle at D, E and F respectively'])).toEqual(
       factsOf(['הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה']),
@@ -333,8 +364,11 @@ describe('#1619 B2 — refusals keep their meaning', () => {
     expect(codes(['מעגל שמרכזו P חסום במרובע ABCD'])).toEqual([[0, 'out-of-scope']]);
   });
 
-  it('a touch on a circle that cannot be pulled tangent (an equation circle) is out-of-scope', () => {
-    expect(codes(['(x-1)^2+(y-1)^2=4', 'משולש ABC', 'הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה'])).toEqual([[2, 'out-of-scope']]);
+  // Integration (ADR-AG-196): this was refused only because B2's lowering had no way to pull a side tangent to
+  // a circle the figure determines. B3's tangency at a point holds for every circle kind, so the sentence now
+  // BUILDS — the triangle circumscribes the stated circle (locked in issue-1619-integration.test.ts).
+  it('a touch on an equation circle is no longer refused — the sides are pulled tangent', () => {
+    expect(codes(['(x-1)^2+(y-1)^2=4', 'משולש ABC', 'הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה'])).toEqual([]);
   });
 
   it('acuteness is a triangle`s adjective — «מרובע חד זוויות ABCD» is not read', () => {

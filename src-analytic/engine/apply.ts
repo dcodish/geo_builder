@@ -27,6 +27,7 @@ import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { RESERVED_SYMBOLS } from './carriers';
 import {
   CENTRE_SENTINEL,
+  CIRCLE_SENTINEL,
   EMPTY_CONSTRUCTION,
   inDomain,
   circleDefPoints,
@@ -616,6 +617,33 @@ function circleByName(c: Construction, name: string): GeoObject | undefined {
 }
 
 /**
+ * THE CIRCLE A SENTENCE ABOUT «המעגל» BINDS TO (ADR-AG-196, #1633) — the one answer for `the-circle`.
+ *
+ * A sentence that describes its own circle (`match`: a centre letter, an equation) binds to a circle the
+ * figure already holds with that centre or that equation, and otherwise states a new one. A sentence whose
+ * subject is only the contextual «המעגל» binds to the figure's ONE circle, states its circle when there is
+ * none, and is ambiguous when there are several — never a pick.
+ */
+function theCircle(
+  c: Construction,
+  match: { centre: Id } | { eq: Expr } | undefined,
+): { t: 'bind'; host: GeoObject } | { t: 'create' } | { t: 'ambiguous'; circles: GeoObject[] } {
+  if (match && 'centre' in match) {
+    const host = circleByName(c, match.centre);
+    return host && curveKindOf(host) === 'circle' ? { t: 'bind', host } : { t: 'create' };
+  }
+  if (match) {
+    const id = resolveCurveByEq(c, match.eq);
+    const host = id ? objectById(c, id) : undefined;
+    return host && curveKindOf(host) === 'circle' ? { t: 'bind', host } : { t: 'create' };
+  }
+  const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+  if (circles.length === 0) return { t: 'create' };
+  if (circles.length === 1) return { t: 'bind', host: circles[0] };
+  return { t: 'ambiguous', circles };
+}
+
+/**
  * WHICH EXISTING CURVE this equation denotes, if any (#1429 — the ADR-AG-023/#1342 identity
  * class at the operand boundary). Resolved numerically at the probe environments, like every
  * identity question here: two spellings of one equation are one curve, and a parameterised
@@ -737,14 +765,25 @@ function applyTouchAt(
    * THE INCIRCLE'S OWN SIDE (#1619 B2, unified at integration — ADR-AG-196): the ring's side touches the
    * incircle BY CONSTRUCTION, so the three statements below would restate a tangency the circle already
    * has, and solve for a point the closed form gives. The touch point is the `side-touch` derived point —
-   * the foot of the centre on the side — stated about the point the sentence introduced (`derived-at`).
-   * Any other line touching the incircle is the general lowering.
+   * the foot of the centre on the side. A point the sentence only just introduced (declared, no constraint
+   * on it yet — a selector only filters) IS that point, exactly, as a free vertex given coordinates is anchored; one the
+   * figure already constrains gets the foot as a condition (`derived-at`). Any other line touching the
+   * incircle is the general lowering.
    */
   const only = lines[0];
   if (host.kind === 'circle-thru' && host.def.t === 'incircle' && only && only.kind === 'points' && at !== only.a && at !== only.b) {
     const ring = host.def.pts;
     const isSide = ring.some((p, i) => [p, ring[(i + 1) % ring.length]].sort().join() === [only.a, only.b].sort().join());
-    if (isSide) return applyFact(c, { t: 'derived', id: at, rule: { t: 'side-touch', circle: host.id, a: only.a, b: only.b }, src });
+    if (isSide) {
+      const touch: Fact = { t: 'derived', id: at, rule: { t: 'side-touch', circle: host.id, a: only.a, b: only.b }, src };
+      const standing = objectById(c, at);
+      const mentioned = (v: unknown) => JSON.stringify(v).includes(JSON.stringify(at));
+      const fresh =
+        standing?.kind === 'free' &&
+        !mentioned(c.constraints) &&
+        !c.objects.some((o) => o.id !== at && mentioned(o));
+      return applyFact(fresh ? { ...c, objects: c.objects.filter((o) => o.id !== at) } : c, touch);
+    }
   }
   const facts: Fact[] = [{ t: 'constraint', k: { t: 'on-curve', id: at, curve: host.id }, src }];
   let dir: Direction;
@@ -1625,6 +1664,63 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      *    `diameter-of` precedent: a sentence about «המעגל» that finds none introduces it (#1324).
      * Several circles and no equation: refused naming the candidates, never a pick.
      */
+    /**
+     * A sentence about THE CIRCLE (ADR-AG-196): bound to the circle `theCircle` resolves, its statement is
+     * applied with that circle's id written in; with no circle to bind to, the sentence states its own.
+     */
+    case 'the-circle': {
+      const bound = theCircle(c, f.match);
+      if (bound.t === 'ambiguous') return { ok: false, error: noHost(f.src, 'circle', bound.circles) };
+      if (bound.t === 'create') return applyAll(c, f.create);
+      const about = JSON.parse(JSON.stringify(f.about).split(CIRCLE_SENTINEL).join(bound.host.id)) as Fact[];
+      return applyAll(c, about);
+    }
+
+    /**
+     * «משוואת המעגל היא …» about the circle the figure has (#1633, ADR-AG-196). Each kind of circle is
+     * pinned through the seam that already owns that part of it — so a conflict is the refusal that seam
+     * gives, naming this line, and agreement is `known`.
+     */
+    case 'circle-eq': {
+      const host = objectById(c, f.circleId);
+      if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, f.circleId) };
+      // An equation circle IS its equation: the same one is known, another is a contradiction.
+      if (host.kind === 'curve') {
+        return resolveCurveByEq(c, f.eq) === host.id
+          ? { ok: true, next: c, effect: 'known' }
+          : { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+      }
+      // The stated circle's centre and radius, read at the probes: a value that moves with the parameters
+      // is not a constant this boundary can write down (no CAS) — refused by name, never dropped.
+      const fits = PROBE_ENVS.map((env) => resolveCurve({ eq: f.eq } as Curve, env));
+      const first = fits[0];
+      if (!first.ok || first.curve.kind !== 'circle') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      const { cx, cy, r } = first.curve;
+      const close = (v: number, w: number) => Math.abs(v - w) <= 1e-9 * Math.max(1, Math.abs(v), Math.abs(w));
+      const constant = fits.every(
+        (fit) => fit.ok && fit.curve.kind === 'circle' && close(fit.curve.cx, cx) && close(fit.curve.cy, cy) && close(fit.curve.r, r),
+      );
+      if (!constant) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      // A computed circle follows from solved points this boundary cannot see — refused by name, the
+      // `radius-of` rule for the same circles.
+      if (host.kind !== 'circle-at') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      const num = (value: number): Expr => ({ kind: 'num', value }) as Expr;
+      // A centre the figure already PLACES at constant coordinates is a restatement: equal is known,
+      // different is the contradiction, said on this line (not left to the solve to miss).
+      const centre = objectById(c, host.centre);
+      if (centre && centre.kind === 'point') {
+        const at = PROBE_ENVS.map((env) => [evalExpr(centre.x as Parameters<typeof evalExpr>[0], env), evalExpr(centre.y as Parameters<typeof evalExpr>[0], env)]);
+        const fixed = at.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y) && close(x, at[0][0]) && close(y, at[0][1]));
+        if (fixed && !(close(at[0][0], cx) && close(at[0][1], cy))) {
+          return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+        }
+      }
+      return applyAll(c, [
+        { t: 'point', id: host.centre, x: num(cx), y: num(cy), src: f.src },
+        { t: 'radius-of', circleId: host.id, value: num(r), src: f.src },
+      ]);
+    }
+
     case 'centre-of': {
       // No creation the sentence can stand for (the centre letter reads as a circle numeral): refused by
       // name rather than absorbed as though it had said nothing.

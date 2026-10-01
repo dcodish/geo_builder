@@ -13,7 +13,7 @@ import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
-import { EMPTY_CONSTRUCTION, diameterCircleId, namesObject, objectById, type Construction, type Fact } from './types';
+import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
 import { SOLVE_TOL } from './solve';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
@@ -242,12 +242,15 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   // refusal — the same rule `owner` already encodes for apply errors. Which facts NAME an object is
   // `namesObject`, one positive list rather than a second copy of the exclusions (#1049).
   const lineOf = new Map<string, number>();
-  facts.forEach((f, i) => {
-    if (namesObject(f) && !lineOf.has(f.id)) lineOf.set(f.id, owner[i]);
-    // «BD קוטר» names the circle it creates without an id of its own (#1324) — the one formula M1 mints it by.
-    if (f.t === 'diameter-of') {
-      const id = diameterCircleId(f.a, f.b);
-      if (!lineOf.has(id)) lineOf.set(id, owner[i]);
+  // A creation a sentence about «המעגל» may make (ADR-AG-196) names its objects on that line too.
+  facts.forEach((top, i) => {
+    for (const f of factsWithin(top)) {
+      if (namesObject(f) && !lineOf.has(f.id)) lineOf.set(f.id, owner[i]);
+      // «BD קוטר» names the circle it creates without an id of its own (#1324) — the one formula M1 mints it by.
+      if (f.t === 'diameter-of') {
+        const id = diameterCircleId(f.a, f.b);
+        if (!lineOf.has(id)) lineOf.set(id, owner[i]);
+      }
     }
   });
   /**
@@ -535,7 +538,31 @@ function nameCanonicalCentres(
 ): { facts: Fact[]; owner: number[]; offered: number[] } {
   const canonical = (f: Fact): boolean =>
     f.t === 'curve' && f.curve.kind !== 'ellipse' && f.curve.kind !== 'parabola' && f.curve.kind !== 'line' && isCanonicalCircle(f.curve.eq);
-  const canonicalIds = new Set(facts.filter(canonical).map((f) => (f as { id: string }).id));
+  /*
+   * A sentence about «המעגל» (ADR-AG-196) CREATES its circle only when no circle precedes it — otherwise it is
+   * a statement about that one. Read that way here, so «משוואת המעגל היא x²+y²=25» as the first circle is the
+   * canonical circle, and a bound sentence adds no second circle to rule 2's count.
+   */
+  const isCircleFactShallow = (f: Fact): boolean =>
+    f.t === 'circle-at' || f.t === 'circle-thru' || f.t === 'diameter-of' || (f.t === 'curve' && f.curve.kind === 'circle');
+  /** Will this `the-circle` CREATE, given what precedes it? A static reading of M1's `theCircle`. */
+  const willCreate = (f: Extract<Fact, { t: 'the-circle' }>, before: readonly Fact[]): boolean => {
+    if (!f.match) return !before.some(isCircleFactShallow);
+    if ('eq' in f.match) {
+      const made = f.create.find((g) => g.t === 'curve');
+      return !made || !before.some((g) => g.t === 'curve' && g.id === made.id);
+    }
+    return true;
+  };
+  const predicted: Fact[] = [];
+  const creates = new Set<number>();
+  facts.forEach((f, i) => {
+    if (f.t === 'the-circle' && willCreate(f, predicted)) {
+      creates.add(i);
+      predicted.push(...f.create);
+    } else predicted.push(f);
+  });
+  const canonicalIds = new Set(predicted.filter(canonical).map((f) => (f as { id: string }).id));
   if (canonicalIds.size === 0) return { facts: [...facts], owner: [...owner], offered: [] };
 
   /**
@@ -552,7 +579,7 @@ function nameCanonicalCentres(
     const r = resolveCurve(f.curve, {});
     return r.ok && r.curve.kind === 'circle';
   };
-  const circleFacts = new Set(facts.filter(isCircleFact).map((f) => ('id' in f ? f.id : JSON.stringify(f))));
+  const circleFacts = new Set(predicted.filter(isCircleFact).map((f) => ('id' in f ? f.id : JSON.stringify(f))));
   const atOrigin = (f: Fact): boolean => {
     if (f.t === 'point') {
       const x = evalExpr(f.x, {});
@@ -564,12 +591,26 @@ function nameCanonicalCentres(
     return f.t === 'derived' && !f.auto && f.rule.t === 'circle-centre' && canonicalIds.has(f.rule.curve);
   };
   const definesLetter = (f: Fact): boolean => (f.t === 'point' || f.t === 'derived') && f.id === CENTRE_LETTER;
-  if (facts.some((f) => atOrigin(f) || definesLetter(f))) return { facts: [...facts], owner: [...owner], offered: [] };
+  if (predicted.some((f) => atOrigin(f) || definesLetter(f))) return { facts: [...facts], owner: [...owner], offered: [] };
 
   const out: Fact[] = [];
   const outOwner: number[] = [];
   const offered: number[] = [];
   facts.forEach((f, i) => {
+    /*
+     * The equation of THE circle (ADR-AG-196) CREATES its canonical circle only when no circle precedes it
+     * (otherwise it is a statement about that one): the offer rides inside the creation, so a sentence that
+     * binds offers nothing.
+     */
+    if (f.t === 'the-circle' && creates.has(i)) {
+      const made = f.create.find((g) => g.t === 'curve' && g.stated && canonicalIds.has(g.id));
+      if (made && made.t === 'curve') {
+        offered.push(out.length);
+        out.push({ ...f, create: [...f.create, { t: 'derived', id: CENTRE_LETTER, rule: { t: 'circle-centre', curve: made.id }, src: f.src, auto: true }] });
+        outOwner.push(owner[i]);
+        return;
+      }
+    }
     out.push(f);
     outOwner.push(owner[i]);
     if (f.t !== 'curve' || !f.stated || !canonicalIds.has(f.id)) return;

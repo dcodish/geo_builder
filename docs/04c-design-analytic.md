@@ -1901,3 +1901,96 @@ change touched folds exactly as before.
 **One commit.** `applyRename` / `applySwap` write `{ lines, queries, spokenFor, seedNames }` in one `set`, and
 the undo slice carries all four (plus seed and muted set). The surface is the shared `shell/frame/LetterPopover`,
 wired by the integrator to `decideRename` / `dispatchRename` / `dispatchSwap`; the typed forms remain.
+
+## The circle the figure has ([ADR-AG-193](06c-decisions-analytic.md#adr-ag-193), #1619 B1, #1598)
+
+Sentences about "the circle" divide into **spellings** and **references**, and each has one home.
+
+**Spellings are lowered onto the sentence that owns the meaning, in the parser.** The frame (`frameAnalytic.ts`) gains three readings — `centreClauses`, `sharedSubjectClauses`, `elidedSubjectClauses` — and two text folds (the «הנתון» adjective after a definite noun; «M נמצא בנקודה (x,y)» → `M(x,y)` in `pointClauses`). Like every reading they are taken only when each clause parses through `readLine`. Inside `parseClause`: the converse of incidence accepts a curve subject («המעגל עובר דרך P» → «P על המעגל», via `viaCanonical`); the crossing head admits «אחת מ…» (`ONE_OF_HE`); a crossing operand may name a half-axis, which becomes the `axis-side` selector beside the incidence; `bothCrossings` emits the two un-ordinaled crossings when an operand is contextual (`incidenceOn(…).t === 'kind'`); `THRU_HE` admits the comma before «העובר»; the circle-noun gate refuses to claim a tail with an English word (`HAS_A_WORD`).
+
+**References are facts M1 resolves**, because only the construction knows which circle «המעגל» is:
+
+```
+on-kind {id, kind, circle?}       → on-curve on circleByName(circle) or the one circle
+centre-of {id, eq?, create?}      → host = curve with eq (resolveCurveByEq) | the one circle | none
+                                      curve       → derived circle-centre        (ADR-AG-184 yields intact)
+                                      circle-thru → derived circumcentre | midpoint (centreRuleOf)
+                                      circle-at   → known (same letter) | already-named (holder)
+                                      none        → applyAll(create)   (the parser's canonical creation)
+via-centre {facts, phrase}        → facts with CENTRE_SENTINEL → centreIdOf(the one circle) | unknown-reference(phrase)
+circle-region {id, region, a?, b?, circle?} → sign selector over Quantity power | arc-side (+ on-curve for an arc's E, A, B)
+radius-length {length, circle?}   → length-eq(length, radius expr of the host)
+```
+
+- **`circleByName`** is the one name → circle chain (numeral id, `circle-at-<letter>`, `curveByName`, then a circle whose centre point carries the letter — `centreIdOf`). `tangent-of`, `radius-of`, `diameter-of` and `tangent-circles` call it; none spells the chain.
+- **`centreRuleOf` / `centreIdOf`** answer "which point is this circle's centre" for every way a circle is stated; `centreIdOf` finds a held point structurally (`sameDerivation`), never by position.
+- **`create`** carries the facts of the canonical creation sentence («נתון מעגל שמרכזו P», «נתון מעגל P שמשוואתו …»), lowered by the rule that owns it; a creation that would not name the centre (a numeral letter) is not carried, and the sentence is refused `out-of-scope` rather than absorbed.
+- **The regions are `sign` selectors** (D7 kind 2). `evaluate.ts circleQuantity` computes the power |PC|² − r², or the product of the point's and the centre's sides of the chord, from the configuration's own positions and resolved circle; a value within `SOLVE_RESOLUTION`·max(1, r²) of zero is zero (on the boundary is neither side). `freeAngleOf` ignores them (no direction to seed).
+- **Selector attribution.** `foldPass` records `selectorFact` exactly as `constraintFact` (before/after comparison of `c.selectors`), and `derive`'s 0-DOF selector arm blames a failing M1-built selector on that fact's line.
+- **`derive.nameCanonicalCentres` rule 2** counts a `centre-of` fact: with an equation, when that equation is a canonical circle; without one, when the list states exactly one circle-bearing fact and it is the canonical one.
+- **`centresOf`** offers an unnamed equation circle's centre with «‹letter› מרכז המעגל ‹eqSrc›», and a sole computed circle's with «‹letter› מרכז המעגל»; a centre a point already occupies (`pointAt`) is offered nothing.
+
+**The other root of a circle and a straight.** In stage two's selector preference, `separatedFrom` tries `chordStarts` before `deflatedStarts`: for each collapsed pair (`collapsedPairs`) whose mover lies on one circle (`on-curve`) and one straight (`on-line`, `on-curve` line, `on-line-2pt`), the mover is placed at the partner reflected through the foot of the centre on the straight — the chord's other end, on the circle the collapsed solve found. Each point is moved at most once (a pair is listed from both crossings' selectors). It proposes a start only; the polish and `selectorsHoldAt` judge it, and deflation follows unchanged when it proposes nothing.
+
+## Inscribed and circumscribed: the sentence is the sentences it is made of ([ADR-AG-194](06c-decisions-analytic.md#adr-ag-194), #1619 B2, #1554)
+
+**One rule family, two directions.** `parseInscribed` reads the polygon-in-circle voices (polygon subject, «בר
+חסימה», circle subject with «חוסם», container-first «במעגל … חסום …») and the circle-in-polygon voices (circle
+subject «… חסום ב<noun>», container-first «ב<noun> … חסום מעגל», polygon subject «… חוסם מעגל»), He and En. The
+container marker «ב» and the verb decide the direction (2-D #31/#38), so neither direction can read as the
+other. It runs in `parseClause` before `parseCircleAt`, whose subject reader would otherwise take «מעגל שמרכזו
+C» off the front of «מעגל שמרכזו C חסום במשולש AOB».
+
+**Lowering by composition.** Nothing in the rule is geometry. The polygon is `parseShape(«<noun> RUN»)` (the
+noun's givens, its `distinct`, and the `acute` selector when the adjective is present). The circle is
+`parseClause(«מעגל <tail>»)`, filtered to exactly one circle-introducing fact (`circle-at`, a circle `curve`,
+`circle-thru`, a defining `diameter-of`), whose id the incidences name — so a circle phrasing any later stream
+teaches the circle rules is inscribable for free. No tail is `circle-thru` over the first three vertices. The
+vertices not on the circle by definition each get `on-curve`. All facts carry the student's line as `src`.
+
+**The incircle** is a fourth `CircleDef`, `incircle`, evaluated in `circleThruCurve` (centre
+`incircleCentre`, radius the distance to the first side; vacancy for a degenerate or non-convex ring). It
+carries no freedom, so `carriers.ts` needed no new row (the `circle-thru` rows read `circleDefPoints`). A
+quadrilateral's Pitot condition is a stated `length-eq`, not a property of the circle.
+
+**Side touch points** are the M1 fact `touch-at` (one per side) and the derived rule `side-touch` (foot of the
+circle's centre on the side; curve parent). The host decides: incircle of a ring with that side — the point
+only; `circle-at` — `tangent-line` (bounded for «צלעות/קטעים») plus the point; otherwise `out-of-scope`.
+
+**«חד זוויות»** is the selector `acute` (D7 kind 2), judged in `failingSelectors` beside `distinct`.
+
+**Diameter on a through-circle** accepts an end that is on the circle by an `on-curve` incidence: the right
+angle at a defining point that is neither end.
+
+**Frame readings.** `diameterClauses` (the «הקטע AB הוא קוטר …» and «קוטר המעגל AC נמצא על …» forms) runs with
+the structural readings; `parenClauses` («<sentence> (<givens>)») runs last, after the comma split, and only
+when every clause parses.
+
+### Not here
+Binding an undescribed «חסום במעגל» to a circle already in the figure; the circle-subject side list «מעגל M
+משיק לצלעות …»; a centre letter on a computed circle (stream B1); tangency to an equation circle (stream B3's
+`tangent-curve`); the right-trapezoid ruling (#1554 vs #1627).
+
+## Tangency at a point, the tangent object, chords ([ADR-AG-195](06c-decisions-analytic.md#adr-ag-195), #1619 B3, #1430)
+
+**The radius is a direction.** `Direction` has a fifth member, `{ k: 'radius', circle, at }`. `dirVector` resolves it from the circle's `NumCurve` (`curveAt`), so it needs no centre POINT, and every circle kind — `circle-at`, an equation `curve`, `circle-thru` — works the same way. `dirRefs` reports `at`, and `constraintCurveRefs` reports the circle through the `relation` arm, so the apply boundary's existence checks cover it unchanged.
+
+**A touch is lowered, not modelled.** `tangent-of { …, at }` is applied by `applyTouchAt`, which emits `on-curve(at, circle)`, the touch point on its target, and `relation ⊥ (radius, target)`. No residual is new, the solver learns nothing, and the DOF count is the three rows' rank. Selectors that must be blamed on the student's line (`distinct` ends, `between` for a bounded noun) are emitted by the parser, because `derive` attributes a failing selector only to a parsed `selector` fact.
+
+**The touch reader.** `peelTouchList` takes the plural list off the end of the sentence. `peelMods` takes the singular «בנקודה A». `tangentTargets` keeps `ordered`, the axes and lines in the student's order, so the touch points pair with the targets in order. `touchFacts` builds the declares, the selectors and one `tangent-of` per target. It is reached from the circle-first order (`circleSubjectFacts`) and the line-first order (`parseCircleAt`), so the two orders cannot drift.
+
+**The tangent object.** `tangent-line-at { at, circle? }` → `line-at { id: tangentLineId(at), through: at, dir: radius, perp: true }` plus `on-curve(at, circle)`. `isTangentObject` (a `line-at` on a radius direction, perpendicular) is the one predicate behind contextual «המשיק» (`on-kind` kind `tangent`) and `tangent-eq`'s resolution. `readTangentNoun` is the one phrase reader for the sentence, the crossing operand (`incidenceOn`; the building facts lead the crossing's) and the equation (`parseTangentObject`).
+
+**Tangency to a determined circle.** `tangent-curve { circle, line }` and `tangent-line` share `lineTangencyRows(centre, radius, line, pair)`. One reads the centre and radius from the resolved circle, the other from the centre point and radius symbol. `tangent-of` picks by host: `circle-at` → `tangent-axis`/`tangent-line`, anything else → `tangent-curve` (axes refused by name).
+
+**Chords.** A chord is lowered only to existing facts: `declare` both ends, `on-curve` or `on-kind` on the circle, and the segment. Two chords that meet use the bounded crossing of the two segments. Equal chords use `length-eq`. `parseChord` runs with `parseTangentObject` before `parseCircleAt`, whose verb split would otherwise read «משוואת המשיק» as a subject before the verb.
+
+## The contextual circle: one binding for every sentence about «המעגל» ([ADR-AG-196](06c-decisions-analytic.md#adr-ag-196), #1633, #1619)
+
+**One fact, one resolver.** A sentence about THE circle lowers to `the-circle { create, about, match? }`. `create` is the sentence's own creation (the curve, the computed circle, the circle on a centre, with their incidences); `about` is the statement about an existing circle, with `CIRCLE_SENTINEL` where the circle's id goes. M1's `theCircle(c, match)` decides: `match.centre` (a centre-described circle, also «מעגל M שמשוואתו …») → `circleByName`; `match.eq` → `resolveCurveByEq`; no match → the figure's circles (0 create, 1 bind, ≥2 `ambiguous-shape`). The bound branch substitutes the id into `about` and applies it with `applyAll`, so its effect and its refusals are the spelled-out statements' own.
+
+**The equation about a circle.** `circle-eq { circleId, eq }` reads the stated circle at the probes (`resolveCurve`, constant centre and radius required). An equation `curve` host compares by `resolveCurveByEq`. A `circle-at` host lowers to `point(centre, cx, cy)` — substitution for a free centre (#1046's anchoring), a constraint otherwise, pre-checked against a centre already at constant coordinates — and `radius-of(circleId, r)`, the substitution seam that also judges a stated radius. Nothing is solved that was not before.
+
+**Pre-M1 passes.** `factsWithin(f)` yields a `the-circle`'s creation, for `derive`'s line-of-object map (vacancies of a created circle are blamed on its line) and `submit`'s restated-centre set. `nameCanonicalCentres` predicts statically whether a `the-circle` will create (no circle before it, or no same-equation curve before it) and puts the offered O inside that creation.
+
+**The touch.** `tangent-of { at }` is the only touch fact. `applyTouchAt`'s first branch is the incircle's own side: the `side-touch` derived point, written in place of a point the same sentence just declared (no constraint on it yet), else as `derived-at`. Everything else is B3's three statements.

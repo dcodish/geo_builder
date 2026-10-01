@@ -385,10 +385,43 @@ export type Fact =
    * resolution, with a length on the other side: M1 lowers it to the `length-eq` whose right side is the
    * circle's own radius expression.
    */
-  | (FactBase & { t: 'radius-length'; circle?: string; length: LengthExpr });
+  | (FactBase & { t: 'radius-length'; circle?: string; length: LengthExpr })
+  /**
+   * A sentence whose subject is THE CIRCLE — «המעגל» with no name — or that describes its circle by a centre
+   * or an equation (ADR-AG-196, #1633, the #1619 integration). It means the circle already in the figure, so
+   * WHICH circle is M1's question, answered once for every such sentence (`theCircle`):
+   *
+   * - `match` absent (the contextual «המעגל»): exactly ONE circle in the figure → `about`, the statement
+   *   about it; NONE → `create`, the sentence states its circle (B1's «M מרכז המעגל» precedent, #1324's
+   *   `diameter-of`); SEVERAL → refused as ambiguous, never a pick.
+   * - `match` present (the sentence describes its own circle — «חסום במעגל שמרכזו M / שמשוואתו …»): a circle
+   *   with that centre or that equation already in the figure → `about`; otherwise `create`, whatever else
+   *   the figure holds.
+   *
+   * `about` carries `CIRCLE_SENTINEL` in the circle's place; M1 writes the resolved circle's id in.
+   */
+  | (FactBase & { t: 'the-circle'; create: Fact[]; about: Fact[]; match?: { centre: Id } | { eq: Expr } })
+  /**
+   * «משוואת המעגל היא …» about a circle the figure ALREADY HAS (#1633, ADR-AG-196) — a statement about it,
+   * never a second circle: an equation circle must be this equation (else `conflicting-restatement`), a circle
+   * on a centre has its centre pinned to the equation's centre (the centre letter takes those coordinates) and
+   * its radius to the equation's radius, each through the seam that already owns it (a coordinate statement,
+   * `radius-of`), so a conflict is refused naming the line.
+   */
+  | (FactBase & { t: 'circle-eq'; circleId: Id; eq: Expr });
 
 /** The stand-in a `via-centre` sentence carries for «מרכז המעגל» — a name no student writes (#1619 B1). */
 export const CENTRE_SENTINEL = 'Z₁';
+
+/** The stand-in a `the-circle` statement carries for the circle M1 resolves (ADR-AG-196). */
+export const CIRCLE_SENTINEL = '⟨the-circle⟩';
+
+/**
+ * A fact and the creation it may apply in its place (ADR-AG-196) — the `create` of a `the-circle`. For the
+ * passes that read the fact list before M1 (which line names an object): they must see a creation the
+ * sentence may make, whichever branch M1 takes.
+ */
+export const factsWithin = (f: Fact): Fact[] => (f.t === 'the-circle' ? [f, ...f.create.flatMap(factsWithin)] : [f]);
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list
