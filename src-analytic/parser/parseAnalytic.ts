@@ -29,14 +29,16 @@ function valueExpr(src: string): Expr | null {
 }
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, type NumeralKind } from '../engine/names';
-import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
+import { UNBOUNDED, circleDefPoints, diameterCircleId, incircleId, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 import {
+  diameterClauses,
   distributeClauses,
   isBareName,
   isProofTarget,
   orthography,
   originClauses,
+  parenClauses,
   partitions,
   pointClauses,
   segmentsOf,
@@ -2212,6 +2214,275 @@ function circleSubjectFacts(subject: CircleSubject, objectText: string | null, m
   ];
 }
 
+// ---------------------------------------------------------------------------
+// INSCRIBED AND CIRCUMSCRIBED — a polygon in a circle, a circle in a polygon (#1619 B2, #1554, ADR-AG-194)
+// ---------------------------------------------------------------------------
+
+/**
+ * ONE RULE FAMILY OVER EVERY SHAPE NOUN, with the CONTAINER deciding the direction.
+ *
+ * Measured on the 471 corpus before this: «מרובע ABCD חסום במעגל», «המרובע ABCD חסום במעגל שמרכזו M», «מרובע
+ * ABCD חסום במעגל שמשוואתו …», «משולש ABC חסום במעגל שקוטרו AC», «במעגל שמרכזו M חסום משולש חד זוויות ABC»,
+ * «במשולש AOB חסום מעגל שמרכזו C» — every one `not-handled`. Only a three-letter run inscribed in a circle
+ * with no description existed (`CIRCUM_HE`), and only once the triangle's vertices had been drawn.
+ *
+ * The class is not "the quadrilateral sentence" (#1554's diagnosis): it is **a polygon noun of any arity, in
+ * either direction, in a circle the sentence may itself introduce**. So the sentence is lowered as the
+ * sentences it is made of, each read by the rule that already owns it:
+ *
+ * - the POLYGON is «<noun> <run>» — `parseShape`, with every given the noun carries («מקבילית» ⇒ two parallel
+ *   pairs; a cyclic one is then a rectangle, by the solve), absorbed by M1 when the ring already exists;
+ * - the CIRCLE is «מעגל <tail>» — «שמרכזו M» is the circle on a centre, «שמשוואתו …» the equation circle,
+ *   «שקוטרו AC» the circle on a diameter — read by the circle rules, so every way the grammar can introduce
+ *   a circle can introduce this one, and it is «המעגל» afterwards like any other. With no tail it is the
+ *   circle COMPUTED through the first three vertices (ADR-AG-160: no solve, no invented centre letter);
+ * - the INCIDENCE: each vertex the circle does not already pass through is ON it. Three vertices define the
+ *   computed circle, so the triangle is the n = 3 case of the same rule with zero incidences — the old
+ *   `CIRCUM_HE` is this rule now, not a second copy beside it.
+ *
+ * The converse direction («מעגל חסום במשולש ABC», «במשולש AOB חסום מעגל», «משולש ABC חוסם מעגל») is the
+ * INCIRCLE — the container marker «ב» and the verb must agree (2-D's #31 / #38), and a rule that read the
+ * letters alone built the converse. It is a computed circle too (`CircleDef` `incircle`); a quadrilateral's
+ * carries its Pitot condition AB + CD = BC + DA as the stated given it is (#1554's lowering).
+ */
+const INSCRIBED_RUN = `((?:${NAME}){3,4})`;
+/** A noun phrase — the noun and its adjectives; `inscribedShape` decides whether the registry knows it. */
+const NOUN_PHRASE = '([א-ת]+(?:[- ][א-ת]+){0,3})';
+const INSCRIBED_VERB_HE = '(?:(?:הוא|היא)\\s+)?(?:ה)?(?:חסום|חסומה)';
+const CIRCUMSCRIBING_VERB_HE = '(?:(?:הוא|היא)\\s+)?(?:ה)?(?:חוסם|חוסמת)';
+/** The circle's own words after «מעגל» — a numeral name, «שמרכזו M», «שמשוואתו …», «שקוטרו AC». */
+const CIRCLE_TAIL = '(?:\\s+(.+?))?';
+
+/** Polygon in circle — the polygon is the subject: «(ה)מרובע ABCD (הוא) חסום במעגל (שמרכזו M)». */
+const CYCLIC_SUBJECT_HE = new RegExp(
+  `^${HE_GIVEN}(?:${NOUN_PHRASE}\\s+)?${INSCRIBED_RUN}\\s+${INSCRIBED_VERB_HE}\\s+ב(?:ה)?מעגל${CIRCLE_TAIL}$`,
+);
+/** «מרובע ABCD בר חסימה» — INSCRIBABLE: the same statement, with no circle described. */
+const CYCLIC_ABLE_HE = new RegExp(
+  `^${HE_GIVEN}(?:${NOUN_PHRASE}\\s+)?${INSCRIBED_RUN}\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?בר[\\s-]+חסימה$`,
+);
+/** The circle is the subject: «(ה)מעגל (I) (ה)חוסם (את) (ה)מרובע ABCD». */
+const CYCLIC_CIRCLE_HE = new RegExp(
+  `^${HE_GIVEN}ה?מעגל${CIRCLE_TAIL}\\s+${CIRCUMSCRIBING_VERB_HE}\\s+(?:את\\s+)?(?:${NOUN_PHRASE}\\s+)?${INSCRIBED_RUN}$`,
+);
+/** The container first: «במעגל (שמרכזו M) חסום משולש (חד זוויות) ABC». */
+const CYCLIC_CONTAINER_HE = new RegExp(
+  `^${HE_GIVEN}ב(?:ה)?מעגל${CIRCLE_TAIL}\\s+${INSCRIBED_VERB_HE}\\s+(?:${NOUN_PHRASE}\\s+)?${INSCRIBED_RUN}$`,
+);
+
+/** Circle in polygon — the circle is the subject: «(ה)מעגל (שמרכזו C) (ה)חסום ב(ה)משולש ABC». */
+const INCIRCLE_SUBJECT_HE = new RegExp(
+  `^${HE_GIVEN}ה?מעגל${CIRCLE_TAIL}\\s+${INSCRIBED_VERB_HE}\\s+ב${NOUN_PHRASE}\\s+${INSCRIBED_RUN}$`,
+);
+/** The container first: «במשולש AOB חסום מעגל (שמרכזו C)». */
+const INCIRCLE_CONTAINER_HE = new RegExp(
+  `^${HE_GIVEN}ב${NOUN_PHRASE}\\s+${INSCRIBED_RUN}\\s+${INSCRIBED_VERB_HE}\\s+(?:ה)?מעגל${CIRCLE_TAIL}$`,
+);
+/** The polygon circumscribes: «(ה)משולש ABC (ה)חוסם (את ה)מעגל». */
+const INCIRCLE_POLYGON_HE = new RegExp(
+  `^${HE_GIVEN}(?:${NOUN_PHRASE}\\s+)?${INSCRIBED_RUN}\\s+${CIRCUMSCRIBING_VERB_HE}\\s+(?:את\\s+)?(?:ה)?מעגל${CIRCLE_TAIL}$`,
+);
+
+const EN_NOUN = '([a-z]+(?:[\\s-][a-z]+){0,3})';
+const CYCLIC_EN: readonly RegExp[] = [
+  new RegExp(`^(?:the\\s+)?circumcircle\\s+of\\s+(?:the\\s+)?(?:${EN_NOUN}\\s+)?${INSCRIBED_RUN}$`, 'i'),
+  new RegExp(`^(?:the\\s+|a\\s+)?circle\\s+circumscribing\\s+(?:the\\s+)?(?:${EN_NOUN}\\s+)?${INSCRIBED_RUN}$`, 'i'),
+  new RegExp(
+    `^(?:the\\s+|a\\s+)?(?:${EN_NOUN}\\s+)?${INSCRIBED_RUN}\\s+is\\s+inscribed\\s+in\\s+(?:a|the)\\s+circle` +
+      `(?:\\s+(?:with|whose)\\s+cent(?:re|er)\\s+(?:is\\s+)?(${NAME}))?$`,
+    'i',
+  ),
+  new RegExp(`^(?:the\\s+|a\\s+)?(?:${EN_NOUN}\\s+)?${INSCRIBED_RUN}\\s+is\\s+(?:cyclic|inscribable)$`, 'i'),
+  new RegExp(`^(?:a\\s+|the\\s+)?cyclic\\s+(quadrilateral)\\s+${INSCRIBED_RUN}$`, 'i'),
+];
+const INCIRCLE_EN: readonly RegExp[] = [
+  new RegExp(`^(?:the\\s+)?incircle\\s+of\\s+(?:the\\s+)?${EN_NOUN}\\s+${INSCRIBED_RUN}$`, 'i'),
+  new RegExp(`^(?:the\\s+|a\\s+)?circle\\s+(?:is\\s+)?inscribed\\s+in\\s+(?:the\\s+|a\\s+)?${EN_NOUN}\\s+${INSCRIBED_RUN}$`, 'i'),
+  new RegExp(`^(?:the\\s+|a\\s+)?${EN_NOUN}\\s+${INSCRIBED_RUN}\\s+circumscribes\\s+(?:a|the)\\s+circle$`, 'i'),
+  new RegExp(`^(?:a\\s+|the\\s+)?tangential\\s+(quadrilateral)\\s+${INSCRIBED_RUN}$`, 'i'),
+];
+
+/**
+ * The polygon a sentence names — its own lowering (`parseShape`), or, with no noun, the generic ring of its
+ * arity («ABCD חסום במעגל» is a quadrilateral). `null` when the phrase is not a shape noun the registry knows,
+ * so a phrase that merely LOOKS like one leaves the sentence to the rules after this one.
+ */
+function inscribedShape(noun: string | undefined, run: string, en: boolean): { facts: Fact[]; vertices: Id[] } | ParseResult | null {
+  const vertices = splitNames(run);
+  const phrase = noun ?? (vertices.length === 3 ? (en ? 'triangle' : 'משולש') : en ? 'quadrilateral' : 'מרובע');
+  const r = parseShape(`${phrase.trim()} ${run}`);
+  if (!r) return null;
+  if (!r.ok) return r;
+  if (!r.facts.some((f) => f.t === 'polygon')) return null;
+  return { facts: r.facts, vertices };
+}
+
+/** The circle a cyclic sentence describes: the facts that introduce it, its id, and the points it already passes through. */
+interface CircleHost {
+  facts: Fact[];
+  id: Id;
+  through: Id[];
+}
+
+/**
+ * «… במעגל <tail>» — the circle, read by the circle rules. No tail (or «חדש»): the circle computed through the
+ * first three vertices. A NUMERAL tail is the circle's own name, as in «מעגל I העובר דרך …» (the old
+ * `CIRCUM_HE` reading, kept). Anything else is «מעגל <tail>» — «שמרכזו M», «שמשוואתו …», «שקוטרו AC» — and
+ * must introduce exactly ONE circle, or the sentence is not this rule's.
+ */
+function cyclicHost(tail: string | undefined, vertices: Id[], line: string): CircleHost | ParseResult | null {
+  const t = tail?.trim();
+  const pts: [Id, Id, Id] = [vertices[0], vertices[1], vertices[2]];
+  if (!t || /^ה?חדש$/.test(t)) {
+    const id = `circle-thru-${[...pts].sort().join('')}`;
+    return { facts: [{ t: 'circle-thru', id, def: { t: 'through', pts }, src: line }], id, through: pts };
+  }
+  if (new RegExp(`^(?:${CIRCLE_NUMERALS})$`).test(t)) {
+    const id = numeralCurveId('circle', t);
+    return { facts: [{ t: 'circle-thru', id, def: { t: 'through', pts }, name: t, src: line }], id, through: pts };
+  }
+  const r = parseClause(`מעגל ${t}`);
+  if (!r.ok) return r.code === 'not-handled' ? null : r;
+  const makers = r.facts.filter(
+    (f) =>
+      f.t === 'circle-at' ||
+      f.t === 'circle-thru' ||
+      (f.t === 'curve' && f.curve.kind === 'circle') ||
+      (f.t === 'diameter-of' && f.define),
+  );
+  if (makers.length !== 1) return null;
+  const m = makers[0];
+  if (m.t === 'diameter-of') return { facts: r.facts, id: diameterCircleId(m.a, m.b), through: [m.a, m.b] };
+  if (m.t === 'circle-thru') return { facts: r.facts, id: m.id, through: circleDefPoints(m.def) };
+  if (m.t === 'circle-at' || m.t === 'curve') return { facts: r.facts, id: m.id, through: [] };
+  return null;
+}
+
+/** A polygon IN a circle: the polygon, the circle, and each vertex the circle does not already pass through ON it. */
+function cyclicFacts(noun: string | undefined, run: string, tail: string | undefined, line: string, en = false): RuleOutcome {
+  const shape = inscribedShape(noun, run, en);
+  if (!shape || !('vertices' in shape)) return shape;
+  const host = cyclicHost(tail, shape.vertices, line);
+  if (!host || !('id' in host)) return host;
+  const on = shape.vertices
+    .filter((v) => !host.through.includes(v))
+    .map((id): Fact => ({ t: 'constraint', k: { t: 'on-curve', id, curve: host.id }, src: line }));
+  return made([...shape.facts, ...host.facts, ...on].map((f) => ({ ...f, src: line })));
+}
+
+/**
+ * A circle IN a polygon — the computed incircle, its centre when the sentence names one, and for a
+ * quadrilateral the Pitot condition that makes the incircle exist. A tail this rule cannot honour (a radius,
+ * an equation, a centre letter for a quadrilateral) is refused BY NAME — a stated given never vanishes.
+ */
+function incircleFacts(noun: string, run: string, tail: string | undefined, line: string, en = false): RuleOutcome {
+  const shape = inscribedShape(noun, run, en);
+  if (!shape || !('vertices' in shape)) return shape;
+  const v = shape.vertices;
+  const ring = shape.facts.find((f) => f.t === 'polygon') as Extract<Fact, { t: 'polygon' }>;
+  const circle: Fact = { t: 'circle-thru', id: incircleId(ring.id), def: { t: 'incircle', pts: v }, src: line };
+  const pitot: Fact[] =
+    v.length === 4
+      ? [
+          {
+            t: 'constraint',
+            k: {
+              t: 'length-eq',
+              left: parseLengthExpr(`${v[0]}${v[1]}+${v[2]}${v[3]}`)!,
+              right: parseLengthExpr(`${v[1]}${v[2]}+${v[3]}${v[0]}`)!,
+            },
+            src: line,
+          },
+        ]
+      : [];
+  const t = tail?.trim();
+  let centre: Fact[] = [];
+  if (t) {
+    const named = new RegExp(`^ש(?:ה)?מרכזו\\s+(?:(?:הוא|היא)\\s+)?(?:ה?נקודה\\s+)?(${NAME})$`).exec(t);
+    // A parenthesised tail is the sentence's givens, not the circle's words — the frame splits it off
+    // (`parenClauses`) only when this rule leaves the whole line alone.
+    if (!named && t.includes('(')) return null;
+    if (!named || v.length !== 3) return refuse('out-of-scope', line);
+    centre = [{ t: 'derived', id: named[1], rule: { t: 'incentre', v: [v[0], v[1], v[2]] }, src: line }];
+  }
+  return made([...shape.facts, ...pitot, circle, ...centre].map((f) => ({ ...f, src: line })));
+}
+
+function parseInscribed(line: string): RuleOutcome {
+  const sub = CYCLIC_SUBJECT_HE.exec(line);
+  if (sub) return cyclicFacts(sub[1], sub[2], sub[3], line);
+  const able = CYCLIC_ABLE_HE.exec(line);
+  if (able) return cyclicFacts(able[1], able[2], undefined, line);
+  const circ = CYCLIC_CIRCLE_HE.exec(line);
+  if (circ) return cyclicFacts(circ[2], circ[3], circ[1], line);
+  const cont = CYCLIC_CONTAINER_HE.exec(line);
+  if (cont) return cyclicFacts(cont[2], cont[3], cont[1], line);
+
+  const inSub = INCIRCLE_SUBJECT_HE.exec(line);
+  if (inSub) return incircleFacts(inSub[2], inSub[3], inSub[1], line);
+  const inCont = INCIRCLE_CONTAINER_HE.exec(line);
+  if (inCont) return incircleFacts(inCont[1], inCont[2], inCont[3], line);
+  const inPoly = INCIRCLE_POLYGON_HE.exec(line);
+  if (inPoly) {
+    const noun = inPoly[1] ?? (splitNames(inPoly[2]).length === 3 ? 'משולש' : 'מרובע');
+    return incircleFacts(noun, inPoly[2], inPoly[3], line);
+  }
+
+  for (const re of CYCLIC_EN) {
+    const m = re.exec(line);
+    // "… with centre M" is «שמרכזו M» — the same circle on a centre, read by the same rule.
+    if (m) return cyclicFacts(m[1], m[2], m[3] ? `שמרכזו ${m[3]}` : undefined, line, true);
+  }
+  for (const re of INCIRCLE_EN) {
+    const m = re.exec(line);
+    if (m) return incircleFacts(m[1], m[2], undefined, line, true);
+  }
+  return null;
+}
+
+/**
+ * «הצלעות AO, BO ו-AB משיקות למעגל בנקודות D, E ו-F בהתאמה» — each side touches the circle at its own named
+ * point (#1619 B2). Paired by «בהתאמה» exactly as the location distribution pairs (`distributeClauses`), and
+ * lowered to one `touch-at` per pair: M1 decides what the touch means for the circle the figure holds.
+ * «צלעות»/«קטעים» bound the touch to the drawn piece (#1503's noun rule); «ישרים», or no noun, does not.
+ */
+const TOUCH_LIST_HE = new RegExp(
+  `^(?:ה?(צלעות|קטעים|ישרים)\\s+)?((?:${NAME}){2}(?:\\s*,\\s*(?:${NAME}){2})*\\s*,?\\s+ו-?\\s*(?:${NAME}){2})` +
+    `\\s+(?:ה)?משיק(?:ות|ים)\\s+ל(?:ה)?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?` +
+    `\\s+ב(?:ה)?נקודות\\s+((?:${NAME})(?:\\s*,\\s*${NAME})*\\s*,?\\s+ו-?\\s*${NAME})\\s+בהתאמה$`,
+);
+
+const TOUCH_LIST_EN = new RegExp(
+  `^(?:the\\s+)?(?:(sides|segments|lines)\\s+)?((?:${NAME}){2}(?:\\s*,\\s*(?:${NAME}){2})*,?\\s+and\\s+(?:${NAME}){2})` +
+    `\\s+(?:are\\s+tangent\\s+to|touch)\\s+the\\s+circle(?:\\s+(${NAME}))?` +
+    `\\s+at\\s+(?:the\\s+points\\s+)?((?:${NAME})(?:\\s*,\\s*${NAME})*,?\\s+and\\s+${NAME})\\s+respectively$`,
+  'i',
+);
+
+function parseTouchList(line: string): RuleOutcome {
+  const he = TOUCH_LIST_HE.exec(line);
+  const en = he ? null : TOUCH_LIST_EN.exec(line);
+  const m = he ?? en;
+  if (!m) return null;
+  const [, nounSrc, sides, circle, points] = m;
+  const noun = en ? ({ sides: 'צלעות', segments: 'קטעים', lines: 'ישרים' } as Record<string, string>)[(nounSrc ?? '').toLowerCase()] : nounSrc;
+  const pairs = sides.match(new RegExp(`(?:${NAME}){2}`, 'g')) ?? [];
+  const at = points.match(new RegExp(NAME, 'g')) ?? [];
+  if (pairs.length !== at.length) return refuse('bad-arity', line);
+  /*
+   * A touch AT AN END of its own side («AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה») is the two tangents from
+   * an external point — #1430's sentence, built in its own stream (#1619 B3). Not claimed here.
+   */
+  if (pairs.some((pq, i) => splitNames(pq).includes(at[i]))) return null;
+  const bounded = noun === 'צלעות' || noun === 'קטעים';
+  return made(
+    pairs.map((p, i): Fact => {
+      const [a, b] = splitNames(p);
+      return { t: 'touch-at', a, b, at: at[i], ...(circle ? { circle } : {}), bounded, src: line };
+    }),
+  );
+}
+
 /**
  * A CIRCLE COMPUTED FROM POINTS — through three of them, or on a diameter (#1464, #1324, ADR-AG-160).
  *
@@ -2251,22 +2522,11 @@ const THRU_EN = new RegExp(
 );
 /** «מעגל ABD» — the three points as the circle's own name. One letter is a CENTRE («מעגל O», #1060). */
 const THRU_BARE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+(${NAME}${NAME}${NAME})$|^(?:the\\s+)?circle\\s+(${NAME}${NAME}${NAME})$`);
-/**
- * The circumscribed circle, in the two voices that MEAN it: the circle CIRCUMSCRIBES («חוסם») the triangle,
- * or the triangle is INSCRIBED («חסום») in the circle. The other two pairings — «מעגל חסום במשולש», «משולש
- * חוסם מעגל» — are the INCIRCLE, and are deliberately not matched (2-D's #31 / #38: the container marker
- * «ב» and the verb must agree, and a rule that read the letters alone built the converse).
+/*
+ * The circumscribed circle («המשולש ABD חסום במעגל», «המעגל החוסם את המשולש ABD», "the circumcircle of
+ * triangle ABD") lived here as `CIRCUM_HE`/`CIRCUM_EN`, three letters only. It is now the n = 3 case of
+ * `parseInscribed` above (#1619 B2), which runs before this rule.
  */
-const CIRCUM_HE = new RegExp(
-  `^${HE_GIVEN}ה?מעגל${THRU_NAME}\\s+(?:ה)?חוסם\\s+(?:את\\s+)?(?:ה?משולש\\s+)?(${NAME}${NAME}${NAME})$` +
-    `|^${HE_GIVEN}(?:ה?משולש\\s+)?(${NAME}${NAME}${NAME})\\s+חסום\\s+ב(?:ה)?מעגל${THRU_NAME}$`,
-);
-const CIRCUM_EN = new RegExp(
-  `^(?:the\\s+)?circumcircle\\s+of\\s+(?:the\\s+)?(?:triangle\\s+)?(${NAME}${NAME}${NAME})$` +
-    `|^(?:the\\s+|a\\s+)?circle\\s+circumscribing\\s+(?:the\\s+)?(?:triangle\\s+)?(${NAME}${NAME}${NAME})$` +
-    `|^(?:the\\s+)?(?:triangle\\s+)?(${NAME}${NAME}${NAME})\\s+is\\s+inscribed\\s+in\\s+(?:a|the)\\s+circle$`,
-  'i',
-);
 
 /**
  * «BD קוטר במעגל» — a DIAMETER (#1324). The sentence names the two ends and, optionally, the circle; WHICH
@@ -2295,19 +2555,10 @@ const DIAM_DEFINE_EN = new RegExp(`^(?:the\\s+|a\\s+)?circle\\s+(?:with|on)\\s+(
 function parseCircleThru(line: string): RuleOutcome {
   const thru = THRU_HE.exec(line) ?? THRU_EN.exec(line);
   const bare = thru ? null : THRU_BARE.exec(line);
-  const circumHe = thru || bare ? null : CIRCUM_HE.exec(line);
-  const circumEn = thru || bare || circumHe ? null : CIRCUM_EN.exec(line);
-  if (thru || bare || circumHe || circumEn) {
-    // Group layout: THRU_* (name, list) · THRU_BARE (he run, en run) · CIRCUM_HE (name, run | run, name)
-    // · CIRCUM_EN (run | run | run) — no name in English.
-    const name = thru?.[1] ?? circumHe?.[1] ?? circumHe?.[4];
-    const run = thru
-      ? thru[2]
-      : bare
-        ? (bare[1] ?? bare[2])
-        : circumHe
-          ? (circumHe[2] ?? circumHe[3])
-          : (circumEn![1] ?? circumEn![2] ?? circumEn![3]);
+  if (thru || bare) {
+    // Group layout: THRU_* (name, list) · THRU_BARE (he run, en run).
+    const name = thru?.[1];
+    const run = thru ? thru[2] : (bare![1] ?? bare![2]);
     const pts = threePoints(run);
     if (!pts) return null;
     // «מעגל III» is a circle's NUMERAL name, not three points I, I, I: a run that repeats a letter in the
@@ -2499,11 +2750,16 @@ function parseShape(line: string): RuleOutcome {
 
   const poly = SHAPE_HE.exec(line) ?? SHAPE_EN.exec(line);
   if (poly) {
-    const [, nounSrc, run] = poly;
+    const [, phrase, run] = poly;
+    // «משולש חד זוויות ABC» — the ACUTE adjective is a given of its own (#1619 B2): peeled off the noun and
+    // stated as the `acute` selector below, never dropped.
+    const { noun: nounSrc, acute } = acuteAdjective(phrase);
     const noun = EN_SHAPE[normalizeShapeNoun(nounSrc).toLowerCase()] ?? nounSrc;
     const row = shapeRow(noun);
     // Not a shape noun at all — leave the sentence to the rules after this one.
     if (!row) return null;
+    // Acuteness is a triangle's adjective; on any other ring the phrase is not one this rule reads.
+    if (acute && row.arity !== 3) return null;
     const vertices = splitNames(run);
     // The noun the student wrote is the assertion to check against — `< 3` only ever caught the
     // shapeless case and let «משולש ABCD» through as a four-sided triangle (#1042). The arity now
@@ -2527,10 +2783,27 @@ function parseShape(line: string): RuleOutcome {
        */
       { t: 'selector' as const, sel: { kind: 'distinct' as const, ids: vertices }, src: line },
       ...row.givens(vertices).map((k: Constraint) => ({ t: 'constraint' as const, k, src: line })),
+      ...(acute ? [{ t: 'selector' as const, sel: { kind: 'acute' as const, ids: vertices }, src: line }] : []),
     ]);
   }
 
   return null;
+}
+
+/**
+ * «חד זוויות» / «חד-זווית» / "acute(-angled)" — the triangle's angles are all acute (#1619 B2, ADR-AG-194).
+ *
+ * The 471 exam writes it inside the noun phrase («במעגל שמרכזו M חסום משולש חד זוויות ABC»), so it is peeled
+ * off here and stated as the `acute` selector — an inequality, D7's kind 2. Only a TRIANGLE noun carries it
+ * (the arity check below refuses it on anything else, through the row); the noun that remains must still be
+ * one the registry knows, so «משולש חד זוויות» is «משולש» plus the given, and nothing else is read.
+ */
+const ACUTE_HE = new RegExp(`\\s+חד(?:ת|ות|י)?[\\s-]+${ANGLE_STEM_HE}ו?ת$`);
+const ACUTE_EN = /^acute(?:[\s-]+angled)?\s+/i;
+function acuteAdjective(phrase: string): { noun: string; acute: boolean } {
+  if (ACUTE_HE.test(phrase)) return { noun: phrase.replace(ACUTE_HE, ''), acute: true };
+  if (ACUTE_EN.test(phrase)) return { noun: phrase.replace(ACUTE_EN, ''), acute: true };
+  return { noun: phrase, acute: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -3737,7 +4010,7 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
     return made(facts);
   };
   if (depth < MAX_FRAME_DEPTH) {
-    for (const reading of [originClauses(s), shapeClauses(s), distributeClauses(s), pointClauses(s), sideClauses(s)]) {
+    for (const reading of [originClauses(s), shapeClauses(s), distributeClauses(s), pointClauses(s), sideClauses(s), diameterClauses(s)]) {
       const r = reading && attempt(reading);
       if (r) return { result: r, framed: true };
     }
@@ -3751,6 +4024,11 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
     const r = attempt(reading);
     if (r) return { result: r, framed: true };
   }
+  // A sentence with its givens in parentheses at the end (#1619 B2) — last, like the comma split, so it can
+  // never override a rule that owns the whole line.
+  const paren = parenClauses(s);
+  const withParen = paren && attempt(paren);
+  if (withParen) return { result: withParen, framed: true };
   return { result: direct, framed: unwrapped };
 }
 
@@ -3770,6 +4048,11 @@ function parseClause(raw: string): ParseResult {
    * `(.+)` and it would read the centre letter as an equation — the #1059 shape, which the Hebrew
    * guard catches only when the tail HAS Hebrew in it. «נתון מעגל O» has none.
    */
+  // Inscribed and circumscribed (#1619 B2) — before `parseCircleAt`, whose subject reader would take
+  // «מעגל שמרכזו C» off the front of «מעגל שמרכזו C חסום במשולש AOB»; and the touch list beside it.
+  const inscribed = parseInscribed(line) ?? parseTouchList(line);
+  if (inscribed) return inscribed;
+
   const centred = parseCircleAt(line);
   if (centred) return centred;
 

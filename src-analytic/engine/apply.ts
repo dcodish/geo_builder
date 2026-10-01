@@ -1430,9 +1430,21 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (host.def.t === 'diameter') {
           const same = [host.def.a, host.def.b].sort().join() === [f.a, f.b].sort().join();
           if (same) return { ok: true, effect: 'known', next: c };
-        } else if (host.def.pts.includes(f.a) && host.def.pts.includes(f.b)) {
-          const third = host.def.pts.find((p) => p !== f.a && p !== f.b)!;
-          return applyFact(c, { t: 'constraint', k: rightAngleAt(third, f.a, f.b), src: f.src });
+        } else if (host.def.t === 'through') {
+          /**
+           * EACH END ON THE CIRCLE, BY DEFINITION OR BY INCIDENCE (#1554 arm 2, #1619 B2). «מרובע ABCD חסום
+           * במעגל» defines the circle through A, B, C and puts D on it by an incidence; «BD קוטר במעגל» is then
+           * as true a statement as «AC קוטר» — which three vertices the lowering happened to pick must not
+           * decide whether the student's sentence is refused. Thales, both directions, with the right angle at
+           * a DEFINING point that is neither end (one always exists: three define, two are named).
+           */
+          const def = host.def.pts;
+          const onIt = (p: Id) =>
+            def.includes(p) || c.constraints.some((k) => k.t === 'on-curve' && k.id === p && k.curve === host!.id);
+          if (onIt(f.a) && onIt(f.b)) {
+            const third = def.find((p) => p !== f.a && p !== f.b)!;
+            return applyFact(c, { t: 'constraint', k: rightAngleAt(third, f.a, f.b), src: f.src });
+          }
         }
       }
       return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
@@ -1523,6 +1535,53 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           src: f.src,
         })),
       ]);
+    }
+
+    /**
+     * «הצלעות AO, BO ו-AB משיקות למעגל בנקודות D, E ו-F בהתאמה» — a side touching a circle AT a named point
+     * (#1619 B2, ADR-AG-194). The circle by the `tangent-of` chain; then by host:
+     *
+     * - the INCIRCLE of a ring that has this side: tangent by construction, so the sentence only names the
+     *   touch — the `side-touch` point (the foot of the centre on the side);
+     * - a circle ON A CENTRE: the side's bounded tangency (#1503's `tangent-line`, the given) and the point;
+     * - anything else — an equation circle, a circle through points — cannot be pulled tangent, and is
+     *   refused BY NAME (`out-of-scope`), the `tangent-of` rule.
+     */
+    case 'touch-at': {
+      for (const id of [f.a, f.b]) {
+        const p = objectById(c, id);
+        if (!p || !isPositional(p)) return { ok: false, error: unknownRef(c, id) };
+      }
+      if (f.a === f.b) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
+      let host: GeoObject | undefined;
+      if (f.circle !== undefined) {
+        host = objectById(c, numeralCurveId('circle', f.circle)) ?? objectById(c, `circle-at-${f.circle}`) ?? curveByName(c, f.circle);
+        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
+      } else {
+        const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+        if (circles.length !== 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
+        host = circles[0];
+      }
+      const touch: Fact = { t: 'derived', id: f.at, rule: { t: 'side-touch', circle: host.id, a: f.a, b: f.b }, src: f.src };
+      if (host.kind === 'circle-thru' && host.def.t === 'incircle') {
+        const ring = host.def.pts;
+        const n = ring.length;
+        const isSide = ring.some((p, i) => [p, ring[(i + 1) % n]].sort().join() === [f.a, f.b].sort().join());
+        if (!isSide) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+        return applyFact(c, touch);
+      }
+      if (host.kind === 'circle-at') {
+        const circle = host;
+        return applyAll(c, [
+          {
+            t: 'constraint',
+            k: { t: 'tangent-line', centre: circle.centre, r: circle.r, line: { kind: 'points', a: f.a, b: f.b, ...(f.bounded ? { bounded: true as const } : {}) } },
+            src: f.src,
+          },
+          touch,
+        ]);
+      }
+      return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
     }
 
     case 'radius-of': {
@@ -1763,7 +1822,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       const refs =
         f.sel.kind === 'axis-side' || f.sel.kind === 'crossing-distinct' || f.sel.kind === 'crossing-nth'
           ? [f.sel.id]
-          : f.sel.kind === 'distinct'
+          : f.sel.kind === 'distinct' || f.sel.kind === 'acute'
             ? f.sel.ids
             : f.sel.kind === 'sign'
               ? dirRefs(f.sel.q.u)
@@ -1842,8 +1901,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        */
       for (const curveRef of f.t === 'derived' ? curveParentsOf(f.rule) : []) {
         const o = objectById(c, curveRef);
-        // A centre names an equation curve; a touch point names two circles of any construction (#1504).
-        const ok = f.t === 'derived' && f.rule.t === 'touch-point' ? !!o && curveKindOf(o) === 'circle' : !!o && o.kind === 'curve';
+        // A centre names an equation curve; a touch point names two circles of any construction (#1504), and
+        // a side's touch point one circle of any construction (#1619 B2).
+        const anyCircle = f.t === 'derived' && (f.rule.t === 'touch-point' || f.rule.t === 'side-touch');
+        const ok = anyCircle ? !!o && curveKindOf(o) === 'circle' : !!o && o.kind === 'curve';
         if (!ok) {
           return { ok: false, error: unknownRef(c, curveRef) };
         }

@@ -339,6 +339,50 @@ export function sideClauses(line: string): string[] | null {
 }
 
 // ---------------------------------------------------------------------------
+// Diameters as subjects (#1619 B2)
+// ---------------------------------------------------------------------------
+
+/**
+ * - «הקטע AB הוא קוטר במעגל שמרכזו M» — the circle on a centre, named by the sentence that makes AB its
+ *   diameter: the circle, then the diameter OF that circle («AB קוטר במעגל M», M1's `diameter-of`).
+ * - «הקטע AB הוא קוטר במעגל» — «הקטע» NAMES the segment, which introduces its ends (#1074), so the segment is
+ *   stated first; «הצלע AC» refers to a side the figure already has and states nothing new.
+ * - «קוטר המעגל AC נמצא על הישר 3y − 2x − 4 = 0» — the line the diameter lies on, and the diameter: «AC נמצא
+ *   על …» (the incidence-in-every-order rule's own sentence) and «AC קוטר במעגל».
+ */
+export function diameterClauses(line: string): string[] | null {
+  const DIAM = `(?:(?:הוא|היא)\\s+)?(?:ה)?קוטר`;
+  const centred = new RegExp(
+    `^(?:ה?(קטע|צלע)\\s+)?((?:${NAME}){2})\\s+${DIAM}\\s+ב(?:ה)?מעגל\\s+ש(?:ה)?מרכזו\\s+(?:(?:הוא|היא)\\s+)?(${NAME})$`,
+  ).exec(line);
+  if (centred) {
+    const [, noun, pair, centre] = centred;
+    return [...(noun === 'קטע' ? [`הקטע ${pair}`] : []), `מעגל שמרכזו ${centre}`, `${pair} קוטר במעגל ${centre}`];
+  }
+  const segment = new RegExp(`^ה?קטע\\s+((?:${NAME}){2})\\s+(${DIAM}(?:\\s+.+)?)$`).exec(line);
+  if (segment) return [`הקטע ${segment[1]}`, `${segment[1]} ${segment[2].replace(/^(?:(?:הוא|היא)\s+)/, '')}`];
+  const onLine = new RegExp(`^(?:ה)?קוטר\\s+(?:ה)?מעגל(?:\\s+(${NAME}))?\\s+((?:${NAME}){2})\\s+נמצא\\s+(על\\s+.+)$`).exec(line);
+  if (onLine) {
+    const [, circle, pair, where] = onLine;
+    // The incidence first: it introduces the two ends when they are new, and the diameter refers to them.
+    return [`${pair} נמצא ${where}`, `${pair} קוטר במעגל${circle ? ` ${circle}` : ''}`];
+  }
+  return null;
+}
+
+/**
+ * «במשולש AOB חסום מעגל שמרכזו C (הנקודה C נמצאת ברביע השני)» — a sentence, and in parentheses at its end the
+ * givens that go with it (#1619 B2). The shape frame reads this for a shape declaration only; any other
+ * sentence followed by parenthesised givens is the same two statements. Offered only when the whole line
+ * is not itself a sentence (the caller tries it last), and taken only when every clause parses.
+ */
+export function parenClauses(line: string): string[] | null {
+  const paren = trailingParen(line);
+  if (!paren || !paren.head || paren.inner.length === 0) return null;
+  return [paren.head, ...paren.inner];
+}
+
+// ---------------------------------------------------------------------------
 // Distribution — «A ו-B נמצאות על ציר ה-x ועל ציר ה-y בהתאמה»
 // ---------------------------------------------------------------------------
 

@@ -330,7 +330,16 @@ export type Fact =
    * means is a question about the construction, so M1 answers it, and refuses where the figure
    * holds none or several of that kind.
    */
-  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind });
+  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind })
+  /**
+   * «הצלעות AO, BO ו-AB משיקות למעגל בנקודות D, E ו-F בהתאמה» — a SIDE touches a circle AT a named point
+   * (#1619 B2, ADR-AG-194). One fact per side. WHICH circle is M1's question (the `tangent-of` chain: `circle`
+   * as the sentence named it, else the figure's one circle); what it lowers to depends on the host: the
+   * incircle of a ring that has this side touches it by construction (only the touch point is named), a
+   * circle on a centre gains the bounded `tangent-line` given beside the named point, and any other circle
+   * is refused BY NAME. The point is the `side-touch` derived point — the foot of the centre on the side.
+   */
+  | (FactBase & { t: 'touch-at'; a: Id; b: Id; at: Id; circle?: string; bounded: boolean });
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list
@@ -450,11 +459,25 @@ export type GeoObject =
    */
   | { kind: 'circle-thru'; id: Id; def: CircleDef; name?: string };
 
-/** How a computed circle is determined (#1464, #1324). */
-export type CircleDef = { t: 'through'; pts: [Id, Id, Id] } | { t: 'diameter'; a: Id; b: Id };
+/**
+ * How a computed circle is determined (#1464, #1324).
+ *
+ * `incircle` (#1619 B2, #1554, ADR-AG-194) — the circle INSCRIBED in a ring of three or four vertices: centre
+ * where the internal bisectors at the first two vertices meet (for a triangle, `derived.ts`'s `incentre`, so
+ * the circle and «מפגש חוצי הזוויות» cannot disagree), radius its distance to the first side. Closed form, no
+ * freedom, no invented centre letter — ADR-AG-160's discipline. A quadrilateral has an incircle only when its
+ * Pitot condition holds; that condition is a GIVEN its sentence lowers beside this circle, never assumed here.
+ */
+export type CircleDef =
+  | { t: 'through'; pts: [Id, Id, Id] }
+  | { t: 'diameter'; a: Id; b: Id }
+  | { t: 'incircle'; pts: Id[] };
 
 /** The points a computed circle is defined from, in the student's order. */
-export const circleDefPoints = (d: CircleDef): Id[] => (d.t === 'through' ? [...d.pts] : [d.a, d.b]);
+export const circleDefPoints = (d: CircleDef): Id[] => (d.t === 'diameter' ? [d.a, d.b] : [...d.pts]);
+
+/** The id of the circle inscribed in a ring (#1619 B2) — one formula for the parser and every reader. */
+export const incircleId = (ringId: Id): Id => `circle-in-${ringId.replace(/^poly-/, '')}`;
 
 export type PointObject = Extract<GeoObject, { kind: 'point' }>;
 export type CurveObject = Extract<GeoObject, { kind: 'curve' }>;
@@ -632,7 +655,17 @@ export type Selector =
    * seeded through the same function (`compareOf`, `evaluate.ts`) — one mechanism with two spellings in
    * the data, never a third sign rule. `rhs` is another point or a value; a value may carry a parameter.
    */
-  | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr } };
+  | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr } }
+  /**
+   * «משולש חד זוויות ABC» — EVERY ANGLE OF THE TRIANGLE IS ACUTE (#1619 B2, ADR-AG-194).
+   *
+   * The exam's adjective is a stated given (it may not vanish) and an INEQUALITY, so it is D7's kind 2: it
+   * consumes no freedom and is no equation a least-squares solve can drive to zero — it is a region, the
+   * triangles whose three angles are under 90°. Judged inside validity like every selector, so `drawableAt`
+   * walks to an acute configuration, and a determined figure whose triangle is not acute is refused on the
+   * sentence (the #1069 predicate). `ids` is the ring, three vertices.
+   */
+  | { kind: 'acute'; ids: Id[] };
 
 /** A quantity the figure DERIVES — never a symbol the student declared (that is a domain, kind 1). */
 export type Quantity = { k: 'slope'; u: Direction };

@@ -2149,7 +2149,11 @@ function openCurveText(d: ReturnType<typeof derive>, id: string): string {
   // with a trailing `- 0` it never wrote.
   if (o?.kind === 'curve') return curveEquationText(o.curve.eq);
   if (o?.kind === 'circle-at') return `O(${o.centre}), r = ${exprText(o.r)}`;
-  // A computed circle (#1464, #1324) is written as what defines it: ⊙ through its points, ⌀ its diameter.
-  if (o?.kind === 'circle-thru') return o.def.t === 'through' ? `⊙${o.def.pts.join('')}` : `⌀${o.def.a}${o.def.b}`;
+  // A computed circle (#1464, #1324) is written as what defines it: ⊙ through its points, ⌀ its diameter,
+  // and the inscribed circle as the ring it is inscribed in (#1619 B2).
+  if (o?.kind === 'circle-thru') {
+    if (o.def.t === 'diameter') return `⌀${o.def.a}${o.def.b}`;
+    return o.def.t === 'through' ? `⊙${o.def.pts.join('')}` : `○${o.def.pts.join('')}`;
+  }
   return '—';
 }
