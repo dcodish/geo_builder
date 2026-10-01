@@ -19,7 +19,7 @@
  * pressing the button on it should not quietly redraw the same picture for ever.
  */
 import { derive } from '../engine/derive';
-import { figureSignature } from '../engine/evaluate';
+import { sameConfiguration } from '../engine/evaluate';
 
 /** How far to look. The same budget the drawable search uses, for the same reason. */
 const TRIES = 24;
@@ -36,8 +36,8 @@ const TRIES = 24;
  * (#1201, #1220), is now stated once and CALLED
  * ([ADR-W-053](../../docs/06w-decisions-workspace.md#adr-w-053)).
  */
-const signature = (lines: readonly string[], seed: number, seedNames: Readonly<Record<string, string>>): string =>
-  figureSignature(derive(lines, seed, seedNames).figure);
+const figureAt = (lines: readonly string[], seed: number, seedNames: Readonly<Record<string, string>>) =>
+  derive(lines, seed, seedNames).figure;
 
 export interface AnotherConfiguration {
   /** The seed to move to — unchanged when nothing different was found. */
@@ -54,9 +54,11 @@ export function anotherConfiguration(
   seedNames: Readonly<Record<string, string>> = {},
 ): AnotherConfiguration {
   if (lines.length === 0) return { seed: seed + 1, found: true };
-  const current = signature(lines, seed, seedNames);
+  // TOLERANCE-AWARE (#1539, ADR-AG-197): a picture that differs only by the solver's noise — «-0.0000» against
+  // «0.0000» above all — is the SAME picture, so the walk moves on to a configuration that really differs.
+  const current = figureAt(lines, seed, seedNames);
   for (let step = 1; step <= tries; step += 1) {
-    if (signature(lines, seed + step, seedNames) !== current) return { seed: seed + step, found: true };
+    if (!sameConfiguration(figureAt(lines, seed + step, seedNames), current)) return { seed: seed + step, found: true };
   }
   return { seed, found: false };
 }
