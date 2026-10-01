@@ -1866,3 +1866,23 @@ names the centre instead (`A(0,0)` → `A(0, 0), r = 4`, in either order); a cen
 their letter; a point `O` the student defined elsewhere (`O(5,5)`) keeps the letter and the centre shows
 its coordinates alone — never a second `O` and never an invented `O₁`. A translated circle, a parabola's
 focus and an ellipse's foci are unchanged: coordinates alone.
+
+**R124 — a given typed in the exam's own frame is understood as the given; a proof target is refused, with a reason**
+([ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), [#1618](https://github.com/dcodish/geo_builder/issues/1618)).
+*(Operator, 2026-10-01, #1616: the 4-point questions "involve more geometry … starting as pure geometry and then moves into analytical"; proof targets: "refuse and explain that this is not a proof engine".)*
+
+A student copies the 4-point question as printed, and each line is understood as the bare given it states:
+- a given-prefix («נתון:», «נתון כי», «ידוע כי», «עוד נתון:»), a continuing «ו…», a figure reference («(ראה ציור)», «כמתואר בסרטוט שלפניכם»), and length units
+- the Israeli coordinate pair «A(2;10)», «10½», and the exam's angle glyph «∢»
+- the shape as a context («במלבן ABCD, …»), with its givens in parentheses («טרפז ישר זווית ABCD (AB ∥ CD, AB ⊥ AD)»), or as a predicate («המרובע ABCO הוא טרפז ישר זווית», «ABC משולש»)
+- the origin in every spelling («O ראשית הצירים», «הנקודה O היא ראשית הצירים»), which is the point O(0,0)
+- plural subjects and «בהתאמה» («הנקודות A ו-B נמצאות על ציר ה-x ועל ציר ה-y בהתאמה»)
+- two givens on one line («AB = 20, AC = 15»)
+
+The same holds in English for the forms the catalogue shows.
+
+A line is accepted whole or not at all; the row recorded is the line as typed. A side named by its ROLE («השוק BC», «היתר AC») stays a claim about that role and is not reduced to «הצלע».
+
+What the student is asked to **prove** («הוכיחו כי …», «הראו כי …», "prove that …") is never drawn. The tool answers that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and asks for only what the question gives.
+
+A right trapezoid («טרפז ישר זווית») does not decide which leg is perpendicular. A stated right angle decides it, and until one is stated it is a configuration «הציגו תצורה אחרת» cycles.

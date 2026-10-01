@@ -148,6 +148,8 @@ const he = {
   errNotHandled: 'לא הצלחתי להבין את המשפט: "{{detail}}"',
   errBadEquation: 'לא הצלחתי לקרוא את המשוואה: "{{detail}}"',
   errOutOfScope: 'המשפט מובן, אך אינו נתמך בכלי הזה: "{{detail}}"',
+  errProofTarget:
+    'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "{{detail}}"',
   errConflict: 'המשפט לא נוסף — הוא סותר את מה שכבר נקבע: "{{detail}}"',
   errNameClash:
     'השם הזה כבר תפוס בשרטוט — הוא {{existing}}. אי אפשר לתת לו משמעות שנייה במשפט "{{detail}}". ' +
@@ -477,6 +479,8 @@ const en: typeof he = {
   errNotHandled: 'I could not understand the statement: "{{detail}}"',
   errBadEquation: 'I could not read the equation: "{{detail}}"',
   errOutOfScope: 'Understood, but not supported in this tool: "{{detail}}"',
+  errProofTarget:
+    'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "{{detail}}"',
   errConflict: 'Not added — it contradicts what is already fixed: "{{detail}}"',
   errNameClash:
     'That name is already taken in this figure — it is {{existing}}. It cannot take a second ' +

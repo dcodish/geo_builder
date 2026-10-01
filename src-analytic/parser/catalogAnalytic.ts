@@ -761,4 +761,32 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'M is the intersection of the diagonals',
     needs: ['טרפז ABCD'],
   },
+  /*
+   * --- THE EXAM'S SENTENCE FRAME (#1618, the 471 4-point question) ---
+   * Each row is a 471 corpus sentence as printed; the frame (`frameAnalytic.ts`) reads the wrapper
+   * once, so every family below inherits it — these rows show that the wrapper exists, not a family.
+   */
+  { category: 'points', family: 'F1', he: 'נתון: K(1,2)', en: 'given: K(1,2)' },
+  { category: 'points', family: 'F1', he: 'O ראשית הצירים', en: 'O is the origin' },
+  {
+    category: 'points',
+    family: 'F1',
+    he: 'הנקודות A ו-B נמצאות על ציר ה-x ועל ציר ה-y בהתאמה',
+    en: 'A and B are on the x-axis and the y-axis respectively',
+    needs: ['נקודה A', 'נקודה B'],
+  },
+  { category: 'points', family: 'F1', he: 'AB = 20, AC = 15', en: 'AB = 20, AC = 15', needs: ['A(0,0)', 'נקודה B', 'נקודה C'] },
+  {
+    category: 'shapes',
+    family: 'F17',
+    he: 'טרפז ישר זווית ABCD (AB ∥ CD, ∢D = 90°)',
+    en: 'right trapezoid ABCD (AB ∥ CD, ∠D = 90°)',
+  },
+  { category: 'shapes', family: 'F17', he: 'המרובע ABCO הוא טרפז ישר זווית', en: 'ABCO is a right trapezoid' },
+  {
+    category: 'shapes',
+    family: 'F17',
+    he: 'במלבן ABCD, הנקודה E נמצאת על הצלע DC',
+    en: 'in rectangle ABCD, E is on side DC',
+  },
 ];

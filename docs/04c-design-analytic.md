@@ -1806,3 +1806,24 @@ then its slope).
 (`app/fallback.ts`): a throttle is «busy»; a completion the tool READ and declined is «understood, not
 supported» (ADR-AG-170); a completion that is not a command at all (`not-handled`), or no answer, keeps
 the student's ORIGINAL refusal — nothing was understood, and the move may well be supported.
+
+## The sentence frame ([ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), #1618)
+
+`parseLine` is the one boundary every rule reads, and it reads the exam's textbook frame **once**:
+
+```
+raw → orthography → proof-target? → readLine(depth 0) → parseClause
+                                          │
+                                          ├─ structural readings: origin · shape · distribution · point · side
+                                          ├─ parseClause (the rule chain, unchanged)
+                                          └─ if no rule owns it (not-handled / bad-operand): comma / «ו» partitions
+```
+
+- **`parseClause`** is the old `parseLine`. The parser's own internal calls (the canonical sentences of `viaCanonical`, the crossing pair, the placed subject) call it directly, so the frame never changes what they mean.
+- **`frameAnalytic.ts` is text → clauses and decides nothing.** A reading is taken only when every clause parses through `readLine` again, one level deeper (`MAX_FRAME_DEPTH = 2`). So the frame cannot accept what the grammar rejects, and a line is never half-accepted.
+- **Order matters, and it is chosen.** The structural readings run *before* `parseClause`, because a rule can half-claim a framed line («טרפז ישר זווית ABCD (AB ∥ CD, …)» used to answer `bad-operand`). The partitions run *after*, and only on `not-handled` / `bad-operand`, so a comma can never override a rule's owned refusal.
+- **Partitions** keep each segment's original separator (`Segment.sep`), so a group is always a substring of the line. They are tried fewest-groups first, and a group that only names a point (`isBareName`) disqualifies the partition: cutting «A» off «A, B ו-C נמצאות על …» would leave A unconstrained.
+- **Shape nouns come from `SHAPES` / `EN_SHAPE`**, longest first, through `normalizeShapeNoun`. A new row in the registry is understood in every frame with no change here.
+- **`unwrap` runs to a fixpoint** (bounded), because frames nest: «וידוע כי …», «נתון בנוסף: … (ראה ציור)».
+
+**Not here:** the imperative wrapper («הוסף …») is still taught by `decideSubmit` before `parseLine` runs (ADR-AG-150). A proof target is refused inside `parseLine` (`proof-target`), so the teaching path's parse of «כי …» fails, and «הראו כי …» reaches the refusal rather than a lesson. A role noun («השוק BC») is not folded; that boundary belongs to ADR-AG-119.

@@ -158,9 +158,17 @@ export const SHAPES: Record<string, ShapeRow> = {
     givens: ([a, b, c, d]) => [assumedParallel(a, b, d, c), equal(a, d, b, c)],
   },
   'טרפז ישר זווית': {
-    // Both right angles sit on the same leg, so this is determined and needs no choice.
+    // Both right angles sit on the same leg — but WHICH leg is unstated (#1618). The row used to seat
+    // the right angle at the first vertex, so «טרפז ישר זווית ABCD» with its right angles at B and C —
+    // the 471 exam's «המרובע ABCO הוא טרפז ישר זווית (∢C = 90°, AB ∥ OC)» — was refused as
+    // unsatisfiable: a default posing as a given (ADR-052). A right angle at ANY vertex, with either
+    // parallel pair, makes a right trapezoid, so all four seats are offered; a stated «∢C = 90°» is
+    // then exactly one of them and collapses the choice by structure (`rightAngleAt` is shared).
     arity: 4,
-    givens: ([a, b, c, d]) => [assumedParallel(a, b, d, c), rightAngleAt(a, b, d)],
+    givens: ([a, b, c, d]) => [
+      assumedParallel(a, b, d, c),
+      choice([rightAngleAt(a, b, d), rightAngleAt(b, a, c), rightAngleAt(c, b, d), rightAngleAt(d, a, c)]),
+    ],
   },
   דלתון: {
     // A kite: two pairs of ADJACENT equal sides, meeting at `A` and at `C`. That makes `AC` the axis
