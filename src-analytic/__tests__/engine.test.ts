@@ -626,6 +626,8 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
       case 'teach': return `teach:${v.canonical}`;
       // #1154 — a rename edits the session; none of the cases below is one.
       case 'rename': return `rename:${v.from}->${v.to}`;
+      // #1303 — a swap edits the session too; none of the cases below is one.
+      case 'swap': return `swap:${v.a}<->${v.b}`;
     }
   };
 

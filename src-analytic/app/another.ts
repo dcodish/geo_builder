@@ -36,8 +36,8 @@ const TRIES = 24;
  * (#1201, #1220), is now stated once and CALLED
  * ([ADR-W-053](../../docs/06w-decisions-workspace.md#adr-w-053)).
  */
-const signature = (lines: readonly string[], seed: number): string =>
-  figureSignature(derive(lines, seed).figure);
+const signature = (lines: readonly string[], seed: number, seedNames: Readonly<Record<string, string>>): string =>
+  figureSignature(derive(lines, seed, seedNames).figure);
 
 export interface AnotherConfiguration {
   /** The seed to move to — unchanged when nothing different was found. */
@@ -50,11 +50,13 @@ export function anotherConfiguration(
   lines: readonly string[],
   seed: number,
   tries = TRIES,
+  // #1631: the session's seed names, so the search compares the figures the canvas would actually draw
+  seedNames: Readonly<Record<string, string>> = {},
 ): AnotherConfiguration {
   if (lines.length === 0) return { seed: seed + 1, found: true };
-  const current = signature(lines, seed);
+  const current = signature(lines, seed, seedNames);
   for (let step = 1; step <= tries; step += 1) {
-    if (signature(lines, seed + step) !== current) return { seed: seed + step, found: true };
+    if (signature(lines, seed + step, seedNames) !== current) return { seed: seed + step, found: true };
   }
   return { seed, found: false };
 }

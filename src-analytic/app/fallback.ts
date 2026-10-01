@@ -112,9 +112,9 @@ export async function runFallback(
   for (const step of gated.lines) {
     const soFar = [...lines, ...accepted];
     const verdict: SubmitVerdict = decideSubmit(step, soFar, seed, derive(soFar, seed));
-    // #1154: a model line that RENAMES is rejected — the fallback adds givens; rewriting the student's
+    // #1154 / #1303: a model line that RENAMES or SWAPS is rejected — the fallback adds givens; rewriting the student's
     // history is theirs to ask for, never the model's.
-    if (verdict.kind === 'refused' || verdict.kind === 'ignored' || verdict.kind === 'rename') {
+    if (verdict.kind === 'refused' || verdict.kind === 'ignored' || verdict.kind === 'rename' || verdict.kind === 'swap') {
       const code = verdict.kind === 'refused' ? (verdict.error as { key?: string }).key : undefined;
       return { kind: 'rejected', refusedStep: step, ...(code ? { code } : {}) };
     }

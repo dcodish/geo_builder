@@ -42,6 +42,9 @@ export interface SavedAnalyticSession {
   /** #1548 — the MUTED lines' indexes (the D6 disable operation). Omitted when none, so a save
    *  from before this field loads unchanged. A muted line is saved and loads muted. */
   disabled?: number[];
+  /** #1631 — the seed-name map a letter change leaves (`Construction.seedNames`), so a renamed free
+   *  vertex loads where it was drawn. Omitted when empty — every save from before it loads unchanged. */
+  seedNames?: Record<string, string>;
 }
 
 /**
@@ -149,6 +152,16 @@ export type InputError =
   | { key: 'rename-taken'; detail: string; holder?: string }
   | { key: 'rename-not-typed'; detail: string }
   | { key: 'rename-unsafe'; detail: string; holder: string }
+  /**
+   * A SWAP the tool understood and declined (#1303, #1631) — the rename's refusals, for two letters.
+   * `swap-unsafe` carries both letters (`holder`, `other`) and, in `detail`, the line that could not be
+   * rewritten faithfully (empty when the figure's own tool-chosen names would have shifted).
+   */
+  | { key: 'swap-bad-name'; detail: string }
+  | { key: 'swap-same'; detail: string }
+  | { key: 'swap-unknown'; detail: string }
+  | { key: 'swap-not-typed'; detail: string }
+  | { key: 'swap-unsafe'; detail: string; holder: string; other: string }
   /** A given the figure cannot satisfy (#1016). #1423: when the refused line RESTATES an existing
    *  letter, `reusedId` names it and `definedBy` carries the student's own line that defines it —
    *  the refusal then says the letter is the problem, with the fresh-letter remedy. */
@@ -163,6 +176,14 @@ export type InputError =
   /** #1379 — over `shell/save`'s statement ceiling; `detail` is the file name */
   | { key: 'load-too-large'; detail: string }
   | { key: 'load-unreadable'; detail: string };
+
+/** What a letter change (rename or swap) commits in ONE set — `app/rename.ts` `RelabelCommit`. */
+export interface LetterCommit {
+  lines: string[];
+  queries: AskedQuestion[];
+  spokenFor: Record<number, string>;
+  seedNames: Record<string, string>;
+}
 
 interface AnalyticState {
   /** The student's lines, in order. The one source of truth. */
@@ -218,7 +239,17 @@ interface AnalyticState {
    * givens and the data panel together, and the two can never disagree about what a letter is. The
    * seed and the muted set are untouched: a letter is a name, not a configuration, and no row moved.
    */
-  applyRename: (next: { lines: string[]; queries: AskedQuestion[]; spokenFor: Record<number, string> }) => void;
+  applyRename: (next: LetterCommit) => void;
+  /**
+   * #1303 / #1631 — record a SWAP the submit path (or the popover) decided on (`app/rename.ts`
+   * `decideSwap`): the same one-commit contract as `applyRename` — one undo step, seed kept.
+   */
+  applySwap: (next: LetterCommit) => void;
+  /**
+   * #1631 — WHICH NAME SEEDS EACH FREE VERTEX (`Construction.seedNames`): a letter change transposes it,
+   * so the renamed vertex is drawn where it was. Empty until a letter changes; saved with the lines.
+   */
+  seedNames: Record<string, string>;
   clearAll: () => void;
   /**
    * Replace the question list. The GESTURES are decided in `app/answers.ts` and this records the
@@ -260,11 +291,30 @@ interface AnalyticState {
    */
   serialize: () => SavedAnalyticSession;
   /** Replace the session with a loaded one. */
-  restore: (session: { lines: string[]; seed?: number; name?: string; spokenFor?: Record<number, string>; disabled?: number[] }) => void;
+  restore: (session: { lines: string[]; seed?: number; name?: string; spokenFor?: Record<number, string>; disabled?: number[]; seedNames?: Record<string, string> }) => void;
   /** Record the fallback's machine lines under the student's OWN sentence (#1297). */
   /** `notice` travels in the commit, as `recordLine`'s does (#1350). */
   recordLlmLines: (spoken: string, lines: string[], notice?: string | null) => void;
   setNotice: (n: string | null) => void;
+}
+
+/** One letter change, as one set — lines, ask rows, display sentences, seed names (#1154, #1631). */
+const letterCommit = ({ lines, queries, spokenFor, seedNames }: LetterCommit) => ({
+  lines: lines.map(ingestTypedText),
+  queries: [...queries],
+  spokenFor: { ...spokenFor },
+  seedNames: { ...seedNames },
+  error: null,
+  notice: null,
+});
+
+/** A loaded seed-name map, kept only as letter → letter strings (a hand-edited file cannot inject anything else). */
+function cleanSeedNames(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const NAME = /^[A-Z][0-9₀-₉]?$/;
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>).filter((e): e is [string, string] => NAME.test(e[0]) && typeof e[1] === 'string' && NAME.test(e[1])),
+  );
 }
 
 export const useAnalyticStore = create<AnalyticState>()(
@@ -273,6 +323,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   lines: [],
   spokenFor: {},
   disabled: [],
+  seedNames: {},
   seed: 0,
   name: '',
   loadAudit: null,
@@ -310,12 +361,12 @@ export const useAnalyticStore = create<AnalyticState>()(
       return { lines: s.lines.map((l, i) => (i === index ? ingestTypedText(next) : l)), spokenFor, error: null, notice: null };
     }),
   setDisabled: (disabled) => set({ disabled: [...disabled].sort((a, b) => a - b), error: null, notice: null }),
-  applyRename: ({ lines, queries, spokenFor }) =>
-    set({ lines: lines.map(ingestTypedText), queries: [...queries], spokenFor: { ...spokenFor }, error: null, notice: null }),
+  applyRename: (next) => set(letterCommit(next)),
+  applySwap: (next) => set(letterCommit(next)),
   clearAll: () =>
     // The QUERIES go with the lines (#1110): a reading of a figure that no longer exists is a lie,
     // and «נקה הכל» is the clearest case of the figure no longer existing.
-    set({ lines: [], spokenFor: {}, disabled: [], error: null, notice: null, seed: 0, name: '', loadAudit: null, queries: [] }),
+    set({ lines: [], spokenFor: {}, disabled: [], seedNames: {}, error: null, notice: null, seed: 0, name: '', loadAudit: null, queries: [] }),
 
   /**
    * The three gestures, as store actions (ADR-AG-067's decisions, now over the stored record).
@@ -346,7 +397,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   setLoadAudit: (loadAudit) => set({ loadAudit }),
 
   serialize: () => {
-    const { lines, seed, name, spokenFor, disabled } = get();
+    const { lines, seed, name, spokenFor, disabled, seedNames } = get();
     return {
       app: ANALYTIC_APP,
       version: ANALYTIC_SAVE_VERSION,
@@ -355,13 +406,15 @@ export const useAnalyticStore = create<AnalyticState>()(
       ...(name.trim() ? { name: name.trim() } : {}),
       ...(Object.keys(spokenFor).length ? { spokenFor: { ...spokenFor } } : {}),
       ...(disabled.length ? { disabled: [...disabled] } : {}),
+      ...(Object.keys(seedNames).length ? { seedNames: { ...seedNames } } : {}),
     };
   },
 
-  restore: ({ lines, seed, name, spokenFor, disabled }) =>
+  restore: ({ lines, seed, name, spokenFor, disabled, seedNames }) =>
     set({
       lines: lines.map(ingestTypedText),
       spokenFor: spokenFor ?? {},
+      seedNames: cleanSeedNames(seedNames),
       // #1548: only indexes that name a line survive a restore — a hand-edited file cannot mute a ghost
       disabled: [...new Set(disabled ?? [])].filter((d) => Number.isInteger(d) && d >= 0 && d < lines.length).sort((a, b) => a - b),
       seed: seed ?? 0,
@@ -384,9 +437,17 @@ export const useAnalyticStore = create<AnalyticState>()(
       // The QUERIES ride along (#1110): undo must put back what the student was reading, not only the
       // figure — the same argument that puts `seed` here (E5/STO-5).
       // The MUTED set rides along too (#1548): muting is a step the student took, so undo takes it back.
-      partialize: (s) => ({ lines: s.lines, seed: s.seed, queries: s.queries, disabled: s.disabled }) as AnalyticState,
+      // #1631: the AI lane's display sentences and the seed-name map ride along too. `spokenFor` is keyed
+      // by line INDEX and written in the same set as the lines it annotates (record, remove, edit,
+      // rename, swap) — left out, an undo restored the lines and kept the other half: a renamed letter
+      // in a row whose given was put back, and after an undone delete every later annotation one row off.
+      // `seedNames` is the same argument for where a renamed free vertex is drawn.
+      partialize: (s) =>
+        ({ lines: s.lines, seed: s.seed, queries: s.queries, disabled: s.disabled, spokenFor: s.spokenFor, seedNames: s.seedNames }) as AnalyticState,
       // Without this, setting an error would push a history entry and undo would appear to do nothing.
-      equality: (a, b) => a.lines === b.lines && a.seed === b.seed && a.queries === b.queries && a.disabled === b.disabled,
+      equality: (a, b) =>
+        a.lines === b.lines && a.seed === b.seed && a.queries === b.queries && a.disabled === b.disabled &&
+        a.spokenFor === b.spokenFor && a.seedNames === b.seedNames,
       limit: 100,
     },
   ),

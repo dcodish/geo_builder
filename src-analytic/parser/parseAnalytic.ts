@@ -4331,3 +4331,25 @@ export function parseRenameAnalytic(raw: string): { from: string; to: string } |
   if (!m) return null;
   return { from: m[1].toUpperCase(), to: m[2] };
 }
+
+/**
+ * #1303 / #1631 — A SWAP REQUEST: «החלף בין A ל-B», «החליפו בין A ל-B», «החלף בין A לבין B»,
+ * "swap A and B", "switch A with B", "swap the letters A and B".
+ *
+ * «בין» is what marks a swap rather than a rename (2-D's `parse.ts` note): «החלף A ב-G» names ONE
+ * letter and its replacement, and stays a rename. Like the rename, a session edit read before the
+ * grammar; the second letter is returned as typed, so «בין A ל-AB» is refused BY NAME.
+ */
+const SWAP_HE = new RegExp(
+  String.raw`^(?:החלף|החליפו|החלפ)\s+(?:את\s+)?(?:ה?אותיות\s+|ה?נקודות\s+|ה?שמות\s+)?בין\s+(?:ה?נקודה\s+)?${RENAME_SOURCE}\s+(?:ל|ו)\s*[-־]?\s*(?:בין\s+)?(?:ה?נקודה\s+)?(\S+?)\.?$`,
+);
+const SWAP_EN = new RegExp(
+  String.raw`^(?:swap|switch|exchange|interchange)\s+(?:the\s+)?(?:letters\s+|names\s+|labels\s+|points\s+)?(?:of\s+)?(?:point\s+)?${RENAME_SOURCE}\s+(?:and|with|&)\s+(?:point\s+)?(\S+?)\.?$`,
+  'i',
+);
+export function parseSwapAnalytic(raw: string): { a: string; b: string } | null {
+  const s = trim(raw.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ''));
+  const m = SWAP_HE.exec(s) ?? SWAP_EN.exec(s);
+  if (!m) return null;
+  return { a: m[1].toUpperCase(), b: m[2] };
+}

@@ -160,10 +160,10 @@ describe('#1154 — refusals name what the student wrote', () => {
     expect(errorText(e, tEn)).toContain('already taken');
   });
 
-  it('a letter the TOOL holds (the canonical centre O) is taken too', () => {
+  it('a letter the TOOL holds (the canonical centre O) is taken too — and its holder is the circle’s line (#1631)', () => {
     const e = refusal('שנה שם P ל-O', session(['נתון מעגל שמשוואתו x^2+y^2=9', 'נקודה P']));
-    expect(e.key).toBe('rename-taken');
-    expect(errorText(e, t)).toBe('האות O כבר תפוסה בשרטוט. בחרו אות פנויה.');
+    expect(e).toEqual({ key: 'rename-taken', detail: 'O', holder: 'נתון מעגל שמשוואתו x^2+y^2=9' });
+    expect(errorText(e, t)).toBe('האות O כבר תפוסה: "נתון מעגל שמשוואתו x^2+y^2=9". בחרו אות פנויה.');
   });
 
   it('an UNKNOWN point is refused by name', () => {
@@ -184,8 +184,10 @@ describe('#1154 — refusals name what the student wrote', () => {
     expect(refusal('שנה שם A ל-A', session(FIGURE))).toEqual({ key: 'rename-same', detail: 'A' });
   });
 
-  it('a letter the tool CHOSE, named by no line, is refused — there is no line of theirs to rewrite', () => {
-    const e = refusal('שנה שם O ל-Q', session(['נתון מעגל שמשוואתו x^2+y^2=9']));
+  it('a letter the tool CHOSE is refused only where no sentence form can name it (#1631 sub-decision a)', () => {
+    // «נתון מעגל שמשוואתו …» CAN name its centre — that case now renames (issue-1631 test). An equation
+    // with no noun cannot: there is nowhere in the student's sentence to write the letter.
+    const e = refusal('שנה שם O ל-Q', session(['x^2+y^2=9']));
     expect(e).toEqual({ key: 'rename-not-typed', detail: 'O' });
   });
 

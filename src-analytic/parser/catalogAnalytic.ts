@@ -57,8 +57,8 @@ export interface CatalogEntryAnalytic {
    * WHICH READER of the deterministic lane owns this entry (#1154 — 3-D's `lane`, ADR-3D-211, copied).
    *
    * Absent = the construction lane: `parseLine` lowers it to facts, the LLM may emit it, and the guard
-   * builds it. `'rewrite'` = a line that edits the SESSION rather than the figure — a rename, read by
-   * `parseRenameAnalytic` before the grammar and never lowered to a fact. It is listed because the
+   * builds it. `'rewrite'` = a line that edits the SESSION rather than the figure — a rename or a swap,
+   * read by `parseSessionEdit` (app/rename.ts) before the grammar and never lowered to a fact. It is listed because the
    * catalog is also the in-app guide (2-D left rename out and the operator could not find it), but it
    * is never taught to the LLM: the fallback adds givens, and a model line that rewrites the student's
    * history is rejected. Every consumer reads THIS field rather than learning about rename separately.
@@ -91,6 +91,9 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // #1154 — change a point's letter: every line and ask row that names it is rewritten. A session
   // edit, not a given (`lane: 'rewrite'`); also offered by clicking the point → «שנה אות». Not featured.
   { category: 'points', family: 'F1', lane: 'rewrite', needs: ['נתונה הנקודה A(2,6)'], he: 'שנה שם A ל-G', en: 'rename A to G' },
+  // #1303 / #1631 — swap two letters: every line and ask row that names either is rewritten at once.
+  // A session edit (`lane: 'rewrite'`), not a given. Not featured.
+  { category: 'points', family: 'F1', lane: 'rewrite', needs: ['נתונה הנקודה A(2,6)', 'נתונה הנקודה B(8,2)'], he: 'החלף בין A ל-B', en: 'swap A and B' },
 
   // --- F3 · lines by equation ---
   { featured: true, category: 'lines', family: 'F3', he: 'נתון הישר l1: 4y-3x-20=0', en: 'line l1: 4y-3x-20=0' },

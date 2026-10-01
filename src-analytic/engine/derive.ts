@@ -88,7 +88,12 @@ export interface Derivation {
   constraintLine: number[];
 }
 
-export function derive(lines: readonly string[], seed = 0): Derivation {
+/**
+ * `seedNames` (#1631, ADR-AG-192): the session's letter → seed-name map, carried on the construction so
+ * every evaluation of THIS figure — the drawn one, the gates, the pool — starts its free vertices from
+ * the same places. Empty for a figure no letter change touched, which is then byte-for-byte the old fold.
+ */
+export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<Record<string, string>> = {}): Derivation {
   const facts: Fact[] = [];
   const faults: LineFault[] = [];
   /** Which line produced each fact, so an apply refusal can be blamed on the right one. */
@@ -115,7 +120,8 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
 
   // The LINE is the fold's unit of application (#1242, ADR-AG-133): every fact of a faulted line carries
   // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
-  const { construction, errors, effects, constraintFact, notices: factNotices } = fold(facts, owner);
+  const { construction: folded, errors, effects, constraintFact, notices: factNotices } = fold(facts, owner);
+  const construction: Construction = Object.keys(seedNames).length > 0 ? { ...folded, seedNames: { ...seedNames } } : folded;
   // Said on the circle's row only when the name was actually GIVEN — a default that yielded to a letter
   // already in the figure named nothing, and the list must not claim it did (#1263's rule).
   for (const i of centred.offered) if (effects[i] === 'created') minted.push({ index: owner[i], id: CENTRE_LETTER });

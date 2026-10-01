@@ -64,7 +64,7 @@ import { AskLane } from '../shell/frame/AskLane';
 import { askSettled, figureIsOpen, type Answer } from './app/ask';
 import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
-import { dispatchRename, renameDraftOf } from './app/rename';
+import { dispatchRename, dispatchSwap, renameDraftOf } from './app/rename';
 import { anotherConfiguration } from './app/another';
 import { offersOf, pointAt } from './engine/crossings';
 import { VERTICAL_TOL } from './engine/lines';
@@ -141,6 +141,8 @@ export function App() {
     disabled,
     setDisabled,
     applyRename,
+    applySwap,
+    seedNames,
     removeLine,
     replaceLine,
     clearAll,
@@ -527,12 +529,12 @@ export function App() {
   const active = useMemo(() => activeOf(lines, disabled), [lines, disabled]);
   const rows = useMemo(() => rowOf(lines.length, disabled), [lines.length, disabled]);
   const d = useMemo(() => {
-    const out = derive(active, seed);
+    const out = derive(active, seed, seedNames);
     // #1473 (ADR-AG-180, operator ruling B′): the page's knowledge gates judge only what is already
     // evaluated and answer «בודק…» for the rest; the pool completes AFTER the render (effect below).
     configurationPool(out.construction).defer();
     return out;
-  }, [active, seed]);
+  }, [active, seed, seedNames]);
 
   /**
    * THE POOL COMPLETES AFTER THE RENDER (#1473). One seed per slice, yielding to the browser between seeds; a re-render when it completes,
@@ -812,7 +814,13 @@ export function App() {
        * is dispatched here rather than decided by `decideSubmit`, which sees only the active lines.
        */
       case 'rename': {
-        const r = dispatchRename(verdict.from, verdict.to, { lines, disabled, queries, spokenFor, seed }, { applyRename, setError }, d);
+        const r = dispatchRename(verdict.from, verdict.to, { lines, disabled, queries, spokenFor, seed, seedNames }, { applyRename, setError }, d);
+        if (r.kind === 'apply') setDraft('');
+        return;
+      }
+      // #1303 / #1631 — a SWAP («החלף בין A ל-B»): the rename's contract, two letters at once.
+      case 'swap': {
+        const r = dispatchSwap(verdict.a, verdict.b, { lines, disabled, queries, spokenFor, seed, seedNames }, { applySwap, setError }, d);
         if (r.kind === 'apply') setDraft('');
         return;
       }
@@ -1224,7 +1232,7 @@ export function App() {
               editValueOf={(id) => lines[Number(id)] ?? ''}
               onEditCommit={(id, next) => {
                 const i = Number(id);
-                if (!decideEdit(i, next, lines, disabled, seed)) return false;
+                if (!decideEdit(i, next, lines, disabled, seed, seedNames)) return false;
                 // #1300 — an edit rewrites a line in place, so a replay without it diverges silently.
                 logAnalytic({ kind: 'action', action: 'edit', detail: `${i}:${next}` });
                 replaceLine(i, next);
@@ -1405,7 +1413,7 @@ export function App() {
                  * operator's own figure, while the DOF cue beside it said the figure still had
                  * freedom. When nothing differs, saying so beats redrawing in silence.
                  */
-                const next = anotherConfiguration(active, seed);
+                const next = anotherConfiguration(active, seed, undefined, seedNames);
                 // #1300: the seed IS the configuration, so a replay that loses this press redraws a
                 // different figure from the one the report is about.
                 logAnalytic({ kind: 'action', action: 'show-another', detail: next.found ? next.seed : 'none' });

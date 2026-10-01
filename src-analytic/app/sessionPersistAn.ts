@@ -35,7 +35,7 @@ export function persistSessionAn(now: Date = new Date()): void {
 export function startSessionPersistAn(): () => void {
   return useAnalyticStore.subscribe((s, p) => {
     // #1548: a mute changes what the session restores as, so it persists like a line does
-    if (s.lines !== p.lines || s.disabled !== p.disabled || s.queries !== p.queries || s.seed !== p.seed || s.name !== p.name) persistSessionAn();
+    if (s.lines !== p.lines || s.disabled !== p.disabled || s.queries !== p.queries || s.seed !== p.seed || s.name !== p.name || s.seedNames !== p.seedNames) persistSessionAn();
   });
 }
 
