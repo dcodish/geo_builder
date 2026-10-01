@@ -1994,3 +1994,57 @@ Binding an undescribed «חסום במעגל» to a circle already in the figure
 **Pre-M1 passes.** `factsWithin(f)` yields a `the-circle`'s creation, for `derive`'s line-of-object map (vacancies of a created circle are blamed on its line) and `submit`'s restated-centre set. `nameCanonicalCentres` predicts statically whether a `the-circle` will create (no circle before it, or no same-equation curve before it) and puts the offered O inside that creation.
 
 **The touch.** `tangent-of { at }` is the only touch fact. `applyTouchAt`'s first branch is the incircle's own side: the `side-touch` derived point, written in place of a point the same sentence just declared (no constraint on it yet), else as `derived-at`. Everything else is B3's three statements.
+
+## Only valid configurations are evidence ([ADR-AG-197](06c-decisions-analytic.md#adr-ag-197), #1642, #1638, #1635, #1634, #1539)
+
+Four seams, one rule: a configuration the givens contradict, or one the search failed to vary, is never read as knowledge.
+
+**Configuration choice — `evaluate`.** Discrete freedom is still resolved before the solve, but the seed's resolution is a preference: `evaluateTryingChoices` evaluates the seed's `choice` options first and, when that figure is not admitted, the options at `seed + 1 … seed + n − 1` at the SAME samples, returning the first admitted figure (else the seed's own). `Figure.choiceSeed` records which, and `choiceSeedOf(c, seed)` is how `locus.ts` resolves the same options. `cycledPairs` treats the two ordinals of a pair named in one sentence (`crossing-nth { both }`) as one more discrete choice — bit k of the seed swaps the k-th pair; configuration 0 is the stated order — and the figure reports failing selectors as the stated objects so `derive`'s blame map still matches. Each uncached option counts in `evaluateStats.uncached`.
+
+**The solve's stage two — `resampledInside`.** After stage two accepts a converged solution, if a parameter moved from its sample and `figureDofOf > 0`, the moved parameters are pushed past the stop point (`at + (at − sample)·(0.25 + 1.5u)`, two seed-drawn tries), the vertices re-solved with the parameters fixed (`carrierSystem(…, { params: 'fixed' })`), and the result kept only if it converges, stays admissible (domains, signs) and the selectors hold. Otherwise the descent's answer stands.
+
+**Pool admission — the gates.** `admittedToPool(f)` = no `unsatisfied`, `selectorsOk`, no `hardRingFaults` (the trapezoid warning excepted). `judge`, `knownOptions` and `holdsInEveryConfiguration` read `admittedOf(c, seeds)`; `drawableAt` itself is unchanged, so the canvas, `derive`'s reporting and «הציגו תצורה אחרת» see what they saw. `starved(figs)` — freedom left and fewer than `MIN_WITNESSES` (2) different pictures — makes an invariant value `{ known: false, starved }` (pending on a partial pool), and a `knownOptions` member with fewer witnesses than that makes the answer "not a set". "Different picture" is `sameConfiguration`: `signatureParts` (points, curves with lines normalised, used non-direction parameters) compared within `SAME_VALUE_EPS`, relative. `figureSignature` prints the same parts, zero spelled once (`zeroFree`); `distinctConfigSeeds` and `anotherConfiguration` compare with `sameConfiguration`. The deferred pool's synchronous floor is `PENDING_FLOOR = 3` seeds.
+
+**Reporting — `derive`.** A figure whose selectors fail after `drawableAt`'s search (its window, every live option per seed) is refused on the failing selectors' lines at any freedom, unless a given already fails in that figure (then the unsatisfied arm blames the line that completed the contradiction). A chord carries `distinct` over its ends and the chord-pair sentence over all its letters (`parseChord`), so the selector-steered solve separates them and this arm reports the case where nothing can.
+
+### Not here
+- Seeding a DERIVED point's region (the incircle centre's quadrant) through its parents — the remaining invalid seeds of #1642's figure are walked past, not repaired.
+- A per-object exact enumeration of roots; the pool stays sampled (ADR-AG-180).
+
+## What a sentence draws, and whose extent it is ([ADR-AG-198](06c-decisions-analytic.md#adr-ag-198), #1639, #1640, #1636, #1641, #1643)
+
+**The piece a sentence names.** `pieceFacts(noun, a, b)` (parser) is the one declaration: the line noun → `line-2pt { a, b }`, any other noun or none → `segment { …, ref: true }`. It is emitted after the sentence's own facts by the touch readers (`TangentTargets.pieces`, one entry per two-point target with its noun), the non-defining diameter, the relation handler (each `points` operand, its own noun), `sideClauses` (side on an axis; «הישרים»/«הישר» carried into the relation), and the converse incidence. `ref` makes M1's segment case treat the ends as references (no `free` minting), so a sentence that refers to absent points still fails on them, deferral included. M1: a `segment` over an existing polygon side is `known`; `line-2pt` checks its ends exist, then — an existing `line-AB`/`line-BA` curve is promoted to `stated` or known, an existing `line-at` is known, a drawn piece over the pair is known (ruling (a)), otherwise the `line-at { through: a, dir: points a→b, name: 'AB' }`. The `curve` case replaces a drawn `line-at` whose id is the same pair's line id, in its position in `objects` (declaration order is kept).
+
+**The extent is the statement's.** Two decisions moved to M1, against the construction BEFORE the statement: the crossing's bounded promotion (`on-line-2pt` with `crossing`, over `drawnPieceOver`) — removed from `evaluate`, so the constraints arrive already bounded — and the bare pair's `extent-of { id, a, b }`, which becomes the `between` selector when a piece is drawn over a–b, and nothing otherwise. The parser keeps a bare pair bare (`lineObject` no longer defaults its noun to «הישר»; `pairText`).
+
+**The frame.** `orthography`: `stripFormatControls` (shell/bidi) first, then a leading bullet, then the maqaf/NBSP folds, then «ה- x» → «ה-x». `NAME_LIST` admits comma lists with an optional final «ו-»; `distributeClauses`' location reading takes the verb OR a predicate opening with «על». `centreClauses` accepts the copula before the centre letter, in both languages.
+
+**The created circle.** `tangent-of` with no circle in the figure (and a touch point, or no axis target) applies `touchedCircleFacts` — `param θ_circle-touched.r > 0` and the stated equation circle `circle-touched` over `θ_circle-touched.{a,b,r}` (`toolSymbol`, carriers.ts; hidden from the parameter rows and the figure signature by the existing `θ_` test) — then the tangency with `circleId`. `the-circle`'s `match` gains `{ inscribed: ring }` (`theCircle`: bind the one circle `statedTangentToSide` finds for every side — the touch lowering's radius-perpendicular mark or a touch-free `tangent-curve` over the pair; else create); bound to `circle-touched`, the incircle sentence redefines it as the computed `incircle` under the same id and drops its tool parameter, then applies `about` (`centre-of { circleId }` names the centre).
+
+**The refusal.** `ShapeRow.notCyclic` (registry) → `cyclicFacts` → `inscribed-contradicts-noun { shape, forced }` → `errInscribedContradictsNoun` with `shapeHe/forcedHe` and `shapeEn/forcedEn` (English by reverse `EN_SHAPE` lookup in `errorText`).
+
+**Into the bidi section (the helper table and the paragraph after it), add a row and a paragraph:**
+
+| helper | protects | emits | direction |
+| --- | --- | --- | --- |
+| `panelRowText` (`app/panelRows.ts`) | every Hebrew phrase in a composed data-panel row | FSI … PDI per phrase (via `isolateRtlName`) | every `ValueRow`, the curve-details line |
+
+**One panel-row composer** ([ADR-AG-199](06c-decisions-analytic.md#adr-ag-199), #1644). The data panel's sections are laid out `ltr`, and a row the tree composes may contain a Hebrew word: the #1036 option set's «או», or «לא בשימוש» on an unused parameter. A number after a right-to-left word takes that word's direction, so without an isolate `A = [(3/5, 4/5)] או (4, -2)` rendered as `… (2- ,4) או`. Every panel row therefore goes through `panelRowText`, which adds the `x_{B}` braces and wraps each Hebrew phrase in `isolateRtlName`. Two rules: a row with no Hebrew letter comes back unchanged, and a row that already carries an isolate (`namedRow`'s equations row, a `t()` string) is left alone, never nested. The data strings stay plain. `pointText` and `scalarText` return no isolates, because the ask lane isolates its own answer row and the #1433 locks read the text.
+
+The canvas needs no counterpart. Every `<text>` inherits `direction: ltr` from the `<svg>` (#1191). A coordinate label is printed by `fmtAnalytic` (a number) or `exprText` (a stated expression), and both emit the ASCII «-», so a U+2212 typed by the student never reaches the label.
+
+**Into the save/load section (or after "The panel's knowledge has one home"), add:**
+
+### A load restores every field the save writes ([ADR-AG-199](06c-decisions-analytic.md#adr-ag-199), #1632)
+
+`serialize()` writes the envelope `app · version · lines · seed · name? · spokenFor? · disabled? · seedNames?`. `loadAnalyticSession` is the one entry for file, link and restored session (#1238), and it passes every one of those fields to `restore`. `restore` sanitises what a hand-edited file could break: `disabled` and `spokenFor` keep only integer indexes of a line in the file (and `spokenFor` only non-empty strings), and `seedNames` keeps only letter → letter pairs. The lock is a whole-envelope round trip with every optional field set, and its key list is pinned, so a field added to `serialize` has to join the fixture and is then checked on the way back in. `spokenFor` was the field that slipped: it was saved since #1297 and never loaded.
+
+---
+
+Add a row to the helper table:
+
+| helper | protects | emits | direction |
+| --- | --- | --- | --- |
+| `slopeRowText` (`app/panelRows.ts`) | the «שיפועים» row: its `t()` parts that already carry isolates | FSI … PDI around each WHOLE Hebrew part | the slope rows |
+
+**A part that already carries isolates is wrapped whole, never re-scanned** (#1646). The rule "never nest" in `panelRowText` is about re-isolating runs INSIDE a string that has isolates: an LRI opened across an existing PDI is closed by it. Wrapping a complete, balanced `t()` string in one FSI … PDI is safe, and it is the only way such a part becomes a single island in an LTR row. So a row built from `t()` parts gets a composer that wraps each part (`slopeRowText`), not a run scanner.
