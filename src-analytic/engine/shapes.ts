@@ -216,6 +216,26 @@ export const normalizeShapeNoun = (src: string): string =>
 export const shapeRow = (noun: string): ShapeRow | null => SHAPES[normalizeShapeNoun(noun)] ?? null;
 
 /**
+ * THE NOUNS THAT PROMISE EXACTLY ONE PAIR OF PARALLEL SIDES (#1627, ADR-AG-189).
+ *
+ * A trapezoid has ONE pair of parallel sides; a rectangle or a parallelogram is not one. The rows above
+ * can only ASSERT relations (`parallel`, `equal`), and «the other pair is not parallel» is not an
+ * equation — so the exclusion is not a row's given but part of the RING the noun promises, judged by
+ * `engine/rings.ts` beside crossed and collapsed. This set is where a noun declares it; the predicate
+ * reads it and names no noun itself.
+ *
+ * Ported ruling, not copied code: the 2-D tree's [ADR-157](../../docs/06-decisions.md#adr-157) —
+ * *"you cannot turn a trapezoid into a square or a rectangle, even if the user asks … give them the
+ * error message"*. Kept OUTSIDE the rows on purpose, so a change to a row's seats (#1625) cannot drop it.
+ * Keys are `SHAPES` keys — a guard in the #1627 test holds them to the table.
+ */
+export const ONE_PARALLEL_PAIR_NOUNS: ReadonlySet<string> = new Set(['טרפז', 'טרפז שווה שוקיים', 'טרפז ישר זווית']);
+
+/** Does this noun (any spelling the table folds) promise exactly one pair of parallel sides? */
+export const promisesOneParallelPair = (noun: string | undefined): boolean =>
+  noun !== undefined && ONE_PARALLEL_PAIR_NOUNS.has(normalizeShapeNoun(noun));
+
+/**
  * Is this noun the GENERIC one for its arity — «משולש», «מרובע» — asserting nothing but the ring?
  *
  * Read off the row rather than listed, so a future generic noun needs no second registration. It

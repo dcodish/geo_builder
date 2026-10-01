@@ -142,6 +142,7 @@ export function errorText(error: InputError, t: Translate): string {
     'kind-mismatch': 'errKindMismatch',
     'does-not-exist': 'errDoesNotExist',
     'ring-contradicts-noun': 'errRingContradictsNoun',
+    'trapezoid-is-parallelogram': 'errTrapezoidIsParallelogram',
     // #1407 — a vertex in SEVERAL shapes gets the three-letter name it needs; in none, the general form.
     'ambiguous-angle': error.key === 'ambiguous-angle' && error.example ? 'errAmbiguousAngleArms' : 'errAmbiguousAngle',
     // ONE chooser for "the reference found none / several of its host" (#1432 am. 1 + #1514): the host

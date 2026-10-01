@@ -25,7 +25,7 @@ import { ToolButton } from '../shell/frame/ToolButton';
 import { orderToolActions } from '../shell/frame/toolRow';
 import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
-import { INITIAL_VIEW, carryWindow, centreOf, figureIsVisible, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
+import { INITIAL_VIEW, centreOf, panned, toWorld, viewAfterChange, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { fmtAnalytic } from './format';
 import { curveDetailsKey, curveEquationText, curveParts, namedRow } from './app/curveText';
@@ -644,9 +644,10 @@ export function App() {
    *
    * It runs on the BOX, not on every render: the effect fires only when the figure's extent actually
    * changes, so a deliberate zoom is untouched for as long as the student keeps looking at the same
-   * figure. And it re-fits only when `figureIsVisible` says the figure has largely left the screen,
-   * so a zoom into a vertex survives the next line. Returning `v` unchanged is a React no-op, which
-   * is what keeps this from looping.
+   * figure. And it re-fits only when `figureIsVisible` says the figure has largely left the screen;
+   * a figure only PARTLY out is widened into view instead (#1624, ADR-AG-190 — the whole shape is
+   * always on the canvas). Returning `v` unchanged is a React no-op, which is what keeps this from
+   * looping.
    */
   const figureBoxKey = `${drawnBox.minX},${drawnBox.minY},${drawnBox.maxX},${drawnBox.maxY}`;
   /**
@@ -658,25 +659,21 @@ export function App() {
    * figure's box, so a new configuration's box would move the frame under it; when the box changed
    * BECAUSE the configuration did (`carryFrameRef`, set by the button), the view is re-expressed
    * against the new box so it shows the same world window — and then the #1225 question is asked of
-   * it exactly as for a fact: re-fit only when the new figure has largely left the screen. That is
-   * the accepted cost, with the re-centre button as the escape hatch. Keyed on the seed as well, so
-   * a configuration whose box happens to equal the last one still clears the flag.
+   * it: kept while the whole new figure fits, otherwise widened to the union of that window and the
+   * figure (#1624, ADR-AG-190 — never re-fitted from nothing, never shrunk on a press). Keyed on the
+   * seed as well, so a configuration whose box happens to equal the last one still clears the flag.
    */
   const prevBoxRef = useRef(drawnBox);
   const carryFrameRef = useRef(false);
   useEffect(() => {
     const prev = prevBoxRef.current;
     prevBoxRef.current = drawnBox;
-    if (carryFrameRef.current) {
-      carryFrameRef.current = false;
-      const surface = { width: canvasSize.w, height: canvasSize.h };
-      setView((v) => {
-        const kept = carryWindow(prev, v, drawnBox, surface);
-        return figureIsVisible(drawnBox, kept, surface) ? kept : INITIAL_VIEW;
-      });
-      return;
-    }
-    setView((v) => (figureIsVisible(figureBoxRef.current, v) ? v : INITIAL_VIEW));
+    // #1624 (ADR-AG-190): ONE decision for every trigger — keep the frame while the whole drawn box
+    // fits, else widen it to the union of the frame and the figure; see `viewAfterChange`.
+    const change = carryFrameRef.current ? 'configuration' : 'figure';
+    carryFrameRef.current = false;
+    const surface = { width: canvasSize.w, height: canvasSize.h };
+    setView((v) => viewAfterChange(prev, v, drawnBox, change, surface));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [figureBoxKey, seed]);
 

@@ -110,16 +110,91 @@ export function viewBox(figure: Box, view: CanvasView, surface?: Surface): Box {
  * asked by the caller — the #1225 rule, one idea for a fact and a configuration alike.
  */
 export function carryWindow(from: Box, view: CanvasView, to: Box, surface?: Surface): CanvasView {
-  const shown = viewBox(from, view, surface);
-  const halfYShown = (shown.maxY - shown.minY) / 2;
-  const halfXShown = (shown.maxX - shown.minX) / 2;
+  return viewShowing(viewBox(from, view, surface), to, surface, view.zoom);
+}
+
+/**
+ * The view that shows (at least) the world window `window`, expressed against the figure box `to`.
+ *
+ * Exact when `window` already has the surface's aspect (what `carryWindow` hands it); otherwise the
+ * aspect step grows the short axis, so the shown window CONTAINS `window` and is centred on it — more
+ * plane, never a stretched one (the transform stays isotropic, ADR-AG-190 option (a)).
+ */
+function viewShowing(window: Box, to: Box, surface: Surface | undefined, fallbackZoom: number): CanvasView {
+  const halfYShown = (window.maxY - window.minY) / 2;
+  const halfXShown = (window.maxX - window.minX) / 2;
   const spanX = to.maxX - to.minX;
   const spanY = to.maxY - to.minY;
   const aspect = surface && surface.width > 0 && surface.height > 0 ? surface.width / surface.height : halfYShown > 0 ? halfXShown / halfYShown : 1;
-  // viewBox(to, view') shows half-height max(spanY/2/zoom', spanX/2/zoom'/aspect); solve for zoom'.
+  // viewBox(to, view') shows half-height max(spanY/2/zoom', spanX/2/zoom'/aspect); solve for zoom' so
+  // that it is the larger of what the window needs on each axis.
   const govern = Math.max(spanY, spanX / aspect) / 2;
-  const zoom = halfYShown > 0 && govern > 0 ? govern / halfYShown : view.zoom;
-  return { zoom, centre: centreOf(shown) };
+  const need = Math.max(halfYShown, halfXShown / aspect);
+  const zoom = need > 0 && govern > 0 ? govern / need : fallbackZoom;
+  return { zoom, centre: centreOf(window) };
+}
+
+/** Does the window `outer` contain the box `inner`? With a relative tolerance, so float noise is not "outside". */
+export function boxContains(outer: Box, inner: Box): boolean {
+  const eps = 1e-9 * Math.max(1, outer.maxX - outer.minX, outer.maxY - outer.minY);
+  return (
+    inner.minX >= outer.minX - eps && inner.maxX <= outer.maxX + eps && inner.minY >= outer.minY - eps && inner.maxY <= outer.maxY + eps
+  );
+}
+
+/** What changed the figure: a configuration press carries the frame (#1262); anything else re-expresses it. */
+export type FigureChange = 'configuration' | 'figure';
+
+/**
+ * THE VIEW AFTER THE FIGURE CHANGED — the one decision every trigger takes (#1624, ADR-AG-190).
+ *
+ * Operator, 2026-10-01, playing «דלתון ABCD» + «הציגו תצורה אחרת»: *"when i press show new config, the
+ * image jumps and sometimes i dont see the full image on canvas due to the position it put the shape. we
+ * should have a rule that the full shape is always in the canvas."*
+ *
+ * #1262 stopped the frame LURCHING by carrying it across a press, and kept it whenever the new figure was
+ * *largely* (≥ 50% per axis, #1225's predicate) inside — so a configuration landing half outside the kept
+ * frame stayed half outside. Measured on `main`, walking 24 presses: «טרפז ABCD» 13 presses with a vertex
+ * off the canvas, «מרובע ABCD» 22, «משולש ABC» 18. The "largely visible" test answered the wrong
+ * question: it is the right test for *has the figure left* (#1225), never for *is the figure shown*.
+ *
+ * The rule, as ruled — both goals, neither traded:
+ * 1. **The candidate frame**: on a press, the window the student was looking at, carried (`carryWindow`);
+ *    on a fact, an edit or an undo, the view as it stands (it is relative to the figure, so the default
+ *    view follows it).
+ * 2. **Keep it while the whole drawn box fits** — returned UNCHANGED (the same object), so a press whose
+ *    configuration fits does not move the frame (#1262's guarantee) and a fact that fits is a React
+ *    no-op (#1225's loop guard).
+ * 3. **Otherwise WIDEN to the union of the candidate window and the drawn box** — the smallest move
+ *    that shows the whole figure; the student's window stays in view, so a press never shrinks the frame
+ *    and never re-fits from nothing.
+ * 4. **One exception, kept from #1225**: on a fact/edit/undo, a figure that has LARGELY left the view
+ *    (the student panned or zoomed elsewhere, then the figure changed) is re-fitted — the union would be
+ *    mostly empty paper, and the operator asked for exactly that re-centring (*"pressing the center button
+ *    does the work but this should be automatic"*). A press never takes it: its frame was the student's.
+ *
+ * The drawn box is the figure's padded box (`engine/evaluate.ts` `viewBox`, plus any shown trace), so
+ * "fits" includes the existing margin and a vertex never sits on the canvas edge. Isotropic only — the
+ * axis-ratio question (unequal scales) is open with the operator and is NOT built here.
+ */
+export function viewAfterChange(
+  from: Box,
+  view: CanvasView,
+  to: Box,
+  change: FigureChange,
+  surface?: Surface,
+): CanvasView {
+  const candidate = change === 'configuration' ? carryWindow(from, view, to, surface) : view;
+  const shown = viewBox(to, candidate, surface);
+  if (boxContains(shown, to)) return candidate;
+  if (change === 'figure' && !figureIsVisible(to, candidate, surface)) return INITIAL_VIEW;
+  const union: Box = {
+    minX: Math.min(shown.minX, to.minX),
+    maxX: Math.max(shown.maxX, to.maxX),
+    minY: Math.min(shown.minY, to.minY),
+    maxY: Math.max(shown.maxY, to.maxY),
+  };
+  return viewShowing(union, to, surface, candidate.zoom);
 }
 
 /**

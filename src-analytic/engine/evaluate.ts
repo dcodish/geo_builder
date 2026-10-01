@@ -2221,6 +2221,43 @@ export function isKnowledge(
   return v;
 }
 
+/**
+ * DO THESE CONSTRAINTS HOLD IN EVERY CONFIGURATION OF `c`? (#1629, ADR-AG-188) — the entailment
+ * question asked of the {@link configurationPool}, the one set every knowledge gate already judges.
+ *
+ * "Already follows" is knowledge about a STATEMENT rather than a value, so it is answered the way
+ * `isKnowledge` answers: across configurations, never at one seed. The submit gate used to read only
+ * the reported FREEDOM, which separates "true here" from "true necessarily" for a continuous DOF and
+ * not at all for DISCRETE configurations at 0 DOF: on a square with two mirror drawings, «שיפוע הצלע
+ * BC הוא −1/2» holds in one and fails in the other, the freedom does not drop, and the given that
+ * SELECTS the drawing was discarded as redundant while the canvas kept the mirror it rules out.
+ *
+ * Each constraint is measured against the figure the pool already drew — the same residual, the same
+ * `SATISFIED_EPS` bar `evaluate` uses for `unsatisfied` — so nothing is sampled here. A `choice` holds
+ * when one of its options does (it IS that disjunction). "Cannot be judged" (`null`: a point vacant in
+ * some configuration) is NOT entailment: the honest fallback is to record the line, which can only add
+ * a row, never drop a given.
+ *
+ * Fills the pool: the caller is a submit, one action, and a settled answer is the only one it can act on.
+ */
+export function holdsInEveryConfiguration(c: Construction, ks: readonly Constraint[]): boolean {
+  if (ks.length === 0) return true;
+  const pool = poolOf(c);
+  pool.fill();
+  const holds = (k: Constraint, f: Figure): boolean => {
+    if (k.t === 'choice') return k.options.some((o) => holds(o, f));
+    const pos = new Map<Id, Pt>(f.points.map((p) => [p.id, { x: p.x, y: p.y }]));
+    const at = (id: Id): Pt | null => pos.get(id) ?? null;
+    const r = residual(k, at, f.env, curveAtOf(c, f.env, at), lineAtOf(c, f.env, at));
+    return r !== null && r.every((v) => Math.abs(v) <= SATISFIED_EPS);
+  };
+  for (const s of pool.ready()) {
+    const f = drawableAt(c, s);
+    if (!ks.every((k) => holds(k, f))) return false;
+  }
+  return true;
+}
+
 function judge(
   c: Construction,
   read: (f: Figure) => number | null,
