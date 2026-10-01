@@ -19,7 +19,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
 import { buildScene } from '../render/scene';
 import { pointText } from '../app/pointText';
-import { panelKnowledge, panelRowText } from '../app/panelRows';
+import { panelKnowledge, panelRowText, slopeRowText } from '../app/panelRows';
+import { analyticI18n } from '../i18n';
 import { loadAnalyticSession } from '../app/loadSession';
 import { fmtAnalytic } from '../format';
 import { useAnalyticStore } from '../store/useAnalyticStore';
@@ -133,5 +134,36 @@ describe('#1632 — a saved file loads with everything it saved', () => {
       'f',
     );
     expect(store().spokenFor).toEqual({ 0: 'נקודה A בראשית' });
+  });
+});
+
+describe('#1646 — the «שיפועים» row keeps its parts in a fixed order', () => {
+  // The REAL label strings, through the i18n post-processor the App's `t()` runs (isolates included).
+  const he = (key: string) => analyticI18n.t(key, { lng: 'he' });
+
+  it('the Hebrew angle label is ONE right-to-left island, its own inner isolate balanced inside it', () => {
+    const label = he('angleWithX');
+    const row = panelRowText(slopeRowText('AB', '2', label, '63.43°'));
+    expect(row).toBe(`AB: 2 · ${FSI}${label}${PDI}: 63.43°`);
+    // fixed order: name, slope, label island, angle
+    const stripped = row.replace(/[\u2066-\u2069]/g, '');
+    expect(stripped).toBe('AB: 2 · זווית עם ציר ה-x: 63.43°');
+    // every isolate opened is closed, and no Hebrew letter sits outside the label's island
+    let depth = 0;
+    for (const ch of row) {
+      if (ch >= '\u2066' && ch <= '\u2068') depth++;
+      else if (ch === PDI) depth--;
+      else if (/[א-ת]/.test(ch)) expect(depth).toBeGreaterThan(0);
+      expect(depth).toBeGreaterThanOrEqual(0);
+    }
+    expect(depth).toBe(0);
+  });
+
+  it('the vertical verdict is an island too, and the English UI row has no invisible characters', () => {
+    const row = slopeRowText('BC', he('slopeVertical'), he('angleWithX'), '90°');
+    expect(row.startsWith(`BC: ${FSI}`)).toBe(true);
+    expect(row.replace(/[\u2066-\u2069]/g, '')).toBe('BC: אנכי (אין שיפוע) · זווית עם ציר ה-x: 90°');
+    const en = (key: string) => analyticI18n.t(key, { lng: 'en' });
+    expect(slopeRowText('AB', '2', en('angleWithX'), '63.43°')).toBe('AB: 2 · angle with the x-axis: 63.43°');
   });
 });

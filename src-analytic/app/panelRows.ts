@@ -196,3 +196,22 @@ export const panelRowText = (text: string): string => {
   const braced = text.replace(/([A-Za-z])_([A-Za-z0-9]+)/g, '$1_{$2}');
   return ANY_ISOLATE.test(braced) ? braced : braced.replace(HEBREW_PHRASE, (m) => isolateRtlName(m));
 };
+
+/**
+ * THE «שיפועים» ROW (#1646, ADR-AG-199) — its parts in a FIXED visual order, each Hebrew part an island.
+ *
+ * The row is `AB: <slope> · <angle label>: <angle>` in an `ltr` section. The label «זווית עם ציר ה-x»
+ * and the vertical verdict «אנכי (אין שיפוע)» are `t()` strings, which the i18n post-processor has
+ * ALREADY isolated inside (`ה-` + LRI x PDI). `panelRowText` correctly refuses to re-isolate a row that
+ * carries isolates, so the label was laid out loose in the LTR row: its Hebrew reversed with «ה» at the
+ * left end and «-x» pushed to its right — «AB: 2 · 63.43° :זווית עם ציר ה-x» as the operator read it.
+ *
+ * Each part is wrapped WHOLE in `isolateRtlName` (FSI … PDI). That is not nesting in the harmful sense:
+ * the string inside is balanced, so its own LRI/PDI pair closes inside the FSI, and the label is one
+ * right-to-left island reading «זווית עם ציר ה-x» with «x» after «ה-». A part with no Hebrew letter (a
+ * number, «—», the English UI) is untouched. The App renders the result through `panelRowText`, which
+ * then sees isolates and only adds braces.
+ */
+export function slopeRowText(name: string, slope: string, angleLabel: string, angle: string): string {
+  return `${name}: ${isolateRtlName(slope)} · ${isolateRtlName(angleLabel)}: ${angle}`;
+}

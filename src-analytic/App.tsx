@@ -36,7 +36,7 @@ import { commitRecord, decideEdit, decideSubmit, decideToggle, noticeText, reach
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
-import { panelKnowledge, panelRowText, segmentKnowledge } from './app/panelRows';
+import { panelKnowledge, panelRowText, segmentKnowledge, slopeRowText } from './app/panelRows';
 import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
 import { angleText } from './app/lineAngle';
@@ -1687,11 +1687,10 @@ export function App() {
                   const isVertical = vertical.known && vertical.value < VERTICAL_TOL;
                   const pending = (!vertical.known && vertical.pending) || (!angle.known && angle.pending) || (!isVertical && !slope.known && slope.pending);
                   if (pending) return <span key={seg.id}><ValueRow text={`${a}${b}: ${checking}`} /></span>;
-                  const angleSuffix = ` · ${t('angleWithX')}: ${angle.known ? angleText(angle.deg) : '—'}`;
-                  if (isVertical) {
-                    return <span key={seg.id}><ValueRow text={`${a}${b}: ${t('slopeVertical')}${angleSuffix}`} /></span>;
-                  }
-                  return <span key={seg.id}><ValueRow text={`${a}${b}: ${slope.known ? fmt(slope.value) : '—'}${angleSuffix}`} /></span>;
+                  // #1646 (ADR-AG-199): the parts in a fixed order, each Hebrew part one island — `slopeRowText`
+                  const slopePart = isVertical ? t('slopeVertical') : slope.known ? fmt(slope.value) : '—';
+                  const anglePart = angle.known ? angleText(angle.deg) : '—';
+                  return <span key={seg.id}><ValueRow text={slopeRowText(`${a}${b}`, slopePart, t('angleWithX'), anglePart)} /></span>;
                 }),
               },
               {
