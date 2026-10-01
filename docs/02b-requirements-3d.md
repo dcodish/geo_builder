@@ -80,11 +80,14 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   «B(0,7,8)» — or «M(3, n, p)» on a midpoint that sits at x = 1 — is refused and names the statement, exactly
   as «B = (3,7,8)» is; on a solid it moves the figure instead. A true restatement stays green, and a
   component left symbolic or unstated is not checked. **A coordinate that pins a point's free freedom places
-  the point:** «K על AB · K(1,0,0)» over typed A, B puts K at the midpoint; «D(3,0,0)» after «D על החלק החיובי
-  של ציר ה-x» puts D at (3,0,0); «B(n, 4, p)» after «B(1, t, 2)» gives t = 4 — in either spelling (`D(…)` or
-  `D = (…)`). *(Realised — [ADR-3D-292](06b-decisions-3d.md#adr-3d-292), #1561; `issue-1561-coord-determines.test.ts`.
-  Gap: a rider on a line or plane, or on a segment between points that are not typed, is refused as the tool's
-  limit, below.)* *(Realised —
+  the point, whatever the point sits on:** «K על AB · K(1,0,0)» puts K at the midpoint; «D(3,0,0)» after «D על
+  החלק החיובי של ציר ה-x» puts D at (3,0,0); «P על הישר l1 · P(3, n, p)» puts P at (3,0,0) on l1; «P על המישור π
+  · P(1,2,0)» places P on π; «B(n, 4, p)» after «B(1, t, 2)» gives t = 4 — in either spelling (`D(…)` or
+  `D = (…)`), and everything built from the point follows it. A coordinate off what the point sits on is
+  refused «בדקו את החישוב»; one that does not fix the point (a single coordinate of a point on a plane) is
+  refused as the tool's limit, below — nothing unstated is invented. *(Realised — [ADR-3D-292](06b-decisions-3d.md#adr-3d-292),
+  #1561, and [ADR-3D-293](06b-decisions-3d.md#adr-3d-293), #1615 — one mechanism for every such point;
+  `issue-1561-coord-determines.test.ts`, `issue-1615-one-mechanism.test.ts`.)* *(Realised —
   [ADR-3D-282](06b-decisions-3d.md#adr-3d-282), #1546; `issue-1546-silent-point-pin.test.ts`.)*
   **A vector or dot product stated on existing points is honoured or refused, never ignored.** «u = (7,7,7)»
   where u = AB is (2,0,0), «AB = (5,5,5)» or «AB = (5, n, p)» over typed A and B, and «u·v = 24» where u·v = 0
@@ -99,8 +102,8 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   a solid the same statement still drives the solid. *(Realised — [ADR-3D-285](06b-decisions-3d.md#adr-3d-285),
   #1567; `issue-1567-pin-arbiters.test.ts`.)*
   **A refusal never tells a student who may be right that they miscalculated.** A given the tool cannot yet
-  make hold — «|SO| = 4» on a cone of unstated height (parked with the cone's design, #1569), a coordinate on
-  a rider of a line («P על הישר l1 · P(3, n, p)») — is refused with «הכלי עדיין לא יודע …, ולכן הוא לא נוסף — זו מגבלה של הכלי», naming the point or the solid.
+  make hold — «|SO| = 4» on a cone of unstated height (parked with the cone's design, #1569), a single
+  coordinate of a point on a plane («P על המישור π · P(1, n, p)») — is refused with «הכלי עדיין לא יודע …, ולכן הוא לא נוסף — זו מגבלה של הכלי», naming the point or the solid.
   «בדקו את החישוב» is kept for a given the student's own data contradicts: a typed point restated elsewhere,
   a coordinate the definition fixes, the wrong side of a stated axis, a spot off the rider's segment. *(Realised —
   [ADR-3D-291](06b-decisions-3d.md#adr-3d-291), #1590; `issue-1590-given-not-drivable.test.ts`.)*

@@ -243,10 +243,13 @@ function sampledCarrierVerdict(claim: Claim3, c: Construction3, resolved: Resolv
       sampled: (id) => {
         const def = c.points.get(id);
         if (!isStatedGiven(claim) || !def || def.kind === 'free3') return false; // free3: the row above
-        // a given the point's OWN stated data already contradicts is false as stated — the sampled freedom
-        // is not why it fails, so it keeps «check the computation» (`statedDataAdmits`)
-        if (!statedDataAdmits(c, claim, resolved.positions)) return false;
-        if (def.kind === 'coord-sym') return (resolved.param?.roots.length ?? 0) === 0;
+        // #1615 (ADR-3D-293): the closed-form solve's own answer. `contradicts` — no value of the point's parameters
+        // reaches the given: false as stated, «check the computation». `determined` — the point was placed, so the
+        // claim was judged on the placed figure. Either way the sampled freedom is not why it fails.
+        const solved = resolved.coordDetermined.get(id);
+        if (solved === 'contradicts' || solved === 'determined') return false;
+        // the coord-sym point, the one kind the solve does not place (its letter is the figure parameter)
+        if (def.kind === 'coord-sym') return statedDataAdmits(c, claim) && (resolved.param?.roots.length ?? 0) === 0;
         const driven = resolved.pivot?.riderTs ?? {};
         return carrierParams3(c, id, def).some((p) => !(p.key in driven));
       },

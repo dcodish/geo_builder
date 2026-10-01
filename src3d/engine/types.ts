@@ -1356,6 +1356,14 @@ export interface Construction3 {
    *  point: they PIN the figure parameter by a post-pivot 1-DOF root-find (roots =
    *  branches; the D3 numeric-only boundary). */
   paramGivens: Claim3[];
+  /**
+   * #1615 (ADR-3D-293) — a coordinate given on an existing point whose position carries free parameters in
+   * the sampled-carrier table (`carrierParams3`): the STATED components (numeric only; null is unstated). The
+   * stated coordinates are stored, never a parameter value — a line or plane rider's offset is measured from
+   * a seat that moves with the seed. `resolve3` solves the parameters from them on a figure the pivot does not
+   * run on, and publishes the outcome (`Resolved3.coordDetermined`).
+   */
+  coordDeterminations: { id: Id; x: number | null; y: number | null; z: number | null }[];
   /** ADR-3D-032 — sign givens on the figure parameter (`k הוא פרמטר חיובי`): select
    *  among the root branches. #325: also on a pin symbol (selects among pivot solutions). */
   paramSigns: ParamSignCommand[];
@@ -1476,6 +1484,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   pairPins: [],
   planePins: [],
   paramGivens: [],
+  coordDeterminations: [],
   paramSigns: [],
   coordPlanePins: [],
   planeLinePerps: [],
