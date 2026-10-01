@@ -169,8 +169,23 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * satisfiable figure, which is the opposite defect. That half is
    * [#1071](https://github.com/dcodish/geo_builder/issues/1071)'s measurement question and is
    * deliberately left alone here.
+   *
+   * **…and the freedom predicate was the wrong one for a selector (#1635, ADR-AG-197).** A figure with
+   * freedom left has other configurations — and `drawableAt` has already TRIED them: it returns a figure whose
+   * selectors fail only when no seed of its window (twenty-five, each with every live `choice` option since
+   * #1642) had them hold, the selector-steered solve (#1463's deflation and chord reflection) having been asked
+   * at each. That is the bounded search ADR-098 reports on. Measured: «המעגל משיק לציר ה-x» · «המעגל חותך את
+   * ציר ה-x בנקודות B ו-C» drew B and C on one point at 24/24 seeds with `faults: []`, because the free centre
+   * kept DOF at 2 — a figure drawn green for givens that cannot hold. So a selector that fails across the whole
+   * search is refused on its line WHATEVER the freedom; the search, not the DOF, is the evidence.
+   *
+   * Where a GIVEN already fails in the figure drawn, the search ran over contradictory configurations and
+   * says nothing separate about the selector: the unsatisfied given carries the refusal (below, on the line
+   * that completed the contradiction), and a triangle's `distinct` failing because its givens collapse it is
+   * not a second, earlier culprit. Measured over the corpus: three already-refused figures («AB = AC» ·
+   * «∠ABC = 90» on «משולש ABC») would otherwise blame «משולש ABC» too.
    */
-  if (!figure.selectorsOk && reportedDof(construction, figure.carrierDof) === 0) {
+  if (!figure.selectorsOk && (reportedDof(construction, figure.carrierDof) === 0 || figure.unsatisfied.length === 0)) {
     const blamed = new Set<number>();
     // Only the sentences whose selector FAILED (#1268): a triangle's `distinct` did not make a crossing's
     // ordinal impossible. Without the per-selector verdict, every selector line, as before.

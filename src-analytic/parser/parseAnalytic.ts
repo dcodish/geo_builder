@@ -2448,8 +2448,29 @@ function chordFacts(a: Id, b: Id, circle: string | undefined, line: string): Fac
   const host = circle === undefined ? undefined : isNumeralName(circle) ? numeralCurveId('circle', circle) : `circle-at-${circle}`;
   const on = (id: Id): Fact =>
     host === undefined ? { t: 'on-kind', id, kind: 'circle', src: line } : { t: 'constraint', k: { t: 'on-curve', id, curve: host }, src: line };
-  return [{ t: 'declare', id: a, src: line }, { t: 'declare', id: b, src: line }, on(a), on(b), ...seg.facts.map((x) => ({ ...x, src: line }))];
+  return [
+    { t: 'declare', id: a, src: line },
+    { t: 'declare', id: b, src: line },
+    on(a),
+    on(b),
+    ...seg.facts.map((x) => ({ ...x, src: line })),
+    // A CHORD HAS TWO ENDS (#1638, ADR-AG-197): a configuration that collapses it onto one point is not the
+    // chord the noun named — the polygon's `distinct`, for the two-point figure a chord is.
+    { t: 'selector', sel: { kind: 'distinct', ids: [a, b] }, src: line },
+  ];
 }
+
+/**
+ * THE POINTS ONE CHORD SENTENCE NAMES ARE DIFFERENT POINTS (#1638, ADR-AG-197). «המיתרים AB ו-BC» names three
+ * points, and the plural noun names two chords: with A = C the "two chords" are one. So the sentence carries a
+ * `distinct` over every letter it named — through the noun, exactly as a polygon's vertices are, never a global
+ * rule (ADR-AG-125: a coincidence the figure merely reaches elsewhere is a different question).
+ */
+const chordPairDistinct = (letters: readonly Id[], line: string): Fact => ({
+  t: 'selector',
+  sel: { kind: 'distinct', ids: [...new Set(letters)] },
+  src: line,
+});
 
 /** A canonical clause's facts, re-attributed to the student's line — `null` when it does not parse. */
 function clauseFacts(clause: string, line: string): Fact[] | null {
@@ -2479,7 +2500,7 @@ function parseChord(line: string): RuleOutcome {
   const first = chordFacts(a, b, centre ?? name, line);
   const second = chordFacts(c, d, centre ?? name, line);
   if (!created || !first || !second) return null;
-  const chords = [...created, ...first, ...second];
+  const chords = [...created, ...first, ...second, chordPairDistinct([a, b, c, d], line)];
   const meet =
     new RegExp(`^(?:נפגשים|נחתכים|מצטלבים)\\s+ב-?\\s*(?:ה?נקודה\\s+)?(${NAME})$`).exec(trim(rest)) ??
     new RegExp(`^(?:meet|intersect|cross)\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`, 'i').exec(trim(rest));
