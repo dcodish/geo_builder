@@ -154,6 +154,19 @@ export function errorText(error: InputError, t: Translate): string {
     'numeral-notation': 'errNumeralNotation',
     'undistinguished-diagonal': 'errNoPrincipalDiagonal',
     'already-named': 'errAlreadyNamed',
+    // #1154 — a rename understood and declined, each naming what the student wrote
+    'rename-bad-name': 'errRenameBadName',
+    'rename-same': 'errRenameSame',
+    'rename-unknown': 'errRenameUnknown',
+    'rename-taken': error.key === 'rename-taken' && error.holder ? 'errRenameTaken' : 'errRenameTakenTool',
+    'rename-not-typed': 'errRenameNotTyped',
+    'rename-unsafe': error.detail ? 'errRenameUnsafe' : 'errRenameUnsafeFigure',
+    // #1303 / #1631 — the swap: a bad name and a tool letter with no faithful form read as the rename's do
+    'swap-bad-name': 'errRenameBadName',
+    'swap-same': 'errSwapSame',
+    'swap-unknown': 'errSwapUnknown',
+    'swap-not-typed': 'errRenameNotTyped',
+    'swap-unsafe': error.detail ? 'errSwapUnsafe' : 'errSwapUnsafeFigure',
     // #1423 — a refusal that restates an existing letter says the LETTER is the problem
     'unsatisfiable': error.key === 'unsatisfiable' && 'reusedId' in error && error.reusedId ? 'errUnsatisfiableReused' : 'errUnsatisfiable',
     // A save file this tool will not open, named by WHICH of the three reasons (#1087).
@@ -176,6 +189,7 @@ export function errorText(error: InputError, t: Translate): string {
     found: host ? host.found : 0,
     range: error.key === 'out-of-domain' && error.domain ? rangeText(error.domain, t) : '',
     holder: 'holder' in error ? (error.holder ?? '') : '',
+    other: 'other' in error ? error.other : '',
     reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '',
     definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '',
   });

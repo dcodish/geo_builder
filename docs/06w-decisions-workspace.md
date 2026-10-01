@@ -5043,3 +5043,43 @@ locales. Locks: the fixture, the meta-lock and the four per-tree locks. Visible 
 **Measured.** Pre-change: all four confs had no security header; a share page rendered with origin `https://x"><script>alert(1)</script>` echoed `<script>alert(1)` raw into `og:image`/`og:url`; a hostile `tail` already 404'd (the distant guarantee held — item 3 is hardening, not a live hole). Locks: `server/__tests__/hardening-1380.test.ts` (23 — headers per enabled product from `products.json`, CSP Report-Only everywhere, the `/g/` hash computed from `SHARE_HANDOFF_SCRIPT`, hostile origin/ids, the threshold table, the banner at each level and on the live dashboard, the journal line); 18 red on the pre-change code, the 5 green being the hostile-id rows (already safe) and the Report-Only guard (vacuous before). `share-store-1374.test.ts` reads the hand-off target from the fallback link the script now follows.
 
 **Consequences.** `deploy/apache-{geo,3d,complex,analytic}-builder.conf`; `server/shareStore.ts`; `server/admin.ts`; `package.json`, `package-lock.json`. Follow-ups before CSP promotion: externalise or hash the admin inline scripts, and consider a `report-uri` sink.
+
+## ADR-W-105 — One letter popover for every builder: click a point, type its letter, and a taken letter offers the swap (#1631)
+
+**Status:** accepted · 2026-10-01 · feature (PR, `feat/1631-letter-popover`) · parts 1, 2 and 4 of #1631 (part 3, the analytic builder, lands separately) · `auto-ok` as transcription of the operator's explicit request (ADR-W-014). **Extends** [ADR-W-016](#adr-w-016) (a new `shell/` surface, seeded by two implementations) and applies [ADR-W-071](#adr-w-071) (docs/28 §5c).
+
+**Requirements:** docs/02w FR-SU-13 (new — one promise for every builder) · **Design:** docs/04w — "The letter popover" (new section). **Product:** workspace (2d + 3d).
+
+**Context.** The operator, playing PR #1630 (2026-10-01): *"re the change letter — it works but not like the 2d tool and I want to copy that mechanism. that means that the letter is replaced without the need to write the text in the input and if a letter is occupied, it offers to switch letters. check that mechanism and we want that same mechanism now for analytics and also for the 3d tool"*.
+
+2-D's point menu (FR-RN-10, [ADR-072](06-decisions.md#adr-072)) is the mechanism he means. Click a point and a small popover opens at it, with an autofocused letter box. Enter or ✓ applies the letter and Escape closes. A taken letter names its holder in the student's own wording ([ADR-520](06-decisions.md#adr-520), #238) and offers «החליפו בין A ל-B», in both directions ([ADR-532](06-decisions.md#adr-532), #1199: *«always allow switching names of nodes»*). The swap is the store's NUL-sentinel triple ([ADR-122](06-decisions.md#adr-122)), and the button declares its colour so a live offer does not read as disabled ([ADR-520](06-decisions.md#adr-520) Am. 2). 3-D had ported the popover's first half for #578 ([ADR-3D-211](06b-decisions-3d.md#adr-3d-211)). Its taken letter was a dead end in both directions: no holder, no swap (#1302). The analytic builder (PR #1630) pre-filled «שנה שם A ל-» into the main input.
+
+That makes two copies of one surface, with a third on the way. ADR-W-016 rule 1 (≥ 2 implementations) is met, and the third-copy rule says the third one belongs in `shell/`.
+
+**Decision.**
+
+1. **`shell/frame/LetterPopover.tsx`** is 2-D's point popover, unchanged in behaviour and look, parameterized by the caller (ADR-W-016 rule 2):
+   - position, bounds and title;
+   - the point's `label`;
+   - `onRename(from, to) → {ok:true} | {ok:false, reason:'taken'|'bad'|…, holder?: {text, onHighlight?}}`;
+   - `onSwap?(a, b) → {ok}`;
+   - every string, `maxLength`, and `children` for the product's own items (2-D: hide/show label).
+
+   It imports no product and no i18n, and has no product branch. The caller mounts it once per opening (a `key`), so nothing typed carries from one point to the next.
+2. **Its decisions are pure and callable:** `shell/frame/letterOffer.ts` holds `swapOffered` (moved from `Figure.tsx`, and re-exported there so 2-D's #1199 lock calls the same function the gate calls), `afterRename`, `afterSwap`, `typedLetter` and `fillLetters`. The JSX calls them and the locks call them ([ADR-W-053](#adr-w-053)).
+3. **2-D migrates its point branch onto it.** The segment and circle menus, including «החליפו קצוות», stay 2-D's own. `letterRename` (exported from `Figure.tsx`) translates the store's answer into the popover's vocabulary, `target-taken` → `taken` with the holder's utterance and the row-highlight callback. 2-D's props, App wiring and store are unchanged. `rename.test.ts`, `swap.test.ts`, `issue-238-letter-holder.test.ts`, `issue-1199-symmetric-letter-offer.test.ts` and `phase2.test.tsx` are unchanged and green.
+4. **3-D adopts it** ([ADR-3D-294](06b-decisions-3d.md#adr-3d-294)): the holder, a `swap` store action, the typed form. This closes #1302.
+5. **A §5c cross-product lock.** The checks live once, in `shell/__tests__/fixtures/letter-swap-rows.ts` as `letterSwapFaults(subject) → string[]`:
+   - a taken letter is refused with a holder in **both** directions, and `swapOffered` shows the offer;
+   - a refusal changes nothing;
+   - the swap keeps the number of statements, the number of points and the set of letters, and does change the statements;
+   - **one** undo restores the session;
+   - `swap(b,a)` is the same exchange as `swap(a,b)`.
+
+   Each tree has a thin lock that hands over its REAL store actions and its real adapter (`src/__tests__/letter-swap-1631.test.ts`, `src3d/__tests__/letter-swap-1631.test.ts`). The meta-lock `shell/__tests__/letter-swap-meta-1631.test.ts` runs the same function against seven deliberately broken builders and asserts each is caught: no holder; a holder in one direction only; accepts a taken letter; a refusal that mutates; a swap that deletes; a swap that does nothing; a swap that takes two undo steps. **The analytic builder plugs in** with a third thin lock in its own tree; nothing in `shell/` changes for it.
+
+**Rejected.**
+- **Each tree keeps its own popover** and copies 2-D's holder and swap into it. That is the third copy of a surface whose two copies had already drifted: 3-D lost the holder and the offer, and its button and note colours differed.
+- **Lifting 2-D's whole canvas menu** (segment and circle items too). Only the point popover exists ≥ 2 times; the segment menu is 2-D's alone, so ADR-W-016 rule 1 keeps it out.
+
+**Consequences.** `shell/frame/LetterPopover.tsx`, `shell/frame/letterOffer.ts` (new); `src/render/Figure.tsx` (the point branch, `letterRename`, `swapOffered` re-exported); `src3d/render/Figure3.tsx`, `src3d/App3.tsx` (see ADR-3D-294). Six locks: two shell, two thin, two 3-D.

@@ -64,6 +64,9 @@ import { AskLane } from '../shell/frame/AskLane';
 import { askSettled, figureIsOpen, type Answer } from './app/ask';
 import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
+import { dispatchRename, dispatchSwap, letterRenameOf, letterTargetOf } from './app/rename';
+import { LetterPopover } from '../shell/frame/LetterPopover';
+import type { LetterRenameResult } from '../shell/frame/letterOffer';
 import { anotherConfiguration } from './app/another';
 import { offersOf, pointAt } from './engine/crossings';
 import { VERTICAL_TOL } from './engine/lines';
@@ -139,6 +142,9 @@ export function App() {
     spokenFor,
     disabled,
     setDisabled,
+    applyRename,
+    applySwap,
+    seedNames,
     removeLine,
     replaceLine,
     clearAll,
@@ -450,7 +456,10 @@ export function App() {
    * page rather than inside the SVG: an SVG-space menu would scale with the canvas and shrink out of
    * readability at low zoom.
    */
-  const [pick, setPick] = useState<{ items: Measurable[]; x: number; y: number } | null>(null);
+  /** `rename` (#1154) is the draft «שנה אות» puts in the input box — null when the click offers none. */
+  const [pick, setPick] = useState<{ items: Measurable[]; letter: string | null; x: number; y: number; seq: number } | null>(null);
+  /** The input zone — «שנה אות» focuses its box after filling it (the shared InputArea takes no ref). */
+  const inputZoneRef = useRef<HTMLDivElement | null>(null);
 
   /**
    * ASK IT, OR TAKE IT BACK (#1118) — one writer, so a measurement can always be retired.
@@ -522,12 +531,12 @@ export function App() {
   const active = useMemo(() => activeOf(lines, disabled), [lines, disabled]);
   const rows = useMemo(() => rowOf(lines.length, disabled), [lines.length, disabled]);
   const d = useMemo(() => {
-    const out = derive(active, seed);
+    const out = derive(active, seed, seedNames);
     // #1473 (ADR-AG-180, operator ruling B′): the page's knowledge gates judge only what is already
     // evaluated and answer «בודק…» for the rest; the pool completes AFTER the render (effect below).
     configurationPool(out.construction).defer();
     return out;
-  }, [active, seed]);
+  }, [active, seed, seedNames]);
 
   /**
    * THE POOL COMPLETES AFTER THE RENDER (#1473). One seed per slice, yielding to the browser between seeds; a re-render when it completes,
@@ -801,6 +810,22 @@ export function App() {
         setDraft(verdict.canonical);
         setNotice(t('noticeTeachCanonical', { verb: verdict.verb, canonical: verdict.canonical }));
         return;
+      /**
+       * #1154 — A RENAME rewrites the session (every line, every ask row) in ONE store commit, or names
+       * why not. Decided in `app/rename.ts` over the WHOLE session — muted lines too — which is why it
+       * is dispatched here rather than decided by `decideSubmit`, which sees only the active lines.
+       */
+      case 'rename': {
+        const r = dispatchRename(verdict.from, verdict.to, { lines, disabled, queries, spokenFor, seed, seedNames }, { applyRename, setError }, d);
+        if (r.kind === 'apply') setDraft('');
+        return;
+      }
+      // #1303 / #1631 — a SWAP («החלף בין A ל-B»): the rename's contract, two letters at once.
+      case 'swap': {
+        const r = dispatchSwap(verdict.a, verdict.b, { lines, disabled, queries, spokenFor, seed, seedNames }, { applySwap, setError }, d);
+        if (r.kind === 'apply') setDraft('');
+        return;
+      }
     }
   };
 
@@ -1066,7 +1091,7 @@ export function App() {
           ) : null
         }
         inputZone={
-          <>
+          <div ref={inputZoneRef} style={{ display: 'contents' }}>
             <InputArea
               value={draft}
               onChange={setDraft}
@@ -1209,7 +1234,7 @@ export function App() {
               editValueOf={(id) => lines[Number(id)] ?? ''}
               onEditCommit={(id, next) => {
                 const i = Number(id);
-                if (!decideEdit(i, next, lines, disabled, seed)) return false;
+                if (!decideEdit(i, next, lines, disabled, seed, seedNames)) return false;
                 // #1300 — an edit rewrites a line in place, so a replay without it diverges silently.
                 logAnalytic({ kind: 'action', action: 'edit', detail: `${i}:${next}` });
                 replaceLine(i, next);
@@ -1229,7 +1254,7 @@ export function App() {
               }
               testId="analytic-facts"
             />
-          </>
+          </div>
         }
         canvasZone={
           <>
@@ -1311,7 +1336,8 @@ export function App() {
                */
               onPick={(what, screen) => {
                 const items = measurablesOf(d.construction, what);
-                setPick(items.length ? { items, x: screen.x, y: screen.y } : null);
+                const letter = letterTargetOf(d.construction, what);
+                setPick(items.length || letter ? { items, letter, x: screen.x, y: screen.y, seq: Date.now() } : null);
               }}
               onCrossing={(sentence) => {
                 // A GUARD, not a second decision: `submit` still owns whether the line is accepted
@@ -1389,7 +1415,7 @@ export function App() {
                  * operator's own figure, while the DOF cue beside it said the figure still had
                  * freedom. When nothing differs, saying so beats redrawing in silence.
                  */
-                const next = anotherConfiguration(active, seed);
+                const next = anotherConfiguration(active, seed, undefined, seedNames);
                 // #1300: the seed IS the configuration, so a replay that loses this press redraws a
                 // different figure from the one the report is about.
                 logAnalytic({ kind: 'action', action: 'show-another', detail: next.found ? next.seed : 'none' });
@@ -1854,40 +1880,80 @@ export function App() {
         never clips at the canvas edge. A click anywhere else closes it — a menu that needs its own
         dismiss button is one the student has to learn.
       */}
-      {pick && (
-        <>
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 40 }}
-            onClick={() => setPick(null)}
-            aria-hidden="true"
-          />
-          <div style={{ ...measureMenu, left: pick.x + 6, top: pick.y + 6 }} role="menu">
-            {pick.items.map((m) => (
-              <button
-                key={m.sentence}
-                type="button"
-                role="menuitem"
-                style={measureItem}
-                onClick={() => {
-                  // The SAME path the typed lane takes — one grammar, one answer (ADR-AG-044).
-                  toggleAsk(m.sentence);
-                  setPick(null);
+      {pick && (() => {
+        // The measure entries, shared by both surfaces: the SAME path the typed lane takes — one
+        // grammar, one answer (ADR-AG-044).
+        const measureItems = pick.items.map((m) => (
+          <button
+            key={m.sentence}
+            type="button"
+            role="menuitem"
+            style={measureItem}
+            onClick={() => {
+              toggleAsk(m.sentence);
+              setPick(null);
+            }}
+          >
+            {/*
+              An entry whose DRAWING is on the canvas offers to clear it, and says so (#1118).
+              The row stays either way — the operator's ruling: the panel is a record, the canvas
+              is a view of it.
+            */}
+            {isDrawn(queries, m.sentence) && <span aria-hidden="true" style={{ opacity: 0.6, marginInlineEnd: 6 }}>✕</span>}
+            <MathText text={analyticBidi.isolateLtrRuns(m.sentence)} />
+          </button>
+        ));
+        if (pick.letter) {
+          /*
+            A POINT gets 2-D's letter popover (#1631, ADR-W-105): type the new letter in place; a taken
+            letter quotes its holder and offers «החליפו בין A ל-B». Its measure entries ride inside, as
+            2-D's hide/show do. Mounted in a full-viewport FIXED layer, because this menu lives at page
+            level (it must not scale with the zoom or clip at the canvas edge) and the popover places
+            itself inside its positioned container.
+          */
+          const state = { lines, disabled, queries, spokenFor, seed, seedNames };
+          const letter = pick.letter;
+          const onRename = (from: string, to: string): LetterRenameResult => {
+            // A taken letter is answered IN the popover (its holder, the swap offer); every other refusal
+            // keeps the analytic tree's own sentence in the error line, which says WHY.
+            return letterRenameOf(dispatchRename(from, to, state, { applyRename, setError: (e) => (e && e.key === 'rename-taken' ? undefined : setError(e)) }, d));
+          };
+          return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
+              <LetterPopover
+                key={pick.seq}
+                x={pick.x}
+                y={pick.y}
+                bounds={{ width: window.innerWidth, height: window.innerHeight }}
+                title={letter}
+                label={letter}
+                onRename={onRename}
+                onSwap={(a, b) => ({ ok: dispatchSwap(a, b, state, { applySwap, setError }, d).kind === 'apply' })}
+                strings={{
+                  placeholder: t('letterPlaceholder'),
+                  apply: t('letterApply'),
+                  taken: t('letterTaken'),
+                  bad: t('letterBad'),
+                  takenBy: t('letterTakenBy'),
+                  swapLetters: t('letterSwap'),
                 }}
+                onClose={() => setPick(null)}
+                testId="letter-popover"
               >
-                {/*
-                  An entry whose DRAWING is on the canvas offers to clear it, and says so (#1118).
-                  The row stays either way — the operator's ruling: the panel is a record, the canvas
-                  is a view of it.
-                */}
-                {isDrawn(queries, m.sentence) && (
-                  <span aria-hidden="true" style={{ opacity: 0.6, marginInlineEnd: 6 }}>✕</span>
-                )}
-                <MathText text={analyticBidi.isolateLtrRuns(m.sentence)} />
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+                {measureItems.length > 0 && <div style={{ borderTop: `1px solid ${color.border}`, paddingTop: 4, display: 'flex', flexDirection: 'column' }}>{measureItems}</div>}
+              </LetterPopover>
+            </div>
+          );
+        }
+        return (
+          <>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setPick(null)} aria-hidden="true" />
+            <div style={{ ...measureMenu, left: pick.x + 6, top: pick.y + 6 }} role="menu">
+              {measureItems}
+            </div>
+          </>
+        );
+      })()}
 
       {/*
         THE MANUAL (#1087) — this product has a command catalog and had no screen showing it, so the

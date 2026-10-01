@@ -1071,7 +1071,11 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
   const ids = freeIds(c);
   const span = searchSpan(c, env);
   const seeded = new Map<Id, Pt>(
-    ids.map((id) => [id, { x: freeCoord(seed, id, 0, span), y: freeCoord(seed, id, 1, span) }]),
+    // #1631: hashed from the vertex's SEED NAME — its own letter unless a letter change carried another
+    ids.map((id) => {
+      const name = c.seedNames?.[id] ?? id;
+      return [id, { x: freeCoord(seed, name, 0, span), y: freeCoord(seed, name, 1, span) }];
+    }),
   );
   /**
    * A REGION selector SEEDS the point it names, instead of only filtering the result (#1071).

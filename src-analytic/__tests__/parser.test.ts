@@ -9,6 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
 import { parseLine } from '../parser/parseAnalytic';
+import { decideSessionEdit, parseSessionEdit } from '../app/rename';
 import { fold } from '../engine/apply';
 import { evaluate } from '../engine/evaluate';
 import { derive } from '../engine/derive';
@@ -18,6 +19,12 @@ import { reportedDof } from '../engine/carriers';
 describe('catalog — every entry parses, in BOTH languages', () => {
   for (const entry of COMMAND_CATALOG_ANALYTIC) {
     it(`${entry.family} · ${entry.he}`, () => {
+      // #1154 / #1303 — a `rewrite` entry (rename, swap) is read by the session lane, not by `parseLine` (3-D's rule).
+      if (entry.lane === 'rewrite') {
+        expect(parseSessionEdit(entry.he), `He session edit did not read: ${entry.he}`).toEqual(parseSessionEdit(entry.en));
+        expect(parseSessionEdit(entry.he)).not.toBeNull();
+        return;
+      }
       const he = parseLine(entry.he);
       const en = parseLine(entry.en);
       expect(he.ok, `He did not parse: ${entry.he}`).toBe(true);
@@ -46,6 +53,12 @@ describe('catalog — every entry PRODUCES something, or says why not', () => {
       // An entry that declares context is built IN that context — «M אמצע AB» is meaningless
       // without A and B, and failing it for that would be the guard reporting a defect that is not
       // one. The context is part of the entry, so it is declared rather than guessed here.
+      // #1154 — a `rewrite` entry must APPLY in its declared context, through the real decision.
+      if (entry.lane === 'rewrite') {
+        const r = parseSessionEdit(entry.he)!;
+        expect(decideSessionEdit(r, { lines: entry.needs ?? [], disabled: [], queries: [], spokenFor: {}, seed: 0 }).kind).toBe('apply');
+        return;
+      }
       const d = derive([...(entry.needs ?? []), entry.he]);
       // A declaration legitimately draws nothing: «a הוא פרמטר חיובי» states a domain, not an
       // object. It is the one category exempt, and it is exempt by its own field rather than by a

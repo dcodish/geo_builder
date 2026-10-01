@@ -13,6 +13,8 @@ describe('parseSwap', () => {
   it('Hebrew "החלף בין C ל-D"', () => expect(parseSwap('החלף בין C ל-D')).toEqual({ a: 'C', b: 'D' }));
   it('Hebrew "החלף בין C ו-D"', () => expect(parseSwap('החלף בין C ו-D')).toEqual({ a: 'C', b: 'D' }));
   it('Hebrew "החלף בין C לבין D"', () => expect(parseSwap('החלף בין C לבין D')).toEqual({ a: 'C', b: 'D' }));
+  // #1631: the plural is the swap button's own wording, and 3-D's typed swap reads it.
+  it('Hebrew "החליפו בין C ל-D"', () => expect(parseSwap('החליפו בין C ל-D')).toEqual({ a: 'C', b: 'D' }));
 
   it('a plain rename is NOT a swap', () => {
     expect(parseSwap('rename C to E')).toBeNull();

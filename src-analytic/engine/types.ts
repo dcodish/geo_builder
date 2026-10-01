@@ -514,6 +514,18 @@ export interface Construction {
   constraints: Constraint[];
   /** Post-solve choices among valid configurations (D7 kind 2) — they consume no freedom. */
   selectors: Selector[];
+  /**
+   * WHICH NAME SEEDS A FREE VERTEX'S DEFAULT POSITION (#1631, ADR-AG-192) — `letter → seed name`,
+   * absent or empty for every figure no letter change touched.
+   *
+   * A free vertex's default sample is hashed from a NAME (`evaluate.ts` `freeCoord`). That name used to
+   * be the letter itself, so changing a letter moved the vertex. A rename or a swap is a TRANSPOSITION
+   * of this map (`app/rename.ts` `transposeSeedNames`), so it stays a permutation: no two vertices can
+   * share a seed name, and a letter the change freed seeds where the new letter would have. It is
+   * session state, saved with the lines; it never changes what a figure IS, only where an unplaced
+   * vertex starts.
+   */
+  seedNames?: Readonly<Record<Id, string>>;
 }
 
 /**

@@ -1807,6 +1807,26 @@ then its slope).
 supported» (ADR-AG-170); a completion that is not a command at all (`not-handled`), or no answer, keeps
 the student's ORIGINAL refusal — nothing was understood, and the move may well be supported.
 
+## A rename rewrites history, proven line by line ([ADR-AG-191](06c-decisions-analytic.md#adr-ag-191), #1154)
+
+The session is the student's LINES, so a rename is not a fact: `decideSubmit` reads it first
+(`parseRenameAnalytic`) and returns a `rename` verdict, and `app/rename.ts` rewrites the history — every
+stored line, every ask row (`queries`) and every AI display sentence (`spokenFor`) — which `applyRename`
+commits in one store `set` (one undo step, seed and muted set untouched). The rewrite is a token
+substitution, but text alone cannot tell a point from a parameter or an English article, so each line is
+PROVEN: `rewriteLine` accepts a rewrite only if the new line parses to the old line's facts with the point id
+renamed (raw-text fields and expression symbols excluded, minted ids compared as letter multisets), trying
+occurrence subsets largest-first when the full substitution is unfaithful, and refusing the line otherwise.
+`decideRename` then folds the rewritten session once and compares its object and fault sets to the current
+figure, renamed — so a rename can never shift a name the TOOL chooses from the free letters (the canonical
+centre O). The refusals (`rename-bad-name`, `-same`, `-unknown`, `-taken` with the holder's line,
+`-not-typed`, `-unsafe`) are InputError kinds worded in `errorText`. The click menu's «שנה אות»
+(`renameDraftOf`) is offered only for a point the lines letter, and composes the same sentence into the
+input box — one grammar, one gate. The catalog row carries `lane: 'rewrite'` (3-D's field): shown in the
+guide, excluded from the LLM vocabulary and the figure corpus, read by the catalog guard through
+`parseRenameAnalytic` + `decideRename`. Known limit: a FREE vertex's default sample is keyed by its letter
+(`freeCoord`), so its drawn position may change on a rename while every given and the freedom stay equal.
+
 ## The sentence frame ([ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), #1618)
 
 `parseLine` is the one boundary every rule reads, and it reads the exam's textbook frame **once**:
@@ -1851,3 +1871,33 @@ The decision is in `render/view.ts` rather than inline in `App.tsx` so the locks
 ## A noun's exclusive condition is part of its ring ([ADR-AG-189](06c-decisions-analytic.md#adr-ag-189), #1627)
 
 A shape noun asserts two kinds of thing. **Relations** are equations over its vertices («AB ∥ DC», «AD = BC»): they are its `SHAPES` row, and the solve meets them. **Ring promises** are properties of the drawn configuration that no equation can hold: simple (not crossed), open (not collapsed), and, for the trapezoid family, *not a parallelogram*. `engine/rings.ts` `ringViolation(vertices, noun)` is the one predicate for all of them. It is pure over positions the caller already has, and it runs in a fixed order: degenerate, then crossed, then the noun's exclusion. Each answer describes a simple, open ring correctly. A noun opts into an exclusion by membership in `shapes.ts` `ONE_PARALLEL_PAIR_NOUNS`. That set is kept outside the rows, so editing a row's seats cannot disarm it, and the predicate names no noun itself. Both pairs of opposite sides are "parallel" below `PARALLEL_SIN_TOL`, which equals `COLLAPSED_SIN_TOL` (|sin θ| < 1e-3, relative and scale-free). The violation is consumed exactly as the other two are. In `evaluate`, `ringFaultsOf` records it on the figure, and `drawableAt`'s `whole()` rejects the configuration, so the seed sweep moves on. In `derive`, on a figure with `reportedDof = 0`, the ADR-AG-129 arm refuses the declaring line with the code `trapezoid-is-parallelogram` (not `ring-contradicts-noun`, whose remedy is about letter order), and the submit gate's appeared-fault rule moves the refusal onto the line that completed the contradiction. A figure that still has freedom and is a parallelogram at every configuration in the budget is drawn from the fallback tier and not refused. That case waits on an operator ruling (ADR-AG-189, "Not built").
+
+Extend the section "A rename rewrites history, proven line by line" (retitle: "A letter change rewrites history, proven line by line ([ADR-AG-191](06c-decisions-analytic.md#adr-ag-191), [ADR-AG-192](06c-decisions-analytic.md#adr-ag-192), #1154, #1631)"), replacing its last sentence ("Known limit: …") with:
+
+**One core, a letter map.** Rename and swap are one operation over a letter map — `{A: G}`, or `{A: B, B: A}`
+for a swap — applied SIMULTANEOUSLY by one regex pass (`relabelMap`), which is what 2-D's NUL-sentinel triple
+achieves with sequential replaces. `relabelSession` rewrites every line (`rewriteLineMap`, the same
+faithfulness proof, ids mapped), every ask row and every display sentence, then re-folds the session and
+compares objects, constraints, selectors and faults, mapped. `decideRename` and `decideSwap` are its two
+entry points; `decideSubmit` reads the typed swap (`parseSwapAnalytic`, «בין» marks it) before the rename.
+
+**The holder is data.** A `rename-taken` verdict carries `holder: { text, index }` — the line as typed and its
+row in the full list — which the shared letter popover quotes and highlights before offering the swap;
+`letterHolder` answers it standalone, falling back to the derivation's `minted` row for a letter the tool gave.
+
+**Materializing a tool letter.** A point the figure has but no line names (`minted`: the canonical centre,
+a coordinate point's `P₁`/origin `O`) is first written into its own sentence — the letter inserted after the
+circle noun or before the coordinate pair — and accepted only if the session folds to the identical
+construction; the ordinary rewrite then runs. No faithful insertion ⇒ that case alone is `*-not-typed`.
+
+**Seed names.** `Construction.seedNames` (`letter → seed name`) decides which name `evaluate` hashes to place
+a free vertex's default sample (`freeCoord`). `derive(lines, seed, seedNames)` puts it on the construction, so
+every evaluation of the figure — canvas, gates, pool — agrees; the submit, toggle and edit trials take it from
+`current`. A letter change TRANSPOSES the map (`transposeSeedNames`), keeping it a permutation, so a renamed
+vertex starts where it started and a freed letter, reused, can never share its seed. The store keeps it beside
+the lines (undo slice, save file, share link, restored session); empty means absent, so a figure no letter
+change touched folds exactly as before.
+
+**One commit.** `applyRename` / `applySwap` write `{ lines, queries, spokenFor, seedNames }` in one `set`, and
+the undo slice carries all four (plus seed and muted set). The surface is the shared `shell/frame/LetterPopover`,
+wired by the integrator to `decideRename` / `dispatchRename` / `dispatchSwap`; the typed forms remain.

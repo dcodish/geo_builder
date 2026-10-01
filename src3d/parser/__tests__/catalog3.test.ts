@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { COMMAND_CATALOG_3D, type CatalogEntry3 } from '../catalog3';
 import { PROMPT_EXAMPLES_3D, PROMPT_SPEC_3D } from '../llmShared3';
-import { parse3, parseRename3 } from '../parse3';
+import { parse3, parseRewrite3 } from '../parse3';
 
 // #1359: the request body is composed in `server/llm/harness.ts`, which a product tree may not
 // import (BOUNDARIES: src -> server is forbidden). These cases assert this product's own prompt
@@ -26,7 +26,7 @@ const promptText = (s: { rules: string[]; vocabulary: () => string; examples: { 
  * is exactly the shadow class this suite exists to catch.
  */
 const understood = (u: string, lane: CatalogEntry3['lane']): boolean =>
-  lane === 'rewrite' ? parseRename3(u) !== null : parse3(u).ok;
+  lane === 'rewrite' ? parseRewrite3(u) !== null : parse3(u).ok; // #1631: the rewrite reader is rename OR swap
 
 describe('catalog guard', () => {
   for (const entry of COMMAND_CATALOG_3D) {

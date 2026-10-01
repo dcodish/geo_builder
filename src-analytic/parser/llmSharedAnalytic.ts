@@ -139,6 +139,7 @@ export const PROMPT_SPEC_ANALYTIC = {
     '- If the request cannot be expressed with the supported forms, return an EMPTY list. An honest refusal',
     '  is better than an approximation.',
   ],
-  vocabulary: (locale?: 'he' | 'en') => vocabOf(COMMAND_CATALOG_ANALYTIC, locale),
+  // #1154 — a `rewrite` entry (rename) edits the session; the model is never taught to emit one.
+  vocabulary: (locale?: 'he' | 'en') => vocabOf(COMMAND_CATALOG_ANALYTIC.filter((e) => e.lane !== 'rewrite'), locale),
   examples: PROMPT_EXAMPLES_ANALYTIC,
 };

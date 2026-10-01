@@ -19,7 +19,7 @@
  * translation and store writes belong to the caller.
  */
 import type { InputError } from '../store/useAnalyticStore';
-import { parseLine } from '../parser/parseAnalytic';
+import { parseLine, parseRenameAnalytic, parseSwapAnalytic } from '../parser/parseAnalytic';
 import { VOCABULARY_ANALYTIC, imperativeCandidates } from '../parser/scopeAnalytic';
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 import { reportedDof } from '../engine/carriers';
@@ -59,7 +59,18 @@ export type SubmitVerdict =
    * `canonical` is a string `parseLine` has just accepted, so this verdict can never teach a form the
    * tool would reject.
    */
-  | { kind: 'teach'; verb: string; canonical: string };
+  | { kind: 'teach'; verb: string; canonical: string }
+  /**
+   * #1154 — a RENAME request («שנה שם A ל-G»). It edits the SESSION, not the figure: nothing is
+   * recorded as a line. The caller hands it to `dispatchRename` (`app/rename.ts`), which needs the
+   * whole session (muted lines, ask rows) that this decision deliberately does not take.
+   */
+  | { kind: 'rename'; from: string; to: string }
+  /**
+   * #1303 / #1631 — a SWAP request («החלף בין A ל-B»). A session edit like the rename; the caller hands
+   * it to `dispatchSwap` (`app/rename.ts`).
+   */
+  | { kind: 'swap'; a: string; b: string };
 
 /**
  * How many CONSTRAINTS the line appended — the measurement that separates #1063 from #1076.
@@ -131,6 +142,14 @@ export function decideSubmit(
   const line = raw.trim();
   if (!line) return { kind: 'ignored' };
 
+  // #1154 — a rename is read BEFORE the grammar and the imperative lesson: it rewrites history and
+  // states nothing, so no fact rule may claim it (the sibling order — 2-D and 3-D intercept it first).
+  // The SWAP first: «בין» is what tells «החלף בין A ל-B» from the rename «החלף A ב-G» (#1303).
+  const swap = parseSwapAnalytic(line);
+  if (swap) return { kind: 'swap', a: swap.a, b: swap.b };
+  const rename = parseRenameAnalytic(line);
+  if (rename) return { kind: 'rename', from: rename.from, to: rename.to };
+
   /**
    * NON-CANONICAL INPUT IS TAUGHT, NEVER SILENTLY ACCEPTED (#1353, ADR-W-030) — and it is checked
    * FIRST, because the defect is that the wrapped form currently succeeds.
@@ -179,7 +198,8 @@ export function decideSubmit(
    * Dry-run the WHOLE list with the new line appended: a statement is acceptable only if the figure
    * still folds. A refusal keeps the prior figure and names the student's own words.
    */
-  const trial = derive([...lines, line], seed);
+  // #1631: the trial is THIS figure plus the line — the same seed names, so it starts where the canvas drew.
+  const trial = derive([...lines, line], seed, current.construction.seedNames ?? {});
   /** A `record` verdict carries the new line's notice, if the fold raised one (#1350). */
   const raised = trial.notices.find((n) => n.index === lines.length);
   const recorded: SubmitVerdict = raised
@@ -411,7 +431,7 @@ export function decideToggle(
   const before = activeOf(lines, disabled);
   const after = activeOf(lines, next);
   const at = rowOf(lines.length, next).indexOf(index);
-  const trial = derive(after, seed);
+  const trial = derive(after, seed, current.construction.seedNames ?? {});
   const was = new Set(current.faults.map((f) => `${before[f.index]}\u0000${f.code}`));
   const fault =
     trial.faults.find((f) => f.index === at) ??
@@ -442,11 +462,12 @@ export function decideEdit(
   lines: readonly string[],
   disabled: readonly number[],
   seed: number,
+  seedNames: Readonly<Record<string, string>> = {},
 ): boolean {
   if (disabled.includes(index)) return parseLine(next.trim()).ok;
   const edited = lines.map((l, j) => (j === index ? next : l));
   const at = rowOf(lines.length, disabled).indexOf(index);
-  return !derive(activeOf(edited, disabled), seed).faults.some((f) => f.index === at);
+  return !derive(activeOf(edited, disabled), seed, seedNames).faults.some((f) => f.index === at);
 }
 
 /**

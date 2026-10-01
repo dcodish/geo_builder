@@ -33,6 +33,8 @@ export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackN
     seed: typeof envelope.seed === 'number' ? envelope.seed : 0,
     name: typeof envelope.name === 'string' ? envelope.name : fallbackName,
     disabled: Array.isArray(envelope.disabled) ? envelope.disabled.filter((d): d is number => typeof d === 'number') : [],
+    // #1631 — where a renamed free vertex is drawn; the store keeps only letter → letter entries
+    seedNames: envelope.seedNames as Record<string, string> | undefined,
   });
   /**
    * #1548 — a MUTED line loads muted, so the audit replays the figure the student will actually see:

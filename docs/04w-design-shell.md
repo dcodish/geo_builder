@@ -388,3 +388,28 @@ Shell holds no strings, so the suite vocabulary is held by a lock, not a module:
 ## The guide speaks student ([ADR-W-101](06w-decisions-workspace.md#adr-w-101))
 
 `ManualScreen.tsx` exports `guideJargon(text, allow?)` — the jargon tokens in one string, by CLASS: a design-doc section (`§2b`), an issue number (`#760`), a decision id, `DOF`, and the machinery's names in English (tier, layer, grammar, parser, engine, solver, LLM, regex, fallback) and Hebrew (שכבה, דקדוק, מנוע, פרסר, אלימינציה, איטרציה — stems, so a prefixed «בשכבה» is caught). `guideJargonIn(content)` walks any object to every string leaf and reports `path: «token» in «text»`, so a new catalog field or locale key is linted the day it lands. Each product's lock hands it its own catalog, section titles and whole he/en locale and expects `[]` (the #1347 shape: the chrome owns the rule, the product owns the question). `allow` names an exact token, for the day a curriculum word collides with a stem; none does today.
+
+## The letter popover ([ADR-W-105](06w-decisions-workspace.md#adr-w-105))
+
+`shell/frame/LetterPopover.tsx` is the on-canvas «click a point, type its letter» popover, used by 2-D's point menu and 3-D's rename. Its contract:
+
+| prop | meaning |
+| --- | --- |
+| `x`, `y`, `bounds` | the anchor (the click) and the canvas size, in px of the positioned container. Placed by **physical** `left`/`top`, clamped into the canvas, never a logical inset (under RTL that mirrors the menu, 2-D F1/REN-1) |
+| `title`, `label` | the header, and the letter the callbacks receive first |
+| `onRename?(from, to)` | returns `{ok:true}` or `{ok:false, reason, holder?}`. `reason:'taken'` with a `holder: {text, onHighlight?}` shows the holder line and the swap offer. Any other reason (including a product's own, such as `busy`) shows the "invalid" note. Absent means no letter box |
+| `onSwap?(a, b)` | returns `{ok}`; absent means no offer |
+| `strings` | `placeholder`, `apply`, `taken`, `bad`, `takenBy` (`{{what}}`), `swapLetters` (`{{a}}`, `{{b}}`) — all from the caller |
+| `maxLength` | the longest typed label (2-D 3, 3-D 4 for `C1'`) |
+| `children` | the product's own items below the letter block (2-D: hide/show label) |
+| `onClose` | the backdrop, Escape, a successful rename or swap |
+
+The caller mounts it once per opening (`key`), so typed text, the note and the offer never outlive the point they were for.
+
+**The decisions are in `letterOffer.ts`, not in the JSX.** `swapOffered(holder)` (the offer's scope: any holder, [ADR-532](06-decisions.md#adr-532)), `afterRename(result, to)`, `afterSwap(result)`, `typedLetter` (trim and upper-case; a product with a richer label grammar normalises further in its own store), and `fillLetters`. 2-D's `Figure.tsx` re-exports `swapOffered`, so its #1199 lock calls the gate's own function.
+
+**The buttons declare their colour** (`letterPopoverBtn.color = var(--color-text, ink)`), because the swap offer sits inside the muted holder block and a button may inherit it ([ADR-520](06-decisions.md#adr-520) Am. 2). The token falls back to the ink value in a builder whose stylesheet does not define it (3-D).
+
+**The product adapts its store's answer** with one small exported function: 2-D's `letterRename` in `Figure.tsx`, 3-D's `letterRename3` in `rename3.ts`. The App wiring calls that function, and so does the cross-product lock.
+
+**The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/letter-swap-rows.ts`. Each builder's thin lock hands over a subject: `setup`, two taken letters, its real `rename` (through its adapter), its real `swap`, `undo`, `statements()` and `points()`. A new builder adds one thin lock in its own tree; the meta-lock proves each row can fail.

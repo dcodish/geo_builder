@@ -11550,3 +11550,42 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 `issue-1590-given-not-drivable.test.ts`: the line rider moves to "now placed", and the tool-limit example becomes the plane given one coordinate. `issue-1561-coord-determines.test.ts` is unchanged and green.
 
 **Consequences.** `src3d/engine/carriers.ts` (`solvable`; `readCoordGiven` reduced to coord-sym; `statedDataAdmits` coord-sym only), `src3d/engine/apply.ts` (records the determination; `determineByCoords` removed), `src3d/engine/evaluate.ts` (`solveCoordDeterminations`, `solveSmall`, the hook, `Resolved3.coordDetermined`), `src3d/engine/types.ts` (`coordDeterminations`), `src3d/store/store3.ts` (the row reads the outcome).
+
+## ADR-3D-294 — A taken letter names its holder and offers the swap; «החלף בין A ל-B» exchanges two letters (#1631, #1302)
+
+**Status:** accepted · 2026-10-01 · feature (PR, `feat/1631-letter-popover`) · #1302 armed 2026-09-21 (*"arm them"*) and #1631 approved 2026-10-01 (*"we want that same mechanism now for analytics and also for the 3d tool"*), each `auto-ok` as transcription. **Extends** [ADR-3D-211](#adr-3d-211) (the rename) with 2-D's swap ([ADR-122](06-decisions.md#adr-122), [ADR-532](06-decisions.md#adr-532)), PATTERN copied (docs/20 §12). **Shares** the popover with 2-D through `shell/` ([ADR-W-105](06w-decisions-workspace.md#adr-w-105)).
+
+**Requirements:** docs/02w FR-SU-13 (new; the promise is workspace-wide and 3-D realises it here — docs/02b carries no rename requirement of its own, ADR-3D-211 having recorded it as a decision only) · **Design:** none (internal) beyond docs/04w "The letter popover".
+
+**Context (measured on `main` 63770fad).** «קובייה ABCDA'B'C'D'» · «M אמצע AB», driven through `rename`: `M→A`, `A→M` and `A→B` are all `target-taken`, with no holder, and the popover said «האות תפוסה — בחרו אות פנויה». «החלף בין A ל-B» and "swap A and B" were not read by any reader (`parseRename3` → null), so they escalated as not-understood. #1302 recorded the same gap on 2026-09-20.
+
+**Decision.**
+1. **The holder.** `letterHolder3(facts, letter)` returns the first ENABLED fact whose commands name the letter, as `{factId, utterance}`. `renameFacts3`'s `target-taken` carries it, and so does the store action's return. `letterRename3` translates that answer into the shared popover's vocabulary. 3-D's step list has no row highlight, so the holder has no `onHighlight`; the popover quotes it.
+2. **The swap.** `swapSession3({facts, queries, planeDisplay}, a, b)` is a pure function: the NUL-sentinel triple `A→␀, B→A, ␀→B` through `renameInCommand3` (both halves of every fact) and `relabelTokens3`. The **ID-keyed side state goes through the same triple**: the queries, and `planeDisplay`, which is keyed by a plane's point run (the half #1302 flagged as most likely to be dropped). Both letters must exist (`no-source`), and `A === B` is `same`. `relabelTokens3`'s boundaries make the prime its own vertex: `A` never matches inside `A'`. The store's `swap(a, b)` commits it in **one `set`** (one undo step: `partialize` covers facts, queries and planeDisplay). The seed is kept. `displayMode` and `dihedralShown` are keyed by fact id, not by letter, and are untouched, as the rename leaves them.
+3. **The typed form.** `parseSwap3` is 2-D's `parseSwap` grammar with the primed label and `normalize3`: «החלף/החליפי/החליפו בין A ל-/לבין/ו- B», "swap A and/with/for B". **«בין» is what marks a swap**, so «החלף E ב-G» stays a rename. `parseRewrite3` is the deterministic lane's second reader whole (swap first, then rename). `decideSubmit3` routes it as a `swap` verdict, and a refusal is a typed `swap-refused` naming both letters, never not-understood. A catalog row «החלף בין A ל-B» / "swap A and B" (`lane: 'rewrite'`), and the catalog guard and shadow matrix now ask `parseRewrite3`.
+4. **The refusal teaches the swap.** `err.rename.target-taken` now offers «הקלידו «החלף בין {{from}} ל-{{to}}»» (He) / «type «swap {{from}} and {{to}}»» (En). Per the #1183 class, the lock extracts the taught sentence from the rendered message in both languages and submits it, and it must swap.
+5. **The popover** is the shared one ([ADR-W-105](06w-decisions-workspace.md#adr-w-105)) with `maxLength` 4 (`C1'`). The new strings `rename.takenBy` and `rename.swapLetters` are worded as 2-D's `pointMenu.*`, and `rename.taken` now reads 2-D's «האות כבר בשימוש» / "Letter already used". Its look follows 2-D: a ✓ button, the red note, and the clamp into the canvas.
+
+**Measured: a swap inside one declared run.** #1302 asked for this to be measured rather than assumed from 2-D's answer. On «קובייה ABCDA'B'C'D'»:
+- `A↔B` (adjacent) → «קובייה BACDA'B'C'D'»;
+- `A↔C` (opposite on the base) → «קובייה CBADA'B'C'D'».
+
+Both build with every row ok and 8 points, and in both the point that was A now carries the other letter **at exactly A's position**. Since every swap rewrites the whole history, it is a pure relabelling whichever pair is chosen. 2-D's adjacent-vs-opposite distinction concerns which polygon a 4-ring declares. In a 3-D solid the run's order is the vertex correspondence, and relabelling it consistently keeps the same solid.
+
+**Locks.** `src3d/__tests__/letter-swap-1631.test.ts` (23):
+- the §5c thin lock, 4 pairs: vertex and constructed point, adjacent, opposite, A and A′;
+- the holder in both directions, and the offer;
+- a muted fact is not a holder;
+- queries and plane display follow the swap, the seed is kept, and one undo restores;
+- the pure core refuses without touching anything;
+- the prime;
+- the within-run measurement;
+- 8 typed spellings;
+- «בין» as the marker;
+- typed through `submit`: one undo, no fact;
+- the typed refusal;
+- the taught sentence driven in He and En.
+
+`issue-578-rename.test.ts`: two rows now expect the holder on `target-taken` (the shape changed on purpose). `catalog3.test.ts` and `shadow-matrix3.test.ts` read `parseRewrite3`.
+
+**Not built.** Row highlighting of the holder in 3-D: 3-D's step list has no selection to light up, and adding one is a separate surface. The segment-ends swap (2-D's «החליפו קצוות»): 3-D has no segment menu (out of scope per #1302).

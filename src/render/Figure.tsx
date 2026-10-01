@@ -15,6 +15,9 @@ import { ANGLE_ARC_R, MIN_MEASURE_FONT_PX, angleValueOffset, buildScene, labelSc
 // #742 / ADR-W-024: the canvas corner cluster (↺ − +) — one look and one arithmetic in every
 // builder, from the shell contract. (The exports left this file for the top tool row.)
 import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../../shell/frame/canvasControls';
+// #1631: the point menu is the shared letter popover — one look and one offer rule in every builder.
+import { LetterPopover } from '../../shell/frame/LetterPopover';
+import { swapOffered, type LetterRenameResult } from '../../shell/frame/letterOffer';
 import type { MeasureLabels, RelationMarks, RelationPick } from './scene';
 import type { RelationsResult, ResolvedCircle } from '@/engine';
 import { findInkCrossings, drawnPointIds, resolveDrawnLines } from '@/engine';
@@ -32,17 +35,30 @@ export interface FigureLetterHolder {
 /**
  * THE TAKEN-LETTER OFFER’S SCOPE (#1199) — a swap is offered wherever the letter has a holder.
  *
- * **Operator ruling, 2026-09-18: «always allow switching names of nodes».** Before it, the offer was
- * gated on a `swappable` flag that #1013 had kept from the destructive version of this feature; because
- * the gate read the TARGET’s holder only, the same pair of letters was refused in one direction and
- * offered in the other.
- *
- * It is a named predicate rather than an inline `true` so the decision is CALLABLE: the offer’s scope
- * now has one home and one lock, and a future narrowing has to come through here
- * ([ADR-W-053](../../docs/06w-decisions-workspace.md) — a lock that reproduces a decision stays green
- * through the change that breaks it).
+ * **Operator ruling, 2026-09-18: «always allow switching names of nodes».** The predicate now lives in
+ * the shared letter popover (#1631, `shell/frame/letterOffer`), which is what the point menu's JSX calls;
+ * it is re-exported here so 2-D's locks keep calling the SAME function the gate calls
+ * ([ADR-W-053](../../docs/06w-decisions-workspace.md) — never a copy).
  */
-export const swapOffered = (holder: FigureLetterHolder | null | undefined): boolean => holder != null;
+export { swapOffered };
+
+/**
+ * 2-D's rename answer in the shared popover's vocabulary (#1631): the store's `target-taken` is the
+ * popover's `taken`, and the holder becomes its quoted wording plus the row highlight (#238).
+ */
+export function letterRename(
+  res: { ok: boolean; reason?: string; holder?: FigureLetterHolder | null },
+  onHighlightFact?: (factId: string) => void,
+): LetterRenameResult {
+  if (res.ok) return { ok: true };
+  if (res.reason !== 'target-taken') return { ok: false, reason: 'bad' };
+  const h = res.holder;
+  return {
+    ok: false,
+    reason: 'taken',
+    holder: h ? { text: h.utterance, onHighlight: onHighlightFact ? () => onHighlightFact(h.factId) : undefined } : null,
+  };
+}
 
 export interface FigureProps {
   construction: Construction;
@@ -248,13 +264,11 @@ export function Figure({
   const [hotCross, setHotCross] = useState<number | null>(null);
   const [hotPromote, setHotPromote] = useState<Id | null>(null); // hovered anonymous promotable dot (#32)
   const [showOrient, setShowOrient] = useState(false); // the rotate/flip/align cluster — collapsed by default (declutter)
-  // The on-canvas edit menu: a point (rename / hide) or a segment (hide / dashed), where (container px),
-  // and a transient note (e.g. "taken").
-  const [menu, setMenu] = useState<{ kind: 'point' | 'segment' | 'circle'; id: string; x: number; y: number } | null>(null);
-  const [renameVal, setRenameVal] = useState('');
-  const [menuNote, setMenuNote] = useState('');
-  /** #238: WHO holds the letter the student just tried to use, when the refusal knows. */
-  const [takenBy, setTakenBy] = useState<{ holder: FigureLetterHolder; to: string } | null>(null);
+  // The on-canvas edit menu: a point (rename / hide) or a segment (hide / dashed), where (container px).
+  // `seq` counts openings: the point popover is mounted per opening (its `key`), so the typed letter,
+  // the note and the swap offer (#1631, now the shared popover's own state) never carry over.
+  const [menu, setMenu] = useState<{ kind: 'point' | 'segment' | 'circle'; id: string; x: number; y: number; seq: number } | null>(null);
+  const menuSeq = useRef(0);
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   // The toolbar sits ABOVE the SVG in normal flow (never overlapping it — the "buttons hide the canvas"
@@ -281,54 +295,8 @@ export function Figure({
   const lastFit = useRef<{ t: Transform; key: string } | null>(null);
 
   function openMenu(kind: 'point' | 'segment' | 'circle', id: string, screen: Vec) {
-    setMenu({ kind, id, x: view.panX + screen.x * view.zoom, y: view.panY + screen.y * view.zoom });
-    setRenameVal('');
-    setMenuNote('');
-    setTakenBy(null);
-  }
-  function applyRename(id: string) {
-    const to = renameVal.trim().toUpperCase();
-    if (!to || !onRename) return;
-    const res = onRename(id, to);
-    setTakenBy(null);
-    if (res.ok) {
-      setMenu(null);
-      return;
-    }
-    if (res.reason !== 'target-taken') {
-      setMenuNote(pointMenuText?.bad ?? '');
-      return;
-    }
-    // #238 (ADR-520): «האות כבר בשימוש» with no way to see WHO held it was the dead end. Name the holder,
-    // quote the student's own wording back, and offer the letter back when taking it is safe.
-    setMenuNote(pointMenuText?.taken ?? 'taken');
-    setTakenBy(res.holder ? { holder: res.holder, to } : null);
-    if (res.holder && onHighlightFact) onHighlightFact(res.holder.factId);
-  }
-
-/**
-   * #1013 — THE OFFER EXCHANGES TWO LETTERS. IT NEVER DELETES A STATEMENT.
-   *
-   * It used to drop the holder and rename onto the freed letter, so «משולש ABC» · «נקודה D» ·
-   * «נקודה E» then D → E left FOUR points and no «נקודה D» — the student asked to re-letter one point
-   * and lost another. Operator ruling 2026-09-18: *"deleting a phase is a capability I do not want to
-   * have automatically done as users will not expect the consequences."*
-   *
-   * A swap destroys nothing, so the whole safety apparatus the delete needed stops being load-bearing.
-   *
-   * **#1199 — the offer is now shown wherever a letter is taken.** It used to appear only where the
-   * destructive one had, which left the asymmetry the operator reported: D→A refused while A→D was
-   * offered, for the same two letters, decided by which one he clicked first. **Operator ruling,
-   * 2026-09-18: always allow switching names of nodes.**
-   */
-  function swapLetters(id: string) {
-    if (!takenBy || !onSwap) return;
-    const res = onSwap(id, takenBy.to);
-    if (res.ok) {
-      setMenu(null);
-      setTakenBy(null);
-      setMenuNote('');
-    } else setMenuNote(pointMenuText?.bad ?? '');
+    menuSeq.current += 1;
+    setMenu({ kind, id, x: view.panX + screen.x * view.zoom, y: view.panY + screen.y * view.zoom, seq: menuSeq.current });
   }
 
   const { scene, transform, crossings, labelDirs, oriented } = useMemo(() => {
@@ -1128,9 +1096,40 @@ export function Figure({
         </button>
       </div>
 
-      {/* On-canvas edit menu (FR-RN-10): click a POINT to rename it or hide/show its label+dot, or a
-          SEGMENT to hide/show it or make it dashed/solid. A transparent backdrop closes it on outside click. */}
-      {menu && (menu.kind === 'point' ? editable : menu.kind === 'segment' ? segEditable : circEditable) && (
+      {/* On-canvas POINT menu (FR-RN-10) — the shared letter popover (#1631): click a point, type its new
+          letter in place; a taken letter names its holder (#238) and offers the swap (#1013/#1199). The
+          popover is `shell/`'s; what is 2-D's own is passed in — the two store operations, the holder's
+          row highlight, the strings, and the hide/show item below the letter block. */}
+      {menu && menu.kind === 'point' && editable && (
+        <LetterPopover
+          key={menu.seq}
+          x={menu.x}
+          y={menu.y}
+          bounds={{ width: vw, height: vh }}
+          title={menu.id}
+          label={menu.id}
+          onRename={onRename && !isHidden(menu.id) ? (from, to) => letterRename(onRename(from, to), onHighlightFact) : undefined}
+          onSwap={onSwap}
+          strings={{
+            placeholder: pointMenuText?.rename ?? 'rename',
+            apply: pointMenuText?.apply ?? 'apply',
+            taken: pointMenuText?.taken ?? 'taken',
+            bad: pointMenuText?.bad ?? '',
+            takenBy: pointMenuText?.takenBy ?? '{{what}}',
+            swapLetters: pointMenuText?.swapLetters ?? 'swap {{a}} and {{b}}',
+          }}
+          onClose={() => setMenu(null)}
+        >
+          {onToggleHidden && (
+            <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onToggleHidden(menu.id); setMenu(null); }}>
+              {isHidden(menu.id) ? (pointMenuText?.show ?? 'show') : (pointMenuText?.hide ?? 'hide')}
+            </button>
+          )}
+        </LetterPopover>
+      )}
+      {/* On-canvas SEGMENT / CIRCLE menu: hide/show, dashed/solid, swap the endpoints. A transparent
+          backdrop closes it on outside click. */}
+      {menu && menu.kind !== 'point' && (menu.kind === 'segment' ? segEditable : circEditable) && (
         <>
           <div style={{ position: 'absolute', inset: 0 }} onClick={() => setMenu(null)} />
           <div
@@ -1155,53 +1154,8 @@ export function Figure({
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{menu.kind === 'point' ? menu.id : menu.kind === 'segment' ? menu.id.replace(/^seg-/, '') : menu.id.replace(/^circle-/, '⊙ ')}</div>
-            {menu.kind === 'point' ? (
-              <>
-                {onRename && !isHidden(menu.id) && (
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <input
-                      autoFocus
-                      value={renameVal}
-                      maxLength={3}
-                      placeholder={pointMenuText?.rename ?? 'rename'}
-                      onChange={(e) => {
-                        setRenameVal(e.target.value);
-                        if (menuNote) setMenuNote('');
-                        if (takenBy) setTakenBy(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') applyRename(menu.id);
-                        if (e.key === 'Escape') setMenu(null);
-                      }}
-                      style={{ width: 64, padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid #cbd5e1', textTransform: 'uppercase' }}
-                    />
-                    <button type="button" style={ctrlBtn} title={pointMenuText?.apply ?? 'apply'} onClick={() => applyRename(menu.id)}>
-                      ✓
-                    </button>
-                  </div>
-                )}
-                {menuNote && <div style={{ fontSize: 11, color: '#dc2626' }}>{menuNote}</div>}
-                {takenBy && (
-                  <div style={{ fontSize: 11, color: '#64748b', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {/* #238: the holder, in the student's OWN wording — a step row they can recognise. */}
-                    <span>{(pointMenuText?.takenBy ?? '{{what}}').replace('{{what}}', takenBy.holder.utterance)}</span>
-                    {onSwap && swapOffered(takenBy.holder) && (
-                      <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => swapLetters(menu.id)}>
-                        {(pointMenuText?.swapLetters ?? 'swap {{a}} and {{b}}')
-                          .replace('{{a}}', menu.id)
-                          .replace('{{b}}', takenBy.to)}
-                      </button>
-                    )}
-                  </div>
-                )}
-                {onToggleHidden && (
-                  <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onToggleHidden(menu.id); setMenu(null); }}>
-                    {isHidden(menu.id) ? (pointMenuText?.show ?? 'show') : (pointMenuText?.hide ?? 'hide')}
-                  </button>
-                )}
-              </>
-            ) : menu.kind === 'segment' ? (
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{menu.kind === 'segment' ? menu.id.replace(/^seg-/, '') : menu.id.replace(/^circle-/, '⊙ ')}</div>
+            {menu.kind === 'segment' ? (
               <>
                 {onToggleSegHidden && (
                   <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onToggleSegHidden(menu.id); setMenu(null); }}>

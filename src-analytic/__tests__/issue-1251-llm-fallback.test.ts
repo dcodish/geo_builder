@@ -62,7 +62,10 @@ describe('#1251 — the system prompt carries the catalogue and the rules that m
 
   it('renders every catalogue entry as vocabulary', () => {
     expect(COMMAND_CATALOG_ANALYTIC.length).toBeGreaterThan(20);
-    for (const e of COMMAND_CATALOG_ANALYTIC.slice(0, 40)) expect(prompt).toContain(e.he);
+    // #1154 — every CONSTRUCTION entry; a `rewrite` entry (rename) is never taught to the model.
+    const taught = COMMAND_CATALOG_ANALYTIC.filter((e) => e.lane !== 'rewrite');
+    for (const e of taught.slice(0, 40)) expect(prompt).toContain(e.he);
+    for (const e of COMMAND_CATALOG_ANALYTIC.filter((x) => x.lane === 'rewrite')) expect(prompt).not.toContain(e.he);
   });
 
   // The three rules that encode rulings rather than style. If one is dropped the model starts
