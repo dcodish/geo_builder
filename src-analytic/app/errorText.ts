@@ -124,6 +124,7 @@ export function errorText(error: InputError, t: Translate): string {
     'not-handled': 'errNotHandled',
     'bad-equation': 'errBadEquation',
     'out-of-scope': 'errOutOfScope',
+    'proof-target': 'errProofTarget',
     'reserved-coordinate': 'errReservedCoordinate',
     'bad-arity': 'errBadArity',
     'repeated-vertex': 'errRepeatedVertex',

@@ -8515,6 +8515,63 @@ A subject whose tail the reader cannot account for, or with a capital letter bef
 
 **Consequences.** New `src-analytic/app/rename.ts`. `parser/parseAnalytic.ts` (`parseRenameAnalytic`), `app/submit.ts` (`rename` verdict), `store/useAnalyticStore.ts` (`applyRename`, six `rename-*` InputError kinds), `app/errorText.ts` + `i18n/index.ts` (eight texts, He/En, and `menuRename`), `App.tsx` (dispatch, menu entry, input focus), `app/fallback.ts`, `app/triageReplay.ts`, `parser/catalogAnalytic.ts` (`lane`, one row), `parser/llmSharedAnalytic.ts` (vocabulary filter — prompt content unchanged). Tests touched: `parser.test.ts`, `analyticCorpus.ts`, `issue-1251-llm-fallback.test.ts`, `engine.test.ts` (exhaustive switch). The LLM vocabulary is unchanged in content, but the proxy bundles the analytic catalogue module: diff the built proxy before deploy.
 
+## ADR-AG-187 — The exam's sentence frame is read once, at `parseLine`; a proof target is refused; a right trapezoid does not fix its leg (#1618)
+
+**Status:** accepted · 2026-10-01 · operator rulings 2026-10-01 on #1616 (full 2-D parity first; proof targets refused, "this is not a proof engine"; chords lifted) · slice A of #1616
+
+**Requirements:** [02c](02c-requirements-analytic.md) R124 — new: a given typed in the exam's textbook frame is understood as the bare given; a proof target is refused with a reason · **Design:** [04c](04c-design-analytic.md) — "The sentence frame" (new section)
+
+**Cites** [ADR-AG-150](#adr-ag-150) (the imperative wrapper is TAUGHT — the register this frame is NOT), [ADR-AG-119](#adr-ag-119) (a role noun is never silently reduced to a length), [ADR-052](06-decisions.md#adr-052), [ADR-W-030](06w-decisions-workspace.md#adr-w-030).
+
+**Context.** The operator asked for the 4-point bagrut question (שאלון 471: geometry that starts synthetic and turns analytic) and full 2-D parity (#1616). The corpus is Q4 + Q5 of the 23 exams in `docs/sample questions/חוברת בגרויות 471 2025.pdf`, inventoried in `471-geometry-inventory.json` (46 questions). Measured through the real `derive` path, **23 of the 263 exam lines** were accepted as printed and **no question** built. Most refusals were sentences whose GEOMETRY the tool already read, refused for the frame around them: «נתון: A(2;10)», «ידוע כי …», «וידוע כי …», «… (ראה ציור)», «… כמתואר בסרטוט שלפניכם», «MO = 8 ס"מ», «AB = 20, AC = 15», «במלבן ABCD, …», «טרפז ישר זווית ABCD (AB ∥ CD, AB ⊥ AD)», «המרובע ABCO הוא טרפז ישר זווית», «הנקודה O היא ראשית הצירים», «A ו-B נמצאות על ציר ה-x ועל ציר ה-y בהתאמה», and every «∢ABC = ∢ADC» (the exam's glyph, #1555). **Class:** each rule embedded its own optional «נתון» (`HE_GIVEN`) and its own spellings, so a wrapper no rule was taught missed EVERY rule at once. #1533, #1555, #1612 and #1239 were four members of it, filed separately. 2-D closed the same class once, at `normalizeUtterance` and its multi-statement splitter.
+
+**Decision.**
+1. **One frame boundary.** `parseLine` (exported, every caller) now runs `orthography → proof check → readings → parseClause`. `parseClause` is the old rule chain, and the parser's own internal calls use it directly, so their semantics are unchanged. `parser/frameAnalytic.ts` is pure text → clauses:
+   - `orthography`: ∢∡→∠, ⁰→°, `A(2;10)`→`(2,10)`, `10½`→`10.5`, «קודקוד»→«קדקוד», «מונח»→«נמצא», maqaf, NBSP
+   - `unwrap`: the given-prefixes in every printed form (He + "given"/"it is known that"); the continuing «ו»/«וכי»; a figure reference, trailing or parenthesised (He + En); «שבציור»/«שלפניכם»; length units; «O – …»; a whole-line parenthesis; the shape qualifier «הצלע AB של המלבן» / «שוק הטרפז AD»; a section label «(ד)»
+2. **A reading is taken only when EVERY clause parses**, so the frame can never accept what the grammar does not, and a line is never half-accepted. The readings:
+   - **origin:** every spelling → `P(0,0)`, the existing coordinate given, so restatement and conflict are `P(0,0)`'s (#1612)
+   - **shape frame:**
+     - the context «ב<shape> <letters>, …»
+     - the shape plus parenthetical givens
+     - the predicate «<letters> הוא <shape>» / «המשולש AOB הוא ישר זווית»
+     - the noun after the letters (#1239)
+     The nouns are derived from the `SHAPES` registry, never a second list.
+   - **distribution:** a plural subject over a location predicate, and «בהתאמה» pairing two lists of equal length. A mismatch is refused, never guessed.
+   - **a point with its coordinates and a predicate:** «הנקודה E(2,7) נמצאת על …»; and a point **defined** by a statement naming it («F נקודה שעבורה המרובע FBAD הוא מעוין»)
+   - **sides as subjects:**
+     - a segment on an axis lowers to both endpoints on it
+     - «AB ו-CD מקבילים זה לזה» lowers to `AB ∥ CD`
+     - «האלכסון AC מאונך לאלכסון BD» lowers to `AC ⊥ BD`
+   - **two givens on one line:** a top-level comma/semicolon, or a «ו» that opens a sentence. Partitions are tried fewest-first. A bare name is never split off its predicate. **This runs only when no rule owns the line** (`not-handled` / `bad-operand`), so it cannot override a rule's deliberate refusal.
+3. **A proof target is refused** with the new code `proof-target`: «הוכיחו כי …», «הראו כי …», «נמקו …», "prove/show that …". The message says it is a claim to prove, that the tool draws the givens and does not check proofs, and to type only what the question gives. «הראו» is also in the imperative lexicon ("show me"); the `כי`/`ש` that makes it "show THAT" decides it, and a lock drives it through `decideSubmit` so the teaching path cannot claim it.
+4. **«טרפז ישר זווית» offers its right angle at any of the four vertices** (a `choice`). The row seated it at the first vertex, so a right trapezoid with its right angles at B and C was refused as unsatisfiable. This was the operator's own example (`ABCO`, ∢C = 90°): a default posing as a given (ADR-052). A stated angle is exactly one option and collapses the choice by structure.
+
+**This is the textbook register, not one aimed at the tool.** ADR-W-030 teaches commands («הוסף …»); these are the exam's own sentences, and this tree's rule is that the student types them. The stored line is always the one typed.
+
+**Withdrawn during the build: the role-noun fold.** Folding «השוק BC» / «הבסיס AB» / «היתר AC» to «הצלע» was tried and reverted. ADR-AG-119's locks are right: a role noun asserts that BC *is a leg*, and reducing it to a side silently drops that claim. Lowering the role to a constraint belongs to the construction slice (#1620). This costs 14/5 and 22/4 their complete build for now. The frame reads every other wrapper in them.
+
+**Measured.**
+- **Corpus:** 23/263 → **143/263** lines; **0 → 5** questions build complete (8/4, 10/4 — the operator's own example — 11/4, 12/4, 15/5). Each figure was checked by hand against the geometry and is locked at its coordinates, at 0 DOF.
+- `issue-1618-corpus471-ratchet.test.ts`: the floor (143 lines, 5 questions) can only rise.
+- `issue-1618-sentence-frame.test.ts`: every framed form lowers to the IDENTICAL facts as its canonical sentence, including all of #1533/#1555/#1612/#1239's own cases; refusals (proof targets in He/En, `הראו כי` through `decideSubmit`, a construction imperative NOT refused, a mismatched «בהתאמה», a half-unreadable line); the right-trapezoid seats.
+- Analytic tree green (170 files).
+- Remaining corpus failures are slices B–D (circles, construction vocabulary, measures) and their cascades.
+
+**Not built — successors.**
+- The exam's construction imperatives («העבירו משיק», «הורידו אנך», «בחרו נקודה כרצונכם») are textbook wording **and** imperatives. Whether ADR-W-030 covers them is a ruling, filed on #1620.
+- Role nouns as claims: #1620.
+- «שכל קודקודיו מונחים על הצירים» (each vertex on SOME axis): a choice, #1620.
+
+**Consequences.** `parser/frameAnalytic.ts` (new); `parser/parseAnalytic.ts` (`parseLine` → frame, `parseClause`, `proof-target`); `engine/shapes.ts` (the right-trapezoid row); `app/errorText.ts` + `i18n/index.ts` (`errProofTarget`, He/En); `parser/catalogAnalytic.ts` (six rows, none featured: #1347 is the operator's); `__tests__/fixtures/corpus471.json`. The proxy bundle carries the analytic catalogue: **the next deploy must push the proxy**. Closes #1618, #1533, #1555, #1612, #1239.
+
+**Amendment 1 (2026-10-01, the operator's play pass on PR #1625).** Three findings, each re-measured from the dev log (session `tk9wowbg`) before it was fixed:
+- **#1626 — the copula is optional when a subject noun is present.** «מרובע ABCO טרפז ישר זוית», «משולש ABC ישר זווית» and «המרובע ABCD מלבן» were refused; the same sentences with «הוא» passed. Hebrew drops the copula routinely. The predicate must still resolve through the registry, so «משולש ABC פיל» stays refused; without a subject noun («ABC ישר זווית») there is nothing to complete an adjective, and it stays refused too.
+- **#1628 — the origin as an unnamed point.** «הצלע AB עוברת דרך ראשית הצירים» was refused: the frame read the origin only when a letter named it. It now lowers to the coordinate point (0,0) in the slot the owning rule reads. `resolveMints` names a minted origin **O** when that letter is free (the ADR-AG-184 default that yields), otherwise `P₁…`. It is never a second O.
+- **The teaching ruling** (operator, on #1618): *"we can still accept it but the expectation is that these are separate lines"*. The bracketed shape form and two givens on one line stay ACCEPTED (their locks stand), but no catalog row and no play sheet teaches them. The bracketed right-trapezoid row became «∢C = 90°» after «טרפז ישר זווית ABCO»; the «AB = 20, AC = 15» row was removed.
+
+The same pass surfaced three bugs that were already on `main`, fixed separately: #1627 (a trapezoid drawn as a rectangle), #1629 (a given that selects a configuration answered «already follows») and #1624 (the shape drawn off the canvas after «הציגו תצורה אחרת»). Locks: `issue-1618-sentence-frame.test.ts` (#1626 and #1628 blocks).
+
 ## ADR-AG-188 — "Already follows" means true in EVERY configuration: a given that selects one is recorded (#1629)
 
 **Status:** accepted · 2026-10-01 · P1 bug · fix round (auto-ok 2026-10-01)

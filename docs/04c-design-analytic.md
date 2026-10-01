@@ -1827,6 +1827,29 @@ guide, excluded from the LLM vocabulary and the figure corpus, read by the catal
 `parseRenameAnalytic` + `decideRename`. Known limit: a FREE vertex's default sample is keyed by its letter
 (`freeCoord`), so its drawn position may change on a rename while every given and the freedom stay equal.
 
+## The sentence frame ([ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), #1618)
+
+`parseLine` is the one boundary every rule reads, and it reads the exam's textbook frame **once**:
+
+```
+raw → orthography → proof-target? → readLine(depth 0) → parseClause
+                                          │
+                                          ├─ structural readings: origin · shape · distribution · point · side
+                                          ├─ parseClause (the rule chain, unchanged)
+                                          └─ if no rule owns it (not-handled / bad-operand): comma / «ו» partitions
+```
+
+- **`parseClause`** is the old `parseLine`. The parser's own internal calls (the canonical sentences of `viaCanonical`, the crossing pair, the placed subject) call it directly, so the frame never changes what they mean.
+- **`frameAnalytic.ts` is text → clauses and decides nothing.** A reading is taken only when every clause parses through `readLine` again, one level deeper (`MAX_FRAME_DEPTH = 2`). So the frame cannot accept what the grammar rejects, and a line is never half-accepted.
+- **Order matters, and it is chosen.** The structural readings run *before* `parseClause`, because a rule can half-claim a framed line («טרפז ישר זווית ABCD (AB ∥ CD, …)» used to answer `bad-operand`). The partitions run *after*, and only on `not-handled` / `bad-operand`, so a comma can never override a rule's owned refusal.
+- **Partitions** keep each segment's original separator (`Segment.sep`), so a group is always a substring of the line. They are tried fewest-groups first, and a group that only names a point (`isBareName`) disqualifies the partition: cutting «A» off «A, B ו-C נמצאות על …» would leave A unconstrained.
+- **Shape nouns come from `SHAPES` / `EN_SHAPE`**, longest first, through `normalizeShapeNoun`. A new row in the registry is understood in every frame with no change here.
+- **`unwrap` runs to a fixpoint** (bounded), because frames nest: «וידוע כי …», «נתון בנוסף: … (ראה ציור)».
+
+**Not here:** the imperative wrapper («הוסף …») is still taught by `decideSubmit` before `parseLine` runs (ADR-AG-150). A proof target is refused inside `parseLine` (`proof-target`), so the teaching path's parse of «כי …» fails, and «הראו כי …» reaches the refusal rather than a lesson. A role noun («השוק BC») is not folded; that boundary belongs to ADR-AG-119.
+
+*Amended 2026-10-01 (#1626, #1628):* `shapeClauses` tries the predicate with the copula first, then without it, and the copula-less form requires a subject noun. `originClauses` rewrites an unnamed «(ב)ראשית הצירים» to the slot `(0,0)` («בנקודה (0,0)»); the name comes from `resolveMints`, which prefers O for the origin when no point holds the letter.
+
 **The entailment test is judged over CONFIGURATIONS, not over the trial ([ADR-AG-188](06c-decisions-analytic.md#adr-ag-188), #1629).** The trial derivation re-searches seeds until the new line holds, so "the given holds in the trial" is true for any given that merely *selects* among discrete configurations. The "freedom did not drop" condition cannot catch this, because mirror images at 0 DOF have no freedom to lose. The gate therefore has a fourth condition, checked last because it is the only one that costs evaluations. The constraints the new line stated (`Derivation.constraintLine`, the fold's own `constraintFact` attribution carried to the line) must hold in every figure of the CURRENT construction's configuration pool (`evaluate.holdsInEveryConfiguration`). That is the same pool, the same residual and the same `SATISFIED_EPS` that `isKnowledge`, `knownOptions`, `knownCurve` and `unsatisfied` use. A residual that cannot be judged reads as "not entailed", so the line records. The pool is filled on demand. On the page, `poolScheduler` has usually completed it already, and if it has not, one submit pays the at most 24 cached evaluations the idle loop would have spent.
 
 ## One decision for the view after any change ([ADR-AG-190](06c-decisions-analytic.md#adr-ag-190), #1624)

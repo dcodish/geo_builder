@@ -1881,6 +1881,28 @@ refused and the message quotes the line that holds it; a letter that is not a po
 point the figure does not have, and the same letter are each refused by name. A letter the tool chose (the
 canonical centre O, a name given to a point stated only by coordinates) is not renamed and says so.
 
+**R124 — a given typed in the exam's own frame is understood as the given; a proof target is refused, with a reason**
+([ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), [#1618](https://github.com/dcodish/geo_builder/issues/1618)).
+*(Operator, 2026-10-01, #1616: the 4-point questions "involve more geometry … starting as pure geometry and then moves into analytical"; proof targets: "refuse and explain that this is not a proof engine".)*
+
+A student copies the 4-point question as printed, and each line is understood as the bare given it states:
+- a given-prefix («נתון:», «נתון כי», «ידוע כי», «עוד נתון:»), a continuing «ו…», a figure reference («(ראה ציור)», «כמתואר בסרטוט שלפניכם»), and length units
+- the Israeli coordinate pair «A(2;10)», «10½», and the exam's angle glyph «∢»
+- the shape as a context («במלבן ABCD, …»), with its givens in parentheses («טרפז ישר זווית ABCD (AB ∥ CD, AB ⊥ AD)»), or as a predicate («המרובע ABCO הוא טרפז ישר זווית», «ABC משולש»)
+- the origin in every spelling («O ראשית הצירים», «הנקודה O היא ראשית הצירים»), which is the point O(0,0)
+- plural subjects and «בהתאמה» («הנקודות A ו-B נמצאות על ציר ה-x ועל ציר ה-y בהתאמה»)
+- two givens on one line («AB = 20, AC = 15»)
+
+The same holds in English for the forms the catalogue shows.
+
+A line is accepted whole or not at all; the row recorded is the line as typed. A side named by its ROLE («השוק BC», «היתר AC») stays a claim about that role and is not reduced to «הצלע».
+
+What the student is asked to **prove** («הוכיחו כי …», «הראו כי …», "prove that …") is never drawn. The tool answers that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and asks for only what the question gives.
+
+A right trapezoid («טרפז ישר זווית») does not decide which leg is perpendicular. A stated right angle decides it, and until one is stated it is a configuration «הציגו תצורה אחרת» cycles.
+
+*R124, amended 2026-10-01:* the subject noun may drop the copula («משולש ABC ישר זווית»); the origin may be used as an unnamed point («… דרך ראשית הצירים»), and it is called O unless that letter is already taken. What the tool TEACHES (its command list and examples) is one fact per line, even where it accepts the exam's bracketed or comma-joined forms.
+
 **R125 — "already follows" is said only about a given that is true in EVERY configuration of the figure**
 ([ADR-AG-188](06c-decisions-analytic.md#adr-ag-188), [#1629](https://github.com/dcodish/geo_builder/issues/1629)). *(Narrows R54.)*
 *(Operator, 2026-10-01, on «נתון: שיפוע הצלע BC הוא -1/2»: "T4 — fails on last statement". The tool answered «זה כבר נובע» and kept drawing the square whose slope is +1/2.)*
