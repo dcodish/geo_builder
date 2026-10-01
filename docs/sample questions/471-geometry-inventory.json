@@ -1,0 +1,1574 @@
+[
+ {
+  "exam": 1,
+  "question": 4,
+  "pdf_pages": [
+   16
+  ],
+  "exam_title": "דוגמה – מבחן מספר 1",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "נתון טרפז ישר זווית ABCD (AB ∥ CD, AB ⊥ AD)",
+   "EB ו-EC הם חוצי הזווית ABC ו-BCD בהתאמה הנפגשים בנקודה E",
+   "הנקודה E נמצאת על השוק AD",
+   "נסמן ∢DCB = 2α",
+   "נתון: B(1,4), E(−1,2)",
+   "משוואת הישר BC היא 3x + y = 7",
+   "(ציור) AB הבסיס הקצר למעלה, CD הבסיס הארוך למטה; A מעל D, B מימין ל-A"
+  ],
+  "prove_targets": [
+   "ΔBEC הוא משולש ישר זווית"
+  ],
+  "structures": [
+   "shape-right-trapezoid",
+   "parenthetical-givens",
+   "parallel",
+   "perpendicular",
+   "angle-bisector",
+   "plural-respectively",
+   "intersection-of-lines",
+   "point-on-segment",
+   "angle-value",
+   "parameter",
+   "point-coords",
+   "line-equation"
+  ],
+  "notes": "Question is CROSSED OUT (red X) in the booklet — likely outside current syllabus. Angle given symbolically (2α), not numerically. Coords of E garbled in text dump; E(−1,2) confirmed by answer key (EC: y=−x+1, C(3,−2))."
+ },
+ {
+  "exam": 1,
+  "question": 5,
+  "pdf_pages": [
+   17
+  ],
+  "exam_title": "דוגמה – מבחן מספר 1",
+  "kind": "analytic",
+  "givens_he": [
+   "מרובע ABCD חסום במעגל שמשוואתו (x−2)² + (y+2)² = 100",
+   "המשכי הצלעות AD ו-BC נפגשים בנקודה E (ראה ציור)",
+   "נתון: A(−8,−2), B(8,−10), C(2,8), E(0,14)",
+   "(ציור) D על המעגל בין A ל-E; E על ציר ה-y מעל המעגל"
+  ],
+  "prove_targets": [
+   "המשולשים ABE ו-CDE דומים"
+  ],
+  "structures": [
+   "cyclic-quadrilateral",
+   "circle-equation",
+   "extension",
+   "intersection-of-lines",
+   "point-coords",
+   "point-on-circle",
+   "point-on-axis"
+  ],
+  "notes": "D has no coordinates: it is the second intersection of line AE with the circle (defined implicitly by the extension givens)."
+ },
+ {
+  "exam": 2,
+  "question": 4,
+  "pdf_pages": [
+   23
+  ],
+  "exam_title": "דוגמה – מבחן מספר 2",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "במלבן ABCD, הנקודה E נמצאת על הצלע DC",
+   "דרך E מעבירים קטע EF המקביל ל-DA",
+   "(ציור) F על הצלע AB",
+   "הצלע AB של המלבן מקבילה לציר ה-x",
+   "נתון: A(2;10), C(7;2)",
+   "בחרו נקודה E כרצונכם, הנמצאת על הצלע DC",
+   "(ציור) A למעלה משמאל, B למעלה מימין, D למטה משמאל, C למטה מימין"
+  ],
+  "prove_targets": [
+   "ΔAEF ≅ ΔEAD",
+   "ΔBEF ≅ ΔEBC",
+   "הסבירו מדוע ∢AEB = ∢CBE + ∢DAE",
+   "הסבירו מדוע S_ΔAEB = S_ΔCBE + S_ΔDAE"
+  ],
+  "structures": [
+   "shape-rectangle",
+   "point-on-segment",
+   "parallel",
+   "axis-parallel",
+   "point-coords",
+   "area"
+  ],
+  "notes": "F's position (on AB) is only in the figure. Section ד(2) asks the student to CHOOSE E freely on DC — a genuine free DOF. B, D derived from opposite corners + axis-parallel side."
+ },
+ {
+  "exam": 2,
+  "question": 5,
+  "pdf_pages": [
+   24
+  ],
+  "exam_title": "דוגמה – מבחן מספר 2",
+  "kind": "analytic",
+  "givens_he": [
+   "במעגל שמרכזו M חסום משולש חד זוויות ABC",
+   "נתון: A(7,−5), B(7,3), C(0,2)"
+  ],
+  "prove_targets": [
+   "הראה כי הישר y = −1 הוא האנך האמצעי לצלע AB"
+  ],
+  "structures": [
+   "triangle-inscribed-in-circle",
+   "circle-center-named",
+   "point-coords",
+   "perp-bisector",
+   "line-equation"
+  ],
+  "notes": "Circumcircle through 3 given points; perp bisectors of AC and AB are asked (part of construction of M). Triangle AMC asked for area."
+ },
+ {
+  "exam": 3,
+  "question": 4,
+  "pdf_pages": [
+   30
+  ],
+  "exam_title": "דוגמה – מבחן מספר 3",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "בטרפז ABCD (CD ∥ AB)",
+   "האלכסון DB חוצה את הזווית ADC",
+   "אלכסוני הטרפז נפגשים בנקודה E",
+   "נסמן: זווית ADB = α",
+   "נתון: A(0,3), D(−4,0)",
+   "האלכסון BD נמצא על ציר ה-x",
+   "הצלע BC מאונכת לציר ה-x",
+   "והנקודה C נמצאת ברביע הרביעי (ראה ציור)"
+  ],
+  "prove_targets": [
+   "AB = AD",
+   "המשולשים AEB ו-CED דומים"
+  ],
+  "structures": [
+   "shape-trapezoid",
+   "parenthetical-givens",
+   "parallel",
+   "angle-bisector",
+   "diagonals-meet",
+   "parameter",
+   "point-coords",
+   "point-on-axis",
+   "perpendicular",
+   "quadrant"
+  ],
+  "notes": "Question is CROSSED OUT (red X) in the booklet. A diagonal lying on the x-axis and a side perpendicular to the x-axis; C pinned by quadrant IV."
+ },
+ {
+  "exam": 3,
+  "question": 5,
+  "pdf_pages": [
+   31
+  ],
+  "exam_title": "דוגמה – מבחן מספר 3",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "המשולש AOB הוא ישר זווית",
+   "הנקודה O היא ראשית הצירים",
+   "הצלע AO נמצאת על ציר ה-x, והצלע BO נמצאת על ציר ה-y (ראה ציור)",
+   "במשולש AOB חסום מעגל שמרכזו C (הנקודה C נמצאת ברביע השני)",
+   "הצלעות AO, BO ו-AB משיקות למעגל בנקודות D, E ו-F בהתאמה",
+   "נתון: D(−2,0)",
+   "נתון: שיפוע הצלע AB הוא 3/4",
+   "(ציור) A על החלק השלילי של ציר ה-x, B על החלק החיובי של ציר ה-y; הרדיוסים CD, CE, CF משורטטים"
+  ],
+  "prove_targets": [
+   "המרובע OECD הוא ריבוע",
+   "המרובע ADCF הוא דלתון"
+  ],
+  "structures": [
+   "shape-right-triangle",
+   "origin-named",
+   "point-on-axis",
+   "incircle",
+   "circle-center-named",
+   "quadrant",
+   "plural-respectively",
+   "circle-tangent-line",
+   "point-coords",
+   "slope",
+   "radius-drawn",
+   "parenthetical-givens"
+  ],
+  "notes": "Incircle of a right triangle sitting on the axes (right angle at origin); tangency points named via 'בהתאמה'; AB fixed only by slope + tangency."
+ },
+ {
+  "exam": 4,
+  "question": 4,
+  "pdf_pages": [
+   38
+  ],
+  "exam_title": "דוגמה – מבחן מספר 4",
+  "kind": "analytic",
+  "givens_he": [
+   "משולש ABC חסום במעגל שקוטרו AC",
+   "קוטר המעגל AC נמצא על הישר 3y − 2x − 4 = 0",
+   "נתון: A(1,2), B(3,4)",
+   "(ציור) C מימין ל-A ומעליו; B מעל AC"
+  ],
+  "prove_targets": [],
+  "structures": [
+   "triangle-inscribed-in-circle",
+   "diameter",
+   "line-equation",
+   "point-coords",
+   "circle-center-named"
+  ],
+  "notes": "C is defined implicitly: on the given line AND such that ∠ABC = 90° (Thales). Center O named only in section ג."
+ },
+ {
+  "exam": 4,
+  "question": 5,
+  "pdf_pages": [
+   38
+  ],
+  "exam_title": "דוגמה – מבחן מספר 4",
+  "kind": "synthetic",
+  "givens_he": [
+   "משולש ABC הוא שווה שוקיים (CB = AB)",
+   "הנקודה E נמצאת על צלע BC כך ש-AE = AC",
+   "נתון: AB = 20, AC = 15"
+  ],
+  "prove_targets": [
+   "ΔABC ∼ ΔEAC"
+  ],
+  "structures": [
+   "shape-isosceles",
+   "parenthetical-givens",
+   "point-on-segment",
+   "length-equality",
+   "length-value"
+  ],
+  "notes": "E is determined by a length equality (AE = AC) on segment BC — the non-trivial (E ≠ C) intersection."
+ },
+ {
+  "exam": 5,
+  "question": 4,
+  "pdf_pages": [
+   47
+  ],
+  "exam_title": "דוגמה – מבחן מספר 5",
+  "kind": "synthetic",
+  "givens_he": [
+   "משולש ABC חסום במעגל שמרכזו O",
+   "נתון: MO ⊥ AB",
+   "(ציור) M נמצאת על הצלע AB",
+   "נתון בנוסף: MO = 8 ס\"מ, ∢ACB = 72°",
+   "עוד נתון: AC = 18 ס\"מ"
+  ],
+  "prove_targets": [
+   "∢ABC = ∢AOM"
+  ],
+  "structures": [
+   "triangle-inscribed-in-circle",
+   "circle-center-named",
+   "perpendicular",
+   "foot-of-perpendicular",
+   "forward-reference",
+   "length-value",
+   "angle-value"
+  ],
+  "notes": "M is never defined in text — only 'MO ⊥ AB' plus the figure places M on AB (foot of perpendicular from O). Prove-target is an angle equality ABC = AOM (text omits ∢). Radius drawn OA in figure."
+ },
+ {
+  "exam": 5,
+  "question": 5,
+  "pdf_pages": [
+   47
+  ],
+  "exam_title": "דוגמה – מבחן מספר 5",
+  "kind": "analytic",
+  "givens_he": [
+   "נתון מעגל שמרכזו M(7;6)",
+   "הישר MB חותך את המעגל בנקודה C (ראו ציור)",
+   "נתון: B(1;14), MC = CB",
+   "העבירו משיק למעגל בנקודה C",
+   "מן הנקודה B הורידו אנך לציר ה-x",
+   "המשיק והאנך נחתכים בנקודה D",
+   "הנקודה E נמצאת על האנך שהורידו מנקודה B לציר ה-x",
+   "נתון: ME ∥ CD"
+  ],
+  "prove_targets": [
+   "המשולש BDM הוא משולש שווה שוקיים",
+   "MD = ED",
+   "הראו כי הנקודה D היא מרכז המעגל החוסם את המשולש BME"
+  ],
+  "structures": [
+   "circle-center-named",
+   "point-coords",
+   "point-on-circle",
+   "intersection-of-lines",
+   "length-equality",
+   "midpoint",
+   "tangent-at-point",
+   "foot-of-perpendicular",
+   "perpendicular",
+   "axis-parallel",
+   "parallel",
+   "forward-reference"
+  ],
+  "notes": "Radius is not given: it follows from C being the midpoint of MB (MC = CB) and C on the circle. 'אנך לציר ה-x' from B is a vertical line x=1. E is on that vertical line, fixed by ME ∥ CD; E not drawn in figure."
+ },
+ {
+  "exam": 6,
+  "question": 4,
+  "pdf_pages": [
+   54
+  ],
+  "exam_title": "דוגמה – מבחן מספר 6",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה",
+   "O – מרכז המעגל",
+   "אלכסוני המרובע ABCO נפגשים בנקודה K",
+   "נתון: O(−2,1), B(8,11), K(−1,2)",
+   "(ציור) A למעלה משמאל, C למטה מימין; B מחוץ למעגל ברביע הראשון"
+  ],
+  "prove_targets": [
+   "OB ⊥ AC",
+   "המשולשים OAK ו-ABK דומים"
+  ],
+  "structures": [
+   "tangent-from-external-point",
+   "plural-respectively",
+   "circle-center-named",
+   "diagonals-meet",
+   "point-coords",
+   "forward-reference",
+   "radius-drawn"
+  ],
+  "notes": "Sentence 1 uses the circle and O before O is named ('O – מרכז המעגל' after). Radius not given: follows from K (foot on OB) — A, C are the tangency points of tangents from B. Which tangency point is A vs C is figure-only."
+ },
+ {
+  "exam": 6,
+  "question": 5,
+  "pdf_pages": [
+   54
+  ],
+  "exam_title": "דוגמה – מבחן מספר 6",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "הישרים AB ו-CD שבציור מקבילים זה לזה",
+   "O – ראשית הצירים",
+   "(ציור) A ו-D על ציר ה-y (D מעל A), B ו-C על ציר ה-x (C מימין ל-B)",
+   "נתון כי היחס בין שטח המשולש AOB לשטח הטרפז ADCB הוא 4:5",
+   "נתון: A(0;6), C(6;0)"
+  ],
+  "prove_targets": [
+   "ΔAOB ∼ ΔDOC",
+   "הסבירו בדרך גאומטרית מדוע המרובע ADCB הוא טרפז"
+  ],
+  "structures": [
+   "parallel",
+   "origin-named",
+   "point-on-axis",
+   "coord-inequality",
+   "area",
+   "NEW:area-ratio",
+   "point-coords",
+   "shape-trapezoid"
+  ],
+  "notes": "Axis placement of A,B,C,D is figure-only. B and D are fixed only by the area ratio 4:5 (triangle : trapezoid) plus AB ∥ CD — an area-ratio given drives positions. Trapezoid is a consequence, not a given."
+ },
+ {
+  "exam": 7,
+  "question": 4,
+  "pdf_pages": [
+   62
+  ],
+  "exam_title": "קיץ תש\"ף 2020 מועד א (מבחן מספר 7)",
+  "kind": "analytic",
+  "givens_he": [
+   "במשולש OBC העבירו גבהים OD ו-BE לצלעות BC ו-OC בהתאמה",
+   "הנקודה O היא ראשית הצירים",
+   "הנקודה C נמצאת על ציר ה-x",
+   "משוואת הישר BC היא: y = −2x + 20",
+   "נתון: S_BDC / S_ODC = 0.8",
+   "(ציור) B ברביע הראשון מעל ציר ה-x; E בין O ל-C; D על BC"
+  ],
+  "prove_targets": [
+   "המשולשים BEC ו-ODC דומים"
+  ],
+  "structures": [
+   "shape-triangle",
+   "altitude",
+   "plural-respectively",
+   "origin-named",
+   "point-on-axis",
+   "line-equation",
+   "foot-of-perpendicular",
+   "NEW:area-ratio",
+   "area"
+  ],
+  "notes": "B is fixed only by an area ratio of two sub-triangles (S_BDC/S_ODC = 0.8) given in section ד; until then B slides along BC. Altitude BE to OC (x-axis) is vertical."
+ },
+ {
+  "exam": 7,
+  "question": 5,
+  "pdf_pages": [
+   62
+  ],
+  "exam_title": "קיץ תש\"ף 2020 מועד א (מבחן מספר 7)",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "במעגל שמרכזו M המיתרים AB ו-BC שווים (ראה סרטוט)",
+   "משוואת המעגל היא: (x − 3)² + (y − 1)² = 10",
+   "נתון: C(4,−2)",
+   "הישר BC מקביל לציר ה-x",
+   "(ציור) B משמאל ל-C; A על המעגל משמאל, ליד ציר ה-x; MA, MC משורטטים ו-MB מקווקו"
+  ],
+  "prove_targets": [
+   "MB חוצה זווית AMC"
+  ],
+  "structures": [
+   "circle-center-named",
+   "chord",
+   "length-equality",
+   "circle-equation",
+   "point-coords",
+   "point-on-circle",
+   "axis-parallel",
+   "parallel",
+   "radius-drawn",
+   "parenthetical-givens"
+  ],
+  "notes": "B = other intersection of horizontal line through C with the circle; A = reflection of C about line MB (AB = BC, A ≠ C)."
+ },
+ {
+  "exam": 8,
+  "question": 4,
+  "pdf_pages": [
+   69
+  ],
+  "exam_title": "קיץ תש\"ף 2020 מועד ב (מבחן מספר 8)",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "במקבילית ABCD נקודה F היא אמצע הצלע AD",
+   "אלכסוני המקבילית נפגשים בנקודה E",
+   "נתון: C(4,2), E(1,4), D(−4,2)",
+   "(ציור) A למעלה משמאל, B למעלה מימין, D למטה משמאל, C למטה מימין"
+  ],
+  "prove_targets": [
+   "FE ∥ DC",
+   "המשולשים AEF ו-ACD דומים"
+  ],
+  "structures": [
+   "shape-parallelogram",
+   "midpoint",
+   "diagonals-meet",
+   "point-coords",
+   "midsegment",
+   "area",
+   "shape-trapezoid"
+  ],
+  "notes": "Diagonal intersection E given as coordinates (A, B derived by reflection through E). DFEC named as a trapezoid in section ג(2) — consequence, not given."
+ },
+ {
+  "exam": 8,
+  "question": 5,
+  "pdf_pages": [
+   69
+  ],
+  "exam_title": "קיץ תש\"ף 2020 מועד ב (מבחן מספר 8)",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "מרובע ABCD חסום במעגל",
+   "נתון: ∢BAD = ∢BCD",
+   "נתון: A(4,−2), C(0,2), D(2,−2)",
+   "העבירו את האלכסון AC במרובע ABCD",
+   "(ציור) B למעלה מימין, מעל A; C משמאל על המעגל; DA בתחתית המעגל"
+  ],
+  "prove_targets": [
+   "BD הוא קוטר במעגל",
+   "הסבירו מדוע AB מקביל לציר ה-y"
+  ],
+  "structures": [
+   "cyclic-quadrilateral",
+   "angle-equality",
+   "point-coords",
+   "diameter",
+   "axis-parallel",
+   "point-on-circle"
+  ],
+  "notes": "B has no coordinates: fixed by cyclic + ∠BAD = ∠BCD (⇒ both right angles), i.e. B = intersection of perpendiculars to AD at A and to CD at C."
+ },
+ {
+  "exam": 9,
+  "question": 4,
+  "pdf_pages": [
+   75
+  ],
+  "title": "חורף תשפ\"א, 2021",
+  "kind": "analytic",
+  "givens_he": [
+   "במלבן ABCD",
+   "הקודקוד B נמצא על ציר ה-y",
+   "והקודקודים A ו-C נמצאים על ציר ה-x, כמתואר בציור",
+   "O - ראשית הצירים",
+   "tan∢BAO = 2",
+   "AO = 3",
+   "A משמאל ל-O ו-C מימין ל-O; B על החלק החיובי של ציר y; D מתחת לציר x (ציור)"
+  ],
+  "prove_targets": [
+   "המשולשים AOB ו-CDA דומים"
+  ],
+  "structures": [
+   "shape-rectangle",
+   "point-on-axis",
+   "origin-named",
+   "angle-value",
+   "NEW:trig-ratio-given",
+   "length-value",
+   "coord-inequality",
+   "quadrant",
+   "similar-triangles-given"
+  ],
+  "notes": "Angle given as tan of an angle (tan∢BAO = 2), not degrees; rectangle diagonal AC lies on the x-axis."
+ },
+ {
+  "exam": 9,
+  "question": 5,
+  "pdf_pages": [
+   76
+  ],
+  "title": "חורף תשפ\"א, 2021",
+  "kind": "analytic",
+  "givens_he": [
+   "המרובע ABCD חסום במעגל שמרכזו M",
+   "ציר ה-y משיק למעגל בנקודה A",
+   "והמעגל חותך את ציר ה-x בנקודות B ו-C",
+   "AD הוא קוטר במעגל (ראו ציור)",
+   "A(0,-4)",
+   "רדיוס המעגל שווה ל-5",
+   "B משמאל ל-C; D מימין ל-A; BC מעל AD (ציור)"
+  ],
+  "prove_targets": [
+   "הסבירו מדוע AD ∥ BC",
+   "הראו כי AB = CD"
+  ],
+  "structures": [
+   "cyclic-quadrilateral",
+   "circle-center-named",
+   "tangent-to-axis",
+   "tangent-at-point",
+   "point-on-circle",
+   "point-on-axis",
+   "diameter",
+   "point-coords",
+   "length-value",
+   "circle-center-radius",
+   "coord-inequality",
+   "plural-respectively"
+  ],
+  "notes": "Circle fixed by tangency to y-axis at A plus radius; B,C are the circle's x-axis intersections (order from figure)."
+ },
+ {
+  "exam": 10,
+  "question": 4,
+  "pdf_pages": [
+   84
+  ],
+  "title": "קיץ תשפ\"א, מועד א, 2021",
+  "kind": "analytic",
+  "givens_he": [
+   "המרובע ABCO הוא טרפז ישר זווית (∢C = 90°, AB ∥ OC)",
+   "משוואת הצלע AB היא y = -2x + 5",
+   "הנקודות A ו-B נמצאות על ציר ה-x ועל ציר ה-y בהתאמה",
+   "O ראשית הצירים (כמתואר בציור)",
+   "C ברביע השני, משמאל לציר y (ציור)"
+  ],
+  "prove_targets": [
+   "המשולשים BOC ו-ABO דומים"
+  ],
+  "structures": [
+   "shape-right-trapezoid",
+   "shape-as-predicate",
+   "parenthetical-givens",
+   "right-angle",
+   "parallel",
+   "line-equation",
+   "point-on-axis",
+   "plural-respectively",
+   "origin-named",
+   "quadrant",
+   "similar-triangles-given"
+  ],
+  "notes": "Trapezoid's properties are given parenthetically; C is determined by AB∥OC and ∠C=90° (foot of perpendicular from B to line OC)."
+ },
+ {
+  "exam": 10,
+  "question": 5,
+  "pdf_pages": [
+   84
+  ],
+  "title": "קיץ תשפ\"א, מועד א, 2021",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "מרובע ABCD חסום במעגל",
+   "∢ABC = ∢ADC",
+   "C(4,2), A(0,-6)",
+   "ידוע כי הקודקודים B ו-D נמצאים על ציר ה-x (ראה ציור)",
+   "האלכסונים AC ו-BD נפגשים בנקודה E",
+   "D משמאל ל-B; D משמאל לציר y ו-B מימין לו (ציור)"
+  ],
+  "prove_targets": [
+   "AC קוטר במעגל",
+   "הראו כי S_EBA / S_EBC = AE / EC"
+  ],
+  "structures": [
+   "cyclic-quadrilateral",
+   "angle-equality",
+   "point-coords",
+   "point-on-axis",
+   "point-on-circle",
+   "diameter",
+   "diagonals-meet",
+   "coord-inequality",
+   "area"
+  ],
+  "notes": "Circle is never given by equation — it follows from AC being a diameter (derived from the angle equality); B,D = circle ∩ x-axis."
+ },
+ {
+  "exam": 11,
+  "question": 4,
+  "pdf_pages": [
+   90
+  ],
+  "title": "קיץ תשפ\"א, מועד מיוחד, 2021",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "במקבילית ABCD הצלע AD נמצאת על ציר ה-x",
+   "הנקודה E נמצאת על הצלע AD",
+   "וידוע כי AB = AE",
+   "B(0,4), A(-3,0)",
+   "∢BEC = 90°",
+   "B על ציר y; סדר הנקודות על ציר x משמאל לימין: A, E, D (ציור)"
+  ],
+  "prove_targets": [
+   "BE חוצה את ∢ABC"
+  ],
+  "structures": [
+   "shape-parallelogram",
+   "point-on-axis",
+   "point-on-segment",
+   "length-equality",
+   "point-coords",
+   "right-angle",
+   "angle-value",
+   "coord-inequality",
+   "shape-trapezoid"
+  ],
+  "notes": "C is fixed only by ∠BEC=90° together with the parallelogram; section ג names the quadrilateral BCEA as a trapezoid (derived, not given)."
+ },
+ {
+  "exam": 11,
+  "question": 5,
+  "pdf_pages": [
+   91
+  ],
+  "title": "קיץ תשפ\"א, מועד מיוחד, 2021",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "במעגל המיתרים AC ו-BD נפגשים בנקודה E, כמתואר בציור",
+   "משוואת המעגל הנתון היא: (x-3)² + (y+2)² = 25",
+   "הנקודות A ו-B נמצאות על ציר ה-y",
+   "העבירו מיתר AD",
+   "נתון: ∢CAD = 30°",
+   "B מעל A על ציר y; C בצד ימין למעלה (ציור)"
+  ],
+  "prove_targets": [
+   "המשולשים ABE ו-DCE דומים"
+  ],
+  "structures": [
+   "chord",
+   "point-on-circle",
+   "intersection-of-lines",
+   "circle-equation",
+   "point-on-axis",
+   "angle-value",
+   "arc/inscribed-angle",
+   "coord-inequality",
+   "similar-triangles-given"
+  ],
+  "notes": "CROSSED OUT in the booklet (out of current syllabus). Equation sign of x-term read from text dump as (x-3)²; consistent with A(0,-6), B(0,2). C and D otherwise free (only ∠CAD=30°)."
+ },
+ {
+  "exam": 12,
+  "question": 4,
+  "pdf_pages": [
+   96
+  ],
+  "title": "קיץ תשפ\"א, מועד ב, 2021",
+  "kind": "analytic",
+  "givens_he": [
+   "במלבן ABCD הצלע AB חותכת את ציר ה-x בנקודה E, כמתואר בציור",
+   "הנקודה O היא ראשית הצירים",
+   "D(4,6), C(7,0)",
+   "A על ציר ה-y (ציור)",
+   "C על ציר ה-x; B מתחת לציר x; E בין O ל-C (ציור)"
+  ],
+  "prove_targets": [
+   "המשולשים AOE ו-CBE דומים"
+  ],
+  "structures": [
+   "shape-rectangle",
+   "intersection-of-lines",
+   "point-on-axis",
+   "origin-named",
+   "point-coords",
+   "quadrant",
+   "similar-triangles-given",
+   "area"
+  ],
+  "notes": "A lying on the y-axis is a figure-only given, yet it is what determines A (and so the rectangle); without it the rectangle is under-determined."
+ },
+ {
+  "exam": 12,
+  "question": 5,
+  "pdf_pages": [
+   97
+  ],
+  "title": "קיץ תשפ\"א, מועד ב, 2021",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "משולש ABC חסום במעגל שמרכזו M",
+   "CD הוא הגובה לצלע AB",
+   "ידוע כי CD עובר דרך מרכז המעגל",
+   "נתונה משוואת המעגל: (x-4)² + (y+2)² = 25",
+   "משוואת הצלע AB היא y = -6",
+   "C למעלה, A משמאל ו-B מימין (ציור)"
+  ],
+  "prove_targets": [
+   "CA = CB"
+  ],
+  "structures": [
+   "triangle-inscribed-in-circle",
+   "circle-center-named",
+   "altitude",
+   "foot-of-perpendicular",
+   "circle-equation",
+   "line-equation",
+   "axis-parallel",
+   "point-on-circle",
+   "chord",
+   "coord-inequality"
+  ],
+  "notes": "C is determined by the altitude through M (C = top of vertical diameter); A,B = circle ∩ line y=-6."
+ },
+ {
+  "exam": 13,
+  "question": 4,
+  "pdf_pages": [
+   104
+  ],
+  "title": "חורף תשפ\"ב, מועד א, 2022",
+  "kind": "analytic",
+  "givens_he": [
+   "בסרטוט שלפניך מתואר משולש ABC",
+   "הקודקוד B נמצא על ציר ה-y",
+   "והצלע AC מקבילה לציר ה-y",
+   "A(6,6), AB = √40",
+   "שיעור ה-y של הקודקוד B קטן מ-6",
+   "הנקודה E היא אמצע הצלע BC",
+   "נתון: הנקודה E נמצאת על ציר ה-x",
+   "הנקודה D היא אמצע הצלע AC",
+   "מן הנקודה E העבירו ישר המקביל לציר ה-y וחותך את הצלע AB בנקודה F",
+   "C מתחת לציר x (ציור)"
+  ],
+  "prove_targets": [
+   "המרובע FADE הוא מקבילית"
+  ],
+  "structures": [
+   "shape-triangle",
+   "point-on-axis",
+   "axis-parallel",
+   "parallel",
+   "point-coords",
+   "length-value",
+   "coord-inequality",
+   "midpoint",
+   "point-on-segment",
+   "intersection-of-lines",
+   "shape-parallelogram",
+   "area"
+  ],
+  "notes": "Disambiguating inequality y_B < 6 picks one of two B's; staged givens across sections; F and line EF are not drawn in the printed figure (it shows only segment ED); EF is parallel to AC."
+ },
+ {
+  "exam": 13,
+  "question": 5,
+  "pdf_pages": [
+   105
+  ],
+  "title": "חורף תשפ\"ב, מועד א, 2022",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "בסרטוט שלפניך מתואר מעגל שמרכזו M",
+   "הנקודות A, B ו-C נמצאות על המעגל",
+   "המשיק למעגל בנקודה A חותך את הישר BC בראשית הצירים O, כמתואר בסרטוט",
+   "נתון: AC הוא קוטר במעגל",
+   "נתון: OC = 15, BC = 3",
+   "נתון: M(9, 10½)",
+   "נתון: משוואת המשיק למעגל בנקודה A היא y = 2x",
+   "הישר AM חותך את ציר ה-y בנקודה F",
+   "סדר על הישר: O, B, C; A מעל BC (ציור)"
+  ],
+  "prove_targets": [
+   "ΔABC ~ ΔOAC"
+  ],
+  "structures": [
+   "circle-center-named",
+   "point-on-circle",
+   "tangent-at-point",
+   "tangent-from-external-point",
+   "intersection-of-lines",
+   "origin-named",
+   "diameter",
+   "length-value",
+   "circle-center-radius",
+   "point-coords",
+   "line-equation",
+   "point-on-axis",
+   "similar-triangles-given"
+  ],
+  "notes": "Secant-tangent from the origin; data arrives in stages (lengths, then center, then tangent equation)."
+ },
+ {
+  "exam": 14,
+  "question": 4,
+  "pdf_pages": [
+   112
+  ],
+  "title": "חורף תשפ\"ב, נבצרים, 2022",
+  "kind": "analytic",
+  "givens_he": [
+   "במשולש ABC הקודקוד B מונח על ציר ה-y",
+   "נתון כי משוואת הצלע AB היא y = -x + 4",
+   "שיעור ה-y של הקודקוד A הוא 10",
+   "נתון כי הצלע BC מקבילה לציר ה-x",
+   "אורך הצלע BC הוא 6",
+   "D היא נקודת החיתוך של הישר AC עם ציר ה-y",
+   "מנקודה D העבירו ישר המקביל לציר ה-x החותך את הצלע AB בנקודה E",
+   "C מימין ל-B; A ברביע השני (ציור)"
+  ],
+  "prove_targets": [
+   "DE הוא קטע אמצעים במשולש ABC"
+  ],
+  "structures": [
+   "shape-triangle",
+   "point-on-axis",
+   "line-equation",
+   "NEW:coordinate-value",
+   "axis-parallel",
+   "length-value",
+   "intersection-of-lines",
+   "point-on-segment",
+   "midsegment",
+   "coord-inequality",
+   "quadrant",
+   "shape-trapezoid",
+   "area"
+  ],
+  "notes": "A given by one coordinate on a known line; C's side (right of B) only from figure; EDCB named as trapezoid in section ו."
+ },
+ {
+  "exam": 14,
+  "question": 5,
+  "pdf_pages": [
+   112
+  ],
+  "title": "חורף תשפ\"ב, נבצרים, 2022",
+  "kind": "analytic",
+  "givens_he": [
+   "ABC הוא משולש ישר זווית (AB ⊥ BC)",
+   "היתר AC מונח על הישר 8y - x - 22 = 0",
+   "נתון: B(5;5), A(2;3)",
+   "הנקודה D היא אמצע הצלע AB, והנקודה E היא אמצע הצלע BC",
+   "C מימין ל-B ומתחתיו (ציור)"
+  ],
+  "prove_targets": [
+   "ΔABC ~ ΔDBE"
+  ],
+  "structures": [
+   "shape-right-triangle",
+   "perpendicular",
+   "right-angle",
+   "parenthetical-givens",
+   "line-equation",
+   "point-coords",
+   "midpoint",
+   "triangle-inscribed-in-circle",
+   "circumcenter",
+   "similar-triangles-given",
+   "area"
+  ],
+  "notes": "Figure shows the circumcircle from the start but the circle is only asked for (ג); coords written with ';' separator; hypotenuse called 'היתר'."
+ },
+ {
+  "exam": 15,
+  "question": 4,
+  "pdf_pages": [
+   120
+  ],
+  "title": "קיץ תשפ\"ב, מועד א, 2022",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "המרובע ABCD שלפניכם חסום במעגל (ראו סרטוט)",
+   "נתון: ∢A = ∢C",
+   "נתון: B(0,12), D(0,2)",
+   "נתון כי שיפוע הצלע BC הוא -1/2",
+   "נתון כי הנקודה E היא אמצע הצלע DC",
+   "A משמאל לציר y ו-C מימין לו (ציור)"
+  ],
+  "prove_targets": [
+   "BD הוא קוטר במעגל"
+  ],
+  "structures": [
+   "cyclic-quadrilateral",
+   "angle-equality",
+   "point-coords",
+   "point-on-axis",
+   "diameter",
+   "slope",
+   "midpoint",
+   "coord-inequality",
+   "area"
+  ],
+  "notes": "Circle determined only via BD being the diameter (derived); A is otherwise free on the circle (left arc)."
+ },
+ {
+  "exam": 15,
+  "question": 5,
+  "pdf_pages": [
+   121
+  ],
+  "title": "קיץ תשפ\"ב, מועד א, 2022",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "נתון ריבוע ABCD",
+   "הצלע AB עוברת דרך ראשית הצירים, O",
+   "הצלע AD חותכת את ציר ה-y בנקודה E",
+   "הקודקוד C מונח על ציר ה-x (ראו סרטוט)",
+   "נתון: הנקודה O היא אמצע הצלע AB",
+   "נתון: E(0,-5)",
+   "נתון: שיפוע הצלע BC הוא -1/2",
+   "B ברביע הראשון, A ברביע השלישי, C על החלק החיובי של ציר x, D ברביע הרביעי (ציור)"
+  ],
+  "prove_targets": [
+   "∢AEO = ∢BOC",
+   "ΔOAE ~ ΔCBO"
+  ],
+  "structures": [
+   "shape-square",
+   "origin-named",
+   "point-on-segment",
+   "intersection-of-lines",
+   "point-on-axis",
+   "midpoint",
+   "point-coords",
+   "slope",
+   "quadrant",
+   "similar-triangles-given",
+   "area"
+  ],
+  "notes": "Square positioned by incidences (origin on AB, C on x-axis, E on AD ∩ y-axis); final section asks 'האם מתקיים ∢BCO = ∢OCE?' — a question, not a given."
+ },
+ {
+  "exam": 16,
+  "question": 4,
+  "pdf_pages": [
+   130
+  ],
+  "title": "קיץ תשפ\"ב, מועד ב, 2022",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "בסרטוט שלפניכם מתואר מעגל, העובר דרך הנקודות O, C, A",
+   "O היא ראשית הצירים",
+   "המעגל חותך את החלק החיובי של ציר ה-x בנקודה A",
+   "הנקודה B נמצאת מחוץ למעגל, על החלק החיובי של ציר ה-x",
+   "הקטע CB חותך את המעגל בנקודה E (ראו סרטוט)",
+   "נתון: ∢EOB = ∢EBO",
+   "נתון: A(4,0), C(0,3)",
+   "נתון כי שיעור ה-x של הנקודה E הוא 4.5",
+   "C על ציר ה-y (ציור)"
+  ],
+  "prove_targets": [
+   "AC = AB",
+   "AC הוא קוטר המעגל"
+  ],
+  "structures": [
+   "circle-through-3-points",
+   "origin-named",
+   "point-on-axis",
+   "point-on-circle",
+   "intersection-of-lines",
+   "angle-equality",
+   "point-coords",
+   "NEW:coordinate-value",
+   "coord-inequality",
+   "area"
+  ],
+  "notes": "B defined via an angle equality (∠EOB=∠EBO) with E defined from B — circular dependency; C on the y-axis only from the figure (also implied by C(0,3))."
+ },
+ {
+  "exam": 16,
+  "question": 5,
+  "pdf_pages": [
+   130
+  ],
+  "title": "קיץ תשפ\"ב, מועד ב, 2022",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "במשולש ABC הקודקוד A מונח על ציר ה-x",
+   "הצלע AC חותכת את ציר ה-y בנקודה D",
+   "הצלע CB מקבילה לציר ה-x, וחותכת את ציר ה-y בנקודה E, כמתואר בסרטוט שלפניכם",
+   "O היא ראשית הצירים",
+   "נתון כי משוואת הישר AC היא y = -4/3x + 4",
+   "וכי DO/DE = 2/3",
+   "נתון: הצלע AB מאונכת לצלע AC",
+   "C משמאל לציר y ו-B מימין לו; A על החלק החיובי של ציר x (ציור)"
+  ],
+  "prove_targets": [
+   "ΔAOD ~ ΔCED"
+  ],
+  "structures": [
+   "shape-triangle",
+   "point-on-axis",
+   "intersection-of-lines",
+   "axis-parallel",
+   "origin-named",
+   "line-equation",
+   "NEW:length-ratio",
+   "perpendicular",
+   "coord-inequality",
+   "similar-triangles-given",
+   "area"
+  ],
+  "notes": "Line CB placed by a segment ratio DO/DE on the y-axis; ADEB quadrilateral area asked."
+ },
+ {
+  "exam": 17,
+  "question": 4,
+  "pdf_pages": [
+   137
+  ],
+  "title": "חורף תשפ\"ג, 2023",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "במשולש ישר זווית ABC (∢ABC = 90°)",
+   "הקודקוד B מונח על ציר ה-x",
+   "והקודקוד A מונח על ציר ה-y",
+   "מן הקודקוד C העבירו אנך לציר ה-x, החותך אותו בנקודה D (ראו סרטוט)",
+   "הנקודה O היא ראשית הצירים",
+   "נתון: CD/OB = 5/2",
+   "משוואת הצלע AB היא y = -2/3x + 4",
+   "(ציור) A על החלק החיובי של ציר ה-y; B בין O ל-D על החלק החיובי של ציר ה-x; C מעל D ברביע הראשון"
+  ],
+  "prove_targets": [
+   "ΔAOB ~ ΔBDC"
+  ],
+  "structures": [
+   "shape-right-triangle",
+   "right-angle",
+   "point-on-axis",
+   "origin-named",
+   "foot-of-perpendicular",
+   "perpendicular",
+   "axis-parallel",
+   "point-ratio",
+   "line-equation",
+   "slope",
+   "quadrant",
+   "cyclic-quadrilateral"
+  ],
+  "notes": "Ratio of two segment lengths (CD/OB = 5/2) as a given, not a point ratio on one segment; section ד asks whether ABDC is cyclic (asked, not given)."
+ },
+ {
+  "exam": 17,
+  "question": 5,
+  "pdf_pages": [
+   137
+  ],
+  "title": "חורף תשפ\"ג, 2023",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "מעגל שמרכזו M משיק לציר ה-x בנקודה E",
+   "המעגל חותך את ציר ה-y בנקודות B ו-C, כמתואר בסרטוט שלפניכם",
+   "הנקודה A נמצאת על המשך ME, כמתואר בסרטוט",
+   "נתון: אורך הקטע AB שווה לרדיוס המעגל",
+   "נתון: M(3,5)",
+   "(ציור) C מעל B על ציר ה-y; A מתחת לציר ה-x (המשך ME מעבר ל-E); הקטעים MB, MC, BC(על ציר y), AB מסורטטים"
+  ],
+  "prove_targets": [
+   "MA מקביל לציר ה-y (הסבירו)",
+   "∢CBM = ∢BMA",
+   "∢CMB = ∢MBA",
+   "המרובע ABCM הוא מקבילית"
+  ],
+  "structures": [
+   "circle-center-named",
+   "tangent-to-axis",
+   "point-on-axis",
+   "point-on-circle",
+   "chord",
+   "radius-drawn",
+   "extension",
+   "length-equality",
+   "point-coords",
+   "axis-parallel",
+   "shape-parallelogram",
+   "coord-inequality"
+  ],
+  "notes": "Length equality to the RADIUS (AB = r) pins A on the extension of ME; two y-axis intersections disambiguated only by the figure (C above B)."
+ },
+ {
+  "exam": 18,
+  "question": 4,
+  "pdf_pages": [
+   146
+  ],
+  "title": "קיץ תשפ\"ג, מועד א, 2023",
+  "kind": "analytic",
+  "givens_he": [
+   "המרובע ABCD הוא טרפז (AB ∥ CD)",
+   "שכל קודקודיו מונחים על הצירים, כמתואר בסרטוט שלפניכם",
+   "ראשית הצירים O היא מפגש האלכסונים של הטרפז",
+   "נתון: A(0,6), AO = OD",
+   "ידוע כי שטח המשולש ABD שווה ל-45",
+   "הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC (ראו סרטוט)",
+   "(ציור) A על החלק החיובי של ציר ה-y, C על החלק השלילי של ציר ה-y; D על החלק השלילי של ציר ה-x, B על החלק החיובי; E מתחת ל-C משמאל (המשך BC מעבר ל-C)"
+  ],
+  "prove_targets": [],
+  "structures": [
+   "shape-trapezoid",
+   "shape-as-predicate",
+   "parallel",
+   "parenthetical-givens",
+   "point-on-axis",
+   "origin-named",
+   "diagonals-meet",
+   "point-coords",
+   "length-equality",
+   "area",
+   "extension",
+   "perimeter",
+   "quadrant"
+  ],
+  "notes": "Area of a sub-triangle (ABD = 45) is a given that fixes B; diagonals meet at the origin; E is the second intersection of the BC extension with circle(D, DC)."
+ },
+ {
+  "exam": 18,
+  "question": 5,
+  "pdf_pages": [
+   146
+  ],
+  "title": "קיץ תשפ\"ג, מועד א, 2023",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "המשולש ABC חסום במעגל שמרכזו M",
+   "הצלע AC היא קוטר במעגל",
+   "המעגל משיק לציר ה-y בנקודה C וחותך את ציר ה-x בנקודה B, כמתואר בסרטוט",
+   "הנקודה D נמצאת על ציר ה-y וידוע כי ∢BAC = ∢ADC",
+   "נתון: C(0,4), B(-2,0)",
+   "(ציור) A משמאל לציר ה-y, A-M-C אופקי; D על ציר ה-y מעל C; B על ציר ה-x מתחת ל-C"
+  ],
+  "prove_targets": [
+   "ΔABC ~ ΔDCA",
+   "האם BC ∥ AD? (נמקו)"
+  ],
+  "structures": [
+   "triangle-inscribed-in-circle",
+   "circle-center-named",
+   "diameter",
+   "tangent-to-axis",
+   "point-on-axis",
+   "point-on-circle",
+   "angle-equality",
+   "point-coords",
+   "similar-triangles-given",
+   "circle-equation",
+   "area",
+   "parallel"
+  ],
+  "notes": "D defined by an angle equality (∢ADC = ∢BAC) with D constrained to the y-axis; circle tangent to y-axis at C means diameter AC is horizontal."
+ },
+ {
+  "exam": 19,
+  "question": 4,
+  "pdf_pages": [
+   153
+  ],
+  "title": "קיץ תשפ\"ג, מועד מיוחד, 2023",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "אלכסוני המקבילית ABCD נפגשים בנקודה E",
+   "נקודה F היא אמצע הצלע BC",
+   "נתון: F(8,4), E(4,4), D(-2,2)",
+   "(ציור) A ו-B למעלה (AB אופקית בציור), D ו-C למטה; D משמאל לציר ה-y; כל המקבילית מעל ציר ה-x; הקטע EF מסורטט, והטרפז DEFC"
+  ],
+  "prove_targets": [
+   "FE ∥ DC",
+   "המשולשים BEF ו-BDC דומים"
+  ],
+  "structures": [
+   "shape-parallelogram",
+   "diagonals-meet",
+   "midpoint",
+   "midsegment",
+   "point-coords",
+   "similar-triangles-given",
+   "line-equation",
+   "area",
+   "shape-trapezoid",
+   "quadrant"
+  ],
+  "notes": "Parallelogram fixed only through derived points (diagonal intersection E and side midpoint F) plus one vertex D — the tool must back-solve vertices from E and F."
+ },
+ {
+  "exam": 19,
+  "question": 5,
+  "pdf_pages": [
+   153
+  ],
+  "title": "קיץ תשפ\"ג, מועד מיוחד, 2023",
+  "kind": "analytic",
+  "givens_he": [
+   "נתון מעגל שמרכזו M(6,10)",
+   "המעגל משיק לציר ה-x בנקודה A",
+   "הנקודה B היא אחת מנקודות החיתוך של המעגל עם ציר ה-y, כמתואר בסרטוט",
+   "הישר BC משיק למעגל בנקודה B",
+   "נתון: ∢BCA = 90°",
+   "(ציור) B היא נקודת החיתוך העליונה עם ציר ה-y; C משמאל לציר ה-y; הקטעים MA, MB, AB, AC מסורטטים"
+  ],
+  "prove_targets": [
+   "AC מקביל ל-MB",
+   "AB חוצה את הזווית CAM"
+  ],
+  "structures": [
+   "circle-center-radius",
+   "point-coords",
+   "circle-center-named",
+   "tangent-to-axis",
+   "point-on-axis",
+   "point-on-circle",
+   "tangent-at-point",
+   "right-angle",
+   "perpendicular",
+   "foot-of-perpendicular",
+   "radius-drawn",
+   "parallel",
+   "angle-bisector",
+   "coord-inequality",
+   "line-equation"
+  ],
+  "notes": "C is the foot of the perpendicular from A to the tangent at B (stated as ∢BCA = 90°); 'one of the intersections' needs the figure's upper choice."
+ },
+ {
+  "exam": 20,
+  "question": 4,
+  "pdf_pages": [
+   161
+  ],
+  "title": "קיץ תשפ\"ג, מועד ב, 2023",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "במקבילית OABC הקודקוד B מונח על ציר ה-y",
+   "והנקודה O היא ראשית הצירים",
+   "מן הקודקודים A ו-C העבירו אנכים לציר ה-x, החותכים אותו בנקודות E ו-F בהתאמה (ראו סרטוט)",
+   "נתון: ∢AOE = ∢COB",
+   "שטח המשולש OCF גדול פי 4 משטח המשולש AOE",
+   "משוואות הישרים AE ו-CF הן x = 4 ו-x = -4 בהתאמה",
+   "אלכסוני המלבן OABC נפגשים בנקודה M",
+   "(ציור) A ברביע הראשון, C ברביע השני, B על החלק החיובי של ציר ה-y; E מימין ל-O, F משמאל"
+  ],
+  "prove_targets": [
+   "∢AOE = ∢OCF",
+   "המשולשים OCF ו-AOE דומים",
+   "המקבילית OABC היא מלבן"
+  ],
+  "structures": [
+   "shape-parallelogram",
+   "origin-named",
+   "point-on-axis",
+   "foot-of-perpendicular",
+   "perpendicular",
+   "plural-respectively",
+   "angle-equality",
+   "area",
+   "line-equation",
+   "axis-parallel",
+   "diagonals-meet",
+   "shape-rectangle",
+   "similar-triangles-given",
+   "quadrant",
+   "forward-reference"
+  ],
+  "notes": "Area ratio of two triangles (4:1) as a given; section ה names 'המלבן OABC' (the proved rectangle) as a given for M; vertical lines x=±4 given as equations."
+ },
+ {
+  "exam": 20,
+  "question": 5,
+  "pdf_pages": [
+   162
+  ],
+  "title": "קיץ תשפ\"ג, מועד ב, 2023",
+  "kind": "analytic",
+  "givens_he": [
+   "במעגל חסום משולש חד זווית ABC",
+   "נתון: B(3,7), A(-5,3)",
+   "מרכז המעגל M נמצא על ציר ה-y",
+   "המעגל חותך את ציר ה-x בנקודות C ו-D, כמתואר בסרטוט שלפניכם",
+   "הנקודה E נמצאת על הקשת הקטנה AC",
+   "נתון: EC = 7",
+   "(ציור) C על החלק החיובי של ציר ה-x, D על החלק השלילי; E מתחת לציר ה-x בין A ל-C; הקטעים AC, AE, EC, BC מסורטטים"
+  ],
+  "prove_targets": [
+   "הראו כי שיעורי מרכז המעגל M הם (0,3)"
+  ],
+  "structures": [
+   "triangle-inscribed-in-circle",
+   "point-coords",
+   "circle-center-named",
+   "point-on-axis",
+   "point-on-circle",
+   "plural-respectively",
+   "coord-inequality",
+   "arc/inscribed-angle",
+   "length-value",
+   "chord",
+   "circle-equation",
+   "area",
+   "NEW:acute-triangle"
+  ],
+  "notes": "Circle defined by two points + centre on y-axis; C is a vertex of the triangle but defined as an x-axis intersection (C/D by figure); E on the MINOR arc AC with chord length 7."
+ },
+ {
+  "exam": 21,
+  "question": 4,
+  "pdf_pages": [
+   170
+  ],
+  "title": "חורף תשפ\"ד, 2024",
+  "kind": "analytic",
+  "givens_he": [
+   "נתון טרפז ישר זווית ABCD (AD ⊥ AB, AB ∥ DC)",
+   "הקודקודים A ו-B נמצאים על ציר ה-x, כמתואר בסרטוט",
+   "אלכסוני הטרפז נפגשים בנקודה M, שנמצאת על ציר ה-y",
+   "נתון: האלכסון AC מאונך לאלכסון BD",
+   "משוואת הישר AC היא: y = -2x + 8",
+   "הנקודה F נמצאת על המשך הצלע CD כך ששטח המשולש BFC גדול פי 2 משטח המשולש BCD",
+   "(ציור) B על החלק השלילי של ציר ה-x, A על החלק החיובי; D מעל A; C משמאל לציר ה-y מעט, CD אופקית"
+  ],
+  "prove_targets": [],
+  "structures": [
+   "shape-right-trapezoid",
+   "perpendicular",
+   "parallel",
+   "parenthetical-givens",
+   "point-on-axis",
+   "diagonals-meet",
+   "line-equation",
+   "extension",
+   "area",
+   "coord-inequality",
+   "quadrant"
+  ],
+  "notes": "Diagonals perpendicular and meeting ON the y-axis; F on the CD extension defined by an area ratio (two possibilities, either accepted)."
+ },
+ {
+  "exam": 21,
+  "question": 5,
+  "pdf_pages": [
+   171
+  ],
+  "title": "חורף תשפ\"ד, 2024",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "נתון מעגל שמרכזו M נמצא על החלק החיובי של ציר ה-y",
+   "הנקודה O היא ראשית הצירים",
+   "המעגל משיק לציר ה-x וחותך את ציר ה-y בנקודה C, כמתואר בסרטוט",
+   "דרך הנקודה D שעל המעגל העבירו משיק למעגל",
+   "המשיק חותך את ציר ה-x בנקודה B ואת ציר ה-y בנקודה A",
+   "נתון כי משוואת המשיק היא 4x + 3y = 40",
+   "(ציור) המעגל משיק לציר ה-x בראשית O; C בראש המעגל על ציר ה-y; D ברביע הראשון; A מעל C; הרדיוס MD מסורטט"
+  ],
+  "prove_targets": [
+   "המרובע OMDB הוא דלתון",
+   "ΔADM ~ ΔAOB"
+  ],
+  "structures": [
+   "circle-center-named",
+   "point-on-axis",
+   "origin-named",
+   "tangent-to-axis",
+   "point-on-circle",
+   "tangent-at-point",
+   "line-equation",
+   "intersection-of-lines",
+   "radius-drawn",
+   "shape-kite",
+   "similar-triangles-given",
+   "incircle",
+   "circle-equation",
+   "quadrant",
+   "parameter"
+  ],
+  "notes": "Radius is unknown (a parameter) while the tangent line's equation is given — the circle is fixed by tangency to a known line; 'tangent to x-axis' implies at O (center on y-axis)."
+ },
+ {
+  "exam": 22,
+  "question": 4,
+  "pdf_pages": [
+   179
+  ],
+  "title": "קיץ תשפ\"ד, מועד א, 2024",
+  "kind": "analytic",
+  "givens_he": [
+   "בסרטוט שלפניכם טרפז ישר זווית ABCD (AB ∥ DC, ∢D = 90°)",
+   "הקודקוד B נמצא על ציר ה-y",
+   "והקודקוד C נמצא על החלק השלילי של ציר ה-x",
+   "הבסיס CD חותך את ציר ה-y בנקודה H",
+   "נתון: הנקודה E(2,7) נמצאת על הבסיס AB",
+   "משוואת שוק הטרפז AD היא y = -2x + 16",
+   "נתון כי אורך השוק BC של הטרפז הוא √72",
+   "(O היא ראשית הצירים)",
+   "(ציור) A ו-D ברביע הראשון, A מעל D משמאל; B על החלק החיובי של ציר ה-y; H בין O ל-B"
+  ],
+  "prove_targets": [],
+  "structures": [
+   "shape-right-trapezoid",
+   "parallel",
+   "right-angle",
+   "parenthetical-givens",
+   "point-on-axis",
+   "intersection-of-lines",
+   "point-on-segment",
+   "point-coords",
+   "line-equation",
+   "length-value",
+   "origin-named",
+   "area",
+   "quadrant",
+   "coord-inequality"
+  ],
+  "notes": "Right angle at D (not A) with legs AD given by equation; E on base AB fixes AB as perpendicular to AD through E; C on NEGATIVE x-axis chosen by the length √72."
+ },
+ {
+  "exam": 22,
+  "question": 5,
+  "pdf_pages": [
+   180
+  ],
+  "title": "קיץ תשפ\"ד, מועד א, 2024",
+  "kind": "synthetic→analytic",
+  "givens_he": [
+   "הקטע AB הוא קוטר במעגל שמרכזו M",
+   "הקטע CD משיק למעגל בנקודה A",
+   "הנקודה B היא אחת מנקודות החיתוך של המעגל עם ציר ה-y, כמתואר בסרטוט",
+   "AM הוא חוצה זווית CMD",
+   "נתון כי משוואת המעגל היא (x+3)² + (y-8)² = 45",
+   "וכי שיעור ה-y של הנקודה B גדול מ-8",
+   "נתון כי הקטע CM מקביל לציר ה-x",
+   "הנקודה E היא אמצע הקטע CM, והנקודה F היא אמצע הקטע DM",
+   "(ציור) C משמאל, D מימין למטה (מתחת לציר ה-x), A על CD בין C ל-D; הקטעים CM, DM מסורטטים"
+  ],
+  "prove_targets": [
+   "המשולש CMD הוא שווה שוקיים",
+   "ΔCMD ~ ΔEMF"
+  ],
+  "structures": [
+   "diameter",
+   "circle-center-named",
+   "tangent-at-point",
+   "point-on-axis",
+   "point-on-circle",
+   "angle-bisector",
+   "circle-equation",
+   "coord-inequality",
+   "axis-parallel",
+   "midpoint",
+   "midsegment",
+   "area",
+   "similar-triangles-given"
+  ],
+  "notes": "C and D are two points on the tangent at A defined by MA bisecting ∢CMD and CM ∥ x-axis; B chosen by a coordinate inequality (y_B > 8)."
+ },
+ {
+  "exam": 23,
+  "question": 4,
+  "pdf_pages": [
+   188
+  ],
+  "title": "קיץ תשפ\"ד, מועד ב, 2024",
+  "kind": "analytic",
+  "givens_he": [
+   "נתון דלתון ABCD (CB = CD, AB = AD)",
+   "הקודקוד D מונח על ציר ה-y",
+   "שיעור ה-y של הקודקוד D קטן מ-9 (ראו סרטוט)",
+   "נתון: C(6,4), A(1,9)",
+   "אורך הצלע AD הוא √10",
+   "E היא נקודת החיתוך של אלכסוני הדלתון",
+   "הנקודה F נמצאת על הקטע EC",
+   "(ד) F נקודה שעבורה המרובע FBAD הוא מעוין",
+   "(ציור) B מימין ל-A ומעליו; C ברביע הראשון למטה מימין; D על ציר ה-y משמאל"
+  ],
+  "prove_targets": [
+   "ΔABF ≅ ΔADF"
+  ],
+  "structures": [
+   "shape-kite",
+   "parenthetical-givens",
+   "length-equality",
+   "point-on-axis",
+   "coord-inequality",
+   "point-coords",
+   "length-value",
+   "diagonals-meet",
+   "point-on-segment",
+   "congruent-given",
+   "shape-rhombus",
+   "shape-as-predicate",
+   "shape-right-triangle",
+   "cyclic-quadrilateral",
+   "line-equation"
+  ],
+  "notes": "D fixed by |AD| = √10 + D on y-axis + y_D < 9; B is the reflection of D over AC; section ד defines F by a shape predicate (FBAD rhombus); section ה asks if ABC right / ABCD cyclic (asked, not given)."
+ },
+ {
+  "exam": 23,
+  "question": 5,
+  "pdf_pages": [
+   189
+  ],
+  "title": "קיץ תשפ\"ד, מועד ב, 2024",
+  "kind": "analytic",
+  "givens_he": [
+   "המשולש ABC חסום במעגל",
+   "נתון כי מרכז המעגל M נמצא בנקודה (4,8)",
+   "המעגל עובר דרך ראשית הצירים O (ראו סרטוט)",
+   "הנקודה A היא אחת מנקודות החיתוך של המעגל עם ציר ה-y",
+   "הצלע AB מקבילה לציר ה-x",
+   "נתון כי שיפוע הישר BC הוא 1",
+   "הנקודה E היא אמצע הצלע BC",
+   "(ציור) A היא נקודת החיתוך העליונה עם ציר ה-y (לא O); B מימין ל-A; C משמאל לציר ה-y"
+  ],
+  "prove_targets": [],
+  "structures": [
+   "triangle-inscribed-in-circle",
+   "circle-center-named",
+   "point-coords",
+   "origin-named",
+   "point-on-circle",
+   "point-on-axis",
+   "axis-parallel",
+   "slope",
+   "midpoint",
+   "circle-equation",
+   "incircle",
+   "coord-inequality"
+  ],
+  "notes": "Circle fixed by centre + passing through origin; B = second intersection of horizontal through A; C = second intersection of slope-1 line through B; incircle of AEC is asked, not given."
+ }
+]
