@@ -1887,4 +1887,17 @@ re-centred (R101's rule, #1225). Both axes keep one scale: a square still looks 
 press, R25a's "re-fits only when the new configuration has largely left it". Unequal axis scales are an
 open question to the operator and not part of this requirement.)*
 
+**R126 — a trapezoid keeps exactly one pair of parallel sides**
+([ADR-AG-189](06c-decisions-analytic.md#adr-ag-189), [#1627](https://github.com/dcodish/geo_builder/issues/1627); the 2-D ruling [ADR-157](06-decisions.md#adr-157), ported).
+*(Operator, 2026-10-01: "when i wrote c=90 it accepted but then i got a rectangle.")*
+
+«טרפז», «טרפז שווה שוקיים» and «טרפז ישר זווית» promise exactly one pair of parallel sides, so the tool
+never draws one as a parallelogram or a rectangle while a true trapezoid fits the givens. That covers the
+configuration it opens on and every one «הציגו תצורה אחרת» offers. When the student's own coordinates
+fix the figure as a parallelogram («טרפז ABCD» · `A(0,0)` · `B(4,0)` · `C(4,3)` · `D(0,3)`), the line
+that did it is refused and the message names it: «… שני זוגות של צלעות נגדיות מקבילות — זה כבר לא טרפז».
+A narrow trapezoid whose legs are nearly parallel stays drawable. *Open:* a stated GIVEN that forces the
+parallelogram on a figure that can still move («טרפז ישר זווית ABCO» · «זווית C ישרה») is drawn as before
+until the operator rules between refusing it and drawing it with a notice (the 2-D ADR-165).
+
 ---

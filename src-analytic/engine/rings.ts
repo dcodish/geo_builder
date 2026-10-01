@@ -52,6 +52,7 @@
  * `shapes.ts`; it inherits this with no edit here.
  */
 import type { Construction, Id } from './types';
+import { promisesOneParallelPair } from './shapes';
 
 /** A position, as `evaluate` has already resolved it. */
 export interface RingPt {
@@ -59,8 +60,14 @@ export interface RingPt {
   y: number;
 }
 
-/** WHICH promise of the noun this configuration breaks. Both are "the ring is not that ring". */
-export type RingViolation = 'degenerate' | 'crossed';
+/**
+ * WHICH promise of the noun this configuration breaks. All are "the ring is not that ring".
+ *
+ * `trapezoid-is-parallelogram` (#1627, ADR-AG-189) is the noun's EXCLUSIVE condition: «טרפז» promises
+ * exactly one pair of parallel sides, and a ring with both pairs parallel is a parallelogram (a rectangle
+ * is one) — not the shape the student named. The 2-D ruling it ports is ADR-157.
+ */
+export type RingViolation = 'degenerate' | 'crossed' | 'trapezoid-is-parallelogram';
 
 /** A declared polygon whose drawn ring contradicts its noun — carried with the id so the line that
  *  stated it can be blamed, and the noun so a report can use the student's own word. */
@@ -96,6 +103,17 @@ export const THIN_SIN_TOL = 5e-2;
 
 /** Below this, two consecutive vertices are the same point and no angle can be read at all. */
 const COINCIDENT_EPS = 1e-9;
+
+/**
+ * How close to parallel two sides may be before they ARE parallel, for a noun that excludes it (#1627).
+ *
+ * The same `|sin θ|` scale, and the same value, as {@link COLLAPSED_SIN_TOL} — 0.057° — and for the
+ * same reason: it separates "the givens made these sides parallel" (the solver leaves them under 1e-7;
+ * measured worst on the issue's rows, a figure that ran to 800 units, 4.8e-4) from "a trapezoid whose
+ * legs happen to be close to parallel", which is narrow but TRUE and must stay drawable (ADR-052). It
+ * is relative — a direction's sine, not a distance — so it means the same at every zoom.
+ */
+export const PARALLEL_SIN_TOL = COLLAPSED_SIN_TOL;
 
 const sub = (p: RingPt, q: RingPt): RingPt => ({ x: p.x - q.x, y: p.y - q.y });
 const cross = (u: RingPt, v: RingPt): number => u.x * v.y - u.y * v.x;
@@ -169,6 +187,17 @@ function isSelfIntersecting(p: readonly RingPt[]): boolean {
 }
 
 /**
+ * Are BOTH pairs of opposite sides of this quadrilateral parallel — is it a parallelogram (#1627)?
+ * A ring of any other size has no opposite pairs to ask about, and answers no.
+ */
+function bothOppositePairsParallel(p: readonly RingPt[]): boolean {
+  if (p.length !== 4) return false;
+  const sinBetween = (u: RingPt, v: RingPt): number => Math.abs(cross(u, v)) / (len(u) * len(v));
+  const [a, b, c, d] = p;
+  return sinBetween(sub(b, a), sub(c, d)) < PARALLEL_SIN_TOL && sinBetween(sub(d, a), sub(c, b)) < PARALLEL_SIN_TOL;
+}
+
+/**
  * Does this ring honour the noun it was declared under, or not — and if not, which promise it breaks.
  *
  * Pure over the positions the caller already has: no solve, no seed, no construction. That is what
@@ -176,12 +205,16 @@ function isSelfIntersecting(p: readonly RingPt[]): boolean {
  * `spread.ts` docblock singles out as the reason that mechanism could be adopted without a new search.
  *
  * Degeneracy is checked FIRST: a collapsed ring has no meaningful crossing to report, and naming it
- * "crossed" would send a report at the student that describes the wrong thing.
+ * "crossed" would send a report at the student that describes the wrong thing. The noun's exclusive
+ * condition comes LAST, for the same reason: it is a question about a simple, open ring (#1627).
+ *
+ * `noun` is the declared noun; without one only the ring promises every polygon makes are judged.
  */
-export function ringViolation(vertices: readonly RingPt[]): RingViolation | null {
+export function ringViolation(vertices: readonly RingPt[], noun?: string): RingViolation | null {
   if (vertices.length < 3) return null; // not a ring; nothing is promised
   if (isCollapsed(vertices)) return 'degenerate';
   if (isSelfIntersecting(vertices)) return 'crossed';
+  if (promisesOneParallelPair(noun) && bothOppositePairsParallel(vertices)) return 'trapezoid-is-parallelogram';
   return null;
 }
 
@@ -198,7 +231,7 @@ export function ringFaultsOf(c: Construction, at: (id: Id) => RingPt | undefined
     if (o.kind !== 'polygon') continue;
     const pts = o.vertices.map(at);
     if (pts.some((p) => !p)) continue;
-    const violation = ringViolation(pts as RingPt[]);
+    const violation = ringViolation(pts as RingPt[], o.noun);
     if (violation) faults.push({ id: o.id, noun: o.noun, violation });
   }
   return faults;
