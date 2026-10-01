@@ -190,7 +190,13 @@ const he = {
   errSwapUnsafe: 'לא הצלחתי להחליף בין {{holder}} ל-{{other}} בשורה "{{detail}}" בלי לשנות את משמעותה. ערכו את השורה ידנית.',
   errSwapUnsafeFigure: 'החלפת {{holder}} ו-{{other}} הייתה משנה גם שם שהכלי בחר בשרטוט, ולכן היא לא בוצעה.',
   // #1154 — the click menu's entry (the sentence it starts is grammar, composed in app/rename.ts)
-  menuRename: 'שנה אות',
+  // The letter popover (#1631, ADR-W-105) — 2-D's pointMenu wording, so the three builders say the same thing.
+  letterPlaceholder: 'אות',
+  letterApply: 'החילו',
+  letterTaken: 'האות כבר בשימוש',
+  letterBad: 'אות לא תקינה',
+  letterTakenBy: 'האות תפוסה על ידי: «{{what}}»',
+  letterSwap: 'החליפו בין {{a}} ל-{{b}}',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
   // #1423 — the letter is the problem, named with the student's own defining sentence and the remedy
   errUnsatisfiableReused: '{{reusedId}} כבר מוגדרת: "{{definedBy}}". המשפט "{{detail}}" סותר את ההגדרה הקיימת — לנקודה חדשה בחרו אות אחרת.',
@@ -532,7 +538,12 @@ const en: typeof he = {
   errSwapUnknown: 'The figure has no point named {{detail}}, so there is nothing to swap with.',
   errSwapUnsafe: 'I could not swap {{holder}} and {{other}} in "{{detail}}" without changing what it says. Edit that line by hand.',
   errSwapUnsafeFigure: 'Swapping {{holder}} and {{other}} would also change a name the tool chose in the figure, so it was not done.',
-  menuRename: 'Change letter',
+  letterPlaceholder: 'letter',
+  letterApply: 'Apply',
+  letterTaken: 'Letter already used',
+  letterBad: 'Invalid letter',
+  letterTakenBy: 'Held by: «{{what}}»',
+  letterSwap: 'Swap {{a}} and {{b}}',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
   errUnsatisfiableReused: '{{reusedId}} is already defined: "{{definedBy}}". "{{detail}}" contradicts that definition — pick another letter for a new point.',
   'locus.line': 'line',

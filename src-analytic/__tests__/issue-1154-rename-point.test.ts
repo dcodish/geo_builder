@@ -13,7 +13,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive, type Derivation } from '../engine/derive';
 import { decideSubmit } from '../app/submit';
-import { decideRename, dispatchRename, relabelText, renameDraftOf, rewriteLine, type RenameState } from '../app/rename';
+import { decideRename, dispatchRename, letterTargetOf, relabelText, rewriteLine, type RenameState } from '../app/rename';
 import { errorText } from '../app/errorText';
 import { ask } from '../app/ask';
 import { analyticI18n } from '../i18n';
@@ -234,27 +234,31 @@ describe('#1154 — the store commits a rename as ONE step', () => {
   });
 });
 
-describe('#1154 — the click menu offers «שנה אות» for a point the student lettered', () => {
-  it('fills the input with the typed sentence, and that sentence completes to a rename', () => {
+describe('#1631 — clicking a point opens the letter popover (the 2-D mechanism), for every point', () => {
+  // #1154's first surface filled the main input with «שנה שם A ל-»; the operator ruled 2-D's instead
+  // (2026-10-01): the letter is typed IN PLACE and a taken one offers a swap. `letterTargetOf` decides which
+  // clicked object gets the popover; `decideRename` decides whether the letter can change.
+  it('a lettered point, a derived point, and a letter the tool chose all get it', () => {
     const d = derive(FIGURE, 0);
-    const draft = renameDraftOf(FIGURE, d.construction, { kind: 'point', id: 'A' });
-    expect(draft).toBe('שנה שם A ל-');
-    expect(typed(`${draft}G`, session(FIGURE)).kind).toBe('apply');
-    expect(t('menuRename')).toBe('שנה אות');
-  });
-
-  it('a derived point the student named is offered too', () => {
-    const d = derive(FIGURE, 0);
-    expect(renameDraftOf(FIGURE, d.construction, { kind: 'point', id: 'M' })).toBe('שנה שם M ל-');
-  });
-
-  it('is not offered for a letter the tool chose, nor for a curve or a segment', () => {
+    expect(letterTargetOf(d.construction, { kind: 'point', id: 'A' })).toBe('A');
+    expect(letterTargetOf(d.construction, { kind: 'point', id: 'M' })).toBe('M');
     const lines = ['נתון מעגל שמשוואתו x^2+y^2=9'];
-    const d = derive(lines, 0);
-    expect(renameDraftOf(lines, d.construction, { kind: 'point', id: 'O' })).toBeNull();
+    expect(letterTargetOf(derive(lines, 0).construction, { kind: 'point', id: 'O' })).toBe('O');
+  });
+
+  it('a curve or a segment has no letter to change', () => {
     const f = derive(FIGURE, 0);
-    expect(renameDraftOf(FIGURE, f.construction, { kind: 'curve', id: 'line-AC' })).toBeNull();
-    expect(renameDraftOf(FIGURE, f.construction, { kind: 'segment', id: 'seg-AB' })).toBeNull();
+    expect(letterTargetOf(f.construction, { kind: 'curve', id: 'line-AC' })).toBeNull();
+    expect(letterTargetOf(f.construction, { kind: 'segment', id: 'seg-AB' })).toBeNull();
+  });
+
+  it('the typed sentence still renames — two surfaces, one decision', () => {
+    expect(typed('שנה שם A ל-G', session(FIGURE)).kind).toBe('apply');
+  });
+
+  it('the popover speaks the 2-D wording', () => {
+    expect(t('letterTaken')).toBe('האות כבר בשימוש');
+    expect(t('letterSwap')).toBe('החליפו בין {{a}} ל-{{b}}');
   });
 });
 

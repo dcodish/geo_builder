@@ -64,7 +64,9 @@ import { AskLane } from '../shell/frame/AskLane';
 import { askSettled, figureIsOpen, type Answer } from './app/ask';
 import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
-import { dispatchRename, dispatchSwap, renameDraftOf } from './app/rename';
+import { dispatchRename, dispatchSwap, letterRenameOf, letterTargetOf } from './app/rename';
+import { LetterPopover } from '../shell/frame/LetterPopover';
+import type { LetterRenameResult } from '../shell/frame/letterOffer';
 import { anotherConfiguration } from './app/another';
 import { offersOf, pointAt } from './engine/crossings';
 import { VERTICAL_TOL } from './engine/lines';
@@ -455,7 +457,7 @@ export function App() {
    * readability at low zoom.
    */
   /** `rename` (#1154) is the draft «שנה אות» puts in the input box — null when the click offers none. */
-  const [pick, setPick] = useState<{ items: Measurable[]; rename: string | null; x: number; y: number } | null>(null);
+  const [pick, setPick] = useState<{ items: Measurable[]; letter: string | null; x: number; y: number; seq: number } | null>(null);
   /** The input zone — «שנה אות» focuses its box after filling it (the shared InputArea takes no ref). */
   const inputZoneRef = useRef<HTMLDivElement | null>(null);
 
@@ -1334,8 +1336,8 @@ export function App() {
                */
               onPick={(what, screen) => {
                 const items = measurablesOf(d.construction, what);
-                const rename = renameDraftOf(lines, d.construction, what);
-                setPick(items.length || rename ? { items, rename, x: screen.x, y: screen.y } : null);
+                const letter = letterTargetOf(d.construction, what);
+                setPick(items.length || letter ? { items, letter, x: screen.x, y: screen.y, seq: Date.now() } : null);
               }}
               onCrossing={(sentence) => {
                 // A GUARD, not a second decision: `submit` still owns whether the line is accepted
@@ -1878,63 +1880,80 @@ export function App() {
         never clips at the canvas edge. A click anywhere else closes it — a menu that needs its own
         dismiss button is one the student has to learn.
       */}
-      {pick && (
-        <>
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 40 }}
-            onClick={() => setPick(null)}
-            aria-hidden="true"
-          />
-          <div style={{ ...measureMenu, left: pick.x + 6, top: pick.y + 6 }} role="menu">
-            {pick.items.map((m) => (
-              <button
-                key={m.sentence}
-                type="button"
-                role="menuitem"
-                style={measureItem}
-                onClick={() => {
-                  // The SAME path the typed lane takes — one grammar, one answer (ADR-AG-044).
-                  toggleAsk(m.sentence);
-                  setPick(null);
-                }}
-              >
-                {/*
-                  An entry whose DRAWING is on the canvas offers to clear it, and says so (#1118).
-                  The row stays either way — the operator's ruling: the panel is a record, the canvas
-                  is a view of it.
-                */}
-                {isDrawn(queries, m.sentence) && (
-                  <span aria-hidden="true" style={{ opacity: 0.6, marginInlineEnd: 6 }}>✕</span>
-                )}
-                <MathText text={analyticBidi.isolateLtrRuns(m.sentence)} />
-              </button>
-            ))}
+      {pick && (() => {
+        // The measure entries, shared by both surfaces: the SAME path the typed lane takes — one
+        // grammar, one answer (ADR-AG-044).
+        const measureItems = pick.items.map((m) => (
+          <button
+            key={m.sentence}
+            type="button"
+            role="menuitem"
+            style={measureItem}
+            onClick={() => {
+              toggleAsk(m.sentence);
+              setPick(null);
+            }}
+          >
             {/*
-              «שנה אות» (#1154) — the 2026-09-16 ruling puts rename IN this menu, composing a typed
-              sentence like every other entry: it fills the input with «שנה שם A ל-» and the student
-              types the new letter, so the submit path (and its refusals) is the one the typed form takes.
+              An entry whose DRAWING is on the canvas offers to clear it, and says so (#1118).
+              The row stays either way — the operator's ruling: the panel is a record, the canvas
+              is a view of it.
             */}
-            {pick.rename && (
-              <button
-                type="button"
-                role="menuitem"
-                style={pick.items.length ? { ...measureItem, borderTop: `1px solid ${color.border}` } : measureItem}
-                onClick={() => {
-                  setDraft(pick.rename!);
-                  setPick(null);
-                  setTimeout(() => {
-                    const box = inputZoneRef.current?.querySelector('input');
-                    box?.focus();
-                    box?.setSelectionRange(box.value.length, box.value.length);
-                  }, 0);
+            {isDrawn(queries, m.sentence) && <span aria-hidden="true" style={{ opacity: 0.6, marginInlineEnd: 6 }}>✕</span>}
+            <MathText text={analyticBidi.isolateLtrRuns(m.sentence)} />
+          </button>
+        ));
+        if (pick.letter) {
+          /*
+            A POINT gets 2-D's letter popover (#1631, ADR-W-105): type the new letter in place; a taken
+            letter quotes its holder and offers «החליפו בין A ל-B». Its measure entries ride inside, as
+            2-D's hide/show do. Mounted in a full-viewport FIXED layer, because this menu lives at page
+            level (it must not scale with the zoom or clip at the canvas edge) and the popover places
+            itself inside its positioned container.
+          */
+          const state = { lines, disabled, queries, spokenFor, seed, seedNames };
+          const letter = pick.letter;
+          const onRename = (from: string, to: string): LetterRenameResult => {
+            // A taken letter is answered IN the popover (its holder, the swap offer); every other refusal
+            // keeps the analytic tree's own sentence in the error line, which says WHY.
+            return letterRenameOf(dispatchRename(from, to, state, { applyRename, setError: (e) => (e && e.key === 'rename-taken' ? undefined : setError(e)) }, d));
+          };
+          return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
+              <LetterPopover
+                key={pick.seq}
+                x={pick.x}
+                y={pick.y}
+                bounds={{ width: window.innerWidth, height: window.innerHeight }}
+                title={letter}
+                label={letter}
+                onRename={onRename}
+                onSwap={(a, b) => ({ ok: dispatchSwap(a, b, state, { applySwap, setError }, d).kind === 'apply' })}
+                strings={{
+                  placeholder: t('letterPlaceholder'),
+                  apply: t('letterApply'),
+                  taken: t('letterTaken'),
+                  bad: t('letterBad'),
+                  takenBy: t('letterTakenBy'),
+                  swapLetters: t('letterSwap'),
                 }}
+                onClose={() => setPick(null)}
+                testId="letter-popover"
               >
-                {t('menuRename')}
-              </button>
-            )}
-          </div>
-        </>
-      )}
+                {measureItems.length > 0 && <div style={{ borderTop: `1px solid ${color.border}`, paddingTop: 4, display: 'flex', flexDirection: 'column' }}>{measureItems}</div>}
+              </LetterPopover>
+            </div>
+          );
+        }
+        return (
+          <>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setPick(null)} aria-hidden="true" />
+            <div style={{ ...measureMenu, left: pick.x + 6, top: pick.y + 6 }} role="menu">
+              {measureItems}
+            </div>
+          </>
+        );
+      })()}
 
       {/*
         THE MANUAL (#1087) — this product has a command catalog and had no screen showing it, so the

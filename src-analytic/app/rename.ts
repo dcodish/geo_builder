@@ -61,6 +61,7 @@ import type { Fact } from '../engine/types';
 import type { AskedQuestion, InputError } from '../store/useAnalyticStore';
 import type { Construction, Id } from '../engine/types';
 import { activeOf, rowOf } from './active';
+import type { LetterRenameResult } from '../../shell/frame/letterOffer';
 
 export { parseRenameAnalytic, parseSwapAnalytic };
 
@@ -466,25 +467,32 @@ export function decideSwap(
 }
 
 /**
- * THE CLICK MENU'S ENTRY (#1154) — the draft «שנה אות» puts in the input box, or null.
+ * WHICH CLICKED OBJECT GETS THE LETTER POPOVER (#1631) — the point's letter, or null.
  *
- * The 2026-09-16 ruling: rename lives IN the #1048 menu, and the entry composes a typed sentence like
- * every other entry («two surfaces, one grammar», ADR-AG-048) — so clicking it fills the input with
- * «שנה שם A ל-» and the student types the new letter. Offered only for a point whose letter the
- * student actually WROTE: the menu offers what would resolve (measurable.ts). #1631 moves this surface
- * to the shared popover (the integrator's wiring), which calls {@link decideRename} directly.
+ * The operator, 2026-10-01: *"the letter is replaced without the need to write the text in the input and
+ * if a letter is occupied, it offers to switch letters"* — 2-D's mechanism (ADR-072, ADR-520, ADR-532),
+ * now the shared `shell/frame/LetterPopover`. It replaces #1154's first surface, which filled the main
+ * input with «שנה שם A ל-» (`renameDraftOf`, retired); the typed sentence still works.
  *
- * The sentence is GRAMMAR, composed here like every measurable sentence (always the Hebrew catalog
- * spelling, as the measure entries are) and never through `t()`: the locale wraps Latin runs in bidi
- * isolates, which have no place inside the student's input box.
+ * Offered for EVERY point of the figure, as 2-D offers any letter, including one the tool chose (a circle's
+ * automatic O, a minted P₁): whether the rename can be honoured is {@link decideRename}'s question, and its
+ * refusal is shown in the popover. A curve or a segment has no letter to change.
  */
-export function renameDraftOf(
-  lines: readonly string[],
-  c: Construction,
-  what: { kind: 'point' | 'curve' | 'segment'; id: Id },
-): string | null {
-  if (what.kind !== 'point' || !pointIdsOf(c).includes(what.id)) return null;
-  return lines.some((l) => occurrences(l, { [what.id]: what.id }).length > 0) ? `שנה שם ${what.id} ל-` : null;
+/**
+ * A RENAME VERDICT IN THE POPOVER'S VOCABULARY (#1631) — what the shared `LetterPopover` is handed, extracted
+ * so the §5c lock calls the adapter App calls. A taken letter is answered IN the popover (its holder line,
+ * the swap offer); any other refusal carries this tree's own error key as the reason, and App shows that
+ * key's sentence in the error line, because it says WHY (a sentence that cannot be rewritten faithfully,
+ * a figure the rename would change).
+ */
+export function letterRenameOf(v: RenameVerdict): LetterRenameResult {
+  if (v.kind === 'apply') return { ok: true };
+  if (v.error.key === 'rename-taken' && v.holder) return { ok: false, reason: 'taken', holder: { text: v.holder.text } };
+  return { ok: false, reason: v.error.key };
+}
+
+export function letterTargetOf(c: Construction, what: { kind: 'point' | 'curve' | 'segment'; id: Id }): Id | null {
+  return what.kind === 'point' && pointIdsOf(c).includes(what.id) ? what.id : null;
 }
 
 /** The store slice the dispatch writes through — the real actions, so the locks drive what App drives. */

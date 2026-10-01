@@ -1937,3 +1937,28 @@ parallelogram on a figure that can still move («טרפז ישר זווית ABCO
 until the operator rules between refusing it and drawing it with a notice (the 2-D ADR-165).
 
 ---
+
+**R129 — two letters can be swapped; a taken letter offers the swap; the tool's own letters can be changed; a changed letter does not move the drawing**
+([ADR-AG-192](06c-decisions-analytic.md#adr-ag-192), [#1631](https://github.com/dcodish/geo_builder/issues/1631), [#1303](https://github.com/dcodish/geo_builder/issues/1303)).
+*(Operator, 2026-10-01: "if a letter is occupied, it offers to switch letters … we want that same mechanism now for analytics"; 2026-09-21: "if a letter is changed, change all inputs and data panel items accordingly".)*
+
+The student types «החלף בין A ל-B» (also «החליפו בין A ל-B», «החלף בין A לבין B», "swap A and B"), or — on
+the point's letter popover — types a letter that is already in use, sees the line that holds it quoted and
+that row highlighted, and accepts «החליפו בין A ל-B». Every given, every data-panel question and every AI
+display sentence exchanges the two letters at once; an equation's x, y and parameters are never touched; each
+question answers what it answered before; nothing is deleted and no row is added; both orders do the same
+thing; one «בטל» undoes the whole swap. «החלף A ב-G» stays a rename. A letter the figure does not have, the
+same letter twice, and a name that is not a point name are each refused by name.
+
+A letter the tool chose — the canonical circle's centre O, a name given to a point stated only by its
+coordinates (P₁, or O for the origin) — can be renamed or swapped like any other: the new letter is written
+into the student's own sentence that made the point («נתון מעגל G שמשוואתו …», «נתונה הנקודה G(-3,7)»),
+and the figure is the same figure. Only where that sentence has no form that names the point (an equation
+with no noun, a coordinate inside a longer sentence) is the change refused, and it says so.
+
+Changing or swapping a letter never moves the drawing: a vertex the student left free is drawn where it
+was, with its new letter, and a swap exchanges the labels in place. Saved figures, links and restored
+sessions keep this.
+
+*Amends R128's last sentence* ("A letter the tool chose … is not renamed and says so"): now renamed through
+the student's sentence, as above.
