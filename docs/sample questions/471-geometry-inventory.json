@@ -5,7 +5,6 @@
   "pdf_pages": [
    16
   ],
-  "exam_title": "דוגמה – מבחן מספר 1",
   "kind": "synthetic→analytic",
   "givens_he": [
    "נתון טרפז ישר זווית ABCD (AB ∥ CD, AB ⊥ AD)",
@@ -33,7 +32,9 @@
    "point-coords",
    "line-equation"
   ],
-  "notes": "Question is CROSSED OUT (red X) in the booklet — likely outside current syllabus. Angle given symbolically (2α), not numerically. Coords of E garbled in text dump; E(−1,2) confirmed by answer key (EC: y=−x+1, C(3,−2))."
+  "notes": "Question is CROSSED OUT (red X) in the booklet — likely outside current syllabus. Angle given symbolically (2α), not numerically. Coords of E garbled in text dump; E(−1,2) confirmed by answer key (EC: y=−x+1, C(3,−2)).",
+  "title": "דוגמה – מבחן מספר 1",
+  "crossedOut": true
  },
  {
   "exam": 1,
@@ -41,7 +42,6 @@
   "pdf_pages": [
    17
   ],
-  "exam_title": "דוגמה – מבחן מספר 1",
   "kind": "analytic",
   "givens_he": [
    "מרובע ABCD חסום במעגל שמשוואתו (x−2)² + (y+2)² = 100",
@@ -61,7 +61,9 @@
    "point-on-circle",
    "point-on-axis"
   ],
-  "notes": "D has no coordinates: it is the second intersection of line AE with the circle (defined implicitly by the extension givens)."
+  "notes": "D has no coordinates: it is the second intersection of line AE with the circle (defined implicitly by the extension givens).",
+  "title": "דוגמה – מבחן מספר 1",
+  "crossedOut": false
  },
  {
   "exam": 2,
@@ -69,7 +71,6 @@
   "pdf_pages": [
    23
   ],
-  "exam_title": "דוגמה – מבחן מספר 2",
   "kind": "synthetic→analytic",
   "givens_he": [
    "במלבן ABCD, הנקודה E נמצאת על הצלע DC",
@@ -94,7 +95,9 @@
    "point-coords",
    "area"
   ],
-  "notes": "F's position (on AB) is only in the figure. Section ד(2) asks the student to CHOOSE E freely on DC — a genuine free DOF. B, D derived from opposite corners + axis-parallel side."
+  "notes": "F's position (on AB) is only in the figure. Section ד(2) asks the student to CHOOSE E freely on DC — a genuine free DOF. B, D derived from opposite corners + axis-parallel side.",
+  "title": "דוגמה – מבחן מספר 2",
+  "crossedOut": false
  },
  {
   "exam": 2,
@@ -102,7 +105,6 @@
   "pdf_pages": [
    24
   ],
-  "exam_title": "דוגמה – מבחן מספר 2",
   "kind": "analytic",
   "givens_he": [
    "במעגל שמרכזו M חסום משולש חד זוויות ABC",
@@ -118,7 +120,9 @@
    "perp-bisector",
    "line-equation"
   ],
-  "notes": "Circumcircle through 3 given points; perp bisectors of AC and AB are asked (part of construction of M). Triangle AMC asked for area."
+  "notes": "Circumcircle through 3 given points; perp bisectors of AC and AB are asked (part of construction of M). Triangle AMC asked for area.",
+  "title": "דוגמה – מבחן מספר 2",
+  "crossedOut": false
  },
  {
   "exam": 3,
@@ -126,7 +130,6 @@
   "pdf_pages": [
    30
   ],
-  "exam_title": "דוגמה – מבחן מספר 3",
   "kind": "synthetic→analytic",
   "givens_he": [
    "בטרפז ABCD (CD ∥ AB)",
@@ -154,7 +157,9 @@
    "perpendicular",
    "quadrant"
   ],
-  "notes": "Question is CROSSED OUT (red X) in the booklet. A diagonal lying on the x-axis and a side perpendicular to the x-axis; C pinned by quadrant IV."
+  "notes": "Question is CROSSED OUT (red X) in the booklet. A diagonal lying on the x-axis and a side perpendicular to the x-axis; C pinned by quadrant IV.",
+  "title": "דוגמה – מבחן מספר 3",
+  "crossedOut": true
  },
  {
   "exam": 3,
@@ -162,7 +167,6 @@
   "pdf_pages": [
    31
   ],
-  "exam_title": "דוגמה – מבחן מספר 3",
   "kind": "synthetic→analytic",
   "givens_he": [
    "המשולש AOB הוא ישר זווית",
@@ -192,7 +196,9 @@
    "radius-drawn",
    "parenthetical-givens"
   ],
-  "notes": "Incircle of a right triangle sitting on the axes (right angle at origin); tangency points named via 'בהתאמה'; AB fixed only by slope + tangency."
+  "notes": "Incircle of a right triangle sitting on the axes (right angle at origin); tangency points named via 'בהתאמה'; AB fixed only by slope + tangency.",
+  "title": "דוגמה – מבחן מספר 3",
+  "crossedOut": false
  },
  {
   "exam": 4,
@@ -200,7 +206,6 @@
   "pdf_pages": [
    38
   ],
-  "exam_title": "דוגמה – מבחן מספר 4",
   "kind": "analytic",
   "givens_he": [
    "משולש ABC חסום במעגל שקוטרו AC",
@@ -216,7 +221,9 @@
    "point-coords",
    "circle-center-named"
   ],
-  "notes": "C is defined implicitly: on the given line AND such that ∠ABC = 90° (Thales). Center O named only in section ג."
+  "notes": "C is defined implicitly: on the given line AND such that ∠ABC = 90° (Thales). Center O named only in section ג.",
+  "title": "דוגמה – מבחן מספר 4",
+  "crossedOut": false
  },
  {
   "exam": 4,
@@ -224,7 +231,6 @@
   "pdf_pages": [
    38
   ],
-  "exam_title": "דוגמה – מבחן מספר 4",
   "kind": "synthetic",
   "givens_he": [
    "משולש ABC הוא שווה שוקיים (CB = AB)",
@@ -241,7 +247,9 @@
    "length-equality",
    "length-value"
   ],
-  "notes": "E is determined by a length equality (AE = AC) on segment BC — the non-trivial (E ≠ C) intersection."
+  "notes": "E is determined by a length equality (AE = AC) on segment BC — the non-trivial (E ≠ C) intersection.",
+  "title": "דוגמה – מבחן מספר 4",
+  "crossedOut": false
  },
  {
   "exam": 5,
@@ -249,7 +257,6 @@
   "pdf_pages": [
    47
   ],
-  "exam_title": "דוגמה – מבחן מספר 5",
   "kind": "synthetic",
   "givens_he": [
    "משולש ABC חסום במעגל שמרכזו O",
@@ -270,7 +277,9 @@
    "length-value",
    "angle-value"
   ],
-  "notes": "M is never defined in text — only 'MO ⊥ AB' plus the figure places M on AB (foot of perpendicular from O). Prove-target is an angle equality ABC = AOM (text omits ∢). Radius drawn OA in figure."
+  "notes": "M is never defined in text — only 'MO ⊥ AB' plus the figure places M on AB (foot of perpendicular from O). Prove-target is an angle equality ABC = AOM (text omits ∢). Radius drawn OA in figure.",
+  "title": "דוגמה – מבחן מספר 5",
+  "crossedOut": false
  },
  {
   "exam": 5,
@@ -278,7 +287,6 @@
   "pdf_pages": [
    47
   ],
-  "exam_title": "דוגמה – מבחן מספר 5",
   "kind": "analytic",
   "givens_he": [
    "נתון מעגל שמרכזו M(7;6)",
@@ -309,7 +317,9 @@
    "parallel",
    "forward-reference"
   ],
-  "notes": "Radius is not given: it follows from C being the midpoint of MB (MC = CB) and C on the circle. 'אנך לציר ה-x' from B is a vertical line x=1. E is on that vertical line, fixed by ME ∥ CD; E not drawn in figure."
+  "notes": "Radius is not given: it follows from C being the midpoint of MB (MC = CB) and C on the circle. 'אנך לציר ה-x' from B is a vertical line x=1. E is on that vertical line, fixed by ME ∥ CD; E not drawn in figure.",
+  "title": "דוגמה – מבחן מספר 5",
+  "crossedOut": false
  },
  {
   "exam": 6,
@@ -317,7 +327,6 @@
   "pdf_pages": [
    54
   ],
-  "exam_title": "דוגמה – מבחן מספר 6",
   "kind": "synthetic→analytic",
   "givens_he": [
    "AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה",
@@ -339,7 +348,9 @@
    "forward-reference",
    "radius-drawn"
   ],
-  "notes": "Sentence 1 uses the circle and O before O is named ('O – מרכז המעגל' after). Radius not given: follows from K (foot on OB) — A, C are the tangency points of tangents from B. Which tangency point is A vs C is figure-only."
+  "notes": "Sentence 1 uses the circle and O before O is named ('O – מרכז המעגל' after). Radius not given: follows from K (foot on OB) — A, C are the tangency points of tangents from B. Which tangency point is A vs C is figure-only.",
+  "title": "דוגמה – מבחן מספר 6",
+  "crossedOut": false
  },
  {
   "exam": 6,
@@ -347,7 +358,6 @@
   "pdf_pages": [
    54
   ],
-  "exam_title": "דוגמה – מבחן מספר 6",
   "kind": "synthetic→analytic",
   "givens_he": [
    "הישרים AB ו-CD שבציור מקבילים זה לזה",
@@ -370,7 +380,9 @@
    "point-coords",
    "shape-trapezoid"
   ],
-  "notes": "Axis placement of A,B,C,D is figure-only. B and D are fixed only by the area ratio 4:5 (triangle : trapezoid) plus AB ∥ CD — an area-ratio given drives positions. Trapezoid is a consequence, not a given."
+  "notes": "Axis placement of A,B,C,D is figure-only. B and D are fixed only by the area ratio 4:5 (triangle : trapezoid) plus AB ∥ CD — an area-ratio given drives positions. Trapezoid is a consequence, not a given.",
+  "title": "דוגמה – מבחן מספר 6",
+  "crossedOut": false
  },
  {
   "exam": 7,
@@ -378,7 +390,6 @@
   "pdf_pages": [
    62
   ],
-  "exam_title": "קיץ תש\"ף 2020 מועד א (מבחן מספר 7)",
   "kind": "analytic",
   "givens_he": [
    "במשולש OBC העבירו גבהים OD ו-BE לצלעות BC ו-OC בהתאמה",
@@ -402,7 +413,9 @@
    "NEW:area-ratio",
    "area"
   ],
-  "notes": "B is fixed only by an area ratio of two sub-triangles (S_BDC/S_ODC = 0.8) given in section ד; until then B slides along BC. Altitude BE to OC (x-axis) is vertical."
+  "notes": "B is fixed only by an area ratio of two sub-triangles (S_BDC/S_ODC = 0.8) given in section ד; until then B slides along BC. Altitude BE to OC (x-axis) is vertical.",
+  "title": "קיץ תש\"ף 2020 מועד א (מבחן מספר 7)",
+  "crossedOut": false
  },
  {
   "exam": 7,
@@ -410,7 +423,6 @@
   "pdf_pages": [
    62
   ],
-  "exam_title": "קיץ תש\"ף 2020 מועד א (מבחן מספר 7)",
   "kind": "synthetic→analytic",
   "givens_he": [
    "במעגל שמרכזו M המיתרים AB ו-BC שווים (ראה סרטוט)",
@@ -434,7 +446,9 @@
    "radius-drawn",
    "parenthetical-givens"
   ],
-  "notes": "B = other intersection of horizontal line through C with the circle; A = reflection of C about line MB (AB = BC, A ≠ C)."
+  "notes": "B = other intersection of horizontal line through C with the circle; A = reflection of C about line MB (AB = BC, A ≠ C).",
+  "title": "קיץ תש\"ף 2020 מועד א (מבחן מספר 7)",
+  "crossedOut": false
  },
  {
   "exam": 8,
@@ -442,7 +456,6 @@
   "pdf_pages": [
    69
   ],
-  "exam_title": "קיץ תש\"ף 2020 מועד ב (מבחן מספר 8)",
   "kind": "synthetic→analytic",
   "givens_he": [
    "במקבילית ABCD נקודה F היא אמצע הצלע AD",
@@ -463,7 +476,9 @@
    "area",
    "shape-trapezoid"
   ],
-  "notes": "Diagonal intersection E given as coordinates (A, B derived by reflection through E). DFEC named as a trapezoid in section ג(2) — consequence, not given."
+  "notes": "Diagonal intersection E given as coordinates (A, B derived by reflection through E). DFEC named as a trapezoid in section ג(2) — consequence, not given.",
+  "title": "קיץ תש\"ף 2020 מועד ב (מבחן מספר 8)",
+  "crossedOut": false
  },
  {
   "exam": 8,
@@ -471,7 +486,6 @@
   "pdf_pages": [
    69
   ],
-  "exam_title": "קיץ תש\"ף 2020 מועד ב (מבחן מספר 8)",
   "kind": "synthetic→analytic",
   "givens_he": [
    "מרובע ABCD חסום במעגל",
@@ -492,7 +506,9 @@
    "axis-parallel",
    "point-on-circle"
   ],
-  "notes": "B has no coordinates: fixed by cyclic + ∠BAD = ∠BCD (⇒ both right angles), i.e. B = intersection of perpendiculars to AD at A and to CD at C."
+  "notes": "B has no coordinates: fixed by cyclic + ∠BAD = ∠BCD (⇒ both right angles), i.e. B = intersection of perpendiculars to AD at A and to CD at C.",
+  "title": "קיץ תש\"ף 2020 מועד ב (מבחן מספר 8)",
+  "crossedOut": false
  },
  {
   "exam": 9,
@@ -525,7 +541,8 @@
    "quadrant",
    "similar-triangles-given"
   ],
-  "notes": "Angle given as tan of an angle (tan∢BAO = 2), not degrees; rectangle diagonal AC lies on the x-axis."
+  "notes": "Angle given as tan of an angle (tan∢BAO = 2), not degrees; rectangle diagonal AC lies on the x-axis.",
+  "crossedOut": false
  },
  {
   "exam": 9,
@@ -562,7 +579,8 @@
    "coord-inequality",
    "plural-respectively"
   ],
-  "notes": "Circle fixed by tangency to y-axis at A plus radius; B,C are the circle's x-axis intersections (order from figure)."
+  "notes": "Circle fixed by tangency to y-axis at A plus radius; B,C are the circle's x-axis intersections (order from figure).",
+  "crossedOut": false
  },
  {
   "exam": 10,
@@ -595,7 +613,8 @@
    "quadrant",
    "similar-triangles-given"
   ],
-  "notes": "Trapezoid's properties are given parenthetically; C is determined by AB∥OC and ∠C=90° (foot of perpendicular from B to line OC)."
+  "notes": "Trapezoid's properties are given parenthetically; C is determined by AB∥OC and ∠C=90° (foot of perpendicular from B to line OC).",
+  "crossedOut": false
  },
  {
   "exam": 10,
@@ -628,7 +647,8 @@
    "coord-inequality",
    "area"
   ],
-  "notes": "Circle is never given by equation — it follows from AC being a diameter (derived from the angle equality); B,D = circle ∩ x-axis."
+  "notes": "Circle is never given by equation — it follows from AC being a diameter (derived from the angle equality); B,D = circle ∩ x-axis.",
+  "crossedOut": false
  },
  {
   "exam": 11,
@@ -660,7 +680,8 @@
    "coord-inequality",
    "shape-trapezoid"
   ],
-  "notes": "C is fixed only by ∠BEC=90° together with the parallelogram; section ג names the quadrilateral BCEA as a trapezoid (derived, not given)."
+  "notes": "C is fixed only by ∠BEC=90° together with the parallelogram; section ג names the quadrilateral BCEA as a trapezoid (derived, not given).",
+  "crossedOut": false
  },
  {
   "exam": 11,
@@ -692,7 +713,8 @@
    "coord-inequality",
    "similar-triangles-given"
   ],
-  "notes": "CROSSED OUT in the booklet (out of current syllabus). Equation sign of x-term read from text dump as (x-3)²; consistent with A(0,-6), B(0,2). C and D otherwise free (only ∠CAD=30°)."
+  "notes": "CROSSED OUT in the booklet (out of current syllabus). Equation sign of x-term read from text dump as (x-3)²; consistent with A(0,-6), B(0,2). C and D otherwise free (only ∠CAD=30°).",
+  "crossedOut": true
  },
  {
   "exam": 12,
@@ -722,7 +744,8 @@
    "similar-triangles-given",
    "area"
   ],
-  "notes": "A lying on the y-axis is a figure-only given, yet it is what determines A (and so the rectangle); without it the rectangle is under-determined."
+  "notes": "A lying on the y-axis is a figure-only given, yet it is what determines A (and so the rectangle); without it the rectangle is under-determined.",
+  "crossedOut": false
  },
  {
   "exam": 12,
@@ -755,7 +778,8 @@
    "chord",
    "coord-inequality"
   ],
-  "notes": "C is determined by the altitude through M (C = top of vertical diameter); A,B = circle ∩ line y=-6."
+  "notes": "C is determined by the altitude through M (C = top of vertical diameter); A,B = circle ∩ line y=-6.",
+  "crossedOut": false
  },
  {
   "exam": 13,
@@ -794,7 +818,8 @@
    "shape-parallelogram",
    "area"
   ],
-  "notes": "Disambiguating inequality y_B < 6 picks one of two B's; staged givens across sections; F and line EF are not drawn in the printed figure (it shows only segment ED); EF is parallel to AC."
+  "notes": "Disambiguating inequality y_B < 6 picks one of two B's; staged givens across sections; F and line EF are not drawn in the printed figure (it shows only segment ED); EF is parallel to AC.",
+  "crossedOut": false
  },
  {
   "exam": 13,
@@ -833,7 +858,8 @@
    "point-on-axis",
    "similar-triangles-given"
   ],
-  "notes": "Secant-tangent from the origin; data arrives in stages (lengths, then center, then tangent equation)."
+  "notes": "Secant-tangent from the origin; data arrives in stages (lengths, then center, then tangent equation).",
+  "crossedOut": false
  },
  {
   "exam": 14,
@@ -871,7 +897,8 @@
    "shape-trapezoid",
    "area"
   ],
-  "notes": "A given by one coordinate on a known line; C's side (right of B) only from figure; EDCB named as trapezoid in section ו."
+  "notes": "A given by one coordinate on a known line; C's side (right of B) only from figure; EDCB named as trapezoid in section ו.",
+  "crossedOut": false
  },
  {
   "exam": 14,
@@ -904,7 +931,8 @@
    "similar-triangles-given",
    "area"
   ],
-  "notes": "Figure shows the circumcircle from the start but the circle is only asked for (ג); coords written with ';' separator; hypotenuse called 'היתר'."
+  "notes": "Figure shows the circumcircle from the start but the circle is only asked for (ג); coords written with ';' separator; hypotenuse called 'היתר'.",
+  "crossedOut": false
  },
  {
   "exam": 15,
@@ -936,7 +964,8 @@
    "coord-inequality",
    "area"
   ],
-  "notes": "Circle determined only via BD being the diameter (derived); A is otherwise free on the circle (left arc)."
+  "notes": "Circle determined only via BD being the diameter (derived); A is otherwise free on the circle (left arc).",
+  "crossedOut": false
  },
  {
   "exam": 15,
@@ -973,7 +1002,8 @@
    "similar-triangles-given",
    "area"
   ],
-  "notes": "Square positioned by incidences (origin on AB, C on x-axis, E on AD ∩ y-axis); final section asks 'האם מתקיים ∢BCO = ∢OCE?' — a question, not a given."
+  "notes": "Square positioned by incidences (origin on AB, C on x-axis, E on AD ∩ y-axis); final section asks 'האם מתקיים ∢BCO = ∢OCE?' — a question, not a given.",
+  "crossedOut": false
  },
  {
   "exam": 16,
@@ -1010,7 +1040,8 @@
    "coord-inequality",
    "area"
   ],
-  "notes": "B defined via an angle equality (∠EOB=∠EBO) with E defined from B — circular dependency; C on the y-axis only from the figure (also implied by C(0,3))."
+  "notes": "B defined via an angle equality (∠EOB=∠EBO) with E defined from B — circular dependency; C on the y-axis only from the figure (also implied by C(0,3)).",
+  "crossedOut": false
  },
  {
   "exam": 16,
@@ -1046,7 +1077,8 @@
    "similar-triangles-given",
    "area"
   ],
-  "notes": "Line CB placed by a segment ratio DO/DE on the y-axis; ADEB quadrilateral area asked."
+  "notes": "Line CB placed by a segment ratio DO/DE on the y-axis; ADEB quadrilateral area asked.",
+  "crossedOut": false
  },
  {
   "exam": 17,
@@ -1083,7 +1115,8 @@
    "quadrant",
    "cyclic-quadrilateral"
   ],
-  "notes": "Ratio of two segment lengths (CD/OB = 5/2) as a given, not a point ratio on one segment; section ד asks whether ABDC is cyclic (asked, not given)."
+  "notes": "Ratio of two segment lengths (CD/OB = 5/2) as a given, not a point ratio on one segment; section ד asks whether ABDC is cyclic (asked, not given).",
+  "crossedOut": false
  },
  {
   "exam": 17,
@@ -1121,7 +1154,8 @@
    "shape-parallelogram",
    "coord-inequality"
   ],
-  "notes": "Length equality to the RADIUS (AB = r) pins A on the extension of ME; two y-axis intersections disambiguated only by the figure (C above B)."
+  "notes": "Length equality to the RADIUS (AB = r) pins A on the extension of ME; two y-axis intersections disambiguated only by the figure (C above B).",
+  "crossedOut": false
  },
  {
   "exam": 18,
@@ -1156,7 +1190,8 @@
    "perimeter",
    "quadrant"
   ],
-  "notes": "Area of a sub-triangle (ABD = 45) is a given that fixes B; diagonals meet at the origin; E is the second intersection of the BC extension with circle(D, DC)."
+  "notes": "Area of a sub-triangle (ABD = 45) is a given that fixes B; diagonals meet at the origin; E is the second intersection of the BC extension with circle(D, DC).",
+  "crossedOut": false
  },
  {
   "exam": 18,
@@ -1192,7 +1227,8 @@
    "area",
    "parallel"
   ],
-  "notes": "D defined by an angle equality (∢ADC = ∢BAC) with D constrained to the y-axis; circle tangent to y-axis at C means diameter AC is horizontal."
+  "notes": "D defined by an angle equality (∢ADC = ∢BAC) with D constrained to the y-axis; circle tangent to y-axis at C means diameter AC is horizontal.",
+  "crossedOut": false
  },
  {
   "exam": 19,
@@ -1224,7 +1260,8 @@
    "shape-trapezoid",
    "quadrant"
   ],
-  "notes": "Parallelogram fixed only through derived points (diagonal intersection E and side midpoint F) plus one vertex D — the tool must back-solve vertices from E and F."
+  "notes": "Parallelogram fixed only through derived points (diagonal intersection E and side midpoint F) plus one vertex D — the tool must back-solve vertices from E and F.",
+  "crossedOut": false
  },
  {
   "exam": 19,
@@ -1263,7 +1300,8 @@
    "coord-inequality",
    "line-equation"
   ],
-  "notes": "C is the foot of the perpendicular from A to the tangent at B (stated as ∢BCA = 90°); 'one of the intersections' needs the figure's upper choice."
+  "notes": "C is the foot of the perpendicular from A to the tangent at B (stated as ∢BCA = 90°); 'one of the intersections' needs the figure's upper choice.",
+  "crossedOut": false
  },
  {
   "exam": 20,
@@ -1305,7 +1343,8 @@
    "quadrant",
    "forward-reference"
   ],
-  "notes": "Area ratio of two triangles (4:1) as a given; section ה names 'המלבן OABC' (the proved rectangle) as a given for M; vertical lines x=±4 given as equations."
+  "notes": "Area ratio of two triangles (4:1) as a given; section ה names 'המלבן OABC' (the proved rectangle) as a given for M; vertical lines x=±4 given as equations.",
+  "crossedOut": false
  },
  {
   "exam": 20,
@@ -1342,7 +1381,8 @@
    "area",
    "NEW:acute-triangle"
   ],
-  "notes": "Circle defined by two points + centre on y-axis; C is a vertex of the triangle but defined as an x-axis intersection (C/D by figure); E on the MINOR arc AC with chord length 7."
+  "notes": "Circle defined by two points + centre on y-axis; C is a vertex of the triangle but defined as an x-axis intersection (C/D by figure); E on the MINOR arc AC with chord length 7.",
+  "crossedOut": false
  },
  {
   "exam": 21,
@@ -1375,7 +1415,8 @@
    "coord-inequality",
    "quadrant"
   ],
-  "notes": "Diagonals perpendicular and meeting ON the y-axis; F on the CD extension defined by an area ratio (two possibilities, either accepted)."
+  "notes": "Diagonals perpendicular and meeting ON the y-axis; F on the CD extension defined by an area ratio (two possibilities, either accepted).",
+  "crossedOut": false
  },
  {
   "exam": 21,
@@ -1415,7 +1456,8 @@
    "quadrant",
    "parameter"
   ],
-  "notes": "Radius is unknown (a parameter) while the tangent line's equation is given — the circle is fixed by tangency to a known line; 'tangent to x-axis' implies at O (center on y-axis)."
+  "notes": "Radius is unknown (a parameter) while the tangent line's equation is given — the circle is fixed by tangency to a known line; 'tangent to x-axis' implies at O (center on y-axis).",
+  "crossedOut": false
  },
  {
   "exam": 22,
@@ -1453,7 +1495,8 @@
    "quadrant",
    "coord-inequality"
   ],
-  "notes": "Right angle at D (not A) with legs AD given by equation; E on base AB fixes AB as perpendicular to AD through E; C on NEGATIVE x-axis chosen by the length √72."
+  "notes": "Right angle at D (not A) with legs AD given by equation; E on base AB fixes AB as perpendicular to AD through E; C on NEGATIVE x-axis chosen by the length √72.",
+  "crossedOut": false
  },
  {
   "exam": 22,
@@ -1493,7 +1536,8 @@
    "area",
    "similar-triangles-given"
   ],
-  "notes": "C and D are two points on the tangent at A defined by MA bisecting ∢CMD and CM ∥ x-axis; B chosen by a coordinate inequality (y_B > 8)."
+  "notes": "C and D are two points on the tangent at A defined by MA bisecting ∢CMD and CM ∥ x-axis; B chosen by a coordinate inequality (y_B > 8).",
+  "crossedOut": false
  },
  {
   "exam": 23,
@@ -1534,7 +1578,8 @@
    "cyclic-quadrilateral",
    "line-equation"
   ],
-  "notes": "D fixed by |AD| = √10 + D on y-axis + y_D < 9; B is the reflection of D over AC; section ד defines F by a shape predicate (FBAD rhombus); section ה asks if ABC right / ABCD cyclic (asked, not given)."
+  "notes": "D fixed by |AD| = √10 + D on y-axis + y_D < 9; B is the reflection of D over AC; section ד defines F by a shape predicate (FBAD rhombus); section ה asks if ABC right / ABCD cyclic (asked, not given).",
+  "crossedOut": false
  },
  {
   "exam": 23,
@@ -1569,6 +1614,7 @@
    "incircle",
    "coord-inequality"
   ],
-  "notes": "Circle fixed by centre + passing through origin; B = second intersection of horizontal through A; C = second intersection of slope-1 line through B; incircle of AEC is asked, not given."
+  "notes": "Circle fixed by centre + passing through origin; B = second intersection of horizontal through A; C = second intersection of slope-1 line through B; incircle of AEC is asked, not given.",
+  "crossedOut": false
  }
 ]

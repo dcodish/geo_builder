@@ -31,6 +31,19 @@ import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/
 import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, type NumeralKind } from '../engine/names';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
+import {
+  distributeClauses,
+  isBareName,
+  isProofTarget,
+  orthography,
+  originClauses,
+  partitions,
+  pointClauses,
+  segmentsOf,
+  shapeClauses,
+  sideClauses,
+  unwrap,
+} from './frameAnalytic';
 
 /**
  * Why a line did not become facts.
@@ -48,6 +61,12 @@ export type ParseFailure =
   | { code: 'bad-equation'; detail: string }
   /** Understood, and deliberately outside the product's scope. */
   | { code: 'out-of-scope'; detail: string }
+  /**
+   * What the student is asked to PROVE — «הוכיחו כי OB ⊥ AC», «הראו כי …» (#1618, operator ruling 3
+   * on #1616). The tool draws the givens; it is not a proof engine, and a claim typed as a statement
+   * must never become a constraint.
+   */
+  | { code: 'proof-target'; detail: string }
   /**
    * A coordinate written in `x` or `y` — «M(3,y)» (#1039).
    *
@@ -1328,7 +1347,7 @@ function bothCrossings(line: string): RuleOutcome {
     : [`${a} is the first intersection of ${x} with ${y}`, `${b} is the second intersection of ${x} with ${y}`];
   const facts: Fact[] = [];
   for (const sentence of sentences) {
-    const r = parseLine(sentence);
+    const r = parseClause(sentence);
     if (!r.ok) return r.code === 'not-handled' ? null : ({ ...r, detail: line } as ParseResult);
     facts.push(...r.facts);
   }
@@ -2011,7 +2030,7 @@ const TANGENT_SPLIT_EN = new RegExp(
 function oneCircleFacts(subject: CircleSubject & { kind: 'one' }, targets: TangentTargets, line: string, at?: Id): Fact[] {
   const r = subject.radius !== undefined ? roleScalar(subject.radius) ?? undefined : undefined;
   if (!subject.name) return r ? [{ t: 'radius-of', value: r, src: line }] : [];
-  const placed = subject.placed !== undefined ? parseLine(`${subject.name}${subject.placed}`) : null;
+  const placed = subject.placed !== undefined ? parseClause(`${subject.name}${subject.placed}`) : null;
   return [
     ...(placed?.ok ? placed.facts.map((f) => ({ ...f, src: line })) : []),
     ...circleAtFacts(subject.name, targets, line, at, r),
@@ -2027,7 +2046,7 @@ function circleSubjectGate(subject: CircleSubject | null, line: string): RuleOut
   if (!subject || subject.kind !== 'one') return null;
   if (subject.radius !== undefined && !roleScalar(subject.radius)) return refuse('bad-equation', subject.radius);
   if (subject.placed !== undefined) {
-    const placed = parseLine(`${subject.name}${subject.placed}`);
+    const placed = parseClause(`${subject.name}${subject.placed}`);
     if (!placed.ok) return placed;
   }
   if (subject.coords !== undefined) {
@@ -3671,7 +3690,71 @@ function parseDividesInRatio(line: string): Fact[] | null {
   return null;
 }
 
+/**
+ * ONE LINE → FACTS, through the sentence frame (#1618).
+ *
+ * The rules below read ONE canonical sentence (`parseClause`). The exam writes its givens inside a
+ * textbook frame — a given-prefix, a figure reference, a context shape, a parenthetical, two givens on
+ * one line — and this is the single boundary that reads the frame (`frameAnalytic.ts`), so a wrapper
+ * is taught once rather than to every rule.
+ *
+ * A READING is a list of clauses; it is taken only when EVERY clause parses, so the frame can never
+ * accept what the grammar does not, and a line is never half-accepted. The shape/origin/distribution
+ * readings are structural and run first (their patterns are unambiguous, and a rule that half-claims
+ * «טרפז ישר זווית ABCD (AB ∥ CD, …)» would otherwise answer first); the comma/«ו» split runs only when
+ * no rule owns the line, so it can never override a rule's deliberate refusal.
+ */
 export function parseLine(raw: string): ParseResult {
+  const typed = trim(raw);
+  const line = orthography(typed);
+  if (!line) return { ok: false, code: 'not-handled', detail: raw };
+  if (isProofTarget(unwrap(line))) return { ok: false, code: 'proof-target', detail: raw };
+  const { result, framed } = readLine(line, 0);
+  if (!result.ok) return result.code === 'not-handled' ? { ...result, detail: raw } : result;
+  /*
+   * A refusal names the STUDENT'S statement (the honesty invariant): an apply error quotes its fact's
+   * `src`, and a framed line's facts were parsed from a canonical clause the student never typed — so
+   * «O ראשית הצירים» after «O(1,1)» was refused quoting "O(0,0)". When the frame changed anything,
+   * every fact carries the line as typed.
+   */
+  return framed || line !== typed ? made(result.facts.map((f) => ({ ...f, src: typed }))) : result;
+}
+
+/** Splits are bounded: a clause may itself be framed, but a reading never nests deeper than this. */
+const MAX_FRAME_DEPTH = 2;
+
+/** One reading of `text`; `framed` says whether the frame changed it or took a reading at all. */
+function readLine(text: string, depth: number): { result: ParseResult; framed: boolean } {
+  const s = unwrap(text);
+  if (!s) return { result: { ok: false, code: 'not-handled', detail: text }, framed: false };
+  const attempt = (clauses: readonly string[]): ParseResult | null => {
+    const facts: Fact[] = [];
+    for (const c of clauses) {
+      const { result } = readLine(c, depth + 1);
+      if (!result.ok) return null;
+      facts.push(...result.facts);
+    }
+    return made(facts);
+  };
+  if (depth < MAX_FRAME_DEPTH) {
+    for (const reading of [originClauses(s), shapeClauses(s), distributeClauses(s), pointClauses(s), sideClauses(s)]) {
+      const r = reading && attempt(reading);
+      if (r) return { result: r, framed: true };
+    }
+  }
+  const direct = parseClause(s);
+  const unwrapped = s !== text.trim();
+  if (direct.ok || depth >= MAX_FRAME_DEPTH) return { result: direct, framed: unwrapped };
+  if (direct.code !== 'not-handled' && direct.code !== 'bad-operand') return { result: direct, framed: unwrapped };
+  for (const reading of partitions(segmentsOf(s))) {
+    if (reading.some(isBareName)) continue;
+    const r = attempt(reading);
+    if (r) return { result: r, framed: true };
+  }
+  return { result: direct, framed: unwrapped };
+}
+
+function parseClause(raw: string): ParseResult {
   const line = trim(raw);
   if (!line) return { ok: false, code: 'not-handled', detail: raw };
 
@@ -4075,7 +4158,7 @@ function viaCanonical(line: string, slot: PointSlot | null, build: (p: Id) => st
   const p = slot && 'name' in slot ? slot.name : MINT_SENTINEL;
   const facts: Fact[] = [];
   for (const s of build(p)) {
-    const r = parseLine(s);
+    const r = parseClause(s);
     if (!r.ok) return null;
     facts.push(...r.facts);
   }
