@@ -90,8 +90,10 @@
     "title": "Rename:",
     "placeholder": "letter",
     "apply": "rename",
-    "taken": "that letter is taken — pick a free one",
-    "bad": "not a legal letter, or no such point"
+    "taken": "Letter already used",
+    "bad": "not a legal letter, or no such point",
+    "takenBy": "Held by: «{{what}}»",
+    "swapLetters": "Swap {{a}} and {{b}}"
   },
   "err": {
     "notUnderstood": "I couldn't understand that given (this version: solids, points on segments, vector naming, and claims to verify)",
@@ -100,7 +102,11 @@
     "rename": {
       "same": "«{{from}}» and «{{to}}» are the same name — nothing to change",
       "no-source": "There is no point «{{from}}» in the figure",
-      "target-taken": "The name «{{to}}» is already taken — pick a free letter (renaming onto a live label would merge two points)"
+      "target-taken": "The name «{{to}}» is already taken — pick a free letter, or swap them: type «swap {{from}} and {{to}}» (renaming onto a live label would merge two points)"
+    },
+    "swap": {
+      "same": "«{{a}}» and «{{b}}» are the same name — nothing to swap",
+      "no-source": "To swap, both points must be in the figure — «{{a}}» or «{{b}}» is not"
     },
     "unknownPoint": "Point «{{id}}» is not defined yet",
     "unknownVector": "Vector «{{id}}» is not declared — name it first (denote AB = u)",

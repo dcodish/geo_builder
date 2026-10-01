@@ -32,7 +32,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { COMMAND_CATALOG_3D } from '../catalog3';
-import { RULES, markVectorContext, normalize3, parseRename3 } from '../parse3';
+import { RULES, markVectorContext, normalize3, parseRewrite3 } from '../parse3';
 import allowlist from './shadow-allowlist3.json';
 
 interface Analysis {
@@ -124,7 +124,7 @@ describe('3-D parser shadow-matrix — catalog corpus', () => {
     // history rewrite the second reader owns. Together the two assertions say what the invariant means —
     // no catalog entry reaches the LLM — across both readers rather than only the one this matrix pins.
     expect(rewrites.length + corpus.length).toBe(all.length);
-    for (const { text } of rewrites) expect(parseRename3(text), text).not.toBeNull();
+    for (const { text } of rewrites) expect(parseRewrite3(text), text).not.toBeNull(); // #1631: rename OR swap
   });
 });
 

@@ -59,6 +59,8 @@ import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { auditLoad3 } from './store/loadAudit3';
 import { useStore } from 'zustand';
 import { derive3, redo3, undo3, useGeo3, type Fact3, type FactStatus3 } from './store/store3';
+import { letterRename3 } from './store/rename3';
+import type { LetterRenameResult } from '../shell/frame/letterOffer';
 import { planeChipsByFact } from './store/planeChips';
 import { dihedralChipsByFact, shownDihedrals } from './store/dihedralChips';
 import { paramChipsByFact } from './store/paramChips';
@@ -125,6 +127,7 @@ export default function App3() {
   const remove = useGeo3((s) => s.remove);
   const replaceFact = useGeo3((s) => s.replaceFact);
   const rename = useGeo3((s) => s.rename);
+  const swap = useGeo3((s) => s.swap);
   const clear = useGeo3((s) => s.clear);
   const resample = useGeo3((s) => s.resample);
   const loadFigure = useGeo3((s) => s.loadFigure);
@@ -516,11 +519,18 @@ export default function App3() {
    */
   /** #578: the canvas half of the rename. One store action for both entry points — the text command is
    *  intercepted in `submit`, this is the click — so a refusal reads the same either way. */
-  const onRenamePoint = (from: string, to: string) => {
+  const onRenamePoint = (from: string, to: string): LetterRenameResult => {
     if (busy) return { ok: false, reason: 'busy' };
     const res = rename(from, to);
     logDebug3({ kind: 'action', action: 'rename', detail: `${from}->${to}:${res.ok ? 'ok' : res.reason}` });
-    return res.ok ? { ok: true } : { ok: false, reason: res.reason };
+    return letterRename3(res); // #1631: a taken letter carries its holder, which the popover quotes and offers to swap
+  };
+  /** #1302 / #1631: the popover's swap offer — the same store action the typed «החלף בין A ל-B» reaches. */
+  const onSwapPoints = (a: string, b: string) => {
+    if (busy) return { ok: false };
+    const res = swap(a, b);
+    logDebug3({ kind: 'action', action: 'swap', detail: `${a}<->${b}:${res.ok ? 'ok' : res.reason}` });
+    return { ok: res.ok };
   };
 
   const onNameCrossing = (k: { line: string; plane: string }) => {
@@ -984,12 +994,15 @@ export default function App3() {
               // (FR-RN-10), routed through the SAME store action the text command uses, so the two
               // entry points cannot drift into two behaviours.
               onRenamePoint={onRenamePoint}
+              onSwapPoints={onSwapPoints}
               renameText={{
                 title: t('rename.title'),
                 placeholder: t('rename.placeholder'),
                 apply: t('rename.apply'),
                 taken: t('rename.taken'),
                 bad: t('rename.bad'),
+                takenBy: t('rename.takenBy'),
+                swapLetters: t('rename.swapLetters'),
               }}
             />
           </div>

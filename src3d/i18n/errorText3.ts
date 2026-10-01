@@ -73,6 +73,9 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // live letter would merge two of their vertices, which is a different operation nobody asked for.
     case 'rename-refused':
       return t(`err.rename.${err.reason}`, { from: err.from, to: err.to });
+    // #1302 / #1631: a swap we understood and declined — named by the two letters the student typed.
+    case 'swap-refused':
+      return t(`err.swap.${err.reason}`, { a: err.a, b: err.b });
     case 'already-defined':
       return t('err.alreadyDefined', { id: err.id });
     // #612 (ADR-3D-158): name BOTH shapes — the honesty invariant is that a refusal names the
