@@ -13368,3 +13368,17 @@ The derived pin was refused at EVERY seed in one entry order and built in the ot
 **Tests.** `src/__tests__/issue-1599-1601-knowledge-pool.test.ts` (SSA status + BC withheld + a unique figure still «נקבע במלואו»; the operator's figure complete far inside the cap with «AC = 2x»; an over-cap figure incomplete, «too complex» status and values note, identical verdict on a second run); scenario `ssa-triangle-two-shapes-status-and-values-1599` (corpus 4); `issue-1444-config-status.test.ts` (pending → «בודק…», incomplete → «too complex», he/en texts); `issue-434-admissible-set.test.ts` (pool-size locks restated as meaning: one configuration once the side is stated, the square's 24 identical seeds).
 
 **Consequences.** `src/engine/solveBudget.ts` (`work`, `countWork`, `workExceeded`, `withWorkBudget`), `src/engine/evaluate.ts` (counts work), `src/replay/core.ts` (`POOL_WORK_CAP`, `CONFIG_SEEDS`, `sharedSamples(facts, opts)`, `SharedSamples.complete`, `Determinacy.complete`, `partialSeedSample`, `preciseSamples`, `computeValues` carries `complete`), `src/engine/valuesPanel.ts` (`ValuesPanelResult.complete`), `src/app/figureStatus.ts`, `src/App.tsx`, locales he/en.
+
+## ADR-559 — a loaded figure keeps its asked questions: `deserializeFigure` reads `queries` back (#1645)
+
+**Status:** accepted · 2026-10-01 · found by the #1637 save-envelope audit (analytic #1632's sibling check)
+
+**Requirements:** none (internal — [ADR-433](#adr-433) already promised that questions travel with the figure; this makes the promise true on load) · **Design:** none (internal)
+
+**Context.** [ADR-433](#adr-433) (#477) writes the student's value queries into the figure file, and `loadFigure` restores `file.queries ?? []`. But `deserializeFigure` (`src/store/figureFile.ts`) built its result without the field, so it was always `undefined`. Measured: saved `["AB"]`, loaded `undefined`. A reopened worksheet lost every quantity its author had been tracking. The audit that found it compared each product's save envelope against its restore: 3-D and complex restore every field, and analytic's `spokenFor` was the same class (#1632).
+
+**Decision.** `deserializeFigure` copies `queries` through, leniently like `display`: only non-empty strings survive, and a malformed field is dropped rather than refusing the file.
+
+**Measured.** `src/store/__tests__/figure-file.test.ts` (#1645 block): save with queries → deserialize → `loadFigure` restores them; a malformed `queries` drops leniently. Both fail on the pre-change code (2 failed | 14 passed) and pass after.
+
+**Consequences.** `src/store/figureFile.ts`. A file saved before #477 has no `queries` and loads exactly as before.

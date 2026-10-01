@@ -193,3 +193,30 @@ describe('namedFigureFileName (issue #20)', () => {
     expect(namedFigureFileName('  ??  ', now)).toBe('figure-2026-07-11.geo.json');
   });
 });
+
+/**
+ * #1645 — the asked QUESTIONS travel with the figure (#477) — and come back. They were written but
+ * `deserializeFigure` never copied them, so `loadFigure` always restored an empty list (measured: saved
+ * ["AB"], loaded undefined). Through the real save → load → store path, never a re-implementation.
+ */
+describe('#1645 — a loaded figure keeps its asked questions', () => {
+  it('save with queries → deserialize → loadFigure restores them', () => {
+    submit('משולש ABC');
+    const json = serializeFigure({ facts: s().facts, seed: s().seed, queries: ['AB', '∠ABC'] }, { locale: 'he', savedAt: '2026-10-01T00:00:00.000Z' });
+    const r = deserializeFigure(json);
+    if (!r.ok) throw new Error(`refused: ${r.reason}`);
+    expect(r.file.queries).toEqual(['AB', '∠ABC']);
+    s().clear();
+    s().loadFigure(r.file);
+    expect(s().queries).toEqual(['AB', '∠ABC']);
+  });
+
+  it('a malformed queries field is dropped leniently, never refusing the file', () => {
+    submit('משולש ABC');
+    const raw = JSON.parse(serializeFigure({ facts: s().facts, seed: s().seed }, { locale: 'he', savedAt: '2026-10-01T00:00:00.000Z' }));
+    raw.queries = ['AB', 7, '', '  ', 'BC'];
+    const r = deserializeFigure(JSON.stringify(raw));
+    if (!r.ok) throw new Error(`refused: ${r.reason}`);
+    expect(r.file.queries).toEqual(['AB', 'BC']);
+  });
+});

@@ -256,6 +256,12 @@ export function deserializeFigure(text: string): FigureLoadResult {
       seed: typeof raw.seed === 'number' && Number.isFinite(raw.seed) ? raw.seed : 0,
       facts,
       display,
+      // #1645: the questions were WRITTEN (#477) but never read back, so `loadFigure`'s
+      // `file.queries ?? []` was always empty and a loaded worksheet lost its asked questions.
+      // Lenient like `display`: only non-empty strings survive.
+      ...(Array.isArray(raw.queries)
+        ? { queries: raw.queries.filter((q): q is string => typeof q === 'string' && q.trim().length > 0) }
+        : {}),
     },
   };
 }
