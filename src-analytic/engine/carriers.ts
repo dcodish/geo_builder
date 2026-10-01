@@ -354,6 +354,15 @@ export function reportedDof(_c: Construction, carrierDof: number): number {
  * knowledge, and an open row until then.
  */
 export const directionSymbol = (lineId: Id): string => `θ_${lineId}`;
+/**
+ * THE TOOL'S OWN FREE SYMBOLS (#1619 ruling b, ADR-AG-198) — the `θ_` family, of which the free line's direction
+ * is one member. A circle a tangency sentence creates with its centre UNNAMED («AB ו-BC משיקים למעגל …» before
+ * any circle) is an equation circle whose centre coordinates and radius are free symbols the student never wrote:
+ * free DOF like a free vertex's coordinates, never a parameter row, and signed through the curve they shape.
+ * Spelled under the same prefix so every surface that already keeps the free direction out of the givens' rows
+ * keeps these out by the same test.
+ */
+export const toolSymbol = (objectId: Id, part: string): string => `θ_${objectId}.${part}`;
 export const isDirectionSymbol = (sym: string): boolean => sym.startsWith('θ_');
 
 // ---------------------------------------------------------------------------

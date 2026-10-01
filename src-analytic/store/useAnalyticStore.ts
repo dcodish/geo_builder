@@ -121,6 +121,8 @@ export type InputError =
   /** A construct that cannot exist in this figure, which has no freedom left to try (#1058). */
   | { key: 'does-not-exist'; detail: string; existing?: string }
   | { key: 'ring-contradicts-noun'; detail: string }
+  /** #1554 ruling 1 (ADR-AG-198) — a noun no circle can pass around, said to be inscribed: both nouns, registry keys. */
+  | { key: 'inscribed-contradicts-noun'; detail: string; shape?: string; forced?: string }
   /** A vertex that does not name an angle on its own — no shape through it, or several (#1049). */
   | { key: 'ambiguous-angle'; detail: string; example?: string }
   /** A shape named by its noun alone, where the figure has no such shape or several (#1049). */

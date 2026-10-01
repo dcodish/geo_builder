@@ -126,7 +126,10 @@ describe('#1619 B2 — the 471 corpus questions build the exam`s own figure', ()
   });
 
   it('«BD קוטר במעגל» after it already follows — not out-of-scope, though D is ON the circle rather than defining it (#1554 arm 2)', () => {
-    expect(decideSubmit('BD קוטר במעגל', EXAM_1554, 0)).toMatchObject({ kind: 'already-follows' });
+    // It DRAWS the diameter BD (#1639, ADR-AG-198), so on the exam's figure — BD a diagonal, not drawn — it
+    // records; once BD is drawn the statement adds nothing, and says so.
+    expect(decideSubmit('BD קוטר במעגל', EXAM_1554, 0)).toMatchObject({ kind: 'record' });
+    expect(decideSubmit('BD קוטר במעגל', [...EXAM_1554, 'BD'], 0)).toMatchObject({ kind: 'already-follows' });
   });
 });
 
@@ -201,10 +204,13 @@ describe('#1619 B2 — every spelling lowers to the sentences it is made of', ()
     const base = factsOf(['מעגל חסום במשולש ABC']);
     for (const l of ['במשולש ABC חסום מעגל', 'המשולש ABC חוסם מעגל', 'משולש ABC חוסם את המעגל', 'the incircle of triangle ABC', 'a circle inscribed in triangle ABC'])
       expect(factsOf([l]), l).toEqual(base);
-    expect(base).toContainEqual({ t: 'circle-thru', id: 'circle-in-ABC', def: { t: 'incircle', pts: ['A', 'B', 'C'] } });
-    expect(base.some((f) => (f as { def?: { t: string } }).def?.t === 'through')).toBe(false);
+    // The circle rides the binding (ADR-AG-198): a circle already stated tangent to every side IS this circle,
+    // otherwise the computed incircle is created — so the creation is read through `the-circle`.
+    const within = (fs: unknown[]) => fs.flatMap((f) => ((f as Fact).t === 'the-circle' ? [f, ...(f as Extract<Fact, { t: 'the-circle' }>).create] : [f]));
+    expect(within(base)).toContainEqual(expect.objectContaining({ t: 'circle-thru', id: 'circle-in-ABC', def: { t: 'incircle', pts: ['A', 'B', 'C'] } }));
+    expect(within(base).some((f) => (f as { def?: { t: string } }).def?.t === 'through')).toBe(false);
     // …and the converse: a polygon IN a circle never builds an incircle.
-    expect(factsOf(['מרובע ABCD חסום במעגל']).some((f) => (f as { def?: { t: string } }).def?.t === 'incircle')).toBe(false);
+    expect(within(factsOf(['מרובע ABCD חסום במעגל'])).some((f) => (f as { def?: { t: string } }).def?.t === 'incircle')).toBe(false);
   });
 
   it('a quadrilateral`s incircle carries its Pitot condition, AB + CD = BC + DA', () => {
@@ -279,20 +285,16 @@ describe('#1554 — every quadrilateral noun, inscribed in a circle and circumsc
   });
 
   /**
-   * A cyclic right trapezoid is a rectangle, which is not a trapezoid. #1554's ruling (2026-09-29) says REFUSE;
-   * #1627's later ruling (2026-10-01) says givens that force a trapezoid into a rectangle are DRAWN WITH A
-   * WARNING. Escalated, not chosen here. What is locked is the half both rulings share: the figure is never
-   * presented as a valid trapezoid — every seed's ring carries a fault (the rectangle, or a collapse the search
-   * ended on), so no configuration is drawn as though the givens held.
+   * A cyclic right trapezoid is a rectangle, which is not a trapezoid. The operator's ruling of 2026-10-01 (on
+   * #1554, ADR-AG-198) settled the escalation: the INSCRIPTION SENTENCE is refused, naming both nouns; #1627's
+   * draw-with-a-warning stays for givens that force the rectangle later. So the figure is never presented as a
+   * valid trapezoid — it is not drawn at all.
    */
-  it('«טרפז ישר זווית ABCD חסום במעגל» is never presented as a valid trapezoid', () => {
-    const violations = new Set<string>();
+  it('«טרפז ישר זווית ABCD חסום במעגל» is refused, naming the noun and the rectangle it would have to be', () => {
     for (const seed of SEEDS) {
       const d = derive(['טרפז ישר זווית ABCD חסום במעגל'], seed);
-      expect(d.figure.ringFaults.length, `seed ${seed}`).toBeGreaterThan(0);
-      for (const r of d.figure.ringFaults) violations.add(r.violation);
+      expect(d.faults.map((f) => f.code), `seed ${seed}`).toEqual(['inscribed-contradicts-noun']);
     }
-    expect(violations).toContain('trapezoid-is-parallelogram');
   });
 
   it('the cyclic quadrilateral is as whole as the plain one, and «הציגו תצורה אחרת» moves it', () => {

@@ -102,7 +102,10 @@ describe('ADR-AG-196 — one lowering for a touch at a named point (B2 ∪ B3)',
     const d = derive(corpus('6/4'));
     expect(d.faults).toEqual([]);
     const q = pts(d.figure);
-    expect([q.A.x, q.A.y, q.C.x, q.C.y].map((v) => Number(v.toFixed(6)) + 0)).toEqual([2, -1, -4, 5]);
+    // The touch line now CREATES its circle (#1619 ruling b, ADR-AG-198), and the two touch points are the two
+    // tangents' feet in either labelling — the ruling's «A(2,−1), C(−4,5) or the mirror».
+    const got = [q.A.x, q.A.y, q.C.x, q.C.y].map((v) => Number(v.toFixed(6)) + 0);
+    expect([[2, -1, -4, 5], [-4, 5, 2, -1]]).toContainEqual(got);
   });
 });
 
@@ -239,7 +242,8 @@ describe('#1619 — the newly landing corpus questions draw the exam`s figure', 
     '2/5': { A: [7, -5], B: [7, 3], C: [0, 2], M: [4, -1] },
     '3/5': { A: [-8, 0], B: [0, 6], C: [-2, 2], D: [-2, 0], E: [0, 2], F: [-3.2, 3.6] },
     '4/4': { A: [1, 2], B: [3, 4], C: [3.4, 3.6] },
-    '6/4': { A: [2, -1], B: [8, 11], C: [-4, 5], O: [-2, 1], K: [-1, 2] },
+    // A and C in either labelling (#1619 ruling b) — the mirror is checked by the 6/4 lock in issue-1637-g2-parser.
+    '6/4': { B: [8, 11], O: [-2, 1], K: [-1, 2] },
     '7/5': { M: [3, 1], A: [0.4, -0.8], B: [2, -2], C: [4, -2] },
     '9/5': { A: [0, -4], B: [-2, 0], C: [-8, 0], D: [-10, -4], M: [-5, -4] },
     '12/5': { A: [7, -6], B: [1, -6], M: [4, -2], D: [4, -6] },

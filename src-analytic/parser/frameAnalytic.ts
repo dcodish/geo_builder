@@ -23,6 +23,7 @@
  */
 import { ANGLE_STEM_HE, EN_SHAPE, SHAPES, normalizeShapeNoun } from '../engine/shapes';
 import { isNumeralName } from '../engine/names';
+import { stripFormatControls } from '../../shell/bidi';
 
 // ---------------------------------------------------------------------------
 // Orthography — character-level folds, always applied
@@ -32,11 +33,19 @@ import { isNumeralName } from '../engine/names';
  * One spelling per symbol. ∢ (U+2222) and ∡ (U+2221) are the exam's angle glyphs and mean ∠ (#1555);
  * ⁰ is typed for °; the Israeli coordinate pair «A(2;10)» separates with a semicolon; «10½» is 10.5;
  * «קודקוד» is the plene spelling of «קדקוד»; the maqaf and the NBSP are a hyphen and a space.
+ *
+ * #1641 / #1643 (ADR-AG-198) — what a PASTE carries is not what the student wrote: the bidi isolates and marks
+ * the page wraps around every name (U+2066…U+2069, U+200E/F — copied off the canvas or the fact list) are
+ * stripped by the shared set (`shell/bidi`, the 2-D/3-D parser boundary, ADR-W-029); a leading bullet («·»,
+ * «•», «*», or «-» followed by a space) is a list mark, not a word; and «ציר ה- x» with a space after the
+ * article's hyphen is «ציר ה-x». Character-level, so every rule reads the one spelling.
  */
 export function orthography(raw: string): string {
-  return raw
+  return stripFormatControls(raw)
+    .replace(/^\s*(?:[·•∙*]|-(?=\s))\s*/, '')
     .replace(/־/g, '-')
     .replace(/ /g, ' ')
+    .replace(/(?<![א-ת])ה-\s+([xy])(?![A-Za-z0-9])/g, 'ה-$1')
     .replace(/[∡∢]/g, '∠')
     .replace(/⁰/g, '°')
     .replace(/(\d)\s*½/g, '$1.5')
@@ -323,8 +332,6 @@ export function pointClauses(line: string): string[] | null {
 // Sides as subjects — on an axis, and related to each other
 // ---------------------------------------------------------------------------
 
-const SIDE = `(?:ה?(?:${SIDE_NOUNS}|ישר)\\s+)?((?:${NAME}){2})`;
-
 /**
  * - «האלכסון BD נמצא על ציר ה-x», «הצלע AO נמצאת על ציר ה-x» — a segment lies on an axis exactly when
  *   both its endpoints do, so that is what it says.
@@ -332,19 +339,29 @@ const SIDE = `(?:ה?(?:${SIDE_NOUNS}|ישר)\\s+)?((?:${NAME}){2})`;
  * - «האלכסון AC מאונך לאלכסון BD» — a relation that names its nouns: the letters are the relation.
  */
 export function sideClauses(line: string): string[] | null {
-  const onAxis = new RegExp(`^${SIDE}\\s+(?:נמצא(?:ת)?\\s+)?על\\s+(ציר\\s+ה-?[xy])$`).exec(line);
+  const onAxis = new RegExp(`^(?:ה?(${SIDE_NOUNS}|ישר)\\s+)?((?:${NAME}){2})\\s+(?:נמצא(?:ת)?\\s+)?על\\s+(ציר\\s+ה-?[xy])$`).exec(line);
   if (onAxis) {
-    const ends = onAxis[1].match(new RegExp(NAME, 'g')) ?? [];
-    return ends.map((p) => `${p} על ${onAxis[2]}`);
+    const [, noun, pair, axis] = onAxis;
+    const ends = pair.match(new RegExp(NAME, 'g')) ?? [];
+    // The sentence NAMES the segment (or the line), so it draws it (#1639, ADR-AG-198): «הישר» the line,
+    // every other noun and the bare pair the segment — the declaration the bare «AO» line makes.
+    return [...ends.map((p) => `${p} על ${axis}`), `${noun === 'ישר' ? 'הישר' : 'הקטע'} ${pair}`];
   }
   const mutual = new RegExp(
-    `^(?:ה?(?:ישרים|צלעות|קטעים|אלכסונים)\\s+)?((?:${NAME}){2})\\s+ו-?\\s*((?:${NAME}){2})\\s+(מקביל(?:ים|ות)|מאונכ(?:ים|ות))(?:\\s+(?:זה|זו)\\s+(?:לזה|לזו))?$`,
+    `^(?:ה?(ישרים|צלעות|קטעים|אלכסונים)\\s+)?((?:${NAME}){2})\\s+ו-?\\s*((?:${NAME}){2})\\s+(מקביל(?:ים|ות)|מאונכ(?:ים|ות))(?:\\s+(?:זה|זו)\\s+(?:לזה|לזו))?$`,
   ).exec(line);
-  if (mutual) return [`${mutual[1]} ${mutual[3].startsWith('מקביל') ? '∥' : '⊥'} ${mutual[2]}`];
+  // The NOUN rides into the relation (#1639, ADR-AG-198): «הישרים AB ו-CD» relates — and so draws — two LINES.
+  if (mutual) {
+    const n = mutual[1] === 'ישרים' ? 'הישר ' : '';
+    return [`${n}${mutual[2]} ${mutual[4].startsWith('מקביל') ? '∥' : '⊥'} ${n}${mutual[3]}`];
+  }
   const related = new RegExp(
-    `^${SIDE}\\s+(מקביל(?:ה)?|מאונכ(?:ת)?|מאונך)\\s+ל(?:-|ה)?(?:${SIDE_NOUNS}|ישר)?\\s*((?:${NAME}){2})$`,
+    `^(?:ה?(${SIDE_NOUNS}|ישר)\\s+)?((?:${NAME}){2})\\s+(מקביל(?:ה)?|מאונכ(?:ת)?|מאונך)\\s+ל(?:-|ה)?(${SIDE_NOUNS}|ישר)?\\s*((?:${NAME}){2})$`,
   ).exec(line);
-  if (related) return [`${related[1]} ${related[2].startsWith('מקביל') ? '∥' : '⊥'} ${related[3]}`];
+  if (related) {
+    const n = (noun: string | undefined) => (noun === 'ישר' ? 'הישר ' : '');
+    return [`${n(related[1])}${related[2]} ${related[3].startsWith('מקביל') ? '∥' : '⊥'} ${n(related[4])}${related[5]}`];
+  }
   return null;
 }
 
@@ -362,13 +379,16 @@ const PLACE_PRED = '(?:נמצא(?:ת|ים|ות)?\\s|על\\s|ב-?\\s*(?:ה?נקו
  * M. A NUMERAL after «המעגל» is the circle's own name (ADR-AG-118), never a centre letter, so it is not read.
  */
 export function centreClauses(line: string): string[] | null {
-  const named = new RegExp(`^(?:ה?נקודת\\s+)?ה?מרכז\\s+(?:של\\s+)?ה?מעגל\\s+(${NAME})(?:\\s+(.+))?$`).exec(line);
+  // «מרכז המעגל הוא M» (#1643, ADR-AG-198) — the copula form of the naming is the same naming.
+  const named = new RegExp(`^(?:ה?נקודת\\s+)?ה?מרכז\\s+(?:של\\s+)?ה?מעגל\\s+(?:(?:הוא|היא)\\s+)?(${NAME})(?:\\s+(.+))?$`).exec(line);
   if (named && !isNumeralName(named[1])) {
     const [, p, rest] = named;
     return rest ? [`${p} מרכז המעגל`, `${p} ${rest}`] : [`${p} מרכז המעגל`];
   }
   const namedEn = new RegExp(`^(?:[Tt]he\\s+)?cent(?:re|er)\\s+of\\s+the\\s+circle,?\\s+(${NAME}),?\\s+(.+)$`).exec(line);
   if (namedEn && !isNumeralName(namedEn[1])) return [`${namedEn[1]} is the centre of the circle`, `${namedEn[1]} ${namedEn[2]}`];
+  const copulaEn = new RegExp(`^(?:[Tt]he\\s+)?cent(?:re|er)\\s+of\\s+the\\s+circle\\s+is\\s+(${NAME})$`).exec(line);
+  if (copulaEn && !isNumeralName(copulaEn[1])) return [`${copulaEn[1]} is the centre of the circle`];
   const created = new RegExp(`^(ה?מעגל\\s+ש?מרכזו\\s+(?:ה?נקודה\\s+)?(${NAME}))\\s+(${PLACE_PRED}.*)$`).exec(line);
   if (created) return [created[1], `${created[2]} ${created[3]}`];
   const createdEn = new RegExp(`^((?:a\\s+|the\\s+)?circle\\s+(?:centred|centered)\\s+at\\s+(${NAME}))\\s+((?:is|lies)\\s.+)$`, 'i').exec(line);
@@ -453,7 +473,12 @@ export function parenClauses(line: string): string[] | null {
 // Distribution — «A ו-B נמצאות על ציר ה-x ועל ציר ה-y בהתאמה»
 // ---------------------------------------------------------------------------
 
-const NAME_LIST = `((?:${NAME})(?:\\s*,\\s*${NAME})*\\s+ו-?\\s*${NAME})`;
+/**
+ * A LIST of point names, however the student separates it (#1641, ADR-AG-198): «A ו-B», «A, B ו-C», «A, B, C»,
+ * «A, B, ו-C». Commas alone are a list, and so is a final «ו-» with or without the comma before it — the frame
+ * used to admit one spelling of a list (the final «ו-» required), so three ordinary spellings missed every rule.
+ */
+const NAME_LIST = `((?:${NAME})(?:(?:\\s*,\\s*${NAME})+(?:\\s*,?\\s*ו-?\\s*${NAME})?|\\s+ו-?\\s*${NAME}))`;
 const namesOf = (list: string): string[] => list.match(new RegExp(NAME, 'g')) ?? [];
 /** Split «על ציר ה-x ועל ציר ה-y» / «x = 4 ו-x = -4» into its members. */
 const objectsOf = (s: string): string[] => s.split(/\s+ו-?(?=\s*(?:על|ב[א-ת]|[A-Za-z0-9(−-]))/).map((x) => x.trim()).filter(Boolean);
@@ -465,12 +490,18 @@ const objectsOf = (s: string): string[] => s.split(/\s+ו-?(?=\s*(?:על|ב[א-�
  * סימטריות») would be changed in meaning by distributing it, so nothing else is.
  */
 export function distributeClauses(line: string): string[] | null {
+  /*
+   * The subject noun is optional, with or without the article («הנקודות», «נקודות»), and so is the VERB when
+   * the predicate opens with «על» (#1641): «A, B, C על המעגל» is the location sentence with its verb dropped,
+   * exactly as «A על המעגל» is «A נמצאת על המעגל». Without «על» the verb stays required — a bare list and
+   * anything else is not this reading, so «A ו-B סימטריות» (a relation BETWEEN the subjects) never distributes.
+   */
   const loc = new RegExp(
-    `^(?:ה?(?:נקודות|קדקודים)\\s+)?${NAME_LIST}\\s+(?:נמצא(?:ות|ים)|מונח(?:ות|ים)|נמצאות|נמצאים)\\s+(.+)$`,
+    `^(?:ה?(?:נקודות|קדקודים)\\s+)?${NAME_LIST}\\s+(?:(?:נמצא(?:ות|ים)|מונח(?:ות|ים))\\s+(.+)|(על\\s.+))$`,
   ).exec(line);
   if (loc) {
     const names = namesOf(loc[1]);
-    let rest = loc[2].trim();
+    let rest = (loc[2] ?? loc[3]).trim();
     const respectively = /\s+בהתאמה$/.test(rest);
     if (respectively) rest = rest.replace(/\s+בהתאמה$/, '');
     if (!respectively) return names.map((n) => `${n} ${rest}`);

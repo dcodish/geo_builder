@@ -94,7 +94,8 @@ describe('#1619 B1 — phrasings that ARE an existing sentence lower to its fact
 
   it('the centre by its ROLE is the same statement as with its letter written in, in both languages', () => {
     const base = ['נתון מעגל שמרכזו M', 'C(1,2)', 'D(4,6)'];
-    const withLetter = built([...base, 'M על הישר CD']);
+    // A bare «CD» keeps no noun (#1636) and its pair is drawn (#1639): «M על CD» and the segment CD.
+    const withLetter = built([...base, 'M על CD', 'CD']);
     expect(built([...base, 'CD עובר דרך מרכז המעגל'])).toEqual(withLetter);
     expect(built([...base, 'CD passes through the centre of the circle'])).toEqual(withLetter);
   });
