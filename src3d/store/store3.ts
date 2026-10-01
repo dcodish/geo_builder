@@ -23,7 +23,7 @@
 import { create } from 'zustand';
 import type { PlaneDisplayMode3Map } from './figureFile3';
 import { buildNotices3, type BuildNotice3 } from '../engine/notices';
-import { normalizeLabel3, renameFacts3, renamePlaneDisplay3, renameQueries3, type RenameResult3 } from './rename3';
+import { normalizeLabel3, renameFacts3, renamePlaneDisplay3, renameQueries3, swapSession3, type RenameResult3, type SwapResult3 } from './rename3';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { ingestTypedText } from '../../shell/bidi';
@@ -41,7 +41,7 @@ import { namedPointAt } from '../engine/crossings3';
 import { meaningKey } from '../engine/operands';
 import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
-import { parse3, parseRename3 } from '../parser/parse3';
+import { parse3, parseRewrite3 } from '../parser/parse3';
 
 export interface Fact3 {
   id: string;
@@ -89,6 +89,8 @@ export type StoreError3 =
    *  was understood perfectly, so escalating it to the LLM would pay for a guess at a question already
    *  answered. `from`/`to` are echoed so the message can name the letters the student typed. */
   | { code: 'rename-refused'; reason: 'same' | 'no-source' | 'target-taken'; from: string; to: string }
+  /** #1302 / #1631: a SWAP that could not be done — typed for the same reason as a rename refusal. */
+  | { code: 'swap-refused'; reason: 'same' | 'no-source'; a: string; b: string }
   | { code: 'bad-file' }
   | { code: 'newer-schema' }
   /** #1379 — a file or link over `shell/save`'s statement ceiling, refused before any replay. */
@@ -928,6 +930,10 @@ export interface Geo3State {
    *  figure is exactly what it would have been had the student typed the new letter from the start.
    *  One undoable step. Also reached from the text command, intercepted in `submit`. */
   rename: (from: string, to: string) => RenameResult3;
+  /** #1302 / #1631: EXCHANGE two existing letters across the session — facts, queries and plane
+   *  display through one NUL-sentinel triple, in ONE set (one undo step); the seed is kept. Reached from
+   *  the popover's offer and from the typed «החלף בין A ל-B», intercepted in `submit`. */
+  swap: (a: string, b: string) => SwapResult3;
   clear: () => void;
   /** Data-panel QUERIES (ADR-3D-057, #274): quantities the student asked to see («w·v», «|AB|»…).
    *  NOT facts — never replayed, never on the figure; saved with the file, undoable. */
@@ -1060,6 +1066,7 @@ function lostGivens3(utterance: string, commands: readonly Command3[], prior: Co
  */
 export type Verdict3 =
   | { readonly kind: 'rename'; readonly from: string; readonly to: string }
+  | { readonly kind: 'swap'; readonly a: string; readonly b: string }
   /** the line reads as nothing the grammar knows — the one verdict the App escalates to the model */
   | { readonly kind: 'not-understood' }
   | { readonly kind: 'refused'; readonly error: NonNullable<StoreError3> }
@@ -1078,8 +1085,11 @@ export function decideSubmit3(
   // App3 because this is where the fact list lives — and because a refusal must carry its own
   // code: a rename we understood and declined must not reach the LLM lane, which escalates on
   // `not-understood` and would pay for a guess at a question already answered.
-  const rn = parseRename3(utterance);
-  if (rn) return { kind: 'rename', from: rn.from, to: rn.to };
+  // #1302 / #1631: «החלף בין A ל-B» is the same kind of rewrite, read FIRST — its «בין» is what marks
+  // it a swap, and the plain «החלף E ב-G» replace-rename below never sees it.
+  const rw = parseRewrite3(utterance);
+  if (rw?.kind === 'swap') return { kind: 'swap', a: rw.a, b: rw.b };
+  if (rw?.kind === 'rename') return { kind: 'rename', from: rw.from, to: rw.to };
   const read = readStatement3(st, utterance);
   if (!read.ok) return read.error.code === 'not-understood' ? { kind: 'not-understood' } : { kind: 'refused', error: read.error };
   return decideCommands3(st, utterance, read.commands, { twins: true, seedSearch: true }, newId);
@@ -1156,6 +1166,9 @@ export const useGeo3 = create<Geo3State>()(
         switch (v.kind) {
           case 'rename':
             get().rename(v.from, v.to);
+            return;
+          case 'swap':
+            get().swap(v.a, v.b);
             return;
           case 'not-understood':
             set({ lastError: { code: 'not-understood' } });
@@ -1279,6 +1292,18 @@ export const useGeo3 = create<Geo3State>()(
           lastError: null,
           lastNotice: null,
         });
+        return { ok: true };
+      },
+      swap: (a, b) => {
+        const { facts, queries, planeDisplay } = get();
+        const r = swapSession3({ facts, queries, planeDisplay }, a, b);
+        if (!r.ok) {
+          set({ lastError: { code: 'swap-refused', reason: r.reason, a: normalizeLabel3(a) ?? a, b: normalizeLabel3(b) ?? b }, lastNotice: null });
+          return r;
+        }
+        // ONE set, so ONE undo step; the SEED is untouched, like the rename's — a letter is a name, not a
+        // configuration, so the drawing must not jump when two letters change places.
+        set({ facts: r.facts, queries: r.queries, planeDisplay: r.planeDisplay, lastError: null, lastNotice: null });
         return { ok: true };
       },
       clear: () => set({ facts: [], queries: [], planeDisplay: {}, displayMode: {}, dihedralShown: {}, figureName: '', lastError: null, lastNotice: null }),

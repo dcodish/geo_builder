@@ -12330,7 +12330,9 @@ export function parseSwap(raw: string): { a: Id; b: Id } | null {
 
   const m =
     s.match(/\bswap\s+([A-Za-z]\d*)\s*(?:and|with|for|↔|<->|→)\s*([A-Za-z]\d*)\b/i) ??
-    s.match(/(?:החלף|החליפי)\s+בין\s+([A-Za-z]\d*)\s*(?:לבין|ל-?|ו-?|↔|→)\s*([A-Za-z]\d*)\b/i);
+    // «החליפו» (plural) is the wording of the swap button itself (ADR-520 Am. 1) and of 3-D's typed swap
+    // (#1631) — a student who reads the button and types it must get the same swap here.
+    s.match(/(?:החלף|החליפי|החליפו)\s+בין\s+([A-Za-z]\d*)\s*(?:לבין|ל-?|ו-?|↔|→)\s*([A-Za-z]\d*)\b/i);
   if (!m) return null;
   const a = up(m[1]);
   const b = up(m[2]);

@@ -155,7 +155,8 @@ describe('#578 — the canvas entry point runs the SAME core', () => {
 
   it('the action reports the reason so the popover can explain a no-op', () => {
     build([CUBE]);
-    expect(st().rename('A', 'B')).toEqual({ ok: false, reason: 'target-taken' });
+    // #1631: a taken letter names its HOLDER — the statement that introduced it, in the student's words
+    expect(st().rename('A', 'B')).toEqual({ ok: false, reason: 'target-taken', holder: { factId: st().facts[0].id, utterance: CUBE } });
     expect(st().rename('Z', 'M')).toEqual({ ok: false, reason: 'no-source' });
     expect(st().rename('A', 'A')).toEqual({ ok: false, reason: 'same' });
     expect(st().rename('A', '3'), 'not a legal label').toEqual({ ok: false, reason: 'no-source' });
@@ -185,7 +186,7 @@ describe('#578 — the token boundary (the piece 2-D had to learn twice)', () =>
 
   it('renameFacts3 refuses rather than merging two points onto one letter', () => {
     const facts = [{ id: '1', utterance: 'x', enabled: true, cmds: [{ type: 'solid', kind: 'cube', ids: ['A', 'B'] } as never] }];
-    expect(renameFacts3(facts, 'A', 'B')).toEqual({ ok: false, reason: 'target-taken' });
+    expect(renameFacts3(facts, 'A', 'B')).toEqual({ ok: false, reason: 'target-taken', holder: { factId: '1', utterance: 'x' } });
   });
 
   it('normalizeLabel3 accepts the labels this product uses and nothing else', () => {

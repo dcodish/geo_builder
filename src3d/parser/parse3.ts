@@ -4724,6 +4724,39 @@ export function parseRename3(raw: string): { from: string; to: string } | null {
 }
 
 /**
+ * «החלף בין A ל-B» / "swap A and B" — a SWAP request (#1302, #1631): exchange two existing letters,
+ * which {@link parseRename3} cannot express (a rename refuses a taken target rather than merge two
+ * points). 2-D's `parseSwap` grammar, verbatim, with this product's PRIMED label token.
+ *
+ * **The word «בין» is what marks it a swap**, so the plain «החלף E ב-G» replace-rename is untouched —
+ * the two readers can never both claim one line. Read before `parse3` on the raw text, so it normalises
+ * through {@link normalize3} itself (#531: a pasted maqaf «ל־B» must not break the connector group).
+ */
+export function parseSwap3(raw: string): { a: string; b: string } | null {
+  const s = normalize3(raw);
+  const L = String.raw`([A-Za-z]\d*'?)`;
+  const m =
+    s.match(new RegExp(String.raw`\bswap\s+${L}\s*(?:and|with|for|↔|<->|→)\s*${L}(?![A-Za-z0-9'])`, 'i')) ??
+    s.match(new RegExp(String.raw`(?:החלף|החליפו|החליפי)\s+בין\s+${L}\s*(?:לבין|ל-?|ו-?|↔|→)\s*${L}(?![A-Za-z0-9'])`, 'i'));
+  if (!m) return null;
+  const a = m[1].toUpperCase();
+  const b = m[2].toUpperCase();
+  return a === b ? null : { a, b };
+}
+
+/**
+ * The deterministic lane's SECOND reader, whole (#578, #1631): a line that rewrites the session's
+ * letters rather than adding a statement — a swap or a rename. What the catalog's `rewrite` lane is
+ * checked against, and the order `decideSubmit3` asks in (swap first: its «בין» is the marker).
+ */
+export function parseRewrite3(raw: string): { kind: 'swap'; a: string; b: string } | { kind: 'rename'; from: string; to: string } | null {
+  const sw = parseSwap3(raw);
+  if (sw) return { kind: 'swap', ...sw };
+  const rn = parseRename3(raw);
+  return rn ? { kind: 'rename', ...rn } : null;
+}
+
+/**
  * #1449 (ADR-3D-279) — THE ASK FORM OF A STATED ANGLE IS THE STATEMENT WITHOUT ITS VALUE.
  *
  * «הזווית בין המישורים π1 ו-π2 היא 54.74» was checked and accepted, while the same words as a question
