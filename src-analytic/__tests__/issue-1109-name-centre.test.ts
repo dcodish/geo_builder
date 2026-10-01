@@ -93,12 +93,16 @@ describe('#1109 — the click is offered only where there is no name', () => {
     expect(offers([CIRCLE, 'P(3,4)'])).toEqual([]);
   });
 
-  it('an ANONYMOUS circle is not offered — its sentence could not round-trip', () => {
+  it('an ANONYMOUS circle is offered BY ITS EQUATION — the sentence round-trips since #1598 (ADR-AG-193)', () => {
     /**
-     * There is no «המעגל ‹name›» to write, and ADR-AG-054's rule is that a ring whose click fails is
-     * worse than no ring.
+     * Until #1598 there was no «המעגל ‹name›» to write, and ADR-AG-054's rule is that a ring whose click
+     * fails is worse than no ring. «P מרכז המעגל (x-1)^2+(y-1)^2=4» is now read back (the `centre-of`
+     * fact), so the ring is offered with that sentence — the round-trip itself is locked in
+     * issue-1619-b1-circle-phrasing.test.ts.
      */
-    expect(offers(['(x-1)^2+(y-1)^2=4'])).toEqual([]);
+    const o = offers(['(x-1)^2+(y-1)^2=4']);
+    expect(o).toHaveLength(1);
+    expect(o[0].sentence).toMatch(/מרכז המעגל \(x-1\)\^2\+\(y-1\)\^2=4$/);
   });
 
   it('a figure with no circle offers nothing', () => {

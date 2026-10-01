@@ -26,6 +26,7 @@ import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, ringsNam
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { RESERVED_SYMBOLS } from './carriers';
 import {
+  CENTRE_SENTINEL,
   EMPTY_CONSTRUCTION,
   inDomain,
   circleDefPoints,
@@ -569,6 +570,44 @@ function curveKindOf(o: GeoObject): string | null {
   if (o.curve.kind) return o.curve.kind;
   const probe = resolveCurve(o.curve, PROBE_ENVS[0]);
   return probe.ok ? probe.curve.kind : null;
+}
+
+/**
+ * THE RULE a circle's CENTRE follows from (#1619 B1) — the one answer to "which point is the centre of this
+ * circle", for every way a circle is stated: an equation circle's centre is read off its equation
+ * (`circle-centre`), a circle through three points has the circumcentre of the three, a circle on a
+ * diameter has the diameter's midpoint. A circle on a centre POINT needs no rule — the point is the centre.
+ */
+function centreRuleOf(o: GeoObject): DerivedRule | null {
+  if (o.kind === 'curve') return { t: 'circle-centre', curve: o.id };
+  if (o.kind === 'circle-thru') {
+    return o.def.t === 'through' ? { t: 'circumcentre', v: [o.def.pts[0], o.def.pts[1], o.def.pts[2]] } : { t: 'midpoint', a: o.def.a, b: o.def.b };
+  }
+  return null;
+}
+
+/** The POINT the figure already holds at this circle's centre, by its id — null when the centre is unnamed. */
+function centreIdOf(c: Construction, o: GeoObject): Id | null {
+  if (o.kind === 'circle-at') return o.centre;
+  const rule = centreRuleOf(o);
+  if (!rule) return null;
+  const held = c.objects.find((p) => p.kind === 'derived' && sameDerivation(p.rule, rule));
+  return held ? held.id : null;
+}
+
+/**
+ * THE CIRCLE A NAME DENOTES — one chain for every sentence that names a circle (#1619 B1).
+ *
+ * The chain was spelled inline four times (`tangent-of`, `radius-of`, `diameter-of`, `tangent-circles`):
+ * a numeral id, a centre-letter id, the student's own name. None of the copies knew the fourth way the
+ * exam names a circle — by the letter of a centre that was NAMED after the circle was stated («נתון מעגל M
+ * שמשוואתו …», «M מרכז המעגל»), so «A על מעגל M» found no circle beside a figure whose circle plainly has
+ * centre M. Asked here once, so every reference reaches every naming.
+ */
+function circleByName(c: Construction, name: string): GeoObject | undefined {
+  const direct = objectById(c, numeralCurveId('circle', name)) ?? objectById(c, `circle-at-${name}`) ?? curveByName(c, name);
+  if (direct) return direct;
+  return c.objects.find((o) => curveKindOf(o) === 'circle' && centreIdOf(c, o) === name);
 }
 
 /**
@@ -1397,7 +1436,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       const isCircle = (o: GeoObject) => curveKindOf(o) === 'circle';
       let host: GeoObject | undefined;
       if (f.circle !== undefined) {
-        host = objectById(c, numeralCurveId('circle', f.circle)) ?? objectById(c, `circle-at-${f.circle}`) ?? curveByName(c, f.circle);
+        host = circleByName(c, f.circle);
         if (!host || !isCircle(host)) return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
       } else if (!f.define) {
         const circles = c.objects.filter(isCircle);
@@ -1457,9 +1496,149 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * Resolved against a PROBE environment, the same device `sameNumbers` uses here: a conic's KIND
        * does not turn on the value of its parameters in any form the corpus writes.
        */
+      // «A על מעגל M» (#1619 B1): a NAMED circle resolves through the one name chain, the bare kind to the one.
+      if (f.circle !== undefined) {
+        const named = circleByName(c, f.circle);
+        if (!named || curveKindOf(named) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
+        return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: named.id }, src: f.src });
+      }
       const matches = c.objects.filter((o) => curveKindOf(o) === f.kind);
       if (matches.length !== 1) return { ok: false, error: noHost(f.src, f.kind, matches) };
       return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: matches[0].id }, src: f.src });
+    }
+
+    /**
+     * «O מרכז המעגל» · «P מרכז המעגל x^2+y^2=16» — NAMING the centre (#1598, #1619 B1).
+     *
+     * Which circle: the one with this equation, else the one circle in the figure. What the name lowers to
+     * is decided by HOW that circle was stated, so no sentence needs a case of its own:
+     *  - an equation circle → the `circle-centre` derivation «O מרכז המעגל I» already lowers to (#1109),
+     *    with its `already-named` and auto-O yield rules unchanged (#1153, ADR-AG-184);
+     *  - a circle computed from points → its circumcentre / the diameter's midpoint (`centreRuleOf`);
+     *  - a circle on a centre point → that point IS the centre: the same letter is known, another letter is
+     *    a second name for one position, refused naming the holder (#1153);
+     *  - an equation that matches no curve → the circle is stated with its centre named, exactly as «נתון
+     *    מעגל P שמשוואתו …» states it (`create`);
+     *  - NO circle at all → the circle on this centre is stated (`create`, «נתון מעגל שמרכזו P») — the
+     *    `diameter-of` precedent: a sentence about «המעגל» that finds none introduces it (#1324).
+     * Several circles and no equation: refused naming the candidates, never a pick.
+     */
+    case 'centre-of': {
+      // No creation the sentence can stand for (the centre letter reads as a circle numeral): refused by
+      // name rather than absorbed as though it had said nothing.
+      const create = (): ApplyOutcome =>
+        f.create ? applyAll(c, f.create) : { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      let host: GeoObject | undefined;
+      if (f.eq !== undefined) {
+        const id = resolveCurveByEq(c, f.eq);
+        if (!id) return create();
+        host = objectById(c, id);
+        if (host && curveKindOf(host) !== 'circle') {
+          return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(host) } };
+        }
+      } else {
+        const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+        if (circles.length === 0) return create();
+        if (circles.length > 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
+        host = circles[0];
+      }
+      if (!host) return { ok: false, error: noHost(f.src, 'circle', 0) };
+      if (host.kind === 'circle-at') {
+        if (host.centre === f.id) return { ok: true, effect: 'known', next: c };
+        return { ok: false, error: { code: 'already-named', detail: f.src, holder: statedName(host.centre) } };
+      }
+      const rule = centreRuleOf(host);
+      if (!rule) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      return applyFact(c, { t: 'derived', id: f.id, rule, src: f.src });
+    }
+
+    /**
+     * «CD עובר דרך מרכז המעגל» — the centre used as a POINT (#1619 B1). Which point the centre IS is the
+     * figure's answer (`centreIdOf`); the sentence's own facts are then applied with that name, so the
+     * statement means exactly what it means with the letter written in. An unnamed centre is a point the
+     * student has not named yet — refused as the unknown reference it is, quoting their own words.
+     */
+    case 'via-centre': {
+      const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+      if (circles.length !== 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
+      const centre = centreIdOf(c, circles[0]);
+      if (centre === null) return { ok: false, error: { code: 'unknown-reference', detail: f.phrase, expected: 'point' } };
+      const facts = JSON.parse(JSON.stringify(f.facts).split(CENTRE_SENTINEL).join(centre)) as Fact[];
+      return applyAll(c, facts.map((g) => ({ ...g, src: f.src })));
+    }
+
+    /**
+     * «B נמצאת מחוץ למעגל» · «E נמצאת על הקשת הקטנה AC» — a REGION of the circle (#1619 B1).
+     *
+     * D7 kind 2 ([ADR-AG-005](../../docs/06c-decisions-analytic.md#adr-ag-005)): a region consumes no
+     * freedom, so it is a SELECTOR over the configurations — `between`'s kind, never a constraint (which
+     * would drop the DOF cue) and never a sampling bound. It is the `sign` selector over the circle's own
+     * derived quantity: the power of the point (outside / inside), or the point's side of the chord against
+     * the centre's (the minor arc is the side the centre is not on). An ARC also states that its point and
+     * the chord's two ends lie ON the circle — «הקשת AC» of a circle has its ends on it — so those
+     * incidences come with it, absorbed where they were already given.
+     */
+    case 'circle-region': {
+      let host: GeoObject | undefined;
+      if (f.circle !== undefined) {
+        host = circleByName(c, f.circle);
+        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
+      } else {
+        const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+        if (circles.length !== 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
+        host = circles[0];
+      }
+      const circle = host.id;
+      if (f.region === 'outside' || f.region === 'inside') {
+        return applyAll(c, [
+          { t: 'declare', id: f.id, src: f.src },
+          { t: 'selector', sel: { kind: 'sign', q: { k: 'power', p: f.id, circle }, positive: f.region === 'outside' }, src: f.src },
+        ]);
+      }
+      const [a, b] = [f.a!, f.b!];
+      if (a === b || f.id === a || f.id === b) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
+      const on = (id: Id): Fact => ({ t: 'constraint', k: { t: 'on-curve', id, curve: circle }, src: f.src });
+      return applyAll(c, [
+        { t: 'declare', id: f.id, src: f.src },
+        on(f.id),
+        on(a),
+        on(b),
+        { t: 'selector', sel: { kind: 'sign', q: { k: 'arc-side', p: f.id, a, b, circle }, positive: f.region === 'major-arc' }, src: f.src },
+      ]);
+    }
+
+    /**
+     * «אורך הקטע AB שווה לרדיוס המעגל» — the radius against a MEASURED length (#1619 B1). The `radius-of`
+     * host resolution, then the `length-eq` the sentence means with the circle's own radius on the right: a
+     * free radius stays free and is SOLVED by the equation (the radius symbol is in the register), a
+     * stated one is a constant, an equation circle's is read at the probes. A computed circle's radius
+     * follows from solved points this boundary cannot see — refused by name, as `radius-of` refuses it.
+     */
+    case 'radius-length': {
+      let host: GeoObject | undefined;
+      if (f.circle !== undefined) {
+        host = circleByName(c, f.circle);
+        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
+      } else {
+        const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+        if (circles.length !== 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
+        host = circles[0];
+      }
+      let r: Expr | null = null;
+      if (host.kind === 'circle-at') r = host.r as Expr;
+      else if (host.kind === 'curve') {
+        const curve = host.curve;
+        const radii = PROBE_ENVS.map((env) => {
+          const rc = resolveCurve(curve, env);
+          return rc.ok && rc.curve.kind === 'circle' ? rc.curve.r : NaN;
+        });
+        // A radius that moves with the parameters is not a constant this boundary can write down (no CAS).
+        if (radii.every(Number.isFinite) && Math.abs(radii[0] - radii[1]) <= 1e-9 * Math.max(1, radii[0])) {
+          r = { kind: 'num', value: radii[0] } as Expr;
+        }
+      }
+      if (!r) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      return applyFact(c, { t: 'constraint', k: { t: 'length-eq', left: f.length, right: { expr: r, terms: [] } }, src: f.src });
     }
 
     case 'crossing-kind': {
@@ -1481,10 +1660,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (f.circle !== undefined) {
         // The line-first order names its circle — «הישר l1 משיק למעגל M» (#1501). The same lookup
         // chain as `diameter-of`: a numeral id, a centre-letter id, or the student's own name.
-        host =
-          objectById(c, numeralCurveId('circle', f.circle)) ??
-          objectById(c, `circle-at-${f.circle}`) ??
-          curveByName(c, f.circle);
+        host = circleByName(c, f.circle);
         if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
       } else {
         // By the fit, not the declaration: «המעגל» about an equation circle still finds ITS circle,
@@ -1523,7 +1699,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         host = objectById(c, f.circleId);
         if (!host) return { ok: false, error: unknownRef(c, f.circleId) };
       } else if (f.circle !== undefined) {
-        host = objectById(c, numeralCurveId('circle', f.circle)) ?? objectById(c, `circle-at-${f.circle}`) ?? curveByName(c, f.circle);
+        host = circleByName(c, f.circle);
         if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
       } else {
         const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
@@ -1641,8 +1817,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     case 'tangent-circles': {
       // The same name→circle chain as `tangent-of`/`diameter-of`: a numeral id, a centre-letter
       // id, or the student's own name — one chain, so the family cannot drift (#1504).
-      const byName = (name: string): GeoObject | undefined =>
-        objectById(c, numeralCurveId('circle', name)) ?? objectById(c, `circle-at-${name}`) ?? curveByName(c, name);
+      const byName = (name: string): GeoObject | undefined => circleByName(c, name);
       const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
       let a: GeoObject | undefined;
       let b: GeoObject | undefined;
@@ -1756,7 +1931,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           : f.sel.kind === 'distinct'
             ? f.sel.ids
             : f.sel.kind === 'sign'
-              ? dirRefs(f.sel.q.u)
+              ? f.sel.q.k === 'slope'
+                ? dirRefs(f.sel.q.u)
+                : f.sel.q.k === 'power'
+                  ? [f.sel.q.p]
+                  : [f.sel.q.p, f.sel.q.a, f.sel.q.b]
               : f.sel.kind === 'coord-compare'
                 ? // Both points of «x_B > x_D» must exist (#1462); a value names none.
                   [f.sel.id, ...('point' in f.sel.rhs ? [f.sel.rhs.point] : [])]
@@ -1769,9 +1948,14 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       // A sign about a NAMED line refers to a line the figure must have (#1323) — the #1150 rule for
       // the curve half of a reference, applied to the selector that names one.
-      if (f.sel.kind === 'sign' && f.sel.q.u.k === 'curve') {
+      if (f.sel.kind === 'sign' && f.sel.q.k === 'slope' && f.sel.q.u.k === 'curve') {
         const o = objectById(c, f.sel.q.u.id);
         if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(c, f.sel.q.u.id) };
+      }
+      // A circle region names the circle M1 resolved (#1619 B1) — it must still be one.
+      if (f.sel.kind === 'sign' && f.sel.q.k !== 'slope') {
+        const o = objectById(c, f.sel.q.circle);
+        if (!o || curveKindOf(o) !== 'circle') return { ok: false, error: unknownRef(c, f.sel.q.circle) };
       }
       // Compared structurally: the union's members have different shapes, and a field-by-field test
       // would have to be extended by hand for each new kind — the drift ADR-043 names.
@@ -2102,6 +2286,8 @@ export interface FoldResult {
   effects: Array<LineEffect | null>;
   /** Per construction constraint, the index of the FACT that added it — see `fold` (#1079). */
   constraintFact: number[];
+  /** Per construction selector, the index of the FACT that added it (#1619 B1) — `constraintFact`'s twin. */
+  selectorFact: number[];
   /** Per-fact NOTICE, positionally (#1350) — what a statement that landed should tell the student. */
   notices: Array<ApplyNotice | null>;
 }
@@ -2183,14 +2369,22 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean): Fold
    * anything about it, so a future resolved reference is attributed with nothing to remember.
    */
   const constraintFact: number[] = [];
+  // The same attribution for SELECTORS (#1619 B1): a region («מחוץ למעגל») is a selector M1 builds from a
+  // contextual fact, so the line that stated it can only be found from the construction, as for constraints.
+  const selectorFact: number[] = [];
   const commit = (i: number, next: Construction, effect: LineEffect, notice?: ApplyNotice) => {
     const before = c.constraints;
+    const beforeSel = c.selectors;
     c = next;
     // Appended AND replaced: #1049’s choice collapse swaps a constraint in place, and the
     // replacement belongs to the line that named the seat, not to the line that opened it.
     c.constraints.forEach((k, at) => {
       if (before[at] === k && constraintFact[at] !== undefined) return;
       constraintFact[at] = i;
+    });
+    c.selectors.forEach((s, at) => {
+      if (beforeSel[at] === s && selectorFact[at] !== undefined) return;
+      selectorFact[at] = i;
     });
     errors[i] = null;
     effects[i] = effect;
@@ -2222,7 +2416,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean): Fold
     });
     if (!progressed) break;
   }
-  return { construction: c, errors, effects, constraintFact, notices };
+  return { construction: c, errors, effects, constraintFact, selectorFact, notices };
 }
 
 /**

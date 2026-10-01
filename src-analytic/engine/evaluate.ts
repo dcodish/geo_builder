@@ -745,6 +745,31 @@ function crossingSiblings(c: Construction, id: Id, at: Map<Id, Pt>): Id[] {
   return [...at.keys()].filter((other) => other !== id && sig(other) === mine);
 }
 
+/**
+ * A CIRCLE'S REGION QUANTITY at this configuration (#1619 B1, ADR-AG-193) — the `power` of a point (|PC|² − r²,
+ * positive outside) or the `arc-side` product (the point's side of the chord AB times the centre's, positive
+ * on the major arc's side). Scale-free in sign, which is all the selector reads; a value within the solver's
+ * resolution of zero is ON the boundary and counts as neither side, so a point the givens put ON the circle
+ * never reads as "outside" by a rounding error. `null` when something it needs is not placed.
+ */
+export function circleQuantity(
+  q: Exclude<Extract<Selector, { kind: 'sign' }>['q'], { k: 'slope' }>,
+  at: (id: Id) => Pt | null,
+  curveAt: (id: Id) => NumCurve | null,
+): number | null {
+  const k = curveAt(q.circle);
+  const p = at(q.p);
+  if (!k || k.kind !== 'circle' || !p) return null;
+  const scale = Math.max(1, k.r * k.r);
+  const zero = (v: number) => (Math.abs(v) <= SOLVE_RESOLUTION * scale ? 0 : v);
+  if (q.k === 'power') return zero((p.x - k.cx) ** 2 + (p.y - k.cy) ** 2 - k.r * k.r);
+  const a = at(q.a);
+  const b = at(q.b);
+  if (!a || !b) return null;
+  const side = (x: number, y: number) => (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
+  return zero(side(p.x, p.y)) * zero(side(k.cx, k.cy));
+}
+
 function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[] {
   const apart = apartOf(at);
 
@@ -760,6 +785,11 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
      */
     if (s.kind === 'sign') {
       const atFn = (id: Id) => at.get(id) ?? null;
+      if (s.q.k !== 'slope') {
+        const q = circleQuantity(s.q, atFn, curveAtOf(c, env, atFn));
+        if (q === null) return true; // an operand not placed (or a vacant circle) judges nothing, as below
+        return s.positive ? q > 0 : q < 0;
+      }
       const v = dirVector(s.q.u, atFn, curveAtOf(c, env, atFn), env);
       if (!v) return true; // an operand that is not placed yet judges nothing, as below
       if (Math.abs(v.x) < 1e-9 * Math.hypot(v.x, v.y)) return false;
@@ -966,6 +996,7 @@ export interface SolveReport {
  * A perpendicular construction inverts the sign and is not reached here; the post-hoc check still judges it.
  */
 function freeAngleOf(c: Construction, sel: Extract<Selector, { kind: 'sign' }>): string | null {
+  if (sel.q.k !== 'slope') return null; // a circle region judges no direction (#1619 B1)
   const u = sel.q.u;
   if (u.k === 'free') return u.sym;
   if (u.k !== 'curve') return null;
@@ -1226,8 +1257,62 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
     c.selectors.length === 0 || failingSelectors(c, system.positionsAt(x), system.envAt(x)).length === 0;
   const separatedFrom = (system: CarrierSystem, x: number[]): number[][] => [
     ...swappedStarts(system, x),
+    ...chordStarts(system, x),
     ...deflatedStarts(system, x, collapsedPairs(c, system.positionsAt(x), ownFree), 120),
   ];
+  /**
+   * THE OTHER ROOT OF A STRAIGHT AND A CIRCLE, IN CLOSED FORM (#1619 B1, ADR-AG-193).
+   *
+   * Two crossings of one circle with one straight («המעגל חותך את ציר ה-x בנקודות B ו-C») that collapsed
+   * onto one root have a known other root: the partner reflected through the foot of the centre on the
+   * straight — the chord's midpoint. Deflation (below) finds it by changing the equations, and on a circle
+   * whose CENTRE AND RADIUS are themselves free it found a different figure instead: the deflated descent
+   * grew the circle until the two points were far apart, and 9 of 24 seeds drew a circle of radius 10⁶–10⁹
+   * through two crossings a continent apart. The reflection is exact, keeps the circle the collapsed solve
+   * found, and is tried first; where the pair is not a circle × straight it proposes nothing and deflation
+   * runs as before. A start, never a verdict — the polish and the selectors still judge it.
+   */
+  const chordStarts = (system: CarrierSystem, x: number[]): number[][] => {
+    const pos = system.positionsAt(x);
+    const env0 = system.envAt(x);
+    const pairs = collapsedPairs(c, pos, ownFree);
+    if (pairs.length === 0) return [];
+    const atFn = (id: Id) => pos.get(id) ?? null;
+    const curveAt = curveAtOf(c, env0, atFn);
+    const m = system.asMap(x);
+    let moved = false;
+    // A pair is listed from BOTH crossings' selectors; moving both members would only swap the collapse.
+    const touched = new Set<Id>();
+    for (const { mover, partner } of pairs) {
+      const p = pos.get(partner);
+      if (!p || touched.has(mover) || touched.has(partner)) continue;
+      touched.add(mover);
+      touched.add(partner);
+      let circle: { cx: number; cy: number } | null = null;
+      let line: { a: number; b: number; c: number } | null = null;
+      for (const k of c.constraints) {
+        if (!('id' in k) || (k as { id?: Id }).id !== mover) continue;
+        if (k.t === 'on-curve') {
+          const cu = curveAt(k.curve);
+          if (cu?.kind === 'circle') circle = { cx: cu.cx, cy: cu.cy };
+          else if (cu?.kind === 'line') line = { a: cu.a, b: cu.b, c: cu.c };
+        } else if (k.t === 'on-line') line = { a: k.a, b: k.b, c: k.c };
+        else if (k.t === 'on-line-2pt') {
+          const A = pos.get(k.a);
+          const B = pos.get(k.b);
+          if (A && B) line = { a: B.y - A.y, b: A.x - B.x, c: -((B.y - A.y) * A.x + (A.x - B.x) * A.y) };
+        }
+      }
+      if (!circle || !line) continue;
+      const n2 = line.a * line.a + line.b * line.b;
+      if (n2 < 1e-24) continue;
+      const t = (line.a * circle.cx + line.b * circle.cy + line.c) / n2;
+      const foot = { x: circle.cx - line.a * t, y: circle.cy - line.b * t };
+      m.set(mover, { x: 2 * foot.x - p.x, y: 2 * foot.y - p.y });
+      moved = true;
+    }
+    return moved ? [system.toVec(m, env0)] : [];
+  };
   /**
    * A comparison between two FREE points that holds the wrong way round (#1462): the two points swapped is
    * the configuration the sentence names wherever the pair is interchangeable (the kite's B and D), and

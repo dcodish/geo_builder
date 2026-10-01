@@ -29,10 +29,13 @@ function valueExpr(src: string): Expr | null {
 }
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, type NumeralKind } from '../engine/names';
-import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
+import { CENTRE_SENTINEL, UNBOUNDED, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 import {
+  centreClauses,
   distributeClauses,
+  elidedSubjectClauses,
+  sharedSubjectClauses,
   isBareName,
   isProofTarget,
   orthography,
@@ -925,6 +928,48 @@ const CENTRE_EN = new RegExp(
 );
 
 /**
+ * «O מרכז המעגל» · «O היא מרכז המעגל» · «P מרכז המעגל x^2+y^2=16» · «P מרכז המעגל שמשוואתו …» · "O is the
+ * centre of the circle (x^2+y^2=16)" — the centre of the circle the figure HAS, named (#1598, #1619 B1).
+ *
+ * The named form above («O מרכז המעגל I») needs a name the student may not have: an equation circle is
+ * anonymous, and «המעגל» is how the exam refers to its one circle. Which circle is M1's question
+ * (`centre-of`) — by the equation when the sentence carries one, through the ADR-AG-023/#1342 identity
+ * resolver, else the one circle. The creation sentence the student would otherwise have typed rides along
+ * as `create`, lowered here by the rule that owns it, so a figure with no such circle gets exactly that
+ * circle and no second lowering of it exists.
+ */
+const CENTRE_CTX_HE = new RegExp(
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מרכז\\s+(?:של\\s+)?ה?מעגל(?:\\s+(?:${HE_EQ_OF}${HE_IS}\\s*:?\\s*)?(.+))?$`,
+);
+const CENTRE_CTX_EN = new RegExp(
+  `^(?:[Tt]he\\s+)?(?:[Pp]oint\\s+)?(${NAME})\\s+is\\s+the\\s+cent(?:re|er)\\s+of\\s+the\\s+circle(?:\\s+(?:whose\\s+equation\\s+is\\s+)?(.+))?$`,
+);
+
+function centreOfCircle(line: string): RuleOutcome {
+  const m = CENTRE_CTX_HE.exec(line) ?? CENTRE_CTX_EN.exec(line);
+  if (!m) return null;
+  const [, id, tail] = m;
+  // Only a creation that NAMES this centre is the statement — «מעגל I שמשוואתו …» reads I as the circle's
+  // numeral, and would create a circle with no centre named at all.
+  const created = (sentence: string): Fact[] | undefined => {
+    const r = parseClause(sentence);
+    if (!r.ok || !r.facts.some((f) => (f.t === 'derived' || f.t === 'circle-at' || f.t === 'declare') && ('centre' in f ? f.centre : f.id) === id)) return undefined;
+    return r.facts.map((f) => ({ ...f, src: line }));
+  };
+  if (tail === undefined) {
+    const create = created(`נתון מעגל שמרכזו ${id}`);
+    return made([{ t: 'centre-of', id, ...(create ? { create } : {}), src: line }]);
+  }
+  // A tail must be the circle's EQUATION (in the plane's variables) — anything else is not this sentence.
+  const src = trim(tail);
+  if (!src.includes('=')) return null;
+  const eq = equationExpr(src);
+  if (!eq || !symbolsOf(eq).some((s) => RESERVED_SYMBOLS.has(s))) return null;
+  const create = created(`נתון מעגל ${id} שמשוואתו ${src}`);
+  return made([{ t: 'centre-of', id, eq, ...(create ? { create } : {}), src: line }]);
+}
+
+/**
  * `M מפגש התיכונים במשולש ABC` · `G מפגש האלכסונים במרובע ABCD` · `M מפגש האלכסונים במרובע` ·
  * `M מפגש האלכסונים` (#1283).
  *
@@ -1018,11 +1063,17 @@ function ordinalOf(line: string): 0 | 1 | null {
  * the clitic joins an operand only when an operand follows it.
  */
 const INTERSECT_JOIN = '(?:\\s+עם\\s+|\\s+ו\\s+|\\s+ו-\\s*|\\s+ו(?=ה|ל|צ|מ|פ|א))';
+/**
+ * «B היא אחת מנקודות החיתוך של המעגל עם ציר ה-y» (#1619 B1) — "one of the crossings" names a crossing and
+ * says nothing about WHICH: it is the sentence without an ordinal, so it is read as that sentence (the
+ * `crossing-distinct` reading, and which root it takes is the configuration's — «הציגו תצורה אחרת»).
+ */
+const ONE_OF_HE = '(?:אחת\\s+מ-?\\s*)?';
 const INTERSECT_HE = new RegExp(
-  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה?נקודת|ה?נקודות)?\\s*ה?חיתוך\\s*${NTH_HE}\\s*(?:של\\s+)?(.+?)${INTERSECT_JOIN}(.+)$`
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*${ONE_OF_HE}(?:ה?נקודת|ה?נקודות)?\\s*ה?חיתוך\\s*${NTH_HE}\\s*(?:של\\s+)?(.+?)${INTERSECT_JOIN}(.+)$`
 );
 const INTERSECT_EN = new RegExp(
-  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+(?:first\\s+|second\\s+|other\\s+)?intersection\\s+(?:point\\s+)?of\\s+(.+?)\\s+(?:and|with)\\s+(.+)$`
+  `^(?:point\\s+)?(${NAME})\\s+is\\s+(?:the\\s+(?:first\\s+|second\\s+|other\\s+)?intersection\\s+(?:point\\s+)?|one\\s+of\\s+the\\s+(?:intersection\\s+points|intersections|points\\s+of\\s+intersection)\\s+)of\\s+(.+?)\\s+(?:and|with)\\s+(.+)$`
 ,  'i',
 );
 
@@ -1037,7 +1088,7 @@ const INTERSECT_EN = new RegExp(
 const BOUNDED_NOUN = /^(?:ה?צלע|ה?קטע|ה?בסיס|(?:the\s+)?(?:side|segment|base))\s/i;
 
 /** A CONTEXTUAL operand — «המעגל», «הפרבולה» with no name: which curve is M1's question (#1429). */
-type KindOperand = { t: 'kind'; kind: 'circle' | 'parabola' | 'ellipse' };
+type KindOperand = { t: 'kind'; kind: 'circle' | 'parabola' | 'ellipse'; circle?: string };
 
 // «המעגל 1» and «המעגל I» are one circle (#1429) — the digit→Roman map now lives in `engine/names.ts`
 // (`numeralCurveId`), shared by the mint and every reference site, for every numeral-named kind.
@@ -1072,6 +1123,15 @@ function incidenceOn(operand: string, id: Id): Constraint | KindOperand | null {
     new RegExp(`^ה?(מעגל|פרבולה|אליפסה)\\s+(${NUMERAL_ALT})$`).exec(trim(operand)) ??
     new RegExp(`^(?:[Tt]he\\s+)?([Cc]ircle|[Pp]arabola|[Ee]llipse)\\s+(${NUMERAL_ALT})$`).exec(trim(operand));
   if (named) return { t: 'on-curve', id, curve: numeralCurveId(KIND_NOUNS[named[1].toLowerCase()] as NumeralKind, named[2]) };
+  /**
+   * A circle by its CENTRE LETTER — «מעגל M», «המעגל M», "circle M" (#1619 B1). The exam names a circle by
+   * its centre («נתון מעגל שמרכזו M … A על מעגל M»), and which circle that is — `circle-at-M`, or an
+   * equation circle whose centre was named M — only the figure knows, so it rides the contextual marker
+   * with the name and M1 resolves it through the one name chain. A numeral is read above, first.
+   */
+  const byCentre =
+    new RegExp(`^ה?מעגל\\s+(${NAME})$`).exec(trim(operand)) ?? new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s+(${NAME})$`).exec(trim(operand));
+  if (byCentre) return { t: 'kind', kind: 'circle', circle: byCentre[1] };
 
   const dir = direction(trim(operand));
   if (dir?.k === 'curve') return { t: 'on-curve', id, curve: dir.id };
@@ -1132,8 +1192,27 @@ function parseIntersection(line: string): RuleOutcome {
   if (spelled) return spelled;
   const m = INTERSECT_HE.exec(line) ?? INTERSECT_EN.exec(line);
   if (!m) return null;
-  const [, id, leftSrc, rightSrc] = m;
+  const [, id, leftRaw, rightRaw] = m;
   const ordinal = ordinalOf(line);
+  /**
+   * «…עם החלק החיובי של ציר ה-x» (#1619 B1) — an axis operand may name ONE PART of the axis. Being ON the
+   * axis is the incidence; which part is the `axis-side` selector «B על החלק החיובי של ציר x» already
+   * carries (D7 kind 2) — the same two facts that sentence lowers to, so the crossing on a half-axis and
+   * the point on a half-axis cannot drift.
+   */
+  const axisPart: Fact[] = [];
+  const peelPart = (src: string): string => {
+    const t = trim(src);
+    const he = /^ה?חלק\s+(ה?חיובי|ה?שלילי)\s+של\s+(ציר\s+ה?-?\s*([xy]))$/.exec(t);
+    const en = he ? null : /^(?:the\s+)?(positive|negative)\s+(?:part\s+of\s+(?:the\s+)?)?(([xy])[- ]axis)$/i.exec(t);
+    const hit = he ?? en;
+    if (!hit) return src;
+    const axis = hit[3].toLowerCase() as 'x' | 'y';
+    axisPart.push({ t: 'selector', sel: { kind: 'axis-side', id, axis, positive: /חיובי|positive/i.test(hit[1]) }, src: line });
+    return he ? hit[2] : `the ${hit[2]}`;
+  };
+  const leftSrc = peelPart(leftRaw);
+  const rightSrc = peelPart(rightRaw);
   // #1286 (ADR-AG-135): a crossing's incidences are marked as such — the drawn extent bounds the
   // SOLUTION set for a crossing only (the operator's T11 ruling and ruling (a) were about this
   // sentence); a cevian's foot or a point «על הישר» keeps the line reading its own ruling gave it.
@@ -1154,12 +1233,15 @@ function parseIntersection(line: string): RuleOutcome {
   if (left.t === 'kind' || right.t === 'kind') {
     if (ordinalOf(line) !== null) return refuse('bad-operand', line);
     const side = (k: Constraint | KindOperand): Fact =>
-      k.t === 'kind' ? { t: 'on-kind', id, kind: k.kind, src: line } : { t: 'constraint', k, src: line };
+      k.t === 'kind'
+        ? { t: 'on-kind', id, kind: k.kind, ...(k.circle ? { circle: k.circle } : {}), src: line }
+        : { t: 'constraint', k, src: line };
     return made([
       { t: 'declare', id, src: line },
       side(left),
       side(right),
       { t: 'selector', sel: { kind: 'crossing-distinct', id }, src: line },
+      ...axisPart,
     ]);
   }
   /**
@@ -1218,6 +1300,7 @@ function parseIntersection(line: string): RuleOutcome {
     ordinal === null
       ? { t: 'selector', sel: { kind: 'crossing-distinct', id }, src: line }
       : { t: 'selector', sel: { kind: 'crossing-nth', id, nth: ordinal, pair: [left, right] }, src: line },
+    ...axisPart,
   ]);
 }
 /**
@@ -1236,7 +1319,7 @@ function intersectionSpellings(line: string): RuleOutcome {
   const both = bothCrossings(line);
   if (both) return both;
   const ordWord = (s: string | undefined) => (s ? ` ${s.replace(/^ה?/, 'ה')}` : '');
-  const HEAD = `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה?נקודת|ה?נקודות)?\\s*ה?חיתוך\\s*(ה?ראשונה|ה?שניי?ה|ה?אחרת)?\\s*`;
+  const HEAD = `^${HE_POINT}(${NAME})${HE_IS}\\s*${ONE_OF_HE}(?:ה?נקודת|ה?נקודות)?\\s*ה?חיתוך\\s*(ה?ראשונה|ה?שניי?ה|ה?אחרת)?\\s*`;
   const dist =
     new RegExp(`${HEAD}(?:של\\s+)?ה?ישרים\\s+(\\S+)\\s+ו-?\\s*(\\S+)$`).exec(line) ??
     new RegExp(`^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+()intersection\\s+of\\s+(?:the\\s+)?lines\\s+(\\S+)\\s+and\\s+(\\S+)$`, 'i').exec(line);
@@ -1342,9 +1425,22 @@ function bothCrossings(line: string): RuleOutcome {
   if (!hit) return null;
   const { a, b, x, y, he } = hit;
   if (a === b) return refuse('repeated-vertex', line); // «בנקודות A ו-A» names one point twice
-  const sentences = he
-    ? [`${a} נקודת החיתוך הראשונה של ${x} עם ${y}`, `${b} נקודת החיתוך השנייה של ${x} עם ${y}`]
-    : [`${a} is the first intersection of ${x} with ${y}`, `${b} is the second intersection of ${x} with ${y}`];
+  /**
+   * A CONTEXTUAL operand — «המעגל חותך את ציר ה-x בנקודות B ו-C» (#1619 B1). The ordinal reading needs the
+   * pair's canonical order, which an operand M1 has not resolved yet cannot give (the single-crossing rule
+   * refuses an ordinal over one, for that reason). So the two letters are the two crossings WITHOUT an
+   * ordinal: each carries `crossing-distinct`, which makes them two different points (a tangency, where
+   * the roots coincide, fails it), and which letter takes which root is the CONFIGURATION's — it moves with
+   * «הציגו תצורה אחרת» rather than being fixed by a default the sentence never stated (ADR-052).
+   */
+  const contextual = [x, y].some((s) => incidenceOn(s, 'Z')?.t === 'kind');
+  const sentences = contextual
+    ? he
+      ? [`${a} נקודת החיתוך של ${x} עם ${y}`, `${b} נקודת החיתוך של ${x} עם ${y}`]
+      : [`${a} is the intersection of ${x} with ${y}`, `${b} is the intersection of ${x} with ${y}`]
+    : he
+      ? [`${a} נקודת החיתוך הראשונה של ${x} עם ${y}`, `${b} נקודת החיתוך השנייה של ${x} עם ${y}`]
+      : [`${a} is the first intersection of ${x} with ${y}`, `${b} is the second intersection of ${x} with ${y}`];
   const facts: Fact[] = [];
   for (const sentence of sentences) {
     const r = parseClause(sentence);
@@ -1446,6 +1542,9 @@ function parseDerived(line: string): RuleOutcome {
     const circleName = letter ?? numeral;
     return made([{ t: 'derived', id, rule: { t: 'circle-centre', curve: numeralCurveId('circle', circleName) }, src: line }]);
   }
+
+  const contextual = centreOfCircle(line);
+  if (contextual) return contextual;
 
   const diag = DIAGONAL_EQ_HE.exec(line) ?? DIAGONAL_EQ_EN.exec(line);
   if (diag && claimable(diag[2])) {
@@ -1866,8 +1965,18 @@ function parseMeasureRoles(line: string): RuleOutcome {
     switch (ref.role) {
       case 'radius': {
         const v = roleScalar(value);
-        if (!v) continue;
-        return made([{ t: 'radius-of', ...(ref.circle ? { circle: ref.circle } : {}), value: v, src: line }]);
+        if (v) return made([{ t: 'radius-of', ...(ref.circle ? { circle: ref.circle } : {}), value: v, src: line }]);
+        /**
+         * «אורך הקטע AB שווה לרדיוס המעגל» · «AB = רדיוס המעגל» (#1619 B1) — the radius against a MEASURED
+         * length, read by the one length reader (`parseLengthExpr`) after the segment noun the exam puts
+         * in front of it. M1 puts the circle's own radius on the other side (`radius-length`).
+         */
+        const lengthSrc = value
+          .replace(/^(?:ה?אורך\s+(?:של\s+)?)?(?:ה?(?:קטע|צלע)\s+)?/, '')
+          .replace(/^(?:the\s+)?(?:length\s+of\s+)?(?:(?:the\s+)?(?:segment|side)\s+)?/i, '');
+        const length = /[A-Z]/.test(lengthSrc) ? parseLengthExpr(lengthSrc) : null;
+        if (!length) continue;
+        return made([{ t: 'radius-length', ...(ref.circle ? { circle: ref.circle } : {}), length, src: line }]);
       }
       case 'perimeter': {
         const v = roleScalar(value);
@@ -2243,7 +2352,9 @@ const POINT_LIST = `([A-Z0-9,\\s]+?(?:(?:\\s+and\\s+|\\s*ו-?\\s*)${NAME})?)`;
 const THRU_NAME = `(?:\\s+(${CIRCLE_NUMERALS}))?`;
 
 const THRU_HE = new RegExp(
-  `^${HE_GIVEN}ה?מעגל${THRU_NAME}\\s+(?:ש|ה)?עובר(?:ת)?\\s+(?:דרך|ב)\\s*(?:ה?נקודות\\s+)?${POINT_LIST}$`,
+  // The comma is the textbook's own punctuation before the relative clause — «מעגל, העובר דרך הנקודות O, C, A»
+  // (#1619 B1, corpus 16/4): the same sentence, so the same rule.
+  `^${HE_GIVEN}ה?מעגל${THRU_NAME}\\s*,?\\s+(?:ש|ה)?עובר(?:ת)?\\s+(?:דרך|ב)\\s*(?:ה?נקודות\\s+)?${POINT_LIST}$`,
 );
 const THRU_EN = new RegExp(
   `^(?:the\\s+|a\\s+)?circle${THRU_NAME}\\s+(?:that\\s+)?(?:passing\\s+|passes\\s+|going\\s+)?through\\s+(?:the\\s+points\\s+)?${POINT_LIST}$`,
@@ -3364,7 +3475,7 @@ function parseConstraint(raw: string): RuleOutcome {
     if (k && k.t === 'kind') {
       return made([
         { t: 'declare', id, src: line },
-        { t: 'on-kind', id, kind: k.kind, src: line },
+        { t: 'on-kind', id, kind: k.kind, ...(k.circle ? { circle: k.circle } : {}), src: line },
       ]);
     }
     // A bare AXIS operand keeps belonging to the ON_AXIS rule below, which also reads the
@@ -3737,7 +3848,16 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
     return made(facts);
   };
   if (depth < MAX_FRAME_DEPTH) {
-    for (const reading of [originClauses(s), shapeClauses(s), distributeClauses(s), pointClauses(s), sideClauses(s)]) {
+    for (const reading of [
+      originClauses(s),
+      shapeClauses(s),
+      distributeClauses(s),
+      pointClauses(s),
+      sideClauses(s),
+      centreClauses(s),
+      sharedSubjectClauses(s),
+      elidedSubjectClauses(s),
+    ]) {
       const r = reading && attempt(reading);
       if (r) return { result: r, framed: true };
     }
@@ -3753,6 +3873,9 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
   }
   return { result: direct, framed: unwrapped };
 }
+
+/** A space-delimited run of three or more Latin letters is a WORD — no equation in this grammar has one (#1068). */
+const HAS_A_WORD = /(?:^|\s)[A-Za-z]{3,}(?=\s|$)/;
 
 function parseClause(raw: string): ParseResult {
   const line = trim(raw);
@@ -3783,6 +3906,10 @@ function parseClause(raw: string): ParseResult {
   // Incidence in every order and over every operand (#1281, #1495) — normalised to the sentences below.
   const incidence = parseIncidence(line);
   if (incidence) return incidence;
+
+  // The circle's centre by its role, and the circle's regions (#1619 B1).
+  const centreSubject = parseCentreSubject(line) ?? parseCircleRegion(line);
+  if (centreSubject) return centreSubject;
 
   /**
    * THE RATIO FAMILY RUNS BEFORE `matchCurve` (#1124).
@@ -3848,6 +3975,13 @@ function parseClause(raw: string): ParseResult {
    */
   const curveTailMeansEquation = ((): boolean => {
     if (!curve) return false;
+    /*
+     * PROSE IN ENGLISH IS PROSE TOO (#1619 B1). The Hebrew test above never saw an English sentence: «the
+     * circle cuts the x-axis at B» names `x` (in "x-axis"), so the circle noun claimed it and answered
+     * `bad-equation` about an equation the student never wrote — #1068's trap, one rule over. The bare
+     * branch's discriminator (`HAS_A_WORD`) is the one asked here: a WORD in the tail is a sentence.
+     */
+    if (HAS_A_WORD.test(normalizeMath(curve.eqSrc))) return false;
     // Deliberately NOT "does it parse as an equation". A TRUNCATED equation must still be told it is
     // unreadable (#1059's «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2» — no `=`, so it parses as nothing),
     // and requiring a clean parse here turned that honest `bad-equation` into `not-handled`. The
@@ -4074,9 +4208,9 @@ function parseClause(raw: string): ParseResult {
    * This is the `[IVX]` trap a third time ([ADR-AG-006](../../docs/06c-decisions-analytic.md#adr-ag-006)),
    * and the lesson is sharper than "measure it": **a discriminator measured only against the inputs it
    * was designed for has not been measured.**
+   *
+   * (`HAS_A_WORD` is module-level since #1619 B1: the noun gate above asks the same question of its tail.)
    */
-  const HAS_A_WORD = /(?:^|\s)[A-Za-z]{3,}(?=\s|$)/;
-
   const bare = equationExpr(line);
   if (bare && !HAS_A_WORD.test(normalizeMath(line)) && symbolsOf(bare).some((s) => RESERVED_SYMBOLS.has(s))) {
     return {
@@ -4171,6 +4305,73 @@ function viaCanonical(line: string, slot: PointSlot | null, build: (p: Id) => st
     out.unshift({ t: 'point', id, x: slot.x, y: slot.y, src: line });
   }
   return made(out);
+}
+
+/** «מרכז המעגל» · «נקודת מרכז המעגל» · "the centre of the circle" — the centre named by its ROLE (#1619 B1). */
+const CENTRE_PHRASE = /^(?:ה?נקודת\s+)?ה?מרכז\s+(?:של\s+)?ה?מעגל$|^(?:the\s+)?cent(?:re|er)\s+of\s+the\s+circle$/i;
+
+/**
+ * A sentence about the circle's centre BY ROLE (#1619 B1): `canonical` is the sentence with
+ * `CENTRE_SENTINEL` where the centre's letter goes, parsed by the rule that owns it; M1 resolves which
+ * point the centre is (`via-centre`). `phrase` is the student's own words for the centre, so an unnamed
+ * centre is refused quoting them.
+ */
+function viaCentre(line: string, phrase: string, canonical: string): RuleOutcome {
+  const r = parseClause(canonical);
+  if (!r.ok) return null;
+  return made([{ t: 'via-centre', facts: r.facts.map((f) => ({ ...f, src: line })), phrase, src: line }]);
+}
+
+/**
+ * «מרכז המעגל נמצא על ציר ה-y» · "the centre of the circle lies on the line y=x" — the centre as the
+ * SUBJECT of any sentence about a point (#1619 B1). With a letter («מרכז המעגל M נמצא …») the frame reads it
+ * as the naming plus the sentence about M (`centreClauses`); without one, the sentence is about the point
+ * the figure's circle has at its centre.
+ */
+const CENTRE_SUBJECT = /^(?:ה?נקודת\s+)?(ה?מרכז\s+(?:של\s+)?ה?מעגל)\s+(.+)$|^((?:the\s+)?cent(?:re|er)\s+of\s+the\s+circle)\s+(.+)$/i;
+function parseCentreSubject(line: string): RuleOutcome {
+  const m = CENTRE_SUBJECT.exec(line);
+  if (!m) return null;
+  const phrase = m[1] ?? m[3];
+  const rest = m[2] ?? m[4];
+  // A letter right after the phrase NAMES the centre — the frame's sentence, not this one.
+  if (new RegExp(`^${NAME}(?:\\s|$)`).test(rest)) return null;
+  return viaCentre(line, phrase, `${CENTRE_SENTINEL} ${rest}`);
+}
+
+/**
+ * «הנקודה B נמצאת מחוץ למעגל» · «… בתוך המעגל» · «E נמצאת על הקשת הקטנה AC» · "B is outside the circle" ·
+ * "E is on the minor arc AC" (#1619 B1) — a REGION of the circle, lowered to `circle-region` for M1 to
+ * resolve the circle (contextual, numeral or centre letter). The circle reference is the one `incidenceOn`
+ * reads, so «מחוץ למעגל M» means the same circle «על מעגל M» does.
+ */
+const REGION_CIRCLE_HE = `ה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?`;
+const REGION_HE = new RegExp(
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?(מחוץ\\s+ל-?|בתוך\\s+|בפנים\\s+)${REGION_CIRCLE_HE}$`,
+);
+const ARC_HE = new RegExp(
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+ה?קשת\\s+ה?(קטנה|גדולה)\\s+(${NAME})(${NAME})(?:\\s+(?:של|ב)\\s*${REGION_CIRCLE_HE})?$`,
+);
+const REGION_EN = new RegExp(`^(?:[Tt]he\\s+)?(?:[Pp]oint\\s+)?(${NAME})\\s+(?:is|lies)\\s+(outside|inside)\\s+(?:of\\s+)?the\\s+circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?$`);
+const ARC_EN = new RegExp(
+  `^(?:[Tt]he\\s+)?(?:[Pp]oint\\s+)?(${NAME})\\s+(?:is|lies)\\s+on\\s+the\\s+(minor|major)\\s+arc\\s+(${NAME})(${NAME})(?:\\s+of\\s+the\\s+circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?)?$`,
+);
+
+function parseCircleRegion(line: string): RuleOutcome {
+  const r = REGION_HE.exec(line) ?? REGION_EN.exec(line);
+  if (r) {
+    const [, id, word, circle] = r;
+    const region = /מחוץ|outside/.test(word) ? 'outside' : 'inside';
+    return made([{ t: 'circle-region', id, region, ...(circle ? { circle } : {}), src: line }]);
+  }
+  const arc = ARC_HE.exec(line) ?? ARC_EN.exec(line);
+  if (arc) {
+    const [, id, size, a, b, circle] = arc;
+    const region = /קטנה|minor/.test(size) ? 'minor-arc' : 'major-arc';
+    if (a === b || id === a || id === b) return refuse('repeated-vertex', line);
+    return made([{ t: 'circle-region', id, region, a, b, ...(circle ? { circle } : {}), src: line }]);
+  }
+  return null;
 }
 
 /** What a line-phrase names, in the grammar's own terms. */
@@ -4276,8 +4477,25 @@ function parseIncidence(line: string): RuleOutcome {
   const conv = CONVERSE_HE.exec(line) ?? CONVERSE_EN.exec(line);
   if (conv) {
     const obj = lineObject(conv[1]);
+    /**
+     * «CD עובר דרך מרכז המעגל» (#1619 B1) — the centre by its ROLE, as the point. The same sentence with the
+     * letter written in, wrapped for M1 to say which letter that is (`via-centre`).
+     */
+    if (obj && obj.k !== 'curve' && obj.k !== 'through' && CENTRE_PHRASE.test(trim(conv[2]))) {
+      const p = CENTRE_SENTINEL;
+      const canonical =
+        obj.k === 'pair' ? `${p} על ${obj.noun} ${obj.a}${obj.b}` : obj.k === 'named' ? `דרך ${p} עובר ישר ${obj.name}` : `${p} על הישר ${obj.src}`;
+      return viaCentre(line, trim(conv[2]), canonical);
+    }
     const slot = pointSlot(conv[2]);
-    if (!obj || !slot || obj.k === 'curve' || obj.k === 'through') return null;
+    if (!obj || !slot || obj.k === 'through') return null;
+    /**
+     * «המעגל עובר דרך A» · «המעגל עובר דרך ראשית הצירים O» · "the circle passes through A" (#1619 B1) — the
+     * converse of «A על המעגל», and that sentence is what it means: lowered onto it, so the circle is
+     * resolved by the one rule that owns a point on a circle (contextual, by numeral, or by centre letter).
+     * Three listed points are the computed circle's sentence (`parseCircleThru`), which answers first.
+     */
+    if (obj.k === 'curve') return viaCanonical(line, slot, (p) => [`${p} על ${trim(conv[1])}`]);
     if (obj.k === 'pair') return viaCanonical(line, slot, (p) => [`${p} על ${obj.noun} ${obj.a}${obj.b}`]);
     // A NAMED line: «דרך P עובר ישר l3» — M1 decides whether it is an incidence on the existing line or a new one.
     if (obj.k === 'named') return viaCanonical(line, slot, (p) => [`דרך ${p} עובר ישר ${obj.name}`]);
