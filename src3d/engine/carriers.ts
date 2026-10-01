@@ -1,4 +1,5 @@
 import type { Claim3, Construction3, Id, PointDef, Positions3 } from './types';
+import type { Vec3 } from './vec3';
 import { freeCoordKey } from './types';
 
 /**
@@ -87,59 +88,114 @@ export function carrierParams3(c: Construction3, id: Id, def: PointDef): Carrier
 }
 
 /**
- * #1590 (ADR-3D-291) — CAN THE POINT'S OWN STATED DATA STILL ADMIT THIS COORDINATE GIVEN?
+ * #1561 (ADR-3D-292) — WHAT A COORDINATE GIVEN SAYS ABOUT A POINT'S FREE PARAMETER, read in closed form.
  *
- * A given that fails over a SAMPLED carrier is not proof the student is wrong: the tool chose the number it
- * failed against. But a given can also contradict what the student already stated about the point — an x
- * the definition fixed («B(1,t,2)» then «B(3,n,p)»), a side of an axis they stated («D על החלק החיובי של
- * ציר ה-x» then «D(-3,0,0)»), a spot off the segment the rider was put on. Those are false as stated, and
- * «check the computation» is the honest answer. This reads ONLY the point's definition and the positions of
- * the points that definition names; it never solves, and it answers `true` ("cannot rule it out") for every
- * claim or carrier kind it does not read — so it can only ever keep a refusal, never invent a green row.
+ * Three point kinds carry a free parameter a coordinate given can pin by itself, with no solver:
+ *  - a rider on a segment whose endpoints are fixed («K על AB» over typed A, B): one `t`, solved per stated
+ *    component as (v − Aₓ)/(Bₓ − Aₓ);
+ *  - a partial point («D על החלק החיובי של ציר ה-x»): the stated components fill the unstated ones;
+ *  - a coord-sym point («B(1, t, 2)»): the letter's value, solved per stated component of its affine form.
+ *
+ * The answer is one of three:
+ *  - `determines` — the given fixes the parameter, consistently and inside its range: `t` strictly inside
+ *    (0, 1), the stated side of an axis, one letter value across components. `apply` lowers it through the
+ *    determination path the tool already honours (#748's rider `t`, the `symbol-value` of «t = 4», the
+ *    partial record's own components), then records the given exactly as before — so its arbiter holds;
+ *  - `contradicts` — the given breaks what the student already stated: a component the definition fixes, the
+ *    other side of the axis, a spot off the segment or past its ends, two letter values. False as stated —
+ *    «check the computation» is the honest answer (ADR-3D-291's `statedDataAdmits`);
+ *  - `open` — nothing to read in closed form (another carrier kind, a sampled endpoint, a letter that already
+ *    has a value, a parameter already stated, nothing numeric stated). The caller keeps its existing route.
+ *
+ * `posOf` is the position of an already-placed point, or undefined: the store passes the resolved figure,
+ * `apply` only typed coordinates. It never decides on a point whose own place was sampled.
  */
-export function statedDataAdmits(c: Construction3, claim: Claim3, pos: Positions3): boolean {
-  if (claim.type !== 'coords-eq') return true;
-  const def = c.points.get(claim.id);
-  if (!def) return true;
-  const axes = (['x', 'y', 'z'] as const).filter((ax) => claim[ax] !== null);
+export type CoordReading =
+  | { kind: 'determines'; how: { t: number } | { fill: { x: number | null; y: number | null; z: number | null } } | { symbol: string; value: number } }
+  | { kind: 'contradicts' }
+  | { kind: 'open' };
+
+export function readCoordGiven(
+  c: Construction3,
+  id: Id,
+  stated: { x: number | null; y: number | null; z: number | null },
+  posOf: (id: Id) => Vec3 | undefined,
+): CoordReading {
+  const def = c.points.get(id);
+  if (!def) return { kind: 'open' };
+  const axes = (['x', 'y', 'z'] as const).filter((ax) => stated[ax] !== null);
+  if (axes.length === 0) return { kind: 'open' };
   const eq = (a: number, b: number) => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(a), Math.abs(b));
-  /** every stated component reached by ONE value of a single parameter, inside [lo, hi] */
-  const oneParam = (at: (ax: 'x' | 'y' | 'z') => { k: number; p: number }, lo: number, hi: number): boolean => {
+  /** one value of a single parameter that reaches every stated component, or 'contradicts', or null (none read) */
+  const oneParam = (at: (ax: 'x' | 'y' | 'z') => { k: number; p: number }): number | null | 'contradicts' => {
     let t: number | null = null;
     for (const ax of axes) {
       const { k, p } = at(ax);
-      const v = claim[ax]!;
+      const v = stated[ax]!;
       if (Math.abs(p) < 1e-12) {
-        if (!eq(k, v)) return false; // a component the definition FIXES
+        if (!eq(k, v)) return 'contradicts'; // a component the definition FIXES
         continue;
       }
       const tx = (v - k) / p;
-      if (t !== null && !eq(t, tx)) return false;
+      if (t !== null && !eq(t, tx)) return 'contradicts';
       t = tx;
     }
-    return t === null || (t >= lo - 1e-9 && t <= hi + 1e-9);
+    return t;
   };
   switch (def.kind) {
     case 'partial': {
-      const params = carrierParams3(c, claim.id, def);
-      return axes.every((ax) => {
-        if (def[ax] !== null) return eq(def[ax]!, claim[ax]!); // stated by the student already
+      const params = carrierParams3(c, id, def);
+      const fill = { x: def.x, y: def.y, z: def.z };
+      let fills = false;
+      for (const ax of axes) {
+        const v = stated[ax]!;
+        if (def[ax] !== null) {
+          if (!eq(def[ax]!, v)) return { kind: 'contradicts' }; // stated by the student already
+          continue;
+        }
         const p = params.find((q) => q.t0 === `coord-${ax}`);
-        return !p || (claim[ax]! >= p.lo && claim[ax]! <= p.hi); // the side of the axis they stated
-      });
+        if (p && !(v >= p.lo && v <= p.hi)) return { kind: 'contradicts' }; // the side of the axis they stated
+        fill[ax] = v;
+        fills = true;
+      }
+      return fills ? { kind: 'determines', how: { fill } } : { kind: 'open' };
     }
-    case 'coord-sym':
-      return oneParam((ax) => def[ax], -Infinity, Infinity);
+    case 'coord-sym': {
+      const t = oneParam((ax) => def[ax]);
+      if (t === 'contradicts') return { kind: 'contradicts' };
+      // a letter that already has a value is a CLAIM about it, checked as one — never silently re-valued
+      const valued = !c.param || c.symbolPins.some((sp) => sp.sym === c.param) || c.paramGivens.length > 0;
+      return t === null || valued ? { kind: 'open' } : { kind: 'determines', how: { symbol: c.param!, value: t } };
+    }
     case 'on-segment': {
-      if (def.t !== undefined) return true;
-      const a = pos.get(def.a), b = pos.get(def.b);
-      if (!a || !b) return true;
+      if (def.t !== undefined) return { kind: 'open' }; // a stated ratio — the given is a claim about it
       // an endpoint that is itself sampled moves the segment — its drawn place is no evidence
-      const sampledEnd = [def.a, def.b].some((e) => { const d = c.points.get(e); return !d || carrierParams3(c, e, d).length > 0; });
-      if (sampledEnd) return true;
-      return oneParam((ax) => ({ k: a[ax], p: b[ax] - a[ax] }), 0, 1); // on the segment the student named
+      const fixedEnd = (e: Id) => { const d = c.points.get(e); return !!d && carrierParams3(c, e, d).length === 0; };
+      const a = posOf(def.a), b = posOf(def.b);
+      if (!a || !b || !fixedEnd(def.a) || !fixedEnd(def.b)) return { kind: 'open' };
+      const t = oneParam((ax) => ({ k: a[ax], p: b[ax] - a[ax] }));
+      if (t === 'contradicts') return { kind: 'contradicts' };
+      if (t === null) return { kind: 'open' };
+      if (t < -1e-9 || t > 1 + 1e-9) return { kind: 'contradicts' }; // off the segment the student named
+      // at an endpoint the rider would coincide with A or B — not a placement; the claim judges it
+      return t > 1e-9 && t < 1 - 1e-9 ? { kind: 'determines', how: { t } } : { kind: 'open' };
     }
     default:
-      return true;
+      return { kind: 'open' };
   }
+}
+
+/**
+ * #1590 (ADR-3D-291) — CAN THE POINT'S OWN STATED DATA STILL ADMIT THIS COORDINATE GIVEN?
+ *
+ * A given that fails over a SAMPLED carrier is not proof the student is wrong: the tool chose the number it
+ * failed against. But a given can also contradict what the student already stated about the point. Those are
+ * false as stated, and «check the computation» is the honest answer. Since #1561 (ADR-3D-292) this is the
+ * `contradicts` answer of {@link readCoordGiven} — one closed-form reader for the refusal and the placement.
+ * It answers `true` ("cannot rule it out") for every claim or carrier kind it does not read, so it can only
+ * ever keep a refusal, never invent a green row.
+ */
+export function statedDataAdmits(c: Construction3, claim: Claim3, pos: Positions3): boolean {
+  if (claim.type !== 'coords-eq') return true;
+  return readCoordGiven(c, claim.id, claim, (id) => pos.get(id)).kind !== 'contradicts';
 }

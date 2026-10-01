@@ -253,9 +253,19 @@ A vertex-named angle («∠BAD», «זווית BAD», «זווית A», a valued
 the kind — `vertex-angle-eq` → `vangle`, `angle-seg-eq` → `seg-angle`, whatever letters the segments share —
 and the claim, the coord-sym root-find (`paramGivens`), the wedge collection and the knees each read the
 quantity of their kind. `vertexAngleDeg` / `lineAngleDeg` / `ANGLE_TOL_DEG` in `claims.ts` are the one measure
-and tolerance, shared by the verifier and the canvas. Still open: the missing drive for riders and partial points on a solid-free figure
-(the pivot's entry gate asks for a solid or a `free3` point, ADR-3D-282), and a revolution's size driven by a
-stated length (#1569).
+and tolerance, shared by the verifier and the canvas. Still open: the drive for riders whose parameter has no closed form on a solid-free figure (a
+line or plane rider; the pivot's entry gate asks for a solid or a `free3` point, ADR-3D-282), and a
+revolution's size driven by a stated length (#1569, parked).
+
+**A coordinate given DETERMINES a closed-form parameter before it is recorded** ([ADR-3D-292](06b-decisions-3d.md#adr-3d-292),
+#1561). `readCoordGiven` (`carriers.ts`) reads a coordinate given against the point's definition and answers
+`determines` / `contradicts` / `open`: a rider's `t` on a segment between fixed endpoints (strictly inside
+(0, 1)), a partial point's unstated components (inside the stated side), a coord-sym letter's value (one value
+across components; never a letter already valued). `determineByCoords` (`apply.ts`) lowers `determines` through
+the path the tool already has for that parameter stated directly — #748's rider `t`, `symbol-value`, the
+partial record (a fully stated one becomes `coord`) — and the existing-id `point3` path then records the pin
+and its `given: true` arbiter as before, which now holds. `contradicts` is ADR-3D-291's `statedDataAdmits`:
+one closed-form reader for the placement and the refusal. At apply only typed coordinates are positions.
 
 **A declared action must hold for every spelling of its row, and the SHAPE of a pin kind is not a
 semantic rule.** `'angle|segment|segment'` declared `drive-dims` while `apply.ts` delivered it only when
@@ -737,8 +747,9 @@ carrier rows; adding a carrier is adding a row, and it judges what a claim READS
 across seeds (the three-valued verdict #909 deferred is not built). Two rows read only a stated GIVEN (a
 `given: true` arbiter) and answer `given-not-drivable` — the tool's limit, named
 ([ADR-3D-291](06b-decisions-3d.md#adr-3d-291), #1590): a point whose free parameter the resolution left
-sampled (`carrierParams3` keys the pivot did not drive, or a coord-sym letter with no root), unless
-`statedDataAdmits` (`carriers.ts`) finds the point's own definition already contradicts the given; and the
+sampled (`carrierParams3` keys the pivot did not drive, or a coord-sym letter with no root) — since
+ADR-3D-292 only the carriers `readCoordGiven` cannot place reach it — unless `statedDataAdmits` (`carriers.ts`)
+finds the point's own definition already contradicts the given; and the
 apex of a cone or cylinder whose height was never stated. An answer keeps the register it had.
 
 **Not driven yet:** a length on a free point after a solid's scale given (#754 owns the size; the rule makes
