@@ -36,7 +36,7 @@ import { commitRecord, decideEdit, decideSubmit, decideToggle, noticeText, reach
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
-import { panelKnowledge, segmentKnowledge } from './app/panelRows';
+import { panelKnowledge, panelRowText, segmentKnowledge } from './app/panelRows';
 import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
 import { angleText } from './app/lineAngle';
@@ -1652,7 +1652,7 @@ export function App() {
                             {t(curveDetailsKey(known!.kind))}
                           </summary>
                           <div style={askTrace}>
-                            <MathText text={braced(parts.details)} />
+                            <MathText text={panelRowText(parts.details)} />
                           </div>
                         </details>
                       )}
@@ -2052,9 +2052,8 @@ function fmt(v: number): string {
  * symbols are `x_B` and `r_O` — names they must keep, because they are what the expressions are
  * built from. The braces are added here, where the string stops being data and becomes type.
  */
-const braced = (text: string): string => text.replace(/([A-Za-z])_([A-Za-z0-9]+)/g, '$1_{$2}');
-
-const ValueRow = ({ text }: { text: string }) => <MathText text={braced(text)} />;
+// #1644 (ADR-AG-199): the braces AND the bidi isolation of a composed row live in `panelRowText`, so a lock calls it.
+const ValueRow = ({ text }: { text: string }) => <MathText text={panelRowText(text)} />;
 
 /**
  * The manual's sections, in teaching order (#1087).

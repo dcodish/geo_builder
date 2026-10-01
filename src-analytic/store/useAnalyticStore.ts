@@ -315,6 +315,21 @@ function cleanSeedNames(raw: unknown): Record<string, string> {
   );
 }
 
+/**
+ * #1632 (ADR-AG-199) — the AI lane's display sentences from a saved file, kept only where they can be
+ * true: a key that names a LINE of this file (an integer index in range) and a string value. A
+ * hand-edited or truncated file cannot attach a sentence to a ghost row — the #1548 rule for `disabled`.
+ */
+function cleanSpokenFor(raw: unknown, lineCount: number): Record<number, string> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Record<number, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const i = Number(k);
+    if (/^\d+$/.test(k) && i < lineCount && typeof v === 'string' && v.trim()) out[i] = v;
+  }
+  return out;
+}
+
 export const useAnalyticStore = create<AnalyticState>()(
   temporal(
     (set, get) => ({
@@ -411,7 +426,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   restore: ({ lines, seed, name, spokenFor, disabled, seedNames }) =>
     set({
       lines: lines.map(ingestTypedText),
-      spokenFor: spokenFor ?? {},
+      spokenFor: cleanSpokenFor(spokenFor, lines.length),
       seedNames: cleanSeedNames(seedNames),
       // #1548: only indexes that name a line survive a restore — a hand-edited file cannot mute a ghost
       disabled: [...new Set(disabled ?? [])].filter((d) => Number.isInteger(d) && d >= 0 && d < lines.length).sort((a, b) => a - b),
