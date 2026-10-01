@@ -261,11 +261,6 @@ const he = {
   errRingContradictsNoun:
     'הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "{{detail}}". אפשר לשנות את סדר האותיות ' +
     'כך שהצלעות לא ייחתכו, או לשנות את השיעורים — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.',
-  // #1627 — a trapezoid has exactly ONE pair of parallel sides (ported 2-D ruling ADR-157: never morph
-  // it into a rectangle or a parallelogram — refuse). Names the student's own statement.
-  errTrapezoidIsParallelogram:
-    'עם "{{detail}}" יש בטרפז שני זוגות של צלעות נגדיות מקבילות — זה כבר לא טרפז אלא מקבילית (או מלבן). ' +
-    'בטרפז יש זוג אחד בלבד של צלעות מקבילות. המשפט לא נוסף.',
   errReservedCoordinate:
     'האותיות x ו-y שמורות לצירי מערכת הצירים, ולכן אי אפשר להשתמש בהן כנעלם בשיעורי נקודה: "{{detail}}". ' +
     'אפשר להשתמש באות אחרת, למשל M(3,t).',
@@ -334,6 +329,10 @@ const he = {
   // so the message confirms they were right and explains why no row appeared.
   // «הציגו תצורה אחרת» found none — an answer about the figure, not a failure (#1084).
   noticeOnlyConfiguration: 'זו התצורה היחידה שמצאתי — הנתונים שכתבתם קובעים את השרטוט.',
+  // #1627 (ADR-AG-189 Am. 1, operator ruling 2026-10-01; 2-D ADR-165): drawn, with this warning while it holds.
+  warnTrapezoidIsParallelogram:
+    'הטרפז {{shape}} כבר אינו טרפז: עם "{{line}}" שני זוגות הצלעות הנגדיות שלו מקבילים, ולכן הוא מקבילית (או מלבן). ' +
+    'השרטוט מוצג כפי שהנתונים קובעים. כדי לחזור לטרפז, אפשר לערוך את המשפט הזה, למחוק אותו או לבטל את «כלול בציור».',
   noticeAlreadyKnown: 'זה כבר ידוע מהנתונים שכתבתם, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
   // #1350 (operator ruling 2026-09-22) — the line IS recorded; this is about identity, never an error.
   noticeNameReadsAs: 'שימו לב: הישר {{detail}} והישר {{holder}} הם שני ישרים שונים — השמות נקראים דומה, אבל כל שם מתייחס לישר שלו.',
@@ -599,9 +598,6 @@ const en: typeof he = {
   errRingContradictsNoun:
     'The points you gave do not form that shape in this order: "{{detail}}". Reorder the letters so ' +
     'the sides do not cross, or change the coordinates — as written the vertices fall on one line or the shape folds over itself.',
-  errTrapezoidIsParallelogram:
-    'With "{{detail}}" both pairs of opposite sides of the trapezoid are parallel — it is no longer a trapezoid but a ' +
-    'parallelogram (or a rectangle). A trapezoid has exactly one pair of parallel sides. The statement was not added.',
   errReservedCoordinate:
     'The letters x and y name the axes, so they cannot be a point\'s unknown: "{{detail}}". ' +
     'Use another letter — for example M(3,t).',
@@ -659,6 +655,9 @@ const en: typeof he = {
   kindCircumcentre: 'the circumcentre',
   kindDiagonalMeet: 'the intersection of the diagonals',
   noticeOnlyConfiguration: 'This is the only configuration I found — your givens fix the figure.',
+  warnTrapezoidIsParallelogram:
+    'Trapezoid {{shape}} is no longer a trapezoid: with "{{line}}" both pairs of its opposite sides are parallel, so it is a parallelogram (or a rectangle). ' +
+    'The figure is drawn as your givens fix it. To get a trapezoid back, edit or delete that statement, or untick «Include in the figure».',
   noticeAlreadyKnown: 'That is already known from what you have written, so I did not add another row: "{{detail}}"',
   noticeNameReadsAs: 'Note: line {{detail}} and line {{holder}} are two different lines — the names read alike, but each one refers to its own line.',
   save: 'Save',

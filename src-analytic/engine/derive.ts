@@ -381,15 +381,12 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * noise rather than honesty. This is why the arm runs here, below every other fault: it can see
    * what has already been said.
    *
-   * **A TRAPEZOID WITH BOTH PAIRS OF SIDES PARALLEL (#1627, ADR-AG-189)** is the third member, on the
-   * same gate. Pinned corners that make «טרפז ABCD» a rectangle are ADR-AG-129's sentence exactly — a
-   * shape noun promises a ring, and these points are not that ring — so they are refused, with their
-   * own message: the remedy here is not "reorder the letters". **Deliberately NOT widened past
-   * `reportedDof = 0`:** unlike crossed and collapsed, this member CAN arrive with freedom (a stated
-   * right angle that turns a right trapezoid into a rectangle leaves a rectangle's five degrees), and
-   * whether that is refused or drawn with a notice is an open ruling — the 2-D sibling's ADR-165 chose
-   * "allow, flag amber" for exactly that case. Until it is ruled, such a figure is drawn as before; the
-   * configuration search already prefers a true trapezoid wherever one exists.
+   * **A TRAPEZOID WITH BOTH PAIRS OF SIDES PARALLEL is deliberately NOT a member** (#1627, ADR-AG-189
+   * Amendment 1 — operator ruling 2026-10-01: givens that force a trapezoid into a rectangle or a
+   * parallelogram are *"drawn with warning"*, the 2-D sibling's ADR-165). Unlike crossed and collapsed,
+   * that ring is a real, valid quadrilateral the givens describe; the configuration search still prefers
+   * a true trapezoid wherever one exists (`drawableAt`'s `whole()`), and when none does the figure is
+   * drawn and `app/shapeWarnings.ts` names the trapezoid and the line that forced it.
    */
   if (figure.ringFaults.length > 0 && reportedDof(construction, figure.carrierDof) === 0) {
     /** Which line declared each polygon — the line the refusal belongs on (#1145). */
@@ -399,12 +396,12 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     });
     const alreadyFaulted = new Set(faults.map((f) => f.index));
     for (const rf of figure.ringFaults) {
-      const exclusion = rf.violation === 'trapezoid-is-parallelogram';
+      if (rf.violation === 'trapezoid-is-parallelogram') continue; // drawn with a warning, never refused
       const index = declaredPolygonOn.get(rf.id);
       if (index === undefined) continue; // no line owns it — nothing honest to say about it
       if (alreadyFaulted.has(index)) continue;
       alreadyFaulted.add(index);
-      faults.push({ index, code: exclusion ? 'trapezoid-is-parallelogram' : 'ring-contradicts-noun', detail: lines[index] });
+      faults.push({ index, code: 'ring-contradicts-noun', detail: lines[index] });
     }
   }
   /**

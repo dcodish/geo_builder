@@ -65,7 +65,10 @@ export interface RingPt {
  *
  * `trapezoid-is-parallelogram` (#1627, ADR-AG-189) is the noun's EXCLUSIVE condition: «טרפז» promises
  * exactly one pair of parallel sides, and a ring with both pairs parallel is a parallelogram (a rectangle
- * is one) — not the shape the student named. The 2-D ruling it ports is ADR-157.
+ * is one) — not the shape the student named. The 2-D ruling it ports is ADR-157. It is a PREFERENCE of
+ * the configuration search and never a refusal (ADR-AG-189 Amendment 1, operator ruling 2026-10-01,
+ * 2-D ADR-165): when the givens leave no true trapezoid the figure is drawn, and
+ * `app/shapeWarnings.ts` warns about it while it holds.
  */
 export type RingViolation = 'degenerate' | 'crossed' | 'trapezoid-is-parallelogram';
 

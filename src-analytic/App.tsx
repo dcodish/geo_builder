@@ -51,6 +51,7 @@ import { exprText } from './engine/expr';
 import { MathText } from '../shell/math';
 import { inputPreviewNodeAnalytic } from './render/inputPreviewNodeAnalytic';
 import { Banner } from '../shell/frame/Banner';
+import { shapeWarningsOf, shapeWarningText } from './app/shapeWarnings';
 import { FigureName } from '../shell/frame/FigureName';
 import { ManualScreen } from '../shell/frame/ManualScreen';
 import { svgToPng } from '../shell/export/svgToPng';
@@ -548,6 +549,12 @@ export function App() {
    * read pending. Settling that before paint means the student never sees a one-frame «בודק…» flash on a
    * line whose answer was in hand; only a line whose pool genuinely completes after the render shows it.
    */
+  /**
+   * A DECLARED TRAPEZOID THE DRAWING IS NOT (#1627, ADR-AG-189 Am. 1 — operator ruling 2026-10-01, 2-D
+   * ADR-165: drawn, with a warning). Read off the drawn figure, so it holds exactly while the drawing is a
+   * parallelogram: deleting or muting the forcing line, or another configuration, clears it.
+   */
+  const shapeWarnings = useMemo(() => shapeWarningsOf(active, d), [active, d]);
   const [poolTick, setPoolTick] = useState(0);
   useLayoutEffect(() => completePoolAfterRender(configurationPool(d.construction), () => setPoolTick((n) => n + 1)), [d]);
 
@@ -1169,6 +1176,23 @@ export function App() {
                 </p>
               )}
             </InputArea>
+            {/*
+              #1627 — the persistent amber warning (2-D's verifier flag, ADR-165): not dismissable, because it
+              describes the figure on screen and goes away only when the figure stops being a parallelogram.
+              It names the student's own sentence (a fallback-built row's spoken text, #1297).
+            */}
+            {shapeWarnings.map((w) => (
+              <div key={`${w.shape}-${w.forcedBy}`} style={{ marginTop: 8 }} data-testid="analytic-shape-warning">
+                <Banner kind="notice">
+                  {shapeWarningText(
+                    w,
+                    t,
+                    analyticBidi.isolateLtrRuns(spokenFor[rows[w.forcedBy]] ?? w.line),
+                    analyticBidi.isolateLtrRuns(w.shape),
+                  )}
+                </Banner>
+              </div>
+            ))}
             <FactList
               rows={lines.map((line, i) => ({
                 id: String(i),
