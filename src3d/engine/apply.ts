@@ -14,7 +14,7 @@ import { resolveSolidSubject } from './solidSubject';
 import { diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { claimPointIds, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import { firstFreeLetter } from './freeLetter';
-import { carrierParams3 } from './carriers';
+import { carrierParams3, readCoordGiven, type CoordReading } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, ScalarPin, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
@@ -358,6 +358,25 @@ type PinGivenClaim = Extract<
 function recordPinGiven(next: Construction3, claim: PinGivenClaim): void {
   if (claim.type === 'vec-val' && claim.x === null && claim.y === null && claim.z === null) return;
   next.claims.push({ ...claim, given: true });
+}
+
+/**
+ * #1561 (ADR-3D-292) — lower a closed-form reading of a coordinate given ({@link readCoordGiven}) through the
+ * determination path the tool already has for that parameter: a rider's `t` (#748's definition update), the
+ * letter's `symbol-value` («t = 4»), or the partial record's own components (a point whose every component is
+ * now stated is a typed `coord` point). One site, so no parameter gains a second placement path.
+ */
+function determineByCoords(c: Construction3, id: Id, how: Extract<CoordReading, { kind: 'determines' }>['how']): ApplyResult3 {
+  const def = c.points.get(id);
+  if ('t' in how) {
+    if (def?.kind !== 'on-segment') return { ok: false, error: { code: 'unknown-point', id } };
+    return applyCommand3(c, { type: 'point-on-segment3', id, a: def.a, b: def.b, t: how.t });
+  }
+  if ('symbol' in how) return applyCommand3(c, { type: 'symbol-value', symbol: how.symbol, value: how.value });
+  const { x, y, z } = how.fill;
+  const next = clone(c);
+  next.points.set(id, x !== null && y !== null && z !== null ? { kind: 'coord', x, y, z } : { kind: 'partial', x, y, z });
+  return { ok: true, next };
 }
 
 /** Auto-draw a VecAtom's pair (idempotent) — named vectors already draw their own segment. */
@@ -1859,7 +1878,24 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // The letters share one namespace per role: a pin symbol that is ALSO the figure's
         // coord-sym parameter would be resolved by two different mechanisms — refused.
         const exprs = cmd.symExprs ?? [null, null, null];
-        const adopted = adoptParamAsPinSym(c, exprs); // #801: the letter re-homes to the pivot when it can
+        // #1561 (ADR-3D-292): a coordinate given that PINS the point's free parameter in closed form — a rider's
+        // `t` on a segment between typed points, a partial point's unstated component, a coord-sym letter —
+        // first DETERMINES it, through the path the tool already honours for that parameter stated directly
+        // (#748's rider `t`, the `symbol-value` of «t = 4», the partial record). The given is then recorded
+        // exactly as before, pin and arbiter, and the arbiter holds. «K על AB · K(1,0,0)» places K at the
+        // midpoint instead of being refused; a given the point's own data contradicts is untouched here and
+        // keeps «check the computation» (ADR-3D-291). Only TYPED coordinates are positions at apply time.
+        const reading = readCoordGiven(c, cmd.id, cmd, (id) => {
+          const d = c.points.get(id);
+          return d?.kind === 'coord' ? v3(d.x, d.y, d.z) : undefined;
+        });
+        let base = c;
+        if (reading.kind === 'determines') {
+          const det = determineByCoords(c, cmd.id, reading.how);
+          if (!det.ok) return det;
+          base = det.next;
+        }
+        const adopted = adoptParamAsPinSym(base, exprs); // #801: the letter re-homes to the pivot when it can
         if (!adopted) return { ok: false, error: { code: 'two-params' } };
         const next = clone(adopted);
         const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);

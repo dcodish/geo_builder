@@ -11476,3 +11476,33 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 **Locks.** `src3d/__tests__/issue-1590-given-not-drivable.test.ts` (20): eight undrivable givens (cone ×2, positive-axis D He + En, a rider on its segment, a coord-sym free coordinate, and the `=` spelling of D and of K) → `given-not-drivable` with the named object; eight false-as-stated givens (typed point, vector over typed points, midpoint, the wrong side of the axis in both spellings, a fixed coord-sym component, off the segment, past its end) → `claim-refuted`; an answer over a rider → `claim-refuted`; both locales render the tool-limit text with no «check the computation», and the control still renders «בדקו את החישוב». `issue-1567-pin-arbiters` R6/R7 re-stated to `given-not-drivable`. The student-text corpus (#1455) harvests the new sequences.
 
 **Consequences.** `src3d/engine/types.ts` (`given-not-drivable`), `src3d/engine/apply.ts` (the coords twin), `src3d/engine/carriers.ts` (`statedDataAdmits`), `src3d/store/store3.ts` (the rows), `src3d/i18n/errorText3.ts`, `src3d/i18n/locales/{he,en}.json`.
+
+## ADR-3D-292 — A coordinate given that pins a point's free parameter in closed form places the point (#1561)
+
+**Status:** accepted · 2026-10-01 · feature (PR, `feat/1561-coord-determines`) · plan: the #1561 comment "Revised plan" of 2026-09-30, approved by the operator (*"we will fix this tomorrow"*, *"try now"*), `auto-ok` as transcription. **Builds on** [ADR-3D-291](#adr-3d-291): its `statedDataAdmits` becomes one answer of the reader below. **Supersedes** the gate-widening plan of the same issue.
+
+**Requirements:** docs/02b FR-SP-5 ("A coordinate that pins a point's free freedom places the point") · **Design:** docs/04b — "A coordinate given DETERMINES a closed-form parameter before it is recorded"
+
+**Context (measured on `main` 993370d4).** The operator, playing T13 of the #1573/#1590 sheet: *"this is an error. why cant K be (1,0,0)??"* — «A(0,0,0) · B(2,0,0) · K על AB · K(1,0,0)» refused with ADR-3D-291's tool-limit message, although K is the midpoint. The same for «D(3,0,0)» after «D על החלק החיובי של ציר ה-x» and «B(n, 4, p)» after «B(1, t, 2)», in both spellings. Nothing moves these points: the pivot's gate needs a solid or a `free3` point. Widening that gate was measured by the #1546 worker to put K at (9,0,0), off its segment — a frame bug the closed-form route never reaches.
+
+**Class.** *A coordinate given on an under-determined point is refused although it determines the point's free parameter in closed form.*
+
+**Mechanism (M1, existing-id lowering).** #748 already made a numeric `t` on an existing free rider a **definition update**; «t = 4» already values a coord-sym letter; a partial record already stores components. Measured: appending `{point-on-segment3, K, A, B, t: 0.5}` to the T13 figure places K at (1,0,0) at all four `claimSeeds`. So the coordinate given only has to be read as that parameter.
+
+**Decision.**
+1. **One reader, `readCoordGiven` (`carriers.ts`)**: `determines` (a rider's `t` strictly inside (0, 1) on a segment whose endpoints carry no sampled freedom; a partial point's unstated components inside the stated side; a coord-sym letter's single value, unless the letter already has one), `contradicts` (a fixed component, the wrong side, off the segment or past its ends, two letter values), or `open` (anything else). ADR-3D-291's `statedDataAdmits` is now `!== 'contradicts'` over it — one closed-form reader for the placement and the refusal.
+2. **One lowering site, `determineByCoords` (`apply.ts`)**, at the head of the existing-id `point3` path (which «D(…)» and, since ADR-3D-291, «D = (…)» both reach): through #748's `point-on-segment3`, the `symbol-value` command, or the partial record (a fully stated one becomes `coord`). The path then records the given exactly as before — pin, `given: true` arbiter, name binding (#814) — on the determined figure, so the arbiter holds and nothing downstream changes shape.
+3. **At apply only typed coordinates are positions** (no evaluation inside the reducer). A rider on a segment between derived or solid points reads `open` and keeps its previous route (the pivot on a solid, else ADR-3D-291's message).
+4. **A rider exactly at an endpoint** («K(0,0,0)») reads `open`: it would coincide with A, which is no placement; the tool-limit message stands.
+
+**Rejected.** Widening the pivot gate (the previous plan): measured to misplace K, and it brings the gauge into a figure the student fixed absolutely.
+
+**Not built (named).** Riders on a line or a plane (no closed-form reading here; still the ADR-3D-291 message), a segment between non-typed points, a symbolic coordinate («K(2s, 0, 0)»). The cone (#1569) is parked by the operator.
+
+**Sibling audit (measured through each product's real submit decision).** 2-D: points carry no typed coordinates (free, on-segment, intersection … kinds), so no coordinate given exists — class not present. Analytic: «A(0,0) · B(2,0) · K על AB · K(1,0)» records, «K(1,5)» is refused `unsatisfiable`, and a LINE rider («הישר l: y = 2x · P על הישר l · P(1,2)») records — analytic already has this capability, including the line rider 3-D still lacks. That disparity is filed as #1615.
+
+**Measured.** The new lock fails **11 of 19** on the pre-change tree (the 8 that pass are the false-as-stated controls, which must pass on both). #1394 parity: exactly **6** existing hashes moved — the six #1590-lock sequences that were refused `given-not-drivable` and now record — and 6 new keys; re-recorded.
+
+**Locks.** `src3d/__tests__/issue-1561-coord-determines.test.ts` (19): the operator's T13 in three spellings with K = (1,0,0) at every claim seed and every row ok; K(0.5,0,0); the host «K על BA»; an identical restatement → already known, a different one → refused; D on the axis in He, En and the `=` spelling; «B(n, 4, p)» → t = 4, B = (1,4,2); eight false-as-stated givens → `claim-refuted`. `issue-1590-given-not-drivable.test.ts` re-stated: its six point cases moved to a "now placed" block; the tool-limit message is locked on a line rider («P על הישר l1 · P(3, n, p)»).
+
+**Consequences.** `src3d/engine/carriers.ts` (`readCoordGiven`, `CoordReading`; `statedDataAdmits` delegates), `src3d/engine/apply.ts` (`determineByCoords`, the existing-id `point3` head).
