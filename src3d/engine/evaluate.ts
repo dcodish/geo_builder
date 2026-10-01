@@ -402,6 +402,10 @@ export interface Resolved3 {
    *  parameter, a pin symbol and a named component — every kind of letter EXCEPT this one. Published by
    *  the code that picks the root, so the two can never disagree about which value was used. */
   ratioSymbols: Record<string, number>;
+  /** #1615 (ADR-3D-293) — per point with a recorded coordinate given, what the closed-form solve found:
+   *  `determined` (placed), `contradicts` (false as stated), `open` (not readable in closed form). Empty
+   *  where the pivot owns the figure. The not-determined verdict reads this, never a second reader. */
+  coordDetermined: ReadonlyMap<Id, CoordDetermined>;
   /**
    * #1474 (ADR-3D-283) — the seed this configuration was resolved at: its GAUGE key. A consumer that
    * asks "is this value the same in the figure's OTHER configurations?" re-resolves at this seed with
@@ -993,7 +997,11 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     // subtraction deliberately keeps #1311's shipped shape for `free3` (and its `partial` twin):
     // their coordinates enroll as a BLOCK whenever any residual reads one, so "enrolled" overstates
     // "consumed" there — refining that is #1415's rank-probe territory, not this count's.
+    // #1615 (ADR-3D-293): a point the closed-form solve PLACED had every solvable parameter set exactly by the
+    // student's coordinates — consumed, the partial point's included (an exact solve, not a block enrolment).
+    const placed = resolved.coordDetermined.get(id) === 'determined';
     for (const cp of carrierParams3(c, id, def)) {
+      if (placed && cp.solvable) continue;
       const blockEnrolled = def.kind === 'free3' || def.kind === 'partial';
       if (!blockEnrolled && resolved.pivot?.riderTs?.[cp.key] !== undefined) continue;
       freeT++;
@@ -1588,6 +1596,30 @@ export function resolve3(c: Construction3, seed: number, opts: { paramValue?: nu
     if (!movedP && !movedL) break;
     evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs, freeLineDofs, undefined, ratioSymbols);
   }
+  // #1615 (ADR-3D-293): a coordinate given on a point that sits on something places it (`solveCoordDeterminations`).
+  // Only where the pivot owns nothing — no solid and no never-positioned point (the pivot's own entry gate):
+  // there the coordinate pin enrolls the rider and the pivot drives it, one driver per figure. It runs after the
+  // free-carrier fixpoint, so no later pass re-seats the point.
+  //
+  // Every probe AND the final placement are FRESH point passes from the same start — the absolute points only —
+  // because a line's or a plane's rider is seated around the centroid of whatever is already placed (its own
+  // earlier position included); a solve probed from one state and applied over another would land elsewhere.
+  let coordDetermined: ReadonlyMap<Id, CoordDetermined> = new Map();
+  if (c.coordDeterminations.length > 0 && !(c.solids.length > 0 || hasFreePoint3(c))) {
+    const absolute = [...c.points].filter(([, def]) => def.kind === 'coord' || def.kind === 'coord-sym').map(([id]) => [id, pos.get(id)!] as const);
+    const solved = solveCoordDeterminations(c, (ts) => {
+      const p2: Positions3 = new Map(absolute);
+      evaluateSolidsAndPoints(c, seed, p2, new Map(planes), new Map(lines), undefined, undefined, undefined, undefined, undefined, ts);
+      return p2;
+    });
+    coordDetermined = solved.outcome;
+    if (solved.ts.size > 0) {
+      pos.clear();
+      for (const [id, p] of absolute) pos.set(id, p);
+      evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs, freeLineDofs, solved.ts, ratioSymbols);
+    }
+  }
+
 
   // ---- ADR-3D-032: a given referencing a coord-sym point pins the parameter — a
   // post-pivot 1-DOF root-find over FINAL positions (roots = branches, the ADR-3D-006
@@ -2572,8 +2604,110 @@ export function resolve3(c: Construction3, seed: number, opts: { paramValue?: nu
     placementSampled,
     placementSampledParts,
     ratioSymbols: Object.fromEntries(ratioSymbols),
+    coordDetermined,
     seed,
   };
+}
+
+/**
+ * #1615 (ADR-3D-293) — ONE MECHANISM: A COORDINATE GIVEN PLACES ANY POINT THAT SITS ON SOMETHING.
+ *
+ * `c.coordDeterminations` holds the STATED components of a coordinate given on a point whose position carries
+ * SOLVABLE parameters in the sampled-carrier table (`carrierParams3`): a segment's `t`, a line's or a plane's
+ * offset, a partial point's missing coordinate, a trapezoid corner's ratio, the bisector distance. Every one of
+ * those placements is LINEAR in its parameters, and every one already reads the same override map the pivot
+ * uses (`riderTOverride`). So there is one step for all of them, and no per-kind code:
+ *
+ *  1. probe the point through the real point pass at parameters 0 and at each unit parameter (exact, because
+ *     the placement is linear), with the earlier determinations already in force — dependents follow;
+ *  2. solve the stated components for the parameters (normal equations; at most 3 unknowns);
+ *  3. answer `determined` (one solution, consistent across the stated components, strictly inside each
+ *     parameter's own range), `contradicts` (no parameter value reaches the stated components, or it lies
+ *     outside the range — false as stated), or `open` (the stated components do not fix every parameter, or the
+ *     solution sits on a range boundary — nothing unstated is invented, ADR-052).
+ *
+ * Only `determined` places the point. A later restatement of an already determined point is a CLAIM about it
+ * and is not re-solved. The coordinates are stored, never a parameter value: a line's or a plane's offset is
+ * measured from a seat that moves with the seed, so the solve runs per resolution.
+ */
+export type CoordDetermined = 'determined' | 'contradicts' | 'open';
+
+function solveCoordDeterminations(
+  c: Construction3,
+  pass: (ts: ReadonlyMap<Id, number>) => Positions3,
+): { ts: Map<Id, number>; outcome: Map<Id, CoordDetermined> } {
+  const ts = new Map<Id, number>();
+  const outcome = new Map<Id, CoordDetermined>();
+  for (const det of c.coordDeterminations) {
+    if (outcome.has(det.id)) continue; // a restatement is a claim about the point, checked as one
+    const def = c.points.get(det.id);
+    if (!def) continue;
+    const params = carrierParams3(c, det.id, def).filter((p) => p.solvable && !ts.has(p.key));
+    if (params.length === 0) continue;
+    const axes = (['x', 'y', 'z'] as const).filter((ax) => det[ax] !== null);
+    const at = (vals: readonly number[]): Vec3 | undefined => {
+      const m = new Map(ts);
+      params.forEach((p, i) => m.set(p.key, vals[i]));
+      return pass(m).get(det.id);
+    };
+    const p0 = at(params.map(() => 0));
+    const cols = params.map((_, i) => {
+      const pi = at(params.map((__, j) => (j === i ? 1 : 0)));
+      return p0 && pi ? sub3(pi, p0) : undefined;
+    });
+    if (!p0 || cols.some((col) => !col)) {
+      outcome.set(det.id, 'open');
+      continue;
+    }
+    // A θ = b over the stated components, solved by the normal equations (AᵀA) θ = Aᵀb
+    const n = params.length;
+    const A = axes.map((ax) => cols.map((col) => col![ax]));
+    const b = axes.map((ax) => det[ax]! - p0[ax]);
+    const M = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (__, j) => A.reduce((s, row) => s + row[i] * row[j], 0)));
+    const r = Array.from({ length: n }, (_, i) => A.reduce((s, row, k) => s + row[i] * b[k], 0));
+    const theta = solveSmall(M, r);
+    if (!theta) {
+      outcome.set(det.id, 'open'); // the stated components do not fix every parameter
+      continue;
+    }
+    const scale = Math.max(1, ...axes.map((ax) => Math.abs(det[ax]!)), ...cols.map((col) => norm3(col!)));
+    const consistent = axes.every((_, k) => Math.abs(A[k].reduce((s, a, i) => s + a * theta[i], 0) - b[k]) <= 1e-7 * scale);
+    if (!consistent) {
+      outcome.set(det.id, 'contradicts');
+      continue;
+    }
+    const EPS = 1e-9;
+    if (params.some((p, i) => theta[i] < p.lo - EPS || theta[i] > p.hi + EPS)) {
+      outcome.set(det.id, 'contradicts'); // outside the segment, past the stated side of the axis, …
+      continue;
+    }
+    if (params.some((p, i) => (Number.isFinite(p.lo) && theta[i] <= p.lo + EPS) || (Number.isFinite(p.hi) && theta[i] >= p.hi - EPS))) {
+      outcome.set(det.id, 'open'); // on a boundary: it would coincide with an endpoint — no placement
+      continue;
+    }
+    params.forEach((p, i) => ts.set(p.key, theta[i]));
+    outcome.set(det.id, 'determined');
+  }
+  return { ts, outcome };
+}
+
+/** Gaussian elimination with partial pivoting for the ≤ 3×3 normal equations; null when singular. */
+function solveSmall(M: number[][], r: number[]): number[] | null {
+  const n = r.length;
+  const a = M.map((row, i) => [...row, r[i]]);
+  const norm = Math.max(1e-300, ...M.flat().map(Math.abs));
+  for (let col = 0; col < n; col++) {
+    let piv = col;
+    for (let i = col + 1; i < n; i++) if (Math.abs(a[i][col]) > Math.abs(a[piv][col])) piv = i;
+    if (Math.abs(a[piv][col]) <= 1e-10 * norm) return null;
+    [a[col], a[piv]] = [a[piv], a[col]];
+    for (let i = 0; i < n; i++) {
+      if (i === col) continue;
+      const f = a[i][col] / a[col][col];
+      for (let j = col; j <= n; j++) a[i][j] -= f * a[col][j];
+    }
+  }
+  return a.map((row, i) => row[n] / row[i]);
 }
 
 /**

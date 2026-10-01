@@ -40,8 +40,8 @@ const refusal = (seq: readonly string[]) => {
 const UNDRIVABLE: [string, string[], unknown][] = [
   ['the operator’s cone: height never stated', ['חרוט שקודקודו S ומרכז בסיסו O', '|SO| = 4'], { kind: 'size', solid: 'cone' }],
   ['the cone with its radius stated, height not', ['חרוט שקודקודו S ומרכז בסיסו O, רדיוסו 5', '|SO| = 4'], { kind: 'size', solid: 'cone' }],
-  // a rider on a LINE has no closed-form reading (#1561 reads segments, axes and letters only)
-  ['a rider on a line, given its x', ['הישר l1: x = (0,0,0) + t(1,0,0)', 'P על הישר l1', 'P(3, n, p)'], { kind: 'point', id: 'P' }],
+  // #1615 (ADR-3D-293): a plane rider given ONE coordinate is not fixed by it — the solve invents nothing (ADR-052)
+  ['a rider on a plane, given only its x', ['המישור π: z = 0', 'P על המישור π', 'P(1, n, p)'], { kind: 'point', id: 'P' }],
 ];
 
 /**
@@ -56,6 +56,8 @@ const NOW_PLACED: [string, string[]][] = [
   ['a coord-sym point, given its free coordinate', ['B(1, t, 2)', 'B(n, 4, p)']],
   ['the `=` spelling on the axis point', ['הקודקוד D נמצא על החלק החיובי של ציר ה-x', 'D = (3,0,0)']],
   ['the `=` spelling on the rider', ['A(0,0,0)', 'B(2,0,0)', 'K על AB', 'K = (1,0,0)']],
+  // #1615 (ADR-3D-293): the line rider, placed by the one generic mechanism
+  ['a rider on a line, given its x', ['הישר l1: x = (0,0,0) + t(1,0,0)', 'P על הישר l1', 'P(3, n, p)']],
 ];
 
 /** False as stated — the student's own data contradicts it; «בדקו את החישוב» is the truth. */
@@ -97,7 +99,7 @@ describe('#1590 — an ANSWER over a sampled carrier keeps its register (the fix
 describe('#1590 — the message names the tool, never the student’s calculation, in both locales', () => {
   const render = (lng: string, err: StoreError3) => errorText3(i18n3d.getFixedT(lng) as (k: string, o?: Record<string, unknown>) => string, err) ?? '';
   const cone = refusal(UNDRIVABLE[0][1])!;
-  const point = refusal(UNDRIVABLE[2][1])!; // the line rider P
+  const point = refusal(UNDRIVABLE[2][1])!; // the plane rider P, given only x
 
   it('Hebrew: the cone message names «החרוט» and the point message names P; neither says «בדקו את החישוב»', () => {
     expect(render('he', cone)).toContain('החרוט');

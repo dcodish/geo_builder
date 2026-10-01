@@ -11506,3 +11506,47 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 **Locks.** `src3d/__tests__/issue-1561-coord-determines.test.ts` (19): the operator's T13 in three spellings with K = (1,0,0) at every claim seed and every row ok; K(0.5,0,0); the host «K על BA»; an identical restatement → already known, a different one → refused; D on the axis in He, En and the `=` spelling; «B(n, 4, p)» → t = 4, B = (1,4,2); eight false-as-stated givens → `claim-refuted`. `issue-1590-given-not-drivable.test.ts` re-stated: its six point cases moved to a "now placed" block; the tool-limit message is locked on a line rider («P על הישר l1 · P(3, n, p)»).
 
 **Consequences.** `src3d/engine/carriers.ts` (`readCoordGiven`, `CoordReading`; `statedDataAdmits` delegates), `src3d/engine/apply.ts` (`determineByCoords`, the existing-id `point3` head).
+
+## ADR-3D-293 — One mechanism places a point from a coordinate given, whatever the point sits on (#1615)
+
+**Status:** accepted · 2026-10-01 · feature (PR, `feat/1615-one-mechanism`) · plan: the #1615 comment "Plan, revised: ONE mechanism", written after the operator asked *"are you proposing to keep 2 kinds of points and move to a single mechanism that is more robust?"* and approved with *"update 1615 and build it"*; `auto-ok` as transcription. **Generalises** [ADR-3D-292](#adr-3d-292): its per-kind segment and axis cases are removed, and their answers are now produced by the step below. **Amends** [ADR-3D-291](#adr-3d-291): the not-determined row reads this step's outcome instead of `statedDataAdmits`, except for the coord-sym point.
+
+**Requirements:** docs/02b FR-SP-5 ("A coordinate that pins a point's free freedom places the point, whatever the point sits on") · **Design:** docs/04b — "One mechanism places a point from a coordinate given, whatever it sits on"; the not-determined rows
+
+**Context (measured on `main` 972ff29e, after ADR-3D-292).** The operator, playing PR #1617's T12: *"why cant it accept it? if n=0 and p=0 its good"*. «הישר l1: x = (0,0,0) + t(1,0,0) · P על הישר l1 · P(3, n, p)», «P(3,0,0)» and «P = (3,0,0)» were refused with the tool-limit message; so was «P(3,1,0)», which is off the line and should get «בדקו את החישוב». The same held for a rider on «המישור π: z = 0». ADR-3D-292 read segments, axes and letters only. Its first plan for #1615 gave lines and planes their own slot and their own reader case next to those. That is a per-kind list growing one entry at a time (docs/17 §3).
+
+**Class.** *A coordinate given on a point that sits on something is placed or judged per kind of carrier, so every carrier kind the reader does not list is refused, and a false given over it is told "the tool's limit".*
+
+**Mechanism.** The parts already existed in one place each. `carrierParams3` is one table of every free parameter of every point that sits on something. `evaluateSolidsAndPoints` places all of them from one override map (`riderTOverride`), which every kind's branch reads. Every such placement is linear in its parameters.
+
+**Decision.**
+1. **Record coordinates, not parameters.** The existing-id `point3` path records the stated components in `c.coordDeterminations` (beside the unchanged pin and `given: true` arbiter) when the point has `solvable` table entries. A line's or plane's offset is measured from a seed-dependent seat, so a stored parameter value would mean a different position at every seed.
+2. **`solvable`, a new table column.** It means "placed linearly from this parameter, and nothing re-seats the point after the point pass". It is wider than `drivable`, which is the pivot's own limit: an equation-plane rider is not a pivot unknown, but its in-plane offsets solve exactly. It is false for a free line's or plane's rider (the free-carrier fixpoint re-seats them) and for a stated side's height.
+3. **One step, `solveCoordDeterminations`.** It runs after the free-carrier fixpoint, only where the pivot owns nothing (no solid, no `free3` point; there the coordinate pin enrolls the rider and the pivot drives it, so each figure has one driver). For each point it probes at parameters 0 and at each unit parameter, solves the stated components by the normal equations, and publishes `Resolved3.coordDetermined`:
+   - `determined`: one solution strictly inside every range. The point is placed, and its dependents follow.
+   - `contradicts`: inconsistent, or out of range.
+   - `open`: underdetermined, or exactly on a range boundary. Nothing unstated is invented (ADR-052).
+4. **Fresh passes.** Every probe and the final placement start from the absolute points only. The measured reason: a line or plane rider is seated around the centroid of what is already placed, its own earlier position included. The first build probed fresh and placed over the old map, and every line case read `contradicts`.
+5. **The verdict reads the outcome.** `contradicts` → «בדקו את החישוב»; `determined` → the arbiter holds; `open` → ADR-3D-291's tool-limit message.
+6. **The freedom count reads the outcome too.** `freeDofCount3` subtracts a placed point's solvable parameters, as it subtracts the pivot's driven riders. Found by reading the play-sheet screenshots: the first build placed P on the line and still printed «דרגות חופש: 1» (2 on the plane) — ADR-3D-292 rewrote the point's definition, so the count never saw it; this mechanism keeps the definition and must say the parameter is consumed. Measured after: line, slanted line, plane, segment, axis point and a dependent midpoint all read 0; the plane given one coordinate (refused) keeps 2.
+7. **The coord-sym point stays outside.** Its letter is the figure parameter, owned by the parameter lane, not a carrier parameter. `readCoordGiven` is reduced to that one case and lowers to `symbol-value` as before.
+
+**Rejected.** A stated-offset slot per point kind (the first plan): every carrier kind needs its own field and reader case, and the next one added to the table would again be refused until someone remembered it.
+
+**Not built (named).** A point on a plane given one coordinate is refused as the tool's limit. It narrows P to a line in the plane, which is a constraint, not a placement. The cone is parked (#1569).
+
+**Sibling audit.** Analytic already places riders on lines and segments from coordinates and refuses off-carrier ones (measured for ADR-3D-292). 2-D has no coordinate statements.
+
+**Measured.** The new lock's first 17 cases fail **11** on `main` (the 4 freedom-count cases were added after the screenshot finding); the 6 that pass there are ADR-3D-292's cases and the honest plane refusal. #1394 parity: **1** existing hash moved (the T12 sequence, refused → recorded) and 5 new keys. Every ADR-3D-292 sequence hash is unchanged, because the determination lives in the construction, not in the recorded commands. Cost (docs/17 §7), `resolve3` per seed over 240 seeds on a 7-line rider figure: 0.017 ms with no determination, 0.033 ms with one, 0.040 ms with two. A figure with no coordinate given on a rider does no extra work (the step is skipped). **Seed sweep** (24 seeds, through `decideSubmit3`): the line T12, a slanted line, the plane, a tilted plane (`x + y + z = 3`), the segment, the axis point and a dependent midpoint are each placed exactly at **24/24** seeds with every row ok at 24/24.
+
+**Locks.** `src3d/__tests__/issue-1615-one-mechanism.test.ts` (21):
+- T12 in three spellings, with P = (3,0,0) at every claim seed and every row ok;
+- the reversed direction and a slanted line through a non-origin anchor; off the line → refused;
+- the plane: placed, off it → refused, one coordinate → the tool-limit message;
+- a dependent midpoint follows the placed rider in both entry orders; restated identically → already known, restated elsewhere → refused;
+- ADR-3D-292's segment and axis cases and three false-as-stated controls, now through the one step;
+- the freedom count: more than 0 before the coordinate, 0 after, for a line, plane, segment and axis point.
+
+`issue-1590-given-not-drivable.test.ts`: the line rider moves to "now placed", and the tool-limit example becomes the plane given one coordinate. `issue-1561-coord-determines.test.ts` is unchanged and green.
+
+**Consequences.** `src3d/engine/carriers.ts` (`solvable`; `readCoordGiven` reduced to coord-sym; `statedDataAdmits` coord-sym only), `src3d/engine/apply.ts` (records the determination; `determineByCoords` removed), `src3d/engine/evaluate.ts` (`solveCoordDeterminations`, `solveSmall`, the hook, `Resolved3.coordDetermined`), `src3d/engine/types.ts` (`coordDeterminations`), `src3d/store/store3.ts` (the row reads the outcome).
