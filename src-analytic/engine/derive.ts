@@ -80,6 +80,12 @@ export interface Derivation {
    * submit path reads the new line's entry and carries it into the commit that records the line.
    */
   notices: Array<ApplyNotice & { index: number }>;
+  /**
+   * WHICH LINE STATED EACH CONSTRAINT (#1629, ADR-AG-188) — positionally over `construction.constraints`,
+   * the fold's own attribution (`constraintFact`) carried to the line. The submit gate reads the new
+   * line's constraints from it to ask whether they hold in every configuration of the current figure.
+   */
+  constraintLine: number[];
 }
 
 export function derive(lines: readonly string[], seed = 0): Derivation {
@@ -368,6 +374,16 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
    * asked for and is the better answer; a second, differently-worded refusal on the same line is
    * noise rather than honesty. This is why the arm runs here, below every other fault: it can see
    * what has already been said.
+   *
+   * **A TRAPEZOID WITH BOTH PAIRS OF SIDES PARALLEL (#1627, ADR-AG-189)** is the third member, on the
+   * same gate. Pinned corners that make «טרפז ABCD» a rectangle are ADR-AG-129's sentence exactly — a
+   * shape noun promises a ring, and these points are not that ring — so they are refused, with their
+   * own message: the remedy here is not "reorder the letters". **Deliberately NOT widened past
+   * `reportedDof = 0`:** unlike crossed and collapsed, this member CAN arrive with freedom (a stated
+   * right angle that turns a right trapezoid into a rectangle leaves a rectangle's five degrees), and
+   * whether that is refused or drawn with a notice is an open ruling — the 2-D sibling's ADR-165 chose
+   * "allow, flag amber" for exactly that case. Until it is ruled, such a figure is drawn as before; the
+   * configuration search already prefers a true trapezoid wherever one exists.
    */
   if (figure.ringFaults.length > 0 && reportedDof(construction, figure.carrierDof) === 0) {
     /** Which line declared each polygon — the line the refusal belongs on (#1145). */
@@ -377,11 +393,12 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
     });
     const alreadyFaulted = new Set(faults.map((f) => f.index));
     for (const rf of figure.ringFaults) {
+      const exclusion = rf.violation === 'trapezoid-is-parallelogram';
       const index = declaredPolygonOn.get(rf.id);
       if (index === undefined) continue; // no line owns it — nothing honest to say about it
       if (alreadyFaulted.has(index)) continue;
       alreadyFaulted.add(index);
-      faults.push({ index, code: 'ring-contradicts-noun', detail: lines[index] });
+      faults.push({ index, code: exclusion ? 'trapezoid-is-parallelogram' : 'ring-contradicts-noun', detail: lines[index] });
     }
   }
   /**
@@ -411,7 +428,8 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
     notices.push({ ...n, index });
   });
 
-  return { construction, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices };
+  const constraintLine = construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]]));
+  return { construction, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices, constraintLine };
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */
@@ -541,4 +559,5 @@ export const EMPTY_DERIVATION: Derivation = {
   outcomes: [],
   minted: [],
   notices: [],
+  constraintLine: [],
 };

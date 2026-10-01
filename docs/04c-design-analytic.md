@@ -1826,3 +1826,25 @@ input box — one grammar, one gate. The catalog row carries `lane: 'rewrite'` (
 guide, excluded from the LLM vocabulary and the figure corpus, read by the catalog guard through
 `parseRenameAnalytic` + `decideRename`. Known limit: a FREE vertex's default sample is keyed by its letter
 (`freeCoord`), so its drawn position may change on a rename while every given and the freedom stay equal.
+
+**The entailment test is judged over CONFIGURATIONS, not over the trial ([ADR-AG-188](06c-decisions-analytic.md#adr-ag-188), #1629).** The trial derivation re-searches seeds until the new line holds, so "the given holds in the trial" is true for any given that merely *selects* among discrete configurations. The "freedom did not drop" condition cannot catch this, because mirror images at 0 DOF have no freedom to lose. The gate therefore has a fourth condition, checked last because it is the only one that costs evaluations. The constraints the new line stated (`Derivation.constraintLine`, the fold's own `constraintFact` attribution carried to the line) must hold in every figure of the CURRENT construction's configuration pool (`evaluate.holdsInEveryConfiguration`). That is the same pool, the same residual and the same `SATISFIED_EPS` that `isKnowledge`, `knownOptions`, `knownCurve` and `unsatisfied` use. A residual that cannot be judged reads as "not entailed", so the line records. The pool is filled on demand. On the page, `poolScheduler` has usually completed it already, and if it has not, one submit pays the at most 24 cached evaluations the idle loop would have spent.
+
+## One decision for the view after any change ([ADR-AG-190](06c-decisions-analytic.md#adr-ag-190), #1624)
+
+The App's box effect (keyed on the drawn box and the seed) makes one call, `viewAfterChange(from, view, to,
+change, surface)` in `render/view.ts`, whatever changed the figure: `change` is `'configuration'` when the
+«הציגו תצורה אחרת» button set `carryFrameRef`, else `'figure'`. The function is pure box arithmetic.
+Its candidate is the carried window for a press (`carryWindow`, ADR-AG-137) and the current relative view
+otherwise; it returns the candidate itself when `boxContains(viewBox(to, candidate, surface), to)` — the
+drawn box is already padded (`engine/evaluate.ts` `viewBox`, plus shown traces via `app/drawnBox.ts`), so
+containment includes the margin. Otherwise it returns `viewShowing(union, to, surface)`, the view whose
+window contains the union of the candidate window and the drawn box: centre = the union's centre, and the
+zoom solved from `max(halfY, halfX / aspect)` exactly as `carryWindow` inverts `viewBox`'s aspect step —
+the window only grows, the scale stays one isotropic number. The single non-union branch is #1225's: for
+`'figure'`, a candidate through which `figureIsVisible` (≥ 50% per axis) fails returns `INITIAL_VIEW`.
+`figureIsVisible` is therefore now only the "has it left" test; the "is it shown" test is containment.
+The decision is in `render/view.ts` rather than inline in `App.tsx` so the locks call it (ADR-W-053).
+
+## A noun's exclusive condition is part of its ring ([ADR-AG-189](06c-decisions-analytic.md#adr-ag-189), #1627)
+
+A shape noun asserts two kinds of thing. **Relations** are equations over its vertices («AB ∥ DC», «AD = BC»): they are its `SHAPES` row, and the solve meets them. **Ring promises** are properties of the drawn configuration that no equation can hold: simple (not crossed), open (not collapsed), and, for the trapezoid family, *not a parallelogram*. `engine/rings.ts` `ringViolation(vertices, noun)` is the one predicate for all of them. It is pure over positions the caller already has, and it runs in a fixed order: degenerate, then crossed, then the noun's exclusion. Each answer describes a simple, open ring correctly. A noun opts into an exclusion by membership in `shapes.ts` `ONE_PARALLEL_PAIR_NOUNS`. That set is kept outside the rows, so editing a row's seats cannot disarm it, and the predicate names no noun itself. Both pairs of opposite sides are "parallel" below `PARALLEL_SIN_TOL`, which equals `COLLAPSED_SIN_TOL` (|sin θ| < 1e-3, relative and scale-free). The violation is consumed exactly as the other two are. In `evaluate`, `ringFaultsOf` records it on the figure, and `drawableAt`'s `whole()` rejects the configuration, so the seed sweep moves on. In `derive`, on a figure with `reportedDof = 0`, the ADR-AG-129 arm refuses the declaring line with the code `trapezoid-is-parallelogram` (not `ring-contradicts-noun`, whose remedy is about letter order), and the submit gate's appeared-fault rule moves the refusal onto the line that completed the contradiction. A figure that still has freedom and is a parallelogram at every configuration in the budget is drawn from the fallback tier and not refused. That case waits on an operator ruling (ADR-AG-189, "Not built").

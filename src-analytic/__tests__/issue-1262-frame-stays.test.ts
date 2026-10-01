@@ -12,10 +12,13 @@
  * left it — #1225's rule for a fact, applied to a configuration, one idea in the product. The row that
  * pinned the lurch as a known state in `issue-1198-locus-in-view.test.ts` moved here with the new
  * expectation; the figure's OWN box still varies (that is the figure), the shown window does not.
+ *
+ * #1624 (ADR-AG-190) completes the rule: the window is kept while the WHOLE figure fits and widened to the
+ * union of window and figure when it does not — "largely visible" had left vertices off the canvas.
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
-import { INITIAL_VIEW, carryWindow, figureIsVisible, viewBox, type CanvasView } from '../render/view';
+import { INITIAL_VIEW, carryWindow, figureIsVisible, viewAfterChange, viewBox, type CanvasView } from '../render/view';
 
 const LINES = ['A(-9a,0)', 'B(41a,0)', 'נקודה P', 'PA מאונך ל-PB'];
 const SEEDS = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -48,22 +51,33 @@ describe('#1262 — the shown window is carried across configurations', () => {
     expect(same(viewBox(boxes[3], carried, SURFACE), w0)).toBe(true);
   });
 
-  it('the app’s rule over the sweep: keep the window while the figure is largely on screen, else re-fit — measured, the reported figure never needs a re-fit and the shown width is constant (was a factor of 3)', () => {
-    const boxes = SEEDS.map((s) => derive(LINES, s).box);
+  /**
+   * MOVED by #1624 (ADR-AG-190), not deleted. This row asserted the shown width was CONSTANT over the sweep
+   * under the old keep-while-largely-visible rule — and measured, that constant frame left B off the canvas
+   * at 4 of the 7 presses (seeds 2, 3, 6, 7): the #1624 class on #1262's own figure. Under the ruled rule the
+   * frame is kept while the figure fits and widened (never shrunk, never moved sideways) when it does not,
+   * so the lurch #1262 removed stays removed — the width is monotone, every frame contains the last — and the
+   * whole figure is on the canvas at every press.
+   */
+  it('the app’s rule over the sweep: no lurch — every frame contains the last and none shrinks — and the whole figure is inside at every press (#1624)', () => {
+    const ds = SEEDS.map((s) => derive(LINES, s));
     let view: CanvasView = INITIAL_VIEW;
-    const shownWidths: number[] = [width(viewBox(boxes[0], view, SURFACE))];
-    let refits = 0;
-    for (let i = 1; i < boxes.length; i++) {
-      const kept = carryWindow(boxes[i - 1], view, boxes[i], SURFACE);
-      if (figureIsVisible(boxes[i], kept, SURFACE)) view = kept;
-      else { view = INITIAL_VIEW; refits++; }
-      shownWidths.push(width(viewBox(boxes[i], view, SURFACE)));
+    let shown = viewBox(ds[0].box, view, SURFACE);
+    for (let i = 1; i < ds.length; i++) {
+      view = viewAfterChange(ds[i - 1].box, view, ds[i].box, 'configuration', SURFACE);
+      const now = viewBox(ds[i].box, view, SURFACE);
+      const tag = `seed ${SEEDS[i]}`;
+      expect(now.minX <= shown.minX + 1e-9 && now.maxX >= shown.maxX - 1e-9 && now.minY <= shown.minY + 1e-9 && now.maxY >= shown.maxY - 1e-9, `${tag}: the frame contains the previous one`).toBe(true);
+      for (const p of ds[i].figure.points) {
+        expect(p.x >= now.minX && p.x <= now.maxX && p.y >= now.minY && p.y <= now.maxY, `${tag}: ${p.id} is inside`).toBe(true);
+      }
+      shown = now;
     }
-    expect(refits, 'every configuration of this figure stays largely inside the first frame').toBe(0);
-    expect(Math.max(...shownWidths) / Math.min(...shownWidths)).toBeLessThan(1 + 1e-9);
   });
 
-  it('a configuration that has largely LEFT the frame re-fits — the escape hatch the ruling accepted', () => {
+  // #1624 (ADR-AG-190) replaced the re-fit with a WIDEN for a press — locked in issue-1624-figure-in-view.test.ts.
+  // The predicate below is still the one a fact/edit/undo uses to decide the figure has LEFT the view.
+  it('a configuration that has largely LEFT the frame is not visible through it (a press now widens, #1624)', () => {
     const near = { minX: 0, maxX: 10, minY: 0, maxY: 10 };
     const far = { minX: 1000, maxX: 1010, minY: 1000, maxY: 1010 };
     const kept = carryWindow(near, INITIAL_VIEW, far, SURFACE);

@@ -86,6 +86,16 @@ export type ApplyErrorCode =
    */
   | 'ring-contradicts-noun'
   /**
+   * A TRAPEZOID THE GIVENS HAVE MADE A PARALLELOGRAM (#1627, ADR-AG-189) — «טרפז ABCD» on four pinned
+   * rectangle corners, or a right trapezoid that a stated right angle turns into a rectangle. The
+   * noun promises exactly one pair of parallel sides (the 2-D ruling ADR-157: a trapezoid is never
+   * morphed into a rectangle or a parallelogram — give the error). Distinct from
+   * `ring-contradicts-noun`, whose remedy (reorder the letters) does not apply: the ring is simple and
+   * open, and it is the other pair of sides that broke the promise. Same gate as that code:
+   * `reportedDof === 0` (the with-freedom case is an open ruling — see `derive`).
+   */
+  | 'trapezoid-is-parallelogram'
+  /**
    * «זווית B ישרה» where the vertex alone does not name an angle (#1049).
    *
    * A vertex names an angle only when the figure says which two rays meet there. With no shape
