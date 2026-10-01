@@ -229,7 +229,8 @@ describe('#1504 amendment 1 — ONE branch-word list, in every position', () => 
   it.each([
     // A modifier with no circle relation to land on is never dropped — the sentence declines.
     [['נתון מעגל M'], 'מעגל M משיק לציר ה-x מבחוץ'],
-    [['נתון מעגל M'], 'מעגל M משיק לציר ה-x בנקודה T'],
+    // «מעגל M משיק לציר ה-x בנקודה T» used to be here: «בנקודה T» had no relation to land on. Since #1619 B3
+    // it names the touch point on the axis (ADR-AG-195) — locked in issue-1619-b3-tangents-chords.test.ts.
     [['נתון מעגל K', 'נתון מעגל M'], 'מעגל M משיק למעגל K זה לזה'],
     // Two branch words at odds with each other in one sentence.
     [['נתון מעגל K', 'נתון מעגל M'], 'מעגל M משיק מבחוץ למעגל K מבפנים'],

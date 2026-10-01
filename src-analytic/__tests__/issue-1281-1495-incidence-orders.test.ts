@@ -51,9 +51,20 @@ describe('#1495 — a SIDE as the subject lowers to exactly the side-equation se
     expect(d.construction.constraints.filter((k) => k.t === 'on-curve').map((k) => (k as { id: string }).id).sort()).toEqual(['B', 'C']);
   });
 
-  it('a side cannot lie on a circle — refused by name, never answered «not understood»', () => {
+  it('a side ON A CIRCLE is a CHORD since #1619 B3 (ruling 4 on #1616 lifted the out-of-scope refusal)', () => {
+    // This lock used to assert `out-of-scope`. The operator ruled chords in (#1616 ruling 4: "Chord: yes"),
+    // so the side lowers to exactly what the spelled-out sentences carry — both ends on the curve, the side drawn.
+    expect(factsOf('הצלע BC נמצאת על המעגל x^2+y^2=9')).toEqual([
+      ...factsOf('B על המעגל x^2+y^2=9'),
+      ...factsOf('C על המעגל x^2+y^2=9'),
+      ...factsOf('הצלע BC'),
+    ]);
     const d = derive(['משולש ABC', 'הצלע BC נמצאת על המעגל x^2+y^2=9'], 0);
-    expect(d.faults.map((f) => [f.index, f.code, f.detail])).toEqual([[1, 'out-of-scope', 'הצלע BC נמצאת על המעגל x^2+y^2=9']]);
+    expect(d.faults).toEqual([]);
+    for (const id of ['B', 'C']) {
+      const p = d.figure.points.find((q) => q.id === id)!;
+      expect(Math.hypot(p.x, p.y)).toBeCloseTo(3, 6);
+    }
   });
 
   it('regression guard: a POINT subject is unchanged — one incidence', () => {

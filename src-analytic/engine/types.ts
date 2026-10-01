@@ -284,7 +284,26 @@ export type Fact =
    * משיק למעגל M» names its circle, so M1 resolves that name instead of demanding the figure hold
    * exactly one.
    */
-  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: TangentLineRef[]; circle?: string })
+  /*
+   * `at` (#1619 B3, ADR-AG-195) — the sentence NAMED the touch point («…משיק לציר ה-x בנקודה A», «הישר BC
+   * משיק למעגל בנקודה B»). Then the fact carries exactly ONE target, and it lowers to the point on the
+   * circle, the point on the target, and the target ⊥ the radius there — for ANY circle, because the
+   * radius direction reads the resolved circle. `circleId` is the host by id, for a fact M1 itself built.
+   */
+  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: TangentLineRef[]; circle?: string; circleId?: Id; at?: Id })
+  /**
+   * «המשיק למעגל בנקודה A» — THE TANGENT AS AN OBJECT (#1619 B3, ADR-AG-195): the line through A
+   * perpendicular to the radius to A, on the circle `circle` names (contextual when absent). M1 resolves
+   * the circle and lowers it to A on the circle plus a `line-at` whose direction is that radius turned a
+   * quarter — a derived line, 0 DOF, id {@link tangentLineId}.
+   */
+  | (FactBase & { t: 'tangent-line-at'; at: Id; circle?: string })
+  /**
+   * «משוואת המשיק היא 4x+3y=40» — the equation of «THE tangent», with no touch point named (#1619 B3).
+   * WHICH tangent is M1's question: the one tangent object the figure holds (the equation is then a
+   * given about it), none (the stated line is tangent to the circle), several (refused, never a pick).
+   */
+  | (FactBase & { t: 'tangent-eq'; id: Id; eq: Expr; eqSrc: string; circle?: string })
   /**
    * «רדיוס המעגל (I|O)? הוא 5» — the radius stated as its own given (#1432). WHICH circle is M1's
    * question (`circle` as the sentence named it, or the contextual one); what it does depends on
@@ -331,7 +350,10 @@ export type Fact =
    * means is a question about the construction, so M1 answers it, and refuses where the figure
    * holds none or several of that kind.
    */
-  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind; circle?: string })
+  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent'; circle?: string })
+  /*
+   * `kind: 'tangent'` (#1619 B3) — «המשיק» with no point: the one tangent OBJECT in the figure.
+   */
   /*
    * `circle` on `on-kind` (#1619 B1): «A על מעגל M» — the circle named by its CENTRE LETTER (or numeral),
    * resolved at M1 through the one name chain (`circleByName`), where the bare kind means the one circle.
@@ -363,16 +385,7 @@ export type Fact =
    * resolution, with a length on the other side: M1 lowers it to the `length-eq` whose right side is the
    * circle's own radius expression.
    */
-  | (FactBase & { t: 'radius-length'; circle?: string; length: LengthExpr })
-  /**
-   * «הצלעות AO, BO ו-AB משיקות למעגל בנקודות D, E ו-F בהתאמה» — a SIDE touches a circle AT a named point
-   * (#1619 B2, ADR-AG-194). One fact per side. WHICH circle is M1's question (the `tangent-of` chain: `circle`
-   * as the sentence named it, else the figure's one circle); what it lowers to depends on the host: the
-   * incircle of a ring that has this side touches it by construction (only the touch point is named), a
-   * circle on a centre gains the bounded `tangent-line` given beside the named point, and any other circle
-   * is refused BY NAME. The point is the `side-touch` derived point — the foot of the centre on the side.
-   */
-  | (FactBase & { t: 'touch-at'; a: Id; b: Id; at: Id; circle?: string; bounded: boolean });
+  | (FactBase & { t: 'radius-length'; circle?: string; length: LengthExpr });
 
 /** The stand-in a `via-centre` sentence carries for «מרכז המעגל» — a name no student writes (#1619 B1). */
 export const CENTRE_SENTINEL = 'Z₁';
@@ -546,6 +559,9 @@ export const namesObject = (f: Fact): f is NamingFact =>
  * The id of the circle «BD קוטר» CREATES (#1324) — one formula for M1, which mints it, and for `derive`, which
  * must blame a vacancy of it on the line that said it. Sorted, so «DB קוטר» is the same circle.
  */
+/** The id of the tangent line AT a point (#1619 B3) — one formula for the parser and M1. */
+export const tangentLineId = (at: Id): Id => `tangent-${at}`;
+
 export const diameterCircleId = (a: Id, b: Id): Id => `circle-diam-${[a, b].sort().join('')}`;
 export const isDerived = (o: GeoObject): o is DerivedObject => o.kind === 'derived';
 export const isFree = (o: GeoObject): o is Extract<GeoObject, { kind: 'free' }> => o.kind === 'free';

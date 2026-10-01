@@ -68,7 +68,18 @@ export type Direction =
    * a later given pins it. The angle is unbounded (a direction is periodic in π), which is what keeps
    * the domain filter out of it.
    */
-  | { k: 'free'; sym: string };
+  | { k: 'free'; sym: string }
+  /**
+   * THE RADIUS TO A POINT — from the centre of `circle` to the point `at` (#1619 B3, ADR-AG-195).
+   *
+   * A tangent at a NAMED point is the line through it perpendicular to this radius, and the corpus says it
+   * three ways: a given line touches there («הישר BC משיק למעגל בנקודה B»), an axis touches there
+   * («ציר ה-y משיק למעגל בנקודה A»), and the tangent is itself the object («המשיק למעגל בנקודה A»). All
+   * three are "⊥ to the radius at A", so the radius is a DIRECTION operand the relation already relates —
+   * one perpendicularity, never a tangent-at kind of its own. The centre is read off the RESOLVED circle,
+   * so a circle stated by its equation, by its centre point or computed from points is the same operand.
+   */
+  | { k: 'radius'; circle: Id; at: Id };
 
 /** An angle named by three points: the vertex and the ends of its two rays (#1331). */
 export interface AngleRef {
@@ -301,6 +312,17 @@ export type Constraint =
    */
   | { t: 'tangent-line'; centre: Id; r: Expr; line: TangentLineRef }
   /**
+   * A LINE TOUCHES A CIRCLE THE FIGURE ALREADY DETERMINES — «הישר y=kx+1 משיק למעגל x²+y²=25» (#1430
+   * step 1, #1619 B3, ADR-AG-195).
+   *
+   * `tangent-line`'s statement — the distance from the centre to the line IS the radius — about a circle
+   * that has no free centre point and radius symbol to name: one stated by its EQUATION, or computed from
+   * points. Both numbers are read off the RESOLVED circle (`curveAt`), so the freedom the given consumes is
+   * the LINE's (a parameter in its equation, a free point it passes through), never the circle's. Same
+   * rows as `tangent-line` (`lineTangencyRows`), so a bounded side is bounded identically.
+   */
+  | { t: 'tangent-curve'; circle: Id; line: TangentLineRef }
+  /**
    * Two CIRCLES touch — «מעגל M משיק למעגל K» (#1504, the third member of the tangency family).
    *
    * One equation with a DISCRETE unstated choice: |MK| = r+R (external) or |MK| = |r−R|
@@ -364,7 +386,7 @@ export function resolveChoices(ks: readonly Constraint[], seed: number): Constra
  */
 export function canonicalConstraint(k: Constraint): string {
   const dir = (d: Direction): string =>
-    d.k === 'points' ? `p:${[d.a, d.b].sort().join(',')}` : d.k === 'axis' ? `a:${d.axis}` : d.k === 'curve' ? `c:${d.id}` : `f:${d.sym}`;
+    d.k === 'points' ? `p:${[d.a, d.b].sort().join(',')}` : d.k === 'axis' ? `a:${d.axis}` : d.k === 'curve' ? `c:${d.id}` : d.k === 'radius' ? `r:${d.circle},${d.at}` : `f:${d.sym}`;
   if (k.t === 'relation') {
     // Both relations are symmetric in their operands: `u ∥ v` is `v ∥ u`, and likewise for ⊥.
     const [u, v] = [dir(k.u), dir(k.v)].sort();
@@ -389,6 +411,13 @@ export function canonicalConstraint(k: Constraint): string {
         ? `p:${[k.line.a, k.line.b].sort().join(',')}${k.line.bounded ? '|bounded' : ''}`
         : `c:${k.line.id}`;
     return `tangent-line|${k.centre}|${line}`;
+  }
+  if (k.t === 'tangent-curve') {
+    const line =
+      k.line.kind === 'points'
+        ? `p:${[k.line.a, k.line.b].sort().join(',')}${k.line.bounded ? '|bounded' : ''}`
+        : `c:${k.line.id}`;
+    return `tangent-curve|${k.circle}|${line}`;
   }
   // «מעגל M משיק למעגל K» is «מעגל K משיק למעגל M» — undirected; the BRANCH is part of the
   // statement (externally and internally tangent are different givens, #1504).
@@ -442,6 +471,9 @@ export function constraintRefs(k: Constraint): Id[] {
     // nothing here — its own freedom lives in the parameter register, not in a point.
     case 'tangent-line':
       return k.line.kind === 'points' ? [k.centre, k.line.a, k.line.b] : [k.centre];
+    // The circle is a CURVE ref; only a two-point line moves points.
+    case 'tangent-curve':
+      return k.line.kind === 'points' ? [k.line.a, k.line.b] : [];
     // Both centres may move — either circle can give way to satisfy the touch.
     case 'tangent-circle':
       return [k.centre, k.other];
@@ -517,6 +549,8 @@ export function describeConstraint(k: Constraint): string {
       return `${k.centre} משיק לציר ${k.axis}`;
     case 'tangent-line':
       return `${k.centre} משיק ל-${k.line.kind === 'curve' ? k.line.label : `${k.line.a}${k.line.b}`}`;
+    case 'tangent-curve':
+      return `${k.line.kind === 'curve' ? k.line.label : `${k.line.a}${k.line.b}`} משיק למעגל`;
     case 'tangent-circle':
       return `מעגל ${k.centre} משיק למעגל ${k.other}${k.branch === 'internal' ? ' מבפנים' : ' מבחוץ'}`;
     case 'derived-at':
@@ -553,7 +587,7 @@ export function describeConstraint(k: Constraint): string {
  * reference as "not a point", which is the opposite defect.
  */
 export function constraintCurveRefs(k: Constraint): Id[] {
-  const ofDir = (d: Direction): Id[] => (d.k === 'curve' ? [d.id] : []);
+  const ofDir = (d: Direction): Id[] => (d.k === 'curve' ? [d.id] : d.k === 'radius' ? [d.circle] : []);
   switch (k.t) {
     case 'on-curve':
       return [k.curve];
@@ -561,6 +595,8 @@ export function constraintCurveRefs(k: Constraint): Id[] {
     // the defect this function was built for (#1150), one constraint kind later (#1501).
     case 'tangent-line':
       return k.line.kind === 'curve' ? [k.line.id] : [];
+    case 'tangent-curve':
+      return k.line.kind === 'curve' ? [k.circle, k.line.id] : [k.circle];
     case 'relation':
       return [...ofDir(k.u), ...ofDir(k.v)];
     case 'slope':
@@ -581,6 +617,9 @@ export function dirRefs(d: Direction): Id[] {
   switch (d.k) {
     case 'points':
       return [d.a, d.b];
+    // The point the radius runs to; the circle is a CURVE ref (`constraintCurveRefs`), never a point.
+    case 'radius':
+      return [d.at];
     case 'axis':
     case 'curve':
     case 'free':
@@ -606,6 +645,8 @@ function describeDir(d: Direction): string {
       return d.id;
     case 'free':
       return 'ישר';
+    case 'radius':
+      return `הרדיוס ל-${d.at}`;
     default: {
       const undescribed: never = d;
       throw new Error(`direction has no description: ${JSON.stringify(undescribed)}`);
@@ -650,6 +691,15 @@ export function dirVector(
       // The axes need no resolution and no figure — that is why they are cheap operands, and why
       // «AB מקביל לציר ה-x» works before anything else on the canvas is determined.
       return d.axis === 'x' ? { x: 1, y: 0 } : { x: 0, y: 1 };
+    case 'radius': {
+      // The centre is the RESOLVED circle's — whatever way it was stated (ADR-AG-195). A point AT the
+      // centre has no radius direction: `null`, "cannot be judged", below.
+      const c = curveAt?.(d.circle) ?? null;
+      const p = at(d.at);
+      if (!c || c.kind !== 'circle' || !p) return null;
+      v = { x: p.x - c.cx, y: p.y - c.cy };
+      break;
+    }
     case 'curve': {
       // For `ax + by + c = 0` the direction is `(−b, a)`: the normal is `(a, b)`, and a line runs
       // perpendicular to its own normal. Only a LINE has a single direction — a circle or a conic
@@ -871,44 +921,15 @@ export function residualRows(
     case 'tangent-line': {
       const radius = evalExpr(k.r, env);
       if (!Number.isFinite(radius)) return null; // an unbound radius judges nothing
-      let a: number;
-      let b: number;
-      let cc: number;
-      if (k.line.kind === 'curve') {
-        const cv = curveAt?.(k.line.id) ?? null;
-        // Only a LINE can be touched this way — a curve of another kind is refused at the apply
-        // boundary, so answering "cannot be judged" here is a vacancy, never a silent drop.
-        if (!cv || cv.kind !== 'line') return null;
-        ({ a, b, c: cc } = cv);
-      } else {
-        // `p` is [centre, a, b], the order `constraintRefs` gives — the line through the pair.
-        const [, q, s] = p;
-        a = s.y - q.y;
-        b = -(s.x - q.x);
-        cc = (s.x - q.x) * q.y - (s.y - q.y) * q.x;
-      }
-      const n = Math.hypot(a, b);
-      if (n < 1e-12) return null; // a degenerate pair names no line to touch
-      // The DISTANCE from the centre to the line IS the radius. Unsigned like `tangent-axis`:
-      // which side the circle sits on is a SELECTOR's business, not a given (ADR-052).
-      const d = Math.abs(a * p[0].x + b * p[0].y + cc) / n;
-      if (k.line.kind === 'points' && k.line.bounded) {
-        /**
-         * A BOUNDED pair — «משיק לצלע AB» (#1503) — bounds the SOLUTION set: a circle touching only
-         * the side's extension is not tangent to the side, so the touch point must lie ON the piece.
-         * The `on-line-2pt` crossing-arm mechanism, applied to the FOOT: `t` is the projection
-         * parameter of the centre onto A→B, which is where the tangency touches; two more rows, each
-         * the distance the foot sits beyond an end along the line — zero anywhere within the side, a
-         * true distance outside it, so the solve pulls the touch inside and a tangency that only the
-         * extension satisfies is UNSATISFIED rather than drawn green. Hard rows, no extent tolerance:
-         * this is a bound on which figures exist, not on which root comes up first — the operator
-         * reading «משיק לצלע» otherwise changes these rows (said on #1503).
-         */
-        const [, q, s] = p;
-        const t = segmentParam(q, s, p[0])!; // n > 0 above ⇒ never null
-        return { eq: [d - radius], bound: [Math.max(0, -t) * n, Math.max(0, t - 1) * n] };
-      }
-      return { eq: [d - radius] };
+      // `p` is [centre, a?, b?], the order `constraintRefs` gives.
+      return lineTangencyRows(p[0], radius, k.line, p.slice(1), curveAt);
+    }
+    case 'tangent-curve': {
+      // The centre and radius of the RESOLVED circle (#1430, ADR-AG-195) — a circle stated by its equation
+      // or computed from points; a vacancy judges nothing (apply refuses a non-circle by name).
+      const circle = curveAt?.(k.circle) ?? null;
+      if (!circle || circle.kind !== 'circle') return null;
+      return lineTangencyRows({ x: circle.cx, y: circle.cy }, circle.r, k.line, p, curveAt);
     }
     case 'tangent-circle': {
       const r1 = evalExpr(k.r, env);
@@ -965,6 +986,58 @@ export function residualRows(
       throw new Error(`constraint has no residual: ${JSON.stringify(unmeasured)}`);
     }
   }
+}
+
+/**
+ * THE ROWS OF "THIS LINE TOUCHES THE CIRCLE (centre, radius)" — one home for `tangent-line` (a circle on a
+ * free centre and radius, #1501) and `tangent-curve` (a circle the figure determines, #1430), so the two
+ * statements cannot measure tangency differently. `pair` is the line's two points when it is named by them.
+ */
+function lineTangencyRows(
+  centre: Pt,
+  radius: number,
+  line: TangentLineRef,
+  pair: Pt[],
+  curveAt?: (id: Id) => NumCurve | null,
+): ResidualRows | null {
+  let a: number;
+  let b: number;
+  let cc: number;
+  if (line.kind === 'curve') {
+    const cv = curveAt?.(line.id) ?? null;
+    // Only a LINE can be touched this way — a curve of another kind is refused at the apply
+    // boundary, so answering "cannot be judged" here is a vacancy, never a silent drop.
+    if (!cv || cv.kind !== 'line') return null;
+    ({ a, b, c: cc } = cv);
+  } else {
+    // `pair` is the line's two points, in the order `constraintRefs` gives them.
+    const [q, s] = pair;
+    a = s.y - q.y;
+    b = -(s.x - q.x);
+    cc = (s.x - q.x) * q.y - (s.y - q.y) * q.x;
+  }
+  const n = Math.hypot(a, b);
+  if (n < 1e-12) return null; // a degenerate pair names no line to touch
+  // The DISTANCE from the centre to the line IS the radius. Unsigned like `tangent-axis`:
+  // which side the circle sits on is a SELECTOR's business, not a given (ADR-052).
+  const d = Math.abs(a * centre.x + b * centre.y + cc) / n;
+  if (line.kind === 'points' && line.bounded) {
+    /**
+     * A BOUNDED pair — «משיק לצלע AB» (#1503) — bounds the SOLUTION set: a circle touching only
+     * the side's extension is not tangent to the side, so the touch point must lie ON the piece.
+     * The `on-line-2pt` crossing-arm mechanism, applied to the FOOT: `t` is the projection
+     * parameter of the centre onto A→B, which is where the tangency touches; two more rows, each
+     * the distance the foot sits beyond an end along the line — zero anywhere within the side, a
+     * true distance outside it, so the solve pulls the touch inside and a tangency that only the
+     * extension satisfies is UNSATISFIED rather than drawn green. Hard rows, no extent tolerance:
+     * this is a bound on which figures exist, not on which root comes up first — the operator
+     * reading «משיק לצלע» otherwise changes these rows (said on #1503).
+     */
+    const [q, s] = pair;
+    const t = segmentParam(q, s, centre)!; // n > 0 above ⇒ never null
+    return { eq: [d - radius], bound: [Math.max(0, -t) * n, Math.max(0, t - 1) * n] };
+  }
+  return { eq: [d - radius] };
 }
 
 /**
