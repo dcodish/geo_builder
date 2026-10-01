@@ -1806,3 +1806,23 @@ then its slope).
 (`app/fallback.ts`): a throttle is «busy»; a completion the tool READ and declined is «understood, not
 supported» (ADR-AG-170); a completion that is not a command at all (`not-handled`), or no answer, keeps
 the student's ORIGINAL refusal — nothing was understood, and the move may well be supported.
+
+## A rename rewrites history, proven line by line ([ADR-AG-191](06c-decisions-analytic.md#adr-ag-191), #1154)
+
+The session is the student's LINES, so a rename is not a fact: `decideSubmit` reads it first
+(`parseRenameAnalytic`) and returns a `rename` verdict, and `app/rename.ts` rewrites the history — every
+stored line, every ask row (`queries`) and every AI display sentence (`spokenFor`) — which `applyRename`
+commits in one store `set` (one undo step, seed and muted set untouched). The rewrite is a token
+substitution, but text alone cannot tell a point from a parameter or an English article, so each line is
+PROVEN: `rewriteLine` accepts a rewrite only if the new line parses to the old line's facts with the point id
+renamed (raw-text fields and expression symbols excluded, minted ids compared as letter multisets), trying
+occurrence subsets largest-first when the full substitution is unfaithful, and refusing the line otherwise.
+`decideRename` then folds the rewritten session once and compares its object and fault sets to the current
+figure, renamed — so a rename can never shift a name the TOOL chooses from the free letters (the canonical
+centre O). The refusals (`rename-bad-name`, `-same`, `-unknown`, `-taken` with the holder's line,
+`-not-typed`, `-unsafe`) are InputError kinds worded in `errorText`. The click menu's «שנה אות»
+(`renameDraftOf`) is offered only for a point the lines letter, and composes the same sentence into the
+input box — one grammar, one gate. The catalog row carries `lane: 'rewrite'` (3-D's field): shown in the
+guide, excluded from the LLM vocabulary and the figure corpus, read by the catalog guard through
+`parseRenameAnalytic` + `decideRename`. Known limit: a FREE vertex's default sample is keyed by its letter
+(`freeCoord`), so its drawn position may change on a rename while every given and the freedom stay equal.

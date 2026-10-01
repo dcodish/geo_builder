@@ -152,6 +152,13 @@ export function errorText(error: InputError, t: Translate): string {
     'numeral-notation': 'errNumeralNotation',
     'undistinguished-diagonal': 'errNoPrincipalDiagonal',
     'already-named': 'errAlreadyNamed',
+    // #1154 — a rename understood and declined, each naming what the student wrote
+    'rename-bad-name': 'errRenameBadName',
+    'rename-same': 'errRenameSame',
+    'rename-unknown': 'errRenameUnknown',
+    'rename-taken': error.key === 'rename-taken' && error.holder ? 'errRenameTaken' : 'errRenameTakenTool',
+    'rename-not-typed': 'errRenameNotTyped',
+    'rename-unsafe': error.detail ? 'errRenameUnsafe' : 'errRenameUnsafeFigure',
     // #1423 — a refusal that restates an existing letter says the LETTER is the problem
     'unsatisfiable': error.key === 'unsatisfiable' && 'reusedId' in error && error.reusedId ? 'errUnsatisfiableReused' : 'errUnsatisfiable',
     // A save file this tool will not open, named by WHICH of the three reasons (#1087).

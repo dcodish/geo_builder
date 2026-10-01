@@ -173,6 +173,17 @@ const he = {
   errNumeralNotation:
     '{{numNoun}} {{holder}} ו{{numNoun}} {{detail}} הם אותו שם — הכלי קורא ספרה ומספר רומי כשם אחד. כדי לא לערבב שתי כתיבות, כתבו {{numNoun}} {{holder}}, כמו בשורות הקודמות.',
   errAlreadyNamed: 'כבר יש שם לנקודה הזו: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
+  // #1154 — the rename's refusals, each naming what the student wrote
+  errRenameBadName: '"{{detail}}" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
+  errRenameSame: 'האות {{detail}} כבר נקראת {{detail}} — אין מה לשנות.',
+  errRenameUnknown: 'אין בשרטוט נקודה בשם {{detail}}, ולכן אין מה לשנות.',
+  errRenameTaken: 'האות {{detail}} כבר תפוסה: "{{holder}}". בחרו אות פנויה.',
+  errRenameTakenTool: 'האות {{detail}} כבר תפוסה בשרטוט. בחרו אות פנויה.',
+  errRenameNotTyped: 'את האות {{detail}} בחר הכלי, ואף שורה שכתבתם לא מזכירה אותה — לכן אין שורה לשנות.',
+  errRenameUnsafe: 'לא הצלחתי לשנות את {{holder}} בשורה "{{detail}}" בלי לשנות את משמעותה. ערכו את השורה ידנית.',
+  errRenameUnsafeFigure: 'שינוי האות {{holder}} היה משנה גם שם שהכלי בחר בשרטוט, ולכן הוא לא בוצע.',
+  // #1154 — the click menu's entry (the sentence it starts is grammar, composed in app/rename.ts)
+  menuRename: 'שנה אות',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
   // #1423 — the letter is the problem, named with the student's own defining sentence and the remedy
   errUnsatisfiableReused: '{{reusedId}} כבר מוגדרת: "{{definedBy}}". המשפט "{{detail}}" סותר את ההגדרה הקיימת — לנקודה חדשה בחרו אות אחרת.',
@@ -495,6 +506,15 @@ const en: typeof he = {
   errNumeralNotation:
     '"{{numNoun}} {{holder}}" and "{{numNoun}} {{detail}}" are the same name — the tool reads a digit and a Roman numeral as one name. To keep one notation, write "{{numNoun}} {{holder}}", as in the earlier lines.',
   errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
+  errRenameBadName: '"{{detail}}" is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
+  errRenameSame: '{{detail}} is already called {{detail}} — nothing to change.',
+  errRenameUnknown: 'The figure has no point named {{detail}}, so there is nothing to rename.',
+  errRenameTaken: 'The letter {{detail}} is already taken: "{{holder}}". Pick a free letter.',
+  errRenameTakenTool: 'The letter {{detail}} is already taken in the figure. Pick a free letter.',
+  errRenameNotTyped: 'The letter {{detail}} was chosen by the tool and none of your lines mentions it, so there is no line to change.',
+  errRenameUnsafe: 'I could not rename {{holder}} in "{{detail}}" without changing what it says. Edit that line by hand.',
+  errRenameUnsafeFigure: 'Renaming {{holder}} would also change a name the tool chose in the figure, so it was not done.',
+  menuRename: 'Change letter',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
   errUnsatisfiableReused: '{{reusedId}} is already defined: "{{definedBy}}". "{{detail}}" contradicts that definition — pick another letter for a new point.',
   'locus.line': 'line',

@@ -624,6 +624,8 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
       // #1353 — an imperative wrapper teaches instead of committing. None of the cases below is
       // wrapped, so reaching this here would itself be the finding.
       case 'teach': return `teach:${v.canonical}`;
+      // #1154 — a rename edits the session; none of the cases below is one.
+      case 'rename': return `rename:${v.from}->${v.to}`;
     }
   };
 

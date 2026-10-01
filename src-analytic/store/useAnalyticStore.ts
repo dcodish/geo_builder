@@ -135,6 +135,18 @@ export type InputError =
    * The refusal names the holder so the student sees the collision, not a scolding about their letter.
    */
   | { key: 'already-named'; detail: string; holder?: string }
+  /**
+   * A RENAME the tool understood and declined (#1154) — each names what the student wrote. `detail` is
+   * the letter (or, for `rename-unsafe`, the line that could not be rewritten faithfully; empty when
+   * the figure's own tool-chosen names would have shifted). `holder` is the student's line that
+   * already holds a taken letter, or the letter being renamed for `rename-unsafe`.
+   */
+  | { key: 'rename-bad-name'; detail: string }
+  | { key: 'rename-same'; detail: string }
+  | { key: 'rename-unknown'; detail: string }
+  | { key: 'rename-taken'; detail: string; holder?: string }
+  | { key: 'rename-not-typed'; detail: string }
+  | { key: 'rename-unsafe'; detail: string; holder: string }
   /** A given the figure cannot satisfy (#1016). #1423: when the refused line RESTATES an existing
    *  letter, `reusedId` names it and `definedBy` carries the student's own line that defines it —
    *  the refusal then says the letter is the problem, with the fresh-letter remedy. */
@@ -198,6 +210,13 @@ interface AnalyticState {
   replaceLine: (index: number, next: string) => void;
   /** #1548 — record the muted set the submit path decided on. */
   setDisabled: (disabled: number[]) => void;
+  /**
+   * #1154 — record a RENAME the submit path decided on (`app/rename.ts`): the rewritten lines, the ask
+   * rows and the AI-lane display sentences, in ONE commit — so one undo puts back the letter, the
+   * givens and the data panel together, and the two can never disagree about what a letter is. The
+   * seed and the muted set are untouched: a letter is a name, not a configuration, and no row moved.
+   */
+  applyRename: (next: { lines: string[]; queries: AskedQuestion[]; spokenFor: Record<number, string> }) => void;
   clearAll: () => void;
   /**
    * Replace the question list. The GESTURES are decided in `app/answers.ts` and this records the
@@ -289,6 +308,8 @@ export const useAnalyticStore = create<AnalyticState>()(
       return { lines: s.lines.map((l, i) => (i === index ? ingestTypedText(next) : l)), spokenFor, error: null, notice: null };
     }),
   setDisabled: (disabled) => set({ disabled: [...disabled].sort((a, b) => a - b), error: null, notice: null }),
+  applyRename: ({ lines, queries, spokenFor }) =>
+    set({ lines: lines.map(ingestTypedText), queries: [...queries], spokenFor: { ...spokenFor }, error: null, notice: null }),
   clearAll: () =>
     // The QUERIES go with the lines (#1110): a reading of a figure that no longer exists is a lie,
     // and «נקה הכל» is the clearest case of the figure no longer existing.

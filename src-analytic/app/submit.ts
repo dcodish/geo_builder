@@ -19,7 +19,7 @@
  * translation and store writes belong to the caller.
  */
 import type { InputError } from '../store/useAnalyticStore';
-import { parseLine } from '../parser/parseAnalytic';
+import { parseLine, parseRenameAnalytic } from '../parser/parseAnalytic';
 import { VOCABULARY_ANALYTIC, imperativeCandidates } from '../parser/scopeAnalytic';
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 import { reportedDof } from '../engine/carriers';
@@ -58,7 +58,13 @@ export type SubmitVerdict =
    * `canonical` is a string `parseLine` has just accepted, so this verdict can never teach a form the
    * tool would reject.
    */
-  | { kind: 'teach'; verb: string; canonical: string };
+  | { kind: 'teach'; verb: string; canonical: string }
+  /**
+   * #1154 — a RENAME request («שנה שם A ל-G»). It edits the SESSION, not the figure: nothing is
+   * recorded as a line. The caller hands it to `dispatchRename` (`app/rename.ts`), which needs the
+   * whole session (muted lines, ask rows) that this decision deliberately does not take.
+   */
+  | { kind: 'rename'; from: string; to: string };
 
 /**
  * How many CONSTRAINTS the line appended — the measurement that separates #1063 from #1076.
@@ -129,6 +135,11 @@ export function decideSubmit(
 ): SubmitVerdict {
   const line = raw.trim();
   if (!line) return { kind: 'ignored' };
+
+  // #1154 — a rename is read BEFORE the grammar and the imperative lesson: it rewrites history and
+  // states nothing, so no fact rule may claim it (the sibling order — 2-D and 3-D intercept it first).
+  const rename = parseRenameAnalytic(line);
+  if (rename) return { kind: 'rename', from: rename.from, to: rename.to };
 
   /**
    * NON-CANONICAL INPUT IS TAUGHT, NEVER SILENTLY ACCEPTED (#1353, ADR-W-030) — and it is checked

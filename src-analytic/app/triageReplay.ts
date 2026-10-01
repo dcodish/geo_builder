@@ -21,6 +21,7 @@
 
 import { derive } from '../engine/derive';
 import { decideSubmit } from './submit';
+import { decideRename } from './rename';
 
 /** One logged event, as the production sink writes it (`ev`, then the fields `analyticsSubmitAnalytic` keeps). */
 export interface LoggedEvent {
@@ -124,6 +125,15 @@ export function replayAnalyticSession(events: readonly LoggedEvent[], budgetMs =
         case 'teach':
           res = { now: 'guided', detail: `teach:${v.verb}`, degraded };
           break;
+        case 'rename': {
+          // #1154 — replayed through the same decision the app dispatches, over the lines this replay tracks.
+          const r = decideRename(v.from, v.to, { lines, disabled: [], queries: [], spokenFor: {}, seed: 0 });
+          if (r.kind === 'apply') {
+            advance(r.lines);
+            res = { now: 'built', detail: 'rename', degraded };
+          } else res = { now: 'refused', detail: r.error.key, degraded };
+          break;
+        }
         case 'refused': {
           const key = v.error.key;
           res =

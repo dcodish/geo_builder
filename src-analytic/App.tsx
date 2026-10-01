@@ -64,6 +64,7 @@ import { AskLane } from '../shell/frame/AskLane';
 import { askSettled, figureIsOpen, type Answer } from './app/ask';
 import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
+import { dispatchRename, renameDraftOf } from './app/rename';
 import { anotherConfiguration } from './app/another';
 import { offersOf, pointAt } from './engine/crossings';
 import { VERTICAL_TOL } from './engine/lines';
@@ -139,6 +140,7 @@ export function App() {
     spokenFor,
     disabled,
     setDisabled,
+    applyRename,
     removeLine,
     replaceLine,
     clearAll,
@@ -450,7 +452,10 @@ export function App() {
    * page rather than inside the SVG: an SVG-space menu would scale with the canvas and shrink out of
    * readability at low zoom.
    */
-  const [pick, setPick] = useState<{ items: Measurable[]; x: number; y: number } | null>(null);
+  /** `rename` (#1154) is the draft «שנה אות» puts in the input box — null when the click offers none. */
+  const [pick, setPick] = useState<{ items: Measurable[]; rename: string | null; x: number; y: number } | null>(null);
+  /** The input zone — «שנה אות» focuses its box after filling it (the shared InputArea takes no ref). */
+  const inputZoneRef = useRef<HTMLDivElement | null>(null);
 
   /**
    * ASK IT, OR TAKE IT BACK (#1118) — one writer, so a measurement can always be retired.
@@ -804,6 +809,16 @@ export function App() {
         setDraft(verdict.canonical);
         setNotice(t('noticeTeachCanonical', { verb: verdict.verb, canonical: verdict.canonical }));
         return;
+      /**
+       * #1154 — A RENAME rewrites the session (every line, every ask row) in ONE store commit, or names
+       * why not. Decided in `app/rename.ts` over the WHOLE session — muted lines too — which is why it
+       * is dispatched here rather than decided by `decideSubmit`, which sees only the active lines.
+       */
+      case 'rename': {
+        const r = dispatchRename(verdict.from, verdict.to, { lines, disabled, queries, spokenFor, seed }, { applyRename, setError }, d);
+        if (r.kind === 'apply') setDraft('');
+        return;
+      }
     }
   };
 
@@ -1069,7 +1084,7 @@ export function App() {
           ) : null
         }
         inputZone={
-          <>
+          <div ref={inputZoneRef} style={{ display: 'contents' }}>
             <InputArea
               value={draft}
               onChange={setDraft}
@@ -1232,7 +1247,7 @@ export function App() {
               }
               testId="analytic-facts"
             />
-          </>
+          </div>
         }
         canvasZone={
           <>
@@ -1314,7 +1329,8 @@ export function App() {
                */
               onPick={(what, screen) => {
                 const items = measurablesOf(d.construction, what);
-                setPick(items.length ? { items, x: screen.x, y: screen.y } : null);
+                const rename = renameDraftOf(lines, d.construction, what);
+                setPick(items.length || rename ? { items, rename, x: screen.x, y: screen.y } : null);
               }}
               onCrossing={(sentence) => {
                 // A GUARD, not a second decision: `submit` still owns whether the line is accepted
@@ -1888,6 +1904,29 @@ export function App() {
                 <MathText text={analyticBidi.isolateLtrRuns(m.sentence)} />
               </button>
             ))}
+            {/*
+              «שנה אות» (#1154) — the 2026-09-16 ruling puts rename IN this menu, composing a typed
+              sentence like every other entry: it fills the input with «שנה שם A ל-» and the student
+              types the new letter, so the submit path (and its refusals) is the one the typed form takes.
+            */}
+            {pick.rename && (
+              <button
+                type="button"
+                role="menuitem"
+                style={pick.items.length ? { ...measureItem, borderTop: `1px solid ${color.border}` } : measureItem}
+                onClick={() => {
+                  setDraft(pick.rename!);
+                  setPick(null);
+                  setTimeout(() => {
+                    const box = inputZoneRef.current?.querySelector('input');
+                    box?.focus();
+                    box?.setSelectionRange(box.value.length, box.value.length);
+                  }, 0);
+                }}
+              >
+                {t('menuRename')}
+              </button>
+            )}
           </div>
         </>
       )}

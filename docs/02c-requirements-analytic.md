@@ -1866,3 +1866,19 @@ names the centre instead (`A(0,0)` → `A(0, 0), r = 4`, in either order); a cen
 their letter; a point `O` the student defined elsewhere (`O(5,5)`) keeps the letter and the centre shows
 its coordinates alone — never a second `O` and never an invented `O₁`. A translated circle, a parabola's
 focus and an ellipse's foci are unchanged: coordinates alone.
+
+**R128 — a point's letter can be changed, and everything that names it follows**
+([ADR-AG-191](06c-decisions-analytic.md#adr-ag-191), [#1154](https://github.com/dcodish/geo_builder/issues/1154)).
+*(Operator, 2026-09-16: "we want to allow changing a node letter by clicking on it like the 2d tools mechanism"; 2026-09-21: "if a letter is changed, change all inputs and data panel items accordingly".)*
+
+The student types «שנה שם A ל-G» (also «שנה את האות A ל-G», «החלף A ב-G», "rename A to G"), or clicks the
+point on the canvas and picks «שנה אות», which puts «שנה שם A ל-» in the input box for them to finish. Every
+given that names A now reads G — inside runs too («משולש GBC», «M אמצע GB», «משוואת הישר GC …») — while an
+equation's x, y and parameters and every Hebrew word stay as written; every question in the data panel
+follows the letter and answers what it answered before. The list keeps its rows (no row is added), the
+points the student placed do not move, and one «בטל» undoes the whole rename. A letter already in use is
+refused and the message quotes the line that holds it; a letter that is not a point name («AB», «5»), a
+point the figure does not have, and the same letter are each refused by name. A letter the tool chose (the
+canonical centre O, a name given to a point stated only by coordinates) is not renamed and says so.
+
+---
