@@ -312,7 +312,12 @@ export type Fact =
    * circle, the point on the target, and the target ⊥ the radius there — for ANY circle, because the
    * radius direction reads the resolved circle. `circleId` is the host by id, for a fact M1 itself built.
    */
-  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: TangentLineRef[]; circle?: string; circleId?: Id; at?: Id })
+  /*
+   * `ring` (ADR-AG-198 Am. 1) — the touch list named EVERY side of one ring as a SIDE («הצלעות AO, BO ו-AB …»), so
+   * a circle the sentence must create is that ring's incircle (the only circle tangent to every side at a point ON
+   * it — an excircle touches extensions): created closed form, never as a free circle the solve must fit.
+   */
+  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: TangentLineRef[]; circle?: string; circleId?: Id; at?: Id; ring?: Id[] })
   /**
    * «המשיק למעגל בנקודה A» — THE TANGENT AS AN OBJECT (#1619 B3, ADR-AG-195): the line through A
    * perpendicular to the radius to A, on the circle `circle` names (contextual when absent). M1 resolves

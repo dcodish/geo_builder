@@ -231,9 +231,10 @@ describe('#1619 B2 — every spelling lowers to the sentences it is made of', ()
   // point is that lowering's incircle branch (issue-1619-integration.test.ts locks the figure).
   it('the touch list is one touch per side, paired by «בהתאמה»', () => {
     expect(factsOf(['הצלעות AO, BO ו-AB משיקות למעגל בנקודות D, E ו-F בהתאמה']).filter((x) => (x as Fact).t === 'tangent-of')).toEqual([
-      { t: 'tangent-of', axes: [], lines: [{ kind: 'points', a: 'A', b: 'O', bounded: true }], at: 'D' },
-      { t: 'tangent-of', axes: [], lines: [{ kind: 'points', a: 'B', b: 'O', bounded: true }], at: 'E' },
-      { t: 'tangent-of', axes: [], lines: [{ kind: 'points', a: 'A', b: 'B', bounded: true }], at: 'F' },
+      // `ring` (ADR-AG-198 Am. 1): the three sides close the ring A–O–B, so a circle this creates is its incircle.
+      { t: 'tangent-of', axes: [], lines: [{ kind: 'points', a: 'A', b: 'O', bounded: true }], at: 'D', ring: ['A', 'O', 'B'] },
+      { t: 'tangent-of', axes: [], lines: [{ kind: 'points', a: 'B', b: 'O', bounded: true }], at: 'E', ring: ['A', 'O', 'B'] },
+      { t: 'tangent-of', axes: [], lines: [{ kind: 'points', a: 'A', b: 'B', bounded: true }], at: 'F', ring: ['A', 'O', 'B'] },
     ]);
     expect(factsOf(['the sides AB, BC and CA touch the circle at D, E and F respectively'])).toEqual(
       factsOf(['הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה']),

@@ -1976,8 +1976,32 @@ function peelTouchList(text: string): { rest: string; ats?: Id[] } {
  * למעגל בנקודה A» is how the exam first mentions C, D and A) — exactly as «משוואת הישר AB היא …» does
  * (ADR-AG-026's ruling). A circle target, or a count that does not pair up, declines (`null`).
  */
+/**
+ * The RING a touch list's sides close (ADR-AG-198 Am. 1): every target a bounded two-point side, and together they
+ * are exactly the sides of one polygon (each vertex on two of them, one cycle). The vertices in cycle order, or null.
+ */
+function touchedRing(targets: TangentTargets): Id[] | null {
+  const sides = targets.ordered.map((t) => ('line' in t && t.line.kind === 'points' && t.line.bounded ? [t.line.a, t.line.b] : null));
+  if (sides.length < 3 || sides.some((s) => s === null)) return null;
+  const edges = sides as Array<[Id, Id]>;
+  const ring: Id[] = [edges[0][0], edges[0][1]];
+  const used = new Set([0]);
+  while (used.size < edges.length) {
+    const last = ring[ring.length - 1];
+    const i = edges.findIndex((e, k) => !used.has(k) && (e[0] === last || e[1] === last));
+    if (i < 0) return null;
+    used.add(i);
+    ring.push(edges[i][0] === last ? edges[i][1] : edges[i][0]);
+  }
+  // Closed, and no vertex twice: the last step returned to the start.
+  if (ring[ring.length - 1] !== ring[0]) return null;
+  ring.pop();
+  return new Set(ring).size === ring.length && ring.length === edges.length ? ring : null;
+}
+
 function touchFacts(targets: TangentTargets, ats: readonly Id[], circle: string | undefined, line: string): Fact[] | null {
   if (targets.circles.length > 0 || ats.length === 0 || ats.length !== targets.ordered.length) return null;
+  const ring = circle === undefined ? touchedRing(targets) : null;
   const named = new Set<Id>();
   targets.ordered.forEach((t, i) => {
     named.add(ats[i]);
@@ -2010,6 +2034,7 @@ function touchFacts(targets: TangentTargets, ats: readonly Id[], circle: string 
       ...('line' in t ? { lines: [t.line] } : {}),
       ...(circle !== undefined ? { circle } : {}),
       at: ats[i],
+      ...(ring ? { ring } : {}),
       src: line,
     })),
     ...targets.pieces.flatMap((q) => pieceFacts(q.noun, q.a, q.b, line)),
