@@ -56,15 +56,19 @@ describe('#1644 — a stated coordinate with a Unicode minus', () => {
   });
 
   it('the panel option row isolates the Hebrew joiner, so «או» cannot swallow the coordinate after it', () => {
-    const d = derive(T5, 0);
+    // A figure with a GENUINE two-answer point: C on either side of AB. (This lock first used the operator's
+    // 7/5 figure, whose «או» rows were themselves the #1638 defect — two letters collapsing onto one point.
+    // With #1638 fixed 7/5 shows one value, so the case needs a figure that really has two.)
+    const d = derive(['A(0,0)', 'B(4,0)', 'נקודה C', 'AC = 3', 'BC = 3'], 0);
     const pk = panelKnowledge(d);
     const rows = pk.points.map(({ id, x, y }) => `${id} = ${pointText(d, id, x, y, fmtAnalytic)}`);
     const optionRows = rows.filter((r) => r.includes(' או '));
-    expect(optionRows.length).toBeGreaterThan(0); // the T5 figure has an option row — the case is exercised
+    expect(optionRows.length).toBeGreaterThan(0); // the figure has an option row — the case is exercised
     for (const r of optionRows) {
       const shown = panelRowText(r);
       // the Hebrew joiner is its own island, so the coordinate after it keeps the row's direction
-      expect(shown).toContain(` ${FSI}או${PDI} (`);
+      // (the option not currently drawn is bracketed, «או [(2, -2.24)]» — the joiner isolates the same way)
+      expect(shown).toMatch(new RegExp(` ${FSI}או${PDI} [[(]`));
       // every Hebrew letter of the row sits inside an isolate
       expect(shown.replace(new RegExp(`${FSI}[^${PDI}]*${PDI}`, 'g'), '')).not.toMatch(/[א-ת]/);
       // nothing is lost: stripping the isolates gives the row back
