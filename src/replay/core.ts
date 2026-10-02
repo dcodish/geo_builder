@@ -21,7 +21,7 @@ import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY } from '@/engine';
 import { work, withWorkBudget } from '@/engine/solveBudget';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -925,8 +925,19 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       // silently stopped honouring a stated given. Judged on the whole-list symbol table, so a
       // definition re-added AFTER the value row binds it again with no retyping; the retry passes leave
       // it alone (0 commands ⇒ not deferrable) and the fold memo's prefix signature carries the table.
-      if (f.cmd.type === 'set-var' && !isSymbolBound(symtab, f.cmd.name, enabledCmds)) {
-        status[f.id] = `variable ${f.cmd.name} is not defined by any statement (the step that defined it was removed, muted or failed)`;
+      // #1658 (ADR-562): the same question for the whole VARIABLE family — a bound «0 < k < 6» or an order
+      // «α < β» on a letter nothing binds lowered to nothing with no mark, so the submit lane answered
+      // «already drawn» and the bound vanished. It now waits, marked, exactly as a value does.
+      const unboundName = unboundSubjectOf(f.cmd, symtab, enabledCmds);
+      if (unboundName) {
+        status[f.id] = `variable ${unboundName} is not defined by any statement (the step that defined it was removed, muted or failed)`;
+        continue;
+      }
+      // #1658: a relation whose letters ARE bound but in a form it cannot follow («k²», an angle letter
+      // against a length letter, an area letter) also lowers to nothing — it is refused, never a silent ✓.
+      const unenforced = unenforceableRelation(f.cmd, symtab, enabledCmds);
+      if (unenforced) {
+        status[f.id] = `relation on ${unenforced.join(', ')} cannot be enforced (a letter is used in a form this statement cannot follow)`;
         continue;
       }
       // A point a lowered command would (re)create that an earlier fact owns but which
@@ -1027,7 +1038,9 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       // student may type «x = 4» before «AB = x» (the whole-list table has always allowed it), or may
       // have deleted the step that used the letter. Either way it is ADR-104's register — recorded,
       // marked, not yet in effect — not a contradiction; the row says why, the cue says "not yet".
-      if (f.cmd.type === 'set-var') return !isSymbolBound(symtab, f.cmd.name, enabledCmds);
+      if (isVariableStatement(f.cmd) && unboundSubjectOf(f.cmd, symtab, enabledCmds)) return true; // #1658: the whole family waits
+      if (f.cmd.type === 'set-var') return false;
+      if (unenforceableRelation(f.cmd, symtab, enabledCmds)) return false; // #1658: cannot hold, not waiting
       // #1328 (ADR-537): a solution was found and refused as not a figure — a rigid contradiction, not a
       // constraint waiting for givens, however much the figure still flexes.
       if (rigid.has(f.id)) return false;
@@ -2499,7 +2512,8 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
   const after = replay(all, seed);
   // #926: a `set-var` whose letter nothing binds YET is marked in the fold (a pending row with its reason,
   // never a silent ✓) but is still data the student may state first — it commits as data-only below.
-  const errored = trial.find((f) => after.status[f.id] !== 'ok' && !(f.cmd.type === 'set-var' && after.pending));
+  // #1658 (ADR-562): the same for every VARIABLE statement (a bound «0 < k < 6», an order «α < β»).
+  const errored = trial.find((f) => after.status[f.id] !== 'ok' && !(isVariableStatement(f.cmd) && after.pending));
   if (errored) {
     // #1441 arm 3 (ADR-551 Am. 1): an error the unstated right-angle SEAT cures is not a refusal.
     // The pre-ladder proof turned this figure's old seat-invariant PENDING classification into an
@@ -2539,7 +2553,8 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
   const dataOnly =
     commands.length > 0 &&
     commands.every(
-      (c) => c.type === 'set-var' || (REQUIREMENT_DATA.has(c.type) && !enabledCmdList.some((e) => deepEqual(e, c))),
+      // #1658: a bound/order on a letter nothing binds YET is data too (it waits, marked, like a value)
+      (c) => c.type === 'set-var' || ((REQUIREMENT_DATA.has(c.type) || isVariableStatement(c)) && !enabledCmdList.some((e) => deepEqual(e, c))),
     );
   /**
    * A DISPLAY-ONLY command produced something the geometry checks above cannot see (#1011).

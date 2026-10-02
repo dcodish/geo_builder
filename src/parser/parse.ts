@@ -23,10 +23,16 @@ import { MIDSEGMENT_SHAPES, RADIUS_VAR, type AnyCommand, type Command, type Id, 
 import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { stripFormatControls } from '../../shell/bidi';
+import { foreignGiven } from './scope';
 
 export type ParseResult =
   | { ok: true; commands: AnyCommand[] }
   | { ok: false; reason: 'not-handled' }
+  // #1654–#1657 (ADR-562): a FOREIGN GIVEN — a slope, a quadrant, axes/coordinates (the analytic Builder's), a
+  // plane, a sphere or another solid (the Space Builder's). Decided BEFORE every rule (`foreignGiven`), because
+  // a plane rule that read the rest of the sentence committed it with the foreign operand reinterpreted or
+  // gone. `phrase` is the student's own word, so the refusal names the clause it could not keep.
+  | { ok: false; reason: 'foreign-given'; category: 'cross-app' | 'analytic'; phrase: string }
   // A rule recognised an angle named by a SINGLE vertex ("∠B = 90") but the figure has ≠2 edges there, so
   // WHICH angle is meant is ambiguous (or its arms don't exist yet). Surfaced as a clarification — "name all
   // three letters" — NOT escalated to the LLM (which would only guess). `vertex` is the named vertex.
@@ -10874,6 +10880,10 @@ const isAmbiguityQuestion = (reason: string): boolean =>
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
   let s = normalizeUtterance(raw);
   if (!s) return { ok: false, reason: 'not-handled' };
+  // #1654–#1657 (ADR-562): a foreign given is refused before ANY rule may read part of the sentence — the
+  // LaTeX/negation placement, for their reason: the partial reading is a different, wrong given.
+  const foreign = foreignGiven(s);
+  if (foreign) return { ok: false, reason: 'foreign-given', category: foreign.category, phrase: foreign.phrase };
   // ANGLE-ALIAS resolution (issue #235, ADR-386) — the sibling ctx-aware REWRITE at the same chokepoint
   // as the size-qualifier/ordinal rewrites below: each bound alias name («נסמן זוית BAM כ-A1») rewrites
   // «זוית A1»/«∠A1» to the aliased triple («זוית BAM»), so EVERY angle-consuming rule — value,

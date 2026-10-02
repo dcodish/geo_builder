@@ -5,7 +5,7 @@ export { parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCirc
   statedLabelTokens, lowercaseLabelFold, lowercaseMeasureLetters, upperCasedLabelCandidate, hebrewLabelCandidate, VERB_GATES } from './parse';
 export type { ParseResult, ParseContext } from './parse';
 export { buildParseCtx } from './context';
-export { classifyOutOfScope, looksCompound, looksLikeLatex, splitGuidance, statedNegation, wordRootMagnitude, SHAPE_NOUNS_HE, SHAPE_NOUNS_EN } from './scope';
+export { classifyOutOfScope, foreignGiven, looksCompound, looksLikeLatex, splitGuidance, statedNegation, wordRootMagnitude, SHAPE_NOUNS_HE, SHAPE_NOUNS_EN } from './scope';
 export type { ScopeCategory, ScopeMatch } from './scope';
 export { COMMAND_CATALOG, CATEGORY_ORDER, CATEGORY_LABELS } from './catalog';
 export type { CommandDoc, Category } from './catalog';

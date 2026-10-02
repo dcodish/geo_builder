@@ -13409,3 +13409,49 @@ Either way, a circle whose centre the sentence does not name is `autoCenter`. It
 - the corner circle's unnamed centre is hidden instead of a visible auto letter.
 
 A centre named in the sentence («למעגל O») is visible as before.
+
+## ADR-562 — a given 2-D cannot model is refused, never committed as a different given or dropped (#1654–#1658)
+
+**Status:** accepted · 2026-10-02 · the #1649 three-way parity audit
+
+**Requirements:** [FR-IN-9](02-requirements.md) extended (a foreign given is refused wherever it sits in the sentence) and [FR-EN-22](02-requirements.md) extended (a bound or order on a letter waits for the letter) · **Design:** [04-design.md](04-design.md) § "A foreign given is refused by the grammar, before any rule" and § "A variable statement waits for its letter"
+
+**Cites** [ADR-553](#adr-553) (the analytic pointer; coordinate entry withdrawn), #109 / [ADR-289](#adr-289) (the guided out-of-scope register, cross-app → the Space Builder), [ADR-436](#adr-436) (negation — the pre-parse placement and its reason), [ADR-390](#adr-390) (numeric bounds on a measure or a letter), [ADR-483](#adr-483) (#926 — a value whose letter is unbound waits, marked), docs/17 (class-first; one chokepoint for the four siblings).
+
+**Context.** Measured on `main` e92b671f through `decideDeterministic2D`:
+
+| # | Utterance | Before |
+| --- | --- | --- |
+| #1654 | «משולש ABC» · «נתון: שיפוע הצלע AB הוא 3/4» | commit `measure-length` \|AB\| = 0.75 |
+| #1655 | «במשולש AOB חסום מעגל שמרכזו C (הנקודה C נמצאת ברביע השני)» | commit the incircle; the quadrant clause gone |
+| #1656 | «משולש ABC» · «דרך AC העבירו מישור המקביל ל-SD» | commit `segment AC`, `segment SD`, `set-parallel AC SD` |
+| #1657 | «כדור שמרכזו O ורדיוסו 3» | commit a circle O with `set-radius 3` |
+| #1658 | «0 < k < 6» (any figure without k) | noop «כבר קיים» (`noop-exists`); the bound gone |
+
+The bare «שיפוע AB הוא 2» already reached the analytic pointer — no rule read it, the parse failed, and `classifyOutOfScope` answered. That is the cause of the first four: the register ran **only on a failed parse**. The rule that read the rest of the sentence decided what reached the student — the side-value rule for #1654, the incircle rule for #1655, the parallel rule for #1656, the circle rule for #1657. «כדור» had been in the cross-app vocabulary since #109. The span accountant's `unknown-word` bucket saw each foreign word, but it only reports and never refuses (ADR-453), so nothing stopped the commit.
+
+#1658 is a different class. A bound on a letter is a supported 2-D statement (ADR-390). `lowerOne` leaves `measure-bound` / `measure-order` alone when the letter has no bare binding. #926 asked "is this letter bound?" only of `set-var`, so the bound lowered to nothing and nothing marked it. The dry run read that as `empty`, and with no new uppercase label the submit lane called it «already drawn». The same silence covered a bound on a letter bound with a coefficient («AB = 2k» · «0 < k < 6»): measured, also «already drawn».
+
+**Decision.**
+1. **A foreign given is refused by `parse`, before every rule.** `foreignGiven` (`parser/scope.ts`) runs the `cross-app` and `analytic` rules of the existing register at the top of `parse()`, the same placement as LaTeX and negation, for the same reason: the partial reading is a different, wrong given. It returns `reason: 'foreign-given'` with the family and the student's word. The vocabulary gains two entries, and the pre-parse guard and the post-failure register read the same `RULES`:
+   - a **quadrant** in `analytic`: «רביע», «רבע» + an ordinal, "quadrant". «רביעי/רביעית» and «רבע מעגל» are excluded.
+   - a **plane as an object** in `cross-app`, via the `planeObject` matcher. The setting phrase «במישור נתון …» / "in the plane, …" is exempt. So is the coordinate plane («מישור הקואורדינטות», «מישור קרטזי», "cartesian plane"), which is left to `analytic`.
+2. **The note names the clause.** `decideFromParse` answers `input.scope.foreign-given`: «"<word>" — a given this tool cannot represent, so nothing of the sentence was built», followed by the family's existing pointer, unchanged (analytic Builder / Space Builder, by button). It is logged as `scope:<category>`, so the dashboard register is unchanged. **The mixed-sentence rule:** 2-D has no rule that splits a plane given from a foreign clause; ADR-264 splits only supported compounds. The whole sentence is refused, and the quoted word tells the student which part to drop. The plane half retyped alone builds.
+3. **A variable statement waits for its letter.** `unboundSubjectOf` asks #926's question of every variable statement (`set-var`, `measure-bound`, `measure-order`). An unbound one is stamped into the waiting register, counted as pending, committed as data, and enforced by the whole-list table once a statement binds the letter, before or after it. `lowerOne` carries a bound across a **positive linear coefficient** (`AB = 2k`, `k > 40` ⇒ \|AB\| > 80). Any other form that still lowers to nothing (a power, a constant, an area letter, an angle letter against a length letter) gets the `unenforceableRelation` status and is refused at submit by name, never left ✓. The `unboundVariable` message now also covers a letter that was never defined.
+
+**LLM fallback.** A `foreign-given` parse is a deterministic refusal, so the model is never called. The model's only possible answer was the defect itself: re-absorbing the operand into a plane given. A foreign word inside a model-produced line cannot arrive either, because the lane never escalates. The bound statements were already deterministic.
+
+**Measured.** `src/app/__tests__/issue-1654-1658-foreign-givens.test.ts` runs through the real `runSubmit` with the model mocked. All four audit sentences are refused with nothing committed, the note quotes the word, and the model is never called. The test also covers 23 spellings (prefixed «נתון:», «הצלע», parenthetical, mid-sentence, English), and the coordinate plane goes to `analytic`. The negatives: the setting phrases, «רבע מעגל», «המעגל הרביעי», every catalog example, and every typed step of the scenario corpus (over 1000) stay untouched. The ✎ seam refuses a sphere. For #1658: the bound waits marked, binds later (\|AB\| > 40), and is scaled across 2k (\|AB\| > 80); «AB = k²» is refused by name. Six scenarios are appended to corpus 4. Four are refusals declared through `refusedSteps` (`foreign-given`, with category and word): `slope-given-refused-not-a-length-1654`, `quadrant-clause-refused-not-dropped-1655`, `plane-parallel-refused-not-a-line-parallel-1656` and `sphere-refused-not-a-circle-1657`. Two are builds: `variable-bound-waits-then-binds-1658` and `variable-bound-scaled-coefficient-1658`.
+
+**Consequences.** Changed files:
+- `src/parser/scope.ts`: `foreignGiven`, `planeObject`, the quadrant pattern, and `Matcher`-typed rules.
+- `src/parser/parse.ts`: the guard and the `foreign-given` reason.
+- `src/app/decideDeterministic.ts`: the refusal branch.
+- `src/engine/lower.ts`: `isVariableStatement`, `unboundSubjectOf`, `unenforceableRelation`, and the coefficient scaling.
+- `src/replay/core.ts`: the fold stamp, `classify`, and `dryRunOutcome`.
+- `src/i18n`: `input.scope.foreign-given`, `errors.unenforceableRelation`, the reworded `errors.unboundVariable`, and its humanizer pattern.
+
+Behaviour changes for a student:
+- A sentence containing a foreign given is refused whole. Before, it was drawn as something else, or drawn without the clause.
+- A not-handled analytic or solid sentence keeps its pointer, now preceded by the quoted word.
+- «0 < k < 6» before its letter exists is a marked row instead of «כבר קיים».

@@ -37,6 +37,8 @@ const CASES: { raw: string; contains: string[] }[] = [
   { raw: 'impossible: the angle at B is 120°, so |AC| must be the longest side, but |AC| = 5 and |BA| = 7', contains: ['120°', '|AC| = 5', '|BA| = 7'] },
   // core.ts (#926) — a variable whose defining step was removed, muted or failed. Same finding.
   { raw: 'variable α is not defined by any statement (the step that defined it was removed, muted or failed)', contains: ['α'] },
+  // core.ts (#1658, ADR-562) — a relation over letters bound in a form it cannot follow («AB = k²» · «0 < k < 6»)
+  { raw: 'relation on k cannot be enforced (a letter is used in a form this statement cannot follow)', contains: ['k'] },
   // step.ts danglingCircleError (#186) — a reference to a circle that doesn't exist
   { raw: "circle 'O2' is not defined", contains: ['O2'] },
   { raw: 'unresolved dependencies for: A, B, circle-O', contains: ['A, B, O'] },

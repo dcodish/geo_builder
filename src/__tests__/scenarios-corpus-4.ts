@@ -3043,4 +3043,83 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.positions.has('@ctr-O'), 'the centre is the named O, not a hidden one').toBe(false);
     },
   },
+  {
+    id: 'slope-given-refused-not-a-length-1654',
+    title: '#1654 (ADR-562): «נתון: שיפוע הצלע AB הוא 3/4» after «משולש ABC» is REFUSED as an analytic given — never |AB| = 0.75',
+    guards:
+      "#1649 parity audit (2026-10-02): the side-value rule skipped the word «שיפוע» and committed |AB| = 0.75 — a slope read as a length, with a green ✓ (the bare «שיפוע AB הוא 2» already reached the analytic pointer, because no rule read it). Root: the out-of-scope register ran only on a FAILED parse; a foreign given is now refused by `parse` before any rule (`foreignGiven`). Step 2 is declared refused with the family and the student's word the note quotes; the triangle stays and AB carries no length. The submit-door surface (note text, LLM never called, every spelling) is in src/app/__tests__/issue-1654-1658-foreign-givens.test.ts.",
+    steps: ['משולש ABC', 'נתון: שיפוע הצלע AB הוא 3/4'],
+    refusedSteps: [
+      { step: 2, reason: 'foreign-given', with: { category: 'analytic', phrase: 'שיפוע' }, why: 'ADR-562 (#1654): a slope needs axes — the analytic Builder’s given, never a length here' },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.construction.constraints.some((c) => c.type === 'distance'), 'no length was invented for AB').toBe(false);
+    },
+  },
+  {
+    id: 'quadrant-clause-refused-not-dropped-1655',
+    title: '#1655 (ADR-562): «במשולש AOB חסום מעגל שמרכזו C (הנקודה C נמצאת ברביע השני)» is REFUSED naming «ברביע» — the incircle is never built with the quadrant dropped',
+    guards:
+      "#1649 parity audit (2026-10-02): the incircle rule read the sentence up to the parenthetical and built, and the quadrant clause vanished — a stated given silently dropped. 2-D has no axes, so the whole sentence is refused (a mixed sentence: nothing of it is built, and the note names the clause); the plane half alone still builds. Same mechanism as #1654.",
+    steps: ['במשולש AOB חסום מעגל שמרכזו C (הנקודה C נמצאת ברביע השני)', 'במשולש AOB חסום מעגל שמרכזו C'],
+    refusedSteps: [
+      { step: 1, reason: 'foreign-given', with: { category: 'analytic', phrase: 'ברביע' }, why: 'ADR-562 (#1655): a quadrant needs axes — refused whole, never built with the clause dropped' },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      for (const id of ['A', 'O', 'B', 'C']) expect(fig.positions.has(id), `the plane half alone builds ${id}`).toBe(true);
+    },
+  },
+  {
+    id: 'plane-parallel-refused-not-a-line-parallel-1656',
+    title: '#1656 (ADR-562): «דרך AC העבירו מישור המקביל ל-SD» is REFUSED as a Space Builder given — never AC ∥ SD',
+    guards:
+      "#1649 parity audit (2026-10-02): the parallel rule skipped «מישור» and committed AC ∥ SD — a plane-parallel-to-line statement reduced to a line given the student never stated. Refused by the grammar before any rule; S and D are never minted.",
+    steps: ['משולש ABC', 'דרך AC העבירו מישור המקביל ל-SD'],
+    refusedSteps: [
+      { step: 2, reason: 'foreign-given', with: { category: 'cross-app', phrase: 'מישור' }, why: 'ADR-562 (#1656): a plane is the Space Builder’s object' },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('S') || fig.positions.has('D'), 'nothing of the plane sentence was built').toBe(false);
+      expect(fig.construction.constraints.some((c) => c.type === 'parallel'), 'no line parallel was invented').toBe(false);
+    },
+  },
+  {
+    id: 'sphere-refused-not-a-circle-1657',
+    title: '#1657 (ADR-562): «כדור שמרכזו O ורדיוסו 3» is REFUSED as a Space Builder given — never a circle of radius 3',
+    guards:
+      "#1649 parity audit (2026-10-02): the circle rule read «…שמרכזו O ורדיוסו 3» and drew a circle; «כדור» was in the cross-app register all along, but that register ran only after a failed parse. Refused before any rule now; the canvas stays empty.",
+    steps: ['כדור שמרכזו O ורדיוסו 3', 'מעגל O'],
+    refusedSteps: [
+      { step: 1, reason: 'foreign-given', with: { category: 'cross-app', phrase: 'כדור' }, why: 'ADR-562 (#1657): a sphere is a 3-D solid — the Space Builder’s' },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.construction.objects.filter((o) => o.kind === 'circle').length, 'only the circle the student asked for afterwards').toBe(1);
+    },
+  },
+  {
+    id: 'variable-bound-waits-then-binds-1658',
+    title: '#1658 (ADR-562): «k > 40» stated before «AB = k» is KEPT and takes effect when the letter is bound — |AB| > 40; it used to answer «כבר קיים» and vanish',
+    guards:
+      "#1649 parity audit (2026-10-02): «0 < k < 6» answered «already drawn» and the bound vanished. A variable bound is a supported 2-D statement (ADR-390); on a letter nothing binds it lowered to nothing with no mark, because #926 asked 'is the letter bound?' of `set-var` only. The whole variable family now waits, marked, like «α = 70», and the whole-list symbol table enforces it once «AB = k» arrives. The waiting status, the order form and the refusal of an unenforceable form are in src/app/__tests__/issue-1654-1658-foreign-givens.test.ts.",
+    steps: ['משולש ABC', 'k > 40', 'AB = k'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| = k > 40').toBeGreaterThan(40);
+    },
+  },
+  {
+    id: 'variable-bound-scaled-coefficient-1658',
+    title: '#1658 (ADR-562): «AB = 2k» · «k > 40» bounds |AB| > 80 — a positive coefficient carries the window instead of dropping the bound',
+    guards:
+      "Same class as the reported «0 < k < 6»: a bound on a letter bound with a coefficient lowered to nothing (only a bare binding was followed), so the stated window silently vanished. A positive coefficient scales it exactly; a power, a constant or a non-positive coefficient is refused by name (unenforceableRelation), never left green.",
+    steps: ['משולש ABC', 'AB = 2k', 'k > 40'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| = 2k > 80').toBeGreaterThan(80);
+    },
+  },
 ];

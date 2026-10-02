@@ -174,7 +174,10 @@ describe('#1162 — the analytic register points at the LIVE tool', () => {
   it.each(['שיעורי הנקודה E הם x=-1 y=7', 'כתוב שיעורי נקודות', 'שיפוע AB', 'y = 2x + 3'])('%s', async (u) => {
     const r = await play([u]);
     expect(r.refused).toBe(true);
-    expect(r.notes).toEqual([ANALYTIC_HE]);
+    // #1654 (ADR-562): a foreign given is refused BEFORE the grammar, and the note quotes the student's word
+    // ahead of the same pointer — the pointer text itself is unchanged.
+    expect(r.notes).toHaveLength(1);
+    expect(r.notes[0].endsWith(ANALYTIC_HE), r.notes[0]).toBe(true);
     expect(llmParseMock).not.toHaveBeenCalled();
   });
   it('the message names the analytic Builder switcher button and no longer calls it planned', () => {
