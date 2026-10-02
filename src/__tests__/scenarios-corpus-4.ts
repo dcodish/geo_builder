@@ -3043,4 +3043,25 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.positions.has('@ctr-O'), 'the centre is the named O, not a hidden one').toBe(false);
     },
   },
+  {
+    id: 'proof-target-refused-1666',
+    title: '#1666 (ADR-561): «הוכיחו כי AB ⊥ AC» after «משולש ABC» is REFUSED as a claim to prove — the triangle stays free, no right angle is forced',
+    guards:
+      "The #1649 parity audit (main 5f042e40, re-measured on e92b671f): after «משולש ABC», 2-D COMMITTED «הוכיחו כי AB ⊥ AC» as `segment, segment, set-perpendicular` — the figure was forced to satisfy the very claim the student was asked to prove, and so 'confirmed' it for free. Operator ruling 2026-10-02 (#1649): proof targets are refused in all three builders, with an explanation. The rule is shared (`shell/proofTarget`, ADR-W-107); 2-D calls it at the submit gate (`decidePreParse`) and at `parse()`, so the step is declared in refusedSteps with the sentence its message quotes. A change that lets the sentence build again, or refuses it for another reason, turns this red. The submit-path surface (message text, both languages, every spelling, the ✎ edit seam) is in src/app/__tests__/proof-target-1666.test.ts.",
+    steps: ['משולש ABC', 'הוכיחו כי AB ⊥ AC'],
+    refusedSteps: [
+      {
+        step: 2,
+        reason: 'proof-target',
+        with: { sentence: 'הוכיחו כי AB ⊥ AC' },
+        why: 'operator ruling 2026-10-02 on #1649 (#1666): a claim to prove is never a given — "all refused with explanation"',
+      },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the triangle carries no violated given').toEqual([]);
+      expect(fig.construction.constraints, 'nothing was committed from the claim — no perpendicularity forced').toEqual([]);
+      for (const id of ['A', 'B', 'C']) expect(fig.positions.has(id), `the triangle keeps ${id}`).toBe(true);
+    },
+  },
 ];

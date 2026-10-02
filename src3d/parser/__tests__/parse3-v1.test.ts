@@ -59,10 +59,11 @@ describe('claims', () => {
     expect(r).toHaveLength(1);
     expect(r[0]).toMatchObject({ type: 'vec-rel', from: 'A', to: 'M', symbol: undefined });
   });
-  it('perp-plane, Hebrew + English + proof prefix, lowers to a seg-plane-rel + the plane triangle', () => {
+  // #1666 (ADR-3D-295): the «הוכיחו כי» prefix is no longer read past — a proof target is refused at the store
+  // (src3d/__tests__/proof-target-1666.test.ts), and here it no longer parses.
+  it('perp-plane, Hebrew + English, lowers to a seg-plane-rel + the plane triangle', () => {
     for (const input of [
       "CA' מאונך למישור BC'D",
-      "הוכיחו כי CA' מאונך למישור BC'D",
       "CA' is perpendicular to plane BC'D",
     ]) {
       const r = cmds(input);

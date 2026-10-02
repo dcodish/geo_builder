@@ -433,3 +433,21 @@ The caller mounts it once per opening (`key`), so typed text, the note and the o
 **A hidden segment has no ink, never no existence.** Where segments are clickable, a faint dashed ghost (`data-noexport`) stays on the line so the menu can bring it back. A product's store keeps the segment in the construction.
 
 **The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/segment-display-rows.ts`. Each builder's thin lock hands over a subject: `setup`, its real toggles, `ink()` read off its real rendered canvas, `measurable()` through its own measure path, `statements()`, an optional `undo` (present only where the display choice is in the undo slice: analytic yes, 2-D no), and its real save → load. The meta-lock proves each row can fail.
+
+## Proof targets ([ADR-W-107](06w-decisions-workspace.md#adr-w-107))
+
+`shell/proofTarget.ts` decides whether a typed line contains a claim the student is asked to PROVE. It is pure and knows no product: `findProofTarget(text)` returns `{ target: true, span: [start, end), sentence }` or `null`, with indices into the string the caller passed.
+
+| match | where | examples |
+| --- | --- | --- |
+| a proof verb + its complementizer | anywhere in the line | «הוכיחו כי», «הוכח ש-», «הוכיחו שהמשולש …», «הראו כי», «הראה ש-AB …», «יש להוכיח כי», «צריך להראות ש-», "prove that", "show that" |
+| a bare prove-verb | only where a sentence starts (line start, after `. ; : , ! ?` or a line break, past an item marker) | «הוכיחו: …», «ב) הוכח את הטענה», "prove: …" |
+
+**Not matched:** a show-verb without its complementizer («הראו את הזוויות», «הראו שני גבהים»: the "show me" imperative), «כיצד» ("how"), and «כי» / «ש» anywhere except directly after a proof verb («נתון כי», «ידוע ש-», «כך ש-»). Invisible paste controls (bidi isolates and marks) are skipped like spaces. `sentence` runs from the verb to the next sentence end (`. ; ! ?` before a space, or a line break) and leaves out an item marker, so in «נתון AB = AC. הוכיחו כי AB ⊥ AC» it is the claim alone.
+
+**Each builder calls it before its grammar** and words its own refusal (same meaning in all three: a claim to prove, not a given; the tool draws the givens and does not check proofs; type only what is given; quoting `sentence`). Nothing of the line is recorded.
+- 2-D: `decidePreParse`, the edit seam, and `parse()`.
+- 3-D: `readStatement3`.
+- Analytic: `parseLine`.
+
+**The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/proof-target-rows.ts`. Each builder's thin lock hands over a `ProofGate`: its REAL submit decision on a figure with A, B and C, answering `{ proof, recorded, text }`. The rows check that every spelling is refused as a proof target, recorded by none and quoted by the refusal, and that the negatives are never refused as one. The meta-lock proves each check can fail.

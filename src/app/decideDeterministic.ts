@@ -59,6 +59,7 @@ import {
   trialFacts,
 } from '@/store/geoStore';
 import { spanShadow } from '@/parser/spanAccounting';
+import { findProofTarget } from '../../shell/proofTarget';
 import { honestyGateReport } from './honestyGates';
 import { honoursConstruct, roleReadings } from './roleReadings';
 
@@ -180,6 +181,15 @@ export function decidePreParse(utterance: string, view: DecideView): Verdict2D |
   // («זווית A לא ישרה» → `set-angle A = 90`) and committed the opposite of the given with a green ✓.
   // A wrong figure that agrees with nothing the student said is the worst outcome the tool can produce;
   // an honest refusal is strictly better until the requirement lane can represent an exclusion.
+  // A PROOF TARGET (#1666, ADR-561 / ADR-W-107) — «הוכיחו כי AB ⊥ AC», "prove that …": what the student must
+  // SHOW, never a given. Refused here, PRE-parse, for the negation's reason: the relation rules matched the
+  // claim inside the sentence and committed it as a constraint, so the figure was forced to satisfy what
+  // was to be proved. The `proof` scope category below only ever ran after a FAILED parse. The rule is
+  // shared by all three builders (`shell/proofTarget`); the note quotes the proof sentence.
+  const proof = findProofTarget(utterance);
+  if (proof) {
+    return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:proof' }], note: { key: 'input.scope.proof-target', params: { sentence: proof.sentence } } };
+  }
   const negated = statedNegation(utterance);
   if (negated) {
     return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:negation' }], note: { key: 'input.scope.negation', params: { word: negated } } };

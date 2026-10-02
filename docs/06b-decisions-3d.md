@@ -11589,3 +11589,20 @@ Both build with every row ok and 8 points, and in both the point that was A now 
 `issue-578-rename.test.ts`: two rows now expect the holder on `target-taken` (the shape changed on purpose). `catalog3.test.ts` and `shadow-matrix3.test.ts` read `parseRewrite3`.
 
 **Not built.** Row highlighting of the holder in 3-D: 3-D's step list has no selection to light up, and adding one is a separate surface. The segment-ends swap (2-D's «החליפו קצוות»): 3-D has no segment menu (out of scope per #1302).
+
+## ADR-3D-295 — «הוכיחו כי …» / "prove that …" is refused, no longer stripped and read as a claim (#1666, 3-D side)
+
+**Status:** accepted · 2026-10-02 · bug (P1, honesty) · operator ruling on #1649, 2026-10-02: *"all refused with exaplanation"*. **Withdraws** [ADR-3D-002](#adr-3d-002) decision 1's last clause ("optional proof-verb prefixes … accepted and ignored"). **Shares** the rule with 2-D and analytic through `shell/` ([ADR-W-107](06w-decisions-workspace.md#adr-w-107)).
+
+**Requirements:** docs/02w FR-SU-15 (new — the workspace promise, realised here for 3-D) · **Design:** docs/04w — "Proof targets"; none beyond it here (internal)
+
+**Context (measured on `main` e92b671f, `decideSubmit3` after «פירמידה ABCD»).** «הוכיחו כי AB ⊥ AC», «הוכיחו ש-AB ⊥ AC», «הראו כי …», "prove that …" and "show that …" were RECORDED as `cos-angle`, a driving given on the free pyramid. «הראו כי ∠BAC = 90°» recorded a claim. «הוכיחו כי AB = AC» was refused `claim-refuted`: the tool "checked the proof" against a figure it had drawn. «הוכח כי», «הראה כי», «יש להוכיח», «צריך להוכיח», an item marker and the mixed line were `not-understood` and would have escalated to the model. The cause is `stripStatementPrefix`, which read past the proof verb on purpose (ADR-3D-002). Since the T2 addendum (2026-07-07) a claim on a free figure DRIVES it, so the strip let the claim to be proved shape the figure.
+
+**Decision.**
+1. **`readStatement3` calls the shared `findProofTarget` before `parse3`.** That is the reader both statement seams share (`submit`, the ✎ edit). A match is a typed `{ code: 'proof-target', sentence }` refusal. It never escalates and nothing of the line is recorded. `errorText3` words it `err.proofTarget`, with the same meaning as analytic's, quoting the sentence.
+2. **`stripStatementPrefix` loses its proof arm.** It strips only the given framing («נתון כי», «נתון ש», "given that"), so a saved file or a model line can no longer lower a proof target either.
+3. A claim typed WITHOUT a proof verb (`AB ⊥ AC`, `CA' מאונך למישור BC'D`) reads exactly as before: verified on a determined figure, driving a free one.
+
+**Measured.** `src3d/__tests__/proof-target-1666.test.ts`: the shared rows through `decideSubmit3`, the Hebrew and English text, the parser no longer reading past «הוכיחו כי» or "prove that" (the given framing unchanged), the bare claim still recording, and no catalog line reading as a target. On the pre-change tree, 3 of its 5 tests fail. `parse3-v1.test.ts` drops the «הוכיחו כי CA' מאונך למישור BC'D» input from its perp-plane spellings.
+
+**Consequences.** `src3d/store/store3.ts` (`StoreError3`, `readStatement3`), `src3d/parser/parse3.ts`, `src3d/i18n/errorText3.ts`, `src3d/i18n/locales/{he,en}.json`. Behaviour change: the proof-verb form of a claim is refused, where it used to be read (and could drive the figure).

@@ -13409,3 +13409,24 @@ Either way, a circle whose centre the sentence does not name is `autoCenter`. It
 - the corner circle's unnamed centre is hidden instead of a visible auto letter.
 
 A centre named in the sentence («למעגל O») is visible as before.
+
+## ADR-561 — «הוכיחו כי …» is refused as a claim to prove, never committed as a given (#1666, 2-D side)
+
+**Status:** accepted · 2026-10-02 · bug (P1, honesty) · operator ruling on #1649, 2026-10-02: *"all refused with exaplanation"*
+
+**Requirements:** docs/02w FR-SU-15 (new — the workspace promise, realised here for 2-D) · **Design:** docs/04w — "Proof targets" (the shared rule); none beyond it here
+
+**Cites** [ADR-W-107](06w-decisions-workspace.md#adr-w-107) (the shared rule and its §5c lock), #1649 (the parity audit that measured it), [ADR-289](#adr-289) (the scope register), #436 (the negation P1, whose pre-parse refusal this mirrors), [ADR-555](#adr-555) (`refusedSteps`).
+
+**Context.** Measured on `main` e92b671f through `decideDeterministic2D` after «משולש ABC»: «הוכיחו כי AB ⊥ AC» and every spelling around it COMMITTED `segment, segment, set-perpendicular`. That covers הוכח / הוכיחו ש- / הראו כי / הראה כי / יש להוכיח / צריך להוכיח / prove that / show that, «א. …» and «נתון AB = AC. הוכיחו כי AB ⊥ AC». «(1) …» and «1. …» escalated to the model. The relation rules matched the claim inside the sentence, and nothing upstream separated a claim from a given. The scope register's `proof` category is consulted only after a FAILED parse, and these lines parsed. The figure was forced to satisfy what the student had to prove.
+
+**Decision.** 2-D calls the shared `findProofTarget` (ADR-W-107) at three places:
+- **`decidePreParse`**, beside the LaTeX and negation refusals, before the spinner and the model. It is a `guided` refusal with the note `input.scope.proof-target` quoting the proof sentence. It logs `scope:proof`, so the admin dashboard keeps counting it where it counted the old category.
+- **The ✎ edit seam** (`runEditCommit`), with the same note and the edited step unchanged.
+- **`parse()`**: a new `ParseResult` refusal `{ reason: 'proof-target', sentence }` at the one boundary every other seam reads. It covers the scenario harness and the LLM's canonical lines, so no 2-D path can lower a claim.
+
+Nothing of a mixed line is committed, which matches analytic. The post-failure `proof` scope category is unchanged.
+
+**Measured.** `src/app/__tests__/proof-target-1666.test.ts`: the shared rows through `decideDeterministic2D`, `runSubmit` on the mixed line (nothing committed, the model never called, the exact Hebrew note), the edit seam, the English text, and no catalog line reading as a target. On the pre-change tree, 4 of its 5 tests fail (the catalog sweep passes either way). Scenario `proof-target-refused-1666` (`scenarios-corpus-4.ts`) declares the refusal in `refusedSteps`. All four `decide-parity-1395` shards still reproduce their goldens; shard 4 gains only the new scenario's key.
+
+**Consequences.** `src/app/decideDeterministic.ts`, `src/app/editPipeline.ts`, `src/parser/parse.ts` (one union member and a two-line check at `parse()`'s entry), and `src/i18n/locales/{he,en}.json` (`input.scope.proof-target`). Behaviour change: a line that contains a proof target is refused, where it used to draw the claim.
