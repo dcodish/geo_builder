@@ -150,8 +150,11 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   // The #186 / #539 auto-binds the decision simulated are applied to the store first, whatever the
   // verdict — the submission already named a circle or a point, exactly as it did inline before.
   if (verdict.kind !== 'store-op') {
+    // #1673: a refused line that only stepped a hidden token aside commits nothing — leave the store (no phantom undo)
+    const asideOnly = verdict.kind === 'refuse' && verdict.binds.every((b) => b.op === 'step-aside');
     for (const b of verdict.binds) {
       if (b.op === 'name-centre') store().nameCentre(b.from, b.to);
+      else if (b.op === 'step-aside') { if (!asideOnly) store().reletterHidden(b.from, b.to); }
       else store().rename(b.from, b.to);
     }
   }

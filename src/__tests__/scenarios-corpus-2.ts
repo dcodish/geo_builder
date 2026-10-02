@@ -85,11 +85,12 @@ export const SCENARIOS_2: Scenario[] = [
     id: 'q5-isosceles-incircle-sqrt3-ratio-and-area',
     title: 'bagrut Q5: isosceles + incircle, «AC=√(3)CO» (the √() toolbar ratio) + «S_{CKE}=6» — builds green, area solves (issues #114/#115, ADR-310/311)',
     guards:
-      "Operator prod session `qderonm3` (2026-07-13): the √3 ratio typed with the √() palette form failed deterministically (`AC=√(3)CO`, `AC גדול פי √(3) מ CO`) and escalated to the LLM, which produced a malformed figure — so `E על CB` defaulted onto the auto-created free point K and `S_{CKE}=6` reported «cannot place E so area=6». Two root fixes: #114 (the ratio rules now use the shared NUMEXPR atom, so `√(3)` parses deterministically — no LLM detour) and #115 (a free on-segment rider defaults into general position, off existing points). With both, the exact sequence builds green and the area solves.",
+      "Operator prod session `qderonm3` (2026-07-13): the √3 ratio typed with the √() palette form failed deterministically (`AC=√(3)CO`, `AC גדול פי √(3) מ CO`) and escalated to the LLM, which produced a malformed figure — so `E על CB` defaulted onto the auto-created free point K and `S_{CKE}=6` reported «cannot place E so area=6». Two root fixes: #114 (the ratio rules now use the shared NUMEXPR atom, so `√(3)` parses deterministically — no LLM detour) and #115 (a free on-segment rider defaults into general position, off existing points). With both, the exact sequence builds green and the area solves. #1673 (ADR-565): the incircle's centre is unnamed, so «O מרכז המעגל» now precedes «OA»; the operator's bare «OA» used to bind the hidden centre by its tool-chosen letter.",
     steps: [
       'משולש שווה שוקיים ABC',
       'AB=AC',
       'במשולש חסום מעגל',
+      'O מרכז המעגל', // #1673 (ADR-565): an unnamed centre answers to no letter until named
       'OA',
       'OB',
       'OC',
@@ -311,12 +312,15 @@ export const SCENARIOS_2: Scenario[] = [
     id: 'stated-meet-relocates-loose-point',
     title: 'AM חותך את CO בנקודה K with M loose: the stated meet re-seats M so the segments really cross (and M stays outside)',
     guards:
-      'ADR-255: operator session gaawv4fr (2026-07-08) — with M seeded outside up-LEFT of the circle, segments AM and CO cannot cross; the figure built ✓ with K on the continuations, the amber was easy to miss, and NO sampled config could rescue it (findValidConfig null — seed jitter explores only a small neighbourhood of the free default). A stated segment-meet is information about where the loose endpoint belongs (M1/M4): apply now re-seats a non-pinned, constraint-free endpoint along the ray from its fixed mate through the other segment\'s midpoint, preserving its circle sides (the stated "M מחוץ למעגל" survives) and general position. Typos as typed: "על במעגל", "בנדוקה".',
+      'ADR-255: operator session gaawv4fr (2026-07-08) — with M seeded outside up-LEFT of the circle, segments AM and CO cannot cross; the figure built ✓ with K on the continuations, the amber was easy to miss, and NO sampled config could rescue it (findValidConfig null — seed jitter explores only a small neighbourhood of the free default). A stated segment-meet is information about where the loose endpoint belongs (M1/M4): apply now re-seats a non-pinned, constraint-free endpoint along the ray from its fixed mate through the other segment\'s midpoint, preserving its circle sides (the stated "M מחוץ למעגל" survives) and general position. Typos as typed: "על במעגל", "בנדוקה". #1673 (ADR-565): «O מרכז המעגל» is inserted after «AB קוטר». The exact sequence the operator typed is kept: the circle is unnamed, so «CO» draws a FREE point O (operator ruling 2026-10-02), and the meet still re-seats the loose endpoints so K lies within both segments. A later «O מרכז המעגל» places that O at the centre (locked in issue-1673-hidden-centre.test.ts).',
     steps: ['AB קוטר', 'C על במעגל', 'M מחוץ למעגל', 'AM חותך את CO בנדוקה K'],
     check(fig) {
       allStepsOk(fig);
-      const c = fig.circles.get('circle-O');
-      expect(c, 'circle O resolved').toBeTruthy();
+      // #1673 (ADR-565): the circle is unnamed, so «CO» drew a FREE point O — never the hidden centre
+      const circle = fig.construction.objects.find((o) => o.kind === 'circle') as { id: string; center: string } | undefined;
+      expect(circle?.center, 'O is the student\'s free point, not the circle centre').not.toBe('O');
+      const c = circle ? fig.circles.get(circle.id) : undefined;
+      expect(c, 'the circle resolved').toBeTruthy();
       if (!c) return;
       // M is strictly outside — the ADR-254 side statement survived the re-seat.
       expect(dist(at(fig, 'M'), c.center), 'M outside circle O').toBeGreaterThan(c.r);
@@ -754,8 +758,8 @@ export const SCENARIOS_2: Scenario[] = [
     id: 'two-circles-kite-surfaces-kite-and-isosceles-theorems',
     title: 'two intersecting circles + their radii → the kite OAPB and its isosceles triangles surface, entailed',
     guards:
-      "operator session (debug log 2026-07-04, the `שני מעגלים נחתכים` figure): `שני מעגלים נחתכים` (two circles → centres O,P, crossings A,B) → `AB` → `OP` → `PA` → `PB` → `OA=OB`. The operator built the classic kite OAPB (two intersecting circles) and reported the feed was thin: \"i have an isosceles triangle but no relevant theorems appear … added OA=OB and got 1 sentence but there are others … no kite theorems.\" Root cause (ADR-218): the theorem matchers only read TYPED shape/equal facts, never the circle STRUCTURE the construction already encodes — so the isosceles triangles OAB/PAB (two radii each, |OA|=|OB|, |PA|=|PB|) and the kite OAPB (two circles sharing A,B) went unrecognised because nobody typed 'isosceles'/'kite'. These are coordinate-free construction ENTAILMENTS, not measured coincidences. Fix: `isoscelesEvidence` now derives isosceles from a circle's centre + two drawn radii, `kiteEvidence` derives a kite from two circles sharing two drawn-out points, and the kite theorems 37/38 were added to the table (a pure gap). This scenario replays the operator's exact sequence and asserts the kite + isosceles theorems surface and the figure is geometrically a kite (OP ⟂ AB, both radius pairs equal).",
-    steps: ['שני מעגלים נחתכים', 'AB', 'OP', 'PA', 'PB', 'OA=OB'],
+      "operator session (debug log 2026-07-04, the `שני מעגלים נחתכים` figure): `שני מעגלים נחתכים` (two circles → centres O,P, crossings A,B) → `AB` → `OP` → `PA` → `PB` → `OA=OB`. The operator built the classic kite OAPB (two intersecting circles) and reported the feed was thin: \"i have an isosceles triangle but no relevant theorems appear … added OA=OB and got 1 sentence but there are others … no kite theorems.\" Root cause (ADR-218): the theorem matchers only read TYPED shape/equal facts, never the circle STRUCTURE the construction already encodes — so the isosceles triangles OAB/PAB (two radii each, |OA|=|OB|, |PA|=|PB|) and the kite OAPB (two circles sharing A,B) went unrecognised because nobody typed 'isosceles'/'kite'. These are coordinate-free construction ENTAILMENTS, not measured coincidences. Fix: `isoscelesEvidence` now derives isosceles from a circle's centre + two drawn radii, `kiteEvidence` derives a kite from two circles sharing two drawn-out points, and the kite theorems 37/38 were added to the table (a pure gap). This scenario replays the operator's exact sequence and asserts the kite + isosceles theorems surface and the figure is geometrically a kite (OP ⟂ AB, both radius pairs equal). #1673 (ADR-565): the two centres are named («O מרכז המעגל», «P מרכז המעגל») before «OP»; the bare «OP» used to bind both hidden centres by their tool-chosen letters.",
+    steps: ['שני מעגלים נחתכים', 'AB', 'O מרכז המעגל', 'P מרכז המעגל', 'OP', 'PA', 'PB', 'OA=OB'], // #1673 (ADR-565): without the naming, «OP» draws two new points and there is no kite
     check(fig) {
       allStepsOk(fig);
       // Geometry: the kite OAPB — |OA|=|OB| and |PA|=|PB| (radii), and the main diagonal OP ⟂ the
@@ -767,7 +771,7 @@ export const SCENARIOS_2: Scenario[] = [
       expect(Math.abs(dot) / (dist(O, P) * dist(A, B) || 1)).toBeLessThan(1e-6); // OP ⟂ AB
       // Feed: the isosceles (22) and BOTH kite properties (37, 38) surface — entailed from the two
       // circles + drawn radii, none of it typed as a shape word.
-      const facts = factsOf(['שני מעגלים נחתכים', 'AB', 'OP', 'PA', 'PB', 'OA=OB']);
+      const facts = factsOf(['שני מעגלים נחתכים', 'AB', 'O מרכז המעגל', 'P מרכז המעגל', 'OP', 'PA', 'PB', 'OA=OB']);
       const ids = detectTheorems({ facts, construction: fig.construction }).map((e) => e.id);
       expect(ids).toEqual(expect.arrayContaining([22, 37, 38]));
     },
@@ -825,7 +829,7 @@ export const SCENARIOS_2: Scenario[] = [
       // The degenerate tangent is rejected with a clear message (NOT a silent freeze / bogus over-constraint).
       expect(fig.lastError).toMatch(/distinct points|single point/);
       // The prior figure is kept: every earlier point still has a position (no clobber, no wipe).
-      for (const id of ['@ctr-O', '@ctr-P', 'A', 'B', 'C', 'D']) expect(fig.positions.has(id), `position for ${id}`).toBe(true); // centres anonymous (ADR-342)
+      for (const id of ['O', 'P', 'A', 'B', 'C', 'D']) expect(fig.positions.has(id), `position for ${id}`).toBe(true); // «C על מעגל P» / «למעגל O» name the centres by use (#1673, ADR-565)
       // The valid earlier tangent (OA ⟂ CA) is unaffected — its constraint still holds in the kept figure.
       const O = at(fig, 'O'), A = at(fig, 'A'), C = at(fig, 'C');
       const dot = (O.x - A.x) * (C.x - A.x) + (O.y - A.y) * (C.y - A.y);
@@ -1439,8 +1443,8 @@ export const SCENARIOS_2: Scenario[] = [
     id: 'two-tangent-circles-then-size-given-flexes-radii',
     title: '"two circles tangent externally" then "OP = 4" RESIZES the radii (r1+r2 = |OP|) instead of over-constraining — the radii are free DOFs, not pinned at 5/3',
     guards:
-      'operator session 23vqi9u8 (built "שני מעגלים משיקים מבחוץ", then OM= / OP=). The figure was created with both radii PINNED at the default seeds (5 and 3): the deterministic parser had no rule for the unnamed phrasing, so it escalated to the LLM, which emitted `circle … radius 5` / `radius 3` (FIXED) + `circles-tangent`. External tangency then forces |OP| = r1+r2 = 8 rigidly, so the student\'s own "OP = 4" was reported "over-constrained: |OP| = 8 cannot hold" — a value the student never gave (ADR-052 violation). The touch point M is also rigid at |OM| = r1 = 5, so "OM = 4" could not move it either. Root fix: (1) a deterministic `circlesTangent` rule that materialises the two circles with FREE radii (distinct seeds); (2) the engine builds external tangency as a `coincide` between the touch point seen from each circle (M = radial-toward(c1→c2), a hidden witness = radial-toward(c2→c1)), with both free radii marked as PERMANENT drivers of it — so |OP| = r1+r2 is a constraint the radii flex to satisfy, not a pinned number. "OP = 4" now resizes the radii (r1+r2 = 4) and "OM = 4" sets r1 = 4, both without over-constraining; the recruiter reaches the radii via radial-toward ancestry (circlesOfPoint/pointParents).',
-    steps: ['שני מעגלים משיקים מבחוץ', 'OP=4'],
+      'operator session 23vqi9u8 (built "שני מעגלים משיקים מבחוץ", then OM= / OP=). The figure was created with both radii PINNED at the default seeds (5 and 3): the deterministic parser had no rule for the unnamed phrasing, so it escalated to the LLM, which emitted `circle … radius 5` / `radius 3` (FIXED) + `circles-tangent`. External tangency then forces |OP| = r1+r2 = 8 rigidly, so the student\'s own "OP = 4" was reported "over-constrained: |OP| = 8 cannot hold" — a value the student never gave (ADR-052 violation). The touch point M is also rigid at |OM| = r1 = 5, so "OM = 4" could not move it either. Root fix: (1) a deterministic `circlesTangent` rule that materialises the two circles with FREE radii (distinct seeds); (2) the engine builds external tangency as a `coincide` between the touch point seen from each circle (M = radial-toward(c1→c2), a hidden witness = radial-toward(c2→c1)), with both free radii marked as PERMANENT drivers of it — so |OP| = r1+r2 is a constraint the radii flex to satisfy, not a pinned number. "OP = 4" now resizes the radii (r1+r2 = 4) and "OM = 4" sets r1 = 4, both without over-constraining; the recruiter reaches the radii via radial-toward ancestry (circlesOfPoint/pointParents). #1673 (ADR-565): the centres are named before «OP=4»; the bare «OP=4» used to bind both hidden centres (the ADR-342 metric amendment, superseded).',
+    steps: ['שני מעגלים משיקים מבחוץ', 'O מרכז המעגל', 'P מרכז המעגל', 'OP=4'], // the naming lines: #1673 (ADR-565)
     check(fig) {
       allStepsOk(fig); // no "over-constrained: |OP| = 8 cannot hold"
       const O = at(fig, 'O'), P = at(fig, 'P'), M = at(fig, 'M');
@@ -1458,12 +1462,13 @@ export const SCENARIOS_2: Scenario[] = [
       'operator session vk346px4 (two intersecting circles O,P; chord CB tangent to P at B; then "המיתר AD במעגל P משיק למעגל O בנקודה A"). The last step parsed to a single `circles-tangent` between circle-P and circle-O — point D and the chord AD were DROPPED entirely, and it asserted the two circles are tangent to EACH OTHER, contradicting the opening "two circles intersect". Status showed green ✓ while nothing new appeared on the canvas. Root cause: `circlesTangent` fires on any "two `מעגל X` tokens + a `משיק` keyword", but here one circle mention ("במעגל P") is the chord\'s HOST, not a second tangent circle — the rule can\'t tell them apart and throws away the chord. The deterministic parser also had NO tangent-chord construct at all (the symmetric step-2 chord only worked via the LLM). Fix: a new `tangentChord` rule (splits at the tangent keyword → host circle before, tangency circle + point after) emits both endpoints on the host circle + radius(target→Z) ⟂ the chord + the segment; and a `chord`/`מיתר` guard on `circlesTangent` so a chord phrasing can never become mutual tangency.',
     steps: [
       'שני מעגלים נחתכים',
+      'O מרכז המעגל', 'P מרכז המעגל', // #1673 (ADR-565): the model step below names the circles by their hidden ids, which tells them apart — so the student names them first
       // Step 2 in the live session was "המיתר CB משיק למעל P בנקודה B" — the "למעל" typo made it
       // out-of-grammar so it escalated to the LLM. Captured here as the canonical commands the log shows.
       { llm: [
         { type: 'point-on-circle', id: 'C', circle: 'circle-O' },
         { type: 'point-on-circle', id: 'B', circle: 'circle-P' },
-        { type: 'set-perpendicular', a: '@ctr-P', b: 'B', c: 'C', d: 'B', implicit: true }, // the centre point id (ADR-342 — the letter is the circle's token, not a point)
+        { type: 'set-perpendicular', a: 'P', b: 'B', c: 'C', d: 'B', implicit: true }, // the centre P, named in the line before (#1673)
         { type: 'segment', a: 'C', b: 'B' },
       ] },
       'CB',

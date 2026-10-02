@@ -27,6 +27,12 @@ const toggle = (i: number) => {
 };
 
 const MIDPOINT = ['A(0,0)', 'B(4,0)', 'M אמצע AB'];
+/**
+ * A line that DEPENDS on row 1 and cannot stand without it. Not «M אמצע AB» since #1670 (ADR-AG-210): with B muted a bare
+ * midpoint mints B as a free point, as 2-D does — the honest counterfactual of a list without «B(4,0)». A cevian to a side
+ * no shape has refers to B and mints nothing, in either builder.
+ */
+const DEPENDENT = ['A(0,0)', 'B(4,0)', 'CD גובה לצלע AB'];
 
 beforeEach(() => {
   store().clearAll();
@@ -35,25 +41,34 @@ beforeEach(() => {
 
 describe('#1548 — muting a row takes it out of the figure and keeps it in the list', () => {
   it('a muted point leaves the figure; un-muting brings the same figure back', () => {
-    MIDPOINT.forEach((l) => store().recordLine(l));
-    expect(ids()).toEqual(['A', 'B', 'M']);
+    DEPENDENT.forEach((l) => store().recordLine(l));
+    expect(ids()).toEqual(['A', 'B', 'C', 'D']);
+    const before = figureOf().figure.points.map((p) => [p.id, p.x, p.y]);
 
     expect(toggle(1).kind).toBe('apply');
-    expect(store().lines).toEqual(MIDPOINT); // the row stays
+    expect(store().lines).toEqual(DEPENDENT); // the row stays
     expect(store().disabled).toEqual([1]);
     expect(ids()).toEqual(['A']);
 
     expect(toggle(1).kind).toBe('apply');
     expect(store().disabled).toEqual([]);
-    expect(figureOf().figure.points.map((p) => [p.id, p.x, p.y])).toEqual([['A', 0, 0], ['B', 4, 0], ['M', 2, 0]]);
+    expect(figureOf().figure.points.map((p) => [p.id, p.x, p.y])).toEqual(before);
+  });
+
+  it('muting a midpoint’s parent leaves the midpoint standing on a FREE parent — the list without that row (#1670)', () => {
+    MIDPOINT.forEach((l) => store().recordLine(l));
+    toggle(1);
+    const muted = figureOf();
+    expect(muted.faults).toEqual([]);
+    expect(muted.figure.points.map((p) => [p.id, p.x, p.y])).toEqual(derive(['A(0,0)', 'M אמצע AB'], store().seed).figure.points.map((p) => [p.id, p.x, p.y]));
   });
 
   it('a line that depended on the muted one faults on ITS OWN row — the honest counterfactual', () => {
-    MIDPOINT.forEach((l) => store().recordLine(l));
+    DEPENDENT.forEach((l) => store().recordLine(l));
     toggle(1);
     const d = figureOf();
     const rows = rowOf(store().lines.length, store().disabled);
-    // the derivation indexes the ACTIVE lines; the row map puts the fault on «M אמצע AB», row 2
+    // the derivation indexes the ACTIVE lines; the row map puts the fault on «CD גובה לצלע AB», row 2
     expect(d.faults.map((f) => [rows[f.index], f.code])).toEqual([[2, 'unknown-reference']]);
   });
 
@@ -132,18 +147,18 @@ describe('#1548 — a muted row saves muted and loads muted', () => {
   });
 
   it('a load restores the mute and audits the figure the student will SEE', () => {
-    MIDPOINT.forEach((l) => store().recordLine(l));
+    DEPENDENT.forEach((l) => store().recordLine(l));
     toggle(1);
     const saved = store().serialize();
     store().clearAll();
 
     const out = loadAnalyticSession(saved as unknown as Record<string, unknown>, '');
-    expect(store().lines).toEqual(MIDPOINT);
+    expect(store().lines).toEqual(DEPENDENT);
     expect(store().disabled).toEqual([1]);
     expect(ids()).toEqual(['A']);
-    // the midpoint's missing parent is reported on the midpoint's own sentence
+    // the cevian's missing side end is reported on the cevian's own sentence
     expect(out.failed).toBe(1);
-    expect(store().loadAudit?.failed).toEqual([{ line: 'M אמצע AB', reason: 'unknown-reference' }]);
+    expect(store().loadAudit?.failed).toEqual([{ line: 'CD גובה לצלע AB', reason: 'unknown-reference' }]);
   });
 
   it('a muted line that no longer READS is named by the audit (the drift net covers muted rows too)', () => {

@@ -67,8 +67,10 @@ describe('#1340 — the fold retries a creating fact exactly as it retries a con
     expect(crossing.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'D', 'P']);
   });
 
-  it('a derived point whose operand NO line declares stays red, naming the reference — nothing is invented', () => {
-    const d = derive(['M אמצע AX', 'A(0,0)', 'B(4,0)'], 0);
+  it('a reference whose operand NO line declares stays red, naming the reference — nothing is invented', () => {
+    // #1670 (ADR-AG-210): «M אמצע AX» now MINTS X after the fixpoint, as 2-D does; a form 2-D does not mint for
+    // (a scaled length) is retried by the same fixpoint and still names the missing point.
+    const d = derive(['AX = 2AB', 'A(0,0)', 'B(4,0)'], 0);
     expect(d.faults).toHaveLength(1);
     expect(d.faults[0]).toMatchObject({ index: 0, code: 'unknown-reference', detail: 'X' });
     expect(d.outcomes[0]).toBe('faulted');

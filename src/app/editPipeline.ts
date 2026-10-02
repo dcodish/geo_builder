@@ -17,8 +17,8 @@
  * student refining a step, not freeform input — and this is the third refusal of the same shape the
  * editor already shipped, not a new behaviour.
  */
-import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabelFold, parse } from '@/parser';
-import { autoNamedLabels, groupKey, replay, useGeoStore } from '@/store/geoStore';
+import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabelFold, parse, typedLabels } from '@/parser';
+import { autoNamedLabels, groupKey, replay, stepAsideFacts, useGeoStore } from '@/store/geoStore';
 import { honestyGateReport } from './honestyGates';
 import { impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
@@ -71,6 +71,8 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     setInputNote(t('input.scope.proof-target', { sentence: proof.sentence }));
     return false;
   }
+  // #1673 (ADR-565): a hidden circle token the edit types steps aside first, exactly as at submit
+  for (const m of stepAsideFacts(store().facts, typedLabels(editText)).moves) store().reletterHidden(m.from, m.to);
   let ectx = prefixCtx();
   let r = parse(editText, ectx);
   // #186: an edit referencing a circle by a name that matches no circle binds an UNNAMED circle the

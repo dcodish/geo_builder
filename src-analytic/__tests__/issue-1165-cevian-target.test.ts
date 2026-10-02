@@ -69,14 +69,19 @@ describe('ADR-AG-117 — the triangle names the side, and it means the same thin
    * The two spellings of ONE statement, per role and per locale. The right-hand column is the form
    * that already worked and is already locked; the left-hand one is what this issue added.
    */
-  const PAIRS: readonly (readonly [string, string, string])[] = [
-    ['he median', 'AD תיכון במשולש ABC', 'AD תיכון לצלע BC'],
-    ['he altitude', 'AD גובה במשולש ABC', 'AD גובה לצלע BC'],
-    ['en median', 'AD is the median in triangle ABC', 'AD is the median to side BC'],
-    ['en altitude', 'AD is the altitude in triangle ABC', 'AD is the altitude to side BC'],
+  /*
+   * #1670 (ADR-AG-210): the triangle form NAMES the triangle, so it also states «משולש ABC» — 2-D draws it, and it is
+   * what introduces the vertices on an empty canvas. So its reference is the side form AFTER «משולש ABC» (the fourth
+   * column), the same statement plus the shape the sentence named; the maqaf form names no shape.
+   */
+  const PAIRS: readonly (readonly [string, string, string, string[]])[] = [
+    ['he median', 'AD תיכון במשולש ABC', 'AD תיכון לצלע BC', ['משולש ABC']],
+    ['he altitude', 'AD גובה במשולש ABC', 'AD גובה לצלע BC', ['משולש ABC']],
+    ['en median', 'AD is the median in triangle ABC', 'AD is the median to side BC', ['משולש ABC']],
+    ['en altitude', 'AD is the altitude in triangle ABC', 'AD is the altitude to side BC', ['משולש ABC']],
     // #1222 — the maqaf is the same statement as the noun-ful spelling, not a different one.
-    ['he median maqaf', 'AD תיכון ל-BC', 'AD תיכון לצלע BC'],
-    ['he altitude maqaf', 'AD גובה ל-BC', 'AD גובה לצלע BC'],
+    ['he median maqaf', 'AD תיכון ל-BC', 'AD תיכון לצלע BC', []],
+    ['he altitude maqaf', 'AD גובה ל-BC', 'AD גובה לצלע BC', []],
   ];
 
   it.each(PAIRS)('%s — the same facts', (_what, added, reference) => {
@@ -86,7 +91,7 @@ describe('ADR-AG-117 — the triangle names the side, and it means the same thin
   // Facts being equal makes the figures equal, but the figure is what the student is shown, and a
   // solve is where an equal-looking pair could still diverge. Several seeds, because one seed can
   // agree by accident and the tool offers the student every configuration.
-  it.each(PAIRS)('%s — the same figure, seeds 0–3', (_what, added, reference) => {
+  it.each(PAIRS)('%s — the same figure, seeds 0–3', (_what, added, reference, shape) => {
     for (let seed = 0; seed <= 3; seed += 1) {
       expect(shapeOf([...TRIANGLE_HE, added], seed), `seed ${seed}`).toEqual(
         shapeOf([...TRIANGLE_EN, ...(namesTriangle(added) ? ['משולש ABC'] : []), reference], seed),

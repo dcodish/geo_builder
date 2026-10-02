@@ -136,10 +136,11 @@ describe('a degenerate configuration is VACANT, never a fault and never a NaN po
 });
 
 describe('a construction may not reference what does not exist', () => {
-  it('refuses a midpoint of points the figure does not have, and NAMES the point', () => {
+  it('refuses a cevian to a side the figure does not have, and NAMES the point', () => {
     // Inventing `B` would place a point the question never gave (ADR-052) and would spend a letter
-    // the student is about to use (the ADR-297 class).
-    const d = derive(['A(1,1)', 'M אמצע AB']);
+    // the student is about to use (the ADR-297 class). #1670 (ADR-AG-210): a bare relation's new letters ARE minted,
+    // as 2-D mints them («M אמצע AB» now builds) — but a side named alone presupposes its shape, and 2-D refuses it too.
+    const d = derive(['A(1,1)', 'AD גובה לצלע BC']);
     expect(d.faults.map((f) => f.code)).toEqual(['unknown-reference']);
     expect(d.faults[0].detail).toBe('B');
     expect(d.figure.points.map((p) => p.id)).toEqual(['A']);

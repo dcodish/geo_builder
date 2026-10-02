@@ -874,6 +874,33 @@ A created circle whose centre the sentence does not name carries `autoCenter`, s
 anonymiser hides its centre until `name-center` promotes it. The resolver's auto letter avoids the
 sentence's own labels, because the anonymiser remaps every exact use of that letter.
 
+## The hidden centre letter steps aside ([ADR-565](06-decisions.md#adr-565))
+
+An unnamed circle still carries an internal reference token (`O`, then `P`, `Q`, `K` — ADR-342): its id is
+`circle-O` and its anonymous centre `@ctr-O`. The token is a typable letter that the student never saw, so it
+must never meet the student's letter. Every seam that parses a student sentence steps it aside first.
+`decideFromParse`, the ✎ edit seam and the scenario mirror call `stepAsideFacts(facts, typedLabels(utterance))`
+(`store/geoStore.ts`). It re-letters each hidden token the sentence types to a letter nobody uses — exact ids
+only, and the circle stays unnamed. The move travels as a `step-aside` bind that the caller applies with
+`reletterHidden`. After it, the student's letter is an ordinary new letter:
+
+- a reference («BO = 5», «AM חותך את CO») mints a free point;
+- «מעגל O» declares a new circle;
+- «C על מעגל O» names the unnamed circle by use through the ADR-347 seam. Two unnamed circles that
+  `autosInterchangeable` finds interchangeable are named in order. That check reads a circle-circle crossing as an
+  unordered pair whose `branch` is seed (ruling (b), #1688). Otherwise it asks which circle.
+
+Naming places a free point. `nameCentreFacts` absorbs a target letter that nothing places. Such a point has only a
+bare `free-point` definition, is no shape's vertex, and is first used after the circle exists. Its bare
+`free-point` is dropped, and the centre takes the letter. `ctx.freePoints` exposes these points to
+`parseNameCenter`, the `nameCenter` rule and `impliedCircleBinding`. A radius sentence («OB רדיוס», «הרדיוס OB»)
+whose centre end is such a letter emits the ADR-347 implied circle (`radiusNamesCentre`). `circleOnDiameter` does
+the same for «AB קוטר במעגל O» when A and B already ride the unnamed circle.
+
+The naming core never collides. `nameCentreFacts` and `renameFacts` step another circle's hidden token aside
+when the target letter is that token. `withAnonymousAutoCentres` re-picks a new unnamed circle's token when a
+drawn circle already holds it. `withMetricCentreBinding` (ADR-342's metric amendment) is gone.
+
 ## A foreign given is refused by the grammar, before any rule ([ADR-562](06-decisions.md#adr-562))
 
 `classifyOutOfScope` (`parser/scope.ts`) holds the vocabulary of the families another tool owns — `analytic`

@@ -326,8 +326,8 @@ function readPiece(text: string): { a: Id; b: Id; noun?: string; row?: StraightN
  * THE ONE LOWERING OF A ROLE NOUN'S CLAIM (#1651, ADR-AG-200) — what «<noun> XY» asserts besides naming XY, as the
  * facts the canonical sentence of that role already carries:
  *
- * - chord → both ends on «המעגל» (`on-kind`, resolved at M1 like «B על המעגל»; `create`: with no circle the chord
- *   states it, #1669) and two distinct ends — exactly `chordFacts` without its introductions and piece. The ends the
+ * - chord → both ends on «המעגל» (`on-kind`, resolved at M1 like «B על המעגל»; with no circle the sentence states it,
+ *   #1669/#1670) and two distinct ends — exactly `chordFacts` without its introductions and piece. The ends the
  *   figure lacks are introduced for EVERY role sentence at one place, `withRoleIntroductions` (#1669, ADR-AG-204);
  * - diameter → «XY קוטר במעגל» (`diameter-of`, its M1 binding: the one circle, or the circle on it when none);
  * - tangent → «XY משיק למעגל» (`tangent-of` over the pair, ADR-AG-196's binding, the touch-created circle when none);
@@ -343,8 +343,8 @@ function claimFacts(row: StraightNoun | undefined, a: Id, b: Id, src: string): F
       return [];
     case 'chord':
       return [
-        { t: 'on-kind', id: a, kind: 'circle', create: true, src },
-        { t: 'on-kind', id: b, kind: 'circle', create: true, src },
+        { t: 'on-kind', id: a, kind: 'circle', src },
+        { t: 'on-kind', id: b, kind: 'circle', src },
         { t: 'selector', sel: { kind: 'distinct', ids: [a, b] }, src },
       ];
     case 'diameter':
@@ -2738,6 +2738,17 @@ const CHORD_ONE_EN = new RegExp(
 const CHORD_PAIR_HE = new RegExp(
   `^(?:${CHORD_CIRCLE_HE}\\s*,?\\s+)?(?:ה)?מיתרים\\s+(${NAME})(${NAME})\\s+ו-?\\s*(${NAME})(${NAME})\\s+(.+)$`,
 );
+/**
+ * TWO CHORDS, NOTHING MORE SAID (#1670, ADR-AG-210 — 2-D builds every one): «AB ו-CD מיתרים במעגל O», «AB ו-CD הם
+ * מיתרים», «המיתרים AB ו-CD במעגל O». The pair reader above needs a predicate after the pair (meet / equal); this is
+ * the pair with none, so it is exactly two `chordFacts` and the pair's `distinct`.
+ */
+const CHORD_LIST_HE = new RegExp(
+  `^${HE_GIVEN}(?:(${NAME})(${NAME})\\s+ו-?\\s*(${NAME})(${NAME})\\s+(?:(?:הם|הינם)\\s+)?(?:ה)?מיתרים|(?:ה)?מיתרים\\s+(${NAME})(${NAME})\\s+ו-?\\s*(${NAME})(${NAME}))(?:\\s+${CHORD_CIRCLE_HE})?$`,
+);
+const CHORD_LIST_EN = new RegExp(
+  `^(?:(?:[Tt]he\\s+)?(?:segments\\s+)?(${NAME})(${NAME})\\s+and\\s+(${NAME})(${NAME})\\s+are\\s+chords|(?:[Tt]he\\s+)?[Cc]hords\\s+(${NAME})(${NAME})\\s+and\\s+(${NAME})(${NAME}))(?:\\s+(?:of|in)\\s+(?:the\\s+)?circle(?:\\s+(${CIRCLE_NAME}))?)?$`,
+);
 const CHORD_PAIR_EN = new RegExp(
   `^(?:[Ii]n\\s+the\\s+circle(?:\\s+(${NAME}))?\\s*,?\\s+)?(?:[Tt]he\\s+)?[Cc]hords\\s+(${NAME})(${NAME})\\s+and\\s+(${NAME})(${NAME})\\s+(.+)$`,
 );
@@ -2750,14 +2761,10 @@ const CHORD_PAIR_EN = new RegExp(
 function chordFacts(a: Id, b: Id, circle: string | undefined, line: string): Fact[] | null {
   const seg = parseClause(`הקטע ${a}${b}`);
   if (!seg.ok) return null;
-  // A circle described by its ring (#1663) has no id to mint here: it rides the contextual marker with its name and
-  // M1 resolves it through the one name chain, exactly as «A על המעגל ⊙ABC» does.
-  const described = circle !== undefined && readDescribedCircle(circle) !== null;
-  const host = circle === undefined || described ? undefined : isNumeralName(circle) ? numeralCurveId('circle', circle) : `circle-at-${circle}`;
-  const on = (id: Id): Fact =>
-    host === undefined
-      ? { t: 'on-kind', id, kind: 'circle', ...(described ? { circle } : { create: true as const }), src: line }
-      : { t: 'constraint', k: { t: 'on-curve', id, curve: host }, src: line };
+  // The circle rides the contextual marker with its NAME (a ring description #1663, a centre letter, a numeral) and M1
+  // resolves it through the one name chain, exactly as «A על מעגל O» does — so a circle named after it was stated
+  // («M מרכז המעגל»), or not stated at all (#1670, ADR-AG-210: the reference states it), is the same circle there.
+  const on = (id: Id): Fact => ({ t: 'on-kind', id, kind: 'circle', ...(circle !== undefined ? { circle } : {}), src: line });
   return [
     { t: 'declare', id: a, src: line },
     { t: 'declare', id: b, src: line },
@@ -2800,6 +2807,19 @@ function parseChord(line: string): RuleOutcome {
     const created = centre ? clauseFacts(`נתון מעגל שמרכזו ${centre}`, line) : [];
     const chord = chordFacts(a, b, centre ?? name, line);
     return created && chord ? made([...created, ...chord]) : null;
+  }
+  const list = CHORD_LIST_HE.exec(line);
+  const listEn = list ? null : CHORD_LIST_EN.exec(line);
+  if (list || listEn) {
+    const g = (list ?? listEn)!;
+    const [a, b, c, d] = g[1] ? [g[1], g[2], g[3], g[4]] : [g[5], g[6], g[7], g[8]];
+    if (a === b || c === d) return refuse('repeated-vertex', line);
+    const centre = list ? list[9] : undefined;
+    const name = list ? list[10] : listEn![9];
+    const created = centre ? clauseFacts(`נתון מעגל שמרכזו ${centre}`, line) : [];
+    const first = chordFacts(a, b, centre ?? name, line);
+    const second = chordFacts(c, d, centre ?? name, line);
+    return created && first && second ? made([...created, ...first, ...second, chordPairDistinct([a, b, c, d], line)]) : null;
   }
   const he = CHORD_PAIR_HE.exec(line);
   const en = he ? null : CHORD_PAIR_EN.exec(line);
@@ -4553,10 +4573,10 @@ const COMPONENT_EN = new RegExp(
  * the exam never uses is a phrase the student has never seen (ADR-AG-005 D8).
  */
 const ON_KIND_HE = new RegExp(
-  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+ה(מעגל|פרבולה|אליפסה)$`
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+(?:ה(מעגל|פרבולה|אליפסה)|(מעגל))$`
 );
 const ON_KIND_EN = new RegExp(
-  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+the\\s+(circle|parabola|ellipse)$`
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+(circle|parabola|ellipse)|a\\s+(circle))$`
 ,  'i',
 );
 
@@ -5481,7 +5501,8 @@ function parseConstraint(raw: string): RuleOutcome {
 
   const onKind = ON_KIND_HE.exec(line) ?? ON_KIND_EN.exec(line);
   if (onKind) {
-    const kind = KIND_NOUNS[onKind[2].toLowerCase()];
+    // «A על מעגל» / "A is on a circle" — the indefinite circle is the contextual one, as in 2-D (#1670, ADR-AG-210).
+    const kind = KIND_NOUNS[(onKind[2] ?? onKind[3]).toLowerCase()];
     if (kind) {
       return made([
         { t: 'declare', id: onKind[1], src: line },

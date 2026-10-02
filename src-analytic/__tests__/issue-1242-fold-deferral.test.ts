@@ -114,9 +114,10 @@ describe('#1242 — atomicity: a line that cannot be finished leaves NO residue'
   });
 
   it('a later line that leaned on the faulted line’s fragment is faulted too — the poisoning runs to a fixpoint', () => {
-    // «M אמצע AD» would have been satisfied by the residue (A and D declared, never placed); with the
-    // residue gone it names points that do not exist, and says so.
-    const d = derive(['AD גובה לצלע BC', 'M אמצע AD'], 0);
+    // «EF גובה לצלע AD» would have been satisfied by the residue (A and D declared, never placed); with the
+    // residue gone it names points that do not exist, and says so. (#1670: not «M אמצע AD» — a bare midpoint now
+    // mints its parents, as 2-D does; a cevian to a side never does.)
+    const d = derive(['AD גובה לצלע BC', 'EF גובה לצלע AD'], 0);
     expect(d.outcomes).toEqual(['faulted', 'faulted']);
     expect(d.construction.objects).toEqual([]);
   });

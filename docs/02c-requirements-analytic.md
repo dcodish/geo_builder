@@ -2170,7 +2170,7 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - A diameter's two ends are antipodal (the segment passes through the centre and is twice the radius).
 - With no circle in the figure, «AB קוטר» draws the circle on AB, and «מיתר AB» / «המיתר AB …» draws a circle through A and B; the centre has no letter until «O מרכז המעגל» names it. An equation stated afterwards («משוואת המעגל היא …») is that circle's equation.
 - With one circle the sentence is about that circle; with several it asks which.
-- «OA רדיוס» means OA is a radius (as «הרדיוס OA»). A radius on a circle whose centre has no letter, or with no circle at all, is still refused.
+- «OA רדיוס» means OA is a radius (as «הרדיוס OA»). With no circle at all it is still refused. On a circle whose centre has no letter, the radius now names the centre (R143, #1670).
 
 **R141 — the perpendicular from a point and its foot, the line through a point that cuts a side, and «האנך» as a reference**
 ([ADR-AG-207](06c-decisions-analytic.md#adr-ag-207), [#1620](https://github.com/dcodish/geo_builder/issues/1620) slice C; operator ruling 2026-10-02: the analytic tool behaves as the 2-D tool does for plane geometry).
@@ -2195,3 +2195,15 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - «האלכסון AC» and «האלכסון AC במרובע ABCD» draw the diagonal (the second also states the quadrilateral); a side named as its diagonal is refused.
 - «קטע האמצעים לצלע BC במשולש ABC» draws the segment joining the midpoints of AB and AC, and «קטע האמצעים בטרפז ABCD» the one joining the midpoints of the legs BC and DA. The midpoints are named M and N, as in 2-D (the next free letters when those are taken, and the student's own letters in «DE קטע אמצעים …»); the tool says it named them. A midpoint the student already named keeps its letter.
 - «שכל קודקודיו מונחים על הצירים» (and «כל קודקודי הטרפז נמצאים על הצירים») puts every vertex of the shape on the x-axis or the y-axis; which axis each vertex takes is not stated, so «הציגו תצורה אחרת» moves between the possible assignments.
+
+**R143 — a sentence that names points or a circle the figure does not have yet builds as it does in the 2-D tool**
+([ADR-AG-210](06c-decisions-analytic.md#adr-ag-210), [#1670](https://github.com/dcodish/geo_builder/issues/1670), [#1686](https://github.com/dcodish/geo_builder/issues/1686); operator rulings 2026-10-02: follow 2-D, *"accept new letter with same logic the 2d tool has"*, an unlabelled centre is never «O» until named, and a new letter beside it is a free point until a sentence places it).
+
+- «AB קוטר» · «OB רדיוס» (also «מיתר AB» · «OA רדיוס» and «A על המעגל» · «OA רדיוס»): the radius gives the centre the student's letter, so O is the centre. The sentence is still refused when both ends of the radius are off the circle, or when there is no circle.
+- «A על המעגל» (also «A על מעגל», «A, B ו-C על המעגל», "A is on a circle") with no circle draws a circle through the point. The circle's centre has no letter. The centre and the radius move with «הציגו תצורה אחרת».
+- A circle named by a letter the figure does not have yet is drawn on that centre: «A על המעגל שמרכזו M», «A על מעגל O», «מיתר AB במעגל O», «AB ו-CD מיתרים במעגל O», «AB קוטר במעגל O», «AB משיק למעגל C», «המשיק למעגל O בנקודה A».
+- New letters in a relation are added as free points wherever the 2-D tool adds them. This holds beside a circle whose centre has no letter too.
+  - Added: «BD⊥AC», «AB∥CD», «AB = CD», «AB = 5», «AB + BC = 10», «זווית ABC = 30», «M אמצע AB», «E על AB», «AB חותך את CD בנקודה E», «C מחלקת את AB ביחס 3:2», «AD גובה במשולש ABC» (this one also draws the triangle).
+  - A point that a later line defines is still defined by that line.
+  - Still refused, as in 2-D, when the letters are new: «AB = 2CD», «AB:BC = 2:3», «AD גובה לצלע BC».
+- «AB קוטר» · «BO = 5» draws BO with B where it is and O a free point. O is not the centre until the student says so. A later «O מרכז המעגל», «OB רדיוס» or «הרדיוס OB» then moves that same O to the centre; no second point appears.

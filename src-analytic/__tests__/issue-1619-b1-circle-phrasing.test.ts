@@ -211,8 +211,9 @@ describe('#1619 B1 — a circle named by its centre letter', () => {
     near(Math.hypot(a.x - 3, a.y - 4), 5);
   });
 
-  it('a letter that names no circle is refused as the reference it is', () => {
-    expect(codes(['נתון מעגל שמרכזו M', 'A על מעגל K'])).toEqual(['unknown-reference']);
+  it('a letter that names no circle STATES it (#1670, follow 2-D); a numeral that names none is refused', () => {
+    expect(codes(['נתון מעגל שמרכזו M', 'A על מעגל K'])).toEqual([]);
+    expect(codes(['נתון מעגל שמרכזו M', 'A על מעגל 3'])).toEqual(['unknown-reference']);
   });
 });
 

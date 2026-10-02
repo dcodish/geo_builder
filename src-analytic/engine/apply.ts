@@ -16,15 +16,15 @@
  * lands, and nowhere else.
  */
 import { fitConic } from './conic';
-import { bareLineName, lineIdOf, nameReading, numeralCurveId, numeralTwin, readDescribedCircle, refKindOf, statedName, type DescribedCircle, type RefKind } from './names';
+import { bareLineName, isNumeralName, lineIdOf, nameReading, numeralCurveId, numeralTwin, readDescribedCircle, refKindOf, statedName, type DescribedCircle, type RefKind } from './names';
 import { parabolaDirectrix, resolveCurve } from './curves';
-import { parseLengthExpr } from './lengths';
+import { isTermPlaceholder, lengthRefs, parseLengthExpr } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule } from './derived';
 import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, promisesOneParallelPair, rightAngleAt, ringsNamed, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
-import { RESERVED_SYMBOLS, toolSymbol } from './carriers';
+import { RESERVED_SYMBOLS, radiusSymbol, toolSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
 import { cevianFacts, onBisectorFacts, toolFootFacts, toolFootRule } from './cevian';
 import {
@@ -812,6 +812,62 @@ function circleNamed(
   return { ok: true, o: circles[0] };
 }
 
+/** A name a student writes for a POINT (a capital letter, an optional index) that is not a circle numeral («I», «II»). */
+const POINT_LETTER = /^[A-Z][0-9₀-₉]?$/;
+
+/**
+ * A NAMED CIRCLE THE FIGURE DOES NOT HAVE YET: THE REFERENCE STATES IT (#1670, ADR-AG-210; operator 2026-10-02 — follow
+ * 2-D). «A על המעגל שמרכזו M», «מיתר AB במעגל O», «AB משיק למעגל C», «AC קוטר במעגל O» with no such circle: 2-D states
+ * the circle on that centre (a free centre when the letter is new, a free radius — ADR-052) and carries on; so does this.
+ * The circle is exactly the one «מעגל M» states (`circle-at-M`, radius symbol `radiusSymbol(M)` > 0), and the fact is then re-applied
+ * against it, so every sentence reaches the circle through the one name chain (`circleByName`) as before.
+ *
+ * `null` = not a name this can state (a numeral, a ring description, a name already holding a non-point) — the caller
+ * keeps its refusal. A new letter is stated even beside a circle whose centre has no letter (operator 2026-10-02, #1686):
+ * it is a free point until a sentence places it.
+ */
+function statingNamedCircle(c: Construction, name: string, f: Fact): ApplyOutcome | null {
+  if (!POINT_LETTER.test(name) || isNumeralName(name)) return null;
+  const held = objectById(c, name);
+  if (held && !isPositional(held)) return null;
+  const r = radiusSymbol(name);
+  const created = applyAll(c, [
+    { t: 'declare', id: name, src: f.src },
+    { t: 'param', sym: r, domain: { min: 0, minOpen: true }, src: f.src },
+    { t: 'circle-at', id: `circle-at-${name}`, centre: name, r: { kind: 'sym', name: r }, src: f.src },
+  ]);
+  if (!created.ok) return created;
+  const out = applyFact(created.next, f);
+  return out.ok ? { ...out, effect: 'created' } : out;
+}
+
+/** Is `id` ON this circle already — one of the points that define it, or stated on it? (#1670) */
+function onCircleAlready(c: Construction, host: GeoObject, id: Id): boolean {
+  if (host.kind === 'circle-thru' && circleDefPoints(host.def).includes(id)) return true;
+  return c.constraints.some((k) => k.t === 'on-curve' && k.id === id && k.curve === host.id);
+}
+
+/**
+ * THE CENTRE NAMED BY A RADIUS (#1670, ADR-AG-210; operator 2026-10-02 — follow 2-D). «AB קוטר» · «OB רדיוס»: the circle's
+ * centre has no letter, and the radius sentence gives it one — the STUDENT's letter, the end the sentence itself just
+ * introduced (no constraint on it, nothing built on it but the drawn radius). It becomes the centre the circle already has
+ * (`centreRuleOf` — the diameter's midpoint, an equation circle's `circle-centre`), in place, so the drawn radius keeps its
+ * end. `null` when `id` is not such a point or the circle's centre has no closed form (a quadrilateral's incircle).
+ */
+function nameCentreAs(c: Construction, host: GeoObject, id: Id, src: string): Construction | null {
+  const rule = centreRuleOf(host);
+  const standing = objectById(c, id);
+  if (!rule || standing?.kind !== 'free') return null;
+  const mentioned = (v: unknown) => JSON.stringify(v).includes(JSON.stringify(id));
+  if (mentioned(c.constraints) || c.objects.some((o) => o.id !== id && o.kind !== 'segment' && mentioned(o))) return null;
+  const at = c.objects.findIndex((o) => o.id === id);
+  const named = applyFact({ ...c, objects: c.objects.filter((o) => o.id !== id) }, { t: 'derived', id, rule, src });
+  if (!named.ok) return null;
+  const centre = named.next.objects.find((o) => o.id === id)!;
+  const rest = named.next.objects.filter((o) => o.id !== id);
+  return { ...named.next, objects: [...rest.slice(0, at), centre, ...rest.slice(at)] };
+}
+
 /**
  * A TANGENCY AT A NAMED POINT (#1619 B3, #1430, ADR-AG-195) — «המעגל משיק לציר ה-x בנקודה A», «הישר BC משיק
  * למעגל בנקודה B», «הקטע CD משיק למעגל בנקודה A».
@@ -962,7 +1018,23 @@ function applyRoleOf(c: Construction, f: Extract<Fact, { t: 'role-of' }>): Apply
     if (circles.length !== 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
     const host = circles[0];
     const centre = centreIdOf(c, host);
-    if (centre === null) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+    if (centre === null) {
+      // The centre has no letter: the radius names it with the ONE end not already on the circle (#1670, ADR-AG-210 —
+      // 2-D's name-the-centre). A point the sentence just introduced BECOMES the centre, in place (`nameCentreAs`); one
+      // that already stands (minted free by «BO = 5», #1686) is PLACED there — the derivation restated about an existing
+      // point is its `derived-at` condition, so no second point appears. Both ends off the circle, or neither: refused.
+      const off = [f.a, f.b].filter((id) => !onCircleAlready(c, host, id));
+      if (off.length !== 1) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      const [id] = off;
+      const rule = centreRuleOf(host);
+      if (!rule) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      const fresh = nameCentreAs(c, host, id, f.src);
+      const placed = fresh ? { ok: true as const, next: fresh } : applyFact(c, { t: 'derived', id, rule, src: f.src });
+      if (!placed.ok) return placed;
+      const end = id === f.a ? f.b : f.a;
+      const out = applyFact(placed.next, say({ t: 'on-curve', id: end, curve: host.id }));
+      return out.ok ? { ...out, effect: 'created' } : out;
+    }
     if (centre !== f.a && centre !== f.b) return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
     const end = centre === f.a ? f.b : f.a;
     return applyFact(c, say({ t: 'on-curve', id: end, curve: host.id }));
@@ -1817,7 +1889,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       let host: GeoObject | undefined;
       if (f.circle !== undefined) {
         host = circleByName(c, f.circle);
-        if (!host || !isCircle(host)) return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
+        // A named circle the figure lacks is stated by the reference (#1670, ADR-AG-210).
+        if (!host) return statingNamedCircle(c, f.circle, f) ?? { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
+        if (!isCircle(host)) return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
       } else if (!f.define) {
         const circles = c.objects.filter(isCircle);
         if (circles.length > 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
@@ -1911,7 +1985,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // «A על מעגל M» (#1619 B1): a NAMED circle resolves through the one name chain, the bare kind to the one.
       if (f.circle !== undefined) {
         const named = circleByName(c, f.circle);
-        if (!named || curveKindOf(named) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
+        // A named circle the figure lacks is stated by the reference (#1670, ADR-AG-210): «A על המעגל שמרכזו M».
+        if (!named) return statingNamedCircle(c, f.circle, f) ?? { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
+        if (curveKindOf(named) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
         return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: named.id }, src: f.src });
       }
       /*
@@ -1934,11 +2010,12 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // «המשיק» — the one tangent OBJECT (#1619 B3): a line built at a touch point, never any line.
       const matches = c.objects.filter((o) => (f.kind === 'tangent' ? isTangentObject(o) : curveKindOf(o) === f.kind));
       /*
-       * A CHORD'S END WITH NO CIRCLE: THE SENTENCE STATES IT (#1669, ADR-AG-204; operator 2026-10-02, "analytic should
-       * mimic 2d"). The tangency's create path (ADR-AG-198 ruling b): the circle with its centre UNNAMED, a later
-       * «O מרכז המעגל» names it. Only a chord's end carries `create`; «A על המעגל» with no circle stays refused.
+       * A POINT ON «המעגל» WITH NO CIRCLE: THE SENTENCE STATES IT (#1669 for a chord's end, ADR-AG-204; #1670 for every
+       * incidence, ADR-AG-210 — operator 2026-10-02, "analytic should mimic 2d"). The tangency's create path (ADR-AG-198
+       * ruling b): the circle with its centre UNNAMED (a later «O מרכז המעגל» names it), a free centre and radius
+       * (ADR-052). «A על המעגל» with no circle builds in 2-D, so it does here; a parabola or an ellipse has no such path.
        */
-      if (matches.length === 0 && f.kind === 'circle' && f.create) {
+      if (matches.length === 0 && f.kind === 'circle') {
         const created = applyAll(c, touchedCircleFacts(f.src));
         if (!created.ok) return created;
         const bound = applyFact(created.next, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: TOUCHED_CIRCLE_ID }, src: f.src });
@@ -2119,7 +2196,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       let host: GeoObject | undefined;
       if (f.circle !== undefined) {
         host = circleByName(c, f.circle);
-        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
+        if (!host) return statingNamedCircle(c, f.circle, f) ?? { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
+        if (curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
       } else {
         const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
         if (circles.length !== 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
@@ -2201,7 +2279,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         // The line-first order names its circle — «הישר l1 משיק למעגל M» (#1501). The same lookup
         // chain as `diameter-of`: a numeral id, a centre-letter id, or the student's own name.
         host = circleByName(c, f.circle);
-        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
+        if (!host) return statingNamedCircle(c, f.circle, f) ?? { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
+        if (curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
       } else {
         // By the fit, not the declaration: «המעגל» about an equation circle still finds ITS circle,
         // and the honest answer below is `out-of-scope`, not "which circle?" (#1501).
@@ -2279,6 +2358,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      */
     case 'tangent-line-at': {
       const host = circleNamed(c, f.circle, f.src);
+      // A named circle the figure lacks is stated by the reference (#1670, ADR-AG-210): «המשיק למעגל O בנקודה A».
+      if (!host.ok && f.circle !== undefined && !circleByName(c, f.circle)) return statingNamedCircle(c, f.circle, f) ?? host;
       if (!host.ok) return host;
       return applyAll(c, [
         { t: 'constraint', k: { t: 'on-curve', id: f.at, curve: host.o.id }, src: f.src },
@@ -3115,7 +3196,7 @@ export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldR
   const group = groupOf ?? facts.map((_, i) => i);
   const excluded = new Map<number, ApplyError>(); // line → the error that faulted it
   for (;;) {
-    const r = foldPass(facts, (i) => !excluded.has(group[i]));
+    const r = foldPass(facts, (i) => !excluded.has(group[i]), group);
     let newly = 0;
     r.errors.forEach((e, i) => {
       if (e && !excluded.has(group[i])) {
@@ -3140,7 +3221,7 @@ export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldR
 }
 
 /** One fold over the facts `include` admits: the in-order pass, then the deferral fixpoint. */
-function foldPass(facts: readonly Fact[], include: (i: number) => boolean): FoldResult {
+function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group?: readonly number[]): FoldResult {
   let c = EMPTY_CONSTRUCTION;
   const errors: Array<ApplyError | null> = facts.map(() => null);
   const effects: Array<LineEffect | null> = facts.map(() => null);
@@ -3190,23 +3271,113 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean): Fold
   // later facts completed. Bounded by the fact count; a pass that lands nothing ends it. A fact is not
   // retried against the very construction it last failed on (nothing changed, so nothing can differ).
   const failedOn = new Map<number, Construction>();
-  for (let pass = 0; pass < facts.length; pass++) {
-    let progressed = false;
-    facts.forEach((f, i) => {
-      if (!include(i) || !errors[i]) return;
-      if (failedOn.get(i) === c) return;
-      const out = applyFact(c, f);
-      if (out.ok) {
-        commit(i, out.next, out.effect, out.notice);
-        progressed = true;
-      } else {
-        errors[i] = out.error;
-        failedOn.set(i, c);
+  const fixpoint = () => {
+    for (let pass = 0; pass < facts.length; pass++) {
+      let progressed = false;
+      facts.forEach((f, i) => {
+        if (!include(i) || !errors[i]) return;
+        if (failedOn.get(i) === c) return;
+        const out = applyFact(c, f);
+        if (out.ok) {
+          commit(i, out.next, out.effect, out.notice);
+          progressed = true;
+        } else {
+          errors[i] = out.error;
+          failedOn.set(i, c);
+        }
+      });
+      if (!progressed) break;
+    }
+  };
+  fixpoint();
+  /*
+   * THE LAST RESORT: A BARE RELATION INTRODUCES ITS NEW LETTERS (#1670, ADR-AG-210; operator 2026-10-02 — "accept new
+   * letter with same logic the 2d tool has"). Only once nothing else can define them — the in-order pass and the deferral
+   * fixpoint have run, so a letter a later line defines («M אמצע AB» typed above «A(0,0)») is still defined there and
+   * every figure that built before builds identically. The first still-failing fact (list order) of a form 2-D mints for
+   * (`mintedByReference`) gets its missing points as free points (ADR-052: drawn somewhere, moving with the seed), and the
+   * fixpoint runs again for the facts that leaned on them. They are minted beside a circle whose centre has no letter too (operator 2026-10-02, #1686: *"create a segment BO where B
+   * is where we know it is and O is free. if the user wants it to be the center, he can write next sentance that O is the
+   * center"*) — a later «O מרכז המעגל» / «OB רדיוס» places it (`derived-at`, `applyRoleOf`).
+   */
+  const lineOf = (i: number) => (group ? group[i] : i);
+  const tried = new Set<number>();
+  for (let guard = 0; guard < facts.length; guard++) {
+    let minted = false;
+    for (let i = 0; i < facts.length && !minted; i++) {
+      if (!include(i) || !errors[i] || tried.has(lineOf(i))) continue;
+      const line = lineOf(i);
+      tried.add(line);
+      // The LINE decides (2-D mints per sentence): every fact of it still failing is a reference to a missing point,
+      // and is either a minting form or the piece/selector the sentence draws beside it. «AD גובה לצלע BC» names a
+      // SIDE — its `perpendicular` half is no minting form, so B and C stay refused, as in 2-D.
+      const failing = facts.map((f, j) => ({ f, j })).filter(({ j }) => include(j) && errors[j] && lineOf(j) === line);
+      const allRefs = failing.every(({ j }) => errors[j]!.code === 'unknown-reference' && refKindOf(errors[j]!.detail) === 'point');
+      const missing = [...new Set(failing.flatMap(({ f }) => mintedByReference(f)))].filter((id) => !objectById(c, id));
+      const formed = failing.every(({ f }) => mintedByReference(f).length > 0 || isMintCompanion(f));
+      if (!allRefs || !formed || missing.length === 0 || !failing.every(({ j }) => missing.includes(errors[j]!.detail))) continue;
+      let next: Construction = { ...c, objects: [...c.objects, ...missing.map((id): GeoObject => ({ kind: 'free', id }))] };
+      const landed: Array<{ j: number; out: Extract<ApplyOutcome, { ok: true }> }> = [];
+      for (const { f, j } of failing) {
+        const out = applyFact(next, f);
+        if (!out.ok) break;
+        landed.push({ j, out });
+        next = out.next;
       }
-    });
-    if (!progressed) break;
+      if (landed.length !== failing.length) continue;
+      for (const { j, out } of landed) commit(j, out.next, j === landed[0].j ? 'created' : out.effect, out.notice);
+      minted = true;
+    }
+    if (!minted) break;
+    fixpoint();
   }
   return { construction: c, errors, effects, constraintFact, selectorFact, notices };
+}
+
+/**
+ * What a sentence that mints may carry beside its minting fact (#1670): its named pieces, a selector, a declaration, and a
+ * length given about the same letters — «C מחלקת את AB ביחס 3:2» places C ON AB (that mints, as in 2-D) and its ratio
+ * rides along, where «AB:BC = 2:3» alone has no minting fact and stays refused, as in 2-D.
+ */
+const MINT_COMPANIONS: ReadonlySet<Fact['t']> = new Set<Fact['t']>(['segment', 'line-2pt', 'extent-of', 'selector', 'declare']);
+const isMintCompanion = (f: Fact): boolean => MINT_COMPANIONS.has(f.t) || (f.t === 'constraint' && f.k.t === 'length-eq');
+
+/** A length side 2-D mints for: a number, or segments ADDED with no coefficient («AB», «AB + BC», «5») — not «2CD», «AB:BC». */
+function plainLengthSide(e: Expr): boolean {
+  if (!symbolsOf(e).some(isTermPlaceholder)) return true;
+  if (e.kind === 'sym') return true;
+  return e.kind === 'add' && plainLengthSide(e.a) && plainLengthSide(e.b);
+}
+
+/**
+ * THE FORMS WHOSE NEW LETTERS ARE MINTED (#1670, ADR-AG-210) — measured on 2-D's `decideDeterministic2D`, which mints a
+ * letter wherever its lowering DRAWS a segment through it: «BD⊥AC», «AB∥CD» and every spelling of the two (the pair
+ * operands of `relation`); «AB = CD», «AB = 5», «AB + BC = 10» (plain lengths); «זווית ABC = 30» (the arms);
+ * «M אמצע AB» (the parents); «E על AB», «AB חותך את CD בנקודה E» (the carrier pair); «AB משיק למעגל C» (the tangent
+ * pair). 2-D REFUSES «AB = 2CD», «AB:BC = 2:3», «C מחלקת את AB ביחס 3:2», the angle bisector and a cevian to a side no
+ * shape has («AD גובה לצלע BC» — its `perpendicular` half is no minting form), so they keep #1028's refusal here.
+ * The ids a fact would mint; `[]` for every other fact. Which LINE mints is decided in `foldPass`, over all its facts.
+ */
+function mintedByReference(f: Fact): Id[] {
+  if (f.t === 'derived') return f.rule.t === 'midpoint' ? [f.rule.a, f.rule.b] : [];
+  if (f.t === 'tangent-of') return (f.lines ?? []).flatMap((l) => (l.kind === 'points' ? [l.a, l.b] : []));
+  if (f.t !== 'constraint') return [];
+  const k = f.k;
+  switch (k.t) {
+    case 'relation':
+      return k.u.k === 'points' && k.v.k === 'points' ? [k.u.a, k.u.b, k.v.a, k.v.b] : [];
+    case 'length-eq': {
+      const pairs = [...k.left.terms, ...k.right.terms];
+      const plain = pairs.every((t) => t.kind === undefined || t.kind === 'length') && plainLengthSide(k.left.expr) && plainLengthSide(k.right.expr);
+      return plain ? lengthRefs(k.left).concat(lengthRefs(k.right)) : [];
+    }
+    case 'angle':
+      return [k.at.v, k.at.a, k.at.b];
+    case 'on-line-2pt':
+      return [k.a, k.b];
+    default:
+      return [];
+  }
 }
 
 /**

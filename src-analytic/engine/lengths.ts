@@ -96,6 +96,9 @@ const polygonArea = (ps: Pt[]): number => {
  */
 const PLACEHOLDER_BASE = 0xe000;
 
+/** Is this expression symbol a TERM placeholder (a measured length), rather than a parameter? (#1670) */
+export const isTermPlaceholder = (sym: string): boolean => sym.length === 1 && sym.charCodeAt(0) >= PLACEHOLDER_BASE && sym.charCodeAt(0) <= 0xf8ff;
+
 /**
  * Two point names run together — `AB`, `A1B2`. The same shape the rest of the parser uses.
  *
