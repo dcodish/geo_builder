@@ -100,6 +100,10 @@ export type InputError =
   | { key: 'ambiguous-cevian'; detail: string }
   /** A cevian whose apex (or side) is in no triangle of the figure (#1240, ADR-AG-209). */
   | { key: 'cevian-no-triangle'; detail: string }
+  /** «תיכון ליתר» with the right angle open, or several right triangles — asks which side is the hypotenuse (#1222). */
+  | { key: 'ambiguous-hypotenuse'; detail: string }
+  /** «תיכון ליתר» with no right angle in the figure (#1222). */
+  | { key: 'ambiguous-no-right-angle'; detail: string }
   /** A crossing the student named that the figure already names — carrying WHO holds it (#1175). */
   | { key: 'crossing-already-named'; detail: string; holder: string }
   /** A crossing of a line with itself — «הישר AB עם הישר BA» names no point (#1255). */

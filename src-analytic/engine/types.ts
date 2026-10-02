@@ -255,7 +255,20 @@ export type Fact =
    * `cevianFacts`; several ask (`ambiguous-cevian`); none is refused (`cevian-no-triangle`). `foot` may be a
    * mint placeholder — the tool names an unnamed foot (#1263's ruling), resolved by `derive` before M1.
    */
-  | (FactBase & { t: 'cevian-of'; role: 'median' | 'altitude'; apex?: Id; foot: Id; side?: [Id, Id] })
+  | (FactBase & {
+      t: 'cevian-of';
+      role: 'median' | 'altitude';
+      apex?: Id;
+      foot: Id;
+      side?: [Id, Id];
+      /**
+       * «תיכון ליתר» (#1222, operator ruling 2026-10-02 on #1620): the side is the HYPOTENUSE of the one triangle whose
+       * right angle the figure states; a right triangle whose right angle is still a choice asks which side it is.
+       */
+      hypotenuse?: true;
+      /** The TOOL named the foot (ADR-AG-211): it is lowered as a derived point (`toolFootFacts`), never a free one. */
+      toolFoot?: true;
+    })
   /**
    * «AD חוצה את הזווית BAC» · «האלכסון DB חוצה את הזווית ADC» · «AM הוא חוצה זווית CMD» — a segment from the
    * angle's vertex that bisects it (#1284; ADR-AG-209). `p` is the segment's other end. What the sentence

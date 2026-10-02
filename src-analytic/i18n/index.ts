@@ -300,6 +300,13 @@ const he = {
   errAmbiguousCevian:
     'הקודקוד או הצלע במשפט "{{detail}}" שייכים ליותר ממשולש אחד בשרטוט, ולכן לא ברור לאיזו צלע הוא יורד. ' +
     'אפשר לציין את הצלע או את המשולש, למשל "AD גובה לצלע BC" או "AD גובה במשולש ABC".',
+  // #1222 (ADR-AG-211) — the hypotenuse is the side facing a STATED right angle; an open one is asked, never assumed.
+  errAmbiguousHypotenuse:
+    'לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: "{{detail}}". ' +
+    'כתבו איזו צלע היא היתר, למשל "תיכון ליתר AB", או איזו זווית ישרה, למשל "זווית C ישרה".',
+  errCevianNoRightAngle:
+    'במשפט "{{detail}}" אין בשרטוט משולש ישר-זווית, ולכן אין יתר. ' +
+    'אפשר לציין קודם זווית ישרה, למשל "זווית C ישרה", או לכתוב את הצלע במפורש, למשל "תיכון לצלע AB".',
   errCevianNoTriangle:
     'במשפט "{{detail}}" אין בשרטוט משולש שהקודקוד או הצלע שייכים לו, ולכן אין צלע שאליה הוא יורד. ' +
     'אפשר להגדיר קודם את המשולש, או לכתוב את הצלע במפורש, למשל "AD גובה לצלע BC".',
@@ -660,6 +667,12 @@ const en: typeof he = {
   errAmbiguousCevian:
     'The vertex or side in "{{detail}}" belongs to more than one triangle in your figure, so it is unclear which side it is drawn to. ' +
     'Name the side or the triangle — for example "AD is the altitude to side BC" or "AD is the altitude in triangle ABC".',
+  errAmbiguousHypotenuse:
+    'Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: "{{detail}}". ' +
+    'Name the hypotenuse — for example "the median to the hypotenuse AB" — or the right angle, for example "angle C is right".',
+  errCevianNoRightAngle:
+    'In "{{detail}}" there is no right triangle in your figure, so there is no hypotenuse. ' +
+    'State a right angle first, for example "angle C is right", or name the side outright, for example "the median to side AB".',
   errCevianNoTriangle:
     'In "{{detail}}" the vertex or side belongs to no triangle in your figure, so there is no side to draw it to. ' +
     'Define the triangle first, or name the side outright — for example "AD is the altitude to side BC".',

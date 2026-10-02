@@ -26,7 +26,7 @@ import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, pr
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { RESERVED_SYMBOLS, toolSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
-import { cevianFacts, onBisectorFacts } from './cevian';
+import { cevianFacts, onBisectorFacts, toolFootFacts, toolFootRule } from './cevian';
 import {
   CENTRE_SENTINEL,
   CIRCLE_SENTINEL,
@@ -159,6 +159,13 @@ export type ApplyErrorCode =
    */
   | 'ambiguous-cevian'
   | 'cevian-no-triangle'
+  /**
+   * «תיכון ליתר» where the figure leaves the right angle open (a right triangle's noun alone) or holds several right
+   * triangles — a QUESTION: which side is the hypotenuse (#1222, operator ruling 2026-10-02 on #1620). And
+   * `ambiguous-no-right-angle` where no triangle has a right angle at all: there is no hypotenuse.
+   */
+  | 'ambiguous-hypotenuse'
+  | 'ambiguous-no-right-angle'
   /**
    * A STATED value substituted into a symbol whose domain it violates (#1432 amendment 1) — «רדיוס
    * המעגל הוא -3», «שרדיוסו 0». The radius symbol carries `{min: 0, minOpen}` and the substitution
@@ -2547,10 +2554,24 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      */
     case 'cevian-of': {
       const targets = new Map<string, { apex: Id; u: Id; v: Id }>();
-      for (const o of c.objects) {
+      let openRight = false;
+      // Both named («גובה מ-A לצלע BC בנקודה D»): nothing to resolve.
+      if (f.apex && f.side) targets.set('named', { apex: f.apex, u: f.side[0], v: f.side[1] });
+      for (const o of f.apex && f.side ? [] : c.objects) {
         if (o.kind !== 'polygon' || o.vertices.length !== 3) continue;
         const ring = o.vertices;
-        if (f.side) {
+        if (f.hypotenuse) {
+          // The right angle the figure STATES — a constraint, never the noun's open choice (ADR-052: never assume C).
+          const right = ring.filter((v) => {
+            const [p, q] = ring.filter((x) => x !== v);
+            const k = rightAngleAt(v, p, q);
+            return c.constraints.some((g) => g.t !== 'choice' && sameConstraint(g, k));
+          });
+          if (right.length === 1) {
+            const [u, v] = ring.filter((x) => x !== right[0]);
+            targets.set(`${right[0]}|${[u, v].sort().join('')}`, { apex: right[0], u, v });
+          } else if (right.length === 0 && o.noun && /ישר/.test(o.noun)) openRight = true;
+        } else if (f.side) {
           const [u, v] = f.side;
           if (!ring.includes(u) || !ring.includes(v) || u === v) continue;
           const apex = ring.find((x) => x !== u && x !== v)!;
@@ -2561,10 +2582,20 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           targets.set(`${f.apex}|${[u, v].sort().join('')}`, { apex: f.apex, u, v });
         }
       }
+      if (f.hypotenuse && (openRight ? targets.size === 0 : false)) return { ok: false, error: { code: 'ambiguous-hypotenuse', detail: f.src } };
+      if (f.hypotenuse && targets.size === 0) return { ok: false, error: { code: 'ambiguous-no-right-angle', detail: f.src } };
+      if (f.hypotenuse && (targets.size > 1 || openRight)) return { ok: false, error: { code: 'ambiguous-hypotenuse', detail: f.src } };
       if (targets.size === 0) return { ok: false, error: { code: 'cevian-no-triangle', detail: f.src } };
       if (targets.size > 1) return { ok: false, error: { code: 'ambiguous-cevian', detail: f.src } };
       const [{ apex, u, v }] = [...targets.values()];
       if (f.foot === apex || f.foot === u || f.foot === v) return { ok: false, error: { code: 'degenerate-role', detail: f.src } };
+      if (f.toolFoot && !objectById(c, f.foot)) {
+        // The same point derived the same way already has a name (#1153): the cevian runs to IT.
+        const rule = toolFootRule(f.role, apex, u, v);
+        const same = c.objects.find((o) => o.kind === 'derived' && sameDerivation(o.rule, rule));
+        if (same) return applyAll(c, [{ t: 'segment', id: `seg-${[apex, same.id].sort().join('')}`, a: apex, b: same.id, src: f.src }]);
+        return applyAll(c, toolFootFacts(f.role, apex, f.foot, u, v, f.src));
+      }
       return applyAll(c, cevianFacts(f.role, apex, f.foot, u, v, f.src));
     }
 

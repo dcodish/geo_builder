@@ -137,6 +137,8 @@ export function errorText(error: InputError, t: Translate): string {
     'bisector-wrong-apex': 'errBisectorWrongApex',
     'ambiguous-cevian': 'errAmbiguousCevian',
     'cevian-no-triangle': 'errCevianNoTriangle',
+    'ambiguous-hypotenuse': 'errAmbiguousHypotenuse',
+    'ambiguous-no-right-angle': 'errCevianNoRightAngle',
     'crossing-already-named': 'errCrossingAlreadyNamed',
     'self-crossing': 'errSelfCrossing',
     'llm-busy': 'errLlmBusy',

@@ -10,8 +10,8 @@ import { fold, existingKindOf, type ApplyError, type ApplyNotice } from './apply
 import { reportedDof } from './carriers';
 import { drawableAt, viewBox, type Figure } from './evaluate';
 import { resolveCurve, type Box } from './curves';
-import { sameDerivation } from './sameDerivation';
-import { FRESH_PREFIX, MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
+import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
+import { resolveToolLetters } from './toolLetters';
 import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
@@ -113,7 +113,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       owner.push(index);
     }
   });
-  const fresh = resolveFresh(parsed, owner);
+  const fresh = resolveToolLetters(parsed, owner);
   const { facts: resolved, minted } = resolveMints(fresh.facts, owner);
   minted.unshift(...fresh.minted);
   // The canonical circle's centre, named O by the tool (#1270) — inserted with its owning line, so the
@@ -126,6 +126,10 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
   const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices } = fold(facts, owner);
   const construction: Construction = Object.keys(seedNames).length > 0 ? { ...folded, seedNames: { ...seedNames } } : folded;
+  // A tool letter whose point the fold did not create — the cevian ran to a point the figure already named the same
+  // way (ADR-AG-211), or its line was refused — named nothing, and the row must not claim it did (#1263's rule).
+  const present = new Set(construction.objects.map((o) => o.id));
+  minted.splice(0, minted.length, ...minted.filter((m) => present.has(m.id)));
   // Said on the circle's row only when the name was actually GIVEN — a default that yielded to a letter
   // already in the figure named nothing, and the list must not claim it did (#1263's rule).
   for (const i of centred.offered) if (effects[i] === 'created') minted.push({ index: owner[i], id: CENTRE_LETTER });
@@ -468,53 +472,6 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
 const subscript = (n: number): string => String(n).replace(/[0-9]/g, (d) => String.fromCharCode(0x2080 + Number(d)));
 
 /**
- * NAMING A POINT A SENTENCE INTRODUCES WITHOUT A LETTER (#1620, ADR-AG-208) — «קטע האמצעים לצלע BC במשולש ABC» joins
- * two midpoints the student never named, and 2-D names them M and N (`freeLabel` over the figure's points, ADR-199).
- *
- * The parser is pure over one line, so it marks each such point with a placeholder (`FRESH_PREFIX` + the letters it
- * prefers + `|` + what the point IS, e.g. `mid:A,B`), and it is resolved HERE, in list order, against the names the
- * EARLIER lines use — so a later line naming «M» refers to the M this one minted, and adding a line never renames
- * an earlier point (stability). A point the figure already derives the same way (the student's own «M אמצע AB»)
- * keeps its letter (2-D's `named-midsegment-reuses-existing-midpoint-endpoint`); otherwise the first preferred
- * letter that is free, else the first one subscripted. The new name is reported (`minted`), as a coordinate
- * point's is: the tool says what it called the point.
- */
-function resolveFresh(facts: Fact[], owner: readonly number[]): { facts: Fact[]; minted: Array<{ index: number; id: string }> } {
-  if (!JSON.stringify(facts).includes(FRESH_PREFIX)) return { facts, minted: [] };
-  const used = new Set<string>();
-  const names = new Map<string, string>();
-  const minted: Array<{ index: number; id: string }> = [];
-  const out: Fact[] = [];
-  const midKey = (a: string, b: string) => `mid:${[a, b].sort().join(',')}`;
-  facts.forEach((f0, i) => {
-    let text = JSON.stringify(f0);
-    for (const ph of new Set(text.match(/@fresh:[^"|]*\|[^"@]*/g) ?? [])) {
-      if (names.has(ph)) continue;
-      const [prefs, key] = ph.slice(FRESH_PREFIX.length).split('|');
-      const own = out.find(
-        (g) => g.t === 'derived' && g.rule.t === 'midpoint' && !g.id.includes(FRESH_PREFIX) && midKey(g.rule.a, g.rule.b) === key,
-      );
-      let name = own && own.t === 'derived' ? own.id : [...prefs].find((x) => !used.has(x));
-      if (!name) {
-        let n = 0;
-        do name = `${prefs[0]}${subscript(++n)}`;
-        while (used.has(name));
-      }
-      names.set(ph, name);
-      used.add(name);
-      if (!own) minted.push({ index: owner[i], id: name });
-    }
-    text = text.replace(/@fresh:[^"|]*\|[^"@]*/g, (ph) => names.get(ph) ?? ph);
-    let f = JSON.parse(text) as Fact;
-    // A segment's id is its SORTED ends — re-derived once the ends have their letters.
-    if (f.t === 'segment') f = { ...f, id: `seg-${[f.a, f.b].sort().join('')}` };
-    for (const m of text.match(/"[A-Z][0-9₀-₉]?"/g) ?? []) used.add(m.slice(1, -1));
-    out.push(f);
-  });
-  return { facts: out, minted };
-}
-
-/**
  * NAMING A POINT THE STUDENT GAVE ONLY BY ITS COORDINATES (#1281; operator ruling #1263, 2026-09-20: *mint a
  * reserved letter, and say so*; build ruling 2026-09-27, #1281).
  *
@@ -539,32 +496,7 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
   const minted: Array<{ index: number; id: string }> = [];
   let n = 0;
   facts.forEach((f, i) => {
-    /*
-     * A DERIVED POINT THE SENTENCE DID NOT NAME (#1620, ADR-AG-207; the #1222 ruling, *"invent a letter in this case.
-     * the user can always change it"*) — «האנך מהנקודה B לציר ה-x» drops a foot the exam leaves unnamed. The same
-     * point already derived the same way keeps ITS name (the coordinate rule above, structurally: one position, one
-     * name, #1153), so a perpendicular stated twice, or after its foot was named, is one point; otherwise the next
-     * reserved name, said on the row. A name given LATER is #1153's `already-named`, naming the tool's letter — the
-     * student renames it, as the ruling says; a later line never re-letters an earlier one, so the figure is stable.
-     */
-    if (f.t === 'derived' && f.id.startsWith(MINT_PREFIX) && !names.has(f.id)) {
-      const resolve = (id: string) => names.get(id) ?? id;
-      const own = facts
-        .slice(0, i)
-        .find((g): g is Extract<Fact, { t: 'derived' }> => g.t === 'derived' && sameDerivation(g.rule, f.rule) && !resolve(g.id).startsWith(MINT_PREFIX));
-      if (own) {
-        names.set(f.id, resolve(own.id));
-        return;
-      }
-      let name: string;
-      do name = `P${subscript(++n)}`;
-      while (used.has(name));
-      used.add(name);
-      names.set(f.id, name);
-      minted.push({ index: owner[i], id: name });
-      return;
-    }
-    if ((f.t !== 'point' && f.t !== 'declare') || !f.id.startsWith(MINT_PREFIX) || names.has(f.id)) return;
+    if (f.t !== 'point' || !f.id.startsWith(MINT_PREFIX) || names.has(f.id)) return;
     const at = numeric(f);
     const own = at
       ? facts.slice(0, i).find((g) => {
@@ -578,20 +510,6 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
       return;
     }
     let name: string;
-    // A FOOT the tool names (#1222, #1240; ADR-AG-209) carries its reserved letter in the placeholder —
-    // `@mint:foot:median:…` → M₁ (2-D's M), `@mint:foot:altitude:…` → H₁ (2-D's F is this tree's focus letter,
-    // #1167) — and takes the next free subscript.
-    const foot = f.t === 'declare' ? /^@mint:foot:(median|altitude):/.exec(f.id) : null;
-    if (foot) {
-      const base = foot[1] === 'median' ? 'M' : 'H';
-      let k = 0;
-      do name = `${base}${subscript(++k)}`;
-      while (used.has(name));
-      used.add(name);
-      names.set(f.id, name);
-      minted.push({ index: owner[i], id: name });
-      return;
-    }
     // The ORIGIN is O when that letter is free (#1628) — the exam's own name for it, and the same default
     // that yields as the canonical circle's centre (ADR-AG-184): a point the student already called O keeps
     // the letter, and the origin then falls back to P₁… like any other coordinate point.
@@ -605,8 +523,8 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
   // A placeholder is a whole id or the SUFFIX of one (#1432 am. 1 — `circle-at-@mint:2,3`, `r_@mint:2,3` for a
   // circle centred on a coordinate point), so it is replaced up to the closing quote, never only as a whole string.
   const out = JSON.parse(text.replace(/@mint:[^"]*/g, (q) => JSON.stringify(names.get(q) ?? q).slice(1, -1))) as Fact[];
-  // A segment to a minted foot was keyed before the foot had its name, and a segment id is its two ends SORTED —
-  // so it is keyed again from its (now named) ends, or «AM₁» typed later would name a second segment.
+  // A segment to a minted point was keyed before the point had its name, and a segment id is its two ends SORTED —
+  // so it is keyed again from its (now named) ends, or «AP₁» typed later would name a second segment.
   return { facts: out.map((f) => (f.t === 'segment' && f.id.includes(MINT_PREFIX) ? { ...f, id: segmentIdOf(f.a, f.b) } : f)), minted };
 }
 

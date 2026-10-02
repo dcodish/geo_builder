@@ -1002,6 +1002,14 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   {
     category: 'derived',
     family: 'F16',
+    he: 'תיכון ליתר AB',
+    en: 'the median to the hypotenuse AB',
+    // ADR-AG-211 (#1222): the hypotenuse is named — or faces a STATED right angle; an open one is asked, never assumed.
+    needs: ['A(4,0)', 'B(0,3)', 'C(0,0)', 'משולש ישר-זווית ABC'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
     he: 'תיכון לצלע BC',
     en: 'the median to side BC',
     needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)', 'משולש ABC'],

@@ -130,22 +130,22 @@ describe('#1284 — the angle bisector, every spelling, measured on the figure',
 });
 
 describe('#1222 / #1240 — medians and altitudes whose target or foot the sentence does not name', () => {
-  it('«תיכון מ-A במשולש ABC» introduces the triangle and the tool names the foot M₁, the midpoint of BC', () => {
+  it('«תיכון מ-A במשולש ABC» introduces the triangle and the tool names the foot M, the midpoint of BC', () => {
     for (const seed of SEEDS) {
       const d = derive(['תיכון מ-A במשולש ABC'], seed);
       expect(d.faults).toEqual([]);
-      expect(d.minted).toEqual([{ index: 0, id: 'M₁' }]);
+      expect(d.minted).toEqual([{ index: 0, id: 'M' }]);
       const m = pts(['תיכון מ-A במשולש ABC'], seed);
-      const [b, c, f] = [get(m, 'B'), get(m, 'C'), get(m, 'M₁')];
+      const [b, c, f] = [get(m, 'B'), get(m, 'C'), get(m, 'M')];
       expect(Math.hypot(f.x - (b.x + c.x) / 2, f.y - (b.y + c.y) / 2)).toBeLessThan(1e-6);
-      expect(d.figure.segments.map((s) => s.ends.join(''))).toContain('AM₁');
+      expect(d.figure.segments.map((s) => s.ends.join(''))).toContain('AM');
     }
   });
 
-  it('«גובה מ-A במשולש ABC» — the foot H₁ is on BC and AH₁ ⟂ BC at every seed', () => {
+  it('«גובה מ-A במשולש ABC» — the foot H is on BC and AH ⟂ BC at every seed', () => {
     for (const seed of SEEDS) {
       const m = pts(['גובה מ-A במשולש ABC'], seed);
-      const [a, b, c, h] = [get(m, 'A'), get(m, 'B'), get(m, 'C'), get(m, 'H₁')];
+      const [a, b, c, h] = [get(m, 'A'), get(m, 'B'), get(m, 'C'), get(m, 'H')];
       expect(onLine(h, b, c)).toBe(true);
       expect(Math.abs(dot(a, h, b, c))).toBeLessThan(1e-6);
     }
@@ -153,11 +153,11 @@ describe('#1222 / #1240 — medians and altitudes whose target or foot the sente
 
   const ALTITUDES: ReadonlyArray<readonly [string, readonly string[], [string, string, string, string]]> = [
     ['«AD גובה» — the side from the one triangle', ['משולש ABC', 'AD גובה'], ['A', 'D', 'B', 'C']],
-    ['«גובה מנקודה A»', ['משולש ABC', 'גובה מנקודה A'], ['A', 'H₁', 'B', 'C']],
-    ['«גובה לצלע BC» — the apex from the one triangle', ['משולש ABC', 'גובה לצלע BC'], ['A', 'H₁', 'B', 'C']],
+    ['«גובה מנקודה A»', ['משולש ABC', 'גובה מנקודה A'], ['A', 'H', 'B', 'C']],
+    ['«גובה לצלע BC» — the apex from the one triangle', ['משולש ABC', 'גובה לצלע BC'], ['A', 'H', 'B', 'C']],
     ['«גובה המשולש לצלע AB הוא CD» (the parity row)', ['משולש ABC', 'גובה המשולש לצלע AB הוא CD'], ['C', 'D', 'A', 'B']],
     ['«הגובה AD לצלע BC»', ['משולש ABC', 'הגובה AD לצלע BC'], ['A', 'D', 'B', 'C']],
-    ['«the altitude from A»', ['משולש ABC', 'the altitude from A'], ['A', 'H₁', 'B', 'C']],
+    ['«the altitude from A»', ['משולש ABC', 'the altitude from A'], ['A', 'H', 'B', 'C']],
   ];
   it.each(ALTITUDES)('%s — foot on the side line, ⟂, seeds 0–5', (_w, lines, [apex, foot, u, v]) => {
     for (const seed of SEEDS) {
@@ -169,8 +169,8 @@ describe('#1222 / #1240 — medians and altitudes whose target or foot the sente
 
   it.each([
     ['«AD תיכון»', ['משולש ABC', 'AD תיכון'], 'D'],
-    ['«תיכון לצלע BC»', ['משולש ABC', 'תיכון לצלע BC'], 'M₁'],
-    ['«תיכון מ-A לצלע BC»', ['משולש ABC', 'תיכון מ-A לצלע BC'], 'M₁'],
+    ['«תיכון לצלע BC»', ['משולש ABC', 'תיכון לצלע BC'], 'M'],
+    ['«תיכון מ-A לצלע BC»', ['משולש ABC', 'תיכון מ-A לצלע BC'], 'M'],
   ] as const)('%s — the foot is the midpoint of BC', (_w, lines, foot) => {
     for (const seed of SEEDS) {
       const m = pts(lines, seed);
@@ -189,22 +189,22 @@ describe('#1222 / #1240 — medians and altitudes whose target or foot the sente
     }
   });
 
-  it('a minted foot never takes a letter the figure already uses', () => {
-    const d = derive(['משולש ABC', 'נקודה M₁', 'תיכון לצלע BC'], 0);
+  it('a minted foot never takes a letter the figure already uses (ADR-AG-211: the next free letter)', () => {
+    const d = derive(['משולש ABC', 'נקודה M', 'תיכון לצלע BC'], 0);
     expect(d.faults).toEqual([]);
-    expect(d.minted.map((x) => x.id)).toEqual(['M₂']);
+    expect(d.minted.map((x) => x.id)).toEqual(['N']);
   });
 });
 
 describe('the tool-named foot is renamable by the student (#1222 ruling: "the user can always change it")', () => {
   const session = (lines: string[]): RenameState => ({ lines, disabled: [], queries: [], spokenFor: {}, seed: 0 });
   it.each([
-    [['תיכון מ-A במשולש ABC'], 'M₁', 'AM תיכון במשולש ABC'],
-    [['משולש ABC', 'גובה מנקודה A'], 'H₁', 'AF גובה'],
-    [['משולש ABC', 'גובה מ-A לצלע BC'], 'H₁', 'AF גובה לצלע BC'],
-    [['משולש ABC', 'תיכון לצלע BC'], 'M₁', 'AM תיכון לצלע BC'],
+    [['תיכון מ-A במשולש ABC'], 'M', 'תיכון מ-A במשולש ABC פוגש את הצלע בנקודה K'],
+    [['משולש ABC', 'גובה מנקודה A'], 'H', 'גובה מנקודה A פוגש את הצלע בנקודה K'],
+    [['משולש ABC', 'גובה מ-A לצלע BC'], 'H', 'גובה מ-A לצלע BC פוגש את הצלע בנקודה K'],
+    [['משולש ABC', 'תיכון לצלע BC'], 'M', 'תיכון לצלע BC פוגש את הצלע בנקודה K'],
   ] as const)('%s — renaming %s writes the letter into the sentence', (lines, from, expected) => {
-    const to = expected.includes('AF') ? 'F' : 'M';
+    const to = 'K';
     const r = decideRename(from, to, session([...lines]));
     expect(r.kind, JSON.stringify(r)).toBe('apply');
     if (r.kind === 'apply') {
@@ -251,7 +251,6 @@ describe('free DOFs stay free, and the figure does not jump', () => {
   it.each([
     ['AD גובה', 'AD גובה לצלע BC'],
     ['AD תיכון', 'AD תיכון לצלע BC'],
-    ['גובה מנקודה A', 'AH₁ גובה לצלע BC'],
     ['AD חוצה את הזווית BAC', 'AD חוצה זווית לצלע BC'],
   ])('«%s» draws what «%s» draws, at every seed', (added, shipped) => {
     for (const seed of SEEDS) {

@@ -1886,9 +1886,9 @@ reserved name, and says so — #1263, 2026-09-20; "the user can always change it
   has A), «גובה לצלע BC» / «תיכון לצלע BC» (the apex is the third vertex). An apex in several triangles ASKS which
   (name the side or the triangle); in none, the sentence is refused.
 - **A cevian whose foot has no letter:** «תיכון מ-A במשולש ABC», «גובה מ-A במשולש ABC», «גובה מנקודה A», «תיכון מ-A
-  לצלע BC», "the altitude from A". The tool names the foot with a reserved letter — M₁ for a median's foot, H₁ for an
-  altitude's (the next free subscript) — and the fact row says «הכלי קרא לנקודה M₁». The student can rename it like any
-  letter; the sentence is then rewritten to name it («AM תיכון במשולש ABC»).
+  לצלע BC», "the altitude from A". The tool names the foot with 2-D's letter (R103c) — M for a median's foot, H for an
+  altitude's — and the fact row says «הכלי קרא לנקודה M». The student can rename it like any letter; the sentence is
+  then rewritten to name it («תיכון מ-A במשולש ABC פוגש את הצלע בנקודה K»).
 - A sentence that names its triangle («… במשולש ABC») draws the triangle when the figure does not have it yet, as in
   2-D.
 - «גובה המשולש לצלע AB הוא CD», «הגובה AD לצלע BC» read as «CD גובה לצלע AB» / «AD גובה לצלע BC».
@@ -1899,7 +1899,28 @@ reserved name, and says so — #1263, 2026-09-20; "the user can always change it
   חוצה זווית C», «CE חוצה זווית A במשולש ABC»); a bisector ending on one of its own rays («AB חוצה זווית BAC»); a
   bisector of an angle whose points the figure lacks; a bisector that contradicts a stated angle (the later statement
   is refused as unsatisfiable, named).
-- **Not yet:** «תיכון ליתר» (the hypotenuse of a right triangle whose right angle is not stated is a choice in this tool).
+- ~~**Not yet:** «תיכון ליתר».~~ Accepted since R103c.
+
+**R103c — the tool's letters are 2-D's, and «תיכון ליתר» never assumes the right angle**
+([ADR-AG-211](06c-decisions-analytic.md#adr-ag-211), [#1620](https://github.com/dcodish/geo_builder/issues/1620),
+[#1222](https://github.com/dcodish/geo_builder/issues/1222); operator rulings 2026-10-02 on #1620).
+
+- A point a sentence introduces without a letter takes 2-D's letter: **M** for a midpoint (a median's foot, a
+  perpendicular bisector's midpoint, a midsegment's first end — its second end N), **H** for a foot (an altitude's, a
+  perpendicular's; 2-D writes F, which is the focus letter in this tool). When the letter is taken, the next free one:
+  M, N, P, Q …; H, G, P …. F is never chosen. Two medians are M and N; two altitudes H and G.
+- The row says «הכלי קרא לנקודה M». A later sentence that uses the letter refers to that point; a later sentence that
+  names the same point a second time is refused and names the letter («already-named»), and the student renames it.
+  The letter never changes when lines are added.
+- The same point reached two ways is one point: «D אמצע BC» then «תיכון מ-A במשולש ABC» runs the median to D.
+- Adding such a cevian never moves the triangle: the tool's foot is computed from it.
+- Any tool letter can be renamed; the sentence is rewritten to name it («… פוגש את הצלע בנקודה K», «אנך אמצעי ל-AB
+  חותך אותו בנקודה K»).
+- A point given only by its coordinates keeps its own reserved name (P₁, #1281) — it is not a construct.
+- «תיכון ליתר» / «גובה ליתר» / "the median to the hypotenuse": when the figure states the right angle («זווית C ישרה»),
+  the cevian runs from it to the side facing it. When it does not — «משולש ישר-זווית ABC» alone — the tool ASKS which
+  side is the hypotenuse; it never assumes C (2-D does: #1689). With no right triangle at all it asks too.
+  «תיכון ליתר AB» names the hypotenuse, and so states that the right angle faces AB.
 
 **R123 — a canonical circle's centre is the point O, unless a letter is already there**
 ([ADR-AG-184](06c-decisions-analytic.md#adr-ag-184), [#1270](https://github.com/dcodish/geo_builder/issues/1270)).
@@ -2154,7 +2175,7 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 **R141 — the perpendicular from a point and its foot, the line through a point that cuts a side, and «האנך» as a reference**
 ([ADR-AG-207](06c-decisions-analytic.md#adr-ag-207), [#1620](https://github.com/dcodish/geo_builder/issues/1620) slice C; operator ruling 2026-10-02: the analytic tool behaves as the 2-D tool does for plane geometry).
 
-- «האנך מהנקודה B לציר ה-x» (also to a side, «לצלע AC», to a line, «לישר l1», or to a tangent) draws the perpendicular from B to its foot. The foot is a point; with no letter given the tool names it (P₁, …) and says so on the row, and the student can rename it.
+- «האנך מהנקודה B לציר ה-x» (also to a side, «לצלע AC», to a line, «לישר l1», or to a tangent) draws the perpendicular from B to its foot. The foot is a point; with no letter given the tool names it (H, then G, P … — R103c) and says so on the row, and the student can rename it.
 - The foot named in the same sentence — «האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D», «D רגל האנך מ-C לציר ה-x», «האנכים מהקודקודים A ו-C לציר ה-x חותכים אותו בנקודות E ו-F בהתאמה» — is that letter. A foot on a side's line may lie beyond the side, as in 2-D. «אנך אמצעי ל-AB» draws the midpoint and the perpendicular bisector.
 - «הישר העובר דרך הנקודה E מקביל לציר ה-y וחותך את הצלע AB בנקודה F» (and «דרך E עובר ישר מקביל ל-… החותך את …», «ישר דרך P מאונך ל-AB») states the line and where it cuts the side; on a SIDE the point lies between its ends. The piece EF is drawn and the line itself is not, as in 2-D, until a sentence states the line.
 - «האנך» refers to the perpendicular already drawn — «הנקודה E נמצאת על האנך שהורידו מנקודה B לציר ה-x», «המשיק והאנך נחתכים בנקודה D». With none, or several and no description that picks one, the sentence is refused and says how to name it.
