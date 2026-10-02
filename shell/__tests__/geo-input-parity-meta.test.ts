@@ -61,6 +61,11 @@ describe('#1649 — the rows are well formed', () => {
     expect(rowFaults()).toEqual([]);
   });
 
+  it('a known gap with no filed issue is rejected (no `to-file:` placeholder can be committed)', () => {
+    const row = { id: 'x', family: 'lengths', steps: ['משולש ABC', 'AB = 6'], expect: 'builds', knownGap: [{ product: '3d', issue: 'to-file:3d-x' }] } as unknown as ParityRow;
+    expect(rowFaults([row])).toEqual([expect.stringMatching(/names no filed issue/)]);
+  });
+
   it('the seed is the size the audit asked for: parity, known-gap and exception rows in every product', () => {
     const gap = PARITY_ROWS.filter((r) => r.knownGap?.length);
     const exc = PARITY_ROWS.filter((r) => r.exception && EXCEPTIONS[r.exception].topic);

@@ -5169,8 +5169,8 @@ So in two builders the figure was made to satisfy the claim the student had to p
 
 **Decision.**
 1. **The rows live once** in `shell/__tests__/fixtures/geo-input-parity.ts`. **305 rows.**
-   - **116 parity rows:** every builder expected gives `expect`.
-   - **172 known-gap rows:** the named builder must still differ. Each names the issue that ports it, or `to-file:<family>` until it is filed. A row that starts agreeing FAILS with "now builds — move it to the parity rows", so the gap list only shrinks.
+   - **128 parity rows:** every builder expected gives `expect`.
+   - **160 known-gap rows:** the named builder must still differ. Each names the FILED issue that ports it — `rowFaults` rejects anything but `#NNNN`, so a gap with no issue cannot be committed. A row that starts agreeing FAILS with "now builds — move it to the parity rows", so the gap list only shrinks.
    - **18 topic-exception rows:** X1–X7. The builders in `mustRefuse` must not build the sentence. They refuse, ask, or hand it to the model, and never draw it as something else.
    Every construction sentence of the three catalogs is a row step, in a context that types in every builder expected (`cat-<catalog>-NNN`), plus the audit's seed, #1669's and #1670's tables, and the exception rows.
 2. **Equality is transitive.** `shell/` may not import a product, so each row carries the reference verdict as `expect`. Each tree's thin lock asserts its own verdict against it through its REAL submit decision:
@@ -5202,6 +5202,8 @@ So in two builders the figure was made to satisfy the claim the student had to p
 
 **Consequences.** New: the shell fixture and meta-lock, and three thin locks. The 2-D lock runs about 30 s, analytic about 1.5 s and 3-D about 3 s, so all stay in the fast tier. Rows that sat at 5–22 s in 2-D, because of contexts with six free points, were re-contexted.
 
-Known gaps without an issue are marked `to-file:<family>`:
-- 2-D: sentence frame, acute qualifier, passes-through, distance phrasing, compound midpoints, circle-defining clause, circle by three letters, role-noun length, «אורך X שווה לאורך Y», chords-crossing conflict, altitude-is-segment.
-- 3-D: lines and incidence, cevian forms, angle forms, noun phrasing, congruence and symbols, shape forms, base-shape qualifiers, area and perimeter, length-or-vector (the open Q2), triangle centres, bounds, ratio forms, plane grammar.
+The gaps this measurement found with no issue were filed from it:
+- 2-D: the sentence frame (#1676); the other phrasing gaps (#1677) — acute qualifier, passes-through, distance phrasing, compound midpoints, circle-defining clause, circle by three letters, role-noun length, «אורך X שווה לאורך Y», altitude-is-segment; and the chords-crossing conflict (#1678).
+- 3-D: length-or-vector, the open Q2 (#1680, which also holds the «∠SDB» allowlist entry); every other core plane-family gap (#1679).
+
+**Rebased onto #1669 / #1667 / #1668.** Thirteen known gaps flipped and failed with "move it to the parity rows", as designed: the twelve #1669 diameter, chord and radius rows, and `chord-cross-first`. No parity row flipped the other way. `bare-relation-new-letters-1670` "flipped" only on its last line, «AC קוטר». Its disparity sits at «BD⊥AC» (analytic still refuses new letters in a bare relation, #1028), so the row now ends there and stays a #1670 gap. `cat-2d-121` («AB ו-CD מיתרים במעגל O», with no circle O in the figure) still differs after #1669.
