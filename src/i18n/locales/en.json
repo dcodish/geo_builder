@@ -71,6 +71,7 @@
       "compound-relation": "Part of this compound relation isn’t supported yet. Supported: same-unit sums like \"arc AC + arc BE = arc AD + arc BC\", \"AB + CD = EF\", \"∠A + ∠B = 180\", and length products/proportions like \"DM·ME = BM·DR\" or \"DM/ME = BM/DM\". A sum can’t mix lengths with angles, and a product needs the same number of segments on each side — restate the given in one of these forms.",
       "latex": "It looks like you pasted a LaTeX formula (with $ or commands like \\triangle). Write it in plain notation — the toolbar has buttons: △ ∥ ∠ ⊥ √. E.g. \"triangle ABC\", \"DE ∥ BC\", \"AD:DB = 1:2\".",
       "negation": "Negation (\"{{word}}\") isn't supported yet. State what IS given instead — e.g. \"angle A = 50\" or \"angle A is acute\". Anything you don't state stays free.",
+      "foreign-given": "\"{{phrase}}\" is a given this tool can't represent, so nothing from this sentence was built (not even part of it). {{guide}}",
       "word-root": "Write the root value with the √ symbol — there's a √() button in the toolbar. E.g. \"√27\" instead of the word \"root 27\".",
       "lowercase-labels": "Point labels are written in UPPERCASE letters. Try: {{corrected}}",
       "hebrew-labels": "Vertices are named with uppercase Latin letters here, not Hebrew ones. Did you mean: {{corrected}}"
@@ -279,7 +280,8 @@
     "degenerateAngle": "An angle needs three distinct points — \"{{angle}}\" repeats its vertex.",
     "degenerateCollinear": "Collinear points must be distinct — \"{{id}}\" appears twice.",
     "retryHint": "You can try a different order (enter the givens first), reword it, or build it in a few smaller steps.",
-    "unboundVariable": "The letter {{name}} is not defined by any statement — the step that defined it was removed, muted or failed. The value stays in the list and takes effect again once the definition is back.",
+    "unboundVariable": "The letter {{name}} is not defined by any statement — it was never defined, or the step that defined it was removed, muted or failed. The statement stays in the list and takes effect once a statement defines it — e.g. AB = {{name}}.",
+    "unenforceableRelation": "The relation on {{names}} can't be enforced: a letter is used in a form this relation can't follow (a power, a constant, an area), or it compares an angle with a length.",
     "boundImpossible": "Impossible: {{value}} contradicts {{bound}} — no figure can satisfy both givens. Check the givens.",
     "hypotenuseImpossible": "Impossible: with the right angle at {{v}}, the hypotenuse {{hyp}} is the longest side of the triangle — but |{{hyp}}| = {{hypVal}} while |{{leg}}| = {{legVal}}. Check the givens.",
     "obtuseSideImpossible": "Impossible: the side opposite the {{deg}}° angle at {{v}} is the longest side — but |{{hyp}}| = {{hypVal}} while |{{leg}}| = {{legVal}}. Check the givens."

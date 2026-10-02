@@ -124,6 +124,38 @@ export function isSymbolBound(tab: SymTab, name: string, cmds: readonly AnyComma
 }
 
 /**
+ * #1658 ([ADR-562](../../docs/06-decisions.md#adr-562)) — the VARIABLE statements: a value for a letter
+ * (`set-var`, «α = 70») and a relation over letters (`measure-bound` «0 < k < 6», `measure-order`
+ * «α < β»). Each is about a letter some OTHER statement must give a meaning, and each lowers to nothing
+ * until one does.
+ */
+export const isVariableStatement = (cmd: AnyCommand): boolean =>
+  cmd.type === 'set-var' || cmd.type === 'measure-bound' || cmd.type === 'measure-order';
+
+/**
+ * The first letter a variable statement is ABOUT that no statement binds, or null (#926 → #1658). #926
+ * asked it of `set-var` only, so «0 < k < 6» on a figure with no k — a bound, the same kind of statement
+ * about the same kind of letter — lowered to nothing with no mark, and the submit lane called it «already
+ * drawn» while the bound vanished. One question for the whole family.
+ */
+export function unboundSubjectOf(cmd: AnyCommand, tab: SymTab, cmds: readonly AnyCommand[]): string | null {
+  if (!isVariableStatement(cmd)) return null;
+  const names = cmd.type === 'set-var' ? [cmd.name] : symbolsConsumedBy(cmd);
+  return names.find((n) => !isSymbolBound(tab, n, cmds)) ?? null;
+}
+
+/**
+ * A RELATION over letters that are all bound but that still lowers to nothing (#1658) — a bound on a
+ * letter used as «k²» or «k + 2», an order between an angle letter and a length letter, a bound on an
+ * area letter. Returns the letters, or null. The statement cannot be enforced, so it must not sit ✓.
+ */
+export function unenforceableRelation(cmd: AnyCommand, tab: SymTab, cmds: readonly AnyCommand[]): string[] | null {
+  if (cmd.type !== 'measure-bound' && cmd.type !== 'measure-order') return null;
+  if (unboundSubjectOf(cmd, tab, cmds)) return null; // waiting for a definition — the #926 register
+  return lowerOne(cmd, tab).length === 0 ? symbolsConsumedBy(cmd) : null;
+}
+
+/**
  * The symbol names a command READS from the table ([ADR-492](../../docs/06-decisions.md#adr-492), #956).
  *
  * This is the whole class of "a magnitude arrives from a row other than the row that shaped it": every
@@ -250,8 +282,14 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       // `measure-order` applies, since a coefficient makes the inequality mean something else.
       const B = tab.vars.get(cmd.name)?.bindings[0];
       if (!B) return [];
-      if (B.coef !== 1 || (B.pow ?? 1) !== 1 || B.affine) return [];
-      const { min, max } = cmd;
+      // #1658 (ADR-562): a POSITIVE coefficient carries the window over exactly — «AB = 2k» with
+      // «0 < k < 6» is 0 < |AB| < 12. It used to be left alone and the stated bound vanished with an
+      // «already drawn» note. A power, a constant or a non-positive coefficient still lowers to nothing,
+      // and `unenforceableRelation` marks that row instead of letting it sit green.
+      if ((B.pow ?? 1) !== 1 || B.affine || !(B.coef > 0)) return [];
+      const scale = (v: number | undefined) => (v === undefined ? undefined : v * B.coef);
+      const min = scale(cmd.min);
+      const max = scale(cmd.max);
       if (B.kind === 'ang') return [{ type: 'set-angle-bound', vertex: B.refs[0], ray1: B.refs[1], ray2: B.refs[2], min, max, minStrict: cmd.minStrict, maxStrict: cmd.maxStrict }];
       if (B.kind === 'len') return [{ type: 'set-length-bound', a: B.refs[0], b: B.refs[1], min, max, minStrict: cmd.minStrict, maxStrict: cmd.maxStrict }];
       return []; // an area binding has no bound constraint yet

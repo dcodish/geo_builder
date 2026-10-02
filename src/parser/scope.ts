@@ -66,10 +66,45 @@ export interface ScopeMatch {
   params?: Record<string, string>;
 }
 
+/** A pattern: a RegExp, or a matcher with the same `exec` shape when a regex alone cannot say it (the
+ *  plane-object test below). Never a `g`-flagged RegExp — `exec` must be stateless. */
+type Matcher = { exec(s: string): { index: number; 0: string } | null };
+
 interface ScopeRule {
   category: Exclude<ScopeCategory, 'unrelated'>; // 'unrelated' is the no-signal fallback, not a keyword rule
-  patterns: RegExp[];
+  patterns: Matcher[];
 }
+
+/**
+ * #1656 (ADR-562) — a PLANE as an object of the sentence: «דרך AC העבירו מישור המקביל ל-SD», «מישור ABC»,
+ * «המישור P», «ניצב למישור», «מישורים», "a plane parallel to SD", "plane ABC". The Space Builder's noun.
+ *
+ * The SETTING phrase is not one: «במישור נתון משולש ABC» / "in the plane, triangle ABC" say where a flat
+ * figure lives, which is exactly this tool. So a bare «במישור» (or "in/on the plane") followed by nothing,
+ * punctuation or an ordinary word is exempt; followed by a LABEL («במישור ABC») or a definite noun
+ * («במישור הבסיס») it names a plane again. «מישור הקואורדינטות» / «מישור הצירים» is the analytic frame
+ * and is left to the `analytic` rule, which names the right tool for it.
+ */
+const PLANE_HE = /(?<![א-ת])([ובהלמשכ]{0,3})מישור(ים|ות)?(?![א-ת])/g;
+const PLANE_EN = /\bplanes?\b/gi;
+const planeObject: Matcher = {
+  exec(s: string) {
+    for (const m of s.matchAll(PLANE_HE)) {
+      const after = s.slice(m.index! + m[0].length);
+      if (/^\s*ה?(?:קואורדינ|צירים|קרטזי)/.test(after)) continue; // the coordinate plane — analytic, not 3-D
+      const setting = (m[1] === 'ב' || m[1] === 'וב') && !m[2] && /^(?:\s*$|\s*[,.:;!?)]|\s+(?!ה)[א-ת])/.test(after);
+      if (!setting) return { index: m.index!, 0: m[0] };
+    }
+    for (const m of s.matchAll(PLANE_EN)) {
+      const before = s.slice(0, m.index!);
+      const after = s.slice(m.index! + m[0].length);
+      if (/\b(?:cartesian|coordinate|xy|x-y)\s+$/i.test(before)) continue; // the coordinate plane — analytic
+      const setting = /\b(?:in|on)\s+(?:the|a)\s+$/i.test(before) && !/s$/i.test(m[0]) && !/^\s*[A-Z]\d*[A-Z]/.test(after);
+      if (!setting) return { index: m.index!, 0: m[0] };
+    }
+    return null;
+  },
+};
 
 /**
  * #1245 (ADR-553) — the COORDINATE-PLACEMENT spellings, as one vocabulary. A coordinate is a signed decimal
@@ -89,11 +124,14 @@ const RULES: ScopeRule[] = [
     // revolution solids (גליל / כדור / חרוט) and «תלת ממדי» used to fall through to the generic
     // `unrelated` message ("no construction detected") or, for «מעגל תלת ממדי», to the paid LLM. Landing in
     // the wrong product is a specific, answerable situation: say which tool to open.
+    // #1656/#1657 (ADR-562): these patterns are ALSO checked before the grammar (`foreignGiven`), because a
+    // plane rule read «כדור שמרכזו O ורדיוסו 3» as a circle and «מישור המקביל ל-SD» as a line parallel.
     category: 'cross-app',
     patterns: [
       /תיבה|קוביי?ה|פ[יו]?רמידה|מנסרה|טטרא?דר|טטרא?הדרון|ארבעון|מקבילון|גליל|כדור|חרוט/,
       /תלת[\s-]*מ[יו]?מד/,
       /\bbox\b|\bcube\b|cuboid|pyramid|prism|tetrahedron|cylinder|sphere|cone\b|\b3-?d\b/i,
+      planeObject,
     ],
   },
   {
@@ -166,6 +204,11 @@ const RULES: ScopeRule[] = [
       /מערכת\s*צירים|ראשית\s*הצירים|צירים|ציר\s+ה|ציר\s*[-]?\s*[xyXY]|רשת\s*[-]?\s*[xyXY]|שיפוע|קואורדינ|שיעורי\s+(?:ה|נקוד)|שיעור\S*\s*ה?-?\s*[xyXY]|משוואת?\s+ה?(?:ישר|קו|פונקצי)|קרטזי/, // axes / origin / slope / coordinates ("שיעורי הנקודה" / "שיעורי נקודות" #1162 / "שיעור ה-x") / line-equation / cartesian / grid
       /\b[xy][-\s]?axis\b|\baxes\b|\baxis\b|\bslope\b|\bcoordinate(?:s)?\b|\bcartesian\b|\borigin\b|equation\s+of\s+(?:the\s+)?(?:line|curve|function)/i,
       /(?:^|[^A-Za-z])[yY]\s*=\s*[-+\d.\s/*]*[xX](?![A-Za-z])/, // a line equation "y = 2x + 3" / "y = -x" (needs both y= and an x term)
+      // #1655 (ADR-562): a QUADRANT — «הנקודה C נמצאת ברביע השני», «ברבע הראשון», "in the second quadrant".
+      // A quadrant needs axes, which this canvas does not have. «רביעי/רביעית» (fourth — the ordinal circle
+      // reference «המעגל הרביעי») is excluded by the trailing letter guard; «רבע מעגל» (a quarter circle, a
+      // real construct) has no ordinal after it, so the second form cannot reach it.
+      /(?<![א-ת])[ובהלמש]{0,3}רביע(?:ים)?(?![א-ת])|(?<![א-ת])[ובהלמש]{0,3}רבע\s+ה(?:ראשון|שני|שלישי|רביעי)(?![א-ת])|\bquadrants?\b/i,
     ],
   },
   {
@@ -320,7 +363,7 @@ export function classifyOutOfScope(utterance: string): ScopeMatch | null {
   const s = utterance.trim();
   if (!s) return null;
   for (const rule of RULES) {
-    if (rule.patterns.some((p) => p.test(s))) {
+    if (rule.patterns.some((p) => p.exec(s) !== null)) {
       return { category: rule.category, messageKey: `input.scope.${rule.category}` };
     }
   }
@@ -329,6 +372,41 @@ export function classifyOutOfScope(utterance: string): ScopeMatch | null {
   // signal («12345»), nor is the capital of an ordinary word («Hello there»).
   if (!hasConstructionSignal(s, GEO_KEYWORD)) return { category: 'unrelated', messageKey: 'input.scope.unrelated' };
   return null; // has geometric content but unmatched → a real gap to implement (stays 'not-understood').
+}
+
+/**
+ * #1654–#1657 (ADR-562) — a FOREIGN GIVEN: a statement whose subject belongs to another tool (a slope, a
+ * quadrant, axes or coordinates → the analytic Builder; a plane, a sphere or another solid → the Space
+ * Builder), in any spelling and anywhere in the sentence.
+ *
+ * WHY BEFORE THE GRAMMAR. `classifyOutOfScope` answered these families only on a FAILED parse, so a plane
+ * rule that read the REST of the sentence committed it with the foreign operand absorbed or gone:
+ * «שיפוע הצלע AB הוא 3/4» → |AB| = 0.75 (the side-value rule skipped the slope word), «כדור שמרכזו O
+ * ורדיוסו 3» → a circle, «דרך AC העבירו מישור המקביל ל-SD» → AC ∥ SD, and «…חסום מעגל שמרכזו C (הנקודה C
+ * נמצאת ברביע השני)» built the incircle with the quadrant gone. Five rules, one cause: the families are
+ * NEVER-PARSEABLE here (no supported construct carries their words — the catalog and corpus nets prove
+ * it), so like LaTeX and negation they are decided before any rule can read part of the sentence.
+ *
+ * `phrase` is the student's own word that carries the family (extended to the whole token), so the
+ * refusal names the clause it could not keep — the honesty invariant for a mixed sentence.
+ */
+const FOREIGN_FAMILIES = new Set<ScopeCategory>(['cross-app', 'analytic']);
+export function foreignGiven(utterance: string): { category: 'cross-app' | 'analytic'; phrase: string } | null {
+  const s = utterance.trim();
+  for (const rule of RULES) {
+    if (!FOREIGN_FAMILIES.has(rule.category)) continue;
+    for (const p of rule.patterns) {
+      const m = p.exec(s);
+      if (!m) continue;
+      let a = m.index;
+      let b = m.index + m[0].length;
+      while (a > 0 && !/[\s(),;:]/.test(s[a - 1])) a--;
+      while (b < s.length && !/[\s(),;:]/.test(s[b])) b++;
+      const phrase = s.slice(a, b).replace(/^[«"'(\-–]+|[»"'.,;:)\-–]+$/g, '').trim() || m[0].trim();
+      return { category: rule.category as 'cross-app' | 'analytic', phrase };
+    }
+  }
+  return null;
 }
 
 /**

@@ -1599,3 +1599,27 @@ over all four (ADR-041).
 ### `proof-target-refused-1666` — «הוכיחו כי AB ⊥ AC» after «משולש ABC» is refused as a claim to prove; the triangle stays free (#1666, ADR-561)
 
 **Guards against:** a proof target committed as a given. The #1649 parity audit found that 2-D read «הוכיחו כי AB ⊥ AC» as `set-perpendicular`, so the figure was forced to satisfy the claim the student had to prove. Operator ruling 2026-10-02 (#1649): proof targets are refused in all three builders, with an explanation (the shared rule `shell/proofTarget`, ADR-W-107). The step is declared in `refusedSteps` (reason `proof-target`, quoting the sentence): a change that lets it build again, or refuses it for another reason, turns this red. **Asserts** the triangle stays green with no violation and no constraint committed. The submit-path surface (every spelling, both languages, the mixed line, the ✎ edit seam) is in `src/app/__tests__/proof-target-1666.test.ts`; the cross-product rows are `shell/__tests__/fixtures/proof-target-rows.ts`.
+
+### `slope-given-refused-not-a-length-1654` — «נתון: שיפוע הצלע AB הוא 3/4» is refused as an analytic given, never |AB| = 0.75 (#1654, ADR-562)
+
+**Guards against:** a slope read as a length. The side-value rule skipped «שיפוע» and committed |AB| = 0.75 with a green ✓; the out-of-scope register ran only on a failed parse. A foreign given is now refused by `parse` before any rule.
+
+### `quadrant-clause-refused-not-dropped-1655` — «…חסום מעגל שמרכזו C (הנקודה C נמצאת ברביע השני)» is refused naming «ברביע» (#1655, ADR-562)
+
+**Guards against:** a stated clause silently dropped. The incircle rule built and the quadrant vanished; 2-D has no axes, so the whole sentence is refused and the note names the clause. The plane half alone still builds.
+
+### `plane-parallel-refused-not-a-line-parallel-1656` — «דרך AC העבירו מישור המקביל ל-SD» is refused as a Space Builder given, never AC ∥ SD (#1656, ADR-562)
+
+**Guards against:** a plane statement reduced to a line given the student never stated.
+
+### `sphere-refused-not-a-circle-1657` — «כדור שמרכזו O ורדיוסו 3» is refused as a Space Builder given, never a circle (#1657, ADR-562)
+
+**Guards against:** a sphere drawn as a circle. «כדור» was in the cross-app register all along; the register ran only after a failed parse.
+
+### `variable-bound-waits-then-binds-1658` — «k > 40» before «AB = k» is kept and takes effect when the letter is bound (#1658, ADR-562)
+
+**Guards against:** a bound on an unbound letter answered «כבר קיים» and vanishing. The variable family now waits, marked, like «α = 70» (#926), and binds later.
+
+### `variable-bound-scaled-coefficient-1658` — «AB = 2k» · «k > 40» bounds |AB| > 80 (#1658, ADR-562)
+
+**Guards against:** a bound on a letter bound with a coefficient lowering to nothing. A positive coefficient carries the window; other forms are refused by name.

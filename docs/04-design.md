@@ -862,6 +862,27 @@ A created circle whose centre the sentence does not name carries `autoCenter`, s
 anonymiser hides its centre until `name-center` promotes it. The resolver's auto letter avoids the
 sentence's own labels, because the anonymiser remaps every exact use of that letter.
 
+## A foreign given is refused by the grammar, before any rule ([ADR-562](06-decisions.md#adr-562))
+
+`classifyOutOfScope` (`parser/scope.ts`) holds the vocabulary of the families another tool owns — `analytic`
+(axes, coordinates, slope, line equations, and since #1655 a quadrant) and `cross-app` (the solids, and since
+#1656 a plane as an object, via the `planeObject` matcher that exempts the setting phrase «במישור …»). It ran
+only on a FAILED parse, so a rule that read the rest of the sentence committed it with the foreign operand
+absorbed. `foreignGiven` asks the same two rules of the utterance at the top of `parse()` — the placement and
+reason of the LaTeX and negation guards — and `parse` returns `{ ok: false, reason: 'foreign-given', category,
+phrase }`. Because it is `parse`, every seam inherits it: the submit lane (`decideFromParse` answers with
+`input.scope.foreign-given`, quoting `phrase` ahead of the family's unchanged pointer, logged as
+`scope:<category>`), the ✎ edit seam, the scenario harness (`refusedSteps`) and log-triage. One vocabulary:
+the pre-parse guard and the post-failure register read the same `RULES` entries.
+
+## A variable statement waits for its letter ([ADR-562](06-decisions.md#adr-562))
+
+`isVariableStatement` (`set-var`, `measure-bound`, `measure-order`) and `unboundSubjectOf` in `engine/lower.ts`
+generalise #926's `set-var`-only question: the fold stamps any variable statement whose letter no statement binds
+into the waiting register, `classify` counts it as pending, and `dryRunOutcome` commits it as data. A relation
+whose letters are bound but in a form it cannot follow (`unenforceableRelation` — it lowers to nothing) gets an
+error status and is refused at submit. `lowerOne` scales a bound by a positive linear coefficient.
+
 ## A stated side is a requirement record, checked at stage 0g′ ([ADR-549](06-decisions.md#adr-549))
 
 - **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`) — `circle-side`,

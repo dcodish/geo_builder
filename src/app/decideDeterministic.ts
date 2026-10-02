@@ -261,6 +261,17 @@ export async function decideFromParse(
   // #770 — a definite SHAPE reference whose named kind is not in the figure («אלכסוני הריבוע» on a
   // trapezoid-only figure): refuse naming the statement, keep the text. Deterministic — the LLM could
   // only bind something the student did not say (ADR-052).
+  /**
+   * #1654–#1657 ([ADR-562](../../docs/06-decisions.md#adr-562)) — a FOREIGN GIVEN (a slope, a quadrant, a
+   * plane, a sphere…) the grammar refused before any rule could read part of it. Answered with the
+   * family's own pointer (analytic Builder / Space Builder), prefixed by the student's word, so a mixed
+   * sentence says which clause could not be kept and that nothing of it was built. Never escalated: the
+   * model could only re-absorb the operand into a plane given, which is the defect itself. Logged under
+   * the family's existing `scope:<category>` tag, so the dashboard's register is unchanged.
+   */
+  if (!r.ok && r.reason === 'foreign-given') {
+    return refuse('guided', { source: 'scope', result: `scope:${r.category}`, phrase: r.phrase }, { key: 'input.scope.foreign-given', params: { phrase: r.phrase, guide: { t: `input.scope.${r.category}` } } });
+  }
   if (!r.ok && r.reason === 'shape-not-found') {
     return refuse('guided', { source: 'parser', result: `shape-not-found:${r.noun}` }, { key: 'input.shapeNotFound', params: { noun: r.noun } });
   }

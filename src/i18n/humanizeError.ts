@@ -282,6 +282,9 @@ export const PATTERNS: Pattern[] = [
   // core.ts (#926) — `variable α is not defined by any statement (the step that defined it was removed, muted or failed)`
   { re: /^variable (\S+) is not defined by any statement/, key: 'errors.unboundVariable', params: (m) => ({ name: m[1] }) },
 
+  // core.ts (#1658, ADR-562) — `relation on k cannot be enforced (a letter is used in a form this statement cannot follow)`
+  { re: /^relation on (.+) cannot be enforced/, key: 'errors.unenforceableRelation', params: (m) => ({ names: m[1] }) },
+
   // step.ts degenerateConstraintError (ADR-202) — `⟂ needs two distinct points on each side — "BB" is a single point, not a segment`
   {
     re: new RegExp(`^(⟂|∥) needs two distinct points on each side ${EMDASH} "(.+)" is a single point, not a segment$`),
