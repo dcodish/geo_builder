@@ -14,6 +14,7 @@
     "src-analytic/__tests__/issue-1473-pool-invariant.test.ts",
     "src-analytic/__tests__/issue-1556-freerank-equality-rows.test.ts",
     "src-analytic/__tests__/issue-1637-g1-knowledge.test.ts",
+    "src-analytic/__tests__/panel-freedom-invariant-1289.test.ts",
     "src/__tests__/determined-prints-1.test.ts",
     "src/__tests__/determined-prints-2.test.ts",
     "src/__tests__/determined-prints-3.test.ts",
