@@ -20,18 +20,23 @@
  */
 import { fmtNum } from '../../shell/format';
 import { isKnowledge, type Figure } from '../engine/evaluate';
-import { isVertical } from '../engine/lines';
+import { isHorizontal, isVertical } from '../engine/lines';
 import type { Construction } from '../engine/types';
 
 /** A direction in one configuration: what a caller reads off a figure. */
 export type DirectionReader = (f: Figure) => { dx: number; dy: number } | null;
 
-/** The angle, in degrees in [0, 180), of one direction. Both ends of the fold snap to 0, so a horizontal line never flickers between 0 and 180. */
+/**
+ * The angle, in degrees in [0, 180), of one direction. Both ENDS are decided by the same scale-free
+ * predicates (`isVertical` / `isHorizontal`, one tolerance), never by an absolute epsilon in degrees: a
+ * solved horizontal side carries the solver's residual (#1648 measured Δy = −2.8e-8 on Δx = 2 — the
+ * fold gave 179.9999992°, which an absolute 1e-9° snap missed and the display rounded to «180°»).
+ */
 export function angleWithXAxis(dx: number, dy: number): number {
   if (isVertical(dx, dy)) return 90;
+  if (isHorizontal(dx, dy)) return 0;
   const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
-  const folded = ((deg % 180) + 180) % 180;
-  return folded < 1e-9 || 180 - folded < 1e-9 ? 0 : folded;
+  return ((deg % 180) + 180) % 180;
 }
 
 /** The angle as KNOWLEDGE: a number only when every valid configuration agrees on it. */

@@ -10,7 +10,7 @@
  * The domain is honoured HERE, at sampling time, which is D7 kind 1: a value outside it was never
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
-import { isDirectionSymbol, paramRegister, usedSymbols } from './carriers';
+import { isDirectionSymbol, paramRegister, shapedObjectOf, toolSymbol, usedSymbols } from './carriers';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
@@ -1160,6 +1160,176 @@ export function choiceSeedOf(c: Construction, seed: number): number {
   return evaluate(c, seed).choiceSeed ?? seed;
 }
 
+/**
+ * A SHAPE THE TOOL CREATED IS FITTED TO THE FIGURE IT JOINS before the figure is solved (#1647, ADR-AG-202).
+ *
+ * A tangency sentence with no circle creates one (ADR-AG-198 ruling b): an equation circle whose centre and
+ * radius are the tool's own free symbols (`θ_<object>.<part>`). The sampler draws those symbols blind — a circle
+ * anywhere, of any size — and the solve then had to make that random circle tangent to the stated sides. When a
+ * side's line cannot move to it (a side on an axis), stage one fails and stage two solves EVERYTHING jointly; and
+ * the cheapest joint answer is to collapse the side the circle must touch (A or B onto O makes "D on AO" true for
+ * any D). Measured on «הצלעות AO ו-BO משיקות למעגל בנקודות D ו-E בהתאמה» after the right triangle on the axes: 4 of
+ * 24 raw seeds admitted, ~170 ms per failing seed, 13 evaluations and ~2.1 s per submit.
+ *
+ * The figure the circle joins was stated FIRST. So the new circle and its touch points (the free points the
+ * statements put ON it) are fitted to the figure the earlier givens draw at this seed — the construction without
+ * them, evaluated for real, every one of its vertices held where it stands, the constraints that mention the
+ * circle, a touch point or anything defined through them as the residuals — and that fit is where the solve
+ * starts: the seed's sample of the circle, made consistent with what was said about it. It is the bounded-noun
+ * and region seeding's lesson (#1071, #1168) for a created object, and the structural stability rule: adding a
+ * statement moves what it introduced, not what was already there.
+ *
+ * A START, NEVER A VERDICT. The fit is tried from the seeded touch points and then from the quarter points of
+ * each bounded piece they lie on (the restarts the solve already uses); a fit the selectors accept is preferred,
+ * any converged fit is used, and with none the evaluation starts exactly as it did. The radius stays free: the
+ * fit moves the seed's sample as little as the descent must, so another seed draws another circle.
+ */
+/** The figure a created shape JOINS — the construction without it — evaluated once per (raw construction, seed, choice). */
+const priorMemo = new WeakMap<Construction, { prior: Construction; figures: Map<string, Figure> } | null>();
+function priorOf(raw: Construction, removed: ReadonlySet<Id>): { prior: Construction; figures: Map<string, Figure> } {
+  let hit = priorMemo.get(raw);
+  if (!hit) {
+    const objects = raw.objects.filter((o) => !removed.has(o.id));
+    hit = {
+      prior: {
+        ...raw,
+        objects,
+        constraints: raw.constraints.filter((k) => !mentionsAny(k, removed)),
+        selectors: raw.selectors.filter((sel) => !mentionsAny(sel, removed)),
+      },
+      figures: new Map(),
+    };
+    priorMemo.set(raw, hit);
+  }
+  return hit;
+}
+
+interface CreatedFit {
+  env: Env;
+  seeded: Map<Id, Pt>;
+  /** The figure the shape joins admits no configuration here, so neither does the whole: nothing is searched. */
+  dead: boolean;
+}
+
+function fitCreatedShapes(raw: Construction, c: Construction, env: Env, seeded: Map<Id, Pt>, seed: number, choiceSeed: number): CreatedFit | null {
+  const syms = paramRegister(c)
+    .map((q) => q.sym)
+    .filter((sym) => shapedObjectOf(sym) !== null && env[sym] !== undefined);
+  if (syms.length === 0) return null;
+  const shaped = new Set<Id>(syms.map((sym) => shapedObjectOf(sym)!));
+  const movers = [...seeded.keys()].filter((id) => c.constraints.some((k) => k.t === 'on-curve' && k.id === id && shaped.has(k.curve)));
+  // Everything the new shape brings: the shape, its touch points, and every object defined through them (a centre
+  // named «O מרכז המעגל», a polygon over a touch point, a point defined from those) — closed in declaration order.
+  const removed = new Set<Id>([...shaped, ...movers]);
+  for (const o of c.objects) if (!removed.has(o.id) && mentionsAny({ ...o, id: '' }, removed)) removed.add(o.id);
+  const own = c.constraints.filter((k) => mentionsAny(k, removed));
+  if (own.length === 0) return null;
+  /*
+   * THE FIGURE AS IT STOOD. The seed's raw vertices satisfy nothing yet, so the construction WITHOUT the new shape
+   * is evaluated first — the real evaluation, its own stages and restarts, at this seed and this choice — and the
+   * shape is fitted to that figure. Its givens are a subset of the whole's and mention none of the shape's
+   * unknowns, so a seed at which it admits no configuration admits none for the whole either (a dead right-angle
+   * seat, #1642): that seed is not searched again with the shape's unknowns added — measured, that search cost
+   * 150–500 ms per dead seat, against 20–40 ms for the figure alone. The post-hoc check still judges every given.
+   */
+  const memo = priorOf(raw, removed);
+  const key = `${seed}:${choiceSeed}`;
+  let before = memo.figures.get(key);
+  if (!before) {
+    before = evaluateUncached(memo.prior, seed, choiceSeed);
+    memo.figures.set(key, before);
+  }
+  const dead = !admittedFigure(before);
+  const base = new Map(seeded);
+  for (const q of before.points) if (base.has(q.id)) base.set(q.id, { x: q.x, y: q.y });
+  env = { ...before.env, ...Object.fromEntries(syms.map((sym) => [sym, env[sym]])) };
+  const unpack = (x: number[]): { e: Env; free: Map<Id, Pt> } => {
+    const e: Record<string, number> = { ...env };
+    syms.forEach((sym, j) => {
+      e[sym] = x[2 * movers.length + j];
+    });
+    const free = new Map(base);
+    movers.forEach((id, i) => free.set(id, { x: x[2 * i], y: x[2 * i + 1] }));
+    return { e, free };
+  };
+  const residualsAt = (x: number[]): number[] => {
+    const { e, free } = unpack(x);
+    const pos = place(c, e, free);
+    const at = (id: Id) => pos.get(id) ?? null;
+    const curveAt = curveAtOf(c, e, at);
+    const lineAt = lineAtOf(c, e, at);
+    return own.flatMap((k) => residual(k, at, e, curveAt, lineAt) ?? [0]);
+  };
+  /*
+   * THE STARTS. Each touch point first goes onto the piece its noun bounds («הצלע AO»: inside A–O) — at its seed's
+   * own position along the piece when that falls inside, else the midpoint (the bounded-noun seeding, #1168), then
+   * at the quarter points. The circle then starts THROUGH its touch points — centred at their centroid, the mean
+   * distance as its radius — so the descent starts inside the angle the touched sides make, not wherever the blind
+   * sample put it (the far quadrant fits the lines and fails every `between`). With one touch point that carries
+   * no position for a centre, the seed's own sample is the circle's start; the blind sample is the last start.
+   */
+  const placed = place(c, env, base);
+  const pieces = c.constraints.filter(
+    (k): k is Extract<Constraint, { t: 'on-line-2pt' }> => k.t === 'on-line-2pt' && k.bounded === true && movers.includes(k.id),
+  );
+  const onPieces = (t: number | null): Map<Id, Pt> => {
+    const m = new Map(base);
+    for (const k of pieces) {
+      const pa = placed.get(k.a);
+      const pb = placed.get(k.b);
+      const q = m.get(k.id);
+      if (!pa || !pb || !q) continue;
+      const dx = pb.x - pa.x;
+      const dy = pb.y - pa.y;
+      const len2 = dx * dx + dy * dy;
+      if (!(len2 > 1e-12)) continue;
+      const own = ((q.x - pa.x) * dx + (q.y - pa.y) * dy) / len2;
+      const u = t ?? (own > 0 && own < 1 ? own : 0.5);
+      m.set(k.id, { x: pa.x + u * dx, y: pa.y + u * dy });
+    }
+    return m;
+  };
+  const throughTouches = (m: Map<Id, Pt>): Env => {
+    const e: Record<string, number> = { ...env };
+    for (const o of shaped) {
+      const [sa, sb, sr] = (['a', 'b', 'r'] as const).map((part) => toolSymbol(o, part));
+      if (!syms.includes(sa) || !syms.includes(sb) || !syms.includes(sr)) continue;
+      const touch = movers
+        .filter((id) => c.constraints.some((k) => k.t === 'on-curve' && k.id === id && k.curve === o))
+        .map((id) => m.get(id)!);
+      if (touch.length < 2) continue;
+      const cx = touch.reduce((acc, q) => acc + q.x, 0) / touch.length;
+      const cy = touch.reduce((acc, q) => acc + q.y, 0) / touch.length;
+      const r = touch.reduce((acc, q) => acc + Math.hypot(q.x - cx, q.y - cy), 0) / touch.length;
+      if (!(r > 1e-9)) continue;
+      e[sa] = cx;
+      e[sb] = cy;
+      e[sr] = r;
+    }
+    return e;
+  };
+  const vecOf = (m: Map<Id, Pt>, e: Env) => [...movers.flatMap((id) => [m.get(id)!.x, m.get(id)!.y]), ...syms.map((sym) => e[sym])];
+  const starts: number[][] = [];
+  for (const t of [null, 0.25, 0.75]) {
+    const m = onPieces(t);
+    starts.push(vecOf(m, throughTouches(m)));
+    if (pieces.length === 0) break;
+  }
+  starts.push(vecOf(base, env));
+  const domains = new Map(paramRegister(c).map((q) => [q.sym, q.domain] as const));
+  let fallback: CreatedFit | null = null;
+  for (const x0 of starts) {
+    const r = solveLM(x0, residualsAt, 60);
+    if (!r.ok) continue;
+    const { e, free } = unpack(r.values);
+    const pos = place(c, e, free);
+    if (!syms.every((sym) => inDomain(domains.get(sym) ?? {}, e[sym], openBoundFloor(pos, e, syms)))) continue;
+    if (failingSelectors(c, pos, e).length === 0) return { env: e, seeded: free, dead };
+    fallback ??= { env: e, seeded: free, dead };
+  }
+  return fallback ?? (dead ? { env, seeded: base, dead } : null);
+}
+
 function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figure {
   /**
    * DISCRETE freedom is resolved HERE, once, before anything measures a constraint (#1049).
@@ -1315,6 +1485,13 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
     }
   }
 
+  // A circle the tool created starts fitted to the figure it joins (#1647) — a start, never a verdict.
+  const fitted = fitCreatedShapes(raw, c, env, seeded, seed, choiceSeed);
+  if (fitted) {
+    env = fitted.env;
+    for (const [id, p] of fitted.seeded) seeded.set(id, p);
+  }
+
   const unsatisfied: Constraint[] = [];
   let free = seeded;
   // Built unconditionally (#1317): the DOF report is rank over the SAME vector the solve moves, and a
@@ -1440,7 +1617,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
     return swapped ? [system.toVec(m, env0)] : [];
   };
 
-  if ((ids.length > 0 || sys.syms.length > 0) && c.constraints.length > 0) {
+  if ((ids.length > 0 || sys.syms.length > 0) && c.constraints.length > 0 && !fitted?.dead) {
     // Through `carrierSystem` (#1137) so the locus tracer walks the SAME residuals this solves.
     const solved = sys;
     /**
