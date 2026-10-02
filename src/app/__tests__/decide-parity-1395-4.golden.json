@@ -140,6 +140,7 @@
  "scenario:variable-bound-waits-then-binds-1658": "1c47ebd3618c9daf",
  "scenario:variable-bound-scaled-coefficient-1658": "8e20b121b7f7267a",
  "scenario:chord-and-diameter-as-relation-operands-1661": "cb14134ec6ad24a2",
+ "scenario:chord-claim-contradiction-refused-in-every-spelling-1668": "89022a62bfbce06d",
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",
  "fixture:defining-interaction.geo.json": "453b283f490e90b0",
  "fixture:equilateral-inscribed.geo.json": "d8a2b3c24fc515b8",

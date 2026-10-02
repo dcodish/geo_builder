@@ -561,7 +561,7 @@ export async function decideFromParse(
       // The gate is the SAME one `classify` applies after replay (issue #207 / ADR-385): a CONCLUDED
       // contradiction — a relation whose residual is invariant or provably one-signed across the free
       // configurations — must take the honest-refusal route below, never park as «waiting for givens».
-      if (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands)) {
+      if (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands, seed)) {
         return {
           kind: 'commit', deferred: true, binds, commands: r.commands, note: null,
           logs: [...logs, { source: 'parser', result: 'deferred-constraint', detail: outcome.detail, commands: r.commands }],

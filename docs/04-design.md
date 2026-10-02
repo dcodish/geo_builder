@@ -782,6 +782,18 @@ run, the role re-readings, deferral and the seam guards — is `decideDeterminis
 A new pre-LLM branch belongs in the decision — the mirror test fails if `runSubmit` parses or refuses on its
 own — and the parity shards (`decide-parity-1395-*`) hold the whole corpus to the recorded behaviour.
 
+**Deferral reads the fold's per-fact verdict ([ADR-564](06-decisions.md#adr-564)).** When the dry run
+errors, the decision asks `deferralWorthwhile` whether to commit the line as "waiting for givens" (ADR-104)
+or refuse it. The fold's classifier judges each failed FACT (`waits` in `computeFold`); the gate used to
+judge the LINE ("does some new constraint flex?"), so a line whose relation flexed was parked while one of
+its other members — a role noun's chord claim on a midpoint — had already been filed as a concluded
+contradiction. The fold now records that per-fact verdict from its first build, before atomic poisoning
+(`FoldNode.concludedByIndex` → `Derived.concluded`), and the gate refuses any line with a member in it —
+unless the figure has an unpinned right-angle seat (`unpinnedSeats`, shared with `seatRescue`): that verdict
+is taken at the current seat, and a seat the student never stated yields (ADR-551 Am. 1), so the post-commit
+config search gets the line. One claim therefore gets one verdict however it is spelled. On the submit path the read is a fold-memo hit:
+the dry run has just folded the same trial.
+
 ## Re-reading a role-assigned letter run ([ADR-521](06-decisions.md#adr-521))
 
 Between the dry run and the refusal, the pre-LLM decision (`app/decideDeterministic.ts`) asks `app/roleReadings.ts` one question:
