@@ -451,3 +451,24 @@ The caller mounts it once per opening (`key`), so typed text, the note and the o
 - Analytic: `parseLine`.
 
 **The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/proof-target-rows.ts`. Each builder's thin lock hands over a `ProofGate`: its REAL submit decision on a figure with A, B and C, answering `{ proof, recorded, text }`. The rows check that every spelling is refused as a proof target, recorded by none and quoted by the refusal, and that the negatives are never refused as one. The meta-lock proves each check can fail.
+
+## Geometry-input parity ([ADR-W-108](06w-decisions-workspace.md#adr-w-108))
+
+`shell/__tests__/fixtures/geo-input-parity.ts` holds the rows and the checks once (docs/28 §5c). `shell/` imports no product, so no single test runs two builders. Equality is carried **transitively**: each row states `expect`, the verdict the reference gives. The 2-D thin lock asserts 2-D gives it, and every other thin lock asserts the same literal.
+
+| piece | what it is |
+| --- | --- |
+| `Verdict` | `builds` (recorded, or already known) · `refused` (an owned refusal) · `asks` (a clarifying question: 2-D `clarify`, analytic and 3-D `ambiguous-*`) · `not-handled` (the line would go to the model) |
+| `StepRunner` | the product's REAL submit decision over an empty canvas, carrying the figure forward; one verdict per step |
+| `ParityRow` | `steps` (context, then the sentence under test), `expect`, optional `contextFor` (another context for one product, the sentence unchanged), `exception`, `only`, `knownGap` |
+| `EXCEPTIONS` X1–X9 | per family: the builders that read it, the builders that must not BUILD it (`mustRefuse`), whether it is a topic outside plane geometry, and its sentence patterns |
+| `parityFaults(runners)` | per row and product: an early return; a context line that does not build; an expected product off `expect`; a known gap that now gives `expect` ("move it to the parity rows"); a `mustRefuse` product that builds |
+| `catalogCoverageFaults(product, sentences)` | each construction sentence of the catalog is a step of a row the product takes part in, a topic-family sentence the product reads, or on `UNCOVERED_CATALOG` (a ratchet under `UNCOVERED_CEILING`) |
+| `rowFaults()` | the rows themselves: unique ids, issues named, exception patterns matched, `only` and `contextFor` used where they are checked |
+
+**The runners.**
+- 2-D: `decideDeterministic2D`, applying binds, the batch commit or the store operation as `runSubmit` does.
+- Analytic: `decideSubmit`, appending on `record`.
+- 3-D: `decideSubmit3`, carrying facts and seed.
+
+The model is never called. **The meta-lock** runs the same checks against an oracle built from the rows, and against that oracle with one defect each: an early return, always-builds, always-refuses, swapped asks/refused, a known gap that heals, a broken context, an excluded builder that absorbs. Each is caught.

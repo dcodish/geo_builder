@@ -5151,3 +5151,57 @@ So in two builders the figure was made to satisfy the claim the student had to p
 - **Keeping 3-D's "prove that" as a verified claim.** It verified only on a determined figure, and on a free figure it drove the figure. The ruling is one behaviour in all three builders. A claim typed WITHOUT a proof verb still reads as before in 3-D.
 
 **Consequences.** `shell/proofTarget.ts` (new); the per-product call sites as listed. Locks: one shell fixture and meta-lock, three thin locks, the 2-D scenario `proof-target-refused-1666`, and `parse3-v1.test.ts` drops its proof-prefix input. Analytic's `issue-1618-sentence-frame.test.ts` locks are unchanged and green.
+
+## ADR-W-108 — One plane-geometry sentence, one verdict in every builder: the cross-product input-parity lock (#1649)
+
+**Status:** accepted · 2026-10-02 · feature (branch `feat/1649-parity-lock`) · `auto-ok` as transcription of the operator's approval (ADR-W-014). Applies [ADR-W-071](#adr-w-071) (docs/28 §5c). Rulings cited:
+- **2026-10-02, on the step-1 audit:** (1) proof targets are refused in all three builders (shipped as [ADR-W-107](#adr-w-107), #1666); (2) the 2-D-only candidates X10–X13 (symbolic lengths, arcs/sectors/semicircles, ≅/~ and segment products, sized and regular shapes) are PORTED to analytic, not excepted. The exceptions table is X1–X9, with no 2-D-only exceptions.
+- **2026-10-02, the governing principle:** *"analytics and 2d should have same user experience"*. For plane geometry 2-D's verdict is the reference, and the lock asserts verdict EQUALITY (builds / refuses / asks), not merely "builds in both".
+- **2026-10-02, on #1670:** analytic follows 2-D on a radius naming an unnamed centre, on «A על המעגל» with no circle, and on new letters in a bare relation. On the hidden centre answering to «O», **2-D changes** (#1673): the one row whose `expect` is the ruling and not 2-D's current verdict.
+
+**Requirements:** docs/02w FR-SU-16 (new). · **Design:** docs/04w — "Geometry-input parity" (new section); docs/28 §5c lists the instance; docs/22 §10 states the workflow rule; CLAUDE.md "Conventions to carry forward" points at it. **Product:** workspace (2d + analytic + 3d), test code only — no product code changes.
+
+**Context.** The operator: *"we need a rule that ensures consistency in data input"*. The step-1 audit (#1649, on 5f042e40) measured 474 plane sentences through the three real submit decisions. 48% worked in every builder they should. Since then #1650, #1651, #1652, #1654–#1658, #1659, #1661, #1663, #1665 and #1666 landed. Re-measured on c6a412aa:
+- the audit's `op-1650` (2-D refused a tangency typed first) and `op-1651` (analytic refused the chord noun as an operand) build in both builders now, and are parity rows;
+- 2-D's honesty findings now refuse correctly and are exception rows: the slope (#1654), the quadrant (#1655), the plane (#1656) and the sphere (#1657);
+- the bound «0 < k < 6» is no longer an exception: 2-D records it as waiting for its letter (ADR-562, #1658), as analytic does. It is a parity row;
+- proof targets are refused by all three (#1666), and are parity rows with `expect: 'refused'`.
+
+**Decision.**
+1. **The rows live once** in `shell/__tests__/fixtures/geo-input-parity.ts`. **305 rows.**
+   - **116 parity rows:** every builder expected gives `expect`.
+   - **172 known-gap rows:** the named builder must still differ. Each names the issue that ports it, or `to-file:<family>` until it is filed. A row that starts agreeing FAILS with "now builds — move it to the parity rows", so the gap list only shrinks.
+   - **18 topic-exception rows:** X1–X7. The builders in `mustRefuse` must not build the sentence. They refuse, ask, or hand it to the model, and never draw it as something else.
+   Every construction sentence of the three catalogs is a row step, in a context that types in every builder expected (`cat-<catalog>-NNN`), plus the audit's seed, #1669's and #1670's tables, and the exception rows.
+2. **Equality is transitive.** `shell/` may not import a product, so each row carries the reference verdict as `expect`. Each tree's thin lock asserts its own verdict against it through its REAL submit decision:
+   - `src/__tests__/geo-input-parity.test.ts`: `decideDeterministic2D`;
+   - `src-analytic/__tests__/geo-input-parity.test.ts`: `decideSubmit`;
+   - `src3d/__tests__/geo-input-parity.test.ts`: `decideSubmit3`.
+   Where 2-D itself is the known gap, `expect` is the verdict 2-D owes (the other builders'). Where a ruling overrides 2-D (#1673), `expect` is the ruling.
+3. **The exceptions table, X1–X9.**
+   - X1 coordinates/axes/origin/quadrants (analytic, 3-D)
+   - X2 equations, slopes, conics (analytic)
+   - X3 R³ parametric lines and plane equations (3-D)
+   - X4 named lines (analytic, 3-D)
+   - X5 parameter declarations (analytic, 3-D)
+   - X6 coordinate notation (analytic)
+   - X7 solids, planes, vectors, primes (3-D)
+   - X8 circle geometry (2-D, analytic): 3-D is not expected, except the four circle rows of its own catalog
+   - X9 free points (2-D, analytic): 3-D defines points by solids or coordinates
+   X1–X7 are topic families and cover catalog sentences by pattern. X8 and X9 only narrow where 3-D is expected, so their sentences still need rows. A row may narrow an exception with `only` where a builder of the family reads it in its own spelling only («A(2,6)» is analytic's; 3-D writes «A(2,-2,6)»).
+4. **The catalog check.** Every construction sentence of each catalog is a row step, a topic-family sentence, or on `UNCOVERED_CATALOG`. That is a ratchet: an allowlisted sentence that becomes covered or leaves the catalog is a fault, and the size sits under `UNCOVERED_CEILING`. Today: **2-D 0, analytic 1, 3-D 4.** Each entry is commented.
+5. **The meta-lock** `shell/__tests__/geo-input-parity-meta.test.ts` runs the same `parityFaults` / `catalogCoverageFaults` / `rowFaults` against an oracle built from the rows and against broken variants: an early return, always-builds, always-refuses, swapped asks/refused, a healed known gap, a broken context, an absorbing excluded builder, an uncovered sentence, and a stale allowlist entry. Each is caught.
+6. **The rule** is docs/22 §10: a plane-geometry input change lands in every builder that should read it, or adds a known-gap row naming its issue; an exception needs a family in `EXCEPTIONS`.
+
+**Not a verdict.** How a figure is drawn (#1652's "both segments drawn") and which points or circle a sentence introduces are left to each builder's own locks. The ruling's "the same points introduced, the same circle created or bound" is a next step for this lock, not built here.
+
+**Rejected.**
+- **One test importing all three runners.** It breaks the isolation rule (BOUNDARIES.json). The transitive literal gives the same equality.
+- **"Builds in both" as the check.** The governing ruling asks for the same verdict: a refusal in one and a question in the other is a disparity too.
+- **Excepting X10–X13.** Ruling 2 ports them; they are known-gap rows naming #1622.
+
+**Consequences.** New: the shell fixture and meta-lock, and three thin locks. The 2-D lock runs about 30 s, analytic about 1.5 s and 3-D about 3 s, so all stay in the fast tier. Rows that sat at 5–22 s in 2-D, because of contexts with six free points, were re-contexted.
+
+Known gaps without an issue are marked `to-file:<family>`:
+- 2-D: sentence frame, acute qualifier, passes-through, distance phrasing, compound midpoints, circle-defining clause, circle by three letters, role-noun length, «אורך X שווה לאורך Y», chords-crossing conflict, altitude-is-segment.
+- 3-D: lines and incidence, cevian forms, angle forms, noun phrasing, congruence and symbols, shape forms, base-shape qualifiers, area and perimeter, length-or-vector (the open Q2), triangle centres, bounds, ratio forms, plane grammar.
