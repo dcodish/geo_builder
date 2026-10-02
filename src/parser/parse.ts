@@ -116,6 +116,10 @@ export type ParseResult =
   // once bound, the letter IS the parametric measure, never a node (operator ruling 2026-07-18, #198). The
   // student picks another letter — a deterministic clarification, never a paid LLM call that mints a node R.
   | { ok: false; reason: 'reserved-symbol'; symbol: string }
+  // #1673 (ADR-565): a sentence uses the hidden reference letter of an UNNAMED circle's centre without naming the
+  // centre — as a point it only references (`as: 'point'`, «BO = 5»), or as a new circle's name that would overwrite
+  // the unnamed circle (`as: 'circle'`, «מעגל O»). The note teaches «X מרכז המעגל»; never bound, never minted.
+  | { ok: false; reason: 'hidden-centre-letter'; letter: string; as: 'point' | 'circle' }
   /** #775: a side named by its ROLE («ליתר», «לבסיס») with no unique referent in the figure —
    *  clarify rather than guess a side or burn an escalation on a form the LLM must not invent for. */
   | { ok: false; reason: 'role-side-unresolved'; role: string }
@@ -670,37 +674,77 @@ const promoteCentreUse = (ctx: ParseContext, letter: string): AnyCommand[] =>
     ? [{ type: 'name-center', center: up(letter) }]
     : [];
 
-/** Command kinds a PURE METRIC statement may lower to — a measure/relation plus its auto-drawn segments. */
-const METRIC_KINDS = new Set([
-  'segment', 'set-distance', 'set-ratio', 'set-equal', 'set-length-radius', 'set-angle', 'set-angle-ratio',
-  'set-measure-sum', 'set-length-product', 'set-area', 'set-area-ratio', 'set-perimeter', 'set-perimeter-ratio',
-  'measure-length', 'measure-angle', 'measure-area', 'mark-angle',
-]);
+/** Every bare upper-case label anywhere in a command — a deep walk over its values, so nested operands
+ *  (`set-equal` pairs, measure-sum terms) count. Composite ids (`circle-O`) never match a label. */
+const labelsDeep = (v: unknown, out: Set<string> = new Set()): Set<string> => {
+  if (typeof v === 'string') {
+    if (/^[A-Z]\d*$/.test(v)) out.add(v);
+  } else if (Array.isArray(v)) for (const e of v) labelsDeep(e, out);
+  else if (v && typeof v === 'object') for (const [k, e] of Object.entries(v)) if (k !== 'type' && k !== 'expr') labelsDeep(e, out);
+  return out;
+};
 
 /**
- * METRIC givens bind hidden-centre tokens ([ADR-342](docs/06-decisions.md#adr-342), issue #177 — the
- * operator's amended ruling): «OP=4» / «OM=4» / «OA=5» beside unnamed circles carry the textbook meaning
- * (O, P are THE centres), so a statement that is PURELY metric — only measure/relation commands and their
- * auto-drawn segments, nothing positional/definitional — promotes every auto-centre token it names.
- * «P על המשך BA» (the reported hijack) lowers to a `set-line`, which is NOT in the whitelist, so
- * PLACING statements keep treating the letter as fresh. The boundary is placing-vs-REFERENCING: a bare
- * segment «OP»/«PA» beside unnamed circles REFERENCES the centres (the operator's kite flow draws the
- * radii and the centre line by their tokens), so segment-only statements bind too — a segment never
- * (re)positions the letter, while every placing kind (on-*, extension, intersection) is outside the list.
+ * #1673 ([ADR-565](docs/06-decisions.md#adr-565), operator ruling on #1670, 2026-10-02: *"an unlablled circle
+ * should not be O automatically"*) — an UNNAMED circle's centre answers to no letter until a sentence names it.
+ *
+ * The tool picks a reference TOKEN for an unnamed circle (`O`, then `P`, `Q`, `K` — ADR-342), and that token is
+ * the one letter the student cannot see. This guard is the one place a parsed sentence meets it, at `parse`'s
+ * exit (beside the #198 reserved-symbol guard), so every rule, the clause split and the model's canonical lines
+ * pass through it. For each token `X` of an unnamed circle:
+ *
+ *  - **The sentence names the centre** (`name-center X` — «O מרכז המעגל», «OB רדיוס», «הרדיוס OB»: the words
+ *    say X IS the centre) → the student's own naming; the ADR-342 replay pre-scan makes X the visible centre.
+ *  - **The sentence names the circle** «מעגל X» and uses it → naming-by-use, the same as «C על מעגל K» binds K
+ *    to the unnamed circle (ADR-347): a `name-center X` is prepended. The token letter is not a privileged
+ *    spelling — it gets exactly what any other letter gets.
+ *  - **The sentence creates a circle with that id** («מעגל O» standing alone) → it would overwrite the unnamed
+ *    circle and every point riding it. Refused (`hidden-centre-letter`, `as: 'circle'`).
+ *  - **The sentence introduces X as its own new point** («נקודה O», «O על המעגל») → a fresh point, as for any
+ *    fresh letter.
+ *  - **Otherwise X is only REFERENCED** («BO = 5», «AM חותך את CO», «זווית AOC = 40») → refused
+ *    (`hidden-centre-letter`, `as: 'point'`) with the naming sentence to type. Before #1673 a metric reference
+ *    bound and revealed the hidden centre (the ADR-342 amendment this supersedes) and every other reference
+ *    minted a free point O beside a circle whose centre the student was told nothing about.
  */
-function withMetricCentreBinding(commands: AnyCommand[], ctx: ParseContext): AnyCommand[] {
-  if (!(ctx.autoCenters ?? []).length) return commands;
-  if (commands.length === 0 || !commands.every((c) => METRIC_KINDS.has(c.type))) return commands;
-  const letters = new Set<string>();
-  for (const c of commands)
-    for (const [k, v] of Object.entries(c)) {
-      if (k === 'type' || k === 'expr') continue;
-      if (typeof v === 'string' && /^[A-Z]\d*$/.test(v)) letters.add(v);
-      if (Array.isArray(v)) for (const e of v) if (typeof e === 'string' && /^[A-Z]\d*$/.test(e)) letters.add(e);
+
+const withHiddenCentreGuard = (r: ParseResult, s: string, ctx: ParseContext): ParseResult => {
+  if (!r.ok) return r;
+  const tokens = (ctx.autoCenters ?? []).map(up);
+  if (!tokens.length) return r;
+  const points = new Set((ctx.points ?? []).map(up));
+  const named = new Set(r.commands.flatMap((c) => (c.type === 'name-center' ? [up(c.center)] : [])));
+  // a parser-injected `ifAbsent` circle over an existing id is skipped by the engine — it creates and claims nothing
+  const live = r.commands.filter((c) => !((c.type === 'circle' || c.type === 'circle-through') && (c as { ifAbsent?: boolean }).ifAbsent && tokens.includes(up(c.center))));
+  // the letters the sentence itself puts after the circle word («מעגל O», «במעגל O», "circle O") or states as the centre
+  const said = new Set(
+    [...[...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => m[1]), circleCenter(s) ?? '']
+      .filter((x) => /^[A-Z]/.test(x))
+      .map(up),
+  );
+  const prepend: AnyCommand[] = [];
+  for (const X of tokens) {
+    if (named.has(X) || !said.has(X) || points.has(X)) continue;
+    // the student names a NEW circle with the letter — it would overwrite the unnamed circle (a tool-minted twin,
+    // `autoCenter`, re-using the token is the label pick's own collision, not a letter the student typed)
+    if (live.some((c) => (c as { id?: unknown }).id === circleId(X) && !(c as { autoCenter?: boolean }).autoCenter)) return { ok: false, reason: 'hidden-centre-letter', letter: X, as: 'circle' };
+    // the student calls the unnamed circle «מעגל X» and uses it — naming-by-use, as «C על מעגל K» names K (ADR-347)
+    if (live.some((c) => JSON.stringify(c).includes(JSON.stringify(circleId(X))))) {
+      prepend.push({ type: 'name-center', center: X });
+      named.add(X);
     }
-  const promos = [...letters].flatMap((l) => promoteCentreUse(ctx, l));
-  return promos.length ? [...promos, ...commands] : commands;
-}
+  }
+  const introduced = new Set(live.flatMap((c) => {
+    const o = c as { id?: unknown; id1?: unknown; id2?: unknown };
+    return [o.id, o.id1, o.id2].filter((v): v is string => typeof v === 'string').map(up);
+  }));
+  const used = labelsDeep(live.filter((c) => c.type !== 'name-center'));
+  for (const X of tokens) {
+    if (named.has(X) || points.has(X) || introduced.has(X)) continue;
+    if (used.has(X)) return { ok: false, reason: 'hidden-centre-letter', letter: X, as: 'point' };
+  }
+  return prepend.length ? { ok: true, commands: [...prepend, ...r.commands] } : r;
+};
 
 /**
  * The ADR-342 post-pass (the ADR-119 chokepoint pattern): every command in a winning parse that CREATES an
@@ -11008,9 +11052,9 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
     const idx = ordM[1] ? ['ראשון', 'שני', 'שלישי', 'רביעי'].indexOf(ordM[1]) : ['first', 'second', 'third', 'fourth'].indexOf(ordM[2].toLowerCase());
     const target = idx >= 0 && (ctx.circles?.length ?? 0) > idx ? ctx.circles![idx] : null;
     if (!target) return { ok: false, reason: 'not-handled' };
-    return withReservedGuard(parseResolved(s.replace(ordM[0], ordM[1] ? `מעגל ${target}` : `circle ${target}`), ctx), ctx);
+    return withHiddenCentreGuard(withReservedGuard(parseResolved(s.replace(ordM[0], ordM[1] ? `מעגל ${target}` : `circle ${target}`), ctx), ctx), s, ctx);
   }
-  return withReservedGuard(parseResolved(s, ctx), ctx);
+  return withHiddenCentreGuard(withReservedGuard(parseResolved(s, ctx), ctx), s, ctx);
 }
 
 /** The size-qualifier resolution (issue #102): rewrite each «[ל/ב/…]המעגל הגדול/הקטן» / "the big/small
@@ -11478,7 +11522,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
       if (claimed === 'unread') continue; // a role noun this winner read bare — let a later rule try, never commit the drop
       if (!Array.isArray(claimed)) return refusalOf(claimed);
       const resolved = withConcentricResolution(withImplicitCircles(withOnCircleMembership(claimed, s, ctx), ctx), s, ctx);
-      if (Array.isArray(resolved)) return { ok: true, commands: withStatedConvexity(withAnonymousAutoCentres(withMetricCentreBinding(withRadiusSymbolBinding(resolved, s, ctx), ctx)), s) };
+      if (Array.isArray(resolved)) return { ok: true, commands: withStatedConvexity(withAnonymousAutoCentres(withRadiusSymbolBinding(resolved, s, ctx)), s) };
       return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
     }
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).

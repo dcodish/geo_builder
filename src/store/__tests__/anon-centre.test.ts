@@ -9,6 +9,11 @@
  * reference token («מעגל O», `circle-O` — byte-unchanged), and — the operator's ruling (b) — a statement
  * whose WORDS name the centre («רדיוס OB») binds-and-PROMOTES the letter, while positional/definitional
  * statements always treat it as fresh.
+ *
+ * #1673 (ADR-565, operator ruling 2026-10-02 — *"an unlablled circle should not be O automatically"*)
+ * withdrew the ADR-342 metric amendment: a statement that only REFERENCES the hidden letter («OA=5») is
+ * refused with the naming sentence to type; the full matrix is locked in
+ * `src/__tests__/issue-1673-hidden-centre.test.ts`.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { parse, buildParseCtx, parseNameCenter } from '@/parser';
@@ -65,8 +70,11 @@ describe('anonymous auto-centres (ADR-342 / #177)', () => {
     expect((b as { circle: string }).circle).toBe('circle-O');
   });
 
-  it('a METRIC given binds the token (amended ruling): «OA=5» promotes O to the centre — a radius given', () => {
-    const fig = replay(factsOf(['מעגל', 'OA=5']), 0);
+  it('a METRIC given no longer binds the token (#1673): «OA=5» is refused; after «O מרכז המעגל» it is a radius given', () => {
+    const fig0 = replay(factsOf(['מעגל']), 0);
+    const r = parse('OA=5', buildParseCtx(fig0.construction, fig0.positions));
+    expect(!r.ok && r.reason, 'the hidden letter answers to nothing').toBe('hidden-centre-letter');
+    const fig = replay(factsOf(['מעגל', 'O מרכז המעגל', 'OA=5']), 0);
     for (const [, s] of Object.entries(fig.status)) expect(s).toBe('ok');
     // The textbook meaning: O IS the centre — promoted, and |OA| = 5 sizes the radius leg.
     expect(fig.positions.has('O'), 'O promoted').toBe(true);

@@ -38,7 +38,8 @@ const param = (a: { x: number; y: number }, b: { x: number; y: number }, p: { x:
 };
 
 describe('#119 — line∩circle within-segment SELECTION', () => {
-  const incircleBase = ['משולש שווה שוקיים ABC', 'AB=AC', 'במשולש חסום מעגל', 'OA', 'OB', 'OC'];
+  // «O מרכז המעגל»: an unnamed centre answers to no letter until named (#1673, ADR-565)
+  const incircleBase = ['משולש שווה שוקיים ABC', 'AB=AC', 'במשולש חסום מעגל', 'O מרכז המעגל', 'OA', 'OB', 'OC'];
 
   it('a centre-endpoint segment (external other end) lowers to onSegment, NOT the driving order', () => {
     const r = parse('המעגל חותך את BO בנקודה K', ctxAfter(incircleBase));

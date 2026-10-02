@@ -91,7 +91,7 @@ describe('theorem matchers (real pipeline)', () => {
     });
 
     it('two intersecting circles with the kite drawn out surface 37, 38 (entailed, none typed as a kite)', () => {
-      const ids = surfaced('שני מעגלים נחתכים', 'AB', 'OP', 'PA', 'PB', 'OA=OB');
+      const ids = surfaced('שני מעגלים נחתכים', 'AB', 'O מרכז המעגל', 'P מרכז המעגל', 'OP', 'PA', 'PB', 'OA=OB') // the centres named first (#1673);
       expect(ids).toEqual(expect.arrayContaining([37, 38]));
     });
 
@@ -530,7 +530,7 @@ describe('theorem matchers (real pipeline)', () => {
     });
 
     it('an ENTAILED kite (two intersecting circles) tags 37 level 2', () => {
-      expect(levelOf(37, 'שני מעגלים נחתכים', 'AB', 'OP', 'PA', 'PB', 'OA=OB')).toBe(2);
+      expect(levelOf(37, 'שני מעגלים נחתכים', 'AB', 'O מרכז המעגל', 'P מרכז המעגל', 'OP', 'PA', 'PB', 'OA=OB')).toBe(2);
     });
 
     it('an EMERGENT 30-60-90 (forced by a size given, never stated) tags 33/34 level 3', () => {

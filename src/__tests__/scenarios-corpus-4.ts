@@ -3190,4 +3190,30 @@ export const SCENARIOS_4: Scenario[] = [
       expect(gateVerdict(onCircle, 'המיתר AB מקביל ל-CD').kind, 'B on the circle: the relation spelling commits').toBe('commit');
     },
   },
+  {
+    id: 'hidden-centre-letter-refused-1673',
+    title: '#1673 (ADR-565): after «AB ו-BC משיקים למעגל …» the unnamed centre answers to no letter — «BO = 5» is REFUSED until «O מרכז המעגל» names it, then builds',
+    guards:
+      "Operator ruling 2026-10-02 on #1670: \"an unlablled circle should not be O automatically\". Measured on main 92881500 through decideDeterministic2D: after the tangency opener (which creates the circle with its centre hidden, ADR-560), «BO = 5» committed `name-center O` + |BO| = 5 — a metric reference bound the hidden centre by the letter the tool had picked (the ADR-342 metric amendment), and every non-metric reference («AM חותך את CO», «D על CO») minted a free point O beside a circle whose hidden centre carried the same letter. Root fix: one guard at parse()'s exit (`withHiddenCentreGuard`): a sentence that only REFERENCES an unnamed centre's letter is refused with the naming sentence to type. Step 2 is declared refused (letter O, as a point); step 3 names the centre in the student's own words; step 4 — the same sentence — then builds. The submit-door matrix (every reference form, the naming and introduction forms that keep building, «מעגל O» naming-by-use, the new-circle collision, English) is in src/__tests__/issue-1673-hidden-centre.test.ts.",
+    steps: ['AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה', 'BO = 5', 'O מרכז המעגל', 'BO = 5'],
+    refusedSteps: [
+      {
+        step: 2,
+        reason: 'hidden-centre-letter',
+        with: { letter: 'O', as: 'point' },
+        why: 'operator ruling 2026-10-02 on #1670 (#1673): an unlabelled circle is not O automatically — the centre answers to no letter until a sentence names it',
+      },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const circle = fig.construction.objects.find((o) => o.kind === 'circle') as { center: string; autoCenter?: boolean } | undefined;
+      expect(circle?.center, 'the named O IS the circle centre').toBe('O');
+      expect(circle?.autoCenter, 'named ⇒ visible').toBeUndefined();
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(dist(B, O), '|BO| = 5').toBeCloseTo(5, 4);
+      expect(dist(O, A), 'A and C on the circle').toBeCloseTo(dist(O, C), 6);
+      const dot = (A.x - O.x) * (B.x - A.x) + (A.y - O.y) * (B.y - A.y);
+      expect(Math.abs(dot) / (dist(O, A) * dist(A, B)), 'OA ⟂ AB — the tangency still holds').toBeLessThan(1e-6);
+    },
+  },
 ];

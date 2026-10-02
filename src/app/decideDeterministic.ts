@@ -386,6 +386,15 @@ export async function decideFromParse(
   // A BOUND radius symbol («R» after «רדיוס מעגל O הוא R») reused as a POINT label («מיתר AR») — once bound,
   // the letter IS the parametric radius, never a node (operator ruling, #198). Say so deterministically and
   // keep the text so the student renames the point; never a paid LLM call that would mint the node R.
+  /**
+   * #1673 (ADR-565): the sentence used the hidden letter of an unnamed circle's centre without naming the centre.
+   * The letter answers to nothing yet, so the note names the sentence that would make it the centre; the text
+   * stays in the box and no model is asked to guess what the letter means.
+   */
+  if (!r.ok && r.reason === 'hidden-centre-letter') {
+    const key = r.as === 'circle' ? 'input.hiddenCentreCircle' : 'input.hiddenCentreLetter';
+    return refuse('guided', { source: 'parser', result: `hidden-centre-letter:${r.as}:${r.letter}` }, { key, params: { letter: r.letter } });
+  }
   if (!r.ok && r.reason === 'reserved-symbol') {
     return refuse('guided', { source: 'parser', result: `reserved-symbol:${r.symbol}` }, { key: 'input.reservedSymbol', params: { symbol: r.symbol } });
   }

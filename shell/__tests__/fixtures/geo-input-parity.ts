@@ -670,9 +670,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #1670: the 2-D ≠ analytic verdicts that remain after #1669 ──
   { id: 'radius-unnamed-centre-1670', family: 'chords-arcs', steps: ['AB קוטר', 'OB רדיוס'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1670' }] },
   { id: 'on-circle-no-circle-1670', family: 'circles', steps: ['A על המעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1670' }] },
-  // operator ruling on #1670 (2026-10-02): an unlabelled centre must NOT answer to «O» — here 2-D is the one that changes,
-  // so `expect` is the ruled verdict (analytic's), not 2-D's current one
-  { id: 'hidden-centre-letter-1673', family: 'circles', steps: ['AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה', 'BO = 5'], expect: 'refused', exception: 'X8', knownGap: [{ product: '2d', issue: '#1673' }], note: 'the reference is the ruling, not 2-D: 2-D lets the unnamed centre answer to O' },
+  // operator ruling on #1670 (2026-10-02): an unlabelled centre must NOT answer to «O» — 2-D changed to it (#1673, ADR-565)
+  { id: 'hidden-centre-letter-1673', family: 'circles', steps: ['AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה', 'BO = 5'], expect: 'refused', exception: 'X8', note: 'an unnamed centre answers to no letter until «O מרכז המעגל» names it' },
   { id: 'bare-relation-new-letters-1670', family: 'parallel-perpendicular', steps: ['מעגל O', 'BD⊥AC'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1670' }], note: 'new letters in a bare relation: 2-D mints them, analytic refuses (#1028); ruled to follow 2-D' },
 
   { id: 'circle-by-circumference', family: 'circles', steps: ['מעגל O שהיקפו 6π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1622' }] },
