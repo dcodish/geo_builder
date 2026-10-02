@@ -398,7 +398,11 @@ export type Fact =
    * `circleId` (ADR-AG-198) — the circle by id, for a statement M1 itself bound (the incircle sentence naming the
    * centre of the circle it found already drawn).
    */
-  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[]; circleId?: Id })
+  /*
+   * `circle` (#1663, ADR-AG-203) — the circle by NAME, through the one name chain (`circleByName`): a numeral, a
+   * centre letter, or a described circle («⊙ABC», «○ABC» — «X מרכז המעגל החוסם את המשולש ABC»).
+   */
+  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[]; circleId?: Id; circle?: string })
   /**
    * A sentence that uses «מרכז המעגל» as a POINT (#1619 B1) — «CD עובר דרך מרכז המעגל». The parser lowers
    * the sentence with `CENTRE_SENTINEL` in the centre's place; M1 resolves which point the centre IS and

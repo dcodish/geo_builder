@@ -28,7 +28,7 @@ import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/
 import { INITIAL_VIEW, centreOf, panned, toWorld, viewAfterChange, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { fmtAnalytic } from './format';
-import { curveDetailsKey, curveEquationText, curveParts, namedRow } from './app/curveText';
+import { curveDetailsKey, curveParts, namedRow } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
@@ -36,7 +36,7 @@ import { commitRecord, decideEdit, decideSubmit, decideToggle, noticeText, reach
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
-import { panelKnowledge, panelRowText, segmentKnowledge, slopeRowText } from './app/panelRows';
+import { openCurveText, panelKnowledge, panelRowText, segmentKnowledge, slopeRowText } from './app/panelRows';
 import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
 import { angleText } from './app/lineAngle';
@@ -47,7 +47,6 @@ import { pointText as pointTextOf } from './app/pointText';
 import { drawnBox as composeDrawnBox } from './app/drawnBox';
 import { SYMBOLS } from './ui/symbols';
 import { logAnalytic, logAnalyticFigure } from './debug/sessionLogAnalytic';
-import { exprText } from './engine/expr';
 import { MathText } from '../shell/math';
 import { inputPreviewNodeAnalytic } from './render/inputPreviewNodeAnalytic';
 import { Banner } from '../shell/frame/Banner';
@@ -1653,7 +1652,7 @@ export function App() {
                   const parts = known ? curveParts(known, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }) : null;
                   return (
                     <span key={c.id}>
-                      <ValueRow text={namedRow(name, parts ? parts.equation : pending ? checking : openCurveText(d, c.id))} />
+                      <ValueRow text={namedRow(name, parts ? parts.equation : pending ? checking : openCurveText(d.construction, c.id))} />
                       {parts?.details && (
                         <details style={askTraceBox} open>
                           <summary style={askTraceToggle} title={t('curveDetailsToggle')}>
@@ -2237,28 +2236,3 @@ const askDismiss: CSSProperties = {
   padding: 0,
   flex: 'none',
 };
-
-/**
- * What an UNFIXED curve row says (#1023).
- *
- * Its own equation, symbolically, when it has one — and for a circle given by its CENTRE (#1060),
- * the centre and radius it was stated with, because that IS how the student wrote it.
- *
- * Falls back to the dash only when there is nothing truthful to say, which after this is rare.
- */
-function openCurveText(d: ReturnType<typeof derive>, id: string): string {
-  const o = d.construction.objects.find((q) => q.id === id);
-  // #1299 — notation has ONE owner (`curveText.ts`), and it delegates to `lineText` for a line whose
-  // coefficients are numbers, so this row and a determined line's row cannot disagree. `exprText` is
-  // the ALGEBRAIC printer and was never a notation decision; it printed the student's own equation
-  // with a trailing `- 0` it never wrote.
-  if (o?.kind === 'curve') return curveEquationText(o.curve.eq);
-  if (o?.kind === 'circle-at') return `O(${o.centre}), r = ${exprText(o.r)}`;
-  // A computed circle (#1464, #1324) is written as what defines it: ⊙ through its points, ⌀ its diameter,
-  // and the inscribed circle as the ring it is inscribed in (#1619 B2).
-  if (o?.kind === 'circle-thru') {
-    if (o.def.t === 'diameter') return `⌀${o.def.a}${o.def.b}`;
-    return o.def.t === 'through' ? `⊙${o.def.pts.join('')}` : `○${o.def.pts.join('')}`;
-  }
-  return '—';
-}

@@ -28,12 +28,13 @@ function valueExpr(src: string): Expr | null {
   return e && !mentionsPlane(e) ? e : null;
 }
 import { constantLengthExpr, namedLengthPairs, parseLengthExpr, type LengthExpr } from '../engine/lengths';
-import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, type NumeralKind } from '../engine/names';
+import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
 import { CENTRE_SENTINEL, CIRCLE_SENTINEL, UNBOUNDED, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 import { findProofTarget } from '../../shell/proofTarget';
 import {
   centreClauses,
+  describedCircles,
   diameterClauses,
   distributeClauses,
   elidedSubjectClauses,
@@ -659,6 +660,13 @@ interface CurveHit {
 /** The numerals themselves, for the lookahead that keeps a NAME from eating one (#1059). */
 const CIRCLE_NUMERALS = `(?:${NUMERAL_ALT})`;
 /**
+ * THE CIRCLE-NAME SLOT of a REFERENCE (#1663, ADR-AG-203) — what may follow «המעגל» when a sentence refers to a
+ * circle the figure has: a centre letter, a numeral, or a circle described by its ring («⊙ABC» / «○ABC», which the
+ * frame folds «המעגל החוסם את המשולש ABC» / «המעגל החסום במשולש ABC» into, `names.ts`). One atom, so every
+ * reference sentence reaches every naming; M1 resolves the name through `circleByName`.
+ */
+const CIRCLE_NAME = `(?:${NAME}|${CIRCLE_NUMERALS}|${DESCRIBED_CIRCLE_ALT})`;
+/**
  * What may FOLLOW a name in the name slot: a space, a colon, or a COMMA — «נתונה פרבולה I, שמשוואתה …»
  * (#1514 pre-play). The comma was missing, so the textbook's own punctuation refused `not-handled`.
  */
@@ -1086,6 +1094,10 @@ function centreOfCircle(line: string): RuleOutcome {
     const create = created(`נתון מעגל שמרכזו ${id}`);
     return made([{ t: 'centre-of', id, ...(create ? { create } : {}), src: line }]);
   }
+  // A circle NAMED by its ring (#1663, ADR-AG-203) — «X מרכז המעגל החוסם את המשולש ABC», folded by the frame to
+  // «… המעגל ⊙ABC». Which circle that is, and what its centre lowers to, is M1's (`centre-of`, `circleByName`);
+  // it describes a circle the figure must already have, so it creates nothing.
+  if (readDescribedCircle(trim(tail))) return made([{ t: 'centre-of', id, circle: trim(tail), src: line }]);
   // A tail must be the circle's EQUATION (in the plane's variables) — anything else is not this sentence.
   const src = trim(tail);
   if (!src.includes('=')) return null;
@@ -1263,7 +1275,8 @@ function incidenceOn(operand: string, id: Id, claims?: ClaimSink): Constraint | 
    * with the name and M1 resolves it through the one name chain. A numeral is read above, first.
    */
   const byCentre =
-    new RegExp(`^ה?מעגל\\s+(${NAME})$`).exec(trim(operand)) ?? new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s+(${NAME})$`).exec(trim(operand));
+    new RegExp(`^ה?מעגל\\s+(${NAME}|${DESCRIBED_CIRCLE_ALT})$`).exec(trim(operand)) ??
+    new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s+(${NAME}|${DESCRIBED_CIRCLE_ALT})$`).exec(trim(operand));
   if (byCentre) return { t: 'kind', kind: 'circle', circle: byCentre[1] };
 
   const dir = direction(trim(operand), claims);
@@ -2008,8 +2021,8 @@ function tangentTargets(tail: string, src: string): TangentTargets | null {
     // the apply boundary — the ADR-AG-165 discipline, unchanged).
     // Unnamed («למעגל», "the circle") it is the CONTEXTUAL circle — which one is M1's question.
     const circ =
-      new RegExp(`^ה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?(?:\\s+(${BRANCH_WORD}))?$`).exec(piece) ??
-      new RegExp(`^(?:the\\s+)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?(?:\\s+(${BRANCH_WORD}))?$`, 'i').exec(piece);
+      new RegExp(`^ה?מעגל(?:\\s+(${CIRCLE_NAME}))?(?:\\s+(${BRANCH_WORD}))?$`).exec(piece) ??
+      new RegExp(`^(?:the\\s+)?circle(?:\\s+(${CIRCLE_NAME}))?(?:\\s+(${BRANCH_WORD}))?$`, 'i').exec(piece);
     if (circ) {
       out.circles.push({ ...(circ[1] ? { name: circ[1] } : {}), ...(circ[2] ? { branch: branchOf(circ[2]) } : {}) });
       continue;
@@ -2230,8 +2243,8 @@ const ROLE_SHAPE_HE = [...Object.keys(SHAPES), ANY_POLYGON_NOUN]
   .map((k) => k.replace(/ /g, '[\\s-]+'))
   .join('|');
 const ROLE_RUN = `((?:${NAME}){3,})`;
-const ROLE_CIRCLE_HE = `(?:\\s+(?:של\\s+)?ה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?)?`;
-const ROLE_CIRCLE_EN = `(?:\\s+of\\s+(?:the\\s+)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?)?`;
+const ROLE_CIRCLE_HE = `(?:\\s+(?:של\\s+)?ה?מעגל(?:\\s+(${CIRCLE_NAME}))?)?`;
+const ROLE_CIRCLE_EN = `(?:\\s+of\\s+(?:the\\s+)?circle(?:\\s+(${CIRCLE_NAME}))?)?`;
 
 const ROLE_RADIUS_HE = new RegExp(`^(?:ה?אורך\\s+(?:של\\s+)?)?ה?רדיוס${ROLE_CIRCLE_HE}$`);
 const ROLE_RADIUS_EN = new RegExp(`^(?:the\\s+)?(?:length\\s+of\\s+(?:the\\s+)?)?radius${ROLE_CIRCLE_EN}$`, 'i');
@@ -2536,10 +2549,10 @@ function circleSubjectGate(subject: CircleSubject | null, line: string): RuleOut
  * tangent object at that point; without one it is «המשיק» — the one tangent the figure holds (M1).
  */
 const TANGENT_NOUN_HE = new RegExp(
-  `^ה?משיק(?:\\s+(?:ל|של\\s+)ה?מעגל(?:\\s+(?:ש?מרכזו\\s+)?(${NAME}|${CIRCLE_NUMERALS}))?)?(?:\\s+ב(?:נקודה\\s+|-\\s*|נקודת\\s+ה?השקה\\s+)(${NAME}))?$`,
+  `^ה?משיק(?:\\s+(?:ל|של\\s+)ה?מעגל(?:\\s+(?:ש?מרכזו\\s+)?(${CIRCLE_NAME}))?)?(?:\\s+ב(?:נקודה\\s+|-\\s*|נקודת\\s+ה?השקה\\s+)(${NAME}))?$`,
 );
 const TANGENT_NOUN_EN = new RegExp(
-  `^(?:[Tt]he\\s+)?[Tt]angent(?:\\s+line)?(?:\\s+(?:to|of)\\s+(?:the\\s+)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?)?(?:\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME}))?$`,
+  `^(?:[Tt]he\\s+)?[Tt]angent(?:\\s+line)?(?:\\s+(?:to|of)\\s+(?:the\\s+)?circle(?:\\s+(${CIRCLE_NAME}))?)?(?:\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME}))?$`,
 );
 function readTangentNoun(text: string): { circle?: string; at?: Id } | null {
   const m = TANGENT_NOUN_HE.exec(text) ?? TANGENT_NOUN_EN.exec(text);
@@ -2621,10 +2634,10 @@ function parseTangentObject(line: string): RuleOutcome {
 
 /** «דרך (הנקודה) P עובר משיק למעגל» / "a tangent to the circle passes through P" (#1430). */
 const TANGENT_FROM_HE = new RegExp(
-  `^דרך\\s+${HE_POINT}(${NAME})\\s+(?:עובר(?:ת)?\\s+)?(?:ישר\\s+)?(?:ה)?משיק\\s+(?:ל|של\\s+)?ה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?$`,
+  `^דרך\\s+${HE_POINT}(${NAME})\\s+(?:עובר(?:ת)?\\s+)?(?:ישר\\s+)?(?:ה)?משיק\\s+(?:ל|של\\s+)?ה?מעגל(?:\\s+(${CIRCLE_NAME}))?$`,
 );
 const TANGENT_FROM_EN = new RegExp(
-  `^(?:[Aa]\\s+|[Tt]he\\s+)?[Tt]angent(?:\\s+line)?\\s+to\\s+(?:the\\s+)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?\\s+(?:passes\\s+)?through\\s+(?:(?:the\\s+)?point\\s+)?(${NAME})$`,
+  `^(?:[Aa]\\s+|[Tt]he\\s+)?[Tt]angent(?:\\s+line)?\\s+to\\s+(?:the\\s+)?circle(?:\\s+(${CIRCLE_NAME}))?\\s+(?:passes\\s+)?through\\s+(?:(?:the\\s+)?point\\s+)?(${NAME})$`,
 );
 
 /**
@@ -2640,12 +2653,12 @@ const TANGENT_FROM_EN = new RegExp(
  * «במעגל שמרכזו M» names the circle by its centre: the sentence is about that circle, which «נתון מעגל
  * שמרכזו M» states (idempotent when it already exists).
  */
-const CHORD_CIRCLE_HE = `ב(?:ה)?מעגל(?:\\s+(?:ש?מרכזו\\s+(${NAME})|(${NAME}|${CIRCLE_NUMERALS})))?`;
+const CHORD_CIRCLE_HE = `ב(?:ה)?מעגל(?:\\s+(?:ש?מרכזו\\s+(${NAME})|(${CIRCLE_NAME})))?`;
 const CHORD_ONE_HE = new RegExp(
   `^${HE_GIVEN}(?:(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?מיתר|(?:ה)?מיתר\\s+(${NAME})(${NAME}))(?:\\s+${CHORD_CIRCLE_HE})?$`,
 );
 const CHORD_ONE_EN = new RegExp(
-  `^(?:(?:the\\s+)?(?:segment\\s+)?(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+chord|(?:the\\s+)?chord\\s+(${NAME})(${NAME}))(?:\\s+(?:of|in)\\s+(?:the\\s+)?circle(?:\\s+(?:centred\\s+at\\s+|centered\\s+at\\s+)?(${NAME}|${CIRCLE_NUMERALS}))?)?$`,
+  `^(?:(?:the\\s+)?(?:segment\\s+)?(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+chord|(?:the\\s+)?chord\\s+(${NAME})(${NAME}))(?:\\s+(?:of|in)\\s+(?:the\\s+)?circle(?:\\s+(?:centred\\s+at\\s+|centered\\s+at\\s+)?(${CIRCLE_NAME}))?)?$`,
 );
 const CHORD_PAIR_HE = new RegExp(
   `^(?:${CHORD_CIRCLE_HE}\\s*,?\\s+)?(?:ה)?מיתרים\\s+(${NAME})(${NAME})\\s+ו-?\\s*(${NAME})(${NAME})\\s+(.+)$`,
@@ -2662,9 +2675,14 @@ const CHORD_PAIR_EN = new RegExp(
 function chordFacts(a: Id, b: Id, circle: string | undefined, line: string): Fact[] | null {
   const seg = parseClause(`הקטע ${a}${b}`);
   if (!seg.ok) return null;
-  const host = circle === undefined ? undefined : isNumeralName(circle) ? numeralCurveId('circle', circle) : `circle-at-${circle}`;
+  // A circle described by its ring (#1663) has no id to mint here: it rides the contextual marker with its name and
+  // M1 resolves it through the one name chain, exactly as «A על המעגל ⊙ABC» does.
+  const described = circle !== undefined && readDescribedCircle(circle) !== null;
+  const host = circle === undefined || described ? undefined : isNumeralName(circle) ? numeralCurveId('circle', circle) : `circle-at-${circle}`;
   const on = (id: Id): Fact =>
-    host === undefined ? { t: 'on-kind', id, kind: 'circle', src: line } : { t: 'constraint', k: { t: 'on-curve', id, curve: host }, src: line };
+    host === undefined
+      ? { t: 'on-kind', id, kind: 'circle', ...(described ? { circle } : {}), src: line }
+      : { t: 'constraint', k: { t: 'on-curve', id, curve: host }, src: line };
   return [
     { t: 'declare', id: a, src: line },
     { t: 'declare', id: b, src: line },
@@ -3251,17 +3269,17 @@ const THRU_BARE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+(${NAME}${NAME}${NAME})
  */
 const DIAM_HE = new RegExp(
   `^${HE_GIVEN}(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?קוטר` +
-    `(?:\\s+(ב|של\\s+)(ה)?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?(\\s+ה?חדש)?)?$`,
+    `(?:\\s+(ב|של\\s+)(ה)?מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?)?$`,
 );
 /** «קוטר BD במעגל» — the noun first, the same statement. */
 const DIAM_NOUN_FIRST_HE = new RegExp(
-  `^${HE_GIVEN}(?:ה)?קוטר\\s+(${NAME})(${NAME})\\s+(ב|של\\s+)(ה)?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?(\\s+ה?חדש)?$`,
+  `^${HE_GIVEN}(?:ה)?קוטר\\s+(${NAME})(${NAME})\\s+(ב|של\\s+)(ה)?מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?$`,
 );
 /** «נתון מעגל שקוטרו BD» — the circle DEFINED by its diameter, always a new circle. */
 const DIAM_DEFINE_HE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+ש(?:ה)?קוטר(?:ו|\\s+שלו)(?:\\s+(?:הוא|היא))?\\s+(${NAME})(${NAME})$`);
 const DIAM_EN = new RegExp(
   `^(?:the\\s+)?(?:segment\\s+)?(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+diameter` +
-    `(?:\\s+of\\s+(the\\s+|a\\s+(new\\s+)?)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?)?$`,
+    `(?:\\s+of\\s+(the\\s+|a\\s+(new\\s+)?)?circle(?:\\s+(${CIRCLE_NAME}))?)?$`,
 );
 const DIAM_DEFINE_EN = new RegExp(`^(?:the\\s+|a\\s+)?circle\\s+(?:with|on)\\s+(?:the\\s+|a\\s+)?diameter\\s+(${NAME})(${NAME})$`, 'i');
 
@@ -4784,7 +4802,8 @@ const MAX_FRAME_DEPTH = 2;
 
 /** One reading of `text`; `framed` says whether the frame changed it or took a reading at all. */
 function readLine(text: string, depth: number): { result: ParseResult; framed: boolean } {
-  const s = unwrap(text);
+  // A circle named by its ring folds to its name before any reading (#1663, ADR-AG-203), so every rule sees one spelling.
+  const s = describedCircles(unwrap(text));
   if (!s) return { result: { ok: false, code: 'not-handled', detail: text }, framed: false };
   const attempt = (clauses: readonly string[]): ParseResult | null => {
     const facts: Fact[] = [];
@@ -5317,16 +5336,16 @@ function parseCentreSubject(line: string): RuleOutcome {
  * resolve the circle (contextual, numeral or centre letter). The circle reference is the one `incidenceOn`
  * reads, so «מחוץ למעגל M» means the same circle «על מעגל M» does.
  */
-const REGION_CIRCLE_HE = `ה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?`;
+const REGION_CIRCLE_HE = `ה?מעגל(?:\\s+(${CIRCLE_NAME}))?`;
 const REGION_HE = new RegExp(
   `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?(מחוץ\\s+ל-?|בתוך\\s+|בפנים\\s+)${REGION_CIRCLE_HE}$`,
 );
 const ARC_HE = new RegExp(
   `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+ה?קשת\\s+ה?(קטנה|גדולה)\\s+(${NAME})(${NAME})(?:\\s+(?:של|ב)\\s*${REGION_CIRCLE_HE})?$`,
 );
-const REGION_EN = new RegExp(`^(?:[Tt]he\\s+)?(?:[Pp]oint\\s+)?(${NAME})\\s+(?:is|lies)\\s+(outside|inside)\\s+(?:of\\s+)?the\\s+circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?$`);
+const REGION_EN = new RegExp(`^(?:[Tt]he\\s+)?(?:[Pp]oint\\s+)?(${NAME})\\s+(?:is|lies)\\s+(outside|inside)\\s+(?:of\\s+)?the\\s+circle(?:\\s+(${CIRCLE_NAME}))?$`);
 const ARC_EN = new RegExp(
-  `^(?:[Tt]he\\s+)?(?:[Pp]oint\\s+)?(${NAME})\\s+(?:is|lies)\\s+on\\s+the\\s+(minor|major)\\s+arc\\s+(${NAME})(${NAME})(?:\\s+of\\s+the\\s+circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?)?$`,
+  `^(?:[Tt]he\\s+)?(?:[Pp]oint\\s+)?(${NAME})\\s+(?:is|lies)\\s+on\\s+the\\s+(minor|major)\\s+arc\\s+(${NAME})(${NAME})(?:\\s+of\\s+the\\s+circle(?:\\s+(${CIRCLE_NAME}))?)?$`,
 );
 
 function parseCircleRegion(line: string): RuleOutcome {

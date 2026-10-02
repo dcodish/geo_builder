@@ -96,6 +96,33 @@ export function numeralCurveId(kind: NumeralKind, numeral: string): Id {
 }
 
 /**
+ * A CIRCLE NAMED BY WHAT IT IS TO A RING (#1663, ADR-AG-203) — «המעגל החוסם את המשולש ABC» (the circle through
+ * every vertex) and «המעגל החסום במשולש ABC» (the circle tangent to every side). A computed circle has no letter
+ * and no equation of its own, so among several circles these descriptions were the only way to name it, and no
+ * sentence read them. The frame folds each description to a NAME in the circle-name slot every circle sentence
+ * already has («על המעגל _», «מרכז המעגל _», «משיק למעגל _», «מיתר במעגל _», «קוטר במעגל _», …), and M1
+ * resolves the name through the one name chain (`circleByName`) against what the figure STATES — the vertices on
+ * the circle, the sides tangent to it — never against how the circle happened to be built.
+ *
+ * The name is spelled the way the data panel already writes these circles (`openCurveText`): «⊙ABC» through the
+ * points, «○ABC» inscribed in the ring. Not a letter the student could have typed for a point, so it can never
+ * collide with a centre letter or a numeral.
+ */
+export type DescribedCircle = { role: 'circum' | 'in'; pts: Id[] };
+const DESCRIBED_MARK = { circum: '⊙', in: '○' } as const;
+const POINT_TOKEN = '[A-Z][0-9₀-₉]?';
+/** The regex atom for a described-circle name, for the parser's circle-name slots. */
+export const DESCRIBED_CIRCLE_ALT = `[⊙○](?:${POINT_TOKEN}){3,4}`;
+const DESCRIBED_RE = new RegExp(`^([⊙○])((?:${POINT_TOKEN}){3,4})$`);
+export const describedCircleName = (role: DescribedCircle['role'], pts: readonly Id[]): string =>
+  `${DESCRIBED_MARK[role]}${pts.join('')}`;
+export function readDescribedCircle(name: string): DescribedCircle | null {
+  const m = DESCRIBED_RE.exec(name);
+  if (!m) return null;
+  return { role: m[1] === '⊙' ? 'circum' : 'in', pts: m[2].match(new RegExp(POINT_TOKEN, 'g')) ?? [] };
+}
+
+/**
  * THE id of a named LINE — every line name the grammar reads: a numeral («ישר 1» → `line-1`), a
  * letter name («l3» → `line-l3`) or a two-point run («AB» → `line-AB`) (#1529, ADR-AG-179). For a
  * numeral it is exactly `numeralCurveId('line', n)`; the point is that no site spells the prefix itself,
