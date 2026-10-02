@@ -73,8 +73,9 @@ describe('#1651 — the measured table: every circle noun records, and states it
     (line) => {
       expect(last([...CTX, line])).toBe('record');
       expect(claimsIn(line)).toEqual([
-        { t: 'on-kind', id: 'B', kind: 'circle', src: '' },
-        { t: 'on-kind', id: 'C', kind: 'circle', src: '' },
+        // `create` (#1669, ADR-AG-204): a chord's end with no circle in the figure states the circle.
+        { t: 'on-kind', id: 'B', kind: 'circle', create: true, src: '' },
+        { t: 'on-kind', id: 'C', kind: 'circle', create: true, src: '' },
         { t: 'selector', sel: { kind: 'distinct', ids: ['B', 'C'] }, src: '' },
       ]);
     },
@@ -173,8 +174,17 @@ describe('#1651 — a claim that conflicts is refused, naming the line', () => {
     expect(last(['נקודה A', 'נקודה B', 'השוק AB = 5'])).toBe('refused:ambiguous-shape');
   });
 
-  it('a circle noun with no circle is the contextual refusal: «המיתר BC …» before any circle', () => {
-    expect(last(['נקודה B', 'נקודה C', 'המיתר BC מקביל לציר ה-x'])).toBe('refused:ambiguous-shape');
+  // Amended by #1669 (ADR-AG-204, operator 2026-10-02: a chord sentence with no circle CREATES it, as 2-D's does — the
+  // ADR-AG-198 create path, centre unnamed). Was `refused:ambiguous-shape`.
+  it('a chord noun with no circle states the circle (#1669): «המיתר BC …» before any circle puts B and C on a new one', () => {
+    const lines = ['נקודה B', 'נקודה C', 'המיתר BC מקביל לציר ה-x'];
+    expect(last(lines)).toBe('record');
+    const d = fig(lines, 0);
+    const circles = d.figure.curves.filter((k) => k.curve.kind === 'circle');
+    expect(circles).toHaveLength(1);
+    const c = circles[0].curve as { cx: number; cy: number; r: number };
+    const q = pts(d.figure);
+    for (const p of [q.B, q.C]) expect(near(Math.hypot(p.x - c.cx, p.y - c.cy), c.r)).toBe(true);
   });
 });
 

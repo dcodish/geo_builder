@@ -268,7 +268,10 @@ describe('#1663 — a computed circle among several is named by its ring', () =>
     // a diameter (#1665's lowering on the named computed circle)
     const diam = [...TWO, 'AF קוטר במעגל החוסם את המשולש ABC'];
     expect(typed([...TWO, 'F על המעגל החוסם את המשולש ABC', 'AF קוטר במעגל החוסם את המשולש ABC']).kinds.slice(-2)).toEqual(['record', 'record']);
-    expect(typed(diam).kinds.at(-1)).toBe('refused:unknown-reference'); // a diameter refers to its ends (#1028)
+    // A diameter INTRODUCES the end it names (#1669, ADR-AG-204 — was `unknown-reference`): F is A's antipode, (6,2).
+    expect(typed(diam).kinds.at(-1)).toBe('record');
+    const f = pt(derive(diam, 0), 'F');
+    expect(close(f.x, 6) && close(f.y, 2)).toBe(true);
   });
 
   it('a circle REFERRED TO by its centre: «על המעגל שמרכזו M» ≡ «על מעגל M»', () => {
