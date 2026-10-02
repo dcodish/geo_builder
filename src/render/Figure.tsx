@@ -17,6 +17,8 @@ import { ANGLE_ARC_R, MIN_MEASURE_FONT_PX, angleValueOffset, buildScene, labelSc
 import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../../shell/frame/canvasControls';
 // #1631: the point menu is the shared letter popover — one look and one offer rule in every builder.
 import { LetterPopover } from '../../shell/frame/LetterPopover';
+import { SegmentMenu } from '../../shell/frame/SegmentMenu';
+import { segInk } from '../../shell/frame/segmentDisplay';
 import { swapOffered, type LetterRenameResult } from '../../shell/frame/letterOffer';
 import type { MeasureLabels, RelationMarks, RelationPick } from './scene';
 import type { RelationsResult, ResolvedCircle } from '@/engine';
@@ -636,7 +638,9 @@ export function Figure({
             const a = transform.toScreen(seg.a);
             const b = transform.toScreen(seg.b);
             const st = segOf(seg.id);
-            const dash = st.dashed ? `${6 / view.zoom} ${5 / view.zoom}` : undefined;
+            // #1653: the ink is the shared decision (`shell/frame/segmentDisplay`), the one the analytic canvas paints from too
+            const ink = segInk(st);
+            const dash = ink === 'dashed' ? `${6 / view.zoom} ${5 / view.zoom}` : undefined;
             // #264 (ADR-388): a COVERED segment (collinearly contained in another drawn segment) owns
             // no ink and no hit-target — the containing run carries both, so hide/dash act on the whole
             // visible line and no menu is occluded. It still echoes fact-selection (the accent overlay).
@@ -658,8 +662,8 @@ export function Figure({
               ) : null;
             }
             return (
-              <g key={seg.id} data-id={seg.id}>
-                {st.hidden ? (
+              <g key={seg.id} data-id={seg.id} data-ink={ink}>
+                {ink === 'ghost' ? (
                   // A HIDDEN segment: a very faint dashed ghost — invisible-ish but clickable, so the
                   // toggle is reversible right on the line (FR-RN-10). The endpoints (points) are unaffected.
                   // `data-noexport`: an edit affordance, stripped from the exported PNG (F3/REN-3).
@@ -1127,70 +1131,53 @@ export function Figure({
           )}
         </LetterPopover>
       )}
-      {/* On-canvas SEGMENT / CIRCLE menu: hide/show, dashed/solid, swap the endpoints. A transparent
-          backdrop closes it on outside click. */}
-      {menu && menu.kind !== 'point' && (menu.kind === 'segment' ? segEditable : circEditable) && (
-        <>
-          <div style={{ position: 'absolute', inset: 0 }} onClick={() => setMenu(null)} />
-          <div
-            style={{
-              position: 'absolute',
-              // PHYSICAL `left`, not `insetInlineStart` (F1/REN-1): `menu.x` is a physical left-based px
-              // coordinate from the click, but under the Hebrew-default `dir=rtl` a logical inline-start
-              // inset resolves to `right` — the menu opened MIRRORED, far from the clicked point. The
-              // fixed toolbars keep their logical insets (they're layout, not click-anchored).
-              left: clamp(menu.x + 8, 0, vw - 150),
-              top: clamp(menu.y + 8, 0, vh - 80),
-              background: '#fff',
-              border: '1px solid #cbd5e1',
-              borderRadius: 8,
-              boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
-              padding: 8,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 6,
-              zIndex: 10,
-              minWidth: 132,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{menu.kind === 'segment' ? menu.id.replace(/^seg-/, '') : menu.id.replace(/^circle-/, '⊙ ')}</div>
-            {menu.kind === 'segment' ? (
-              <>
-                {onToggleSegHidden && (
-                  <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onToggleSegHidden(menu.id); setMenu(null); }}>
-                    {segOf(menu.id).hidden ? (segMenuText?.show ?? 'show') : (segMenuText?.hide ?? 'hide')}
-                  </button>
-                )}
-                {onToggleSegDashed && !segOf(menu.id).hidden && (
-                  <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onToggleSegDashed(menu.id); setMenu(null); }}>
-                    {segOf(menu.id).dashed ? (segMenuText?.solid ?? 'solid') : (segMenuText?.dashed ?? 'dashed')}
-                  </button>
-                )}
-                {onSwap && (() => {
-                  // Swap the segment's two endpoint LABELS (e.g. a chord's C ↔ D) — the menu header already
-                  // shows which segment. Only a named segment carries its endpoint ids (a line-derived one doesn't).
-                  const seg = scene.segments.find((sg) => sg.id === menu.id);
-                  if (!seg?.aId || !seg.bId) return null;
-                  const { aId, bId } = seg;
-                  return (
-                    <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onSwap(aId, bId); setMenu(null); }}>
-                      {segMenuText?.swap ?? 'swap'}
-                    </button>
-                  );
-                })()}
-              </>
-            ) : (
-              <>
-                {onToggleCircleHidden && (
-                  <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onToggleCircleHidden(menu.id); setMenu(null); }}>
-                    {circHidden(menu.id) ? (circleMenuText?.show ?? 'show') : (circleMenuText?.hide ?? 'hide')}
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        </>
+      {/* On-canvas SEGMENT / CIRCLE menu — the shared segment menu (#1653, ADR-W-106): hide/show and
+          dashed/solid are `shell/`'s; what is 2-D's own is passed in — the store toggles, the strings, and
+          «החליפו קצוות» (ADR-122) as a child. A circle's menu is the same surface with hide/show alone. */}
+      {menu && menu.kind === 'segment' && segEditable && (
+        <SegmentMenu
+          key={menu.seq}
+          x={menu.x}
+          y={menu.y}
+          bounds={{ width: vw, height: vh }}
+          title={menu.id.replace(/^seg-/, '')}
+          state={segOf(menu.id)}
+          onToggleHidden={onToggleSegHidden ? () => onToggleSegHidden(menu.id) : undefined}
+          onToggleDashed={onToggleSegDashed ? () => onToggleSegDashed(menu.id) : undefined}
+          strings={{
+            hide: segMenuText?.hide ?? 'hide',
+            show: segMenuText?.show ?? 'show',
+            dashed: segMenuText?.dashed ?? 'dashed',
+            solid: segMenuText?.solid ?? 'solid',
+          }}
+          onClose={() => setMenu(null)}
+        >
+          {onSwap && (() => {
+            // Swap the segment's two endpoint LABELS (e.g. a chord's C ↔ D) — the menu header already
+            // shows which segment. Only a named segment carries its endpoint ids (a line-derived one doesn't).
+            const seg = scene.segments.find((sg) => sg.id === menu.id);
+            if (!seg?.aId || !seg.bId) return null;
+            const { aId, bId } = seg;
+            return (
+              <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onSwap(aId, bId); setMenu(null); }}>
+                {segMenuText?.swap ?? 'swap'}
+              </button>
+            );
+          })()}
+        </SegmentMenu>
+      )}
+      {menu && menu.kind === 'circle' && circEditable && (
+        <SegmentMenu
+          key={menu.seq}
+          x={menu.x}
+          y={menu.y}
+          bounds={{ width: vw, height: vh }}
+          title={menu.id.replace(/^circle-/, '⊙ ')}
+          state={{ hidden: circHidden(menu.id) }}
+          onToggleHidden={onToggleCircleHidden ? () => onToggleCircleHidden(menu.id) : undefined}
+          strings={{ hide: circleMenuText?.hide ?? 'hide', show: circleMenuText?.show ?? 'show', dashed: '', solid: '' }}
+          onClose={() => setMenu(null)}
+        />
       )}
       </div>
 

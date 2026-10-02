@@ -13,6 +13,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import type { LoadAudit } from '../../shell/save';
 import { ingestTypedText } from '../../shell/bidi';
+import { cleanSegDisplay, toggleSegFlag, type SegDisplayMap } from '../../shell/frame/segmentDisplay';
 import type { RefKind } from '../engine/names';
 
 /**
@@ -45,6 +46,9 @@ export interface SavedAnalyticSession {
   /** #1631 — the seed-name map a letter change leaves (`Construction.seedNames`), so a renamed free
    *  vertex loads where it was drawn. Omitted when empty — every save from before it loads unchanged. */
   seedNames?: Record<string, string>;
+  /** #1653 — the per-segment display choices (hidden, dashed), keyed by `segKey` (the endpoint pair).
+   *  Omitted when none, so every save from before it loads unchanged. */
+  segStyle?: SegDisplayMap;
 }
 
 /**
@@ -183,6 +187,8 @@ export interface LetterCommit {
   queries: AskedQuestion[];
   spokenFor: Record<number, string>;
   seedNames: Record<string, string>;
+  /** #1653 — the segment display map under the new letters; absent = unchanged. */
+  segStyle?: SegDisplayMap;
 }
 
 interface AnalyticState {
@@ -250,6 +256,16 @@ interface AnalyticState {
    * so the renamed vertex is drawn where it was. Empty until a letter changes; saved with the lines.
    */
   seedNames: Record<string, string>;
+  /**
+   * #1653 — THE STUDENT'S SEGMENT DISPLAY CHOICES (2-D's FR-RN-10 `segStyle`): hidden and/or dashed, keyed
+   * by the endpoint pair (`render/scene.ts` `segKey`). A display preference, not a given — a hidden
+   * segment is still in the figure for every reference, measurement and question. It rides in the undo
+   * slice (one «בטל» restores a hide, as the ask lane's `shown` does) and in the save file.
+   */
+  segStyle: SegDisplayMap;
+  /** Flip one segment's hidden / dashed flag — the shared `toggleSegFlag` (`shell/frame/segmentDisplay`). */
+  toggleSegHidden: (key: string) => void;
+  toggleSegDashed: (key: string) => void;
   clearAll: () => void;
   /**
    * Replace the question list. The GESTURES are decided in `app/answers.ts` and this records the
@@ -291,7 +307,7 @@ interface AnalyticState {
    */
   serialize: () => SavedAnalyticSession;
   /** Replace the session with a loaded one. */
-  restore: (session: { lines: string[]; seed?: number; name?: string; spokenFor?: Record<number, string>; disabled?: number[]; seedNames?: Record<string, string> }) => void;
+  restore: (session: { lines: string[]; seed?: number; name?: string; spokenFor?: Record<number, string>; disabled?: number[]; seedNames?: Record<string, string>; segStyle?: unknown }) => void;
   /** Record the fallback's machine lines under the student's OWN sentence (#1297). */
   /** `notice` travels in the commit, as `recordLine`'s does (#1350). */
   recordLlmLines: (spoken: string, lines: string[], notice?: string | null) => void;
@@ -299,11 +315,12 @@ interface AnalyticState {
 }
 
 /** One letter change, as one set — lines, ask rows, display sentences, seed names (#1154, #1631). */
-const letterCommit = ({ lines, queries, spokenFor, seedNames }: LetterCommit) => ({
+const letterCommit = ({ lines, queries, spokenFor, seedNames, segStyle }: LetterCommit) => ({
   lines: lines.map(ingestTypedText),
   queries: [...queries],
   spokenFor: { ...spokenFor },
   seedNames: { ...seedNames },
+  ...(segStyle ? { segStyle: { ...segStyle } } : {}),
   error: null,
   notice: null,
 });
@@ -339,6 +356,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   spokenFor: {},
   disabled: [],
   seedNames: {},
+  segStyle: {},
   seed: 0,
   name: '',
   loadAudit: null,
@@ -378,10 +396,12 @@ export const useAnalyticStore = create<AnalyticState>()(
   setDisabled: (disabled) => set({ disabled: [...disabled].sort((a, b) => a - b), error: null, notice: null }),
   applyRename: (next) => set(letterCommit(next)),
   applySwap: (next) => set(letterCommit(next)),
+  toggleSegHidden: (key) => set((s) => ({ segStyle: toggleSegFlag(s.segStyle, key, 'hidden') })),
+  toggleSegDashed: (key) => set((s) => ({ segStyle: toggleSegFlag(s.segStyle, key, 'dashed') })),
   clearAll: () =>
     // The QUERIES go with the lines (#1110): a reading of a figure that no longer exists is a lie,
     // and «נקה הכל» is the clearest case of the figure no longer existing.
-    set({ lines: [], spokenFor: {}, disabled: [], seedNames: {}, error: null, notice: null, seed: 0, name: '', loadAudit: null, queries: [] }),
+    set({ lines: [], spokenFor: {}, disabled: [], seedNames: {}, segStyle: {}, error: null, notice: null, seed: 0, name: '', loadAudit: null, queries: [] }),
 
   /**
    * The three gestures, as store actions (ADR-AG-067's decisions, now over the stored record).
@@ -412,7 +432,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   setLoadAudit: (loadAudit) => set({ loadAudit }),
 
   serialize: () => {
-    const { lines, seed, name, spokenFor, disabled, seedNames } = get();
+    const { lines, seed, name, spokenFor, disabled, seedNames, segStyle } = get();
     return {
       app: ANALYTIC_APP,
       version: ANALYTIC_SAVE_VERSION,
@@ -422,11 +442,14 @@ export const useAnalyticStore = create<AnalyticState>()(
       ...(Object.keys(spokenFor).length ? { spokenFor: { ...spokenFor } } : {}),
       ...(disabled.length ? { disabled: [...disabled] } : {}),
       ...(Object.keys(seedNames).length ? { seedNames: { ...seedNames } } : {}),
+      ...(Object.keys(segStyle).length ? { segStyle: JSON.parse(JSON.stringify(segStyle)) as SegDisplayMap } : {}),
     };
   },
 
-  restore: ({ lines, seed, name, spokenFor, disabled, seedNames }) =>
+  restore: ({ lines, seed, name, spokenFor, disabled, seedNames, segStyle }) =>
     set({
+      // #1653 — the segment display map, kept only as key → {hidden?, dashed?: true}
+      segStyle: cleanSegDisplay(segStyle),
       lines: lines.map(ingestTypedText),
       spokenFor: cleanSpokenFor(spokenFor, lines.length),
       seedNames: cleanSeedNames(seedNames),
@@ -457,12 +480,14 @@ export const useAnalyticStore = create<AnalyticState>()(
       // rename, swap) — left out, an undo restored the lines and kept the other half: a renamed letter
       // in a row whose given was put back, and after an undone delete every later annotation one row off.
       // `seedNames` is the same argument for where a renamed free vertex is drawn.
+      // #1653: the segment display map rides along — a hide is a step the student took on the canvas, and the
+      // operator's lock is «one «בטל» restores it» (the ask lane's `shown` is the same kind of choice, and is here).
       partialize: (s) =>
-        ({ lines: s.lines, seed: s.seed, queries: s.queries, disabled: s.disabled, spokenFor: s.spokenFor, seedNames: s.seedNames }) as AnalyticState,
+        ({ lines: s.lines, seed: s.seed, queries: s.queries, disabled: s.disabled, spokenFor: s.spokenFor, seedNames: s.seedNames, segStyle: s.segStyle }) as AnalyticState,
       // Without this, setting an error would push a history entry and undo would appear to do nothing.
       equality: (a, b) =>
         a.lines === b.lines && a.seed === b.seed && a.queries === b.queries && a.disabled === b.disabled &&
-        a.spokenFor === b.spokenFor && a.seedNames === b.seedNames,
+        a.spokenFor === b.spokenFor && a.seedNames === b.seedNames && a.segStyle === b.segStyle,
       limit: 100,
     },
   ),

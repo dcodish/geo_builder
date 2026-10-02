@@ -14,6 +14,17 @@ import { analyticBidi } from '../i18n/bidi';
 import type { Figure } from '../engine/evaluate';
 import type { CurveKind } from '../engine/types';
 import { tickStep } from '../../shell/ticks';
+import { segInk, type SegDisplayMap, type SegInk } from '../../shell/frame/segmentDisplay';
+
+/**
+ * THE KEY A SEGMENT'S DISPLAY IS FILED UNDER (#1653) — its two endpoint letters, unordered.
+ *
+ * Not the scene id: a polygon side's id (`polygon-ABC-0`) and a stated segment's (`seg-AB`) are two ids
+ * for one visible line, and both change when the polygon is restated. The endpoint pair is what the
+ * student sees and names, it survives a rename by relabelling (`relabelSegKey`), and a side drawn twice
+ * hides as one line.
+ */
+export const segKey = (ends: readonly [string, string]): string => [...ends].sort().join('|');
 
 export interface Transform {
   sx: (x: number) => number;
@@ -106,6 +117,9 @@ export interface SceneSegment {
    * which; this carries the text and where to put it.
    */
   label?: { text: string; x: number; y: number };
+  /** #1653 — the display key (`segKey` of its endpoints) and how it is inked (`shell`'s `segInk`). */
+  key: string;
+  ink: SegInk;
 }
 
 /** A derived point's construction, projected to screen space (#1030). Drawn dotted, behind the
@@ -178,6 +192,8 @@ export interface SceneCrossing {
   cy: number;
   /** What clicking it means, in the student's own words. */
   sentence: string;
+  /** #1598 — set on an unnamed circle's CENTRE offer: the circle's id. Its click asks for a letter. */
+  centreOf?: string;
 }
 
 // #1465 (ADR-W-094): the nice-step rule lives in shell/ticks, shared with the complex Builder's grid
@@ -215,7 +231,7 @@ export interface SceneKnowledge {
    * crossings can be NAMED is a question about the construction, and the renderer has only the
    * figure. It projects them and draws them.
    */
-  crossings?: Array<{ id: string; x: number; y: number; sentence: string }>;
+  crossings?: Array<{ id: string; x: number; y: number; sentence: string; centreOf?: string }>;
   /**
    * The point-to-line perpendiculars to DRAW, in world coordinates (#1048) — one per answered
    * distance. The caller owns them because they belong to the ask lane, which the renderer cannot
@@ -227,6 +243,11 @@ export interface SceneKnowledge {
    * it owns `marks`: they belong to the ask lane, which the renderer cannot see.
    */
   loci?: Array<{ points: Array<{ x: number; y: number }>; closed: boolean; label?: string }>;
+  /**
+   * The student's per-segment display choices (#1653), keyed by {@link segKey} — the store's record,
+   * handed in like the others. A hidden segment is still in the figure; only its ink goes.
+   */
+  segStyle?: SegDisplayMap;
 }
 
 /** Does a drawn point stand here? The centre mark's label defers to it (#1086). */
@@ -329,12 +350,15 @@ export function buildScene(
     const y1 = t.sy(s.a.y);
     const x2 = t.sx(s.b.x);
     const y2 = t.sy(s.b.y);
+    const key = segKey(s.ends);
     return {
       id: s.id,
       x1,
       y1,
       x2,
       y2,
+      key,
+      ink: segInk(knows.segStyle?.[key]),
       // Formatting is a DISPLAY concern, so it happens here and not in the engine — and it goes
       // through the shared formatter, never a local rounder (the #723 chokepoint, and #1029).
       label:
@@ -448,6 +472,7 @@ export function buildScene(
     cx: t.sx(k.x),
     cy: t.sy(k.y),
     sentence: k.sentence,
+    ...(k.centreOf ? { centreOf: k.centreOf } : {}),
   }));
 
   return {

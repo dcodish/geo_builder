@@ -67,6 +67,10 @@ import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDr
 import { measurablesOf, type Measurable } from './app/measurable';
 import { dispatchRename, dispatchSwap, letterRenameOf, letterTargetOf } from './app/rename';
 import { LetterPopover } from '../shell/frame/LetterPopover';
+import { SegmentMenu } from '../shell/frame/SegmentMenu';
+import { centreLabelOf, centrePopoverOps } from './app/centreName';
+import { segKey } from './render/scene';
+import { segmentName } from './app/lines';
 import type { LetterRenameResult } from '../shell/frame/letterOffer';
 import { anotherConfiguration } from './app/another';
 import { offersOf, pointAt } from './engine/crossings';
@@ -146,6 +150,9 @@ export function App() {
     applyRename,
     applySwap,
     seedNames,
+    segStyle,
+    toggleSegHidden,
+    toggleSegDashed,
     removeLine,
     replaceLine,
     clearAll,
@@ -458,7 +465,10 @@ export function App() {
    * readability at low zoom.
    */
   /** `rename` (#1154) is the draft «שנה אות» puts in the input box — null when the click offers none. */
-  const [pick, setPick] = useState<{ items: Measurable[]; letter: string | null; x: number; y: number; seq: number } | null>(null);
+  /** #1653: a clicked SEGMENT also carries its display key and name — it opens the shared segment menu. */
+  const [pick, setPick] = useState<{ items: Measurable[]; letter: string | null; segment?: { key: string; name: string }; x: number; y: number; seq: number } | null>(null);
+  /** #1598: a clicked unnamed circle CENTRE — the offer it is, and where (viewport px) to open the letter popover. */
+  const [centrePick, setCentrePick] = useState<{ offerId: string; x: number; y: number; seq: number } | null>(null);
   /** The input zone — «שנה אות» focuses its box after filling it (the shared InputArea takes no ref). */
   const inputZoneRef = useRef<HTMLDivElement | null>(null);
 
@@ -823,13 +833,13 @@ export function App() {
        * is dispatched here rather than decided by `decideSubmit`, which sees only the active lines.
        */
       case 'rename': {
-        const r = dispatchRename(verdict.from, verdict.to, { lines, disabled, queries, spokenFor, seed, seedNames }, { applyRename, setError }, d);
+        const r = dispatchRename(verdict.from, verdict.to, { lines, disabled, queries, spokenFor, seed, seedNames, segStyle }, { applyRename, setError }, d);
         if (r.kind === 'apply') setDraft('');
         return;
       }
       // #1303 / #1631 — a SWAP («החלף בין A ל-B»): the rename's contract, two letters at once.
       case 'swap': {
-        const r = dispatchSwap(verdict.a, verdict.b, { lines, disabled, queries, spokenFor, seed, seedNames }, { applySwap, setError }, d);
+        const r = dispatchSwap(verdict.a, verdict.b, { lines, disabled, queries, spokenFor, seed, seedNames, segStyle }, { applySwap, setError }, d);
         if (r.kind === 'apply') setDraft('');
         return;
       }
@@ -930,9 +940,11 @@ export function App() {
       // Rings and nameable centres, one list, one letter source, one grammar (#1109) — built in
       // `offersOf` so the click path is callable from a test (#1268).
       crossings: offersOf(d.figure, d.construction),
+      // #1653 — the student's per-segment display choices (hidden / dashed)
+      segStyle,
     });
     // poolTick: the pool completed, re-read the gates (#1473)
-  }, [d, view, canvasSize, answers, poolTick]);
+  }, [d, view, canvasSize, answers, poolTick, segStyle]);
 
   const errorText = error ? errorTextOf(error, t as unknown as Translate) : null;
 
@@ -1361,8 +1373,13 @@ export function App() {
               onPick={(what, screen) => {
                 const items = measurablesOf(d.construction, what);
                 const letter = letterTargetOf(d.construction, what);
-                setPick(items.length || letter ? { items, letter, x: screen.x, y: screen.y, seq: Date.now() } : null);
+                // #1653: a drawn segment always has a menu now — hide/show and dashed/solid, its measures inside
+                const ends = what.kind === 'segment' ? d.figure.segments.find((sg) => sg.id === what.id)?.ends : undefined;
+                const segment = ends ? { key: segKey(ends), name: segmentName(d.construction, what.id) ?? ends.join('') } : undefined;
+                setPick(items.length || letter || segment ? { items, letter, segment, x: screen.x, y: screen.y, seq: Date.now() } : null);
               }}
+              /* #1598 — an unnamed circle's centre opens the letter popover: the student picks the letter. */
+              onCentre={(offerId, screen) => setCentrePick({ offerId, x: screen.x, y: screen.y, seq: Date.now() })}
               onCrossing={(sentence) => {
                 // A GUARD, not a second decision: `submit` still owns whether the line is accepted
                 // and what the student is told. This only asks whether jumping the configuration
@@ -1934,7 +1951,7 @@ export function App() {
             level (it must not scale with the zoom or clip at the canvas edge) and the popover places
             itself inside its positioned container.
           */
-          const state = { lines, disabled, queries, spokenFor, seed, seedNames };
+          const state = { lines, disabled, queries, spokenFor, seed, seedNames, segStyle };
           const letter = pick.letter;
           const onRename = (from: string, to: string): LetterRenameResult => {
             // A taken letter is answered IN the popover (its holder, the swap offer); every other refusal
@@ -1968,6 +1985,33 @@ export function App() {
             </div>
           );
         }
+        if (pick.segment) {
+          /*
+            A SEGMENT gets the shared segment menu (#1653, ADR-W-106) — 2-D's hide/show and dashed/solid —
+            with its #1048 measure entries inside, as 2-D's «החליפו קצוות» rides in 2-D's. Mounted in the
+            same full-viewport FIXED layer as the letter popover, for the same reason.
+          */
+          const { key, name: segName } = pick.segment;
+          return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
+              <SegmentMenu
+                key={pick.seq}
+                x={pick.x}
+                y={pick.y}
+                bounds={{ width: window.innerWidth, height: window.innerHeight }}
+                title={segName}
+                state={segStyle[key] ?? {}}
+                onToggleHidden={() => toggleSegHidden(key)}
+                onToggleDashed={() => toggleSegDashed(key)}
+                strings={{ hide: t('segHide'), show: t('segShow'), dashed: t('segDashed'), solid: t('segSolid') }}
+                onClose={() => setPick(null)}
+                testId="segment-menu"
+              >
+                {measureItems.length > 0 && <div style={{ borderTop: `1px solid ${color.border}`, paddingTop: 4, display: 'flex', flexDirection: 'column' }}>{measureItems}</div>}
+              </SegmentMenu>
+            </div>
+          );
+        }
         return (
           <>
             <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setPick(null)} aria-hidden="true" />
@@ -1975,6 +2019,45 @@ export function App() {
               {measureItems}
             </div>
           </>
+        );
+      })()}
+
+      {/*
+        NAME AN UNNAMED CIRCLE'S CENTRE (#1598) — the shared letter popover on the centre offer. The letter
+        typed records exactly the sentence the typed path would («X מרכז המעגל …», `app/centreName.ts`), and a
+        taken letter quotes its holder and offers the swap, like every LetterPopover.
+      */}
+      {centrePick && (() => {
+        const state = { lines, disabled, queries, spokenFor, seed, seedNames, segStyle };
+        const ops = centrePopoverOps(
+          centrePick.offerId,
+          state,
+          { record: (v) => commitRecord(v, recordLine, t), applySwap, setError },
+          d,
+        );
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
+            <LetterPopover
+              key={centrePick.seq}
+              x={centrePick.x}
+              y={centrePick.y}
+              bounds={{ width: window.innerWidth, height: window.innerHeight }}
+              title={t('centreTitle')}
+              label={centreLabelOf(d)}
+              onRename={ops.onRename}
+              onSwap={ops.onSwap}
+              strings={{
+                placeholder: t('letterPlaceholder'),
+                apply: t('letterApply'),
+                taken: t('letterTaken'),
+                bad: t('letterBad'),
+                takenBy: t('letterTakenBy'),
+                swapLetters: t('letterSwap'),
+              }}
+              onClose={() => setCentrePick(null)}
+              testId="centre-popover"
+            />
+          </div>
         );
       })()}
 

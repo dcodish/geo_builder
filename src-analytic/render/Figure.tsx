@@ -19,12 +19,15 @@ const SCAFFOLD = '#94a3b8';
  *  it sits on — ADR-AG-010 R34 makes legibility at projection size a design condition for exactly
  *  this surface. */
 const SCAFFOLD_TEXT = '#475569';
+/** A HIDDEN segment's ghost (#1653) — 2-D's ghost colour: there to be clicked, not read. */
+const GHOST = '#cbd5e1';
 
 export function Figure({
   scene,
   showConstruction = false,
   onCrossing,
   onPick,
+  onCentre,
 }: {
   scene: Scene;
   showConstruction?: boolean;
@@ -43,8 +46,16 @@ export function Figure({
    * menu would be a second place deciding what is measurable.
    */
   onPick?: (what: { kind: 'point' | 'curve' | 'segment'; id: string }, screen: { x: number; y: number }) => void;
+  /**
+   * #1598 — an unnamed circle's CENTRE was clicked: the caller opens the letter popover for that offer.
+   * Absent = the centre offer behaves as any ring (`onCrossing` with its automatic sentence).
+   */
+  onCentre?: (offerId: string, screen: { x: number; y: number }) => void;
 }) {
   const { width, height, axes, curves, segments, construction, points, crossings, measures, loci } = scene;
+  /** #1598: a centre offer asks for a letter (`onCentre`); every other ring adds its sentence (`onCrossing`). */
+  const ringClick = (k: Scene['crossings'][number], e: { clientX: number; clientY: number }) =>
+    k.centreOf && onCentre ? onCentre(k.id, { x: e.clientX, y: e.clientY }) : onCrossing?.(k.sentence, { x: k.wx, y: k.wy });
   return (
     <svg
       width="100%"
@@ -133,10 +144,42 @@ export function Figure({
 
       {/* segments — stated segments and polygon sides (#1028). Drawn BEFORE the curves and points so
           a vertex dot and a curve both sit on top of the ink rather than under it. */}
+      {/*
+        #1653 — each segment is inked as the student chose (`shell/frame/segmentDisplay`'s `segInk`, the
+        decision 2-D paints from too): solid, dashed, or HIDDEN. A hidden segment has no ink; while the
+        canvas is clickable a faint dashed ghost stays on the line (an edit affordance, never exported) so
+        the segment menu can bring it back — 2-D's FR-RN-10 ghost.
+      */}
       <g stroke={CURVE} strokeWidth={2} strokeLinecap="round">
-        {segments.map((s) => (
-          <line key={s.id} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} data-id={s.id} />
-        ))}
+        {segments.map((s) =>
+          s.ink === 'ghost' ? (
+            onPick ? (
+              <line
+                key={s.id}
+                x1={s.x1}
+                y1={s.y1}
+                x2={s.x2}
+                y2={s.y2}
+                data-id={s.id}
+                data-ink="ghost"
+                data-noexport="1"
+                stroke={GHOST}
+                strokeDasharray="3 6"
+              />
+            ) : null
+          ) : (
+            <line
+              key={s.id}
+              x1={s.x1}
+              y1={s.y1}
+              x2={s.x2}
+              y2={s.y2}
+              data-id={s.id}
+              data-ink={s.ink}
+              strokeDasharray={s.ink === 'dashed' ? '8 6' : undefined}
+            />
+          ),
+        )}
       </g>
 
       {/*
@@ -354,8 +397,9 @@ export function Figure({
               strokeOpacity={0.55}
               strokeWidth={1.25}
               strokeDasharray="3 2"
-              style={{ cursor: onCrossing ? 'pointer' : 'default' }}
-              onClick={onCrossing ? () => onCrossing(k.sentence, { x: k.wx, y: k.wy }) : undefined}
+              style={{ cursor: onCrossing || (k.centreOf && onCentre) ? 'pointer' : 'default' }}
+              data-centre-offer={k.centreOf}
+              onClick={onCrossing || (k.centreOf && onCentre) ? (e) => ringClick(k, e) : undefined}
             />
           </g>
         ))}

@@ -9102,3 +9102,45 @@ And on #1262's own figure («A(-9a,0)» · «B(41a,0)» · «נקודה P» · �
 **Not built, said out loud.**
 - **The equation row of the created circle prints its tool symbols** («(x − θ_circle-touched.a)² + …») while the circle is not determined — pre-existing (seen on `5f042e40` too), a display question for the created circle's open equation, not part of either issue.
 - **The render's synchronous option walk still completes the pool** on this figure (~0.8 s of the 1.08 s); making it cheaper further is the dead-seat cost of the triangle itself (#1642's tries) or the background worker (#1381), not the created circle.
+
+## ADR-AG-201 — Click a segment to hide or dash it; click an unnamed centre to give it a letter (#1598, #1653 analytic side)
+
+**Status:** accepted · 2026-10-02 · feature (branch `feat/1653-1598-canvas-menus`) · `auto-ok` for both issues as transcription of the operator's approval (ADR-W-014) · the analytic half of [ADR-W-106](06w-decisions-workspace.md#adr-w-106).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R138 (new) · **Design:** [04c](04c-design-analytic.md) "The canvas's click menus: a segment's display, a centre's letter" (new section).
+
+**Cites** #1048 (the measure menu), #1109 / #1619 B1 (`centresOf`, the typed «X מרכז המעגל …»), #1631 / ADR-W-105 (the shared letter popover), #1632 / ADR-AG-199 (the whole-envelope round trip), ADR-AG-048 (two surfaces, one grammar), ADR-AG-184 (a canonical circle's O), ADR-W-047 (canvas = inputs).
+
+**Context.**
+- **#1653.** Operator, 2026-10-02: *"in the analytic tool we dont have an option to click on a segment and hide it like we have in 2d"*. Measured at pickup: the segment click opened only the measure menu, and the store had no display state.
+- **#1598.** Operator, 2026-10-02: *"i want to be able to press on the center of a circle to create a letter in addition to the ability to define it through input like O מרכז המעגל"*. Re-measured at pickup: PR #1637 (B1) already offers a centre ring for every unnamed circle that some sentence can name. That covers an equation circle (`… מרכז המעגל x^2+y^2=16`), a numeral circle (`… מרכז המעגל I`), and the figure's only computed circle (`… מרכז המעגל`). But a click COMMITTED the ring's sentence with the automatic letter (`freeLetter`), and the student never chose it.
+
+**Decision.**
+1. **Segment display state** lives in the store as `segStyle`, keyed by the endpoint pair (`render/scene.ts` `segKey`, e.g. `A|B`, not the scene id). It is toggled by `toggleSegHidden(key)` / `toggleSegDashed(key)`, through the shared `toggleSegFlag`. It rides in the **undo slice** (`partialize` + `equality`), so one «בטל» restores a hide, as it does the ask lane's `shown`. It goes in the **save envelope** (`serialize` writes it when non-empty, `loadAnalyticSession` passes it, and `restore` cleans it with `cleanSegDisplay`) and in the session-persist trigger. `clearAll` empties it. A rename or swap re-keys it in the same commit (`relabelSegStyle` in `relabelSession`), so a hidden AB stays hidden as DB.
+2. **The canvas inks each segment through the shared `segInk`.** A hidden segment has no ink. While picks are wired, a faint dashed ghost stays on it (`data-noexport`, so it never reaches the exported image), and clicking the ghost opens the same menu with «הציגו קטע». A stated length on a hidden segment stays drawn: everything the student stated stays visible (the honesty invariant). A hidden segment is still in the construction, so every reference, measurement and question reaches it.
+3. **The segment click opens the shared `SegmentMenu`**, with the #1048 measure entries as its children. A segment with no measure entries still gets the menu.
+4. **The centre click opens the shared `LetterPopover`** (`Figure` `onCentre`, set on the offers `centresOf` marks with `centreOf`). The popover's two callbacks come from `app/centreName.ts` `centrePopoverOps`:
+   - **A free letter** records exactly the sentence the typed path takes. `centreSentenceOf(figure, offerId, letter)` is `centresOf` asked with that letter, never a second composer. `decideSubmit` decides it, and `commitRecord` records it. So the click writes «M מרכז המעגל x^2+y^2=16», «C מרכז המעגל I», or «M מרכז המעגל».
+   - **A taken letter** is refused with its holder (`letterHolder`), so the popover quotes it and offers the swap.
+   - **The swap** gives the centre the asked-for letter, and the old holder takes the centre's automatic letter (the popover's `label`). It records the centre under the automatic letter, then runs `decideSwap`, and commits both as ONE session, so one undo restores it.
+   The ring and the cross are the circle's own centre, an input-derived object, so ADR-W-047 holds.
+
+**Locks.**
+- `src-analytic/__tests__/segment-display-1653.test.tsx` (7): the §5c rows on a triangle side and on a stated segment; a rename and its undo carry a hidden side; a swap carries a dashed one; «נקה הכל» clears; the measure menu is unchanged under a hide; a hand-edited save is cleaned.
+- `src-analytic/__tests__/issue-1598-centre-popover.test.ts` (9): the four circle kinds each record the exact sentence, place the letter at the offer, re-parse through `decideSubmit`, withdraw the offer, and undo in one step; a lowercase letter; a refused non-letter; a taken letter with its holder, the offer, and a one-step swap; the canonical circle's O and a lettered centre unchanged.
+- `issue-1637-g3-app.test.ts`: the whole-envelope key list gains `segStyle`.
+- **Fails before:** 16 of the new and extended tests. The two canonical-circle guards pass before, as they should.
+
+**Browser** (`/analytic.html`, port 5175, Playwright, screenshots read):
+- With A(0,0), B(6,0), C(2,4), «משולש ABC», a click on AB opens «AB» with «הסתירו קטע», «מקווקו» and the four measure entries.
+- Hide gives `poly-ABC-0:ghost` (a faint dashed ghost on the axis). «בטל» gives `solid`. «מקווקו» gives `dashed`.
+- Hide, then a click on the ghost, shows «הציגו קטע» plus the measures. Show brings it back `dashed`.
+- With O(5,5) and x^2+y^2=16, a click on the centre ring opens «מרכז המעגל». Typing O shows «האות כבר בשימוש», «האות תפוסה על ידי: «O(5,5)»» and «החליפו בין P ל-O». Typing M adds the row «M מרכז המעגל x²+y²=16», with M(0, 0) at the centre and no ring left.
+
+**Not here, said out loud.**
+- **A computed circle among several** (a circumcircle plus an equation circle) offers no centre ring: no typed sentence names its centre («X מרכז המעגל החוסם את המשולש ABC» is `not-handled`; «X מרכז המעגל» is `ambiguous-shape`). That is a grammar gap, unchanged and reported.
+- **The swap on the figure's only computed circle** (`A` taken by a vertex of the circumscribed triangle) is refused `swap-unsafe`, because `decideSwap` cannot faithfully rewrite the contextual «P מרכז המעגל». The same typed swap is refused identically on main. It is the rename machinery's limit, reported.
+- **3-D** is ADR-W-106 item 5.
+
+**Consequences.** `store/useAnalyticStore.ts` (`segStyle`, toggles, undo slice, envelope); `render/scene.ts` (`segKey`, `SceneSegment.key/ink`, `centreOf` on crossings); `render/Figure.tsx` (ink by `segInk`, the ghost, `onCentre`); `engine/crossings.ts` (`centreOf`, `centreSentenceOf`); `app/centreName.ts` (new); `app/rename.ts` (`relabelSegStyle`, `nameInUse` exported); `app/loadSession.ts`; `app/sessionPersistAn.ts`; `App.tsx`; `i18n/index.ts` (`segHide/segShow/segDashed/segSolid`, `centreTitle`). The save envelope gains one optional key, so an older file loads unchanged. No grammar or catalogue change, so the proxy bundle is unaffected.
+

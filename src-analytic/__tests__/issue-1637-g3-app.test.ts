@@ -121,11 +121,13 @@ describe('#1632 — a saved file loads with everything it saved', () => {
       spokenFor: { 2: 'M היא אמצע הקטע AB' },
       disabled: [2],
       seedNames: { A: 'B', B: 'A' },
+      // #1653 (ADR-AG-201) — the segment display choices joined the envelope
+      segStyle: { 'A|B': { dashed: true }, 'A|M': { hidden: true } },
     });
     const saved = JSON.parse(JSON.stringify(store().serialize()));
     // the fixture exercises every optional field — a field added to `serialize` without a value here
     // shows up as a key this list does not have, and fails the next line
-    expect(Object.keys(saved).sort()).toEqual(['app', 'disabled', 'lines', 'name', 'seed', 'seedNames', 'spokenFor', 'version']);
+    expect(Object.keys(saved).sort()).toEqual(['app', 'disabled', 'lines', 'name', 'seed', 'seedNames', 'segStyle', 'spokenFor', 'version']);
 
     store().clearAll();
     loadAnalyticSession(saved, 'fallback');

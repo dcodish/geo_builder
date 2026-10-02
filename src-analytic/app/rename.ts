@@ -62,6 +62,8 @@ import type { AskedQuestion, InputError } from '../store/useAnalyticStore';
 import type { Construction, Id } from '../engine/types';
 import { activeOf, rowOf } from './active';
 import type { LetterRenameResult } from '../../shell/frame/letterOffer';
+import type { SegDisplayMap } from '../../shell/frame/segmentDisplay';
+import { segKey } from '../render/scene';
 
 export { parseRenameAnalytic, parseSwapAnalytic };
 
@@ -232,6 +234,8 @@ export interface RenameState {
   seed: number;
   /** #1631 — the session's seed-name map (`Construction.seedNames`); absent = none. */
   seedNames?: LetterMap;
+  /** #1653 — the segment display map (keyed by endpoint pair); absent = none. */
+  segStyle?: SegDisplayMap;
 }
 
 /**
@@ -249,6 +253,18 @@ export interface RelabelCommit {
   queries: AskedQuestion[];
   spokenFor: Record<number, string>;
   seedNames: Record<string, string>;
+  /** #1653 — the segment display map, its endpoint-pair keys relabelled: a hidden AB stays hidden as XB. */
+  segStyle: SegDisplayMap;
+}
+
+/** #1653 — re-key a segment display map under a letter map (a rename's one entry, a swap's two). */
+export function relabelSegStyle(style: SegDisplayMap, map: LetterMap): SegDisplayMap {
+  const out: SegDisplayMap = {};
+  for (const [k, v] of Object.entries(style)) {
+    const ends = k.split('|');
+    out[ends.length === 2 ? segKey([map[ends[0]] ?? ends[0], map[ends[1]] ?? ends[1]]) : k] = { ...v };
+  }
+  return out;
 }
 
 /** What the rename decided. A taken letter carries its HOLDER as data — the popover quotes it and offers the swap. */
@@ -294,7 +310,7 @@ export function letterHolder(state: RenameState, id: string, current: Derivation
 }
 
 /** Is `id` a name in use — a point of the figure, a named curve, or any letter a line uses? */
-function nameInUse(state: RenameState, current: Derivation, id: string): boolean {
+export function nameInUse(state: RenameState, current: Derivation, id: string): boolean {
   if (current.construction.objects.some((o) => o.id === id || statedName(o.id) === id)) return true;
   return typedHolder(state.lines, id) !== null;
 }
@@ -399,6 +415,7 @@ function relabelSession(
     queries: state.queries.map((q) => ({ ...q, sentence: relabelMap(q.sentence, map) })),
     spokenFor: Object.fromEntries(Object.entries(state.spokenFor).map(([k, v]) => [k, relabelMap(v, map)])),
     seedNames,
+    segStyle: relabelSegStyle(state.segStyle ?? {}, map),
   };
 }
 
@@ -505,7 +522,7 @@ export interface SwapActions {
   setError: (e: InputError | null) => void;
 }
 
-const commitOf = (v: RelabelCommit): RelabelCommit => ({ lines: v.lines, queries: v.queries, spokenFor: v.spokenFor, seedNames: v.seedNames });
+const commitOf = (v: RelabelCommit): RelabelCommit => ({ lines: v.lines, queries: v.queries, spokenFor: v.spokenFor, seedNames: v.seedNames, segStyle: v.segStyle });
 
 /**
  * DISPATCH A RENAME — decide, then write ONE commit (one undo step) or show the refusal.

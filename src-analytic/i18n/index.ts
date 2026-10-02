@@ -197,6 +197,13 @@ const he = {
   letterBad: 'אות לא תקינה',
   letterTakenBy: 'האות תפוסה על ידי: «{{what}}»',
   letterSwap: 'החליפו בין {{a}} ל-{{b}}',
+  // The segment menu (#1653, ADR-W-106) — 2-D's segMenu wording, so the builders say the same thing.
+  segHide: 'הסתירו קטע',
+  segShow: 'הציגו קטע',
+  segDashed: 'מקווקו',
+  segSolid: 'רציף',
+  // #1598 — the letter popover opened on an unnamed circle's centre
+  centreTitle: 'מרכז המעגל',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
   // #1423 — the letter is the problem, named with the student's own defining sentence and the remedy
   errUnsatisfiableReused: '{{reusedId}} כבר מוגדרת: "{{definedBy}}". המשפט "{{detail}}" סותר את ההגדרה הקיימת — לנקודה חדשה בחרו אות אחרת.',
@@ -547,6 +554,11 @@ const en: typeof he = {
   letterBad: 'Invalid letter',
   letterTakenBy: 'Held by: «{{what}}»',
   letterSwap: 'Swap {{a}} and {{b}}',
+  segHide: 'Hide segment',
+  segShow: 'Show segment',
+  segDashed: 'Dashed',
+  segSolid: 'Solid',
+  centreTitle: 'Circle centre',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
   errUnsatisfiableReused: '{{reusedId}} is already defined: "{{definedBy}}". "{{detail}}" contradicts that definition — pick another letter for a new point.',
   'locus.line': 'line',
