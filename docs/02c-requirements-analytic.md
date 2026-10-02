@@ -2180,7 +2180,7 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - «הישר העובר דרך הנקודה E מקביל לציר ה-y וחותך את הצלע AB בנקודה F» (and «דרך E עובר ישר מקביל ל-… החותך את …», «ישר דרך P מאונך ל-AB») states the line and where it cuts the side; on a SIDE the point lies between its ends. The piece EF is drawn and the line itself is not, as in 2-D, until a sentence states the line.
 - «האנך» refers to the perpendicular already drawn — «הנקודה E נמצאת על האנך שהורידו מנקודה B לציר ה-x», «המשיק והאנך נחתכים בנקודה D». With none, or several and no description that picks one, the sentence is refused and says how to name it.
 - «הצלע CB מקבילה לציר ה-x, וחותכת את ציר ה-y בנקודה E» is both statements about CB.
-- «הקטע EF מקביל ל-DA» with F not yet placed adds F, free to move along the parallel through E, until a later given places it.
+- «הקטע EF מקביל ל-DA» (and «EF ∥ DA», «הצלע EF מקבילה ל-DA», «הישר EF מקביל ל-DA», R143) with F not yet placed adds F, free to move along the parallel through E, until a later given places it.
 - Refused by name: a perpendicular from a point of the line itself, a foot that is its own point, a line the sentence does not name readably.
 
 **R142 — diagonals, extensions, the midsegment and a point on a side with a condition read as the 2-D tool reads them**

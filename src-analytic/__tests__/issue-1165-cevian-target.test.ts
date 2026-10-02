@@ -94,7 +94,7 @@ describe('ADR-AG-117 — the triangle names the side, and it means the same thin
   it.each(PAIRS)('%s — the same figure, seeds 0–3', (_what, added, reference, shape) => {
     for (let seed = 0; seed <= 3; seed += 1) {
       expect(shapeOf([...TRIANGLE_HE, added], seed), `seed ${seed}`).toEqual(
-        shapeOf([...TRIANGLE_EN, ...(namesTriangle(added) ? ['משולש ABC'] : []), reference], seed),
+        shapeOf([...TRIANGLE_EN, ...shape, reference], seed),
       );
     }
   });

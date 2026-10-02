@@ -228,12 +228,17 @@ describe('a straight piece as the shared subject — «הצלע CB מקבילה 
 });
 
 describe('«הקטע EF מקביל ל-DA» NAMES the segment — a new end is a free point the relation constrains', () => {
-  it('F is introduced and slides on the parallel through E; «הצלע»/the bare pair still refer', () => {
-    const d = clean(derive(['משולש ABC', 'E על BC', 'הקטע EF מקביל ל-AC'], 0));
-    const [a, c, e, f] = ['A', 'C', 'E', 'F'].map((id) => pt(d, id));
-    expect(Math.abs(cross(sub(f, e), sub(c, a)))).toBeLessThan(1e-6 * Math.max(1, dot(sub(c, a), sub(c, a))));
-    expect(derive(['משולש ABC', 'E על BC', 'EF ∥ AC'], 0).faults[0]).toMatchObject({ code: 'unknown-reference', detail: 'F' });
-    expect(derive(['משולש ABC', 'E על BC', 'הצלע EF מקבילה ל-AC'], 0).faults[0]).toMatchObject({ code: 'unknown-reference', detail: 'F' });
+  /*
+   * Every spelling introduces F: «הקטע» by this ADR (operator ruling 2026-10-02 on #1620, "Create F"), and the bare
+   * pair, «הצלע» and «הישר» by #1670 row 4 / #1686 (ADR-AG-210 — a two-pair relation mints its new letters, 2-D's rule).
+   * 2-D owes all four: it refuses them with a solver conflict, not by rule (#1677).
+   */
+  it.each(['הקטע EF מקביל ל-AC', 'EF ∥ AC', 'הצלע EF מקבילה ל-AC', 'הישר EF מקביל ל-AC'])('«%s» — F is introduced and slides on the parallel through E', (line) => {
+    for (const seed of [0, 1, 2]) {
+      const d = clean(derive(['משולש ABC', 'E על BC', line], seed));
+      const [a, c, e, f] = ['A', 'C', 'E', 'F'].map((id) => pt(d, id));
+      expect(Math.abs(cross(sub(f, e), sub(c, a)))).toBeLessThan(1e-6 * Math.max(1, dot(sub(c, a), sub(c, a))));
+    }
   });
 });
 
