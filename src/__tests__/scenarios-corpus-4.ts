@@ -47,6 +47,7 @@ import type { AnyCommand, Id, Vec } from '@/engine';
 import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-harness';
 import { ctxOf } from './scenario-pipeline';
+import { gateVerdict } from './submit-gate';
 import { parse } from '@/parser';
 import { computeValues, figureDeterminacy, findValidConfig, searchAnotherView, sharedSamples } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
@@ -3166,6 +3167,27 @@ export const SCENARIOS_4: Scenario[] = [
         expect(dist(ctr!, eb), `«${line}»: B and C on it`).toBeCloseTo(dist(ctr!, ec), 6);
         if (diameter) expect(Math.abs((ec.x - eb.x) * (ctr!.y - eb.y) - (ec.y - eb.y) * (ctr!.x - eb.x)) / dist(eb, ec), 'the centre on BC').toBeLessThan(1e-6);
       }
+    },
+  },
+  {
+    id: 'chord-claim-contradiction-refused-in-every-spelling-1668',
+    title: '#1668 (ADR-564): with B the midpoint of radius OA, «המיתר AB מקביל ל-CD» is REFUSED at the door exactly like «AB מיתר במעגל O» — never committed with red rows',
+    guards:
+      "Found by the #1661 fix stream (ADR-563, 'observed, pre-existing'), 2026-10-02. Measured on c6a412aa: every chord / diameter spelling dry-ran to the same conflict (|OB| = R cannot hold), but the submit gate then asked deferralWorthwhile whether to park the line as waiting for givens — and that asked whether SOME new constraint flexed. A relation spelling carries a ∥ / a length / a collinearity that does, so it was parked and painted red; the bare predicate carries none, so it was refused. The fold already filed the chord claim as a concluded contradiction; the gate now reads that per-fact verdict (Derived.concluded). Asserts: the figure before the line is green, every spelling is refused by the deterministic gate with ONE identical conflict detail, and on B ON the circle the relation spelling commits. The submit-door locks (notes, nothing committed, the hypotenuse twin) are in src/app/__tests__/issue-1668-claim-gate-parity.test.ts.",
+    steps: ['מעגל O', 'A על המעגל', 'B אמצע OA', 'קטע CD'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['מעגל O', 'A על המעגל', 'B אמצע OA', 'קטע CD']);
+      const details = new Set<string>();
+      for (const line of ['AB מיתר במעגל O', 'המיתר AB מקביל ל-CD', 'הקוטר AB מקביל ל-CD', 'המיתר AB = 5']) {
+        const v = gateVerdict(facts, line);
+        expect(v.kind === 'refused' && v.reason, `«${line}» is refused as a conflict`).toBe('error');
+        if (v.kind === 'refused') details.add(v.detail ?? '');
+      }
+      expect([...details], 'one claim, one verdict').toHaveLength(1);
+      expect([...details][0]).toMatch(/OB.*cannot hold/);
+      const onCircle = factsOf(['מעגל O', 'A על המעגל', 'B על המעגל', 'קטע CD']);
+      expect(gateVerdict(onCircle, 'המיתר AB מקביל ל-CD').kind, 'B on the circle: the relation spelling commits').toBe('commit');
     },
   },
 ];

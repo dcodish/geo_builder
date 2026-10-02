@@ -209,18 +209,11 @@ describe('#1661 — refusals name the statement and commit nothing', () => {
   });
 
   it('a chord claim on a point that cannot be on the circle is a conflict, never a silent segment', async () => {
-    for (const l of ['מעגל O', 'A על המעגל', 'B אמצע OA', 'קטע CD']) expect((await submit(l)).accepted, l).toBe(true);
-    const before = useGeoStore.getState().facts.length;
-    const r = await submit('המיתר AB מקביל ל-CD');
-    const st = useGeoStore.getState();
-    const d = replay(st.facts, st.seed);
-    // Either refused at the door, or committed with the claim's row carrying the conflict (the replay's
-    // per-fact status, which the steps panel shows red) — never a green bare segment.
-    if (r.accepted) {
-      const claim = st.facts.slice(before).find((f) => f.cmd.type === 'point-on-circle' && f.cmd.id === 'B');
-      expect(claim, 'the chord claim on B is part of the line').toBeDefined();
-      expect(d.status[claim!.id], 'and its row shows the conflict').toMatch(/over-constrained|cannot/);
-    } else expect(st.facts.length).toBe(before);
+    // #1668 (ADR-564): refused at the door, exactly as «AB מיתר במעגל O» is — this lock used to accept
+    // either outcome (the line committed with its rows red); the spellings now share one verdict
+    // (src/app/__tests__/issue-1668-claim-gate-parity.test.ts).
+    const note = await refusedLast(['מעגל O', 'A על המעגל', 'B אמצע OA', 'קטע CD', 'המיתר AB מקביל ל-CD']);
+    expect(note).toMatch(/OB.*cannot hold/);
   });
 
   it('«המשיק BC מקביל ל-AD» is never committed as a bare segment', async () => {

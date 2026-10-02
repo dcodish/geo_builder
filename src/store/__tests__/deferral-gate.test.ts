@@ -54,6 +54,21 @@ describe('deferralWorthwhile (#207, ADR-385)', () => {
     expect(deferralWorthwhile(prefix, lastCmds(prefix, 'ישר ABE'))).toBe(false);
   });
 
+  it('a line whose OTHER member is a concluded contradiction is NOT deferral-worthy, though its ∥ flexes (#1668)', () => {
+    // «המיתר AB מקביל ל-CD» with B = mid(OA): the ∥ flexes, but the chord claim on B can never hold — the
+    // fold files it as concluded, so the gate (which used to ask only "does SOME constraint flex?") refuses.
+    const prefix = factsOf(['מעגל O', 'A על המעגל', 'B אמצע OA', 'קטע CD']);
+    expect(deferralWorthwhile(prefix, lastCmds(prefix, 'המיתר AB מקביל ל-CD'))).toBe(false);
+    expect(deferralWorthwhile(prefix, lastCmds(prefix, 'הקוטר AB מקביל ל-CD'))).toBe(false);
+  });
+
+  it('…but a concluded member an UNPINNED right-angle seat may still cure keeps the ADR-104 route (#1668 / ADR-551 Am. 1)', () => {
+    // The #546 figure: at the default seat (C) «קשת AB = קשת BC» is filed concluded, yet reseating the right
+    // angle at B builds it; the post-commit config search does that, so the gate must not refuse it.
+    const prefix = factsOf(['משולש ישר זווית ABC', 'משולש ABC חסום במעגל', 'מעגל חסום במשולש ABC', 'משיק למעגל בנקודה B']);
+    expect(deferralWorthwhile(prefix, lastCmds(prefix, 'קשת AB = קשת BC'))).toBe(true);
+  });
+
   it('a command group with no relation constraint at all is never deferral-worthy', () => {
     const prefix = factsOf(['AB']);
     expect(deferralWorthwhile(prefix, lastCmds(prefix, 'CD'))).toBe(false);

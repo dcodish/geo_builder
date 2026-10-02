@@ -64,7 +64,7 @@ export function gateVerdict(facts: Fact[], utterance: string, seed = 0): GateVer
     return { kind: 'refused', reason: 'honesty-gate' };
   }
   const outcome = dryRunOutcome(facts, r.commands, seed);
-  if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands))) {
+  if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands, seed))) {
     return { kind: 'commit', commands: r.commands };
   }
   if (outcome.reason === 'empty') {

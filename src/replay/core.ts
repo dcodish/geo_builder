@@ -159,6 +159,12 @@ export interface Derived {
    * never a reason to refuse. A genuine build failure leaves it false.
    */
   sampledFailure: boolean;
+  /**
+   * #1668 ([ADR-564](docs/06-decisions.md#adr-564)): the fact ids the fold's build rejected AND filed as a
+   * CONCLUDED contradiction — the per-fact half of `pending`. A statement with a member here can never be
+   * "waiting for givens", whatever else in it still flexes; `deferralWorthwhile` reads it.
+   */
+  concluded: Set<string>;
 }
 
 /** A free circle radius the student can drag: `base` is the stable seed radius (for the slider range),
@@ -321,6 +327,9 @@ export function replay(facts: Fact[], seed = 0): Derived {
 interface FoldNode {
   cur: Construction;
   statusByIndex: FactStatus[];
+  /** #1668 (ADR-564): fact index → the build rejected it and the classifier filed it as a CONCLUDED
+   *  contradiction (not ADR-104 waiting), judged before atomic poisoning. Top-level fold only. */
+  concludedByIndex: boolean[];
   applied: Command[];
   pending: boolean;
   buildError: string | null;
@@ -381,6 +390,7 @@ function translateFold(node: FoldNode, permToOrig: number[]): FoldNode {
   return {
     ...node,
     statusByIndex,
+    concludedByIndex: node.concludedByIndex.reduce<boolean[]>((acc, c, permIdx) => { acc[permToOrig[permIdx]] = c; return acc; }, []),
     rtReorderByIndex: node.rtReorderByIndex.map(([permIdx, ids]) => [permToOrig[permIdx], ids] as [number, [Id, Id, Id]]),
     // #360: the owner maps carry fact INDICES in the permuted order — translate them like statusByIndex.
     ownerByConKey: new Map([...node.ownerByConKey].map(([k, permIdx]) => [k, permToOrig[permIdx]])),
@@ -1031,9 +1041,9 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
   // waiting for the givens that pin the figure (ADR-104), so it's a PENDING info state, not a red error.
   // A genuine failure (a non-deferrable step, or any failure once the figure is fully determined) stays a
   // hard `lastError`.
-  const classify = (cur: Construction, status: Record<string, FactStatus>) => {
-    const failedFacts = facts.filter((f) => f.enabled && status[f.id] !== 'ok' && status[f.id] !== 'disabled');
-    const pending = failedFacts.length > 0 && failedFacts.every((f) => {
+  // `waits` is the PER-FACT verdict; `classify` folds it over every failed fact. Kept separate so the
+  // fold can record which facts it filed as a concluded contradiction (`concludedByIndex`, #1668).
+  const waits = (cur: Construction, f: Fact): boolean => {
       // #926 (ADR-483): a value for a letter no statement binds is WAITING for its definition — the
       // student may type «x = 4» before «AB = x» (the whole-list table has always allowed it), or may
       // have deleted the step that used the letter. Either way it is ADR-104's register — recorded,
@@ -1046,11 +1056,35 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       if (rigid.has(f.id)) return false;
       const ec = lowerOne(f.cmd, symtab);
       return hasDeferrableConstraint(ec) && constraintIsPending(cur, ec); // a deferrable constraint that still FLEXES (not a rigid contradiction)
-    });
+  };
+  const classify = (cur: Construction, status: Record<string, FactStatus>) => {
+    const failedFacts = facts.filter((f) => f.enabled && status[f.id] !== 'ok' && status[f.id] !== 'disabled');
+    const pending = failedFacts.length > 0 && failedFacts.every((f) => waits(cur, f));
     return { failedFacts, pending };
   };
   let { cur, status, applied, ownerByConKey, ownerByObjId, owned } = runBuild(new Map(), resumeFrom);
-  let { failedFacts, pending } = classify(cur, status);
+  /**
+   * #1668 ([ADR-564](docs/06-decisions.md#adr-564)) — WHICH FACTS THE BUILD ITSELF FILED AS A CONCLUDED
+   * CONTRADICTION. Read off the FIRST build, before atomic-group poisoning spreads one member's error over
+   * its siblings: a statement's own failures, each judged by the same per-fact `waits` the classifier
+   * uses. The submit gate's deferral question («commit this as waiting for givens?», `deferralWorthwhile`)
+   * reads it, so the gate and the fold can no longer disagree about a statement — the gate used to ask
+   * whether SOME relation in the line still flexes, so «המיתר AB מקביל ל-CD» (the ∥ flexes) was parked
+   * while its chord claim on a midpoint B had already been filed here as a rigid contradiction (red rows).
+   *
+   * One verdict per failed fact, reused by the first `classify` (no second probe). Only the top-level,
+   * attributing fold records it — a HOIST rescue is adopted only when clean and the drop-one search's
+   * trial folds are never replayed — so those pay nothing extra.
+   */
+  const firstFailed = facts.filter((f) => f.enabled && status[f.id] !== 'ok' && status[f.id] !== 'disabled');
+  const recordConcluded = attribute && hoistDepth === 0;
+  const concludedIds = new Set<string>();
+  let failedFacts = firstFailed;
+  let pending: boolean;
+  if (recordConcluded) {
+    for (const f of firstFailed) if (!waits(cur, f)) concludedIds.add(f.id);
+    pending = firstFailed.length > 0 && concludedIds.size === 0;
+  } else ({ failedFacts, pending } = classify(cur, status));
   // ATOMIC GROUP: one utterance lowers to a GROUP of commands (e.g. "EF ⟂ BC" → segment EF + segment BC +
   // set-perpendicular). If the constraint HARD-fails (a genuine contradiction, not a pending under-determined
   // solve), the auto-drawn scaffolding segments must NOT survive on their own — the whole utterance failed, so
@@ -1297,6 +1331,7 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
   return {
     cur,
     statusByIndex: facts.map((f) => status[f.id]),
+    concludedByIndex: facts.map((f) => concludedIds.has(f.id)),
     applied,
     pending,
     buildError,
@@ -1515,7 +1550,8 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   // predicate alone.
   const flat = e.ok && lastError === null ? degeneratePolygons(figure, e.positions) : [];
   const degeneracies: DegenerateNotice[] = flat.length ? nameDegeneracies(facts, seed, flat) : [];
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, coincidences, forcedOffArc, degeneracies, sampledFailure };
+  const concluded = new Set<string>(facts.filter((_, i) => fold.concludedByIndex?.[i]).map((f) => f.id));
+  return { construction: figure, positions: e.ok ? e.positions : new Map(), circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, coincidences, forcedOffArc, degeneracies, sampledFailure, concluded };
 }
 
 /** The (a, b, id, circle) triples every enabled `extend-onto-circle` step asserts ("המשך a·b onto `circle` at id"). */
@@ -1634,12 +1670,31 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
  * classifier can never diverge (issue #207 / ADR-385 — the route used to consult only the first half,
  * committing a CONCLUDED contradiction as «waiting for givens»: the quarter-circle whose |OC|=|OD| is
  * structurally impossible landed as a parked deferred-constraint instead of the honest refusal).
+ * #1668 (ADR-564): and the classifier's verdict is PER FACT — `Derived.concluded` carries it, so a line
+ * one of whose members the fold filed as a concluded contradiction never parks on another member's flex.
  */
-export function deferralWorthwhile(facts: Fact[], commands: AnyCommand[]): boolean {
+export function deferralWorthwhile(facts: Fact[], commands: AnyCommand[], seed = 0): boolean {
   if (!hasDeferrableConstraint(commands)) return false;
   const symtab = buildSymTab([...facts.filter((f) => f.enabled).map((f) => f.cmd), ...commands]);
   const lowered = commands.flatMap((c) => lowerOne(c, symtab)) as Command[];
-  return constraintIsPending(replay(facts).construction, lowered);
+  if (!constraintIsPending(replay(facts).construction, lowered)) return false;
+  // #1668 (ADR-564): the statement is judged FACT BY FACT, as the classifier judges it — a line whose
+  // build rejected a member the fold filed as a concluded contradiction (a chord claim on a midpoint, a
+  // second right angle) is not waiting for givens, however much ANOTHER member (its ∥, its length) still
+  // flexes. The check above asks only whether SOME new constraint flexes, so it parked lines the fold
+  // then painted red, while the same claim spelled without a relation was refused at the door. Read
+  // second: on the submit path the dry run has just folded this very trial (a memo hit), and a line the
+  // flex probe already refuses never pays it.
+  //
+  // The fold's verdict is taken at the CURRENT right-angle seat, and an unstated seat yields (ADR-551
+  // Am. 1): a failure it may cure is not concluded. `dryRunOutcome` tries that cure under a 1.5 s
+  // budget; a line it could not finish there (measured: the #546 arc line on a triangle with its two
+  // circles — cold rotated folds, ~20 s) keeps the ADR-104 route, and the post-commit config search
+  // reseats it. So a concluded member refuses only where no unpinned seat could still yield.
+  const all = trialFacts(facts, commands);
+  const trial = replay(all, seed);
+  if (!all.slice(facts.length).some((f) => trial.concluded.has(f.id))) return true;
+  return unpinnedSeats(all).length > 0;
 }
 
 /** The figure's overall scale (bounding-box diagonal of all placed points) — the yardstick a clearance
@@ -2406,6 +2461,17 @@ export function viewUsable(d: Derived): boolean {
  * through to the new-label check and then to the **LLM escalation**; a restatement the tool understood
  * perfectly must never reach the model. Routed straight to «כבר קיים» instead.
  */
+/** The UNPINNED right-triangle seats {@link seatRescue} may flip (at most two — the combinatorics are
+ *  bounded like the branch tier). Non-empty means a failure at the current seat may belong to the
+ *  unstated seat (ADR-052/163/445) rather than to the givens — `deferralWorthwhile` reads it (#1668). */
+export function unpinnedSeats(facts: Fact[]): { f: Fact; i: number }[] {
+  const pinnedRA = explicitRightAngleVerts(facts);
+  return facts
+    .map((f, i) => ({ f, i }))
+    .filter(({ f }) => f.enabled && f.cmd.type === 'right-triangle' && !f.cmd.ids.some((id) => pinnedRA.has(id)))
+    .slice(0, 2);
+}
+
 /**
  * The SEAT sweep alone (#566/ADR-445's seat tier, extracted for #1441 arm 3): flip each UNPINNED
  * right-triangle seat via the solve-chosen `rot` and accept the first rewritten fact list meeting
@@ -2414,12 +2480,7 @@ export function viewUsable(d: Derived): boolean {
  * failures belong to the unstated seat. Zero cost when no unpinned right-triangle exists.
  */
 export function seatRescue(facts: Fact[], deadline: number): { facts: Fact[]; seed: number } | null {
-  const pinnedRA = explicitRightAngleVerts(facts);
-  const rtFacts = facts
-    .map((f, i) => ({ f, i }))
-    .filter(({ f }) => f.enabled && f.cmd.type === 'right-triangle' && !f.cmd.ids.some((id) => pinnedRA.has(id)))
-    .slice(0, 2); // bound the combinatorics, like the branch tier
-  for (const { f, i } of rtFacts) {
+  for (const { f, i } of unpinnedSeats(facts)) {
     const cur = (f.cmd as { rot?: 1 | 2 }).rot ?? 0;
     for (const rot of ([1, 2, 0] as const).filter((r) => r !== cur)) {
       const fc = facts.map((g, idx) => {

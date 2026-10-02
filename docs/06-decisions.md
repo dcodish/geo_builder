@@ -13548,3 +13548,40 @@ A relation that cannot be enforced (`unenforceableRelation`) is not waiting: it 
 - **Observed, pre-existing (measured on the pre-change parser too):** «המיתר AB מקביל ל-CD» where B is the midpoint of radius OA is committed with its rows red («over-constrained»), while «AB מיתר במעגל O» is refused at the door — the submit gate judges the two lines differently. Worth its own issue.
 
 **Consequences.** `src/parser/roleNouns.ts` (new), `src/parser/parse.ts` (`withRoleClaims` replaces `withCarrierMembership`; `RoleClaimWhy`; the `role-claim` result and clarify), `src/app/decideDeterministic.ts` (the refusal), `src/i18n/locales/{he,en}.json` (`input.roleClaim.*`).
+
+## ADR-564 — One claim, one verdict at the door: the deferral gate reads the fold's per-fact verdict (#1668)
+
+**Status:** accepted · 2026-10-02 · P2 honesty bug, found by the #1661 fix stream (ADR-563, "observed, pre-existing") · branch `fix/1668-2d-chord-gate` off `main` @ c6a412aa
+
+**Requirements:** none (internal) — the existing promise (a contradiction is refused at the door, naming the statement) now holds for every spelling · **Design:** [04-design.md](04-design.md) § "The pre-LLM decision" — *Deferral reads the fold's per-fact verdict* · **LADDER stage:** submit gate (the ADR-104 deferral decision); no parser, solver or render change.
+
+**Cites** [ADR-104](#adr-104) (deferral), [ADR-385](#adr-385) (#207: ONE deferral gate shared with `classify`), [ADR-563](#adr-563) (#1661: role-noun claims), ADR-551 Am. 1 (#1441: the unstated right-angle seat yields at the gate), [ADR-443](#adr-443) (#546's figure).
+
+**Context — measured at pickup on c6a412aa, through `runSubmit` (the model mocked).** On «מעגל O · A על המעגל · B אמצע OA · קטע CD» (B can never be on the circle), every spelling dry-ran to the same error, «over-constrained: |OB| = 1·R cannot hold [vs #2]»:
+
+| typed | before |
+| --- | --- |
+| «AB מיתר במעגל O», «מיתר AB» | refused at the door |
+| «המיתר AB מקביל ל-CD», «הקוטר AB מקביל ל-CD», «המיתר AB = 5», «AB קוטר במעגל O» | **committed, every row red** |
+| «היתר AC = 5» on «משולש ABC · זווית C = 90» (the plain «זווית ABC = 90» is refused) | **committed, every row red** |
+
+The parse was right in every row (`point-on-circle B` is emitted each time) — the role-noun lowering is not the cause, and the predicate diameter form is affected too. **Cause:** after the dry-run error the decision asks `deferralWorthwhile` whether to commit the line as "waiting for givens". That asked whether SOME new constraint of the LINE still flexes; the relation spellings carry a ∥ / a length / a collinearity that does, so they parked. The fold's classifier judges each failed FACT (`point-on-circle B` is no deferrable constraint), filed the line as a concluded contradiction and painted it red. ADR-385 made the gate and the classifier share their predicates but not their unit.
+
+**Class (docs/17 §1):** *the submit gate's deferral verdict is computed over a different unit (the line) than the fold's (each fact)*, so any line pairing a rigid failure with a flexing relation was parked while its claim-only twin was refused — not specific to chords.
+
+**Decision.**
+1. `computeFold` records, from its first build and before atomic-group poisoning, which facts it filed as concluded — each judged by the classifier's own per-fact predicate (`waits`, extracted from `classify`, which now folds it). `FoldNode.concludedByIndex` → `Derived.concluded`. Only the top-level attributing fold computes it (rescue and drop-one trial folds pay nothing); the first `classify` reuses the same verdicts.
+2. `deferralWorthwhile(facts, commands, seed)` keeps its cheap flex probe first, then refuses a line with any trial member in `Derived.concluded`. On the submit path that replay is a fold-memo hit (the dry run just folded the trial).
+3. **The seat exception.** The verdict is taken at the current right-angle seat, and an unstated seat yields (ADR-551 Am. 1). `dryRunOutcome` tries that cure under a 1.5 s budget; when the figure has an unpinned seat (`unpinnedSeats`, now shared with `seatRescue`), a concluded member keeps the ADR-104 route and the post-commit config search reseats. Measured: without this, #546's «קשת AB = קשת BC» (concluded at seat C, built at seat B; the cold rotated folds outrun the 1.5 s budget, ~20 s) would have been refused — the one parity row the first cut changed.
+
+**Measured after** (same door): all six chord/diameter spellings are refused with one identical note and nothing committed; on B ON the circle they commit green; «היתר AC = 5» is refused with the same note as «זווית ABC = 90»; «היתר AB = 5» commits green.
+
+**Locks.** `src/app/__tests__/issue-1668-claim-gate-parity.test.ts` (4, through `runSubmit`): six spellings refused identically, nothing committed, never escalated; three spellings accepted green on B on the circle; the hypotenuse twin refused like the plain angle; the consistent hypotenuse green. `src/store/__tests__/deferral-gate.test.ts` +2: the chord and diameter relation lines are not deferral-worthy; the #546 arc line with an unpinned seat stays deferral-worthy. `issue-1661-role-noun-claims.test` — the over-constraint row no longer accepts "committed red" as an outcome: it must be refused. Scenario `chord-claim-contradiction-refused-in-every-spelling-1668` (corpus 4, through `gateVerdict`). `submit-gate.ts`'s `gateVerdict` passes its seed to `deferralWorthwhile`, as the app does. **Fails before: 4** (the two new #1668 submit tests that refuse, the new deferral-gate row, the tightened #1661 row); the consistent-figure rows and the seat row pass before as controls.
+
+**Parity goldens.** Shard 4 gains only the new scenario's key. No row of any shard changes (the first cut, without the seat exception, changed `anonymous-circle-binds-by-membership-beside-second-circle` — measured and fixed in decision 3, not re-recorded).
+
+**Sibling audit.** `deferralWorthwhile` has one caller in product code (`decideDeterministic`). `src/validation/replaySession.ts` (dev-only) still mirrors the pre-ADR-385 gate (`hasDeferrableConstraint` alone); left as is — it is the validation harness's own record, not a submit path.
+
+**Not built, said out loud.** On a figure with an unpinned right-angle seat, a line whose concluded member no seat can cure still parks and paints red (the old behaviour, now confined to that figure family): deciding it needs the seat sweep run to completion at the gate, which is the time budget ADR-551 bounded. *A ruling for the operator if it matters:* lift the budget for this question, or keep it.
+
+**Consequences.** `src/replay/core.ts` (`waits`, `concludedByIndex`, `Derived.concluded`, `unpinnedSeats`, `deferralWorthwhile`), `src/app/decideDeterministic.ts` (passes the seed).
