@@ -104,13 +104,29 @@ describe('ADR-AG-119 — what #1246 could only refuse, this answers (#1128)', ()
    * hypotenuse — so reading it as |BC| = 10 would drop the student's claim silently. The noun list
    * admits only nouns that add NOTHING to the pair they precede.
    */
-  it.each(['התיכון BC = 10', 'הגובה BC = 10', 'השוק BC = 10', 'הבסיס BC = 10', 'היתר BC = 10'])(
-    '«%s» is still NOT silently reduced to a length',
-    (line) => {
-      const r = parseLine(line);
-      expect(r.ok).toBe(false);
-    },
-  );
+  it.each(['התיכון BC = 10', 'הגובה BC = 10'])('«%s» is still NOT silently reduced to a length', (line) => {
+    const r = parseLine(line);
+    expect(r.ok).toBe(false);
+  });
+
+  /**
+   * ⚠ MOVED (#1651 / #1620 item 2, ADR-AG-200): «השוק», «הבסיס» and «היתר» were rows of the refusal above. The
+   * boundary's INTENT — the claim is never dropped — is unchanged; what changed is that the claim can now be
+   * STATED, so these three are accepted only WITH it: the length, plus the role (`role-of`: a leg, a base, a
+   * hypotenuse), which M1 lowers against the figure. Asserted as "the side's length AND the claim", never as a
+   * bare length, so a later change that dropped the claim again turns this red.
+   */
+  it.each([
+    ['השוק BC = 10', 'leg'],
+    ['הבסיס BC = 10', 'base'],
+    ['היתר BC = 10', 'hypotenuse'],
+  ])('«%s» is a length that STATES its role claim (%s), never a bare length', (line, role) => {
+    const r = parseLine(line);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.facts.some((f) => f.t === 'constraint' && f.k.t === 'length-eq')).toBe(true);
+    expect(r.facts.filter((f) => f.t === 'role-of').map((f) => (f.t === 'role-of' ? [f.role, f.a, f.b] : []))).toEqual([[role, 'B', 'C']]);
+  });
 
   /**
    * «הישר BC = 10» stays refused too, and for a different reason worth keeping separate: a LINE has

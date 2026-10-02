@@ -140,8 +140,12 @@ describe('#1281 — the converse word order, a coordinate operand, and «בסי�
     expect(d.construction.objects.some((o) => o.kind === 'segment')).toBe(true);
   });
 
-  it('«הבסיס CD» names the side, as «הצלע CD» does', () => {
-    expect(factsOf('הבסיס CD')).toEqual(factsOf('הצלע CD'));
+  it('«הבסיס CD» names the side, as «הצלע CD» does — and states the base claim beside it (#1651)', () => {
+    // ⚠ Was «≡ הצלע CD» exactly. Since ADR-AG-200 «בסיס» is a ROLE noun: the side, plus `role-of base`, which M1
+    // lowers to «CD ∥ its opposite side» in a trapezoid and to nothing where the figure gives «base» no content.
+    expect(factsOf('הבסיס CD')).toEqual([...factsOf('הצלע CD'), { t: 'role-of', role: 'base', a: 'C', b: 'D', src: '' }]);
+    // …and where nothing gives it content, the figure is the side's figure.
+    expect(derive(['C(0,0)', 'D(1,1)', 'הבסיס CD'], 0).construction).toEqual(derive(['C(0,0)', 'D(1,1)', 'הצלע CD'], 0).construction);
   });
 
   it('refusal: a point slot that is neither a name nor a coordinate is not claimed, and names the statement', () => {

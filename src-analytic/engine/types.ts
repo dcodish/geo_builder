@@ -444,7 +444,18 @@ export type Fact =
    * its radius to the equation's radius, each through the seam that already owns it (a coordinate statement,
    * `radius-of`), so a conflict is refused naming the line.
    */
-  | (FactBase & { t: 'circle-eq'; circleId: Id; eq: Expr });
+  | (FactBase & { t: 'circle-eq'; circleId: Id; eq: Expr })
+  /**
+   * WHAT A ROLE NOUN CLAIMS, where only the figure can say how (#1651, #1620 item 2; ADR-AG-200). «הרדיוס MB»
+   * says one end is THE circle's centre — which end, only the figure knows; «השוק BC» / «הבסיס AB» / «היתר AC»
+   * say which side of WHICH polygon. The parser's one claim lowering (`claimFacts`) emits this for those four;
+   * the chord, diameter and tangent claims lower straight to the facts their own sentences carry. M1 resolves
+   * it once (`applyRoleOf`): the right claim on the polygon or circle the figure holds, a conflict refused.
+   */
+  | (FactBase & { t: 'role-of'; role: PolygonOrRadiusRole; a: Id; b: Id });
+
+/** The role claims that need the FIGURE to lower (#1651, ADR-AG-200) — the rest lower in the parser. */
+export type PolygonOrRadiusRole = 'radius' | 'leg' | 'base' | 'hypotenuse';
 
 /** The stand-in a `via-centre` sentence carries for «מרכז המעגל» — a name no student writes (#1619 B1). */
 export const CENTRE_SENTINEL = 'Z₁';

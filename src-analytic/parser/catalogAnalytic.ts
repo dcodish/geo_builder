@@ -367,6 +367,18 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'in the circle the chords AC and BD meet at E',
     needs: ['נתון מעגל x^2+y^2=25'],
   },
+  // A piece named by its ROLE — the noun's claim is stated with it (#1651, #1620 item 2; ADR-AG-200). Not featured; the
+  // two polygon-role rows sit in «relations» (a length, an incidence) so «shapes» stays under the guide's cap (#1347).
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'המיתר BC מקביל לציר ה-x',
+    en: 'the chord BC is parallel to the x-axis',
+    needs: ['נתון מעגל שמרכזו M', 'B על המעגל', 'C על המעגל'],
+  },
+  { category: 'circles', family: 'F5', he: 'הרדיוס MB מאונך לציר ה-x', en: 'the radius MB is perpendicular to the x-axis', needs: ['נתון מעגל שמרכזו M', 'נקודה B'] },
+  { category: 'relations', family: 'F17', he: 'אורך השוק BC הוא 6', en: 'the leg BC = 6', needs: ['טרפז ABCD'] },
+  { category: 'relations', family: 'F17', he: 'היתר AC מונח על הישר y = x', en: 'the hypotenuse AC lies on the line y = x', needs: ['משולש ישר זווית ABC'] },
 
   // The 4-point questions' circle sentences (#1619 B1, ADR-AG-193) — the exam's own wording about the
   // circle it has: points on it, its axis crossings, its centre placed, its regions. Not featured: the six
