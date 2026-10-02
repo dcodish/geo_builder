@@ -54,9 +54,11 @@
  * sample is keyed by a name (`evaluate.ts` `freeCoord`), so the change also TRANSPOSES the session's
  * seed-name map (`transposeSeedNames`): the renamed vertex starts where it started before.
  */
-import { parseLine, parseRenameAnalytic, parseSwapAnalytic } from '../parser/parseAnalytic';
+import { ANON_ID_RE, parseLine, parseRenameAnalytic, parseSwapAnalytic } from '../parser/parseAnalytic';
 import { derive, type Derivation } from '../engine/derive';
 import { statedName } from '../engine/names';
+import { relabelSymbol } from '../engine/carriers';
+import { canonicalConstraint, type Constraint } from '../engine/solve';
 import type { Fact } from '../engine/types';
 import type { AskedQuestion, InputError } from '../store/useAnalyticStore';
 import type { Construction, Id } from '../engine/types';
@@ -117,19 +119,50 @@ const RAW_FIELDS = new Set(['src', 'eqSrc']);
 
 /**
  * Map the letters across one parsed value: every id-bearing string (`A`, `seg-AB`, `poly-ABC`,
- * `line-AC`), never a raw-text field and never an expression's SYMBOL — a parameter is not a point,
- * whatever letter it is.
+ * `line-AC`), never a raw-text field.
+ *
+ * A SYMBOL is mapped only where it is spelled from an id (#1667, ADR-AG-205): `r_P`, a centre's radius,
+ * follows P — in the parameter declaration AND in every expression node that reads it, through the one
+ * owner of those spellings (`relabelSymbol`). A symbol the student wrote is not a point, whatever letter
+ * it is, and stays.
+ *
+ * A CONSTRAINT is compared as the statement it is (`canonicalConstraint`, the engine's own identity of
+ * a constraint), never by its raw operand order: the lowering orders a symmetric relation's operands by
+ * letter («∢BEC = 90°», a square's right angle), so the same statement under a letter change would
+ * otherwise read as a different one.
  */
+const relabelId = (map: LetterMap) => (id: Id): Id => canonId(relabelMap(id, map));
 function renameIds(v: unknown, map: LetterMap, key: string | null = null): unknown {
   if (key !== null && RAW_FIELDS.has(key)) return undefined;
-  if (typeof v === 'string') return canonId(relabelMap(v, map));
+  if (typeof v === 'string') return key === 'sym' ? relabelSymbol(v, relabelId(map)) : canonId(relabelMap(v, map));
   if (Array.isArray(v)) return v.map((e) => renameIds(e, map));
   if (v && typeof v === 'object') {
     const o = v as Record<string, unknown>;
-    if (o.kind === 'sym') return o; // an Expr symbol: a parameter, untouched
+    if (o.kind === 'sym' && typeof o.name === 'string') return { ...o, name: relabelSymbol(o.name, relabelId(map)) };
+    if (o.t === 'constraint' && o.k && typeof o.k === 'object') {
+      const { k, ...rest } = o;
+      return { ...(renameIds(rest, map) as object), k: statementOf(k as Constraint, map) };
+    }
     return Object.fromEntries(Object.entries(o).map(([k, x]) => [k, renameIds(x, map, k)]));
   }
   return v;
+}
+
+/** One constraint, its letters mapped, as the statement it is. */
+const statementOf = (k: Constraint, map: LetterMap): string => canonicalConstraint(renameIds(k, map) as Constraint);
+
+/**
+ * A serialized shape UP TO a consistent renaming of anonymous ids (#1667, ADR-AG-205): each content-hashed id
+ * (`ANON_ID_RE`, the parser's own spelling) becomes its order of first appearance. A hash spelled from a
+ * letter — «דרך P עובר ישר» hashes `through:P` — changes under a letter change and the letter map cannot
+ * follow it; the hash is a name nobody wrote, so two shapes that differ only in it say the same thing.
+ */
+function upToAnonymous(json: string): string {
+  const seen = new Map<string, string>();
+  return json.replace(ANON_ID_RE, (id) => {
+    if (!seen.has(id)) seen.set(id, `curve-#${seen.size}`);
+    return seen.get(id)!;
+  });
 }
 
 /** A parse's facts with the raw-text fields dropped — the comparable shape. */
@@ -173,11 +206,11 @@ export function rewriteLineMap(line: string, map: LetterMap): { line: string; co
   const at = occurrences(line, map);
   const before = parseLine(line);
   if (!before.ok) return { line: substituteAt(line, at, map), counts: countOf(at) };
-  const want = JSON.stringify(renameIds(before.facts, map));
+  const want = upToAnonymous(JSON.stringify(renameIds(before.facts, map)));
   const faithful = (sub: ReadonlyArray<{ at: number; tok: string }>) => {
     const next = substituteAt(line, sub, map);
     const p = parseLine(next);
-    return p.ok && shapeOf(p.facts) === want ? next : null;
+    return p.ok && upToAnonymous(shapeOf(p.facts)) === want ? next : null;
   };
   const all = faithful(at);
   if (all !== null) return { line: all, counts: countOf(at) };
@@ -325,12 +358,19 @@ function isPoint(state: RenameState, current: Derivation, id: string): boolean {
 }
 
 /** The comparable shape of a derivation's construction — objects and constraints, raw text dropped. */
-const constructionShape = (d: Derivation, map: LetterMap): string =>
-  JSON.stringify([
-    d.construction.objects.map((o) => `${o.kind}:${canonId(relabelMap(o.id, map))}`).sort(),
-    renameIds(d.construction.constraints, map),
-    renameIds(d.construction.selectors, map),
-  ]);
+const constructionShape = (d: Derivation, map: LetterMap): string => {
+  // Anonymous ids are numbered in DECLARATION order, before the object list is sorted (a hash sorts anywhere).
+  const [objects, ...rest] = JSON.parse(
+    upToAnonymous(
+      JSON.stringify([
+        d.construction.objects.map((o) => `${o.kind}:${canonId(relabelMap(o.id, map))}`),
+        d.construction.constraints.map((k) => statementOf(k, map)),
+        renameIds(d.construction.selectors, map),
+      ]),
+    ),
+  ) as [string[], ...unknown[]];
+  return JSON.stringify([[...objects].sort(), ...rest]);
+};
 const faultShape = (d: Derivation): string => d.faults.map((f) => `${f.index}:${f.code}`).sort().join('|');
 
 /** Insert `name` at each place a sentence can carry it: after a circle noun, before a coordinate pair. */

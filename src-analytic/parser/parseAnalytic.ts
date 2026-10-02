@@ -20,7 +20,7 @@
 import type { DerivedRule } from '../engine/derived';
 import { isAngleRef, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
-import { RESERVED_SYMBOLS, directionSymbol, mentionsPlane } from '../engine/carriers';
+import { RESERVED_SYMBOLS, directionSymbol, mentionsPlane, radiusSymbol } from '../engine/carriers';
 
 /** A student's VALUE — a number or an expression in parameters, never the plane's x/y (#1496, `mentionsPlane`). */
 function valueExpr(src: string): Expr | null {
@@ -926,6 +926,14 @@ function anonIndex(eqSrc: string): string {
   for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) | 0;
   return `anon${Math.abs(h).toString(36)}`;
 }
+
+/**
+ * Every id {@link anonIndex} mints, wherever it occurs — a whole id, inside a symbol (`θ_curve-anon…`) or a
+ * placeholder (#1667, ADR-AG-205). A content hash is a name nobody wrote: the letter change compares a line
+ * and a figure UP TO a consistent renaming of these, because a hash spelled from a letter («דרך P עובר ישר»)
+ * cannot be mapped by the letter map.
+ */
+export const ANON_ID_RE = /curve-anon[0-9a-z]+/g;
 
 // ---------------------------------------------------------------------------
 // The entry point
@@ -2076,7 +2084,7 @@ function tangentTargets(tail: string, src: string): TangentTargets | null {
  * created, and the apply boundary checks the curve exists before the constraint lands (#1150).
  */
 function circleAtFacts(centre: Id, targets: TangentTargets, line: string, at?: Id, rStated?: Expr): Fact[] {
-  const sym = `r_${centre}`;
+  const sym = radiusSymbol(centre);
   const r: Expr = { kind: 'sym', name: sym };
   return [
     ...targets.facts,
