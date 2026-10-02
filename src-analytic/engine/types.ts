@@ -377,11 +377,11 @@ export type Fact =
    * means is a question about the construction, so M1 answers it, and refuses where the figure
    * holds none or several of that kind.
    */
-  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent'; circle?: string; create?: true })
+  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent'; circle?: string })
   /*
-   * `create` on `on-kind` (#1669, ADR-AG-204) — a CHORD's end: with no circle in the figure the chord sentence
-   * states the circle (centre unnamed, ADR-AG-196's none → create, as 2-D's «מיתר AB» does), where «A על המעגל»
-   * keeps the no-circle refusal. One circle binds and several are ambiguous, exactly as without it.
+   * With no circle in the figure, `on-kind` circle STATES one (#1669 for a chord's end, ADR-AG-204; #1670 for every
+   * incidence, ADR-AG-210 — 2-D's «A על המעגל» creates its circle): centre unnamed, ADR-AG-196's none → create. A
+   * NAMED circle the figure lacks is stated on that centre (`statingNamedCircle`). One binds, several are ambiguous.
    */
   /*
    * `kind: 'tangent'` (#1619 B3) — «המשיק» with no point: the one tangent OBJECT in the figure.

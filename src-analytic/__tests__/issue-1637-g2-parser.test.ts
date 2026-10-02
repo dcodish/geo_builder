@@ -232,7 +232,8 @@ describe('#1643 — what a paste carries, the copula centre, and the no-circle m
   });
 
   it('a circle reference with NO circle says there is no circle — never "which one"', () => {
-    const e = refusal('A על המעגל', []);
+    // #1670: «A על המעגל» with no circle now STATES it (2-D does); a radius with no circle still refers to one.
+    const e = refusal('OB רדיוס', []);
     expect(errorText(e, t)).toContain('אין בשרטוט מעגל');
     expect(errorText(e, tEn)).toContain('There is no circle');
   });

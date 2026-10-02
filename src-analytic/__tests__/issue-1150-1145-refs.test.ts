@@ -92,7 +92,8 @@ describe('#1145 — the refusal names what the STUDENT wrote', () => {
   /** A missing POINT was already named correctly, and must stay that way — `statedName` is the
    *  identity on an id with no prefix, which is what makes a uniform call safe. */
   it('a missing point still names its letter', () => {
-    expect(refusal(['A(0,0)'], 'M אמצע AB')?.detail).toBe('B');
+    // #1670: «M אמצע AB» now mints B (2-D's rule); a cevian to a side no shape has still refers, and refuses.
+    expect(refusal(['A(0,0)'], 'AD גובה לצלע BC')?.detail).toBe('B');
   });
 
   it('statedName strips only the prefixes it minted', () => {

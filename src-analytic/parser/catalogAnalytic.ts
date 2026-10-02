@@ -375,6 +375,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   },
   { category: 'circles', family: 'F5', he: 'דרך P עובר משיק למעגל', en: 'a tangent to the circle passes through P', needs: ['נתון מעגל x^2+y^2=25', 'P(10,0)'] },
   { category: 'circles', family: 'F5', he: 'AB מיתר במעגל', en: 'AB is a chord of the circle', needs: ['נתון מעגל x^2+y^2=25'] },
+  // Two chords of a circle not stated yet: the sentence states it on its centre letter, as 2-D does (#1670, ADR-AG-210).
+  { category: 'circles', family: 'F5', he: 'AB ו-CD מיתרים במעגל O', en: 'AB and CD are chords of the circle O' },
   {
     category: 'circles',
     family: 'F5',

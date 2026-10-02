@@ -574,9 +574,10 @@ describe('#1074 — the segment NOUN is optional', () => {
     expect(r.scene.points).toHaveLength(2);
   });
 
-  it('leaves «M אמצע AB» refusing — naming is not referring', () => {
-    // #1028 is not softened by this. The distinction is which of the two the sentence does.
-    expect(derive(['M אמצע AB'], 0).faults.map((f) => f.code)).toEqual(['unknown-reference']);
+  it('leaves «AB = 2CD» refusing — naming is not referring', () => {
+    // #1028 is not softened by this. The distinction is which of the two the sentence does. (#1670, ADR-AG-210: the
+    // forms 2-D mints for — «M אמצע AB», «AB = 5» — now mint their new letters; a scaled length is not one of them.)
+    expect(derive(['AB = 2CD'], 0).faults.map((f) => f.code)).toEqual(['unknown-reference']);
   });
 
   it('keeps «AB = 5» a LENGTH — and, since #1652, the length also draws the pair it names', () => {

@@ -2094,6 +2094,28 @@ Add a row to the helper table:
 
 ## A role sentence introduces its ends ([ADR-AG-204](06c-decisions-analytic.md#adr-ag-204), #1669)
 
-**One place.** `parseClause` wraps the grammar's rules (`parseClauseRules`) and passes every clause's facts through `withRoleIntroductions`, so every direct, framed and split reading gets the same treatment. It reads the clause's role facts: a `diameter-of`'s two ends, a radius `role-of`'s two ends and an `on-kind` circle's subject. Any end the clause does not already define (`POINT_MAKERS`) or declare gets a `declare` placed FIRST. The claim facts a `ClaimSink` emits come after the rule's own facts, and those facts reference the ends. An existing point absorbs its `declare`, so placement is never disturbed. `RADIUS_PREDICATE` routes «OA רדיוס» to the radius role in `parseShape`, so `applyRoleOf` decides which end is the centre and refuses an unnamed or absent centre.
+**One place.** `parseClause` wraps the grammar's rules (`parseClauseRules`) and passes every clause's facts through `withRoleIntroductions`, so every direct, framed and split reading gets the same treatment. It reads the clause's role facts: a `diameter-of`'s two ends, a radius `role-of`'s two ends and an `on-kind` circle's subject. Any end the clause does not already define (`POINT_MAKERS`) or declare gets a `declare` placed FIRST. The claim facts a `ClaimSink` emits come after the rule's own facts, and those facts reference the ends. An existing point absorbs its `declare`, so placement is never disturbed. `RADIUS_PREDICATE` routes «OA רדיוס» to the radius role in `parseShape`, so `applyRoleOf` decides which end is the centre. It refuses an absent centre, and on an unnamed centre it names it with the new end (#1670, below).
 
 **The created circle.** A chord's `on-kind` carries `create` (set by `claimFacts` and the contextual `chordFacts`). With no circle, M1 applies `touchedCircleFacts`, the ADR-AG-198 creation (an equation circle over the tool's free symbols, centre unnamed), and puts the end on it. A diameter with no circle already states the `circle-thru` diameter circle. A `circle-eq` bound to the created circle replaces its expression under the same id and drops its free symbols, the way the incircle sentence redefines it. This is how a later «משוואת המעגל היא …» fixes the circle that the chords or a tangency created.
+
+## New letters and circles a reference names ([ADR-AG-210](06c-decisions-analytic.md#adr-ag-210), #1670, #1686)
+
+**The radius names the centre.** This is `applyRoleOf`'s radius arm, for a circle whose centre has no point (`centreIdOf` is null).
+- The end NOT already on the circle (`onCircleAlready`: a defining point, or an `on-curve` to it) becomes the centre the circle already has (`centreRuleOf`: the diameter's midpoint, an equation circle's `circle-centre`).
+- If that end was just introduced (`nameCentreAs`: free, unconstrained, nothing built on it but a drawn segment), it is replaced in place.
+- If it already stands (minted free by «BO = 5»), it is placed: the derivation restated about an existing point lowers to `derived-at`, so no second point is created. «O מרכז המעגל» takes the same path through `centre-of`.
+- The other end goes on the circle.
+- Refused as `out-of-scope`, as before: both ends off the circle, neither end off it, or a centre with no closed form.
+
+**A circle the reference names.**
+- `on-kind` circle with no circle in the figure always creates one (`touchedCircleFacts`). The `create` flag ADR-AG-204 added for chords is retired: every incidence creates, as 2-D's does.
+- A NAMED circle that the name chain (`circleByName`) cannot find is stated by `statingNamedCircle`, using exactly «מעגל M»'s facts: `declare`, `param radiusSymbol(M)` > 0, `circle-at-M`. The fact is then re-applied against it.
+- `statingNamedCircle` is called where a sentence REFERS to a named circle: `on-kind`, `diameter-of`, `tangent-of`, `tangent-line-at`, `circle-region`.
+- A numeral, a ring description, or a name already holding a non-point is not stated; the caller's refusal stands.
+- `chordFacts` now emits `on-kind { circle }` for a letter too. It used to write `circle-at-<letter>` directly, which skipped the name chain.
+
+**New letters, last.** `foldPass` runs the in-order pass and the deferral fixpoint first, so every figure that built before builds identically. Then it goes line by line, in list order. A line mints when every fact of it still failing is an `unknown-reference` to a point, and each such fact is one of:
+- a minting form (`mintedByReference`): a two-pair `relation`, a plain `length-eq` with no coefficient, an `angle`, an `on-line-2pt`, a midpoint `derived`, or a `tangent-of` pair;
+- a companion: `segment`, `line-2pt`, `extent-of`, `selector`, `declare`, or a `length-eq` riding beside a minting fact.
+
+The missing points are added as `free` objects and the line's facts are re-applied; then the fixpoint runs again. This applies beside an unnamed centre too (#1686). A `perpendicular` (the cevian's own half) is not a minting form, so «AD גובה לצלע BC» stays refused. The cevian's triangle form states «משולש ABC» first (`clauseFacts`).

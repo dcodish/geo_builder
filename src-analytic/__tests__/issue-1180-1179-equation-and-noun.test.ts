@@ -123,7 +123,8 @@ describe('#1179 — the refusal names the kind the statement expected', () => {
   });
 
   it('a missing POINT is still called a point — the row that was always right', () => {
-    const he = message(['A(0,0)'], 'M אמצע AB', 'he');
+    // #1670: «M אמצע AB» now mints B (2-D's rule); a cevian to a side no shape has still refers, and refuses.
+    const he = message(['A(0,0)'], 'AD גובה לצלע BC', 'he');
     expect(he.kind).toBe('point');
     expect(he.text).toContain('הנקודה');
     expect(he.text).toContain('B');

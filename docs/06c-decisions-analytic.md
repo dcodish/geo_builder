@@ -9271,3 +9271,134 @@ The figure-level check (`constructionShape` + faults, ADR-AG-191) still guards e
 **Not built, said out loud.** The figure-level refusal says `rename-unsafe` with an empty line (no sentence to quote — the reason is a tool-chosen name that would move); its wording is unchanged here.
 
 **Consequences.** `engine/carriers.ts` (`radiusSymbol`, `relabelSymbol`), `engine/solve.ts` (`canonicalConstraint` reads a `choice`), `parser/parseAnalytic.ts` (`circleAtFacts` calls `radiusSymbol`; `ANON_ID_RE`), `app/rename.ts` (`renameIds`, `statementOf`, `upToAnonymous`, `constructionShape`). Sibling check (docs/17 §1): 2-D and 3-D rename by fact rewrite (`renameFacts`, `renameFacts3`) over typed ids, with no symbol spelled from a letter and no line-level parse comparison — this class has no sibling instance.
+
+## ADR-AG-210 — A radius names an unnamed centre, a reference states the circle it names, and a bare relation mints its new letters — by 2-D's rule (#1670, #1686)
+
+**Status:** accepted · 2026-10-02.
+- Operator rulings on #1670 (2026-10-02): rows 1–2 follow 2-D; *"an unlablled circle should not be O automatically. and yes - accept new letter with same logic the 2d tool has"*.
+- Operator ruling on #1686 (2026-10-02), on «BO = 5» beside an unnamed circle: *"create a segment BO where B is where we know it is and O is free. if the user wants it to be the center, he can write next sentance that O is the center … thats why we create a random point O until user assigns its location"*.
+- Lifts [#1028](https://github.com/dcodish/geo_builder/issues/1028)'s refusal for the forms 2-D mints for.
+- Amends [ADR-AG-204](#adr-ag-204): its "a radius on an unnamed centre stays refused", and its `on-kind { create }`.
+- Branch `fix/1670-follow-2d` off `main` @ 92881500.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R143 (new); R140's radius bullet amended. · **Design:** [04c](04c-design-analytic.md) — new section "New letters and circles a reference names". · **LADDER stage:**
+- M1: `applyRoleOf`'s radius arm, `statingNamedCircle` at the five named-circle references, `on-kind`'s create arm.
+- The fold: `foldPass`'s last-resort mint, after the deferral fixpoint.
+- Parse: the plural chord list, «A על מעגל», the cevian's named triangle.
+- No solver change.
+
+**Cites** [ADR-AG-196](#adr-ag-196) (none → create), [ADR-AG-198](#adr-ag-198) (the touch-created circle, centre unnamed), [ADR-AG-204](#adr-ag-204) (the role introductions this extends), [ADR-AG-205](#adr-ag-205) (`radiusSymbol`), [ADR-AG-133](#adr-ag-133) / [ADR-AG-156](#adr-ag-156) (the line as the unit; the deferral fixpoint), [ADR-AG-144](#adr-ag-144) (a derivation restated about an existing point is `derived-at`), [ADR-052](06-decisions.md#adr-052) (a minted letter is a free DOF), #1673 (2-D's half of the centre ruling), #1686.
+
+**Context — measured on 92881500.** 2-D through `decideDeterministic2D` (the parity runner); analytic through `decideSubmit`.
+
+| sequence | 2-D | analytic before | after |
+| --- | --- | --- | --- |
+| «AB קוטר» · «OB רדיוס» / «הרדיוס OB» / «OB הוא רדיוס» / «AO רדיוס» | builds, `name-center` O | `out-of-scope` | records, O the midpoint |
+| «מיתר AB» · «OA רדיוס»; «A על המעגל» · «OA רדיוס»; tangents · «OA רדיוס» | builds | refused | records, O the centre |
+| «מיתר AB» · «CO רדיוס» (both new) | builds — picks O, the letter convention | `out-of-scope` | `out-of-scope` (kept: ruled out, #1673) |
+| «OB רדיוס» (no circle) | not-handled | `ambiguous-shape` | unchanged |
+| «A על המעגל» / «A על מעגל» / «A, B ו-C על המעגל» | builds a circle | `ambiguous-shape` / not-handled | records, one circle |
+| «A על המעגל שמרכזו M», «A על מעגל O», «מיתר AB במעגל O», «AB ו-CD מיתרים במעגל O», «AB משיק למעגל C», «AB קוטר במעגל O», «המשיק למעגל O בנקודה A» | builds the circle on the letter | `unknown-reference` (circle) / not-handled | records |
+| «מעגל O» · «BD⊥AC» (· «AC קוטר») | builds, B D A C free | `unknown-reference` (#1028) | records |
+| «AB∥CD», «AB = CD», «AB = 5», «AB + BC = 10», «זווית ABC = 30», «M אמצע AB», «E על AB», «AB חותך את CD בנקודה E», «C מחלקת את AB ביחס 3:2», «AD גובה במשולש ABC» | builds | `unknown-reference` | records |
+| «AB = 2CD», «AB:BC = 2:3», «AD גובה לצלע BC», «AD תיכון לצלע BC» | refused | `unknown-reference` | unchanged |
+| «AB קוטר» · «BO = 5» | builds — binds the HIDDEN centre (#1673) | `unknown-reference` | records, O FREE (#1686) |
+| «AB קוטר» · «OC ⊥ AB» / «CD ⊥ AB» | builds, the letters free | `unknown-reference` | records |
+| … · «BO = 5» · «O מרכז המעגל» / «OB רדיוס» | — | — | O placed at the centre, the same point |
+
+**The class (docs/17 §1).** A reference to a letter or a circle the figure lacked was refused at the one place it is resolved, which is where 2-D introduces it. There are three such seams, each fixed once:
+- the radius's centre (`applyRoleOf`);
+- the named circle (`circleByName`'s callers);
+- the point reference (`unknown-reference` from `constraint`, `derived` and `tangent-of`).
+
+**Decision.**
+1. **A radius names the unnamed centre.** The end NOT already on the circle (`onCircleAlready`) becomes the centre the circle already has (`centreRuleOf`).
+   - An end the sentence just introduced is replaced in place (`nameCentreAs`).
+   - An end that already stands — a free O that «BO = 5» minted — is PLACED: the derivation restated about an existing point lowers to `derived-at` (ADR-AG-144), so no second point appears. «O מרכז המעגל» reaches the same `derived-at` through `centre-of`.
+   - Both ends off the circle: refused. 2-D picks «O» by letter convention there, which the #1673 ruling rejects.
+2. **Every point on «המעגל» with no circle states the circle** (ADR-AG-198's create path, centre unnamed). ADR-AG-204's `create` flag on `on-kind` is retired: the chord's end and the plain incidence now take one path.
+3. **A named circle the figure lacks is stated on its letter.** `statingNamedCircle` applies «מעגל M»'s own facts, then re-applies the sentence. It is wired at `on-kind`, `diameter-of`, `tangent-of`, `tangent-line-at` and `circle-region`.
+   - `chordFacts` now routes a letter through the name chain too; it used to write `circle-at-<letter>` directly.
+   - Plural chords with no predicate are now read (`CHORD_LIST_HE/EN`): «AB ו-CD מיתרים (במעגל O)», «המיתרים AB ו-CD …», and the English forms.
+   - «A על מעגל» and "on a circle" mean the contextual circle.
+4. **New letters are minted LAST** (`foldPass`), after the in-order pass and the deferral fixpoint. So a letter a later line defines is still defined there, and every figure that built before builds the same.
+   - The rule is per line. Every still-failing fact must be an `unknown-reference` to a point, and must be either:
+     - a minting form (`mintedByReference`, measured on 2-D): a two-pair `relation`, a `length-eq` with no coefficient, an `angle`, an `on-line-2pt`, a midpoint, or a tangent pair; or
+     - a companion: the drawn pieces, a selector, a declaration, or a length riding beside a minting fact.
+   - The missing letters become `free` points (ADR-052), and the line re-applies.
+   - «AD גובה לצלע BC»'s `perpendicular` is not a minting form, so that sentence stays refused, as in 2-D.
+   - «AD גובה במשולש ABC» now states «משולש ABC» first, as 2-D draws it.
+5. **Beside an unnamed centre, too (#1686).** The first cut of this ADR withheld the mint while any circle's centre had no letter. That cut refused «BO = 5» with a "name the centre first" message, and it refused «AB קוטר» · «CD ⊥ AB», which 2-D builds. The operator ruled it out: the new letter is minted free, and a later sentence places it. The guard, its `unnamedCentre` error field and its message are removed. #1673's half stands unchanged: the hidden centre never answers to the letter, because O is a new free point, not that centre.
+
+**Locks** (`issue-1670-follow-2d.test.ts`, 73 tests, all through `decideSubmit` / `derive` at six seeds).
+- **Row 1:**
+  - four spellings, with O the diameter's midpoint and the circle's centre, and A free;
+  - the three other unnamed circles;
+  - once named, the centre answers: «O מרכז המעגל» is already-known, and «BO = 5» sets r = 5;
+  - four refusals: both ends new; an equation circle with both ends new; no circle (two spellings).
+- **#1686:**
+  - five sequences build beside an unnamed centre;
+  - «AB קוטר» · «BO = 5» draws BO with |BO| = 5 and O free, and off the centre at some seed;
+  - «O מרכז המעגל», «OB רדיוס» and «הרדיוס OB» after it place that O at the centre at every seed, with exactly one O (five sequences), and r = 5 with points {A, B, O};
+  - a named circle beside an unnamed centre is a second circle.
+- **Row 2:**
+  - six spellings, with A and the circle free;
+  - several points lie on one circle;
+  - a parabola or an ellipse is still refused.
+- **Named circles:**
+  - twelve named-circle references, each centred on its letter, which is free;
+  - the diameter's midpoint;
+  - the tangent at distance r, in two spellings;
+  - a second named circle beside a first;
+  - a numeral is still refused.
+- **Row 4:**
+  - BD ⊥ AC at every seed with B free, then «AC קוטר» passing through O;
+  - sixteen 2-D mint forms build;
+  - the givens hold on the minted points;
+  - the deferral wins over the mint;
+  - four 2-D refusals each name their letter.
+
+**Fails before: 62 of 73.** The 11 that pass before are refusal controls.
+
+**Parity** (`geo-input-parity.ts`).
+- Moved to the parity rows: `radius-unnamed-centre-1670`, `on-circle-no-circle-1670`, `bare-relation-new-letters-1670`, `cat-2d-121`, `cat-2d-150`, `cat-an-009`.
+- Also moved: **`cat-2d-136`** («המשיק למעגל O בנקודה A חותך את מעגל P בנקודה D»). It was filed under #1622, and builds now because both of its named circles are stated.
+- `hidden-centre-letter-1673` is now `expect: 'builds'` with no gaps. S5b reworks 2-D to the same rule.
+- 21 new rows, none of them gaps:
+  - 12 mint forms and refusals, with one free point as context (X9: 3-D has no free points);
+  - 9 circle rows (X8), including `bare-relation-unnamed-centre-1670`.
+
+**⚠ Locks changed, each to this ruling.**
+- These #1028 locks used «M אמצע AB», «OC = 15», «A על המעגל», «A על מעגל K», «הישר l1 משיק למעגל M» or «C מחלקת את AB ביחס 3:2» as their example of a refusal. Each now uses a form 2-D still refuses («AD גובה לצלע BC», «AB = 2CD», «OC = 2OD», «OB רדיוס», a numeral circle), or a real contradiction:
+  - `derived`, `solve`, `parser`;
+  - `issue-1150-1145-refs`, `issue-1180-1179-equation-and-noun`;
+  - `issue-1242-fold-deferral` — the poisoning line is now «EF גובה לצלע AD»;
+  - `issue-1340-forward-derived-point`;
+  - `issue-1353-imperatives-taught` — a divider over a C placed off AB is `unsatisfiable`;
+  - `issue-1501-tangent-line`, `issue-1619-b1-circle-phrasing`, `issue-1637-g2-parser`;
+  - `issue-1651-1652` — its `create: true` facts are also dropped.
+- `fact-ops-1548` changes in meaning. Muting «B(4,0)» under «M אמצע AB» now leaves M on a FREE B — the list without that row — and that is locked. The mute and audit tests use «CD גובה לצלע AB» as the dependent instead.
+- `issue-1669-role-introductions`: its three "radius on an unnamed centre stays refused" rows build now. «מיתר AB» · «CO רדיוס» (both new) joins the refusals.
+- `issue-1165-cevian-target`: the triangle form now equals the side form after «משולש ABC», in facts and in figure.
+
+**Measured.** 471 corpus (seed 0): **220/263 lines, +3**, and **21/46 questions, unchanged**. The floor is the integrator's to raise. The three new lines:
+- 5/5 «נתון: ME ∥ CD»;
+- 6/5 «הישרים AB ו-CD שבציור מקבילים זה לזה»;
+- 23/4 «הנקודה F נמצאת על הקטע EC».
+
+**Not built, said out loud.**
+- «AD תיכון במשולש ABC» on an empty canvas now builds. 2-D refuses it («unresolved dependencies for: D») while it builds the altitude form. That looks like a gap in 2-D's median gate (ADR-AG-117's noted divergence, #1233), not a ruling.
+- «AB משיק למעגל» with no circle now builds: the touch-created circle, with A and B minted. 2-D does not parse it and hands it to the model.
+- 2-D's «O» convention is not ported, by ruling: a radius «CO» with both ends new is still refused.
+
+**Consequences.**
+- `engine/apply.ts`:
+  - new helpers `statingNamedCircle`, `nameCentreAs`, `onCircleAlready`;
+  - `applyRoleOf`'s radius arm, `on-kind`, and the five named-circle sites;
+  - `foldPass`'s mint phase, with `mintedByReference` / `isMintCompanion`.
+- `engine/lengths.ts`: `isTermPlaceholder`.
+- `engine/types.ts`: `on-kind.create` retired.
+- `parser/parseAnalytic.ts`: `CHORD_LIST_HE/EN`, `chordFacts` by name, the `ON_KIND` indefinite circle, the cevian's named triangle.
+- `parser/catalogAnalytic.ts`: new entry «AB ו-CD מיתרים במעגל O».
+
+Sibling check (docs/17 §1): 2-D is the reference and builds every row above except the refusals. 3-D has no free points and no circles of this kind (X8/X9), and its parity lock is green.

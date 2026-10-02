@@ -95,10 +95,12 @@ describe('#1353 — an imperative wrapper is taught, never committed', () => {
   });
 
   it('and where the sentence would NOT be accepted, nothing is taught — the honest refusal stands', () => {
-    const v = decideSubmit('הוסף C מחלקת את AB ביחס 3:2', [], 0);
+    // #1670 (ADR-AG-210, #1686): every new letter of «C מחלקת את AB ביחס 3:2» is now minted, as 2-D mints it, so the
+    // refusal a lesson must not paper over is a CONTRADICTION: C is already placed off AB.
+    const v = decideSubmit('הוסף C מחלקת את AB ביחס 3:2', [...AB, 'C(9,9)'], 0);
     expect(v.kind).toBe('refused');
     if (v.kind !== 'refused') return;
-    expect(v.error.key, 'the student hears the real problem: A and B do not exist').toBe('unknown-reference');
+    expect(v.error.key, 'the student hears the real problem: C is not on AB').toBe('unsatisfiable');
   });
 
   /**
