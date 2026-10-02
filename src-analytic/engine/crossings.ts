@@ -387,6 +387,12 @@ export interface Namable {
   y: number;
   /** The whole sentence the click would commit, letter included. */
   sentence: string;
+  /**
+   * #1598 — an unnamed circle's CENTRE offer carries the circle's id. Its click opens the shared letter
+   * popover rather than committing `sentence` with the automatic letter: the student chooses the letter,
+   * and `centreSentenceOf` composes the SAME sentence with it.
+   */
+  centreOf?: string;
 }
 
 /**
@@ -448,11 +454,11 @@ export function centresOf(figure: Figure, letter: string): Namable[] {
      */
     const eqSrc = cu.id.startsWith('curve-') ? cu.label.eqSrc : undefined;
     if (eqSrc) {
-      out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence: `${letter} מרכז המעגל ${eqSrc}` });
+      out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence: `${letter} מרכז המעגל ${eqSrc}`, centreOf: cu.id });
       continue;
     }
     if (!numeralKey(cu.id) && circles.length === 1 && cu.id.startsWith('circle-thru-')) {
-      out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence: `${letter} מרכז המעגל` });
+      out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence: `${letter} מרכז המעגל`, centreOf: cu.id });
       continue;
     }
 
@@ -473,9 +479,24 @@ export function centresOf(figure: Figure, letter: string): Namable[] {
       x: circle.cx,
       y: circle.cy,
       sentence: `${letter} מרכז המעגל ${name}`,
+      centreOf: cu.id,
     });
   }
   return out;
+}
+
+/**
+ * THE SENTENCE THAT NAMES ONE CIRCLE'S CENTRE `letter` (#1598) — the centre offer's own sentence, with the
+ * student's letter in place of the automatic one.
+ *
+ * The click and the typed path are ONE decision: this is {@link centresOf} asked with the chosen letter,
+ * never a second composer, so the form (`… מרכז המעגל I` for a numeral circle, `… מרכז המעגל x^2+y^2=16`
+ * for an equation circle, the contextual `… מרכז המעגל` for the figure's only computed circle) is the
+ * one the grammar reads back (ADR-AG-048). Null when that circle offers no centre (already named, or no
+ * sentence can name it).
+ */
+export function centreSentenceOf(figure: Figure, offerId: string, letter: string): string | null {
+  return centresOf(figure, letter).find((o) => o.id === offerId)?.sentence ?? null;
 }
 
 /**

@@ -2066,3 +2066,12 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - Opening a saved file, a share link or a restored session shows every row the way it showed when saved. A row built by the AI fallback shows the student's own sentence, not the tool's command line. A muted row stays muted, and a renamed letter stays where it was drawn.
 
 - A slope row in the data panel reads, in this order: the segment, its slope, «זווית עם ציר ה-x», the angle (`AB: 2 · זווית עם ציר ה-x: 63.43°`). The Hebrew label reads naturally, with x right after «ה-». A vertical segment reads `CD: אנכי (אין שיפוע) · זווית עם ציר ה-x: 90°`.
+
+**R138 — a clicked segment can be hidden or dashed, and a clicked unnamed centre takes the letter the student types**
+([ADR-AG-201](06c-decisions-analytic.md#adr-ag-201), [#1653](https://github.com/dcodish/geo_builder/issues/1653), [#1598](https://github.com/dcodish/geo_builder/issues/1598)).
+*(Operator, 2026-10-02: "in the analytic tool we dont have an option to click on a segment and hide it like we have in 2d"; "i want to be able to press on the center of a circle to create a letter in addition to the ability to define it through input like O מרכז המעגל".)*
+
+- Clicking a drawn segment opens a menu with «הסתירו קטע» and «מקווקו», and the segment's measurements below them. A hidden segment is not drawn. A faint dashed mark stays on the line, which is not part of the downloaded image, and clicking it offers «הציגו קטע». One «בטל» also brings the segment back. A hidden segment can still be measured and referred to, and a length the student stated for it stays on the canvas.
+- A dashed or hidden segment stays that way after saving and opening the file, after a share link, and after a restored session. It follows its letters when a point is renamed or two letters are swapped. «נקה הכל» clears these choices.
+- Clicking the centre of a circle whose centre has no letter opens the letter box («מרכז המעגל»). The letter the student types adds exactly the row they could have typed: «M מרכז המעגל x²+y²=16» for a circle given by its equation, «C מרכז המעגל I» for a named circle, «M מרכז המעגל» for the figure's only computed circle. The letter is the centre. A letter already in use names the row that holds it and offers to swap: the centre takes that letter, and the old point takes the centre's automatic letter, undone in one step. A character that is not a letter is refused and nothing is added.
+- A canonical circle's centre is still the tool's O (R123), with no ring to click.

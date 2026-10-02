@@ -5083,3 +5083,39 @@ That makes two copies of one surface, with a third on the way. ADR-W-016 rule 1 
 - **Lifting 2-D's whole canvas menu** (segment and circle items too). Only the point popover exists ≥ 2 times; the segment menu is 2-D's alone, so ADR-W-016 rule 1 keeps it out.
 
 **Consequences.** `shell/frame/LetterPopover.tsx`, `shell/frame/letterOffer.ts` (new); `src/render/Figure.tsx` (the point branch, `letterRename`, `swapOffered` re-exported); `src3d/render/Figure3.tsx`, `src3d/App3.tsx` (see ADR-3D-294). Six locks: two shell, two thin, two 3-D.
+
+## ADR-W-106 — One segment menu for every builder: click a segment, hide it or dash it (#1653)
+
+**Status:** accepted · 2026-10-02 · feature (branch `feat/1653-1598-canvas-menus`) · `auto-ok` as transcription of the operator's approval (ADR-W-014). **Extends** [ADR-W-016](#adr-w-016) (a new `shell/` surface) and [ADR-W-105](#adr-w-105) (its sibling, the letter popover); applies [ADR-W-071](#adr-w-071) (docs/28 §5c).
+
+**Requirements:** docs/02w FR-SU-14 (new — one promise for every builder) · **Design:** docs/04w — "The segment menu" (new section). **Product:** workspace (2d + analytic; 3d reported).
+
+**Context.** The operator, 2026-10-02: *"in the analytic tool we dont have an option to click on a segment and hide it like we have in 2d"*. 2-D's on-canvas segment menu (FR-RN-10, [ADR-072](06-decisions.md#adr-072)) offers «הסתירו קטע / הציגו קטע», «מקווקו / רציף» and «החליפו קצוות». A hidden segment loses its ink and keeps a faint dashed ghost on the line, so the same menu can bring it back. Measured at pickup (5f042e40): the analytic builder's segment click opened only the #1048 measure menu, and its store had no per-segment display state. 3-D's edges have no click target, and its dashing means depth-hidden or auxiliary ([ADR-3D-104](06b-decisions-3d.md)), not a student choice. ADR-W-105 kept the segment menu out of `shell/` because only 2-D had one. A second builder now needs it, so ADR-W-016 rule 1 is met.
+
+**Decision.**
+
+1. **`shell/frame/SegmentMenu.tsx`** is 2-D's segment menu, unchanged in behaviour and look, parameterized by the caller (ADR-W-016 rule 2): position, bounds and title (the segment's name); the segment's display `state` (`{hidden?, dashed?}`); `onToggleHidden?` and `onToggleDashed?`; every string (`hide`, `show`, `dashed`, `solid`); `children` for the product's own items; `onClose`. Every toggle closes the menu, and the backdrop closes it on an outside click. It imports no product and no i18n.
+2. **Its decisions are pure and callable** (`shell/frame/segmentDisplay.ts`, [ADR-W-053](#adr-w-053)):
+   - `toggleSegFlag(map, key, flag)` is 2-D's `setSegFlag`, moved unchanged. It keeps only `true` flags and drops an all-off entry, so «hide, then show» returns an equal map.
+   - `segInk(display) → 'solid' | 'dashed' | 'ghost'` is the ink decision both renderers paint from. Each renderer writes it on the segment as `data-ink`, and the locks read that attribute off the real markup.
+   - `segmentMenuItems(state, wired)` decides what the menu offers: hide or show, then dashed or solid, the dash entry only while the segment is drawn.
+   - `cleanSegDisplay(raw)` cleans a loaded map down to `key → {hidden?, dashed?: true}`.
+   The KEY is the product's own: 2-D's seg id, analytic's endpoint pair.
+3. **2-D migrates onto it.** The segment branch renders `SegmentMenu`, with «החליפו קצוות» as a child. The circle menu is the same surface with only hide/show. `geoStore` uses `toggleSegFlag`. 2-D's props, App wiring, store semantics and every existing lock are unchanged (`hidden.test.ts`, `phase-e.test.ts`, `phase2.test.tsx`, `figure-file.test.ts`).
+4. **The analytic builder adopts it** ([ADR-AG-201](06c-decisions-analytic.md#adr-ag-201)). Per-segment state lives in the store, in the undo slice and in the save envelope. The #1048 measure entries render as the menu's children.
+5. **3-D: not adopted, reported.** Its edges have no click target: the SVG's pointer-down starts the orbit drag, and only point labels and crossings stop it. Its dashed stroke already means depth-hidden. Dashed-by-choice would reuse the depth-hidden stroke, and that is the dash-semantics conflict ADR-3D-104 records. Hide-only adoption needs an edge hit-target that does not steal the orbit drag, and a ruling on whether 3-D offers «מקווקו» at all. Left for the operator.
+6. **A §5c cross-product lock.** The checks live once, in `shell/__tests__/fixtures/segment-display-rows.ts` as `segmentDisplayFaults(subject)`:
+   - hide leaves no ink on the product's real rendered canvas;
+   - the statements are unchanged and the product's measure path still answers;
+   - «show» restores the stroke;
+   - where the product records the choice in its undo history, one undo restores it;
+   - dashed survives save → load, so does hidden, and un-hiding brings the dash back.
+   The thin locks are `src/__tests__/segment-display-1653.test.tsx` (2-D: the real `Figure` markup, replay, and `figureStateOf` → `serializeFigure` → `deserializeFigure` → `loadFigure`) and `src-analytic/__tests__/segment-display-1653.test.tsx` (analytic: `buildScene` + `Figure` markup, `measurablesOf`, the store's undo, `serialize` → `loadAnalyticSession`). The meta-lock `shell/__tests__/segment-display-meta-1653.test.ts` runs the same function against nine deliberately broken builders and asserts each is caught.
+
+**Open question (needs a ruling): should 2-D's hide be undoable?** The analytic builder's display choice rides in its undo slice. That follows the operator's lock («one «בטל» restores it») and the ask lane's `shown`, which is already there. 2-D's `segStyle` (like its `hidden` points and circles) is a display preference outside the undo slice (FR-RN-10), reversed by the menu's second press. The shared rows declare `undo` optional, so each builder's existing behaviour is locked. Making 2-D undoable means adding `segStyle` to its `partialize`/`equality`. That is a one-line change, but it is a 2-D behaviour change, so it is not made here.
+
+**Rejected.**
+- **A second menu in the analytic tree** beside 2-D's. That is the third copy of a surface, the drift ADR-W-105 retired for the letter popover.
+- **Keying analytic's state by scene id** (`poly-ABC-0`). A polygon side and a stated segment are two ids for one visible line, and the id changes when the polygon is restated. The endpoint pair is what the student sees, and a rename relabels it.
+
+**Consequences.** `shell/frame/SegmentMenu.tsx`, `shell/frame/segmentDisplay.ts` (new); `src/render/Figure.tsx` (the segment and circle branches, `data-ink`); `src/store/geoStore.ts` (`toggleSegFlag`); the analytic side as listed in ADR-AG-201. Locks: two shell, two thin, plus the analytic tree's own.

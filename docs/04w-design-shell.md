@@ -413,3 +413,23 @@ The caller mounts it once per opening (`key`), so typed text, the note and the o
 **The product adapts its store's answer** with one small exported function: 2-D's `letterRename` in `Figure.tsx`, 3-D's `letterRename3` in `rename3.ts`. The App wiring calls that function, and so does the cross-product lock.
 
 **The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/letter-swap-rows.ts`. Each builder's thin lock hands over a subject: `setup`, two taken letters, its real `rename` (through its adapter), its real `swap`, `undo`, `statements()` and `points()`. A new builder adds one thin lock in its own tree; the meta-lock proves each row can fail.
+
+## The segment menu ([ADR-W-106](06w-decisions-workspace.md#adr-w-106))
+
+`shell/frame/SegmentMenu.tsx` is the on-canvas «click a segment» menu, used by 2-D's segment and circle menus and the analytic builder's segment click. Its contract:
+
+| prop | meaning |
+| --- | --- |
+| `x`, `y`, `bounds` | the anchor (the click) and the container size, in px. Placed by **physical** `left`/`top`, clamped, never a logical inset (2-D F1/REN-1), exactly as the letter popover |
+| `title` | the header: the segment's name («AB»), or «⊙ O» for 2-D's circle |
+| `state` | the product's stored `{hidden?, dashed?}` for this segment |
+| `onToggleHidden?`, `onToggleDashed?` | the product's store toggles; absent = no such entry |
+| `strings` | `hide`, `show`, `dashed`, `solid` — all from the caller |
+| `children` | the product's own items below the display entries (2-D: «החליפו קצוות»; analytic: the measure entries) |
+| `onClose` | the backdrop and every toggle (the result is seen on the canvas at once) |
+
+**The decisions are in `segmentDisplay.ts`, not in the JSX.** `toggleSegFlag(map, key, flag)` keeps the map canonical: only `true` flags are stored, an all-off entry is removed, and hiding does not forget the dash. `segInk(display)` returns `solid` / `dashed` / `ghost`, and both renderers paint from it and write it as `data-ink`. `segmentMenuItems(state, wired)` returns hide or show, then dashed or solid while the segment is drawn. `cleanSegDisplay(raw)` cleans a loaded map. The key is the product's own (2-D: the seg id; analytic: the endpoint pair `A|B`).
+
+**A hidden segment has no ink, never no existence.** Where segments are clickable, a faint dashed ghost (`data-noexport`) stays on the line so the menu can bring it back. A product's store keeps the segment in the construction.
+
+**The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/segment-display-rows.ts`. Each builder's thin lock hands over a subject: `setup`, its real toggles, `ink()` read off its real rendered canvas, `measurable()` through its own measure path, `statements()`, an optional `undo` (present only where the display choice is in the undo slice: analytic yes, 2-D no), and its real save → load. The meta-lock proves each row can fail.

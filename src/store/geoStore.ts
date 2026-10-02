@@ -34,6 +34,7 @@ import type { DetectAllResult, Determinacy, Fact } from '@/replay/core';
 import { viewDelta } from '@/replay/viewDelta';
 import type { ViewDelta } from '@/replay/viewDelta';
 import { geoWork, geoValues, isCancelled } from './geoWork';
+import { toggleSegFlag } from '../../shell/frame/segmentDisplay';
 import { pruneDisplayMode, toggleDisplayMode, displayModeFromIndexed, type DisplayModeMap } from '../../shell/displayMode';
 
 /**
@@ -52,19 +53,9 @@ async function detectFor(facts: Fact[], get: () => GeoState): Promise<DetectAllR
   }
 }
 
-/** Flip one display flag (hidden/dashed) on a segment's style entry, keeping only the TRUE flags
- *  (so the entry stays minimal — `{dashed:true}`, not `{dashed:true,hidden:false}`); drop it when empty. */
-function setSegFlag(style: Record<Id, { hidden?: boolean; dashed?: boolean }>, id: Id, flag: 'hidden' | 'dashed'): Record<Id, { hidden?: boolean; dashed?: boolean }> {
-  const cur = style[id] ?? {};
-  const next: { hidden?: boolean; dashed?: boolean } = { ...cur, [flag]: !cur[flag] };
-  const clean: { hidden?: boolean; dashed?: boolean } = {};
-  if (next.hidden) clean.hidden = true;
-  if (next.dashed) clean.dashed = true;
-  const out = { ...style };
-  if (!clean.hidden && !clean.dashed) delete out[id];
-  else out[id] = clean;
-  return out;
-}
+/** Flip one display flag (hidden/dashed) on a segment's style entry — the SHARED toggle (#1653,
+ *  `shell/frame/segmentDisplay`), so the analytic builder's segment menu keeps the same canonical map. */
+const setSegFlag = toggleSegFlag;
 
 /** Rewrite a seg-id key (`seg-AB`, `seg-O1O2`) under a point rename — TOKENIZE the endpoint run
  *  (`[A-Z]\d*` labels, the same shape `relabelId` uses) and re-derive the renamed, re-sorted key so it
