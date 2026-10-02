@@ -57,6 +57,15 @@ function autosInterchangeable(construction: Construction): boolean {
     if (v && typeof v === 'object') {
       const o = v as Record<string, unknown>;
       const out: Record<string, unknown> = {};
+      // #1688 (ADR-565, operator ruling (b) 2026-10-02): a crossing of the two circles is the same statement whichever
+      // circle is listed first, and its `branch` only picks a side of the line of centres — swapping the circles
+      // reflects the figure across that line, which no given can tell apart. So the pair is unordered and the
+      // branch is seed, not statement. (`avoid` — "the OTHER crossing" — stays: it is a relation between points.)
+      if (o.kind === 'circle-circle') {
+        out.circles = [norm(o.circle1, swap), norm(o.circle2, swap)].map((x) => JSON.stringify(x)).sort();
+        for (const k of Object.keys(o).sort()) if (k !== 'circle1' && k !== 'circle2' && k !== 'branch' && k !== 'solve') out[k] = norm(o[k], swap);
+        return out;
+      }
       for (const k of Object.keys(o).sort()) {
         if (k === 'solve') continue; // solver bookkeeping, never semantics (docs/17 §2.2)
         if (k === 'value' && o.via === 'free') continue; // a free radius' SEED value
@@ -90,6 +99,15 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     // Centre letters that were AUTO-assigned (unnamed circle → hidden centre): «מרכז המעגל הוא P» renames
     // one of these to the student's letter instead of minting a second circle (issue #112).
     autoCenters: construction.objects.flatMap((o) => (o.kind === 'circle' && o.autoCenter && !o.center.startsWith('~') ? [ctrToken(o.center)] : [])),
+    // #1673 (ADR-565): points nothing places (a bare free point, no polygon's vertex) — a naming may absorb one
+    freePoints: (() => {
+      const vertices = new Set(construction.objects.flatMap((o) => (o.kind === 'polygon' ? o.vertices : [])));
+      // a point a drawn circle is built from (a diameter end, a through point) is placed by that circle
+      const byId = new Map(construction.objects.map((o) => [o.id, o] as const));
+      const labelsIn = (o: unknown): string[] => (o ? JSON.stringify(o).match(/"[A-Z]\d*"/g)?.map((q) => q.slice(1, -1)) ?? [] : []);
+      for (const o of construction.objects) if (o.kind === 'circle') for (const l of [...labelsIn(o), ...labelsIn(byId.get(o.center))]) vertices.add(l);
+      return construction.objects.flatMap((o) => (o.kind === 'free-point' && /^[A-Z]\d*$/.test(o.id) && !vertices.has(o.id) ? [o.id] : []));
+    })(),
     // #538: whether the two unnamed circles are structurally identical under the pair swap — lets the
     // #186 binding name-by-use deterministically when asking "which circle?" has no informative answer.
     autosInterchangeable: autosInterchangeable(construction),

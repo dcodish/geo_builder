@@ -1344,6 +1344,7 @@ export const SCENARIOS_3: Scenario[] = [
       'building on the secant figure, the operator added a SECOND collinearity ("line DB passes through E" after "line AD passes through C"). The two constraints share the carrier D, making a triangular system (D fixed by A,D,C; E then fixed by D,B,E). The joint driven solver minimised the SUM of both residuals, which pulled the shared D toward both and satisfied neither — it returned the seed and falsely reported "over-constrained: A, D, C collinear cannot hold" (even though the solver had ALREADY found an accepted solution, the polish wandered off it into a degenerate same-cost basin). Fixed with a binding-aware seed (each bounded carrier solved against the constraint IT drives) + keeping an accepted candidate through the polish (ADR-050 amendment).',
     steps: [
       'שני מעגלים נחתכים בנקודות A ו-B', // circle-O (r5) + circle-P (r3.6) meeting at A,B
+      'O מרכז המעגל', 'P מרכז המעגל', // #1673 (ADR-565): the model step below names the circles by their hidden ids, which tells them apart — so the student names them first
       { llm: ['C על מעגל O', 'D על מעגל P'] }, // "C עם מעגל אחד ו D על מעגל שני" → two canonical lines (re-parsed, TST-3)
       'ישר AD עובר בנקודה C', // A, D, C collinear (drives D onto line AC)
       'E על מעגל O', // a free point on circle O

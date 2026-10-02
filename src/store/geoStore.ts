@@ -163,10 +163,12 @@ export function letterHolder(facts: Fact[], letter: Id): LetterHolder | null {
  * plain fact arrays in the App's submit loop, the scenario harness, and the log-triage verifier with
  * THE SAME implementation (a re-implementation is the ADR-346 drift class this repo keeps paying for).
  */
-export function renameFacts(facts: Fact[], from: Id, to: Id): { ok: true; facts: Fact[] } | { ok: false; reason: 'same' | 'no-source' } | { ok: false; reason: 'target-taken'; holder: LetterHolder | null } {
+export function renameFacts(facts0: Fact[], from: Id, to: Id): { ok: true; facts: Fact[] } | { ok: false; reason: 'same' | 'no-source' } | { ok: false; reason: 'target-taken'; holder: LetterHolder | null } {
   const F = from.toUpperCase();
   const T = to.toUpperCase();
   if (F === T) return { ok: false, reason: 'same' };
+  // #1673 (ADR-565): a hidden circle token the student types steps aside before the rename takes the letter
+  const facts = stepAsideFacts(facts0, [T]).facts;
   const all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
   if (!all.has(F)) return { ok: false, reason: 'no-source' };
   if (all.has(T)) return { ok: false, reason: 'target-taken', holder: letterHolder(facts, T) }; // would merge two distinct points
@@ -183,6 +185,94 @@ export function renameFacts(facts: Fact[], from: Id, to: Id): { ok: true; facts:
 }
 
 /**
+ * #1673 / #1688 ([ADR-565](docs/06-decisions.md#adr-565), operator ruling 2026-10-02) — THE HIDDEN CENTRE LETTER
+ * STEPS ASIDE. An unnamed circle keeps an internal reference token the tool picked (`O`, then `P`, `Q`, `K`):
+ * its centre is `@ctr-O`, its id `circle-O`. The student never saw that letter, so it may never take part in
+ * the student's naming. Whenever the student types the letter — as a new point («BO = 5»), a new circle
+ * («מעגל O»), a naming target («מרכז המעגל הימני הוא O») — the hidden circle is re-lettered first, to a
+ * letter nobody uses, and the student's letter is then simply a fresh letter.
+ */
+
+/** The tokens of the circles whose centre is still anonymous (`@ctr-…`, never promoted by a `name-center`). */
+export function hiddenCentreTokens(facts: Fact[]): string[] {
+  const promoted = new Set(facts.flatMap((f) => (f.cmd.type === 'name-center' ? [(f.cmd as { center: string }).center.toUpperCase()] : [])));
+  const out: string[] = [];
+  for (const f of facts) {
+    const c = f.cmd as { type?: string; center?: string };
+    if ((c.type !== 'circle' && c.type !== 'circle-through') || !c.center?.startsWith('@ctr-')) continue;
+    const tok = c.center.slice(5);
+    if (!promoted.has(tok) && !out.includes(tok)) out.push(tok);
+  }
+  return out;
+}
+
+/** Re-letter ONE hidden circle `from` → `to` across every fact: its anonymous centre and its circle id (with the
+ *  concentric `-2` suffix). Whole-value exact, so a student's own point or `circle-<from>1` is untouched. The
+ *  utterances never contain the hidden letter, so they stay as typed. */
+export function reletterHiddenFacts(facts: Fact[], from: Id, to: Id): Fact[] {
+  const ctrFrom = `@ctr-${from}`;
+  const ctrTo = `@ctr-${to}`;
+  const cFrom = `circle-${from}`;
+  const cTo = `circle-${to}`;
+  const map = (v: unknown): unknown =>
+    typeof v === 'string'
+      ? v === ctrFrom ? ctrTo : v === cFrom ? cTo : v.startsWith(`${cFrom}-`) ? cTo + v.slice(cFrom.length) : v
+      : Array.isArray(v) ? v.map(map) : v;
+  return facts.map((f) => ({ ...f, cmd: Object.fromEntries(Object.entries(f.cmd).map(([k, v]) => [k, k === 'expr' ? v : map(v)])) as AnyCommand }));
+}
+
+/** Every letter the fact list already spends — point ids and circle tokens, hidden or not. */
+function spentLetters(facts: Fact[]): Set<string> {
+  const out = new Set<string>(facts.flatMap((f) => commandPointIds(f.cmd)));
+  for (const f of facts) {
+    const c = f.cmd as { type?: string; id?: string; center?: string };
+    if (typeof c.id === 'string' && c.id.startsWith('circle-')) out.add(c.id.slice(7).replace(/-\d+$/, ''));
+    if (typeof c.center === 'string' && c.center.startsWith('@ctr-')) out.add(c.center.slice(5));
+  }
+  return out;
+}
+
+/**
+ * Move every hidden token the student is about to use (`letters`) to a fresh letter. Returns the new facts and
+ * the moves made (empty when nothing collides). Deterministic: the fresh letter is the first of O, P, Q, K, then
+ * A–Z, then A1… that no fact spends and `letters` does not name.
+ */
+export function stepAsideFacts(facts: Fact[], letters: Iterable<string>): { facts: Fact[]; moves: { from: Id; to: Id }[] } {
+  const want = new Set([...letters].map((l) => l.toUpperCase()));
+  const hits = hiddenCentreTokens(facts).filter((t) => want.has(t));
+  if (!hits.length) return { facts, moves: [] };
+  const moves: { from: Id; to: Id }[] = [];
+  let out = facts;
+  for (const from of hits) {
+    const avoid = new Set([...spentLetters(out), ...want]);
+    const order = ['O', 'P', 'Q', 'K', ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))];
+    let to = order.find((l) => !avoid.has(l));
+    for (let cycle = 1; !to; cycle++) to = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i) + cycle).find((l) => !avoid.has(l));
+    out = reletterHiddenFacts(out, from, to);
+    moves.push({ from, to });
+  }
+  return { facts: out, moves };
+}
+
+/**
+ * A point the naming may ABSORB into a circle's centre («BO = 5» then «O מרכז המעגל»): nothing places it —
+ * no command defines it except a bare `free-point`, it is no shape's vertex — and it is first used after the
+ * circle exists, so the renamed centre is defined before every fact that refers to it.
+ */
+function absorbablePoint(facts: Fact[], T: Id, centre: Id): boolean {
+  const createdAt = facts.findIndex((f) => (f.cmd as { center?: string }).center === centre && (f.cmd.type === 'circle' || f.cmd.type === 'circle-through'));
+  const firstUse = facts.findIndex((f) => commandPointIds(f.cmd).includes(T));
+  if (createdAt < 0 || firstUse < 0 || firstUse < createdAt) return false;
+  return facts.every((f) => {
+    const c = f.cmd as { type: string; id?: unknown; id1?: unknown; id2?: unknown; ids?: unknown; vertices?: unknown };
+    if ((c.id === T || c.id1 === T || c.id2 === T) && c.type !== 'free-point') return false;
+    if (Array.isArray(c.ids) && c.ids.includes(T)) return false;
+    if (Array.isArray(c.vertices) && c.vertices.includes(T)) return false;
+    return true;
+  });
+}
+
+/**
  * The PURE fact-list core of the `nameCentre` store action (ADR-342 / #186): resolve the centre token
  * `from` (a letter, or a raw '@ctr-…' id) to the owning circle's real centre and rename it — plus the
  * circle's reference id letter-half and the auto-centre reveal — to `to`, across every fact. Extracted
@@ -190,12 +280,13 @@ export function renameFacts(facts: Fact[], from: Id, to: Id): { ok: true; facts:
  * THE SAME implementation (a re-implementation is the ADR-346 drift class this repo keeps paying for).
  */
 export function nameCentreFacts(
-  facts: Fact[],
+  facts0: Fact[],
   from: Id,
   to: Id,
 ): { ok: true; facts: Fact[]; source: string; letter: string; anon: boolean } | { ok: false; reason: 'same' | 'no-source' } | { ok: false; reason: 'target-taken'; holder: LetterHolder | null } {
   const F = from.startsWith('@') ? from : from.toUpperCase();
   const T = to.toUpperCase();
+  let facts = facts0;
   let source: string | null = null;
   let letter: string | null = null; // the circle-id letter half (`circle-<letter>`)
   for (const f of facts) {
@@ -208,7 +299,11 @@ export function nameCentreFacts(
       break;
     }
   }
-  const all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
+  // #1673 / #1688 (ADR-565): the target letter may be ANOTHER unnamed circle's hidden token — the student never saw
+  // it, so it steps aside (re-lettered, still hidden) instead of colliding: «מרכז המעגל הימני הוא O» used to
+  // rename P's centre onto the left circle's `circle-O` and wipe the figure.
+  if (letter !== T && hiddenCentreTokens(facts).includes(T)) facts = stepAsideFacts(facts, [T]).facts;
+  let all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
   if (!source) {
     // legacy: renaming a centre letter that IS a plain point (a named centre being re-lettered)
     if (!all.has(F)) return { ok: false, reason: 'no-source' };
@@ -216,7 +311,13 @@ export function nameCentreFacts(
     letter = F;
   }
   if (source === T) return { ok: false, reason: 'same' }; // promoting a token to its OWN letter ('@ctr-O'→'O') is a real change
-  if (all.has(T)) return { ok: false, reason: 'target-taken', holder: letterHolder(facts, T) };
+  if (all.has(T)) {
+    // #1673 (ADR-565): «BO = 5» drew a FREE point O; «O מרכז המעגל» then PLACES that O at the centre — the free
+    // point is absorbed (its bare `free-point`, if any, dropped) and every fact that used O now uses the centre.
+    if (!source.startsWith('@') || !absorbablePoint(facts, T, source)) return { ok: false, reason: 'target-taken', holder: letterHolder(facts, T) };
+    facts = facts.filter((f) => !(f.cmd.type === 'free-point' && (f.cmd as { id?: string }).id === T));
+    all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
+  }
   const anon = source.startsWith('@');
   // The circle-id follow must match the WHOLE id (or its `-`-suffixed concentric inner), never a
   // substring: `renameInCommand`'s literal fallback turned `circle-O1` into `circle-O21` when the
@@ -439,6 +540,8 @@ export interface GeoState {
    *  fact AND reveal it (a named centre always shows, FR-RN-8). One undo entry — «מרכז המעגל הוא P» on a
    *  circle the student drew unnamed, instead of a second circle. */
   nameCentre: (from: Id, to: Id) => RenameResult;
+  /** #1673 (ADR-565): re-letter a HIDDEN circle token the student is about to use — the circle stays unnamed. */
+  reletterHidden: (from: Id, to: Id) => void;
   /** PROMOTE an anonymous constructed point (`@`-prefixed, #32 / [ADR-297](docs/06-decisions.md#adr-297) —
    *  a decomposition touch/tangency point the student didn't name, shown as a clickable dot) to a real
    *  named point: assign the next free capital letter and rewrite the `@`-id → that letter everywhere. One
@@ -929,6 +1032,13 @@ export const useGeoStore = create<GeoState>()(
           selectedId: null,
         });
         return { ok: true };
+      },
+
+      reletterHidden: (from, to) => {
+        set({
+          facts: reletterHiddenFacts(get().facts, from, to),
+          hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${from}` ? `circle-${to}` : c)),
+        });
       },
 
       /**

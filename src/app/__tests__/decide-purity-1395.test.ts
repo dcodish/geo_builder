@@ -82,6 +82,7 @@ describe('#1395 — asking the decision changes nothing', () => {
       if (v.kind === 'store-op') continue;
       for (const b of v.binds) {
         if (b.op === 'name-centre') useGeoStore.getState().nameCentre(b.from, b.to);
+        else if (b.op === 'step-aside') useGeoStore.getState().reletterHidden(b.from, b.to);
         else useGeoStore.getState().rename(b.from, b.to);
       }
       if (v.kind === 'commit') useGeoStore.getState().executeMany([...v.commands], line);

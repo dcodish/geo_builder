@@ -203,6 +203,9 @@ export interface ParseContext {
   /** Centre letters that were AUTO-assigned to an unnamed circle (hidden until named) — «מרכז המעגל
    *  הוא P» renames one of these to P and reveals it, instead of creating a second circle (issue #112). */
   autoCenters?: string[];
+  /** #1673 (ADR-565): points nothing places — a bare free point, no shape's vertex («BO = 5» drew O). A sentence that
+   *  names one of them the centre of an unnamed circle PLACES it there (the naming absorbs it). */
+  freePoints?: string[];
   /** #539: points that lie structurally BETWEEN two others BY CONSTRUCTION (a mutual tangency's touch
    *  between the centres, a midpoint, an interior rider) — the candidate set for the point naming-by-use
    *  binding: a fresh set-line label whose stated slot exactly one of these occupies IS that point.
@@ -665,42 +668,36 @@ const centrePt = (ctx: ParseContext, letter: string): Id => ctx.centrePoint?.[le
  * centre); a named centre — or a letter the student separately owns as a point — needs/gets nothing.
  * Positional/definitional statements («P על המשך BA») must NOT call this — the letter stays fresh there.
  */
+/** #1673 (ADR-565): may `x` become an unnamed circle's centre by being named so? A fresh letter, or a free point. */
+const nameableAsCentre = (ctx: ParseContext, x: string): boolean =>
+  !(ctx.points ?? []).map(up).includes(up(x)) || (ctx.freePoints ?? []).map(up).includes(up(x));
+
+/**
+ * #1673 (ADR-565): a RADIUS sentence whose centre end is the student's own letter for an UNNAMED circle («OB רדיוס»,
+ * «הרדיוס OB» — the hidden token stepped aside, so O is fresh, or a free point drawn earlier). The end that is not
+ * on the circle and may be named is the centre; the other is the rim. Two new letters → the first written is the
+ * centre (a radius is written centre-first); otherwise ambiguous → null.
+ */
+const radiusNamesCentre = (ctx: ParseContext, a: string, b: string, host: string): { centre: string; rim: string } | null => {
+  if (!(ctx.autoCenters ?? []).map(up).includes(up(host))) return null;
+  const members = membersOfCenter(ctx, up(host));
+  const ends = [up(a), up(b)];
+  let cand = ends.filter((x) => nameableAsCentre(ctx, x) && !members.has(x));
+  if (cand.length !== 1) cand = ends.filter((x) => !(ctx.points ?? []).map(up).includes(x));
+  // both letters new («רדיוס OB» on a bare «מעגל»): a radius is written centre-first, as «OB» in every textbook
+  if (cand.length === 2) cand = [ends[0]];
+  if (cand.length !== 1) return null;
+  return { centre: cand[0], rim: ends.find((x) => x !== cand[0])! };
+};
+/** The implied circle a radius sentence names by use — the #186 seam then binds it to the unnamed circle. */
+const impliedCentreCircle = (centre: string): AnyCommand =>
+  ({ type: 'circle', id: circleId(centre), center: centre, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, implied: true });
+
 const promoteCentreUse = (ctx: ParseContext, letter: string): AnyCommand[] =>
   (ctx.autoCenters ?? []).map(up).includes(up(letter)) && !(ctx.points ?? []).includes(up(letter))
     ? [{ type: 'name-center', center: up(letter) }]
     : [];
 
-/** Command kinds a PURE METRIC statement may lower to — a measure/relation plus its auto-drawn segments. */
-const METRIC_KINDS = new Set([
-  'segment', 'set-distance', 'set-ratio', 'set-equal', 'set-length-radius', 'set-angle', 'set-angle-ratio',
-  'set-measure-sum', 'set-length-product', 'set-area', 'set-area-ratio', 'set-perimeter', 'set-perimeter-ratio',
-  'measure-length', 'measure-angle', 'measure-area', 'mark-angle',
-]);
-
-/**
- * METRIC givens bind hidden-centre tokens ([ADR-342](docs/06-decisions.md#adr-342), issue #177 — the
- * operator's amended ruling): «OP=4» / «OM=4» / «OA=5» beside unnamed circles carry the textbook meaning
- * (O, P are THE centres), so a statement that is PURELY metric — only measure/relation commands and their
- * auto-drawn segments, nothing positional/definitional — promotes every auto-centre token it names.
- * «P על המשך BA» (the reported hijack) lowers to a `set-line`, which is NOT in the whitelist, so
- * PLACING statements keep treating the letter as fresh. The boundary is placing-vs-REFERENCING: a bare
- * segment «OP»/«PA» beside unnamed circles REFERENCES the centres (the operator's kite flow draws the
- * radii and the centre line by their tokens), so segment-only statements bind too — a segment never
- * (re)positions the letter, while every placing kind (on-*, extension, intersection) is outside the list.
- */
-function withMetricCentreBinding(commands: AnyCommand[], ctx: ParseContext): AnyCommand[] {
-  if (!(ctx.autoCenters ?? []).length) return commands;
-  if (commands.length === 0 || !commands.every((c) => METRIC_KINDS.has(c.type))) return commands;
-  const letters = new Set<string>();
-  for (const c of commands)
-    for (const [k, v] of Object.entries(c)) {
-      if (k === 'type' || k === 'expr') continue;
-      if (typeof v === 'string' && /^[A-Z]\d*$/.test(v)) letters.add(v);
-      if (Array.isArray(v)) for (const e of v) if (typeof e === 'string' && /^[A-Z]\d*$/.test(e)) letters.add(e);
-    }
-  const promos = [...letters].flatMap((l) => promoteCentreUse(ctx, l));
-  return promos.length ? [...promos, ...commands] : commands;
-}
 
 /**
  * The ADR-342 post-pass (the ADR-119 chokepoint pattern): every command in a winning parse that CREATES an
@@ -709,18 +706,34 @@ function withMetricCentreBinding(commands: AnyCommand[], ctx: ParseContext): Any
  * like `circle-O` are untouched — the LETTER keeps naming the circle). Running at the chokepoint means a
  * future rule that mints an auto centre can never regress the class.
  */
-function withAnonymousAutoCentres(commands: AnyCommand[]): AnyCommand[] {
+function withAnonymousAutoCentres(commands: AnyCommand[], ctx: ParseContext = NO_CONTEXT): AnyCommand[] {
   const minted = new Map<string, Id>();
+  // #1688 (ADR-565): a NEW unnamed circle whose picked token is already a drawn circle's token (the pickers avoid
+  // the student's points, not the hidden tokens) would overwrite that circle — «AB קוטר» · «שני מעגלים נחתכים»
+  // replaced the diameter circle. Such a token is re-picked here, the one chokepoint every auto-centre passes.
+  const taken = new Set([...(ctx.circles ?? []), ...(ctx.points ?? [])].map(up));
+  const retoken = new Map<string, string>();
   for (const c of commands)
-    if ((c.type === 'circle' || c.type === 'circle-through') && c.autoCenter && !c.center.startsWith('@') && !c.center.startsWith('~'))
-      minted.set(c.center, ctrAnonId(c.center));
+    if ((c.type === 'circle' || c.type === 'circle-through') && c.autoCenter && !c.center.startsWith('@') && !c.center.startsWith('~')) {
+      let tok = c.center;
+      if (taken.has(up(tok)) && !(c as { ifAbsent?: boolean }).ifAbsent) {
+        tok = freeLabel([...taken, ...commands.flatMap((k) => commandLetters(k))], ['O', 'P', 'Q', 'K']);
+        retoken.set(c.center, tok);
+      }
+      taken.add(up(tok));
+      minted.set(c.center, ctrAnonId(tok));
+    }
   if (minted.size === 0) return commands;
   return commands.map((c) => {
     let s = JSON.stringify(c);
     for (const [from, to] of minted) s = s.split(JSON.stringify(from)).join(JSON.stringify(to));
+    for (const [from, to] of retoken) s = s.split(JSON.stringify(circleId(from))).join(JSON.stringify(circleId(to)));
     return JSON.parse(s) as AnyCommand;
   });
 }
+/** The bare labels a command carries (top-level string and array values). */
+const commandLetters = (c: AnyCommand): string[] =>
+  Object.entries(c).flatMap(([k, v]) => (k === 'expr' ? [] : (Array.isArray(v) ? v : [v]).filter((x): x is string => typeof x === 'string' && /^[A-Z]\d*$/.test(x))));
 
 /** The first `n` vertex labels — A, B, C, D, … in order, skipping any already in `used` — for a polygon
  *  the student drew WITHOUT naming its vertices ("מרובע חסום במעגל" / "square"). The convention is to name
@@ -4392,7 +4405,7 @@ const nameCenter: Rule = (s, ctx) => {
    * one circle renames, an interchangeable pair binds (the #538 carve-out), anything else asks.
    */
   const autos = (ctx.autoCenters ?? []).map(up);
-  if (autos.length > 0 && !autos.includes(X) && !(ctx.points ?? []).map(up).includes(X)) {
+  if (autos.length > 0 && !autos.includes(X) && nameableAsCentre(ctx, X)) { // #1673: a free point is placed there
     return [{ type: 'circle', id: circleId(X), center: X, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, implied: true }];
   }
   return null; // no circle yet → `circle` creates circle-X; a different existing centre → rename, defer
@@ -4877,6 +4890,14 @@ const radiusSegment: Rule = (s, ctx) => {
   if (!ids) return null;
   const [x, y] = [up(ids[0]), up(ids[1])];
   const centre = circles.includes(x) ? x : circles.includes(y) ? y : null;
+  if (!centre && x !== y) {
+    // #1673 (ADR-565): «OB רדיוס» beside an UNNAMED circle names its centre O by use (the hidden token stepped aside)
+    const host = existingCircleRef(s, ctx);
+    const named = host ? radiusNamesCentre(ctx, x, y, host) : null;
+    if (!named) return null;
+    const rimOn = membersOfCenter(ctx, up(host!)).has(named.rim);
+    return [impliedCentreCircle(named.centre), ...(rimOn ? [] : [{ type: 'point-on-circle' as const, id: named.rim, circle: circleId(named.centre) }]), { type: 'segment', a: named.centre, b: named.rim }];
+  }
   if (!centre || x === y) return null;
   const rim = centre === x ? y : x;
   return [
@@ -6138,6 +6159,14 @@ const circleOnDiameter: Rule = (s, ctx) => {
       const pts = e.points.map(up);
       return pts.includes(up(ids[0])) && pts.includes(up(ids[1]));
     });
+  // #1673 (ADR-565): «AB קוטר במעגל O» where A and B already ride an UNNAMED circle — the student's name for THAT
+  // circle (the hidden token stepped aside, so O matched nothing). Naming-by-use, as «C על מעגל K» (ADR-347): the
+  // implied circle and the two memberships let the #186 seam bind O to the circle they ride; the re-parse then adds
+  // the diameter to it. Never a second circle through two points of the first.
+  if (named && !explicitNew && endpointsExist && (ctx.autoCenters ?? []).some((t) => ids.every((x) => membersOfCenter(ctx, up(t)).has(up(x))))) {
+    const X = up(named);
+    return [impliedCentreCircle(X), ...ids.map((x): AnyCommand => ({ type: 'point-on-circle', id: up(x), circle: circleId(X) }))];
+  }
   const referencedCircleMissing = named ? true : circles.length === 0 || hostIsEndpoint || explicitNew || crossMembers; // (a named-and-existing circle already returned above)
   // DEFINE-from-new signal (vs the ADD phrasing "diameter DE in circle O"): the diameter LABELS come
   // BEFORE the keyword ("AB קוטר") — the student says "AB is a/the diameter" — OR the circle is referred
@@ -9883,7 +9912,9 @@ export function impliedCircleBinding(
   const autos = ctx.autoCenters ?? [];
   if (autos.length === 0) return null; // no unnamed circle to bind — the implicit creation stands
   const X = up(implied.center); // the letter the student used IS the implied centre
-  if ((ctx.points ?? []).map(up).includes(X)) return null; // X is a real point → "circle centred X" is a creation
+  // X is a real point → "circle centred X" is a creation — unless nothing places it (#1673, ADR-565: «BO = 5» drew a
+  // free O; «O מרכז המעגל» then places that O at the centre — the naming absorbs it)
+  if ((ctx.points ?? []).map(up).includes(X) && !(ctx.freePoints ?? []).map(up).includes(X)) return null;
   const members = new Map((ctx.circleMembers ?? []).map((e) => [e.id ?? circleId(e.center), new Set(e.points.map(up))]));
   const points = new Set((ctx.points ?? []).map(up));
   const subjects = commands.flatMap((c) =>
@@ -10177,7 +10208,14 @@ function withRoleClaims(commands: AnyCommand[], s: string, ctx: ParseContext): A
         const host = centreEnds.length === 1 ? { center: centreEnds[0], prepend: [] } : circleFor();
         if (!host) return ambiguous();
         const centre = up(host.center);
-        if (!centreEnds.includes(centre)) return refuse(op, 'no-centre-end', { other: centre.replace(/^@CTR-/, '') });
+        if (!centreEnds.includes(centre)) {
+          // #1673 (ADR-565): the student's own letter for an UNNAMED circle's centre names it by use
+          const named = radiusNamesCentre(ctx, a, b, centre);
+          if (!named) return refuse(op, 'no-centre-end', { other: centre.replace(/^@CTR-/, '') });
+          add(impliedCentreCircle(named.centre));
+          if (!onCircleAlready(named.rim, centre)) add({ type: 'point-on-circle', id: named.rim, circle: circleId(named.centre) });
+          continue;
+        }
         const rim = centre === a ? b : a;
         for (const c of promoteCentreUse(ctx, centre)) add(c);
         if (!onCircleAlready(rim, centre)) add({ type: 'point-on-circle', id: rim, circle: circleId(host.center) });
@@ -11478,7 +11516,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
       if (claimed === 'unread') continue; // a role noun this winner read bare — let a later rule try, never commit the drop
       if (!Array.isArray(claimed)) return refusalOf(claimed);
       const resolved = withConcentricResolution(withImplicitCircles(withOnCircleMembership(claimed, s, ctx), ctx), s, ctx);
-      if (Array.isArray(resolved)) return { ok: true, commands: withStatedConvexity(withAnonymousAutoCentres(withMetricCentreBinding(withRadiusSymbolBinding(resolved, s, ctx), ctx)), s) };
+      if (Array.isArray(resolved)) return { ok: true, commands: withStatedConvexity(withAnonymousAutoCentres(withRadiusSymbolBinding(resolved, s, ctx), ctx), s) };
       return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
     }
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).
@@ -11673,6 +11711,19 @@ const hasHebrewScript = (s: string): boolean => /[א-ת]/.test(s);
  *  tokens like «18r»). The raw runs, case preserved — callers decide scope and canonicalization. */
 const lowercaseLabelRuns = (s: string): string[] =>
   (s.match(/(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g) ?? []).filter((run) => !UNIT_WORDS.has(run.toLowerCase()));
+/**
+ * #1673 ([ADR-565](../../docs/06-decisions.md#adr-565)) — the point letters the student TYPED: every Latin word that
+ * is a run of labels («BO», «S_{CKE}», «2CE» → C, E), split into its labels. An English word («Point», «The») is not a
+ * label run, so it contributes nothing. The submit seams step a hidden circle token out of the way of these.
+ */
+export function typedLabels(raw: string): Id[] {
+  const out = new Set<string>();
+  for (const word of normalizeUtterance(raw).match(/[A-Za-z0-9]+/g) ?? []) {
+    const w = word.replace(/^\d+/, '');
+    if (/^(?:[A-Z]\d*)+$/.test(w)) for (const l of w.match(/[A-Z]\d*/g) ?? []) out.add(l);
+  }
+  return [...out];
+}
 export function statedLabelTokens(s: string): Id[] {
   const out = [...(s.match(/[A-Z]\d*/g) ?? [])];
   if (hasHebrewScript(s)) for (const run of lowercaseLabelRuns(s)) out.push(...(run.toUpperCase().match(/[A-Z]\d*/g) ?? []));
@@ -12389,7 +12440,7 @@ export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { 
   const x = circleCenter(qualM ? s.replace(qualM[0], heQ ? ' מעגל ' : ' the circle ') : s);
   if (!x) return null;
   const X = up(x);
-  if ((ctx.points ?? []).map(up).includes(X)) return null; // the naming letter must be FRESH (a taken letter would merge)
+  if (!nameableAsCentre(ctx, X)) return null; // the naming letter must be FRESH, or a free point the naming places (#1673)
   // Just "the centre [of the circle] is X" — nothing geometric remains after the centre/circle words,
   // the label, copulas, the size qualifier, and filler (the nameCenter-rule leftover check).
   const leftover = s
@@ -12413,7 +12464,8 @@ export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { 
     if (byTok.size >= 2) {
       let best: { tok: string; x: number } | null = null;
       for (const [tok, x] of byTok) if (!best || (dirQ === 'right' ? x > best.x : x < best.x)) best = { tok, x };
-      if (best && best.tok !== X) return { from: best.tok, to: X };
+      // #1673 (ADR-565): the picked circle's hidden token may BE the student's letter — naming it then reveals it
+      if (best && (best.tok !== X || autos.includes(best.tok))) return { from: best.tok, to: X };
     }
     return null; // degenerate (shared token) — defer rather than guess
   }
@@ -12430,7 +12482,7 @@ export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { 
     const pickId = qual === 'outer' ? outerId : innerId;
     const pick = sizes.find((c) => c.id === pickId)!;
     const from = pick.center.startsWith('@ctr-') ? pick.center.slice(5) : pick.center; // nameCentre is token-driven
-    if (from === X) return null;
+    if (from === X && !autos.includes(from)) return null; // #1673: a hidden token equal to X is revealed, not skipped
     // The assert carries POST-RENAME ids: `nameCentre` renames the picked circle `circle-<from>` →
     // `circle-<to>`, so a lock built on the pre-rename id would reference a GHOST — it applied vacuously
     // green and `orderedBelow` was stamped on neither circle, so the just-stated big/small order was
@@ -12441,7 +12493,8 @@ export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { 
   // The centre to rename: the sole AUTO-named centre (the reported case), else — if none is auto — the sole
   // already-NAMED centre being re-lettered. Ambiguous (0 or ≥2 candidates) → defer to the parser.
   const from = autos.length === 1 ? autos[0] : autos.length === 0 && named.length === 1 ? named[0] : null;
-  if (!from || from === X) return null;
+  // #1673 (ADR-565): the sole unnamed circle's hidden token may BE the student's letter — naming it reveals it
+  if (!from || (from === X && autos.length !== 1)) return null;
   return { from, to: X };
 }
 

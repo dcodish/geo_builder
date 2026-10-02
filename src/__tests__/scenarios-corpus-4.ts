@@ -933,6 +933,7 @@ export const SCENARIOS_4: Scenario[] = [
       "operator session eew5ezi5 (2026-07-10, the ADR-124/#6 source question re-typed correctly with the NEW point E): two circles meet at A,B; chord AD in P tangent to O at A; chord CB in O tangent to P at B; 'המשך AC חותך את מעגל P בנקודה E' (the operator typed חותר — a typo the LLM corrected). Every step showed ✓ but E landed BETWEEN C and A (t = 0.64), amber-flagged orderBeyond — 'fails to create the C-A-E sequence'. Root cause (issue #19): ADR-142's shared-endpoint either-side semantics lived ONLY behind extensionsClear's `relax` flag, set solely by firstSatisfyingSeed's fallback pass — so (a) the strict primary sweep demanded E beyond C, which is geometrically impossible here at EVERY seed (CB tangent to circle P pins C outside P), burning the app's 2500ms wall budget before the fallback ever ran, and (b) meetsRequirements/`findValidConfig` used the STRICT form, rejecting the very seed the fallback found — the consumers disagreed. Fix (ADR-267): a PREFERENCE LADDER — strict letter order wherever achievable (the ADR-098 free-DOF family, where the order genuinely SELECTS the config), the ADR-142 either-side bar as the ACCEPTANCE tier, searched in ONE interleaved budget-safe sweep (a fallback bar rides the same loop, never a second pass); meetsRequirements/findValidConfig/resample/the ADR-256 sample filter all honour the ladder.",
     steps: [
       'שני מעגלים נחתכים בנקודות A ו-B',
+      'O מרכז המעגל', 'P מרכז המעגל', // #1673 (ADR-565): named so the second-drawn circle is P — with P named by order onto the first circle the app's config search finds no valid configuration (issue #19 lock)
       'AD מיתר במעגל P משיק למעגל O בנקודה A',
       'CB מיתר במעגל O משיק למעגל P בנקודה B',
       { llm: ['המשך AC חותך את מעגל P בנקודה E'] }, // the operator's חותר typo, as the LLM's corrected canonical line
@@ -1209,6 +1210,7 @@ export const SCENARIOS_4: Scenario[] = [
       'operator prod report (2026-07-11, the booklet tangent-secant question part ג, same figure as #36/#37): "I\'m trying to say that a different circle has a radius of r (not R) — not supported." The trailing radius-symbol clause שרדיוסו r defeated the end-anchored droppedCirclePredicate gate, and once the circumcircle existed the ADR-156 idempotent re-inscribe branch returned a BARE `triangle ADO` — the stated inscription AND the r vanished with every row ✓ (the docs/17 §6 silent-wrong-figure class). Fix (ADR-279): the measure-symbol honesty lane `droppedRadiusSymbol` + the widened CIRCLE_PRED_TAIL (a predicate may carry its circle\'s qualifier/size clause). This scenario locks the HONEST half that builds: the first entry of the part-ג utterance creates the second circle through A, D, O (r stays unbound — its per-circle binding is issue #54); the refusal half (a re-type must never commit a bare triangle) is locked in src/parser/__tests__/issue-53.test.ts.',
     steps: [
       'משולש ABC חסום במעגל',
+      'O מרכז המעגל', // #1673 (ADR-565): «משולש ADO» means this centre — named first, since an unnamed centre answers to no letter
       'BC קוטר',
       'G על המשך CA',
       'GA=AC',
@@ -3188,6 +3190,28 @@ export const SCENARIOS_4: Scenario[] = [
       expect([...details][0]).toMatch(/OB.*cannot hold/);
       const onCircle = factsOf(['מעגל O', 'A על המעגל', 'B על המעגל', 'קטע CD']);
       expect(gateVerdict(onCircle, 'המיתר AB מקביל ל-CD').kind, 'B on the circle: the relation spelling commits').toBe('commit');
+    },
+  },
+  {
+    id: 'hidden-centre-letter-steps-aside-1673',
+    title: '#1673 / #1688 (ADR-565): after «AB ו-BC משיקים למעגל …» «BO = 5» draws a FREE point O; «O מרכז המעגל» then places that O at the centre',
+    guards:
+      "Operator ruling 2026-10-02 (#1686/#1688): \"the behavior should be to create a segment BO where B is where we know it is and O is free. if the user wants it to be the center, he can write next sentance that O is the center. the 2d behavior today is wrong since the user doesnt know that O was assigned.\" Measured on main 92881500: after the tangency opener (its circle unnamed, ADR-560), «BO = 5» bound the hidden centre the tool had lettered O (ADR-342's metric amendment). Root fix: the hidden token steps aside whenever the student types its letter (`stepAsideFacts`), so O is a fresh letter; the naming sentence then absorbs the free O into the centre (`nameCentreFacts`). Asserts after step 2 that O is free and the circle unnamed (the prefix figure), and after step 3 that O IS the visible centre, |BO| = 5, and the tangency holds. The submit-door matrix is in src/__tests__/issue-1673-hidden-centre.test.ts.",
+    steps: ['AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה', 'BO = 5', 'O מרכז המעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const before = replay(factsOf(['AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה', 'BO = 5']), 0);
+      const c0 = before.construction.objects.find((o) => o.kind === 'circle') as { center: string; autoCenter?: boolean } | undefined;
+      expect(c0?.center.startsWith('@ctr-'), 'after «BO = 5» the centre is still unnamed').toBe(true);
+      expect(before.construction.objects.find((o) => o.id === 'O')?.kind, 'and O is a free point').toBe('free-point');
+      const circle = fig.construction.objects.find((o) => o.kind === 'circle') as { center: string; autoCenter?: boolean } | undefined;
+      expect(circle?.center, 'the naming placed O at the centre').toBe('O');
+      expect(circle?.autoCenter, 'named ⇒ visible').toBeUndefined();
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(dist(B, O), '|BO| = 5').toBeCloseTo(5, 4);
+      expect(dist(O, A), 'A and C on the circle').toBeCloseTo(dist(O, C), 6);
+      const dot = (A.x - O.x) * (B.x - A.x) + (A.y - O.y) * (B.y - A.y);
+      expect(Math.abs(dot) / (dist(O, A) * dist(A, B)), 'OA ⟂ AB — the tangency still holds').toBeLessThan(1e-6);
     },
   },
 ];

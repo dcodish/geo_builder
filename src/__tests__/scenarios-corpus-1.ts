@@ -933,7 +933,8 @@ export const SCENARIOS_1: Scenario[] = [
       expect((P.x - A.x) * (A.x - B.x) + (P.y - A.y) * (A.y - B.y), 'P beyond A on ray B→A').toBeGreaterThan(0);
       // both circles intact, their centres anonymous — the letters stay the student's
       expect(fig.construction.objects.filter((o) => o.kind === 'circle').length).toBe(2);
-      expect(fig.positions.has('@ctr-O') && fig.positions.has('@ctr-P'), 'anonymous centres').toBe(true);
+      // #1673 (ADR-565): the student's P made the hidden token P step aside — both centres stay anonymous
+      expect([...fig.positions.keys()].filter((k) => k.startsWith('@ctr-')).length, 'anonymous centres').toBe(2);
     },
   },
   {

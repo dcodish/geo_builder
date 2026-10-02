@@ -8,8 +8,8 @@
  * The harness re-exports everything here, so every existing test import site is unchanged — this file
  * is a LAYERING split, not a second implementation (the ADR-346 no-mirrors rule).
  */
-import { parse, buildParseCtx, impliedCircleBinding, impliedPointBinding } from '@/parser';
-import { autoNamedLabels, replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, renameFacts } from '@/store/geoStore';
+import { parse, buildParseCtx, impliedCircleBinding, impliedPointBinding, parseNameCenter, typedLabels } from '@/parser';
+import { autoNamedLabels, replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, renameFacts, stepAsideFacts } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
 import type { ParseResult } from '@/parser';
@@ -110,6 +110,7 @@ export function factsOf(steps: Step[], refused: readonly RefusedStep[] = []): Fa
       if (start < 0) throw new Error(`edit step: no step group ${key} to edit`);
       let end = start;
       while (end < facts.length && facts[end].group === key) end++;
+      facts = stepAsideFacts(facts, typedLabels(step.edit.to)).facts; // #1673 mirror (ADR-565): the hidden token steps aside
       let er = parse(step.edit.to, ctxOf(facts.slice(0, start)));
       // #186 mirror (the App's commitEdit auto-bind): a fresh circle name in an edit binds an unnamed
       // circle via the shared decision helper + fact core, then re-parses against the renamed prefix.
@@ -145,12 +146,26 @@ export function factsOf(steps: Step[], refused: readonly RefusedStep[] = []): Fa
     }
     const group = `g${g++}`;
     if (typeof step === 'string') {
+      // The app's store-op naming (decidePreParse → `nameCentre`): «מרכז המעגל הימני הוא O» renames a hidden centre and
+      // adds no fact of its own (a size qualifier also locks the order, #178). Mirrored so a scenario can name its circles.
+      const nc = parseNameCenter(step, ctxOf(facts));
+      if (nc) {
+        const res = nameCentreFacts(facts, nc.from, nc.to);
+        if (!res.ok) throw new Error(`scenario naming step was refused (${res.reason}): ${JSON.stringify(step)}`);
+        facts = res.facts;
+        if (nc.assert) push(group, step, { type: 'set-radius-order', outer: nc.assert.outer, inner: nc.assert.inner });
+        settle(group);
+        continue;
+      }
+      // #1673 mirror (decideFromParse, ADR-565): a hidden circle token the student types steps aside first
+      facts = stepAsideFacts(facts, typedLabels(step)).facts;
       let r = parse(step, ctxOf(facts));
       // #186 mirror (App.submit's auto-bind): a circle named by a fresh name, with unnamed circles in
       // the figure, binds one of them (shared decision helper + fact core) and re-parses.
       for (let guard = 0; r.ok && guard < 3; guard++) {
         const bind = impliedCircleBinding(r.commands, ctxOf(facts));
-        if (bind && 'clarify' in bind) break;
+        // the app ASKS which circle (#186); committing the implied creation here was a silent divergence (#1673)
+        if (bind && 'clarify' in bind) throw new Error(`scenario step ASKS which circle (unknown-circle ${bind.center}): ${JSON.stringify(step)}`);
         if (bind) {
           const nc = nameCentreFacts(facts, bind.from, bind.to);
           if (!nc.ok) break;
