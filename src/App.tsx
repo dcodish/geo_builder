@@ -53,7 +53,7 @@ import { btn, card as themeCard, fs, sectionTitle } from '@/ui/theme';
 // #743: the under-canvas row's ONE look — the style contract lives in shell (seeded from this
 // tree's own btn.accent/btn.subtle, which the operator praised); every builder's row consumes it.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
-import { cyclableSeat, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
+import { cyclableSeat, factsWaitingForLetter, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, figureNameFromFileName, figureStateOf, namedFigureFileName, serializeFigure } from '@/store/figureFile';
@@ -820,6 +820,8 @@ export default function App() {
     return letterFor.size ? applyDisplayMode(builtLabels, (sym) => letterFor.has(sym)) : builtLabels;
   }, [builtLabels, paramChips, displayMode]);
   const { status, lastError, pending } = derivedRaw;
+  // #1658 Am. 1 (ADR-562): rows WAITING for their letter read as waiting, never as a broken ✗.
+  const waitingIds = useMemo(() => factsWaitingForLetter(facts), [facts]);
   // #574 (ADR-447): the one seam turning an anonymous id into words the student can act on.
   const describePoint = (id: string): string => {
     const d = anonPointDescriptor(id, construction);
@@ -1595,6 +1597,7 @@ export default function App() {
                 <div style={legend}>
                   <span><span style={{ color: '#16a34a' }}>✓</span> {t('steps.statusOk')}</span>
                   <span><span style={{ color: '#dc2626' }}>✗</span> {t('steps.statusBroken')}</span>
+                  {facts.some((f) => waitingIds.has(f.id)) && <span><span style={{ color: '#2563eb' }}>⧗</span> {t('steps.statusWaiting')}</span>}
                   <span><span style={{ color: '#94a3b8' }}>○</span> {t('steps.statusOff')}</span>
                 </div>
               )}
@@ -1611,9 +1614,13 @@ export default function App() {
                 textDir={textDir}
                 rows={groups.map((g) => {
                   const anyOn = g.facts.some((f) => f.enabled);
-                  const brokenFact = g.facts.find((f) => f.enabled && status[f.id] !== 'ok');
-                  const state = !anyOn ? 'disabled' : brokenFact ? 'broken' : 'ok';
-                  const errText = brokenFact ? explainError(status[brokenFact.id] as string, utteranceForError(g.facts, status, status[brokenFact.id] as string), otherUtteranceForError(facts, status[brokenFact.id] as string)) : undefined;
+                  const brokenFact = g.facts.find((f) => f.enabled && status[f.id] !== 'ok' && !waitingIds.has(f.id));
+                  // #1658 Am. 1: a row whose only non-ok facts wait for a letter is WAITING (⧗), with the
+                  // reason on hover and when selected — the same sentence, never the red broken mark.
+                  const waitingFact = brokenFact ? undefined : g.facts.find((f) => f.enabled && waitingIds.has(f.id) && status[f.id] !== 'ok');
+                  const state = !anyOn ? 'disabled' : brokenFact ? 'broken' : waitingFact ? 'waiting' : 'ok';
+                  const reasonFact = brokenFact ?? waitingFact;
+                  const errText = reasonFact ? explainError(status[reasonFact.id] as string, utteranceForError(g.facts, status, status[reasonFact.id] as string), otherUtteranceForError(facts, status[reasonFact.id] as string)) : undefined;
                   const label = stepLabel(g.facts.map((f) => f.cmd), g.facts[0].utterance, canonLocale);
                   // #948: rows are GROUPS but a chip is owned by the FACT that valued the letter —
                   // find the owning fact inside this group.
@@ -1640,11 +1647,11 @@ export default function App() {
                     text: label,
                     lead: (
                       <span style={{ fontSize: 12, width: 16, textAlign: 'center', flexShrink: 0 }}>
-                        {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
+                        {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : state === 'waiting' ? <span data-testid="waiting-mark" style={{ color: '#2563eb' }}>⧗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
                       </span>
                     ),
                     content: (
-                      <button type="button" style={factLabel(state)} onClick={() => select(g.key)} title={state === 'broken' ? errText : undefined}>
+                      <button type="button" style={factLabel(state)} onClick={() => select(g.key)} title={state === 'broken' || state === 'waiting' ? errText : undefined}>
                         {hasMath(label) ? <MathText text={label} /> : label}
                       </button>
                     ),
@@ -1671,8 +1678,8 @@ export default function App() {
                               </span>
                             );
                           })}
-                          {state === 'broken' && errText && g.key === selectedId && (
-                            <span style={{ fontSize: 11, color: '#dc2626', paddingInlineStart: 6 }} dir={textDir(errText)}>
+                          {(state === 'broken' || state === 'waiting') && errText && g.key === selectedId && (
+                            <span style={{ fontSize: 11, color: state === 'waiting' ? '#2563eb' : '#dc2626', paddingInlineStart: 6 }} dir={textDir(errText)}>
                               {errText}
                             </span>
                           )}
@@ -2430,7 +2437,7 @@ const bookLink: React.CSSProperties = {
 };
 // factRow retired with the shared FactList (B5-2d): the row card is chrome; the SELECTED accent
 // rides the FactRow.selected flag, and brokenness reads from the ✗ mark + inline reason.
-function factLabel(state: 'ok' | 'disabled' | 'broken'): React.CSSProperties {
+function factLabel(state: 'ok' | 'disabled' | 'broken' | 'waiting'): React.CSSProperties {
   return {
     display: 'block',
     width: '100%',

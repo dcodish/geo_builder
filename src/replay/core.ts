@@ -2005,6 +2005,21 @@ function sampledConfigError(error: string, violated: Constraint[] | undefined, f
 }
 
 /**
+ * #1658 Am. 1 ([ADR-562](docs/06-decisions.md#adr-562)) — the rows that are WAITING FOR A LETTER: a
+ * variable statement (a value «α = 70», a bound «0 < k < 6», an order «α < β») whose letter no enabled
+ * statement binds. The fold stamps exactly these with the waiting reason (the same `unboundSubjectOf`
+ * over the same whole-list table), and they constrain nothing — so they are neither a broken row nor a
+ * reason a configuration fails. ONE predicate for the two readers that used to see a plain non-ok
+ * status: the requirements bar below (which drove the «no configuration» notice) and the row mark.
+ */
+export function factsWaitingForLetter(facts: readonly Fact[]): Set<string> {
+  const enabledCmds = facts.filter((f) => f.enabled).map((f) => f.cmd);
+  if (!enabledCmds.some(isVariableStatement)) return new Set();
+  const tab = buildSymTab(enabledCmds);
+  return new Set(facts.filter((f) => f.enabled && unboundSubjectOf(f.cmd, tab, enabledCmds)).map((f) => f.id));
+}
+
+/**
  * Does the figure at this (facts, seed) meet EVERY requirement — it BUILDS, the givens verifier is clean,
  * every extension reaches its far side, the points are distinct, and declared polygons draw convex? This is
  * the bar the auto-resolver searches for before drawing ([ADR-106](docs/06-decisions.md#adr-106)). A
@@ -2013,6 +2028,7 @@ function sampledConfigError(error: string, violated: Constraint[] | undefined, f
  */
 export function meetsRequirements(facts: Fact[], seed = 0, relaxExtensions = false): boolean {
   const fig = replay(facts, seed);
+  const waiting = factsWaitingForLetter(facts);
   return (
     fig.lastError === null &&
     // #345 (ADR-397): a configuration in which a COMMITTED step did not hold is not displayable.
@@ -2022,7 +2038,9 @@ export function meetsRequirements(facts: Fact[], seed = 0, relaxExtensions = fal
     // configuration", with the given silently not applying. The cross-seed escape class
     // (ADR-085/098/127/166), one level up: not a requirement the sampler forgot, but the step statuses
     // themselves. A disabled fact is not part of the figure, so it is exempt by definition.
-    facts.every((f) => !f.enabled || fig.status[f.id] === 'ok') &&
+    // #1658 Am. 1: a row WAITING for its letter constrains nothing, so it cannot make a view fail — it used
+    // to, and the post-commit search then exhausted into «לא נמצאה תצורה…» beside a perfectly good figure.
+    facts.every((f) => !f.enabled || fig.status[f.id] === 'ok' || waiting.has(f.id)) &&
     fig.violations.length === 0 &&
     // relaxExtensions: the ADR-142 acceptance bar for a config `firstSatisfyingSeed` returned as its
     // shared-endpoint FALLBACK — the letter-order side is unachievable, so either extension counts

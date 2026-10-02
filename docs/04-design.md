@@ -881,7 +881,7 @@ the pre-parse guard and the post-failure register read the same `RULES` entries.
 generalise #926's `set-var`-only question: the fold stamps any variable statement whose letter no statement binds
 into the waiting register, `classify` counts it as pending, and `dryRunOutcome` commits it as data. A relation
 whose letters are bound but in a form it cannot follow (`unenforceableRelation` — it lowers to nothing) gets an
-error status and is refused at submit. `lowerOne` scales a bound by a positive linear coefficient.
+error status and is refused at submit. `lowerOne` scales a bound by a positive linear coefficient. A waiting row is not a failing one (Am. 1): `factsWaitingForLetter` — the same `unboundSubjectOf` over the same table — is read by `meetsRequirements` (a waiting row cannot fail a view, so no configuration search and no «no configuration» notice) and by the step list (a third row state, ⧗ waiting, beside ✓ / ✗ / ○).
 
 ## A role noun is a claim, lowered once ([ADR-563](06-decisions.md#adr-563))
 

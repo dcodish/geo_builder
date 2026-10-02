@@ -181,6 +181,7 @@
     "editDropped": "העריכה לא נקראה במלואה — נשאר בלי שימוש: {{items}}",
     "statusOk": "תקין",
     "statusBroken": "בעיה",
+    "statusWaiting": "ממתין להגדרת האות",
     "statusOff": "לא נכלל",
     "editBrokeDependents": "העריכה נקלטה, אבל {{items}} כבר לא בתוקף — מה שהוא מתייחס אליו אינו מוגדר עוד",
     "paramDisplayTitle": "הצגת {{sym}}: אות או ערך",

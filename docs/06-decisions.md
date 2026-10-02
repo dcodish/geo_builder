@@ -13477,6 +13477,25 @@ Behaviour changes for a student:
 - A not-handled analytic or solid sentence keeps its pointer, now preceded by the quoted word.
 - «0 < k < 6» before its letter exists is a marked row instead of «כבר קיים».
 
+**Amendment 1 (2026-10-02, #1658 pre-play) — a waiting row reads as WAITING, in the row mark and the notice.** The sheet was pre-played in the browser after the merge. «משולש ABC» · «0 < k < 6» committed, but three things showed at once:
+- the row had a red ✗ («בעיה»);
+- the input area showed «לא נמצאה תצורה שמקיימת את כל הדרישות יחד — הציור המוצג עשוי להיות מנוון…»;
+- the blue «הנתון נרשם אך לא משפיע בינתיים על הצורה» note showed beside them.
+
+Both wrong signals had one cause. Two readers judged the row by `status === 'ok'`, and a waiting row's status is its reason string:
+- the row mark in `App.tsx` showed ✗ for any non-ok status;
+- `meetsRequirements`, since #345, requires every enabled fact to be `ok`. The post-commit `runViewResolve` therefore launched the configuration search, which no seed can satisfy (a seed cannot bind a letter), so it exhausted into `figure.noValidConfig`.
+
+The same was true of #926's «α = 70» since ADR-483.
+
+**Decision.** `factsWaitingForLetter(facts)` (`replay/core.ts`) is the one predicate. It asks the fold's own `unboundSubjectOf` over the same whole-list table, so it names exactly the rows the fold stamped with the waiting reason. Both readers use it:
+- `meetsRequirements` exempts a waiting row, which constrains nothing;
+- the row is drawn in a third state, ⧗ «ממתין להגדרת האות» (`steps.statusWaiting`, blue), with the reason on hover and when selected.
+
+A relation that cannot be enforced (`unenforceableRelation`) is not waiting: it stays ✗ and still fails the requirements bar.
+
+**Measured.** `src/app/__tests__/issue-1658-waiting-row.test.ts` drives the real `runSubmit` → `runViewResolve` flow with the real `meetsRequirements`, for the bound, the one-sided bound, the order and the value. Each row reads as waiting, with no violation, no `lastError` and the pending cue, and no search is launched, so no notice. After «AB = k» every row is ok and 0 < |AB| < 6. Five of its six cases fail on the pre-amendment `core.ts`; the sixth is the still-broken control. Driven in Playwright on a dev server from the worktree: the row shows ⧗, the blue note shows, «לא נמצאה תצורה» does not, and after «AB = k» all three rows are ✓.
+
 ## ADR-563 — A role noun is a claim, lowered once from one registry (#1661)
 
 **Status:** accepted · 2026-10-02 · P1 honesty bug, found by the analytic #1651 fix stream · branch `fix/1661-2d-role-nouns` off `main` @ e92b671f

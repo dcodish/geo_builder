@@ -181,6 +181,7 @@
     "editDropped": "The edit was not read in full — left unused: {{items}}",
     "statusOk": "OK",
     "statusBroken": "problem",
+    "statusWaiting": "waiting for its letter",
     "statusOff": "excluded",
     "editBrokeDependents": "The edit was applied, but {{items}} no longer takes effect — what it refers to is not defined any more",
     "paramDisplayTitle": "Show {{sym}}: letter or value",
