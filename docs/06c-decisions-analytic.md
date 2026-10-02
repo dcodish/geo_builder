@@ -9475,3 +9475,52 @@ Controls:
 - 2-D gaps found and filed: **#1684** (P1 — «AD חוצה זווית C» draws the bisector of A; «AE גובה» with A in two triangles picks one), **#1685** (plural cevians with «בהתאמה», the copula before «חוצה זווית»).
 
 **Consequences.** `engine/cevian.ts` (new), `engine/types.ts` (`cevian-of`, `bisects` facts; `angle-side` selector), `engine/solve.ts` (`Direction.bisector`), `engine/apply.ts` (two M1 cases, three error codes, the selector's refs), `engine/evaluate.ts` (`angleSideOf`, validity + seeding), `engine/derive.ts` (foot mints, segment re-key), `parser/parseAnalytic.ts` (`parseCevianFamily` and its regexes, `cevianWithTarget`, `bisector-wrong-apex`), `parser/catalogAnalytic.ts` (eight rows — the LLM vocabulary grows: diff the built proxy before deploy), `app/rename.ts` (`cevianNamingCandidates`), `app/errorText.ts` + `i18n/index.ts` (three new texts; `errDegenerateRole`/`errApexNotAVertex` name the bisector), `store/useAnalyticStore.ts` (three `InputError` keys). Sibling check (docs/17 §1): 2-D is the reference (two defects filed); 3-D's cevians are #1679.
+
+
+## ADR-AG-211 — The tool's letters are 2-D's, through one role → letter table; the cevian's tool foot is derived; «תיכון ליתר» asks unless the right angle is stated (#1620 S6, #1222)
+
+**Status:** accepted · 2026-10-02 · operator rulings on #1620, 2026-10-02: (1) *a point the student did not name takes 2-D's letter — M for a midpoint, F for a foot, the next free letter if taken; analytic uses H for a foot because F is the focus letter (#1167); announced on the row and renameable*; (2) *«תיכון ליתר»: build when a stated right angle fixes the vertex, otherwise ASK which side is the hypotenuse; never assume C.* Branch `feat/1620-s6-letters` off `feat/1620-construction-vocabulary` @ b1b1683d (S1–S4 integrated). A NEW ADR, not an amendment of ADR-AG-209: the change crosses three streams — S2's [ADR-AG-207](#adr-ag-207) (the perpendicular's foot and the perpendicular bisector's midpoint took `P₁`), S3's [ADR-AG-208](#adr-ag-208) (the midsegment's `FRESH_PREFIX`) and S4's [ADR-AG-209](#adr-ag-209) (`M₁`/`H₁`) — and supersedes each one's letter rule.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R103c (new); R103b's foot letters and its "not yet: «תיכון ליתר»" amended; the perpendicular-foot bullet (ADR-AG-207) amended: P₁ → H. · **Design:** [04c](04c-design-analytic.md) — new section "The tool's letters: one table, one resolver"; ADR-AG-209's "tool-named foot" paragraph superseded. · **LADDER stage:** the mint seam (`resolveToolLetters`, before `resolveMints`), M1 (`cevian-of` `toolFoot` / `hypotenuse`). No solver change.
+
+**Context — measured** (2-D through `decideDeterministic2D`; analytic through `decideSubmit` / `derive`, on b1b1683d):
+
+| sequence (after «משולש ABC» unless shown) | 2-D | analytic before | analytic after |
+| --- | --- | --- | --- |
+| «תיכון מ-A במשולש ABC» | M | M₁ | M |
+| «נקודה M» · «תיכון מ-A …» | **M again** (over the free M) | M₁ | N |
+| two medians from A and B | 2nd **refused** «M coincides …» | M₁, M₂ | M, N |
+| «גובה מ-A במשולש ABC» | F | H₁ | H |
+| «נקודה F» · altitude | G | H₁ | H (F is never the tool's) |
+| F, G, H taken · altitude | P | H₁ | P (H, G taken → P) |
+| two altitudes | F, G | H₁, H₂ | H, G |
+| «האנך מ-C ל-AB» | F | P₁ | H |
+| «אנך אמצעי ל-AB» | M (over a free M too) | P₁ | M (N when M is taken) |
+| «קטע האמצעים לצלע BC במשולש ABC» | M, N | M, N | M, N |
+| «D אמצע BC» · «תיכון מ-A …» | — | a second point M₁ on D | the median runs to D (one point) |
+| «משולש ישר-זווית ABC» · «תיכון ליתר» | median from **C** (assumed) | not-handled | **asks** (`ambiguous-hypotenuse`) |
+| … · «זווית C ישרה» / «זווית A ישרה» · «תיכון ליתר» | from C / from A | not-handled | from C / from A |
+| … · «גובה ליתר» (stated A) | foot F from A | not-handled | foot H from A, ⟂ BC |
+| «משולש ABC» · «תיכון ליתר» | asks (`roleSideUnresolved`) | not-handled | asks (`ambiguous-no-right-angle`) |
+| «משולש ישר-זווית ABC» · «תיכון ליתר AB» | builds (right angle at C) | not-handled | builds (the claim puts it at C) |
+| rename the perpendicular bisector's tool midpoint | — | `rename-not-typed` | «אנך אמצעי ל-AB חותך אותו בנקודה K» |
+
+Also measured: the S4 cevian foot was a FREE point plus constraints, so adding «תיכון מ-A במשולש ABC» to a free triangle re-solved and moved the triangle (ADR-AG-209's "not done").
+
+**The class (docs/17 §1): three letter rules for one act.** Naming a point the student did not name was implemented three times, with three namespaces and two notions of "taken" (S2/S4 against the WHOLE list — so a later «AM = 3» would have renamed the earlier mint — and S3 against the earlier lines). One act, one mechanism.
+
+**Decision.**
+1. **One table, one resolver** — `engine/toolLetters.ts`: `TOOL_LETTERS` (midpoint `MNPQ`, midpoint-2 `NPQS`, foot `HGP` — 2-D's `freeLabel` preferences, F → H), 2-D's pool, then a subscript. Every rule writes `toolPoint(role, key)`; `resolveToolLetters` resolves in list order against the EARLIER facts' letters (a later line refers to the tool's point and never re-letters it) and gives a placeholder whose derivation an earlier point already has that point's name (#1153). S3's `resolveFresh` and S2's/S4's branches in `resolveMints` are gone; `resolveMints` keeps only the coordinate point's reserved `P₁` (#1281 — a different ruling, not a construct). `derive` drops a `minted` entry whose point the fold did not create.
+2. **The cevian's tool foot is DERIVED** (`toolFootFacts`): `midpoint(u, v)` / ADR-AG-207's `foot(apex → uv)`. It is a closed form, so the triangle never moves (ADR-AG-209's open stability item, for this path), and «האנך מ-A ל-BC» and «גובה מ-A במשולש ABC» are one point. A foot the STUDENT names keeps `cevianFacts` (ADR-AG-109's conjunction, untouched).
+3. **Naming after the fact** — `FOOT_TAIL` («… פוגש את הצלע בנקודה K», "… at K") on the apex, side and hypotenuse forms, lowered as the tool's foot; the rename writes it (`cevianNamingCandidates`, tried first). The perpendicular bisector reads S2's «… חותך אותו בנקודה K», which the rename already wrote, so its midpoint is renameable now.
+4. **The hypotenuse** (`TO_HYP_*`, `cevian-of { hypotenuse }`): the right angle the figure STATES (a non-choice constraint equal to `rightAngleAt`) decides; an open right-triangle noun or several right triangles `ambiguous-hypotenuse`, none `ambiguous-no-right-angle` — both ask, He/En texts. «תיכון ליתר AB» states ADR-AG-200's hypotenuse claim and builds.
+
+**Locks.** `issue-1620-tool-letters.test.ts` (41): per role the letter and its fallbacks (median ×5, perpendicular bisector ×2, midsegment ×2, altitude ×6, perpendicular ×2); the coordinate `P₁` control; the row; one point reached two ways (median to D; perpendicular = altitude; `already-known`); a later naming is `already-named` holding M; a later line using M refers to it; five tool-foot lines leave a FREE triangle unmoved at seeds 0–5; letters and geometry stable at six seeds; five renames to K (median, altitude, hypotenuse median, perpendicular bisector, axis perpendicular), each folding to the same position; the hypotenuse — open asks (three spellings), none asks, stated C / A / plain triangle builds the right median at six seeds, the altitude ⟂, «תיכון ליתר AB» puts the right angle at C, a contradicting named hypotenuse is `unsatisfiable`. **Fails before: 37 of 41** (green before: S3's two midsegment rows, the `P₁` control, and the perpendicular bisector's stability — S2's midpoint was already derived). **Locks changed to this ruling:** `issue-1620-bisectors-cevians` (M₁/H₁ → M/H; the fallback row; renames now write «… פוגש את הצלע בנקודה K»; the "draws what «AH₁ …» draws" parity row removed — the tool foot no longer moves the triangle, locked above), `issue-1620-perpendiculars` (P₁ → H; the bisector's midpoint P₁ → M). Parity: `cat-2d-051` expect `asks` (2-D gap **#1689**, filed: 2-D assumes C); new rows `hypotenuse-median-stated`, `hypotenuse-median-named` (builds), `hypotenuse-no-right-angle` (asks). Catalog: «תיכון ליתר AB».
+
+**Measured.** 471 corpus: 250/263 lines, 35/46 questions — unchanged.
+
+**2-D, filed:** **#1689** (P2 — «תיכון ליתר» assumes the right angle at C); **#1690** (P2 — the median's and perpendicular bisector's midpoint is always M, over a taken M; a second median is refused).
+
+**Not done.** The bare tail «… בנקודה K» (without «פוגש את הצלע») is not read — an earlier rule claims «X בנקודה K»; the rename never writes it. A student-NAMED cevian foot («AD גובה לצלע BC») is still a free point plus constraints (ADR-AG-109), so it can still move a free triangle (ADR-AG-209's open item, now confined to that path).
+
+**Consequences.** `engine/toolLetters.ts` (new), `engine/derive.ts` (`resolveFresh` removed, `resolveMints` coordinate-only, the minted filter), `engine/cevian.ts` (`toolFootRule`, `toolFootFacts`), `engine/types.ts` (`cevian-of.hypotenuse`, `.toolFoot`), `engine/apply.ts` (the `cevian-of` hypotenuse and tool-foot arms, two codes), `parser/parseAnalytic.ts` (`toolPoint` at the S2/S3/S4 sites, `FOOT_TAIL`, `TO_HYP`, the perpendicular bisector's tail; `FRESH_PREFIX` re-exported), `app/rename.ts`, `app/errorText.ts`, `i18n/index.ts`, `store/useAnalyticStore.ts`, `parser/catalogAnalytic.ts` (one row — diff the built proxy before deploy).

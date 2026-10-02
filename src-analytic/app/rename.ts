@@ -374,18 +374,15 @@ const constructionShape = (d: Derivation, map: LetterMap): string => {
 const faultShape = (d: Derivation): string => d.faults.map((f) => `${f.index}:${f.code}`).sort().join('|');
 
 /**
- * A cevian whose foot the TOOL named (#1222, #1240; ADR-AG-209) — «תיכון מ-A במשולש ABC», «גובה מנקודה A», «תיכון
- * לצלע BC» — is written as the named form the grammar already reads, «A<foot> <role> …»: the apex is the one the
- * sentence names, or (for the side form) each point of the figure, the fold-equality proof below rejecting every
- * apex but the right one.
+ * A cevian whose foot the TOOL named (#1222, #1240; ADR-AG-211) — «תיכון מ-A במשולש ABC», «גובה מנקודה A», «תיכון לצלע
+ * BC», «תיכון ליתר» — names it after the fact: «… פוגש את הצלע בנקודה M» / "… at M", which the grammar lowers exactly as
+ * the tool's own foot (a derived point), so the fold-equality proof below accepts it.
  */
-const CEVIAN_FROM = /^(?:נתון\s+)?ה?(תיכון|גובה)\s+(?:ה?יוצא\s+)?מ(?:ן\s+|-\s*)?(?:ה?(?:קודקוד|נקודה)\s+)?([A-Z][0-9₀-₉]?)(?:\s+(.+))?$/;
-const CEVIAN_TO = /^(?:נתון\s+)?ה?(תיכון|גובה)\s+((?:ל|אל\s+ה?)-?\s*(?:ה?צלע\s+)?[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)$/;
-function cevianNamingCandidates(line: string, name: string, points: readonly string[]): string[] {
-  const from = CEVIAN_FROM.exec(line.trim());
-  if (from) return [`${from[2]}${name} ${from[1]}${from[3] ? ` ${from[3]}` : ''}`];
-  const to = CEVIAN_TO.exec(line.trim());
-  if (to) return points.filter((q) => q !== name).map((q) => `${q}${name} ${to[1]} ${to[2]}`);
+const CEVIAN_ROLE = /^(?:נתון\s+)?ה?(?:תיכון|גובה)\s/;
+const CEVIAN_ROLE_EN = /^(?:the\s+|an?\s+)?(?:median|altitude|height)\s/i;
+function cevianNamingCandidates(line: string, name: string): string[] {
+  if (CEVIAN_ROLE.test(line.trim())) return [`${line} פוגש את הצלע בנקודה ${name}`];
+  if (CEVIAN_ROLE_EN.test(line.trim())) return [`${line} at ${name}`];
   return [];
 }
 
@@ -418,7 +415,7 @@ function materialize(state: RenameState, current: Derivation, id: string): strin
   const want = constructionShape(current, {});
   const wantFaults = faultShape(current);
   const line = state.lines[row];
-  for (const cand of [...namingCandidates(line, id), ...cevianNamingCandidates(line, id, pointIdsOf(current.construction))]) {
+  for (const cand of [...cevianNamingCandidates(line, id), ...namingCandidates(line, id)]) {
     const p = parseLine(cand);
     if (!p.ok || !factsMention(p.facts, id)) continue;
     const lines = state.lines.map((l, i) => (i === row ? cand : l));

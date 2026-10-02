@@ -16,6 +16,7 @@
  * `set-angle-ratio` 2-D lowers «AD חוצה את הזווית BAC» to when D already exists.
  */
 import type { AngleRef, Constraint } from './solve';
+import type { DerivedRule } from './derived';
 import type { Fact, Id } from './types';
 
 export type CevianRole = 'median' | 'altitude' | 'bisector';
@@ -46,6 +47,23 @@ export function cevianFacts(role: CevianRole, apex: Id, foot: Id, u: Id, v: Id, 
     { t: 'segment', id: segmentIdOf(apex, foot), a: apex, b: foot, src },
     { t: 'constraint', k: { t: 'on-line-2pt', id: foot, a: u, b: v }, src },
     { t: 'constraint', k, src },
+  ];
+}
+
+/**
+ * A FOOT THE TOOL NAMES is a DERIVED point (#1620 S6, ADR-AG-211): a median's is the `midpoint` of the side, an
+ * altitude's the `foot` of the perpendicular from the apex (ADR-AG-207's rule) — 0-DOF closed forms, so adding the
+ * cevian never moves the triangle (stability is structural), and the same point reached another way («D אמצע BC»,
+ * «האנך מ-A ל-BC») is ONE point with one name (#1153; `toolLetters.ts` reuses it). A foot the STUDENT names keeps
+ * `cevianFacts`: it may already exist, and its conjunction is what a refusal names (ADR-AG-109).
+ */
+export function toolFootRule(role: 'median' | 'altitude', apex: Id, u: Id, v: Id): DerivedRule {
+  return role === 'median' ? { t: 'midpoint', a: u, b: v } : { t: 'foot', from: apex, onto: { k: 'points', a: u, b: v } };
+}
+export function toolFootFacts(role: 'median' | 'altitude', apex: Id, foot: Id, u: Id, v: Id, src: string): Fact[] {
+  return [
+    { t: 'derived', id: foot, rule: toolFootRule(role, apex, u, v), src },
+    { t: 'segment', id: segmentIdOf(apex, foot), a: apex, b: foot, src },
   ];
 }
 

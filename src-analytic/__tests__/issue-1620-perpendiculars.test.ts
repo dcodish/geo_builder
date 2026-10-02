@@ -45,11 +45,11 @@ describe('the perpendicular from a point — the foot, the piece, the tool lette
     for (const seed of SEEDS) {
       const d = clean(derive(['משולש ABC', 'האנך מהנקודה B לציר ה-x'], seed));
       const b = pt(d, 'B');
-      const f = pt(d, 'P₁');
+      const f = pt(d, 'H');
       expect(f.y).toBeCloseTo(0, 9);
       expect(f.x).toBeCloseTo(b.x, 9);
-      expect(d.figure.segments.some((s) => s.ends.includes('B') && s.ends.includes('P₁'))).toBe(true);
-      expect(d.minted).toEqual([{ index: 1, id: 'P₁' }]);
+      expect(d.figure.segments.some((s) => s.ends.includes('B') && s.ends.includes('H'))).toBe(true);
+      expect(d.minted).toEqual([{ index: 1, id: 'H' }]);
     }
   });
 
@@ -118,17 +118,17 @@ describe('the perpendicular from a point — the foot, the piece, the tool lette
 
   it('a perpendicular stated twice is one foot; a later NAME for the tool-lettered foot is #1153’s already-named', () => {
     const twice = clean(derive(['משולש ABC', 'האנך מ-B לצלע AC', 'האנך מהנקודה B לצלע AC'], 0));
-    expect(twice.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'P₁']);
+    expect(twice.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'H']);
     expect(twice.outcomes[2]).toBe('known');
     const named = derive(['משולש ABC', 'D רגל האנך מ-B ל-AC', 'האנך מ-B לצלע AC'], 0);
     expect(named.faults).toEqual([]);
     expect(named.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'D']);
     const later = derive(['משולש ABC', 'האנך מ-B לצלע AC', 'D רגל האנך מ-B ל-AC'], 0);
-    expect(later.faults[0]).toMatchObject({ index: 2, code: 'already-named', holder: 'P₁' });
+    expect(later.faults[0]).toMatchObject({ index: 2, code: 'already-named', holder: 'H' });
   });
 
   it('the tool letter can be renamed — the sentence is rewritten to name the foot', () => {
-    const v = decideRename('P₁', 'D', { lines: ['משולש ABC', 'האנך מהנקודה B לציר ה-x'], disabled: [], queries: [], spokenFor: {}, seed: 0 });
+    const v = decideRename('H', 'D', { lines: ['משולש ABC', 'האנך מהנקודה B לציר ה-x'], disabled: [], queries: [], spokenFor: {}, seed: 0 });
     expect(v.kind).toBe('apply');
     if (v.kind === 'apply') expect(v.lines).toEqual(['משולש ABC', 'האנך מהנקודה B לציר ה-x חותך אותו בנקודה D']);
   });
@@ -142,7 +142,7 @@ describe('the perpendicular from a point — the foot, the piece, the tool lette
 
   it('the perpendicular bisector: the midpoint (a tool letter, or the student’s), and the line through it ⟂ AB', () => {
     const d = clean(derive(['משולש ABC', 'אנך אמצעי ל-AB'], 1));
-    const [a, b, m] = ['A', 'B', 'P₁'].map((id) => pt(d, id));
+    const [a, b, m] = ['A', 'B', 'M'].map((id) => pt(d, id));
     expect(m.x).toBeCloseTo((a.x + b.x) / 2, 9);
     const line = d.figure.curves.find((c) => c.curve.kind === 'line' && c.stated);
     expect(line).toBeDefined();
@@ -288,7 +288,7 @@ describe('corpus 471 — the questions S2 completes', () => {
     expect(pt(d, 'C')).toMatchObject({ x: expect.closeTo(4, 6), y: expect.closeTo(10, 6) });
     expect(pt(d, 'D')).toMatchObject({ x: expect.closeTo(1, 6), y: expect.closeTo(7.75, 6) });
     expect(pt(d, 'E')).toMatchObject({ x: expect.closeTo(1, 6), y: expect.closeTo(1.5, 6) });
-    expect(pt(d, 'P₁')).toMatchObject({ x: expect.closeTo(1, 9), y: expect.closeTo(0, 9) });
+    expect(pt(d, 'H')).toMatchObject({ x: expect.closeTo(1, 9), y: expect.closeTo(0, 9) });
   });
 
   it('16/5 as printed: CB ∥ x-axis cuts the y-axis at E (0, 10), with DO/DE = 2/3 and AB ⊥ AC', () => {

@@ -18,7 +18,8 @@
  * Unmatched input returns `not-handled`, which is the seam where the LLM fallback escalates.
  */
 import type { DerivedRule, FootLine } from '../engine/derived';
-import { cevianFacts, type CevianRole } from '../engine/cevian';
+import { cevianFacts, toolFootFacts, type CevianRole } from '../engine/cevian';
+import { toolPoint } from '../engine/toolLetters';
 import { isAngleRef, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS, directionSymbol, mentionsPlane, radiusSymbol } from '../engine/carriers';
@@ -3635,7 +3636,7 @@ function parseVerticesOnAxes(line: string): RuleOutcome {
  * them — so it adds no engine concept, and the parallelism the theorem gives is the figure's, never a second
  * statement. A triangle's midsegment to BC joins the midpoints of the two sides at the apex; a trapezoid's joins
  * the midpoints of its legs, BC and DA (the pair its noun assumes parallel is AB ∥ DC). The midpoints are the
- * letters the student wrote, else 2-D's M and N (`FRESH_PREFIX`, resolved by `derive` against the letters in use).
+ * letters the student wrote, else 2-D's M and N (`toolPoint`, resolved by `engine/toolLetters.ts` against the letters in use).
  * The ring is declared by its own sentence («משולש ABC»), absorbed when the figure already has it.
  */
 const MIDSEG_HE = '(?:ה?קטע\\s+ה?אמצעים)';
@@ -3679,8 +3680,8 @@ function parseMidsegment(line: string): RuleOutcome {
   const declared = parseClause(`${noun} ${ring.join('')}`);
   if (!declared.ok) return declared;
   const key = ([a, b]: [Id, Id]) => `mid:${[a, b].sort().join(',')}`;
-  const m1 = given ? given[0] : `${FRESH_PREFIX}MNPQ|${key(sides[0])}`;
-  const m2 = given ? given[1] : `${FRESH_PREFIX}NPQS|${key(sides[1])}`;
+  const m1 = given ? given[0] : toolPoint('midpoint', key(sides[0]));
+  const m2 = given ? given[1] : toolPoint('midpoint-2', key(sides[1]));
   return made([
     ...declared.facts.map((f) => ({ ...f, src: line })),
     { t: 'derived', id: m1, rule: { t: 'midpoint', a: sides[0][0], b: sides[0][1] }, src: line },
@@ -3932,14 +3933,27 @@ const roleOf = (src: string): 'median' | 'altitude' => (/תיכון|median/i.tes
 /** «מ-A» · «מנקודה A» · «מהקודקוד A» · «מן הנקודה A» · «היוצא מ-A». */
 const FROM_HE = `(?:ה?יוצא\\s+)?מ(?:ן\\s+|-\\s*)?(?:ה?(?:קודקוד|נקודה)\\s+)?`;
 /** «תיכון מ-A במשולש ABC» · «גובה מנקודה A לצלע BC» · «גובה מ-A» — the apex named, the foot not (#1222, #1240). */
-const FROM_APEX_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+${FROM_HE}(${NAME})(?:\\s+${ROLE_TARGET_HE})?$`);
+/**
+ * «… פוגש את הצלע בנקודה M» · «… בנקודה H» · "… at H" — the foot NAMED after the fact (ADR-AG-211): the form a
+ * renamed tool letter is written into, lowered exactly as the tool's own foot (a derived point, at M1). Last group.
+ */
+const FOOT_TAIL_HE = `(?:\\s+(?:ש?(?:פוגש|חותך)\\s+(?:אותה|אותו|את\\s+ה?צלע))?\\s+ב(?:ה)?נקודה\\s+(${NAME}))?`;
+const FOOT_TAIL_EN = `(?:\\s+(?:(?:meets|cuts)\\s+(?:it|the\\s+side)\\s+)?at\\s+(?:the\\s+point\\s+)?(${NAME}))?`;
+const FROM_APEX_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+${FROM_HE}(${NAME})(?:\\s+${ROLE_TARGET_HE})?${FOOT_TAIL_HE}$`);
 const FROM_APEX_EN = new RegExp(
-  `^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+from\\s+(?:(?:the\\s+)?(?:vertex|point)\\s+)?(${NAME})(?:\\s+${ROLE_TARGET_EN})?$`,
+  `^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+from\\s+(?:(?:the\\s+)?(?:vertex|point)\\s+)?(${NAME})(?:\\s+${ROLE_TARGET_EN})?${FOOT_TAIL_EN}$`,
   'i',
 );
 /** «תיכון לצלע BC» · «הגובה לצלע BC» — the side named, neither the apex nor the foot (#1240). */
-const TO_SIDE_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+(?:ל|אל\\s+ה?)-?\\s*(?:ה?צלע\\s+)?(${NAME})(${NAME})$`);
-const TO_SIDE_EN = new RegExp(`^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+to\\s+(?:the\\s+)?(?:side\\s+)?(${NAME})(${NAME})$`, 'i');
+const TO_SIDE_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+(?:ל|אל\\s+ה?)-?\\s*(?:ה?צלע\\s+)?(${NAME})(${NAME})${FOOT_TAIL_HE}$`);
+const TO_SIDE_EN = new RegExp(`^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+to\\s+(?:the\\s+)?(?:side\\s+)?(${NAME})(${NAME})${FOOT_TAIL_EN}$`, 'i');
+/**
+ * «תיכון ליתר» · «הגובה ליתר AB» · "the median to the hypotenuse" (#1222, operator ruling 2026-10-02 on #1620): the side
+ * is the hypotenuse — named («ליתר AB», which also STATES that it is, ADR-AG-200's claim), or the one the figure's
+ * stated right angle faces (M1). Groups: role, side u, side v.
+ */
+const TO_HYP_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+(?:ל|אל\\s+)-?\\s*ה?יתר(?:\\s+(${NAME})(${NAME}))?${FOOT_TAIL_HE}$`);
+const TO_HYP_EN = new RegExp(`^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+to\\s+the\\s+hypotenuse(?:\\s+(${NAME})(${NAME}))?${FOOT_TAIL_EN}$`, 'i');
 /** «AD גובה» · «AD הוא התיכון» · "AD is the altitude" · "AD median" — the cevian named, its target not (#1240). */
 const NAMED_ONLY_HE = new RegExp(`^${HE_GIVEN}(${NAME})(${NAME})${HE_IS}\\s*ה?${MA_ROLE_HE}$`);
 const NAMED_ONLY_EN = new RegExp(`^(${NAME})(${NAME})\\s+(?:is\\s+(?:the\\s+|an?\\s+)?)?(median|altitude)$`, 'i');
@@ -3974,14 +3988,12 @@ function angleOfLetters(run: string): AngleName | 'repeated' | null {
 }
 
 /**
- * The tool names a foot the student did not (#1263's ruling: a RESERVED name, said so in the row): the
- * placeholder `derive.resolveMints` turns into `M₁` (a median's foot, 2-D's letter) or `H₁` (an altitude's —
- * 2-D's `F` is the conic focus's letter in this tree, #1167), the seam a coordinate point's `P₁` already takes.
- * The key is the sentence's own operands, so the same foot stated twice is one point.
+ * The tool names a foot the student did not (operator ruling 2026-10-02 on #1620, ADR-AG-211): a median's foot is a
+ * MIDPOINT and takes M (the next free letter), an altitude's is a FOOT and takes H (2-D's F is the focus letter here,
+ * #1167) — through the one role → letter table, `engine/toolLetters.ts`. The key is the sentence's own operands, so
+ * the same foot stated twice is one point.
  */
-// The role is spelled in lower case in the placeholder: a capital there would read as a LETTER the line uses (the
-// rename's holder check), and the reserved letter is `derive`'s to choose.
-const footMint = (role: 'median' | 'altitude', key: string): Id => `${MINT_PREFIX}foot:${role}:${key}`;
+const footMint = (role: 'median' | 'altitude', key: string): Id => toolPoint(role === 'median' ? 'midpoint' : 'foot', `${role}:${key}`);
 
 /** The side a cevian is drawn to, from the side it names or from its triangle; a refusal code when neither works. */
 function cevianSide(
@@ -4094,29 +4106,46 @@ function parseCevianFamily(line: string): RuleOutcome {
   // ── the apex named, the foot not: the tool names the foot ──
   const fa = FROM_APEX_HE.exec(line) ?? FROM_APEX_EN.exec(line);
   if (fa) {
-    const [, roleSrc, apex, u0, v0, triRun] = fa;
+    const [, roleSrc, apex, u0, v0, triRun, named] = fa;
     const role = roleOf(roleSrc);
-    if (!u0 && !triRun) {
-      const foot = footMint(role, apex);
-      return made([
-        { t: 'declare', id: foot, src: line },
-        { t: 'cevian-of', role, apex, foot, src: line },
-      ]);
-    }
+    if (named === apex) return refuse('degenerate-role', line);
+    if (!u0 && !triRun) return made([{ t: 'cevian-of', role, apex, foot: named ?? footMint(role, apex), toolFoot: true, src: line }]);
     const side = cevianSide(apex, u0, v0, triRun);
     if (typeof side === 'string') return refuse(side, line);
-    return cevianWithTarget(role, apex, footMint(role, `${apex}${[side.u, side.v].sort().join('')}`), side, line);
+    const { u, v, ring } = side;
+    if (apex === u || apex === v || named === u || named === v) return refuse('degenerate-role', line);
+    const tri = ring ? namedShapeFacts('משולש', ring, line) : [];
+    if (tri === 'bad-arity') return refuse('bad-arity', line);
+    // A foot the sentence names may already be a point of the figure — M1 decides (derived when new, ADR-AG-211).
+    if (named) return made([...tri, { t: 'cevian-of', role, apex, side: [u, v], foot: named, toolFoot: true, src: line }]);
+    // The key says what the foot IS — the side's midpoint, the perpendicular's foot — in the forms the midsegment
+    // (ADR-AG-208) and the perpendicular (ADR-AG-207) key theirs, so one point reached two ways is one placeholder.
+    const sorted = [u, v].sort();
+    const foot = toolPoint(role === 'median' ? 'midpoint' : 'foot', role === 'median' ? `mid:${sorted.join(',')}` : `foot(${apex}|${sorted.join('')})`);
+    return made([...tri, ...toolFootFacts(role, apex, foot, u, v, line)]);
+  }
+  const hyp = TO_HYP_HE.exec(line) ?? TO_HYP_EN.exec(line);
+  if (hyp) {
+    const [, roleSrc, u, v, named] = hyp;
+    const role = roleOf(roleSrc);
+    if (u && u === v) return refuse('repeated-vertex', line);
+    if (named && (named === u || named === v)) return refuse('degenerate-role', line);
+    const foot = named ?? footMint(role, u ? `hyp-${[u, v].sort().join('')}` : 'hyp');
+    // A named hypotenuse is a claim (ADR-AG-200's «היתר AB»: the right angle faces it), stated before the cevian.
+    const claim = u ? claimFacts(nounRow('יתר'), u, v, line) ?? [] : [];
+    return made([
+      ...claim,
+      u ? { t: 'cevian-of', role, side: [u, v], foot, toolFoot: true, src: line } : { t: 'cevian-of', role, hypotenuse: true, foot, toolFoot: true, src: line },
+    ]);
   }
   const ts = TO_SIDE_HE.exec(line) ?? TO_SIDE_EN.exec(line);
   if (ts) {
-    const [, roleSrc, u, v] = ts;
+    const [, roleSrc, u, v, named] = ts;
     if (u === v) return refuse('repeated-vertex', line);
+    if (named === u || named === v) return refuse('degenerate-role', line);
     const role = roleOf(roleSrc);
-    const foot = footMint(role, `-${[u, v].sort().join('')}`);
-    return made([
-      { t: 'declare', id: foot, src: line },
-      { t: 'cevian-of', role, side: [u, v], foot, src: line },
-    ]);
+    const foot = named ?? footMint(role, `-${[u, v].sort().join('')}`);
+    return made([{ t: 'cevian-of', role, side: [u, v], foot, toolFoot: true, src: line }]);
   }
 
   // ── the cevian named, its target not ──
@@ -4870,7 +4899,7 @@ function perpendicularFacts(
   // A perpendicular from a point of the line onto that line has no length, and a foot at its own point is no foot:
   // 2-D's #1233 refusal, by the definition rather than by the case.
   if ((onto.k === 'points' && (from === onto.a || from === onto.b)) || foot === from) return refuse('degenerate-role', line);
-  const id = foot ?? `${MINT_PREFIX}${footKey(from, onto)}`;
+  const id = foot ?? toolPoint('foot', footKey(from, onto));
   return made([
     ...tangentObjectFacts(trim(ontoText), line),
     { t: 'derived', id, rule: { t: 'foot', from, onto }, src: line },
@@ -4893,8 +4922,9 @@ function cutIsOwnLine(cutText: string | undefined, ontoText: string): boolean {
  * «אנך אמצעי ל-AB» · «האנך האמצעי לצלע AB» · «the perpendicular bisector of AB» — 2-D's lowering, copied: the
  * midpoint (a tool letter unless the student named it, the one mint) and the line through it perpendicular to AB.
  */
-const PERP_BISECTOR_HE = new RegExp(`^ה?אנך\\s+ה?אמצעי\\s+(?:ל-?\\s*|של\\s+)(.+)$`);
-const PERP_BISECTOR_EN = /^(?:[Tt]he\s+)?[Pp]erpendicular\s+bisector\s+(?:of|to)\s+(.+)$/;
+/** «… חותך אותו בנקודה M» / "… meets it at M" names the midpoint (ADR-AG-211) — the form a renamed tool letter is written into. */
+const PERP_BISECTOR_HE = new RegExp(`^ה?אנך\\s+ה?אמצעי\\s+(?:ל-?\\s*|של\\s+)(.+?)(?:\\s+(?:חותך|פוגש)\\s+אותו\\s+ב(?:ה)?נקודה\\s+(${NAME}))?$`);
+const PERP_BISECTOR_EN = new RegExp(`^(?:[Tt]he\\s+)?[Pp]erpendicular\\s+bisector\\s+(?:of|to)\\s+(.+?)(?:\\s+meets\\s+it\\s+at\\s+(${NAME}))?$`);
 
 function parsePerpendicular(line: string): RuleOutcome {
   const bisector = PERP_BISECTOR_HE.exec(line) ?? PERP_BISECTOR_EN.exec(line);
@@ -4903,7 +4933,7 @@ function parsePerpendicular(line: string): RuleOutcome {
     const piece = direction(trim(bisector[1]), claims);
     if (!piece || piece.k !== 'points') return refuse('bad-operand', line);
     const [a, b] = [piece.a, piece.b].sort();
-    const mid = `${MINT_PREFIX}mid(${a}${b})`;
+    const mid = bisector[2] ?? toolPoint('midpoint', `mid:${a},${b}`);
     return made([
       { t: 'derived', id: mid, rule: { t: 'midpoint', a: piece.a, b: piece.b }, src: line },
       { t: 'line-at', id: `curve-${anonIndex(`perp-bisector:${a}${b}`)}`, through: mid, dir: piece, perp: true, src: line },
@@ -6197,7 +6227,7 @@ export const MINT_PREFIX = '@mint:';
  * midpoints. `@fresh:<preferred letters>|<what the point is>`, resolved over the whole list by `derive`
  * (`resolveFresh`), as `MINT_PREFIX` is: only the list knows which letters are taken.
  */
-export const FRESH_PREFIX = '@fresh:';
+export { TOOL_PREFIX as FRESH_PREFIX } from '../engine/toolLetters';
 /** A name no student writes and no mint takes — the stand-in while a canonical sentence is parsed. */
 const MINT_SENTINEL = 'Z₀';
 
