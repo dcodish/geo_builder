@@ -27,7 +27,7 @@ function valueExpr(src: string): Expr | null {
   const e = parseExpr(normalizeMath(src));
   return e && !mentionsPlane(e) ? e : null;
 }
-import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
+import { constantLengthExpr, namedLengthPairs, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, type NumeralKind } from '../engine/names';
 import { CENTRE_SENTINEL, CIRCLE_SENTINEL, UNBOUNDED, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
@@ -247,24 +247,116 @@ const HE_POINT = '(?:ה?(?:נקוד(?:ה|ות)|קדקוד)\\s+)?';
  * a median and an altitude are segments, and reading them as infinite lines would contradict every
  * other rule in the tree that draws them.
  */
-const STRAIGHT_NOUNS: readonly { he: string; bounded: boolean }[] = [
-  { he: 'ישר', bounded: false },
-  { he: 'אלכסון', bounded: false },
-  { he: 'צלע', bounded: true },
-  { he: 'קטע', bounded: true },
-  { he: 'תיכון', bounded: true },
-  { he: 'גובה', bounded: true },
-  { he: 'שוק', bounded: true },
-  { he: 'בסיס', bounded: true },
-  { he: 'יתר', bounded: true },
+/**
+ * **A ROLE NOUN IS A CLAIM, LOWERED ONCE (#1651, #1620 item 2; ADR-AG-200).** «המיתר BC» says B and C are on
+ * the circle; «הקוטר BC» that the chord passes through the centre; «הרדיוס MB» that one end IS the centre; «המשיק
+ * BC» that the line touches the circle; «השוק BC» that BC is not in the trapezoid's parallel pair; «הבסיס AB» that
+ * it is; «היתר AC» that the right angle faces it. So a row may carry a `claim`, and every rule that resolves a noun
+ * through this registry also states that claim (`claimFacts`) — a role noun is never silently reduced to its
+ * piece (ADR-AG-119's boundary, which held only because the nouns were refused).
+ *
+ * «תיכון» and «גובה» carry a claim this tree does not lower yet (a median's foot is a midpoint, an altitude's a
+ * foot of a perpendicular, each of a triangle the sentence does not name). `claimFacts` answers `null` for them,
+ * and a rule that cannot state a claim does not read the noun at all — so they stay refused, never dropped.
+ */
+export type RoleClaim = 'chord' | 'diameter' | 'radius' | 'tangent' | 'leg' | 'base' | 'hypotenuse' | 'median' | 'altitude';
+interface StraightNoun {
+  he: string;
+  /** The English nouns for the same row, lower case. */
+  en: readonly string[];
+  bounded: boolean;
+  claim?: RoleClaim;
+}
+const STRAIGHT_NOUNS: readonly StraightNoun[] = [
+  { he: 'ישר', en: ['line'], bounded: false },
+  { he: 'אלכסון', en: ['diagonal'], bounded: false },
+  { he: 'צלע', en: ['side'], bounded: true },
+  { he: 'קטע', en: ['segment'], bounded: true },
+  { he: 'תיכון', en: ['median'], bounded: true, claim: 'median' },
+  { he: 'גובה', en: ['altitude', 'height'], bounded: true, claim: 'altitude' },
+  { he: 'שוק', en: ['leg'], bounded: true, claim: 'leg' },
+  { he: 'בסיס', en: ['base'], bounded: true, claim: 'base' },
+  { he: 'יתר', en: ['hypotenuse'], bounded: true, claim: 'hypotenuse' },
+  // The circle's nouns (#1651): a chord, a diameter and a radius are segments; a tangent is a line.
+  { he: 'מיתר', en: ['chord'], bounded: true, claim: 'chord' },
+  { he: 'קוטר', en: ['diameter'], bounded: true, claim: 'diameter' },
+  { he: 'רדיוס', en: ['radius'], bounded: true, claim: 'radius' },
+  { he: 'משיק', en: ['tangent'], bounded: false, claim: 'tangent' },
 ];
+/** Longest first, so «מיתר» is never read as «יתר» with a stray letter in front. */
+const byLength = (xs: readonly string[]) => [...xs].sort((a, b) => b.length - a.length);
 /** The nouns as an alternation — DERIVED from the registry, so the two can never drift. */
-const HE_LINE = `ה?(?:${STRAIGHT_NOUNS.map((n) => n.he).join('|')})`;
+const HE_LINE = `ה?(?:${byLength(STRAIGHT_NOUNS.map((n) => n.he)).join('|')})`;
+/** The nouns that claim nothing beyond their piece — the anonymous «הישר y=2x» can carry no claim about a pair. */
+const HE_LINE_PLAIN = `ה?(?:${byLength(STRAIGHT_NOUNS.filter((n) => !n.claim).map((n) => n.he)).join('|')})`;
+/** Every noun of the registry in either language, with its article — one alternation for every pair operand. */
+const PIECE_NOUN = `(?:ה?(?:${byLength(STRAIGHT_NOUNS.map((n) => n.he)).join('|')})|(?:[Tt]he\\s+)?(?:${byLength(STRAIGHT_NOUNS.flatMap((n) => n.en)).map((w) => `[${w[0]}${w[0].toUpperCase()}]${w.slice(1)}`).join('|')}))`;
+/** The registry row a captured noun names — by the WHOLE word (article and English «the» aside), never a substring. */
+const nounRow = (noun: string | undefined): StraightNoun | undefined => {
+  if (!noun) return undefined;
+  const w = noun.trim().replace(/^the\s+/i, '');
+  return STRAIGHT_NOUNS.find((n) => n.he === w || `ה${n.he}` === w || n.en.includes(w.toLowerCase()));
+};
 /** What extent a captured noun means. An unrecognised or absent noun decides nothing. */
 const extentOfNoun = (noun: string | undefined): 'line' | 'segment' | undefined => {
-  const hit = noun ? STRAIGHT_NOUNS.find((n) => noun.includes(n.he)) : undefined;
+  const hit = nounRow(noun);
   return hit ? (hit.bounded ? 'segment' : 'line') : undefined;
 };
+/** «<noun>? XY» — a named pair and the registry row of the noun in front of it (absent for a bare pair). */
+const PIECE_PHRASE = new RegExp(`^(?:(${PIECE_NOUN})\\s+)?(${'[A-Z][0-9₀-₉]?'})(${'[A-Z][0-9₀-₉]?'})$`);
+function readPiece(text: string): { a: Id; b: Id; noun?: string; row?: StraightNoun } | null {
+  const m = PIECE_PHRASE.exec(trim(text));
+  if (!m || m[2] === m[3]) return null;
+  return { a: m[2], b: m[3], ...(m[1] ? { noun: m[1], row: nounRow(m[1]) } : {}) };
+}
+
+/**
+ * THE ONE LOWERING OF A ROLE NOUN'S CLAIM (#1651, ADR-AG-200) — what «<noun> XY» asserts besides naming XY, as the
+ * facts the canonical sentence of that role already carries:
+ *
+ * - chord → both ends on «המעגל» (`on-kind`, resolved at M1 like «B על המעגל») and two distinct ends — exactly
+ *   `chordFacts` without its introductions (a role noun REFERS to its ends, #1028);
+ * - diameter → «XY קוטר במעגל» (`diameter-of`, its M1 binding: the one circle, or the circle on it when none);
+ * - tangent → «XY משיק למעגל» (`tangent-of` over the pair, ADR-AG-196's binding, the touch-created circle when none);
+ * - radius, leg, base, hypotenuse → `role-of`, which only the figure can lower (which end is the centre, which
+ *   polygon the side belongs to) — M1's `applyRoleOf`.
+ *
+ * `[]` for a noun with no claim; `null` for a claim this tree cannot lower (median, altitude), which the caller
+ * treats as a noun it does not read — a refusal, never a drop.
+ */
+function claimFacts(row: StraightNoun | undefined, a: Id, b: Id, src: string): Fact[] | null {
+  switch (row?.claim) {
+    case undefined:
+      return [];
+    case 'chord':
+      return [
+        { t: 'on-kind', id: a, kind: 'circle', src },
+        { t: 'on-kind', id: b, kind: 'circle', src },
+        { t: 'selector', sel: { kind: 'distinct', ids: [a, b] }, src },
+      ];
+    case 'diameter':
+      return [{ t: 'diameter-of', a, b, define: false, src }];
+    case 'tangent':
+      return [{ t: 'tangent-of', axes: [], lines: [{ kind: 'points', a, b }], src }];
+    case 'radius':
+    case 'leg':
+    case 'base':
+    case 'hypotenuse':
+      return [{ t: 'role-of', role: row.claim, a, b, src }];
+    default:
+      return null;
+  }
+}
+/** A sink a resolver states a role noun's claim into — absent, the resolver does not read a claiming noun. */
+type ClaimSink = { out: Fact[]; src: string };
+/** The claim of the noun in front of a pair, into the sink; `false` when it cannot be stated there. */
+function stateClaim(row: StraightNoun | undefined, a: Id, b: Id, sink: ClaimSink | undefined): boolean {
+  if (!row?.claim) return true;
+  const facts = sink ? claimFacts(row, a, b, sink.src) : null;
+  if (!facts) return false;
+  sink!.out.push(...facts);
+  return true;
+}
 /** «המעגל» / «מעגל». */
 const HE_CIRCLE = 'ה?מעגל';
 /** «שמשוואתו» / «שמשוואתה» / «משוואת» / «שמשוואת» — the "whose equation is" connector. */
@@ -526,6 +618,8 @@ interface CurveHit {
    * separately instead — the split `ON_OBJECT` already uses for its `bounded` decision.
    */
   extent?: 'line' | 'segment';
+  /** The registry row of the noun — its CLAIM is stated beside the equation (#1651, ADR-AG-200). */
+  noun?: StraightNoun;
   /**
    * The letter the student gave as this circle`s CENTRE — «מעגל O שמשוואתו …» (#1059).
    *
@@ -592,13 +686,22 @@ function matchCurve(line: string): CurveHit | null {
   const heLineNamed = line.match(
     new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?(${HE_LINE})\\s+(${LINE_NAME})${NAMING_TAIL_HE}(.+)$`),
   );
-  if (heLineNamed) {
+  /*
+   * A noun whose claim cannot be stated over this name (a numeral line) is not read here. ⚠ «תיכון» / «גובה» keep the
+   * reading #1236 (ADR-AG-111) gave them — understood, the claim NOT lowered — pending the operator's ruling filed with
+   * ADR-AG-200: lowering a median/altitude claim needs the triangle the sentence does not name, and refusing them
+   * would withdraw an accepted spelling under a bug's banner. Every OTHER site still leaves them unread.
+   */
+  const claimRow = heLineNamed ? nounRow(heLineNamed[1]) : undefined;
+  const legacyRole = claimRow?.claim === 'median' || claimRow?.claim === 'altitude';
+  if (heLineNamed && (!claimRow?.claim || legacyRole || (TWO_POINT_NAME.test(heLineNamed[2]) && claimFacts(claimRow, 'A', 'B', '') !== null))) {
     return {
       id: lineIdOf(heLineNamed[2]),
       name: lineNameOf(heLineNamed[2], 'he'),
       kind: 'line',
       eqSrc: heLineNamed[3],
       extent: extentOfNoun(heLineNamed[1]),
+      ...(claimRow ? { noun: claimRow } : {}),
     };
   }
   /**
@@ -674,7 +777,7 @@ function matchCurve(line: string): CurveHit | null {
     // Not an equation in the plane's variables — this rule has no claim on the sentence. Fall through.
   }
 
-  const heLineBare = line.match(new RegExp(`^${HE_GIVEN}(${HE_LINE})\\s+(.+=.+)$`));
+  const heLineBare = line.match(new RegExp(`^${HE_GIVEN}(${HE_LINE_PLAIN})\\s+(.+=.+)$`));
   if (heLineBare) {
     // An ANONYMOUS straight given by its equation alone: there are no endpoints to bound it between,
     // so a bounded noun has nothing to draw a segment over and the line is what the student gets.
@@ -1108,7 +1211,11 @@ const INTERSECT_EN = new RegExp(
  * and «הישר l1» mean here exactly what they mean there, and cannot drift.
  */
 /** The nouns that mean the DRAWN piece rather than the infinite line (#1168, ADR-AG-111’s pair). */
-const BOUNDED_NOUN = /^(?:ה?צלע|ה?קטע|ה?בסיס|(?:the\s+)?(?:side|segment|base))\s/i;
+// DERIVED from the registry (#1651, ADR-AG-200): «על המיתר BC», «על השוק AD» are on the segment, as «על הצלע» is.
+const BOUNDED_NOUN = new RegExp(
+  `^(?:ה?(?:${byLength(STRAIGHT_NOUNS.filter((n) => n.bounded).map((n) => n.he)).join('|')})|(?:the\\s+)?(?:${byLength(STRAIGHT_NOUNS.filter((n) => n.bounded).flatMap((n) => n.en)).join('|')}))\\s`,
+  'i',
+);
 
 /** A CONTEXTUAL operand — «המעגל», «הפרבולה» with no name: which curve is M1's question (#1429). */
 type KindOperand = { t: 'kind'; kind: 'circle' | 'parabola' | 'ellipse' | 'tangent'; circle?: string };
@@ -1116,7 +1223,7 @@ type KindOperand = { t: 'kind'; kind: 'circle' | 'parabola' | 'ellipse' | 'tange
 // «המעגל 1» and «המעגל I» are one circle (#1429) — the digit→Roman map now lives in `engine/names.ts`
 // (`numeralCurveId`), shared by the mint and every reference site, for every numeral-named kind.
 
-function incidenceOn(operand: string, id: Id): Constraint | KindOperand | null {
+function incidenceOn(operand: string, id: Id, claims?: ClaimSink): Constraint | KindOperand | null {
   // «המשיק למעגל בנקודה A» — the tangent object at A; bare «המשיק» — the one in the figure (#1619 B3).
   const tangent = readTangentNoun(trim(operand));
   if (tangent) return tangent.at ? { t: 'on-curve', id, curve: tangentLineId(tangent.at) } : { t: 'kind', kind: 'tangent' };
@@ -1159,7 +1266,7 @@ function incidenceOn(operand: string, id: Id): Constraint | KindOperand | null {
     new RegExp(`^ה?מעגל\\s+(${NAME})$`).exec(trim(operand)) ?? new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s+(${NAME})$`).exec(trim(operand));
   if (byCentre) return { t: 'kind', kind: 'circle', circle: byCentre[1] };
 
-  const dir = direction(trim(operand));
+  const dir = direction(trim(operand), claims);
   if (dir?.k === 'curve') return { t: 'on-curve', id, curve: dir.id };
   /**
    * #1168: `direction()` deliberately forgets the noun — «הישר AC» and «הצלע AC» relate the same
@@ -1243,19 +1350,22 @@ function parseIntersection(line: string): RuleOutcome {
   // sentence); a cevian's foot or a point «על הישר» keeps the line reading its own ruling gave it.
   const asCrossing = (k: Constraint | KindOperand | null) =>
     k && k.t === 'on-line-2pt' ? { ...k, crossing: true as const } : k;
-  const left = asCrossing(incidenceOn(leftSrc, id));
-  const right = asCrossing(incidenceOn(rightSrc, id));
+  // A role noun's claim rides beside the crossing (#1651, ADR-AG-200): «נקודת החיתוך של המיתר AB עם …».
+  const claims: ClaimSink = { out: [], src: line };
+  const left = asCrossing(incidenceOn(leftSrc, id, claims));
+  const right = asCrossing(incidenceOn(rightSrc, id, claims));
   // The verb was understood and an operand was not — #1052’s refusal, which names the formats that
   // do work rather than calling the whole sentence unintelligible.
   if (!left || !right) return refuse('bad-operand', line);
+  const withClaims = (r: RuleOutcome): RuleOutcome => (r && r.ok && claims.out.length > 0 ? made([...r.facts, ...claims.out]) : r);
   // A tangent named by its touch point is BUILT by the sentence that names it (#1619 B3) — idempotent, so
   // «המשיק למעגל בנקודה A חותך את …» states the tangent and its crossing in one sentence.
   const built = [leftSrc, rightSrc].flatMap((op) => tangentObjectFacts(trim(op), line));
   if (built.length > 0) {
     const rest = parseIntersectionPlain(line, id, left, right, axisPart);
-    return rest && rest.ok ? made([...built, ...rest.facts]) : rest;
+    return withClaims(rest && rest.ok ? made([...built, ...rest.facts]) : rest);
   }
-  return parseIntersectionPlain(line, id, left, right, axisPart);
+  return withClaims(parseIntersectionPlain(line, id, left, right, axisPart));
 }
 
 /** The crossing once its two operands are read — split out so a built tangent can lead it (#1619 B3). */
@@ -1674,6 +1784,8 @@ const SEGMENT_EN = new RegExp(`^(?:(?:segment|side)\\s+)?(${NAME})(${NAME})$`, '
 /** «הישר BC» / "the line BC" on a line of its own — the LINE the pair names, drawn (#1639, ADR-AG-198). */
 const LINE_PIECE_HE = new RegExp(`^${HE_GIVEN}ה?ישר\\s+(${NAME})(${NAME})$`);
 const LINE_PIECE_EN = new RegExp(`^(?:the\\s+)?[Ll]ine\\s+(${NAME})(${NAME})$`);
+/** «<any registry noun> XY» on a line of its own — the role nouns' declaration (#1651, ADR-AG-200). */
+const PIECE_DECL = new RegExp(`^${HE_GIVEN}(${PIECE_NOUN})\\s+(${NAME})(${NAME})$`);
 
 /**
  * A segment's id is CANONICAL — «הקטע AB» and «הקטע BA» are one object, so they must be one id.
@@ -1696,10 +1808,52 @@ const segmentId = (a: string, b: string) => `seg-${[a, b].sort().join('')}`;
  * refers to points the figure does not have still fails on them (a reference never invents a point, #1028).
  */
 type PieceNoun = 'line' | 'segment';
-const pieceNounOf = (noun: string | undefined): PieceNoun => (noun && /ישר|^(?:the\s+)?lines?$/i.test(noun.trim()) ? 'line' : 'segment');
+// «המשיק BC» is a LINE, as «הישר BC» is (#1651) — a tangent is never a segment.
+const pieceNounOf = (noun: string | undefined): PieceNoun =>
+  noun && /ישר|משיק|^(?:the\s+)?(?:lines?|tangent)$/i.test(noun.trim()) ? 'line' : 'segment';
 function pieceFacts(noun: PieceNoun, a: Id, b: Id, src: string): Fact[] {
   if (a === b) return [];
   return noun === 'line' ? [{ t: 'line-2pt', a, b, src }] : [{ t: 'segment', id: segmentId(a, b), a, b, ref: true, src }];
+}
+
+/**
+ * A LENGTH GIVEN DRAWS THE PAIRS IT NAMES (#1652, operator ruling 2026-10-02; ADR-AG-200) — «OC = 15, BC = 3»,
+ * «AB = 2CD», «AB + BC = 10», «AC:CB = 3:2» draw each pair as its segment, through `pieceFacts` like every other
+ * sentence that names a pair (#1639). A DISTANCE spelling («המרחק בין O ל-C», «המרחק OC», «d_{OC}», «|OC|») draws
+ * nothing: the student chose the word that says distance. Which pairs were NAMED is the length reader's own answer
+ * (`namedLengthPairs`), never a second scan of the text.
+ */
+function lengthPieces(sides: readonly string[], src: string): Fact[] {
+  const seen = new Set<string>();
+  return sides.flatMap((side) => namedLengthPairs(side)).flatMap(({ a, b }) => {
+    const key = [a, b].sort().join();
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return pieceFacts('segment', a, b, src);
+  });
+}
+
+/**
+ * A ROLE NOUN INSIDE A LENGTH GIVEN — «אורך השוק BC (של הטרפז) הוא √72», «המיתר BC = 3», "the hypotenuse AC = 10"
+ * (#1651, #1620 item 2; ADR-AG-200). The noun's claim is stated into the sink and the pair is left for the length
+ * reader, so a role noun reaches a length only WITH its claim — ADR-AG-119's boundary kept by stating, no longer
+ * by refusing. `null` when a noun's claim cannot be lowered (median, altitude): the length rule then declines.
+ * Only BOUNDED role nouns: a tangent is a line, and a line has no length (ADR-AG-111) — it stays unread.
+ */
+let ROLE_IN_LENGTH: RegExp | null = null;
+function lengthRoles(src: string, sink: ClaimSink): string | null {
+  const roleNouns = STRAIGHT_NOUNS.filter((n) => n.claim && n.bounded);
+  ROLE_IN_LENGTH ??= new RegExp(
+    `(?:ה?(${byLength(roleNouns.map((n) => n.he)).join('|')})|(?:the\\s+)?(${byLength(roleNouns.flatMap((n) => n.en)).join('|')}))\\s+` +
+      `(${NAME})(${NAME})(?![A-Za-z0-9])(?:\\s+(?:של\\s+ה?(?:${ROLE_SHAPE_HE})|of\\s+(?:the\\s+)?(?:${ROLE_SHAPE_EN}))(?=\\s|=|$))?`,
+    'g',
+  );
+  let ok = true;
+  const out = src.replace(ROLE_IN_LENGTH, (_m, he: string | undefined, en: string | undefined, a: string, b: string) => {
+    if (!stateClaim(nounRow(he ?? en), a, b, sink)) ok = false;
+    return `${a}${b}`;
+  });
+  return ok ? out : null;
 }
 
 /**
@@ -2155,6 +2309,9 @@ function roleSplits(body: string): Array<[string, string]> {
  * area rule's #1080 ruling: naming a shape draws it).
  */
 function parseMeasureRoles(line: string): RuleOutcome {
+  // «הרדיוס MB» NAMES the radius MB — the piece and its claim (#1651, ADR-AG-200), `parseShape`'s — not "the radius
+  // is the length MB", which the last-token split below would read and which says nothing of where the centre is.
+  if (PIECE_DECL.test(trim(line)) && nounRow(PIECE_DECL.exec(trim(line))![1])?.claim === 'radius') return null;
   const body = trim(line)
     .replace(/^נתו(?:ן|נה|נים|נות)\s+(?:כי\s+|ש(?=\S))?/, '')
     .replace(/^(?:it\s+is\s+)?given\s+(?:that\s+)?/i, '');
@@ -2176,7 +2333,8 @@ function parseMeasureRoles(line: string): RuleOutcome {
           .replace(/^(?:the\s+)?(?:length\s+of\s+)?(?:(?:the\s+)?(?:segment|side)\s+)?/i, '');
         const length = /[A-Z]/.test(lengthSrc) ? parseLengthExpr(lengthSrc) : null;
         if (!length) continue;
-        return made([{ t: 'radius-length', ...(ref.circle ? { circle: ref.circle } : {}), length, src: line }]);
+        // The length side NAMES its pair, so it is drawn (#1652) — «אורך הקטע AB שווה לרדיוס המעגל» draws AB.
+        return made([{ t: 'radius-length', ...(ref.circle ? { circle: ref.circle } : {}), length, src: line }, ...lengthPieces([lengthSrc], line)]);
       }
       case 'perimeter': {
         const v = roleScalar(value);
@@ -3311,6 +3469,24 @@ function namedShapeFacts(noun: string | undefined, ids: Id[], line: string): Fac
   ];
 }
 function parseShape(line: string): RuleOutcome {
+  /*
+   * A PIECE NAMED BY ITS ROLE — «השוק BC», «היתר AC», «הקוטר BC», «הרדיוס MB», «המשיק BC» (#1651, ADR-AG-200): the
+   * piece, by the noun's extent, introduced as «הקטע BC» / «הישר BC» introduce theirs, then the role's claim. A
+   * claim this tree cannot lower (median, altitude) leaves the sentence to the rules below, unread here.
+   */
+  const role = PIECE_DECL.exec(line);
+  const roleRow = role ? nounRow(role[1]) : undefined;
+  if (role && roleRow?.claim) {
+    const [, , a, b] = role;
+    if (a === b) return refuse('repeated-vertex', line);
+    const claim = claimFacts(roleRow, a, b, line);
+    if (claim) {
+      const piece: Fact[] = roleRow.bounded
+        ? [{ t: 'segment', id: segmentId(a, b), a, b, src: line }]
+        : [{ t: 'declare', id: a, src: line }, { t: 'declare', id: b, src: line }, ...pieceFacts('line', a, b, line)];
+      return made([...piece, ...claim]);
+    }
+  }
   const seg = SEGMENT_HE.exec(line) ?? SEGMENT_EN.exec(line);
   if (seg) {
     const [, a, b] = seg;
@@ -3693,21 +3869,22 @@ const NAMED_LINE = new RegExp(`^(?:ה?ישר\\s+|[Ll]ine\\s+)?([ℓl][0-9]?)$|^(
  * flagged `i`, because `NAME` is deliberately uppercase-only and a case-insensitive whole-pattern
  * would quietly start accepting `ab` as two vertices.
  */
-const TWO_POINTS = new RegExp(
-  `^(?:ה?(?:צלע|קטע|ישר|בסיס)\\s+|[Ss]ide\\s+|[Ss]egment\\s+|[Bb]ase\\s+|[Ll]ine\\s+)?(${NAME})(${NAME})$`,
-);
-
-function direction(phrase: string): Direction | null {
-  const p = trim(phrase).replace(/^ה(?=ישר|צלע|קטע)/, 'ה'); // keep the article; normalise spacing only
+/*
+ * #1651 (ADR-AG-200): the noun list is the REGISTRY's (`readPiece`), not a fourth inline copy — «המיתר BC», «השוק
+ * AD», «the chord BC» are directions exactly as «הצלע BC» is. A noun that CLAIMS something is read only by a caller
+ * that passes a `ClaimSink` to state the claim into; without one it is not a direction (`bad-operand`, never a drop).
+ */
+function direction(phrase: string, claims?: ClaimSink): Direction | null {
+  const p = trim(phrase);
   const axis = AXIS_HE.exec(p) ?? AXIS_EN.exec(p);
   if (axis) return { k: 'axis', axis: axis[1].toLowerCase() === 'x' ? 'x' : 'y' };
   const named = NAMED_LINE.exec(p);
   if (named) return { k: 'curve', id: lineIdOf(named[1] ?? named[2]) };
-  const pts = TWO_POINTS.exec(p);
+  const pts = readPiece(p);
   // A two-letter run reads as its two POINTS even when fronted by «הישר», and that is deliberate:
   // «הישר AC» relates the direction A→C whether or not a `line-AC` object was ever stated, so the
   // sentence means the same thing before and after the line is given a name.
-  if (pts && pts[1] !== pts[2]) return { k: 'points', a: pts[1], b: pts[2] };
+  if (pts && (!pts.noun || pts.row) && stateClaim(pts.row, pts.a, pts.b, claims)) return { k: 'points', a: pts.a, b: pts.b };
   return null;
 }
 
@@ -3822,7 +3999,8 @@ function parseThroughLine(line: string): RuleOutcome {
   const m = THROUGH_HE.exec(line) ?? THROUGH_EN.exec(line);
   if (!m) return null;
   const [, through, word, dirSrc] = m;
-  const dir = direction(trim(dirSrc));
+  const claims: ClaimSink = { out: [], src: line };
+  const dir = direction(trim(dirSrc), claims);
   // The verb was understood and the operand was not — an OWNED refusal about this sentence, naming
   // what a direction may be, rather than a fall-through to "I did not understand you" (ADR-AG-017).
   if (!dir) return refuse('bad-operand', line);
@@ -3846,6 +4024,7 @@ function parseThroughLine(line: string): RuleOutcome {
   return made([
     { t: 'declare', id: through, src: line },
     { t: 'line-at', id, through, dir, perp, src: line },
+    ...claims.out,
   ]);
 }
 
@@ -3979,19 +4158,22 @@ function parseConstraint(raw: string): RuleOutcome {
   const rel = RELATION_HE.exec(line) ?? RELATION_EN.exec(line) ?? RELATION_SYM.exec(line);
   if (rel) {
     const [, left, word, right] = rel;
-    const u = direction(left);
-    const v = direction(right);
+    // A role noun's claim is stated beside the relation (#1651, ADR-AG-200): «המיתר BC ∥ ציר ה-x» is also «B, C על המעגל».
+    const claims: ClaimSink = { out: [], src: line };
+    const u = direction(left, claims);
+    const v = direction(right, claims);
     // The verb was understood; if an operand was not, that is an OWNED refusal about this sentence
     // rather than a fall-through to "I did not understand you" (ADR-AG-017).
     if (!u || !v) return refuse('bad-operand', line);
     const parallel = new RegExp(`^(?:מקביל|parallel|${REL_PARALLEL_SYM})`, 'i').test(word);
     // Each operand that names a PAIR is drawn, by its own noun (#1639) — after the relation, which refers to them.
     const drawn = ([[left, u], [right, v]] as const).flatMap(([text, d]) =>
-      d.k === 'points' ? pieceFacts(pieceNounOf(/^(ה?ישר|[Ll]ine)\s/.exec(trim(text))?.[1]), d.a, d.b, line) : [],
+      d.k === 'points' ? pieceFacts(pieceNounOf(readPiece(text)?.noun), d.a, d.b, line) : [],
     );
     return made([
       { t: 'constraint', k: { t: 'relation', rel: parallel ? 'parallel' : 'perpendicular', u, v }, src: line },
       ...drawn,
+      ...claims.out,
     ]);
   }
 
@@ -4012,19 +4194,21 @@ function parseConstraint(raw: string): RuleOutcome {
    */
   const sign = SLOPE_SIGN_HE.exec(line) ?? SLOPE_SIGN_EN.exec(line);
   if (sign) {
-    const u = direction(sign[1]);
+    const claims: ClaimSink = { out: [], src: line };
+    const u = direction(sign[1], claims);
     if (!u) return refuse('bad-operand', line);
     const positive = /חיובי|גדול|>|positive|greater/i.test(sign[2]);
-    return made([{ t: 'selector', sel: { kind: 'sign', q: { k: 'slope', u }, positive }, src: line }]);
+    return made([{ t: 'selector', sel: { kind: 'sign', q: { k: 'slope', u }, positive }, src: line }, ...claims.out]);
   }
 
   const slope = SLOPE_HE.exec(line) ?? SLOPE_EN.exec(line);
   if (slope && claimable(slope[2])) {
-    const u = direction(slope[1]);
+    const claims: ClaimSink = { out: [], src: line };
+    const u = direction(slope[1], claims);
     if (!u) return refuse('bad-operand', line);
     const value = valueExpr(slope[2]);
     if (!value) return refuse('bad-equation', trim(slope[2]));
-    return made([{ t: 'constraint', k: { t: 'slope', u, value }, src: line }]);
+    return made([{ t: 'constraint', k: { t: 'slope', u, value }, src: line }, ...claims.out]);
   }
 
 
@@ -4047,12 +4231,20 @@ function parseConstraint(raw: string): RuleOutcome {
   const areaGivenValue = areaGiven ? valueExpr(areaGiven[3]) : null;
   const lengthEq = areaGivenValue ? null : LENGTH_EQ.exec(line);
   if (lengthEq) {
-    const left = parseLengthExpr(lengthEq[1]);
-    const right = parseLengthExpr(lengthEq[2]) ?? constantLengthExpr(lengthEq[2]);
+    // A role noun in front of a pair («אורך השוק BC», «המיתר BC») states its claim and leaves the pair (#1651).
+    const roles: ClaimSink = { out: [], src: line };
+    const leftSrc = lengthRoles(lengthEq[1], roles);
+    const rightSrc = lengthRoles(lengthEq[2], roles);
+    const left = leftSrc === null ? null : parseLengthExpr(leftSrc);
+    const right = rightSrc === null ? null : parseLengthExpr(rightSrc) ?? constantLengthExpr(rightSrc);
     // At least ONE side must mention a length, or this is an ordinary equation (`y=2x`) that the
     // bare-equation branch reads far better than we would.
     if (left && right) {
-      return made([{ t: 'constraint', k: { t: 'length-eq', left, right }, src: line }]);
+      return made([
+        { t: 'constraint', k: { t: 'length-eq', left, right }, src: line },
+        ...lengthPieces([leftSrc!, rightSrc!], line),
+        ...roles.out,
+      ]);
     }
   }
   const areaHe = AREA_HE.exec(line);
@@ -4207,7 +4399,10 @@ function parseConstraint(raw: string): RuleOutcome {
   if (on) {
     const [, id, noun, operandRaw] = on;
     const operand = trim(operandRaw);
-    const bounded = /צלע|קטע|side|segment/i.test(noun ?? '');
+    // The noun decides the bound — the captured one, or the registry noun in front of the operand's pair («על השוק AD»).
+    const bounded = extentOfNoun(noun) === 'segment' || BOUNDED_NOUN.test(operand);
+    // A role noun's claim is stated beside the incidence (#1651, ADR-AG-200).
+    const claims: ClaimSink = { out: [], src: line };
     /**
      * ONE OPERAND RESOLVER (#1429). This handler, the crossing operand and «P על המעגל» each
      * hand-rolled "which curve does this name" and each knew a different subset — «P על המעגל I»
@@ -4216,7 +4411,7 @@ function parseConstraint(raw: string): RuleOutcome {
      * point-on sentence is a `between` SELECTOR (the #1069/#1168 ruling), not the crossing's
      * hard extent, so the flag is lifted off the constraint and re-expressed as the selector.
      */
-    const k = incidenceOn(`${noun ?? ''} ${operand}`.trim(), id) ?? incidenceOn(operand, id);
+    const k = incidenceOn(`${noun ?? ''} ${operand}`.trim(), id, claims) ?? incidenceOn(operand, id, claims);
     if (k && k.t === 'kind') {
       return made([
         { t: 'declare', id, src: line },
@@ -4239,7 +4434,7 @@ function parseConstraint(raw: string): RuleOutcome {
           // NO noun (#1636, ADR-AG-198): the pair inherits the extent of what the figure draws over it — M1's call.
           facts.push({ t: 'extent-of', id, a: rest.a, b: rest.b, src: line });
         }
-        return made(facts);
+        return made([...facts, ...claims.out]);
       }
       return made([
         { t: 'declare', id, src: line },
@@ -4485,7 +4680,8 @@ function parseRatioColon(line: string): Fact[] | null {
   const q = Number(m[6]);
   if (!(p > 0) || !(q > 0)) return null;
   const fact = ratioFact([m[1], m[2]], [m[3], m[4]], p, q, line);
-  return fact ? [fact] : null;
+  // «AC:CB = 3:2» names both pairs, so both are drawn (#1652) — the length rule's own reading of a named pair.
+  return fact ? [fact, ...lengthPieces([`${m[1]}${m[2]}`, `${m[3]}${m[4]}`], line)] : null;
 }
 
 /** The placement shared by the divider and prose spellings: `C` sits on `AB`, between its ends. */
@@ -4853,6 +5049,8 @@ function parseClause(raw: string): ParseResult {
         ...through,
         ...boundedSeg,
         ...centre,
+        // The noun's claim (#1651, ADR-AG-200) — «משוואת המיתר BC היא …» also says B and C are on the circle.
+        ...(named ? claimFacts(curve.noun, named[1], named[2], line) ?? [] : []),
     ];
     /*
      * The equation of THE circle (#1633, ADR-AG-196): about the figure's one circle when it has one. A circle
@@ -5153,18 +5351,20 @@ type LineObject =
   | { k: 'curve' };
 
 /** English nouns onto the Hebrew noun the canonical sentence carries (a base is a side, #1281). */
-const NOUN_OF: Record<string, string> = { line: 'הישר', side: 'הצלע', segment: 'הקטע', base: 'הצלע' };
+// A ROLE noun keeps its role in the canonical sentence (#1651, ADR-AG-200) — «הבסיס CD עובר דרך P» is «P על הבסיס CD»,
+// whose incidence states the base claim; folding it to «הצלע» would drop it.
+const NOUN_OF: Record<string, string> = { line: 'הישר', side: 'הצלע', segment: 'הקטע' };
 function heNoun(noun: string | undefined): string {
   if (!noun) return 'הישר';
   const n = noun.trim().replace(/^the\s+/i, '').toLowerCase();
   if (NOUN_OF[n]) return NOUN_OF[n];
-  if (/בסיס/.test(n)) return 'הצלע';
+  const row = nounRow(noun);
+  if (row) return `ה${row.he}`;
   return /^ה/.test(n) ? n : `ה${n}`;
 }
 
-const OBJ_PAIR = new RegExp(
-  `^((?:ה?(?:ישר|צלע|קטע|בסיס))|(?:[Tt]he\\s+)?(?:[Ll]ine|[Ss]ide|[Ss]egment|[Bb]ase))?\\s*(${NAME})(${NAME})$`,
-);
+// Any registry noun (#1651): a role noun reaches the canonical incidence, which states its claim or refuses it.
+const OBJ_PAIR = new RegExp(`^(${PIECE_NOUN})?\\s*(${NAME})(${NAME})$`);
 const OBJ_NAMED = new RegExp(`^(?:ה?ישר|(?:[Tt]he\\s+)?[Ll]ine)\\s+(${FREE_LINE_NAME})$|^([ℓl][0-9]?)$`);
 const OBJ_CURVE = /^(?:ה?(?:מעגל|פרבולה|אליפסה)|(?:the\s+|a\s+)?(?:circle|parabola|ellipse))(?:\s|$)/i;
 const OBJ_EQ = /^(?:ה?ישר\s+|(?:the\s+)?line\s+)?([^=]+=[^=]+)$/i;
@@ -5199,13 +5399,17 @@ const CONVERSE_EN = /^(.+?)\s+(?:passes\s+through|goes\s+through|contains)\s+(.+
 
 /** «הצלע BC נמצאת על …» · «האלכסון BD מונח על …» · "the side BC lies on …" — a SIDE as the subject (#1495). */
 const SIDE_ON_HE = new RegExp(
-  `^${HE_GIVEN}(?:(ה?(?:צלע|קטע|בסיס|ישר|אלכסון))\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:(?:נמצא|נמצאת|מונח|מונחת)\\s+)?על\\s+(.+)$`,
+  // The noun is any registry noun (#1651, ADR-AG-200) — «היתר AC מונח על הישר …» keeps its role in the canonical sentence.
+  `^${HE_GIVEN}(?:(${HE_LINE})\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:(?:נמצא|נמצאת|מונח|מונחת)\\s+)?על\\s+(.+)$`,
 );
 const SIDE_ON_EN = new RegExp(
-  `^(?:[Tt]he\\s+)?(?:(side|segment|base|diagonal|line)\\s+)?(${NAME})(${NAME})\\s+(?:lies|is|lie)\\s+on\\s+(.+)$`,
+  `^(?:[Tt]he\\s+)?(?:(${STRAIGHT_NOUNS.flatMap((n) => n.en).join('|')})\\s+)?(${NAME})(${NAME})\\s+(?:lies|is|lie)\\s+on\\s+(.+)$`,
 );
 /** The noun «משוואת …» takes for the side: a side, a segment, a line or a diagonal (a base is a side). */
 function eqNounOf(noun: string | undefined): string {
+  // A ROLE noun keeps its role (#1651, ADR-AG-200): the canonical sentence states the claim, so it may not fold to «הצלע».
+  const row = nounRow(noun);
+  if (row?.claim) return `ה${row.he}`;
   const n = (noun ?? '').replace(/^ה/, '').toLowerCase();
   if (n === 'קטע' || n === 'segment') return 'הקטע';
   if (n === 'ישר' || n === 'line') return 'הישר';
@@ -5239,7 +5443,15 @@ function parseIncidence(line: string): RuleOutcome {
     const [, noun, a, b, objectText] = side;
     const obj = lineObject(objectText);
     if (!obj) return null;
-    const drawn = noun && /ישר|line/i.test(noun) ? [] : [`${/קטע|segment/i.test(noun ?? '') ? 'הקטע' : 'הצלע'} ${a}${b}`];
+    // A role noun is drawn AS its role — «היתר AC» — so the drawn piece's sentence states the claim (#1651); one this
+    // tree cannot lower (median, altitude) leaves the sentence unread.
+    const role = nounRow(noun);
+    if (role?.claim && !claimFacts(role, a, b, line)) return null;
+    const drawn = role?.claim
+      ? [`ה${role.he} ${a}${b}`]
+      : noun && /ישר|line/i.test(noun)
+        ? []
+        : [`${/קטע|segment/i.test(noun ?? '') ? 'הקטע' : 'הצלע'} ${a}${b}`];
     /**
      * A SIDE ON A CIRCLE IS A CHORD (#1619 B3, ruling 4 on #1616: *"Chord: yes … lift the out-of-scope
      * refusal"*). It used to be refused here as a different sentence; it is the same statement as «BC מיתר

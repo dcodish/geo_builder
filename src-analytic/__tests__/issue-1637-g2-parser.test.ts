@@ -128,7 +128,8 @@ describe('#1640 + #1636 — the extent belongs to the statement', () => {
       'BC',
     ];
     const { verdicts, kept } = play(lines);
-    expect(verdicts).toEqual(['record', 'record', 'record', 'record', 'record', 'record', 'record', 'already-known', 'record']);
+    // BC is «כבר ידוע» since #1652 (ADR-AG-200): «OC = 15, BC = 3» names BC and draws it — the line-5 length drew it.
+    expect(verdicts).toEqual(['record', 'record', 'record', 'record', 'record', 'record', 'record', 'already-known', 'already-known']);
     for (const seed of [0, 1, 2, 3]) {
       const d = derive(kept, seed);
       expect(d.faults, `seed ${seed}`).toEqual([]);

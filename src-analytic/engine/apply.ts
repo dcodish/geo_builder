@@ -22,7 +22,7 @@ import { parseLengthExpr } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule } from './derived';
 import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
-import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, ringsNamed, shapeRow } from './shapes';
+import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, promisesOneParallelPair, rightAngleAt, ringsNamed, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { RESERVED_SYMBOLS, toolSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
@@ -874,6 +874,82 @@ function applyTouchAt(
  * created anything counted, one that only narrowed narrowed, and one whose every part was already
  * known is the only case where dropping the row is honest.
  */
+/**
+ * A ROLE NOUN'S CLAIM, LOWERED AGAINST THE FIGURE (#1651, #1620 item 2; ADR-AG-200) — the one place `role-of` is
+ * resolved, whichever sentence named the piece by its role.
+ *
+ * - **radius** «הרדיוס MB»: THE circle (one in the figure; none or several is the contextual refusal). The end that
+ *   is its centre stays, the other end is ON it. An end that is not the centre when the centre is another named
+ *   point contradicts the figure (`conflicting-restatement`); a circle whose centre has no name cannot say which
+ *   end is meant (`out-of-scope`, said by name, never a pick).
+ * - **leg / base** «השוק BC» / «הבסיס AB» of a trapezoid (a noun promising one parallel pair): a leg is NOT in the
+ *   parallel pair, so the other two sides are parallel; a base IS, so it is parallel to its opposite side. Both
+ *   are stated relations, so the trapezoid's ASSUMED pair is pinned or displaced by the mechanism #1159 built,
+ *   never re-derived; a pair the student already stated the other way is refused (`conflicting-restatement`).
+ *   In a triangle a leg is one of the two EQUAL sides (a choice of apex between its two ends, cycled — ADR-052),
+ *   and the base of an isosceles triangle is the side opposite its apex.
+ * - **hypotenuse** «היתר AC»: the right angle is at the triangle's third vertex — the constraint «זווית B ישרה»
+ *   lowers to (`rightAngleAt`), so a right triangle's seat choice collapses by structure.
+ *
+ * Which polygon: the ones holding a–b as a SIDE where the role means something. One → lowered; several →
+ * ambiguous; none → the contextual refusal for a leg or a hypotenuse. A base with no such polygon claims nothing
+ * further: «הבסיס CD» names a side (#1281), and only a trapezoid or an isosceles triangle gives «base» a content.
+ */
+function applyRoleOf(c: Construction, f: Extract<Fact, { t: 'role-of' }>): ApplyOutcome {
+  for (const id of [f.a, f.b]) {
+    const p = objectById(c, id);
+    if (!p || !isPositional(p)) return { ok: false, error: unknownRef(c, id) };
+  }
+  if (f.a === f.b) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
+  const say = (k: Constraint): Fact => ({ t: 'constraint', k, src: f.src });
+  if (f.role === 'radius') {
+    const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+    if (circles.length !== 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
+    const host = circles[0];
+    const centre = centreIdOf(c, host);
+    if (centre === null) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+    if (centre !== f.a && centre !== f.b) return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+    const end = centre === f.a ? f.b : f.a;
+    return applyFact(c, say({ t: 'on-curve', id: end, curve: host.id }));
+  }
+  const pair = (a: Id, b: Id): Direction => ({ k: 'points', a, b });
+  const parallel = (a: Id, b: Id, p: Id, q: Id): Constraint => ({ t: 'relation', rel: 'parallel', u: pair(a, b), v: pair(p, q) });
+  const equal = (a: Id, b: Id, p: Id, q: Id): Constraint => ({ t: 'length-eq', left: parseLengthExpr(`${a}${b}`)!, right: parseLengthExpr(`${p}${q}`)! });
+  /** The claim on one polygon whose ring holds a–b as the side starting at index i — null when the role means nothing there. */
+  const claimOn = (o: Extract<GeoObject, { kind: 'polygon' }>, i: number): { says: Constraint; conflict?: Constraint } | null => {
+    const v = o.vertices;
+    const n = v.length;
+    const at = (k: number) => v[(i + k) % n];
+    if (n === 3) {
+      const third = at(2);
+      if (f.role === 'hypotenuse') return { says: rightAngleAt(third, f.a, f.b) };
+      if (f.role === 'leg') return { says: { t: 'choice', options: [equal(f.a, f.b, f.a, third), equal(f.b, f.a, f.b, third)] } };
+      return o.noun !== undefined && normalizeShapeNoun(o.noun) === 'משולש שווה שוקיים' ? { says: equal(third, f.a, third, f.b) } : null;
+    }
+    if (n !== 4 || !promisesOneParallelPair(o.noun) || f.role === 'hypotenuse') return null;
+    const own = parallel(at(0), at(1), at(3), at(2));
+    const other = parallel(at(1), at(2), at(0), at(3));
+    return f.role === 'base' ? { says: own, conflict: other } : { says: other, conflict: own };
+  };
+  const found: Array<{ o: GeoObject; says: Constraint; conflict?: Constraint }> = [];
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon') continue;
+    const n = o.vertices.length;
+    const i = o.vertices.findIndex((p, k) => [p, o.vertices[(k + 1) % n]].sort().join() === [f.a, f.b].sort().join());
+    if (i < 0) continue;
+    const claim = claimOn(o, i);
+    if (claim) found.push({ o, ...claim });
+  }
+  if (found.length === 0 && f.role === 'base') return { ok: true, effect: 'known', next: c };
+  if (found.length !== 1) return { ok: false, error: noHost(f.src, 'polygon', found.map((x) => x.o)) };
+  const { says, conflict } = found[0];
+  // The other pair already STATED parallel by the student: the role contradicts their own given.
+  if (conflict && c.constraints.some((k) => k.t === 'relation' && !k.assumed && sameConstraint(k, conflict))) {
+    return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+  }
+  return applyFact(c, say(says));
+}
+
 function applyAll(c: Construction, facts: readonly Fact[]): ApplyOutcome {
   let next = c;
   let effect: LineEffect = 'known';
@@ -2334,6 +2410,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (f.id === f.a || f.id === f.b || !drawnPieceOver(c, f.a, f.b)) return { ok: true, effect: 'known', next: c };
       return applyFact(c, { t: 'selector', sel: { kind: 'between', id: f.id, a: f.a, b: f.b }, src: f.src });
     }
+
+    case 'role-of':
+      return applyRoleOf(c, f);
 
     /** Introduce a named but unplaced point; harmless and absorbed if it already exists. */
     case 'declare': {
