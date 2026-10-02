@@ -2103,3 +2103,14 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - With no circle in the figure, «AB קוטר» draws the circle on AB, and «מיתר AB» / «המיתר AB …» draws a circle through A and B; the centre has no letter until «O מרכז המעגל» names it. An equation stated afterwards («משוואת המעגל היא …») is that circle's equation.
 - With one circle the sentence is about that circle; with several it asks which.
 - «OA רדיוס» means OA is a radius (as «הרדיוס OA»). A radius on a circle whose centre has no letter, or with no circle at all, is still refused.
+
+**R141 — the perpendicular from a point and its foot, the line through a point that cuts a side, and «האנך» as a reference**
+([ADR-AG-207](06c-decisions-analytic.md#adr-ag-207), [#1620](https://github.com/dcodish/geo_builder/issues/1620) slice C; operator ruling 2026-10-02: the analytic tool behaves as the 2-D tool does for plane geometry).
+
+- «האנך מהנקודה B לציר ה-x» (also to a side, «לצלע AC», to a line, «לישר l1», or to a tangent) draws the perpendicular from B to its foot. The foot is a point; with no letter given the tool names it (P₁, …) and says so on the row, and the student can rename it.
+- The foot named in the same sentence — «האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D», «D רגל האנך מ-C לציר ה-x», «האנכים מהקודקודים A ו-C לציר ה-x חותכים אותו בנקודות E ו-F בהתאמה» — is that letter. A foot on a side's line may lie beyond the side, as in 2-D. «אנך אמצעי ל-AB» draws the midpoint and the perpendicular bisector.
+- «הישר העובר דרך הנקודה E מקביל לציר ה-y וחותך את הצלע AB בנקודה F» (and «דרך E עובר ישר מקביל ל-… החותך את …», «ישר דרך P מאונך ל-AB») states the line and where it cuts the side; on a SIDE the point lies between its ends. The piece EF is drawn and the line itself is not, as in 2-D, until a sentence states the line.
+- «האנך» refers to the perpendicular already drawn — «הנקודה E נמצאת על האנך שהורידו מנקודה B לציר ה-x», «המשיק והאנך נחתכים בנקודה D». With none, or several and no description that picks one, the sentence is refused and says how to name it.
+- «הצלע CB מקבילה לציר ה-x, וחותכת את ציר ה-y בנקודה E» is both statements about CB.
+- «הקטע EF מקביל ל-DA» with F not yet placed adds F, free to move along the parallel through E, until a later given places it.
+- Refused by name: a perpendicular from a point of the line itself, a foot that is its own point, a line the sentence does not name readably.

@@ -76,7 +76,18 @@ export type DerivedRule =
    * it exactly at that foot. The tangency itself is the host's business (by construction for an incircle,
    * a stated `tangent-line` for a circle on a centre) — this rule only names where it happens.
    */
-  | { t: 'side-touch'; circle: Id; a: Id; b: Id };
+  | { t: 'side-touch'; circle: Id; a: Id; b: Id }
+  /**
+   * «D רגל האנך מ-C לציר ה-x» · «האנך מהנקודה B לצלע AC» — THE FOOT OF THE PERPENDICULAR from `from` onto a
+   * LINE (#1620 slice C, ADR-AG-207): an axis, the line through two points, or a line OBJECT (named, stated by
+   * its equation, constructed through a point, a tangent). 2-D's `foot` object, copied. Determined, not
+   * solved: the projection of one point on one line. The line through `from` and the foot is «האנך», which a
+   * later sentence may refer to («E על האנך», «המשיק והאנך נחתכים …») — M1 resolves it by this rule.
+   */
+  | { t: 'foot'; from: Id; onto: FootLine };
+
+/** The line a foot is dropped onto — the three `Direction` members that are a LINE, not only a direction. */
+export type FootLine = { k: 'axis'; axis: 'x' | 'y' } | { k: 'points'; a: Id; b: Id } | { k: 'curve'; id: Id };
 
 /** The ids a rule is defined in terms of. EXHAUSTIVE — see the union's docblock. */
 export function parentsOf(r: DerivedRule): Id[] {
@@ -93,6 +104,9 @@ export function parentsOf(r: DerivedRule): Id[] {
     // The side's two ends; the circle is its CURVE parent (`curveParentsOf`).
     case 'side-touch':
       return [r.a, r.b];
+    // The point the perpendicular is dropped FROM, and a two-point line's two points; a line object is a CURVE parent.
+    case 'foot':
+      return r.onto.k === 'points' ? [r.from, r.onto.a, r.onto.b] : [r.from];
     // Its parent is a CURVE, not a point — see `curveParentOf`. Returning the curve id here would
     // send it through every check that assumes a parent is positional.
     case 'circle-centre':
@@ -129,6 +143,8 @@ export function ruleLabel(r: DerivedRule): string {
       return 'נקודת ההשקה';
     case 'side-touch':
       return `נקודת ההשקה על ${r.a}${r.b}`;
+    case 'foot':
+      return `רגל האנך מ-${r.from}`;
     default: {
       const unlabelled: never = r;
       throw new Error(`derived rule has no label: ${JSON.stringify(unlabelled)}`);
@@ -315,6 +331,7 @@ export function curveParentsOf(r: DerivedRule): Id[] {
   if (r.t === 'circle-centre' || r.t === 'parabola-focus') return [r.curve];
   if (r.t === 'touch-point') return [r.a, r.b];
   if (r.t === 'side-touch') return [r.circle];
+  if (r.t === 'foot' && r.onto.k === 'curve') return [r.onto.id];
   return [];
 }
 
@@ -339,8 +356,8 @@ export function touchPoint(
 export function evalRule(
   r: DerivedRule,
   at: (id: Id) => Pt | null,
-  /** The resolved curves, for the one rule that needs them. Absent means "no curve is available". */
-  curveAt?: (id: Id) => { kind?: string; cx?: number; cy?: number; r?: number } | null,
+  /** The resolved curves, for the rules that need them. Absent means "no curve is available". */
+  curveAt?: (id: Id) => { kind?: string; cx?: number; cy?: number; r?: number; a?: number; b?: number; c?: number } | null,
 ): Pt | null {
   const ps = parentsOf(r).map(at);
   if (ps.some((p) => p === null)) return null;
@@ -376,6 +393,18 @@ export function evalRule(
       const c = curveAt?.(r.circle);
       if (!c || c.kind !== 'circle' || c.cx === undefined || c.cy === undefined) return null;
       return footOn({ x: c.cx, y: c.cy }, p[0], p[1]);
+    }
+    case 'foot': {
+      const from = p[0];
+      if (r.onto.k === 'axis') return r.onto.axis === 'x' ? { x: from.x, y: 0 } : { x: 0, y: from.y };
+      if (r.onto.k === 'points') return footOn(from, p[1], p[2]);
+      // A line OBJECT, read off its resolved equation ax + by + c = 0 — vacant when it is not a line here.
+      const l = curveAt?.(r.onto.id);
+      if (!l || l.kind !== 'line' || l.a === undefined || l.b === undefined || l.c === undefined) return null;
+      const nn = l.a * l.a + l.b * l.b;
+      if (!(nn > 1e-24)) return null;
+      const k = (l.a * from.x + l.b * from.y + l.c) / nn;
+      return { x: from.x - k * l.a, y: from.y - k * l.b };
     }
     case 'midpoint':
       return midpoint(p[0], p[1]);
@@ -581,6 +610,9 @@ export function constructionOf(
     // does not resolve — the point's own mark is the answer, as for the centre.
     case 'side-touch':
       return null;
+    // The perpendicular itself, from the point to its foot — what a student draws to find it.
+    case 'foot':
+      return { lines: [{ a: p[0], b: self }], feet: [] };
 
     default: {
       const undrawn: never = r;

@@ -161,7 +161,8 @@ export type ApplyErrorCode =
  * (area, meet), whose kite example is the right remedy.
  */
 export interface HostRef {
-  kind: 'circle' | 'parabola' | 'ellipse' | 'line' | 'polygon';
+  /** `perpendicular` (#1620, ADR-AG-207): «האנך» — the one perpendicular dropped from a point in the figure. */
+  kind: 'circle' | 'parabola' | 'ellipse' | 'line' | 'polygon' | 'perpendicular';
   found: number;
   need?: number;
   /**
@@ -1686,6 +1687,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (prior.kind !== 'line-at') {
           return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };
         }
+        // A carrier line (`drawn: false`) stated AS A LINE is now drawn (#1620, ADR-AG-207) — the same object, upgraded.
+        if (prior.drawn === false && f.drawn !== false) {
+          const { drawn: _carrier, ...line } = prior;
+          return { ok: true, effect: 'narrowed', next: { ...c, objects: c.objects.map((o) => (o.id === f.id ? line : o)) } };
+        }
         return { ok: true, effect: 'known', next: c };
       }
       return {
@@ -1695,7 +1701,15 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           ...c,
           objects: [
             ...c.objects,
-            { kind: 'line-at', id: f.id, through: f.through, dir: f.dir, perp: f.perp, ...(f.name ? { name: f.name } : {}) },
+            {
+              kind: 'line-at',
+              id: f.id,
+              through: f.through,
+              dir: f.dir,
+              perp: f.perp,
+              ...(f.name ? { name: f.name } : {}),
+              ...(f.drawn === false ? { drawn: false as const } : {}),
+            },
           ],
         },
       };
@@ -1850,6 +1864,23 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const named = circleByName(c, f.circle);
         if (!named || curveKindOf(named) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
         return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: named.id }, src: f.src });
+      }
+      /*
+       * «האנך» — the one PERPENDICULAR the figure drew (#1620, ADR-AG-207): a `foot` derived point, whose line is the
+       * point it is dropped from through the foot. Narrowed by the description when the sentence gives one («האנך
+       * שהורידו מנקודה B לציר ה-x»). A reference, never a construction: none or several is the «המשיק» refusal.
+       */
+      if (f.kind === 'perpendicular') {
+        const feet = c.objects.filter(
+          (o): o is Extract<GeoObject, { kind: 'derived' }> =>
+            o.kind === 'derived' &&
+            o.rule.t === 'foot' &&
+            (!f.foot || (o.rule.from === f.foot.from && (!f.foot.onto || sameDerivation(o.rule, { t: 'foot', from: f.foot.from, onto: f.foot.onto })))),
+        );
+        if (feet.length !== 1) return { ok: false, error: noHost(f.src, 'perpendicular', feet.length) };
+        const foot = feet[0];
+        if (foot.rule.t !== 'foot') return { ok: false, error: noHost(f.src, 'perpendicular', 0) };
+        return applyFact(c, { t: 'constraint', k: { t: 'on-line-2pt', id: f.id, a: foot.rule.from, b: foot.id }, src: f.src });
       }
       // «המשיק» — the one tangent OBJECT (#1619 B3): a line built at a touch point, never any line.
       const matches = c.objects.filter((o) => (f.kind === 'tangent' ? isTangentObject(o) : curveKindOf(o) === f.kind));
@@ -2606,7 +2637,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         // A centre names an equation curve; a touch point names two circles of any construction (#1504), and
         // a side's touch point one circle of any construction (#1619 B2).
         const anyCircle = f.t === 'derived' && (f.rule.t === 'touch-point' || f.rule.t === 'side-touch');
-        const ok = anyCircle ? !!o && curveKindOf(o) === 'circle' : !!o && o.kind === 'curve';
+        // A foot is dropped onto any LINE object — stated by its equation, constructed, a tangent (#1620, ADR-AG-207).
+        const anyLine = f.t === 'derived' && f.rule.t === 'foot';
+        const ok = anyCircle ? !!o && curveKindOf(o) === 'circle' : anyLine ? !!o && curveKindOf(o) === 'line' : !!o && o.kind === 'curve';
         if (!ok) {
           return { ok: false, error: unknownRef(c, curveRef) };
         }

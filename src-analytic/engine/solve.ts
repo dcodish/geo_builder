@@ -514,6 +514,8 @@ function describeRule(r: DerivedRule): string {
       return `נקודת ההשקה של ${r.a} ו-${r.b}`;
     case 'side-touch':
       return `נקודת ההשקה של ${r.circle} עם ${r.a}${r.b}`;
+    case 'foot':
+      return `רגל האנך מ-${r.from}`;
     default: {
       const undescribed: never = r;
       throw new Error(`rule has no description: ${JSON.stringify(undescribed)}`);

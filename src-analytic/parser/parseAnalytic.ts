@@ -17,7 +17,7 @@
  *
  * Unmatched input returns `not-handled`, which is the seam where the LLM fallback escalates.
  */
-import type { DerivedRule } from '../engine/derived';
+import type { DerivedRule, FootLine } from '../engine/derived';
 import { isAngleRef, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS, directionSymbol, mentionsPlane, radiusSymbol } from '../engine/carriers';
@@ -29,7 +29,7 @@ function valueExpr(src: string): Expr | null {
 }
 import { constantLengthExpr, namedLengthPairs, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
-import { CENTRE_SENTINEL, CIRCLE_SENTINEL, UNBOUNDED, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
+import { CENTRE_SENTINEL, CIRCLE_SENTINEL, UNBOUNDED, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 import { findProofTarget } from '../../shell/proofTarget';
 import {
@@ -1239,7 +1239,7 @@ const BOUNDED_NOUN = new RegExp(
 );
 
 /** A CONTEXTUAL operand — «המעגל», «הפרבולה» with no name: which curve is M1's question (#1429). */
-type KindOperand = { t: 'kind'; kind: 'circle' | 'parabola' | 'ellipse' | 'tangent'; circle?: string };
+type KindOperand = { t: 'kind'; kind: 'circle' | 'parabola' | 'ellipse' | 'tangent' | 'perpendicular'; circle?: string; foot?: PerpRef };
 
 // «המעגל 1» and «המעגל I» are one circle (#1429) — the digit→Roman map now lives in `engine/names.ts`
 // (`numeralCurveId`), shared by the mint and every reference site, for every numeral-named kind.
@@ -1248,6 +1248,9 @@ function incidenceOn(operand: string, id: Id, claims?: ClaimSink): Constraint | 
   // «המשיק למעגל בנקודה A» — the tangent object at A; bare «המשיק» — the one in the figure (#1619 B3).
   const tangent = readTangentNoun(trim(operand));
   if (tangent) return tangent.at ? { t: 'on-curve', id, curve: tangentLineId(tangent.at) } : { t: 'kind', kind: 'tangent' };
+  // «האנך», «האנך שהורידו מנקודה B לציר ה-x» — the perpendicular the figure drew (#1620, ADR-AG-207).
+  const perp = perpendicularRef(trim(operand));
+  if (perp) return perp === 'bad' ? null : perp;
   const axis = AXIS_HE.exec(trim(operand)) ?? AXIS_EN.exec(trim(operand));
   if (axis) {
     return axis[1].toLowerCase() === 'x'
@@ -1410,7 +1413,7 @@ function parseIntersectionPlain(
     if (ordinalOf(line) !== null) return refuse('bad-operand', line);
     const side = (k: Constraint | KindOperand): Fact =>
       k.t === 'kind'
-        ? { t: 'on-kind', id, kind: k.kind, ...(k.circle ? { circle: k.circle } : {}), src: line }
+        ? { t: 'on-kind', id, kind: k.kind, ...(k.circle ? { circle: k.circle } : {}), ...(k.foot ? { foot: k.foot } : {}), src: line }
         : { t: 'constraint', k, src: line };
     return made([
       { t: 'declare', id, src: line },
@@ -3940,7 +3943,8 @@ const RELATION_HE = new RegExp(
   // verb alone already identifies the sentence — nothing else in the grammar uses it.
   `^${HE_GIVEN}(.+?)\\s+(${PARALLEL_WORDS}|${PERP_WORDS})\\s+(?:ל-?\\s*)?(.+)$`,
 );
-const RELATION_EN = /^(.+?)\s+(?:is\s+)?(parallel|perpendicular)(?:\s+to)?\s+(.+)$/i;
+// «the perpendicular» after an article is the NOUN («E is on the perpendicular from B …», #1620 ADR-AG-207), never the relation.
+const RELATION_EN = /^(.+?)(?<!\b(?:the|a))\s+(?:is\s+)?(parallel|perpendicular)(?:\s+to)?\s+(.+)$/i;
 
 /**
  * THE EXAM'S OWN NOTATION — «AB ∥ DC», «AB || DC», «AB ⊥ DC» (#1160).
@@ -3983,12 +3987,28 @@ const RELATION_SYM = new RegExp(`^${HE_GIVEN}(.+?)\\s*(${REL_PARALLEL_SYM}|${REL
  * (five times by #1081's count, and #1088 made it six).
  */
 const THROUGH_HE = new RegExp(
-  `^${HE_GIVEN}דרך\\s+${HE_POINT}(${NAME})\\s+(?:עובר(?:ת)?\\s+)?ה?(?:ישר|קו)\\s+(${PARALLEL_WORDS}|${PERP_WORDS})\\s+ל-?\\s*(.+)$`,
+  `^${HE_GIVEN}דרך\\s+${HE_POINT}(${NAME})\\s+(?:עובר(?:ת)?\\s+)?ה?(?:ישר|קו)\\s+(?:ו?ה)?(${PARALLEL_WORDS}|${PERP_WORDS})\\s+ל-?\\s*(.+)$`,
 );
 const THROUGH_EN = new RegExp(
   `^(?:a\\s+|the\\s+)?line\\s+(?:passes\\s+)?through\\s+(?:point\\s+)?(${NAME})\\s+(?:and\\s+is\\s+|is\\s+)?(parallel|perpendicular)\\s+to\\s+(.+)$`,
   'i',
 );
+/**
+ * THE LINE FIRST — «ישר דרך P מאונך ל-AB» (2-D's catalog spelling), «הישר העובר דרך הנקודה E מקביל לציר ה-y»
+ * (the exam's, as S1 teaches it) — the same construction as «דרך P עובר ישר …», read by the same handler (#1620,
+ * ADR-AG-207). The relation word may carry its own article or clitic («והמקביל»).
+ */
+const THROUGH_LINE_FIRST_HE = new RegExp(
+  `^${HE_GIVEN}ה?(?:ישר|קו)\\s+(?:(?:ה|ש)?עובר(?:ת)?\\s+)?דרך\\s+${HE_POINT}(${NAME})\\s+(?:ו?(?:הוא|היא)\\s+)?(?:ו?ה)?(${PARALLEL_WORDS}|${PERP_WORDS})\\s+ל-?\\s*(.+)$`,
+);
+/**
+ * …AND WHERE IT CUTS A SIDE — «… מקביל לציר ה-y וחותך את הצלע AB בנקודה F», «… the y-axis and cuts side AB at F»
+ * (#1620, ADR-AG-207). One sentence, two facts: the line, and its crossing with the named object — the crossing
+ * rule's own lowering («F נקודת החיתוך של הישר עם הצלע AB»), so «הצלע» bounds the crossing to the side. As in 2-D
+ * the line is then a CARRIER and the piece from the point to the crossing is what is drawn.
+ */
+const THROUGH_CUT_HE = new RegExp(`^(.+?)\\s*,?\\s+(?:ו|ה|ש)?(?:חות(?:ך|כת)|פוגש(?:ת)?)\\s+את\\s+(.+?)\\s+ב(?:נקודה\\s+|-\\s*)(${NAME})$`);
+const THROUGH_CUT_EN = new RegExp(`^(.+?)\\s*,?\\s+(?:and\\s+|which\\s+)?(?:cuts|meets|intersects)\\s+(.+?)\\s+at\\s+(?:(?:the\\s+)?point\\s+)?(${NAME})$`);
 
 /**
  * A LINE THROUGH A POINT WITH A FREE DIRECTION — «דרך N עובר ישר», «דרך M עובר ישר l4» (#1319, ADR-AG-144).
@@ -4034,9 +4054,11 @@ function parseThroughLine(line: string): RuleOutcome {
       },
     ]);
   }
-  const m = THROUGH_HE.exec(line) ?? THROUGH_EN.exec(line);
+  const m = THROUGH_HE.exec(line) ?? THROUGH_LINE_FIRST_HE.exec(line) ?? THROUGH_EN.exec(line);
   if (!m) return null;
-  const [, through, word, dirSrc] = m;
+  const [, through, word, tail] = m;
+  const cut = THROUGH_CUT_HE.exec(tail) ?? THROUGH_CUT_EN.exec(tail);
+  const dirSrc = cut ? cut[1] : tail;
   const claims: ClaimSink = { out: [], src: line };
   const dir = direction(trim(dirSrc), claims);
   // The verb was understood and the operand was not — an OWNED refusal about this sentence, naming
@@ -4059,11 +4081,202 @@ function parseThroughLine(line: string): RuleOutcome {
    * do not introduce their operands either. Naming the thing a construction is ABOUT differs from
    * mentioning the thing it is measured against.
    */
+  if (!cut) {
+    return made([
+      { t: 'declare', id: through, src: line },
+      { t: 'line-at', id, through, dir, perp, src: line },
+      ...claims.out,
+    ]);
+  }
+  // The crossing — the crossing rule's own lowering, over the line just built and the object it cuts.
+  const [, , targetSrc, at] = cut;
+  if (at === through) return refuse('degenerate-role', line);
+  const target = incidenceOn(targetSrc, at, claims);
+  if (!target) return refuse('bad-operand', line);
+  const crossing = parseIntersectionPlain(
+    line,
+    at,
+    { t: 'on-curve', id: at, curve: id },
+    target.t === 'on-line-2pt' ? { ...target, crossing: true as const } : target,
+    [],
+  );
+  if (!crossing || !crossing.ok) return crossing;
   return made([
     { t: 'declare', id: through, src: line },
-    { t: 'line-at', id, through, dir, perp, src: line },
+    { t: 'line-at', id, through, dir, perp, drawn: false, src: line },
+    ...crossing.facts,
+    { t: 'segment', id: segmentId(through, at), a: through, b: at, ref: true, src: line },
     ...claims.out,
   ]);
+}
+
+// ---------------------------------------------------------------------------
+// THE PERPENDICULAR FROM A POINT, ITS FOOT, AND «האנך» AS A REFERENCE (#1620 slice C, ADR-AG-207)
+// ---------------------------------------------------------------------------
+
+/**
+ * «האנך מהנקודה B לציר ה-x» · «האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D» · «D רגל האנך מ-C לציר ה-x» ·
+ * «האנכים מהקודקודים A ו-C לציר ה-x חותכים אותו בנקודות E ו-F בהתאמה».
+ *
+ * The 4-point exam builds its figure by dropping perpendiculars, and the tree had no word for one. 2-D's lowering is
+ * the template: the FOOT is a derived point (`foot`, closed form — the projection of one point on one line), the
+ * perpendicular sentence also draws the piece from the point to its foot, and the «רגל» sentence names the foot
+ * only. An unnamed foot takes a tool letter (the #1222 ruling, *"invent a letter … the user can always change
+ * it"*) through the one mint (`resolveMints`), which also gives a foot already named its own letter back — so a
+ * perpendicular stated twice is one foot, and a second NAME for one foot is #1153's `already-named`.
+ *
+ * The target is any LINE: an axis, a pair («לצלע AC», «ל-AD», «לישר AB»), a line object («לישר l1», «למשיק בנקודה
+ * A»). A pair is the LINE through it, as 2-D's foot is: an obtuse triangle's foot lies beyond the side.
+ *
+ * The verb clause the descriptive register adds («האנך שהורידו מנקודה B …», «האנך המורד מ…») is part of the noun
+ * phrase and says nothing more; the IMPERATIVE («מן הנקודה B הורידו אנך …») is taught onto these sentences (S1).
+ */
+const PERP_VERB_CLAUSE = '(?:\\s+(?:ש(?:הורידו|הורד|העבירו|הועבר|מורידים|מעבירים)|ה(?:יורד|מורד|מועבר)))?';
+const PERP_FROM_HE = `\\s+מ(?:ן\\s+|-\\s*|\\s*)(?:ה?(?:נקודה|קו?דקוד)\\s+)?(${NAME})`;
+const PERP_FROM_PLURAL_HE = `\\s+מ(?:ן\\s+|-\\s*|\\s*)(?:ה?(?:נקודות|קו?דקודים)\\s+)?(${NAME})\\s+ו-?\\s*(${NAME})`;
+const PERP_TO_HE = '\\s+(?:אל\\s+|ל-?\\s*)(.+?)';
+/** «חותך אותו בנקודה D» / «החותך את ציר ה-x בנקודה D» — where the perpendicular meets its line: the foot, named. */
+const PERP_CUT_HE = `(?:\\s*,?\\s+(?:ו|ה|ש)?(?:חות(?:ך|כת)|פוגש(?:ת)?)\\s+(?:אותו|אותה|(?:את\\s+)?(.+?))\\s+ב(?:נקודה\\s+|-\\s*)(${NAME}))?`;
+const PERP_CUT_PLURAL_HE = `(?:\\s*,?\\s+(?:ו|ה|ש)?(?:חותכים|פוגשים)\\s+(?:אותו|אותה|(?:את\\s+)?(.+?))\\s+ב(?:נקודות\\s+|-\\s*)(${NAME})\\s+ו-?\\s*(${NAME})(?:\\s+בהתאמה)?)?`;
+const PERP_HE = new RegExp(`^ה?אנך${PERP_VERB_CLAUSE}${PERP_FROM_HE}${PERP_TO_HE}${PERP_CUT_HE}$`);
+const PERP_PLURAL_HE = new RegExp(`^ה?אנכים${PERP_VERB_CLAUSE}${PERP_FROM_PLURAL_HE}${PERP_TO_HE}${PERP_CUT_PLURAL_HE}$`);
+const PERP_FOOT_HE = new RegExp(
+  `^(?:ה?נקודה\\s+)?(${NAME})\\s+(?:(?:היא|הינה|הוא)\\s+)?ה?רגל\\s+ה?אנך${PERP_VERB_CLAUSE}${PERP_FROM_HE}${PERP_TO_HE}$`,
+);
+const PERP_FROM_EN = `\\s+from\\s+(?:(?:the\\s+)?(?:point|vertex)\\s+)?(${NAME})`;
+const PERP_EN = new RegExp(
+  `^(?:[Tt]he\\s+)?[Pp]erpendicular(?:\\s+(?:dropped|drawn))?${PERP_FROM_EN}\\s+(?:on)?to\\s+(.+?)(?:\\s*,?\\s+(?:which\\s+|and\\s+)?(?:meets|cuts|intersects)\\s+(?:it|(.+?))\\s+at\\s+(?:(?:the\\s+)?point\\s+)?(${NAME}))?$`,
+);
+const PERP_PLURAL_EN = new RegExp(
+  `^(?:[Tt]he\\s+)?[Pp]erpendiculars(?:\\s+(?:dropped|drawn))?\\s+from\\s+(?:(?:the\\s+)?(?:points|vertices)\\s+)?(${NAME})\\s+and\\s+(${NAME})\\s+(?:on)?to\\s+(.+?)(?:\\s*,?\\s+(?:meet|cut|intersect)\\s+(?:it|(.+?))\\s+at\\s+(?:(?:the\\s+)?points\\s+)?(${NAME})\\s+and\\s+(${NAME})(?:\\s*,?\\s+respectively)?)?$`,
+);
+const PERP_FOOT_EN = new RegExp(
+  `^(?:(?:[Tt]he\\s+)?[Pp]oint\\s+)?(${NAME})\\s+is\\s+the\\s+foot\\s+of\\s+the\\s+perpendicular${PERP_FROM_EN}\\s+(?:on)?to\\s+(.+)$`,
+);
+/** «האנך» as an OPERAND — bare, or by its description («האנך שהורידו מנקודה B לציר ה-x»). */
+const PERP_REF_HE = new RegExp(`^ה?אנך(?:${PERP_VERB_CLAUSE}${PERP_FROM_HE}(?:${PERP_TO_HE})?)?$`);
+const PERP_REF_EN = new RegExp(`^(?:[Tt]he\\s+)?[Pp]erpendicular(?:${PERP_FROM_EN}(?:\\s+(?:on)?to\\s+(.+?))?)?$`);
+
+/**
+ * The LINE a foot is dropped onto, from the operand text — `direction()`'s vocabulary (an axis, a pair under any
+ * registry noun, a named line) plus a tangent named by its touch point. `null` for anything else (a bare «המשיק»,
+ * a circle): a foot needs one known line, never a guess.
+ */
+function footLineOf(text: string, claims: ClaimSink): FootLine | null {
+  const t = trim(text);
+  const tangent = readTangentNoun(t);
+  if (tangent) return tangent.at ? { k: 'curve', id: tangentLineId(tangent.at) } : null;
+  const d = direction(t, claims);
+  if (!d) return null;
+  if (d.k === 'axis' || d.k === 'curve') return d;
+  if (d.k === 'points') return { k: 'points', a: d.a, b: d.b };
+  return null;
+}
+
+const sameFootLine = (u: FootLine, v: FootLine): boolean =>
+  u.k === 'axis'
+    ? v.k === 'axis' && u.axis === v.axis
+    : u.k === 'curve'
+      ? v.k === 'curve' && u.id === v.id
+      : v.k === 'points' && ((u.a === v.a && u.b === v.b) || (u.a === v.b && u.b === v.a));
+
+const footKey = (from: Id, onto: FootLine): string =>
+  `foot(${from}|${onto.k === 'axis' ? `axis-${onto.axis}` : onto.k === 'curve' ? onto.id : [onto.a, onto.b].sort().join('')})`;
+
+/**
+ * The facts of ONE perpendicular: the foot (named, or a mint placeholder), and — when the sentence is about the
+ * perpendicular rather than about its foot — the piece from the point to the foot. A tangent named as the target
+ * is built by the sentence that names it, idempotently, as everywhere else (#1619 B3).
+ */
+function perpendicularFacts(
+  from: Id,
+  ontoText: string,
+  foot: Id | undefined,
+  draw: boolean,
+  line: string,
+): ParseResult {
+  const claims: ClaimSink = { out: [], src: line };
+  const onto = footLineOf(ontoText, claims);
+  // The verb was understood; the line it is dropped onto was not — an owned refusal naming the operand (ADR-AG-017).
+  if (!onto) return refuse('bad-operand', line);
+  // A perpendicular from a point of the line onto that line has no length, and a foot at its own point is no foot:
+  // 2-D's #1233 refusal, by the definition rather than by the case.
+  if ((onto.k === 'points' && (from === onto.a || from === onto.b)) || foot === from) return refuse('degenerate-role', line);
+  const id = foot ?? `${MINT_PREFIX}${footKey(from, onto)}`;
+  return made([
+    ...tangentObjectFacts(trim(ontoText), line),
+    { t: 'derived', id, rule: { t: 'foot', from, onto }, src: line },
+    // The piece from the point to its foot, drawn: the minted foot sits LAST in the id so the mint's rewrite reaches it.
+    ...(draw ? [{ t: 'segment' as const, id: foot ? segmentId(from, foot) : `seg-${from}${id}`, a: from, b: id, ref: true as const, src: line }] : []),
+    ...claims.out,
+  ]);
+}
+
+/** A cut object that is not the perpendicular's own line names a different crossing — not this rule's sentence. */
+function cutIsOwnLine(cutText: string | undefined, ontoText: string): boolean {
+  if (!cutText) return true;
+  const sink: ClaimSink = { out: [], src: '' };
+  const a = footLineOf(cutText, sink);
+  const b = footLineOf(ontoText, sink);
+  return !!a && !!b && sameFootLine(a, b);
+}
+
+/**
+ * «אנך אמצעי ל-AB» · «האנך האמצעי לצלע AB» · «the perpendicular bisector of AB» — 2-D's lowering, copied: the
+ * midpoint (a tool letter unless the student named it, the one mint) and the line through it perpendicular to AB.
+ */
+const PERP_BISECTOR_HE = new RegExp(`^ה?אנך\\s+ה?אמצעי\\s+(?:ל-?\\s*|של\\s+)(.+)$`);
+const PERP_BISECTOR_EN = /^(?:[Tt]he\s+)?[Pp]erpendicular\s+bisector\s+(?:of|to)\s+(.+)$/;
+
+function parsePerpendicular(line: string): RuleOutcome {
+  const bisector = PERP_BISECTOR_HE.exec(line) ?? PERP_BISECTOR_EN.exec(line);
+  if (bisector) {
+    const claims: ClaimSink = { out: [], src: line };
+    const piece = direction(trim(bisector[1]), claims);
+    if (!piece || piece.k !== 'points') return refuse('bad-operand', line);
+    const [a, b] = [piece.a, piece.b].sort();
+    const mid = `${MINT_PREFIX}mid(${a}${b})`;
+    return made([
+      { t: 'derived', id: mid, rule: { t: 'midpoint', a: piece.a, b: piece.b }, src: line },
+      { t: 'line-at', id: `curve-${anonIndex(`perp-bisector:${a}${b}`)}`, through: mid, dir: piece, perp: true, src: line },
+      ...claims.out,
+    ]);
+  }
+  const foot = PERP_FOOT_HE.exec(line) ?? PERP_FOOT_EN.exec(line);
+  if (foot) {
+    const [, id, from, onto] = foot;
+    return perpendicularFacts(from, onto, id, false, line);
+  }
+  const one = PERP_HE.exec(line) ?? PERP_EN.exec(line);
+  if (one) {
+    const [, from, onto, cut, id] = one;
+    if (!cutIsOwnLine(cut, onto)) return null;
+    return perpendicularFacts(from, onto, id, true, line);
+  }
+  const two = PERP_PLURAL_HE.exec(line) ?? PERP_PLURAL_EN.exec(line);
+  if (two) {
+    const [, p, q, onto, cut, f, g] = two;
+    if (!cutIsOwnLine(cut, onto)) return null;
+    if (p === q || (f !== undefined && f === g)) return refuse('repeated-vertex', line);
+    const a = perpendicularFacts(p, onto, f, true, line);
+    if (!a.ok) return a;
+    const b = perpendicularFacts(q, onto, g, true, line);
+    if (!b.ok) return b;
+    return made([...a.facts, ...b.facts]);
+  }
+  return null;
+}
+
+/** «האנך» / «האנך מ-B לציר ה-x» as an operand — the contextual reference M1 resolves (`on-kind`). */
+function perpendicularRef(text: string): KindOperand | null | 'bad' {
+  const m = PERP_REF_HE.exec(text) ?? PERP_REF_EN.exec(text);
+  if (!m) return null;
+  const [, from, ontoText] = m;
+  if (!from) return { t: 'kind', kind: 'perpendicular' };
+  if (!ontoText) return { t: 'kind', kind: 'perpendicular', foot: { from } };
+  const onto = footLineOf(ontoText, { out: [], src: '' });
+  if (!onto) return 'bad';
+  return { t: 'kind', kind: 'perpendicular', foot: { from, onto } };
 }
 
 /** A direction as a STABLE string, for the content-derived id above. */
@@ -4208,7 +4421,19 @@ function parseConstraint(raw: string): RuleOutcome {
     const drawn = ([[left, u], [right, v]] as const).flatMap(([text, d]) =>
       d.k === 'points' ? pieceFacts(pieceNounOf(readPiece(text)?.noun), d.a, d.b, line) : [],
     );
+    /*
+     * «הקטע EF מקביל ל-DA» NAMES the segment EF (#1074: naming introduces, referring does not) — corpus 2/4 draws EF
+     * through E parallel to DA before F is placed («F על הצלע AB» comes next). So the ends of an operand under the
+     * naming noun «הקטע» are introduced, as «הקטע EF» alone introduces them; a new end is a free point the relation
+     * then constrains (ADR-052). «הצלע», «הישר» and the bare pair still REFER (#1028, ADR-AG-198) — #1620, ADR-AG-207.
+     */
+    const named = ([[left, u], [right, v]] as const).flatMap(([text, d]) =>
+      d.k === 'points' && /^(?:ה?קטע|(?:the\s+)?segment)$/i.test(readPiece(text)?.noun?.trim() ?? '')
+        ? [d.a, d.b].map((id): Fact => ({ t: 'declare', id, src: line }))
+        : [],
+    );
     return made([
+      ...named,
       { t: 'constraint', k: { t: 'relation', rel: parallel ? 'parallel' : 'perpendicular', u, v }, src: line },
       ...drawn,
       ...claims.out,
@@ -4453,7 +4678,7 @@ function parseConstraint(raw: string): RuleOutcome {
     if (k && k.t === 'kind') {
       return made([
         { t: 'declare', id, src: line },
-        { t: 'on-kind', id, kind: k.kind, ...(k.circle ? { circle: k.circle } : {}), src: line },
+        { t: 'on-kind', id, kind: k.kind, ...(k.circle ? { circle: k.circle } : {}), ...(k.foot ? { foot: k.foot } : {}), src: line },
       ]);
     }
     // A bare AXIS operand keeps belonging to the ON_AXIS rule below, which also reads the
@@ -5164,7 +5389,7 @@ function parseClauseRules(raw: string): ParseResult {
     // the student wrote perfectly — the swallowing defect #1059 records, and the relation rule's own
     // docblock gives the cure: a construction recognisable from a keyword no other rule uses costs
     // nothing to match early and removes the ambiguity entirely.
-    parseThroughLine(line) ?? parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
+    parseThroughLine(line) ?? parsePerpendicular(line) ?? parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
   if (matched) return matched;
 
   // NO constrained-shape refusal here any more (#1049). It existed because those nouns carried

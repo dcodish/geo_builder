@@ -16,7 +16,7 @@
  *   CYCLE (rotations and reflections of the same ring, nothing more).
  * - **`circle-centre`** — one parent curve, compared directly.
  */
-import type { DerivedRule } from './derived';
+import type { DerivedRule, FootLine } from './derived';
 import type { Id } from './types';
 
 /** The same unordered pair or set of vertices, whatever order they were written in. */
@@ -38,6 +38,12 @@ function sameRing(a: readonly Id[], b: readonly Id[]): boolean {
     for (let i = 0; i < n; i++) forms.push(seq.slice(i).concat(seq.slice(0, i)).join());
   }
   return forms.includes(a.join());
+}
+
+function sameFootLine(a: FootLine, b: FootLine): boolean {
+  if (a.k === 'axis') return b.k === 'axis' && a.axis === b.axis;
+  if (a.k === 'curve') return b.k === 'curve' && a.id === b.id;
+  return b.k === 'points' && sameSet([a.a, a.b], [b.a, b.b]);
 }
 
 /** `true` when both rules define the SAME point — so naming the second is naming it twice. */
@@ -63,6 +69,9 @@ export function sameDerivation(a: DerivedRule, b: DerivedRule): boolean {
     // One circle, one side: the same touch whichever end is named first (#1619 B2).
     case 'side-touch':
       return b.t === 'side-touch' && a.circle === b.circle && sameSet([a.a, a.b], [b.a, b.b]);
+    // One point, one line: the same foot whichever end of a two-point line is named first (#1620, ADR-AG-207).
+    case 'foot':
+      return b.t === 'foot' && a.from === b.from && sameFootLine(a.onto, b.onto);
     default: {
       /**
        * EXHAUSTIVE on purpose. A new `DerivedRule` must decide whether two of its instances are the

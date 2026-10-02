@@ -120,6 +120,45 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'lines', family: 'F3', he: 'דרך P עובר ישר', en: 'a line through P' },
   { category: 'lines', family: 'F3', he: 'דרך P עובר ישר l3', en: 'line l3 through P' },
   /**
+   * The exam's constructions as declarative sentences (#1620 slice C, ADR-AG-207) — the perpendicular dropped from a
+   * point and its foot (corpus 5/5, 17/4, 20/4), the line through a point that cuts a side (13/4, 14/4), and the
+   * perpendicular named by its description (5/5). The imperatives («הורידו», «העבירו») are taught onto these.
+   */
+  { category: 'lines', family: 'F3', he: 'האנך מהנקודה B לציר ה-x', en: 'the perpendicular from B to the x-axis', needs: ['B(1,14)'] },
+  { category: 'lines', family: 'F3', he: 'האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D', en: 'the perpendicular from C to the x-axis meets it at D', needs: ['C(4,6)'] },
+  { category: 'lines', family: 'F3', he: 'D רגל האנך מ-C לציר ה-x', en: 'D is the foot of the perpendicular from C to the x-axis', needs: ['C(4,6)'] },
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'האנכים מהקודקודים A ו-C לציר ה-x חותכים אותו בנקודות E ו-F בהתאמה',
+    en: 'the perpendiculars from A and C to the x-axis meet it at E and F respectively',
+    needs: ['A(2,3)', 'C(5,7)'],
+  },
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'הישר העובר דרך הנקודה E מקביל לציר ה-y וחותך את הצלע AB בנקודה F',
+    en: 'the line through E parallel to the y-axis cuts side AB at F',
+    needs: ['A(0,0)', 'B(6,4)', 'E(3,-2)'],
+  },
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'הנקודה E נמצאת על האנך שהורידו מנקודה B לציר ה-x',
+    en: 'E is on the perpendicular from B to the x-axis',
+    needs: ['B(1,14)', 'האנך מהנקודה B לציר ה-x'],
+  },
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'המשיק והאנך נחתכים בנקודה D',
+    en: 'the tangent and the perpendicular intersect at D',
+    needs: ['נתון מעגל שמרכזו M(7,6) ורדיוסו 5', 'C(4,10)', 'המשיק למעגל בנקודה C', 'B(1,14)', 'האנך מהנקודה B לציר ה-x'],
+  },
+  { category: 'lines', family: 'F3', he: 'ישר דרך P מאונך ל-AB', en: 'line through P perpendicular to AB', needs: ['A(0,0)', 'B(4,3)', 'נקודה P'] },
+  { category: 'lines', family: 'F3', he: 'F רגל האנך מ-C ל-AD', en: 'F is the foot of the perpendicular from C to AD', needs: ['מרובע ABCD'] },
+  { category: 'lines', family: 'F3', he: 'אנך אמצעי ל-AB', en: 'the perpendicular bisector of AB', needs: ['A(0,0)', 'B(4,3)'] },
+  /**
    * A line by a POINT AND A SLOPE (#1278, ADR-AG-186) — written in point-slope form, the stated numbers
    * copied as given. The equation layer evaluates it as it stands (no CAS: nothing is simplified), so
    * the textbook's own form needs no arithmetic from the student or from the LLM lane, which had no

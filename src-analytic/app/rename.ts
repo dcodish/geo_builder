@@ -386,6 +386,8 @@ function namingCandidates(line: string, name: string): string[] {
     const at = m.index ?? 0;
     out.push(`${line.slice(0, at)}${name}${line.slice(at)}`);
   }
+  // A perpendicular's foot (#1620, ADR-AG-207): «האנך מהנקודה B לציר ה-x» names it «… חותך אותו בנקודה P₁».
+  out.push(`${line} חותך אותו בנקודה ${name}`, `${line} meets it at ${name}`);
   return out;
 }
 

@@ -26,13 +26,19 @@
  * Constructive forms («מעגל שמרכזו M ורדיוסו 5») synthesize the same `Expr`, so there is one
  * representation, not two.
  */
-import type { DerivedRule } from './derived';
+import type { DerivedRule, FootLine } from './derived';
 import type { AngleName, Constraint, Direction, TangentLineRef } from './solve';
 import type { Expr } from './expr';
 import type { LengthExpr } from './lengths';
 import { lineIdOf, numeralCurveId } from './names';
 
 export type Id = string;
+
+/** A perpendicular named by its DESCRIPTION — the point it is dropped from and, when said, the line it is dropped onto (#1620). */
+export interface PerpRef {
+  from: Id;
+  onto?: FootLine;
+}
 
 // ---------------------------------------------------------------------------
 // Parameters and the THREE kinds of inequality (ADR-AG-005 D7)
@@ -278,7 +284,12 @@ export type Fact =
    * unknown the rest of the question determines. `name` is the student's own name for it («ישר l3»),
    * absent for an anonymous one.
    */
-  | (FactBase & { t: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string })
+  /**
+   * `drawn: false` (#1620, ADR-AG-207) — the line is a CARRIER, not a drawing: «הישר העובר דרך E מקביל לציר ה-y
+   * וחותך את הצלע AB בנקודה F» draws the piece EF and keeps the line only to hold F (2-D's `visible: false`).
+   * A later sentence that states the line itself draws it (M1's upgrade).
+   */
+  | (FactBase & { t: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string; drawn?: false })
   /**
    * «מעגל ABD» · «המעגל העובר דרך A, B ו-D» · «נתון מעגל שקוטרו BD» — a circle COMPUTED from points
    * (#1464, #1324, ADR-AG-160). `name` is the student's own name for it, absent for an anonymous one.
@@ -377,7 +388,12 @@ export type Fact =
    * means is a question about the construction, so M1 answers it, and refuses where the figure
    * holds none or several of that kind.
    */
-  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent'; circle?: string; create?: true })
+  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent' | 'perpendicular'; circle?: string; create?: true; foot?: PerpRef })
+  /*
+   * `kind: 'perpendicular'` (#1620, ADR-AG-207) — «E על האנך», «המשיק והאנך נחתכים בנקודה D»: the one perpendicular
+   * the figure DREW (a `foot` derived point and the line from its point to it). `foot` narrows it by its description
+   * («האנך שהורידו מנקודה B לציר ה-x»); a reference, never a construction — none or several is refused by name.
+   */
   /*
    * `create` on `on-kind` (#1669, ADR-AG-204) — a CHORD's end: with no circle in the figure the chord sentence
    * states the circle (centre unnamed, ADR-AG-196's none → create, as 2-D's «מיתר AB» does), where «A על המעגל»
@@ -579,7 +595,7 @@ export type GeoObject =
    * `name` is how the student refers to it («ישר l3»), so a crossing can name it; absent for an
    * anonymous line.
    */
-  | { kind: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string }
+  | { kind: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string; drawn?: false }
   /**
    * A circle COMPUTED FROM POINTS (#1464, #1324, [ADR-AG-160](../../docs/06c-decisions-analytic.md#adr-ag-160))
    * — «מעגל ABD», the circle through three points, and «BD קוטר במעגל», the circle on a diameter.

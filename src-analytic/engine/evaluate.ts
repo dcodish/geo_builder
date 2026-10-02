@@ -2099,7 +2099,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
         // and a crossing ring can offer a sentence about it.
         const curve = lineAtCurve(c, env, at, o);
         if (curve) {
-          curves.push({ id: o.id, label: { name: o.name ?? '', kind: 'line' }, curve, stated: true });
+          curves.push({ id: o.id, label: { name: o.name ?? '', kind: 'line' }, curve, stated: o.drawn !== false });
         } else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }

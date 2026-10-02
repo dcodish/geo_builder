@@ -11,6 +11,7 @@ import { reportedDof } from './carriers';
 import { drawableAt, viewBox, type Figure } from './evaluate';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
+import { sameDerivation } from './sameDerivation';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
 import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
@@ -488,6 +489,31 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
   const minted: Array<{ index: number; id: string }> = [];
   let n = 0;
   facts.forEach((f, i) => {
+    /*
+     * A DERIVED POINT THE SENTENCE DID NOT NAME (#1620, ADR-AG-207; the #1222 ruling, *"invent a letter in this case.
+     * the user can always change it"*) — «האנך מהנקודה B לציר ה-x» drops a foot the exam leaves unnamed. The same
+     * point already derived the same way keeps ITS name (the coordinate rule above, structurally: one position, one
+     * name, #1153), so a perpendicular stated twice, or after its foot was named, is one point; otherwise the next
+     * reserved name, said on the row. A name given LATER is #1153's `already-named`, naming the tool's letter — the
+     * student renames it, as the ruling says; a later line never re-letters an earlier one, so the figure is stable.
+     */
+    if (f.t === 'derived' && f.id.startsWith(MINT_PREFIX) && !names.has(f.id)) {
+      const resolve = (id: string) => names.get(id) ?? id;
+      const own = facts
+        .slice(0, i)
+        .find((g): g is Extract<Fact, { t: 'derived' }> => g.t === 'derived' && sameDerivation(g.rule, f.rule) && !resolve(g.id).startsWith(MINT_PREFIX));
+      if (own) {
+        names.set(f.id, resolve(own.id));
+        return;
+      }
+      let name: string;
+      do name = `P${subscript(++n)}`;
+      while (used.has(name));
+      used.add(name);
+      names.set(f.id, name);
+      minted.push({ index: owner[i], id: name });
+      return;
+    }
     if (f.t !== 'point' || !f.id.startsWith(MINT_PREFIX) || names.has(f.id)) return;
     const at = numeric(f);
     const own = at
@@ -515,7 +541,13 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
   // A placeholder is a whole id or the SUFFIX of one (#1432 am. 1 — `circle-at-@mint:2,3`, `r_@mint:2,3` for a
   // circle centred on a coordinate point), so it is replaced up to the closing quote, never only as a whole string.
   const out = JSON.parse(text.replace(/@mint:[^"]*/g, (q) => JSON.stringify(names.get(q) ?? q).slice(1, -1))) as Fact[];
-  return { facts: out, minted };
+  // A segment to a minted point carried the placeholder LAST in its id; with the name known, its id is the
+  // canonical one any later sentence about the same piece computes (`seg-` and the two ends, sorted).
+  const pieces = out.map((g, i) => {
+    const was = facts[i];
+    return g.t === 'segment' && was.t === 'segment' && was.id.includes(MINT_PREFIX) ? { ...g, id: `seg-${[g.a, g.b].sort().join('')}` } : g;
+  });
+  return { facts: pieces, minted };
 }
 
 /**
