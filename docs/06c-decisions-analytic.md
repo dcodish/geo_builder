@@ -9186,3 +9186,58 @@ And on #1262's own figure («A(-9a,0)» · «B(41a,0)» · «נקודה P» · �
 - **The touch-created circle's free solve** costs seconds per line once free points ride it (above); pre-existing.
 
 **Consequences.** `app/panelRows.ts` (`openCurveText`, `readsToolSymbol`), `App.tsx` (imports it), `engine/apply.ts` (`describedCircle`, `circleByName`, `diameter-of`'s general lowering, `centre-of { circle }`), `engine/names.ts` (the described-circle name), `engine/types.ts` (`centre-of.circle`), `engine/crossings.ts` (`centresOf`), `parser/frameAnalytic.ts` (`describedCircles`), `parser/parseAnalytic.ts` (`CIRCLE_NAME`, the slots, `centreOfCircle`, `chordFacts`, `readLine`), `parser/catalogAnalytic.ts` (four rows, He + En, not featured — the LLM vocabulary grows by them; the proxy bundles the catalogue, so diff the built proxy before deploy). Sibling check (docs/17 §1): 2-D's circles always carry a centre point (no diameter class), it has no `θ_` symbols, and it reads «המעגל החוסם את משולש ABC» in its own crossing sentence; 3-D has no circles of this kind.
+
+## ADR-AG-204 — A role sentence introduces the points it names, and a chord or diameter with no circle states it (#1669)
+
+**Status:** accepted · 2026-10-02 · operator ruling on #1669 (2026-10-02): *"yes — analytic should mimic 2d behavior on these issues like we discussed earlier. analytics and 2d should have same user experience"* — a chord or diameter sentence with no circle CREATES the circle (centre unnamed until named), one circle binds, several ask, a radius on an unnamed centre stays refused. Settles ADR-AG-200's open "chord with no circle: create or refuse" as **create**. Branch `fix/1669-role-introductions` off `main` @ c6a412aa.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R140 (new) — a chord, diameter or radius sentence introduces the points it names; a chord or diameter typed before any circle draws the circle; a later equation of that circle is honoured. · **Design:** [04c](04c-design-analytic.md) — new section "A role sentence introduces its ends". · **LADDER stage:** parse (`withRoleIntroductions`, every clause; `RADIUS_PREDICATE`) and M1 (`on-kind { create }`, `circle-eq` on the created circle). No solver change.
+
+**Cites** [ADR-AG-196](#adr-ag-196) (none → create, one → bind, several → ambiguous), [ADR-AG-198](#adr-ag-198) ruling b (the touch-created circle, centre unnamed — the create path reused), [ADR-AG-200](#adr-ag-200) (`claimFacts` "minus its introductions", `applyRoleOf`), [ADR-AG-203](#adr-ag-203) (`diameter-of` on every circle kind), [ADR-052](06-decisions.md#adr-052) (an introduced end is a free DOF), 2-D ADR-391 (2-D's chord/diameter create their circle), #1028.
+
+**Context — measured at pickup on c6a412aa** (analytic through `decideSubmit`; 2-D through its real `runSubmit`, the model mocked):
+
+| sequence | 2-D | analytic before | analytic after |
+| --- | --- | --- | --- |
+| circle · «AB קוטר במעגל» / «AB קוטר» / «הקוטר AB מקביל …» | builds | `unknown-reference` | records |
+| «נתון מעגל שמרכזו M» · «AB קוטר במעגל» | builds | `unknown-reference` | records (M the midpoint) |
+| circle · «A על המעגל» · «AB קוטר במעגל» | builds | `unknown-reference` (B) | records (B the antipode) |
+| circle · «המיתר AB מקביל …» | builds | `unknown-reference` | records |
+| centre O · «OA רדיוס» | builds | `unknown-reference` | records |
+| «AB קוטר» / «AB קוטר במעגל» (no circle) | builds the circle on AB, centre unnamed | `unknown-reference` | records, the same circle |
+| «AB קוטר» · «O מרכז המעגל» | builds | line 1 refused; line 2 built a circle on O | records; O the midpoint |
+| «מיתר AB» / «המיתר AB מקביל …» (no circle) | builds a circle, centre unnamed | `ambiguous-shape` / `unknown-reference` | records, a circle with its centre unnamed |
+| «נתון מעגל שקוטרו AB» | builds | `unknown-reference` | records |
+| «AB קוטר» · «C על המעגל» · «BD מיתר» (corpus-2) | builds | refused, refused, refused | records |
+| «מעגל O» · «AB קוטר» · «BD מיתר» (corpus-2 :499) | builds | records | records |
+| «מיתר AB» · «C על המעגל» · «AC קוטר» | builds | refused | records |
+| two circles · «AB קוטר במעגל» | refused, asks which | `unknown-reference` | `ambiguous-shape` (asks which) |
+| «הרדיוס OB» / «OB רדיוס» (no circle) | refused (not understood) | refused | refused |
+| centre O · «AB רדיוס» | refused | refused | refused (`conflicting-restatement`) |
+| circle · «מיתר AB» / «AB מיתר במעגל» / «AB משיק למעגל בנקודה A» / «משולש ABC חסום במעגל» | builds | records | records |
+
+**The class (docs/17 §1): a role sentence did not introduce the points it names.** The chord predicate and the inscribed shape minted their ends (`chordFacts`, `cyclicFacts` declare them); every diameter spelling (`diameter-of`), every role-noun operand (ADR-AG-200's `claimFacts` — "the facts the role's canonical sentence carries, minus its introductions") and the radius did not, so each refused the very sentence 2-D builds. Two further members surfaced on measurement: the defining sentence «נתון מעגל שקוטרו AB» (refused the same way), and the predicate «OA רדיוס», which the measure-role split read as "the radius equals |OA|" and so needed A first. And the chord typed before any circle kept the `ambiguous-shape` refusal ADR-AG-200 left open for this ruling.
+
+**Decision.**
+1. **The introductions are declared at ONE place** — `withRoleIntroductions`, applied to every clause the grammar reads (`parseClause` wraps the rules; every direct, framed or split reading passes through it). It reads the clause's ROLE facts, not the rule that produced them: a `diameter-of`'s two ends, a radius `role-of`'s two ends, and the subject of an `on-kind` circle (the chord claim; every other `on-kind` emitter already declares its point). Each end the clause does not already define or declare is declared FIRST — a role noun's claim is stated after the rule's own facts (`ClaimSink`), which reference the ends. An existing point absorbs its `declare`, so a placed end keeps its place; a new end is a free point the role constrains (ADR-052).
+2. **The radius predicate is the role.** «OA רדיוס» / «OA הוא רדיוס במעגל» / "OA is a radius (of the circle)" lower to «הרדיוס OA» (`RADIUS_PREDICATE` in `parseShape`; `parseMeasureRoles` yields it), so M1's `applyRoleOf` decides which end is the centre. A radius whose circle has an unnamed centre (an equation circle with no letter, the circle a diameter or chord created) stays `out-of-scope`; with no circle `ambiguous-shape`; neither end the centre `conflicting-restatement`.
+3. **A chord's end with no circle states the circle** (`on-kind { create }`, set by `claimFacts` and the contextual `chordFacts`): M1 applies ADR-AG-198's creation (`touchedCircleFacts` — the equation circle over the tool's free symbols, centre unnamed) and puts the end on it; the next end binds to it. One circle binds and several ask, as before. «A על המעגל» carries no `create` and keeps its refusal. A diameter with no circle already stated the circle on it (#1324's `circle-thru` diameter, centre the unnamed midpoint) — it needed only its ends.
+4. **The created circle takes the equation stated after it.** `circle-eq` bound to the created circle (`the-circle`'s binding of «משוואת המעגל היא …») replaces its expression by the stated equation under the same id and drops its free symbols — the incircle sentence's treatment of the same circle (ADR-AG-198). Without it, corpus 11/5 (chords first, equation second) went from a deferred-then-landed first line to a `conflicting-restatement` on the equation line, and the ratchet fell 217 → 216: the measured reason for this arm. The tangency-created circle followed by its equation was refused the same way before and records now.
+
+**Locks** (`issue-1669-role-introductions.test.ts`, 55): the issue's table and ten neighbours record with no fault; seven diameter spellings are antipodal (|AB| = 2r, midpoint = centre) at four seeds; the vertical noun form gives (0, ±5); a centre letter is the midpoint; a placed A(3,4) keeps its place and B = (−3,−4); the chord operand's ends on the circle, AB horizontal; the radius on centre O; «OA רדיוס» ≡ «הרדיוס OA»; no circle — the diameter's circle and the chord's circle are created with no centre point, and «O מרכז המעגל» names the midpoint / the centre; 11/5's order gives one circle (3,−2), r = 5, A..D on it; the tangency-created circle takes its equation (was `conflicting-restatement`); a placed end contradicting the equation is `unsatisfiable`; two circles ask (three spellings); six radius refusals on an unnamed or absent centre; 24-seed sweeps — B is A's antipode at 24/24 and takes ≥ 12 places, the no-circle diameter and chord vary; corpus-2's diameter-then-chord sequences. **Fails before: 48 of 55** (the 7 are controls: four already-minting rows, «הרדיוס OA» on a named centre, and two no-circle radius refusals).
+
+**⚠ Locks changed, each to this ruling.**
+- `issue-1637-g2-parser` "a diameter still REFERS to its ends … refused": now records, the ends on the circle through M, M their midpoint.
+- `issue-1651-1652` the chord claim's facts now carry `create: true` (the equality with «BC מיתר במעגל»'s lowering still holds — both carry it); "a circle noun with no circle is the contextual refusal" → the chord states the circle, B and C on it.
+- `issue-1659-1665-1663` «AF קוטר במעגל החוסם את המשולש ABC» with no F: `unknown-reference` → records, F = (6,2), A's antipode.
+
+**Measured.** 471 corpus (seed 0): **217/263 lines, 21/46 questions — unchanged** (11/5 still stops at «העבירו מיתר AD», `not-handled`); the floor stays. Every new line records in 0–10 ms.
+
+**Not built, said out loud — the 2-D disparities this measurement found outside the ruling's words.**
+- **A radius on an UNNAMED centre: 2-D does not refuse it.** «AB קוטר» · «OB רדיוס» and «מיתר AB» · «OA רדיוס» build in 2-D, which NAMES the unnamed centre O from the radius (`name-center`). The ruling says "the radius on an unnamed centre stays refused, because 2-D refuses it too" — measured, 2-D refuses only with NO circle. Kept refused here as the ruling's words say; **a ruling for the operator** (follow 2-D and name the centre, or keep refusing).
+- **«A על המעגל» with no circle:** 2-D creates a circle; analytic refuses. Outside "chord or diameter"; reported for the operator.
+- **A bare pair naming new points** («מעגל O» · «BD⊥AC» · «AC קוטר»): 2-D creates B, D, A, C free; analytic refuses «BD⊥AC» (#1028's reference rule — no role gives the points a carrier). A different class.
+- **The centre's implicit letter:** 2-D's created circle answers to «O» in a later sentence (corpus-2 :315's «AM חותך את CO»); here the centre is unnamed until «O מרכז המעגל» names it, as the ruling says.
+- «משוואת המעגל היא …» after a no-circle «AB קוטר» stays `out-of-scope` (ADR-AG-196's computed-circle refusal, unchanged).
+
+**Consequences.** `parser/parseAnalytic.ts` (`parseClause` → `withRoleIntroductions` + `POINT_MAKERS`, `parseClauseRules`; `RADIUS_PREDICATE` in `parseShape` and the `parseMeasureRoles` yield; `claimFacts` / `chordFacts` set `create`), `engine/types.ts` (`on-kind.create`), `engine/apply.ts` (`on-kind`'s create arm, `circle-eq` on the created circle). No catalogue row changes, so the LLM vocabulary is unchanged. Sibling check (docs/17 §1): 2-D is the reference and builds every row (above); 3-D has no circles of this kind.

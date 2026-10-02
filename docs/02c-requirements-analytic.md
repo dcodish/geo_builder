@@ -2094,3 +2094,12 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - Clicking the centre of a computed circle that is one of several offers the letter box, and the letter adds «K מרכז המעגל החוסם את המשולש ABC» (or «… החסום במשולש ABC»).
 - «AB קוטר במעגל», «הקוטר AB …» and «הקוטר AB = 10» work on every circle — one given by its equation, one a tangency sentence drew, one computed from points — not only on a circle whose centre has a letter. A radius on a centre with no letter is still refused.
 - A circle whose equation the givens do not fix shows «—» in the data panel, never the tool's internal symbols (such as «θ_…»). An open equation the student wrote (with their own parameters) is still shown.
+
+**R140 — a chord, diameter or radius sentence introduces the points it names, and a chord or diameter typed before any circle draws the circle**
+([ADR-AG-204](06c-decisions-analytic.md#adr-ag-204), [#1669](https://github.com/dcodish/geo_builder/issues/1669); operator ruling 2026-10-02: the analytic tool behaves as the 2-D tool does here).
+
+- «AB קוטר», «AB קוטר במעגל», «הקוטר AB מקביל לציר ה-y», «המיתר AB מקביל לציר ה-x», «נתון מעגל שקוטרו AB», «הרדיוס OA» and «OA רדיוס» work when A and B are not yet in the figure: each named point is added, on the circle, free to move along it. A point already placed keeps its place — after «A(3,4)» on x²+y²=25, «AB קוטר במעגל» puts B at (−3,−4).
+- A diameter's two ends are antipodal (the segment passes through the centre and is twice the radius).
+- With no circle in the figure, «AB קוטר» draws the circle on AB, and «מיתר AB» / «המיתר AB …» draws a circle through A and B; the centre has no letter until «O מרכז המעגל» names it. An equation stated afterwards («משוואת המעגל היא …») is that circle's equation.
+- With one circle the sentence is about that circle; with several it asks which.
+- «OA רדיוס» means OA is a radius (as «הרדיוס OA»). A radius on a circle whose centre has no letter, or with no circle at all, is still refused.

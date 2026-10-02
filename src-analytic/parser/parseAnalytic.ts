@@ -315,8 +315,9 @@ function readPiece(text: string): { a: Id; b: Id; noun?: string; row?: StraightN
  * THE ONE LOWERING OF A ROLE NOUN'S CLAIM (#1651, ADR-AG-200) — what «<noun> XY» asserts besides naming XY, as the
  * facts the canonical sentence of that role already carries:
  *
- * - chord → both ends on «המעגל» (`on-kind`, resolved at M1 like «B על המעגל») and two distinct ends — exactly
- *   `chordFacts` without its introductions (a role noun REFERS to its ends, #1028);
+ * - chord → both ends on «המעגל» (`on-kind`, resolved at M1 like «B על המעגל»; `create`: with no circle the chord
+ *   states it, #1669) and two distinct ends — exactly `chordFacts` without its introductions and piece. The ends the
+ *   figure lacks are introduced for EVERY role sentence at one place, `withRoleIntroductions` (#1669, ADR-AG-204);
  * - diameter → «XY קוטר במעגל» (`diameter-of`, its M1 binding: the one circle, or the circle on it when none);
  * - tangent → «XY משיק למעגל» (`tangent-of` over the pair, ADR-AG-196's binding, the touch-created circle when none);
  * - radius, leg, base, hypotenuse → `role-of`, which only the figure can lower (which end is the centre, which
@@ -331,8 +332,8 @@ function claimFacts(row: StraightNoun | undefined, a: Id, b: Id, src: string): F
       return [];
     case 'chord':
       return [
-        { t: 'on-kind', id: a, kind: 'circle', src },
-        { t: 'on-kind', id: b, kind: 'circle', src },
+        { t: 'on-kind', id: a, kind: 'circle', create: true, src },
+        { t: 'on-kind', id: b, kind: 'circle', create: true, src },
         { t: 'selector', sel: { kind: 'distinct', ids: [a, b] }, src },
       ];
     case 'diameter':
@@ -1799,6 +1800,15 @@ const LINE_PIECE_HE = new RegExp(`^${HE_GIVEN}ה?ישר\\s+(${NAME})(${NAME})$`)
 const LINE_PIECE_EN = new RegExp(`^(?:the\\s+)?[Ll]ine\\s+(${NAME})(${NAME})$`);
 /** «<any registry noun> XY» on a line of its own — the role nouns' declaration (#1651, ADR-AG-200). */
 const PIECE_DECL = new RegExp(`^${HE_GIVEN}(${PIECE_NOUN})\\s+(${NAME})(${NAME})$`);
+/**
+ * «OA רדיוס» · «OA הוא רדיוס במעגל» · "OA is a radius (of the circle)" — the radius ROLE as a predicate, the same
+ * claim as «הרדיוס OA» (#1669, ADR-AG-204), as «AB קוטר» is the same claim as «הקוטר AB». It was read by the
+ * measure-role split as "the radius equals |OA|", which says nothing of which end is the centre (2-D reads the role).
+ */
+const RADIUS_PREDICATE = new RegExp(
+  `^${HE_GIVEN}(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?רדיוס(?:\\s+(?:ב|של\\s+)ה?מעגל)?$` +
+    `|^(?:the\\s+)?(?:segment\\s+)?(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+radius(?:\\s+of\\s+the\\s+circle)?$`,
+);
 
 /**
  * A segment's id is CANONICAL — «הקטע AB» and «הקטע BA» are one object, so they must be one id.
@@ -2325,6 +2335,7 @@ function parseMeasureRoles(line: string): RuleOutcome {
   // «הרדיוס MB» NAMES the radius MB — the piece and its claim (#1651, ADR-AG-200), `parseShape`'s — not "the radius
   // is the length MB", which the last-token split below would read and which says nothing of where the centre is.
   if (PIECE_DECL.test(trim(line)) && nounRow(PIECE_DECL.exec(trim(line))![1])?.claim === 'radius') return null;
+  if (RADIUS_PREDICATE.test(trim(line))) return null;
   const body = trim(line)
     .replace(/^נתו(?:ן|נה|נים|נות)\s+(?:כי\s+|ש(?=\S))?/, '')
     .replace(/^(?:it\s+is\s+)?given\s+(?:that\s+)?/i, '');
@@ -2681,7 +2692,7 @@ function chordFacts(a: Id, b: Id, circle: string | undefined, line: string): Fac
   const host = circle === undefined || described ? undefined : isNumeralName(circle) ? numeralCurveId('circle', circle) : `circle-at-${circle}`;
   const on = (id: Id): Fact =>
     host === undefined
-      ? { t: 'on-kind', id, kind: 'circle', ...(described ? { circle } : {}), src: line }
+      ? { t: 'on-kind', id, kind: 'circle', ...(described ? { circle } : { create: true as const }), src: line }
       : { t: 'constraint', k: { t: 'on-curve', id, curve: host }, src: line };
   return [
     { t: 'declare', id: a, src: line },
@@ -3492,7 +3503,8 @@ function parseShape(line: string): RuleOutcome {
    * piece, by the noun's extent, introduced as «הקטע BC» / «הישר BC» introduce theirs, then the role's claim. A
    * claim this tree cannot lower (median, altitude) leaves the sentence to the rules below, unread here.
    */
-  const role = PIECE_DECL.exec(line);
+  const pred = RADIUS_PREDICATE.exec(line);
+  const role: readonly string[] | null = pred ? [line, 'רדיוס', pred[1] ?? pred[3], pred[2] ?? pred[4]] : PIECE_DECL.exec(line);
   const roleRow = role ? nounRow(role[1]) : undefined;
   if (role && roleRow?.claim) {
     const [, , a, b] = role;
@@ -4850,7 +4862,53 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
 /** A space-delimited run of three or more Latin letters is a WORD — no equation in this grammar has one (#1068). */
 const HAS_A_WORD = /(?:^|\s)[A-Za-z]{3,}(?=\s|$)/;
 
+/**
+ * ONE CLAUSE: the grammar's reading, then the points its ROLE sentence introduces (#1669, ADR-AG-204). Every leaf
+ * reading — direct, framed, split — passes through here, so the introductions are declared at ONE place.
+ */
 function parseClause(raw: string): ParseResult {
+  const r = parseClauseRules(raw);
+  return r.ok ? made(withRoleIntroductions(r.facts)) : r;
+}
+
+/** The facts that MAKE a point of their id — a point the clause defines (or already declares) is left as the clause has it. */
+const POINT_MAKERS: ReadonlySet<Fact['t']> = new Set<Fact['t']>(['point', 'derived', 'centre-of', 'focus-of']);
+
+/**
+ * A ROLE SENTENCE INTRODUCES THE POINTS IT NAMES (#1669, ADR-AG-204; operator 2026-10-02: *"analytic should mimic 2d
+ * behavior … analytics and 2d should have same user experience"*). «AB קוטר», «הקוטר AB מקביל לציר ה-y», «המיתר AB
+ * מקביל לציר ה-x», «הרדיוס OA», «OA רדיוס» name ends the figure may not have yet, and the role gives each a carrier —
+ * the circle — so each is a free point the role then constrains (ADR-052: an introduced end is a free DOF, never a
+ * default). The chord predicate («מיתר AB») and the inscribed shape always minted theirs; the diameter spellings, the
+ * role-noun operands (ADR-AG-200's `claimFacts`, "minus its introductions") and the radius did not, and were refused
+ * `unknown-reference` where 2-D builds the figure.
+ *
+ * A role's ends, read off the clause's own facts rather than off the rule that produced them, so no rule has to
+ * remember: a `diameter-of`'s two ends (every diameter spelling, defining or not), a radius `role-of`'s two ends (M1
+ * then decides which is the centre — a radius on an unnamed or absent centre stays refused there, as in 2-D), and the
+ * subject of an `on-kind` circle (the chord claim; «A על המעגל» already declares its point, so this changes nothing
+ * for it). The declarations go FIRST — a role noun's claim is stated after the rule's own facts (`ClaimSink`), and
+ * those facts reference the ends. An existing point absorbs its `declare` (`known`), so a placed A keeps its place.
+ */
+function withRoleIntroductions(facts: readonly Fact[]): Fact[] {
+  const defined = new Set(facts.filter((f) => POINT_MAKERS.has(f.t) || f.t === 'declare').map((f) => (f as { id: Id }).id));
+  const ends: Array<{ id: Id; src: string }> = [];
+  for (const f of facts) {
+    const ids =
+      f.t === 'diameter-of'
+        ? [f.a, f.b]
+        : f.t === 'role-of' && f.role === 'radius'
+          ? [f.a, f.b]
+          : f.t === 'on-kind' && f.kind === 'circle'
+            ? [f.id]
+            : [];
+    for (const id of ids) if (!defined.has(id) && !ends.some((e) => e.id === id)) ends.push({ id, src: f.src });
+  }
+  if (ends.length === 0) return [...facts];
+  return [...ends.map(({ id, src }): Fact => ({ t: 'declare', id, src })), ...facts];
+}
+
+function parseClauseRules(raw: string): ParseResult {
   const line = trim(raw);
   if (!line) return { ok: false, code: 'not-handled', detail: raw };
 

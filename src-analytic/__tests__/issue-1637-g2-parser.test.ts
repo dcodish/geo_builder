@@ -86,8 +86,12 @@ describe('#1639 — a sentence that names a pair draws it', () => {
     expect(decideSubmit('AC', lines, 0).kind).toBe('already-known');
   });
 
-  it('a diameter still REFERS to its ends: with no A and C it is refused, never introducing them', () => {
-    expect(refusal('AC הוא קוטר במעגל', ['נתון מעגל שמרכזו M']).key).toBe('unknown-reference');
+  // Amended by #1669 (ADR-AG-204, operator 2026-10-02 "analytic should mimic 2d"): a ROLE sentence introduces the
+  // ends it names — the diameter puts A and C on the circle, the centre M their midpoint. Was `unknown-reference`.
+  it('a diameter INTRODUCES its ends (#1669): with no A and C it records, both on the circle through M', () => {
+    expect(decideSubmit('AC הוא קוטר במעגל', ['נתון מעגל שמרכזו M'], 0).kind).toBe('record');
+    const q = pts(derive(['נתון מעגל שמרכזו M', 'AC הוא קוטר במעגל'], 0).figure);
+    expect(Math.abs((q.A.x + q.C.x) / 2 - q.M.x) + Math.abs((q.A.y + q.C.y) / 2 - q.M.y)).toBeLessThan(1e-6);
   });
 
   it('the audit: a relation, a side on an axis and the converse incidence draw their pairs, by noun', () => {

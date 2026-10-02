@@ -808,7 +808,8 @@ function circleNamed(
  * vertex, kept out of the parameter rows (the free direction's discipline), the radius positive. It is an
  * ordinary circle from here on — «המעגל» binds to it, «O מרכז המעגל» names its centre through the derived
  * `circle-centre` an equation circle's centre already has (B1), its equation prints once the givens fix it.
- * Only made when there is no circle, so its one id never meets another.
+ * Only made when there is no circle, so its one id never meets another. A CHORD sentence typed before any circle
+ * states the same circle (#1669, ADR-AG-204 — the `on-kind { create }` arm): one creation for both sentences.
  */
 const TOUCHED_CIRCLE_ID: Id = 'circle-touched';
 
@@ -1852,6 +1853,17 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       // «המשיק» — the one tangent OBJECT (#1619 B3): a line built at a touch point, never any line.
       const matches = c.objects.filter((o) => (f.kind === 'tangent' ? isTangentObject(o) : curveKindOf(o) === f.kind));
+      /*
+       * A CHORD'S END WITH NO CIRCLE: THE SENTENCE STATES IT (#1669, ADR-AG-204; operator 2026-10-02, "analytic should
+       * mimic 2d"). The tangency's create path (ADR-AG-198 ruling b): the circle with its centre UNNAMED, a later
+       * «O מרכז המעגל» names it. Only a chord's end carries `create`; «A על המעגל» with no circle stays refused.
+       */
+      if (matches.length === 0 && f.kind === 'circle' && f.create) {
+        const created = applyAll(c, touchedCircleFacts(f.src));
+        if (!created.ok) return created;
+        const bound = applyFact(created.next, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: TOUCHED_CIRCLE_ID }, src: f.src });
+        return bound.ok ? { ...bound, effect: 'created' } : bound;
+      }
       if (matches.length !== 1) return { ok: false, error: noHost(f.src, f.kind === 'tangent' ? 'line' : f.kind, matches) };
       return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: matches[0].id }, src: f.src });
     }
@@ -1909,6 +1921,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     case 'circle-eq': {
       const host = objectById(c, f.circleId);
       if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, f.circleId) };
+      /*
+       * THE CIRCLE A SENTENCE CREATED TAKES THE STATED EQUATION (#1669, ADR-AG-204). A chord or tangency sentence typed
+       * before any circle stated it with its centre and radius UNKNOWN (the tool's free symbols, ADR-AG-198); «משוואת
+       * המעגל היא …» then says what it is. It becomes that equation under the SAME id — every chord end and touch
+       * already on it keeps its referent — and its free symbols leave the figure: the incircle sentence's treatment of
+       * the same circle (`the-circle`, above). Corpus 11/5 types its chords first and its equation second.
+       */
+      if (host.kind === 'curve' && host.id === TOUCHED_CIRCLE_ID) {
+        const own = (sym: string) => sym.startsWith(toolSymbol(TOUCHED_CIRCLE_ID, ''));
+        const defined: Construction = {
+          ...c,
+          params: c.params.filter((p) => !own(p.sym)),
+          objects: c.objects.map((o) => (o.id === TOUCHED_CIRCLE_ID && o.kind === 'curve' ? { ...o, curve: { kind: 'circle', eq: f.eq } } : o)),
+        };
+        return { ok: true, next: defined, effect: 'narrowed' };
+      }
       // An equation circle IS its equation: the same one is known, another is a contradiction.
       if (host.kind === 'curve') {
         return resolveCurveByEq(c, f.eq) === host.id
