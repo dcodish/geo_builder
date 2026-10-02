@@ -3022,4 +3022,25 @@ export const SCENARIOS_4: Scenario[] = [
       expect(rows.find((r) => r.kind === 'length' && r.label === 'AB')?.value, 'the givens still print').toBeCloseTo(5, 6);
     },
   },
+  {
+    id: 'tangency-first-creates-the-circle-1650',
+    title: '#1650 (ADR-560): corpus 6/4 typed as printed — «AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה» before any circle creates the circle (centre unnamed), «O מרכז המעגל» names its centre, and the diagonals of ABCO meet at K',
+    guards:
+      "Operator, 2026-10-02: «AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה — this works on analytic but not on 2d.» Typed first, 2-D refused it («הצעד הזה מסתמך על ABC שעדיין לא הוגדרו»): the two-sides tangency rule re-decided bind-or-create itself, and with no circle it always took the corner construction, which bisects an angle whose points did not exist and defined the touch point A as a foot from itself. Ruling on #1619 (2026-10-01, ported from analytic ADR-AG-196/198): a tangency about «המעגל» with no circle creates the circle, its centre unnamed until a later sentence names it. Asserts every step builds, the touch points are A and C (OA ⟂ AB, OC ⟂ CB, A and C on the circle), O is the named centre, and K is the meet of the diagonals AC and BO. The submit-gate locks (and «מעגל O» first, two circles → ambiguous) are in src/app/__tests__/issue-1650-tangency-creates-circle.test.ts.",
+    steps: ['AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה', 'O מרכז המעגל', 'אלכסוני המרובע ABCO נפגשים בנקודה K'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const o = at(fig, 'O'), b = at(fig, 'B'), k = at(fig, 'K');
+      for (const T of ['A', 'C']) {
+        const p = at(fig, T);
+        expect(Math.abs((p.x - o.x) * (b.x - p.x) + (p.y - o.y) * (b.y - p.y)) / (dist(o, p) * dist(p, b)), `O${T} ⟂ ${T}B`).toBeLessThan(1e-6);
+      }
+      expect(dist(o, at(fig, 'A')), 'A and C on the one circle').toBeCloseTo(dist(o, at(fig, 'C')), 6);
+      const cross = (p: Vec, q: Vec, r: Vec) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+      expect(Math.abs(cross(at(fig, 'A'), at(fig, 'C'), k)), 'K on AC').toBeLessThan(1e-6);
+      expect(Math.abs(cross(b, o, k)), 'K on BO').toBeLessThan(1e-6);
+      expect(fig.positions.has('@ctr-O'), 'the centre is the named O, not a hidden one').toBe(false);
+    },
+  },
 ];

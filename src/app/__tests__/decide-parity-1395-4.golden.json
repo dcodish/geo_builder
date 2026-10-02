@@ -131,6 +131,7 @@
  "scenario:zero-dof-configurations-status-1444": "9b00153cdeea57c1",
  "scenario:tangents-perpendicular-foot-values-1601": "71d94094f0cdffc8",
  "scenario:ssa-triangle-two-shapes-status-and-values-1599": "b8004d436344c180",
+ "scenario:tangency-first-creates-the-circle-1650": "b9dcad315196e919",
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",
  "fixture:defining-interaction.geo.json": "453b283f490e90b0",
  "fixture:equilateral-inscribed.geo.json": "d8a2b3c24fc515b8",
