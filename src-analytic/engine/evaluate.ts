@@ -11,7 +11,7 @@
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
 import { isDirectionSymbol, paramRegister, usedSymbols } from './carriers';
-import { circumcentre, constructionOf, evalRule, type Construction as RuleConstruction, type Pt } from './derived';
+import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
@@ -20,7 +20,6 @@ import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
 import { dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
-import { drawnPieceOver } from './extent';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { curveByName, inDomain, isFree, objectById, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type Selector } from './types';
 
@@ -120,6 +119,12 @@ export interface Figure {
   provenance: Record<Id, PointProvenance>;
   /** The register symbols some object or constraint reads (#1343) — the ones a configuration is made of. */
   usedSymbols: string[];
+  /**
+   * The seed the DISCRETE choices of this configuration were resolved at (#1642, ADR-AG-197) — the figure's
+   * own seed unless that seed's option contradicted the other givens and another option was taken at the
+   * same samples. Absent on a figure built by hand (read as the seed).
+   */
+  choiceSeed?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -459,6 +464,20 @@ export function carrierSystem(
  * a diameter whose ends coincide has no circle at this configuration.
  */
 export function circleThruCurve(o: Extract<GeoObject, { kind: 'circle-thru' }>, at: (id: Id) => Pt | null): NumCurve | null {
+  /**
+   * THE INSCRIBED CIRCLE (#1619 B2, ADR-AG-194) — centre where the bisectors meet (`incircleCentre`), radius
+   * its distance to the first side. A degenerate or non-convex ring has none: a vacancy, as above.
+   */
+  if (o.def.t === 'incircle') {
+    const vs = o.def.pts.map(at);
+    if (vs.some((p) => !p)) return null;
+    const ctr = incircleCentre(vs as Pt[]);
+    if (!ctr) return null;
+    const foot = footOn(ctr, vs[0]!, vs[1]!);
+    if (!foot) return null;
+    const r = Math.hypot(ctr.x - foot.x, ctr.y - foot.y);
+    return Number.isFinite(r) && r > 0 ? { kind: 'circle', cx: ctr.x, cy: ctr.y, r } : null;
+  }
   if (o.def.t === 'through') {
     const [p, q, s] = o.def.pts.map(at);
     if (!p || !q || !s) return null;
@@ -745,6 +764,31 @@ function crossingSiblings(c: Construction, id: Id, at: Map<Id, Pt>): Id[] {
   return [...at.keys()].filter((other) => other !== id && sig(other) === mine);
 }
 
+/**
+ * A CIRCLE'S REGION QUANTITY at this configuration (#1619 B1, ADR-AG-193) — the `power` of a point (|PC|² − r²,
+ * positive outside) or the `arc-side` product (the point's side of the chord AB times the centre's, positive
+ * on the major arc's side). Scale-free in sign, which is all the selector reads; a value within the solver's
+ * resolution of zero is ON the boundary and counts as neither side, so a point the givens put ON the circle
+ * never reads as "outside" by a rounding error. `null` when something it needs is not placed.
+ */
+export function circleQuantity(
+  q: Exclude<Extract<Selector, { kind: 'sign' }>['q'], { k: 'slope' }>,
+  at: (id: Id) => Pt | null,
+  curveAt: (id: Id) => NumCurve | null,
+): number | null {
+  const k = curveAt(q.circle);
+  const p = at(q.p);
+  if (!k || k.kind !== 'circle' || !p) return null;
+  const scale = Math.max(1, k.r * k.r);
+  const zero = (v: number) => (Math.abs(v) <= SOLVE_RESOLUTION * scale ? 0 : v);
+  if (q.k === 'power') return zero((p.x - k.cx) ** 2 + (p.y - k.cy) ** 2 - k.r * k.r);
+  const a = at(q.a);
+  const b = at(q.b);
+  if (!a || !b) return null;
+  const side = (x: number, y: number) => (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
+  return zero(side(p.x, p.y)) * zero(side(k.cx, k.cy));
+}
+
 function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[] {
   const apart = apartOf(at);
 
@@ -760,11 +804,37 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
      */
     if (s.kind === 'sign') {
       const atFn = (id: Id) => at.get(id) ?? null;
+      if (s.q.k !== 'slope') {
+        const q = circleQuantity(s.q, atFn, curveAtOf(c, env, atFn));
+        if (q === null) return true; // an operand not placed (or a vacant circle) judges nothing, as below
+        return s.positive ? q > 0 : q < 0;
+      }
       const v = dirVector(s.q.u, atFn, curveAtOf(c, env, atFn), env);
       if (!v) return true; // an operand that is not placed yet judges nothing, as below
       if (Math.abs(v.x) < 1e-9 * Math.hypot(v.x, v.y)) return false;
       const positive = v.x * v.y > 0;
       return s.positive ? positive : !positive;
+    }
+    /**
+     * EVERY ANGLE ACUTE (#1619 B2, ADR-AG-194) — at each vertex the two sides make a positive dot product.
+     * A right angle is not acute: judged at the solver's resolution, relative to the sides, so a determined
+     * right triangle is refused rather than passed on a rounding.
+     */
+    if (s.kind === 'acute') {
+      const ps = s.ids.map((id) => at.get(id));
+      if (ps.some((p) => !p)) return true; // an absent vertex judges nothing, as below
+      const n = ps.length;
+      for (let i = 0; i < n; i += 1) {
+        const v = ps[i]!;
+        const p = ps[(i + n - 1) % n]!;
+        const q = ps[(i + 1) % n]!;
+        const ux = p.x - v.x;
+        const uy = p.y - v.y;
+        const wx = q.x - v.x;
+        const wy = q.y - v.y;
+        if (ux * wx + uy * wy <= SOLVE_RESOLUTION * Math.hypot(ux, uy) * Math.hypot(wx, wy)) return false;
+      }
+      return true;
     }
     if (s.kind === 'distinct') {
       const ps = s.ids.map((id) => at.get(id));
@@ -966,6 +1036,7 @@ export interface SolveReport {
  * A perpendicular construction inverts the sign and is not reached here; the post-hoc check still judges it.
  */
 function freeAngleOf(c: Construction, sel: Extract<Selector, { kind: 'sign' }>): string | null {
+  if (sel.q.k !== 'slope') return null; // a circle region judges no direction (#1619 B1)
   const u = sel.q.u;
   if (u.k === 'free') return u.sym;
   if (u.k !== 'curve') return null;
@@ -1017,13 +1088,79 @@ export function evaluate(raw: Construction, seed = 0): Figure {
   }
   const hit = perSeed.get(seed);
   if (hit) return hit;
-  evaluateStats.uncached += 1;
-  const out = evaluateUncached(raw, seed);
+  const out = evaluateTryingChoices(raw, seed);
   perSeed.set(seed, out);
   return out;
 }
 
-function evaluateUncached(raw: Construction, seed = 0): Figure {
+/**
+ * THE SEED'S CHOICE IS A PREFERENCE, NOT A VERDICT (#1642, ADR-AG-197).
+ *
+ * A `choice` (#1049 — which angle of «משולש ישר זווית» is the right one, which tangency of two circles) is
+ * resolved by the seed so «הציגו תצורה אחרת» cycles the options. But an option the OTHER givens contradict
+ * is dead at every seed it is drawn at: «משולש AOB ישר זווית» · «AO על ציר ה-x» · «BO על ציר ה-y» seats the
+ * right angle at O whatever the seed, and measured on the operator's six lines the seats at A and B left
+ * only 1 raw seed of 24 valid — so `drawableAt` walked forward, the configuration pool held two pictures,
+ * and the knowledge gates read a 2-DOF figure's coordinates as a two-member option set.
+ *
+ * So a seed whose option yields no valid figure tries the next option AT THE SAME SAMPLES before the seed is
+ * declared invalid. A figure whose every option is valid draws exactly what it drew (the seed's option is
+ * tried first and accepted); one whose seed lands on a dead option draws a live one instead of nothing. The
+ * options are enumerated in seed order (`seed + k`), so the cycle still reaches every live option.
+ */
+function choiceCount(c: Construction): number {
+  let n = 1;
+  for (const k of c.constraints) if (k.t === 'choice' && k.options.length > 1) n = Math.max(n, k.options.length);
+  return n;
+}
+function admittedFigure(f: Figure): boolean {
+  return f.unsatisfied.length === 0 && f.selectorsOk && hardRingFaults(f).length === 0;
+}
+function evaluateTryingChoices(raw: Construction, seed: number): Figure {
+  evaluateStats.uncached += 1;
+  const first = evaluateUncached(raw, seed, seed);
+  const n = choiceCount(raw);
+  if (n <= 1 || admittedFigure(first)) return first;
+  for (let k = 1; k < n; k += 1) {
+    evaluateStats.uncached += 1;
+    const f = evaluateUncached(raw, seed, seed + k);
+    if (admittedFigure(f)) return f;
+  }
+  return first;
+}
+
+/**
+ * TWO CROSSINGS NAMED IN ONE SENTENCE ARE A DISCRETE CHOICE, AND IT CYCLES (#1539 — operator ruling 2026-10-01,
+ * superseding ADR-AG-185's fixed order).
+ *
+ * «הישר l1 חותך את המעגל I בנקודות A ו-B» lowers to two ordinals (`crossing-nth` with `both`): A the first root,
+ * B the second. ADR-AG-185 fixed that order and ruled it never cycled; the operator has since ruled that
+ * «הציגו תצורה אחרת» *"should always swap if there are more than 1 option"*. Which letter takes which root is
+ * then exactly a `choice` (#1049): resolved per configuration, here, before anything measures a selector. The
+ * stated order is configuration 0's (the first drawing is unchanged); the k-th pair of one figure swaps on bit
+ * k of the seed, so successive configurations reach every assignment. `both`'s own promise — the pair MEETS
+ * twice — is unchanged and still judged in every configuration.
+ */
+function cycledPairs(selectors: readonly Selector[], seed: number): Selector[] {
+  const pairIndex = new Map<string, number>();
+  let changed = false;
+  const out = selectors.map((s) => {
+    if (s.kind !== 'crossing-nth' || !s.both) return s;
+    const key = JSON.stringify(s.pair.map((k) => ({ ...k, id: '' })));
+    if (!pairIndex.has(key)) pairIndex.set(key, pairIndex.size);
+    if (((seed >> pairIndex.get(key)!) & 1) === 0) return s;
+    changed = true;
+    return { ...s, nth: (1 - s.nth) as 0 | 1 };
+  });
+  return changed ? out : (selectors as Selector[]);
+}
+
+/** The seed this configuration resolved its discrete choices at (#1642) — what the locus walk must resolve them at too. */
+export function choiceSeedOf(c: Construction, seed: number): number {
+  return evaluate(c, seed).choiceSeed ?? seed;
+}
+
+function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figure {
   /**
    * DISCRETE freedom is resolved HERE, once, before anything measures a constraint (#1049).
    *
@@ -1033,18 +1170,14 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
    * count, the satisfaction check, the provenance — then sees an ordinary constraint and never
    * learns that discrete freedom exists.
    */
-  /**
-   * THE FIGURE IS THE AUTHORITY on a straight's extent (#1286, ADR-AG-135 — operator ruling (a),
-   * 2026-09-20): an incidence on a pair the figure DRAWS as a piece — a segment object, a polygon side —
-   * is bounded whatever noun the sentence used. «הישר CA» on a triangle side denotes that side and
-   * yields the root on it; «הישר» keeps its infinite reading only where the letters name nothing drawn.
-   * Resolved here, once, like the discrete choices above, so the solve, the validity check and the
-   * knowledge gate all see one truth. The parser's noun stays a hint, never the decision.
+  /*
+   * THE FIGURE IS THE AUTHORITY on a crossing's extent (#1286, ADR-AG-135 ruling (a)) — decided at the M1
+   * boundary since ADR-AG-198 (#1640), against the figure AS IT STOOD when the crossing was stated
+   * (`apply.ts`, the `constraint` case): resolved here over the whole construction, a piece drawn later
+   * narrowed an earlier statement. The constraints arrive already bounded; the solve, the validity check
+   * and the knowledge gate still see one truth.
    */
-  const bound = raw.constraints.map((k) =>
-    k.t === 'on-line-2pt' && k.crossing && !k.bounded && drawnPieceOver(raw, k.a, k.b) ? { ...k, bounded: true } : k,
-  );
-  const c: Construction = { ...raw, constraints: resolveChoices(bound, seed) };
+  const c: Construction = { ...raw, constraints: resolveChoices(raw.constraints, choiceSeed), selectors: cycledPairs(raw.selectors, seed) };
   let env = foldSignSelectors(c, sampleEnv(c, seed));
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];
@@ -1226,8 +1359,62 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
     c.selectors.length === 0 || failingSelectors(c, system.positionsAt(x), system.envAt(x)).length === 0;
   const separatedFrom = (system: CarrierSystem, x: number[]): number[][] => [
     ...swappedStarts(system, x),
+    ...chordStarts(system, x),
     ...deflatedStarts(system, x, collapsedPairs(c, system.positionsAt(x), ownFree), 120),
   ];
+  /**
+   * THE OTHER ROOT OF A STRAIGHT AND A CIRCLE, IN CLOSED FORM (#1619 B1, ADR-AG-193).
+   *
+   * Two crossings of one circle with one straight («המעגל חותך את ציר ה-x בנקודות B ו-C») that collapsed
+   * onto one root have a known other root: the partner reflected through the foot of the centre on the
+   * straight — the chord's midpoint. Deflation (below) finds it by changing the equations, and on a circle
+   * whose CENTRE AND RADIUS are themselves free it found a different figure instead: the deflated descent
+   * grew the circle until the two points were far apart, and 9 of 24 seeds drew a circle of radius 10⁶–10⁹
+   * through two crossings a continent apart. The reflection is exact, keeps the circle the collapsed solve
+   * found, and is tried first; where the pair is not a circle × straight it proposes nothing and deflation
+   * runs as before. A start, never a verdict — the polish and the selectors still judge it.
+   */
+  const chordStarts = (system: CarrierSystem, x: number[]): number[][] => {
+    const pos = system.positionsAt(x);
+    const env0 = system.envAt(x);
+    const pairs = collapsedPairs(c, pos, ownFree);
+    if (pairs.length === 0) return [];
+    const atFn = (id: Id) => pos.get(id) ?? null;
+    const curveAt = curveAtOf(c, env0, atFn);
+    const m = system.asMap(x);
+    let moved = false;
+    // A pair is listed from BOTH crossings' selectors; moving both members would only swap the collapse.
+    const touched = new Set<Id>();
+    for (const { mover, partner } of pairs) {
+      const p = pos.get(partner);
+      if (!p || touched.has(mover) || touched.has(partner)) continue;
+      touched.add(mover);
+      touched.add(partner);
+      let circle: { cx: number; cy: number } | null = null;
+      let line: { a: number; b: number; c: number } | null = null;
+      for (const k of c.constraints) {
+        if (!('id' in k) || (k as { id?: Id }).id !== mover) continue;
+        if (k.t === 'on-curve') {
+          const cu = curveAt(k.curve);
+          if (cu?.kind === 'circle') circle = { cx: cu.cx, cy: cu.cy };
+          else if (cu?.kind === 'line') line = { a: cu.a, b: cu.b, c: cu.c };
+        } else if (k.t === 'on-line') line = { a: k.a, b: k.b, c: k.c };
+        else if (k.t === 'on-line-2pt') {
+          const A = pos.get(k.a);
+          const B = pos.get(k.b);
+          if (A && B) line = { a: B.y - A.y, b: A.x - B.x, c: -((B.y - A.y) * A.x + (A.x - B.x) * A.y) };
+        }
+      }
+      if (!circle || !line) continue;
+      const n2 = line.a * line.a + line.b * line.b;
+      if (n2 < 1e-24) continue;
+      const t = (line.a * circle.cx + line.b * circle.cy + line.c) / n2;
+      const foot = { x: circle.cx - line.a * t, y: circle.cy - line.b * t };
+      m.set(mover, { x: 2 * foot.x - p.x, y: 2 * foot.y - p.y });
+      moved = true;
+    }
+    return moved ? [system.toVec(m, env0)] : [];
+  };
   /**
    * A comparison between two FREE points that holds the wrong way round (#1462): the two points swapped is
    * the configuration the sentence names wherever the pair is interchangeable (the kite's B and D), and
@@ -1402,6 +1589,26 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
         if (!admissible(r.values)) return;
         if (!state.best || r.worst < state.best.worst) state.best = { ...r, ok: false };
       };
+      const resampledInside = (r: SolveResult): SolveResult | null => {
+        if (ids.length === 0) return null;
+        const at = solved.envAt(r.values);
+        const moved = solved.syms.filter((sym) => {
+          const d = at[sym] - env[sym];
+          return Number.isFinite(d) && Math.abs(d) > 1e-6 * Math.max(1, Math.abs(at[sym]));
+        });
+        if (moved.length === 0 || figureDofOf(c, solved, r.values) === 0) return null;
+        for (const salt of [1, 2]) {
+          const factor = 0.25 + 1.5 * jitter(seed, 7717 * salt);
+          const pushed: Record<string, number> = { ...at };
+          for (const sym of moved) pushed[sym] = at[sym] + (at[sym] - env[sym]) * factor;
+          if (!admissible(solved.toVec(solved.asMap(r.values), pushed))) continue;
+          const fixed = carrierSystem(c, pushed, { params: 'fixed' });
+          const r1 = solveLM(fixed.toVec(solved.asMap(r.values)), fixed.residualsAt, 120);
+          if (!r1.ok || !selectorsHoldAt(fixed, r1.values)) continue;
+          return { ok: true, worst: r1.worst, values: solved.toVec(fixed.asMap(r1.values), pushed) };
+        }
+        return null;
+      };
       const walk = (start: Map<Id, Pt>, attempt: Env): SolveResult => {
         let x = solved.toVec(start, attempt);
         for (let i = 1; i <= c.constraints.length; i += 1) {
@@ -1488,7 +1695,24 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
         // Only reachable if even the start left a domain (a sign folded outside one): keep the old answer.
         if (!state.best) state.best = r;
       }
-      const res = state.best!;
+      /**
+       * A FREE PARAMETER IS NOT REPAIRED TO ITS BOUNDARY (#1634, ADR-AG-197).
+       *
+       * Stage two moves a parameter only because the vertices alone could not satisfy the givens at its
+       * sample — and a least-squares descent from an INFEASIBLE sample stops at the first feasible value: the
+       * boundary of the feasible region. «מעגל שמרכזו M(6,10)» · «B על המעגל» · «B על ציר ה-y»: r sampled in
+       * [1, 4), no crossing exists below 6, and the solve stopped at r = 6 — the tangent circle — at 24/24
+       * seeds. The radius is free (ADR-052), so that is a default posing as a given, and a degenerate drawing.
+       *
+       * The infeasible sample says which way the feasible side lies: past the boundary, away from the sample.
+       * So a converged stage two that moved a parameter and left the figure with freedom is RESAMPLED inside —
+       * the moved parameters pushed on past where the descent stopped, by a seed-drawn fraction of the way it
+       * came, and the vertices re-solved with them held there. If that solves, the parameter was free and the
+       * boundary was the descent's accident; if not (a parameter a given PINS — `a² = 4` — or a radius the
+       * givens force to zero), nothing changes. A start, never a verdict: the solve and the post-hoc check
+       * judge the result exactly as before.
+       */
+      const res = (state.accepted && state.best?.ok ? resampledInside(state.best) : null) ?? state.best!;
       free = solved.asMap(res.values);
       env = solved.envAt(res.values);
       solvedVec = res.values;
@@ -1731,7 +1955,11 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
     construction,
     vacant,
     unsatisfied,
-    ...((failing) => ({ selectorsOk: failing.length === 0, selectorsFailing: failing }))(failingSelectors(c, placed, env)),
+    // Reported as the STATED selectors (a cycled pair's ordinal is the sentence's own object), so `derive`
+    // blames the line that stated it.
+    ...((failing) => ({ selectorsOk: failing.length === 0, selectorsFailing: failing.map((q) => raw.selectors[c.selectors.indexOf(q)] ?? q) }))(
+      failingSelectors(c, placed, env),
+    ),
     /**
      * Read from the POINTS this evaluation just produced, so the ring judged is the ring drawn
      * (#1158, #1166). A vertex that did not resolve leaves its polygon unjudged — that is a vacancy
@@ -1746,6 +1974,7 @@ function evaluateUncached(raw: Construction, seed = 0): Figure {
     ),
     carrierDof: figureDofOf(c, sys, solvedVec),
     usedSymbols: [...usedSymbols(c)],
+    ...(choiceSeed !== seed ? { choiceSeed } : {}),
     provenance: Object.fromEntries(
       points.map((p) => [p.id, provenanceOf(c, p.id, env, curves) ?? { x: { known: false }, y: { known: false } }]),
     ),
@@ -1969,9 +2198,34 @@ const SAME_VALUE_EPS = 1e-4;
  * and read zero spread as certainty. `another.ts` now calls this rather than owning a second copy.
  */
 export function figureSignature(f: Figure): string {
-  const n = (v: number) => v.toFixed(4);
-  const points = f.points.map((p) => `${p.id}:${n(p.x)},${n(p.y)}`);
-  const curves = f.curves.map((c) => `${c.id}:${curveSignature(c.curve)}`);
+  return signatureParts(f)
+    .map((g) => `${g.label}${g.values.map(zeroFree).join(',')}`)
+    .join('|');
+}
+
+/**
+ * A NUMBER TO SIGN, WITHOUT ITS SIGNED ZERO (#1539, ADR-AG-197). `(-1e-9).toFixed(4)` is «-0.0000», and the
+ * signature read the solver's noise around zero as a second configuration: a fully determined figure counted
+ * as three, «הציגו תצורה אחרת» "found" a picture identical to the one on screen, and the walk that should
+ * swap two named crossings stopped on the noise instead. Zero has one spelling.
+ */
+function zeroFree(v: number): string {
+  const s = v.toFixed(4);
+  return /^-0\.0*$/.test(s) ? s.slice(1) : s;
+}
+
+/**
+ * The configuration as labelled NUMBERS — one list for the signature and for the tolerance-aware comparison
+ * ({@link sameConfiguration}), so "the same picture" has one definition (ADR-W-053). `#` marks the number's
+ * place in its label.
+ */
+function signatureParts(f: Figure): Array<{ label: string; values: number[] }> {
+  const out: Array<{ label: string; values: number[] }> = [];
+  for (const p of f.points) out.push({ label: `${p.id}:`, values: [p.x, p.y] });
+  for (const c of f.curves) {
+    const [kind, values] = curveNumbers(c.curve);
+    out.push({ label: `${c.id}:${kind} `, values });
+  }
   /**
    * …AND THE PARAMETERS THE FIGURE USES (#1343, amending ADR-AG-144). A parameter is part of the
    * configuration exactly as a point is, and a value that lives only in the environment was invisible
@@ -1981,28 +2235,57 @@ export function figureSignature(f: Figure): string {
    * stays honest about it — and never a free direction, whose line already signs and whose angle has two
    * spellings for one line.
    */
-  const params = f.usedSymbols
-    .filter((sym) => !isDirectionSymbol(sym) && Number.isFinite(f.env[sym]))
-    .map((sym) => `${sym}=${n(f.env[sym])}`);
-  return [...points, ...curves, ...params].join('|');
+  for (const sym of f.usedSymbols) {
+    if (isDirectionSymbol(sym) || !Number.isFinite(f.env[sym])) continue;
+    out.push({ label: `${sym}=`, values: [f.env[sym]] });
+  }
+  return out;
 }
 
-/** The resolved shape of one curve, to the precision a student could see. */
-function curveSignature(c: NumCurve): string {
-  const n = (v: number) => v.toFixed(4);
+/** The resolved shape of one curve as numbers, to compare — a line SIGNED NORMALISED (#1201). */
+function curveNumbers(c: NumCurve): [string, number[]] {
   switch (c.kind) {
     case 'line': {
       const k = normalizedLine(c.a, c.b, c.c);
       // A degenerate triple has no line to compare; it signs as itself rather than throwing.
-      return k ? `line ${n(k.a)},${n(k.b)},${n(k.c)}` : `line ${n(c.a)},${n(c.b)},${n(c.c)}`;
+      return ['line', k ? [k.a, k.b, k.c] : [c.a, c.b, c.c]];
     }
     case 'circle':
-      return `circle ${n(c.cx)},${n(c.cy)},${n(c.r)}`;
+      return ['circle', [c.cx, c.cy, c.r]];
     case 'parabola':
-      return `parabola ${n(c.p)}`;
+      return ['parabola', [c.p]];
     case 'ellipse':
-      return `ellipse ${n(c.a)},${n(c.b)}`;
+      return ['ellipse', [c.a, c.b]];
   }
+}
+
+/**
+ * ARE THESE TWO CONFIGURATIONS ONE PICTURE? (#1539, ADR-AG-197) — the TOLERANCE-AWARE reading of
+ * {@link figureSignature}. A rounded string still splits two solves of one root that straddle a rounding
+ * boundary (1.23455 vs 1.23454); this compares the same labelled numbers within the value-identity bar the
+ * knowledge gate already uses (`SAME_VALUE_EPS`, relative). What the distinct walk, «הציגו תצורה אחרת» and the
+ * pool's starvation test count with.
+ */
+export function sameConfiguration(a: Figure, b: Figure): boolean {
+  const pa = signatureParts(a);
+  const pb = signatureParts(b);
+  if (pa.length !== pb.length) return false;
+  for (let i = 0; i < pa.length; i += 1) {
+    if (pa[i].label !== pb[i].label || pa[i].values.length !== pb[i].values.length) return false;
+    for (let j = 0; j < pa[i].values.length; j += 1) {
+      const x = pa[i].values[j];
+      const y = pb[i].values[j];
+      if (!(Math.abs(x - y) <= SAME_VALUE_EPS * Math.max(1, Math.abs(x), Math.abs(y)))) return false;
+    }
+  }
+  return true;
+}
+
+/** How many different pictures these configurations are. */
+function distinctCount(figs: readonly Figure[]): number {
+  const reps: Figure[] = [];
+  for (const f of figs) if (!reps.some((r) => sameConfiguration(r, f))) reps.push(f);
+  return reps.length;
 }
 
 /** How far to look for a differing configuration. The same budget the drawable search and the
@@ -2040,11 +2323,12 @@ export function distinctConfigSeeds(c: Construction, count = 3, tries = DISTINCT
   if (hit) return hit;
 
   const seeds: number[] = [];
-  const seen = new Set<string>();
+  const seen: Figure[] = [];
   for (let seed = 0; seed < tries && seeds.length < count; seed += 1) {
-    const sig = figureSignature(drawableAt(c, seed));
-    if (seen.has(sig)) continue;
-    seen.add(sig);
+    const f = drawableAt(c, seed);
+    // Tolerance-aware (#1539): two solves of one root are one configuration whatever their rounding.
+    if (seen.some((g) => sameConfiguration(g, f))) continue;
+    seen.push(f);
     seeds.push(seed);
   }
   const out = seeds.length > 0 ? seeds : [0];
@@ -2200,18 +2484,28 @@ function poolSeeds(c: Construction): { pool: Pool; seeds: number[] } {
     pool.fill();
     return { pool, seeds: pool.ready() };
   }
-  distinctConfigSeeds(c);
+  /**
+   * THE FLOOR IS SEEDS 0, 1 AND 2 — not "until three DIFFERENT configurations" (#1539, ADR-AG-197). The two
+   * were the same work only while the signature split one picture on «-0.0000»: with zero normalised, a
+   * DETERMINED figure has one configuration, and a walk for three different ones evaluated all twenty-four
+   * seeds at render — the very cost B′ moved off the render path. Three seeds is the floor the render path
+   * has always paid; whatever they cannot settle is pending until the idle loop completes the pool.
+   */
+  for (let s = 0; s < PENDING_FLOOR; s += 1) drawableAt(c, s);
   return { pool, seeds: pool.ready() };
 }
+
+/** The seeds a deferred pool evaluates synchronously, before the render. */
+const PENDING_FLOOR = 3;
 
 /** The verdict before it is reported — `knownCurve` asks per coefficient and reports once. */
 function knowledgeOf(c: Construction, read: (f: Figure) => number | null): Knowledge {
   const { pool, seeds } = poolSeeds(c);
   const v = judge(c, read, seeds);
   // Invariant over a PARTIAL pool is not knowledge yet; differing already is open for good (a superset
-  // of the seeds can only widen the spread).
-  if (v.known && !pool.complete()) return { known: false, pending: true };
-  return v;
+  // of the seeds can only widen the spread). A pool too STARVED to tell (#1642) may yet fill: pending too.
+  if ((v.known || ('starved' in v && v.starved)) && !pool.complete()) return { known: false, pending: true };
+  return v.known ? v : { known: false };
 }
 
 export function isKnowledge(
@@ -2255,28 +2549,82 @@ export function holdsInEveryConfiguration(c: Construction, ks: readonly Constrai
     const r = residual(k, at, f.env, curveAtOf(c, f.env, at), lineAtOf(c, f.env, at));
     return r !== null && r.every((v) => Math.abs(v) <= SATISFIED_EPS);
   };
-  for (const s of pool.ready()) {
-    const f = drawableAt(c, s);
+  // Only the configurations the pool ADMITS (#1642): a figure that breaks a given entails nothing.
+  const admitted = admittedOf(c, pool.ready());
+  if (admitted.length === 0) return false;
+  for (const f of admitted) {
     if (!ks.every((k) => holds(k, f))) return false;
   }
   return true;
 }
 
+/**
+ * A ring fault that makes a configuration INVALID — every one but the trapezoid-is-parallelogram WARNING,
+ * which is drawn and named rather than refused (ADR-AG-189 Amendment 1).
+ */
+export function hardRingFaults(f: Figure): RingFault[] {
+  return f.ringFaults.filter((r) => r.violation !== 'trapezoid-is-parallelogram');
+}
+
+/**
+ * POOL ADMISSION (#1642, ADR-AG-197) — the configurations a knowledge gate may read: every given HOLDS, every
+ * selector holds, and the ring is the noun's. `drawableAt` falls back to a configuration that breaks one when
+ * nothing in its window is valid — the canvas must still draw something, and `derive` reports it on the line
+ * — but a value read off such a configuration is a value the student's own givens contradict (the issue's
+ * report: «B = (0, 4.83) או (5.39, 0)», a B on the y-axis printed beside one that is not). A VACANCY is not a
+ * fault (ADR-AG-008) and stays admitted: a value that needs the vacant object reads `null`.
+ */
+export function admittedToPool(f: Figure): boolean {
+  return admittedFigure(f);
+}
+
+/** The admitted configurations at these seeds. */
+function admittedOf(c: Construction, seeds: readonly number[]): Figure[] {
+  const out: Figure[] = [];
+  for (const s of seeds) {
+    const f = drawableAt(c, s);
+    if (admittedFigure(f)) out.push(f);
+  }
+  return out;
+}
+
+/**
+ * TOO FEW CONFIGURATIONS TO TELL (#1642, ADR-AG-197). A figure with continuous freedom left has a new picture
+ * at nearly every seed; when the admitted pool holds fewer than {@link MIN_WITNESSES} different pictures, its
+ * agreement says nothing — one picture always agrees with itself (#1282's class, reached through a starved
+ * pool rather than a forward walk). A determined figure is never starved: its pictures ARE its roots.
+ */
+function starved(figs: readonly Figure[]): boolean {
+  return figs.some((f) => f.carrierDof > 0) && distinctCount(figs) < MIN_WITNESSES;
+}
+
+/** How many different pictures must agree before a figure with freedom left may print a value (#1642). */
+const MIN_WITNESSES = 2;
+
 function judge(
   c: Construction,
   read: (f: Figure) => number | null,
   seeds: readonly number[],
-): { known: true; value: number } | { known: false } {
+): { known: true; value: number } | { known: false; starved?: true } {
   const vals: number[] = [];
   let span = Infinity;
-  for (const s of seeds) {
-    const f = drawableAt(c, s);
+  // Only ADMITTED configurations are evidence (#1642): none admitted is a pool that cannot tell.
+  const figs = admittedOf(c, seeds);
+  if (figs.length === 0) return { known: false, starved: true };
+  for (const f of figs) {
     const v = read(f);
     if (v === null || !Number.isFinite(v)) return { known: false };
     vals.push(v);
     span = Math.min(span, figureSpan(f));
   }
   if (vals.length === 0) return { known: false };
+  const verdict = judgeValues(vals, span);
+  // Agreement across too few PICTURES of a figure that can still move is not knowledge (#1642).
+  if (verdict.known && starved(figs)) return { known: false, starved: true };
+  return verdict;
+}
+
+function judgeValues(vals: readonly number[], span: number): { known: true; value: number } | { known: false } {
   const scale = Math.max(1, ...vals.map(Math.abs));
   const spread = Math.max(...vals) - Math.min(...vals);
   /**
@@ -2388,8 +2736,8 @@ export function knownOptions(
     const pool = poolOf(c);
     if (pool.deferred && !pool.complete()) {
       const seen: number[][] = [];
-      for (const s of pool.ready()) {
-        const v = read(drawableAt(c, s));
+      for (const f of admittedOf(c, pool.ready())) {
+        const v = read(f);
         if (v === null || v.some((n) => !Number.isFinite(n))) return null;
         seen.push(v);
       }
@@ -2403,8 +2751,10 @@ export function knownOptions(
     pool.fill();
   }
   const samples: number[][] = [];
-  for (let seed = 0; seed < seeds; seed += 1) {
-    const v = read(drawableAt(c, seed));
+  // Only ADMITTED configurations (#1642): a member read off a figure that breaks a given is not an option.
+  const figs = admittedOf(c, Array.from({ length: seeds }, (_, s) => s));
+  for (const f of figs) {
+    const v = read(f);
     // A value absent at ANY configuration is not a member of a stable set.
     if (v === null || v.some((n) => !Number.isFinite(n))) return null;
     samples.push(v);
@@ -2412,12 +2762,27 @@ export function knownOptions(
   const scale = Math.max(1, ...samples.flat().map(Math.abs));
   const near = (a: number[], b: number[]) => a.every((n, i) => Math.abs(n - b[i]) <= SAME_VALUE_EPS * scale);
   const distinct: number[][] = [];
-  for (const v of samples) {
-    if (!distinct.some((d) => near(d, v))) distinct.push(v);
+  const witnesses: Figure[][] = [];
+  for (const [i, v] of samples.entries()) {
+    const at = distinct.findIndex((d) => near(d, v));
+    if (at < 0) {
+      distinct.push(v);
+      witnesses.push([figs[i]]);
+    } else witnesses[at].push(figs[i]);
     // More than the cap is a continuous family wearing a set’s clothes — answer NOT a set, early.
     if (distinct.length > OPTION_CAP) return null;
   }
   if (distinct.length < 2) return null;
+  /**
+   * EACH MEMBER NEEDS ITS OWN WITNESSES when the figure can still move (#1642, ADR-AG-197). On a figure with
+   * continuous freedom two configurations ARE two members — a free value sampled twice reads as a two-member
+   * "set" whenever the pool holds only two pictures (measured on the operator's six lines, 2 DOF and a
+   * starved pool: «A = (−4.16, 0) או (−3.78, 0)»). A member of a genuine discrete set is reached by many
+   * different pictures (the other freedom still moves); one witnessed by fewer than {@link MIN_WITNESSES}
+   * cannot be told from a free value, so the answer is NOT a set. A determined figure needs no witnesses: its
+   * pictures are its roots.
+   */
+  if (figs.some((f) => f.carrierDof > 0) && witnesses.some((w) => distinctCount(w) < MIN_WITNESSES)) return null;
   /**
    * A CLUSTER INSIDE SOLVER RESOLUTION IS NOT AN OPTION SET (#1259, ADR-AG-136 — operator ruling,
    * 2026-09-20). At a tangency every solve lands within the solver's own resolution of every other and the

@@ -1901,3 +1901,150 @@ change touched folds exactly as before.
 **One commit.** `applyRename` / `applySwap` write `{ lines, queries, spokenFor, seedNames }` in one `set`, and
 the undo slice carries all four (plus seed and muted set). The surface is the shared `shell/frame/LetterPopover`,
 wired by the integrator to `decideRename` / `dispatchRename` / `dispatchSwap`; the typed forms remain.
+
+## The circle the figure has ([ADR-AG-193](06c-decisions-analytic.md#adr-ag-193), #1619 B1, #1598)
+
+Sentences about "the circle" divide into **spellings** and **references**, and each has one home.
+
+**Spellings are lowered onto the sentence that owns the meaning, in the parser.** The frame (`frameAnalytic.ts`) gains three readings — `centreClauses`, `sharedSubjectClauses`, `elidedSubjectClauses` — and two text folds (the «הנתון» adjective after a definite noun; «M נמצא בנקודה (x,y)» → `M(x,y)` in `pointClauses`). Like every reading they are taken only when each clause parses through `readLine`. Inside `parseClause`: the converse of incidence accepts a curve subject («המעגל עובר דרך P» → «P על המעגל», via `viaCanonical`); the crossing head admits «אחת מ…» (`ONE_OF_HE`); a crossing operand may name a half-axis, which becomes the `axis-side` selector beside the incidence; `bothCrossings` emits the two un-ordinaled crossings when an operand is contextual (`incidenceOn(…).t === 'kind'`); `THRU_HE` admits the comma before «העובר»; the circle-noun gate refuses to claim a tail with an English word (`HAS_A_WORD`).
+
+**References are facts M1 resolves**, because only the construction knows which circle «המעגל» is:
+
+```
+on-kind {id, kind, circle?}       → on-curve on circleByName(circle) or the one circle
+centre-of {id, eq?, create?}      → host = curve with eq (resolveCurveByEq) | the one circle | none
+                                      curve       → derived circle-centre        (ADR-AG-184 yields intact)
+                                      circle-thru → derived circumcentre | midpoint (centreRuleOf)
+                                      circle-at   → known (same letter) | already-named (holder)
+                                      none        → applyAll(create)   (the parser's canonical creation)
+via-centre {facts, phrase}        → facts with CENTRE_SENTINEL → centreIdOf(the one circle) | unknown-reference(phrase)
+circle-region {id, region, a?, b?, circle?} → sign selector over Quantity power | arc-side (+ on-curve for an arc's E, A, B)
+radius-length {length, circle?}   → length-eq(length, radius expr of the host)
+```
+
+- **`circleByName`** is the one name → circle chain (numeral id, `circle-at-<letter>`, `curveByName`, then a circle whose centre point carries the letter — `centreIdOf`). `tangent-of`, `radius-of`, `diameter-of` and `tangent-circles` call it; none spells the chain.
+- **`centreRuleOf` / `centreIdOf`** answer "which point is this circle's centre" for every way a circle is stated; `centreIdOf` finds a held point structurally (`sameDerivation`), never by position.
+- **`create`** carries the facts of the canonical creation sentence («נתון מעגל שמרכזו P», «נתון מעגל P שמשוואתו …»), lowered by the rule that owns it; a creation that would not name the centre (a numeral letter) is not carried, and the sentence is refused `out-of-scope` rather than absorbed.
+- **The regions are `sign` selectors** (D7 kind 2). `evaluate.ts circleQuantity` computes the power |PC|² − r², or the product of the point's and the centre's sides of the chord, from the configuration's own positions and resolved circle; a value within `SOLVE_RESOLUTION`·max(1, r²) of zero is zero (on the boundary is neither side). `freeAngleOf` ignores them (no direction to seed).
+- **Selector attribution.** `foldPass` records `selectorFact` exactly as `constraintFact` (before/after comparison of `c.selectors`), and `derive`'s 0-DOF selector arm blames a failing M1-built selector on that fact's line.
+- **`derive.nameCanonicalCentres` rule 2** counts a `centre-of` fact: with an equation, when that equation is a canonical circle; without one, when the list states exactly one circle-bearing fact and it is the canonical one.
+- **`centresOf`** offers an unnamed equation circle's centre with «‹letter› מרכז המעגל ‹eqSrc›», and a sole computed circle's with «‹letter› מרכז המעגל»; a centre a point already occupies (`pointAt`) is offered nothing.
+
+**The other root of a circle and a straight.** In stage two's selector preference, `separatedFrom` tries `chordStarts` before `deflatedStarts`: for each collapsed pair (`collapsedPairs`) whose mover lies on one circle (`on-curve`) and one straight (`on-line`, `on-curve` line, `on-line-2pt`), the mover is placed at the partner reflected through the foot of the centre on the straight — the chord's other end, on the circle the collapsed solve found. Each point is moved at most once (a pair is listed from both crossings' selectors). It proposes a start only; the polish and `selectorsHoldAt` judge it, and deflation follows unchanged when it proposes nothing.
+
+## Inscribed and circumscribed: the sentence is the sentences it is made of ([ADR-AG-194](06c-decisions-analytic.md#adr-ag-194), #1619 B2, #1554)
+
+**One rule family, two directions.** `parseInscribed` reads the polygon-in-circle voices (polygon subject, «בר
+חסימה», circle subject with «חוסם», container-first «במעגל … חסום …») and the circle-in-polygon voices (circle
+subject «… חסום ב<noun>», container-first «ב<noun> … חסום מעגל», polygon subject «… חוסם מעגל»), He and En. The
+container marker «ב» and the verb decide the direction (2-D #31/#38), so neither direction can read as the
+other. It runs in `parseClause` before `parseCircleAt`, whose subject reader would otherwise take «מעגל שמרכזו
+C» off the front of «מעגל שמרכזו C חסום במשולש AOB».
+
+**Lowering by composition.** Nothing in the rule is geometry. The polygon is `parseShape(«<noun> RUN»)` (the
+noun's givens, its `distinct`, and the `acute` selector when the adjective is present). The circle is
+`parseClause(«מעגל <tail>»)`, filtered to exactly one circle-introducing fact (`circle-at`, a circle `curve`,
+`circle-thru`, a defining `diameter-of`), whose id the incidences name — so a circle phrasing any later stream
+teaches the circle rules is inscribable for free. No tail is `circle-thru` over the first three vertices. The
+vertices not on the circle by definition each get `on-curve`. All facts carry the student's line as `src`.
+
+**The incircle** is a fourth `CircleDef`, `incircle`, evaluated in `circleThruCurve` (centre
+`incircleCentre`, radius the distance to the first side; vacancy for a degenerate or non-convex ring). It
+carries no freedom, so `carriers.ts` needed no new row (the `circle-thru` rows read `circleDefPoints`). A
+quadrilateral's Pitot condition is a stated `length-eq`, not a property of the circle.
+
+**Side touch points** are the M1 fact `touch-at` (one per side) and the derived rule `side-touch` (foot of the
+circle's centre on the side; curve parent). The host decides: incircle of a ring with that side — the point
+only; `circle-at` — `tangent-line` (bounded for «צלעות/קטעים») plus the point; otherwise `out-of-scope`.
+
+**«חד זוויות»** is the selector `acute` (D7 kind 2), judged in `failingSelectors` beside `distinct`.
+
+**Diameter on a through-circle** accepts an end that is on the circle by an `on-curve` incidence: the right
+angle at a defining point that is neither end.
+
+**Frame readings.** `diameterClauses` (the «הקטע AB הוא קוטר …» and «קוטר המעגל AC נמצא על …» forms) runs with
+the structural readings; `parenClauses` («<sentence> (<givens>)») runs last, after the comma split, and only
+when every clause parses.
+
+### Not here
+Binding an undescribed «חסום במעגל» to a circle already in the figure; the circle-subject side list «מעגל M
+משיק לצלעות …»; a centre letter on a computed circle (stream B1); tangency to an equation circle (stream B3's
+`tangent-curve`); the right-trapezoid ruling (#1554 vs #1627).
+
+## Tangency at a point, the tangent object, chords ([ADR-AG-195](06c-decisions-analytic.md#adr-ag-195), #1619 B3, #1430)
+
+**The radius is a direction.** `Direction` has a fifth member, `{ k: 'radius', circle, at }`. `dirVector` resolves it from the circle's `NumCurve` (`curveAt`), so it needs no centre POINT, and every circle kind — `circle-at`, an equation `curve`, `circle-thru` — works the same way. `dirRefs` reports `at`, and `constraintCurveRefs` reports the circle through the `relation` arm, so the apply boundary's existence checks cover it unchanged.
+
+**A touch is lowered, not modelled.** `tangent-of { …, at }` is applied by `applyTouchAt`, which emits `on-curve(at, circle)`, the touch point on its target, and `relation ⊥ (radius, target)`. No residual is new, the solver learns nothing, and the DOF count is the three rows' rank. Selectors that must be blamed on the student's line (`distinct` ends, `between` for a bounded noun) are emitted by the parser, because `derive` attributes a failing selector only to a parsed `selector` fact.
+
+**The touch reader.** `peelTouchList` takes the plural list off the end of the sentence. `peelMods` takes the singular «בנקודה A». `tangentTargets` keeps `ordered`, the axes and lines in the student's order, so the touch points pair with the targets in order. `touchFacts` builds the declares, the selectors and one `tangent-of` per target. It is reached from the circle-first order (`circleSubjectFacts`) and the line-first order (`parseCircleAt`), so the two orders cannot drift.
+
+**The tangent object.** `tangent-line-at { at, circle? }` → `line-at { id: tangentLineId(at), through: at, dir: radius, perp: true }` plus `on-curve(at, circle)`. `isTangentObject` (a `line-at` on a radius direction, perpendicular) is the one predicate behind contextual «המשיק» (`on-kind` kind `tangent`) and `tangent-eq`'s resolution. `readTangentNoun` is the one phrase reader for the sentence, the crossing operand (`incidenceOn`; the building facts lead the crossing's) and the equation (`parseTangentObject`).
+
+**Tangency to a determined circle.** `tangent-curve { circle, line }` and `tangent-line` share `lineTangencyRows(centre, radius, line, pair)`. One reads the centre and radius from the resolved circle, the other from the centre point and radius symbol. `tangent-of` picks by host: `circle-at` → `tangent-axis`/`tangent-line`, anything else → `tangent-curve` (axes refused by name).
+
+**Chords.** A chord is lowered only to existing facts: `declare` both ends, `on-curve` or `on-kind` on the circle, and the segment. Two chords that meet use the bounded crossing of the two segments. Equal chords use `length-eq`. `parseChord` runs with `parseTangentObject` before `parseCircleAt`, whose verb split would otherwise read «משוואת המשיק» as a subject before the verb.
+
+## The contextual circle: one binding for every sentence about «המעגל» ([ADR-AG-196](06c-decisions-analytic.md#adr-ag-196), #1633, #1619)
+
+**One fact, one resolver.** A sentence about THE circle lowers to `the-circle { create, about, match? }`. `create` is the sentence's own creation (the curve, the computed circle, the circle on a centre, with their incidences); `about` is the statement about an existing circle, with `CIRCLE_SENTINEL` where the circle's id goes. M1's `theCircle(c, match)` decides: `match.centre` (a centre-described circle, also «מעגל M שמשוואתו …») → `circleByName`; `match.eq` → `resolveCurveByEq`; no match → the figure's circles (0 create, 1 bind, ≥2 `ambiguous-shape`). The bound branch substitutes the id into `about` and applies it with `applyAll`, so its effect and its refusals are the spelled-out statements' own.
+
+**The equation about a circle.** `circle-eq { circleId, eq }` reads the stated circle at the probes (`resolveCurve`, constant centre and radius required). An equation `curve` host compares by `resolveCurveByEq`. A `circle-at` host lowers to `point(centre, cx, cy)` — substitution for a free centre (#1046's anchoring), a constraint otherwise, pre-checked against a centre already at constant coordinates — and `radius-of(circleId, r)`, the substitution seam that also judges a stated radius. Nothing is solved that was not before.
+
+**Pre-M1 passes.** `factsWithin(f)` yields a `the-circle`'s creation, for `derive`'s line-of-object map (vacancies of a created circle are blamed on its line) and `submit`'s restated-centre set. `nameCanonicalCentres` predicts statically whether a `the-circle` will create (no circle before it, or no same-equation curve before it) and puts the offered O inside that creation.
+
+**The touch.** `tangent-of { at }` is the only touch fact. `applyTouchAt`'s first branch is the incircle's own side: the `side-touch` derived point, written in place of a point the same sentence just declared (no constraint on it yet), else as `derived-at`. Everything else is B3's three statements.
+
+## Only valid configurations are evidence ([ADR-AG-197](06c-decisions-analytic.md#adr-ag-197), #1642, #1638, #1635, #1634, #1539)
+
+Four seams, one rule: a configuration the givens contradict, or one the search failed to vary, is never read as knowledge.
+
+**Configuration choice — `evaluate`.** Discrete freedom is still resolved before the solve, but the seed's resolution is a preference: `evaluateTryingChoices` evaluates the seed's `choice` options first and, when that figure is not admitted, the options at `seed + 1 … seed + n − 1` at the SAME samples, returning the first admitted figure (else the seed's own). `Figure.choiceSeed` records which, and `choiceSeedOf(c, seed)` is how `locus.ts` resolves the same options. `cycledPairs` treats the two ordinals of a pair named in one sentence (`crossing-nth { both }`) as one more discrete choice — bit k of the seed swaps the k-th pair; configuration 0 is the stated order — and the figure reports failing selectors as the stated objects so `derive`'s blame map still matches. Each uncached option counts in `evaluateStats.uncached`.
+
+**The solve's stage two — `resampledInside`.** After stage two accepts a converged solution, if a parameter moved from its sample and `figureDofOf > 0`, the moved parameters are pushed past the stop point (`at + (at − sample)·(0.25 + 1.5u)`, two seed-drawn tries), the vertices re-solved with the parameters fixed (`carrierSystem(…, { params: 'fixed' })`), and the result kept only if it converges, stays admissible (domains, signs) and the selectors hold. Otherwise the descent's answer stands.
+
+**Pool admission — the gates.** `admittedToPool(f)` = no `unsatisfied`, `selectorsOk`, no `hardRingFaults` (the trapezoid warning excepted). `judge`, `knownOptions` and `holdsInEveryConfiguration` read `admittedOf(c, seeds)`; `drawableAt` itself is unchanged, so the canvas, `derive`'s reporting and «הציגו תצורה אחרת» see what they saw. `starved(figs)` — freedom left and fewer than `MIN_WITNESSES` (2) different pictures — makes an invariant value `{ known: false, starved }` (pending on a partial pool), and a `knownOptions` member with fewer witnesses than that makes the answer "not a set". "Different picture" is `sameConfiguration`: `signatureParts` (points, curves with lines normalised, used non-direction parameters) compared within `SAME_VALUE_EPS`, relative. `figureSignature` prints the same parts, zero spelled once (`zeroFree`); `distinctConfigSeeds` and `anotherConfiguration` compare with `sameConfiguration`. The deferred pool's synchronous floor is `PENDING_FLOOR = 3` seeds.
+
+**Reporting — `derive`.** A figure whose selectors fail after `drawableAt`'s search (its window, every live option per seed) is refused on the failing selectors' lines at any freedom, unless a given already fails in that figure (then the unsatisfied arm blames the line that completed the contradiction). A chord carries `distinct` over its ends and the chord-pair sentence over all its letters (`parseChord`), so the selector-steered solve separates them and this arm reports the case where nothing can.
+
+### Not here
+- Seeding a DERIVED point's region (the incircle centre's quadrant) through its parents — the remaining invalid seeds of #1642's figure are walked past, not repaired.
+- A per-object exact enumeration of roots; the pool stays sampled (ADR-AG-180).
+
+## What a sentence draws, and whose extent it is ([ADR-AG-198](06c-decisions-analytic.md#adr-ag-198), #1639, #1640, #1636, #1641, #1643)
+
+**The piece a sentence names.** `pieceFacts(noun, a, b)` (parser) is the one declaration: the line noun → `line-2pt { a, b }`, any other noun or none → `segment { …, ref: true }`. It is emitted after the sentence's own facts by the touch readers (`TangentTargets.pieces`, one entry per two-point target with its noun), the non-defining diameter, the relation handler (each `points` operand, its own noun), `sideClauses` (side on an axis; «הישרים»/«הישר» carried into the relation), and the converse incidence. `ref` makes M1's segment case treat the ends as references (no `free` minting), so a sentence that refers to absent points still fails on them, deferral included. M1: a `segment` over an existing polygon side is `known`; `line-2pt` checks its ends exist, then — an existing `line-AB`/`line-BA` curve is promoted to `stated` or known, an existing `line-at` is known, a drawn piece over the pair is known (ruling (a)), otherwise the `line-at { through: a, dir: points a→b, name: 'AB' }`. The `curve` case replaces a drawn `line-at` whose id is the same pair's line id, in its position in `objects` (declaration order is kept).
+
+**The extent is the statement's.** Two decisions moved to M1, against the construction BEFORE the statement: the crossing's bounded promotion (`on-line-2pt` with `crossing`, over `drawnPieceOver`) — removed from `evaluate`, so the constraints arrive already bounded — and the bare pair's `extent-of { id, a, b }`, which becomes the `between` selector when a piece is drawn over a–b, and nothing otherwise. The parser keeps a bare pair bare (`lineObject` no longer defaults its noun to «הישר»; `pairText`).
+
+**The frame.** `orthography`: `stripFormatControls` (shell/bidi) first, then a leading bullet, then the maqaf/NBSP folds, then «ה- x» → «ה-x». `NAME_LIST` admits comma lists with an optional final «ו-»; `distributeClauses`' location reading takes the verb OR a predicate opening with «על». `centreClauses` accepts the copula before the centre letter, in both languages.
+
+**The created circle.** `tangent-of` with no circle in the figure (and a touch point, or no axis target) applies `touchedCircleFacts` — `param θ_circle-touched.r > 0` and the stated equation circle `circle-touched` over `θ_circle-touched.{a,b,r}` (`toolSymbol`, carriers.ts; hidden from the parameter rows and the figure signature by the existing `θ_` test) — then the tangency with `circleId`. `the-circle`'s `match` gains `{ inscribed: ring }` (`theCircle`: bind the one circle `statedTangentToSide` finds for every side — the touch lowering's radius-perpendicular mark or a touch-free `tangent-curve` over the pair; else create); bound to `circle-touched`, the incircle sentence redefines it as the computed `incircle` under the same id and drops its tool parameter, then applies `about` (`centre-of { circleId }` names the centre).
+
+**The refusal.** `ShapeRow.notCyclic` (registry) → `cyclicFacts` → `inscribed-contradicts-noun { shape, forced }` → `errInscribedContradictsNoun` with `shapeHe/forcedHe` and `shapeEn/forcedEn` (English by reverse `EN_SHAPE` lookup in `errorText`).
+
+**Into the bidi section (the helper table and the paragraph after it), add a row and a paragraph:**
+
+| helper | protects | emits | direction |
+| --- | --- | --- | --- |
+| `panelRowText` (`app/panelRows.ts`) | every Hebrew phrase in a composed data-panel row | FSI … PDI per phrase (via `isolateRtlName`) | every `ValueRow`, the curve-details line |
+
+**One panel-row composer** ([ADR-AG-199](06c-decisions-analytic.md#adr-ag-199), #1644). The data panel's sections are laid out `ltr`, and a row the tree composes may contain a Hebrew word: the #1036 option set's «או», or «לא בשימוש» on an unused parameter. A number after a right-to-left word takes that word's direction, so without an isolate `A = [(3/5, 4/5)] או (4, -2)` rendered as `… (2- ,4) או`. Every panel row therefore goes through `panelRowText`, which adds the `x_{B}` braces and wraps each Hebrew phrase in `isolateRtlName`. Two rules: a row with no Hebrew letter comes back unchanged, and a row that already carries an isolate (`namedRow`'s equations row, a `t()` string) is left alone, never nested. The data strings stay plain. `pointText` and `scalarText` return no isolates, because the ask lane isolates its own answer row and the #1433 locks read the text.
+
+The canvas needs no counterpart. Every `<text>` inherits `direction: ltr` from the `<svg>` (#1191). A coordinate label is printed by `fmtAnalytic` (a number) or `exprText` (a stated expression), and both emit the ASCII «-», so a U+2212 typed by the student never reaches the label.
+
+**Into the save/load section (or after "The panel's knowledge has one home"), add:**
+
+### A load restores every field the save writes ([ADR-AG-199](06c-decisions-analytic.md#adr-ag-199), #1632)
+
+`serialize()` writes the envelope `app · version · lines · seed · name? · spokenFor? · disabled? · seedNames?`. `loadAnalyticSession` is the one entry for file, link and restored session (#1238), and it passes every one of those fields to `restore`. `restore` sanitises what a hand-edited file could break: `disabled` and `spokenFor` keep only integer indexes of a line in the file (and `spokenFor` only non-empty strings), and `seedNames` keeps only letter → letter pairs. The lock is a whole-envelope round trip with every optional field set, and its key list is pinned, so a field added to `serialize` has to join the fixture and is then checked on the way back in. `spokenFor` was the field that slipped: it was saved since #1297 and never loaded.
+
+---
+
+Add a row to the helper table:
+
+| helper | protects | emits | direction |
+| --- | --- | --- | --- |
+| `slopeRowText` (`app/panelRows.ts`) | the «שיפועים» row: its `t()` parts that already carry isolates | FSI … PDI around each WHOLE Hebrew part | the slope rows |
+
+**A part that already carries isolates is wrapped whole, never re-scanned** (#1646). The rule "never nest" in `panelRowText` is about re-isolating runs INSIDE a string that has isolates: an LRI opened across an existing PDI is closed by it. Wrapping a complete, balanced `t()` string in one FSI … PDI is safe, and it is the only way such a part becomes a single island in an LTR row. So a row built from `t()` parts gets a composer that wraps each part (`slopeRowText`), not a run scanner.

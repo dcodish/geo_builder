@@ -31,7 +31,7 @@
  * So: solve once, step along the null space of the Jacobian by a fixed arclength, re-solve, repeat —
  * outward in both directions, to the view box or to closure.
  */
-import { carrierSystem, drawableAt, viewBox, type CarrierSystem } from './evaluate';
+import { carrierSystem, choiceSeedOf, drawableAt, viewBox, type CarrierSystem } from './evaluate';
 import { agreeingUnion, shapeOfTrace, type LocusShape } from './locusFit';
 import { resolveChoices, solveLM, SOLVE_TOL } from './solve';
 import type { Env } from './expr';
@@ -180,7 +180,7 @@ export function traceLocus(
    */
   const c: Construction = {
     ...raw,
-    constraints: resolveChoices(raw.constraints, opts.seed ?? 0),
+    constraints: resolveChoices(raw.constraints, choiceSeedOf(raw, opts.seed ?? 0)),
   };
   /**
    * THE STEP IS A FRACTION OF THE VIEW, not a fixed number of units.
@@ -292,7 +292,7 @@ export function traceLocus(
  * locus, and «המקום הגיאומטרי של A» about a pinned `A` should say so rather than draw a dot.
  */
 export function hasLocus(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>, seed = 0): boolean {
-  const c: Construction = { ...raw, constraints: resolveChoices(raw.constraints, seed) };
+  const c: Construction = { ...raw, constraints: resolveChoices(raw.constraints, choiceSeedOf(raw, seed)) };
   const sys = carrierSystem(c, env, { params: 'fixed' });
   if (sys.ids.length === 0) return false;
   const x0 = sys.toVec(start);
@@ -455,7 +455,7 @@ export function locusOf(
     const first = traceLocus(c, f.env, id, start, { bounds: room, seed });
     if (!first || first.points.length < 2) return null;
     const comps = [first];
-    const resolved: Construction = { ...c, constraints: resolveChoices(c.constraints, seed) };
+    const resolved: Construction = { ...c, constraints: resolveChoices(c.constraints, choiceSeedOf(c, seed)) };
     const sys = carrierSystem(resolved, f.env, { params: 'fixed' });
     if (sys.ids.length === 0) return comps;
     const near = Math.hypot(room.maxX - room.minX, room.maxY - room.minY) / 100;

@@ -3,8 +3,12 @@
  * SENTENCE: «הישר l1 חותך את המעגל I בנקודות A ו-B» / «A ו-B נקודות החיתוך של הישר l1 עם המעגל I».
  *
  * Measured at the base: both spellings `not-handled`. The operator's ruling, 2026-09-29, option (a):
- * A takes the FIRST root of #1268's canonical order (`crossing-order.ts`), B the second; deterministic,
- * never cycled by «הציגו תצורה אחרת»; the student swaps the letters to get the other assignment.
+ * A takes the FIRST root of #1268's canonical order (`crossing-order.ts`), B the second.
+ *
+ * **Amended by the operator's ruling of 2026-10-01 (#1539, ADR-AG-197):** «הציגו תצורה אחרת» *"should always
+ * swap if there are more than 1 option"* — the stated order is the FIRST drawing (configuration 0), and the
+ * press reaches the swapped assignment. The three sweep locks below that asserted "never cycled" now assert
+ * the ruling: configuration 0 in the stated order, both assignments reachable, always the pair's two roots.
  *
  * Every expected position is read from `conicMeet` over the figure's OWN resolved curves — the order the
  * rings and the selector share — never written out as a coordinate, so the lock is about the ORDER.
@@ -70,21 +74,26 @@ describe('#1512 — the 12-seed sweep and «הציגו תצורה אחרת»', (
   // A circle whose centre is a free parameter and a free point K: the figure really has other configurations.
   const FREE = ['נתון מעגל I שמשוואתו (x-a)^2+(y-4)^2=9', L1, 'נקודה K'];
 
-  it('A is the first canonical root and B the second at every one of 12 seeds (both spellings)', () => {
+  it('at every one of 12 seeds A and B are the pair\'s two roots; seed 0 takes the stated order, and both assignments occur (both spellings)', () => {
     for (const line of [VERB, NOUN]) {
       const centres = new Set<string>();
+      const orders = new Set<string>();
       for (let seed = 0; seed < 12; seed += 1) {
         const d = derive([...FREE, line], seed);
         expect(d.faults).toEqual([]);
         const roots = canonicalRoots(d);
         expect(roots).toHaveLength(2);
-        expect(near(pt(d, 'A'), roots[0])).toBe(true);
-        expect(near(pt(d, 'B'), roots[1])).toBe(true);
+        const stated = near(pt(d, 'A'), roots[0]) && near(pt(d, 'B'), roots[1]);
+        const swapped = near(pt(d, 'A'), roots[1]) && near(pt(d, 'B'), roots[0]);
+        expect(stated || swapped, `seed ${seed}`).toBe(true);
+        if (seed === 0) expect(stated, 'configuration 0 is the stated order').toBe(true);
+        orders.add(stated ? 'stated' : 'swapped');
         const c = d.figure.curves.find((cu) => cu.curve.kind === 'circle')!.curve as Extract<NumCurve, { kind: 'circle' }>;
         centres.add(c.cx.toFixed(3));
       }
       // The sweep really moved the figure — otherwise the order was checked on one configuration.
       expect(centres.size).toBeGreaterThan(1);
+      expect(orders.size, 'the swap is reachable (ruling 2026-10-01)').toBe(2);
     }
   });
 
@@ -101,29 +110,35 @@ describe('#1512 — the 12-seed sweep and «הציגו תצורה אחרת»', (
     expect(near(pt(dc, 'Q'), roots[0])).toBe(true);
   });
 
-  it('pressing «הציגו תצורה אחרת» never swaps the assignment', () => {
+  it('pressing «הציגו תצורה אחרת» reaches the swapped assignment, and every press keeps A and B on the two roots', () => {
     const lines = [...FREE, VERB];
     let seed = 0;
     let moved = 0;
+    let swaps = 0;
     for (let press = 0; press < 6; press += 1) {
       const next = anotherConfiguration(lines, seed);
       if (next.found) moved += 1;
       seed = next.seed;
       const d = derive(lines, seed);
       const roots = canonicalRoots(d);
-      expect(near(pt(d, 'A'), roots[0])).toBe(true);
-      expect(near(pt(d, 'B'), roots[1])).toBe(true);
+      const stated = near(pt(d, 'A'), roots[0]) && near(pt(d, 'B'), roots[1]);
+      const swapped = near(pt(d, 'A'), roots[1]) && near(pt(d, 'B'), roots[0]);
+      expect(stated || swapped).toBe(true);
+      if (swapped) swaps += 1;
     }
     expect(moved).toBeGreaterThan(0);
+    expect(swaps).toBeGreaterThan(0);
   });
 
-  it('a figure with no freedom has no other configuration to swap to', () => {
+  it('a figure with no freedom swaps the letters on the press — its only other configuration (ruling 2026-10-01)', () => {
     const lines = [CIRCLE, L1, VERB];
     const d0 = derive(lines, 0);
     const next = anotherConfiguration(lines, 0);
+    expect(next.found).toBe(true);
     const d1 = derive(lines, next.seed);
-    expect(near(pt(d1, 'A'), pt(d0, 'A')!)).toBe(true);
-    expect(near(pt(d1, 'B'), pt(d0, 'B')!)).toBe(true);
+    expect(d1.faults).toEqual([]);
+    expect(near(pt(d1, 'A'), pt(d0, 'B')!)).toBe(true);
+    expect(near(pt(d1, 'B'), pt(d0, 'A')!)).toBe(true);
   });
 });
 

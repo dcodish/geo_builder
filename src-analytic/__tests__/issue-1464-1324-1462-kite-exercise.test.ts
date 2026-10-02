@@ -17,6 +17,7 @@ import { derive } from '../engine/derive';
 import { distinctConfigSeeds, drawableAt, type Figure } from '../engine/evaluate';
 import { reportedDof } from '../engine/carriers';
 import { parseLine } from '../parser/parseAnalytic';
+import { factsWithin } from '../engine/types';
 import { ask } from '../app/ask';
 import { fmtNum } from '../../shell/format';
 
@@ -65,9 +66,15 @@ describe('#1464 — the circle through three points, in every spelling the exam 
     expect(d.figure.curves.filter((c) => c.curve.kind === 'circle')).toHaveLength(1);
   });
 
-  it('the INCIRCLE voices are not claimed — «מעגל חסום במשולש», «משולש חוסם מעגל» (2-D #31 / #38)', () => {
-    expect(parseLine('מעגל חסום במשולש ABD').ok).toBe(false);
-    expect(parseLine('משולש ABD חוסם מעגל').ok).toBe(false);
+  // #1619 B2 built the incircle: these voices are now CLAIMED — as the incircle, never as this circumcircle.
+  it('the INCIRCLE voices are never read as the circumcircle — «מעגל חסום במשולש», «משולש חוסם מעגל» (2-D #31 / #38)', () => {
+    for (const line of ['מעגל חסום במשולש ABD', 'משולש ABD חוסם מעגל']) {
+      const r = parseLine(line);
+      expect(r.ok).toBe(true);
+      // The creation rides `the-circle` since ADR-AG-198 (a circle already stated tangent to every side binds).
+      const defs = r.ok ? r.facts.flatMap(factsWithin).flatMap((f) => (f.t === 'circle-thru' ? [f.def.t] : [])) : [];
+      expect(defs).toEqual(['incircle']);
+    }
   });
 
   it('«מעגל III» stays a circle NAME, and «נתון מעגל O» stays a circle on a centre (#1060)', () => {

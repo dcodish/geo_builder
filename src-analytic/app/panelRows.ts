@@ -4,6 +4,7 @@ import { VERTICAL_TOL, verticality } from '../engine/lines';
 import { lineAngleOf } from './lineAngle';
 import { isDirectionSymbol, paramRegister, usedSymbols } from '../engine/carriers';
 import { type ParamDecl, positionalOf } from '../engine/types';
+import { isolateRtlName } from '../../shell/bidi';
 
 /**
  * WHICH CURVES THE DATA PANEL LISTS (#1250) — one decision, in one place, so a lock can CALL it.
@@ -165,3 +166,52 @@ export const panelShowsUnknown = (pk: PanelKnowledge): boolean =>
   pk.params.some((p) => !p.k.known) ||
   pk.points.some((p) => !p.x.known || !p.y.known) ||
   pk.curves.some((cu) => cu.known === null);
+
+/**
+ * WHAT A COMPOSED DATA-PANEL ROW DISPLAYS (#1644, ADR-AG-199) — one function, so a lock can CALL it.
+ *
+ * The panel's sections are laid out `ltr`, and most rows are pure Latin, which needs nothing. But a
+ * row the tree COMPOSES may carry a Hebrew word: the #1036 option set joins its positions with «או»
+ * («A = [(3/5, 4/5)] או (4, -2)»), and an unused parameter carries «לא בשימוש». Under the bidi
+ * algorithm a European number that follows a right-to-left run takes that run's direction, so the
+ * coordinate after «או» was laid out as part of the Hebrew run and read «(2- ,4)» — the operator's
+ * *"the −2 is not shown correctly"* (PR #1637 T5, corpus 7/5).
+ *
+ * **The helper is the LTR-row one, `isolateRtlName` (FSI … PDI), applied to each Hebrew phrase** — the
+ * mirror of `isolateLtrRuns`, and the one the design names for Hebrew inside an LTR row (04c, the bidi
+ * table; #1344's `namedRow`). Inside an isolate the phrase is skipped when its neighbours resolve, so
+ * the digit after «או» finds the row's own Latin letter as its strong neighbour and stays LTR.
+ *
+ * Two rules keep it from doing harm:
+ * - a row with no Hebrew letter is returned exactly as it was — no invisible characters;
+ * - a row that ALREADY carries an isolate was composed with its own (the equations row through
+ *   `namedRow`, a `t()` string through the i18n post-processor) and is left alone: never nest — an
+ *   outer isolate closed by the inner one's PDI is worse than none.
+ *
+ * Braces first: a subscript the panel writes as `x_B` becomes `x_{B}` for `MathText`.
+ */
+const HEBREW_PHRASE = /[א-ת][א-ת׳״'"]*(?:\s+[א-ת][א-ת׳״'"]*)*/g;
+const ANY_ISOLATE = /[\u2066-\u2069]/;
+export const panelRowText = (text: string): string => {
+  const braced = text.replace(/([A-Za-z])_([A-Za-z0-9]+)/g, '$1_{$2}');
+  return ANY_ISOLATE.test(braced) ? braced : braced.replace(HEBREW_PHRASE, (m) => isolateRtlName(m));
+};
+
+/**
+ * THE «שיפועים» ROW (#1646, ADR-AG-199) — its parts in a FIXED visual order, each Hebrew part an island.
+ *
+ * The row is `AB: <slope> · <angle label>: <angle>` in an `ltr` section. The label «זווית עם ציר ה-x»
+ * and the vertical verdict «אנכי (אין שיפוע)» are `t()` strings, which the i18n post-processor has
+ * ALREADY isolated inside (`ה-` + LRI x PDI). `panelRowText` correctly refuses to re-isolate a row that
+ * carries isolates, so the label was laid out loose in the LTR row: its Hebrew reversed with «ה» at the
+ * left end and «-x» pushed to its right — «AB: 2 · 63.43° :זווית עם ציר ה-x» as the operator read it.
+ *
+ * Each part is wrapped WHOLE in `isolateRtlName` (FSI … PDI). That is not nesting in the harmful sense:
+ * the string inside is balanced, so its own LRI/PDI pair closes inside the FSI, and the label is one
+ * right-to-left island reading «זווית עם ציר ה-x» with «x» after «ה-». A part with no Hebrew letter (a
+ * number, «—», the English UI) is untouched. The App renders the result through `panelRowText`, which
+ * then sees isolates and only adds braces.
+ */
+export function slopeRowText(name: string, slope: string, angleLabel: string, angle: string): string {
+  return `${name}: ${isolateRtlName(slope)} · ${isolateRtlName(angleLabel)}: ${angle}`;
+}

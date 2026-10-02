@@ -258,6 +258,10 @@ const he = {
   // #1170 — about the RING, never about a failed search: on a figure whose points are all pinned
   // there was only ever one configuration, so «לא נמצאה תצורה» would be a false sentence. Names
   // the student's own statement (#1145) and points at the two things they can actually change.
+  // #1554 ruling 1 (ADR-AG-198) — המשפט סותר את שם הצורה שלו; שני השמות נאמרים, והתיקון מוצע.
+  errInscribedContradictsNoun:
+    '{{shapeHe}} לא יכול להיות חסום במעגל: "{{detail}}". מעגל שעובר דרך ארבעת הקודקודים הופך אותו ל{{forcedHe}}, ' +
+    'ו{{forcedHe}} אינו {{shapeHe}}. אם הצורה היא {{forcedHe}}, כתבו «{{forcedHe}} ABCD חסום במעגל».',
   errRingContradictsNoun:
     'הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "{{detail}}". אפשר לשנות את סדר האותיות ' +
     'כך שהצלעות לא ייחתכו, או לשנות את השיעורים — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.',
@@ -595,6 +599,10 @@ const en: typeof he = {
   errDoesNotExist:
     'In this figure {{existing}} does not exist — the givens already fix every point, and there is ' +
     'no other configuration where it would. "{{detail}}" was not added.',
+  // #1554 ruling 1 (ADR-AG-198) — the sentence contradicts its own noun; both nouns named, the remedy offered.
+  errInscribedContradictsNoun:
+    'A {{shapeEn}} cannot be inscribed in a circle: "{{detail}}". A circle around it would make it a {{forcedEn}}, ' +
+    'and a {{forcedEn}} is not a {{shapeEn}}. If the shape is a {{forcedEn}}, write "{{forcedEn}} ABCD is inscribed in a circle".',
   errRingContradictsNoun:
     'The points you gave do not form that shape in this order: "{{detail}}". Reorder the letters so ' +
     'the sides do not cross, or change the coordinates — as written the vertices fall on one line or the shape folds over itself.',

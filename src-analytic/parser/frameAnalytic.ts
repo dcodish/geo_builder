@@ -22,6 +22,8 @@
  * line that is STORED is always the one the student typed.
  */
 import { ANGLE_STEM_HE, EN_SHAPE, SHAPES, normalizeShapeNoun } from '../engine/shapes';
+import { isNumeralName } from '../engine/names';
+import { stripFormatControls } from '../../shell/bidi';
 
 // ---------------------------------------------------------------------------
 // Orthography — character-level folds, always applied
@@ -31,11 +33,19 @@ import { ANGLE_STEM_HE, EN_SHAPE, SHAPES, normalizeShapeNoun } from '../engine/s
  * One spelling per symbol. ∢ (U+2222) and ∡ (U+2221) are the exam's angle glyphs and mean ∠ (#1555);
  * ⁰ is typed for °; the Israeli coordinate pair «A(2;10)» separates with a semicolon; «10½» is 10.5;
  * «קודקוד» is the plene spelling of «קדקוד»; the maqaf and the NBSP are a hyphen and a space.
+ *
+ * #1641 / #1643 (ADR-AG-198) — what a PASTE carries is not what the student wrote: the bidi isolates and marks
+ * the page wraps around every name (U+2066…U+2069, U+200E/F — copied off the canvas or the fact list) are
+ * stripped by the shared set (`shell/bidi`, the 2-D/3-D parser boundary, ADR-W-029); a leading bullet («·»,
+ * «•», «*», or «-» followed by a space) is a list mark, not a word; and «ציר ה- x» with a space after the
+ * article's hyphen is «ציר ה-x». Character-level, so every rule reads the one spelling.
  */
 export function orthography(raw: string): string {
-  return raw
+  return stripFormatControls(raw)
+    .replace(/^\s*(?:[·•∙*]|-(?=\s))\s*/, '')
     .replace(/־/g, '-')
     .replace(/ /g, ' ')
+    .replace(/(?<![א-ת])ה-\s+([xy])(?![A-Za-z0-9])/g, 'ה-$1')
     .replace(/[∡∢]/g, '∠')
     .replace(/⁰/g, '°')
     .replace(/(\d)\s*½/g, '$1.5')
@@ -103,6 +113,9 @@ const UNWRAP: ReadonlyArray<[RegExp, string]> = [
   [/(\d)\s*(?:ס"מ|ס״מ|סמ'|cm)(?![א-תA-Za-z])/g, '$1'],
   // «O – מרכז המעגל», «O - ראשית הצירים»: a dash between a name and its description.
   [/^([A-Z][0-9₀-₉]?)\s+[–—-]\s+(?=[א-ת])/, '$1 '],
+  // «משוואת המעגל הנתון היא …», «הישר הנתון», «הנקודה הנתונה» (#1619 B1) — «הנתון» after a definite noun is
+  // the given-prefix as an ADJECTIVE: "the given circle" is the circle. Written out per inflection (final ן).
+  [/(?<=(?:^|\s)ה[א-ת]+)\s+הנתו(?:ן|נה|נים|נות)(?=\s|:|,|$)/g, ''],
   [/\s*\.$/, ''],
 ];
 
@@ -302,6 +315,12 @@ export function shapeClauses(line: string): string[] | null {
  *   names it: the statement alone (it introduces F).
  */
 export function pointClauses(line: string): string[] | null {
+  // «M נמצא בנקודה (4,8)», «הנקודה M נמצאת ב-(4,8)», "M is at (4,8)" (#1619 B1) — the coordinate given, said
+  // as a location: the point at those coordinates is `M(4,8)`.
+  const at =
+    new RegExp(`^(?:ה?נקודה\\s+)?(${NAME})\\s+(?:(?:היא|הוא)\\s+)?(?:נמצא(?:ת)?\\s+)?ב-?\\s*(?:ה?נקודה\\s+)?(\\([^()]+\\))$`).exec(line) ??
+    new RegExp(`^(?:[Tt]he\\s+)?(?:[Pp]oint\\s+)?(${NAME})\\s+(?:is|lies)\\s+at\\s+(?:the\\s+point\\s+)?(\\([^()]+\\))$`).exec(line);
+  if (at) return [`${at[1]}${at[2]}`];
   const placed = new RegExp(`^(?:ה?נקודה\\s+)?(${NAME})(\\([^()]+\\))\\s+(?!=)(.+)$`).exec(line);
   if (placed) return [`${placed[1]}${placed[2]}`, `${placed[1]} ${placed[3].trim()}`];
   const defined = new RegExp(`^(${NAME})\\s+(?:(?:היא|הוא)\\s+)?(?:ה)?נקודה\\s+(?:ש(?:עבורה|בה)|כך\\s+ש-?)\\s*(.+)$`).exec(line);
@@ -313,8 +332,6 @@ export function pointClauses(line: string): string[] | null {
 // Sides as subjects — on an axis, and related to each other
 // ---------------------------------------------------------------------------
 
-const SIDE = `(?:ה?(?:${SIDE_NOUNS}|ישר)\\s+)?((?:${NAME}){2})`;
-
 /**
  * - «האלכסון BD נמצא על ציר ה-x», «הצלע AO נמצאת על ציר ה-x» — a segment lies on an axis exactly when
  *   both its endpoints do, so that is what it says.
@@ -322,27 +339,146 @@ const SIDE = `(?:ה?(?:${SIDE_NOUNS}|ישר)\\s+)?((?:${NAME}){2})`;
  * - «האלכסון AC מאונך לאלכסון BD» — a relation that names its nouns: the letters are the relation.
  */
 export function sideClauses(line: string): string[] | null {
-  const onAxis = new RegExp(`^${SIDE}\\s+(?:נמצא(?:ת)?\\s+)?על\\s+(ציר\\s+ה-?[xy])$`).exec(line);
+  const onAxis = new RegExp(`^(?:ה?(${SIDE_NOUNS}|ישר)\\s+)?((?:${NAME}){2})\\s+(?:נמצא(?:ת)?\\s+)?על\\s+(ציר\\s+ה-?[xy])$`).exec(line);
   if (onAxis) {
-    const ends = onAxis[1].match(new RegExp(NAME, 'g')) ?? [];
-    return ends.map((p) => `${p} על ${onAxis[2]}`);
+    const [, noun, pair, axis] = onAxis;
+    const ends = pair.match(new RegExp(NAME, 'g')) ?? [];
+    // The sentence NAMES the segment (or the line), so it draws it (#1639, ADR-AG-198): «הישר» the line,
+    // every other noun and the bare pair the segment — the declaration the bare «AO» line makes.
+    return [...ends.map((p) => `${p} על ${axis}`), `${noun === 'ישר' ? 'הישר' : 'הקטע'} ${pair}`];
   }
   const mutual = new RegExp(
-    `^(?:ה?(?:ישרים|צלעות|קטעים|אלכסונים)\\s+)?((?:${NAME}){2})\\s+ו-?\\s*((?:${NAME}){2})\\s+(מקביל(?:ים|ות)|מאונכ(?:ים|ות))(?:\\s+(?:זה|זו)\\s+(?:לזה|לזו))?$`,
+    `^(?:ה?(ישרים|צלעות|קטעים|אלכסונים)\\s+)?((?:${NAME}){2})\\s+ו-?\\s*((?:${NAME}){2})\\s+(מקביל(?:ים|ות)|מאונכ(?:ים|ות))(?:\\s+(?:זה|זו)\\s+(?:לזה|לזו))?$`,
   ).exec(line);
-  if (mutual) return [`${mutual[1]} ${mutual[3].startsWith('מקביל') ? '∥' : '⊥'} ${mutual[2]}`];
+  // The NOUN rides into the relation (#1639, ADR-AG-198): «הישרים AB ו-CD» relates — and so draws — two LINES.
+  if (mutual) {
+    const n = mutual[1] === 'ישרים' ? 'הישר ' : '';
+    return [`${n}${mutual[2]} ${mutual[4].startsWith('מקביל') ? '∥' : '⊥'} ${n}${mutual[3]}`];
+  }
   const related = new RegExp(
-    `^${SIDE}\\s+(מקביל(?:ה)?|מאונכ(?:ת)?|מאונך)\\s+ל(?:-|ה)?(?:${SIDE_NOUNS}|ישר)?\\s*((?:${NAME}){2})$`,
+    `^(?:ה?(${SIDE_NOUNS}|ישר)\\s+)?((?:${NAME}){2})\\s+(מקביל(?:ה)?|מאונכ(?:ת)?|מאונך)\\s+ל(?:-|ה)?(${SIDE_NOUNS}|ישר)?\\s*((?:${NAME}){2})$`,
   ).exec(line);
-  if (related) return [`${related[1]} ${related[2].startsWith('מקביל') ? '∥' : '⊥'} ${related[3]}`];
+  if (related) {
+    const n = (noun: string | undefined) => (noun === 'ישר' ? 'הישר ' : '');
+    return [`${n(related[1])}${related[2]} ${related[3].startsWith('מקביל') ? '∥' : '⊥'} ${n(related[4])}${related[5]}`];
+  }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// The circle's centre and the circle as a shared subject (#1619 B1)
+// ---------------------------------------------------------------------------
+
+/** What may follow a point to say where it is — the predicates the point rules already read. */
+const PLACE_PRED = '(?:נמצא(?:ת|ים|ות)?\\s|על\\s|ב-?\\s*(?:ה?נקודה\\s+)?\\(|ברביע|מחוץ\\s|בתוך\\s)';
+
+/**
+ * «מרכז המעגל M נמצא על ציר ה-y» · «מרכז המעגל M נמצא בנקודה (4,8)» · «נתון מעגל שמרכזו M נמצא על החלק
+ * החיובי של ציר ה-y» · «O – מרכז המעגל» — the centre NAMED and PLACED in one sentence. It says two things the
+ * grammar already reads apart: the naming («M מרכז המעגל», or the circle stated on M) and the sentence about
+ * M. A NUMERAL after «המעגל» is the circle's own name (ADR-AG-118), never a centre letter, so it is not read.
+ */
+export function centreClauses(line: string): string[] | null {
+  // «מרכז המעגל הוא M» (#1643, ADR-AG-198) — the copula form of the naming is the same naming.
+  const named = new RegExp(`^(?:ה?נקודת\\s+)?ה?מרכז\\s+(?:של\\s+)?ה?מעגל\\s+(?:(?:הוא|היא)\\s+)?(${NAME})(?:\\s+(.+))?$`).exec(line);
+  if (named && !isNumeralName(named[1])) {
+    const [, p, rest] = named;
+    return rest ? [`${p} מרכז המעגל`, `${p} ${rest}`] : [`${p} מרכז המעגל`];
+  }
+  const namedEn = new RegExp(`^(?:[Tt]he\\s+)?cent(?:re|er)\\s+of\\s+the\\s+circle,?\\s+(${NAME}),?\\s+(.+)$`).exec(line);
+  if (namedEn && !isNumeralName(namedEn[1])) return [`${namedEn[1]} is the centre of the circle`, `${namedEn[1]} ${namedEn[2]}`];
+  const copulaEn = new RegExp(`^(?:[Tt]he\\s+)?cent(?:re|er)\\s+of\\s+the\\s+circle\\s+is\\s+(${NAME})$`).exec(line);
+  if (copulaEn && !isNumeralName(copulaEn[1])) return [`${copulaEn[1]} is the centre of the circle`];
+  const created = new RegExp(`^(ה?מעגל\\s+ש?מרכזו\\s+(?:ה?נקודה\\s+)?(${NAME}))\\s+(${PLACE_PRED}.*)$`).exec(line);
+  if (created) return [created[1], `${created[2]} ${created[3]}`];
+  const createdEn = new RegExp(`^((?:a\\s+|the\\s+)?circle\\s+(?:centred|centered)\\s+at\\s+(${NAME}))\\s+((?:is|lies)\\s.+)$`, 'i').exec(line);
+  if (createdEn && /^[A-Z]/.test(createdEn[2])) return [createdEn[1], `${createdEn[2]} ${createdEn[3]}`];
+  return null;
+}
+
+/**
+ * «המעגל משיק לציר ה-x וחותך את ציר ה-y בנקודה C» (#1619 B1) — two predicates sharing the circle as their
+ * subject. Each is a sentence the grammar reads with the subject written in; the ו-cut is only before one of
+ * the circle's verbs, so «… בנקודות B ו-C» is never cut.
+ */
+const CIRCLE_VERB = '(?:חות(?:ך|כת)|משיק(?:ה)?|עובר(?:ת)?)';
+export function sharedSubjectClauses(line: string): string[] | null {
+  const he = new RegExp(`^(ה?מעגל(?:\\s+${NAME})?)\\s+(${CIRCLE_VERB}\\s.+?)\\s+ו-?(${CIRCLE_VERB}\\s.+)$`).exec(line);
+  if (he) return [`${he[1]} ${he[2]}`, `${he[1]} ${he[3]}`];
+  const en = new RegExp(
+    `^((?:[Tt]he\\s+)?circle(?:\\s+${NAME})?)\\s+(.+?)\\s+and\\s+((?:cuts|intersects|meets|passes|is\\s+tangent|touches)\\s.+)$`,
+  ).exec(line);
+  if (en) return [`${en[1]} ${en[2]}`, `${en[1]} ${en[3]}`];
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Diameters as subjects (#1619 B2)
+// ---------------------------------------------------------------------------
+
+/**
+ * - «הקטע AB הוא קוטר במעגל שמרכזו M» — the circle on a centre, named by the sentence that makes AB its
+ *   diameter: the circle, then the diameter OF that circle («AB קוטר במעגל M», M1's `diameter-of`).
+ * - «הקטע AB הוא קוטר במעגל» — «הקטע» NAMES the segment, which introduces its ends (#1074), so the segment is
+ *   stated first; «הצלע AC» refers to a side the figure already has and states nothing new.
+ * - «קוטר המעגל AC נמצא על הישר 3y − 2x − 4 = 0» — the line the diameter lies on, and the diameter: «AC נמצא
+ *   על …» (the incidence-in-every-order rule's own sentence) and «AC קוטר במעגל».
+ */
+export function diameterClauses(line: string): string[] | null {
+  const DIAM = `(?:(?:הוא|היא)\\s+)?(?:ה)?קוטר`;
+  const centred = new RegExp(
+    `^(?:ה?(קטע|צלע)\\s+)?((?:${NAME}){2})\\s+${DIAM}\\s+ב(?:ה)?מעגל\\s+ש(?:ה)?מרכזו\\s+(?:(?:הוא|היא)\\s+)?(${NAME})$`,
+  ).exec(line);
+  if (centred) {
+    const [, noun, pair, centre] = centred;
+    return [...(noun === 'קטע' ? [`הקטע ${pair}`] : []), `מעגל שמרכזו ${centre}`, `${pair} קוטר במעגל ${centre}`];
+  }
+  const segment = new RegExp(`^ה?קטע\\s+((?:${NAME}){2})\\s+(${DIAM}(?:\\s+.+)?)$`).exec(line);
+  if (segment) return [`הקטע ${segment[1]}`, `${segment[1]} ${segment[2].replace(/^(?:(?:הוא|היא)\s+)/, '')}`];
+  const onLine = new RegExp(`^(?:ה)?קוטר\\s+(?:ה)?מעגל(?:\\s+(${NAME}))?\\s+((?:${NAME}){2})\\s+נמצא\\s+(על\\s+.+)$`).exec(line);
+  if (onLine) {
+    const [, circle, pair, where] = onLine;
+    // The incidence first: it introduces the two ends when they are new, and the diameter refers to them.
+    return [`${pair} נמצא ${where}`, `${pair} קוטר במעגל${circle ? ` ${circle}` : ''}`];
+  }
+  return null;
+}
+
+/**
+ * «הנקודה B נמצאת מחוץ למעגל, על החלק החיובי של ציר ה-x» (#1619 B1) — a point and a list of where it is,
+ * the later places with the subject left out. Each place is the sentence with the subject written back in.
+ */
+const ELIDED_PRED = /^(?:על|מחוץ|בתוך|נמצא(?:ת)?|ברביע)(?:\s|$)/;
+export function elidedSubjectClauses(line: string): string[] | null {
+  const subject = new RegExp(`^(?:ה?נקודה\\s+)?(${NAME})\\s`).exec(line);
+  if (!subject) return null;
+  const segs = segmentsOf(line);
+  if (segs.length < 2 || !segs.slice(1).every((s) => ELIDED_PRED.test(s.text))) return null;
+  return [segs[0].text, ...segs.slice(1).map((s) => `${subject[1]} ${s.text}`)];
+}
+
+/**
+ * «במשולש AOB חסום מעגל שמרכזו C (הנקודה C נמצאת ברביע השני)» — a sentence, and in parentheses at its end the
+ * givens that go with it (#1619 B2). The shape frame reads this for a shape declaration only; any other
+ * sentence followed by parenthesised givens is the same two statements. Offered only when the whole line
+ * is not itself a sentence (the caller tries it last), and taken only when every clause parses.
+ */
+export function parenClauses(line: string): string[] | null {
+  const paren = trailingParen(line);
+  if (!paren || !paren.head || paren.inner.length === 0) return null;
+  return [paren.head, ...paren.inner];
 }
 
 // ---------------------------------------------------------------------------
 // Distribution — «A ו-B נמצאות על ציר ה-x ועל ציר ה-y בהתאמה»
 // ---------------------------------------------------------------------------
 
-const NAME_LIST = `((?:${NAME})(?:\\s*,\\s*${NAME})*\\s+ו-?\\s*${NAME})`;
+/**
+ * A LIST of point names, however the student separates it (#1641, ADR-AG-198): «A ו-B», «A, B ו-C», «A, B, C»,
+ * «A, B, ו-C». Commas alone are a list, and so is a final «ו-» with or without the comma before it — the frame
+ * used to admit one spelling of a list (the final «ו-» required), so three ordinary spellings missed every rule.
+ */
+const NAME_LIST = `((?:${NAME})(?:(?:\\s*,\\s*${NAME})+(?:\\s*,?\\s*ו-?\\s*${NAME})?|\\s+ו-?\\s*${NAME}))`;
 const namesOf = (list: string): string[] => list.match(new RegExp(NAME, 'g')) ?? [];
 /** Split «על ציר ה-x ועל ציר ה-y» / «x = 4 ו-x = -4» into its members. */
 const objectsOf = (s: string): string[] => s.split(/\s+ו-?(?=\s*(?:על|ב[א-ת]|[A-Za-z0-9(−-]))/).map((x) => x.trim()).filter(Boolean);
@@ -354,12 +490,18 @@ const objectsOf = (s: string): string[] => s.split(/\s+ו-?(?=\s*(?:על|ב[א-�
  * סימטריות») would be changed in meaning by distributing it, so nothing else is.
  */
 export function distributeClauses(line: string): string[] | null {
+  /*
+   * The subject noun is optional, with or without the article («הנקודות», «נקודות»), and so is the VERB when
+   * the predicate opens with «על» (#1641): «A, B, C על המעגל» is the location sentence with its verb dropped,
+   * exactly as «A על המעגל» is «A נמצאת על המעגל». Without «על» the verb stays required — a bare list and
+   * anything else is not this reading, so «A ו-B סימטריות» (a relation BETWEEN the subjects) never distributes.
+   */
   const loc = new RegExp(
-    `^(?:ה?(?:נקודות|קדקודים)\\s+)?${NAME_LIST}\\s+(?:נמצא(?:ות|ים)|מונח(?:ות|ים)|נמצאות|נמצאים)\\s+(.+)$`,
+    `^(?:ה?(?:נקודות|קדקודים)\\s+)?${NAME_LIST}\\s+(?:(?:נמצא(?:ות|ים)|מונח(?:ות|ים))\\s+(.+)|(על\\s.+))$`,
   ).exec(line);
   if (loc) {
     const names = namesOf(loc[1]);
-    let rest = loc[2].trim();
+    let rest = (loc[2] ?? loc[3]).trim();
     const respectively = /\s+בהתאמה$/.test(rest);
     if (respectively) rest = rest.replace(/\s+בהתאמה$/, '');
     if (!respectively) return names.map((n) => `${n} ${rest}`);

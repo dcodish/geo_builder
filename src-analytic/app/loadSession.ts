@@ -32,6 +32,10 @@ export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackN
     lines: savedLines,
     seed: typeof envelope.seed === 'number' ? envelope.seed : 0,
     name: typeof envelope.name === 'string' ? envelope.name : fallbackName,
+    // #1632 (ADR-AG-199) — the AI lane's display sentences. `serialize` wrote them and this call never
+    // passed them on, so a loaded file showed the canonical command lines in place of the student's own
+    // words. The store's `restore` range-checks them against the lines, as it does `disabled`.
+    spokenFor: envelope.spokenFor as Record<number, string> | undefined,
     disabled: Array.isArray(envelope.disabled) ? envelope.disabled.filter((d): d is number => typeof d === 'number') : [],
     // #1631 — where a renamed free vertex is drawn; the store keeps only letter → letter entries
     seedNames: envelope.seedNames as Record<string, string> | undefined,

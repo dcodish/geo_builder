@@ -99,6 +99,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { featured: true, category: 'lines', family: 'F3', he: 'נתון הישר l1: 4y-3x-20=0', en: 'line l1: 4y-3x-20=0' },
   { featured: true, category: 'lines', family: 'F3', he: 'משוואת הישר AC היא y=-2x+8', en: 'the line AC is y=-2x+8' },
   { featured: true, category: 'lines', family: 'F3', he: 'הישר x=-4', en: 'the line x=-4' },
+  // The LINE through two named points, drawn (#1639, ADR-AG-198) — «הישר AB» the line, where «הקטע AB» is the segment.
+  { category: 'lines', family: 'F3', he: 'הישר AB', en: 'the line AB', needs: ['A(0,0)', 'B(4,3)'] },
   { category: 'lines', family: 'F3', he: 'הישר y=x', en: 'the line y=x' },
 
   // The noun is OPTIONAL for an equation (02c R6, #1037) — the fit names the family, and the
@@ -257,6 +259,29 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['B(7,7)', 'D(1,1)'],
   },
 
+  // --- F5 · inscribed and circumscribed (#1619 B2, #1554, ADR-AG-194) ---
+  // The 471 exams' own openers: a polygon of any noun inscribed in a circle (bare, on a centre, by its
+  // equation), the acute triangle, «בר חסימה», and the converse — the incircle and its touch points.
+  // Unfeatured: this section's six are chosen (#1347), and these join its tail.
+  { category: 'circles', family: 'F5', he: 'מרובע ABCD חסום במעגל', en: 'quadrilateral ABCD is inscribed in a circle' },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'המשולש ABC חסום במעגל שמרכזו M',
+    en: 'triangle ABC is inscribed in a circle with centre M',
+  },
+  { category: 'circles', family: 'F5', he: 'במעגל חסום משולש חד זוויות ABC', en: 'acute triangle ABC is inscribed in a circle' },
+  { category: 'circles', family: 'F5', he: 'מרובע ABCD בר חסימה', en: 'cyclic quadrilateral ABCD' },
+  { category: 'circles', family: 'F5', he: 'מעגל חסום במשולש ABC', en: 'the incircle of triangle ABC' },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה',
+    en: 'the sides AB, BC and CA touch the circle at D, E and F respectively',
+    needs: ['מעגל חסום במשולש ABC'],
+  },
+  { category: 'circles', family: 'F5', he: 'מעגל חסום במרובע ABCD', en: 'a circle inscribed in quadrilateral ABCD' },
+
   // --- F5 · tangency — how the corpus pins a circle WITHOUT giving its radius (#1060 axes,
   // #1501 lines). These rows are also what teaches the LLM lane the vocabulary: neither half was
   // in the catalog before #1501, so the fallback could never emit a tangency at all.
@@ -313,6 +338,89 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'מעגל M משיק למעגל K בנקודה T',
     en: 'circle M is tangent to circle K at T',
     needs: ['נתון מעגל K'],
+  },
+  // Tangency AT a named point, the tangent as an object, and chords (#1619 B3, #1430, ADR-AG-195) — the
+  // 471 booklet's own sentences. Not featured: which rows take the section's six seats is #1347's call.
+  { category: 'circles', family: 'F5', he: 'המעגל משיק לציר ה-x בנקודה A', en: 'the circle is tangent to the x-axis at the point A', needs: ['נתון מעגל שמרכזו M(6,10)'] },
+  { category: 'circles', family: 'F5', he: 'הישר BC משיק למעגל בנקודה B', en: 'the line BC is tangent to the circle at B', needs: ['נתון מעגל x^2+y^2=25', 'B(3,4)'] },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה',
+    en: 'AB and BC are tangent to the circle at the points A and C respectively',
+    needs: ['נתון מעגל שמרכזו O(-2,1)', 'B(8,11)'],
+  },
+  { category: 'circles', family: 'F5', he: 'המשיק למעגל בנקודה A', en: 'the tangent to the circle at A', needs: ['נתון מעגל x^2+y^2=25', 'A(3,4)'] },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'משוואת המשיק למעגל בנקודה A היא 3x+4y=25',
+    en: 'the equation of the tangent to the circle at A is 3x+4y=25',
+    needs: ['נתון מעגל x^2+y^2=25', 'A(3,4)'],
+  },
+  { category: 'circles', family: 'F5', he: 'דרך P עובר משיק למעגל', en: 'a tangent to the circle passes through P', needs: ['נתון מעגל x^2+y^2=25', 'P(10,0)'] },
+  { category: 'circles', family: 'F5', he: 'AB מיתר במעגל', en: 'AB is a chord of the circle', needs: ['נתון מעגל x^2+y^2=25'] },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'במעגל המיתרים AC ו-BD נפגשים בנקודה E',
+    en: 'in the circle the chords AC and BD meet at E',
+    needs: ['נתון מעגל x^2+y^2=25'],
+  },
+
+  // The 4-point questions' circle sentences (#1619 B1, ADR-AG-193) — the exam's own wording about the
+  // circle it has: points on it, its axis crossings, its centre placed, its regions. Not featured: the six
+  // featured seats are #1347's pedagogy call.
+  { category: 'circles', family: 'F5', he: 'המעגל עובר דרך A', en: 'the circle passes through A', needs: ['נתון מעגל שמרכזו M'] },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'המעגל חותך את ציר ה-x בנקודות B ו-C',
+    en: 'the circle cuts the x-axis at points B and C',
+    needs: ['נתון מעגל שמרכזו M'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'המעגל חותך את החלק החיובי של ציר ה-x בנקודה A',
+    en: 'the circle cuts the positive x-axis at A',
+    needs: ['נתון מעגל שמרכזו M'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'B היא אחת מנקודות החיתוך של המעגל עם ציר ה-y',
+    en: 'B is one of the intersection points of the circle with the y-axis',
+    needs: ['נתון מעגל שמרכזו M'],
+  },
+  { category: 'circles', family: 'F5', he: 'מרכז המעגל M נמצא על ציר ה-y', en: 'the centre of the circle, M, is on the y-axis', needs: ['נתון מעגל שמרכזו M'] },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'הנקודה B נמצאת מחוץ למעגל',
+    en: 'B is outside the circle',
+    needs: ['נתון מעגל שמרכזו M(0,0)', 'רדיוס המעגל הוא 5'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'הנקודה E נמצאת על הקשת הקטנה AC',
+    en: 'E is on the minor arc AC',
+    needs: ['נתון מעגל שמרכזו M(0,0)', 'רדיוס המעגל הוא 5', 'A(5,0)', 'C(0,5)'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'אורך הקטע AB שווה לרדיוס המעגל',
+    en: 'AB equals the radius of the circle',
+    needs: ['נתון מעגל שמרכזו M', 'A(0,0)', 'B(3,4)'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'CD עובר דרך מרכז המעגל',
+    en: 'CD passes through the centre of the circle',
+    needs: ['נתון מעגל שמרכזו M', 'C(1,2)', 'D(4,6)'],
   },
 
   // --- F6 · conics by equation (canonical only — D6/§2a) ---
@@ -664,6 +772,9 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'O is the centre of circle I',
     needs: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9'],
   },
+  // The centre of the circle the figure HAS, named — contextually or by its equation (#1598, ADR-AG-193).
+  { category: 'derived', family: 'F16', he: 'O מרכז המעגל', en: 'O is the centre of the circle', needs: ['(x-3)^2+(y-4)^2=9'] },
+  { category: 'derived', family: 'F16', he: 'P מרכז המעגל x^2+y^2=16', en: 'P is the centre of the circle x^2+y^2=16', needs: ['O(5,5)', 'x^2+y^2=16'] },
   // The crossing sentence and the point-on-a-named-circle (#1429): neither had a catalog row, so
   // the panel could not teach them and the LLM lane could not emit them — the discoverability half
   // of the operand-resolver class.
@@ -690,6 +801,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'P on circle I',
     needs: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9'],
   },
+  // A circle named by its CENTRE LETTER (#1619 B1) — the exam's «מעגל M».
+  { category: 'points', family: 'F3', he: 'A על מעגל M', en: 'A is on circle M', needs: ['נתון מעגל שמרכזו M'] },
 
   // --- F16 · derived points over stated vertices (02c §8) ---
   {

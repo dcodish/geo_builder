@@ -12,6 +12,7 @@ import type { RefKind } from '../engine/names';
 import type { InputError } from '../store/useAnalyticStore';
 import type { HostRef } from '../engine/apply';
 import { hostKey, rangeText } from './hostKey';
+import { EN_SHAPE } from '../engine/shapes';
 
 /** The slice of i18next's `t` this needs — a key and its interpolation values, back a string. */
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -112,6 +113,9 @@ export function ambiguousCurveExample(detail: string, theNoun: string, name: str
   return `${detail.slice(0, end)} ${name}${detail.slice(end)}`;
 }
 
+/** A registry noun in English — the first English spelling the table maps onto it (the table is the one source). */
+const enNoun = (he: string | undefined): string => (he ? Object.keys(EN_SHAPE).find((k) => EN_SHAPE[k] === he) ?? he : '');
+
 /** The sentence a student reads for `error`, in the locale `t` speaks. */
 export function errorText(error: InputError, t: Translate): string {
   const kind: RefKind | undefined = 'expected' in error ? error.expected : undefined;
@@ -142,6 +146,7 @@ export function errorText(error: InputError, t: Translate): string {
     'kind-mismatch': 'errKindMismatch',
     'does-not-exist': 'errDoesNotExist',
     'ring-contradicts-noun': 'errRingContradictsNoun',
+    'inscribed-contradicts-noun': 'errInscribedContradictsNoun',
     // #1407 — a vertex in SEVERAL shapes gets the three-letter name it needs; in none, the general form.
     'ambiguous-angle': error.key === 'ambiguous-angle' && error.example ? 'errAmbiguousAngleArms' : 'errAmbiguousAngle',
     // ONE chooser for "the reference found none / several of its host" (#1432 am. 1 + #1514): the host
@@ -191,5 +196,10 @@ export function errorText(error: InputError, t: Translate): string {
     other: 'other' in error ? error.other : '',
     reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '',
     definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '',
+    // #1554 ruling 1 (ADR-AG-198): the two nouns, in each locale's spelling (the registry key is the Hebrew).
+    shapeHe: 'shape' in error ? (error.shape ?? '') : '',
+    forcedHe: 'forced' in error ? (error.forced ?? '') : '',
+    shapeEn: 'shape' in error ? enNoun(error.shape) : '',
+    forcedEn: 'forced' in error ? enNoun(error.forced) : '',
   });
 }

@@ -121,6 +121,8 @@ export type InputError =
   /** A construct that cannot exist in this figure, which has no freedom left to try (#1058). */
   | { key: 'does-not-exist'; detail: string; existing?: string }
   | { key: 'ring-contradicts-noun'; detail: string }
+  /** #1554 ruling 1 (ADR-AG-198) — a noun no circle can pass around, said to be inscribed: both nouns, registry keys. */
+  | { key: 'inscribed-contradicts-noun'; detail: string; shape?: string; forced?: string }
   /** A vertex that does not name an angle on its own — no shape through it, or several (#1049). */
   | { key: 'ambiguous-angle'; detail: string; example?: string }
   /** A shape named by its noun alone, where the figure has no such shape or several (#1049). */
@@ -315,6 +317,21 @@ function cleanSeedNames(raw: unknown): Record<string, string> {
   );
 }
 
+/**
+ * #1632 (ADR-AG-199) — the AI lane's display sentences from a saved file, kept only where they can be
+ * true: a key that names a LINE of this file (an integer index in range) and a string value. A
+ * hand-edited or truncated file cannot attach a sentence to a ghost row — the #1548 rule for `disabled`.
+ */
+function cleanSpokenFor(raw: unknown, lineCount: number): Record<number, string> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Record<number, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const i = Number(k);
+    if (/^\d+$/.test(k) && i < lineCount && typeof v === 'string' && v.trim()) out[i] = v;
+  }
+  return out;
+}
+
 export const useAnalyticStore = create<AnalyticState>()(
   temporal(
     (set, get) => ({
@@ -411,7 +428,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   restore: ({ lines, seed, name, spokenFor, disabled, seedNames }) =>
     set({
       lines: lines.map(ingestTypedText),
-      spokenFor: spokenFor ?? {},
+      spokenFor: cleanSpokenFor(spokenFor, lines.length),
       seedNames: cleanSeedNames(seedNames),
       // #1548: only indexes that name a line survive a restore — a hand-edited file cannot mute a ghost
       disabled: [...new Set(disabled ?? [])].filter((d) => Number.isInteger(d) && d >= 0 && d < lines.length).sort((a, b) => a - b),

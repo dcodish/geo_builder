@@ -131,11 +131,29 @@ describe('#1473 — the pool is bounded, and shared by every consumer', () => {
     expect(after, 'every gate, the ask lane and the option walk read the ONE pool').toBe(0);
   });
 
-  it('priorConsumers is the honest baseline: it fills no more than the old walks did', () => {
-    // guards the helper above against quietly becoming the pool itself: on the determined 572 figure the
-    // old sample left every row known, so the old path never walked the pool
+  it('the render path on the determined 572 figure spends at most the three-seed floor, and leaves the pool to the idle loop', () => {
+    /*
+     * This lock guarded `priorConsumers` against quietly becoming the pool (on 572 the old distinct walk stopped
+     * at seed 2). It stopped there only because the signature read «-0.0000» as a different configuration
+     * (#1539): with zero normalised, a DETERMINED figure has one configuration and the distinct walk honestly
+     * scans the window — so the relative baseline is lax on 572 by construction. The guard is restated as the
+     * absolute budget it protected (ADR-AG-197): the deferred render path pays the three-seed floor and no more.
+     */
+    // Every DETERMINED prefix (a free one may fill the pool through the option walk it always paid for).
+    let determined = 0;
+    for (let n = 1; n <= PART_B.length; n += 1) {
+      const d = derive(PART_B.slice(0, n), 0);
+      if (d.figure.carrierDof !== 0) continue;
+      determined += 1;
+      const pool = configurationPool(d.construction);
+      pool.defer();
+      const now = spent(() => renderPath(d));
+      expect(now, `line ${n}`).toBeLessThanOrEqual(3);
+    }
+    expect(determined).toBeGreaterThan(0);
     const d = derive(PART_B, 0);
-    priorConsumers(d);
+    configurationPool(d.construction).defer();
+    renderPath(d);
     expect(configurationPool(d.construction).complete()).toBe(false);
   });
 });

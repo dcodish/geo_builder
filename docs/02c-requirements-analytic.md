@@ -1965,3 +1965,104 @@ sessions keep this.
 
 *Amends R128's last sentence* ("A letter the tool chose … is not renamed and says so"): now renamed through
 the student's sentence, as above.
+
+**R130 — the exam's sentences about the circle the figure has are understood**
+([ADR-AG-193](06c-decisions-analytic.md#adr-ag-193), [#1619](https://github.com/dcodish/geo_builder/issues/1619) B1, [#1598](https://github.com/dcodish/geo_builder/issues/1598)).
+*(Operator, 2026-09-30, on «x^2+y^2=16» beside «O(5,5)»: "the center of the circle in this case has no dot that I can press and create the center"; 2026-10-01: "now we need to work on phase B".)*
+
+A student types the 4-point exam's own sentences about its circle, and each draws what it says:
+- **a point on it** — «A על מעגל M» (the circle named by its centre letter), «המעגל עובר דרך A», «המעגל עובר דרך ראשית הצירים O»;
+- **its crossings at named points** — «המעגל חותך את ציר ה-x בנקודה A», «… בנקודות B ו-C», «… את החלק החיובי של ציר ה-x בנקודה A», «B היא אחת מנקודות החיתוך של המעגל עם ציר ה-y». Two named crossings are always two different points, and a circle that only touches the axis is refused for them. Which letter is which is a drawing «הציגו תצורה אחרת» changes, because the sentence does not say;
+- **its centre named and placed** — «O – מרכז המעגל», «מרכז המעגל M נמצא על ציר ה-y», «… נמצא בנקודה (4,8)», «נתון מעגל שמרכזו M נמצא על החלק החיובי של ציר ה-y». A sentence about «המעגל» when the figure has no circle introduces that circle;
+- **its radius and centre by role** — «אורך הקטע AB שווה לרדיוס המעגל», «CD עובר דרך מרכז המעגל». An unnamed centre used as a point is refused, asking for its letter first;
+- **its regions** — «הנקודה B נמצאת מחוץ למעגל» / «בתוך המעגל», «E נמצאת על הקשת הקטנה AC» (or «הגדולה»). A region never removes a degree of freedom; a figure with no freedom that contradicts it is refused on that line;
+- **its own frame** — «משוואת המעגל הנתון היא …», «בסרטוט שלפניכם מתואר מעגל, העובר דרך הנקודות O, C, A», «המעגל משיק לציר ה-x וחותך את ציר ה-y בנקודה C», «הנקודה B נמצאת מחוץ למעגל, על החלק החיובי של ציר ה-x».
+
+**The centre of any circle can be named** (#1598): «P מרכז המעגל», «P מרכז המעגל x^2+y^2=16», «P מרכז המעגל שמשוואתו …», and by clicking the centre of a circle that has only its equation — the click writes that sentence. On a canonical circle the student's letter replaces the tool's O. With several circles and no equation the sentence is refused, naming the circles; a centre that already has a letter keeps it, and a second letter is refused naming the first.
+
+**R131 — a polygon inscribed in a circle, a circle inscribed in a polygon, the points where its sides touch, and «חד זוויות»**
+([ADR-AG-194](06c-decisions-analytic.md#adr-ag-194), [#1619](https://github.com/dcodish/geo_builder/issues/1619) B2, [#1554](https://github.com/dcodish/geo_builder/issues/1554)).
+*(Operator, 2026-09-29: "we should support all quads as part of 1554 that can be חסום and חוסם"; 2026-10-01: "now we need to work on phase B".)*
+
+The student types the exam's opener as printed: «מרובע ABCD חסום במעגל», «המרובע ABCD חסום במעגל שמרכזו M», «מרובע
+ABCD חסום במעגל שמשוואתו (x−2)² + (y+2)² = 100», «משולש ABC חסום במעגל שקוטרו AC», «במעגל שמרכזו M חסום משולש חד
+זוויות ABC», «המעגל החוסם את המרובע ABCD», «מרובע ABCD בר חסימה», and the English equivalents. Every shape noun
+can be inscribed — triangle and every quadrilateral noun — and the shape is drawn whether or not it was drawn
+before. The circle is the one the sentence describes: on the named centre, by the given equation, on the given
+diameter, or (with no description) the circle through the vertices; afterwards it is «המעגל» like any other
+circle. Every vertex lies on it in every configuration, and «הציגו תצורה אחרת» still moves the figure. A noun
+that cannot be inscribed as itself is drawn as the shape it must be (a cyclic parallelogram is a rectangle, a
+cyclic trapezoid isosceles, a cyclic rhombus a square, a cyclic kite right-angled at its side vertices).
+
+The converse — «מעגל חסום במשולש ABC», «במשולש AOB חסום מעגל שמרכזו C», «משולש ABC חוסם מעגל», «מעגל חסום במרובע
+ABCD» — draws the circle inside the shape, touching every side; a named centre on a triangle's incircle is the
+point where the angle bisectors meet. A quadrilateral circumscribes a circle only when AB + CD = BC + DA, and
+the sentence states that as a given (a parallelogram becomes a rhombus, a rectangle a square). «הצלעות AO, BO
+ו-AB משיקות למעגל בנקודות D, E ו-F בהתאמה» names the touch points: each lies on its side and on the circle; on a
+circle given by its centre the sides become tangent to it. «חד זוויות» is honoured: the triangle drawn is acute
+in every configuration, and coordinates that make it not acute are refused on the sentence that said it.
+
+The diameter forms land: «AD הוא קוטר במעגל», «הצלע AC היא קוטר במעגל», «הקטע AB הוא קוטר במעגל שמרכזו M», «קוטר
+המעגל AC נמצא על הישר 3y − 2x − 4 = 0» — including a diameter between vertices the circle passes through by
+incidence. A sentence followed by its givens in parentheses is read as both.
+
+Refused by name, never dropped: a radius, an equation or a quadrilateral's centre on an incircle; a touch on a
+circle that cannot be made tangent (one given by its equation). «טרפז ישר זווית ABCD חסום במעגל» is never shown
+as a valid trapezoid; whether it is refused or drawn with a warning awaits a ruling (#1554 vs #1627).
+
+**R132 — a tangent at a named point, the tangent as an object, tangency to any circle, and chords**
+([ADR-AG-195](06c-decisions-analytic.md#adr-ag-195), [#1619](https://github.com/dcodish/geo_builder/issues/1619) B3, [#1430](https://github.com/dcodish/geo_builder/issues/1430)).
+*(Operator, 2026-10-01: "now we need to work on phase B"; #1616 ruling 4: "Chord: yes.")*
+
+The student types the exam's own tangency sentence with its touch point and the figure honours it:
+- «המעגל משיק לציר ה-x בנקודה A», «מעגל שמרכזו M משיק לציר ה-x בנקודה E», «ציר ה-y משיק למעגל בנקודה A», «הישר BC משיק למעגל בנקודה B», «הקטע CD משיק למעגל בנקודה A», «AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה». The touch point is on the circle and on the line, and the line is perpendicular to the radius there, at every configuration. For «הקטע» the touch is between the segment's ends.
+- «המשיק למעגל בנקודה A» draws the tangent at A. «המשיק» then refers to it: «המשיק חותך את ציר ה-x בנקודה B ואת ציר ה-y בנקודה A». «משוואת המשיק (בנקודה A) היא …» gives its equation. An equation that is not the tangent there is refused on its own line, and the line is drawn once.
+- A line may be tangent to a circle given by its equation: «הישר y=kx+10 משיק למעגל x²+y²=25» finds the values of k, cycled by «הציגו תצורה אחרת». «דרך P עובר משיק למעגל» draws a tangent from P, and the other tangent is the other configuration.
+- A chord is accepted: «AB מיתר במעגל», «הצלע AB נמצאת על המעגל», «במעגל המיתרים AC ו-BD נפגשים בנקודה E», «במעגל שמרכזו M המיתרים AB ו-BC שווים».
+
+Refused by name, never drawn: a tangent from a point inside the circle, a touch point that would coincide with the line's other end, and a bare «המשיק» when the figure has no tangent or several. The imperatives «העבירו משיק / מיתר» wait on #1620.
+
+**R133 — «המעגל» is the circle the figure has**
+([ADR-AG-196](06c-decisions-analytic.md#adr-ag-196), [#1633](https://github.com/dcodish/geo_builder/issues/1633), [#1619](https://github.com/dcodish/geo_builder/issues/1619)).
+*(Operator, 2026-10-01: "now we need to work on phase B"; #1633: "The student stated ONE circle twice.")*
+
+A sentence about «המעגל» with no name means the circle already drawn:
+- «נתון מעגל שמרכזו M» then «משוואת המעגל היא (x−3)²+(y−1)²=10» (also «משוואת המעגל הנתון היא: …», «נתונה משוואת המעגל: …») draws ONE circle: M moves to (3,1) and the radius is √10. An equation that contradicts the circle — a different equation for a circle given by its equation, a centre already placed elsewhere, a radius already given — is refused on that line.
+- «משולש ABC חסום במעגל» after a circle exists puts A, B and C on that circle. «המעגל עובר דרך הנקודות A, B ו-C» after a circle exists is «A על המעגל» three times.
+- A sentence that describes its circle («חסום במעגל שמרכזו M», «… שמשוואתו …», «נתון מעגל M שמשוואתו …», «משוואת המעגל M היא …») means the circle already drawn with that centre or that equation — its equation then pins that circle, as above — and otherwise draws a new one.
+- With no circle yet, each of these sentences draws its circle, as before. With two or more circles, «המעגל» is refused as ambiguous and the circles are named; the student names the one they mean.
+
+The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקודות D, E ו-F בהתאמה» (and "the sides … touch the circle at …") works for every circle, including one given by its equation; on an inscribed circle the touch points are exactly where the sides meet it.
+
+**R134 — a value is printed only when the drawings whose givens hold agree on it, and «הציגו תצורה אחרת» always reaches another drawing when there is one**
+([ADR-AG-197](06c-decisions-analytic.md#adr-ag-197), [#1642](https://github.com/dcodish/geo_builder/issues/1642), [#1638](https://github.com/dcodish/geo_builder/issues/1638), [#1635](https://github.com/dcodish/geo_builder/issues/1635), [#1634](https://github.com/dcodish/geo_builder/issues/1634), [#1539](https://github.com/dcodish/geo_builder/issues/1539)).
+*(Operator, 2026-10-01: "there is no way to know A or C or B"; "point B is showing as 2 possible locations but it cannot be"; «הציגו תצורה אחרת» "should always swap if there are more than 1 option".)*
+
+- The data panel and the answers print a number (or «… או …») only from drawings in which every given the student wrote holds. A drawing that breaks a given — a point off the axis it was put on, a point outside its quadrant — is never a source of a value.
+- A figure that can still move prints a value only when several different drawings agree on it. «משולש AOB ישר זווית» with its sides on the axes and the inscribed centre C in the second quadrant prints A as «(x_A, 0)», B as «(0, y_B)» and C as «—», never a pair of sample values.
+- When the other givens decide which angle of «משולש ישר זווית» is the right one, every drawing uses that angle.
+- A chord has two different ends, and the points named in «המיתרים AB ו-BC» are three different points: corpus 7/5 prints B = (2, −2) alone.
+- A sentence whose condition can hold in no drawing is refused on that line even when the figure still has freedom: «המעגל משיק לציר ה-x» then «המעגל חותך את ציר ה-x בנקודות B ו-C» refuses the second sentence.
+- An unstated radius (any free value) is drawn inside the range where the figure exists, never stuck at the edge of it: «מעגל שמרכזו M(6,10)» · «B על המעגל» · «B על ציר ה-y» draws circles of different radii larger than 6, and B moves.
+- «הציגו תצורה אחרת» on a figure with exactly one drawing says there is no other. Two crossings named in one sentence — «המעגל חותך את ציר ה-x בנקודות B ו-C», «הישר l1 חותך את המעגל I בנקודות A ו-B» — are first drawn in the order written, and the button swaps them. (R85 amended: the pair is no longer "never cycled".) A single ordinal («נקודת החיתוך הראשונה») keeps its root.
+
+**R135 — a sentence draws what it names, the extent belongs to the statement, every list and paste is read, and a tangency states its circle**
+([ADR-AG-198](06c-decisions-analytic.md#adr-ag-198), [#1639](https://github.com/dcodish/geo_builder/issues/1639), [#1640](https://github.com/dcodish/geo_builder/issues/1640), [#1636](https://github.com/dcodish/geo_builder/issues/1636), [#1641](https://github.com/dcodish/geo_builder/issues/1641), [#1643](https://github.com/dcodish/geo_builder/issues/1643), rulings of 2026-10-01 on [#1554](https://github.com/dcodish/geo_builder/issues/1554) and [#1619](https://github.com/dcodish/geo_builder/issues/1619)).
+*(Operator, 2026-10-01: "the line BC should be drawn as well"; "for some reason it refuses to draw BC"; "i tried several variations … and none worked except this exact one".)*
+
+- A sentence that names a pair draws it: «BC משיק למעגל בנקודה B», «AC הוא קוטר במעגל», «AB ⊥ CD», «הצלע AO נמצאת על ציר ה-x», «CD עובר דרך P». «הישר BC» draws the line BC; «הקטע BC», «הצלע BC» and a bare «BC» draw the segment. Typing the pair afterwards answers «כבר ידוע». A pair the figure already draws as a side is not drawn twice. «הישר BC» on a line of its own draws the line.
+- The extent belongs to each statement. A bare «BC» typed to see it draws the segment and never changes what an earlier sentence said about the line BC. A point «על הצלע BC» / «על הקטע BC» is between B and C; «על הישר BC» is anywhere on the line; «על BC» is between B and C when the figure already draws the segment BC (or a side BC), and on the line when it does not. A point that cannot be where the sentence puts it is refused on that line.
+- A list of points is read however it is separated — «A, B, C על המעגל», «נקודות A, B ו-C נמצאות על המעגל», «A, B, ו-C …» — with or without «(ה)נקודות» and with the verb dropped before «על». «ציר ה- x» with a space is «ציר ה-x». A list joined by a relation between its members («A ו-B סימטריות») is never split.
+- Text pasted from the screen reads as typed: the invisible direction marks are ignored, and a leading «·», «•», «*» or «- » is a list mark. «מרכז המעגל הוא M» names the centre as «M מרכז המעגל» does.
+- «טרפז ישר זווית ABCD חסום במעגל» (and «… בר חסימה», "right trapezoid ABCD is inscribed in a circle") is refused: the message names the right trapezoid and the rectangle a circle would force, and offers «מלבן ABCD חסום במעגל».
+- A tangency sentence about «המעגל» typed when the figure has no circle draws the circle, with no letter for its centre until a sentence names it («O מרכז המעגל»). With one circle it means that circle; with several it is refused and the circles are named. Corpus 6/4 typed as printed builds A(2,−1), C(−4,5) (or the mirror); «הצלעות AO, BO ו-AB משיקות למעגל בנקודות D, E ו-F בהתאמה» typed before «במשולש AOB חסום מעגל שמרכזו C» builds the same figure as the printed order.
+
+**R136 — the data panel's option rows read in order, and a loaded figure keeps the student's own words**
+([ADR-AG-199](06c-decisions-analytic.md#adr-ag-199), [#1644](https://github.com/dcodish/geo_builder/issues/1644), [#1632](https://github.com/dcodish/geo_builder/issues/1632)).
+*(Operator, 2026-10-01, playing PR #1637 T5: "the −2 is not shown correctly … the 2- is shown also on the screenshot you took.")*
+
+- A data-panel row that joins two positions with «או» shows each position exactly as written, left to right: `A = [(3/5, 4/5)] או (4, -2)`, never `(2- ,4)`. The same holds for any panel row that contains a Hebrew word.
+- A point's canvas label shows a coordinate typed with the exam's minus «−» exactly as one typed with «-»: «C(4,−2)» and «C(4,-2)» both read `C(4, -2)`. A stated fraction keeps its written form (`2/3` stays `2/3`).
+- Opening a saved file, a share link or a restored session shows every row the way it showed when saved. A row built by the AI fallback shows the student's own sentence, not the tool's command line. A muted row stays muted, and a renamed letter stays where it was drawn.
+
+- A slope row in the data panel reads, in this order: the segment, its slope, «זווית עם ציר ה-x», the angle (`AB: 2 · זווית עם ציר ה-x: 63.43°`). The Hebrew label reads naturally, with x right after «ה-». A vertical segment reads `CD: אנכי (אין שיפוע) · זווית עם ציר ה-x: 90°`.

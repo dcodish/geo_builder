@@ -161,9 +161,15 @@ describe('#1501 — refusals, never silent drops', () => {
     expect(d.faults.map((f) => f.code)).toEqual(['unknown-reference']);
   });
 
-  it('tangency about a circle known only by its EQUATION is out of scope, by name', () => {
-    const d = derive(['נתון מעגל I שמשוואתו x^2+y^2=25', 'נתון הישר l1: y=2x+5', 'המעגל משיק לישר l1'], 0);
-    expect(d.faults.map((f) => f.code)).toEqual(['out-of-scope']);
+  it('tangency about a circle known only by its EQUATION is JUDGED since #1430 (#1619 B3, ADR-AG-195)', () => {
+    // This lock used to assert `out-of-scope`. #1430 step 1 lowers it to `tangent-curve` — the distance
+    // from the resolved circle's centre to the line is its radius — so a line that is NOT tangent is refused
+    // on its own line as unsatisfiable, and one that is builds.
+    const off = derive(['נתון מעגל I שמשוואתו x^2+y^2=25', 'נתון הישר l1: y=2x+5', 'המעגל משיק לישר l1'], 0);
+    expect(off.faults.map((f) => [f.index, f.code])).toEqual([[2, 'unsatisfiable']]);
+    const on = derive(['נתון מעגל I שמשוואתו x^2+y^2=25', 'נתון הישר l1: x=5', 'המעגל משיק לישר l1'], 0);
+    expect(on.faults).toEqual([]);
+    expect(on.construction.constraints.some((k) => k.t === 'tangent-curve')).toBe(true);
   });
 
   it('«משיק» to an equation that is a CIRCLE is circle-to-circle tangency — out of scope, by name', () => {

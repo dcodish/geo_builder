@@ -36,7 +36,7 @@ import { commitRecord, decideEdit, decideSubmit, decideToggle, noticeText, reach
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
-import { panelKnowledge, segmentKnowledge } from './app/panelRows';
+import { panelKnowledge, panelRowText, segmentKnowledge, slopeRowText } from './app/panelRows';
 import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
 import { angleText } from './app/lineAngle';
@@ -1652,7 +1652,7 @@ export function App() {
                             {t(curveDetailsKey(known!.kind))}
                           </summary>
                           <div style={askTrace}>
-                            <MathText text={braced(parts.details)} />
+                            <MathText text={panelRowText(parts.details)} />
                           </div>
                         </details>
                       )}
@@ -1687,11 +1687,10 @@ export function App() {
                   const isVertical = vertical.known && vertical.value < VERTICAL_TOL;
                   const pending = (!vertical.known && vertical.pending) || (!angle.known && angle.pending) || (!isVertical && !slope.known && slope.pending);
                   if (pending) return <span key={seg.id}><ValueRow text={`${a}${b}: ${checking}`} /></span>;
-                  const angleSuffix = ` · ${t('angleWithX')}: ${angle.known ? angleText(angle.deg) : '—'}`;
-                  if (isVertical) {
-                    return <span key={seg.id}><ValueRow text={`${a}${b}: ${t('slopeVertical')}${angleSuffix}`} /></span>;
-                  }
-                  return <span key={seg.id}><ValueRow text={`${a}${b}: ${slope.known ? fmt(slope.value) : '—'}${angleSuffix}`} /></span>;
+                  // #1646 (ADR-AG-199): the parts in a fixed order, each Hebrew part one island — `slopeRowText`
+                  const slopePart = isVertical ? t('slopeVertical') : slope.known ? fmt(slope.value) : '—';
+                  const anglePart = angle.known ? angleText(angle.deg) : '—';
+                  return <span key={seg.id}><ValueRow text={slopeRowText(`${a}${b}`, slopePart, t('angleWithX'), anglePart)} /></span>;
                 }),
               },
               {
@@ -2052,9 +2051,8 @@ function fmt(v: number): string {
  * symbols are `x_B` and `r_O` — names they must keep, because they are what the expressions are
  * built from. The braces are added here, where the string stops being data and becomes type.
  */
-const braced = (text: string): string => text.replace(/([A-Za-z])_([A-Za-z0-9]+)/g, '$1_{$2}');
-
-const ValueRow = ({ text }: { text: string }) => <MathText text={braced(text)} />;
+// #1644 (ADR-AG-199): the braces AND the bidi isolation of a composed row live in `panelRowText`, so a lock calls it.
+const ValueRow = ({ text }: { text: string }) => <MathText text={panelRowText(text)} />;
 
 /**
  * The manual's sections, in teaching order (#1087).
@@ -2173,7 +2171,11 @@ function openCurveText(d: ReturnType<typeof derive>, id: string): string {
   // with a trailing `- 0` it never wrote.
   if (o?.kind === 'curve') return curveEquationText(o.curve.eq);
   if (o?.kind === 'circle-at') return `O(${o.centre}), r = ${exprText(o.r)}`;
-  // A computed circle (#1464, #1324) is written as what defines it: ⊙ through its points, ⌀ its diameter.
-  if (o?.kind === 'circle-thru') return o.def.t === 'through' ? `⊙${o.def.pts.join('')}` : `⌀${o.def.a}${o.def.b}`;
+  // A computed circle (#1464, #1324) is written as what defines it: ⊙ through its points, ⌀ its diameter,
+  // and the inscribed circle as the ring it is inscribed in (#1619 B2).
+  if (o?.kind === 'circle-thru') {
+    if (o.def.t === 'diameter') return `⌀${o.def.a}${o.def.b}`;
+    return o.def.t === 'through' ? `⊙${o.def.pts.join('')}` : `○${o.def.pts.join('')}`;
+  }
   return '—';
 }

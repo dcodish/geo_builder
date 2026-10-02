@@ -60,6 +60,9 @@ export function sameDerivation(a: DerivedRule, b: DerivedRule): boolean {
     // Where two circles touch is one point whichever circle is named first (#1504).
     case 'touch-point':
       return b.t === 'touch-point' && sameSet([a.a, a.b], [b.a, b.b]);
+    // One circle, one side: the same touch whichever end is named first (#1619 B2).
+    case 'side-touch':
+      return b.t === 'side-touch' && a.circle === b.circle && sameSet([a.a, a.b], [b.a, b.b]);
     default: {
       /**
        * EXHAUSTIVE on purpose. A new `DerivedRule` must decide whether two of its instances are the

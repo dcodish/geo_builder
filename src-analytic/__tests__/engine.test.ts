@@ -635,8 +635,12 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
 
   it('says so for a given the determined figure already satisfies', () => {
     expect(verdict(PINNED, 'B נמצא על ציר ה-x')).toBe('entailed'); // the operator's B12
-    expect(verdict(PINNED, 'AB מאונך ל-AC')).toBe('entailed');
-    expect(verdict(PINNED, 'AB מקביל לציר ה-x')).toBe('entailed');
+    // #1639 (ADR-AG-198): a relation DRAWS the pairs it names, so over bare points it records (it drew AB and
+    // AC); with the pieces already drawn it adds nothing, and says so — #1080's shape for the area.
+    expect(verdict([...PINNED, 'AB', 'AC'], 'AB מאונך ל-AC')).toBe('entailed');
+    expect(verdict(PINNED, 'AB מאונך ל-AC')).toBe('recorded');
+    expect(verdict([...PINNED, 'AB'], 'AB מקביל לציר ה-x')).toBe('entailed');
+    expect(verdict(PINNED, 'AB מקביל לציר ה-x')).toBe('recorded');
   });
 
   it('and for the AREA once the shape it names is already there (#1080 narrowed this)', () => {

@@ -9,11 +9,11 @@
 import { fold, existingKindOf, type ApplyError, type ApplyNotice } from './apply';
 import { reportedDof } from './carriers';
 import { drawableAt, viewBox, type Figure } from './evaluate';
-import type { Box } from './curves';
+import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
-import { EMPTY_CONSTRUCTION, diameterCircleId, namesObject, objectById, type Construction, type Fact } from './types';
+import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
 import { SOLVE_TOL } from './solve';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
@@ -120,7 +120,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
 
   // The LINE is the fold's unit of application (#1242, ADR-AG-133): every fact of a faulted line carries
   // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
-  const { construction: folded, errors, effects, constraintFact, notices: factNotices } = fold(facts, owner);
+  const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices } = fold(facts, owner);
   const construction: Construction = Object.keys(seedNames).length > 0 ? { ...folded, seedNames: { ...seedNames } } : folded;
   // Said on the circle's row only when the name was actually GIVEN — a default that yielded to a letter
   // already in the figure named nothing, and the list must not claim it did (#1263's rule).
@@ -169,14 +169,36 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * satisfiable figure, which is the opposite defect. That half is
    * [#1071](https://github.com/dcodish/geo_builder/issues/1071)'s measurement question and is
    * deliberately left alone here.
+   *
+   * **…and the freedom predicate was the wrong one for a selector (#1635, ADR-AG-197).** A figure with
+   * freedom left has other configurations — and `drawableAt` has already TRIED them: it returns a figure whose
+   * selectors fail only when no seed of its window (twenty-five, each with every live `choice` option since
+   * #1642) had them hold, the selector-steered solve (#1463's deflation and chord reflection) having been asked
+   * at each. That is the bounded search ADR-098 reports on. Measured: «המעגל משיק לציר ה-x» · «המעגל חותך את
+   * ציר ה-x בנקודות B ו-C» drew B and C on one point at 24/24 seeds with `faults: []`, because the free centre
+   * kept DOF at 2 — a figure drawn green for givens that cannot hold. So a selector that fails across the whole
+   * search is refused on its line WHATEVER the freedom; the search, not the DOF, is the evidence.
+   *
+   * Where a GIVEN already fails in the figure drawn, the search ran over contradictory configurations and
+   * says nothing separate about the selector: the unsatisfied given carries the refusal (below, on the line
+   * that completed the contradiction), and a triangle's `distinct` failing because its givens collapse it is
+   * not a second, earlier culprit. Measured over the corpus: three already-refused figures («AB = AC» ·
+   * «∠ABC = 90» on «משולש ABC») would otherwise blame «משולש ABC» too.
    */
-  if (!figure.selectorsOk && reportedDof(construction, figure.carrierDof) === 0) {
+  if (!figure.selectorsOk && (reportedDof(construction, figure.carrierDof) === 0 || figure.unsatisfied.length === 0)) {
     const blamed = new Set<number>();
     // Only the sentences whose selector FAILED (#1268): a triangle's `distinct` did not make a crossing's
     // ordinal impossible. Without the per-selector verdict, every selector line, as before.
     const failing = new Set((figure.selectorsFailing ?? []).map((s) => JSON.stringify(s)));
     facts.forEach((f, i) => {
       if (f.t === 'selector' && (failing.size === 0 || failing.has(JSON.stringify(f.sel)))) blamed.add(owner[i]);
+    });
+    // A selector M1 BUILT from a contextual sentence («B נמצאת מחוץ למעגל», #1619 B1) has no `selector`
+    // fact of its own — it is blamed on the line the fold recorded as adding it.
+    construction.selectors.forEach((s, at) => {
+      const fact = selectorFact[at];
+      if (fact === undefined || facts[fact]?.t === 'selector') return;
+      if (failing.size === 0 || failing.has(JSON.stringify(s))) blamed.add(owner[fact]);
     });
     for (const index of blamed) {
       faults.push({ index, code: 'unsatisfiable', detail: lines[index] });
@@ -235,12 +257,15 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   // refusal — the same rule `owner` already encodes for apply errors. Which facts NAME an object is
   // `namesObject`, one positive list rather than a second copy of the exclusions (#1049).
   const lineOf = new Map<string, number>();
-  facts.forEach((f, i) => {
-    if (namesObject(f) && !lineOf.has(f.id)) lineOf.set(f.id, owner[i]);
-    // «BD קוטר» names the circle it creates without an id of its own (#1324) — the one formula M1 mints it by.
-    if (f.t === 'diameter-of') {
-      const id = diameterCircleId(f.a, f.b);
-      if (!lineOf.has(id)) lineOf.set(id, owner[i]);
+  // A creation a sentence about «המעגל» may make (ADR-AG-196) names its objects on that line too.
+  facts.forEach((top, i) => {
+    for (const f of factsWithin(top)) {
+      if (namesObject(f) && !lineOf.has(f.id)) lineOf.set(f.id, owner[i]);
+      // «BD קוטר» names the circle it creates without an id of its own (#1324) — the one formula M1 mints it by.
+      if (f.t === 'diameter-of') {
+        const id = diameterCircleId(f.a, f.b);
+        if (!lineOf.has(id)) lineOf.set(id, owner[i]);
+      }
     }
   });
   /**
@@ -528,25 +553,79 @@ function nameCanonicalCentres(
 ): { facts: Fact[]; owner: number[]; offered: number[] } {
   const canonical = (f: Fact): boolean =>
     f.t === 'curve' && f.curve.kind !== 'ellipse' && f.curve.kind !== 'parabola' && f.curve.kind !== 'line' && isCanonicalCircle(f.curve.eq);
-  const canonicalIds = new Set(facts.filter(canonical).map((f) => (f as { id: string }).id));
+  /*
+   * A sentence about «המעגל» (ADR-AG-196) CREATES its circle only when no circle precedes it — otherwise it is
+   * a statement about that one. Read that way here, so «משוואת המעגל היא x²+y²=25» as the first circle is the
+   * canonical circle, and a bound sentence adds no second circle to rule 2's count.
+   */
+  const isCircleFactShallow = (f: Fact): boolean =>
+    f.t === 'circle-at' || f.t === 'circle-thru' || f.t === 'diameter-of' || (f.t === 'curve' && f.curve.kind === 'circle');
+  /** Will this `the-circle` CREATE, given what precedes it? A static reading of M1's `theCircle`. */
+  const willCreate = (f: Extract<Fact, { t: 'the-circle' }>, before: readonly Fact[]): boolean => {
+    if (!f.match) return !before.some(isCircleFactShallow);
+    if ('eq' in f.match) {
+      const made = f.create.find((g) => g.t === 'curve');
+      return !made || !before.some((g) => g.t === 'curve' && g.id === made.id);
+    }
+    return true;
+  };
+  const predicted: Fact[] = [];
+  const creates = new Set<number>();
+  facts.forEach((f, i) => {
+    if (f.t === 'the-circle' && willCreate(f, predicted)) {
+      creates.add(i);
+      predicted.push(...f.create);
+    } else predicted.push(f);
+  });
+  const canonicalIds = new Set(predicted.filter(canonical).map((f) => (f as { id: string }).id));
   if (canonicalIds.size === 0) return { facts: [...facts], owner: [...owner], offered: [] };
 
+  /**
+   * Rule 2 for the CONTEXTUAL naming «P מרכז המעגל» (#1598, #1619 B1): the sentence names the centre of the
+   * one circle, so when the list states exactly one circle and it is this canonical one, the student's letter
+   * is the name and no O is offered beside it. With an equation («P מרכז המעגל x^2+y^2=16») it is the circle
+   * of that equation. Any other circle in the list makes «המעגל» ambiguous — M1 refuses that sentence, and the
+   * default stands.
+   */
+  const isCircleFact = (f: Fact): boolean => {
+    if (f.t === 'circle-at' || f.t === 'circle-thru' || f.t === 'diameter-of') return true;
+    if (f.t !== 'curve') return false;
+    if (f.curve.kind) return f.curve.kind === 'circle';
+    const r = resolveCurve(f.curve, {});
+    return r.ok && r.curve.kind === 'circle';
+  };
+  const circleFacts = new Set(predicted.filter(isCircleFact).map((f) => ('id' in f ? f.id : JSON.stringify(f))));
   const atOrigin = (f: Fact): boolean => {
     if (f.t === 'point') {
       const x = evalExpr(f.x, {});
       const y = evalExpr(f.y, {});
       return Number.isFinite(x) && Number.isFinite(y) && Math.abs(x) < 1e-12 && Math.abs(y) < 1e-12;
     }
+    if (f.t === 'centre-of') return f.eq !== undefined ? isCanonicalCircle(f.eq) : circleFacts.size === 1 && canonicalIds.size === 1;
     // Rule 2: a centre the student named, of a circle centred on the origin, occupies the origin.
     return f.t === 'derived' && !f.auto && f.rule.t === 'circle-centre' && canonicalIds.has(f.rule.curve);
   };
   const definesLetter = (f: Fact): boolean => (f.t === 'point' || f.t === 'derived') && f.id === CENTRE_LETTER;
-  if (facts.some((f) => atOrigin(f) || definesLetter(f))) return { facts: [...facts], owner: [...owner], offered: [] };
+  if (predicted.some((f) => atOrigin(f) || definesLetter(f))) return { facts: [...facts], owner: [...owner], offered: [] };
 
   const out: Fact[] = [];
   const outOwner: number[] = [];
   const offered: number[] = [];
   facts.forEach((f, i) => {
+    /*
+     * The equation of THE circle (ADR-AG-196) CREATES its canonical circle only when no circle precedes it
+     * (otherwise it is a statement about that one): the offer rides inside the creation, so a sentence that
+     * binds offers nothing.
+     */
+    if (f.t === 'the-circle' && creates.has(i)) {
+      const made = f.create.find((g) => g.t === 'curve' && g.stated && canonicalIds.has(g.id));
+      if (made && made.t === 'curve') {
+        offered.push(out.length);
+        out.push({ ...f, create: [...f.create, { t: 'derived', id: CENTRE_LETTER, rule: { t: 'circle-centre', curve: made.id }, src: f.src, auto: true }] });
+        outOwner.push(owner[i]);
+        return;
+      }
+    }
     out.push(f);
     outOwner.push(owner[i]);
     if (f.t !== 'curve' || !f.stated || !canonicalIds.has(f.id)) return;

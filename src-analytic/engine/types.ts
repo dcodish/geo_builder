@@ -29,6 +29,7 @@
 import type { DerivedRule } from './derived';
 import type { AngleName, Constraint, Direction, TangentLineRef } from './solve';
 import type { Expr } from './expr';
+import type { LengthExpr } from './lengths';
 import { lineIdOf, numeralCurveId } from './names';
 
 export type Id = string;
@@ -168,7 +169,29 @@ export type Fact =
    * `known`), where a student's own derivation of an existing point is a CONDITION on it (#1320).
    */
   | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule; auto?: true })
-  | (FactBase & { t: 'segment'; id: Id; a: Id; b: Id })
+  /**
+   * `ref` (#1639, ADR-AG-198) — the segment is drawn by a sentence that REFERS to its ends («AC קוטר במעגל»), so
+   * the ends must already exist: it never introduces them, as the bare «AC» line (which NAMES the segment) does.
+   */
+  | (FactBase & { t: 'segment'; id: Id; a: Id; b: Id; ref?: true })
+  /**
+   * «הישר BC» — THE LINE through two named points, DRAWN (#1639, ADR-AG-198): the line-noun twin of the
+   * segment a bare «BC» declares. A sentence that names a line draws it, whichever relation it states, and
+   * the line is the `line-at` through `a` along `a→b` (0 DOF, closed form). M1 decides what it adds: nothing
+   * when the figure already has that line (stated by its equation, or drawn) or draws a piece over the pair
+   * (ADR-AG-135's ruling (a): the figure is the authority), the line otherwise. A later «משוואת הישר BC היא
+   * …» states THIS line's equation — the curve takes the line's place, never a second object beside it.
+   */
+  | (FactBase & { t: 'line-2pt'; a: Id; b: Id })
+  /**
+   * The EXTENT of a bare pair in an incidence (#1636, #1640, ADR-AG-198) — «CD עובר דרך מרכז המעגל», «O על
+   * BC». The noun decides when there is one («הצלע/הקטע» the segment, «הישר» the line); with none the pair
+   * inherits the extent of the object it refers to, and only M1 can see that: when the figure draws a piece
+   * over `a`–`b` at the time of the statement, the point lies BETWEEN them (the `between` selector «הצלע BC»
+   * carries); when it draws none, the line reading stands and this adds nothing. A piece drawn LATER never
+   * narrows it — the extent belongs to the statement.
+   */
+  | (FactBase & { t: 'extent-of'; id: Id; a: Id; b: Id })
   | (FactBase & { t: 'polygon'; id: Id; vertices: Id[]; noun?: string })
   /**
    * A statement that must HOLD rather than an object that exists (#1016) — «שטח המשולש ABC הוא 20».
@@ -283,7 +306,31 @@ export type Fact =
    * משיק למעגל M» names its circle, so M1 resolves that name instead of demanding the figure hold
    * exactly one.
    */
-  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: TangentLineRef[]; circle?: string })
+  /*
+   * `at` (#1619 B3, ADR-AG-195) — the sentence NAMED the touch point («…משיק לציר ה-x בנקודה A», «הישר BC
+   * משיק למעגל בנקודה B»). Then the fact carries exactly ONE target, and it lowers to the point on the
+   * circle, the point on the target, and the target ⊥ the radius there — for ANY circle, because the
+   * radius direction reads the resolved circle. `circleId` is the host by id, for a fact M1 itself built.
+   */
+  /*
+   * `ring` (ADR-AG-198 Am. 1) — the touch list named EVERY side of one ring as a SIDE («הצלעות AO, BO ו-AB …»), so
+   * a circle the sentence must create is that ring's incircle (the only circle tangent to every side at a point ON
+   * it — an excircle touches extensions): created closed form, never as a free circle the solve must fit.
+   */
+  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: TangentLineRef[]; circle?: string; circleId?: Id; at?: Id; ring?: Id[] })
+  /**
+   * «המשיק למעגל בנקודה A» — THE TANGENT AS AN OBJECT (#1619 B3, ADR-AG-195): the line through A
+   * perpendicular to the radius to A, on the circle `circle` names (contextual when absent). M1 resolves
+   * the circle and lowers it to A on the circle plus a `line-at` whose direction is that radius turned a
+   * quarter — a derived line, 0 DOF, id {@link tangentLineId}.
+   */
+  | (FactBase & { t: 'tangent-line-at'; at: Id; circle?: string })
+  /**
+   * «משוואת המשיק היא 4x+3y=40» — the equation of «THE tangent», with no touch point named (#1619 B3).
+   * WHICH tangent is M1's question: the one tangent object the figure holds (the equation is then a
+   * given about it), none (the stated line is tangent to the circle), several (refused, never a pick).
+   */
+  | (FactBase & { t: 'tangent-eq'; id: Id; eq: Expr; eqSrc: string; circle?: string })
   /**
    * «רדיוס המעגל (I|O)? הוא 5» — the radius stated as its own given (#1432). WHICH circle is M1's
    * question (`circle` as the sentence named it, or the contextual one); what it does depends on
@@ -330,7 +377,87 @@ export type Fact =
    * means is a question about the construction, so M1 answers it, and refuses where the figure
    * holds none or several of that kind.
    */
-  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind });
+  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent'; circle?: string })
+  /*
+   * `kind: 'tangent'` (#1619 B3) — «המשיק» with no point: the one tangent OBJECT in the figure.
+   */
+  /*
+   * `circle` on `on-kind` (#1619 B1): «A על מעגל M» — the circle named by its CENTRE LETTER (or numeral),
+   * resolved at M1 through the one name chain (`circleByName`), where the bare kind means the one circle.
+   */
+  /**
+   * «O מרכז המעגל» · «P מרכז המעגל x^2+y^2=16» (#1598, #1619 B1) — NAMES the centre of the contextual
+   * circle, or of the circle with this equation. Which circle is M1's question; what the name lowers to
+   * depends on how that circle was stated (a derived centre of an equation circle, the circumcentre of a
+   * computed one, the centre point a centred circle already has), and with NO circle at all it creates one
+   * on this centre — the `diameter-of` precedent (#1324): a sentence about «המעגל» that finds none states it.
+   * `create` is that statement's facts, lowered by the parser from the canonical creation sentence («נתון
+   * מעגל שמרכזו O», «נתון מעגל O שמשוואתו …»), so the creation has one lowering, not a second copy here.
+   */
+  /*
+   * `circleId` (ADR-AG-198) — the circle by id, for a statement M1 itself bound (the incircle sentence naming the
+   * centre of the circle it found already drawn).
+   */
+  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[]; circleId?: Id })
+  /**
+   * A sentence that uses «מרכז המעגל» as a POINT (#1619 B1) — «CD עובר דרך מרכז המעגל». The parser lowers
+   * the sentence with `CENTRE_SENTINEL` in the centre's place; M1 resolves which point the centre IS and
+   * applies the facts with that name. One mechanism for every sentence that names the centre by its role.
+   */
+  | (FactBase & { t: 'via-centre'; facts: Fact[]; phrase: string })
+  /**
+   * «B נמצאת מחוץ למעגל» · «… בתוך המעגל» · «E נמצאת על הקשת הקטנה AC» (#1619 B1) — a REGION of the
+   * contextual (or named) circle. M1 resolves the circle and lowers to the `sign` selector over its
+   * `power` / `arc-side` quantity; an arc also puts its point and the chord's ends on the circle.
+   */
+  | (FactBase & { t: 'circle-region'; id: Id; region: 'outside' | 'inside' | 'minor-arc' | 'major-arc'; a?: Id; b?: Id; circle?: string })
+  /**
+   * «אורך הקטע AB שווה לרדיוס המעגל» (#1619 B1) — the radius equals a MEASURED length. The `radius-of`
+   * resolution, with a length on the other side: M1 lowers it to the `length-eq` whose right side is the
+   * circle's own radius expression.
+   */
+  | (FactBase & { t: 'radius-length'; circle?: string; length: LengthExpr })
+  /**
+   * A sentence whose subject is THE CIRCLE — «המעגל» with no name — or that describes its circle by a centre
+   * or an equation (ADR-AG-196, #1633, the #1619 integration). It means the circle already in the figure, so
+   * WHICH circle is M1's question, answered once for every such sentence (`theCircle`):
+   *
+   * - `match` absent (the contextual «המעגל»): exactly ONE circle in the figure → `about`, the statement
+   *   about it; NONE → `create`, the sentence states its circle (B1's «M מרכז המעגל» precedent, #1324's
+   *   `diameter-of`); SEVERAL → refused as ambiguous, never a pick.
+   * - `match` present (the sentence describes its own circle — «חסום במעגל שמרכזו M / שמשוואתו …»): a circle
+   *   with that centre or that equation already in the figure → `about`; otherwise `create`, whatever else
+   *   the figure holds.
+   *
+   * `about` carries `CIRCLE_SENTINEL` in the circle's place; M1 writes the resolved circle's id in.
+   */
+  /*
+   * `match: { inscribed }` (#1619 ruling b, ADR-AG-198) — «במשולש AOB חסום מעגל»: the circle the figure already
+   * states TANGENT TO EVERY SIDE of that ring (the touch sentence typed first created it) is this circle; with
+   * none, the sentence states the computed incircle as before.
+   */
+  | (FactBase & { t: 'the-circle'; create: Fact[]; about: Fact[]; match?: { centre: Id } | { eq: Expr } | { inscribed: Id[] } })
+  /**
+   * «משוואת המעגל היא …» about a circle the figure ALREADY HAS (#1633, ADR-AG-196) — a statement about it,
+   * never a second circle: an equation circle must be this equation (else `conflicting-restatement`), a circle
+   * on a centre has its centre pinned to the equation's centre (the centre letter takes those coordinates) and
+   * its radius to the equation's radius, each through the seam that already owns it (a coordinate statement,
+   * `radius-of`), so a conflict is refused naming the line.
+   */
+  | (FactBase & { t: 'circle-eq'; circleId: Id; eq: Expr });
+
+/** The stand-in a `via-centre` sentence carries for «מרכז המעגל» — a name no student writes (#1619 B1). */
+export const CENTRE_SENTINEL = 'Z₁';
+
+/** The stand-in a `the-circle` statement carries for the circle M1 resolves (ADR-AG-196). */
+export const CIRCLE_SENTINEL = '⟨the-circle⟩';
+
+/**
+ * A fact and the creation it may apply in its place (ADR-AG-196) — the `create` of a `the-circle`. For the
+ * passes that read the fact list before M1 (which line names an object): they must see a creation the
+ * sentence may make, whichever branch M1 takes.
+ */
+export const factsWithin = (f: Fact): Fact[] => (f.t === 'the-circle' ? [f, ...f.create.flatMap(factsWithin)] : [f]);
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list
@@ -450,11 +577,25 @@ export type GeoObject =
    */
   | { kind: 'circle-thru'; id: Id; def: CircleDef; name?: string };
 
-/** How a computed circle is determined (#1464, #1324). */
-export type CircleDef = { t: 'through'; pts: [Id, Id, Id] } | { t: 'diameter'; a: Id; b: Id };
+/**
+ * How a computed circle is determined (#1464, #1324).
+ *
+ * `incircle` (#1619 B2, #1554, ADR-AG-194) — the circle INSCRIBED in a ring of three or four vertices: centre
+ * where the internal bisectors at the first two vertices meet (for a triangle, `derived.ts`'s `incentre`, so
+ * the circle and «מפגש חוצי הזוויות» cannot disagree), radius its distance to the first side. Closed form, no
+ * freedom, no invented centre letter — ADR-AG-160's discipline. A quadrilateral has an incircle only when its
+ * Pitot condition holds; that condition is a GIVEN its sentence lowers beside this circle, never assumed here.
+ */
+export type CircleDef =
+  | { t: 'through'; pts: [Id, Id, Id] }
+  | { t: 'diameter'; a: Id; b: Id }
+  | { t: 'incircle'; pts: Id[] };
 
 /** The points a computed circle is defined from, in the student's order. */
-export const circleDefPoints = (d: CircleDef): Id[] => (d.t === 'through' ? [...d.pts] : [d.a, d.b]);
+export const circleDefPoints = (d: CircleDef): Id[] => (d.t === 'diameter' ? [d.a, d.b] : [...d.pts]);
+
+/** The id of the circle inscribed in a ring (#1619 B2) — one formula for the parser and every reader. */
+export const incircleId = (ringId: Id): Id => `circle-in-${ringId.replace(/^poly-/, '')}`;
 
 export type PointObject = Extract<GeoObject, { kind: 'point' }>;
 export type CurveObject = Extract<GeoObject, { kind: 'curve' }>;
@@ -487,6 +628,9 @@ export const namesObject = (f: Fact): f is NamingFact =>
  * The id of the circle «BD קוטר» CREATES (#1324) — one formula for M1, which mints it, and for `derive`, which
  * must blame a vacancy of it on the line that said it. Sorted, so «DB קוטר» is the same circle.
  */
+/** The id of the tangent line AT a point (#1619 B3) — one formula for the parser and M1. */
+export const tangentLineId = (at: Id): Id => `tangent-${at}`;
+
 export const diameterCircleId = (a: Id, b: Id): Id => `circle-diam-${[a, b].sort().join('')}`;
 export const isDerived = (o: GeoObject): o is DerivedObject => o.kind === 'derived';
 export const isFree = (o: GeoObject): o is Extract<GeoObject, { kind: 'free' }> => o.kind === 'free';
@@ -632,10 +776,32 @@ export type Selector =
    * seeded through the same function (`compareOf`, `evaluate.ts`) — one mechanism with two spellings in
    * the data, never a third sign rule. `rhs` is another point or a value; a value may carry a parameter.
    */
-  | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr } };
+  | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr } }
+  /**
+   * «משולש חד זוויות ABC» — EVERY ANGLE OF THE TRIANGLE IS ACUTE (#1619 B2, ADR-AG-194).
+   *
+   * The exam's adjective is a stated given (it may not vanish) and an INEQUALITY, so it is D7's kind 2: it
+   * consumes no freedom and is no equation a least-squares solve can drive to zero — it is a region, the
+   * triangles whose three angles are under 90°. Judged inside validity like every selector, so `drawableAt`
+   * walks to an acute configuration, and a determined figure whose triangle is not acute is refused on the
+   * sentence (the #1069 predicate). `ids` is the ring, three vertices.
+   */
+  | { kind: 'acute'; ids: Id[] };
 
-/** A quantity the figure DERIVES — never a symbol the student declared (that is a domain, kind 1). */
-export type Quantity = { k: 'slope'; u: Direction };
+/**
+ * A quantity the figure DERIVES — never a symbol the student declared (that is a domain, kind 1).
+ *
+ * `power` and `arc-side` (#1619 B1, ADR-AG-193) are the circle's two REGIONS, each the sign of a derived
+ * quantity and so members here rather than a fourth selector kind (the #1201 shape the slope member warned
+ * against): «B נמצאת מחוץ למעגל» is the POWER of B with respect to the circle, |PC|² − r², positive; «E על
+ * הקשת הקטנה AC» is E on the side of the chord AC away from the centre — `arc-side` is the product of the two
+ * sides, positive on the MAJOR arc's side. Both consume no freedom (a region, `between`'s kind), and
+ * `circle` is the id M1 resolved, never a name.
+ */
+export type Quantity =
+  | { k: 'slope'; u: Direction }
+  | { k: 'power'; p: Id; circle: Id }
+  | { k: 'arc-side'; p: Id; a: Id; b: Id; circle: Id };
 
 export const EMPTY_CONSTRUCTION: Construction = {
   params: [],

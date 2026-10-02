@@ -26,7 +26,7 @@ import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import { holdsInEveryConfiguration } from '../engine/evaluate';
 import type { ApplyNotice } from '../engine/apply';
-import type { Fact } from '../engine/types';
+import { factsWithin, type Fact } from '../engine/types';
 import { activeOf, rowOf } from './active';
 
 /** What a recorded line tells the student (#1350) — the engine's notice, without the line index. */
@@ -233,7 +233,7 @@ export function decideSubmit(
     // מעגל M») mentions its centre to name the circle, not to define a new point there — so the
     // "pick another letter" hint would blame the wrong line (#1504 amendment 1).
     const restatedCentres = new Set(
-      parsed.facts.flatMap((f) => (f.t === 'circle-at' && current.construction.objects.some((o) => o.id === f.id) ? [f.centre] : [])),
+      parsed.facts.flatMap(factsWithin).flatMap((f) => (f.t === 'circle-at' && current.construction.objects.some((o) => o.id === f.id) ? [f.centre] : [])),
     );
     const reused = subjectIdsOf(parsed).find(
       (id) => !restatedCentres.has(id) && current.construction.objects.some((o) => o.id === id),

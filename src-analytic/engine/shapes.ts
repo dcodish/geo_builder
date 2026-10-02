@@ -97,6 +97,14 @@ export interface ShapeRow {
    * there must be refused rather than guessed ([#1070](https://github.com/dcodish/geo_builder/issues/1070)).
    */
   principalDiagonal?: (v: Id[]) => [Id, Id];
+  /**
+   * A noun that can NEVER be inscribed in a circle (#1554 ruling 1, re-affirmed 2026-10-01; ADR-AG-198): the
+   * noun a circumscribing circle would force the ring into, which this noun itself excludes. In a cyclic
+   * quadrilateral opposite angles sum to 180°, so a right trapezoid's two right angles force the other two to be
+   * right as well — a rectangle, which has two parallel pairs where a trapezoid has exactly one. «X ABCD חסום במעגל» on such a noun asks
+   * for something the noun forbids, and is refused naming both nouns; it is never drawn as the forced shape.
+   */
+  notCyclic?: string;
 }
 
 /**
@@ -158,6 +166,7 @@ export const SHAPES: Record<string, ShapeRow> = {
     givens: ([a, b, c, d]) => [assumedParallel(a, b, d, c), equal(a, d, b, c)],
   },
   'טרפז ישר זווית': {
+    notCyclic: 'מלבן',
     // Both right angles sit on the same leg — but WHICH leg is unstated (#1618). The row used to seat
     // the right angle at the first vertex, so «טרפז ישר זווית ABCD» with its right angles at B and C —
     // the 471 exam's «המרובע ABCO הוא טרפז ישר זווית (∢C = 90°, AB ∥ OC)» — was refused as

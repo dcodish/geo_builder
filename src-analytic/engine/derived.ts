@@ -68,7 +68,15 @@ export type DerivedRule =
    * `K ± r_K·û` whose distance to M is r_M — so the rule follows whichever touch (external or
    * internal) the configuration chose, including an unstated one cycled by «הציגו תצורה אחרת».
    */
-  | { t: 'touch-point'; a: Id; b: Id };
+  | { t: 'touch-point'; a: Id; b: Id }
+  /**
+   * «הצלעות AO, BO ו-AB משיקות למעגל בנקודות D, E ו-F בהתאמה» — where a SIDE touches a circle (#1619 B2,
+   * ADR-AG-194): the foot of the circle's centre on the line `ab`. Its parents are the two points AND the
+   * circle (a curve parent, like `touch-point`). Determined, not solved: a line tangent to a circle meets
+   * it exactly at that foot. The tangency itself is the host's business (by construction for an incircle,
+   * a stated `tangent-line` for a circle on a centre) — this rule only names where it happens.
+   */
+  | { t: 'side-touch'; circle: Id; a: Id; b: Id };
 
 /** The ids a rule is defined in terms of. EXHAUSTIVE — see the union's docblock. */
 export function parentsOf(r: DerivedRule): Id[] {
@@ -82,6 +90,9 @@ export function parentsOf(r: DerivedRule): Id[] {
       return [...r.v];
     case 'diagonals':
       return [...r.v];
+    // The side's two ends; the circle is its CURVE parent (`curveParentsOf`).
+    case 'side-touch':
+      return [r.a, r.b];
     // Its parent is a CURVE, not a point — see `curveParentOf`. Returning the curve id here would
     // send it through every check that assumes a parent is positional.
     case 'circle-centre':
@@ -116,6 +127,8 @@ export function ruleLabel(r: DerivedRule): string {
       return 'מוקד הפרבולה';
     case 'touch-point':
       return 'נקודת ההשקה';
+    case 'side-touch':
+      return `נקודת ההשקה על ${r.a}${r.b}`;
     default: {
       const unlabelled: never = r;
       throw new Error(`derived rule has no label: ${JSON.stringify(unlabelled)}`);
@@ -142,6 +155,54 @@ function isDegenerate(a: Pt, b: Pt, c: Pt): boolean {
 }
 
 export const midpoint = (a: Pt, b: Pt): Pt => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+/** The foot of `p` on the line through `a` and `b` — `null` when the two coincide (no line). */
+export function footOn(p: Pt, a: Pt, b: Pt): Pt | null {
+  const ux = b.x - a.x;
+  const uy = b.y - a.y;
+  const nn = ux * ux + uy * uy;
+  if (!(nn > 1e-24)) return null;
+  const t = ((p.x - a.x) * ux + (p.y - a.y) * uy) / nn;
+  return { x: a.x + t * ux, y: a.y + t * uy };
+}
+
+/**
+ * The centre of the circle INSCRIBED in a ring of three or four vertices (#1619 B2, ADR-AG-194) — `null`
+ * for a degenerate or non-convex ring, which has none (a vacancy, never a guessed circle).
+ *
+ * A triangle's is the incentre, through the one closed form above. A quadrilateral's is the meet of the
+ * internal bisectors at its first two vertices: the point equidistant from the sides `DA`, `AB` and `BC`.
+ * It is tangent to the fourth side exactly when the Pitot condition holds, which the sentence states as its
+ * own given — so this function never pretends a non-tangential ring has an incircle, it only says where the
+ * one the givens promise sits.
+ */
+export function incircleCentre(v: readonly Pt[]): Pt | null {
+  if (v.length === 3) return incentre(v[0], v[1], v[2]);
+  if (v.length !== 4) return null;
+  // Convex, with a consistent turn: every consecutive triple turns the same way, and none is straight.
+  const turns = v.map((_, i) => cross2(v[i], v[(i + 1) % 4], v[(i + 2) % 4]));
+  const scale = Math.max(...v.map((p, i) => dist(p, v[(i + 1) % 4])));
+  if (!(scale > 1e-12)) return null;
+  if (!(turns.every((t) => t > 1e-9 * scale * scale) || turns.every((t) => t < -1e-9 * scale * scale))) return null;
+  const unit = (p: Pt, q: Pt): Pt => {
+    const d = dist(p, q);
+    return { x: (q.x - p.x) / d, y: (q.y - p.y) / d };
+  };
+  const [a, b, c, d] = v;
+  const ua = unit(a, b);
+  const wa = unit(a, d);
+  const ub = unit(b, c);
+  const wb = unit(b, a);
+  const da = { x: ua.x + wa.x, y: ua.y + wa.y };
+  const db = { x: ub.x + wb.x, y: ub.y + wb.y };
+  // a + s·da = b + t·db
+  const det = da.x * -db.y - da.y * -db.x;
+  if (Math.abs(det) < 1e-12) return null;
+  const rx = b.x - a.x;
+  const ry = b.y - a.y;
+  const s = (rx * -db.y - ry * -db.x) / det;
+  return { x: a.x + s * da.x, y: a.y + s * da.y };
+}
 
 export const centroid = (a: Pt, b: Pt, c: Pt): Pt => ({
   x: (a.x + b.x + c.x) / 3,
@@ -253,6 +314,7 @@ export function curveParentOf(r: DerivedRule): Id | null {
 export function curveParentsOf(r: DerivedRule): Id[] {
   if (r.t === 'circle-centre' || r.t === 'parabola-focus') return [r.curve];
   if (r.t === 'touch-point') return [r.a, r.b];
+  if (r.t === 'side-touch') return [r.circle];
   return [];
 }
 
@@ -309,6 +371,11 @@ export function evalRule(
       const k = circle(r.a);
       const m = circle(r.b);
       return k && m ? touchPoint(k, m) : null;
+    }
+    case 'side-touch': {
+      const c = curveAt?.(r.circle);
+      if (!c || c.kind !== 'circle' || c.cx === undefined || c.cy === undefined) return null;
+      return footOn({ x: c.cx, y: c.cy }, p[0], p[1]);
     }
     case 'midpoint':
       return midpoint(p[0], p[1]);
@@ -509,6 +576,10 @@ export function constructionOf(
 
     // Its scaffolding would be the line of centres; the parents are curves, so none is drawn here.
     case 'touch-point':
+      return null;
+    // The radius to the touch is the whole construction, and the centre is a curve parent this walk
+    // does not resolve — the point's own mark is the answer, as for the centre.
+    case 'side-touch':
       return null;
 
     default: {
