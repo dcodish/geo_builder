@@ -1830,6 +1830,15 @@ guide, excluded from the LLM vocabulary and the figure corpus, read by the catal
 `parseRenameAnalytic` + `decideRename`. Known limit: a FREE vertex's default sample is keyed by its letter
 (`freeCoord`), so its drawn position may change on a rename while every given and the freedom stay equal.
 
+*Amended 2026-10-02 ([ADR-AG-205](06c-decisions-analytic.md#adr-ag-205), #1667):* the compared shape is
+invariant under the letter map. (1) A symbol spelled from an id — `r_<centre>`, `θ_<line>`, `θ_<object>.<part>`
+— is spelled by `engine/carriers.ts` (`radiusSymbol`, `directionSymbol`, `toolSymbol`) and mapped by the one
+inverse `relabelSymbol`, in a parameter declaration and in every expression node alike; a student's own
+symbol is left alone. (2) A constraint is compared as `canonicalConstraint` (the engine's statement identity,
+now also over a `choice`'s options), so operands the lowering orders by letter do not read as a different
+statement. (3) Line and figure shapes are compared up to a consistent renaming of anonymous ids
+(`ANON_ID_RE`, beside `anonIndex`), because «דרך P עובר ישר» hashes its anchor letter.
+
 ## The sentence frame ([ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), #1618)
 
 `parseLine` is the one boundary every rule reads, and it reads the exam's textbook frame **once**:

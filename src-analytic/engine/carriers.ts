@@ -374,6 +374,33 @@ export const shapedObjectOf = (sym: string): Id | null => {
   return dot > 2 ? sym.slice(2, dot) : null;
 };
 
+/**
+ * A CIRCLE'S FREE RADIUS, SPELLED FROM ITS CENTRE (#1059, #1667) — `r_O` for the circle a sentence creates on
+ * the centre O («נתון מעגל שמרכזו O», «O מרכז המעגל», «מעגל O משיק לציר ה-x»). Named after the centre so it
+ * needs no resolution against the figure and cannot collide with a student's own one-letter parameter.
+ */
+export const radiusSymbol = (centre: Id): string => `r_${centre}`;
+const RADIUS_PREFIX = radiusSymbol('');
+
+/**
+ * THE ONE OWNER OF EVERY SYMBOL SPELLED FROM AN ID (#1667, ADR-AG-205) — map the id a symbol is spelled from,
+ * and leave every other symbol alone.
+ *
+ * Three families carry an id inside their name: a circle's radius {@link radiusSymbol} (`r_<centre>`), a free
+ * line's direction {@link directionSymbol} (`θ_<line>`), and a created shape's parts {@link toolSymbol}
+ * (`θ_<object>.<part>`). A letter change rewrites ids; a symbol that carries one must follow it in EVERY place
+ * it occurs — a parameter declaration and an expression node alike — or the same figure reads as two (#1667:
+ * `param r_P` was mapped and `{ sym r_P }` was not, so a centre could never be renamed). A symbol the student
+ * wrote (`a`, `R`, `k`) is not an id, whatever letter it is, and is returned unchanged.
+ */
+export function relabelSymbol(sym: string, relabelId: (id: Id) => Id): string {
+  if (sym.startsWith(RADIUS_PREFIX) && sym.length > RADIUS_PREFIX.length) return radiusSymbol(relabelId(sym.slice(RADIUS_PREFIX.length)));
+  if (!isDirectionSymbol(sym)) return sym;
+  const shaped = shapedObjectOf(sym);
+  if (shaped !== null) return toolSymbol(relabelId(shaped), sym.slice(sym.lastIndexOf('.') + 1));
+  return directionSymbol(relabelId(sym.slice(directionSymbol('').length)));
+}
+
 // ---------------------------------------------------------------------------
 // PROVENANCE — what the student's own givens say about one point (#1032)
 // ---------------------------------------------------------------------------

@@ -428,6 +428,9 @@ export function canonicalConstraint(k: Constraint): string {
   // The equation fields are SPELLING (#1429) — apply strips them, but a raw constraint compared
   // before that must not read as a different statement than its applied twin.
   if (k.t === 'on-curve') return `on-curve|${k.id}|${k.curve}`;
+  // A choice is its options, each the statement it is (#1667): a right triangle's seats are built with their
+  // rays sorted by letter, so the same seat must not read as a different option because a letter changed.
+  if (k.t === 'choice') return `choice|${k.options.map(canonicalConstraint).join('||')}`;
   if (k.t === 'angle') return JSON.stringify({ ...k, at: ray(k.at) });
   if (k.t === 'angle-ratio') return JSON.stringify({ ...k, left: ray(k.left), right: ray(k.right) });
   return JSON.stringify(k);
