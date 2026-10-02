@@ -2114,3 +2114,16 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - «הצלע CB מקבילה לציר ה-x, וחותכת את ציר ה-y בנקודה E» is both statements about CB.
 - «הקטע EF מקביל ל-DA» with F not yet placed adds F, free to move along the parallel through E, until a later given places it.
 - Refused by name: a perpendicular from a point of the line itself, a foot that is its own point, a line the sentence does not name readably.
+
+**R142 — diagonals, extensions, the midsegment and a point on a side with a condition read as the 2-D tool reads them**
+([ADR-AG-208](06c-decisions-analytic.md#adr-ag-208), [#1620](https://github.com/dcodish/geo_builder/issues/1620); operator ruling 2026-10-02: the analytic tool gives the same experience as 2-D for plane geometry).
+
+- «E על המשך הצלע BC» (and «E על המשך BC», «נקודה E על המשך הקטע BC») puts E on the line BC past C, free to slide along the extension; «… מעבר ל-B» puts it past B instead. A sentence about «המשך AD» on an empty canvas adds A and D, as 2-D does. A point placed inside the side is not on its extension, and saying it is is refused naming the sentence.
+- «המשכי הצלעות AD ו-BC נפגשים בנקודה E» (and «המשך הצלע AD והמשך הצלע BC נפגשים …») puts E where the two lines cross, past D and past C. Parallel sides do not meet, and the sentence is refused.
+- «המשך AC חותך את מעגל O בנקודה E» puts E on the circle, on the line AC past C.
+- «הנקודה E נמצאת על צלע BC כך ש-AE = AC» places E on the side and states AE = AC; «כך ש-…» joins any placement to the condition after it. Both parts are givens: a condition the tool cannot read refuses the whole line, never keeping the placement without it. A condition the placement cannot meet is refused naming the sentence.
+- «האלכסונים AC ו-BD נפגשים בנקודה E» puts E where the two named diagonals meet, and draws them; it works on an empty canvas too. Two sides named as diagonals («האלכסונים AB ו-CD» in «מרובע ABCD») are refused, never read as the real diagonals.
+- «אלכסוני הטרפז נפגשים בנקודה M» and «E היא נקודת החיתוך של אלכסוני הדלתון» mean that shape's diagonals: the trapezoid beside a plain quadrilateral, a right trapezoid as a trapezoid. With two trapezoids the tool asks which; with none it refuses. «…, שנמצאת על ציר ה-y» after a sentence that names a point is a given about that point. «שטח הטרפז …» finds a right trapezoid the same way.
+- «האלכסון AC» and «האלכסון AC במרובע ABCD» draw the diagonal (the second also states the quadrilateral); a side named as its diagonal is refused.
+- «קטע האמצעים לצלע BC במשולש ABC» draws the segment joining the midpoints of AB and AC, and «קטע האמצעים בטרפז ABCD» the one joining the midpoints of the legs BC and DA. The midpoints are named M and N, as in 2-D (the next free letters when those are taken, and the student's own letters in «DE קטע אמצעים …»); the tool says it named them. A midpoint the student already named keeps its letter.
+- «שכל קודקודיו מונחים על הצירים» (and «כל קודקודי הטרפז נמצאים על הצירים») puts every vertex of the shape on the x-axis or the y-axis; which axis each vertex takes is not stated, so «הציגו תצורה אחרת» moves between the possible assignments.

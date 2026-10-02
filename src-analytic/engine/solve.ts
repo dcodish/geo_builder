@@ -344,7 +344,14 @@ export type Constraint =
    * or «M מפגש התיכונים» about an existing point is the same statement and not a per-rule list.
    */
   | { t: 'derived-at'; id: Id; rule: DerivedRule }
-  | { t: 'choice'; options: Constraint[] };
+  | { t: 'choice'; options: Constraint[] }
+  /**
+   * ONE OPTION THAT IS SEVERAL STATEMENTS (#1620, ADR-AG-208) — «every vertex on some axis» chooses an axis for
+   * EACH vertex, and the choices are not independent options of separate `choice`s (those cycle together, on one
+   * seed index): the option is the whole assignment. Only ever an option of a `choice`, and flattened with it by
+   * {@link resolveChoices}, so nothing downstream measures one.
+   */
+  | { t: 'all'; of: Constraint[] };
 
 /**
  * The constraints as THIS configuration sees them — every discrete choice resolved by the seed.
@@ -355,6 +362,7 @@ export type Constraint =
  */
 export function resolveChoices(ks: readonly Constraint[], seed: number): Constraint[] {
   return ks.flatMap((k) => {
+    if (k.t === 'all') return resolveChoices(k.of, seed);
     if (k.t !== 'choice') return [k];
     if (k.options.length === 0) return [];
     return resolveChoices([k.options[((seed % k.options.length) + k.options.length) % k.options.length]], seed);
@@ -431,6 +439,7 @@ export function canonicalConstraint(k: Constraint): string {
   // A choice is its options, each the statement it is (#1667): a right triangle's seats are built with their
   // rays sorted by letter, so the same seat must not read as a different option because a letter changed.
   if (k.t === 'choice') return `choice|${k.options.map(canonicalConstraint).join('||')}`;
+  if (k.t === 'all') return `all|${k.of.map(canonicalConstraint).sort().join('&&')}`;
   if (k.t === 'angle') return JSON.stringify({ ...k, at: ray(k.at) });
   if (k.t === 'angle-ratio') return JSON.stringify({ ...k, left: ray(k.left), right: ray(k.right) });
   return JSON.stringify(k);
@@ -484,6 +493,8 @@ export function constraintRefs(k: Constraint): Id[] {
       return [k.id, ...parentsOf(k.rule)];
     case 'choice':
       return [...new Set(k.options.flatMap(constraintRefs))];
+    case 'all':
+      return [...new Set(k.of.flatMap(constraintRefs))];
     default: {
       const unreferenced: never = k;
       throw new Error(`constraint declares no refs: ${JSON.stringify(unreferenced)}`);
@@ -562,6 +573,8 @@ export function describeConstraint(k: Constraint): string {
       return `${k.id} = ${describeRule(k.rule)}`;
     case 'choice':
       return k.options.map(describeConstraint).join(' או ');
+    case 'all':
+      return k.of.map(describeConstraint).join(' ו');
     default: {
       const undescribed: never = k;
       throw new Error(`constraint has no description: ${JSON.stringify(undescribed)}`);
@@ -610,6 +623,8 @@ export function constraintCurveRefs(k: Constraint): Id[] {
       return curveParentsOf(k.rule);
     case 'choice':
       return [...new Set(k.options.flatMap(constraintCurveRefs))];
+    case 'all':
+      return [...new Set(k.of.flatMap(constraintCurveRefs))];
     default:
       // EXHAUSTIVE BY DEFAULT, deliberately — unlike `constraintRefs`, whose `never` arm forces every
       // new kind to declare its points. A constraint kind that names no curve is the common case, and
@@ -985,6 +1000,7 @@ export function residualRows(
      * only one, which is the defect the kind exists to prevent.
      */
     case 'choice':
+    case 'all':
       throw new Error('a choice must be resolved by resolveChoices() before it is measured');
     default: {
       const unmeasured: never = k;
