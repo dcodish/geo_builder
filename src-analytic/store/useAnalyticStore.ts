@@ -118,11 +118,7 @@ export type InputError =
    */
   | { key: 'name-kind-clash'; detail: string; existing?: string }
   /** A construction that refers to a point the figure does not have yet (#1028). */
-  /**
-   * `unnamedCentre` (#1670, ADR-AG-210): the name is new and the figure holds a circle whose centre has no letter yet,
-   * so it was not minted — the student may mean that centre; the message says how to name it.
-   */
-  | { key: 'unknown-reference'; detail: string; expected?: RefKind; unnamedCentre?: true }
+  | { key: 'unknown-reference'; detail: string; expected?: RefKind }
   /**
    * The noun and the equation name different families (02c R7, #1514 pre-play) — «פרבולה I שמשוואתה
    * x^2+y^2=16». `existing` is what the equation describes (`curve:<kind>`), `expected` the noun written.

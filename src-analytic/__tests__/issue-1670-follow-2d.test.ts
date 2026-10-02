@@ -10,17 +10,15 @@
  * 4. New letters in a bare relation («מעגל O» · «BD⊥AC») — minted as free points, in exactly the forms 2-D mints for
  *    (a lowering that draws a segment through them); the forms 2-D refuses keep #1028's refusal.
  *
- * And the #1673 ruling holds in analytic: an unlabelled centre never answers to a letter. While one exists, a NEW letter
- * is not minted at all — the student may mean that centre — and the refusal teaches how to name it (ruling asked on #1686).
+ * And the #1673 / #1686 rulings: an unlabelled centre never answers to a letter, and a NEW letter beside it is still
+ * minted — a free point (*"create a segment BO where B is where we know it is and O is free"*) — which a later
+ * «O מרכז המעגל» / «OB רדיוס» PLACES at the centre, with no second point.
  *
  * Every assertion CALLS the real decision (`decideSubmit`, `derive`); nothing re-implements it.
  */
 import { describe, expect, it } from 'vitest';
 import { derive, type Derivation } from '../engine/derive';
 import { decideSubmit } from '../app/submit';
-import { errorText } from '../app/errorText';
-import { analyticI18n } from '../i18n';
-import type { InputError } from '../store/useAnalyticStore';
 
 /** Type the lines through the submit gate; every verdict, and the lines it kept. */
 function typed(lines: readonly string[], seed = 0): { kinds: string[]; recorded: string[]; last: ReturnType<typeof decideSubmit> } {
@@ -65,10 +63,6 @@ function acrossSeeds(lines: readonly string[], check: (d: Derivation) => void, f
   }
   if (free) expect(places.size, `${free} is a free DOF, not a default`).toBeGreaterThan(1);
 }
-const t = analyticI18n.getFixedT('he');
-/** The message as read — the bidi isolates around a Latin name dropped. */
-const plain = (x: string) => x.replace(/[\u2066-\u2069]/g, '');
-const tEn = analyticI18n.getFixedT('en');
 
 // ---------------------------------------------------------------------------------------------------------------
 // Row 1 — the radius names the unnamed centre with the student's letter
@@ -128,37 +122,66 @@ describe('#1670 row 1 — «OB רדיוס» names a centre that has no letter', 
 });
 
 // ---------------------------------------------------------------------------------------------------------------
-// #1673 — an unlabelled centre never answers to a letter (kept)
+// #1686 — beside an unnamed centre a new letter is minted FREE; a later sentence places it (operator 2026-10-02)
 // ---------------------------------------------------------------------------------------------------------------
 
-describe('#1673 holds in analytic — an unnamed centre never answers to «O»', () => {
+/** O is the circle's centre, and the figure holds exactly one point called O. */
+function oIsTheCentre(d: Derivation) {
+  expect(d.figure.points.filter((p) => p.id === 'O')).toHaveLength(1);
+  const c = theCircle(d);
+  const o = pt(d, 'O');
+  expect(close(o.x, c.cx, 1e-5) && close(o.y, c.cy, 1e-5), `O at (${o.x}, ${o.y}), centre (${c.cx}, ${c.cy})`).toBe(true);
+}
+
+describe('#1686 — a new letter beside an unnamed centre is a free point until a sentence places it', () => {
   it.each([
     [['AB קוטר', 'BO = 5']],
     [['AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה', 'BO = 5']],
     [['AB קוטר', 'OC ⊥ AB']],
+    [['AB קוטר', 'CD ⊥ AB']],
     [['מיתר AB', 'M אמצע OB']],
-  ])('%j — the new letter is neither the hidden centre nor a fresh point: refused, saying how to name the centre', (lines) => {
-    const { last } = typed(lines);
-    expect(last.kind).toBe('refused');
-    if (last.kind !== 'refused') return;
-    expect(last.error.key).toBe('unknown-reference');
-    expect((last.error as InputError & { unnamedCentre?: true }).unnamedCentre).toBe(true);
-    expect(plain(errorText(last.error, t))).toContain('«O מרכז המעגל»');
-    expect(plain(errorText(last.error, tEn))).toContain('"O is the centre of the circle"');
+  ])('%j builds — the new letters are minted', (lines) => {
+    builds(lines);
   });
 
-  it('a NAMED circle the figure lacks is not stated beside an unnamed centre either («AB קוטר» · «A על מעגל O»)', () => {
-    const { last } = typed(['AB קוטר', 'A על מעגל O']);
-    expect(last.kind === 'refused' && last.error.key).toBe('unknown-reference');
-    expect(last.kind === 'refused' && (last.error as { unnamedCentre?: true }).unnamedCentre).toBe(true);
+  it('«AB קוטר» · «BO = 5»: BO is drawn, |BO| = 5, and O is FREE — not the hidden centre', () => {
+    const lines = ['AB קוטר', 'BO = 5'];
+    let offCentre = 0;
+    acrossSeeds(
+      lines,
+      (d) => {
+        const [b, o] = [pt(d, 'B'), pt(d, 'O')];
+        expect(close(Math.hypot(b.x - o.x, b.y - o.y), 5, 1e-5)).toBe(true);
+        expect(d.figure.segments.some((s) => [...s.ends].sort().join('') === 'BO')).toBe(true);
+        const c = theCircle(d);
+        if (!close(o.x, c.cx, 1e-3) || !close(o.y, c.cy, 1e-3)) offCentre++;
+      },
+      'O',
+    );
+    expect(offCentre, 'O is not silently the centre').toBeGreaterThan(0);
   });
 
-  it('the TAUGHT remedies drive: naming the centre, or defining the new points, makes the same sentence build', () => {
-    expect(typed(['AB קוטר', 'O מרכז המעגל', 'BO = 5']).kinds).toEqual(['record', 'record', 'record']);
-    expect(typed(['AB קוטר', 'O is the centre of the circle', 'BO = 5']).kinds).toEqual(['record', 'record', 'record']);
-    expect(typed(['AB קוטר', 'O מרכז המעגל', 'A על מעגל O']).kinds.at(-1)).not.toMatch(/^refused/);
-    expect(typed(['AB קוטר', 'נקודה C', 'נקודה D', 'CD ⊥ AB']).kinds).toEqual(['record', 'record', 'record', 'record']);
-    expect(typed(['AB קוטר', 'point C', 'point D', 'CD ⊥ AB']).kinds).toEqual(['record', 'record', 'record', 'record']);
+  it.each([
+    [['AB קוטר', 'BO = 5', 'O מרכז המעגל']],
+    [['AB קוטר', 'BO = 5', 'OB רדיוס']],
+    [['AB קוטר', 'BO = 5', 'הרדיוס OB']],
+    [['AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה', 'BO = 5', 'O מרכז המעגל']],
+    [['AB קוטר', 'OC ⊥ AB', 'O מרכז המעגל']],
+  ])('%j — the later sentence PLACES the free O at the centre, at every seed, and makes no second point', (lines) => {
+    builds(lines);
+    acrossSeeds(lines, oIsTheCentre);
+  });
+
+  it('…and the givens still hold once O is placed: «BO = 5» makes the radius 5', () => {
+    acrossSeeds(['AB קוטר', 'BO = 5', 'O מרכז המעגל'], (d) => {
+      expect(close(theCircle(d).r, 5, 1e-5)).toBe(true);
+      expect(d.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'O']);
+    });
+  });
+
+  it('a named circle beside an unnamed centre is its own circle on a free letter («AB קוטר» · «A על מעגל O»)', () => {
+    builds(['AB קוטר', 'A על מעגל O']);
+    expect(circles(derive(['AB קוטר', 'A על מעגל O'], 0))).toHaveLength(2);
   });
 });
 

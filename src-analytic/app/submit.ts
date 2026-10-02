@@ -243,7 +243,6 @@ export function decideSubmit(
       kind: 'refused',
       error: {
         key: fault.code, detail: fault.detail, existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example, host: fault.host, domain: fault.domain,
-        ...(fault.unnamedCentre ? { unnamedCentre: true } : {}),
         ...(reused && definedBy ? { reusedId: reused, definedBy } : {}),
       } as InputError,
     };
@@ -442,7 +441,6 @@ export function decideToggle(
       kind: 'refused',
       error: {
         key: fault.code, detail: lines[index], existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example,
-        ...(fault.unnamedCentre ? { unnamedCentre: true } : {}),
       } as InputError,
     };
   }

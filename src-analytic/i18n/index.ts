@@ -161,8 +161,6 @@ const he = {
   errUnknownRefPoint: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
   errUnknownRefLine: 'הישר {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
   errUnknownRefCircle: 'המעגל {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
-  errUnknownRefUnnamedCentre:
-    'השם {{detail}} עדיין לא הוגדר, ולמרכז המעגל עדיין אין שם — ייתכן ש-{{detail}} הוא המרכז. אם כן, כתבו קודם «{{detail}} מרכז המעגל»; אם לא, הגדירו קודם כל נקודה חדשה שבמשפט («נקודה {{detail}}»).',
   // #1514 pre-play — a named conic is a noun of its own; it was reported as a missing POINT with its raw id.
   errUnknownRefParabola: 'הפרבולה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
   errUnknownRefEllipse: 'האליפסה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
@@ -529,9 +527,6 @@ const en: typeof he = {
   errUnknownRefPoint: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefLine: 'The line {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefCircle: 'The circle {{detail}} has not been defined yet. Define it first, then you can refer to it.',
-  errUnknownRefUnnamedCentre:
-    'The name {{detail}} has not been defined yet, and the circle’s centre has no name yet — {{detail}} may be that centre. ' +
-    'If so, first write "{{detail}} is the centre of the circle"; if not, first define each new point of the sentence ("point {{detail}}").',
   errUnknownRefParabola: 'The parabola {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefEllipse: 'The ellipse {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errKindMismatch:

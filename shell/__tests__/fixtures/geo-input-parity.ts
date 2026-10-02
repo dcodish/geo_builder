@@ -670,9 +670,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #1670: the 2-D ≠ analytic verdicts that remain after #1669 ──
   { id: 'radius-unnamed-centre-1670', family: 'chords-arcs', steps: ['AB קוטר', 'OB רדיוס'], expect: 'builds', exception: 'X8' },
   { id: 'on-circle-no-circle-1670', family: 'circles', steps: ['A על המעגל'], expect: 'builds', exception: 'X8' },
-  // operator ruling on #1670 (2026-10-02): an unlabelled centre must NOT answer to «O» — here 2-D is the one that changes,
-  // so `expect` is the ruled verdict (analytic's), not 2-D's current one
-  { id: 'hidden-centre-letter-1673', family: 'circles', steps: ['AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה', 'BO = 5'], expect: 'refused', exception: 'X8', knownGap: [{ product: '2d', issue: '#1673' }], note: 'the reference is the ruling, not 2-D: 2-D lets the unnamed centre answer to O' },
+  // operator rulings on #1670 / #1686 (2026-10-02): an unlabelled centre must NOT answer to «O», and the new letter is minted
+  // anyway — «BO = 5» draws BO with O a FREE point, which a later «O מרכז המעגל» places (ADR-AG-210)
+  { id: 'hidden-centre-letter-1673', family: 'circles', steps: ['AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה', 'BO = 5'], expect: 'builds', exception: 'X8', note: 'builds with O a free point, never the hidden centre (#1673, #1686)' },
   { id: 'bare-relation-new-letters-1670', family: 'parallel-perpendicular', steps: ['מעגל O', 'BD⊥AC'], expect: 'builds', exception: 'X8', note: 'new letters in a bare relation: 2-D mints them; analytic does since #1670 (ADR-AG-210, ruled to follow 2-D)' },
   // #1670 (ADR-AG-210): the class — every form 2-D mints new letters for, and the forms it does NOT (#1028 holds there).
   // One free point (X9 — 3-D has none) and the rest of the letters NEW.
@@ -694,7 +694,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'radius-names-chord-centre-1670', family: 'chords-arcs', steps: ['מיתר AB', 'OA רדיוס'], expect: 'builds', exception: 'X8' },
   { id: 'diameter-named-circle-new-1670', family: 'chords-arcs', steps: ['AB קוטר במעגל O'], expect: 'builds', exception: 'X8' },
   { id: 'tangent-at-new-circle-1670', family: 'tangents', steps: ['המשיק למעגל O בנקודה A'], expect: 'builds', exception: 'X8' },
-  { id: 'bare-relation-unnamed-centre-1670', family: 'chords-arcs', steps: ['AB קוטר', 'CD ⊥ AB'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1686' }], note: 'a new letter beside an unnamed centre: analytic refuses (it may be that centre, #1673), 2-D mints — ruling on #1686' },
+  { id: 'bare-relation-unnamed-centre-1670', family: 'chords-arcs', steps: ['AB קוטר', 'CD ⊥ AB'], expect: 'builds', exception: 'X8', note: 'a new letter beside an unnamed centre is minted free (operator ruling on #1686)' },
 
   { id: 'circle-by-circumference', family: 'circles', steps: ['מעגל O שהיקפו 6π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1622' }] },
   { id: 'altitude-is-segment', family: 'cevians-centres', steps: ['משולש ABC', 'גובה המשולש לצלע AB הוא CD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: 'analytic', issue: '#1240' }], note: "3-D's catalog sentence; 2-D and analytic do not read it" },

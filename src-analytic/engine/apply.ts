@@ -211,11 +211,6 @@ export interface ApplyError {
    */
   holder?: Id;
   /**
-   * For `unknown-reference`: the name is NEW and the figure holds a circle whose centre has no letter yet (#1670,
-   * ADR-AG-210), so the name was not minted — the student may mean that centre, and the message says how to name it.
-   */
-  unnamedCentre?: true;
-  /**
    * The THREE-LETTER name an ambiguous one-letter angle needs (#1407, ADR-AG-158) — «ACB» for «זווית C»
    * when more than two edges meet at C. Read off the first shape through the vertex (else its first two
    * edges), rays sorted, so the student's own line with the letter replaced by this name is a line the tool
@@ -790,17 +785,6 @@ function circleNamed(
   return { ok: true, o: circles[0] };
 }
 
-/**
- * DOES THE FIGURE HOLD A CIRCLE WHOSE CENTRE HAS NO LETTER? (#1670, ADR-AG-210) — a circle a chord, diameter or tangency
- * sentence created, an equation circle nobody named the centre of. While one does, a NEW letter is never minted by a
- * reference (a bare relation's ends, the centre of a named circle): the student may mean that centre, and an unlabelled
- * centre never answers to a letter until a sentence names it (operator 2026-10-02, #1673). The refusal says so
- * (`unnamedCentre`), so the remedy — «O מרכז המעגל» — is one line away.
- */
-function hasUnnamedCentre(c: Construction): boolean {
-  return c.objects.some((o) => curveKindOf(o) === 'circle' && centreIdOf(c, o) === null);
-}
-
 /** A name a student writes for a POINT (a capital letter, an optional index) that is not a circle numeral («I», «II»). */
 const POINT_LETTER = /^[A-Z][0-9₀-₉]?$/;
 
@@ -812,15 +796,13 @@ const POINT_LETTER = /^[A-Z][0-9₀-₉]?$/;
  * against it, so every sentence reaches the circle through the one name chain (`circleByName`) as before.
  *
  * `null` = not a name this can state (a numeral, a ring description, a name already holding a non-point) — the caller
- * keeps its refusal. A NEW letter while the figure holds an unnamed centre is refused naming it (`hasUnnamedCentre`).
+ * keeps its refusal. A new letter is stated even beside a circle whose centre has no letter (operator 2026-10-02, #1686):
+ * it is a free point until a sentence places it.
  */
 function statingNamedCircle(c: Construction, name: string, f: Fact): ApplyOutcome | null {
   if (!POINT_LETTER.test(name) || isNumeralName(name)) return null;
   const held = objectById(c, name);
   if (held && !isPositional(held)) return null;
-  if (!held && hasUnnamedCentre(c)) {
-    return { ok: false, error: { ...unknownRef(c, numeralCurveId('circle', name)), unnamedCentre: true } };
-  }
   const r = radiusSymbol(name);
   const created = applyAll(c, [
     { t: 'declare', id: name, src: f.src },
@@ -830,6 +812,12 @@ function statingNamedCircle(c: Construction, name: string, f: Fact): ApplyOutcom
   if (!created.ok) return created;
   const out = applyFact(created.next, f);
   return out.ok ? { ...out, effect: 'created' } : out;
+}
+
+/** Is `id` ON this circle already — one of the points that define it, or stated on it? (#1670) */
+function onCircleAlready(c: Construction, host: GeoObject, id: Id): boolean {
+  if (host.kind === 'circle-thru' && circleDefPoints(host.def).includes(id)) return true;
+  return c.constraints.some((k) => k.t === 'on-curve' && k.id === id && k.curve === host.id);
 }
 
 /**
@@ -1004,13 +992,20 @@ function applyRoleOf(c: Construction, f: Extract<Fact, { t: 'role-of' }>): Apply
     const host = circles[0];
     const centre = centreIdOf(c, host);
     if (centre === null) {
-      // The centre has no letter: the radius names it with the ONE end the sentence just introduced (#1670,
-      // ADR-AG-210 — 2-D's name-the-centre). Both ends new, or neither, cannot say which is meant: refused by name.
-      const named = [f.a, f.b].map((id) => ({ id, next: nameCentreAs(c, host, id, f.src) })).filter((x) => x.next !== null);
-      if (named.length !== 1) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
-      const [{ id, next }] = named;
+      // The centre has no letter: the radius names it with the ONE end not already on the circle (#1670, ADR-AG-210 —
+      // 2-D's name-the-centre). A point the sentence just introduced BECOMES the centre, in place (`nameCentreAs`); one
+      // that already stands (minted free by «BO = 5», #1686) is PLACED there — the derivation restated about an existing
+      // point is its `derived-at` condition, so no second point appears. Both ends off the circle, or neither: refused.
+      const off = [f.a, f.b].filter((id) => !onCircleAlready(c, host, id));
+      if (off.length !== 1) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      const [id] = off;
+      const rule = centreRuleOf(host);
+      if (!rule) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      const fresh = nameCentreAs(c, host, id, f.src);
+      const placed = fresh ? { ok: true as const, next: fresh } : applyFact(c, { t: 'derived', id, rule, src: f.src });
+      if (!placed.ok) return placed;
       const end = id === f.a ? f.b : f.a;
-      const out = applyFact(next!, say({ t: 'on-curve', id: end, curve: host.id }));
+      const out = applyFact(placed.next, say({ t: 'on-curve', id: end, curve: host.id }));
       return out.ok ? { ...out, effect: 'created' } : out;
     }
     if (centre !== f.a && centre !== f.b) return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
@@ -3108,8 +3103,9 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
    * fixpoint have run, so a letter a later line defines («M אמצע AB» typed above «A(0,0)») is still defined there and
    * every figure that built before builds identically. The first still-failing fact (list order) of a form 2-D mints for
    * (`mintedByReference`) gets its missing points as free points (ADR-052: drawn somewhere, moving with the seed), and the
-   * fixpoint runs again for the facts that leaned on them. While the figure holds an unnamed centre the letters are not
-   * minted — the student may mean that centre — and the refusal says so (`hasUnnamedCentre`).
+   * fixpoint runs again for the facts that leaned on them. They are minted beside a circle whose centre has no letter too (operator 2026-10-02, #1686: *"create a segment BO where B
+   * is where we know it is and O is free. if the user wants it to be the center, he can write next sentance that O is the
+   * center"*) — a later «O מרכז המעגל» / «OB רדיוס» places it (`derived-at`, `applyRoleOf`).
    */
   const lineOf = (i: number) => (group ? group[i] : i);
   const tried = new Set<number>();
@@ -3127,10 +3123,6 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
       const missing = [...new Set(failing.flatMap(({ f }) => mintedByReference(f)))].filter((id) => !objectById(c, id));
       const formed = failing.every(({ f }) => mintedByReference(f).length > 0 || isMintCompanion(f));
       if (!allRefs || !formed || missing.length === 0 || !failing.every(({ j }) => missing.includes(errors[j]!.detail))) continue;
-      if (hasUnnamedCentre(c)) {
-        failing.forEach(({ j }) => (errors[j] = { ...errors[j]!, unnamedCentre: true }));
-        continue;
-      }
       let next: Construction = { ...c, objects: [...c.objects, ...missing.map((id): GeoObject => ({ kind: 'free', id }))] };
       const landed: Array<{ j: number; out: Extract<ApplyOutcome, { ok: true }> }> = [];
       for (const { f, j } of failing) {
