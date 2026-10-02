@@ -242,6 +242,24 @@ export type Fact =
       rhs: { t: 'value'; value: Expr } | { t: 'angle'; of: AngleName; k: Expr };
     })
   /**
+   * A CEVIAN WHOSE TARGET ONLY THE FIGURE KNOWS (#1240, #1222; ADR-AG-209) — «AD גובה», «תיכון מנקודה A»,
+   * «גובה לצלע BC». The sentence names the apex, or the side, and not both: given «משולש ABC», apex `A`
+   * determines side `BC` and side `BC` determines apex `A`. Which triangle holds them is a question about the
+   * construction, so it is resolved at M1 (the `right-angle` seam): exactly one triangle builds through
+   * `cevianFacts`; several ask (`ambiguous-cevian`); none is refused (`cevian-no-triangle`). `foot` may be a
+   * mint placeholder — the tool names an unnamed foot (#1263's ruling), resolved by `derive` before M1.
+   */
+  | (FactBase & { t: 'cevian-of'; role: 'median' | 'altitude'; apex?: Id; foot: Id; side?: [Id, Id] })
+  /**
+   * «AD חוצה את הזווית BAC» · «האלכסון DB חוצה את הזווית ADC» · «AM הוא חוצה זווית CMD» — a segment from the
+   * angle's vertex that bisects it (#1284; ADR-AG-209). `p` is the segment's other end. What the sentence
+   * adds depends on the figure, exactly as in 2-D: a `p` the figure does not have yet is the bisector's FOOT
+   * on the line through the angle's two ray points (`cevianFacts`), and an existing `p` lies on the bisector's
+   * ray (`onBisectorFacts`). A lone vertex («זווית A») is resolved by the one angle resolver. With NO `p` —
+   * «חוצה זווית ABC» on its own — the bisector is drawn as a line through the vertex (2-D's visible `bisector`).
+   */
+  | (FactBase & { t: 'bisects'; at: AngleName; p?: Id })
+  /**
    * «שטח הדלתון הוא 24» — a shape named by its NOUN, with no vertices (#1049).
    *
    * A CONTEXTUAL reference: "the kite" means the one the student already drew. Which ring that is
@@ -806,7 +824,16 @@ export type Selector =
    * walks to an acute configuration, and a determined figure whose triangle is not acute is refused on the
    * sentence (the #1069 predicate). `ids` is the ring, three vertices.
    */
-  | { kind: 'acute'; ids: Id[] };
+  | { kind: 'acute'; ids: Id[] }
+  /**
+   * «DB חוצה את הזווית ADC» about an EXISTING B — B IS ON THE BISECTOR'S OWN RAY, not its opposite (#1284, ADR-AG-209).
+   *
+   * The equal-angle row (`angle-ratio`, unsigned) holds on the whole bisector LINE: on the opposite ray both angles
+   * are 180° − α/2. Which ray is a REGION, not an equation — D7's kind 2, like `between` — so it is a selector:
+   * `id` lies in the open half-plane at `v` that holds the angle (a, v, b)'s interior, i.e. on the internal
+   * bisector's side of the perpendicular to it at `v`. Consumes no freedom; judged inside validity; seeded.
+   */
+  | { kind: 'angle-side'; id: Id; v: Id; a: Id; b: Id };
 
 /**
  * A quantity the figure DERIVES — never a symbol the student declared (that is a domain, kind 1).

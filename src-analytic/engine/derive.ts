@@ -11,6 +11,7 @@ import { reportedDof } from './carriers';
 import { drawableAt, viewBox, type Figure } from './evaluate';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
+import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
 import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
@@ -488,7 +489,7 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
   const minted: Array<{ index: number; id: string }> = [];
   let n = 0;
   facts.forEach((f, i) => {
-    if (f.t !== 'point' || !f.id.startsWith(MINT_PREFIX) || names.has(f.id)) return;
+    if ((f.t !== 'point' && f.t !== 'declare') || !f.id.startsWith(MINT_PREFIX) || names.has(f.id)) return;
     const at = numeric(f);
     const own = at
       ? facts.slice(0, i).find((g) => {
@@ -502,6 +503,20 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
       return;
     }
     let name: string;
+    // A FOOT the tool names (#1222, #1240; ADR-AG-209) carries its reserved letter in the placeholder —
+    // `@mint:foot:median:…` → M₁ (2-D's M), `@mint:foot:altitude:…` → H₁ (2-D's F is this tree's focus letter,
+    // #1167) — and takes the next free subscript.
+    const foot = f.t === 'declare' ? /^@mint:foot:(median|altitude):/.exec(f.id) : null;
+    if (foot) {
+      const base = foot[1] === 'median' ? 'M' : 'H';
+      let k = 0;
+      do name = `${base}${subscript(++k)}`;
+      while (used.has(name));
+      used.add(name);
+      names.set(f.id, name);
+      minted.push({ index: owner[i], id: name });
+      return;
+    }
     // The ORIGIN is O when that letter is free (#1628) — the exam's own name for it, and the same default
     // that yields as the canonical circle's centre (ADR-AG-184): a point the student already called O keeps
     // the letter, and the origin then falls back to P₁… like any other coordinate point.
@@ -515,7 +530,9 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
   // A placeholder is a whole id or the SUFFIX of one (#1432 am. 1 — `circle-at-@mint:2,3`, `r_@mint:2,3` for a
   // circle centred on a coordinate point), so it is replaced up to the closing quote, never only as a whole string.
   const out = JSON.parse(text.replace(/@mint:[^"]*/g, (q) => JSON.stringify(names.get(q) ?? q).slice(1, -1))) as Fact[];
-  return { facts: out, minted };
+  // A segment to a minted foot was keyed before the foot had its name, and a segment id is its two ends SORTED —
+  // so it is keyed again from its (now named) ends, or «AM₁» typed later would name a second segment.
+  return { facts: out.map((f) => (f.t === 'segment' && f.id.includes(MINT_PREFIX) ? { ...f, id: segmentIdOf(f.a, f.b) } : f)), minted };
 }
 
 /**

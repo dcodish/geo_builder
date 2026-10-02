@@ -79,7 +79,13 @@ export type Direction =
    * one perpendicularity, never a tangent-at kind of its own. The centre is read off the RESOLVED circle,
    * so a circle stated by its equation, by its centre point or computed from points is the same operand.
    */
-  | { k: 'radius'; circle: Id; at: Id };
+  | { k: 'radius'; circle: Id; at: Id }
+  /**
+   * THE BISECTOR OF THE ANGLE (a, v, b) — «חוצה זווית ABC» drawn on its own (#1284, ADR-AG-209; 2-D's `bisector`
+   * command with `visible`). The sum of the two unit rays from `v`, so the line through `v` along it is the
+   * internal bisector: a direction operand like the radius, read off the figure at every iterate.
+   */
+  | { k: 'bisector'; v: Id; a: Id; b: Id };
 
 /** An angle named by three points: the vertex and the ends of its two rays (#1331). */
 export interface AngleRef {
@@ -386,7 +392,7 @@ export function resolveChoices(ks: readonly Constraint[], seed: number): Constra
  */
 export function canonicalConstraint(k: Constraint): string {
   const dir = (d: Direction): string =>
-    d.k === 'points' ? `p:${[d.a, d.b].sort().join(',')}` : d.k === 'axis' ? `a:${d.axis}` : d.k === 'curve' ? `c:${d.id}` : d.k === 'radius' ? `r:${d.circle},${d.at}` : `f:${d.sym}`;
+    d.k === 'points' ? `p:${[d.a, d.b].sort().join(',')}` : d.k === 'axis' ? `a:${d.axis}` : d.k === 'curve' ? `c:${d.id}` : d.k === 'radius' ? `r:${d.circle},${d.at}` : d.k === 'bisector' ? `b:${d.v},${[d.a, d.b].sort().join(',')}` : `f:${d.sym}`;
   if (k.t === 'relation') {
     // Both relations are symmetric in their operands: `u ∥ v` is `v ∥ u`, and likewise for ⊥.
     const [u, v] = [dir(k.u), dir(k.v)].sort();
@@ -623,6 +629,8 @@ export function dirRefs(d: Direction): Id[] {
     // The point the radius runs to; the circle is a CURVE ref (`constraintCurveRefs`), never a point.
     case 'radius':
       return [d.at];
+    case 'bisector':
+      return [d.v, d.a, d.b];
     case 'axis':
     case 'curve':
     case 'free':
@@ -650,6 +658,8 @@ function describeDir(d: Direction): string {
       return 'ישר';
     case 'radius':
       return `הרדיוס ל-${d.at}`;
+    case 'bisector':
+      return `חוצה הזווית ${d.a}${d.v}${d.b}`;
     default: {
       const undescribed: never = d;
       throw new Error(`direction has no description: ${JSON.stringify(undescribed)}`);
@@ -701,6 +711,18 @@ export function dirVector(
       const p = at(d.at);
       if (!c || c.kind !== 'circle' || !p) return null;
       v = { x: p.x - c.cx, y: p.y - c.cy };
+      break;
+    }
+    case 'bisector': {
+      // The sum of the two UNIT rays: the internal bisector's direction. A ray of no length judges nothing.
+      const v0 = at(d.v);
+      const a = at(d.a);
+      const b = at(d.b);
+      if (!v0 || !a || !b) return null;
+      const la = Math.hypot(a.x - v0.x, a.y - v0.y);
+      const lb = Math.hypot(b.x - v0.x, b.y - v0.y);
+      if (la < 1e-12 || lb < 1e-12) return null;
+      v = { x: (a.x - v0.x) / la + (b.x - v0.x) / lb, y: (a.y - v0.y) / la + (b.y - v0.y) / lb };
       break;
     }
     case 'curve': {

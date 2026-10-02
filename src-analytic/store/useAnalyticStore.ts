@@ -94,6 +94,12 @@ export type InputError =
   | { key: 'degenerate-role'; detail: string }
   /** A cevian named by its triangle whose apex is not a vertex of that triangle (#1165). */
   | { key: 'apex-not-a-vertex'; detail: string }
+  /** An angle bisector that does not start at its angle's vertex (#1284, ADR-AG-209). */
+  | { key: 'bisector-wrong-apex'; detail: string }
+  /** A cevian whose target the figure leaves open — the apex (or side) in several triangles (#1240, ADR-AG-209). */
+  | { key: 'ambiguous-cevian'; detail: string }
+  /** A cevian whose apex (or side) is in no triangle of the figure (#1240, ADR-AG-209). */
+  | { key: 'cevian-no-triangle'; detail: string }
   /** A crossing the student named that the figure already names — carrying WHO holds it (#1175). */
   | { key: 'crossing-already-named'; detail: string; holder: string }
   /** A crossing of a line with itself — «הישר AB עם הישר BA» names no point (#1255). */

@@ -53,6 +53,15 @@ const shapeOf = (lines: readonly string[], seed: number) => {
 };
 
 const TRIANGLE_HE = ['A(1,6)', 'B(-3,0)', 'C(5,0)'];
+/**
+ * ADR-AG-209 (#1620 S4): a sentence that NAMES its triangle also introduces it, as 2-D's does — «גובה מ-A במשולש
+ * ABC» on an empty canvas draws the triangle. So the triangle spelling is the side spelling PLUS the triangle's
+ * own fact, first; a triangle already drawn absorbs it. The parity below is stated that way, still as parity.
+ */
+const namesTriangle = (line: string): boolean => /במשולש|in triangle/.test(line);
+const triangleFacts = (): unknown[] => factsOf('משולש ABC').filter((f) => (f as { t: string }).t === 'polygon');
+const withItsTriangle = (added: string, reference: string): unknown[] =>
+  namesTriangle(added) ? [...triangleFacts(), ...factsOf(reference)] : factsOf(reference);
 const TRIANGLE_EN = ['A(1,6)', 'B(-3,0)', 'C(5,0)'];
 
 describe('ADR-AG-117 — the triangle names the side, and it means the same thing (#1165)', () => {
@@ -71,7 +80,7 @@ describe('ADR-AG-117 — the triangle names the side, and it means the same thin
   ];
 
   it.each(PAIRS)('%s — the same facts', (_what, added, reference) => {
-    expect(factsOf(added)).toEqual(factsOf(reference));
+    expect(factsOf(added)).toEqual(withItsTriangle(added, reference));
   });
 
   // Facts being equal makes the figures equal, but the figure is what the student is shown, and a
@@ -80,7 +89,7 @@ describe('ADR-AG-117 — the triangle names the side, and it means the same thin
   it.each(PAIRS)('%s — the same figure, seeds 0–3', (_what, added, reference) => {
     for (let seed = 0; seed <= 3; seed += 1) {
       expect(shapeOf([...TRIANGLE_HE, added], seed), `seed ${seed}`).toEqual(
-        shapeOf([...TRIANGLE_EN, reference], seed),
+        shapeOf([...TRIANGLE_EN, ...(namesTriangle(added) ? ['משולש ABC'] : []), reference], seed),
       );
     }
   });
@@ -91,8 +100,8 @@ describe('ADR-AG-117 — the triangle names the side, and it means the same thin
    * avoid — it would otherwise be read as an altitude to `BC`, which `B` is an endpoint of.
    */
   it('any vertex may be the apex — the ring is what is left over', () => {
-    expect(factsOf('BD גובה במשולש ABC')).toEqual(factsOf('BD גובה לצלע AC'));
-    expect(factsOf('CD תיכון במשולש ABC')).toEqual(factsOf('CD תיכון לצלע AB'));
+    expect(factsOf('BD גובה במשולש ABC')).toEqual(withItsTriangle('BD גובה במשולש ABC', 'BD גובה לצלע AC'));
+    expect(factsOf('CD תיכון במשולש ABC')).toEqual(withItsTriangle('CD תיכון במשולש ABC', 'CD תיכון לצלע AB'));
   });
 });
 

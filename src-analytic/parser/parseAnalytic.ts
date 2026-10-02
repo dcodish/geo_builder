@@ -18,6 +18,7 @@
  * Unmatched input returns `not-handled`, which is the seam where the LLM fallback escalates.
  */
 import type { DerivedRule } from '../engine/derived';
+import { cevianFacts, type CevianRole } from '../engine/cevian';
 import { isAngleRef, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS, directionSymbol, mentionsPlane, radiusSymbol } from '../engine/carriers';
@@ -113,6 +114,12 @@ export type ParseFailure =
    * determinate: remove the apex from the ring and the other two letters are the side.
    */
   | { code: 'apex-not-a-vertex'; detail: string }
+  /**
+   * An angle bisector that does not start at the vertex of the angle it bisects — «XD חוצה את הזווית BAC», or
+   * «CE חוצה זווית A במשולש ABC», which names the apex twice and disagreeing (#1284, ADR-AG-209). Its own code:
+   * `apex-not-a-vertex` is about a triangle's ring, and the ring may be fine.
+   */
+  | { code: 'bisector-wrong-apex'; detail: string }
   /**
    * A crossing the student asked to NAME that is a point the figure already names — «P נקודת החיתוך
    * של הישר AB עם הישר BC», where `AB` and `BC` meet at `B` (#1175).
@@ -3669,6 +3676,324 @@ const CEVIAN_EN = new RegExp(
   'i',
 );
 
+
+/*
+ * ---------------------------------------------------------------------------
+ * THE CEVIAN FAMILY, COMPLETED (#1284, #1222, #1240; ADR-AG-209)
+ * ---------------------------------------------------------------------------
+ *
+ * The rule above reads a cevian that names everything: apex, foot, and the side (or the triangle). The
+ * sentences below name LESS, and each absence is answered the way 2-D answers it (measured through
+ * `decideDeterministic2D`, ADR-AG-209's table) — never by a regex per phrasing, always by reaching the ONE
+ * lowering (`engine/cevian.ts`):
+ *
+ *  - the angle bisector as the third role («CE חוצה זווית C במשולש ABC», «CE חוצה זווית לצלע AB»);
+ *  - a bisector named by its ANGLE alone («AD חוצה את הזווית BAC», «האלכסון DB חוצה את הזווית ADC», «AM הוא
+ *    חוצה זווית CMD») — the `bisects` fact, which M1 lowers to a foot or to a ray as the figure decides;
+ *  - the meeting point of two bisectors («E חיתוך חוצי הזוויות BAC ו-BCA»);
+ *  - a named cevian with no target («AD גובה») and a cevian whose foot has no letter («תיכון מ-A במשולש ABC»,
+ *    «גובה מנקודה A», «תיכון לצלע BC») — the `cevian-of` fact and the tool-named foot (#1263's ruling);
+ *  - the noun-first orders («גובה המשולש לצלע AB הוא CD», «הגובה AD לצלע BC») — rewritten to the named form;
+ *  - plural cevians paired by «בהתאמה» («OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה», «EB ו-EC הם חוצי הזווית
+ *    ABC ו-BCD בהתאמה הנפגשים בנקודה E») — distributed into singular sentences.
+ */
+
+/** «חוצה זווית» · «חוצה את הזווית» · «חוצה-זווית» · «החוצה זווית» — the bisector's role, with no angle letters. */
+const BISECTOR_HE = `ה?חוצה(?:-|\\s+)(?:את\\s+)?ה?זו?וית`;
+/** The angle after the role: one vertex letter, or three with the vertex in the middle. Groups: g1, g2?, g3?. */
+const BIS_ANGLE = `[∠∢]?\\s*(${NAME})(?:(${NAME})(${NAME}))?`;
+/** The side (with «ל»/«אל» — a bare pair is not a target here) or the triangle. Groups: side u, side v, triangle run. */
+const ROLE_TARGET_HE = `(?:(?:ל|אל\\s+ה?)-?\\s*(?:ה?צלע\\s+)?(${NAME})(${NAME})|ב?ה?משולש\\s+(${NAME_RUN}))`;
+/** {@link ROLE_TARGET_HE} with no capture groups, for a rule that only carries the target over. */
+const ROLE_TARGET_HE_TEXT = `(?:(?:ל|אל\\s+ה?)-?\\s*(?:ה?צלע\\s+)?(?:${NAME}){2}|ב?ה?משולש\\s+${NAME_RUN})`;
+const ROLE_TARGET_EN = `(?:to\\s+(?:side\\s+)?(${NAME})(${NAME})|in\\s+triangle\\s+(${NAME_RUN}))`;
+
+/** «CE חוצה זווית C במשולש ABC» · «CE חוצה-זווית לצלע AB» — the bisector role with a target (#1284). */
+const BISECTOR_CEVIAN_HE = new RegExp(
+  `^${HE_GIVEN}(${NAME})(${NAME})${HE_IS}\\s*${BISECTOR_HE}(?:\\s+(${NAME}))?\\s+${ROLE_TARGET_HE}$`,
+);
+const BISECTOR_CEVIAN_EN = new RegExp(
+  `^(${NAME})(${NAME})\\s+is\\s+(?:the\\s+|an\\s+)?(?:angle\\s+)?bisector(?:\\s+of\\s+(?:the\\s+)?angle\\s+(${NAME}))?\\s+${ROLE_TARGET_EN}$`,
+  'i',
+);
+/** «AD חוצה את הזווית BAC» · «האלכסון DB חוצה את הזווית ADC» · «AM הוא חוצה זווית CMD» · «AD חוצה זווית A». */
+const BISECTS_HE = new RegExp(
+  `^${HE_GIVEN}(?:ה?(?:אלכסון|קטע|ישר|צלע)\\s+)?(${NAME})(${NAME})${HE_IS}\\s*${BISECTOR_HE}\\s+${BIS_ANGLE}$`,
+);
+const BISECTS_EN = new RegExp(
+  `^(?:the\\s+)?(?:(?:diagonal|segment|line|side)\\s+)?(${NAME})(${NAME})\\s+(?:bisects|is\\s+(?:the\\s+|an\\s+)?(?:angle\\s+)?bisector\\s+of)\\s+(?:the\\s+)?angle\\s+${BIS_ANGLE}$`,
+  'i',
+);
+/** «חוצה זווית ABC» · «חוצה הזווית B» · "the bisector of angle ABC" — the bisector drawn on its own (cat-2d-044). */
+const BISECTOR_ALONE_HE = new RegExp(`^${HE_GIVEN}${BISECTOR_HE}\\s+${BIS_ANGLE}$`);
+const BISECTOR_ALONE_EN = new RegExp(`^(?:the\\s+|an\\s+)?(?:angle\\s+)?bisector\\s+of\\s+(?:the\\s+)?angle\\s+${BIS_ANGLE}$`, 'i');
+/** The angles of a bisector LIST — «BAC ו-BCA», «A ו-C», «ABC, BCD ו-CDA». */
+const ANGLE_LIST = `((?:[∠∢]?\\s*(?:${NAME}){1,3})(?:\\s*,\\s*[∠∢]?\\s*(?:${NAME}){1,3})*\\s*,?\\s+ו-?\\s*[∠∢]?\\s*(?:${NAME}){1,3})`;
+/** «E חיתוך חוצי הזוויות BAC ו-BCA» · «E נקודת החיתוך של חוצי הזוויות A ו-C» · «E נקודת המפגש של חוצי …». */
+const BISECTORS_MEET_HE = new RegExp(
+  `^${HE_GIVEN}(?:ה?נקודה\\s+)?(${NAME})${HE_IS}\\s*(?:ה?נקודת\\s+)?ה?(?:חיתוך|מפגש)\\s+(?:של\\s+)?(?:שני\\s+)?ה?חוצי\\s+ה?זו?וי(?:ו)?ת\\s+${ANGLE_LIST}$`,
+);
+/** «חוצי הזוויות BAC ו-BCA נחתכים בנקודה E» — the same meeting point, verb-first. */
+const BISECTORS_MEET_VERB_HE = new RegExp(
+  `^${HE_GIVEN}ה?חוצי\\s+ה?זו?וי(?:ו)?ת\\s+${ANGLE_LIST}\\s+(?:נחתכים|נפגשים|נחתכות|נפגשות)\\s+ב(?:ה)?נקודה\\s+(${NAME})$`,
+);
+/** «E is the intersection of the bisectors of angles BAC and BCA». */
+const BISECTORS_MEET_EN = new RegExp(
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+is\\s+(?:the\\s+)?(?:intersection|meeting\\s+point)\\s+of\\s+the\\s+(?:angle\\s+)?bisectors\\s+of\\s+(?:the\\s+)?angles\\s+((?:${NAME}){1,3}(?:\\s*,\\s*(?:${NAME}){1,3})*,?\\s+and\\s+(?:${NAME}){1,3})$`,
+  'i',
+);
+
+/** The roles a median/altitude sentence may name. */
+const MA_ROLE_HE = '(תיכון|גובה)';
+const roleOf = (src: string): 'median' | 'altitude' => (/תיכון|median/i.test(src) ? 'median' : 'altitude');
+/** «מ-A» · «מנקודה A» · «מהקודקוד A» · «מן הנקודה A» · «היוצא מ-A». */
+const FROM_HE = `(?:ה?יוצא\\s+)?מ(?:ן\\s+|-\\s*)?(?:ה?(?:קודקוד|נקודה)\\s+)?`;
+/** «תיכון מ-A במשולש ABC» · «גובה מנקודה A לצלע BC» · «גובה מ-A» — the apex named, the foot not (#1222, #1240). */
+const FROM_APEX_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+${FROM_HE}(${NAME})(?:\\s+${ROLE_TARGET_HE})?$`);
+const FROM_APEX_EN = new RegExp(
+  `^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+from\\s+(?:(?:the\\s+)?(?:vertex|point)\\s+)?(${NAME})(?:\\s+${ROLE_TARGET_EN})?$`,
+  'i',
+);
+/** «תיכון לצלע BC» · «הגובה לצלע BC» — the side named, neither the apex nor the foot (#1240). */
+const TO_SIDE_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+(?:ל|אל\\s+ה?)-?\\s*(?:ה?צלע\\s+)?(${NAME})(${NAME})$`);
+const TO_SIDE_EN = new RegExp(`^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+to\\s+(?:the\\s+)?(?:side\\s+)?(${NAME})(${NAME})$`, 'i');
+/** «AD גובה» · «AD הוא התיכון» · "AD is the altitude" · "AD median" — the cevian named, its target not (#1240). */
+const NAMED_ONLY_HE = new RegExp(`^${HE_GIVEN}(${NAME})(${NAME})${HE_IS}\\s*ה?${MA_ROLE_HE}$`);
+const NAMED_ONLY_EN = new RegExp(`^(${NAME})(${NAME})\\s+(?:is\\s+(?:the\\s+|an?\\s+)?)?(median|altitude)$`, 'i');
+/** «גובה המשולש (ABC) לצלע AB הוא CD» · «התיכון לצלע BC הוא AD» — the noun first, the named cevian last. */
+const NOUN_FIRST_HE = new RegExp(
+  `^${HE_GIVEN}ה?${MA_ROLE_HE}(?:\\s+ה?משולש(?:\\s+(${NAME_RUN}))?)?\\s+((?:ל|אל\\s+ה?)-?\\s*(?:ה?צלע\\s+)?(?:${NAME}){2})\\s+(?:הוא|היא)\\s+(${NAME})(${NAME})$`,
+);
+/** «הגובה AD לצלע BC» · «התיכון AD במשולש ABC» — the definite noun, then the named cevian, then its target. */
+const NOUN_NAMED_HE = new RegExp(`^${HE_GIVEN}ה${MA_ROLE_HE}\\s+(${NAME})(${NAME})\\s+(${ROLE_TARGET_HE_TEXT})$`);
+/**
+ * «OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה» · «BE ו-CF הם גבהים במשולש ABC» · «EB ו-EC הם חוצי הזווית ABC ו-BCD
+ * בהתאמה הנפגשים בנקודה E» — a plural cevian. Groups: segment list, role noun, the rest.
+ */
+const SEG_LIST = `((?:${NAME}){2}(?:\\s*,\\s*(?:${NAME}){2})*\\s*,?\\s+ו-?\\s*(?:${NAME}){2})`;
+const PLURAL_CEVIAN_HE = new RegExp(
+  `^${HE_GIVEN}${SEG_LIST}\\s+(?:הם|הן)\\s+ה?(גבהים|תיכונים|חוצי\\s+ה?זו?וי(?:ו)?ת)\\s+(.+)$`,
+);
+/** "OD and BE are the altitudes to sides BC and OC respectively" · "BE and CF are altitudes in triangle ABC". */
+const SEG_LIST_EN = `((?:${NAME}){2}(?:\\s*,\\s*(?:${NAME}){2})*,?\\s+and\\s+(?:${NAME}){2})`;
+const PLURAL_CEVIAN_EN = new RegExp(`^${SEG_LIST_EN}\\s+are\\s+(?:the\\s+)?(altitudes|medians|(?:angle\\s+)?bisectors)\\s+(.+)$`, 'i');
+const MEET_TAIL_EN = new RegExp(`,?\\s+(?:which\\s+|that\\s+)?(?:meet|intersect)\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`, 'i');
+/** «… הנפגשים בנקודה E» — the plural's meeting tail. */
+const MEET_TAIL_HE = new RegExp(`\\s+(?:ה|ש)?(?:נפגשים|נחתכים|נפגשות|נחתכות)\\s+ב(?:ה)?נקודה\\s+(${NAME})$`);
+
+/** The letters of a one-or-three-letter angle as an {@link AngleName}; null for any other count. */
+function angleOfLetters(run: string): AngleName | 'repeated' | null {
+  const ls = run.replace(/[∠∢\s]/g, '').match(new RegExp(NAME, 'g')) ?? [];
+  if (ls.length === 1) return { v: ls[0] };
+  if (ls.length !== 3) return null;
+  if (new Set(ls).size !== 3) return 'repeated';
+  return { v: ls[1], a: ls[0], b: ls[2] };
+}
+
+/**
+ * The tool names a foot the student did not (#1263's ruling: a RESERVED name, said so in the row): the
+ * placeholder `derive.resolveMints` turns into `M₁` (a median's foot, 2-D's letter) or `H₁` (an altitude's —
+ * 2-D's `F` is the conic focus's letter in this tree, #1167), the seam a coordinate point's `P₁` already takes.
+ * The key is the sentence's own operands, so the same foot stated twice is one point.
+ */
+// The role is spelled in lower case in the placeholder: a capital there would read as a LETTER the line uses (the
+// rename's holder check), and the reserved letter is `derive`'s to choose.
+const footMint = (role: 'median' | 'altitude', key: string): Id => `${MINT_PREFIX}foot:${role}:${key}`;
+
+/** The side a cevian is drawn to, from the side it names or from its triangle; a refusal code when neither works. */
+function cevianSide(
+  apex: Id,
+  u0: string | undefined,
+  v0: string | undefined,
+  triRun: string | undefined,
+): { u: Id; v: Id; ring?: Id[] } | 'bad-arity' | 'apex-not-a-vertex' | 'repeated-vertex' {
+  if (u0 && v0) return u0 === v0 ? 'repeated-vertex' : { u: u0, v: v0 };
+  const ring = (triRun ?? '').match(new RegExp(NAME, 'g')) ?? [];
+  if (ring.length !== 3) return 'bad-arity';
+  if (new Set(ring).size !== 3) return 'repeated-vertex';
+  const others = ring.filter((p) => p !== apex);
+  if (others.length !== 2) return 'apex-not-a-vertex';
+  return { u: others[0], v: others[1], ring };
+}
+
+/**
+ * The facts of a cevian whose apex and side are known — the triangle, when the sentence named one, FIRST: «גובה
+ * מ-A במשולש ABC» introduces the triangle it names, as 2-D's does (ADR-AG-209), and a triangle already drawn
+ * absorbs it (`known`). Then the #1231 gate, then the one lowering.
+ */
+function cevianWithTarget(role: CevianRole, apex: Id, foot: Id, side: { u: Id; v: Id; ring?: Id[] }, line: string): ParseResult {
+  const { u, v, ring } = side;
+  if (apex === u || apex === v || apex === foot || foot === u || foot === v) return refuse('degenerate-role', line);
+  const tri = ring ? namedShapeFacts('משולש', ring, line) : [];
+  if (tri === 'bad-arity') return refuse('bad-arity', line);
+  return made([...tri, ...cevianFacts(role, apex, foot, u, v, line)]);
+}
+
+/** Parse each canonical sentence, re-attributed to the student's line; null when one is not a sentence at all. */
+function viaSentences(line: string, sentences: readonly string[], lead: Fact[] = []): RuleOutcome {
+  const facts: Fact[] = [...lead];
+  for (const s of sentences) {
+    const r = parseClause(s);
+    if (!r.ok) return r.code === 'not-handled' ? null : { ...r, detail: line };
+    facts.push(...r.facts);
+  }
+  return made(facts.map((f) => ({ ...f, src: line })));
+}
+
+function parseCevianFamily(line: string): RuleOutcome {
+  // ── the bisector as the third cevian role ──
+  const bc = BISECTOR_CEVIAN_HE.exec(line) ?? BISECTOR_CEVIAN_EN.exec(line);
+  if (bc) {
+    const [, apex, foot, stated, u0, v0, triRun] = bc;
+    // «CE חוצה זווית A במשולש ABC» states the apex twice, and the two disagree: a refusal, never a guess.
+    if (stated && stated !== apex) return refuse('bisector-wrong-apex', line);
+    const side = cevianSide(apex, u0, v0, triRun);
+    if (typeof side === 'string') return refuse(side, line);
+    return cevianWithTarget('bisector', apex, foot, side, line);
+  }
+
+  // ── a bisector named by its angle ──
+  const bs = BISECTS_HE.exec(line) ?? BISECTS_EN.exec(line);
+  if (bs) {
+    const [, x, y, g1, g2, g3] = bs;
+    if (x === y) return refuse('repeated-vertex', line);
+    const at = angleOfLetters(`${g1}${g2 ?? ''}${g3 ?? ''}`);
+    if (at === 'repeated') return refuse('repeated-vertex', line);
+    if (!at) return refuse('bad-operand', line);
+    // The segment runs FROM the angle's vertex — either end may be written first («AM הוא חוצה זווית CMD»).
+    if (at.v !== x && at.v !== y) return refuse('bisector-wrong-apex', line);
+    const p = at.v === x ? y : x;
+    if (isAngleRef(at) && (p === at.a || p === at.b)) return refuse('degenerate-role', line);
+    return made([{ t: 'bisects', at, p, src: line }]);
+  }
+
+  // ── the bisector on its own ──
+  const alone = BISECTOR_ALONE_HE.exec(line) ?? BISECTOR_ALONE_EN.exec(line);
+  if (alone) {
+    const [, g1, g2, g3] = alone;
+    const at = angleOfLetters(`${g1}${g2 ?? ''}${g3 ?? ''}`);
+    if (at === 'repeated') return refuse('repeated-vertex', line);
+    if (!at) return refuse('bad-operand', line);
+    return made([{ t: 'bisects', at, src: line }]);
+  }
+
+  // ── the meeting point of bisectors ──
+  const meet = BISECTORS_MEET_HE.exec(line);
+  const meetVerb = meet ? null : BISECTORS_MEET_VERB_HE.exec(line);
+  const meetEn = meet || meetVerb ? null : BISECTORS_MEET_EN.exec(line);
+  if (meet || meetVerb || meetEn) {
+    const [p, list] = meet ? [meet[1], meet[2]] : meetVerb ? [meetVerb[2], meetVerb[1]] : [meetEn![1], meetEn![2]];
+    const runs = list.split(/\s*,\s*|\s+ו-?\s*|\s+and\s+/i).map((r) => r.trim()).filter(Boolean);
+    // The meeting point is introduced FIRST, so each bisector reads it as a point on its ray, never as its foot.
+    const facts: Fact[] = [{ t: 'declare', id: p, src: line }];
+    for (const run of runs) {
+      const at = angleOfLetters(run);
+      if (at === 'repeated') return refuse('repeated-vertex', line);
+      if (!at) return refuse('bad-operand', line);
+      if (at.v === p || (isAngleRef(at) && (p === at.a || p === at.b))) return refuse('degenerate-role', line);
+      facts.push({ t: 'bisects', at, p, src: line });
+    }
+    return made(facts);
+  }
+
+  // ── the noun first: rewritten to the named form, which owns the lowering ──
+  const nf = NOUN_FIRST_HE.exec(line);
+  if (nf) {
+    const [, roleSrc, triRun, target, a, b] = nf;
+    return viaSentences(line, [`${a}${b} ${roleSrc} ${target}${triRun ? ` במשולש ${triRun}` : ''}`]);
+  }
+  const nn = NOUN_NAMED_HE.exec(line);
+  if (nn) {
+    const [, roleSrc, a, b, target] = nn;
+    return viaSentences(line, [`${a}${b} ${roleSrc} ${target}`]);
+  }
+
+  // ── the apex named, the foot not: the tool names the foot ──
+  const fa = FROM_APEX_HE.exec(line) ?? FROM_APEX_EN.exec(line);
+  if (fa) {
+    const [, roleSrc, apex, u0, v0, triRun] = fa;
+    const role = roleOf(roleSrc);
+    if (!u0 && !triRun) {
+      const foot = footMint(role, apex);
+      return made([
+        { t: 'declare', id: foot, src: line },
+        { t: 'cevian-of', role, apex, foot, src: line },
+      ]);
+    }
+    const side = cevianSide(apex, u0, v0, triRun);
+    if (typeof side === 'string') return refuse(side, line);
+    return cevianWithTarget(role, apex, footMint(role, `${apex}${[side.u, side.v].sort().join('')}`), side, line);
+  }
+  const ts = TO_SIDE_HE.exec(line) ?? TO_SIDE_EN.exec(line);
+  if (ts) {
+    const [, roleSrc, u, v] = ts;
+    if (u === v) return refuse('repeated-vertex', line);
+    const role = roleOf(roleSrc);
+    const foot = footMint(role, `-${[u, v].sort().join('')}`);
+    return made([
+      { t: 'declare', id: foot, src: line },
+      { t: 'cevian-of', role, side: [u, v], foot, src: line },
+    ]);
+  }
+
+  // ── the cevian named, its target not ──
+  const no = NAMED_ONLY_HE.exec(line) ?? NAMED_ONLY_EN.exec(line);
+  if (no) {
+    const [, apex, foot, roleSrc] = no;
+    if (apex === foot) return refuse('degenerate-role', line);
+    return made([{ t: 'cevian-of', role: roleOf(roleSrc), apex, foot, src: line }]);
+  }
+
+  // ── plural, distributed into the singular sentences above ──
+  const pl = PLURAL_CEVIAN_HE.exec(line);
+  const plEn = pl ? null : PLURAL_CEVIAN_EN.exec(line);
+  if (pl || plEn) {
+    const he = !!pl;
+    const [, segList, noun, rest0] = (pl ?? plEn)!;
+    const segs = segList.match(new RegExp(`${NAME}${NAME}`, 'g')) ?? [];
+    let rest = rest0.trim();
+    const tail = he ? MEET_TAIL_HE.exec(rest) : MEET_TAIL_EN.exec(rest);
+    if (tail) rest = rest.slice(0, tail.index).trim();
+    const respectivelyRe = he ? /\s+בהתאמה$/ : /,?\s+respectively$/i;
+    const respectively = respectivelyRe.test(rest);
+    rest = rest.replace(respectivelyRe, '');
+    const bisector = /^חוצי|bisectors/i.test(noun);
+    const median = /תיכונים|medians/i.test(noun);
+    // The singular sentence each language already reads, per segment and its target.
+    const sideSentence = (s: string, t: string): string =>
+      he
+        ? bisector ? `${s} חוצה את הזווית ${t}` : `${s} ${median ? 'תיכון' : 'גובה'} לצלע ${t}`
+        : bisector ? `${s} bisects angle ${t}` : `${s} is the ${median ? 'median' : 'altitude'} to side ${t}`;
+    const triSentence = (s: string, run: string): string =>
+      he
+        ? `${s} ${bisector ? 'חוצה זווית' : median ? 'תיכון' : 'גובה'} במשולש ${run}`
+        : `${s} is the ${bisector ? 'angle bisector' : median ? 'median' : 'altitude'} in triangle ${run}`;
+    let sentences: string[];
+    const tri = (he ? new RegExp(`^ב?ה?משולש\\s+(${NAME_RUN})$`) : new RegExp(`^in\\s+triangle\\s+(${NAME_RUN})$`, 'i')).exec(rest);
+    if (tri) {
+      sentences = segs.map((s) => triSentence(s, tri[1]));
+    } else {
+      // «לצלעות BC ו-OC» · «ABC ו-BCD» — one target per segment, in order, and only under «בהתאמה».
+      const targets = rest
+        .replace(he ? /^(?:ל|אל\s+ה?)-?\s*(?:ה?צלעות\s+)?/ : /^(?:to\s+(?:the\s+)?(?:sides\s+)?|of\s+(?:the\s+)?angles\s+)/i, '')
+        .split(he ? /\s*,\s*|\s+ו-?\s*/ : /\s*,\s*(?:and\s+)?|\s+and\s+/i)
+        .map((t) => t.trim())
+        .filter(Boolean);
+      if (targets.length !== segs.length || !respectively) return null;
+      sentences = segs.map((s, i) => sideSentence(s, targets[i]));
+    }
+    // A shared end of the bisectors is where they MEET («הנפגשים בנקודה E»): a point the sentence introduces
+    // before either bisector, so neither reads it as its foot on a side.
+    const meetAt = tail?.[1];
+    if (meetAt && !segs.every((s) => s.includes(meetAt!))) return refuse('bad-operand', line);
+    const letters = (s: string): string[] => s.match(new RegExp(NAME, 'g')) ?? [];
+    const shared = meetAt ?? (bisector ? letters(segs[0] ?? '').find((ch) => segs.every((s) => letters(s).includes(ch))) : undefined);
+    const lead: Fact[] = shared ? [{ t: 'declare', id: shared, src: line }] : [];
+    return viaSentences(line, sentences, lead);
+  }
+  return null;
+}
+
 /** `B נמצא על ציר ה-x` / `B על החלק החיובי של ציר x` — incidence, optionally with a side selector. */
 /**
  * `D על הצלע BC` · `נקודה D נמצאת על הקטע BC` · `B על הישר y=x` · `P נמצאת על הישר l1`.
@@ -4072,6 +4397,7 @@ function describeDirId(d: Direction): string {
   if (d.k === 'curve') return `curve-${d.id}`;
   if (d.k === 'free') return `free-${d.sym}`;
   if (d.k === 'radius') return `radius-${d.circle}-${d.at}`;
+  if (d.k === 'bisector') return `bisector-${d.a}${d.v}${d.b}`;
   return `pts-${d.a}${d.b}`;
 }
 
@@ -4324,6 +4650,9 @@ function parseConstraint(raw: string): RuleOutcome {
     return null;
   }
 
+  const family = parseCevianFamily(line);
+  if (family) return family;
+
   const cev = CEVIAN_HE.exec(line) ?? CEVIAN_EN.exec(line);
   if (cev) {
     const [, apex, foot, roleSrc, u0, v0, triRun] = cev;
@@ -4371,46 +4700,13 @@ function parseConstraint(raw: string): RuleOutcome {
      */
     if (apex === u || apex === v || apex === foot || foot === u || foot === v)
       return refuse('degenerate-role', line);
-    return made([
-      // The sentence NAMES the foot — «AD תיכון לצלע BC» is where `D` first appears — so it is
-      // declared here. Without this the segment below would refuse it as an unknown reference, which
-      // is right for a sentence that merely mentions a point and wrong for one that introduces it.
-      { t: 'declare', id: apex, src: line },
-      { t: 'declare', id: foot, src: line },
-      // The cevian's own segment, so «AD» is a thing on the canvas and not only a relation.
-      { t: 'segment', id: segmentId(apex, foot), a: apex, b: foot, src: line },
-      /**
-       * EVERY CONDITION THE ROLE MEANS, NOT ONLY THE ONE IT IS NAMED AFTER (#1232).
-       *
-       * Both cevians are a CONJUNCTION: the foot lies on the side, **and** the segment to it has the
-       * role's own property. The median's `midpoint` happens to carry both halves in one kind — a
-       * midpoint is on the side by construction — so its leg read correctly while stating only one
-       * constraint. The altitude's does not: `perpendicular` is a pure direction condition, two
-       * vectors whose dot product is driven to zero, and it says nothing about where `D` sits. Emitting
-       * it alone dropped the incidence half silently, and the tool drew a "height" floating off its own
-       * side with `faults: []` at every seed — a stated given vanishing, which is the honesty
-       * invariant this repo treats as cardinal.
-       *
-       * So the incidence is stated HERE, for both roles, and each role then adds what is left. It is
-       * `on-line-2pt` — the tree's one incidence residual, degenerate-safe at an endpoint — rather
-       * than a new compound kind, for three reasons: a refusal can then name WHICH half failed
-       * («D על BC» or «AD ⊥ BC») instead of a lump; a student who already stated «AD ⊥ BC» has that
-       * half recognised as known by `canonicalConstraint`; and a line lowering to several facts is
-       * this rule's existing shape ([ADR-AG-025](../../docs/06c-decisions-analytic.md#adr-ag-025)
-       * counts the median at four), not a new one.
-       *
-       * The foot is on the **LINE** `uv`, with no `between` selector: an obtuse triangle's altitude
-       * lands beyond an endpoint and is a perfectly honest figure. Bounding it to the segment would
-       * refuse a correct construction, which is the opposite failure and no better.
-       *
-       * For the median the incidence is implied by `midpoint`, so it is redundant rather than wrong —
-       * it is stated anyway so the conjunction lives in ONE place and neither leg can drift from it.
-       */
-      { t: 'constraint', k: { t: 'on-line-2pt', id: foot, a: u, b: v }, src: line },
-      median
-        ? { t: 'constraint', k: { t: 'midpoint', id: foot, a: u, b: v }, src: line }
-        : { t: 'constraint', k: { t: 'perpendicular', a: apex, b: foot, c: u, d: v }, src: line },
-    ]);
+    /*
+     * EVERY CONDITION THE ROLE MEANS, NOT ONLY THE ONE IT IS NAMED AFTER (#1232): the foot on the side's LINE,
+     * and then the role's own property — stated in ONE place for every spelling of every role
+     * (`engine/cevian.ts`, ADR-AG-209), which is where the #1232 reasoning now lives. A triangle the sentence
+     * names is introduced first, as 2-D introduces it (ADR-AG-209); one already drawn absorbs it.
+     */
+    return cevianWithTarget(median ? 'median' : 'altitude', apex, foot, { u, v, ...(triRun ? { ring: (triRun.match(new RegExp(NAME, 'g')) ?? []) } : {}) }, line);
   }
 
   /**

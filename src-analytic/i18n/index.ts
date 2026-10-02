@@ -281,13 +281,24 @@ const he = {
   // #1231 — names the STATEMENT and the reason, never internal state, and shows what a correct
   // sentence looks like: a median or an altitude runs from a vertex to the side facing it.
   errDegenerateRole:
-    'תיכון וגובה יוצאים מקודקוד אל הצלע שמולו, ובמשפט "{{detail}}" הקודקוד עצמו נמצא על הצלע הזאת ' +
+    'תיכון, גובה וחוצה זווית יוצאים מקודקוד אל הצלע שמולו, ובמשפט "{{detail}}" הקודקוד עצמו נמצא על הצלע הזאת ' +
     '(או שהוא גם הקודקוד וגם הרגל). אפשר לכתוב למשל "AD תיכון לצלע BC".',
   // #1165 — «XD תיכון במשולש ABC». The triangle spelling works by removing the apex from the ring,
   // so an apex outside it leaves three candidate sides and nothing to choose between them.
   errApexNotAVertex:
-    'תיכון או גובה יוצאים מקודקוד של המשולש, ובמשפט "{{detail}}" הקודקוד שנכתב אינו אחד מקודקודי ' +
+    'תיכון, גובה או חוצה זווית יוצאים מקודקוד של המשולש, ובמשפט "{{detail}}" הקודקוד שנכתב אינו אחד מקודקודי ' +
     'המשולש. אפשר לכתוב את הקודקוד שבמשולש, למשל "AD תיכון במשולש ABC", או לציין את הצלע במפורש.',
+  // #1284 (ADR-AG-209) — the bisector runs FROM the vertex of the angle it bisects.
+  errBisectorWrongApex:
+    'חוצה זווית יוצא מקודקוד הזווית שהוא חוצה, ובמשפט "{{detail}}" הקטע אינו יוצא מהקודקוד הזה. ' +
+    'כתבו קטע שמתחיל בקודקוד הזווית, למשל "AD חוצה את הזווית BAC".',
+  // #1240 (ADR-AG-209) — a cevian whose target the figure does not determine: ask, never guess.
+  errAmbiguousCevian:
+    'הקודקוד או הצלע במשפט "{{detail}}" שייכים ליותר ממשולש אחד בשרטוט, ולכן לא ברור לאיזו צלע הוא יורד. ' +
+    'אפשר לציין את הצלע או את המשולש, למשל "AD גובה לצלע BC" או "AD גובה במשולש ABC".',
+  errCevianNoTriangle:
+    'במשפט "{{detail}}" אין בשרטוט משולש שהקודקוד או הצלע שייכים לו, ולכן אין צלע שאליה הוא יורד. ' +
+    'אפשר להגדיר קודם את המשולש, או לכתוב את הצלע במפורש, למשל "AD גובה לצלע BC".',
   // #1175 — the refusal's job is to tell them WHICH point is already there. It names the holder and
   // the reason, so a student who mis-read their own figure learns the thing they got wrong.
   errCrossingAlreadyNamed:
@@ -627,13 +638,22 @@ const en: typeof he = {
   errRepeatedVertex:
     'The same letter appears more than once in "{{detail}}". Each vertex needs its own name.',
   errDegenerateRole:
-    'A median or an altitude runs from a vertex to the side OPPOSITE it, and in "{{detail}}" that ' +
+    'A median, an altitude or an angle bisector runs from a vertex to the side OPPOSITE it, and in "{{detail}}" that ' +
     'vertex lies on the side itself (or is its own foot). Write it as, for example, ' +
     '"AD is the median to side BC".',
   errApexNotAVertex:
-    'A median or an altitude starts at a VERTEX of the triangle, and in "{{detail}}" the point ' +
+    'A median, an altitude or an angle bisector starts at a VERTEX of the triangle, and in "{{detail}}" the point ' +
     'written is not one of that triangle’s vertices. Use a vertex of the triangle — for ' +
     'example "AD is the median in triangle ABC" — or name the side outright.',
+  errBisectorWrongApex:
+    'An angle bisector starts at the VERTEX of the angle it bisects, and the segment in "{{detail}}" does not. ' +
+    'Start the segment at the angle’s vertex — for example "AD bisects angle BAC".',
+  errAmbiguousCevian:
+    'The vertex or side in "{{detail}}" belongs to more than one triangle in your figure, so it is unclear which side it is drawn to. ' +
+    'Name the side or the triangle — for example "AD is the altitude to side BC" or "AD is the altitude in triangle ABC".',
+  errCevianNoTriangle:
+    'In "{{detail}}" the vertex or side belongs to no triangle in your figure, so there is no side to draw it to. ' +
+    'Define the triangle first, or name the side outright — for example "AD is the altitude to side BC".',
   errCrossingAlreadyNamed:
     'Those lines meet at {{holder}}, and that point already has a name. "{{detail}}" would give it a second one. If you meant a different point, check which two lines cross there.',
   errSelfCrossing:
