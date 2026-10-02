@@ -36,9 +36,19 @@ describe('PAR-1 — chord with a "= length" keeps the length AND the circle memb
     expect(onCircle(c)).toEqual(['A', 'B']);
   });
 
-  it('"chord AB = CD" (equal chords, bare labels) → both on circle + set-equal', () => {
+  // #1661 (ADR-563): the claim belongs to the pair the noun is ATTACHED to. "chord AB = CD" calls AB a chord
+  // and says nothing about CD; the word-presence pass this lock used to pin put C and D on the circle too —
+  // the same over-claim that put A and D on it in «המיתר BC מקביל ל-AD». Equal CHORDS are stated with the
+  // noun on both pairs, and then both are claimed.
+  it('"chord AB = CD" → AB on the circle + set-equal; CD (no noun) is not claimed', () => {
     const c = cmds('chord AB = CD');
     expect(c.some((x) => x.type === 'set-equal'), 'the equality is kept').toBe(true);
+    expect(onCircle(c)).toEqual(['A', 'B']);
+  });
+
+  it('"chord AB = chord CD" (the noun on both pairs) → all four on the circle', () => {
+    const c = cmds('chord AB = chord CD');
+    expect(c.some((x) => x.type === 'set-equal')).toBe(true);
     expect(onCircle(c)).toEqual(['A', 'B', 'C', 'D']);
   });
 

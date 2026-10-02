@@ -290,6 +290,15 @@ export async function decideFromParse(
   if (!r.ok && r.reason === 'role-side-unresolved') {
     return refuse('clarify', { source: 'parser', result: `role-side-unresolved:${r.role}` }, { key: 'input.roleSideUnresolved', params: { role: r.role } });
   }
+  // #1661 ([ADR-563](../../docs/06-decisions.md#adr-563)): a role noun («המיתר OB», «הרדיוס BC», «השוק AB»)
+  // whose claim cannot be stated on this figure. Refused naming the noun and the pair the student typed —
+  // never built as a bare segment with the claim dropped, never a paid guess at what the role meant.
+  if (!r.ok && r.reason === 'role-claim') {
+    return refuse(r.why === 'several-polygons' || r.why === 'leg-apex' ? 'clarify' : 'guided', { source: 'parser', result: `role-claim:${r.why}:${r.a}${r.b}` }, {
+      key: `input.roleClaim.${r.why}`,
+      params: { noun: r.noun, pair: `${r.a}${r.b}`, a: r.a, b: r.b, other: r.other ?? '', options: (r.options ?? []).join(', ') },
+    });
+  }
   // #777: a comparative with no COMPARAND («צלע AD גדולה פי 2» — twice WHAT?). The second operand is
   // simply absent, so the only way to build it is to invent one — a given the student never stated
   // (ADR-052), shown with a green ✓. Escalating is the same error one step removed: the LLM would have
