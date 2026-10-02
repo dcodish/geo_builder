@@ -157,6 +157,7 @@ export function errorText(error: InputError, t: Translate): string {
     // Ruling 2026-09-29 — «1» and «I» are one name; mixing the two notations is refused with a note.
     'numeral-notation': 'errNumeralNotation',
     'undistinguished-diagonal': 'errNoPrincipalDiagonal',
+    'not-a-diagonal': 'errNotADiagonal',
     'already-named': 'errAlreadyNamed',
     // #1154 — a rename understood and declined, each naming what the student wrote
     'rename-bad-name': 'errRenameBadName',

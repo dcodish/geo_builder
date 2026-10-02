@@ -967,4 +967,17 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'במלבן ABCD, הנקודה E נמצאת על הצלע DC',
     en: 'in rectangle ABCD, E is on side DC',
   },
+  /*
+   * --- DIAGONALS, EXTENSIONS, MIDSEGMENTS (#1620, ADR-AG-208) — 471 corpus sentences, each with 2-D's verdict ---
+   */
+  { category: 'points', family: 'F17', he: 'הנקודה E נמצאת על המשך הצלע BC', en: 'E is on the extension of side BC', needs: ['מרובע ABCD'] },
+  { category: 'points', family: 'F17', he: 'הנקודה E נמצאת על צלע BC כך ש-AE = AC', en: 'E is on side BC such that AE = AC', needs: ['משולש ABC'] },
+  { category: 'derived', family: 'F17', he: 'המשכי הצלעות AD ו-BC נפגשים בנקודה E', en: 'the extensions of sides AD and BC meet at E', needs: ['מרובע ABCD'] },
+  { category: 'derived', family: 'F17', he: 'המשך AC חותך את מעגל O בנקודה E', en: 'the extension of AC cuts circle O at E', needs: ['מעגל O', 'משולש ABC'] },
+  { category: 'derived', family: 'F17', he: 'האלכסונים AC ו-BD נפגשים בנקודה E', en: 'the diagonals AC and BD meet at E', needs: ['מרובע ABCD'] },
+  { category: 'derived', family: 'F17', he: 'E היא נקודת החיתוך של אלכסוני הדלתון', en: 'E is the intersection of the diagonals of the kite', needs: ['דלתון ABCD'] },
+  { category: 'lines', family: 'F17', he: 'האלכסון AC במרובע ABCD', en: 'diagonal AC of quadrilateral ABCD' },
+  { category: 'derived', family: 'F17', he: 'קטע האמצעים לצלע BC במשולש ABC', en: 'midsegment to BC in triangle ABC' },
+  { category: 'derived', family: 'F17', he: 'קטע האמצעים בטרפז ABCD', en: 'midsegment of trapezoid ABCD' },
+  { category: 'points', family: 'F17', he: 'שכל קודקודיו מונחים על הצירים', en: 'all the vertices of the trapezoid lie on the axes', needs: ['טרפז ABCD'] },
 ];

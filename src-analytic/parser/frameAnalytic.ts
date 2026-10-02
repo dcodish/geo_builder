@@ -500,6 +500,30 @@ export function elidedSubjectClauses(line: string): string[] | null {
  * sentence followed by parenthesised givens is the same two statements. Offered only when the whole line
  * is not itself a sentence (the caller tries it last), and taken only when every clause parses.
  */
+/**
+ * A SENTENCE AND ITS CONDITION (#1620, ADR-AG-208) — «הנקודה E נמצאת על צלע BC כך ש-AE = AC», «E על המשך BC כך
+ * ש-DE = DC», "E is on side BC such that AE = AC". «כך ש» joins two statements the grammar reads apart: where
+ * the point is, and what holds there. Both are givens, so the reading is taken only when BOTH parse — a
+ * condition the grammar cannot read refuses the whole line rather than vanish (the honesty invariant).
+ *
+ * …and the RELATIVE CLAUSE about the point a sentence just named — «אלכסוני הטרפז נפגשים בנקודה M, שנמצאת על
+ * ציר ה-y», "… at the point M, which lies on the y-axis": the clause is a sentence about that point, with the
+ * relative pronoun «ש» standing for its name.
+ *
+ * Offered after the whole line failed (like the comma split), so it never overrides a rule that owns it.
+ */
+export function conditionClauses(line: string): string[] | null {
+  const such = /^(.+?)\s*,?\s+כך\s+ש-?\s*(.+)$/.exec(line) ?? /^(.+?)\s*,?\s+such\s+that\s+(.+)$/i.exec(line);
+  if (such) return [such[1].trim(), such[2].trim()];
+  const rel = new RegExp(
+    `^(.*?(${NAME}))\\s*,?\\s+ש(?:ה)?((?:נמצא|מונח)(?:ת|ים|ות)?|היא|הוא)\\s+(.+)$`,
+  ).exec(line);
+  if (rel) return [rel[1].trim(), `${rel[2]} ${rel[3]} ${rel[4].trim()}`];
+  const relEn = new RegExp(`^(.*?(${NAME}))\\s*,?\\s+which\\s+((?:lies|is)\\s+.+)$`).exec(line);
+  if (relEn) return [relEn[1].trim(), `${relEn[2]} ${relEn[3].trim()}`];
+  return null;
+}
+
 export function parenClauses(line: string): string[] | null {
   const paren = trailingParen(line);
   if (!paren || !paren.head || paren.inner.length === 0) return null;

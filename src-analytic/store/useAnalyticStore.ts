@@ -139,6 +139,8 @@ export type InputError =
   | { key: 'out-of-domain'; detail: string; domain?: { min?: number; minOpen?: boolean; max?: number; maxOpen?: boolean; exclude?: number[] } }
   /** «האלכסון הראשי» where the shape distinguishes no principal diagonal (#1070). */
   | { key: 'undistinguished-diagonal'; detail: string }
+  /** «האלכסונים AB ו-CD» where the quadrilateral makes them sides (#1620, ADR-AG-208). */
+  | { key: 'not-a-diagonal'; detail: string }
   /**
    * A naming of something that already has a name (#1153) — carrying WHO holds it.
    *

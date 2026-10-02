@@ -42,6 +42,7 @@ import {
   isBareName,
   orthography,
   originClauses,
+  conditionClauses,
   parenClauses,
   partitions,
   pointClauses,
@@ -144,7 +145,9 @@ export type ParseFailure =
    * `forced` the noun the circle would force (both registry keys, `notCyclic`), so the refusal names both.
    * Never drawn as the forced shape: that would be a figure drawn green for givens that cannot hold.
    */
-  | { code: 'inscribed-contradicts-noun'; detail: string; shape: string; forced: string };
+  | { code: 'inscribed-contradicts-noun'; detail: string; shape: string; forced: string }
+  /** «האלכסון AB במרובע ABCD» — the pair is a SIDE of the ring the sentence names (#1620, ADR-AG-208). */
+  | { code: 'not-a-diagonal'; detail: string };
 
 export type ParseResult = { ok: true; facts: Fact[] } | ({ ok: false } & ParseFailure);
 
@@ -1126,7 +1129,7 @@ function centreOfCircle(line: string): RuleOutcome {
  * the sentence while the verb form resolved it from the figure: two spellings #1070 calls identical,
  * two mechanisms, and «M מפגש האלכסונים» went to the LLM.
  */
-const CONCURRENCY_HE = new RegExp(`^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מפגש\\s+(.+)$`);
+const CONCURRENCY_HE = new RegExp(`^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?(?:מפגש|ה?חיתוך\\s+(?:של\\s+)?)\\s*(.+)$`);
 const CONCURRENCY_EN = new RegExp(
   `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+(?:(?:intersection|meeting)(?:\\s+point)?\\s+of\\s+(?:the\\s+)?)?(.+)$`,
   'i',
@@ -1661,7 +1664,40 @@ function withLineNoun(s: string): string {
  * triangle the figure holds. `null` = not a concurrency sentence, including one that would drop a
  * stated name the tail does not account for (the leftover guard, ADR-024).
  */
+/**
+ * «האלכסונים AC ו-BD» · «האלכסון AC והאלכסון BD» · "the diagonals AC and BD" — the two diagonals NAMED by their
+ * letters (#1620, ADR-AG-208). Read before the role table: the plural noun alone would take it as «האלכסונים».
+ */
+const NAMED_DIAGONALS_HE = new RegExp(
+  `^\\s*(?:ה?אלכסונים|ה?אלכסון)\\s+(${NAME})(${NAME})\\s+ו-?\\s*(?:ה?אלכסון\\s+)?(${NAME})(${NAME})\\s*$`,
+);
+const NAMED_DIAGONALS_EN = new RegExp(
+  `^\\s*(?:the\\s+)?diagonals?\\s+(${NAME})(${NAME})\\s+and\\s+(?:(?:the\\s+)?diagonal\\s+)?(${NAME})(${NAME})\\s*$`,
+  'i',
+);
+
+/**
+ * THE MEET OF TWO NAMED DIAGONALS (#1620, ADR-AG-208; 2-D's verdict) — the two segments are drawn (a sentence that
+ * names them introduces their ends, as 2-D's does on an empty canvas) and the point is the `diagonals` rule's
+ * meet over the ring order they imply (AC, BD → A, B, C, D). Whether they ARE diagonals of a quadrilateral the
+ * figure holds is M1's question (`meet-of.named`).
+ */
+function namedDiagonalsMeet(id: Id, subject: string, line: string): RuleOutcome {
+  const m = NAMED_DIAGONALS_HE.exec(subject) ?? NAMED_DIAGONALS_EN.exec(subject);
+  if (!m) return null;
+  const [, p1, p2, q1, q2] = m;
+  const all = [p1, p2, q1, q2];
+  if (hasRepeat(all) || all.includes(id)) return refuse('repeated-vertex', line);
+  return made([
+    { t: 'segment', id: segmentId(p1, p2), a: p1, b: p2, src: line },
+    { t: 'segment', id: segmentId(q1, q2), a: q1, b: q2, src: line },
+    { t: 'meet-of', role: 'diagonals', arity: 4, id, named: [p1, q1, p2, q2], src: line },
+  ]);
+}
+
 function concurrencyOf(id: Id, subject: string, line: string): RuleOutcome {
+  const named = namedDiagonalsMeet(id, subject, line);
+  if (named) return named;
   let role: (typeof ROLES)[number] | undefined;
   let hit: RegExpExecArray | null = null;
   for (const r of ROLES) {
@@ -1679,8 +1715,13 @@ function concurrencyOf(id: Id, subject: string, line: string): RuleOutcome {
   const [, noun, run] = of;
   const stated = arityOf(noun);
   if (stated !== null && stated !== role.n) return refuse('bad-arity', line);
-  // No letters: the shape is whichever one the figure has, which only M1 can say.
-  if (!run) return made([{ t: 'meet-of', role: role.t, arity: role.n, id, src: line }]);
+  // No letters: the shape is whichever one the figure has, which only M1 can say — among the rings the NOUN names
+  // (#1620, ADR-AG-208): «אלכסוני הטרפז» is the trapezoid's, not any quadrilateral's.
+  if (!run) {
+    const key = noun ? (EN_SHAPE[normalizeShapeNoun(noun).toLowerCase()] ?? normalizeShapeNoun(noun)) : undefined;
+    const shaped = key !== undefined && shapeRow(key) ? { noun: key } : {};
+    return made([{ t: 'meet-of', role: role.t, arity: role.n, id, ...shaped, src: line }]);
+  }
   const v = splitNames(run);
   /**
    * Three ways this sentence can be wrong about its own vertices, and all three were falling
@@ -1704,6 +1745,10 @@ function concurrencyOf(id: Id, subject: string, line: string): RuleOutcome {
 }
 
 function parseDerived(line: string): RuleOutcome {
+  // A point on one or two EXTENSIONS (#1620, ADR-AG-208) — before the crossing rules, whose subject reader
+  // would take «המשך AC» for an operand and refuse it.
+  const extended = parseExtensionMeet(line) ?? parseExtensionCrossing(line);
+  if (extended) return extended;
   const crossing = parseIntersection(line);
   if (crossing) return crossing;
 
@@ -3505,7 +3550,142 @@ function namedShapeFacts(noun: string | undefined, ids: Id[], line: string): Fac
     ...row.givens(ids).map((k: Constraint) => ({ t: 'constraint' as const, k, src: line })),
   ];
 }
+/**
+ * «האלכסון AC» · «האלכסון AC במרובע ABCD» · "diagonal AC (of quadrilateral ABCD)" — a DIAGONAL DECLARED (#1620,
+ * ADR-AG-208): the segment it names, drawn (2-D draws «האלכסון AC» as the segment AC). With its quadrilateral
+ * named, the ring is declared too (a restatement is absorbed) and the pair must be a diagonal OF it — two
+ * vertices that are not adjacent; «האלכסון AB במרובע ABCD» names a side and is refused.
+ *
+ * This is the sentence stream S1 teaches «העבירו את האלכסון AC במרובע ABCD» onto (ADR-W-030).
+ */
+const DIAGONAL_DECL_HE = new RegExp(
+  `^${HE_GIVEN}ה?אלכסון\\s+(${NAME})(${NAME})(?:\\s+(?:ב|של\\s+)(?:ה)?([א-ת]+(?:[- ][א-ת]+){0,2})\\s+(${NAME_RUN}))?$`,
+);
+const DIAGONAL_DECL_EN = new RegExp(
+  `^(?:the\\s+)?diagonal\\s+(${NAME})(${NAME})(?:\\s+(?:of|in)\\s+(?:the\\s+)?(${ROLE_SHAPE_EN})\\s+(${NAME_RUN}))?$`,
+  'i',
+);
+
+function parseDiagonalDecl(line: string): RuleOutcome {
+  const m = DIAGONAL_DECL_HE.exec(line) ?? DIAGONAL_DECL_EN.exec(line);
+  if (!m) return null;
+  const [, a, b, noun, run] = m;
+  if (a === b) return refuse('repeated-vertex', line);
+  const segment: Fact = { t: 'segment', id: segmentId(a, b), a, b, src: line };
+  if (!run) return made([segment]);
+  const ring = splitNames(run);
+  if (hasRepeat(ring)) return refuse('repeated-vertex', line);
+  // The ring, as its own declaration sentence lowers it (one lowering of «מרובע ABCD», selectors included).
+  const key = noun ? (EN_SHAPE[normalizeShapeNoun(noun).toLowerCase()] ?? normalizeShapeNoun(noun)) : '';
+  if (!shapeRow(key)) return null; // not a shape noun — not this sentence
+  const declared = parseClause(`${key} ${ring.join('')}`);
+  if (!declared.ok) return declared;
+  const shape = declared.facts.map((f) => ({ ...f, src: line }));
+  const i = ring.indexOf(a);
+  const j = ring.indexOf(b);
+  const adjacent = (i - j + ring.length) % ring.length === 1 || (j - i + ring.length) % ring.length === 1;
+  if (i < 0 || j < 0 || adjacent) return refuse('not-a-diagonal', line);
+  return made([...shape, segment]);
+}
+
+/**
+ * «שכל קודקודיו מונחים על הצירים» (18/4) · «כל קודקודי הטרפז נמצאים על הצירים» · «כל הקודקודים של המרובע מונחים על
+ * הצירים» · "all its vertices lie on the axes" — EVERY VERTEX ON SOME AXIS (#1620 item 3, ADR-AG-208). The leading
+ * «ש» continues the sentence before it («המרובע ABCD הוא טרפז … שכל קודקודיו …»); «קודקודיו» is the ring that
+ * sentence named, so the ring is M1's contextual question, the noun narrowing it when the sentence carries one.
+ * Lowered to the choice over the assignments (`vertices-on-axes`) — never a frame, and never one assignment.
+ */
+const VERTEX_HE = 'קו?דקוד';
+const VERTICES_ON_AXES_HE = new RegExp(
+  `^(?:ש|ו)?(?:כל\\s+)?(?:ה?${VERTEX_HE}י(?:ו|ה|הם|הן)|${VERTEX_HE}י\\s+ה?([א-ת]+(?:[- ][א-ת]+){0,2}?)|ה?${VERTEX_HE}ים(?:\\s+של\\s+ה?([א-ת]+(?:[- ][א-ת]+){0,2}?))?)` +
+    `\\s+(?:(?:נמצאים|מונחים|נמצאות|מונחות)\\s+)?על\\s+ה?צירים$`,
+);
+const VERTICES_ON_AXES_EN = new RegExp(
+  `^(?:and\\s+)?(?:all\\s+)?(?:(?:of\\s+)?its\\s+vertices|(?:of\\s+)?the\\s+vertices(?:\\s+of\\s+the\\s+(${ROLE_SHAPE_EN}))?)\\s+(?:lie|are)\\s+on\\s+the\\s+(?:coordinate\\s+)?axes$`,
+  'i',
+);
+
+function parseVerticesOnAxes(line: string): RuleOutcome {
+  const m = VERTICES_ON_AXES_HE.exec(line) ?? VERTICES_ON_AXES_EN.exec(line);
+  if (!m) return null;
+  const raw = m[1] ?? m[2];
+  if (raw === undefined) return made([{ t: 'vertices-on-axes', src: line }]);
+  const noun = EN_SHAPE[normalizeShapeNoun(raw).toLowerCase()] ?? normalizeShapeNoun(raw);
+  // A word that is not a shape noun is not this sentence.
+  if (!shapeRow(noun)) return null;
+  return made([{ t: 'vertices-on-axes', noun, src: line }]);
+}
+
+/**
+ * THE MIDSEGMENT (#1620, ADR-AG-208; 2-D's verdict, ADR-199/ADR-222) — «קטע האמצעים לצלע BC במשולש ABC» ·
+ * «קטע האמצעים המקביל לצלע BC במשולש ABC» · «MN קטע אמצעים לצלע BC במשולש ABC» · «קטע האמצעים בטרפז ABCD» ·
+ * "midsegment to BC in triangle ABC" · "midsegment of trapezoid ABCD".
+ *
+ * Lowered to what it IS — two `midpoint` derivations (`derived.ts`, 0-DOF closed forms) and the segment joining
+ * them — so it adds no engine concept, and the parallelism the theorem gives is the figure's, never a second
+ * statement. A triangle's midsegment to BC joins the midpoints of the two sides at the apex; a trapezoid's joins
+ * the midpoints of its legs, BC and DA (the pair its noun assumes parallel is AB ∥ DC). The midpoints are the
+ * letters the student wrote, else 2-D's M and N (`FRESH_PREFIX`, resolved by `derive` against the letters in use).
+ * The ring is declared by its own sentence («משולש ABC»), absorbed when the figure already has it.
+ */
+const MIDSEG_HE = '(?:ה?קטע\\s+ה?אמצעים)';
+const MIDSEG_TRI_HE = new RegExp(
+  `^${HE_GIVEN}(?:(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?)?${MIDSEG_HE}(?:\\s+(${NAME})(${NAME}))?\\s+(?:ה?מקביל\\s+)?ל(?:-|ה)?(?:צלע\\s+)?(${NAME})(${NAME})\\s+ב(?:ה)?משולש\\s+(${NAME})(${NAME})(${NAME})$`,
+);
+const MIDSEG_TRI_EN = new RegExp(
+  `^(?:(${NAME})(${NAME})\\s+is\\s+)?(?:the\\s+)?mid-?segment(?:\\s+(${NAME})(${NAME}))?\\s+(?:parallel\\s+)?to\\s+(?:side\\s+)?(${NAME})(${NAME})\\s+(?:in|of)\\s+(?:the\\s+)?triangle\\s+(${NAME})(${NAME})(${NAME})$`,
+  'i',
+);
+const MIDSEG_TRAP_HE = new RegExp(`^${HE_GIVEN}(?:(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?)?${MIDSEG_HE}(?:\\s+(${NAME})(${NAME}))?\\s+ב(?:ה)?טרפז\\s+(${NAME})(${NAME})(${NAME})(${NAME})$`);
+const MIDSEG_TRAP_EN = new RegExp(
+  `^(?:(${NAME})(${NAME})\\s+is\\s+)?(?:the\\s+)?(?:mid-?segment|median)(?:\\s+(${NAME})(${NAME}))?\\s+(?:of|in)\\s+(?:the\\s+)?trapezoid\\s+(${NAME})(${NAME})(${NAME})(${NAME})$`,
+  'i',
+);
+
+function parseMidsegment(line: string): RuleOutcome {
+  const tri = MIDSEG_TRI_HE.exec(line) ?? MIDSEG_TRI_EN.exec(line);
+  const trap = tri ? null : (MIDSEG_TRAP_HE.exec(line) ?? MIDSEG_TRAP_EN.exec(line));
+  const m = tri ?? trap;
+  if (!m) return null;
+  const given = m[1] ? [m[1], m[2]] : m[3] ? [m[3], m[4]] : null;
+  let ring: Id[];
+  let sides: [[Id, Id], [Id, Id]];
+  let noun: string;
+  if (tri) {
+    const base = [m[5], m[6]];
+    ring = [m[7], m[8], m[9]];
+    if (hasRepeat(ring) || base[0] === base[1]) return refuse('repeated-vertex', line);
+    if (!base.every((x) => ring.includes(x))) return refuse('bad-operand', line); // the base must be a side of the triangle
+    const apex = ring.find((x) => !base.includes(x))!;
+    sides = [[apex, base[0]], [apex, base[1]]];
+    noun = 'משולש';
+  } else {
+    ring = [m[5], m[6], m[7], m[8]];
+    if (hasRepeat(ring)) return refuse('repeated-vertex', line);
+    sides = [[ring[1], ring[2]], [ring[3], ring[0]]];
+    noun = 'טרפז';
+  }
+  if (given && (given[0] === given[1] || given.some((x) => ring.includes(x)))) return refuse('repeated-vertex', line);
+  const declared = parseClause(`${noun} ${ring.join('')}`);
+  if (!declared.ok) return declared;
+  const key = ([a, b]: [Id, Id]) => `mid:${[a, b].sort().join(',')}`;
+  const m1 = given ? given[0] : `${FRESH_PREFIX}MNPQ|${key(sides[0])}`;
+  const m2 = given ? given[1] : `${FRESH_PREFIX}NPQS|${key(sides[1])}`;
+  return made([
+    ...declared.facts.map((f) => ({ ...f, src: line })),
+    { t: 'derived', id: m1, rule: { t: 'midpoint', a: sides[0][0], b: sides[0][1] }, src: line },
+    { t: 'derived', id: m2, rule: { t: 'midpoint', a: sides[1][0], b: sides[1][1] }, src: line },
+    { t: 'segment', id: segmentId(m1, m2), a: m1, b: m2, src: line },
+  ]);
+}
+
 function parseShape(line: string): RuleOutcome {
+  const midsegment = parseMidsegment(line);
+  if (midsegment) return midsegment;
+  const onAxes = parseVerticesOnAxes(line);
+  if (onAxes) return onAxes;
+  const diagonal = parseDiagonalDecl(line);
+  if (diagonal) return diagonal;
   /*
    * A PIECE NAMED BY ITS ROLE — «השוק BC», «היתר AC», «הקוטר BC», «הרדיוס MB», «המשיק BC» (#1651, ADR-AG-200): the
    * piece, by the noun's extent, introduced as «הקטע BC» / «הישר BC» introduce theirs, then the role's claim. A
@@ -3691,6 +3871,169 @@ const ON_OBJECT_EN = new RegExp(
   `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+)?(side|segment|line|circle|parabola|ellipse)?\\s*(.+)$`,
   'i',
 );
+
+// ---------------------------------------------------------------------------
+// EXTENSIONS — the part of a side's line past its end (#1620, ADR-AG-208)
+// ---------------------------------------------------------------------------
+
+/**
+ * The noun in front of an extended pair: a bounded straight («הצלע», «הקטע», a role noun such as «השוק») or
+ * none. A LINE has no extension — «המשך הישר AB» is not this sentence.
+ */
+const EXT_NOUN_HE = '(?:ה?(?:צלע|קטע|שוק|בסיס|אלכסון|יתר|קוטר|מיתר|רדיוס)\\s+)?';
+const EXT_NOUN_EN = '(?:(?:the\\s+)?(?:side|segment|leg|base|diagonal|hypotenuse|diameter|chord|radius)\\s+)?';
+/** «המשך» / «ההמשך» / «המשכו של» — the extension noun, with the optional «של» before its pair. */
+const EXT_HE = '(?:ה)?המשך(?:\\s+של)?';
+
+/**
+ * «E על המשך הצלע BC» · «הנקודה A נמצאת על המשך ME» · «E על המשך BC מעבר ל-C» · "E is on the extension of
+ * side BC (beyond C)".
+ */
+const EXTENSION_HE = new RegExp(
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+|מונח(?:ת)?\\s+)?על\\s+${EXT_HE}\\s+(${EXT_NOUN_HE}(${NAME})(${NAME}))` +
+    `(?:\\s*,?\\s*מעבר\\s+ל(?:-|ה)?\\s*(?:נקודה\\s+|קו?דקוד\\s+)?(${NAME}))?$`,
+);
+const EXTENSION_EN = new RegExp(
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+the\\s+extension\\s+of\\s+(${EXT_NOUN_EN}(${NAME})(${NAME}))` +
+    `(?:\\s*,?\\s*(?:beyond|past)\\s+(?:the\\s+)?(?:point\\s+|vertex\\s+)?(${NAME}))?$`,
+  'i',
+);
+
+/**
+ * THE FACTS OF ONE EXTENSION — `id` on the line through the pair, PAST its far end (#1620, ADR-AG-208).
+ *
+ * The 2-D reading (ADR-054), which the analytic builder now gives too: «המשך BC» runs past C, the second
+ * letter, and «… מעבר ל-B» names the end it runs past. Lowered as #1073 lowered «על הצלע»: the collinearity
+ * is the constraint (one DOF consumed) and WHICH part of the line is a selector (`beyond`, none consumed) —
+ * so the point keeps one degree of freedom: how far past the end is unstated (ADR-052).
+ *
+ * What is drawn is 2-D's: the side itself (a sentence about «המשך AD» on an empty canvas introduces A and D,
+ * as 2-D's does) and the extension piece from the end to the point. The operand goes through `incidenceOn`,
+ * the one operand resolver, so a role noun («המשך השוק AD») states its claim exactly as «על השוק AD» does.
+ *
+ * `past` — the end the student named in «מעבר ל-X»: it must be one of the pair, and it flips the direction
+ * when it is the first. `null` = the sentence named no such end, or one the pair does not have.
+ */
+function extensionFacts(id: Id, operand: string, past: Id | undefined, src: string): Fact[] | null {
+  const claims: ClaimSink = { out: [], src };
+  const k = incidenceOn(operand, id, claims);
+  if (!k || k.t !== 'on-line-2pt') return null;
+  if (k.a === k.b || id === k.a || id === k.b) return null;
+  if (past !== undefined && past !== k.a && past !== k.b) return null;
+  const [from, end] = past === k.a ? [k.b, k.a] : [k.a, k.b];
+  return [
+    { t: 'segment', id: segmentId(k.a, k.b), a: k.a, b: k.b, src },
+    { t: 'declare', id, src },
+    { t: 'constraint', k: { t: 'on-line-2pt', id, a: k.a, b: k.b }, src },
+    { t: 'selector', sel: { kind: 'beyond', id, a: from, b: end }, src },
+    { t: 'segment', id: segmentId(end, id), a: end, b: id, ref: true, src },
+    ...claims.out,
+  ];
+}
+
+/** «E על המשך הצלע BC» — one point on one extension. */
+function parseExtension(line: string): RuleOutcome {
+  const m = EXTENSION_HE.exec(line) ?? EXTENSION_EN.exec(line);
+  if (!m) return null;
+  const [, id, operand, , , past] = m;
+  const facts = extensionFacts(id, trim(operand), past, line);
+  return facts ? made(facts) : refuse('bad-operand', line);
+}
+
+/**
+ * «המשכי הצלעות AD ו-BC נפגשים בנקודה E» · «המשך הצלע AD והמשך הצלע BC נפגשים בנקודה E» · "the extensions of
+ * AD and BC meet at E" — ONE point on TWO extensions (#1620, ADR-AG-208; 2-D's `dir1`/`dir2` meet, ADR-054).
+ *
+ * Two extensions of the same point, each lowered by `extensionFacts`: the two collinearities pin the point
+ * (it is the crossing of the two lines), and the two `beyond` selectors say the crossing is past D and past
+ * C — a statement about the QUADRILATERAL, which a configuration whose sides meet the other way does not
+ * satisfy. A pair of parallel sides has no crossing, and the solve reports it on this line.
+ */
+const EXT_MEET_VERB_HE = '(?:נפגשים|נחתכים|מצטלבים|נפגשות|נחתכות|מצטלבות)';
+const EXT_MEET_HE = [
+  new RegExp(
+    `^${HE_GIVEN}(?:ה)?המשכי\\s+(?:ה?(צלעות|קטעים|שוקיים|שוקי\\s+ה[א-ת]+)\\s+)?((?:${NAME}){2})\\s+ו-?\\s*((?:${NAME}){2})\\s+${EXT_MEET_VERB_HE}\\s+ב-?\\s*(?:ה?נקוד(?:ה|ת))?\\s*(${NAME})$`,
+  ),
+  new RegExp(
+    `^${HE_GIVEN}${EXT_HE}\\s+(${EXT_NOUN_HE}(?:${NAME}){2})\\s+ו-?\\s*${EXT_HE}\\s+(${EXT_NOUN_HE}(?:${NAME}){2})\\s+${EXT_MEET_VERB_HE}\\s+ב-?\\s*(?:ה?נקוד(?:ה|ת))?\\s*(${NAME})$`,
+  ),
+];
+const EXT_MEET_EN = new RegExp(
+  `^(?:the\\s+)?extensions\\s+of\\s+(?:the\\s+)?(?:(sides|segments|legs)\\s+)?((?:${NAME}){2})\\s+and\\s+((?:${NAME}){2})\\s+(?:meet|intersect|cross)\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`,
+  'i',
+);
+/** The plural noun of «המשכי ה<noun> AD ו-BC», as the singular each pair takes. */
+const singularSide = (plural: string | undefined): string => {
+  if (!plural) return '';
+  if (/^שוק/.test(plural) || /^legs$/i.test(plural)) return 'השוק ';
+  return /^(?:קטעים|segments)$/i.test(plural) ? 'הקטע ' : 'הצלע ';
+};
+
+function parseExtensionMeet(line: string): RuleOutcome {
+  let pair: [string, string] | null = null;
+  let id: Id | null = null;
+  const plural = EXT_MEET_HE[0].exec(line) ?? EXT_MEET_EN.exec(line);
+  if (plural) {
+    const noun = singularSide(plural[1]);
+    pair = [`${noun}${plural[2]}`, `${noun}${plural[3]}`];
+    id = plural[4];
+  } else {
+    const each = EXT_MEET_HE[1].exec(line);
+    if (each) {
+      pair = [trim(each[1]), trim(each[2])];
+      id = each[3];
+    }
+  }
+  if (!pair || !id) return null;
+  const first = extensionFacts(id, pair[0], undefined, line);
+  const second = extensionFacts(id, pair[1], undefined, line);
+  if (!first || !second) return refuse('bad-operand', line);
+  return made([...first, ...second.filter((f) => f.t !== 'declare')]);
+}
+
+/**
+ * «המשך AC חותך את מעגל O בנקודה E» · «המשך הצלע AD חותך את BC בנקודה E» — A CROSSING ON AN EXTENSION
+ * (#1620, ADR-AG-208; 2-D's `extend-onto-circle`, ADR-054). The crossing sentence without «המשך» is read by
+ * the crossing rules, which own every operand; the extension only says WHICH crossing — the one past the
+ * pair's far end — so it is that sentence's facts, with the pair's incidence on the whole LINE (a bounded
+ * crossing would forbid the very root the sentence names) and the `beyond` selector beside it.
+ */
+const EXT_CROSS_HE = new RegExp(
+  `^${HE_GIVEN}${EXT_HE}\\s+(?:ה?(?:צלע|קטע)\\s+)?(${NAME})(${NAME})\\s+((?:חות(?:ך|כת)|פוגש(?:ת)?)\\s.+)$`,
+);
+const EXT_CROSS_EN = new RegExp(
+  `^(?:the\\s+)?extension\\s+of\\s+(?:the\\s+)?(?:(?:side|segment)\\s+)?(${NAME})(${NAME})\\s+((?:cuts|intersects|meets|crosses)\\s.+)$`,
+  'i',
+);
+
+function parseExtensionCrossing(line: string): RuleOutcome {
+  const m = EXT_CROSS_HE.exec(line) ?? EXT_CROSS_EN.exec(line);
+  if (!m) return null;
+  const [, a, b, rest] = m;
+  if (a === b) return refuse('repeated-vertex', line);
+  const r = parseClause(`${a}${b} ${rest}`);
+  if (!r.ok) return r;
+  // The crossing point: the one this sentence places on the pair's line.
+  const on = r.facts.find(
+    (f): f is Fact & { t: 'constraint'; k: Extract<Constraint, { t: 'on-line-2pt' }> } =>
+      f.t === 'constraint' && f.k.t === 'on-line-2pt' && ((f.k.a === a && f.k.b === b) || (f.k.a === b && f.k.b === a)),
+  );
+  if (!on) return null;
+  const id = on.k.id;
+  const facts: Fact[] = r.facts
+    .filter((f) => !(f.t === 'segment' && [f.a, f.b].includes(id) && [f.a, f.b].includes(a)))
+    .map((f): Fact => {
+      if (f !== on) return { ...f, src: line };
+      const { bounded: _b, crossing: _c, ...k } = on.k;
+      return { t: 'constraint', k, src: line };
+    });
+  return made([
+    { t: 'segment', id: segmentId(a, b), a, b, src: line },
+    ...facts,
+    { t: 'selector', sel: { kind: 'beyond', id, a, b }, src: line },
+    { t: 'segment', id: segmentId(b, id), a: b, b: id, ref: true, src: line },
+  ]);
+}
 
 /**
  * A RIGHT ANGLE, named four ways (#1049).
@@ -4433,6 +4776,10 @@ function parseConstraint(raw: string): RuleOutcome {
    * resolver the relations use ([ADR-AG-024](../../docs/06c-decisions-analytic.md#adr-ag-024)), so
    * «הצלע AB» cannot come to mean one thing here and another there.
    */
+  // «E על המשך הצלע BC» — the other part of the side's line (#1620, ADR-AG-208), before the side rule reads «המשך».
+  const extension = parseExtension(line);
+  if (extension) return extension;
+
   const on = ON_OBJECT_HE.exec(line) ?? ON_OBJECT_EN.exec(line);
   if (on) {
     const [, id, noun, operandRaw] = on;
@@ -4859,6 +5206,10 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
     const r = attempt(reading);
     if (r) return { result: r, framed: true };
   }
+  // A sentence and its «כך ש» condition, or a relative clause about the point it named (#1620, ADR-AG-208).
+  const condition = conditionClauses(s);
+  const withCondition = condition && attempt(condition);
+  if (withCondition) return { result: withCondition, framed: true };
   // A sentence with its givens in parentheses at the end (#1619 B2) — last, like the comma split, so it can
   // never override a rule that owns the whole line.
   const paren = parenClauses(s);
@@ -5320,6 +5671,12 @@ const COORD_ONLY = new RegExp(`^${COORD_PAIR}$`);
  * The key is the coordinates' own text, so the same point stated twice is one point.
  */
 export const MINT_PREFIX = '@mint:';
+/**
+ * THE PLACEHOLDER for a point a sentence introduces with no letter (#1620, ADR-AG-208) — the midsegment's two
+ * midpoints. `@fresh:<preferred letters>|<what the point is>`, resolved over the whole list by `derive`
+ * (`resolveFresh`), as `MINT_PREFIX` is: only the list knows which letters are taken.
+ */
+export const FRESH_PREFIX = '@fresh:';
 /** A name no student writes and no mint takes — the stand-in while a canonical sentence is parsed. */
 const MINT_SENTINEL = 'Z₀';
 

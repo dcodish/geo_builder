@@ -228,6 +228,18 @@ const SIGN_STREAM = 100003;
  */
 const SATISFIED_EPS = 1e-6;
 
+/**
+ * Where `p` sits along `a → b`, as the projection parameter: 0 at `a`, 1 at `b`, past 1 beyond `b` (#1620).
+ * A degenerate base (the two ends coincide) answers NaN, which no range test accepts.
+ */
+function beyondParam(a: Pt, b: Pt, p: Pt): number {
+  const ux = b.x - a.x;
+  const uy = b.y - a.y;
+  const nn = ux * ux + uy * uy;
+  if (nn < 1e-24) return Number.NaN;
+  return ((p.x - a.x) * ux + (p.y - a.y) * uy) / nn;
+}
+
 function jitter(seed: number, salt: number): number {
   const x = Math.sin(seed * 127.1 + salt * 311.7) * 43758.5453;
   return x - Math.floor(x);
@@ -883,10 +895,16 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       if (rhs === null) return true; // an operand that is not placed yet judges nothing, as above
       return cmp.greater ? lhs > rhs : lhs < rhs;
     }
-    if (s.kind !== 'between') return true;
+    if (s.kind !== 'between' && s.kind !== 'beyond') return true;
     const a = at.get(s.a);
     const b = at.get(s.b);
     if (!a || !b) return true;
+    /**
+     * BEYOND `b` (#1620, ADR-AG-208) — the same projection parameter, the other part of the line: past the
+     * end, and visibly so (a point AT `b` is on the side, not on its extension). Collinearity is the
+     * constraint's job here too.
+     */
+    if (s.kind === 'beyond') return beyondParam(a, b, p) > 1 && Math.hypot(p.x - b.x, p.y - b.y) >= apart;
     /**
      * BETWEEN, as the projection parameter along `ab` (#1073).
      *
@@ -1463,6 +1481,34 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
     const want = v + (sel.greater ? mag : -mag);
     seeded.set(sel.id, sel.axis === 'x' ? { x: want, y: at0.y } : { x: at0.x, y: want });
   }
+  /**
+   * AN EXTENSION SEEDS ITS POINT PAST THE END (#1620, ADR-AG-208) — the #1071 lesson for `beyond`.
+   *
+   * «E על המשך הצלע BC» leaves E one degree of freedom on the line, and the sampler knows nothing of which
+   * part of it: a free E starts wherever its letter hashes to, and the descent projects it onto the line at
+   * the nearest point — inside the side about half the time. So the point STARTS past `b`: at its own
+   * sample's position along the line when that is already beyond, else at a seed-varied distance (a fraction
+   * of the base, so the start states no magnitude — ADR-052 — and «הציגו תצורה אחרת» still moves it). A
+   * start, never a verdict: the solve may move it and the judge keeps the last word. Two extensions on one
+   * point (the meet of two extended sides) are a crossing the solve finds; the first one seeds it.
+   */
+  if (c.selectors.some((s) => s.kind === 'beyond')) {
+    const pos = place(c, env, seeded);
+    const done = new Set<Id>();
+    for (const sel of c.selectors) {
+      if (sel.kind !== 'beyond' || !seeded.has(sel.id) || done.has(sel.id)) continue;
+      const pa = pos.get(sel.a);
+      const pb = pos.get(sel.b);
+      const own = seeded.get(sel.id)!;
+      if (!pa || !pb) continue;
+      const t = beyondParam(pa, pb, own);
+      if (!Number.isFinite(t)) continue;
+      const u = t > 1.05 ? t : 1.2 + 0.8 * jitter(seed, 0xe7);
+      seeded.set(sel.id, { x: pa.x + u * (pb.x - pa.x), y: pa.y + u * (pb.y - pa.y) });
+      done.add(sel.id);
+    }
+  }
+
   /**
    * AN ORDINAL SEEDS THE ROOT IT NAMES (#1268, ADR-AG-157) — the #1071 lesson for a branch.
    *
@@ -2721,6 +2767,7 @@ export function holdsInEveryConfiguration(c: Construction, ks: readonly Constrai
   pool.fill();
   const holds = (k: Constraint, f: Figure): boolean => {
     if (k.t === 'choice') return k.options.some((o) => holds(o, f));
+    if (k.t === 'all') return k.of.every((o) => holds(o, f));
     const pos = new Map<Id, Pt>(f.points.map((p) => [p.id, { x: p.x, y: p.y }]));
     const at = (id: Id): Pt | null => pos.get(id) ?? null;
     const r = residual(k, at, f.env, curveAtOf(c, f.env, at), lineAtOf(c, f.env, at));

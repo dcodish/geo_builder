@@ -219,6 +219,8 @@ const he = {
   'locus.circle.2': 'שני מעגלים',
   'locus.parabola.2': 'שתי פרבולות',
   'locus.ellipse.2': 'שתי אליפסות',
+  errNotADiagonal:
+    'האותיות האלה הן צלעות של המרובע, לא אלכסונים שלו: "{{detail}}". אלכסון מחבר שני קודקודים שאינם סמוכים, למשל «האלכסונים AC ו-BD נפגשים בנקודה E» במרובע ABCD.',
   errNoPrincipalDiagonal:
     'בצורה הזאת אין אלכסון ראשי ואלכסון משני — ההבחנה הזאת קיימת רק בצורות כמו דלתון: "{{detail}}". אפשר לציין את האלכסון לפי הקודקודים, למשל «משוואת האלכסון AC היא y=2x».',
   errAmbiguousShape:
@@ -569,6 +571,9 @@ const en: typeof he = {
   'locus.circle.2': 'two circles',
   'locus.parabola.2': 'two parabolas',
   'locus.ellipse.2': 'two ellipses',
+  errNotADiagonal:
+    'Those letters name sides of the quadrilateral, not its diagonals: "{{detail}}". A diagonal joins two ' +
+    'vertices that are not adjacent, for example "the diagonals AC and BD meet at E" in quadrilateral ABCD.',
   errNoPrincipalDiagonal:
     'This shape has no principal and secondary diagonal — that distinction exists only for shapes ' +
     'like a kite: "{{detail}}". Name the diagonal by its vertices instead, for example "the ' +

@@ -122,6 +122,12 @@ export type ApplyErrorCode =
    */
   | 'undistinguished-diagonal'
   /**
+   * «האלכסונים AB ו-CD» where «מרובע ABCD» makes AB and CD two of its SIDES (#1620, ADR-AG-208). The letters
+   * say which segments; the noun says they are diagonals; the figure says they are not — so the sentence is
+   * refused, never quietly re-read as the quadrilateral's real diagonals.
+   */
+  | 'not-a-diagonal'
+  /**
    * NAMING SOMETHING THAT ALREADY HAS A NAME (#1153).
    *
    * «P מרכז המעגל I» then «O מרכז המעגל I» minted a SECOND point on top of the first, and a
@@ -1575,9 +1581,32 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * figure makes it unambiguous; none or several makes it a refusal, never a pick.
      */
     case 'meet-of': {
-      const rings = c.objects.filter(
-        (o) => o.kind === 'polygon' && o.vertices.length === f.arity,
-      ) as PolygonObject[];
+      /*
+       * THE DIAGONALS NAMED BY THEIR LETTERS (#1620, ADR-AG-208) — «האלכסונים AC ו-BD נפגשים בנקודה E». A ring of
+       * those four vertices is the quadrilateral they are diagonals OF, so they must be its diagonals: «AB ו-CD» in
+       * «מרובע ABCD» names two of its sides, and is refused rather than read as the other pair. With no such ring
+       * the two named segments stand alone, and their meet is the `diagonals` rule over the named order.
+       */
+      if (f.named) {
+        const named = f.named;
+        const key = (a: Id, b: Id) => [a, b].sort().join('');
+        const wanted = new Set([key(named[0], named[2]), key(named[1], named[3])]);
+        const same = (c.objects.filter((o) => o.kind === 'polygon') as PolygonObject[]).filter(
+          (o) => o.vertices.length === 4 && named.every((x) => o.vertices.includes(x)),
+        );
+        for (const ring of same) {
+          const [p, q, r, s] = ring.vertices;
+          if (!wanted.has(key(p, r)) || !wanted.has(key(q, s))) {
+            return { ok: false, error: { code: 'not-a-diagonal', detail: f.src } };
+          }
+        }
+        return applyFact(c, { t: 'derived', id: f.id, rule: { t: 'diagonals', v: [...named] }, src: f.src });
+      }
+      /*
+       * THE NOUN SELECTS (#1620, ADR-AG-208) — «אלכסוני הטרפז» is the trapezoid's, even beside another quadrilateral,
+       * and is refused in a figure with no trapezoid; the generic «המרובע» is any ring of the arity (2-D's verdicts).
+       */
+      const rings = (ringsNamed(c.objects, f.noun) as PolygonObject[]).filter((o) => o.vertices.length === f.arity);
       if (rings.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
       const v = rings[0].vertices;
       const rule: DerivedRule =
@@ -2407,13 +2436,36 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'area-of': {
-      const rings = c.objects.filter(
-        (o) => o.kind === 'polygon' && o.noun === f.noun,
-      ) as PolygonObject[];
+      // The rings the noun names — `ringsNamed`, the one answer for a contextual shape noun (#1620, ADR-AG-208):
+      // «שטח הטרפז» is a right trapezoid's area too, as «אלכסוני הטרפז» are its diagonals.
+      const rings = ringsNamed(c.objects, f.noun) as PolygonObject[];
       if (rings.length !== 1) {
         return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
       }
       return applyFact(c, { t: 'constraint', k: { t: 'area', ids: rings[0].vertices, value: f.value }, src: f.src });
+    }
+
+    /**
+     * «שכל קודקודיו מונחים על הצירים» — EVERY VERTEX ON SOME AXIS (#1620 item 3, ADR-AG-208).
+     *
+     * The ring is the one the sentence refers to («קודקודיו» — its vertices; «קודקודי הטרפז»). Each vertex is on
+     * the x-axis or the y-axis and the sentence does not say which, so the statement is ONE discrete choice over
+     * the 2ⁿ assignments, each option the conjunction of its n incidences (`all`): a choice per vertex would
+     * cycle on one seed index and never mix the axes. Which assignment the figure takes is the seed's preference
+     * among the options the other givens leave alive (#1642's `evaluateTryingChoices`), never a guess the tool
+     * makes — and an assignment the ring cannot be drawn on (three vertices on one axis) is simply not admitted.
+     */
+    case 'vertices-on-axes': {
+      const rings = ringsNamed(c.objects, f.noun) as PolygonObject[];
+      if (rings.length !== 1) return { ok: false, error: noHost(f.src, 'polygon', rings.length) };
+      const v = rings[0].vertices;
+      const onAxis = (id: Id, axis: 'x' | 'y'): Constraint =>
+        axis === 'x' ? { t: 'on-line', id, a: 0, b: 1, c: 0 } : { t: 'on-line', id, a: 1, b: 0, c: 0 };
+      const options: Constraint[] = [];
+      for (let mask = 0; mask < 1 << v.length; mask += 1) {
+        options.push({ t: 'all', of: v.map((id, i) => onAxis(id, (mask >> i) & 1 ? 'y' : 'x')) });
+      }
+      return applyFact(c, { t: 'constraint', k: { t: 'choice', options }, src: f.src });
     }
 
     case 'right-angle': {

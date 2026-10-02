@@ -258,7 +258,17 @@ export type Fact =
    * The contextual sibling of `area-of`: the shape is whichever one in the figure has the right
    * number of vertices, resolved at M1 and refused when that is not exactly one.
    */
-  | (FactBase & { t: 'meet-of'; role: DerivedRule['t']; arity: number; id: Id })
+  | (FactBase & { t: 'meet-of'; role: DerivedRule['t']; arity: number; id: Id; noun?: string; named?: [Id, Id, Id, Id] })
+  /*
+   * `noun` (#1620, ADR-AG-208) — the shape noun the sentence wrote («אלכסוני הטרפז»): the rings it names are
+   * `ringsNamed`'s (a specific noun its own rings and their refinements, a generic noun every ring of its
+   * arity), so «הטרפז» resolves to the one trapezoid beside a plain quadrilateral and is refused where the
+   * figure has none — 2-D's verdict. Absent: every ring of the arity, as before.
+   *
+   * `named` (#1620, ADR-AG-208) — the diagonals NAMED by their letters («האלכסונים AC ו-BD»), as the ring order
+   * the `diagonals` rule reads (v0v2, v1v3). A ring of those four vertices whose diagonals they are NOT («AB ו-CD»
+   * in «מרובע ABCD», two of its sides) refuses the sentence; with no such ring the named segments stand alone.
+   */
   /**
    * «משוואת האלכסון הראשי היא y=2x» — a diagonal named by its ROLE rather than its endpoints.
    *
@@ -461,7 +471,14 @@ export type Fact =
    * the chord, diameter and tangent claims lower straight to the facts their own sentences carry. M1 resolves
    * it once (`applyRoleOf`): the right claim on the polygon or circle the figure holds, a conflict refused.
    */
-  | (FactBase & { t: 'role-of'; role: PolygonOrRadiusRole; a: Id; b: Id });
+  | (FactBase & { t: 'role-of'; role: PolygonOrRadiusRole; a: Id; b: Id })
+  /**
+   * «שכל קודקודיו מונחים על הצירים» · «כל קודקודי הטרפז נמצאים על הצירים» — EVERY VERTEX ON SOME AXIS (#1620 item 3,
+   * ADR-AG-208). Not a frame: each vertex is on the x-axis OR the y-axis, and the sentence does not say which, so
+   * it is a DISCRETE choice over the assignments (02c R14, «discrete ones cycle») — M1 builds it over the one ring
+   * the sentence refers to (`ringsNamed`; none or several is refused, as every contextual shape reference is).
+   */
+  | (FactBase & { t: 'vertices-on-axes'; noun?: string });
 
 /** The role claims that need the FIGURE to lower (#1651, ADR-AG-200) — the rest lower in the parser. */
 export type PolygonOrRadiusRole = 'radius' | 'leg' | 'base' | 'hypotenuse';
@@ -712,6 +729,17 @@ export type Selector =
    * and the collinearity beside it is the constraint.
    */
   | { kind: 'between'; id: Id; a: Id; b: Id }
+  /**
+   * «E על המשך הצלע BC» — the point lies on the line `ab` BEYOND `b`, on the far side from `a` (#1620,
+   * ADR-AG-208). `between`'s complement on the same line, and a selector for the same reason: the
+   * collinearity beside it consumes the degree of freedom, «המשך» only says WHICH part of the line, so the
+   * point keeps its one DOF (how far past `b` is unstated, ADR-052). Open at `b` — a point AT the end is on
+   * the side, not on its extension — judged at the figure's visible resolution, like `distinct`.
+   *
+   * The DIRECTION is the student's: «המשך BC» runs past C (the 2-D reading, ADR-054), and «… מעבר ל-B»
+   * swaps the ends. «המשכי AD ו-BC נפגשים ב-E» is two of these on one point.
+   */
+  | { kind: 'beyond'; id: Id; a: Id; b: Id }
   /**
    * The vertices of a shape are DISTINCT POINTS (#1077).
    *

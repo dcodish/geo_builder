@@ -10,7 +10,7 @@ import { fold, existingKindOf, type ApplyError, type ApplyNotice } from './apply
 import { reportedDof } from './carriers';
 import { drawableAt, viewBox, type Figure } from './evaluate';
 import { resolveCurve, type Box } from './curves';
-import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
+import { FRESH_PREFIX, MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
 import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
@@ -111,7 +111,9 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       owner.push(index);
     }
   });
-  const { facts: resolved, minted } = resolveMints(parsed, owner);
+  const fresh = resolveFresh(parsed, owner);
+  const { facts: resolved, minted } = resolveMints(fresh.facts, owner);
+  minted.unshift(...fresh.minted);
   // The canonical circle's centre, named O by the tool (#1270) — inserted with its owning line, so the
   // fold and every per-line rollup below see it as part of the circle's sentence.
   const centred = nameCanonicalCentres(resolved, owner);
@@ -231,7 +233,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     let at = construction.constraints.indexOf(k);
     if (at < 0) {
       at = construction.constraints.findIndex(
-        (c) => c.t === 'choice' && c.options.includes(k),
+        (c) => c.t === 'choice' && c.options.some((o) => o === k || (o.t === 'all' && o.of.includes(k))),
       );
     }
     const fact = at >= 0 ? constraintFact[at] : undefined;
@@ -462,6 +464,53 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */
 const subscript = (n: number): string => String(n).replace(/[0-9]/g, (d) => String.fromCharCode(0x2080 + Number(d)));
+
+/**
+ * NAMING A POINT A SENTENCE INTRODUCES WITHOUT A LETTER (#1620, ADR-AG-208) — «קטע האמצעים לצלע BC במשולש ABC» joins
+ * two midpoints the student never named, and 2-D names them M and N (`freeLabel` over the figure's points, ADR-199).
+ *
+ * The parser is pure over one line, so it marks each such point with a placeholder (`FRESH_PREFIX` + the letters it
+ * prefers + `|` + what the point IS, e.g. `mid:A,B`), and it is resolved HERE, in list order, against the names the
+ * EARLIER lines use — so a later line naming «M» refers to the M this one minted, and adding a line never renames
+ * an earlier point (stability). A point the figure already derives the same way (the student's own «M אמצע AB»)
+ * keeps its letter (2-D's `named-midsegment-reuses-existing-midpoint-endpoint`); otherwise the first preferred
+ * letter that is free, else the first one subscripted. The new name is reported (`minted`), as a coordinate
+ * point's is: the tool says what it called the point.
+ */
+function resolveFresh(facts: Fact[], owner: readonly number[]): { facts: Fact[]; minted: Array<{ index: number; id: string }> } {
+  if (!JSON.stringify(facts).includes(FRESH_PREFIX)) return { facts, minted: [] };
+  const used = new Set<string>();
+  const names = new Map<string, string>();
+  const minted: Array<{ index: number; id: string }> = [];
+  const out: Fact[] = [];
+  const midKey = (a: string, b: string) => `mid:${[a, b].sort().join(',')}`;
+  facts.forEach((f0, i) => {
+    let text = JSON.stringify(f0);
+    for (const ph of new Set(text.match(/@fresh:[^"|]*\|[^"@]*/g) ?? [])) {
+      if (names.has(ph)) continue;
+      const [prefs, key] = ph.slice(FRESH_PREFIX.length).split('|');
+      const own = out.find(
+        (g) => g.t === 'derived' && g.rule.t === 'midpoint' && !g.id.includes(FRESH_PREFIX) && midKey(g.rule.a, g.rule.b) === key,
+      );
+      let name = own && own.t === 'derived' ? own.id : [...prefs].find((x) => !used.has(x));
+      if (!name) {
+        let n = 0;
+        do name = `${prefs[0]}${subscript(++n)}`;
+        while (used.has(name));
+      }
+      names.set(ph, name);
+      used.add(name);
+      if (!own) minted.push({ index: owner[i], id: name });
+    }
+    text = text.replace(/@fresh:[^"|]*\|[^"@]*/g, (ph) => names.get(ph) ?? ph);
+    let f = JSON.parse(text) as Fact;
+    // A segment's id is its SORTED ends — re-derived once the ends have their letters.
+    if (f.t === 'segment') f = { ...f, id: `seg-${[f.a, f.b].sort().join('')}` };
+    for (const m of text.match(/"[A-Z][0-9₀-₉]?"/g) ?? []) used.add(m.slice(1, -1));
+    out.push(f);
+  });
+  return { facts: out, minted };
+}
 
 /**
  * NAMING A POINT THE STUDENT GAVE ONLY BY ITS COORDINATES (#1281; operator ruling #1263, 2026-09-20: *mint a

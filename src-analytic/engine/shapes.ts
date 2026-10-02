@@ -272,12 +272,24 @@ export function ringsNamed<T extends { kind: string; vertices?: readonly string[
   noun: string | undefined,
 ): T[] {
   const row = noun && noun !== ANY_POLYGON_NOUN ? shapeRow(noun) : null;
+  const key = noun ? normalizeShapeNoun(noun) : '';
   return objects.filter(
     (o) =>
       o.kind === 'polygon' &&
-      (!row || o.noun === noun || (isGenericNoun(noun!) && (o.vertices?.length ?? 0) === row.arity)),
+      (!row || refines(o.noun, key) || (isGenericNoun(noun!) && (o.vertices?.length ?? 0) === row.arity)),
   );
 }
+
+/**
+ * Is a ring stated as `stated` one that `key` names (#1620, ADR-AG-208)? Its own noun, or a REFINEMENT of it: the
+ * table's qualified nouns are the base noun plus a qualifier («טרפז ישר זווית», «טרפז שווה שוקיים»), and a right
+ * trapezoid is a trapezoid — 2-D stores it as one, so «אלכסוני הטרפז» finds it there.
+ */
+const refines = (stated: string | undefined, key: string): boolean => {
+  if (!stated) return false;
+  const own = normalizeShapeNoun(stated);
+  return own === key || own.startsWith(`${key} `);
+};
 
 /**
  * Does `stated` name one of `choice`'s options?
