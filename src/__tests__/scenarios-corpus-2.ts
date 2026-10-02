@@ -312,12 +312,15 @@ export const SCENARIOS_2: Scenario[] = [
     id: 'stated-meet-relocates-loose-point',
     title: 'AM חותך את CO בנקודה K with M loose: the stated meet re-seats M so the segments really cross (and M stays outside)',
     guards:
-      'ADR-255: operator session gaawv4fr (2026-07-08) — with M seeded outside up-LEFT of the circle, segments AM and CO cannot cross; the figure built ✓ with K on the continuations, the amber was easy to miss, and NO sampled config could rescue it (findValidConfig null — seed jitter explores only a small neighbourhood of the free default). A stated segment-meet is information about where the loose endpoint belongs (M1/M4): apply now re-seats a non-pinned, constraint-free endpoint along the ray from its fixed mate through the other segment\'s midpoint, preserving its circle sides (the stated "M מחוץ למעגל" survives) and general position. Typos as typed: "על במעגל", "בנדוקה". #1673 (ADR-565): «O מרכז המעגל» is inserted after «AB קוטר». Before, «CO» minted a free point O beside a circle whose hidden centre carried the same letter; the exact sequence is now refused at its last line and locked so in issue-1673-hidden-centre.test.ts.',
-    steps: ['AB קוטר', 'O מרכז המעגל', 'C על במעגל', 'M מחוץ למעגל', 'AM חותך את CO בנדוקה K'], // «O מרכז המעגל»: #1673 (ADR-565)
+      'ADR-255: operator session gaawv4fr (2026-07-08) — with M seeded outside up-LEFT of the circle, segments AM and CO cannot cross; the figure built ✓ with K on the continuations, the amber was easy to miss, and NO sampled config could rescue it (findValidConfig null — seed jitter explores only a small neighbourhood of the free default). A stated segment-meet is information about where the loose endpoint belongs (M1/M4): apply now re-seats a non-pinned, constraint-free endpoint along the ray from its fixed mate through the other segment\'s midpoint, preserving its circle sides (the stated "M מחוץ למעגל" survives) and general position. Typos as typed: "על במעגל", "בנדוקה". #1673 (ADR-565): «O מרכז המעגל» is inserted after «AB קוטר». The exact sequence the operator typed is kept: the circle is unnamed, so «CO» draws a FREE point O (operator ruling 2026-10-02), and the meet still re-seats the loose endpoints so K lies within both segments. A later «O מרכז המעגל» places that O at the centre (locked in issue-1673-hidden-centre.test.ts).',
+    steps: ['AB קוטר', 'C על במעגל', 'M מחוץ למעגל', 'AM חותך את CO בנדוקה K'],
     check(fig) {
       allStepsOk(fig);
-      const c = fig.circles.get('circle-O');
-      expect(c, 'circle O resolved').toBeTruthy();
+      // #1673 (ADR-565): the circle is unnamed, so «CO» drew a FREE point O — never the hidden centre
+      const circle = fig.construction.objects.find((o) => o.kind === 'circle') as { id: string; center: string } | undefined;
+      expect(circle?.center, 'O is the student\'s free point, not the circle centre').not.toBe('O');
+      const c = circle ? fig.circles.get(circle.id) : undefined;
+      expect(c, 'the circle resolved').toBeTruthy();
       if (!c) return;
       // M is strictly outside — the ADR-254 side statement survived the re-seat.
       expect(dist(at(fig, 'M'), c.center), 'M outside circle O').toBeGreaterThan(c.r);
@@ -756,7 +759,7 @@ export const SCENARIOS_2: Scenario[] = [
     title: 'two intersecting circles + their radii → the kite OAPB and its isosceles triangles surface, entailed',
     guards:
       "operator session (debug log 2026-07-04, the `שני מעגלים נחתכים` figure): `שני מעגלים נחתכים` (two circles → centres O,P, crossings A,B) → `AB` → `OP` → `PA` → `PB` → `OA=OB`. The operator built the classic kite OAPB (two intersecting circles) and reported the feed was thin: \"i have an isosceles triangle but no relevant theorems appear … added OA=OB and got 1 sentence but there are others … no kite theorems.\" Root cause (ADR-218): the theorem matchers only read TYPED shape/equal facts, never the circle STRUCTURE the construction already encodes — so the isosceles triangles OAB/PAB (two radii each, |OA|=|OB|, |PA|=|PB|) and the kite OAPB (two circles sharing A,B) went unrecognised because nobody typed 'isosceles'/'kite'. These are coordinate-free construction ENTAILMENTS, not measured coincidences. Fix: `isoscelesEvidence` now derives isosceles from a circle's centre + two drawn radii, `kiteEvidence` derives a kite from two circles sharing two drawn-out points, and the kite theorems 37/38 were added to the table (a pure gap). This scenario replays the operator's exact sequence and asserts the kite + isosceles theorems surface and the figure is geometrically a kite (OP ⟂ AB, both radius pairs equal). #1673 (ADR-565): the two centres are named («O מרכז המעגל», «P מרכז המעגל») before «OP»; the bare «OP» used to bind both hidden centres by their tool-chosen letters.",
-    steps: ['שני מעגלים נחתכים', 'AB', 'O מרכז המעגל', 'P מרכז המעגל', 'OP', 'PA', 'PB', 'OA=OB'], // the naming lines: #1673 (ADR-565)
+    steps: ['שני מעגלים נחתכים', 'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', 'AB', 'OP', 'PA', 'PB', 'OA=OB'], // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
     check(fig) {
       allStepsOk(fig);
       // Geometry: the kite OAPB — |OA|=|OB| and |PA|=|PB| (radii), and the main diagonal OP ⟂ the
@@ -768,7 +771,7 @@ export const SCENARIOS_2: Scenario[] = [
       expect(Math.abs(dot) / (dist(O, P) * dist(A, B) || 1)).toBeLessThan(1e-6); // OP ⟂ AB
       // Feed: the isosceles (22) and BOTH kite properties (37, 38) surface — entailed from the two
       // circles + drawn radii, none of it typed as a shape word.
-      const facts = factsOf(['שני מעגלים נחתכים', 'AB', 'O מרכז המעגל', 'P מרכז המעגל', 'OP', 'PA', 'PB', 'OA=OB']);
+      const facts = factsOf(['שני מעגלים נחתכים', 'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', 'AB', 'OP', 'PA', 'PB', 'OA=OB']);
       const ids = detectTheorems({ facts, construction: fig.construction }).map((e) => e.id);
       expect(ids).toEqual(expect.arrayContaining([22, 37, 38]));
     },
@@ -815,6 +818,7 @@ export const SCENARIOS_2: Scenario[] = [
       'operator session `wetjqgsj`: two free-radius circles + `C על מעגל P` + `CA משיק למעגל O בנקודה A` (a valid tangent → `set-perpendicular(O,A,C,A)`) + `CA` + `D על מעגל O`, then `BB משיק למעגל P בנקודה B`. The last tangent is named by a DEGENERATE line "BB" (one point repeated), so the parser emitted `set-perpendicular(P,B,B,B)` whose second operand B→B is a zero-length vector (NaN direction). Left to the solver this did NOT fail cleanly — `recruitFreeDofs` chased the NaN over every free DOF and the joint optimizer churned ~4.4 s per replay before reporting a bogus over-constraint; the app runs that slow replay many times in its config-search loop, so the whole UI FROZE. Root fix (ADR-202): `applyStep` rejects a ∥/⟂ with a zero-length operand (its two endpoint ids identical) up front, before any evaluate — 4.4 s → ~15 ms with a clear message, for any source of the degeneracy (parser typo, LLM, `AA ⟂ BC`).',
     steps: [
       'שני מעגלים נחתכים',
+      'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
       'C על מעגל P',
       'CA משיק למעגל O בנקודה A',
       'CA',
@@ -1459,12 +1463,13 @@ export const SCENARIOS_2: Scenario[] = [
       'operator session vk346px4 (two intersecting circles O,P; chord CB tangent to P at B; then "המיתר AD במעגל P משיק למעגל O בנקודה A"). The last step parsed to a single `circles-tangent` between circle-P and circle-O — point D and the chord AD were DROPPED entirely, and it asserted the two circles are tangent to EACH OTHER, contradicting the opening "two circles intersect". Status showed green ✓ while nothing new appeared on the canvas. Root cause: `circlesTangent` fires on any "two `מעגל X` tokens + a `משיק` keyword", but here one circle mention ("במעגל P") is the chord\'s HOST, not a second tangent circle — the rule can\'t tell them apart and throws away the chord. The deterministic parser also had NO tangent-chord construct at all (the symmetric step-2 chord only worked via the LLM). Fix: a new `tangentChord` rule (splits at the tangent keyword → host circle before, tangency circle + point after) emits both endpoints on the host circle + radius(target→Z) ⟂ the chord + the segment; and a `chord`/`מיתר` guard on `circlesTangent` so a chord phrasing can never become mutual tangency.',
     steps: [
       'שני מעגלים נחתכים',
+      'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
       // Step 2 in the live session was "המיתר CB משיק למעל P בנקודה B" — the "למעל" typo made it
       // out-of-grammar so it escalated to the LLM. Captured here as the canonical commands the log shows.
       { llm: [
         { type: 'point-on-circle', id: 'C', circle: 'circle-O' },
         { type: 'point-on-circle', id: 'B', circle: 'circle-P' },
-        { type: 'set-perpendicular', a: '@ctr-P', b: 'B', c: 'C', d: 'B', implicit: true }, // the centre point id (ADR-342 — the letter is the circle's token, not a point)
+        { type: 'set-perpendicular', a: 'P', b: 'B', c: 'C', d: 'B', implicit: true }, // the centre P, named by the scenario's naming lines (#1673)
         { type: 'segment', a: 'C', b: 'B' },
       ] },
       'CB',
@@ -1555,6 +1560,7 @@ export const SCENARIOS_2: Scenario[] = [
       'operator session 1dugj1cw (bagrut Q4: two circles meet at A,B; AD tangent to the left circle at A; CB tangent to the right at B; F on the extension of BD onto the left circle; E on the extension of CA onto the right circle). The original figure has F BEYOND B (D→B→F), so the input should read "המשך DB" — but the operator wrote "המשך BD", which the parser reads as beyond D. That direction is geometrically impossible (D is on a tangent to the left circle, so always OUTSIDE it ⇒ line BD can only re-cross it behind B, never beyond D), so `firstSatisfyingSeed` could satisfy NO seed and the WHOLE figure drifted — E also landed wrong (the verifier flagged both). Root cause (ADR-142): for the SHARED-ENDPOINT extend-onto-circle (a line endpoint already on the target circle), the other crossing is UNIQUE — the side is forced by the geometry, not the BD/DB letter order. Fix: `extensionsClear` (the seed-gate) and the givens-verifier both accept the new point on EITHER extension when an endpoint is on the circle (flag only a genuinely-between point); a neither-on-circle driven extension stays strict. So the typo builds clean and the seed search finds a config where E is also beyond A.',
     steps: [
       'שני מעגלים נחתכים בנקודות A ו B',
+      'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
       'המשיק למעגל O בנקודה A חותך את מעגל P בנקודה D',
       'המשיק למעגל P בנקודה B חותך את מעגל O בנקודה C',
       'נקודה F נמצאת על המשך הצלע BD וחותכת את מעגל O בנקודה F', // reversed "BD" — the circle disambiguates

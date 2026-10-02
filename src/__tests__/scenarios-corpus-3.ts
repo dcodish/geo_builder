@@ -268,6 +268,7 @@ export const SCENARIOS_3: Scenario[] = [
       "operator (session zqvtvh15): building the full Q4, CE⟂AB failed 'over-constrained' because it was entered before CD=36, DE=18 — without the sizes the figure is an under-determined coupled solve the engine can't land, but WITH them it's determinate and the ⟂ solves. The operator's principle: the diagram must build the SAME regardless of entry order. Fix (ADR-104): after the in-order pass, replay RETRIES still-failed CONSTRAINT-only facts against the now-complete figure, to a fixpoint — so a constraint typed too early is effectively re-ordered to AFTER the givens that pin it. Here CE⟂AB defers past CD=36/DE=18 and then holds. (Builds on ADR-103, which made the circle CENTRES drivable so |CD|=36 is reachable at all.)",
     steps: [
       'שני מעגלים נחתכים בנקודות A ו B',
+      'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
       'נקודה C על מעגל P',
       'המשך CA חותך את מעגל O בנקודה D',
       'המשך CB חותך את מעגל O בנקודה E',
@@ -295,6 +296,7 @@ export const SCENARIOS_3: Scenario[] = [
       'operator session (zqvtvh15, bagrut Q4): after two circles meet at A,B; C on circle P; D = CA extended onto circle O, a size given like CD=36 (and ultimately CE⟂AB with CD=36, DE=18) failed "over-constrained: |CD|=36 cannot hold". Root cause (ADR-103): recruitFreeDofs surfaced a circle\'s free RADIUS but never its free CENTRE, and `ancestors` does not traverse a circle∩circle point — so the centres O,P were unreachable. Pinned a fixed gap apart, the circle∩circle geometry caps |CD| (~8 here) however large the radii grow, so |CD|=36 was unreachable though a real configuration exists (the centres just spread). Fix: surface a circle\'s free, non-pinned centre as a drivable DOF alongside its radius. (Known remaining limitation: entering CE⟂AB BEFORE the size givens is an under-determined coupled solve that still does not converge — the sizes must precede the ⟂; tracked separately.)',
     steps: [
       'שני מעגלים נחתכים בנקודות A ו B',
+      'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
       'נקודה C על מעגל P',
       'המשך CA חותך את מעגל O בנקודה D',
       'CD=36',
@@ -313,6 +315,7 @@ export const SCENARIOS_3: Scenario[] = [
       'operator (session 99j7krj3/f2gyj40u): typing an angle EQUALITY ("∠GEC=∠CBA", "∠GEC=∠CHA") returned not-understood — the `angle` rule needs a numeric value, so a two-angle equality fell through to the LLM (also not-understood). The engine already had the relation (`set-angle-ratio` k=1, as similar-triangles uses); the gap was purely the parser. Fix (ADR-100): an `angleEquality` rule reads "∠ABC = ∠DEF" (Hebrew "זווית"/∠, optional coefficient "= 2∠DEF") → set-angle-ratio. Here it is exercised end-to-end with the book\'s own part-א theorem ∠EDA=∠CBA on the Q4 figure: it parses (no LLM), applies, and HOLDS (a true relation for every configuration).',
     steps: [
       'שני מעגלים נחתכים בנקודות A ו B',
+      'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
       'נקודה C על מעגל P',
       'המשך CA חותך את מעגל O בנקודה D',
       'המשך CB חותך את מעגל O בנקודה E',
@@ -334,6 +337,7 @@ export const SCENARIOS_3: Scenario[] = [
       'operator session (99j7krj3, 2026-06-22), the full bagrut Q4: two circles meet at A,B; C on the right circle; CA/CB extended hit the LEFT circle O at D,E; then "מרובע EBAD חסום במעגל O" → weak:error → LLM built-nothing (twice). Root cause (ADR-099): the inscribe rule emitted `circumcircle(circle-O, E,B,A)` to build the circumscribing circle — but circle O ALREADY exists, so re-creating it redefined its centre ("\'O\' is already defined") and the whole step was dropped. E,B,A,D are already ON circle O by their own construction (A,B are O∩P; D,E are line∩O), so the intent is just "draw the quad inscribed in the EXISTING O". Fix: when the named circle already exists, the rule asserts membership per vertex (`point-on-circle`, idempotent for a point already on it — ADR-093 — and converting a free one to slide on it) and draws the polygon, never re-creating the circle.',
     steps: [
       'שני מעגלים נחתכים בנקודות A ו B',
+      'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
       'נקודה C על מעגל P',
       'המשך CA חותך את מעגל O בנקודה D',
       'המשך CB חותך את מעגל O בנקודה E',
@@ -359,6 +363,7 @@ export const SCENARIOS_3: Scenario[] = [
       'operator report (session n19qmb3t, 2026-06-22): "point C is not positioned in a place that can satisfy the input". Two circles meet at A,B; C is a FREE point on circle P; "המשך CA חותך מעגל O בנקודה D" and "המשך CB חותך מעגל O בנקודה E". At the default/sampled C (top of circle P) C is OUTSIDE circle O, so on line CB the far crossing IS B — the only OTHER crossing falls BETWEEN C and B, so E is on the near side and "המשך" (beyond B) is violated, yet the figure showed GREEN (verified). Root cause (ADR-098): the extend-onto-circle SHARED-ENDPOINT branch deterministically picks the other crossing with NO record of the directional intent, the free θ of C was sampled blind to it, AND the verifier re-derived neither the membership nor the order — three gaps. Fix (operator chose SAMPLE/GATE, never drive): the verifier now re-derives both (a wrong-side figure goes amber), the sampler/“show another” gate on the order, and the app/`run()` auto-advance to the first configuration where BOTH extensions reach the far side. C is a free DOF — sampled to a satisfying placement, never driven across the E=B tangent degeneracy.',
     steps: [
       'שני מעגלים נחתכים בנקודות A ו B',
+      'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
       'נקודה C על מעגל P',
       'המשך CA חותך את מעגל O בנקודה D',
       'המשך CB חותך את מעגל O בנקודה E',
@@ -1228,6 +1233,7 @@ export const SCENARIOS_3: Scenario[] = [
       'the operator\'s actual session (jvdi4sl7) CRASHED step 4 with "A and F would be at the same point". Diagnosed from the geometry: C was defined as "tangent to circle O at A meets circle P", so line CA IS the tangent to circle O at A (cos(CA,OA)=0) — it touches O only at A, so "המשך CA חותך מעגל O" has NO second crossing F. The figure is geometrically impossible as typed, but the engine reported it via the opaque generic coincidence check. Two fixes: (1) extend-onto-circle, when an endpoint is already on the target circle, routes to a deterministic line∩circle that AVOIDS the shared endpoint (ADR-054); (2) that path, when NO fresh crossing remains (tangent / chord), now returns a CLEAR "line is tangent … no second crossing to extend onto" message instead of collapsing F onto A. This locks that the impossible input is handled GRACEFULLY (prior figure kept, clear error), never a crash.',
     steps: [
       'שני מעגלים ננחתכים בנקודות A ו- B', // O (r5, free) + P (r3.6, free); A,B = the two crossings (operator's exact text)
+      'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
       'המשיק למעגל O בנקודה A חותך את מעגל P בנקודה C', // C on circle P, ON the tangent-to-O-at-A line
       'המשיק למעגל P בנקודה B חותך את מעגל O בנקודה D', // D on circle O
       'המשך CA חותך את מעגל O בנקודה F', // IMPOSSIBLE: line CA is tangent to O at A — no second crossing
@@ -1247,6 +1253,7 @@ export const SCENARIOS_3: Scenario[] = [
       'this is the LLM-decomposition path that produced a GREEN-but-WRONG figure. The operator typed "המשך AC חותך את מעגל P בנקודה E"; before lineMeetsCircle existed it escalated, and the LLM split it into "E על המשך AC" + "E על מעגל P". The second command (point-on-circle for the ALREADY-EXISTING E) hit addObj, which no-ops on an existing id — so the on-circle fact was SILENTLY DROPPED: every step reported ok, lastError was null, yet E sat ~7.4 from P\'s centre (radius 3.6), nowhere near the circle. Fixed in applyCommand: re-defining an existing on-segment/extension point as "on circle C" — when one of its line ends is also on C — becomes the SECOND crossing (line∩circle, avoiding the shared end), so E is driven onto the circle instead of dropped. (The post-evaluate verifier is the general net for any case this does not reconcile.)',
     steps: [
       'שני מעגלים נחתכים בנקודות A ו B',
+      'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
       'C על מעגל O', // a point on the left circle, so line AC exists (A is on BOTH circles)
       'E על המשך AC', // E created as an on-extension point (the LLM\'s first half)
       'E על מעגל P', // redefining the EXISTING E as on circle P — used to be silently dropped
@@ -1270,6 +1277,7 @@ export const SCENARIOS_3: Scenario[] = [
       'a full bagrut figure (the operator\'s actual Hebrew input): two circles meet at A,B; the tangent to the LEFT circle at A is a chord AD of the RIGHT circle (D the other crossing); the tangent to the RIGHT circle at B is a chord CB of the LEFT circle; AC extended meets the right circle again at E; BD extended meets the left circle at F. The "tangent to circle X at P meets circle Y at Q" phrasing MISPARSED twice: (1) it contains "tangent" + two circle names + "at", so circlesTangent grabbed it and made the two circles mutually tangent at A — contradicting that they already INTERSECT at A,B; (2) even the dedicated rule first missed the active verb "פוגש" (meets) — only "נחתך/נפגש/cuts/meets" were in the shared INTERSECT_KW — so the operator\'s "פוגש את מעגל P" fell through to circlesTangent and D was never created. Fixed: "פוגש"/"פגש" added to INTERSECT_KW, and a dedicated rule (before circlesTangent) reads it as a tangent LINE ∩ the other circle (the crossing that AVOIDS the shared point) and DRAWS the chord. E,F come from the existing-point secant. NO fixed assumptions — the only free DOFs are the two circle radii.',
     steps: [
       'שני מעגלים נחתכים בנקודות A ו B', // circle-O (left, r5) + circle-P (right, r3.6), A,B = the two crossings
+      'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
       'המשיק למעגל O בנקודה A פוגש את מעגל P בנקודה D', // AD ⟂ radius OA; D = tangent ∩ circle P, avoiding A (the "פוגש" misparse)
       'המשיק למעגל P בנקודה B פוגש את מעגל O בנקודה C', // CB ⟂ radius PB; C = tangent ∩ circle O, avoiding B
       'המשך CA חותך את מעגל P בנקודה E', // E beyond A on circle P (order C→A→E) — strict directional המשך (ADR-054)
@@ -1316,6 +1324,7 @@ export const SCENARIOS_3: Scenario[] = [
       'modelling "E on line DB" (E on circle O, B also on circle O) as a generic driven collinearity let the numeric solve land on the DEGENERATE crossing E = B, or on the wrong side, seed-dependently — the operator saw "E on B" and "E not on the continuation of DB", and only got it right by cycling. It is really "the second intersection of line DB with circle O", so it now becomes a line∩circle that AVOIDS the shared point (B) — deterministic, and structurally never collapses onto B. Same for C on line AD (A on circle O).',
     steps: [
       'two circles intersect at A and B', // circle-O (r5) + circle-P (r3.6)
+      'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
       'C על מעגל O',
       'D על מעגל P',
       'נקודה E נמצאת על מעגל O',
@@ -1344,6 +1353,7 @@ export const SCENARIOS_3: Scenario[] = [
       'building on the secant figure, the operator added a SECOND collinearity ("line DB passes through E" after "line AD passes through C"). The two constraints share the carrier D, making a triangular system (D fixed by A,D,C; E then fixed by D,B,E). The joint driven solver minimised the SUM of both residuals, which pulled the shared D toward both and satisfied neither — it returned the seed and falsely reported "over-constrained: A, D, C collinear cannot hold" (even though the solver had ALREADY found an accepted solution, the polish wandered off it into a degenerate same-cost basin). Fixed with a binding-aware seed (each bounded carrier solved against the constraint IT drives) + keeping an accepted candidate through the polish (ADR-050 amendment).',
     steps: [
       'שני מעגלים נחתכים בנקודות A ו-B', // circle-O (r5) + circle-P (r3.6) meeting at A,B
+      'מרכז המעגל השמאלי הוא O', 'מרכז המעגל הימני הוא P', // #1673 (ADR-565): the student names the two circles — an unnamed circle answers to no letter
       { llm: ['C על מעגל O', 'D על מעגל P'] }, // "C עם מעגל אחד ו D על מעגל שני" → two canonical lines (re-parsed, TST-3)
       'ישר AD עובר בנקודה C', // A, D, C collinear (drives D onto line AC)
       'E על מעגל O', // a free point on circle O

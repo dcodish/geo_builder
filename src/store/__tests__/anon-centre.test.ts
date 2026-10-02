@@ -10,10 +10,9 @@
  * whose WORDS name the centre («רדיוס OB») binds-and-PROMOTES the letter, while positional/definitional
  * statements always treat it as fresh.
  *
- * #1673 (ADR-565, operator ruling 2026-10-02 — *"an unlablled circle should not be O automatically"*)
- * withdrew the ADR-342 metric amendment: a statement that only REFERENCES the hidden letter («OA=5») is
- * refused with the naming sentence to type; the full matrix is locked in
- * `src/__tests__/issue-1673-hidden-centre.test.ts`.
+ * #1673 / #1688 (ADR-565, operator ruling 2026-10-02) withdrew the ADR-342 metric amendment: the hidden letter
+ * STEPS ASIDE when the student types it, so «OA=5» draws a free O; «O מרכז המעגל» then places it at the centre.
+ * The full matrix is locked in `src/__tests__/issue-1673-hidden-centre.test.ts`.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { parse, buildParseCtx, parseNameCenter } from '@/parser';
@@ -54,8 +53,8 @@ describe('anonymous auto-centres (ADR-342 / #177)', () => {
     const P = fig.positions.get('P')!;
     expect(beyond(P, fig.positions.get('A')!, fig.positions.get('B')!), 'P beyond A on ray B→A').toBe(true);
     // both circles intact, their centres anonymous and distinct from the student's P
-    expect(fig.positions.has('@ctr-O')).toBe(true);
-    expect(fig.positions.has('@ctr-P')).toBe(true);
+    // #1673: the student's P made the hidden token P step aside — both centres stay anonymous
+    expect([...fig.positions.keys()].filter((k) => k.startsWith('@ctr-'))).toHaveLength(2);
   });
 
   it('semantic centre-use PROMOTES (ruling b): «רדיוס OB» makes O the real, visible centre — strictly', () => {
@@ -70,11 +69,10 @@ describe('anonymous auto-centres (ADR-342 / #177)', () => {
     expect((b as { circle: string }).circle).toBe('circle-O');
   });
 
-  it('a METRIC given no longer binds the token (#1673): «OA=5» is refused; after «O מרכז המעגל» it is a radius given', () => {
-    const fig0 = replay(factsOf(['מעגל']), 0);
-    const r = parse('OA=5', buildParseCtx(fig0.construction, fig0.positions));
-    expect(!r.ok && r.reason, 'the hidden letter answers to nothing').toBe('hidden-centre-letter');
-    const fig = replay(factsOf(['מעגל', 'O מרכז המעגל', 'OA=5']), 0);
+  it('a METRIC given no longer binds the token (#1673): «OA=5» draws a free O; «O מרכז המעגל» places it — a radius given', () => {
+    const fig0 = replay(factsOf(['מעגל', 'OA=5']), 0);
+    expect(fig0.construction.objects.find((o) => o.id === 'O')?.kind, 'O is a free point of the student').toBe('free-point');
+    const fig = replay(factsOf(['מעגל', 'OA=5', 'O מרכז המעגל']), 0);
     for (const [, s] of Object.entries(fig.status)) expect(s).toBe('ok');
     // The textbook meaning: O IS the centre — promoted, and |OA| = 5 sizes the radius leg.
     expect(fig.positions.has('O'), 'O promoted').toBe(true);

@@ -60,6 +60,7 @@ const run2D: StepRunner = async (steps) => {
     }
     for (const b of v.binds) {
       if (b.op === 'name-centre') st().nameCentre(b.from, b.to);
+      else if (b.op === 'step-aside') st().reletterHidden(b.from, b.to);
       else st().rename(b.from, b.to);
     }
     if (v.kind === 'commit') st().executeMany([...v.commands], line);

@@ -33,7 +33,7 @@ const ISSUE_SEQUENCES: string[][] = [
   ['מעגל ברדיוס 3'],
   ['משולש ABC חסום במעגל', 'AB=6', 'BC=8', 'AC=10'],
   ['משולש שווה צלעות ABC', 'AB=6', 'מעגל חסום במשולש ABC'],
-  ['שני מעגלים נחתכים', 'רדיוס מעגל O הוא 3'],
+  ['שני מעגלים נחתכים', 'מרכז המעגל השמאלי הוא O', 'רדיוס מעגל O הוא 3'],
   ['מעגל O ברדיוס 5', 'משיק מנקודה E למעגל', 'OE=13'],
 ];
 
@@ -89,10 +89,11 @@ describe("the issue's sequences (#1442)", () => {
     expect(rows.map(text)).toEqual(['רדיוס המעגל', 'שטח המעגל', 'היקף המעגל']);
     expect(rows[0].value).toBeCloseTo(3, 6);
   });
-  it('two unnamed circles — each by its reference token', () => {
-    const rows = circleRows(rowsOf(['שני מעגלים נחתכים', 'רדיוס מעגל O הוא 3']));
+  // #1673 (ADR-565): an unnamed circle answers to no letter, so the student names one before giving its radius
+  it('two circles, the one the student named O — its row by that name', () => {
+    const rows = circleRows(rowsOf(['שני מעגלים נחתכים', 'מרכז המעגל השמאלי הוא O', 'רדיוס מעגל O הוא 3']));
     const radius = rows.find((r) => r.kind === 'radius');
-    expect(radius && text(radius)).toMatch(/^רדיוס מעגל .*O/);
+    expect(radius && text(radius)).toBe('רדיוס O'); // a named centre labels its circle, as «מעגל O» does
     expect(radius?.value).toBeCloseTo(3, 6);
   });
   it('a tangent from E — the hidden Thales circle prints NO row; circle O prints once', () => {

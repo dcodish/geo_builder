@@ -45,6 +45,7 @@ import {
   parseNameCenter,
   parseRename,
   parseSwap,
+  typedLabels,
 } from '@/parser';
 import { independentConstructs } from './independence';
 import type { AnyCommand, Construction, Id, Vec } from '@/engine';
@@ -56,6 +57,7 @@ import {
   nameCentreFacts,
   renameFacts,
   replay,
+  stepAsideFacts,
   trialFacts,
 } from '@/store/geoStore';
 import { spanShadow } from '@/parser/spanAccounting';
@@ -86,7 +88,8 @@ export type DecideLog = Readonly<Record<string, unknown>>;
 
 /** An auto-bind the parse loop made (#186 circle / #539 point) — the caller applies it to the store. */
 export interface DecideBind {
-  readonly op: 'name-centre' | 'rename';
+  /** `step-aside` (#1673, ADR-565): a hidden circle token re-lettered out of the student's way — still unnamed */
+  readonly op: 'name-centre' | 'rename' | 'step-aside';
   readonly from: Id;
   readonly to: Id;
 }
@@ -219,6 +222,18 @@ export async function decideFromParse(
   let viewNow = (): DecideView => state.view;
 
   let pctx = buildParseCtx(state.view.construction, state.view.positions);
+  // #1673 / #1688 (ADR-565, operator ruling 2026-10-02): a letter the student types is THEIRS. An unnamed circle's
+  // hidden token that happens to be that letter is re-lettered first (still hidden), so «BO = 5» draws a free O,
+  // «מעגל O» declares a new circle O, and nothing the student never saw answers to their letter.
+  const aside = stepAsideFacts(facts, typedLabels(utterance));
+  if (aside.moves.length) {
+    facts = aside.facts;
+    for (const m of aside.moves) binds.push({ op: 'step-aside', from: m.from, to: m.to });
+    logs.push({ source: 'step-aside', moves: aside.moves, intermediate: true });
+    const d0 = replay(facts, seed);
+    viewNow = () => ({ construction: d0.construction, positions: d0.positions });
+    pctx = buildParseCtx(d0.construction, d0.positions);
+  }
   let r = parse(utterance, pctx);
   // #186: a circle referenced BY NAME that matches no existing circle, while UNNAMED (auto-centre)
   // circles are on canvas, is naming-by-use of one of THEM — the student cannot know the internal
@@ -386,15 +401,6 @@ export async function decideFromParse(
   // A BOUND radius symbol («R» after «רדיוס מעגל O הוא R») reused as a POINT label («מיתר AR») — once bound,
   // the letter IS the parametric radius, never a node (operator ruling, #198). Say so deterministically and
   // keep the text so the student renames the point; never a paid LLM call that would mint the node R.
-  /**
-   * #1673 (ADR-565): the sentence used the hidden letter of an unnamed circle's centre without naming the centre.
-   * The letter answers to nothing yet, so the note names the sentence that would make it the centre; the text
-   * stays in the box and no model is asked to guess what the letter means.
-   */
-  if (!r.ok && r.reason === 'hidden-centre-letter') {
-    const key = r.as === 'circle' ? 'input.hiddenCentreCircle' : 'input.hiddenCentreLetter';
-    return refuse('guided', { source: 'parser', result: `hidden-centre-letter:${r.as}:${r.letter}` }, { key, params: { letter: r.letter } });
-  }
   if (!r.ok && r.reason === 'reserved-symbol') {
     return refuse('guided', { source: 'parser', result: `reserved-symbol:${r.symbol}` }, { key: 'input.reservedSymbol', params: { symbol: r.symbol } });
   }

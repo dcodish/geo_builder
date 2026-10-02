@@ -90,6 +90,15 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     // Centre letters that were AUTO-assigned (unnamed circle → hidden centre): «מרכז המעגל הוא P» renames
     // one of these to the student's letter instead of minting a second circle (issue #112).
     autoCenters: construction.objects.flatMap((o) => (o.kind === 'circle' && o.autoCenter && !o.center.startsWith('~') ? [ctrToken(o.center)] : [])),
+    // #1673 (ADR-565): points nothing places (a bare free point, no polygon's vertex) — a naming may absorb one
+    freePoints: (() => {
+      const vertices = new Set(construction.objects.flatMap((o) => (o.kind === 'polygon' ? o.vertices : [])));
+      // a point a drawn circle is built from (a diameter end, a through point) is placed by that circle
+      const byId = new Map(construction.objects.map((o) => [o.id, o] as const));
+      const labelsIn = (o: unknown): string[] => (o ? JSON.stringify(o).match(/"[A-Z]\d*"/g)?.map((q) => q.slice(1, -1)) ?? [] : []);
+      for (const o of construction.objects) if (o.kind === 'circle') for (const l of [...labelsIn(o), ...labelsIn(byId.get(o.center))]) vertices.add(l);
+      return construction.objects.flatMap((o) => (o.kind === 'free-point' && /^[A-Z]\d*$/.test(o.id) && !vertices.has(o.id) ? [o.id] : []));
+    })(),
     // #538: whether the two unnamed circles are structurally identical under the pair swap — lets the
     // #186 binding name-by-use deterministically when asking "which circle?" has no informative answer.
     autosInterchangeable: autosInterchangeable(construction),

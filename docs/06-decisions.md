@@ -13586,55 +13586,92 @@ The parse was right in every row (`point-on-circle B` is emitted each time) — 
 
 **Consequences.** `src/replay/core.ts` (`waits`, `concludedByIndex`, `Derived.concluded`, `unpinnedSeats`, `deferralWorthwhile`), `src/app/decideDeterministic.ts` (passes the seed).
 
-## ADR-565 — An unnamed circle's centre answers to no letter until a sentence names it (#1673)
+## ADR-565 — The hidden centre letter steps aside: a letter the student types is always theirs (#1673, #1688)
 
-**Status:** accepted · 2026-10-02 · bug (P2) · operator ruling on #1670, 2026-10-02: *"an unlablled circle should not be O automatically"* · branch `fix/1673-hidden-centre` off `main` @ 92881500
+**Status:** accepted · 2026-10-02 · bug (P2) · operator rulings 2026-10-02: on #1670 (*"an unlablled circle should not be O automatically"*), then on #1686 / #1688 (below) · branch `fix/1673-hidden-centre` off `main` @ 92881500
 
-**Requirements:** [FR-RN-8](02-requirements.md) extended — an unnamed centre answers to no letter until a sentence names it · **Design:** [04-design.md](04-design.md) § "An unnamed centre answers to no letter" · **LADDER stage:** parser (the `parse()` exit, beside the #198 reserved-symbol guard); no solver or render change.
+**Requirements:** [FR-RN-8](02-requirements.md) extended — an unnamed centre answers to no letter; the student's letter is a new point until a sentence places it · **Design:** [04-design.md](04-design.md) § "The hidden centre letter steps aside" · **LADDER stage:** the submit seams, before the parser (`decideFromParse`, the ✎ edit seam, the scenario mirror); the store naming core (`nameCentreFacts`, `renameFacts`); the parser's auto-centre chokepoint (`withAnonymousAutoCentres`). No solver or render change.
 
-**Cites** [ADR-342](#adr-342) (anonymous centres; its 2026-07-17 metric amendment is **superseded** here), [ADR-347](#adr-347) (naming-by-use of an unnamed circle), [ADR-560](#adr-560) (the tangency opener's hidden centre), #198 (the reserved-symbol guard, the precedent for a letter the student may not reuse), [ADR-W-108](06w-decisions-workspace.md#adr-w-108) (the parity row), docs/17 §1 (class first).
+**Cites** [ADR-342](#adr-342) (anonymous centres; its 2026-07-17 metric amendment is **withdrawn** here), [ADR-347](#adr-347) (#186: a circle named by a letter that matches no circle names an unnamed one by use — the rule every letter now follows), [ADR-349](#adr-349) (directional naming), #538 (the interchangeable-pair pick), [ADR-560](#adr-560) (the tangency opener's hidden centre), [ADR-W-108](06w-decisions-workspace.md#adr-w-108) (the parity row), docs/17 §1.
 
-**Context — measured at pickup on 92881500 through `decideDeterministic2D`.** An unnamed circle keeps a reference token the tool picked (`O`, then `P`, `Q`, `K`): its id is `circle-O` and its centre `@ctr-O`. The student never sees the letter. Four paths let it answer to the student's letter:
+**The ruling.** Operator, 2026-10-02 (#1686 / #1688), on «BO = 5» beside an unnamed circle: *"the behavior should be to create a segment BO where B is where we know it is and O is free. if the user wants it to be the center, he can write next sentance that O is the center. the 2d behavior today is wrong since the user doesnt know that O was assigned. its even more confusing if there are 2 circles. thats why we create a random point O until user assigns its location"*. It replaces this ADR's first decision (below, *History*).
 
-| typed after an unnamed circle | before |
+**Context — measured at pickup on 92881500 through `decideDeterministic2D`.** An unnamed circle keeps an internal reference token the tool picked (`O`, then `P`, `Q`, `K`): its id is `circle-O`, its centre `@ctr-O`. The student never sees the letter, yet it answered to theirs:
+
+| typed | on 92881500 |
 | --- | --- |
-| «BO = 5», «OA = 5», «OP = 4», «AO», «זווית AOC = 40» | `name-center O` (+ `P`) — the metric binding revealed the hidden centre |
-| «AM חותך את CO בנקודה K» (corpus-2 :315), «D על CO», «D אמצע OC», «OM ⊥ AB», «משולש ABO», «המשך הקטע KO» | a free point O, minted beside a circle whose hidden centre had the same letter |
-| «CD קוטר במעגל O», «C על מעגל O» | bound to the hidden circle by its token; the centre stayed hidden (a fresh «מעגל K» names the centre K by use) |
-| «מעגל O» alone | a new circle with id `circle-O` overwrote the unnamed one: A, B lost the diameter circle |
+| «BO = 5», «OA = 5», «OP = 4», «AO», «זווית AOC = 40» after an unnamed circle | `name-center O` (+ `P`) — the ADR-342 metric binding revealed the hidden centre |
+| «AM חותך את CO» (corpus-2 :315), «D על CO», «OM ⊥ AB», «משולש ABO» | a free point O beside a circle whose hidden id also said O (`circle-O`), so a later «מעגל O» meant the circle and not the point |
+| «C על מעגל O» / «CD קוטר במעגל O» | bound to the hidden circle by its token, silently; a fresh «מעגל K» names the centre K by use (ADR-347) |
+| «מעגל O» alone | a new `circle-O` overwrote the unnamed circle: A and B lost their diameter circle |
+| «שני מעגלים נחתכים» · «מרכז המעגל הימני הוא O» (#1688) | renamed P's centre onto the left circle's `circle-O` — **every step failed** ("O is no longer available"), the figure wiped |
+| «AB קוטר» · «שני מעגלים נחתכים» (#1688) | the pair's picker re-used the token O and overwrote the diameter circle |
+| two unnamed circles · «O מרכז המעגל» (#1688) | named whichever circle the tool had lettered O; «Q מרכז המעגל» asks which |
 
-The issue's premise for corpus-2 :315 was half right: «CO» did not bind the hidden centre. It minted a separate free O. Both readings put a point the student never placed on the figure.
+**Class.** The token is internal, but it is a typable letter, and every letter-resolution path compared the student's letter with it. The fix is not per path. A letter the student types must never meet a hidden token.
 
-**Class.** A letter the student never assigned answers to a tool-made object. The four paths are one class. Only the first was a deliberate rule (`withMetricCentreBinding`); the other three are the token leaking through ordinary letter resolution.
+**Decision — the hidden token steps aside.**
+1. **Before the parse** (`decideFromParse`; the ✎ edit seam; the scenario mirror `factsOf`), every hidden token whose letter the sentence types (`typedLabels`: each Latin run of labels, «BO» → B, O) is re-lettered to a letter nobody uses (`stepAsideFacts` → `reletterHiddenFacts`: `@ctr-O`→`@ctr-P`, `circle-O`→`circle-P`, exact values only; the circle stays unnamed). It travels as a `step-aside` bind the caller applies with the store's `reletterHidden`, so the commit, the model's lane and undo see one figure. A refused line that only stepped aside leaves the store untouched (no phantom undo step). The student's O is then simply a new letter, and every existing rule treats it as one:
+   - «BO = 5», «AM חותך את CO», «OA = 5», «AO», «זווית AOC = 40», «משולש ABO» → **a new free point O**; the circle stays unnamed.
+   - «מעגל O» → **a new circle O**, as «מעגל K»; the unnamed circle is untouched.
+   - «C על מעגל O» beside one unnamed circle → names it by use, exactly as «C על מעגל K» (ADR-347). Beside several it **asks which**, unless the pair is interchangeable (#538).
+   - «CD קוטר במעגל O» with new C, D → a new circle O on that diameter, as with K. With A, B already on the unnamed circle («משולש ABC חסום במעגל» · «AB קוטר במעגל O»), the circle they ride is named by use (`circleOnDiameter`, new), and AB becomes its diameter — never a second circle through two of its points.
+2. **Naming places an existing free point.** «O מרכז המעגל» (and «מרכז המעגל הוא O», "O is the centre of the circle", «OB רדיוס», «הרדיוס OB») after «BO = 5» **places that free O at the centre**. `nameCentreFacts` absorbs a target letter when nothing places it (no command defines it but a bare `free-point`, it is no shape's vertex, and the circle exists before its first use). The bare `free-point` fact is dropped, and every fact that used O now uses the centre. `ctx.freePoints` (new) lets `parseNameCenter`, the `nameCenter` rule and `impliedCircleBinding` see such a point as nameable. Points a drawn circle is built from (a diameter end, a through point) are excluded.
+3. **Radius sentences name the centre by use.** «OB רדיוס» / «הרדיוס OB» beside an unnamed circle used to rely on O being the token. Now the end that is not on the circle and may be named is the centre (`radiusNamesCentre`; with two new letters, the first written, centre-first as textbooks write a radius). It is emitted as the ADR-347 implied circle, and the #186 seam binds it.
+4. **The naming core never collides.** `nameCentreFacts` steps another circle's hidden token aside when the target letter is that token (#1688's wipe). `renameFacts` does the same before a rename takes the letter. The sole unnamed circle's own token may BE the student's letter — naming then reveals it (`parseNameCenter`, the size and directional paths).
+5. **Tool-minted twins never collide.** `withAnonymousAutoCentres` re-picks a new unnamed circle's token when it is already a drawn circle's token (not `ifAbsent`), so «AB קוטר» · «שני מעגלים נחתכים» adds two circles beside the diameter circle.
+6. `withMetricCentreBinding` is deleted (ADR-342's amendment, withdrawn by the ruling).
 
-**Decision.** One guard, `withHiddenCentreGuard`, wraps every `parse()` result. Every rule, the clause split and the model's canonical lines pass through `parse()`, so they all meet it. `withMetricCentreBinding` is deleted. For each token X that is not a real point:
+**Measured after** (same door; `src/__tests__/issue-1673-hidden-centre.test.ts`):
 
-1. **The sentence names the centre** (`name-center X`, from «O מרכז המעגל», «OB רדיוס», «הרדיוס OB», "O is the centre of the circle"): unchanged. These sentences name the centre with the student's own letter.
-2. **The sentence calls the circle «מעגל X» and uses it:** a `name-center X` is prepended. This is naming-by-use, exactly what «מעגל K» already got from ADR-347.
-3. **The sentence creates a new circle `circle-X`** (not `ifAbsent`, not tool-minted): refused, `hidden-centre-letter` with `as: 'circle'` (`input.hiddenCentreCircle`).
-4. **The sentence introduces X as its own new point** (`id` / `id1` / `id2`: «נקודה O», «O על המעגל»): a fresh point, as for any fresh letter.
-5. **Otherwise X is only referenced:** refused, `hidden-centre-letter` with `as: 'point'`. The note (`input.hiddenCentreLetter`, He + En) teaches «X מרכז המעגל». The submit door maps both to a `guided` refusal, so the text stays in the box and no model is asked.
+| typed | now |
+| --- | --- |
+| tangency · «BO = 5» | builds; O a free point, the circle unnamed |
+| … · «O מרכז המעגל» | O placed at the centre; \|BO\| = 5, OA ⟂ AB hold, every step green |
+| corpus-2 :315 as typed | builds; O free, K on CO. With «O מרכז המעגל» after it, O moves to the centre and K stays on CO |
+| «OA = 5», «AO», «זווית AOC = 40», «D על CO», «OM ⊥ AB», «משולש ABO» | build with O a new point |
+| «OB רדיוס», «הרדיוס OB», «O מרכז המעגל» after «AB קוטר» | name the centre O (kept) |
+| «BO = 5» · «OB רדיוס»; «נקודה O» · «O מרכז המעגל» | the free O is placed at the centre |
+| «מעגל O» after «AB קוטר» | a second circle O; the diameter circle intact |
+| «C על מעגל O» / «C על מעגל K» | the one unnamed circle named by use |
+| «CD קוטר במעגל O» / «… K» | a new circle on CD |
+| «משולש ABC חסום במעגל» · «AB קוטר במעגל O» | the circumcircle named O, ∠ACB = 90 |
+| two circles · «מרכז המעגל הימני הוא O» | no wipe; the right circle is O; «מרכז המעגל השמאלי הוא P» · «OP» then build |
+| «AB קוטר» · «שני מעגלים נחתכים» | three circles; AB still a diameter |
+| two intersecting circles · «O מרכז המעגל» | asks which circle (`input.unknownCircle`) |
+| two circles · «OP = 4» | two free points, both circles unnamed |
 
-**Measured after** (same door): every row of the first two table rows is refused with the note. After «O מרכז המעגל» the same sentences build on the real centre. «OB רדיוס», «הרדיוס OB», «O מרכז המעגל» and "O is the centre of the circle" name the centre as before. «CD קוטר במעגל O» names O, and a following «BO = 5» builds. «מעגל O» alone is refused with the diameter circle intact. «מעגל K» still draws a second circle. «נקודה O» · «BO = 5» builds a fresh O with the centre still hidden.
+**Behaviour change, said out loud.** Two-circle flows that refer to «מעגל O» / «מעגל P» without having named the circles («שני מעגלים נחתכים בנקודות A ו B» · «נקודה C על מעגל P») now **ask which circle P is**, where the hidden letters used to answer. For a fresh pair of intersecting circles nothing tells them apart, yet #538's interchangeability check sees the two crossing branches as distinct, so it asks. Their note teaches the directional naming («מרכז המעגל הימני הוא P»).
 
-**Scenarios and tests changed, each measured (recorded per the plan):**
-- `stated-meet-relocates-loose-point` (corpus-2 :315, operator session gaawv4fr) gains «O מרכז המעגל» after «AB קוטר». The ADR-255 meet it guards needs «CO» to be the radius. The exact sequence is now refused at its last line, and that refusal is locked in the new test.
-- `q5-isosceles-incircle-sqrt3-ratio-and-area` gains «O מרכז המעגל» after the incircle. Its «OA» / «OB» / «OC» / «AC=√(3)CO» / «OK» all named the hidden incentre.
-- `two-circles-kite-surfaces-kite-and-isosceles-theorems` gains «O מרכז המעגל» and «P מרכז המעגל» before «OP», in its steps and in its theorem `factsOf`.
-- `two-tangent-circles-then-size-given-flexes-radii` gains the same two naming lines before «OP=4». This is the `23vqi9u8` flow that ADR-342's amendment was written for: the size given now follows a naming.
-- `degenerate-tangent-line-fails-fast-no-freeze` reads the centres as `O` and `P`, not `@ctr-O` / `@ctr-P`. Its «C על מעגל P» and «למעגל O» now name them by use (decision 2). No step changed.
-- Unit tests: `anon-centre.test.ts` (the metric-binding test now asserts the refusal, then the named radius given); `line-circle-on-segment.test.ts` and `theorems/matchers.test.ts` (the incircle and kite sequences gain the naming lines).
-- `.geo.json` fixtures: none changed. `fixtures.test.ts` is green as-is.
-- **Parity goldens** (`decide-parity-1395-*`): 22 scenario keys re-recorded (7 in shard 2, 11 in shard 3, 4 in shard 4; shard 1 unchanged), and shard 4 gains the new scenario's key. Four of them are the scenarios above that gained naming lines. The other 18 are two-circle sequences («שני מעגלים נחתכים» · «C על מעגל P» …), `degenerate-tangent-line-fails-fast-no-freeze` among them. In each, «מעגל O/P» now names the centre by use (decision 2), so the centres become visible points `O` / `P`. Apart from degenerate-tangent's centre ids, every one of the 18 passes its own scenario check unchanged.
+**Scenarios, tests and goldens changed (each measured):**
+- `stated-meet-relocates-loose-point` (corpus-2 :315, gaawv4fr): **back to the operator's exact sequence**. O is a free point; the check reads the circle by structure, asserts O is not its centre, and still asserts K within AM and CO with M outside.
+- `q5-isosceles-incircle-sqrt3-ratio-and-area` and `two-tangent-circles-then-size-given-flexes-radii` (23vqi9u8) keep the «O מרכז המעגל» (+ «P מרכז המעגל») lines this branch added: they name the centres before «OA» / «OP=4», and the tangent pair is interchangeable, so the plain naming binds.
+- `inscribe-existing-triangle-with-radius-symbol` gains «O מרכז המעגל» after the circumcircle («משולש ADO» means that centre).
+- 18 two-circle scenarios gain «מרכז המעגל השמאלי הוא O» · «מרכז המעגל הימני הוא P» after their opener. This reproduces the old token assignment (the r=5 circle on the left), so every check stands unchanged:
+  - corpus-2: `two-circles-kite-surfaces-kite-and-isosceles-theorems` (steps + its theorem `factsOf`), `degenerate-tangent-line-fails-fast-no-freeze`, `extension-onto-circle-side-inferred-from-circle`, `chord-tangent-to-other-circle-at-endpoint` (its pre-baked model step's `@ctr-P` is now `P`);
+  - corpus-3: `free-point-on-circle-both-extensions-reach-far-side`, `extend-onto-tangent-line-is-rejected-clearly`, `q4-constraints-order-independent`, `redefine-existing-point-onto-circle`, `distance-drives-circle-centres-apart`, `two-circles-mutual-tangent-secants`, `angle-equality-on-q4`, `second-intersection-avoids-shared-point`, `inscribe-existing-points-in-existing-circle`, `two-collinear-chain-solves`;
+  - corpus-4: `two-circles-then-secant-from-A`, `shared-endpoint-extension-either-side-default`, `plural-hemshekhei-extensions-meet`, `adr-124-contradictory-extension-refused-honestly`.
+- `gxccyt2n-hidden-centre-never-squats-letter` counts two anonymous centres instead of reading `@ctr-O` / `@ctr-P` by name (P stepped aside).
+- The scenario mirror (`scenario-pipeline.ts`) now mirrors the app in three places it did not: the store-op naming (`parseNameCenter` → `nameCentreFacts`), the step-aside, and a which-circle question. On that question the app ASKS, and the mirror used to commit the implied circle instead — a silent divergence; it now fails the scenario.
+- Unit tests: `anon-centre.test.ts` («OA=5» draws a free O, the naming then places it; the reported «P על המשך BA» counts anonymous centres); `values-panel-labels-1442.test.ts` (two circles: the student names one before its radius, labelled «רדיוס O»); `line-circle-on-segment.test.ts` and `theorems/matchers.test.ts` keep the naming lines this branch added (their raw `parse` mirror has no step-aside); `decide-purity-1395.test.ts` applies the new bind.
+- `.geo.json` fixtures: none changed; `fixtures.test.ts` green.
+- **Parity goldens** (`decide-parity-1395-*`), re-recorded:
+  - shard 1: `gxccyt2n` (P now steps aside);
+  - shards 2–4: the scenarios above whose steps changed, plus five whose recorded path changed but whose figure is the same — `name-existing-circle-centre` and `tangency-first-creates-the-circle-1650` (the naming is now the store op), `bagrut-chord-diameter-perp-session` («הרדיוס OB» names by use), `diameter-on-existing-chord-is-a-constraint` (decision 1, diameter), `existing-point-statements-lower-to-constraints` (O stepped aside, the same "cannot hold" at its last line);
+  - the new scenario's key.
+- **Parity row** `hidden-centre-letter-1673`: `expect: 'builds'`, no gaps. The analytic thin lock fails on this branch alone until S5a lands analytic's agreement.
 
-**Locks.** `src/__tests__/issue-1673-hidden-centre.test.ts` (23, through `decideDeterministic2D` with the store applied as the pipeline applies it, plus one at `parse()`): the parity row, corpus-2 :315 as typed, eight reference forms, the two-circle «OP = 4», the parse boundary, the taught remedy, corpus-2 :315 with the naming line, the three naming spellings, English, «מעגל O» naming-by-use, the new-circle collision, «מעגל K» unchanged, and the two introductions. Scenario `hidden-centre-letter-refused-1673` (corpus 4) declares step 2 in `refusedSteps`, then names the centre and builds. The parity row `hidden-centre-letter-1673` drops its 2-D known gap. **Fails before: 16 of 23** (the seven that pass before are controls: the naming spellings, «מעגל K», and the two introductions), plus the new scenario.
+**Locks.** `src/__tests__/issue-1673-hidden-centre.test.ts` (26, through `decideDeterministic2D` with the store applied as the pipeline applies it). Scenario `hidden-centre-letter-steps-aside-1673` (corpus 4): «BO = 5» leaves O free and the circle unnamed, then «O מרכז המעגל» places O at the centre with |BO| = 5 and the tangency intact. **Fails before: 13 of 26**, measured by running the test against 92881500's product files. The 13 that pass before are controls: corpus-2 :315 (it already minted a free O), the naming spellings, the end state of «BO = 5» · «O מרכז המעגל» (the old binding reached the same figure), and the K mirrors.
 
-**Not built, said out loud (a follow-up, not this fix).** The token still collides with the student's letter wherever the student uses it for a different object:
-- «שני מעגלים נחתכים» · «מרכז המעגל הימני הוא O» renames circle P's centre to O while circle O's token is O. The figure wipes: every step fails with "O is no longer available". This was measured identically on 92881500, through the store-op `nameCentre` path, which this guard does not see.
-- «AB קוטר» · «שני מעגלים נחתכים» mints a second `circle-O` and overwrites the diameter circle. The tool-minted collision is exempted from decision 3, so it behaves as before.
-- After «נקודה O», a later «מעגל O» still resolves to the hidden circle.
-- With two unnamed circles that are not interchangeable, «O מרכז המעגל» still names the circle whose token is O, while «Q מרכז המעגל» asks which circle.
+**History — the first decision on this branch (withdrawn the same day).** The first cut refused every reference to the hidden letter («BO = 5» → "the circle's centre has no name yet; write «O מרכז המעגל»") and refused «מעגל O» as an overwrite. The operator's #1686 / #1688 ruling replaced the refusal with the free point: the student's letter is theirs, and placing it is a later sentence's job. The refusal reason (`hidden-centre-letter`) and its two notes were removed.
 
-The mechanism these need is for the hidden token to yield: re-letter it to a free hidden letter whenever the student takes its letter. That is a store-level rename across facts, and it is recommended as its own issue.
+**Not built.** A fresh pair of intersecting circles is not treated as interchangeable (#538), so «מעגל P» on it asks rather than picking. *A ruling for the operator:* (a) keep asking — the current, literal reading of #1688; (b) extend #538 so the crossing branches count as symmetric, and the first «מעגל P» names one circle deterministically. (b) would let the bagrut two-circle flows build as typed, without naming lines, but «O מרכז המעגל» on such a pair would then name a circle instead of asking. Recommended: (b), since the pick asserts nothing the student could tell apart. The model lane is unchanged: `llmParse` re-parses canonical lines against the figure as given to the model, where the tokens are what it was shown.
 
-**Consequences.** `src/parser/parse.ts` (`withHiddenCentreGuard`, `labelsDeep`, the `hidden-centre-letter` `ParseResult` member; `withMetricCentreBinding` and `METRIC_KINDS` deleted), `src/app/decideDeterministic.ts` (the guided refusal), `src/i18n/locales/{he,en}.json` (`input.hiddenCentreLetter`, `input.hiddenCentreCircle`). Behaviour change for a student: after an unnamed circle, a sentence that uses its centre's letter without naming it («BO = 5») is refused with the sentence to type («O מרכז המעגל»), where it used to bind the hidden centre silently or draw a stray point O. «מעגל O» now reveals the centre it names.
+**Consequences.**
+- `src/store/geoStore.ts`: `hiddenCentreTokens`, `reletterHiddenFacts`, `stepAsideFacts`, `absorbablePoint`; `nameCentreFacts` / `renameFacts` step aside and absorb; store action `reletterHidden`.
+- `src/parser/parse.ts`: `typedLabels`, `nameableAsCentre`, `radiusNamesCentre`, `impliedCentreCircle`, the `ctx.freePoints` reads, the `circleOnDiameter` naming-by-use, the `withAnonymousAutoCentres` re-pick; `withMetricCentreBinding` deleted.
+- `src/parser/context.ts`: `freePoints`.
+- `src/app/decideDeterministic.ts`: the step-aside and the `step-aside` bind.
+- `src/app/submitPipeline.ts`, `src/app/editPipeline.ts`: apply it.
+
+**Behaviour change for a student:** after an unnamed circle, «BO = 5» draws a new free point O, and «O מרכז המעגל» then puts it at the centre. «מעגל O» draws a new circle. Two unnamed circles are named before they are referred to by letter.
