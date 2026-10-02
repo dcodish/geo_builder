@@ -886,8 +886,9 @@ only, and the circle stays unnamed. The move travels as a `step-aside` bind that
 
 - a reference («BO = 5», «AM חותך את CO») mints a free point;
 - «מעגל O» declares a new circle;
-- «C על מעגל O» names the unnamed circle by use through the ADR-347 seam, or asks which circle when there are
-  several.
+- «C על מעגל O» names the unnamed circle by use through the ADR-347 seam. Two unnamed circles that
+  `autosInterchangeable` finds interchangeable are named in order. That check reads a circle-circle crossing as an
+  unordered pair whose `branch` is seed (ruling (b), #1688). Otherwise it asks which circle.
 
 Naming places a free point. `nameCentreFacts` absorbs a target letter that nothing places. Such a point has only a
 bare `free-point` definition, is no shape's vertex, and is first used after the circle exists. Its bare

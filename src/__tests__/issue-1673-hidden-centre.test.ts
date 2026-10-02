@@ -189,9 +189,26 @@ describe('#1688 — the hidden letter never collides with the student\'s naming'
     allOk();
   });
 
-  it('two unnamed intersecting circles: «O מרכז המעגל» ASKS which circle — never the one whose hidden letter was O', async () => {
-    const vs = await run(['שני מעגלים נחתכים', 'O מרכז המעגל']);
-    const v = vs[1];
+  it('ruling (b): two fresh intersecting circles are interchangeable — «O מרכז המעגל» names the first, «P מרכז המעגל» the other', async () => {
+    built(await run(['שני מעגלים נחתכים', 'O מרכז המעגל', 'P מרכז המעגל']));
+    expect(circles().map((c) => c.center)).toEqual(['O', 'P']); // by order: the first drawn circle takes the first new letter
+    allOk();
+  });
+
+  it('ruling (b): the bagrut flow builds as typed — «נקודה C על מעגל P» names one circle, «מעגל O» the other', async () => {
+    built(await run(['שני מעגלים נחתכים בנקודות A ו B', 'נקודה C על מעגל P', 'המשך CA חותך את מעגל O בנקודה D', 'המשך CB חותך את מעגל O בנקודה E']));
+    expect(circles().map((c) => c.center).sort()).toEqual(['O', 'P']);
+    const P = pos('P'), O = pos('O');
+    expect(dist(pos('C'), P)).toBeCloseTo(dist(pos('A'), P), 6);
+    expect(dist(pos('D'), O)).toBeCloseTo(dist(pos('A'), O), 6);
+    expect(dist(pos('E'), O)).toBeCloseTo(dist(pos('B'), O), 6);
+    // every step built (the far-side order of the extensions is the seed search's job, as in the scenario harness)
+    expect(Object.values(fig().status).every((x) => x === 'ok')).toBe(true);
+  });
+
+  it('circles a statement already tells apart still ASK: «C על המעגל הגדול» then «O מרכז המעגל»', async () => {
+    const vs = await run(['שני מעגלים נחתכים', 'C על המעגל הגדול', 'O מרכז המעגל']);
+    const v = vs[2];
     expect(v.kind === 'refuse' && v.category).toBe('clarify');
     expect(v.kind === 'refuse' && 'key' in v.note && v.note.key).toBe('input.unknownCircle');
     expect(circles().every((c) => c.center.startsWith('@ctr-')), 'nothing named').toBe(true);

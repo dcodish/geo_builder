@@ -50,11 +50,20 @@ describe('#186 — implied circle tagging + the binding decision', () => {
     expect((implied[0] as { id: string }).id).toBe('circle-O2');
   });
 
-  it('two unnamed circles + NO membership signal → clarify (never a silent pick)', () => {
+  it('two FRESH intersecting circles + no signal → the first is named, by order (#1688 ruling (b), ADR-565)', () => {
+    // nothing tells the pair apart — swapping them only reflects the figure — so naming either asserts nothing
     const facts = factsFrom(['שני מעגלים נחתכים']);
     const cmds = parseOk('E ו C על מעגל O2', facts); // E,C are new — no signal
-    const bind = impliedCircleBinding(cmds, ctxOf(facts));
-    expect(bind).toEqual({ clarify: 'unknown-circle', center: 'O2' });
+    expect(impliedCircleBinding(cmds, ctxOf(facts))).toEqual({ from: 'O', to: 'O2' });
+  });
+
+  it('two unnamed circles a statement tells apart + NO membership signal → clarify (never a silent pick)', () => {
+    const facts: Fact[] = [
+      ...factsFrom(['שני מעגלים נחתכים']),
+      { id: 'r.0', group: 'r', utterance: 'D על המעגל', cmd: { type: 'point-on-circle', id: 'D', circle: 'circle-P' } as AnyCommand, enabled: true },
+    ];
+    const cmds = parseOk('E ו C על מעגל O2', facts); // E,C are new — no signal; D distinguishes circle P
+    expect(impliedCircleBinding(cmds, ctxOf(facts))).toEqual({ clarify: 'unknown-circle', center: 'O2' });
   });
 
   it('a stated-membership signal picks the circle the subjects already ride', () => {
