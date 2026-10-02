@@ -493,7 +493,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-118', family: 'chords-arcs', steps: ['רבע מעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1622' }] },
   { id: 'cat-2d-119', family: 'chords-arcs', steps: ['גזרה AOB בזווית 80'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1622' }] },
   { id: 'cat-2d-120', family: 'chords-arcs', steps: ['מעגל O', 'מיתר AB במעגל O'], expect: 'builds', exception: 'X8' },
-  { id: 'cat-2d-121', family: 'chords-arcs', steps: ['AB ו-CD מיתרים במעגל O'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1669' }] },
+  { id: 'cat-2d-121', family: 'chords-arcs', steps: ['AB ו-CD מיתרים במעגל O'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1670' }] },
   { id: 'cat-2d-122', family: 'circles', steps: ['מנקודה E מחוץ למעגל O ישר חותך את המעגל בנקודות A ו-B'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1622' }] },
   { id: 'cat-2d-123', family: 'circles', steps: ['משולש ABC', 'מעגל O', 'הישר AO חותך את מעגל O בנקודות C ו-D'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-124', family: 'circles', steps: ['מעגל O', 'נקודה A', 'נקודה D', 'נקודה B', 'AD חותך את מעגל O בנקודה B'], expect: 'builds', exception: 'X8' },
