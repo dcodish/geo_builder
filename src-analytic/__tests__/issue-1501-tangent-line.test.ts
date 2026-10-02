@@ -126,9 +126,12 @@ describe('#1501 — every order and the contextual form', () => {
     expect(dist(m, 1, 1, -1)).toBeCloseTo(f.radius()!, 5);
   });
 
-  it('«הישר l1 משיק למעגל M» about a circle the figure does not have is refused', () => {
+  it('«הישר l1 משיק למעגל M» about a circle the figure does not have STATES it; a numeral circle is still refused', () => {
+    // #1670 (ADR-AG-210, follow 2-D): a named circle the figure lacks is stated on that centre — free centre, free radius.
     const d = derive([L1, 'הישר l1 משיק למעגל M'], 0);
-    expect(d.faults.map((f) => f.code)).toEqual(['unknown-reference']);
+    expect(d.faults).toEqual([]);
+    expect(d.construction.objects.some((o) => o.id === 'circle-at-M')).toBe(true);
+    expect(derive([L1, 'הישר l1 משיק למעגל 2'], 0).faults.map((f) => f.code)).toEqual(['unknown-reference']);
   });
 
   it('a mixed list — «מעגל O משיק לציר ה-x ולישר l1» — is the axis AND the line', () => {

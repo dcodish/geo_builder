@@ -37,6 +37,8 @@ export interface LineFault {
   /** #1432 am. 1 — the host a contextual reference needed, and the bound a stated value broke. */
   host?: ApplyError['host'];
   domain?: ApplyError['domain'];
+  /** #1670 — a new letter not minted because the figure holds a circle whose centre has no letter yet. */
+  unnamedCentre?: ApplyError['unnamedCentre'];
 }
 
 /**
@@ -128,10 +130,10 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   const reported = new Set<string>();
   errors.forEach((e, i) => {
     if (!e) return;
-    const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null]);
+    const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null, e.unnamedCentre ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.unnamedCentre ? { unnamedCentre: true as const } : {}) });
   });
 
   /**

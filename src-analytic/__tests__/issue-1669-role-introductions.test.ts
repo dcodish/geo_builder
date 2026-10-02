@@ -250,11 +250,12 @@ describe('#1669 — which circle (the operator ruling)', () => {
     expect(typed(['x^2+y^2=25', 'x^2+y^2=4', 'הקוטר AB מקביל לציר ה-y']).kinds.at(-1)).toBe('refused:ambiguous-shape');
   });
 
+  // #1670 (ADR-AG-210, operator 2026-10-02 — follow 2-D): a radius whose ONE new end is the unnamed centre NAMES it with
+  // the student's letter — «AB קוטר» · «OB רדיוס» builds now (locked in issue-1670-follow-2d.test.ts). What stays refused:
+  // both ends new (nothing says which is the centre), and no circle at all.
   it.each([
-    [['AB קוטר', 'OB רדיוס'], 'refused:out-of-scope'],
-    [['AB קוטר', 'הרדיוס OB'], 'refused:out-of-scope'],
-    [['מיתר AB', 'OA רדיוס'], 'refused:out-of-scope'],
     [['(x-1)^2+(y-2)^2=9', 'OA רדיוס'], 'refused:out-of-scope'],
+    [['מיתר AB', 'CO רדיוס'], 'refused:out-of-scope'],
     [['הרדיוס OB'], 'refused:ambiguous-shape'],
     [['OB רדיוס'], 'refused:ambiguous-shape'],
   ])('REFUSAL — a radius on an unnamed or absent centre stays refused: %j', (lines, verdict) => {

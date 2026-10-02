@@ -142,7 +142,8 @@ export function errorText(error: InputError, t: Translate): string {
     'conflicting-restatement': 'errConflict',
     'name-kind-clash': 'errNameClash',
     // An id with no prefix (and so no kind) falls to the kind-free wording rather than guessing.
-    'unknown-reference': kind ? UNKNOWN_REF_KEY[kind] : 'errUnknownRef',
+    // #1670 — a new letter beside a circle whose centre has no letter: it may BE that centre, so the remedy names it.
+    'unknown-reference': error.key === 'unknown-reference' && error.unnamedCentre ? 'errUnknownRefUnnamedCentre' : kind ? UNKNOWN_REF_KEY[kind] : 'errUnknownRef',
     'kind-mismatch': 'errKindMismatch',
     'does-not-exist': 'errDoesNotExist',
     'ring-contradicts-noun': 'errRingContradictsNoun',

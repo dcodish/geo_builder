@@ -2102,4 +2102,13 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - A diameter's two ends are antipodal (the segment passes through the centre and is twice the radius).
 - With no circle in the figure, «AB קוטר» draws the circle on AB, and «מיתר AB» / «המיתר AB …» draws a circle through A and B; the centre has no letter until «O מרכז המעגל» names it. An equation stated afterwards («משוואת המעגל היא …») is that circle's equation.
 - With one circle the sentence is about that circle; with several it asks which.
-- «OA רדיוס» means OA is a radius (as «הרדיוס OA»). A radius on a circle whose centre has no letter, or with no circle at all, is still refused.
+- «OA רדיוס» means OA is a radius (as «הרדיוס OA»). With no circle at all it is still refused. On a circle whose centre has no letter, the radius now names the centre (R141, #1670).
+
+**R141 — a sentence that names points or a circle the figure does not have yet builds as it does in the 2-D tool**
+([ADR-AG-210](06c-decisions-analytic.md#adr-ag-210), [#1670](https://github.com/dcodish/geo_builder/issues/1670); operator rulings 2026-10-02: follow 2-D, *"accept new letter with same logic the 2d tool has"*, and an unlabelled centre is never «O» until named).
+
+- «AB קוטר» · «OB רדיוס» (and «מיתר AB» · «OA רדיוס», «A על המעגל» · «OA רדיוס»): the radius gives the centre the student's letter — O is the centre. If both ends of the radius are new, or there is no circle, the sentence is still refused.
+- «A על המעגל» (and «A על מעגל», «A, B ו-C על המעגל», "A is on a circle") with no circle draws a circle through the point; its centre has no letter and moves with «הציגו תצורה אחרת», as does its radius.
+- A circle named by a letter the figure does not have yet is drawn on that centre: «A על המעגל שמרכזו M», «A על מעגל O», «מיתר AB במעגל O», «AB ו-CD מיתרים במעגל O», «AB קוטר במעגל O», «AB משיק למעגל C», «המשיק למעגל O בנקודה A».
+- New letters in a relation are added as free points where the 2-D tool adds them: «BD⊥AC», «AB∥CD», «AB = CD», «AB = 5», «AB + BC = 10», «זווית ABC = 30», «M אמצע AB», «E על AB», «AB חותך את CD בנקודה E», «C מחלקת את AB ביחס 3:2», «AD גובה במשולש ABC» (which also draws the triangle). A point a later line defines is still defined there. «AB = 2CD», «AB:BC = 2:3» and «AD גובה לצלע BC» with new letters are still refused, as in 2-D.
+- While the figure has a circle whose centre has no letter, a new letter is not added: it may be meant as that centre. The message says so and offers both fixes — «O מרכז המעגל», or defining the new points first.

@@ -73,9 +73,9 @@ describe('#1651 — the measured table: every circle noun records, and states it
     (line) => {
       expect(last([...CTX, line])).toBe('record');
       expect(claimsIn(line)).toEqual([
-        // `create` (#1669, ADR-AG-204): a chord's end with no circle in the figure states the circle.
-        { t: 'on-kind', id: 'B', kind: 'circle', create: true, src: '' },
-        { t: 'on-kind', id: 'C', kind: 'circle', create: true, src: '' },
+        // With no circle in the figure the chord states it (#1669, ADR-AG-204) — as every incidence now does (#1670).
+        { t: 'on-kind', id: 'B', kind: 'circle', src: '' },
+        { t: 'on-kind', id: 'C', kind: 'circle', src: '' },
         { t: 'selector', sel: { kind: 'distinct', ids: ['B', 'C'] }, src: '' },
       ]);
     },
@@ -296,7 +296,9 @@ describe('#1652 — a length given draws the pair it names; a distance draws not
     expect(last(['A(0,0)', 'B(3,4)', 'AB = 6'])).toBe('refused:unsatisfiable');
   });
 
-  it('a length over points that do not exist still refuses — the drawn piece never introduces them', () => {
-    expect(last(['OC = 15'])).toBe('refused:unknown-reference');
+  it('a scaled length over points that do not exist still refuses — the drawn piece never introduces them', () => {
+    // #1670 (ADR-AG-210): a PLAIN length («OC = 15») now mints its new letters, as 2-D does; a scaled one does not, in
+    // either builder — so the drawn piece is still never what introduces a point.
+    expect(last(['OC = 2OD'])).toBe('refused:unknown-reference');
   });
 });
