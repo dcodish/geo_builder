@@ -82,6 +82,8 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "AB and AD are tangent to circle O at E and K": {
     "en": [
+      "segment",
+      "segment",
       "bisector",
       "point-on-line",
       "foot",
@@ -89,6 +91,8 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle-through",
     ],
     "he": [
+      "segment",
+      "segment",
       "bisector",
       "point-on-line",
       "foot",

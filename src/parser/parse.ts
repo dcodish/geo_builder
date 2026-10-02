@@ -508,7 +508,11 @@ const resolveOrIntroduceCircle = (s: string, ctx: ParseContext, opts?: { implied
   // `implied` (#184): a construct noun that presupposes its circle — a bare «קוטר»/"a diameter",
   // «משיק»/"a tangent" — introduces one even without the circle word.
   if (circles.length === 0 && (mentionsCircle(s) || opts?.implied)) {
-    const c = freeLabel([...(ctx.points ?? [])], ['O', 'P', 'Q', 'K']);
+    // #1650: the auto letter dodges the sentence's OWN labels too, not only the drawn ones — the anonymiser
+    // (`withAnonymousAutoCentres`) remaps every exact use of the letter, so a letter the sentence also names
+    // as a point (a fresh «O» typed in the same line) would be swallowed into the hidden centre.
+    const said = (s.match(/[A-Z]\d*/g) ?? []);
+    const c = freeLabel([...(ctx.points ?? []), ...said], ['O', 'P', 'Q', 'K']);
     return {
       center: c,
       prepend: [{ type: 'circle', id: circleId(c), center: c, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, autoCenter: true }],
@@ -5891,15 +5895,38 @@ const cornerTangentCircle: Rule = (s, ctx) => {
   // else THE one circle when the figure has exactly one (so "AB ו-AD משיקים למעגל" with NO name and a single
   // circle present still constrains it instead of spawning a spurious corner circle that hijacks labels like E
   // — the exact misfire in the operator's bagrut-Q4 session). Mirrors `tangentLine`/ADR-099.
-  const namedCenter = circleCenter(s);
-  const existingCenter =
-    namedCenter && (ctx.circles ?? []).some((c) => up(c) === up(namedCenter))
-      ? up(namedCenter)
-      : !namedCenter && (ctx.circles ?? []).length === 1
-        ? up(ctx.circles![0])
-        : null;
-  if (existingCenter) {
-    const O = existingCenter;
+  //
+  // #1650 (ADR-560): bind-or-create is asked of the SHARED resolver (`existingCircleRef` /
+  // `resolveOrIntroduceCircle`, #159/#430), not re-decided here. The rule's own copy knew only "named and
+  // drawn" or "exactly one", and with NO circle it always took the corner construction below — which needs
+  // the corner's three points to exist (it bisects the angle) and the touch points to be FREE (it defines
+  // them as feet). The operator's corpus 6/4 opener «AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה» has
+  // neither: nothing is drawn yet, and the touch points ARE the arm tips — so it emitted a bisector over
+  // undefined points and `foot A` defined A from itself, and the submit gate refused it. The ruling on
+  // #1619 (2026-10-01): a tangency about «המעגל» with no circle CREATES the circle, its centre unnamed
+  // until a later «O מרכז המעגל» names it; one circle binds; several are ambiguous (the analytic sibling
+  // is ADR-AG-196/198). Beside several circles with no tie-break this rule now declines, so
+  // `ambiguousCircleAsk` asks — it used to mint a third circle.
+  const tpM = s.match(/(?:\bat\b|בנקוד(?:ות|ה|ים)?)\s+([A-Za-z]\d*)\s*(?:and|ו-?|,)\s*([A-Za-z]\d*)/i); // בנקוד\w* fails — \w excludes Hebrew, so the suffix must be spelled out
+  const namedTips = tpM ? [up(tpM[1]), up(tpM[2])] : null;
+  const known = new Set((ctx.points ?? []).map(up));
+  const existingCenter = existingCircleRef(s, ctx);
+  const namedRaw = circleCenter(s);
+  const named = namedRaw && /^[A-Z]/.test(namedRaw) ? up(namedRaw) : null;
+  // An anonymous «המעגל» the figure cannot bind (several circles, no tie-break) is AMBIGUOUS — never a pick
+  // and never a fresh circle; declining hands it to `ambiguousCircleAsk`, which asks which one.
+  if (!existingCenter && !named && (ctx.circles ?? []).some((c) => !c.startsWith('~'))) return null;
+  // The corner construction CREATES the circle constructively — it DEFINES the touch points (feet from a
+  // centre on the bisector), so it can only when they are free: fresh labels, not the arm tips, not points
+  // already placed. A corner point not yet drawn is minted by its side, as a shape macro mints its vertices.
+  // Touch points that are GIVEN (the tips, or placed points) cannot be redefined: the circle is introduced
+  // by the shared resolver and the touches are stated on it exactly as on a drawn circle.
+  const cornerBuildable =
+    !existingCenter && (!namedTips || namedTips.every((T) => !known.has(T) && T !== vertex && T !== arm1 && T !== arm2));
+  const intro = existingCenter || cornerBuildable ? null : resolveOrIntroduceCircle(s, ctx);
+  if (!existingCenter && !cornerBuildable && !intro) return null;
+  if (existingCenter || intro) {
+    const O = existingCenter ?? intro!.center;
     const members = membersOfCenter(ctx, O);
     // Named tangency points ("בנקודות D ו C" / "at D and C") pair with the two arms IN ORDER. WITHOUT names
     // the tangent point IS the arm's own tip (tangent AT the endpoint — the ADR-115 kite case). The DISTINCTION
@@ -5907,9 +5934,8 @@ const cornerTangentCircle: Rule = (s, ctx) => {
     // so it is D that lies on O with the radius ⟂ the side — the arm ENDPOINT stays where it is (e.g. A on
     // another circle), NOT forced onto O. (ADR-228 Am.5 — the operator's bagrut-Q11: AB tangent to O2 at D,
     // with A on O1; the old code forced A onto O2 → contradiction.)
-    const tpM = s.match(/(?:\bat\b|בנקוד(?:ות|ה|ים)?)\s+([A-Za-z]\d*)\s*(?:and|ו-?|,)\s*([A-Za-z]\d*)/i); // בנקוד\w* fails — \w excludes Hebrew, so the suffix must be spelled out
-    const tips = tpM ? [up(tpM[1]), up(tpM[2])] : [arm1, arm2];
-    const cmds: AnyCommand[] = [];
+    const tips = namedTips ?? [arm1, arm2];
+    const cmds: AnyCommand[] = [...(intro?.prepend ?? [])]; // a circle this sentence itself introduces (#1650)
     for (const [arm, T] of [[arm1, tips[0]], [arm2, tips[1]]] as const) {
       cmds.push({ type: 'segment', a: vertex, b: arm }); // draw the tangent side (idempotent if already an edge)
       if (!members.has(T)) cmds.push({ type: 'point-on-circle', id: T, circle: circleId(O) }); // the TANGENT POINT lies on the circle
@@ -5921,12 +5947,11 @@ const cornerTangentCircle: Rule = (s, ctx) => {
   // The circle's centre: the named one ("circle O"), else a fresh auto-name — the corner circle is a
   // NEW object, so "AB ו-AD משיקים למעגל" (no name) is built deterministically rather than escalating
   // (the centre is dodged against the figure's labels, like the incircle's incenter).
-  const center = circleCenter(s) ?? freeLabel([vertex, arm1, arm2, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M']);
+  const center = named ?? freeLabel([vertex, arm1, arm2, ...(namedTips ?? []), ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M']);
   // optional named tangency points: "at E and K" / "בנקודות E ו-K"
-  const tp = s.match(/(?:\bat\b|בנקוד(?:ות|ה|ים)?)\s+([A-Za-z]\d*)\s*(?:and|ו-?|,)\s*([A-Za-z]\d*)/i); // בנקוד\w* fails — \w excludes Hebrew, so the suffix must be spelled out
   const taken = [vertex, arm1, arm2, center, ...(ctx.points ?? [])];
-  const E = tp ? up(tp[1]) : freeLabel(taken, ['E', 'F', 'G']); // tangency on side 1 (also the circle's through-point)
-  const K = tp ? up(tp[2]) : freeLabel([...taken, E], ['K', 'M', 'N']); // tangency on side 2
+  const E = namedTips ? namedTips[0] : freeLabel(taken, ['E', 'F', 'G']); // tangency on side 1 (also the circle's through-point)
+  const K = namedTips ? namedTips[1] : freeLabel([...taken, E], ['K', 'M', 'N']); // tangency on side 2
   const bisId = `bis-${arm1}${vertex}${arm2}`;
   // #785 (ADR-462): this lowering encodes tangency STRUCTURALLY — the centre rides the corner's bisector
   // and the radius IS the perpendicular distance to each side, so no `tangent` command is emitted and
@@ -5934,12 +5959,20 @@ const cornerTangentCircle: Rule = (s, ctx) => {
   // centre; this shape is `foot` + `circle-through`, one encoding past it. The rule declares what it
   // encoded on EVERY command it emits, so the gate's operand accounting sees all the stated labels.
   const enc = { consumed: { verbs: [VERB_TANGENT] } };
+  // #1650: a side whose end is not drawn yet mints it (the `segment` command introduces a free endpoint) —
+  // on an empty canvas the sentence states the corner as well as the circle. A drawn corner is unchanged.
+  const mint: AnyCommand[] = [arm1, arm2]
+    .filter((arm) => !known.has(vertex) || !known.has(arm))
+    .map((arm) => ({ type: 'segment', a: vertex, b: arm }));
   return [
+    ...mint,
     { type: 'bisector', id: bisId, vertex, p: arm1, q: arm2, ...enc },
     { type: 'point-on-line', id: center, line: bisId, offset: 2, ...enc }, // the centre — a FREE DOF sliding along the bisector (seed kept small so resample stays within the sides)
     { type: 'foot', id: E, from: center, a: vertex, b: arm1, ...enc }, // tangency point on side 1
     { type: 'foot', id: K, from: center, a: vertex, b: arm2, ...enc }, // tangency point on side 2
-    { type: 'circle-through', id: circleId(center), center, through: E, ...enc }, // r = dist(centre, side) ⇒ tangent to both
+    // r = dist(centre, side) ⇒ tangent to both. #1650: an UNNAMED centre is `autoCenter` — hidden until a
+    // later «O מרכז המעגל» names it (ADR-342; the #1619 ruling: no tool-chosen letter is offered).
+    { type: 'circle-through', id: circleId(center), center, through: E, ...(named ? {} : { autoCenter: true }), ...enc },
   ];
 };
 
