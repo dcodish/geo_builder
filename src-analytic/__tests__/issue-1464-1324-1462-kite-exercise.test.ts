@@ -161,9 +161,11 @@ describe('#1324 — a circle from its diameter, and a diameter of an existing ci
     expect(d.figure.curves.filter((c) => c.curve.kind === 'circle')).toHaveLength(2);
   });
 
-  it('refusals: a circle known only by its equation (out-of-scope), two circles and none named (ambiguous)', () => {
+  it('refusals: placed ends that cannot be a diameter of an equation circle (unsatisfiable), two circles and none named (ambiguous)', () => {
+    // ADR-AG-203 (#1665): a circle known only by its equation is no longer refused out-of-scope — the diameter is the
+    // chord through its centre. Placed ends that are not on it are a contradiction, refused on the diameter's line.
     const eq = derive(['B(-3,0)', 'D(3,0)', '(x-3)^2+(y-4)^2=9', 'BD קוטר במעגל'], 0);
-    expect(eq.faults.map((f) => [f.index, f.code])).toEqual([[3, 'out-of-scope']]);
+    expect(eq.faults.map((f) => [f.index, f.code])).toEqual([[3, 'unsatisfiable']]);
     const two = derive(['A(0,4)', 'B(-3,0)', 'D(3,0)', 'מעגל ABD', '(x-3)^2+(y-4)^2=9', 'BD קוטר במעגל'], 0);
     expect(two.faults.map((f) => [f.index, f.code])).toEqual([[5, 'ambiguous-shape']]);
     // Ends that coincide have no circle.

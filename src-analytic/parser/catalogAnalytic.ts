@@ -251,6 +251,21 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'BD is a diameter of the circle',
     needs: ['B(7,7)', 'D(1,1)'],
   },
+  // The circle named by its ring or by its centre inside another sentence (#1663, ADR-AG-203).
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'D על המעגל החוסם את המשולש ABC',
+    en: 'D is on the circumcircle of triangle ABC',
+    needs: ['A(0,0)', 'B(6,0)', 'C(2,4)', 'משולש ABC חסום במעגל', 'x^2+y^2=16'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'A על המעגל שמרכזו M',
+    en: 'A is on the circle with centre M',
+    needs: ['נתון מעגל שמרכזו M', 'x^2+y^2=16'],
+  },
   {
     category: 'circles',
     family: 'F5',
@@ -787,6 +802,21 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // The centre of the circle the figure HAS, named — contextually or by its equation (#1598, ADR-AG-193).
   { category: 'derived', family: 'F16', he: 'O מרכז המעגל', en: 'O is the centre of the circle', needs: ['(x-3)^2+(y-4)^2=9'] },
   { category: 'derived', family: 'F16', he: 'P מרכז המעגל x^2+y^2=16', en: 'P is the centre of the circle x^2+y^2=16', needs: ['O(5,5)', 'x^2+y^2=16'] },
+  // A COMPUTED circle among several, named by its ring (#1663, ADR-AG-203) — the circumcircle and the incircle.
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'K מרכז המעגל החוסם את המשולש ABC',
+    en: 'K is the centre of the circumcircle of triangle ABC',
+    needs: ['A(0,0)', 'B(6,0)', 'C(2,4)', 'משולש ABC חסום במעגל', 'x^2+y^2=16'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'K מרכז המעגל החסום במשולש ABC',
+    en: 'K is the centre of the circle inscribed in triangle ABC',
+    needs: ['A(0,0)', 'B(6,0)', 'C(2,4)', 'במשולש ABC חסום מעגל', 'x^2+y^2=16'],
+  },
   // The crossing sentence and the point-on-a-named-circle (#1429): neither had a catalog row, so
   // the panel could not teach them and the LLM lane could not emit them — the discoverability half
   // of the operand-resolver class.

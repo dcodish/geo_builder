@@ -3,7 +3,9 @@ import { isKnowledge, knownCurve, settled, type Figure, type Knowledge } from '.
 import { VERTICAL_TOL, verticality } from '../engine/lines';
 import { lineAngleOf } from './lineAngle';
 import { isDirectionSymbol, paramRegister, usedSymbols } from '../engine/carriers';
-import { type ParamDecl, positionalOf } from '../engine/types';
+import { type Construction, type ParamDecl, positionalOf } from '../engine/types';
+import { exprText, symbolsOf, type Expr } from '../engine/expr';
+import { curveEquationText } from './curveText';
 import { isolateRtlName } from '../../shell/bidi';
 
 /**
@@ -159,6 +161,38 @@ export function segmentKnowledge(d: Pick<Derivation, 'construction' | 'figure'>)
     });
     return { id: seg.id, ends: seg.ends, vertical, slope, angle, length };
   });
+}
+
+/**
+ * WHAT AN UNFIXED CURVE ROW SAYS (#1023, #1060, #1299; moved here from `App.tsx` by #1659, ADR-AG-203).
+ *
+ * Its own equation, symbolically, when it has one — and for a circle given by its CENTRE (#1060), the centre
+ * and radius it was stated with, because that IS how the student wrote it; a computed circle as what defines
+ * it. The dash — the panel's "not determined by the givens" — when there is nothing truthful to say.
+ *
+ * **An expression that reads a TOOL symbol is not the student's, and is never printed** (#1659). The `θ_`
+ * family (`carriers.ts` — a free line's direction, the centre and radius of a circle a tangency sentence
+ * created with its centre unnamed) are unknowns the tool made up: the parameter rows already keep them out by
+ * `isDirectionSymbol`, and this row printed them raw — «(x − θ_circle-touched.a)² + …». An open curve whose
+ * equation is the tool's is exactly "not determined by the givens", so it reads as the dash, the same as every
+ * other undetermined row. Asked of the EXPRESSION, never of the object's kind or id, so any future shape the
+ * tool creates is covered by the same test. Lived inline in the component, where no lock could call it
+ * (ADR-W-053).
+ */
+export const readsToolSymbol = (e: Expr): boolean => symbolsOf(e).some(isDirectionSymbol);
+export function openCurveText(c: Pick<Construction, 'objects'>, id: string): string {
+  const o = c.objects.find((q) => q.id === id);
+  // #1299 — notation has ONE owner (`curveText.ts`), and it delegates to `lineText` for a line whose
+  // coefficients are numbers, so this row and a determined line's row cannot disagree.
+  if (o?.kind === 'curve') return readsToolSymbol(o.curve.eq) ? '—' : curveEquationText(o.curve.eq);
+  if (o?.kind === 'circle-at') return readsToolSymbol(o.r) ? '—' : `O(${o.centre}), r = ${exprText(o.r)}`;
+  // A computed circle (#1464, #1324) is written as what defines it: ⊙ through its points, ⌀ its diameter,
+  // and the inscribed circle as the ring it is inscribed in (#1619 B2).
+  if (o?.kind === 'circle-thru') {
+    if (o.def.t === 'diameter') return `⌀${o.def.a}${o.def.b}`;
+    return o.def.t === 'through' ? `⊙${o.def.pts.join('')}` : `○${o.def.pts.join('')}`;
+  }
+  return '—';
 }
 
 /** Does the panel print at least one quantity as UNKNOWN? (the #1289 invariant's right-hand side) */

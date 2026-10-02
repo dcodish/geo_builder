@@ -16,7 +16,7 @@
  * lands, and nowhere else.
  */
 import { fitConic } from './conic';
-import { bareLineName, lineIdOf, nameReading, numeralCurveId, numeralTwin, refKindOf, statedName, type RefKind } from './names';
+import { bareLineName, lineIdOf, nameReading, numeralCurveId, numeralTwin, readDescribedCircle, refKindOf, statedName, type DescribedCircle, type RefKind } from './names';
 import { parabolaDirectrix, resolveCurve } from './curves';
 import { parseLengthExpr } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule } from './derived';
@@ -613,9 +613,36 @@ function centreIdOf(c: Construction, o: GeoObject): Id | null {
  * centre M. Asked here once, so every reference reaches every naming.
  */
 function circleByName(c: Construction, name: string): GeoObject | undefined {
+  const described = readDescribedCircle(name);
+  if (described) return describedCircle(c, described);
   const direct = objectById(c, numeralCurveId('circle', name)) ?? objectById(c, `circle-at-${name}`) ?? curveByName(c, name);
   if (direct) return direct;
   return c.objects.find((o) => curveKindOf(o) === 'circle' && centreIdOf(c, o) === name);
+}
+
+/**
+ * THE CIRCLE A RING DESCRIBES (#1663, ADR-AG-203) — «המעגל החוסם את המשולש ABC» is the circle the figure states
+ * EVERY vertex on (a defining point of a computed circle, or an incidence — so a triangle inscribed in an equation
+ * circle names that circle); «המעגל החסום במשולש ABC» is the computed incircle of that ring, or the circle the
+ * figure states tangent to every side of it (the touch sentence's circle, ADR-AG-198). Asked of what the figure
+ * STATES, never of the circle's kind, so every way a circle can come to pass through or touch a ring is the same
+ * name. None → undefined, and the caller refuses the reference as it refuses any unknown circle name.
+ */
+function describedCircle(c: Construction, d: DescribedCircle): GeoObject | undefined {
+  const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+  if (d.role === 'circum') {
+    const onIt = (o: GeoObject, p: Id) =>
+      (o.kind === 'circle-thru' && o.def.t !== 'incircle' && circleDefPoints(o.def).includes(p)) ||
+      c.constraints.some((k) => k.t === 'on-curve' && k.id === p && k.curve === o.id);
+    return circles.find((o) => d.pts.every((p) => onIt(o, p)));
+  }
+  const ring = ringId(d.pts);
+  const sides = d.pts.map((p, i) => [p, d.pts[(i + 1) % d.pts.length]] as const);
+  return circles.find(
+    (o) =>
+      (o.kind === 'circle-thru' && o.def.t === 'incircle' && ringId(o.def.pts) === ring) ||
+      sides.every(([a, b]) => statedTangentToSide(c, o.id, a, b)),
+  );
 }
 
 /**
@@ -1711,8 +1738,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * - A circle named, or the one circle in the figure: the sentence is ABOUT it (M1). Lowered exactly:
      *   a circle on a centre point → both ends on it and the centre at their midpoint; a circle through
      *   three points two of which are the ends → the right angle at the third (Thales, both directions);
-     *   the circle already on this diameter → known. A circle known only by its equation has no centre
-     *   point to state the midpoint of, and is refused BY NAME (`out-of-scope`) — never dropped.
+     *   the circle already on this diameter → known. Any other circle (an equation circle, a created one,
+     *   any computed circle) → both ends on it, distinct, and AB through its centre (#1665, ADR-AG-203).
      * - Several circles and none named: refused as ambiguous, never a pick.
      */
     case 'diameter-of': {
@@ -1765,7 +1792,27 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           }
         }
       }
-      return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      /**
+       * EVERY OTHER CIRCLE — an equation circle, the circle a tangency sentence created with its centre unnamed,
+       * a computed circle the ends are not defining points of (#1665, ADR-AG-203). A diameter is the chord
+       * through the CENTRE, and the centre is the resolved circle's whatever way it was stated — nothing needs
+       * its letter. So: both ends on the circle, the two ends different points (a chord has two ends, #1638),
+       * and AB along the radius at A — the line through A and B passes through the centre, and with B ≠ A on
+       * the circle that makes B the antipode of A. The radius is the direction operand the touch lowering
+       * already relates (ADR-AG-195), read off the RESOLVED circle, so this is one lowering for every kind. It
+       * was refused `out-of-scope` because the only lowering stated the centre as a POINT (the midpoint), which
+       * a circle with no centre letter does not have. (A RADIUS still needs its centre end named — `role-of`.)
+       */
+      return applyAll(c, [
+        on(f.a),
+        on(f.b),
+        { t: 'selector', sel: { kind: 'distinct', ids: [f.a, f.b] }, src: f.src },
+        {
+          t: 'constraint',
+          k: { t: 'relation', rel: 'parallel', u: { k: 'points', a: f.a, b: f.b }, v: { k: 'radius', circle: host.id, at: f.a } },
+          src: f.src,
+        },
+      ]);
     }
 
     /**
@@ -1908,6 +1955,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (f.circleId !== undefined) {
         host = objectById(c, f.circleId);
         if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, f.circleId) };
+      } else if (f.circle !== undefined) {
+        host = circleByName(c, f.circle);
+        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
       } else if (f.eq !== undefined) {
         const id = resolveCurveByEq(c, f.eq);
         if (!id) return create();

@@ -461,6 +461,21 @@ export function centresOf(figure: Figure, letter: string): Namable[] {
       out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence: `${letter} מרכז המעגל`, centreOf: cu.id });
       continue;
     }
+    /**
+     * ONE OF SEVERAL: a computed circle is named by its RING (#1663, ADR-AG-203) — «P מרכז המעגל החוסם את המשולש
+     * ABC» for the circle through three points, «P מרכז המעגל החסום במשולש ABC» for a triangle's incircle. The
+     * grammar reads both back (the frame's described-circle fold, `circleByName`), so the ring the contextual form
+     * could not offer is offered with this one. A quadrilateral's incircle has no centre rule, so no ring.
+     */
+    const ring = (prefix: string) => (cu.id.startsWith(prefix) ? cu.id.slice(prefix.length).match(/[A-Z][0-9₀-₉]?/g) ?? [] : []);
+    const thru = ring('circle-thru-');
+    const inner = ring('circle-in-');
+    if (!numeralKey(cu.id) && (thru.length === 3 || inner.length === 3)) {
+      const sentence =
+        thru.length === 3 ? `${letter} מרכז המעגל החוסם את המשולש ${thru.join('')}` : `${letter} מרכז המעגל החסום במשולש ${inner.join('')}`;
+      out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence, centreOf: cu.id });
+      continue;
+    }
 
     /**
      * The student's own letter comes from the ID, not from `label.name`.

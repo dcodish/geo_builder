@@ -201,6 +201,54 @@ const EN_KEYS = Object.keys(EN_SHAPE).sort((a, b) => b.length - a.length);
 const SHAPE_EN = `(?:${EN_KEYS.map((k) => k.replace(/[ -]/g, '[\\s-]+')).join('|')})`;
 const LETTERS = `((?:${NAME}){3,4})`;
 
+/**
+ * A CIRCLE NAMED BY ITS RING, INSIDE A SENTENCE (#1663, ADR-AG-203) — «X מרכז המעגל החוסם את המשולש ABC», «A על
+ * המעגל החסום במשולש ABC», «… משיק למעגל החוסם את ABC», "the circumcircle of triangle ABC", "the incircle of
+ * triangle ABC", "the circle inscribed in triangle ABC". A computed circle has no letter and no equation, so
+ * among several circles this description is the only thing that names it.
+ *
+ * Folded to the described-circle NAME («המעגל ⊙ABC» / «המעגל ○ABC», `names.ts`) that every circle sentence's
+ * name slot reads, so the whole reference grammar learns it at once and M1 resolves it by what the figure states
+ * (`circleByName`). The ADJECTIVE carries the article («החוסם», «החסום») — that is what makes it a definite
+ * reference to a circle the figure has; «מעגל שחוסם …» / «מעגל חוסם …» describe a circle and stay the inscription
+ * sentences' own. A line that IS the description and nothing more («המעגל החוסם את המשולש ABC») is the
+ * inscription STATEMENT, read by its own rule (it binds or creates, ADR-AG-196) — never folded.
+ */
+const DESCRIBED_HE: ReadonlyArray<[RegExp, '⊙' | '○']> = [
+  [new RegExp(`מעגל\\s+החוס(?:ם|מת)\\s+(?:את\\s+)?(?:ה?${SHAPE_HE}\\s+)?${LETTERS}(?![A-Za-z0-9₀-₉'])`, 'g'), '⊙'],
+  [new RegExp(`מעגל\\s+החסו(?:ם|מה)\\s+ב(?:ה)?${SHAPE_HE}\\s+${LETTERS}(?![A-Za-z0-9₀-₉'])`, 'g'), '○'],
+];
+const DESCRIBED_EN: ReadonlyArray<[RegExp, '⊙' | '○']> = [
+  [new RegExp(`\\bcircumcircle\\s+of\\s+(?:the\\s+)?(?:${SHAPE_EN}\\s+)?${LETTERS}(?![A-Za-z0-9₀-₉'])`, 'gi'), '⊙'],
+  [new RegExp(`\\bcircle\\s+circumscribing\\s+(?:the\\s+)?(?:${SHAPE_EN}\\s+)?${LETTERS}(?![A-Za-z0-9₀-₉'])`, 'gi'), '⊙'],
+  [new RegExp(`\\bincircle\\s+of\\s+(?:the\\s+)?(?:${SHAPE_EN}\\s+)?${LETTERS}(?![A-Za-z0-9₀-₉'])`, 'gi'), '○'],
+  [new RegExp(`\\bcircle\\s+inscribed\\s+in\\s+(?:the\\s+)?${SHAPE_EN}\\s+${LETTERS}(?![A-Za-z0-9₀-₉'])`, 'gi'), '○'],
+];
+/**
+ * «… על המעגל שמרכזו M», «… משיק למעגל שמרכזו M …», «… מחוץ למעגל שמרכזו M», «… לרדיוס המעגל שמרכזו M» — a circle
+ * REFERRED TO by its centre is «מעגל M» (#1059's reading: the letter is the centre), the name every reference slot
+ * reads. Only after a word that makes it a reference — a preposition («על», «של», «בתוך», «ל-») or «רדיוס»: the
+ * creation («נתון מעגל שמרכזו M …») and the inscription sentences («… חסום במעגל שמרכזו M», «במעגל שמרכזו M
+ * חסום …», «המעגל שמרכזו C החסום במשולש …») read their own «שמרכזו» tail and are never folded.
+ */
+const CENTRED_REF_HE = new RegExp(
+  `(?<![א-ת])((?:על|של|בתוך|ל?רדיוס)\\s+ה?מעגל|ל(?:ה)?מעגל)\\s+ש(?:ה)?מרכזו\\s+(?:(?:הוא|היא)\\s+)?(?:ה?נקודה\\s+)?(${NAME})(?![A-Za-z0-9₀-₉'])`,
+  'g',
+);
+const CENTRED_REF_EN = new RegExp(
+  `\\b((?:on|to|of|inside|outside)\\s+(?:the\\s+)?circle)\\s+(?:with|whose)\\s+cent(?:re|er)\\s+(?:is\\s+)?(?:at\\s+)?(${NAME})(?![A-Za-z0-9₀-₉'])`,
+  'gi',
+);
+const WHOLE_DESCRIPTION = /^(?:ה?מעגל|(?:the\s+|a\s+)?circle)\s+[⊙○][A-Z0-9₀-₉]+$/i;
+export function describedCircles(line: string): string {
+  let out = line
+    .replace(CENTRED_REF_HE, (_m, ref: string, centre: string) => `${ref} ${centre}`)
+    .replace(CENTRED_REF_EN, (_m, ref: string, centre: string) => `${ref} ${centre}`);
+  for (const [re, mark] of DESCRIBED_HE) out = out.replace(re, (_m, run: string) => `מעגל ${mark}${run}`);
+  for (const [re, mark] of DESCRIBED_EN) out = out.replace(re, (_m, run: string) => `circle ${mark}${run}`);
+  return out === line || WHOLE_DESCRIPTION.test(out) ? line : out;
+}
+
 /** A noun phrase the registry knows, in its canonical spelling — or null. */
 const shapeKey = (phrase: string): string | null => {
   const he = normalizeShapeNoun(phrase);
