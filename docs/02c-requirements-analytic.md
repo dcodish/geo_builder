@@ -1037,6 +1037,22 @@ imperative over something the tool does not understand («צייר משהו יפ
 today. The verbs are a closed, published list, not a model's judgement: what counts as non-canonical
 input is a teaching decision this product owns.
 
+**The exam's own construction imperatives are taught the same way** ([ADR-AG-206](06c-decisions-analytic.md#adr-ag-206),
+[#1620](https://github.com/dcodish/geo_builder/issues/1620); operator ruling 2026-10-01). The bagrut builds its
+figure with «העבירו», «הורידו», «מעבירים», «בחרו», often after an adverbial and not at the start of the line. Each
+is answered with the plain sentence, pre-filled for the student to confirm:
+
+- «העבירו משיק למעגל בנקודה C» → «המשיק למעגל בנקודה C»; «דרך הנקודה D שעל המעגל העבירו משיק למעגל» → «המשיק למעגל בנקודה D» (a tangent at D touches the circle at D, so nothing is dropped).
+- «העבירו מיתר AD» → «המיתר AD»; «העבירו את האלכסון AC במרובע ABCD» → «האלכסון AC במרובע ABCD».
+- «בחרו נקודה E כרצונכם, הנמצאת על הצלע DC» → «הנקודה E נמצאת על הצלע DC» («כרצונכם» says the point is free, which it already is). When the figure already holds the sentence, it is still taught, and confirming it answers «already known».
+- «מן הנקודה B הורידו אנך לציר ה-x» → «האנך מהנקודה B לציר ה-x»; «מן הקודקודים A ו-C העבירו אנכים לציר ה-x, החותכים אותו בנקודות E ו-F בהתאמה» → «האנכים מהקודקודים A ו-C לציר ה-x חותכים אותו בנקודות E ו-F בהתאמה».
+- «מן הנקודה E העבירו ישר המקביל לציר ה-y וחותך את הצלע AB בנקודה F» → «הישר העובר דרך הנקודה E מקביל לציר ה-y וחותך את הצלע AB בנקודה F».
+- «דרך E מעבירים קטע EF המקביל ל-DA» → «הקטע EF מקביל ל-DA»; «במשולש OBC העבירו גבהים OD ו-BE לצלעות BC ו-OC בהתאמה» → «במשולש OBC, OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה».
+
+A sentence the tool cannot yet accept is not taught: the line keeps its honest refusal. A sentence that DESCRIBES
+a drawn object with the same verb — «הנקודה E נמצאת על האנך שהורידו מנקודה B לציר ה-x» — is not an instruction
+and is never taught.
+
 **R113 — a display name reads in the right order, whatever its script**
 ([ADR-AG-149](06c-decisions-analytic.md#adr-ag-149),
 [#1344](https://github.com/dcodish/geo_builder/issues/1344)). The panel's equations row must read
@@ -2020,7 +2036,7 @@ The student types the exam's own tangency sentence with its touch point and the 
 - A line may be tangent to a circle given by its equation: «הישר y=kx+10 משיק למעגל x²+y²=25» finds the values of k, cycled by «הציגו תצורה אחרת». «דרך P עובר משיק למעגל» draws a tangent from P, and the other tangent is the other configuration.
 - A chord is accepted: «AB מיתר במעגל», «הצלע AB נמצאת על המעגל», «במעגל המיתרים AC ו-BD נפגשים בנקודה E», «במעגל שמרכזו M המיתרים AB ו-BC שווים».
 
-Refused by name, never drawn: a tangent from a point inside the circle, a touch point that would coincide with the line's other end, and a bare «המשיק» when the figure has no tangent or several. The imperatives «העבירו משיק / מיתר» wait on #1620.
+Refused by name, never drawn: a tangent from a point inside the circle, a touch point that would coincide with the line's other end, and a bare «המשיק» when the figure has no tangent or several. The imperatives «העבירו משיק / מיתר» are taught as these sentences (R114).
 
 **R133 — «המעגל» is the circle the figure has**
 ([ADR-AG-196](06c-decisions-analytic.md#adr-ag-196), [#1633](https://github.com/dcodish/geo_builder/issues/1633), [#1619](https://github.com/dcodish/geo_builder/issues/1619)).

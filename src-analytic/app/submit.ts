@@ -182,7 +182,16 @@ export function decideSubmit(
      * no verb in front yields no candidates at all.
      */
     if (!parseLine(candidate.remainder).ok) continue;
-    if (decideSubmit(candidate.remainder, lines, seed, current).kind === 'record') {
+    /**
+     * #1620 (ADR-AG-206) — for the EXAM's construction register, a sentence the figure ALREADY HOLDS is
+     * taught too. The exam restates its givens in imperative form («בחרו נקודה E כרצונכם, הנמצאת על הצלע
+     * DC» after «במלבן ABCD, הנקודה E נמצאת על הצלע DC», 2/4), and refusing it would tell the student the
+     * tool cannot read a sentence it reads perfectly. The pre-filled sentence is still one the next Enter
+     * ACCEPTS — it answers «already known» there, recording nothing, which is the honest answer about it.
+     * The tool wrapper («הוסף …») keeps #1353's stricter promise: what it teaches, the next Enter records.
+     */
+    const next = decideSubmit(candidate.remainder, lines, seed, current).kind;
+    if (next === 'record' || (candidate.exam && (next === 'already-known' || next === 'already-follows'))) {
       return { kind: 'teach', verb: candidate.verb, canonical: candidate.remainder };
     }
   }
@@ -488,3 +497,24 @@ export const reachesFallback = (verdict: SubmitVerdict): boolean =>
   // answers, so it keeps the deterministic refusal and never costs a call. `not-handled` carries the
   // student's own line as its detail (the #1272 lock), so the predicate needs nothing more.
   hasConstructionSignal(verdict.error.detail ?? '', VOCABULARY_ANALYTIC);
+
+/**
+ * THE LINES A STUDENT ENDS UP WITH when they type `typed` one at a time and confirm every lesson
+ * (#1620, ADR-AG-206).
+ *
+ * A taught imperative is never recorded as typed: the box is pre-filled with `canonical`, and one Enter
+ * records THAT. So the honest coverage of an exam's text is the coverage of what this function returns —
+ * each line as typed, except where {@link decideSubmit} teaches, where it is the sentence taught. The
+ * corpus ratchet calls this rather than re-implementing the teaching ("locks must call, not reproduce"),
+ * so a change to the register moves the count the moment it moves what students see.
+ *
+ * Each decision sees the lines before it AS CONFIRMED, exactly as the session would hold them.
+ */
+export function confirmTaught(typed: readonly string[], seed: number): string[] {
+  const out: string[] = [];
+  for (const line of typed) {
+    const v = decideSubmit(line, out, seed);
+    out.push(v.kind === 'teach' ? v.canonical : line);
+  }
+  return out;
+}

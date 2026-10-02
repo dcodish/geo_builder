@@ -2097,3 +2097,25 @@ Add a row to the helper table:
 **One place.** `parseClause` wraps the grammar's rules (`parseClauseRules`) and passes every clause's facts through `withRoleIntroductions`, so every direct, framed and split reading gets the same treatment. It reads the clause's role facts: a `diameter-of`'s two ends, a radius `role-of`'s two ends and an `on-kind` circle's subject. Any end the clause does not already define (`POINT_MAKERS`) or declare gets a `declare` placed FIRST. The claim facts a `ClaimSink` emits come after the rule's own facts, and those facts reference the ends. An existing point absorbs its `declare`, so placement is never disturbed. `RADIUS_PREDICATE` routes «OA רדיוס» to the radius role in `parseShape`, so `applyRoleOf` decides which end is the centre and refuses an unnamed or absent centre.
 
 **The created circle.** A chord's `on-kind` carries `create` (set by `claimFacts` and the contextual `chordFacts`). With no circle, M1 applies `touchedCircleFacts`, the ADR-AG-198 creation (an equation circle over the tool's free symbols, centre unnamed), and puts the end on it. A diameter with no circle already states the `circle-thru` diameter circle. A `circle-eq` bound to the created circle replaces its expression under the same id and drops its free symbols, the way the incircle sentence redefines it. This is how a later «משוואת המעגל היא …» fixes the circle that the chords or a tangency created.
+
+## The exam's construction register ([ADR-AG-206](06c-decisions-analytic.md#adr-ag-206), #1620)
+
+**Two registers, one gate.** `parser/scopeAnalytic.ts` holds the tool wrapper (#1353: a verb FIRST, stripped) and,
+beside it, `constructionCandidates` — the exam's register. It reads a closed grammar
+`ADVERBIAL* VERB ADVERBIAL* NOUN NAMES? REST` after `unwrap`: the verbs are `CONSTRUCTION_VERBS_HE` (whole
+tokens, so «שהורידו» never matches); the adverbials are «מן/מ(ה)נקודה|קודקוד(ים) X», «דרך (הנקודה) X (שעל ה…)»
+and «ב<polygon> XYZ»; the nouns are a closed table with their definite forms; the relative participles of
+REST («המקביל», «החותך», «הנמצאת», …) become its predicate (the first loses «ה», each later one gains «ו»);
+«כרצונכם» is dropped. One composition rule per noun: tangent (at the through-point, its «שעל המעגל» implied),
+line/segment («העובר דרך …», or nothing when a named segment already starts at the anchor), perpendicular
+(«מ<anchor>»), role nouns (the copula «ב<polygon>, X ו-Y הם גבהים …»), and the definite subject for the rest.
+`imperativeCandidates` offers these readings first, flagged `exam`.
+
+**The register never decides.** `decideSubmit` keeps a candidate only when the parser and the fold accept it,
+so the taught text is always a sentence the next Enter accepts. An `exam` candidate is also taught when the
+figure already holds it (`already-known` / `already-follows`): the exam restates givens imperatively. The tool
+wrapper keeps #1353's `record`-only rule.
+
+**Coverage counts what the student confirms.** `confirmTaught(lines, seed)` (`app/submit.ts`) walks the lines
+through `decideSubmit` and substitutes each lesson; the 471 ratchet derives that list, so the teaching is
+called, never re-implemented in the test.
