@@ -1,0 +1,140 @@
+{
+ "name": "round-2026-10-02c",
+ "title": "fix round 2026-10-02 C — «AB קוטר» introduces its points / creates the circle (#1669), centre letters renamable (#1667), one verdict for a contradictory chord in 2-D (#1668)",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "אנליטית: «AB קוטר במעגל» בלי למקם את A ו-B קודם",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+y^2=25",
+    "AB קוטר במעגל"
+   ],
+   "lookFor": "השורה השנייה ירוקה; A ו-B על המעגל, משני צדי המרכז (0,0)",
+   "before": "נדחה — היה צריך לכתוב קודם «A על המעגל», «B על המעגל»"
+  },
+  {
+   "id": "T2",
+   "title": "אנליטית: «AB קוטר» בלי מעגל — נוצר מעגל, ואז נותנים שם למרכז",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "AB קוטר",
+    "O מרכז המעגל"
+   ],
+   "lookFor": "שתי השורות ירוקות; נוצר מעגל שקוטרו AB; אחרי השורה השנייה O באמצע AB",
+   "before": "השורה הראשונה נדחתה"
+  },
+  {
+   "id": "T3",
+   "title": "אנליטית: A כבר על המעגל — B נקבע מולו",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+y^2=25",
+    "A(3,4)",
+    "AB קוטר במעגל"
+   ],
+   "lookFor": "A נשאר ב-(3,4) ו-B ב-(−3,−4)",
+   "before": "נדחה"
+  },
+  {
+   "id": "T4",
+   "title": "אנליטית: «המיתר AB מקביל לציר ה-x» בלי למקם את A ו-B",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+y^2=25",
+    "המיתר AB מקביל לציר ה-x"
+   ],
+   "lookFor": "ירוק; A ו-B על המעגל ו-AB אופקי",
+   "before": "נדחה"
+  },
+  {
+   "id": "T5",
+   "title": "אנליטית: שני מעגלים — «AB קוטר במעגל» שואל לאיזה (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+y^2=25",
+    "(x-12)^2+y^2=4",
+    "AB קוטר במעגל"
+   ],
+   "expectRefusal": "מעגל",
+   "lookFor": "השורה השלישית נדחית ושואלת לאיזה מעגל הכוונה",
+   "before": "נדחה בהודעה אחרת (אות לא מוכרת)"
+  },
+  {
+   "id": "T6",
+   "title": "אנליטית: שינוי שם של מרכז מעגל",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתונה הנקודה A(9,1)",
+    "נתון מעגל שמרכזו P"
+   ],
+   "lookFor": "לחצו על P והקלידו Q: כל השורות משתמשות ב-Q והציור לא זז; «בטל» מחזיר. שוב לחצו על P והקלידו A ← «החליפו בין P ל-A»: האותיות מתחלפות",
+   "before": "«לא ניתן לשנות שם בבטחה»"
+  },
+  {
+   "id": "T7",
+   "title": "אנליטית: שינוי שם בריבוע — הציור לא זז",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון ריבוע ABCD"
+   ],
+   "lookFor": "לחצו על A והקלידו E: הריבוע נקרא EBCD והוא לא זז",
+   "before": "השינוי נדחה"
+  },
+  {
+   "id": "T8",
+   "title": "דו-ממד: מיתר שסותר את הנתונים נדחה בכל צורת כתיבה (סירוב)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "A על המעגל",
+    "B אמצע OA",
+    "קטע CD",
+    "המיתר AB מקביל ל-CD"
+   ],
+   "lookFor": "אחרי השורה האחרונה מופיע «חושב...» לכמה שניות (כ-6), ואז השורה נדחית עם הודעה ש-|OB| לא יכול להתקיים (B אמצע הרדיוס, לא על המעגל); לא נרשמת שורה ושום צעד לא נצבע באדום",
+   "before": "השורה נרשמה וכל הצעדים נצבעו באדום"
+  },
+  {
+   "id": "T9",
+   "title": "דו-ממד: אותו מיתר כשהוא אפשרי — מתקבל (הגנה)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "A על המעגל",
+    "B על המעגל",
+    "קטע CD",
+    "המיתר AB מקביל ל-CD"
+   ],
+   "lookFor": "כל השורות ירוקות; AB ∥ CD",
+   "before": "unchanged"
+  }
+ ]
+}
