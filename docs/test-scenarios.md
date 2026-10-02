@@ -1623,3 +1623,7 @@ over all four (ADR-041).
 ### `variable-bound-scaled-coefficient-1658` — «AB = 2k» · «k > 40» bounds |AB| > 80 (#1658, ADR-562)
 
 **Guards against:** a bound on a letter bound with a coefficient lowering to nothing. A positive coefficient carries the window; other forms are refused by name.
+
+### `chord-and-diameter-as-relation-operands-1661` — «המיתר BC מקביל ל-AD» / «הקוטר BC מקביל ל-AD» state the chord / diameter claim, with or without a drawn circle, and never claim AD (#1661, ADR-563)
+
+**Guards against:** a role noun read as a bare segment. 2-D's parse read «המיתר BC מקביל ל-AD» and «הקוטר BC מקביל ל-AD» as segment BC plus the parallel: with no circle drawn the chord/diameter claim vanished, and with one circle the word-presence chord pass recovered it but also put A and D on the circle (AD is no chord). Root cause: the role nouns were re-spelled per rule with no one place stating what a noun asserts (the analytic sibling is ADR-AG-200). **Asserts** on the drawn circle O: |OB| = |OC|, BC ∥ AD, A stays a free point; on an empty canvas each sentence introduces the circle (as «מיתר BC» does) with B and C on it, and the diameter's centre lies on BC. The submit-gate locks (two circles → ask, chord through the centre, radius off the centre, the polygon roles and their refusals) are in `src/app/__tests__/issue-1661-role-noun-claims.test.ts`.

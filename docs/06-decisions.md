@@ -13476,3 +13476,56 @@ Behaviour changes for a student:
 - A sentence containing a foreign given is refused whole. Before, it was drawn as something else, or drawn without the clause.
 - A not-handled analytic or solid sentence keeps its pointer, now preceded by the quoted word.
 - «0 < k < 6» before its letter exists is a marked row instead of «כבר קיים».
+
+## ADR-563 — A role noun is a claim, lowered once from one registry (#1661)
+
+**Status:** accepted · 2026-10-02 · P1 honesty bug, found by the analytic #1651 fix stream · branch `fix/1661-2d-role-nouns` off `main` @ e92b671f
+
+**Requirements:** [FR-IN-13](02-requirements.md) (new): a piece named by its role keeps its role, wherever it is used · **Design:** [04-design.md](04-design.md) § "A role noun is a claim, lowered once" · **LADDER stage:** parse (a post-pass in `runRules`); no engine, solver or render change.
+
+**Cites** the analytic sibling [ADR-AG-200](06c-decisions-analytic.md#adr-ag-200) (#1651: the same class, its own code — `STRAIGHT_NOUNS` + `claimFacts`), [ADR-119](#adr-119) / PAR-4 (`withCarrierMembership`, the word-presence pass this replaces), [ADR-367](#adr-367) / [ADR-391](#adr-391) (#159, #231: «מיתר» / «קוטר» presuppose their circle — `resolveOrIntroduceCircle({ implied })`), [ADR-443](#adr-443) (the membership tie-break and the which-circle question), [ADR-560](#adr-560) (the shared bind-or-create seam), [ADR-342](#adr-342) (a typed centre letter promotes an unnamed centre), #775 / [ADR-465](#adr-465) (`ctx.roleSides`), #989 / [ADR-506](#adr-506) (a stated ∥ displaces a trapezoid's assumed pair), #352 (a bare «הבסיס BC» is an orientation wish).
+
+**Context — measured at pickup on `e92b671f`, through the real submit door (`runSubmit`, the model mocked):**
+
+| typed (context) | before |
+| --- | --- |
+| «המיתר BC מקביל ל-AD», «הקוטר BC מקביל ל-AD», «המיתר BC = 5» (no circle) | **committed a bare segment + the relation — the claim dropped** (the reported case) |
+| «המיתר BC מקביל ל-AD» (two circles) | **committed, claim dropped silently** («BC מיתר» asks which circle) |
+| «המיתר BC מקביל ל-AD», «… מאונך …», «מיתר BC …», «AD מקביל למיתר BC», "the chord BC is parallel to AD" (one circle) | B, C on the circle — **and A, D too** (AD is no chord: an invented given) |
+| «הקוטר BC …», «AD מקביל לקוטר BC», «הקוטר BC = 6» (one circle) | correct (the diameter pair was resolved from the text) |
+| «המיתר OB מקביל ל-AD» (O the centre) | **committed; chord claim dropped**, A and D put on the circle |
+| «הרדיוס BC מאונך ל-AD» (circle O), «הרדיוס OB מאונך ל-AD» (no circle) | **committed; radius claim dropped** |
+| «היתר AB = 5» (triangle, empty canvas), «היתר AC = 5» on «משולש ישר זווית ABC» | **committed; hypotenuse claim dropped** (the right angle stayed at C) |
+| «השוק AB = 5», «השוק AD = 3», «השוק BC מקביל ל-AD», «הבסיס AB = 5» (triangle / isosceles / trapezoid) | **committed; leg / base claim dropped** |
+| «E על המיתר BC», «המיתר BC חותך את AD בנקודה E», «מיתר BC = מיתר AD», «AD מאונך לרדיוס OB» (one circle) | correct |
+| «המשיק BC …», «המיתר BC שווה ל-AD», «אורך המיתר BC הוא 5», «התיכון AD = 5» | not 2-D grammar (escalates) — no drop |
+
+**Class (docs/17 §1):** *a role noun naming a segment operand is read as a bare segment by whichever rule wins, and its claim is either dropped or re-derived by word presence.* The vocabulary was re-spelled per rule (`CARRIER_PRE`, `CARRIER_NOUN`, `CUT_FILLER`, the segments-meet rule's prefix list, the lenient length strip) with no place that states what a noun asserts. The one recovery, ADR-119's `withCarrierMembership`, keyed on the WORD («מיתר» anywhere ⇒ every segment endpoint is on the circle) and gave up when no circle resolved. So it dropped claims where the figure had no circle, several circles or a centre end; it invented them on the other operand; and it never knew the polygon roles at all.
+
+**Decision.**
+1. **One registry, `src/parser/roleNouns.ts`.** Rows for chord, diameter, radius, tangent, leg, base, hypotenuse (Hebrew with clitics, matched as whole words so «מיתר» is never «מ+יתר»; English with uppercase labels only). `roleOperands(s)` returns each noun with the pair(s) the words attach it to: «<noun> XY», a plural list «המיתרים AB ו-CD», and the predicate «XY מיתר» / "XY is a chord" for chord and diameter.
+2. **One lowering, `withRoleClaims`** (`parse.ts`), run in `runRules` after whichever rule won, before the circle post-passes. Each operand's claim is stated, or the sentence is refused naming the noun and the pair (`ParseResult` `role-claim`, `input.roleClaim.<why>`):
+   - **chord** — both ends on the circle; **diameter** — also `set-collinear` through the centre. The circle binds as the canonical sentences bind it: the pointing references, then the shared seam (named · the one circle · the tie-break · **none → introduced**, as «מיתר BC» and «BC קוטר» already do · several → the which-circle question). An end at the circle's centre → `centre-end`. An end already on the circle (a drawn member, or placed by the winning rule) is not restated; a pair the winning rule defined a circle by (`diameter`, a midpoint centre, a semicircle's 180° arc) is left to it.
+   - **radius** — the circle whose centre is an end; the other end on it (a typed centre letter promotes an unnamed centre, ADR-342). No circle → `no-circle` (which end is the centre cannot be decided — analytic refuses the same); no centre end → `no-centre-end`.
+   - **tangent** — no lowering here. A winner that touched no circle read it bare → `'unread'`: the next rule tries, and the line never commits the drop.
+   - **hypotenuse / leg / base** — the polygon (declared, or created in the same line) holding the pair as a side, lowered to its canonical sentence so the engine's default-yielding judges it exactly as it judges that sentence: hypotenuse → «∠ = 90» at the third vertex (the right-angle seat re-seats — measured); an isosceles base → the two other sides equal (the apex variant collapses); a trapezoid's base → ∥ its opposite side, a trapezoid's leg → its two neighbours ∥ (the assumed pair yields, #989). A triangle's leg that the isosceles structure (`ctx.roleSides`) already makes one states nothing new (the #775/#805 reading of «גובה לשוק AC»); otherwise `leg-apex`, teaching «AB = AC» / «BA = BC» (driven: it builds). No polygon → `no-polygon` (a base of none names a side, #352); several → `several-polygons`.
+3. **The over-claim is gone by construction:** only the pair the noun is attached to is claimed. «chord AB = CD» claims AB only; «chord AB = chord CD» claims both.
+
+**Measured after** (same door): every row of the table states its claim or is refused naming the sentence; the escalating rows are unchanged. «המיתר BC מקביל ל-AD» on an empty canvas introduces one circle with B and C on it; on circle O, A and D stay free points; beside two circles it asks which circle and commits nothing.
+
+**Locks.** `src/app/__tests__/issue-1661-role-noun-claims.test.ts` (38, through `runSubmit`): nine relation spellings on a drawn circle (B and C on it, the diameter through O, the relation holds, A and D never claimed); the relation's claim equals «BC מיתר במעגל O»'s (called, not reproduced); lengths on a chord and a diameter; incidence, meet, chord = chord, radius; three empty-canvas rows (the circle introduced); refusals — two circles, a chord through the centre, a radius off the centre, a radius with no circle and its taught remedy building, a chord claim on a point that cannot be on the circle (refused, or its row shows the over-constraint), the tangent never committed bare; the polygon roles — hypotenuse on a triangle and re-seated on a right triangle, isosceles base, trapezoid leg and base, the trapezoid leg ∥ contradiction shown, a plain triangle's base claims nothing, a triangle's leg refused and the taught equality building, a hypotenuse with no triangle refused; the registry (whole words, attachment, plural, predicate, no bare-noun binding). Scenario `chord-and-diameter-as-relation-operands-1661` (corpus 4). **Fails before: 22 of 38** on the pre-change parser (the 16 that pass are controls that were already right: the four diameter relation spellings on a drawn circle, the chord and diameter lengths, «מיתר BC = מיתר AD», the radius from the centre, the two taught remedies, the over-constraint and tangent rows, a plain triangle's base, and the registry unit rows); the scenario fails before too.
+
+**⚠ Locks changed, each to its own intent.**
+- `chord-relation.test` PAR-1: «chord AB = CD» → AB claimed, CD not (the lock pinned the word-presence over-claim); a new row «chord AB = chord CD» claims all four.
+- `point-on-carrier.test`: «E על מיתר AC» / "E on (the) chord AC" with no circle — E still rides AC (the lock's point), and the chord now introduces its circle with A and C on it (the lock pinned the drop).
+- `decide-parity-1395` goldens — exactly two rows change: shard 2 `first-utterance-meet-of-default-segments` («מיתר CK חותך את AO בנקודה E» typed first now introduces the circle with C and K on it — the reported class; the scenario's own assertions still pass); shard 3 `parallel-chords-keep-circle-membership` (A, already on circle O as the LLM-step diameter's end, is no longer restated — the claim holds; C, D and F are claimed as before). Shard 4 gains only the new scenario's key.
+
+**Sibling audit (docs/17 §1).** Grepped `parse.ts` for every role-noun alternation (מיתר, קוטר, רדיוס, משיק, שוק, בסיס, יתר and English): the inline lists remain as rule vocabulary, but no rule can now drop or invent a claim — the post-pass owns it for every winner. Analytic: fixed by ADR-AG-200. 3-D and complex: no circle or polygon role nouns of this kind.
+
+**Not built, said out loud.**
+- **A triangle's leg whose apex the words do not fix is refused** (`leg-apex`). Analytic narrows the apex choice to the pair's two ends and cycles it; 2-D's isosceles variant has no narrowing, so stating one would choose a default for the student. *A ruling for the operator:* keep the refusal, or pin the current apex.
+- **A chord with no circle introduces it.** The 2-D chord sentence has done so since ADR-391 (#231); analytic refuses a chord with no circle (ADR-AG-196). The relation form follows 2-D's own sentence, so one noun means one thing in 2-D. *Aligning the two trees is the operator's call.*
+- **«אורך המיתר BC הוא 5», «המיתר BC שווה ל-AD», «המשיק BC = 5», «התיכון AD = 5»** remain outside 2-D grammar (they escalate; nothing is dropped). Reading them is a capability, not part of this fix.
+- **Observed, pre-existing (measured on the pre-change parser too):** «המיתר AB מקביל ל-CD» where B is the midpoint of radius OA is committed with its rows red («over-constrained»), while «AB מיתר במעגל O» is refused at the door — the submit gate judges the two lines differently. Worth its own issue.
+
+**Consequences.** `src/parser/roleNouns.ts` (new), `src/parser/parse.ts` (`withRoleClaims` replaces `withCarrierMembership`; `RoleClaimWhy`; the `role-claim` result and clarify), `src/app/decideDeterministic.ts` (the refusal), `src/i18n/locales/{he,en}.json` (`input.roleClaim.*`).

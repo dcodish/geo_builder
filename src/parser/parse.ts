@@ -22,6 +22,7 @@
 import { MIDSEGMENT_SHAPES, RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
 import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
+import { roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
 import { findProofTarget } from '../../shell/proofTarget';
 import { foreignGiven } from './scope';
@@ -118,6 +119,10 @@ export type ParseResult =
   /** #775: a side named by its ROLE («ליתר», «לבסיס») with no unique referent in the figure —
    *  clarify rather than guess a side or burn an escalation on a form the LLM must not invent for. */
   | { ok: false; reason: 'role-side-unresolved'; role: string }
+  /** #1661 ([ADR-563](../../docs/06-decisions.md#adr-563)): a ROLE NOUN on a pair («המיתר OB», «הרדיוס BC»,
+   *  «השוק AB», «היתר AB») whose claim cannot be stated on this figure — the sentence is refused naming the
+   *  noun and the pair, never built as a bare segment with the claim dropped. */
+  | { ok: false; reason: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] }
   /** #957: a side clause («שהצלע שלו 6») on a shape whose sides are NOT equal by definition — a
    *  rectangle, trapezoid, parallelogram, kite, general quad. The grammar reads the sentence
    *  perfectly well; what is missing is WHICH side, and only the student can supply it. Falling
@@ -307,7 +312,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -1735,7 +1740,7 @@ const lineLineIntersection: Rule = (s, ctx) => {
   // geometry) — don't half-parse "diameter AB and chord DE meet at C" into a bare intersection that
   // drops it: escalate so the operand gets created (ADR-024; the LLM has the circle as context, and
   // the tangent/diameter compounds run earlier). A CHORD or RADIUS operand, by contrast, is just a
-  // segment reference whose circle membership the `withCarrierMembership` post-pass restores (ADR-119)
+  // segment reference whose circle membership the `withRoleClaims` post-pass restores (ADR-119)
   // — "המיתר CK חותך את הרדיוס AO בנקודה E" is a plain segment meet + memberships (issue #17), so those
   // nouns no longer abort the parse.
   if (/\bdiameter\b|\btangent\b|קוטר|משיק/i.test(s)) return 'stop';
@@ -3443,7 +3448,7 @@ const SEG_DIV_RHS = new RegExp(String.raw`=\s*[A-Za-z]\d*\s*[A-Za-z]\d*\s*\/\s*$
 /**
  * An optional CARRIER NOUN before a label pair — "מיתר AB" / "the chord AB" / "קוטר CD". The relation
  * rules tolerate it so a noun-repeated given ("מיתר AB = מיתר CD", "chord AB > chord CD") parses as the
- * relation on the two segments; the `withCarrierMembership` post-pass then restores the on-circle
+ * relation on the two segments; the `withRoleClaims` post-pass then restores the on-circle
  * membership (and a diameter's through-centre collinearity) the noun asserts. Without this, the
  * chord/diameter rules' relation-tail bail (PAR-1) ORPHANED these forms — nothing claimed them and a
  * previously-parsing textbook phrasing regressed to an LLM escalation (review 2026-07-03, P4).
@@ -5992,7 +5997,7 @@ const cornerTangentCircle: Rule = (s, ctx) => {
 /**
  * A RELATION riding a carrier-noun utterance — symbols (`=`, `<`, `>`) OR the word forms ("שווה",
  * "equals", "גדול/קטן", "longer/shorter"). The carrier rules (`chord`/`diameter`) bail on it so the
- * relation rule claims the utterance whole (membership is restored by `withCarrierMembership`), or —
+ * relation rule claims the utterance whole (membership is restored by `withRoleClaims`), or —
  * for a form no deterministic rule reads (word-equality, operator-declared out of grammar) — the
  * utterance escalates honestly instead of HALF-parsing to a bare chord that silently drops the
  * relation and the second segment (review 2026-07-03, P3). "שווה שוקיים/צלעות" (isosceles/equilateral
@@ -6026,7 +6031,7 @@ const chord: Rule = (s, ctx) => {
   if (POINT_ON_CARRIER.test(s)) return null;
   // A RELATION tail ("chord AB = 6" / "chord AB = CD" / "מיתר AB שווה למיתר CD") is a MEASURE on the
   // chord, not a bare chord declaration — bail so the measure/equality rule claims the length;
-  // `withCarrierMembership` then re-asserts the endpoints on the circle from the segments that rule
+  // `withRoleClaims` then re-asserts the endpoints on the circle from the segments that rule
   // draws (PAR-1). Without this the relation was silently dropped. (⟂/∥ chords need no guard here —
   // those constraint rules already run before `chord`.)
   if (CARRIER_RELATION_TAIL.test(s)) return null;
@@ -6195,10 +6200,10 @@ const diameter: Rule = (s, ctx) => {
   if (!/diameter|קוטר/i.test(s)) return null;
   // "E על הקוטר AB" is a POINT ON the diameter (a point on segment AB), not a diameter DEFINITION — defer
   // to pointOnSegment (which runs later), else this rule grabs the "AB" run and drops the rider E. The
-  // `withCarrierMembership` post-pass still asserts A,B on the circle + collinear-through-centre (PAR-5).
+  // `withRoleClaims` post-pass still asserts A,B on the circle + collinear-through-centre (PAR-5).
   if (POINT_ON_CARRIER.test(s)) return null;
   // A RELATION tail ("diameter AB = 10", word forms too) is a MEASURE on the diameter — bail so the measure
-  // rule claims the length; `withCarrierMembership` then re-asserts A,B on the circle AND collinear-through-
+  // rule claims the length; `withRoleClaims` then re-asserts A,B on the circle AND collinear-through-
   // centre so it stays a DIAMETER (PAR-1/PAR-4). Without this the "= 10" was silently dropped.
   if (CARRIER_RELATION_TAIL.test(s)) return null;
   let center = resolveCenter(s, ctx);
@@ -6357,7 +6362,7 @@ const pairOnCircle: Rule = (s, ctx) => {
  *  `.geo.json` carried the partial lowering to every machine (ADR-240; the app-level droppedNewLabels
  *  net flagged it, but the LLM round-trip re-entered this same single-subject grammar). A point named
  *  on a CARRIER ("D על המיתר AB") is a point on that segment, not on the circle — defer to the
- *  segment rules (`withCarrierMembership` restores the carrier's own membership). */
+ *  segment rules (`withRoleClaims` restores the carrier's own membership). */
 const pointOnCircle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
   if (POINT_ON_CARRIER.test(s)) return null; // "D על המיתר AB במעגל O" — on the chord, NOT on the circle
@@ -9330,7 +9335,7 @@ const compoundAtDistance: Rule = (s, ctx) => {
  * shape word, so "משולש שווה שוקיים" (isosceles) isn't mistaken for an equality — and (b) parses on its own;
  * otherwise fall through untouched. Runs right after `compoundSuchThat` (whose halves recurse back through
  * here for any commas inside them). Each piece's parse already applied the post-passes; re-applying them on
- * the combined result is idempotent (the `withCarrierMembership` CONSTRUCT-guard + `withImplicitCircles`
+ * the combined result is idempotent (the `withRoleClaims` CONSTRUCT-guard + `withImplicitCircles`
  * seeing the prepended circle as already-defined).
  */
 // Separators: `,` `;` `וגם` `and`, and the bare Hebrew conjunction ו ("AB = 4 ו-BC = 6" / "… ו BC …" /
@@ -10034,124 +10039,202 @@ function withConcentricResolution(
 }
 
 /**
- * CARRIER membership post-pass (`withCarrierMembership`, generalises ADR-119's chord version to diameters,
- * PAR-4). A point named as a CHORD endpoint lies ON the circle — in ANY phrasing, not only the standalone
- * `chord` rule. When "chord"/"מיתר" appears together with a relation ("CD and AF are parallel chords",
- * "the chord AB equals the chord CD", "chord AB ⟂ chord CD"), the relational rule wins the first-match
- * race (it runs before `chord` and only understands plain segments), silently dropping the on-circle
- * membership — the endpoints would end up free points joined by segments, NOT points on the circle
- * (operator session sflkyd0r: "CD ו AF מיתרים המקבילים זה לזה" → segments + ∥ only). The fix is one
- * general post-pass, not a per-relation special case: every SEGMENT endpoint in a chord-flavoured
- * utterance is asserted on the resolved circle. A DIAMETER-flavoured utterance additionally gets the
- * diameter's endpoints collinear-through-centre (so "diameter AB = 10" is a real diameter, not a chord),
- * while asserting only the diameter itself when it isn't also a chord (so a diameter ⟂ a NON-chord segment
- * doesn't force that segment onto the circle). Idempotent (the standalone `chord`/`diameter` rules' own
- * membership is deduped); a circle CENTRE is excluded so "radius OE" keeps O off the circle; a chord's
- * MIDPOINT is never a segment endpoint, so "C אמצע מיתר AB" puts A,B — not C — on the circle. Matches
- * the standalone rule's unconditional semantics (a chord's endpoints are on the circle whether they are
- * new or already placed). (ADR-119)
+ * Why a role noun's claim was refused (#1661, [ADR-563](docs/06-decisions.md#adr-563)) — each names the
+ * statement back to the student:
+ *  - `centre-end` — a chord / diameter with an end at the circle's centre («המיתר OB»): a chord joins two
+ *    points ON the circle, and the centre is not one;
+ *  - `no-centre-end` — a radius neither of whose ends is the centre («הרדיוס BC» beside circle O);
+ *  - `no-circle` — a radius on a figure with no circle: which end is the centre cannot be decided;
+ *  - `no-polygon` — a leg / hypotenuse whose pair is a side of no triangle (or trapezoid);
+ *  - `several-polygons` — the pair is a side of several polygons the role could be about;
+ *  - `leg-apex` — a leg of a triangle: the apex is one of its two ends and the words do not say which.
  */
-function withCarrierMembership(commands: AnyCommand[], s: string, ctx: ParseContext): AnyCommand[] {
-  const isChord = /chord|מיתר/i.test(s);
-  const isDiameter = /diameter|קוטר/i.test(s);
-  const isRadius = /\bradius\b|רדיוס/i.test(s);
-  if (!isChord && !isDiameter && !isRadius) return commands;
-  // If a CIRCLE-CONSTRUCT rule already handled the utterance (the standalone `chord`/`diameter`, or
-  // `circleOnDiameter`/`pointOnCircle`/arc/…), it modelled membership itself — don't double-add. Only a
-  // winner that never touched the circle (parallel/⟂/distance/equal/ratio/pointOnSegment/segments-meet —
-  // bare segments + line geometry) can have DROPPED the membership and needs it restored here.
-  const CIRCLE_CONSTRUCT: ReadonlySet<string> = new Set([
-    'point-on-circle', 'circle', 'circle-through', 'circumcircle', 'diameter', 'arc-midpoint',
-    'line-circle-intersection', 'circle-circle-intersection', 'tangent',
-  ]);
-  if (commands.some((c) => CIRCLE_CONSTRUCT.has(c.type))) return commands;
-  const center = resolveCenter(s, ctx);
-  if (!center) return commands; // no circle to anchor on — leave the parse untouched
-  const circ = circleId(center);
-  // A LINE construct (a collinearity / a line∩line meet) modelled the circle geometry itself ONLY when it
-  // ANCHORS to the circle — references its centre (`diameterCutsSegment`'s F–O line, the `diameter` rule's
-  // A·O·B collinearity). A meet of two chords ("chords AC and BD meet at E") emits the same command KINDS
-  // but never touches the circle — bailing on the kind alone dropped all four memberships (review
-  // 2026-07-03, P5). So bail per-command on the centre reference, not per-kind — and only for a
-  // DIAMETER-flavoured utterance: a RADIUS operand legitimately touches the centre ("המיתר CK חותך את
-  // הרדיוס AO בנקודה E", issue #17 — its intersection command references O, yet the chord/rim
-  // memberships are exactly what this pass must restore; the pair logic below is already centre-safe).
-  const LINE_CONSTRUCT: ReadonlySet<string> = new Set(['set-collinear', 'set-line', 'line-line-intersection', 'line-intersection']);
-  const refsCentre = (c: AnyCommand): boolean =>
-    Object.entries(c).some(([k, v]) => k !== 'type' && (v === up(center) || (Array.isArray(v) && v.includes(up(center)))));
-  if (isDiameter && commands.some((c) => LINE_CONSTRUCT.has(c.type) && refsCentre(c))) return commands;
-  const centers = new Set([center, ...(ctx.circles ?? [])].map(up));
-  const already = new Set(
-    commands.flatMap((c) => (c.type === 'point-on-circle' && c.circle === circ ? [up(c.id)] : [])),
-  );
-  // Ordered endpoint PAIRS drawn by the winning rule — a `segment` or a `point-on-segment` carrier (the
-  // on-segment RIDER `id` is NOT an endpoint, so "C אמצע מיתר AB" puts A,B — not C — on the circle). A pair
-  // touching the circle's CENTRE is a radius, not a chord — excluded (so "radius OE" keeps O off). A
-  // segment touching a point the rule CREATED as an intersection is SCAFFOLDING it drew (an extension leg
-  // to the new crossing, e.g. K→P in "המשך הקטע KO חותך את המיתר CB בנקודה P"), never a stated chord —
-  // excluded, so the crossing itself is not forced onto the circle (issue #17).
-  const newMeets = new Set(
-    commands.flatMap((c) =>
-      c.type === 'line-line-intersection' || c.type === 'line-intersection' || c.type === 'line-circle-intersection'
-        ? [up(c.id)]
-        : [],
-    ),
-  );
-  const pairs: Id[][] = []; // chord/diameter: an endpoint pair NOT touching the centre
-  const rims: Id[] = []; // radius: the non-centre end of a centre→rim carrier ("D on radius OB" → B)
-  const typedCentres = new Set<Id>(); // centre letters the student typed as carrier ends (semantic use, ADR-342)
-  for (const c of commands) {
-    if (c.type !== 'segment' && c.type !== 'point-on-segment') continue;
-    const ab = [up(c.a), up(c.b)];
-    if (ab.some((id) => newMeets.has(id))) continue; // scaffolding to a new crossing, not a stated carrier
-    const centreEnds = ab.filter((id) => centers.has(id));
-    if (centreEnds.length === 0) pairs.push(ab);
-    else if (isRadius && centreEnds.length === 1) rims.push(ab.find((id) => !centers.has(id))!);
-    // The student TYPED a centre letter as a carrier endpoint («הרדיוס OB», «המשך הקטע KO») — this pass
-    // already commits to reading that end AS the centre, so it is semantic centre-use: promote an unnamed
-    // auto centre to the letter (ADR-342 ruling (b)).
-    for (const t of centreEnds) typedCentres.add(t);
-  }
-  if (!pairs.length && !rims.length) return commands;
-  // WHICH pair is the diameter? Never "the first segment the winner drew" — that is utterance order, so
-  // "המיתר CD מאונך לקוטר AB" (chord named first) forced the CHORD through the centre and left the real
-  // diameter a chord: a silently WRONG figure that even verifies green (review 2026-07-03, P1). Resolve
-  // it from the TEXT instead: the pair adjacent to the diameter noun ("לקוטר AB" / "diameter AB", or the
-  // labels-first "AB קוטר"); a lone pair is unambiguous; otherwise DON'T GUESS (skip the diameter
-  // semantics — ADR-052's no-unstated-assumption rule).
-  const diameterPair = (): Id[] | null => {
-    if (!isDiameter) return null;
-    const afterNoun = s.match(/(?:diameter|קוטר)[^A-Za-z]{0,4}([A-Za-z]\d*)\s*([A-Za-z]\d*)/i);
-    const beforeNoun = s.match(/([A-Za-z]\d*)\s*([A-Za-z]\d*)[^A-Za-z]{0,6}(?:diameter|קוטר)/i);
-    for (const m of [afterNoun, beforeNoun]) {
-      if (!m) continue;
-      const want = [up(m[1]), up(m[2])].sort().join('|');
-      const hit = pairs.find((p) => [...p].sort().join('|') === want);
-      if (hit) return hit;
-    }
-    return pairs.length === 1 ? pairs[0] : null;
+export type RoleClaimWhy = 'centre-end' | 'no-centre-end' | 'no-circle' | 'no-polygon' | 'several-polygons' | 'leg-apex';
+
+/** Command kinds that put a point on a circle (or define a circle through it) — the forms a rule uses
+ *  when IT modelled a chord end's membership. */
+const ON_CIRCLE_KINDS: ReadonlySet<string> = new Set([
+  'point-on-circle', 'circle-through', 'circumcircle', 'diameter', 'arc-midpoint',
+  'line-circle-intersection', 'circle-circle-intersection', 'tangent',
+]);
+/** Does `c` reference the id `x` in any field? */
+const refsId = (c: AnyCommand, x: Id): boolean =>
+  Object.entries(c).some(([k, v]) => k !== 'type' && (v === x || (Array.isArray(v) && v.includes(x))));
+
+/**
+ * ROLE-NOUN CLAIM post-pass (#1661, [ADR-563](docs/06-decisions.md#adr-563)) — supersedes ADR-119's
+ * `withCarrierMembership` (which generalised the chord post-pass to diameters, PAR-4).
+ *
+ * A role noun is a CLAIM about the pair it names: «המיתר BC» says B and C are on the circle, «הקוטר BC»
+ * adds that BC passes through the centre, «הרדיוס OB» that O is the centre and B on the circle, «היתר AB»
+ * that the angle opposite AB is right, «השוק BC» / «הבסיס BC» the polygon role. Many rules TOLERATE such a
+ * noun before a pair and lower only the plain segment (the relation, length, meet and incidence rules),
+ * and the first-match race decides which rule reads the sentence — so the claim used to survive only
+ * where this post-pass happened to recover it, by WORD PRESENCE: "a chord word anywhere ⇒ every segment
+ * endpoint is on the circle". That both DROPPED claims (no circle yet, several circles, a radius whose
+ * ends are not the centre, every polygon role) and INVENTED them («המיתר BC מקביל ל-AD» put A and D on
+ * the circle too — AD is no chord).
+ *
+ * Now the WORDS decide: {@link roleOperands} (the one registry, `roleNouns.ts`) returns each role noun
+ * with the pair it is attached to, and every operand's claim is lowered here, once, after whichever rule
+ * won — or the sentence is refused naming the noun. The circle binds as the canonical sentences bind it
+ * (the shared seam, ADR-367/ADR-391/ADR-560): the named circle; the one circle; the membership
+ * tie-break; none → introduced (a chord / diameter presupposes its circle, as «מיתר BC» and «BC קוטר»
+ * already introduce one); several it cannot bind → ask which. The polygon roles lower to the canonical
+ * sentence of their claim — «זווית C = 90» for a hypotenuse, «CA = CB» for an isosceles base, «AB ∥ CD»
+ * for a trapezoid's leg or base — so the engine's existing default-yielding (M4: the right-angle seat, the
+ * isosceles apex variant, the trapezoid's assumed pair) judges them exactly as it judges those sentences.
+ *
+ * Returns the commands (claims PREPENDED so their points exist before the relation drives them), a
+ * refusal, or `'unread'` when a noun has no lowering here (a tangent the winning rule read as a bare
+ * segment) — the caller then lets a later rule try, never commits the drop.
+ */
+function withRoleClaims(commands: AnyCommand[], s: string, ctx: ParseContext): AnyCommand[] | Clarify | 'unread' {
+  const ops = roleOperands(s);
+  if (!ops.length) return commands;
+  const extra: AnyCommand[] = [];
+  const add = (c: AnyCommand): void => {
+    const k = JSON.stringify(c);
+    if (![...extra, ...commands].some((x) => JSON.stringify(x) === k)) extra.push(c);
   };
-  const diaPair = diameterPair();
-  // A CHORD utterance puts EVERY named segment on the circle (both "parallel chords", and a diameter is
-  // itself a chord); a diameter-ONLY utterance ("diameter AB = 10") asserts just the resolved diameter
-  // pair — so an unrelated segment (a diameter ⟂ a NON-chord) isn't wrongly forced onto the circle. A
-  // pure radius utterance contributes no chord/diameter pair — only its rim point below.
-  const memberPairs = isChord ? pairs : diaPair ? [diaPair] : [];
-  const endpoints: Id[] = [];
-  for (const [a, b] of memberPairs) for (const id of [a, b]) if (!centers.has(id) && !already.has(id) && !endpoints.includes(id)) endpoints.push(id);
-  // A RADIUS carrier's rim point ("D on radius OB" → B) lies on the circle too.
-  for (const id of rims) if (!already.has(id) && !endpoints.includes(id)) endpoints.push(id);
-  const extra: AnyCommand[] = endpoints.map((id) => ({ type: 'point-on-circle', id, circle: circ }));
-  // A DIAMETER passes through the centre — add the collinearity so the RESOLVED pair is a DIAMETER, not
-  // just a chord. (A winner that modelled the diameter itself — the `diameter` rule's kinds, or a
-  // centre-anchored collinearity — already bailed above, so no double-add here.)
-  // The collinearity references the centre AS A POINT internally (the student never typed it here) —
-  // route through the real centre id (ADR-342 flavor (b)); when a semantic use promoted the letter, the
-  // replay pre-scan renames the anon id back to it, so both paths converge.
-  if (diaPair) extra.push({ type: 'set-collinear', a: diaPair[0], b: centrePt(ctx, up(center)), c: diaPair[1] });
-  for (const t of typedCentres) extra.unshift(...promoteCentreUse(ctx, t));
-  if (!extra.length) return commands;
-  return [...extra, ...commands];
+  const refuse = (op: RoleOperand, why: RoleClaimWhy, more: { other?: string; options?: string[] } = {}): Clarify =>
+    ({ clarify: 'role-claim', why, noun: op.noun, a: op.a, b: op.b, ...more });
+
+  // ── The circle roles ────────────────────────────────────────────────────────────────────────────
+  const drawnCircles = (ctx.circles ?? []).filter((c) => !c.startsWith('~')).map(up);
+  /** Circles the WINNING RULE itself creates in this utterance (their centres). */
+  const madeCircles = [...new Set(commands.flatMap((c) =>
+    (c.type === 'circle' || c.type === 'circle-through') && typeof c.center === 'string' && !c.center.startsWith('~') ? [up(c.center.replace(/^@ctr-/, ''))] : []))];
+  let circle: { center: string; prepend: AnyCommand[] } | null | undefined;
+  const circleFor = (): { center: string; prepend: AnyCommand[] } | null => {
+    if (circle !== undefined) return circle;
+    const pointed = circumscribingRef(s, ctx) ?? directionalCircleRef(s, ctx);
+    const r = pointed ? { center: pointed, prepend: [] } : resolveOrIntroduceCircle(s, ctx, { implied: true });
+    // The winning rule created the circle itself (one, in this very utterance) — that is the referent,
+    // never a second, introduced one beside it.
+    circle = r && r.prepend.length && madeCircles.length === 1 ? { center: madeCircles[0], prepend: [] } : r;
+    return circle;
+  };
+  const ambiguous = (): Clarify => ({ clarify: 'ambiguous-circle-ref', centers: drawnCircles });
+  /** An end already on the circle — a drawn member of it (the claim holds; nothing to state), or one the
+   *  winning rule placed on (or through) a circle itself (it modelled that membership). */
+  const onCircleAlready = (x: Id, center: string): boolean =>
+    membersOfCenter(ctx, center).has(x) || commands.some((c) => ON_CIRCLE_KINDS.has(c.type) && refsId(c, x));
+  /** The rule DEFINED a circle by this pair as its diameter — `diameter`; a centre that is the pair's
+   *  midpoint («EO קוטר» beside circle O is the Thales circle on EO, not a diameter of O); or a semicircle,
+   *  whose ends sit at fixed antipodal bearings under its 180° arc. */
+  const definesByDiameter = (a: Id, b: Id): boolean =>
+    commands.some((c) => c.type === 'arc' && c.spanDeg === 180 && [up(c.from), up(c.to)].sort().join() === [a, b].sort().join()) ||
+    commands.some((c) => c.type === 'diameter' && [c.id1, c.id2].map(up).sort().join() === [a, b].sort().join()) ||
+    commands.some((c) => c.type === 'midpoint' && [up(c.a), up(c.b)].sort().join() === [a, b].sort().join() &&
+      commands.some((k) => (k.type === 'circle' || k.type === 'circle-through') && k.center === c.id));
+
+  // ── The polygon roles ───────────────────────────────────────────────────────────────────────────
+  type Holder = { ring: Id[]; trapezoid: boolean; isoApex: Id | null };
+  const holders = ((): Holder[] => {
+    const out: Holder[] = [];
+    const keyOf = (ring: Id[]): string => [...ring].sort().join('|');
+    const pushH = (h: Holder): void => {
+      const i = out.findIndex((o) => keyOf(o.ring) === keyOf(h.ring));
+      if (i < 0) out.push(h);
+      else out[i] = { ring: out[i].ring, trapezoid: out[i].trapezoid || h.trapezoid, isoApex: out[i].isoApex ?? h.isoApex };
+    };
+    // Isosceles structure is SEMANTIC (`ctx.roleSides` — the equal pair the isosceles variant or a stated
+    // equality lowers to), never a measured coincidence (ADR-052).
+    const apexIn = (ring: Id[]): Id | null => {
+      const base = (ctx.roleSides ?? []).find((r) => r.role === 'base' && r.edge.every((v) => ring.includes(up(v))));
+      return base ? ring.find((v) => !base.edge.map(up).includes(v)) ?? null : null;
+      // (`roleSides` pushes the base with every leg pair it derives, so the base alone identifies the apex.)
+    };
+    for (const p of ctx.declaredPolygons ?? []) {
+      const ring = p.vertices.map(up);
+      if (ring.length === 3) pushH({ ring, trapezoid: false, isoApex: apexIn(ring) });
+      else if (ring.length === 4) pushH({ ring, trapezoid: /trapez/i.test(p.kind ?? ''), isoApex: null });
+    }
+    for (const c of commands) {
+      const ids = (c as { ids?: unknown }).ids;
+      if (!Array.isArray(ids) || ids.length < 3 || ids.length > 4 || !ids.every((x) => typeof x === 'string')) continue;
+      const ring = (ids as string[]).map(up);
+      const decl = (c as { declaredAs?: string }).declaredAs ?? '';
+      if (ring.length === 3) {
+        const iso = c.type === 'shape-variant' && c.shape === 'isosceles' ? ring[c.variant ?? 0] ?? null : null;
+        pushH({ ring, trapezoid: false, isoApex: iso });
+      } else pushH({ ring, trapezoid: /trapez/i.test(c.type) || /trapez/i.test(decl), isoApex: null });
+    }
+    return out;
+  })();
+  /** The polygons holding a–b as a SIDE (adjacent in the ring). */
+  const sideOf = (h: Holder, a: Id, b: Id): boolean =>
+    h.ring.some((v, i) => { const w = h.ring[(i + 1) % h.ring.length]; return (v === a && w === b) || (v === b && w === a); });
+
+  for (const op of ops) {
+    const { a, b } = op;
+    if (op.role === 'chord' || op.role === 'diameter' || op.role === 'radius') {
+      // The radius names its own circle by its centre end; the chord and the diameter take the sentence's.
+      const centreEnds = [a, b].filter((x) => drawnCircles.includes(x) || madeCircles.includes(x));
+      if (op.role === 'radius') {
+        if (!drawnCircles.length && !madeCircles.length) return refuse(op, 'no-circle');
+        const host = centreEnds.length === 1 ? { center: centreEnds[0], prepend: [] } : circleFor();
+        if (!host) return ambiguous();
+        const centre = up(host.center);
+        if (!centreEnds.includes(centre)) return refuse(op, 'no-centre-end', { other: centre.replace(/^@CTR-/, '') });
+        const rim = centre === a ? b : a;
+        for (const c of promoteCentreUse(ctx, centre)) add(c);
+        if (!onCircleAlready(rim, centre)) add({ type: 'point-on-circle', id: rim, circle: circleId(host.center) });
+        continue;
+      }
+      if (op.role === 'diameter' && definesByDiameter(a, b)) continue; // the rule defined the circle by it
+      const host = circleFor();
+      if (!host) return ambiguous();
+      const center = up(host.center);
+      if ([a, b].includes(center)) return refuse(op, 'centre-end', { other: center });
+      for (const c of host.prepend) add(c);
+      for (const x of [a, b]) if (!onCircleAlready(x, center)) add({ type: 'point-on-circle', id: x, circle: circleId(center) });
+      if (op.role === 'diameter') {
+        const ctr = centrePt(ctx, center);
+        const through = commands.some((c) => (c.type === 'set-collinear' || c.type === 'set-line') && refsId(c, a) && refsId(c, b) && (refsId(c, ctr) || refsId(c, center)));
+        if (!through) add({ type: 'set-collinear', a, b: ctr, c: b });
+      }
+      continue;
+    }
+    if (op.role === 'tangent') {
+      // No lowering here: the tangent sentences own their semantics. A winner that touched no circle read
+      // «המשיק BC» as a bare segment — unread, so a later rule may try and the line never commits the drop.
+      const touches = commands.some((c) => c.type === 'tangent' || c.type === 'common-tangent' || c.type === 'circles-tangent' ||
+        Object.values(c).some((v) => typeof v === 'string' && v.startsWith('circle-')));
+      if (!touches) return 'unread';
+      continue;
+    }
+    // leg / base / hypotenuse — the polygons where the role has content.
+    const held = holders.filter((h) => sideOf(h, a, b));
+    const relevant =
+      op.role === 'hypotenuse' ? held.filter((h) => h.ring.length === 3)
+      : op.role === 'leg' ? held.filter((h) => h.ring.length === 3 || h.trapezoid)
+      : held.filter((h) => h.isoApex || h.trapezoid);
+    if (relevant.length === 0) {
+      if (op.role === 'base') continue; // a base of no isosceles triangle / trapezoid names a side (#352)
+      return refuse(op, 'no-polygon');
+    }
+    if (relevant.length > 1) return refuse(op, 'several-polygons', { options: relevant.map((h) => h.ring.join('')) });
+    const h = relevant[0];
+    if (h.ring.length === 3) {
+      const z = h.ring.find((v) => v !== a && v !== b)!;
+      if (op.role === 'hypotenuse') add({ type: 'set-angle', vertex: z, ray1: a, ray2: b, value: 90 });
+      else if (op.role === 'base') add({ type: 'set-equal', a: z, b: a, c: z, d: b });
+      // A leg the figure's isosceles structure already makes one (its apex is an end of the pair) states
+      // nothing new — the #775/#805 reading of «גובה לשוק AC». Otherwise the apex is one of the two ends
+      // and the words do not say which: ask, teaching the equality that does.
+      else if (!(h.isoApex && (h.isoApex === a || h.isoApex === b))) return refuse(op, 'leg-apex', { other: z });
+      continue;
+    }
+    // A trapezoid: the bases are the parallel pair. A base is parallel to its opposite side; a leg's two
+    // NEIGHBOURS are the bases.
+    const i = h.ring.findIndex((v, k) => { const w = h.ring[(k + 1) % 4]; return (v === a && w === b) || (v === b && w === a); });
+    const side = (k: number): [Id, Id] => [h.ring[k % 4], h.ring[(k + 1) % 4]];
+    const [p, q] = op.role === 'base' ? [side(i), side(i + 2)] : [side(i + 1), side(i + 3)];
+    add({ type: 'set-parallel', a: p[0], b: p[1], c: q[0], d: q[1] });
+  }
+  return extra.length ? [...extra, ...commands] : commands;
 }
 
 /**
@@ -11118,7 +11201,7 @@ function regionSideFallback(s: string, ctx: ParseContext): ParseResult | null {
  * triangle ("קטע האמצעים PQ לצלע BC במשולש ABC" — P,Q ride A,B,C), and a bare noun with polygons
  * already in the figure is a definite reference ("גובה מ A במשולש"). CIRCLE nouns are deliberately
  * excluded: a circle word in a relation utterance is a carrier/membership marker owned by the
- * `withCarrierMembership`/`withImplicitCircles` post-passes (ADR-119), not a dropped construction.
+ * `withRoleClaims`/`withImplicitCircles` post-passes (ADR-119), not a dropped construction.
  */
 const POLY_NOUN =
   /משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|מקבילית|מחומש|משושה|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|kite|parallelogram|pentagon|hexagon/gi;
@@ -11390,7 +11473,11 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
     if (Array.isArray(res)) {
       // Concentric resolution runs LAST (ADR-244): the other post-passes mint the pair's OUTER id
       // (`circleId(centre)`), and this one redirects/confirms per qualifier or asks to clarify.
-      const resolved = withConcentricResolution(withImplicitCircles(withOnCircleMembership(withCarrierMembership(withCarrierSegments(res), s, ctx), s, ctx), ctx), s, ctx);
+      // #1661 (ADR-563): every role noun's claim is lowered (or the sentence refused) before the circle passes.
+      const claimed = withRoleClaims(withCarrierSegments(res), s, ctx);
+      if (claimed === 'unread') continue; // a role noun this winner read bare — let a later rule try, never commit the drop
+      if (!Array.isArray(claimed)) return refusalOf(claimed);
+      const resolved = withConcentricResolution(withImplicitCircles(withOnCircleMembership(claimed, s, ctx), ctx), s, ctx);
       if (Array.isArray(resolved)) return { ok: true, commands: withStatedConvexity(withAnonymousAutoCentres(withMetricCentreBinding(withRadiusSymbolBinding(resolved, s, ctx), ctx)), s) };
       return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
     }
@@ -11419,6 +11506,8 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };
   if (res.clarify === 'alias-taken') return { ok: false, reason: 'alias-taken', name: res.name };
   if (res.clarify === 'role-side-unresolved') return { ok: false, reason: 'role-side-unresolved', role: res.role };
+  if (res.clarify === 'role-claim')
+    return { ok: false, reason: 'role-claim', why: res.why, noun: res.noun, a: res.a, b: res.b, ...(res.other ? { other: res.other } : {}), ...(res.options ? { options: res.options } : {}) };
   if (res.clarify === 'side-unspecified') return { ok: false, reason: 'side-unspecified', noun: res.noun, value: res.value };
   if (res.clarify === 'incomplete-comparative') return { ok: false, reason: 'incomplete-comparative', subject: res.subject, factor: res.factor };
   if (res.clarify === 'angle-sides-disjoint') return { ok: false, reason: 'angle-sides-disjoint', s1: res.s1, s2: res.s2 };

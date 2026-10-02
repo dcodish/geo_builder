@@ -81,6 +81,14 @@
     "alreadyDrawn": "That's already on the figure — nothing to add.",
     "sideUnspecified": "A {{noun}} does not have all sides equal, so \"its side\" does not name a particular one — say WHICH side, for example \"{{a}} = {{value}}\".",
     "roleSideUnresolved": "The figure has no single side matching \"{{role}}\" — declare the matching triangle first (e.g. \"right triangle ABC\" for the hypotenuse, \"isosceles triangle ABC\" for the base), or name the side by its letters (e.g. \"median to side AB\").",
+    "roleClaim": {
+      "centre-end": "\"{{noun}} {{pair}}\": {{other}} is the centre of the circle, not a point on it — a chord or a diameter joins two points on the circle.",
+      "no-centre-end": "\"{{noun}} {{pair}}\": a radius starts at the centre of the circle, {{other}}, but neither {{a}} nor {{b}} is the centre.",
+      "no-circle": "\"{{noun}} {{pair}}\": there is no circle in the figure yet, so it is unclear which end is the centre. Draw the circle first — e.g. \"circle {{a}}\".",
+      "no-polygon": "\"{{noun}} {{pair}}\": {{pair}} is not a side of any triangle or trapezoid in the figure, so there is nothing to give it that role. Declare the shape first.",
+      "several-polygons": "\"{{noun}} {{pair}}\": {{pair}} is a side of several shapes ({{options}}), so it is unclear which one is meant. State the given directly — e.g. a right angle or parallel sides.",
+      "leg-apex": "\"{{noun}} {{pair}}\": in a triangle a leg starts at the apex — {{a}} or {{b}} — and the sentence does not say which. Write the equality: \"{{a}}{{b}} = {{a}}{{other}}\" or \"{{b}}{{a}} = {{b}}{{other}}\"."
+    },
     "ambiguousAngle": "There's more than one angle at {{vertex}}, so I can't tell which one you mean. Name all three letters of the angle — e.g. \"∠A{{vertex}}C = 90\" — or give it a name: \"denote angle A{{vertex}}C as {{vertex}}1\".",
     "tangentsAmbiguous": "More than two tangents are drawn here ({{points}}), so it is unclear which two meet. Name them — e.g. «the tangent at {{a}} and the tangent at {{b}} meet at E».",
     "aliasTaken": "The name {{name}} is already taken on this figure, so it can't name an angle. Pick another name — e.g. a letter with a different digit.",

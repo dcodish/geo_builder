@@ -3143,4 +3143,29 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| = 2k > 80').toBeGreaterThan(80);
     },
   },
+  {
+    id: 'chord-and-diameter-as-relation-operands-1661',
+    title: '#1661 (ADR-563): «המיתר BC מקביל ל-AD» and «הקוטר BC מקביל ל-AD» state the chord / diameter claim — B and C on the circle (and O on BC for the diameter), whether or not the circle is drawn yet, and AD is never put on the circle',
+    guards:
+      "Found by the analytic #1651 fix stream (ADR-AG-200), 2026-10-02: 2-D's parse read «המיתר BC מקביל ל-AD» and «הקוטר BC מקביל ל-AD» as a plain segment BC plus the parallel. Measured: with no circle drawn the claim vanished (bare segments); with one circle the word-presence chord pass recovered it but also put A and D on the circle (AD is no chord). Root cause: the role nouns were re-spelled per rule with no one place that states what a noun asserts. Asserts, line by line: on the drawn circle O, |OB| = |OC|, BC ∥ AD and A is not on the circle; on an empty canvas the chord introduces its circle (as «מיתר BC» does) with B and C on it; the diameter's centre lies on BC. The submit-gate locks (two circles → ask, centre/radius/polygon refusals, the polygon roles) are in src/app/__tests__/issue-1661-role-noun-claims.test.ts.",
+    steps: ['מעגל O', 'קטע AD', 'המיתר BC מקביל ל-AD'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const o = at(fig, 'O'), b = at(fig, 'B'), c = at(fig, 'C'), a = at(fig, 'A'), d = at(fig, 'D');
+      expect(dist(o, b), 'B and C on circle O').toBeCloseTo(dist(o, c), 6);
+      const sin = ((c.x - b.x) * (d.y - a.y) - (c.y - b.y) * (d.x - a.x)) / (dist(b, c) * dist(a, d));
+      expect(Math.abs(sin), 'BC ∥ AD').toBeLessThan(1e-6);
+      expect(fig.construction.objects.find((x) => x.id === 'A')?.kind, 'A stays a free point — AD is no chord').toBe('free-point');
+      for (const [line, diameter] of [['המיתר BC מקביל ל-AD', false], ['הקוטר BC מקביל ל-AD', true]] as const) {
+        const e = replay(factsOf([line]), 0);
+        allStepsOk(e);
+        const ctr = e.positions.get('@ctr-O') ?? e.positions.get('O');
+        expect(ctr, `«${line}» on an empty canvas introduces the circle`).toBeDefined();
+        const eb = at(e, 'B'), ec = at(e, 'C');
+        expect(dist(ctr!, eb), `«${line}»: B and C on it`).toBeCloseTo(dist(ctr!, ec), 6);
+        if (diameter) expect(Math.abs((ec.x - eb.x) * (ctr!.y - eb.y) - (ec.y - eb.y) * (ctr!.x - eb.x)) / dist(eb, ec), 'the centre on BC').toBeLessThan(1e-6);
+      }
+    },
+  },
 ];

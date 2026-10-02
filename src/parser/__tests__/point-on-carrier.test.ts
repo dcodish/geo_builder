@@ -31,7 +31,17 @@ describe('point on a named carrier', () => {
   ])('%s → E on segment AC (carrier noun skipped, E kept)', (utterance) => {
     const r = parse(utterance);
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.commands).toEqual(onSeg('E', 'A', 'C'));
+    if (!r.ok) return;
+    expect(r.commands.slice(-2)).toEqual(onSeg('E', 'A', 'C'));
+    // #1661 (ADR-563): a CHORD carrier still claims its ends on the circle — with none drawn, the noun
+    // introduces it exactly as «מיתר AC» does (it used to be dropped here: a bare segment). The other
+    // carrier nouns (side / segment / diagonal) claim nothing.
+    const chord = /מיתר|chord/.test(utterance);
+    const circles = r.commands.filter((c) => c.type === 'circle');
+    const on = r.commands.filter((c) => c.type === 'point-on-circle').map((c) => (c as { id: string }).id);
+    expect(circles.length, 'a circle is introduced only for a chord').toBe(chord ? 1 : 0);
+    expect(on, 'the chord ends are on it').toEqual(chord ? ['A', 'C'] : []);
+    expect(r.commands.length).toBe(chord ? 5 : 2);
   });
 
   it('with a circle in context the chord endpoints land ON the circle and E rides the chord', () => {

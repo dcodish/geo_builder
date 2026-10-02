@@ -883,6 +883,39 @@ into the waiting register, `classify` counts it as pending, and `dryRunOutcome` 
 whose letters are bound but in a form it cannot follow (`unenforceableRelation` — it lowers to nothing) gets an
 error status and is refused at submit. `lowerOne` scales a bound by a positive linear coefficient.
 
+## A role noun is a claim, lowered once ([ADR-563](06-decisions.md#adr-563))
+
+`src/parser/roleNouns.ts` is the one vocabulary of role nouns (chord, diameter, radius, tangent, leg, base,
+hypotenuse — Hebrew with its clitics, matched as whole words so «מיתר» is never «יתר»; English with uppercase
+labels only). `roleOperands(s)` returns each noun with the pair(s) the WORDS attach it to: «<noun> XY», a plural
+list «המיתרים AB ו-CD», and for chord / diameter the predicate «XY מיתר» / "XY is a chord". A noun with no
+adjacent pair binds nothing.
+
+`withRoleClaims` (`src/parser/parse.ts`) runs after whichever rule won, in `runRules`, before the circle
+post-passes. It replaced ADR-119's word-presence `withCarrierMembership`. Each operand's claim:
+
+- **chord** — both ends `point-on-circle`; **diameter** — the same plus `set-collinear` through the centre;
+  the circle from `circumscribingRef` / `directionalCircleRef` / `resolveOrIntroduceCircle({ implied })`, or
+  the circle the winning rule itself creates. Several circles it cannot bind → `ambiguous-circle-ref`. An end
+  at that circle's centre → refused (`centre-end`). An end the winning rule already put on a circle is not
+  restated; a pair the rule defined a circle by (`diameter`, a midpoint centre, a semicircle's 180° arc) is
+  left to it.
+- **radius** — the circle whose centre is an end (else the sentence's circle); the other end on it, the centre
+  letter promoted if it names an unnamed centre (ADR-342). No circle → `no-circle`; no centre end →
+  `no-centre-end`.
+- **tangent** — no lowering here: a winner that touched no circle read it as a bare segment, so the operand is
+  `'unread'` and `runRules` tries the next rule.
+- **hypotenuse / leg / base** — the polygons (declared, or created by the same line) holding the pair as a side,
+  where the role has content. One → its canonical sentence: hypotenuse → `set-angle` 90 at the third vertex; an
+  isosceles base → `set-equal` of the two other sides; a trapezoid base → `set-parallel` with the opposite
+  side; a trapezoid leg → `set-parallel` of its two neighbours; a triangle leg that the isosceles structure
+  (`ctx.roleSides`) already makes one → nothing; otherwise `leg-apex`. None → `no-polygon` (a base of none
+  names a side); several → `several-polygons`. The engine's existing default-yielding (the right-angle seat,
+  the isosceles apex variant, the trapezoid's assumed pair) judges these exactly as it judges the sentences.
+
+Refusals are `ParseResult` `role-claim` (`why`, the noun as typed, the pair), mapped in
+`decideDeterministic.ts` to `input.roleClaim.<why>`.
+
 ## A stated side is a requirement record, checked at stage 0g′ ([ADR-549](06-decisions.md#adr-549))
 
 - **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`) — `circle-side`,
