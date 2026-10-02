@@ -58,6 +58,7 @@
       "analytic": "This tool builds geometric constructions on a free canvas, not graphs on a coordinate system. Axes, coordinates, slopes and line equations are built in the \"$t(switcherAnalytic)\" tool — click \"$t(switcherAnalytic)\" at the top of the screen. Here, describe the figure itself — e.g. \"triangle ABC\" or \"point D on AB\".",
       "coordinate-point": "Placing a point by its coordinates is done in the \"$t(switcherAnalytic)\" tool — click \"$t(switcherAnalytic)\" at the top of the screen. There you write E(-1,7). Here, describe the figure itself — e.g. \"triangle ABC\" or \"point D on AB\".",
       "angle-relation": "That's an angle relationship the tool highlights for you once you draw the figure (e.g. two parallel lines and a transversal) — not something to type. Draw the figure and the relationships appear on their own.",
+      "proof-target": "That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: \"{{sentence}}\"",
       "proof": "The tool draws the figure from the givens — it doesn't write proofs. Enter the givens and the figure builds and verifies as you go.",
       "compute": "The tool draws the figure from the givens — it doesn't compute values or solve the problem. Enter the givens (lengths, angles, ratios) and the figure is built.",
       "unrelated": "No geometric construction detected here. Describe a shape or a given — e.g. \"triangle ABC\" or \"point D on AB\".",

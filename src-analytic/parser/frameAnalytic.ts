@@ -64,22 +64,11 @@ export function orthography(raw: string): string {
 // Proof targets — refused, never parsed (operator ruling 3 on #1616)
 // ---------------------------------------------------------------------------
 
-/**
- * «הוכיחו כי OB ⊥ AC», «הראו כי …», "prove that …" — what the student is asked to PROVE.
- *
- * The tool draws the givens; it is not a proof engine. A proof target typed into the box must never
- * become a constraint — before this, «הוכיחו כי AC ⊥ BD» reached the operand check, which is one
- * spelling away from drawing the claim as though it were given.
- *
- * «הראו» is also in the imperative lexicon (`scopeAnalytic.ts`, "show me …"), so the `כי`/`ש` that
- * makes it "show THAT" is required; a bare «הראו את …» stays the teaching path's.
+/*
+ * «הוכיחו כי OB ⊥ AC», «הראו כי …», "prove that …" — what the student is asked to PROVE. This tree had the
+ * first copy of the rule (#1618); #1666 (ADR-W-107) moved it to `shell/proofTarget.ts` so all three
+ * builders refuse the same spellings, and `parseLine` calls it from there.
  */
-const PROOF_HE = /^ו?(?:הוכיחו|הוכח|הוכיחי|תוכיחו|הראו|הראה|הראי|נמקו|נמק)\s+(?:כי|ש-?|את\s+ש-?)\s*\S/;
-const PROOF_HE_BARE = /^ו?(?:הוכיחו|הוכח|הוכיחי|תוכיחו)(?:\s|:|$)/;
-const PROOF_EN = /^(?:prove|show)\s+that\b/i;
-
-export const isProofTarget = (line: string): boolean =>
-  PROOF_HE.test(line) || PROOF_HE_BARE.test(line) || PROOF_EN.test(line);
 
 // ---------------------------------------------------------------------------
 // The wrapper — given-prefixes, figure references, units

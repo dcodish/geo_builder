@@ -23,6 +23,7 @@ import { MIDSEGMENT_SHAPES, RADIUS_VAR, type AnyCommand, type Command, type Id, 
 import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { stripFormatControls } from '../../shell/bidi';
+import { findProofTarget } from '../../shell/proofTarget';
 
 export type ParseResult =
   | { ok: true; commands: AnyCommand[] }
@@ -55,6 +56,11 @@ export type ParseResult =
   // segment's first letter. The bisector runs FROM its first letter, so the sentence contradicts itself;
   // refused quoting both letters, never silently redirected to either.
   | { ok: false; reason: 'bisector-wrong-apex'; apex: string; stated: string }
+  // #1666 (ADR-561, ADR-W-107): a PROOF TARGET — «הוכיחו כי AB ⊥ AC», "prove that …" — is what the student
+  // must SHOW, never a given. Every rule used to read the claim inside it and lower it as a constraint.
+  // `sentence` is the proof sentence as typed. The submit gate refuses it before the parser
+  // (`decidePreParse`); this is the same shared rule at the one boundary every other seam reads.
+  | { ok: false; reason: 'proof-target'; sentence: string }
   // #1274 (operator ruling, ADR-W-066): «D = חיתוך AB ו-BC» — the two carriers the student named share a
   // letter, so their crossing IS that letter, in every configuration, with no solve, no seed and no
   // tolerance. The geometry is right and only the NAME is wrong: there is no new point to make. Refused
@@ -10874,6 +10880,9 @@ const isAmbiguityQuestion = (reason: string): boolean =>
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
   let s = normalizeUtterance(raw);
   if (!s) return { ok: false, reason: 'not-handled' };
+  // #1666: a claim to prove never reaches a rule (`shell/proofTarget`, shared by all three builders).
+  const proof = findProofTarget(raw);
+  if (proof) return { ok: false, reason: 'proof-target', sentence: proof.sentence };
   // ANGLE-ALIAS resolution (issue #235, ADR-386) — the sibling ctx-aware REWRITE at the same chokepoint
   // as the size-qualifier/ordinal rewrites below: each bound alias name («נסמן זוית BAM כ-A1») rewrites
   // «זוית A1»/«∠A1» to the aliased triple («זוית BAM»), so EVERY angle-consuming rule — value,

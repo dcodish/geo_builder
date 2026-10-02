@@ -57,6 +57,9 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
         : t('err.ambiguousAngleVertexBare', { vertex: err.vertex });
     case 'dropped-given':
       return t('err.droppedGiven', { items: err.items });
+    // #1666: the tool draws the givens; a claim to prove is named and left out.
+    case 'proof-target':
+      return t('err.proofTarget', { sentence: err.sentence });
     // #926: the change went through; this names the rows it left without effect (they stay, marked).
     case 'dependents-broken':
       return t('err.dependentsBroken', { cause: err.cause, items: err.items });

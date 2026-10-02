@@ -22,6 +22,7 @@ import { autoNamedLabels, groupKey, replay, useGeoStore } from '@/store/geoStore
 import { honestyGateReport } from './honestyGates';
 import { impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
+import { findProofTarget } from '../../shell/proofTarget';
 
 export interface EditDeps {
   t: (key: string, opts?: Record<string, unknown>) => string;
@@ -64,6 +65,12 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     const before = replay(prefix);
     return buildParseCtx(before.construction, before.positions);
   };
+  // #1666 (ADR-561): an edit is a statement too — a proof target is refused here exactly as at submit.
+  const proof = findProofTarget(editText);
+  if (proof) {
+    setInputNote(t('input.scope.proof-target', { sentence: proof.sentence }));
+    return false;
+  }
   let ectx = prefixCtx();
   let r = parse(editText, ectx);
   // #186: an edit referencing a circle by a name that matches no circle binds an UNNAMED circle the

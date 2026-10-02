@@ -27,6 +27,7 @@ import { normalizeLabel3, renameFacts3, renamePlaneDisplay3, renameQueries3, swa
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { ingestTypedText } from '../../shell/bidi';
+import { findProofTarget } from '../../shell/proofTarget';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, freeDims } from '../engine/apply';
@@ -76,6 +77,9 @@ export type StoreError3 =
   // does not know the prime convention no better off.
   | { code: 'ambiguous-main-diagonal'; pairs: string }
   | { code: 'ambiguous-angle-vertex'; vertex: string; angles: string }
+  /** #1666 (ADR-3D-295, ADR-W-107): a PROOF TARGET («הוכיחו כי …», "prove that …") — what the student must
+   *  show, never a given. `sentence` is the proof sentence as typed. Typed, so it never escalates. */
+  | { code: 'proof-target'; sentence: string }
   /** The LLM decomposition lost part of the stated input (docs/24 S2.3 honesty gates) — `items` names
    *  the dropped labels/magnitudes; nothing was committed. */
   | { code: 'dropped-given'; items: string }
@@ -1011,6 +1015,12 @@ function readStatement3(
   st: { facts: Fact3[]; seed: number },
   utterance: string,
 ): { ok: true; commands: Command3[] } | { ok: false; error: NonNullable<StoreError3> } {
+  // #1666 (ADR-3D-295): a PROOF TARGET is refused BEFORE the grammar, at the one reader both statement
+  // seams share (`submit`, the ✎ edit). It used to parse: ADR-3D-002 stripped «הוכיחו כי» / "prove that" and
+  // read the claim, which since the T2 addendum DRIVES a free figure — so the figure was made to satisfy
+  // what the student was asked to prove. The rule is shared with 2-D and analytic (`shell/proofTarget`).
+  const proof = findProofTarget(utterance);
+  if (proof) return { ok: false, error: { code: 'proof-target', sentence: proof.sentence } };
   let parsed = parse3(utterance);
   // #866 (ADR-3D-239) — a vertex carrying exactly ONE angle is not ambiguous, and asking there
   // would make the clarification's own sentence false ("more than one angle meets at A" when one

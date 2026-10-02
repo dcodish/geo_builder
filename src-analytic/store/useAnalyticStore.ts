@@ -82,6 +82,8 @@ export type InputError =
   | { key: 'bad-equation'; detail: string }
   /** Understood, and deliberately outside this product's scope (a rotated conic, a hyperbola). */
   | { key: 'out-of-scope'; detail: string }
+  /** A claim to PROVE, never a given (#1618; the shared rule since #1666, `shell/proofTarget`) — `detail` is the proof sentence. */
+  | { key: 'proof-target'; detail: string }
   /** `x` or `y` used as a point's unknown — they are the plane's own variables (#1039). */
   | { key: 'reserved-coordinate'; detail: string }
   /** A shape noun and a vertex count that disagree (#1042). */

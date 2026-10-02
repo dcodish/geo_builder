@@ -1222,19 +1222,20 @@ const onSegment: Rule = (s) => {
 
 const GREEK = /[α-ωΑ-Ω]/;
 
-/** An optional proof-verb prefix (`הוכיחו כי`, `prove that`) — claims accept it and ignore it. */
 /**
  * Strip a leading DISCOURSE marker — text that frames the statement without being part of it.
  *
- * Two families, one class: the proof framing (`הוכיחו כי` / `prove that`) and the given framing
- * (`נתון ש` / `נתון כי` / `given that`). Neither changes WHAT is asserted — drive-vs-verify is decided
- * by the figure's freedom at apply (M1), never by the wording — so a rule that understands the bare
- * statement must understand the framed one. #337 (ADR-3D-088): the corpus wording
+ * The given framing (`נתון ש` / `נתון כי` / `given that`) does not change WHAT is asserted — drive-vs-verify
+ * is decided by the figure's freedom at apply (M1), never by the wording — so a rule that understands the
+ * bare statement must understand the framed one. The PROOF framing (`הוכיחו כי` / `prove that`) was
+ * stripped here too until #1666 (ADR-3D-295): a claim to prove is not a given, and since the T2 addendum a
+ * claim on a free figure DRIVES it — so it is refused at the store's statement reader before this runs
+ * (`shell/proofTarget`), and the parser no longer reads past it. #337 (ADR-3D-088): the corpus wording
  * «נתון שהזווית שבין … שווה לזווית שבין …» reached no rule for want of exactly this.
  */
 const stripStatementPrefix = (s: string): string =>
   s.replace(
-    /^(?:הוכיחו?\s+(?:כי|ש-?)\s*|הראו?\s+(?:כי|ש-?)\s*|prove\s+that\s+|show\s+that\s+|נתון\s+(?:כי\s+|ש-?)\s*|given\s+that\s+)/i,
+    /^(?:נתון\s+(?:כי\s+|ש-?)\s*|given\s+that\s+)/i,
     '',
   );
 

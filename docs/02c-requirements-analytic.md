@@ -1897,7 +1897,7 @@ The same holds in English for the forms the catalogue shows.
 
 A line is accepted whole or not at all; the row recorded is the line as typed. A side named by its ROLE («השוק BC», «היתר AC») stays a claim about that role and is not reduced to «הצלע».
 
-What the student is asked to **prove** («הוכיחו כי …», «הראו כי …», "prove that …") is never drawn. The tool answers that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and asks for only what the question gives.
+What the student is asked to **prove** («הוכיחו כי …», «הראו כי …», "prove that …") is never drawn. The tool answers that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and asks for only what the question gives. Since #1666 the rule is shared with 2-D and 3-D ([FR-SU-15](02w-requirements-workspace.md), [ADR-W-107](06w-decisions-workspace.md#adr-w-107)): it also catches «יש להוכיח …», an item marker and a claim after a given on the same line, where the message quotes the claim.
 
 A right trapezoid («טרפז ישר זווית») does not decide which leg is perpendicular. A stated right angle decides it, and until one is stated it is a configuration «הציגו תצורה אחרת» cycles.
 

@@ -5119,3 +5119,35 @@ That makes two copies of one surface, with a third on the way. ADR-W-016 rule 1 
 - **Keying analytic's state by scene id** (`poly-ABC-0`). A polygon side and a stated segment are two ids for one visible line, and the id changes when the polygon is restated. The endpoint pair is what the student sees, and a rename relabels it.
 
 **Consequences.** `shell/frame/SegmentMenu.tsx`, `shell/frame/segmentDisplay.ts` (new); `src/render/Figure.tsx` (the segment and circle branches, `data-ink`); `src/store/geoStore.ts` (`toggleSegFlag`); the analytic side as listed in ADR-AG-201. Locks: two shell, two thin, plus the analytic tree's own.
+
+## ADR-W-107 — A claim to prove is refused in every builder, by one shared rule (#1666)
+
+**Status:** accepted · 2026-10-02 · bug (P1, honesty) · operator ruling on #1649, 2026-10-02: *"all refused with exaplanation"*. **Extends** [ADR-W-016](#adr-w-016) (a new `shell/` decision) and applies [ADR-W-071](#adr-w-071) (docs/28 §5c). Product sides: [ADR-561](06-decisions.md#adr-561) (2-D), [ADR-3D-295](06b-decisions-3d.md#adr-3d-295) (3-D); analytic's first copy was ADR-AG-187 (#1618).
+
+**Requirements:** docs/02w FR-SU-15 (new — one promise for every builder); docs/02c R124 notes the shared rule · **Design:** docs/04w — "Proof targets" (new section). **Product:** workspace (2d + 3d + analytic).
+
+**Context.** A bagrut question has givens and claims. «הוכיחו כי AB ⊥ AC» is a claim: what the student must show. Measured on `main` e92b671f through each builder's real submit decision, after a figure with A, B and C:
+- **2-D** (`decideDeterministic2D`) committed every spelling as a constraint (`segment, segment, set-perpendicular`): «הוכיחו כי», «הוכח כי», «הוכיחו ש-», «הראו כי», «הראה כי», «יש להוכיח כי», «צריך להוכיח כי», "prove that", "show that", «א. הוכיחו כי …» and the mixed line «נתון AB = AC. הוכיחו כי AB ⊥ AC». «(1) …» and «1. …» escalated to the paid model.
+- **3-D** (`decideSubmit3`) recorded «הוכיחו כי», «הוכיחו ש-», «הראו כי», "prove that" and "show that" as a driving `cos-angle` on the free pyramid, recorded «הראו כי ∠BAC = 90°» as a claim, and refused «הוכיחו כי AB = AC» as `claim-refuted`. ADR-3D-002 stripped the proof verb on purpose ("accepted and ignored"); since its T2 addendum a claim on a free figure DRIVES it.
+- **Analytic** (`decideSubmit`) refused the plain spellings as `proof-target`. «יש להוכיח», «צריך להוכיח», an item marker and the mixed line were refused as `bad-operand`, which blamed the operand. Its rule also fired on «הראו שני גבהים» ("show two altitudes") and «הראו כיצד …» ("show how"), because the `ש` and `כי` it matched were the first letters of a word.
+
+So in two builders the figure was made to satisfy the claim the student had to prove, and it "confirmed" the claim for free. The scope register's 2-D `proof` category could not help: it is consulted only after a FAILED parse, and these lines parsed.
+
+**Decision.**
+
+1. **`shell/proofTarget.ts` — `findProofTarget(text) → { target: true, span: [start, end), sentence } | null`.** Pure. It imports no product and returns no student-facing string. Two kinds of match:
+   - **A proof verb with its complementizer, anywhere in the line:** «הוכיחו / הוכח / הוכיחי / תוכיחו / נמקו» + «כי» / «ש» / «את ש»; «הראו / הראה / הראי» + «כי» / «ש-» / «ש» before the article or a non-Hebrew character; «יש / צריך / עליכם / נדרש להוכיח / להראות» likewise; "prove / show / demonstrate that". The pair never occurs in a given, which is what makes "anywhere" safe and catches the mixed line and an item marker.
+   - **A bare prove-verb only where a sentence starts:** «הוכיחו: …», «הוכח את הטענה», "prove: …", at the line's start or after `. ; : , ! ?` or a line break, past an item marker («א.», «(1)», «1.», «ב'»).
+
+   The show-verbs never count bare, because «הראו את …» is the "show me" imperative. A whole-word «כי» is required, because «כיצד» means "how". The span runs from the verb to the next sentence end, so `sentence` is the claim and not the given before it.
+2. **Each builder calls it at its own submit gate, before its grammar, and words its own refusal** (same meaning as analytic's, quoting `sentence`): «זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "…"». **Nothing of the line is recorded**, the mixed line included. That was analytic's behaviour, and now all three do the same.
+   - 2-D: `decidePreParse` (before the spinner and the model), the ✎ edit seam, and `parse()` (ADR-561).
+   - 3-D: `readStatement3`, the reader both statement seams share. The ADR-3D-002 strip loses its proof arm (ADR-3D-295).
+   - Analytic: `parseLine`, its line chokepoint, which `decideSubmit` calls before any rule. The local copy in `frameAnalytic.ts` is deleted.
+3. **A §5c cross-product lock.** The rows live once in `shell/__tests__/fixtures/proof-target-rows.ts` (`proofTargetFaults(gate)`): 15 spellings must be refused as proof targets, recorded by none, and quoted by the refusal; 12 negatives must not be refused as proof targets. The negatives are «כי» and «ש» in other senses (`נתון כי`, `ידוע ש-`, `כך ש-`), the show-me imperative, and «כיצד». The thin locks call each builder's REAL decision: `src/app/__tests__/proof-target-1666.test.ts` (`decideDeterministic2D`, plus `runSubmit` and the edit seam), `src3d/__tests__/proof-target-1666.test.ts` (`decideSubmit3`) and `src-analytic/__tests__/proof-target-1666.test.ts` (`decideSubmit`). Each also asserts that no line of its catalog reads as a proof target. The meta-lock `shell/__tests__/proof-target-meta-1666.test.ts` runs the same function against broken gates and asserts each is caught: no gate, a line-start-anchored detector, a detector that fires on any «כי»/«ש», a bare show-verb, a refusal that does not quote, and a gate that records the given half.
+
+**Rejected.**
+- **Recording the given half of a mixed line and refusing the claim.** It needs a sentence splitter in each builder, and analytic deliberately does not half-accept a line (`parseLine`: "a line is never half-accepted"). The refusal quotes the claim, so the student sees which half to retype.
+- **Keeping 3-D's "prove that" as a verified claim.** It verified only on a determined figure, and on a free figure it drove the figure. The ruling is one behaviour in all three builders. A claim typed WITHOUT a proof verb still reads as before in 3-D.
+
+**Consequences.** `shell/proofTarget.ts` (new); the per-product call sites as listed. Locks: one shell fixture and meta-lock, three thin locks, the 2-D scenario `proof-target-refused-1666`, and `parse3-v1.test.ts` drops its proof-prefix input. Analytic's `issue-1618-sentence-frame.test.ts` locks are unchanged and green.

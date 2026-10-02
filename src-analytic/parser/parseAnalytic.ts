@@ -31,6 +31,7 @@ import { constantLengthExpr, namedLengthPairs, parseLengthExpr, type LengthExpr 
 import { NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, type NumeralKind } from '../engine/names';
 import { CENTRE_SENTINEL, CIRCLE_SENTINEL, UNBOUNDED, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
+import { findProofTarget } from '../../shell/proofTarget';
 import {
   centreClauses,
   diameterClauses,
@@ -38,7 +39,6 @@ import {
   elidedSubjectClauses,
   sharedSubjectClauses,
   isBareName,
-  isProofTarget,
   orthography,
   originClauses,
   parenClauses,
@@ -4763,7 +4763,11 @@ export function parseLine(raw: string): ParseResult {
   const typed = trim(raw);
   const line = orthography(typed);
   if (!line) return { ok: false, code: 'not-handled', detail: raw };
-  if (isProofTarget(unwrap(line))) return { ok: false, code: 'proof-target', detail: raw };
+  // #1666 (ADR-W-107): the shared rule, which every builder's submit gate calls before its grammar. The
+  // detail is the PROOF SENTENCE — in a mixed line («נתון AB = AC. הוכיחו כי …») that is the part the student
+  // must leave out; nothing of the line is recorded, as before.
+  const proof = findProofTarget(line) ?? findProofTarget(unwrap(line));
+  if (proof) return { ok: false, code: 'proof-target', detail: proof.sentence };
   const { result, framed } = readLine(line, 0);
   if (!result.ok) return result.code === 'not-handled' ? { ...result, detail: raw } : result;
   /*
