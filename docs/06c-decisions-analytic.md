@@ -9355,3 +9355,66 @@ The 16/5 line «הצלע CB מקבילה לציר ה-x, וחותכת את ציר
 - 2-D's two defects above (#1682, #1683) — not mirrored.
 
 **Consequences.** `engine/types.ts` (`Selector.beyond`, `meet-of.noun` / `named`, the `vertices-on-axes` fact), `engine/solve.ts` (`Constraint.all`), `engine/evaluate.ts` (`beyondParam`, the judge, the seeding, `holds` reads `all`), `engine/apply.ts` (`meet-of`, `area-of`, `vertices-on-axes`, `not-a-diagonal`), `engine/shapes.ts` (`ringsNamed` refinements), `engine/derive.ts` (`resolveFresh`; a choice's blame through `all`), `parser/parseAnalytic.ts` (the extension rules, named diagonals, `parseDiagonalDecl`, `parseMidsegment`, `parseVerticesOnAxes`, `FRESH_PREFIX`, the concurrency head), `parser/frameAnalytic.ts` (`conditionClauses`), the catalog (ten rows), store / errorText / i18n (`not-a-diagonal`). Sibling check (docs/17 §1): 2-D is the reference and has every capability; its two honesty defects are filed (#1682, #1683). 3-D answers these sentences `not-handled` (#1679's parity scope).
+## ADR-AG-206 — The exam's construction imperatives are taught as the sentence they build; the corpus counts what the student confirms (#1620)
+
+**Status:** accepted · 2026-10-02 · operator ruling 2026-10-01 on #1620 (*the exam's construction imperatives are taught, not accepted as typed — the ADR-W-030 pattern*) · stream S1 of slice C, branch `feat/1620-s1-imperatives` off `feat/1620-construction-vocabulary` @ 92881500.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R114 amended (the exam's construction imperatives are taught; a descriptive «שהורידו» line is not), and the R132 note «wait on #1620» resolved. · **Design:** [04c](04c-design-analytic.md): new section "The exam's construction register". · **LADDER stage:** the submit gate (before parse); no parser, fold, solver or render change.
+
+**Cites** [ADR-W-030](06w-decisions-workspace.md#adr-w-030) (non-canonical input is taught), [ADR-AG-150](#adr-ag-150) / #1353 (the analytic wrapper register and its gate), [ADR-AG-187](#adr-ag-187) (slice A: the exam frame, proof targets; the imperatives parked there), [ADR-AG-195](#adr-ag-195) (#1637 B3: the tangent and chord noun forms the lessons lower onto), #1102 (*locks must call, not reproduce*).
+
+**Context — measured at pickup** (each corpus line typed after its own question's earlier lines, through `decideSubmit`): all twelve exam imperatives answered `not-handled` — a paid fallback for sentences the tool can read once they are in textbook form. The wrapper register could not reach them: it strips a verb only at the START of a line, its lexicon held `העבר` but not `העבירו / הורידו / מעבירים / מורידים / בחרו`, and the exam's object is indefinite with its claims in relative clauses («ישר המקביל … החותך …»), so even a stripped remainder («משיק למעגל בנקודה C», «מן הנקודה B אנך לציר ה-x») is not the textbook sentence. **Class:** an instruction register read at one position (verb first) by one transformation (strip), where the exam's register needs a FRAME.
+
+**Decision.**
+1. **A second, closed register — the exam's — composes the declarative sentence by frame** (`constructionCandidates`, `parser/scopeAnalytic.ts`): `ADVERBIAL* VERB ADVERBIAL* NOUN NAMES? REST` after `unwrap`. The verbs `CONSTRUCTION_VERBS_HE` (also added to `IMPERATIVE_VERBS_HE`, so #1353's catalog net covers them) are matched as WHOLE tokens — «שהורידו / שהעבירו» never match — and mid-line only after one of three adverbials («מן/מ(ה)נקודה|קודקוד(ים) X», «דרך (הנקודה) X (שעל ה…)», «ב<polygon> XYZ»). Relative participles become the predicate; «כרצונכם» is dropped. One composition per noun: the tangent at the through-point; a line or segment «העובר דרך …»; a perpendicular «מ<anchor>»; an altitude or median as the copula «ב<polygon>, X ו-Y הם גבהים …»; the definite subject otherwise. The frame's reading comes before the verb-first strip.
+2. **The register never decides.** Every composed string is a candidate that `decideSubmit` keeps only if `parseLine` and the fold accept it, so a lesson is always a sentence the next Enter accepts. An exam candidate is also taught when the figure ALREADY holds it — the exam restates givens («בחרו נקודה E כרצונכם, הנמצאת על הצלע DC» after «במלבן ABCD, הנקודה E נמצאת על הצלע DC»); confirming it answers «already known». The tool wrapper keeps #1353's `record`-only promise (its lock is unchanged and green).
+3. **The ratchet counts what the student confirms.** `confirmTaught(lines, seed)` (`app/submit.ts`, exported) walks a question through `decideSubmit` as typed lines arrive and substitutes each lesson; the 471 ratchet derives that list. The test calls the app's decision and does not know the register exists. The FLOOR is not raised here (the integrator raises it).
+
+**The contract with streams S2–S4** — the exact taught sentence per exam line. Each is locked as the register's first reading now, and as the decision's lesson once its sentence parses:
+
+| exam line (corpus) | taught | on this branch |
+| --- | --- | --- |
+| העבירו משיק למעגל בנקודה C (5/5) | המשיק למעגל בנקודה C | taught |
+| דרך הנקודה D שעל המעגל העבירו משיק למעגל (21/5) | המשיק למעגל בנקודה D | taught; D on the circle measured |
+| העבירו מיתר AD (11/5) | המיתר AD | taught |
+| בחרו נקודה E כרצונכם, הנמצאת על הצלע DC (2/4) | הנקודה E נמצאת על הצלע DC | taught (already known there) |
+| העבירו את האלכסון AC במרובע ABCD (8/5) | האלכסון AC במרובע ABCD | S3 |
+| מן הנקודה B הורידו אנך לציר ה-x (5/5) | האנך מהנקודה B לציר ה-x | S2 |
+| מן הקודקוד C העבירו אנך לציר ה-x, החותך אותו בנקודה D (17/4) | האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D | S2 |
+| מן הקודקודים A ו-C העבירו אנכים לציר ה-x, החותכים … בהתאמה (20/4) | האנכים מהקודקודים A ו-C לציר ה-x חותכים אותו בנקודות E ו-F בהתאמה | S2 |
+| מן הנקודה E העבירו ישר המקביל לציר ה-y וחותך את הצלע AB בנקודה F (13/4) | הישר העובר דרך הנקודה E מקביל לציר ה-y וחותך את הצלע AB בנקודה F | S2 |
+| מנקודה D העבירו ישר המקביל לציר ה-x החותך את הצלע AB בנקודה E (14/4) | הישר העובר דרך הנקודה D מקביל לציר ה-x וחותך את הצלע AB בנקודה E | S2 |
+| דרך E מעבירים קטע EF המקביל ל-DA (2/4) | הקטע EF מקביל ל-DA | parses, but refused today (`unknown-reference` F: the NEXT line places F) — S2 |
+| במשולש OBC העבירו גבהים OD ו-BE לצלעות BC ו-OC בהתאמה (7/4) | במשולש OBC, OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה | S4 |
+
+**Locks** (`issue-1620-imperatives-taught.test.ts`, 37 tests, all through `decideSubmit` / `confirmTaught` over the corpus file):
+- The twelve contract strings are the register's first reading.
+- The four S1 rows are taught exactly, the quoted verb is the student's own word, and the next Enter is accepted.
+- The ADR-W-030 property: the confirmed list ends in the canonical string and derives the SAME construction as typing that string.
+- 21/5: D is on the circle, and the stated tangent is perpendicular to MD at D.
+- The eight S2–S4 rows are never committed, and if taught, only with the contract string. These rows upgrade themselves on integration.
+- 11/5 and 21/5 land whole.
+- «בחרו … כרצונכם» on a bare rectangle teaches the incidence, which records.
+- The singular and present-tense verbs take the same frames.
+
+Controls:
+- A descriptive «שהורידו / שהעבירו» line (and corpus 5/5 #6) is not taught.
+- A mid-line verb with no adverbial is not read.
+- Proof targets stay `proof-target`, and no exam imperative parses as one.
+
+**Fails before: 25 of 37.** The 12 that pass before are the eight not-yet-parsing rows (honest refusals before and after) and four controls. `issue-1353-imperatives-taught` is unchanged and green.
+
+**Measured.** 471 corpus (seed 0, through `confirmTaught`): **217/263 → 222/263 lines, 21/46 → 23/46 questions** (+11/5, +21/5; 2/4 #5 and 5/5 #3 also land). The ratchet run costs ~7 s (one `decideSubmit` per line).
+
+**2-D's verdict on the same imperatives** (`decideDeterministic2D`, in 2-D-expressible contexts): «העבירו משיק למעגל בנקודה C» and «העבירו מיתר AD» **COMMIT silently**. `REQUEST_WORDS` strips «העבירו» and no teaching note is shown, so the imperative is recorded as the student's sentence — the ADR-W-030 defect in the sibling. Reported for filing against `2d`, not fixed here. The rest:
+- escalate as `dropped`: «דרך הנקודה D שעל המעגל העבירו משיק למעגל», «דרך E מעבירים קטע EF …».
+- escalate as `not-handled`: «העבירו את האלכסון …», «בחרו נקודה E כרצונכם …», «מן הקודקוד C הורידו אנך לצלע AB», «במשולש OBC העבירו גבהים …».
+- refused (`unresolved dependencies`): «מן הנקודה E העבירו ישר המקביל ל-AC …».
+- refused as analytic-only: the axis lines.
+
+**Not built, said out loud.**
+- **English** exam frames («from B drop a perpendicular to the x-axis»): the corpus is Hebrew; the English verb-first wrapper is unchanged.
+- **Parity rows** for the imperatives are not added. 2-D (the reference) commits two of them, so a row would lock the defect; they belong with the 2-D finding.
+- The S2–S4 lessons are delivered by this mechanism the moment their sentences parse; nothing more is needed here.
+
+**Consequences.** `parser/scopeAnalytic.ts` (`CONSTRUCTION_VERBS_HE`, `constructionCandidates`, `ImperativeCandidate.exam`, five verbs in `IMPERATIVE_VERBS_HE`, `imperativeCandidates` offers the frames first; imports `unwrap`), `app/submit.ts` (the exam candidate's acceptance set; `confirmTaught`), `__tests__/issue-1618-corpus471-ratchet.test.ts` (measures `confirmTaught`). Sibling check (docs/17 §1): 2-D as above; 3-D's `scope3` has its own register and no analytic-axis sentences, so it was not measured here.

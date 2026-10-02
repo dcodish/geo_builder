@@ -2120,3 +2120,24 @@ Add a row to the helper table:
 **Fresh names.** The midsegment lowers to two `midpoint` derivations and their segment. Its unnamed midpoints carry `FRESH_PREFIX` placeholders (`@fresh:MNPQ|mid:A,B`), resolved by `derive` (`resolveFresh`) in list order against the letters EARLIER lines use: an existing midpoint of the same pair keeps its letter, else the first free preferred letter (2-D's `freeLabel` order), else a subscript. Reported through `minted`, like a coordinate point's name.
 
 **Every vertex on some axis.** `vertices-on-axes` is resolved at M1 against the one ring (`ringsNamed`) into ONE `choice` over the 2ⁿ assignments, each option a conjunction (`Constraint.all`, flattened by `resolveChoices` and never measured itself). A choice per vertex would cycle on one seed index and never mix the axes. Dead assignments are skipped by `evaluateTryingChoices` (ADR-AG-197).
+## The exam's construction register ([ADR-AG-206](06c-decisions-analytic.md#adr-ag-206), #1620)
+
+**Two registers, one gate.** `parser/scopeAnalytic.ts` holds the tool wrapper (#1353: a verb FIRST, stripped) and,
+beside it, `constructionCandidates` — the exam's register. It reads a closed grammar
+`ADVERBIAL* VERB ADVERBIAL* NOUN NAMES? REST` after `unwrap`: the verbs are `CONSTRUCTION_VERBS_HE` (whole
+tokens, so «שהורידו» never matches); the adverbials are «מן/מ(ה)נקודה|קודקוד(ים) X», «דרך (הנקודה) X (שעל ה…)»
+and «ב<polygon> XYZ»; the nouns are a closed table with their definite forms; the relative participles of
+REST («המקביל», «החותך», «הנמצאת», …) become its predicate (the first loses «ה», each later one gains «ו»);
+«כרצונכם» is dropped. One composition rule per noun: tangent (at the through-point, its «שעל המעגל» implied),
+line/segment («העובר דרך …», or nothing when a named segment already starts at the anchor), perpendicular
+(«מ<anchor>»), role nouns (the copula «ב<polygon>, X ו-Y הם גבהים …»), and the definite subject for the rest.
+`imperativeCandidates` offers these readings first, flagged `exam`.
+
+**The register never decides.** `decideSubmit` keeps a candidate only when the parser and the fold accept it,
+so the taught text is always a sentence the next Enter accepts. An `exam` candidate is also taught when the
+figure already holds it (`already-known` / `already-follows`): the exam restates givens imperatively. The tool
+wrapper keeps #1353's `record`-only rule.
+
+**Coverage counts what the student confirms.** `confirmTaught(lines, seed)` (`app/submit.ts`) walks the lines
+through `decideSubmit` and substitutes each lesson; the 471 ratchet derives that list, so the teaching is
+called, never re-implemented in the test.

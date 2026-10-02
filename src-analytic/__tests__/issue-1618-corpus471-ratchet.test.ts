@@ -12,7 +12,9 @@
  * LOWERS either count, so a slice can never buy one structure by losing another. Raising a floor is
  * part of the slice that earned it.
  *
- * This counts lines the parser and apply ACCEPT — it is a coverage gate, not a figure check. A
+ * This counts lines the parser and apply ACCEPT — it is a coverage gate, not a figure check. A line the
+ * submit decision TEACHES (the exam's construction imperatives, ADR-AG-206) is counted as the sentence the
+ * student confirms: `confirmTaught` is the app's own decision, called here, never a copy of it. A
  * question that fully lands gets a `.geo.json` fixture in the slice that completes it, which is where
  * the figure itself is verified.
  */
@@ -20,6 +22,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
+import { confirmTaught } from '../app/submit';
 
 interface CorpusQuestion {
   id: string;
@@ -38,7 +41,8 @@ function measure() {
   let total = 0;
   const landed: string[] = [];
   for (const q of CORPUS) {
-    const d = derive(q.lines, 0);
+    // ADR-AG-206: the lines as the student ends up holding them — every taught imperative confirmed.
+    const d = derive(confirmTaught(q.lines, 0), 0);
     const failing = new Set(d.faults.map((f) => f.index));
     total += q.lines.length;
     lines += q.lines.length - failing.size;
