@@ -364,6 +364,15 @@ export const directionSymbol = (lineId: Id): string => `θ_${lineId}`;
  */
 export const toolSymbol = (objectId: Id, part: string): string => `θ_${objectId}.${part}`;
 export const isDirectionSymbol = (sym: string): boolean => sym.startsWith('θ_');
+/**
+ * The object a SHAPE symbol shapes — `θ_<object>.<part>`, made by {@link toolSymbol} — or `null` for any other
+ * symbol, a free line's direction (`θ_<line>`, no part) included. Used by the solve's created-shape fit (#1647).
+ */
+export const shapedObjectOf = (sym: string): Id | null => {
+  if (!sym.startsWith('θ_')) return null;
+  const dot = sym.lastIndexOf('.');
+  return dot > 2 ? sym.slice(2, dot) : null;
+};
 
 // ---------------------------------------------------------------------------
 // PROVENANCE — what the student's own givens say about one point (#1032)

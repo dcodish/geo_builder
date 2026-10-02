@@ -51,6 +51,9 @@ builds. A new panel row that prints a value belongs in that function, or the inv
 `app/lineAngle.ts` answers "what angle does this direction make with the positive x-axis, and is it known?"
 for every surface: the «שיפועים» panel row reads a segment's direction, the ask lane a named line's, and both
 call `lineAngleOf` (fold to [0°, 180°), vertical = 90°, gated by `isKnowledge`, printed by `angleText`).
+Both ENDS of the fold are the scale-free predicates of `engine/lines.ts` — `isVertical` → 90°, `isHorizontal` → 0°, one
+tolerance (`VERTICAL_TOL`, relative to the direction's length) — never an absolute epsilon in degrees: a solved
+horizontal side carries the solver's residual and must never print «180°» ([ADR-AG-202](06c-decisions-analytic.md#adr-ag-202), #1648).
 
 ## The model — objects, and the register that makes them free
 
@@ -2020,6 +2023,8 @@ Four seams, one rule: a configuration the givens contradict, or one the search f
 **The frame.** `orthography`: `stripFormatControls` (shell/bidi) first, then a leading bullet, then the maqaf/NBSP folds, then «ה- x» → «ה-x». `NAME_LIST` admits comma lists with an optional final «ו-»; `distributeClauses`' location reading takes the verb OR a predicate opening with «על». `centreClauses` accepts the copula before the centre letter, in both languages.
 
 **The created circle.** `tangent-of` with no circle in the figure (and a touch point, or no axis target) applies `touchedCircleFacts` — `param θ_circle-touched.r > 0` and the stated equation circle `circle-touched` over `θ_circle-touched.{a,b,r}` (`toolSymbol`, carriers.ts; hidden from the parameter rows and the figure signature by the existing `θ_` test) — then the tangency with `circleId`. `the-circle`'s `match` gains `{ inscribed: ring }` (`theCircle`: bind the one circle `statedTangentToSide` finds for every side — the touch lowering's radius-perpendicular mark or a touch-free `tangent-curve` over the pair; else create); bound to `circle-touched`, the incircle sentence redefines it as the computed `incircle` under the same id and drops its tool parameter, then applies `about` (`centre-of { circleId }` names the centre).
+
+**The created circle starts fitted** ([ADR-AG-202](06c-decisions-analytic.md#adr-ag-202), #1647). `evaluateUncached` calls `fitCreatedShapes` before the solve when the construction has shape symbols (`θ_<object>.<part>`, `shapedObjectOf`): the construction without the shape, its touch points and everything defined through them is evaluated (memoised per construction, seed and choice); the circle and its touch points are fitted to that figure over the constraints that mention them (touch points on their bounded pieces, the circle started through them); the fit seeds the solve. When that prior figure admits no configuration at the seed, the joint search is skipped and the post-hoc check judges the prior's effort with the fitted circle.
 
 **The refusal.** `ShapeRow.notCyclic` (registry) → `cyclicFacts` → `inscribed-contradicts-noun { shape, forced }` → `errInscribedContradictsNoun` with `shapeHe/forcedHe` and `shapeEn/forcedEn` (English by reverse `EN_SHAPE` lookup in `errorText`).
 
