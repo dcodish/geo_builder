@@ -642,7 +642,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'bisector-copula', family: 'cevians-centres', steps: ['משולש CMD', 'AM הוא חוצה זווית CMD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1685' }, { product: '3d', issue: '#1679' }], note: '471 corpus 22/5' },
   { id: 'bisector-wrong-vertex', family: 'cevians-centres', steps: ['משולש ABC', 'AD חוצה זווית C'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1684' }, { product: '3d', issue: '#1679' }], note: 'the reference is the honesty invariant, not 2-D: 2-D draws the bisector of A and drops «C»' },
   { id: 'cevian-apex-two-triangles', family: 'cevians-centres', steps: ['משולש ABC', 'משולש ABD', 'AE גובה'], expect: 'asks', knownGap: [{ product: '2d', issue: '#1684' }, { product: '3d', issue: '#1679' }], note: 'the reference is ADR-052, not 2-D: 2-D picks triangle ABC silently' },
-  { id: 'bisector-foot', family: 'cevians-centres', steps: ['משולש AOC', 'D על AC כך ש-OD חוצה-זווית AOC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1284' }] },
+  { id: 'bisector-foot', family: 'cevians-centres', steps: ['משולש AOC', 'D על AC כך ש-OD חוצה-זווית AOC'], expect: 'builds' },
   // the circle rows of 3-D's own catalog are plain rows (X8 excepts every other circle sentence in 3-D)
   { id: 'circle3d-incircle', family: 'inscribed', steps: ['מעגל חסום במשולש ABC'], expect: 'builds' },
   { id: 'circle3d-touch', family: 'tangents', steps: ['משולש ABC', 'מעגל A משיק לישר BC בנקודה F'], expect: 'builds' },
