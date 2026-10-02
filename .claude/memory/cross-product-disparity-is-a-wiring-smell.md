@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 41d38bce-e024-4bc7-9645-a1607e5a4bdc
-  modified: 2026-09-11T10:15:56.301Z
+  modified: 2026-10-02T13:03:45.986Z
 ---
 
 When 3-D refuses a sequence 2-D builds, the operator treats it as **something not wired correctly**, not
@@ -21,6 +21,9 @@ which is exactly the 1-DOF point kind 3-D lacked — and skipped the escalation 
 **How to apply:** for any 3-D/complex refusal or capability gap, run the identical utterance sequence
 through 2-D's `factsOf → replayFacts` and read what point/constraint kinds it produced. If 2-D builds it,
 the escalation is not "should we support this" but "port 2-D's mechanism"; write the sibling's mechanism
-into the issue/ADR as the template. Also compare which sides/pairs each product picks — #989 was found
+into the issue/ADR as the template. **Analytic too, as a standing ruling (2026-10-02, #1669/#1649):**
+*"analytics and 2d should have same user experience"* — for plane geometry, 2-D's verdict (builds / refuses /
+asks, the points it introduces, the circle it creates or binds) is the reference; don't ask the operator
+"create or refuse?" for an analytic gap 2-D already answers — follow 2-D and say so. Also compare which sides/pairs each product picks — #989 was found
 this way (2-D's parallel pair depends on typing order). Related: [[measure-before-diagnosing]],
 [[measure-the-plans-therefore]], [[try-the-neighbouring-spelling]].
