@@ -1,0 +1,265 @@
+{
+ "name": "round-2026-10-02b",
+ "title": "fix round 2026-10-02 B — proof targets refused everywhere (#1666), 2-D foreign givens refused (#1654–#1658), 2-D role nouns as claims (#1661), analytic circle naming / diameter / panel (#1659 #1665 #1663)",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "דו-ממד: «הוכיחו כי…» נדחה עם הסבר (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "הוכיחו כי AB ⊥ AC"
+   ],
+   "expectRefusal": "להוכחה",
+   "lookFor": "השורה השנייה נדחית: «זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות…»; המשולש לא נהיה ישר זווית",
+   "before": "נבנה ניצב בין AB ל-AC — הציור «הוכיח» את הטענה בעצמו"
+  },
+  {
+   "id": "T2",
+   "title": "מרחב: «הוכיחו כי…» נדחה עם הסבר (סירוב)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "פירמידה ABCD",
+    "הוכיחו כי AB ⊥ AC"
+   ],
+   "expectRefusal": "להוכחה",
+   "lookFor": "השורה השנייה נדחית עם אותו הסבר; הפירמידה לא משתנה",
+   "before": "הטענה נרשמה ועיצבה את הפירמידה"
+  },
+  {
+   "id": "T3",
+   "title": "אנליטית: «הוכיחו כי…» עדיין נדחה (הגנה)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "C(0,3)",
+    "הוכיחו כי AB ⊥ AC"
+   ],
+   "expectRefusal": "להוכחה",
+   "lookFor": "השורה האחרונה נדחית עם אותו הסבר",
+   "before": "unchanged"
+  },
+  {
+   "id": "T4",
+   "title": "דו-ממד: «כך ש-» אינו טענה להוכחה (הגנה)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "D על AB כך ש-AD = DB"
+   ],
+   "lookFor": "שתי השורות ירוקות; D אמצע AB",
+   "before": "unchanged"
+  },
+  {
+   "id": "T5",
+   "title": "דו-ממד: שיפוע לא נקרא כאורך (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "נתון: שיפוע הצלע AB הוא 3/4"
+   ],
+   "expectRefusal": "שיפוע",
+   "lookFor": "השורה השנייה נדחית ומצטטת «שיפוע», עם הפניה לכלי האנליטי; AB לא מקבל אורך 0.75",
+   "before": "נרשם AB = 0.75"
+  },
+  {
+   "id": "T6",
+   "title": "דו-ממד: רביע לא נבלע בשקט (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "במשולש AOB חסום מעגל שמרכזו C (הנקודה C נמצאת ברביע השני)"
+   ],
+   "expectRefusal": "רביע",
+   "lookFor": "המשפט נדחה כולו ומצטט «ברביע» — לא נבנה ממנו דבר (גם לא החלק בלי הרביע)",
+   "before": "נבנה המעגל החסום והרביע נעלם"
+  },
+  {
+   "id": "T7",
+   "title": "דו-ממד: מישור לא הופך לישר (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "דרך AC העבירו מישור המקביל ל-SD"
+   ],
+   "expectRefusal": "מישור",
+   "lookFor": "נדחה ומצטט «מישור», עם הפניה להנדסת המרחב",
+   "before": "נרשם AC ∥ SD"
+  },
+  {
+   "id": "T8",
+   "title": "דו-ממד: כדור לא מצויר כמעגל (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "כדור שמרכזו O ורדיוסו 3"
+   ],
+   "expectRefusal": "כדור",
+   "lookFor": "נדחה ומצטט «כדור», עם הפניה להנדסת המרחב",
+   "before": "צויר מעגל"
+  },
+  {
+   "id": "T9",
+   "title": "דו-ממד: «רבע מעגל» ממשיך לעבוד (הגנה)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "רבע מעגל OAB"
+   ],
+   "lookFor": "השורה ירוקה ורבע המעגל מצויר",
+   "before": "unchanged"
+  },
+  {
+   "id": "T10",
+   "title": "דו-ממד: חסם על k נשמר ונאכף כש-k מוגדר",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "0 < k < 6",
+    "AB = k"
+   ],
+   "lookFor": "אחרי «0 < k < 6» השורה מסומנת ⧗ כחול «ממתין להגדרת האות» — לא ✗ אדום ולא הודעת «לא נמצאה תצורה»; אחרי «AB = k» כל השורות ✓ ואורך AB בין 0 ל-6 גם אחרי «הציגו תצורה אחרת»",
+   "before": "«0 < k < 6» ענה «כבר קיים» והחסם נעלם",
+   "expectAbsent": [
+    "לא נמצאה תצורה"
+   ]
+  },
+  {
+   "id": "T11",
+   "title": "דו-ממד: «המיתר BC מקביל ל-AD» — רק B ו-C על המעגל",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "המיתר BC מקביל ל-AD"
+   ],
+   "lookFor": "B ו-C על המעגל ו-BC ∥ AD; A ו-D לא הוצמדו למעגל",
+   "before": "BC צויר כקטע רגיל, או ש-A ו-D הוצמדו למעגל בלי שנאמר"
+  },
+  {
+   "id": "T12",
+   "title": "דו-ממד: «המיתר BC = 5» בלי מעגל יוצר מעגל",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "המיתר BC = 5"
+   ],
+   "lookFor": "נוצר מעגל, B ו-C עליו, BC = 5",
+   "before": "קטע BC רגיל בלי מעגל"
+  },
+  {
+   "id": "T13",
+   "title": "דו-ממד: «היתר AB = 5» — הזווית הישרה ב-C",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "היתר AB = 5"
+   ],
+   "lookFor": "זווית C ישרה ו-AB = 5",
+   "before": "AB = 5 בלבד, בלי זווית ישרה"
+  },
+  {
+   "id": "T14",
+   "title": "דו-ממד: «השוק AB» כשלא ברור מה הקודקוד — נדחה ומלמד (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "השוק AB = 5"
+   ],
+   "expectRefusal": "AB",
+   "lookFor": "נדחה ומציע לכתוב «AB = AC» או «BA = BC»",
+   "before": "AB = 5 כצלע רגילה"
+  },
+  {
+   "id": "T15",
+   "title": "אנליטית: בלוח אין סמלים פנימיים (θ_)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש AOB ישר זווית",
+    "O ראשית הצירים",
+    "הצלע AO נמצאת על ציר ה-x",
+    "הצלע BO נמצאת על ציר ה-y",
+    "הצלעות AO ו-BO משיקות למעגל בנקודות D ו-E בהתאמה"
+   ],
+   "expectAbsent": [
+    "θ_"
+   ],
+   "lookFor": "בלוח הנתונים שורת המעגל מציגה «—» ולא «θ_circle-touched…»",
+   "before": "«(x − θ_circle-touched.a)² + …»"
+  },
+  {
+   "id": "T16",
+   "title": "אנליטית: קוטר במעגל שנתון במשוואה",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+y^2=25",
+    "A על המעגל",
+    "B על המעגל",
+    "AB קוטר במעגל"
+   ],
+   "lookFor": "השורה האחרונה ירוקה; AB עובר דרך (0,0)",
+   "before": "נדחה «אינו נתמך בכלי הזה»"
+  },
+  {
+   "id": "T17",
+   "title": "אנליטית: מעגל מחושב בין כמה מעגלים — נותנים שם למרכזו",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "C(0,3)",
+    "משולש ABC חסום במעגל",
+    "(x-10)^2+y^2=4",
+    "K מרכז המעגל החוסם את המשולש ABC"
+   ],
+   "lookFor": "השורה האחרונה ירוקה ו-K בנקודה (2, 1.5)",
+   "before": "השורה האחרונה לא הובנה"
+  }
+ ]
+}
