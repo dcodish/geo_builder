@@ -700,7 +700,10 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
    * see that, which is exactly what the reproduced helper above could not do.
    */
   it('#1102 — the reported sentences reach the entailment test at all', () => {
-    expect(verdict(['A(0,0)', 'B(4,0)'], 'AB = 4')).toBe('entailed');
+    // #1652 (ADR-AG-200): a length given NAMES its pair and draws it, so over bare points it records (it drew
+    // something — #1639's shape for a relation); with the segment already drawn it is still "already follows".
+    expect(verdict(['A(0,0)', 'B(4,0)'], 'AB = 4')).toBe('recorded');
+    expect(verdict(['A(0,0)', 'B(4,0)', 'AB'], 'AB = 4')).toBe('entailed');
     expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('entailed');
     expect(verdict([...PINNED, 'משולש ABC'], 'B נמצא על ציר ה-x')).toBe('entailed');
   });

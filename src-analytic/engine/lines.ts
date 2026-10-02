@@ -100,6 +100,16 @@ export function isVertical(dx: number, dy: number): boolean {
 }
 
 /**
+ * The mirror question: a direction is HORIZONTAL when its vertical part is negligible relative to its
+ * length — the same ratio and the same tolerance, so the two ends of the angle fold are judged alike
+ * (#1648: a solved horizontal side carries the solver's residual, Δy ≈ 3e-8 on Δx = 2, which an
+ * absolute 1e-9° snap read as 179.9999992° and printed «180°»).
+ */
+export function isHorizontal(dx: number, dy: number): boolean {
+  return verticality(dy, dx) < VERTICAL_TOL;
+}
+
+/**
  * The same question for a line given as `ax + by + c = 0`, whose direction is `(−b, a)`.
  *
  * Stated as a call rather than a second threshold: a line is vertical exactly when the direction along

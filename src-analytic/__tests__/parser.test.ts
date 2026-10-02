@@ -579,11 +579,15 @@ describe('#1074 — the segment NOUN is optional', () => {
     expect(derive(['M אמצע AB'], 0).faults.map((f) => f.code)).toEqual(['unknown-reference']);
   });
 
-  it('keeps «AB = 5» a LENGTH, not a segment', () => {
-    // The =-bearing rules run first, which is the whole guard.
+  it('keeps «AB = 5» a LENGTH — and, since #1652, the length also draws the pair it names', () => {
+    // The =-bearing rules run first, which is the whole guard: the length is STATED (never read as a bare segment
+    // declaration that would drop the 5). ⚠ This lock used to assert NO segment; the operator's ruling of
+    // 2026-10-02 (#1652, ADR-AG-200) is that «XY = v» names the segment and draws it, so the segment now
+    // appears BESIDE the length — the length's half of this lock is the part that was always its point.
     const d = derive(['A(0,0)', 'B(3,4)', 'AB = 5'], 0);
     expect(d.faults).toEqual([]);
-    expect(d.construction.objects.filter((o) => o.kind === 'segment')).toHaveLength(0);
+    expect(d.construction.constraints.some((k) => k.t === 'length-eq')).toBe(true);
+    expect(d.construction.objects.filter((o) => o.kind === 'segment').map((o) => o.id)).toEqual(['seg-AB']);
   });
 
   it('still refuses «EE», and still canonicalises FE to EF', () => {

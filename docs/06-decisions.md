@@ -13382,3 +13382,30 @@ The derived pin was refused at EVERY seed in one entry order and built in the ot
 **Measured.** `src/store/__tests__/figure-file.test.ts` (#1645 block): save with queries → deserialize → `loadFigure` restores them; a malformed `queries` drops leniently. Both fail on the pre-change code (2 failed | 14 passed) and pass after.
 
 **Consequences.** `src/store/figureFile.ts`. A file saved before #477 has no `queries` and loads exactly as before.
+
+## ADR-560 — a tangency about «המעגל» with no circle creates the circle; one binds; several ask (#1650)
+
+**Status:** accepted · 2026-10-02 · operator report 2026-10-02 (corpus 6/4); ports the #1619 ruling of 2026-10-01
+
+**Requirements:** [FR-IN-12](02-requirements.md) extended — a tangency sentence about «המעגל» follows the same none → introduce / one → bind / several → ask rule · **Design:** [04-design.md](04-design.md) § "A tangency about the circle asks the shared resolver"
+
+**Cites** the operator ruling on #1619 (2026-10-01: a tangency / touch sentence about «המעגל» when the figure has NO circle creates the circle, its centre unnamed until a later sentence names it), the analytic sibling [ADR-AG-196 / ADR-AG-198](06c-decisions-analytic.md#adr-ag-198) (ruling (b), the same rule in the analytic Builder's own code), [ADR-029](#adr-029) (one circle needs no name), #159 / #430 (`resolveOrIntroduceCircle` / `existingCircleRef`, the shared bind-or-create seam), [ADR-342](#adr-342) (an unnamed circle's centre is hidden until named), [ADR-443](#adr-443) (the membership tie-break and the `ambiguousCircleAsk` question), ADR-228 Am. 5 (named touch points on a drawn circle), docs/17 §M1.
+
+**Context.** Operator, 2026-10-02: *"AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה — this works on analytic but not on 2d."* Measured on `main` through `runSubmit`: typed first, the line was refused («הצעד הזה מסתמך על ABC שעדיין לא הוגדרו» — `unresolved dependencies for: bis-ABC`); after «מעגל O» it built. The two-sides tangency rule (`cornerTangentCircle`) decided bind-or-create with its own copy of the question — "the named circle if drawn, else the one circle" — and with no circle it always took the corner construction: a centre on the bisector of ∠ABC and the touch points as feet from it. That construction needs the corner's three points to exist and the touch points to be free. Corpus 6/4 has neither: nothing is drawn, and the touch points ARE the arm tips, so it bisected an angle of undefined points and defined A as a foot from itself. The same private copy also minted a THIRD circle beside two circles instead of asking, and gave the corner circle a visible tool-chosen centre letter.
+
+**Decision.** `cornerTangentCircle` asks the shared seam. `existingCircleRef` binds (named and drawn, the one circle, or the ADR-443 tie-break) → the touches are stated on that circle (`point-on-circle` + radius ⟂ side), as before. An unnamed reference beside circles it cannot bind declines, so `ambiguousCircleAsk` asks which circle. Otherwise the sentence CREATES the circle, in one of two ways, decided by whether the touch points are free:
+- **free** (fresh labels, or none stated): the corner construction, as before. A corner point not drawn yet is minted by its side (`segment`), the way a shape macro mints its vertices.
+- **given** (an arm tip, or a point already placed): the touch point cannot be redefined as a foot, so `resolveOrIntroduceCircle` introduces the circle (free centre and radius, ADR-052) and the touches are stated on it exactly as on a drawn circle. Corpus 6/4 takes this path; B is minted by the sides, A and C by their `point-on-circle`.
+
+Either way, a circle whose centre the sentence does not name is `autoCenter`. Its centre is hidden (ADR-342) until «O מרכז המעגל» names it through the existing `name-center` path; no letter is offered. `resolveOrIntroduceCircle`'s auto letter now also avoids the sentence's own labels. The anonymiser remaps every exact use of that letter, so a letter the same line names as a point would have been swallowed into the hidden centre.
+
+**Measured.** `src/app/__tests__/issue-1650-tangency-creates-circle.test.ts` runs through the real `runSubmit`. Corpus 6/4 as printed builds with no model call: OA ⟂ AB, OC ⟂ CB, A and C on the circle, K on AC and BO. Before «O מרכז המעגל» the centre is hidden. With «מעגל O» first the sentence binds and the figure is unchanged. Beside two circles it is refused with the which-circle question and commits nothing. A fresh corner with fresh touch points D, E builds with BD = BE. Four of these fail on the pre-change parser, and so does scenario `tangency-first-creates-the-circle-1650` (5 failed | 1 passed). All four `decide-parity-1395` shards still reproduce their goldens; shard 4 gains only the new scenario's key. The PAR-10 catalog snapshot gains two `segment`s for "AB and AD are tangent to circle O at E and K" on an empty canvas. That is the minting, and it is intended.
+
+**Not built — the three-side touch list.** «הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה» is not 2-D grammar at all, before or after this change. Even after «משולש ABC», the two-sides rule reads only «BC ו-CA», and the multi-instruction honesty gate refuses the line. Analytic builds it as the incircle (ADR-AG-198 Am. 1). Porting it is a new capability, not part of this fix.
+
+**Consequences.** `src/parser/parse.ts` (`cornerTangentCircle`, `resolveOrIntroduceCircle`). Three behaviours change:
+- the tangency opener builds instead of being refused;
+- beside several circles the sentence asks instead of minting a third circle;
+- the corner circle's unnamed centre is hidden instead of a visible auto letter.
+
+A centre named in the sentence («למעגל O») is visible as before.

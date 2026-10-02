@@ -2067,6 +2067,15 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 
 - A slope row in the data panel reads, in this order: the segment, its slope, «זווית עם ציר ה-x», the angle (`AB: 2 · זווית עם ציר ה-x: 63.43°`). The Hebrew label reads naturally, with x right after «ה-». A vertical segment reads `CD: אנכי (אין שיפוע) · זווית עם ציר ה-x: 90°`.
 
+**R137 — a piece named by its role is understood wherever a side is, and the role is honoured; a length given draws the pairs it names**
+([ADR-AG-200](06c-decisions-analytic.md#adr-ag-200), [#1651](https://github.com/dcodish/geo_builder/issues/1651), [#1652](https://github.com/dcodish/geo_builder/issues/1652), [#1620](https://github.com/dcodish/geo_builder/issues/1620) item 2).
+*(Operator, 2026-10-02, playing PR #1637: "when i write הישר BC מקביל לציר ה-x — accepted. when i write המיתר BC מקביל לציר ה-x — its rejected"; "when a user types OC = 15, BC = 3 — i would think they want to also draw the segments, otherwise they would say something like המרחק בין".)*
+
+- «המיתר BC», «הקוטר BC», «הרדיוס MB», «המשיק BC», «השוק BC», «הבסיס AB» and «היתר AC» (and "the chord / diameter / radius / tangent / leg / base / hypotenuse") are read in every sentence that reads «הצלע BC»: a relation («… מקביל לציר ה-x»), a length («אורך השוק BC הוא 6»), an equation («משוואת המיתר BC היא y=1»), a point on it («E על השוק AD»), a side on a line («היתר AC מונח על הישר …»), and on a line of its own.
+- The role is a given and the figure honours it: a chord's ends are on the circle; a diameter passes through the centre; a radius runs from the centre to the circle; a tangent touches the circle; a leg of a trapezoid is not one of its parallel sides and a base is; the right angle faces the hypotenuse; the base of an isosceles triangle faces its apex. A role the figure contradicts is refused naming the sentence; a role with nothing to belong to (a leg with no polygon, a chord with no circle) is refused, never dropped.
+- «התיכון» and «הגובה» are still not read in these sentences (their claim is not honoured yet); «משוואת התיכון …» keeps its earlier reading pending a ruling.
+- A length given draws each pair it names: «OC = 15, BC = 3», «AB = 2CD», «AB + BC = 10», «AC:CB = 3:2», «אורך הקטע AB הוא 3». A distance spelling — «המרחק בין O ל-C הוא 15», «המרחק OC = 15», «d_{OC} = 15», «|OC| = 15» — states the distance and draws nothing.
+
 **R138 — a clicked segment can be hidden or dashed, and a clicked unnamed centre takes the letter the student types**
 ([ADR-AG-201](06c-decisions-analytic.md#adr-ag-201), [#1653](https://github.com/dcodish/geo_builder/issues/1653), [#1598](https://github.com/dcodish/geo_builder/issues/1598)).
 *(Operator, 2026-10-02: "in the analytic tool we dont have an option to click on a segment and hide it like we have in 2d"; "i want to be able to press on the center of a circle to create a letter in addition to the ability to define it through input like O מרכז המעגל".)*
@@ -2075,3 +2084,4 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - A dashed or hidden segment stays that way after saving and opening the file, after a share link, and after a restored session. It follows its letters when a point is renamed or two letters are swapped. «נקה הכל» clears these choices.
 - Clicking the centre of a circle whose centre has no letter opens the letter box («מרכז המעגל»). The letter the student types adds exactly the row they could have typed: «M מרכז המעגל x²+y²=16» for a circle given by its equation, «C מרכז המעגל I» for a named circle, «M מרכז המעגל» for the figure's only computed circle. The letter is the centre. A letter already in use names the row that holds it and offers to swap: the centre takes that letter, and the old point takes the centre's automatic letter, undone in one step. A character that is not a letter is refused and nothing is added.
 - A canonical circle's centre is still the tool's O (R123), with no ring to click.
+

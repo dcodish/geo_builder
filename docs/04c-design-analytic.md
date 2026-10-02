@@ -51,6 +51,9 @@ builds. A new panel row that prints a value belongs in that function, or the inv
 `app/lineAngle.ts` answers "what angle does this direction make with the positive x-axis, and is it known?"
 for every surface: the «שיפועים» panel row reads a segment's direction, the ask lane a named line's, and both
 call `lineAngleOf` (fold to [0°, 180°), vertical = 90°, gated by `isKnowledge`, printed by `angleText`).
+Both ENDS of the fold are the scale-free predicates of `engine/lines.ts` — `isVertical` → 90°, `isHorizontal` → 0°, one
+tolerance (`VERTICAL_TOL`, relative to the direction's length) — never an absolute epsilon in degrees: a solved
+horizontal side carries the solver's residual and must never print «180°» ([ADR-AG-202](06c-decisions-analytic.md#adr-ag-202), #1648).
 
 ## The model — objects, and the register that makes them free
 
@@ -2021,6 +2024,8 @@ Four seams, one rule: a configuration the givens contradict, or one the search f
 
 **The created circle.** `tangent-of` with no circle in the figure (and a touch point, or no axis target) applies `touchedCircleFacts` — `param θ_circle-touched.r > 0` and the stated equation circle `circle-touched` over `θ_circle-touched.{a,b,r}` (`toolSymbol`, carriers.ts; hidden from the parameter rows and the figure signature by the existing `θ_` test) — then the tangency with `circleId`. `the-circle`'s `match` gains `{ inscribed: ring }` (`theCircle`: bind the one circle `statedTangentToSide` finds for every side — the touch lowering's radius-perpendicular mark or a touch-free `tangent-curve` over the pair; else create); bound to `circle-touched`, the incircle sentence redefines it as the computed `incircle` under the same id and drops its tool parameter, then applies `about` (`centre-of { circleId }` names the centre).
 
+**The created circle starts fitted** ([ADR-AG-202](06c-decisions-analytic.md#adr-ag-202), #1647). `evaluateUncached` calls `fitCreatedShapes` before the solve when the construction has shape symbols (`θ_<object>.<part>`, `shapedObjectOf`): the construction without the shape, its touch points and everything defined through them is evaluated (memoised per construction, seed and choice); the circle and its touch points are fitted to that figure over the constraints that mention them (touch points on their bounded pieces, the circle started through them); the fit seeds the solve. When that prior figure admits no configuration at the seed, the joint search is skipped and the post-hoc check judges the prior's effort with the fitted circle.
+
 **The refusal.** `ShapeRow.notCyclic` (registry) → `cyclicFacts` → `inscribed-contradicts-noun { shape, forced }` → `errInscribedContradictsNoun` with `shapeHe/forcedHe` and `shapeEn/forcedEn` (English by reverse `EN_SHAPE` lookup in `errorText`).
 
 **Into the bidi section (the helper table and the paragraph after it), add a row and a paragraph:**
@@ -2049,6 +2054,18 @@ Add a row to the helper table:
 
 **A part that already carries isolates is wrapped whole, never re-scanned** (#1646). The rule "never nest" in `panelRowText` is about re-isolating runs INSIDE a string that has isolates: an LRI opened across an existing PDI is closed by it. Wrapping a complete, balanced `t()` string in one FSI … PDI is safe, and it is the only way such a part becomes a single island in an LTR row. So a row built from `t()` parts gets a composer that wraps each part (`slopeRowText`), not a run scanner.
 
+## A role noun is a claim; a length draws what it names ([ADR-AG-200](06c-decisions-analytic.md#adr-ag-200), #1651, #1652, #1620 item 2)
+
+**One vocabulary.** `STRAIGHT_NOUNS` (parser) is the only list of nouns that name a straight piece — `{ he, en[], bounded, claim? }`. `HE_LINE`, `HE_LINE_PLAIN` (no claim: the anonymous «הישר y=…»), `PIECE_NOUN` (He + En, article optional), `BOUNDED_NOUN` and the side-as-subject nouns are derived from it; `readPiece(text)` reads «<noun>? XY» and `nounRow` resolves a noun by the whole word. A rule that re-spells the nouns inline is the defect this section exists to prevent.
+
+**One claim lowering.** `claimFacts(row, a, b, src)` → the facts the role's canonical sentence carries, minus its introductions: chord → `on-kind circle` ×2 + `distinct`; diameter → `diameter-of { define: false }`; tangent → `tangent-of` over the pair; radius / leg / base / hypotenuse → `role-of { role, a, b }`; median / altitude → `null` (no lowering). `[]` for a noun with no claim.
+
+**State it or do not read it.** `direction(phrase, sink?)` accepts a claiming noun only with a `ClaimSink` and pushes the claim into it (`stateClaim`); without one, or with a `null` lowering, the phrase is not a direction. Callers that pass a sink — relation, slope, slope sign, line through a point, incidence (`incidenceOn`), crossing — emit `sink.out` after their own facts and pieces. The equation rule appends `claimFacts` to the curve's facts; the side-as-subject and converse rules keep the role noun in their canonical sentence (`eqNounOf`, `heNoun`); `parseShape` declares «<role> XY» (segment or line by `bounded`) and its claim; `lengthRoles` strips «(אורך) <bounded role> XY (של <shape>)» to the pair inside a length and states the claim.
+
+**M1: `applyRoleOf`.** `role-of` is resolved against the construction as it stands: radius → the one circle, the non-centre end `on-curve` (neither end the centre: `conflicting-restatement`; unnamed centre: `out-of-scope`); leg / base → the polygons holding a–b as a side where the role has content (a one-parallel-pair quadrilateral: a stated `parallel` of the right pair, pinning or displacing the assumed pair through the `constraint` case; a triangle: leg → `choice` of apex, isosceles base → the apex `length-eq`); hypotenuse → `rightAngleAt(third)`. The other pair already stated parallel → `conflicting-restatement`; no polygon → `ambiguous-shape { host: polygon, found: 0 }` (a base with none adds nothing).
+
+**A length draws the pairs it names.** `readLength(src, named?)` (engine/lengths.ts) is `parseLengthExpr`'s body with one addition: the `LENGTH_TOKEN` stage adds the index of each term it reaches to `named`. `namedLengthPairs(src)` returns those pairs; a distance spelling never reaches that stage (the distance frames, the symbolic notations rewritten into them, and `DISTANCE_NOUN` for «המרחק AB» — run before `LENGTH_NOUN`). `lengthPieces(sides, src)` (parser) draws each named pair once through `pieceFacts('segment', …)`; called by the length rule, `parseRatioColon` and the `radius-length` reading.
+
 ## The canvas's click menus: a segment's display, a centre's letter ([ADR-AG-201](06c-decisions-analytic.md#adr-ag-201), #1653, #1598)
 
 **A segment.** The store keeps `segStyle` (`{hidden?, dashed?}` per endpoint pair, `render/scene.ts` `segKey`). It is in the undo slice, the save envelope (an optional key: `serialize` writes it when non-empty, and `restore` cleans it through `shell`'s `cleanSegDisplay`) and the session-persist trigger. `relabelSession` re-keys it in a rename's or swap's single commit. `buildScene` takes it as `knows.segStyle` and gives each `SceneSegment` its `key` and `ink` (`shell`'s `segInk`). `Figure` draws `solid`/`dashed` ink, or for `ghost` a faint dashed line (`data-noexport`) only while picks are wired. The hit layer is unchanged, so a hidden segment is still clickable. App opens the shared `SegmentMenu` for a segment pick, with `measurablesOf`'s entries as its children.
@@ -2056,3 +2073,4 @@ Add a row to the helper table:
 **A centre.** `centresOf` marks each centre offer with `centreOf` (the circle id), and the scene carries it onto the crossing. `Figure`'s `onCentre(offerId, screen)` fires for those instead of `onCrossing`. App opens the shared `LetterPopover` with `app/centreName.ts` `centrePopoverOps(offerId, state, actions, d)`:
 - `decideCentreName` refuses a bad letter, and refuses a taken letter WITH its holder (`nameInUse`, `letterHolder` from `app/rename.ts`). Otherwise it composes `centreSentenceOf(figure, offerId, letter)`, which is `centresOf` with that letter, so the form is the one the grammar reads back. `decideSubmit` then decides it, and `commitRecord` records it.
 - `decideCentreSwap` records the centre under `centreLabelOf` (the automatic letter, which is also the popover's `label`), runs `decideSwap(auto, taken)` on that session, and commits the result through `applySwap` as one step.
+

@@ -1,0 +1,166 @@
+{
+ "name": "fixes-1651-1650-1648",
+ "title": "fix round 2026-10-02 — circle nouns as claims, lengths draw their segment (#1651, #1652), 2-D tangent sentence creates the circle (#1650), angle 0° and the slow touch circle (#1648, #1647)",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "אנליטית: «המיתר BC מקביל לציר ה-x» מתקבל, והמיתר על המעגל",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+y^2=25",
+    "B על המעגל",
+    "C על המעגל",
+    "המיתר BC מקביל לציר ה-x"
+   ],
+   "lookFor": "השורה האחרונה ירוקה; BC אופקי ושני קצותיו על המעגל",
+   "before": "השורה האחרונה נדחתה («הישר BC …» התקבל, «המיתר BC …» לא)"
+  },
+  {
+   "id": "T2",
+   "title": "אנליטית: «הקוטר AB» עובר דרך מרכז המעגל",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל שמרכזו M",
+    "A על המעגל",
+    "B על המעגל",
+    "הקוטר AB מקביל לציר ה-y"
+   ],
+   "lookFor": "השורה האחרונה ירוקה; AB אנכי ועובר דרך המרכז M",
+   "before": "השורה האחרונה נדחתה"
+  },
+  {
+   "id": "T3",
+   "title": "אנליטית: «השוק» שסותרת את הנתונים נדחית ומצטטת את השורה",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "טרפז ABCD",
+    "AB ∥ DC",
+    "השוק AB = 5"
+   ],
+   "expectRefusal": "השוק AB",
+   "lookFor": "השורה «השוק AB = 5» נדחית (AB היא אחת הצלעות המקבילות — לא שוק), והציור לא משתנה",
+   "before": "«השוק AB = 5» נדחה כמילה לא מוכרת"
+  },
+  {
+   "id": "T4",
+   "title": "אנליטית: «OC = 3, BC = 5» מצייר את שני הקטעים",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "O(0,0)",
+    "B על ציר ה-x",
+    "C על ציר ה-y",
+    "OC = 3, BC = 5"
+   ],
+   "lookFor": "הקטעים OC ו-BC מצוירים (C בנקודה (0,3), B ב-(±4,0)); הקטע OB לא מצויר",
+   "before": "האורכים נשמרו אבל שום קטע לא צויר"
+  },
+  {
+   "id": "T5",
+   "title": "אנליטית: «המרחק בין B ל-C» לא מצייר קטע",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "O(0,0)",
+    "B על ציר ה-x",
+    "C על ציר ה-y",
+    "OC = 3",
+    "המרחק בין B ל-C הוא 5"
+   ],
+   "lookFor": "רק הקטע OC מצויר; בין B ל-C אין קו",
+   "before": "unchanged"
+  },
+  {
+   "id": "T6",
+   "title": "אנליטית: צלע אופקית — הזווית עם ציר ה-x היא 0°, לא 180°",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל שמרכזו M",
+    "המיתרים AB ו-BC שווים",
+    "משוואת המעגל היא (x-3)^2+(y-1)^2=10",
+    "C(4,-2)",
+    "הישר BC מקביל לציר ה-x"
+   ],
+   "lookFor": "לחצו על הצלע BC ← «זווית עם ציר ה-x»: בלוח הנתונים 0°",
+   "before": "180°"
+  },
+  {
+   "id": "T7",
+   "title": "אנליטית: מעגל משיק לשתי הצלעות נבנה בלי המתנה ארוכה",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש AOB ישר זווית",
+    "O ראשית הצירים",
+    "הצלע AO נמצאת על ציר ה-x",
+    "הצלע BO נמצאת על ציר ה-y",
+    "הצלעות AO ו-BO משיקות למעגל בנקודות D ו-E בהתאמה"
+   ],
+   "lookFor": "אחרי Enter בשורה האחרונה הציור מופיע תוך כשנייה; המעגל משיק לשני הצירים ב-D וב-E",
+   "before": "כ-8 שניות המתנה אחרי Enter"
+  },
+  {
+   "id": "T8",
+   "title": "דו-ממד: «AB ו-BC משיקים למעגל…» כשורה ראשונה יוצר את המעגל",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה",
+    "O מרכז המעגל",
+    "אלכסוני המרובע ABCO נפגשים בנקודה K"
+   ],
+   "lookFor": "שלוש השורות ירוקות; מעגל משיק ל-AB ב-A ול-BC ב-C; אחרי השורה הראשונה אין אות במרכז, ואחרי השנייה המרכז הוא O; K נמצא על AC ועל BO",
+   "before": "השורה הראשונה נדחתה («הגדירו קודם מעגל»)"
+  },
+  {
+   "id": "T9",
+   "title": "דו-ממד: כשיש שני מעגלים — המשפט שואל לאיזה מעגל הכוונה",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה"
+   ],
+   "expectRefusal": "מעגל",
+   "lookFor": "השורה השלישית נדחית ושואלת לאיזה מעגל הכוונה; לא נוסף מעגל שלישי",
+   "before": "צויר בשקט מעגל שלישי Q"
+  },
+  {
+   "id": "T10",
+   "title": "דו-ממד: עם «מעגל O» קודם — בונה כמו קודם",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה"
+   ],
+   "lookFor": "שתי השורות ירוקות; AB ו-BC משיקים למעגל O ב-A וב-C",
+   "before": "unchanged"
+  }
+ ]
+}

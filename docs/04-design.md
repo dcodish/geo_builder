@@ -844,6 +844,24 @@ list). A definition lowers exactly one through point; a longer list is the circu
 now reads list separators) or it fails closed. The old "uppercase residue for the post-passes" allowance
 is gone: no post-pass ever claimed it.
 
+## A tangency about the circle asks the shared resolver ([ADR-560](06-decisions.md#adr-560))
+
+`cornerTangentCircle` (two sides tangent to a circle, `src/parser/parse.ts`) no longer keeps its own copy of
+the bind-or-create question. It asks the same seam as every circle-consuming rule:
+
+- `existingCircleRef` binds when the circle is named and drawn, when there is one circle, or through the
+  ADR-443 tie-break. The touches are then stated on that circle.
+- An unnamed reference beside circles it cannot bind declines, and `ambiguousCircleAsk` asks which one.
+- Otherwise the sentence creates the circle. The **corner construction** (bisector, centre on it, feet)
+  is used when the touch points are free. It needs no drawn corner: a missing corner point is minted by
+  its side's `segment`. When a touch point is given (an arm tip or a placed point), it cannot be
+  redefined as a foot. Then `resolveOrIntroduceCircle` introduces the circle and the touches are stated
+  on it, exactly as on a drawn circle.
+
+A created circle whose centre the sentence does not name carries `autoCenter`, so the ADR-342
+anonymiser hides its centre until `name-center` promotes it. The resolver's auto letter avoids the
+sentence's own labels, because the anonymiser remaps every exact use of that letter.
+
 ## A stated side is a requirement record, checked at stage 0g′ ([ADR-549](06-decisions.md#adr-549))
 
 - **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`) — `circle-side`,

@@ -280,6 +280,38 @@ const IS_POINT = /^[A-Z][0-9₀-₉]?$/;
 const AREA_TOKEN = /(?:שטח|[Aa]rea\s+of)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9₀-₉]?){3,})/g;
 
 export function parseLengthExpr(src: string): LengthExpr | null {
+  return readLength(src);
+}
+
+/**
+ * THE PAIRS A LENGTH GIVEN *NAMES* — the ones it draws (#1652, ADR-AG-200).
+ *
+ * Operator ruling, 2026-10-02: *"when a user types OC = 15, BC = 3 — i would think they want to also draw the
+ * segments, otherwise they would say something like המרחק בין"*. So a pair written as a pair («OC», «אורך הקטע
+ * OC», «2CD», «AB + BC») names the segment, and a DISTANCE spelling («המרחק בין O ל-C», «המרחק OC», «d_{OC}»,
+ * «|OC|») states a distance and names nothing. Read by the SAME pass that builds the expression, so the two can
+ * never disagree about which term a spelling produced — a term is named when the pair token itself reached it.
+ */
+export function namedLengthPairs(src: string): Array<{ a: Id; b: Id }> {
+  const named = new Set<number>();
+  const le = readLength(src, named);
+  if (!le) return [];
+  return [...named].flatMap((i) => {
+    const t = le.terms[i];
+    return t.kind === undefined || t.kind === 'length' ? [{ a: t.a, b: t.b }] : [];
+  });
+}
+
+/**
+ * «המרחק AB» · "the distance AB" — the distance NOUN in front of a bare pair (#1652): the same term the pair makes,
+ * but a distance, so it is consumed here, before `LENGTH_NOUN` would strip the noun and leave the pair to look named.
+ */
+const DISTANCE_NOUN = new RegExp(
+  String.raw`(?:ה?מרחק|(?:the\s+)?[Dd]istance)\s+(?:ה?(?:קטע|צלע|ישר)\s+)?(?<![A-Za-z])([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)(?![A-Za-z])`,
+  'g',
+);
+
+function readLength(src: string, named?: Set<number>): LengthExpr | null {
   const terms: MeasureTerm[] = [];
   // Areas first — see AREA_TOKEN. Each becomes a placeholder before any length token is looked for.
   // Point-to-line first: its tail contains a name that LENGTH_TOKEN would otherwise claim (#1048).
@@ -326,8 +358,14 @@ export function parseLengthExpr(src: string): LengthExpr | null {
       );
     });
   }
+  // A DISTANCE noun in front of a bare pair is a distance, not a named pair (#1652).
+  const withDistances = withPL.replace(DISTANCE_NOUN, (_m, a: string, b: string) => {
+    if (a === b) return _m;
+    const at = terms.findIndex((t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.a === a && t.b === b);
+    return String.fromCharCode(PLACEHOLDER_BASE + (at >= 0 ? at : terms.push({ a, b }) - 1));
+  });
   // A length noun in front of a bare pair adds nothing to it — «אורך AB» IS «AB» (#1128).
-  const withNouns = withPL.replace(LENGTH_NOUN, '');
+  const withNouns = withDistances.replace(LENGTH_NOUN, '');
   const withAreas = withNouns.replace(AREA_TOKEN, (_m, run: string) => {
     const ids = run.match(/[A-Z][0-9₀-₉]?/g) ?? [];
     const key = ids.join();
@@ -341,6 +379,7 @@ export function parseLengthExpr(src: string): LengthExpr | null {
     if (a === b) return `${a}${b}`;
     const at = terms.findIndex((t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.a === a && t.b === b);
     const i = at >= 0 ? at : terms.push({ a, b }) - 1;
+    named?.add(i); // the pair token itself reached this term: the student NAMED the segment (#1652)
     return String.fromCharCode(PLACEHOLDER_BASE + i);
   });
   if (terms.length === 0) return null;

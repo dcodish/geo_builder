@@ -31,7 +31,7 @@ interface CorpusQuestion {
 const CORPUS: CorpusQuestion[] = JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'corpus471.json'), 'utf8'));
 
 /** The floors. Raise them in the commit that earns them; never lower them. */
-const FLOOR = { lines: 214, questions: 19 };
+const FLOOR = { lines: 217, questions: 21 }; // ADR-AG-200 (#1651, #1620 item 2): 14/5 and 22/4 land — their role nouns state their claims
 
 function measure() {
   let lines = 0;
