@@ -952,6 +952,67 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     // (the foot beyond an endpoint is honest), but a reference card should show the ordinary case.
     needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
   },
+  // --- F16 · the cevian family completed (#1284, #1222, #1240; ADR-AG-209) ---
+  // The third ROLE (the angle bisector, by its triangle and by its angle), the meeting point of two
+  // bisectors, the bisector drawn alone, and the spellings that leave the target or the foot to the
+  // figure: «AD גובה» (the side from the one triangle), «גובה מ-A במשולש ABC» and «תיכון לצלע BC»
+  // (the tool names the foot), and the exam's plural with «בהתאמה» (7/4).
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'CE חוצה זווית C במשולש ABC',
+    en: 'CE is the angle bisector of angle C in triangle ABC',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'AD חוצה את הזווית BAC',
+    en: 'AD bisects angle BAC',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'E חיתוך חוצי הזוויות BAC ו-BCA',
+    en: 'E is the intersection of the bisectors of angles BAC and BCA',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'חוצה זווית ABC',
+    en: 'the bisector of angle ABC',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'AD גובה',
+    en: 'AD is the altitude',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)', 'משולש ABC'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'גובה מ-A במשולש ABC',
+    en: 'the altitude from A in triangle ABC',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'תיכון לצלע BC',
+    en: 'the median to side BC',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)', 'משולש ABC'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה',
+    en: 'OD and BE are the altitudes to sides BC and OC respectively',
+    needs: ['O(0,0)', 'B(4,8)', 'C(10,0)'],
+  },
   {
     category: 'derived',
     family: 'F16',

@@ -36,8 +36,10 @@ describe('#1275 — T25 is checkable: the cevian rows are what «נקודות נ
    * third thing nobody was asserting.
    */
   it('the #1165 rows are still in the catalog and still carry their flag', () => {
-    const cevians = derived.filter((c) => /תיכון|גובה/.test(c.he));
-    expect(cevians.length).toBeGreaterThanOrEqual(2);
+    // The two #1165 rows BY NAME: later cevian rows (ADR-AG-209) are not featured — which six a section features
+    // is the operator's pedagogy call (#1347), not a side effect of adding a capability.
+    const cevians = derived.filter((c) => c.he === 'AD תיכון במשולש ABC' || c.he === 'AD גובה לצלע BC');
+    expect(cevians.length).toBe(2);
     expect(cevians.every((c) => c.featured)).toBe(true);
   });
 });

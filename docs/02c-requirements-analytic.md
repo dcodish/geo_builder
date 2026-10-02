@@ -1865,10 +1865,41 @@ leaves three candidate sides, and the tool refuses it by name rather than choosi
 never invents what the student did not state). That refusal is its own message, because the two
 neighbouring ones would each say something untrue about a sentence whose triangle is perfectly good.
 
-**Still not accepted, and deliberately:** the spellings that name no target at all — «AD גובה»,
-«תיכון מ-A לצלע BC» with no letter for the foot. Those need the FIGURE to say what the cevian reaches
-or need the tool to mint a name, and this parser reads one sentence with no figure in hand
-([#1240](https://github.com/dcodish/geo_builder/issues/1240), and #1222's apex-fronted arm).
+~~**Still not accepted, and deliberately:** the spellings that name no target at all — «AD גובה»,
+«תיכון מ-A לצלע BC» with no letter for the foot.~~ Accepted since R103b.
+
+**R103b — the angle bisector is the third cevian, and a cevian may leave its target or its foot to the figure**
+([ADR-AG-209](06c-decisions-analytic.md#adr-ag-209), [#1284](https://github.com/dcodish/geo_builder/issues/1284),
+[#1222](https://github.com/dcodish/geo_builder/issues/1222), [#1240](https://github.com/dcodish/geo_builder/issues/1240);
+operator rulings: the 2-D tool's verdict is the reference, 2026-10-02; the tool may name what the student did not, in a
+reserved name, and says so — #1263, 2026-09-20; "the user can always change it" — #1222, 2026-09-19).
+
+- **The angle bisector** reads in every shape the median and altitude read: «CE חוצה זווית C במשולש ABC», «CE חוצה-זווית
+  לצלע AB», «CE הוא חוצה זווית C במשולש ABC»; and by its ANGLE alone: «AD חוצה את הזווית BAC», «AD חוצה זווית A»,
+  «האלכסון DB חוצה את הזווית ADC», «AM הוא חוצה זווית CMD» (the vertex may be either end of the segment), "AD bisects
+  angle BAC". The two angles at the vertex are equal on the drawn figure.
+- When the segment's other end is a NEW point, it is the bisector's foot on the opposite side (inside it). When it is a
+  point the figure already has, that point lies on the bisector — on the bisector's own ray, never the opposite one.
+- «E חיתוך חוצי הזוויות BAC ו-BCA» (and «E נקודת החיתוך של חוצי הזוויות A ו-C», «חוצי הזוויות … נחתכים בנקודה E»)
+  puts E on both bisectors; «חוצה זווית ABC» on its own draws the bisector as a line.
+- **A cevian whose target the figure determines:** «AD גובה», «AD תיכון» (the side opposite A in the one triangle that
+  has A), «גובה לצלע BC» / «תיכון לצלע BC» (the apex is the third vertex). An apex in several triangles ASKS which
+  (name the side or the triangle); in none, the sentence is refused.
+- **A cevian whose foot has no letter:** «תיכון מ-A במשולש ABC», «גובה מ-A במשולש ABC», «גובה מנקודה A», «תיכון מ-A
+  לצלע BC», "the altitude from A". The tool names the foot with a reserved letter — M₁ for a median's foot, H₁ for an
+  altitude's (the next free subscript) — and the fact row says «הכלי קרא לנקודה M₁». The student can rename it like any
+  letter; the sentence is then rewritten to name it («AM תיכון במשולש ABC»).
+- A sentence that names its triangle («… במשולש ABC») draws the triangle when the figure does not have it yet, as in
+  2-D.
+- «גובה המשולש לצלע AB הוא CD», «הגובה AD לצלע BC» read as «CD גובה לצלע AB» / «AD גובה לצלע BC».
+- **Plural, paired by «בהתאמה»:** «OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה», «BE ו-CF הם גבהים במשולש ABC», «EB ו-EC הם
+  חוצי הזווית ABC ו-BCD בהתאמה הנפגשים בנקודה E», and the English "OD and BE are the altitudes to sides BC and OC
+  respectively" — each segment is its own cevian; a shared end of two bisectors is where they meet.
+- **Refused, each by name:** a bisector whose segment does not start at the angle's vertex («XD חוצה זווית BAC», «AD
+  חוצה זווית C», «CE חוצה זווית A במשולש ABC»); a bisector ending on one of its own rays («AB חוצה זווית BAC»); a
+  bisector of an angle whose points the figure lacks; a bisector that contradicts a stated angle (the later statement
+  is refused as unsatisfiable, named).
+- **Not yet:** «תיכון ליתר» (the hypotenuse of a right triangle whose right angle is not stated is a choice in this tool).
 
 **R123 — a canonical circle's centre is the point O, unless a letter is already there**
 ([ADR-AG-184](06c-decisions-analytic.md#adr-ag-184), [#1270](https://github.com/dcodish/geo_builder/issues/1270)).

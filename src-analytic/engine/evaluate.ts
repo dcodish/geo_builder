@@ -801,6 +801,21 @@ export function circleQuantity(
   return zero(side(p.x, p.y)) * zero(side(k.cx, k.cy));
 }
 
+/**
+ * Which side of the vertex `p` is on, relative to the angle (a, v, b) (#1284, ADR-AG-209): the projection of `p − v`
+ * on the internal bisector's direction (the sum of the two unit rays) — positive on the angle's side, negative on the
+ * opposite ray's. `null` when an operand is unplaced or a ray has no length (nothing to judge).
+ */
+function angleSideOf(p: Pt, v: Pt | undefined, a: Pt | undefined, b: Pt | undefined): number | null {
+  if (!v || !a || !b) return null;
+  const la = Math.hypot(a.x - v.x, a.y - v.y);
+  const lb = Math.hypot(b.x - v.x, b.y - v.y);
+  if (la < 1e-12 || lb < 1e-12) return null;
+  const dx = (a.x - v.x) / la + (b.x - v.x) / lb;
+  const dy = (a.y - v.y) / la + (b.y - v.y) / lb;
+  return (p.x - v.x) * dx + (p.y - v.y) * dy;
+}
+
 function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[] {
   const apart = apartOf(at);
 
@@ -894,6 +909,11 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       const rhs = rhsOf(cmp, (id) => at.get(id) ?? null, env);
       if (rhs === null) return true; // an operand that is not placed yet judges nothing, as above
       return cmp.greater ? lhs > rhs : lhs < rhs;
+    }
+    /** ON THE BISECTOR'S OWN RAY (#1284, ADR-AG-209) — the angle's side of the perpendicular at its vertex. */
+    if (s.kind === 'angle-side') {
+      const side = angleSideOf(p, at.get(s.v), at.get(s.a), at.get(s.b));
+      return side === null || side > 0;
     }
     if (s.kind !== 'between' && s.kind !== 'beyond') return true;
     const a = at.get(s.a);
@@ -1448,6 +1468,20 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
       const inside = t >= 0 && t <= 1 ? t : 0.5;
       seeded.set(k.id, { x: pa.x + inside * dx, y: pa.y + inside * dy });
     }
+  }
+  /**
+   * …and a point said to be on an angle's BISECTOR starts on the bisector's own ray (#1284, ADR-AG-209): a seed on
+   * the wrong side of the vertex is reflected through it, keeping its distance — the #1071 lesson for a ray, so the
+   * descent starts in the basin the sentence names. A start, never a verdict: the judge keeps the last word.
+   */
+  for (const s0 of c.selectors) {
+    if (s0.kind !== 'angle-side') continue;
+    const posOf = (id: Id): Pt | null => seeded.get(id) ?? pointAtId(c, env, id);
+    const p0 = seeded.get(s0.id);
+    const v0 = posOf(s0.v);
+    if (!p0 || !v0) continue;
+    const side = angleSideOf(p0, v0, posOf(s0.a) ?? undefined, posOf(s0.b) ?? undefined);
+    if (side !== null && side < 0) seeded.set(s0.id, { x: 2 * v0.x - p0.x, y: 2 * v0.y - p0.y });
   }
   /**
    * …and a COMPARISON between two points seeds their ORDER (#1462, ADR-AG-161) — the same lesson for a pair.

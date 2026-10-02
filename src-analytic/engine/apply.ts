@@ -26,6 +26,7 @@ import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, pr
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { RESERVED_SYMBOLS, toolSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
+import { cevianFacts, onBisectorFacts } from './cevian';
 import {
   CENTRE_SENTINEL,
   CIRCLE_SENTINEL,
@@ -146,6 +147,18 @@ export type ApplyErrorCode =
    */
   | 'repeated-vertex'
   | 'out-of-scope'
+  /**
+   * The cevian parser refusal a cevian resolved at M1 can also reach (#1240, ADR-AG-209): «AB גובה» once the
+   * figure says `B` is a vertex of the side the altitude would be drawn to.
+   */
+  | 'degenerate-role'
+  /**
+   * «AD גובה» · «גובה לצלע BC» where the figure holds the apex (or the side) in SEVERAL triangles with
+   * different targets (#1240, ADR-AG-209) — a question, never a guess (02c R32): the student names the side
+   * or the triangle. And `cevian-no-triangle` when it holds it in none: there is no side to draw it to.
+   */
+  | 'ambiguous-cevian'
+  | 'cevian-no-triangle'
   /**
    * A STATED value substituted into a symbol whose domain it violates (#1432 amendment 1) — «רדיוס
    * המעגל הוא -3», «שרדיוסו 0». The radius symbol carries `{min: 0, minOpen}` and the substitution
@@ -2528,6 +2541,68 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     /**
+     * A CEVIAN WHOSE TARGET THE FIGURE DETERMINES (#1240, #1222; ADR-AG-209) — «AD גובה», «תיכון מנקודה A»,
+     * «גובה לצלע BC». The triangles of the figure that hold the named apex (or both ends of the named side)
+     * are the candidates; one target builds through the one lowering, several ask, none refuses.
+     */
+    case 'cevian-of': {
+      const targets = new Map<string, { apex: Id; u: Id; v: Id }>();
+      for (const o of c.objects) {
+        if (o.kind !== 'polygon' || o.vertices.length !== 3) continue;
+        const ring = o.vertices;
+        if (f.side) {
+          const [u, v] = f.side;
+          if (!ring.includes(u) || !ring.includes(v) || u === v) continue;
+          const apex = ring.find((x) => x !== u && x !== v)!;
+          if (f.apex && f.apex !== apex) continue;
+          targets.set(`${apex}|${[u, v].sort().join('')}`, { apex, u, v });
+        } else if (f.apex && ring.includes(f.apex)) {
+          const [u, v] = ring.filter((x) => x !== f.apex);
+          targets.set(`${f.apex}|${[u, v].sort().join('')}`, { apex: f.apex, u, v });
+        }
+      }
+      if (targets.size === 0) return { ok: false, error: { code: 'cevian-no-triangle', detail: f.src } };
+      if (targets.size > 1) return { ok: false, error: { code: 'ambiguous-cevian', detail: f.src } };
+      const [{ apex, u, v }] = [...targets.values()];
+      if (f.foot === apex || f.foot === u || f.foot === v) return { ok: false, error: { code: 'degenerate-role', detail: f.src } };
+      return applyAll(c, cevianFacts(f.role, apex, f.foot, u, v, f.src));
+    }
+
+    /**
+     * «AD חוצה את הזווית BAC» (#1284, ADR-AG-209) — 2-D's verdict: a `p` the figure does not have yet is the
+     * bisector's foot on the line through the angle's ray points; an existing `p` lies on the bisector's ray.
+     */
+    case 'bisects': {
+      const at = resolveAngleName(c, f.at, f.src);
+      if (!at.ok) return at;
+      for (const id of [at.ref.v, at.ref.a, at.ref.b]) {
+        const o = objectById(c, id);
+        if (!o || !isPositional(o)) return { ok: false, error: unknownRef(c, id) };
+      }
+      // «חוצה זווית ABC» on its own: the bisector LINE through the vertex, named by its angle so it is drawn once.
+      if (f.p === undefined) {
+        const [a, b] = [at.ref.a, at.ref.b].sort();
+        return applyFact(c, {
+          t: 'line-at',
+          id: `line-bisector-${a}${at.ref.v}${b}`,
+          through: at.ref.v,
+          dir: { k: 'bisector', v: at.ref.v, a, b },
+          perp: false,
+          src: f.src,
+        });
+      }
+      if (f.p === at.ref.a || f.p === at.ref.b) return { ok: false, error: { code: 'degenerate-role', detail: f.src } };
+      const prior = objectById(c, f.p);
+      if (prior && !isPositional(prior)) {
+        return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };
+      }
+      return applyAll(
+        c,
+        prior ? onBisectorFacts(at.ref, f.p, f.src) : cevianFacts('bisector', at.ref.v, f.p, at.ref.a, at.ref.b, f.src),
+      );
+    }
+
+    /**
      * «הישר BC» — the line through two named points, DRAWN (#1639, ADR-AG-198). A REFERENCE to its points
      * (the sentence that names a line about points it does not introduce fails on them first; the bare
      * «הישר BC» line declares them before this fact). What it adds is decided here, against the figure:
@@ -2609,7 +2684,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
               : f.sel.kind === 'coord-compare'
                 ? // Both points of «x_B > x_D» must exist (#1462); a value names none.
                   [f.sel.id, ...('point' in f.sel.rhs ? [f.sel.rhs.point] : [])]
-                : [f.sel.id, f.sel.a, f.sel.b];
+                : f.sel.kind === 'angle-side'
+                  ? [f.sel.id, f.sel.v, f.sel.a, f.sel.b]
+                  : [f.sel.id, f.sel.a, f.sel.b];
       for (const id of refs) {
         const o = objectById(c, id);
         if (!o || !isPositional(o)) {
