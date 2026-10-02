@@ -952,6 +952,8 @@ the product's BEHAVIOUR. The callable is `aboutContent(t)`, and the product also
 over its real submit gate, so every «try this» line the About shows must build in sequence on an empty
 canvas. The runner must return one verdict per step: an early return is a fault, never a pass.
 
+`geo-input-parity.ts` (#1649, [ADR-W-108](06w-decisions-workspace.md#adr-w-108)) asserts EQUALITY across builders without one test seeing two of them. Each row carries the reference verdict as a literal (`expect`, 2-D's), and every tree's thin lock asserts its own submit decision against that literal, so the builders agree transitively. Known gaps are a ratchet: a gap that closes fails until its row moves to the parity rows. Each catalog's sentences must be covered by a row or a topic exception.
+
 ## 5d. The sequence gate ([ADR-W-076](06w-decisions-workspace.md#adr-w-076))
 
 *Never reorder the letters of a point sequence — the sequence IS the statement.* One algorithm,

@@ -352,3 +352,16 @@ locally), and it has no RUNBOOK row until the operator lifts the rule.
 4. CI: add the product's exclusive paths to the `changes` classifier in `.github/workflows/ci.yml` + a `test-<tool>` lane (`vitest src-<tool>/ server/`); add `test:<tool>` npm scripts. **Until the classifier knows the new paths they fall in the uncategorized bucket and run all lanes — safe by default.**
 5. Server: a `tool:` value + log sink + `DashboardProfile` in the shared proxy; Apache directives per RUNBOOK/deploy docs.
 6. Extend `server/__tests__/isolation.test.ts` with the new tree.
+
+## 10. One plane-geometry sentence, one verdict in every builder ([ADR-W-108](06w-decisions-workspace.md#adr-w-108))
+
+**A plane-geometry input change lands in every builder that should read it, or adds a known-gap row naming its issue; an exception needs a family in `EXCEPTIONS`.**
+
+- **2-D's verdict is the reference** (operator ruling on #1649, 2026-10-02: *"analytics and 2d should have same user experience"*). A plane sentence that 2-D builds, refuses or asks about gets the same answer in the analytic builder, and in 3-D for the core plane families (polygons, lengths, angles, midpoints and ratios, cevians, parallel and perpendicular, area).
+- **The rows live once:** `shell/__tests__/fixtures/geo-input-parity.ts`. Each tree's thin lock (`src/`, `src-analytic/`, `src3d/` → `__tests__/geo-input-parity.test.ts`) runs them through its real submit decision.
+- **Adding or changing a sentence form in one builder** means one of:
+  - a parity row, where every builder already agrees;
+  - a known-gap row naming the issue that ports it (`knownGap: [{ product, issue: '#NNNN' }]`). When the port lands the row fails with "move it to the parity rows", so the list only shrinks;
+  - an `EXCEPTIONS` family, X1–X9: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, free points in 3-D. A new family is an ADR-W decision, never a quiet edit.
+- **The catalog check** makes this reach every guide sentence. Each builder's catalog sentence is a step of some row, belongs to a topic exception, or sits on `UNCOVERED_CATALOG`. That allowlist is a ratchet: it may shrink, never grow.
+- **Not a verdict:** how the figure is drawn (which segments, which marks). That stays with each builder's own locks.
