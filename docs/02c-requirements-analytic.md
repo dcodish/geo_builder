@@ -2316,3 +2316,10 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - «משולש קהה זווית ABC» («קהה-זווית», «ABC משולש קהה זווית», "obtuse triangle ABC") says one of the three angles is obtuse without saying which: the first figure is obtuse at one vertex, and «הציגו תצורה אחרת» moves the obtuse angle to the others. A later given decides it («זווית BAC = 30», «זווית ABC = 40» leave only C); givens that leave no obtuse angle are refused. «ABC משולש חד זוויות» now reads letters-first too.
 - Corpus 7/4 «נתון: S_BDC / S_ODC = 0.8» stays refused: the page prints it so, and with D on BC the triangle BDC has no area. The exam's answer key is the ratio S_BEC / S_ODC = 0.8 (B(6,8)), which the tool builds when typed.
 - A point against an axis says which side of it the point is on: «D מתחת לציר x», «A מעל ציר ה-x», «C משמאל לציר ה-y», «B מימין לציר y» ("D is below the x-axis"). Several givens may share one line, joined by «;»: «A משמאל ל-O ו-C מימין ל-O; B על החלק החיובי של ציר y; D מתחת לציר x (ציור)» (a bare «(ציור)» states nothing).
+
+**R166 — a stated length is written where it can be read**
+([ADR-AG-223](06c-decisions-analytic.md#adr-ag-223), [#1717](https://github.com/dcodish/geo_builder/issues/1717))
+
+- A length the student stated («AO = 3») is written beside its segment, on the side away from the figure. It is written in the figure's blue. It never overlaps a point's label (with its coordinates), a point, a drawn side or another stated length. It never stands in the row of axis numbers, where it would read as one of them. When the first place is taken, the number moves further out, and to the other side if it must.
+- A stated segment that lies on an axis is drawn in the figure's colour over the axis.
+- The number keeps one place across «הציגו תצורה אחרת» when the figure itself does not move.
