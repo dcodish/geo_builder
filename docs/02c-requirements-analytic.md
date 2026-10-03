@@ -2323,3 +2323,12 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - A length the student stated («AO = 3») is written beside its segment, on the side away from the figure. It is written in the figure's blue. It never overlaps a point's label (with its coordinates), a point, a drawn side or another stated length. It never stands in the row of axis numbers, where it would read as one of them. When the first place is taken, the number moves further out, and to the other side if it must.
 - A stated segment that lies on an axis is drawn in the figure's colour over the axis.
 - The number keeps one place across «הציגו תצורה אחרת» when the figure itself does not move.
+
+**R167 — two lines of any kind meet at a named point**
+([ADR-AG-224](06c-decisions-analytic.md#adr-ag-224), [#1715](https://github.com/dcodish/geo_builder/issues/1715))
+
+- «<line> ו<line> נפגשים בנקודה E» works for any two lines the tool draws: an angle bisector («חוצה זוית B», «חוצה הזווית ABC»), an altitude or median from a vertex («הגובה מ-A», «התיכון מ-B»), a perpendicular bisector («האנך האמצעי לצלע AB»), a drawn perpendicular («האנך מ-C ל-AB»), a tangent at a point, or a named line. It also accepts «נחתכים» / «נפגשות» / «מצטלבים», «ב-E», «ו-», and English "… and … meet at E". Each line is drawn, and E is where they cross. Two bisectors of a triangle meet at its incentre; two altitudes at the orthocentre; two medians at the centroid; two perpendicular bisectors at the circumcentre.
+- The same lines work in «E נקודת החיתוך של X עם Y», «X חותך את Y בנקודה E» and «E על X».
+- Parallel lines are refused as impossible. The same line written twice is refused. Two named lines that share a letter («הישר AB והישר BC») are refused, because they meet at that point.
+- An altitude or median named only by its side («הגובה לצלע BC») is not read in these sentences.
+- A perpendicular «האנך מ-P ל-X» must already be drawn (R141).
