@@ -11606,3 +11606,56 @@ Both build with every row ok and 8 points, and in both the point that was A now 
 **Measured.** `src3d/__tests__/proof-target-1666.test.ts`: the shared rows through `decideSubmit3`, the Hebrew and English text, the parser no longer reading past «הוכיחו כי» or "prove that" (the given framing unchanged), the bare claim still recording, and no catalog line reading as a target. On the pre-change tree, 3 of its 5 tests fail. `parse3-v1.test.ts` drops the «הוכיחו כי CA' מאונך למישור BC'D» input from its perp-plane spellings.
 
 **Consequences.** `src3d/store/store3.ts` (`StoreError3`, `readStatement3`), `src3d/parser/parse3.ts`, `src3d/i18n/errorText3.ts`, `src3d/i18n/locales/{he,en}.json`. Behaviour change: the proof-verb form of a claim is refused, where it used to be read (and could drive the figure).
+
+## ADR-3D-296 — A point placement keeps its tail: the condition after «X על YZ» is a given (#1730)
+
+**Status:** accepted · 2026-10-04 · bug (P1, the honesty class) · round #1721 (operator, 2026-10-03: *"fix the P1s now as well"*) · found by the 2-D #1682 stream (ADR-570) · branch `fix/1730-3d-placement-tail` off `main` @ 4fbb3293
+
+**Requirements:** [FR-SP-13](02b-requirements-3d.md) (new) — a point placement keeps its condition · **Design:** [04b-design-3d.md](04b-design-3d.md) § "A point placement keeps its tail" · **LADDER stage:** the parser (`onSegment`, `readCondition3`) and the honesty gates `lostGivens3` shares with the LLM lane. No solver, replay or render change.
+
+**Cites** ADR-570 (the 2-D twin, copied as a pattern — `src3d` never imports `src/`), ADR-024 (the leftover guard), [ADR-3D-147](#adr-3d-147) (the gates bound to the event), [ADR-3D-224](#adr-3d-224) (#921: the ratio letter), the #108 ruling (a shape with a property glued on is two steps).
+
+**Context — measured at pickup on 4fbb3293, through `decideSubmit3`, seed 0.** The issue's claim held, and the class was wider:
+
+| typed, after «משולש ABC» | before |
+| --- | --- |
+| «D על BC ונתון כי AD = AC» (also «ונתון ש-», «וידוע כי», «, AD = AC», «ו-AD = AC», "and it is given that") | records `point-on-segment3 D on BC` alone, green; D lands where AD ≠ AC |
+| «D על BC כך ש-AD = AC» | the same — even «כך ש» was dropped unless the condition was a ratio of D itself |
+| «D על BC ונתון כי AD = 3» | the same: the 3 was "accounted" by the digit in the command's own type name, `point-on-segment3` |
+| «D על AB במרחק 3 מ-A» | the same (the #1649 rows `cat-2d-027` / `e1-at-distance-far-end` passed on it) |
+| «K על AA' כך ש-AK = 2KA'» | correct: `t = ⅔` (the ratio lane) |
+
+**Class.** *A point-placement sentence keeps its prefix and drops its tail* — `onSegment` was not anchored after the carrier, so any condition that was not a ratio of the rider vanished; and no gate could see it: the label gate found every letter referenced by the rider, 3-D had no relation gate at all, and the number gate counted the digit in a command's `type` string as a payload.
+
+**Decision.**
+1. **`onSegment` is anchored.** After «X על YZ» comes nothing (a free rider), a distance tail («במרחק 3 מ-A», "at distance 3 from A" — the condition `AX = 3`), or a connector and a condition. The connector vocabulary is one fragment, `PLACEMENT_CONNECTOR`: «כך ש», the given-conjunction «ונתון כי / ש», «וידוע כי / ש» (2-D's ADR-570 reading), «ו-», a comma, "such that", "and (it is) given that". Anything else declines the line (→ the model lane), never commits the placement alone.
+2. **A whole ratio of the rider keeps the ratio lane** (`WHOLE_RATIO`: a baked `t`, the #921 letter, and a ratio that does not fit the rider still refused). **Any other condition is read by `readCondition3`** — the ordinary rule list, all or nothing — beside the free rider, which the condition then drives. The one difference from a line of its own: a bare pair equation is a LENGTH there (`CONDITION_LENGTHS`), as it always was inside a ratio clause, so «AD = AC» is `|AD| = |AC|` rather than the `ambiguous-vector-length` question. A shape subject is not a placement — «משולש ABC ונתון כי AB = AC» stays the #108 two-step teaching.
+3. **The net: `droppedGivenRelations3` joins `lostGivens3`.** A stated `XY = ZW` / `⊥` / `∥` between point pairs must be carried by ONE command that states something; a free rider (`point-on-segment3` with no `t`/`sym`) and plain ink (`segment3`) do not vouch for a relation merely because they mention the point the line introduces — the exemption ADR-570 narrowed in 2-D, here never granted. Both statement seams (the deterministic one and the model's `submitSteps`) share it.
+4. **The number gate ignores `type` tags.** A discriminator is not a payload.
+
+**Plan vs mechanism (recorded).** The issue's plan was the clause split and the gate check; 3-D had no relation gate, so decision 3 adds the 2-D one with the narrowed exemption built in. Decision 4 and the distance tail are the same class found while measuring (the 3 that vanished in «… ונתון כי AD = 3» and «… במרחק 3 מ-A»).
+
+**Sibling audit.** Grepped the 3-D placement rules: `onSegment` was the one unanchored reader (`midpoint` counts its labels and declines a tail; «M אמצע BC ונתון כי AM = 3» stays `not-understood`, an honest escalation, not read here). The extension form («על המשך BC …») is not read by 3-D at all (#1679). **2-D:** fixed by ADR-570. **Analytic:** reads both (ADR-AG-208).
+
+**Measured after** (`src3d/__tests__/issue-1730-placement-tail.test.ts`, through `decideSubmit3` and the drawn positions):
+
+| typed, after «משולש ABC» | now |
+| --- | --- |
+| «D על BC ונתון כי AD = AC» and the eight other connectors (He/En) | records `length-rel AD = AC`; AD = AC at seeds 0–3 |
+| «D על AB» · «E על BC ונתון כי DE = DC» | DE = DC at seeds 0–3 |
+| «D על BC ונתון כי AD ⊥ BC» | records the `cos-angle` |
+| «D על AB במרחק 0.5 מ-A» / English | AD = 0.5 |
+| «K על AA' כך ש-AK = 2KA'» / «… AB = 2KA'» / «D על BC» | unchanged (`t = ⅔` / refused / free rider) |
+| «D על BC ונתון כי משהו אחר» | not read (declines whole) |
+
+**Found, filed.** «D על AB במרחק 3 מ-A» now reads AD = 3 — and on a triangle of unstated size the pivot refuses it `givens-contradict` (AD = 2 builds, AD = 3 does not; stating AB = 5 first works). That is a solver reach defect the old drop hid, filed as **#1735** (P2, 3d); the two #1649 rows that passed by dropping the 3 now carry it as a 3-D known gap.
+
+**Locks.** `issue-1730-placement-tail.test.ts` (20). **Fails before: 17 of 20**, measured by reverting `parse3.ts`, `honesty3.ts` and `store3.ts` to 4fbb3293 (with a no-op `droppedGivenRelations3` stub); the 3 that pass before are controls (the ratio lane, the #108 shape subject, a relation a command carries). Fixture `fixtures3/placement-condition-1730.geo3.json` (the operator's exact sequence; the drift net holds the stored `length-rel`). #1649: `side-given-clause-holds-1730` (new — «AC = 2» · «D על BC ונתון כי AD = AC» · «AD = 1» is refused in all three builders; on 4fbb3293 3-D built it), and `cat-2d-027` / `e1-at-distance-far-end` gain the 3-D known gap #1735.
+
+**Unchanged, measured.** `npx vitest run src3d` (the whole 3-D tree, run alone): 291 files, 5345 tests, green after one re-record — the `decide-submit3-parity-1394` golden gains this ADR's new sequences (14 keys added, **no recorded hash changed**). `honesty3.test.ts` (the catalog is gate-clean under the new relation gate) and `student-text-1455` are inside that run. The three products' #1649 parity locks and the meta-lock: green. The full suite is the batch gate (round #1721).
+
+**Consequences.**
+- `src3d/parser/parse3.ts`: `PLACEMENT_CONNECTOR`, `PLACEMENT_CLAUSE`, `WHOLE_RATIO`, `AT_DISTANCE`, the anchored `onSegment`, `readCondition3` + `CONDITION_LENGTHS` (read in `lengthRel`).
+- `src3d/parser/honesty3.ts`: `droppedGivenRelations3`; `droppedGivenNumbers3` skips `type` tags. `src3d/store/store3.ts`: the gate in `lostGivens3`.
+
+**Behaviour change for a student:** «D על BC ונתון כי AD = AC» (or «כך ש-AD = AC», «, AD = AC», «במרחק 3 מ-A») now draws D so the condition holds, instead of quietly ignoring it. A condition the tool cannot read is no longer half-drawn: the whole line goes to the fallback.

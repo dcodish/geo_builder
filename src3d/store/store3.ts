@@ -41,7 +41,7 @@ import { dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
 import { meaningKey } from '../engine/operands';
 import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
-import { droppedConstructNoun3, droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
+import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
 import { parse3, parseRewrite3 } from '../parser/parse3';
 
 export interface Fact3 {
@@ -1061,6 +1061,7 @@ function lostGivens3(utterance: string, commands: readonly Command3[], prior: Co
     ...droppedShapeNoun3(utterance, cmds), // #587 / ADR-3D-084: a stated base shape the lane cannot lower
     ...droppedTriShape3(utterance, cmds), // #424: a stated triangle qualifier silently dropped
     ...droppedConstructNoun3(utterance, cmds), // #438/#440: a stated OBJECT never materialised
+    ...droppedGivenRelations3(utterance, cmds), // #1730: a stated pair relation no command carries
   ];
 }
 

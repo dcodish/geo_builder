@@ -260,6 +260,10 @@ const SEEDED: SeededCorpus = {
     'π1 ניצב ל-π3',
     'A(1,0,0) נמצאת על אחד המישורים', // a point, so the net has positions to check (A is on π2)
   ],
+  // #1730 (ADR-3D-296) — the operator-reported sequence: a point placement's condition clause is a given.
+  // Before, the clause was dropped and the line recorded the rider alone; the drift net now holds the
+  // stored `length-rel`, and the connector sweep and the held equality live in issue-1730-placement-tail.test.ts.
+  'placement-condition-1730.geo3.json': ['משולש ABC', 'D על BC ונתון כי AD = AC'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

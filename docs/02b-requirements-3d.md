@@ -153,6 +153,14 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   them ([FR-SP-2](#the-space-model)/[FR-SP-3](#the-space-model)). It is never minted **on** the known
   point: a zero segment drawn green asserts a perpendicular the figure does not have.
   *(Realised — [ADR-3D-268](06b-decisions-3d.md#adr-3d-268), #1499.)*
+- **FR-SP-13 (Must)** — **A point placement keeps its condition.** «D על BC ונתון כי AD = AC» states two
+  givens, and both are honoured: D rides BC and AD = AC drives it. The condition is a given whichever
+  connector introduces it — «כך ש», «ונתון כי / ש», «וידוע כי / ש», «ו-», a comma, "such that", "and it is
+  given that" — and so is a distance tail («D על AB במרחק 3 מ-A»). A ratio of the rider itself
+  («K על AA' כך ש-AK = 2KA'») keeps its ratio reading. A condition the tool cannot read declines the whole
+  line; it never commits the placement alone. A stated pair relation («AD = AC», «AD ⊥ BC») that no
+  committed command carries is refused, naming it — on every statement seam, the model's included. The
+  2-D twin is FR-IN-4d. *(Realised — [ADR-3D-296](06b-decisions-3d.md#adr-3d-296), #1730.)*
 
 ## Vectors — the geometric lane
 

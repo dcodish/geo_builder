@@ -615,6 +615,18 @@ The three statement seams share their pieces: `readStatement3` (the grammar plus
 search), which the LLM lane's `submitSteps` also ends in. A new branch belongs in the decision; the parity
 lock replays 1,500 sequences against the recorded behaviour.
 
+## A point placement keeps its tail (#1730, [ADR-3D-296](06b-decisions-3d.md#adr-3d-296))
+
+`onSegment` («X על YZ») is anchored: after the carrier comes nothing, a distance tail («במרחק 3 מ-A»), or
+a connector (`PLACEMENT_CONNECTOR` — «כך ש», «ונתון כי/ש», «וידוע כי/ש», «ו-», a comma, the English
+forms) and a condition. A condition that is a whole ratio of the rider (`WHOLE_RATIO`) keeps the ratio lane
+(a baked `t`, or the #921 letter); any other is read by `readCondition3` — the ordinary rule list, all or
+nothing, with one difference: a bare pair equation is a LENGTH there (`CONDITION_LENGTHS`), as it always
+was inside a ratio clause. The rider stays free and the condition drives it. An unread tail declines the
+line. The net behind it is `droppedGivenRelations3` in `lostGivens3`: a stated pair relation must be
+carried by one command that states something — a free rider and plain ink do not vouch for it — and the
+number gate no longer counts the digit in a command's `type` name as a payload.
+
 ## Known gaps
 
 Recorded here because a design doc that omits its weakest properties is not describing the system.
