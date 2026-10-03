@@ -19,7 +19,7 @@
  * is unknown (ADR-W-053).
  */
 import { fmtNum } from '../../shell/format';
-import { isKnowledge, type Figure } from '../engine/evaluate';
+import { knownValue, type Figure } from '../engine/evaluate';
 import { isHorizontal, isVertical } from '../engine/lines';
 import type { Construction } from '../engine/types';
 
@@ -40,13 +40,17 @@ export function angleWithXAxis(dx: number, dy: number): number {
 }
 
 /** The angle as KNOWLEDGE: a number only when every valid configuration agrees on it. */
-export function lineAngleOf(c: Construction, read: DirectionReader): { known: true; deg: number } | { known: false; pending?: true } {
-  const k = isKnowledge(c, (f) => {
+export function lineAngleOf(
+  c: Construction,
+  read: DirectionReader,
+): { known: true; deg: number } | { known: false; pending?: true; options?: readonly number[] } {
+  // #1716 (ADR-AG-226): through the panel's one value gate, so an angle with two values lists both.
+  const k = knownValue(c, (f) => {
     const v = read(f);
     return v === null ? null : angleWithXAxis(v.dx, v.dy);
   });
   // #1473: a PENDING verdict stays pending — the surface shows «בודק…», never the open dash as if settled.
-  return k.known ? { known: true, deg: k.value } : k.pending ? { known: false, pending: true } : { known: false };
+  return k.known ? { known: true, deg: k.value } : k.options ? { known: false, options: k.options } : k.pending ? { known: false, pending: true } : { known: false };
 }
 
 /** The one spelling of an angle on screen — two decimals (#723), with the degree sign. */

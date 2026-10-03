@@ -10626,3 +10626,58 @@ Two more items, built on top of ef942ea7:
 - `src/render/Figure.tsx`, `src/render/scene.ts`: adopt the kit, byte-identical.
 - `src-analytic/engine/statedMeasures.ts` (new); `engine/derive.ts` (`Derivation.stated`); `engine/evaluate.ts` and `engine/lengths.ts` (`pinnedLength` retired); `engine/types.ts` (`definition`); `parser/parseAnalytic.ts` (the three definition sites).
 - `src-analytic/render/scene.ts` (`Scene.stated`, `statedScene`, the #1048 knee through the kit); `render/Figure.tsx` (the layer); `App.tsx` (the hand-off).
+
+## ADR-AG-226 — A data-panel row shows up to two values, through one value gate (#1716)
+
+**Status:** accepted · 2026-10-03 · fix-round #1721, stream R5 item 2 (PR stacked on #1714's). Operator report, playing T6 (471 9/4): *"the row of tan should have created a slope of 2 and it did not. not in the canvas and not in the data panel"*. **Operator ruling, 2026-10-03:** *"if there are 2 options, we always show up to 2 options. in this case, i think there would be only one"* — transcribed on #1716 as: one value as today; two values listed («2 או −2»); more than two keeps «—».
+
+**Requirements:** [02c](02c-requirements-analytic.md) R167. · **Design:** [04c](04c-design-analytic.md), "One value gate; up to two values".
+
+**Class.** *A value the givens fix up to a discrete choice is printed as unknown.* The honesty gate asks "one value in every configuration", and a slope that is 2 in some and −2 in others failed it and printed «—», hiding what the student DID fix. The second question — "a small stable set" (`knownOptions`, #1036) — existed, but only the point rows (and the ask lane's `scalarText`) asked it, at a cap of FOUR. The parameter, slope, angle, length and equation rows never did.
+
+**Measured at pickup** (on `feat/1714-stated-measures`, 9/4 exam lines sliced at `printed`, `confirmTaught`, seeds 0 and 3):
+- Slope AB, BC, CD and DA were `{known: false}` → «—». Their angles with the x-axis were open.
+- Points: A «[(−3, 0)] או (3, 0)», B and C two options each, and **D four options** «(−9, −6) או (−9, 6) או [(9, 6)] או (9, −6)».
+- With the figure note (`lines` whole): slope AB = 2 and D = (9, −6), one configuration. The issue's numbers held.
+
+**Decision.**
+
+1. **One gate** — `knownValues(c, read, size)` in `engine/evaluate.ts`, beside `isKnowledge` and `knownOptions`. It answers, in order:
+   - every component invariant → known (the honesty gate, unchanged);
+   - none seen to move, some still pending → pending (#1473);
+   - a stable discrete set of at most `MAX_LISTED_VALUES = 2` → `options`;
+   - otherwise open.
+
+   `read` returns the whole value as a vector, so a point stays `(1, −5)` or `(3, 3)`, never four products. `knownValue` is its scalar form, returning `Knowledge` with `options`. `knownCurveOptions` is `knownCurve`'s twin: it reads all of a curve's coefficients as one vector, so two whole equations are listed, never a mix of their coefficients.
+2. **Every row asks it**:
+   - `panelKnowledge` parameters (`knownValue`) and curves (`knownCurveOptions`);
+   - `segmentKnowledge` slopes and lengths (`knownValue`);
+   - `lineAngleOf` (the slope row's angle, and the ask lane's);
+   - `pointText` (`knownValues` with `size` 2) and `scalarText` (the ask lane's scalar answers).
+
+   One formatter, `valueText` (`app/panelRows.ts`), prints the value or the two options joined by «או», in the option set's stable ascending order: the order the point rows and #1433's «3.16 או 5.83» already used, which its lock asserts. So 9/4 reads «-2 או 2».
+3. **The cap is the ruling's two, for every row, points included.** A point with three or four positions now prints «—» (9/4's D, exam lines only). This is the ruling as transcribed; nothing locked a point list longer than two.
+4. **The render path pays nothing new (#1473 B′, *"we cannot afford 0.5 s addition"*).** Measured first: routing the new rows through `knownOptions` made the render complete the pool (572 line 5: 23 evaluations against a budget of 2), and `issue-1473-perf-budget` went red.
+   - So on a DEFERRED, incomplete pool the gate answers from the evaluated figures alone. More than two values already seen → open. Otherwise → PENDING («בודק…»), and the idle loop completes the pool and settles the row.
+   - Only the point rows' option walk may complete it on the render (`{ fillPool: true }`), because that walk is the one the render path paid before #1473, which B′ grandfathers.
+   - The verdict is identical once the pool is complete; the option decides only who pays.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1716-two-values.test.ts`, 9 tests, all through the panel's own functions:
+  - 9/4 as printed: slope AB «-2 או 2» at seeds 0–3, its angle 63.43° / 116.57°, A's two positions, D «—» (four positions);
+  - 9/4 with the figure note: «2», and D = (9, −6);
+  - a parameter «-3 או 3», a length «2 או 4», a line «3x − 2y − 6 = 0» / «3x + 2y − 6 = 0»;
+  - the ask lane answers what the row shows;
+  - a continuous value stays open.
+- **Fails before: 9 of 9** (the gate and the formatter do not exist on the base). Measured semantically too: «—» on every row above.
+- Unchanged and green: `issue-1433-known-options` (order), `issue-1473-perf-budget` (after point 4), the #1289 freedom invariant, and every analytic test reaching the panel, the ask lane or the gates (145 files, 3949 tests).
+
+**Not built, said out loud.**
+- The ask lane's equation options and its locus point sets keep their own `knownOptions` calls (their cap stays four). They are answers to a question, not panel rows, and the plan names the panel's rows.
+- The canvas half of T6 (the angle written at BAO) is #1714's layer (ADR-AG-225).
+
+**Sibling check.** 2-D and 3-D have no value-set panel (2-D's panel prints determined values only). The class is analytic's, whose gauge is pinned.
+
+**Consequences.**
+- `engine/evaluate.ts`: `MAX_LISTED_VALUES`, `Values`, `knownValues`, `knownValue`, `knownCurveOptions`; `Knowledge` gains `options`.
+- `app/panelRows.ts` (`valueText`, the rows); `app/pointText.ts`; `app/lineAngle.ts`; `App.tsx` (the parameter, equation, slope, angle and length rows).

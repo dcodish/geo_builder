@@ -36,7 +36,7 @@ import { commitRecord, decideEdit, decideSubmit, decideToggle, noticeText, reach
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
-import { openCurveText, panelKnowledge, panelRowText, segmentKnowledge, slopeRowText } from './app/panelRows';
+import { openCurveText, panelKnowledge, panelRowText, segmentKnowledge, slopeRowText, valueText } from './app/panelRows';
 import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
 import { angleText } from './app/lineAngle';
@@ -1546,9 +1546,11 @@ export function App() {
                   // A symbol nothing reads is never asked of the gate (#1343): it is not part of any
                   // configuration, and one sample of it is not knowledge — it printed «m = -3.46» once.
                   // #1473: a value not yet read over the whole pool is «בודק…», never its domain as if open.
-                  const text = k.known
-                    ? `${label} = ${fmtAnalytic(k.value)}`
-                    : k.pending
+                  // #1716 (ADR-AG-226): one value, or two («α = 30 או 150»), through the panel's one gate.
+                  const shown = valueText(k, fmtAnalytic);
+                  const text = shown !== null
+                    ? `${label} = ${shown}`
+                    : !k.known && k.pending
                       ? `${label} = ${checking}`
                       : `${domainText(label, domain)}${used ? '' : ` ${t('paramUnused')}`}`;
                   return <span key={sym}><ValueRow text={text} /></span>;
@@ -1609,7 +1611,7 @@ export function App() {
                  * would have to be set correctly at every mint site, and the name already answers
                  * truthfully at all of them.
                  */
-                rows: knows.curves.map(({ id, known, pending }) => {
+                rows: knows.curves.map(({ id, known, pending, options }) => {
                   const c = d.figure.curves.find((cu) => cu.id === id)!;
                   // The SAME honesty gate the point rows use: an equation prints only when every
                   // coefficient is invariant across the free DOFs. A parabola whose `a` is still
@@ -1655,7 +1657,7 @@ export function App() {
                   const parts = known ? curveParts(known, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }) : null;
                   return (
                     <span key={c.id}>
-                      <ValueRow text={namedRow(name, parts ? parts.equation : pending ? checking : openCurveText(d.construction, c.id))} />
+                      <ValueRow text={namedRow(name, parts ? parts.equation : pending ? checking : options ? options.map((o) => curveParts(o, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }).equation).join(' או ') : openCurveText(d.construction, c.id))} />
                       {parts?.details && (
                         <details style={askTraceBox} open>
                           <summary style={askTraceToggle} title={t('curveDetailsToggle')}>
@@ -1707,8 +1709,9 @@ export function App() {
                   const pending = (!vertical.known && vertical.pending) || (!angle.known && angle.pending) || (!isVertical && !slope.known && slope.pending);
                   if (pending) return <span key={seg.id}><ValueRow text={`${a}${b}: ${checking}`} /></span>;
                   // #1646 (ADR-AG-199): the parts in a fixed order, each Hebrew part one island — `slopeRowText`
-                  const slopePart = isVertical ? t('slopeVertical') : slope.known ? fmt(slope.value) : '—';
-                  const anglePart = angle.known ? angleText(angle.deg) : '—';
+                  // #1716 (ADR-AG-226): a slope or an angle with two values across the configurations lists both.
+                  const slopePart = isVertical ? t('slopeVertical') : (valueText(slope, fmt) ?? '—');
+                  const anglePart = angle.known ? angleText(angle.deg) : (valueText({ known: false, options: angle.options }, (v) => angleText(v)) ?? '—');
                   return <span key={seg.id}><ValueRow text={slopeRowText(`${a}${b}`, slopePart, t('angleWithX'), anglePart)} /></span>;
                 }),
               },
@@ -1731,7 +1734,7 @@ export function App() {
                   const [a, b] = s.ends;
                   const k = s.length;
                   return (
-                    <span key={s.id}><ValueRow text={`${a}${b} = ${k.known ? fmt(k.value) : k.pending ? checking : '—'}`} /></span>
+                    <span key={s.id}><ValueRow text={`${a}${b} = ${valueText(k, fmt) ?? (!k.known && k.pending ? checking : '—')}`} /></span>
                   );
                 }),
               },

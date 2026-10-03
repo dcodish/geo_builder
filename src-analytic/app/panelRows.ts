@@ -1,5 +1,6 @@
 import type { Derivation } from '../engine/derive';
-import { isKnowledge, knownCurve, settled, type Figure, type Knowledge } from '../engine/evaluate';
+import { isKnowledge, knownCurve, knownCurveOptions, knownValue, settled, type Figure, type Knowledge } from '../engine/evaluate';
+import type { NumCurve } from '../engine/types';
 import { VERTICAL_TOL, verticality } from '../engine/lines';
 import { lineAngleOf } from './lineAngle';
 import { isDirectionSymbol, paramRegister, usedSymbols } from '../engine/carriers';
@@ -73,7 +74,7 @@ export interface PanelKnowledge {
   /** each positional object's coordinates (ADR-AG-003 §2) */
   readonly points: readonly { id: string; x: PanelKnown; y: PanelKnown }[];
   /** each LISTED curve, with its equation when every coefficient is invariant, else null; `pending` = not yet settled (#1473) */
-  readonly curves: readonly { id: string; known: ReturnType<typeof knownCurve>; pending: boolean }[];
+  readonly curves: readonly { id: string; known: ReturnType<typeof knownCurve>; pending: boolean; options: NumCurve[] | null }[];
 }
 
 export function panelKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): PanelKnowledge {
@@ -84,7 +85,7 @@ export function panelKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): 
       .filter((p) => !isDirectionSymbol(p.sym))
       .map((p) => {
         const isUsed = used.has(p.sym);
-        const k: PanelKnown = isUsed ? isKnowledge(c, (f) => f.env[p.sym] ?? null) : { known: false };
+        const k: PanelKnown = isUsed ? knownValue(c, (f) => f.env[p.sym] ?? null) : { known: false };
         return { sym: p.sym, domain: p.domain, used: isUsed, k };
       }),
     points: positionalOf(c).map((p) => ({
@@ -94,7 +95,9 @@ export function panelKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): 
     })),
     curves: d.figure.curves.filter(panelListsCurve).map((cu) => {
       const s = settled(() => knownCurve(c, cu.id));
-      return { id: cu.id, known: s.value, pending: s.pending };
+      // #1716: an equation with exactly two values across the configurations lists both, through the one gate.
+      const options = s.value || s.pending ? null : knownCurveOptions(c, cu.id);
+      return { id: cu.id, known: s.value, pending: s.pending, options };
     }),
   };
 }
@@ -151,11 +154,11 @@ export function segmentKnowledge(d: Pick<Derivation, 'construction' | 'figure'>)
     const isVert = vertical.known && vertical.value < VERTICAL_TOL;
     const slope: PanelKnown = isVert
       ? { known: false }
-      : isKnowledge(c, (f) => {
+      : knownValue(c, (f) => {
           const v = read(f);
           return v === null || Math.abs(v.dx) < 1e-12 ? null : v.dy / v.dx;
         });
-    const length = isKnowledge(c, (f) => {
+    const length = knownValue(c, (f) => {
       const v = read(f);
       return v === null ? null : Math.hypot(v.dx, v.dy);
     });
@@ -193,6 +196,19 @@ export function openCurveText(c: Pick<Construction, 'objects'>, id: string): str
     return o.def.t === 'through' ? `⊙${o.def.pts.join('')}` : `○${o.def.pts.join('')}`;
   }
   return '—';
+}
+
+/**
+ * WHAT A VALUE ROW PRINTS (#1716, ADR-AG-226) — the one formatter for the one gate's verdict: the value; or its
+ * two options, in the option set's stable ascending order and joined as the point rows join theirs («-2 או 2», #1433's «3.16 או 5.83»); or `null`, which the row words
+ * as «—» (open) or «בודק…» (pending). Two options that print the same at the display precision are not two
+ * answers the student can tell apart, so they print nothing rather than one "option" the gate withheld.
+ */
+export function valueText(k: PanelKnown, fmt: (v: number) => string): string | null {
+  if (k.known) return fmt(k.value);
+  if (!k.options) return null;
+  const texts = [...new Set([...k.options].sort((a, b) => a - b).map(fmt))];
+  return texts.length > 1 ? texts.join(' או ') : null;
 }
 
 /** Does the panel print at least one quantity as UNKNOWN? (the #1289 invariant's right-hand side) */

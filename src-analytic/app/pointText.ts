@@ -9,7 +9,8 @@
  */
 import type { derive } from '../engine/derive';
 import { exprText } from '../engine/expr';
-import { isKnowledge, knownCurve, knownOptions, reportPending } from '../engine/evaluate';
+import { knownCurve, knownValue, knownValues, reportPending } from '../engine/evaluate';
+import { valueText } from './panelRows';
 
 /** A coordinate's verdict; `pending` = not yet read over the whole configuration pool (#1473). */
 type Know = { known: boolean; value?: number; pending?: boolean };
@@ -29,10 +30,18 @@ export function pointText(
    * before the dependency: neither member is knowledge, but the set is, and printing one member
    * alone would be the cardinal sin while printing nothing throws away the shape of the answer.
    */
-  const options = knownOptions(d.construction, (f) => {
-    const q = f.points.find((r) => r.id === id);
-    return q ? [q.x, q.y] : null;
-  });
+  // #1716 (ADR-AG-226): the panel's ONE value gate — at most two positions are listed; more read as open.
+  const verdict = knownValues(
+    d.construction,
+    (f) => {
+      const q = f.points.find((r) => r.id === id);
+      return q ? [q.x, q.y] : null;
+    },
+    2,
+    // the walk the render path has always paid for an open point (#1473 B′)
+    { fillPool: true },
+  );
+  const options = verdict.known ? undefined : verdict.options;
   if (options) {
     // The DRAWN one is marked, which is what connects this row to «הציגו תצורה אחרת».
     const here = d.figure.points.find((q) => q.id === id);
@@ -95,16 +104,9 @@ export function pointText(
  */
 export function scalarText(
   c: ReturnType<typeof derive>['construction'],
-  read: Parameters<typeof isKnowledge>[1],
+  read: Parameters<typeof knownValue>[1],
   fmt: (v: number) => string,
 ): string | null {
-  const k = isKnowledge(c, read);
-  if (k.known) return fmt(k.value);
-  const set = knownOptions(c, (f) => {
-    const v = read(f);
-    return v === null ? null : [v];
-  });
-  if (!set) return null;
-  const texts = [...new Set(set.map(([v]) => fmt(v)))];
-  return texts.length > 1 ? texts.join(' או ') : null;
+  // #1716 (ADR-AG-226): the panel's one value gate and its one formatter — the ask lane cannot disagree with a row.
+  return valueText(knownValue(c, read), fmt);
 }
