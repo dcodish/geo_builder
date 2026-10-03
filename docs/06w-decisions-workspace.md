@@ -5243,3 +5243,29 @@ The name X10 reuses ADR-W-108's candidate label for the same subject on purpose.
 - **Folding it into X1 with an `only`.** `only` narrows which READING builders are checked. It cannot move a builder into `mustRefuse`.
 
 **Consequences.** `ExceptionId` gains `'X10'`. The meta-lock's "every family is used" holds: X10 has six rows. docs/22 §10 and docs/04w name X1–X10.
+
+
+## ADR-W-110 — Every product's usage log is kept 30 days, and each file is pruned on its own (#1672)
+
+**Status:** accepted · 2026-10-03 · round #1721 · amends [ADR-278](06-decisions.md#adr-278) (the retention default and its "7→~30" ladder). Ruling cited:
+- **2026-10-02, on #1672:** *"we can keep a log of 30 days for all products"*.
+
+**Requirements:** [03](03-nonfunctional-requirements.md) NFR-SE-3 — default 30 days for every product's log, and the privacy note states it. · **Design:** none (internal). **Product:** server (the sink) and every builder's privacy note (2-D, 3-D, complex, analytic).
+
+**Context.** `server/eventLog.ts` prunes each sink file at most once per UTC day. The guard was one module-level `lastPruneDay` string, shared by every file. The first post of the day, almost always 2-D, set it, so the other products' files were skipped for the rest of the day. They were pruned only on days they happened to be posted to first. In prod the 3-D log held 18 days under a 7-day window. Every builder's note also told students their statements are kept «למספר ימים» / "for a few days", which fits a week and not a month.
+
+The class has two halves. One mechanism (the prune marker) silently covered only one of N files. And the note is prose while the window is a constant, with nothing holding one to the other.
+
+**Decision.**
+1. **A per-file marker.** `lastPruneDay` is a `Map<file, day>`. Each product's file is pruned on its own first post of each UTC day.
+2. **`DEFAULT_RETENTION_DAYS = 30`**, one exported constant for every product's sink. The `retentionDays()` fallbacks are unchanged: unset or garbage gives the finite default, an explicit `0` keeps everything.
+3. **Every note states the number.** 2-D, 3-D, complex and analytic, in Hebrew and English, now say «עד 30 יום» / "up to 30 days".
+4. **The prose is locked to the constant.** `server/__tests__/retention-disclosure-1672.test.ts` builds each builder's real declaration through its real i18n. Each note that declares the usage log must state `DEFAULT_RETENTION_DAYS` as a whole number and must not use the vague wording. The table is checked against `products.json`, so a fifth builder fails until its note is read. The lock lives in `server/` because only `server/` may import both the constant and the product trees (BOUNDARIES.json).
+
+**Locks.** `server/__tests__/eventLog.test.ts`: four product files, each with an expired event, each get one post on the same day, and all four are pruned. With the 30-day default, an event 29 days old stays and one 31 days old goes, in every file. Fails before: 14 of 32 — eventLog 5 of 21 (the existing V1 concurrency lock also goes red: under the shared marker it found the day already consumed by an earlier test, the bug itself), the disclosure lock 9 of 11.
+
+**Rejected.**
+- **Raising the default only.** With the shared marker, the sibling files would still drift past 30 days.
+- **A row in the ADR-W-090 shell fixture.** `shell/` may not import `server/`, and reading the constant out of the source text would reproduce the decision rather than call it.
+
+**Consequences.** Prod: `EVENTS_RETENTION_DAYS` must stay unset on the proxy (it was not set on 2026-10-02). The proxy and the four static bundles ship together, since the note text is in the bundles. After the next UTC day, each `events*.jsonl` should have its oldest event at most 30 days old.
