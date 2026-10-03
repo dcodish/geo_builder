@@ -2342,4 +2342,5 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - A stated length is written on its segment in the student's own form: «AB = 5» → «5», «AB = 3a» → «3a».
 - A stated equality marks both members: «AB = AC» one tick on each, «∢ABC = ∢ACB» one arc on each; a second equality class draws two.
 - «שטח המשולש ABC הוא 13» writes «S=13» inside the triangle; «⌢AC = 60°» writes «60°» on the arc, never at the centre.
+- Each value sits AT its mark (#1733, ADR-AG-228): an angle's value next to its arc, never farther than 2.5 times the arc's radius from the vertex; an area's inside its shape; an arc's along the arc. A length label moves out of an angle value's way, and no value covers a point's label.
 - A shape noun's own definition is not marked («מלבן ABCD» draws no knees, «מעוין ABCD» no ticks), and a value the tool computed is never written on the canvas: it is in the data panel.
