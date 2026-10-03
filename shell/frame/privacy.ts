@@ -21,7 +21,7 @@
  * decision: the checker's endpoint table (`SINK_OF_ENDPOINT`) must learn the new sink in the
  * same change, or every product that reaches it fails its lock.
  *
- * - `usage-log` — the server's usage-event log (typed statements, kept a few days, anonymous id);
+ * - `usage-log` — the server's usage-event log (typed statements, kept up to the server's retention window — 30 days — anonymous id);
  * - `llm`       — the model fallback: a statement the local parser did not understand is sent,
  *                 through our proxy, to an external AI service;
  * - `share-store` — «העתק קישור»: the figure and its picture are stored on the server.
