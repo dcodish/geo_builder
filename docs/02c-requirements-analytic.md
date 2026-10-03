@@ -161,12 +161,14 @@ tree; subscripts are new to this input language.
 then refuses hands the student `not-handled` on their own click, which is worse than no chip —
 #511's rule, and the operator's own framing when ruling the analytic set.
 
-The set: `²` `³` `√()` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}` `⊥` `∥` `∠` `°`
+The set: `²` `³` `√()` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}` `⊥` `∥` `∠` `°` `α` `β` `γ` `δ` `θ` `<` `S_{}`
 ([ADR-AG-212](06c-decisions-analytic.md#adr-ag-212), [#1696](https://github.com/dcodish/geo_builder/issues/1696):
-the 2-D palette reviewed chip by chip; `√()` wraps a selection as 2-D's does). The 2-D chips still absent
-are absent because their sentences are not read yet — α β γ δ θ, `S_{}` and `<` between measures
-(#1621), `△` `≅` `~` and `⌢{}` (#1622) — and each arrives in that work's own change, because a
-chip is part of shipping a notation rather than a follow-up to it.
+the 2-D palette reviewed chip by chip; `√()` wraps a selection as 2-D's does). Each later chip arrived with its
+notation: the Greek angle names with the angle alias ([ADR-AG-215](06c-decisions-analytic.md#adr-ag-215)), `<` with
+order between measures ([ADR-AG-216](06c-decisions-analytic.md#adr-ag-216)), `S_{}` with the area notation
+([ADR-AG-214](06c-decisions-analytic.md#adr-ag-214)).
+The 2-D chips still absent — `△` `≅` `~` and `⌢{}` (#1622) — are absent because their sentences are not read yet, and each
+arrives in that work's own change, because a chip is part of shipping a notation rather than a follow-up to it.
 
 Mechanically enforced: every entry is driven through the real grammar, with a totality guard so a
 button cannot be added without a proof — and pressing any chip inside a Hebrew sentence must not
@@ -2212,3 +2214,37 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
   - A point that a later line defines is still defined by that line.
   - Still refused, as in 2-D, when the letters are new: «AB = 2CD», «AB:BC = 2:3», «AD גובה לצלע BC».
 - «AB קוטר» · «BO = 5» draws BO with B where it is and O a free point. O is not the centre until the student says so. A later «O מרכז המעגל», «OB רדיוס» or «הרדיוס OB» then moves that same O to the centre; no second point appears.
+
+**R151 — an angle named by a Greek letter, and the tan or cos of an angle, read as givens**
+([ADR-AG-215](06c-decisions-analytic.md#adr-ag-215), [#1621](https://github.com/dcodish/geo_builder/issues/1621); operator rulings 2026-10-01: tan of an angle is in scope, sin/cos follow when needed; 2026-10-02: the same experience as 2-D for plane geometry).
+
+- «∢ABC = α», «זווית ABC = 2α», and the exam's «נסמן ∢DCB = 2α» / «נסמן: זווית ADB = α» name the angle by a Greek letter (α β γ δ θ and the rest of the lowercase alphabet; π stays the number). The letter is a free value: the triangle may take any shape, the angle follows it, and «הציגו תצורה אחרת» changes it. The same letter on two angles makes them equal.
+- A later «α = 30» (or «α = 30°») sets the letter, and so the angle. A figure that already fixes the angle at another value refuses the line, naming it. «θ = 2β» relates two letters.
+- A Latin letter is not set this way: «a = 5» and «r=5» stay unread, as before (a single Latin letter can mean a radius or a point).
+- «tan∢BAO = 2», «tan(∢BAO) = 2», «tg∢BAO = 2», «טנגנס הזווית BAO הוא 2» and "the tangent of angle BAO is 2" state the angle by its tangent. A positive tangent is an acute angle and a negative one an obtuse angle. The drawing may still be any reflection of the figure, as for an angle given in degrees. «קוסינוס הזווית ACB = 3/4» and «cos∢ACB = 3/4» state it by its cosine; a cosine outside −1…1 is refused, naming the line.
+- «sin∢ACB = 1/2» is not read: a sine fits an acute angle and an obtuse one, and the tool does not choose between them.
+- The symbol palette offers α β γ δ θ.
+
+**R152 — a coordinate stated about a vertex, and an order between measures, read as the 2-D tool reads them**
+([ADR-AG-216](06c-decisions-analytic.md#adr-ag-216), [#1621](https://github.com/dcodish/geo_builder/issues/1621); operator ruling 2026-10-02: the analytic tool gives the same experience as 2-D for plane geometry).
+
+- «שיעור ה-y של הקודקוד A הוא 10» states A's y-coordinate exactly as «שיעור ה-y של הנקודה A הוא 10» does. The same holds for every point sentence: «הקודקוד» and «הקדקוד» name a point as «הנקודה» does.
+- «שיעור ה-y של הקודקוד B קטן מ-6» says which of the figure's possible positions B takes. It never moves a point the other givens already fix. A figure where it cannot hold is refused, naming the sentence.
+- An order between two lengths or two angles, or between a length or an angle and a number, is a given about the figure: «AB < BC», «AB קטן מ-BC», «DC > AB», «AB ≤ 10», «AB לפחות 3», «∢ABC ≤ 40°», «20 < ∢ABC < 60», «זווית ABC גדולה מ-40», «∢ABC < ∢BAC», «זווית ABC קהה», «זווית ABC חדה».
+  - The figure is drawn with the order true. Where the order leaves freedom, «הציגו תצורה אחרת» still moves the figure, always inside the order.
+  - ≤, ≥, «לפחות» and «לכל היותר» admit equality; <, >, «גדול מ» and «קטן מ» do not.
+  - The sentence draws the segments it names, and adds points the figure does not have yet, as «AB = 5» does.
+  - An order the other givens contradict is refused, naming the sentence. Comparing a length with an angle is refused.
+- The symbol palette offers `<`.
+- Not read: «D מעל A», «C מימין ל-B» (positions on the drawing; awaiting a ruling) and «משולש קהה זווית ABC» (which angle is obtuse is unstated).
+
+**R150 — the ratio of two measures, and the area notation S_{…}, as givens**
+([ADR-AG-214](06c-decisions-analytic.md#adr-ag-214), [#1621](https://github.com/dcodish/geo_builder/issues/1621); operator ruling 2026-10-02: the analytic tool gives the same experience as 2-D for plane geometry).
+
+- «היחס בין שטח המשולש AOB לשטח הטרפז ADCB הוא 4:5» states that the two areas are in the ratio 4:5. The ratio may be written `p:q`, as a fraction («4/5») or as a number («0.8»). Either measure may be an area, a length or a distance, and the polygon may have any number of vertices. «the ratio of the area of triangle AOB to the area of trapezoid ADCB is 4:5» is the English form.
+- «S_{ABC}» and «S_ABC» mean «שטח ABC», in a given («S_{ABC} = 13», «S_BDC / S_ODC = 0.8») and in a question. The palette has an «S_{}» button: select the vertices, press it, and get «S_{ABC}».
+- A length ratio may be written with «/»: «DO/DE = 2/3», «CD/OB = 5/2», the same as «DO:DE = 2:3».
+- An area value may be written «שטח המשולש ABD שווה ל-45», and in English «the area of triangle ABC is 45».
+- A ratio pins only what it states. Every other size and shape stays free and moves with «הציגו תצורה אחרת».
+- A ratio that cannot hold is refused, naming the sentence. For example: a part of a triangle twice the triangle's area, or a triangle with all three vertices on one line («S_BDC» when D is on BC).
+- A ratio that names a point the figure does not have is refused, naming that point.

@@ -19,7 +19,7 @@
  *
  * The 2-D chips whose sentences analytic does not read yet — measured, and locked as still refused in
  * `symbols-module.test.ts`, so the day one parses the lock goes red and the chip is owed:
- * the Greek angle names α β γ δ θ, `S_{}` and `<` between two measures (slice D, #1621);
+ * (slice D's chips — α β γ δ θ, `<` and `S_{}` — shipped with #1621);
  * `△` `≅` `~` and `⌢{}` (slice E, #1622). A chip inserting a character the grammar then refuses
  * hands the student `not-handled` on their own click, so each joins in its notation's own PR.
  * `xⁿ` is not offered: `²` and `³` cover the exam's powers and `^` is on every keyboard.
@@ -63,4 +63,23 @@ export const SYMBOLS: readonly SymbolSpec[] = [
   { label: '∥', titleKey: 'symPar', before: '∥' },
   { label: '∠', titleKey: 'symAngle', before: '∠' },
   { label: '°', titleKey: 'symDeg', before: '°' },
+  /**
+   * #1621 D2 (ADR-AG-215) — 2-D's Greek angle names, in 2-D's order, now that «∢ABC = α», «נסמן ∢DCB = 2α» and
+   * «α = 30» read: a Greek letter is a parameter in `expr.ts`, free until a given pins it.
+   */
+  { label: 'α', titleKey: 'symAlpha', before: 'α' },
+  { label: 'β', titleKey: 'symBeta', before: 'β' },
+  { label: 'γ', titleKey: 'symGamma', before: 'γ' },
+  { label: 'δ', titleKey: 'symDelta', before: 'δ' },
+  { label: 'θ', titleKey: 'symTheta', before: 'θ' },
+  /**
+   * #1621 D3 (ADR-AG-216) — 2-D's `<`, now that analytic reads an ORDER between two measures («AB < BC», «∢ABC < ∢BAC»)
+   * and a bound («AB < 10»). `≤` and `≥` above serve the same sentences, with the boundary admitted.
+   */
+  { label: '<', titleKey: 'symLt', before: '<' },
+  /**
+   * #1621 (ADR-AG-214) — the area notation, in the PR that made it read: select «ABC», press it, get
+   * «S_{ABC}» (2-D's chip, the same wrap). «S_{ABC} = 13» and «S_BDC / S_ODC = 0.8» (corpus 7/4) are «שטח ABC».
+   */
+  { label: 'S_{}', titleKey: 'symArea', before: 'S_{', after: '}' },
 ];

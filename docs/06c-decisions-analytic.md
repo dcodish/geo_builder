@@ -9753,3 +9753,264 @@ Measured on 4b2608ab with a sweep through `decideSubmit`. The integrator's hypot
 **Locks** (+2, now 15 in all): every diameter spelling × the sentence and its plural, with no `reusedId`; the unnamed-circle diameters × two spellings. Both fail on 4b2608ab (2 of 2).
 
 **Open for the operator.** «AC קוטר» (unnamed circle) followed by «המשיק בנקודה A והמשיק בנקודה C **למעגל O** נפגשים בנקודה D» records. «למעגל O» states a *second* circle O through A and C (ADR-AG-210, and the #1673 ruling that an unlabelled centre never answers to «O»), and the tangents to that circle meet. 2-D reads O as the one circle and refuses the sentence as parallel. Left as built and not locked: the question is on the round report.
+
+## ADR-AG-215 — An angle named by a Greek letter is a free parameter; tan and cos are measures of the angle (#1621 D2)
+
+**Status:** accepted · 2026-10-03 · slice D stream D2 of the V4 plan (#1616). Rulings applied, none asked:
+- operator 2026-10-01 on #1621: *tan of an angle is in scope — a new measure kind*; sin/cos follow *if the corpus or a student needs them*;
+- 2026-10-02: the analytic tool gives 2-D's experience for plane geometry;
+- ADR-052: every unstated magnitude is a free DOF.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R151. · **Design:** [04c](04c-design-analytic.md) "A Greek angle name is a parameter; tan and cos are measures of the angle".
+
+**Context.** Three corpus 471 questions stopped one line short.
+
+| question | line | reading before |
+|---|---|---|
+| 1/4 | «נסמן ∢DCB = 2α» | not-handled |
+| 3/4 | «נסמן: זווית ADB = α» | not-handled |
+| 9/4 | «tan∢BAO = 2» | not-handled |
+
+The bare «∢ABC = α» was `bad-equation`, because `expr.ts` read Latin symbols only.
+
+2-D was measured through `decideDeterministic2D`:
+- «נסמן ∢DCB = 2α» and «∢ABC = α» commit `measure-angle` with the variable — the figure's angle, labelled.
+- «α = 30» commits `set-var`; «α = 200» after the alias is refused (the angle sum).
+- Every trigonometric given — `tan∢ABC = 2`, `tg`, `tan(…)`, «טנגנס», `cos∢ACB = 3/4`, «קוסינוס», `sin` — commits a `set-angle` of the leading integer IN DEGREES (2°, 3°). That is a wrong figure drawn green. It is filed as **#1698** (P1, 2d), not ported.
+
+**Decision.**
+1. **A Greek letter is a parameter.**
+   - `expr.ts` admits one lowercase Greek letter (π excepted — the constant) beside the Latin ones.
+   - «∢ABC = α» is the existing `angle` row with a symbolic value. The register makes α a free DOF from the constraint's own expression (#1343). Free until pinned, as ADR-052 requires, and the triangle stays as free as 2-D's.
+   - Greek and Latin are distinct code points (`a` ≠ `α`). The tool's own symbols are `θ_<id>`, never one character, so they cannot collide.
+2. **The sampler reads the range the use implies** (`impliedRange`, sampling only).
+   - Unbounded sampling drew a free α at 1°–4°.
+   - A symbol a stated angle holds linearly is sampled inside 0°–180° (a cosine inside −1…1).
+   - It is not a declaration and never reaches `paramRegister`: no panel text, no root filter.
+3. **«α = 30» is a constraint**, `param-eq`, solved with the rest. A contradicted pin is `unsatisfiable` on its line, quoting it.
+   - Like every unsatisfiable set in this tree, the faults also name the givens it conflicts with: «∢ABC = 40», «∢ABC = α», «α = 30» faults all three, as «∢ABC = 40» · «∢ABC = 30» faults both.
+   - **Greek only.** «a = 5» and «r=5» keep their standing refusals (parser.test, #1432 am. 1): beside a circle «r=5» means the radius, whose symbol is the circle's, and a fresh-`r` pin would build green and say nothing.
+4. **«נסמן» / «נסמן:» / "let" is a frame lead-in.** The clause after it must parse on its own, so «נסמן את שטח ABCD ב-S» stays unread.
+5. **tan and cos are a `measure` of the `angle` row.** They are not a constraint kind of their own, so refs, identity, the vertex resolver and the ask lane's stated-angle test stay single. Both are one-to-one on the unsigned range:
+   - tan through its sign — positive is acute, negative is obtuse;
+   - cos outright.
+
+   So a value fixes ONE angle, and the orientation stays exactly as free as for a value in degrees. 9/4 lands A = (±3, 0), B = (0, ±6) and reaches more than one reflection across seeds (locked).
+
+   The residuals have no pole:
+   - tan is `sin(θ − atan t)`;
+   - cos is `(cos θ − c)/2`, with no root for |c| > 1, so such a cosine is `unsatisfiable`.
+
+   Spellings: `tan∠`, `tan(∠…)`, `tg`, `tan of angle`, «טנגנס הזווית … הוא», "the tangent of angle …", `cos∠`, «קוסינוס הזווית …», with one letter or three.
+6. **Palette** (ADR-AG-212's rule): α β γ δ θ ship in this change, in 2-D's order, each with a he/en title. Their "still not read" row is removed.
+
+**Not built, said out loud.**
+- **sin.** sin θ = sin(180° − θ), so «sin∢ACB = 1/2» needs a discrete choice (acute/obtuse, cycled like a right-angle seat). That is a second mechanism, so per the ruling ("same mechanism, no extra risk") it is left `not-handled` and locked as unread. No corpus line needs it.
+- **«נסמן זוית BAM כ-A1»** (cat-2d-059) names an angle by a LABEL for later reference — 2-D's `angle-alias`, a display name, not a measure. Analytic has no angle-name references; the gap stays on #1621.
+- **«נסמן את שטח ABCD ב-S»** (cat-2d-072) is the area family. Its gap stays on #1621.
+
+**Measured** (seed 0, `confirmTaught`, this branch):
+- 471 corpus **254/263 lines, 38/46 questions** — from 251/35;
+- 1/4, 3/4 and 9/4 now land whole.
+
+**Parity** (`shell/__tests__/fixtures/geo-input-parity.ts`):
+- Flipped (analytic `#1621` gap removed): `cat-2d-083` «זווית ABC = 2α», `cat-3d-010` «קוסינוס הזווית ACB = 3/4», `pyr-angle-label`, `pyr-angle-label-value`.
+- New rows `alias-*-1621` and `trig-*-1621` (10). 3-D does not read `∢` or a Greek alias on its plane figures, so each carries a 3-D known gap on #1679. The trig rows note #1698: the verdict matches 2-D while 2-D's figure is wrong.
+
+**Locks.** `issue-1621-d2-angle-alias-tan.test.ts`, 18 cases:
+- the alias moves with the seed, inside its range;
+- the pin holds at every seed; contradictions are refused on the pin;
+- Greek and Latin never meet; π stays the constant;
+- every spelling is one statement; tan/cos at several seeds and signs; sin is unread;
+- 1/4, 3/4 and 9/4 typed line by line through `decideSubmit`, to their coordinates.
+
+`symbols-module.test.ts`: five Greek parse proofs, and the α "still not read" row removed. Catalog: seven new He/En entries. **Fails before: 16 of 18** — the two that pass before are the Latin-`a` pin by the figure and the sin refusal, which hold by design.
+
+**Consequences.**
+- `engine/expr.ts`: `SYMBOL_RE`.
+- `engine/solve.ts`: `angle.measure`, `param-eq` (refs, description, residual).
+- `engine/carriers.ts`: `impliedRange`, `narrowedDomain`.
+- `engine/evaluate.ts`: `sampleEnv`.
+- `engine/types.ts`, `engine/apply.ts`: `vertex-angle.rhs.measure`.
+- `parser/parseAnalytic.ts`: `parseAngleMeasure`, `parseParamValue`.
+- `parser/frameAnalytic.ts`: the «נסמן» lead-in.
+- `parser/catalogAnalytic.ts`, `ui/symbols.ts`, `i18n/index.ts`.
+
+Sibling check (docs/17 §1):
+- 2-D is the reference for the alias and the pin, and agrees.
+- 2-D's trig reading is the defect #1698 records.
+- 3-D's known gaps are on #1679.
+
+**Amendment 1 (2026-10-03, found by stream E5 — a stated value vanished).**
+
+- **Symptom.** «α = 50», then «α = 40», both recorded green. A pin was judged only once an angle used the name.
+- **Measured.** `paramRegister` returned `[]` for the two-pin construction.
+  - The pin's SUBJECT was stored as a bare string (`sym: 'α'`), so the register's structural walk over `{ kind: 'sym' }` nodes (`constraintSymbols`, #1343) could not see it.
+  - The value `50` holds no symbol either, so α was never registered and never sampled.
+  - The residual then read `env['α']` as undefined and answered "cannot be judged", which the solve reads as satisfied.
+- **Fix.** The subject is carried as the expression node the walk reads (`sym: { kind: 'sym', name }`). The pinned symbol is therefore registered by the same mechanism as every value — no per-kind list.
+- **Now.** «α = 50 · α = 40» is `unsatisfiable` on the second line, naming it. A consistent pin on an unused alias records and holds its value. «θ = 2β · β = 20 · θ = 50» is refused on the third line.
+- **Sweep, locked.**
+  - Two pins.
+  - A pin, then an angle that uses it.
+  - An angle, then two pins.
+  - An angle, then a repeated pin.
+- **Not covered: a declared domain plus a pin.** A Greek letter cannot be declared today: «0 < α < 90» and «α < 90» are `not-handled`, because the domain rules read Latin letters only. So that combination has no case on this side.
+- **Locks.** Three new cases in `issue-1621-d2-angle-alias-tan.test.ts` (21 in all). **Fails before: 3 of 3.**
+
+## ADR-AG-216 — A coordinate stated about a vertex («הקודקוד A»), and an ORDER between measures read as 2-D's region (#1621 D3)
+
+**Status:** accepted · 2026-10-03 · slice D stream D3 (#1621, the V4 plan #1616). Standing rulings applied: analytic gives the same experience as 2-D for plane geometry (2026-10-02, #1649/#1669 — 2-D's verdict measured through `decideDeterministic2D` for every sentence below); every unstated magnitude is a free DOF (ADR-052); no stated given may vanish; the palette chip ships with its notation (#1696, ADR-AG-212).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R152. · **Design:** [04c](04c-design-analytic.md) "An order between measures".
+
+**Context.** Measured on the slice-C branch (5dab4a4a), two classes of sentence failed.
+
+1. **A coordinate stated about a vertex.** «שיעור ה-y של הקודקוד A הוא 10» (471 corpus 14/4), «שיעור ה-y של הקודקוד B קטן מ-6» (13/4) and «שיעור ה-y של הקודקוד D קטן מ-9 (ראו סרטוט)» (23/4) were `not-handled`, while the same sentences with «הנקודה» built. The root cause is a noun gate spelled twice. The shared subject token `HE_POINT` spelled the vertex «קדקוד» (defective) and missed the exam's «קודקוד» (plene). The coordinate rules (`HE_COORD`, `HE_RHS_COORD`, `COMPONENT_HE`) and two other point-subject rules (`BISECTORS_MEET_HE`, `PERP_FOOT_HE`) did not use the token at all; they spelled «ה?נקודה» inline. This is the drift `HE_POINT`'s own docblock warns about.
+2. **An order between two measures, or a measure and a bound.** On analytic these were all `not-handled` or `bad-equation` (#1696's held `<` chip). 2-D reads each one:
+
+| sentence | 2-D (measured) | analytic before | analytic now |
+|---|---|---|---|
+| «AB < BC», «AB קטן מ-BC», «DC > AB» | builds (`set-length-order`, draws both segments) | not-handled | builds |
+| «AB ≤ 10», «AB ≥ 10», «AB לפחות 3» | builds (`set-length-bound`, strictness kept, #1265) | not-handled | builds |
+| «∢ABC ≤ 40°», «∢ABC > 90°», «20 < ∢ABC < 60», «זווית ABC גדולה מ-40» | builds (`set-angle-bound`) | bad-equation | builds |
+| «זווית ABC קהה», «זווית ABC חדה», "angle ABC is obtuse" | builds (`set-angle-acuteness`) | not-handled | builds |
+| «AB < BC» / «זווית ABC קהה» with no figure | builds (mints the letters) | not-handled | builds (mints, ADR-AG-210) |
+| «AB = 5», «BC = 7», «AB > BC» | refused (conflict) | not-handled | refused (`unsatisfiable`) |
+| «∢ABC < ∢BAC» | **not-handled** (2-D orders only named variables and segments) | bad-equation | builds (see the 2-D gap below) |
+| «AB < ∢ABC» | not-handled | bad-equation | refused (`bad-operand`: two kinds of thing) |
+
+2-D treats every one of these as a REGION. ADR-039 / ADR-390 / ADR-108 say that a bound "removes no DOF". The measure stays free and is sampled inside the region, and a determined figure outside the region is a conflict.
+
+**Decision.**
+
+1. **One token, both spellings.** `HE_POINT` reads `קו?דקוד`. Every point-subject rule that spelled «ה?נקודה» inline now uses `HE_POINT`: the coordinate value, the comparison and its right-hand side, the bisector meet, and the perpendicular foot. The free-point declaration's own alternation gains the plene spelling too. The value still lowers to the shipped `coord` constraint, and the comparison to the shipped `coord-compare` selector (ADR-AG-005 D7: a strict comparison is a SELECTOR, not a constraint). English keeps its single `point` noun, as the catalog's #1127 note records.
+2. **An order is a `sign` selector over a new `Quantity` member, `order {left, right}`.** Each side (`OrderSide`) is one of three things:
+   - a length expression, read by `parseLengthExpr` (segments and areas, so «הצלע AB», «|AB|», a role noun and «שטח המשולש ABC» read as they do in «AB = …»);
+   - a three-letter angle, in degrees;
+   - a value.
+
+   `positive` says the left side is the larger. The new `closed` flag admits the boundary for ≤ / ≥ / «לפחות» / «לכל היותר»; the word forms are strict, as in 2-D. Acuteness is the order against 90°, strict. A window («20 < ∢ABC < 60») is two orders. The member is the one `Quantity`'s docblock reserved for "a length, an area": the class "an inequality about a derived quantity" keeps one home and does not become a fourth selector kind. The rule, `parseOrder`, runs right after the coordinate comparison, so the parameter domains («a > 0», «0 < k < 6») and «x_B > x_D» keep their readings. Three kinds of side are declined and fall through to the existing rules: a lone vertex («∢B > 40», resolved only at M1), a point-to-line distance (its line name only M1 resolves, and an order that judged nothing would vanish), and a «פי» ratio (still `length-eq` through `asEquation`).
+3. **Judged inside validity.** `orderQuantity` (`evaluate.ts`) measures each side with the function its equality twin uses: `evalLengthExpr` for the `length-eq` residual, `angleAt` for the `angle` residual. A difference within `SOLVE_RESOLUTION` of zero, relative to the two sides, is on the boundary. So «AB < BC» on AB = BC = 5 is refused, and «AB ≤ BC» there holds. The selector never moves a determined figure: it only filters. When no configuration of a figure satisfies the order, `derive` refuses it on the sentence (ADR-AG-197).
+4. **…and SEEDED into its region** (`seedOrder`, the #1071 lesson for a measure). Sample-and-reject is the wrong mechanism for a region. Measured before this step:
+   - a free triangle with «∢ABC ≥ 150°» was refused at seeds 0–2, although seed 3 drew it. That is a satisfiable figure refused;
+   - «AB ≥ 10» drew the same single configuration at all eight seeds.
+
+   So where the seed put the measure on the wrong side, one free end of the length slides along its segment, or one free ray of the angle turns about the vertex. It moves to a value `u` of the way into the region, where `u` ∈ [0.15, 0.65] is varied by the seed and is relative to the bound. It therefore states no magnitude, and «הציגו תצורה אחרת» still moves the figure. This is a start, never a verdict: the judge keeps the last word.
+5. **A bare order mints its letters** (`mintedByReference`, ADR-AG-210). 2-D draws «AB < BC»'s segments, «AB ≤ 10»'s segment and «זווית ABC קהה»'s arms, so it adds their letters. The order's plain lengths and angles are now a minting form. «2AB < CD» is not, as «AB = 2CD» is not.
+6. **The `<` chip** joins the palette (`symLt`, he «קטן מ», en "less than"). Its proof is «AB < BC» on «משולש ABC», and its held row is removed. `≤` and `≥` already serve the same sentences with the boundary admitted.
+
+**Not built, and why.**
+- **«D מעל A», «C מימין ל-B»** (the transcriber's parenthesis in 6/5 «A ו-D על ציר ה-y (D מעל A), B ו-C על ציר ה-x (C מימין ל-B)») stay `not-handled`. 2-D refuses screen-orientation words as non-givens (`input.scope.orientation`, which «C מימין ל-B» answers) or escalates them («D מעל A»). On analytic's pinned frame the words would be the selectors `y_D > y_A` and `x_C > x_B`, but that reading contradicts 2-D's stated ruling and is a new question. It is put to the operator in the stream report, not guessed. The line stays honestly not-handled; corpus471.json is untouched.
+- **«משולש קהה זווית ABC»** (and «משולש ABC קהה זווית») stays `not-handled`, as in 2-D. Unlike «חד זוויות», which states all three angles, it does not say WHICH angle is obtuse. It is a choice over three regions, and needs its own decision line.
+- **The 2-D gap:** «∢ABC < ∢BAC» builds here and escalates in 2-D. It is a known-gap row for 2-D under #1677, because 2-D's equality twin «∢ABC = ∢BAC» builds there. Also for 2-D: 2-D's `lengthOrder` drops the ≤ strictness that its `measureBound` keeps (#1265), so «AB = 5 · BC = 5 · AB ≤ BC» is a conflict in 2-D and builds here. That one is reported, not filed.
+
+**Locks.** `src-analytic/__tests__/issue-1621-d3-coordinates-order.test.ts` (34). It covers:
+- the vertex sentence equal to its «הנקודה» twin, and the comparison a selector;
+- 14/4, 13/4 and 23/4 at their printed coordinates at six seeds. 13/4's other comparison picks the other root, B(0,8);
+- eleven spellings, each lowering to an order selector and never to a constraint, and the window as two selectors;
+- strict versus closed at the boundary;
+- no constraint added;
+- a determined figure's positions identical with and without a holding order, and three contradicted orders refused;
+- ten free figures drawn inside their region at every seed, still varying (≥ 3 distinct configurations): «AB ≥ 10», «AB ≤ 1», «∢ABC ≥ 150°», «∢ABC ≤ 10°», «∢ABC < ∢BAC», the bare «AB < BC» and others;
+- the mixed-kind refusal, the submit path, and the neighbours' readings («a > 0», «0 < k < 6», «x_B > x_D», «… גדול פי 2 מ…»).
+
+**Fails before: 33 of 34.** The only one that passes before is the neighbours guard.
+
+Other locks touched:
+- The parity rows (`shell/__tests__/fixtures/geo-input-parity.ts`). Analytic's known gap is dropped from cat-2d-088 (#1621) and from cat-2d-085, cat-2d-086, cat-2d-087, pyr-angle-between and pyr-angle-greater. Those five were filed under #1622, but they are this mechanism, and they flipped. Eleven order rows are added: 3-D's gap on each is #1679, and 2-D's on the angle–angle row is #1677. Two X6 exception rows are added for the vertex spellings.
+- Seven catalog rows, He and En.
+- The palette lock.
+- The 471 ratchet measures **254/263 lines · 38/46 questions** (from 251 · 35): 13/4, 14/4 and 23/4 fully land.
+## ADR-AG-214 — The ratio of two measures and the area notation S_{…} are givens: one `length-eq`, no new solver (#1621 slice D, stream D1)
+
+**Status:** accepted · 2026-10-03.
+- #1621's fix plan: area and length ratios lower onto the existing measures in `engine/lengths.ts`, with no new solver.
+- The palette comment on #1621 (#1696): the `S_{}` chip ships with its notation.
+- The standing ruling (2026-10-02, #1649/#1669): analytic gives 2-D's experience for plane geometry. 2-D's verdicts were measured, and they are the reference wherever 2-D reads the sentence.
+- Branch `feat/1621-d1-ratios-areas` off `feat/1620-construction-vocabulary` @ 5dab4a4a.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R150 (new); R11a's palette set amended (`S_{}`). · **Design:** [04c](04c-design-analytic.md) — new section "Measures as givens: the ratio of two measures and the area notation". · **LADDER stage:**
+- Parse only: `orthography` (the notation), `asEquation` (the prose ratio), `AREA_EN` / `AREA_TOKEN` (English area words).
+- No M1, fold or solver change.
+
+**Cites:**
+- [ADR-AG-122](#adr-ag-122) / [ADR-AG-212](#adr-ag-212): a chip ships with its notation.
+- The `length-eq` measure layer (#1050, #1075): areas as terms, and comparisons rewritten into equations.
+- #1128: a notation is rewritten into its worded synonym.
+- #1124: the colon ratio and the divider.
+
+**Context — measured on 5dab4a4a.** 2-D was measured through `decideDeterministic2D`; analytic through `decideSubmit` / `derive(confirmTaught(…))`.
+
+| sentence | 2-D | analytic before | analytic after |
+|---|---|---|---|
+| «היחס בין שטח המשולש AOB לשטח הטרפז ADCB הוא 4:5» (6/5) | not-handled (it reads «הוא 4»; its honesty gate escalates the dropped 5) | not-handled | builds |
+| «S_BDC / S_ODC = 0.8» (7/4), «S_{ABD} / S_{ADC} = 0.8» | builds (`set-area-ratio`) | not-handled | builds |
+| «S_{ABC} = 13», «S_ABC = 13» | builds | not-handled | builds |
+| «שטח המשולש OCF גדול פי 4 משטח המשולש AOE» (20/4) | builds | builds | builds |
+| «ידוע כי שטח המשולש ABD שווה ל-45» (18/4) | refused (`split-statements`) | builds | builds |
+| «DO/DE = 2/3» (16/5), «CD/OB = 5/2» (17/4) | builds (`set-ratio`) | builds | builds |
+| «S_{ABD} / S_{ABC} = 2» (a part twice its whole) | refused (cannot place D) | not-handled | refused `unsatisfiable`, naming the line |
+| «S_{XYZ} / S_{ABC} = 2» | refused (unknown point) | not-handled | refused `unknown-reference` «X» |
+| «the area of triangle ABC is 45» | — | not-handled | builds |
+
+The 16/5, 17/4, 18/4 and 20/4 lines already landed after slice C. This ADR locks each of them to its printed coordinates.
+
+**Decision.**
+1. **`S_{ABC}` / `S_ABC` is «שטח ABC».**
+   - `areaNotation` (`engine/lengths.ts`) rewrites the notation into the worded phrase. It runs in `orthography`, so every rule reads one spelling, and in `readLength`, so the ask lane reads it too.
+   - Only a run of three or more vertex names is rewritten. `S_1` and `S_A` are names and are left alone.
+   - The same pattern as `d_{AB}` (#1128): a spelling can never disagree with its synonym.
+2. **«היחס בין X ל-Y הוא v» is an equation over two measures.**
+   - `ratioAsEquation` (first in `asEquation`): `p:q` gives `q·X = p·Y`; any other value `r` gives `X = r·Y`. X and Y may be areas, lengths or distances, of any polygon.
+   - The join is found by the MEASURES. Hebrew glues «ל» to the second measure («לשטח»), and a distance contains its own «ל» («המרחק מ-P לישר AB»). So every candidate join is tried, and the first split where both sides parse through `parseLengthExpr` is taken.
+   - The English twin is "the ratio of X to Y is v".
+   - The divider «היחס בין AC ל-CB הוא 3:2» is unchanged: `parseDividesInRatio` reads it first.
+3. **English area words.**
+   - `AREA_EN` was case-insensitive, so its noun `[a-z]+` also matched the vertex run. «the area of triangle ABC is 45» read the noun «triangle ABC», found no such shape, and was not-handled. Every English area value with vertices failed this way (measured).
+   - A noun word is now a letter followed by lowercase letters.
+   - `AREA_TOKEN` consumes the article in «the area of …», so "the" is never multiplied as t·h·e (the #1321 trap).
+4. **The `S_{}` chip** joins the palette: select «ABC», press it, get «S_{ABC}». Its proof is in `symbols-module.test.ts`, and its row is removed from the held list.
+5. **Refusals come from the existing paths.**
+   - A ratio that cannot hold is `unsatisfiable`, naming the line.
+   - A region with a missing vertex is `unknown-reference`, naming the vertex.
+
+**Corpus (471 ratchet, `confirmTaught`, seed 0): 251/263 lines · 35/46 questions — unchanged in count, two lines moved.**
+- **6/5 line 3** (the area ratio) now lands. 6/5 does not land whole: line 2 «A ו-D על ציר ה-y (D מעל A), B ו-C על ציר ה-x (C מימין ל-B)» carries the position words «מעל» / «מימין ל-», which are stream D3's.
+  - With them written as the component order they mean (`y_D > y_A`, `x_C > x_B`), the question draws A(0,6), D(0,9), B(4,0), C(6,0) at every seed: the printed answer.
+  - Without the order, the ratio holds on the mirror figure (|OB| = 4, |OD| = 9).
+- **7/4 line 4 «S_BDC / S_ODC = 0.8» is now READ and is refused `unsatisfiable`.**
+  - The exam prints it this way (booklet p. 49). But D is the foot of the altitude OD on BC, so B, D and C are collinear and S_BDC = 0 in every figure. The refusal is the honest verdict.
+  - With the similar-triangle reading «S_BEC / S_ODC = 0.8» (part ג proves BEC ~ ODC), the figure lands at B(6,8) or B(14,−8). That case is locked as the notation test on 7/4's own figure, but it is NOT substituted for the printed line. See the question in the stream report.
+  - As a side effect, in the batch `derive` the solver's compromise also leaves line 0's altitude constraints unsatisfied, so the ratchet counts line 0 as failing too. The submit path, which is what a student meets, refuses only line 4. Lines 0–3 record.
+  - This is the attribution class of #902: an impossible given blames an earlier, innocent line. The behaviour is pre-existing, in `derive`'s unsatisfied-blame loop, and is not changed here.
+
+**Parity (#1649).**
+- No #1621 analytic row is a ratio or area sentence except `cat-2d-072` «נסמן את שטח ABCD ב-S». That row is the «נסמן» naming mechanism (stream D2) and is left to it.
+- Seven new rows:
+  - `area-ratio-prose-1621` and `area-value-equals-1621`: builds. Known gaps: 2-D #1677, 3-D #1679.
+  - `area-ratio-notation-1621` (X9), `length-ratio-slash-1621` (X9): builds.
+  - `area-notation-value-1621`: builds. Known gap: 3-D #1679.
+  - `area-ratio-impossible-1621` (X9): refused.
+  - `area-ratio-no-region-1621`: refused. Known gap: 3-D #1679.
+- New catalog entries (F20, He and En): the prose area ratio, `S_{ABD} / S_{ADC} = 0.8`, `S_{ABC} = 13`, «שטח המשולש ABC שווה ל-45», `BD/DC = 2/3`.
+
+**Not built, said out loud.**
+- The colon form between two AREAS («S_ABD : S_ADC = 4:5») stays not-handled, as in 2-D. The colon ratio is a segment form (#1124).
+- 2-D's compact `SABC` is not read. In analytic it collides with a four-letter polygon S·A·B·C.
+- «היחס בין AB ל-AC הוא 2:3» on a triangle is still read as a DIVIDER (A between B and C), as before. That is `parseDividesInRatio`'s shared-letter rule, not changed here.
+- Measured, not fixed (pre-existing): «D על BC» after «משולש ABC» draws the SAME figure at every seed. This is the #1687 neighbourhood. So the free-DOF lock here uses a quadrilateral.
+
+**Locks.** `issue-1621-ratios-areas.test.ts` (27). Each calls `derive` / `decideSubmit` / `confirmTaught` / `parseLine` / `ask` and measures the stated ratio off the drawn figure by the shoelace, at 8 seeds:
+- notation identity with «שטח ABC = 13»;
+- the ask lane answering «S_{ABC}»;
+- seven ratio spellings, Hebrew and English;
+- the triangle-to-quadrilateral ratio;
+- the measure-driven join on a distance ratio;
+- slash = colon for lengths;
+- English area values;
+- free DOFs stay free;
+- the two refusals;
+- the corpus line by line: 6/5, 7/4 (refusal and notation), 16/5, 17/4, 18/4, 20/4.
+
+`symbols-module.test.ts`: the `S_{}` proof (totality-guarded), and its held row removed. Parity: the seven rows. **Fails before: 21 of 27.** The six that already passed are the four corpus questions that landed after slice C, the length ratio by «/», and the subscripted-name guard.

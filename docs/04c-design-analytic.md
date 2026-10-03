@@ -1067,6 +1067,35 @@ seeded positions are SWAPPED. After the solve, a converged solution with the pai
 swapped restart (`swappedStarts`) beside the deflation restarts of ADR-AG-159 — the kite's B and D are
 interchangeable roots, so the swap is one polish away. The post-hoc judge keeps the last word.
 
+### An order between measures ([ADR-AG-216](06c-decisions-analytic.md#adr-ag-216), #1621 D3)
+
+**The data.** «AB < BC», «AB ≤ 10», «∢ABC < ∢BAC», «זווית ABC קהה» lower to `sign {q: {k: 'order', left, right}, positive, closed?}`, a selector (D7 kind 2) over `left − right`.
+- Each side is an `OrderSide`: a `length` (`LengthExpr`, with segments and areas only), a three-letter `angle` (in degrees), or a `value`.
+- `positive` means the left side is the larger.
+- `closed` admits zero (≤ ≥ «לפחות» «לכל היותר»).
+- Acuteness is the order against 90°.
+- A window is two orders.
+
+**The parser.** `parseOrder` (`parseAnalytic.ts`) runs right after `parseCompare`.
+- It reads the symbolic operators, the Hebrew «גדול/קטן מ-» and «לפחות/לכל היותר», and the English "greater/less/longer/shorter than" and "at least/at most".
+- Each side goes through the length reader with role nouns (`lengthRoles`), so it means what it means in «AB = …».
+- It declines a lone vertex, a point-to-line distance, two values, and «פי».
+- It refuses a length beside an angle (`bad-operand`).
+
+**The judge.** `orderQuantity` (`evaluate.ts`) measures each side with the `length-eq` and `angle` residuals' own readers (`evalLengthExpr`, `angleAt`). A difference within `SOLVE_RESOLUTION`·max(1, |l|, |r|) of zero is on the boundary. `signHolds` is the one test the judge and the seeding share.
+
+**The seeding.** `seedOrder` runs after the coordinate-compare seeding. Where the seeded start violates the order, it moves one free point of the first side that has one:
+- a single length's free end slides along the segment;
+- an angle's free ray turns about the vertex, keeping its length and its side.
+
+The point moves to a value a seed-varied fraction `u ∈ [0.15, 0.65]` into the region, relative to the other side. The judge keeps the last word.
+
+**Minting.** `mintedByReference` treats an order whose sides are plain lengths, angles or values as a minting form (`orderMints`), as its equality twin is.
+
+**Apply.** The selector's refs are every point either side measures (`lengthRefs`, the angle's three letters).
+
+**`HE_POINT`.** The subject token reads `ה?(?:נקוד(?:ה|ות)|קו?דקוד)`. The coordinate rules (`HE_COORD`, `HE_RHS_COORD`, `COMPONENT_HE`), `BISECTORS_MEET_HE` and `PERP_FOOT_HE` use it instead of an inline «ה?נקודה».
+
 ## Born after the chassis
 
 This is the **first builder created after `shell/` existed**, and the difference shows in what it did
@@ -2193,3 +2222,22 @@ The missing points are added as `free` objects and the line's facts are re-appli
 **The open-bound floor keeps the sampled scale.** `openBoundFloor(at, env, syms, sampled)` is `SOLVE_RESOLUTION × max(figureScale(at, env, syms), sampled)`. Stage two's `admissible` passes the scale of the seeded start (`figureScale` of the seeded positions and sampled parameters). A descent that shrinks the whole figure toward a point therefore meets the bound at the start's scale, not at its own vanishing span. The other callers (`fitCreatedShapes`) pass nothing and judge as before.
 
 **Amendment 1 (ADR-AG-213).** `evaluate` measures a whole-figure collapse after the solve. When `figureScale(solved) < SOLVE_RESOLUTION × figureScale(sampled)` (the sample is `sampledEnv` and `seeded`), and the figure keeps freedom (`figureDofOf` > 0), the last constraint is reported unsatisfied. This covers the vertex-only collapse that no parameter floor sees. `submit.ts`'s `subjectIdsOf` skips a tangent's touch-point `declare`, so the #1423 letter hint does not fire on a tangent sentence.
+
+## A Greek angle name is a parameter; tan and cos are measures of the angle ([ADR-AG-215](06c-decisions-analytic.md#adr-ag-215), #1621)
+
+- **The alias is a symbol.** `expr.ts`'s `SYMBOL_RE` admits one lowercase Greek letter beside the Latin ones, π excepted: π is the constant. «∢ABC = α» lowers to the existing `angle` row with `value: α`, and the register (`paramRegister`, #1343) makes α a free DOF from the constraint's own expression. 2-D labels the measured angle instead (`measure-angle` with a variable). The freedom is the same: an alias on a free figure leaves it exactly as free.
+- **The sampler reads the range a use implies.** `carriers.ts` `impliedRange` reads the stated `angle` rows that hold a symbol LINEARLY (tested numerically, three evaluations — no CAS). In degrees that is 0°–180°, as a cosine −1…1. `sampleEnv` narrows the stated domain by it (`narrowedDomain`). It is never a declaration: `paramRegister`'s domains filter a pin's roots and print in the panel, and this range adds nothing a root does not already satisfy. Without it a free α was sampled at 1°–4°.
+- **The pin is a constraint.** «α = 30» is `param-eq` (`solve.ts`): residual `(env[sym] − value)`, relative to the value, no point refs. It is solved with everything else, so a contradiction is `unsatisfiable` on its line, never a re-reading. The parse rule (`parseParamValue`) admits a Greek symbol only. A Latin pin keeps its standing refusal (#1432 «r=5», parser.test «a = 5»).
+- **tan and cos ride the `angle` row** as `measure?: 'tan' | 'cos'`. One row keeps refs, identity (`canonicalConstraint`), the ask lane's "stated angle" test and the vertex resolver (`vertex-angle.rhs.measure`) single. The residuals have no pole and one root on 0°–π:
+  - tan: `(sin θ − t·cos θ)/√(1+t²)` = sin(θ − atan t), the slope row's `dy = m·dx` choice;
+  - cos: `(cos θ − c)/2`, with no root when |c| > 1.
+  - sin has two roots there (θ and π − θ), a discrete choice this row does not carry, so it is not parsed.
+- **«נסמן» is a frame lead-in** (`frameAnalytic` `UNWRAP`), like «נתון:». The clause after it must parse on its own, so «נסמן את שטח ABCD ב-S» stays unread.
+## Measures as givens: the ratio of two measures and the area notation ([ADR-AG-214](06c-decisions-analytic.md#adr-ag-214), #1621)
+
+No new constraint kind and no new solver: every form lowers to the `length-eq` that «AB = 10», «AB = AC» and «שטח ABC גדול פי 3 משטח CEF» already use (`engine/lengths.ts`).
+
+- **The area notation is a rewrite.** `areaNotation` (`engine/lengths.ts`) turns `S_{ABC}` and `S_ABC` (three or more vertex names) into «שטח ABC». It runs in two places, both calling the one function: `orthography` (`parser/frameAnalytic.ts`), so every rule reads «S_{ABC} = 13» as «שטח ABC = 13»; and `readLength`, so the ask lane, which hands a bare measure to `parseLengthExpr`, reads it too. This is the `d_{AB}` → «המרחק בין A ל-B» pattern (#1128).
+- **The prose ratio is a rewrite into an equation.** `ratioAsEquation` (`parser/parseAnalytic.ts`, called first by `asEquation`) reads «היחס בין X ל-Y הוא v» and "the ratio of X to Y is v". It tries every join («לבין», «ובין», «ל-», «ל», "to", "and") and takes the first split where both sides parse as measures through `parseLengthExpr`. A value `p:q` becomes `q·X = p·Y`; any other value `r` becomes `X = r·Y`. The divider spelling «היחס בין AC ל-CB הוא 3:2» is `parseDividesInRatio`'s and is read earlier.
+- **English area words.** `AREA_EN` is no longer case-insensitive: a noun word is a letter followed by lowercase letters, so it cannot swallow the vertex run. `AREA_TOKEN` consumes "the" in front of "area of", so the article is never read as symbols.
+- **Refusals come from the existing paths.** A ratio that cannot hold is `unsatisfiable` on its line (the submit gate and `derive`). A region whose vertex is missing is `unknown-reference` naming the vertex (`apply`'s reference check).
