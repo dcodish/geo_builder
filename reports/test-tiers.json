@@ -13,7 +13,6 @@
     "src-analytic/__tests__/issue-1473-perf-budget.test.ts",
     "src-analytic/__tests__/issue-1473-pool-invariant.test.ts",
     "src-analytic/__tests__/issue-1556-freerank-equality-rows.test.ts",
-    "src-analytic/__tests__/issue-1619-b2-inscribed.test.ts",
     "src-analytic/__tests__/issue-1620-tangents-meet.test.ts",
     "src-analytic/__tests__/issue-1621-ratios-areas.test.ts",
     "src-analytic/__tests__/issue-1637-g1-knowledge.test.ts",
@@ -62,7 +61,6 @@
     "src3d/__tests__/exam-2026-2.test.ts",
     "src3d/__tests__/fixtures3.test.ts",
     "src3d/__tests__/issue-1311-free-pair-length-drive.test.ts",
-    "src3d/__tests__/issue-1476-dihedral-construction.test.ts",
     "src3d/__tests__/issue-1498-frame-and-carrier-drive.test.ts",
     "src3d/__tests__/issue-1499-perp-from-in-plane-point.test.ts",
     "src3d/__tests__/issue-1506-two-configurations.test.ts",
@@ -80,7 +78,6 @@
     "src3d/__tests__/named-parametric-line.test.ts",
     "src3d/__tests__/queries.test.ts",
     "src3d/__tests__/right-apex.test.ts",
-    "src3d/__tests__/scenarios3.test.ts",
     "src3d/__tests__/symbol-pin-collapse.test.ts",
     "src3d/__tests__/v7-t2.test.ts"
   ]
