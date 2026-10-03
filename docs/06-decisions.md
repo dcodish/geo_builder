@@ -13892,3 +13892,54 @@ The humanizer already strips id prefixes (`bis-CAB` → `CAB`), so what a studen
 - `src/app/decideDeterministic.ts`: `missingOperandLetters` and the refusal arm. `src/i18n/locales/{he,en}.json`: `input.missingOperands`, `input.unresolvedSentence`.
 
 **Behaviour change for a student:** on an empty page, «AD תיכון במשולש ABC» and «AD חוצה זווית במשולש ABC» now draw the triangle with the median or bisector, as «AD גובה במשולש ABC» already did. A line whose points are not in the figure yet («AD תיכון לצלע BC» on an empty page) is now refused with a note that quotes the line and names the missing points, instead of an internal message.
+
+## ADR-569 — Lines a sentence names by letters are read as named, and «אלכסון» is a role noun in every sentence (#1683)
+
+**Status:** accepted · 2026-10-03 · bug (P1, the honesty class) · round #1721 (operator: *"Fold all into one round"*) · found by the #1620 analytic stream (ADR-AG-208) · branch `fix/1683-diagonal-sides` off `main` @ deed7b20
+
+**Requirements:** [FR-IN-4c](02-requirements.md) extended — the diagonal claim holds in every sentence naming a pair after the noun, and lines named by letters are never replaced by others · **Design:** [04-design.md](04-design.md) § "A role noun is a claim, lowered once" (the `diagonal` row; lines named by letters belong to the rule that reads them) · **LADDER stage:** the parser (`specialPointMeet`, the role-noun registry and its `withRoleClaims` post-pass). The verdict is the existing ADR-499 apply check and verifier; no solver, replay or render change.
+
+**Cites** [ADR-499](#adr-499) (#966: «אלכסון» is a claim — the apply refusal and the verifier), [ADR-563](#adr-563) (#1661: the role-noun registry, lowered once after whichever rule won), [ADR-024](#adr-024), the #71 plural distribution (`pluralSpecialLines`), ADR-AG-208 (analytic's `not-a-diagonal`).
+
+**Context — measured at pickup on deed7b20, through `runSubmit` / `decideDeterministic2D`.** The issue's claim held, and the class was wider than its sketch:
+
+| typed | before |
+| --- | --- |
+| «מרובע ABCD» · «האלכסונים AB ו-CD נפגשים בנקודה E» (also «נחתכים», "the diagonals AB and CD meet at E") | commits `line-line-intersection E` of **AC and BD** — the named sides replaced by the real diagonals |
+| «מרובע ABCD» · «האלכסון AB חותך את CD בנקודה E» | commits plain segments AB, CD and their meet — side AB accepted as a «diagonal» |
+| «מרובע ABCD» · «האלכסון AB» | refused «AB is not a diagonal of ABCD — it is a side» (ADR-499, already right) |
+| «משולש ABC» · «D על BC» · «E על AC» · «התיכונים AD ו-BE נפגשים בנקודה G» | commits the centroid from hidden midpoints; D and E untouched — AD never made a median (same for «הגבהים AD ו-BE …») |
+| «האלכסונים AC ו-BD נפגשים בנקודה E», empty canvas | commits plain segments and the meet; the diagonal claim dropped |
+
+**Class.** *A sentence that names its lines by letters, under a role noun, is lowered to lines the letters do not name, or loses the role's claim* — because (1) `specialPointMeet` derives its two lines from the shape and never read a pair list after the noun (every family), and (2) the diagonal claim lived only in the `segment` / `diagonals` rules' own flag, so any other winner (the meet, the cut, the point-on-carrier rules) dropped it.
+
+**Decision.**
+1. **Lines named by letters belong to the rule that reads them.** `letteredCentreLines` reads a pair list right after the family noun. Diagonals: `specialPointMeet` defers, and the lettered meet rule reads the pairs. Medians, altitudes and angle bisectors: each pair goes through its own rule («AD תיכון», «AD גובה», «AD חוצה זווית»), all or nothing as in #71, and the point is the crossing of the first two lines; a pair its rule cannot read escalates whole. The ⊥-bisector family names sides («של AB ו-BC»), not lines, and keeps the derived form. The unlettered forms («האלכסונים נפגשים», «אלכסוני ABCD», «התיכונים נפגשים») are unchanged.
+2. **«אלכסון» joins the role-noun registry** (`roleNouns.ts`, singular and plural, He/En, predicate order too). `withRoleClaims` lowers it to ADR-499's own claim, `segment {diagonal: true}` — flagging the winner's segment of the pair when it drew one, else adding it. The existing apply check refuses a side named as a diagonal, naming the statement; the verifier judges a pair whose ring arrives later. The construct «אלכסוני» stays out: it is also the internal-tangent adjective («המשיק המשותף האלכסוני»), and «AC ו-BD אלכסוני הריבוע» is the `diagonals` rule's, which already flags its pairs.
+
+**Plan vs mechanism (recorded).** The plan's sketch said that with no ring the named pairs are "read as written". They are — the segments and the meet commit — but now carry the claim, so on an empty canvas the figure shows the same note the singular «האלכסון AC» already shows there («AC is drawn as a diagonal but is not a diagonal of any shape»), until the quad is declared, when it clears (locked). That is FR-IN-4c as written ("accepted and checked against the finished figure"); dropping the claim only when no ring exists would make one sentence mean two things by figure state (docs/17 §2.3).
+
+**Sibling audit.** Grepped every centre-family read in `specialPointMeet` (5 families, 4 read letters now, ⊥-bisector by design not) and every rule that tolerates «אלכסון» before a pair (the meet, cut, unnamed-cut and point-on-carrier rules — all covered by the registry, one lowering). **Analytic:** already refuses (ADR-AG-208). **3-D:** has it, worse — `parse3` commits «האלכסונים AB ו-CD נפגשים בנקודה E» as `E on AB at t = 0.5`, dropping CD and the meet; filed **#1728** (P1, 3d), and the parity row carries it as a known gap.
+
+**Measured after** (`src/app/__tests__/issue-1683-lettered-lines.test.ts`):
+
+| typed | now |
+| --- | --- |
+| «מרובע ABCD» · «האלכסונים AB ו-CD נפגשים בנקודה E» / «… נחתכים …» / "the diagonals AB and CD meet at E" / «האלכסון AB חותך את CD בנקודה E» | refused «AB is not a diagonal of ABCD — it is a side», no paid call |
+| «מרובע ABCD» · «האלכסונים AC ו-AB …» | refused (they meet at A, #1274) |
+| «מרובע ABCD» · «האלכסונים AC ו-BD …» / «BD ו-AC» / English | builds: AC and BD drawn and claimed, E their meet |
+| «מרובע ABCD» · «מרובע ABEF» · «האלכסונים AE ו-BF נפגשים בנקודה K» | builds the named meet |
+| empty · «האלכסונים AC ו-BD נפגשים בנקודה E» | builds with the diagonal note; · «מרובע ABCD» → no violations |
+| «משולש ABC» · «D על BC» · «E על AC» · «התיכונים AD ו-BE נפגשים בנקודה G» | D, E become the midpoints; G is the centroid at seeds 0–3 |
+| «משולש ABC» · «הגבהים AD ו-BE נחתכים בנקודה H» / «חוצי הזווית AD ו-BE נפגשים בנקודה I» | the named feet / bisector points, and their crossing |
+| «האלכסונים נפגשים בנקודה E», «אלכסוני ABCD נפגשים …», «התיכונים נפגשים בנקודה G» | unchanged |
+
+**Unchanged, measured.** The test files that exercise diagonal / centre-meet / role-noun sentences (grep), the lexical ratchet and the four #1649 parity files — 92 files, 2100 tests — green after one lock update — `point-on-carrier.test.ts` asserted «E על האלכסון AC» / "E on diagonal AC" draw a bare carrier ("noun skipped"), i.e. the dropped claim; it now expects the flagged carrier. Decide-parity goldens: one recorded hash changed, `concyclic-flexes-the-rectangle` («CE חותך את האלכסון DB בנקודה F» in a rectangle — DB now carries its true diagonal claim; the scenario stays green), re-recorded; shard 4 gains the new scenario's key. The full suite is the batch gate (round #1721).
+
+**Locks.** `src/app/__tests__/issue-1683-lettered-lines.test.ts` (16, through `decideDeterministic2D` after a gate-driven prefix). **Fails before: 12 of 16**, measured by reverting `parse.ts` and `roleNouns.ts` to deed7b20; the 4 that pass before are controls (the later ring clearing the note, the two-ring meet, the unlettered forms). Scenario `diagonals-named-by-letters-1683` (corpus 4). #1649 parity row `diag-meet-sides-1683` (refused; 3-D known gap #1728).
+
+**Consequences.**
+- `src/parser/roleNouns.ts`: the `diagonal` row.
+- `src/parser/parse.ts`: `letteredCentreLines`; `specialPointMeet` reads lettered lines through their rules; `withRoleClaims` lowers `diagonal`.
+
+**Behaviour change for a student:** in a quadrilateral ABCD, «האלכסונים AB ו-CD נפגשים בנקודה E» is now refused with a note saying AB is a side, not a diagonal, instead of quietly drawing where AC and BD cross. «התיכונים AD ו-BE נפגשים בנקודה G» now makes D and E the midpoints. Typed on an empty page, «האלכסונים AC ו-BD נפגשים בנקודה E» now shows the "not a diagonal of any shape" note until the quadrilateral is declared, as «האלכסון AC» already did.

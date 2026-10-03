@@ -968,6 +968,10 @@ post-passes. It replaced ADR-119's word-presence `withCarrierMembership`. Each o
 - **radius** — the circle whose centre is an end (else the sentence's circle); the other end on it, the centre
   letter promoted if it names an unnamed centre (ADR-342). No circle → `no-circle`; no centre end →
   `no-centre-end`.
+- **diagonal** ([ADR-569](06-decisions.md#adr-569)) — the ADR-499 claim `segment {diagonal: true}`, on the winner's
+  own segment of the pair when it drew one; judged at apply (`diagonalClaimRefusal`) and by the verifier once a
+  ring exists. The construct «אלכסוני» is not in the row: it is also the internal-tangent adjective, and
+  «AC ו-BD אלכסוני הריבוע» is the `diagonals` rule's, which flags its own pairs.
 - **tangent** — no lowering here: a winner that touched no circle read it as a bare segment, so the operand is
   `'unread'` and `runRules` tries the next rule.
 - **hypotenuse / leg / base** — the polygons (declared, or created by the same line) holding the pair as a side,
@@ -980,6 +984,13 @@ post-passes. It replaced ADR-119's word-presence `withCarrierMembership`. Each o
 
 Refusals are `ParseResult` `role-claim` (`why`, the noun as typed, the pair), mapped in
 `decideDeterministic.ts` to `input.roleClaim.<why>`.
+
+**Lines named by letters belong to the rule that reads them** ([ADR-569](06-decisions.md#adr-569)). `specialPointMeet`
+derives a centre's two lines from the shape; when the family noun is followed by a pair list
+(`letteredCentreLines`: «האלכסונים AB ו-CD», «התיכונים AD ו-BE», "the medians AD and BE") it does not derive
+them. Diagonals go to the lettered meet rule (and the registry carries the claim); medians, altitudes and angle
+bisectors are distributed through their own rule («AD תיכון»), all or nothing, and the point is the crossing of
+the first two named lines. The ⊥-bisector family names sides, not lines, and keeps the derived form.
 
 ## A stated side is a requirement record, checked at stage 0g′ ([ADR-549](06-decisions.md#adr-549))
 

@@ -1465,10 +1465,63 @@ const CENTER_FAMILIES = [
   { key: 'diag', n: 4, he: /ה?אלכסונ/, en: /diagonals?/i },
 ] as const;
 
+/**
+ * The pair list a centre-meet sentence names its LINES by, right after the family noun — «האלכסונים AB
+ * ו-CD», «התיכונים AD, BE ו-CF», "the medians AD and BE" (#1683). Null when the noun is not followed by
+ * two or more uppercase pairs («האלכסונים נפגשים», «אלכסוני ABCD», «האנכים האמצעיים של AB ו-BC»).
+ */
+const letteredCentreLines = (s: string, he: RegExp, en: RegExp): [Id, Id][] | null => {
+  const m = s.match(new RegExp(`(?:${he.source})[א-ת]*|(?:${en.source})`, 'i'));
+  if (!m) return null;
+  const pair = new RegExp(String.raw`^\s*(?<![A-Za-z\d])(${ULABEL})\s*(${ULABEL})(?![A-Za-z\d])`);
+  const join = /^\s*(?:,\s*(?:and\s+)?|ו-?\s*|and\s+)/;
+  let rest = s.slice((m.index ?? 0) + m[0].length);
+  const out: [Id, Id][] = [];
+  for (;;) {
+    const p = rest.match(pair);
+    if (!p) break;
+    out.push([p[1], p[2]]);
+    rest = rest.slice(p[0].length);
+    const j = rest.match(join);
+    if (!j) break;
+    rest = rest.slice(j[0].length);
+  }
+  return out.length >= 2 ? out : null;
+};
+
 const specialPointMeet: Rule = (s, ctx) => {
   if (!/מפגש|נפגש|נחתכ|חיתוך|concurren|intersection\s+of|\bmeet\b/i.test(s)) return null; // a MEETING statement
   const fam = CENTER_FAMILIES.find((f) => f.he.test(s) || f.en.test(s));
   if (!fam) return null;
+  /**
+   * #1683 ([ADR-569](../../docs/06-decisions.md#adr-569)) — LINES THE SENTENCE NAMES BY LETTERS ARE THE
+   * STUDENT'S. This rule derives its two lines from the shape and never read a pair list after the noun, so
+   * «האלכסונים AB ו-CD נפגשים בנקודה E» in ABCD drew the meet of AC and BD (the letters replaced by others),
+   * and «התיכונים AD ו-BE נפגשים בנקודה G» with D, E on the sides drew the centroid with D and E untouched
+   * (the claim that AD is a median gone). A named line is read as named:
+   *  - diagonals: the lettered meet rule reads the pairs, and the role-noun registry carries the diagonal
+   *    claim on each — so a side named as a diagonal is refused, naming the statement;
+   *  - medians / altitudes / angle bisectors: each pair goes through its OWN rule («AD תיכון»), all or
+   *    nothing (the #71 distribution), and the point is the crossing of the first two lines. A pair its rule
+   *    cannot read escalates whole — never a partial figure, never the letters swapped for others.
+   * The ⊥-bisector family names SIDES («של AB ו-BC»), not lines, and is not read here.
+   */
+  const lettered = letteredCentreLines(s, fam.he, fam.en);
+  if (lettered && fam.key === 'diag') return null;
+  if (lettered && fam.key !== 'perpbis') {
+    const word = fam.key === 'median' ? 'תיכון' : fam.key === 'altitude' ? 'גובה' : 'חוצה זווית';
+    const [[a, b], [c, d]] = lettered;
+    if (new Set([a, b, c, d]).size < 4) return 'stop'; // two lines from one vertex meet there — not a centre
+    const out: AnyCommand[] = [];
+    for (const [p, q] of lettered) {
+      const r = parse(`${p}${q} ${word}`, ctx);
+      if (!r.ok) return 'stop';
+      out.push(...r.commands);
+    }
+    const at = s.match(new RegExp(String.raw`(?:בנקודה|\bat\b(?:\s+point)?)\s+(${LABEL})\b`, 'i'));
+    const X = at ? up(at[1]) : leadingNamedPoint(s) ?? freeLabel([a, b, c, d, ...(ctx.points ?? [])], ['G', 'H', 'I', 'K']);
+    return [...out, { type: 'line-line-intersection', id: X, a, b, c, d }];
+  }
   // Result label: "… בנקודה X" / "… at X" (after the meet), or "הנקודה X היא …"/"X מפגש …"/"X is the
   // intersection …" (before). Precise so a shape vertex is never mistaken for the result point.
   const after = s.match(/(?:בנקודה|\bat\b(?:\s+point)?)\s+([A-Za-z]\d*)\b/i);
@@ -10443,6 +10496,16 @@ function withRoleClaims(commands: AnyCommand[], s: string, ctx: ParseContext): A
         const through = commands.some((c) => (c.type === 'set-collinear' || c.type === 'set-line') && refsId(c, a) && refsId(c, b) && (refsId(c, ctr) || refsId(c, center)));
         if (!through) add({ type: 'set-collinear', a, b: ctr, c: b });
       }
+      continue;
+    }
+    if (op.role === 'diagonal') {
+      // #1683 (ADR-569): the ADR-499 claim, exactly as «האלכסון AB» states it — checked against the figure's
+      // rings at apply (`diagonalClaimRefusal`) and by the verifier once a ring exists. The winner's own
+      // plain segment of the pair carries the flag rather than gaining a twin.
+      const same = (c: AnyCommand) => c.type === 'segment' && [c.a, c.b].map(up).sort().join() === [a, b].sort().join();
+      const i = commands.findIndex(same);
+      if (i >= 0) commands = commands.map((c, k) => (k === i && c.type === 'segment' ? { ...c, diagonal: true as const } : c));
+      else add({ type: 'segment', a, b, diagonal: true });
       continue;
     }
     if (op.role === 'tangent') {
