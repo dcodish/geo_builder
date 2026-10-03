@@ -317,7 +317,8 @@ export type Fact =
    */
   | (FactBase & { t: 'diagonal-eq'; principal: boolean; eq: Expr })
   /** «נתון מעגל O» — a circle on a centre point, with a radius parameter (#1060). */
-  | (FactBase & { t: 'circle-at'; id: Id; centre: Id; r: Expr })
+  /** `hidden` (#1622 E4, ADR-AG-220): the circle a SECTOR is cut from — it carries the arc's ends, and only the arc is drawn. */
+  | (FactBase & { t: 'circle-at'; id: Id; centre: Id; r: Expr; hidden?: true })
   /**
    * «דרך P עובר ישר מקביל ל AB» — a line through a point, with a copied direction (#1093).
    *
@@ -335,7 +336,28 @@ export type Fact =
    * «מעגל ABD» · «המעגל העובר דרך A, B ו-D» · «נתון מעגל שקוטרו BD» — a circle COMPUTED from points
    * (#1464, #1324, ADR-AG-160). `name` is the student's own name for it, absent for an anonymous one.
    */
-  | (FactBase & { t: 'circle-thru'; id: Id; def: CircleDef; name?: string })
+  /** `hidden` (#1622 E4, ADR-AG-220): the circle a SEMICIRCLE is half of — it carries its points, only the half is drawn. */
+  | (FactBase & { t: 'circle-thru'; id: Id; def: CircleDef; name?: string; hidden?: true })
+  /**
+   * A DRAWN ARC of a circle the figure holds (#1622 E4, ADR-AG-220) — a semicircle, a quarter circle, a sector's
+   * arc. Decoration over objects that exist: the circle carries the points, this says which part of it is drawn.
+   */
+  | (FactBase & { t: 'arc'; id: Id; def: ArcDef })
+  /**
+   * «קשת AB = 40 במעגל O» · «⌢{AC} = 60°» · «קשת DE = 2 קשת CE» · «קשת AC + קשת BE = קשת AD + קשת BC» — an
+   * ARC-MEASURE given (#1622 E4, ADR-AG-220; 2-D's `arcValue` / `arcEquality` / `measureSum`, ADR-116). An arc's
+   * measure IS its central angle, so this is Σ kᵢ·⌢(aᵢbᵢ) = value. WHICH circle is M1's question (the named one —
+   * stated when the figure lacks it, ADR-AG-210 — or the one circle); the arc's ends are ON it.
+   */
+  | (FactBase & { t: 'arc-of'; circle?: string; terms: Array<{ k: Expr; a: Id; b: Id }>; value: Expr })
+  /** «M אמצע הקשת BC במעגל O» (#1622 E4) — the midpoint of the arc BC (the minor one unless «הגדולה»). */
+  | (FactBase & { t: 'arc-mid'; id: Id; a: Id; b: Id; circle?: string; major?: true })
+  /**
+   * «גזרה AOB בזווית 80» · «רבע מעגל» (#1622 E4, ADR-AG-220) — a SECTOR: two radii and the arc between them. With a
+   * centre letter (`v`), the circle on that centre (bound when the figure has it, else stated hidden); with none
+   * (the bare quarter circle), a circle of its own with its centre unnamed. `value` is the central angle.
+   */
+  | (FactBase & { t: 'sector'; v?: Id; a: Id; b: Id; value?: Expr })
   /**
    * «BD קוטר במעגל» — a diameter, stated about a circle that may or may not exist yet (#1324).
    *
@@ -619,7 +641,7 @@ export type GeoObject =
    * It carries NO freedom itself: the centre is a `free` point with its own two degrees, and the
    * radius is an ordinary parameter in the register. Counting it here would count both twice.
    */
-  | { kind: 'circle-at'; id: Id; centre: Id; r: Expr }
+  | { kind: 'circle-at'; id: Id; centre: Id; r: Expr; hidden?: true }
   /**
    * «דרך P עובר ישר מקביל ל AB» — a line CONSTRUCTED through a point, copying a direction (#1093).
    *
@@ -659,7 +681,21 @@ export type GeoObject =
    * Three collinear points, or a diameter whose ends coincide, have no circle: a VACANCY at that
    * configuration, never a circle drawn through a guess.
    */
-  | { kind: 'circle-thru'; id: Id; def: CircleDef; name?: string };
+  | { kind: 'circle-thru'; id: Id; def: CircleDef; name?: string; hidden?: true }
+  /**
+   * A DRAWN ARC (#1622 E4, ADR-AG-220) — which part of a circle the figure draws. No freedom and no expression: its
+   * circle and its ends are objects counted where they live; it only says what is inked.
+   */
+  | { kind: 'arc'; id: Id; def: ArcDef };
+
+/**
+ * WHICH PART OF A CIRCLE AN ARC IS (#1622 E4, ADR-AG-220), from `from` to `to` on `circle`:
+ * - `ccw` — counter-clockwise from `from` to `to` (2-D's semicircle, B → A); with `away`, the half on the far side
+ *   of the chord from that point («מחוץ למשולש ABC»), 2-D's `bulgeRef`; with `toward`, the half on its side («בתוך»).
+ * - `minor` / `major` — the shorter / longer arc between the two ends (a sector, by its angle).
+ * `radii` draws the two bounding radii with it (a sector whose centre has no letter, so no segment can name them).
+ */
+export type ArcDef = { circle: Id; from: Id; to: Id; pick: 'ccw' | 'minor' | 'major'; away?: Id; toward?: Id; radii?: true };
 
 /**
  * How a computed circle is determined (#1464, #1324).
@@ -699,14 +735,15 @@ export const isCurve = (o: GeoObject): o is CurveObject => o.kind === 'curve';
  * was silently treated as naming an object and collided with the point it merely mentions. A
  * positive list gets the new kind wrong in the safe direction: excluded until it says otherwise.
  */
-export type NamingFact = Extract<Fact, { t: 'point' | 'curve' | 'derived' | 'segment' | 'polygon' | 'circle-thru' }>;
+export type NamingFact = Extract<Fact, { t: 'point' | 'curve' | 'derived' | 'segment' | 'polygon' | 'circle-thru' | 'arc' }>;
 export const namesObject = (f: Fact): f is NamingFact =>
   f.t === 'point' ||
   f.t === 'curve' ||
   f.t === 'derived' ||
   f.t === 'segment' ||
   f.t === 'polygon' ||
-  f.t === 'circle-thru';
+  f.t === 'circle-thru' ||
+  f.t === 'arc';
 
 /**
  * The id of the circle «BD קוטר» CREATES (#1324) — one formula for M1, which mints it, and for `derive`, which

@@ -114,6 +114,9 @@ export function carrierOf(o: GeoObject): Carrier | null {
     // A circle COMPUTED from points (#1464, #1324): a closed form of points counted where they live.
     case 'circle-thru':
       return null;
+    // A DRAWN ARC (#1622 E4): which part of a circle is inked — its circle and ends are counted where they live.
+    case 'arc':
+      return null;
     default: {
       const unclassified: never = o;
       throw new Error(`object kind carries no DOF classification: ${JSON.stringify(unclassified)}`);
@@ -153,8 +156,9 @@ export function symbolDeps(o: GeoObject): string[] {
         const sym = freeDirectionSymbol(o.dir);
         return sym === null ? [] : [sym];
       }
-      // Defined by reference alone (#1464): no expression, nothing to register.
+      // Defined by reference alone (#1464): no expression, nothing to register. So is a drawn arc (#1622 E4).
       case 'circle-thru':
+      case 'arc':
         return [];
       default: {
         const unwalked: never = o;
@@ -198,6 +202,9 @@ export function objectDeps(o: GeoObject): Id[] {
     // Its defining points — all placed before the circle can be computed (#1464).
     case 'circle-thru':
       return circleDefPoints(o.def);
+    // Its circle and its ends — and the point it bulges away from (#1622 E4) — all placed before it is drawn.
+    case 'arc':
+      return [o.def.circle, o.def.from, o.def.to, ...[o.def.away, o.def.toward].filter((x): x is Id => x !== undefined)];
     default: {
       const undeclared: never = o;
       throw new Error(`object kind declares no dependencies: ${JSON.stringify(undeclared)}`);

@@ -161,12 +161,12 @@ tree; subscripts are new to this input language.
 then refuses hands the student `not-handled` on their own click, which is worse than no chip —
 #511's rule, and the operator's own framing when ruling the analytic set.
 
-The set: `²` `³` `√()` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}` `⊥` `∥` `∠` `°`
+The set: `²` `³` `√()` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}` `⊥` `∥` `∠` `°` `⌢{}`
 ([ADR-AG-212](06c-decisions-analytic.md#adr-ag-212), [#1696](https://github.com/dcodish/geo_builder/issues/1696):
 the 2-D palette reviewed chip by chip; `√()` wraps a selection as 2-D's does). The 2-D chips still absent
 are absent because their sentences are not read yet — α β γ δ θ, `S_{}` and `<` between measures
-(#1621), `△` `≅` `~` and `⌢{}` (#1622) — and each arrives in that work's own change, because a
-chip is part of shipping a notation rather than a follow-up to it.
+(#1621), `△` `≅` `~` (#1622) — and each arrives in that work's own change, because a
+chip is part of shipping a notation rather than a follow-up to it. `⌢{}` arrived with the arc measures ([ADR-AG-220](06c-decisions-analytic.md#adr-ag-220)).
 
 Mechanically enforced: every entry is driven through the real grammar, with a totality guard so a
 button cannot be added without a proof — and pressing any chip inside a Hebrew sentence must not
@@ -2210,3 +2210,16 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
   - A point that a later line defines is still defined by that line.
   - Still refused, as in 2-D, when the letters are new: «AB = 2CD», «AB:BC = 2:3», «AD גובה לצלע BC».
 - «AB קוטר» · «BO = 5» draws BO with B where it is and O a free point. O is not the centre until the student says so. A later «O מרכז המעגל», «OB רדיוס» or «הרדיוס OB» then moves that same O to the centre; no second point appears.
+
+**R163 — arcs, sectors, semicircles and the diameter from a point build as they do in the 2-D tool**
+([ADR-AG-220](06c-decisions-analytic.md#adr-ag-220), [#1622](https://github.com/dcodish/geo_builder/issues/1622); operator rulings 2026-10-02: analytic gives 2-D's verdict for plane geometry, and the arc rows are ported).
+
+- An arc's measure is its central angle: «קשת AB = 40 במעגל O», «⌢{AC} = 60°», «קשת AC = 60» (the one circle), «קשת DE = 2 קשת CE», «קשת AB שווה לקשת BC», «קשת AC + קשת BE = קשת AD + קשת BC», «קשת AB + קשת CD = 180». The arc's ends are put on the circle. An arc of more than 180° is the circle's other arc. A circle whose centre has no letter works too. An arc whose ends the figure does not have is refused, naming the missing point.
+- «זוית מרכזית COD» draws the radii OC and OD (the middle letter is the centre); «זוית מרכזית COD = 80» also sets the angle.
+- «חצי מעגל שקוטרו AB», «חצי מעגל על צלע AB מחוץ למשולש ABC» (or «בתוך»), «על כל צלע של ריבוע ABCD יש חצי מעגל» draw the half circle over AB and the diameter AB; the full circle is not drawn. A point put «על המעגל» lies on that half's circle, so the angle it sees AB at is 90°.
+- «רבע מעגל» draws a 90° arc with its two radii, and the tool names the ends (A, B — the next free letters); «רבע מעגל OAB» uses the student's letters, O the centre. «גזרה AOB בזווית 80» draws the two radii OA, OB and the 80° arc; with no angle the angle is free and moves with «הציגו תצורה אחרת»; an angle over 180 draws the large arc. A sector cut from a circle the figure already has rides that circle.
+- «M אמצע הקשת BC במעגל O» places M halfway along the small arc BC («הקשת הגדולה» — the large one).
+- «קוטר מנקודה F במעגל O», «קוטר העובר בנקודה A במעגל O» draw the diameter from that point; the tool names the far end (D, or the next free letter). «קוטר» alone names both ends. «קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E» draws the piece from F to E, where the diameter's line meets AC.
+- «מעגל O בקוטר 10» / «מעגל O שקוטרו 10» is the circle with radius 5.
+- The symbol palette has the ⌢{} button: select «AC», press it, get «⌢{AC}».
+- Every sentence above has its English twin («arc AB = 40 in circle O», «semicircle with diameter AB», «quarter circle», «sector AOB with angle 80», «M is the midpoint of arc BC in circle O», «diameter from point F in circle O», «circle O with diameter 10»).

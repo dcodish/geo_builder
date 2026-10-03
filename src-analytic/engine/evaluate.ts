@@ -21,7 +21,7 @@ import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
 import { dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
-import { curveByName, inDomain, isFree, objectById, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type Selector } from './types';
+import { curveByName, inDomain, isFree, objectById, type ArcDef, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type Selector } from './types';
 
 export interface FigurePoint {
   id: Id;
@@ -83,6 +83,21 @@ export interface FigureSegment {
   pinnedLength?: number;
 }
 
+/**
+ * A DRAWN ARC (#1622 E4, ADR-AG-220) — resolved to its circle and its angular extent, so the renderer projects it and
+ * never looks a point up. `start` and `sweep` are in radians in WORLD space (counter-clockwise positive); `radii`
+ * also draws the two bounding radii (a sector whose centre has no letter).
+ */
+export interface FigureArc {
+  id: Id;
+  cx: number;
+  cy: number;
+  r: number;
+  start: number;
+  sweep: number;
+  radii: boolean;
+}
+
 /** A derived point's own construction — what a student would have to draw to find it (#1030).
  *  Computed always and rendered behind a toggle, so `Figure` stays a complete description of the
  *  figure and showing it is purely a display decision. */
@@ -96,6 +111,8 @@ export interface Figure {
   points: FigurePoint[];
   curves: FigureCurve[];
   segments: FigureSegment[];
+  /** The drawn arcs (#1622 E4) — absent on a figure built by hand, read as none. */
+  arcs?: FigureArc[];
   construction: FigureConstruction[];
   /** Objects that do not exist at this parameter value — named, never silently dropped. */
   vacant: Vacancy[];
@@ -1194,6 +1211,43 @@ function cycledPairs(selectors: readonly Selector[], seed: number): Selector[] {
 }
 
 /** The seed this configuration resolved its discrete choices at (#1642) — what the locus walk must resolve them at too. */
+/**
+ * THE ANGULAR EXTENT OF AN ARC (#1622 E4, ADR-AG-220) — the one reading of an `ArcDef`, exported for its locks.
+ * `ccw` runs counter-clockwise from `from` to `to` (2-D's semicircle, B → A); with `away` the half whose middle is
+ * on the far side of the chord from that point (2-D's `bulgeRef`). `minor` / `major` are the shorter / longer way.
+ */
+export function arcOf(
+  id: Id,
+  def: ArcDef,
+  at: (id: Id) => Pt | null,
+  curveAt: (id: Id) => NumCurve | null,
+): FigureArc | null {
+  const circle = curveAt(def.circle);
+  const p = at(def.from);
+  const q = at(def.to);
+  if (!circle || circle.kind !== 'circle' || !p || !q) return null;
+  const { cx, cy, r } = circle;
+  if (Math.hypot(p.x - cx, p.y - cy) < 1e-12 || Math.hypot(q.x - cx, q.y - cy) < 1e-12) return null;
+  const start = Math.atan2(p.y - cy, p.x - cx);
+  const TAU = 2 * Math.PI;
+  let ccw = (Math.atan2(q.y - cy, q.x - cx) - start) % TAU;
+  if (ccw <= 1e-12) ccw += TAU;
+  let sweep = ccw;
+  if (def.pick === 'minor') sweep = ccw <= Math.PI ? ccw : ccw - TAU;
+  else if (def.pick === 'major') sweep = ccw > Math.PI ? ccw : ccw - TAU;
+  else if (def.away || def.toward) {
+    const w = at((def.away ?? def.toward)!);
+    if (!w) return null;
+    // The side of the chord p→q a point is on (the cross product's sign): the arc's middle on the other side of it
+    // (`away`), or on the same side (`toward`).
+    const side = (x: number, y: number) => (q.x - p.x) * (y - p.y) - (q.y - p.y) * (x - p.x);
+    const mid = start + ccw / 2;
+    const same = Math.sign(side(cx + r * Math.cos(mid), cy + r * Math.sin(mid))) === Math.sign(side(w.x, w.y));
+    if (same === Boolean(def.away)) sweep = ccw - TAU;
+  }
+  return { id, cx, cy, r, start, sweep, radii: def.radii === true };
+}
+
 export function choiceSeedOf(c: Construction, seed: number): number {
   return evaluate(c, seed).choiceSeed ?? seed;
 }
@@ -1390,6 +1444,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];
   const segments: FigureSegment[] = [];
+  const arcs: FigureArc[] = [];
   const construction: FigureConstruction[] = [];
   const vacant: Vacancy[] = [];
 
@@ -2151,7 +2206,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
             id: o.id,
             label: { name: '', kind: 'circle' },
             curve: { kind: 'circle', cx: c0.x, cy: c0.y, r: radius },
-            stated: true,
+            // A sector's circle (#1622 E4) carries its points and is not drawn — the arc is.
+            stated: !o.hidden,
           });
         } else vacant.push({ id: o.id, reason: 'vacant' });
         break;
@@ -2190,7 +2246,19 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
        */
       case 'circle-thru': {
         const curve = circleThruCurve(o, at);
-        if (curve) curves.push({ id: o.id, label: { name: o.name ?? '', kind: 'circle' }, curve, stated: true });
+        if (curve) curves.push({ id: o.id, label: { name: o.name ?? '', kind: 'circle' }, curve, stated: !o.hidden });
+        else vacant.push({ id: o.id, reason: 'vacant' });
+        break;
+      }
+
+      /**
+       * A DRAWN ARC (#1622 E4, ADR-AG-220) — on the circle the figure resolved (the one the constraints were measured
+       * against), between the directions of its two ends. Its circle or an end absent, or an end at the centre, is a
+       * vacancy, never an arc drawn through a guess.
+       */
+      case 'arc': {
+        const arc = arcOf(o.id, o.def, at, curveAtOf(c, env, at));
+        if (arc) arcs.push(arc);
         else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
@@ -2209,6 +2277,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
     points,
     curves,
     segments,
+    arcs,
     construction,
     vacant,
     unsatisfied,

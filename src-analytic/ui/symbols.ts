@@ -20,7 +20,7 @@
  * The 2-D chips whose sentences analytic does not read yet — measured, and locked as still refused in
  * `symbols-module.test.ts`, so the day one parses the lock goes red and the chip is owed:
  * the Greek angle names α β γ δ θ, `S_{}` and `<` between two measures (slice D, #1621);
- * `△` `≅` `~` and `⌢{}` (slice E, #1622). A chip inserting a character the grammar then refuses
+ * `△` `≅` `~` (slice E, #1622). A chip inserting a character the grammar then refuses
  * hands the student `not-handled` on their own click, so each joins in its notation's own PR.
  * `xⁿ` is not offered: `²` and `³` cover the exam's powers and `^` is on every keyboard.
  */
@@ -63,4 +63,9 @@ export const SYMBOLS: readonly SymbolSpec[] = [
   { label: '∥', titleKey: 'symPar', before: '∥' },
   { label: '∠', titleKey: 'symAngle', before: '∠' },
   { label: '°', titleKey: 'symDeg', before: '°' },
+  /**
+   * #1622 E4 (ADR-AG-220) — 2-D's arc template, now that analytic reads arc measures: select «AC», press it, get
+   * «⌢{AC}» («⌢{AC} = 60°», «⌢{AC} + ⌢{BE} = …»); the fact list typesets it as the over-arc, as 2-D's does.
+   */
+  { label: '⌢{}', titleKey: 'symArc', before: '⌢{', after: '}' },
 ];

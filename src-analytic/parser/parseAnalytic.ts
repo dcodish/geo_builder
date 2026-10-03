@@ -21,7 +21,7 @@ import type { DerivedRule, FootLine } from '../engine/derived';
 import { cevianFacts, toolFootFacts, type CevianRole } from '../engine/cevian';
 import { toolPoint } from '../engine/toolLetters';
 import { isAngleRef, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
-import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
+import { evalExpr, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS, directionSymbol, mentionsPlane, radiusSymbol } from '../engine/carriers';
 
 /** A student's VALUE — a number or an expression in parameters, never the plane's x/y (#1496, `mentionsPlane`). */
@@ -5839,6 +5839,337 @@ function withRoleIntroductions(facts: readonly Fact[]): Fact[] {
   return [...ends.map(({ id, src }): Fact => ({ t: 'declare', id, src })), ...facts];
 }
 
+// ---------------------------------------------------------------------------
+// ARCS, SECTORS AND DIAMETERS FROM A POINT — 2-D's chords-arcs family, ported (#1622 E4, ADR-AG-220)
+// ---------------------------------------------------------------------------
+
+/**
+ * The circle an arc sentence names, wherever it sits — «במעגל O», «של המעגל O», «in circle O», "of the circle".
+ * Group 1 is the name (absent for the contextual «המעגל»). Removed from the line before the arc terms are read, as
+ * 2-D's `dropCircleRef` does, so «קשת AB במעגל O = 40» and «קשת AB = 40 במעגל O» are one sentence.
+ */
+const ARC_CIRCLE_REF = new RegExp(
+  `\\s*(?:(?:ב|של)\\s*-?\\s*ה?מעגל|(?:in|of|on)\\s+(?:the\\s+)?circle)(?:\\s+(${CIRCLE_NAME}))?(?=\\s|$|[=+−-])`,
+  'i',
+);
+/** One arc reference: the noun or the glyph, then its two ends — «קשת AB», «הקשת AB», «⌢{AB}», «⌢AB», "arc AB". */
+const ARC_TERM = new RegExp(`^(?:ה?קשת|⌢|⏜|arcs?)\\s*\\{?\\s*(${NAME})\\s*(${NAME})\\s*\\}?$`, 'i');
+const ARC_WORD = /קשת|⌢|⏜|\barcs?\b/i;
+
+/** «2 קשת CE» · «2·⌢{CE}» · «⌢{CE}» → [coefficient, arc]; a bare number → the value; anything else → null. */
+function arcSide(side: string): Array<{ k: Expr; a: Id; b: Id } | { value: Expr }> | null {
+  const out: Array<{ k: Expr; a: Id; b: Id } | { value: Expr }> = [];
+  // Split on + and − between terms, keeping each sign with its term.
+  const parts = side.replace(/−/g, '-').match(/[+-]?[^+-]+/g);
+  if (!parts) return null;
+  for (const raw of parts) {
+    let t = raw.trim();
+    let sign = 1;
+    if (t.startsWith('+')) t = t.slice(1).trim();
+    else if (t.startsWith('-')) {
+      sign = -1;
+      t = t.slice(1).trim();
+    }
+    const at = t.search(/ה?קשת|⌢|⏜|arcs?/i);
+    if (at < 0) {
+      const v = valueExpr(t.replace(/°|מעלות|degrees?/gi, '').trim());
+      if (!v) return null;
+      out.push({ value: sign < 0 ? { kind: 'neg', a: v } : v });
+      continue;
+    }
+    const arc = ARC_TERM.exec(t.slice(at).trim());
+    if (!arc) return null;
+    const coefText = t.slice(0, at).replace(/[*·⋅×]\s*$/, '').trim();
+    const k = coefText ? valueExpr(coefText) : ({ kind: 'num', value: 1 } as Expr);
+    if (!k) return null;
+    out.push({ k: sign < 0 ? { kind: 'neg', a: k } : k, a: arc[1], b: arc[2] });
+  }
+  return out;
+}
+
+/**
+ * «קשת AB = 40 במעגל O» · «⌢{AC} = 60°» · «קשת DE = 2 קשת CE» · «קשת CD שווה לקשת DE» · «קשת AC + קשת BE = קשת AD +
+ * קשת BC במעגל O» · "arc AB = 40 in circle O" — ARC MEASURES (2-D's `arcValue`, `arcEquality`, `measureSum`). Every
+ * spelling is one `arc-of` fact: Σ kᵢ·⌢(aᵢbᵢ) = value, the terms moved to the left. A single arc whose value is
+ * reflex (an arc of 200°) is its circle's other arc: the central angle is 360 − value (an unsigned angle).
+ */
+function parseArcMeasure(line: string): RuleOutcome {
+  if (!ARC_WORD.test(line) || /אמצע|midpoint|מרכזית|central|(?:^|\s)על\s+ה?קשת|\bon\s+the\s/i.test(line)) return null;
+  const ref = ARC_CIRCLE_REF.exec(line);
+  const circle = ref?.[1];
+  const body = (ref ? line.slice(0, ref.index) + line.slice(ref.index + ref[0].length) : line)
+    .replace(/(?<![א-ת])שוו(?:ה|ות)\s+ל-?\s*(?=ה?קשת|⌢|⏜)/g, '= ')
+    // «הקשת AC שווה ל-60» · «קשת AC היא 60 מעלות» — a copula before a NUMBER is the value (between two arcs it is
+    // 2-D's taught «arc-copula», not read here).
+    .replace(/(?<![א-ת])(?:שוו(?:ה|ות)(?:\s*ל-?)?|היא|הוא)\s*(?=[0-9])/g, '= ')
+    .replace(/\bequals?\b|\bis\s+equal\s+to\b/gi, '=');
+  const sides = body.split('=');
+  if (sides.length !== 2) return null;
+  const left = arcSide(sides[0]);
+  const right = arcSide(sides[1]);
+  if (!left || !right) return null;
+  const neg = (e: Expr): Expr => ({ kind: 'neg', a: e });
+  const terms = [
+    ...left.filter((t): t is { k: Expr; a: Id; b: Id } => 'a' in t),
+    ...right.filter((t): t is { k: Expr; a: Id; b: Id } => 'a' in t).map((t) => ({ ...t, k: neg(t.k) })),
+  ];
+  const values = [...left.filter((t): t is { value: Expr } => 'value' in t).map((t) => neg(t.value)), ...right.filter((t): t is { value: Expr } => 'value' in t).map((t) => t.value)];
+  if (terms.length === 0 || values.length > 1) return null;
+  if (terms.some((t) => t.a === t.b)) return refuse('repeated-vertex', line);
+  let value: Expr = values[0] ?? { kind: 'num', value: 0 };
+  // A lone arc of more than 180° is the major arc: its central angle (unsigned) is the minor arc's, 360 − value.
+  if (terms.length === 1 && values.length === 1) {
+    const v = evalExpr(value, {}) / evalExpr(terms[0].k, {});
+    if (Number.isFinite(v) && !(v > 0 && v < 360)) return refuse('out-of-scope', line);
+    if (Number.isFinite(v) && v > 180) value = { kind: 'mul', a: terms[0].k, b: { kind: 'sub', a: { kind: 'num', value: 360 }, b: { kind: 'num', value: v } } };
+  }
+  return made([{ t: 'arc-of', ...(circle ? { circle } : {}), terms, value, src: line }]);
+}
+
+/** «… = 80» · «… היא 80» · «… בזווית 80» · "… with angle 80" — a central angle's value, degrees optional. */
+const CENTRAL_VALUE = `(?:\\s*(?:=|היא|הוא|שווה(?:\\s+ל-?)?|ב?זווית|עם\\s+זווית|שזוויתה|is|of|with\\s+(?:an?\\s+)?angle(?:\\s+of)?)\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(?:°|מעלות|degrees?)?)?`;
+const CENTRAL_HE = new RegExp(`^${HE_GIVEN}ה?זוו?ית\\s+(?:ה)?מרכזית\\s+(${NAME})(${NAME})(${NAME})${CENTRAL_VALUE}$`);
+const CENTRAL_EN = new RegExp(`^(?:the\\s+|a\\s+)?central\\s+angle\\s+(${NAME})(${NAME})(${NAME})${CENTRAL_VALUE}$`, 'i');
+
+/**
+ * «זוית מרכזית COD» · «זוית מרכזית COD = 80» · "central angle COD" — 2-D's `centralAngle`, three-letter form: the
+ * MIDDLE letter is the centre, its two radii are drawn (introducing the points, as 2-D's segments do), and a value
+ * is an angle given. The arc-subtended form («…נשענת על קשת CD») is not ported (ADR-AG-220, not built).
+ */
+function parseCentralAngle(line: string): RuleOutcome {
+  const m = CENTRAL_HE.exec(line) ?? CENTRAL_EN.exec(line);
+  if (!m) return null;
+  const [, a, v, b, val] = m;
+  if (a === v || b === v || a === b) return refuse('repeated-vertex', line);
+  const value = val === undefined ? null : Number(val);
+  if (value !== null && !(value > 0 && value <= 180)) return refuse('out-of-scope', line);
+  const angle: Fact[] =
+    value === null
+      ? []
+      : [{ t: 'constraint', k: value === 90 ? rightAngleAt(v, a, b) : { t: 'angle', at: { v, a, b }, value: { kind: 'num', value } }, src: line }];
+  return made([
+    ...[a, v, b].map((id): Fact => ({ t: 'declare', id, src: line })),
+    { t: 'segment', id: segmentId(v, a), a: v, b: a, src: line },
+    { t: 'segment', id: segmentId(v, b), a: v, b, src: line },
+    ...angle,
+  ]);
+}
+
+/** «M אמצע הקשת BC במעגל O» · «M היא אמצע הקשת הקטנה BC» · "M is the midpoint of arc BC in circle O". */
+const ARC_MID_HE = new RegExp(
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה)?אמצע\\s+ה?קשת\\s+(?:ה?(קטנה|גדולה)\\s+)?(${NAME})(${NAME})(?:\\s+ה?(קטנה|גדולה))?(?:\\s*(?:ב|של)\\s*-?\\s*ה?מעגל(?:\\s+(${CIRCLE_NAME}))?)?$`,
+);
+const ARC_MID_EN = new RegExp(
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+midpoint\\s+of\\s+(?:the\\s+)?(?:(minor|major)\\s+)?arc\\s+(${NAME})(${NAME})()(?:\\s+(?:in|of|on)\\s+(?:the\\s+)?circle(?:\\s+(${CIRCLE_NAME}))?)?$`,
+  'i',
+);
+
+function parseArcMidpoint(line: string): RuleOutcome {
+  const m = ARC_MID_HE.exec(line) ?? ARC_MID_EN.exec(line);
+  if (!m) return null;
+  const [, id, size1, a, b, size2, circle] = m;
+  if (a === b || id === a || id === b) return refuse('repeated-vertex', line);
+  const major = /גדולה|major/i.test(`${size1 ?? ''}${size2 ?? ''}`);
+  return made([{ t: 'arc-mid', id, a, b, ...(circle ? { circle } : {}), ...(major ? { major: true as const } : {}), src: line }]);
+}
+
+/** «מחוץ למשולש ABC» · «בתוך הריבוע ABCD» · "outside triangle ABC" — which side of its side a semicircle bulges. */
+const SEMI_SIDE_HE = `(?:\\s+(מחוץ\\s+ל-?|מבחוץ\\s+ל-?|בתוך\\s+|בפנים\\s+)ה?([א-ת]+(?:[- ][א-ת]+){0,2})\\s+(${NAME_RUN}))?`;
+const SEMI_SIDE_EN = `(?:\\s+(outside|inside)\\s+(?:of\\s+)?(?:the\\s+)?(${ROLE_SHAPE_EN})\\s+(${NAME_RUN}))?`;
+const SEMI_HE = new RegExp(
+  `^${HE_GIVEN}(?:ה)?חצי\\s+(?:ה)?מעגל\\s+(?:ש(?:ה)?קוטרו|שבנוי\\s+על|הבנוי\\s+על|בנוי\\s+על|על)\\s+(?:ה?(?:צלע|קטע|קוטר)\\s+)?(${NAME})(${NAME})${SEMI_SIDE_HE}$`,
+);
+const SEMI_EN = new RegExp(
+  `^(?:a\\s+|the\\s+)?semicircle\\s+(?:with\\s+diameter|on|over|built\\s+on)\\s+(?:(?:the\\s+)?(?:side|segment|diameter)\\s+)?(${NAME})(${NAME})${SEMI_SIDE_EN}$`,
+  'i',
+);
+/** «על כל צלע של ריבוע ABCD יש חצי מעגל» · "a semicircle on each side of square ABCD". */
+const SEMI_EACH_HE = new RegExp(
+  `^(?:על\\s+כל\\s+(?:אחת\\s+מ)?ה?צלע(?:ות)?\\s+(?:של\\s+)?ה?([א-ת]+(?:[- ][א-ת]+){0,2})\\s+(${NAME_RUN})\\s+(?:יש|בנוי|נבנה|מונח)\\s+חצי\\s+מעגל|חצי\\s+מעגל\\s+על\\s+כל\\s+(?:אחת\\s+מ)?ה?צלע(?:ות)?\\s+(?:של\\s+)?ה?([א-ת]+(?:[- ][א-ת]+){0,2})\\s+(${NAME_RUN}))$`,
+);
+const SEMI_EACH_EN = new RegExp(`^(?:a\\s+)?semicircles?\\s+on\\s+(?:each|every)\\s+side\\s+of\\s+(?:the\\s+)?(${ROLE_SHAPE_EN})\\s+(${NAME_RUN})$`, 'i');
+
+/** The semicircle on the diameter `a`–`b`: the circle on it (hidden — only the half is drawn), the half, and the diameter. */
+function semicircleFacts(a: Id, b: Id, side: { away?: Id; toward?: Id }, line: string): Fact[] {
+  const circle = diameterCircleId(a, b);
+  return [
+    { t: 'declare', id: a, src: line },
+    { t: 'declare', id: b, src: line },
+    { t: 'circle-thru', id: circle, def: { t: 'diameter', a, b }, hidden: true, src: line },
+    // 2-D's arc runs counter-clockwise from the SECOND end to the first (B → A); a side phrase picks the half instead.
+    { t: 'arc', id: `arc-${b}${a}`, def: { circle, from: b, to: a, pick: 'ccw', ...side }, src: line },
+    { t: 'segment', id: segmentId(a, b), a, b, src: line },
+  ];
+}
+
+/** The ring a shape phrase names, as the shape sentence lowers it — «משולש ABC» — or a refusal / null. */
+function ringFacts(noun: string, run: string, line: string): { facts: Fact[]; ring: Id[] } | ParseResult | null {
+  const ring = run.match(new RegExp(NAME, 'g')) ?? [];
+  const facts = namedShapeFacts(noun, ring, line);
+  if (facts === 'bad-arity') return refuse('out-of-scope', line);
+  if (facts.length === 0) return null;
+  return { facts, ring };
+}
+
+/**
+ * «חצי מעגל שקוטרו AB» · «חצי מעגל על צלע AB מחוץ למשולש ABC» · «על כל צלע של ריבוע ABCD יש חצי מעגל» · "semicircle
+ * with diameter AB" — 2-D's semicircles. The half is drawn over its diameter; a named shape is stated (absorbed when the
+ * figure has it) and the half bulges OUT of it (or into it, «בתוך»), 2-D's `bulgeRef`. «על כל צלע» erects one on every
+ * side, each counter-clockwise from the side's second vertex to its first, as 2-D draws them.
+ */
+function parseSemicircle(line: string): RuleOutcome {
+  const each = SEMI_EACH_HE.exec(line) ?? SEMI_EACH_EN.exec(line);
+  if (each) {
+    const noun = each[1] ?? each[3];
+    const run = each[2] ?? each[4];
+    const shape = ringFacts(noun, run, line);
+    if (!shape) return null;
+    if ('ok' in shape) return shape;
+    const { facts, ring } = shape;
+    const halves = ring.flatMap((p, i) => semicircleFacts(p, ring[(i + 1) % ring.length], {}, line).filter((f) => f.t !== 'segment'));
+    return made([...facts, ...halves]);
+  }
+  const m = SEMI_HE.exec(line) ?? SEMI_EN.exec(line);
+  if (!m) return null;
+  const [, a, b, where, noun, run] = m;
+  if (a === b) return refuse('repeated-vertex', line);
+  if (!where) return made(semicircleFacts(a, b, {}, line));
+  const shape = ringFacts(noun, run, line);
+  if (!shape) return null;
+  if ('ok' in shape) return shape;
+  const other = shape.ring.find((p) => p !== a && p !== b);
+  if (!shape.ring.includes(a) || !shape.ring.includes(b) || !other) return refuse('out-of-scope', line);
+  const side = /מחוץ|מבחוץ|outside/i.test(where) ? { away: other } : { toward: other };
+  return made([...shape.facts, ...semicircleFacts(a, b, side, line)]);
+}
+
+/** «רבע מעגל» · «רבע מעגל OAB» (the FIRST letter is the centre) · "quarter circle". */
+const QUARTER_HE = new RegExp(`^${HE_GIVEN}(?:ה)?רבע\\s+(?:ה)?מעגל(?:\\s+(${NAME})(${NAME})(${NAME}))?$`);
+const QUARTER_EN = new RegExp(`^(?:a\\s+|the\\s+)?quarter[\\s-]+circle(?:\\s+(${NAME})(${NAME})(${NAME}))?$`, 'i');
+/** «גזרה AOB בזווית 80» · «הגזרה AOB» · "sector AOB with angle 80" — the MIDDLE letter is the centre. */
+const SECTOR_HE = new RegExp(`^${HE_GIVEN}(?:ה)?גזרה(?:\\s+(?:ה)?(?:עגולה|מעגלית))?\\s+(${NAME})(${NAME})(${NAME})${CENTRAL_VALUE}$`);
+const SECTOR_EN = new RegExp(`^(?:a\\s+|the\\s+)?(?:circular\\s+)?sector\\s+(${NAME})(${NAME})(${NAME})${CENTRAL_VALUE}$`, 'i');
+
+/**
+ * «גזרה AOB בזווית 80» · «רבע מעגל» · «רבע מעגל OAB» · "sector AOB with angle 80" · "quarter circle" — 2-D's sector and
+ * quarter circle, one `sector` fact for M1 (the circle it is cut from is a question about the figure). A bare quarter
+ * circle names its two ends with the tool's letters (2-D's A, B — the next free ones) and leaves its centre unnamed.
+ */
+function parseSector(line: string): RuleOutcome {
+  const q = QUARTER_HE.exec(line) ?? QUARTER_EN.exec(line);
+  if (q) {
+    const [, v, a, b] = q;
+    const ninety: Expr = { kind: 'num', value: 90 };
+    if (v) {
+      if (new Set([v, a, b]).size < 3) return refuse('repeated-vertex', line);
+      return made([{ t: 'sector', v, a, b, value: ninety, src: line }]);
+    }
+    return made([{ t: 'sector', a: toolPoint('end', 'quarter-1'), b: toolPoint('end', 'quarter-2'), value: ninety, src: line }]);
+  }
+  const s = SECTOR_HE.exec(line) ?? SECTOR_EN.exec(line);
+  if (!s) return null;
+  const [, a, v, b, val] = s;
+  if (new Set([v, a, b]).size < 3) return refuse('repeated-vertex', line);
+  return made([{ t: 'sector', v, a, b, ...(val !== undefined ? { value: { kind: 'num', value: Number(val) } as Expr } : {}), src: line }]);
+}
+
+/**
+ * The circle a diameter-from-a-point sentence names: «במעגל O» · «של מעגל O» · «של המעגל» · «מעגל O» (as the
+ * diameter's genitive, «קוטר מעגל O») · "in circle O" · "of the circle".
+ */
+const DIAM_CIRCLE_HE = `(?:\\s*(?:ב|של)\\s*-?\\s*ה?מעגל(?:\\s+(${CIRCLE_NAME}))?)?`;
+const DIAM_FROM_HE = new RegExp(
+  `^${HE_GIVEN}(?:ה)?קוטר(?:\\s+(?:ה)?מעגל(?:\\s+(${CIRCLE_NAME}))?)?\\s+(?:ה?(?:יוצא|עובר|היוצא|העובר)\\s+)?(?:מ|ב|דרך\\s+)-?\\s*${HE_POINT}(${NAME})${DIAM_CIRCLE_HE}$`,
+);
+const DIAM_FROM_EN = new RegExp(
+  `^(?:a\\s+|the\\s+)?diameter(?:\\s+of\\s+(?:the\\s+)?circle(?:\\s+(${CIRCLE_NAME}))?)?\\s+(?:(?:that\\s+)?(?:starts|starting|passes|passing|goes|going|drawn)\\s+)?(?:from|through|at)\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})(?:\\s+(?:in|of|on)\\s+(?:the\\s+)?circle(?:\\s+(${CIRCLE_NAME}))?)?$`,
+  'i',
+);
+/** «קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E» — the diameter from F, cut off where it meets a side. */
+const DIAM_CUT_HE = new RegExp(
+  `^${HE_GIVEN}(?:ה)?קוטר(?:\\s+(?:ה)?מעגל(?:\\s+(${NAME}))?)?\\s+(?:ה?(?:יוצא|עובר|היוצא|העובר)\\s+)?(?:מ|ב|דרך\\s+)-?\\s*${HE_POINT}(${NAME})${DIAM_CIRCLE_HE}\\s+(?:ו)?(?:חותך|פוגש)\\s+(?:את\\s+)?(?:ה?(צלע|קטע|ישר)\\s+)?(${NAME})(${NAME})\\s+ב(?:נקודה\\s+)?(${NAME})$`,
+);
+const DIAM_CUT_EN = new RegExp(
+  `^(?:a\\s+|the\\s+)?diameter(?:\\s+of\\s+(?:the\\s+)?circle(?:\\s+(${NAME}))?)?\\s+from\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})()\\s+(?:meets|cuts|intersects)\\s+(?:the\\s+)?(?:(side|segment|line)\\s+)?(${NAME})(${NAME})\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`,
+  'i',
+);
+/** «קוטר» · «נתון קוטר» · «הקוטר» · "a diameter" — a diameter whose ends the tool names (2-D's A, B). */
+const DIAM_BARE = /^(?:(?:נתו(?:ן|נה)\s+)?(?:ה)?קוטר|(?:a\s+|the\s+)?diameter)$/i;
+
+/**
+ * «קוטר מנקודה F במעגל O» · «קוטר העובר בנקודה A במעגל O» · «קוטר» · «קוטר מעגל O היוצא מנקודה F חותך את הצלע AC
+ * בנקודה E» — 2-D's diameter from a point: the diameter whose one end the sentence names and whose other end the tool
+ * names (2-D's D, the next free letter), lowered to the `diameter-of` «FD קוטר במעגל O» carries. The cut form draws
+ * only the piece from F to where the line FO meets the side (2-D's `line-line-intersection`, `segment F–E`).
+ */
+function parseDiameterFrom(line: string): RuleOutcome {
+  if (DIAM_BARE.test(line)) {
+    const a = toolPoint('end', 'diameter-1');
+    const b = toolPoint('end', 'diameter-2');
+    return made([{ t: 'diameter-of', a, b, define: false, src: line }, { t: 'segment', id: segmentId(a, b), a, b, ref: true, src: line }]);
+  }
+  const cut = DIAM_CUT_HE.exec(line) ?? DIAM_CUT_EN.exec(line);
+  if (cut) {
+    const [, genitive, f, trailing, noun, a, b, e] = cut;
+    const circle = genitive ?? trailing;
+    if (new Set([f, a, b, e]).size < 4) return refuse('repeated-vertex', line);
+    const bounded = !noun || /צלע|קטע|side|segment/i.test(noun);
+    const centre = circle && new RegExp(`^${NAME}$`).test(circle) ? circle : CENTRE_SENTINEL;
+    const facts: Fact[] = [
+      { t: 'on-kind', id: f, kind: 'circle', ...(circle ? { circle } : {}), src: line },
+      { t: 'declare', id: e, src: line },
+      { t: 'constraint', k: { t: 'on-line-2pt', id: e, a: f, b: centre }, src: line },
+      { t: 'constraint', k: { t: 'on-line-2pt', id: e, a, b, ...(bounded ? { bounded: true, crossing: true } : {}) }, src: line },
+      ...(bounded ? [{ t: 'selector', sel: { kind: 'between', id: e, a, b }, src: line } as Fact] : []),
+      { t: 'segment', id: segmentId(f, e), a: f, b: e, src: line },
+    ];
+    if (centre !== CENTRE_SENTINEL) return made([{ t: 'declare', id: f, src: line }, ...facts]);
+    return made([{ t: 'declare', id: f, src: line }, { t: 'via-centre', facts, phrase: 'מרכז המעגל', src: line }]);
+  }
+  const m = DIAM_FROM_HE.exec(line) ?? DIAM_FROM_EN.exec(line);
+  if (!m) return null;
+  const [, genitive, f, trailing] = m;
+  const circle = genitive ?? trailing;
+  const d = toolPoint('diameter-end', f);
+  return made([
+    { t: 'diameter-of', a: f, b: d, define: false, ...(circle ? { circle } : {}), src: line },
+    { t: 'segment', id: segmentId(f, d), a: f, b: d, ref: true, src: line },
+  ]);
+}
+
+/**
+ * «מעגל בקוטר 10» · «מעגל O שקוטרו 10» · «נתון מעגל O שאורך קוטרו 10» · "a circle with diameter 10" — a circle by its
+ * DIAMETER's value is the circle with half that radius: read as the radius sentence it is («מעגל O שרדיוסו (10)/2»), so
+ * the two can never disagree, and whatever the radius sentence does with an unnamed circle this does too.
+ */
+const DIAM_VALUE_HE = new RegExp(
+  `^(${HE_GIVEN}(?:ה)?מעגל(?:\\s+(?:${CIRCLE_NAME}))?)\\s+(?:ש(?:אורך\\s+)?קוטרו|ב(?:אורך\\s+)?קוטר|עם\\s+קוטר|שקוטרו\\s+באורך|בעל\\s+קוטר)\\s*(?:של\\s+|הוא\\s+|=\\s*)?([0-9]+(?:\\.[0-9]+)?)$`,
+);
+const DIAM_VALUE_EN = new RegExp(`^((?:a\\s+|the\\s+)?circle(?:\\s+${CIRCLE_NAME})?)\\s+(?:with|of)\\s+(?:a\\s+)?diameter\\s+(?:of\\s+)?([0-9]+(?:\\.[0-9]+)?)$`, 'i');
+
+function parseCircleByDiameter(line: string): RuleOutcome {
+  const he = DIAM_VALUE_HE.exec(line);
+  const en = he ? null : DIAM_VALUE_EN.exec(line);
+  const m = he ?? en;
+  if (!m) return null;
+  const radius = Number(m[2]) / 2;
+  const sentence = he ? `${m[1]} שרדיוסו ${radius}` : `${m[1]} with radius ${radius}`;
+  const r = parseClauseRules(sentence);
+  return r.ok ? made(r.facts.map((f) => ({ ...f, src: line }))) : r;
+}
+
+function parseArcFamily(line: string): RuleOutcome {
+  return (
+    parseCircleByDiameter(line) ??
+    parseCentralAngle(line) ??
+    parseArcMidpoint(line) ??
+    parseSemicircle(line) ??
+    parseSector(line) ??
+    parseDiameterFrom(line) ??
+    parseArcMeasure(line)
+  );
+}
+
 function parseClauseRules(raw: string): ParseResult {
   const line = trim(raw);
   if (!line) return { ok: false, code: 'not-handled', detail: raw };
@@ -5849,6 +6180,11 @@ function parseClauseRules(raw: string): ParseResult {
   // A coordinate compared (#1462) — after the parameter domains, whose atoms are single symbols.
   const compared = parseCompare(line);
   if (compared) return compared;
+
+  // Arcs, sectors, semicircles and the diameter from a point (#1622 E4, ADR-AG-220) — before the circle, the midpoint
+  // and the constraint rules, which would each claim a piece of «M אמצע הקשת BC» or «קשת AB = 40».
+  const arcFamily = parseArcFamily(line);
+  if (arcFamily) return arcFamily;
 
   /**
    * A circle stated by its CENTRE runs before `matchCurve` (#1060), because that rule’s tail is
