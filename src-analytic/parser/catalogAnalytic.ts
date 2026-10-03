@@ -1220,9 +1220,9 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'relations', family: 'F17', he: '△ABC ~ △DEF', en: '△ABC ~ △DEF' },
   { category: 'relations', family: 'F17', he: 'המשולשים ABC ו-DEF דומים', en: 'triangles ABC and DEF are similar' },
   { category: 'relations', family: 'F17', he: 'AB·AC = AD²', en: 'AB·AC = AD²', needs: ['משולש ABC', 'D על BC'] },
-  { category: 'relations', family: 'F17', he: 'AB = 3x', en: 'AB = 3x', needs: ['משולש ABC'] },
-  { category: 'relations', family: 'F17', he: 'AB = AC = 3x', en: 'AB = AC = 3x', needs: ['משולש ABC'] },
-  { category: 'relations', family: 'F17', he: 'AD = 12√x', en: 'AD = 12√x' },
+  { category: 'relations', family: 'F17', he: 'AB = 3a', en: 'AB = 3a', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: 'AB = AC = 3a', en: 'AB = AC = 3a', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: 'AD = 12√a', en: 'AD = 12√a' },
   { category: 'relations', family: 'F17', he: 'המרחק בין AB לבין CD הוא 3', en: 'the distance between AB and CD = 3', needs: ['טרפז ABCD'] },
   { category: 'lines', family: 'F17', he: 'CD חוצה את AB', en: 'CD bisects AB' },
   { category: 'lines', family: 'F17', he: 'CD חותך את AB', en: 'CD cuts AB' },
@@ -1273,6 +1273,11 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'relations', family: 'F17', he: '∢ABC ≤ 40°', en: '∠ABC ≤ 40°', needs: ['משולש ABC'] },
   { category: 'relations', family: 'F17', he: '∢ABC < ∢BAC', en: '∠ABC < ∠BAC', needs: ['משולש ABC'] },
   { category: 'relations', family: 'F17', he: 'זווית ABC קהה', en: 'angle ABC is obtuse', needs: ['משולש ABC'] },
+  // #1616 rulings of 2026-10-03 (ADR-AG-222) — an obtuse triangle is a choice over its vertices (#1708); a position
+  // word between two points is a coordinate comparison on the fixed axes (#1706, corpus 6/5)
+  { category: 'shapes', family: 'F17', he: 'משולש קהה זווית ABC', en: 'obtuse triangle ABC' },
+  { category: 'relations', family: 'F17', he: 'D מעל A', en: 'D is above A', needs: ['נקודה A', 'נקודה D'] },
+  { category: 'relations', family: 'F17', he: 'C מימין ל-B', en: 'C is to the right of B', needs: ['נקודה B', 'נקודה C'] },
   // #1622 E5 (ADR-AG-221) — an order between angle aliases (2-D's measure-order / measure-bound), an angle named by a
   // label (2-D's angle-alias), and an area label that introduces the region it names
   { category: 'relations', family: 'F17', he: 'α < β', en: 'α < β', needs: ['משולש ABC', '∢ABC = α', '∢BAC = β'] },

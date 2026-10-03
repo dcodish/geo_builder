@@ -214,7 +214,8 @@ describe('#1618 — the 471 questions the frame completes build their figure', (
   const FIGURES: Record<string, Record<string, [number, number]>> = {
     '8/4': { A: [-2, 6], B: [6, 6], C: [4, 2], D: [-4, 2], E: [1, 4], F: [-3, 4] },
     '10/4': { A: [2.5, 0], B: [0, 5], C: [-2, 4], O: [0, 0] },
-    '11/4': { A: [-3, 0], B: [0, 4], C: [-10, 4], D: [-13, 0], E: [-8, 0] },
+    // The printed figure (booklet p. 77): E right of A, D right of E — the position note picks it (#1706, ADR-AG-222).
+    '11/4': { A: [-3, 0], B: [0, 4], C: [10, 4], D: [7, 0], E: [2, 0] },
     '12/4': { A: [0, 4], B: [3, -2], C: [7, 0], D: [4, 6], E: [2, 0] },
     '15/5': { A: [-2, -4], B: [2, 4], C: [10, 0], D: [6, -8], E: [0, -5], O: [0, 0] },
   };

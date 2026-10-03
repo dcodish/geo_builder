@@ -231,10 +231,16 @@ describe('tan and cos of an angle — a measure of the angle (operator ruling 20
 
 interface CorpusQuestion {
   id: string;
+  /** how many of `lines` the exam prints; the figure-position notes follow (ADR-AG-222) */
+  printed: number;
   lines: string[];
 }
 const CORPUS: CorpusQuestion[] = JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'corpus471.json'), 'utf8'));
-const question = (id: string): string[] => confirmTaught(CORPUS.find((c) => c.id === id)!.lines, 0);
+/** The exam's own lines, as printed — the figure-position notes after `printed` (ADR-AG-222) are another lock's. */
+const question = (id: string): string[] => {
+  const q = CORPUS.find((c) => c.id === id)!;
+  return confirmTaught(q.lines.slice(0, q.printed), 0);
+};
 
 /** Typed one at a time, the app records each line — the submit path, not only the fold. */
 const typedInOrder = (lines: readonly string[]) => {

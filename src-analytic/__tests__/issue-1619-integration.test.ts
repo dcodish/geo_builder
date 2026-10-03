@@ -245,8 +245,10 @@ describe('#1619 — the newly landing corpus questions draw the exam`s figure', 
     // A and C in either labelling (#1619 ruling b) — the mirror is checked by the 6/4 lock in issue-1637-g2-parser.
     '6/4': { B: [8, 11], O: [-2, 1], K: [-1, 2] },
     '7/5': { M: [3, 1], A: [0.4, -0.8], B: [2, -2], C: [4, -2] },
-    '9/5': { A: [0, -4], B: [-2, 0], C: [-8, 0], D: [-10, -4], M: [-5, -4] },
-    '12/5': { A: [7, -6], B: [1, -6], M: [4, -2], D: [4, -6] },
+    // The printed figures (booklet pp. 63, 84), which the position notes now pick (#1706, ADR-AG-222): 9/5's circle
+    // right of the y-axis, B left of C; 12/5's A left of B.
+    '9/5': { A: [0, -4], B: [2, 0], C: [8, 0], D: [10, -4], M: [5, -4] },
+    '12/5': { A: [1, -6], B: [7, -6], M: [4, -2], D: [4, -6] },
     '13/5': { M: [9, 10.5], A: [6, 12], B: [9.6, 7.2], C: [12, 9], O: [0, 0], F: [0, 15] },
     '15/4': { B: [0, 12], C: [4, 10], D: [0, 2], E: [2, 6] },
     '16/4': { O: [0, 0], A: [4, 0], B: [9, 0], E: [4.5, 1.5], C: [0, 3] },

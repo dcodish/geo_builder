@@ -5207,3 +5207,39 @@ The gaps this measurement found with no issue were filed from it:
 - 3-D: length-or-vector, the open Q2 (#1680, which also holds the «∠SDB» allowlist entry); every other core plane-family gap (#1679).
 
 **Rebased onto #1669 / #1667 / #1668.** Thirteen known gaps flipped and failed with "move it to the parity rows", as designed: the twelve #1669 diameter, chord and radius rows, and `chord-cross-first`. No parity row flipped the other way. `bare-relation-new-letters-1670` "flipped" only on its last line, «AC קוטר». Its disparity sits at «BD⊥AC» (analytic still refuses new letters in a bare relation, #1028), so the row now ends there and stays a #1670 gap. `cat-2d-121` («AB ו-CD מיתרים במעגל O», with no circle O in the figure) still differs after #1669.
+
+
+## ADR-W-109 — Exception family X10: x or y as a length is 2-D's reading and analytic refuses it (#1622, #1649)
+
+**Status:** accepted · 2026-10-03 · on PR #1713 (`feat/1616-rulings-0310`) · amends [ADR-W-108](#adr-w-108) §3 (the exceptions table) and its "Rejected — excepting X10–X13" line, for symbolic lengths in x and y only. Ruling cited:
+- **2026-10-03, on #1622:** *"I dont think its good practive anyway to confuse x in analytics. in the 2d its normal but not in analytics… for anaytics only, if a user wants to give a proportion of a segment using x or y we reject it"*. Recorded on #1622 as "an analytic-only verdict, so it gets a #1649 exception row (2-D reads it, analytic must refuse)".
+
+**Requirements:** [02c](02c-requirements-analytic.md) R161 (amended by ADR-AG-222). · **Design:** docs/04w — the `EXCEPTIONS` row of the parity-lock table now reads X1–X10; docs/22 §10 lists the family. **Product:** workspace (the shared parity fixture) and analytic (ADR-AG-222 builds the refusal).
+
+**Context.** ADR-W-108 ported the 2-D-only candidate X10 (symbolic lengths) to analytic. ADR-AG-218 then read «AB = 3x» there through an internal length variable. The operator has now withdrawn that reading for x and y in analytic. 2-D keeps it. That pair of verdicts is exactly an exception: one builder reads the sentence by design, and another must not build it.
+- X1 (the coordinate frame) has the right subject — "x and y are the plane's coordinates" — but the wrong shape. Its `mustRefuse` is 2-D, the builder that DOES read this sentence. A family is one shape, so X1 cannot hold it.
+- No other family names analytic in `mustRefuse` except X7 (solids), whose subject is unrelated.
+
+**Decision.** A new family is added: **X10 — x or y as a length («AB = 3x»)**.
+- `products`: 2-D and 3-D.
+- `mustRefuse`: analytic.
+- `topic`: false — it is plane geometry, so its catalog sentences still need rows.
+- Pattern: a two-letter length equal to an expression in x or y.
+
+3-D is a product of the family because it is a synthetic builder like 2-D: when it ports symbolic lengths, it reads them as 2-D does. Its rows keep their known gap on #1679.
+
+The rows moved into the family:
+- `symbol-length`, `symbol-length-square`, `symbol-length-chain-1622`, `symbol-length-y-1622`;
+- `cat-2d-082` («AD = 12√x»).
+
+`symbol-length-beside-line-1622` stays an X2 row. Its analytic context now states the length with another letter («AB = 3a», via `contextFor`).
+
+Every other letter is a plain parity row (`symbol-length-letter-1622`, `-letter-chain-1622`, `-letter-root-1622`), and analytic agrees with 2-D on those.
+
+The name X10 reuses ADR-W-108's candidate label for the same subject on purpose. The candidate was "symbolic lengths"; the family is its x/y slice, which the ruling took back.
+
+**Rejected.**
+- **A known gap on analytic.** A gap promises a port. The ruling says analytic must refuse forever, so the meta-lock's "a healed gap fails" would invert the ruling.
+- **Folding it into X1 with an `only`.** `only` narrows which READING builders are checked. It cannot move a builder into `mustRefuse`.
+
+**Consequences.** `ExceptionId` gains `'X10'`. The meta-lock's "every family is used" holds: X10 has six rows. docs/22 §10 and docs/04w name X1–X10.

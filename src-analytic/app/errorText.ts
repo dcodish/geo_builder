@@ -135,6 +135,7 @@ export function errorText(error: InputError, t: Translate): string {
     'degenerate-role': 'errDegenerateRole',
     'apex-not-a-vertex': 'errApexNotAVertex',
     'bisector-wrong-apex': 'errBisectorWrongApex',
+    'length-xy': 'errLengthXY',
     'ambiguous-cevian': 'errAmbiguousCevian',
     'cevian-no-triangle': 'errCevianNoTriangle',
     'ambiguous-hypotenuse': 'errAmbiguousHypotenuse',

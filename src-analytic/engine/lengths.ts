@@ -419,23 +419,6 @@ export function constantLengthExpr(src: string): LengthExpr | null {
   return expr && !mentionsPlane(expr) ? { expr, terms: [] } : null;
 }
 
-/**
- * THE LENGTH VARIABLE — «AB = 3x», «AD = 12√x», «AB = x²» (#1622, ADR-AG-218; operator ruling 2026-10-02 on #1622).
- *
- * The ruling: *inside a LENGTH expression a variable is a free length parameter, NEVER the plane's coordinate*, and it
- * must stay unambiguous with x/y in equations and coordinates. So the letter is decided by its SLOT, not by its
- * spelling: in the VALUE of a length given (the side with no measure on it) `x` and `y` are this variable; in an
- * equation they are the plane's (`y = 2x + 1` beside «AB = 3x» is still the line); in a coordinate they are refused
- * (`reserved-coordinate`); in a parameter declaration («x > 0») they are this variable (the plane's coordinate is
- * never a parameter). The two readings never share a symbol: the length variable is carried internally as its own
- * symbol ({@link LENGTH_VARIABLE}), so `RESERVED_SYMBOLS` — the plane — is untouched, the register samples it as any
- * unstated magnitude (ADR-052) and a later «AB = 6» pins it, while every gate that reads x/y as the plane reads
- * exactly what it read before. Shown to the student under the letter they typed ({@link paramLabel}).
- *
- * Only the value SIDE: a side that also carries a measure («AB is y=x-4», #1496; «AB = AC + x») still declines — a
- * measure beside the plane's letter is prose around an equation, never a length.
- */
-export const LENGTH_VARIABLE: Readonly<Record<'x' | 'y', string>> = { x: 'ｘ', y: 'ｙ' };
 
 /**
  * AN ANGLE LABEL — «נסמן זוית BAM כ-A1» (#1622 E5, ADR-AG-221; 2-D's `angle-alias`, ADR-386). The book's subscript
@@ -449,27 +432,18 @@ export const angleLabelSymbol = (name: string): string => `${ANGLE_LABEL_MARK}${
 /** The label a symbol carries, or `null` when it is no angle label. */
 export const angleLabelName = (sym: string): string | null => (sym.startsWith(ANGLE_LABEL_MARK) && sym.length > 1 ? sym.slice(1) : null);
 
-/** The letter a parameter is SHOWN as — the length variable under the student's own `x`/`y`; every other symbol is itself. */
-export const paramLabel = (sym: string): string => (sym === LENGTH_VARIABLE.x ? 'x' : sym === LENGTH_VARIABLE.y ? 'y' : sym);
-
-const asLengthVariable = (e: Expr): Expr => {
-  if (e.kind === 'sym') return e.name === 'x' || e.name === 'y' ? { kind: 'sym', name: LENGTH_VARIABLE[e.name] } : e;
-  if (e.kind === 'num') return e;
-  if (e.kind === 'neg' || e.kind === 'sqrt') return { ...e, a: asLengthVariable(e.a) };
-  return { ...e, a: asLengthVariable(e.a), b: asLengthVariable(e.b) };
-};
-
 /**
- * The VALUE side of a length given (#1622): a number or an expression in parameters, where the plane's letters are
- * the length variable. `null` when it does not parse, or when the plane's letter stands beside a point's name.
+ * x AND y ARE NEVER A LENGTH IN ANALYTIC (#1622, operator ruling 2026-10-03, amending the 2026-10-02 item; ADR-AG-222
+ * amendment, which withdraws ADR-AG-218's length variable): *"I dont think its good practive anyway to confuse x in
+ * analytics. in the 2d its normal but not in analytics"*. The VALUE side of a length given that reads as an expression
+ * in the plane's letters («AB = 3x», «AB = 2y», «AB = x²», «AD = 12√x») is refused with a teaching message — x and y
+ * are the coordinates here, so the student names the length with another letter («AB = 3a»). True for exactly that
+ * side: it parses, it uses x or y, and no point's name stands beside the letter (a measure beside the plane's letter,
+ * «AB = AC + x», is #1496's prose around an equation and declines as before).
  */
-export function lengthValueExpr(src: string): LengthExpr | null {
+export function planeLetterLength(src: string): boolean {
   const expr = parseExpr(normalizeMath(src));
-  if (!expr) return null;
-  if (!mentionsPlane(expr)) return { expr, terms: [] }; // exactly `constantLengthExpr`'s reading
-  // A capital beside the variable is a point's name (ADR-AG-163) — «AC + x» is a measure and the plane, never a value.
-  if (/[A-Z]/.test(src)) return null;
-  return { expr: asLengthVariable(expr), terms: [] };
+  return !!expr && mentionsPlane(expr) && !/[A-Z]/.test(src);
 }
 
 /**

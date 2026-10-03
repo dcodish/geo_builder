@@ -32,8 +32,12 @@ type T = (k: string, o?: Record<string, unknown>) => string;
 const plain = (f: T): T => (k, o) => f(k, o).replace(/[⁦-⁩]/g, '');
 const t = plain(analyticI18n.getFixedT('he') as unknown as T);
 const tEn = plain(analyticI18n.getFixedT('en') as unknown as T);
-const CORPUS: { id: string; lines: string[] }[] = JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'corpus471.json'), 'utf8'));
-const corpus = (id: string) => CORPUS.find((q) => q.id === id)!.lines;
+const CORPUS: { id: string; printed: number; lines: string[] }[] = JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'corpus471.json'), 'utf8'));
+/** The exam's own lines — the corpus's figure-position notes (ADR-AG-222) come after `printed`. */
+const corpus = (id: string) => {
+  const q = CORPUS.find((c) => c.id === id)!;
+  return q.lines.slice(0, q.printed);
+};
 
 /** The student's session: each line submitted in turn through the real gate; a recorded line joins the list. */
 function play(lines: readonly string[], seed = 0): { verdicts: string[]; kept: string[] } {

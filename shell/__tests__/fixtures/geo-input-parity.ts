@@ -65,7 +65,7 @@ export interface StepVerdict {
  */
 export type StepRunner = (steps: readonly string[]) => readonly StepVerdict[] | Promise<readonly StepVerdict[]>;
 
-export type ExceptionId = 'X1' | 'X2' | 'X3' | 'X4' | 'X5' | 'X6' | 'X7' | 'X8' | 'X9';
+export type ExceptionId = 'X1' | 'X2' | 'X3' | 'X4' | 'X5' | 'X6' | 'X7' | 'X8' | 'X9' | 'X10';
 
 export interface ExceptionFamily {
   title: string;
@@ -91,12 +91,13 @@ export interface ExceptionFamily {
  */
 export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
   X1: {
-    title: 'coordinates, the origin, the axes, quadrants',
-    reason: 'the coordinate frame: 2-D is coordinate-free by design and sends these to the analytic builder',
+    title: 'coordinates, the origin, the axes, quadrants, position words between points',
+    reason:
+      "the coordinate frame: 2-D is coordinate-free by design and sends these to the analytic builder. A position word between two points («D מעל A», «C מימין ל-B») is the frame too: analytic's axes are fixed, so it compares coordinates there (#1706, operator ruling 2026-10-03), while 2-D refuses screen orientation (input.scope.orientation) — those rows carry only: ['analytic']",
     products: ['analytic', '3d'],
     mustRefuse: ['2d'],
     topic: true,
-    patterns: [/\(\s*[-\w√.+ ]+,/, /ציר ה-?\s?[xyz]/, /ראשית/, /רביע/, /הצירים/],
+    patterns: [/\(\s*[-\w√.+ ]+,/, /ציר ה-?\s?[xyz]/, /ראשית/, /רביע/, /הצירים/, /(?:^|\()[A-Z]\d?\s+(?:מעל|מתחת|מימין|משמאל)\s*ל?-?\s*[A-Z]\d?(?:$|\))/],
   },
   X2: {
     title: 'equations of lines, circles and conics; slopes; focus and directrix',
@@ -170,6 +171,15 @@ export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
     mustRefuse: [],
     topic: false,
     patterns: [/(?:^|\s)נקודה [A-Z]/, /^נקודות /],
+  },
+  X10: {
+    title: 'x or y as a length («AB = 3x»)',
+    reason:
+      "operator ruling 2026-10-03 on #1622 (ADR-W-109): in analytic x and y are the plane's coordinates, so a length written in them is refused there with a teaching message (name it «AB = 3a»); 2-D reads it as a free length, as it always has. Every other letter is a plain parity row",
+    products: ['2d', '3d'],
+    mustRefuse: ['analytic'],
+    topic: false,
+    patterns: [/[A-Z]{2}\s*=\s*(?:[A-Z]{2}\s*=\s*)?[\d√]*\s*[xy](?![A-Za-z])/],
   },
 };
 
@@ -457,7 +467,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-079', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB מאונך ל-CD'], expect: 'builds' },
   { id: 'cat-2d-080', family: 'lengths', steps: ['△ABC ≅ △DEF'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'cat-2d-081', family: 'lengths', steps: ['△ABC ~ △DEF'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
-  { id: 'cat-2d-082', family: 'lengths', steps: ['AD = 12√x'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
+  { id: 'cat-2d-082', family: 'lengths', steps: ['AD = 12√x'], expect: 'builds', exception: 'X10', knownGap: [{ product: '3d', issue: '#1679' }], note: 'analytic refuses x as a length (2026-10-03)' },
   { id: 'cat-2d-083', family: 'angles', steps: ['משולש ABC', 'זווית ABC = 2α'], expect: 'builds' },
   { id: 'cat-2d-084', family: 'angles', steps: ['α < β'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'cat-2d-085', family: 'angles', steps: ['משולש ABC', 'זווית ABC גדולה מ-40'], expect: 'builds' },
@@ -700,17 +710,20 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'diag-meet-no-figure-1620', family: 'intersections', steps: ['האלכסונים AC ו-BD נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'diagonal-decl-1620', family: 'polygons', steps: ['מרובע ABCD', 'האלכסון AC'], expect: 'builds' },
   { id: 'diagonal-in-ring-1620', family: 'polygons', steps: ['מרובע ABCD', 'האלכסון AC במרובע ABCD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: 'the sentence #1620 S1 teaches «העבירו את האלכסון AC במרובע ABCD» onto; 2-D does not read the ring tail' },
-  { id: 'symbol-length', family: 'lengths', steps: ['משולש ABC', 'AB = 3x'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'X10, ported to analytic by ruling 2 (2026-10-02)' },
-  { id: 'symbol-length-square', family: 'lengths', steps: ['משולש ABC', 'AB = x²'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'X10' },
+  { id: 'symbol-length', family: 'lengths', steps: ['משולש ABC', 'AB = 3x'], expect: 'builds', exception: 'X10', knownGap: [{ product: '3d', issue: '#1679' }], note: 'ported to analytic 2026-10-02, withdrawn for x/y 2026-10-03: analytic refuses it with the teaching message' },
+  { id: 'symbol-length-square', family: 'lengths', steps: ['משולש ABC', 'AB = x²'], expect: 'builds', exception: 'X10', knownGap: [{ product: '3d', issue: '#1679' }] },
 
   // ── #1622 E2 (ADR-AG-218): the sentences slice E makes readable in analytic, each at 2-D's measured verdict ──
   { id: 'congruent-he-1622', family: 'lengths', steps: ['משולש ABC חופף למשולש DEF'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'X11, ported by ruling 2 (2026-10-02)' },
   { id: 'similar-plural-he-1622', family: 'angles', steps: ['המשולשים ABC ו-DEF דומים'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'X12' },
   { id: 'congruent-proof-target-1622', family: 'lengths', steps: ['הוכיחו ש-△ABC ≅ △DEF'], expect: 'refused', note: 'a PROOF TARGET is never a given (#1666) — the boundary ≅ as a given must not cross' },
   { id: 'segment-product-1622', family: 'lengths', steps: ['משולש ABC', 'D על BC', 'AB·AC = AD²'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'X13' },
-  { id: 'symbol-length-chain-1622', family: 'lengths', steps: ['משולש ABC', 'AB = AC = 3x'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'X10 — a chained equality with a value' },
-  { id: 'symbol-length-y-1622', family: 'lengths', steps: ['משולש ABC', 'AB = 2y'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'X10 — y in a length is a length too' },
-  { id: 'symbol-length-beside-line-1622', family: 'topic', steps: ['משולש ABC', 'AB = 3x', 'y = 2x + 1'], expect: 'builds', exception: 'X2', note: 'the ruling\'s collision case: the length variable never makes the equation\'s x a length' },
+  { id: 'symbol-length-chain-1622', family: 'lengths', steps: ['משולש ABC', 'AB = AC = 3x'], expect: 'builds', exception: 'X10', knownGap: [{ product: '3d', issue: '#1679' }], note: 'a chained equality with a value' },
+  { id: 'symbol-length-y-1622', family: 'lengths', steps: ['משולש ABC', 'AB = 2y'], expect: 'builds', exception: 'X10', knownGap: [{ product: '3d', issue: '#1679' }] },
+  { id: 'symbol-length-beside-line-1622', family: 'topic', steps: ['משולש ABC', 'AB = 3x', 'y = 2x + 1'], expect: 'builds', exception: 'X2', contextFor: { analytic: ['משולש ABC', 'AB = 3a'] }, note: 'a length never makes the equation\'s x a length; analytic states its length with another letter (an x-length is X10 there since 2026-10-03)' },
+  { id: 'symbol-length-letter-1622', family: 'lengths', steps: ['משולש ABC', 'AB = 3a'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'every letter but x and y is a free length in both builders' },
+  { id: 'symbol-length-letter-chain-1622', family: 'lengths', steps: ['משולש ABC', 'AB = AC = 3a'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
+  { id: 'symbol-length-letter-root-1622', family: 'lengths', steps: ['AD = 12√a'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'vertex-value-1622', family: 'angles', steps: ['משולש ABC', 'A = 40'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'vertex-value-free-1622', family: 'angles', steps: ['נקודה A', 'A = 40'], expect: 'asks', exception: 'X9', note: 'a free point has no arms: 2-D asks which angle' },
   { id: 'area-label-1622', family: 'area-perimeter', steps: ['מרובע ABCD', 'נסמן את שטח ABCD ב-S'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
@@ -881,6 +894,18 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'ex-plane-1656', family: 'topic', steps: ['משולש ACD', 'נקודה S', 'דרך AC העבירו מישור המקביל ל-SD'], contextFor: { '3d': ['פירמידה SABCD שבסיסה ריבוע'] }, expect: 'builds', exception: 'X7', note: '#1656: 2-D used to commit AC ∥ SD' },
   { id: 'ex-sphere-1657', family: 'topic', steps: ['כדור שמרכזו O ורדיוסו 3'], expect: 'builds', exception: 'X7', note: '#1657: 2-D used to draw a circle' },
   { id: 'ex-vector', family: 'topic', steps: ['משולש ABC', 'וקטור AB'], expect: 'builds', exception: 'X7' },
+  // ── #1616 rulings of 2026-10-03 (ADR-AG-222) ──
+  { id: 'ex-position-above-1706', family: 'topic', steps: ['נקודה A', 'נקודה D', 'D מעל A'], expect: 'builds', exception: 'X1', only: ['analytic'], note: "#1706: y_D > y_A on analytic's fixed axes; 2-D does not read screen orientation" },
+  { id: 'ex-position-below-1706', family: 'topic', steps: ['נקודה A', 'נקודה D', 'D מתחת ל-A'], expect: 'builds', exception: 'X1', only: ['analytic'] },
+  { id: 'ex-position-right-1706', family: 'topic', steps: ['נקודה B', 'נקודה C', 'C מימין ל-B'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '2-D refuses it as input.scope.orientation' },
+  { id: 'ex-position-left-1706', family: 'topic', steps: ['נקודה B', 'נקודה C', 'C משמאל ל-B'], expect: 'builds', exception: 'X1', only: ['analytic'] },
+  { id: 'ex-position-aside-1706', family: 'topic', steps: ['A ו-D על ציר ה-y (D מעל A), B ו-C על ציר ה-x (C מימין ל-B)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: 'corpus 6/5 line 3: the position words inside the asides' },
+  { id: 'ex-median-equation-1662', family: 'topic', steps: ['משולש ABC', 'משוואת התיכון AD היא y=x'], expect: 'builds', exception: 'X2', note: '#1662: the median claim is kept — D is the midpoint of BC' },
+  { id: 'ex-altitude-equation-ask-1662', family: 'topic', steps: ['משולש ABC', 'משולש ABE', 'משוואת הגובה AD היא y=x'], expect: 'asks', exception: 'X2', note: '#1662: two triangles have the vertex A and neither side holds D' },
+  { id: 'cevian-foot-on-side-1662', family: 'cevians-centres', steps: ['משולש ABC', 'משולש ABE', 'D על BC', 'AD גובה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'the triangle whose opposite side holds D (2-D measured: commits)' },
+  { id: 'obtuse-triangle-1708', family: 'polygons', steps: ['משולש קהה זווית ABC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: '#1708: one of the three angles is obtuse — a choice over the vertices' },
+  { id: 'obtuse-triangle-hyphen-1708', family: 'polygons', steps: ['משולש קהה-זווית ABC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }] },
+  { id: 'obtuse-triangle-letters-first-1708', family: 'polygons', steps: ['ABC משולש קהה זווית'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }] },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
