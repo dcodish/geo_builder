@@ -10614,7 +10614,7 @@ Two more items, built on top of ef942ea7:
 - Analytic has no `.geo.json` fixtures (ADR-AG-200's practice); the operator's sequences are rows of the analytic lock.
 
 **Not built, said out loud.**
-- **The ADR-W-047 chip.** After «∢ABC = α» · «α = 30» the canvas reads «30°» (2-D's default). Analytic has no chip to bring «α» back, so the form the student typed is recoverable only from the fact list. 2-D and 3-D have the chip; analytic's adoption is filed as its own issue (ADR-W-047 names each product's adoption separately).
+- **The ADR-W-047 chip.** After «∢ABC = α» · «α = 30» the canvas reads «30°» (2-D's default). Analytic has no chip to bring «α» back, so the form the student typed is recoverable only from the fact list. 2-D and 3-D have the chip; analytic's adoption is filed as [#1725](https://github.com/dcodish/geo_builder/issues/1725) (ADR-W-047 names each product's adoption separately).
 - **«a = 2» is not read in analytic** (not-handled; a Greek letter is), so «AB = 3a» is valued only by «AB = 6». Measured, not touched.
 - **Equalities are drawn at rest.** 2-D shows «AB = AC» only in its hover relations layer. Analytic has no such layer, and the plan lists the ticks, so a stated equality is marked persistently. A noun's own equal sides are not (point 2).
 - **2-D's area label is a bare «13»**; analytic writes «S=13», as the plan specified. This is a 2-D parity question, reported and not changed here.
