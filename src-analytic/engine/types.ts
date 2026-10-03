@@ -525,7 +525,28 @@ export type Fact =
    * it is a DISCRETE choice over the assignments (02c R14, «discrete ones cycle») — M1 builds it over the one ring
    * the sentence refers to (`ringsNamed`; none or several is refused, as every contextual shape reference is).
    */
-  | (FactBase & { t: 'vertices-on-axes'; noun?: string });
+  | (FactBase & { t: 'vertices-on-axes'; noun?: string })
+  /**
+   * A SENTENCE ABOUT ONE OR TWO CIRCLES IT MAY HAVE TO DRAW (#1622 slice E3, #1693; ADR-AG-219) — «שני מעגלים נחתכים
+   * בנקודות A ו-B», «נתון מעגל», «מעגל בקוטר 10», «AB משיק משותף למעגלים O ו-P», «ישר חותך את שני המעגלים …». Each
+   * {@link CircleSlot} is resolved at M1, in order, to a circle id, and `about` — the statement, written over
+   * {@link CIRCLE_SLOT_SENTINELS} — is applied with those ids written in:
+   *
+   * - `new` draws a circle with its centre UNNAMED (ADR-AG-198's created circle; the radius free unless `r` states it).
+   *   Two drawn by one sentence are a PAIR: interchangeable until a statement tells them apart, and then named by
+   *   order on first mention (operator ruling 2026-10-02 on #1688).
+   * - `named` is the circle a letter names — found through the one name chain, named by order on an interchangeable
+   *   pair, else stated on that letter (ADR-AG-210's `statingNamedCircle`).
+   * - `the` is «המעגל» / «שני המעגלים»: the figure's circles when it holds exactly that many, drawn when it holds
+   *   none, refused as ambiguous otherwise (ADR-AG-196's none → create, one → bind, several → ask).
+   */
+  | (FactBase & { t: 'circles-about'; slots: CircleSlot[]; about: Fact[] });
+
+/** One circle a `circles-about` sentence speaks of (ADR-AG-219). */
+export type CircleSlot = { k: 'new'; r?: Expr } | { k: 'named'; name: string } | { k: 'the' };
+
+/** The stand-ins a `circles-about` statement carries for its circles, by slot (ADR-AG-219) — names no student writes. */
+export const CIRCLE_SLOT_SENTINELS = ['⟨circle-1⟩', '⟨circle-2⟩'] as const;
 
 /** The role claims that need the FIGURE to lower (#1651, ADR-AG-200) — the rest lower in the parser. */
 export type PolygonOrRadiusRole = 'radius' | 'leg' | 'base' | 'hypotenuse';
@@ -541,7 +562,8 @@ export const CIRCLE_SENTINEL = '⟨the-circle⟩';
  * passes that read the fact list before M1 (which line names an object): they must see a creation the
  * sentence may make, whichever branch M1 takes.
  */
-export const factsWithin = (f: Fact): Fact[] => (f.t === 'the-circle' ? [f, ...f.create.flatMap(factsWithin)] : [f]);
+export const factsWithin = (f: Fact): Fact[] =>
+  f.t === 'the-circle' ? [f, ...f.create.flatMap(factsWithin)] : f.t === 'circles-about' ? [f, ...f.about.flatMap(factsWithin)] : [f];
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list
@@ -905,7 +927,26 @@ export type Selector =
 export type Quantity =
   | { k: 'slope'; u: Direction }
   | { k: 'power'; p: Id; circle: Id }
-  | { k: 'arc-side'; p: Id; a: Id; b: Id; circle: Id };
+  | { k: 'arc-side'; p: Id; a: Id; b: Id; circle: Id }
+  /**
+   * TWO CIRCLES' MUTUAL POSITION (#1622 E3, ADR-AG-219) — `apart`: the gap between them, |AB| − (rₐ + r_b), positive
+   * when they are disjoint, each outside the other («שני מעגלים זרים»); `inside`: rₐ − r_b − |AB|, positive when `b`
+   * lies strictly inside `a` («מעגל P מוכל בתוך מעגל O»); `larger`: rₐ − r_b («R > r» between two circles, the
+   * concentric pair kept apart); `cross`: |AB| − |rₐ − r_b|, positive when neither lies inside the other and they are not
+   * one circle («שני מעגלים נחתכים» — two crossings of two DIFFERENT circles). Regions, so selectors: they consume no freedom.
+   */
+  | { k: 'circles'; a: Id; b: Id; rel: 'apart' | 'inside' | 'larger' | 'cross' }
+  /**
+   * WHICH SIDE OF A COMMON TANGENT THE CENTRES ARE ON (#1622 E3, ADR-AG-219) — the product of the two centres' signed
+   * sides of the line `p``q`: positive for an EXTERNAL common tangent (both on one side), negative for an internal one.
+   */
+  | { k: 'centres-side'; a: Id; b: Id; p: Id; q: Id }
+  /**
+   * A STATED ORDER BETWEEN PARAMETERS (#1622 E3, ADR-AG-219) — «R > r» between two radius letters: the value of `e`
+   * (R − r) at the configuration's parameters. A region of the parameter space (D7 kind 2), never a domain: a domain
+   * bounds ONE symbol by a number.
+   */
+  | { k: 'params'; e: Expr };
 
 export const EMPTY_CONSTRUCTION: Construction = {
   params: [],

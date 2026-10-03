@@ -30,6 +30,8 @@ import { cevianFacts, onBisectorFacts, toolFootFacts, toolFootRule } from './cev
 import {
   CENTRE_SENTINEL,
   CIRCLE_SENTINEL,
+  CIRCLE_SLOT_SENTINELS,
+  UNBOUNDED,
   EMPTY_CONSTRUCTION,
   inDomain,
   circleDefPoints,
@@ -830,6 +832,12 @@ function statingNamedCircle(c: Construction, name: string, f: Fact): ApplyOutcom
   if (!POINT_LETTER.test(name) || isNumeralName(name)) return null;
   const held = objectById(c, name);
   if (held && !isPositional(held)) return null;
+  // Two fresh interchangeable circles: the new letter names one of them, by order (#1688 ruling, ADR-AG-219).
+  if (!held) {
+    const pick = circleToName(c);
+    if (pick?.t === 'name') return namingByOrder(c, pick.host, name, f);
+    if (pick?.t === 'ask') return { ok: false, error: noHost(f.src, 'circle', pick.circles) };
+  }
   const r = radiusSymbol(name);
   const created = applyAll(c, [
     { t: 'declare', id: name, src: f.src },
@@ -899,8 +907,8 @@ const TOUCHED_CIRCLE_ID: Id = 'circle-touched';
 /** A ring's canonical polygon id — the smallest rotation of it and of its reverse (the parser's `polygonId`). */
 const ringId = (v: readonly Id[]): Id =>
   `poly-${[[...v], [...v].reverse()].flatMap((b) => b.map((_, i) => [...b.slice(i), ...b.slice(0, i)].join(''))).sort()[0]}`;
-function touchedCircleFacts(src: string): Fact[] {
-  const sym = (part: string): Expr => ({ kind: 'sym', name: toolSymbol(TOUCHED_CIRCLE_ID, part) });
+function touchedCircleFacts(src: string, id: Id = TOUCHED_CIRCLE_ID, radius?: Expr): Fact[] {
+  const sym = (part: string): Expr => ({ kind: 'sym', name: toolSymbol(id, part) });
   const sq = (e: Expr): Expr => ({ kind: 'pow', a: e, b: { kind: 'num', value: 2 } });
   const eq: Expr = {
     kind: 'sub',
@@ -909,12 +917,206 @@ function touchedCircleFacts(src: string): Fact[] {
       a: sq({ kind: 'sub', a: { kind: 'sym', name: 'x' }, b: sym('a') }),
       b: sq({ kind: 'sub', a: { kind: 'sym', name: 'y' }, b: sym('b') }),
     },
-    b: sq(sym('r')),
+    b: sq(radius ?? sym('r')),
   };
   return [
-    { t: 'param', sym: toolSymbol(TOUCHED_CIRCLE_ID, 'r'), domain: { min: 0, minOpen: true }, src },
-    { t: 'curve', id: TOUCHED_CIRCLE_ID, label: { name: '', kind: 'circle' }, curve: { kind: 'circle', eq }, stated: true, src },
+    ...(radius ? [] : [{ t: 'param' as const, sym: toolSymbol(id, 'r'), domain: { min: 0, minOpen: true }, src }]),
+    { t: 'curve', id, label: { name: '', kind: 'circle' }, curve: { kind: 'circle', eq }, stated: true, src },
   ];
+}
+
+/**
+ * A CIRCLE A SENTENCE DREW WITH ITS CENTRE UNNAMED (ADR-AG-198, ADR-AG-219) — an equation circle over its own tool
+ * symbols (`θ_<id>.a`, `.b`, `.r`): the tangency's created circle, «A על המעגל»'s, and the circles a
+ * `circles-about` sentence draws. Asked of the expression, never of the id, so every way of creating one is one kind.
+ */
+function isCreatedCircle(o: GeoObject): o is CurveObject {
+  return o.kind === 'curve' && JSON.stringify(o.curve).includes(`"${toolSymbol(o.id, '')}`);
+}
+
+/** A fresh id for a circle a `circles-about` sentence draws: `circle-new<k>`, a pair `circle-pair<k>-1` / `-2` (ADR-AG-219). */
+function freshCircleIds(c: Construction, n: number): Id[] {
+  const taken = (id: Id) => c.objects.some((o) => o.id === id);
+  for (let k = 1; ; k += 1) {
+    const ids = n === 2 ? [`circle-pair${k}-1`, `circle-pair${k}-2`] : Array.from({ length: n }, (_, i) => `circle-new${k + i}`);
+    if (!ids.some(taken)) return ids;
+  }
+}
+
+/** A created circle's centre and radius, read off the equation `touchedCircleFacts` writes: (x−a)² + (y−b)² − r². */
+function createdParts(o: CurveObject): { a: Expr; b: Expr; r: Expr } | null {
+  const eq = o.curve.eq as Expr;
+  if (eq.kind !== 'sub' || eq.a.kind !== 'add' || eq.b.kind !== 'pow') return null;
+  const [px, py] = [eq.a.a, eq.a.b];
+  if (px.kind !== 'pow' || py.kind !== 'pow' || px.a.kind !== 'sub' || py.a.kind !== 'sub') return null;
+  return { a: px.a.b, b: py.a.b, r: eq.b.a };
+}
+
+/**
+ * TWO CIRCLES' STATED POSITION, DRAWN BY CONSTRUCTION (#1622 E3, ADR-AG-219) — «מוכל» (`inside`: `b` strictly inside
+ * `a`) and «זרים» (`apart`). Each is a thin region of a random draw once points ride the circles
+ * (measured: «מעגל P מוכל בתוך מעגל O» held at 1 seed of 24; «שני מעגלים זרים» · «C על מעגל P» · «D על מעגל O» at none),
+ * so the distance between the centres is PARAMETRISED by what the relation allows, and the selector beside it stays
+ * the statement:
+ *
+ * - `inside`: s·(R − r), s ∈ [0, 1); a circle the sentence drew inside takes radius k·R, k ∈ (0, 1);
+ * - `apart`: R + r + g, g > 0.
+ *
+ * «נחתכים» needs none: its two crossings already put both circles through two points, and its `cross` selector only
+ * keeps the two circles from being one (measured: parametrising it as well slowed the #1693 sequence tenfold).
+ *
+ * Two circles on centre POINTS: the centre distance is that length (`length-eq`). A circle the sentence DREW (its
+ * centre the tool's symbols): its centre is the other centre plus that distance along the rational direction
+ * ((1−m²), 2m)/(1+m²) — or, beside a centre point, that point is placed there from it (`coord`). Every configuration
+ * of the relation is one value of the symbols, which are the tool's own, sampled and moved by «הציגו תצורה אחרת» —
+ * free, never defaults (ADR-052). Anything else keeps the selector alone (the walk).
+ */
+function relateCircles(
+  c: Construction,
+  rel: 'apart' | 'inside',
+  aId: Id,
+  bId: Id,
+  src: string,
+): { ok: true; next: Construction } | { ok: false; error: ApplyError } {
+  const a = objectById(c, aId);
+  const b = objectById(c, bId);
+  if (!a || !b || a === b) return { ok: false, error: { code: 'unsatisfiable', detail: src } };
+  const sym = (name: string): Expr => ({ kind: 'sym', name });
+  const num = (value: number): Expr => ({ kind: 'num', value });
+  const add = (x: Expr, y: Expr): Expr => ({ kind: 'add', a: x, b: y });
+  const sub = (x: Expr, y: Expr): Expr => ({ kind: 'sub', a: x, b: y });
+  const mul = (x: Expr, y: Expr): Expr => ({ kind: 'mul', a: x, b: y });
+  const partsOf = (o: GeoObject): { a?: Expr; b?: Expr; r: Expr; centre?: Id } | null => {
+    if (o.kind === 'circle-at') return { r: o.r as Expr, centre: o.centre };
+    if (o.kind === 'curve') return createdParts(o);
+    return null;
+  };
+  const pa = partsOf(a);
+  const pb = partsOf(b);
+  if (!pa || !pb || (pa.centre !== undefined && pa.centre === pb.centre)) return { ok: true, next: c };
+  const own = (part: string) => toolSymbol(b.id, part);
+  const params: Fact[] = [];
+  let rB = pb.r;
+  const freeR = isCreatedCircle(b) && JSON.stringify(b.curve).includes(`"${own('r')}"`);
+  // A circle the sentence drew inside another takes radius k·R: every smaller radius, none rejected.
+  if (rel === 'inside' && freeR) {
+    rB = mul(sym(own('k')), pa.r);
+    params.push({ t: 'param', sym: own('k'), domain: { min: 0, max: 1, minOpen: true, maxOpen: true }, src });
+  }
+  const s = sym(own('s'));
+  let distance: Expr;
+  if (rel === 'inside') {
+    distance = mul(s, sub(pa.r, rB));
+    params.push({ t: 'param', sym: own('s'), domain: { min: 0, max: 1, minOpen: false, maxOpen: true }, src });
+  } else {
+    distance = add(add(pa.r, rB), sym(own('g')));
+    params.push({ t: 'param', sym: own('g'), domain: { min: 0, minOpen: true }, src });
+  }
+  // Two centre POINTS: the centre distance is a length given.
+  if (pa.centre !== undefined && pb.centre !== undefined) {
+    const left = parseLengthExpr(`${pa.centre}${pb.centre}`);
+    if (!left) return { ok: true, next: c };
+    const out = applyAll(c, [...params, { t: 'constraint', k: { t: 'length-eq', left, right: { expr: distance, terms: [] } }, src }]);
+    return out.ok ? { ok: true, next: out.next } : out;
+  }
+  const m = sym(own('m'));
+  const mm: Expr = { kind: 'pow', a: m, b: num(2) };
+  const den = add(num(1), mm);
+  const ux: Expr = { kind: 'div', a: sub(num(1), mm), b: den };
+  const uy: Expr = { kind: 'div', a: mul(num(2), m), b: den };
+  params.push({ t: 'param', sym: own('m'), domain: UNBOUNDED, src });
+  let next: Construction = c;
+  const substitute = (name: string, value: Expr) => {
+    next = {
+      ...next,
+      objects: substituteSym(next.objects, name, value),
+      constraints: substituteSym(next.constraints, name, value),
+      params: next.params.filter((p) => p.sym !== name),
+    };
+  };
+  const extra: Fact[] = [];
+  if (isCreatedCircle(b) && pb.a && pb.b) {
+    if (rB !== pb.r) substitute(own('r'), rB);
+    if (pa.a && pa.b) {
+      // A drawn circle beside a drawn circle: its centre is the other's plus the distance.
+      substitute(own('a'), add(pa.a, mul(distance, ux)));
+      substitute(own('b'), add(pa.b, mul(distance, uy)));
+    } else if (pa.centre !== undefined) {
+      // Beside a centre POINT: the point is placed at the distance from the drawn centre (the same freedom, moved).
+      extra.push({ t: 'constraint', k: { t: 'coord', id: pa.centre, x: sub(pb.a, mul(distance, ux)), y: sub(pb.b, mul(distance, uy)) }, src });
+    } else return { ok: true, next: c };
+  } else return { ok: true, next: c };
+  const out = applyAll(next, [...params, ...extra]);
+  return out.ok ? { ok: true, next: out.next } : out;
+}
+
+/** The sibling of a circle one sentence drew as a PAIR (`circle-pair<k>-1` ↔ `-2`), or null (ADR-AG-219). */
+function pairSiblingOf(id: Id): Id | null {
+  const m = /^(circle-pair\d+)-([12])$/.exec(id);
+  return m ? `${m[1]}-${m[2] === '1' ? '2' : '1'}` : null;
+}
+
+/**
+ * ARE TWO CIRCLES INTERCHANGEABLE — does swapping them change no statement of the figure? (#1688 ruling, ADR-AG-219;
+ * 2-D's `autosInterchangeable`, ADR-565 decision 7). Every object, constraint, selector and parameter is serialised
+ * twice — once with the two circles (and the tool symbols spelled from their ids) swapped — and the two multisets
+ * compared. «שני מעגלים נחתכים בנקודות A ו-B» is symmetric (each crossing is on both); «C על מעגל P», a size, or
+ * «מוכל» tells them apart.
+ */
+function interchangeable(c: Construction, a: Id, b: Id): boolean {
+  const swap = (text: string) => text.replace(/circle-pair\d+-[12](?=[".])/g, (m) => (m === a ? b : m === b ? a : m));
+  const bag = (xs: readonly unknown[], swapped: boolean) =>
+    xs.map((x) => (swapped ? swap(JSON.stringify(x)) : JSON.stringify(x))).map(normaliseSymmetric).sort();
+  /*
+   * The STATEMENTS, not the drawing: the two circles' own equations and the tool's symbols that place them are how the
+   * pair is drawn (`relateCircles` puts the second relative to the first), never something the student said.
+   */
+  const mine = (sym: string) => sym.startsWith(toolSymbol(a, '')) || sym.startsWith(toolSymbol(b, ''));
+  const all = [...c.objects.filter((o) => o.id !== a && o.id !== b), ...c.constraints, ...c.selectors, ...c.params.filter((p) => !mine(p.sym))];
+  return JSON.stringify(bag(all, false)) === JSON.stringify(bag(all, true));
+}
+
+/** A symmetric statement written in one order: `apart` / `cross` between two circles read the same either way round. */
+function normaliseSymmetric(text: string): string {
+  const m = /^\{"kind":"sign","q":\{"k":"circles","a":"([^"]+)","b":"([^"]+)","rel":"(?:apart|cross)"\}/.exec(text);
+  if (!m || m[1] <= m[2]) return text;
+  return text.replace(`"a":"${m[1]}","b":"${m[2]}"`, `"a":"${m[2]}","b":"${m[1]}"`);
+}
+
+/**
+ * WHICH UNNAMED CIRCLE A NEW LETTER NAMES (operator ruling 2026-10-02 on #1688, ADR-AG-219). Two freshly drawn circles
+ * that are interchangeable: the first mention of a new letter names the first-drawn one, deterministically, and the
+ * next new letter names the other. Circles a statement tells apart are not picked between: the caller asks which.
+ *
+ * - `name` — the circle the letter names: the first of an interchangeable pair, or the one left unnamed once its
+ *   pair sibling was named;
+ * - `ask` — two or more circles with unnamed centres and no such answer;
+ * - `null` — at most one unnamed circle that is no pair's: the caller keeps its rule (ADR-AG-210 states a new circle).
+ */
+function circleToName(c: Construction): { t: 'name'; host: GeoObject } | { t: 'ask'; circles: GeoObject[] } | null {
+  const unnamed = c.objects.filter((o) => curveKindOf(o) === 'circle' && centreRuleOf(o) !== null && centreIdOf(c, o) === null);
+  for (const o of unnamed) {
+    const sib = pairSiblingOf(o.id);
+    if (!sib || o.id > sib) continue;
+    if (unnamed.some((u) => u.id === sib) && interchangeable(c, o.id, sib)) return { t: 'name', host: o };
+  }
+  for (const o of unnamed) {
+    const sib = pairSiblingOf(o.id);
+    const sibling = sib ? objectById(c, sib) : undefined;
+    if (sibling && centreIdOf(c, sibling) !== null) return { t: 'name', host: o };
+  }
+  return unnamed.length >= 2 ? { t: 'ask', circles: unnamed } : null;
+}
+
+/** Name `host`'s centre `id` (the derivation its centre follows), then re-apply `f` — the naming by order (ADR-AG-219). */
+function namingByOrder(c: Construction, host: GeoObject, id: Id, f: Fact): ApplyOutcome {
+  const rule = centreRuleOf(host);
+  if (!rule) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+  const named = applyFact(c, { t: 'derived', id, rule, src: f.src });
+  if (!named.ok) return named;
+  if (f.t === 'centre-of') return { ...named, effect: 'created' };
+  const out = applyFact(named.next, f);
+  return out.ok ? { ...out, effect: 'created' } : out;
 }
 
 function applyTouchAt(
@@ -2045,6 +2247,69 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * A sentence about THE CIRCLE (ADR-AG-196): bound to the circle `theCircle` resolves, its statement is
      * applied with that circle's id written in; with no circle to bind to, the sentence states its own.
      */
+    /**
+     * A SENTENCE ABOUT ONE OR TWO CIRCLES IT MAY HAVE TO DRAW (#1622 E3, #1693; ADR-AG-219). Each slot resolves to a
+     * circle id, in order — a `new` circle drawn with its centre unnamed (two drawn together are a pair, named by
+     * order on first mention), a `named` circle through the name chain (named by order on an interchangeable pair,
+     * else stated on the letter), `the` circles the figure holds (exactly that many bind, none are drawn, any other
+     * count asks) — and the statement is applied with the ids written in.
+     */
+    case 'circles-about': {
+      let cur = c;
+      const theCount = f.slots.filter((s) => s.k === 'the').length;
+      let bound: Id[] | null = null;
+      if (theCount > 0) {
+        const circles = cur.objects.filter((o) => curveKindOf(o) === 'circle');
+        if (circles.length === theCount) bound = circles.map((o) => o.id);
+        else if (circles.length !== 0) return { ok: false, error: noHost(f.src, 'circle', circles, theCount === 2 ? 2 : undefined) };
+      }
+      const drawn = f.slots.filter((s) => s.k === 'new' || (s.k === 'the' && !bound)).length;
+      const fresh = drawn > 0 ? freshCircleIds(cur, drawn) : [];
+      const ids: Id[] = [];
+      for (const slot of f.slots) {
+        if (slot.k === 'the' && bound) {
+          ids.push(bound.shift()!);
+          continue;
+        }
+        if (slot.k === 'named') {
+          const host = circleByName(cur, slot.name);
+          if (host) {
+            if (curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(cur, numeralCurveId('circle', slot.name)) };
+            ids.push(host.id);
+            continue;
+          }
+          // The circle a letter names, named by order or stated on the letter — `statingNamedCircle` with nothing to re-apply.
+          const stated = statingNamedCircle(cur, slot.name, { t: 'circles-about', slots: [], about: [], src: f.src });
+          if (!stated) return { ok: false, error: unknownRef(cur, numeralCurveId('circle', slot.name)) };
+          if (!stated.ok) return stated;
+          cur = stated.next;
+          const made = circleByName(cur, slot.name);
+          if (!made) return { ok: false, error: unknownRef(cur, numeralCurveId('circle', slot.name)) };
+          ids.push(made.id);
+          continue;
+        }
+        const id = fresh.shift()!;
+        const created = applyAll(cur, touchedCircleFacts(f.src, id, slot.k === 'new' ? slot.r : undefined));
+        if (!created.ok) return created;
+        cur = created.next;
+        ids.push(id);
+      }
+      let text = JSON.stringify(f.about);
+      ids.forEach((id, i) => {
+        text = text.split(CIRCLE_SLOT_SENTINELS[i]).join(id);
+      });
+      const about = (JSON.parse(text) as Fact[]).map((g) => ({ ...g, src: f.src }));
+      // A stated position is drawn by construction, never left to the sampler's luck (ADR-AG-219, `relateCircles`).
+      for (const g of about) {
+        if (g.t !== 'selector' || g.sel.kind !== 'sign' || g.sel.q.k !== 'circles' || (g.sel.q.rel !== 'inside' && g.sel.q.rel !== 'apart')) continue;
+        const placed = relateCircles(cur, g.sel.q.rel, g.sel.q.a, g.sel.q.b, f.src);
+        if (!placed.ok) return placed;
+        cur = placed.next;
+      }
+      const out = applyAll(cur, about);
+      return out.ok && cur !== c ? { ...out, effect: 'created' } : out;
+    }
+
     case 'the-circle': {
       const bound = theCircle(c, f.match);
       if (bound.t === 'ambiguous') return { ok: false, error: noHost(f.src, 'circle', bound.circles) };
@@ -2153,7 +2418,12 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       } else {
         const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
         if (circles.length === 0) return create();
-        if (circles.length > 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
+        if (circles.length > 1) {
+          // «O מרכז המעגל» beside two fresh interchangeable circles names one, by order (#1688 ruling, ADR-AG-219).
+          const pick = objectById(c, f.id) ? null : circleToName(c);
+          if (pick?.t === 'name') return namingByOrder(c, pick.host, f.id, f);
+          return { ok: false, error: noHost(f.src, 'circle', circles) };
+        }
         host = circles[0];
       }
       if (!host) return { ok: false, error: noHost(f.src, 'circle', 0) };
@@ -2439,6 +2709,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         return sameNumbers(host.r, f.value)
           ? { ok: true, next: c, effect: 'known' }
           : { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+      }
+      if (isCreatedCircle(host) && JSON.stringify(host.curve).includes(`"${toolSymbol(host.id, 'r')}"`)) {
+        /*
+         * A CREATED circle's radius is the tool's free symbol (ADR-AG-198): the student just gave it, so it is pinned
+         * exactly as a centred circle's `r_O` is (above) — «A על המעגל» · «רדיוס המעגל הוא 5», «מעגל בקוטר 10» (2-D
+         * sets the radius of its unnamed circle; ADR-AG-219).
+         */
+        const sym = toolSymbol(host.id, 'r');
+        const admitted = admitStated(c, c.params.find((p) => p.sym === sym)?.domain, f.value, f.src);
+        if (!admitted.ok) return admitted;
+        const base = admitted.next;
+        const objects = substituteSym(base.objects, sym, f.value);
+        const constraints = substituteSym(base.constraints, sym, f.value);
+        const restText = JSON.stringify({ objects, constraints });
+        const params = restText.includes(`"${sym}"`) ? base.params : base.params.filter((p) => p.sym !== sym);
+        return { ok: true, next: { ...base, objects, constraints, params }, effect: 'narrowed' };
       }
       if (host.kind === 'curve') {
         // An equation circle's radius is determined by its equation — the sentence is a claim.
@@ -2792,7 +3078,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
                 ? dirRefs(f.sel.q.u)
                 : f.sel.q.k === 'power'
                   ? [f.sel.q.p]
-                  : [f.sel.q.p, f.sel.q.a, f.sel.q.b]
+                  : f.sel.q.k === 'circles' || f.sel.q.k === 'params'
+                    ? []
+                    : f.sel.q.k === 'centres-side'
+                      ? [f.sel.q.p, f.sel.q.q]
+                      : [f.sel.q.p, f.sel.q.a, f.sel.q.b]
               : f.sel.kind === 'coord-compare'
                 ? // Both points of «x_B > x_D» must exist (#1462); a value names none.
                   [f.sel.id, ...('point' in f.sel.rhs ? [f.sel.rhs.point] : [])]
@@ -2812,9 +3102,25 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(c, f.sel.q.u.id) };
       }
       // A circle region names the circle M1 resolved (#1619 B1) — it must still be one.
-      if (f.sel.kind === 'sign' && f.sel.q.k !== 'slope') {
+      if (f.sel.kind === 'sign' && (f.sel.q.k === 'power' || f.sel.q.k === 'arc-side')) {
         const o = objectById(c, f.sel.q.circle);
         if (!o || curveKindOf(o) !== 'circle') return { ok: false, error: unknownRef(c, f.sel.q.circle) };
+      }
+      // Two circles' position names two circles the figure holds (ADR-AG-219).
+      if (f.sel.kind === 'sign' && (f.sel.q.k === 'circles' || f.sel.q.k === 'centres-side')) {
+        for (const id of [f.sel.q.a, f.sel.q.b]) {
+          const o = objectById(c, id);
+          if (!o || curveKindOf(o) !== 'circle') return { ok: false, error: unknownRef(c, id) };
+        }
+      }
+      /*
+       * An order between parameters («R > r», ADR-AG-219) compares symbols the figure USES — a radius letter a
+       * sentence gave. A symbol nothing reads would be a given about nothing: refused naming it, never kept.
+       */
+      if (f.sel.kind === 'sign' && f.sel.q.k === 'params') {
+        const used = JSON.stringify({ o: c.objects, k: c.constraints });
+        const missing = symbolsOf(f.sel.q.e).find((sym) => !used.includes(`"name":"${sym}"`));
+        if (missing !== undefined) return { ok: false, error: { code: 'unknown-reference', detail: missing, expected: 'point' } };
       }
       // Compared structurally: the union's members have different shapes, and a field-by-field test
       // would have to be extended by hand for each new kind — the drift ADR-043 names.

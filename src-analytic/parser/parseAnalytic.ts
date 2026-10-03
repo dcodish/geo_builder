@@ -19,10 +19,10 @@
  */
 import type { DerivedRule, FootLine } from '../engine/derived';
 import { cevianFacts, toolFootFacts, type CevianRole } from '../engine/cevian';
-import { toolPoint } from '../engine/toolLetters';
+import { toolPoint, type ToolPointRole } from '../engine/toolLetters';
 import { isAngleRef, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
-import { RESERVED_SYMBOLS, directionSymbol, mentionsPlane, radiusSymbol } from '../engine/carriers';
+import { RESERVED_SYMBOLS, directionSymbol, mentionsPlane, radiusSymbol, toolSymbol } from '../engine/carriers';
 
 /** A student's VALUE — a number or an expression in parameters, never the plane's x/y (#1496, `mentionsPlane`). */
 function valueExpr(src: string): Expr | null {
@@ -31,7 +31,7 @@ function valueExpr(src: string): Expr | null {
 }
 import { constantLengthExpr, namedLengthPairs, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
-import { CENTRE_SENTINEL, CIRCLE_SENTINEL, UNBOUNDED, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type PerpRef, type Selector } from '../engine/types';
+import { CENTRE_SENTINEL, CIRCLE_SENTINEL, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 import { findProofTarget } from '../../shell/proofTarget';
 import {
@@ -2842,6 +2842,376 @@ function parseChord(line: string): RuleOutcome {
   if (equal) {
     const same = clauseFacts(`${a}${b} = ${c}${d}`, line);
     return same ? made([...chords, ...same]) : null;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// CIRCLES THE SENTENCE DRAWS, AND THE TWO-CIRCLE FIGURES (#1622 slice E3, #1693; ADR-AG-219)
+// ---------------------------------------------------------------------------
+
+/**
+ * The 2-D circle and tangent sentences the corpus does not exercise, read as 2-D reads them (operator ruling
+ * 2026-10-02: *"analytics and 2d should have same user experience"*; each verdict measured through
+ * `decideDeterministic2D` before porting). Every one lowers to statements the engine already has — a point on a
+ * circle, a tangency at a named point (ADR-AG-195), the crossing selectors (#1113), `between` / `beyond` — over the
+ * circles a `circles-about` fact resolves at M1: a circle the sentence DRAWS with its centre unnamed, a circle a
+ * letter NAMES (stated when absent, named by order on a fresh interchangeable pair — the #1688 ruling), or «המעגל» /
+ * «שני המעגלים», the figure's own. Nothing here re-implements a lowering: the slots are ids, and the statement is the
+ * same facts a sentence about a named circle carries.
+ *
+ * Points the student did not name take 2-D's letters through the one table (`toolLetters.ts`, ADR-AG-211): the
+ * crossings A, B; a secant's ends C, D; a tangent's touch point T; the common tangents' touches B, C, D, E.
+ */
+const [SLOT1, SLOT2] = CIRCLE_SLOT_SENTINELS;
+const PI = Math.PI;
+/** «ו-B», «וB», «ו B», ", B", " and B" — the join of a two-name list. */
+const AND_HE = '\\s*(?:,\\s*|\\s+)?ו[-־]?\\s*';
+const AND_ANY = `(?:${AND_HE}|\\s*,?\\s+and\\s+)`;
+
+/** A circle slot's statement: a point on it. */
+const onSlot = (id: Id, slot: string, src: string): Fact => ({ t: 'constraint', k: { t: 'on-curve', id, curve: slot }, src });
+const declareAll = (ids: readonly Id[], src: string): Fact[] => ids.map((id): Fact => ({ t: 'declare', id, src }));
+const segmentFact = (a: Id, b: Id, src: string): Fact => ({ t: 'segment', id: segmentId(a, b), a, b, src });
+/**
+ * The `circles-about` fact, with the pieces it draws stated AFTER it at the top level: a segment's id is its sorted
+ * ends, and the tool's letters re-key a top-level segment from its ends once its placeholders are named
+ * (`resolveToolLetters`) — nested inside the fact, a placeholder sorted into the id would be read as another point.
+ */
+const aboutCircles = (slots: CircleSlot[], about: Fact[], src: string): ParseResult =>
+  made([{ t: 'circles-about', slots, about: about.filter((f) => f.t !== 'segment'), src }, ...about.filter((f) => f.t === 'segment')]);
+
+/**
+ * THE SIZE A CIRCLE IS GIVEN BY — its radius, diameter, circumference or area (2-D's «מעגל O שהיקפו 6π» = radius 3,
+ * «ששטחו 9π», «בקוטר 10»), lowered to the RADIUS it states: the one quantity the circle carries. A letter («שרדיוסו R»)
+ * names the radius, leaving it free (2-D's radius symbol). `null` = not a size this reads.
+ */
+const SIZE_HE = `(?:[שו]?(?:אורך\\s+)?(רדיוסו|קוטרו|היקפו|שטחו)|ב(?:אורך\\s+)?(רדיוס|קוטר|היקף|שטח)|עם\\s+(רדיוס|קוטר|היקף|שטח)(?:\\s+של)?)\\s*(?:(?:${COPULA_WORDS})\\s*|=\\s*)?(\\S+)`;
+const SIZE_EN = `(?:(?:and\\s+)?(?:with\\s+(?:a\\s+|an\\s+)?|whose\\s+|of\\s+)?(radius|diameter|circumference|perimeter|area)(?:\\s+of|\\s+is)?)\\s*=?\\s*(\\S+)`;
+const SIZE_WORD: Record<string, 'r' | 'd' | 'c' | 'a'> = {
+  רדיוסו: 'r', רדיוס: 'r', radius: 'r',
+  קוטרו: 'd', קוטר: 'd', diameter: 'd',
+  היקפו: 'c', היקף: 'c', circumference: 'c', perimeter: 'c',
+  שטחו: 'a', שטח: 'a', area: 'a',
+};
+function radiusOfSize(word: string, text: string): Expr | null {
+  const kind = SIZE_WORD[word.toLowerCase()];
+  if (!kind) return null;
+  // A radius LETTER — «שרדיוסו R» — names the radius (2-D's radius symbol); it stays free (ADR-052).
+  if (kind === 'r' && /^[A-Za-z]$/.test(text) && !RESERVED_SYMBOLS.has(text)) return { kind: 'sym', name: text };
+  const v = roleScalar(text);
+  if (!v) return null;
+  if (kind === 'r') return v;
+  if (kind === 'd') return { kind: 'div', a: v, b: { kind: 'num', value: 2 } };
+  if (kind === 'c') return { kind: 'div', a: v, b: { kind: 'num', value: 2 * PI } };
+  return { kind: 'sqrt', a: { kind: 'div', a: v, b: { kind: 'num', value: PI } } };
+}
+const sizeOf = (m: RegExpExecArray, from: number): Expr | null => {
+  const word = m[from] ?? m[from + 1] ?? m[from + 2];
+  return word ? radiusOfSize(word, m[from + 3]) : null;
+};
+const sizeOfEn = (m: RegExpExecArray, from: number): Expr | null => radiusOfSize(m[from], m[from + 1]);
+
+/** A circle on a NAMED centre with a radius — the canonical creation, lowered once («נתון מעגל O» + `radius-of`). */
+function namedCircleFacts(centre: Id, r: Expr | null, line: string): Fact[] | null {
+  const base = parseClause(`נתון מעגל ${centre}`);
+  if (!base.ok) return null;
+  return [...base.facts, ...(r ? [{ t: 'radius-of' as const, circleId: `circle-at-${centre}`, value: r, src: line }] : [])].map((f) => ({ ...f, src: line }));
+}
+
+/** The two points a sentence names («בנקודות A ו-B», "at A and B"), or the tool's letters for its role. */
+function namedPair(a: string | undefined, b: string | undefined, role: ToolPointRole, key: string): [Id, Id] {
+  return a && b ? [a, b] : [toolPoint(role, `${key}-1`), toolPoint(role, `${key}-2`)];
+}
+
+/** Two points on one circle, the two crossings of the curve they lie on — `crossing-distinct` makes them two (#1113). */
+function crossingsOn(ids: readonly Id[], slots: readonly string[], src: string): Fact[] {
+  return [
+    ...declareAll(ids, src),
+    ...ids.flatMap((id) => slots.map((s) => onSlot(id, s, src))),
+    ...ids.map((id): Fact => ({ t: 'selector', sel: { kind: 'crossing-distinct', id }, src })),
+  ];
+}
+
+/** A line tangent to the circle in `slot` at `at`, the line through `a` and `b` (ADR-AG-195's lowering). */
+const touchAt = (slot: string, at: Id, a: Id, b: Id, src: string): Fact => ({
+  t: 'tangent-of',
+  axes: [],
+  lines: [{ kind: 'points', a, b }],
+  circleId: slot,
+  at,
+  src,
+});
+
+/** A common tangent `a``b` touching the circle in `s1` at `a` and the one in `s2` at `b`; `kind` its stated kind. */
+function commonTangentFacts(a: Id, b: Id, s1: string, s2: string, kind: 'external' | 'internal' | undefined, src: string): Fact[] {
+  return [
+    ...declareAll([a, b], src),
+    touchAt(s1, a, a, b, src),
+    touchAt(s2, b, a, b, src),
+    { t: 'selector', sel: { kind: 'distinct', ids: [a, b] }, src },
+    ...(kind ? [{ t: 'selector' as const, sel: { kind: 'sign' as const, q: { k: 'centres-side' as const, a: s1, b: s2, p: a, q: b }, positive: kind === 'external' }, src }] : []),
+    segmentFact(a, b, src),
+  ];
+}
+
+const TANGENT_KIND: Record<string, 'external' | 'internal'> = {
+  חיצוני: 'external', external: 'external', exterior: 'external',
+  פנימי: 'internal', אלכסוני: 'internal', internal: 'internal', interior: 'internal', transverse: 'internal',
+};
+
+/** «למעגלים O ו-P» / «לשני המעגלים» / "to circles O and P" / "of the two circles" — the two circles a sentence names. */
+function twoCircleSlots(text: string): CircleSlot[] | null {
+  const t = trim(text);
+  if (/^(?:ל|של\s+)?שני\s+ה?מעגלים$|^(?:to|of)\s+(?:the\s+)?(?:two|both)\s+circles$/i.test(t)) return [{ k: 'the' }, { k: 'the' }];
+  const named =
+    new RegExp(`^(?:ל|של\\s+)?ה?מעגלים\\s+(${NAME})${AND_HE}(${NAME})$`).exec(t) ??
+    new RegExp(`^(?:to|of)\\s+(?:the\\s+)?circles\\s+(${NAME})${AND_ANY}(${NAME})$`, 'i').exec(t);
+  return named && named[1] !== named[2] ? [{ k: 'named', name: named[1] }, { k: 'named', name: named[2] }] : null;
+}
+
+/** «מעגל O» / «המעגל» / "circle O" / "the circle" after its preposition — one circle slot. */
+function oneCircleSlot(text: string | undefined): CircleSlot {
+  return text ? { k: 'named', name: text } : { k: 'the' };
+}
+
+function parseCircleFamilies(raw: string): RuleOutcome {
+  const line = trim(raw);
+  const g = line.replace(/^נתו(?:ן|נה|נים|נות)\s*:?\s+/, '').replace(/^given\s*:?\s+/i, '');
+
+  // «מעגל סביב O רדיוס 5» / «מעגל עם מרכז O» — 2-D's spellings of the centred circle, read as «נתון מעגל שמרכזו O ורדיוסו 5».
+  const around =
+    new RegExp(`^מעגל\\s+(?:סביב|עם\\s+מרכז)\\s*(?:ה?נקודה\\s+)?(${NAME})(?:\\s*,?\\s+(?:ו?ב?רדיוס|ש?רדיוסו|ורדיוסו)\\s*(\\S+))?$`).exec(g) ??
+    new RegExp(`^(?:a\\s+)?circle\\s+(?:around|about|cent(?:re|er)ed\\s+at|with\\s+cent(?:re|er))\\s+(${NAME})(?:\\s*,?\\s+(?:with\\s+)?radius\\s+(\\S+))?$`, 'i').exec(g);
+  if (around) {
+    const r = around[2] !== undefined ? radiusOfSize('radius', around[2]) : null;
+    if (around[2] !== undefined && !r) return refuse('bad-equation', around[2]);
+    const facts = namedCircleFacts(around[1], r, line);
+    return facts ? made(facts) : null;
+  }
+
+  // «מעגל O שהיקפו 6π» · «מעגל O ששטחו 9π» · «מעגל O שקוטרו 10» · «מעגל O שרדיוסו R» — a named circle sized.
+  const namedSized = new RegExp(`^ה?מעגל\\s+(${NAME})\\s+${SIZE_HE}$`).exec(g);
+  const namedSizedEn = namedSized ? null : new RegExp(`^(?:the\\s+|a\\s+)?circle\\s+(${NAME})\\s+${SIZE_EN}$`, 'i').exec(g);
+  if (namedSized || namedSizedEn) {
+    const r = namedSized ? sizeOf(namedSized, 2) : sizeOfEn(namedSizedEn!, 2);
+    // A numeric diameter only: «נתון מעגל שקוטרו BD» names a diameter by its ends, `parseCircleThru`'s.
+    if (!r) return null;
+    const facts = namedCircleFacts((namedSized ?? namedSizedEn)![1], r, line);
+    return facts ? made(facts) : null;
+  }
+
+  // «נתון מעגל» · «מעגל» · «מעגל בקוטר 10» · «מעגל שרדיוסו 5» — a NEW circle, its centre unnamed (2-D draws one each time).
+  if (/^מעגל$|^(?:a\s+)?circle$/i.test(g)) return aboutCircles([{ k: 'new' }], [], line);
+  const sized = new RegExp(`^מעגל\\s+${SIZE_HE}$`).exec(g);
+  const sizedEn = sized ? null : new RegExp(`^(?:a\\s+)?circle\\s+${SIZE_EN}$`, 'i').exec(g);
+  if (sized || sizedEn) {
+    const r = sized ? sizeOf(sized, 1) : sizeOfEn(sizedEn!, 1);
+    if (!r) return null;
+    return aboutCircles([{ k: 'new', r }], [], line);
+  }
+
+  // «מרכז המעגל» on its own — the circle's centre, of the circle the figure has (drawn when there is none). It adds
+  // nothing when the circle stands: the centre is shown, unnamed, until a sentence names it (#1673, ADR-AG-210).
+  if (/^(?:ה?נקודת\s+)?מרכז\s+ה?מעגל$|^(?:the\s+)?cent(?:re|er)\s+of\s+the\s+circle$/i.test(g)) return aboutCircles([{ k: 'the' }], [], line);
+
+  // «שני מעגלים …» — two circles the sentence draws, a PAIR (interchangeable until a statement tells them apart).
+  const two = /^שני\s+מעגלים(?:\s+(.+))?$/.exec(g) ?? /^(?:the\s+)?two\s+(?:(disjoint|intersecting|nested|concentric)\s+)?circles(?:\s+(.+))?$/i.exec(g);
+  if (two) {
+    const he = /^שני/.test(g);
+    const adjective = he ? undefined : two[1]?.toLowerCase();
+    const rest = trim((he ? two[1] : two[2]) ?? '');
+    const pair: CircleSlot[] = [{ k: 'new' }, { k: 'new' }];
+    if (!rest && !adjective) return aboutCircles(pair, [], line);
+    if ((he && /^זרים$/.test(rest)) || (adjective === 'disjoint' && !rest)) {
+      return aboutCircles(pair, [{ t: 'selector', sel: { kind: 'sign', q: { k: 'circles', a: SLOT1, b: SLOT2, rel: 'apart' }, positive: true }, src: line }], line);
+    }
+    if ((he && /^מוכלים$/.test(rest)) || (adjective === 'nested' && !rest)) {
+      return aboutCircles(pair, [{ t: 'selector', sel: { kind: 'sign', q: { k: 'circles', a: SLOT1, b: SLOT2, rel: 'inside' }, positive: true }, src: line }], line);
+    }
+    const cross =
+      (he ? new RegExp(`^נחתכים(?:\\s+(?:זה\\s+עם\\s+זה\\s+)?ב(?:נקודות|-)?\\s*(${NAME})${AND_HE}(${NAME}))?$`).exec(rest) : null) ??
+      (!he && adjective === 'intersecting' && !rest ? ([''] as unknown as RegExpExecArray) : null) ??
+      (!he && !adjective ? new RegExp(`^intersect(?:\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME}))?$`, 'i').exec(rest) : null);
+    if (cross) {
+      const [a, b] = namedPair(cross[1], cross[2], 'crossing', 'two-circles');
+      // Two crossings of two DIFFERENT circles: both points on both is also true of one circle drawn twice.
+      return aboutCircles(pair, [
+        ...crossingsOn([a, b], [SLOT1, SLOT2], line),
+        { t: 'selector', sel: { kind: 'sign', q: { k: 'circles', a: SLOT1, b: SLOT2, rel: 'cross' }, positive: true }, src: line },
+      ], line);
+    }
+    const concentric =
+      (he ? new RegExp(`^(?:בעלי|עם)\\s+מרכז\\s+משותף\\s+(${NAME})$`).exec(rest) : null) ??
+      (!he ? new RegExp(`^with\\s+(?:a\\s+)?common\\s+cent(?:re|er)\\s+(${NAME})$`, 'i').exec(rest) : null) ??
+      (!he && adjective === 'concentric' ? new RegExp(`^(?:with\\s+|about\\s+|around\\s+)(?:cent(?:re|er)\\s+)?(${NAME})$`, 'i').exec(rest) : null);
+    if (concentric) {
+      const o = concentric[1];
+      const outer = namedCircleFacts(o, null, line);
+      if (!outer) return null;
+      const id = `circle-at-${o}-2`;
+      const sym = toolSymbol(id, 'r');
+      return made([
+        ...outer,
+        { t: 'param', sym, domain: { ...UNBOUNDED, min: 0, minOpen: true }, src: line },
+        { t: 'circle-at', id, centre: o, r: { kind: 'sym', name: sym }, src: line },
+        // Concentric circles are two circles: the second is the inner one (2-D's radius order), a region, not a size.
+        { t: 'selector', sel: { kind: 'sign', q: { k: 'circles', a: `circle-at-${o}`, b: id, rel: 'larger' }, positive: true }, src: line },
+      ]);
+    }
+    return null;
+  }
+
+  // «מעגל P מוכל בתוך מעגל O» · «מעגל מוכל בתוך המעגל הגדול» — one circle strictly inside the other.
+  const inside =
+    new RegExp(`^מעגל(?:\\s+(${NAME}))?\\s+(?:ה)?מוכל(?:\\s+(?:בתוך\\s+|ב)ה?מעגל(?:\\s+(${NAME})|\\s+ה?גדול)?)?$`).exec(g) ??
+    new RegExp(`^(?:a\\s+)?circle(?:\\s+(${NAME}))?\\s+(?:is\\s+|lies\\s+)?(?:contained\\s+)?(?:in|inside|within)\\s+(?:the\\s+)?(?:big\\s+|large\\s+|larger\\s+)?circle(?:\\s+(${NAME}))?$`, 'i').exec(g);
+  if (inside) {
+    const inner: CircleSlot = inside[1] ? { k: 'named', name: inside[1] } : { k: 'new' };
+    const outer = oneCircleSlot(inside[2]);
+    if (inside[1] && inside[1] === inside[2]) return refuse('repeated-vertex', line);
+    return aboutCircles([outer, inner], [{ t: 'selector', sel: { kind: 'sign', q: { k: 'circles', a: SLOT1, b: SLOT2, rel: 'inside' }, positive: true }, src: line }], line);
+  }
+
+  // «ישר חותך את שני המעגלים בנקודות C, D, E ו-F» — the first two on the first circle, the last two on the second, in order.
+  const fourCut =
+    new RegExp(`^ישר\\s+(?:ה)?חות(?:ך|כת)\\s+את\\s+שני\\s+ה?מעגלים\\s+ב(?:נקודות\\s+)?(${NAME})\\s*,\\s*(${NAME})\\s*,\\s*(${NAME})${AND_HE}(${NAME})$`).exec(g) ??
+    new RegExp(`^(?:a\\s+)?line\\s+(?:cuts|cutting|intersects)\\s+(?:the\\s+)?(?:two|both)\\s+circles\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})\\s*,\\s*(${NAME})\\s*,\\s*(${NAME})${AND_ANY}(${NAME})$`, 'i').exec(g);
+  if (fourCut) {
+    const [, c1, d1, e1, f1] = fourCut;
+    if (new Set([c1, d1, e1, f1]).size !== 4) return refuse('repeated-vertex', line);
+    return aboutCircles([{ k: 'the' }, { k: 'the' }], [
+      ...declareAll([c1, d1, e1, f1], line),
+      onSlot(c1, SLOT1, line), onSlot(d1, SLOT1, line), onSlot(e1, SLOT2, line), onSlot(f1, SLOT2, line),
+      { t: 'constraint', k: { t: 'on-line-2pt', id: d1, a: c1, b: f1 }, src: line },
+      { t: 'constraint', k: { t: 'on-line-2pt', id: e1, a: c1, b: f1 }, src: line },
+      { t: 'selector', sel: { kind: 'distinct', ids: [c1, d1, e1, f1] }, src: line },
+      // «… בנקודות C, D, E ו-F» names them along the line, in order.
+      { t: 'selector', sel: { kind: 'between', id: d1, a: c1, b: e1 }, src: line },
+      { t: 'selector', sel: { kind: 'between', id: e1, a: d1, b: f1 }, src: line },
+      segmentFact(c1, f1, line),
+    ], line);
+  }
+
+  // «ישר החותך את המעגל בשתי נקודות» · «… בנקודות C ו-D» — a secant of the circle, its two ends named or the tool's.
+  const secant =
+    new RegExp(`^ישר\\s+(?:ה|ש)?חות(?:ך|כת)\\s+את\\s+ה?מעגל(?:\\s+(${NAME}))?\\s+ב(?:שתי\\s+נקודות|נקודות\\s+(${NAME})${AND_HE}(${NAME}))$`).exec(g) ??
+    new RegExp(`^(?:a\\s+)?line\\s+(?:cutting|that\\s+cuts|cuts|intersecting|intersects)\\s+(?:the\\s+)?circle(?:\\s+(${NAME}))?\\s+(?:at|in)\\s+(?:two\\s+points|(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME}))$`, 'i').exec(g);
+  if (secant) {
+    const [a, b] = namedPair(secant[2], secant[3], 'secant', 'secant');
+    if (a === b) return refuse('repeated-vertex', line);
+    return aboutCircles([oneCircleSlot(secant[1])], [...crossingsOn([a, b], [SLOT1], line), segmentFact(a, b, line)], line);
+  }
+
+  // «מנקודה E מחוץ למעגל O ישר חותך את המעגל בנקודות A ו-B» — a secant from an external point: E, A, B in a row, A near.
+  const fromOutside =
+    new RegExp(`^מ(?:ה)?נקודה\\s+(${NAME})\\s+(?:ה?נמצאת\\s+)?מחוץ\\s+למעגל(?:\\s+(${NAME}))?\\s*,?\\s+ישר\\s+(?:ה|ש)?חות(?:ך|כת)\\s+את\\s+ה?מעגל(?:\\s+${NAME})?\\s+ב(?:נקודות\\s+)?(${NAME})${AND_HE}(${NAME})$`).exec(g) ??
+    new RegExp(`^from\\s+(?:a\\s+|the\\s+)?point\\s+(${NAME})\\s+outside\\s+(?:the\\s+)?circle(?:\\s+(${NAME}))?\\s*,?\\s+a\\s+line\\s+(?:cuts|intersects|meets)\\s+(?:the\\s+)?circle(?:\\s+${NAME})?\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME})$`, 'i').exec(g);
+  if (fromOutside) {
+    const [, e, o, a, b] = fromOutside;
+    if (new Set([e, a, b]).size !== 3) return refuse('repeated-vertex', line);
+    return aboutCircles([oneCircleSlot(o)], [
+      ...crossingsOn([a, b], [SLOT1], line),
+      { t: 'declare', id: e, src: line },
+      { t: 'constraint', k: { t: 'on-line-2pt', id: e, a, b }, src: line },
+      { t: 'selector', sel: { kind: 'beyond', id: e, a: b, b: a }, src: line },
+      segmentFact(e, a, line),
+      segmentFact(a, b, line),
+    ], line);
+  }
+
+  // «מנקודה E משיק נוגע במעגל O בנקודה D» · «מנקודה E מחוץ למעגל O שני משיקים נוגעים במעגל בנקודות A ו-B» — tangents from a point.
+  const fromPoint =
+    new RegExp(`^מ(?:ה)?נקודה\\s+(${NAME})(?:\\s+(?:ה?נמצאת\\s+)?מחוץ\\s+למעגל(?:\\s+(${NAME}))?)?\\s*,?\\s+(?:(שני\\s+משיקים\\s+נוגעים)|משיק\\s+נוגע)\\s+ב?ה?מעגל(?:\\s+(${NAME}))?\\s+ב(?:נקודה\\s+(${NAME})|נקודות\\s+(${NAME})${AND_HE}(${NAME}))$`).exec(g) ??
+    new RegExp(`^from\\s+(?:a\\s+|the\\s+)?point\\s+(${NAME})(?:\\s+outside\\s+(?:the\\s+)?circle(?:\\s+(${NAME}))?)?\\s*,?\\s+(?:(two\\s+tangents\\s+touch)|a\\s+tangent\\s+touches)\\s+(?:the\\s+)?circle(?:\\s+(${NAME}))?\\s+at\\s+(?:(?:the\\s+)?(?:point\\s+)?(${NAME})|(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME}))$`, 'i').exec(g);
+  if (fromPoint) {
+    const [, e, o1, twoWord, o2, one, a2, b2] = fromPoint;
+    if (o1 && o2 && o1 !== o2) return null;
+    const touches = twoWord ? (a2 ? [a2, b2] : null) : one ? [one] : null;
+    if (!touches) return null;
+    if (new Set([e, ...touches]).size !== touches.length + 1) return refuse('repeated-vertex', line);
+    return aboutCircles([oneCircleSlot(o1 ?? o2)], [
+      ...declareAll([e, ...touches], line),
+      ...touches.map((t) => touchAt(SLOT1, t, e, t, line)),
+      { t: 'selector', sel: { kind: 'distinct', ids: [e, ...touches] }, src: line },
+      ...touches.map((t) => segmentFact(e, t, line)),
+    ], line);
+  }
+
+  // «משיק למעגל» — a tangent at a touch point the tool names (2-D's T).
+  if (/^משיק\s+למעגל$|^(?:a\s+)?tangent\s+(?:line\s+)?to\s+the\s+circle$/i.test(g)) {
+    const t = toolPoint('touch', 'tangent');
+    return aboutCircles([{ k: 'the' }], [
+      { t: 'declare', id: t, src: line },
+      onSlot(t, SLOT1, line),
+      { t: 'line-at', id: tangentLineId(t), through: t, dir: { k: 'radius', circle: SLOT1, at: t }, perp: true, src: line },
+    ], line);
+  }
+
+  // «AB משיק משותף (חיצוני|פנימי)? למעגלים O ו-P» · «… לשני המעגלים» — a common tangent, touching the first at A.
+  const common =
+    new RegExp(`^(?:ה?(?:ישר|קטע)\\s+)?(${NAME})(${NAME})\\s+(?:הוא\\s+)?משיק\\s+משותף(?:\\s+(חיצוני|פנימי|אלכסוני))?\\s+(.+?)(?:\\s+ב(?:נקודה\\s+|-)(${NAME}))?$`).exec(g) ??
+    new RegExp(`^(?:the\\s+(?:line|segment)\\s+)?(${NAME})(${NAME})\\s+is\\s+(?:a|an|the)\\s+(?:(external|exterior|internal|interior|transverse)\\s+)?common\\s+tangent\\s+((?:to|of)\\s+.+?)(?:\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME}))?$`, 'i').exec(g);
+  if (common) {
+    const [, a, b, kindWord, target, at] = common;
+    if (a === b) return refuse('repeated-vertex', line);
+    const slots = twoCircleSlots(target);
+    if (!slots) return null;
+    const kind = kindWord ? TANGENT_KIND[kindWord.toLowerCase()] : undefined;
+    if (!at) return aboutCircles(slots, commonTangentFacts(a, b, SLOT1, SLOT2, kind, line), line);
+    // «CD משיק משותף למעגלים O ו-P בנקודה M» — the circles touch at M, and CD is the tangent there, M between C and D.
+    if (kindWord || slots[0].k !== 'named' || slots[1].k !== 'named' || at === a || at === b) return null;
+    const [o, p] = [slots[0].name, slots[1].name];
+    const touch = parseClause(`מעגל ${o} ומעגל ${p} משיקים זה לזה בנקודה ${at}`);
+    const tangent = parseClause(`הישר ${a}${b} משיק למעגל ${o} בנקודה ${at}`);
+    if (!touch.ok || !tangent.ok) return null;
+    return aboutCircles(slots, [
+      ...touch.facts,
+      ...tangent.facts,
+      { t: 'selector', sel: { kind: 'between', id: at, a, b }, src: line },
+    ], line);
+  }
+
+  // «מנקודה A יוצאים שני משיקים לשני המעגלים» — the two common tangents through A (2-D's B, C and D, E their touches).
+  const fromA =
+    new RegExp(`^מ(?:ה)?נקודה\\s+(${NAME})\\s+(?:יוצאים\\s+שני\\s+משיקים|יוצא\\s+משיק)\\s+(?:משותפים\\s+|משותף\\s+)?לשני\\s+ה?מעגלים$`).exec(g) ??
+    new RegExp(`^from\\s+(?:the\\s+)?point\\s+(${NAME})\\s+(?:two\\s+(?:common\\s+)?tangents|a\\s+(?:common\\s+)?tangent)\\s+(?:are\\s+drawn\\s+|is\\s+drawn\\s+)?to\\s+(?:the\\s+)?(?:two|both)\\s+circles$`, 'i').exec(g);
+  if (fromA) {
+    const p = fromA[1];
+    const twoTangents = /שני\s+משיקים|two\s+/i.test(g);
+    const pts = (twoTangents ? ['b1', 'c1', 'b2', 'c2'] : ['b1', 'c1']).map((k) => toolPoint('common', k));
+    const facts: Fact[] = [{ t: 'declare', id: p, src: line }];
+    for (let i = 0; i < pts.length; i += 2) {
+      const [t1, t2] = [pts[i], pts[i + 1]];
+      facts.push(...declareAll([t1, t2], line), touchAt(SLOT1, t1, t1, t2, line), touchAt(SLOT2, t2, t1, t2, line));
+      facts.push({ t: 'constraint', k: { t: 'on-line-2pt', id: p, a: t1, b: t2 }, src: line });
+      facts.push(segmentFact(t1, t2, line), segmentFact(p, t1, line));
+    }
+    facts.push({ t: 'selector', sel: { kind: 'distinct', ids: [p, ...pts] }, src: line });
+    return aboutCircles([{ k: 'the' }, { k: 'the' }], facts, line);
+  }
+
+  // «הישר AC פוגש את מעגל P בנקודה E» — «פוגש» is «חותך» (2-D's order-agnostic crossing).
+  // «AB מיתר במעגל O ומשיק למעגל P» — a chord of one circle tangent to the other: the two sentences it joins.
+  const chordTangent =
+    new RegExp(`^(${NAME}${NAME})\\s+(?:הוא\\s+)?(מיתר\\s+ב(?:ה?מעגל)(?:\\s+${NAME})?)\\s*,?\\s+ו(?:הוא\\s+)?(משיק\\s+ל(?:ה?מעגל)(?:\\s+${NAME})?)$`).exec(g) ??
+    new RegExp(`^(${NAME}${NAME})\\s+is\\s+a\\s+(chord\\s+of\\s+(?:the\\s+)?circle(?:\\s+${NAME})?)\\s*,?\\s+and\\s+(?:is\\s+)?(tangent\\s+to\\s+(?:the\\s+)?circle(?:\\s+${NAME})?)$`, 'i').exec(g);
+  if (chordTangent) {
+    const [, ab, chord, tangent] = chordTangent;
+    const en = /^chord/i.test(chord);
+    return viaCanonical(line, null, () => (en ? [`${ab} is a ${chord}`, `${ab} is ${tangent}`] : [`${ab} ${chord}`, `${ab} ${tangent}`]));
+  }
+
+  const meets = new RegExp(`^(ה?ישר\\s+${NAME}${NAME})\\s+פוגש\\s+את\\s+(ה?מעגל(?:\\s+${NAME})?)\\s+ב(?:נקודה\\s+|-)(${NAME})$`).exec(g);
+  if (meets) return viaCanonical(line, null, () => [`${meets[1]} חותך את ${meets[2]} בנקודה ${meets[3]}`]);
+  const meetsEn = new RegExp(`^(?:the\\s+)?line\\s+(${NAME}${NAME})\\s+meets\\s+(?:the\\s+)?circle(?:\\s+(${NAME}))?\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`, 'i').exec(g);
+  if (meetsEn) return viaCanonical(line, null, () => [`הישר ${meetsEn[1]} חותך את ${meetsEn[2] ? `מעגל ${meetsEn[2]}` : 'המעגל'} בנקודה ${meetsEn[3]}`]);
+
+  // «R > r» — an order between two radius letters (2-D's `set-radius-order`), a region of the parameters.
+  const order = /^([A-Za-z])\s*([<>])\s*([A-Za-z])$/.exec(normalizeMath(line));
+  if (order && order[1] !== order[3] && !RESERVED_SYMBOLS.has(order[1]) && !RESERVED_SYMBOLS.has(order[3])) {
+    const [big, small] = order[2] === '>' ? [order[1], order[3]] : [order[3], order[1]];
+    return made([{ t: 'selector', sel: { kind: 'sign', q: { k: 'params', e: { kind: 'sub', a: { kind: 'sym', name: big }, b: { kind: 'sym', name: small } } }, positive: true }, src: line }]);
   }
   return null;
 }
@@ -5859,6 +6229,10 @@ function parseClauseRules(raw: string): ParseResult {
   // «מעגל שמרכזו C» off the front of «מעגל שמרכזו C חסום במשולש AOB».
   const inscribed = parseInscribed(line);
   if (inscribed) return inscribed;
+  // The circles a sentence draws, and the two-circle figures (#1622 E3, ADR-AG-219) — before the tangent object, whose
+  // noun reader would take «משיק למעגל» as the reference «המשיק», and before `parseCircleAt`'s subject reader.
+  const circleFamilies = parseCircleFamilies(line);
+  if (circleFamilies) return circleFamilies;
   // The tangent as an object and chords (#1619 B3) — before `parseCircleAt`, whose verb split would
   // read «משוואת המשיק …» as a subject «משוואת» before the verb «המשיק».
   const tangentObject = parseTangentObject(line) ?? parseChord(line);

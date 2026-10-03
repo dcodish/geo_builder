@@ -25,7 +25,7 @@
 import { sameDerivation } from './sameDerivation';
 import type { Fact, Id } from './types';
 
-export type ToolPointRole = 'midpoint' | 'midpoint-2' | 'foot';
+export type ToolPointRole = 'midpoint' | 'midpoint-2' | 'foot' | 'crossing' | 'secant' | 'touch' | 'common';
 
 /** The ONE role → letters table. The first free letter wins; then 2-D's pool; then the first letter subscripted. */
 export const TOOL_LETTERS: Readonly<Record<ToolPointRole, string>> = {
@@ -35,6 +35,16 @@ export const TOOL_LETTERS: Readonly<Record<ToolPointRole, string>> = {
   'midpoint-2': 'NPQS',
   /** The foot of a perpendicular or an altitude: 2-D's F, G, H, P with F → H (#1167). */
   foot: 'HGP',
+  /*
+   * The circle sentences' points (#1622 E3, ADR-AG-219), measured on 2-D: «שני מעגלים נחתכים» names its crossings A, B
+   * (B, C beside an A); «ישר החותך את המעגל בשתי נקודות» its ends C, D; «משיק למעגל» its touch point T (S beside a T);
+   * «מנקודה A יוצאים שני משיקים לשני המעגלים» its touches B, C, D, E. F is skipped, as for the foot: it is this tool's
+   * focus letter (#1167).
+   */
+  crossing: 'ABCDE',
+  secant: 'CDEGH',
+  touch: 'TS',
+  common: 'BCDEGH',
 };
 /** 2-D's `freeLabel` pool, minus nothing: it holds no F. */
 const POOL = 'MNPQRSTUVWXYZKLGHIJ';

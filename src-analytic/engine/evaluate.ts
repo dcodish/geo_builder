@@ -784,7 +784,7 @@ function crossingSiblings(c: Construction, id: Id, at: Map<Id, Pt>): Id[] {
  * never reads as "outside" by a rounding error. `null` when something it needs is not placed.
  */
 export function circleQuantity(
-  q: Exclude<Extract<Selector, { kind: 'sign' }>['q'], { k: 'slope' }>,
+  q: Extract<Extract<Selector, { kind: 'sign' }>['q'], { k: 'power' | 'arc-side' }>,
   at: (id: Id) => Pt | null,
   curveAt: (id: Id) => NumCurve | null,
 ): number | null {
@@ -799,6 +799,39 @@ export function circleQuantity(
   if (!a || !b) return null;
   const side = (x: number, y: number) => (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
   return zero(side(p.x, p.y)) * zero(side(k.cx, k.cy));
+}
+
+/**
+ * TWO CIRCLES' QUANTITY at this configuration (#1622 E3, ADR-AG-219) — their mutual position (`circles`) or the
+ * sides of a common tangent their centres are on (`centres-side`). Read off the SOLVED circles, so a circle on a
+ * centre point, an equation circle and a created circle are one reading. Like {@link circleQuantity}, a value within
+ * the solver's resolution of zero is ON the boundary and counts as neither side — two circles the givens make
+ * touch are not "apart", a centre ON the tangent is on neither side. `null` when an operand is not placed.
+ */
+export function circlePairQuantity(
+  q: Extract<Extract<Selector, { kind: 'sign' }>['q'], { k: 'circles' | 'centres-side' }>,
+  at: (id: Id) => Pt | null,
+  curveAt: (id: Id) => NumCurve | null,
+): number | null {
+  const a = curveAt(q.a);
+  const b = curveAt(q.b);
+  if (!a || !b || a.kind !== 'circle' || b.kind !== 'circle') return null;
+  const scale = Math.max(1, a.r, b.r);
+  const zero = (v: number) => (Math.abs(v) <= SOLVE_RESOLUTION * scale ? 0 : v);
+  if (q.k === 'circles') {
+    const d = Math.hypot(a.cx - b.cx, a.cy - b.cy);
+    if (q.rel === 'apart') return zero(d - (a.r + b.r));
+    if (q.rel === 'inside') return zero(a.r - b.r - d);
+    if (q.rel === 'cross') return zero(d - Math.abs(a.r - b.r));
+    return zero(a.r - b.r);
+  }
+  const p = at(q.p);
+  const r = at(q.q);
+  if (!p || !r) return null;
+  const len = Math.hypot(r.x - p.x, r.y - p.y);
+  if (len < 1e-12) return null;
+  const side = (x: number, y: number) => ((r.x - p.x) * (y - p.y) - (r.y - p.y) * (x - p.x)) / len;
+  return zero(side(a.cx, a.cy)) * zero(side(b.cx, b.cy));
 }
 
 /**
@@ -831,6 +864,18 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
      */
     if (s.kind === 'sign') {
       const atFn = (id: Id) => at.get(id) ?? null;
+      // A stated order between parameters («R > r», ADR-AG-219): the expression's value at this configuration.
+      if (s.q.k === 'params') {
+        const v = evalExpr(s.q.e, env);
+        if (!Number.isFinite(v)) return true; // a symbol not in this configuration judges nothing, as below
+        const zero = Math.abs(v) <= SOLVE_RESOLUTION * Math.max(1, Math.abs(v));
+        return !zero && (s.positive ? v > 0 : v < 0);
+      }
+      if (s.q.k === 'circles' || s.q.k === 'centres-side') {
+        const q = circlePairQuantity(s.q, atFn, curveAtOf(c, env, atFn));
+        if (q === null) return true; // an operand not placed judges nothing, as below
+        return s.positive ? q > 0 : q < 0;
+      }
       if (s.q.k !== 'slope') {
         const q = circleQuantity(s.q, atFn, curveAtOf(c, env, atFn));
         if (q === null) return true; // an operand not placed (or a vacant circle) judges nothing, as below
