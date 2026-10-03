@@ -1647,3 +1647,7 @@ over all four (ADR-041).
 ### `trig-given-label-is-the-angle-1718` — «tan∢ABC = 2» labels the wedge «63.43°», only the angle (#1718, ADR-572)
 
 **Guards against:** a trig given labelled by its ratio. ADR-566 put the typed given on the measure, so the wedge read «tan=2»; the operator ruled the figure shows only the angle it draws. **Asserts** the operator's exact lines: ∠ABC = atan 2 as drawn and the wedge text exactly «63.43°» (the shared display rounder). The seed sweep, cos / cot / negative values and the signed-fraction accounting are in `src/__tests__/issue-1718-trig-angle-label.test.ts`.
+
+### `sine-is-a-two-angle-choice-1711` — «sin∢ACB = 3/4» builds ∠C ≈ 48.59°, and «הציגו תצורה אחרת» reaches ≈ 131.41° (#1711, ADR-573)
+
+**Guards against:** a sine refused (ADR-566's `sine-two-angles`), or drawn at one root with the other unreachable. The operator ruled the two angles a configuration choice the button cycles. **Asserts** the operator's exact lines: the acute default as drawn and labelled «48.59°», and one press of the button (`searchAnotherView`) reaching the obtuse root labelled «131.41°». The only-one-root cases (obtuse stated before and after the sine, an angle sum), the two-sine product, the ambiguous case and the refusals are in `src/__tests__/issue-1711-sine-choice.test.ts`.

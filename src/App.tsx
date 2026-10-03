@@ -30,7 +30,7 @@ import { ToolButton } from '../shell/frame/ToolButton';
 // #1376: the row's ORDER is a shared contract — a product supplies actions by id, never by position.
 import { orderToolActions } from '../shell/frame/toolRow';
 import registry from '../products.json';
-import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, unstatedChoices, VARIANT_COUNT } from '@/engine';
+import { cyclableVariant, firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, unstatedChoices } from '@/engine';
 import { viewDeltaOf } from '@/store/geoStore';
 import type { ViewDelta, ViewDeltaItem } from '@/store/geoStore';
 import { unstatedChoiceText } from '@/ui/unstatedChoice';
@@ -1016,9 +1016,10 @@ export default function App() {
   // `firstCyclableBranch` excludes it and "show another configuration" resamples the circles
   // instead. With no cyclable branch, it re-samples the free DOFs. (Single source of truth, ADR-043.)
   const branchId = firstCyclableBranch(construction);
-  // A kite/isosceles whose equal-pair is a cyclable VARIANT (ADR-138) — so "show another configuration"
-  // offers to flip which sides are equal even when the shape is otherwise determined.
-  const hasVariant = facts.some((f) => f.enabled && f.cmd.type === 'shape-variant' && VARIANT_COUNT[f.cmd.shape] > 1);
+  // Any cyclable VARIANT — a kite/isosceles equal-pair (ADR-138), an inscribed seating, a sine's two roots
+  // (#1711, ADR-573) — so "show another configuration" offers it even when the figure is otherwise
+  // determined (SSA: «AB = 4», «AC = 3», «sin∢ACB = 3/4»). The search's OWN predicate, never restated.
+  const hasVariant = facts.some((f) => f.enabled && cyclableVariant(f.cmd));
   // #786 (ADR-460 Am. 3, play amendment 2026-09-13): the one-fact-per-line ADVISORY is a property of the
   // committed STEP — the line packed two independent constructs — so it lives on the step's row, derived on
   // every render from the step's own utterance (the same discriminator the seam uses), not only as the
