@@ -1540,6 +1540,10 @@ sounds: they are not composed strings. A tick is `String(r)` for a number the ax
 carries its own id — single-script by construction, with no Hebrew to mix and nothing to reorder. The
 seam covers every channel whose text is BUILT from parts, which is every channel where the defect can
 occur.
+### Where a stated length is written ([ADR-AG-223](06c-decisions-analytic.md#adr-ag-223), #1717)
+
+`buildScene` places every stated length through `placeLengthLabels`, after the point labels exist. The rule is 2-D's (copied, never imported): the label starts at the midpoint and moves along the normal away from the figure's centroid. It then steps outward until its box clears every point label, point dot, drawn segment and earlier length label, and each axis's whole row of numbers. The row is one band, because a number standing among the ticks reads as a tick. The label is written in the figure's blue, as 2-D writes its values. If the outward side never clears, it tries the inward side. Box widths are estimated at 0.6 em per glyph, 2-D's own estimate. A segment through the centroid takes a fixed orientation, so its label cannot flip between seeds. The scene hands the label's centre to `Figure.tsx`. The label and tick geometry are shared constants (`POINT_LABEL`, `LENGTH_LABEL_FONT`, `TICK_LABEL`), so painting and placement agree. This is the second copy of the rule after 2-D. 3-D uses a fixed offset, so nothing is hoisted to `shell/`.
+
 ## A curve reads as an equation plus its properties ([ADR-AG-097](06c-decisions-analytic.md#adr-ag-097))
 
 `curveParts(c: NumCurve) → { equation, details? }` is the tree's ONE curve-text decision, in
@@ -2309,3 +2313,11 @@ No new constraint kind and no new solver: every form lowers to the `length-eq` t
 - **The region choice.** `Selector` gains `{ kind: 'choice'; options: Selector[] }`. `evaluateUncached` resolves it at the choice seed (`resolveSelectorChoices`, the `resolveChoices` rule) and `choiceCount` counts it, so `evaluateTryingChoices` passes over a dead option at the same samples (#1642). `failingSelectors` reads an unresolved choice as "some option holds"; the selector-reference check in M1 recurses into the options. «משולש קהה זווית ABC» (`OBTUSE_HE` / `OBTUSE_EN` beside the acute adjective, and `ANGLE_ADJECTIVE_HE` in the letters-first frame) lowers to `obtuseChoice(ring)`: one D3 order «∢ > 90» per vertex.
 - **A point against an axis; «;» clauses** (ADR-AG-222 amendment). `POSITION_AXIS_HE` / `_EN` in `parseCompare` lower «X מעל/מתחת ל/מימין ל/משמאל ל ציר ה-x/y» to `coord-compare` against 0 when the word names a side of that axis. `readLine` splits a top-level «;» into sentences read at the same depth. `segmentsOf` cuts before «ו-» + a point's name (the joint kept as the separator). `unwrap` drops a bare «(ציור)».
 - **x and y are never a length.** `planeLetterLength` (`engine/lengths.ts`) marks a length value side written in x or y; the length rule refuses it `length-xy` (`errLengthXY`). A chain reading returns a pair's owned refusal, quoting the whole line.
+
+## One meet frame; a line-object as an operand ([ADR-AG-224](06c-decisions-analytic.md#adr-ag-224), #1715)
+
+- **`meetFrame`** reads «<subject> נפגשים/נחתכים בנקודה E». It runs before `parsePerpendicular` in the rule chain. It tries every join in the subject (the clitic «ו» now also before ח ג ת), left to right. Each split goes through the canonical crossing «E נקודת החיתוך של X עם Y», and the first split that parses wins. An owned refusal is the sentence's own; no reading at all is `null`, for the rules after it.
+- **`lineObjectOperand`** reads a line-object noun phrase through `parseClause`, the same rule that reads it as a sentence. It puts the point on the line that sentence built, using one table: `bisects` → `p`; `cevian-of` → apex–foot; a piece ending at a derived point → that piece's line; `line-at` → `on-curve`.
+- **`incidenceOn`** returns it as `{ t: 'object', facts }`, after the tangent and the contextual «האנך» (ADR-AG-207's reference rule; question #1727).
+- **`parseIntersectionPlain`** lowers it like a contextual operand: declare, each side's facts, `crossing-distinct`. Two operands with the same incidence are `repeated-vertex`.
+- **The point-on sentence** lowers an object operand to the declare and its facts.

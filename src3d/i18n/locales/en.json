@@ -1,7 +1,7 @@
 {
   "title": "Space Geometry",
   "tagline": "Build in 3-D space — solids, points, vectors",
-  "privacy": "Privacy: no sign-up and no personal details are collected; typed instructions (math text only) are kept for a few days with an anonymous visitor id — your IP address is never stored. Statements the tool does not understand are sent for processing to an external AI service. When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.",
+  "privacy": "Privacy: no sign-up and no personal details are collected; typed instructions (math text only) are kept for up to 30 days with an anonymous visitor id — your IP address is never stored. Statements the tool does not understand are sent for processing to an external AI service. When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.",
   "language": "עברית",
   "switcherAria": "Switch between builders",
   "switcher2d": "Plane Geometry",

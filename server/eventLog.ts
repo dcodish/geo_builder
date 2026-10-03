@@ -142,7 +142,12 @@ function serialized<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
-const DEFAULT_RETENTION_DAYS = 7; // operator 2026-07-11 (ADR-278): keep little at this stage; raise to ~30 with real traffic
+/**
+ * ONE window for every product's sink. Operator 2026-07-11 (ADR-278) started at 7 days; operator 2026-10-02
+ * (#1672, ADR-W-110) raised it to 30 for all products. Every builder's privacy note states this number —
+ * `server/__tests__/retention-disclosure-1672.test.ts` holds the prose to it.
+ */
+export const DEFAULT_RETENTION_DAYS = 30;
 
 /**
  * Effective retention window in days. `EVENTS_RETENTION_DAYS` unset/blank/garbage → the finite DEFAULT
@@ -157,14 +162,19 @@ export function retentionDays(): number {
   return n > 0 ? n : 0;
 }
 
-let lastPruneDay = '';
-/** Once per UTC day, rewrite the log without events older than `retentionDays()` (0 → keep all). */
+/**
+ * The UTC day each sink FILE was last pruned. Per file, never one shared marker (#1672): with one marker
+ * the first post of the day (almost always 2-D) consumed it, and every other product's log was pruned
+ * only on days it happened to be posted to first — 3-D held 18 days under a 7-day window in prod.
+ */
+const lastPruneDay = new Map<string, string>();
+/** Once per UTC day PER FILE, rewrite the log without events older than `retentionDays()` (0 → keep all). */
 async function pruneByRetention(file: string): Promise<void> {
   const days = retentionDays();
   if (!days) return; // retention explicitly disabled → keep everything (no change)
   const today = new Date().toISOString().slice(0, 10);
-  if (today === lastPruneDay) return; // already pruned today
-  lastPruneDay = today;
+  if (lastPruneDay.get(file) === today) return; // this file was already pruned today
+  lastPruneDay.set(file, today);
   try {
     const text = await readFile(file, 'utf8');
     const pruned = pruneOldEvents(text, Date.now() - days * 86_400_000);

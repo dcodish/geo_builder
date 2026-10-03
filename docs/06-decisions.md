@@ -13881,3 +13881,199 @@ Not changed: size (`radius.via !== 'free'`) and size order (`orderedBelow`) alre
 - Locales: `input.trigGiven.sine-out-of-range` replaces `sine-two-angles`.
 
 **Behaviour change for a student:** «sin∢ACB = 3/4» now draws the angle (about 48.59°) instead of refusing, and «הציגו תצורה אחרת» switches it to about 131.41°. If something else in the figure allows only one of the two (say «זווית ACB קהה», typed before or after), that one is drawn. More generally, «הציגו תצורה אחרת» now goes through every combination when a figure has several such choices (two sines, two isosceles triangles), and a later line that only an earlier choice's other option can satisfy now builds instead of being refused.
+
+## ADR-568 — A cevian sentence's stated vertex and its shape are honoured or asked, never dropped or picked (#1684)
+
+**Status:** accepted · 2026-10-03 · bug (P1, the honesty class) · round #1721 (operator: *"Fold all into one round"*) · found by the #1620 analytic stream (ADR-AG-209) · branch `fix/1684-bisector-vertex` off `main` @ deed7b20
+
+**Requirements:** [FR-IN-9 (Must)](02-requirements.md) extended — a cevian whose shape is not stated asks; a bisector's stated vertex is honoured or refused · **Design:** [04-design.md](04-design.md) § "A refusal names what the rule matched" (the stated-vertex reader and `cevianShapeEdges`) · **LADDER stage:** the parser (the bisector, median and altitude rules) and the pre-LLM decision's refusal arms. No solver, replay or render change.
+
+**Cites** [ADR-528](#adr-528) (#1266/#1267: a cevian refusal names what the rule matched), [ADR-540](#adr-540) (#1285: `statedTriangle`, the triangle form's lone vertex), [ADR-052](#adr-052), ADR-AG-209 / ADR-AG-222 (the analytic verdicts this ports: `bisector-wrong-apex`, `ambiguous-cevian`, the foot narrowing the apex).
+
+**Context — measured at pickup on deed7b20, through `runSubmit` / `decideDeterministic2D`.** Both of the issue's claims held as written.
+
+| typed | before |
+| --- | --- |
+| «משולש ABC» · «AD חוצה זווית C» (also «… את זווית C», "AD bisects angle C") | commits `bisector bis-BAC (vertex A)` — the bisector of ∠A; «C» gone |
+| «משולש ABC» · «CE חוצה זווית A במשולש ABC» | refused `bisector-wrong-apex` (the #1285 triangle form) |
+| «משולש ABC» · «משולש ABD» · «AE גובה» / «גובה מ-A» | commits `foot E from A to BC` — ABC picked silently |
+| same figure · «AE תיכון» | escalates to the paid model (`not-handled`) |
+| same figure · «AE חוצה זווית» | asks `ambiguous-angle` (already right) |
+
+**Class.** *A cevian sentence's stated or unstated choice of angle or target shape is resolved by the rule's own default instead of by the sentence.* Two members: (1) the angle's vertex letter was read only in the triangle form, so the bare form fell back to the apex's neighbours and dropped the letter; (2) `oppositePolygonEdges` unions the opposite sides of EVERY polygon holding the apex, and the altitude took the first (the median, seeing several, escalated) — a union that is right inside one shape (a parallelogram's heights, the operator's draw-one steer) and wrong across shapes.
+
+**Decision.**
+1. **One stated-vertex reader for both bisector forms.** The vertex is the letter right after the angle word («זווית C», «הזווית B», "angle C", «∠C»); the triangle form keeps its lone-letter fallback (and only it — a stray letter in «CD חוצה את AB בנקודה K» is the segment-bisection rule's). The vertex is honoured or refused: the segment's first letter → the angle there (arms from the triangle, else the figure, as before); the segment's far end → the angle at that EXISTING point with one angle there (the existing `vertex === D` constraint — «BD חוצה זווית D» in a quadrilateral); anything else, or a far end that is not yet a point → `bisector-wrong-apex`, quoting both letters.
+2. **`cevianShapeEdges` decides the target shape, for every cevian rule that derives it.** It groups the opposite sides by the polygon holding the apex. One target set → the old union (so a single shape, including a parallelogram's several heights, is unchanged); shapes that give the apex different opposite sides → the new clarify `ambiguous-cevian`, which the decision maps to `input.ambiguousCevian`, quoting the sentence, the shapes, and an example side and triangle. A foot the figure already puts on exactly one candidate side answers it (analytic's ADR-AG-222 reading). All three callers of `oppositePolygonEdges` (the median's named and classic forms, the altitude) go through it; a stated side or triangle never reaches it.
+
+**Sibling audit.** Grepped every caller of `oppositePolygonEdges` (3, all routed) and every reader of a single-letter angle in the bisector rule (1). Other `ambiguous-angle` raisers already ask. **Analytic:** already answers both (ADR-AG-209). **3-D:** the class is not present — `parse3` returns `not-handled` for the single-letter bisector forms (it escalates, nothing is dropped), and «AE גובה» there is the pyramid height, resolved at apply. **Found, not fixed:** the `input.ambiguousAngle` example hard-codes `A{{vertex}}C`, so for vertex A it teaches «∠AAC» — filed as #1722 (P3).
+
+**Measured after** (`src/app/__tests__/issue-1684-cevian-stated-vertex.test.ts`):
+
+| typed | now |
+| --- | --- |
+| «משולש ABC» · «AD חוצה זווית C» / «… את זווית C» / «… את הזווית B» / "AD bisects [the] angle C" | refused `bisector-wrong-apex`, no paid call |
+| «משולש ABC» · «AD חוצה זווית A» / «CE חוצה זווית C במשולש ABC» / «CD חוצה זווית במשולש ABC» | builds, unchanged |
+| «מרובע ABCD» · «BD חוצה זווית D» | builds the equal-angle constraint at D |
+| «משולש ABC» · «AD חוצה זווית D» | refused (D is not a point yet) |
+| «משולש ABC» · «משולש ABD» · «AE גובה» / «AE תיכון» / «גובה מ-A» / «תיכון מ-A» / "AE height" / "height from A" | asks `ambiguous-cevian`, no paid call |
+| same · «AE גובה לצלע BD» / «… במשולש ABD» / «… במשולש ABC» / «AE תיכון לצלע BC» | builds on the named side |
+| same · «E על BC» · «AE גובה» | builds to BC (the foot narrows) |
+| «מקבילית ABCD» · «AE גובה»; «משולש ABC» · «AE גובה» | builds, unchanged |
+
+**Unchanged, measured.** The 74 existing test files that exercise cevian/bisector sentences (grep of חוצה/גובה/תיכון/altitude/median/bisector/ambiguous-angle) plus the four #1649 parity files: 78 files, 2556 tests, green; decide-parity goldens: no recorded hash changed, shard 4 gains the new scenario's key only. The full suite is the batch gate (round #1721).
+
+**Locks.** `src/app/__tests__/issue-1684-cevian-stated-vertex.test.ts` (23, through `decideDeterministic2D` after a gate-driven prefix). **Fails before: 14 of 23**, measured by reverting the parser, decision and locale changes to deed7b20; the 9 that pass before are controls (the apex vertex, the triangle form, the named side or triangle, the foot narrowing, the parallelogram and single-triangle builds). Scenario `cevian-stated-vertex-and-shape-1684` (corpus 4). #1649 parity: `bisector-wrong-vertex` and `cevian-apex-two-triangles` drop their 2-D known gap; new rows `bisector-wrong-vertex-en` (refused) and `cevian-apex-two-triangles-side` (builds).
+
+**Consequences.**
+- `src/parser/parse.ts`: the stated-vertex reader in `bisectorPlacesPoint`; `cevianShapeEdges`; the `ambiguous-cevian` clarify and parse result.
+- `src/app/decideDeterministic.ts`: the `ambiguous-cevian` arm. `src/i18n/locales/{he,en}.json`: `input.ambiguousCevian`.
+
+**Behaviour change for a student:** «AD חוצה זווית C» is now refused with a note saying the bisector runs from A, not C, instead of quietly drawing the bisector of angle A. «AE גובה» (or «AE תיכון») when A is a corner of two triangles now asks which side or triangle is meant instead of picking one.
+
+## ADR-571 — A triangle-form cevian introduces its triangle through one step, and an unresolved operand is refused naming the sentence (#1720)
+
+**Status:** accepted · 2026-10-03 · bug (P2) · round #1721 (operator auto-ok of the round 2 items) · operator report: *"AD תיכון במשולש ABC should be accepted"* · branch `fix/1720-cevian-triangle` off **`fix/1684-bisector-vertex`** (6d6604e6), because it edits the triangle-form bisector block and the median rule ADR-568 rewrote
+
+**Requirements:** [FR-EN-8](02-requirements.md) extended — an unresolved operand is refused quoting the line and naming the missing letters; a cevian that names its triangle introduces it for every role · **Design:** [04-design.md](04-design.md) § "A refusal names what the rule matched" (`cevianTriangle`) and § "The pre-LLM decision" (*An unresolved operand is refused naming the sentence*) · **LADDER stage:** the parser (a wrapper over the four cevian rules) and the pre-LLM decision's dry-run error arm. No solver, replay or render change.
+
+**Cites** [ADR-540](#adr-540) (#1285: `statedTriangle`), [ADR-568](#adr-568) (the cevian shape resolver this builds on), [ADR-487](#adr-487) (#943: the refusal names the statement), [ADR-546](#adr-546) (the pre-LLM decision), ADR-AG-209 / ADR-AG-210 (analytic introduces the named triangle for every role).
+
+**Context — measured at pickup on deed7b20 and on the ADR-568 tip, through `runSubmit`, empty canvas.** The issue's table held:
+
+| typed | before |
+| --- | --- |
+| «AD תיכון במשולש ABC», "AD median in triangle ABC" | refused «unresolved dependencies for: D» |
+| «AD חוצה זווית במשולש ABC», «… זווית A במשולש ABC», "AD bisects the angle in triangle ABC" | refused «unresolved dependencies for: bis-CAB» |
+| «AD גובה במשולש ABC», «גובה מ-A במשולש ABC», «תיכון מ-A במשולש ABC» | builds, triangle drawn |
+| «AD תיכון לצלע BC», «AD חוצה זווית BAC» | refused with the same internal message |
+
+The humanizer already strips id prefixes (`bis-CAB` → `CAB`), so what a student read was «הצעד הזה מסתמך על CAB שעדיין לא הוגדרו» — no raw id, but naming an internal object (and the wrong one: B and C are what is missing), never the sentence.
+
+**Class.** (1) *A cevian sentence that names its triangle introduces it only where a rule happens to carry its own copy of the introduction* — the altitude and the classic median did; the named median and the bisector did not. (2) *An operand the figure lacks surfaces as the evaluator's internal message* instead of a refusal of the sentence.
+
+**Decision.**
+1. **One step introduces the stated triangle for every cevian rule.** `cevianTriangle(rule)` wraps `median`, `altitude`, `pluralSpecialLines` and `bisectorPlacesPoint` in `RULES`. When the sentence names a triangle (`statedTriangle`), the rule's lowering references all three of its vertices (it is a cevian OF that triangle), and the figure has no polygon on those vertices, `triangle` is prepended. The altitude's and the classic median's own copies are removed, so there is one introducer. `statedTriangle` also reads the English forms those rules always read ("median from A in ABC", "triangle ABC with a height from A"), uppercase labels only, so "a triangle and …" can never be read as A, N, D.
+2. **An unresolved operand is refused naming the sentence.** On the decision's dry-run error arm, an evaluator «unresolved dependencies» failure answers `input.missingOperands`: the sentence quoted, plus `missingOperandLetters`, the point labels the batch references that neither the figure nor the batch (applied structurally, with no evaluation) defines. When it has no letters to name, it answers `input.unresolvedSentence`. Internal ids are never point labels, so none can reach the note.
+
+**Sibling audit.** Every cevian rule is in `RULES` once and now wrapped (4). The grep for other emitters of a stated triangle found only the midsegment rule (`triangle` + its own construct, a different sentence). The grep for «unresolved dependencies» reaching a student found the submit refusal (fixed here) and the fact-list banner via `humanizeError` (already prefix-sanitized; it names a step that failed after an edit, which is a different message). **Analytic:** builds all three (ADR-AG-209/210). **3-D:** refuses all three forms honestly (`unknown-point` / `not-handled`), so this class is not present. The cevian capability itself is the existing #1679 gap, and the new parity rows carry it.
+
+**Measured after** (`src/app/__tests__/issue-1720-cevian-triangle.test.ts`):
+
+| typed, empty canvas | now |
+| --- | --- |
+| «AD תיכון במשולש ABC», «AD חוצה זווית במשולש ABC», «AD גובה במשולש ABC», "AD median in triangle ABC", "AD bisects the angle in triangle ABC", «תיכון מ-A במשולש ABC», «גובה מ-A במשולש ABC», «AD חוצה זווית A במשולש ABC» | builds, `triangle ABC` first; at seeds 0–3 D is the midpoint / the equal-angle point / the foot |
+| «משולש ABC» · the three forms | builds, no triangle re-declared |
+| «AD תיכון לצלע BC» | refused «"AD תיכון לצלע BC": B, C עדיין לא בסרטוט …», no paid call |
+| «AD חוצה זווית BAC» | refused quoting the sentence, no internal id, both locales |
+
+**Unchanged, measured.** 156 test files that touch cevian / triangle / unresolved sentences, plus the ratchet, the four #1649 parity files, `i18n-keys-1372` and the seam registry: 158 files, 4459 tests, green after one lock update (the one red, re-run alone after it: 5 of 5). `triage-fixes.test.ts` asserted «AD תיכון במשולש ABC» lowers to `midpoint, segment` in a context holding only quad ABCD — the missing introduction itself. It now expects `triangle` first, as the altitude form always gave. Decide-parity goldens: **no recorded hash changed**; shard 4 gains the new scenario's key. The full suite is the batch gate (round #1721).
+
+**Locks.** `src/app/__tests__/issue-1720-cevian-triangle.test.ts` (13). **Fails before: 10 of 13**, measured by reverting `parse.ts`, `decideDeterministic.ts` and the locales to the ADR-568 base. The 3 that pass before are controls: the altitude form, the classic altitude, and the existing-triangle check. Scenario `triangle-form-cevian-introduces-triangle-1720` (corpus 4). #1649 rows `cevian-{median,bisector,altitude}-triangle-empty-1720` (builds; 3-D known gap #1679).
+
+**Consequences.**
+- `src/parser/parse.ts`: `cevianTriangle`; `statedTriangle`'s English forms; the altitude's and classic median's copies removed; four `RULES` entries wrapped.
+- `src/app/decideDeterministic.ts`: `missingOperandLetters` and the refusal arm. `src/i18n/locales/{he,en}.json`: `input.missingOperands`, `input.unresolvedSentence`.
+
+**Behaviour change for a student:** on an empty page, «AD תיכון במשולש ABC» and «AD חוצה זווית במשולש ABC» now draw the triangle with the median or bisector, as «AD גובה במשולש ABC» already did. A line whose points are not in the figure yet («AD תיכון לצלע BC» on an empty page) is now refused with a note that quotes the line and names the missing points, instead of an internal message.
+
+## ADR-569 — Lines a sentence names by letters are read as named, and «אלכסון» is a role noun in every sentence (#1683)
+
+**Status:** accepted · 2026-10-03 · bug (P1, the honesty class) · round #1721 (operator: *"Fold all into one round"*) · found by the #1620 analytic stream (ADR-AG-208) · branch `fix/1683-diagonal-sides` off `main` @ deed7b20
+
+**Requirements:** [FR-IN-4c](02-requirements.md) extended — the diagonal claim holds in every sentence naming a pair after the noun, and lines named by letters are never replaced by others · **Design:** [04-design.md](04-design.md) § "A role noun is a claim, lowered once" (the `diagonal` row; lines named by letters belong to the rule that reads them) · **LADDER stage:** the parser (`specialPointMeet`, the role-noun registry and its `withRoleClaims` post-pass). The verdict is the existing ADR-499 apply check and verifier; no solver, replay or render change.
+
+**Cites** [ADR-499](#adr-499) (#966: «אלכסון» is a claim — the apply refusal and the verifier), [ADR-563](#adr-563) (#1661: the role-noun registry, lowered once after whichever rule won), [ADR-024](#adr-024), the #71 plural distribution (`pluralSpecialLines`), ADR-AG-208 (analytic's `not-a-diagonal`).
+
+**Context — measured at pickup on deed7b20, through `runSubmit` / `decideDeterministic2D`.** The issue's claim held, and the class was wider than its sketch:
+
+| typed | before |
+| --- | --- |
+| «מרובע ABCD» · «האלכסונים AB ו-CD נפגשים בנקודה E» (also «נחתכים», "the diagonals AB and CD meet at E") | commits `line-line-intersection E` of **AC and BD** — the named sides replaced by the real diagonals |
+| «מרובע ABCD» · «האלכסון AB חותך את CD בנקודה E» | commits plain segments AB, CD and their meet — side AB accepted as a «diagonal» |
+| «מרובע ABCD» · «האלכסון AB» | refused «AB is not a diagonal of ABCD — it is a side» (ADR-499, already right) |
+| «משולש ABC» · «D על BC» · «E על AC» · «התיכונים AD ו-BE נפגשים בנקודה G» | commits the centroid from hidden midpoints; D and E untouched — AD never made a median (same for «הגבהים AD ו-BE …») |
+| «האלכסונים AC ו-BD נפגשים בנקודה E», empty canvas | commits plain segments and the meet; the diagonal claim dropped |
+
+**Class.** *A sentence that names its lines by letters, under a role noun, is lowered to lines the letters do not name, or loses the role's claim* — because (1) `specialPointMeet` derives its two lines from the shape and never read a pair list after the noun (every family), and (2) the diagonal claim lived only in the `segment` / `diagonals` rules' own flag, so any other winner (the meet, the cut, the point-on-carrier rules) dropped it.
+
+**Decision.**
+1. **Lines named by letters belong to the rule that reads them.** `letteredCentreLines` reads a pair list right after the family noun. Diagonals: `specialPointMeet` defers, and the lettered meet rule reads the pairs. Medians, altitudes and angle bisectors: each pair goes through its own rule («AD תיכון», «AD גובה», «AD חוצה זווית»), all or nothing as in #71, and the point is the crossing of the first two lines; a pair its rule cannot read escalates whole. The ⊥-bisector family names sides («של AB ו-BC»), not lines, and keeps the derived form. The unlettered forms («האלכסונים נפגשים», «אלכסוני ABCD», «התיכונים נפגשים») are unchanged.
+2. **«אלכסון» joins the role-noun registry** (`roleNouns.ts`, singular and plural, He/En, predicate order too). `withRoleClaims` lowers it to ADR-499's own claim, `segment {diagonal: true}` — flagging the winner's segment of the pair when it drew one, else adding it. The existing apply check refuses a side named as a diagonal, naming the statement; the verifier judges a pair whose ring arrives later. The construct «אלכסוני» stays out: it is also the internal-tangent adjective («המשיק המשותף האלכסוני»), and «AC ו-BD אלכסוני הריבוע» is the `diagonals` rule's, which already flags its pairs.
+
+**Plan vs mechanism (recorded).** The plan's sketch said that with no ring the named pairs are "read as written". They are — the segments and the meet commit — but now carry the claim, so on an empty canvas the figure shows the same note the singular «האלכסון AC» already shows there («AC is drawn as a diagonal but is not a diagonal of any shape»), until the quad is declared, when it clears (locked). That is FR-IN-4c as written ("accepted and checked against the finished figure"); dropping the claim only when no ring exists would make one sentence mean two things by figure state (docs/17 §2.3).
+
+**Sibling audit.** Grepped every centre-family read in `specialPointMeet` (5 families, 4 read letters now, ⊥-bisector by design not) and every rule that tolerates «אלכסון» before a pair (the meet, cut, unnamed-cut and point-on-carrier rules — all covered by the registry, one lowering). **Analytic:** already refuses (ADR-AG-208). **3-D:** has it, worse — `parse3` commits «האלכסונים AB ו-CD נפגשים בנקודה E» as `E on AB at t = 0.5`, dropping CD and the meet; filed **#1728** (P1, 3d), and the parity row carries it as a known gap.
+
+**Measured after** (`src/app/__tests__/issue-1683-lettered-lines.test.ts`):
+
+| typed | now |
+| --- | --- |
+| «מרובע ABCD» · «האלכסונים AB ו-CD נפגשים בנקודה E» / «… נחתכים …» / "the diagonals AB and CD meet at E" / «האלכסון AB חותך את CD בנקודה E» | refused «AB is not a diagonal of ABCD — it is a side», no paid call |
+| «מרובע ABCD» · «האלכסונים AC ו-AB …» | refused (they meet at A, #1274) |
+| «מרובע ABCD» · «האלכסונים AC ו-BD …» / «BD ו-AC» / English | builds: AC and BD drawn and claimed, E their meet |
+| «מרובע ABCD» · «מרובע ABEF» · «האלכסונים AE ו-BF נפגשים בנקודה K» | builds the named meet |
+| empty · «האלכסונים AC ו-BD נפגשים בנקודה E» | builds with the diagonal note; · «מרובע ABCD» → no violations |
+| «משולש ABC» · «D על BC» · «E על AC» · «התיכונים AD ו-BE נפגשים בנקודה G» | D, E become the midpoints; G is the centroid at seeds 0–3 |
+| «משולש ABC» · «הגבהים AD ו-BE נחתכים בנקודה H» / «חוצי הזווית AD ו-BE נפגשים בנקודה I» | the named feet / bisector points, and their crossing |
+| «האלכסונים נפגשים בנקודה E», «אלכסוני ABCD נפגשים …», «התיכונים נפגשים בנקודה G» | unchanged |
+
+**Unchanged, measured.** The test files that exercise diagonal / centre-meet / role-noun sentences (grep), the lexical ratchet and the four #1649 parity files — 92 files, 2100 tests — green after one lock update — `point-on-carrier.test.ts` asserted «E על האלכסון AC» / "E on diagonal AC" draw a bare carrier ("noun skipped"), i.e. the dropped claim; it now expects the flagged carrier. Decide-parity goldens: one recorded hash changed, `concyclic-flexes-the-rectangle` («CE חותך את האלכסון DB בנקודה F» in a rectangle — DB now carries its true diagonal claim; the scenario stays green), re-recorded; shard 4 gains the new scenario's key. The full suite is the batch gate (round #1721).
+
+**Locks.** `src/app/__tests__/issue-1683-lettered-lines.test.ts` (16, through `decideDeterministic2D` after a gate-driven prefix). **Fails before: 12 of 16**, measured by reverting `parse.ts` and `roleNouns.ts` to deed7b20; the 4 that pass before are controls (the later ring clearing the note, the two-ring meet, the unlettered forms). Scenario `diagonals-named-by-letters-1683` (corpus 4). #1649 parity row `diag-meet-sides-1683` (refused; 3-D known gap #1728).
+
+**Consequences.**
+- `src/parser/roleNouns.ts`: the `diagonal` row.
+- `src/parser/parse.ts`: `letteredCentreLines`; `specialPointMeet` reads lettered lines through their rules; `withRoleClaims` lowers `diagonal`.
+
+**Behaviour change for a student:** in a quadrilateral ABCD, «האלכסונים AB ו-CD נפגשים בנקודה E» is now refused with a note saying AB is a side, not a diagonal, instead of quietly drawing where AC and BD cross. «התיכונים AD ו-BE נפגשים בנקודה G» now makes D and E the midpoints. Typed on an empty page, «האלכסונים AC ו-BD נפגשים בנקודה E» now shows the "not a diagonal of any shape" note until the quadrilateral is declared, as «האלכסון AC» already did.
+
+## ADR-570 — A point placement keeps its tail: a condition clause is a given, «מעבר ל-X» picks the end (#1682)
+
+**Status:** accepted · 2026-10-03 · bug (P1, the honesty class) · round #1721 (operator: *"Fold all into one round"*) · found by the #1620 analytic stream (ADR-AG-208) · branch `fix/1682-extension-condition` off `main` @ deed7b20
+
+**Requirements:** [FR-IN-4d](02-requirements.md) (new) — a point placement keeps its tail · **Design:** [04-design.md](04-design.md) § "A point placement keeps its tail" · **LADDER stage:** the parser (the `compoundSuchThat` splitter, `pointOnExtension`) and the dropped-relation honesty gate it and the submit seam share. No solver, replay or render change.
+
+**Cites** [ADR-024](#adr-024) (the leftover guard), [ADR-264](#adr-264) (`droppedGivenRelations` and the clause fallback), the #760 `compoundSuchThat` / `compoundAtDistance` composition, the #108 operator ruling (a shape with a property glued on is taught as two steps), ADR-AG-208 (analytic reads the clause and the `beyond` direction).
+
+**Context — measured at pickup on deed7b20, through `runSubmit` / `decideDeterministic2D` + the store, seed 0.** The issue's claims held, and the class was wider:
+
+| typed, after «מרובע ABCD» unless noted | before |
+| --- | --- |
+| «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC» | commits the extension only; DE = DC dropped, green |
+| «הנקודה E נמצאת על המשך הצלע BC מעבר לנקודה B» / «E על המשך BC מעבר ל-B» / "E on the extension of BC beyond B" | E drawn past **C** |
+| «E על המשך BC מעבר לנקודה A» | committed past C — the stated letter (not an end of BC) dropped |
+| «E על המשך BC ו-DE = DC», «E על המשך BC, DE = DC» | DE = DC dropped |
+| «משולש ABC» · «D על BC ונתון כי AD = AC» / «… וידוע ש-AD = AC» | AD = AC dropped |
+| «E על המשך BC כך ש-DE = DC» | correct (the «כך ש» splitter) |
+| «משולש ABC ונתון כי AB = AC» | the #108 two-step teaching (correct, by ruling) |
+
+**Class.** *A point-placement sentence keeps its prefix and drops its tail* — the point-on-carrier rules are not anchored, so a condition clause or an end qualifier after the carrier is never read; and the net that should catch a dropped relation, `droppedGivenRelations`, counted «DE = DC» as carried because **some** label of it (E) is introduced by **some** command of the line.
+
+**Decision.**
+1. **The given-conjunction is a condition after a point placement.** `compoundSuchThat` also splits on `GIVEN_AND` («ונתון כי / ש», «וידוע כי / ש», "and it is given that") when the left half is a point placement (`POINT_PLACEMENT`); each half parses through the real grammar, all or nothing, as «כך ש» does. A shape subject is not split — the #108 ruling stands.
+2. **`pointOnExtension` reads the end qualifier** «מעבר ל(-)(נקודה) X» / "beyond X": the far end keeps the carrier, the near end reverses it (E on the extension of CB), any other letter escalates the line whole (`stop`).
+3. **The gate's exemption is narrowed to what it was written for.** A relation is accounted by an introduced point only when the command that introduces it carries every label of the relation («K על המשך AB כך ש AB=BK» baked as t = 2). This is the class's net: it now catches the drop for every rule and for the LLM lane, and the parser's own clause fallback (ADR-264), which consults it, reads «E על המשך BC ו-DE = DC» and «…, DE = DC» correctly with no new code.
+
+**Sibling audit.** Grepped the point-on rules (`pointOnSegment`, `pointsOnSegment`, `pointOnExtension`, `extendVerb`) — all unanchored; decision 3 is the shared net, decisions 1–2 the reads. Grepped `droppedGivenRelations`' callers (the submit seam, the clause fallback, the LLM lane) — all inherit the narrowed exemption. **Analytic:** reads both (ADR-AG-208). **3-D:** has it — `decideSubmit3` records «משולש ABC» · «D על BC ונתון כי AD = AC» as `point-on-segment3 D on BC` only, green; filed **#1730** (P1, 3d). The extension forms are not read by 3-D at all (`not-handled`, the existing #1679 gap).
+
+**Measured after** (`src/app/__tests__/issue-1682-point-placement-tail.test.ts`):
+
+| typed | now |
+| --- | --- |
+| «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC», «… ונתון ש-…», «… וידוע כי …», "… and it is given that DE = DC", «… ו-DE = DC», «…, DE = DC» | commits with `set-equal DE = DC`; DE = DC at seeds 0–3, no violations, no paid call |
+| «משולש ABC» · «הנקודה D נמצאת על הצלע BC ונתון כי AD = AC» | commits with AD = AC |
+| «… מעבר לנקודה B», «… מעבר ל-B», "… beyond B" | E past B at seeds 0–3 |
+| «… מעבר לנקודה C», «E על המשך BC» | E past C, unchanged |
+| «E על המשך BC מעבר לנקודה B ונתון כי DE = DC» | both held |
+| «E על המשך BC מעבר לנקודה A» | not committed (escalates) |
+| «משולש ABC ונתון כי AB = AC» | the #108 teaching, unchanged |
+
+**Unchanged, measured.** 217 test files that touch extensions, conditions, the honesty gates (grep of המשך / extension / כך ש / such that / droppedGivenRelations / honesty / gate …) plus the ratchet and the four #1649 parity files: 3974 tests, green. Decide-parity goldens: **no recorded hash changed** across all four shards (the narrowed exemption moves no corpus decision); shard 4 gains the new scenario's key. The full suite is the batch gate (round #1721).
+
+**Locks.** `src/app/__tests__/issue-1682-point-placement-tail.test.ts` (16, through `decideDeterministic2D` and the store). **Fails before: 13 of 16**, measured by reverting `parse.ts` to deed7b20; the 3 that pass before are controls (the #108 shape teaching, «מעבר לנקודה C», the bare extension). Scenario `point-placement-keeps-its-tail-1682` (corpus 4). #1649 rows `ext-given-clause-1682`, `ext-beyond-1682` (3-D known gap #1679), `side-given-clause-1682` (3-D passes the verdict but drops the given — #1730).
+
+**Consequences.**
+- `src/parser/parse.ts`: `GIVEN_AND` / `POINT_PLACEMENT` in `compoundSuchThat`; the end qualifier in `pointOnExtension`; `droppedGivenRelations`' exemption (b).
+
+**Behaviour change for a student:** «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC» now draws E so that DE = DC, instead of quietly ignoring the second half. «… מעבר לנקודה B» now puts E past B, not past C. A sentence like «E על המשך BC מעבר לנקודה A», whose letter is not an end of BC, is no longer drawn.
