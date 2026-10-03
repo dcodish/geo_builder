@@ -888,7 +888,9 @@ only, and the circle stays unnamed. The move travels as a `step-aside` bind that
 - «מעגל O» declares a new circle;
 - «C על מעגל O» names the unnamed circle by use through the ADR-347 seam. Two unnamed circles that
   `autosInterchangeable` finds interchangeable are named in order. That check reads a circle-circle crossing as an
-  unordered pair whose `branch` is seed (ruling (b), #1688). Otherwise it asks which circle.
+  unordered pair whose `branch` is seed (ruling (b), #1688). Otherwise it asks which circle. It compares the
+  construction's requirement records too ([ADR-567](06-decisions.md#adr-567), #1709): a stated containment drives
+  nothing and lives only there, so a nested pair is told apart and asks; a disjoint pair is an unordered relation.
 
 Naming places a free point. `nameCentreFacts` absorbs a target letter that nothing places. Such a point has only a
 bare `free-point` definition, is no shape's vertex, and is first used after the circle exists. Its bare
@@ -976,7 +978,9 @@ Refusals are `ParseResult` `role-claim` (`why`, the noun as typed, the pair), ma
 ## A stated side is a requirement record, checked at stage 0g′ ([ADR-549](06-decisions.md#adr-549))
 
 - **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`) — `circle-side`,
-  `polygon-side`, `line-side`. ONE definition of which commands state a side, `recordRequirement`
+  `polygon-side`, `line-side`, and since [ADR-567](06-decisions.md#adr-567) (#1709) `circle-position`: two circles'
+  stated containment or disjointness (`set-circle-position`, never the unstated bare-pair variant). The side prover
+  skips it; `autosInterchangeable` reads it. ONE definition of which commands state a side, `recordRequirement`
   (`engine/requirements.ts`), is called by `applyCommand` (so every probe carries the records) and by
   `applyStep` / `applyCoupledStep`'s single `withRequirements` stamp on an accepted result — so a record
   survives every ladder rebuild (M1 reinterpretations, recruiter trials, ownership passes) without any of

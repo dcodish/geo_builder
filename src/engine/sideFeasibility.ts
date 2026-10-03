@@ -204,7 +204,9 @@ class Structure {
 }
 
 const sideText = (r: SideRequirement): string =>
-  r.kind === 'circle-side'
+  r.kind === 'circle-position'
+    ? `${circleName(r.a)} ${r.relation} ${circleName(r.b)}` // never reached: the prover reads sides only
+    : r.kind === 'circle-side'
     ? `${r.id} ${r.side} circle ${circleName(r.circle)}`
     : r.kind === 'polygon-side'
       ? `${r.id} ${r.side} ${polyNoun(r.poly)} ${r.poly.join('')}`
@@ -226,7 +228,8 @@ function assertedObjects(cmd: Command | undefined): GeoObject[] {
  * `cmd` is read again only for the claim it asserts about an existing point.
  */
 export function sideImpossibility(probed: Construction, cmd?: Command): SideImpossibility | null {
-  const reqs = probed.requirements;
+  // the stated SIDES only — a circle-position record (#1709) is no side, and this prover has nothing to say about it
+  const reqs = probed.requirements?.filter((r) => r.kind !== 'circle-position');
   if (!reqs?.length) return null;
   const s = new Structure(probed, assertedObjects(cmd));
   const isNew = (r: SideRequirement): boolean =>
@@ -251,7 +254,7 @@ export function sideImpossibility(probed: Construction, cmd?: Command): SideImpo
       if (on) return hit(on, r);
       const other = reqs.find((q) => q.kind === 'polygon-side' && q.id === r.id && q.side !== r.side && ringKey(q.poly) === ringKey(r.poly));
       if (other) return hit(sideText(isNew(r) ? other : r), isNew(r) ? r : other);
-    } else {
+    } else if (r.kind === 'line-side') {
       for (const p of r.subjects) {
         const on = s.onLine(p, r.a, r.b);
         if (on) return hit(on, r);

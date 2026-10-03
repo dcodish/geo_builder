@@ -13739,3 +13739,61 @@ Every committed row is a figure drawn green for a given nobody stated.
 **Consequences.** `src/parser/parse.ts`: `trigGiven`, `trigLine`, `TrigRefusal`, the `trig-given` `ParseResult`, `NOTATION_WORDS`, `angleValueOf` (quotient). `src/parser/spanAccounting.ts`: value-only numbers, `NOTATION_WORDS`. `src/app/decideDeterministic.ts`: the `trig-given` refusal. Locales: `input.trigGiven.*` (he, en).
 
 **Behaviour change for a student:** «tan∢ABC = 2» now draws the angle whose tangent is 2 (about 63°), labelled «tan=2»; «cos∢ACB = 3/4» draws about 41°. A sine, an impossible cosine, or a trig comparison is refused with a note saying why — it used to draw a wrong, tiny angle.
+
+## ADR-567 — Circles a statement tells apart ask: a stated containment is a requirement record the interchangeability test reads (#1709)
+
+**Status:** accepted · 2026-10-03 · bug (P2) · operator 2026-10-03 on #1709: *"Fix 2d"*; the ruling it applies is #1688 option (b) (2026-10-02) · branch `fix/1709-nested-circles-ask` off `main` @ a8938c2d
+
+**Requirements:** [FR-RN-8](02-requirements.md) — the promise is unchanged (once a statement tells two unnamed circles apart, a new letter asks); the sentence now names containment among the statements that do · **Design:** [04-design.md](04-design.md) § "The hidden centre letter steps aside" and § "A stated side is a requirement record" · **LADDER stage:** none — the requirement record (`engine/requirements.ts`, stamped by `applyCommand` and `withRequirements`) and the parser context (`autosInterchangeable`). No solver, verifier or render change.
+
+**Cites** [ADR-565](#adr-565) (decision 7: interchangeable circles name by order), [ADR-549](#adr-549) (stated sides as requirement records), [ADR-358](#adr-358) (#196: `set-circle-position`), [ADR-376](#adr-376) (#224: «מעגל מוכל בתוך …»), #538 (the isomorphism check), docs/17 §1.
+
+**Context — measured at pickup on a8938c2d, through `decideDeterministic2D` with the store applied as the pipeline applies it.**
+
+| typed | `autosInterchangeable` before the last line | verdict |
+| --- | --- | --- |
+| «מעגל מוכל בתוך המעגל הגדול» · «C על מעגל P» | true | named the OUTER circle P, silently |
+| «שני מעגלים מוכלים» · «C על מעגל P» | true | the same |
+| «שני מעגלים נחתכים» · «C על המעגל הגדול» · «D על מעגל P» | false | asks (the qualifier stamps `orderedBelow`) |
+| «שני מעגלים משיקים מבפנים» · «C על מעגל P» | false | asks |
+| «שני מעגלים נחתכים» / «משיקים מבחוץ» / «זרים» · «C על מעגל P» | true | named by order (the ruling) |
+
+The construction after «מעגל מוכל בתוך המעגל הגדול» held two free-radius unnamed circles and nothing else. The containment is a strict inequality, so it drives nothing: `set-circle-position` only improves the seed and is checked by the verifier from the fact list. The figure the isomorphism test serialises — objects and constraints — therefore had no trace of it. The issue's diagnosis held.
+
+**Class.** A stated relation that drives nothing lives outside `objects` and `constraints`, and any structural reader of the construction is blind to it. ADR-549 already gave stated sides a home on the construction (`requirements`), but `autosInterchangeable` did not read that field either. So a side stated against one circle would have been missed the same way.
+
+**Decision.**
+1. **The stated mutual position is a requirement record.** `sideRequirementOf` (`engine/requirements.ts`) records `set-circle-position` with `relation: 'contained' | 'disjoint'` as `{kind: 'circle-position', relation, a, b}` (`a` contains `b`). The unstated bare-pair variant (`relation: 'any'`, «שני מעגלים») records nothing. It rides the existing stamps (`applyCommand`, `withRequirements`), so every ladder path keeps it.
+2. **The interchangeability test reads every requirement record.** `autosInterchangeable` serialises `construction.requirements` beside the objects and constraints, under the same swap. A containment is asymmetric, so a nested pair is not interchangeable and a new letter asks which circle (`input.unknownCircle`). A disjoint pair is an unordered relation and serialises as a set, so it stays interchangeable and is named by order, as the ruling says for a pair swapping changes nothing about.
+3. **The side prover reads sides only.** `sideImpossibility` filters the new kind out, so it does no work on a figure whose only record is a position.
+
+Not changed: size (`radius.via !== 'free'`) and size order (`orderedBelow`) already told the pair apart, and still do.
+
+**Measured after** (`src/__tests__/issue-1709-nested-circles-ask.test.ts`):
+
+| typed | now |
+| --- | --- |
+| «מעגל מוכל בתוך המעגל הגדול» · «C על מעגל P» | asks; both circles stay unnamed, C is not placed |
+| … · «O מרכז המעגל» | asks |
+| «שני מעגלים מוכלים» · «C על מעגל P»; "a circle contained in the big circle" · "C on circle P" | ask |
+| nested · «מרכז המעגל הקטן הוא P» · «C על מעגל P» · «D על מעגל O» | builds: C on the contained P, D on the container O (named by use), P strictly inside O |
+| nested · «מרכז המעגל הימני הוא P» (the note's example) · «C על מעגל P» | builds |
+| «שני מעגלים נחתכים» / «משיקים מבחוץ» / «זרים» · «C על מעגל P» · «D על מעגל O» | named by order, unchanged |
+| «שני מעגלים נחתכים» · «C על המעגל הגדול» / «רדיוס המעגל הגדול הוא 5» · «C על מעגל P» | ask, unchanged |
+| «שני מעגלים משיקים מבפנים» · «C על מעגל P» | asks, unchanged |
+
+**Unchanged, measured.** The 18 two-circle scenarios ADR-565 restored to the operator's exact sequences, and every other corpus scenario (`scenarios-e2e-1…8`), `fixtures.test.ts`, `scenarios-props-*`, `circle-name-binding.test.ts`, `issue-1673-hidden-centre.test.ts`: green with no edit. Decide-parity goldens: no recorded hash changed; shard 4 gains the new scenario's key only.
+
+**Locks.** `src/__tests__/issue-1709-nested-circles-ask.test.ts` (15, through `decideDeterministic2D`; the record and the context through `replay` + `buildParseCtx`). Scenario `nested-circles-new-letter-asks-1709` (corpus 4): the operator's two lines ask (the scenario mirror raises the which-circle question), and with the small circle named the sequence builds. **Fails before: 6 of 15**, measured by running the test with the four product files reverted to a8938c2d: the four asks and the two record/context checks. The 9 that pass before are controls: both remedies, the order-named pairs, the stated-size and stated-order asks, the internal tangency, and the bare pair.
+
+**Found, not fixed (filed as #1710).** «מרכז המעגל הגדול הוא P» beside two unnamed circles whose small one carries the hidden token P records the size order as `outer=circle-P, inner=circle-P`. The figure turns amber ("the inner circle P should be strictly inside the outer circle P"). `parseNameCenter`'s assert maps only the named circle's id, and `nameCentreFacts` then steps the other token aside (ADR-565 decision 4). This was measured on a8938c2d and is independent of this change. It is the natural answer to this ADR's question for a nested pair, so it matters here. The note's own example («המעגל הימני») works.
+
+**Also seen, not in scope.** «רדיוס המעגל הגדול 5» (no «הוא») escalates as `weak:dropped` on an intersecting pair, while «רדיוס המעגל הגדול הוא 5» builds.
+
+**Consequences.**
+- `src/engine/types.ts`: `SideRequirement` gains `circle-position`.
+- `src/engine/requirements.ts`: `sideRequirementOf` records it.
+- `src/engine/sideFeasibility.ts`: the prover and its text read sides only.
+- `src/parser/context.ts`: `autosInterchangeable` reads `requirements`, with a disjoint pair unordered.
+
+**Behaviour change for a student:** after «מעגל מוכל בתוך המעגל הגדול» (or «שני מעגלים מוכלים»), «C על מעגל P» asks which circle P is instead of silently taking the big one. Naming one first («מרכז המעגל הקטן הוא P») builds as before.

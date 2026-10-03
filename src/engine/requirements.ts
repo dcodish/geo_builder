@@ -1,5 +1,6 @@
 /**
- * STATED SIDES AS REQUIREMENT RECORDS (#1470, [ADR-549](../../docs/06-decisions.md#adr-549)).
+ * STATED SIDES AS REQUIREMENT RECORDS (#1470, [ADR-549](../../docs/06-decisions.md#adr-549)), and two circles'
+ * stated mutual position (#1709, [ADR-567](../../docs/06-decisions.md#adr-567)).
  *
  * The ONE definition of which commands state a side and what they record. `applyCommand` calls it for
  * the probe the stage-0 provers read, and `applyStep`/`applyCoupledStep` stamp the committed figure with
@@ -13,6 +14,8 @@ export function sideRequirementOf(cmd: Command): SideRequirement | null {
   if (cmd.type === 'point-circle-side') return { kind: 'circle-side', id: cmd.id, circle: cmd.circle, side: cmd.side };
   if (cmd.type === 'point-polygon-side') return { kind: 'polygon-side', id: cmd.id, poly: [...cmd.poly], side: cmd.side };
   if (cmd.type === 'points-line-side') return { kind: 'line-side', a: cmd.a, b: cmd.b, subjects: [...cmd.subjects], rel: cmd.rel };
+  // #1709 (ADR-567): a STATED mutual position of two circles; the unstated bare-pair variant states nothing
+  if (cmd.type === 'set-circle-position' && cmd.relation !== 'any') return { kind: 'circle-position', relation: cmd.relation, a: cmd.a, b: cmd.b };
   return null;
 }
 

@@ -35,6 +35,11 @@ const ctrToken = (centerId: string): string => (centerId.startsWith('@ctr-') ? c
  * twins and the auto-minted `radial-toward` touch family, which the tangency `coincide` makes one
  * point). CONSERVATIVE by construction: any member point, stated size/order, or asymmetric relation
  * (containment, internal tangency) serializes differently → NOT interchangeable → the honest clarify.
+ *
+ * #1709 ([ADR-567](../../docs/06-decisions.md#adr-567)): the statements include the construction's REQUIREMENT
+ * records, not only its objects and constraints. A stated inequality (a containment, a side) drives nothing, so it
+ * lives there — and a check blind to them read «מעגל מוכל בתוך המעגל הגדול» as two identical circles and named the
+ * OUTER one by order. A disjoint pair is an unordered relation, so it serializes as a set.
  */
 function autosInterchangeable(construction: Construction): boolean {
   const autos = construction.objects.filter(
@@ -61,6 +66,9 @@ function autosInterchangeable(construction: Construction): boolean {
       // circle is listed first, and its `branch` only picks a side of the line of centres — swapping the circles
       // reflects the figure across that line, which no given can tell apart. So the pair is unordered and the
       // branch is seed, not statement. (`avoid` — "the OTHER crossing" — stays: it is a relation between points.)
+      if (o.kind === 'circle-position' && o.relation === 'disjoint') {
+        return { kind: o.kind, relation: o.relation, circles: [norm(o.a, swap), norm(o.b, swap)].map((x) => JSON.stringify(x)).sort() };
+      }
       if (o.kind === 'circle-circle') {
         out.circles = [norm(o.circle1, swap), norm(o.circle2, swap)].map((x) => JSON.stringify(x)).sort();
         for (const k of Object.keys(o).sort()) if (k !== 'circle1' && k !== 'circle2' && k !== 'branch' && k !== 'solve') out[k] = norm(o[k], swap);
@@ -77,7 +85,11 @@ function autosInterchangeable(construction: Construction): boolean {
     return v;
   };
   const canon = (swap: boolean): string =>
-    [...construction.objects.map((o) => JSON.stringify(norm(o, swap))), ...construction.constraints.map((k) => JSON.stringify(norm(k, swap)))]
+    [
+      ...construction.objects.map((o) => JSON.stringify(norm(o, swap))),
+      ...construction.constraints.map((k) => JSON.stringify(norm(k, swap))),
+      ...(construction.requirements ?? []).map((r) => JSON.stringify(norm(r, swap))),
+    ]
       .sort()
       .join('\n');
   return canon(false) === canon(true);
