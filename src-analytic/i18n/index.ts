@@ -120,6 +120,7 @@ const he = {
   symTheta: 'תטא — שם של זווית',
   symLt: 'קטן מ',
   symArea: 'שטח מצולע',
+  symArc: 'קשת',
   // A vertical segment HAS no slope, and that is an answer rather than an absence (#1078).
   slopeVertical: 'אנכי (אין שיפוע)',
   // #1322 — the angle a line makes with the positive x-axis, beside its slope (m = tan α)
@@ -525,6 +526,7 @@ const en: typeof he = {
   symTheta: 'theta — an angle’s name',
   symLt: 'less than',
   symArea: 'the area of a polygon',
+  symArc: 'arc',
   slopeVertical: 'vertical (no slope)',
   angleWithX: 'angle with the x-axis',
   secParams: 'Parameters',
