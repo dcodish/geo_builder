@@ -129,6 +129,11 @@
     "canonicalHint": "Got it. Next time you can write: {{canonical}} — that form always works.",
     "polygonNotSupported": "The polygon \"{{noun}}\" is not supported. Supported: {{offer}} — add \"regular\" for a regular one (e.g. \"regular pentagon\").",
     "incompleteComparative": "{{factor}} times WHAT? Name the segment it is compared to — e.g. \"{{subject}} is {{factor}} times AB\".",
+    "trigGiven": {
+      "sine-two-angles": "A sine fits two angles of a figure — an acute one and an obtuse one (sin θ = sin(180° − θ)) — so «{{sentence}}» does not say which angle to draw. State the angle in degrees, or give its cos or tan, which name exactly one angle.",
+      "out-of-range": "The {{fn}} of an angle is always between −1 and 1, so «{{sentence}}» describes no angle.",
+      "form": "The tool reads the {{fn}} of an angle as one equality, written like «{{fn}}∢ABC = 1/2»: the angle by its three letters (or its vertex) and a number. Comparisons and expressions with {{fn}} are not read yet."
+    },
     "angleSidesDisjoint": "The segments {{s1}} and {{s2}} do not meet, so there is no angle between them. Name two sides that share an endpoint, or name the angle by its three letters.",
     "cevianRoleAltitude": "the altitude",
     "cevianRoleMedian": "the median",

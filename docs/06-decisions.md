@@ -13688,3 +13688,54 @@ The parse was right in every row (`point-on-circle B` is emitted each time) — 
 - `src/app/submitPipeline.ts`, `src/app/editPipeline.ts`: apply it.
 
 **Behaviour change for a student:** after an unnamed circle, «BO = 5» draws a new free point O, and «O מרכז המעגל» then puts it at the centre. «מעגל O» draws a new circle. Two unnamed circles are named before they are referred to by letter.
+
+## ADR-566 — A trigonometric given is a ratio, decided whole before any angle rule (#1698)
+
+**Status:** accepted · 2026-10-03 · bug (P1, the honesty class) · operator on #1698: *"Should be fixed. No decision required from me"* · found by the analytic stream D2 (ADR-AG-215), measured, not reported · branch `fix/1698-trig-ratio` off `main` @ a8938c2d
+
+**Requirements:** [FR-IN-7d](02-requirements.md) (new) — a trig given is a ratio; what names no single angle is refused by name · **Design:** [04-design.md](04-design.md) § "A trig function of an angle is decided whole, before any rule" · **LADDER stage:** the parser, at the `parse()` boundary (beside the proof-target and foreign-given guards); the span accountant's number collection. No solver, replay or render change.
+
+**Cites** [ADR-462](#adr-462) (#784: a transformed number is declared `consumed`), [ADR-498](#adr-498) (#969: the angle value reader), [ADR-453](#adr-453) (span accounting), [ADR-562](#adr-562) (the before-any-rule placement), [ADR-052](#adr-052), [ADR-W-047](06w-decisions-workspace.md#adr-w-047) (canvas = inputs), ADR-AG-215 (the analytic sibling: tan and cos are measures of the angle; sin left unread).
+
+**Context — measured at pickup on a8938c2d, through `decideDeterministic2D` on «משולש ABC».**
+
+| typed | before |
+| --- | --- |
+| «tan∢ABC = 2», «tan(∢ABC) = 2», «tg∢ABC = 2», «טנגנס הזווית ABC הוא 2», «tan∢ABC=2», «ctg∢ABC = 2», «cot∢ABC = 2», «זווית B שטנגנס שלה 2» | `set-angle B = 2` — a **2°** angle |
+| «cos∢ACB = 3/4», «קוסינוס הזווית ACB = 3/4», «sin∢ACB = 3/4», «סינוס הזווית ACB = 3/4» | `set-angle C = 3` — **3°**, the «/4» lost |
+| «cos∢ABC = 0.5» · «cos∢ABC = 2» · «tan∢ABC = -2» · «cos∢ABC = -1/2» | 0.5° · 2° · **−2°** · **−1°** |
+| «tan∢ABC > 1» · «cos∢ABC < 0.5» | `set-angle-bound` min 1° · max 0.5° |
+| «tan∢ABC = α» | `measure-angle` α — the alias bound to the ANGLE |
+| «tan∢ABC = √3» · «2cos∢ABC = 1» | escalated (`weak:dropped`) — honest only by accident |
+| «∢ABC = 3/4» · «זווית ABC היא 90/2» | 3° · 90° (the denominator lost) |
+| «tan B = 2», «cos ABC = 0.6» | not-handled |
+
+Every committed row is a figure drawn green for a given nobody stated.
+
+**Root cause.** No rule read the function word. Every value-bearing angle rule finds its angle keyword, skips the unknown «tan» / «cos» / «טנגנס» in front of it (an unknown word is a report bucket of the span accountant, never a refusal), and takes the first standalone number for the angle — `angleValueOf` read a number, never a quotient. Two nets that should have caught the «/4» were blind: `droppedGivenNumbers` accounts a fraction by its numerator alone (its generosity doctrine), and the span accountant collected its numbers from the commands' serialized JSON, KEYS included, so the field name `ray2` "accounted" the stated 4 (√4 = 2).
+
+**Class (docs/17 §1).** *A function of an angle read as the angle.* A function word is invisible to every angle rule by construction — six rules read angle values (`angle`, `measureAngle`, the bound/acuteness/arc/ratio family) — so a guard per rule is the patch shape. The decision belongs at the one boundary every rule reads, before any of them.
+
+**Decision.**
+1. **`trigGiven` decides the line whole, at the top of `parse()`** (after the angle-alias rewrite, so «tan∢A1 = 2» names the aliased angle). A line that applies tan / tg / cot / ctg / cotg / sin / cos — or «טנגנס» / «קוטנגנס» / «קוסינוס» / «סינוס» with a clitic prefix, or "the tangent / cosine of" — to an angle (an angle noun in the line, or a label right after the function) never reaches an angle rule and never escalates. A line with a function word and no angle («sin 30», «משפט הסינוסים») is not its business.
+2. **One canonical shape lowers**: [«נתון» / «ידוע» / "given" lead-in] FN [of / של] [(] [angle noun] LABELS [)] copula VALUE — the angle by one vertex or three letters (`angleArms`, so a vertex with ≠ 2 edges asks, as everywhere), the copula `=` / «הוא» / «היא» / «שווה (ל-)» / "is" / "equals", the value any concrete value of the shared `NUMEXPR` atom (fraction, decimal, radical), optionally signed. tan and cos are one-to-one on (0°, 180°) — tan through its sign (negative ⇒ obtuse), cos outright — and cot is 1/tan (cot 0 = 90°), so the value names ONE angle. It lowers to the arms' segments and a **`measure-angle` with a literal value and the given as its text** (`{ value: 63.43…, text: 'tan=2' }`): the existing literal-measure path (`lowerOne` → `set-angle`), so the constraint is exactly the degree given's and the figure prints «tan=2», never a computed 63.43° (canvas = inputs). The ratio is declared `consumed` (ADR-462), so «√3», «-2», «3/4» are accounted.
+3. **What names no single angle is refused by name** — `{ ok: false, reason: 'trig-given', why, fn, sentence }`, answered with `input.trigGiven.<why>`:
+   - `sine-two-angles` — checked FIRST, in every form: sin θ = sin(180° − θ), so a sine names an acute and an obtuse angle. ADR-052 makes that an unstated, cyclable choice. 2-D has the variant mechanism (`engine/variants.ts`) but measured unsafe for a narrow change: `findValidConfig` has no variant tier (an infeasible default root would be refused although the other root draws), and `searchAnotherView` cycles only the first variant fact. **Not built — filed as #1711.** The note asks for the angle in degrees or its cos / tan.
+   - `out-of-range` — a cosine outside [−1, 1] (cos = ±1 lowers to 0° / 180° and the engine refuses the degenerate angle, as it does «∢ABC = 180»).
+   - `form` — any other trig line: a comparison («tan∢ABC > 1» — tan is not monotone across 90°, so a bound is a union), a symbol («tan∢ABC = α»), a clause («זווית B שטנגנס שלה 2»). The note teaches «<fn>∢ABC = 1/2», which builds (memory: taught remedies must drive the spelling).
+4. **A quotient in degrees is one value**: `angleValueOf` reads `n / d` («∢ABC = 90/2» = 45°).
+5. **The nets.** The span accountant collects numbers from the commands' VALUES, never their field names (the label pass's own discipline). `NOTATION_WORDS` (cm, mm and the Latin function names) is the one list the label-counting gates (`statedLabelTokens`, the accountant) never read as point labels — «נתון: tan∢ABC = 2» is not the points T, A, N.
+
+**Measured after** (same door): every spelling of the table's tan / cot / cos rows commits the trig inverse (2 → 63.43°, 3/4 → 41.41° for cos and 36.87° for tan, −2 → 116.57°, −1/2 → 120°, √3 → 60°); the drawn angle equals it at seeds 0–5; «tan B = 2» and «tan of angle ABC = 2» now build; sin / cos > 1 / the comparison, symbol and clause forms are refused by name, never escalated.
+
+**Existing locks measured.** No scenario, fixture or catalog entry used a trig given (grep over `src/`, `fixtures/`, `docs/test-scenarios.md`): nothing was locking the bug, so no figure assertion changed. The parity row `cat-3d-010` («קוסינוס הזווית ACB = 3/4», expect `builds`) keeps its verdict; it now builds the right figure. The analytic branch's `trig-*-1621` rows (not on main) carry notes «2-D: 2° (#1698)» that are now stale. `decide-parity-1395` shard 4 gains only the new scenario's key; no recorded row of any shard drifted (the accountant change included). Gates on this branch: `test:fast` (1022 files) green but for that shard key, recorded; every 2-D slow-tier file in `reports/test-tiers.json` (37 files, 690 tests, the eight scenario slices and the three props files among them) green.
+
+**Locks.** `src/__tests__/issue-1698-trig-ratio.test.ts` (33, through `decideDeterministic2D` and `replay`): 17 spellings commit the trig inverse; the label at the wedge is «tan=2»; the drawn angle at seeds 0–5 for four givens; seven refusals by key, the model never called; «∢ABC = 90/2» = 45°; stability — the trig figure is positionally identical to its degree twin at four seeds, and a later additive line moves no point. Scenario `trig-given-is-a-ratio-1698` (corpus 4). **Fails before: 31 of 33** — the two that pass before are the "model never called" control and the additive-stability control.
+
+**Sibling check.** 3-D reads «קוסינוס הזווית ACB = 3/4» as its own `cos-angle` (correct, unchanged). Analytic: ADR-AG-215 reads tan and cos as measures and leaves sin unread — the same verdicts as 2-D now, except that 2-D refuses sin by name where analytic is `not-handled`.
+
+**Not built, said out loud.** The sine (#1711). A trig comparison or expression («tan∢ABC > 1», «2cos∢ABC = 1», «cos²…») is refused, not read. A conflicting trig given's note names the lowered angle («∠ABC = 63.43494882292201° cannot hold»), the same internal-value wording every measure with a transformed value has today (e.g. «AB = 3π»); not changed here. A negative angle in degrees («∢ABC = -2») still commits — a separate defect, observed, not filed by this stream.
+
+**Consequences.** `src/parser/parse.ts`: `trigGiven`, `trigLine`, `TrigRefusal`, the `trig-given` `ParseResult`, `NOTATION_WORDS`, `angleValueOf` (quotient). `src/parser/spanAccounting.ts`: value-only numbers, `NOTATION_WORDS`. `src/app/decideDeterministic.ts`: the `trig-given` refusal. Locales: `input.trigGiven.*` (he, en).
+
+**Behaviour change for a student:** «tan∢ABC = 2» now draws the angle whose tangent is 2 (about 63°), labelled «tan=2»; «cos∢ACB = 3/4» draws about 41°. A sine, an impossible cosine, or a trig comparison is refused with a note saying why — it used to draw a wrong, tiny angle.

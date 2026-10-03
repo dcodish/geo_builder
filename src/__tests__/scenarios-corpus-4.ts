@@ -3214,4 +3214,25 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs(dot) / (dist(O, A) * dist(A, B)), 'OA ⟂ AB — the tangency still holds').toBeLessThan(1e-6);
     },
   },
+  {
+    id: 'trig-given-is-a-ratio-1698',
+    title: '#1698 (ADR-566): «tan∢ABC = 2» draws ∠B = atan 2 ≈ 63.43° and «קוסינוס הזווית ACB = 3/4» draws ∠C = acos ¾ ≈ 41.41° — never 2° and 3°',
+    guards:
+      "Measured on main a8938c2d (found by the #1621 analytic stream D2, ADR-AG-215): every trig given committed a set-angle of the value's leading number IN DEGREES — «tan∢ABC = 2» a 2° angle, «cos∢ACB = 3/4» a 3° one with the «/4» lost, «sin…» the same — a wrong figure drawn green. Root cause: no rule read the function word; every angle rule skipped it and took the first number for the angle. Fix: `trigGiven` decides a line that applies tan/cot/cos/sin to an angle WHOLE, before any rule — tan/cot/cos lower to the one angle they name (a measure-angle labelled with the given as typed), sin (two angles) and |cos| > 1 are refused by name. Asserts both angles as drawn, the label text, and that the sine and an out-of-range cosine are refused at the gate. The spelling sweep, the seeds and the stability twin are in src/__tests__/issue-1698-trig-ratio.test.ts.",
+    steps: ['משולש ABC', 'tan∢ABC = 2', 'קוסינוס הזווית ACB = 3/4'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(angle(A, B, C), '∠ABC = atan 2').toBeCloseTo((Math.atan(2) * 180) / Math.PI, 4);
+      expect(angle(A, C, B), '∠ACB = acos 3/4').toBeCloseTo((Math.acos(0.75) * 180) / Math.PI, 4);
+      const facts = factsOf(['משולש ABC', 'tan∢ABC = 2', 'קוסינוס הזווית ACB = 3/4']);
+      const texts = facts.flatMap((f) => (f.cmd.type === 'measure-angle' && 'value' in f.cmd.expr && f.cmd.expr.text ? [f.cmd.expr.text] : []));
+      expect(texts, 'the figure prints the givens as stated').toEqual(['tan=2', 'cos=3/4']);
+      const tri = factsOf(['משולש ABC']);
+      for (const line of ['sin∢ACB = 3/4', 'cos∢ACB = 5/4']) {
+        const v = gateVerdict(tri, line);
+        expect(v.kind === 'refused' && v.detail, `«${line}» is refused by the parser`).toBe('trig-given');
+      }
+    },
+  },
 ];

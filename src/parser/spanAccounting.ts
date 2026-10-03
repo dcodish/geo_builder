@@ -40,7 +40,7 @@
  * bucket, never silently treated as filler.
  */
 import type { AnyCommand } from '@/engine';
-import { normalizeUtterance } from './parse';
+import { normalizeUtterance, NOTATION_WORDS } from './parse';
 
 export interface UnaccountedSpan {
   kind: 'label' | 'number' | 'relation' | 'unknown-word';
@@ -165,7 +165,19 @@ export function accountUtterance(utterance: string, commands: AnyCommand[], actx
   // radius symbol `name: "r"` (#54) accounts a lowercase-stated «r» without letting a type string's
   // letters account anything (values only, `type` excluded above).
   for (const v of strVals) if (/^[A-Za-z]\d*$/.test(v)) valueLabels.add(v.toUpperCase());
-  const cmdNumbers = (JSON.stringify(commands).match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+  // #1698 (ADR-566): numbers come from the commands' VALUES, never their field NAMES — the same
+  // discipline the label pass above applies. Scanning the serialized JSON let `ray1`/`ray2` (and
+  // `line1`, `circle2`, `v1`, …) account a stated 1 or 2, so «∢ABC = 3/4» lowered to 3° passed with its
+  // «4» "accounted" by √4 = 2 from the key `ray2`.
+  const numVals: number[] = [];
+  const collectNums = (v: unknown): void => {
+    if (typeof v === 'number' && Number.isFinite(v)) numVals.push(v);
+    else if (typeof v === 'string') for (const m of v.match(/-?\d+(?:\.\d+)?/g) ?? []) numVals.push(Number(m));
+    else if (Array.isArray(v)) v.forEach(collectNums);
+    else if (v && typeof v === 'object') Object.values(v).forEach(collectNums);
+  };
+  commands.forEach(collectNums);
+  const cmdNumbers = numVals;
   const out: UnaccountedSpan[] = [];
 
   // labels: split glued runs (ABCD → A,B,C,D; O1 stays O1). The AREA MARKER S is notation, not a
@@ -190,7 +202,7 @@ export function accountUtterance(utterance: string, commands: AnyCommand[], actx
   const labelWords = new Set<string>();
   if (/[א-ת]/.test(s)) {
     for (const run of s.match(/(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g) ?? []) {
-      if (['cm', 'mm'].includes(run.toLowerCase())) continue;
+      if (NOTATION_WORDS.has(run.toLowerCase())) continue; // units and trig function names (#1698)
       labelWords.add(run.toLowerCase());
       for (const label of run.toUpperCase().match(/[A-Z]\d*/g) ?? []) account(label);
     }

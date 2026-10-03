@@ -914,6 +914,24 @@ phrase }`. Because it is `parse`, every seam inherits it: the submit lane (`deci
 `scope:<category>`), the ✎ edit seam, the scenario harness (`refusedSteps`) and log-triage. One vocabulary:
 the pre-parse guard and the post-failure register read the same `RULES` entries.
 
+## A trig function of an angle is decided whole, before any rule ([ADR-566](06-decisions.md#adr-566))
+
+`trigGiven` (`parser/parse.ts`) runs at the top of `parse()`, after the angle-alias rewrite and beside the
+proof-target and foreign-given guards, for their reason: a rule that reads part of the sentence commits a
+different given. A line in which tan / tg / cot / ctg / sin / cos (or «טנגנס» / «קוטנגנס» / «קוסינוס» /
+«סינוס», with a clitic prefix) is applied to an angle — an angle noun in the line, or a label right after the
+function — belongs to it whole. The one canonical shape (`trigLine`: [lead-in] FN [of|של] [(] [angle noun]
+LABELS [)] copula VALUE, the value read by the shared `NUMEXPR` atom, optionally signed) lowers to the arms'
+`segment`s plus a `measure-angle` whose `expr` is `{ value: <the angle in degrees>, text: '<fn>=<value as
+typed>' }` — the existing literal-measure path (`lowerOne` → `set-angle`; `measureLabelForms` prints `text`),
+so the figure shows the given and every downstream consumer sees an ordinary angle. tan / cot map through the
+principal angle and add 180° when negative; cos through `acos`. The transformed ratio is declared in
+`consumed.numbers` (ADR-462), so the numbers gates account «√3», «-2», «3/4». Anything else returns
+`{ ok: false, reason: 'trig-given', why, fn, sentence }` — `sine-two-angles` (checked first, in every form),
+`out-of-range`, or `form` — answered by `decideFromParse` with `input.trigGiven.<why>`; it never reaches the
+angle rules and never escalates. `NOTATION_WORDS` (units + the Latin function names) is the one list of
+Latin words the label-counting gates (`statedLabelTokens`, the span accountant) never read as point labels.
+
 ## A variable statement waits for its letter ([ADR-562](06-decisions.md#adr-562))
 
 `isVariableStatement` (`set-var`, `measure-bound`, `measure-order`) and `unboundSubjectOf` in `engine/lower.ts`

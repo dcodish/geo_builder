@@ -395,6 +395,12 @@ export async function decideFromParse(
   if (!r.ok && r.reason === 'crossing-already-named') {
     return refuse('guided', { source: 'parser', result: `crossing-already-named:${r.holder}:${r.s1.join('')}/${r.s2.join('')}` }, { key: 'input.crossingAlreadyNamed', params: { holder: r.holder, id: r.id, s1: r.s1.join(''), s2: r.s2.join('') } });
   }
+  // #1698 (ADR-566): a trig function of an angle that names no single angle — a sine (two angles), a
+  // cosine outside [−1, 1], or a form other than «tan∢ABC = 2». Refused naming the function; never an
+  // escalation (the model would guess the very reading the grammar refused).
+  if (!r.ok && r.reason === 'trig-given') {
+    return refuse('guided', { source: 'parser', result: `trig-given:${r.why}:${r.fn}` }, { key: `input.trigGiven.${r.why}`, params: { fn: r.fn, sentence: r.sentence } });
+  }
   if (!r.ok && r.reason === 'angle-sides-disjoint') {
     return refuse('guided', { source: 'parser', result: `angle-sides-disjoint:${r.s1}/${r.s2}` }, { key: 'input.angleSidesDisjoint', params: { s1: r.s1, s2: r.s2 } });
   }
