@@ -3271,4 +3271,20 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs(cross) / dist(B, D), 'E on line BD').toBeLessThan(1e-6);
     },
   },
+  {
+    id: 'triangle-form-cevian-introduces-triangle-1720',
+    title: '#1720 (ADR-571): «AD תיכון במשולש ABC» on an empty canvas builds the triangle and the median (D the midpoint of BC); «AD חוצה זווית במשולש ABC» builds too',
+    guards:
+      "Operator report 2026-10-03: \"AD תיכון במשולש ABC should be accepted\". Measured on deed7b20: on an empty canvas the median and bisector triangle forms were refused «unresolved dependencies for: D» / «… bis-CAB» while «AD גובה במשולש ABC» built. Root cause: the altitude and the classic median each carried their own copy of «introduce the named triangle»; the named median and the bisector had none, so D's operands never existed. Fix: one step, `cevianTriangle`, wrapped around every cevian rule; and an unresolved operand on the submit path is refused quoting the sentence and naming the missing letters. Asserts the operator's line builds with D the midpoint of BC, and that the bisector form builds with equal half-angles. The role matrix, the seeds, the existing-triangle control and the refusal text are in src/app/__tests__/issue-1720-cevian-triangle.test.ts.",
+    steps: ['AD תיכון במשולש ABC'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      expect(fig.construction.objects.some((o) => o.kind === 'polygon'), 'triangle ABC is drawn').toBe(true);
+      expect(dist(B, D), 'D is the midpoint of BC').toBeCloseTo(dist(D, C), 6);
+      const bis = replay(factsOf(['AD חוצה זווית במשולש ABC']), 0);
+      const p = (k: string) => bis.positions.get(k)!;
+      expect(angle(p('B'), p('A'), p('D')), 'AD bisects ∠A').toBeCloseTo(angle(p('D'), p('A'), p('C')), 4);
+    },
+  },
 ];

@@ -8650,8 +8650,37 @@ const statedSide = (s: string): { side: [Id, Id]; match: string } | null => {
  * (`ambiguous-angle`, a vertex with more than two edges).
  */
 const statedTriangle = (s: string): { ring: [Id, Id, Id]; match: string } | null => {
-  const m = s.match(/(?:\bin\s+(?:the\s+)?triangle\s+|ב?ה?משולש\s+)([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  const m =
+    s.match(/(?:\bin\s+(?:the\s+)?triangle\s+|ב?ה?משולש\s+)([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i) ??
+    // #1720: the English forms the median and altitude rules always read — "median from A in ABC", "triangle
+    // ABC with a height from A". UPPERCASE labels only (no /i), so "a triangle and …" is never A, N, D.
+    s.match(new RegExp(String.raw`(?:\b[Ii]n\s+(?:the\s+)?|\b[Tt]riangle\s+)(${ULABEL})\s*(${ULABEL})\s*(${ULABEL})(?![A-Za-z\d])`));
   return m ? { ring: [up(m[1]), up(m[2]), up(m[3])], match: m[0] } : null;
+};
+
+/**
+ * #1720 ([ADR-571](../../docs/06-decisions.md#adr-571)) — A CEVIAN SENTENCE INTRODUCES THE TRIANGLE IT NAMES.
+ *
+ * «AD גובה במשולש ABC» on an empty canvas built the triangle with the altitude; «AD תיכון במשולש ABC» and
+ * «AD חוצה זווית במשולש ABC» did not, so D's operands (the side BC) never existed and the commit failed with
+ * the evaluator's «unresolved dependencies for: D». The altitude and the classic median each carried their
+ * own copy of the introduction; the named median and the bisector had none. This is now ONE step, wrapped
+ * around every cevian rule: when the sentence names a triangle (`statedTriangle`), the rule's lowering is
+ * about that triangle (it references all three vertices), and the figure has no polygon on those three
+ * vertices, the triangle is introduced first. An existing triangle is never re-declared.
+ */
+const cevianTriangle = (rule: Rule): Rule => (s, ctx) => {
+  const res = rule(s, ctx);
+  if (!Array.isArray(res)) return res;
+  const tri = statedTriangle(s);
+  if (!tri || new Set(tri.ring).size !== 3) return res;
+  const key = (vs: readonly string[]) => vs.map(up).sort().join('|');
+  const ringKey = key(tri.ring);
+  if ((ctx.polygons ?? []).some((p) => key(p) === ringKey)) return res;
+  if (res.some((c) => Array.isArray((c as { ids?: unknown }).ids) && key((c as { ids: string[] }).ids) === ringKey)) return res;
+  const named = new Set(res.flatMap((c) => JSON.stringify(c).match(/[A-Z]\d*/g) ?? []));
+  if (!tri.ring.every((v) => named.has(v))) return res; // the cevian is not about this triangle
+  return [{ type: 'triangle', ids: [tri.ring[0], tri.ring[1], tri.ring[2]] }, ...res];
 };
 
 type CevianRole = 'median' | 'altitude';
@@ -8807,7 +8836,7 @@ const median: Rule = (s, ctx) => {
   if (others.length !== 2) return null;
   const mid = existingMidpointOf(ctx, others[0], others[1]) ?? freeLabel(tri, ['M', 'N', 'P', 'Q']); // reuse (Am. 2)
   return [
-    { type: 'triangle', ids: [tri[0], tri[1], tri[2]] },
+    // the stated triangle is introduced by `cevianTriangle` (#1720), the one step
     { type: 'midpoint', id: mid, a: others[0], b: others[1] },
     { type: 'segment', a: apex, b: mid },
   ];
@@ -9043,8 +9072,7 @@ const altitude: Rule = (s, ctx) => {
   // apex and the side are resolved above is covered by one check.
   const altFault = cevianFault(apex, f, [p, q], 'altitude');
   if (altFault) return altFault; // #1266
-  const cmds: Command[] = [];
-  if (tri) cmds.push({ type: 'triangle', ids: [tri[0], tri[1], tri[2]] });
+  const cmds: Command[] = []; // the stated triangle is introduced by `cevianTriangle` (#1720), the one step
   // #1247 — the foot may BE an endpoint of the side, and then the sentence is a right angle at that
   // vertex rather than a new point. Deciding it here, at the one emit, keeps both readings in one place.
   if (f === p || f === q) return [...cmds, ...altitudeAtVertex(apex, f, [p, q])];
@@ -9836,13 +9864,13 @@ export const RULES: Rule[] = [
   inscribedPolygon, // before the shape rules ("triangle ABC inscribed …" contains "triangle")
   // Special-line constructs whose Hebrew names a triangle ("…במשולש ABC") must
   // run before the shape rules, or `triangle` grabs the embedded משולש and stops.
-  median,
-  pluralSpecialLines, // #71: "AD BE ו-CF הם גבהים במשולש" distributes into the singulars, all-or-nothing
-  altitude, // "height/altitude from A" / "perpendicular from A to BC"
+  cevianTriangle(median), // #1720: every cevian rule introduces the triangle it names, through one step
+  cevianTriangle(pluralSpecialLines), // #71: "AD BE ו-CF הם גבהים במשולש" distributes into the singulars, all-or-nothing
+  cevianTriangle(altitude), // "height/altitude from A" / "perpendicular from A to BC"
   specialPointMeet, // "X מפגש האלכסונים/התיכונים/…" — a named centre meet (noun form); before the shapes + diagonals (#44)
   perpBisector, // "perpendicular bisector of AB"
   midsegment, // "midsegment to BC in triangle ABC" — a triangle construct ("במשולש"); before the shapes AND before segment/midpoint (its "קטע"/"אמצע" keywords)
-  bisectorPlacesPoint, // "AD bisects ∠BAC" / "CD חוצה זווית [C] [במשולש ABC]" — places D on the opposite side; the triangle operand is READ (#1285), it identifies the angle. Before the shapes (its "במשולש ABC" form would otherwise make `triangle` 'stop'); safe before the bisector-∩ compounds because it DEFERS on intersect keywords.
+  cevianTriangle(bisectorPlacesPoint), // "AD bisects ∠BAC" / "CD חוצה זווית [C] [במשולש ABC]" — places D on the opposite side; the triangle operand is READ (#1285), it identifies the angle. Before the shapes (its "במשולש ABC" form would otherwise make `triangle` 'stop'); safe before the bisector-∩ compounds because it DEFERS on intersect keywords.
   bisectsSegment, // "CD חוצה את AB" / "CD bisects AB" — SEGMENT bisection (#240, ADR-382): midpoint + set-line macro. After the angle sense (which owns any angle-keyword utterance); before `chord`/`segment` (whose "הקטע AB" would half-parse the object and drop the bisection).
   regularPolygon, // "regular pentagon ABCDE" / "מחומש משוכלל" — before square (it also routes "regular triangle/quadrilateral")
   square,

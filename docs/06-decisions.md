@@ -13846,3 +13846,49 @@ Not changed: size (`radius.via !== 'free'`) and size order (`orderedBelow`) alre
 - `src/app/decideDeterministic.ts`: the `ambiguous-cevian` arm. `src/i18n/locales/{he,en}.json`: `input.ambiguousCevian`.
 
 **Behaviour change for a student:** «AD חוצה זווית C» is now refused with a note saying the bisector runs from A, not C, instead of quietly drawing the bisector of angle A. «AE גובה» (or «AE תיכון») when A is a corner of two triangles now asks which side or triangle is meant instead of picking one.
+
+## ADR-571 — A triangle-form cevian introduces its triangle through one step, and an unresolved operand is refused naming the sentence (#1720)
+
+**Status:** accepted · 2026-10-03 · bug (P2) · round #1721 (operator auto-ok of the round 2 items) · operator report: *"AD תיכון במשולש ABC should be accepted"* · branch `fix/1720-cevian-triangle` off **`fix/1684-bisector-vertex`** (6d6604e6), because it edits the triangle-form bisector block and the median rule ADR-568 rewrote
+
+**Requirements:** [FR-EN-8](02-requirements.md) extended — an unresolved operand is refused quoting the line and naming the missing letters; a cevian that names its triangle introduces it for every role · **Design:** [04-design.md](04-design.md) § "A refusal names what the rule matched" (`cevianTriangle`) and § "The pre-LLM decision" (*An unresolved operand is refused naming the sentence*) · **LADDER stage:** the parser (a wrapper over the four cevian rules) and the pre-LLM decision's dry-run error arm. No solver, replay or render change.
+
+**Cites** [ADR-540](#adr-540) (#1285: `statedTriangle`), [ADR-568](#adr-568) (the cevian shape resolver this builds on), [ADR-487](#adr-487) (#943: the refusal names the statement), [ADR-546](#adr-546) (the pre-LLM decision), ADR-AG-209 / ADR-AG-210 (analytic introduces the named triangle for every role).
+
+**Context — measured at pickup on deed7b20 and on the ADR-568 tip, through `runSubmit`, empty canvas.** The issue's table held:
+
+| typed | before |
+| --- | --- |
+| «AD תיכון במשולש ABC», "AD median in triangle ABC" | refused «unresolved dependencies for: D» |
+| «AD חוצה זווית במשולש ABC», «… זווית A במשולש ABC», "AD bisects the angle in triangle ABC" | refused «unresolved dependencies for: bis-CAB» |
+| «AD גובה במשולש ABC», «גובה מ-A במשולש ABC», «תיכון מ-A במשולש ABC» | builds, triangle drawn |
+| «AD תיכון לצלע BC», «AD חוצה זווית BAC» | refused with the same internal message |
+
+The humanizer already strips id prefixes (`bis-CAB` → `CAB`), so what a student read was «הצעד הזה מסתמך על CAB שעדיין לא הוגדרו» — no raw id, but naming an internal object (and the wrong one: B and C are what is missing), never the sentence.
+
+**Class.** (1) *A cevian sentence that names its triangle introduces it only where a rule happens to carry its own copy of the introduction* — the altitude and the classic median did; the named median and the bisector did not. (2) *An operand the figure lacks surfaces as the evaluator's internal message* instead of a refusal of the sentence.
+
+**Decision.**
+1. **One step introduces the stated triangle for every cevian rule.** `cevianTriangle(rule)` wraps `median`, `altitude`, `pluralSpecialLines` and `bisectorPlacesPoint` in `RULES`. When the sentence names a triangle (`statedTriangle`), the rule's lowering references all three of its vertices (it is a cevian OF that triangle), and the figure has no polygon on those vertices, `triangle` is prepended. The altitude's and the classic median's own copies are removed, so there is one introducer. `statedTriangle` also reads the English forms those rules always read ("median from A in ABC", "triangle ABC with a height from A"), uppercase labels only, so "a triangle and …" can never be read as A, N, D.
+2. **An unresolved operand is refused naming the sentence.** On the decision's dry-run error arm, an evaluator «unresolved dependencies» failure answers `input.missingOperands`: the sentence quoted, plus `missingOperandLetters`, the point labels the batch references that neither the figure nor the batch (applied structurally, with no evaluation) defines. When it has no letters to name, it answers `input.unresolvedSentence`. Internal ids are never point labels, so none can reach the note.
+
+**Sibling audit.** Every cevian rule is in `RULES` once and now wrapped (4). The grep for other emitters of a stated triangle found only the midsegment rule (`triangle` + its own construct, a different sentence). The grep for «unresolved dependencies» reaching a student found the submit refusal (fixed here) and the fact-list banner via `humanizeError` (already prefix-sanitized; it names a step that failed after an edit, which is a different message). **Analytic:** builds all three (ADR-AG-209/210). **3-D:** refuses all three forms honestly (`unknown-point` / `not-handled`), so this class is not present. The cevian capability itself is the existing #1679 gap, and the new parity rows carry it.
+
+**Measured after** (`src/app/__tests__/issue-1720-cevian-triangle.test.ts`):
+
+| typed, empty canvas | now |
+| --- | --- |
+| «AD תיכון במשולש ABC», «AD חוצה זווית במשולש ABC», «AD גובה במשולש ABC», "AD median in triangle ABC", "AD bisects the angle in triangle ABC", «תיכון מ-A במשולש ABC», «גובה מ-A במשולש ABC», «AD חוצה זווית A במשולש ABC» | builds, `triangle ABC` first; at seeds 0–3 D is the midpoint / the equal-angle point / the foot |
+| «משולש ABC» · the three forms | builds, no triangle re-declared |
+| «AD תיכון לצלע BC» | refused «"AD תיכון לצלע BC": B, C עדיין לא בסרטוט …», no paid call |
+| «AD חוצה זווית BAC» | refused quoting the sentence, no internal id, both locales |
+
+**Unchanged, measured.** 156 test files that touch cevian / triangle / unresolved sentences, plus the ratchet, the four #1649 parity files, `i18n-keys-1372` and the seam registry: 158 files, 4459 tests, green after one lock update (the one red, re-run alone after it: 5 of 5). `triage-fixes.test.ts` asserted «AD תיכון במשולש ABC» lowers to `midpoint, segment` in a context holding only quad ABCD — the missing introduction itself. It now expects `triangle` first, as the altitude form always gave. Decide-parity goldens: **no recorded hash changed**; shard 4 gains the new scenario's key. The full suite is the batch gate (round #1721).
+
+**Locks.** `src/app/__tests__/issue-1720-cevian-triangle.test.ts` (13). **Fails before: 10 of 13**, measured by reverting `parse.ts`, `decideDeterministic.ts` and the locales to the ADR-568 base. The 3 that pass before are controls: the altitude form, the classic altitude, and the existing-triangle check. Scenario `triangle-form-cevian-introduces-triangle-1720` (corpus 4). #1649 rows `cevian-{median,bisector,altitude}-triangle-empty-1720` (builds; 3-D known gap #1679).
+
+**Consequences.**
+- `src/parser/parse.ts`: `cevianTriangle`; `statedTriangle`'s English forms; the altitude's and classic median's copies removed; four `RULES` entries wrapped.
+- `src/app/decideDeterministic.ts`: `missingOperandLetters` and the refusal arm. `src/i18n/locales/{he,en}.json`: `input.missingOperands`, `input.unresolvedSentence`.
+
+**Behaviour change for a student:** on an empty page, «AD תיכון במשולש ABC» and «AD חוצה זווית במשולש ABC» now draw the triangle with the median or bisector, as «AD גובה במשולש ABC» already did. A line whose points are not in the figure yet («AD תיכון לצלע BC» on an empty page) is now refused with a note that quotes the line and names the missing points, instead of an internal message.
