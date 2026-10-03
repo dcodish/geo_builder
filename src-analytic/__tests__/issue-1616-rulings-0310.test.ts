@@ -163,6 +163,50 @@ describe('#1706 — a position word between two points is a coordinate compariso
     }
   });
 
+  it.each([
+    ['D מתחת לציר x', 'D', 'y', false],
+    ['D מתחת לציר ה-x', 'D', 'y', false],
+    ['A מעל ציר ה-x', 'A', 'y', true],
+    ['C משמאל לציר ה-y', 'C', 'x', false],
+    ['B מימין לציר y', 'B', 'x', true],
+    ['D is below the x-axis', 'D', 'y', false],
+    ['C is to the left of the y-axis', 'C', 'x', false],
+  ])('a point against an AXIS — «%s» — is the coordinate-sign selector', (line, id, axis, greater) => {
+    expect(factsOf(line)).toEqual([expect.objectContaining({ t: 'selector', sel: { kind: 'coord-compare', id, axis, greater, rhs: { value: { kind: 'num', value: 0 } } } })]);
+  });
+
+  it('a word that names no side of that axis is not read («D מעל ציר ה-y»)', () => {
+    expect(parseLine('D מעל ציר ה-y').ok).toBe(false);
+  });
+
+  it('9/4 with its «;»-joined note: one configuration, A(−3,0), B(0,6), slope AB = 2 — and two without the note', () => {
+    const corpus: { id: string; lines: string[] }[] = JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'corpus471.json'), 'utf8'));
+    const q = corpus.find((x) => x.id === '9/4')!;
+    const note = 'A משמאל ל-O ו-C מימין ל-O; B על החלק החיובי של ציר y; D מתחת לציר x (ציור)';
+    expect(q.lines.at(-1)).toBe(note);
+    const { verdicts, lines } = typed(q.lines);
+    expect(verdicts.map((v) => v.kind)).toEqual(q.lines.map(() => 'record'));
+    const shape = (ls: readonly string[], seed: number) => {
+      const d = clean(ls, seed);
+      return ['A', 'B', 'C', 'D'].map((id) => `${id}(${pt(d, id).x.toFixed(4)},${pt(d, id).y.toFixed(4)})`).join(' ').replace(/-0\.0000(?!\d)/g, '0.0000');
+    };
+    const withNote = new Set(SEEDS.map((seed) => shape(lines, seed)));
+    expect(withNote.size).toBe(1);
+    const d = clean(lines, 0);
+    const [A, B, D] = ['A', 'B', 'D'].map((id) => pt(d, id));
+    expect(Math.hypot(A.x + 3, A.y)).toBeLessThan(EPS);
+    expect(Math.hypot(B.x, B.y - 6)).toBeLessThan(EPS);
+    expect((B.y - A.y) / (B.x - A.x)).toBeCloseTo(2, 6);
+    expect(D.y).toBeLessThan(0);
+    // the note is what decides it: the exam's own lines leave more than one drawing
+    expect(new Set(SEEDS.map((seed) => shape(lines.slice(0, -1), seed))).size).toBeGreaterThan(1);
+  });
+
+  it('«(ציור)» alone is a pointer to the figure and states nothing', () => {
+    const statements = (line: string) => factsOf(line).map((f) => ({ ...f, src: '' }));
+    expect(statements('D מתחת לציר x (ציור)')).toEqual(statements('D מתחת לציר x'));
+  });
+
   it('the aside is read wherever it sits — each clause of the comma list keeps its own', () => {
     const facts = factsOf('A ו-D על ציר ה-y (D מעל A), B ו-C על ציר ה-x (C מימין ל-B)');
     const sels = facts.filter((f) => f.t === 'selector' && f.sel.kind === 'coord-compare').map((f) => (f.t === 'selector' ? JSON.stringify(f.sel) : ''));
@@ -184,7 +228,7 @@ describe('#1707 — corpus 7/4 re-checked against the page: the printed ratio ca
   });
 
   it('typed as printed, the first four lines build and the printed ratio is refused (D is on BC, so S_BDC = 0)', () => {
-    const { verdicts } = typed(confirmTaught(q.lines, 0));
+    const { verdicts } = typed(confirmTaught(q.lines, 0).slice(0, 5));
     expect(verdicts.map((v) => (v.kind === 'refused' ? `refused:${v.error.key}` : v.kind))).toEqual(['record', 'record', 'record', 'record', 'refused:unsatisfiable']);
   });
 

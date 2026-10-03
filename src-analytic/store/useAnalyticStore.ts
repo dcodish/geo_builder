@@ -96,6 +96,7 @@ export type InputError =
   | { key: 'apex-not-a-vertex'; detail: string }
   /** An angle bisector that does not start at its angle's vertex (#1284, ADR-AG-209). */
   | { key: 'bisector-wrong-apex'; detail: string }
+  | { key: 'length-xy'; detail: string }
   /** A cevian whose target the figure leaves open — the apex (or side) in several triangles (#1240, ADR-AG-209). */
   | { key: 'ambiguous-cevian'; detail: string }
   /** A cevian whose apex (or side) is in no triangle of the figure (#1240, ADR-AG-209). */

@@ -3,9 +3,12 @@
  *
  * The 4-point bagrut geometry questions (Q4 + Q5 of the 23 exams in `חוברת בגרויות 471 2025`), each as
  * the student would type it — the exam's OWN sentences, one per line, transcribed into
- * `fixtures/corpus471.json` from `docs/sample questions/471-geometry-inventory.json`. Only the
- * transcribers' figure-position notes («A למעלה משמאל…») are left out: they describe the drawing, they
- * are not sentences anyone types.
+ * `fixtures/corpus471.json` from `docs/sample questions/471-geometry-inventory.json`. The exam's own lines come
+ * first and unchanged. After them come the transcribers' figure-position notes («A משמאל ל-O», «D מתחת לציר x»,
+ * «B ברביע הראשון»), each clause as a line the grammar reads: since #1706 a position word is a given that narrows
+ * the configurations, and a student who sees the printed figure types what it shows (operator, 2026-10-03, on
+ * #1706; ADR-AG-222). A clause with no readable meaning («הקטעים CM, DM מסורטטים», «A למעלה משמאל» with nothing
+ * to be left of) is left out; ADR-AG-222 lists them.
  *
  * The analytic tool was built for the 5-point question and accepted 23 of these lines as printed when
  * the corpus was first measured. Each #1616 slice raises the floor below; the test fails if a change
@@ -28,13 +31,15 @@ interface CorpusQuestion {
   id: string;
   title: string;
   crossedOut: boolean;
+  /** How many of `lines` the exam prints; the transcribers' figure-position notes follow them. */
+  printed: number;
   lines: string[];
 }
 
 const CORPUS: CorpusQuestion[] = JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'corpus471.json'), 'utf8'));
 
 /** The floors. Raise them in the commit that earns them; never lower them. */
-const FLOOR = { lines: 258, questions: 42 }; // #1616 rulings of 2026-10-03 (ADR-AG-222): corpus 6/5 — position words in an aside
+const FLOOR = { lines: 357, questions: 45 }; // ADR-AG-222 amendment: the figure-position notes are typed lines (#1706)
 
 function measure() {
   let lines = 0;
@@ -54,7 +59,11 @@ function measure() {
 describe('#1618 — the 471 corpus ratchet', () => {
   it('the corpus is the 46 questions of the inventory', () => {
     expect(CORPUS).toHaveLength(46);
-    for (const q of CORPUS) expect(q.lines.length).toBeGreaterThan(0);
+    for (const q of CORPUS) {
+      expect(q.lines.length).toBeGreaterThan(0);
+      expect(q.printed, q.id).toBeGreaterThan(0);
+      expect(q.printed, q.id).toBeLessThanOrEqual(q.lines.length);
+    }
   });
 
   it('no change lowers the number of corpus lines or questions that land', () => {

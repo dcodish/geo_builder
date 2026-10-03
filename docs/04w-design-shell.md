@@ -461,7 +461,7 @@ The caller mounts it once per opening (`key`), so typed text, the note and the o
 | `Verdict` | `builds` (recorded, or already known) · `refused` (an owned refusal) · `asks` (a clarifying question: 2-D `clarify`, analytic and 3-D `ambiguous-*`) · `not-handled` (the line would go to the model) |
 | `StepRunner` | the product's REAL submit decision over an empty canvas, carrying the figure forward; one verdict per step |
 | `ParityRow` | `steps` (context, then the sentence under test), `expect`, optional `contextFor` (another context for one product, the sentence unchanged), `exception`, `only`, `knownGap` |
-| `EXCEPTIONS` X1–X9 | per family: the builders that read it, the builders that must not BUILD it (`mustRefuse`), whether it is a topic outside plane geometry, and its sentence patterns |
+| `EXCEPTIONS` X1–X10 (X10: [ADR-W-109](06w-decisions-workspace.md#adr-w-109)) | per family: the builders that read it, the builders that must not BUILD it (`mustRefuse`), whether it is a topic outside plane geometry, and its sentence patterns |
 | `parityFaults(runners)` | per row and product: an early return; a context line that does not build; an expected product off `expect`; a known gap that now gives `expect` ("move it to the parity rows"); a `mustRefuse` product that builds |
 | `catalogCoverageFaults(product, sentences)` | each construction sentence of the catalog is a step of a row the product takes part in, a topic-family sentence the product reads, or on `UNCOVERED_CATALOG` (a ratchet under `UNCOVERED_CEILING`) |
 | `rowFaults()` | the rows themselves: unique ids, issues named, exception patterns matched, `only` and `contextFor` used where they are checked |

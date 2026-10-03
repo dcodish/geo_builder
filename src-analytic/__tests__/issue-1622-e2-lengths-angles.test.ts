@@ -1,7 +1,7 @@
 /**
  * #1622 E2 (ADR-AG-218) — 2-D parity for lengths, angles, crossings and cevians; congruent/similar triangles as GIVENS;
- * segment products; the LENGTH VARIABLE («AB = 3x», the operator's 2026-10-02 ruling: inside a length a variable is a
- * free length, never the plane's coordinate).
+ * segment products; a LETTER in a length is a free length («AB = 3a») — except x and y, which analytic refuses as a length
+ * (operator ruling 2026-10-03 on #1622, ADR-AG-222's amendment: they are the plane's coordinates).
  *
  * Every lock CALLS the real path — `decideSubmit` for the verdict, `derive` for the figure — and asserts geometry,
  * never the facts a rule happens to emit. The verdicts beside 2-D's are in the shared parity rows.
@@ -10,7 +10,6 @@ import { describe, expect, it } from 'vitest';
 import { decideSubmit } from '../app/submit';
 import { derive } from '../engine/derive';
 import { panelKnowledge } from '../app/panelRows';
-import { LENGTH_VARIABLE, paramLabel } from '../engine/lengths';
 import { parseLine } from '../parser/parseAnalytic';
 import { exprText } from '../engine/expr';
 
@@ -86,65 +85,61 @@ describe('#1622 E2 — a segment product (X13)', () => {
   });
 });
 
-describe('#1622 E2 — the LENGTH VARIABLE (ruling 2026-10-02: never the plane\'s coordinate)', () => {
-  it('«AB = 3x» builds with x a FREE length — its own symbol, not the plane\'s x — and «AB = 6» pins it to 2', () => {
-    expect(play(['משולש ABC', 'AB = 3x'])).toEqual(['record', 'record']);
-    const free = derive(['משולש ABC', 'AB = 3x'], 0);
-    expect(Object.keys(free.figure.env)).toEqual([LENGTH_VARIABLE.x]);
+describe('#1622 E2 — a letter in a length; x and y refused (operator ruling 2026-10-03, ADR-AG-222)', () => {
+  it('«AB = 3a» builds with a a FREE length, sampled per seed, and «AB = 6» pins it to 2', () => {
+    expect(play(['משולש ABC', 'AB = 3a'])).toEqual(['record', 'record']);
+    expect(Object.keys(derive(['משולש ABC', 'AB = 3a'], 0).figure.env)).toEqual(['a']);
     // a free magnitude moves with the seed (ADR-052)
-    const sampled = new Set(SEEDS.map((seed) => derive(['משולש ABC', 'AB = 3x'], seed).figure.env[LENGTH_VARIABLE.x].toFixed(3)));
+    const sampled = new Set(SEEDS.map((seed) => derive(['משולש ABC', 'AB = 3a'], seed).figure.env.a.toFixed(3)));
     expect(sampled.size).toBeGreaterThan(1);
-    const pinned = derive(['משולש ABC', 'AB = 3x', 'AB = 6'], 0);
-    const row = panelKnowledge(pinned).params.find((r) => r.sym === LENGTH_VARIABLE.x)!;
+    const pinned = derive(['משולש ABC', 'AB = 3a', 'AB = 6'], 0);
+    const row = panelKnowledge(pinned).params.find((r) => r.sym === 'a')!;
     expect(row.k.known && row.k.value).toBeCloseTo(2, 6);
-    expect(paramLabel(row.sym)).toBe('x'); // shown under the letter the student typed
   });
 
-  it('one variable relates two lengths: «AB = 3x», «AC = 2x» keep AB:AC = 3:2', () => {
-    const lines = ['משולש ABC', 'AB = 3x', 'AC = 2x'];
+  it('one letter relates two lengths: «AB = 3k», «AC = 2k» keep AB:AC = 3:2', () => {
+    const lines = ['משולש ABC', 'AB = 3k', 'AC = 2k'];
     for (const seed of SEEDS) {
       const p = pts(lines, seed);
       expect(dist(p.A, p.B) / dist(p.A, p.C)).toBeCloseTo(1.5, 4);
     }
   });
 
-  it('THE COLLISION CASE: «y = 2x + 1» beside «AB = 3x» is still the plane\'s line, and does not touch the length', () => {
-    const lines = ['משולש ABC', 'AB = 3x', 'y = 2x + 1'];
+  it.each(['AB = 3x', 'AB = AC = 3x', 'AB = 2y', 'AB = x²', 'AD = 12√x', 'אורך AB הוא 3x', 'AB = 3x + 1'])(
+    "«%s» is REFUSED with the teaching message — x and y are the plane's coordinates here",
+    (line) => expect(play(['משולש ABC', line])).toEqual(['record', 'refused:length-xy']),
+  );
+
+  it('the refusal quotes the whole line the student typed, a chain included', () => {
+    const v = decideSubmit('AB = AC = 3x', ['משולש ABC'], 0);
+    expect(v.kind === 'refused' && v.error.key === 'length-xy' && v.error.detail).toBe('AB = AC = 3x');
+  });
+
+  it('the plane is untouched: «y = 2x + 1» is still the line, and no x/y symbol is ever a parameter of a length', () => {
+    const lines = ['משולש ABC', 'AB = 3a', 'y = 2x + 1'];
     expect(play(lines)).toEqual(['record', 'record', 'record']);
     const d = derive(lines, 0);
     expect(d.figure.curves.some((c) => c.curve.kind === 'line')).toBe(true);
-    expect(Object.keys(d.figure.env)).toEqual([LENGTH_VARIABLE.x]);
+    expect(Object.keys(d.figure.env)).toEqual(['a']);
   });
 
-  it.each([
-    ['AB = 2y', LENGTH_VARIABLE.y],
-    ['AB = x²', LENGTH_VARIABLE.x],
-    ['AD = 12√x', LENGTH_VARIABLE.x],
-  ])('«%s» builds over the length variable', (line, sym) => {
-    expect(play(['משולש ABC', line])).toEqual(['record', 'record']);
-    expect(Object.keys(derive(['משולש ABC', line], 0).figure.env)).toContain(sym);
-  });
-
-  it('a declaration of x/y is about the length variable (the plane\'s coordinate is never a parameter)', () => {
-    const p = parseLine('x > 0');
-    expect(p.ok && p.facts[0].t === 'param' && p.facts[0].sym).toBe(LENGTH_VARIABLE.x);
-  });
-
-  it('a measure beside the plane\'s letter still declines (#1496): «side AB is y=x-4», «AB = AC + x», an AREA «… הוא y»', () => {
+  it("a measure beside the plane's letter still declines (#1496): «side AB is y=x-4», «AB = AC + x», an AREA «… הוא y»", () => {
     expect(play(['משולש ABC', 'side AB is y=x-4']).at(-1)).toBe('refused:not-handled');
     expect(play(['משולש ABC', 'AB = AC + x']).at(-1)).toBe('refused:not-handled');
     expect(parseLine('שטח המשולש ABC הוא y').ok).toBe(false);
   });
 
-  it('the length variable prints as the student\'s letter', () => {
-    expect(exprText({ kind: 'mul', a: { kind: 'num', value: 3 }, b: { kind: 'sym', name: LENGTH_VARIABLE.x } })).toBe('3·x');
+  it('a parameter is its own letter (the withdrawn length variable left no second symbol): «x > 0» declares x', () => {
+    const p = parseLine('x > 0');
+    expect(p.ok && p.facts[0].t === 'param' && p.facts[0].sym).toBe('x');
+    expect(exprText({ kind: 'mul', a: { kind: 'num', value: 3 }, b: { kind: 'sym', name: 'a' } })).toBe('3·a');
   });
 });
 
 describe('#1622 E2 — chained equalities', () => {
-  it('«AB = AC = 3x»: both equal, both over the variable', () => {
+  it('«AB = AC = 3a»: both equal, both over the letter', () => {
     for (const seed of SEEDS) {
-      const p = pts(['משולש ABC', 'AB = AC = 3x', 'BC = 4'], seed);
+      const p = pts(['משולש ABC', 'AB = AC = 3a', 'BC = 4'], seed);
       expect(dist(p.A, p.B)).toBeCloseTo(dist(p.A, p.C), 4);
     }
   });
@@ -235,7 +230,7 @@ describe('#1622 E2 — angles', () => {
     expect(angle(p.A, p.B, p.C)).toBeCloseTo(40, 3);
     expect(play(['נקודה A', 'A = 40']).at(-1)).toBe('refused:ambiguous-angle');
     expect(play(['נתון מעגל O', 'R=5']).at(-1)).toBe('refused:not-handled');
-    expect(play(['משולש ABC', 'AB = 3x', 'x = 4']).at(-1)).toBe('record'); // lowercase: the line, never an angle
+    expect(play(['משולש ABC', 'AB = 3a', 'x = 4']).at(-1)).toBe('record'); // lowercase: the line, never an angle
   });
 });
 

@@ -362,6 +362,6 @@ locally), and it has no RUNBOOK row until the operator lifts the rule.
 - **Adding or changing a sentence form in one builder** means one of:
   - a parity row, where every builder already agrees;
   - a known-gap row naming the issue that ports it (`knownGap: [{ product, issue: '#NNNN' }]`). When the port lands the row fails with "move it to the parity rows", so the list only shrinks;
-  - an `EXCEPTIONS` family, X1–X9: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, free points in 3-D. A new family is an ADR-W decision, never a quiet edit.
+  - an `EXCEPTIONS` family, X1–X10: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, free points in 3-D, x or y as a length in analytic (ADR-W-109). A new family is an ADR-W decision, never a quiet edit.
 - **The catalog check** makes this reach every guide sentence. Each builder's catalog sentence is a step of some row, belongs to a topic exception, or sits on `UNCOVERED_CATALOG`. That allowlist is a ratchet: it may shrink, never grow.
 - **Not a verdict:** how the figure is drawn (which segments, which marks). That stays with each builder's own locks.

@@ -310,6 +310,10 @@ const he = {
     'תיכון, גובה או חוצה זווית יוצאים מקודקוד של המשולש, ובמשפט "{{detail}}" הקודקוד שנכתב אינו אחד מקודקודי ' +
     'המשולש. אפשר לכתוב את הקודקוד שבמשולש, למשל "AD תיכון במשולש ABC", או לציין את הצלע במפורש.',
   // #1284 (ADR-AG-209) — the bisector runs FROM the vertex of the angle it bisects.
+  // Operator ruling 2026-10-03 on #1622 (ADR-AG-222) — x and y are the plane's coordinates, never a length.
+  errLengthXY:
+    'בכלי הגיאומטריה האנליטית x ו-y הם שיעורי המישור, ולכן הם לא יכולים לסמן אורך ב-"{{detail}}". ' +
+    'סמנו את האורך באות אחרת, למשל "AB = 3a" או "AB = 3k".',
   errBisectorWrongApex:
     'חוצה זווית יוצא מקודקוד הזווית שהוא חוצה, ובמשפט "{{detail}}" הקטע אינו יוצא מהקודקוד הזה. ' +
     'כתבו קטע שמתחיל בקודקוד הזווית, למשל "AD חוצה את הזווית BAC".',
@@ -700,6 +704,9 @@ const en: typeof he = {
     'A median, an altitude or an angle bisector starts at a VERTEX of the triangle, and in "{{detail}}" the point ' +
     'written is not one of that triangle’s vertices. Use a vertex of the triangle — for ' +
     'example "AD is the median in triangle ABC" — or name the side outright.',
+  errLengthXY:
+    'In the analytic tool x and y are the coordinates of the plane, so they cannot name a length in "{{detail}}". ' +
+    'Name the length with another letter, e.g. "AB = 3a" or "AB = 3k".',
   errBisectorWrongApex:
     'An angle bisector starts at the VERTEX of the angle it bisects, and the segment in "{{detail}}" does not. ' +
     'Start the segment at the angle’s vertex — for example "AD bisects angle BAC".',

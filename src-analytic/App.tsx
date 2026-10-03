@@ -42,7 +42,6 @@ import { hostKey } from './app/hostKey';
 import { angleText } from './app/lineAngle';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
 import { domainText } from './engine/types';
-import { paramLabel } from './engine/lengths';
 import { configurationPool, knownCurve, settled } from './engine/evaluate';
 import { pointText as pointTextOf } from './app/pointText';
 import { drawnBox as composeDrawnBox } from './app/drawnBox';
@@ -1541,8 +1540,7 @@ export function App() {
                  * vertex's coordinates.
                  */
                 rows: knows.params.map(({ sym, domain, used, k }) => {
-                  // The length variable is shown under the letter the student typed (#1622, ADR-AG-218 — `paramLabel`).
-                  const label = paramLabel(sym);
+                  const label = sym;
                   // A symbol nothing reads is never asked of the gate (#1343): it is not part of any
                   // configuration, and one sample of it is not knowledge — it printed «m = -3.46» once.
                   // #1473: a value not yet read over the whole pool is «בודק…», never its domain as if open.

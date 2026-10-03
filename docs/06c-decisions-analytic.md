@@ -9691,6 +9691,8 @@ Sibling check (docs/17 §1): 2-D is the reference and builds every row above exc
 - «טרפז ABCD» · «המרחק בין AB לבין CD הוא 3» was refused `unsatisfiable` (2-D: not-handled, gap #1677).
 - «side AB is y=x-4» must stay not-handled (#1496).
 
+> **Amended 2026-10-03 by [ADR-AG-222](#adr-ag-222) (operator ruling on #1622).** The x/y length variable below is WITHDRAWN: analytic refuses «AB = 3x», «AB = 2y», «AB = x²», «AD = 12√x» and «AB = AC = 3x» with a teaching message (`length-xy`: x and y are the plane's coordinates — name the length «AB = 3a»). `LENGTH_VARIABLE`, `paramLabel`, `lengthValueExpr` and the x/y branch of `paramSym` are removed. Every other letter keeps this ADR's reading, and the open question about «x = 4» below no longer arises. The rest of this ADR stands.
+
 **The length variable: measured collisions, and the mechanism.** The ruling: inside a length, a letter is a free length and never the plane's coordinate, and it must stay unambiguous with x/y in equations and coordinates. Measured on the built branch:
 
 | sentence(s) | reading |
@@ -10475,3 +10477,70 @@ Sibling check (docs/17 §1):
 - 2-D reads no obtuse-triangle adjective (#1677).
 - 2-D refuses position words by design.
 - 3-D reads none of these.
+
+### ADR-AG-222 amendment (2026-10-03, same PR #1713) — x and y are never a length; a point against an axis; «;» clauses; the position notes are corpus lines
+
+Two more items, built on top of ef942ea7:
+- **5. An operator ruling** (2026-10-03, recorded on #1622).
+- **6. #1706's approved follow-ups.** `auto-ok` as transcription of the operator's batch approval in the issue's comment (ADR-W-014).
+
+**5. x and y are never a length in analytic.** The ruling: *"I dont think its good practive anyway to confuse x in analytics. in the 2d its normal but not in analytics… for anaytics only, if a user wants to give a proportion of a segment using x or y we reject it"*.
+- **What is withdrawn.** ADR-AG-218's length variable (amended in place) read x/y in a length's value side as the internal symbols U+FF58/U+FF59. It is removed, with no dead path left behind:
+  - `LENGTH_VARIABLE`, `paramLabel`, `asLengthVariable` and `lengthValueExpr` (`engine/lengths.ts`);
+  - the fullwidth branch of `exprText` (`engine/expr.ts`);
+  - the panel's label mapping (`App.tsx`);
+  - `paramSym`. Its x/y branch was its only content, so «x > 0» declares `x` exactly as it did before ADR-AG-218.
+- **What now refuses.** `planeLetterLength` is true when a value side parses, uses x or y, and has no point name beside the letter.
+  - The length rule refuses such a side as **`length-xy`** before reading it.
+  - The message (he/en, `errLengthXY`) teaches the fix: in the analytic tool x and y are the plane's coordinates, so name the length with another letter, e.g. «AB = 3a» or «AB = 3k».
+  - Measured, every one now `refused:length-xy`: «AB = 3x», «AB = 2y», «AB = x²», «AD = 12√x», «אורך AB הוא 3x», «AB = 3x + 1», «BD = x».
+- **A chain carries its pair's refusal.** «AB = AC = 3x» was `not-handled`: the chain reading drops a clause that fails. `readLine` now returns a chain pair's OWNED refusal (anything but not-handled / bad-operand), quoting the whole line. It is the chain's rule — a chain IS its pairs — not a special case for this code.
+- **Unchanged:**
+  - every other letter («AB = 3a», «AB = 3k» · «AC = 2k» keep 3 : 2, «AB = AC = 3a», «AD = 12√a»);
+  - «y = 2x + 1» and «x = 4» (the plane's lines);
+  - «AB = AC + x», still not-handled (#1496).
+- **Parity.** The x/y rows become exception rows of a new family, **X10** ([ADR-W-109](06w-decisions-workspace.md#adr-w-109)): 2-D and 3-D read the sentence, and analytic must refuse it.
+  - X1 could not hold it, because X1's `mustRefuse` is 2-D.
+  - Rows moved to X10: `symbol-length`, `symbol-length-square`, `symbol-length-chain-1622`, `symbol-length-y-1622`, `cat-2d-082`.
+  - `symbol-length-beside-line-1622` keeps X2, with an analytic context «AB = 3a».
+  - New parity rows: `symbol-length-letter-1622`, `-letter-chain-1622`, `-letter-root-1622`. 2-D and analytic both build them.
+  - Catalog: «AB = 3x», «AB = AC = 3x», «AD = 12√x» are now «AB = 3a», «AB = AC = 3a», «AD = 12√a».
+- **Locks.** `issue-1622-e2-lengths-angles.test.ts` covers this:
+  - the x/y rows are refusal rows;
+  - «AB = 3a» builds, is free per seed, and is pinned by «AB = 6»;
+  - the refusal quotes the chain whole.
+
+**6. #1706's follow-ups.**
+- **A point against an AXIS.** «D מתחת לציר x», «A מעל ציר ה-x», «C משמאל לציר ה-y», «B מימין לציר y», "D is below the x-axis" are read by `POSITION_AXIS_HE` / `_EN`.
+  - Each lowers to the coordinate-sign selector: `coord-compare` against 0, the reading `axis-side` already has.
+  - A word that names no side of that axis («D מעל ציר ה-y») is not read.
+- **«;»-joined clauses.** `readLine` splits a top-level «;» into sentences, each read at the same depth (a list of sentences nests nothing). «A(0;6)» keeps its own «;».
+  - Two smaller frame pieces came with it:
+    - `segmentsOf` cuts «… ו-C …» before a point's name, keeping «ו-» as the separator so a merged reading is unchanged;
+    - `unwrap` drops a bare «(ציור)» like «(ראו ציור)».
+  - 9/4's whole note «A משמאל ל-O ו-C מימין ל-O; B על החלק החיובי של ציר y; D מתחת לציר x (ציור)» now reads.
+- **The corpus gains the transcribers' position notes.**
+  - For each question whose inventory carries a figure note, its clauses follow the exam's own lines, each as a line the grammar reads.
+  - Each question now records `printed`, the number of exam lines, so a test about "the exam as printed" slices there.
+  - Questions 19/4, 22/5 and 23/5 had their raw note as the last line. That line is replaced by its readable clauses.
+  - A clause is left out when it has no readable meaning:
+    - drawing-only clauses — «הקטעים … מסורטטים», «MB מקווקו»;
+    - a direction with no referent — «A למעלה משמאל» where nothing is named to be left of, «C בצד ימין למעלה»;
+    - a point against a segment or a circle — «B מעל AC», «A מעל BC», «E מעל המעגל», «BC מעל AD»;
+    - a clause the exam's own lines already state («M נמצאת על הצלע AB», «F על הצלע AB», «C על ציר ה-y», and the two that a given coordinate implies: 1/5's «E על ציר ה-y», 12/4's «C על ציר ה-x»).
+  - Betweenness on a line («E בין O ל-C», «סדר על הישר: O, B, C») is typed as «E על הקטע OC». «X בין Y ל-Z» for three points is not read; reported, not built.
+- **The position notes decide figures that the locks had pinned to the wrong configuration.** Measured against the printed pages:
+  - 11/4 (booklet p. 77) prints E right of A. The `sentence-frame` lock had pinned E(−8,0); it is now A(−3,0) B(0,4) C(10,4) D(7,0) E(2,0).
+  - 9/5 (p. 63) prints the circle right of the y-axis. It is now M(5,−4), B(2,0), C(8,0), D(10,−4), where the lock had the mirror.
+  - 12/5 (p. 84) prints A left of B: A(1,−6), B(7,−6), where the lock had the letters swapped.
+  - Those locks had pinned whichever configuration the seed reached first. They now assert the printed figure.
+  - 6/4 is now only the printed A(−4,5), C(2,−1).
+  - 9/4 is now one configuration: A(−3,0), B(0,6), C(12,0), D(9,−6), slope AB = 2. It is locked at eight seeds, and the exam's lines alone leave more than one.
+  - The two tests that check "as printed" (6/4 in `issue-1637-g2-parser`, 9/4 in `issue-1621-d2-angle-alias-tan`) slice at `printed`.
+
+**Measured (corpus 471, `confirmTaught`, seed 0).**
+- Before (ef942ea7): **258/263 lines, 42/46 questions**.
+- After: **357/361 lines, 45/46 questions**. 94 note lines are added; 19/4, 22/5 and 23/5 now land; only 7/4 fails (#1707, its printed ratio).
+- As the integrator's message allows, the FLOOR is raised to 357 / 45. The ratchet's header now says the notes are included.
+
+**Requirements:** R161 amended (x/y refused); R165 extended. **Design:** 04c — the E2 section's length bullet is rewritten, and this ADR's section is extended.

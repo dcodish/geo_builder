@@ -193,6 +193,8 @@ const UNWRAP: ReadonlyArray<[RegExp, string]> = [
   [new RegExp(String.raw`^ב${FIGURE}\s+(?:מתוא(?:ר|רת|רים|רות)\s+)?`), ''],
   // A reference to the figure — trailing, or parenthesised anywhere — states nothing.
   [new RegExp(String.raw`\s*\(\s*${SEE_FIGURE}\s*\)`, 'g'), ''],
+  // «(ציור)» alone — the transcribers' figure tag on a position note (#1706, ADR-AG-222): a pointer, no statement.
+  [new RegExp(String.raw`\s*\(\s*${FIGURE}\s*\)\s*`, 'g'), ' '],
   [new RegExp(String.raw`\s*,?\s*${SEE_FIGURE}\s*\.?$`), ''],
   [new RegExp(String.raw`\s*\(\s*${SEE_FIGURE_EN}\s*\)`, 'gi'), ''],
   [new RegExp(String.raw`\s*,?\s*${SEE_FIGURE_EN}\s*\.?$`, 'i'), ''],
@@ -835,6 +837,15 @@ export function segmentsOf(line: string): Segment[] {
     else if (ch === ')') depth = Math.max(0, depth - 1);
     else if (depth === 0 && (ch === ',' || ch === ';')) cut(i, ch + ' ', 1);
     else if (depth === 0 && ch === ' ' && /^ ו(?:ה[א-ת]|ידוע|נתו|כי\s)/.test(line.slice(i))) cut(i, ' ', 1);
+    else if (depth === 0 && ch === ' ') {
+      // «A משמאל ל-O ו-C מימין ל-O» (#1706 follow-up, ADR-AG-222): «ו-» before a point's name may join two sentences.
+      // The joint is kept as the separator, so a reading that merges the pieces gets the line back unchanged.
+      const joint = /^ ו-?(?=[A-Z][0-9₀-₉]?\s)/.exec(line.slice(i));
+      if (joint) {
+        cut(i, joint[0], joint[0].length);
+        i += joint[0].length - 1;
+      }
+    }
   }
   cut(line.length, '', 0);
   return out;

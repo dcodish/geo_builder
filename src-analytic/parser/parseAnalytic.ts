@@ -29,7 +29,7 @@ function valueExpr(src: string): Expr | null {
   const e = parseExpr(normalizeMath(src));
   return e && !mentionsPlane(e) ? e : null;
 }
-import { LENGTH_VARIABLE, angleLabelSymbol, constantLengthExpr, lengthValueExpr, namedLengthPairs, parseLengthExpr, type LengthExpr } from '../engine/lengths';
+import { angleLabelSymbol, constantLengthExpr, namedLengthPairs, planeLetterLength, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
 import { CENTRE_SENTINEL, CIRCLE_SENTINEL, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow, BARE_POLYGON_NOT_BUILT } from '../engine/shapes';
@@ -50,6 +50,7 @@ import {
   conditionClauses,
   parenClauses,
   asideClauses,
+  splitTopLevel,
   partitions,
   pointClauses,
   segmentsOf,
@@ -126,6 +127,8 @@ export type ParseFailure =
    * `apex-not-a-vertex` is about a triangle's ring, and the ring may be fine.
    */
   | { code: 'bisector-wrong-apex'; detail: string }
+  /** «AB = 3x» — x and y are the plane's coordinates, never a length (operator ruling 2026-10-03, ADR-AG-222). */
+  | { code: 'length-xy'; detail: string }
   /**
    * A crossing the student asked to NAME that is a point the figure already names — «P נקודת החיתוך
    * של הישר AB עם הישר BC», where `AB` and `BC` meet at `B` (#1175).
@@ -499,17 +502,11 @@ const HE_NONZERO = /שונה\s+מ-?\s*אפס|שונה\s+מ-?\s*0/;
 const HE_LESS = /קטן\s+מ-?\s*(-?[0-9.]+)/;
 const HE_GREATER = /גדול\s+מ-?\s*(-?[0-9.]+)/;
 
-/**
- * A PARAMETER SLOT'S x/y IS THE LENGTH VARIABLE (#1622, ADR-AG-218): the plane's coordinate is never a parameter, so
- * «x > 0» / «0 < x < 5» / «x הוא פרמטר» can only be about the free length «AB = 3x» states — the ruling's slot rule.
- */
-const paramSym = (sym: string): string => (sym === 'x' || sym === 'y' ? LENGTH_VARIABLE[sym] : sym);
-
 function parseParamHe(line: string): Fact | null {
   // «a הוא פרמטר חיובי» · «t הוא פרמטר קטן מ-9» · «a הוא פרמטר שונה מאפס» · «a הוא פרמטר»
   const m = line.match(new RegExp(`^([a-zA-Z])${HE_IS}\\s*פרמטר(.*)$`));
   if (!m) return null;
-  const sym = paramSym(m[1]);
+  const sym = m[1];
   const rest = m[2] ?? '';
   const domain: Domain = { ...UNBOUNDED };
   if (HE_POSITIVE.test(rest)) {
@@ -537,7 +534,7 @@ function parseParamHe(line: string): Fact | null {
 function parseParamEn(line: string): Fact | null {
   const m = line.match(/^([a-zA-Z])\s+is\s+a\s+(positive\s+|negative\s+|nonzero\s+)?parameter(.*)$/i);
   if (!m) return null;
-  const sym = paramSym(m[1]);
+  const sym = m[1];
   const flag = (m[2] ?? '').toLowerCase();
   const rest = (m[3] ?? '').toLowerCase();
   const domain: Domain = { ...UNBOUNDED };
@@ -567,13 +564,13 @@ function parseParamEn(line: string): Fact | null {
 function parseInequality(line: string): Fact | null {
   const s = normalizeMath(line).replace(/≠/g, '!=').replace(/≤/g, '<=').replace(/≥/g, '>=');
   const ne = s.match(/^([a-zA-Z])\s*!=\s*(-?[0-9.]+)$/);
-  if (ne) return { t: 'param', sym: paramSym(ne[1]), domain: { exclude: [Number(ne[2])] }, src: line };
+  if (ne) return { t: 'param', sym: ne[1], domain: { exclude: [Number(ne[2])] }, src: line };
 
   const chain = s.match(/^(-?[0-9.]+)\s*(<=?)\s*([a-zA-Z])\s*(<=?)\s*(-?[0-9.]+)$/);
   if (chain) {
     return {
       t: 'param',
-      sym: paramSym(chain[3]),
+      sym: chain[3],
       domain: {
         min: Number(chain[1]),
         minOpen: chain[2] === '<',
@@ -590,7 +587,7 @@ function parseInequality(line: string): Fact | null {
     const domain: Domain = one[2].startsWith('<')
       ? { max: v, maxOpen: open }
       : { min: v, minOpen: open };
-    return { t: 'param', sym: paramSym(one[1]), domain, src: line };
+    return { t: 'param', sym: one[1], domain, src: line };
   }
   return null;
 }
@@ -4019,6 +4016,19 @@ const POSITION_WORD_EN = new RegExp(
   `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is|lies)\\s+(above|below|to\\s+the\\s+right\\s+of|to\\s+the\\s+left\\s+of)\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`,
   'i',
 );
+/**
+ * A POSITION WORD AGAINST AN AXIS — «D מתחת לציר x», «A מעל ציר ה-x», «C משמאל לציר ה-y», "D is below the x-axis"
+ * (#1706 follow-up, approved 2026-10-03; ADR-AG-222). The side of an axis is the sign of the OTHER coordinate — the
+ * existing coordinate-sign reading (`coord-compare` against 0, which `axis-side` already is): above / below the x-axis
+ * is y ≷ 0, right / left of the y-axis is x ≷ 0. A word that names no side of that axis («מעל ציר ה-y») is not read.
+ */
+const POSITION_AXIS_HE = new RegExp(
+  `^${HE_GIVEN}${HE_POINT}(${NAME})\\s+(?:(?:נמצא|נמצאת|נמצאים|נמצאות|מונח|מונחת)\\s+)?(מעל|מתחת|מימין|משמאל)(?:\\s*ל)?-?\\s*ה?ציר\\s+ה?-?\\s*([xy])$`,
+);
+const POSITION_AXIS_EN = new RegExp(
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is|lies)\\s+(above|below|to\\s+the\\s+right\\s+of|to\\s+the\\s+left\\s+of)\\s+the\\s+([xy])[- ]?axis$`,
+  'i',
+);
 /** The axis and direction a position word means on analytic's fixed axes. */
 function positionMeaning(word: string): { axis: 'x' | 'y'; greater: boolean } {
   const w = word.toLowerCase();
@@ -4033,6 +4043,13 @@ function parseCompare(line: string): RuleOutcome {
   if (pos) {
     const { axis, greater } = positionMeaning(pos[2]);
     return compareFacts(pos[1], axis, greater, { point: pos[3] }, line);
+  }
+  const side = POSITION_AXIS_HE.exec(line) ?? POSITION_AXIS_EN.exec(line);
+  if (side) {
+    const { axis, greater } = positionMeaning(side[2]);
+    // The x-axis has sides above and below (y); the y-axis right and left (x). Any other pairing names no side.
+    if (axis === side[3].toLowerCase()) return null;
+    return compareFacts(side[1], axis, greater, { value: { kind: 'num', value: 0 } }, line);
   }
   const sym = COMPARE_SYM.exec(line);
   if (sym) {
@@ -6259,11 +6276,15 @@ function parseConstraint(raw: string): RuleOutcome {
     const leftSrc = lengthRoles(lengthEq[1], roles);
     const rightSrc = lengthRoles(lengthEq[2], roles);
     const left = leftSrc === null ? null : parseLengthExpr(leftSrc);
-    // The value side may carry the LENGTH VARIABLE — «AB = 3x» (#1622, ADR-AG-218, `lengthValueExpr`): x/y there are
-    // a free length, never the plane's coordinate; a side that also names a measure still declines (#1496).
-    // Only beside a LENGTH: «שטח המשולש ABC הוא y» is an area, which the ruling does not reach — it still declines (#1496).
+    /*
+     * x AND y ARE NEVER A LENGTH HERE (operator ruling 2026-10-03 on #1622; ADR-AG-222's amendment withdraws ADR-AG-218's
+     * length variable). «AB = 3x» is refused with a teaching message — the plane's letters are coordinates — while every
+     * other letter («AB = 3a») is a free length as before. Only beside a LENGTH: «שטח המשולש ABC הוא y» is an area and
+     * still declines (#1496), and a side that also names a measure («AB = AC + x») declines too.
+     */
     const lengthOnly = !!left && left.terms.every((t) => t.kind === undefined || t.kind === 'length');
-    const right = rightSrc === null ? null : parseLengthExpr(rightSrc) ?? (lengthOnly ? lengthValueExpr(rightSrc) : constantLengthExpr(rightSrc));
+    if (lengthOnly && rightSrc !== null && !parseLengthExpr(rightSrc) && planeLetterLength(rightSrc)) return refuse('length-xy', line);
+    const right = rightSrc === null ? null : parseLengthExpr(rightSrc) ?? constantLengthExpr(rightSrc);
     // At least ONE side must mention a length, or this is an ordinary equation (`y=2x`) that the
     // bare-equation branch reads far better than we would.
     /*
@@ -6816,6 +6837,25 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
   // A circle named by its ring folds to its name before any reading (#1663, ADR-AG-203), so every rule sees one spelling.
   const s = describedCircles(unwrap(text));
   if (!s) return { result: { ok: false, code: 'not-handled', detail: text }, framed: false };
+  /*
+   * CLAUSES JOINED BY «;» (#1706 follow-up, ADR-AG-222) — «A משמאל ל-O ו-C מימין ל-O; B על החלק החיובי של ציר y; D
+   * מתחת לציר x»: each clause is a sentence of its own, read at THIS depth (a list of sentences nests no reading, as an
+   * aside does not). Only a top-level «;» — «A(0;6)» keeps its own. Every clause must read, or the line falls through.
+   */
+  const sentences = splitTopLevel(s, /;/);
+  if (sentences.length > 1) {
+    const facts: Fact[] = [];
+    let all = true;
+    for (const sentence of sentences) {
+      const { result } = readLine(sentence, depth);
+      if (!result.ok) {
+        all = false;
+        break;
+      }
+      facts.push(...result.facts);
+    }
+    if (all) return { result: made(facts), framed: true };
+  }
   const attempt = (clauses: readonly string[]): ParseResult | null => {
     const facts: Fact[] = [];
     for (const c of clauses) {
@@ -6843,6 +6883,15 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
     ]) {
       const r = reading && attempt(reading);
       if (r) return { result: r, framed: true };
+    }
+    /*
+     * A chain IS its pairs: a pair refused with an OWNED reason refuses the chain with it, quoting the whole line —
+     * «AB = AC = 3x» is «AC = 3x»'s refusal (x is the plane's coordinate, ADR-AG-222), never `not-handled`.
+     */
+    const chain = chainClauses(s);
+    for (const clause of chain ?? []) {
+      const { result } = readLine(clause, depth + 1);
+      if (!result.ok && result.code !== 'not-handled' && result.code !== 'bad-operand') return { result: { ...result, detail: text }, framed: true };
     }
   }
   const direct = parseClause(s);
