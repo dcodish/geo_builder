@@ -63,6 +63,7 @@ export type ParseResult =
   // segment's first letter. The bisector runs FROM its first letter, so the sentence contradicts itself;
   // refused quoting both letters, never silently redirected to either.
   | { ok: false; reason: 'bisector-wrong-apex'; apex: string; stated: string }
+  | { ok: false; reason: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: string; shapes: string[]; side: string }
   // #1666 (ADR-561, ADR-W-107): a PROOF TARGET — «הוכיחו כי AB ⊥ AC», "prove that …" — is what the student
   // must SHOW, never a given. Every rule used to read the claim inside it and lower it as a constraint.
   // `sentence` is the proof sentence as typed. The submit gate refuses it before the parser
@@ -319,7 +320,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -1464,10 +1465,63 @@ const CENTER_FAMILIES = [
   { key: 'diag', n: 4, he: /ה?אלכסונ/, en: /diagonals?/i },
 ] as const;
 
+/**
+ * The pair list a centre-meet sentence names its LINES by, right after the family noun — «האלכסונים AB
+ * ו-CD», «התיכונים AD, BE ו-CF», "the medians AD and BE" (#1683). Null when the noun is not followed by
+ * two or more uppercase pairs («האלכסונים נפגשים», «אלכסוני ABCD», «האנכים האמצעיים של AB ו-BC»).
+ */
+const letteredCentreLines = (s: string, he: RegExp, en: RegExp): [Id, Id][] | null => {
+  const m = s.match(new RegExp(`(?:${he.source})[א-ת]*|(?:${en.source})`, 'i'));
+  if (!m) return null;
+  const pair = new RegExp(String.raw`^\s*(?<![A-Za-z\d])(${ULABEL})\s*(${ULABEL})(?![A-Za-z\d])`);
+  const join = /^\s*(?:,\s*(?:and\s+)?|ו-?\s*|and\s+)/;
+  let rest = s.slice((m.index ?? 0) + m[0].length);
+  const out: [Id, Id][] = [];
+  for (;;) {
+    const p = rest.match(pair);
+    if (!p) break;
+    out.push([p[1], p[2]]);
+    rest = rest.slice(p[0].length);
+    const j = rest.match(join);
+    if (!j) break;
+    rest = rest.slice(j[0].length);
+  }
+  return out.length >= 2 ? out : null;
+};
+
 const specialPointMeet: Rule = (s, ctx) => {
   if (!/מפגש|נפגש|נחתכ|חיתוך|concurren|intersection\s+of|\bmeet\b/i.test(s)) return null; // a MEETING statement
   const fam = CENTER_FAMILIES.find((f) => f.he.test(s) || f.en.test(s));
   if (!fam) return null;
+  /**
+   * #1683 ([ADR-569](../../docs/06-decisions.md#adr-569)) — LINES THE SENTENCE NAMES BY LETTERS ARE THE
+   * STUDENT'S. This rule derives its two lines from the shape and never read a pair list after the noun, so
+   * «האלכסונים AB ו-CD נפגשים בנקודה E» in ABCD drew the meet of AC and BD (the letters replaced by others),
+   * and «התיכונים AD ו-BE נפגשים בנקודה G» with D, E on the sides drew the centroid with D and E untouched
+   * (the claim that AD is a median gone). A named line is read as named:
+   *  - diagonals: the lettered meet rule reads the pairs, and the role-noun registry carries the diagonal
+   *    claim on each — so a side named as a diagonal is refused, naming the statement;
+   *  - medians / altitudes / angle bisectors: each pair goes through its OWN rule («AD תיכון»), all or
+   *    nothing (the #71 distribution), and the point is the crossing of the first two lines. A pair its rule
+   *    cannot read escalates whole — never a partial figure, never the letters swapped for others.
+   * The ⊥-bisector family names SIDES («של AB ו-BC»), not lines, and is not read here.
+   */
+  const lettered = letteredCentreLines(s, fam.he, fam.en);
+  if (lettered && fam.key === 'diag') return null;
+  if (lettered && fam.key !== 'perpbis') {
+    const word = fam.key === 'median' ? 'תיכון' : fam.key === 'altitude' ? 'גובה' : 'חוצה זווית';
+    const [[a, b], [c, d]] = lettered;
+    if (new Set([a, b, c, d]).size < 4) return 'stop'; // two lines from one vertex meet there — not a centre
+    const out: AnyCommand[] = [];
+    for (const [p, q] of lettered) {
+      const r = parse(`${p}${q} ${word}`, ctx);
+      if (!r.ok) return 'stop';
+      out.push(...r.commands);
+    }
+    const at = s.match(new RegExp(String.raw`(?:בנקודה|\bat\b(?:\s+point)?)\s+(${LABEL})\b`, 'i'));
+    const X = at ? up(at[1]) : leadingNamedPoint(s) ?? freeLabel([a, b, c, d, ...(ctx.points ?? [])], ['G', 'H', 'I', 'K']);
+    return [...out, { type: 'line-line-intersection', id: X, a, b, c, d }];
+  }
   // Result label: "… בנקודה X" / "… at X" (after the meet), or "הנקודה X היא …"/"X מפגש …"/"X is the
   // intersection …" (before). Precise so a shape vertex is never mistaken for the result point.
   const after = s.match(/(?:בנקודה|\bat\b(?:\s+point)?)\s+([A-Za-z]\d*)\b/i);
@@ -2194,6 +2248,19 @@ const pointOnExtension: Rule = (s, ctx) => {
     id = up(m[1]);
   }
   if (!seg) return null;
+  /**
+   * #1682 ([ADR-570](../../docs/06-decisions.md#adr-570)) — WHICH END the extension passes. «מעבר לנקודה B» /
+   * «מעבר ל-B» / "beyond B" names it, and the rule never looked: «על המשך הצלע BC מעבר לנקודה B» drew E past
+   * C. The named end is honoured — the far letter as before, the near letter reverses the carrier (E on the
+   * extension of CB) — and a letter that is neither end is not an extension of this segment: escalate whole,
+   * never a figure with the qualifier dropped.
+   */
+  const beyond = s.match(new RegExp(String.raw`(?:מעבר\s*ל(?:-|\s*)?(?:ה?נקודה\s+)?|\bbeyond\s+(?:the\s+)?(?:point\s+)?)(${LABEL})(?![A-Za-z\d])`, 'i'));
+  if (beyond) {
+    const end = up(beyond[1]);
+    if (end === seg[0]) seg = [seg[1], seg[0]];
+    else if (end !== seg[1]) return 'stop';
+  }
   // "C on the extension of DA" beyond A → order D→A→C. If C ALREADY EXISTS (e.g. an inscribed vertex still
   // on the circle), creating it afresh as an off-object on-segment point would keep it pinned to its prior
   // carrier and the apply path picks the WRONG (near) intersection, losing the order. Emit an ORDERED
@@ -8649,8 +8716,39 @@ const statedSide = (s: string): { side: [Id, Id]; match: string } | null => {
  * (`ambiguous-angle`, a vertex with more than two edges).
  */
 const statedTriangle = (s: string): { ring: [Id, Id, Id]; match: string } | null => {
-  const m = s.match(/(?:\bin\s+(?:the\s+)?triangle\s+|ב?ה?משולש\s+)([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  const m =
+    s.match(/(?:\bin\s+(?:the\s+)?triangle\s+|ב?ה?משולש\s+)([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i) ??
+    // #1720: the English forms the median and altitude rules always read — "median from A in ABC", "triangle
+    // ABC with a height from A". UPPERCASE labels only (no /i), so "a triangle and …" is never A, N, D.
+    s.match(new RegExp(String.raw`(?:\b[Ii]n\s+(?:the\s+)?|\b[Tt]riangle\s+)(${ULABEL})\s*(${ULABEL})\s*(${ULABEL})(?![A-Za-z\d])`));
   return m ? { ring: [up(m[1]), up(m[2]), up(m[3])], match: m[0] } : null;
+};
+
+/**
+ * #1720 ([ADR-571](../../docs/06-decisions.md#adr-571)) — A CEVIAN SENTENCE INTRODUCES THE TRIANGLE IT NAMES.
+ *
+ * «AD גובה במשולש ABC» on an empty canvas built the triangle with the altitude; «AD תיכון במשולש ABC» and
+ * «AD חוצה זווית במשולש ABC» did not, so D's operands (the side BC) never existed and the commit failed with
+ * the evaluator's «unresolved dependencies for: D». The altitude and the classic median each carried their
+ * own copy of the introduction; the named median and the bisector had none. This is now ONE step, wrapped
+ * around every cevian rule: when the sentence names a triangle (`statedTriangle`), the rule's lowering is
+ * about that triangle (it references all three vertices), and the figure has no polygon on those three
+ * vertices, the triangle is introduced first. An existing triangle is never re-declared.
+ */
+/** Keeps the wrapped rule's NAME — the shadow-matrix and every rule-attribution diagnostic read `rule.name` (round #1721). */
+const cevianTriangle = (rule: Rule): Rule => Object.defineProperty(cevianTriangleOf(rule), 'name', { value: rule.name });
+const cevianTriangleOf = (rule: Rule): Rule => (s, ctx) => {
+  const res = rule(s, ctx);
+  if (!Array.isArray(res)) return res;
+  const tri = statedTriangle(s);
+  if (!tri || new Set(tri.ring).size !== 3) return res;
+  const key = (vs: readonly string[]) => vs.map(up).sort().join('|');
+  const ringKey = key(tri.ring);
+  if ((ctx.polygons ?? []).some((p) => key(p) === ringKey)) return res;
+  if (res.some((c) => Array.isArray((c as { ids?: unknown }).ids) && key((c as { ids: string[] }).ids) === ringKey)) return res;
+  const named = new Set(res.flatMap((c) => JSON.stringify(c).match(/[A-Z]\d*/g) ?? []));
+  if (!tri.ring.every((v) => named.has(v))) return res; // the cevian is not about this triangle
+  return [{ type: 'triangle', ids: [tri.ring[0], tri.ring[1], tri.ring[2]] }, ...res];
 };
 
 type CevianRole = 'median' | 'altitude';
@@ -8739,9 +8837,10 @@ const median: Rule = (s, ctx) => {
         // to (the ADR-263 altitude mechanism): the median's side is the edge NOT touching the apex —
         // exactly one for a triangle no matter how many auxiliary points exist. Several (a quad) or
         // none → defer, never guess (ADR-052).
-        const edges = oppositePolygonEdges(apex, ctx.polygons, foot);
-        if (edges.length !== 1) return null;
-        opp = edges[0];
+        const res = cevianShapeEdges(apex, ctx, foot); // #1684: several shapes, several targets → ask
+        if ('shapes' in res) return { clarify: 'ambiguous-cevian', role: 'median', apex, shapes: res.shapes, side: res.side };
+        if (res.edges.length !== 1) return null;
+        opp = res.edges[0];
       }
     }
     // #1233 — the gate that used to read only `apex ∈ opp` here is now the shared definition, so the
@@ -8791,7 +8890,9 @@ const median: Rule = (s, ctx) => {
   if (!tri) {
     // No triangle named («תיכון מ-C» alone) — the #168 sibling: resolve the opposite side from the
     // polygon the apex belongs to (exactly one non-touching edge = a triangle; else defer).
-    const edges = oppositePolygonEdges(apex, ctx.polygons, null);
+    const res = cevianShapeEdges(apex, ctx, null); // #1684
+    if ('shapes' in res) return { clarify: 'ambiguous-cevian', role: 'median', apex, shapes: res.shapes, side: res.side };
+    const edges = res.edges;
     if (edges.length !== 1) return null;
     const mid = existingMidpointOf(ctx, edges[0][0], edges[0][1]) ?? freeLabel([apex, ...edges[0], ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']); // reuse (Am. 2)
     return [
@@ -8803,7 +8904,7 @@ const median: Rule = (s, ctx) => {
   if (others.length !== 2) return null;
   const mid = existingMidpointOf(ctx, others[0], others[1]) ?? freeLabel(tri, ['M', 'N', 'P', 'Q']); // reuse (Am. 2)
   return [
-    { type: 'triangle', ids: [tri[0], tri[1], tri[2]] },
+    // the stated triangle is introduced by `cevianTriangle` (#1720), the one step
     { type: 'midpoint', id: mid, a: others[0], b: others[1] },
     { type: 'segment', a: apex, b: mid },
   ];
@@ -8848,6 +8949,45 @@ const oppositePolygonEdges = (apex: Id, polygons?: string[][], exclude?: Id | nu
     }
   }
   return out;
+};
+
+/**
+ * WHICH SHAPE a cevian with no stated side or triangle is in (#1684, [ADR-568](../../docs/06-decisions.md#adr-568)).
+ *
+ * `oppositePolygonEdges` unions the opposite sides of EVERY polygon holding the apex, so after «משולש ABC»
+ * and «משולש ABD» the altitude «AE גובה» took the first of {BC, BD} — a target the sentence never chose,
+ * drawn green (ADR-052's cardinal sin), and the median escalated the same sentence to a paid guess. The
+ * union is right inside ONE shape (a parallelogram's several heights are one figure's, the operator's
+ * draw-one steer) and wrong ACROSS shapes: two shapes that give the apex different opposite sides are two
+ * different statements, so the sentence must say which (analytic's `ambiguous-cevian`, ADR-AG-209).
+ *
+ * A foot the figure already puts on one candidate side narrows it (the sentence names its own foot —
+ * analytic's ADR-AG-222 reading). Returns the edges to use (the old union order), or the shapes to ask
+ * between.
+ */
+const cevianShapeEdges = (
+  apex: Id,
+  ctx: ParseContext,
+  foot: Id | null,
+): { edges: [Id, Id][] } | { shapes: string[]; side: string } => {
+  const all = oppositePolygonEdges(apex, ctx.polygons, foot);
+  const key = (e: readonly Id[]) => [...e].sort().join('|');
+  const on = foot ? ctx.onSegment?.[foot] : undefined;
+  if (on) {
+    const hit = all.filter((e) => key(e) === key(on.map(up)));
+    if (hit.length === 1) return { edges: hit };
+  }
+  const shapes = new Map<string, { ring: string; sides: string; first: string }>();
+  for (const poly of ctx.polygons ?? []) {
+    const verts = poly.map(up);
+    if (!verts.includes(apex)) continue;
+    const own = oppositePolygonEdges(apex, [verts], foot);
+    if (own.length === 0) continue;
+    shapes.set([...verts].sort().join(''), { ring: verts.join(''), sides: own.map(key).sort().join(','), first: own[0].join('') });
+  }
+  const targets = new Set([...shapes.values()].map((x) => x.sides));
+  if (targets.size > 1) return { shapes: [...shapes.values()].map((x) => x.ring), side: [...shapes.values()][0].first };
+  return { edges: all };
 };
 
 /**
@@ -8968,7 +9108,10 @@ const altitude: Rule = (s, ctx) => {
         // parallelogram / general quad has several genuine heights — the height is ambiguous but real, so
         // DRAW ONE deterministically rather than refuse (the operator's steer, superseding ADR-169's
         // parallelogram-defers). This also excludes any drawn diagonal by construction (it is not an edge).
-        const edges = oppositePolygonEdges(apex, ctx.polygons, namedFoot);
+        // #1684: the draw-one steer is for ONE shape's several heights; shapes that disagree are asked.
+        const res = cevianShapeEdges(apex, ctx, namedFoot);
+        if ('shapes' in res) return { clarify: 'ambiguous-cevian', role: 'altitude', apex, shapes: res.shapes, side: res.side };
+        const edges = res.edges;
         if (edges.length >= 1) {
           [p, q] = edges[0];
         } else if (pts.length === 2) {
@@ -8997,8 +9140,7 @@ const altitude: Rule = (s, ctx) => {
   // apex and the side are resolved above is covered by one check.
   const altFault = cevianFault(apex, f, [p, q], 'altitude');
   if (altFault) return altFault; // #1266
-  const cmds: Command[] = [];
-  if (tri) cmds.push({ type: 'triangle', ids: [tri[0], tri[1], tri[2]] });
+  const cmds: Command[] = []; // the stated triangle is introduced by `cevianTriangle` (#1720), the one step
   // #1247 — the foot may BE an endpoint of the side, and then the sentence is a right angle at that
   // vertex rather than a new point. Deciding it here, at the one emit, keeps both readings in one place.
   if (f === p || f === q) return [...cmds, ...altitudeAtVertex(apex, f, [p, q])];
@@ -9142,16 +9284,42 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
    * במשולש ABC»), a lone vertex letter («… זווית C במשולש ABC»), or nothing («CD חוצה זווית במשולש ABC»).
    */
   let tri = labelRun(after, 3);
-  if (!tri && triangle) {
-    // A lone vertex letter names the angle's apex. It must be the segment's first letter — the bisector
-    // runs FROM it — or the student has written something false about their own segment: refused
-    // quoting both, exactly as #1267 refuses a wrongly-named side, never silently redirected.
-    const lone = labelRun(after, 1);
-    if (lone && lone[0] !== apex && lone[0] !== D) return { clarify: 'bisector-wrong-apex', apex, stated: lone[0] };
-    // The triangle IDENTIFIES the angle: the apex's two ring neighbours are its arms.
-    const i = triangle.ring.indexOf(apex);
-    if (i < 0) return { clarify: 'bisector-wrong-apex', apex, stated: triangle.ring.join('') };
-    tri = [triangle.ring[(i + 2) % 3], apex, triangle.ring[(i + 1) % 3]];
+  /**
+   * THE ANGLE'S STATED VERTEX (#1684, [ADR-568](../../docs/06-decisions.md#adr-568)).
+   *
+   * A single letter naming the angle («זווית C», "angle C") is a given about WHERE the bisected angle is,
+   * and it was read only when the sentence also named a triangle (#1285). Without one, «AD חוצה זווית C»
+   * resolved the angle from A's neighbours and drew the bisector of ∠A: the stated vertex vanished and the
+   * figure showed a given that cannot hold (a segment from A cannot bisect ∠C). Now ONE reader serves both
+   * forms, and the vertex it reads is honoured or refused, never dropped:
+   *  - it is the segment's first letter → the angle at the apex (arms from the triangle, else the figure);
+   *  - it is the segment's second letter → the angle at D, when D is a figure point with one angle there
+   *    (the `vertex === D` constraint below — «BD חוצה זווית D» in a rhombus);
+   *  - anything else → `bisector-wrong-apex`, quoting both letters (analytic's ADR-AG-209 verdict).
+   * The letter is read right after the angle word, so a foot named later in the sentence («בנקודה D») is
+   * never mistaken for it; a lone letter elsewhere is the fallback the triangle form always had.
+   */
+  if (!tri) {
+    const vertexText = triangle ? tail.replace(triangle.match, ' ') : tail;
+    const kw = vertexText.match(/(?:זוו?ית|(?<![A-Za-z])[Aa]ngle|[∠∡])\s*(?:(?:at|of)\s+)?(?:the\s+)?(?:vertex\s+)?(?:ש?ב?ה?קודקוד\s+)?([A-Z]\d*)(?![A-Za-z\d])/);
+    // The triangle form's lone-letter fallback (#1285) stays the triangle form's: without a triangle and an
+    // angle word, a stray letter («CD חוצה את AB בנקודה K») is the segment-bisection rule's, not an angle.
+    const lone = triangle ? labelRun(after, 1) : null;
+    const v: Id | null = kw ? kw[1] : lone && lone[0] !== D ? lone[0] : null;
+    if (v && v !== apex && v !== D) return { clarify: 'bisector-wrong-apex', apex, stated: v };
+    const at: Id = v ?? apex;
+    if (triangle) {
+      // The triangle IDENTIFIES the angle: the vertex's two ring neighbours are its arms.
+      const i = triangle.ring.indexOf(at);
+      if (i < 0) return { clarify: 'bisector-wrong-apex', apex, stated: v ?? triangle.ring.join('') };
+      tri = [triangle.ring[(i + 2) % 3], at, triangle.ring[(i + 1) % 3]];
+    } else if (at === D) {
+      // The angle at the segment's far end: D must already be a figure point with exactly one angle there.
+      if (!(ctx.points ?? []).includes(D)) return { clarify: 'bisector-wrong-apex', apex, stated: D };
+      const nbD = ((ctx.neighbors ?? {})[D] ?? []).filter((x) => x !== apex);
+      if (nbD.length !== 2) return { clarify: 'ambiguous-angle', vertex: D };
+      tri = [nbD[0], D, nbD[1]];
+    }
   }
   if (!tri) {
     // No explicit angle triple ("CD חוצה זוית" / "CD bisects the angle"): resolve the angle from the
@@ -9425,8 +9593,18 @@ const shapeWithConstruct: Rule = (s, ctx) => {
   return null;
 };
 
+/**
+ * #1682 ([ADR-570](../../docs/06-decisions.md#adr-570)) — «ונתון כי / ונתון ש / וידוע כי» ("and it is given
+ * that") after a POINT PLACEMENT is the same condition as «כך ש»: «הנקודה E נמצאת על המשך הצלע BC ונתון כי
+ * DE = DC» places E and states DE = DC. The point rules read their prefix and dropped the clause, green.
+ * Only after a point-on-carrier subject: a SHAPE with a given glued on («משולש ABC ונתון כי AB = AC») is the
+ * #108 compound the operator ruled is TAUGHT as two steps, and stays so.
+ */
+const GIVEN_AND = /\s+(?:ו-?\s*(?:נתון|ידוע)\s*(?:כי|ש-?)|and\s+(?:it\s+is\s+)?(?:given|known)\s+that)\s*/i;
+const POINT_PLACEMENT = /^(?:ה?נקודה\s+|the\s+point\s+|point\s+)?[A-Z]\d*\s+(?:נמצא[הת]?\s+|is\s+|lies\s+)?(?:על|\bon\b)\s/i;
 const compoundSuchThat: Rule = (s, ctx) => {
-  const parts = s.split(SUCH_THAT);
+  const given = s.split(GIVEN_AND);
+  const parts = given.length === 2 && POINT_PLACEMENT.test(given[0].trim()) ? given : s.split(SUCH_THAT);
   if (parts.length < 2) return null;
   const left = parts[0].trim();
   const right = parts.slice(1).join(' ').trim();
@@ -9764,13 +9942,13 @@ export const RULES: Rule[] = [
   inscribedPolygon, // before the shape rules ("triangle ABC inscribed …" contains "triangle")
   // Special-line constructs whose Hebrew names a triangle ("…במשולש ABC") must
   // run before the shape rules, or `triangle` grabs the embedded משולש and stops.
-  median,
-  pluralSpecialLines, // #71: "AD BE ו-CF הם גבהים במשולש" distributes into the singulars, all-or-nothing
-  altitude, // "height/altitude from A" / "perpendicular from A to BC"
+  cevianTriangle(median), // #1720: every cevian rule introduces the triangle it names, through one step
+  cevianTriangle(pluralSpecialLines), // #71: "AD BE ו-CF הם גבהים במשולש" distributes into the singulars, all-or-nothing
+  cevianTriangle(altitude), // "height/altitude from A" / "perpendicular from A to BC"
   specialPointMeet, // "X מפגש האלכסונים/התיכונים/…" — a named centre meet (noun form); before the shapes + diagonals (#44)
   perpBisector, // "perpendicular bisector of AB"
   midsegment, // "midsegment to BC in triangle ABC" — a triangle construct ("במשולש"); before the shapes AND before segment/midpoint (its "קטע"/"אמצע" keywords)
-  bisectorPlacesPoint, // "AD bisects ∠BAC" / "CD חוצה זווית [C] [במשולש ABC]" — places D on the opposite side; the triangle operand is READ (#1285), it identifies the angle. Before the shapes (its "במשולש ABC" form would otherwise make `triangle` 'stop'); safe before the bisector-∩ compounds because it DEFERS on intersect keywords.
+  cevianTriangle(bisectorPlacesPoint), // "AD bisects ∠BAC" / "CD חוצה זווית [C] [במשולש ABC]" — places D on the opposite side; the triangle operand is READ (#1285), it identifies the angle. Before the shapes (its "במשולש ABC" form would otherwise make `triangle` 'stop'); safe before the bisector-∩ compounds because it DEFERS on intersect keywords.
   bisectsSegment, // "CD חוצה את AB" / "CD bisects AB" — SEGMENT bisection (#240, ADR-382): midpoint + set-line macro. After the angle sense (which owns any angle-keyword utterance); before `chord`/`segment` (whose "הקטע AB" would half-parse the object and drop the bisection).
   regularPolygon, // "regular pentagon ABCDE" / "מחומש משוכלל" — before square (it also routes "regular triangle/quadrilateral")
   square,
@@ -10343,6 +10521,16 @@ function withRoleClaims(commands: AnyCommand[], s: string, ctx: ParseContext): A
         const through = commands.some((c) => (c.type === 'set-collinear' || c.type === 'set-line') && refsId(c, a) && refsId(c, b) && (refsId(c, ctr) || refsId(c, center)));
         if (!through) add({ type: 'set-collinear', a, b: ctr, c: b });
       }
+      continue;
+    }
+    if (op.role === 'diagonal') {
+      // #1683 (ADR-569): the ADR-499 claim, exactly as «האלכסון AB» states it — checked against the figure's
+      // rings at apply (`diagonalClaimRefusal`) and by the verifier once a ring exists. The winner's own
+      // plain segment of the pair carries the flag rather than gaining a twin.
+      const same = (c: AnyCommand) => c.type === 'segment' && [c.a, c.b].map(up).sort().join() === [a, b].sort().join();
+      const i = commands.findIndex(same);
+      if (i >= 0) commands = commands.map((c, k) => (k === i && c.type === 'segment' ? { ...c, diagonal: true as const } : c));
+      else add({ type: 'segment', a, b, diagonal: true });
       continue;
     }
     if (op.role === 'tangent') {
@@ -11669,6 +11857,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'cevian-wrong-side')
     return { ok: false, reason: 'cevian-wrong-side', apex: res.apex, stated: res.stated, actual: res.actual };
   if (res.clarify === 'bisector-wrong-apex') return { ok: false, reason: 'bisector-wrong-apex', apex: res.apex, stated: res.stated };
+  if (res.clarify === 'ambiguous-cevian') return { ok: false, reason: 'ambiguous-cevian', role: res.role, apex: res.apex, shapes: res.shapes, side: res.side };
   if (res.clarify === 'crossing-already-named')
     return { ok: false, reason: 'crossing-already-named', holder: res.holder, id: res.id, s1: res.s1, s2: res.s2 };
   if (res.clarify === 'arc-copula') return { ok: false, reason: 'arc-copula', a: res.a, b: res.b };
@@ -12401,16 +12590,22 @@ export function droppedGivenRelations(utterance: string, commands: AnyCommand[])
     isConstraint: typeof (c as { type?: unknown }).type === 'string' && (c as { type: string }).type.startsWith('set-'),
     labels: new Set(JSON.stringify(c).match(/[A-Z]\d*/g) ?? []),
   }));
-  const introduced = new Set(
-    commands
-      .map((c) => (c as { id?: unknown }).id)
-      .filter((x): x is string => typeof x === 'string' && /^[A-Z]\d*$/.test(x)),
-  );
+  /**
+   * (b) as written: the point-definition command that INTRODUCES one of the relation's labels must itself
+   * carry every label of it — «K על המשך AB כך ש AB=BK» baked as `point-on-segment K on AB (t = 2)`.
+   * #1682 ([ADR-570](../../docs/06-decisions.md#adr-570)): "some label is introduced by ANY command" let
+   * «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC» through — E is introduced (on BC), D is in no command
+   * of the line, and DE = DC vanished green. A definition that never mentions D cannot carry a relation on D.
+   */
+  const definers = commands.flatMap((c) => {
+    const id = (c as { id?: unknown }).id;
+    return typeof id === 'string' && /^[A-Z]\d*$/.test(id) ? [{ id, labels: new Set(JSON.stringify(c).match(/[A-Z]\d*/g) ?? []) }] : [];
+  });
   const dropped: string[] = [];
   for (const m of s.matchAll(rel)) {
     const labels = [...new Set([m[1], m[2], m[4], m[5]])];
     const accounted =
-      labels.some((l) => introduced.has(l)) ||
+      definers.some((d) => labels.includes(d.id) && labels.every((l) => d.labels.has(l))) ||
       perCommand.some((c) => c.isConstraint && labels.every((l) => c.labels.has(l)));
     if (!accounted) dropped.push(m[0].replace(/\s+/g, ' ').trim());
   }

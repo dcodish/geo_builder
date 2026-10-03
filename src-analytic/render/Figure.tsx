@@ -6,7 +6,7 @@
  * plane cannot be mirrored by the RTL page around it (the #118 bidi lesson has no purchase here —
  * and `dir` is not an SVG attribute, so asserting it would only have been decoration).
  */
-import type { Scene } from './scene';
+import { LENGTH_LABEL_FONT, POINT_LABEL, TICK_LABEL, type Scene } from './scene';
 
 const AXIS = '#64748b';
 const GRID = '#e2e8f0';
@@ -86,18 +86,18 @@ export function Figure({
         <line x1={0} y1={axes.xAxisY} x2={width} y2={axes.xAxisY} />
         <line x1={axes.yAxisX} y1={0} x2={axes.yAxisX} y2={height} />
       </g>
-      <g fill={AXIS} fontSize={11} fontFamily="system-ui, sans-serif">
+      <g fill={AXIS} fontSize={TICK_LABEL.font} fontFamily="system-ui, sans-serif">
         {axes.xTicks.map((t) => (
-          <text key={`tx${t.label}`} x={t.pos} y={axes.xAxisY + 14} textAnchor="middle">
+          <text key={`tx${t.label}`} x={t.pos} y={axes.xAxisY + TICK_LABEL.below} textAnchor="middle">
             {t.label}
           </text>
         ))}
         {axes.yTicks.map((t) => (
-          <text key={`ty${t.label}`} x={axes.yAxisX - 6} y={t.pos + 4} textAnchor="end">
+          <text key={`ty${t.label}`} x={axes.yAxisX - TICK_LABEL.left} y={t.pos + 4} textAnchor="end">
             {t.label}
           </text>
         ))}
-        <text x={axes.yAxisX - 6} y={axes.xAxisY + 14} textAnchor="end">
+        <text x={axes.yAxisX - TICK_LABEL.left} y={axes.xAxisY + TICK_LABEL.below} textAnchor="end">
           O
         </text>
       </g>
@@ -185,18 +185,21 @@ export function Figure({
       </g>
 
       {/*
-        A segment's STATED length, drawn at its midpoint (#1065).
+        A segment's STATED length (#1065), beside its midpoint.
 
         Only lengths the student's own given pinned reach here — «AB = 10». A derived length is an
-        answer and lives in the data panel instead (ADR-AG-016: the canvas shows the question). The
-        text is nudged off the line so it does not sit on top of it, and carries the same paint-order
-        halo the point labels use so it stays legible over a crossing side.
+        answer and lives in the data panel instead (ADR-AG-016: the canvas shows the question). WHERE it
+        sits is the scene's decision (#1717, `placeLengthLabels`: outward from the figure, clear of every
+        point label), and it carries the same paint-order halo the point labels use so it stays legible
+        over a crossing side. Written in the figure's blue, as 2-D writes its values, "to set them apart from
+        point names" (and from the grey axis numbers).
       */}
-      <g fontSize={12} fill={INK} textAnchor="middle" paintOrder="stroke" stroke="#fff" strokeWidth={3}>
+      <g fontSize={LENGTH_LABEL_FONT} fill={CURVE} textAnchor="middle" paintOrder="stroke" stroke="#fff" strokeWidth={3}>
         {segments
           .filter((s) => s.label)
           .map((s) => (
-            <text key={`${s.id}-len`} x={s.label!.x} y={s.label!.y - 6} data-length-for={s.id}>
+            // #1717: the scene hands the label's CENTRE, already clear of the point labels; 0.35em centres the glyphs on it
+            <text key={`${s.id}-len`} x={s.label!.x} y={s.label!.y} dy="0.35em" data-length-for={s.id}>
               {s.label!.text}
             </text>
           ))}
@@ -216,9 +219,10 @@ export function Figure({
           <line key={`st${i}`} x1={tk.x1} y1={tk.y1} x2={tk.x2} y2={tk.y2} data-stated="tick" strokeWidth={2} />
         ))}
       </g>
-      <g fontSize={12} fill={MEASURE} textAnchor="middle" dominantBaseline="central" paintOrder="stroke" stroke="#fff" strokeWidth={3} pointerEvents="none">
+      {/* the values are written exactly as the lengths are (#1717): the scene hands each CENTRE, 0.35em centres the glyphs */}
+      <g fontSize={LENGTH_LABEL_FONT} fill={CURVE} textAnchor="middle" paintOrder="stroke" stroke="#fff" strokeWidth={3} pointerEvents="none">
         {scene.stated.labels.map((l, i) => (
-          <text key={`sl${i}`} x={l.x} y={l.y} data-stated={l.kind}>
+          <text key={`sl${i}`} x={l.x} y={l.y} dy="0.35em" data-stated={l.kind}>
             {l.text}
           </text>
         ))}
@@ -461,9 +465,9 @@ export function Figure({
               image export this product already has. The rendered result is the same subscript.
             */}
             <text
-              x={p.cx + 7}
-              y={p.cy - 7}
-              fontSize={13}
+              x={p.cx + POINT_LABEL.dx}
+              y={p.cy + POINT_LABEL.dy}
+              fontSize={POINT_LABEL.font}
               fontFamily="system-ui, sans-serif"
               fill={INK}
               // A coordinate label lands ON the ink it describes — B sits on the axis, D on its own

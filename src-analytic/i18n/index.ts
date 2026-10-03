@@ -149,7 +149,7 @@ const he = {
   creditName: 'ד"ר דוד קודיש',
   creditContact: 'לשאלות',
   privacy:
-    'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. לצורך שיפור הכלי נשמרים המשפטים שהקלדתם (טקסט מתמטי בלבד) עם מזהה מבקר אנונימי — ללא כתובת ה-IP — למספר ימים בלבד.' +
+    'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. לצורך שיפור הכלי נשמרים המשפטים שהקלדתם (טקסט מתמטי בלבד) עם מזהה מבקר אנונימי — ללא כתובת ה-IP — עד 30 יום.' +
     ' משפטים שהכלי לא הבין נשלחים לעיבוד בשירות בינה מלאכותית חיצוני.' +
     ' כשאתם לוחצים «העתק קישור», השרטוט ותמונה שלו נשמרים בשרת כדי שהקישור יעבוד — בלי שם ובלי פרטים אישיים, ומי שיש לו את הקישור יכול לפתוח אותו.',
   close: 'סגור',
@@ -567,7 +567,7 @@ const en: typeof he = {
   creditName: 'Dr. David Codish',
   creditContact: 'Questions',
   privacy:
-    'Privacy: no sign-up and no personal details are collected. To improve the tool, the statements you type (math text only) are kept for a few days with an anonymous visitor id — your IP address is never stored.' +
+    'Privacy: no sign-up and no personal details are collected. To improve the tool, the statements you type (math text only) are kept for up to 30 days with an anonymous visitor id — your IP address is never stored.' +
     ' Statements the tool does not understand are sent for processing to an external AI service.' +
     ' When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.',
   close: 'Close',
