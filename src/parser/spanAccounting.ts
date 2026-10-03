@@ -211,10 +211,13 @@ export function accountUtterance(utterance: string, commands: AnyCommand[], actx
   //  · a minus glued after a Hebrew letter is the maqaf preposition («מ-40»), not a sign → lookbehind;
   //  · a stated value may LOWER halved (diameter→radius; circumference 6π → r = 6/2) or ÷100 (40% → t=0.4);
   //  · a stated ratio pair «3/4» lowers to the single quotient 0.75 — accept both members when a/b lands.
+  //    Sign-blind, like the single-number pass below: the pair is read without its sign, so «-1/2» lowered
+  //    to −0.5 (a signed cosine) lands as well as «1/2» to 0.5. Before #1718 a signed trig given was
+  //    accounted only by accident — the digits of its label text «cos=-1/2» paid for the «2».
   const ratioPairs = new Set<string>();
   for (const m of s.matchAll(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/g)) {
     const q = Number(m[1]) / Number(m[2]);
-    if (cmdNumbers.some((c) => Math.abs(c - q) < 1e-9)) {
+    if (cmdNumbers.some((c) => Math.abs(Math.abs(c) - q) < 1e-9)) {
       ratioPairs.add(m[1]);
       ratioPairs.add(m[2]);
     }

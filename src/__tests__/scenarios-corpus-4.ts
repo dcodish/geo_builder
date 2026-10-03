@@ -3218,16 +3218,17 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'trig-given-is-a-ratio-1698',
     title: '#1698 (ADR-566): «tan∢ABC = 2» draws ∠B = atan 2 ≈ 63.43° and «קוסינוס הזווית ACB = 3/4» draws ∠C = acos ¾ ≈ 41.41° — never 2° and 3°',
     guards:
-      "Measured on main a8938c2d (found by the #1621 analytic stream D2, ADR-AG-215): every trig given committed a set-angle of the value's leading number IN DEGREES — «tan∢ABC = 2» a 2° angle, «cos∢ACB = 3/4» a 3° one with the «/4» lost, «sin…» the same — a wrong figure drawn green. Root cause: no rule read the function word; every angle rule skipped it and took the first number for the angle. Fix: `trigGiven` decides a line that applies tan/cot/cos/sin to an angle WHOLE, before any rule — tan/cot/cos lower to the one angle they name (a measure-angle labelled with the given as typed), sin (two angles) and |cos| > 1 are refused by name. Asserts both angles as drawn, the label text, and that the sine and an out-of-range cosine are refused at the gate. The spelling sweep, the seeds and the stability twin are in src/__tests__/issue-1698-trig-ratio.test.ts.",
+      "Measured on main a8938c2d (found by the #1621 analytic stream D2, ADR-AG-215): every trig given committed a set-angle of the value's leading number IN DEGREES — «tan∢ABC = 2» a 2° angle, «cos∢ACB = 3/4» a 3° one with the «/4» lost, «sin…» the same — a wrong figure drawn green. Root cause: no rule read the function word; every angle rule skipped it and took the first number for the angle. Fix: `trigGiven` decides a line that applies tan/cot/cos/sin to an angle WHOLE, before any rule — tan/cot/cos lower to the one angle they name (a measure-angle labelled with the angle it draws — #1718 amended the «tan=2» label), sin (two angles) and |cos| > 1 are refused by name. Asserts both angles as drawn, the label text, and that the sine and an out-of-range cosine are refused at the gate. The spelling sweep, the seeds and the stability twin are in src/__tests__/issue-1698-trig-ratio.test.ts.",
     steps: ['משולש ABC', 'tan∢ABC = 2', 'קוסינוס הזווית ACB = 3/4'],
     check: (fig) => {
       allStepsOk(fig);
       const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
       expect(angle(A, B, C), '∠ABC = atan 2').toBeCloseTo((Math.atan(2) * 180) / Math.PI, 4);
       expect(angle(A, C, B), '∠ACB = acos 3/4').toBeCloseTo((Math.acos(0.75) * 180) / Math.PI, 4);
-      const facts = factsOf(['משולש ABC', 'tan∢ABC = 2', 'קוסינוס הזווית ACB = 3/4']);
-      const texts = facts.flatMap((f) => (f.cmd.type === 'measure-angle' && 'value' in f.cmd.expr && f.cmd.expr.text ? [f.cmd.expr.text] : []));
-      expect(texts, 'the figure prints the givens as stated').toEqual(['tan=2', 'cos=3/4']);
+      // #1718 (ADR-572): the figure prints the ANGLE each given draws, never «tan=2» / «cos=3/4».
+      const wedge = (v: string) => fig.labels.angles.filter((l) => l.vertex === v).map((l) => l.text);
+      expect(wedge('B'), 'the tan given is labelled by its angle').toEqual(['63.43°']);
+      expect(wedge('C'), 'the cos given is labelled by its angle').toEqual(['41.41°']);
       const tri = factsOf(['משולש ABC']);
       for (const line of ['sin∢ACB = 3/4', 'cos∢ACB = 5/4']) {
         const v = gateVerdict(tri, line);
@@ -3250,6 +3251,18 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(at(fig, 'O'), at(fig, 'P')) + P!.radius.value, 'P lies strictly inside O').toBeLessThan(O!.radius.value);
       expect(dist(at(fig, 'C'), at(fig, 'P')), 'C on the contained circle P').toBeCloseTo(P!.radius.value, 6);
       expect(dist(at(fig, 'D'), at(fig, 'O')), 'D on the container O').toBeCloseTo(O!.radius.value, 6);
+    },
+  },
+  {
+    id: 'trig-given-label-is-the-angle-1718',
+    title: '#1718 (ADR-572): «tan∢ABC = 2» labels the wedge at B «63.43°» — only the angle, never «tan=2»',
+    guards:
+      'Operator, 2026-10-03, playing T31: "if we have tan something = something, we should translate that to an angle and show the angle" and "only 64.43" (atan 2 = 63.43°). Measured on main deed7b20: the wedge read «tan=2», because ADR-566 put the typed given on the measure as its label text. Fix: the trig lowering carries no text, so the one label builder prints the drawn angle through the shared display rounder (fmtNum); the fact row keeps the sentence. Asserts the operator\'s exact lines: the angle as drawn, and the wedge text exactly «63.43°». The seed sweep, cos/cot/negative values and the signed-fraction accounting are in src/__tests__/issue-1718-trig-angle-label.test.ts.',
+    steps: ['משולש ABC', 'tan∢ABC = 2'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), '∠ABC = atan 2').toBeCloseTo((Math.atan(2) * 180) / Math.PI, 4);
+      expect(fig.labels.angles.filter((l) => l.vertex === 'B').map((l) => l.text), 'only the angle').toEqual(['63.43°']);
     },
   },
   {
