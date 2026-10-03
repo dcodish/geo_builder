@@ -19,7 +19,7 @@
 import { LABEL, ULABEL } from './lexicon';
 
 /** What a role noun asserts about its pair. Lowered in `parse.ts` (`withRoleClaims`). */
-export type RoleNoun = 'chord' | 'diameter' | 'radius' | 'tangent' | 'leg' | 'base' | 'hypotenuse';
+export type RoleNoun = 'chord' | 'diameter' | 'radius' | 'tangent' | 'leg' | 'base' | 'hypotenuse' | 'diagonal';
 
 interface RoleRow {
   role: RoleNoun;
@@ -53,6 +53,15 @@ export const ROLE_NOUNS: readonly RoleRow[] = [
   { role: 'leg', he: 'שוק', en: 'leg', labelsFirst: false },
   { role: 'base', he: 'בסיס', en: 'base', labelsFirst: false },
   { role: 'hypotenuse', he: 'יתר', en: 'hypotenuse', labelsFirst: false },
+  /**
+   * #1683 ([ADR-569](../../docs/06-decisions.md#adr-569)): «אלכסון» claims its pair is non-adjacent on a ring
+   * (ADR-499). The claim lived only in the `segment` / `diagonals` rules' flag, so a sentence another rule
+   * won dropped it — «האלכסון AB חותך את CD בנקודה E» drew side AB as a «diagonal», green. Here, every
+   * rule's reading carries it. The construct «אלכסוני» is deliberately absent: it is also the adjective of an
+   * internal common tangent («המשיק המשותף האלכסוני»), and «AC ו-BD אלכסוני הריבוע» is the `diagonals`
+   * rule's, which flags its pairs itself.
+   */
+  { role: 'diagonal', he: 'אלכסון', hePlural: 'אלכסונים', en: 'diagonal', enPlural: 'diagonals', labelsFirst: true },
 ];
 
 /** Hebrew clitics in front of a role noun: «ו»/«ש», then «ל»/«ב»/«כ» or «מ» (only before «ה» — so «מיתר»

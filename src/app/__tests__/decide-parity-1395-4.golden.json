@@ -161,5 +161,9 @@
  "fixture:issue-989-trapezoid-after-triangle.geo.json": "0703ef8c37579057",
  "fixture:issue-989-trapezoid-stated-pair.geo.json": "5ac9c9b206c76b86",
  "fixture:parallel-chords.geo.json": "54f8605ea57acfa6",
- "fixture:trapezoid-altitude.geo.json": "abbbf2a8308ff3fa"
+ "fixture:trapezoid-altitude.geo.json": "abbbf2a8308ff3fa",
+ "scenario:cevian-stated-vertex-and-shape-1684": "8a7fa9ec24cc7042",
+ "scenario:triangle-form-cevian-introduces-triangle-1720": "66d4dac428433bae",
+ "scenario:diagonals-named-by-letters-1683": "54f38ccf867bda6e",
+ "scenario:point-placement-keeps-its-tail-1682": "dc2212fa248c24a2"
 }

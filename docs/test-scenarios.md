@@ -1647,3 +1647,19 @@ over all four (ADR-041).
 ### `trig-given-label-is-the-angle-1718` — «tan∢ABC = 2» labels the wedge «63.43°», only the angle (#1718, ADR-572)
 
 **Guards against:** a trig given labelled by its ratio. ADR-566 put the typed given on the measure, so the wedge read «tan=2»; the operator ruled the figure shows only the angle it draws. **Asserts** the operator's exact lines: ∠ABC = atan 2 as drawn and the wedge text exactly «63.43°» (the shared display rounder). The seed sweep, cos / cot / negative values and the signed-fraction accounting are in `src/__tests__/issue-1718-trig-angle-label.test.ts`.
+
+### `cevian-stated-vertex-and-shape-1684` — «AD חוצה זווית C» is refused; «AE גובה» with A in triangles ABC and ABD asks; naming the side builds (#1684, ADR-568)
+
+**Guards against:** a cevian sentence's stated vertex being dropped, and its target shape being picked silently. 2-D drew the bisector of ∠A for «AD חוצה זווית C» (the stated vertex C gone — a segment from A cannot bisect ∠C), and drew «AE גובה» to BC when A is a vertex of both ABC and ABD. **Asserts** that «AD חוצה זווית C» is refused (`bisector-wrong-apex`) and «AE גובה» asks (`ambiguous-cevian`) at the gate, and that the operator's answer «AE גובה לצלע BD» builds with E on BD and AE ⟂ BD. The submit-door matrix (spellings, both locales, the foot-on-side narrowing, the parallelogram draw-one steer) is in `src/app/__tests__/issue-1684-cevian-stated-vertex.test.ts`.
+
+### `triangle-form-cevian-introduces-triangle-1720` — «AD תיכון במשולש ABC» on an empty canvas builds the triangle and the median; the bisector form builds too (#1720, ADR-571)
+
+**Guards against:** a triangle-form cevian that does not introduce its triangle. On an empty canvas «AD תיכון במשולש ABC» and «AD חוצה זווית במשולש ABC» were refused with the internal «unresolved dependencies for: D» / «… bis-CAB», while «AD גובה במשולש ABC» built — only the altitude carried the introduction. **Asserts** that the operator's line builds with triangle ABC drawn and D the midpoint of BC, and that the bisector form builds with equal half-angles at A. The role matrix (Hebrew and English, the classic «תיכון מ-A» forms), the seeds, the existing-triangle control and the refusal that now quotes the sentence are in `src/app/__tests__/issue-1720-cevian-triangle.test.ts`.
+
+### `diagonals-named-by-letters-1683` — in ABCD «האלכסונים AB ו-CD נפגשים בנקודה E» is refused; «האלכסונים AC ו-BD …» builds the named meet (#1683, ADR-569)
+
+**Guards against:** a sentence's lines replaced by other lines. In «מרובע ABCD», «האלכסונים AB ו-CD נפגשים בנקודה E» drew the meet of AC and BD — two sides named as diagonals, the letters silently swapped for the real diagonals, green. **Asserts** that the operator's line is refused at the gate naming the side («AB is not a diagonal of ABCD»), and that «האלכסונים AC ו-BD נפגשים בנקודה E» builds E on both diagonals. The submit-door matrix (English, «נחתכים», the cut form «האלכסון AB חותך את CD», no ring, two rings, the lettered medians / altitudes / angle bisectors) is in `src/app/__tests__/issue-1683-lettered-lines.test.ts`.
+
+### `point-placement-keeps-its-tail-1682` — «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC» holds DE = DC; «… מעבר לנקודה B» puts E past B (#1682, ADR-570)
+
+**Guards against:** a point-placement sentence losing its tail. After «מרובע ABCD», the condition «ונתון כי DE = DC» was dropped (|DE| = 4.47, |DC| = 4.12, green), and «מעבר לנקודה B» was ignored, so E was drawn past C. The extension rule reads only its prefix, and the dropped-relation gate counted DE = DC as carried because E is introduced by the line. **Asserts** that the operator's exact line holds DE = DC, and that «הנקודה E נמצאת על המשך הצלע BC מעבר לנקודה B» puts E beyond B. The spelling matrix, the seeds and the #108 shape control are in `src/app/__tests__/issue-1682-point-placement-tail.test.ts`.

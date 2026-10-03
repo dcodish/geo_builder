@@ -11,7 +11,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFile, rm, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { handleLog, hashIp, pruneOldEvents, retentionDays } from '../eventLog';
+import { DEFAULT_RETENTION_DAYS, handleLog, hashIp, pruneOldEvents, retentionDays } from '../eventLog';
 
 function mockRes() {
   return {
@@ -84,13 +84,13 @@ describe('retentionDays — finite BY DEFAULT (issue #57, ADR-278)', () => {
   afterEach(() => {
     delete process.env.EVENTS_RETENTION_DAYS;
   });
-  it('defaults to 7 days when the env is unset', () => {
+  it('defaults to 30 days when the env is unset (operator 2026-10-02, #1672)', () => {
     delete process.env.EVENTS_RETENTION_DAYS;
-    expect(retentionDays()).toBe(7);
+    expect(retentionDays()).toBe(30);
   });
   it('honours an explicit positive window', () => {
-    process.env.EVENTS_RETENTION_DAYS = '30';
-    expect(retentionDays()).toBe(30);
+    process.env.EVENTS_RETENTION_DAYS = '12';
+    expect(retentionDays()).toBe(12);
   });
   it('an explicit 0 is the documented keep-forever escape hatch', () => {
     process.env.EVENTS_RETENTION_DAYS = '0';
@@ -98,9 +98,65 @@ describe('retentionDays — finite BY DEFAULT (issue #57, ADR-278)', () => {
   });
   it('garbage falls back to the default, never to keep-forever', () => {
     process.env.EVENTS_RETENTION_DAYS = 'forever';
-    expect(retentionDays()).toBe(7);
+    expect(retentionDays()).toBe(30);
     process.env.EVENTS_RETENTION_DAYS = '  ';
-    expect(retentionDays()).toBe(7);
+    expect(retentionDays()).toBe(30);
+  });
+});
+
+describe("#1672 — every product's log is pruned, not just the first one posted to each day", () => {
+  // The once-per-UTC-day guard was ONE module-level marker shared by every sink file. The first post
+  // of the day (almost always 2-D) consumed it, so 3-D/complex/analytic were pruned only on the days
+  // they happened to be posted to first — 3-D held 18 days under a 7-day window in prod.
+  afterEach(() => {
+    delete process.env.EVENTS_RETENTION_DAYS;
+  });
+  const ancient = JSON.stringify({ serverTs: '2020-01-01T00:00:00Z', iph: 'h', ev: 'submit', utterance: 'ancient' }) + '\n';
+
+  it('one post to each of four product files on the same day prunes ALL four', async () => {
+    // Fresh file paths (a new temp dir per test): the per-file marker has never seen them, whatever the
+    // other tests in this module already posted today. Under the old shared marker, at most one is pruned.
+    const dir = path.dirname(logPath);
+    const files = { '2d': logPath, '3d': path.join(dir, 'events-3d.jsonl'), complex: path.join(dir, 'events-complex.jsonl'), analytic: path.join(dir, 'events-analytic.jsonl') };
+    for (const f of Object.values(files)) await writeFile(f, ancient, 'utf8');
+    for (const [tool, f] of Object.entries(files)) {
+      const res = mockRes();
+      const body = JSON.stringify({ ...(tool === '2d' ? {} : { tool }), ev: 'submit', utterance: `fresh-${tool}` });
+      await handleLog(mockReq('POST', '10.0.2.1', [body]) as unknown as IncomingMessage, res as unknown as ServerResponse, {
+        ipSalt: 's',
+        logPath: files['2d'],
+        logPaths: { [tool]: f },
+      });
+      expect(res.statusCode).toBe(204);
+    }
+    for (const [tool, f] of Object.entries(files)) {
+      const text = await readFile(f, 'utf8');
+      expect(text, `${tool}: the new event was appended`).toContain(`fresh-${tool}`);
+      expect(text, `${tool}: its expired event was pruned`).not.toContain('ancient');
+    }
+  });
+
+  it('the default window is 30 days for every product (operator 2026-10-02), and an event past it is pruned', async () => {
+    expect(retentionDays()).toBe(30);
+    expect(DEFAULT_RETENTION_DAYS).toBe(30);
+    const day = 86_400_000;
+    const at = (ago: number, u: string) => JSON.stringify({ serverTs: new Date(Date.now() - ago).toISOString(), iph: 'h', ev: 'submit', utterance: u });
+    const dir = path.dirname(logPath);
+    const files = { '2d': logPath, '3d': path.join(dir, 'events-3d.jsonl'), complex: path.join(dir, 'events-complex.jsonl'), analytic: path.join(dir, 'events-analytic.jsonl') };
+    for (const f of Object.values(files)) await writeFile(f, [at(31 * day, 'day-31'), at(29 * day, 'day-29'), ''].join('\n'), 'utf8');
+    for (const [tool, f] of Object.entries(files)) {
+      const body = JSON.stringify({ ...(tool === '2d' ? {} : { tool }), ev: 'submit', utterance: 'now' });
+      await handleLog(mockReq('POST', '10.0.2.2', [body]) as unknown as IncomingMessage, mockRes() as unknown as ServerResponse, {
+        ipSalt: 's',
+        logPath: files['2d'],
+        logPaths: { [tool]: f },
+      });
+    }
+    for (const [tool, f] of Object.entries(files)) {
+      const text = await readFile(f, 'utf8');
+      expect(text, `${tool}: 29 days old is inside the window`).toContain('day-29');
+      expect(text, `${tool}: 31 days old is past it`).not.toContain('day-31');
+    }
   });
 });
 
