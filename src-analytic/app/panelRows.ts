@@ -263,5 +263,14 @@ export const panelRowText = (text: string): string => {
  * then sees isolates and only adds braces.
  */
 export function slopeRowText(name: string, slope: string, angleLabel: string, angle: string): string {
-  return `${name}: ${isolateRtlName(slope)} · ${isolateRtlName(angleLabel)}: ${angle}`;
+  return `${name}: ${valuePart(slope)} · ${isolateRtlName(angleLabel)}: ${valuePart(angle)}`;
 }
+
+/**
+ * A VALUE part of the row (#1716, ADR-AG-226). A word part («אנכי (אין שיפוע)») is one right-to-left island, as
+ * #1646 made it. A value LIST («-2 או 2», «63.43° או 116.57°») is a left-to-right run with a Hebrew joiner in it:
+ * isolating it WHOLE made it an RTL island and laid it out «2 או 2-» (measured in the browser), so only its
+ * Hebrew words are islands — `panelRowText`'s rule for the point rows' «או».
+ */
+const valuePart = (part: string): string =>
+  /[0-9]/.test(part) ? part.replace(HEBREW_PHRASE, (m) => isolateRtlName(m)) : isolateRtlName(part);

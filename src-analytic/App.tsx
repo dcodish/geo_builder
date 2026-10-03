@@ -37,6 +37,7 @@ import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
 import { openCurveText, panelKnowledge, panelRowText, segmentKnowledge, slopeRowText, valueText } from './app/panelRows';
+import { isolateRtlName } from '../shell/bidi';
 import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
 import { angleText } from './app/lineAngle';
@@ -1657,7 +1658,7 @@ export function App() {
                   const parts = known ? curveParts(known, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }) : null;
                   return (
                     <span key={c.id}>
-                      <ValueRow text={namedRow(name, parts ? parts.equation : pending ? checking : options ? options.map((o) => curveParts(o, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }).equation).join(' או ') : openCurveText(d.construction, c.id))} />
+                      <ValueRow text={namedRow(name, parts ? parts.equation : pending ? checking : options ? options.map((o) => curveParts(o, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }).equation).join(` ${isolateRtlName('או')} `) : openCurveText(d.construction, c.id))} />
                       {parts?.details && (
                         <details style={askTraceBox} open>
                           <summary style={askTraceToggle} title={t('curveDetailsToggle')}>

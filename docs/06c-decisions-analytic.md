@@ -10655,6 +10655,8 @@ Two more items, built on top of ef942ea7:
    - `lineAngleOf` (the slope row's angle, and the ask lane's);
    - `pointText` (`knownValues` with `size` 2) and `scalarText` (the ask lane's scalar answers).
 
+   **Bidi, measured in the browser:** `slopeRowText` isolated each part WHOLE (#1646), so a list «-2 או 2» became one right-to-left island and read «2 או 2-». A value part now isolates only its Hebrew words (`valuePart`, the rule `panelRowText` applies to the point rows), and a word part stays whole. The equation row joins its two equations with an isolated «או».
+
    One formatter, `valueText` (`app/panelRows.ts`), prints the value or the two options joined by «או», in the option set's stable ascending order: the order the point rows and #1433's «3.16 או 5.83» already used, which its lock asserts. So 9/4 reads «-2 או 2».
 3. **The cap is the ruling's two, for every row, points included.** A point with three or four positions now prints «—» (9/4's D, exam lines only). This is the ruling as transcribed; nothing locked a point list longer than two.
 4. **The render path pays nothing new (#1473 B′, *"we cannot afford 0.5 s addition"*).** Measured first: routing the new rows through `knownOptions` made the render complete the pool (572 line 5: 23 evaluations against a budget of 2), and `issue-1473-perf-budget` went red.
@@ -10663,13 +10665,13 @@ Two more items, built on top of ef942ea7:
    - The verdict is identical once the pool is complete; the option decides only who pays.
 
 **Locks.**
-- `src-analytic/__tests__/issue-1716-two-values.test.ts`, 9 tests, all through the panel's own functions:
+- `src-analytic/__tests__/issue-1716-two-values.test.ts`, 10 tests (the 10th: the slope row's bidi), all through the panel's own functions:
   - 9/4 as printed: slope AB «-2 או 2» at seeds 0–3, its angle 63.43° / 116.57°, A's two positions, D «—» (four positions);
   - 9/4 with the figure note: «2», and D = (9, −6);
   - a parameter «-3 או 3», a length «2 או 4», a line «3x − 2y − 6 = 0» / «3x + 2y − 6 = 0»;
   - the ask lane answers what the row shows;
   - a continuous value stays open.
-- **Fails before: 9 of 9** (the gate and the formatter do not exist on the base). Measured semantically too: «—» on every row above.
+- **Fails before: 9 of the first 9** (the gate and the formatter do not exist on the base). Measured semantically too: «—» on every row above.
 - Unchanged and green: `issue-1433-known-options` (order), `issue-1473-perf-budget` (after point 4), the #1289 freedom invariant, and every analytic test reaching the panel, the ask lane or the gates (145 files, 3949 tests).
 
 **Not built, said out loud.**

@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
 import { MAX_LISTED_VALUES, knownValue } from '../engine/evaluate';
 import { confirmTaught } from '../app/submit';
-import { panelKnowledge, segmentKnowledge, valueText } from '../app/panelRows';
+import { panelKnowledge, segmentKnowledge, slopeRowText, valueText } from '../app/panelRows';
 import { pointText, scalarText } from '../app/pointText';
 import { curveParts } from '../app/curveText';
 import { fmtAnalytic } from '../format';
@@ -106,6 +106,16 @@ describe('#1716 — every row kind goes through the one gate', () => {
     const k = panelKnowledge(d).params.find((p) => p.sym === 'k')!;
     expect(valueText(k.k, fmtAnalytic)).toBeNull();
     expect(knownValue(d.construction, (f) => f.env.k ?? null)).toEqual({ known: false });
+  });
+
+  it('the slope row keeps a value list left-to-right: only «או» is an island (measured in the browser: «2 או 2-»)', () => {
+    const FSI = '⁨';
+    const PDI = '⁩';
+    const row = slopeRowText('AB', '-2 או 2', 'זווית עם ציר ה-x', '63.43° או 116.57°');
+    expect(row.startsWith(`AB: -2 ${FSI}או${PDI} 2 · `)).toBe(true);
+    expect(row.endsWith(`: 63.43° ${FSI}או${PDI} 116.57°`)).toBe(true);
+    // a WORD part stays one right-to-left island, as #1646 made it
+    expect(slopeRowText('BC', 'אנכי (אין שיפוע)', 'זווית', '90°')).toContain(`${FSI}אנכי (אין שיפוע)${PDI}`);
   });
 
   it('the cap is the ruling’s two', () => {
