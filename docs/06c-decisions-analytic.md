@@ -10844,7 +10844,7 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 
 **Status:** accepted · 2026-10-03 · fix-round #1721, stream R5 item 3 (PR stacked on #1716's). **Operator ruling, 2026-10-03 (T31):** *"in the analytics tool, we should both translate to an angle and treat it as an indication of a slope. in analytucs, if by any chance they will have cos or sin of an angle, translate it to an angle and right it down"*. The issue's plan: write the angle on the arc and in the panel; show the slope through #1716's up-to-two rule; build sin as a choice of θ or 180° − θ, cycled by «הציגו תצורה אחרת», with both listed until a given settles it; refuse |sin| > 1.
 
-**Requirements:** [02c](02c-requirements-analytic.md) R168. · **Design:** [04c](04c-design-analytic.md), "A trig given is an angle; sin is a choice between two roots".
+**Requirements:** [02c](02c-requirements-analytic.md) R170. · **Design:** [04c](04c-design-analytic.md), "A trig given is an angle; sin is a choice between two roots".
 
 **Measured at pickup** (on `feat/1716-two-values`):
 - «tan∢ABC = 2»: the canvas already wrote «63.43°» (ADR-AG-225), but no panel row stated the angle.
