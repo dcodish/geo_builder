@@ -13691,7 +13691,7 @@ The parse was right in every row (`point-on-circle B` is emitted each time) — 
 
 ## ADR-566 — A trigonometric given is a ratio, decided whole before any angle rule (#1698)
 
-**Status:** accepted · 2026-10-03 · bug (P1, the honesty class) · operator on #1698: *"Should be fixed. No decision required from me"* · found by the analytic stream D2 (ADR-AG-215), measured, not reported · branch `fix/1698-trig-ratio` off `main` @ a8938c2d · **label amended by [ADR-572](#adr-572) (#1718): the figure prints the angle («63.43°»), not «tan=2»**
+**Status:** accepted · 2026-10-03 · bug (P1, the honesty class) · operator on #1698: *"Should be fixed. No decision required from me"* · found by the analytic stream D2 (ADR-AG-215), measured, not reported · branch `fix/1698-trig-ratio` off `main` @ a8938c2d · **label amended by [ADR-572](#adr-572) (#1718): the figure prints the angle («63.43°»), not «tan=2»** · **the sine refusal (decision 3, `sine-two-angles`) withdrawn by [ADR-573](#adr-573) (#1711): a sine in (0, 1) builds as a two-root choice**
 
 **Requirements:** [FR-IN-7d](02-requirements.md) (new) — a trig given is a ratio; what names no single angle is refused by name · **Design:** [04-design.md](04-design.md) § "A trig function of an angle is decided whole, before any rule" · **LADDER stage:** the parser, at the `parse()` boundary (beside the proof-target and foreign-given guards); the span accountant's number collection. No solver, replay or render change.
 
@@ -13820,6 +13820,67 @@ Not changed: size (`radius.via !== 'free'`) and size order (`orderedBelow`) alre
 **Locks.** `src/__tests__/issue-1718-trig-angle-label.test.ts` (12, through `replay`'s label list and `decideDeterministic2D`): eight trig givens (tan, Hebrew tan, negative tan, √3, cot, cos, Hebrew cos, negative cos) label their wedge with `fmtNum(angle)°` at seeds 0–3 and nothing else; the operator's case reads exactly «63.43°»; the fact keeps its utterance; «cos∢ABC = -1/2» and «tan∢ABC = -3/4» commit, never escalate. **Fails before: 9 of 12** (measured with `src/parser` reverted to deed7b20) — the three that pass before are the fact-row control and the two signed-fraction locks, which guard the regression this change would otherwise cause. The #1698 lock now asserts «63.43°» and no `text`; scenario `trig-given-is-a-ratio-1698` asserts the two wedges «63.43°» / «41.41°»; new scenario `trig-given-label-is-the-angle-1718` (corpus 4, the operator's exact lines). `decide-parity-1395` shard 4: the 1698 key's hash changed (its commands lost `text`, intended) and the 1718 key was added; shards 1–3 unchanged.
 
 **Behaviour change for a student:** «tan∢ABC = 2» now shows «63.43°» at the angle instead of «tan=2»; «cos∢ACB = 3/4» shows «41.41°». The step list still shows what they typed.
+
+## ADR-573 — A sine is a two-root angle choice; the configuration searches walk every variant (#1711)
+
+**Status:** accepted · 2026-10-03 · feature (P2) · operator ruling on #1711 (playing T33): *"sin∢ACB = 3/4 gives to options but this is just a dof and the show other config should deal with it. so in this case we accept the constrain but have 2 options for it. sometimes the other figure data will only allow 1 option and then we can nail it"* · fix-round #1721 · branch `feat/1711-sine-choice` off `feat/1718-trig-angle-label` (it changes the same lowering, `trigGiven`)
+
+**Requirements:** [FR-IN-7d](02-requirements.md) — a sine in (0, 1) builds as a configuration choice; a sine outside (0, 1] is refused by name · **Design:** [04-design.md](04-design.md) § "A sine is a two-root angle choice; the configuration searches walk every variant"; [LADDER.md](LADDER.md) § the configuration searches · **LADDER stage:** the configuration searches — a new `findValidConfig` tier between the right-angle seat and the reflection masks; `dryRunOutcome`'s curable test beside the seat cure; `searchAnotherView`'s variant dimension. No solver or fold change.
+
+**Cites** [ADR-566](#adr-566) (its decision 3, the `sine-two-angles` refusal, is withdrawn), [ADR-572](#adr-572) (the label is the drawn angle), [ADR-052](#adr-052) (an unstated magnitude is a cyclable choice), [ADR-138](#adr-138) / [ADR-262](#adr-262) (variant commands), [ADR-340](#adr-340) (the composite view search), [ADR-445](#adr-445) / [ADR-551](#adr-551) (the seat tier and the seat cure at the door — the shape this follows), [ADR-481](#adr-481) (the button reads the search's own predicate).
+
+**Context — measured at pickup.** First on the #1718 tip (e3f063b8): «sin∢ACB = 3/4» was refused, `input.trigGiven.sine-two-angles`. Then with the sine lowered as a variant and the searches unchanged, the two engine gaps the issue names were measured directly:
+
+| case | before the search fix |
+| --- | --- |
+| «משולש ABC» · «sin∢ACB = 3/4» | builds ∠C = 48.59°; one press reaches 131.41° (a single variant cycles) |
+| «זווית ACB קהה» · «sin∢ACB = 3/4» | the gate REFUSED the sine (`dryRunOutcome` tried no variant, so the acute default conflicted) |
+| «sin∢ACB = 3/4» · «זווית ACB קהה» | the gate REFUSED the obtuse line («∠ACB = 48.590378° contradicts ∠ACB > 90°»), and `findValidConfig` on the committed pair returned **null** — it never left the variants the facts held (gap 1) |
+| two triangles, «sin∢ACB = 3/4» · «sin∢DFE = 1/2», eight presses | reached **2 of 4** combinations (0,0 · 1,0): `searchAnotherView` stepped only the first variant fact (gap 2) |
+
+**Class (docs/17 §1).** *An unstated configuration choice is reachable only when it is the first one, and only by the button.* The two searches each held their own idea of the variant dimension: `findValidConfig` none at all, `searchAnotherView` one fact. Every variant kind shared the gap — two isosceles apexes, an apex beside an inscribed seating — and the sine is just the first kind whose wrong default a later given can make impossible.
+
+**Decision.**
+1. **A sine in (0, 1) lowers to the trig `measure-angle` with both roots** — `expr: { value: θ, roots: [θ, 180° − θ] }`, `variant: 0`, so the acute root is the default. sin = 1 is the single angle 90°. A sine ≤ 0 or > 1 is refused by name as `sine-out-of-range` (an angle of a figure is in (0°, 180°), where the sine is in (0, 1]); `sine-two-angles` is gone, and the `form` note's taught spelling «sin∢ABC = 1/2» now builds.
+2. **A multi-root literal angle is a variant command** (`engine/variants.ts`). `withVariant` sets `variant` and rewrites `expr.value` to the chosen root, so the lowering, the label (`fmtNum`, ADR-572) and the verifier all read the drawn angle, and none of them needed a change. `variantConfigs` samples across the roots, so a relation true at one root is never reported as forced.
+3. **One variant dimension, `variantAxes`** (`replay/core.ts`): every enabled cyclable variant fact, in fact order, at most four.
+   - **`variantRescue`** tries the other assignments, fewest changed facts first (stability), at most 32, at seeds 0–5. Like `seatRescue`, it serves both the **variant tier of `findValidConfig`** (after the seat, before the reflection masks, because a wrong variant fails at every seed) and **`dryRunOutcome`'s curable test**: a step whose error some variant assignment cures commits. Its own new choice is settled by `settleVariantDefaults` at commit, and an earlier fact's choice by the post-commit `autoResolve`, under the keep-prior view (ADR-446).
+   - **`searchAnotherView` walks the product as an odometer.** The variant step `v` advances the mixed-radix assignment by `v`, with the first axis turning fastest, so successive presses reach every combination.
+4. **The button's enablement reads `cyclableVariant`**, the search's own predicate (the ADR-481 lesson). It used to count only shape-variants, so a figure the givens otherwise determine — the ambiguous case «AB = 4», «AC = 3», «sin∢ACB = 3/4» — would have hidden its choice.
+
+**Measured after** (`src/__tests__/issue-1711-sine-choice.test.ts`):
+
+| case | now |
+| --- | --- |
+| «sin∢ACB = 3/4», «סינוס הזווית ACB = 3/4», «נתון כי סינוס הזווית ACB שווה ל-0.75», «sin C = 3/4» | commit, ∠C = 48.59° at seeds 0–3, labelled «48.59°» |
+| the button, six presses | both roots reached; the obtuse one labelled «131.41°»; every view meets its requirements |
+| obtuse stated first / after | builds; ∠C = 131.41° (after: the store's `autoResolve` lands it, tier `variant`) |
+| «∢ABC = 100» · «sin∢ACB = 3/4» | every press keeps ∠C acute (the obtuse root cannot hold) |
+| two sines in two triangles, eight presses | all four combinations |
+| «AB = 4» · «AC = 3» · «sin∢ACB = 3/4» | a press reaches the obtuse triangle with AB = 4 |
+| «sin∢ACB = 1» | 90°, not a choice |
+| «sin∢ACB = 5/4», «= 2», «סינוס הזווית ACB = -1/2», «= 0» | refused, `sine-out-of-range`; the model never called |
+
+**Locks.** `src/__tests__/issue-1711-sine-choice.test.ts` (18). **Fails before: 17 of 18** with every product file reverted to the #1718 tip; the one that passes is the model-never-called control. With only `replay/core.ts` reverted (the sine lowered, the searches old), **4 fail**: obtuse-first (the door), obtuse-after, the variant tier itself, and the four-combination product — the two gaps, each locked. Scenario `sine-is-a-two-angle-choice-1711` (corpus 4, the operator's exact lines). The #1698 locks now refuse a sine above 1 instead of a sine. Parity rows `trig-sine-choice-1711` (builds) and `trig-sine-out-of-range-1711` (refused) are known gaps for analytic (#1719, this round) and 3-D (#1726, filed).
+
+**Existing locks measured (the door and the search changed for EVERY variant kind, so the whole variant surface was run).** All eight scenario slices (`scenarios-e2e-1…8`) green with no edit; `decide-parity-1395` shards 1–3 unchanged, shard 4 unchanged but for the new scenario's key (no recorded hash drifted, so no existing scenario or fixture changed verdict at the door); 46 files touching the searches, the door, the variants and the store (`dry-run`, `auto-resolve`, `resample-validity`, `shape-variant`, `variant-default`, `resolve-view`, `issue-566`, `issue-942-coincident-views`, `scenarios-props-{adr250,budget,resample,submit-gate}`, `fixtures`, `i18n-keys-1372`, `import-direction` among them; 448 tests) green; the four #1649 parity runners green.
+
+**Sibling check.** 3-D does not read a sine at all (`not-handled`); filed as #1726. Analytic gets the same ruling on #1719.
+
+**Not built, said out loud.**
+- The figure's "unstated choices" note (`unstatedChoices`) does not name the sine's root. The label shows the drawn angle, so nothing is hidden, but the note does not invite the press.
+- `viewDelta`'s "what changed" note does not name a root change, because a `measure-angle` has no object id. It stays silent rather than guessing.
+- The store's unused `cycleVariant` action still steps the first variant only. Nothing in the UI calls it; the button runs `searchAnotherView`.
+
+**Consequences.**
+- `src/engine/types.ts`: `MeasureExpr.roots`, and `measure-angle.variant`.
+- `src/engine/variants.ts`: the multi-root angle.
+- `src/parser/parse.ts`: the sine branch of `trigGiven`, and `TrigRefusal`.
+- `src/replay/core.ts`: `variantAxes`, `variantRescue`, the `findValidConfig` tier, the `dryRunOutcome` cure, the `searchAnotherView` odometer, `variantConfigs`.
+- `src/App.tsx`: `hasVariant`.
+- Locales: `input.trigGiven.sine-out-of-range` replaces `sine-two-angles`.
+
+**Behaviour change for a student:** «sin∢ACB = 3/4» now draws the angle (about 48.59°) instead of refusing, and «הציגו תצורה אחרת» switches it to about 131.41°. If something else in the figure allows only one of the two (say «זווית ACB קהה», typed before or after), that one is drawn. More generally, «הציגו תצורה אחרת» now goes through every combination when a figure has several such choices (two sines, two isosceles triangles), and a later line that only an earlier choice's other option can satisfy now builds instead of being refused.
 
 ## ADR-568 — A cevian sentence's stated vertex and its shape are honoured or asked, never dropped or picked (#1684)
 

@@ -1648,6 +1648,10 @@ over all four (ADR-041).
 
 **Guards against:** a trig given labelled by its ratio. ADR-566 put the typed given on the measure, so the wedge read «tan=2»; the operator ruled the figure shows only the angle it draws. **Asserts** the operator's exact lines: ∠ABC = atan 2 as drawn and the wedge text exactly «63.43°» (the shared display rounder). The seed sweep, cos / cot / negative values and the signed-fraction accounting are in `src/__tests__/issue-1718-trig-angle-label.test.ts`.
 
+### `sine-is-a-two-angle-choice-1711` — «sin∢ACB = 3/4» builds ∠C ≈ 48.59°, and «הציגו תצורה אחרת» reaches ≈ 131.41° (#1711, ADR-573)
+
+**Guards against:** a sine refused (ADR-566's `sine-two-angles`), or drawn at one root with the other unreachable. The operator ruled the two angles a configuration choice the button cycles. **Asserts** the operator's exact lines: the acute default as drawn and labelled «48.59°», and one press of the button (`searchAnotherView`) reaching the obtuse root labelled «131.41°». The only-one-root cases (obtuse stated before and after the sine, an angle sum), the two-sine product, the ambiguous case and the refusals are in `src/__tests__/issue-1711-sine-choice.test.ts`.
+
 ### `cevian-stated-vertex-and-shape-1684` — «AD חוצה זווית C» is refused; «AE גובה» with A in triangles ABC and ABD asks; naming the side builds (#1684, ADR-568)
 
 **Guards against:** a cevian sentence's stated vertex being dropped, and its target shape being picked silently. 2-D drew the bisector of ∠A for «AD חוצה זווית C» (the stated vertex C gone — a segment from A cannot bisect ∠C), and drew «AE גובה» to BC when A is a vertex of both ABC and ABD. **Asserts** that «AD חוצה זווית C» is refused (`bisector-wrong-apex`) and «AE גובה» asks (`ambiguous-cevian`) at the gate, and that the operator's answer «AE גובה לצלע BD» builds with E on BD and AE ⟂ BD. The submit-door matrix (spellings, both locales, the foot-on-side narrowing, the parallelogram draw-one steer) is in `src/app/__tests__/issue-1684-cevian-stated-vertex.test.ts`.

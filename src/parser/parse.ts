@@ -3244,9 +3244,13 @@ const ANGLE_KW = /angle|∠|∢|הזוו?ית|זוו?ית/i;
 // whose value is that angle in degrees. It carries NO `text`: the figure labels the ANGLE the given
 // draws, through the one label builder's number branch (`measureLabelForms` → the shared `fmtNum`
 // rounder), so «tan∢ABC = 2» prints «63.43°» and the fact row keeps the sentence as typed (#1718,
-// ADR-572, amending ADR-566's «tan=2»). cot is 1/tan. sin is NOT
-// one-to-one there (sin θ = sin(180° − θ)): the line is refused, naming the two angles, until a
-// cyclable acute/obtuse choice exists (follow-up issue). A cosine outside [−1, 1] has no angle.
+// ADR-572, amending ADR-566's «tan=2»). cot is 1/tan. sin is NOT one-to-one there (sin θ =
+// sin(180° − θ)), so a sine in (0, 1) fits TWO angles, and which one the figure has is an unstated
+// configuration choice (ADR-052) — operator ruling on #1711: "this is just a dof and the show other
+// config should deal with it". It lowers to the same `measure-angle` carrying both roots
+// (`expr.roots`, acute first) and a cyclable `variant` (ADR-573): «הציגו תצורה אחרת» switches the
+// root, the figure search tries each, and the label prints whichever is drawn. sin = 1 is the one
+// angle 90°. A cosine outside [−1, 1], or a sine outside (0, 1], has no angle of a figure.
 const TRIG_FN_EN = String.raw`(?<![A-Za-z])(?<en>tan|tg|ctg|cotg|cot|sin|cos)(?![A-Za-z])|(?<![A-Za-z])(?:the\s+)?(?<enw>tangent|cotangent|sine|cosine)\s+of(?![A-Za-z])`;
 const TRIG_FN_HE = String.raw`(?<![א-ת])[ושהלבמכ]{0,3}(?<he>קוטנגנס|קוסינוס|טנגנס|סינוס)(?![א-ת])`;
 type TrigFn = 'tan' | 'cot' | 'sin' | 'cos';
@@ -3271,7 +3275,7 @@ const trigLine = (): RegExp =>
   ));
 
 /** Why a trig line is refused — the note names the student's function and, where it helps, the value. */
-export type TrigRefusal = 'sine-two-angles' | 'out-of-range' | 'form';
+export type TrigRefusal = 'out-of-range' | 'sine-out-of-range' | 'form';
 
 /**
  * Decide a line that applies a trigonometric function to an angle. `null` = the line has no such
@@ -3291,9 +3295,6 @@ function trigGiven(s: string, ctx: ParseContext): ParseResult | null {
   const fn = trigFnOf(word);
   const shown = /[א-ת]/.test(word) || /^(?:tangent|cotangent|sine|cosine)$/i.test(word) ? fn : word.toLowerCase();
   const refuse = (why: TrigRefusal): ParseResult => ({ ok: false, reason: 'trig-given', why, fn: shown, sentence: s });
-  // A sine names two angles in EVERY form, so it is refused before the form is read — the form note
-  // would teach a spelling that is refused too (memory: taught remedies must drive the spelling).
-  if (fn === 'sin') return refuse('sine-two-angles');
   const m = s.match(trigLine());
   if (!m) return refuse('form');
   const g = m.groups as Record<string, string | undefined>;
@@ -3302,7 +3303,14 @@ function trigGiven(s: string, ctx: ParseContext): ParseResult | null {
   const v = (g.sg ? -1 : 1) * magnitude.value;
   const deg = (r: number): number => (r * 180) / Math.PI;
   let value: number;
-  if (fn === 'cos') {
+  /** The angles a sine fits (#1711): [θ, 180° − θ], acute first — the default drawn is the acute one. */
+  let roots: number[] | undefined;
+  if (fn === 'sin') {
+    // An angle of a figure lies in (0°, 180°), where the sine is in (0, 1]: a sine ≤ 0 or > 1 has no angle.
+    if (v <= 0 || v > 1) return refuse('sine-out-of-range');
+    value = deg(Math.asin(v));
+    if (v < 1) roots = [value, 180 - value];
+  } else if (fn === 'cos') {
     if (Math.abs(v) > 1) return refuse('out-of-range');
     value = deg(Math.acos(v));
   } else {
@@ -3322,7 +3330,10 @@ function trigGiven(s: string, ctx: ParseContext): ParseResult | null {
       // The stated ratio is TRANSFORMED (2 → 63.43°), so the rule declares it consumed (#784, ADR-462):
       // the numbers gates then account the student's «√3» / «-2» / «3/4» against this command. No
       // `text`: the canvas labels the resulting angle, rounded by the shared display rounder (#1718).
-      { type: 'measure-angle', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2, expr: { value }, consumed: { numbers: [v] } },
+      // A sine carries both roots and the variant that picks one (#1711, ADR-573) — see `engine/variants.ts`.
+      roots
+        ? { type: 'measure-angle', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2, expr: { value, roots }, variant: 0, consumed: { numbers: [v] } }
+        : { type: 'measure-angle', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2, expr: { value }, consumed: { numbers: [v] } },
     ],
   };
 }
