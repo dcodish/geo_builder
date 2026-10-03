@@ -14,6 +14,7 @@
     "src-analytic/__tests__/issue-1473-pool-invariant.test.ts",
     "src-analytic/__tests__/issue-1556-freerank-equality-rows.test.ts",
     "src-analytic/__tests__/issue-1619-b2-inscribed.test.ts",
+    "src-analytic/__tests__/issue-1620-tangents-meet.test.ts",
     "src-analytic/__tests__/issue-1621-ratios-areas.test.ts",
     "src-analytic/__tests__/issue-1637-g1-knowledge.test.ts",
     "src-analytic/__tests__/issue-1659-1665-1663.test.ts",
