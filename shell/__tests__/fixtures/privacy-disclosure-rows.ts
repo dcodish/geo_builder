@@ -45,7 +45,7 @@ export const REPO_ROOT = path.resolve(__dirname, '../../..');
  * NON-sink: it sends no student input. A new endpoint is a privacy decision and lands here first.
  */
 export const SINK_OF_ENDPOINT: Readonly<Record<string, DataSink | null>> = {
-  log: 'usage-log', // server/eventLog — typed statements, a few days, salted visitor hash
+  log: 'usage-log', // server/eventLog — typed statements, 30 days (#1672), salted visitor hash
   parse: 'llm', // the model proxy — the unrecognised statement goes to an external AI service
   share: 'share-store', // «העתק קישור» — the figure and its picture are stored for the short link
   config: null, // GET the operator's per-tool config; sends only the tool id

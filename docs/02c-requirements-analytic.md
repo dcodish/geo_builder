@@ -2317,7 +2317,23 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - Corpus 7/4 «נתון: S_BDC / S_ODC = 0.8» stays refused: the page prints it so, and with D on BC the triangle BDC has no area. The exam's answer key is the ratio S_BEC / S_ODC = 0.8 (B(6,8)), which the tool builds when typed.
 - A point against an axis says which side of it the point is on: «D מתחת לציר x», «A מעל ציר ה-x», «C משמאל לציר ה-y», «B מימין לציר y» ("D is below the x-axis"). Several givens may share one line, joined by «;»: «A משמאל ל-O ו-C מימין ל-O; B על החלק החיובי של ציר y; D מתחת לציר x (ציור)» (a bare «(ציור)» states nothing).
 
-**R166 — what the student stated about a length, an angle, an area or an arc is written on the figure, as in the 2-D tool**
+**R166 — a stated length is written where it can be read**
+([ADR-AG-223](06c-decisions-analytic.md#adr-ag-223), [#1717](https://github.com/dcodish/geo_builder/issues/1717))
+
+- A length the student stated («AO = 3») is written beside its segment, on the side away from the figure. It is written in the figure's blue. It never overlaps a point's label (with its coordinates), a point, a drawn side or another stated length. It never stands in the row of axis numbers, where it would read as one of them. When the first place is taken, the number moves further out, and to the other side if it must.
+- A stated segment that lies on an axis is drawn in the figure's colour over the axis.
+- The number keeps one place across «הציגו תצורה אחרת» when the figure itself does not move.
+
+**R167 — two lines of any kind meet at a named point**
+([ADR-AG-224](06c-decisions-analytic.md#adr-ag-224), [#1715](https://github.com/dcodish/geo_builder/issues/1715))
+
+- «<line> ו<line> נפגשים בנקודה E» works for any two lines the tool draws: an angle bisector («חוצה זוית B», «חוצה הזווית ABC»), an altitude or median from a vertex («הגובה מ-A», «התיכון מ-B»), a perpendicular bisector («האנך האמצעי לצלע AB»), a drawn perpendicular («האנך מ-C ל-AB»), a tangent at a point, or a named line. It also accepts «נחתכים» / «נפגשות» / «מצטלבים», «ב-E», «ו-», and English "… and … meet at E". Each line is drawn, and E is where they cross. Two bisectors of a triangle meet at its incentre; two altitudes at the orthocentre; two medians at the centroid; two perpendicular bisectors at the circumcentre.
+- The same lines work in «E נקודת החיתוך של X עם Y», «X חותך את Y בנקודה E» and «E על X».
+- Parallel lines are refused as impossible. The same line written twice is refused. Two named lines that share a letter («הישר AB והישר BC») are refused, because they meet at that point.
+- An altitude or median named only by its side («הגובה לצלע BC») is not read in these sentences.
+- A perpendicular «האנך מ-P ל-X» must already be drawn (R141).
+
+**R168 — what the student stated about a length, an angle, an area or an arc is written on the figure, as in the 2-D tool**
 ([ADR-AG-225](06c-decisions-analytic.md#adr-ag-225), [#1714](https://github.com/dcodish/geo_builder/issues/1714); operator ruling 2026-10-02: analytic gives 2-D's experience for plane geometry; the canvas shows the inputs, the panel the computed values — ADR-W-047).
 
 - A stated angle draws an arc at its vertex with the value the student gave: «∢ABC = 30» → «30°», «∢ABC = α» → «α». Once the letter is valued («α = 30») the figure shows «30°», as 2-D does.
@@ -2328,7 +2344,7 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - «שטח המשולש ABC הוא 13» writes «S=13» inside the triangle; «⌢AC = 60°» writes «60°» on the arc, never at the centre.
 - A shape noun's own definition is not marked («מלבן ABCD» draws no knees, «מעוין ABCD» no ticks), and a value the tool computed is never written on the canvas: it is in the data panel.
 
-**R167 — a value the givens fix up to two choices shows both**
+**R169 — a value the givens fix up to two choices shows both**
 ([ADR-AG-226](06c-decisions-analytic.md#adr-ag-226), [#1716](https://github.com/dcodish/geo_builder/issues/1716); operator ruling 2026-10-03: *"if there are 2 options, we always show up to 2 options"*).
 
 - A data-panel row whose value is the same in every configuration shows it, as before.

@@ -10545,6 +10545,141 @@ Two more items, built on top of ef942ea7:
 
 **Requirements:** R161 amended (x/y refused); R165 extended. **Design:** 04c — the E2 section's length bullet is rewritten, and this ADR's section is extended.
 
+## ADR-AG-223 — A stated length is written clear of every other label: 2-D's outward rule, then a step along the normal (#1717)
+
+**Date:** 2026-10-03 · round #1721 · **Status:** accepted
+
+**Report.** The operator, playing corpus 9/4 (T6): *"AO=3 is not created. you can see in your own diagram this is not respected"*.
+
+**Re-measured at pickup (deed7b20).** The given IS respected: A = (−3, 0) and AO = 3 at every seed.
+- **The segment is already drawn over the axis.** `seg-AO` is painted after the axes, in the figure's ink (#2563eb, 2px) over the grey 1.5px axis. A crop of the play screenshot shows the blue run between A and O. So the plan's first bullet ("draw a stated segment on an axis above the axis, in figure ink") already held. It is now locked rather than built.
+- **What hid the given was its label.** The «3» was written at AO's midpoint, 6px up, inside A's own label. The canvas read «A(x_A, 0)3», so the 3 looked like part of A's label and AO looked like the axis.
+
+**Class.** *A length label is placed with no knowledge of the other labels on the canvas.* An analytic point label carries the point's stated coordinates («A(x_A, 0)»), so it is several times wider than 2-D's single letter. Any short segment, or any segment ending at a labelled point, could put the two labels on top of each other. Measured before the fix on a second member: «A(0,0)», «B(1,0)», «C(0,6)», «משולש ABC», «AB = 1» wrote its «1» inside «A(0, 0)».
+
+**Mechanism.** `placeLengthLabels` (`render/scene.ts`) does two things:
+- **It copies 2-D's value-label rule** (`src/render/scene.ts`, ADR-031 / #126). The label starts at the segment's midpoint and is pushed along the normal away from the figure's centroid. The first position is the label box's own half-extent along the normal plus a 4px gap, so it clears the segment at any slope.
+- **It adds what this canvas needs: a step along the normal.** The label moves outward 4px at a time, up to 12 steps, until its box clears all of these:
+  - every point label and every point dot;
+  - every drawn segment;
+  - every length label already placed;
+  - each axis's whole ROW of numbers (the band under the x-axis and the column left of the y-axis).
+
+  When the outward side never clears, the inward side is tried. When neither clears, the label keeps its first outward position: still drawn, never dropped.
+- **Why a band, and not each tick.** On the first cut, AO's «3» landed below the axis between «−2» and «O». Its box overlapped neither, but it READ as a tick number. The play-sheet render showed this; the overlap test could not.
+- **The label is written in the figure's blue.** 2-D writes its values this way "to set them apart from point names". Here it also sets them apart from the grey axis numbers.
+- **A segment through the centroid has no outside.** This is 9/4's AO, on the axis the rectangle straddles. A sign read off float noise would flip the label between configurations of one figure. So a tie takes a fixed orientation and then the side that clears in fewer steps. It is locked: one label position over eight seeds.
+- **The scene returns the label's centre.** `Figure.tsx` centres the glyphs on it (`dy="0.35em"`). The point-label offsets, the length font and the tick-label offsets are exported constants (`POINT_LABEL`, `LENGTH_LABEL_FONT`, `TICK_LABEL`). The painter draws with them and the placement measures against them, so the two cannot disagree.
+
+**The third-copy rule (ADR-W-016, #1353).** This is the SECOND copy of the outward-normal rule, after 2-D.
+- 3-D writes a length at a fixed screen offset (`scene3.ts`, `labelX: mid + 9, labelY: mid − 7`). It does not use this rule.
+- complex has no length labels.
+- So nothing is hoisted to `shell/`. A third builder that adopts the rule moves it there, with a §5c lock.
+
+**Sibling audit.**
+- 2-D's placement is blind to point labels too. But a 2-D point label is one letter, placed away from the incident segments, and a short side's value is shrunk to fit (`labelScale`, #1337). No report; not filed.
+- 3-D's fixed offset could meet a vertex label on a short edge. It has never been reported, and 3-D labels are single letters too. Not filed.
+
+**Locks.** `src-analytic/__tests__/issue-1717-length-label.test.tsx`, 41 tests. The locks read the DRAWN markup (`<Figure>` rendered to static markup). The box estimates are the test's own, at 0.6 em per glyph, as an independent oracle. They cover:
+- 9/4 at eight seeds:
+  - AO's «3» clears every other text on the canvas and every inked side;
+  - AO is inked solid in the figure's stroke, painted after the x-axis;
+  - the label does not change side between seeds;
+- the class: a short side between two coordinate-labelled points; a vertical side on the y-axis; three stated sides whose labels must also clear each other, each at eight seeds.
+
+**Fails before: 32 of 41.** At every seed these are: the 9/4 label (inside A's label), the short-side member, the y-axis member and the three-sided triangle (labels crossing drawn sides). The 9/4 paint-order tests pass before, which is the re-measurement above.
+
+**Requirements:** R166 (new). **Design:** 04c — the canvas's bidi chokepoint section gains "where a stated length is written".
+
+## ADR-AG-224 — One meet frame over every line-object: «<line> ו<line> נפגשים / נחתכים בנקודה E» (#1715)
+
+**Date:** 2026-10-03 · round #1721 · **Status:** accepted
+
+**Requirements:** [02c](02c-requirements-analytic.md) R167 (new). · **Design:** [04c](04c-design-analytic.md) — new section "One meet frame; a line-object as an operand". · **LADDER stage:** parse only (`meetFrame`, `lineObjectOperand`, the operand resolver `incidenceOn`, the crossing lowering `parseIntersectionPlain`). No new fact, no new object, no M1 or solver change.
+
+**Report.** The operator, playing the round sheet (T4): *"syntax EB ו-EC הם חוצי הזווית ABC ו-BCD בהתאמה הנפגשים בנקודה E is accepted but not variations of it such as חוצה זוית DCB וחוצה זוית CBA נפגשים בנקודה E or חוצה זוית C וחוצה זוית B נפגשים בנקודה E. note that the 2d tool does support these syntaxes"*.
+
+**Re-measured at pickup (deed7b20).** The issue's table holds:
+- every plural spelling builds;
+- «חוצה זוית BCA וחוצה זוית CBA …», «חוצה זוית C וחוצה זוית B …» and «חוצה הזווית B וחוצה הזווית C נחתכים …» are `not-handled` in analytic and build in 2-D.
+
+**2-D across the whole cross-product of kinds.** Measured through `decideDeterministic2D` after «משולש ABC»: seven kinds × seven kinds × the two verbs, plus variants. **The issue's guess that 2-D reads altitudes, medians and perpendiculars in this frame is not true.** 2-D's verdicts are:
+- **Builds** in 2-D:
+  - two bisectors written the same way («חוצה זוית B וחוצה זוית C נפגשים», three-letter with three-letter);
+  - the operator's three spellings;
+  - a three-letter bisector with a named line;
+  - two named lines;
+  - two tangents;
+  - a tangent with a named line.
+- **`not-handled`** in 2-D:
+  - every pair with an altitude, a median, a perpendicular or a perpendicular bisector;
+  - «חוצה זוית B וחוצה זוית C **נחתכים**» (while «נפגשים» builds);
+  - a one-letter bisector with a three-letter one;
+  - a named line before a one-letter bisector;
+  - «… נפגשים ב-E».
+- **Refused** in 2-D, as misreadings: «הגובה מ-A והאנך מ-B ל-AC …» (`cevianApexOnSide`) and «הגובה מ-A לצלע BC והתיכון מ-B לצלע AC …» (`cevianMedianFootAtEnd`).
+- **Builds a point on the one line** in 2-D: «חוצה זוית B וחוצה הזווית B …».
+- **Parallel named lines** are refused, by 2-D and analytic both.
+
+The verdicts were followed this way:
+- **Where 2-D builds or refuses, analytic now agrees.** Those rows are plain parity.
+- **Where 2-D is `not-handled` or misreads, analytic builds.** This is the frame the plan names, over every kind it lists. These rows are analytic-ahead with 2-D's gap on #1677 (the ADR-AG-213 precedent). The new members are recorded there in a comment.
+
+**Root cause.** The frame was never wired per kind. The meet branch already lowered every «X ו-Y נפגשים בנקודה E» to the canonical crossing «E נקודת החיתוך של X עם Y». What was per-kind was the **operand resolver** (`incidenceOn`). It read a named line, an axis, a curve, a tangent at a point and the contextual «האנך», and **no line-object a sentence builds**: an angle bisector, an altitude or median from its apex, a perpendicular bisector. Two spelling defects stacked on top:
+- the clitic join admitted «ו» only before ה ל צ מ פ א, so «וחוצה» never split;
+- `parsePerpendicular`, earlier in the chain, read «האנך מ-A ל-BC וחוצה … נפגשים בנקודה E» as one perpendicular onto an unreadable line, and refused it.
+
+**The class (docs/17 §1).** *A line-object is read as a SENTENCE everywhere and as an OPERAND nowhere.* So every frame that takes an operand missed the same objects:
+- the meet;
+- the noun crossing «E נקודת החיתוך של X עם Y»;
+- «X חותך את Y בנקודה E»;
+- the point-on sentence «E על X».
+
+**Decision.**
+1. **`lineObjectOperand`, one reader for a line-object operand.** The noun phrase is read by the rule that reads it as a sentence (`parseClause`), so the operand cannot mean anything its sentence does not. The point is then put on the line that sentence built, using one table keyed by what was built:
+   - `bisects` with no point → the same fact with `p` (the point is on the bisector's RAY, ADR-AG-209's lowering, so two bisectors of one triangle meet at the incentre);
+   - `cevian-of` with an apex → on the line through apex and foot;
+   - a drawn piece ending at a derived point → on that piece's line;
+   - `line-at` → on that line.
+
+   The objects are built idempotently, as their own sentences build them. A cevian named only by its side («הגובה לצלע BC») has no apex until M1 finds one. It is not read (`not-handled`), and 2-D does not read it either.
+2. **`incidenceOn` returns it as a third operand kind** (`{ t: 'object', facts }`). It is placed AFTER the tangent and AFTER the contextual «האנך»: ADR-AG-207 rules «האנך מ-P ל-X» a reference to the drawn perpendicular, however fully it is described. That ruling is kept. Whether a full description should build the perpendicular instead is filed as a question, #1727.
+3. **`parseIntersectionPlain` lowers an object operand** as it lowers a contextual one: the point is declared first, then each side's facts, then `crossing-distinct`. An ordinal over a line-object pair is `bad-operand`.
+4. **One object twice names no point.** Two operands that read as the same incidence are `repeated-vertex`. This is ADR-AG-213's tangent check («המשיק בנקודה A והמשיק בנקודה A»), now by its definition rather than by its noun. A pair of two-point lines keeps its sharper refusals: `self-crossing`, and `crossing-already-named`.
+5. **`meetFrame`, the one frame.** It reads the subject and the point, then tries every join («ו», «ו-», a clitic «ו» before a noun, «עם», English "and") left to right. The first split whose canonical crossing parses wins. An owned refusal of a split is the sentence's own. A subject no split reads is `null`, so the concurrency rule («הגבהים נפגשים») and the diagonal, extension and chord rules keep their sentences.
+   - It runs in the rule chain BEFORE `parsePerpendicular`.
+   - The clitic join admits ח ג ת («וחוצה», «וגובה», «ותיכון»).
+   - **What is retired onto it:** the meet branch that handled named lines (ADR-AG-213's «הישר AC והישר BD») and tangents, with the tangent-specific one-touch-point check. The plural «המשיקים בנקודות A ו-C נפגשים …» (`tangentsMeet`) already lowered to the same canonical sentence and still does. Its locks (`issue-1620-tangents-meet`, 14) are green unchanged.
+6. **The class reaches the other operand frames for free.** «E נקודת החיתוך של חוצה זוית B עם הגובה מ-A», «חוצה זוית B חותך את הגובה מ-A בנקודה E» and «E על חוצה זוית B» all build, with E on the lines. 2-D leaves each `not-handled`. They are locked in the test file. They are not parity rows; the frame's rows carry the 2-D gap.
+
+**Locks.** `src-analytic/__tests__/issue-1715-meet-frame.test.ts`, 56 tests. **Fails before: 52 of 56.** The 4 controls are the two retired named-line and tangent meets, the parallel refusal and the crossing-already-named refusal. They cover:
+- **the operator's three spellings** at 8 seeds: E equals `incentre(A, B, C)` (`engine/derived.ts`);
+- **four more spellings**: «ו-», «ב-E», «נחתכות», the noun form; plus English "the bisector of angle B and the bisector of angle C meet at E";
+- **the classical centres through the frame** at 8 seeds: two altitudes → `orthocentre`; two medians → `centroid`; two perpendicular bisectors → `circumcentre`; two drawn perpendiculars → `orthocentre`;
+- **the cross-product**: seven kinds (bisector of B; bisector of ACB; altitude from A; median from B; the drawn perpendicular from C to AB; perpendicular bisector of BC; line AM), every ordered pair, at 3 seeds. E satisfies each line's own defining residual (equal angles inside the angle, ⟂, collinear, equidistant). Pairs through one named point (the bisector of B and the median from B; the altitude from A and line AM) are excluded: they meet at that point;
+- **the retired rules**: named lines «נפגשים» = «נחתכים»; the two tangents; a tangent with a bisector;
+- **the refusals**: parallel named lines and parallel drawn perpendiculars are `unsatisfiable`; one object twice is `repeated-vertex`; a meet at a point the pair names is `crossing-already-named`; a side-only cevian is not read; an undrawn perpendicular asks (ADR-AG-207).
+
+**Parity** (`shell/__tests__/fixtures/geo-input-parity.ts`, 14 rows `meet-*-1715`):
+- **Parity with 2-D:** the operator's three spellings, a named line with a bisector, the parallel refusal.
+- **Analytic-ahead, 2-D gap #1677:** «נחתכים» with one-letter bisectors, «ב-E», a bisector with an altitude, an altitude with a median, two altitudes, two medians, two perpendicular bisectors, a bisector with a drawn perpendicular.
+- **Refused against 2-D's build, 2-D gap #1677:** one bisector twice.
+- **3-D:** every row carries #1679 (no cevians in its plane lane).
+
+All four parity locks are green. Catalog: two entries (F17), «חוצה זוית C וחוצה זוית B נפגשים בנקודה E» and «הגובה מ-A והתיכון מ-B נפגשים בנקודה E», each a parity step.
+
+**Not built, said out loud.**
+- **Stability.** Adding E re-solves the figure jointly and moves the triangle's free vertices. This is the #1687 property, shared by the plural «חוצי הזוויות … נפגשים» since ADR-AG-209. 2-D's meet point is derived and moves nothing.
+- **A crossing at a named point only the figure knows is not caught.** «חוצה זוית ABC והישר BF» (F on AC) puts E on B, and so does 2-D. This is the positional member of #1175 / ADR-AG-140, filed there.
+- **Two lines that coincide only in this configuration** («האנך האמצעי לצלע AB והאנך האמצעי לצלע CD» in a rectangle) build E free along the common line, as two equation lines that coincide do. Same family.
+- **«חוצה זוית C וחוצה זוית B נפגשים בנקודה E» on an EMPTY canvas** is `unknown-reference`, where 2-D asks which angle. Not a row.
+
+**Sibling audit.**
+- **2-D:** its frame is the per-kind one described above. Members recorded on #1677; not fixed here (different product).
+- **3-D:** has no cevians in the plane (#1679). Checked: none of these sentences builds there.
+
+**Consequences.** `parser/parseAnalytic.ts`: `ObjectOperand`, `LINE_OBJECT_NOUN`, `lineObjectOperand`, `incidenceOn`, `parseIntersectionPlain`, `meetFrame`, `INTERSECT_JOIN`, the rule chain, the point-on arm. Also `parser/catalogAnalytic.ts` (two entries) and the parity fixture.
+
 ## ADR-AG-225 — What the student stated is written on the figure, as 2-D writes it: the stated-measure layer, on one planar mark geometry hoisted to `shell/marks` (#1714)
 
 **Status:** accepted · 2026-10-03 · fix-round #1721, stream R5 item 1 (PR, base `main`). Operator report, playing round #1709 T5: *"when an angle or segment are given, we need to put those values on the segment or angle like the 2d tool does"*; the T6 comment adds that «tan∢BAO = 2» shows nothing. Rulings applied:
@@ -10553,7 +10688,7 @@ Two more items, built on top of ef942ea7:
 - a trig given is written as the ANGLE in degrees («63.43°», never «tan=2»; #1718/#1719, 2026-10-03);
 - x and y are never a length (ADR-AG-222 amendment), so a symbolic length uses another letter («3a»).
 
-**Requirements:** [02c](02c-requirements-analytic.md) R166. · **Design:** [04c](04c-design-analytic.md), "The stated-measure layer".
+**Requirements:** [02c](02c-requirements-analytic.md) R168. · **Design:** [04c](04c-design-analytic.md), "The stated-measure layer".
 
 **Class.** *A measure the student STATED is not visible on the figure.* This breaks the honesty invariant "everything the student stated is visible" (docs/17 §6) for every kind but one. The scene had one stated label, a segment pinned by a NUMBER (#1065, `FigureSegment.pinnedLength`). There was no angle mark of any kind, and the only knee was the answered perpendicular's (#1048).
 
@@ -10627,11 +10762,32 @@ Two more items, built on top of ef942ea7:
 - `src-analytic/engine/statedMeasures.ts` (new); `engine/derive.ts` (`Derivation.stated`); `engine/evaluate.ts` and `engine/lengths.ts` (`pinnedLength` retired); `engine/types.ts` (`definition`); `parser/parseAnalytic.ts` (the three definition sites).
 - `src-analytic/render/scene.ts` (`Scene.stated`, `statedScene`, the #1048 knee through the kit); `render/Figure.tsx` (the layer); `App.tsx` (the hand-off).
 
+### ADR-AG-225 amendment (2026-10-03, same PR #1724) — one label placement with #1717
+
+Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabels`). The canvas now has **one label placement path**: `placeSceneLabels` in `render/scene.ts`.
+- **What #1717 already did.** It placed a stated length clear of point labels, point dots, the axis label rows and drawn segments.
+- **What this branch had.** A second placement: fixed offsets for an angle value, an area and an arc.
+- **Now every stated value goes through `placeSceneLabels`, in ONE call with the lengths.**
+  - `placeLengthLabels` is a thin adapter over it (`lengthRequests`, which is #1717's outward-normal rule, unchanged).
+  - Each `statedScene` label is a `LabelRequest` (an anchor, a step direction and the text):
+    - an angle value starts just outside its arc on the wedge bisector, with up to 40 steps (a narrow wedge takes longer to clear its own arms);
+    - an area starts ON its centroid (reach 0);
+    - an arc's value starts on the arc and steps inward;
+    - a stated length whose segment is not drawn uses #1717's rule.
+  - Every value thus clears every other label, the lengths included.
+- **Measured on 9/4.** With two placements, ∢BAO's «63.43°» landed on AO's «3», and #1717's own lock caught it. With one, both clear.
+- **The placement box is the box the glyphs ink.** Each text is written 0.35 em below its centre (`Figure.tsx`), so the box is −0.45 em to +0.6 em around the centre, not ±0.5 em.
+- **One visual style.** The stated values are written exactly as the lengths are (`LENGTH_LABEL_FONT`, the figure's ink, `dy = 0.35em`). The marks keep the measure blue.
+- **The #1717 lock now passes `{ stated: d.stated }`**, as `App.tsx` does. A stated length comes from `Derivation.stated` since `pinnedLength` was retired.
+- **Requirement renumbered.** #1717 and #1715 took R166 and R167 on `main`, so this layer's requirement is **R168**.
+
+**Requirements:** R168 (renumbered from R166). **Design:** 04c — "The stated-measure layer" placement bullet: one call to `placeSceneLabels`.
+
 ## ADR-AG-226 — A data-panel row shows up to two values, through one value gate (#1716)
 
 **Status:** accepted · 2026-10-03 · fix-round #1721, stream R5 item 2 (PR stacked on #1714's). Operator report, playing T6 (471 9/4): *"the row of tan should have created a slope of 2 and it did not. not in the canvas and not in the data panel"*. **Operator ruling, 2026-10-03:** *"if there are 2 options, we always show up to 2 options. in this case, i think there would be only one"* — transcribed on #1716 as: one value as today; two values listed («2 או −2»); more than two keeps «—».
 
-**Requirements:** [02c](02c-requirements-analytic.md) R167. · **Design:** [04c](04c-design-analytic.md), "One value gate; up to two values".
+**Requirements:** [02c](02c-requirements-analytic.md) R169. · **Design:** [04c](04c-design-analytic.md), "One value gate; up to two values".
 
 **Class.** *A value the givens fix up to a discrete choice is printed as unknown.* The honesty gate asks "one value in every configuration", and a slope that is 2 in some and −2 in others failed it and printed «—», hiding what the student DID fix. The second question — "a small stable set" (`knownOptions`, #1036) — existed, but only the point rows (and the ask lane's `scalarText`) asked it, at a cap of FOUR. The parameter, slope, angle, length and equation rows never did.
 

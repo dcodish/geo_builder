@@ -1222,6 +1222,9 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'derived', family: 'F17', he: 'המשכי הצלעות AD ו-BC נפגשים בנקודה E', en: 'the extensions of sides AD and BC meet at E', needs: ['מרובע ABCD'] },
   { category: 'derived', family: 'F17', he: 'המשך AC חותך את מעגל O בנקודה E', en: 'the extension of AC cuts circle O at E', needs: ['מעגל O', 'משולש ABC'] },
   { category: 'derived', family: 'F17', he: 'האלכסונים AC ו-BD נפגשים בנקודה E', en: 'the diagonals AC and BD meet at E', needs: ['מרובע ABCD'] },
+  // #1715 (ADR-AG-224): one meet frame over every line-object — a bisector, a cevian from its apex, a perpendicular bisector
+  { category: 'derived', family: 'F17', he: 'חוצה זוית C וחוצה זוית B נפגשים בנקודה E', en: 'the bisector of angle C and the bisector of angle B meet at E', needs: ['משולש ABC'] },
+  { category: 'derived', family: 'F17', he: 'הגובה מ-A והתיכון מ-B נפגשים בנקודה E', en: 'the altitude from A and the median from B meet at E', needs: ['משולש ABC'] },
   { category: 'derived', family: 'F17', he: 'E היא נקודת החיתוך של אלכסוני הדלתון', en: 'E is the intersection of the diagonals of the kite', needs: ['דלתון ABCD'] },
   { category: 'lines', family: 'F17', he: 'האלכסון AC במרובע ABCD', en: 'diagonal AC of quadrilateral ABCD' },
   { category: 'derived', family: 'F17', he: 'קטע האמצעים לצלע BC במשולש ABC', en: 'midsegment to BC in triangle ABC' },
