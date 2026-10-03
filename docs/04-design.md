@@ -888,7 +888,9 @@ only, and the circle stays unnamed. The move travels as a `step-aside` bind that
 - «מעגל O» declares a new circle;
 - «C על מעגל O» names the unnamed circle by use through the ADR-347 seam. Two unnamed circles that
   `autosInterchangeable` finds interchangeable are named in order. That check reads a circle-circle crossing as an
-  unordered pair whose `branch` is seed (ruling (b), #1688). Otherwise it asks which circle.
+  unordered pair whose `branch` is seed (ruling (b), #1688). Otherwise it asks which circle. It compares the
+  construction's requirement records too ([ADR-567](06-decisions.md#adr-567), #1709): a stated containment drives
+  nothing and lives only there, so a nested pair is told apart and asks; a disjoint pair is an unordered relation.
 
 Naming places a free point. `nameCentreFacts` absorbs a target letter that nothing places. Such a point has only a
 bare `free-point` definition, is no shape's vertex, and is first used after the circle exists. Its bare
@@ -913,6 +915,24 @@ phrase }`. Because it is `parse`, every seam inherits it: the submit lane (`deci
 `input.scope.foreign-given`, quoting `phrase` ahead of the family's unchanged pointer, logged as
 `scope:<category>`), the ✎ edit seam, the scenario harness (`refusedSteps`) and log-triage. One vocabulary:
 the pre-parse guard and the post-failure register read the same `RULES` entries.
+
+## A trig function of an angle is decided whole, before any rule ([ADR-566](06-decisions.md#adr-566))
+
+`trigGiven` (`parser/parse.ts`) runs at the top of `parse()`, after the angle-alias rewrite and beside the
+proof-target and foreign-given guards, for their reason: a rule that reads part of the sentence commits a
+different given. A line in which tan / tg / cot / ctg / sin / cos (or «טנגנס» / «קוטנגנס» / «קוסינוס» /
+«סינוס», with a clitic prefix) is applied to an angle — an angle noun in the line, or a label right after the
+function — belongs to it whole. The one canonical shape (`trigLine`: [lead-in] FN [of|של] [(] [angle noun]
+LABELS [)] copula VALUE, the value read by the shared `NUMEXPR` atom, optionally signed) lowers to the arms'
+`segment`s plus a `measure-angle` whose `expr` is `{ value: <the angle in degrees>, text: '<fn>=<value as
+typed>' }` — the existing literal-measure path (`lowerOne` → `set-angle`; `measureLabelForms` prints `text`),
+so the figure shows the given and every downstream consumer sees an ordinary angle. tan / cot map through the
+principal angle and add 180° when negative; cos through `acos`. The transformed ratio is declared in
+`consumed.numbers` (ADR-462), so the numbers gates account «√3», «-2», «3/4». Anything else returns
+`{ ok: false, reason: 'trig-given', why, fn, sentence }` — `sine-two-angles` (checked first, in every form),
+`out-of-range`, or `form` — answered by `decideFromParse` with `input.trigGiven.<why>`; it never reaches the
+angle rules and never escalates. `NOTATION_WORDS` (units + the Latin function names) is the one list of
+Latin words the label-counting gates (`statedLabelTokens`, the span accountant) never read as point labels.
 
 ## A variable statement waits for its letter ([ADR-562](06-decisions.md#adr-562))
 
@@ -958,7 +978,9 @@ Refusals are `ParseResult` `role-claim` (`why`, the noun as typed, the pair), ma
 ## A stated side is a requirement record, checked at stage 0g′ ([ADR-549](06-decisions.md#adr-549))
 
 - **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`) — `circle-side`,
-  `polygon-side`, `line-side`. ONE definition of which commands state a side, `recordRequirement`
+  `polygon-side`, `line-side`, and since [ADR-567](06-decisions.md#adr-567) (#1709) `circle-position`: two circles'
+  stated containment or disjointness (`set-circle-position`, never the unstated bare-pair variant). The side prover
+  skips it; `autosInterchangeable` reads it. ONE definition of which commands state a side, `recordRequirement`
   (`engine/requirements.ts`), is called by `applyCommand` (so every probe carries the records) and by
   `applyStep` / `applyCoupledStep`'s single `withRequirements` stamp on an accepted result — so a record
   survives every ladder rebuild (M1 reinterpretations, recruiter trials, ownership passes) without any of

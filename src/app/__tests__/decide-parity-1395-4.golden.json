@@ -142,6 +142,8 @@
  "scenario:chord-and-diameter-as-relation-operands-1661": "cb14134ec6ad24a2",
  "scenario:chord-claim-contradiction-refused-in-every-spelling-1668": "89022a62bfbce06d",
  "scenario:hidden-centre-letter-steps-aside-1673": "e80001ee186c5dce",
+ "scenario:trig-given-is-a-ratio-1698": "217e8c2669e7846b",
+ "scenario:nested-circles-new-letter-asks-1709": "798df55ca2452855",
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",
  "fixture:defining-interaction.geo.json": "453b283f490e90b0",
  "fixture:equilateral-inscribed.geo.json": "d8a2b3c24fc515b8",

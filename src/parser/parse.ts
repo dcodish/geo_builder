@@ -68,6 +68,10 @@ export type ParseResult =
   // `sentence` is the proof sentence as typed. The submit gate refuses it before the parser
   // (`decidePreParse`); this is the same shared rule at the one boundary every other seam reads.
   | { ok: false; reason: 'proof-target'; sentence: string }
+  // #1698 (ADR-566): a trigonometric function of an angle («sin∢ACB = 3/4», «cos∢B = 2», «tan∢B > 1»)
+  // that `trigGiven` cannot lower to exactly one angle. Refused naming the function, never handed to an
+  // angle rule (which read it as degrees) and never escalated. `fn` is the student's own spelling.
+  | { ok: false; reason: 'trig-given'; why: TrigRefusal; fn: string; sentence: string }
   // #1274 (operator ruling, ADR-W-066): «D = חיתוך AB ו-BC» — the two carriers the student named share a
   // letter, so their crossing IS that letter, in every configuration, with no solve, no seed and no
   // tolerance. The geometry is right and only the NAME is wrong: there is no new point to make. Refused
@@ -2414,8 +2418,14 @@ function angleValueOf(stripped: string): AngleValue | null {
   // ALIAS, #267) used to read the "1" of "A1" as value 1° and silently set ∠CAD=1°. The lookbehind keeps
   // this from grabbing a digit glued to a preceding letter (a subscripted label), so such input falls
   // through to `angleAliasRule` / an honest escalation instead of a silent wrong given.
-  const numM = stripped.match(new RegExp(String.raw`(?<![A-Za-z])` + num));
-  if (numM) return { kind: 'num', value: parseFloat(numM[1]), rest: stripped.replace(numM[0], ' ') };
+  // #1698 (ADR-566): a QUOTIENT is one value. «∢ABC = 90/2» used to read its numerator alone (90°) and
+  // leave «/2» behind, unread — the same truncation that drew «cos∢ACB = 3/4» as 3°.
+  const numM = stripped.match(new RegExp(String.raw`(?<![A-Za-z])` + num + String.raw`(?:\s*\/\s*` + num + ')?'));
+  if (numM) {
+    const den = numM[2] !== undefined ? parseFloat(numM[2]) : 1;
+    if (den === 0) return null;
+    return { kind: 'num', value: parseFloat(numM[1]) / den, rest: stripped.replace(numM[0], ' ') };
+  }
   return null;
 }
 
@@ -3147,6 +3157,106 @@ type MeasureSide = { terms: MeasureTerm[]; constant: number };
 
 const ARC_KW = /arcs?|הקשת|קשת|⌢|⏜/i;
 const ANGLE_KW = /angle|∠|∢|הזוו?ית|זוו?ית/i;
+
+// ── A trigonometric function OF an angle (#1698, ADR-566) ────────────────────────────────────────
+//
+// «tan∢ABC = 2» states a RATIO, never a number of degrees. No rule read the function word: every
+// value-bearing angle rule found its angle keyword, skipped the unknown «tan» / «cos» / «טנגנס» in
+// front of it, took the first standalone number for the angle and committed `set-angle 2` — a 2°
+// figure drawn green for a given nobody stated (and «3/4» additionally lost its «/4»). The class is
+// "a function of an angle read as the angle", and a function word is invisible to every angle rule
+// by construction, so the fix is not a guard in each of them: it is ONE decision taken before any
+// rule runs (the `foreignGiven` / proof-target placement, for the same reason — a partial reading of
+// the sentence is a different, wrong given). A line that applies a trig function to an angle belongs
+// to `trigGiven` WHOLE: it either lowers the exact canonical form or is refused by name. It never
+// returns the line to the angle rules, and it never escalates (the model would only guess a reading
+// the grammar already knows to be ambiguous or out of range).
+//
+// The lowering. tan and cos are one-to-one on an angle's range (0°, 180°) — tan through its sign
+// (positive acute, negative obtuse), cos outright — so a value fixes ONE angle, a `measure-angle`
+// whose value is that angle in degrees and whose `text` is the student's own given, so the figure
+// prints «tan=2», never a computed 63.43° (canvas = inputs, ADR-W-047). cot is 1/tan. sin is NOT
+// one-to-one there (sin θ = sin(180° − θ)): the line is refused, naming the two angles, until a
+// cyclable acute/obtuse choice exists (follow-up issue). A cosine outside [−1, 1] has no angle.
+const TRIG_FN_EN = String.raw`(?<![A-Za-z])(?<en>tan|tg|ctg|cotg|cot|sin|cos)(?![A-Za-z])|(?<![A-Za-z])(?:the\s+)?(?<enw>tangent|cotangent|sine|cosine)\s+of(?![A-Za-z])`;
+const TRIG_FN_HE = String.raw`(?<![א-ת])[ושהלבמכ]{0,3}(?<he>קוטנגנס|קוסינוס|טנגנס|סינוס)(?![א-ת])`;
+type TrigFn = 'tan' | 'cot' | 'sin' | 'cos';
+const trigFnOf = (w: string): TrigFn => {
+  const k = w.toLowerCase();
+  if (/^(?:tan|tg|tangent|טנגנס)$/.test(k)) return 'tan';
+  if (/^(?:ctg|cotg|cot|cotangent|קוטנגנס)$/.test(k)) return 'cot';
+  if (/^(?:sin|sine|סינוס)$/.test(k)) return 'sin';
+  return 'cos';
+};
+let trigFnRe: RegExp | null = null;
+let trigLineRe: RegExp | null = null;
+/**
+ * The ONE canonical shape a trig given lowers from: [given-lead-in] FN [of|של] [(] [angle noun] LABELS [)]
+ * copula VALUE — the angle by one vertex or three letters, the value any concrete value the shared
+ * {@link NUMEXPR} atom reads (a fraction «3/4», a radical «√3», a decimal), optionally signed.
+ */
+const trigLine = (): RegExp =>
+  (trigLineRe ??= new RegExp(
+    String.raw`^(?:(?:נתון|ידוע)(?:\s+(?:ש-?|כי))?\s*:?\s*|given\s*(?:that\s+)?:?\s*)?(?:${TRIG_FN_EN}|${TRIG_FN_HE})\s*(?:(?:of|של)\s+)?(?:the\s+)?\(?\s*(?:${ANGLE_KW.source})?\s*(?<lab>(?:${ULABEL}\s*){1,3}|${LABEL})\s*\)?\s*(?:=|(?:הוא|היא|שווה)(?:\s*ל-?)?|is(?:\s+equal\s+to)?|equals)\s*(?<sg>[-−])?\s*${NUMEXPR('tv')}\s*\.?$`,
+    'iu',
+  ));
+
+/** Why a trig line is refused — the note names the student's function and, where it helps, the value. */
+export type TrigRefusal = 'sine-two-angles' | 'out-of-range' | 'form';
+
+/**
+ * Decide a line that applies a trigonometric function to an angle. `null` = the line has no such
+ * application (no trig function next to an angle), and the rules run as before.
+ */
+function trigGiven(s: string, ctx: ParseContext): ParseResult | null {
+  trigFnRe ??= new RegExp(`${TRIG_FN_EN}|${TRIG_FN_HE}`, 'iu');
+  const fnM = s.match(trigFnRe);
+  if (!fnM) return null;
+  // A function word with no angle after it is not this decision's: «sin 30» is out of scope, «משפט
+  // הסינוסים» is a theorem name (the scope gate owns both). An angle is either named by the angle noun
+  // or is the label the function is applied to («tan B = 2»).
+  const after = s.slice(fnM.index! + fnM[0].length);
+  const appliedToLabel = new RegExp(String.raw`^\s*(?:(?:of|של)\s+)?(?:the\s+)?\(?\s*${ULABEL}`, 'u').test(after);
+  if (!ANGLE_KW.test(s) && !appliedToLabel) return null;
+  const word = fnM.groups!.en ?? fnM.groups!.enw ?? fnM.groups!.he ?? '';
+  const fn = trigFnOf(word);
+  const shown = /[א-ת]/.test(word) || /^(?:tangent|cotangent|sine|cosine)$/i.test(word) ? fn : word.toLowerCase();
+  const refuse = (why: TrigRefusal): ParseResult => ({ ok: false, reason: 'trig-given', why, fn: shown, sentence: s });
+  // A sine names two angles in EVERY form, so it is refused before the form is read — the form note
+  // would teach a spelling that is refused too (memory: taught remedies must drive the spelling).
+  if (fn === 'sin') return refuse('sine-two-angles');
+  const m = s.match(trigLine());
+  if (!m) return refuse('form');
+  const g = m.groups as Record<string, string | undefined>;
+  const magnitude = numexprVal(g, 'tv');
+  if (!magnitude) return refuse('form');
+  const v = (g.sg ? -1 : 1) * magnitude.value;
+  const deg = (r: number): number => (r * 180) / Math.PI;
+  let value: number;
+  if (fn === 'cos') {
+    if (Math.abs(v) > 1) return refuse('out-of-range');
+    value = deg(Math.acos(v));
+  } else {
+    // tan / cot over (0°, 180°): the principal angle of the ratio, moved into (90°, 180°) when negative.
+    const t = fn === 'tan' ? v : null;
+    const principal = t !== null ? deg(Math.atan(t)) : v === 0 ? 90 : deg(Math.atan(1 / v));
+    value = principal < 0 ? 180 + principal : principal;
+  }
+  const arms = angleArms(g.lab ?? '', ctx);
+  if (!arms) return refuse('form');
+  if ('clarify' in arms) return arms.clarify === 'ambiguous-angle' ? { ok: false, reason: 'ambiguous-angle', vertex: arms.vertex } : refuse('form');
+  const text = `${shown}=${g.sg ? '-' : ''}${magnitude.text}`;
+  return {
+    ok: true,
+    commands: [
+      { type: 'segment', a: arms.vertex, b: arms.ray1 },
+      { type: 'segment', a: arms.vertex, b: arms.ray2 },
+      // The stated ratio is TRANSFORMED (2 → 63.43°), so the rule declares it consumed (#784, ADR-462):
+      // the numbers gates then account the student's «√3» / «-2» / «3/4» against this command.
+      { type: 'measure-angle', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2, expr: { value, text }, consumed: { numbers: [v] } },
+    ],
+  };
+}
 /**
  * The additive joiner between measure terms: `+` and the true minus `−` unconditionally; the ASCII
  * HYPHEN only when flanked by measure-ish material — a Hebrew conjunction/preposition hyphen
@@ -11024,6 +11134,11 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
     const re = new RegExp(String.raw`((?:angle|∠|∢|ה?זוו?ית)\s*)${al.name}(?![A-Za-z\d])`, 'gi');
     s = s.replace(re, `$1${al.ray1}${al.vertex}${al.ray2}`);
   }
+  // #1698 (ADR-566): a trig function of an angle is decided WHOLE before any angle rule can read the
+  // line (they skipped the function word and took the ratio for degrees). After the alias rewrite, so
+  // «tan∢A1 = 2» names the aliased angle.
+  const trig = trigGiven(s, ctx);
+  if (trig) return withReservedGuard(trig, ctx);
   // «המעגל הגדול/הקטן» between two INDEPENDENT circles (issue #102, operator ruling): the size
   // qualifier both REFERS and ASSERTS — resolve the reference to a concrete circle (recorded roles
   // first, else assign by the drawn sizes) and, on a first ASSIGNING use, append the R>r-like
@@ -11706,11 +11821,17 @@ function augmentParseCtx(ctx: ParseContext, cmds: AnyCommand[]): ParseContext {
  *    evidence, so English lowercase labels teach rather than silently commit too.
  */
 const UNIT_WORDS = new Set(['cm', 'mm']);
+/**
+ * #1698 (ADR-566): Latin NOTATION words that are never a run of point labels — the units above and the
+ * trigonometric function names `trigGiven` reads («נתון: tan∢ABC = 2» is not the points T, A, N). One
+ * list, read by every gate that asks which labels a text states (this file's and the span accountant's).
+ */
+export const NOTATION_WORDS: ReadonlySet<string> = new Set([...UNIT_WORDS, 'tan', 'tg', 'ctg', 'cotg', 'cot', 'sin', 'cos']);
 const hasHebrewScript = (s: string): boolean => /[א-ת]/.test(s);
 /** Standalone Latin runs that CONTAIN a lowercase letter (boundaries exclude digit-glued expression
  *  tokens like «18r»). The raw runs, case preserved — callers decide scope and canonicalization. */
 const lowercaseLabelRuns = (s: string): string[] =>
-  (s.match(/(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g) ?? []).filter((run) => !UNIT_WORDS.has(run.toLowerCase()));
+  (s.match(/(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g) ?? []).filter((run) => !NOTATION_WORDS.has(run.toLowerCase()));
 /**
  * #1673 ([ADR-565](../../docs/06-decisions.md#adr-565)) — the point letters the student TYPED: every Latin word that
  * is a run of labels («BO», «S_{CKE}», «2CE» → C, E), split into its labels. An English word («Point», «The») is not a

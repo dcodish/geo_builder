@@ -1001,7 +1001,12 @@ export type Constraint =
 export type SideRequirement =
   | { kind: 'circle-side'; id: Id; circle: Id; side: 'inside' | 'outside' }
   | { kind: 'polygon-side'; id: Id; poly: Id[]; side: 'inside' | 'outside' }
-  | { kind: 'line-side'; a: Id; b: Id; subjects: Id[]; rel: 'different' | 'same' };
+  | { kind: 'line-side'; a: Id; b: Id; subjects: Id[]; rel: 'different' | 'same' }
+  /** Two circles' stated MUTUAL POSITION (#196 «זרים» / «מוכל בתוך»; #1709, ADR-567): `a` contains `b`, or the
+   *  pair is disjoint (unordered). Recorded so the figure itself says which circle holds which — before, the
+   *  statement lived only in its fact command, and the interchangeable-pair test (`autosInterchangeable`)
+   *  read a nested pair as two identical circles. The unstated bare-pair variant (`relation: 'any'`) records nothing. */
+  | { kind: 'circle-position'; relation: 'contained' | 'disjoint'; a: Id; b: Id };
 
 export interface Construction {
   objects: GeoObject[];
