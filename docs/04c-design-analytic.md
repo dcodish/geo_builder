@@ -1067,6 +1067,35 @@ seeded positions are SWAPPED. After the solve, a converged solution with the pai
 swapped restart (`swappedStarts`) beside the deflation restarts of ADR-AG-159 — the kite's B and D are
 interchangeable roots, so the swap is one polish away. The post-hoc judge keeps the last word.
 
+### An order between measures ([ADR-AG-216](06c-decisions-analytic.md#adr-ag-216), #1621 D3)
+
+**The data.** «AB < BC», «AB ≤ 10», «∢ABC < ∢BAC», «זווית ABC קהה» lower to `sign {q: {k: 'order', left, right}, positive, closed?}`, a selector (D7 kind 2) over `left − right`.
+- Each side is an `OrderSide`: a `length` (`LengthExpr`, with segments and areas only), a three-letter `angle` (in degrees), or a `value`.
+- `positive` means the left side is the larger.
+- `closed` admits zero (≤ ≥ «לפחות» «לכל היותר»).
+- Acuteness is the order against 90°.
+- A window is two orders.
+
+**The parser.** `parseOrder` (`parseAnalytic.ts`) runs right after `parseCompare`.
+- It reads the symbolic operators, the Hebrew «גדול/קטן מ-» and «לפחות/לכל היותר», and the English "greater/less/longer/shorter than" and "at least/at most".
+- Each side goes through the length reader with role nouns (`lengthRoles`), so it means what it means in «AB = …».
+- It declines a lone vertex, a point-to-line distance, two values, and «פי».
+- It refuses a length beside an angle (`bad-operand`).
+
+**The judge.** `orderQuantity` (`evaluate.ts`) measures each side with the `length-eq` and `angle` residuals' own readers (`evalLengthExpr`, `angleAt`). A difference within `SOLVE_RESOLUTION`·max(1, |l|, |r|) of zero is on the boundary. `signHolds` is the one test the judge and the seeding share.
+
+**The seeding.** `seedOrder` runs after the coordinate-compare seeding. Where the seeded start violates the order, it moves one free point of the first side that has one:
+- a single length's free end slides along the segment;
+- an angle's free ray turns about the vertex, keeping its length and its side.
+
+The point moves to a value a seed-varied fraction `u ∈ [0.15, 0.65]` into the region, relative to the other side. The judge keeps the last word.
+
+**Minting.** `mintedByReference` treats an order whose sides are plain lengths, angles or values as a minting form (`orderMints`), as its equality twin is.
+
+**Apply.** The selector's refs are every point either side measures (`lengthRefs`, the angle's three letters).
+
+**`HE_POINT`.** The subject token reads `ה?(?:נקוד(?:ה|ות)|קו?דקוד)`. The coordinate rules (`HE_COORD`, `HE_RHS_COORD`, `COMPONENT_HE`), `BISECTORS_MEET_HE` and `PERP_FOOT_HE` use it instead of an inline «ה?נקודה».
+
 ## Born after the chassis
 
 This is the **first builder created after `shell/` existed**, and the difference shows in what it did

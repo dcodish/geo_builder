@@ -19,7 +19,7 @@
  *
  * The 2-D chips whose sentences analytic does not read yet — measured, and locked as still refused in
  * `symbols-module.test.ts`, so the day one parses the lock goes red and the chip is owed:
- * `S_{}` and `<` between two measures (slice D, #1621);
+ * `S_{}` (slice D, #1621 — stream D1);
  * `△` `≅` `~` and `⌢{}` (slice E, #1622). A chip inserting a character the grammar then refuses
  * hands the student `not-handled` on their own click, so each joins in its notation's own PR.
  * `xⁿ` is not offered: `²` and `³` cover the exam's powers and `^` is on every keyboard.
@@ -72,4 +72,9 @@ export const SYMBOLS: readonly SymbolSpec[] = [
   { label: 'γ', titleKey: 'symGamma', before: 'γ' },
   { label: 'δ', titleKey: 'symDelta', before: 'δ' },
   { label: 'θ', titleKey: 'symTheta', before: 'θ' },
+  /**
+   * #1621 D3 (ADR-AG-216) — 2-D's `<`, now that analytic reads an ORDER between two measures («AB < BC», «∢ABC < ∢BAC»)
+   * and a bound («AB < 10»). `≤` and `≥` above serve the same sentences, with the boundary admitted.
+   */
+  { label: '<', titleKey: 'symLt', before: '<' },
 ];

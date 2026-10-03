@@ -15,13 +15,13 @@ import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Co
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
-import { pairKey, pinnedLengths } from './lengths';
+import { evalLengthExpr, pairKey, pinnedLengths } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
-import { dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
+import { angleAt, dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
-import { curveByName, inDomain, isFree, objectById, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type Selector } from './types';
+import { curveByName, inDomain, isFree, objectById, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type OrderSide, type Selector } from './types';
 
 export interface FigurePoint {
   id: Id;
@@ -803,7 +803,7 @@ function crossingSiblings(c: Construction, id: Id, at: Map<Id, Pt>): Id[] {
  * never reads as "outside" by a rounding error. `null` when something it needs is not placed.
  */
 export function circleQuantity(
-  q: Exclude<Extract<Selector, { kind: 'sign' }>['q'], { k: 'slope' }>,
+  q: Exclude<Extract<Selector, { kind: 'sign' }>['q'], { k: 'slope' } | { k: 'order' }>,
   at: (id: Id) => Pt | null,
   curveAt: (id: Id) => NumCurve | null,
 ): number | null {
@@ -821,6 +821,39 @@ export function circleQuantity(
 }
 
 /**
+ * AN ORDER'S DIFFERENCE at this configuration (#1621 D3, ADR-AG-216) — `left − right`, each side measured by the
+ * function its equality twin is measured by: a length expression by `evalLengthExpr` (the `length-eq` residual's own
+ * reader), an angle by `angleAt` (the `angle` residual's), in degrees. A difference within the solver's resolution of
+ * zero, relative to the two sides, is ON the boundary and reads as 0 — so «AB < BC» on a figure with AB = BC is
+ * refused rather than passed on a rounding, and «AB ≤ BC» there holds. `null` when an operand is not placed.
+ */
+export function orderQuantity(
+  q: Extract<Extract<Selector, { kind: 'sign' }>['q'], { k: 'order' }>,
+  at: (id: Id) => Pt | null,
+  env: Env,
+  lineAt?: (name: string) => NamedLine | null,
+): number | null {
+  const side = (o: OrderSide): number | null => {
+    if (o.t === 'value') {
+      const v = evalExpr(o.value, env);
+      return Number.isFinite(v) ? v : null;
+    }
+    if (o.t === 'length') return evalLengthExpr(o.le, at, env, lineAt);
+    const v = at(o.at.v);
+    const a = at(o.at.a);
+    const b = at(o.at.b);
+    if (!v || !a || !b) return null;
+    const theta = angleAt(v, a, b);
+    return theta === null ? null : (theta * 180) / Math.PI;
+  };
+  const l = side(q.left);
+  const r = side(q.right);
+  if (l === null || r === null) return null;
+  const d = l - r;
+  return Math.abs(d) <= SOLVE_RESOLUTION * Math.max(1, Math.abs(l), Math.abs(r)) ? 0 : d;
+}
+
+/**
  * Which side of the vertex `p` is on, relative to the angle (a, v, b) (#1284, ADR-AG-209): the projection of `p − v`
  * on the internal bisector's direction (the sum of the two unit rays) — positive on the angle's side, negative on the
  * opposite ray's. `null` when an operand is unplaced or a ray has no length (nothing to judge).
@@ -833,6 +866,72 @@ function angleSideOf(p: Pt, v: Pt | undefined, a: Pt | undefined, b: Pt | undefi
   const dx = (a.x - v.x) / la + (b.x - v.x) / lb;
   const dy = (a.y - v.y) / la + (b.y - v.y) / lb;
   return (p.x - v.x) * dx + (p.y - v.y) * dy;
+}
+
+/** Does a sign selector's quantity sit on its named side — the judge's own test, shared with the seeding below. */
+const signHolds = (s: Extract<Selector, { kind: 'sign' }>, q: number): boolean =>
+  s.positive ? (s.closed ? q >= 0 : q > 0) : s.closed ? q <= 0 : q < 0;
+
+/**
+ * Move ONE free point so the order holds at the start (#1621 D3, ADR-AG-216) — see the seeding loop in
+ * `evaluateUncached`. The side that moves is the first one with a free point to move: a single length (one end
+ * slides along the segment) or an angle (one ray turns about the vertex, keeping its length and its side). Its
+ * target is `u` of the way into the region from the other side's value — for a length a factor (1 ± u), for an
+ * angle a fraction of the room left before 0° or 180°. A side it cannot move, or a region with no room, is left
+ * alone: the judge decides.
+ */
+function seedOrder(
+  s: Extract<Selector, { kind: 'sign' }>,
+  q: Extract<Extract<Selector, { kind: 'sign' }>['q'], { k: 'order' }>,
+  seeded: Map<Id, Pt>,
+  posOf: (id: Id) => Pt | null,
+  env: Env,
+  u: number,
+): void {
+  const now = orderQuantity(q, posOf, env);
+  if (now === null || signHolds(s, now)) return;
+  const valueOf = (o: OrderSide): number | null => {
+    const one = { k: 'order' as const, left: o, right: { t: 'value' as const, value: { kind: 'num' as const, value: 0 } } };
+    return orderQuantity(one, posOf, env);
+  };
+  for (const [mine, other, up] of [
+    [q.left, q.right, s.positive],
+    [q.right, q.left, !s.positive],
+  ] as const) {
+    const o = valueOf(other);
+    if (o === null) continue;
+    if (mine.t === 'length') {
+      const t = mine.le.terms[0];
+      if (mine.le.terms.length !== 1 || mine.le.expr.kind !== 'sym' || !t || (t.kind !== undefined && t.kind !== 'length')) continue;
+      const [fixed, mover] = seeded.has(t.b) ? [t.a, t.b] : seeded.has(t.a) ? [t.b, t.a] : [null, null];
+      if (!fixed || !mover) continue;
+      const f = posOf(fixed);
+      const m = seeded.get(mover)!;
+      if (!f) continue;
+      if (!up && !(o > 0)) continue; // a length below a non-positive value: no room
+      const w = up ? Math.max(o, 0) * (1 + u) + (o > 0 ? 0 : u) : o * (1 - u);
+      const d = Math.hypot(m.x - f.x, m.y - f.y);
+      const [ux, uy] = d > 1e-9 ? [(m.x - f.x) / d, (m.y - f.y) / d] : [1, 0];
+      seeded.set(mover, { x: f.x + ux * w, y: f.y + uy * w });
+      return;
+    }
+    if (mine.t === 'angle') {
+      const { v, a, b } = mine.at;
+      const [fixed, mover] = seeded.has(b) && b !== v ? [a, b] : seeded.has(a) && a !== v ? [b, a] : [null, null];
+      if (!fixed || !mover) continue;
+      const pv = posOf(v);
+      const pf = posOf(fixed);
+      const m = seeded.get(mover)!;
+      if (!pv || !pf) continue;
+      if ((up && o >= 180) || (!up && o <= 0)) continue; // no room on the named side
+      const w = ((up ? o + u * (180 - Math.max(o, 0)) : Math.min(o, 180) * (1 - u)) * Math.PI) / 180;
+      const r = Math.hypot(m.x - pv.x, m.y - pv.y) || Math.hypot(pf.x - pv.x, pf.y - pv.y) || 1;
+      const side = (pf.x - pv.x) * (m.y - pv.y) - (pf.y - pv.y) * (m.x - pv.x) < 0 ? -1 : 1;
+      const phi = Math.atan2(pf.y - pv.y, pf.x - pv.x) + side * w;
+      seeded.set(mover, { x: pv.x + r * Math.cos(phi), y: pv.y + r * Math.sin(phi) });
+      return;
+    }
+  }
 }
 
 function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[] {
@@ -850,6 +949,12 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
      */
     if (s.kind === 'sign') {
       const atFn = (id: Id) => at.get(id) ?? null;
+      /** AN ORDER (#1621 D3, ADR-AG-216) — strict unless the student wrote ≤ / ≥ (`closed`). */
+      if (s.q.k === 'order') {
+        const q = orderQuantity(s.q, atFn, env, lineAtOf(c, env, atFn));
+        if (q === null) return true; // an operand not placed judges nothing, as below
+        return signHolds(s, q);
+      }
       if (s.q.k !== 'slope') {
         const q = circleQuantity(s.q, atFn, curveAtOf(c, env, atFn));
         if (q === null) return true; // an operand not placed (or a vacant circle) judges nothing, as below
@@ -1534,6 +1639,22 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
     const want = v + (sel.greater ? mag : -mag);
     seeded.set(sel.id, sel.axis === 'x' ? { x: want, y: at0.y } : { x: at0.x, y: want });
   }
+  /**
+   * …and an ORDER seeds its measure INTO ITS REGION (#1621 D3, ADR-AG-216) — the #1071 lesson for a measure.
+   *
+   * «AB ≥ 10», «∢ABC ≥ 150°», «AB < BC» on a free figure are regions of the measure, and sample-and-reject is the
+   * wrong mechanism for a region: measured before this, a free triangle with «∢ABC ≥ 150°» was refused at seeds 0–2
+   * (no configuration inside the window held it) while seed 3 drew it — a satisfiable figure refused — and «AB ≥ 10»
+   * drew the ONE configuration the walk found at every seed. So where the seed put the measure on the wrong side, the
+   * sampler is told which side: one free end of a length moves along its own segment, one free ray of an angle turns
+   * about the vertex, to a value a seed-varied fraction into the region — relative to the bound, so it states no
+   * magnitude (ADR-052) and «הציגו תצורה אחרת» still moves it. A start, never a verdict: the solve may move it and
+   * the judge keeps the last word.
+   */
+  c.selectors.forEach((s0, i) => {
+    if (s0.kind !== 'sign' || s0.q.k !== 'order') return;
+    seedOrder(s0, s0.q, seeded, (id) => seeded.get(id) ?? pointAtId(c, env, id), env, 0.15 + 0.5 * jitter(seed, 1621 + i));
+  });
   /**
    * AN EXTENSION SEEDS ITS POINT PAST THE END (#1620, ADR-AG-208) — the #1071 lesson for `beyond`.
    *

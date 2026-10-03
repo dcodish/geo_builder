@@ -118,6 +118,7 @@ const he = {
   symGamma: 'גמא — שם של זווית',
   symDelta: 'דלתא — שם של זווית',
   symTheta: 'תטא — שם של זווית',
+  symLt: 'קטן מ',
   // A vertical segment HAS no slope, and that is an answer rather than an absence (#1078).
   slopeVertical: 'אנכי (אין שיפוע)',
   // #1322 — the angle a line makes with the positive x-axis, beside its slope (m = tan α)
@@ -521,6 +522,7 @@ const en: typeof he = {
   symGamma: 'gamma — an angle’s name',
   symDelta: 'delta — an angle’s name',
   symTheta: 'theta — an angle’s name',
+  symLt: 'less than',
   slopeVertical: 'vertical (no slope)',
   angleWithX: 'angle with the x-axis',
   secParams: 'Parameters',

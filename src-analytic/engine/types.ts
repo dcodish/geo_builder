@@ -27,7 +27,7 @@
  * representation, not two.
  */
 import type { DerivedRule, FootLine } from './derived';
-import type { AngleName, Constraint, Direction, TangentLineRef } from './solve';
+import type { AngleName, AngleRef, Constraint, Direction, TangentLineRef } from './solve';
 import type { Expr } from './expr';
 import type { LengthExpr } from './lengths';
 import { lineIdOf, numeralCurveId } from './names';
@@ -862,7 +862,16 @@ export type Selector =
    * one home. A slope is its first member; a length, an area or a coordinate would be further members
    * with their own reader, never a fourth value keyword in the slope rule (the #1201 shape).
    */
-  | { kind: 'sign'; q: Quantity; positive: boolean }
+  | {
+      kind: 'sign';
+      q: Quantity;
+      positive: boolean;
+      /**
+       * «AB ≤ 10» · «∢ABC ≥ 40°» — the BOUNDARY is admitted (#1621 D3, ADR-AG-216): the quantity may be zero.
+       * Absent ⇒ strict, which is what every word form («גדול מ», «קהה») and every earlier sign meant.
+       */
+      closed?: true;
+    }
   /**
    * «x_B > x_D» · «שיעור ה-x של B גדול משיעור ה-x של D» · «y_A < 0» — A COORDINATE COMPARED (#1462, ADR-AG-161).
    *
@@ -909,7 +918,22 @@ export type Selector =
 export type Quantity =
   | { k: 'slope'; u: Direction }
   | { k: 'power'; p: Id; circle: Id }
-  | { k: 'arc-side'; p: Id; a: Id; b: Id; circle: Id };
+  | { k: 'arc-side'; p: Id; a: Id; b: Id; circle: Id }
+  /**
+   * «AB < BC» · «DC > AB» · «AB ≤ 10» · «∢ABC < ∢BAC» · «זווית ABC קהה» — AN ORDER BETWEEN TWO MEASURES, or a
+   * measure and a value (#1621 D3, ADR-AG-216): the quantity is `left − right`. 2-D reads it as a region the
+   * figure must lie in (ADR-039 / ADR-390: it "removes no DOF"), which is D7's kind 2 here — a selector over the
+   * derived difference, the member this union's docblock reserved for "a length, an area" rather than a fourth
+   * selector kind. Both sides are the same KIND (the parser pairs a length with a length or a number, an angle
+   * with an angle or a number of degrees).
+   */
+  | { k: 'order'; left: OrderSide; right: OrderSide };
+
+/**
+ * One side of a stated ORDER (#1621 D3, ADR-AG-216): a length expression (`lengths.ts`: segments and areas — the
+ * measures `length-eq` already equates), a three-letter angle in DEGREES, or a plain value.
+ */
+export type OrderSide = { t: 'length'; le: LengthExpr } | { t: 'angle'; at: AngleRef } | { t: 'value'; value: Expr };
 
 export const EMPTY_CONSTRUCTION: Construction = {
   params: [],

@@ -47,6 +47,7 @@ import {
   type Fact,
   type GeoObject,
   type Id,
+  type OrderSide,
   type PointObject,
   type PolygonObject,
 } from './types';
@@ -2799,7 +2800,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
                 ? dirRefs(f.sel.q.u)
                 : f.sel.q.k === 'power'
                   ? [f.sel.q.p]
-                  : [f.sel.q.p, f.sel.q.a, f.sel.q.b]
+                  : f.sel.q.k === 'order'
+                    ? // Every point either side measures (#1621 D3) — a vertex of an angle, an end of a length.
+                      [f.sel.q.left, f.sel.q.right].flatMap((o) => (o.t === 'length' ? lengthRefs(o.le) : o.t === 'angle' ? [o.at.v, o.at.a, o.at.b] : []))
+                    : [f.sel.q.p, f.sel.q.a, f.sel.q.b]
               : f.sel.kind === 'coord-compare'
                 ? // Both points of «x_B > x_D» must exist (#1462); a value names none.
                   [f.sel.id, ...('point' in f.sel.rhs ? [f.sel.rhs.point] : [])]
@@ -2819,7 +2823,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(c, f.sel.q.u.id) };
       }
       // A circle region names the circle M1 resolved (#1619 B1) — it must still be one.
-      if (f.sel.kind === 'sign' && f.sel.q.k !== 'slope') {
+      if (f.sel.kind === 'sign' && (f.sel.q.k === 'power' || f.sel.q.k === 'arc-side')) {
         const o = objectById(c, f.sel.q.circle);
         if (!o || curveKindOf(o) !== 'circle') return { ok: false, error: unknownRef(c, f.sel.q.circle) };
       }
@@ -3367,6 +3371,9 @@ function plainLengthSide(e: Expr): boolean {
  */
 function mintedByReference(f: Fact): Id[] {
   if (f.t === 'derived') return f.rule.t === 'midpoint' ? [f.rule.a, f.rule.b] : [];
+  // An ORDER (#1621 D3, ADR-AG-216) mints as its equality twin does: 2-D draws «AB < BC»'s two segments, «AB ≤ 10»'s
+  // one, and «זווית ABC קהה»'s two arms, minting their letters — the plain lengths and the angles, never «2AB < CD».
+  if (f.t === 'selector') return f.sel.kind === 'sign' && f.sel.q.k === 'order' ? orderMints(f.sel.q.left, f.sel.q.right) : [];
   if (f.t === 'tangent-of') return (f.lines ?? []).flatMap((l) => (l.kind === 'points' ? [l.a, l.b] : []));
   if (f.t !== 'constraint') return [];
   const k = f.k;
@@ -3385,6 +3392,20 @@ function mintedByReference(f: Fact): Id[] {
     default:
       return [];
   }
+}
+
+/** The letters an order's two sides mint (`mintedByReference`): each side a value, a plain length, or an angle — else none. */
+function orderMints(...sides: OrderSide[]): Id[] {
+  const ids: Id[] = [];
+  for (const o of sides) {
+    if (o.t === 'angle') ids.push(o.at.v, o.at.a, o.at.b);
+    else if (o.t === 'length') {
+      const plain = o.le.terms.every((t) => t.kind === undefined || t.kind === 'length') && plainLengthSide(o.le.expr);
+      if (!plain) return [];
+      ids.push(...lengthRefs(o.le));
+    }
+  }
+  return ids;
 }
 
 /**
