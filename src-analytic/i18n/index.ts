@@ -108,6 +108,10 @@ const he = {
   symAbs: 'אורך הקטע',
   symDist: 'מרחק בין שתי נקודות',
   symComponent: 'שיעור ה-x של נקודה',
+  symPerp: 'מאונך ל־',
+  symPar: 'מקביל ל־',
+  symAngle: 'זווית',
+  symDeg: 'מעלות',
   // A vertical segment HAS no slope, and that is an answer rather than an absence (#1078).
   slopeVertical: 'אנכי (אין שיפוע)',
   // #1322 — the angle a line makes with the positive x-axis, beside its slope (m = tan α)
@@ -502,6 +506,10 @@ const en: typeof he = {
   symAbs: 'the length of a segment',
   symDist: 'distance between two points',
   symComponent: 'the x-coordinate of a point',
+  symPerp: 'perpendicular to',
+  symPar: 'parallel to',
+  symAngle: 'angle',
+  symDeg: 'degrees',
   slopeVertical: 'vertical (no slope)',
   angleWithX: 'angle with the x-axis',
   secParams: 'Parameters',

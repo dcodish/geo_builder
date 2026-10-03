@@ -39,10 +39,9 @@ const TEMPLATES: Record<
 > = {
   symSq: { value: 'x^2+y', sel: [5, 5], complete: '=25', expected: 'x^2+y²=25' }, // #1348: the button inserts the glyph on its face
   symSqrt: {
-    value: 'AB = ',
-    sel: [5, 5],
-    complete: '20',
-    expected: 'AB = √20',
+    value: 'AB = 20',
+    sel: [5, 7],
+    expected: 'AB = √(20)', // #1696: a WRAP — the selected radicand lands inside the brackets
     setup: ['A(0,0)', 'נקודה B'],
   },
   symEll: { value: 'נתון הישר 1: y=2x', sel: [10, 10], expected: 'נתון הישר ℓ1: y=2x' },
@@ -85,6 +84,11 @@ const TEMPLATES: Record<
     expected: 'x_{A} = 5',
     setup: ['נקודה A'],
   },
+  // #1696 (ADR-AG-212) — the 2-D chips analytic now reads.
+  symPerp: { value: 'AD  BC', sel: [3, 3], expected: 'AD ⊥ BC', setup: ['משולש ABC', 'D על BC'] },
+  symPar: { value: 'AB  CD', sel: [3, 3], expected: 'AB ∥ CD', setup: ['מרובע ABCD'] },
+  symAngle: { value: 'ABC = 37', sel: [0, 0], expected: '∠ABC = 37', setup: ['משולש ABC'] },
+  symDeg: { value: '∠ABC = 90', sel: [9, 9], expected: '∠ABC = 90°', setup: ['משולש ABC'] },
 };
 
 describe('the symbol palette parses — every offered button, through the real grammar (#1129)', () => {
@@ -149,7 +153,7 @@ describe('the symbol palette parses — every offered button, through the real g
     expect(six.map((s) => [s.label, s.before, s.after])).toEqual([
       // #1348 (ADR-W-095): changed ON PURPOSE — each face now inserts its own glyph
       ['²', '²', undefined],
-      ['√', '√', undefined],
+      ['√()', '√(', ')'], // #1696: changed ON PURPOSE — 2-D's wrapping radical
       ['ℓ', 'ℓ', undefined],
       ['≤', '≤', undefined],
       ['≥', '≥', undefined],
@@ -158,15 +162,28 @@ describe('the symbol palette parses — every offered button, through the real g
   });
 
   /**
-   * THE HELD GLYPHS, asserted as held. The operator's ruling keeps `°` and `∡` out until the angle
-   * capability exists, and the reason is mechanical rather than a matter of taste — so the reason is
-   * asserted. When this row goes red, the capability has landed and the chips are owed.
+   * THE HELD 2-D CHIPS, asserted as held — and as UNREAD, not merely refused (#1696, ADR-AG-212).
+   *
+   * The row this replaces held `°` with «זווית BAC = 90°» on A(0,0) B(4,0) C(1,3) — a triangle whose angle
+   * at A is fixed near 72°, so the line faulted `unsatisfiable` and the "does not parse" claim passed by
+   * contradiction for as long as `°` had parsed. So each sentence here sits on a figure where it COULD
+   * hold, and the fault must be a READING fault: when one of these starts to parse, this goes red and its
+   * chip is owed in that notation's own PR (#1621 / #1622).
    */
-  it.each(['°', '∡', '∠'])('«%s» is not offered, because it still does not parse', (glyph) => {
-    expect(SYMBOLS.some((s) => s.before.includes(glyph))).toBe(false);
-    const d = derive(['A(0,0)', 'B(4,0)', 'C(1,3)', 'משולש ABC', `זווית BAC = 90${glyph === '°' ? '°' : ''}`]);
-    if (glyph === '°') {
-      expect(d.faults.length, 'the degree sign parses now — the chip is owed').toBeGreaterThan(0);
-    }
+  const READING = ['not-handled', 'bad-equation', 'bad-operand'];
+  it.each<[string, string[], string]>([
+    ['α', ['משולש ABC'], '∢ABC = α'],
+    ['S_{', ['משולש ABC'], 'S_{ABC} = 13'],
+    ['<', ['משולש ABC'], 'AB < BC'],
+    ['△', ['משולש ABC', 'משולש DEF'], '△ABC ≅ △DEF'],
+    ['~', ['משולש ABC', 'משולש DEF'], 'ABC ~ DEF'],
+    ['⌢', ['x^2+y^2=25', 'A על המעגל', 'C על המעגל'], '⌢{AC} = 60°'],
+  ])('«%s» is not offered, because «%s · %s» is still not read', (glyph, setup, line) => {
+    expect(SYMBOLS.some((s) => s.before.includes(glyph) || s.label.includes(glyph))).toBe(false);
+    const d = derive([...setup, line]);
+    expect(d.faults.filter((f) => f.index < setup.length), 'the setup itself must build').toEqual([]);
+    const fault = d.faults.find((f) => f.index === setup.length);
+    expect(fault?.code, `«${line}» reads now — the «${glyph}» chip is owed`).toBeDefined();
+    expect(READING).toContain(fault!.code);
   });
 });

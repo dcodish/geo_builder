@@ -161,9 +161,12 @@ tree; subscripts are new to this input language.
 then refuses hands the student `not-handled` on their own click, which is worse than no chip —
 #511's rule, and the operator's own framing when ruling the analytic set.
 
-The set: `²` `³` `√` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}`. **`°` and `∡` are deliberately absent**
-until the angle capability exists (§5d marks «∡ACB = 90°» ✗); they arrive in that work's own change,
-because a chip is part of shipping a notation rather than a follow-up to it.
+The set: `²` `³` `√()` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}` `⊥` `∥` `∠` `°`
+([ADR-AG-212](06c-decisions-analytic.md#adr-ag-212), [#1696](https://github.com/dcodish/geo_builder/issues/1696):
+the 2-D palette reviewed chip by chip; `√()` wraps a selection as 2-D's does). The 2-D chips still absent
+are absent because their sentences are not read yet — α β γ δ θ, `S_{}` and `<` between measures
+(#1621), `△` `≅` `~` and `⌢{}` (#1622) — and each arrives in that work's own change, because a
+chip is part of shipping a notation rather than a follow-up to it.
 
 Mechanically enforced: every entry is driven through the real grammar, with a totality guard so a
 button cannot be added without a proof — and pressing any chip inside a Hebrew sentence must not

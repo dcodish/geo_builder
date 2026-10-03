@@ -9654,3 +9654,27 @@ Also measured: the S4 cevian foot was a FREE point plus constraints, so adding �
 - `parser/catalogAnalytic.ts`: new entry «AB ו-CD מיתרים במעגל O».
 
 Sibling check (docs/17 §1): 2-D is the reference and builds every row above except the refusals. 3-D has no free points and no circles of this kind (X8/X9), and its parity lock is green.
+
+## ADR-AG-212 — The analytic palette carries every 2-D chip whose sentence it reads: ⊥ ∥ ∠ ° and √() (#1696)
+
+**Status:** accepted · 2026-10-03 · operator, playing PR #1695: *"analytics tool doesnt have parallel and perpendiculatr symbols. review all symobols from 2d and decide what should be in analytics too"*; the review was put to the operator with a per-symbol decision table (#1696) and approved (*"yes"*, to add the now-set in PR #1695).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R11a (the set amended). · **Design:** none (internal) — data in `src-analytic/ui/symbols.ts`; the palette's shape (`shell/symbols`) is unchanged.
+
+**Context.** The 2-D palette has 21 chips, analytic's had 12. Analytic's rule (R11a, ADR-AG-122) is that a chip may only be offered when its sentence is read, so each 2-D chip was measured through `derive` on PR #1695's branch, on a figure where its sentence can hold:
+
+| 2-D chip | sentence | analytic | decision |
+|---|---|---|---|
+| ⊥ ∥ | «AD ⊥ BC», «AB ∥ CD» | builds | added |
+| ∠ | «∠ABC = 37°» | builds (#1330: one lowering with «∢», «זווית») | added — 2-D's glyph |
+| ° | «∢ABC = 90°» | builds | added — the 2026-09-16 hold (angles unbuilt) no longer applies |
+| √() | «AB = √(2/3)» | builds | replaces the bare `√`, so a selection lands inside the brackets as in 2-D |
+| α β γ δ θ · S_{} · < | «∢ABC = α», «S_{ABC} = 13», «AB < BC» | `bad-equation` / not-handled | held — owed by #1621 |
+| △ ≅ ~ · ⌢{} | «△ABC ≅ △DEF», «⌢{AC} = 60°» | not-handled | held — owed by #1622 |
+| xⁿ | — | `^` already reads inside equations | not offered: `²` `³` cover the exam's powers |
+
+**Decision.** Add ⊥ ∥ ∠ ° and replace `√` by the wrapping `√()`, each with a he/en title. Each held chip is recorded on the issue that will make its sentence readable (#1621, #1622 comments), so it ships in that notation's own PR.
+
+**A vacuous lock, found and replaced.** `symbols-module.test.ts` held `°` with «זווית BAC = 90°» on A(0,0) B(4,0) C(1,3). That triangle's angle at A is fixed near 72°, so the line faulted `unsatisfiable` and "°  still does not parse" passed by contradiction, after `°` had started to parse. The replacement holds each still-absent chip on a figure where its sentence could hold, and requires a READING fault (`not-handled` / `bad-equation` / `bad-operand`), so the row goes red the day the notation lands.
+
+**Locks.** `symbols-module.test.ts`: four new parse proofs (totality-guarded), `√()` as a wrap («AB = 20» with «20» selected → «AB = √(20)», builds), the original-six row updated on purpose, six held-chip rows. `palette-faces-1348` (each one-character face inserts its own glyph) and the bidi no-split row cover the new chips unchanged. **Fails before: 3 of 21** — the totality guard, the `√()` wrap proof and the original-six row; the four new parse proofs iterate the palette, so they do not exist before it.
