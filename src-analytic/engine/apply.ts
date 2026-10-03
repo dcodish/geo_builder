@@ -19,7 +19,7 @@ import { fitConic } from './conic';
 import { bareLineName, isNumeralName, lineIdOf, nameReading, numeralCurveId, numeralTwin, readDescribedCircle, refKindOf, statedName, type DescribedCircle, type RefKind } from './names';
 import { parabolaDirectrix, resolveCurve } from './curves';
 import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr } from './lengths';
-import { curveParentsOf, parentsOf, type DerivedRule } from './derived';
+import { curveParentsOf, parentsOf, type DerivedRule, type FootLine } from './derived';
 import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, promisesOneParallelPair, rightAngleAt, ringsNamed, shapeRow } from './shapes';
@@ -2472,7 +2472,39 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
             o.rule.t === 'foot' &&
             (!f.foot || (o.rule.from === f.foot.from && (!f.foot.onto || sameDerivation(o.rule, { t: 'foot', from: f.foot.from, onto: f.foot.onto })))),
         );
-        if (feet.length !== 1) return { ok: false, error: noHost(f.src, 'perpendicular', feet.length) };
+        /**
+         * NAMED IN FULL, the perpendicular is the OBJECT, not only a pointer to one (#1727, ADR-AG-229 — operator ruling
+         * 2026-10-03, amending ADR-AG-207's reference-only rule). One already drawn is the one referred to — a `foot`
+         * derived the same way, or an altitude whose foot the student named («AD גובה לצלע BC»: AD ⟂ BC, D on BC) —
+         * and never duplicated. With none, the reference BUILDS it as «האנך מ-A ל-BC» does: the foot (its tool letter,
+         * `mint`) and the piece from the point to it.
+         */
+        const full = f.foot?.onto ? f.foot : undefined;
+        const named: Id[] =
+          full && full.onto?.k === 'points'
+            ? c.constraints.flatMap((k) => {
+                if (k.t !== 'perpendicular' || k.a !== full.from) return [];
+                const pair = full.onto as Extract<FootLine, { k: 'points' }>;
+                const onPair = (k.c === pair.a && k.d === pair.b) || (k.c === pair.b && k.d === pair.a);
+                const footOn = c.constraints.some(
+                  (q) => q.t === 'on-line-2pt' && q.id === k.b && ((q.a === pair.a && q.b === pair.b) || (q.a === pair.b && q.b === pair.a)),
+                );
+                return onPair && footOn && !feet.some((o) => o.id === k.b) ? [k.b] : [];
+              })
+            : [];
+        if (feet.length + named.length === 0 && full?.onto && full.mint) {
+          const built = applyAll(c, [
+            { t: 'derived', id: full.mint, rule: { t: 'foot', from: full.from, onto: full.onto }, src: f.src },
+            { t: 'segment', id: segmentIdOf(full.from, full.mint), a: full.from, b: full.mint, ref: true, src: f.src },
+          ]);
+          if (!built.ok) return built;
+          const bound = applyFact(built.next, { t: 'constraint', k: { t: 'on-line-2pt', id: f.id, a: full.from, b: full.mint }, src: f.src });
+          return bound.ok ? { ...bound, effect: 'created' } : bound;
+        }
+        if (feet.length + named.length !== 1) return { ok: false, error: noHost(f.src, 'perpendicular', feet.length + named.length) };
+        if (named.length === 1) {
+          return applyFact(c, { t: 'constraint', k: { t: 'on-line-2pt', id: f.id, a: full!.from, b: named[0] }, src: f.src });
+        }
         const foot = feet[0];
         if (foot.rule.t !== 'foot') return { ok: false, error: noHost(f.src, 'perpendicular', 0) };
         return applyFact(c, { t: 'constraint', k: { t: 'on-line-2pt', id: f.id, a: foot.rule.from, b: foot.id }, src: f.src });

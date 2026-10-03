@@ -2184,6 +2184,7 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - The foot named in the same sentence — «האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D», «D רגל האנך מ-C לציר ה-x», «האנכים מהקודקודים A ו-C לציר ה-x חותכים אותו בנקודות E ו-F בהתאמה» — is that letter. A foot on a side's line may lie beyond the side, as in 2-D. «אנך אמצעי ל-AB» draws the midpoint and the perpendicular bisector.
 - «הישר העובר דרך הנקודה E מקביל לציר ה-y וחותך את הצלע AB בנקודה F» (and «דרך E עובר ישר מקביל ל-… החותך את …», «ישר דרך P מאונך ל-AB») states the line and where it cuts the side; on a SIDE the point lies between its ends. The piece EF is drawn and the line itself is not, as in 2-D, until a sentence states the line.
 - «האנך» refers to the perpendicular already drawn — «הנקודה E נמצאת על האנך שהורידו מנקודה B לציר ה-x», «המשיק והאנך נחתכים בנקודה D». With none, or several and no description that picks one, the sentence is refused and says how to name it.
+- A perpendicular named in full inside another sentence — its point and its line, «E על האנך מ-A ל-BC», «האנך מ-A ל-BC והתיכון מ-B נפגשים בנקודה E» — is drawn when the figure has none: the foot (named by the tool) and the piece. One already drawn (also as «הגובה מ-A» or «AD גובה לצלע BC») is the one meant, never drawn again. «E נקודת החיתוך של האנך מ-A ל-BC עם הישר BC» names the foot E ([ADR-AG-229](06c-decisions-analytic.md#adr-ag-229), #1727).
 - «הצלע CB מקבילה לציר ה-x, וחותכת את ציר ה-y בנקודה E» is both statements about CB.
 - «הקטע EF מקביל ל-DA» (and «EF ∥ DA», «הצלע EF מקבילה ל-DA», «הישר EF מקביל ל-DA», R143) with F not yet placed adds F, free to move along the parallel through E, until a later given places it.
 - Refused by name: a perpendicular from a point of the line itself, a foot that is its own point, a line the sentence does not name readably.
@@ -2331,4 +2332,4 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - The same lines work in «E נקודת החיתוך של X עם Y», «X חותך את Y בנקודה E» and «E על X».
 - Parallel lines are refused as impossible. The same line written twice is refused. Two named lines that share a letter («הישר AB והישר BC») are refused, because they meet at that point.
 - An altitude or median named only by its side («הגובה לצלע BC») is not read in these sentences.
-- A perpendicular «האנך מ-P ל-X» must already be drawn (R141).
+- A perpendicular «האנך מ-P ל-X» is drawn if the figure has none, and is the drawn one otherwise (R141, #1727).

@@ -10679,3 +10679,62 @@ All four parity locks are green. Catalog: two entries (F17), «חוצה זוית
 - **3-D:** has no cevians in the plane (#1679). Checked: none of these sentences builds there.
 
 **Consequences.** `parser/parseAnalytic.ts`: `ObjectOperand`, `LINE_OBJECT_NOUN`, `lineObjectOperand`, `incidenceOn`, `parseIntersectionPlain`, `meetFrame`, `INTERSECT_JOIN`, the rule chain, the point-on arm. Also `parser/catalogAnalytic.ts` (two entries) and the parity fixture.
+
+## ADR-AG-229 — A perpendicular named in full is built when the figure has none; one already drawn is referred to (#1727, amends ADR-AG-207)
+
+**Date:** 2026-10-03 · **Status:** accepted · PR for #1727
+
+**Requirements:** [02c](02c-requirements-analytic.md) R141 and R167 amended. · **Design:** [04c](04c-design-analytic.md) — the ADR-AG-224 section's `incidenceOn` bullet, and a new bullet on `on-kind perpendicular`. · **LADDER stage:** parse (`perpendicularRef`, `parseIntersectionPlain`) and M1 (the `on-kind` perpendicular arm). No new object kind, no new derived rule.
+
+**Ruling.** On #1727 the operator ruled, 2026-10-03: *"1727 - yes"*. A fully described «האנך מ-P ל-X» (point AND line named) builds the perpendicular from P to X, with its foot, when no such perpendicular is drawn. That includes its use as an operand of the meet frame (ADR-AG-224). A perpendicular already drawn with that description is still the one referred to, never duplicated. This amends ADR-AG-207 decision 5 ("a reference, never a construction").
+
+**Measured on 4fbb3293 before the change** (through `decideSubmit`):
+
+| sequence | before | after |
+|---|---|---|
+| «משולש ABC» · «האנך מ-A ל-BC והתיכון מ-B נפגשים בנקודה E» | `ambiguous-shape` (found 0) | builds: foot H, AH drawn, E on AH and on the median |
+| «משולש ABC» · «E על האנך מ-A ל-BC» | `ambiguous-shape` | builds: H, AH, E on AH |
+| «B(1,14)» · «E על האנך מהנקודה B לציר ה-x» | `ambiguous-shape` | builds: H(1,0), E at x = 1 |
+| corpus 5/5's «האנך מהנקודה B לציר ה-x» (the sentence) | builds H | unchanged |
+| … «האנך מ-A ל-BC» drawn · «E על האנך מ-A ל-BC» | builds on H | unchanged: no second foot, no second piece |
+| «הגובה מ-A» · «E על האנך מ-A ל-BC» | builds on the altitude's H | unchanged |
+| «AD גובה לצלע BC» · «E על האנך מ-A ל-BC» | `ambiguous-shape` (a named-foot altitude was not a perpendicular to M1) | builds on AD, with no new point |
+| «E נקודת החיתוך של האנך מ-A ל-BC עם הישר BC» | `ambiguous-shape` | E is the foot (see 3) |
+| «E על האנך» / «E על האנך מ-B» | `ambiguous-shape` | unchanged |
+
+**Decision.**
+1. **The reference carries a way to build itself.** When the perpendicular is named in full, `perpendicularRef` still lowers to `on-kind perpendicular { foot: { from, onto } }`, and the foot reference now carries `mint`. `mint` is the tool placeholder of its foot, `toolPoint('foot', footKey(from, onto))`, the same key the sentence «האנך מ-A ל-BC» uses. `derive`'s `resolveToolLetters` letters it with the other tool letters, in list order.
+2. **M1 decides, because only the figure knows whether it exists** (`on-kind`, apply.ts). The arm counts the perpendiculars that match the description:
+   - a `foot` derived the same way (the sentence, or an altitude's tool foot, ADR-AG-211);
+   - an altitude whose foot the student named, «AD גובה לצלע BC». That is the constraint AD ⟂ BC with D on BC, which was not a perpendicular to M1 before.
+
+   What M1 does with the count:
+   - **one** → it is the one referred to (as before), and the minted letter names nothing (`derive` drops a tool letter the fold did not create, #1263's rule);
+   - **none**, named in full → the perpendicular is BUILT, exactly as its own sentence builds it: the derived foot and the piece from the point to it, then the point is put on that line;
+   - **several, or none for a partial description** → `ambiguous-shape`, as before.
+3. **A perpendicular crossed with its own line meets it at its foot.** «E נקודת החיתוך של האנך מ-A ל-BC עם הישר BC» and «האנך מ-A ל-BC והישר BC נפגשים בנקודה E» now say «E רגל האנך מ-A ל-BC». They are lowered as that sentence: the foot named E, and the piece drawn. Building first and then crossing would have put two letters on one point (the #1113 family).
+   - With the perpendicular already drawn, the sentence is the #1153 `already-named` refusal, naming the foot.
+   - The axis line and a named curve are matched the same way.
+4. **A perpendicular from a point of its own line onto it** («האנך מ-A ל-AB») is not built. It keeps the reference reading and its refusal.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1727-perpendicular-builds.test.ts`, 13 tests. **Fails before: 7 of 13.** The 6 controls are the reference cases (drawn before, a named foot, the altitude), the cases that stay references, and corpus 5/5. The tests cover:
+  - built from nothing at 8 seeds: H equals `footOn(A, B, C)`, AH is the only piece, E ⟂ BC through A, H announced;
+  - the meet frame with a median, and two undrawn perpendiculars meeting at the `orthocentre`, both at 8 seeds;
+  - onto the x-axis;
+  - "never duplicated" for four drawn forms: no new point and no new letter announced;
+  - the foot case in both spellings, and its refusal after the perpendicular is drawn;
+  - bare «האנך» and «האנך מ-B», the degenerate case, and the sentence form.
+- **The ADR-AG-207 lock is updated to the ruling.** In `issue-1620-perpendiculars.test.ts`, «E על האנך מ-C ל-AB» beside the perpendicular from A now builds the one from C (points A B C E G H, pieces AH and CG). It was `ambiguous-shape`. The none and several cases keep their refusals.
+- **The ADR-AG-224 lock is updated.** `issue-1715-meet-frame.test.ts`'s "an undrawn «האנך מ-C ל-AB» asks" now records.
+- **Gate:** `npx vitest run src-analytic shell src/__tests__/geo-input-parity.test.ts src3d/__tests__/geo-input-parity.test.ts` gives 265 files and 5,293 tests, green. `tsc -b` is clean.
+
+**Parity.** No row changes verdict. `meet-perpendicular-drawn-1715` draws the perpendicular first, and `an-1620-perp-03` refers to one drawn. 2-D leaves the operand forms `not-handled` (#1677). Its own sentence «האנך מ-C ל-AB» builds, as here.
+
+**Sibling audit.** 2-D has no operand reading of a perpendicular (recorded on #1677). 3-D has no feet (#1679).
+
+**Consequences.**
+- `engine/types.ts`: `PerpRef.mint`.
+- `parser/parseAnalytic.ts`: `perpendicularRef` and `parseIntersectionPlain`'s own-line foot.
+- `engine/apply.ts`: the `on-kind` perpendicular arm.
+- The two locks above.
