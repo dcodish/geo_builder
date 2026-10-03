@@ -4766,7 +4766,7 @@ function parseParamValue(line: string): RuleOutcome {
   if (!claimable(valueSrc)) return null;
   const value = valueExpr(valueSrc);
   if (!value) return null;
-  return made([{ t: 'constraint', k: { t: 'param-eq', sym: m[1], value }, src: line }]);
+  return made([{ t: 'constraint', k: { t: 'param-eq', sym: { kind: 'sym', name: m[1] }, value }, src: line }]);
 }
 
 /**

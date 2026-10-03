@@ -369,8 +369,14 @@ export type Constraint =
    * register like any other (it is read from this constraint's own expressions, #1343), and this states the value
    * it must take — a statement that HOLDS, solved with the rest, so a value the figure already contradicts
    * («∢ABC = 40», «∢ABC = α», then «α = 30») is `unsatisfiable` on this line, never a silent re-reading.
+   *
+   * The SUBJECT is an expression node, not a bare string (ADR-AG-215 am. 1). The register finds a constraint's
+   * symbols by a STRUCTURAL walk over `{ kind: 'sym' }` nodes (`constraintSymbols`, #1343); a subject stored as a
+   * string was invisible to it, so a pin on an alias no angle used yet never entered the solve, its residual
+   * could not be evaluated (read as satisfied), and «α = 50» · «α = 40» recorded green — a stated value vanished.
+   * Carried as the node the walk reads, the subject is registered by the same mechanism every value is.
    */
-  | { t: 'param-eq'; sym: string; value: Expr }
+  | { t: 'param-eq'; sym: Extract<Expr, { kind: 'sym' }>; value: Expr }
   | { t: 'choice'; options: Constraint[] }
   /**
    * ONE OPTION THAT IS SEVERAL STATEMENTS (#1620, ADR-AG-208) — «every vertex on some axis» chooses an axis for
@@ -580,7 +586,7 @@ export function describeConstraint(k: Constraint): string {
     case 'angle':
       return `${k.measure ?? ''}∠${k.at.a}${k.at.v}${k.at.b} = ${exprText(k.value)}`;
     case 'param-eq':
-      return `${k.sym} = ${exprText(k.value)}`;
+      return `${k.sym.name} = ${exprText(k.value)}`;
     case 'angle-ratio':
       return `∠${k.left.a}${k.left.v}${k.left.b} = ${exprText(k.k) === '1' ? '' : exprText(k.k)}∠${k.right.a}${k.right.v}${k.right.b}`;
     case 'relation':
@@ -909,7 +915,7 @@ export function residualRows(
       return { eq: [(theta - (value * Math.PI) / 180) / Math.PI] };
     }
     case 'param-eq': {
-      const have = env[k.sym];
+      const have = env[k.sym.name];
       const want = evalExpr(k.value, env);
       if (have === undefined || !Number.isFinite(have) || !Number.isFinite(want)) return null;
       // Relative to the value, like the area and length rows, so «α = 30» and «k = 0.5» converge alike.
