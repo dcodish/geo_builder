@@ -29,7 +29,7 @@ function valueExpr(src: string): Expr | null {
   const e = parseExpr(normalizeMath(src));
   return e && !mentionsPlane(e) ? e : null;
 }
-import { LENGTH_VARIABLE, constantLengthExpr, lengthValueExpr, namedLengthPairs, parseLengthExpr, type LengthExpr } from '../engine/lengths';
+import { LENGTH_VARIABLE, angleLabelSymbol, constantLengthExpr, lengthValueExpr, namedLengthPairs, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
 import { CENTRE_SENTINEL, CIRCLE_SENTINEL, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow, BARE_POLYGON_NOT_BUILT } from '../engine/shapes';
@@ -5082,6 +5082,8 @@ const DEGREE_TAIL = /\s*(?:°|מעלות|degrees?)\s*$/i;
  * vertex («∢B > 40») is left to the rules that resolve it at M1 — declined here, never guessed. A point-to-line
  * distance is declined too: its line is a name only M1 can resolve, and an order that judged nothing would vanish.
  */
+/** One lowercase Greek letter, π excepted (the constant) — an angle ALIAS (ADR-AG-215), the only symbol a bare order compares. */
+const GREEK_ALIAS = /^[α-ορ-ω]$/;
 const ORDER_ANGLE = new RegExp(`^(?:${ANGLE_NOUN_HE}|${ANGLE_NOUN_EN})(${NAME})(${NAME})(${NAME})(?![A-Za-z0-9])$`, 'i');
 /** The symbolic operators, the two-character ones first, with the two typeset glyphs. */
 const ORDER_OP = /\s*(<=|>=|≤|≥|<|>)\s*/;
@@ -5122,10 +5124,24 @@ function orderFacts(leftSrc: string, rightSrc: string, leftGreater: boolean, clo
   const left = orderSide(leftSrc, claims);
   const right = orderSide(rightSrc, claims);
   if (!left || !right) return null;
-  // Two values are a domain or an equation, not this construct.
-  if (left.side.t === 'value' && right.side.t === 'value') return null;
-  // A length beside an angle compares two different kinds of thing: understood, and refused by name.
-  if ((left.side.t === 'angle' && right.side.t === 'length') || (left.side.t === 'length' && right.side.t === 'angle')) {
+  /*
+   * Two values are a domain or an equation, not this construct — EXCEPT an angle NAMED by a Greek letter (#1622 E5,
+   * ADR-AG-221). «α < β», «α < 30», «20 < α < 60» compare angle aliases (ADR-AG-215): 2-D commits them as its
+   * `measure-order` / `measure-bound` on its measure variables, on an empty canvas too, and they bind when a later
+   * «∢ABC = α» names the angle. The side is the alias's own value; the order judges it, and seeds it, like any side.
+   * Only a lone Greek letter or a number on each side (2-D's grammar: «α < 2β», «α < AB» escalate there).
+   */
+  if (left.side.t === 'value' && right.side.t === 'value') {
+    const [l, r] = [left.side.value, right.side.value];
+    const alias = (e: Expr) => e.kind === 'sym' && GREEK_ALIAS.test(e.name);
+    if (!(alias(l) || alias(r)) || !(alias(l) || l.kind === 'num') || !(alias(r) || r.kind === 'num')) return null;
+  }
+  // A length beside an angle compares two different kinds of thing: understood, and refused by name. A value that
+  // names a Greek alias IS an angle (ADR-AG-215, #1622 E5): «α < AB» is «∢ABC < AB» spelled by its alias.
+  const kindOf = (o: OrderSide): 'angle' | 'length' | 'value' =>
+    o.t === 'value' ? (symbolsOf(o.value).some((x) => GREEK_ALIAS.test(x)) ? 'angle' : 'value') : o.t;
+  const kinds = [kindOf(left.side), kindOf(right.side)];
+  if (kinds.includes('angle') && kinds.includes('length')) {
     return refuse('bad-operand', line);
   }
   const drawn = lengthPieces([left, right].filter((o) => o.side.t === 'length').map((o) => o.text), line);
@@ -5194,6 +5210,44 @@ function parseOrder(line: string): RuleOutcome {
   const enBound = ORDER_BOUND_EN.exec(line);
   if (enBound) return orderFacts(enBound[1], enBound[3], /least|no\s+less/i.test(enBound[2]), true, line);
   return null;
+}
+
+/**
+ * AN ANGLE NAMED BY THE STUDENT — «נסמן זוית BAM כ-A1», «נסמן זוית CAD כ 1», «נסמן ∠CAB = A1», "denote angle BAM as A1"
+ * (#1622 E5, ADR-AG-221; 2-D's `angleAliasRule`, ADR-386, copied, never imported). The book's subscript name binds to
+ * the angle: 2-D draws the two arms and labels the arc. A bare digit is the vertex letter plus that digit (CAD כ 1 ⇒
+ * A1), as in 2-D. A Greek name is D2's alias (ADR-AG-215) — «נסמן זוית BAM כ-α» is «∢BAM = α», read by that rule,
+ * which is what 2-D commits for it too (`measure-angle` on its variable).
+ *
+ * The label is D2's mechanism under another name: the angle constraint with a free value, the parameter
+ * `angleLabelSymbol(A1)` = `∠A1` (never `A1`, a point's shape here — see `lengths.ts`). It states no magnitude
+ * (ADR-052), the panel shows it under its book name, and a second angle with the same label, or a label that is a
+ * point's name, is refused at M1 (`alias-taken`) — 2-D's verdict for both.
+ *
+ * Read on the line WITH its verb, before the «נסמן» lead-in is unwrapped: 2-D binds «∠CAB = A1» only after the verb
+ * (the bare equation escalates there), and so does this rule.
+ */
+const LABEL_VERB = '(?:נסמן|נסמנה|מסמנים|לסמן)';
+const LABEL_ANGLE_HE = `(?:את\\s+)?(?:ה?${ANGLE_STEM_HE}ת\\s*|∠\\s*)`;
+const LABEL_NAME = `(?:∠\\s*|ה?${ANGLE_STEM_HE}ת\\s*)?([A-Z]\\d+|\\d+|[α-ορ-ω])`;
+const ANGLE_LABEL_HE = new RegExp(`^${LABEL_VERB}\\s*:?\\s+${LABEL_ANGLE_HE}(${NAME})(${NAME})(${NAME})\\s+(?:כ|ב(?:תור)?)\\s*-?\\s*${LABEL_NAME}$`);
+const ANGLE_LABEL_EQ = new RegExp(`^(?:${LABEL_VERB}|[Dd]enote|[Ll]et)\\s*:?\\s+(?:${LABEL_ANGLE_HE}|(?:the\\s+)?angle\\s+)(${NAME})(${NAME})(${NAME})\\s*=\\s*(?:∠\\s*)?([A-Z]\\d+)$`);
+const ANGLE_LABEL_EN = new RegExp(`^(?:[Dd]enote|[Ll]abel|[Mm]ark|[Ll]et)\\s+(?:the\\s+)?(?:angle\\s+|∠\\s*)(${NAME})(${NAME})(${NAME})\\s+(?:as|by|be)\\s+(?:∠\\s*|angle\\s+)?([A-Z]\\d+|\\d+|[α-ορ-ω])$`);
+
+function parseAngleLabel(line: string): RuleOutcome {
+  const m = ANGLE_LABEL_HE.exec(line) ?? ANGLE_LABEL_EQ.exec(line) ?? ANGLE_LABEL_EN.exec(line);
+  if (!m) return null;
+  const [, p, v, q, given] = m;
+  const at = angleNameOf(p, v, q);
+  if (!at || !isAngleRef(at)) return refuse('repeated-vertex', line);
+  if (GREEK_ALIAS.test(given)) return parseClause(`∠${p}${v}${q} = ${given}`);
+  const name = /^\d+$/.test(given) ? `${v}${given}` : given;
+  // The binding first, so a taken label is the line's answer before its arms are looked for; then the two arms 2-D draws.
+  return made([
+    { t: 'constraint', k: { t: 'angle', at, value: { kind: 'sym', name: angleLabelSymbol(name) } }, src: line },
+    { t: 'segment', id: segmentId(v, p), a: v, b: p, ref: true, src: line },
+    { t: 'segment', id: segmentId(v, q), a: v, b: q, ref: true, src: line },
+  ]);
 }
 
 /**
@@ -6663,6 +6717,9 @@ export function parseLine(raw: string): ParseResult {
   // must leave out; nothing of the line is recorded, as before.
   const proof = findProofTarget(line) ?? findProofTarget(unwrap(line));
   if (proof) return { ok: false, code: 'proof-target', detail: proof.sentence };
+  // An angle the student NAMES (#1622 E5, ADR-AG-221) — read with its verb, before the lead-in is unwrapped.
+  const label = parseAngleLabel(line);
+  if (label) return label.ok ? made(label.facts.map((f) => ({ ...f, src: typed }))) : label;
   const { result, framed } = readLine(line, 0);
   if (!result.ok) return result.code === 'not-handled' ? { ...result, detail: raw } : result;
   /*

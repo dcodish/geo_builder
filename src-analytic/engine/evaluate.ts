@@ -1345,6 +1345,10 @@ function foldSignSelectors(c: Construction, env: Env): Env {
   let out = env;
   for (const sel of c.selectors) {
     if (sel.kind !== 'sign') continue;
+    if (sel.q.k === 'order') {
+      out = seedOrderParams(c, sel, sel.q, out);
+      continue;
+    }
     const sym = freeAngleOf(c, sel);
     if (sym === null) continue;
     const theta = out[sym];
@@ -1356,6 +1360,57 @@ function foldSignSelectors(c: Construction, env: Env): Env {
     if (isPositive !== sel.positive) out = { ...out, [sym]: Math.PI - reduced };
   }
   return out;
+}
+
+/**
+ * AN ORDER SEEDS A PARAMETER SIDE INTO ITS REGION (#1622 E5, ADR-AG-221) — `seedOrder`'s twin for a VALUE side.
+ *
+ * «α < β», «α < 30», «20 < α < 60» order angle ALIASES (ADR-AG-215): free parameters, each sampled across the range its
+ * angle allows. Sample-and-reject is the wrong mechanism for a region (#1071, ADR-AG-216) — it would refuse a
+ * satisfiable figure at every seed whose sample fell on the wrong side. So where the sample breaks the order, the first
+ * side that is a lone sampled symbol is moved into the region: RESCALED from its own range onto the part of that range
+ * the order allows. The sample's relative position is kept, so the start states no magnitude (ADR-052) and «הציגו
+ * תצורה אחרת» still moves it; an unbounded symbol is reflected across the other side instead. A start, never a
+ * verdict: the solve may move it and the judge (`orderQuantity`) keeps the last word.
+ */
+function seedOrderParams(
+  c: Construction,
+  s: Extract<Selector, { kind: 'sign' }>,
+  q: Extract<Extract<Selector, { kind: 'sign' }>['q'], { k: 'order' }>,
+  env: Env,
+): Env {
+  const valueOf = (o: OrderSide): number => (o.t === 'value' ? evalExpr(o.value, env) : NaN);
+  const [l, r] = [valueOf(q.left), valueOf(q.right)];
+  if (!Number.isFinite(l) || !Number.isFinite(r)) return env;
+  const now = orderQuantity(q, () => null, env);
+  if (now === null || signHolds(s, now)) return env;
+  for (const [mine, other, above] of [
+    [q.left, r, s.positive],
+    [q.right, l, !s.positive],
+  ] as const) {
+    if (mine.t !== 'value' || mine.value.kind !== 'sym' || !(mine.value.name in env)) continue;
+    const sym = mine.value.name;
+    const x = env[sym];
+    const declared = paramRegister(c).find((p) => p.sym === sym)?.domain ?? {};
+    const d = narrowedDomain(declared, impliedRange(c, sym));
+    const [lo, hi] = [d.min ?? -Infinity, d.max ?? Infinity];
+    const bounded = Number.isFinite(lo) && Number.isFinite(hi) && hi > lo;
+    // The sample's place in its own range, kept off the ends (an open bound is never drawn on).
+    const t = bounded ? Math.min(0.95, Math.max(0.05, (x - lo) / (hi - lo))) : 0;
+    let want: number;
+    if (above) {
+      if (!(other < hi)) continue; // no room above
+      const from = Math.max(other, lo);
+      want = bounded ? from + t * (hi - from) : other + Math.max(Math.abs(other - x), 1);
+    } else {
+      if (!(other > lo)) continue; // no room below
+      const to = Math.min(other, hi);
+      want = bounded ? lo + t * (to - lo) : other - Math.max(Math.abs(other - x), 1);
+    }
+    if (!Number.isFinite(want)) continue;
+    return { ...env, [sym]: want };
+  }
+  return env;
 }
 
 /**

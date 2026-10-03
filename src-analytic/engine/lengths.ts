@@ -437,6 +437,18 @@ export function constantLengthExpr(src: string): LengthExpr | null {
  */
 export const LENGTH_VARIABLE: Readonly<Record<'x' | 'y', string>> = { x: 'ｘ', y: 'ｙ' };
 
+/**
+ * AN ANGLE LABEL — «נסמן זוית BAM כ-A1» (#1622 E5, ADR-AG-221; 2-D's `angle-alias`, ADR-386). The book's subscript
+ * name binds to the angle as a free parameter of its own, D2's Greek alias (ADR-AG-215) under a name that is no
+ * expression symbol. The parameter is `∠A1`, never `A1`: «A1» is a POINT's shape in this tree («נקודה A1», «A1(1,2)»,
+ * and `mentionsAny` reads a capital-plus-digit string as a point id), so the bare name would collide with every point
+ * the student may name A1. The `∠` keeps the two apart, and it is how the panel shows the label — the book's ∠A1.
+ */
+const ANGLE_LABEL_MARK = '∠';
+export const angleLabelSymbol = (name: string): string => `${ANGLE_LABEL_MARK}${name}`;
+/** The label a symbol carries, or `null` when it is no angle label. */
+export const angleLabelName = (sym: string): string | null => (sym.startsWith(ANGLE_LABEL_MARK) && sym.length > 1 ? sym.slice(1) : null);
+
 /** The letter a parameter is SHOWN as — the length variable under the student's own `x`/`y`; every other symbol is itself. */
 export const paramLabel = (sym: string): string => (sym === LENGTH_VARIABLE.x ? 'x' : sym === LENGTH_VARIABLE.y ? 'y' : sym);
 

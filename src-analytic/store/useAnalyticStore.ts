@@ -162,6 +162,8 @@ export type InputError =
    * The refusal names the holder so the student sees the collision, not a scolding about their letter.
    */
   | { key: 'already-named'; detail: string; holder?: string }
+  /** «נסמן זוית MAC כ-A1» where A1 already names another angle, or a point (#1622 E5, ADR-AG-221) — `holder` is the label. */
+  | { key: 'alias-taken'; detail: string; holder?: string }
   /**
    * A RENAME the tool understood and declined (#1154) — each names what the student wrote. `detail` is
    * the letter (or, for `rename-unsafe`, the line that could not be rewritten faithfully; empty when
