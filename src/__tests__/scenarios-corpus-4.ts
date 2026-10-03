@@ -3218,7 +3218,7 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'trig-given-is-a-ratio-1698',
     title: '#1698 (ADR-566): «tan∢ABC = 2» draws ∠B = atan 2 ≈ 63.43° and «קוסינוס הזווית ACB = 3/4» draws ∠C = acos ¾ ≈ 41.41° — never 2° and 3°',
     guards:
-      "Measured on main a8938c2d (found by the #1621 analytic stream D2, ADR-AG-215): every trig given committed a set-angle of the value's leading number IN DEGREES — «tan∢ABC = 2» a 2° angle, «cos∢ACB = 3/4» a 3° one with the «/4» lost, «sin…» the same — a wrong figure drawn green. Root cause: no rule read the function word; every angle rule skipped it and took the first number for the angle. Fix: `trigGiven` decides a line that applies tan/cot/cos/sin to an angle WHOLE, before any rule — tan/cot/cos lower to the one angle they name (a measure-angle labelled with the angle it draws — #1718 amended the «tan=2» label), sin (two angles) and |cos| > 1 are refused by name. Asserts both angles as drawn, the label text, and that the sine and an out-of-range cosine are refused at the gate. The spelling sweep, the seeds and the stability twin are in src/__tests__/issue-1698-trig-ratio.test.ts.",
+      "Measured on main a8938c2d (found by the #1621 analytic stream D2, ADR-AG-215): every trig given committed a set-angle of the value's leading number IN DEGREES — «tan∢ABC = 2» a 2° angle, «cos∢ACB = 3/4» a 3° one with the «/4» lost, «sin…» the same — a wrong figure drawn green. Root cause: no rule read the function word; every angle rule skipped it and took the first number for the angle. Fix: `trigGiven` decides a line that applies tan/cot/cos/sin to an angle WHOLE, before any rule — tan/cot/cos lower to the one angle they name (a measure-angle labelled with the angle it draws — #1718 amended the «tan=2» label), sin above 1 and |cos| > 1 are refused by name (#1711 made a sine in (0, 1) a two-angle choice). Asserts both angles as drawn, the label text, and that the sine and an out-of-range cosine are refused at the gate. The spelling sweep, the seeds and the stability twin are in src/__tests__/issue-1698-trig-ratio.test.ts.",
     steps: ['משולש ABC', 'tan∢ABC = 2', 'קוסינוס הזווית ACB = 3/4'],
     check: (fig) => {
       allStepsOk(fig);
@@ -3230,7 +3230,8 @@ export const SCENARIOS_4: Scenario[] = [
       expect(wedge('B'), 'the tan given is labelled by its angle').toEqual(['63.43°']);
       expect(wedge('C'), 'the cos given is labelled by its angle').toEqual(['41.41°']);
       const tri = factsOf(['משולש ABC']);
-      for (const line of ['sin∢ACB = 3/4', 'cos∢ACB = 5/4']) {
+      // #1711 (ADR-573): «sin∢ACB = 3/4» now builds (a two-root choice); a sine above 1 is refused.
+      for (const line of ['sin∢ACB = 5/4', 'cos∢ACB = 5/4']) {
         const v = gateVerdict(tri, line);
         expect(v.kind === 'refused' && v.detail, `«${line}» is refused by the parser`).toBe('trig-given');
       }
@@ -3263,6 +3264,24 @@ export const SCENARIOS_4: Scenario[] = [
       allStepsOk(fig);
       expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), '∠ABC = atan 2').toBeCloseTo((Math.atan(2) * 180) / Math.PI, 4);
       expect(fig.labels.angles.filter((l) => l.vertex === 'B').map((l) => l.text), 'only the angle').toEqual(['63.43°']);
+    },
+  },
+  {
+    id: 'sine-is-a-two-angle-choice-1711',
+    title: '#1711 (ADR-573): «sin∢ACB = 3/4» builds ∠C ≈ 48.59°, and «הציגו תצורה אחרת» reaches the other angle ≈ 131.41°',
+    guards:
+      'Operator ruling 2026-10-03 (playing T33): "sin∢ACB = 3/4 gives to options but this is just a dof and the show other config should deal with it … sometimes the other figure data will only allow 1 option and then we can nail it". Before: refused by name (ADR-566, `sine-two-angles`). Fix: the sine lowers to a measure-angle carrying both roots and a cyclable variant; `findValidConfig` gained a variant tier and the submit gate a variant cure (one shared `variantRescue`), and `searchAnotherView` walks the product of every variant. Asserts the operator\'s exact lines: the acute default as drawn and labelled, and a press of the button reaching the obtuse root with its label. The only-one-root cases, the two-sine product and the refusals are in src/__tests__/issue-1711-sine-choice.test.ts.',
+    steps: ['משולש ABC', 'sin∢ACB = 3/4'],
+    check(fig) {
+      allStepsOk(fig);
+      const acute = (Math.asin(0.75) * 180) / Math.PI;
+      expect(angle(at(fig, 'A'), at(fig, 'C'), at(fig, 'B')), 'the acute root by default').toBeCloseTo(acute, 4);
+      expect(fig.labels.angles.filter((l) => l.vertex === 'C').map((l) => l.text), 'labelled with the drawn angle').toEqual(['48.59°']);
+      const next = searchAnotherView(factsOf(['משולש ABC', 'sin∢ACB = 3/4']), 0);
+      expect(next, 'the button finds another view').not.toBeNull();
+      const alt = replay(next!.facts, next!.seed);
+      expect(angle(at(alt, 'A'), at(alt, 'C'), at(alt, 'B')), 'the obtuse root').toBeCloseTo(180 - acute, 4);
+      expect(alt.labels.angles.filter((l) => l.vertex === 'C').map((l) => l.text)).toEqual(['131.41°']);
     },
   },
 ];

@@ -105,8 +105,9 @@ describe('#1698 — what names no single angle is refused by name, never drawn a
   const REFUSED: [string, string][] = [
     ['cos∢ABC = 2', 'input.trigGiven.out-of-range'],
     ['קוסינוס הזווית ACB = 5/4', 'input.trigGiven.out-of-range'],
-    ['sin∢ACB = 3/4', 'input.trigGiven.sine-two-angles'],
-    ['סינוס הזווית ACB = 3/4', 'input.trigGiven.sine-two-angles'],
+    // #1711 (ADR-573): a sine in (0, 1) now BUILDS as a two-root choice; only a sine with no angle is refused.
+    ['sin∢ACB = 5/4', 'input.trigGiven.sine-out-of-range'],
+    ['סינוס הזווית ACB = -1/2', 'input.trigGiven.sine-out-of-range'],
     ['tan∢ABC > 1', 'input.trigGiven.form'],
     ['tan∢ABC = α', 'input.trigGiven.form'],
     ['זווית B שטנגנס שלה 2', 'input.trigGiven.form'],
