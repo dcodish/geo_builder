@@ -549,7 +549,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // --- F17 · segments and NEUTRAL shape nouns (02c §8) ---
   // Only the nouns that carry no constraint of their own. «מקבילית» / «טרפז» / «ריבוע» each carry a
   // given this slice cannot honour, so they are refused by name rather than taught here.
-  { category: 'shapes', family: 'F17', he: 'הקטע AB', en: 'segment AB', needs: ['A(0,0)', 'B(4,3)'] },
+  { featured: true, category: 'shapes', family: 'F17', he: 'הקטע AB', en: 'segment AB', needs: ['A(0,0)', 'B(4,3)'] },
   // --- F19 · the DISTANCE, in the spellings a student actually writes (#1128) ---
   // Three rows walking the three FAMILIES of spelling — the plain Hebrew noun, the textbook
   // subscript, the absolute-value bars — rather than all thirteen, which are one term and are
@@ -578,14 +578,14 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   },
 
   {
-    category: 'shapes',
+    featured: true, category: 'shapes',
     family: 'F17',
     he: 'משולש ABC',
     en: 'triangle ABC',
     needs: ['A(1,3)', 'B(-4,1)', 'C(-3,8)'],
   },
   {
-    category: 'shapes',
+    featured: true, category: 'shapes',
     family: 'F17',
     he: 'מרובע ABCD',
     en: 'quadrilateral ABCD',
@@ -1186,15 +1186,15 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
    * and the locks in issue-1618-sentence-frame.test.ts hold that — but no catalog row shows them.
    */
   {
-    category: 'shapes',
+    featured: true, category: 'shapes',
     family: 'F17',
     he: '∢C = 90°',
     en: '∠C = 90°',
     needs: ['טרפז ישר זווית ABCO'],
   },
-  { category: 'shapes', family: 'F17', he: 'המרובע ABCO הוא טרפז ישר זווית', en: 'ABCO is a right trapezoid' },
+  { featured: true, category: 'shapes', family: 'F17', he: 'המרובע ABCO הוא טרפז ישר זווית', en: 'ABCO is a right trapezoid' },
   {
-    category: 'shapes',
+    featured: true, category: 'shapes',
     family: 'F17',
     he: 'במלבן ABCD, הנקודה E נמצאת על הצלע DC',
     en: 'in rectangle ABCD, E is on side DC',
@@ -1253,4 +1253,21 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'relations', family: 'F17', he: '∢ABC ≤ 40°', en: '∠ABC ≤ 40°', needs: ['משולש ABC'] },
   { category: 'relations', family: 'F17', he: '∢ABC < ∢BAC', en: '∠ABC < ∠BAC', needs: ['משולש ABC'] },
   { category: 'relations', family: 'F17', he: 'זווית ABC קהה', en: 'angle ABC is obtuse', needs: ['משולש ABC'] },
+  // #1622 slice E1 (ADR-AG-217) — the shapes and points 2-D reads, as the corpus and 2-D's guide write them
+  { category: 'shapes', family: 'F17', he: 'ABCD', en: 'ABCD' },
+  { category: 'shapes', family: 'F17', he: 'ריבוע ABCD שצלעו הוא 1', en: 'square ABCD whose side is 1' },
+  { category: 'shapes', family: 'F17', he: 'ריבוע שצלעו 4', en: 'a square whose side is 4' },
+  { category: 'shapes', family: 'F17', he: 'מלבן במידות 4*6', en: 'rectangle 4 by 6' },
+  { category: 'shapes', family: 'F17', he: 'מחומש ABCDE', en: 'pentagon ABCDE' },
+  { category: 'shapes', family: 'F17', he: 'מחומש משוכלל ABCDE', en: 'regular pentagon ABCDE' },
+  { category: 'shapes', family: 'F17', he: 'מעוין BDEF חסום במשולש ABC', en: 'rhombus BDEF inscribed in triangle ABC' },
+  { category: 'points', family: 'F17', he: 'נקודה E על AC ב-40%', en: 'E on AC at 40%' },
+  { category: 'points', family: 'F17', he: 'C במרחק 5 מ-A ו-5 מ-B', en: 'C is 5 from A and 5 from B', needs: ['משולש ABC'] },
+  { category: 'points', family: 'F17', he: 'D על AB במרחק 3 מ-A', en: 'D on AB at a distance of 3 from A', needs: ['משולש ABC'] },
+  { category: 'derived', family: 'F17', he: 'אמצע AB', en: 'midpoint of AB', needs: ['משולש ABC'] },
+  { category: 'points', family: 'F17', he: 'הנקודה E נמצאת בתוך המשולש KAO', en: 'point E inside triangle KAO' },
+  { category: 'points', family: 'F17', he: 'C ו-D בצדדים שונים של AB', en: 'C and D are on different sides of AB' },
+  { category: 'lines', family: 'F17', he: 'קו ועליו נקודה A', en: 'a line with point A on it' },
+  { category: 'lines', family: 'F17', he: 'ישר ABE', en: 'line ABE', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: '5 < AB < 9', en: '5 < AB < 9' },
 ];

@@ -918,6 +918,33 @@ function angleSideOf(p: Pt, v: Pt | undefined, a: Pt | undefined, b: Pt | undefi
   return (p.x - v.x) * dx + (p.y - v.y) * dy;
 }
 
+/**
+ * WHERE A POINT IS AGAINST A RING (#1622, ADR-AG-217) — `boundary` within `near` of a side, else `inside` or
+ * `outside` by the even-odd rule (a simple ring, which `rings.ts` holds every declared noun to).
+ */
+export function ringRegion(p: Pt, ring: readonly Pt[], near: number): 'inside' | 'outside' | 'boundary' {
+  const n = ring.length;
+  let inside = false;
+  for (let i = 0, j = n - 1; i < n; j = i, i += 1) {
+    const a = ring[j];
+    const b = ring[i];
+    const ux = b.x - a.x;
+    const uy = b.y - a.y;
+    const nn = ux * ux + uy * uy;
+    const t = nn > 1e-24 ? Math.max(0, Math.min(1, ((p.x - a.x) * ux + (p.y - a.y) * uy) / nn)) : 0;
+    if (Math.hypot(p.x - (a.x + t * ux), p.y - (a.y + t * uy)) <= near) return 'boundary';
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside ? 'inside' : 'outside';
+}
+
+/** The signed side of `p` against the line `ab`, as a distance — `null` when `ab` has no direction (#1622). */
+function sideOfLine(p: Pt, a: Pt, b: Pt): number | null {
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  if (!(len > 1e-12)) return null;
+  return ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) / len;
+}
+
 /** Does a sign selector's quantity sit on its named side — the judge's own test, shared with the seeding below. */
 const signHolds = (s: Extract<Selector, { kind: 'sign' }>, q: number): boolean =>
   s.positive ? (s.closed ? q >= 0 : q > 0) : s.closed ? q <= 0 : q < 0;
@@ -1060,8 +1087,38 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       }
       return true;
     }
+    /**
+     * WHICH SIDE OF A LINE (#1622, ADR-AG-217) — a subject within the visible resolution of the line is ON it, which
+     * is neither side, so it fails both readings (2-D's `points-line-side`).
+     */
+    if (s.kind === 'line-side') {
+      const a = at.get(s.a);
+      const b = at.get(s.b);
+      if (!a || !b) return true;
+      const sides: number[] = [];
+      for (const id of s.ids) {
+        const q = at.get(id);
+        if (!q) return true; // an absent subject judges nothing, as below
+        const d = sideOfLine(q, a, b);
+        if (d === null) return true; // a line with no direction has no sides to judge
+        sides.push(Math.abs(d) < apart ? 0 : Math.sign(d));
+      }
+      if (sides.some((x) => x === 0)) return false;
+      return s.same ? sides.every((x) => x === sides[0]) : sides[0] !== sides[1];
+    }
     const p = at.get(s.id);
     if (!p) return true; // a selector about an absent point judges nothing
+    /**
+     * INSIDE OR OUTSIDE A RING (#1622, ADR-AG-217) — the boundary is inside only for a `closed` region (an inscribed
+     * vertex on its side); an open «בתוך» / «מחוץ ל» excludes it, as a point on a side is neither.
+     */
+    if (s.kind === 'in-polygon') {
+      const ring = s.ring.map((id) => at.get(id));
+      if (ring.some((q) => !q)) return true;
+      const where = ringRegion(p, ring as Pt[], apart);
+      if (where === 'boundary') return s.closed === true && s.inside;
+      return (where === 'inside') === s.inside;
+    }
     /**
      * A CROSSING IS NOT ITS SIBLING (#1113).
      *
@@ -1706,6 +1763,71 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
     if (!p0 || !v0) continue;
     const side = angleSideOf(p0, v0, posOf(s0.a) ?? undefined, posOf(s0.b) ?? undefined);
     if (side !== null && side < 0) seeded.set(s0.id, { x: 2 * v0.x - p0.x, y: 2 * v0.y - p0.y });
+  }
+  /**
+   * …and the REGIONS #1622 states (ADR-AG-217) seed their points, the #1071 lesson once more — a start, never a verdict:
+   *  - a side of a line: a free subject on the wrong side (against the FIRST subject for «באותו צד», the other one
+   *    for «בצדדים שונים») is reflected across the line, keeping its distance;
+   *  - inside / outside a ring: a free point on the wrong side of the boundary is drawn toward the ring's centroid, or
+   *    pushed away from it, along its own ray (so the seed's direction still varies the figure);
+   */
+  /*
+   * …and a ring of FIVE OR MORE free vertices (#1622, ADR-AG-217) starts SIMPLE: the sampled positions are kept and
+   * handed to the vertices in angular order about their centroid, so the ring is star-shaped from its first sample.
+   * Measured: eight free samples in letter order form a simple ring so rarely that «מתומן ABCDEFGH» exhausted the
+   * walk at 16 of 24 seeds and was drawn crossed. Quadrilaterals and triangles keep their old start (the walk finds
+   * theirs, and their figures are locked). A start, never a verdict — `rings.ts` still judges the drawn ring.
+   */
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon' || o.vertices.length < 5 || !o.vertices.every((v) => seeded.has(v))) continue;
+    const pts = o.vertices.map((v) => seeded.get(v)!);
+    const cx = pts.reduce((t, p) => t + p.x, 0) / pts.length;
+    const cy = pts.reduce((t, p) => t + p.y, 0) / pts.length;
+    const sorted = [...pts].sort((p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx));
+    o.vertices.forEach((v, i) => seeded.set(v, sorted[i]));
+  }
+  {
+    const posOf = (id: Id): Pt | null => seeded.get(id) ?? pointAtId(c, env, id);
+    const frac =(((seed * 0.6180339887) % 1) + 1) % 1;
+    for (const s0 of c.selectors) {
+      if (s0.kind === 'line-side') {
+        const a = posOf(s0.a);
+        const b = posOf(s0.b);
+        if (!a || !b) continue;
+        const first = posOf(s0.ids[0]);
+        const d0 = first ? sideOfLine(first, a, b) : null;
+        if (d0 === null || d0 === 0) continue;
+        const len = Math.hypot(b.x - a.x, b.y - a.y);
+        const nx = -(b.y - a.y) / len;
+        const ny = (b.x - a.x) / len;
+        for (const id of s0.ids.slice(1)) {
+          const q = seeded.get(id);
+          const d = q ? sideOfLine(q, a, b) : null;
+          if (!q || d === null) continue;
+          const wrong = d === 0 || (s0.same ? Math.sign(d) !== Math.sign(d0) : Math.sign(d) === Math.sign(d0));
+          if (!wrong) continue;
+          // Reflect across the line (twice the signed distance along the unit normal); ON it, step off to the side.
+          const k = d === 0 ? (s0.same ? Math.sign(d0) : -Math.sign(d0)) * len * 0.5 : -2 * d;
+          seeded.set(id, { x: q.x + k * nx, y: q.y + k * ny });
+        }
+      } else if (s0.kind === 'in-polygon' && !s0.closed) {
+        const q = seeded.get(s0.id);
+        const ring = s0.ring.map(posOf);
+        if (!q || ring.some((r) => !r)) continue;
+        const pts = ring as Pt[];
+        const cx = pts.reduce((t, r) => t + r.x, 0) / pts.length;
+        const cy = pts.reduce((t, r) => t + r.y, 0) / pts.length;
+        const reach = Math.max(...pts.map((r) => Math.hypot(r.x - cx, r.y - cy)));
+        if (!(reach > 1e-9)) continue;
+        if (ringRegion(q, pts, 0) === (s0.inside ? 'inside' : 'outside')) continue;
+        const r0 = Math.hypot(q.x - cx, q.y - cy);
+        const ux = r0 > 1e-9 ? (q.x - cx) / r0 : 1;
+        const uy = r0 > 1e-9 ? (q.y - cy) / r0 : 0;
+        // Inside: a fraction of the way out from the centroid along this ray; outside: past the farthest vertex.
+        const r = s0.inside ? reach * (0.1 + 0.3 * frac) : reach * (1.5 + frac);
+        seeded.set(s0.id, { x: cx + r * ux, y: cy + r * uy });
+      }
+    }
   }
   /**
    * …and a COMPARISON between two points seeds their ORDER (#1462, ADR-AG-161) — the same lesson for a pair.

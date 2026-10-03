@@ -418,6 +418,20 @@ function namingCandidates(line: string, name: string): string[] {
 }
 
 /**
+ * A shape or midpoint the TOOL lettered (#1622, ADR-AG-217) — «ריבוע שצלעו 4», «מלבן במידות 4*6», «אמצע AB» — names its
+ * letters after the fact: the row's whole run of tool letters written after a word of the sentence («ריבוע ABCD שצלעו
+ * 4»), or the one letter before it («M אמצע AB»). The fold-equality proof below keeps only the form that draws the same.
+ */
+function letteringCandidates(line: string, run: readonly string[], name: string): string[] {
+  const words = line.split(' ');
+  const out: string[] = [`${name} ${line}`];
+  for (let i = 1; i <= Math.min(3, words.length); i += 1) {
+    out.push([...words.slice(0, i), run.join(''), ...words.slice(i)].join(' '));
+  }
+  return out;
+}
+
+/**
  * MATERIALIZE a letter the TOOL chose (#1631 sub-decision a): rewrite the sentence that made the tool
  * name `id` into a form that names it explicitly, proven to fold to the IDENTICAL construction. Returns
  * the lines with that one row rewritten, or null when the sentence has no such form.
@@ -428,7 +442,9 @@ function materialize(state: RenameState, current: Derivation, id: string): strin
   const want = constructionShape(current, {});
   const wantFaults = faultShape(current);
   const line = state.lines[row];
-  for (const cand of [...cevianNamingCandidates(line, id), ...namingCandidates(line, id)]) {
+  const at = current.minted.find((x) => x.id === id)!.index;
+  const run = current.minted.filter((x) => x.index === at).map((x) => x.id);
+  for (const cand of [...cevianNamingCandidates(line, id), ...namingCandidates(line, id), ...letteringCandidates(line, run, id)]) {
     const p = parseLine(cand);
     if (!p.ok || !factsMention(p.facts, id)) continue;
     const lines = state.lines.map((l, i) => (i === row ? cand : l));

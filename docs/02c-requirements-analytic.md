@@ -2272,3 +2272,15 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - «מעגל O בקוטר 10» / «מעגל O שקוטרו 10» is the circle with radius 5.
 - The symbol palette has the ⌢{} button: select «AC», press it, get «⌢{AC}».
 - Every sentence above has its English twin («arc AB = 40 in circle O», «semicircle with diameter AB», «quarter circle», «sector AOB with angle 80», «M is the midpoint of arc BC in circle O», «diameter from point F in circle O», «circle O with diameter 10»).
+**R160 — the shapes and points the 2-D tool reads build the same here**
+([ADR-AG-217](06c-decisions-analytic.md#adr-ag-217), [#1622](https://github.com/dcodish/geo_builder/issues/1622) slice E1; operator ruling 2026-10-02: analytic gives the same experience as 2-D for plane geometry).
+
+- A bare run of three or four letters («ABC», «ABCD») is the triangle or quadrilateral it names.
+- «מחומש ABCDE», «משושה …», «מתומן …» draw a polygon of that many sides and assert nothing else. «משובע», «מתושע», «מעושר» without «משוכלל» are refused by name, offering the nouns that build.
+- «מחומש משוכלל ABCDE» (and «משושה / משובע / מתומן / מתושע / מעושר משוכלל», "regular pentagon ABCDE") draws a regular polygon: equal sides and equal angles. Its size, place and turn are free and move with «הציגו תצורה אחרת».
+- A shape may state its size: «ריבוע ABCD שצלעו הוא 1» (square, rhombus, equilateral triangle, a regular polygon), «מלבן במידות 4*6» / «מלבן 4 על 6» (any quadrilateral: the first number is AB, the second BC). «מלבן ABCD שצלעו 4» asks which side is meant.
+- A shape written without letters («ריבוע», «ריבוע שצלעו 4», «מחומש משוכלל») is lettered by the tool with the first free letters (A, B, C, …), as in 2-D; the row says so, and the letters can be renamed. «קו ועליו נקודה A» draws a line BC with A on it.
+- «מעוין BDEF חסום במשולש ABC», «מלבן DEFG …», «ריבוע DEFG …»: a letter the triangle shares is its vertex, and every other vertex lies on a side. When the letters do not say which side, «הציגו תצורה אחרת» moves between the possible placements.
+- Points: «נקודה E על AC ב-40%» (40% of the way from A); «C במרחק 5 מ-A ו-5 מ-B»; «D על AB במרחק 3 מ-A»; «אמצע AB» (the tool names it M); «הנקודה E נמצאת בתוך המשולש KAO» / «… מחוץ ל…» (naming the triangle draws it); «C ו-D בצדדים שונים של AB» / «… באותו צד של AB»; «ישר ABE» (A, B, E on one line, B between).
+- A bound on a length is R-numbered with the orders of #1621 D3 (ADR-AG-216); «AB בין 5 ל-9» / "AB is between 5 and 9" now reads as the window «5 < AB < 9».
+- «המעגל החוסם את המשולש ABC» named in a sentence when the figure has no such circle draws it (the circle through A, B and C), as a named circle does (R143).

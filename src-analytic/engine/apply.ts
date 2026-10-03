@@ -833,6 +833,25 @@ const POINT_LETTER = /^[A-Z][0-9₀-₉]?$/;
  * it is a free point until a sentence places it.
  */
 function statingNamedCircle(c: Construction, name: string, f: Fact): ApplyOutcome | null {
+  /*
+   * A RING-DESCRIBED circle the figure does not have (#1622, ADR-AG-217) — «D על המעגל החוסם את המשולש ABC», «המעגל
+   * החוסם את משולש ABC חותך את CE בנקודה D»: 2-D builds the circumcircle on demand; so does this, as the computed circle
+   * «המעגל החוסם את המשולש ABC» states (`circle-thru` through the three; the incircle for «החסום ב»). Its ring must exist.
+   */
+  const described = readDescribedCircle(name);
+  if (described) {
+    const creation: Fact | null =
+      described.role === 'circum'
+        ? described.pts.length === 3
+          ? { t: 'circle-thru', id: `circle-thru-${[...described.pts].sort().join('')}`, def: { t: 'through', pts: [described.pts[0], described.pts[1], described.pts[2]] }, src: f.src }
+          : null
+        : { t: 'circle-thru', id: incircleId(ringId(described.pts)), def: { t: 'incircle', pts: [...described.pts] }, src: f.src };
+    if (!creation) return null;
+    const made = applyAll(c, [creation]);
+    if (!made.ok) return made;
+    const out = applyFact(made.next, f);
+    return out.ok ? { ...out, effect: 'created' } : out;
+  }
   if (!POINT_LETTER.test(name) || isNumeralName(name)) return null;
   const held = objectById(c, name);
   if (held && !isPositional(held)) return null;
@@ -3300,7 +3319,12 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
                   [f.sel.id, ...('point' in f.sel.rhs ? [f.sel.rhs.point] : [])]
                 : f.sel.kind === 'angle-side'
                   ? [f.sel.id, f.sel.v, f.sel.a, f.sel.b]
-                  : [f.sel.id, f.sel.a, f.sel.b];
+                  : // #1622 (ADR-AG-217): the subjects and the line; the point and its ring.
+                    f.sel.kind === 'line-side'
+                    ? [...f.sel.ids, f.sel.a, f.sel.b]
+                    : f.sel.kind === 'in-polygon'
+                      ? [f.sel.id, ...f.sel.ring]
+                      : [f.sel.id, f.sel.a, f.sel.b];
       for (const id of refs) {
         const o = objectById(c, id);
         if (!o || !isPositional(o)) {

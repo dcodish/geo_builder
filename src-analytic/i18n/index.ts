@@ -314,6 +314,12 @@ const he = {
     'הקודקוד או הצלע במשפט "{{detail}}" שייכים ליותר ממשולש אחד בשרטוט, ולכן לא ברור לאיזו צלע הוא יורד. ' +
     'אפשר לציין את הצלע או את המשולש, למשל "AD גובה לצלע BC" או "AD גובה במשולש ABC".',
   // #1222 (ADR-AG-211) — the hypotenuse is the side facing a STATED right angle; an open one is asked, never assumed.
+  errAmbiguousSide:
+    'בצורה הזאת הצלעות אינן שוות זו לזו, ולכן לא ידוע לאיזו צלע הכוונה: "{{detail}}". ' +
+    'כתבו את הצלע עצמה, למשל "מלבן ABCD" ואחר כך "AB = 4", או את שתי המידות, למשל "מלבן ABCD במידות 4*6".',
+  errPolygonNotSupported:
+    'מצולע כזה נבנה רק כשהוא משוכלל: "{{detail}}". אפשר לכתוב אותו כמשוכלל (למשל "משובע משוכלל ABCDEFG"), ' +
+    'או להשתמש במחומש, משושה או מתומן.',
   errAmbiguousHypotenuse:
     'לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: "{{detail}}". ' +
     'כתבו איזו צלע היא היתר, למשל "תיכון ליתר AB", או איזו זווית ישרה, למשל "זווית C ישרה".',
@@ -692,6 +698,12 @@ const en: typeof he = {
   errAmbiguousCevian:
     'The vertex or side in "{{detail}}" belongs to more than one triangle in your figure, so it is unclear which side it is drawn to. ' +
     'Name the side or the triangle — for example "AD is the altitude to side BC" or "AD is the altitude in triangle ABC".',
+  errAmbiguousSide:
+    'This shape\'s sides are not all equal, so it is unclear which side you mean: "{{detail}}". ' +
+    'Name the side itself — for example "rectangle ABCD" and then "AB = 4" — or both dimensions, for example "rectangle ABCD 4 by 6".',
+  errPolygonNotSupported:
+    'A polygon with this many sides is built only when it is regular: "{{detail}}". Write it as regular ' +
+    '(for example "regular heptagon ABCDEFG"), or use a pentagon, hexagon or octagon.',
   errAmbiguousHypotenuse:
     'Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: "{{detail}}". ' +
     'Name the hypotenuse — for example "the median to the hypotenuse AB" — or the right angle, for example "angle C is right".',
