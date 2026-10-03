@@ -10544,3 +10544,92 @@ Two more items, built on top of ef942ea7:
 - As the integrator's message allows, the FLOOR is raised to 357 / 45. The ratchet's header now says the notes are included.
 
 **Requirements:** R161 amended (x/y refused); R165 extended. **Design:** 04c — the E2 section's length bullet is rewritten, and this ADR's section is extended.
+
+## ADR-AG-224 — One meet frame over every line-object: «<line> ו<line> נפגשים / נחתכים בנקודה E» (#1715)
+
+**Date:** 2026-10-03 · round #1721 · **Status:** accepted
+
+**Requirements:** [02c](02c-requirements-analytic.md) R167 (new). · **Design:** [04c](04c-design-analytic.md) — new section "One meet frame; a line-object as an operand". · **LADDER stage:** parse only (`meetFrame`, `lineObjectOperand`, the operand resolver `incidenceOn`, the crossing lowering `parseIntersectionPlain`). No new fact, no new object, no M1 or solver change.
+
+**Report.** The operator, playing the round sheet (T4): *"syntax EB ו-EC הם חוצי הזווית ABC ו-BCD בהתאמה הנפגשים בנקודה E is accepted but not variations of it such as חוצה זוית DCB וחוצה זוית CBA נפגשים בנקודה E or חוצה זוית C וחוצה זוית B נפגשים בנקודה E. note that the 2d tool does support these syntaxes"*.
+
+**Re-measured at pickup (deed7b20).** The issue's table holds:
+- every plural spelling builds;
+- «חוצה זוית BCA וחוצה זוית CBA …», «חוצה זוית C וחוצה זוית B …» and «חוצה הזווית B וחוצה הזווית C נחתכים …» are `not-handled` in analytic and build in 2-D.
+
+**2-D across the whole cross-product of kinds.** Measured through `decideDeterministic2D` after «משולש ABC»: seven kinds × seven kinds × the two verbs, plus variants. **The issue's guess that 2-D reads altitudes, medians and perpendiculars in this frame is not true.** 2-D's verdicts are:
+- **Builds** in 2-D:
+  - two bisectors written the same way («חוצה זוית B וחוצה זוית C נפגשים», three-letter with three-letter);
+  - the operator's three spellings;
+  - a three-letter bisector with a named line;
+  - two named lines;
+  - two tangents;
+  - a tangent with a named line.
+- **`not-handled`** in 2-D:
+  - every pair with an altitude, a median, a perpendicular or a perpendicular bisector;
+  - «חוצה זוית B וחוצה זוית C **נחתכים**» (while «נפגשים» builds);
+  - a one-letter bisector with a three-letter one;
+  - a named line before a one-letter bisector;
+  - «… נפגשים ב-E».
+- **Refused** in 2-D, as misreadings: «הגובה מ-A והאנך מ-B ל-AC …» (`cevianApexOnSide`) and «הגובה מ-A לצלע BC והתיכון מ-B לצלע AC …» (`cevianMedianFootAtEnd`).
+- **Builds a point on the one line** in 2-D: «חוצה זוית B וחוצה הזווית B …».
+- **Parallel named lines** are refused, by 2-D and analytic both.
+
+The verdicts were followed this way:
+- **Where 2-D builds or refuses, analytic now agrees.** Those rows are plain parity.
+- **Where 2-D is `not-handled` or misreads, analytic builds.** This is the frame the plan names, over every kind it lists. These rows are analytic-ahead with 2-D's gap on #1677 (the ADR-AG-213 precedent). The new members are recorded there in a comment.
+
+**Root cause.** The frame was never wired per kind. The meet branch already lowered every «X ו-Y נפגשים בנקודה E» to the canonical crossing «E נקודת החיתוך של X עם Y». What was per-kind was the **operand resolver** (`incidenceOn`). It read a named line, an axis, a curve, a tangent at a point and the contextual «האנך», and **no line-object a sentence builds**: an angle bisector, an altitude or median from its apex, a perpendicular bisector. Two spelling defects stacked on top:
+- the clitic join admitted «ו» only before ה ל צ מ פ א, so «וחוצה» never split;
+- `parsePerpendicular`, earlier in the chain, read «האנך מ-A ל-BC וחוצה … נפגשים בנקודה E» as one perpendicular onto an unreadable line, and refused it.
+
+**The class (docs/17 §1).** *A line-object is read as a SENTENCE everywhere and as an OPERAND nowhere.* So every frame that takes an operand missed the same objects:
+- the meet;
+- the noun crossing «E נקודת החיתוך של X עם Y»;
+- «X חותך את Y בנקודה E»;
+- the point-on sentence «E על X».
+
+**Decision.**
+1. **`lineObjectOperand`, one reader for a line-object operand.** The noun phrase is read by the rule that reads it as a sentence (`parseClause`), so the operand cannot mean anything its sentence does not. The point is then put on the line that sentence built, using one table keyed by what was built:
+   - `bisects` with no point → the same fact with `p` (the point is on the bisector's RAY, ADR-AG-209's lowering, so two bisectors of one triangle meet at the incentre);
+   - `cevian-of` with an apex → on the line through apex and foot;
+   - a drawn piece ending at a derived point → on that piece's line;
+   - `line-at` → on that line.
+
+   The objects are built idempotently, as their own sentences build them. A cevian named only by its side («הגובה לצלע BC») has no apex until M1 finds one. It is not read (`not-handled`), and 2-D does not read it either.
+2. **`incidenceOn` returns it as a third operand kind** (`{ t: 'object', facts }`). It is placed AFTER the tangent and AFTER the contextual «האנך»: ADR-AG-207 rules «האנך מ-P ל-X» a reference to the drawn perpendicular, however fully it is described. That ruling is kept. Whether a full description should build the perpendicular instead is filed as a question, #1727.
+3. **`parseIntersectionPlain` lowers an object operand** as it lowers a contextual one: the point is declared first, then each side's facts, then `crossing-distinct`. An ordinal over a line-object pair is `bad-operand`.
+4. **One object twice names no point.** Two operands that read as the same incidence are `repeated-vertex`. This is ADR-AG-213's tangent check («המשיק בנקודה A והמשיק בנקודה A»), now by its definition rather than by its noun. A pair of two-point lines keeps its sharper refusals: `self-crossing`, and `crossing-already-named`.
+5. **`meetFrame`, the one frame.** It reads the subject and the point, then tries every join («ו», «ו-», a clitic «ו» before a noun, «עם», English "and") left to right. The first split whose canonical crossing parses wins. An owned refusal of a split is the sentence's own. A subject no split reads is `null`, so the concurrency rule («הגבהים נפגשים») and the diagonal, extension and chord rules keep their sentences.
+   - It runs in the rule chain BEFORE `parsePerpendicular`.
+   - The clitic join admits ח ג ת («וחוצה», «וגובה», «ותיכון»).
+   - **What is retired onto it:** the meet branch that handled named lines (ADR-AG-213's «הישר AC והישר BD») and tangents, with the tangent-specific one-touch-point check. The plural «המשיקים בנקודות A ו-C נפגשים …» (`tangentsMeet`) already lowered to the same canonical sentence and still does. Its locks (`issue-1620-tangents-meet`, 14) are green unchanged.
+6. **The class reaches the other operand frames for free.** «E נקודת החיתוך של חוצה זוית B עם הגובה מ-A», «חוצה זוית B חותך את הגובה מ-A בנקודה E» and «E על חוצה זוית B» all build, with E on the lines. 2-D leaves each `not-handled`. They are locked in the test file. They are not parity rows; the frame's rows carry the 2-D gap.
+
+**Locks.** `src-analytic/__tests__/issue-1715-meet-frame.test.ts`, 56 tests. **Fails before: 52 of 56.** The 4 controls are the two retired named-line and tangent meets, the parallel refusal and the crossing-already-named refusal. They cover:
+- **the operator's three spellings** at 8 seeds: E equals `incentre(A, B, C)` (`engine/derived.ts`);
+- **four more spellings**: «ו-», «ב-E», «נחתכות», the noun form; plus English "the bisector of angle B and the bisector of angle C meet at E";
+- **the classical centres through the frame** at 8 seeds: two altitudes → `orthocentre`; two medians → `centroid`; two perpendicular bisectors → `circumcentre`; two drawn perpendiculars → `orthocentre`;
+- **the cross-product**: seven kinds (bisector of B; bisector of ACB; altitude from A; median from B; the drawn perpendicular from C to AB; perpendicular bisector of BC; line AM), every ordered pair, at 3 seeds. E satisfies each line's own defining residual (equal angles inside the angle, ⟂, collinear, equidistant). Pairs through one named point (the bisector of B and the median from B; the altitude from A and line AM) are excluded: they meet at that point;
+- **the retired rules**: named lines «נפגשים» = «נחתכים»; the two tangents; a tangent with a bisector;
+- **the refusals**: parallel named lines and parallel drawn perpendiculars are `unsatisfiable`; one object twice is `repeated-vertex`; a meet at a point the pair names is `crossing-already-named`; a side-only cevian is not read; an undrawn perpendicular asks (ADR-AG-207).
+
+**Parity** (`shell/__tests__/fixtures/geo-input-parity.ts`, 14 rows `meet-*-1715`):
+- **Parity with 2-D:** the operator's three spellings, a named line with a bisector, the parallel refusal.
+- **Analytic-ahead, 2-D gap #1677:** «נחתכים» with one-letter bisectors, «ב-E», a bisector with an altitude, an altitude with a median, two altitudes, two medians, two perpendicular bisectors, a bisector with a drawn perpendicular.
+- **Refused against 2-D's build, 2-D gap #1677:** one bisector twice.
+- **3-D:** every row carries #1679 (no cevians in its plane lane).
+
+All four parity locks are green. Catalog: two entries (F17), «חוצה זוית C וחוצה זוית B נפגשים בנקודה E» and «הגובה מ-A והתיכון מ-B נפגשים בנקודה E», each a parity step.
+
+**Not built, said out loud.**
+- **Stability.** Adding E re-solves the figure jointly and moves the triangle's free vertices. This is the #1687 property, shared by the plural «חוצי הזוויות … נפגשים» since ADR-AG-209. 2-D's meet point is derived and moves nothing.
+- **A crossing at a named point only the figure knows is not caught.** «חוצה זוית ABC והישר BF» (F on AC) puts E on B, and so does 2-D. This is the positional member of #1175 / ADR-AG-140, filed there.
+- **Two lines that coincide only in this configuration** («האנך האמצעי לצלע AB והאנך האמצעי לצלע CD» in a rectangle) build E free along the common line, as two equation lines that coincide do. Same family.
+- **«חוצה זוית C וחוצה זוית B נפגשים בנקודה E» on an EMPTY canvas** is `unknown-reference`, where 2-D asks which angle. Not a row.
+
+**Sibling audit.**
+- **2-D:** its frame is the per-kind one described above. Members recorded on #1677; not fixed here (different product).
+- **3-D:** has no cevians in the plane (#1679). Checked: none of these sentences builds there.
+
+**Consequences.** `parser/parseAnalytic.ts`: `ObjectOperand`, `LINE_OBJECT_NOUN`, `lineObjectOperand`, `incidenceOn`, `parseIntersectionPlain`, `meetFrame`, `INTERSECT_JOIN`, the rule chain, the point-on arm. Also `parser/catalogAnalytic.ts` (two entries) and the parity fixture.

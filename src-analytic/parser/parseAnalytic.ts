@@ -1246,7 +1246,8 @@ function ordinalOf(line: string): 0 | 1 | null {
  * matched and the whole sentence fell to `not-handled`. The lookahead keeps «ונקודה…» prose out:
  * the clitic joins an operand only when an operand follows it.
  */
-const INTERSECT_JOIN = '(?:\\s+עם\\s+|\\s+ו\\s+|\\s+ו-\\s*|\\s+ו(?=ה|ל|צ|מ|פ|א))';
+// #1715: «וחוצה», «וגובה», «ותיכון» — a line-object noun follows the clitic too.
+const INTERSECT_JOIN = '(?:\\s+עם\\s+|\\s+ו\\s+|\\s+ו-\\s*|\\s+ו(?=ה|ל|צ|מ|פ|א|ח|ג|ת))';
 /**
  * «B היא אחת מנקודות החיתוך של המעגל עם ציר ה-y» (#1619 B1) — "one of the crossings" names a crossing and
  * says nothing about WHICH: it is the sentence without an ordinal, so it is read as that sentence (the
@@ -1278,16 +1279,77 @@ const BOUNDED_NOUN = new RegExp(
 /** A CONTEXTUAL operand — «המעגל», «הפרבולה» with no name: which curve is M1's question (#1429). */
 type KindOperand = { t: 'kind'; kind: 'circle' | 'parabola' | 'ellipse' | 'tangent' | 'perpendicular'; circle?: string; foot?: PerpRef };
 
+/**
+ * A LINE-OBJECT operand (#1715, ADR-AG-224) — «חוצה זוית B», «הגובה מ-A», «התיכון מ-A», «האנך מ-A ל-BC», «האנך
+ * האמצעי ל-AB», "the bisector of angle B". `facts` BUILD the object (idempotently, as its own sentence would) and put
+ * the operand's point ON it. See {@link lineObjectOperand}.
+ */
+type ObjectOperand = { t: 'object'; facts: Fact[] };
+
+/** The nouns of a line-object a sentence builds (the gate before the sentence reader is asked). */
+const LINE_OBJECT_NOUN = /^(?:ה?(?:חוצה|גובה|תיכון|אנך)(?=[\s-])|(?:the\s+|an?\s+)?(?:angle\s+)?(?:bisector|altitude|height|median|perpendicular)\b)/i;
+
+/**
+ * ONE READER FOR A LINE-OBJECT NAMED AS AN OPERAND (#1715, ADR-AG-224).
+ *
+ * Operator, round sheet T4: *"…not variations of it such as חוצה זוית DCB וחוצה זוית CBA נפגשים בנקודה E or חוצה זוית
+ * C וחוצה זוית B נפגשים בנקודה E. note that the 2d tool does support these syntaxes"*. Every plural spelling built
+ * (ADR-AG-209), and the two-singular frame «X ו-Y נפגשים בנקודה E» built for named lines and tangents only: the
+ * operand resolver (`incidenceOn`) knew those two kinds of line and no other. **The class: a line-object is read as
+ * a SENTENCE everywhere and as an OPERAND nowhere**, so every frame that takes an operand — the meet, the crossing
+ * «E נקודת החיתוך של X עם Y», «X חותך את Y בנקודה E» — missed the same objects.
+ *
+ * The words are read by the rule that reads them as a sentence (`parseClause`), so the operand cannot mean anything
+ * its sentence does not; then the point is put on the line that sentence built — one table, by what was built:
+ * - an angle bisector («חוצה זוית B», `bisects` with no point) → the point is on its RAY (`bisects` with `p`: the
+ *   reading «חוצי הזוויות B ו-C נפגשים בנקודה E» already lowers to, so E is the incentre when both are inside one
+ *   triangle);
+ * - a cevian named from its apex («הגובה מ-A», `cevian-of`) → on the line through the apex and its foot;
+ * - a drawn piece from a point to a derived one («האנך מ-A ל-BC», «הגובה מ-A לצלע BC») → on that piece's line;
+ * - a line through a point («האנך האמצעי ל-AB», `line-at`) → on that line.
+ *
+ * Anything else the sentence reader built is not a line-object (`null`, and the caller's other readers go on). A
+ * cevian named only by its side («הגובה לצלע BC») has no apex until M1 finds it, so it is not read here — 2-D does
+ * not read it in these frames either.
+ */
+function lineObjectOperand(operand: string, id: Id): ObjectOperand | 'bad' | null {
+  if (!LINE_OBJECT_NOUN.test(operand)) return null;
+  const r = parseClause(operand);
+  if (!r.ok) return r.code === 'not-handled' ? null : 'bad';
+  const facts = r.facts.map((f) => ({ ...f, src: '' })) as Fact[];
+  const on = (a: Id, b: Id): ObjectOperand | 'bad' =>
+    a === id || b === id ? 'bad' : { t: 'object', facts: [...facts, { t: 'constraint', k: { t: 'on-line-2pt', id, a, b }, src: '' }] };
+  if (facts.length === 1 && facts[0].t === 'bisects' && facts[0].p === undefined) {
+    const at = facts[0].at;
+    if (at.v === id || (isAngleRef(at) && (at.a === id || at.b === id))) return 'bad';
+    return { t: 'object', facts: [{ ...facts[0], p: id }] };
+  }
+  const cevian = facts.find((f) => f.t === 'cevian-of');
+  if (cevian) return cevian.t === 'cevian-of' && cevian.apex !== undefined ? on(cevian.apex, cevian.foot) : null;
+  const lineAt = facts.find((f) => f.t === 'line-at');
+  if (lineAt && lineAt.t === 'line-at') return { t: 'object', facts: [...facts, { t: 'constraint', k: { t: 'on-curve', id, curve: lineAt.id }, src: '' }] };
+  // The drawn piece runs from the given point to the DERIVED one (the foot) — its line is the object's line.
+  const derived = new Set(facts.flatMap((f) => (f.t === 'derived' ? [f.id] : [])));
+  const piece = facts.find((f) => f.t === 'segment' && (derived.has(f.a) || derived.has(f.b)));
+  if (piece && piece.t === 'segment') return on(piece.a, piece.b);
+  return null;
+}
+
 // «המעגל 1» and «המעגל I» are one circle (#1429) — the digit→Roman map now lives in `engine/names.ts`
 // (`numeralCurveId`), shared by the mint and every reference site, for every numeral-named kind.
 
-function incidenceOn(operand: string, id: Id, claims?: ClaimSink): Constraint | KindOperand | null {
+function incidenceOn(operand: string, id: Id, claims?: ClaimSink): Constraint | KindOperand | ObjectOperand | null {
   // «המשיק למעגל בנקודה A» — the tangent object at A; bare «המשיק» — the one in the figure (#1619 B3).
   const tangent = readTangentNoun(trim(operand));
   if (tangent) return tangent.at ? { t: 'on-curve', id, curve: tangentLineId(tangent.at) } : { t: 'kind', kind: 'tangent' };
   // «האנך», «האנך שהורידו מנקודה B לציר ה-x» — the perpendicular the figure drew (#1620, ADR-AG-207).
   const perp = perpendicularRef(trim(operand));
   if (perp) return perp === 'bad' ? null : perp;
+  // A line-object named in full — a bisector, a cevian from its apex, a perpendicular bisector — is BUILT by the operand
+  // (#1715), as a tangent at a named point is above. AFTER «האנך»: ADR-AG-207 rules that phrase a REFERENCE to the
+  // perpendicular the figure drew, however fully it is described.
+  const object = lineObjectOperand(trim(operand), id);
+  if (object) return object === 'bad' ? null : object;
   const axis = AXIS_HE.exec(trim(operand)) ?? AXIS_EN.exec(trim(operand));
   if (axis) {
     return axis[1].toLowerCase() === 'x'
@@ -1410,7 +1472,7 @@ function parseIntersection(line: string): RuleOutcome {
   // #1286 (ADR-AG-135): a crossing's incidences are marked as such — the drawn extent bounds the
   // SOLUTION set for a crossing only (the operator's T11 ruling and ruling (a) were about this
   // sentence); a cevian's foot or a point «על הישר» keeps the line reading its own ruling gave it.
-  const asCrossing = (k: Constraint | KindOperand | null) =>
+  const asCrossing = (k: Constraint | KindOperand | ObjectOperand | null) =>
     k && k.t === 'on-line-2pt' ? { ...k, crossing: true as const } : k;
   // A role noun's claim rides beside the crossing (#1651, ADR-AG-200): «נקודת החיתוך של המיתר AB עם …».
   const claims: ClaimSink = { out: [], src: line };
@@ -1434,11 +1496,17 @@ function parseIntersection(line: string): RuleOutcome {
 function parseIntersectionPlain(
   line: string,
   id: Id,
-  left: Constraint | KindOperand,
-  right: Constraint | KindOperand,
+  left: Constraint | KindOperand | ObjectOperand,
+  right: Constraint | KindOperand | ObjectOperand,
   axisPart: readonly Fact[],
 ): RuleOutcome {
   const ordinal = ordinalOf(line);
+  /**
+   * ONE OBJECT TWICE (#1715; ADR-AG-213's tangent check, by its definition rather than by its noun) — «המשיק בנקודה
+   * A והמשיק בנקודה A», «חוצה זוית B וחוצה הזווית B»: two operands that read as the same incidence name one line,
+   * which has no crossing to name. Two lines given by their PAIRS keep their own, sharper refusals below.
+   */
+  if (left.t !== 'on-line-2pt' && JSON.stringify(left) === JSON.stringify(right)) return refuse('repeated-vertex', line);
   /**
    * A CONTEXTUAL operand — «עם המעגל» (#1429) — lowers to the fold-resolved `on-kind` fact, the
    * SAME resolution «P על המעגל» has always had, so the crossing and the point-on sentence cannot
@@ -1446,16 +1514,23 @@ function parseIntersectionPlain(
    * the sentence names a root order this rule cannot see yet, and guessing one would name the
    * wrong crossing silently.
    */
-  if (left.t === 'kind' || right.t === 'kind') {
+  /**
+   * A LINE-OBJECT operand (#1715) takes the same lowering: its own facts build the object and put the point on it,
+   * after the point is declared — so a bisector reads the point as one on its ray, never as its foot (ADR-AG-209).
+   * An ordinal names a root order of a pair of curves, which a line-object pair does not have.
+   */
+  if (left.t === 'kind' || right.t === 'kind' || left.t === 'object' || right.t === 'object') {
     if (ordinalOf(line) !== null) return refuse('bad-operand', line);
-    const side = (k: Constraint | KindOperand): Fact =>
-      k.t === 'kind'
-        ? { t: 'on-kind', id, kind: k.kind, ...(k.circle ? { circle: k.circle } : {}), ...(k.foot ? { foot: k.foot } : {}), src: line }
-        : { t: 'constraint', k, src: line };
+    const side = (k: Constraint | KindOperand | ObjectOperand): Fact[] =>
+      k.t === 'object'
+        ? k.facts.map((f) => ({ ...f, src: line }))
+        : k.t === 'kind'
+          ? [{ t: 'on-kind', id, kind: k.kind, ...(k.circle ? { circle: k.circle } : {}), ...(k.foot ? { foot: k.foot } : {}), src: line }]
+          : [{ t: 'constraint', k, src: line }];
     return made([
       { t: 'declare', id, src: line },
-      side(left),
-      side(right),
+      ...side(left),
+      ...side(right),
       { t: 'selector', sel: { kind: 'crossing-distinct', id }, src: line },
       ...axisPart,
     ]);
@@ -1520,6 +1595,45 @@ function parseIntersectionPlain(
   ]);
 }
 /**
+ * THE MEET FRAME — «<line> ו<line> נפגשים / נחתכים בנקודה E», ONE lowering for every kind of line (#1715, ADR-AG-224).
+ *
+ * The two noun phrases are any two operands the one resolver reads (`incidenceOn`): a named line («הישר AC»), a tangent
+ * at a point (ADR-AG-213), an axis, a curve, and — since #1715 — every line-object a sentence builds: an angle bisector,
+ * a cevian from its apex, a perpendicular from a point, a perpendicular bisector (`lineObjectOperand`). The sentence is
+ * the canonical crossing «E נקודת החיתוך של X עם Y», so the crossing rule owns the semantics: the two incidences, the
+ * structural refusals (one object twice; a crossing at a point the pair already names), parallel lines `unsatisfiable`.
+ *
+ * The verb is one verb (#1081, ADR-AG-213): «נחתכים / נפגשים / מצטלבים», either gender, «בנקודה E / ב-E»; English
+ * meet / intersect / cross. The tangent pair's single circle phrase is shared (`sharedCircle`), and the plural
+ * «המשיקים בנקודות A ו-C נפגשים …» distributes into this same canonical sentence (`tangentsMeet`).
+ *
+ * WHERE the subject splits: every «ו» / «עם» / "and" that could join two operands is tried, left to right, and the
+ * first split whose two halves both read wins — «האנך מ-A ל-BC והגובה מ-B» must not split inside a phrase. An OWNED
+ * refusal of a split (one object twice, a crossing already named) is this sentence's. A subject no split reads falls
+ * through (`null`), so the concurrency rule after it keeps «הגבהים … נפגשים».
+ */
+function meetFrame(line: string): RuleOutcome {
+  // «X ו-Y נפגשים/נחתכים בנקודה E» — the subject, the point. English: "X and Y meet at E".
+  const he = new RegExp(`^(.+?)\\s+${MEET_VERB_HE}\\s+${AT_POINT_HE}(${NAME})$`).exec(line);
+  const m = he ?? new RegExp(`^(.+?)\\s+(?:intersect|meet|cross)\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`, 'i').exec(line);
+  if (!m) return null;
+  const [, subject, id] = m;
+  const join = he ? new RegExp(INTERSECT_JOIN, 'g') : /\s+and\s+/gi;
+  for (const j of subject.matchAll(join)) {
+    const left = subject.slice(0, j.index);
+    const right = subject.slice(j.index! + j[0].length);
+    if (!trim(left) || !trim(right)) continue;
+    const [a, b] = sharedCircle(left, right);
+    const canonical = `${id} נקודת החיתוך של ${withLineNoun(a)} עם ${withLineNoun(b)}`;
+    const r = parseClause(canonical);
+    if (r.ok) return made(r.facts.map((f) => ({ ...f, src: line })));
+    if (r.code !== 'not-handled' && r.code !== 'bad-operand') return { ...r, detail: line } as ParseResult;
+  }
+  return null;
+}
+
+
+/**
  * THE CROSSING'S OTHER SPELLINGS (#1429) — each normalised to the canonical «E נקודת החיתוך של X
  * עם Y» and re-parsed (`viaCanonical`, the #1495 seam), so one rule owns the semantics:
  *
@@ -1557,21 +1671,6 @@ function intersectionSpellings(line: string): RuleOutcome {
   }
   const tangents = tangentsMeet(line);
   if (tangents) return tangents;
-  // «נחתכים», «נפגשים» and «מצטלבים» are ONE verb for two lines (#1620 S7, ADR-AG-213 — the #1081 alternation the
-  // concurrency rule already carries): «הישר AC והישר BD נפגשים בנקודה E» was `not-handled` while «…נחתכים…»
-  // built, and 2-D reads both alike. A subject this rule cannot read as two lines still falls through
-  // (`viaCanonical` answers `null`), so the concurrency rule after it keeps «הגבהים … נפגשים».
-  const meet =
-    new RegExp(`^(.+?)${INTERSECT_JOIN}(.+?)\\s+${MEET_VERB_HE}\\s+${AT_POINT_HE}(${NAME})$`).exec(line) ??
-    new RegExp(`^(.+?)\\s+and\\s+(.+?)\\s+(?:intersect|meet|cross)\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`, 'i').exec(line);
-  if (meet) {
-    // «המשיק בנקודה A והמשיק בנקודה A …» is one line twice: no crossing to name (the plural's «בנקודות A ו-A» rule).
-    const touchA = readTangentNoun(trim(meet[1]))?.at;
-    if (touchA !== undefined && touchA === readTangentNoun(trim(meet[2]))?.at) return refuse('repeated-vertex', line);
-    const [a, b] = sharedCircle(meet[1], meet[2]);
-    const id = meet[3];
-    return viaCanonical(line, null, () => [`${id} נקודת החיתוך של ${withLineNoun(a)} עם ${withLineNoun(b)}`]);
-  }
   // «X חותך את Y בנקודה B ואת Z בנקודה A» — one subject, two crossings: each is its own sentence (#1619 B3).
   const cutsTwo = new RegExp(
     `^(.+?)\\s+חות(?:ך|כת|כים|כות)\\s+את\\s+(.+?)\\s+ב?נקודה\\s+(${NAME})\\s*,?\\s+ו(?:את\\s+|-)(.+?)\\s+ב?נקודה\\s+(${NAME})$`,
@@ -6461,6 +6560,8 @@ function parseConstraint(raw: string): RuleOutcome {
         { t: 'on-kind', id, kind: k.kind, ...(k.circle ? { circle: k.circle } : {}), ...(k.foot ? { foot: k.foot } : {}), src: line },
       ]);
     }
+    // «E על חוצה זוית B» — a point on a line-object the sentence builds (#1715): the operand's own lowering.
+    if (k && k.t === 'object') return made([{ t: 'declare', id, src: line }, ...k.facts.map((f) => ({ ...f, src: line }))]);
     // A bare AXIS operand keeps belonging to the ON_AXIS rule below, which also reads the
     // positive/negative-part clause — one owner for that whole sentence family.
     if (k && k.t !== 'on-line') {
@@ -7910,7 +8011,10 @@ function parseClauseRules(raw: string): ParseResult {
     // the student wrote perfectly — the swallowing defect #1059 records, and the relation rule's own
     // docblock gives the cure: a construction recognisable from a keyword no other rule uses costs
     // nothing to match early and removes the ambiguity entirely.
-    parseCongruence(line) ?? parseSegmentCross(line) ?? parseAngleBetween(line) ?? parseVertexValue(line) ?? parseThroughLine(line) ?? parsePerpendicular(line) ?? parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
+    // `meetFrame` BEFORE `parsePerpendicular` (#1715): «האנך מ-A ל-BC וחוצה זוית C נפגשים בנקודה E» starts like a
+    // perpendicular, whose rule would take everything after «ל-» as its line and refuse it. The frame answers `null`
+    // for a subject it cannot split into two operands, so a sentence that is a perpendicular is untouched.
+    parseCongruence(line) ?? parseSegmentCross(line) ?? parseAngleBetween(line) ?? parseVertexValue(line) ?? parseThroughLine(line) ?? meetFrame(line) ?? parsePerpendicular(line) ?? parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
   if (matched) return matched;
 
   // NO constrained-shape refusal here any more (#1049). It existed because those nouns carried

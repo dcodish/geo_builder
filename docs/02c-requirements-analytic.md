@@ -2316,3 +2316,12 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - «משולש קהה זווית ABC» («קהה-זווית», «ABC משולש קהה זווית», "obtuse triangle ABC") says one of the three angles is obtuse without saying which: the first figure is obtuse at one vertex, and «הציגו תצורה אחרת» moves the obtuse angle to the others. A later given decides it («זווית BAC = 30», «זווית ABC = 40» leave only C); givens that leave no obtuse angle are refused. «ABC משולש חד זוויות» now reads letters-first too.
 - Corpus 7/4 «נתון: S_BDC / S_ODC = 0.8» stays refused: the page prints it so, and with D on BC the triangle BDC has no area. The exam's answer key is the ratio S_BEC / S_ODC = 0.8 (B(6,8)), which the tool builds when typed.
 - A point against an axis says which side of it the point is on: «D מתחת לציר x», «A מעל ציר ה-x», «C משמאל לציר ה-y», «B מימין לציר y» ("D is below the x-axis"). Several givens may share one line, joined by «;»: «A משמאל ל-O ו-C מימין ל-O; B על החלק החיובי של ציר y; D מתחת לציר x (ציור)» (a bare «(ציור)» states nothing).
+
+**R167 — two lines of any kind meet at a named point**
+([ADR-AG-224](06c-decisions-analytic.md#adr-ag-224), [#1715](https://github.com/dcodish/geo_builder/issues/1715))
+
+- «<line> ו<line> נפגשים בנקודה E» works for any two lines the tool draws: an angle bisector («חוצה זוית B», «חוצה הזווית ABC»), an altitude or median from a vertex («הגובה מ-A», «התיכון מ-B»), a perpendicular bisector («האנך האמצעי לצלע AB»), a drawn perpendicular («האנך מ-C ל-AB»), a tangent at a point, or a named line. It also accepts «נחתכים» / «נפגשות» / «מצטלבים», «ב-E», «ו-», and English "… and … meet at E". Each line is drawn, and E is where they cross. Two bisectors of a triangle meet at its incentre; two altitudes at the orthocentre; two medians at the centroid; two perpendicular bisectors at the circumcentre.
+- The same lines work in «E נקודת החיתוך של X עם Y», «X חותך את Y בנקודה E» and «E על X».
+- Parallel lines are refused as impossible. The same line written twice is refused. Two named lines that share a letter («הישר AB והישר BC») are refused, because they meet at that point.
+- An altitude or median named only by its side («הגובה לצלע BC») is not read in these sentences.
+- A perpendicular «האנך מ-P ל-X» must already be drawn (R141).

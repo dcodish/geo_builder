@@ -906,6 +906,21 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'obtuse-triangle-1708', family: 'polygons', steps: ['משולש קהה זווית ABC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: '#1708: one of the three angles is obtuse — a choice over the vertices' },
   { id: 'obtuse-triangle-hyphen-1708', family: 'polygons', steps: ['משולש קהה-זווית ABC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }] },
   { id: 'obtuse-triangle-letters-first-1708', family: 'polygons', steps: ['ABC משולש קהה זווית'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }] },
+  // ── #1715 (ADR-AG-224): ONE meet frame, «<line> ו<line> נפגשים / נחתכים בנקודה E», over every line-object ──
+  { id: 'meet-bisectors-1715', family: 'intersections', steps: ['משולש ABC', 'חוצה זוית C וחוצה זוית B נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'the operator’s spelling (#1715 T4): E is the incentre' },
+  { id: 'meet-bisectors-3-1715', family: 'intersections', steps: ['משולש ABC', 'חוצה זוית BCA וחוצה זוית CBA נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
+  { id: 'meet-bisectors-cut-1715', family: 'intersections', steps: ['משולש ABC', 'חוצה הזווית B וחוצה הזווית C נחתכים בנקודה E'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
+  { id: 'meet-bisector-line-2-1715', family: 'intersections', steps: ['משולש ABC', 'D על BC', 'הישר AD וחוצה זוית ABC נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
+  { id: 'meet-bisectors-short-cut-1715', family: 'intersections', steps: ['משולש ABC', 'חוצה זוית B וחוצה זוית C נחתכים בנקודה E'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: '2-D reads «נפגשים» here but not «נחתכים»' },
+  { id: 'meet-at-short-1715', family: 'intersections', steps: ['משולש ABC', 'חוצה זוית B וחוצה זוית C נפגשים ב-E'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }] },
+  { id: 'meet-bisector-altitude-1715', family: 'intersections', steps: ['משולש ABC', 'חוצה זוית A והגובה מ-B נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }] },
+  { id: 'meet-altitude-median-1715', family: 'intersections', steps: ['משולש ABC', 'הגובה מ-A והתיכון מ-B נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }] },
+  { id: 'meet-altitudes-1715', family: 'intersections', steps: ['משולש ABC', 'הגובה מ-A והגובה מ-B נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: 'E is the orthocentre' },
+  { id: 'meet-medians-1715', family: 'intersections', steps: ['משולש ABC', 'התיכון מ-A והתיכון מ-B נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: 'E is the centroid' },
+  { id: 'meet-perp-bisectors-1715', family: 'intersections', steps: ['משולש ABC', 'האנך האמצעי לצלע AB והאנך האמצעי לצלע BC נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: 'E is the circumcentre' },
+  { id: 'meet-perpendicular-drawn-1715', family: 'intersections', steps: ['משולש ABC', 'האנך מ-C ל-AB', 'חוצה זוית B והאנך מ-C ל-AB נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: '«האנך מ-C ל-AB» refers to the drawn perpendicular (ADR-AG-207)' },
+  { id: 'meet-same-line-twice-1715', family: 'intersections', steps: ['משולש ABC', 'חוצה זוית B וחוצה הזווית B נפגשים בנקודה E'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: 'one line twice names no point; 2-D builds a point on it' },
+  { id: 'meet-parallel-1715', family: 'intersections', steps: ['מלבן ABCD', 'הישר AB והישר CD נפגשים בנקודה E'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679' }] },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
