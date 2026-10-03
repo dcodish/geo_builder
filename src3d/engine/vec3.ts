@@ -55,6 +55,23 @@ export function bisectorDir3(apex: Vec3, a: Vec3, b: Vec3): Vec3 | null {
 /** Linear interpolation a + t·(b−a) — the on-segment point. */
 export const lerp3 = (a: Vec3, b: Vec3, t: number): Vec3 => add3(a, scale3(sub3(b, a), t));
 
+/**
+ * #1728 — where the lines a1–b1 and a2–b2 cross: the midpoint of their closest approach (closed form), so
+ * a crossing of coplanar lines is exact and a skew pair still gets a defined point for the verifier to
+ * judge. `null` for parallel or degenerate lines — there is no crossing to place.
+ */
+export function lineCrossing3(a1: Vec3, b1: Vec3, a2: Vec3, b2: Vec3): Vec3 | null {
+  const d1 = sub3(b1, a1);
+  const d2 = sub3(b2, a2);
+  const n = cross3(d1, d2);
+  const n2 = dot3(n, n);
+  if (n2 <= 1e-24 * Math.max(dot3(d1, d1) * dot3(d2, d2), 1e-300)) return null;
+  const w = sub3(a2, a1);
+  const t1 = dot3(cross3(w, d2), n) / n2;
+  const t2 = dot3(cross3(w, d1), n) / n2;
+  return scale3(add3(add3(a1, scale3(d1, t1)), add3(a2, scale3(d2, t2))), 0.5);
+}
+
 /** Centroid of a non-empty list of points. */
 export function centroid3(ps: Vec3[]): Vec3 {
   const s = ps.reduce(add3, v3(0, 0, 0));

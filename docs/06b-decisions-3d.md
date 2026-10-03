@@ -11606,3 +11606,55 @@ Both build with every row ok and 8 points, and in both the point that was A now 
 **Measured.** `src3d/__tests__/proof-target-1666.test.ts`: the shared rows through `decideSubmit3`, the Hebrew and English text, the parser no longer reading past «הוכיחו כי» or "prove that" (the given framing unchanged), the bare claim still recording, and no catalog line reading as a target. On the pre-change tree, 3 of its 5 tests fail. `parse3-v1.test.ts` drops the «הוכיחו כי CA' מאונך למישור BC'D» input from its perp-plane spellings.
 
 **Consequences.** `src3d/store/store3.ts` (`StoreError3`, `readStatement3`), `src3d/parser/parse3.ts`, `src3d/i18n/errorText3.ts`, `src3d/i18n/locales/{he,en}.json`. Behaviour change: the proof-verb form of a claim is refused, where it used to be read (and could drive the figure).
+
+## ADR-3D-297 — Two diagonals named by letters meet where both are; the diagonal crossing is a crossing, not a midpoint (#1728)
+
+**Status:** accepted · 2026-10-04 · bug (P1, the honesty class) · round #1721 (operator, 2026-10-03: *"fix the P1s now as well"*) · found by the 2-D #1683 stream (ADR-569) · branch `fix/1728-3d-diagonals-meet` off `main` @ 4fbb3293. Numbered after ADR-3D-296 (#1730), which lands in the same round.
+
+**Requirements:** [FR-CL-2](02b-requirements-3d.md) extended — the diagonal claim travels into every sentence naming pairs after the noun, and the meet is of the pairs the sentence names · **Design:** [04b-design-3d.md](04b-design-3d.md) § "A named meeting point is a crossing, judged on the figure" · **LADDER stage:** the parser (`diagIntersection`), the apply reducer (`seg-crossing3`, `diag-intersection`), evaluate (the `seg-cross` point kind, closed form) and the `derive3` status pass. No solver change.
+
+**Cites** ADR-569 (the 2-D twin, copied as a pattern), [ADR-3D-071](#adr-3d-071) (two runs of two letters are two diagonals), [ADR-3D-203](#adr-3d-203) / [ADR-3D-246](#adr-3d-246) (the «אלכסון» claim, apply + verifier), ADR-052 (no unstated property).
+
+**Context — measured at pickup on 4fbb3293, through `parse3` / `decideSubmit3`.** The issue's claim held, and the class was wider:
+
+| typed | before |
+| --- | --- |
+| «מרובע ABCD» · «האלכסונים AB ו-CD נפגשים בנקודה E» (also «נחתכים», English) | records `point-on-segment3 E on AB, t = ½` — CD and the meet dropped, the sides accepted as diagonals |
+| «מרובע ABCD» · «האלכסונים AC ו-BD נפגשים בנקודה E» | records E at the midpoint of AC: on the general quad E is **off BD** (0.14–0.19 at seeds 0–2), and a following «E על BD» is refused `claim-refuted` |
+| «מרובע ABCD» · «E מפגש האלכסונים של ABCD» (the named-quad form, `diag-intersection`) | the same midpoint of AC, off BD — the parallelogram assumption ADR-3D's V8-a recorded as "filed" |
+| «האלכסונים AC ו-BD …» on an empty canvas | refused `dropped-given B, D` |
+| «התיכונים AD ו-BE נפגשים בנקודה G», «הגבהים AD ו-BE …», «האלכסון AB חותך את CD בנקודה E» | `not-understood` (escalates — honest; 3-D does not read these, so the 2-D median/altitude arms have no 3-D counterpart to fix) |
+
+**Class.** *A sentence naming two segments that meet at a point is lowered to a point on ONE of them* — the meet of the second segment is dropped, and the lowering assumes a parallelogram (the diagonals bisect each other) that the student never stated; the role noun «אלכסונים» before letters carried no claim.
+
+**Decision.**
+1. **A new point kind, `seg-cross { a1, b1, a2, b2 }`** — where the two lines cross, in closed form (`lineCrossing3`, the midpoint of the closest approach; unplaced when parallel). It is a derived 0-DOF kind: `GAUGE_KINDS`, `structurallyOnRun3`, and the #769 coincidence set know it.
+2. **Two named diagonals lower to what the sentence says:** `segment3 a1b1 {diagonal: 'any'}`, `segment3 a2b2 {diagonal: 'any'}` (ADR-3D-203's claim — the apply refusal and the verifier, no new check), and `seg-crossing3` (new command; draws both segments). AB named as a diagonal of the quad ABCD is refused `not-a-diagonal`, naming the pair, as «אלכסון AB» already was.
+3. **The named-quad form uses the same kind** (`diag-intersection` → `seg-cross` of the 1st↔3rd and 2nd↔4th vertices), so no spelling of the diagonal crossing assumes a parallelogram. On a parallelogram the point is where it was.
+4. **The meeting is the figure's to show.** `derive3` checks that the two drawn segments meet — `mutualHolds('intersecting')`, bounded, at `MUTUAL_VERIFY_TOL`, the predicate the stated «AC ו-BD נחתכים» claim already uses — and refuses `segments-do-not-meet { id, s1, s2 }` («הקטעים «AC» ו-«B'D'» אינם נפגשים בציור — אין להם נקודת מפגש «E»»), naming the student's segments.
+
+**Plan vs mechanism (recorded).** The plan's sketch asked the rule to "consume both pairs (the lines' crossing) or refuse"; 3-D had no point kind for a crossing of two segments, so decision 1 adds it (a closed form beside `plane-cut`, no solver). Decision 3 is the same class found while measuring (the plan named only the lettered form).
+
+**Sibling audit.** Grepped every 3-D reader of a diagonal/meet sentence: `diagIntersection` (both forms fixed), `quadDiagonals` (draws, names no point — unaffected), `centroidRule` (medians by the noun, the centroid kind — exact, unaffected). 3-D reads no lettered median/altitude/bisector meet (`not-understood`). **2-D:** ADR-569. **Analytic:** refuses the sides form (ADR-AG-208).
+
+**Measured after** (`src3d/__tests__/issue-1728-diagonals-meet.test.ts`, through `decideSubmit3` and the drawn positions):
+
+| typed | now |
+| --- | --- |
+| «מרובע ABCD» · «האלכסונים AB ו-CD נפגשים בנקודה E» / «נחתכים» / English | refused `not-a-diagonal` (AB) |
+| «מרובע ABCD» · «האלכסונים AC ו-BD …» / «BD ו-AC» / «נחתכים» / English | E on both diagonals, inside both, seeds 0–3 |
+| … · «E על BD» | builds (true) |
+| «מרובע ABCD» · «E מפגש האלכסונים של ABCD» | E on both diagonals, seeds 0–3 |
+| «מנסרה ישרה שבסיסה מלבן» · «האלכסונים AC ו-BD נפגשים בנקודה O»; «קובייה …» · «האלכסונים AB' ו-A'B …» | the face centre (controls) |
+| «קובייה ABCDA'B'C'D'» · «האלכסונים AC ו-B'D' נפגשים בנקודה E» (skew) | refused `segments-do-not-meet` naming AC and B'D' |
+| «אלכסוני ABCD נחתכים בנקודה O», «אלכסוני הריבוע …» | `diag-intersection`, unchanged |
+| empty canvas | refused (unknown point), never half-built |
+
+**Unchanged, measured.** `npx vitest run src3d` (the whole 3-D tree, run alone): 291 files, 5341 tests, green. Three locks asserted the old lowering (`point-on-segment3 … t = ½` for the pair form) and now expect the two claimed segments and the crossing: `diagonal-pair.test.ts`, `at-point-marker.test.ts`, `shadow-matrix3.test.ts`. The `decide-submit3-parity-1394` golden gains this ADR's new sequences (keys added only, **no recorded hash changed**). The three products' #1649 parity locks and the meta-lock: green. The full suite is the batch gate (round #1721).
+
+**Locks.** `issue-1728-diagonals-meet.test.ts` (14). **Fails before: 10 of 14**, measured by reverting `src3d/{engine,parser,store,i18n}` to 4fbb3293; the 4 that pass before are controls (the rectangle and cube faces, where the midpoint is the crossing; the unlettered forms; the empty canvas). Fixture `fixtures3/diagonals-named-meet-1728.geo3.json` («מרובע ABCD» · the named meet · «E על BD»). #1649: `diag-meet-sides-1683` drops its 3-D known gap (3-D refuses, like 2-D and analytic); `diag-meet-holds-1728` (new — the content check: «E על BD» after the meet builds in all three builders; 3-D refuted it before).
+
+**Consequences.**
+- `src3d/engine/types.ts` (`seg-cross`, `SegCrossingCommand`, `segments-do-not-meet`), `vec3.ts` (`lineCrossing3`), `evaluate.ts`, `apply.ts`; `src3d/store/store3.ts` (the meet check, the coincidence set), `figureFile3.ts`; `src3d/parser/parse3.ts`; `src3d/i18n/errorText3.ts` + locales.
+
+**Behaviour change for a student:** in a quadrilateral ABCD, «האלכסונים AB ו-CD נפגשים בנקודה E» is now refused — AB is a side, not a diagonal — instead of putting E halfway along AB. «האלכסונים AC ו-BD נפגשים בנקודה E» (and «E מפגש האלכסונים של ABCD») now puts E where the two diagonals actually cross; before, on a quadrilateral that is not a parallelogram, E sat beside the second diagonal.

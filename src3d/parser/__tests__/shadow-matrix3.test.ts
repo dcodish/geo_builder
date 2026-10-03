@@ -141,19 +141,19 @@ describe('3-D parser shadow-matrix — known shadow-prone probes', () => {
       text: 'האלכסונים AC ו BD נחתכים בנקודה O',
       note: 'ADR-3D-071: the Hebrew PLURAL names both diagonals in one word — two runs of two letters is the semantic signal, never the word count; the named-quad branch must not claim it',
       owner: 'diagIntersection',
-      commands: [{ type: 'point-on-segment3', id: 'O', a: 'A', b: 'C', t: 0.5 }],
+      commands: [{ type: 'segment3', a: 'A', b: 'C', diagonal: 'any' }, { type: 'segment3', a: 'B', b: 'D', diagonal: 'any' }, { type: 'seg-crossing3', id: 'O', a1: 'A', b1: 'C', a2: 'B', b2: 'D' }] /* #1728: both named diagonals and their crossing */,
     },
     {
       text: 'the diagonals AC and BD intersect at point O',
       note: 'ADR-3D-071 (En): the verb form + trailing `at point O` marker; two grouped diagonals, not quad ACBD',
       owner: 'diagIntersection',
-      commands: [{ type: 'point-on-segment3', id: 'O', a: 'A', b: 'C', t: 0.5 }],
+      commands: [{ type: 'segment3', a: 'A', b: 'C', diagonal: 'any' }, { type: 'segment3', a: 'B', b: 'D', diagonal: 'any' }, { type: 'seg-crossing3', id: 'O', a1: 'A', b1: 'C', a2: 'B', b2: 'D' }] /* #1728: both named diagonals and their crossing */,
     },
     {
       text: 'האלכסון AC והאלכסון BD נפגשים בנקודה O',
       note: 'ADR-3D-071/ADR-3D-055: the per-diagonal repeated word + the נפגש verb — same two-run grouping',
       owner: 'diagIntersection',
-      commands: [{ type: 'point-on-segment3', id: 'O', a: 'A', b: 'C', t: 0.5 }],
+      commands: [{ type: 'segment3', a: 'A', b: 'C', diagonal: 'any' }, { type: 'segment3', a: 'B', b: 'D', diagonal: 'any' }, { type: 'seg-crossing3', id: 'O', a1: 'A', b1: 'C', a2: 'B', b2: 'D' }] /* #1728: both named diagonals and their crossing */,
     },
     {
       text: 'O מפגש האלכסונים של הפאה ABCD',

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-03T21:25:31.707Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מרובע ABCD",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon4",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "האלכסונים AC ו-BD נפגשים בנקודה E",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "C",
+          "diagonal": "any"
+        },
+        {
+          "type": "segment3",
+          "a": "B",
+          "b": "D",
+          "diagonal": "any"
+        },
+        {
+          "type": "seg-crossing3",
+          "id": "E",
+          "a1": "A",
+          "b1": "C",
+          "a2": "B",
+          "b2": "D"
+        }
+      ]
+    },
+    {
+      "utterance": "E על BD",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "E",
+          "a": "B",
+          "b": "D"
+        }
+      ]
+    }
+  ]
+}
