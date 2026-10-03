@@ -975,6 +975,14 @@ post-passes. It replaced ADR-119's word-presence `withCarrierMembership`. Each o
 Refusals are `ParseResult` `role-claim` (`why`, the noun as typed, the pair), mapped in
 `decideDeterministic.ts` to `input.roleClaim.<why>`.
 
+## A point placement keeps its tail ([ADR-570](06-decisions.md#adr-570))
+
+The point-on-carrier rules (`pointOnExtension`, `pointOnSegment`) match a prefix and are not anchored, so whatever followed the carrier was never read. Three seams now carry the tail:
+
+- **The condition clause** — `compoundSuchThat` splits on «כך ש» / "such that" (as before) and, after a point-placement subject (`POINT_PLACEMENT`), on the given-conjunction `GIVEN_AND` («ונתון כי / ש», «וידוע כי / ש», "and it is given that"). Each half parses through the real grammar, all or nothing. A shape subject is not split: that is the #108 compound, taught as two steps.
+- **The end qualifier** — `pointOnExtension` reads «מעבר ל(-)(נקודה) X» / "beyond X": X the far end keeps the carrier; X the near end reverses it (E on the extension of CB); any other letter escalates the line whole.
+- **The net** — `droppedGivenRelations`'s exemption (b) holds only when the command that INTRODUCES one of the relation's labels itself carries every label of the relation (`K על המשך AB כך ש AB=BK` baked as t = 2). "Some label is introduced by any command" accounted «DE = DC» because E was introduced on BC. With the exemption narrowed, the parser's own clause fallback (ADR-264) reads «E על המשך BC ו-DE = DC» and «…, DE = DC», which consult the same gate, and every rule and the LLM lane are held to it.
+
 ## A stated side is a requirement record, checked at stage 0g′ ([ADR-549](06-decisions.md#adr-549))
 
 - **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`) — `circle-side`,
