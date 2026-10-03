@@ -3214,4 +3214,21 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs(dot) / (dist(O, A) * dist(A, B)), 'OA ⟂ AB — the tangency still holds').toBeLessThan(1e-6);
     },
   },
+  {
+    id: 'nested-circles-new-letter-asks-1709',
+    title: '#1709 (ADR-567): «מעגל מוכל בתוך המעגל הגדול» · «C על מעגל P» asks which circle; naming the small one P then builds C on it and D on the container',
+    guards:
+      "Operator ruling 2026-10-02 (#1688, option (b)): two fresh INTERCHANGEABLE circles are named by order; circles a statement tells apart ask which one. Measured on main a8938c2d: «מעגל מוכל בתוך המעגל הגדול» · «C על מעגל P» named the OUTER circle P silently. Root cause: a stated containment drives nothing, so it lived only in its fact command (`set-circle-position`), and `autosInterchangeable` (parser/context.ts) read a construction holding two identical unnamed circles. Root fix: the stated mutual position is a requirement record on the construction (engine/requirements.ts), and the interchangeability test reads every requirement record (a disjoint pair as an unordered set). Asserts that the operator's exact two lines ASK (the scenario mirror throws the app's which-circle question), and that after the student names the small circle the sequence builds with C on the contained circle and D on its container. The submit-door matrix (nested, plural, English, the remedies, and the order-named controls) is in src/__tests__/issue-1709-nested-circles-ask.test.ts.",
+    steps: ['מעגל מוכל בתוך המעגל הגדול', 'מרכז המעגל הקטן הוא P', 'C על מעגל P', 'D על מעגל O'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(() => factsOf(['מעגל מוכל בתוך המעגל הגדול', 'C על מעגל P']), 'the exact report asks which circle').toThrow(/ASKS which circle \(unknown-circle P\)/);
+      const circ = (c: string) => fig.construction.objects.find((o) => o.kind === 'circle' && o.center === c) as { radius: { value: number } } | undefined;
+      const P = circ('P'), O = circ('O');
+      expect(P && O, 'both circles are named by the student').toBeTruthy();
+      expect(dist(at(fig, 'O'), at(fig, 'P')) + P!.radius.value, 'P lies strictly inside O').toBeLessThan(O!.radius.value);
+      expect(dist(at(fig, 'C'), at(fig, 'P')), 'C on the contained circle P').toBeCloseTo(P!.radius.value, 6);
+      expect(dist(at(fig, 'D'), at(fig, 'O')), 'D on the container O').toBeCloseTo(O!.radius.value, 6);
+    },
+  },
 ];
