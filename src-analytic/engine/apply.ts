@@ -2622,7 +2622,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       const left = resolveAngleName(c, f.left, f.src);
       if (!left.ok) return left;
       if (f.rhs.t === 'value') {
-        return applyFact(c, { t: 'constraint', k: { t: 'angle', at: left.ref, value: f.rhs.value }, src: f.src });
+        const k: Constraint = { t: 'angle', at: left.ref, value: f.rhs.value };
+        if (f.rhs.measure) k.measure = f.rhs.measure;
+        return applyFact(c, { t: 'constraint', k, src: f.src });
       }
       const right = resolveAngleName(c, f.rhs.of, f.src);
       if (!right.ok) return right;

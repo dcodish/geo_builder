@@ -2212,3 +2212,13 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
   - A point that a later line defines is still defined by that line.
   - Still refused, as in 2-D, when the letters are new: «AB = 2CD», «AB:BC = 2:3», «AD גובה לצלע BC».
 - «AB קוטר» · «BO = 5» draws BO with B where it is and O a free point. O is not the centre until the student says so. A later «O מרכז המעגל», «OB רדיוס» or «הרדיוס OB» then moves that same O to the centre; no second point appears.
+
+**R151 — an angle named by a Greek letter, and the tan or cos of an angle, read as givens**
+([ADR-AG-215](06c-decisions-analytic.md#adr-ag-215), [#1621](https://github.com/dcodish/geo_builder/issues/1621); operator rulings 2026-10-01: tan of an angle is in scope, sin/cos follow when needed; 2026-10-02: the same experience as 2-D for plane geometry).
+
+- «∢ABC = α», «זווית ABC = 2α», and the exam's «נסמן ∢DCB = 2α» / «נסמן: זווית ADB = α» name the angle by a Greek letter (α β γ δ θ and the rest of the lowercase alphabet; π stays the number). The letter is a free value: the triangle may take any shape, the angle follows it, and «הציגו תצורה אחרת» changes it. The same letter on two angles makes them equal.
+- A later «α = 30» (or «α = 30°») sets the letter, and so the angle. A figure that already fixes the angle at another value refuses the line, naming it. «θ = 2β» relates two letters.
+- A Latin letter is not set this way: «a = 5» and «r=5» stay unread, as before (a single Latin letter can mean a radius or a point).
+- «tan∢BAO = 2», «tan(∢BAO) = 2», «tg∢BAO = 2», «טנגנס הזווית BAO הוא 2» and "the tangent of angle BAO is 2" state the angle by its tangent. A positive tangent is an acute angle and a negative one an obtuse angle. The drawing may still be any reflection of the figure, as for an angle given in degrees. «קוסינוס הזווית ACB = 3/4» and «cos∢ACB = 3/4» state it by its cosine; a cosine outside −1…1 is refused, naming the line.
+- «sin∢ACB = 1/2» is not read: a sine fits an acute angle and an obtuse one, and the tool does not choose between them.
+- The symbol palette offers α β γ δ θ.
