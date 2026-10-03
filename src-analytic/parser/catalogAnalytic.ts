@@ -830,6 +830,60 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: '∠B = ∠C',
     needs: ['משולש ABC'],
   },
+  /**
+   * #1621 D2 (ADR-AG-215) — an angle NAMED BY A GREEK LETTER, free until a later given pins it (2-D's `measure-angle`
+   * with a variable, then `set-var`), with the exam's «נסמן» lead-in (corpus 471 1/4, 3/4); and tan / cos of an
+   * angle as a measure of it (operator ruling 2026-10-01; corpus 471 9/4).
+   */
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'נסמן ∢DCB = 2α',
+    en: 'let ∠DCB = 2α',
+    needs: ['מרובע ABCD'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'נסמן: זווית ADB = α',
+    en: 'let angle ADB = α',
+    needs: ['משולש ABD'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: '∢ABC = α',
+    en: '∠ABC = α',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'α = 30',
+    en: 'α = 30',
+    needs: ['משולש ABC', '∢ABC = α'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'tan∢ABC = 2',
+    en: 'tan∠ABC = 2',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'טנגנס הזווית ABC הוא 2',
+    en: 'the tangent of angle ABC is 2',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'קוסינוס הזווית ACB = 3/4',
+    en: 'cos∠ACB = 3/4',
+    needs: ['משולש ABC'],
+  },
 
   /** Naming a circle's CENTRE (#1109) — the same click-to-name family as a crossing. */
   {

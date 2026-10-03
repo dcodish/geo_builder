@@ -9678,3 +9678,90 @@ Sibling check (docs/17 §1): 2-D is the reference and builds every row above exc
 **A vacuous lock, found and replaced.** `symbols-module.test.ts` held `°` with «זווית BAC = 90°» on A(0,0) B(4,0) C(1,3). That triangle's angle at A is fixed near 72°, so the line faulted `unsatisfiable` and "°  still does not parse" passed by contradiction, after `°` had started to parse. The replacement holds each still-absent chip on a figure where its sentence could hold, and requires a READING fault (`not-handled` / `bad-equation` / `bad-operand`), so the row goes red the day the notation lands.
 
 **Locks.** `symbols-module.test.ts`: four new parse proofs (totality-guarded), `√()` as a wrap («AB = 20» with «20» selected → «AB = √(20)», builds), the original-six row updated on purpose, six held-chip rows. `palette-faces-1348` (each one-character face inserts its own glyph) and the bidi no-split row cover the new chips unchanged. **Fails before: 3 of 21** — the totality guard, the `√()` wrap proof and the original-six row; the four new parse proofs iterate the palette, so they do not exist before it.
+
+## ADR-AG-215 — An angle named by a Greek letter is a free parameter; tan and cos are measures of the angle (#1621 D2)
+
+**Status:** accepted · 2026-10-03 · slice D stream D2 of the V4 plan (#1616). Rulings applied, none asked:
+- operator 2026-10-01 on #1621: *tan of an angle is in scope — a new measure kind*; sin/cos follow *if the corpus or a student needs them*;
+- 2026-10-02: the analytic tool gives 2-D's experience for plane geometry;
+- ADR-052: every unstated magnitude is a free DOF.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R151. · **Design:** [04c](04c-design-analytic.md) "A Greek angle name is a parameter; tan and cos are measures of the angle".
+
+**Context.** Three corpus 471 questions stopped one line short.
+
+| question | line | reading before |
+|---|---|---|
+| 1/4 | «נסמן ∢DCB = 2α» | not-handled |
+| 3/4 | «נסמן: זווית ADB = α» | not-handled |
+| 9/4 | «tan∢BAO = 2» | not-handled |
+
+The bare «∢ABC = α» was `bad-equation`, because `expr.ts` read Latin symbols only.
+
+2-D was measured through `decideDeterministic2D`:
+- «נסמן ∢DCB = 2α» and «∢ABC = α» commit `measure-angle` with the variable — the figure's angle, labelled.
+- «α = 30» commits `set-var`; «α = 200» after the alias is refused (the angle sum).
+- Every trigonometric given — `tan∢ABC = 2`, `tg`, `tan(…)`, «טנגנס», `cos∢ACB = 3/4`, «קוסינוס», `sin` — commits a `set-angle` of the leading integer IN DEGREES (2°, 3°). That is a wrong figure drawn green. It is filed as **#1698** (P1, 2d), not ported.
+
+**Decision.**
+1. **A Greek letter is a parameter.**
+   - `expr.ts` admits one lowercase Greek letter (π excepted — the constant) beside the Latin ones.
+   - «∢ABC = α» is the existing `angle` row with a symbolic value. The register makes α a free DOF from the constraint's own expression (#1343). Free until pinned, as ADR-052 requires, and the triangle stays as free as 2-D's.
+   - Greek and Latin are distinct code points (`a` ≠ `α`). The tool's own symbols are `θ_<id>`, never one character, so they cannot collide.
+2. **The sampler reads the range the use implies** (`impliedRange`, sampling only).
+   - Unbounded sampling drew a free α at 1°–4°.
+   - A symbol a stated angle holds linearly is sampled inside 0°–180° (a cosine inside −1…1).
+   - It is not a declaration and never reaches `paramRegister`: no panel text, no root filter.
+3. **«α = 30» is a constraint**, `param-eq`, solved with the rest. A contradicted pin is `unsatisfiable` on its line, quoting it.
+   - Like every unsatisfiable set in this tree, the faults also name the givens it conflicts with: «∢ABC = 40», «∢ABC = α», «α = 30» faults all three, as «∢ABC = 40» · «∢ABC = 30» faults both.
+   - **Greek only.** «a = 5» and «r=5» keep their standing refusals (parser.test, #1432 am. 1): beside a circle «r=5» means the radius, whose symbol is the circle's, and a fresh-`r` pin would build green and say nothing.
+4. **«נסמן» / «נסמן:» / "let" is a frame lead-in.** The clause after it must parse on its own, so «נסמן את שטח ABCD ב-S» stays unread.
+5. **tan and cos are a `measure` of the `angle` row.** They are not a constraint kind of their own, so refs, identity, the vertex resolver and the ask lane's stated-angle test stay single. Both are one-to-one on the unsigned range:
+   - tan through its sign — positive is acute, negative is obtuse;
+   - cos outright.
+
+   So a value fixes ONE angle, and the orientation stays exactly as free as for a value in degrees. 9/4 lands A = (±3, 0), B = (0, ±6) and reaches more than one reflection across seeds (locked).
+
+   The residuals have no pole:
+   - tan is `sin(θ − atan t)`;
+   - cos is `(cos θ − c)/2`, with no root for |c| > 1, so such a cosine is `unsatisfiable`.
+
+   Spellings: `tan∠`, `tan(∠…)`, `tg`, `tan of angle`, «טנגנס הזווית … הוא», "the tangent of angle …", `cos∠`, «קוסינוס הזווית …», with one letter or three.
+6. **Palette** (ADR-AG-212's rule): α β γ δ θ ship in this change, in 2-D's order, each with a he/en title. Their "still not read" row is removed.
+
+**Not built, said out loud.**
+- **sin.** sin θ = sin(180° − θ), so «sin∢ACB = 1/2» needs a discrete choice (acute/obtuse, cycled like a right-angle seat). That is a second mechanism, so per the ruling ("same mechanism, no extra risk") it is left `not-handled` and locked as unread. No corpus line needs it.
+- **«נסמן זוית BAM כ-A1»** (cat-2d-059) names an angle by a LABEL for later reference — 2-D's `angle-alias`, a display name, not a measure. Analytic has no angle-name references; the gap stays on #1621.
+- **«נסמן את שטח ABCD ב-S»** (cat-2d-072) is the area family. Its gap stays on #1621.
+
+**Measured** (seed 0, `confirmTaught`, this branch):
+- 471 corpus **254/263 lines, 38/46 questions** — from 251/35;
+- 1/4, 3/4 and 9/4 now land whole.
+
+**Parity** (`shell/__tests__/fixtures/geo-input-parity.ts`):
+- Flipped (analytic `#1621` gap removed): `cat-2d-083` «זווית ABC = 2α», `cat-3d-010` «קוסינוס הזווית ACB = 3/4», `pyr-angle-label`, `pyr-angle-label-value`.
+- New rows `alias-*-1621` and `trig-*-1621` (10). 3-D does not read `∢` or a Greek alias on its plane figures, so each carries a 3-D known gap on #1679. The trig rows note #1698: the verdict matches 2-D while 2-D's figure is wrong.
+
+**Locks.** `issue-1621-d2-angle-alias-tan.test.ts`, 18 cases:
+- the alias moves with the seed, inside its range;
+- the pin holds at every seed; contradictions are refused on the pin;
+- Greek and Latin never meet; π stays the constant;
+- every spelling is one statement; tan/cos at several seeds and signs; sin is unread;
+- 1/4, 3/4 and 9/4 typed line by line through `decideSubmit`, to their coordinates.
+
+`symbols-module.test.ts`: five Greek parse proofs, and the α "still not read" row removed. Catalog: seven new He/En entries. **Fails before: 16 of 18** — the two that pass before are the Latin-`a` pin by the figure and the sin refusal, which hold by design.
+
+**Consequences.**
+- `engine/expr.ts`: `SYMBOL_RE`.
+- `engine/solve.ts`: `angle.measure`, `param-eq` (refs, description, residual).
+- `engine/carriers.ts`: `impliedRange`, `narrowedDomain`.
+- `engine/evaluate.ts`: `sampleEnv`.
+- `engine/types.ts`, `engine/apply.ts`: `vertex-angle.rhs.measure`.
+- `parser/parseAnalytic.ts`: `parseAngleMeasure`, `parseParamValue`.
+- `parser/frameAnalytic.ts`: the «נסמן» lead-in.
+- `parser/catalogAnalytic.ts`, `ui/symbols.ts`, `i18n/index.ts`.
+
+Sibling check (docs/17 §1):
+- 2-D is the reference for the alias and the pin, and agrees.
+- 2-D's trig reading is the defect #1698 records.
+- 3-D's known gaps are on #1679.

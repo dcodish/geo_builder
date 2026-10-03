@@ -112,6 +112,12 @@ const he = {
   symPar: 'מקביל ל־',
   symAngle: 'זווית',
   symDeg: 'מעלות',
+  // #1621 D2 — the Greek angle names
+  symAlpha: 'אלפא — שם של זווית',
+  symBeta: 'בטא — שם של זווית',
+  symGamma: 'גמא — שם של זווית',
+  symDelta: 'דלתא — שם של זווית',
+  symTheta: 'תטא — שם של זווית',
   // A vertical segment HAS no slope, and that is an answer rather than an absence (#1078).
   slopeVertical: 'אנכי (אין שיפוע)',
   // #1322 — the angle a line makes with the positive x-axis, beside its slope (m = tan α)
@@ -510,6 +516,11 @@ const en: typeof he = {
   symPar: 'parallel to',
   symAngle: 'angle',
   symDeg: 'degrees',
+  symAlpha: 'alpha — an angle’s name',
+  symBeta: 'beta — an angle’s name',
+  symGamma: 'gamma — an angle’s name',
+  symDelta: 'delta — an angle’s name',
+  symTheta: 'theta — an angle’s name',
   slopeVertical: 'vertical (no slope)',
   angleWithX: 'angle with the x-axis',
   secParams: 'Parameters',

@@ -4489,6 +4489,72 @@ const angleNameOf = (p: string, v?: string, q?: string): AngleName | null => {
 const DEGREE_TAIL = /\s*(?:°|מעלות|degrees?)\s*$/i;
 
 /**
+ * tan AND cos OF AN ANGLE (#1621, ADR-AG-215; operator ruling 2026-10-01: *tan of an angle is in scope — a new
+ * measure kind*; sin/cos follow if needed). «tan∢BAO = 2» (corpus 9/4), «tan(∢BAO) = 2», «tg∢BAO = 2»,
+ * «טנגנס הזווית BAO הוא 2», «cos∢ACB = 3/4», «קוסינוס הזווית ACB = 3/4» (cat-3d-010), "the tangent of angle BAO
+ * is 2". The angle is named exactly as the numeric-angle rule names it (one letter or three), so it lowers to
+ * the SAME `angle` constraint — or `vertex-angle` fact — with its `measure`.
+ *
+ * sin is deliberately absent: sin θ = sin(180° − θ), so «sin∢ABC = 3/4» leaves a discrete choice (acute or
+ * obtuse) this measure does not carry. It stays unread (`not-handled`) rather than drawn at one of the two.
+ */
+const MEASURE_FN: Readonly<Record<string, 'tan' | 'cos'>> = {
+  tan: 'tan',
+  tg: 'tan',
+  tangent: 'tan',
+  טנגנס: 'tan',
+  cos: 'cos',
+  cosine: 'cos',
+  קוסינוס: 'cos',
+};
+/** The function word, in either language, with its optional «של» / "of (the)". One head, so «tan of angle …» is read. */
+const MEASURE_HEAD = new RegExp(`^${HE_GIVEN}(?:the\\s+)?(tan|tg|cos|tangent|cosine|טנגנס|קוסינוס)(?![A-Za-z])\\s*(?:(?:של|of)\\s+)?(?:the\\s+)?`);
+const MEASURE_ANGLE_HE = new RegExp(`^(?:${ANGLE_NOUN_HE})?${ANGLE_LETTERS}${HE_IS}\\s*(?:=\\s*)?(.+)$`);
+const MEASURE_ANGLE_EN = new RegExp(`^(?:${ANGLE_NOUN_EN})?${ANGLE_LETTERS}\\s*(?:is\\s+|equals?\\s+)?(?:=\\s*)?(.+)$`);
+
+function parseAngleMeasure(line: string): RuleOutcome {
+  const head = MEASURE_HEAD.exec(line);
+  if (!head) return null;
+  const measure = MEASURE_FN[head[1]];
+  // «tan(∢BAO) = 2» — the argument in parentheses is the same angle.
+  const rest = line.slice(head[0].length).replace(/^\(\s*([^()]*?)\s*\)/, '$1').trim();
+  const m = MEASURE_ANGLE_HE.exec(rest) ?? MEASURE_ANGLE_EN.exec(rest);
+  if (!m) return null;
+  const [, p, v, q, rhsSrc] = m;
+  // «tangent» is also the tangency noun; only an ANGLE after it makes the sentence this rule's — a letter
+  // PAIR («the tangent AB …») never matches, because `ANGLE_LETTERS` reads one letter or three.
+  const left = angleNameOf(p, v, q);
+  if (!left) return refuse('repeated-vertex', line);
+  const valueSrc = trim(rhsSrc);
+  if (!claimable(valueSrc)) return null;
+  const value = valueExpr(valueSrc);
+  if (!value) return refuse('bad-equation', valueSrc);
+  if (isAngleRef(left)) return made([{ t: 'constraint', k: { t: 'angle', at: left, value, measure }, src: line }]);
+  return made([{ t: 'vertex-angle', left, rhs: { t: 'value', value, measure }, src: line }]);
+}
+
+/**
+ * «α = 30» — A PARAMETER GIVEN ITS VALUE (#1621, ADR-AG-215), 2-D's `set-var`: the later given that pins an angle
+ * alias («∢ABC = α», then «α = 30»). One lowercase GREEK letter on the left and a value on the right, with an
+ * optional degree tail; language-neutral, after the parameter DOMAINS.
+ *
+ * GREEK ONLY, deliberately. A Latin letter keeps its standing refusal (parser.test «a = 5», #1432 «r=5»): «r=5» beside
+ * a circle means its RADIUS, whose symbol is the circle's own, so a pin of a fresh `r` would build green and state
+ * nothing the student meant. A Greek letter has no second reading in this tool — it only ever names an angle.
+ */
+const PARAM_VALUE = /^([α-ορ-ω])\s*=\s*(.+)$/;
+
+function parseParamValue(line: string): RuleOutcome {
+  const m = PARAM_VALUE.exec(normalizeMath(line));
+  if (!m) return null;
+  const valueSrc = m[2].replace(DEGREE_TAIL, '');
+  if (!claimable(valueSrc)) return null;
+  const value = valueExpr(valueSrc);
+  if (!value) return null;
+  return made([{ t: 'constraint', k: { t: 'param-eq', sym: m[1], value }, src: line }]);
+}
+
+/**
  * «C ברביע השלישי» — a point placed in a REGION (#1071).
  *
  * A quadrant is not a curve and not a value: it is a pair of inequalities. That makes it D7's SECOND
@@ -5430,6 +5496,9 @@ function parseConstraint(raw: string): RuleOutcome {
     return refuse('bad-operand', line);
   }
 
+  const trig = parseAngleMeasure(line);
+  if (trig) return trig;
+
   const angVal = ANGLE_VALUE_HE.exec(line) ?? ANGLE_VALUE_EN.exec(line);
   if (angVal) {
     const [, p, v, q, rhsSrc] = angVal;
@@ -5845,6 +5914,9 @@ function parseClauseRules(raw: string): ParseResult {
 
   const param = parseParamHe(line) ?? parseParamEn(line) ?? parseInequality(line);
   if (param) return { ok: true, facts: [param] };
+
+  const pin = parseParamValue(line);
+  if (pin) return pin;
 
   // A coordinate compared (#1462) — after the parameter domains, whose atoms are single symbols.
   const compared = parseCompare(line);

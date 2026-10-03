@@ -2181,3 +2181,14 @@ called, never re-implemented in the test.
 - a companion: `segment`, `line-2pt`, `extent-of`, `selector`, `declare`, or a `length-eq` riding beside a minting fact.
 
 The missing points are added as `free` objects and the line's facts are re-applied; then the fixpoint runs again. This applies beside an unnamed centre too (#1686). A `perpendicular` (the cevian's own half) is not a minting form, so «AD גובה לצלע BC» stays refused. The cevian's triangle form states «משולש ABC» first (`clauseFacts`).
+
+## A Greek angle name is a parameter; tan and cos are measures of the angle ([ADR-AG-215](06c-decisions-analytic.md#adr-ag-215), #1621)
+
+- **The alias is a symbol.** `expr.ts`'s `SYMBOL_RE` admits one lowercase Greek letter beside the Latin ones, π excepted: π is the constant. «∢ABC = α» lowers to the existing `angle` row with `value: α`, and the register (`paramRegister`, #1343) makes α a free DOF from the constraint's own expression. 2-D labels the measured angle instead (`measure-angle` with a variable). The freedom is the same: an alias on a free figure leaves it exactly as free.
+- **The sampler reads the range a use implies.** `carriers.ts` `impliedRange` reads the stated `angle` rows that hold a symbol LINEARLY (tested numerically, three evaluations — no CAS). In degrees that is 0°–180°, as a cosine −1…1. `sampleEnv` narrows the stated domain by it (`narrowedDomain`). It is never a declaration: `paramRegister`'s domains filter a pin's roots and print in the panel, and this range adds nothing a root does not already satisfy. Without it a free α was sampled at 1°–4°.
+- **The pin is a constraint.** «α = 30» is `param-eq` (`solve.ts`): residual `(env[sym] − value)`, relative to the value, no point refs. It is solved with everything else, so a contradiction is `unsatisfiable` on its line, never a re-reading. The parse rule (`parseParamValue`) admits a Greek symbol only. A Latin pin keeps its standing refusal (#1432 «r=5», parser.test «a = 5»).
+- **tan and cos ride the `angle` row** as `measure?: 'tan' | 'cos'`. One row keeps refs, identity (`canonicalConstraint`), the ask lane's "stated angle" test and the vertex resolver (`vertex-angle.rhs.measure`) single. The residuals have no pole and one root on 0°–π:
+  - tan: `(sin θ − t·cos θ)/√(1+t²)` = sin(θ − atan t), the slope row's `dy = m·dx` choice;
+  - cos: `(cos θ − c)/2`, with no root when |c| > 1.
+  - sin has two roots there (θ and π − θ), a discrete choice this row does not carry, so it is not parsed.
+- **«נסמן» is a frame lead-in** (`frameAnalytic` `UNWRAP`), like «נתון:». The clause after it must parse on its own, so «נסמן את שטח ABCD ב-S» stays unread.

@@ -10,7 +10,7 @@
  * The domain is honoured HERE, at sampling time, which is D7 kind 1: a value outside it was never
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
-import { isDirectionSymbol, paramRegister, shapedObjectOf, toolSymbol, usedSymbols } from './carriers';
+import { impliedRange, isDirectionSymbol, narrowedDomain, paramRegister, shapedObjectOf, toolSymbol, usedSymbols } from './carriers';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
@@ -302,7 +302,8 @@ export function sampleParam(d: Domain, seed: number, salt: number): number {
 export function sampleEnv(c: Construction, seed = 0): Env {
   const env: Record<string, number> = {};
   paramRegister(c).forEach((p, i) => {
-    env[p.sym] = sampleParam(p.domain, seed, i + 1);
+    // #1621 (ADR-AG-215): a symbol a stated angle holds is sampled inside the range that angle allows.
+    env[p.sym] = sampleParam(narrowedDomain(p.domain, impliedRange(c, p.sym)), seed, i + 1);
   });
   return env;
 }

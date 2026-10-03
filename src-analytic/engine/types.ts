@@ -245,7 +245,8 @@ export type Fact =
   | (FactBase & {
       t: 'vertex-angle';
       left: AngleName;
-      rhs: { t: 'value'; value: Expr } | { t: 'angle'; of: AngleName; k: Expr };
+      /** `measure` (#1621, ADR-AG-215): «tan∢A = 2» — the `angle` constraint's measure, carried to it unchanged. */
+      rhs: { t: 'value'; value: Expr; measure?: 'tan' | 'cos' } | { t: 'angle'; of: AngleName; k: Expr };
     })
   /**
    * A CEVIAN WHOSE TARGET ONLY THE FIGURE KNOWS (#1240, #1222; ADR-AG-209) — «AD גובה», «תיכון מנקודה A»,
