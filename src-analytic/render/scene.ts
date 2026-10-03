@@ -266,8 +266,17 @@ export interface LabelRequest {
   reach?: number;
   both?: boolean;
   tie?: boolean;
-  /** How many steps to try (default `LENGTH_MAX_STEPS`) — an angle value walks out of its wedge, which takes longer. */
-  steps?: number;
+  /**
+   * #1733 (ADR-AG-228): an explicit, BOUNDED list of centres to try in order, instead of stepping along `n`. A value
+   * bound to a mark (an angle's arc, an area's ring, an arc's band) never leaves the region where it reads as that
+   * mark's, so its candidates are all inside that region; when none is clear it takes the first that covers no
+   * point label, else the first — a slight overlap with a lower-priority label beats a label that has wandered off.
+   */
+  candidates?: ReadonlyArray<{ x: number; y: number }>;
+  /** Placement order (lower first, stable); a later label yields to an earlier one. Angle values 0, lengths 1, the rest 2. */
+  priority?: number;
+  /** A drawn line this label may cross — an angle value over its OWN arms, as 2-D writes it (the white halo keeps it legible). */
+  mayCross?: (l: ScreenLine) => boolean;
 }
 
 /** A stated length's request: its midpoint, stepping along the OUTWARD normal (#1717's rule, unchanged). */
@@ -314,7 +323,16 @@ export function placeSceneLabels(
     ...points.map((p) => ({ x0: p.cx - 4, y0: p.cy - 4, x1: p.cx + 4, y1: p.cy + 4 })),
     ...furniture,
   ];
-  return reqs.map((r) => {
+  /** A point's label and dot — the one thing a label may never cover, whatever its priority. */
+  const hard = obstacles.slice(0, points.length * 2);
+  // #1733: a higher-priority label is placed first, so a lower one yields to it (2-D's rule at a crowded vertex: the
+  // angle value stays at its angle, and the length moves).
+  const order = reqs.map((_, i) => i).sort((a, b) => (reqs[a].priority ?? 1) - (reqs[b].priority ?? 1) || a - b);
+  const out: Array<{ x: number; y: number }> = new Array(reqs.length);
+  for (const i of order) out[i] = placeOne(reqs[i]);
+  return out;
+
+  function placeOne(r: LabelRequest): { x: number; y: number } {
     const { mid, n, tie = false } = r;
     // the bidi isolates (`lbl`) are invisible, so they take no width
     const hw = textWidth(r.text.replace(/[\u2066-\u2069]/g, '').length, LENGTH_LABEL_FONT) / 2;
@@ -329,20 +347,30 @@ export function placeSceneLabels(
       return { x: mid.x + n.x * d, y: mid.y + n.y * d };
     };
     const firstClear = (side: 1 | -1): { k: number; c: { x: number; y: number } } | null => {
-      for (let k = 0; k <= (r.steps ?? LENGTH_MAX_STEPS); k += 1) {
+      for (let k = 0; k <= LENGTH_MAX_STEPS; k += 1) {
         const c = at(side, k);
         const b = boxAt(c);
         if (!obstacles.some((o) => overlaps(o, b)) && !lines.some((l) => crosses(l, b))) return { k, c };
       }
       return null;
     };
+    if (r.candidates && r.candidates.length > 0) {
+      const clear = (c: { x: number; y: number }) => {
+        const b = boxAt(c);
+        return !obstacles.some((o) => overlaps(o, b)) && !lines.some((l) => !r.mayCross?.(l) && crosses(l, b));
+      };
+      const pos =
+        r.candidates.find(clear) ?? r.candidates.find((c) => !hard.some((o) => overlaps(o, boxAt(c)))) ?? r.candidates[0];
+      obstacles.push(boxAt(pos));
+      return pos;
+    }
     const outward = firstClear(1);
     const inward = r.both && (!outward || tie) ? firstClear(-1) : null;
     const best = outward && (!inward || !tie || outward.k <= inward.k) ? outward : inward;
     const pos = best ? best.c : at(1, 0);
     obstacles.push(boxAt(pos));
     return pos;
-  });
+  }
 }
 
 export interface Scene {
@@ -395,8 +423,8 @@ export interface SceneStated {
 
 /** The stated angle arc's radius, in px — shrunk by `markFitScale` when the corner has no room (#1337's rule). */
 export const STATED_ARC_PX = 18;
-/** How far an angle value may step out of a narrow wedge before it keeps its first position (4 px a step). */
-const ANGLE_LABEL_STEPS = 40;
+/** #1733: an angle's value is never farther from its vertex than this many arc radii — beyond it, it reads as another mark's. */
+export const ANGLE_LABEL_BOUND = 2.5;
 /** A stated right angle's knee leg, in px. */
 export const STATED_KNEE_PX = 10;
 
@@ -798,6 +826,55 @@ const pathOf = (ps: readonly MarkPt[]): string =>
 /** A stated value as written: a number through the shared formatter (#723), or the student's own text. */
 const valueText = (v: StatedValue, unit = ''): string => ('num' in v ? `${fmtAnalytic(v.num)}${unit}` : v.text);
 
+/**
+ * WHERE AN ANGLE'S VALUE MAY GO (#1733, ADR-AG-228) — every candidate within {@link ANGLE_LABEL_BOUND} arc radii of
+ * the vertex, in the order the issue's plan gives:
+ * 1. on the bisector, just outside the arc, then inside it, then further out to the bound;
+ * 2. rotated about the vertex by ±25° and ±50° — only while still inside the angle's span;
+ * 3. on the reflex side, just outside the arc.
+ */
+function angleCandidates(c: { V: MarkPt; A: MarkPt; B: MarkPt }, r: number): Array<{ x: number; y: number }> {
+  const u = wedgeBisector(c.V, c.A, c.B);
+  const half = angleBetween(c.V, c.A, c.B) / 2;
+  const base = Math.atan2(u.y, u.x);
+  const bound = ANGLE_LABEL_BOUND * Math.max(r, 8);
+  const at = (th: number, d: number) => ({ x: c.V.x + Math.cos(th) * d, y: c.V.y + Math.sin(th) * d });
+  const radii: number[] = [Math.min(r + 9, bound), r * 0.55];
+  for (let d = r + 15; d <= bound; d += 6) radii.push(d);
+  const out: Array<{ x: number; y: number }> = radii.map((d) => at(base, d));
+  for (const deg of [25, -25, 50, -50]) {
+    const rot = (deg * Math.PI) / 180;
+    if (Math.abs(rot) >= half) continue;
+    for (const d of radii) out.push(at(base + rot, d));
+  }
+  out.push(at(base + Math.PI, Math.min(r + 9, bound)));
+  return out;
+}
+
+/** Does a drawn line end at `v` — one of the arms of an angle there? */
+const endsAt = (v: MarkPt) => (l: ScreenLine): boolean =>
+  Math.hypot(l.x1 - v.x, l.y1 - v.y) < 0.5 || Math.hypot(l.x2 - v.x, l.y2 - v.y) < 0.5;
+
+/** The interior angle at `v`, in radians (screen space keeps it: the transform is isotropic). */
+function angleBetween(v: MarkPt, a: MarkPt, b: MarkPt): number {
+  const ax = a.x - v.x;
+  const ay = a.y - v.y;
+  const bx = b.x - v.x;
+  const by = b.y - v.y;
+  return Math.abs(Math.atan2(ax * by - ay * bx, ax * bx + ay * by));
+}
+
+/** Is `p` inside the ring (even-odd)? */
+function inRing(p: { x: number; y: number }, ring: readonly MarkPt[]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const a = ring[i];
+    const b = ring[j];
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
 /** The stated layer before placement: its marks, and its labels as requests for `placeSceneLabels`. */
 interface StatedDraft {
   marks: SceneStated['marks'];
@@ -850,7 +927,7 @@ function statedScene(
     // The value sits just OUTSIDE its own arc, along the wedge bisector (2-D's `angleValueOffset`), stepping further
     // out while it collides (one placement, #1717).
     const u = wedgeBisector(c.V, c.A, c.B);
-    ask('angle', { mid: { x: c.V.x + u.x * r, y: c.V.y + u.y * r }, n: u, text: lbl(valueText(g.value, '°')), steps: ANGLE_LABEL_STEPS });
+    ask('angle', { mid: { x: c.V.x + u.x * r, y: c.V.y + u.y * r }, n: u, text: lbl(valueText(g.value, '°')), candidates: angleCandidates(c, r), priority: 0, mayCross: endsAt(c.V) });
   }
   // Equal angles: concentric rings, one per class count, outside a value arc at the same corner.
   for (const g of stated.equalAngles) {
@@ -879,8 +956,15 @@ function statedScene(
     if (ps.length < 3 || ps.length !== ar.ids.length) continue;
     const cx = ps.reduce((s, p) => s + p.x, 0) / ps.length;
     const cy = ps.reduce((s, p) => s + p.y, 0) / ps.length;
-    // ON its centroid first (reach 0), stepping up while it collides.
-    ask('area', { mid: { x: cx, y: cy }, n: { x: 0, y: -1 }, text: lbl(`S=${valueText(ar.value)}`), reach: 0, both: true });
+    // ON its centroid first, then nearby spots — every one INSIDE its ring (#1733), so it never reads as another region's.
+    const inside: Array<{ x: number; y: number }> = [];
+    for (let k = 0; k <= 8; k += 1) {
+      for (const [dx, dy] of k === 0 ? [[0, 0]] : [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+        const c = { x: cx + dx * 6 * k, y: cy + dy * 6 * k };
+        if (inRing(c, ps)) inside.push(c);
+      }
+    }
+    ask('area', { mid: { x: cx, y: cy }, n: { x: 0, y: -1 }, text: lbl(`S=${valueText(ar.value)}`), candidates: inside.length ? inside : [{ x: cx, y: cy }], priority: 2 });
   }
   /**
    * An ARC's value sits ON the arc (2-D's ADR-335: never a wedge at the often-hidden centre) — at the minor arc's
@@ -897,7 +981,17 @@ function statedScene(
     const bis = Math.hypot(sum.x, sum.y) < 1e-9 ? { x: -da.y, y: da.x } : unitOf(sum);
     const on = { x: t.sx(curve.cx + bis.x * curve.r), y: t.sy(curve.cy + bis.y * curve.r) };
     const inward = unitOf({ x: t.sx(curve.cx) - on.x, y: t.sy(curve.cy) - on.y });
-    ask('arc', { mid: on, n: inward, text: lbl(valueText(a.value, '°')) });
+    // #1733: within the arc's BAND — inside the circle near the arc, at its midpoint and slid along it within its span.
+    const half = Math.acos(Math.max(-1, Math.min(1, da.x * db.x + da.y * db.y))) / 2;
+    const base = Math.atan2(bis.y, bis.x);
+    const band: Array<{ x: number; y: number }> = [];
+    for (const rot of [0, 0.5, -0.5, 0.85, -0.85]) {
+      const th = base + rot * half;
+      const p = { x: t.sx(curve.cx + Math.cos(th) * curve.r), y: t.sy(curve.cy + Math.sin(th) * curve.r) };
+      const w = unitOf({ x: t.sx(curve.cx) - p.x, y: t.sy(curve.cy) - p.y });
+      for (const d of [12, 18, 24]) band.push({ x: p.x + w.x * d, y: p.y + w.y * d });
+    }
+    ask('arc', { mid: on, n: inward, text: lbl(valueText(a.value, '°')), candidates: band, priority: 2 });
   }
   return out;
 }
