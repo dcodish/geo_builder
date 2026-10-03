@@ -26,7 +26,7 @@ import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, pr
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { RESERVED_SYMBOLS, radiusSymbol, toolSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
-import { cevianFacts, onBisectorFacts, toolFootFacts, toolFootRule } from './cevian';
+import { cevianFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
 import {
   CENTRE_SENTINEL,
   CIRCLE_SENTINEL,
@@ -2262,12 +2262,17 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // `on-kind` rule, one arity up, resolved by the same fit-level kind test.
       const point = objectById(c, f.id);
       if (!point || !isPositional(point)) return { ok: false, error: unknownRef(c, f.id) };
-      const pair = c.objects.filter((o) => curveKindOf(o) === f.kind);
-      if (pair.length !== 2) return { ok: false, error: noHost(f.src, f.kind, pair.length, 2) };
-      return applyAll(
-        c,
-        pair.map((o) => ({ t: 'constraint' as const, k: { t: 'on-curve' as const, id: f.id, curve: o.id }, src: f.src })),
-      );
+      // «המשיקים נפגשים בנקודה D» (#1620 S7, ADR-AG-213): the TANGENT objects, by the test «המשיק» resolves with.
+      const pair = c.objects.filter((o) => (f.kind === 'tangent' ? isTangentObject(o) : curveKindOf(o) === f.kind));
+      if (pair.length !== 2) return { ok: false, error: noHost(f.src, f.kind === 'tangent' ? 'line' : f.kind, pair.length, 2) };
+      // …and, as 2-D draws that sentence, the piece from each touch point to the crossing.
+      const pieces: Fact[] = f.pieces
+        ? pair.flatMap((o) => (o.kind === 'line-at' ? [{ t: 'segment' as const, id: segmentIdOf(o.through, f.id), a: o.through, b: f.id, src: f.src }] : []))
+        : [];
+      return applyAll(c, [
+        ...pair.map((o) => ({ t: 'constraint' as const, k: { t: 'on-curve' as const, id: f.id, curve: o.id }, src: f.src })),
+        ...pieces,
+      ]);
     }
 
     case 'tangent-of': {

@@ -1529,11 +1529,21 @@ function intersectionSpellings(line: string): RuleOutcome {
       { t: 'selector', sel: { kind: 'crossing-distinct', id: bare[1] }, src: line },
     ]);
   }
+  const tangents = tangentsMeet(line);
+  if (tangents) return tangents;
+  // «נחתכים», «נפגשים» and «מצטלבים» are ONE verb for two lines (#1620 S7, ADR-AG-213 — the #1081 alternation the
+  // concurrency rule already carries): «הישר AC והישר BD נפגשים בנקודה E» was `not-handled` while «…נחתכים…»
+  // built, and 2-D reads both alike. A subject this rule cannot read as two lines still falls through
+  // (`viaCanonical` answers `null`), so the concurrency rule after it keeps «הגבהים … נפגשים».
   const meet =
-    new RegExp(`^(.+?)${INTERSECT_JOIN}(.+?)\\s+נחתכ(?:ים|ות)\\s+ב?נקודה\\s+(${NAME})$`).exec(line) ??
-    new RegExp(`^(.+?)\\s+and\\s+(.+?)\\s+intersect\\s+at\\s+(?:point\\s+)?(${NAME})$`, 'i').exec(line);
+    new RegExp(`^(.+?)${INTERSECT_JOIN}(.+?)\\s+${MEET_VERB_HE}\\s+${AT_POINT_HE}(${NAME})$`).exec(line) ??
+    new RegExp(`^(.+?)\\s+and\\s+(.+?)\\s+(?:intersect|meet|cross)\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`, 'i').exec(line);
   if (meet) {
-    const [, a, b, id] = meet;
+    // «המשיק בנקודה A והמשיק בנקודה A …» is one line twice: no crossing to name (the plural's «בנקודות A ו-A» rule).
+    const touchA = readTangentNoun(trim(meet[1]))?.at;
+    if (touchA !== undefined && touchA === readTangentNoun(trim(meet[2]))?.at) return refuse('repeated-vertex', line);
+    const [a, b] = sharedCircle(meet[1], meet[2]);
+    const id = meet[3];
     return viaCanonical(line, null, () => [`${id} נקודת החיתוך של ${withLineNoun(a)} עם ${withLineNoun(b)}`]);
   }
   // «X חותך את Y בנקודה B ואת Z בנקודה A» — one subject, two crossings: each is its own sentence (#1619 B3).
@@ -2623,16 +2633,103 @@ function circleSubjectGate(subject: CircleSubject | null, line: string): RuleOut
  * given, and the sentence that states the tangent alone. With a touch point it names (and builds) the
  * tangent object at that point; without one it is «המשיק» — the one tangent the figure holds (M1).
  */
+// The circle may also FOLLOW the point — «המשיק בנקודה C למעגל O», "the tangent at C to circle O" (#1620 S7,
+// ADR-AG-213): the order 2-D's «המשיק בנקודה A והמשיק בנקודה C למעגל O» writes its second tangent in.
+const TANGENT_CIRCLE_HE = `\\s+(?:ל|של\\s+)ה?מעגל(?:\\s+(?:ש?מרכזו\\s+)?(${CIRCLE_NAME}))?`;
+const TANGENT_CIRCLE_EN = `\\s+(?:to|of)\\s+(?:the\\s+)?circle(?:\\s+(${CIRCLE_NAME}))?`;
 const TANGENT_NOUN_HE = new RegExp(
-  `^ה?משיק(?:\\s+(?:ל|של\\s+)ה?מעגל(?:\\s+(?:ש?מרכזו\\s+)?(${CIRCLE_NAME}))?)?(?:\\s+ב(?:נקודה\\s+|-\\s*|נקודת\\s+ה?השקה\\s+)(${NAME}))?$`,
+  `^ה?משיק(?:${TANGENT_CIRCLE_HE})?(?:\\s+ב(?:נקודה\\s+|-\\s*|נקודת\\s+ה?השקה\\s+)(${NAME}))?(${TANGENT_CIRCLE_HE})?$`,
 );
 const TANGENT_NOUN_EN = new RegExp(
-  `^(?:[Tt]he\\s+)?[Tt]angent(?:\\s+line)?(?:\\s+(?:to|of)\\s+(?:the\\s+)?circle(?:\\s+(${CIRCLE_NAME}))?)?(?:\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME}))?$`,
+  `^(?:[Tt]he\\s+)?[Tt]angent(?:\\s+line)?(?:${TANGENT_CIRCLE_EN})?(?:\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME}))?(${TANGENT_CIRCLE_EN})?$`,
 );
 function readTangentNoun(text: string): { circle?: string; at?: Id } | null {
   const m = TANGENT_NOUN_HE.exec(text) ?? TANGENT_NOUN_EN.exec(text);
   if (!m) return null;
-  return { ...(m[1] ? { circle: m[1] } : {}), ...(m[2] ? { at: m[2] } : {}) };
+  // Groups: [1] a leading circle's name, [2] the point, [3] a TRAILING circle phrase ([4] its name). One circle
+  // phrase, before the point or after it — never both («המשיק למעגל O בנקודה A למעגל K» names two circles).
+  if (m[3] !== undefined && /מעגל|circle/i.test(m[0].slice(0, m[0].length - m[3].length))) return null;
+  const circle = m[1] ?? m[4];
+  return { ...(circle ? { circle } : {}), ...(m[2] ? { at: m[2] } : {}) };
+}
+
+/** The meet verbs, plural, either gender — «נחתכים», «נפגשות», «מצטלבים» (#1081's alternation). */
+const MEET_VERB_HE = '(?:נחתכ|נפגש|מצטלב)(?:ים|ות)';
+/** «בנקודה D», «ב-D», «נקודה D» — where they meet. */
+const AT_POINT_HE = '(?:ב-?\\s*(?:ה?נקודה\\s+)?|נקודה\\s+)';
+
+/**
+ * ONE CIRCLE PHRASE FOR A COORDINATED PAIR OF TANGENTS (#1620 S7, ADR-AG-213). «המשיק בנקודה A והמשיק בנקודה C
+ * למעגל O נפגשים בנקודה D» says «למעגל O» once, after the second tangent, and it is the circle of BOTH — 2-D's
+ * reading. So when both operands are tangents at named points and exactly one names its circle, both are
+ * spelled with it: on an empty canvas the first tangent would otherwise reach M1 before the circle exists.
+ * Any other pair passes unchanged.
+ */
+function sharedCircle(a: string, b: string): [string, string] {
+  const ta = readTangentNoun(trim(a));
+  const tb = readTangentNoun(trim(b));
+  if (!ta?.at || !tb?.at || (ta.circle !== undefined) === (tb.circle !== undefined)) return [a, b];
+  const circle = (ta.circle ?? tb.circle)!;
+  const en = TANGENT_NOUN_EN.test(trim(a)) && TANGENT_NOUN_EN.test(trim(b));
+  const spell = (at: Id) => (en ? `the tangent to circle ${circle} at ${at}` : `המשיק למעגל ${circle} בנקודה ${at}`);
+  return [spell(ta.at), spell(tb.at)];
+}
+
+/**
+ * THE TWO TANGENTS MEET (#1620 S7, ADR-AG-213 — parity row `cat-2d-111`).
+ *
+ * - «המשיקים (למעגל O) בנקודות A ו-C (למעגל O) נפגשים/נחתכים בנקודה D», "the tangents (to circle O) at A and C
+ *   meet at D" — the plural distributed: the two singular tangents, and D their crossing. Lowered to the
+ *   canonical «D נקודת החיתוך של המשיק למעגל O בנקודה A עם המשיק למעגל O בנקודה C», so the crossing rule owns
+ *   the semantics (each tangent built if absent, the circle stated if absent — ADR-AG-195 / ADR-AG-210).
+ * - «המשיקים נפגשים בנקודה D», «D נקודת החיתוך של המשיקים», "the tangents meet at D" — no point named: the TWO
+ *   tangents the figure holds (M1, `crossing-kind` `tangent`, the «הישרים» rule one noun over), and, as 2-D
+ *   draws it, the pieces from each touch point to D. None, one or three tangents is that rule's refusal.
+ *
+ * The singular pair («המשיק בנקודה A והמשיק בנקודה C …») is the general two-line meet, its circle shared
+ * (`sharedCircle`).
+ */
+const PAIR_JOIN_TAN = '\\s+ו[-־]?\\s*';
+const TANGENTS_AT_HE = new RegExp(
+  `^${HE_GIVEN}ה?משיקים(${TANGENT_CIRCLE_HE})?\\s+ב(?:נקודות\\s+|-\\s*)?(${NAME})${PAIR_JOIN_TAN}(${NAME})(${TANGENT_CIRCLE_HE})?\\s+(?:ה|ש)?${MEET_VERB_HE}\\s+${AT_POINT_HE}(${NAME})$`,
+);
+const TANGENTS_AT_EN = new RegExp(
+  `^(?:[Tt]he\\s+)?[Tt]angents(${TANGENT_CIRCLE_EN})?\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})\\s+and\\s+(${NAME})(${TANGENT_CIRCLE_EN})?\\s+(?:meet|intersect|cross)\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`,
+);
+// Case written into the words, never an `i` flag: it would read a lowercase letter as a point and a lowercase
+// `i` as the numeral I in a circle's name (the [IVX] trap, ADR-AG-006).
+const TANGENTS_BARE = [
+  new RegExp(`^${HE_GIVEN}ה?משיקים\\s+(?:ה|ש)?${MEET_VERB_HE}\\s+${AT_POINT_HE}(${NAME})$`),
+  new RegExp(`^${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה?נקודת\\s+)?ה?(?:חיתוך|מפגש)\\s+(?:של\\s+)?ה?משיקים$`),
+  new RegExp(`^(?:[Tt]he\\s+)?[Tt]angents\\s+(?:meet|intersect|cross)\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`),
+  new RegExp(`^(?:[Pp]oint\\s+)?(${NAME})\\s+is\\s+the\\s+(?:intersection|meeting\\s+point)\\s+of\\s+the\\s+tangents$`),
+];
+
+function tangentsMeet(line: string): RuleOutcome {
+  for (const re of TANGENTS_BARE) {
+    const m = re.exec(line);
+    if (!m) continue;
+    const id = m[1];
+    return made([
+      { t: 'declare', id, src: line },
+      { t: 'crossing-kind', id, kind: 'tangent', pieces: true, src: line },
+      { t: 'selector', sel: { kind: 'crossing-distinct', id }, src: line },
+    ]);
+  }
+  const he = TANGENTS_AT_HE.exec(line);
+  const m = he ?? TANGENTS_AT_EN.exec(line);
+  if (!m) return null;
+  // Groups: [1] a leading circle phrase ([2] its name), [3] [4] the touch points, [5] a trailing one ([6]), [7] D.
+  const [, lead, leadName, a, b, trail, trailName, id] = m;
+  if (lead !== undefined && trail !== undefined) return null; // two circle phrases would name two circles
+  if (a === b) return refuse('repeated-vertex', line);
+  const circled = lead !== undefined || trail !== undefined;
+  const named = leadName ?? trailName;
+  const tangent = (at: Id) =>
+    he
+      ? `המשיק${circled ? ` למעגל${named ? ` ${named}` : ''}` : ''} בנקודה ${at}`
+      : `the tangent${circled ? ` to the circle${named ? ` ${named}` : ''}` : ''} at ${at}`;
+  return viaCanonical(line, null, () => [`${id} נקודת החיתוך של ${tangent(a)} עם ${tangent(b)}`]);
 }
 
 /** The facts that BUILD the tangent a phrase names at a point — none for bare «המשיק». */

@@ -412,6 +412,10 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'the equation of the tangent to the circle at A is 3x+4y=25',
     needs: ['נתון מעגל x^2+y^2=25', 'A(3,4)'],
   },
+  // The two tangents meet (#1620 S7, ADR-AG-213) — 2-D's sentence, its plural, and the bare reference.
+  { category: 'circles', family: 'F5', he: 'המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D', en: 'the tangent at A and the tangent at C to circle O meet at D' },
+  { category: 'circles', family: 'F5', he: 'המשיקים למעגל O בנקודות A ו-C נפגשים בנקודה D', en: 'the tangents to circle O at A and C meet at D' },
+  { category: 'circles', family: 'F5', he: 'המשיקים נפגשים בנקודה D', en: 'the tangents meet at D', needs: ['מעגל O', 'המשיק למעגל O בנקודה A', 'המשיק למעגל O בנקודה C'] },
   { category: 'circles', family: 'F5', he: 'דרך P עובר משיק למעגל', en: 'a tangent to the circle passes through P', needs: ['נתון מעגל x^2+y^2=25', 'P(10,0)'] },
   { category: 'circles', family: 'F5', he: 'AB מיתר במעגל', en: 'AB is a chord of the circle', needs: ['נתון מעגל x^2+y^2=25'] },
   // Two chords of a circle not stated yet: the sentence states it on its centre letter, as 2-D does (#1670, ADR-AG-210).

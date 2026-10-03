@@ -751,13 +751,31 @@ function spanOf(at: Map<Id, Pt>): number {
  * so it states no magnitude (ADR-052) and a value the descent merely APPROACHED the bound with is
  * the bound. One function, so every open bound the solve judges uses the same floor.
  */
-export function openBoundFloor(at: Map<Id, Pt>, env: Env, syms: readonly string[]): number {
+export function openBoundFloor(at: Map<Id, Pt>, env: Env, syms: readonly string[], sampled = 0): number {
+  return SOLVE_RESOLUTION * Math.max(figureScale(at, env, syms), sampled);
+}
+
+/**
+ * THE FIGURE'S SCALE — its point spread, or its largest parameter magnitude when that is larger. The ruler
+ * {@link openBoundFloor} is relative to.
+ *
+ * **A ruler measured on the solved figure ALONE collapses with it (#1620 S7, ADR-AG-213).** A figure with no
+ * stated magnitude can satisfy a contradiction in the LIMIT of shrinking to a point: «AC קוטר במעגל O» and
+ * the two tangents at A and C stated to MEET (they are parallel) drove every point and the radius together
+ * toward the centre, and at r ≈ 4·10⁻⁶ the span was 4·10⁻⁶ too — so the floor, a fraction of that span,
+ * called the radius positive and the figure was drawn green as one dot. So the solve also passes the scale
+ * of the figure it STARTED from (`sampled` — the seeded vertices and the sampled parameters, every one
+ * inside its domain): a descent that shrank the whole figure by more than the solver's resolution relative
+ * to where it began has reached the bound, not a configuration. It states no magnitude (ADR-052) — the
+ * sample's own extent is the reference — and a figure whose givens keep its size never comes near it.
+ */
+export function figureScale(at: Map<Id, Pt>, env: Env, syms: readonly string[]): number {
   let scale = spanOf(at);
   for (const sym of syms) {
     const v = Math.abs(env[sym]);
     if (Number.isFinite(v) && v > scale) scale = v;
   }
-  return SOLVE_RESOLUTION * scale;
+  return scale;
 }
 
 /**
@@ -1785,11 +1803,14 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
       // out of its declared domain is not an answer — the next attempt is tried. A SIGN about a free
       // direction is the same kind of preference over attempts (the seeding, applied to the result): a
       // root with the wrong sign is not the one the sentence names; the post-hoc check keeps the last word.
+      // The scale the figure was SAMPLED at (#1620 S7, ADR-AG-213): a whole-figure collapse takes a
+      // span-relative floor down with it, so the floor is never smaller than the start's.
+      const sampledScale = figureScale(solved.positionsAt(solved.toVec(seeded, env)), env, solved.syms);
       const admissible = (x: number[]) => {
         const e = solved.envAt(x);
         // An open bound is judged at the solver's resolution, never exactly (#1504): a radius the
         // givens drive to zero converges to ~1e-10 and must not read as positive.
-        const floor = openBoundFloor(solved.positionsAt(x), e, solved.syms);
+        const floor = openBoundFloor(solved.positionsAt(x), e, solved.syms, sampledScale);
         if (!solved.syms.every((sym) => inDomain(domains.get(sym) ?? {}, e[sym], floor))) return false;
         for (const sel of c.selectors) {
           if (sel.kind !== 'sign') continue;

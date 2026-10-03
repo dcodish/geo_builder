@@ -2181,3 +2181,13 @@ called, never re-implemented in the test.
 - a companion: `segment`, `line-2pt`, `extent-of`, `selector`, `declare`, or a `length-eq` riding beside a minting fact.
 
 The missing points are added as `free` objects and the line's facts are re-applied; then the fixpoint runs again. This applies beside an unnamed centre too (#1686). A `perpendicular` (the cevian's own half) is not a minting form, so «AD גובה לצלע BC» stays refused. The cevian's triangle form states «משולש ABC» first (`clauseFacts`).
+
+## The two tangents meet; the meet verbs; a floor that does not collapse with the figure ([ADR-AG-213](06c-decisions-analytic.md#adr-ag-213), #1620 S7)
+
+**No new object.** Every spelling lowers (`viaCanonical`) to the canonical crossing «D נקודת החיתוך של המשיק למעגל O בנקודה A עם המשיק למעגל O בנקודה C», whose operands are the tangent noun (`readTangentNoun` → `on-curve(D, tangent-<at>)`, the tangent built by `tangent-line-at`, the circle stated by `statingNamedCircle`). D stays a free point with two incidences, solved like every other crossing.
+- `readTangentNoun` accepts the circle phrase after the point (`TANGENT_CIRCLE_HE` / `_EN`), never on both sides.
+- `intersectionSpellings`' two-operand meet takes `MEET_VERB_HE` (נחתכ/נפגש/מצטלב × ים/ות), `AT_POINT_HE`, and English meet/intersect/cross. `sharedCircle` writes a circle said once onto both tangent operands; one touch point twice is `repeated-vertex`.
+- `tangentsMeet` (called first in `intersectionSpellings`) reads the plural «המשיקים … בנקודות A ו-C …» into the two singular tangents, and the bare plural into `crossing-kind { kind: 'tangent', pieces: true }`.
+- M1's `crossing-kind` arm selects tangent objects with `isTangentObject` (the «המשיק» test) for `kind: 'tangent'`; `pieces` adds a `segment` from each tangent's `through` to the crossing. Not exactly two is `noHost(…, 'line', n, 2)`.
+
+**The open-bound floor keeps the sampled scale.** `openBoundFloor(at, env, syms, sampled)` is `SOLVE_RESOLUTION × max(figureScale(at, env, syms), sampled)`. Stage two's `admissible` passes the scale of the seeded start (`figureScale` of the seeded positions and sampled parameters). A descent that shrinks the whole figure toward a point therefore meets the bound at the start's scale, not at its own vanishing span. The other callers (`fitCreatedShapes`) pass nothing and judge as before.

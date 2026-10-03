@@ -420,8 +420,11 @@ export type Fact =
    * WHICH two objects is a question about the construction, so M1 answers it: exactly two of the
    * kind lower to the two incidences the spelled-out sentence would carry, anything else refuses
    * `ambiguous-shape` — the `on-kind` rule, one arity up.
+   *
+   * `tangent` (#1620 S7, ADR-AG-213): «המשיקים נפגשים בנקודה D» — the two TANGENT objects; `pieces` also draws
+   * each touch point's piece to the crossing, as 2-D draws it.
    */
-  | (FactBase & { t: 'crossing-kind'; id: Id; kind: 'line' | 'circle' })
+  | (FactBase & { t: 'crossing-kind'; id: Id; kind: 'line' | 'circle' | 'tangent'; pieces?: true })
   /**
    * «הנקודה A נמצאת על האליפסה» — a point on a curve named only by its KIND (#1057).
    *
