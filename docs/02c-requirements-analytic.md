@@ -2316,3 +2316,14 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - «משולש קהה זווית ABC» («קהה-זווית», «ABC משולש קהה זווית», "obtuse triangle ABC") says one of the three angles is obtuse without saying which: the first figure is obtuse at one vertex, and «הציגו תצורה אחרת» moves the obtuse angle to the others. A later given decides it («זווית BAC = 30», «זווית ABC = 40» leave only C); givens that leave no obtuse angle are refused. «ABC משולש חד זוויות» now reads letters-first too.
 - Corpus 7/4 «נתון: S_BDC / S_ODC = 0.8» stays refused: the page prints it so, and with D on BC the triangle BDC has no area. The exam's answer key is the ratio S_BEC / S_ODC = 0.8 (B(6,8)), which the tool builds when typed.
 - A point against an axis says which side of it the point is on: «D מתחת לציר x», «A מעל ציר ה-x», «C משמאל לציר ה-y», «B מימין לציר y» ("D is below the x-axis"). Several givens may share one line, joined by «;»: «A משמאל ל-O ו-C מימין ל-O; B על החלק החיובי של ציר y; D מתחת לציר x (ציור)» (a bare «(ציור)» states nothing).
+
+**R166 — what the student stated about a length, an angle, an area or an arc is written on the figure, as in the 2-D tool**
+([ADR-AG-225](06c-decisions-analytic.md#adr-ag-225), [#1714](https://github.com/dcodish/geo_builder/issues/1714); operator ruling 2026-10-02: analytic gives 2-D's experience for plane geometry; the canvas shows the inputs, the panel the computed values — ADR-W-047).
+
+- A stated angle draws an arc at its vertex with the value the student gave: «∢ABC = 30» → «30°», «∢ABC = α» → «α». Once the letter is valued («α = 30») the figure shows «30°», as 2-D does.
+- A trig given writes the angle it fixes, in degrees: «tan∢BAO = 2» → «63.43°» (never «tan=2»); «cos∢ABC = 0.5» → «60°».
+- A stated right angle («זווית ABC ישרה», «∢ABC = 90», «AB ⊥ BC») draws the square knee, never «90°». «משולש ישר-זווית ABC» draws the knee at the vertex the configuration chose, and it moves with «הציגו תצורה אחרת».
+- A stated length is written on its segment in the student's own form: «AB = 5» → «5», «AB = 3a» → «3a».
+- A stated equality marks both members: «AB = AC» one tick on each, «∢ABC = ∢ACB» one arc on each; a second equality class draws two.
+- «שטח המשולש ABC הוא 13» writes «S=13» inside the triangle; «⌢AC = 60°» writes «60°» on the arc, never at the centre.
+- A shape noun's own definition is not marked («מלבן ABCD» draws no knees, «מעוין ABCD» no ticks), and a value the tool computed is never written on the canvas: it is in the data panel.

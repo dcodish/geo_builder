@@ -15,6 +15,8 @@ import type { Figure } from '../engine/evaluate';
 import type { CurveKind } from '../engine/types';
 import { tickStep } from '../../shell/ticks';
 import { segInk, type SegDisplayMap, type SegInk } from '../../shell/frame/segmentDisplay';
+import { angleArcPoints, equalTickSegments, markFitScale, rightAngleKnee, unitOf, wedgeBisector, type MarkPt } from '../../shell/marks';
+import type { StatedMeasures, StatedValue } from '../engine/statedMeasures';
 
 /**
  * THE KEY A SEGMENT'S DISPLAY IS FILED UNDER (#1653) — its two endpoint letters, unordered.
@@ -109,12 +111,13 @@ export interface SceneSegment {
   x2: number;
   y2: number;
   /**
-   * The length the STUDENT stated for this segment, ready to draw at its midpoint (#1065).
+   * The length the STUDENT stated for this segment, ready to draw at its midpoint (#1065) — a number
+   * («AB = 10») or their own letter («AB = 3a», #1714).
    *
-   * Present only when a given pinned it — «AB = 10». A length the tool DERIVED is an answer and
-   * belongs in the data panel, not on the figure
-   * ([ADR-AG-016](../../docs/06c-decisions-analytic.md#adr-ag-016)). The engine decides which is
-   * which; this carries the text and where to put it.
+   * Present only when a given stated it. A length the tool DERIVED is an answer and belongs in the data
+   * panel, not on the figure ([ADR-AG-016](../../docs/06c-decisions-analytic.md#adr-ag-016)). The
+   * stated-measure layer (`engine/statedMeasures.ts`) decides which is which; this carries the text and
+   * where to put it.
    */
   label?: { text: string; x: number; y: number };
   /** #1653 — the display key (`segKey` of its endpoints) and how it is inked (`shell`'s `segInk`). */
@@ -175,7 +178,29 @@ export interface Scene {
    * nothing the student named, and it lives as long as the question does.
    */
   loci: SceneLocus[];
+  /**
+   * THE STUDENT'S STATED MEASURES, drawn (#1714, ADR-AG-225) — 2-D's stated-measure layer: an arc and the value
+   * at a stated angle, a knee at a stated right angle, ticks and arcs on a stated equality, the value on a stated
+   * arc and inside a stated area. A stated length rides its segment's `label` instead, where it always has.
+   */
+  stated: SceneStated;
 }
+
+/** The stated-measure layer in screen space (#1714). Geometry from `shell/marks`, the planar kit 2-D draws with. */
+export interface SceneStated {
+  /** Arcs and knees as SVG path data: `angle` a value's arc, `right` a knee, `equal` one ring of an equal-angle mark. */
+  marks: Array<{ kind: 'angle' | 'right' | 'equal'; d: string }>;
+  /** Equal-length hatch ticks. */
+  ticks: Array<{ x1: number; y1: number; x2: number; y2: number }>;
+  /** The values, already placed: an angle's beside its arc, an arc's on the arc, an area's at the centroid, and a
+   *  stated length whose segment is not drawn, at its midpoint. */
+  labels: Array<{ kind: 'angle' | 'arc' | 'area' | 'length'; text: string; x: number; y: number }>;
+}
+
+/** The stated angle arc's radius, in px — shrunk by `markFitScale` when the corner has no room (#1337's rule). */
+export const STATED_ARC_PX = 18;
+/** A stated right angle's knee leg, in px. */
+export const STATED_KNEE_PX = 10;
 
 /** A drawn arc (#1622 E4, ADR-AG-220), projected — its bounding radii included when the arc carries them. */
 export interface SceneArc {
@@ -259,6 +284,11 @@ export interface SceneKnowledge {
    * handed in like the others. A hidden segment is still in the figure; only its ink goes.
    */
   segStyle?: SegDisplayMap;
+  /**
+   * What the student STATED about a measure (#1714, ADR-AG-225) — `Derivation.stated`, handed in like the
+   * knowledge gates: which constraint is a statement is a question about the fold, which the renderer cannot see.
+   */
+  stated?: StatedMeasures;
 }
 
 /** Does a drawn point stand here? The centre mark's label defers to it (#1086). */
@@ -356,6 +386,8 @@ export function buildScene(
   // A segment is already resolved to endpoints by `evaluate`, so this is a pure projection — the
   // renderer never looks a vertex up, which is what keeps it a consumer rather than a second
   // geometry implementation.
+  /** #1714: the stated lengths, by segment key — each written once, on the segment that carries it. */
+  const statedLength = new Map((knows.stated?.lengths ?? []).map((l) => [segKey([l.a, l.b]), l.value] as const));
   const segments: SceneSegment[] = fig.segments.map((s) => {
     const x1 = t.sx(s.a.x);
     const y1 = t.sy(s.a.y);
@@ -372,12 +404,18 @@ export function buildScene(
       ink: segInk(knows.segStyle?.[key]),
       // Formatting is a DISPLAY concern, so it happens here and not in the engine — and it goes
       // through the shared formatter, never a local rounder (the #723 chokepoint, and #1029).
-      label:
-        s.pinnedLength === undefined
-          ? undefined
-          : { text: lbl(fmtAnalytic(s.pinnedLength)), x: (x1 + x2) / 2, y: (y1 + y2) / 2 },
+      label: statedLength.has(key)
+        ? { text: lbl(valueText(statedLength.get(key)!)), x: (x1 + x2) / 2, y: (y1 + y2) / 2 }
+        : undefined,
     };
   });
+  // A side drawn twice (a polygon side and a stated segment) carries its length ONCE.
+  const labelled = new Set<string>();
+  for (const s of segments) {
+    if (!s.label) continue;
+    if (labelled.has(s.key)) s.label = undefined;
+    else labelled.add(s.key);
+  }
 
   /**
    * The arcs, projected (#1622 E4). Sampled in WORLD space and then transformed, like every curve, so the isotropic
@@ -456,17 +494,12 @@ export function buildScene(
     const dx = x1 - x2;
     const dy = y1 - y2;
     const len = Math.hypot(dx, dy) || 1;
-    // Along the perpendicular, and along the line itself — the two edges of the right angle.
-    const ux = (dx / len) * RIGHT_ANGLE;
-    const uy = (dy / len) * RIGHT_ANGLE;
-    const vx = -uy;
-    const vy = ux;
+    // Along the perpendicular, and along the line itself — the knee's two rays (`shell/marks`, #1714).
+    const along = { x: x2 - dy / len, y: y2 + dx / len };
     return {
       x1, y1, x2, y2,
       // Drawn only when the foot is far enough from the point for a tick to read at all.
-      tick: len > RIGHT_ANGLE * 2
-        ? `M${(x2 + ux).toFixed(2)},${(y2 + uy).toFixed(2)}L${(x2 + ux + vx).toFixed(2)},${(y2 + uy + vy).toFixed(2)}L${(x2 + vx).toFixed(2)},${(y2 + vy).toFixed(2)}`
-        : null,
+      tick: len > RIGHT_ANGLE * 2 ? pathOf(rightAngleKnee({ x: x2, y: y2 }, { x: x1, y: y1 }, along, RIGHT_ANGLE)) : null,
       label: m.label ? { text: lbl(m.label), x: (x1 + x2) / 2, y: (y1 + y2) / 2 } : null,
     };
   });
@@ -502,9 +535,12 @@ export function buildScene(
     ...(k.centreOf ? { centreOf: k.centreOf } : {}),
   }));
 
+  const stated = statedScene(fig, t, knows.stated, segments);
+
   return {
     width,
     height,
+    stated,
     axes: {
       xAxisY: t.sy(0),
       yAxisX: t.sx(0),
@@ -520,4 +556,102 @@ export function buildScene(
     measures,
     loci,
   };
+}
+
+/** Screen points as SVG path data, at the scene's two-decimal precision. */
+const pathOf = (ps: readonly MarkPt[]): string =>
+  ps.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join('');
+
+/** A stated value as written: a number through the shared formatter (#723), or the student's own text. */
+const valueText = (v: StatedValue, unit = ''): string => ('num' in v ? `${fmtAnalytic(v.num)}${unit}` : v.text);
+
+/**
+ * THE STATED-MEASURE LAYER, projected (#1714, ADR-AG-225). The engine said WHAT was stated; this places it, every
+ * shape through `shell/marks`, so an analytic arc, knee and tick are 2-D's. Positions come from the figure; a mark
+ * whose point is absent at this configuration is skipped, never drawn at a guess.
+ */
+function statedScene(
+  fig: Figure,
+  t: Transform,
+  stated: StatedMeasures | undefined,
+  segments: readonly SceneSegment[],
+): SceneStated {
+  const out: SceneStated = { marks: [], ticks: [], labels: [] };
+  if (!stated) return out;
+  const at = (id: string): MarkPt | null => {
+    const p = fig.points.find((q) => q.id === id);
+    return p ? { x: t.sx(p.x), y: t.sy(p.y) } : null;
+  };
+  /** The corner's three screen points and the scale its marks fit at — the shortest adjacent side (#1337). */
+  const corner = (v: string, a: string, b: string) => {
+    const V = at(v);
+    const A = at(a);
+    const B = at(b);
+    if (!V || !A || !B) return null;
+    const room = Math.min(Math.hypot(A.x - V.x, A.y - V.y), Math.hypot(B.x - V.x, B.y - V.y));
+    if (room < 1e-6) return null;
+    return { V, A, B, k: markFitScale(room, STATED_ARC_PX) };
+  };
+
+  for (const r of stated.rights) {
+    const c = corner(r.v, r.a, r.b);
+    if (c) out.marks.push({ kind: 'right', d: pathOf(rightAngleKnee(c.V, c.A, c.B, STATED_KNEE_PX * c.k)) });
+  }
+  for (const g of stated.angles) {
+    const c = corner(g.v, g.a, g.b);
+    if (!c) continue;
+    const r = STATED_ARC_PX * c.k;
+    out.marks.push({ kind: 'angle', d: pathOf(angleArcPoints(c.V, c.A, c.B, r)) });
+    // The value sits just OUTSIDE its own arc, along the wedge bisector (2-D's `angleValueOffset`).
+    const u = wedgeBisector(c.V, c.A, c.B);
+    const off = r + 11;
+    out.labels.push({ kind: 'angle', text: lbl(valueText(g.value, '°')), x: c.V.x + u.x * off, y: c.V.y + u.y * off });
+  }
+  // Equal angles: concentric rings, one per class count, outside a value arc at the same corner.
+  for (const g of stated.equalAngles) {
+    const c = corner(g.v, g.a, g.b);
+    if (!c) continue;
+    for (let j = 0; j < g.count; j += 1) {
+      out.marks.push({ kind: 'equal', d: pathOf(angleArcPoints(c.V, c.A, c.B, (STATED_ARC_PX + 5 + 3 * j) * c.k)) });
+    }
+  }
+  for (const e of stated.equalLengths) {
+    const A = at(e.a);
+    const B = at(e.b);
+    if (!A || !B) continue;
+    for (const [p, q] of equalTickSegments(A, B, e.count, 5, 4)) out.ticks.push({ x1: p.x, y1: p.y, x2: q.x, y2: q.y });
+  }
+  // A stated length rides its drawn segment's label; one whose segment is not drawn is written here.
+  const drawn = new Set(segments.map((s) => s.key));
+  for (const l of stated.lengths) {
+    if (drawn.has(segKey([l.a, l.b]))) continue;
+    const A = at(l.a);
+    const B = at(l.b);
+    if (A && B) out.labels.push({ kind: 'length', text: lbl(valueText(l.value)), x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 - 6 });
+  }
+  for (const ar of stated.areas) {
+    const ps = ar.ids.map(at).filter((p): p is MarkPt => p !== null);
+    if (ps.length < 3 || ps.length !== ar.ids.length) continue;
+    const cx = ps.reduce((s, p) => s + p.x, 0) / ps.length;
+    const cy = ps.reduce((s, p) => s + p.y, 0) / ps.length;
+    out.labels.push({ kind: 'area', text: lbl(`S=${valueText(ar.value)}`), x: cx, y: cy });
+  }
+  /**
+   * An ARC's value sits ON the arc (2-D's ADR-335: never a wedge at the often-hidden centre) — at the minor arc's
+   * midpoint, nudged toward the centre so it hugs the arc without crossing the stroke.
+   */
+  for (const a of stated.arcs) {
+    const curve = fig.curves.find((c) => c.id === a.circle)?.curve;
+    const A = fig.points.find((p) => p.id === a.a);
+    const B = fig.points.find((p) => p.id === a.b);
+    if (!curve || curve.kind !== 'circle' || !A || !B) continue;
+    const da = unitOf({ x: A.x - curve.cx, y: A.y - curve.cy });
+    const db = unitOf({ x: B.x - curve.cx, y: B.y - curve.cy });
+    const sum = { x: da.x + db.x, y: da.y + db.y };
+    const bis = Math.hypot(sum.x, sum.y) < 1e-9 ? { x: -da.y, y: da.x } : unitOf(sum);
+    const on = { x: t.sx(curve.cx + bis.x * curve.r), y: t.sy(curve.cy + bis.y * curve.r) };
+    const inward = unitOf({ x: t.sx(curve.cx) - on.x, y: t.sy(curve.cy) - on.y });
+    out.labels.push({ kind: 'arc', text: lbl(valueText(a.value, '°')), x: on.x + inward.x * 12, y: on.y + inward.y * 12 });
+  }
+  return out;
 }

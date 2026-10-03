@@ -17,6 +17,7 @@ import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
 import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
 import { SOLVE_TOL } from './solve';
+import { NO_STATED_MEASURES, statedMeasures, type StatedMeasures } from './statedMeasures';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
 /** The point ids an incidence constraint is ABOUT — how a crossing is recognised (#1254). */
@@ -88,6 +89,12 @@ export interface Derivation {
    * line's constraints from it to ask whether they hold in every configuration of the current figure.
    */
   constraintLine: number[];
+  /**
+   * WHAT THE STUDENT STATED ABOUT A MEASURE (#1714, ADR-AG-225) — lengths, angles, right angles, areas, arcs and
+   * equalities, read off the constraints a SENTENCE added (a noun's definition only through its resolved choice),
+   * for the canvas to write on the figure. The answer side stays in the panel (ADR-AG-016).
+   */
+  stated: StatedMeasures;
 }
 
 /**
@@ -465,7 +472,17 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   });
 
   const constraintLine = construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]]));
-  return { construction, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices, constraintLine };
+  // #1714: a constraint the parser built as a noun's or a correspondence's DEFINITION is not a stated measure; every
+  // other one is a statement (the fold's own attribution, never a list of statement kinds).
+  const stated = statedMeasures(
+    construction,
+    (at) => {
+      const f = constraintFact[at] === undefined ? undefined : facts[constraintFact[at]];
+      return f === undefined ? undefined : f.t === 'constraint' && f.definition ? 'definition' : 'statement';
+    },
+    figure.choiceSeed ?? seed,
+  );
+  return { construction, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices, constraintLine, stated };
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */
@@ -656,4 +673,5 @@ export const EMPTY_DERIVATION: Derivation = {
   minted: [],
   notices: [],
   constraintLine: [],
+  stated: NO_STATED_MEASURES,
 };

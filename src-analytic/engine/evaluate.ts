@@ -15,7 +15,7 @@ import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Co
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
-import { evalLengthExpr, pairKey, pinnedLengths } from './lengths';
+import { evalLengthExpr } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
@@ -71,16 +71,6 @@ export interface FigureSegment {
    * only what it is handed.
    */
   ends: [Id, Id];
-  /**
-   * The length to draw ON this segment, when the STUDENT’s own given pinned it — as a NUMBER.
-   *
-   * Decided upstream rather than in `render/`, which keeps the decision beside the honesty gate that
-   * answers it — while FORMATTING stays a display concern, so the engine never owns a rounder.
-   * Absent means draw nothing: a length the tool merely DERIVED belongs in the data panel, not on
-   * the canvas ([ADR-AG-016](../../docs/06c-decisions-analytic.md#adr-ag-016) — the canvas shows the
-   * question, the panel shows the answer).
-   */
-  pinnedLength?: number;
 }
 
 /**
@@ -625,24 +615,6 @@ export function lineAtOf(c: Construction, env: Env, at: (id: Id) => Pt | null): 
       },
       at,
     );
-}
-
-/**
- * The label a drawn segment carries — its length, when the student’s own given pinned it (#1065).
- *
- * The given must PIN this length by itself and the stated value must be KNOWLEDGE — both decided in
- * — «AB = 10», not «AB = AC»), and the resulting length must be KNOWLEDGE: a length stated in terms
- * of a free parameter is stated and still not a number, and printing one sample of it on the canvas
- * would be [#1020](https://github.com/dcodish/geo_builder/issues/1020) in a new place.
- *
- * Returns `undefined` for everything else — including a length the tool DERIVED, which is correct
- * and belongs in the data panel rather than on the figure (ADR-AG-016).
- */
-function segmentLabel(
-  pinned: Map<string, number>,
-  ends: [Id, Id],
-): number | undefined {
-  return pinned.get(pairKey(ends[0], ends[1]));
 }
 
 /**
@@ -2525,14 +2497,6 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
   const placed = new Map<Id, Pt>(free);
   const at = (id: Id): Pt | null => placed.get(id) ?? null;
 
-  /**
-   * Which lengths the student PINNED, computed once for this evaluation (#1065).
-   *
-   * Read from the constraints rather than from the figure, because the question "did a given say
-   * this" is about what was STATED and cannot be recovered from where the points ended up.
-   */
-  const pinned = pinnedLengths(c.constraints, env);
-
   for (const o of c.objects) {
     switch (o.kind) {
       case 'point': {
@@ -2591,7 +2555,6 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
             a,
             b,
             ends: [o.a, o.b],
-            pinnedLength: segmentLabel(pinned, [o.a, o.b]),
           });
         }
         else vacant.push({ id: o.id, reason: 'vacant' });
@@ -2609,7 +2572,6 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
               a: vs[i],
               b: vs[(i + 1) % vs.length],
               ends,
-              pinnedLength: segmentLabel(pinned, ends),
             });
           }
         } else vacant.push({ id: o.id, reason: 'vacant' });
