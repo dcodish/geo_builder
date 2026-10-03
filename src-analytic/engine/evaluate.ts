@@ -1950,6 +1950,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
   }
 
   const unsatisfied: Constraint[] = [];
+  // The figure as SAMPLED, before any solve moves it — the reference a collapse is measured against (ADR-AG-213).
+  const sampledEnv = env;
   let free = seeded;
   // Built unconditionally (#1317): the DOF report is rank over the SAME vector the solve moves, and a
   // figure with parameters and no free vertex still has unknowns to count.
@@ -2420,6 +2422,33 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
       }
     }
   }
+  /**
+   * A WHOLE FIGURE SHRUNK TO A POINT IS NOT A SOLUTION (#1620 S7, ADR-AG-213 amendment 1).
+   *
+   * A figure with no stated magnitude meets a contradiction in the LIMIT of collapsing: «AC קוטר» and the
+   * tangents at A and C stated to meet (they are parallel) drove A, C and D onto one point — every residual
+   * zero, and every scale-relative judge (the `distinct` selector's `apartOf`, the open-bound floor) measured
+   * against the collapsed span, so each one held. The reference those judges lack is the figure the solve
+   * STARTED from: a solve that ends with the figure's extent (`figureScale` — its points and its parameters)
+   * below the solver's resolution of the extent it was sampled at has reached the degenerate limit, not a
+   * configuration. Nothing stated can make that legitimate — two named points on one position is what #1113
+   * forbids — and a figure whose sample was already a point (coincident stated coordinates) never triggers.
+   * Blame lands on the LAST given (ADR-492's shortest infeasible prefix, as the thin-ring arm above).
+   */
+  if (unsatisfied.length === 0 && c.constraints.length > 0 && (ids.length > 0 || sys.syms.length > 0)) {
+    const startScale = figureScale(place(c, sampledEnv, seeded), sampledEnv, sys.syms);
+    const solvedPos = place(c, env, free);
+    // Only while the figure still has FREEDOM: a coincidence the givens force (no freedom left) is #1254's
+    // `crossing-already-named` arm in derive, which names the point already there.
+    if (
+      solvedPos.size >= 2 &&
+      figureScale(solvedPos, env, sys.syms) < SOLVE_RESOLUTION * startScale &&
+      figureDofOf(c, sys, solvedVec) > 0
+    ) {
+      unsatisfied.push(c.constraints[c.constraints.length - 1]);
+    }
+  }
+
   const placed = new Map<Id, Pt>(free);
   const at = (id: Id): Pt | null => placed.get(id) ?? null;
 

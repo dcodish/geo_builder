@@ -105,12 +105,21 @@ const objectsGained = (before: Derivation, after: Derivation): number =>
  * is already the crossing of AB is a statement about that P (#1046), and «לא נמצאה תצורה» beside a
  * visible free crossing reads as the figure's fault when the letter is the problem.
  */
-const subjectIdsOf = (parsed: { facts: readonly Fact[] }): string[] =>
-  parsed.facts.flatMap((f) => {
+const subjectIdsOf = (parsed: { facts: readonly Fact[] }): string[] => {
+  /**
+   * A TOUCH POINT IS REFERRED TO, NOT DEFINED (#1620 S7, ADR-AG-213 amendment 1). «המשיק בנקודה A …» declares A
+   * only so a tangent at a point the figure lacks can be built (introduce-if-absent); the sentence is about the
+   * tangent and where it meets, never a new point A. Counted as a subject, A — already a diameter's end — drew the
+   * «A כבר מוגדרת … בחרו אות אחרת» hint on parallel tangents, blaming a letter the student used correctly.
+   */
+  const touched = new Set(parsed.facts.flatMap((f) => (f.t === 'tangent-line-at' ? [f.at] : [])));
+  return parsed.facts.flatMap((f) => {
+    if (f.t === 'declare' && touched.has(f.id)) return [];
     if (f.t === 'point' || f.t === 'derived' || f.t === 'declare') return [f.id];
     if (f.t === 'constraint' && (f.k.t === 'on-curve' || f.k.t === 'on-line-2pt')) return [(f.k as { id: string }).id];
     return [];
   });
+};
 
 /** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
 const definingLineOf = (lines: readonly string[], id: string): string | null => {
@@ -120,6 +129,8 @@ const definingLineOf = (lines: readonly string[], id: string): string | null => 
     const ids = new Set<string>([
       ...subjectIdsOf(p),
       ...p.facts.flatMap((f) => (f.t === 'polygon' ? f.vertices : [])),
+      // A tangent sentence that INTRODUCED its touch point still defines it (ADR-AG-213 am. 1).
+      ...p.facts.flatMap((f) => (f.t === 'tangent-line-at' ? [f.at] : [])),
     ]);
     if (ids.has(id)) return l;
   }
