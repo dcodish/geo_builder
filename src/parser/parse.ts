@@ -8735,7 +8735,9 @@ const statedTriangle = (s: string): { ring: [Id, Id, Id]; match: string } | null
  * about that triangle (it references all three vertices), and the figure has no polygon on those three
  * vertices, the triangle is introduced first. An existing triangle is never re-declared.
  */
-const cevianTriangle = (rule: Rule): Rule => (s, ctx) => {
+/** Keeps the wrapped rule's NAME — the shadow-matrix and every rule-attribution diagnostic read `rule.name` (round #1721). */
+const cevianTriangle = (rule: Rule): Rule => Object.defineProperty(cevianTriangleOf(rule), 'name', { value: rule.name });
+const cevianTriangleOf = (rule: Rule): Rule => (s, ctx) => {
   const res = rule(s, ctx);
   if (!Array.isArray(res)) return res;
   const tri = statedTriangle(s);
