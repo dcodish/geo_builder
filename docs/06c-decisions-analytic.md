@@ -10341,3 +10341,137 @@ Measured on the way: the constraint form of a regular polygon (n − 1 equal sid
 - `parser/catalogAnalytic.ts`; `shell/__tests__/fixtures/geo-input-parity.ts`.
 
 Sibling check (docs/17 §1): 2-D is the reference and was measured for every sentence. 3-D reads none of them (gaps on #1679).
+
+## ADR-AG-222 — The equation of a median keeps the median; position words between points are coordinate comparisons; an obtuse triangle is a choice over its vertices; corpus 7/4 re-checked (#1662, #1706, #1707, #1708)
+
+**Status:** accepted · 2026-10-03 · stream G1, a follow-up to the analytic V4 stack (#1616), on `feat/1622-parity` @ ef83e204. It applies four operator rulings of 2026-10-03, as given:
+- **#1662** *"It should keep the median"* — option 1, lower it: the triangle is the one with vertex A whose opposite side contains D, and several candidates ask.
+- **#1706** *"Yes. It's meant to reduce the option[s]"* — position words between points are `coord-compare` selectors. They are analytic-only, so they are an exception row, not a gap.
+- **#1707** *"If it cannot hold, it should be refused, but double check that figure since if it's an exam, I think it should be possible"*.
+- **#1708** *"It means one of them must be"* — a choice over the three vertices, cycled, never a fixed default (ADR-052).
+
+Standing rulings applied:
+- analytic gives 2-D's experience for plane geometry (2026-10-02);
+- no stated given may vanish;
+- every unstated magnitude is a free DOF (ADR-052).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R165 (and R137's median line amended). · **Design:** [04c](04c-design-analytic.md), "The equation of a cevian keeps its claim; position words are coordinate comparisons; an obtuse triangle is a region choice".
+
+**Context — measured.** 2-D through `decideDeterministic2D` (the parity runner's lane); analytic through `decideSubmit` on the base.
+
+| sentence(s) | 2-D | analytic before | analytic now |
+|---|---|---|---|
+| «משולש ABC» · «משוואת התיכון AD היא y=x» | refused (X2: equations) | records a plain line; **the median is dropped** | builds: D the midpoint of BC, A and D on y=x |
+| «משולש ABC» · «משוואת הגובה AD היא y=2x+1» | refused (X2) | plain line, altitude dropped | builds: AD ⊥ BC, D on BC |
+| the same with a second triangle «משולש ABE», D on no side | refused (X2) | plain line | asks (`ambiguous-cevian`) |
+| «משולש ABC» · «משולש ABE» · «D על BC» · «משוואת התיכון AD …» | refused (X2) | plain line | builds in ABC |
+| «משוואת התיכון AD היא y=x» on an empty canvas | refused (X2) | plain line | refused `cevian-no-triangle` |
+| «משולש ABC» · «משולש ABE» · «D על BC» · «AD גובה» | **commits** | asks `ambiguous-cevian` | builds (the foot's side) |
+| the same context · «AD תיכון» | not-handled | asks | builds — see "Not built" |
+| «D מעל A» (two free points) | not-handled | not-handled | builds (`coord-compare` y_D > y_A) |
+| «D מתחת ל-A», «C משמאל ל-B» | not-handled / refused `input.scope.orientation` | not-handled | builds |
+| «C מימין ל-B» | refused `input.scope.orientation` | not-handled | builds |
+| corpus 6/5 line 3 «A ו-D על ציר ה-y (D מעל A), B ו-C על ציר ה-x (C מימין ל-B)» | — (X1) | not-handled | builds; 6/5 lands whole at D(0,9) A(0,6) B(4,0) C(6,0), every seed |
+| «משולש קהה זווית ABC», «משולש קהה-זווית ABC», «ABC משולש קהה זווית», "obtuse triangle ABC" | not-handled | not-handled | builds: a choice over the obtuse vertex |
+| «משולש חד זוויות ABC» | not-handled | builds (`acute`) | unchanged; «ABC משולש חד זוויות» now reads too |
+| corpus 7/4 «נתון: S_BDC / S_ODC = 0.8» | — | refused `unsatisfiable` | unchanged (see 3) |
+
+**Decision.**
+
+1. **The equation's claim is the cevian (#1662).**
+   - `equationClaimFacts` is `claimFacts` plus the two cevian nouns. «משוואת התיכון AD …» also emits slice C's `cevian-of` (ADR-AG-209), with apex A and foot D. The triangle is resolved at M1 by the code «AD תיכון» already uses: one candidate builds through `cevianFacts`, several ask, none refuses.
+   - The `?? []` that silently dropped the claim is gone: `matchCurve` admits a claiming noun only when its claim can be stated.
+   - **The foot narrows the apex.** The ruling names the triangle "whose opposite side contains D". Among several candidate triangles, `cevian-of`'s apex-only branch now keeps those whose opposite side already holds the foot (`footOnPair`: a stated incidence on that pair, or a derived midpoint or foot onto it).
+   - That is the class, not the equation sentence. «AD גובה» after «D על BC» with two triangles on A used to ask, while 2-D commits it (measured).
+   - A foot on no side narrows nothing. So the #1240 lock (`cevian-apex-two-triangles`, 2-D's own gap #1684) is unchanged.
+   - Only the equation reads the two nouns. «E על התיכון AD» is `escalate:dropped` in 2-D (measured), so every other site keeps `claimFacts`' `null` and leaves them unread.
+
+2. **Position words are `coord-compare` selectors (#1706).**
+   - `POSITION_WORD_HE` / `_EN` sit at the head of `parseCompare`.
+     - Hebrew: «X מעל / מתחת ל / מימין ל / משמאל ל Y», with an optional «הנקודה» and «נמצאת».
+     - English: "X is above / below / to the right of / to the left of Y".
+     - Both operands must be point names, so «D משמאל לציר ה-y» (a side of an axis, corpus 19/4) is not this sentence.
+   - The selector is ADR-AG-161's: D7 kind 2, consuming no freedom. Measured with A(0,6), D on the y-axis and AD = 3: «D מעל A» gives D(0,9) and «D מתחת ל-A» gives D(0,3), at every seed.
+   - **Asides anywhere.** The corpus line still failed after the words parsed:
+     - the comma split, the distribution and the trailing-paren split each spend a frame level, and `MAX_FRAME_DEPTH` is 2;
+     - `asideClauses` therefore removes every space-preceded top-level «(…)» and reads the head at the SAME depth, because removing an aside nests no reading;
+     - it runs last, after `parenClauses`, so it never overrides a rule that owns the line;
+     - a glued group («A(0;6)», «2(x−1)») is never an aside.
+   - **The parity exception.** There is no new family.
+     - X1 is "the coordinate frame", and a direction on fixed axes is the frame. X1 gains one pattern (a position word between two point names).
+     - Its rows carry `only: ['analytic']`. 3-D is not checked: «מעל» there would be a question about z, which has no ruling. 2-D is must-refuse and never builds it (not-handled or `input.scope.orientation`).
+     - docs/22 §10 makes a new family an ADR-W decision. This change extends an existing family's patterns under the operator's explicit ruling, and is reported to the integrator for that reason.
+
+3. **Corpus 7/4, re-checked against the page (#1707).**
+   - The booklet (471 2025, p. 49 = PDF p. 62) prints «נתון: S_BDC / S_ODC = 0.8» exactly as transcribed.
+     - The text says OD is the altitude to BC.
+     - The figure draws D on BC between B and C, and E as the foot of BE on OC.
+     - So B, D and C are collinear, S_BDC = 0, and the printed ratio cannot hold. **The transcription is right, and the refusal stays.**
+   - **The exam's answer key** (p. 52 = PDF p. 65) gives ד(1) BC = 4√5 and ד(2) S_OBC = 40.
+     - With C(10,0) and D(8,4), that is B(6,8): S_BEC = ½·4·8 = 16 and S_ODC = ½·10·4 = 20, a ratio of 0.8.
+     - The answer key therefore answers **S_BEC / S_ODC = 0.8**: the similar triangles of part ג. «BDC» is a typo for «BEC».
+     - S_BOD / S_ODC = 0.8 would give BC = 3.6√5, which disagrees with the key.
+   - The corpus keeps the printed sentence, because the student types the exam.
+     - The inventory note records the check and the answer-key reading.
+     - The answer-key reading builds when typed: B(6,8), or its mirror B(14,−8) on the line BC.
+     - Whether the corpus should carry the corrected line instead is the operator's call (escalated).
+
+4. **An obtuse triangle is a region choice (#1708).**
+   - The obtuse angle is D3's order «∢ > 90» (ADR-AG-216), which is a SELECTOR. The `choice` ADR-AG-208 used for «שכל קודקודיו מונחים על הצירים» is a CONSTRAINT choice. So `Selector` gains its twin: `{ kind: 'choice'; options: Selector[] }`.
+   - It is resolved at the choice seed exactly as `resolveChoices` resolves the constraint one (`resolveSelectorChoices`).
+   - `choiceCount` counts it, so `evaluateTryingChoices` passes over a dead option (#1642).
+   - Every later stage sees one ordinary selector. M1's reference check recurses into the options, and an unresolved choice is judged "some option holds".
+   - The adjective is peeled off the noun like the acute one (`OBTUSE_HE` / `OBTUSE_EN`), on triangles only. The letters-first frame now carries either adjective (`ANGLE_ADJECTIVE_HE`).
+   - Measured over eight seeds:
+     - each configuration is obtuse at exactly one vertex, and all three vertices occur (A, B, C at seeds 0–2);
+     - «זווית BAC = 30» · «זווית ABC = 40» leave only C;
+     - «∠A = ∠B = 60» is refused on the second angle;
+     - A(0,0) B(4,0) C(1,3) is refused, and A(0,0) B(4,0) C(5,1) builds, obtuse at B.
+
+**Not built, said out loud.**
+- **«AD תיכון» after «D על BC» with two triangles** now builds in analytic, because the foot narrows the apex. 2-D answers not-handled for the median while it commits the altitude. That is a 2-D asymmetry; it is reported for #1684 / #1677, not patched here, and no parity row was added for the median spelling.
+- **The English equation of a median** ("the equation of the median AD is y=x") is not-handled. So is every English noun-equation form in this tree; "the line AC is …" is the only one read. Not widened.
+- **«A ו-D על ציר ה-y (D מעל A)» as one clause** states its selector twice, because the distribution hands the aside to each subject. M1 absorbs the duplicate. Left as is.
+- **Corpus 7/4** stays at 3/5 lines. Line 1's fault in the ratchet's `derive` is the same conflict, blamed on both lines. Typed in order, lines 1–4 record and only line 5 is refused (locked).
+- **3-D** reads none of these sentences. Its rows are `only: ['analytic']` (X1), free (X2), or gaps on #1679.
+
+**Measured.** 471 corpus (`confirmTaught`, seed 0): **258/263 lines, 42/46 questions**, against 257/263 and 41/46 on the base. **6/5 lands whole.** As this stream's prompt allows, the ratchet FLOOR is raised to 258 / 42 in this branch.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1616-rulings-0310.test.ts` has 35 tests, all through `decideSubmit` / `derive` / `parseLine`, over eight seeds. **Fails before: 30 of 35.** The five that pass on the base:
+  - #1707's three — the printed line is kept, it is refused, and the answer-key reading builds. No code changed for #1707.
+  - the axis-side guard: «D משמאל לציר ה-y» is no point comparison;
+  - the non-triangle guard: «מרובע קהה זווית ABCD».
+- `issue-1234-equation-extent.test.ts`, the #1236 lock:
+  - it asserted only `.ok` for «משוואת התיכון …», which a plain line with the claim dropped passed;
+  - it now also asserts the claim (`cevian-of`), and that the operator's figure takes «משוואת התיכון CE …» with no fault and no second object;
+  - **fails before: 2 of 3.**
+- 6/5 is locked line by line at its printed coordinates. Analytic has no `.geo.json` fixtures (ADR-AG-200/207/208's practice).
+- Parity rows added:
+  - ex-position-above / below / right / left / aside-1706 (X1, `only: ['analytic']`);
+  - ex-median-equation-1662 (X2, builds) and ex-altitude-equation-ask-1662 (X2, asks);
+  - cevian-foot-on-side-1662, a plain row where 2-D and analytic both build, with a 3-D gap on #1679;
+  - obtuse-triangle-1708, -hyphen-1708, -letters-first-1708, with 2-D gaps on #1677 and 3-D gaps on #1679.
+- Catalog: «משולש קהה זווית ABC», «D מעל A», «C מימין ל-B» (He/En).
+
+**Consequences.**
+- `parser/parseAnalytic.ts`:
+  - `equationClaimFacts`;
+  - `POSITION_WORD_HE` / `_EN` and `positionMeaning` in `parseCompare`;
+  - `OBTUSE_HE` / `_EN` and `obtuseChoice`;
+  - the `asideClauses` step in `readLine`.
+- `parser/frameAnalytic.ts`: `asideClauses`; `ANGLE_ADJECTIVE_HE` / `_EN` in the letters-first shape frame.
+- `engine/apply.ts`: `footOnPair` and the foot narrowing in `cevian-of`; the selector reference check as a recursive `refsOf`.
+- `engine/types.ts`: the selector `choice`.
+- `engine/evaluate.ts`: `resolveSelectorChoices`, `choiceCount`, and the `choice` case in `failingSelectors`.
+- `parser/catalogAnalytic.ts`.
+- `shell/__tests__/fixtures/geo-input-parity.ts`: X1's pattern and reason, and the rows.
+- `docs/sample questions/471-geometry-inventory.json`: 7/4's note.
+- The ratchet floor.
+
+Sibling check (docs/17 §1):
+- 2-D is the reference and was measured for every sentence.
+- 2-D already narrows «AD גובה» by the foot.
+- 2-D reads no obtuse-triangle adjective (#1677).
+- 2-D refuses position words by design.
+- 3-D reads none of these.

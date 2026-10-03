@@ -26,6 +26,13 @@ import { isNumeralName } from '../engine/names';
 import { stripFormatControls } from '../../shell/bidi';
 import { areaNotation } from '../engine/lengths';
 
+/**
+ * A triangle's ANGLE adjective after its noun — «חד זוויות», «קהה זווית» (and their hyphenated / gendered spellings) —
+ * the shape rule's own `ACUTE_HE` / `OBTUSE_HE` vocabulary, so a letters-first sentence keeps it (#1708, ADR-AG-222).
+ */
+const ANGLE_ADJECTIVE_HE = `(?:חד(?:ת|ות|י)?|קה(?:ה|ת|ים|ות))[\\s-]+${ANGLE_STEM_HE}ו?ת`;
+const ANGLE_ADJECTIVE_EN = `(?:acute|obtuse)(?:[\\s-]+angled)?`;
+
 // ---------------------------------------------------------------------------
 // Orthography — character-level folds, always applied
 // ---------------------------------------------------------------------------
@@ -405,10 +412,12 @@ export function shapeClauses(line: string): string[] | null {
   if (decl && paren && shapeKey(decl[1])) return [`${shapeKey(decl[1])} ${decl[2]}`, ...extra];
 
   // «ABC משולש», «ABCD דלתון» — the letters first (#1239).
-  const after = new RegExp(`^${LETTERS}\\s+(?:ה)?(${SHAPE_HE})$`).exec(head);
-  if (after && shapeKey(after[2])) return [`${shapeKey(after[2])} ${after[1]}`, ...extra];
-  const afterEn = new RegExp(`^${LETTERS}\\s+(?:is\\s+(?:a|an)\\s+)?(${SHAPE_EN})$`, 'i').exec(head);
-  if (afterEn && shapeKey(afterEn[2])) return [`${shapeKey(afterEn[2])} ${afterEn[1]}`, ...extra];
+  // A triangle's angle adjective rides along («ABC משולש קהה זווית», «ABC משולש חד זוויות» — #1708, ADR-AG-222): the
+  // clause keeps it after the noun, where the shape rule peels it off as a given.
+  const after = new RegExp(`^${LETTERS}\\s+(?:ה)?(${SHAPE_HE})(\\s+${ANGLE_ADJECTIVE_HE})?$`).exec(head);
+  if (after && shapeKey(after[2])) return [`${shapeKey(after[2])}${after[3] ?? ''} ${after[1]}`, ...extra];
+  const afterEn = new RegExp(`^${LETTERS}\\s+(?:is\\s+(?:a|an)\\s+)?(${ANGLE_ADJECTIVE_EN}\\s+)?(${SHAPE_EN})$`, 'i').exec(head);
+  if (afterEn && shapeKey(afterEn[3])) return [afterEn[2] ? `${afterEn[2]}${afterEn[3]} ${afterEn[1]}` : `${shapeKey(afterEn[3])} ${afterEn[1]}`, ...extra];
 
   // «(ה)<noun>? <letters> הוא|היא <predicate>» — the predicate is a shape noun, or an adjective the
   // subject noun completes («המשולש AOB הוא ישר זווית» → משולש ישר זווית).
@@ -671,6 +680,56 @@ export function chainClauses(line: string): string[] | null {
   // `y`, which is prose around an equation (#1496), never a link in a chain of equal measures.
   if (members.slice(0, -1).some((x) => !/[A-Z]/.test(x))) return null;
   return members.slice(0, -1).map((x, i) => `${x} = ${members[i + 1]}`);
+}
+
+/**
+ * EVERY PARENTHETICAL ASIDE, wherever it sits — «A ו-D על ציר ה-y (D מעל A), B ו-C על ציר ה-x (C מימין ל-B)» (corpus
+ * 6/5, #1706, ADR-AG-222): the line with each aside removed, and the givens inside them. `parenClauses` reads only a
+ * TRAILING aside and spends a frame level on the head, so an aside on a clause of a comma list (which itself needs the
+ * comma split and the distribution) ran out of depth. Removing an aside nests nothing — the head is the same sentence,
+ * one parenthesis shorter — so the caller reads the head at its OWN depth.
+ *
+ * An aside is a top-level «(…)» preceded by a space; a coordinate pair or a function call is glued to what precedes it
+ * («A(2,3)», «2(x-1)»), as in `trailingParen`. Null when the line has no aside.
+ */
+export function asideClauses(line: string): { head: string; inner: string[] } | null {
+  let head = '';
+  const inner: string[] = [];
+  let i = 0;
+  while (i < line.length) {
+    if (line[i] === '(' && i > 0 && line[i - 1] === ' ') {
+      let depth = 0;
+      let j = i;
+      for (; j < line.length; j += 1) {
+        if (line[j] === '(') depth += 1;
+        if (line[j] === ')') depth -= 1;
+        if (depth === 0) break;
+      }
+      if (j >= line.length) return null;
+      const parts = splitTopLevel(line.slice(i + 1, j));
+      if (parts.length === 0) return null;
+      inner.push(...parts);
+      i = j + 1;
+      continue;
+    }
+    if (line[i] === '(') {
+      // A glued group is part of the head, whole — its own «(» is never an aside.
+      let depth = 0;
+      let j = i;
+      for (; j < line.length; j += 1) {
+        if (line[j] === '(') depth += 1;
+        if (line[j] === ')') depth -= 1;
+        if (depth === 0) break;
+      }
+      head += line.slice(i, j + 1);
+      i = j + 1;
+      continue;
+    }
+    head += line[i];
+    i += 1;
+  }
+  const h = head.replace(/\s+([,.;])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+  return inner.length > 0 && h ? { head: h, inner } : null;
 }
 
 export function parenClauses(line: string): string[] | null {

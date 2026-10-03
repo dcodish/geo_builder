@@ -983,7 +983,15 @@ export type Selector =
    * (on the side's line AND in the closed triangle is on the side). Open otherwise: a point on the boundary is
    * neither inside nor outside. A region, D7's kind 2. Judged inside validity, and seeded.
    */
-  | { kind: 'in-polygon'; id: Id; ring: Id[]; inside: boolean; closed?: true };
+  | { kind: 'in-polygon'; id: Id; ring: Id[]; inside: boolean; closed?: true }
+  /**
+   * ONE OF SEVERAL REGIONS, THE SENTENCE NOT SAYING WHICH — «משולש קהה זווית ABC»: the angle at A, at B or at C is
+   * obtuse (#1708, operator ruling 2026-10-03: *"It means one of them must be"*; ADR-AG-222). The region twin of the
+   * constraint `choice` (#1049, «משולש ישר זווית»): resolved per configuration at the CHOICE seed (`resolveSelectorChoices`,
+   * `evaluate.ts`), so «הציגו תצורה אחרת» cycles the options and an option the other givens leave no figure for is
+   * passed over (#1642). Never a fixed default (ADR-052). Each option is an ordinary selector, judged as itself.
+   */
+  | { kind: 'choice'; options: Selector[] };
 
 /**
  * A quantity the figure DERIVES — never a symbol the student declared (that is a domain, kind 1).

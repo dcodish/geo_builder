@@ -1015,6 +1015,9 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
   const apart = apartOf(at);
 
   const holds = (s: Selector): boolean => {
+    // A region choice that reaches here unresolved (#1708) holds when one of its options does — the constraint
+    // `choice`'s rule (`holds` in the locus check). `evaluate` resolves it first, so this is the raw reading only.
+    if (s.kind === 'choice') return s.options.some(holds);
     /**
      * THE SIGN OF A DERIVED QUANTITY (#1323, ADR-AG-144) — «שיפוע הישר l1 שלילי».
      *
@@ -1462,7 +1465,22 @@ export function evaluate(raw: Construction, seed = 0): Figure {
 function choiceCount(c: Construction): number {
   let n = 1;
   for (const k of c.constraints) if (k.t === 'choice' && k.options.length > 1) n = Math.max(n, k.options.length);
+  // A region choice («משולש קהה זווית», #1708) is a discrete choice too: tried at the same samples, in seed order.
+  for (const s of c.selectors) if (s.kind === 'choice' && s.options.length > 1) n = Math.max(n, s.options.length);
   return n;
+}
+
+/**
+ * THE REGION CHOICE RESOLVED (#1708, ADR-AG-222) — `resolveChoices`' rule for a selector `choice`: the option the
+ * choice seed indexes, so every later stage (validity, seeding, `drawableAt`) sees one ordinary selector.
+ */
+export function resolveSelectorChoices(selectors: readonly Selector[], seed: number): Selector[] {
+  if (!selectors.some((s) => s.kind === 'choice')) return selectors as Selector[];
+  return selectors.flatMap((s) => {
+    if (s.kind !== 'choice') return [s];
+    if (s.options.length === 0) return [];
+    return resolveSelectorChoices([s.options[((seed % s.options.length) + s.options.length) % s.options.length]], seed);
+  });
 }
 function admittedFigure(f: Figure): boolean {
   return f.unsatisfied.length === 0 && f.selectorsOk && hardRingFaults(f).length === 0;
@@ -1735,7 +1753,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
    * narrowed an earlier statement. The constraints arrive already bounded; the solve, the validity check
    * and the knowledge gate still see one truth.
    */
-  const c: Construction = { ...raw, constraints: resolveChoices(raw.constraints, choiceSeed), selectors: cycledPairs(raw.selectors, seed) };
+  const c: Construction = { ...raw, constraints: resolveChoices(raw.constraints, choiceSeed), selectors: resolveSelectorChoices(cycledPairs(raw.selectors, seed), choiceSeed) };
   let env = foldSignSelectors(c, sampleEnv(c, seed));
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];

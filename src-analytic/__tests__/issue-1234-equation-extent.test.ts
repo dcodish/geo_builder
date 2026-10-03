@@ -47,6 +47,21 @@ describe('ADR-AG-111 — recognition: the noun is no longer a gate (#1236)', () 
     expect(parseLine(`משוואת ה${noun} BD היא 4x+5y=0`).ok).toBe(true);
   });
 
+  /**
+   * #1662 (operator ruling 2026-10-03, ADR-AG-222): «תיכון» / «גובה» are understood AND keep their claim. This lock
+   * used to stop at `.ok` — a plain line with the median dropped passed it. The claim is the cevian of the triangle
+   * the figure resolves, and on the operator's figure it is the median CE already drawn.
+   */
+  it.each([['תיכון', 'median'], ['גובה', 'altitude']])('«%s» states its claim, never a plain line', (noun, role) => {
+    const r = parseLine(`משוואת ה${noun} BD היא 4x+5y=0`);
+    expect(r.ok && r.facts.some((f) => f.t === 'cevian-of' && f.role === role && f.apex === 'B' && f.foot === 'D')).toBe(true);
+  });
+  it('on the operator’s figure, «משוואת התיכון CE …» is the median CE already there — no fault, no second object', () => {
+    const d = derive([...BASE, 'משוואת התיכון CE היא x-3y=0'], 0);
+    expect(d.faults).toEqual([]);
+    expect(shapeOf([...BASE, 'משוואת התיכון CE היא x-3y=0']).drawn).toEqual([]);
+  });
+
   // THE NEGATIVE CONTROL. The registry is still a list, deliberately: an unknown noun must mint
   // nothing rather than have the tool guess at a word it does not know.
   it.each([['הפיל'], ['המחברת'], ['השולחן']])('an unknown noun «%s» stays not-handled', (noun) => {

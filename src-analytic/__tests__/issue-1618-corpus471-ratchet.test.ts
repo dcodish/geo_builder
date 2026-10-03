@@ -34,7 +34,7 @@ interface CorpusQuestion {
 const CORPUS: CorpusQuestion[] = JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'corpus471.json'), 'utf8'));
 
 /** The floors. Raise them in the commit that earns them; never lower them. */
-const FLOOR = { lines: 257, questions: 41 }; // #1621 slice D (ADR-AG-214…216): ratios and areas, the angle alias and tan/cos, coordinates in words and order
+const FLOOR = { lines: 258, questions: 42 }; // #1616 rulings of 2026-10-03 (ADR-AG-222): corpus 6/5 — position words in an aside
 
 function measure() {
   let lines = 0;

@@ -47,6 +47,7 @@ import {
   type CurveObject,
   type Domain,
   type Fact,
+  type Selector,
   type ArcDef,
   type GeoObject,
   type Id,
@@ -1354,6 +1355,20 @@ function applyRoleOf(c: Construction, f: Extract<Fact, { t: 'role-of' }>): Apply
     return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
   }
   return applyFact(c, say(says));
+}
+
+/**
+ * Does the figure already put `id` on the line of `u`/`v`? — an incidence it states («D על BC»), or a derived point
+ * defined on that pair (its midpoint, the foot of a perpendicular onto it). Read off the construction, never a sample.
+ */
+function footOnPair(c: Construction, id: Id, u: Id, v: Id): boolean {
+  const pair = (a: Id, b: Id) => (a === u && b === v) || (a === v && b === u);
+  if (c.constraints.some((k) => k.t === 'on-line-2pt' && k.id === id && pair(k.a, k.b))) return true;
+  const o = objectById(c, id);
+  if (o?.kind !== 'derived') return false;
+  if (o.rule.t === 'midpoint') return pair(o.rule.a, o.rule.b);
+  if (o.rule.t === 'foot' && o.rule.onto.k === 'points') return pair(o.rule.onto.a, o.rule.onto.b);
+  return false;
 }
 
 function applyAll(c: Construction, facts: readonly Fact[]): ApplyOutcome {
@@ -3213,6 +3228,19 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           targets.set(`${f.apex}|${[u, v].sort().join('')}`, { apex: f.apex, u, v });
         }
       }
+      /*
+       * THE FOOT NARROWS THE APEX (#1662, operator ruling 2026-10-03; ADR-AG-222). A cevian named by its two ends («AD
+       * גובה», «משוואת התיכון AD היא …») is drawn in the triangle with vertex A whose opposite side CONTAINS D: when the
+       * figure already puts D on one candidate's side, the others are not what the sentence names. 2-D reads «AD גובה»
+       * after «D על BC» in the same way (measured: it commits). A foot on no candidate's side narrows nothing.
+       */
+      if (f.apex && !f.side && !f.hypotenuse && targets.size > 1) {
+        const onSide = [...targets].filter(([, t]) => footOnPair(c, f.foot, t.u, t.v));
+        if (onSide.length > 0) {
+          targets.clear();
+          for (const [k, t] of onSide) targets.set(k, t);
+        }
+      }
       if (f.hypotenuse && (openRight ? targets.size === 0 : false)) return { ok: false, error: { code: 'ambiguous-hypotenuse', detail: f.src } };
       if (f.hypotenuse && targets.size === 0) return { ok: false, error: { code: 'ambiguous-no-right-angle', detail: f.src } };
       if (f.hypotenuse && (targets.size > 1 || openRight)) return { ok: false, error: { code: 'ambiguous-hypotenuse', detail: f.src } };
@@ -3332,37 +3360,41 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * endpoints it is measured against (#1073). A selector that silently judged nothing because one
        * of its points was missing would be a given that vanished.
        */
-      const refs =
-        f.sel.kind === 'axis-side' || f.sel.kind === 'crossing-distinct' || f.sel.kind === 'crossing-nth'
-          ? [f.sel.id]
-          : f.sel.kind === 'distinct' || f.sel.kind === 'acute'
-            ? f.sel.ids
-            : f.sel.kind === 'sign'
-              ? f.sel.q.k === 'slope'
-                ? dirRefs(f.sel.q.u)
-                : f.sel.q.k === 'power'
-                  ? [f.sel.q.p]
-                  : f.sel.q.k === 'circles' || f.sel.q.k === 'params'
+      const refsOf = (sel: Selector): Id[] =>
+        // A choice («משולש קהה זווית», #1708) names every point of every option.
+        sel.kind === 'choice'
+          ? sel.options.flatMap(refsOf)
+          : sel.kind === 'axis-side' || sel.kind === 'crossing-distinct' || sel.kind === 'crossing-nth'
+          ? [sel.id]
+          : sel.kind === 'distinct' || sel.kind === 'acute'
+            ? sel.ids
+            : sel.kind === 'sign'
+              ? sel.q.k === 'slope'
+                ? dirRefs(sel.q.u)
+                : sel.q.k === 'power'
+                  ? [sel.q.p]
+                  : sel.q.k === 'circles' || sel.q.k === 'params'
                     ? []
-                    : f.sel.q.k === 'centres-side'
-                      ? [f.sel.q.p, f.sel.q.q]
-                      : f.sel.q.k === 'order'
+                    : sel.q.k === 'centres-side'
+                      ? [sel.q.p, sel.q.q]
+                      : sel.q.k === 'order'
                         ? // Every point either side measures (#1621 D3) — a vertex of an angle, an end of a length.
-                          [f.sel.q.left, f.sel.q.right].flatMap((o) => (o.t === 'length' ? lengthRefs(o.le) : o.t === 'angle' ? [o.at.v, o.at.a, o.at.b] : []))
-                        : [f.sel.q.p, f.sel.q.a, f.sel.q.b]
-              : f.sel.kind === 'coord-compare'
+                          [sel.q.left, sel.q.right].flatMap((o) => (o.t === 'length' ? lengthRefs(o.le) : o.t === 'angle' ? [o.at.v, o.at.a, o.at.b] : []))
+                        : [sel.q.p, sel.q.a, sel.q.b]
+              : sel.kind === 'coord-compare'
                 ? // Both points of «x_B > x_D» must exist (#1462); a value names none.
-                  [f.sel.id, ...('point' in f.sel.rhs ? [f.sel.rhs.point] : [])]
-                : f.sel.kind === 'angle-side'
-                  ? [f.sel.id, f.sel.v, f.sel.a, f.sel.b]
-                  : f.sel.kind === 'segments-cross'
-                    ? [f.sel.a, f.sel.b, f.sel.c, f.sel.d]
+                  [sel.id, ...('point' in sel.rhs ? [sel.rhs.point] : [])]
+                : sel.kind === 'angle-side'
+                  ? [sel.id, sel.v, sel.a, sel.b]
+                  : sel.kind === 'segments-cross'
+                    ? [sel.a, sel.b, sel.c, sel.d]
                     : // #1622 (ADR-AG-217): the subjects and the line; the point and its ring.
-                      f.sel.kind === 'line-side'
-                      ? [...f.sel.ids, f.sel.a, f.sel.b]
-                      : f.sel.kind === 'in-polygon'
-                        ? [f.sel.id, ...f.sel.ring]
-                        : [f.sel.id, f.sel.a, f.sel.b];
+                      sel.kind === 'line-side'
+                      ? [...sel.ids, sel.a, sel.b]
+                      : sel.kind === 'in-polygon'
+                        ? [sel.id, ...sel.ring]
+                        : [sel.id, sel.a, sel.b];
+      const refs = refsOf(f.sel);
       for (const id of refs) {
         const o = objectById(c, id);
         if (!o || !isPositional(o)) {

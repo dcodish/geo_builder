@@ -49,6 +49,7 @@ import {
   restatedClauses,
   conditionClauses,
   parenClauses,
+  asideClauses,
   partitions,
   pointClauses,
   segmentsOf,
@@ -369,6 +370,20 @@ function claimFacts(row: StraightNoun | undefined, a: Id, b: Id, src: string): F
     default:
       return null;
   }
+}
+/**
+ * THE CLAIM OF A NOUN IN AN EQUATION SENTENCE (#1662, operator ruling 2026-10-03: *"It should keep the median"*;
+ * ADR-AG-222). «משוואת התיכון AD היא …» / «משוואת הגובה AD היא …» says AD is a median / an altitude — of the triangle
+ * the FIGURE holds with vertex A whose opposite side contains D. That is slice C's cevian resolution (`cevian-of`,
+ * ADR-AG-209), so the claim is the same fact «AD תיכון» lowers to: one triangle builds through `cevianFacts`, several
+ * ask (`ambiguous-cevian`), none refuses (`cevian-no-triangle`) — never a plain line with the claim dropped.
+ *
+ * Only this sentence reads the two nouns: 2-D drops the claim in «E על התיכון AD» (measured: `escalate:dropped`), so
+ * every other site keeps `claimFacts`' `null` and leaves them unread.
+ */
+function equationClaimFacts(row: StraightNoun | undefined, a: Id, b: Id, src: string): Fact[] | null {
+  if (row?.claim === 'median' || row?.claim === 'altitude') return [{ t: 'cevian-of', role: row.claim, apex: a, foot: b, src }];
+  return claimFacts(row, a, b, src);
 }
 /** A sink a resolver states a role noun's claim into — absent, the resolver does not read a claiming noun. */
 type ClaimSink = { out: Fact[]; src: string };
@@ -723,14 +738,12 @@ function matchCurve(line: string): CurveHit | null {
     new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?(${HE_LINE})\\s+(${LINE_NAME})${NAMING_TAIL_HE}(.+)$`),
   );
   /*
-   * A noun whose claim cannot be stated over this name (a numeral line) is not read here. ⚠ «תיכון» / «גובה» keep the
-   * reading #1236 (ADR-AG-111) gave them — understood, the claim NOT lowered — pending the operator's ruling filed with
-   * ADR-AG-200: lowering a median/altitude claim needs the triangle the sentence does not name, and refusing them
-   * would withdraw an accepted spelling under a bug's banner. Every OTHER site still leaves them unread.
+   * A noun whose claim cannot be stated over this name (a numeral line) is not read here. «תיכון» / «גובה» state
+   * their claim through `equationClaimFacts` (#1662, operator ruling 2026-10-03, ADR-AG-222): the triangle is the
+   * one the FIGURE resolves, at M1.
    */
   const claimRow = heLineNamed ? nounRow(heLineNamed[1]) : undefined;
-  const legacyRole = claimRow?.claim === 'median' || claimRow?.claim === 'altitude';
-  if (heLineNamed && (!claimRow?.claim || legacyRole || (TWO_POINT_NAME.test(heLineNamed[2]) && claimFacts(claimRow, 'A', 'B', '') !== null))) {
+  if (heLineNamed && (!claimRow?.claim || (TWO_POINT_NAME.test(heLineNamed[2]) && equationClaimFacts(claimRow, 'A', 'B', '') !== null))) {
     return {
       id: lineIdOf(heLineNamed[2]),
       name: lineNameOf(heLineNamed[2], 'he'),
@@ -3987,7 +4000,40 @@ function compareFacts(id: Id, axis: 'x' | 'y', greater: boolean, rhs: CoordCompa
 }
 type CoordCompareRhs = Extract<Selector, { kind: 'coord-compare' }>['rhs'];
 
+/**
+ * A POSITION WORD BETWEEN TWO POINTS — «D מעל A», «D מתחת ל-A», «C מימין ל-B», «C משמאל ל-B» (#1706, operator ruling
+ * 2026-10-03: *"Yes. It's meant to reduce the option[s]"*; ADR-AG-222). Analytic's axes are FIXED, so «above» IS
+ * y_D > y_A and «to the right of» IS x_C > x_B: the same `coord-compare` selector «y_D > y_A» lowers to — a branch
+ * selector (ADR-AG-005 D7 kind 2), never a constraint, so it picks among the configurations the givens leave and pins
+ * nothing. Corpus 6/5 writes them in a parenthetical after a placement («A ו-D על ציר ה-y (D מעל A)»), which the
+ * frame's parenthesis split already hands here.
+ *
+ * Both sides must be POINTS: «D משמאל לציר ה-y» (a side of an axis) is a different sentence, not read here. 2-D refuses
+ * screen orientation by design (`input.scope.orientation`), so this reading is analytic's own — exception X10 of the
+ * #1649 parity lock.
+ */
+const POSITION_WORD_HE = new RegExp(
+  `^${HE_GIVEN}${HE_POINT}(${NAME})\\s+(?:(?:נמצא|נמצאת|נמצאים|נמצאות|מונח|מונחת)\\s+)?(מעל|מתחת|מימין|משמאל)(?:\\s*ל)?-?\\s*${HE_POINT}(${NAME})$`,
+);
+const POSITION_WORD_EN = new RegExp(
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is|lies)\\s+(above|below|to\\s+the\\s+right\\s+of|to\\s+the\\s+left\\s+of)\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`,
+  'i',
+);
+/** The axis and direction a position word means on analytic's fixed axes. */
+function positionMeaning(word: string): { axis: 'x' | 'y'; greater: boolean } {
+  const w = word.toLowerCase();
+  if (w === 'מעל' || w === 'above') return { axis: 'y', greater: true };
+  if (w === 'מתחת' || w === 'below') return { axis: 'y', greater: false };
+  if (w === 'מימין' || /right/.test(w)) return { axis: 'x', greater: true };
+  return { axis: 'x', greater: false };
+}
+
 function parseCompare(line: string): RuleOutcome {
+  const pos = POSITION_WORD_HE.exec(line) ?? POSITION_WORD_EN.exec(line);
+  if (pos) {
+    const { axis, greater } = positionMeaning(pos[2]);
+    return compareFacts(pos[1], axis, greater, { point: pos[3] }, line);
+  }
   const sym = COMPARE_SYM.exec(line);
   if (sym) {
     const lhs = atomOf(sym, 1);
@@ -4301,13 +4347,13 @@ function parseShape(line: string): RuleOutcome {
     const [, phrase, run] = poly;
     // «משולש חד זוויות ABC» — the ACUTE adjective is a given of its own (#1619 B2): peeled off the noun and
     // stated as the `acute` selector below, never dropped.
-    const { noun: nounSrc, acute } = acuteAdjective(phrase);
+    const { noun: nounSrc, acute, obtuse } = acuteAdjective(phrase);
     const noun = EN_SHAPE[normalizeShapeNoun(nounSrc).toLowerCase()] ?? nounSrc;
     const row = shapeRow(noun);
     // Not a shape noun at all — leave the sentence to the rules after this one.
     if (!row) return null;
     // Acuteness is a triangle's adjective; on any other ring the phrase is not one this rule reads.
-    if (acute && row.arity !== 3) return null;
+    if ((acute || obtuse) && row.arity !== 3) return null;
     const vertices = splitNames(run);
     // The noun the student wrote is the assertion to check against — `< 3` only ever caught the
     // shapeless case and let «משולש ABCD» through as a four-sided triangle (#1042). The arity now
@@ -4325,6 +4371,7 @@ function parseShape(line: string): RuleOutcome {
     return made([
       ...shapeDeclaration(noun, vertices, line),
       ...(acute ? [{ t: 'selector' as const, sel: { kind: 'acute' as const, ids: vertices }, src: line }] : []),
+      ...(obtuse ? [{ t: 'selector' as const, sel: obtuseChoice(vertices), src: line }] : []),
     ]);
   }
 
@@ -4373,10 +4420,40 @@ function shapeDeclaration(noun: string, vertices: Id[], line: string): Fact[] {
  */
 const ACUTE_HE = new RegExp(`\\s+חד(?:ת|ות|י)?[\\s-]+${ANGLE_STEM_HE}ו?ת$`);
 const ACUTE_EN = /^acute(?:[\s-]+angled)?\s+/i;
-function acuteAdjective(phrase: string): { noun: string; acute: boolean } {
+/**
+ * «קהה זווית» / «קהה-זווית» / "obtuse(-angled)" — ONE of the triangle's angles is obtuse, the sentence not saying which
+ * (#1708, operator ruling 2026-10-03: *"It means one of them must be"*; ADR-AG-222). The acute adjective's twin, peeled
+ * off the noun the same way; it lowers to `obtuseChoice`.
+ */
+const OBTUSE_HE = new RegExp(`\\s+קה(?:ה|ת|ים|ות)[\\s-]+${ANGLE_STEM_HE}ו?ת$`);
+const OBTUSE_EN = /^obtuse(?:[\s-]+angled)?\s+/i;
+function acuteAdjective(phrase: string): { noun: string; acute: boolean; obtuse?: true } {
   if (ACUTE_HE.test(phrase)) return { noun: phrase.replace(ACUTE_HE, ''), acute: true };
   if (ACUTE_EN.test(phrase)) return { noun: phrase.replace(ACUTE_EN, ''), acute: true };
+  if (OBTUSE_HE.test(phrase)) return { noun: phrase.replace(OBTUSE_HE, ''), acute: false, obtuse: true };
+  if (OBTUSE_EN.test(phrase)) return { noun: phrase.replace(OBTUSE_EN, ''), acute: false, obtuse: true };
   return { noun: phrase, acute: false };
+}
+
+/**
+ * «משולש קהה זווית ABC» — the angle at A, at B or at C is obtuse: a `choice` over the three vertices (#1708, ADR-AG-222).
+ * Each option is D3's «זווית ABC קהה» order (ADR-AG-216) at its vertex — the region, never a constraint — and the
+ * choice is resolved per configuration, so «הציגו תצורה אחרת» cycles the obtuse vertex and none is a fixed default
+ * (ADR-052). The `choice` mechanism ADR-AG-208 used for «שכל קודקודיו מונחים על הצירים», for a region.
+ */
+function obtuseChoice(ring: readonly Id[]): Selector {
+  return {
+    kind: 'choice',
+    options: ring.map((v, i): Selector => ({
+      kind: 'sign',
+      q: {
+        k: 'order',
+        left: { t: 'angle', at: { v, a: ring[(i + ring.length - 1) % ring.length], b: ring[(i + 1) % ring.length] } },
+        right: { t: 'value', value: { kind: 'num', value: 90 } },
+      },
+      positive: true,
+    })),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -6786,6 +6863,13 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
   const paren = parenClauses(s);
   const withParen = paren && attempt(paren);
   if (withParen) return { result: withParen, framed: true };
+  // Asides ANYWHERE in the line (#1706, ADR-AG-222): the head keeps this depth — removing an aside nests no reading.
+  const aside = asideClauses(s);
+  if (aside) {
+    const head = readLine(aside.head, depth);
+    const rest = head.result.ok ? attempt(aside.inner) : null;
+    if (head.result.ok && rest?.ok) return { result: made([...head.result.facts, ...rest.facts]), framed: true };
+  }
   // «נסמן את שטח ABCD ב-S» — another sentence the grammar reads (#1622, ADR-AG-218).
   const restated = restatedClauses(s);
   const withRestated = restated && attempt(restated);
@@ -7749,8 +7833,10 @@ function parseClauseRules(raw: string): ParseResult {
         ...through,
         ...boundedSeg,
         ...centre,
-        // The noun's claim (#1651, ADR-AG-200) — «משוואת המיתר BC היא …» also says B and C are on the circle.
-        ...(named ? claimFacts(curve.noun, named[1], named[2], line) ?? [] : []),
+        // The noun's claim (#1651, ADR-AG-200) — «משוואת המיתר BC היא …» also says B and C are on the circle, and
+        // «משוואת התיכון AD היא …» that AD is a median (#1662, ADR-AG-222). `matchCurve` admits only a noun whose
+        // claim can be stated, so nothing here can be dropped.
+        ...(named ? equationClaimFacts(curve.noun, named[1], named[2], line) ?? [] : []),
     ];
     /*
      * The equation of THE circle (#1633, ADR-AG-196): about the figure's one circle when it has one. A circle

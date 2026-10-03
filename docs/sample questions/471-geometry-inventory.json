@@ -413,7 +413,7 @@
    "NEW:area-ratio",
    "area"
   ],
-  "notes": "B is fixed only by an area ratio of two sub-triangles (S_BDC/S_ODC = 0.8) given in section ד; until then B slides along BC. Altitude BE to OC (x-axis) is vertical.",
+  "notes": "B is fixed only by an area ratio of two sub-triangles (S_BDC/S_ODC = 0.8) given in section ד; until then B slides along BC. Altitude BE to OC (x-axis) is vertical. RE-CHECKED 2026-10-03 against the page (#1707, ADR-AG-222): the booklet (p. 49, PDF p. 62) prints S_BDC / S_ODC = 0.8 exactly as transcribed, and its figure has D on BC (OD is the altitude to BC), so B, D, C are collinear and S_BDC = 0 — the printed ratio cannot hold, and the analytic tool refuses it. The exam's own answer key (p. 52, PDF p. 65) gives ד(1) BC = 4√5 and ד(2) S_OBC = 40, which is B(6,8): the ratio S_BEC / S_ODC = 0.8 (16/20 — the similar triangles of part ג), so the printed BDC is a typo for BEC. The corpus keeps the printed sentence (the student types the exam); the answer-key reading builds B(6,8) or its mirror B(14,−8) on the line BC.",
   "title": "קיץ תש\"ף 2020 מועד א (מבחן מספר 7)",
   "crossedOut": false
  },

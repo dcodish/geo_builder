@@ -91,12 +91,13 @@ export interface ExceptionFamily {
  */
 export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
   X1: {
-    title: 'coordinates, the origin, the axes, quadrants',
-    reason: 'the coordinate frame: 2-D is coordinate-free by design and sends these to the analytic builder',
+    title: 'coordinates, the origin, the axes, quadrants, position words between points',
+    reason:
+      "the coordinate frame: 2-D is coordinate-free by design and sends these to the analytic builder. A position word between two points («D מעל A», «C מימין ל-B») is the frame too: analytic's axes are fixed, so it compares coordinates there (#1706, operator ruling 2026-10-03), while 2-D refuses screen orientation (input.scope.orientation) — those rows carry only: ['analytic']",
     products: ['analytic', '3d'],
     mustRefuse: ['2d'],
     topic: true,
-    patterns: [/\(\s*[-\w√.+ ]+,/, /ציר ה-?\s?[xyz]/, /ראשית/, /רביע/, /הצירים/],
+    patterns: [/\(\s*[-\w√.+ ]+,/, /ציר ה-?\s?[xyz]/, /ראשית/, /רביע/, /הצירים/, /(?:^|\()[A-Z]\d?\s+(?:מעל|מתחת|מימין|משמאל)\s*ל?-?\s*[A-Z]\d?(?:$|\))/],
   },
   X2: {
     title: 'equations of lines, circles and conics; slopes; focus and directrix',
@@ -881,6 +882,18 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'ex-plane-1656', family: 'topic', steps: ['משולש ACD', 'נקודה S', 'דרך AC העבירו מישור המקביל ל-SD'], contextFor: { '3d': ['פירמידה SABCD שבסיסה ריבוע'] }, expect: 'builds', exception: 'X7', note: '#1656: 2-D used to commit AC ∥ SD' },
   { id: 'ex-sphere-1657', family: 'topic', steps: ['כדור שמרכזו O ורדיוסו 3'], expect: 'builds', exception: 'X7', note: '#1657: 2-D used to draw a circle' },
   { id: 'ex-vector', family: 'topic', steps: ['משולש ABC', 'וקטור AB'], expect: 'builds', exception: 'X7' },
+  // ── #1616 rulings of 2026-10-03 (ADR-AG-222) ──
+  { id: 'ex-position-above-1706', family: 'topic', steps: ['נקודה A', 'נקודה D', 'D מעל A'], expect: 'builds', exception: 'X1', only: ['analytic'], note: "#1706: y_D > y_A on analytic's fixed axes; 2-D does not read screen orientation" },
+  { id: 'ex-position-below-1706', family: 'topic', steps: ['נקודה A', 'נקודה D', 'D מתחת ל-A'], expect: 'builds', exception: 'X1', only: ['analytic'] },
+  { id: 'ex-position-right-1706', family: 'topic', steps: ['נקודה B', 'נקודה C', 'C מימין ל-B'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '2-D refuses it as input.scope.orientation' },
+  { id: 'ex-position-left-1706', family: 'topic', steps: ['נקודה B', 'נקודה C', 'C משמאל ל-B'], expect: 'builds', exception: 'X1', only: ['analytic'] },
+  { id: 'ex-position-aside-1706', family: 'topic', steps: ['A ו-D על ציר ה-y (D מעל A), B ו-C על ציר ה-x (C מימין ל-B)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: 'corpus 6/5 line 3: the position words inside the asides' },
+  { id: 'ex-median-equation-1662', family: 'topic', steps: ['משולש ABC', 'משוואת התיכון AD היא y=x'], expect: 'builds', exception: 'X2', note: '#1662: the median claim is kept — D is the midpoint of BC' },
+  { id: 'ex-altitude-equation-ask-1662', family: 'topic', steps: ['משולש ABC', 'משולש ABE', 'משוואת הגובה AD היא y=x'], expect: 'asks', exception: 'X2', note: '#1662: two triangles have the vertex A and neither side holds D' },
+  { id: 'cevian-foot-on-side-1662', family: 'cevians-centres', steps: ['משולש ABC', 'משולש ABE', 'D על BC', 'AD גובה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'the triangle whose opposite side holds D (2-D measured: commits)' },
+  { id: 'obtuse-triangle-1708', family: 'polygons', steps: ['משולש קהה זווית ABC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: '#1708: one of the three angles is obtuse — a choice over the vertices' },
+  { id: 'obtuse-triangle-hyphen-1708', family: 'polygons', steps: ['משולש קהה-זווית ABC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }] },
+  { id: 'obtuse-triangle-letters-first-1708', family: 'polygons', steps: ['ABC משולש קהה זווית'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }] },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
