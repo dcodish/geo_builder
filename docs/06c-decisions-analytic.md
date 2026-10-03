@@ -10544,3 +10544,85 @@ Two more items, built on top of ef942ea7:
 - As the integrator's message allows, the FLOOR is raised to 357 / 45. The ratchet's header now says the notes are included.
 
 **Requirements:** R161 amended (x/y refused); R165 extended. **Design:** 04c — the E2 section's length bullet is rewritten, and this ADR's section is extended.
+
+## ADR-AG-225 — What the student stated is written on the figure, as 2-D writes it: the stated-measure layer, on one planar mark geometry hoisted to `shell/marks` (#1714)
+
+**Status:** accepted · 2026-10-03 · fix-round #1721, stream R5 item 1 (PR, base `main`). Operator report, playing round #1709 T5: *"when an angle or segment are given, we need to put those values on the segment or angle like the 2d tool does"*; the T6 comment adds that «tan∢BAO = 2» shows nothing. Rulings applied:
+- the canvas shows the inputs and the panel the computed values (ADR-AG-016, [ADR-W-047](06w-decisions-workspace.md#adr-w-047), re-affirmed on #1563);
+- analytic gives 2-D's experience for plane geometry (2026-10-02);
+- a trig given is written as the ANGLE in degrees («63.43°», never «tan=2»; #1718/#1719, 2026-10-03);
+- x and y are never a length (ADR-AG-222 amendment), so a symbolic length uses another letter («3a»).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R166. · **Design:** [04c](04c-design-analytic.md), "The stated-measure layer".
+
+**Class.** *A measure the student STATED is not visible on the figure.* This breaks the honesty invariant "everything the student stated is visible" (docs/17 §6) for every kind but one. The scene had one stated label, a segment pinned by a NUMBER (#1065, `FigureSegment.pinnedLength`). There was no angle mark of any kind, and the only knee was the answered perpendicular's (#1048).
+
+**Measured at pickup (deed7b20, `derive` → `buildScene`).** «AB = 5» → «5» on AB. Each of these drew nothing on the canvas: «AB = 3a», «AB = AC», «∢ABC = 30», «∢ABC = α» · «α = 30», «זווית ABC ישרה», «⌢{AC} = 60°», «שטח המשולש ABC הוא 13», «tan∢ABC = 2», «∢ABC = ∢ACB», «משולש ישר זווית ABC». The issue's table held.
+
+**2-D, measured first** (`replayFacts` → `labels` / `angleMarks`):
+- «זווית ABC = α» → «α»; then «α = 30» → **«30°»**, with the letter kept as `letter: 'α'` for the ADR-W-047 chip.
+- «AB = 3a» → «3a». «שטח … 13» → «13» at the centroid. «tan∢ABC = 2» → «tan=2» (#1718 changes that in 2-D).
+- «AB = AC» and «∢ABC = ∢ACB» draw nothing at rest. 2-D shows equalities only in its hover-driven relations layer, which analytic does not have.
+
+**Decision.**
+
+1. **The layer is read off the construction, from the constraints a SENTENCE added** (`engine/statedMeasures.ts`, `statedMeasures`):
+   - a length against a value;
+   - an angle against a value (degrees, or the angle a `tan` / `cos` fixes);
+   - a right angle at a vertex: a `relation` ⊥ whose two point pairs share one end, or an angle of 90°. It is a knee, never «90°»;
+   - an area, and an arc (`arc-sum` with one term);
+   - the equalities `AB = AC` / `∠ABC = ∠ACB`, unioned into classes; class *i* draws *i*+1 ticks or rings.
+
+   `derive` computes it once per configuration and carries it on `Derivation.stated`. `App` hands it to `buildScene` (`SceneKnowledge.stated`), like the knowledge gates: which constraint is a statement is a question about the fold, which the renderer cannot see.
+2. **A noun's own givens are its DEFINITION, not a statement.** This is 2-D's rule: «מלבן ABCD» draws no knees and «מעוין ABCD» no ticks.
+   - The parser, which builds them from the noun, marks them once: the `constraint` fact gains `definition?: true` at the shape rows, `namedShapeFacts`, and the congruence correspondences (which 2-D does not mark either).
+   - The fold's own attribution (`constraintFact`) carries each constraint to its fact.
+   - **The exception is 2-D's too.** A noun's unstated CHOICE («משולש ישר-זווית ABC») is shown as the configuration resolved it (`resolveChoices` at `Figure.choiceSeed`), so the knee moves with «הציגו תצורה אחרת». Measured: seeds 0, 1 and 2 put it at A, B and C.
+3. **The value is the student's.**
+   - A number prints through `fmtAnalytic` (#723).
+   - A letter prints as written, juxtaposed as the exam writes it (`statedText`: «3a», «12√a», not the printer's `3·a`).
+   - A letter the givens later VALUE («α = 30», a `param-eq`, resolved to a fixpoint) prints the value, which is 2-D's default.
+   - A measure stated twice prints once: a number beats a letter, otherwise the later statement wins (2-D's `lenByKey.set`).
+   - A trig given prints its angle: tan → atan, with a negative tan obtuse (ADR-AG-215's one-to-one reading); cos → acos.
+4. **`pinnedLength` is retired.** The segment label now comes from the stated layer, so «AB = 3a» labels AB «3a». `pinnedLengths` and `segmentLabel` are gone, leaving one source. The #1065 lock reads the layer; «AB = a» with a free `a` now writes «a» (the given), and still never a sampled number.
+5. **One planar mark geometry, in `shell/marks.ts` (the third-copy rule).**
+   - 2-D drew the knee, the arc and the hatch ticks inline in `src/render/Figure.tsx`; analytic drew its own knee at the #1048 foot; the complex Builder draws its own argument arcs. This layer would have been the third copy.
+   - So the arithmetic moved to `shell/`: `rightAngleKnee`, `angleArcPoints`, `wedgeBisector`, `equalTickSegments`, `unitOf`, and #1337's fit rule as `markFitScale`. They are written with 2-D's exact expressions, and **2-D's markup is byte-identical**: five figures rendered before and after compare equal (`cmp`).
+   - 2-D's `Figure.tsx` (the stated knee and arc, the hover knee and rings, the stated ticks) and `scene.ts` (`markScale`; `MARK_FIT_FRACTION` and `MIN_MARK_SCALE` re-exported) call it. Analytic's #1048 knee does too.
+   - **3-D is not a consumer, by design.** Its knee and arc lie in the plane of two WORLD arms and foreshorten with the orbit (`src3d/render/rightAngles.ts`): a different geometry, not a copy. Complex's `arcPath` is an SVG arc command over the argument, not a corner mark, and is left alone.
+6. **Placement** (`render/scene.ts`, `statedScene`):
+   - the arc at radius 18 px and the knee at 10 px, both shrunk by `markFitScale` into a corner shorter than they are (#1337: shrink, never drop);
+   - an angle's value just outside its arc, on the wedge bisector; equal rings outside it;
+   - an area's «S=…» at the ring's centroid;
+   - an arc's value ON the arc at the minor arc's midpoint, nudged 12 px toward the centre (2-D's ADR-335: never a wedge at the centre);
+   - a stated length on its drawn segment's label (written once when a side is drawn twice), or at the midpoint when no segment is drawn.
+
+   Every label goes through `lbl` (#1191). The layer is painted in 2-D's measure blue (`#1d4ed8`).
+
+**The §5c lock.**
+- `shell/__tests__/fixtures/mark-geometry-rows.ts` holds the checks once, measured on the shape and never by re-deriving the arithmetic:
+  - `kneeFaults`: three corners, equal legs on the two rays, the square's far corner;
+  - `arcFaults`: one radius, the ends on the rays, sweeping the INTERIOR angle;
+  - `tickFaults`: perpendicular, centred, the right length and count.
+- `shell/__tests__/mark-geometry-1714.test.ts` runs them on the kit. A meta-lock runs them on five broken kits (no far corner, a lopsided knee, the arc the long way, ticks along the segment, a tick short) and asserts each is caught.
+- The thin locks hand in each product's REAL output: `src/render/__tests__/mark-geometry-1714.test.tsx` parses 2-D's rendered `<polyline>`s and ticks, and the analytic lock parses the scene's paths.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1714-stated-measures.test.ts`: 17 tests through `derive` → `buildScene` at six seeds. They cover every kind's text and mark shape, the right-triangle knee walking the three seats, the noun definitions marking nothing, and a derived length never becoming a canvas label. **Fails before: 16 of 17.** The one that passes on the base is the guard that a derived length is not a label.
+- `engine.test.ts`'s #1065 block now reads the layer, with one assertion added: «AB = a» writes «a».
+- `shell/__tests__/mark-geometry-1714.test.ts`: 8 tests. The 2-D thin lock: 3 tests.
+- Analytic has no `.geo.json` fixtures (ADR-AG-200's practice); the operator's sequences are rows of the analytic lock.
+
+**Not built, said out loud.**
+- **The ADR-W-047 chip.** After «∢ABC = α» · «α = 30» the canvas reads «30°» (2-D's default). Analytic has no chip to bring «α» back, so the form the student typed is recoverable only from the fact list. 2-D and 3-D have the chip; analytic's adoption is filed as [#1725](https://github.com/dcodish/geo_builder/issues/1725) (ADR-W-047 names each product's adoption separately).
+- **«a = 2» is not read in analytic** (not-handled; a Greek letter is), so «AB = 3a» is valued only by «AB = 6». Measured, not touched.
+- **Equalities are drawn at rest.** 2-D shows «AB = AC» only in its hover relations layer. Analytic has no such layer, and the plan lists the ticks, so a stated equality is marked persistently. A noun's own equal sides are not (point 2).
+- **2-D's area label is a bare «13»**; analytic writes «S=13», as the plan specified. This is a 2-D parity question, reported and not changed here.
+
+**Sibling check (docs/17 §1).** 2-D is the reference and was measured. 3-D has its own stated arcs and knees (ADR-3D-222/233), in 3-D geometry. The class (a stated measure left invisible) does not exist in 2-D or 3-D.
+
+**Consequences.**
+- `shell/marks.ts` (new).
+- `src/render/Figure.tsx`, `src/render/scene.ts`: adopt the kit, byte-identical.
+- `src-analytic/engine/statedMeasures.ts` (new); `engine/derive.ts` (`Derivation.stated`); `engine/evaluate.ts` and `engine/lengths.ts` (`pinnedLength` retired); `engine/types.ts` (`definition`); `parser/parseAnalytic.ts` (the three definition sites).
+- `src-analytic/render/scene.ts` (`Scene.stated`, `statedScene`, the #1048 knee through the kit); `render/Figure.tsx` (the layer); `App.tsx` (the hand-off).

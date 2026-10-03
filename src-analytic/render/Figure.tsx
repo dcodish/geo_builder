@@ -21,6 +21,8 @@ const SCAFFOLD = '#94a3b8';
 const SCAFFOLD_TEXT = '#475569';
 /** A HIDDEN segment's ghost (#1653) — 2-D's ghost colour: there to be clicked, not read. */
 const GHOST = '#cbd5e1';
+/** The stated-measure layer (#1714) — 2-D's measure blue, so a student reads the same marks in both tools. */
+const MEASURE = '#1d4ed8';
 
 export function Figure({
   scene,
@@ -198,6 +200,28 @@ export function Figure({
               {s.label!.text}
             </text>
           ))}
+      </g>
+
+      {/*
+        THE STUDENT'S STATED MEASURES (#1714, ADR-AG-225) — 2-D's layer, in 2-D's measure blue: an arc and its value
+        at a stated angle, a knee at a stated right angle, ticks and rings on a stated equality, an arc's value on
+        the arc, an area's at the centroid. Everything here is something the student typed; a derived value lives
+        in the data panel (ADR-AG-016).
+      */}
+      <g data-testid="analytic-stated" fill="none" stroke={MEASURE} strokeWidth={1.5} strokeLinecap="round" pointerEvents="none">
+        {scene.stated.marks.map((m, i) => (
+          <path key={`sm${i}`} d={m.d} data-stated={m.kind} />
+        ))}
+        {scene.stated.ticks.map((tk, i) => (
+          <line key={`st${i}`} x1={tk.x1} y1={tk.y1} x2={tk.x2} y2={tk.y2} data-stated="tick" strokeWidth={2} />
+        ))}
+      </g>
+      <g fontSize={12} fill={MEASURE} textAnchor="middle" dominantBaseline="central" paintOrder="stroke" stroke="#fff" strokeWidth={3} pointerEvents="none">
+        {scene.stated.labels.map((l, i) => (
+          <text key={`sl${i}`} x={l.x} y={l.y} data-stated={l.kind}>
+            {l.text}
+          </text>
+        ))}
       </g>
 
       {/* curves */}

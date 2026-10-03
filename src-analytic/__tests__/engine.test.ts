@@ -530,8 +530,9 @@ describe('#1045 — a line that added nothing says so, and is not recorded', () 
  * not calculated."* So the cases below assert WHICH SURFACE, not merely that a number exists.
  */
 describe('#1065 — a stated length labels the segment; a derived one does not', () => {
+  // #1714 (ADR-AG-225): the stated-measure layer is where a stated length lives now; a NUMBER is what #1065 pinned.
   const pinned = (lines: string[]) =>
-    derive(lines, 0).figure.segments.filter((s) => s.pinnedLength !== undefined).map((s) => s.ends.join(''));
+    derive(lines, 0).stated.lengths.filter((l) => 'num' in l.value).map((l) => `${l.a}${l.b}`);
 
   const lengthOf = (d: ReturnType<typeof derive>, a: string, b: string) =>
     isKnowledge(d.construction, (f) => {
@@ -572,6 +573,8 @@ describe('#1065 — a stated length labels the segment; a derived one does not',
      * The gate is the same one `provenanceOf` uses for coordinates: no free symbols in the value.
      */
     expect(pinned(['a הוא פרמטר', 'משולש ABC', 'AB = a'])).toEqual([]);
+    // #1714: it is still the student's GIVEN, so the canvas writes their letter — never a sampled number.
+    expect(derive(['a הוא פרמטר', 'משולש ABC', 'AB = a'], 0).stated.lengths.map((l) => l.value)).toEqual([{ text: 'a' }]);
   });
 
   it('a relation between two lengths pins NEITHER on its own', () => {

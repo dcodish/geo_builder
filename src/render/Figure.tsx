@@ -19,6 +19,7 @@ import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from
 import { LetterPopover } from '../../shell/frame/LetterPopover';
 import { SegmentMenu } from '../../shell/frame/SegmentMenu';
 import { segInk } from '../../shell/frame/segmentDisplay';
+import { angleArcPoints, equalTickSegments, rightAngleKnee } from '../../shell/marks';
 import { swapOffered, type LetterRenameResult } from '../../shell/frame/letterOffer';
 import type { MeasureLabels, RelationMarks, RelationPick } from './scene';
 import type { RelationsResult, ResolvedCircle } from '@/engine';
@@ -906,31 +907,21 @@ export function Figure({
               const V = transform.toScreen(m.vertex);
               const P1 = transform.toScreen(m.p1);
               const P2 = transform.toScreen(m.p2);
-              const u1 = unitVec({ x: P1.x - V.x, y: P1.y - V.y });
-              const u2 = unitVec({ x: P2.x - V.x, y: P2.y - V.y });
               // #1337 — the shortest adjacent side is the room this corner has; the square and the arc
               // shrink into it together, so a needle's two marks stop overprinting each other.
               const roomPx = Math.min(Math.hypot(P1.x - V.x, P1.y - V.y), Math.hypot(P2.x - V.x, P2.y - V.y));
               const k = markScale(roomPx, r);
+              // #1714 (ADR-AG-225): the knee and the arc are `shell/marks` — one planar mark geometry for
+              // every flat builder, so analytic's stated measures draw the same shapes as this.
               if (m.right) {
                 const s = 4 * r * k; // right-angle square — a touch larger so it reads clearly (operator request)
-                const c1 = `${V.x + u1.x * s},${V.y + u1.y * s}`;
-                const c2 = `${V.x + (u1.x + u2.x) * s},${V.y + (u1.y + u2.y) * s}`;
-                const c3 = `${V.x + u2.x * s},${V.y + u2.y * s}`;
-                return <polyline key={`am-${i}`} points={`${c1} ${c2} ${c3}`} fill="none" stroke="#1d4ed8" strokeWidth={stroke} style={{ pointerEvents: 'none' }} />;
+                const knee = rightAngleKnee(V, P1, P2, s).map((c) => `${c.x},${c.y}`).join(' ');
+                return <polyline key={`am-${i}`} points={knee} fill="none" stroke="#1d4ed8" strokeWidth={stroke} style={{ pointerEvents: 'none' }} />;
               }
               // arc: sample the SHORT signed angle from ray1 to ray2 (the interior angle). Drawn well clear
               // of the vertex so it's obvious WHICH angle is marked, not a tiny nick at the corner (operator).
               const ar = ANGLE_ARC_R * r * k;
-              const th1 = Math.atan2(u1.y, u1.x);
-              let dth = Math.atan2(u2.y, u2.x) - th1;
-              while (dth > Math.PI) dth -= 2 * Math.PI;
-              while (dth < -Math.PI) dth += 2 * Math.PI;
-              const N = 14;
-              const pts = Array.from({ length: N + 1 }, (_, k) => {
-                const th = th1 + (dth * k) / N;
-                return `${V.x + ar * Math.cos(th)},${V.y + ar * Math.sin(th)}`;
-              }).join(' ');
+              const pts = angleArcPoints(V, P1, P2, ar).map((c) => `${c.x},${c.y}`).join(' ');
               return <polyline key={`am-${i}`} points={pts} fill="none" stroke="#1d4ed8" strokeWidth={stroke} style={{ pointerEvents: 'none' }} />;
             })}
 
@@ -943,25 +934,21 @@ export function Figure({
                 const A = transform.toScreen(tk.a);
                 const B = transform.toScreen(tk.b);
                 const L = Math.hypot(B.x - A.x, B.y - A.y) || 1;
-                const ux = (B.x - A.x) / L;
-                const uy = (B.y - A.y) / L;
-                const nx = -uy; // perpendicular to the segment (the hatch direction)
-                const ny = ux;
+                const nx = -(B.y - A.y) / L; // perpendicular to the segment (where the `?` sits)
+                const ny = (B.x - A.x) / L;
                 const mx = (A.x + B.x) / 2;
                 const my = (A.y + B.y) / 2;
                 const half = 1.8 * r; // hatch half-length
                 const spacing = 1.7 * r; // gap between the ticks of one group, centred on the midpoint
-                return Array.from({ length: tk.count }, (_, k) => {
-                  const off = (k - (tk.count - 1) / 2) * spacing;
-                  const cx = mx + ux * off;
-                  const cy = my + uy * off;
+                // #1714 (ADR-AG-225): the hatch geometry is `shell/marks`, shared with analytic.
+                return equalTickSegments(A, B, tk.count, half, spacing).map(([p, q], k) => {
                   return (
                     <line
                       key={`rt-${i}-${k}`}
-                      x1={cx - nx * half}
-                      y1={cy - ny * half}
-                      x2={cx + nx * half}
-                      y2={cy + ny * half}
+                      x1={p.x}
+                      y1={p.y}
+                      x2={q.x}
+                      y2={q.y}
                       stroke={tk.stated ? '#d97706' : relColor(tk.count)}
                       strokeWidth={stroke * 1.4}
                       strokeLinecap="round"
@@ -993,19 +980,10 @@ export function Figure({
                 const V = transform.toScreen(an.vertex);
                 const P1 = transform.toScreen(an.p1);
                 const P2 = transform.toScreen(an.p2);
-                const u1 = unitVec({ x: P1.x - V.x, y: P1.y - V.y });
-                const u2 = unitVec({ x: P2.x - V.x, y: P2.y - V.y });
-                const th1 = Math.atan2(u1.y, u1.x);
-                let dth = Math.atan2(u2.y, u2.x) - th1; // the short signed (interior) angle
-                while (dth > Math.PI) dth -= 2 * Math.PI;
-                while (dth < -Math.PI) dth += 2 * Math.PI;
-                const N = 14;
                 return Array.from({ length: an.count }, (_, k) => {
                   const ar = 4.5 * r + (an.startArc + k) * 1.5 * r; // concentric arcs, staggered past other marks at this vertex
-                  const pts = Array.from({ length: N + 1 }, (_, j) => {
-                    const th = th1 + (dth * j) / N;
-                    return `${V.x + ar * Math.cos(th)},${V.y + ar * Math.sin(th)}`;
-                  }).join(' ');
+                  // the short signed (interior) angle — `shell/marks` (#1714)
+                  const pts = angleArcPoints(V, P1, P2, ar).map((c) => `${c.x},${c.y}`).join(' ');
                   return <polyline key={`ra-${i}-${k}`} points={pts} fill="none" stroke={relColor(an.count)} strokeWidth={stroke * 1.4} />;
                 });
               })}
@@ -1047,13 +1025,8 @@ export function Figure({
                 const V = transform.toScreen(m.vertex);
                 const P1 = transform.toScreen(m.p1);
                 const P2 = transform.toScreen(m.p2);
-                const u1 = unitVec({ x: P1.x - V.x, y: P1.y - V.y });
-                const u2 = unitVec({ x: P2.x - V.x, y: P2.y - V.y });
-                const s = 4 * r;
-                const c1 = `${V.x + u1.x * s},${V.y + u1.y * s}`;
-                const c2 = `${V.x + (u1.x + u2.x) * s},${V.y + (u1.y + u2.y) * s}`;
-                const c3 = `${V.x + u2.x * s},${V.y + u2.y * s}`;
-                return <polyline key={`rr-${i}`} points={`${c1} ${c2} ${c3}`} fill="none" stroke={REL} strokeWidth={stroke} style={{ pointerEvents: 'none' }} />;
+                const knee = rightAngleKnee(V, P1, P2, 4 * r).map((c) => `${c.x},${c.y}`).join(' ');
+                return <polyline key={`rr-${i}`} points={knee} fill="none" stroke={REL} strokeWidth={stroke} style={{ pointerEvents: 'none' }} />;
               })}
               {/* Forced segment LENGTHS (issue #126): a length number at the midpoint, revealed on hover so a
                   determined side reads its length. Relations colour + white halo; LTR (it's a number). */}

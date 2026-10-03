@@ -941,6 +941,8 @@ export function App() {
       crossings: offersOf(d.figure, d.construction),
       // #1653 — the student's per-segment display choices (hidden / dashed)
       segStyle,
+      // #1714 — what the student STATED about a length, angle, area or arc, written on the figure
+      stated: d.stated,
     });
     // poolTick: the pool completed, re-read the gates (#1473)
   }, [d, view, canvasSize, answers, poolTick, segStyle]);
