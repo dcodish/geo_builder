@@ -30,7 +30,9 @@ describe('2-D triage — altitude / median apex descriptors', () => {
   });
   it('median from a point with an explicit side (no named segment, no triangle)', () => {
     expect(types('מהנקודה C הורידו תיכון לצלע AB')).toEqual(['midpoint', 'segment']);
-    expect(types('AD תיכון במשולש ABC')).toEqual(['midpoint', 'segment']); // regression
+    // #1720 (ADR-571): the named triangle is introduced when the figure lacks it (this context holds only quad
+    // ABCD) — the one step every cevian role shares, as the altitude form always did
+    expect(types('AD תיכון במשולש ABC')).toEqual(['triangle', 'midpoint', 'segment']); // regression
   });
 });
 

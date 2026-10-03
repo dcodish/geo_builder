@@ -253,5 +253,5 @@ Tag the rollback deploy too (`prod/YYYY-MM-DD-rollback`) and log it.
 ## Logs & data
 
 - **Proxy service:** `journalctl -u geo-proxy -f`
-- **Prod usage events:** `/var/www/geo-proxy/events.jsonl` (2-D) + `events-3d.jsonl` (3-D) — hashed IPs only, self-rotating, retention per `EVENTS_RETENTION_DAYS`. Triaged by the `/log-triage` skill.
+- **Prod usage events:** `/var/www/geo-proxy/events.jsonl` (2-D) + `events-3d.jsonl` (3-D) + one `events-<tool>.jsonl` per later builder — hashed IPs only, self-rotating, retention per `EVENTS_RETENTION_DAYS` (unset ⇒ 30 days, every file pruned on its own once per UTC day — ADR-W-110). Leave it UNSET in prod: the privacy notes state 30. Triaged by the `/log-triage` skill.
 - **Dev debug log:** `logs/debug-log.jsonl` (dev-only, gitignored) — the session-reconstruction source for bug reports; keep `logs/` out of personal cloud sync.

@@ -346,12 +346,14 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "CE bisects angle C in triangle ABC": {
     "en": [
+      "triangle",
       "bisector",
       "line-through",
       "line-intersection",
       "segment",
     ],
     "he": [
+      "triangle",
       "bisector",
       "line-through",
       "line-intersection",

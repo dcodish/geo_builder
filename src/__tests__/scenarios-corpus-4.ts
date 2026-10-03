@@ -3252,4 +3252,71 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(at(fig, 'D'), at(fig, 'O')), 'D on the container O').toBeCloseTo(O!.radius.value, 6);
     },
   },
+  {
+    id: 'cevian-stated-vertex-and-shape-1684',
+    title: '#1684 (ADR-568): «AD חוצה זווית C» is refused (a segment from A cannot bisect ∠C); «AE גובה» with A in triangles ABC and ABD asks; naming the side builds',
+    guards:
+      "Found by the #1620 analytic stream (ADR-AG-209), measured on main deed7b20 through decideDeterministic2D: «משולש ABC» · «AD חוצה זווית C» committed the bisector of ∠A with the stated vertex C dropped, and «משולש ABC» · «משולש ABD» · «AE גובה» committed the foot on BC, triangle ABC picked silently. Root cause: the bisector rule read a lone vertex letter only in the triangle form (#1285), and the cevian rules unioned the opposite sides of every polygon holding the apex (`oppositePolygonEdges`) and took the first. Fix: one stated-vertex reader for both bisector forms, and `cevianShapeEdges`, which asks (`ambiguous-cevian`) when the shapes holding the apex give it different opposite sides. Asserts the refusal and the ask at the gate, and that naming the side builds the foot on BD with AE ⟂ BD. The submit-door matrix (spellings, both locales, the foot-on-side narrowing, the parallelogram steer) is in src/app/__tests__/issue-1684-cevian-stated-vertex.test.ts.",
+    steps: ['משולש ABC', 'משולש ABD', 'AE גובה לצלע BD'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const wrong = gateVerdict(factsOf(['משולש ABC']), 'AD חוצה זווית C');
+      expect(wrong.kind === 'refused' && wrong.detail, '«AD חוצה זווית C» is refused by the parser').toBe('bisector-wrong-apex');
+      const two = gateVerdict(factsOf(['משולש ABC', 'משולש ABD']), 'AE גובה');
+      expect(two.kind === 'refused' && two.detail, '«AE גובה» with A in two triangles asks').toBe('ambiguous-cevian');
+      const A = at(fig, 'A'), B = at(fig, 'B'), D = at(fig, 'D'), E = at(fig, 'E');
+      const dot = (E.x - A.x) * (D.x - B.x) + (E.y - A.y) * (D.y - B.y);
+      expect(Math.abs(dot) / (dist(A, E) * dist(B, D)), 'AE ⟂ BD').toBeLessThan(1e-6);
+      const cross = (E.x - B.x) * (D.y - B.y) - (E.y - B.y) * (D.x - B.x);
+      expect(Math.abs(cross) / dist(B, D), 'E on line BD').toBeLessThan(1e-6);
+    },
+  },
+  {
+    id: 'triangle-form-cevian-introduces-triangle-1720',
+    title: '#1720 (ADR-571): «AD תיכון במשולש ABC» on an empty canvas builds the triangle and the median (D the midpoint of BC); «AD חוצה זווית במשולש ABC» builds too',
+    guards:
+      "Operator report 2026-10-03: \"AD תיכון במשולש ABC should be accepted\". Measured on deed7b20: on an empty canvas the median and bisector triangle forms were refused «unresolved dependencies for: D» / «… bis-CAB» while «AD גובה במשולש ABC» built. Root cause: the altitude and the classic median each carried their own copy of «introduce the named triangle»; the named median and the bisector had none, so D's operands never existed. Fix: one step, `cevianTriangle`, wrapped around every cevian rule; and an unresolved operand on the submit path is refused quoting the sentence and naming the missing letters. Asserts the operator's line builds with D the midpoint of BC, and that the bisector form builds with equal half-angles. The role matrix, the seeds, the existing-triangle control and the refusal text are in src/app/__tests__/issue-1720-cevian-triangle.test.ts.",
+    steps: ['AD תיכון במשולש ABC'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      expect(fig.construction.objects.some((o) => o.kind === 'polygon'), 'triangle ABC is drawn').toBe(true);
+      expect(dist(B, D), 'D is the midpoint of BC').toBeCloseTo(dist(D, C), 6);
+      const bis = replay(factsOf(['AD חוצה זווית במשולש ABC']), 0);
+      const p = (k: string) => bis.positions.get(k)!;
+      expect(angle(p('B'), p('A'), p('D')), 'AD bisects ∠A').toBeCloseTo(angle(p('D'), p('A'), p('C')), 4);
+    },
+  },
+  {
+    id: 'diagonals-named-by-letters-1683',
+    title: '#1683 (ADR-569): in «מרובע ABCD», «האלכסונים AB ו-CD נפגשים בנקודה E» is refused (AB and CD are sides); «האלכסונים AC ו-BD …» builds the named meet',
+    guards:
+      "Found by the #1620 analytic stream (ADR-AG-208), measured on main deed7b20 through decideDeterministic2D: «מרובע ABCD» · «האלכסונים AB ו-CD נפגשים בנקודה E» committed the meet of AC and BD — the student's letters replaced by others, green. Root cause: specialPointMeet derives its two lines from the shape and never read a pair list after the noun, and the diagonal claim (ADR-499) lived only in the segment/diagonals rules' flag, so a sentence another rule won dropped it. Fix: lines named by letters go to the rule that reads them (the lettered meet; a cevian family through its own rule), and «אלכסון» joins the role-noun registry, so every reading carries the claim. Asserts the operator's line is refused at the gate with the side named, and that the correct spelling builds E on both diagonals. The submit-door matrix (English, the cut form, no ring, two rings, the lettered medians/altitudes/bisectors) is in src/app/__tests__/issue-1683-lettered-lines.test.ts.",
+    steps: ['מרובע ABCD', 'האלכסונים AC ו-BD נפגשים בנקודה E'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const wrong = gateVerdict(factsOf(['מרובע ABCD']), 'האלכסונים AB ו-CD נפגשים בנקודה E');
+      expect(wrong.kind === 'refused' && wrong.detail, '«האלכסונים AB ו-CD …» is refused naming the side').toMatch(/AB is not a diagonal of ABCD/);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E');
+      const off = (P: Vec, Q: Vec, R: Vec) => Math.abs((R.x - P.x) * (Q.y - P.y) - (R.y - P.y) * (Q.x - P.x)) / dist(P, Q);
+      expect(off(A, C, E), 'E on AC').toBeLessThan(1e-6);
+      expect(off(B, D, E), 'E on BD').toBeLessThan(1e-6);
+    },
+  },
+  {
+    id: 'point-placement-keeps-its-tail-1682',
+    title: '#1682 (ADR-570): «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC» holds DE = DC; «… מעבר לנקודה B» puts E past B',
+    guards:
+      "Found by the #1620 analytic stream (ADR-AG-208), measured on main deed7b20 (seed 0): after «מרובע ABCD», «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC» committed only the extension (|DE| = 4.47, |DC| = 4.12), and «… מעבר לנקודה B» drew E past C — both green. Root cause: the point-on-carrier rules read their prefix and ignore the tail, and droppedGivenRelations counted DE = DC as carried because E is introduced by the line. Fix: the given-conjunction clause after a point placement splits like «כך ש»; pointOnExtension reads «מעבר ל-X»; the gate's introduced-point exemption needs the defining command to carry every label. Asserts the operator's exact line holds DE = DC, and that the qualifier line puts E beyond B. The spelling matrix (ונתון ש / וידוע כי / English / «ו-» / comma / «על הצלע»), the seeds and the #108 shape control are in src/app/__tests__/issue-1682-point-placement-tail.test.ts.",
+    steps: ['מרובע ABCD', 'הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E');
+      expect(dist(D, E), 'DE = DC').toBeCloseTo(dist(D, C), 6);
+      const beyond = replay(factsOf(['מרובע ABCD', 'הנקודה E נמצאת על המשך הצלע BC מעבר לנקודה B']), 0);
+      const B2 = beyond.positions.get('B')!, C2 = beyond.positions.get('C')!, E2 = beyond.positions.get('E')!;
+      const t = ((E2.x - B2.x) * (C2.x - B2.x) + (E2.y - B2.y) * (C2.y - B2.y)) / dist(B2, C2) ** 2;
+      expect(t, '«מעבר לנקודה B» puts E past B').toBeLessThan(0);
+    },
+  },
 ];

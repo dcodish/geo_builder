@@ -48,7 +48,7 @@ import {
   typedLabels,
 } from '@/parser';
 import { independentConstructs } from './independence';
-import type { AnyCommand, Construction, Id, Vec } from '@/engine';
+import { applyCommand, type AnyCommand, type Command, type Construction, type Id, type Vec } from '@/engine';
 import {
   type Fact,
   autoNamedLabels,
@@ -387,6 +387,18 @@ export async function decideFromParse(
     return refuse('guided', { source: 'parser', result: `bisector-wrong-apex:${r.apex}:${r.stated}` }, { key: 'input.bisectorWrongApex', params: { apex: r.apex, stated: r.stated } });
   }
   /**
+   * #1684 ([ADR-568](../../docs/06-decisions.md#adr-568)): «AE גובה» when A is a vertex of several shapes that
+   * give it different opposite sides. Which side is a given the sentence did not state, so it is ASKED,
+   * quoting the sentence and the shapes — never one picked silently, never a paid guess.
+   */
+  if (!r.ok && r.reason === 'ambiguous-cevian') {
+    const kind = r.role === 'median' ? 'input.cevianRoleMedian' : 'input.cevianRoleAltitude';
+    return refuse('clarify', { source: 'parser', result: `ambiguous-cevian:${r.role}:${r.apex}:${r.shapes.join(',')}` }, {
+      key: 'input.ambiguousCevian',
+      params: { sentence: utterance.trim(), apex: r.apex, shapes: r.shapes.join(', '), side: r.side, shape: r.shapes[0], kind: { t: kind } },
+    });
+  }
+  /**
    * #1274 (operator ruling, ADR-W-066): «D = חיתוך AB ו-BC» — AB and BC meet at B and nowhere else, so
    * the letter the student asked for would be a second name for a point the figure already has. The
    * crossing is AFFIRMED and the name refused (3-D's ADR-3D-183 wording, now 2-D's too); the text stays
@@ -593,6 +605,22 @@ export async function decideFromParse(
       // it (it would re-emit the same in-grammar command). Show the SPECIFIC reason (humanized: "…contradicts
       // an earlier given", "C is already defined — edit/delete the earlier step") instead of the generic
       // "produced nothing". (ADR-156 follow-up — the "impossible with the current data" message.)
+      /**
+       * #1720 ([ADR-571](../../docs/06-decisions.md#adr-571)): a line whose operands are not in the figure fails
+       * in the topological evaluator, and its message — «unresolved dependencies for: bis-CAB» — named an
+       * internal object, never the sentence. Here the refusal quotes the sentence and names the student's
+       * own letters it relies on that nothing has defined (`missingOperandLetters`).
+       */
+      if (outcome.reason === 'error' && /^unresolved dependencies/.test(outcome.detail ?? '')) {
+        const missing = missingOperandLetters(viewNow().construction, r.commands);
+        return refuse(
+          'guided',
+          { source: 'parser', result: `missing-operands:${missing.join(',')}`, detail: outcome.detail, commands: r.commands },
+          missing.length
+            ? { key: 'input.missingOperands', params: { sentence: utterance.trim(), points: missing.join(', ') } }
+            : { key: 'input.unresolvedSentence', params: { sentence: utterance.trim() } },
+        );
+      }
       if (outcome.reason === 'error') {
         // #943 (ADR-487): the refusal names the STATEMENT. On this path the sentence needs no lookup at
         // all — it is the text the student just typed, still in the box, and this is the path the
@@ -703,6 +731,33 @@ export async function decideFromParse(
   }
   // out of grammar, OR a deterministic parse that built nothing → the caller asks the model
   return { kind: 'escalate', binds, logs, weak, parseReason: r.ok ? null : r.reason };
+}
+
+/**
+ * #1720 ([ADR-571](../../docs/06-decisions.md#adr-571)) — the point letters a batch RELIES ON that neither the
+ * figure nor the batch itself defines: every uppercase point label the commands reference, minus the
+ * objects that exist after applying the batch structurally (`applyCommand`, no evaluation — so a shape's
+ * own corners and a construct's own point count as defined). Internal ids (`bis-CAB`, `~med-BC`) are
+ * never point labels, so they can never reach the student.
+ */
+export function missingOperandLetters(prev: Construction, commands: readonly AnyCommand[]): string[] {
+  let c = prev;
+  for (const cmd of commands) {
+    try {
+      c = applyCommand(c, cmd as Command);
+    } catch {
+      /* a command the structural pass cannot apply defines nothing */
+    }
+  }
+  const defined = new Set(c.objects.map((o) => o.id));
+  const referenced = new Set<string>();
+  const visit = (v: unknown): void => {
+    if (typeof v === 'string') {
+      if (/^[A-Z]\d*$/.test(v)) referenced.add(v);
+    } else if (Array.isArray(v)) v.forEach(visit);
+  };
+  for (const cmd of commands) for (const [k, v] of Object.entries(cmd)) if (k !== 'type') visit(v);
+  return [...referenced].filter((x) => !defined.has(x)).sort();
 }
 
 /** The whole pre-LLM lane in one call — for a caller with no spinner to paint (log-triage, #1358). */

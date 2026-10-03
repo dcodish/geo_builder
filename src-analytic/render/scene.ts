@@ -116,8 +116,8 @@ export interface SceneSegment {
    *
    * Present only when a given stated it. A length the tool DERIVED is an answer and belongs in the data
    * panel, not on the figure ([ADR-AG-016](../../docs/06c-decisions-analytic.md#adr-ag-016)). The
-   * stated-measure layer (`engine/statedMeasures.ts`) decides which is which; this carries the text and
-   * where to put it.
+   * stated-measure layer (`engine/statedMeasures.ts`) decides which is which; this carries the text and the
+   * label's CENTRE, placed clear of every other label by `placeSceneLabels` (#1717, #1714).
    */
   label?: { text: string; x: number; y: number };
   /** #1653 — the display key (`segKey` of its endpoints) and how it is inked (`shell`'s `segInk`). */
@@ -148,6 +148,202 @@ export interface SceneMeasure {
 
 /** Screen-space leg length of the right-angle tick at the foot of a perpendicular. */
 const RIGHT_ANGLE = 9;
+
+/**
+ * Where a point's label is drawn relative to its dot, and at what size (#1717). `Figure.tsx` paints from these and
+ * the length-label placement below measures against them, so the two can never disagree about where a label is.
+ */
+export const POINT_LABEL = { dx: 7, dy: -7, font: 13 } as const;
+/** A stated length's font size (#1065). */
+export const LENGTH_LABEL_FONT = 12;
+/** The axis tick labels' font size and their offsets from the axes — furniture a length label must not cover either. */
+export const TICK_LABEL = { font: 11, below: 14, left: 6 } as const;
+
+/** An axis-aligned screen box. */
+export interface LabelBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * A text's width, estimated from its glyph count. The scene has no font metrics to ask — the renderer lays the
+ * label out as SVG — and an estimate is the honest instrument for the one question asked here: do two labels
+ * overlap. The 0.6 em per glyph is 2-D's own estimate (`labelScale` in `src/render/scene.ts`).
+ */
+const textWidth = (chars: number, font: number): number => Math.max(1, chars) * font * 0.6;
+
+/** The box a point's label covers: name, then its stated coordinates when it has any (subscripts at 9px). */
+export function pointLabelBox(p: ScenePoint): LabelBox {
+  const f = POINT_LABEL.font;
+  let w = textWidth(p.label.length, f);
+  let sub = false;
+  if (p.coords) {
+    // «(» + «, » + «)», each part's own text, and a subscript at its own smaller size
+    w += textWidth(4, f);
+    for (const part of p.coords) {
+      w += textWidth(part.text.length, f);
+      if (part.sub) {
+        w += textWidth(part.sub.length, 9);
+        sub = true;
+      }
+    }
+  }
+  const x0 = p.cx + POINT_LABEL.dx;
+  const base = p.cy + POINT_LABEL.dy;
+  return { x0, y0: base - f * 0.8, x1: x0 + w, y1: base + f * 0.25 + (sub ? 3 : 0) };
+}
+
+const overlaps = (a: LabelBox, b: LabelBox): boolean => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+type ScreenLine = { x1: number; y1: number; x2: number; y2: number };
+/** Does a drawn line pass through the box? Liang–Barsky clipping of the segment against it. */
+const crosses = (l: ScreenLine, b: LabelBox): boolean => {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = l.x2 - l.x1;
+  const dy = l.y2 - l.y1;
+  const edges: Array<[number, number]> = [
+    [-dx, l.x1 - b.x0],
+    [dx, b.x1 - l.x1],
+    [-dy, l.y1 - b.y0],
+    [dy, b.y1 - l.y1],
+  ];
+  for (const [p, q] of edges) {
+    if (p === 0) {
+      if (q < 0) return false;
+    } else {
+      const r = q / p;
+      if (p < 0) t0 = Math.max(t0, r);
+      else t1 = Math.min(t1, r);
+      if (t0 > t1) return false;
+    }
+  }
+  return true;
+};
+
+/** The clear gap between a segment and its length label, and the step taken outward while the label still collides. */
+const LENGTH_GAP = 4;
+const LENGTH_STEP = 4;
+const LENGTH_MAX_STEPS = 12;
+
+/**
+ * WHERE A STATED LENGTH IS WRITTEN (#1717) — 2-D's value-label rule, COPIED (`src/render/scene.ts`, ADR-031 / #126:
+ * «a length sits at its segment's midpoint, nudged perpendicular to the OUTSIDE, away from the figure's centroid»),
+ * plus the step this canvas needs and 2-D's does not.
+ *
+ * Operator, corpus 9/4: *"AO=3 is not created"* — it was, but its «3» sat at AO's midpoint 6px up, inside A's own
+ * label, and read «A(x_A, 0)3». A point label here carries the point's stated coordinates, so it is several times
+ * wider than 2-D's single letter, and any short segment, or any segment ending at a labelled point, put the two on
+ * top of each other. **The class: a length label was placed with no knowledge of the other labels.** So, from the
+ * outward side's first clear position, the label steps along the normal until its box clears every point label,
+ * every point dot, every axis tick label, every drawn segment and every length label already placed; when the outward side never
+ * clears, the inward side is tried; when neither does, it keeps the outward first position — still drawn, never
+ * dropped (a stated given stays visible).
+ *
+ * The returned position is the label's CENTRE; `Figure.tsx` centres the text on it.
+ */
+export function placeLengthLabels(
+  segs: ReadonlyArray<{ x1: number; y1: number; x2: number; y2: number; text: string }>,
+  points: readonly ScenePoint[],
+  furniture: readonly LabelBox[] = [],
+  lines: readonly ScreenLine[] = [],
+): Array<{ x: number; y: number }> {
+  return placeSceneLabels(lengthRequests(segs, points), points, furniture, lines);
+}
+
+/**
+ * ONE LABEL TO PLACE (#1714, on #1717's placement): an anchor, the unit direction it steps along, and its text.
+ * `reach` (default: the box's own half-extent along `n` plus the gap) is where the first try sits from the anchor —
+ * 0 for a label that belongs ON its anchor (an area at its centroid). `both` also tries the opposite direction when
+ * the first never clears; `tie` takes whichever side clears in fewer steps (a segment with no outside, #1717).
+ */
+export interface LabelRequest {
+  mid: { x: number; y: number };
+  n: { x: number; y: number };
+  text: string;
+  reach?: number;
+  both?: boolean;
+  tie?: boolean;
+  /** How many steps to try (default `LENGTH_MAX_STEPS`) — an angle value walks out of its wedge, which takes longer. */
+  steps?: number;
+}
+
+/** A stated length's request: its midpoint, stepping along the OUTWARD normal (#1717's rule, unchanged). */
+function lengthRequests(
+  segs: ReadonlyArray<{ x1: number; y1: number; x2: number; y2: number; text: string }>,
+  points: readonly ScenePoint[],
+): LabelRequest[] {
+  const cen = points.length
+    ? { x: points.reduce((s, p) => s + p.cx, 0) / points.length, y: points.reduce((s, p) => s + p.cy, 0) / points.length }
+    : { x: 0, y: 0 };
+  return segs.map((s) => {
+    const mid = { x: (s.x1 + s.x2) / 2, y: (s.y1 + s.y2) / 2 };
+    const dx = s.x2 - s.x1;
+    const dy = s.y2 - s.y1;
+    const l = Math.hypot(dx, dy) || 1;
+    let n = { x: -dy / l, y: dx / l };
+    const out = (mid.x - cen.x) * n.x + (mid.y - cen.y) * n.y;
+    // A segment through the centroid (9/4's AO, on the axis the rectangle straddles) has no outside. Its two sides
+    // tie, and a sign read off float noise would flip the label between configurations of ONE figure; so a tie
+    // takes a fixed orientation and then the side that clears in the fewer steps.
+    const tie = Math.abs(out) < 0.5;
+    if (tie) {
+      if (n.y < 0 || (n.y === 0 && n.x < 0)) n = { x: -n.x, y: -n.y };
+    } else if (out < 0) n = { x: -n.x, y: -n.y }; // outward
+    return { mid, n, text: s.text, both: true, tie };
+  });
+}
+
+/**
+ * THE ONE LABEL PLACEMENT OF THE CANVAS (#1717, widened by #1714): every stated value — a length, an angle's value,
+ * an area's «S=…», an arc's value — is placed HERE, in order, each clear of every point label, point dot, axis label
+ * row, drawn segment and every label placed before it. From its first position the label steps along `n` until
+ * its box clears; with `both`, the opposite side is tried when that never clears; when nothing clears it keeps its
+ * first position — still drawn, never dropped (a stated given stays visible). Returns each label's CENTRE.
+ */
+export function placeSceneLabels(
+  reqs: readonly LabelRequest[],
+  points: readonly ScenePoint[],
+  furniture: readonly LabelBox[] = [],
+  lines: readonly ScreenLine[] = [],
+): Array<{ x: number; y: number }> {
+  const obstacles: LabelBox[] = [
+    ...points.map(pointLabelBox),
+    ...points.map((p) => ({ x0: p.cx - 4, y0: p.cy - 4, x1: p.cx + 4, y1: p.cy + 4 })),
+    ...furniture,
+  ];
+  return reqs.map((r) => {
+    const { mid, n, tie = false } = r;
+    // the bidi isolates (`lbl`) are invisible, so they take no width
+    const hw = textWidth(r.text.replace(/[\u2066-\u2069]/g, '').length, LENGTH_LABEL_FONT) / 2;
+    const hh = LENGTH_LABEL_FONT / 2;
+    // the box's own half-extent along the normal, so the first position clears the anchor whatever its slope
+    const reach = r.reach ?? hw * Math.abs(n.x) + hh * Math.abs(n.y) + LENGTH_GAP;
+    // the box the glyphs actually ink: Figure.tsx writes the text 0.35em below the centre, so a cap reaches 0.45em above
+    // it and a descender 0.6em below (the 0.8/0.25 em split every label box here uses)
+    const boxAt = (c: { x: number; y: number }): LabelBox => ({ x0: c.x - hw, y0: c.y - 0.45 * LENGTH_LABEL_FONT, x1: c.x + hw, y1: c.y + 0.6 * LENGTH_LABEL_FONT });
+    const at = (side: 1 | -1, k: number) => {
+      const d = (reach + k * LENGTH_STEP) * side;
+      return { x: mid.x + n.x * d, y: mid.y + n.y * d };
+    };
+    const firstClear = (side: 1 | -1): { k: number; c: { x: number; y: number } } | null => {
+      for (let k = 0; k <= (r.steps ?? LENGTH_MAX_STEPS); k += 1) {
+        const c = at(side, k);
+        const b = boxAt(c);
+        if (!obstacles.some((o) => overlaps(o, b)) && !lines.some((l) => crosses(l, b))) return { k, c };
+      }
+      return null;
+    };
+    const outward = firstClear(1);
+    const inward = r.both && (!outward || tie) ? firstClear(-1) : null;
+    const best = outward && (!inward || !tie || outward.k <= inward.k) ? outward : inward;
+    const pos = best ? best.c : at(1, 0);
+    obstacles.push(boxAt(pos));
+    return pos;
+  });
+}
 
 export interface Scene {
   width: number;
@@ -199,6 +395,8 @@ export interface SceneStated {
 
 /** The stated angle arc's radius, in px — shrunk by `markFitScale` when the corner has no room (#1337's rule). */
 export const STATED_ARC_PX = 18;
+/** How far an angle value may step out of a narrow wedge before it keeps its first position (4 px a step). */
+const ANGLE_LABEL_STEPS = 40;
 /** A stated right angle's knee leg, in px. */
 export const STATED_KNEE_PX = 10;
 
@@ -388,7 +586,7 @@ export function buildScene(
   // geometry implementation.
   /** #1714: the stated lengths, by segment key — each written once, on the segment that carries it. */
   const statedLength = new Map((knows.stated?.lengths ?? []).map((l) => [segKey([l.a, l.b]), l.value] as const));
-  const segments: SceneSegment[] = fig.segments.map((s) => {
+  const projected: SceneSegment[] = fig.segments.map((s) => {
     const x1 = t.sx(s.a.x);
     const y1 = t.sy(s.a.y);
     const x2 = t.sx(s.b.x);
@@ -410,11 +608,11 @@ export function buildScene(
     };
   });
   // A side drawn twice (a polygon side and a stated segment) carries its length ONCE.
-  const labelled = new Set<string>();
-  for (const s of segments) {
+  const written = new Set<string>();
+  for (const s of projected) {
     if (!s.label) continue;
-    if (labelled.has(s.key)) s.label = undefined;
-    else labelled.add(s.key);
+    if (written.has(s.key)) s.label = undefined;
+    else written.add(s.key);
   }
 
   /**
@@ -481,6 +679,48 @@ export function buildScene(
   });
 
   /**
+   * The stated lengths' labels, placed now that every point label exists to be avoided (#1717).
+   *
+   * The axes' numbers are furniture a length label must not join, and not only by overlap: a «3» standing in the row
+   * of tick numbers under the x-axis READS as a tick (measured on 9/4's first cut, where AO's «3» landed between «−2»
+   * and «O»). So each axis's whole label row is one obstacle band — the x-axis's row of numbers under it, the y-axis's
+   * column to its left, the O marker where they meet.
+   */
+  const xAxisY = t.sy(0);
+  const yAxisX = t.sx(0);
+  const xTicks = ticks(box.minX, box.maxX, t.sx);
+  const yTicks = ticks(box.minY, box.maxY, t.sy);
+  const tf = TICK_LABEL.font;
+  const FAR = 1e6;
+  const rowY = xAxisY + TICK_LABEL.below;
+  const colR = yAxisX - TICK_LABEL.left;
+  const colW = Math.max(1, ...yTicks.map((k) => k.label.length));
+  const furniture: LabelBox[] = [
+    { x0: -FAR, y0: rowY - tf * 0.8, x1: FAR, y1: rowY + tf * 0.25 },
+    { x0: colR - textWidth(colW, tf), y0: -FAR, x1: colR, y1: FAR },
+  ];
+  const labelled = projected.filter((s) => s.label);
+  // #1714: the stated-measure layer's marks, and its labels as REQUESTS — placed in the same call as the lengths, so
+  // one placement keeps every stated value clear of every other (#1717's rule, one path).
+  const statedDraft = statedScene(fig, t, knows.stated, projected);
+  const placed = placeSceneLabels(
+    [...lengthRequests(labelled.map((s) => ({ x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, text: s.label!.text })), points), ...statedDraft.requests],
+    points,
+    furniture,
+    projected.filter((s) => s.ink !== 'ghost'),
+  );
+  const placedOf = new Map(labelled.map((s, i) => [s, placed[i]] as const));
+  const segments: SceneSegment[] = projected.map((s) => {
+    const at = placedOf.get(s);
+    return at && s.label ? { ...s, label: { ...s.label, x: at.x, y: at.y } } : s;
+  });
+  const stated: SceneStated = {
+    marks: statedDraft.marks,
+    ticks: statedDraft.ticks,
+    labels: statedDraft.requests.map((r, i) => ({ kind: statedDraft.kinds[i], text: r.text, ...placed[labelled.length + i] })),
+  };
+
+  /**
    * The perpendicular, projected (#1048). The RIGHT-ANGLE tick is built here rather than in the
    * renderer because it is geometry — two short legs of equal screen length along the foot's own two
    * directions — and building it from screen vectors keeps it square at every zoom, which a
@@ -535,18 +775,11 @@ export function buildScene(
     ...(k.centreOf ? { centreOf: k.centreOf } : {}),
   }));
 
-  const stated = statedScene(fig, t, knows.stated, segments);
-
   return {
     width,
     height,
     stated,
-    axes: {
-      xAxisY: t.sy(0),
-      yAxisX: t.sx(0),
-      xTicks: ticks(box.minX, box.maxX, t.sx),
-      yTicks: ticks(box.minY, box.maxY, t.sy),
-    },
+    axes: { xAxisY, yAxisX, xTicks, yTicks },
     curves,
     segments,
     arcs,
@@ -565,6 +798,14 @@ const pathOf = (ps: readonly MarkPt[]): string =>
 /** A stated value as written: a number through the shared formatter (#723), or the student's own text. */
 const valueText = (v: StatedValue, unit = ''): string => ('num' in v ? `${fmtAnalytic(v.num)}${unit}` : v.text);
 
+/** The stated layer before placement: its marks, and its labels as requests for `placeSceneLabels`. */
+interface StatedDraft {
+  marks: SceneStated['marks'];
+  ticks: SceneStated['ticks'];
+  requests: LabelRequest[];
+  kinds: Array<SceneStated['labels'][number]['kind']>;
+}
+
 /**
  * THE STATED-MEASURE LAYER, projected (#1714, ADR-AG-225). The engine said WHAT was stated; this places it, every
  * shape through `shell/marks`, so an analytic arc, knee and tick are 2-D's. Positions come from the figure; a mark
@@ -575,9 +816,13 @@ function statedScene(
   t: Transform,
   stated: StatedMeasures | undefined,
   segments: readonly SceneSegment[],
-): SceneStated {
-  const out: SceneStated = { marks: [], ticks: [], labels: [] };
+): StatedDraft {
+  const out: StatedDraft = { marks: [], ticks: [], requests: [], kinds: [] };
   if (!stated) return out;
+  const ask = (kind: SceneStated['labels'][number]['kind'], r: LabelRequest) => {
+    out.requests.push(r);
+    out.kinds.push(kind);
+  };
   const at = (id: string): MarkPt | null => {
     const p = fig.points.find((q) => q.id === id);
     return p ? { x: t.sx(p.x), y: t.sy(p.y) } : null;
@@ -602,10 +847,10 @@ function statedScene(
     if (!c) continue;
     const r = STATED_ARC_PX * c.k;
     out.marks.push({ kind: 'angle', d: pathOf(angleArcPoints(c.V, c.A, c.B, r)) });
-    // The value sits just OUTSIDE its own arc, along the wedge bisector (2-D's `angleValueOffset`).
+    // The value sits just OUTSIDE its own arc, along the wedge bisector (2-D's `angleValueOffset`), stepping further
+    // out while it collides (one placement, #1717).
     const u = wedgeBisector(c.V, c.A, c.B);
-    const off = r + 11;
-    out.labels.push({ kind: 'angle', text: lbl(valueText(g.value, '°')), x: c.V.x + u.x * off, y: c.V.y + u.y * off });
+    ask('angle', { mid: { x: c.V.x + u.x * r, y: c.V.y + u.y * r }, n: u, text: lbl(valueText(g.value, '°')), steps: ANGLE_LABEL_STEPS });
   }
   // Equal angles: concentric rings, one per class count, outside a value arc at the same corner.
   for (const g of stated.equalAngles) {
@@ -627,14 +872,15 @@ function statedScene(
     if (drawn.has(segKey([l.a, l.b]))) continue;
     const A = at(l.a);
     const B = at(l.b);
-    if (A && B) out.labels.push({ kind: 'length', text: lbl(valueText(l.value)), x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 - 6 });
+    if (A && B) ask('length', lengthRequests([{ x1: A.x, y1: A.y, x2: B.x, y2: B.y, text: lbl(valueText(l.value)) }], fig.points.map((p) => ({ id: p.id, cx: t.sx(p.x), cy: t.sy(p.y), label: p.id })))[0]);
   }
   for (const ar of stated.areas) {
     const ps = ar.ids.map(at).filter((p): p is MarkPt => p !== null);
     if (ps.length < 3 || ps.length !== ar.ids.length) continue;
     const cx = ps.reduce((s, p) => s + p.x, 0) / ps.length;
     const cy = ps.reduce((s, p) => s + p.y, 0) / ps.length;
-    out.labels.push({ kind: 'area', text: lbl(`S=${valueText(ar.value)}`), x: cx, y: cy });
+    // ON its centroid first (reach 0), stepping up while it collides.
+    ask('area', { mid: { x: cx, y: cy }, n: { x: 0, y: -1 }, text: lbl(`S=${valueText(ar.value)}`), reach: 0, both: true });
   }
   /**
    * An ARC's value sits ON the arc (2-D's ADR-335: never a wedge at the often-hidden centre) — at the minor arc's
@@ -651,7 +897,7 @@ function statedScene(
     const bis = Math.hypot(sum.x, sum.y) < 1e-9 ? { x: -da.y, y: da.x } : unitOf(sum);
     const on = { x: t.sx(curve.cx + bis.x * curve.r), y: t.sy(curve.cy + bis.y * curve.r) };
     const inward = unitOf({ x: t.sx(curve.cx) - on.x, y: t.sy(curve.cy) - on.y });
-    out.labels.push({ kind: 'arc', text: lbl(valueText(a.value, '°')), x: on.x + inward.x * 12, y: on.y + inward.y * 12 });
+    ask('arc', { mid: on, n: inward, text: lbl(valueText(a.value, '°')) });
   }
   return out;
 }
