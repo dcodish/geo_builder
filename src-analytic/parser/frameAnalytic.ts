@@ -24,6 +24,7 @@
 import { ANGLE_STEM_HE, EN_SHAPE, SHAPES, normalizeShapeNoun } from '../engine/shapes';
 import { isNumeralName } from '../engine/names';
 import { stripFormatControls } from '../../shell/bidi';
+import { areaNotation } from '../engine/lengths';
 
 // ---------------------------------------------------------------------------
 // Orthography — character-level folds, always applied
@@ -41,7 +42,8 @@ import { stripFormatControls } from '../../shell/bidi';
  * article's hyphen is «ציר ה-x». Character-level, so every rule reads the one spelling.
  */
 export function orthography(raw: string): string {
-  return stripFormatControls(raw)
+  // `S_{ABC}` / `S_ABC` is the notation for «שטח ABC» (#1621, ADR-AG-214) — one spelling for every rule.
+  return areaNotation(stripFormatControls(raw))
     .replace(/^\s*(?:[·•∙*]|-(?=\s))\s*/, '')
     .replace(/־/g, '-')
     .replace(/ /g, ' ')
@@ -88,6 +90,11 @@ const UNWRAP: ReadonlyArray<[RegExp, string]> = [
   // «עוד נתון:», «ידוע כי», «ידוע גם ש-». The four inflections are written out: «נתון» ends in FINAL nun.
   [/^(?:עוד\s+)?נתו(?:ן|נה|נים|נות)(?:\s+(?:גם|בנוסף|עוד))?\s*(?::\s*|\s+כי\s+|\s+ש-?|\s+)/, ''],
   [/^ידוע\s+(?:גם\s+)?(?:כי\s+|ש-?)/, ''],
+  // «נסמן ∢DCB = 2α», «נסמן: זווית ADB = α» (#1621, ADR-AG-215) — "let us denote": the exam introducing a symbol by
+  // the equation that follows, which is the given itself (the symbol is free until a later given pins it). Only an
+  // equation is a reading — «נסמן את שטח ABCD ב-S» unwraps to a clause no rule reads, and stays unread.
+  [/^נסמן\s*(?::\s*|\s+כי\s+|\s+)/, ''],
+  [/^(?:let|denote)\s+/i, ''],
   [/^(?:it\s+is\s+(?:given|known)\s+that|given\s+that|given\s*:|given)\s+/i, ''],
   // The figure that introduces the sentence — «בסרטוט שלפניכם מתואר משולש ABC».
   [new RegExp(String.raw`^ב${FIGURE}\s+(?:מתוא(?:ר|רת|רים|רות)\s+)?`), ''],

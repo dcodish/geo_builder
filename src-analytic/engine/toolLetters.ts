@@ -25,7 +25,7 @@
 import { sameDerivation } from './sameDerivation';
 import type { Fact, Id } from './types';
 
-export type ToolPointRole = 'midpoint' | 'midpoint-2' | 'foot' | 'vertex';
+export type ToolPointRole = 'midpoint' | 'midpoint-2' | 'foot' | 'vertex' | 'end' | 'diameter-end';
 
 /** The ONE role → letters table. The first free letter wins; then 2-D's pool; then the first letter subscripted. */
 export const TOOL_LETTERS: Readonly<Record<ToolPointRole, string>> = {
@@ -42,6 +42,14 @@ export const TOOL_LETTERS: Readonly<Record<ToolPointRole, string>> = {
    * placeholder is LINE-SCOPED: «ריבוע» twice is two squares (ABCD, then EFGH), as in 2-D.
    */
   vertex: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  /**
+   * The ends of a shape whose points the sentence did not name (#1622 E4, ADR-AG-220) — «קוטר», «רבע מעגל»: 2-D names
+   * them A, B, the next free letters in order. F stays the focus letter (#1167) and O the centre's (#1673), so neither
+   * is offered.
+   */
+  end: 'ABCDEGHIJKLMNPQRSTUVWXYZ',
+  /** The far end of a diameter from a named point (#1622 E4) — «קוטר מנקודה F»: 2-D's D, then the next free letter. */
+  'diameter-end': 'DEGHIJKLMNPQRSTUVWXYZ',
 };
 /** 2-D's `freeLabel` pool, minus nothing: it holds no F. */
 const POOL = 'MNPQRSTUVWXYZKLGHIJ';

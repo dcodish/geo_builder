@@ -52,7 +52,7 @@ export function Figure({
    */
   onCentre?: (offerId: string, screen: { x: number; y: number }) => void;
 }) {
-  const { width, height, axes, curves, segments, construction, points, crossings, measures, loci } = scene;
+  const { width, height, axes, curves, segments, arcs, construction, points, crossings, measures, loci } = scene;
   /** #1598: a centre offer asks for a letter (`onCentre`); every other ring adds its sentence (`onCrossing`). */
   const ringClick = (k: Scene['crossings'][number], e: { clientX: number; clientY: number }) =>
     k.centreOf && onCentre ? onCentre(k.id, { x: e.clientX, y: e.clientY }) : onCrossing?.(k.sentence, { x: k.wx, y: k.wy });
@@ -204,6 +204,10 @@ export function Figure({
       <g fill="none" stroke={CURVE} strokeWidth={2}>
         {curves.map((c) => (
           <path key={c.id} d={c.d} data-kind={c.kind} data-id={c.id} />
+        ))}
+        {/* the drawn arcs (#1622 E4) — a semicircle, a quarter circle, a sector, inked like a curve */}
+        {(arcs ?? []).map((a) => (
+          <path key={a.id} d={a.d} data-kind="arc" data-id={a.id} strokeLinejoin="round" />
         ))}
       </g>
       {/*

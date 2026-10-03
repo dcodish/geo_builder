@@ -383,7 +383,20 @@ const CEVIAN_ROLE_EN = /^(?:the\s+|an?\s+)?(?:median|altitude|height)\s/i;
 function cevianNamingCandidates(line: string, name: string): string[] {
   if (CEVIAN_ROLE.test(line.trim())) return [`${line} פוגש את הצלע בנקודה ${name}`];
   if (CEVIAN_ROLE_EN.test(line.trim())) return [`${line} at ${name}`];
-  return [];
+  return diameterNamingCandidates(line, name);
+}
+
+/**
+ * A diameter from a point whose far end the TOOL named (#1622 E4, ADR-AG-220) — «קוטר מנקודה F במעגל O» — names it as
+ * the sentence that states both ends: «FD קוטר במעגל O», the `diameter-of` it already lowers to, so the fold-equality
+ * proof below accepts it.
+ */
+function diameterNamingCandidates(line: string, name: string): string[] {
+  const p = parseLine(line);
+  if (!p.ok) return [];
+  const d = p.facts.find((f): f is Extract<Fact, { t: 'diameter-of' }> => f.t === 'diameter-of');
+  if (!d || d.a.startsWith('@') || !d.b.startsWith('@')) return [];
+  return [`${d.a}${name} קוטר${d.circle ? ` במעגל ${d.circle}` : ''}`];
 }
 
 /** Insert `name` at each place a sentence can carry it: after a circle noun, before a coordinate pair. */

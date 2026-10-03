@@ -152,6 +152,8 @@ export interface Scene {
   axes: SceneAxes;
   curves: SceneCurve[];
   segments: SceneSegment[];
+  /** The drawn arcs (#1622 E4) — a semicircle, a quarter circle, a sector — as SVG path data in screen space. */
+  arcs: SceneArc[];
   construction: SceneConstruction[];
   points: ScenePoint[];
   /**
@@ -174,6 +176,15 @@ export interface Scene {
    */
   loci: SceneLocus[];
 }
+
+/** A drawn arc (#1622 E4, ADR-AG-220), projected — its bounding radii included when the arc carries them. */
+export interface SceneArc {
+  id: string;
+  d: string;
+}
+
+/** Steps per full turn when an arc is drawn as a polyline — the curves' own density. */
+const ARC_STEPS = 96;
 
 export interface SceneLocus {
   /** The polyline in SCREEN coordinates, ready for an SVG `path`. */
@@ -368,6 +379,22 @@ export function buildScene(
     };
   });
 
+  /**
+   * The arcs, projected (#1622 E4). Sampled in WORLD space and then transformed, like every curve, so the isotropic
+   * Y-flip turns the counter-clockwise world sweep into what the student sees without a second convention here.
+   */
+  const arcs: SceneArc[] = (fig.arcs ?? []).map((a) => {
+    const n = Math.max(2, Math.ceil((Math.abs(a.sweep) / (2 * Math.PI)) * ARC_STEPS));
+    const pts: string[] = [];
+    for (let i = 0; i <= n; i += 1) {
+      const th = a.start + (a.sweep * i) / n;
+      pts.push(`${t.sx(a.cx + a.r * Math.cos(th)).toFixed(2)},${t.sy(a.cy + a.r * Math.sin(th)).toFixed(2)}`);
+    }
+    const centre = `${t.sx(a.cx).toFixed(2)},${t.sy(a.cy).toFixed(2)}`;
+    const d = a.radii ? `M${centre}L${pts.join('L')}L${centre}` : `M${pts.join('L')}`;
+    return { id: a.id, d };
+  });
+
   const construction: SceneConstruction[] = fig.construction.map((c) => ({
     id: c.id,
     lines: c.lines.map((l) => ({ x1: t.sx(l.a.x), y1: t.sy(l.a.y), x2: t.sx(l.b.x), y2: t.sy(l.b.y) })),
@@ -486,6 +513,7 @@ export function buildScene(
     },
     curves,
     segments,
+    arcs,
     construction,
     points,
     crossings,

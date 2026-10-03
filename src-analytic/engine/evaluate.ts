@@ -10,18 +10,18 @@
  * The domain is honoured HERE, at sampling time, which is D7 kind 1: a value outside it was never
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
-import { isDirectionSymbol, paramRegister, shapedObjectOf, toolSymbol, usedSymbols } from './carriers';
+import { impliedRange, isDirectionSymbol, narrowedDomain, paramRegister, shapedObjectOf, toolSymbol, usedSymbols } from './carriers';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
-import { pairKey, pinnedLengths } from './lengths';
+import { evalLengthExpr, pairKey, pinnedLengths } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
-import { dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
+import { angleAt, dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
-import { curveByName, inDomain, isFree, objectById, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type Selector } from './types';
+import { curveByName, inDomain, isFree, objectById, type ArcDef, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type OrderSide, type Selector } from './types';
 
 export interface FigurePoint {
   id: Id;
@@ -83,6 +83,21 @@ export interface FigureSegment {
   pinnedLength?: number;
 }
 
+/**
+ * A DRAWN ARC (#1622 E4, ADR-AG-220) — resolved to its circle and its angular extent, so the renderer projects it and
+ * never looks a point up. `start` and `sweep` are in radians in WORLD space (counter-clockwise positive); `radii`
+ * also draws the two bounding radii (a sector whose centre has no letter).
+ */
+export interface FigureArc {
+  id: Id;
+  cx: number;
+  cy: number;
+  r: number;
+  start: number;
+  sweep: number;
+  radii: boolean;
+}
+
 /** A derived point's own construction — what a student would have to draw to find it (#1030).
  *  Computed always and rendered behind a toggle, so `Figure` stays a complete description of the
  *  figure and showing it is purely a display decision. */
@@ -96,6 +111,8 @@ export interface Figure {
   points: FigurePoint[];
   curves: FigureCurve[];
   segments: FigureSegment[];
+  /** The drawn arcs (#1622 E4) — absent on a figure built by hand, read as none. */
+  arcs?: FigureArc[];
   construction: FigureConstruction[];
   /** Objects that do not exist at this parameter value — named, never silently dropped. */
   vacant: Vacancy[];
@@ -302,7 +319,8 @@ export function sampleParam(d: Domain, seed: number, salt: number): number {
 export function sampleEnv(c: Construction, seed = 0): Env {
   const env: Record<string, number> = {};
   paramRegister(c).forEach((p, i) => {
-    env[p.sym] = sampleParam(p.domain, seed, i + 1);
+    // #1621 (ADR-AG-215): a symbol a stated angle holds is sampled inside the range that angle allows.
+    env[p.sym] = sampleParam(narrowedDomain(p.domain, impliedRange(c, p.sym)), seed, i + 1);
   });
   return env;
 }
@@ -751,13 +769,31 @@ function spanOf(at: Map<Id, Pt>): number {
  * so it states no magnitude (ADR-052) and a value the descent merely APPROACHED the bound with is
  * the bound. One function, so every open bound the solve judges uses the same floor.
  */
-export function openBoundFloor(at: Map<Id, Pt>, env: Env, syms: readonly string[]): number {
+export function openBoundFloor(at: Map<Id, Pt>, env: Env, syms: readonly string[], sampled = 0): number {
+  return SOLVE_RESOLUTION * Math.max(figureScale(at, env, syms), sampled);
+}
+
+/**
+ * THE FIGURE'S SCALE — its point spread, or its largest parameter magnitude when that is larger. The ruler
+ * {@link openBoundFloor} is relative to.
+ *
+ * **A ruler measured on the solved figure ALONE collapses with it (#1620 S7, ADR-AG-213).** A figure with no
+ * stated magnitude can satisfy a contradiction in the LIMIT of shrinking to a point: «AC קוטר במעגל O» and
+ * the two tangents at A and C stated to MEET (they are parallel) drove every point and the radius together
+ * toward the centre, and at r ≈ 4·10⁻⁶ the span was 4·10⁻⁶ too — so the floor, a fraction of that span,
+ * called the radius positive and the figure was drawn green as one dot. So the solve also passes the scale
+ * of the figure it STARTED from (`sampled` — the seeded vertices and the sampled parameters, every one
+ * inside its domain): a descent that shrank the whole figure by more than the solver's resolution relative
+ * to where it began has reached the bound, not a configuration. It states no magnitude (ADR-052) — the
+ * sample's own extent is the reference — and a figure whose givens keep its size never comes near it.
+ */
+export function figureScale(at: Map<Id, Pt>, env: Env, syms: readonly string[]): number {
   let scale = spanOf(at);
   for (const sym of syms) {
     const v = Math.abs(env[sym]);
     if (Number.isFinite(v) && v > scale) scale = v;
   }
-  return SOLVE_RESOLUTION * scale;
+  return scale;
 }
 
 /**
@@ -784,7 +820,7 @@ function crossingSiblings(c: Construction, id: Id, at: Map<Id, Pt>): Id[] {
  * never reads as "outside" by a rounding error. `null` when something it needs is not placed.
  */
 export function circleQuantity(
-  q: Exclude<Extract<Selector, { kind: 'sign' }>['q'], { k: 'slope' }>,
+  q: Exclude<Extract<Selector, { kind: 'sign' }>['q'], { k: 'slope' } | { k: 'order' }>,
   at: (id: Id) => Pt | null,
   curveAt: (id: Id) => NumCurve | null,
 ): number | null {
@@ -799,6 +835,39 @@ export function circleQuantity(
   if (!a || !b) return null;
   const side = (x: number, y: number) => (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
   return zero(side(p.x, p.y)) * zero(side(k.cx, k.cy));
+}
+
+/**
+ * AN ORDER'S DIFFERENCE at this configuration (#1621 D3, ADR-AG-216) — `left − right`, each side measured by the
+ * function its equality twin is measured by: a length expression by `evalLengthExpr` (the `length-eq` residual's own
+ * reader), an angle by `angleAt` (the `angle` residual's), in degrees. A difference within the solver's resolution of
+ * zero, relative to the two sides, is ON the boundary and reads as 0 — so «AB < BC» on a figure with AB = BC is
+ * refused rather than passed on a rounding, and «AB ≤ BC» there holds. `null` when an operand is not placed.
+ */
+export function orderQuantity(
+  q: Extract<Extract<Selector, { kind: 'sign' }>['q'], { k: 'order' }>,
+  at: (id: Id) => Pt | null,
+  env: Env,
+  lineAt?: (name: string) => NamedLine | null,
+): number | null {
+  const side = (o: OrderSide): number | null => {
+    if (o.t === 'value') {
+      const v = evalExpr(o.value, env);
+      return Number.isFinite(v) ? v : null;
+    }
+    if (o.t === 'length') return evalLengthExpr(o.le, at, env, lineAt);
+    const v = at(o.at.v);
+    const a = at(o.at.a);
+    const b = at(o.at.b);
+    if (!v || !a || !b) return null;
+    const theta = angleAt(v, a, b);
+    return theta === null ? null : (theta * 180) / Math.PI;
+  };
+  const l = side(q.left);
+  const r = side(q.right);
+  if (l === null || r === null) return null;
+  const d = l - r;
+  return Math.abs(d) <= SOLVE_RESOLUTION * Math.max(1, Math.abs(l), Math.abs(r)) ? 0 : d;
 }
 
 /**
@@ -843,12 +912,70 @@ function sideOfLine(p: Pt, a: Pt, b: Pt): number | null {
   return ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) / len;
 }
 
-/** Does the length `l` honour the bound (#1622)? Judged at the solver's resolution: a strict end excludes it. */
-function inLengthBound(l: number, s: Extract<Selector, { kind: 'length-bound' }>): boolean {
-  const floor = SOLVE_RESOLUTION * Math.max(1, l);
-  if (s.min !== undefined && (s.minStrict !== false ? l <= s.min + floor : l < s.min - floor)) return false;
-  if (s.max !== undefined && (s.maxStrict !== false ? l >= s.max - floor : l > s.max + floor)) return false;
-  return true;
+/** Does a sign selector's quantity sit on its named side — the judge's own test, shared with the seeding below. */
+const signHolds = (s: Extract<Selector, { kind: 'sign' }>, q: number): boolean =>
+  s.positive ? (s.closed ? q >= 0 : q > 0) : s.closed ? q <= 0 : q < 0;
+
+/**
+ * Move ONE free point so the order holds at the start (#1621 D3, ADR-AG-216) — see the seeding loop in
+ * `evaluateUncached`. The side that moves is the first one with a free point to move: a single length (one end
+ * slides along the segment) or an angle (one ray turns about the vertex, keeping its length and its side). Its
+ * target is `u` of the way into the region from the other side's value — for a length a factor (1 ± u), for an
+ * angle a fraction of the room left before 0° or 180°. A side it cannot move, or a region with no room, is left
+ * alone: the judge decides.
+ */
+function seedOrder(
+  s: Extract<Selector, { kind: 'sign' }>,
+  q: Extract<Extract<Selector, { kind: 'sign' }>['q'], { k: 'order' }>,
+  seeded: Map<Id, Pt>,
+  posOf: (id: Id) => Pt | null,
+  env: Env,
+  u: number,
+): void {
+  const now = orderQuantity(q, posOf, env);
+  if (now === null || signHolds(s, now)) return;
+  const valueOf = (o: OrderSide): number | null => {
+    const one = { k: 'order' as const, left: o, right: { t: 'value' as const, value: { kind: 'num' as const, value: 0 } } };
+    return orderQuantity(one, posOf, env);
+  };
+  for (const [mine, other, up] of [
+    [q.left, q.right, s.positive],
+    [q.right, q.left, !s.positive],
+  ] as const) {
+    const o = valueOf(other);
+    if (o === null) continue;
+    if (mine.t === 'length') {
+      const t = mine.le.terms[0];
+      if (mine.le.terms.length !== 1 || mine.le.expr.kind !== 'sym' || !t || (t.kind !== undefined && t.kind !== 'length')) continue;
+      const [fixed, mover] = seeded.has(t.b) ? [t.a, t.b] : seeded.has(t.a) ? [t.b, t.a] : [null, null];
+      if (!fixed || !mover) continue;
+      const f = posOf(fixed);
+      const m = seeded.get(mover)!;
+      if (!f) continue;
+      if (!up && !(o > 0)) continue; // a length below a non-positive value: no room
+      const w = up ? Math.max(o, 0) * (1 + u) + (o > 0 ? 0 : u) : o * (1 - u);
+      const d = Math.hypot(m.x - f.x, m.y - f.y);
+      const [ux, uy] = d > 1e-9 ? [(m.x - f.x) / d, (m.y - f.y) / d] : [1, 0];
+      seeded.set(mover, { x: f.x + ux * w, y: f.y + uy * w });
+      return;
+    }
+    if (mine.t === 'angle') {
+      const { v, a, b } = mine.at;
+      const [fixed, mover] = seeded.has(b) && b !== v ? [a, b] : seeded.has(a) && a !== v ? [b, a] : [null, null];
+      if (!fixed || !mover) continue;
+      const pv = posOf(v);
+      const pf = posOf(fixed);
+      const m = seeded.get(mover)!;
+      if (!pv || !pf) continue;
+      if ((up && o >= 180) || (!up && o <= 0)) continue; // no room on the named side
+      const w = ((up ? o + u * (180 - Math.max(o, 0)) : Math.min(o, 180) * (1 - u)) * Math.PI) / 180;
+      const r = Math.hypot(m.x - pv.x, m.y - pv.y) || Math.hypot(pf.x - pv.x, pf.y - pv.y) || 1;
+      const side = (pf.x - pv.x) * (m.y - pv.y) - (pf.y - pv.y) * (m.x - pv.x) < 0 ? -1 : 1;
+      const phi = Math.atan2(pf.y - pv.y, pf.x - pv.x) + side * w;
+      seeded.set(mover, { x: pv.x + r * Math.cos(phi), y: pv.y + r * Math.sin(phi) });
+      return;
+    }
+  }
 }
 
 function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[] {
@@ -866,6 +993,12 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
      */
     if (s.kind === 'sign') {
       const atFn = (id: Id) => at.get(id) ?? null;
+      /** AN ORDER (#1621 D3, ADR-AG-216) — strict unless the student wrote ≤ / ≥ (`closed`). */
+      if (s.q.k === 'order') {
+        const q = orderQuantity(s.q, atFn, env, lineAtOf(c, env, atFn));
+        if (q === null) return true; // an operand not placed judges nothing, as below
+        return signHolds(s, q);
+      }
       if (s.q.k !== 'slope') {
         const q = circleQuantity(s.q, atFn, curveAtOf(c, env, atFn));
         if (q === null) return true; // an operand not placed (or a vacant circle) judges nothing, as below
@@ -927,13 +1060,6 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       }
       if (sides.some((x) => x === 0)) return false;
       return s.same ? sides.every((x) => x === sides[0]) : sides[0] !== sides[1];
-    }
-    /** A BOUND ON A LENGTH (#1622, ADR-AG-217). */
-    if (s.kind === 'length-bound') {
-      const a = at.get(s.a);
-      const b = at.get(s.b);
-      if (!a || !b) return true;
-      return inLengthBound(Math.hypot(b.x - a.x, b.y - a.y), s);
     }
     const p = at.get(s.id);
     if (!p) return true; // a selector about an absent point judges nothing
@@ -1266,6 +1392,43 @@ function cycledPairs(selectors: readonly Selector[], seed: number): Selector[] {
 }
 
 /** The seed this configuration resolved its discrete choices at (#1642) — what the locus walk must resolve them at too. */
+/**
+ * THE ANGULAR EXTENT OF AN ARC (#1622 E4, ADR-AG-220) — the one reading of an `ArcDef`, exported for its locks.
+ * `ccw` runs counter-clockwise from `from` to `to` (2-D's semicircle, B → A); with `away` the half whose middle is
+ * on the far side of the chord from that point (2-D's `bulgeRef`). `minor` / `major` are the shorter / longer way.
+ */
+export function arcOf(
+  id: Id,
+  def: ArcDef,
+  at: (id: Id) => Pt | null,
+  curveAt: (id: Id) => NumCurve | null,
+): FigureArc | null {
+  const circle = curveAt(def.circle);
+  const p = at(def.from);
+  const q = at(def.to);
+  if (!circle || circle.kind !== 'circle' || !p || !q) return null;
+  const { cx, cy, r } = circle;
+  if (Math.hypot(p.x - cx, p.y - cy) < 1e-12 || Math.hypot(q.x - cx, q.y - cy) < 1e-12) return null;
+  const start = Math.atan2(p.y - cy, p.x - cx);
+  const TAU = 2 * Math.PI;
+  let ccw = (Math.atan2(q.y - cy, q.x - cx) - start) % TAU;
+  if (ccw <= 1e-12) ccw += TAU;
+  let sweep = ccw;
+  if (def.pick === 'minor') sweep = ccw <= Math.PI ? ccw : ccw - TAU;
+  else if (def.pick === 'major') sweep = ccw > Math.PI ? ccw : ccw - TAU;
+  else if (def.away || def.toward) {
+    const w = at((def.away ?? def.toward)!);
+    if (!w) return null;
+    // The side of the chord p→q a point is on (the cross product's sign): the arc's middle on the other side of it
+    // (`away`), or on the same side (`toward`).
+    const side = (x: number, y: number) => (q.x - p.x) * (y - p.y) - (q.y - p.y) * (x - p.x);
+    const mid = start + ccw / 2;
+    const same = Math.sign(side(cx + r * Math.cos(mid), cy + r * Math.sin(mid))) === Math.sign(side(w.x, w.y));
+    if (same === Boolean(def.away)) sweep = ccw - TAU;
+  }
+  return { id, cx, cy, r, start, sweep, radii: def.radii === true };
+}
+
 export function choiceSeedOf(c: Construction, seed: number): number {
   return evaluate(c, seed).choiceSeed ?? seed;
 }
@@ -1462,6 +1625,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];
   const segments: FigureSegment[] = [];
+  const arcs: FigureArc[] = [];
   const construction: FigureConstruction[] = [];
   const vacant: Vacancy[] = [];
 
@@ -1561,8 +1725,6 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
    *    for «בצדדים שונים») is reflected across the line, keeping its distance;
    *  - inside / outside a ring: a free point on the wrong side of the boundary is drawn toward the ring's centroid, or
    *    pushed away from it, along its own ray (so the seed's direction still varies the figure);
-   *  - a bound on a length: a free end is slid along the segment's own ray to a length inside the window (a
-   *    seed-varied place in it, or past the one stated end by a fraction of it — no new magnitude, ADR-052).
    */
   /*
    * …and a ring of FIVE OR MORE free vertices (#1622, ADR-AG-217) starts SIMPLE: the sampled positions are kept and
@@ -1619,23 +1781,6 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
         // Inside: a fraction of the way out from the centroid along this ray; outside: past the farthest vertex.
         const r = s0.inside ? reach * (0.1 + 0.3 * frac) : reach * (1.5 + frac);
         seeded.set(s0.id, { x: cx + r * ux, y: cy + r * uy });
-      } else if (s0.kind === 'length-bound') {
-        const mover = seeded.has(s0.b) ? s0.b : seeded.has(s0.a) ? s0.a : null;
-        if (!mover) continue;
-        const anchor = posOf(mover === s0.b ? s0.a : s0.b);
-        const q = seeded.get(mover)!;
-        if (!anchor) continue;
-        const l = Math.hypot(q.x - anchor.x, q.y - anchor.y);
-        if (inLengthBound(l, s0)) continue;
-        const target =
-          s0.min !== undefined && s0.max !== undefined
-            ? s0.min + (s0.max - s0.min) * (0.2 + 0.6 * frac)
-            : s0.min !== undefined
-              ? (s0.min > 0 ? s0.min : 1) * (1.2 + frac)
-              : s0.max! * (0.2 + 0.6 * frac);
-        const ux = l > 1e-9 ? (q.x - anchor.x) / l : 1;
-        const uy = l > 1e-9 ? (q.y - anchor.y) / l : 0;
-        seeded.set(mover, { x: anchor.x + target * ux, y: anchor.y + target * uy });
       }
     }
   }
@@ -1671,6 +1816,22 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
     const want = v + (sel.greater ? mag : -mag);
     seeded.set(sel.id, sel.axis === 'x' ? { x: want, y: at0.y } : { x: at0.x, y: want });
   }
+  /**
+   * …and an ORDER seeds its measure INTO ITS REGION (#1621 D3, ADR-AG-216) — the #1071 lesson for a measure.
+   *
+   * «AB ≥ 10», «∢ABC ≥ 150°», «AB < BC» on a free figure are regions of the measure, and sample-and-reject is the
+   * wrong mechanism for a region: measured before this, a free triangle with «∢ABC ≥ 150°» was refused at seeds 0–2
+   * (no configuration inside the window held it) while seed 3 drew it — a satisfiable figure refused — and «AB ≥ 10»
+   * drew the ONE configuration the walk found at every seed. So where the seed put the measure on the wrong side, the
+   * sampler is told which side: one free end of a length moves along its own segment, one free ray of an angle turns
+   * about the vertex, to a value a seed-varied fraction into the region — relative to the bound, so it states no
+   * magnitude (ADR-052) and «הציגו תצורה אחרת» still moves it. A start, never a verdict: the solve may move it and
+   * the judge keeps the last word.
+   */
+  c.selectors.forEach((s0, i) => {
+    if (s0.kind !== 'sign' || s0.q.k !== 'order') return;
+    seedOrder(s0, s0.q, seeded, (id) => seeded.get(id) ?? pointAtId(c, env, id), env, 0.15 + 0.5 * jitter(seed, 1621 + i));
+  });
   /**
    * AN EXTENSION SEEDS ITS POINT PAST THE END (#1620, ADR-AG-208) — the #1071 lesson for `beyond`.
    *
@@ -1941,11 +2102,14 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
       // out of its declared domain is not an answer — the next attempt is tried. A SIGN about a free
       // direction is the same kind of preference over attempts (the seeding, applied to the result): a
       // root with the wrong sign is not the one the sentence names; the post-hoc check keeps the last word.
+      // The scale the figure was SAMPLED at (#1620 S7, ADR-AG-213): a whole-figure collapse takes a
+      // span-relative floor down with it, so the floor is never smaller than the start's.
+      const sampledScale = figureScale(solved.positionsAt(solved.toVec(seeded, env)), env, solved.syms);
       const admissible = (x: number[]) => {
         const e = solved.envAt(x);
         // An open bound is judged at the solver's resolution, never exactly (#1504): a radius the
         // givens drive to zero converges to ~1e-10 and must not read as positive.
-        const floor = openBoundFloor(solved.positionsAt(x), e, solved.syms);
+        const floor = openBoundFloor(solved.positionsAt(x), e, solved.syms, sampledScale);
         if (!solved.syms.every((sym) => inDomain(domains.get(sym) ?? {}, e[sym], floor))) return false;
         for (const sel of c.selectors) {
           if (sel.kind !== 'sign') continue;
@@ -2307,7 +2471,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
             id: o.id,
             label: { name: '', kind: 'circle' },
             curve: { kind: 'circle', cx: c0.x, cy: c0.y, r: radius },
-            stated: true,
+            // A sector's circle (#1622 E4) carries its points and is not drawn — the arc is.
+            stated: !o.hidden,
           });
         } else vacant.push({ id: o.id, reason: 'vacant' });
         break;
@@ -2346,7 +2511,19 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
        */
       case 'circle-thru': {
         const curve = circleThruCurve(o, at);
-        if (curve) curves.push({ id: o.id, label: { name: o.name ?? '', kind: 'circle' }, curve, stated: true });
+        if (curve) curves.push({ id: o.id, label: { name: o.name ?? '', kind: 'circle' }, curve, stated: !o.hidden });
+        else vacant.push({ id: o.id, reason: 'vacant' });
+        break;
+      }
+
+      /**
+       * A DRAWN ARC (#1622 E4, ADR-AG-220) — on the circle the figure resolved (the one the constraints were measured
+       * against), between the directions of its two ends. Its circle or an end absent, or an end at the centre, is a
+       * vacancy, never an arc drawn through a guess.
+       */
+      case 'arc': {
+        const arc = arcOf(o.id, o.def, at, curveAtOf(c, env, at));
+        if (arc) arcs.push(arc);
         else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
@@ -2365,6 +2542,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
     points,
     curves,
     segments,
+    arcs,
     construction,
     vacant,
     unsatisfied,

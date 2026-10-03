@@ -1067,6 +1067,35 @@ seeded positions are SWAPPED. After the solve, a converged solution with the pai
 swapped restart (`swappedStarts`) beside the deflation restarts of ADR-AG-159 — the kite's B and D are
 interchangeable roots, so the swap is one polish away. The post-hoc judge keeps the last word.
 
+### An order between measures ([ADR-AG-216](06c-decisions-analytic.md#adr-ag-216), #1621 D3)
+
+**The data.** «AB < BC», «AB ≤ 10», «∢ABC < ∢BAC», «זווית ABC קהה» lower to `sign {q: {k: 'order', left, right}, positive, closed?}`, a selector (D7 kind 2) over `left − right`.
+- Each side is an `OrderSide`: a `length` (`LengthExpr`, with segments and areas only), a three-letter `angle` (in degrees), or a `value`.
+- `positive` means the left side is the larger.
+- `closed` admits zero (≤ ≥ «לפחות» «לכל היותר»).
+- Acuteness is the order against 90°.
+- A window is two orders.
+
+**The parser.** `parseOrder` (`parseAnalytic.ts`) runs right after `parseCompare`.
+- It reads the symbolic operators, the Hebrew «גדול/קטן מ-» and «לפחות/לכל היותר», and the English "greater/less/longer/shorter than" and "at least/at most".
+- Each side goes through the length reader with role nouns (`lengthRoles`), so it means what it means in «AB = …».
+- It declines a lone vertex, a point-to-line distance, two values, and «פי».
+- It refuses a length beside an angle (`bad-operand`).
+
+**The judge.** `orderQuantity` (`evaluate.ts`) measures each side with the `length-eq` and `angle` residuals' own readers (`evalLengthExpr`, `angleAt`). A difference within `SOLVE_RESOLUTION`·max(1, |l|, |r|) of zero is on the boundary. `signHolds` is the one test the judge and the seeding share.
+
+**The seeding.** `seedOrder` runs after the coordinate-compare seeding. Where the seeded start violates the order, it moves one free point of the first side that has one:
+- a single length's free end slides along the segment;
+- an angle's free ray turns about the vertex, keeping its length and its side.
+
+The point moves to a value a seed-varied fraction `u ∈ [0.15, 0.65]` into the region, relative to the other side. The judge keeps the last word.
+
+**Minting.** `mintedByReference` treats an order whose sides are plain lengths, angles or values as a minting form (`orderMints`), as its equality twin is.
+
+**Apply.** The selector's refs are every point either side measures (`lengthRefs`, the angle's three letters).
+
+**`HE_POINT`.** The subject token reads `ה?(?:נקוד(?:ה|ות)|קו?דקוד)`. The coordinate rules (`HE_COORD`, `HE_RHS_COORD`, `COMPONENT_HE`), `BISECTORS_MEET_HE` and `PERP_FOOT_HE` use it instead of an inline «ה?נקודה».
+
 ## Born after the chassis
 
 This is the **first builder created after `shell/` existed**, and the difference shows in what it did
@@ -2182,6 +2211,47 @@ called, never re-implemented in the test.
 
 The missing points are added as `free` objects and the line's facts are re-applied; then the fixpoint runs again. This applies beside an unnamed centre too (#1686). A `perpendicular` (the cevian's own half) is not a minting form, so «AD גובה לצלע BC» stays refused. The cevian's triangle form states «משולש ABC» first (`clauseFacts`).
 
+## The two tangents meet; the meet verbs; a floor that does not collapse with the figure ([ADR-AG-213](06c-decisions-analytic.md#adr-ag-213), #1620 S7)
+
+**No new object.** Every spelling lowers (`viaCanonical`) to the canonical crossing «D נקודת החיתוך של המשיק למעגל O בנקודה A עם המשיק למעגל O בנקודה C», whose operands are the tangent noun (`readTangentNoun` → `on-curve(D, tangent-<at>)`, the tangent built by `tangent-line-at`, the circle stated by `statingNamedCircle`). D stays a free point with two incidences, solved like every other crossing.
+- `readTangentNoun` accepts the circle phrase after the point (`TANGENT_CIRCLE_HE` / `_EN`), never on both sides.
+- `intersectionSpellings`' two-operand meet takes `MEET_VERB_HE` (נחתכ/נפגש/מצטלב × ים/ות), `AT_POINT_HE`, and English meet/intersect/cross. `sharedCircle` writes a circle said once onto both tangent operands; one touch point twice is `repeated-vertex`.
+- `tangentsMeet` (called first in `intersectionSpellings`) reads the plural «המשיקים … בנקודות A ו-C …» into the two singular tangents, and the bare plural into `crossing-kind { kind: 'tangent', pieces: true }`.
+- M1's `crossing-kind` arm selects tangent objects with `isTangentObject` (the «המשיק» test) for `kind: 'tangent'`; `pieces` adds a `segment` from each tangent's `through` to the crossing. Not exactly two is `noHost(…, 'line', n, 2)`.
+
+**The open-bound floor keeps the sampled scale.** `openBoundFloor(at, env, syms, sampled)` is `SOLVE_RESOLUTION × max(figureScale(at, env, syms), sampled)`. Stage two's `admissible` passes the scale of the seeded start (`figureScale` of the seeded positions and sampled parameters). A descent that shrinks the whole figure toward a point therefore meets the bound at the start's scale, not at its own vanishing span. The other callers (`fitCreatedShapes`) pass nothing and judge as before.
+## A Greek angle name is a parameter; tan and cos are measures of the angle ([ADR-AG-215](06c-decisions-analytic.md#adr-ag-215), #1621)
+
+- **The alias is a symbol.** `expr.ts`'s `SYMBOL_RE` admits one lowercase Greek letter beside the Latin ones, π excepted: π is the constant. «∢ABC = α» lowers to the existing `angle` row with `value: α`, and the register (`paramRegister`, #1343) makes α a free DOF from the constraint's own expression. 2-D labels the measured angle instead (`measure-angle` with a variable). The freedom is the same: an alias on a free figure leaves it exactly as free.
+- **The sampler reads the range a use implies.** `carriers.ts` `impliedRange` reads the stated `angle` rows that hold a symbol LINEARLY (tested numerically, three evaluations — no CAS). In degrees that is 0°–180°, as a cosine −1…1. `sampleEnv` narrows the stated domain by it (`narrowedDomain`). It is never a declaration: `paramRegister`'s domains filter a pin's roots and print in the panel, and this range adds nothing a root does not already satisfy. Without it a free α was sampled at 1°–4°.
+- **The pin is a constraint.** «α = 30» is `param-eq` (`solve.ts`): residual `(env[sym] − value)`, relative to the value, no point refs. It is solved with everything else, so a contradiction is `unsatisfiable` on its line, never a re-reading. The parse rule (`parseParamValue`) admits a Greek symbol only. A Latin pin keeps its standing refusal (#1432 «r=5», parser.test «a = 5»).
+- **tan and cos ride the `angle` row** as `measure?: 'tan' | 'cos'`. One row keeps refs, identity (`canonicalConstraint`), the ask lane's "stated angle" test and the vertex resolver (`vertex-angle.rhs.measure`) single. The residuals have no pole and one root on 0°–π:
+  - tan: `(sin θ − t·cos θ)/√(1+t²)` = sin(θ − atan t), the slope row's `dy = m·dx` choice;
+  - cos: `(cos θ − c)/2`, with no root when |c| > 1.
+  - sin has two roots there (θ and π − θ), a discrete choice this row does not carry, so it is not parsed.
+- **«נסמן» is a frame lead-in** (`frameAnalytic` `UNWRAP`), like «נתון:». The clause after it must parse on its own, so «נסמן את שטח ABCD ב-S» stays unread.
+## Measures as givens: the ratio of two measures and the area notation ([ADR-AG-214](06c-decisions-analytic.md#adr-ag-214), #1621)
+
+No new constraint kind and no new solver: every form lowers to the `length-eq` that «AB = 10», «AB = AC» and «שטח ABC גדול פי 3 משטח CEF» already use (`engine/lengths.ts`).
+
+- **The area notation is a rewrite.** `areaNotation` (`engine/lengths.ts`) turns `S_{ABC}` and `S_ABC` (three or more vertex names) into «שטח ABC». It runs in two places, both calling the one function: `orthography` (`parser/frameAnalytic.ts`), so every rule reads «S_{ABC} = 13» as «שטח ABC = 13»; and `readLength`, so the ask lane, which hands a bare measure to `parseLengthExpr`, reads it too. This is the `d_{AB}` → «המרחק בין A ל-B» pattern (#1128).
+- **The prose ratio is a rewrite into an equation.** `ratioAsEquation` (`parser/parseAnalytic.ts`, called first by `asEquation`) reads «היחס בין X ל-Y הוא v» and "the ratio of X to Y is v". It tries every join («לבין», «ובין», «ל-», «ל», "to", "and") and takes the first split where both sides parse as measures through `parseLengthExpr`. A value `p:q` becomes `q·X = p·Y`; any other value `r` becomes `X = r·Y`. The divider spelling «היחס בין AC ל-CB הוא 3:2» is `parseDividesInRatio`'s and is read earlier.
+- **English area words.** `AREA_EN` is no longer case-insensitive: a noun word is a letter followed by lowercase letters, so it cannot swallow the vertex run. `AREA_TOKEN` consumes "the" in front of "area of", so the article is never read as symbols.
+- **Refusals come from the existing paths.** A ratio that cannot hold is `unsatisfiable` on its line (the submit gate and `derive`). A region whose vertex is missing is `unknown-reference` naming the vertex (`apply`'s reference check).
+## Arcs, sectors and the diameter from a point ([ADR-AG-220](06c-decisions-analytic.md#adr-ag-220), #1622 E4)
+
+**One constraint for every arc measure.** `arc-sum` (`engine/solve.ts`): Σ kᵢ·⌢(aᵢbᵢ) = value in degrees, each arc the unsigned angle at the centre of its RESOLVED circle (`curveAt(circle)` — the circle is a curve ref, its ends are the point refs) between the radii to its ends; the residual is the sum less the value, in radians over π. A value, a ratio (moved to the left: ⌢DE − 2⌢CE = 0), an equality and a sum are the same kind, and no centre letter is read — the ADR-AG-195 / ADR-AG-203 discipline. The parser's `arc-of { circle?, terms, value }` (`parseArcMeasure`: the circle reference removed wherever it sits, «שווה ל» before an arc and a copula before a number read as `=`, each side split into `k·arc` terms and at most one number; a lone reflex value becomes k·(360 − v)) is lowered at M1: `arcHost` resolves the circle (the name chain, `statingNamedCircle` for a named circle the figure lacks, else the ONE circle — `noHost` otherwise), the ends must exist (`unknownRef`), `onCircle` adds the `on-curve` of each end the circle does not already carry (a defining point, a stated incidence, its centre), then the constraint.
+
+**A drawn arc is an object.** `GeoObject` `arc { def: ArcDef }`, `ArcDef = { circle, from, to, pick: 'ccw' | 'minor' | 'major', away?, toward?, radii? }`. No freedom (`carrierOf` null, `symbolDeps` []), `objectDeps` its circle, ends and side point. `evaluate`'s `arcOf` reads the resolved `NumCurve` and the placed ends: `start` the angle of `from`, `sweep` the counter-clockwise turn to `to`, or the shorter / longer one, or — with `away` / `toward` — the half whose middle is on the far / near side of the chord from that point; a missing circle or end, or an end at the centre, is a vacancy. `Figure.arcs` (optional: a figure built by hand has none) → `Scene.arcs` (sampled in world space, then projected, so the Y-flip needs no second convention; with `radii` the path runs centre → arc → centre) → one `<path>` per arc in the curve layer. The circles under arcs are `hidden`: `circle-at` / `circle-thru` carry the flag and evaluate to `stated: false`, the created equation circle is minted `stated: false` (`createdCircleFacts(id, src, hidden)`, which `touchedCircleFacts` now calls) — so the canvas, the crossing markers and the panel skip them while every incidence still binds to them. `applyStatement` un-hides a hidden circle a later creation sentence states (`unhidden`).
+
+**The shapes, lowered.**
+- Semicircle (`semicircleFacts`, parser): `declare` both ends, `circle-thru diameter` (`diameterCircleId`, hidden), `arc { ccw from b to a }` (2-D's direction) plus `away` / `toward` the ring's first other vertex when a shape is named (the shape's own facts first, `namedShapeFacts`), and the segment. «על כל צלע» repeats it over every side of the ring, without the segments (the sides are drawn).
+- Sector (`sector` fact, M1): with a centre letter `v`, the circle `circleByName(v)` or a new hidden `circle-at-v` (free radius `r_v` > 0); the ends declared and put on it, `distinct`, `angle { v, a, b }` (the value, or 360 − value with `pick: 'major'`), the segments `va`, `vb`, the minor/major arc. With none (the bare quarter circle), `createdCircleFacts('circle-sector-<ab>', hidden)`, the ends on it, `relation perpendicular` between their radius directions (any other value: `arc-sum`), the arc with `radii`.
+- Arc midpoint (`arc-mid`, M1): `declare` the ends and M, each on the circle, `distinct` ends, `arc-sum` ⌢(aM) − ⌢(Mb) = 0, and the `sign` selector over `arc-side` (minor: negative) — two roots, the region picks one.
+
+**The diameter from a point** lowers to the existing `diameter-of` with the far end a tool placeholder (`toolPoint('diameter-end', F)`); `TOOL_LETTERS` gains `end` `ABCDEGHIJKLMNPQRSTUVWXYZ` and `diameter-end` `DEGHIJKLMNPQRSTUVWXYZ` (no F, no O); `app/rename.ts` `diameterNamingCandidates` names it after the fact as «FD קוטר במעגל O» (the same `diameter-of`, so `materialize`'s fold-equality proof accepts it). The cut form emits `on-kind` (F on the circle), `declare E`, `on-line-2pt(E; F, centre)`, `on-line-2pt(E; a, b; bounded, crossing)` + `between` for a side, and the segment FE — the centre the circle's letter, or `CENTRE_SENTINEL` inside a `via-centre` for the contextual circle. «מעגל O בקוטר 10» is re-read as «מעגל O שרדיוסו 5» (`parseCircleByDiameter`), so it inherits that sentence's every behaviour.
+
+**Order.** `parseArcFamily` runs first in `parseClauseRules` after the parameter and coordinate-compare readers, before the circle, midpoint and constraint rules that would each claim a piece of «M אמצע הקשת BC» or «קשת AB = 40».
 ## Shapes and points 2-D reads ([ADR-AG-217](06c-decisions-analytic.md#adr-ag-217), #1622 E1)
 
 **Lowering, not a second grammar.** `parseShapesAndPoints` (`parser/parseAnalytic.ts`, tried right after the coordinate comparisons) holds one rule per 2-D sentence, each 2-D's regex copied. Almost every rule ends in `lowered(line, sentences, toolVertices)`: the canonical sentences the line means («ריבוע ABCD» + «AB = 1»; «הקטע AC» + «E מחלקת את AC ביחס 40:60»; «D על AB» + «AD = 3»; «הקטע AE» + «B על הקטע AE»), parsed by `parseClause` and re-attributed to the student's line. A canonical sentence the grammar cannot read leaves the line unread; one it refuses refuses the line with the student's words.
@@ -2190,7 +2260,7 @@ The missing points are added as `free` objects and the line's facts are re-appli
 
 **Regular polygons are constructed.** `ShapeRow.regular = n`; `shapeDeclaration` (the one lowering of a declared shape, also used by `namedShapeFacts`) emits `declare` v0, v1, then `derived regular-vertex { a: v0, b: v1, n, k }` for every other vertex — the closed form walks the ring turning 360°/n counter-clockwise from the side v0→v1 — then the polygon and its `distinct` selector. `givens` is empty for these rows and `isGenericNoun` excludes them. A vertex already in the figure takes the derivation as a condition (`derived-at`).
 
-**Three regions** (`Selector`, judged in `failingSelectors`, seeded in the #1071 block): `line-side { ids, a, b, same }` (signed distance to the line, zero within the visible resolution `apart`); `in-polygon { id, ring, inside, closed? }` (`ringRegion`: boundary within `apart`, else even-odd; the boundary is inside only when `closed`); `length-bound { a, b, min?, max?, minStrict?, maxStrict? }` (`inLengthBound`, at `SOLVE_RESOLUTION`). Seeding reflects a wrong-side subject across the line, moves a free point along its ray from the ring's centroid, and slides a free end to a seed-varied length in the window. A polygon of five or more all-free vertices is seeded star-shaped: its sampled positions are handed out in angular order about their centroid, so the ring starts simple (quadrilaterals and triangles keep their old start).
+**Two regions** (`Selector`, judged in `failingSelectors`, seeded in the #1071 block): `line-side { ids, a, b, same }` (signed distance to the line, zero within the visible resolution `apart`); `in-polygon { id, ring, inside, closed? }` (`ringRegion`: boundary within `apart`, else even-odd; the boundary is inside only when `closed`). A bound on a length is not here: it is ADR-AG-216's `order` quantity, and E1 only adds the word window «AB בין 5 ל-9» to `parseOrder` (`ORDER_BETWEEN` → `windowFacts`). Seeding reflects a wrong-side subject across the line, moves a free point along its ray from the ring's centroid. A polygon of five or more all-free vertices is seeded star-shaped: its sampled positions are handed out in angular order about their centroid, so the ring starts simple (quadrilaterals and triangles keep their old start).
 
 **Inscribed in a triangle.** `engine/inscribe.ts` is 2-D's `inscribePlacements` (copied): shared letters anchor, riders are spread over the sides between anchors, both directions and (with no anchor) every rotation, deduplicated. The lowering states the triangle and the shape by their own sentences, then a `choice` of `all(on-line-2pt { bounded })` per placement, and a closed `in-polygon` on the triangle per rider (on a side's line and in the closed convex triangle is on the side).
 
