@@ -50,7 +50,8 @@ import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } fr
 import type { Construction3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind } from './types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3,
-  bisectorDir3} from './vec3';
+  bisectorDir3,
+  lineCrossing3} from './vec3';
 import { quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
@@ -3046,6 +3047,13 @@ function evaluateSolidsAndPoints(
         }
         pos.set(id, lerp3(A, B, (lo + hi) / 2));
       }
+    } else if (def.kind === 'seg-cross') {
+      // #1728: where two named segments' lines cross. Left unplaced when they are parallel — derive3 then
+      // refuses the line naming the two segments, rather than a point drawn somewhere arbitrary.
+      const [A1, B1, A2, B2] = [def.a1, def.b1, def.a2, def.b2].map((p) => pos.get(p));
+      if (!A1 || !B1 || !A2 || !B2) continue;
+      const X = lineCrossing3(A1, B1, A2, B2);
+      if (X) pos.set(id, X);
     } else if (def.kind === 'foot-seg') {
       // V8-g: a triangle altitude's foot — ⟂ from `from` onto the line through a,b
       const from = pos.get(def.from);

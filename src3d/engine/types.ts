@@ -464,9 +464,9 @@ export interface Centroid3Command {
 
 /**
  * `E מפגש האלכסונים של הפאה ABCD` / `E is the intersection of the diagonals of face
- * ABCD` (V8-a) — the diagonal crossing of a parallelogram face/base = the midpoint of
- * a diagonal (EXACT for the box/cube faces & square/rect/parallelogram bases this
- * curriculum names; a general quad's crossing ≠ midpoint — filed). `face` = the 4
+ * ABCD` (V8-a) — the crossing of the face's two diagonals (1st↔3rd and 2nd↔4th cyclic vertices).
+ * #1728: it is the `seg-cross` point of the two, not the midpoint of the first — the midpoint was exact
+ * only for a parallelogram, and a general quad's crossing sat off its second diagonal. `face` = the 4
  * cyclic vertices, or `[]` = the "the base" sentinel (resolved by apply to the single
  * solid's base ring, the ADR-3D-011 chokepoint pattern).
  */
@@ -474,6 +474,21 @@ export interface DiagIntersectionCommand {
   type: 'diag-intersection';
   id: Id;
   face: Id[];
+}
+
+/**
+ * #1728 — the point where two NAMED segments meet: «האלכסונים AC ו-BD נפגשים בנקודה E». The crossing of
+ * the lines a1–b1 and a2–b2 (`seg-cross`), with both segments drawn. That the two segments really meet —
+ * coplanar, not parallel, crossing inside both — is a property of the figure, checked by `derive3`
+ * (`segments-do-not-meet`), never assumed.
+ */
+export interface SegCrossingCommand {
+  type: 'seg-crossing3';
+  id: Id;
+  a1: Id;
+  b1: Id;
+  a2: Id;
+  b2: Id;
 }
 
 /**
@@ -982,6 +997,7 @@ export type Command3 =
   | Segment3Command
   | Centroid3Command
   | DiagIntersectionCommand
+  | SegCrossingCommand
   | QuadDiagonalsCommand
   | PointInSpanCommand
   | ClaimCommand
@@ -1162,6 +1178,8 @@ export type PointDef =
   | { kind: 'line-plane'; line: string; plane: string }
   | { kind: 'plane-cut'; plane: string; a: Id; b: Id } // V8-b (G2): a plane ∩ segment a–b
   | { kind: 'foot-face'; from: Id; face: Id[] } // V8-e (G5): foot of ⟂ from a vertex onto a face's plane
+  // #1728: where the lines a1–b1 and a2–b2 cross (the midpoint of their closest approach; derive3 checks they meet)
+  | { kind: 'seg-cross'; a1: Id; b1: Id; a2: Id; b2: Id }
   // V8-f (G11): D on segment a–b, its t root-found so ray apex→D bisects ∠(a)(apex)(b)
   | { kind: 'bisector-seg'; a: Id; b: Id; apex: Id }
   /** #343: a FREE rider on the bisector ray of ∠a·apex·b — one sampled DOF (how far along the ray). */
@@ -1397,7 +1415,7 @@ export interface Construction3 {
 export const hasFreePoint3 = (c: Construction3): boolean => [...c.points.values()].some((def) => def.kind === 'free3');
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-export const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'bisector-ray', 'foot-seg', 'reflect-line', 'parallelogram-point', 'scaled-offset', 'right-pyramid-apex', 'right-apex', 'free3']);
+export const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'seg-cross', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'bisector-ray', 'foot-seg', 'reflect-line', 'parallelogram-point', 'scaled-offset', 'right-pyramid-apex', 'right-apex', 'free3']);
 
 /**
  * #1498 — DOES THE PIVOT'S GAUGE APPLY TO THIS POINT? Asked in ONE place.
@@ -1709,6 +1727,9 @@ export type EngineError3 =
   // student pointed at an edge, so a crossing beyond its endpoints is not on the figure — refuse
   // honestly rather than silently extending their segment into a line (which is what used to happen).
   | { code: 'crossing-off-segment'; id: Id }
+  // #1728: two named segments a stated meeting point should lie on do not meet — skew, parallel, or
+  // crossing outside the drawn ink. Names the student's two segments and the point.
+  | { code: 'segments-do-not-meet'; id: Id; s1: string; s2: string }
   | { code: 'symbolic-new-point'; id: Id } // a NEW point with symbolic components is under-determined
   // #898: a coordinate POWER on a figure with no solid — nothing for the solver to pin the exponent
   // in, and this lane's degree-1 storage would silently drop it. Refused by name, never dropped.

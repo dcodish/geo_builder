@@ -91,9 +91,8 @@ describe('#530 — the PROPERTY, not the two strings: id is never sourced positi
 
   it('the NO-marker forms keep the positional reading (point-first is not affected)', () => {
     expect(cmds('O מפגש האלכסונים של הפאה ABCD')).toEqual([{ type: 'diag-intersection', id: 'O', face: ['A', 'B', 'C', 'D'] }]);
-    expect(cmds('O = intersection of diagonal AC with diagonal BD')).toEqual([
-      { type: 'point-on-segment3', id: 'O', a: 'A', b: 'C', t: 0.5 },
-    ]);
+    // #1728: two named diagonals lower to both of them and their crossing (no longer the first one's midpoint)
+    expect(cmds('O = intersection of diagonal AC with diagonal BD')).toEqual([{ type: 'segment3', a: 'A', b: 'C', diagonal: 'any' }, { type: 'segment3', a: 'B', b: 'D', diagonal: 'any' }, { type: 'seg-crossing3', id: 'O', a1: 'A', b1: 'C', a2: 'B', b2: 'D' }]);
   });
 });
 

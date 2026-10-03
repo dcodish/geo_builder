@@ -1450,9 +1450,9 @@ const AT_POINT = String.raw`בנקוד[הת]\s*`;
 /**
  * `E מפגש האלכסונים של הפאה ABCD` / `O נקודת חיתוך אלכסוני הבסיס` / `O = intersection
  * of diagonal AC with diagonal BD` (V8-a, G3) — the diagonal crossing of a
- * parallelogram face/base. Three forms: a NAMED quad (4 cyclic vertices → the crossing
- * is the midpoint of the 1st & 3rd), TWO explicit diagonals (→ midpoint of the first),
- * or the implicit `the base` (0 vertices → the base sentinel, resolved by apply).
+ * face/base. Three forms: a NAMED quad (4 cyclic vertices → the crossing of the 1st↔3rd and
+ * 2nd↔4th diagonals), TWO explicit diagonals (→ both drawn and claimed, and their crossing —
+ * #1728), or the implicit `the base` (0 vertices → the base sentinel, resolved by apply).
  */
 const diagIntersection: Rule = (s) => {
   if (!/אלכסו[ןנ]|diagonal/i.test(s)) return null;
@@ -1498,9 +1498,18 @@ const diagIntersection: Rule = (s) => {
     .map((r) => r.match(TOKEN) ?? [])
     .filter((g) => !(g.length === 1 && g[0] === id));
   if (rest.length === 4 && groups.length === 2 && groups.every((g) => g.length === 2)) {
-    const [a, b] = groups[0]; // two explicit diagonals — the crossing is on the first, a–b
+    // #1728 — TWO NAMED DIAGONALS are read as named: each pair is drawn and carries the diagonal claim
+    // (ADR-3D-203's `segment3 {diagonal}`, judged at apply and again by the verifier), and the point is
+    // where THEY cross (`seg-crossing3`). This used to lower to the midpoint of the first pair alone —
+    // the second pair and the meeting dropped, and a parallelogram assumed — so «האלכסונים AB ו-CD
+    // נפגשים בנקודה E» on the quad ABCD put E halfway along the side AB, green. The 2-D twin is ADR-569.
+    const [[a1, b1], [a2, b2]] = groups;
     if (new Set(rest).size !== 4 || rest.includes(id)) return null;
-    return [{ type: 'point-on-segment3', id, a, b, t: 0.5 }];
+    return [
+      { type: 'segment3', a: a1, b: b1, diagonal: 'any' },
+      { type: 'segment3', a: a2, b: b2, diagonal: 'any' },
+      { type: 'seg-crossing3', id, a1, b1, a2, b2 },
+    ];
   }
   if (rest.length === 4) return [{ type: 'diag-intersection', id, face: rest }]; // named quad, cyclic
   if (rest.length === 0) return [{ type: 'diag-intersection', id, face: [] }]; // `the base` sentinel

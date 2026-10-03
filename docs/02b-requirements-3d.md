@@ -361,7 +361,11 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   of the same kind: «אלכסון AB» / «אלכסון ראשי AB» is checked at the apply moment when one solid can judge
   it, and **again on the final figure** for every solid that holds both letters — a pair no solid holds
   stays unjudged, never refused ([ADR-3D-203](06b-decisions-3d.md#adr-3d-203),
-  [ADR-3D-246](06b-decisions-3d.md#adr-3d-246)).
+  [ADR-3D-246](06b-decisions-3d.md#adr-3d-246)). The claim travels with the noun into every sentence that
+  names pairs after it: «האלכסונים AC ו-BD נפגשים בנקודה E» draws and claims both pairs, and E is where the
+  pairs **the sentence names** meet — never a midpoint of one of them, and never a parallelogram the student
+  did not state. Two named segments that do not meet in the figure are refused, naming both
+  ([ADR-3D-297](06b-decisions-3d.md#adr-3d-297), #1728; the 2-D twin is ADR-569).
 - **FR-CL-2a (Must)** — **A segment RATIO is one notation with two separators.** «BE/ED = 1:3» and
   «BE:ED = 1:3» are the same statement and are read identically, in every combination of the two
   separators and with a bare number on the right («AB/BC = 2»); `/` is how a textbook writes it. A
