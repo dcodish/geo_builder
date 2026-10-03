@@ -27,7 +27,7 @@
  * representation, not two.
  */
 import type { DerivedRule, FootLine } from './derived';
-import type { AngleName, Constraint, Direction, TangentLineRef } from './solve';
+import type { AngleName, AngleRef, Constraint, Direction, TangentLineRef } from './solve';
 import type { Expr } from './expr';
 import type { LengthExpr } from './lengths';
 import { lineIdOf, numeralCurveId } from './names';
@@ -245,7 +245,8 @@ export type Fact =
   | (FactBase & {
       t: 'vertex-angle';
       left: AngleName;
-      rhs: { t: 'value'; value: Expr } | { t: 'angle'; of: AngleName; k: Expr };
+      /** `measure` (#1621, ADR-AG-215): «tan∢A = 2» — the `angle` constraint's measure, carried to it unchanged. */
+      rhs: { t: 'value'; value: Expr; measure?: 'tan' | 'cos' } | { t: 'angle'; of: AngleName; k: Expr };
     })
   /**
    * A CEVIAN WHOSE TARGET ONLY THE FIGURE KNOWS (#1240, #1222; ADR-AG-209) — «AD גובה», «תיכון מנקודה A»,
@@ -317,7 +318,8 @@ export type Fact =
    */
   | (FactBase & { t: 'diagonal-eq'; principal: boolean; eq: Expr })
   /** «נתון מעגל O» — a circle on a centre point, with a radius parameter (#1060). */
-  | (FactBase & { t: 'circle-at'; id: Id; centre: Id; r: Expr })
+  /** `hidden` (#1622 E4, ADR-AG-220): the circle a SECTOR is cut from — it carries the arc's ends, and only the arc is drawn. */
+  | (FactBase & { t: 'circle-at'; id: Id; centre: Id; r: Expr; hidden?: true })
   /**
    * «דרך P עובר ישר מקביל ל AB» — a line through a point, with a copied direction (#1093).
    *
@@ -335,7 +337,28 @@ export type Fact =
    * «מעגל ABD» · «המעגל העובר דרך A, B ו-D» · «נתון מעגל שקוטרו BD» — a circle COMPUTED from points
    * (#1464, #1324, ADR-AG-160). `name` is the student's own name for it, absent for an anonymous one.
    */
-  | (FactBase & { t: 'circle-thru'; id: Id; def: CircleDef; name?: string })
+  /** `hidden` (#1622 E4, ADR-AG-220): the circle a SEMICIRCLE is half of — it carries its points, only the half is drawn. */
+  | (FactBase & { t: 'circle-thru'; id: Id; def: CircleDef; name?: string; hidden?: true })
+  /**
+   * A DRAWN ARC of a circle the figure holds (#1622 E4, ADR-AG-220) — a semicircle, a quarter circle, a sector's
+   * arc. Decoration over objects that exist: the circle carries the points, this says which part of it is drawn.
+   */
+  | (FactBase & { t: 'arc'; id: Id; def: ArcDef })
+  /**
+   * «קשת AB = 40 במעגל O» · «⌢{AC} = 60°» · «קשת DE = 2 קשת CE» · «קשת AC + קשת BE = קשת AD + קשת BC» — an
+   * ARC-MEASURE given (#1622 E4, ADR-AG-220; 2-D's `arcValue` / `arcEquality` / `measureSum`, ADR-116). An arc's
+   * measure IS its central angle, so this is Σ kᵢ·⌢(aᵢbᵢ) = value. WHICH circle is M1's question (the named one —
+   * stated when the figure lacks it, ADR-AG-210 — or the one circle); the arc's ends are ON it.
+   */
+  | (FactBase & { t: 'arc-of'; circle?: string; terms: Array<{ k: Expr; a: Id; b: Id }>; value: Expr })
+  /** «M אמצע הקשת BC במעגל O» (#1622 E4) — the midpoint of the arc BC (the minor one unless «הגדולה»). */
+  | (FactBase & { t: 'arc-mid'; id: Id; a: Id; b: Id; circle?: string; major?: true })
+  /**
+   * «גזרה AOB בזווית 80» · «רבע מעגל» (#1622 E4, ADR-AG-220) — a SECTOR: two radii and the arc between them. With a
+   * centre letter (`v`), the circle on that centre (bound when the figure has it, else stated hidden); with none
+   * (the bare quarter circle), a circle of its own with its centre unnamed. `value` is the central angle.
+   */
+  | (FactBase & { t: 'sector'; v?: Id; a: Id; b: Id; value?: Expr })
   /**
    * «BD קוטר במעגל» — a diameter, stated about a circle that may or may not exist yet (#1324).
    *
@@ -420,8 +443,11 @@ export type Fact =
    * WHICH two objects is a question about the construction, so M1 answers it: exactly two of the
    * kind lower to the two incidences the spelled-out sentence would carry, anything else refuses
    * `ambiguous-shape` — the `on-kind` rule, one arity up.
+   *
+   * `tangent` (#1620 S7, ADR-AG-213): «המשיקים נפגשים בנקודה D» — the two TANGENT objects; `pieces` also draws
+   * each touch point's piece to the crossing, as 2-D draws it.
    */
-  | (FactBase & { t: 'crossing-kind'; id: Id; kind: 'line' | 'circle' })
+  | (FactBase & { t: 'crossing-kind'; id: Id; kind: 'line' | 'circle' | 'tangent'; pieces?: true })
   /**
    * «הנקודה A נמצאת על האליפסה» — a point on a curve named only by its KIND (#1057).
    *
@@ -641,7 +667,7 @@ export type GeoObject =
    * It carries NO freedom itself: the centre is a `free` point with its own two degrees, and the
    * radius is an ordinary parameter in the register. Counting it here would count both twice.
    */
-  | { kind: 'circle-at'; id: Id; centre: Id; r: Expr }
+  | { kind: 'circle-at'; id: Id; centre: Id; r: Expr; hidden?: true }
   /**
    * «דרך P עובר ישר מקביל ל AB» — a line CONSTRUCTED through a point, copying a direction (#1093).
    *
@@ -681,7 +707,21 @@ export type GeoObject =
    * Three collinear points, or a diameter whose ends coincide, have no circle: a VACANCY at that
    * configuration, never a circle drawn through a guess.
    */
-  | { kind: 'circle-thru'; id: Id; def: CircleDef; name?: string };
+  | { kind: 'circle-thru'; id: Id; def: CircleDef; name?: string; hidden?: true }
+  /**
+   * A DRAWN ARC (#1622 E4, ADR-AG-220) — which part of a circle the figure draws. No freedom and no expression: its
+   * circle and its ends are objects counted where they live; it only says what is inked.
+   */
+  | { kind: 'arc'; id: Id; def: ArcDef };
+
+/**
+ * WHICH PART OF A CIRCLE AN ARC IS (#1622 E4, ADR-AG-220), from `from` to `to` on `circle`:
+ * - `ccw` — counter-clockwise from `from` to `to` (2-D's semicircle, B → A); with `away`, the half on the far side
+ *   of the chord from that point («מחוץ למשולש ABC»), 2-D's `bulgeRef`; with `toward`, the half on its side («בתוך»).
+ * - `minor` / `major` — the shorter / longer arc between the two ends (a sector, by its angle).
+ * `radii` draws the two bounding radii with it (a sector whose centre has no letter, so no segment can name them).
+ */
+export type ArcDef = { circle: Id; from: Id; to: Id; pick: 'ccw' | 'minor' | 'major'; away?: Id; toward?: Id; radii?: true };
 
 /**
  * How a computed circle is determined (#1464, #1324).
@@ -721,14 +761,15 @@ export const isCurve = (o: GeoObject): o is CurveObject => o.kind === 'curve';
  * was silently treated as naming an object and collided with the point it merely mentions. A
  * positive list gets the new kind wrong in the safe direction: excluded until it says otherwise.
  */
-export type NamingFact = Extract<Fact, { t: 'point' | 'curve' | 'derived' | 'segment' | 'polygon' | 'circle-thru' }>;
+export type NamingFact = Extract<Fact, { t: 'point' | 'curve' | 'derived' | 'segment' | 'polygon' | 'circle-thru' | 'arc' }>;
 export const namesObject = (f: Fact): f is NamingFact =>
   f.t === 'point' ||
   f.t === 'curve' ||
   f.t === 'derived' ||
   f.t === 'segment' ||
   f.t === 'polygon' ||
-  f.t === 'circle-thru';
+  f.t === 'circle-thru' ||
+  f.t === 'arc';
 
 /**
  * The id of the circle «BD קוטר» CREATES (#1324) — one formula for M1, which mints it, and for `derive`, which
@@ -880,7 +921,16 @@ export type Selector =
    * one home. A slope is its first member; a length, an area or a coordinate would be further members
    * with their own reader, never a fourth value keyword in the slope rule (the #1201 shape).
    */
-  | { kind: 'sign'; q: Quantity; positive: boolean }
+  | {
+      kind: 'sign';
+      q: Quantity;
+      positive: boolean;
+      /**
+       * «AB ≤ 10» · «∢ABC ≥ 40°» — the BOUNDARY is admitted (#1621 D3, ADR-AG-216): the quantity may be zero.
+       * Absent ⇒ strict, which is what every word form («גדול מ», «קהה») and every earlier sign meant.
+       */
+      closed?: true;
+    }
   /**
    * «x_B > x_D» · «שיעור ה-x של B גדול משיעור ה-x של D» · «y_A < 0» — A COORDINATE COMPARED (#1462, ADR-AG-161).
    *
@@ -946,7 +996,22 @@ export type Quantity =
    * (R − r) at the configuration's parameters. A region of the parameter space (D7 kind 2), never a domain: a domain
    * bounds ONE symbol by a number.
    */
-  | { k: 'params'; e: Expr };
+  | { k: 'params'; e: Expr }
+  /**
+   * «AB < BC» · «DC > AB» · «AB ≤ 10» · «∢ABC < ∢BAC» · «זווית ABC קהה» — AN ORDER BETWEEN TWO MEASURES, or a
+   * measure and a value (#1621 D3, ADR-AG-216): the quantity is `left − right`. 2-D reads it as a region the
+   * figure must lie in (ADR-039 / ADR-390: it "removes no DOF"), which is D7's kind 2 here — a selector over the
+   * derived difference, the member this union's docblock reserved for "a length, an area" rather than a fourth
+   * selector kind. Both sides are the same KIND (the parser pairs a length with a length or a number, an angle
+   * with an angle or a number of degrees).
+   */
+  | { k: 'order'; left: OrderSide; right: OrderSide };
+
+/**
+ * One side of a stated ORDER (#1621 D3, ADR-AG-216): a length expression (`lengths.ts`: segments and areas — the
+ * measures `length-eq` already equates), a three-letter angle in DEGREES, or a plain value.
+ */
+export type OrderSide = { t: 'length'; le: LengthExpr } | { t: 'angle'; at: AngleRef } | { t: 'value'; value: Expr };
 
 export const EMPTY_CONSTRUCTION: Construction = {
   params: [],

@@ -34,7 +34,7 @@
 import { curveParentOf, parentsOf } from './derived';
 import { evalExpr, exprText, symbolsOf, type Env, type Expr } from './expr';
 import { constraintRefs, dirRefs, freeDirectionSymbol } from './solve';
-import { UNBOUNDED, circleDefPoints, type Construction, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
+import { UNBOUNDED, circleDefPoints, type Construction, type Domain, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
 
 /**
  * The plane's own coordinates. A curve is the zero set of `f(x, y; params)`, so `x` and `y` occur
@@ -114,6 +114,9 @@ export function carrierOf(o: GeoObject): Carrier | null {
     // A circle COMPUTED from points (#1464, #1324): a closed form of points counted where they live.
     case 'circle-thru':
       return null;
+    // A DRAWN ARC (#1622 E4): which part of a circle is inked — its circle and ends are counted where they live.
+    case 'arc':
+      return null;
     default: {
       const unclassified: never = o;
       throw new Error(`object kind carries no DOF classification: ${JSON.stringify(unclassified)}`);
@@ -153,8 +156,9 @@ export function symbolDeps(o: GeoObject): string[] {
         const sym = freeDirectionSymbol(o.dir);
         return sym === null ? [] : [sym];
       }
-      // Defined by reference alone (#1464): no expression, nothing to register.
+      // Defined by reference alone (#1464): no expression, nothing to register. So is a drawn arc (#1622 E4).
       case 'circle-thru':
+      case 'arc':
         return [];
       default: {
         const unwalked: never = o;
@@ -198,6 +202,9 @@ export function objectDeps(o: GeoObject): Id[] {
     // Its defining points — all placed before the circle can be computed (#1464).
     case 'circle-thru':
       return circleDefPoints(o.def);
+    // Its circle and its ends — and the point it bulges away from (#1622 E4) — all placed before it is drawn.
+    case 'arc':
+      return [o.def.circle, o.def.from, o.def.to, ...[o.def.away, o.def.toward].filter((x): x is Id => x !== undefined)];
     default: {
       const undeclared: never = o;
       throw new Error(`object kind declares no dependencies: ${JSON.stringify(undeclared)}`);
@@ -301,6 +308,55 @@ export function constraintSymbols(constraints: Construction['constraints']): str
   };
   walk(constraints);
   return out;
+}
+
+/**
+ * THE RANGE A SYMBOL'S USE IMPLIES, for SAMPLING only (#1621, ADR-AG-215).
+ *
+ * «∢ABC = α» names an angle by a symbol, and the angle it names is unsigned — 0° to 180° — so α can only ever
+ * take a value inside that range. Sampled as an unbounded parameter it drew 1°–4° (`sampleParam`'s magnitude),
+ * a sliver no student would recognise as their triangle, and «הציגו תצורה אחרת» could draw a negative angle
+ * the solve then had to repair. A symbol that a stated angle holds LINEARLY (`α`, `2α`, `α + 10`) is sampled
+ * inside the range that angle allows — in degrees 0°–180°, as a cosine −1 to 1 — so the free alias moves
+ * across real triangles (ADR-052: free, and resampled with the seed).
+ *
+ * It is NOT a declaration and never reaches `paramRegister`: the register's domains filter a pin's roots and
+ * print in the panel, and this range states nothing the student did not — every root of the angle given lies
+ * inside it already. A tan value implies no range (every real is a tangent). Read off the constraints'
+ * own expressions numerically (three evaluations test linearity), never by matching their shape — no CAS.
+ */
+export function impliedRange(c: Construction, sym: string): Domain {
+  const out: Domain = {};
+  for (const k of c.constraints) {
+    if (k.t !== 'angle' || k.measure === 'tan') continue;
+    const syms = symbolsOf(k.value);
+    if (syms.length !== 1 || syms[0] !== sym) continue;
+    const f = (t: number) => evalExpr(k.value, { [sym]: t });
+    const b = f(0);
+    const m = f(1) - b;
+    if (!Number.isFinite(b) || !Number.isFinite(m) || Math.abs(m) < 1e-12 || Math.abs(f(2) - (b + 2 * m)) > 1e-9) continue;
+    const [lo, hi] = k.measure === 'cos' ? [-1, 1] : [0, 180];
+    const ends = [(lo - b) / m, (hi - b) / m].sort((p, q) => p - q);
+    if (out.min === undefined || ends[0] > out.min) out.min = ends[0];
+    if (out.max === undefined || ends[1] < out.max) out.max = ends[1];
+  }
+  if (out.min !== undefined) out.minOpen = true;
+  if (out.max !== undefined) out.maxOpen = true;
+  return out;
+}
+
+/** A stated domain narrowed by an implied range — the stated one alone when the two do not meet. */
+export function narrowedDomain(stated: Domain, implied: Domain): Domain {
+  const d: Domain = { ...stated };
+  if (implied.min !== undefined && (d.min === undefined || implied.min > d.min)) {
+    d.min = implied.min;
+    d.minOpen = implied.minOpen;
+  }
+  if (implied.max !== undefined && (d.max === undefined || implied.max < d.max)) {
+    d.max = implied.max;
+    d.maxOpen = implied.maxOpen;
+  }
+  return d.min !== undefined && d.max !== undefined && d.min >= d.max ? stated : d;
 }
 
 export function usedSymbols(c: Construction): Set<string> {
