@@ -9678,3 +9678,97 @@ Sibling check (docs/17 §1): 2-D is the reference and builds every row above exc
 **A vacuous lock, found and replaced.** `symbols-module.test.ts` held `°` with «זווית BAC = 90°» on A(0,0) B(4,0) C(1,3). That triangle's angle at A is fixed near 72°, so the line faulted `unsatisfiable` and "°  still does not parse" passed by contradiction, after `°` had started to parse. The replacement holds each still-absent chip on a figure where its sentence could hold, and requires a READING fault (`not-handled` / `bad-equation` / `bad-operand`), so the row goes red the day the notation lands.
 
 **Locks.** `symbols-module.test.ts`: four new parse proofs (totality-guarded), `√()` as a wrap («AB = 20» with «20» selected → «AB = √(20)», builds), the original-six row updated on purpose, six held-chip rows. `palette-faces-1348` (each one-character face inserts its own glyph) and the bidi no-split row cover the new chips unchanged. **Fails before: 3 of 21** — the totality guard, the `√()` wrap proof and the original-six row; the four new parse proofs iterate the palette, so they do not exist before it.
+
+
+## ADR-AG-218 — Lengths, angles, crossings and congruence read at 2-D's verdict; a letter in a length is a free length, decided by its slot (#1622 E2)
+
+**Status:** accepted · 2026-10-03 · slice E stream E2 of the analytic V4 plan (#1616). Rulings applied: *analytic gives the same experience as 2-D for plane geometry* (2026-10-02); *«≅ / ~», segment products and «AB = 3x» are ported* (#1622, 2026-10-02, X10–X13); *proof targets are refused* (#1666).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R161. · **Design:** [04c](04c-design-analytic.md), "Lengths, angles, crossings and congruence at 2-D's verdict; the length variable".
+
+**Context.** Each sentence was measured through 2-D's `decideDeterministic2D` and analytic's `decideSubmit` on the base (PR #1695 @ 5dab4a4a). Every one below was `not-handled` in analytic and `builds` in 2-D, with three exceptions:
+- «AB·AC = AD²» already built.
+- «טרפז ABCD» · «המרחק בין AB לבין CD הוא 3» was refused `unsatisfiable` (2-D: not-handled, gap #1677).
+- «side AB is y=x-4» must stay not-handled (#1496).
+
+**The length variable: measured collisions, and the mechanism.** The ruling: inside a length, a letter is a free length and never the plane's coordinate, and it must stay unambiguous with x/y in equations and coordinates. Measured on the built branch:
+
+| sentence(s) | reading |
+|---|---|
+| «AB = 3x» | a free length (`ｘ` internally, shown as x) |
+| «AB = 3x», «y = 2x + 1» | the length, and the plane's line: both build, and the line is untouched |
+| «AB = 3x», «AB = 6» | x = 2, shown in the panel |
+| «AB = 3x», «AC = 2x» | AB : AC = 3 : 2 (the shared letter relates them, as in 2-D) |
+| «AB = 2y» | a free length (`ｙ`) |
+| «a הוא פרמטר», «AB = 3a» | the same `a`, unchanged |
+| «x > 0» | a domain on the length variable (the plane's coordinate is never a parameter) |
+| «side AB is y=x-4», «AB = AC + x», «שטח המשולש ABC הוא y» | still decline (#1496): the plane's letter beside a measure, or an area |
+| «AB = 3x», «x = 4» | **the line x = 4** (an equation slot); see the open question below |
+
+The mechanism is the slot. `lengthValueExpr` (the value side of a length-only given) and `paramSym` (a parameter declaration) rewrite x/y to `LENGTH_VARIABLE` (U+FF58, U+FF59). `RESERVED_SYMBOLS` is untouched, so every gate that treats x/y as the plane is unchanged, and the register samples the variable as any unstated magnitude (ADR-052). `exprText` and the panel (`paramLabel`) print the student's letter.
+
+**Decision.**
+1. **≅ / ~ as givens** (`parseCongruence`): «△ABC ≅ △DEF», «משולש ABC חופף למשולש DEF», «המשולשים ABC ו-DEF חופפים/דומים», «ABC ~ DEF», and English.
+   - Both triangles are declared.
+   - ≅ adds DE = AB, EF = BC, FD = CA; ~ adds ∠EDF = ∠BAC and ∠DEF = ∠ABC (2-D's lowering).
+   - Proof targets stay refused before any rule reads them (`findProofTarget`).
+   - The palette offers △ ≅ ~ (#1696).
+2. **Chained equalities** (`chainClauses`, before the direct reading) state every adjacent pair.
+   - A chain is taken only when every pair parses, and only when every member but the last names points.
+   - «angle AEB equals angle BEC equals 60 degrees» needed the slot before the direct reading: the angle rule answered its tail with an owned `bad-equation`.
+   - A chained angle mints its letters as 2-D does (`mintedByReference` gains `angle-ratio`).
+3. **2-D's distance forms** (`distanceClauses`):
+   - «C במרחק 5 מ-A ו-5 מ-B» → «נקודה C» and two DISTANCES; no segment is drawn (#1652).
+   - «D על AB במרחק 3 מ-A» → the membership and «AD = 3».
+   - A single «D במרחק 3 מ-A» is not read, because 2-D does not read it either.
+4. **Crossing segments** (`parseSegmentCross`):
+   - «CD חותך את AB», «AB ו-CD נחתכים», «הקטעים …», «AC ו-BD נחתכים» → both segments and the new selector `segments-cross` (D7 kind 2). No letter is invented.
+   - «CD חוצה את AB [בנקודה K]» → the midpoint (2-D's M, a tool letter), on line CD and `between` C and D.
+5. **An angle by its sides** (`parseAngleBetween`): «הזווית בין BD ל-BA היא 30» → ∠DBA. Sides with no common end are refused `bad-operand` (2-D refuses them too).
+6. **Angle values in words**: 2-D's `normalizeWordDegrees`, copied into `orthography`.
+7. **«A = 40»** (`parseVertexValue`, case-sensitive) is a bare `vertex-angle`. At M1, a letter that is not a point is `not-handled` (a new `ApplyErrorCode`), so «R=5» stays not understood (#1432 am. 1).
+8. **Three restated sentences:**
+   - «ישר ABE» → every letter on the line of the first two, each inner letter `between` its neighbours.
+   - «קו ועליו נקודה A» → «נקודה A» and «דרך A עובר ישר»: a free-direction line, with no invented letter.
+   - «נסמן את שטח ABCD ב-S» → «שטח ABCD = S».
+9. **A line-line distance given** with two-point names lowers to AB ∥ CD and C's distance to AB. The line-line term moved no point and had no value until the lines were parallel, so the solve could never reach it.
+
+**Not built.**
+- **Order and bounds** («α < β», «זווית ABC גדולה מ-40», «40 < זווית ABC < 60», the pyramid-angle rows) belong to stream D3 (ADR-AG-216), per the integrator. cat-2d-084/085/086 and pyr-angle-between/greater keep their gaps here.
+- **«מלבן במידות 4*6»** (cat-2d-015): the shape is unnamed, and 2-D invents ABCD. It is in the same class as E1's «ריבוע שצלעו 4», so it follows that stream's decision on unnamed shapes.
+- **«נסמן את שטח ABCD ב-S» on an empty canvas** (cat-2d-072, gap #1621) is not minted. It builds once ABCD is drawn.
+- **«AB·AC = AD²» on an empty canvas** is still refused `unknown-reference`, because a product is not a minting form. 2-D mints it.
+- **A symbolic length is not labelled on the canvas**, the same as «AB = 3a» today.
+
+**Open question for the operator.** After «AB = 3x», what is «x = 4»?
+- (a) The length variable's value, as in 2-D (AB = 12).
+- (b) The vertical line x = 4. This is what is built, because it is an equation slot.
+- (c) Ask which one.
+
+Recommendation: (c) when the figure has a length variable x, else (b). Option (a) would silently change what an analytic student's «x = 4» means.
+
+**Locks.**
+- `issue-1622-e2-lengths-angles.test.ts` has 43 tests. Every one goes through `decideSubmit` / `derive` and asserts geometry over six seeds. **Fails before: 37 of 43.** The 6 that pass on the base are guards: the proof targets, the #1496 declines, and 2-D's-forms-only.
+- `symbols-module.test.ts`: proofs for △ ≅ ~, and their held rows removed.
+- Parity rows flipped (analytic gap dropped): cat-2d-026, -027, -039, -041, -048, -058, -061, -062, -063, -080, -081, -082, cat-3d-007, cat-3d-009, symbol-length, symbol-length-square.
+- New parity rows:
+  - congruent-he, similar-plural-he, congruent-proof-target (refused);
+  - segment-product, symbol-length-chain, symbol-length-y, symbol-length-beside-line (X2);
+  - vertex-value, vertex-value-free (X9, asks);
+  - area-label, segments-cross-pair, segment-bisects-named, distances-free (X9);
+  - chain-length-value, angle-sides-disjoint (refused).
+- `issue-1620-diagonals-extensions.test.ts`: the "unreadable condition" lock used «כך שהמשולש ABE דומה למשולש ABC». That sentence now reads, so the lock uses «… ביחס 1:2», which is still unread. The lock's intent is unchanged.
+
+**Measured.** 471 corpus: 251/263 lines, 35/46 questions. Unchanged, since none of these sentences is in the corpus.
+
+**Consequences.**
+- `engine/lengths.ts`: `LENGTH_VARIABLE`, `paramLabel`, `lengthValueExpr`.
+- `engine/expr.ts`: `exprText` prints the student's letter.
+- `engine/types.ts`: selector `segments-cross`; `vertex-angle.bare`.
+- `engine/apply.ts`: the `not-handled` code, the selector refs, the bare vertex check, and `angle-ratio` minting.
+- `engine/evaluate.ts`: the `segments-cross` judge.
+- `parser/parseAnalytic.ts`: the rules above, `paramSym`, the length-only value side, and the line-line lowering.
+- `parser/frameAnalytic.ts`: `wordDegrees`, `chainClauses`, `distanceClauses`, `restatedClauses`.
+- `parser/catalogAnalytic.ts`: 21 He/En entries.
+- `ui/symbols.ts`, `i18n/index.ts`: the three chips.
+- `App.tsx`: the panel's parameter label.

@@ -2181,3 +2181,12 @@ called, never re-implemented in the test.
 - a companion: `segment`, `line-2pt`, `extent-of`, `selector`, `declare`, or a `length-eq` riding beside a minting fact.
 
 The missing points are added as `free` objects and the line's facts are re-applied; then the fixpoint runs again. This applies beside an unnamed centre too (#1686). A `perpendicular` (the cevian's own half) is not a minting form, so «AD גובה לצלע BC» stays refused. The cevian's triangle form states «משולש ABC» first (`clauseFacts`).
+
+## Lengths, angles, crossings and congruence at 2-D's verdict; the length variable ([ADR-AG-218](06c-decisions-analytic.md#adr-ag-218), #1622 E2)
+
+- **The length variable is decided by its SLOT.** In the value side of a length given (`lengthValueExpr`, `engine/lengths.ts`) and in a parameter declaration (`paramSym`), `x`/`y` are rewritten to the internal symbols `LENGTH_VARIABLE` (U+FF58/U+FF59). `RESERVED_SYMBOLS` (the plane) is unchanged, so every gate that reads x/y as the plane reads what it read before. `exprText` and the panel (`paramLabel`) print the student's letter. A side that also carries a measure, and an area value, still decline (#1496).
+- **Congruence / similarity** (`parseCongruence`) lower to the two triangles plus three `length-eq` (SSS) or two `angle-ratio` (AA), in vertex order.
+- **Crossing segments** are the selector `segments-cross` (D7 kind 2, judged in `failingSelectors`). **A bisected segment** is a derived midpoint (tool letter), on the bisecting line and `between` its ends.
+- **A line-line distance given** with two-point names lowers to `AB ∥ CD` plus the point-line distance of C, because the line-line term moves no point and has no value until the lines are parallel.
+- **Frames** (`frameAnalytic.ts`): `chainClauses` (before the direct reading), `distanceClauses`, `restatedClauses`; the word-number fold before «מעלות»/"degrees" sits in `orthography`.
+- **«A = 40»** is a `vertex-angle` with `bare`: at M1, a letter that is not a point is `not-handled`, never a refusal about a missing point.

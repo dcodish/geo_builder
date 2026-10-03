@@ -29,7 +29,7 @@ function valueExpr(src: string): Expr | null {
   const e = parseExpr(normalizeMath(src));
   return e && !mentionsPlane(e) ? e : null;
 }
-import { constantLengthExpr, namedLengthPairs, parseLengthExpr, type LengthExpr } from '../engine/lengths';
+import { LENGTH_VARIABLE, constantLengthExpr, lengthValueExpr, namedLengthPairs, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
 import { CENTRE_SENTINEL, CIRCLE_SENTINEL, UNBOUNDED, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
@@ -44,6 +44,9 @@ import {
   isBareName,
   orthography,
   originClauses,
+  chainClauses,
+  distanceClauses,
+  restatedClauses,
   conditionClauses,
   parenClauses,
   partitions,
@@ -474,11 +477,17 @@ const HE_NONZERO = /שונה\s+מ-?\s*אפס|שונה\s+מ-?\s*0/;
 const HE_LESS = /קטן\s+מ-?\s*(-?[0-9.]+)/;
 const HE_GREATER = /גדול\s+מ-?\s*(-?[0-9.]+)/;
 
+/**
+ * A PARAMETER SLOT'S x/y IS THE LENGTH VARIABLE (#1622, ADR-AG-218): the plane's coordinate is never a parameter, so
+ * «x > 0» / «0 < x < 5» / «x הוא פרמטר» can only be about the free length «AB = 3x» states — the ruling's slot rule.
+ */
+const paramSym = (sym: string): string => (sym === 'x' || sym === 'y' ? LENGTH_VARIABLE[sym] : sym);
+
 function parseParamHe(line: string): Fact | null {
   // «a הוא פרמטר חיובי» · «t הוא פרמטר קטן מ-9» · «a הוא פרמטר שונה מאפס» · «a הוא פרמטר»
   const m = line.match(new RegExp(`^([a-zA-Z])${HE_IS}\\s*פרמטר(.*)$`));
   if (!m) return null;
-  const sym = m[1];
+  const sym = paramSym(m[1]);
   const rest = m[2] ?? '';
   const domain: Domain = { ...UNBOUNDED };
   if (HE_POSITIVE.test(rest)) {
@@ -506,7 +515,7 @@ function parseParamHe(line: string): Fact | null {
 function parseParamEn(line: string): Fact | null {
   const m = line.match(/^([a-zA-Z])\s+is\s+a\s+(positive\s+|negative\s+|nonzero\s+)?parameter(.*)$/i);
   if (!m) return null;
-  const sym = m[1];
+  const sym = paramSym(m[1]);
   const flag = (m[2] ?? '').toLowerCase();
   const rest = (m[3] ?? '').toLowerCase();
   const domain: Domain = { ...UNBOUNDED };
@@ -536,13 +545,13 @@ function parseParamEn(line: string): Fact | null {
 function parseInequality(line: string): Fact | null {
   const s = normalizeMath(line).replace(/≠/g, '!=').replace(/≤/g, '<=').replace(/≥/g, '>=');
   const ne = s.match(/^([a-zA-Z])\s*!=\s*(-?[0-9.]+)$/);
-  if (ne) return { t: 'param', sym: ne[1], domain: { exclude: [Number(ne[2])] }, src: line };
+  if (ne) return { t: 'param', sym: paramSym(ne[1]), domain: { exclude: [Number(ne[2])] }, src: line };
 
   const chain = s.match(/^(-?[0-9.]+)\s*(<=?)\s*([a-zA-Z])\s*(<=?)\s*(-?[0-9.]+)$/);
   if (chain) {
     return {
       t: 'param',
-      sym: chain[3],
+      sym: paramSym(chain[3]),
       domain: {
         min: Number(chain[1]),
         minOpen: chain[2] === '<',
@@ -559,7 +568,7 @@ function parseInequality(line: string): Fact | null {
     const domain: Domain = one[2].startsWith('<')
       ? { max: v, maxOpen: open }
       : { min: v, minOpen: open };
-    return { t: 'param', sym: one[1], domain, src: line };
+    return { t: 'param', sym: paramSym(one[1]), domain, src: line };
   }
   return null;
 }
@@ -3570,6 +3579,59 @@ function parseCompare(line: string): RuleOutcome {
  * A noun whose arity disagrees with the vertex count is a REFUSAL, which is #1042 applied to a
  * sentence that had never been checked for it.
  */
+/**
+ * CONGRUENT AND SIMILAR TRIANGLES AS GIVENS — «△ABC ≅ △DEF», «משולש ABC חופף למשולש DEF», «ABC ~ DEF», «המשולשים ABC
+ * ו-DEF דומים», "triangle ABC is congruent to triangle DEF" (#1622, ADR-AG-218; X10–X13 ruled PORTED 2026-10-02).
+ *
+ * 2-D's lowering, copied (`src/parser/parse.ts`): both triangles are declared (a restatement is absorbed), the vertices
+ * correspond IN ORDER, and ≅ states the three corresponding sides equal (DE = AB, EF = BC, FD = CA — SSS), ~ two
+ * corresponding angles equal (∠EDF = ∠BAC, ∠DEF = ∠ABC — AA). The givens are equalities the solve honours; no
+ * size is assumed (ADR-052) — the first triangle stays free and the second follows it.
+ *
+ * A PROOF TARGET is never this: «הוכיחו ש-△ABC ≅ △DEF» is refused before any rule reads it (`findProofTarget`,
+ * #1666) — the boundary between a given and what the student is asked to show.
+ */
+const TRI_RUN = `(${NAME}${NAME}${NAME})`;
+const TRI_SYM = `(?:△\\s*|ה?משולש\\s+)?`;
+const CONG_SYMBOL = new RegExp(`^${HE_GIVEN}${TRI_SYM}${TRI_RUN}\\s*(≅|~|∼)\\s*${TRI_SYM}${TRI_RUN}$`);
+const CONG_HE = new RegExp(`^${HE_GIVEN}ה?משולש\\s+${TRI_RUN}\\s+(חופף|דומה)\\s+ל-?\\s*(?:ה?משולש\\s+)?${TRI_RUN}$`);
+const CONG_PLURAL_HE = new RegExp(`^${HE_GIVEN}ה?משולשים\\s+${TRI_RUN}\\s+ו-?\\s*${TRI_RUN}\\s+(חופפים|דומים)$`);
+const CONG_EN = new RegExp(`^(?:[Tt]he\\s+)?[Tt]riangle\\s+${TRI_RUN}\\s+is\\s+(congruent|similar)\\s+to\\s+(?:the\\s+)?(?:triangle\\s+)?${TRI_RUN}$`);
+const CONG_PLURAL_EN = new RegExp(`^(?:[Tt]he\\s+)?[Tt]riangles\\s+${TRI_RUN}\\s+and\\s+${TRI_RUN}\\s+are\\s+(congruent|similar)$`);
+
+function parseCongruence(line: string): RuleOutcome {
+  let m: { p: string; q: string; similar: boolean } | null = null;
+  const sym = CONG_SYMBOL.exec(line);
+  if (sym) m = { p: sym[1], q: sym[3], similar: sym[2] !== '≅' };
+  const he = !m ? CONG_HE.exec(line) : null;
+  if (he) m = { p: he[1], q: he[3], similar: he[2] === 'דומה' };
+  const hePl = !m ? CONG_PLURAL_HE.exec(line) : null;
+  if (hePl) m = { p: hePl[1], q: hePl[2], similar: hePl[3] === 'דומים' };
+  const en = !m ? CONG_EN.exec(line) : null;
+  if (en) m = { p: en[1], q: en[3], similar: en[2].toLowerCase() === 'similar' };
+  const enPl = !m ? CONG_PLURAL_EN.exec(line) : null;
+  if (enPl) m = { p: enPl[1], q: enPl[2], similar: enPl[3].toLowerCase() === 'similar' };
+  if (!m) return null;
+  const [a, b, c] = splitNames(m.p);
+  const [d, e, f] = splitNames(m.q);
+  if (hasRepeat([a, b, c]) || hasRepeat([d, e, f])) return refuse('repeated-vertex', line);
+  if (m.p === m.q) return refuse('repeated-vertex', line);
+  const shapes = [...(namedShapeFacts('משולש', [a, b, c], line) as Fact[]), ...(namedShapeFacts('משולש', [d, e, f], line) as Fact[])];
+  const len = (p: Id, q: Id) => parseLengthExpr(`${p}${q}`)!;
+  const one: Expr = { kind: 'num', value: 1 };
+  const givens: Constraint[] = m.similar
+    ? [
+        { t: 'angle-ratio', left: { v: d, a: e, b: f }, right: { v: a, a: b, b: c }, k: one },
+        { t: 'angle-ratio', left: { v: e, a: d, b: f }, right: { v: b, a: a, b: c }, k: one },
+      ]
+    : [
+        { t: 'length-eq', left: len(d, e), right: len(a, b) },
+        { t: 'length-eq', left: len(e, f), right: len(b, c) },
+        { t: 'length-eq', left: len(f, d), right: len(c, a) },
+      ];
+  return made([...shapes, ...givens.map((k): Fact => ({ t: 'constraint', k, src: line }))]);
+}
+
 function namedShapeFacts(noun: string | undefined, ids: Id[], line: string): Fact[] | 'bad-arity' {
   if (!noun) return [];
   const key = EN_SHAPE[normalizeShapeNoun(noun).toLowerCase()] ?? normalizeShapeNoun(noun);
@@ -4489,6 +4551,125 @@ const angleNameOf = (p: string, v?: string, q?: string): AngleName | null => {
 const DEGREE_TAIL = /\s*(?:°|מעלות|degrees?)\s*$/i;
 
 /**
+ * TWO SEGMENTS THAT CROSS, AND ONE THAT BISECTS ANOTHER (#1622, ADR-AG-218) — 2-D's lowerings, copied:
+ *
+ * - «CD חותך את AB» · «AB ו-CD נחתכים» · «הקטעים AB ו-CD נחתכים» · "CD cuts AB" · "AB and CD intersect" — the two
+ *   segments, drawn, and the `segments-cross` selector: they CROSS, with no point named, so no letter is invented
+ *   (a student who wants the crossing names it — «… בנקודה E» is the intersection rule's).
+ * - «CD חוצה את AB» · "CD bisects AB" — CD passes through the MIDPOINT of AB, inside both segments: the midpoint
+ *   (2-D's M — a tool letter unless «בנקודה M» names it, ADR-AG-211), C, M, D on one line, and M between C and D.
+ *
+ * Every letter is introduced, as 2-D introduces it (a restatement is absorbed): the sentence names its segments.
+ */
+const SEG_NOUN = `(?:ה?(?:קטע|צלע|ישר|אלכסון)\\s+|(?:[Tt]he\\s+)?(?:[Ss]egment|[Ss]ide|[Dd]iagonal)\\s+)?`;
+const PAIR = `(${NAME})(${NAME})`;
+const CROSS_HE = new RegExp(`^${HE_GIVEN}${SEG_NOUN}${PAIR}\\s+(?:חותך|חותכת)\\s+את\\s+${SEG_NOUN}${PAIR}$`);
+const CROSS_PAIR_HE = new RegExp(`^${HE_GIVEN}(?:ה?(?:קטעים|אלכסונים)\\s+)?${PAIR}\\s+ו-?\\s*${PAIR}\\s+נחתכים$`);
+const CROSS_EN = new RegExp(`^${SEG_NOUN}${PAIR}\\s+(?:cuts|crosses|intersects)\\s+${SEG_NOUN}${PAIR}$`);
+const CROSS_PAIR_EN = new RegExp(`^(?:[Tt]he\\s+)?(?:[Ss]egments\\s+|[Dd]iagonals\\s+)?${PAIR}\\s+and\\s+${PAIR}\\s+(?:intersect|cross)$`);
+const SEG_BISECTS_HE = new RegExp(`^${HE_GIVEN}${SEG_NOUN}${PAIR}\\s+(?:חוצה|חוצָה)\\s+את\\s+${SEG_NOUN}${PAIR}(?:\\s+ב(?:ה)?נקודה\\s+(${NAME}))?$`);
+const SEG_BISECTS_EN = new RegExp(`^${SEG_NOUN}${PAIR}\\s+bisects\\s+${SEG_NOUN}${PAIR}(?:\\s+at\\s+(?:the\\s+point\\s+)?(${NAME}))?$`);
+
+function parseSegmentCross(line: string): RuleOutcome {
+  const seg = (a: Id, b: Id): Fact => ({ t: 'segment', id: segmentId(a, b), a, b, src: line });
+  const declare = (ids: Id[]): Fact[] => [...new Set(ids)].map((id): Fact => ({ t: 'declare', id, src: line }));
+  const bis = SEG_BISECTS_HE.exec(line) ?? SEG_BISECTS_EN.exec(line);
+  if (bis) {
+    const [, c, d, a, b, named] = bis;
+    if (c === d || a === b || hasRepeat([a, b, c, d])) return refuse('repeated-vertex', line);
+    const [p, q] = [a, b].sort();
+    const mid = named ?? toolPoint('midpoint', `mid:${p},${q}`);
+    return made([
+      ...declare([a, b, c, d]),
+      seg(a, b),
+      seg(c, d),
+      { t: 'derived', id: mid, rule: { t: 'midpoint', a, b }, src: line },
+      { t: 'constraint', k: { t: 'on-line-2pt', id: mid, a: c, b: d }, src: line },
+      { t: 'selector', sel: { kind: 'between', id: mid, a: c, b: d }, src: line },
+    ]);
+  }
+  const cross = CROSS_HE.exec(line) ?? CROSS_PAIR_HE.exec(line) ?? CROSS_EN.exec(line) ?? CROSS_PAIR_EN.exec(line);
+  if (!cross) return null;
+  const [, a, b, c, d] = cross;
+  if (a === b || c === d) return refuse('repeated-vertex', line);
+  // Segments sharing an end meet AT that end — they do not cross; the sentence names no crossing a figure can keep.
+  if (hasRepeat([a, b, c, d])) return refuse('degenerate-role', line);
+  return made([...declare([a, b, c, d]), seg(a, b), seg(c, d), { t: 'selector', sel: { kind: 'segments-cross', a, b, c, d }, src: line }]);
+}
+
+/**
+ * «הזווית בין BD ל-BA היא 30» · «הזווית בין הצלעות AB ו-AC היא 30» · "the angle between BD and BA is 30" — an angle
+ * named by the two SIDES that form it (#1622, ADR-AG-218; 2-D's rule, copied): the sides share an end, which is the
+ * vertex, and their other ends are the rays — the same `angle` constraint «זווית DBA = 30» lowers to, with both sides
+ * drawn. Sides that share no end form no angle here: refused on the sentence (2-D refuses it too).
+ */
+const ANGLE_BETWEEN_HE = new RegExp(
+  `^${HE_GIVEN}ה?${ANGLE_STEM_HE}ת\\s+(?:ש)?בין\\s+(?:ה?(?:קטע|צלע|ישר)(?:ים|ות)?\\s+)?${PAIR}\\s+(?:לבין\\s+|ל-?\\s*|ו-?\\s*)(?:ה?(?:קטע|צלע|ישר)\\s+)?${PAIR}${HE_IS}\\s*(?:=\\s*)?(.+)$`,
+);
+const ANGLE_BETWEEN_EN = new RegExp(
+  `^(?:the\\s+)?angle\\s+between\\s+(?:the\\s+)?(?:(?:segments|sides|lines)\\s+)?${PAIR}\\s+and\\s+(?:the\\s+)?${PAIR}\\s+(?:is\\s+|equals?\\s+)?(?:=\\s*)?(.+)$`,
+  'i',
+);
+
+function parseAngleBetween(line: string): RuleOutcome {
+  const m = ANGLE_BETWEEN_HE.exec(line) ?? ANGLE_BETWEEN_EN.exec(line);
+  if (!m) return null;
+  const [, p1, p2, q1, q2, valueRaw] = m;
+  const valueSrc = trim(valueRaw).replace(DEGREE_TAIL, '');
+  if (!claimable(valueSrc)) return null;
+  if (p1 === p2 || q1 === q2) return refuse('repeated-vertex', line);
+  const shared = [p1, p2].filter((x) => x === q1 || x === q2);
+  if (shared.length !== 1) return refuse('bad-operand', line);
+  const v = shared[0];
+  const a = p1 === v ? p2 : p1;
+  const b = q1 === v ? q2 : q1;
+  const value = valueExpr(valueSrc);
+  if (!value) return refuse('bad-equation', valueSrc);
+  return made([
+    { t: 'constraint', k: { t: 'angle', at: { v, a, b }, value }, src: line },
+    { t: 'segment', id: segmentId(v, a), a: v, b: a, src: line },
+    { t: 'segment', id: segmentId(v, b), a: v, b, src: line },
+  ]);
+}
+
+/**
+ * «A = 40» · «A = 40°» — the NOUN-LESS vertex angle (#1622, ADR-AG-218; 2-D's bare-vertex rule): a lone vertex given a
+ * number is the angle at that vertex, resolved at M1 by the one resolver «זווית A = 40» uses — two arms at A build,
+ * a free point asks which angle (`ambiguous-angle`, as 2-D asks). A number only: «A = (2,3)» and «A = B» are not this.
+ */
+// Case-SENSITIVE: a lowercase letter is a parameter or the plane's — «x = 4» is the line, never an angle at a point.
+const VERTEX_VALUE = new RegExp(`^${HE_GIVEN}(${NAME})\\s*=\\s*(\\d+(?:\\.\\d+)?)\\s*(?:°|מעלות|degrees?)?$`);
+
+function parseVertexValue(line: string): RuleOutcome {
+  const m = VERTEX_VALUE.exec(line);
+  if (!m) return null;
+  return made([{ t: 'vertex-angle', left: { v: m[1] }, rhs: { t: 'value', value: { kind: 'num', value: Number(m[2]) } }, bare: true, src: line }]);
+}
+
+/**
+ * «ישר ABE» · «הישר ABE» · "line ABE" — ORDERED collinear points (#1622, ADR-AG-218; 2-D's `set-line`): three or more
+ * letters on one line IN THE NAMED ORDER, so every inner letter lies between its neighbours (B between A and E — the
+ * order picks the side). Each letter is introduced (the line names them, #1066); every one after the first two is on
+ * their line, and the order rides as `between` selectors (D7 kind 2 — a region, no freedom consumed).
+ */
+const ORDERED_LINE = new RegExp(`^${HE_GIVEN}(?:ה?ישר|(?:[Tt]he\\s+)?[Ll]ine)\\s+((?:${NAME}){3,})$`);
+
+function parseOrderedLine(line: string): RuleOutcome {
+  const m = ORDERED_LINE.exec(line);
+  if (!m) return null;
+  const ids = splitNames(m[1]);
+  if (hasRepeat(ids)) return refuse('repeated-vertex', line);
+  const [p, q] = ids;
+  return made([
+    ...ids.map((id): Fact => ({ t: 'declare', id, src: line })),
+    ...ids.slice(2).map((id): Fact => ({ t: 'constraint', k: { t: 'on-line-2pt', id, a: p, b: q }, src: line })),
+    ...ids.slice(1, -1).map((id, i): Fact => ({ t: 'selector', sel: { kind: 'between', id, a: ids[i], b: ids[i + 2] }, src: line })),
+    { t: 'segment', id: segmentId(ids[0], ids[ids.length - 1]), a: ids[0], b: ids[ids.length - 1], src: line },
+  ]);
+}
+
+
+/**
  * «C ברביע השלישי» — a point placed in a REGION (#1071).
  *
  * A quadrant is not a curve and not a value: it is a pair of inequalities. That makes it D7's SECOND
@@ -5218,9 +5399,34 @@ function parseConstraint(raw: string): RuleOutcome {
     const leftSrc = lengthRoles(lengthEq[1], roles);
     const rightSrc = lengthRoles(lengthEq[2], roles);
     const left = leftSrc === null ? null : parseLengthExpr(leftSrc);
-    const right = rightSrc === null ? null : parseLengthExpr(rightSrc) ?? constantLengthExpr(rightSrc);
+    // The value side may carry the LENGTH VARIABLE — «AB = 3x» (#1622, ADR-AG-218, `lengthValueExpr`): x/y there are
+    // a free length, never the plane's coordinate; a side that also names a measure still declines (#1496).
+    // Only beside a LENGTH: «שטח המשולש ABC הוא y» is an area, which the ruling does not reach — it still declines (#1496).
+    const lengthOnly = !!left && left.terms.every((t) => t.kind === undefined || t.kind === 'length');
+    const right = rightSrc === null ? null : parseLengthExpr(rightSrc) ?? (lengthOnly ? lengthValueExpr(rightSrc) : constantLengthExpr(rightSrc));
     // At least ONE side must mention a length, or this is an ordinary equation (`y=2x`) that the
     // bare-equation branch reads far better than we would.
+    /*
+     * THE DISTANCE BETWEEN TWO LINES, AS A GIVEN (#1622, ADR-AG-218) — «טרפז ABCD», «המרחק בין AB לבין CD הוא 3». A
+     * distance between lines exists only when they are PARALLEL (the #1205 ruling, which refuses the question on
+     * crossing lines), so the given states both halves of what it means: AB ∥ CD, and C at that distance from AB.
+     * Kept as the line-line term it was refused `unsatisfiable`: the term moves no point (it served the ask lane
+     * only) and has no value until the lines are parallel, so the solve could never reach it.
+     */
+    const only = left && left.terms.length === 1 && left.expr.kind === 'sym' ? left.terms[0] : null;
+    const pairOf = (n: string) => /^([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)$/.exec(n);
+    if (only && only.kind === 'line-line' && right && right.terms.length === 0) {
+      const u = pairOf(only.u);
+      const v = pairOf(only.v);
+      const pl = u && v ? parseLengthExpr(`המרחק בין ${v[1]} ל-${only.u}`) : null;
+      if (u && v && pl) {
+        return made([
+          { t: 'constraint', k: { t: 'relation', rel: 'parallel', u: { k: 'points', a: u[1], b: u[2] }, v: { k: 'points', a: v[1], b: v[2] } }, src: line },
+          { t: 'constraint', k: { t: 'length-eq', left: pl, right }, src: line },
+          ...roles.out,
+        ]);
+      }
+    }
     if (left && right) {
       return made([
         { t: 'constraint', k: { t: 'length-eq', left, right }, src: line },
@@ -5764,6 +5970,10 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
       sharedSubjectClauses(s),
       elidedSubjectClauses(s),
       diameterClauses(s),
+      // A chained equality — «AB = AC = 3x», «זוית AEB שווה לזווית BEC שווה 60 מעלות» (#1622, ADR-AG-218): every
+      // pair. Before the direct reading, whose angle rule would answer «angle AEB equals angle BEC equals 60» with an
+      // owned `bad-equation` about its tail; taken only when every pair parses.
+      chainClauses(s),
     ]) {
       const r = reading && attempt(reading);
       if (r) return { result: r, framed: true };
@@ -5787,6 +5997,14 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
   const paren = parenClauses(s);
   const withParen = paren && attempt(paren);
   if (withParen) return { result: withParen, framed: true };
+  // «קו ועליו נקודה A», «נסמן את שטח ABCD ב-S» — another sentence the grammar reads (#1622, ADR-AG-218).
+  const restated = restatedClauses(s);
+  const withRestated = restated && attempt(restated);
+  if (withRestated) return { result: withRestated, framed: true };
+  // A point placed by its distances — «C במרחק 5 מ-A ו-5 מ-B», «D על AB במרחק 3 מ-A» (#1622, ADR-AG-218).
+  const dist = distanceClauses(s);
+  const withDist = dist && attempt(dist);
+  if (withDist) return { result: withDist, framed: true };
   return { result: direct, framed: unwrapped };
 }
 
@@ -6087,7 +6305,7 @@ function parseClauseRules(raw: string): ParseResult {
     // the student wrote perfectly — the swallowing defect #1059 records, and the relation rule's own
     // docblock gives the cure: a construction recognisable from a keyword no other rule uses costs
     // nothing to match early and removes the ambiguity entirely.
-    parseThroughLine(line) ?? parsePerpendicular(line) ?? parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
+    parseCongruence(line) ?? parseSegmentCross(line) ?? parseAngleBetween(line) ?? parseOrderedLine(line) ?? parseVertexValue(line) ?? parseThroughLine(line) ?? parsePerpendicular(line) ?? parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
   if (matched) return matched;
 
   // NO constrained-shape refusal here any more (#1049). It existed because those nouns carried

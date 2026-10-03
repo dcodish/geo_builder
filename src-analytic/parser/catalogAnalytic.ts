@@ -1090,4 +1090,28 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'derived', family: 'F17', he: 'קטע האמצעים לצלע BC במשולש ABC', en: 'midsegment to BC in triangle ABC' },
   { category: 'derived', family: 'F17', he: 'קטע האמצעים בטרפז ABCD', en: 'midsegment of trapezoid ABCD' },
   { category: 'points', family: 'F17', he: 'שכל קודקודיו מונחים על הצירים', en: 'all the vertices of the trapezoid lie on the axes', needs: ['טרפז ABCD'] },
+  /*
+   * --- 2-D PARITY: LENGTHS, ANGLES, CROSSINGS, CONGRUENCE (#1622 E2, ADR-AG-218) — each 2-D's catalog sentence, at its verdict ---
+   */
+  { category: 'relations', family: 'F17', he: '△ABC ≅ △DEF', en: '△ABC ≅ △DEF' },
+  { category: 'relations', family: 'F17', he: 'משולש ABC חופף למשולש DEF', en: 'triangle ABC is congruent to triangle DEF' },
+  { category: 'relations', family: 'F17', he: '△ABC ~ △DEF', en: '△ABC ~ △DEF' },
+  { category: 'relations', family: 'F17', he: 'המשולשים ABC ו-DEF דומים', en: 'triangles ABC and DEF are similar' },
+  { category: 'relations', family: 'F17', he: 'AB·AC = AD²', en: 'AB·AC = AD²', needs: ['משולש ABC', 'D על BC'] },
+  { category: 'relations', family: 'F17', he: 'AB = 3x', en: 'AB = 3x', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: 'AB = AC = 3x', en: 'AB = AC = 3x', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: 'AD = 12√x', en: 'AD = 12√x' },
+  { category: 'relations', family: 'F17', he: 'המרחק בין AB לבין CD הוא 3', en: 'the distance between AB and CD = 3', needs: ['טרפז ABCD'] },
+  { category: 'points', family: 'F17', he: 'C במרחק 5 מ-A ו-5 מ-B', en: 'C is 5 from A and 5 from B', needs: ['משולש ABC'] },
+  { category: 'points', family: 'F17', he: 'D על AB במרחק 3 מ-A', en: 'D on AB at a distance of 3 from A', needs: ['משולש ABC'] },
+  { category: 'points', family: 'F17', he: 'ישר ABE', en: 'line ABE', needs: ['משולש ABC'] },
+  { category: 'lines', family: 'F17', he: 'קו ועליו נקודה A', en: 'a line with point A' },
+  { category: 'lines', family: 'F17', he: 'CD חוצה את AB', en: 'CD bisects AB' },
+  { category: 'lines', family: 'F17', he: 'CD חותך את AB', en: 'CD cuts AB' },
+  { category: 'lines', family: 'F17', he: 'AC ו-BD נחתכים', en: 'AC and BD intersect', needs: ['מרובע ABCD'] },
+  { category: 'relations', family: 'F17', he: 'הזווית בין BD ל-BA היא 30', en: 'the angle between BD and BA is 30', needs: ['מרובע ABCD'] },
+  { category: 'relations', family: 'F17', he: 'זווית ABC שווה לשלושים מעלות', en: 'angle ABC equals thirty degrees' },
+  { category: 'relations', family: 'F17', he: 'זוית AEB שווה לזווית BEC שווה 60 מעלות', en: 'angle AEB equals angle BEC equals 60 degrees' },
+  { category: 'relations', family: 'F17', he: 'A = 40', en: 'A = 40', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: 'נסמן את שטח ABCD ב-S', en: 'denote the area of ABCD by S', needs: ['מרובע ABCD'] },
 ];

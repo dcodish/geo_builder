@@ -89,6 +89,10 @@ const TEMPLATES: Record<
   symPar: { value: 'AB  CD', sel: [3, 3], expected: 'AB ∥ CD', setup: ['מרובע ABCD'] },
   symAngle: { value: 'ABC = 37', sel: [0, 0], expected: '∠ABC = 37', setup: ['משולש ABC'] },
   symDeg: { value: '∠ABC = 90', sel: [9, 9], expected: '∠ABC = 90°', setup: ['משולש ABC'] },
+  // #1622 (ADR-AG-218) — congruent and similar triangles as givens.
+  symTriangle: { value: 'ABC ≅ △DEF', sel: [0, 0], expected: '△ABC ≅ △DEF', setup: ['משולש ABC', 'משולש DEF'] },
+  symCong: { value: '△ABC  △DEF', sel: [5, 5], expected: '△ABC ≅ △DEF', setup: ['משולש ABC', 'משולש DEF'] },
+  symSim: { value: 'ABC  DEF', sel: [4, 4], expected: 'ABC ~ DEF', setup: ['משולש ABC', 'משולש DEF'] },
 };
 
 describe('the symbol palette parses — every offered button, through the real grammar (#1129)', () => {
@@ -175,8 +179,6 @@ describe('the symbol palette parses — every offered button, through the real g
     ['α', ['משולש ABC'], '∢ABC = α'],
     ['S_{', ['משולש ABC'], 'S_{ABC} = 13'],
     ['<', ['משולש ABC'], 'AB < BC'],
-    ['△', ['משולש ABC', 'משולש DEF'], '△ABC ≅ △DEF'],
-    ['~', ['משולש ABC', 'משולש DEF'], 'ABC ~ DEF'],
     ['⌢', ['x^2+y^2=25', 'A על המעגל', 'C על המעגל'], '⌢{AC} = 60°'],
   ])('«%s» is not offered, because «%s · %s» is still not read', (glyph, setup, line) => {
     expect(SYMBOLS.some((s) => s.before.includes(glyph) || s.label.includes(glyph))).toBe(false);

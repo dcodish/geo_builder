@@ -2210,3 +2210,18 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
   - A point that a later line defines is still defined by that line.
   - Still refused, as in 2-D, when the letters are new: «AB = 2CD», «AB:BC = 2:3», «AD גובה לצלע BC».
 - «AB קוטר» · «BO = 5» draws BO with B where it is and O a free point. O is not the centre until the student says so. A later «O מרכז המעגל», «OB רדיוס» or «הרדיוס OB» then moves that same O to the centre; no second point appears.
+
+**R161 — lengths, angles, crossings and congruent or similar triangles read as the 2-D tool reads them**
+([ADR-AG-218](06c-decisions-analytic.md#adr-ag-218), [#1622](https://github.com/dcodish/geo_builder/issues/1622); operator rulings 2026-10-02: the same experience as 2-D for plane geometry, and «≅ / ~», segment products and a letter in a length are ported to analytic.)
+
+- «△ABC ≅ △DEF» (also «משולש ABC חופף למשולש DEF», «המשולשים ABC ו-DEF חופפים») draws both triangles with the corresponding sides equal. «△ABC ~ △DEF» (also «ABC ~ DEF», «המשולשים ABC ו-DEF דומים») draws them with the corresponding angles equal. The palette offers △, ≅ and ~. A sentence asking the student to PROVE it («הוכיחו ש-△ABC ≅ △DEF») is still refused.
+- «AB·AC = AD²» holds on the figure.
+- «AB = 3x», «AB = x²», «AD = 12√x», «AB = 2y»: the letter is a free length. It moves with «הציגו תצורה אחרת» until a later given fixes it («AB = 6» makes x = 2, shown in the panel as x). The same letter in two lengths relates them. In an equation («y = 2x + 1») x and y are still the plane's coordinates, also in the same figure; «x = 4» is the line x = 4.
+- A chain of equalities states every link: «AB = AC = 3x», «זוית AEB שווה לזווית BEC שווה 60 מעלות».
+- «C במרחק 5 מ-A ו-5 מ-B» places C at both distances; «D על AB במרחק 3 מ-A» puts D on AB, 3 from A.
+- «CD חותך את AB» (also «AB ו-CD נחתכים», «הקטעים AB ו-CD נחתכים») draws the two segments crossing, with no point named. «CD חוצה את AB» makes CD pass through the midpoint of AB (named M, or the letter given by «בנקודה K»).
+- «הזווית בין BD ל-BA היא 30» is the angle DBA. Two sides with no common end form no angle, and the sentence is refused.
+- An angle value may be written in words: «שווה לשלושים מעלות», "thirty degrees".
+- «A = 40» is the angle at A when A is a vertex of the figure; on a free point the tool asks which angle.
+- «ישר ABE» puts the points on one line in that order. «קו ועליו נקודה A» draws a line through A, with no other letter. «נסמן את שטח ABCD ב-S» labels the area S, and the panel shows its value once the figure fixes it.
+- In a trapezoid, «המרחק בין AB לבין CD הוא 3» keeps AB and CD parallel and 3 apart.

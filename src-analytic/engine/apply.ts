@@ -52,6 +52,12 @@ import {
 } from './types';
 
 export type ApplyErrorCode =
+  /**
+   * A sentence whose MEANING depends on the figure, and the figure gives it none (#1622, ADR-AG-218): «A = 40» is the
+   * angle at A only when A is a point of the figure — «R=5» beside a circle with no point R is not understood (#1432
+   * am. 1), exactly the verdict a parse failure gives, so the student is told the same thing and the model may try it.
+   */
+  | 'not-handled'
   /** A restatement that contradicts what the figure already holds. */
   | 'conflicting-restatement'
   /** A name used for two different kinds of object. */
@@ -2614,6 +2620,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * same `unsatisfiable` refusal «זווית ACB = 200» is, never a second meaning of the sentence.
      */
     case 'vertex-angle': {
+      if (f.bare) {
+        const host = objectById(c, f.left.v);
+        if (!host || !isPositional(host)) return { ok: false, error: { code: 'not-handled', detail: f.src } };
+      }
       const left = resolveAngleName(c, f.left, f.src);
       if (!left.ok) return left;
       if (f.rhs.t === 'value') {
@@ -2798,7 +2808,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
                   [f.sel.id, ...('point' in f.sel.rhs ? [f.sel.rhs.point] : [])]
                 : f.sel.kind === 'angle-side'
                   ? [f.sel.id, f.sel.v, f.sel.a, f.sel.b]
-                  : [f.sel.id, f.sel.a, f.sel.b];
+                  : f.sel.kind === 'segments-cross'
+                    ? [f.sel.a, f.sel.b, f.sel.c, f.sel.d]
+                    : [f.sel.id, f.sel.a, f.sel.b];
       for (const id of refs) {
         const o = objectById(c, id);
         if (!o || !isPositional(o)) {
@@ -3373,6 +3385,9 @@ function mintedByReference(f: Fact): Id[] {
     }
     case 'angle':
       return [k.at.v, k.at.a, k.at.b];
+    // «זוית AEB שווה לזווית BEC» — two angles' arms, as 2-D draws them (#1622, ADR-AG-218).
+    case 'angle-ratio':
+      return [k.left, k.right].flatMap((r) => (isAngleRef(r) ? [r.v, r.a, r.b] : []));
     case 'on-line-2pt':
       return [k.a, k.b];
     default:

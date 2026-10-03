@@ -20,7 +20,7 @@
  * The 2-D chips whose sentences analytic does not read yet — measured, and locked as still refused in
  * `symbols-module.test.ts`, so the day one parses the lock goes red and the chip is owed:
  * the Greek angle names α β γ δ θ, `S_{}` and `<` between two measures (slice D, #1621);
- * `△` `≅` `~` and `⌢{}` (slice E, #1622). A chip inserting a character the grammar then refuses
+ * `⌢{}` (slice E, #1622 — `△` `≅` `~` joined with their notation, ADR-AG-218). A chip inserting a character the grammar then refuses
  * hands the student `not-handled` on their own click, so each joins in its notation's own PR.
  * `xⁿ` is not offered: `²` and `³` cover the exam's powers and `^` is on every keyboard.
  */
@@ -63,4 +63,11 @@ export const SYMBOLS: readonly SymbolSpec[] = [
   { label: '∥', titleKey: 'symPar', before: '∥' },
   { label: '∠', titleKey: 'symAngle', before: '∠' },
   { label: '°', titleKey: 'symDeg', before: '°' },
+  /**
+   * #1622 (ADR-AG-218) — congruent and similar triangles as givens: «△ABC ≅ △DEF», «ABC ~ DEF» now read, so 2-D's
+   * three chips ship with them (the operator's #1696 note: a chip ships in the same PR as its notation).
+   */
+  { label: '△', titleKey: 'symTriangle', before: '△' },
+  { label: '≅', titleKey: 'symCong', before: '≅' },
+  { label: '~', titleKey: 'symSim', before: '~' },
 ];

@@ -245,7 +245,11 @@ export type Fact =
   | (FactBase & {
       t: 'vertex-angle';
       left: AngleName;
-      rhs: { t: 'value'; value: Expr } | { t: 'angle'; of: AngleName; k: Expr };
+      rhs:
+        | { t: 'value'; value: Expr }
+        | { t: 'angle'; of: AngleName; k: Expr };
+      /** «A = 40» — no angle noun (#1622, ADR-AG-218): a letter that is no point of the figure is not understood, not refused. */
+      bare?: true;
     })
   /**
    * A CEVIAN WHOSE TARGET ONLY THE FIGURE KNOWS (#1240, #1222; ADR-AG-209) — «AD גובה», «תיכון מנקודה A»,
@@ -890,7 +894,13 @@ export type Selector =
    * `id` lies in the open half-plane at `v` that holds the angle (a, v, b)'s interior, i.e. on the internal
    * bisector's side of the perpendicular to it at `v`. Consumes no freedom; judged inside validity; seeded.
    */
-  | { kind: 'angle-side'; id: Id; v: Id; a: Id; b: Id };
+  | { kind: 'angle-side'; id: Id; v: Id; a: Id; b: Id }
+  /**
+   * «CD חותך את AB» · «AC ו-BD נחתכים» — TWO SEGMENTS CROSS, with no crossing point named (#1622, ADR-AG-218; 2-D's
+   * `segments-cross`). A region, not an equation — the configurations whose segments AB and CD meet at a point inside
+   * both — so D7's kind 2, judged inside validity and walked to by `drawableAt`; it consumes no freedom.
+   */
+  | { kind: 'segments-cross'; a: Id; b: Id; c: Id; d: Id };
 
 /**
  * A quantity the figure DERIVES — never a symbol the student declared (that is a domain, kind 1).

@@ -390,7 +390,8 @@ function print(e: Expr, need: number): string {
         // The SHARED formatter, never a local rounder — the #723 chokepoint.
         return fmtNum(e.value);
       case 'sym':
-        return e.name;
+        // The length variable («AB = 3x», `lengths.ts` LENGTH_VARIABLE, #1622) prints as the letter the student typed.
+        return e.name === 'ｘ' ? 'x' : e.name === 'ｙ' ? 'y' : e.name;
       case 'neg':
         return `-${print(e.a, POW.neg)}`;
       case 'sqrt':

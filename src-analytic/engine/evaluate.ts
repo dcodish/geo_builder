@@ -863,6 +863,21 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       }
       return true;
     }
+    /**
+     * TWO SEGMENTS CROSS (#1622, ADR-AG-218) — each segment's ends lie strictly on opposite sides of the other's line,
+     * judged relative to the segments' own size (a touch at an end, within the solver's resolution, is not a crossing).
+     */
+    if (s.kind === 'segments-cross') {
+      const [a, b, p, q] = [s.a, s.b, s.c, s.d].map((id) => at.get(id));
+      if (!a || !b || !p || !q) return true; // an absent point judges nothing, as below
+      const side = (u: Pt, v: Pt, w: Pt) => (v.x - u.x) * (w.y - u.y) - (v.y - u.y) * (w.x - u.x);
+      const tol = SOLVE_RESOLUTION * Math.hypot(b.x - a.x, b.y - a.y) * Math.hypot(q.x - p.x, q.y - p.y);
+      const s1 = side(a, b, p);
+      const s2 = side(a, b, q);
+      const s3 = side(p, q, a);
+      const s4 = side(p, q, b);
+      return ((s1 > tol && s2 < -tol) || (s1 < -tol && s2 > tol)) && ((s3 > tol && s4 < -tol) || (s3 < -tol && s4 > tol));
+    }
     if (s.kind === 'distinct') {
       const ps = s.ids.map((id) => at.get(id));
       // A selector about an absent point judges nothing, as below.
