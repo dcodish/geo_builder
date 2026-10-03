@@ -18,7 +18,7 @@
 import { fitConic } from './conic';
 import { bareLineName, isNumeralName, lineIdOf, nameReading, numeralCurveId, numeralTwin, readDescribedCircle, refKindOf, statedName, type DescribedCircle, type RefKind } from './names';
 import { parabolaDirectrix, resolveCurve } from './curves';
-import { isTermPlaceholder, lengthRefs, parseLengthExpr } from './lengths';
+import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule } from './derived';
 import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
@@ -150,6 +150,8 @@ export type ApplyErrorCode =
    * student takes, never a silent substitution.
    */
   | 'already-named'
+  /** «נסמן זוית MAC כ-A1» where A1 already names another angle, or a point (#1622 E5, ADR-AG-221) — `holder` is the label. */
+  | 'alias-taken'
   /**
    * The two PARSER refusals a construction can also reach at M1 (#1464, #1324), with the parser's own
    * messages: «מעגל AAB» names the same point twice (`repeated-vertex`), and «BD קוטר במעגל I» over a circle
@@ -1423,6 +1425,14 @@ function maxCrossings(a: string | null, b: string | null): number | null {
 export function applyFact(c: Construction, f: Fact): ApplyOutcome {
   const out = applyStatement(c, f);
   if (!out.ok || out.effect === 'known') return out;
+  // A POINT NAMED BY AN ANGLE'S LABEL (#1622 E5, ADR-AG-221) — «נסמן זוית BAM כ-A1» then «נקודה A1»: the name is
+  // taken, as 2-D answers (`aliasTaken`). Checked here, where every statement that introduces an object lands, so no
+  // one way of naming a point can slip past; the label-after-point order is the angle constraint's own check.
+  if (out.next.objects.length > c.objects.length) {
+    const labels = new Set(out.next.constraints.flatMap((k) => (k.t === 'angle' && k.value.kind === 'sym' ? [angleLabelName(k.value.name)] : [])));
+    const taken = out.next.objects.find((o) => labels.has(o.id) && !objectById(c, o.id));
+    if (taken) return { ok: false, error: { code: 'alias-taken', detail: f.src, holder: taken.id } };
+  }
   const notice = readingTwin(c, f);
   return notice ? { ...out, notice } : out;
 }
@@ -1773,6 +1783,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           host = mint.next;
         }
         return applyFact(host, { t: 'constraint', k: { ...bare, curve: resolved }, src: f.src });
+      }
+      /*
+       * AN ANGLE LABEL NAMES ONE ANGLE (#1622 E5, ADR-AG-221; 2-D's ADR-386 `alias-taken`). «נסמן זוית BAM כ-A1» binds the
+       * label to the angle as a free parameter of its own (`angleLabelSymbol`). The SAME label on a DIFFERENT angle would
+       * read as «∢BAM = ∢MAC» through the shared symbol — an equality nobody stated — and a label that is already a
+       * POINT's name is two things under one name. Both are refused naming the label, as 2-D does; restating the same
+       * binding is absorbed below like any repeated constraint. Judged BEFORE the references: a clash is the answer
+       * whether or not the angle's letters exist yet (2-D asks on «נקודה A1» · «נסמן זוית BAM כ-A1» too).
+       */
+      if (f.k.t === 'angle' && f.k.value.kind === 'sym' && angleLabelName(f.k.value.name) !== null) {
+        const sym = f.k.value.name;
+        const label = angleLabelName(sym)!;
+        const at = f.k.at;
+        const same = (o: AngleName) => isAngleRef(o) && o.v === at.v && [o.a, o.b].sort().join() === [at.a, at.b].sort().join();
+        const rebound = c.constraints.some((k) => k.t === 'angle' && k.value.kind === 'sym' && k.value.name === sym && !same(k.at));
+        if (rebound || objectById(c, label)) return { ok: false, error: { code: 'alias-taken', detail: f.src, holder: label } };
       }
       const missing = constraintRefs(f.k).find((id) => {
         const o = objectById(c, id);
@@ -3871,6 +3897,20 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
       const formed = failing.every(({ f }) => mintedByReference(f).length > 0 || isMintCompanion(f));
       if (!allRefs || !formed || missing.length === 0 || !failing.every(({ j }) => missing.includes(errors[j]!.detail))) continue;
       let next: Construction = { ...c, objects: [...c.objects, ...missing.map((id): GeoObject => ({ kind: 'free', id }))] };
+      // An area LABEL names its region (#1622 E5, ADR-AG-221): the ring is drawn with its new letters, as a noun draws
+      // its own — the polygon the area is OF, so its points stay a simple ring the area can be read on.
+      let ringsDrawn = true;
+      for (const { f } of failing) {
+        const ring = areaLabelRing(f);
+        if (!ring || objectById(next, polygonIdOf(ring))) continue;
+        const out = applyFact(next, { t: 'polygon', id: polygonIdOf(ring), vertices: ring, src: f.src });
+        if (!out.ok) {
+          ringsDrawn = false;
+          break;
+        }
+        next = out.next;
+      }
+      if (!ringsDrawn) continue;
       const landed: Array<{ j: number; out: Extract<ApplyOutcome, { ok: true }> }> = [];
       for (const { f, j } of failing) {
         const out = applyFact(next, f);
@@ -3924,6 +3964,8 @@ function mintedByReference(f: Fact): Id[] {
     case 'relation':
       return k.u.k === 'points' && k.v.k === 'points' ? [k.u.a, k.u.b, k.v.a, k.v.b] : [];
     case 'length-eq': {
+      const ring = areaLabelRing(f);
+      if (ring) return ring;
       const pairs = [...k.left.terms, ...k.right.terms];
       const plain = pairs.every((t) => t.kind === undefined || t.kind === 'length') && plainLengthSide(k.left.expr) && plainLengthSide(k.right.expr);
       return plain ? lengthRefs(k.left).concat(lengthRefs(k.right)) : [];
@@ -3939,6 +3981,25 @@ function mintedByReference(f: Fact): Id[] {
       return [];
   }
 }
+
+/**
+ * THE RING AN AREA LABEL NAMES (#1622 E5, ADR-AG-221) — «נסמן את שטח ABCD ב-S», i.e. «שטח ABCD = S»: one area on one
+ * side and a lone symbol on the other. 2-D commits that label on an empty canvas (its `measure-area` on a variable,
+ * binding when the shape comes) and introduces nothing. Analytic holds no statement about points it does not have, so
+ * the label introduces what it names — the quadrilateral ABCD — exactly as «AB = 5» introduces A and B (ADR-AG-210):
+ * free vertices (ADR-052) and the ring they are the area of. Only the LABEL: 2-D REFUSES an area VALUE about unknown
+ * points («שטח המשולש ABC הוא 13», «S_{XYZ} = S_{ABC}» — measured), so those keep #1028's refusal here.
+ */
+function areaLabelRing(f: Fact): Id[] | null {
+  if (f.t !== 'constraint' || f.k.t !== 'length-eq') return null;
+  const { left, right } = f.k;
+  const lone = (s: typeof left) => s.terms.length === 0 && s.expr.kind === 'sym' && !isTermPlaceholder(s.expr.name);
+  const area = (s: typeof left) => s.terms.length === 1 && s.terms[0].kind === 'area' && s.expr.kind === 'sym';
+  const side = area(left) && lone(right) ? left : area(right) && lone(left) ? right : null;
+  const term = side?.terms[0];
+  return term && term.kind === 'area' ? [...term.ids] : null;
+}
+const polygonIdOf = (ring: readonly Id[]): Id => `poly-${ring.join('')}`;
 
 /** The letters an order's two sides mint (`mintedByReference`): each side a value, a plain length, or an angle — else none. */
 function orderMints(...sides: OrderSide[]): Id[] {

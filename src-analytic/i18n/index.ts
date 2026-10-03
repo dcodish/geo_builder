@@ -191,6 +191,7 @@ const he = {
   errNumeralNotation:
     '{{numNoun}} {{holder}} ו{{numNoun}} {{detail}} הם אותו שם — הכלי קורא ספרה ומספר רומי כשם אחד. כדי לא לערבב שתי כתיבות, כתבו {{numNoun}} {{holder}}, כמו בשורות הקודמות.',
   errAlreadyNamed: 'כבר יש שם לנקודה הזו: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
+  errAliasTaken: 'השם {{holder}} כבר תפוס בציור — שם אחד מסמן דבר אחד, נקודה או זווית. בחרו שם אחר, למשל אות עם ספרה אחרת.',
   // #1154 — the rename's refusals, each naming what the student wrote
   errRenameBadName: '"{{detail}}" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
   errRenameSame: 'האות {{detail}} כבר נקראת {{detail}} — אין מה לשנות.',
@@ -595,6 +596,7 @@ const en: typeof he = {
   errNumeralNotation:
     '"{{numNoun}} {{holder}}" and "{{numNoun}} {{detail}}" are the same name — the tool reads a digit and a Roman numeral as one name. To keep one notation, write "{{numNoun}} {{holder}}", as in the earlier lines.',
   errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
+  errAliasTaken: 'The name {{holder}} is already taken on this figure — one name marks one thing, a point or an angle. Pick another name, e.g. a letter with a different digit.',
   errRenameBadName: '"{{detail}}" is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
   errRenameSame: '{{detail}} is already called {{detail}} — nothing to change.',
   errRenameUnknown: 'The figure has no point named {{detail}}, so there is nothing to rename.',

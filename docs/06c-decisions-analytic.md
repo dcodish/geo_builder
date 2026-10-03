@@ -10214,3 +10214,87 @@ Measured on the way: the constraint form of a regular polygon (n − 1 equal sid
 **Not done.** A shape inscribed in a QUADRILATERAL, an unlettered or partly lettered inscribed shape, and 2-D's region head that is a full statement («E על המעגל O בתוך המשולש ABC») — not on the row list, not read. Angle bounds are D3's too (cat-2d-085/086, ADR-AG-216).
 
 **Consequences.** `engine/shapes.ts`, `engine/derived.ts` (+ `sameDerivation.ts`, `solve.ts` labels), `engine/toolLetters.ts`, `engine/inscribe.ts` (new), `engine/types.ts`, `engine/apply.ts` (selector refs, `statingNamedCircle`), `engine/evaluate.ts` (judge + seed), `parseOrder` (the word window), `parser/parseAnalytic.ts`, `parser/catalogAnalytic.ts` (16 rows — diff the built proxy before deploy), `app/rename.ts`, `app/errorText.ts`, `store/useAnalyticStore.ts`, `i18n/index.ts` (two codes, He + En), `shell/__tests__/fixtures/geo-input-parity.ts`.
+
+## ADR-AG-221 — An order between angle names is D3's order; an angle named by a label is D2's alias under `∠A1`; an area label introduces the region it names (#1622 E5)
+
+**Status:** accepted · 2026-10-03 · slice E stream E5 of the analytic V4 plan (#1616): the last three analytic `#1622` known-gap rows. Standing rulings applied, none asked:
+- *analytic gives the same experience as 2-D for plane geometry* (2026-10-02, #1649/#1669);
+- *a reference creates what it names* (ADR-AG-210, #1670);
+- *every unstated magnitude is a free DOF* (ADR-052);
+- *no stated given may vanish* (honesty invariants).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R164. · **Design:** [04c](04c-design-analytic.md), "An order between angle names; an angle named by a label; an area label introduces its region".
+
+**Context — measured.** 2-D through `decideDeterministic2D` (the parity runner's lane); analytic through `decideSubmit` on the base (`feat/1622-parity` @ 1cf0596f).
+
+| sentence(s) | 2-D | analytic before | analytic now |
+|---|---|---|---|
+| «α < β» (empty canvas) | commits `measure-order` α < β | not-handled | builds (order selector) |
+| «α < 30», «α < 30°», «20 < α < 60» | commits `measure-bound` | not-handled | builds |
+| «α ≤ β» | commits `measure-order` `<=` | not-handled | builds, closed |
+| «α < β» · «משולש ABC» · «∢ABC = α» · «∢BAC = β» | builds; the order binds | not-handled at line 1 | builds; ∢BAC < ∢ABC at every seed |
+| … · «α = 50» · «β = 40» | refused (conflict) | — | refused `unsatisfiable` on «β = 40» |
+| «α < 2β», «α < AB» | not-handled | not-handled; «α < AB» recorded green (D3's length-vs-value pair) | not-handled; `bad-operand` |
+| «נסמן זוית BAM כ-A1» (empty, or on a triangle) | commits segments AB, AM + `angle-alias` A1 | not-handled | builds: arms drawn, A1 bound |
+| «נסמן זוית CAD כ 1», «נסמן ∠CAB=A1», «בתור», «כזוית», «כ-∠A1», "denote angle CAB as/by A1" | the same binding (digit ⇒ A1) | not-handled | the same facts |
+| «∠CAB=A1» with no verb | not-handled | records a free parameter named `A` (A·1) | unchanged — see "Not built" |
+| «נסמן זוית MAC כ-A1» after A1 is bound to ∢BAM | asks `aliasTaken` | — | refused `alias-taken` |
+| «נקודה A1» then the label, or the label then «נקודה A1» / «A1(1,2)» | asks `aliasTaken` (both orders; the coordinate form is out of 2-D's scope) | — | refused `alias-taken` |
+| «זוית A1 = 40», «∠A1 = 40», «A1 = 30», «זוית A1 = זוית A2» after the label | escalate (dropped / not-handled) | — | not-handled |
+| «נסמן זוית BAM כ-α» | commits `measure-angle` on α | not-handled | «∢BAM = α» (D2) |
+| «נסמן את שטח ABCD ב-S» (empty canvas) | commits `measure-area` on S; NO object | refused `unknown-reference` A | builds: quadrilateral ABCD, S its area |
+| … · «ריבוע ABCD» / «מרובע ABCD» / «AB = 5» | builds | — | builds (the noun takes the ring over) |
+| «שטח ABCD = 20», «שטח ABC = שטח ABD», «S_{XYZ} / S_{ABC} = 2» on missing points | refused (unknown point) | refused | refused (unchanged) |
+
+**Decision.**
+1. **The alias order is D3's `order` (ADR-AG-216), with no second mechanism.**
+   - `orderFacts` declined two VALUE sides ("a domain or an equation"). It now admits them when each side is a lone Greek alias or a number, and at least one is an alias. That is 2-D's grammar: `measure-order` between two variables, `measure-bound` against a number. «α < 2β» is unread here, as in 2-D.
+   - The selector is the one «AB < BC» lowers to. `orderQuantity` already evaluates a value side with `evalExpr`. An alias no angle uses is not in the register, so the order judges nothing until «∢ABC = α» binds it. 2-D commits the bare order and binds it later in the same way.
+   - A value naming a Greek alias is an ANGLE in the kind check, so «α < AB» is `bad-operand`, like D3's «AB < ∢ABC».
+   - **Seeded into its region** (`seedOrderParams`, in `foldSignSelectors`, the #1323 fold for a parameter). Measured before the seeding: «α > 150» · «משולש ABC» · «∢ABC = α» drew no figure at most seeds — sample-and-reject on a region, the #1071 class D3 named. Now, where the sample breaks the order, the alias's sample is rescaled from its implied range onto the region, keeping its relative place. Measured over eight seeds: «α < 30», «α > 150», «20 < α < 60» and «α < β» hold at every seed, with ≥ 3 distinct angles.
+   - E3's `params` quantity («R > r», ADR-AG-219) is a separate reader for Latin radius letters with a "used" check. It is not merged here (see "Not built").
+2. **The angle label is D2's alias mechanism (ADR-AG-215) under a non-expression name.**
+   - `parseAngleLabel` copies 2-D's `angleAliasRule` spellings. It reads the line WITH its verb, in `parseLine` before `unwrap` strips «נסמן». 2-D binds «∠CAB=A1» only after the verb, and this rule does the same.
+   - It lowers to the `angle` constraint with the free value `∠A1`, plus the two arm segments 2-D draws. A Greek name goes through `parseClause('∠BAM = α')`, D2's own reading.
+   - **The collision, measured.** «A1» is a point's name in this tree: «נקודה A1» and «A1(1,2)» build, `NAME` is `[A-Z][0-9]?`, and `mentionsAny` reads a capital-plus-digit string as a point id. So the parameter is never `A1`; it is `∠A1` (`angleLabelSymbol`). The expression reader cannot produce that name, `mentionsAny` cannot mistake it for a point, and the panel prints it as the book's ∠A1.
+   - The collision the STUDENT can make — one name for two things — is 2-D's `aliasTaken`, ported as `alias-taken`. It covers the same label on a different angle (which the shared symbol would otherwise read as the equality ∢BAM = ∢MAC, a given nobody stated) and a label that is a point's name, in either order. Restating the same binding is absorbed.
+   - The label states no magnitude. On a determined figure the panel reads its angle: ∠A1 = 90 on A(0,0), B(4,0), C(0,3).
+3. **«נסמן את שטח ABCD ב-S» on an empty canvas introduces the quadrilateral ABCD.**
+   - 2-D commits the label with no object. Analytic holds no statement about points it does not have, so the label cannot wait for the shape.
+   - The standing rule "a reference creates what it names" (ADR-AG-210) chooses the closest honest equivalent: the label names a region, so it introduces it, exactly as «AB = 5» introduces A and B. The vertices are free (ADR-052), and the ring is a noun-less polygon, so only the simple-ring promise is judged. S is the drawn area at every seed. A later «ריבוע ABCD» / «מלבן ABCD» takes the ring over (the #1049 promotion), and «AB = 5» then gives S = 25.
+   - `areaLabelRing` is the minting form: one area term against a lone symbol. It deliberately excludes an area VALUE, because 2-D REFUSES «שטח ABCD = 20» and «שטח ABC = שטח ABD» on missing points (measured). Those keep #1028's refusal.
+   - The alternative — introduce only the four points — was rejected. Four free points in the order A, B, C, D may cross, and the area of a crossed ring is not the area of «ABCD».
+
+**Not built, said out loud.**
+- **«∠CAB = A1» without the verb** records a free parameter named `A` (A·1). This is pre-existing: the value reader treats the point letter `A` as a symbol. 2-D escalates the same line. It is a separate defect (an angle value that reads a point name as a parameter), reported for filing, not patched here.
+- **2-D's catalog promises follow-ups to the label** — «∠A1 = 40», «∠A1 = ∠D1», «angle A1 is acute» (`catalog.ts` row 127). Measured: every one escalates in 2-D's deterministic lane. Analytic reads none of them either (same verdict). The gap between 2-D's catalog text and its lane is reported, not filed.
+- **An alias order with no angle bound** judges nothing: «α < β» · «α = 50» · «β = 40» records, exactly as 2-D commits it. The same holds for the pre-existing «α = 50» · «α = 40» — a pin about a symbol no object uses is never evaluated. Reported as one class (unbound parameter givens are unjudged), not patched here.
+- **E3's `params` quantity and D3's `order`** both order parameters. Merging them would move E3's "used" check and its Latin radius grammar, so it is left to the integrator as a follow-up.
+- The `alias-taken` refusal is `refused` in the parity vocabulary; 2-D's is `asks` (a clarify). The student reads the same remedy. No parity row is added for it; the lock below holds it.
+
+**Measured.** 471 corpus (`confirmTaught`, seed 0): **257/263 lines, 41/46 questions — unchanged**. None of these sentences is in the corpus.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1622-e5-last-rows.test.ts` has 21 tests, all through `decideSubmit` / `derive` / `parseLine`, over eight seeds. **Fails before: 17 of 21.** The four that pass on the base are guards:
+  - the neighbours (Latin domains, «a < b»);
+  - «A1 = 30» unread and the repeated vertex;
+  - no second ring on an existing quadrilateral;
+  - area VALUES on missing points refused.
+- Parity rows flipped (analytic `#1622` gap dropped): **cat-2d-059, cat-2d-072, cat-2d-084**.
+- New rows, each with 3-D's gap on #1679:
+  - alias-order-bound-1622, alias-order-window-1622, alias-order-closed-1622, alias-order-binds-1622;
+  - angle-label-1622, angle-label-digit-1622, angle-label-equals-1622, angle-label-greek-1622;
+  - area-label-triangle-1622;
+  - area-value-unknown-1622 (refused).
+- Two drafted rows were dropped, because 3-D's last line coincides with 2-D while its context fails: the contradicted pin, and «A1 = 30». The test file holds both.
+- Catalog: four He/En entries («α < β», «α < 30», «נסמן זוית BAM כ-A1», «נסמן את שטח המשולש ABC ב-S»).
+
+**Consequences.**
+- `parser/parseAnalytic.ts`: `GREEK_ALIAS`, `orderFacts` (alias value sides and the kind check), `parseAngleLabel` and its call in `parseLine`.
+- `engine/evaluate.ts`: `seedOrderParams` in `foldSignSelectors`.
+- `engine/apply.ts`: the `alias-taken` code; the label check in the `angle` constraint; the label-name check in `applyFact`; `areaLabelRing` as a minting form, and its ring stated in the mint pass.
+- `engine/lengths.ts`: `angleLabelSymbol`, `angleLabelName`.
+- `store/useAnalyticStore.ts`, `app/errorText.ts`, `i18n/index.ts`: `errAliasTaken` (he/en).
+- `parser/catalogAnalytic.ts`; `shell/__tests__/fixtures/geo-input-parity.ts`.
+
+Sibling check (docs/17 §1): 2-D is the reference and was measured for every sentence. 3-D reads none of them (gaps on #1679).

@@ -1273,6 +1273,12 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'relations', family: 'F17', he: '∢ABC ≤ 40°', en: '∠ABC ≤ 40°', needs: ['משולש ABC'] },
   { category: 'relations', family: 'F17', he: '∢ABC < ∢BAC', en: '∠ABC < ∠BAC', needs: ['משולש ABC'] },
   { category: 'relations', family: 'F17', he: 'זווית ABC קהה', en: 'angle ABC is obtuse', needs: ['משולש ABC'] },
+  // #1622 E5 (ADR-AG-221) — an order between angle aliases (2-D's measure-order / measure-bound), an angle named by a
+  // label (2-D's angle-alias), and an area label that introduces the region it names
+  { category: 'relations', family: 'F17', he: 'α < β', en: 'α < β', needs: ['משולש ABC', '∢ABC = α', '∢BAC = β'] },
+  { category: 'relations', family: 'F17', he: 'α < 30', en: 'α < 30', needs: ['משולש ABC', '∢ABC = α'] },
+  { category: 'relations', family: 'F17', he: 'נסמן זוית BAM כ-A1', en: 'denote angle BAM as A1', needs: ['משולש ABC', 'נקודה M על BC'] },
+  { category: 'relations', family: 'F17', he: 'נסמן את שטח המשולש ABC ב-S', en: 'denote the area of triangle ABC by S' },
   // #1622 slice E1 (ADR-AG-217) — the shapes and points 2-D reads, as the corpus and 2-D's guide write them
   { category: 'shapes', family: 'F17', he: 'ABCD', en: 'ABCD' },
   { category: 'shapes', family: 'F17', he: 'ריבוע ABCD שצלעו הוא 1', en: 'square ABCD whose side is 1' },
