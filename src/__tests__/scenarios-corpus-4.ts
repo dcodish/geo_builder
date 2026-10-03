@@ -3252,4 +3252,20 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(at(fig, 'D'), at(fig, 'O')), 'D on the container O').toBeCloseTo(O!.radius.value, 6);
     },
   },
+  {
+    id: 'diagonals-named-by-letters-1683',
+    title: '#1683 (ADR-569): in «מרובע ABCD», «האלכסונים AB ו-CD נפגשים בנקודה E» is refused (AB and CD are sides); «האלכסונים AC ו-BD …» builds the named meet',
+    guards:
+      "Found by the #1620 analytic stream (ADR-AG-208), measured on main deed7b20 through decideDeterministic2D: «מרובע ABCD» · «האלכסונים AB ו-CD נפגשים בנקודה E» committed the meet of AC and BD — the student's letters replaced by others, green. Root cause: specialPointMeet derives its two lines from the shape and never read a pair list after the noun, and the diagonal claim (ADR-499) lived only in the segment/diagonals rules' flag, so a sentence another rule won dropped it. Fix: lines named by letters go to the rule that reads them (the lettered meet; a cevian family through its own rule), and «אלכסון» joins the role-noun registry, so every reading carries the claim. Asserts the operator's line is refused at the gate with the side named, and that the correct spelling builds E on both diagonals. The submit-door matrix (English, the cut form, no ring, two rings, the lettered medians/altitudes/bisectors) is in src/app/__tests__/issue-1683-lettered-lines.test.ts.",
+    steps: ['מרובע ABCD', 'האלכסונים AC ו-BD נפגשים בנקודה E'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const wrong = gateVerdict(factsOf(['מרובע ABCD']), 'האלכסונים AB ו-CD נפגשים בנקודה E');
+      expect(wrong.kind === 'refused' && wrong.detail, '«האלכסונים AB ו-CD …» is refused naming the side').toMatch(/AB is not a diagonal of ABCD/);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E');
+      const off = (P: Vec, Q: Vec, R: Vec) => Math.abs((R.x - P.x) * (Q.y - P.y) - (R.y - P.y) * (Q.x - P.x)) / dist(P, Q);
+      expect(off(A, C, E), 'E on AC').toBeLessThan(1e-6);
+      expect(off(B, D, E), 'E on BD').toBeLessThan(1e-6);
+    },
+  },
 ];

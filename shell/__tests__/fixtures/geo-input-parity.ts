@@ -707,6 +707,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'diag-meet-right-trapezoid-1620', family: 'intersections', steps: ['טרפז ישר זווית ABCD', 'אלכסוני הטרפז נפגשים בנקודה M'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'diag-meet-two-trapezoids-1620', family: 'intersections', steps: ['טרפז ABCD', 'טרפז EFGH', 'אלכסוני הטרפז נפגשים בנקודה M'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'diag-meet-generic-two-1620', family: 'intersections', steps: ['טרפז ABCD', 'מרובע EFGH', 'אלכסוני המרובע נפגשים בנקודה M'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1679' }] },
+  { id: 'diag-meet-sides-1683', family: 'intersections', steps: ['מרובע ABCD', 'האלכסונים AB ו-CD נפגשים בנקודה E'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1728' }], note: 'AB and CD are sides of ABCD, not its diagonals (#1683, ADR-569; analytic ADR-AG-208)' },
   { id: 'diag-meet-no-figure-1620', family: 'intersections', steps: ['האלכסונים AC ו-BD נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'diagonal-decl-1620', family: 'polygons', steps: ['מרובע ABCD', 'האלכסון AC'], expect: 'builds' },
   { id: 'diagonal-in-ring-1620', family: 'polygons', steps: ['מרובע ABCD', 'האלכסון AC במרובע ABCD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: 'the sentence #1620 S1 teaches «העבירו את האלכסון AC במרובע ABCD» onto; 2-D does not read the ring tail' },

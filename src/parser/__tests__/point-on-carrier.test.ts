@@ -28,14 +28,18 @@ describe('point on a named carrier', () => {
     ['E on segment AC'],
     ['E on diagonal AC'],
     ['E on the chord AC'],
-  ])('%s → E on segment AC (carrier noun skipped, E kept)', (utterance) => {
+  ])('%s → E on segment AC (carrier noun read, E kept)', (utterance) => {
     const r = parse(utterance);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.commands.slice(-2)).toEqual(onSeg('E', 'A', 'C'));
+    // #1683 (ADR-569): a DIAGONAL carrier claims its pair is a diagonal (ADR-499) — the drawn carrier
+    // carries the flag, as «האלכסון AC» does; it used to be skipped here, the claim dropped.
+    const diagonal = /אלכסון|diagonal/.test(utterance);
+    const [seg, rider] = onSeg('E', 'A', 'C');
+    expect(r.commands.slice(-2)).toEqual([diagonal ? { ...seg, diagonal: true } : seg, rider]);
     // #1661 (ADR-563): a CHORD carrier still claims its ends on the circle — with none drawn, the noun
     // introduces it exactly as «מיתר AC» does (it used to be dropped here: a bare segment). The other
-    // carrier nouns (side / segment / diagonal) claim nothing.
+    // carrier nouns (side / segment) claim nothing.
     const chord = /מיתר|chord/.test(utterance);
     const circles = r.commands.filter((c) => c.type === 'circle');
     const on = r.commands.filter((c) => c.type === 'point-on-circle').map((c) => (c as { id: string }).id);
