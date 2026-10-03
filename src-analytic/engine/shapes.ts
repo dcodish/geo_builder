@@ -105,7 +105,24 @@ export interface ShapeRow {
    * for something the noun forbids, and is refused naming both nouns; it is never drawn as the forced shape.
    */
   notCyclic?: string;
+  /**
+   * EVERY SIDE IS EQUAL BY DEFINITION (#1622, ADR-AG-217) — so «שצלעו 4» names ONE length unambiguously. 2-D's
+   * `SIDE_SHAPES` (square, rhombus, equilateral triangle), read off the row instead of a second list, plus the regular
+   * polygons. On any other noun «its side» is an unstated pick of WHICH side (ADR-052): the sentence asks.
+   */
+  equalSides?: true;
+  /**
+   * A REGULAR polygon of this many sides (#1622, ADR-AG-217; 2-D's ADR-111). Its noun is not lowered to constraints
+   * but CONSTRUCTED: the first two vertices free and every other one the `regular-vertex` closed form over that
+   * first side (`derived.ts`) — rigid up to similarity, 4 DOF, exactly 2-D's figure. Measured: the constraint form
+   * (n − 1 equal sides, n angles of (n − 2)·180°/n) left «משושה משוכלל» unsatisfiable from a sampled start. The
+   * declaration's lowering (`parseAnalytic`'s `shapeDeclaration`) reads this flag; `givens` is empty.
+   */
+  regular?: number;
 }
+
+/** A regular n-gon's row — see {@link ShapeRow.regular}. */
+const regular = (n: number): ShapeRow => ({ arity: n, equalSides: true, regular: n, givens: () => [] });
 
 /**
  * The table. Hebrew keys are the nouns as the exam writes them; `-` and space variants are
@@ -126,6 +143,7 @@ export const SHAPES: Record<string, ShapeRow> = {
   },
   'משולש שווה צלעות': {
     arity: 3,
+    equalSides: true,
     givens: ([a, b, c]) => [equal(a, b, b, c), equal(b, c, c, a)],
   },
   // --- quadrilaterals ---
@@ -142,6 +160,7 @@ export const SHAPES: Record<string, ShapeRow> = {
   },
   ריבוע: {
     arity: 4,
+    equalSides: true,
     givens: ([a, b, c, d]) => [
       parallel(a, b, d, c),
       parallel(a, d, b, c),
@@ -151,6 +170,7 @@ export const SHAPES: Record<string, ShapeRow> = {
   },
   מעוין: {
     arity: 4,
+    equalSides: true,
     givens: ([a, b, c, d]) => [parallel(a, b, d, c), parallel(a, d, b, c), equal(a, b, b, c)],
     // A rhombus's diagonals are not interchangeable in a figure, but neither is distinguished by the
     // NOUN — «הראשי» has no referent here, and guessing one would assert a given (#1070).
@@ -186,7 +206,31 @@ export const SHAPES: Record<string, ShapeRow> = {
     givens: ([a, b, c, d]) => [equal(a, b, a, d), equal(c, b, c, d)],
     principalDiagonal: ([a, , c]) => [a, c],
   },
+  /*
+   * --- polygons of five sides and more (#1622, ADR-AG-217) ---
+   * 2-D's #835 ruling, ported: *"we should support מחומש, משושה, מתומן. if משוכלל is not mentioned, so its just the
+   * shape and if its משוכלל so draw it like that"*. A BARE noun is the n-sided «מרובע» — the ring and nothing else
+   * (ADR-052: «מחומש» must not acquire the equal sides of «מחומש משוכלל»); 2-D builds it for 5, 6 and 8 only. A
+   * regular one is read for every noun 2-D's `HE_POLY_NAME_N` knows.
+   */
+  מחומש: { arity: 5, givens: () => [] },
+  משושה: { arity: 6, givens: () => [] },
+  מתומן: { arity: 8, givens: () => [] },
+  'מחומש משוכלל': regular(5),
+  'משושה משוכלל': regular(6),
+  'משובע משוכלל': regular(7),
+  'מתומן משוכלל': regular(8),
+  'מתושע משוכלל': regular(9),
+  'מעושר משוכלל': regular(10),
 };
+
+/**
+ * The polygon nouns 2-D knows and builds only when REGULAR (#835's closed set: «משובע», «מתושע», «מעושר») — a bare one
+ * is refused BY NAME, offering the nouns that do build, never handed to the model to invent a figure (#1622).
+ */
+export const BARE_POLYGON_NOT_BUILT: ReadonlySet<string> = new Set(['משובע', 'מתושע', 'מעושר']);
+/** The bare polygon nouns that DO build, for the refusal to offer. */
+export const BARE_POLYGON_OFFER = ['מחומש', 'משושה', 'מתומן'];
 
 /**
  * THE ANGLE NOUN'S STEM, in both of its spellings (#1407, ADR-AG-155).
@@ -213,6 +257,8 @@ const SPELLING_FOLDS: ReadonlyArray<[RegExp, string]> = [
   [new RegExp(`(?<![א-ת])${ANGLE_STEM_HE}ת(?![א-ת])`, 'g'), 'זווית'],
   [/(?<![א-ת])מעויין(?![א-ת])/g, 'מעוין'],
   [/(?<![א-ת])שוה(?![א-ת])/g, 'שווה'],
+  // «משומן» — 2-D's legitimate but uncommon octagon spelling (#835), folded onto «מתומן».
+  [/(?<![א-ת])משומן(?![א-ת])/g, 'מתומן'],
 ];
 
 /** «ישר-זווית» ≡ «ישר זווית», and «ה» may front the noun — one spelling reaches the table. */
@@ -253,7 +299,7 @@ export const promisesOneParallelPair = (noun: string | undefined): boolean =>
  */
 export const isGenericNoun = (noun: string): boolean => {
   const row = shapeRow(noun);
-  return !!row && row.givens(['A', 'B', 'C', 'D'].slice(0, row.arity)).length === 0;
+  return !!row && !row.regular && row.givens([...'ABCDEFGHIJ'].slice(0, row.arity)).length === 0;
 };
 
 /** The noun that names ANY polygon — «היקף המצולע», "the polygon" — and so selects by nothing. */
@@ -374,4 +420,16 @@ export const EN_SHAPE: Record<string, string> = {
   'isosceles trapezoid': 'טרפז שווה שוקיים',
   'right trapezoid': 'טרפז ישר זווית',
   kite: 'דלתון',
+  pentagon: 'מחומש',
+  hexagon: 'משושה',
+  octagon: 'מתומן',
+  'regular pentagon': 'מחומש משוכלל',
+  'regular hexagon': 'משושה משוכלל',
+  'regular heptagon': 'משובע משוכלל',
+  'regular octagon': 'מתומן משוכלל',
+  'regular nonagon': 'מתושע משוכלל',
+  'regular decagon': 'מעושר משוכלל',
+  // 2-D routes a regular triangle / quadrilateral to the canonical shapes (ADR-111).
+  'regular triangle': 'משולש שווה צלעות',
+  'regular quadrilateral': 'ריבוע',
 };

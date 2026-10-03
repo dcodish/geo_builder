@@ -377,6 +377,14 @@ export type Constraint =
    * Carried as the node the walk reads, the subject is registered by the same mechanism every value is.
    */
   | { t: 'param-eq'; sym: Extract<Expr, { kind: 'sym' }>; value: Expr }
+  /**
+   * Σ kᵢ·⌢(aᵢbᵢ) = value — ARC MEASURES, in degrees (#1622 E4, ADR-AG-220; 2-D's ADR-116 identity: an arc's measure IS
+   * its central angle). Each arc is the unsigned angle at the CENTRE of its resolved circle between the radii to its
+   * two ends — read off the circle, so a circle stated by an equation, by a centre letter or computed from points is
+   * one operand and no centre letter is needed (the ADR-AG-203 radius-direction discipline). One kind for a value
+   * («קשת AB = 40»), a ratio («קשת DE = 2 קשת CE» → ⌢DE − 2⌢CE = 0) and a sum.
+   */
+  | { t: 'arc-sum'; terms: Array<{ k: Expr; circle: Id; a: Id; b: Id }>; value: Expr }
   | { t: 'choice'; options: Constraint[] }
   /**
    * ONE OPTION THAT IS SEVERAL STATEMENTS (#1620, ADR-AG-208) — «every vertex on some axis» chooses an axis for
@@ -527,6 +535,9 @@ export function constraintRefs(k: Constraint): Id[] {
     // A parameter's value names no point: its freedom lives in the register.
     case 'param-eq':
       return [];
+    // The arcs' ends; each circle is a CURVE ref (`constraintCurveRefs`), as the radius direction's is.
+    case 'arc-sum':
+      return k.terms.flatMap((t) => [t.a, t.b]);
     case 'choice':
       return [...new Set(k.options.flatMap(constraintRefs))];
     case 'all':
@@ -563,6 +574,8 @@ function describeRule(r: DerivedRule): string {
       return `נקודת ההשקה של ${r.circle} עם ${r.a}${r.b}`;
     case 'foot':
       return `רגל האנך מ-${r.from}`;
+    case 'regular-vertex':
+      return `קודקוד ${r.k + 1} של המצולע המשוכלל על ${r.a}${r.b}`;
     default: {
       const undescribed: never = r;
       throw new Error(`rule has no description: ${JSON.stringify(undescribed)}`);
@@ -609,6 +622,15 @@ export function describeConstraint(k: Constraint): string {
       return `מעגל ${k.centre} משיק למעגל ${k.other}${k.branch === 'internal' ? ' מבפנים' : ' מבחוץ'}`;
     case 'derived-at':
       return `${k.id} = ${describeRule(k.rule)}`;
+    case 'arc-sum':
+      return `${k.terms
+        .map((t, i) => {
+          const c = exprText(t.k);
+          const sign = c.startsWith('-') ? ' − ' : i === 0 ? '' : ' + ';
+          const mag = c.replace(/^-/, '');
+          return `${sign}${mag === '1' ? '' : mag}⌢${t.a}${t.b}`;
+        })
+        .join('')} = ${exprText(k.value)}`;
     case 'choice':
       return k.options.map(describeConstraint).join(' או ');
     case 'all':
@@ -659,6 +681,8 @@ export function constraintCurveRefs(k: Constraint): Id[] {
       return ofDir(k.u);
     case 'derived-at':
       return curveParentsOf(k.rule);
+    case 'arc-sum':
+      return [...new Set(k.terms.map((t) => t.circle))];
     case 'choice':
       return [...new Set(k.options.flatMap(constraintCurveRefs))];
     case 'all':
@@ -1043,6 +1067,27 @@ export function residualRows(
       const floor = SOLVE_RESOLUTION * Math.max(Math.abs(r1), Math.abs(r2), d);
       if (d < floor) return { eq: [Math.max(Math.abs(miss), floor - d)] };
       return { eq: [miss] };
+    }
+    /**
+     * ARC MEASURES (#1622 E4, ADR-AG-220) — each arc the unsigned central angle of its resolved circle, the sum less
+     * the value in radians over π (the `angle` row's scale). A circle not resolved, or an end at its centre, is
+     * "cannot be judged" (`null`), never zero.
+     */
+    case 'arc-sum': {
+      if (!curveAt) return null;
+      let sum = 0;
+      for (const [i, t] of k.terms.entries()) {
+        const circle = curveAt(t.circle);
+        if (!circle || circle.kind !== 'circle') return null;
+        const centre = { x: circle.cx, y: circle.cy };
+        const theta = angleAt(centre, p[2 * i], p[2 * i + 1]);
+        const coef = evalExpr(t.k, env);
+        if (theta === null || !Number.isFinite(coef)) return null;
+        sum += coef * theta;
+      }
+      const deg = evalExpr(k.value, env);
+      if (!Number.isFinite(deg)) return null;
+      return { eq: [(sum - (deg * Math.PI) / 180) / Math.PI] };
     }
     case 'derived-at': {
       /**

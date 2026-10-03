@@ -59,7 +59,92 @@ export function orthography(raw: string): string {
     // «מונח/מונחת/מונחים על» — the exam's verb for lying on a carrier — is «נמצא על».
     .replace(/(?<![א-ת])מונח(ת|ים|ות)?(?![א-ת])/g, (_m, s: string | undefined) => `נמצא${s ?? ''}`)
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .replace(/^.*$/, (t) => wordDegrees(t).trim());
+}
+
+/*
+ * AN ANGLE VALUE IN WORDS (#1622, ADR-AG-218) — «שווה לשלושים מעלות», «ארבעים וחמש מעלות», "thirty degrees" read as
+ * the digits, copied from 2-D's `normalizeWordDegrees` (src/parser/parse.ts, #185 row 5; never imported,
+ * BOUNDARIES.json). Scoped to the DEGREE word on purpose — a counting word elsewhere («צלע אחת») is a determiner,
+ * not a value — and a glued prefix on the number word is kept («לשלושים» → «ל-30»).
+ */
+const HE_NUM_UNITS: Readonly<Record<string, number>> = {
+  'אחת': 1, 'אחד': 1, 'שתיים': 2, 'שניים': 2, 'שתי': 2, 'שני': 2, 'שלוש': 3, 'שלושה': 3, 'ארבע': 4, 'ארבעה': 4,
+  'חמש': 5, 'חמישה': 5, 'שש': 6, 'שישה': 6, 'שבע': 7, 'שבעה': 7, 'שמונה': 8, 'תשע': 9, 'תשעה': 9,
+};
+const HE_NUM_TENS: Readonly<Record<string, number>> = {
+  'עשר': 10, 'עשרה': 10, 'עשרים': 20, 'שלושים': 30, 'ארבעים': 40, 'חמישים': 50, 'שישים': 60, 'ששים': 60,
+  'שבעים': 70, 'שמונים': 80, 'תשעים': 90,
+};
+const EN_NUM_WORDS: Readonly<Record<string, number>> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17,
+  eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70,
+  eighty: 80, ninety: 90,
+};
+
+/** «שלושים» → 30, «ארבעים וחמש» → 45, «מאה ועשרים» → 120, «שלוש עשרה» → 13; null when not a cardinal. */
+function heWordNumber(tokens: readonly string[]): number | null {
+  if (tokens.length === 2 && HE_NUM_UNITS[tokens[0]] !== undefined && /^עשרה?$/.test(tokens[1])) return 10 + HE_NUM_UNITS[tokens[0]];
+  let total = 0;
+  let rank = Infinity; // strictly descending magnitude, so «חמש שלושים» is not a number
+  for (let i = 0; i < tokens.length; i += 1) {
+    const t = i > 0 ? tokens[i].replace(/^ו/, '') : tokens[i];
+    const v = t === 'מאה' ? 100 : (HE_NUM_TENS[t] ?? HE_NUM_UNITS[t]);
+    if (v === undefined || v >= rank) return null;
+    total += v;
+    rank = v;
+  }
+  return total > 0 ? total : null;
+}
+
+function enWordNumber(tokens: readonly string[]): number | null {
+  let total = 0;
+  let rank = Infinity;
+  for (const t of tokens) {
+    if (t === 'and') continue;
+    if (t === 'hundred') {
+      if (total === 0) return null;
+      total *= 100;
+      rank = 99;
+      continue;
+    }
+    const v = EN_NUM_WORDS[t];
+    if (v === undefined || v >= rank) return null;
+    total += v;
+    rank = v;
+  }
+  return total > 0 ? total : null;
+}
+
+/** The Hebrew cardinal with an optional glued prefix on its first word («לשלושים», «בארבעים וחמש»). */
+function heNumPhrase(words: readonly string[]): { pre: string; value: number } | null {
+  const direct = heWordNumber(words);
+  if (direct !== null) return { pre: '', value: direct };
+  const g = words[0].match(/^([ולבמכש])([א-ת]{2,})$/);
+  const v = g ? heWordNumber([g[2], ...words.slice(1)]) : null;
+  return g && v !== null ? { pre: g[1], value: v } : null;
+}
+
+function wordDegrees(s: string): string {
+  // The run of words directly before «מעלות», trimmed from the LEFT until a cardinal remains.
+  const he = s.replace(/((?:[א-ת]+\s+){1,3})(?=מעלות(?![א-ת]))/g, (m, phrase: string) => {
+    const words = phrase.trim().split(/\s+/);
+    for (let i = 0; i < words.length; i += 1) {
+      const hit = heNumPhrase(words.slice(i));
+      if (hit) return `${words.slice(0, i).join(' ')}${i ? ' ' : ''}${hit.pre ? `${hit.pre}-` : ''}${hit.value} `;
+    }
+    return m;
+  });
+  return he.replace(/((?:[A-Za-z]+[-\s]+){1,4})(?=degrees?\b)/gi, (m, phrase: string) => {
+    const words = phrase.trim().split(/[-\s]+/);
+    for (let i = 0; i < words.length; i += 1) {
+      const v = enWordNumber(words.slice(i).map((w) => w.toLowerCase()));
+      if (v !== null) return `${words.slice(0, i).join(' ')}${i ? ' ' : ''}${v} `;
+    }
+    return m;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +177,8 @@ const UNWRAP: ReadonlyArray<[RegExp, string]> = [
   [/^ידוע\s+(?:גם\s+)?(?:כי\s+|ש-?)/, ''],
   // «נסמן ∢DCB = 2α», «נסמן: זווית ADB = α» (#1621, ADR-AG-215) — "let us denote": the exam introducing a symbol by
   // the equation that follows, which is the given itself (the symbol is free until a later given pins it). Only an
-  // equation is a reading — «נסמן את שטח ABCD ב-S» unwraps to a clause no rule reads, and stays unread.
+  // equation is a reading here; «נסמן את שטח ABCD ב-S» unwraps to «את שטח ABCD ב-S», which `restatedClauses` reads
+  // (#1622, ADR-AG-218).
   [/^נסמן\s*(?::\s*|\s+כי\s+|\s+)/, ''],
   [/^(?:let|denote)\s+/i, ''],
   [/^(?:it\s+is\s+(?:given|known)\s+that|given\s+that|given\s*:|given)\s+/i, ''],
@@ -542,6 +628,49 @@ export function conditionClauses(line: string): string[] | null {
   const relEn = new RegExp(`^(.*?(${NAME}))\\s*,?\\s+which\\s+((?:lies|is)\\s+.+)$`).exec(line);
   if (relEn) return [relEn[1].trim(), `${relEn[2]} ${relEn[3].trim()}`];
   return null;
+}
+
+/**
+ * «נסמן את שטח ABCD ב-S» · "denote the area of ABCD by S" — the area LABELLED by a letter (#1622, ADR-AG-218): «שטח ABCD = S», a
+ * free value the panel shows under the student's letter (known once other givens pin it).
+ */
+// «נסמן» / "denote" may already be unwrapped (#1621's «נסמן …» frame) — the clause is then «את שטח ABCD ב-S».
+const AREA_LABEL_HE = /^(?:נסמן\s+)?את\s+(שטח\s+.+?)\s+ב-?\s*([A-Za-z])$/;
+const AREA_LABEL_EN = /^(?:(?:denote|label)\s+)?(?:the\s+)?(area\s+of\s+.+?)\s+(?:by|as)\s+([A-Za-z])$/i;
+export function restatedClauses(line: string): string[] | null {
+  const area = AREA_LABEL_HE.exec(line) ?? AREA_LABEL_EN.exec(line);
+  if (area) return [`${area[1].replace(/^area\s+of\s+/i, 'שטח ')} = ${area[2]}`];
+  return null;
+}
+
+/**
+ * A CHAINED EQUALITY (#1622, ADR-AG-218) — «AB = AC = 3x», «זוית AEB שווה לזווית BEC שווה 60 מעלות», «∠A = ∠B = 50»:
+ * one sentence stating that every member equals the next, read as the pairwise equalities 2-D lowers it to
+ * (`set-equal` + each value). The joints are the closed set of ways to say "is" (`=`, «שווה (ל-)», «הוא/היא»,
+ * "equals", "is") — the #1260 allowlist, so a relation word is never read as an equality. Two joints at least: one
+ * joint is a sentence the grammar reads whole. Offered after the whole line failed, and taken only when EVERY pair
+ * parses, so a member the grammar cannot read refuses the line rather than vanish.
+ */
+const CHAIN_JOINT = /\s*=\s*|\s+(?:שוו(?:ה|ות|ים)(?:\s+ל-?\s*|\s+)|(?:הוא|היא|equals?(?:\s+to)?|is)\s+)/;
+export function chainClauses(line: string): string[] | null {
+  if (/[<>≤≥]/.test(line)) return null;
+  const members: string[] = [];
+  let rest = line;
+  for (;;) {
+    const m = CHAIN_JOINT.exec(rest);
+    if (!m) break;
+    // Inside parentheses is not a joint — «A(2,3)» never carries one, and an equation's own `=` is left whole.
+    const before = rest.slice(0, m.index);
+    if ((before.match(/\(/g) ?? []).length !== (before.match(/\)/g) ?? []).length) return null;
+    members.push(before.trim());
+    rest = rest.slice(m.index + m[0].length);
+  }
+  members.push(rest.trim());
+  if (members.length < 3 || members.some((x) => !x)) return null;
+  // Every member but the last is a MEASURE — it names points. «side AB is y=x-4» has the joints and a middle member
+  // `y`, which is prose around an equation (#1496), never a link in a chain of equal measures.
+  if (members.slice(0, -1).some((x) => !/[A-Z]/.test(x))) return null;
+  return members.slice(0, -1).map((x, i) => `${x} = ${members[i + 1]}`);
 }
 
 export function parenClauses(line: string): string[] | null {

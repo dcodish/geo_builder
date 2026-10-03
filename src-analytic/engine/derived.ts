@@ -84,7 +84,15 @@ export type DerivedRule =
    * solved: the projection of one point on one line. The line through `from` and the foot is «האנך», which a
    * later sentence may refer to («E על האנך», «המשיק והאנך נחתכים …») — M1 resolves it by this rule.
    */
-  | { t: 'foot'; from: Id; onto: FootLine };
+  | { t: 'foot'; from: Id; onto: FootLine }
+  /**
+   * «מחומש משוכלל ABCDE» — the `k`-th vertex of the REGULAR `n`-gon whose first side is `a`→`b` (#1622, ADR-AG-217).
+   * 2-D's ADR-111 places a regular polygon's vertices on a hidden circle at pinned angles (rigid up to similarity);
+   * this is the same figure as a closed form over its first side: walk the ring turning 360°/n left at each vertex.
+   * Determined, not solved — measured, the constraint form (equal sides and (n−2)·180°/n angles) left a hexagon
+   * unsatisfiable from a sampled start. The ring runs counter-clockwise, as 2-D's increasing angles do.
+   */
+  | { t: 'regular-vertex'; a: Id; b: Id; n: number; k: number };
 
 /** The line a foot is dropped onto — the three `Direction` members that are a LINE, not only a direction. */
 export type FootLine = { k: 'axis'; axis: 'x' | 'y' } | { k: 'points'; a: Id; b: Id } | { k: 'curve'; id: Id };
@@ -107,6 +115,8 @@ export function parentsOf(r: DerivedRule): Id[] {
     // The point the perpendicular is dropped FROM, and a two-point line's two points; a line object is a CURVE parent.
     case 'foot':
       return r.onto.k === 'points' ? [r.from, r.onto.a, r.onto.b] : [r.from];
+    case 'regular-vertex':
+      return [r.a, r.b];
     // Its parent is a CURVE, not a point — see `curveParentOf`. Returning the curve id here would
     // send it through every check that assumes a parent is positional.
     case 'circle-centre':
@@ -145,6 +155,8 @@ export function ruleLabel(r: DerivedRule): string {
       return `נקודת ההשקה על ${r.a}${r.b}`;
     case 'foot':
       return `רגל האנך מ-${r.from}`;
+    case 'regular-vertex':
+      return `קודקוד ${r.k + 1} של המצולע המשוכלל על ${r.a}${r.b}`;
     default: {
       const unlabelled: never = r;
       throw new Error(`derived rule has no label: ${JSON.stringify(unlabelled)}`);
@@ -171,6 +183,23 @@ function isDegenerate(a: Pt, b: Pt, c: Pt): boolean {
 }
 
 export const midpoint = (a: Pt, b: Pt): Pt => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+/** Vertex `k` of the regular `n`-gon on the side `a`→`b`, counter-clockwise — `null` when the side has no length. */
+export function regularVertex(a: Pt, b: Pt, n: number, k: number): Pt | null {
+  const ex = b.x - a.x;
+  const ey = b.y - a.y;
+  if (!(Math.hypot(ex, ey) > 1e-12) || !(n >= 3) || k < 0 || k >= n) return null;
+  const turn = (2 * Math.PI) / n;
+  let x = a.x;
+  let y = a.y;
+  for (let i = 0; i < k; i += 1) {
+    const c = Math.cos(i * turn);
+    const s = Math.sin(i * turn);
+    x += ex * c - ey * s;
+    y += ex * s + ey * c;
+  }
+  return { x, y };
+}
 
 /** The foot of `p` on the line through `a` and `b` — `null` when the two coincide (no line). */
 export function footOn(p: Pt, a: Pt, b: Pt): Pt | null {
@@ -406,6 +435,8 @@ export function evalRule(
       const k = (l.a * from.x + l.b * from.y + l.c) / nn;
       return { x: from.x - k * l.a, y: from.y - k * l.b };
     }
+    case 'regular-vertex':
+      return regularVertex(p[0], p[1], r.n, r.k);
     case 'midpoint':
       return midpoint(p[0], p[1]);
     case 'centroid':
@@ -613,6 +644,9 @@ export function constructionOf(
     // The perpendicular itself, from the point to its foot — what a student draws to find it.
     case 'foot':
       return { lines: [{ a: p[0], b: self }], feet: [] };
+    // A vertex of the regular ring: the ring is the figure; there is no auxiliary line to draw.
+    case 'regular-vertex':
+      return null;
 
     default: {
       const undrawn: never = r;

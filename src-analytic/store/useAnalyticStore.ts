@@ -151,6 +151,10 @@ export type InputError =
   | { key: 'undistinguished-diagonal'; detail: string }
   /** «האלכסונים AB ו-CD» where the quadrilateral makes them sides (#1620, ADR-AG-208). */
   | { key: 'not-a-diagonal'; detail: string }
+  /** «מלבן ABCD שצלעו 4» — «its side» on a shape whose sides are not all equal: which side? (#1622, ADR-AG-217). */
+  | { key: 'ambiguous-side'; detail: string }
+  /** «משובע ABCDEFG» — a polygon noun built only when regular (#1622, ADR-AG-217; 2-D's #835). */
+  | { key: 'polygon-not-supported'; detail: string }
   /**
    * A naming of something that already has a name (#1153) — carrying WHO holds it.
    *
@@ -158,6 +162,8 @@ export type InputError =
    * The refusal names the holder so the student sees the collision, not a scolding about their letter.
    */
   | { key: 'already-named'; detail: string; holder?: string }
+  /** «נסמן זוית MAC כ-A1» where A1 already names another angle, or a point (#1622 E5, ADR-AG-221) — `holder` is the label. */
+  | { key: 'alias-taken'; detail: string; holder?: string }
   /**
    * A RENAME the tool understood and declined (#1154) — each names what the student wrote. `detail` is
    * the letter (or, for `rename-unsafe`, the line that could not be rewritten faithfully; empty when

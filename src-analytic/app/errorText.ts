@@ -163,7 +163,10 @@ export function errorText(error: InputError, t: Translate): string {
     'numeral-notation': 'errNumeralNotation',
     'undistinguished-diagonal': 'errNoPrincipalDiagonal',
     'not-a-diagonal': 'errNotADiagonal',
+    'ambiguous-side': 'errAmbiguousSide',
+    'polygon-not-supported': 'errPolygonNotSupported',
     'already-named': 'errAlreadyNamed',
+    'alias-taken': 'errAliasTaken',
     // #1154 — a rename understood and declined, each naming what the student wrote
     'rename-bad-name': 'errRenameBadName',
     'rename-same': 'errRenameSame',

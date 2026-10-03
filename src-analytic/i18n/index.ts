@@ -112,6 +112,9 @@ const he = {
   symPar: 'מקביל ל־',
   symAngle: 'זווית',
   symDeg: 'מעלות',
+  symTriangle: 'משולש',
+  symCong: 'חופף ל־',
+  symSim: 'דומה ל־',
   // #1621 D2 — the Greek angle names
   symAlpha: 'אלפא — שם של זווית',
   symBeta: 'בטא — שם של זווית',
@@ -120,6 +123,7 @@ const he = {
   symTheta: 'תטא — שם של זווית',
   symLt: 'קטן מ',
   symArea: 'שטח מצולע',
+  symArc: 'קשת',
   // A vertical segment HAS no slope, and that is an answer rather than an absence (#1078).
   slopeVertical: 'אנכי (אין שיפוע)',
   // #1322 — the angle a line makes with the positive x-axis, beside its slope (m = tan α)
@@ -187,6 +191,7 @@ const he = {
   errNumeralNotation:
     '{{numNoun}} {{holder}} ו{{numNoun}} {{detail}} הם אותו שם — הכלי קורא ספרה ומספר רומי כשם אחד. כדי לא לערבב שתי כתיבות, כתבו {{numNoun}} {{holder}}, כמו בשורות הקודמות.',
   errAlreadyNamed: 'כבר יש שם לנקודה הזו: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
+  errAliasTaken: 'השם {{holder}} כבר תפוס בציור — שם אחד מסמן דבר אחד, נקודה או זווית. בחרו שם אחר, למשל אות עם ספרה אחרת.',
   // #1154 — the rename's refusals, each naming what the student wrote
   errRenameBadName: '"{{detail}}" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
   errRenameSame: 'האות {{detail}} כבר נקראת {{detail}} — אין מה לשנות.',
@@ -313,6 +318,12 @@ const he = {
     'הקודקוד או הצלע במשפט "{{detail}}" שייכים ליותר ממשולש אחד בשרטוט, ולכן לא ברור לאיזו צלע הוא יורד. ' +
     'אפשר לציין את הצלע או את המשולש, למשל "AD גובה לצלע BC" או "AD גובה במשולש ABC".',
   // #1222 (ADR-AG-211) — the hypotenuse is the side facing a STATED right angle; an open one is asked, never assumed.
+  errAmbiguousSide:
+    'בצורה הזאת הצלעות אינן שוות זו לזו, ולכן לא ידוע לאיזו צלע הכוונה: "{{detail}}". ' +
+    'כתבו את הצלע עצמה, למשל "מלבן ABCD" ואחר כך "AB = 4", או את שתי המידות, למשל "מלבן ABCD במידות 4*6".',
+  errPolygonNotSupported:
+    'מצולע כזה נבנה רק כשהוא משוכלל: "{{detail}}". אפשר לכתוב אותו כמשוכלל (למשל "משובע משוכלל ABCDEFG"), ' +
+    'או להשתמש במחומש, משושה או מתומן.',
   errAmbiguousHypotenuse:
     'לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: "{{detail}}". ' +
     'כתבו איזו צלע היא היתר, למשל "תיכון ליתר AB", או איזו זווית ישרה, למשל "זווית C ישרה".',
@@ -518,6 +529,9 @@ const en: typeof he = {
   symPar: 'parallel to',
   symAngle: 'angle',
   symDeg: 'degrees',
+  symTriangle: 'triangle',
+  symCong: 'congruent to',
+  symSim: 'similar to',
   symAlpha: 'alpha — an angle’s name',
   symBeta: 'beta — an angle’s name',
   symGamma: 'gamma — an angle’s name',
@@ -525,6 +539,7 @@ const en: typeof he = {
   symTheta: 'theta — an angle’s name',
   symLt: 'less than',
   symArea: 'the area of a polygon',
+  symArc: 'arc',
   slopeVertical: 'vertical (no slope)',
   angleWithX: 'angle with the x-axis',
   secParams: 'Parameters',
@@ -581,6 +596,7 @@ const en: typeof he = {
   errNumeralNotation:
     '"{{numNoun}} {{holder}}" and "{{numNoun}} {{detail}}" are the same name — the tool reads a digit and a Roman numeral as one name. To keep one notation, write "{{numNoun}} {{holder}}", as in the earlier lines.',
   errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
+  errAliasTaken: 'The name {{holder}} is already taken on this figure — one name marks one thing, a point or an angle. Pick another name, e.g. a letter with a different digit.',
   errRenameBadName: '"{{detail}}" is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
   errRenameSame: '{{detail}} is already called {{detail}} — nothing to change.',
   errRenameUnknown: 'The figure has no point named {{detail}}, so there is nothing to rename.',
@@ -690,6 +706,12 @@ const en: typeof he = {
   errAmbiguousCevian:
     'The vertex or side in "{{detail}}" belongs to more than one triangle in your figure, so it is unclear which side it is drawn to. ' +
     'Name the side or the triangle — for example "AD is the altitude to side BC" or "AD is the altitude in triangle ABC".',
+  errAmbiguousSide:
+    'This shape\'s sides are not all equal, so it is unclear which side you mean: "{{detail}}". ' +
+    'Name the side itself — for example "rectangle ABCD" and then "AB = 4" — or both dimensions, for example "rectangle ABCD 4 by 6".',
+  errPolygonNotSupported:
+    'A polygon with this many sides is built only when it is regular: "{{detail}}". Write it as regular ' +
+    '(for example "regular heptagon ABCDEFG"), or use a pentagon, hexagon or octagon.',
   errAmbiguousHypotenuse:
     'Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: "{{detail}}". ' +
     'Name the hypotenuse — for example "the median to the hypotenuse AB" — or the right angle, for example "angle C is right".',

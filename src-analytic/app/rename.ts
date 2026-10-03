@@ -383,7 +383,20 @@ const CEVIAN_ROLE_EN = /^(?:the\s+|an?\s+)?(?:median|altitude|height)\s/i;
 function cevianNamingCandidates(line: string, name: string): string[] {
   if (CEVIAN_ROLE.test(line.trim())) return [`${line} פוגש את הצלע בנקודה ${name}`];
   if (CEVIAN_ROLE_EN.test(line.trim())) return [`${line} at ${name}`];
-  return [];
+  return diameterNamingCandidates(line, name);
+}
+
+/**
+ * A diameter from a point whose far end the TOOL named (#1622 E4, ADR-AG-220) — «קוטר מנקודה F במעגל O» — names it as
+ * the sentence that states both ends: «FD קוטר במעגל O», the `diameter-of` it already lowers to, so the fold-equality
+ * proof below accepts it.
+ */
+function diameterNamingCandidates(line: string, name: string): string[] {
+  const p = parseLine(line);
+  if (!p.ok) return [];
+  const d = p.facts.find((f): f is Extract<Fact, { t: 'diameter-of' }> => f.t === 'diameter-of');
+  if (!d || d.a.startsWith('@') || !d.b.startsWith('@')) return [];
+  return [`${d.a}${name} קוטר${d.circle ? ` במעגל ${d.circle}` : ''}`];
 }
 
 /** Insert `name` at each place a sentence can carry it: after a circle noun, before a coordinate pair. */
@@ -405,6 +418,20 @@ function namingCandidates(line: string, name: string): string[] {
 }
 
 /**
+ * A shape or midpoint the TOOL lettered (#1622, ADR-AG-217) — «ריבוע שצלעו 4», «מלבן במידות 4*6», «אמצע AB» — names its
+ * letters after the fact: the row's whole run of tool letters written after a word of the sentence («ריבוע ABCD שצלעו
+ * 4»), or the one letter before it («M אמצע AB»). The fold-equality proof below keeps only the form that draws the same.
+ */
+function letteringCandidates(line: string, run: readonly string[], name: string): string[] {
+  const words = line.split(' ');
+  const out: string[] = [`${name} ${line}`];
+  for (let i = 1; i <= Math.min(3, words.length); i += 1) {
+    out.push([...words.slice(0, i), run.join(''), ...words.slice(i)].join(' '));
+  }
+  return out;
+}
+
+/**
  * MATERIALIZE a letter the TOOL chose (#1631 sub-decision a): rewrite the sentence that made the tool
  * name `id` into a form that names it explicitly, proven to fold to the IDENTICAL construction. Returns
  * the lines with that one row rewritten, or null when the sentence has no such form.
@@ -415,7 +442,9 @@ function materialize(state: RenameState, current: Derivation, id: string): strin
   const want = constructionShape(current, {});
   const wantFaults = faultShape(current);
   const line = state.lines[row];
-  for (const cand of [...cevianNamingCandidates(line, id), ...namingCandidates(line, id)]) {
+  const at = current.minted.find((x) => x.id === id)!.index;
+  const run = current.minted.filter((x) => x.index === at).map((x) => x.id);
+  for (const cand of [...cevianNamingCandidates(line, id), ...namingCandidates(line, id), ...letteringCandidates(line, run, id)]) {
     const p = parseLine(cand);
     if (!p.ok || !factsMention(p.facts, id)) continue;
     const lines = state.lines.map((l, i) => (i === row ? cand : l));

@@ -9679,6 +9679,153 @@ Sibling check (docs/17 §1): 2-D is the reference and builds every row above exc
 
 **Locks.** `symbols-module.test.ts`: four new parse proofs (totality-guarded), `√()` as a wrap («AB = 20» with «20» selected → «AB = √(20)», builds), the original-six row updated on purpose, six held-chip rows. `palette-faces-1348` (each one-character face inserts its own glyph) and the bidi no-split row cover the new chips unchanged. **Fails before: 3 of 21** — the totality guard, the `√()` wrap proof and the original-six row; the four new parse proofs iterate the palette, so they do not exist before it.
 
+
+## ADR-AG-218 — Lengths, angles, crossings and congruence read at 2-D's verdict; a letter in a length is a free length, decided by its slot (#1622 E2)
+
+**Status:** accepted · 2026-10-03 · slice E stream E2 of the analytic V4 plan (#1616). Rulings applied: *analytic gives the same experience as 2-D for plane geometry* (2026-10-02); *«≅ / ~», segment products and «AB = 3x» are ported* (#1622, 2026-10-02, X10–X13); *proof targets are refused* (#1666).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R161. · **Design:** [04c](04c-design-analytic.md), "Lengths, angles, crossings and congruence at 2-D's verdict; the length variable".
+
+**Context.** Each sentence was measured through 2-D's `decideDeterministic2D` and analytic's `decideSubmit` on the base (PR #1695 @ 5dab4a4a). Every one below was `not-handled` in analytic and `builds` in 2-D, with three exceptions:
+- «AB·AC = AD²» already built.
+- «טרפז ABCD» · «המרחק בין AB לבין CD הוא 3» was refused `unsatisfiable` (2-D: not-handled, gap #1677).
+- «side AB is y=x-4» must stay not-handled (#1496).
+
+**The length variable: measured collisions, and the mechanism.** The ruling: inside a length, a letter is a free length and never the plane's coordinate, and it must stay unambiguous with x/y in equations and coordinates. Measured on the built branch:
+
+| sentence(s) | reading |
+|---|---|
+| «AB = 3x» | a free length (`ｘ` internally, shown as x) |
+| «AB = 3x», «y = 2x + 1» | the length, and the plane's line: both build, and the line is untouched |
+| «AB = 3x», «AB = 6» | x = 2, shown in the panel |
+| «AB = 3x», «AC = 2x» | AB : AC = 3 : 2 (the shared letter relates them, as in 2-D) |
+| «AB = 2y» | a free length (`ｙ`) |
+| «a הוא פרמטר», «AB = 3a» | the same `a`, unchanged |
+| «x > 0» | a domain on the length variable (the plane's coordinate is never a parameter) |
+| «side AB is y=x-4», «AB = AC + x», «שטח המשולש ABC הוא y» | still decline (#1496): the plane's letter beside a measure, or an area |
+| «AB = 3x», «x = 4» | **the line x = 4** (an equation slot); see the open question below |
+
+The mechanism is the slot. `lengthValueExpr` (the value side of a length-only given) and `paramSym` (a parameter declaration) rewrite x/y to `LENGTH_VARIABLE` (U+FF58, U+FF59). `RESERVED_SYMBOLS` is untouched, so every gate that treats x/y as the plane is unchanged, and the register samples the variable as any unstated magnitude (ADR-052). `exprText` and the panel (`paramLabel`) print the student's letter.
+
+**Decision.**
+1. **≅ / ~ as givens** (`parseCongruence`): «△ABC ≅ △DEF», «משולש ABC חופף למשולש DEF», «המשולשים ABC ו-DEF חופפים/דומים», «ABC ~ DEF», and English.
+   - Both triangles are declared.
+   - ≅ adds DE = AB, EF = BC, FD = CA; ~ adds ∠EDF = ∠BAC and ∠DEF = ∠ABC (2-D's lowering).
+   - Proof targets stay refused before any rule reads them (`findProofTarget`).
+   - The palette offers △ ≅ ~ (#1696).
+2. **Chained equalities** (`chainClauses`, before the direct reading) state every adjacent pair.
+   - A chain is taken only when every pair parses, and only when every member but the last names points.
+   - «angle AEB equals angle BEC equals 60 degrees» needed the slot before the direct reading: the angle rule answered its tail with an owned `bad-equation`.
+   - A chained angle mints its letters as 2-D does (`mintedByReference` gains `angle-ratio`).
+3. **2-D's distance forms** («C במרחק 5 מ-A ו-5 מ-B», «D על AB במרחק 3 מ-A») are lowered by E1 ([ADR-AG-217](#adr-ag-217)), whose family they are. This stream's duplicate frame was deleted at the convergence merge; the locks here assert the geometry through E1's lowering.
+4. **Crossing segments** (`parseSegmentCross`):
+   - «CD חותך את AB», «AB ו-CD נחתכים», «הקטעים …», «AC ו-BD נחתכים» → both segments and the new selector `segments-cross` (D7 kind 2). No letter is invented.
+   - «CD חוצה את AB [בנקודה K]» → the midpoint (2-D's M, a tool letter), on line CD and `between` C and D.
+5. **An angle by its sides** (`parseAngleBetween`): «הזווית בין BD ל-BA היא 30» → ∠DBA. Sides with no common end are refused `bad-operand` (2-D refuses them too).
+6. **Angle values in words**: 2-D's `normalizeWordDegrees`, copied into `orthography`.
+7. **«A = 40»** (`parseVertexValue`, case-sensitive) is a bare `vertex-angle`. At M1, a letter that is not a point is `not-handled` (a new `ApplyErrorCode`), so «R=5» stays not understood (#1432 am. 1).
+8. **«נסמן את שטח ABCD ב-S»** → «שטח ABCD = S» (`restatedClauses`, which also reads the clause #1621's «נסמן» frame unwraps to). «ישר ABE» and «קו ועליו נקודה A» are E1's ([ADR-AG-217](#adr-ag-217)) and keep E1's behaviour, including its kept divergences from 2-D recorded there (for «קו ועליו נקודה A» the tool's letters B, C carry the line, as in 2-D). This stream's duplicate rules were deleted at the convergence merge.
+9. **A line-line distance given** with two-point names lowers to AB ∥ CD and C's distance to AB. The line-line term moved no point and had no value until the lines were parallel, so the solve could never reach it.
+
+**Not built.**
+- **Order and bounds** («α < β», «זווית ABC גדולה מ-40», «40 < זווית ABC < 60», the pyramid-angle rows) belong to stream D3 (ADR-AG-216), per the integrator. cat-2d-084/085/086 and pyr-angle-between/greater keep their gaps here.
+- **«מלבן במידות 4*6»** (cat-2d-015) is built by E1 (ADR-AG-217) and is a parity row.
+- **«נסמן את שטח ABCD ב-S» on an empty canvas** (cat-2d-072, gap #1622) stays a gap. Measured: 2-D commits a bare `measure-area` there and introduces NO quadrilateral (no object), so there is no 2-D figure to copy; it builds once ABCD is drawn.
+- **«נסמן זוית BAM כ-A1»** (cat-2d-059, gap #1622) is a different mechanism — an angle NAMED by a label (2-D's `angle-alias`), not a value — and stays a gap.
+- **«AB·AC = AD²» on an empty canvas** is still refused `unknown-reference`, because a product is not a minting form. 2-D mints it.
+- **A symbolic length is not labelled on the canvas**, the same as «AB = 3a» today.
+
+**Open question for the operator.** After «AB = 3x», what is «x = 4»?
+- (a) The length variable's value, as in 2-D (AB = 12).
+- (b) The vertical line x = 4. This is what is built, because it is an equation slot.
+- (c) Ask which one.
+
+Recommendation: (c) when the figure has a length variable x, else (b). Option (a) would silently change what an analytic student's «x = 4» means.
+
+**Locks.**
+- `issue-1622-e2-lengths-angles.test.ts` has 43 tests. Every one goes through `decideSubmit` / `derive` and asserts geometry over six seeds. **Fails before: 37 of 43.** The 6 that pass on the base are guards: the proof targets, the #1496 declines, and 2-D's-forms-only.
+- `symbols-module.test.ts`: proofs for △ ≅ ~, and their held rows removed.
+- Parity rows flipped (analytic gap dropped): cat-2d-026, -027, -039, -048 (lowered by E1), -041, -058, -061, -062, -063, -080, -081, -082, cat-3d-007, cat-3d-009, symbol-length, symbol-length-square.
+- New parity rows:
+  - congruent-he, similar-plural-he, congruent-proof-target (refused);
+  - segment-product, symbol-length-chain, symbol-length-y, symbol-length-beside-line (X2);
+  - vertex-value, vertex-value-free (X9, asks);
+  - area-label, segments-cross-pair, segment-bisects-named, distances-free (X9);
+  - chain-length-value, angle-sides-disjoint (refused).
+- `issue-1621-d2-angle-alias-tan.test.ts` (convergence merge): its "«נסמן» before an unread clause stays unread" row used «נסמן את שטח ABCD ב-S», which this ADR makes read; it now uses «נסמן את המשולש ABC ב-T». Its intent is unchanged.
+- `issue-1620-diagonals-extensions.test.ts`: the "unreadable condition" lock used «כך שהמשולש ABE דומה למשולש ABC». That sentence now reads, so the lock uses «… ביחס 1:2», which is still unread. The lock's intent is unchanged.
+
+**Measured.** 471 corpus: 251/263 lines, 35/46 questions. Unchanged, since none of these sentences is in the corpus.
+
+**Consequences.**
+- `engine/lengths.ts`: `LENGTH_VARIABLE`, `paramLabel`, `lengthValueExpr`.
+- `engine/expr.ts`: `exprText` prints the student's letter.
+- `engine/types.ts`: selector `segments-cross`; `vertex-angle.bare`.
+- `engine/apply.ts`: the `not-handled` code, the selector refs, the bare vertex check, and `angle-ratio` minting.
+- `engine/evaluate.ts`: the `segments-cross` judge.
+- `parser/parseAnalytic.ts`: the rules above, `paramSym`, the length-only value side, and the line-line lowering.
+- `parser/frameAnalytic.ts`: `wordDegrees`, `chainClauses`, `restatedClauses`.
+- `parser/catalogAnalytic.ts`: 17 He/En entries (E1 carries the four sentences it lowers).
+- `ui/symbols.ts`, `i18n/index.ts`: the three chips.
+- `App.tsx`: the panel's parameter label.
+## ADR-AG-219 — The circle and tangent sentences 2-D reads, and two fresh circles named by order (#1622 slice E3, #1693)
+
+**Status:** accepted · 2026-10-03 · slice E stream E3 (branch `feat/1622-e3-circles-tangents` off `feat/1620-construction-vocabulary` @ 5dab4a4a). Standing rulings applied, no new question asked:
+- *"analytics and 2d should have same user experience"* (2026-10-02): every sentence below was measured through `decideDeterministic2D` first, and 2-D's verdict, points and letters are the reference.
+- #1688 (2026-10-02), *"First mention names one"*: two fresh interchangeable circles are named by order on first mention; circles that are not interchangeable still ask which.
+- #1673 / #1686 (ADR-AG-210): an unnamed centre never answers to a letter until a sentence names it.
+- ADR-052: every size and position not stated stays a free symbol.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R162 (new). · **Design:** [04c](04c-design-analytic.md) — new section "Circles a sentence draws; two circles named by order". · **LADDER stage:** parse (`parseCircleFamilies`, the four tool-letter roles), M1 (`circles-about`, `relateCircles`, `circleToName` at `statingNamedCircle` and `centre-of`, `radius-of` on a created circle), validity (three new `sign` quantities). No solver change.
+
+**Cites** [ADR-AG-195](#adr-ag-195) (the tangency at a named point), [ADR-AG-196](#adr-ag-196) (none → create, one → bind, several → ask), [ADR-AG-198](#adr-ag-198) (the created circle, centre unnamed), [ADR-AG-210](#adr-ag-210) (`statingNamedCircle`, new letters), [ADR-AG-211](#adr-ag-211) (the tool's letters), #1113 (the crossing selectors), 2-D [ADR-565](06-decisions.md#adr-565) decision 7 (`autosInterchangeable`).
+
+**Context — measured on 5dab4a4a.** Analytic through `decideSubmit`, 2-D through `decideDeterministic2D`.
+
+| sentence (parity row) | 2-D | analytic before | after |
+| --- | --- | --- | --- |
+| «מעגל סביב O רדיוס 5» (089), «מעגל עם מרכז O» (148) | builds | not-handled | records |
+| «מעגל O שהיקפו 6π» (circle-by-circumference), «ששטחו 9π», «מעגל בקוטר 10» (097), «מעגל שרדיוסו 5» | builds | not-handled / `ambiguous-shape` | records, r = 3 / 3 / 5 / 5 |
+| «מעגל O שרדיוסו R» (098) · «R > r» | builds | `bad-equation` · not-handled | records; R > r at every seed |
+| «נתון מעגל» (147), «מרכז המעגל» (149) | builds | not-handled | records |
+| «שני מעגלים» (091), «זרים» (092), «בעלי מרכז משותף O» (090), «מוכלים» | builds | not-handled | records |
+| «מעגל P מוכל בתוך מעגל O» (093), «מעגל מוכל בתוך המעגל הגדול» (094) | builds | not-handled | records, contained at every seed |
+| «שני מעגלים נחתכים בנקודות A ו-B» (135) | builds | not-handled | records |
+| «ישר החותך את המעגל בשתי נקודות» (146), «ישר חותך את שני המעגלים בנקודות C, D, E ו-F» (096) | builds | not-handled | records |
+| «מנקודה E מחוץ למעגל O ישר חותך את המעגל בנקודות A ו-B» (122) | builds | `bad-operand` | records |
+| «הישר AC פוגש את מעגל P בנקודה E» (138) | builds | not-handled | records |
+| «משיק למעגל» (144), «מנקודה E משיק נוגע …» (126), «… שני משיקים נוגעים …» (125) | builds | not-handled | records |
+| «AB משיק משותף למעגלים O ו-P» (141), «… חיצוני לשני המעגלים» (095), «… בנקודה M» (142), «מנקודה A יוצאים שני משיקים לשני המעגלים» (151) | builds | not-handled | records |
+| #1693: «שני מעגלים נחתכים בנקודות A ו B» · «נקודה C על מעגל P» · «המשך CA חותך את מעגל O בנקודה D» · «המשך CB …» | builds all four | not-handled · `unknown-reference` · … | records all four |
+| #1693: «שני מעגלים נחתכים» · «O מרכז המעגל» · «P מרכז המעגל» | names both | not-handled · record · `already-named` | names both, by order |
+
+**The classes (docs/17 §1).**
+1. *A sentence about circles it must draw had no way to say "this circle" before the circle existed.* The created circle (ADR-AG-198) had one fixed id and was made only inside M1 arms, so no sentence could create two circles, or create one and state something about it in the same line.
+2. *A circle relation was a thin region nobody constructed.* «מוכל» and «זרים» are inequalities between two circles; left to the random draw they held at 1 seed of 24 («מעגל P מוכל בתוך מעגל O») and at none once points rode both circles («שני מעגלים זרים» · «C על מעגל P» · «D על מעגל O»).
+3. *A new letter beside two fresh circles had no rule.* It stated a third circle, so «נקודה C על מעגל P» on the two-circle opener drew a circle the student never meant.
+
+**Decision.**
+1. **One fact for a sentence about circles** — `circles-about { slots, about }`. Each slot is resolved at M1, in order: `new` draws a created circle under a fresh id (`circle-new<k>`; two at once are a pair, `circle-pair<k>-1/-2`), with a stated radius when the sentence gives one; `named` goes through `circleByName`, and when absent through `statingNamedCircle`; `the` binds the figure's circles when it holds exactly that many, draws them when it holds none, and asks otherwise. The statement is applied with the ids written in. It is made only of statements the engine already had: `on-curve`, `tangent-of { circleId, at }`, `crossing-distinct`, `between` / `beyond`, `distinct`, the tangent `line-at`.
+2. **The sentences** (`parseCircleFamilies`, He and En, before the tangent object and `parseCircleAt`): 2-D's centred spellings re-read as «נתון מעגל שמרכזו O ורדיוסו 5»; a size (radius, diameter, circumference, area) lowered to the radius it states; a radius letter kept free (`radius-of` with the symbol); «R > r» a `sign` selector over R − r, refused naming a letter no object uses; the two-circle family; the secants; the tangents from a point; the common tangents, with «חיצוני / פנימי» a `centres-side` selector; «AB מיתר במעגל O ומשיק למעגל P» as its two sentences; «CD משיק משותף … בנקודה M» composed from «מעגל O ומעגל P משיקים זה לזה בנקודה M» and «הישר CD משיק למעגל O בנקודה M», M between C and D; «פוגש» read as «חותך». The points the student did not name take 2-D's letters through four new roles of the one table: crossing A, B; secant C, D; touch T (S beside a T); common tangents B, C, D, E (F skipped, ADR-AG-211's focus rule).
+3. **Positions are selectors drawn by construction** (`relateCircles`). `inside`: the centre distance s·(R − r), s ∈ [0, 1), and a drawn inner circle's radius k·R; `apart`: R + r + g, g > 0. Two centre points take it as a `length-eq`; a drawn circle's centre symbols are substituted along the rational direction ((1−m²), 2m)/(1+m²); beside a centre point, a `coord` places that point. The tool's symbols are free (ADR-052). «נחתכים» needs none: its crossings already put both circles through two points, and its `cross` selector (|AB| > |rₐ − r_b|) only keeps the pair from being one circle drawn twice — measured: the created-circle fit drew both identical without it, and parametrising it slowed the #1693 sequence tenfold.
+4. **A created circle's radius is pinned like a centred circle's**: `radius-of` substitutes its `θ_<id>.r` through `admitStated`. «A על המעגל» · «רדיוס המעגל הוא 5» builds, as in 2-D.
+5. **Naming by order** (`circleToName`, at `statingNamedCircle` and the contextual `centre-of`). Among the circles with an unnamed centre: a drawn pair whose swap changes no statement names its first circle; a circle whose pair sibling is named is "the other"; two or more with neither answer ask (`ambiguous-shape`); one that is no pair's keeps ADR-AG-210 (a new circle on the letter). The swap test compares the figure's statements — every object but the two circles, the constraints, the selectors, the parameters other than the pair's own symbols — as multisets, with the ids swapped; `apart` / `cross` are normalised as symmetric. The naming is the centre's derivation, so the letter finds the circle from then on.
+
+**Locks** (`issue-1622-e3-circles-tangents.test.ts`, 82, through `decideSubmit` / `derive`, geometry at six seeds with ADR-052's variation check): each sentence above in Hebrew and English with its figure — radii, centres, incidences, perpendicular radii at every touch, the chord of one circle at distance r from the other’s centre, external/internal sides, contained and disjoint at every seed (also with points riding both circles), the crossings on both of two different circles, the C, D, E, F order, A between E and B, M between C and D; the tool's letters (A, B; B, C beside an A; C, D; D, E beside a C; T; S beside a T; B, C, D, E); #1693's two sequences with P and O on the first and second circle; a named letter binds thereafter; «מעגל O» alone is a third circle; a nested pair asks; a lone unnamed circle keeps ADR-AG-210; refusals: «R > r» with no radius letters, «מעגל O מוכל בתוך מעגל O», a negative radius on a created circle. **Fails before: 77 of 82** — the 5 controls: «נתון מעגל שקוטרו BD» keeps its diameter reading, the definite «המעגל ברדיוס 5» stays contextual, «x > y» is no radius order, a lone unnamed circle beside «A על מעגל O», and the English «circle with center O», which an existing reader already took.
+
+**Parity** (`geo-input-parity.ts`). The analytic gap removed from 24 rows: cat-2d-089 … 098, 122, 125, 126, 135, 138, 141, 142, 144, 146, 147, 148, 149, 151, circle-by-circumference. Eleven rows added, none a gap: `chord-tangent-other-circle-1622`, `two-circles-named-by-order-1693`, `two-circles-centres-by-order-1693`, `two-circles-nested-1622`, `circle-by-area-1622`, `circle-by-radius-unnamed-1622`, `radius-letters-order-1622`, `common-tangent-internal-1622`, `centre-of-given-circle-1622`, `radius-of-created-circle-1622`, `circle-inside-the-circle-1622`. The catalog gains 28 rows (He + En), each a parity step.
+
+**Measured.** 471 corpus (seed 0): **251/263 lines, 35/46 questions — unchanged** (no corpus line uses these sentences). Every new sentence submits in under 70 ms; 24-seed sweeps: no fault on any of them; «מנקודה A יוצאים שני משיקים לשני המעגלים» costs ~55 ms a derivation (1.3 s for 24 seeds), the slowest.
+
+**Not built, said out loud.**
+- **2-D names a circle of a NON-interchangeable pair by order** — «מעגל מוכל בתוך המעגל הגדול» · «C על מעגל P» names the outer circle P in 2-D, against the ruling's "circles that are not interchangeable still ask which" (its `autosInterchangeable` does not read `set-circle-position`). Analytic asks, as the ruling says. Reported for the operator; no parity row.
+- **A lone unnamed circle**: 2-D names it by use («AB קוטר» · «C על מעגל O» names the diameter circle O, ADR-347); analytic keeps ADR-AG-210's lock (a new circle O). Ruled on #1670/#1686 for analytic; reported as a remaining disparity.
+- **«מרכז המעגל» does not letter the centre**: 2-D's `name-center` reveals its hidden centre; here the centre stays unnamed (#1673 / ADR-AG-210) and the sentence binds the circle.
+- **«AD חותך את מעגל O»** (the secant with only the far point named) and **«R = 1.5r»** (a ratio between radius letters) are not read; **«שני מעגלים משיקים מבחוץ»** stays `ambiguous-shape` (the tangency of two created circles needs centre points, `out-of-scope` there).
+- **«AB מיתר במעגל O ומשיק למעגל P» on an empty canvas** builds here (its two sentences each state their circle, ADR-AG-210) where 2-D refuses it; beside two circles both build (parity row `chord-tangent-other-circle-1622`).
+
+**Consequences.** `engine/types.ts` (`circles-about`, `CircleSlot`, `CIRCLE_SLOT_SENTINELS`, three `Quantity` members, `factsWithin`), `engine/apply.ts` (the `circles-about` arm, `touchedCircleFacts(src, id, r)`, `isCreatedCircle`, `freshCircleIds`, `relateCircles`, `createdParts`, `interchangeable`, `circleToName`, `namingByOrder`; `statingNamedCircle`, `centre-of`, `radius-of`, the selector refs), `engine/evaluate.ts` (`circlePairQuantity`, the `params` sign), `engine/toolLetters.ts` (four roles), `parser/parseAnalytic.ts` (`parseCircleFamilies`), `parser/catalogAnalytic.ts` (28 rows — the LLM vocabulary grows by them; diff the built proxy before deploy). Sibling check (docs/17 §1): 2-D is the reference (above); 3-D has no circles of this kind (X8).
+
 ## ADR-AG-213 — The two tangents meet where 2-D says they do; «נפגשים» is «נחתכים» for two lines; the open-bound floor keeps the scale the figure was sampled at (#1620 S7)
 
 **Status:** accepted · 2026-10-03 · #1620 slice C, stream S7 (branch `feat/1620-s7-tangents-meet` off `feat/1620-construction-vocabulary` @ 5dab4a4a). Standing rulings applied: analytic gives 2-D's experience for plane geometry (2026-10-02, #1649/#1669) — 2-D's verdict and drawing are the reference, measured through `decideDeterministic2D`; a sentence that names a circle not yet in the figure states it (ADR-AG-210, #1670); a figure drawn green for givens that cannot hold is the honesty class (2026-09-21 #1328).
@@ -10014,3 +10161,183 @@ The 16/5, 17/4, 18/4 and 20/4 lines already landed after slice C. This ADR locks
 - the corpus line by line: 6/5, 7/4 (refusal and notation), 16/5, 17/4, 18/4, 20/4.
 
 `symbols-module.test.ts`: the `S_{}` proof (totality-guarded), and its held row removed. Parity: the seven rows. **Fails before: 21 of 27.** The six that already passed are the four corpus questions that landed after slice C, the length ratio by «/», and the subscripted-name guard.
+## ADR-AG-220 — Arcs are central angles on the resolved circle; a semicircle, a quarter circle and a sector are arcs drawn on a hidden circle; a diameter from a point names its far end (#1622 E4)
+
+**Status:** accepted · 2026-10-03 · stream E4 of slice E (#1622), branch `feat/1622-e4-chords-arcs` off `feat/1620-construction-vocabulary` @ 5dab4a4a. Standing rulings applied: analytic gives 2-D's verdict for plane geometry (operator 2026-10-02, #1649); the #1622 arc rows are PORTED, not excepted (operator 2026-10-02 on #1622); a reference states the named circle it names (ADR-AG-210); the tool's letters are 2-D's (ADR-AG-211); every unstated magnitude is a free DOF (ADR-052); a palette chip ships with its notation (ADR-AG-212, #1696).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R163 (new) — arc measures, the central angle, the semicircle / quarter circle / sector, the midpoint of an arc, the diameter from a point and a circle by its diameter's value build as in 2-D; R11a (the palette set gains `⌢{}`). · **Design:** [04c](04c-design-analytic.md) — new section "Arcs, sectors and the diameter from a point". · **LADDER stage:** parse (`parseArcFamily`), M1 (`arc-of`, `arc-mid`, `sector`, `arc`), the solve (the `arc-sum` residual) and the renderer (`Figure.arcs`).
+
+**Cites** 2-D [ADR-116](06-decisions.md#adr-116) (an arc's measure is its central angle), ADR-335 (the absolute arc value), ADR-533 (the arc copula is taught); [ADR-AG-195](#adr-ag-195) (the radius direction read off the resolved circle), [ADR-AG-198](#adr-ag-198) (the created circle with its centre unnamed), [ADR-AG-203](#adr-ag-203) (a statement about a circle never needs its centre letter), [ADR-AG-210](#adr-ag-210), [ADR-AG-211](#adr-ag-211), [ADR-AG-212](#adr-ag-212).
+
+**Context — measured on 5dab4a4a.** Analytic answered `not-handled` on every one of the 15 chords-arcs parity rows (2-D builds all 15), on «⌢{AC} = 60°» and «קשת AC = 60» (2-D builds), on «זוית מרכזית COD = 80», «גזרה AOB», «רבע מעגל OAB», «M אמצע הקשת BC», «קוטר מנקודה F», «מעגל O בקוטר 10» (2-D builds each). 2-D lowers them to its `set-angle` / `set-angle-ratio` / `set-measure-sum` at the circle's centre (`arcOf`), its `arc` command over a hidden circle, its `arc-midpoint` and its `diameter`.
+
+**The classes (docs/17 §1).**
+1. *An arc measure had no lowering.* Analytic has `angle` and `angle-ratio` over three POINTS, so a circle whose centre has no letter (an equation circle, a diameter's circle) could not carry one, and there was no angle SUM at all («∠A + ∠B = 180» is `bad-equation` too).
+2. *Nothing could draw PART of a circle.* Every curve is drawn whole.
+3. *A diameter could only be named by both its ends.*
+
+**Decision.**
+1. **One constraint for every arc measure — `arc-sum`: Σ kᵢ·⌢(aᵢbᵢ) = value**, each arc the unsigned angle at the CENTRE of its resolved circle between the radii to its ends (`solve.ts`; the circle a curve ref, read off `curveAt` like ADR-AG-195's radius direction). A value («קשת AB = 40», «⌢{AC} = 60°»), a ratio («קשת DE = 2 קשת CE» → ⌢DE − 2⌢CE = 0), an equality in words («קשת AB שווה לקשת BC») and a sum are one kind; no centre letter is needed, so «⌢{AC} = 60°» on «x^2+y^2=25» builds. A lone arc over 180° is the other arc («קשת AB = 200» → the central angle 160°). The parser emits one `arc-of` fact; M1 resolves the circle (`arcHost`: the name chain, stating a named circle the figure lacks — ADR-AG-210 — or the ONE circle; none or several is the contextual refusal), requires the ends to exist (2-D refuses an unknown end too: «מעגל O» · «קשת AB = 40 במעגל O» is refused in both), and **puts the ends ON the circle** — an arc AB of circle O has its ends on O; 2-D assumes it ("true in the corpus") and draws a triangle's A and B off the circle, which here would be a figure drawn green for a given that does not hold. Ends already on it are skipped (`onCircle`).
+2. **A drawn arc is an object — `arc { circle, from, to, pick, away | toward, radii }`** (`types.ts`, `carriers.ts` all three switches, `evaluate.ts` `arcOf` → `Figure.arcs`, `scene.ts` → `Scene.arcs`, `Figure.tsx`). No freedom and no expression; it says which part of a circle the figure holds is inked: `ccw` from `from` to `to` (2-D's semicircle, B → A), `away`/`toward` the half on the far / near side of the chord from a point (2-D's `bulgeRef`, «מחוץ / בתוך»), `minor` / `major` (a sector), `radii` (a sector whose centre has no letter). Its circle is **hidden** — `circle-at` / `circle-thru` gain `hidden`, the created equation circle `stated: false` — so the circle still carries the points (and «C על המעגל» binds to it) while only the arc is drawn; a hidden circle the student later states («מעגל O» after «גזרה AOB») is un-hidden, not doubled.
+   - **Semicircle** «חצי מעגל שקוטרו AB» / «… על צלע AB מחוץ למשולש ABC» / «על כל צלע של ריבוע ABCD יש חצי מעגל»: the hidden circle on the diameter AB (`circle-diam-AB`, so «AB קוטר» after it is the same circle), the half, the segment AB; a named shape is stated (absorbed when present) and the half bulges out of it (or into it, «בתוך»).
+   - **Sector** «גזרה AOB [בזווית 80]» and **quarter circle** «רבע מעגל OAB» → one `sector` fact: the circle on the centre letter — the figure's when it has one, else a hidden one with a free radius — the ends on it, the angle (a reflex value draws the major arc over the 360 − v central angle, as 2-D does), the radii as segments; no angle stated leaves it free (ADR-052). The bare «רבע מעגל» has no centre letter: a created circle of its own (ADR-AG-198's, hidden, `circle-sector-AB`), its ends named by the tool, the radii perpendicular, drawn with the arc.
+3. **The midpoint of an arc** «M אמצע הקשת BC (במעגל O)» → `arc-mid`: B, C, M introduced and on the circle, ⌢BM = ⌢MC (`arc-sum`), and M on the MINOR arc's side of BC (the existing `arc-side` region) — the major's with «הגדולה».
+4. **The central angle** «זוית מרכזית COD [= 80]» — 2-D's three-letter form: the middle letter is the centre, the radii OC, OD are drawn (introducing the points), a value is an angle given.
+5. **The diameter from a point** «קוטר מנקודה F במעגל O» / «קוטר העובר בנקודה A במעגל O» / «קוטר מנקודה F» → `diameter-of { F, <tool letter> }` — the existing lowering; the far end takes 2-D's D (the next free letter). The bare «קוטר» names both ends (2-D's A, B). The cut form «קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E» draws only F–E: E on the line F→centre and on the side AC (bounded, as a crossing), the contextual circle through `via-centre`. The far end is renameable as ADR-AG-211 promises: `app/rename.ts` `diameterNamingCandidates` rewrites the row as «FD קוטר במעגל O», which folds identically. Two roles join `TOOL_LETTERS`: `end` (`ABCDEGH…`) and `diameter-end` (`DEGH…`) — **F and O are never offered** (F is the focus letter, #1167, as for the foot; O would read as the centre, #1673). 2-D would offer F where it is free.
+6. **A circle by its diameter's value** «מעגל O בקוטר 10» / «מעגל O שקוטרו 10» / "circle O with diameter 10" is the circle with radius 5. *Converged at integration:* it is read by [ADR-AG-219](#adr-ag-219)'s one size reader (radius, diameter, circumference, area — named, unnamed or definite), and this ADR's own lowering was removed, so the sentence has one lowering.
+7. **The `⌢{}` chip** (`ui/symbols.ts`, 2-D's arc template as a wrap: «AC» → «⌢{AC}»), proven on the equation circle; the held-chip row is removed. The fact list already typesets «⌢{AC}» as the over-arc (`shell/math`).
+
+**Parity.** The 14 chords-arcs rows that now build drop their analytic gap: cat-2d-065, 066, 067, 069, 115, 116, 117, 118, 119, 128, 129, 130, 131, 145. 17 rows added (`e4-*`), each measured in 2-D first: the glyph, the contextual and reflex arc, the equality in words, the sum against a value, **the refusal of an arc whose ends do not exist**, the central angle's value, the free and reflex sector, the named quarter circle, the minor and major arc midpoint, a semicircle beside a circle, the semicircle inside a triangle, the circle by its diameter (two spellings), the diameter from a point on the contextual circle. 16 catalog rows, He + En.
+
+**Locks** (`issue-1622-e4-chords-arcs.test.ts`, 36): the arc value in five spellings (∠AOC = 60°, A and C on the circle, six seeds); on an equation circle (the angle at (0,0), |AC| = 5); the reflex arc (160°); cat-2d-066 (the ends ON circle O, ∠AOB = 40°); the ratio (∠DOE = 2∠COE); the equality in words; the sum identity; the sum against 180; the refusal of an unknown end; He ≡ En; the central angle's radii and value; the semicircle (centre = midpoint, r = |AB|/2, sweep π, circle hidden, AB drawn); **Thales twice — «C על המעגל» on the semicircle and «C על מעגל O» beside a diameter of O give ∠ACB = 90° at six seeds**; out of / into the triangle (the arc's middle on the far / near side of AB from C); the four halves of the square; the quarter circle (tool letters A, B; then B, C beside an A; 90° arc with radii); the sector (∠AOB = 80°, OA = OB, an 80° arc, OA and OB drawn); the reflex sector (a 200° arc over 160°); the free sector moves; a sector cut from a drawn circle O keeps it drawn and «מעגל O» after a sector draws it; the arc midpoint (empty canvas; minor, major, English — ∠BOM is half of ∠BOC or of its complement); the diameter from F (O the midpoint of FD), its D → E letter, **the tool's D renamed to K** (the row becomes «FK קוטר במעגל O») and the bare «קוטר»; the cut form (E on FO, between A and C, FE drawn); the circle by its diameter (r = 5, three spellings). `symbols-module.test.ts`: the `⌢{}` proof. **Fails before: 35 of 36** (the control is Thales on «AB קוטר במעגל O», which already held).
+
+**Measured.** 471 corpus (seed 0): **251/263 lines, 35/46 questions — unchanged** (the corpus has no arc sentence beyond «הנקודה E נמצאת על הקשת הקטנה AC», which already read). Every new line records in 0–90 ms (`decideSubmit`); the arc midpoint is the slowest (a solved point and a region selector).
+
+**Not built, said out loud.**
+- **«מעגל בקוטר 10» (cat-2d-097)** was left a known gap here, pending stream E3; it builds since [ADR-AG-219](#adr-ag-219) (a new circle with its centre unnamed, radius 5), and the gap is dropped.
+- **The arc copula** «קשת AC היא קשת CD» — 2-D refuses it and teaches «קשת AC שווה לקשת CD» (ADR-533); here it is `not-handled`. Not a parity row; porting it needs a teaching refusal key.
+- **The arc-subtended central angle** «זוית מרכזית נשענת על קשת CD» and the O-family reading of «גזרה OAB» (2-D takes an O-family letter as the centre wherever it sits; here the middle letter is the centre, as #1673 rules out reading O by convention). The three-letter semicircle «חצי מעגל ODC» is not read.
+- **The bare «רבע מעגל» / «קוטר» tool letters are not renameable** (no sentence names a quarter circle's ends without its centre letter; the bare diameter has two placeholders). **A second bare «רבע מעגל» or «קוטר»** reuses the tool's placeholder and answers «already known»; 2-D draws a second one with the next letters.
+- **«קשת AB = 40 במעגל O» on a triangle with no O** states circle O (ADR-AG-210) where 2-D refuses the unknown centre — the ruling's direction, not 2-D's verdict; not a parity row.
+- **Angle sums outside arcs** («∠A + ∠B = 180») are still `bad-equation`: `arc-sum` is over central angles only.
+
+**Consequences.** `engine/types.ts` (`arc` object + fact, `ArcDef`, `arc-of`, `arc-mid`, `sector`, `hidden` on `circle-at` / `circle-thru`), `engine/solve.ts` (`arc-sum`: refs, curve refs, describe, residual), `engine/carriers.ts`, `engine/evaluate.ts` (`arcOf`, `Figure.arcs`, hidden circles unstated), `engine/apply.ts` (`arc`, `arc-of`, `arc-mid`, `sector`, `arcHost`, `onCircle`, `unhidden`, `createdCircleFacts` generalising `touchedCircleFacts`), `engine/toolLetters.ts` (`end`, `diameter-end`), `app/rename.ts` (`diameterNamingCandidates`), `parser/parseAnalytic.ts` (`parseArcFamily`, first after the coordinate compare), `parser/catalogAnalytic.ts` (16 rows, not featured — the LLM vocabulary grows by them; the proxy bundles the catalogue, so diff the built proxy before deploy), `render/scene.ts`, `render/Figure.tsx`, `ui/symbols.ts` + `i18n` (`symArc`), `shell/__tests__/fixtures/geo-input-parity.ts`. Sibling check (docs/17 §1): 2-D is the reference; 3-D has no circles of this kind (X8).
+## ADR-AG-217 — The shapes and points 2-D reads: a bare run, the regular and five-to-eight-sided polygons, a shape that states its size, a shape inscribed in a triangle, and the point forms (#1622 slice E1)
+
+**Status:** accepted · 2026-10-03 · stream E1 of slice E (#1622), branch `feat/1622-e1-shapes-points` off `feat/1620-construction-vocabulary` @ 5dab4a4a. Standing rulings applied, none new: *analytic gives the same experience as 2-D for plane geometry* (2026-10-02 — 2-D's verdict and its introduced points are the reference, its rules copied, never imported); *a point the student did not name takes 2-D's letter* ([ADR-AG-211](#adr-ag-211)); *a reference states the circle it names* ([ADR-AG-210](#adr-ag-210)); every unstated magnitude is a free DOF ([ADR-052](06-decisions.md#adr-052)); D7's three inequalities ([ADR-AG-005](#adr-ag-005)). The issue body's "not ported by design: unnamed auto-constructs" predates the ADR-AG-211 ruling and the 2026-10-02 parity ruling that put these rows on #1622 as gaps; the unlettered shape and line follow ADR-AG-211.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R160 (new). · **Design:** [04c](04c-design-analytic.md) — new section "Shapes and points 2-D reads (#1622 E1)". · **LADDER stage:** parse (lowering onto canonical sentences), the mint seam (`resolveToolLetters`'s `vertex` role), M1 (`statingNamedCircle` for a ring-described circle), validity (three new selectors, judged and seeded). One new closed form (`regular-vertex`); no solver change.
+
+**Context — measured** (2-D through `decideDeterministic2D`, as the parity runner; analytic through `decideSubmit` / `derive`, on 5dab4a4a). Every row below was `not-handled` in analytic except where noted.
+
+| sentence (context) | 2-D | analytic after |
+| --- | --- | --- |
+| «ABCD» · «ABC» | quadrilateral / triangle | the same ring («ABCDE»: 2-D not-handled, not read here either) |
+| «ריבוע ABCD שצלעו הוא 1» · «מעוין ABCD שצלעו 4» · «משולש שווה צלעות ABC שצלעו 4» | shape + AB = 1 | the same: the noun, then «AB = 1» |
+| «ריבוע שצלעו 4» · «ריבוע» · «משולש» | ABCD (`autoVertexLabels`) | ABCD — the tool's `vertex` letters, announced, renameable |
+| «מלבן ABCD שצלעו 4» | asks (`sideUnspecified`) | asks (`ambiguous-side`) |
+| «מלבן במידות 4*6» · «מלבן 4 על 6» · «מלבן ABCD במידות 4*6» | rectangle ABCD, AB = 4, BC = 6 | the same |
+| «מחומש ABCDE» · «משושה …» · «מתומן …» | generic n-gon | the same ring, nothing asserted |
+| «משובע ABCDEFG» | refused (`polygonNotSupported`) | refused (`polygon-not-supported`) |
+| «מחומש משוכלל ABCDE» (… to «מעושר משוכלל»), «מחומש משוכלל», "regular pentagon ABCDE" | on a hidden circle, pinned angles, free radius | first side free, every other vertex the `regular-vertex` closed form |
+| «הנקודה E נמצאת בתוך המשולש KAO» · «… מחוץ למשולש ABC» | triangle + `point-polygon-side` | triangle + E + `in-polygon` selector |
+| «משולש ABC» · «C במרחק 5 מ-A ו-5 מ-B» | `point-by-distances` | «AC = 5», «BC = 5» |
+| «משולש ABC» · «D על AB במרחק 3 מ-A» (and «מ-B») | D on AB, AD = 3 | «D על AB», «AD = 3» |
+| «מעוין BDEF חסום במשולש ABC» · «מלבן DEFG …» · «ריבוע DEFG …» | `inscribe` (riders, cyclable variant) | the two shapes, a `choice` over 2-D's placements, closed `in-polygon` per rider |
+| «משולש ABC» · «נקודה E» · «נקודה D» · «המעגל החוסם את משולש ABC חותך את CE בנקודה D» | circumcircle on demand | `unknown-reference (⊙ABC)` before → the computed circle stated, D on it and on CE |
+| «נקודה E על AC ב-40%» (also on an empty canvas) · «… על הצלע AC ב-40%» | segment AC, E at t = 0.4 | «הקטע AC», «E מחלקת את AC ביחס 40:60» |
+| «משולש ABC» · «אמצע AB» | midpoint M | the tool's midpoint (M, then N …) |
+| «C ו-D בצדדים שונים של AB» · «C ו-D באותו צד של AB» | segment AB + `points-line-side` | «הקטע AB», C, D, `line-side` selector |
+| «קו ועליו נקודה A» · «קו ועליו נקודות A ו-B» | segment BC (CD), A on it | the same letters, «A על הקטע BC» |
+| «משולש ABC» · «ישר ABE» · «ישר ABEF» | `set-line`: collinear, in order | «הקטע AE», «B על הקטע AE» (each inner point between its neighbours) |
+| «5 < AB < 9» · «AB > 5» · «5 ≤ AB ≤ 9» · «AB בין 5 ל-9» | segment + `set-length-bound` | [ADR-AG-216](#adr-ag-216)'s order (`sign` over `order`); E1 adds only the word window «AB בין 5 ל-9» |
+
+Measured on the way: the constraint form of a regular polygon (n − 1 equal sides, n angles of (n − 2)·180°/n) left «משושה משוכלל ABCDEF» `unsatisfiable` from a sampled start, which is why the regular polygon is constructed instead. The inscribed rhombus is valid at 16 of 48 raw seeds (the solve collapses the free triangle at the rest; `drawableAt` walks past them), the rectangle at 26, the square at 34; both mirror placements are reached.
+
+**The class (docs/17 §1).** Not one defect but a vocabulary gap, and each sentence is lowered onto the sentences this grammar already owns (`lowered`: parse the canonical sentences, re-attribute to the student's line), so no second lowering of a shape, a length, a ratio or an incidence exists. The new mechanisms are the ones no existing sentence carried: a noun-less shape (the tool's letters), a regular polygon (a closed form), and two regions (selectors); bounds on a length go through ADR-AG-216.
+
+**Decision.**
+1. **Shapes** (`engine/shapes.ts`): rows «מחומש», «משושה», «מתומן» (generic; «משומן» folds onto «מתומן»), and regular rows for 5–10 sides (`regular: n`, constructed by `shapeDeclaration`: the first two vertices free, the rest `derived regular-vertex` — `engine/derived.ts`, counter-clockwise as 2-D's increasing angles); `equalSides` on square, rhombus, equilateral triangle and the regular rows (2-D's `SIDE_SHAPES`, read off the row); `BARE_POLYGON_NOT_BUILT` («משובע», «מתושע», «מעושר» bare → `polygon-not-supported`). English: pentagon, hexagon, octagon, "regular …", and 2-D's regular triangle → equilateral, regular quadrilateral → square.
+2. **The tool's letters for a vertex** (`engine/toolLetters.ts`): role `vertex`, letters A–Z (2-D's `autoVertexLabels`), LINE-SCOPED (a vertex is nothing but its line's own, so «ריבוע» twice is ABCD then EFGH); a polygon a placeholder named is re-keyed from its resolved ring, as a segment is. The rename writes the run into the sentence («ריבוע KBCD שצלעו 4», «K אמצע AB» — `letteringCandidates`, proven by the existing fold-equality check).
+3. **The point forms and lines** (`parseAnalytic.ts`, `parseShapesAndPoints`): `parseSizedShape`, `parseUnnamedShape`, `parseBareRun`, `parseBareMidpoint`, `parseAtFraction`, `parseByDistances`, `parseAtDistance` (2-D's #760 compound: the left half through the real grammar), `parseLineSide`, `parseRegion`, `parseOrderedLine`, `parseLineWithPoints`, `parseInscribedInTriangle` — each 2-D's regex, copied. **Bounds on a length are NOT E1's mechanism:** they are [ADR-AG-216](#adr-ag-216)'s (#1621 D3) `sign` selector over the `order` quantity. E1 first built a separate `length-bound` selector for the same sentences; at integration (the integrator's convergence pass, docs/17's one-lowering rule) it was removed, and the one spelling D3 lacked — the word window «AB בין 5 ל-9» / "AB is between 5 and 9", numeric ends only, strict as 2-D's word forms — was added to `parseOrder` as a reading of the same two orders «5 < AB < 9» states (`windowFacts`, shared with the symbolic window).
+4. **Two regions** (`types.ts` `Selector`; judged in `failingSelectors`, seeded beside #1071's): `line-side` (a subject on the line is on neither side), `in-polygon` (even-odd; `closed` counts the boundary as inside — an inscribed vertex on its side). Each is D7's kind 2: no freedom consumed, the figure keeps moving inside it.
+5. **The inscribed placement** (`engine/inscribe.ts`, 2-D's `inscribePlacements` copied): a shared letter is the triangle's vertex, every other vertex rides a side; the placements the letters do not pin are a `choice` (2-D's cyclable `variant`).
+6. **A ring-described circle a reference names** (`statingNamedCircle`): «המעגל החוסם את המשולש ABC» / «… החסום במשולש ABC» with no such circle states the computed circle (circumcircle through the three; the incircle), then the sentence is applied to it — ADR-AG-210's rule, for the described names.
+
+**Locks.** `issue-1622-e1-shapes-points.test.ts` (137; **Fails before: 136 of 137** — the one green before is «המשולש» alone not recording, a control): every sentence's verdict through `decideSubmit` (He and En, the rectangle's «שצלעו» asks, the heptagon refused, a definite noun is not a new shape); the tool's letters (10 sequences) and three renames writing the letters in, each landing where the tool's point was; the figures at six seeds — squares of side 1, 4 and √2, the 4 × 6 rectangle, regular 5-, 6- and 8-gons (equal sides and angles; the bare pentagon is not regular), the regular polygon moves, inside/outside, the two distances, the inscribed rhombus/rectangle/square (every vertex on a side, the shape honoured) and the rhombus's two mirror placements, 40%, the midpoint, both line-side readings, the line with a point, the ordered line of three and four, five length bounds (through D3's order), the bound leaves the length free, a strict bound the givens violate is refused and a closed one at its end holds. Parity (`geo-input-parity.ts`): 19 rows lose their analytic `#1622` gap (cat-2d-009, 013, 014, 015, 019, 020, 021, 022, 024, 026, 027, 036, 037, 039, 048, 087, 106, 143, cat-3d-015); 21 new `e1-*` rows, each 2-D's measured verdict. Catalog: 16 entries (He + En); the shapes section now exceeds the guide's cap of six, so the six rows it showed before are marked `featured` — the guide is unchanged, and which six it SHOULD show stays #1347's open question. **Locks changed to this decision:** `shapes.test.ts` and `issue-1158-1166-polygon-noun-validity.test.ts` sweep the registry with as many letters as each row's arity (they assumed at most four / five), and `shapes.test.ts`'s "a row may not smuggle in a mechanism" admits the one declared exception, a `regular` row (its `declare` + `regular-vertex` construction, no constraints). The ring sweep caught a real defect on the way: eight free vertices sampled in letter order are almost never a simple ring, so «מתומן ABCDEFGH» was drawn crossed at 16 of 24 seeds; a ring of five or more free vertices now STARTS star-shaped (its samples handed out in angular order about their centroid, `evaluate.ts`), quadrilaterals and triangles keep their start.
+
+**Measured.** 471 corpus: 251/263 lines, 35/46 questions — unchanged (none of these sentences is in the corpus).
+
+**Divergences kept, and why.**
+- «ישר ABE» on an EMPTY canvas: 2-D refuses (*"references an unknown point"* — its `set-line` needs two existing anchors); analytic introduces the points, as «הישר AB» introduces its own (the 2026-09-15 ruling). With a figure both build.
+- «D על המעגל החוסם את המשולש ABC» with no circle: 2-D is not-handled (only the «… חותך את … בנקודה» form builds its circumcircle); analytic states the circle for every reference (ADR-AG-210's rule). The drawn circle is visible — 2-D draws its on-demand circumcircle hidden and centres it on O; here the centre stays unlabelled (#1673).
+- «C במרחק 5 מ-A ו-5 מ-B» with A and B new: 2-D refuses (unresolved dependencies); analytic mints them, as «AB = 5» does (ADR-AG-210).
+- «קו ועליו נקודה A» beside an existing segment: 2-D puts A on THE figure's single segment; the indefinite «קו» here always states a new line.
+
+**Not done.** A shape inscribed in a QUADRILATERAL, an unlettered or partly lettered inscribed shape, and 2-D's region head that is a full statement («E על המעגל O בתוך המשולש ABC») — not on the row list, not read. Angle bounds are D3's too (cat-2d-085/086, ADR-AG-216).
+
+**Consequences.** `engine/shapes.ts`, `engine/derived.ts` (+ `sameDerivation.ts`, `solve.ts` labels), `engine/toolLetters.ts`, `engine/inscribe.ts` (new), `engine/types.ts`, `engine/apply.ts` (selector refs, `statingNamedCircle`), `engine/evaluate.ts` (judge + seed), `parseOrder` (the word window), `parser/parseAnalytic.ts`, `parser/catalogAnalytic.ts` (16 rows — diff the built proxy before deploy), `app/rename.ts`, `app/errorText.ts`, `store/useAnalyticStore.ts`, `i18n/index.ts` (two codes, He + En), `shell/__tests__/fixtures/geo-input-parity.ts`.
+
+## ADR-AG-221 — An order between angle names is D3's order; an angle named by a label is D2's alias under `∠A1`; an area label introduces the region it names (#1622 E5)
+
+**Status:** accepted · 2026-10-03 · slice E stream E5 of the analytic V4 plan (#1616): the last three analytic `#1622` known-gap rows. Standing rulings applied, none asked:
+- *analytic gives the same experience as 2-D for plane geometry* (2026-10-02, #1649/#1669);
+- *a reference creates what it names* (ADR-AG-210, #1670);
+- *every unstated magnitude is a free DOF* (ADR-052);
+- *no stated given may vanish* (honesty invariants).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R164. · **Design:** [04c](04c-design-analytic.md), "An order between angle names; an angle named by a label; an area label introduces its region".
+
+**Context — measured.** 2-D through `decideDeterministic2D` (the parity runner's lane); analytic through `decideSubmit` on the base (`feat/1622-parity` @ 1cf0596f).
+
+| sentence(s) | 2-D | analytic before | analytic now |
+|---|---|---|---|
+| «α < β» (empty canvas) | commits `measure-order` α < β | not-handled | builds (order selector) |
+| «α < 30», «α < 30°», «20 < α < 60» | commits `measure-bound` | not-handled | builds |
+| «α ≤ β» | commits `measure-order` `<=` | not-handled | builds, closed |
+| «α < β» · «משולש ABC» · «∢ABC = α» · «∢BAC = β» | builds; the order binds | not-handled at line 1 | builds; ∢BAC < ∢ABC at every seed |
+| … · «α = 50» · «β = 40» | refused (conflict) | — | refused `unsatisfiable` on «β = 40» |
+| «α < 2β», «α < AB» | not-handled | not-handled; «α < AB» recorded green (D3's length-vs-value pair) | not-handled; `bad-operand` |
+| «נסמן זוית BAM כ-A1» (empty, or on a triangle) | commits segments AB, AM + `angle-alias` A1 | not-handled | builds: arms drawn, A1 bound |
+| «נסמן זוית CAD כ 1», «נסמן ∠CAB=A1», «בתור», «כזוית», «כ-∠A1», "denote angle CAB as/by A1" | the same binding (digit ⇒ A1) | not-handled | the same facts |
+| «∠CAB=A1» with no verb | not-handled | records a free parameter named `A` (A·1) | unchanged — see "Not built" |
+| «נסמן זוית MAC כ-A1» after A1 is bound to ∢BAM | asks `aliasTaken` | — | refused `alias-taken` |
+| «נקודה A1» then the label, or the label then «נקודה A1» / «A1(1,2)» | asks `aliasTaken` (both orders; the coordinate form is out of 2-D's scope) | — | refused `alias-taken` |
+| «זוית A1 = 40», «∠A1 = 40», «A1 = 30», «זוית A1 = זוית A2» after the label | escalate (dropped / not-handled) | — | not-handled |
+| «נסמן זוית BAM כ-α» | commits `measure-angle` on α | not-handled | «∢BAM = α» (D2) |
+| «נסמן את שטח ABCD ב-S» (empty canvas) | commits `measure-area` on S; NO object | refused `unknown-reference` A | builds: quadrilateral ABCD, S its area |
+| … · «ריבוע ABCD» / «מרובע ABCD» / «AB = 5» | builds | — | builds (the noun takes the ring over) |
+| «שטח ABCD = 20», «שטח ABC = שטח ABD», «S_{XYZ} / S_{ABC} = 2» on missing points | refused (unknown point) | refused | refused (unchanged) |
+
+**Decision.**
+1. **The alias order is D3's `order` (ADR-AG-216), with no second mechanism.**
+   - `orderFacts` declined two VALUE sides ("a domain or an equation"). It now admits them when each side is a lone Greek alias or a number, and at least one is an alias. That is 2-D's grammar: `measure-order` between two variables, `measure-bound` against a number. «α < 2β» is unread here, as in 2-D.
+   - The selector is the one «AB < BC» lowers to. `orderQuantity` already evaluates a value side with `evalExpr`. An alias no angle uses is not in the register, so the order judges nothing until «∢ABC = α» binds it. 2-D commits the bare order and binds it later in the same way.
+   - A value naming a Greek alias is an ANGLE in the kind check, so «α < AB» is `bad-operand`, like D3's «AB < ∢ABC».
+   - **Seeded into its region** (`seedOrderParams`, in `foldSignSelectors`, the #1323 fold for a parameter). Measured before the seeding: «α > 150» · «משולש ABC» · «∢ABC = α» drew no figure at most seeds — sample-and-reject on a region, the #1071 class D3 named. Now, where the sample breaks the order, the alias's sample is rescaled from its implied range onto the region, keeping its relative place. Measured over eight seeds: «α < 30», «α > 150», «20 < α < 60» and «α < β» hold at every seed, with ≥ 3 distinct angles.
+   - E3's `params` quantity («R > r», ADR-AG-219) is a separate reader for Latin radius letters with a "used" check. It is not merged here (see "Not built").
+2. **The angle label is D2's alias mechanism (ADR-AG-215) under a non-expression name.**
+   - `parseAngleLabel` copies 2-D's `angleAliasRule` spellings. It reads the line WITH its verb, in `parseLine` before `unwrap` strips «נסמן». 2-D binds «∠CAB=A1» only after the verb, and this rule does the same.
+   - It lowers to the `angle` constraint with the free value `∠A1`, plus the two arm segments 2-D draws. A Greek name goes through `parseClause('∠BAM = α')`, D2's own reading.
+   - **The collision, measured.** «A1» is a point's name in this tree: «נקודה A1» and «A1(1,2)» build, `NAME` is `[A-Z][0-9]?`, and `mentionsAny` reads a capital-plus-digit string as a point id. So the parameter is never `A1`; it is `∠A1` (`angleLabelSymbol`). The expression reader cannot produce that name, `mentionsAny` cannot mistake it for a point, and the panel prints it as the book's ∠A1.
+   - The collision the STUDENT can make — one name for two things — is 2-D's `aliasTaken`, ported as `alias-taken`. It covers the same label on a different angle (which the shared symbol would otherwise read as the equality ∢BAM = ∢MAC, a given nobody stated) and a label that is a point's name, in either order. Restating the same binding is absorbed.
+   - The label states no magnitude. On a determined figure the panel reads its angle: ∠A1 = 90 on A(0,0), B(4,0), C(0,3).
+3. **«נסמן את שטח ABCD ב-S» on an empty canvas introduces the quadrilateral ABCD.**
+   - 2-D commits the label with no object. Analytic holds no statement about points it does not have, so the label cannot wait for the shape.
+   - The standing rule "a reference creates what it names" (ADR-AG-210) chooses the closest honest equivalent: the label names a region, so it introduces it, exactly as «AB = 5» introduces A and B. The vertices are free (ADR-052), and the ring is a noun-less polygon, so only the simple-ring promise is judged. S is the drawn area at every seed. A later «ריבוע ABCD» / «מלבן ABCD» takes the ring over (the #1049 promotion), and «AB = 5» then gives S = 25.
+   - `areaLabelRing` is the minting form: one area term against a lone symbol. It deliberately excludes an area VALUE, because 2-D REFUSES «שטח ABCD = 20» and «שטח ABC = שטח ABD» on missing points (measured). Those keep #1028's refusal.
+   - The alternative — introduce only the four points — was rejected. Four free points in the order A, B, C, D may cross, and the area of a crossed ring is not the area of «ABCD».
+
+**Not built, said out loud.**
+- **«∠CAB = A1» without the verb** records a free parameter named `A` (A·1). This is pre-existing: the value reader treats the point letter `A` as a symbol. 2-D escalates the same line. It is a separate defect (an angle value that reads a point name as a parameter), reported for filing, not patched here.
+- **2-D's catalog promises follow-ups to the label** — «∠A1 = 40», «∠A1 = ∠D1», «angle A1 is acute» (`catalog.ts` row 127). Measured: every one escalates in 2-D's deterministic lane. Analytic reads none of them either (same verdict). The gap between 2-D's catalog text and its lane is reported, not filed.
+- **An alias order with no angle bound** judges nothing: «α < β» · «α = 50» · «β = 40» records, exactly as 2-D commits it. The same holds for the pre-existing «α = 50» · «α = 40» — a pin about a symbol no object uses is never evaluated. Reported as one class (unbound parameter givens are unjudged), not patched here.
+- **E3's `params` quantity and D3's `order`** both order parameters. Merging them would move E3's "used" check and its Latin radius grammar, so it is left to the integrator as a follow-up.
+- The `alias-taken` refusal is `refused` in the parity vocabulary; 2-D's is `asks` (a clarify). The student reads the same remedy. No parity row is added for it; the lock below holds it.
+
+**Measured.** 471 corpus (`confirmTaught`, seed 0): **257/263 lines, 41/46 questions — unchanged**. None of these sentences is in the corpus.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1622-e5-last-rows.test.ts` has 21 tests, all through `decideSubmit` / `derive` / `parseLine`, over eight seeds. **Fails before: 17 of 21.** The four that pass on the base are guards:
+  - the neighbours (Latin domains, «a < b»);
+  - «A1 = 30» unread and the repeated vertex;
+  - no second ring on an existing quadrilateral;
+  - area VALUES on missing points refused.
+- Parity rows flipped (analytic `#1622` gap dropped): **cat-2d-059, cat-2d-072, cat-2d-084**.
+- New rows, each with 3-D's gap on #1679:
+  - alias-order-bound-1622, alias-order-window-1622, alias-order-closed-1622, alias-order-binds-1622;
+  - angle-label-1622, angle-label-digit-1622, angle-label-equals-1622, angle-label-greek-1622;
+  - area-label-triangle-1622;
+  - area-value-unknown-1622 (refused).
+- Two drafted rows were dropped, because 3-D's last line coincides with 2-D while its context fails: the contradicted pin, and «A1 = 30». The test file holds both.
+- Catalog: four He/En entries («α < β», «α < 30», «נסמן זוית BAM כ-A1», «נסמן את שטח המשולש ABC ב-S»).
+
+**Consequences.**
+- `parser/parseAnalytic.ts`: `GREEK_ALIAS`, `orderFacts` (alias value sides and the kind check), `parseAngleLabel` and its call in `parseLine`.
+- `engine/evaluate.ts`: `seedOrderParams` in `foldSignSelectors`.
+- `engine/apply.ts`: the `alias-taken` code; the label check in the `angle` constraint; the label-name check in `applyFact`; `areaLabelRing` as a minting form, and its ring stated in the mint pass.
+- `engine/lengths.ts`: `angleLabelSymbol`, `angleLabelName`.
+- `store/useAnalyticStore.ts`, `app/errorText.ts`, `i18n/index.ts`: `errAliasTaken` (he/en).
+- `parser/catalogAnalytic.ts`; `shell/__tests__/fixtures/geo-input-parity.ts`.
+
+Sibling check (docs/17 §1): 2-D is the reference and was measured for every sentence. 3-D reads none of them (gaps on #1679).

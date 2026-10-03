@@ -154,8 +154,9 @@ describe('an angle named by a Greek letter — free until pinned (ADR-052)', () 
     };
     const one = facts('∢DCB = 2α');
     for (const s of ['נסמן ∢DCB = 2α', 'נסמן: ∢DCB = 2α', 'נסמן זווית DCB = 2α', 'let ∠DCB = 2α', 'angle DCB = 2α']) expect(facts(s), s).toEqual(one);
-    // «נסמן» before a clause no rule reads stays unread — it is a lead-in, never a reading of its own.
-    const area = parseLine('נסמן את שטח ABCD ב-S');
+    // «נסמן» before a clause no rule reads stays unread — it is a lead-in, never a reading of its own. (The area LABEL
+    // «נסמן את שטח ABCD ב-S» reads since #1622, ADR-AG-218, so the lead-in is shown on a clause that still does not.)
+    const area = parseLine('נסמן את המשולש ABC ב-T');
     expect(area.ok ? 'built' : area.code).toBe('not-handled');
   });
 });

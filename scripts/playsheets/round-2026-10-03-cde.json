@@ -1,0 +1,450 @@
+{
+ "name": "round-2026-10-03-cde",
+ "title": "אנליטית — סיום פרק C (#1695), פרק D מדדים כנתונים (#1700), פרק E השלמת התאמה ל-2-D (PR של פרק E)",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "פרק C: שני המשיקים נפגשים בנקודה D — על קנבס ריק",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "lines": [
+    "המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D"
+   ],
+   "lookFor": "ירוק; נוצרים מעגל O, הנקודות A ו-C עליו, שני המשיקים, ו-D בנקודת המפגש שלהם (DA = DC)",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T2",
+   "title": "פרק C: «המשיקים נפגשים בנקודה D» אחרי ששני המשיקים כבר מצוירים",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O",
+    "A על המעגל",
+    "C על המעגל",
+    "המשיק למעגל בנקודה A",
+    "המשיק למעגל בנקודה C",
+    "המשיקים נפגשים בנקודה D"
+   ],
+   "lookFor": "כל השורות ירוקות; D על שני המשיקים, והקטעים AD ו-CD מצוירים",
+   "before": "השורה האחרונה לא הובנה"
+  },
+  {
+   "id": "T3",
+   "title": "פרק C: משיקים בקצות קוטר מקבילים — נדחה (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "lines": [
+    "AC קוטר במעגל O",
+    "המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D"
+   ],
+   "expectRefusal": "לא נמצאה תצורה",
+   "lookFor": "השורה השנייה נדחית — אין תצורה שבה המשיקים נפגשים (הם מקבילים); אין רמז «בחרו אות אחרת», והשרטוט לא קורס לנקודה",
+   "before": "לא הובן (ובגרסה קודמת של הענף — השרטוט קרס לנקודה אחת בירוק)"
+  },
+  {
+   "id": "T4",
+   "title": "פרק D: «נסמן ∢DCB = 2α» — בחינה 1/4 נבנית במלואה",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון טרפז ישר זווית ABCD (AB ∥ CD, AB ⊥ AD)",
+    "EB ו-EC הם חוצי הזווית ABC ו-BCD בהתאמה הנפגשים בנקודה E",
+    "הנקודה E נמצאת על השוק AD",
+    "נסמן ∢DCB = 2α",
+    "נתון: B(1,4), E(−1,2)",
+    "משוואת הישר BC היא 3x + y = 7"
+   ],
+   "lookFor": "כל שש השורות ירוקות; הטרפז נבנה, ו-E על AD במפגש חוצי הזוויות",
+   "before": "שורה 4 לא הובנה"
+  },
+  {
+   "id": "T5",
+   "title": "פרק D: זווית בשם α, ואז α = 30 קובע אותה",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "∢ABC = α",
+    "α = 30"
+   ],
+   "lookFor": "שלוש השורות ירוקות; אחרי השורה השנייה «הציגו תצורה אחרת» משנה את הזווית (α חופשי); אחרי השלישית ∢ABC = 30°",
+   "before": "שורה 2 נדחתה (bad-equation)"
+  },
+  {
+   "id": "T6",
+   "title": "פרק D: «tan∢BAO = 2» — בחינה 9/4 נבנית במלואה",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "במלבן ABCD",
+    "הקודקוד B נמצא על ציר ה-y",
+    "והקודקודים A ו-C נמצאים על ציר ה-x, כמתואר בציור",
+    "O - ראשית הצירים",
+    "tan∢BAO = 2",
+    "AO = 3"
+   ],
+   "lookFor": "כל שש השורות ירוקות; A = (±3, 0) ו-B = (0, ±6)",
+   "before": "שורה 5 לא הובנה"
+  },
+  {
+   "id": "T7",
+   "title": "פרק D: «sin» עדיין לא נקרא — הכלי לא בוחר בין זווית חדה לקהה (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "sin∢ABC = 1/2"
+   ],
+   "expectRefusal": "לא הצלחתי להבין",
+   "lookFor": "השורה השנייה לא מובנת — שום דבר לא מצויר",
+   "before": "ללא שינוי"
+  },
+  {
+   "id": "T8",
+   "title": "פרק D: יחס שטחים בכתיב S_{…}",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "נקודה D על BC",
+    "S_{ABD} / S_{ADC} = 0.8"
+   ],
+   "lookFor": "כל השורות ירוקות; שטח ABD הוא 0.8 משטח ADC",
+   "before": "השורה השלישית לא הובנה"
+  },
+  {
+   "id": "T9",
+   "title": "פרק D: «היחס בין שטח … לשטח … הוא 4:5»",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "נקודה D על BC",
+    "היחס בין שטח המשולש ABD לשטח המשולש ADC הוא 4:5"
+   ],
+   "lookFor": "כל השורות ירוקות; BD:DC = 4:5",
+   "before": "השורה השלישית לא הובנה"
+  },
+  {
+   "id": "T10",
+   "title": "פרק D: שיעור ה-y של קודקוד במילים — בחינה 14/4 נבנית במלואה",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "במשולש ABC הקודקוד B מונח על ציר ה-y",
+    "נתון כי משוואת הצלע AB היא y = -x + 4",
+    "שיעור ה-y של הקודקוד A הוא 10",
+    "נתון כי הצלע BC מקבילה לציר ה-x",
+    "אורך הצלע BC הוא 6",
+    "D היא נקודת החיתוך של הישר AC עם ציר ה-y",
+    "הישר העובר דרך הנקודה D מקביל לציר ה-x וחותך את הצלע AB בנקודה E"
+   ],
+   "lookFor": "כל שבע השורות ירוקות; A = (−6, 10), B = (0, 4)",
+   "before": "שורה 3 לא הובנה (הכתיב «קודקוד» לא הוכר)"
+  },
+  {
+   "id": "T11",
+   "title": "פרק D: סדר בין אורכים — «AB < BC»",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "AB < BC"
+   ],
+   "lookFor": "שתי השורות ירוקות; בכל תצורה («הציגו תצורה אחרת») AB קצר מ-BC",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T12",
+   "title": "פרק D: «זווית ABC קהה»",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "זווית ABC קהה"
+   ],
+   "lookFor": "שתי השורות ירוקות; הזווית ב-B גדולה מ-90°",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T13",
+   "title": "פרק D: סדר שסותר את הנתונים נדחה (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "AB = 5",
+    "BC = 7",
+    "AB > BC"
+   ],
+   "expectRefusal": "לא נמצאה תצורה",
+   "lookFor": "השורה האחרונה נדחית ומצטטת את המשפט",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T14",
+   "title": "פרק E: מחומש משוכלל",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "מחומש משוכלל ABCDE"
+   ],
+   "lookFor": "ירוק; מחומש עם צלעות שוות וזוויות שוות",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T15",
+   "title": "פרק E: מלבן במידות 4*6 — הכלי נותן שמות לקודקודים",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "מלבן במידות 4*6"
+   ],
+   "lookFor": "ירוק; מלבן ABCD עם AB = 4 ו-BC = 6, והשורה אומרת שהכלי בחר את האותיות",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T16",
+   "title": "פרק E: מעוין חסום במשולש — «הציגו תצורה אחרת» מחליף מיקום",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "מעוין BDEF חסום במשולש ABC"
+   ],
+   "lookFor": "שתי השורות ירוקות; המעוין בתוך המשולש וקודקודיו על הצלעות; «הציגו תצורה אחרת» מחליף בין המיקומים האפשריים",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T17",
+   "title": "פרק E: נקודה על צלע ב-40%",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "נקודה E על AC ב-40%"
+   ],
+   "lookFor": "שתי השורות ירוקות; AE = 0.4·AC",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T18",
+   "title": "פרק E: משובע אינו נתמך — נדחה בשם (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "משובע ABCDEFG"
+   ],
+   "expectRefusal": "משוכלל",
+   "lookFor": "השורה נדחית עם הסבר שמצולע בן 7 צלעות אינו נתמך",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T19",
+   "title": "פרק E: משולשים חופפים כנתון",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "△ABC ≅ △DEF"
+   ],
+   "lookFor": "ירוק; שני משולשים מצוירים, והצלעות המתאימות שוות (AB = DE, BC = EF, CA = FD)",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T20",
+   "title": "פרק E: «הוכיחו ש…» חפיפה — מטרת הוכחה, נדחית (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "משולש DEF",
+    "הוכיחו ש-△ABC ≅ △DEF"
+   ],
+   "expectRefusal": "טענה להוכחה",
+   "lookFor": "השורה השלישית נדחית כמטרת הוכחה — הכלי לא מוכיח",
+   "before": "ללא שינוי"
+  },
+  {
+   "id": "T21",
+   "title": "פרק E: «AB = 3x» הוא אורך, ו-«y = 2x + 1» נשאר ישר",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "AB = 3x",
+    "y = 2x + 1",
+    "AB = 6"
+   ],
+   "lookFor": "כל השורות ירוקות; הישר y = 2x + 1 מצויר כרגיל; אחרי «AB = 6» בלוח מופיע x = 2",
+   "before": "שורה 2 לא הובנה"
+  },
+  {
+   "id": "T22",
+   "title": "פרק E: שוויון משורשר עם ערך — «AB = AC = 5»",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "AB = AC = 5"
+   ],
+   "lookFor": "שתי השורות ירוקות; AB = AC = 5",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T23",
+   "title": "פרק E: פתיחת שני המעגלים (#1693) — נבנית כמו שהוקלדה",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "שני מעגלים נחתכים בנקודות A ו B",
+    "נקודה C על מעגל P",
+    "המשך CA חותך את מעגל O בנקודה D",
+    "המשך CB חותך את מעגל O בנקודה E"
+   ],
+   "lookFor": "ארבע השורות ירוקות; C על המעגל הראשון (P), ו-D ו-E על השני (O) — כמו בהנדסת המישור",
+   "before": "שורה 1 לא הובנה"
+  },
+  {
+   "id": "T24",
+   "title": "פרק E: מעגל מוכל בתוך מעגל",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O",
+    "מעגל P מוכל בתוך מעגל O"
+   ],
+   "lookFor": "שתי השורות ירוקות; מעגל P כולו בתוך O בכל תצורה",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T25",
+   "title": "פרק E: משיק משותף לשני מעגלים",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "AB משיק משותף למעגלים O ו-P"
+   ],
+   "lookFor": "ירוק; שני מעגלים, ו-AB נוגע בשניהם (A על אחד, B על השני)",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T26",
+   "title": "פרק E: מעגל לפי היקף — «מעגל O שהיקפו 6π»",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O שהיקפו 6π"
+   ],
+   "lookFor": "ירוק; רדיוס 3",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T27",
+   "title": "פרק E: מידת קשת — «⌢{AC} = 60°»",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+y^2=25",
+    "A על המעגל",
+    "C על המעגל",
+    "⌢{AC} = 60°"
+   ],
+   "lookFor": "כל השורות ירוקות; הזווית המרכזית AOC היא 60°; בשורת הנתונים הקשת מוצגת עם קשת מעל AC",
+   "before": "השורה האחרונה לא הובנה"
+  },
+  {
+   "id": "T28",
+   "title": "פרק E: חצי מעגל על קוטר AB",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "חצי מעגל שקוטרו AB"
+   ],
+   "lookFor": "ירוק; חצי מעגל מעל הקטע AB (לא מעגל שלם)",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T29",
+   "title": "פרק E: גזרה AOB",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "גזרה AOB"
+   ],
+   "lookFor": "ירוק; גזרה עם מרכז O ושני רדיוסים OA, OB",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T30",
+   "title": "לוח הסמלים: כל הכפתורים החדשים",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC"
+   ],
+   "lookFor": "בלוח הסמלים: ⊥ ∥ ∠ ° √() α β γ δ θ < S_{} △ ≅ ~ ⌢{}",
+   "before": "לא היו ⊥ ∥ ∠ ° ושאר הכפתורים"
+  }
+ ]
+}

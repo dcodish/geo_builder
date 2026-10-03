@@ -234,7 +234,8 @@ describe('#1620 — a point on a side WITH a condition («כך ש-»)', () => {
   });
 
   it('a condition the grammar cannot read refuses the WHOLE line — the placement is not kept without it', () => {
-    const lines = ['A(0,0)', 'B(4,0)', 'C(6,3)', 'E על המשך הצלע BC כך שהמשולש ABE דומה למשולש ABC'];
+    // #1622 (ADR-AG-218) made «המשולש ABE דומה למשולש ABC» a readable given; a similarity RATIO still is not.
+    const lines = ['A(0,0)', 'B(4,0)', 'C(6,3)', 'E על המשך הצלע BC כך שהמשולש ABE דומה למשולש ABC ביחס 1:2'];
     expect(play(lines).verdicts.at(-1)).toMatch(/^refused/);
     expect(derive(lines, 0).figure.points.some((p) => p.id === 'E')).toBe(false);
   });

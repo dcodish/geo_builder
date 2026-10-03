@@ -39,7 +39,8 @@ const dof = (line: string) => {
   const d = derive([line], 0);
   return reportedDof(d.construction, d.figure.carrierDof);
 };
-const ring = (noun: string) => (shapeRow(noun)!.arity === 3 ? 'ABC' : 'ABCD');
+// As many letters as the row's arity — the table holds polygons up to ten sides (#1622, ADR-AG-217).
+const ring = (noun: string) => 'ABCDEFGHIJ'.slice(0, shapeRow(noun)!.arity);
 
 describe('#1049 — every noun in the table BUILDS, and its givens actually HOLD', () => {
   /**
@@ -213,6 +214,16 @@ describe('#1049 — adding a noun is adding a ROW', () => {
        * vertices are distinct (#1077), and it is listed here rather than admitted loosely so that a
        * row which started emitting selectors of its own would still fail this.
        */
+      // The ONE declared exception (#1622, ADR-AG-217): a `regular` row is CONSTRUCTED — its first two vertices
+      // declared, every other one the `regular-vertex` closed form over that side — and declares no constraint.
+      if (row.regular) {
+        const derived = r.facts.filter((f) => f.t === 'derived');
+        expect(derived.length, noun).toBe(row.arity - 2);
+        expect(derived.every((f) => f.t === 'derived' && f.rule.t === 'regular-vertex'), noun).toBe(true);
+        expect([...kinds].every((k) => ['polygon', 'selector', 'declare', 'derived'].includes(k)), noun).toBe(true);
+        expect(row.givens([...names]), noun).toEqual([]);
+        continue;
+      }
       expect([...kinds].every((k) => k === 'polygon' || k === 'constraint' || k === 'selector'), noun).toBe(true);
       const selectors = r.facts.filter((f) => f.t === 'selector');
       expect(selectors, noun).toHaveLength(1);
