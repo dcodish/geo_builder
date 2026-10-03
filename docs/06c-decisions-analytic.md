@@ -9678,3 +9678,96 @@ Sibling check (docs/17 §1): 2-D is the reference and builds every row above exc
 **A vacuous lock, found and replaced.** `symbols-module.test.ts` held `°` with «זווית BAC = 90°» on A(0,0) B(4,0) C(1,3). That triangle's angle at A is fixed near 72°, so the line faulted `unsatisfiable` and "°  still does not parse" passed by contradiction, after `°` had started to parse. The replacement holds each still-absent chip on a figure where its sentence could hold, and requires a READING fault (`not-handled` / `bad-equation` / `bad-operand`), so the row goes red the day the notation lands.
 
 **Locks.** `symbols-module.test.ts`: four new parse proofs (totality-guarded), `√()` as a wrap («AB = 20» with «20» selected → «AB = √(20)», builds), the original-six row updated on purpose, six held-chip rows. `palette-faces-1348` (each one-character face inserts its own glyph) and the bidi no-split row cover the new chips unchanged. **Fails before: 3 of 21** — the totality guard, the `√()` wrap proof and the original-six row; the four new parse proofs iterate the palette, so they do not exist before it.
+
+## ADR-AG-214 — The ratio of two measures and the area notation S_{…} are givens: one `length-eq`, no new solver (#1621 slice D, stream D1)
+
+**Status:** accepted · 2026-10-03.
+- #1621's fix plan: area and length ratios lower onto the existing measures in `engine/lengths.ts`, with no new solver.
+- The palette comment on #1621 (#1696): the `S_{}` chip ships with its notation.
+- The standing ruling (2026-10-02, #1649/#1669): analytic gives 2-D's experience for plane geometry. 2-D's verdicts were measured, and they are the reference wherever 2-D reads the sentence.
+- Branch `feat/1621-d1-ratios-areas` off `feat/1620-construction-vocabulary` @ 5dab4a4a.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R150 (new); R11a's palette set amended (`S_{}`). · **Design:** [04c](04c-design-analytic.md) — new section "Measures as givens: the ratio of two measures and the area notation". · **LADDER stage:**
+- Parse only: `orthography` (the notation), `asEquation` (the prose ratio), `AREA_EN` / `AREA_TOKEN` (English area words).
+- No M1, fold or solver change.
+
+**Cites:**
+- [ADR-AG-122](#adr-ag-122) / [ADR-AG-212](#adr-ag-212): a chip ships with its notation.
+- The `length-eq` measure layer (#1050, #1075): areas as terms, and comparisons rewritten into equations.
+- #1128: a notation is rewritten into its worded synonym.
+- #1124: the colon ratio and the divider.
+
+**Context — measured on 5dab4a4a.** 2-D was measured through `decideDeterministic2D`; analytic through `decideSubmit` / `derive(confirmTaught(…))`.
+
+| sentence | 2-D | analytic before | analytic after |
+|---|---|---|---|
+| «היחס בין שטח המשולש AOB לשטח הטרפז ADCB הוא 4:5» (6/5) | not-handled (it reads «הוא 4»; its honesty gate escalates the dropped 5) | not-handled | builds |
+| «S_BDC / S_ODC = 0.8» (7/4), «S_{ABD} / S_{ADC} = 0.8» | builds (`set-area-ratio`) | not-handled | builds |
+| «S_{ABC} = 13», «S_ABC = 13» | builds | not-handled | builds |
+| «שטח המשולש OCF גדול פי 4 משטח המשולש AOE» (20/4) | builds | builds | builds |
+| «ידוע כי שטח המשולש ABD שווה ל-45» (18/4) | refused (`split-statements`) | builds | builds |
+| «DO/DE = 2/3» (16/5), «CD/OB = 5/2» (17/4) | builds (`set-ratio`) | builds | builds |
+| «S_{ABD} / S_{ABC} = 2» (a part twice its whole) | refused (cannot place D) | not-handled | refused `unsatisfiable`, naming the line |
+| «S_{XYZ} / S_{ABC} = 2» | refused (unknown point) | not-handled | refused `unknown-reference` «X» |
+| «the area of triangle ABC is 45» | — | not-handled | builds |
+
+The 16/5, 17/4, 18/4 and 20/4 lines already landed after slice C. This ADR locks each of them to its printed coordinates.
+
+**Decision.**
+1. **`S_{ABC}` / `S_ABC` is «שטח ABC».**
+   - `areaNotation` (`engine/lengths.ts`) rewrites the notation into the worded phrase. It runs in `orthography`, so every rule reads one spelling, and in `readLength`, so the ask lane reads it too.
+   - Only a run of three or more vertex names is rewritten. `S_1` and `S_A` are names and are left alone.
+   - The same pattern as `d_{AB}` (#1128): a spelling can never disagree with its synonym.
+2. **«היחס בין X ל-Y הוא v» is an equation over two measures.**
+   - `ratioAsEquation` (first in `asEquation`): `p:q` gives `q·X = p·Y`; any other value `r` gives `X = r·Y`. X and Y may be areas, lengths or distances, of any polygon.
+   - The join is found by the MEASURES. Hebrew glues «ל» to the second measure («לשטח»), and a distance contains its own «ל» («המרחק מ-P לישר AB»). So every candidate join is tried, and the first split where both sides parse through `parseLengthExpr` is taken.
+   - The English twin is "the ratio of X to Y is v".
+   - The divider «היחס בין AC ל-CB הוא 3:2» is unchanged: `parseDividesInRatio` reads it first.
+3. **English area words.**
+   - `AREA_EN` was case-insensitive, so its noun `[a-z]+` also matched the vertex run. «the area of triangle ABC is 45» read the noun «triangle ABC», found no such shape, and was not-handled. Every English area value with vertices failed this way (measured).
+   - A noun word is now a letter followed by lowercase letters.
+   - `AREA_TOKEN` consumes the article in «the area of …», so "the" is never multiplied as t·h·e (the #1321 trap).
+4. **The `S_{}` chip** joins the palette: select «ABC», press it, get «S_{ABC}». Its proof is in `symbols-module.test.ts`, and its row is removed from the held list.
+5. **Refusals come from the existing paths.**
+   - A ratio that cannot hold is `unsatisfiable`, naming the line.
+   - A region with a missing vertex is `unknown-reference`, naming the vertex.
+
+**Corpus (471 ratchet, `confirmTaught`, seed 0): 251/263 lines · 35/46 questions — unchanged in count, two lines moved.**
+- **6/5 line 3** (the area ratio) now lands. 6/5 does not land whole: line 2 «A ו-D על ציר ה-y (D מעל A), B ו-C על ציר ה-x (C מימין ל-B)» carries the position words «מעל» / «מימין ל-», which are stream D3's.
+  - With them written as the component order they mean (`y_D > y_A`, `x_C > x_B`), the question draws A(0,6), D(0,9), B(4,0), C(6,0) at every seed: the printed answer.
+  - Without the order, the ratio holds on the mirror figure (|OB| = 4, |OD| = 9).
+- **7/4 line 4 «S_BDC / S_ODC = 0.8» is now READ and is refused `unsatisfiable`.**
+  - The exam prints it this way (booklet p. 49). But D is the foot of the altitude OD on BC, so B, D and C are collinear and S_BDC = 0 in every figure. The refusal is the honest verdict.
+  - With the similar-triangle reading «S_BEC / S_ODC = 0.8» (part ג proves BEC ~ ODC), the figure lands at B(6,8) or B(14,−8). That case is locked as the notation test on 7/4's own figure, but it is NOT substituted for the printed line. See the question in the stream report.
+  - As a side effect, in the batch `derive` the solver's compromise also leaves line 0's altitude constraints unsatisfied, so the ratchet counts line 0 as failing too. The submit path, which is what a student meets, refuses only line 4. Lines 0–3 record.
+  - This is the attribution class of #902: an impossible given blames an earlier, innocent line. The behaviour is pre-existing, in `derive`'s unsatisfied-blame loop, and is not changed here.
+
+**Parity (#1649).**
+- No #1621 analytic row is a ratio or area sentence except `cat-2d-072` «נסמן את שטח ABCD ב-S». That row is the «נסמן» naming mechanism (stream D2) and is left to it.
+- Seven new rows:
+  - `area-ratio-prose-1621` and `area-value-equals-1621`: builds. Known gaps: 2-D #1677, 3-D #1679.
+  - `area-ratio-notation-1621` (X9), `length-ratio-slash-1621` (X9): builds.
+  - `area-notation-value-1621`: builds. Known gap: 3-D #1679.
+  - `area-ratio-impossible-1621` (X9): refused.
+  - `area-ratio-no-region-1621`: refused. Known gap: 3-D #1679.
+- New catalog entries (F20, He and En): the prose area ratio, `S_{ABD} / S_{ADC} = 0.8`, `S_{ABC} = 13`, «שטח המשולש ABC שווה ל-45», `BD/DC = 2/3`.
+
+**Not built, said out loud.**
+- The colon form between two AREAS («S_ABD : S_ADC = 4:5») stays not-handled, as in 2-D. The colon ratio is a segment form (#1124).
+- 2-D's compact `SABC` is not read. In analytic it collides with a four-letter polygon S·A·B·C.
+- «היחס בין AB ל-AC הוא 2:3» on a triangle is still read as a DIVIDER (A between B and C), as before. That is `parseDividesInRatio`'s shared-letter rule, not changed here.
+- Measured, not fixed (pre-existing): «D על BC» after «משולש ABC» draws the SAME figure at every seed. This is the #1687 neighbourhood. So the free-DOF lock here uses a quadrilateral.
+
+**Locks.** `issue-1621-ratios-areas.test.ts` (27). Each calls `derive` / `decideSubmit` / `confirmTaught` / `parseLine` / `ask` and measures the stated ratio off the drawn figure by the shoelace, at 8 seeds:
+- notation identity with «שטח ABC = 13»;
+- the ask lane answering «S_{ABC}»;
+- seven ratio spellings, Hebrew and English;
+- the triangle-to-quadrilateral ratio;
+- the measure-driven join on a distance ratio;
+- slash = colon for lengths;
+- English area values;
+- free DOFs stay free;
+- the two refusals;
+- the corpus line by line: 6/5, 7/4 (refusal and notation), 16/5, 17/4, 18/4, 20/4.
+
+`symbols-module.test.ts`: the `S_{}` proof (totality-guarded), and its held row removed. Parity: the seven rows. **Fails before: 21 of 27.** The six that already passed are the four corpus questions that landed after slice C, the length ratio by «/», and the subscripted-name guard.

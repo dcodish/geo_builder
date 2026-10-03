@@ -161,10 +161,11 @@ tree; subscripts are new to this input language.
 then refuses hands the student `not-handled` on their own click, which is worse than no chip —
 #511's rule, and the operator's own framing when ruling the analytic set.
 
-The set: `²` `³` `√()` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}` `⊥` `∥` `∠` `°`
+The set: `²` `³` `√()` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}` `⊥` `∥` `∠` `°` `S_{}`
 ([ADR-AG-212](06c-decisions-analytic.md#adr-ag-212), [#1696](https://github.com/dcodish/geo_builder/issues/1696):
-the 2-D palette reviewed chip by chip; `√()` wraps a selection as 2-D's does). The 2-D chips still absent
-are absent because their sentences are not read yet — α β γ δ θ, `S_{}` and `<` between measures
+the 2-D palette reviewed chip by chip; `√()` wraps a selection as 2-D's does; `S_{}` with the area notation,
+[ADR-AG-214](06c-decisions-analytic.md#adr-ag-214), R150). The 2-D chips still absent
+are absent because their sentences are not read yet — α β γ δ θ and `<` between measures
 (#1621), `△` `≅` `~` and `⌢{}` (#1622) — and each arrives in that work's own change, because a
 chip is part of shipping a notation rather than a follow-up to it.
 
@@ -2210,3 +2211,14 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
   - A point that a later line defines is still defined by that line.
   - Still refused, as in 2-D, when the letters are new: «AB = 2CD», «AB:BC = 2:3», «AD גובה לצלע BC».
 - «AB קוטר» · «BO = 5» draws BO with B where it is and O a free point. O is not the centre until the student says so. A later «O מרכז המעגל», «OB רדיוס» or «הרדיוס OB» then moves that same O to the centre; no second point appears.
+
+**R150 — the ratio of two measures, and the area notation S_{…}, as givens**
+([ADR-AG-214](06c-decisions-analytic.md#adr-ag-214), [#1621](https://github.com/dcodish/geo_builder/issues/1621); operator ruling 2026-10-02: the analytic tool gives the same experience as 2-D for plane geometry).
+
+- «היחס בין שטח המשולש AOB לשטח הטרפז ADCB הוא 4:5» states that the two areas are in the ratio 4:5. The ratio may be written `p:q`, as a fraction («4/5») or as a number («0.8»). Either measure may be an area, a length or a distance, and the polygon may have any number of vertices. «the ratio of the area of triangle AOB to the area of trapezoid ADCB is 4:5» is the English form.
+- «S_{ABC}» and «S_ABC» mean «שטח ABC», in a given («S_{ABC} = 13», «S_BDC / S_ODC = 0.8») and in a question. The palette has an «S_{}» button: select the vertices, press it, and get «S_{ABC}».
+- A length ratio may be written with «/»: «DO/DE = 2/3», «CD/OB = 5/2», the same as «DO:DE = 2:3».
+- An area value may be written «שטח המשולש ABD שווה ל-45», and in English «the area of triangle ABC is 45».
+- A ratio pins only what it states. Every other size and shape stays free and moves with «הציגו תצורה אחרת».
+- A ratio that cannot hold is refused, naming the sentence. For example: a part of a triangle twice the triangle's area, or a triangle with all three vertices on one line («S_BDC» when D is on BC).
+- A ratio that names a point the figure does not have is refused, naming that point.

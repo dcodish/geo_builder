@@ -2181,3 +2181,12 @@ called, never re-implemented in the test.
 - a companion: `segment`, `line-2pt`, `extent-of`, `selector`, `declare`, or a `length-eq` riding beside a minting fact.
 
 The missing points are added as `free` objects and the line's facts are re-applied; then the fixpoint runs again. This applies beside an unnamed centre too (#1686). A `perpendicular` (the cevian's own half) is not a minting form, so «AD גובה לצלע BC» stays refused. The cevian's triangle form states «משולש ABC» first (`clauseFacts`).
+
+## Measures as givens: the ratio of two measures and the area notation ([ADR-AG-214](06c-decisions-analytic.md#adr-ag-214), #1621)
+
+No new constraint kind and no new solver: every form lowers to the `length-eq` that «AB = 10», «AB = AC» and «שטח ABC גדול פי 3 משטח CEF» already use (`engine/lengths.ts`).
+
+- **The area notation is a rewrite.** `areaNotation` (`engine/lengths.ts`) turns `S_{ABC}` and `S_ABC` (three or more vertex names) into «שטח ABC». It runs in two places, both calling the one function: `orthography` (`parser/frameAnalytic.ts`), so every rule reads «S_{ABC} = 13» as «שטח ABC = 13»; and `readLength`, so the ask lane, which hands a bare measure to `parseLengthExpr`, reads it too. This is the `d_{AB}` → «המרחק בין A ל-B» pattern (#1128).
+- **The prose ratio is a rewrite into an equation.** `ratioAsEquation` (`parser/parseAnalytic.ts`, called first by `asEquation`) reads «היחס בין X ל-Y הוא v» and "the ratio of X to Y is v". It tries every join («לבין», «ובין», «ל-», «ל», "to", "and") and takes the first split where both sides parse as measures through `parseLengthExpr`. A value `p:q` becomes `q·X = p·Y`; any other value `r` becomes `X = r·Y`. The divider spelling «היחס בין AC ל-CB הוא 3:2» is `parseDividesInRatio`'s and is read earlier.
+- **English area words.** `AREA_EN` is no longer case-insensitive: a noun word is a letter followed by lowercase letters, so it cannot swallow the vertex run. `AREA_TOKEN` consumes "the" in front of "area of", so the article is never read as symbols.
+- **Refusals come from the existing paths.** A ratio that cannot hold is `unsatisfiable` on its line (the submit gate and `derive`). A region whose vertex is missing is `unknown-reference` naming the vertex (`apply`'s reference check).

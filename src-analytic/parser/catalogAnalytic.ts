@@ -756,6 +756,36 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'the ratio between AC and CB is 3:2',
     needs: ['A(0,0)', 'B(10,0)'],
   },
+  /**
+   * --- MEASURES AS GIVENS (#1621, ADR-AG-214), F20: the ratio of two measures and the area notation ---
+   *
+   * The exam's own spellings (corpus 6/5, 7/4, 16/5, 18/4), each lowering to the same `length-eq` as
+   * «AB = 10»: the prose ratio of two AREAS, the `S_{}` notation (the palette's chip), an area value with
+   * «שווה ל-», and a length ratio by `/`.
+   */
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'היחס בין שטח המשולש AOB לשטח הטרפז ADCB הוא 4:5',
+    en: 'the ratio of the area of triangle AOB to the area of trapezoid ADCB is 4:5',
+    needs: ['משולש AOB', 'טרפז ADCB'],
+  },
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'S_{ABD} / S_{ADC} = 0.8',
+    en: 'S_{ABD} / S_{ADC} = 0.8',
+    needs: ['משולש ABC', 'נקודה D על BC'],
+  },
+  { category: 'relations', family: 'F20', he: 'S_{ABC} = 13', en: 'S_{ABC} = 13', needs: ['משולש ABC'] },
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'שטח המשולש ABC שווה ל-45',
+    en: 'the area of triangle ABC is 45',
+    needs: ['משולש ABC'],
+  },
+  { category: 'relations', family: 'F20', he: 'BD/DC = 2/3', en: 'BD/DC = 2/3', needs: ['משולש ABC', 'נקודה D על BC'] },
 
   /**
    * A RIGHT ANGLE (#1049), in the word spelling and in the glyph the 2-D tool teaches (#1330). The

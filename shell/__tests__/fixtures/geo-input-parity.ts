@@ -736,6 +736,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   { id: 'circle-by-circumference', family: 'circles', steps: ['מעגל O שהיקפו 6π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1622' }] },
   { id: 'altitude-is-segment', family: 'cevians-centres', steps: ['משולש ABC', 'גובה המשולש לצלע AB הוא CD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }], note: "3-D's catalog sentence; 2-D does not read it" },
+  // ── #1621 D1 (ADR-AG-214): measures as givens — ratios and areas ──
+  { id: 'area-ratio-prose-1621', family: 'area-perimeter', steps: ['משולש AOB', 'טרפז ADCB', 'היחס בין שטח המשולש AOB לשטח הטרפז ADCB הוא 4:5'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: 'corpus 6/5; 2-D reads «הוא 4» and its honesty gate escalates the dropped 5' },
+  { id: 'area-ratio-notation-1621', family: 'area-perimeter', steps: ['משולש ABC', 'נקודה D על BC', 'S_{ABD} / S_{ADC} = 0.8'], expect: 'builds', exception: 'X9', note: 'corpus 7/4 writes S_BDC / S_ODC' },
+  { id: 'area-notation-value-1621', family: 'area-perimeter', steps: ['משולש ABC', 'S_{ABC} = 13'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
+  { id: 'area-value-equals-1621', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC שווה ל-45'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: 'corpus 18/4; 2-D splits it at «שטח המשולש» (split-statements)' },
+  { id: 'length-ratio-slash-1621', family: 'midpoint-ratio', steps: ['משולש ABC', 'נקודה D על BC', 'BD/DC = 2/3'], expect: 'builds', exception: 'X9', note: 'corpus 16/5 «DO/DE = 2/3», 17/4 «CD/OB = 5/2»' },
+  { id: 'area-ratio-impossible-1621', family: 'area-perimeter', steps: ['משולש ABC', 'נקודה D על BC', 'S_{ABD} / S_{ABC} = 2'], expect: 'refused', exception: 'X9', note: 'a part twice its whole: refused naming the statement' },
+  { id: 'area-ratio-no-region-1621', family: 'area-perimeter', steps: ['משולש ABC', 'S_{XYZ} / S_{ABC} = 2'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679' }], note: 'a region whose vertices do not exist is refused by name' },
   // ── exception rows: the builders outside the family must answer honestly, never build ──
   { id: 'ex-coordinate-point', family: 'topic', steps: ['נתונה הנקודה A(2,6)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '3-D spells a point A(2,-2,6), so only analytic reads this spelling' },
   { id: 'ex-axis', family: 'topic', steps: ['C על ציר ה-x'], expect: 'builds', exception: 'X1' },
