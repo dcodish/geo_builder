@@ -167,7 +167,21 @@ export type Constraint =
    * and `at.b`, unsigned (0°–180°), because the exam states an angle's size and never its orientation.
    * A right angle keeps its own lowering (`rightAngleAt` → `perpendicular`), so 90° is read there first.
    */
-  | { t: 'angle'; at: AngleRef; value: Expr }
+  | {
+      t: 'angle';
+      at: AngleRef;
+      value: Expr;
+      /**
+       * WHICH MEASURE OF THE ANGLE the value states (#1621, ADR-AG-215; operator ruling 2026-10-01: tan is in
+       * scope) — absent for DEGREES, `tan` for «tan∢BAO = 2», `cos` for «cos∢ACB = 3/4». A new measure of the
+       * SAME angle, so it rides this constraint rather than a kind of its own: the refs, the identity and every
+       * reader of "a stated angle" stay one. Both are one-to-one on the unsigned angle's range (0°–180°) — tan
+       * through its sign (acute or obtuse), cos outright — so a stated value fixes ONE angle, and the
+       * orientation stays as free as it is for a value in degrees. sin is not: sin θ = sin(180° − θ), a
+       * discrete choice this kind does not carry, so «sin∢…» is not read (ADR-AG-215 "not built").
+       */
+      measure?: 'tan' | 'cos';
+    }
   /**
    * `∠ABC = ∠ACB` · `∠ABC = 2∠ACB` — two angles in a stated ratio (#1331, the 2-D `angle-ratio` shape,
    * ADR-100). `k` is 1 for an equality.
@@ -350,6 +364,21 @@ export type Constraint =
    * or «M מפגש התיכונים» about an existing point is the same statement and not a per-rule list.
    */
   | { t: 'derived-at'; id: Id; rule: DerivedRule }
+  /**
+   * «α = 30» — a PARAMETER given its value (#1621, ADR-AG-215; 2-D's `set-var`). The symbol is a free DOF in the
+   * register like any other (it is read from this constraint's own expressions, #1343), and this states the value
+   * it must take — a statement that HOLDS, solved with the rest, so a value the figure already contradicts
+   * («∢ABC = 40», «∢ABC = α», then «α = 30») is `unsatisfiable` on this line, never a silent re-reading.
+   */
+  | { t: 'param-eq'; sym: string; value: Expr }
+  /**
+   * Σ kᵢ·⌢(aᵢbᵢ) = value — ARC MEASURES, in degrees (#1622 E4, ADR-AG-220; 2-D's ADR-116 identity: an arc's measure IS
+   * its central angle). Each arc is the unsigned angle at the CENTRE of its resolved circle between the radii to its
+   * two ends — read off the circle, so a circle stated by an equation, by a centre letter or computed from points is
+   * one operand and no centre letter is needed (the ADR-AG-203 radius-direction discipline). One kind for a value
+   * («קשת AB = 40»), a ratio («קשת DE = 2 קשת CE» → ⌢DE − 2⌢CE = 0) and a sum.
+   */
+  | { t: 'arc-sum'; terms: Array<{ k: Expr; circle: Id; a: Id; b: Id }>; value: Expr }
   | { t: 'choice'; options: Constraint[] }
   /**
    * ONE OPTION THAT IS SEVERAL STATEMENTS (#1620, ADR-AG-208) — «every vertex on some axis» chooses an axis for
@@ -497,6 +526,12 @@ export function constraintRefs(k: Constraint): Id[] {
       return [k.centre, k.other];
     case 'derived-at':
       return [k.id, ...parentsOf(k.rule)];
+    // A parameter's value names no point: its freedom lives in the register.
+    case 'param-eq':
+      return [];
+    // The arcs' ends; each circle is a CURVE ref (`constraintCurveRefs`), as the radius direction's is.
+    case 'arc-sum':
+      return k.terms.flatMap((t) => [t.a, t.b]);
     case 'choice':
       return [...new Set(k.options.flatMap(constraintRefs))];
     case 'all':
@@ -533,6 +568,8 @@ function describeRule(r: DerivedRule): string {
       return `נקודת ההשקה של ${r.circle} עם ${r.a}${r.b}`;
     case 'foot':
       return `רגל האנך מ-${r.from}`;
+    case 'regular-vertex':
+      return `קודקוד ${r.k + 1} של המצולע המשוכלל על ${r.a}${r.b}`;
     default: {
       const undescribed: never = r;
       throw new Error(`rule has no description: ${JSON.stringify(undescribed)}`);
@@ -554,7 +591,9 @@ export function describeConstraint(k: Constraint): string {
     case 'perpendicular':
       return `${k.a}${k.b} ⊥ ${k.c}${k.d}`;
     case 'angle':
-      return `∠${k.at.a}${k.at.v}${k.at.b} = ${exprText(k.value)}`;
+      return `${k.measure ?? ''}∠${k.at.a}${k.at.v}${k.at.b} = ${exprText(k.value)}`;
+    case 'param-eq':
+      return `${k.sym} = ${exprText(k.value)}`;
     case 'angle-ratio':
       return `∠${k.left.a}${k.left.v}${k.left.b} = ${exprText(k.k) === '1' ? '' : exprText(k.k)}∠${k.right.a}${k.right.v}${k.right.b}`;
     case 'relation':
@@ -577,6 +616,15 @@ export function describeConstraint(k: Constraint): string {
       return `מעגל ${k.centre} משיק למעגל ${k.other}${k.branch === 'internal' ? ' מבפנים' : ' מבחוץ'}`;
     case 'derived-at':
       return `${k.id} = ${describeRule(k.rule)}`;
+    case 'arc-sum':
+      return `${k.terms
+        .map((t, i) => {
+          const c = exprText(t.k);
+          const sign = c.startsWith('-') ? ' − ' : i === 0 ? '' : ' + ';
+          const mag = c.replace(/^-/, '');
+          return `${sign}${mag === '1' ? '' : mag}⌢${t.a}${t.b}`;
+        })
+        .join('')} = ${exprText(k.value)}`;
     case 'choice':
       return k.options.map(describeConstraint).join(' או ');
     case 'all':
@@ -627,6 +675,8 @@ export function constraintCurveRefs(k: Constraint): Id[] {
       return ofDir(k.u);
     case 'derived-at':
       return curveParentsOf(k.rule);
+    case 'arc-sum':
+      return [...new Set(k.terms.map((t) => t.circle))];
     case 'choice':
       return [...new Set(k.options.flatMap(constraintCurveRefs))];
     case 'all':
@@ -869,9 +919,25 @@ export function residualRows(
       // lives in [-1, 1] like the dot and cross rows beside it and a stated angle weighs what they weigh.
       const [v, a, b] = p;
       const theta = angleAt(v, a, b);
-      const deg = evalExpr(k.value, env);
-      if (theta === null || !Number.isFinite(deg)) return null;
-      return { eq: [(theta - (deg * Math.PI) / 180) / Math.PI] };
+      const value = evalExpr(k.value, env);
+      if (theta === null || !Number.isFinite(value)) return null;
+      /**
+       * tan and cos (#1621, ADR-AG-215) — each written so it has NO POLE and ONE root on the unsigned range.
+       * tan as `sin θ − t·cos θ` over √(1+t²), which is sin(θ − atan t): the slope residual's `dy = m·dx` choice
+       * for the same reason (a quotient blows up at 90°, and a residual that blows up cannot be crossed), and its
+       * second root atan t ± 180° lies outside 0°–180°. cos as the plain difference, already in [-1, 1]; a value
+       * outside [-1, 1] has no root at all, so it stays non-zero and the figure is honestly `unsatisfiable`.
+       */
+      if (k.measure === 'tan') return { eq: [(Math.sin(theta) - value * Math.cos(theta)) / Math.sqrt(1 + value * value)] };
+      if (k.measure === 'cos') return { eq: [(Math.cos(theta) - value) / 2] };
+      return { eq: [(theta - (value * Math.PI) / 180) / Math.PI] };
+    }
+    case 'param-eq': {
+      const have = env[k.sym];
+      const want = evalExpr(k.value, env);
+      if (have === undefined || !Number.isFinite(have) || !Number.isFinite(want)) return null;
+      // Relative to the value, like the area and length rows, so «α = 30» and «k = 0.5» converge alike.
+      return { eq: [(have - want) / Math.max(1, Math.abs(want))] };
     }
     case 'angle-ratio': {
       const [v1, a1, b1, v2, a2, b2] = p;
@@ -995,6 +1061,27 @@ export function residualRows(
       const floor = SOLVE_RESOLUTION * Math.max(Math.abs(r1), Math.abs(r2), d);
       if (d < floor) return { eq: [Math.max(Math.abs(miss), floor - d)] };
       return { eq: [miss] };
+    }
+    /**
+     * ARC MEASURES (#1622 E4, ADR-AG-220) — each arc the unsigned central angle of its resolved circle, the sum less
+     * the value in radians over π (the `angle` row's scale). A circle not resolved, or an end at its centre, is
+     * "cannot be judged" (`null`), never zero.
+     */
+    case 'arc-sum': {
+      if (!curveAt) return null;
+      let sum = 0;
+      for (const [i, t] of k.terms.entries()) {
+        const circle = curveAt(t.circle);
+        if (!circle || circle.kind !== 'circle') return null;
+        const centre = { x: circle.cx, y: circle.cy };
+        const theta = angleAt(centre, p[2 * i], p[2 * i + 1]);
+        const coef = evalExpr(t.k, env);
+        if (theta === null || !Number.isFinite(coef)) return null;
+        sum += coef * theta;
+      }
+      const deg = evalExpr(k.value, env);
+      if (!Number.isFinite(deg)) return null;
+      return { eq: [(sum - (deg * Math.PI) / 180) / Math.PI] };
     }
     case 'derived-at': {
       /**

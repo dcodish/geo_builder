@@ -24,6 +24,7 @@
 import { ANGLE_STEM_HE, EN_SHAPE, SHAPES, normalizeShapeNoun } from '../engine/shapes';
 import { isNumeralName } from '../engine/names';
 import { stripFormatControls } from '../../shell/bidi';
+import { areaNotation } from '../engine/lengths';
 
 // ---------------------------------------------------------------------------
 // Orthography — character-level folds, always applied
@@ -41,7 +42,8 @@ import { stripFormatControls } from '../../shell/bidi';
  * article's hyphen is «ציר ה-x». Character-level, so every rule reads the one spelling.
  */
 export function orthography(raw: string): string {
-  return stripFormatControls(raw)
+  // `S_{ABC}` / `S_ABC` is the notation for «שטח ABC» (#1621, ADR-AG-214) — one spelling for every rule.
+  return areaNotation(stripFormatControls(raw))
     .replace(/^\s*(?:[·•∙*]|-(?=\s))\s*/, '')
     .replace(/־/g, '-')
     .replace(/ /g, ' ')
@@ -173,6 +175,12 @@ const UNWRAP: ReadonlyArray<[RegExp, string]> = [
   // «עוד נתון:», «ידוע כי», «ידוע גם ש-». The four inflections are written out: «נתון» ends in FINAL nun.
   [/^(?:עוד\s+)?נתו(?:ן|נה|נים|נות)(?:\s+(?:גם|בנוסף|עוד))?\s*(?::\s*|\s+כי\s+|\s+ש-?|\s+)/, ''],
   [/^ידוע\s+(?:גם\s+)?(?:כי\s+|ש-?)/, ''],
+  // «נסמן ∢DCB = 2α», «נסמן: זווית ADB = α» (#1621, ADR-AG-215) — "let us denote": the exam introducing a symbol by
+  // the equation that follows, which is the given itself (the symbol is free until a later given pins it). Only an
+  // equation is a reading here; «נסמן את שטח ABCD ב-S» unwraps to «את שטח ABCD ב-S», which `restatedClauses` reads
+  // (#1622, ADR-AG-218).
+  [/^נסמן\s*(?::\s*|\s+כי\s+|\s+)/, ''],
+  [/^(?:let|denote)\s+/i, ''],
   [/^(?:it\s+is\s+(?:given|known)\s+that|given\s+that|given\s*:|given)\s+/i, ''],
   // The figure that introduces the sentence — «בסרטוט שלפניכם מתואר משולש ABC».
   [new RegExp(String.raw`^ב${FIGURE}\s+(?:מתוא(?:ר|רת|רים|רות)\s+)?`), ''],
@@ -623,61 +631,13 @@ export function conditionClauses(line: string): string[] | null {
 }
 
 /**
- * A POINT PLACED BY ITS DISTANCES (#1622, ADR-AG-218) — 2-D's two forms, copied (`src/parser/parse.ts`):
- *
- * - «C במרחק 5 מ-A ו-5 מ-B» · "C is 5 from A and 5 from B" (2-D's `point-by-distances`): the point and its two
- *   DISTANCES — the distance spelling, so no segment is drawn (the #1652 ruling: «המרחק בין» names nothing), as 2-D
- *   draws none.
- * - «D על AB במרחק 3 מ-A» · "D on AB at a distance of 3 from A" (2-D's #760 `compoundAtDistance`): the membership,
- *   read by the real grammar, and the synthesized length «AD = 3», which 2-D draws.
- *
- * Only 2-D's forms: a single «D במרחק 3 מ-A» is not one (2-D hands it to the model), so it is not read here either.
+ * «נסמן את שטח ABCD ב-S» · "denote the area of ABCD by S" — the area LABELLED by a letter (#1622, ADR-AG-218): «שטח ABCD = S», a
+ * free value the panel shows under the student's letter (known once other givens pin it).
  */
-const DIST_NUM = String.raw`(\d+(?:\.\d+)?(?:√\d+)?)`;
-const BY_DISTANCES_HE = new RegExp(
-  String.raw`^(?:ה?נקודה\s+)?(${NAME})\s+(?:נמצאת?\s+)?במרחק\s+${DIST_NUM}\s+מ-?\s*(?:ה?נקודה\s+)?(${NAME})\s+ו-?\s*(?:במרחק\s+)?${DIST_NUM}\s+מ-?\s*(?:ה?נקודה\s+)?(${NAME})$`,
-);
-const BY_DISTANCES_EN = new RegExp(
-  String.raw`^(?:(?:[Tt]he\s+)?[Pp]oint\s+)?(${NAME})\s+(?:is\s+)?${DIST_NUM}\s+from\s+(${NAME})\s+and\s+${DIST_NUM}\s+from\s+(${NAME})$`,
-);
-const AT_DISTANCE = new RegExp(
-  String.raw`^(.+?)\s+(?:במרחק|at\s+(?:a\s+)?distance(?:\s+of)?)\s+${DIST_NUM}\s+(?:מ-?\s*|from\s+)(${NAME})$`,
-);
-export function distanceClauses(line: string): string[] | null {
-  const by = BY_DISTANCES_HE.exec(line) ?? BY_DISTANCES_EN.exec(line);
-  if (by) {
-    const [, id, d1, p, d2, q] = by;
-    if (id === p || id === q || p === q) return null;
-    return [`נקודה ${id}`, `המרחק בין ${id} ל-${p} הוא ${d1}`, `המרחק בין ${id} ל-${q} הוא ${d2}`];
-  }
-  const at = AT_DISTANCE.exec(line);
-  if (at) {
-    const [, left, d, from] = at;
-    // The left half is a point-on-carrier statement about ONE subject point — anything else is a richer sentence.
-    const subj = new RegExp(String.raw`^(?:ה?נקודה\s+|(?:[Tt]he\s+)?[Pp]oint\s+)?(${NAME})\s+(?:על|on)\s`).exec(left.trim());
-    if (!subj || subj[1] === from) return null;
-    return [left.trim(), `${from}${subj[1]} = ${d}`];
-  }
-  return null;
-}
-
-/**
- * TWO TEXTBOOK SENTENCES THAT ARE ANOTHER SENTENCE THE GRAMMAR READS (#1622, ADR-AG-218):
- *
- * - «קו ועליו נקודה A» · «ישר ועליו נקודה A» · "a line with point A" — an unnamed line carrying a point: the point,
- *   and the exam's own «דרך A עובר ישר» — a line through it whose direction is a free DOF (ADR-AG-144). 2-D draws it
- *   between two letters it invents; analytic invents none (the free-direction line needs no second point), which is
- *   the same figure with no letter the student did not write.
- * - «נסמן את שטח ABCD ב-S» · "denote the area of ABCD by S" — the area LABELLED by a letter: «שטח ABCD = S», a free
- *   value the panel shows under the student's letter (known once other givens pin it).
- */
-const LINE_WITH_POINT_HE = new RegExp(String.raw`^(?:נתון\s+)?(?:ה?קו|ה?ישר)\s+(?:ש)?ו?עליו\s+(?:ה?נקודה\s+)?(${NAME})$`);
-const LINE_WITH_POINT_EN = new RegExp(String.raw`^(?:[Aa]\s+)?[Ll]ine\s+with\s+(?:a\s+|the\s+)?point\s+(${NAME})(?:\s+on\s+it)?$`);
-const AREA_LABEL_HE = /^נסמן\s+(?:את\s+)?(שטח\s+.+?)\s+ב-?\s*([A-Za-z])$/;
-const AREA_LABEL_EN = /^(?:denote|label)\s+(?:the\s+)?(area\s+of\s+.+?)\s+(?:by|as)\s+([A-Za-z])$/i;
+// «נסמן» / "denote" may already be unwrapped (#1621's «נסמן …» frame) — the clause is then «את שטח ABCD ב-S».
+const AREA_LABEL_HE = /^(?:נסמן\s+)?את\s+(שטח\s+.+?)\s+ב-?\s*([A-Za-z])$/;
+const AREA_LABEL_EN = /^(?:(?:denote|label)\s+)?(?:the\s+)?(area\s+of\s+.+?)\s+(?:by|as)\s+([A-Za-z])$/i;
 export function restatedClauses(line: string): string[] | null {
-  const lp = LINE_WITH_POINT_HE.exec(line) ?? LINE_WITH_POINT_EN.exec(line);
-  if (lp) return [`נקודה ${lp[1]}`, `דרך ${lp[1]} עובר ישר`];
   const area = AREA_LABEL_HE.exec(line) ?? AREA_LABEL_EN.exec(line);
   if (area) return [`${area[1].replace(/^area\s+of\s+/i, 'שטח ')} = ${area[2]}`];
   return null;

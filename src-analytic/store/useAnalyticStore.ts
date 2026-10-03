@@ -151,6 +151,10 @@ export type InputError =
   | { key: 'undistinguished-diagonal'; detail: string }
   /** «האלכסונים AB ו-CD» where the quadrilateral makes them sides (#1620, ADR-AG-208). */
   | { key: 'not-a-diagonal'; detail: string }
+  /** «מלבן ABCD שצלעו 4» — «its side» on a shape whose sides are not all equal: which side? (#1622, ADR-AG-217). */
+  | { key: 'ambiguous-side'; detail: string }
+  /** «משובע ABCDEFG» — a polygon noun built only when regular (#1622, ADR-AG-217; 2-D's #835). */
+  | { key: 'polygon-not-supported'; detail: string }
   /**
    * A naming of something that already has a name (#1153) — carrying WHO holds it.
    *

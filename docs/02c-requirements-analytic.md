@@ -161,12 +161,14 @@ tree; subscripts are new to this input language.
 then refuses hands the student `not-handled` on their own click, which is worse than no chip —
 #511's rule, and the operator's own framing when ruling the analytic set.
 
-The set: `²` `³` `√()` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}` `⊥` `∥` `∠` `°`
+The set: `²` `³` `√()` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}` `⊥` `∥` `∠` `°` `α` `β` `γ` `δ` `θ` `<` `S_{}` `⌢{}`
 ([ADR-AG-212](06c-decisions-analytic.md#adr-ag-212), [#1696](https://github.com/dcodish/geo_builder/issues/1696):
-the 2-D palette reviewed chip by chip; `√()` wraps a selection as 2-D's does). The 2-D chips still absent
-are absent because their sentences are not read yet — α β γ δ θ, `S_{}` and `<` between measures
-(#1621), `△` `≅` `~` and `⌢{}` (#1622) — and each arrives in that work's own change, because a
-chip is part of shipping a notation rather than a follow-up to it.
+the 2-D palette reviewed chip by chip; `√()` wraps a selection as 2-D's does). Each later chip arrived with its
+notation: the Greek angle names with the angle alias ([ADR-AG-215](06c-decisions-analytic.md#adr-ag-215)), `<` with
+order between measures ([ADR-AG-216](06c-decisions-analytic.md#adr-ag-216)), `S_{}` with the area notation
+([ADR-AG-214](06c-decisions-analytic.md#adr-ag-214)), `⌢{}` with arc measures ([ADR-AG-220](06c-decisions-analytic.md#adr-ag-220)).
+The 2-D chips still absent — `△` `≅` `~` (#1622) — are absent because their sentences are not read yet, and each
+arrives in that work's own change, because a chip is part of shipping a notation rather than a follow-up to it.
 
 Mechanically enforced: every entry is driven through the real grammar, with a totality guard so a
 button cannot be added without a proof — and pressing any chip inside a Hebrew sentence must not
@@ -2185,6 +2187,8 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - «הצלע CB מקבילה לציר ה-x, וחותכת את ציר ה-y בנקודה E» is both statements about CB.
 - «הקטע EF מקביל ל-DA» (and «EF ∥ DA», «הצלע EF מקבילה ל-DA», «הישר EF מקביל ל-DA», R143) with F not yet placed adds F, free to move along the parallel through E, until a later given places it.
 - Refused by name: a perpendicular from a point of the line itself, a foot that is its own point, a line the sentence does not name readably.
+- **Amended by [ADR-AG-213](06c-decisions-analytic.md#adr-ag-213) (#1620 S7) — the two tangents meet.** «המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D» draws both tangents and D where they cross, as 2-D does; on an empty canvas it also adds circle O and puts A and C on it, free to move. «למעגל O» said once belongs to both tangents, before or after the point. «המשיקים למעגל O בנקודות A ו-C נפגשים בנקודה D» and English ("the tangent at A and the tangent at C to circle O meet at D", "the tangents to circle O at A and C meet at D") say the same. «המשיקים נפגשים בנקודה D» (also «D נקודת החיתוך של המשיקים», "the tangents meet at D") means the two tangents already drawn and also draws AD and CD; with none, one or three tangents the tool asks which two. Tangents at the two ends of a diameter are parallel: the sentence is refused, naming the diameter it contradicts — never drawn as a circle shrunk to a dot. One tangent named twice is refused.
+- «נפגשים», «נחתכים» and «מצטלבים» mean the same for two lines («הישר AC והישר BD נפגשים בנקודה E», "l1 and l2 meet at E"), as in 2-D.
 
 **R142 — diagonals, extensions, the midsegment and a point on a side with a condition read as the 2-D tool reads them**
 ([ADR-AG-208](06c-decisions-analytic.md#adr-ag-208), [#1620](https://github.com/dcodish/geo_builder/issues/1620); operator ruling 2026-10-02: the analytic tool gives the same experience as 2-D for plane geometry).
@@ -2218,10 +2222,78 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - «AB·AC = AD²» holds on the figure.
 - «AB = 3x», «AB = x²», «AD = 12√x», «AB = 2y»: the letter is a free length. It moves with «הציגו תצורה אחרת» until a later given fixes it («AB = 6» makes x = 2, shown in the panel as x). The same letter in two lengths relates them. In an equation («y = 2x + 1») x and y are still the plane's coordinates, also in the same figure; «x = 4» is the line x = 4.
 - A chain of equalities states every link: «AB = AC = 3x», «זוית AEB שווה לזווית BEC שווה 60 מעלות».
-- «C במרחק 5 מ-A ו-5 מ-B» places C at both distances; «D על AB במרחק 3 מ-A» puts D on AB, 3 from A.
 - «CD חותך את AB» (also «AB ו-CD נחתכים», «הקטעים AB ו-CD נחתכים») draws the two segments crossing, with no point named. «CD חוצה את AB» makes CD pass through the midpoint of AB (named M, or the letter given by «בנקודה K»).
 - «הזווית בין BD ל-BA היא 30» is the angle DBA. Two sides with no common end form no angle, and the sentence is refused.
 - An angle value may be written in words: «שווה לשלושים מעלות», "thirty degrees".
 - «A = 40» is the angle at A when A is a vertex of the figure; on a free point the tool asks which angle.
-- «ישר ABE» puts the points on one line in that order. «קו ועליו נקודה A» draws a line through A, with no other letter. «נסמן את שטח ABCD ב-S» labels the area S, and the panel shows its value once the figure fixes it.
+- «נסמן את שטח ABCD ב-S» labels the area S, and the panel shows its value once the figure fixes it. (The distance forms, «ישר ABE» and «קו ועליו נקודה A» are promised by R160.)
 - In a trapezoid, «המרחק בין AB לבין CD הוא 3» keeps AB and CD parallel and 3 apart.
+**R162 — the circle and tangent sentences of the 2-D tool build here too, and two fresh circles are named by order**
+([ADR-AG-219](06c-decisions-analytic.md#adr-ag-219), [#1622](https://github.com/dcodish/geo_builder/issues/1622), [#1693](https://github.com/dcodish/geo_builder/issues/1693); operator rulings 2026-10-02: the analytic tool gives the same experience as 2-D for plane geometry, and on #1688 *"first mention names one"*).
+
+- A circle by its centre in 2-D's words: «מעגל סביב O רדיוס 5», «מעגל עם מרכז O». A circle sized by a value: «מעגל O שהיקפו 6π» (radius 3), «מעגל O ששטחו 9π», «מעגל O שקוטרו 10», «מעגל בקוטר 10», «מעגל שרדיוסו 5». A radius named by a letter, «מעגל O שרדיוסו R», stays free; «R > r» then keeps the circle with radius R the larger in every configuration. «R > r» about letters no circle carries is refused naming the letter.
+- «נתון מעגל» and «מעגל» draw a new circle each time; its centre has no letter until a sentence names it. «מרכז המעגל» on its own refers to the circle already drawn (or draws one). «רדיוס המעגל הוא 5» sets the radius of a circle drawn without one.
+- Two circles: «שני מעגלים», «שני מעגלים זרים» (each outside the other, always), «שני מעגלים מוכלים» and «מעגל P מוכל בתוך מעגל O» (one strictly inside the other, always), «מעגל מוכל בתוך המעגל הגדול» (a new circle inside the circle the figure has), «שני מעגלים בעלי מרכז משותף O» (two circles on O, the second the inner), «שני מעגלים נחתכים בנקודות A ו-B» (A and B on both; without the letters the crossings are named A and B). Every size and position not stated moves with «הציגו תצורה אחרת».
+- **Two fresh circles are named by order.** After «שני מעגלים נחתכים …» (or any two circles one sentence drew that no statement tells apart), the first new letter that names a circle — «נקודה C על מעגל P», «O מרכז המעגל» — names the first circle, and the next new letter names the other. Once a statement tells the two circles apart (one inside the other), a new letter is asked about instead. «מעגל O» on its own is still a new circle.
+- Lines cutting circles: «ישר החותך את המעגל בשתי נקודות» (the points named C and D, or «בנקודות C ו-D»), «ישר חותך את שני המעגלים בנקודות C, D, E ו-F» (C, D on the first circle, E, F on the second, along the line in that order), «מנקודה E מחוץ למעגל O ישר חותך את המעגל בנקודות A ו-B» (E outside, A between E and B), «הישר AC פוגש את מעגל P בנקודה E».
+- Tangents: «משיק למעגל» (the touch point named T), «מנקודה E משיק נוגע במעגל O בנקודה D», «מנקודה E מחוץ למעגל O שני משיקים נוגעים במעגל בנקודות A ו-B», «AB משיק משותף למעגלים O ו-P», «AB משיק משותף חיצוני / פנימי לשני המעגלים» (the centres on the same side of AB, or on opposite sides), «CD משיק משותף למעגלים O ו-P בנקודה M» (the circles touch at M; M between C and D), «מנקודה A יוצאים שני משיקים לשני המעגלים» (the touches named B, C and D, E), «AB מיתר במעגל O ומשיק למעגל P».
+- Each of these is also read in English («circle centered at O radius 5», «two circles intersect at A and B», «AB is a common tangent to circles O and P», …).
+
+**R151 — an angle named by a Greek letter, and the tan or cos of an angle, read as givens**
+([ADR-AG-215](06c-decisions-analytic.md#adr-ag-215), [#1621](https://github.com/dcodish/geo_builder/issues/1621); operator rulings 2026-10-01: tan of an angle is in scope, sin/cos follow when needed; 2026-10-02: the same experience as 2-D for plane geometry).
+
+- «∢ABC = α», «זווית ABC = 2α», and the exam's «נסמן ∢DCB = 2α» / «נסמן: זווית ADB = α» name the angle by a Greek letter (α β γ δ θ and the rest of the lowercase alphabet; π stays the number). The letter is a free value: the triangle may take any shape, the angle follows it, and «הציגו תצורה אחרת» changes it. The same letter on two angles makes them equal.
+- A later «α = 30» (or «α = 30°») sets the letter, and so the angle. A figure that already fixes the angle at another value refuses the line, naming it. «θ = 2β» relates two letters.
+- A Latin letter is not set this way: «a = 5» and «r=5» stay unread, as before (a single Latin letter can mean a radius or a point).
+- «tan∢BAO = 2», «tan(∢BAO) = 2», «tg∢BAO = 2», «טנגנס הזווית BAO הוא 2» and "the tangent of angle BAO is 2" state the angle by its tangent. A positive tangent is an acute angle and a negative one an obtuse angle. The drawing may still be any reflection of the figure, as for an angle given in degrees. «קוסינוס הזווית ACB = 3/4» and «cos∢ACB = 3/4» state it by its cosine; a cosine outside −1…1 is refused, naming the line.
+- «sin∢ACB = 1/2» is not read: a sine fits an acute angle and an obtuse one, and the tool does not choose between them.
+- The symbol palette offers α β γ δ θ.
+
+**R152 — a coordinate stated about a vertex, and an order between measures, read as the 2-D tool reads them**
+([ADR-AG-216](06c-decisions-analytic.md#adr-ag-216), [#1621](https://github.com/dcodish/geo_builder/issues/1621); operator ruling 2026-10-02: the analytic tool gives the same experience as 2-D for plane geometry).
+
+- «שיעור ה-y של הקודקוד A הוא 10» states A's y-coordinate exactly as «שיעור ה-y של הנקודה A הוא 10» does. The same holds for every point sentence: «הקודקוד» and «הקדקוד» name a point as «הנקודה» does.
+- «שיעור ה-y של הקודקוד B קטן מ-6» says which of the figure's possible positions B takes. It never moves a point the other givens already fix. A figure where it cannot hold is refused, naming the sentence.
+- An order between two lengths or two angles, or between a length or an angle and a number, is a given about the figure: «AB < BC», «AB קטן מ-BC», «DC > AB», «AB ≤ 10», «AB לפחות 3», «∢ABC ≤ 40°», «20 < ∢ABC < 60», «זווית ABC גדולה מ-40», «∢ABC < ∢BAC», «זווית ABC קהה», «זווית ABC חדה».
+  - The figure is drawn with the order true. Where the order leaves freedom, «הציגו תצורה אחרת» still moves the figure, always inside the order.
+  - ≤, ≥, «לפחות» and «לכל היותר» admit equality; <, >, «גדול מ» and «קטן מ» do not.
+  - The sentence draws the segments it names, and adds points the figure does not have yet, as «AB = 5» does.
+  - An order the other givens contradict is refused, naming the sentence. Comparing a length with an angle is refused.
+- The symbol palette offers `<`.
+- Not read: «D מעל A», «C מימין ל-B» (positions on the drawing; awaiting a ruling) and «משולש קהה זווית ABC» (which angle is obtuse is unstated).
+
+**R150 — the ratio of two measures, and the area notation S_{…}, as givens**
+([ADR-AG-214](06c-decisions-analytic.md#adr-ag-214), [#1621](https://github.com/dcodish/geo_builder/issues/1621); operator ruling 2026-10-02: the analytic tool gives the same experience as 2-D for plane geometry).
+
+- «היחס בין שטח המשולש AOB לשטח הטרפז ADCB הוא 4:5» states that the two areas are in the ratio 4:5. The ratio may be written `p:q`, as a fraction («4/5») or as a number («0.8»). Either measure may be an area, a length or a distance, and the polygon may have any number of vertices. «the ratio of the area of triangle AOB to the area of trapezoid ADCB is 4:5» is the English form.
+- «S_{ABC}» and «S_ABC» mean «שטח ABC», in a given («S_{ABC} = 13», «S_BDC / S_ODC = 0.8») and in a question. The palette has an «S_{}» button: select the vertices, press it, and get «S_{ABC}».
+- A length ratio may be written with «/»: «DO/DE = 2/3», «CD/OB = 5/2», the same as «DO:DE = 2:3».
+- An area value may be written «שטח המשולש ABD שווה ל-45», and in English «the area of triangle ABC is 45».
+- A ratio pins only what it states. Every other size and shape stays free and moves with «הציגו תצורה אחרת».
+- A ratio that cannot hold is refused, naming the sentence. For example: a part of a triangle twice the triangle's area, or a triangle with all three vertices on one line («S_BDC» when D is on BC).
+- A ratio that names a point the figure does not have is refused, naming that point.
+
+**R163 — arcs, sectors, semicircles and the diameter from a point build as they do in the 2-D tool**
+([ADR-AG-220](06c-decisions-analytic.md#adr-ag-220), [#1622](https://github.com/dcodish/geo_builder/issues/1622); operator rulings 2026-10-02: analytic gives 2-D's verdict for plane geometry, and the arc rows are ported).
+
+- An arc's measure is its central angle: «קשת AB = 40 במעגל O», «⌢{AC} = 60°», «קשת AC = 60» (the one circle), «קשת DE = 2 קשת CE», «קשת AB שווה לקשת BC», «קשת AC + קשת BE = קשת AD + קשת BC», «קשת AB + קשת CD = 180». The arc's ends are put on the circle. An arc of more than 180° is the circle's other arc. A circle whose centre has no letter works too. An arc whose ends the figure does not have is refused, naming the missing point.
+- «זוית מרכזית COD» draws the radii OC and OD (the middle letter is the centre); «זוית מרכזית COD = 80» also sets the angle.
+- «חצי מעגל שקוטרו AB», «חצי מעגל על צלע AB מחוץ למשולש ABC» (or «בתוך»), «על כל צלע של ריבוע ABCD יש חצי מעגל» draw the half circle over AB and the diameter AB; the full circle is not drawn. A point put «על המעגל» lies on that half's circle, so the angle it sees AB at is 90°.
+- «רבע מעגל» draws a 90° arc with its two radii, and the tool names the ends (A, B — the next free letters); «רבע מעגל OAB» uses the student's letters, O the centre. «גזרה AOB בזווית 80» draws the two radii OA, OB and the 80° arc; with no angle the angle is free and moves with «הציגו תצורה אחרת»; an angle over 180 draws the large arc. A sector cut from a circle the figure already has rides that circle.
+- «M אמצע הקשת BC במעגל O» places M halfway along the small arc BC («הקשת הגדולה» — the large one).
+- «קוטר מנקודה F במעגל O», «קוטר העובר בנקודה A במעגל O» draw the diameter from that point; the tool names the far end (D, or the next free letter). «קוטר» alone names both ends. «קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E» draws the piece from F to E, where the diameter's line meets AC.
+- «מעגל O בקוטר 10» / «מעגל O שקוטרו 10» is the circle with radius 5.
+- The symbol palette has the ⌢{} button: select «AC», press it, get «⌢{AC}».
+- Every sentence above has its English twin («arc AB = 40 in circle O», «semicircle with diameter AB», «quarter circle», «sector AOB with angle 80», «M is the midpoint of arc BC in circle O», «diameter from point F in circle O», «circle O with diameter 10»).
+**R160 — the shapes and points the 2-D tool reads build the same here**
+([ADR-AG-217](06c-decisions-analytic.md#adr-ag-217), [#1622](https://github.com/dcodish/geo_builder/issues/1622) slice E1; operator ruling 2026-10-02: analytic gives the same experience as 2-D for plane geometry).
+
+- A bare run of three or four letters («ABC», «ABCD») is the triangle or quadrilateral it names.
+- «מחומש ABCDE», «משושה …», «מתומן …» draw a polygon of that many sides and assert nothing else. «משובע», «מתושע», «מעושר» without «משוכלל» are refused by name, offering the nouns that build.
+- «מחומש משוכלל ABCDE» (and «משושה / משובע / מתומן / מתושע / מעושר משוכלל», "regular pentagon ABCDE") draws a regular polygon: equal sides and equal angles. Its size, place and turn are free and move with «הציגו תצורה אחרת».
+- A shape may state its size: «ריבוע ABCD שצלעו הוא 1» (square, rhombus, equilateral triangle, a regular polygon), «מלבן במידות 4*6» / «מלבן 4 על 6» (any quadrilateral: the first number is AB, the second BC). «מלבן ABCD שצלעו 4» asks which side is meant.
+- A shape written without letters («ריבוע», «ריבוע שצלעו 4», «מחומש משוכלל») is lettered by the tool with the first free letters (A, B, C, …), as in 2-D; the row says so, and the letters can be renamed. «קו ועליו נקודה A» draws a line BC with A on it.
+- «מעוין BDEF חסום במשולש ABC», «מלבן DEFG …», «ריבוע DEFG …»: a letter the triangle shares is its vertex, and every other vertex lies on a side. When the letters do not say which side, «הציגו תצורה אחרת» moves between the possible placements.
+- Points: «נקודה E על AC ב-40%» (40% of the way from A); «C במרחק 5 מ-A ו-5 מ-B»; «D על AB במרחק 3 מ-A»; «אמצע AB» (the tool names it M); «הנקודה E נמצאת בתוך המשולש KAO» / «… מחוץ ל…» (naming the triangle draws it); «C ו-D בצדדים שונים של AB» / «… באותו צד של AB»; «ישר ABE» (A, B, E on one line, B between).
+- A bound on a length is R-numbered with the orders of #1621 D3 (ADR-AG-216); «AB בין 5 ל-9» / "AB is between 5 and 9" now reads as the window «5 < AB < 9».
+- «המעגל החוסם את המשולש ABC» named in a sentence when the figure has no such circle draws it (the circle through A, B and C), as a named circle does (R143).

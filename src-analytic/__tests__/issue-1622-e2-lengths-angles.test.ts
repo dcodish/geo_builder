@@ -162,6 +162,7 @@ describe('#1622 E2 — chained equalities', () => {
   it('the English chain reads too', () => expect(play(['angle AEB equals angle BEC equals 60 degrees'])).toEqual(['record']));
 });
 
+// Lowered by E1 (ADR-AG-217); locked here as the sentences of this row family (cat-2d-026/027).
 describe('#1622 E2 — a point placed by its distances', () => {
   it('«C במרחק 5 מ-A ו-5 מ-B»', () => {
     for (const seed of SEEDS) {
@@ -247,11 +248,12 @@ describe('#1622 E2 — lines, and labels', () => {
     }
   });
 
-  it('«קו ועליו נקודה A»: A and a line through it, with no letter invented', () => {
+  it('«קו ועליו נקודה A» (E1 lowering, ADR-AG-217): A rides a line the tool draws between its own letters, as 2-D does', () => {
     const d = derive(['קו ועליו נקודה A'], 0);
     expect(d.faults).toEqual([]);
-    expect(d.figure.points.map((p) => p.id)).toEqual(['A']);
-    expect(d.figure.curves.filter((c) => c.curve.kind === 'line')).toHaveLength(1);
+    const p = Object.fromEntries(d.figure.points.map((q) => [q.id, q]));
+    expect(Object.keys(p).sort()).toEqual(['A', 'B', 'C']);
+    expect(Math.abs(cross(p.B, p.C, p.A)) / dist(p.B, p.C)).toBeLessThan(1e-4);
   });
 
   it('«נסמן את שטח ABCD ב-S»: a free value S, known once the figure pins the area', () => {

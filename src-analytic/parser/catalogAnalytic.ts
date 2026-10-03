@@ -343,6 +343,35 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'circles', family: 'F5', he: 'המעגל O משיק לשני הצירים', en: 'circle O is tangent to both axes' },
   // #1432 — the radius as a given, and the focus as a namable point (ADR-AG-169). Not featured.
   { category: 'circles', family: 'F5', he: 'נתון מעגל O שרדיוסו 5', en: 'circle O with radius 5' },
+  // #1622 E4 (ADR-AG-220) — 2-D's arcs, sectors, semicircles and the diameter from a point, ported. Not featured.
+  { category: 'circles', family: 'F5', he: 'מעגל O בקוטר 10', en: 'circle O with diameter 10' },
+  { category: 'circles', family: 'F5', he: 'קשת AB = 40 במעגל O', en: 'arc AB = 40 in circle O', needs: ['משולש ABC', 'מעגל O'] },
+  { category: 'circles', family: 'F5', he: '⌢{AC} = 60°', en: '⌢{AC} = 60°', needs: ['מעגל O', 'A על מעגל O', 'C על מעגל O'] },
+  { category: 'circles', family: 'F5', he: 'קשת DE = 2 קשת CE במעגל O', en: 'arc DE = 2 arc CE in circle O', needs: ['נקודה D', 'נקודה E', 'נקודה C', 'נקודה O'] },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'קשת AC + קשת BE = קשת AD + קשת BC במעגל O',
+    en: 'arc AC + arc BE = arc AD + arc BC in circle O',
+    needs: ['נקודה A', 'נקודה C', 'נקודה B', 'נקודה E', 'נקודה D', 'נקודה O'],
+  },
+  { category: 'circles', family: 'F5', he: 'זוית מרכזית COD', en: 'central angle COD' },
+  { category: 'circles', family: 'F5', he: 'M אמצע הקשת BC במעגל O', en: 'M is the midpoint of arc BC in circle O' },
+  { category: 'circles', family: 'F5', he: 'חצי מעגל שקוטרו AB', en: 'semicircle with diameter AB' },
+  { category: 'circles', family: 'F5', he: 'חצי מעגל על צלע AB מחוץ למשולש ABC', en: 'semicircle on side AB outside triangle ABC' },
+  { category: 'circles', family: 'F5', he: 'על כל צלע של ריבוע ABCD יש חצי מעגל', en: 'a semicircle on each side of square ABCD' },
+  { category: 'circles', family: 'F5', he: 'רבע מעגל', en: 'quarter circle' },
+  { category: 'circles', family: 'F5', he: 'גזרה AOB בזווית 80', en: 'sector AOB with angle 80' },
+  { category: 'circles', family: 'F5', he: 'קוטר', en: 'a diameter' },
+  { category: 'circles', family: 'F5', he: 'קוטר מנקודה F במעגל O', en: 'diameter from point F in circle O' },
+  { category: 'circles', family: 'F5', he: 'קוטר העובר בנקודה A במעגל O', en: 'diameter through point A in circle O' },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E',
+    en: 'diameter of circle O from point F meets side AC at E',
+    needs: ['משולש ABC', 'מעגל O', 'F על מעגל O'],
+  },
   { category: 'derived', family: 'F16', he: 'F מוקד הפרבולה', en: 'F is the focus of the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x'] },
   // #1432 am. 1 — the bagrut's centre-by-coordinates circle, and the perimeter as a real given. Not featured.
   { category: 'circles', family: 'F5', he: 'נתון מעגל שמרכזו (2,3) ורדיוסו 5', en: 'circle centred at (2,3) with radius 5' },
@@ -412,6 +441,10 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'the equation of the tangent to the circle at A is 3x+4y=25',
     needs: ['נתון מעגל x^2+y^2=25', 'A(3,4)'],
   },
+  // The two tangents meet (#1620 S7, ADR-AG-213) — 2-D's sentence, its plural, and the bare reference.
+  { category: 'circles', family: 'F5', he: 'המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D', en: 'the tangent at A and the tangent at C to circle O meet at D' },
+  { category: 'circles', family: 'F5', he: 'המשיקים למעגל O בנקודות A ו-C נפגשים בנקודה D', en: 'the tangents to circle O at A and C meet at D' },
+  { category: 'circles', family: 'F5', he: 'המשיקים נפגשים בנקודה D', en: 'the tangents meet at D', needs: ['מעגל O', 'המשיק למעגל O בנקודה A', 'המשיק למעגל O בנקודה C'] },
   { category: 'circles', family: 'F5', he: 'דרך P עובר משיק למעגל', en: 'a tangent to the circle passes through P', needs: ['נתון מעגל x^2+y^2=25', 'P(10,0)'] },
   { category: 'circles', family: 'F5', he: 'AB מיתר במעגל', en: 'AB is a chord of the circle', needs: ['נתון מעגל x^2+y^2=25'] },
   // Two chords of a circle not stated yet: the sentence states it on its centre letter, as 2-D does (#1670, ADR-AG-210).
@@ -516,7 +549,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // --- F17 · segments and NEUTRAL shape nouns (02c §8) ---
   // Only the nouns that carry no constraint of their own. «מקבילית» / «טרפז» / «ריבוע» each carry a
   // given this slice cannot honour, so they are refused by name rather than taught here.
-  { category: 'shapes', family: 'F17', he: 'הקטע AB', en: 'segment AB', needs: ['A(0,0)', 'B(4,3)'] },
+  { featured: true, category: 'shapes', family: 'F17', he: 'הקטע AB', en: 'segment AB', needs: ['A(0,0)', 'B(4,3)'] },
   // --- F19 · the DISTANCE, in the spellings a student actually writes (#1128) ---
   // Three rows walking the three FAMILIES of spelling — the plain Hebrew noun, the textbook
   // subscript, the absolute-value bars — rather than all thirteen, which are one term and are
@@ -545,14 +578,14 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   },
 
   {
-    category: 'shapes',
+    featured: true, category: 'shapes',
     family: 'F17',
     he: 'משולש ABC',
     en: 'triangle ABC',
     needs: ['A(1,3)', 'B(-4,1)', 'C(-3,8)'],
   },
   {
-    category: 'shapes',
+    featured: true, category: 'shapes',
     family: 'F17',
     he: 'מרובע ABCD',
     en: 'quadrilateral ABCD',
@@ -713,6 +746,11 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   },
   { category: 'points', family: 'F1', he: 'x_B > 3', en: 'x_B > 3', needs: ['B(7,7)'] },
   { category: 'points', family: 'F1', he: 'y_A < 0', en: 'y_A < 0', needs: ['A(1,-2)'] },
+  /*
+   * --- the exam names a VERTEX («הקודקוד A», #1621 D3, ADR-AG-216) — 471 corpus 14/4, 13/4, 23/4 ---
+   */
+  { category: 'points', family: 'F1', he: 'שיעור ה-y של הקודקוד A הוא 10', en: 'the y-coordinate of A is 10', needs: ['משולש ABC'] },
+  { category: 'points', family: 'F1', he: 'שיעור ה-y של הקודקוד B קטן מ-6', en: 'the y-coordinate of B is less than 6', needs: ['משולש ABC'] },
   {
     category: 'points',
     family: 'F1',
@@ -756,6 +794,36 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'the ratio between AC and CB is 3:2',
     needs: ['A(0,0)', 'B(10,0)'],
   },
+  /**
+   * --- MEASURES AS GIVENS (#1621, ADR-AG-214), F20: the ratio of two measures and the area notation ---
+   *
+   * The exam's own spellings (corpus 6/5, 7/4, 16/5, 18/4), each lowering to the same `length-eq` as
+   * «AB = 10»: the prose ratio of two AREAS, the `S_{}` notation (the palette's chip), an area value with
+   * «שווה ל-», and a length ratio by `/`.
+   */
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'היחס בין שטח המשולש AOB לשטח הטרפז ADCB הוא 4:5',
+    en: 'the ratio of the area of triangle AOB to the area of trapezoid ADCB is 4:5',
+    needs: ['משולש AOB', 'טרפז ADCB'],
+  },
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'S_{ABD} / S_{ADC} = 0.8',
+    en: 'S_{ABD} / S_{ADC} = 0.8',
+    needs: ['משולש ABC', 'נקודה D על BC'],
+  },
+  { category: 'relations', family: 'F20', he: 'S_{ABC} = 13', en: 'S_{ABC} = 13', needs: ['משולש ABC'] },
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'שטח המשולש ABC שווה ל-45',
+    en: 'the area of triangle ABC is 45',
+    needs: ['משולש ABC'],
+  },
+  { category: 'relations', family: 'F20', he: 'BD/DC = 2/3', en: 'BD/DC = 2/3', needs: ['משולש ABC', 'נקודה D על BC'] },
 
   /**
    * A RIGHT ANGLE (#1049), in the word spelling and in the glyph the 2-D tool teaches (#1330). The
@@ -828,6 +896,60 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     family: 'F17',
     he: '∠B = ∠C',
     en: '∠B = ∠C',
+    needs: ['משולש ABC'],
+  },
+  /**
+   * #1621 D2 (ADR-AG-215) — an angle NAMED BY A GREEK LETTER, free until a later given pins it (2-D's `measure-angle`
+   * with a variable, then `set-var`), with the exam's «נסמן» lead-in (corpus 471 1/4, 3/4); and tan / cos of an
+   * angle as a measure of it (operator ruling 2026-10-01; corpus 471 9/4).
+   */
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'נסמן ∢DCB = 2α',
+    en: 'let ∠DCB = 2α',
+    needs: ['מרובע ABCD'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'נסמן: זווית ADB = α',
+    en: 'let angle ADB = α',
+    needs: ['משולש ABD'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: '∢ABC = α',
+    en: '∠ABC = α',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'α = 30',
+    en: 'α = 30',
+    needs: ['משולש ABC', '∢ABC = α'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'tan∢ABC = 2',
+    en: 'tan∠ABC = 2',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'טנגנס הזווית ABC הוא 2',
+    en: 'the tangent of angle ABC is 2',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'קוסינוס הזווית ACB = 3/4',
+    en: 'cos∠ACB = 3/4',
     needs: ['משולש ABC'],
   },
 
@@ -1064,15 +1186,15 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
    * and the locks in issue-1618-sentence-frame.test.ts hold that — but no catalog row shows them.
    */
   {
-    category: 'shapes',
+    featured: true, category: 'shapes',
     family: 'F17',
     he: '∢C = 90°',
     en: '∠C = 90°',
     needs: ['טרפז ישר זווית ABCO'],
   },
-  { category: 'shapes', family: 'F17', he: 'המרובע ABCO הוא טרפז ישר זווית', en: 'ABCO is a right trapezoid' },
+  { featured: true, category: 'shapes', family: 'F17', he: 'המרובע ABCO הוא טרפז ישר זווית', en: 'ABCO is a right trapezoid' },
   {
-    category: 'shapes',
+    featured: true, category: 'shapes',
     family: 'F17',
     he: 'במלבן ABCD, הנקודה E נמצאת על הצלע DC',
     en: 'in rectangle ABCD, E is on side DC',
@@ -1102,10 +1224,6 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'relations', family: 'F17', he: 'AB = AC = 3x', en: 'AB = AC = 3x', needs: ['משולש ABC'] },
   { category: 'relations', family: 'F17', he: 'AD = 12√x', en: 'AD = 12√x' },
   { category: 'relations', family: 'F17', he: 'המרחק בין AB לבין CD הוא 3', en: 'the distance between AB and CD = 3', needs: ['טרפז ABCD'] },
-  { category: 'points', family: 'F17', he: 'C במרחק 5 מ-A ו-5 מ-B', en: 'C is 5 from A and 5 from B', needs: ['משולש ABC'] },
-  { category: 'points', family: 'F17', he: 'D על AB במרחק 3 מ-A', en: 'D on AB at a distance of 3 from A', needs: ['משולש ABC'] },
-  { category: 'points', family: 'F17', he: 'ישר ABE', en: 'line ABE', needs: ['משולש ABC'] },
-  { category: 'lines', family: 'F17', he: 'קו ועליו נקודה A', en: 'a line with point A' },
   { category: 'lines', family: 'F17', he: 'CD חוצה את AB', en: 'CD bisects AB' },
   { category: 'lines', family: 'F17', he: 'CD חותך את AB', en: 'CD cuts AB' },
   { category: 'lines', family: 'F17', he: 'AC ו-BD נחתכים', en: 'AC and BD intersect', needs: ['מרובע ABCD'] },
@@ -1114,4 +1232,62 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'relations', family: 'F17', he: 'זוית AEB שווה לזווית BEC שווה 60 מעלות', en: 'angle AEB equals angle BEC equals 60 degrees' },
   { category: 'relations', family: 'F17', he: 'A = 40', en: 'A = 40', needs: ['משולש ABC'] },
   { category: 'relations', family: 'F17', he: 'נסמן את שטח ABCD ב-S', en: 'denote the area of ABCD by S', needs: ['מרובע ABCD'] },
+  /*
+   * --- CIRCLES AND TANGENTS 2-D READS (#1622 slice E3, #1693, ADR-AG-219) — each with 2-D's measured verdict ---
+   */
+  { category: 'circles', family: 'F5', he: 'מעגל סביב O רדיוס 5', en: 'circle centered at O radius 5' },
+  { category: 'circles', family: 'F5', he: 'מעגל עם מרכז O', en: 'circle with center O' },
+  { category: 'circles', family: 'F5', he: 'נתון מעגל', en: 'given a circle' },
+  { category: 'circles', family: 'F5', he: 'מרכז המעגל', en: 'the centre of the circle' },
+  { category: 'circles', family: 'F5', he: 'מעגל בקוטר 10', en: 'a circle with diameter 10' },
+  { category: 'circles', family: 'F5', he: 'מעגל O שהיקפו 6π', en: 'circle O with circumference 6π' },
+  { category: 'circles', family: 'F5', he: 'מעגל O ששטחו 9π', en: 'circle O with area 9π' },
+  { category: 'circles', family: 'F5', he: 'מעגל O שרדיוסו R', en: 'circle O with radius R' },
+  { category: 'circles', family: 'F5', he: 'R > r', en: 'R > r', needs: ['מעגל O שרדיוסו R', 'מעגל P שרדיוסו r'] },
+  { category: 'circles', family: 'F5', he: 'שני מעגלים', en: 'two circles' },
+  { category: 'circles', family: 'F5', he: 'שני מעגלים זרים', en: 'two disjoint circles' },
+  { category: 'circles', family: 'F5', he: 'שני מעגלים מוכלים', en: 'two nested circles' },
+  { category: 'circles', family: 'F5', he: 'שני מעגלים בעלי מרכז משותף O', en: 'two circles with a common center O' },
+  { category: 'circles', family: 'F5', he: 'שני מעגלים נחתכים בנקודות A ו-B', en: 'two circles intersect at A and B' },
+  { category: 'circles', family: 'F5', he: 'מעגל P מוכל בתוך מעגל O', en: 'circle P is contained in circle O' },
+  { category: 'circles', family: 'F5', he: 'מעגל מוכל בתוך המעגל הגדול', en: 'a circle contained inside the big circle' },
+  { category: 'circles', family: 'F5', he: 'ישר החותך את המעגל בשתי נקודות', en: 'a line cutting the circle at two points' },
+  { category: 'circles', family: 'F5', he: 'ישר חותך את שני המעגלים בנקודות C, D, E ו-F', en: 'a line cuts the two circles at points C, D, E and F' },
+  { category: 'circles', family: 'F5', he: 'מנקודה E מחוץ למעגל O ישר חותך את המעגל בנקודות A ו-B', en: 'from a point E outside circle O a line cuts the circle at A and B' },
+  { category: 'circles', family: 'F5', he: 'הישר AC פוגש את מעגל P בנקודה E', en: 'line AC meets circle P at E', needs: ['משולש ישר-זווית ABC'] },
+  { category: 'circles', family: 'F5', he: 'משיק למעגל', en: 'a tangent to the circle' },
+  { category: 'circles', family: 'F5', he: 'מנקודה E משיק נוגע במעגל O בנקודה D', en: 'from point E a tangent touches circle O at D' },
+  { category: 'circles', family: 'F5', he: 'מנקודה E מחוץ למעגל O שני משיקים נוגעים במעגל בנקודות A ו-B', en: 'from point E outside circle O two tangents touch the circle at A and B' },
+  { category: 'circles', family: 'F5', he: 'AB משיק משותף למעגלים O ו-P', en: 'AB is a common tangent to circles O and P' },
+  { category: 'circles', family: 'F5', he: 'AB משיק משותף חיצוני לשני המעגלים', en: 'AB is an external common tangent of the two circles' },
+  { category: 'circles', family: 'F5', he: 'CD משיק משותף למעגלים O ו-P בנקודה M', en: 'CD is a common tangent to circles O and P at M' },
+  { category: 'circles', family: 'F5', he: 'מנקודה A יוצאים שני משיקים לשני המעגלים', en: 'from point A two tangents to the two circles' },
+  { category: 'circles', family: 'F5', he: 'AB מיתר במעגל O ומשיק למעגל P', en: 'AB is a chord of circle O and tangent to circle P', needs: ['מעגל O', 'מעגל P'] },
+  /*
+   * --- AN ORDER between measures, a bound, an angle's acuteness (#1621 D3, ADR-AG-216) — regions, as 2-D reads them ---
+   */
+  { category: 'relations', family: 'F17', he: 'AB < BC', en: 'AB < BC', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: 'AB קטן מ-BC', en: 'AB is shorter than BC', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: 'DC > AB', en: 'DC > AB', needs: ['מרובע ABCD'] },
+  { category: 'relations', family: 'F17', he: 'AB ≤ 10', en: 'AB ≤ 10', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: '∢ABC ≤ 40°', en: '∠ABC ≤ 40°', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: '∢ABC < ∢BAC', en: '∠ABC < ∠BAC', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: 'זווית ABC קהה', en: 'angle ABC is obtuse', needs: ['משולש ABC'] },
+  // #1622 slice E1 (ADR-AG-217) — the shapes and points 2-D reads, as the corpus and 2-D's guide write them
+  { category: 'shapes', family: 'F17', he: 'ABCD', en: 'ABCD' },
+  { category: 'shapes', family: 'F17', he: 'ריבוע ABCD שצלעו הוא 1', en: 'square ABCD whose side is 1' },
+  { category: 'shapes', family: 'F17', he: 'ריבוע שצלעו 4', en: 'a square whose side is 4' },
+  { category: 'shapes', family: 'F17', he: 'מלבן במידות 4*6', en: 'rectangle 4 by 6' },
+  { category: 'shapes', family: 'F17', he: 'מחומש ABCDE', en: 'pentagon ABCDE' },
+  { category: 'shapes', family: 'F17', he: 'מחומש משוכלל ABCDE', en: 'regular pentagon ABCDE' },
+  { category: 'shapes', family: 'F17', he: 'מעוין BDEF חסום במשולש ABC', en: 'rhombus BDEF inscribed in triangle ABC' },
+  { category: 'points', family: 'F17', he: 'נקודה E על AC ב-40%', en: 'E on AC at 40%' },
+  { category: 'points', family: 'F17', he: 'C במרחק 5 מ-A ו-5 מ-B', en: 'C is 5 from A and 5 from B', needs: ['משולש ABC'] },
+  { category: 'points', family: 'F17', he: 'D על AB במרחק 3 מ-A', en: 'D on AB at a distance of 3 from A', needs: ['משולש ABC'] },
+  { category: 'derived', family: 'F17', he: 'אמצע AB', en: 'midpoint of AB', needs: ['משולש ABC'] },
+  { category: 'points', family: 'F17', he: 'הנקודה E נמצאת בתוך המשולש KAO', en: 'point E inside triangle KAO' },
+  { category: 'points', family: 'F17', he: 'C ו-D בצדדים שונים של AB', en: 'C and D are on different sides of AB' },
+  { category: 'lines', family: 'F17', he: 'קו ועליו נקודה A', en: 'a line with point A on it' },
+  { category: 'lines', family: 'F17', he: 'ישר ABE', en: 'line ABE', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: '5 < AB < 9', en: '5 < AB < 9' },
 ];

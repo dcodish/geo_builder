@@ -93,6 +93,18 @@ const TEMPLATES: Record<
   symTriangle: { value: 'ABC ≅ △DEF', sel: [0, 0], expected: '△ABC ≅ △DEF', setup: ['משולש ABC', 'משולש DEF'] },
   symCong: { value: '△ABC  △DEF', sel: [5, 5], expected: '△ABC ≅ △DEF', setup: ['משולש ABC', 'משולש DEF'] },
   symSim: { value: 'ABC  DEF', sel: [4, 4], expected: 'ABC ~ DEF', setup: ['משולש ABC', 'משולש DEF'] },
+  // #1621 D2 (ADR-AG-215) — the Greek angle names: an angle named by one, free until pinned.
+  symAlpha: { value: '∠ABC = 2', sel: [8, 8], expected: '∠ABC = 2α', setup: ['משולש ABC'] },
+  symBeta: { value: '∠ABC = 2', sel: [8, 8], expected: '∠ABC = 2β', setup: ['משולש ABC'] },
+  symGamma: { value: '∠ABC = 2', sel: [8, 8], expected: '∠ABC = 2γ', setup: ['משולש ABC'] },
+  symDelta: { value: '∠ABC = 2', sel: [8, 8], expected: '∠ABC = 2δ', setup: ['משולש ABC'] },
+  symTheta: { value: '∠ABC = 2', sel: [8, 8], expected: '∠ABC = 2θ', setup: ['משולש ABC'] },
+  // #1621 D3 (ADR-AG-216) — an order between two measures.
+  symLt: { value: 'AB  BC', sel: [3, 3], expected: 'AB < BC', setup: ['משולש ABC'] },
+  // #1621 (ADR-AG-214) — the area notation, wrapped around the selected vertices.
+  symArea: { value: 'ABC = 13', sel: [0, 3], expected: 'S_{ABC} = 13', setup: ['משולש ABC'] },
+  // #1622 E4 (ADR-AG-220) — the arc template wraps the selected pair: «AC» → «⌢{AC}».
+  symArc: { value: 'AC = 60°', sel: [0, 2], expected: '⌢{AC} = 60°', setup: ['x^2+y^2=25', 'A על המעגל', 'C על המעגל'] },
 };
 
 describe('the symbol palette parses — every offered button, through the real grammar (#1129)', () => {
@@ -174,18 +186,8 @@ describe('the symbol palette parses — every offered button, through the real g
    * hold, and the fault must be a READING fault: when one of these starts to parse, this goes red and its
    * chip is owed in that notation's own PR (#1621 / #1622).
    */
-  const READING = ['not-handled', 'bad-equation', 'bad-operand'];
-  it.each<[string, string[], string]>([
-    ['α', ['משולש ABC'], '∢ABC = α'],
-    ['S_{', ['משולש ABC'], 'S_{ABC} = 13'],
-    ['<', ['משולש ABC'], 'AB < BC'],
-    ['⌢', ['x^2+y^2=25', 'A על המעגל', 'C על המעגל'], '⌢{AC} = 60°'],
-  ])('«%s» is not offered, because «%s · %s» is still not read', (glyph, setup, line) => {
-    expect(SYMBOLS.some((s) => s.before.includes(glyph) || s.label.includes(glyph))).toBe(false);
-    const d = derive([...setup, line]);
-    expect(d.faults.filter((f) => f.index < setup.length), 'the setup itself must build').toEqual([]);
-    const fault = d.faults.find((f) => f.index === setup.length);
-    expect(fault?.code, `«${line}» reads now — the «${glyph}» chip is owed`).toBeDefined();
-    expect(READING).toContain(fault!.code);
+  // Since #1622 (ADR-AG-218, ADR-AG-220) and #1621 every held chip reads, so each is offered — a held glyph is a fault now.
+  it('no 2-D chip whose sentence reads is held back', () => {
+    for (const glyph of ['△', '≅', '~', 'α', '<', 'S_{', '⌢']) expect(SYMBOLS.some((s) => s.before.includes(glyph)), glyph).toBe(true);
   });
 });

@@ -245,6 +245,25 @@ const SYMBOLIC_DISTANCE: Array<[RegExp, string]> = [
 ];
 
 /**
+ * THE AREA NOTATION, REWRITTEN INTO THE WORDED ONE (#1621, ADR-AG-214).
+ *
+ * `S_{ABC}` and `S_ABC` are the exam's NOTATION for «שטח ABC» (corpus 7/4: «S_BDC / S_ODC = 0.8»), the
+ * spelling 2-D has read since ADR-118 and offers on its `S_{}` chip. A notation, not a new measure — so it
+ * is rewritten into the worded phrase and handed to `AREA_TOKEN`, exactly as `d_{AB}` becomes «המרחק בין A
+ * ל-B» above (#1128): one spelling of a question can then never be read differently from its synonym
+ * (ADR-W-053). The same function runs over a whole LINE in `orthography` (the parser's chokepoint), so
+ * «S_{ABC} = 13» reaches every rule as «שטח ABC = 13», and here, so the ask lane — which hands a bare
+ * measure to `parseLengthExpr` — reads it too.
+ *
+ * A RUN OF THREE OR MORE vertices only: `S_1` or `S_A` is a subscripted name, not a polygon, and is left
+ * alone. Bounded on letters so a word ending in `S` (`AS_…`) is never cut.
+ */
+const AREA_NOTATION = /(?<![A-Za-z0-9])S\s*_\s*(?:\{\s*((?:[A-Z][0-9₀-₉]?){3,})\s*\}|((?:[A-Z][0-9₀-₉]?){3,})(?![A-Za-z0-9₀-₉]))/g;
+
+/** `S_{ABC}` / `S_ABC` → «שטח ABC», everywhere in `s` (#1621). */
+export const areaNotation = (s: string): string => s.replace(AREA_NOTATION, (_m, braced?: string, bare?: string) => `שטח ${braced ?? bare}`);
+
+/**
  * A LENGTH NOUN standing directly in front of a pair — «אורך AB», «הקטע AB», «צלע AB» (#1128).
  *
  * Operator, playing the 2-D round of 2026-09-19: *"אורך הקטע BC = 10 is not recognized in analytics
@@ -280,7 +299,9 @@ const PARALLEL_SINE = 1e-6;
 
 const IS_POINT = /^[A-Z][0-9₀-₉]?$/;
 
-const AREA_TOKEN = /(?:שטח|[Aa]rea\s+of)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9₀-₉]?){3,})/g;
+// The English ARTICLE is part of the measure (#1621): «the area of triangle ABC = 45» otherwise left «the» to be
+// multiplied as t·h·e — the #1321 trap the distance noun already closes for «the distance».
+const AREA_TOKEN = /(?:(?:[Tt]he\s+)?[Aa]rea\s+of|שטח)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9₀-₉]?){3,})/g;
 
 export function parseLengthExpr(src: string): LengthExpr | null {
   return readLength(src);
@@ -327,7 +348,7 @@ function readLength(src: string, named?: Set<number>): LengthExpr | null {
    */
   // The symbolic notations become the worded question first, so the frames below decide the roles
   // for every spelling at once (#1128).
-  let withPL = SYMBOLIC_DISTANCE.reduce((s, [re, to]) => s.replace(re, to), normalizeMath(src));
+  let withPL = SYMBOLIC_DISTANCE.reduce((s, [re, to]) => s.replace(re, to), normalizeMath(areaNotation(src)));
   for (const f of DISTANCE_FRAMES) {
     withPL = withPL.replace(f, (_m, x: string, y: string) => {
       const push = (t: MeasureTerm, same: (u: MeasureTerm) => boolean) => {

@@ -30,7 +30,8 @@ import { ringViolation, type RingPt } from '../engine/rings';
 import { SHAPES } from '../engine/shapes';
 
 const SEEDS = 24;
-const LETTERS = ['A', 'B', 'C', 'D', 'E'];
+// Ten letters: the registry holds polygons up to ten sides (#1622, ADR-AG-217).
+const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 
 /** The ring as DRAWN, read off the figure `derive` actually produced. */
 function drawnRing(lines: string[], seed: number, verts: string[]): RingPt[] | null {

@@ -83,7 +83,15 @@ type Tok =
  * Private-use characters cannot appear in student input or in any corpus phrasing, so widening the
  * class here cannot change how a real expression is read.
  */
-const SYMBOL_RE = /[A-Za-z-]/;
+/**
+ * …and ONE lowercase GREEK letter (#1621, ADR-AG-215) — the exam's angle names: «נסמן ∢DCB = 2α», «∢ABC = α».
+ * The 2-D parser's variable alphabet is `[a-zα-ω]` (ADR-031: Latin for lengths, Greek for angles); here a
+ * Greek letter is a parameter like any other — free and sampled until a given pins it (ADR-052). π (U+03C0)
+ * is NOT in the class: it is the constant below, so the range is written around it. Distinct code points
+ * from the Latin letters, so a figure may hold both `a` and `α` and they never meet. The tool's own
+ * symbols (`θ_<id>`, carriers.ts) are never one character, so a student's `θ` cannot be one of them.
+ */
+const SYMBOL_RE = /[A-Za-z-α-ορ-ω]/;
 
 /**
  * The LATIN half of `SYMBOL_RE`, separately, because the letter-run rules below are about what a

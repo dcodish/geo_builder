@@ -72,6 +72,9 @@ export function sameDerivation(a: DerivedRule, b: DerivedRule): boolean {
     // One point, one line: the same foot whichever end of a two-point line is named first (#1620, ADR-AG-207).
     case 'foot':
       return b.t === 'foot' && a.from === b.from && sameFootLine(a.onto, b.onto);
+    // One side, one ring size, one index — the side's direction matters (the ring turns left from it).
+    case 'regular-vertex':
+      return b.t === 'regular-vertex' && a.a === b.a && a.b === b.b && a.n === b.n && a.k === b.k;
     default: {
       /**
        * EXHAUSTIVE on purpose. A new `DerivedRule` must decide whether two of its instances are the
