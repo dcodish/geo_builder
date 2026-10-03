@@ -132,14 +132,40 @@ describe('«המשיקים נפגשים בנקודה D» — the two tangents th
 describe('the tangents at the ends of a diameter are PARALLEL — refused, never drawn as a dot', () => {
   const DIAMETER = ['מעגל O', 'AC קוטר במעגל O'];
 
-  it('2-D’s sentence after «AC קוטר במעגל O» is refused `unsatisfiable`, naming the line and the diameter it contradicts', () => {
-    for (const seed of [0, 1, 2]) {
-      const v = decideSubmit(ROW_111, DIAMETER, seed);
-      expect(v.kind).toBe('refused');
-      if (v.kind !== 'refused') continue;
-      expect(v.error).toMatchObject({ key: 'unsatisfiable', detail: ROW_111, definedBy: 'AC קוטר במעגל O' });
+  /**
+   * ADR-AG-213 amendment 1 (integrator pre-play): every diameter spelling, and A, C placed first by «… על המעגל».
+   * The refusal is `unsatisfiable` naming THIS line — never the #1423 "A is already defined, pick another letter"
+   * hint (`reusedId`): the tangent sentence REFERS to A and C, it does not define them.
+   */
+  const refusedPlainly = (lines: string[], sentence: string, seed = 0) => {
+    const v = decideSubmit(sentence, lines, seed);
+    expect(v.kind, `${lines.join(' | ')} ⟶ ${sentence}`).toBe('refused');
+    if (v.kind !== 'refused') return;
+    expect(v.error, `${lines.join(' | ')} ⟶ ${sentence}`).toMatchObject({ key: 'unsatisfiable', detail: sentence });
+    expect('reusedId' in v.error ? v.error.reusedId : undefined, `${lines.join(' | ')} ⟶ ${sentence}`).toBeUndefined();
+  };
+  const PLURAL = 'המשיקים למעגל O בנקודות A ו-C נפגשים בנקודה D';
+
+  it('after every spelling of the diameter of circle O, the sentence and its plural are refused `unsatisfiable` naming the line', () => {
+    const contexts = [
+      ['AC קוטר במעגל O'],
+      ['מעגל O', 'AC קוטר במעגל O'],
+      ['מעגל O', 'AC קוטר'],
+      ['מעגל O', 'הקוטר AC'],
+      ['מעגל O', 'AC קוטר במעגל'],
+      ['מעגל O', 'A על המעגל', 'C על המעגל', 'AC קוטר במעגל O'],
+      ['מעגל O', 'A על המעגל', 'C על המעגל', 'AC קוטר'],
+    ];
+    for (const lines of contexts) for (const s of [ROW_111, PLURAL]) refusedPlainly(lines, s);
+    for (const seed of [1, 2]) refusedPlainly(DIAMETER, ROW_111, seed);
+  }, 180_000);
+
+  it('a diameter of an UNNAMED circle («AC קוטר», «הקוטר AC», «AC קוטר במעגל»): the tangents to it are refused, never drawn on one dot', () => {
+    // Before: A, C and D on one point with no fault — the diameter collapsed (no parameter, so no floor applied).
+    for (const pre of ['AC קוטר', 'הקוטר AC', 'AC קוטר במעגל']) {
+      for (const s of ['המשיק בנקודה A והמשיק בנקודה C נפגשים בנקודה D', 'המשיקים בנקודות A ו-C נפגשים בנקודה D']) refusedPlainly([pre], s);
     }
-  });
+  }, 120_000);
 
   it('the bare plural after both tangents is refused the same way', () => {
     const lines = [...DIAMETER, 'המשיק למעגל O בנקודה A', 'המשיק למעגל O בנקודה C'];
