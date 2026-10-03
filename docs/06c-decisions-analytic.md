@@ -10891,3 +10891,42 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 - `parser/parseAnalytic.ts`; `parser/catalogAnalytic.ts`.
 - `app/panelRows.ts` (`trigAngles`, `angles`); `App.tsx` (the «זוויות» section); `i18n/index.ts` (`secAngles`).
 - `shell/__tests__/fixtures/geo-input-parity.ts`.
+
+## ADR-AG-228 — A value label stays bound to its mark: bounded candidates, an angle value placed first, its own arms crossable (#1733)
+
+**Status:** accepted · 2026-10-03 · fix-round #1721 (PR #1724, then restacked into #1731 and #1732). It **amends ADR-AG-225 amendment 1** (the single label placement). Operator, playing round #1721 T23 (9/4, :5182): *"the angle location is wrong."* Approved for fixing at once ("fix 1733 now").
+
+**Requirements:** [02c](02c-requirements-analytic.md) R168 (amended: a value sits at its mark). · **Design:** [04c](04c-design-analytic.md), "The stated-measure layer", the placement bullet.
+
+**Measured.** On 9/4 the «63.43°» of ∠BAO sat about 3.5 units from A, beside O and the y-axis, where it reads as theirs.
+- ADR-AG-225 amendment 1 stepped an angle value along its bisector for up to 40 steps with no distance bound.
+- In a crowded corner (A's coordinate label, AO's «3») the first clear spot was far away.
+- The new lock fails on the pre-fix stack at **23 of 48** cases: 9/4, a crowded vertex, and a 10° wedge.
+
+**Class.** *A value label placed for clearance with no bound detaches from its mark,* and then reads as belonging to another one. That is worse than a slight overlap. The canvas shows the inputs only if each input is legible as ITS input (ADR-W-047).
+
+**Decision** (`render/scene.ts`).
+
+1. **Bounded candidates.** A `LabelRequest` may carry an ordered `candidates` list instead of stepping.
+   - **An angle value**: every candidate lies within `ANGLE_LABEL_BOUND = 2.5` arc radii of the vertex (`angleCandidates`), tried in this order:
+     - on the bisector just outside the arc, inside it, then outward to the bound;
+     - rotated ±25° and ±50°, only within the angle's span;
+     - the reflex side, just outside the arc.
+   - **An area's «S=…»**: only spots INSIDE its ring (centroid first).
+   - **An arc's value**: only spots in its band, 12–24 px inside the circle, at the arc's midpoint and slid along it within its span.
+2. **When none is clear** the label takes the first candidate that covers no POINT label or dot, else the first one. It never wanders off its mark. This is 2-D's resolution of a crowded vertex (`src/render/scene.ts` `relationMarks` / `angleValueOffset`): the value stays on its bisector at a fixed offset and accepts the overlap.
+3. **Priority.** Angle values are placed first, the lengths next, the area and arc values last. So a length label yields to an angle value (it is placed clear of it), and a point label is never covered by choice.
+4. **Its own arms may be crossed.** An angle value may sit over the two arms of ITS angle (`mayCross`: a line ending at the vertex), as 2-D writes it, legible through the white halo. Any other line still blocks it.
+   - Measured: without this, every interior spot of a 10° wedge crossed an arm and the label fell to the reflex side, at 6 of 8 seeds.
+
+**Locks.** `src-analytic/__tests__/issue-1733-angle-label-bound.test.ts`, 48 tests:
+- 9/4, as printed and with the figure note, at 8 seeds each: «63.43°» within 2.5 arc radii of A, on the angle's side, and never nearer another point than A;
+- a crowded coordinate-labelled vertex with a stated side at 8 seeds;
+- a 10° wedge at 8 seeds;
+- an area label inside its triangle, and an arc label within its band, at 8 seeds each.
+
+**Fails before: 23 of 48.** #1717's `issue-1717-length-label` and #1714's locks stay green.
+
+**Not built.** The rotation candidates are fixed angles (±25°, ±50°), as planned. A vertex crowded on every side keeps the first spot that covers no point label, and may overlap a length label or a line.
+
+**Sibling check.** 2-D's value labels take a fixed offset per rank on the bisector (`angleValueOffset`, `rank`) and do not avoid other labels. Analytic now avoids them, inside a bound. 3-D's arcs are its own (ADR-3D-222).
