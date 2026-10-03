@@ -232,6 +232,12 @@ const TOKEN = /[A-Z]\d*'?/g;
 /** The label-token SOURCE fragment (no captures) — compose new rules from this, never re-spell
  *  the fragment inline (the S2.1 lexical-ratchet discipline). */
 const LBL = String.raw`[A-Z]\d*'?`;
+/** The UNSIGNED decimal — the atom every numeric fragment in this file is built from, and the one
+ *  {@link NUM} signs. Introduced with #513 because the lexical ratchet (docs/24 S2.1) is right: a new
+ *  regex must COMPOSE from an atom, never inline a fresh copy. Composing the radicand work from it
+ *  retires more inline copies than the fix adds, so the recorded ceiling moves DOWN. *  Declared beside {@link LBL} (#1730 integration, round 2026-10-04) so module-level rules that sit
+ *  above its old place — `WHOLE_RATIO` — compose from it instead of inlining the fragment. */
+const UNUM = String.raw`\d+(?:\.\d+)?`;
 
 /**
  * #486 — Hebrew noun gates, shared. Two things a student writes freely and a hand-written rule keeps
@@ -1215,7 +1221,7 @@ const PLACEMENT_CLAUSE = new RegExp(
  *  lane's own reading (#748, #921): a ratio of this rider bakes its `t`, and one that does not fit the rider
  *  is refused, as before. */
 const WHOLE_RATIO = new RegExp(
-  String.raw`^(?:${LBL}${LBL}\s*:\s*${LBL}${LBL}\s*=\s*\d+(?:\.\d+)?\s*:\s*\d+(?:\.\d+)?|${LBL}${LBL}\s*=\s*(?:\d+(?:\.\d+)?|[a-z]\d?)\s*[·×*]?\s*${LBL}${LBL})\s*$`,
+  String.raw`^(?:${LBL}${LBL}\s*:\s*${LBL}${LBL}\s*=\s*${UNUM}\s*:\s*${UNUM}|${LBL}${LBL}\s*=\s*(?:${UNUM}|[a-z]\d?)\s*[·×*]?\s*${LBL}${LBL})\s*$`,
 );
 
 /**
@@ -1680,11 +1686,6 @@ const spanPoint: Rule = (s) => {
  * still refuses honestly; that is the arithmetic-expression reader ruled for #509, not a fourth
  * private branch here.
  */
-/** The UNSIGNED decimal — the atom every numeric fragment in this file is built from, and the one
- *  {@link NUM} signs. Introduced with #513 because the lexical ratchet (docs/24 S2.1) is right: a new
- *  regex must COMPOSE from an atom, never inline a fresh copy. Composing the radicand work from it
- *  retires more inline copies than the fix adds, so the recorded ceiling moves DOWN. */
-const UNUM = String.raw`\d+(?:\.\d+)?`;
 
 const RADICAND = String.raw`(?:\(\s*${UNUM}(?:\s*\/\s*${UNUM})?\s*\)|${UNUM})`;
 
