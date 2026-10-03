@@ -9678,3 +9678,68 @@ Sibling check (docs/17 §1): 2-D is the reference and builds every row above exc
 **A vacuous lock, found and replaced.** `symbols-module.test.ts` held `°` with «זווית BAC = 90°» on A(0,0) B(4,0) C(1,3). That triangle's angle at A is fixed near 72°, so the line faulted `unsatisfiable` and "°  still does not parse" passed by contradiction, after `°` had started to parse. The replacement holds each still-absent chip on a figure where its sentence could hold, and requires a READING fault (`not-handled` / `bad-equation` / `bad-operand`), so the row goes red the day the notation lands.
 
 **Locks.** `symbols-module.test.ts`: four new parse proofs (totality-guarded), `√()` as a wrap («AB = 20» with «20» selected → «AB = √(20)», builds), the original-six row updated on purpose, six held-chip rows. `palette-faces-1348` (each one-character face inserts its own glyph) and the bidi no-split row cover the new chips unchanged. **Fails before: 3 of 21** — the totality guard, the `√()` wrap proof and the original-six row; the four new parse proofs iterate the palette, so they do not exist before it.
+
+## ADR-AG-216 — A coordinate stated about a vertex («הקודקוד A»), and an ORDER between measures read as 2-D's region (#1621 D3)
+
+**Status:** accepted · 2026-10-03 · slice D stream D3 (#1621, the V4 plan #1616). Standing rulings applied: analytic gives the same experience as 2-D for plane geometry (2026-10-02, #1649/#1669 — 2-D's verdict measured through `decideDeterministic2D` for every sentence below); every unstated magnitude is a free DOF (ADR-052); no stated given may vanish; the palette chip ships with its notation (#1696, ADR-AG-212).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R152. · **Design:** [04c](04c-design-analytic.md) "An order between measures".
+
+**Context.** Measured on the slice-C branch (5dab4a4a), two classes of sentence failed.
+
+1. **A coordinate stated about a vertex.** «שיעור ה-y של הקודקוד A הוא 10» (471 corpus 14/4), «שיעור ה-y של הקודקוד B קטן מ-6» (13/4) and «שיעור ה-y של הקודקוד D קטן מ-9 (ראו סרטוט)» (23/4) were `not-handled`, while the same sentences with «הנקודה» built. The root cause is a noun gate spelled twice. The shared subject token `HE_POINT` spelled the vertex «קדקוד» (defective) and missed the exam's «קודקוד» (plene). The coordinate rules (`HE_COORD`, `HE_RHS_COORD`, `COMPONENT_HE`) and two other point-subject rules (`BISECTORS_MEET_HE`, `PERP_FOOT_HE`) did not use the token at all; they spelled «ה?נקודה» inline. This is the drift `HE_POINT`'s own docblock warns about.
+2. **An order between two measures, or a measure and a bound.** On analytic these were all `not-handled` or `bad-equation` (#1696's held `<` chip). 2-D reads each one:
+
+| sentence | 2-D (measured) | analytic before | analytic now |
+|---|---|---|---|
+| «AB < BC», «AB קטן מ-BC», «DC > AB» | builds (`set-length-order`, draws both segments) | not-handled | builds |
+| «AB ≤ 10», «AB ≥ 10», «AB לפחות 3» | builds (`set-length-bound`, strictness kept, #1265) | not-handled | builds |
+| «∢ABC ≤ 40°», «∢ABC > 90°», «20 < ∢ABC < 60», «זווית ABC גדולה מ-40» | builds (`set-angle-bound`) | bad-equation | builds |
+| «זווית ABC קהה», «זווית ABC חדה», "angle ABC is obtuse" | builds (`set-angle-acuteness`) | not-handled | builds |
+| «AB < BC» / «זווית ABC קהה» with no figure | builds (mints the letters) | not-handled | builds (mints, ADR-AG-210) |
+| «AB = 5», «BC = 7», «AB > BC» | refused (conflict) | not-handled | refused (`unsatisfiable`) |
+| «∢ABC < ∢BAC» | **not-handled** (2-D orders only named variables and segments) | bad-equation | builds (see the 2-D gap below) |
+| «AB < ∢ABC» | not-handled | bad-equation | refused (`bad-operand`: two kinds of thing) |
+
+2-D treats every one of these as a REGION. ADR-039 / ADR-390 / ADR-108 say that a bound "removes no DOF". The measure stays free and is sampled inside the region, and a determined figure outside the region is a conflict.
+
+**Decision.**
+
+1. **One token, both spellings.** `HE_POINT` reads `קו?דקוד`. Every point-subject rule that spelled «ה?נקודה» inline now uses `HE_POINT`: the coordinate value, the comparison and its right-hand side, the bisector meet, and the perpendicular foot. The free-point declaration's own alternation gains the plene spelling too. The value still lowers to the shipped `coord` constraint, and the comparison to the shipped `coord-compare` selector (ADR-AG-005 D7: a strict comparison is a SELECTOR, not a constraint). English keeps its single `point` noun, as the catalog's #1127 note records.
+2. **An order is a `sign` selector over a new `Quantity` member, `order {left, right}`.** Each side (`OrderSide`) is one of three things:
+   - a length expression, read by `parseLengthExpr` (segments and areas, so «הצלע AB», «|AB|», a role noun and «שטח המשולש ABC» read as they do in «AB = …»);
+   - a three-letter angle, in degrees;
+   - a value.
+
+   `positive` says the left side is the larger. The new `closed` flag admits the boundary for ≤ / ≥ / «לפחות» / «לכל היותר»; the word forms are strict, as in 2-D. Acuteness is the order against 90°, strict. A window («20 < ∢ABC < 60») is two orders. The member is the one `Quantity`'s docblock reserved for "a length, an area": the class "an inequality about a derived quantity" keeps one home and does not become a fourth selector kind. The rule, `parseOrder`, runs right after the coordinate comparison, so the parameter domains («a > 0», «0 < k < 6») and «x_B > x_D» keep their readings. Three kinds of side are declined and fall through to the existing rules: a lone vertex («∢B > 40», resolved only at M1), a point-to-line distance (its line name only M1 resolves, and an order that judged nothing would vanish), and a «פי» ratio (still `length-eq` through `asEquation`).
+3. **Judged inside validity.** `orderQuantity` (`evaluate.ts`) measures each side with the function its equality twin uses: `evalLengthExpr` for the `length-eq` residual, `angleAt` for the `angle` residual. A difference within `SOLVE_RESOLUTION` of zero, relative to the two sides, is on the boundary. So «AB < BC» on AB = BC = 5 is refused, and «AB ≤ BC» there holds. The selector never moves a determined figure: it only filters. When no configuration of a figure satisfies the order, `derive` refuses it on the sentence (ADR-AG-197).
+4. **…and SEEDED into its region** (`seedOrder`, the #1071 lesson for a measure). Sample-and-reject is the wrong mechanism for a region. Measured before this step:
+   - a free triangle with «∢ABC ≥ 150°» was refused at seeds 0–2, although seed 3 drew it. That is a satisfiable figure refused;
+   - «AB ≥ 10» drew the same single configuration at all eight seeds.
+
+   So where the seed put the measure on the wrong side, one free end of the length slides along its segment, or one free ray of the angle turns about the vertex. It moves to a value `u` of the way into the region, where `u` ∈ [0.15, 0.65] is varied by the seed and is relative to the bound. It therefore states no magnitude, and «הציגו תצורה אחרת» still moves the figure. This is a start, never a verdict: the judge keeps the last word.
+5. **A bare order mints its letters** (`mintedByReference`, ADR-AG-210). 2-D draws «AB < BC»'s segments, «AB ≤ 10»'s segment and «זווית ABC קהה»'s arms, so it adds their letters. The order's plain lengths and angles are now a minting form. «2AB < CD» is not, as «AB = 2CD» is not.
+6. **The `<` chip** joins the palette (`symLt`, he «קטן מ», en "less than"). Its proof is «AB < BC» on «משולש ABC», and its held row is removed. `≤` and `≥` already serve the same sentences with the boundary admitted.
+
+**Not built, and why.**
+- **«D מעל A», «C מימין ל-B»** (the transcriber's parenthesis in 6/5 «A ו-D על ציר ה-y (D מעל A), B ו-C על ציר ה-x (C מימין ל-B)») stay `not-handled`. 2-D refuses screen-orientation words as non-givens (`input.scope.orientation`, which «C מימין ל-B» answers) or escalates them («D מעל A»). On analytic's pinned frame the words would be the selectors `y_D > y_A` and `x_C > x_B`, but that reading contradicts 2-D's stated ruling and is a new question. It is put to the operator in the stream report, not guessed. The line stays honestly not-handled; corpus471.json is untouched.
+- **«משולש קהה זווית ABC»** (and «משולש ABC קהה זווית») stays `not-handled`, as in 2-D. Unlike «חד זוויות», which states all three angles, it does not say WHICH angle is obtuse. It is a choice over three regions, and needs its own decision line.
+- **The 2-D gap:** «∢ABC < ∢BAC» builds here and escalates in 2-D. It is a known-gap row for 2-D under #1677, because 2-D's equality twin «∢ABC = ∢BAC» builds there. Also for 2-D: 2-D's `lengthOrder` drops the ≤ strictness that its `measureBound` keeps (#1265), so «AB = 5 · BC = 5 · AB ≤ BC» is a conflict in 2-D and builds here. That one is reported, not filed.
+
+**Locks.** `src-analytic/__tests__/issue-1621-d3-coordinates-order.test.ts` (34). It covers:
+- the vertex sentence equal to its «הנקודה» twin, and the comparison a selector;
+- 14/4, 13/4 and 23/4 at their printed coordinates at six seeds. 13/4's other comparison picks the other root, B(0,8);
+- eleven spellings, each lowering to an order selector and never to a constraint, and the window as two selectors;
+- strict versus closed at the boundary;
+- no constraint added;
+- a determined figure's positions identical with and without a holding order, and three contradicted orders refused;
+- ten free figures drawn inside their region at every seed, still varying (≥ 3 distinct configurations): «AB ≥ 10», «AB ≤ 1», «∢ABC ≥ 150°», «∢ABC ≤ 10°», «∢ABC < ∢BAC», the bare «AB < BC» and others;
+- the mixed-kind refusal, the submit path, and the neighbours' readings («a > 0», «0 < k < 6», «x_B > x_D», «… גדול פי 2 מ…»).
+
+**Fails before: 33 of 34.** The only one that passes before is the neighbours guard.
+
+Other locks touched:
+- The parity rows (`shell/__tests__/fixtures/geo-input-parity.ts`). Analytic's known gap is dropped from cat-2d-088 (#1621) and from cat-2d-085, cat-2d-086, cat-2d-087, pyr-angle-between and pyr-angle-greater. Those five were filed under #1622, but they are this mechanism, and they flipped. Eleven order rows are added: 3-D's gap on each is #1679, and 2-D's on the angle–angle row is #1677. Two X6 exception rows are added for the vertex spellings.
+- Seven catalog rows, He and En.
+- The palette lock.
+- The 471 ratchet measures **254/263 lines · 38/46 questions** (from 251 · 35): 13/4, 14/4 and 23/4 fully land.

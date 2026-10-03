@@ -2210,3 +2210,16 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
   - A point that a later line defines is still defined by that line.
   - Still refused, as in 2-D, when the letters are new: «AB = 2CD», «AB:BC = 2:3», «AD גובה לצלע BC».
 - «AB קוטר» · «BO = 5» draws BO with B where it is and O a free point. O is not the centre until the student says so. A later «O מרכז המעגל», «OB רדיוס» or «הרדיוס OB» then moves that same O to the centre; no second point appears.
+
+**R152 — a coordinate stated about a vertex, and an order between measures, read as the 2-D tool reads them**
+([ADR-AG-216](06c-decisions-analytic.md#adr-ag-216), [#1621](https://github.com/dcodish/geo_builder/issues/1621); operator ruling 2026-10-02: the analytic tool gives the same experience as 2-D for plane geometry).
+
+- «שיעור ה-y של הקודקוד A הוא 10» states A's y-coordinate exactly as «שיעור ה-y של הנקודה A הוא 10» does. The same holds for every point sentence: «הקודקוד» and «הקדקוד» name a point as «הנקודה» does.
+- «שיעור ה-y של הקודקוד B קטן מ-6» says which of the figure's possible positions B takes. It never moves a point the other givens already fix. A figure where it cannot hold is refused, naming the sentence.
+- An order between two lengths or two angles, or between a length or an angle and a number, is a given about the figure: «AB < BC», «AB קטן מ-BC», «DC > AB», «AB ≤ 10», «AB לפחות 3», «∢ABC ≤ 40°», «20 < ∢ABC < 60», «זווית ABC גדולה מ-40», «∢ABC < ∢BAC», «זווית ABC קהה», «זווית ABC חדה».
+  - The figure is drawn with the order true. Where the order leaves freedom, «הציגו תצורה אחרת» still moves the figure, always inside the order.
+  - ≤, ≥, «לפחות» and «לכל היותר» admit equality; <, >, «גדול מ» and «קטן מ» do not.
+  - The sentence draws the segments it names, and adds points the figure does not have yet, as «AB = 5» does.
+  - An order the other givens contradict is refused, naming the sentence. Comparing a length with an angle is refused.
+- The symbol palette offers `<`.
+- Not read: «D מעל A», «C מימין ל-B» (positions on the drawing; awaiting a ruling) and «משולש קהה זווית ABC» (which angle is obtuse is unstated).

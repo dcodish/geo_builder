@@ -713,6 +713,11 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   },
   { category: 'points', family: 'F1', he: 'x_B > 3', en: 'x_B > 3', needs: ['B(7,7)'] },
   { category: 'points', family: 'F1', he: 'y_A < 0', en: 'y_A < 0', needs: ['A(1,-2)'] },
+  /*
+   * --- the exam names a VERTEX («הקודקוד A», #1621 D3, ADR-AG-216) — 471 corpus 14/4, 13/4, 23/4 ---
+   */
+  { category: 'points', family: 'F1', he: 'שיעור ה-y של הקודקוד A הוא 10', en: 'the y-coordinate of A is 10', needs: ['משולש ABC'] },
+  { category: 'points', family: 'F1', he: 'שיעור ה-y של הקודקוד B קטן מ-6', en: 'the y-coordinate of B is less than 6', needs: ['משולש ABC'] },
   {
     category: 'points',
     family: 'F1',
@@ -1090,4 +1095,14 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'derived', family: 'F17', he: 'קטע האמצעים לצלע BC במשולש ABC', en: 'midsegment to BC in triangle ABC' },
   { category: 'derived', family: 'F17', he: 'קטע האמצעים בטרפז ABCD', en: 'midsegment of trapezoid ABCD' },
   { category: 'points', family: 'F17', he: 'שכל קודקודיו מונחים על הצירים', en: 'all the vertices of the trapezoid lie on the axes', needs: ['טרפז ABCD'] },
+  /*
+   * --- AN ORDER between measures, a bound, an angle's acuteness (#1621 D3, ADR-AG-216) — regions, as 2-D reads them ---
+   */
+  { category: 'relations', family: 'F17', he: 'AB < BC', en: 'AB < BC', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: 'AB קטן מ-BC', en: 'AB is shorter than BC', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: 'DC > AB', en: 'DC > AB', needs: ['מרובע ABCD'] },
+  { category: 'relations', family: 'F17', he: 'AB ≤ 10', en: 'AB ≤ 10', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: '∢ABC ≤ 40°', en: '∠ABC ≤ 40°', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: '∢ABC < ∢BAC', en: '∠ABC < ∠BAC', needs: ['משולש ABC'] },
+  { category: 'relations', family: 'F17', he: 'זווית ABC קהה', en: 'angle ABC is obtuse', needs: ['משולש ABC'] },
 ];

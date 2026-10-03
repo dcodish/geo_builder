@@ -31,7 +31,7 @@ function valueExpr(src: string): Expr | null {
 }
 import { constantLengthExpr, namedLengthPairs, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
-import { CENTRE_SENTINEL, CIRCLE_SENTINEL, UNBOUNDED, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type PerpRef, type Selector } from '../engine/types';
+import { CENTRE_SENTINEL, CIRCLE_SENTINEL, UNBOUNDED, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 import { findProofTarget } from '../../shell/proofTarget';
 import {
@@ -222,7 +222,7 @@ const HE_GIVEN = '(?:נתו(?:ן|נה|נים|נות)\\s+)?';
  * any call site: this tree's stated rule is that a noun gate re-spelled inline drifts, and it has paid
  * for that three times. One alternation, and every construct that admits a point gains the spelling.
  */
-const HE_POINT = '(?:ה?(?:נקוד(?:ה|ות)|קדקוד)\\s+)?';
+const HE_POINT = '(?:ה?(?:נקוד(?:ה|ות)|קו?דקוד)\\s+)?';
 /** «הישר» / «ישר». */
 /**
  * The line NOUNS — «הישר AC», and «האלכסון AC», which is the same object (#1070).
@@ -3462,13 +3462,13 @@ const COORD_ATOM_ONLY = new RegExp(`^${COORD_ATOM}$`);
  * («שיעור» is masculine, «קואורדינטה» feminine) — `קטן` ends in a FINAL nun, `קטנה` in a medial one, the
  * `נתונ(ה|ים)` trap this tree keeps recording. «מ» is a prefix («משיעור», «מ-3»), so it is matched as one.
  */
-const HE_COORD = `(?:(?:ה?שיעור|ה?ערך|ה?קואורדינט[הת])\\s+ה?-?\\s*([xy])|([xy]))\\s+(?:של\\s+)?(?:ה?נקודה\\s+)?(${NAME})`;
+const HE_COORD = `(?:(?:ה?שיעור|ה?ערך|ה?קואורדינט[הת])\\s+ה?-?\\s*([xy])|([xy]))\\s+(?:של\\s+)?${HE_POINT}(${NAME})`;
 const COMPARE_HE = new RegExp(
   `^${HE_GIVEN}${HE_COORD}\\s+(?:(?:הוא|היא)\\s+)?(גדול|גדולה|קטן|קטנה)(?:\\s+יותר)?\\s+מ-?\\s*(.+)$`,
 );
 /** The RIGHT side of the Hebrew comparison, after «מ»: another point's coordinate, or a value. */
 const HE_RHS_COORD = new RegExp(
-  `^(?:(?:ה?שיעור|ה?ערך|ה?קואורדינט[הת])\\s+ה?-?\\s*([xy])\\s+(?:של\\s+)?|([xy])\\s+של\\s+|(?:זה|זו)\\s+של\\s+)(?:ה?נקודה\\s+)?(${NAME})$`,
+  `^(?:(?:ה?שיעור|ה?ערך|ה?קואורדינט[הת])\\s+ה?-?\\s*([xy])\\s+(?:של\\s+)?|([xy])\\s+של\\s+|(?:זה|זו)\\s+של\\s+)${HE_POINT}(${NAME})$`,
 );
 /** «שיעור ה-x של B חיובי» — the comparison with 0, in the sign words. */
 const SIGN_HE = new RegExp(`^${HE_GIVEN}${HE_COORD}\\s+(?:(?:הוא|היא)\\s+)?(חיובי|חיובית|שלילי|שלילית)$`);
@@ -3935,7 +3935,7 @@ const BISECTOR_ALONE_EN = new RegExp(`^(?:the\\s+|an\\s+)?(?:angle\\s+)?bisector
 const ANGLE_LIST = `((?:[∠∢]?\\s*(?:${NAME}){1,3})(?:\\s*,\\s*[∠∢]?\\s*(?:${NAME}){1,3})*\\s*,?\\s+ו-?\\s*[∠∢]?\\s*(?:${NAME}){1,3})`;
 /** «E חיתוך חוצי הזוויות BAC ו-BCA» · «E נקודת החיתוך של חוצי הזוויות A ו-C» · «E נקודת המפגש של חוצי …». */
 const BISECTORS_MEET_HE = new RegExp(
-  `^${HE_GIVEN}(?:ה?נקודה\\s+)?(${NAME})${HE_IS}\\s*(?:ה?נקודת\\s+)?ה?(?:חיתוך|מפגש)\\s+(?:של\\s+)?(?:שני\\s+)?ה?חוצי\\s+ה?זו?וי(?:ו)?ת\\s+${ANGLE_LIST}$`,
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה?נקודת\\s+)?ה?(?:חיתוך|מפגש)\\s+(?:של\\s+)?(?:שני\\s+)?ה?חוצי\\s+ה?זו?וי(?:ו)?ת\\s+${ANGLE_LIST}$`,
 );
 /** «חוצי הזוויות BAC ו-BCA נחתכים בנקודה E» — the same meeting point, verb-first. */
 const BISECTORS_MEET_VERB_HE = new RegExp(
@@ -4488,6 +4488,119 @@ const angleNameOf = (p: string, v?: string, q?: string): AngleName | null => {
 /** A degree tail the value may carry: «60°», «60 מעלות», "60 degrees". */
 const DEGREE_TAIL = /\s*(?:°|מעלות|degrees?)\s*$/i;
 
+// ---------------------------------------------------------------------------
+// AN ORDER BETWEEN MEASURES — «AB < BC», «DC > AB», «AB ≤ 10», «∢ABC < ∢BAC», «זווית ABC קהה» (#1621 D3, ADR-AG-216)
+// ---------------------------------------------------------------------------
+
+/**
+ * 2-D reads an inequality between two segment lengths («DC > AB», ADR-039 / ADR-158), a numeric bound on a length
+ * or an angle («AB ≤ 10», «∢ABC > 40», ADR-390 — with its strictness, #1265) and an angle's acuteness («זווית ABC
+ * קהה», ADR-108) as REGIONS the figure must lie in: they remove no DOF, a free measure stays sampled inside the
+ * region, and a determined figure outside it is a conflict. Analytic answered `not-handled` / `bad-equation` to all
+ * of them (#1696's held `<` chip). The analytic reading of a region is D7's kind 2: a `sign` selector over the
+ * DIFFERENCE of the two sides (`Quantity` `order`), judged inside validity like every selector — so it never moves
+ * a determined figure, and a figure none of whose configurations satisfies it is refused on this sentence.
+ *
+ * Each side is the measure its equality twin reads: a length expression (`parseLengthExpr`, so «הצלע AB», «|AB|»,
+ * «שטח המשולש ABC» and a role noun mean here what they mean in «AB = …»), a THREE-letter angle, or a value. A lone
+ * vertex («∢B > 40») is left to the rules that resolve it at M1 — declined here, never guessed. A point-to-line
+ * distance is declined too: its line is a name only M1 can resolve, and an order that judged nothing would vanish.
+ */
+const ORDER_ANGLE = new RegExp(`^(?:${ANGLE_NOUN_HE}|${ANGLE_NOUN_EN})(${NAME})(${NAME})(${NAME})(?![A-Za-z0-9])$`, 'i');
+/** The symbolic operators, the two-character ones first, with the two typeset glyphs. */
+const ORDER_OP = /\s*(<=|>=|≤|≥|<|>)\s*/;
+/** Is this operator NON-strict — does the side it bounds admit its value (2-D's #1265)? */
+const closedOp = (op: string): boolean => op === '<=' || op === '>=' || op === '≤' || op === '≥';
+/** Does this operator say its LEFT side is the larger? */
+const greaterOp = (op: string): boolean => op.startsWith('>') || op === '≥';
+const ORDER_WORD_HE = new RegExp(`^(.+?)\\s+(?:(?:הוא|היא)\\s+)?(גדול|גדולה|קטן|קטנה)(?:\\s+יותר)?\\s+מ(?:-|ן\\s+)?\\s*(.+)$`);
+const ORDER_BOUND_HE = new RegExp(`^(.+?)\\s+(?:(?:הוא|היא)\\s+)?(לפחות|לכל\\s+היותר)\\s+(.+)$`);
+const ORDER_WORD_EN = /^(?:the\s+)?(.+?)\s+is\s+(greater|larger|longer|bigger|more|less|smaller|shorter)\s+than\s+(.+)$/i;
+const ORDER_BOUND_EN = /^(?:the\s+)?(.+?)\s+is\s+(at\s+least|at\s+most|no\s+less\s+than|no\s+more\s+than)\s+(.+)$/i;
+const ACUTENESS_HE = new RegExp(`^${HE_GIVEN}${ANGLE_NOUN_HE}(${NAME})(${NAME})(${NAME})${HE_IS}\\s*(קהה|חדה)$`);
+const ACUTENESS_EN = new RegExp(`^${ANGLE_NOUN_EN}(${NAME})(${NAME})(${NAME})\\s+is\\s+(?:an?\\s+)?(obtuse|acute)(?:\\s+angle)?$`, 'i');
+
+/** One side of an order, as the measure its equality twin reads — `null` when it is no side this rule takes. */
+function orderSide(src: string, claims: ClaimSink): { side: OrderSide; text: string } | null {
+  const t = trim(src);
+  if (!t) return null;
+  const ang = ORDER_ANGLE.exec(t);
+  if (ang) {
+    const at = angleNameOf(ang[1], ang[2], ang[3]);
+    return at && isAngleRef(at) ? { side: { t: 'angle', at }, text: t } : null;
+  }
+  const roled = lengthRoles(t, claims);
+  if (roled === null) return null;
+  const le = parseLengthExpr(roled);
+  if (le && le.terms.length > 0) {
+    const measured = le.terms.every((x) => x.kind === undefined || x.kind === 'length' || x.kind === 'area');
+    return measured ? { side: { t: 'length', le }, text: roled } : null;
+  }
+  const value = valueExpr(t.replace(DEGREE_TAIL, ''));
+  return value ? { side: { t: 'value', value }, text: t } : null;
+}
+
+/** The facts of one order: the pairs a length side names are drawn (#1652's rule, as «AB = …» draws them), then the selector. */
+function orderFacts(leftSrc: string, rightSrc: string, leftGreater: boolean, closed: boolean, line: string): RuleOutcome {
+  const claims: ClaimSink = { out: [], src: line };
+  const left = orderSide(leftSrc, claims);
+  const right = orderSide(rightSrc, claims);
+  if (!left || !right) return null;
+  // Two values are a domain or an equation, not this construct.
+  if (left.side.t === 'value' && right.side.t === 'value') return null;
+  // A length beside an angle compares two different kinds of thing: understood, and refused by name.
+  if ((left.side.t === 'angle' && right.side.t === 'length') || (left.side.t === 'length' && right.side.t === 'angle')) {
+    return refuse('bad-operand', line);
+  }
+  const drawn = lengthPieces([left, right].filter((o) => o.side.t === 'length').map((o) => o.text), line);
+  const sel: Selector = {
+    kind: 'sign',
+    q: { k: 'order', left: left.side, right: right.side },
+    positive: leftGreater,
+    ...(closed ? { closed: true as const } : {}),
+  };
+  return made([...drawn, { t: 'selector', sel, src: line }, ...claims.out]);
+}
+
+function parseOrder(line: string): RuleOutcome {
+  /** «זווית ABC קהה» / «∢ABC חדה» — the order against 90°, strict (a right angle is neither; 2-D's ADR-108). */
+  const acute = ACUTENESS_HE.exec(line) ?? ACUTENESS_EN.exec(line);
+  if (acute) {
+    const at = angleNameOf(acute[1], acute[2], acute[3]);
+    if (!at || !isAngleRef(at)) return refuse('repeated-vertex', line);
+    const sel: Selector = {
+      kind: 'sign',
+      q: { k: 'order', left: { t: 'angle', at }, right: { t: 'value', value: { kind: 'num', value: 90 } } },
+      positive: /קהה|obtuse/i.test(acute[4]),
+    };
+    return made([{ t: 'selector', sel, src: line }]);
+  }
+  const body = line.replace(new RegExp(`^${HE_GIVEN}`), '');
+  const parts = body.split(ORDER_OP);
+  if (parts.length === 3) return orderFacts(parts[0], parts[2], greaterOp(parts[1]), closedOp(parts[1]), line);
+  /** «40 < ∢ABC < 60» — a WINDOW: two orders on the one measure, each end keeping its own operator (2-D's #1265). */
+  if (parts.length === 5) {
+    const [a, o1, mid, o2, b] = parts;
+    if (greaterOp(o1) !== greaterOp(o2)) return null; // «40 < α > 60» states nothing
+    const lo = orderFacts(mid, a, !greaterOp(o1), closedOp(o1), line);
+    const hi = orderFacts(mid, b, greaterOp(o2), closedOp(o2), line);
+    if (!lo || !hi) return null;
+    if (!lo.ok) return lo;
+    if (!hi.ok) return hi;
+    const seen = new Set(lo.facts.map((f) => JSON.stringify(f)));
+    return made([...lo.facts, ...hi.facts.filter((f) => !seen.has(JSON.stringify(f)))]);
+  }
+  const he = ORDER_WORD_HE.exec(body);
+  if (he) return orderFacts(he[1], he[3], he[2].startsWith('גדול'), false, line);
+  const heBound = ORDER_BOUND_HE.exec(body);
+  if (heBound) return orderFacts(heBound[1], heBound[3], heBound[2] === 'לפחות', true, line);
+  const en = ORDER_WORD_EN.exec(line);
+  if (en) return orderFacts(en[1], en[3], /greater|larger|longer|bigger|more/i.test(en[2]), false, line);
+  const enBound = ORDER_BOUND_EN.exec(line);
+  if (enBound) return orderFacts(enBound[1], enBound[3], /least|no\s+less/i.test(enBound[2]), true, line);
+  return null;
+}
+
 /**
  * «C ברביע השלישי» — a point placed in a REGION (#1071).
  *
@@ -4532,7 +4645,7 @@ const QUADRANT_SIGNS: Record<string, [boolean, boolean]> = {
  * spelling is a silent drop and this tree has paid for that three times.
  */
 const COMPONENT_HE = new RegExp(
-  `^${HE_GIVEN}(?:ה?שיעור|ה?ערך|ה?קואורדינט[הת])\\s+ה?-?\\s*([xy])\\s+(?:של\\s+)?(?:ה?נקודה\\s+)?(${NAME})${HE_IS}\\s*:?\\s*(.+)$`,
+  `^${HE_GIVEN}(?:ה?שיעור|ה?ערך|ה?קואורדינט[הת])\\s+ה?-?\\s*([xy])\\s+(?:של\\s+)?${HE_POINT}(${NAME})${HE_IS}\\s*:?\\s*(.+)$`,
 );
 /**
  * THE SUBSCRIPTED SPELLING (#1127) — `x_A = 5`.
@@ -4858,7 +4971,7 @@ const PERP_CUT_PLURAL_HE = `(?:\\s*,?\\s+(?:ו|ה|ש)?(?:חותכים|פוגשי
 const PERP_HE = new RegExp(`^ה?אנך${PERP_VERB_CLAUSE}${PERP_FROM_HE}${PERP_TO_HE}${PERP_CUT_HE}$`);
 const PERP_PLURAL_HE = new RegExp(`^ה?אנכים${PERP_VERB_CLAUSE}${PERP_FROM_PLURAL_HE}${PERP_TO_HE}${PERP_CUT_PLURAL_HE}$`);
 const PERP_FOOT_HE = new RegExp(
-  `^(?:ה?נקודה\\s+)?(${NAME})\\s+(?:(?:היא|הינה|הוא)\\s+)?ה?רגל\\s+ה?אנך${PERP_VERB_CLAUSE}${PERP_FROM_HE}${PERP_TO_HE}$`,
+  `^${HE_POINT}(${NAME})\\s+(?:(?:היא|הינה|הוא)\\s+)?ה?רגל\\s+ה?אנך${PERP_VERB_CLAUSE}${PERP_FROM_HE}${PERP_TO_HE}$`,
 );
 const PERP_FROM_EN = `\\s+from\\s+(?:(?:the\\s+)?(?:point|vertex)\\s+)?(${NAME})`;
 const PERP_EN = new RegExp(
@@ -5850,6 +5963,10 @@ function parseClauseRules(raw: string): ParseResult {
   const compared = parseCompare(line);
   if (compared) return compared;
 
+  // An order between measures (#1621 D3) — after the coordinate comparison, whose atoms it would read as values.
+  const ordered = parseOrder(line);
+  if (ordered) return ordered;
+
   /**
    * A circle stated by its CENTRE runs before `matchCurve` (#1060), because that rule’s tail is
    * `(.+)` and it would read the centre letter as an equation — the #1059 shape, which the Hebrew
@@ -6123,7 +6240,7 @@ function parseClauseRules(raw: string): ParseResult {
    * engine work rather than a sentence. Filed rather than folded in.
    */
   const FREE_POINT_HE = new RegExp(
-    `^${HE_GIVEN}(?:ה?(?:נקוד(?:ה|ות)|קדקוד)\\s+(${NAME})|(${NAME})\\s+(?:היא|הינה)?\\s*ה?(?:נקודה|קדקוד))$`,
+    `^${HE_GIVEN}(?:ה?(?:נקוד(?:ה|ות)|קו?דקוד)\\s+(${NAME})|(${NAME})\\s+(?:היא|הינה)?\\s*ה?(?:נקודה|קו?דקוד))$`,
   );
   const FREE_POINT_EN = new RegExp(
     `^(?:a\\s+|the\\s+|given\\s+(?:a\\s+|the\\s+)?)?point\\s+(${NAME})$`,
