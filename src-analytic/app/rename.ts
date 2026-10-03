@@ -373,6 +373,19 @@ const constructionShape = (d: Derivation, map: LetterMap): string => {
 };
 const faultShape = (d: Derivation): string => d.faults.map((f) => `${f.index}:${f.code}`).sort().join('|');
 
+/**
+ * A cevian whose foot the TOOL named (#1222, #1240; ADR-AG-211) — «תיכון מ-A במשולש ABC», «גובה מנקודה A», «תיכון לצלע
+ * BC», «תיכון ליתר» — names it after the fact: «… פוגש את הצלע בנקודה M» / "… at M", which the grammar lowers exactly as
+ * the tool's own foot (a derived point), so the fold-equality proof below accepts it.
+ */
+const CEVIAN_ROLE = /^(?:נתון\s+)?ה?(?:תיכון|גובה)\s/;
+const CEVIAN_ROLE_EN = /^(?:the\s+|an?\s+)?(?:median|altitude|height)\s/i;
+function cevianNamingCandidates(line: string, name: string): string[] {
+  if (CEVIAN_ROLE.test(line.trim())) return [`${line} פוגש את הצלע בנקודה ${name}`];
+  if (CEVIAN_ROLE_EN.test(line.trim())) return [`${line} at ${name}`];
+  return [];
+}
+
 /** Insert `name` at each place a sentence can carry it: after a circle noun, before a coordinate pair. */
 const CIRCLE_NOUN = /(?:ה?מעגל|[Cc]ircle)(?=[\s:,])/g;
 const COORD_PAIR = /(?<![A-Za-z0-9₀-₉])\(\s*[^(),;]+?\s*[,;]\s*[^(),;]+?\s*\)/g;
@@ -386,6 +399,8 @@ function namingCandidates(line: string, name: string): string[] {
     const at = m.index ?? 0;
     out.push(`${line.slice(0, at)}${name}${line.slice(at)}`);
   }
+  // A perpendicular's foot (#1620, ADR-AG-207): «האנך מהנקודה B לציר ה-x» names it «… חותך אותו בנקודה P₁».
+  out.push(`${line} חותך אותו בנקודה ${name}`, `${line} meets it at ${name}`);
   return out;
 }
 
@@ -399,7 +414,8 @@ function materialize(state: RenameState, current: Derivation, id: string): strin
   if (row === null) return null;
   const want = constructionShape(current, {});
   const wantFaults = faultShape(current);
-  for (const cand of namingCandidates(state.lines[row], id)) {
+  const line = state.lines[row];
+  for (const cand of [...cevianNamingCandidates(line, id), ...namingCandidates(line, id)]) {
     const p = parseLine(cand);
     if (!p.ok || !factsMention(p.facts, id)) continue;
     const lines = state.lines.map((l, i) => (i === row ? cand : l));

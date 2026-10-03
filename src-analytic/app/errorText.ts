@@ -89,7 +89,7 @@ const NUMERAL_NOUN_KEY: Record<RefKind, string> = {
  * Every HOST kind a contextual reference can need (#1432's `HostRef`), exhaustive — so a new host kind
  * cannot reach the refusal without its `errHost.*` keys (locked per kind × arity in the i18n test).
  */
-export const HOST_KINDS: Record<HostRef['kind'], true> = { circle: true, parabola: true, ellipse: true, line: true, polygon: true };
+export const HOST_KINDS: Record<HostRef['kind'], true> = { circle: true, parabola: true, ellipse: true, line: true, polygon: true, perpendicular: true };
 
 /** The DEFINITE noun as a student writes it before a name — «הפרבולה» / "the parabola". */
 const THE_NOUN_KEY: Record<RefKind, string> = {
@@ -122,7 +122,7 @@ export function errorText(error: InputError, t: Translate): string {
   const host = error.key === 'ambiguous-shape' ? error.host : undefined;
   const candidates = host?.candidates ?? [];
   // The noun a candidate's name follows is the HOST's kind when a host is carried (a curve kind there).
-  const nounKind: RefKind = host && host.kind !== 'polygon' ? (host.kind as RefKind) : (kind ?? 'curve');
+  const nounKind: RefKind = host && host.kind !== 'polygon' ? (host.kind === 'perpendicular' ? 'line' : (host.kind as RefKind)) : (kind ?? 'curve');
   const theNoun = t(THE_NOUN_KEY[nounKind]);
   const key: string = {
     'not-handled': 'errNotHandled',
@@ -134,6 +134,11 @@ export function errorText(error: InputError, t: Translate): string {
     'repeated-vertex': 'errRepeatedVertex',
     'degenerate-role': 'errDegenerateRole',
     'apex-not-a-vertex': 'errApexNotAVertex',
+    'bisector-wrong-apex': 'errBisectorWrongApex',
+    'ambiguous-cevian': 'errAmbiguousCevian',
+    'cevian-no-triangle': 'errCevianNoTriangle',
+    'ambiguous-hypotenuse': 'errAmbiguousHypotenuse',
+    'ambiguous-no-right-angle': 'errCevianNoRightAngle',
     'crossing-already-named': 'errCrossingAlreadyNamed',
     'self-crossing': 'errSelfCrossing',
     'llm-busy': 'errLlmBusy',
@@ -157,6 +162,7 @@ export function errorText(error: InputError, t: Translate): string {
     // Ruling 2026-09-29 — «1» and «I» are one name; mixing the two notations is refused with a note.
     'numeral-notation': 'errNumeralNotation',
     'undistinguished-diagonal': 'errNoPrincipalDiagonal',
+    'not-a-diagonal': 'errNotADiagonal',
     'already-named': 'errAlreadyNamed',
     // #1154 — a rename understood and declined, each naming what the student wrote
     'rename-bad-name': 'errRenameBadName',

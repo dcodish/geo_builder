@@ -2098,6 +2098,68 @@ Add a row to the helper table:
 
 **The created circle.** A chord's `on-kind` carries `create` (set by `claimFacts` and the contextual `chordFacts`). With no circle, M1 applies `touchedCircleFacts`, the ADR-AG-198 creation (an equation circle over the tool's free symbols, centre unnamed), and puts the end on it. A diameter with no circle already states the `circle-thru` diameter circle. A `circle-eq` bound to the created circle replaces its expression under the same id and drops its free symbols, the way the incircle sentence redefines it. This is how a later «משוואת המעגל היא …» fixes the circle that the chords or a tangency created.
 
+## The perpendicular from a point, and the line through a point that cuts a side ([ADR-AG-207](06c-decisions-analytic.md#adr-ag-207), #1620)
+
+**The foot is a derived point.** `DerivedRule { t: 'foot'; from; onto: FootLine }` (engine/derived.ts), `FootLine` = an axis, a two-point line, or a line object id. `evalRule` projects `from` onto the line (`footOn` for a pair, the resolved `ax + by + c = 0` for an object — read through `curveAt`, vacant when it is not a line). A line object is a curve parent (`curveParentsOf`); M1's derived case accepts any object whose kind is `line`. `sameDerivation` compares `from` and the line (a pair as a set).
+
+**The sentences.** `parsePerpendicular` (in the `parseClauseRules` chain after `parseThroughLine`) reads the foot sentence, the perpendicular with an optional cut naming its own line, the plural with «בהתאמה», and the perpendicular bisector; `footLineOf` resolves the target through `direction()` plus a tangent named by its touch point; `perpendicularFacts` emits the `derived` foot and, for the perpendicular, the `ref` segment from the point to it. An unnamed foot or bisector midpoint is a mint placeholder (`@mint:foot(…)`, `@mint:mid(…)`): `resolveMints` (engine/derive.ts) maps a placeholder `derived` fact to an earlier `derived` fact with the same derivation, else the next `P₁…` (recorded in `minted`); segment ids carrying a placeholder are re-keyed to `seg-` + the sorted ends after minting. `namingCandidates` (app/rename.ts) adds «<line> חותך אותו בנקודה <name>» so a rename can materialise the tool's letter.
+
+**«האנך» as an operand.** `perpendicularRef` (called first in `incidenceOn` after the tangent noun) returns `{ t: 'kind', kind: 'perpendicular', foot?: { from, onto? } }`; every emitter of `on-kind` carries `foot`. M1's `on-kind` arm filters the `foot` derived objects by the description and lowers to `on-line-2pt(id, from, foot)`; none / several → `noHost(…, 'perpendicular', n)`, rendered by `errHost.{none,many}.perpendicular`.
+
+**The line through a point that cuts.** `THROUGH_LINE_FIRST_HE` adds the line-first spellings to `parseThroughLine`; `THROUGH_CUT_HE` / `_EN` split a crossing tail off the direction operand. With a tail the facts are the `line-at` with `drawn: false`, `parseIntersectionPlain`'s crossing over `on-curve(F, line)` and `incidenceOn(target)` (marked `crossing`, so a bounded noun bounds it), and the `ref` segment from the point to F. `evaluate` marks a `drawn: false` line `stated: false`; M1's `line-at` case upgrades such a carrier when a drawn sentence restates it.
+
+**The frame.** `sharedSubjectClauses` also splits a straight-piece subject (`PIECE_SUBJECT`) before a second piece verb (`PIECE_VERB`); `sideClauses` keeps «הקטע» when it rewrites «X מקביל ל-Y» to the symbol form, and the relation rule declares the ends of a «הקטע» operand before the relation.
+## Extensions, named diagonals, the midsegment, a condition after a placement ([ADR-AG-208](06c-decisions-analytic.md#adr-ag-208), #1620)
+
+**An extension is a selector.** `Selector.beyond { id, a, b }` is `between`'s complement on the same line: the point is past `b`, away from `a`, judged by the projection parameter (`t > 1`) and the figure's visible resolution (`apartOf`, as `distinct`). The collinearity beside it (`on-line-2pt`, unbounded) consumes the one DOF; the selector consumes none, so the distance past the end stays free (ADR-052). The evaluator seeds a free extension point past the end at a seed-varied distance (a start, never a verdict). The parser lowers «על המשך …» (`extensionFacts`, one owner): the side segment (introducing its ends), `declare`, the incidence, the selector, the piece from the end to the point; the operand goes through `incidenceOn`, so a role noun states its claim. «המשכי … נפגשים» is two `extensionFacts` on one point; «המשך AC חותך …» is the crossing sentence's facts with the pair's incidence unbounded plus the selector.
+
+**«כך ש-» and the relative clause are frame readings.** `conditionClauses` (frameAnalytic) cuts «X כך ש-Y» / "X such that Y" into the placement and the condition, and «…בנקודה M, שנמצאת על …» into the sentence and a sentence about its last-named point. Offered after the whole line fails, taken only when every clause parses — so an unreadable condition refuses the line.
+
+**Diagonals.** `meet-of` gains `noun` (the contextual shape noun, resolved by `ringsNamed`, which now also matches a noun's refinements — «טרפז» finds «טרפז ישר זווית») and `named` (the four letters of «האלכסונים AC ו-BD», in the `diagonals` rule's order). A ring with those four vertices must have them as its diagonals (`not-a-diagonal` otherwise); with none, the named segments stand alone. `area-of` resolves through `ringsNamed` too. «האלכסון AC (במרובע ABCD)» is a segment, the ring stated by its own sentence and checked for non-adjacency.
+
+**Fresh names.** The midsegment lowers to two `midpoint` derivations and their segment. Its unnamed midpoints carry `FRESH_PREFIX` placeholders (`@fresh:MNPQ|mid:A,B`), resolved by `derive` (`resolveFresh`) in list order against the letters EARLIER lines use: an existing midpoint of the same pair keeps its letter, else the first free preferred letter (2-D's `freeLabel` order), else a subscript. Reported through `minted`, like a coordinate point's name.
+
+**Every vertex on some axis.** `vertices-on-axes` is resolved at M1 against the one ring (`ringsNamed`) into ONE `choice` over the 2ⁿ assignments, each option a conjunction (`Constraint.all`, flattened by `resolveChoices` and never measured itself). A choice per vertex would cycle on one seed index and never mix the axes. Dead assignments are skipped by `evaluateTryingChoices` (ADR-AG-197).
+## The exam's construction register ([ADR-AG-206](06c-decisions-analytic.md#adr-ag-206), #1620)
+
+**Two registers, one gate.** `parser/scopeAnalytic.ts` holds the tool wrapper (#1353: a verb FIRST, stripped) and,
+beside it, `constructionCandidates` — the exam's register. It reads a closed grammar
+`ADVERBIAL* VERB ADVERBIAL* NOUN NAMES? REST` after `unwrap`: the verbs are `CONSTRUCTION_VERBS_HE` (whole
+tokens, so «שהורידו» never matches); the adverbials are «מן/מ(ה)נקודה|קודקוד(ים) X», «דרך (הנקודה) X (שעל ה…)»
+and «ב<polygon> XYZ»; the nouns are a closed table with their definite forms; the relative participles of
+REST («המקביל», «החותך», «הנמצאת», …) become its predicate (the first loses «ה», each later one gains «ו»);
+«כרצונכם» is dropped. One composition rule per noun: tangent (at the through-point, its «שעל המעגל» implied),
+line/segment («העובר דרך …», or nothing when a named segment already starts at the anchor), perpendicular
+(«מ<anchor>»), role nouns (the copula «ב<polygon>, X ו-Y הם גבהים …»), and the definite subject for the rest.
+`imperativeCandidates` offers these readings first, flagged `exam`.
+
+**The register never decides.** `decideSubmit` keeps a candidate only when the parser and the fold accept it,
+so the taught text is always a sentence the next Enter accepts. An `exam` candidate is also taught when the
+figure already holds it (`already-known` / `already-follows`): the exam restates givens imperatively. The tool
+wrapper keeps #1353's `record`-only rule.
+
+**Coverage counts what the student confirms.** `confirmTaught(lines, seed)` (`app/submit.ts`) walks the lines
+through `decideSubmit` and substitutes each lesson; the 471 ratchet derives that list, so the teaching is
+called, never re-implemented in the test.
+## The cevian family: one lowering, three roles, the target or the foot from the figure ([ADR-AG-209](06c-decisions-analytic.md#adr-ag-209), #1284, #1222, #1240)
+
+**One lowering.** `engine/cevian.ts` owns what every spelling of a cevian lowers to: `cevianFacts(role, apex, foot, u, v)` — declare both ends, the segment, the foot `on-line-2pt` on `uv` (the line, never bounded — ADR-AG-109), then the role's own row: `midpoint`, `perpendicular`, or for the bisector `angle-ratio ∠(u,apex,foot) = ∠(foot,apex,v)` (k = 1, the unsigned residual of #1331). The internal bisector line meets the opposite side's line once, inside the side, so no `between` and no closed-form foot are needed. `onBisectorFacts(at, p)` is the bisector through an EXISTING point: the same equal-angle row plus the `angle-side` selector — a region (`angleSideOf`: the projection of `p − v` on the sum of the unit rays, positive on the angle's side), seeded by reflecting a wrong-side seed through the vertex. A second angle row (`∠ = ½∠`) was measured first and rejected: one condition analytically, but the numeric rank (`freeRank`, central differences, 1e-9 relative pivot) read the two near-parallel rows as 2 at some seeds.
+
+**Where each spelling is read.** The fully-named cevian (`CEVIAN_HE/EN`, unchanged grammar) and the bisector with a target (`BISECTOR_CEVIAN_*`) lower in the parser through `cevianWithTarget`, which first emits the named triangle's own facts (`namedShapeFacts`; a drawn triangle absorbs them). Everything else is `parseCevianFamily`: `BISECTS_*` and the bisector-meet / bisector-alone rules emit the M1 fact `bisects { at: AngleName, p? }`; `NAMED_ONLY_*`, `TO_SIDE_*` and `FROM_APEX_*` without a target emit `cevian-of { role, apex?, side?, foot }`; `NOUN_FIRST_HE` / `NOUN_NAMED_HE` rewrite to the named form; `PLURAL_CEVIAN_HE/EN` distribute into singular sentences (`viaSentences`), declaring a shared bisector end first so neither bisector reads it as a foot.
+
+**M1.** `bisects`: the angle through `resolveAngleName`; its three points must exist; no `p` → a `line-at` through the vertex along the new `Direction` `{ k: 'bisector', v, a, b }` (the sum of the unit rays; id `line-bisector-<a><v><b>`); a `p` the figure lacks → `cevianFacts('bisector', …)` (the foot on the line through the ray points — 2-D's `line-intersection`); an existing `p` → `onBisectorFacts`. `cevian-of`: the triangles (3-vertex polygons) holding the apex, or both ends of the side, give the candidate targets — one builds through `cevianFacts`, several `ambiguous-cevian`, none `cevian-no-triangle`.
+
+**The tool-named foot** — superseded by [ADR-AG-211](06c-decisions-analytic.md#adr-ag-211), below: a derived point named through the one letter table.
+
+## The tool's letters: one table, one resolver ([ADR-AG-211](06c-decisions-analytic.md#adr-ag-211), #1620 S6, #1222)
+
+**One placeholder, one resolver.** A parser rule that introduces a point without a letter writes `toolPoint(role, key)` (`engine/toolLetters.ts`) — `@fresh:<role>|<key>`, the key saying what the point IS (`mid:B,C`, `foot(A|BC)`, `median:A`). `resolveToolLetters` (called by `derive` before `resolveMints`) walks the facts in list order: a placeholder on a `derived` fact whose rule an EARLIER non-placeholder derived fact already has (`sameDerivation`) takes that name; otherwise the first letter of `TOOL_LETTERS[role]` (midpoint `MNPQ`, midpoint-2 `NPQS`, foot `HGP`) not used by an earlier fact, then 2-D's `freeLabel` pool `MNPQRSTUVWXYZKLGHIJ`, then a subscript. A segment's id is re-keyed from its named ends (a placeholder may sort first inside it, so ids are never scanned). Earlier-facts-only is what makes a later line refer to the tool's point and never re-letter it. `derive` drops a `minted` entry whose point the fold did not create. The midsegment (S3), the perpendicular's foot and the perpendicular bisector's midpoint (S2) and the cevian's foot (S4) all write `toolPoint`; a coordinate point keeps `resolveMints`' reserved `P₁` (#1281).
+
+**The cevian's tool foot is derived.** `toolFootFacts` (`engine/cevian.ts`): a median's foot is `derived midpoint(u, v)`, an altitude's `derived foot(apex → uv)` (ADR-AG-207's rule), plus the segment — 0-DOF closed forms, so the triangle never moves. The triangle/side forms emit it in the parser (keyed like the midsegment's and the perpendicular's, so «האנך מ-A ל-BC» and «גובה מ-A במשולש ABC» are one placeholder); the figure-resolved forms carry `cevian-of { toolFoot }`, and M1 lowers to `toolFootFacts` — or, when the figure already derives that point, a segment to IT; a foot the student names that already exists keeps `cevianFacts`.
+
+**Naming after the fact.** `FOOT_TAIL_HE/EN` («… פוגש את הצלע בנקודה K», "… at K") on the apex, side and hypotenuse forms names the foot; it lowers through `cevian-of { toolFoot }`, so it folds exactly as the tool's own foot. `cevianNamingCandidates` (`app/rename.ts`) writes that tail, first; the perpendicular bisector reads the S2 tail «… חותך אותו בנקודה K», so its midpoint renames too.
+
+**The hypotenuse.** `TO_HYP_*` emit `cevian-of { hypotenuse }` (or, with letters, the ADR-AG-200 hypotenuse claim plus `cevian-of { side }`). M1 reads, per 3-vertex polygon, the right angle the figure STATES — a non-`choice` constraint equal (`sameConstraint`) to `rightAngleAt(v, …)`: exactly one triangle with one stated right vertex builds; a right-triangle noun whose choice is still open, or several, is `ambiguous-hypotenuse`; none at all `ambiguous-no-right-angle` (both ask — 2-D asks there too).
 ## New letters and circles a reference names ([ADR-AG-210](06c-decisions-analytic.md#adr-ag-210), #1670, #1686)
 
 **The radius names the centre.** This is `applyRoleOf`'s radius arm, for a circle whose centre has no point (`centreIdOf` is null).
@@ -2119,3 +2181,15 @@ Add a row to the helper table:
 - a companion: `segment`, `line-2pt`, `extent-of`, `selector`, `declare`, or a `length-eq` riding beside a minting fact.
 
 The missing points are added as `free` objects and the line's facts are re-applied; then the fixpoint runs again. This applies beside an unnamed centre too (#1686). A `perpendicular` (the cevian's own half) is not a minting form, so «AD גובה לצלע BC» stays refused. The cevian's triangle form states «משולש ABC» first (`clauseFacts`).
+
+## The two tangents meet; the meet verbs; a floor that does not collapse with the figure ([ADR-AG-213](06c-decisions-analytic.md#adr-ag-213), #1620 S7)
+
+**No new object.** Every spelling lowers (`viaCanonical`) to the canonical crossing «D נקודת החיתוך של המשיק למעגל O בנקודה A עם המשיק למעגל O בנקודה C», whose operands are the tangent noun (`readTangentNoun` → `on-curve(D, tangent-<at>)`, the tangent built by `tangent-line-at`, the circle stated by `statingNamedCircle`). D stays a free point with two incidences, solved like every other crossing.
+- `readTangentNoun` accepts the circle phrase after the point (`TANGENT_CIRCLE_HE` / `_EN`), never on both sides.
+- `intersectionSpellings`' two-operand meet takes `MEET_VERB_HE` (נחתכ/נפגש/מצטלב × ים/ות), `AT_POINT_HE`, and English meet/intersect/cross. `sharedCircle` writes a circle said once onto both tangent operands; one touch point twice is `repeated-vertex`.
+- `tangentsMeet` (called first in `intersectionSpellings`) reads the plural «המשיקים … בנקודות A ו-C …» into the two singular tangents, and the bare plural into `crossing-kind { kind: 'tangent', pieces: true }`.
+- M1's `crossing-kind` arm selects tangent objects with `isTangentObject` (the «המשיק» test) for `kind: 'tangent'`; `pieces` adds a `segment` from each tangent's `through` to the crossing. Not exactly two is `noHost(…, 'line', n, 2)`.
+
+**The open-bound floor keeps the sampled scale.** `openBoundFloor(at, env, syms, sampled)` is `SOLVE_RESOLUTION × max(figureScale(at, env, syms), sampled)`. Stage two's `admissible` passes the scale of the seeded start (`figureScale` of the seeded positions and sampled parameters). A descent that shrinks the whole figure toward a point therefore meets the bound at the start's scale, not at its own vanishing span. The other callers (`fitCreatedShapes`) pass nothing and judge as before.
+
+**Amendment 1 (ADR-AG-213).** `evaluate` measures a whole-figure collapse after the solve. When `figureScale(solved) < SOLVE_RESOLUTION × figureScale(sampled)` (the sample is `sampledEnv` and `seeded`), and the figure keeps freedom (`figureDofOf` > 0), the last constraint is reported unsatisfied. This covers the vertex-only collapse that no parameter floor sees. `submit.ts`'s `subjectIdsOf` skips a tangent's touch-point `declare`, so the #1423 letter hint does not fire on a tangent sentence.

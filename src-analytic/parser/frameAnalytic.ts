@@ -389,14 +389,15 @@ export function sideClauses(line: string): string[] | null {
   ).exec(line);
   // The NOUN rides into the relation (#1639, ADR-AG-198): «הישרים AB ו-CD» relates — and so draws — two LINES.
   if (mutual) {
-    const n = mutual[1] === 'ישרים' ? 'הישר ' : '';
+    const n = mutual[1] === 'ישרים' ? 'הישר ' : mutual[1] === 'קטעים' ? 'הקטע ' : '';
     return [`${n}${mutual[2]} ${mutual[4].startsWith('מקביל') ? '∥' : '⊥'} ${n}${mutual[3]}`];
   }
   const related = new RegExp(
     `^(?:ה?(${SIDE_NOUNS}|ישר)\\s+)?((?:${NAME}){2})\\s+(מקביל(?:ה)?|מאונכ(?:ת)?|מאונך)\\s+ל(?:-|ה)?(${SIDE_NOUNS}|ישר)?\\s*((?:${NAME}){2})$`,
   ).exec(line);
   if (related) {
-    const n = (noun: string | undefined) => (noun === 'ישר' ? 'הישר ' : '');
+    // «הקטע» rides too (#1620, ADR-AG-207): it NAMES the segment, so its ends are introduced (#1074).
+    const n = (noun: string | undefined) => (noun === 'ישר' ? 'הישר ' : noun === 'קטע' ? 'הקטע ' : '');
     return [`${n(related[1])}${related[2]} ${related[3].startsWith('מקביל') ? '∥' : '⊥'} ${n(related[4])}${related[5]}`];
   }
   return null;
@@ -446,8 +447,20 @@ export function sharedSubjectClauses(line: string): string[] | null {
     `^((?:[Tt]he\\s+)?circle(?:\\s+${NAME})?)\\s+(.+?)\\s+and\\s+((?:cuts|intersects|meets|passes|is\\s+tangent|touches)\\s.+)$`,
   ).exec(line);
   if (en) return [`${en[1]} ${en[2]}`, `${en[1]} ${en[3]}`];
+  /*
+   * A STRAIGHT PIECE AS THE SHARED SUBJECT (#1620, ADR-AG-207) — «הצלע CB מקבילה לציר ה-x, וחותכת את ציר ה-y בנקודה
+   * E» (16/5). The circle's case one noun over: the second predicate's subject is elided, so the relation rule claimed
+   * the whole line and refused «ציר ה-x, וחותכת …» as its operand. Cut only before one of a piece's verbs.
+   */
+  const piece = new RegExp(`^(${PIECE_SUBJECT})\\s+(${PIECE_VERB}\\s.+?)\\s*,?\\s+ו-?(${PIECE_VERB}\\s.+)$`).exec(line);
+  if (piece) return [`${piece[1]} ${piece[2]}`, `${piece[1]} ${piece[3]}`];
   return null;
 }
+
+/** A side, segment or line named by its two points, with or without its noun — a subject that predicates may share. */
+const PIECE_SUBJECT = `(?:ה?(?:${SIDE_NOUNS}|ישר)\\s+)?(?:${NAME}){2}`;
+/** The verbs a straight piece takes as a subject, every inflection — the cut sits only before one of these. */
+const PIECE_VERB = '(?:מקביל|מאונכ|מאונך|ניצב|חותכ|חותך|עובר|נמצא|משיק|פוגש)[א-ת]*';
 
 // ---------------------------------------------------------------------------
 // Diameters as subjects (#1619 B2)
@@ -500,6 +513,30 @@ export function elidedSubjectClauses(line: string): string[] | null {
  * sentence followed by parenthesised givens is the same two statements. Offered only when the whole line
  * is not itself a sentence (the caller tries it last), and taken only when every clause parses.
  */
+/**
+ * A SENTENCE AND ITS CONDITION (#1620, ADR-AG-208) — «הנקודה E נמצאת על צלע BC כך ש-AE = AC», «E על המשך BC כך
+ * ש-DE = DC», "E is on side BC such that AE = AC". «כך ש» joins two statements the grammar reads apart: where
+ * the point is, and what holds there. Both are givens, so the reading is taken only when BOTH parse — a
+ * condition the grammar cannot read refuses the whole line rather than vanish (the honesty invariant).
+ *
+ * …and the RELATIVE CLAUSE about the point a sentence just named — «אלכסוני הטרפז נפגשים בנקודה M, שנמצאת על
+ * ציר ה-y», "… at the point M, which lies on the y-axis": the clause is a sentence about that point, with the
+ * relative pronoun «ש» standing for its name.
+ *
+ * Offered after the whole line failed (like the comma split), so it never overrides a rule that owns it.
+ */
+export function conditionClauses(line: string): string[] | null {
+  const such = /^(.+?)\s*,?\s+כך\s+ש-?\s*(.+)$/.exec(line) ?? /^(.+?)\s*,?\s+such\s+that\s+(.+)$/i.exec(line);
+  if (such) return [such[1].trim(), such[2].trim()];
+  const rel = new RegExp(
+    `^(.*?(${NAME}))\\s*,?\\s+ש(?:ה)?((?:נמצא|מונח)(?:ת|ים|ות)?|היא|הוא)\\s+(.+)$`,
+  ).exec(line);
+  if (rel) return [rel[1].trim(), `${rel[2]} ${rel[3]} ${rel[4].trim()}`];
+  const relEn = new RegExp(`^(.*?(${NAME}))\\s*,?\\s+which\\s+((?:lies|is)\\s+.+)$`).exec(line);
+  if (relEn) return [relEn[1].trim(), `${relEn[2]} ${relEn[3].trim()}`];
+  return null;
+}
+
 export function parenClauses(line: string): string[] | null {
   const paren = trailingParen(line);
   if (!paren || !paren.head || paren.inner.length === 0) return null;

@@ -228,6 +228,18 @@ const SIGN_STREAM = 100003;
  */
 const SATISFIED_EPS = 1e-6;
 
+/**
+ * Where `p` sits along `a → b`, as the projection parameter: 0 at `a`, 1 at `b`, past 1 beyond `b` (#1620).
+ * A degenerate base (the two ends coincide) answers NaN, which no range test accepts.
+ */
+function beyondParam(a: Pt, b: Pt, p: Pt): number {
+  const ux = b.x - a.x;
+  const uy = b.y - a.y;
+  const nn = ux * ux + uy * uy;
+  if (nn < 1e-24) return Number.NaN;
+  return ((p.x - a.x) * ux + (p.y - a.y) * uy) / nn;
+}
+
 function jitter(seed: number, salt: number): number {
   const x = Math.sin(seed * 127.1 + salt * 311.7) * 43758.5453;
   return x - Math.floor(x);
@@ -739,13 +751,31 @@ function spanOf(at: Map<Id, Pt>): number {
  * so it states no magnitude (ADR-052) and a value the descent merely APPROACHED the bound with is
  * the bound. One function, so every open bound the solve judges uses the same floor.
  */
-export function openBoundFloor(at: Map<Id, Pt>, env: Env, syms: readonly string[]): number {
+export function openBoundFloor(at: Map<Id, Pt>, env: Env, syms: readonly string[], sampled = 0): number {
+  return SOLVE_RESOLUTION * Math.max(figureScale(at, env, syms), sampled);
+}
+
+/**
+ * THE FIGURE'S SCALE — its point spread, or its largest parameter magnitude when that is larger. The ruler
+ * {@link openBoundFloor} is relative to.
+ *
+ * **A ruler measured on the solved figure ALONE collapses with it (#1620 S7, ADR-AG-213).** A figure with no
+ * stated magnitude can satisfy a contradiction in the LIMIT of shrinking to a point: «AC קוטר במעגל O» and
+ * the two tangents at A and C stated to MEET (they are parallel) drove every point and the radius together
+ * toward the centre, and at r ≈ 4·10⁻⁶ the span was 4·10⁻⁶ too — so the floor, a fraction of that span,
+ * called the radius positive and the figure was drawn green as one dot. So the solve also passes the scale
+ * of the figure it STARTED from (`sampled` — the seeded vertices and the sampled parameters, every one
+ * inside its domain): a descent that shrank the whole figure by more than the solver's resolution relative
+ * to where it began has reached the bound, not a configuration. It states no magnitude (ADR-052) — the
+ * sample's own extent is the reference — and a figure whose givens keep its size never comes near it.
+ */
+export function figureScale(at: Map<Id, Pt>, env: Env, syms: readonly string[]): number {
   let scale = spanOf(at);
   for (const sym of syms) {
     const v = Math.abs(env[sym]);
     if (Number.isFinite(v) && v > scale) scale = v;
   }
-  return SOLVE_RESOLUTION * scale;
+  return scale;
 }
 
 /**
@@ -787,6 +817,21 @@ export function circleQuantity(
   if (!a || !b) return null;
   const side = (x: number, y: number) => (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
   return zero(side(p.x, p.y)) * zero(side(k.cx, k.cy));
+}
+
+/**
+ * Which side of the vertex `p` is on, relative to the angle (a, v, b) (#1284, ADR-AG-209): the projection of `p − v`
+ * on the internal bisector's direction (the sum of the two unit rays) — positive on the angle's side, negative on the
+ * opposite ray's. `null` when an operand is unplaced or a ray has no length (nothing to judge).
+ */
+function angleSideOf(p: Pt, v: Pt | undefined, a: Pt | undefined, b: Pt | undefined): number | null {
+  if (!v || !a || !b) return null;
+  const la = Math.hypot(a.x - v.x, a.y - v.y);
+  const lb = Math.hypot(b.x - v.x, b.y - v.y);
+  if (la < 1e-12 || lb < 1e-12) return null;
+  const dx = (a.x - v.x) / la + (b.x - v.x) / lb;
+  const dy = (a.y - v.y) / la + (b.y - v.y) / lb;
+  return (p.x - v.x) * dx + (p.y - v.y) * dy;
 }
 
 function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[] {
@@ -883,10 +928,21 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       if (rhs === null) return true; // an operand that is not placed yet judges nothing, as above
       return cmp.greater ? lhs > rhs : lhs < rhs;
     }
-    if (s.kind !== 'between') return true;
+    /** ON THE BISECTOR'S OWN RAY (#1284, ADR-AG-209) — the angle's side of the perpendicular at its vertex. */
+    if (s.kind === 'angle-side') {
+      const side = angleSideOf(p, at.get(s.v), at.get(s.a), at.get(s.b));
+      return side === null || side > 0;
+    }
+    if (s.kind !== 'between' && s.kind !== 'beyond') return true;
     const a = at.get(s.a);
     const b = at.get(s.b);
     if (!a || !b) return true;
+    /**
+     * BEYOND `b` (#1620, ADR-AG-208) — the same projection parameter, the other part of the line: past the
+     * end, and visibly so (a point AT `b` is on the side, not on its extension). Collinearity is the
+     * constraint's job here too.
+     */
+    if (s.kind === 'beyond') return beyondParam(a, b, p) > 1 && Math.hypot(p.x - b.x, p.y - b.y) >= apart;
     /**
      * BETWEEN, as the projection parameter along `ab` (#1073).
      *
@@ -1432,6 +1488,20 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
     }
   }
   /**
+   * …and a point said to be on an angle's BISECTOR starts on the bisector's own ray (#1284, ADR-AG-209): a seed on
+   * the wrong side of the vertex is reflected through it, keeping its distance — the #1071 lesson for a ray, so the
+   * descent starts in the basin the sentence names. A start, never a verdict: the judge keeps the last word.
+   */
+  for (const s0 of c.selectors) {
+    if (s0.kind !== 'angle-side') continue;
+    const posOf = (id: Id): Pt | null => seeded.get(id) ?? pointAtId(c, env, id);
+    const p0 = seeded.get(s0.id);
+    const v0 = posOf(s0.v);
+    if (!p0 || !v0) continue;
+    const side = angleSideOf(p0, v0, posOf(s0.a) ?? undefined, posOf(s0.b) ?? undefined);
+    if (side !== null && side < 0) seeded.set(s0.id, { x: 2 * v0.x - p0.x, y: 2 * v0.y - p0.y });
+  }
+  /**
    * …and a COMPARISON between two points seeds their ORDER (#1462, ADR-AG-161) — the same lesson for a pair.
    *
    * «x_B > x_D»: where both points are free and the seed put them the wrong way round, their seeded
@@ -1464,6 +1534,34 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
     seeded.set(sel.id, sel.axis === 'x' ? { x: want, y: at0.y } : { x: at0.x, y: want });
   }
   /**
+   * AN EXTENSION SEEDS ITS POINT PAST THE END (#1620, ADR-AG-208) — the #1071 lesson for `beyond`.
+   *
+   * «E על המשך הצלע BC» leaves E one degree of freedom on the line, and the sampler knows nothing of which
+   * part of it: a free E starts wherever its letter hashes to, and the descent projects it onto the line at
+   * the nearest point — inside the side about half the time. So the point STARTS past `b`: at its own
+   * sample's position along the line when that is already beyond, else at a seed-varied distance (a fraction
+   * of the base, so the start states no magnitude — ADR-052 — and «הציגו תצורה אחרת» still moves it). A
+   * start, never a verdict: the solve may move it and the judge keeps the last word. Two extensions on one
+   * point (the meet of two extended sides) are a crossing the solve finds; the first one seeds it.
+   */
+  if (c.selectors.some((s) => s.kind === 'beyond')) {
+    const pos = place(c, env, seeded);
+    const done = new Set<Id>();
+    for (const sel of c.selectors) {
+      if (sel.kind !== 'beyond' || !seeded.has(sel.id) || done.has(sel.id)) continue;
+      const pa = pos.get(sel.a);
+      const pb = pos.get(sel.b);
+      const own = seeded.get(sel.id)!;
+      if (!pa || !pb) continue;
+      const t = beyondParam(pa, pb, own);
+      if (!Number.isFinite(t)) continue;
+      const u = t > 1.05 ? t : 1.2 + 0.8 * jitter(seed, 0xe7);
+      seeded.set(sel.id, { x: pa.x + u * (pb.x - pa.x), y: pa.y + u * (pb.y - pa.y) });
+      done.add(sel.id);
+    }
+  }
+
+  /**
    * AN ORDINAL SEEDS THE ROOT IT NAMES (#1268, ADR-AG-157) — the #1071 lesson for a branch.
    *
    * «נקודת החיתוך השנייה» is judged by the `crossing-nth` selector, and a filter that only rejects leaves
@@ -1493,6 +1591,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
   }
 
   const unsatisfied: Constraint[] = [];
+  // The figure as SAMPLED, before any solve moves it — the reference a collapse is measured against (ADR-AG-213).
+  const sampledEnv = env;
   let free = seeded;
   // Built unconditionally (#1317): the DOF report is rank over the SAME vector the solve moves, and a
   // figure with parameters and no free vertex still has unknowns to count.
@@ -1705,11 +1805,14 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
       // out of its declared domain is not an answer — the next attempt is tried. A SIGN about a free
       // direction is the same kind of preference over attempts (the seeding, applied to the result): a
       // root with the wrong sign is not the one the sentence names; the post-hoc check keeps the last word.
+      // The scale the figure was SAMPLED at (#1620 S7, ADR-AG-213): a whole-figure collapse takes a
+      // span-relative floor down with it, so the floor is never smaller than the start's.
+      const sampledScale = figureScale(solved.positionsAt(solved.toVec(seeded, env)), env, solved.syms);
       const admissible = (x: number[]) => {
         const e = solved.envAt(x);
         // An open bound is judged at the solver's resolution, never exactly (#1504): a radius the
         // givens drive to zero converges to ~1e-10 and must not read as positive.
-        const floor = openBoundFloor(solved.positionsAt(x), e, solved.syms);
+        const floor = openBoundFloor(solved.positionsAt(x), e, solved.syms, sampledScale);
         if (!solved.syms.every((sym) => inDomain(domains.get(sym) ?? {}, e[sym], floor))) return false;
         for (const sel of c.selectors) {
           if (sel.kind !== 'sign') continue;
@@ -1960,6 +2063,33 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
       }
     }
   }
+  /**
+   * A WHOLE FIGURE SHRUNK TO A POINT IS NOT A SOLUTION (#1620 S7, ADR-AG-213 amendment 1).
+   *
+   * A figure with no stated magnitude meets a contradiction in the LIMIT of collapsing: «AC קוטר» and the
+   * tangents at A and C stated to meet (they are parallel) drove A, C and D onto one point — every residual
+   * zero, and every scale-relative judge (the `distinct` selector's `apartOf`, the open-bound floor) measured
+   * against the collapsed span, so each one held. The reference those judges lack is the figure the solve
+   * STARTED from: a solve that ends with the figure's extent (`figureScale` — its points and its parameters)
+   * below the solver's resolution of the extent it was sampled at has reached the degenerate limit, not a
+   * configuration. Nothing stated can make that legitimate — two named points on one position is what #1113
+   * forbids — and a figure whose sample was already a point (coincident stated coordinates) never triggers.
+   * Blame lands on the LAST given (ADR-492's shortest infeasible prefix, as the thin-ring arm above).
+   */
+  if (unsatisfied.length === 0 && c.constraints.length > 0 && (ids.length > 0 || sys.syms.length > 0)) {
+    const startScale = figureScale(place(c, sampledEnv, seeded), sampledEnv, sys.syms);
+    const solvedPos = place(c, env, free);
+    // Only while the figure still has FREEDOM: a coincidence the givens force (no freedom left) is #1254's
+    // `crossing-already-named` arm in derive, which names the point already there.
+    if (
+      solvedPos.size >= 2 &&
+      figureScale(solvedPos, env, sys.syms) < SOLVE_RESOLUTION * startScale &&
+      figureDofOf(c, sys, solvedVec) > 0
+    ) {
+      unsatisfied.push(c.constraints[c.constraints.length - 1]);
+    }
+  }
+
   const placed = new Map<Id, Pt>(free);
   const at = (id: Id): Pt | null => placed.get(id) ?? null;
 
@@ -2099,7 +2229,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
         // and a crossing ring can offer a sentence about it.
         const curve = lineAtCurve(c, env, at, o);
         if (curve) {
-          curves.push({ id: o.id, label: { name: o.name ?? '', kind: 'line' }, curve, stated: true });
+          curves.push({ id: o.id, label: { name: o.name ?? '', kind: 'line' }, curve, stated: o.drawn !== false });
         } else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
@@ -2721,6 +2851,7 @@ export function holdsInEveryConfiguration(c: Construction, ks: readonly Constrai
   pool.fill();
   const holds = (k: Constraint, f: Figure): boolean => {
     if (k.t === 'choice') return k.options.some((o) => holds(o, f));
+    if (k.t === 'all') return k.of.every((o) => holds(o, f));
     const pos = new Map<Id, Pt>(f.points.map((p) => [p.id, { x: p.x, y: p.y }]));
     const at = (id: Id): Pt | null => pos.get(id) ?? null;
     const r = residual(k, at, f.env, curveAtOf(c, f.env, at), lineAtOf(c, f.env, at));

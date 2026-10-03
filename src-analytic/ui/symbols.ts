@@ -15,19 +15,22 @@
  * entry through the real grammar with a totality guard so a new button cannot be added without a
  * proof. That is the #511 rule: a builder must never offer a glyph it refuses in every position.
  *
- * ## What is deliberately NOT here
+ * ## What is deliberately NOT here (#1696, ADR-AG-212)
  *
- * `°` and `∡` are held by the ruling above. Their capability is unbuilt — 02c §5d marks «∡ACB = 90°»
- * as ✗ — and a chip that inserts a character the grammar then refuses hands the student
- * `not-handled` on their own click. They join the day the angle capability lands, in that work's own
- * PR, because a chip is part of shipping a notation rather than a follow-up to it.
+ * The 2-D chips whose sentences analytic does not read yet — measured, and locked as still refused in
+ * `symbols-module.test.ts`, so the day one parses the lock goes red and the chip is owed:
+ * the Greek angle names α β γ δ θ, `S_{}` and `<` between two measures (slice D, #1621);
+ * `△` `≅` `~` and `⌢{}` (slice E, #1622). A chip inserting a character the grammar then refuses
+ * hands the student `not-handled` on their own click, so each joins in its notation's own PR.
+ * `xⁿ` is not offered: `²` and `³` cover the exam's powers and `^` is on every keyboard.
  */
 import type { SymbolSpec } from '../../shell/symbols';
 
 export const SYMBOLS: readonly SymbolSpec[] = [
   // The six that shipped inline, unchanged in label and in insert text.
   { label: '²', titleKey: 'symSq', before: '²' }, // #1348: the face IS the payload (the grammar reads ² as ^2)
-  { label: '√', titleKey: 'symSqrt', before: '√' },
+  // #1696 — 2-D's wrapping radical: select «2/3», press it, get «√(2/3)», so the radicand is explicit.
+  { label: '√()', titleKey: 'symSqrt', before: '√(', after: ')' },
   { label: 'ℓ', titleKey: 'symEll', before: 'ℓ' },
   { label: '≤', titleKey: 'symLe', before: '≤' },
   { label: '≥', titleKey: 'symGe', before: '≥' },
@@ -50,4 +53,14 @@ export const SYMBOLS: readonly SymbolSpec[] = [
   { label: '|x|', titleKey: 'symAbs', before: '|', after: '|' },
   { label: 'd_{}', titleKey: 'symDist', before: 'd_{', after: '}' },
   { label: 'x_{}', titleKey: 'symComponent', before: 'x_{', after: '}' },
+  /**
+   * #1696 (ADR-AG-212) — the 2-D palette's relation and angle chips, now that analytic reads every one of
+   * them: «AD ⊥ BC», «AB ∥ CD» (#1160, slice C #1620), «∠ABC = 37» (#1330 — the same lowering as «∢» and
+   * «זווית»), and «∢ABC = 90°» (the angle capability that held `°` on 2026-09-16 has since landed).
+   * Operator, playing PR #1695: *"analytics tool doesnt have parallel and perpendiculatr symbols"*.
+   */
+  { label: '⊥', titleKey: 'symPerp', before: '⊥' },
+  { label: '∥', titleKey: 'symPar', before: '∥' },
+  { label: '∠', titleKey: 'symAngle', before: '∠' },
+  { label: '°', titleKey: 'symDeg', before: '°' },
 ];

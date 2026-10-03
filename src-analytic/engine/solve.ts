@@ -79,7 +79,13 @@ export type Direction =
    * one perpendicularity, never a tangent-at kind of its own. The centre is read off the RESOLVED circle,
    * so a circle stated by its equation, by its centre point or computed from points is the same operand.
    */
-  | { k: 'radius'; circle: Id; at: Id };
+  | { k: 'radius'; circle: Id; at: Id }
+  /**
+   * THE BISECTOR OF THE ANGLE (a, v, b) — «חוצה זווית ABC» drawn on its own (#1284, ADR-AG-209; 2-D's `bisector`
+   * command with `visible`). The sum of the two unit rays from `v`, so the line through `v` along it is the
+   * internal bisector: a direction operand like the radius, read off the figure at every iterate.
+   */
+  | { k: 'bisector'; v: Id; a: Id; b: Id };
 
 /** An angle named by three points: the vertex and the ends of its two rays (#1331). */
 export interface AngleRef {
@@ -344,7 +350,14 @@ export type Constraint =
    * or «M מפגש התיכונים» about an existing point is the same statement and not a per-rule list.
    */
   | { t: 'derived-at'; id: Id; rule: DerivedRule }
-  | { t: 'choice'; options: Constraint[] };
+  | { t: 'choice'; options: Constraint[] }
+  /**
+   * ONE OPTION THAT IS SEVERAL STATEMENTS (#1620, ADR-AG-208) — «every vertex on some axis» chooses an axis for
+   * EACH vertex, and the choices are not independent options of separate `choice`s (those cycle together, on one
+   * seed index): the option is the whole assignment. Only ever an option of a `choice`, and flattened with it by
+   * {@link resolveChoices}, so nothing downstream measures one.
+   */
+  | { t: 'all'; of: Constraint[] };
 
 /**
  * The constraints as THIS configuration sees them — every discrete choice resolved by the seed.
@@ -355,6 +368,7 @@ export type Constraint =
  */
 export function resolveChoices(ks: readonly Constraint[], seed: number): Constraint[] {
   return ks.flatMap((k) => {
+    if (k.t === 'all') return resolveChoices(k.of, seed);
     if (k.t !== 'choice') return [k];
     if (k.options.length === 0) return [];
     return resolveChoices([k.options[((seed % k.options.length) + k.options.length) % k.options.length]], seed);
@@ -386,7 +400,7 @@ export function resolveChoices(ks: readonly Constraint[], seed: number): Constra
  */
 export function canonicalConstraint(k: Constraint): string {
   const dir = (d: Direction): string =>
-    d.k === 'points' ? `p:${[d.a, d.b].sort().join(',')}` : d.k === 'axis' ? `a:${d.axis}` : d.k === 'curve' ? `c:${d.id}` : d.k === 'radius' ? `r:${d.circle},${d.at}` : `f:${d.sym}`;
+    d.k === 'points' ? `p:${[d.a, d.b].sort().join(',')}` : d.k === 'axis' ? `a:${d.axis}` : d.k === 'curve' ? `c:${d.id}` : d.k === 'radius' ? `r:${d.circle},${d.at}` : d.k === 'bisector' ? `b:${d.v},${[d.a, d.b].sort().join(',')}` : `f:${d.sym}`;
   if (k.t === 'relation') {
     // Both relations are symmetric in their operands: `u ∥ v` is `v ∥ u`, and likewise for ⊥.
     const [u, v] = [dir(k.u), dir(k.v)].sort();
@@ -431,6 +445,7 @@ export function canonicalConstraint(k: Constraint): string {
   // A choice is its options, each the statement it is (#1667): a right triangle's seats are built with their
   // rays sorted by letter, so the same seat must not read as a different option because a letter changed.
   if (k.t === 'choice') return `choice|${k.options.map(canonicalConstraint).join('||')}`;
+  if (k.t === 'all') return `all|${k.of.map(canonicalConstraint).sort().join('&&')}`;
   if (k.t === 'angle') return JSON.stringify({ ...k, at: ray(k.at) });
   if (k.t === 'angle-ratio') return JSON.stringify({ ...k, left: ray(k.left), right: ray(k.right) });
   return JSON.stringify(k);
@@ -484,6 +499,8 @@ export function constraintRefs(k: Constraint): Id[] {
       return [k.id, ...parentsOf(k.rule)];
     case 'choice':
       return [...new Set(k.options.flatMap(constraintRefs))];
+    case 'all':
+      return [...new Set(k.of.flatMap(constraintRefs))];
     default: {
       const unreferenced: never = k;
       throw new Error(`constraint declares no refs: ${JSON.stringify(unreferenced)}`);
@@ -514,6 +531,8 @@ function describeRule(r: DerivedRule): string {
       return `נקודת ההשקה של ${r.a} ו-${r.b}`;
     case 'side-touch':
       return `נקודת ההשקה של ${r.circle} עם ${r.a}${r.b}`;
+    case 'foot':
+      return `רגל האנך מ-${r.from}`;
     default: {
       const undescribed: never = r;
       throw new Error(`rule has no description: ${JSON.stringify(undescribed)}`);
@@ -560,6 +579,8 @@ export function describeConstraint(k: Constraint): string {
       return `${k.id} = ${describeRule(k.rule)}`;
     case 'choice':
       return k.options.map(describeConstraint).join(' או ');
+    case 'all':
+      return k.of.map(describeConstraint).join(' ו');
     default: {
       const undescribed: never = k;
       throw new Error(`constraint has no description: ${JSON.stringify(undescribed)}`);
@@ -608,6 +629,8 @@ export function constraintCurveRefs(k: Constraint): Id[] {
       return curveParentsOf(k.rule);
     case 'choice':
       return [...new Set(k.options.flatMap(constraintCurveRefs))];
+    case 'all':
+      return [...new Set(k.of.flatMap(constraintCurveRefs))];
     default:
       // EXHAUSTIVE BY DEFAULT, deliberately — unlike `constraintRefs`, whose `never` arm forces every
       // new kind to declare its points. A constraint kind that names no curve is the common case, and
@@ -623,6 +646,8 @@ export function dirRefs(d: Direction): Id[] {
     // The point the radius runs to; the circle is a CURVE ref (`constraintCurveRefs`), never a point.
     case 'radius':
       return [d.at];
+    case 'bisector':
+      return [d.v, d.a, d.b];
     case 'axis':
     case 'curve':
     case 'free':
@@ -650,6 +675,8 @@ function describeDir(d: Direction): string {
       return 'ישר';
     case 'radius':
       return `הרדיוס ל-${d.at}`;
+    case 'bisector':
+      return `חוצה הזווית ${d.a}${d.v}${d.b}`;
     default: {
       const undescribed: never = d;
       throw new Error(`direction has no description: ${JSON.stringify(undescribed)}`);
@@ -701,6 +728,18 @@ export function dirVector(
       const p = at(d.at);
       if (!c || c.kind !== 'circle' || !p) return null;
       v = { x: p.x - c.cx, y: p.y - c.cy };
+      break;
+    }
+    case 'bisector': {
+      // The sum of the two UNIT rays: the internal bisector's direction. A ray of no length judges nothing.
+      const v0 = at(d.v);
+      const a = at(d.a);
+      const b = at(d.b);
+      if (!v0 || !a || !b) return null;
+      const la = Math.hypot(a.x - v0.x, a.y - v0.y);
+      const lb = Math.hypot(b.x - v0.x, b.y - v0.y);
+      if (la < 1e-12 || lb < 1e-12) return null;
+      v = { x: (a.x - v0.x) / la + (b.x - v0.x) / lb, y: (a.y - v0.y) / la + (b.y - v0.y) / lb };
       break;
     }
     case 'curve': {
@@ -983,6 +1022,7 @@ export function residualRows(
      * only one, which is the defect the kind exists to prevent.
      */
     case 'choice':
+    case 'all':
       throw new Error('a choice must be resolved by resolveChoices() before it is measured');
     default: {
       const unmeasured: never = k;

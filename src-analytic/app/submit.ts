@@ -105,12 +105,21 @@ const objectsGained = (before: Derivation, after: Derivation): number =>
  * is already the crossing of AB is a statement about that P (#1046), and «לא נמצאה תצורה» beside a
  * visible free crossing reads as the figure's fault when the letter is the problem.
  */
-const subjectIdsOf = (parsed: { facts: readonly Fact[] }): string[] =>
-  parsed.facts.flatMap((f) => {
+const subjectIdsOf = (parsed: { facts: readonly Fact[] }): string[] => {
+  /**
+   * A TOUCH POINT IS REFERRED TO, NOT DEFINED (#1620 S7, ADR-AG-213 amendment 1). «המשיק בנקודה A …» declares A
+   * only so a tangent at a point the figure lacks can be built (introduce-if-absent); the sentence is about the
+   * tangent and where it meets, never a new point A. Counted as a subject, A — already a diameter's end — drew the
+   * «A כבר מוגדרת … בחרו אות אחרת» hint on parallel tangents, blaming a letter the student used correctly.
+   */
+  const touched = new Set(parsed.facts.flatMap((f) => (f.t === 'tangent-line-at' ? [f.at] : [])));
+  return parsed.facts.flatMap((f) => {
+    if (f.t === 'declare' && touched.has(f.id)) return [];
     if (f.t === 'point' || f.t === 'derived' || f.t === 'declare') return [f.id];
     if (f.t === 'constraint' && (f.k.t === 'on-curve' || f.k.t === 'on-line-2pt')) return [(f.k as { id: string }).id];
     return [];
   });
+};
 
 /** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
 const definingLineOf = (lines: readonly string[], id: string): string | null => {
@@ -120,6 +129,8 @@ const definingLineOf = (lines: readonly string[], id: string): string | null => 
     const ids = new Set<string>([
       ...subjectIdsOf(p),
       ...p.facts.flatMap((f) => (f.t === 'polygon' ? f.vertices : [])),
+      // A tangent sentence that INTRODUCED its touch point still defines it (ADR-AG-213 am. 1).
+      ...p.facts.flatMap((f) => (f.t === 'tangent-line-at' ? [f.at] : [])),
     ]);
     if (ids.has(id)) return l;
   }
@@ -182,7 +193,16 @@ export function decideSubmit(
      * no verb in front yields no candidates at all.
      */
     if (!parseLine(candidate.remainder).ok) continue;
-    if (decideSubmit(candidate.remainder, lines, seed, current).kind === 'record') {
+    /**
+     * #1620 (ADR-AG-206) — for the EXAM's construction register, a sentence the figure ALREADY HOLDS is
+     * taught too. The exam restates its givens in imperative form («בחרו נקודה E כרצונכם, הנמצאת על הצלע
+     * DC» after «במלבן ABCD, הנקודה E נמצאת על הצלע DC», 2/4), and refusing it would tell the student the
+     * tool cannot read a sentence it reads perfectly. The pre-filled sentence is still one the next Enter
+     * ACCEPTS — it answers «already known» there, recording nothing, which is the honest answer about it.
+     * The tool wrapper («הוסף …») keeps #1353's stricter promise: what it teaches, the next Enter records.
+     */
+    const next = decideSubmit(candidate.remainder, lines, seed, current).kind;
+    if (next === 'record' || (candidate.exam && (next === 'already-known' || next === 'already-follows'))) {
       return { kind: 'teach', verb: candidate.verb, canonical: candidate.remainder };
     }
   }
@@ -488,3 +508,24 @@ export const reachesFallback = (verdict: SubmitVerdict): boolean =>
   // answers, so it keeps the deterministic refusal and never costs a call. `not-handled` carries the
   // student's own line as its detail (the #1272 lock), so the predicate needs nothing more.
   hasConstructionSignal(verdict.error.detail ?? '', VOCABULARY_ANALYTIC);
+
+/**
+ * THE LINES A STUDENT ENDS UP WITH when they type `typed` one at a time and confirm every lesson
+ * (#1620, ADR-AG-206).
+ *
+ * A taught imperative is never recorded as typed: the box is pre-filled with `canonical`, and one Enter
+ * records THAT. So the honest coverage of an exam's text is the coverage of what this function returns —
+ * each line as typed, except where {@link decideSubmit} teaches, where it is the sentence taught. The
+ * corpus ratchet calls this rather than re-implementing the teaching ("locks must call, not reproduce"),
+ * so a change to the register moves the count the moment it moves what students see.
+ *
+ * Each decision sees the lines before it AS CONFIRMED, exactly as the session would hold them.
+ */
+export function confirmTaught(typed: readonly string[], seed: number): string[] {
+  const out: string[] = [];
+  for (const line of typed) {
+    const v = decideSubmit(line, out, seed);
+    out.push(v.kind === 'teach' ? v.canonical : line);
+  }
+  return out;
+}

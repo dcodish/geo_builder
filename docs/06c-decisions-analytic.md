@@ -9272,6 +9272,258 @@ The figure-level check (`constructionShape` + faults, ADR-AG-191) still guards e
 
 **Consequences.** `engine/carriers.ts` (`radiusSymbol`, `relabelSymbol`), `engine/solve.ts` (`canonicalConstraint` reads a `choice`), `parser/parseAnalytic.ts` (`circleAtFacts` calls `radiusSymbol`; `ANON_ID_RE`), `app/rename.ts` (`renameIds`, `statementOf`, `upToAnonymous`, `constructionShape`). Sibling check (docs/17 §1): 2-D and 3-D rename by fact rewrite (`renameFacts`, `renameFacts3`) over typed ids, with no symbol spelled from a letter and no line-level parse comparison — this class has no sibling instance.
 
+## ADR-AG-207 — The perpendicular from a point is its foot; a line through a point may cut a side in the same sentence; «האנך» refers to the one drawn (#1620 slice C, stream S2)
+
+**Status:** accepted · 2026-10-02 · #1620 slice C, stream S2 (branch `feat/1620-s2-perpendiculars` off `feat/1620-construction-vocabulary` @ 92881500). Standing rulings applied: analytic gives 2-D's experience for plane geometry (2026-10-02, #1649/#1669); the exam's imperatives are TAUGHT onto these declarative sentences by stream S1 (ruling on #1620, 2026-10-01; ADR-W-030); an unnamed foot takes a tool letter (#1222 ruling 2026-09-19, *"invent a letter in this case. the user can always change it"*).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R141 (new) — the perpendicular from a point, its foot, the line through a point cutting a side, «האנך» as a reference, a side as the subject of two predicates. · **Design:** [04c](04c-design-analytic.md) — new section "The perpendicular from a point, and the line through a point that cuts a side". · **LADDER stage:** parse (`parsePerpendicular`, `parseThroughLine`'s crossing tail, the piece shared-subject frame) and M1 (`on-kind perpendicular`, the carrier `line-at` upgrade); a new `DerivedRule` (`foot`, closed form). No solver change.
+
+**Cites** [ADR-AG-009](#adr-ag-009) B4 (derived points), #1093 (`דרך P עובר ישר`), #1153 (one position, one name), #1281 / #1263 (the mint, said on the row), [ADR-AG-191](#adr-ag-191) (a rename materialises a tool letter), [ADR-AG-195](#adr-ag-195) («המשיק» as a contextual reference), [ADR-AG-198](#adr-ag-198) (a relation's operands are references), [ADR-052](06-decisions.md#adr-052), #1074 (naming a segment introduces its ends), 2-D's `foot` object and its #1233 / #1247 foot rules.
+
+**Context — measured at pickup (92881500).** Every perpendicular sentence of the 471 corpus was `not-handled`; the only perpendicular the tree could draw was a whole LINE through a point («דרך P עובר ישר מאונך …»), with no foot. 2-D's verdicts, through `decideDeterministic2D`:
+
+| sentence (after «משולש ABC» / «מרובע ABCD») | 2-D | analytic before | analytic after |
+|---|---|---|---|
+| «F רגל האנך מ-C ל-AD» / «D רגל האנך מ-C ל-AB» | builds (`foot`) | `not-handled` | builds (`foot`) |
+| «האנך מ-C ל-AB» | builds — foot lettered «F» + segment CF | `not-handled` | builds — foot «P₁» + segment |
+| «האנך מהקודקוד C לצלע AB חותך אותה בנקודה D» | `not-handled` (dropped) | `not-handled` | builds |
+| «ישר דרך P מאונך / מקביל ל-AB» (after «נקודה P») | builds | `bad-operand` | builds |
+| «אנך אמצעי ל-AB» | builds — midpoint «M» + line | `not-handled` | builds — midpoint «P₁» + line |
+| «דרך E עובר ישר מקביל ל-AC החותך את הצלע AB בנקודה F» | builds — line hidden, segment FE | `bad-operand` | builds, the same drawing |
+| «הישר העובר דרך הנקודה E מקביל ל-AC וחותך את הצלע AB בנקודה F» | refused (`unresolved par-F-AC`) | `bad-operand` | builds |
+| «E על האנך» / «E על האנך מ-A ל-BC» | `not-handled` | `not-handled` | builds |
+| «הקטע EF מקביל ל-AC» (F new) | refused («cannot place E … so that EF ∥ AC») | `unknown-reference` | builds — F free on the parallel |
+| «המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D» (empty canvas) | builds | `not-handled` | `not-handled` (not built — below) |
+
+The 16/5 line «הצלע CB מקבילה לציר ה-x, וחותכת את ציר ה-y בנקודה E» was `bad-operand`. **Root cause:** a straight piece that is the subject of two coordinated predicates loses its subject in the second («…, וחותכת …»); the frame restored an elided subject only for a POINT subject and for «המעגל», so the relation rule claimed the whole line and refused «ציר ה-x, וחותכת …» as its operand.
+
+**The class (docs/17 §1).** *A construction the exam performs ON a stated object — dropping a perpendicular, drawing a line through a point to a side — had no sentence and no object, so every one of its spellings missed every rule; and a sentence whose subject is shared by two predicates was split for only two subject kinds.*
+
+**Decision.**
+1. **The foot is a derived point** — `DerivedRule { t: 'foot'; from; onto }`, `onto` an axis, a two-point line, or a line OBJECT (named, equation, constructed, a tangent). Closed form (`evalRule`), 0 DOF, exhaustive in every rule switch (`parentsOf`, `curveParentsOf`, `ruleLabel`, `describeRule`, `sameDerivation`, `constructionOf` — the perpendicular itself is its construction). A pair is the LINE through it, as 2-D's foot is. M1's derived checks apply unchanged: a foot restated about an existing point is `derived-at` (a right angle, 2-D's #1247), a second name for one foot is #1153's `already-named`.
+2. **The sentences** (`parsePerpendicular`): «האנך מ-P ל-X» — the foot and the piece P→foot; «… חותך אותו / את X בנקודה D» and «D רגל האנך מ-P ל-X» — the foot named (the «רגל» form draws no piece, as in 2-D); the plural «האנכים מהקודקודים A ו-C ל-X חותכים אותו בנקודות E ו-F בהתאמה» — one per point; «אנך אמצעי ל-AB» — the midpoint and the line through it ⟂ AB. The descriptive verb clause («האנך שהורידו / המורד מ…») is part of the noun phrase. English: "the perpendicular from C to …", "D is the foot of the perpendicular …", "the perpendiculars from A and C … respectively", "the perpendicular bisector of AB". A cut naming a DIFFERENT line is not this rule's sentence (`null`). Refused by name: a point of the line itself or the point as its own foot (`degenerate-role`), an unreadable line (`bad-operand`), an unknown point (`unknown-reference`).
+3. **The tool letter goes through the one mint.** An unnamed foot or midpoint carries a placeholder (`@mint:foot(B|axis-x)`); `resolveMints` gives it the name of the same derivation stated EARLIER by the student, else the next `P₁…`, and says so on the row (`minted`). A later naming is #1153's refusal naming `P₁` — never a re-lettering of an earlier line (the figure stays stable, and a `known` line would not be recorded). The rename materialises the letter as «… חותך אותו בנקודה P₁» (a new `namingCandidates` form, proven by fold like the others). A segment to a minted point is re-keyed to its canonical id after minting.
+4. **A line through a point may cut an object in the same sentence**: «דרך E עובר ישר מקביל ל-X החותך את הצלע AB בנקודה F», «הישר העובר דרך הנקודה E מקביל ל-X וחותך את …», «ישר דרך P מאונך ל-AB» (the line-first spellings), "the line through E parallel to … cuts side AB at F". The line is the `line-at` it always was; the crossing is `parseIntersectionPlain`'s own lowering over it, so «הצלע» bounds F to the side. As in 2-D the line is then a CARRIER (`drawn: false` on `line-at`, `stated: false` in the figure) and the piece EF is drawn. A later sentence stating the line itself upgrades the carrier (`narrowed`), never a second line.
+5. **«האנך» is a contextual reference** (`on-kind { kind: 'perpendicular', foot? }`): the one `foot` in the figure, narrowed by the description when one is given; it lowers to the point on the line from the foot's point through the foot. None or several is `ambiguous-shape` with a new host kind `perpendicular` (its own he/en messages) — the «המשיק» rule. It reads as an operand wherever `incidenceOn` does: «E על האנך …», «המשיק והאנך נחתכים בנקודה D». The English relation rule no longer reads «the perpendicular» after an article as the verb.
+6. **A straight piece as a shared subject** (`sharedSubjectClauses`): «<side | segment | line | pair> <verb> …, ו<verb> …» is the two sentences with the subject written in, cut only before a piece's verb — the circle case one noun over.
+7. **«הקטע EF מקביל ל-DA» names the segment** (#1074), so the ends of a «הקטע» operand of a relation are introduced (and the frame's «X מקביל ל-Y» rewrite keeps the «הקטע» noun it used to drop). Corpus 2/4 draws EF through E before F is placed; F is a free point the relation constrains to the parallel (ADR-052), and «F על הצלע AB» pins it. «הצלע», «הישר» and the bare pair still REFER (ADR-AG-198, #1028). **This narrows ADR-AG-198 for the one noun that names**, and is flagged for the operator. **Operator ruling 2026-10-02 (asked during integration, recorded on #1620):** *"Create F"* — «הקטע EF» introduces its new end, free along the parallel through E. **Amended at integration:** with ADR-AG-210 (#1670 row 4 / #1686, merged from main) a bare pair, «הצלע» and «הישר» mint their new end too — a two-pair relation mints, 2-D's rule — so every spelling introduces F (rows `an-1620-perp-06…06d`). 2-D owes all four: it refuses them with a solver conflict, not by rule (#1677).
+
+**Locks** (`issue-1620-perpendiculars.test.ts`, 27): the foot on the axis and on a side's line with the ⟂ residual at 8 seeds; seven spellings of the named foot are one point; the plural in order; 2-D's «F רגל האנך מ-C ל-AD»; ADR-052 (the triangle still moves with the seed); **stability** — the perpendicular, the named foot and the plural move no drawn point at 8 seeds; a perpendicular stated twice is one foot, a foot named earlier keeps its name, named later is `already-named` (holder P₁); the rename to D rewrites the sentence; four refusals; the perpendicular bisector (midpoint, the line's normal ∥ AB) and an earlier «M אמצע AB» reused; three spellings of the line through a point cutting a side — F on the parallel, BETWEEN A and B, the line a carrier and EF drawn, at 8 seeds; the carrier upgraded by «דרך E עובר ישר …»; «ישר דרך P מאונך ל-AB»; the crossing at the line's own point refused; «E על האנך» by three spellings; none / several / a non-matching description refused, and a description picking one of two; 16/5's shared subject with and without the comma; «הקטע EF» introducing F while «EF ∥ AC» and «הצלע EF …» still refuse; and the corpus questions typed in order through `decideSubmit` (S1's taught sentences in place of the imperatives): **5/5** D (1, 7.75), E (1, 1.5); **16/5** as printed, E (0, 10) between C and B, AB ⊥ AC; **17/4** D the foot of C, CD/OB = 5/2; **20/4** E (4, 0), F (−4, 0); **2/4** F on AB with EF ∥ DA; **21/5** B (10, 0), A (0, 40/3); **13/4** and **14/4** less their slice-D line. **Fails before: 25 of 27** (the 2 controls: ADR-052's seed variation, and 21/5, which already lands with S1's taught tangent).
+
+**Parity** (`shell/__tests__/fixtures/geo-input-parity.ts`): `cat-2d-042`, `-045`, `-046` and `-053` lose their analytic gap (3-D's #1679 gaps kept). New rows `an-1620-perp-01…07`: 01 and 04 agree with 2-D; 02, 03, 05, 06 and 07 are analytic-ahead rows with 2-D's gap on #1677 (2-D escalates or refuses them); each carries 3-D's #1679 gap or the X8 exception.
+
+**Measured.** 471 corpus as printed (seed 0): **219/263 lines, 22/46 questions** (was 217 / 21) — 16/5 lands (its line 3, and line 6 «וכי DO/DE = 2/3», which waited on E). With S1's taught sentences in place of the imperatives, 2/4, 5/5, 17/4, 20/4 and 21/5 land too; 13/4 and 14/4 then miss only their «שיעור ה-y …» line (slice D). Every new sentence records in ≤ 15 ms.
+
+**Not built, said out loud.**
+- **`cat-2d-111`** «המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D» on an empty canvas stays `not-handled` (its gap kept on #1620): it needs a tangent sentence to CREATE an absent named circle (the #1670 create path, stream S5a) and the verb «נפגשים» over two crossing operands, whose reading of «AC ו-BD נפגשים» belongs to stream S3's diagonals. Left for after both merge.
+- **Stability under a new constrained FREE point** is a property of the analytic solve, not of these sentences: a crossing or relation that adds a free point re-solves jointly and can move earlier free vertices (measured on the base: «AD גובה לצלע BC» moves A by 12.4 at seed 0; «F נקודת החיתוך של הישר AB עם הישר CD» moves B by 5.2). The line-through-a-side crossing and «E על האנך» inherit it; the foot (derived) does not. Recommend an issue for the solve.
+- 5/5 typed in order refuses its own line 2 («הישר MB …» names B a line before «B(1;14)» gives it); the fold's deferral lands it in the ratchet. Outside this stream.
+- The perpendicular bisector's tool-lettered midpoint has no naming form for the rename (`rename-not-typed`); naming it first («M אמצע AB») works.
+
+**Consequences.** `engine/derived.ts` (`foot`, `FootLine`), `engine/sameDerivation.ts`, `engine/solve.ts` (`describeRule`), `engine/types.ts` (`PerpRef`, `on-kind.foot`, `line-at.drawn`), `engine/apply.ts` (the `on-kind` perpendicular arm, the carrier upgrade, a foot's line-object parent, `HostRef` `perpendicular`), `engine/evaluate.ts` (a carrier is not stated), `engine/derive.ts` (`resolveMints` for a derived point), `parser/parseAnalytic.ts` (`parsePerpendicular`, `perpendicularRef`, `THROUGH_LINE_FIRST_HE`, the crossing tail, the «הקטע» relation operand, `RELATION_EN`), `parser/frameAnalytic.ts` (the piece shared subject; the «הקטע» noun kept), `app/rename.ts` (`namingCandidates`), `app/errorText.ts` + `i18n` (the perpendicular host), `parser/catalogAnalytic.ts` (ten entries). Sibling check (docs/17 §1): 2-D is the reference and has the foot, the perpendicular bisector and the hidden-line crossing; it lacks «… חותך אותה בנקודה D», «הישר העובר דרך … וחותך …», «E על האנך» and introducing F in «הקטע EF מקביל ל-AC» — recorded as #1677 rows; 3-D has no feet (#1679).
+## ADR-AG-208 — An extension is a selector; named diagonals meet where they are named; the midsegment names its midpoints as 2-D does; «כך ש-» is a condition, never dropped (#1620 S3)
+
+**Status:** accepted · 2026-10-02 · slice C stream S3 (branch `feat/1620-s3-diagonals-extensions` off `feat/1620-construction-vocabulary` = `main` @ 92881500).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R142. · **Design:** [04c](04c-design-analytic.md) — "Extensions, named diagonals, the midsegment, a condition after a placement". · **LADDER stage:** a new selector (`beyond`) judged and seeded beside `between`; no residual change. `Constraint.all` exists only inside a `choice` and is flattened before anything measures it.
+
+**Cites** [ADR-AG-021](#adr-ag-021) (the diagonal meet is closed, vacant when concave), #1073 (a side is a collinearity plus a `between` selector), [ADR-AG-197](#adr-ag-197) (a dead choice option is skipped at the same samples), [ADR-AG-198](#adr-ag-198) (a sentence that names a piece draws it), [ADR-AG-200](#adr-ag-200) (role nouns state their claims through `incidenceOn`), 2-D's ADR-054 (an extension runs past the second-named end) and ADR-199 / ADR-222 (the midsegment and its M, N) in [06](06-decisions.md).
+
+**Context — measured at pickup (seed 0, `derive` / `decideSubmit`).** 471 corpus 217/263 lines, 21/46 questions. `not-handled`: 10/5 «האלכסונים AC ו-BD נפגשים בנקודה E»; 21/4 «אלכסוני הטרפז נפגשים בנקודה M, שנמצאת על ציר ה-y» and «הנקודה F נמצאת על המשך הצלע CD כך ששטח המשולש BFC גדול פי 2 משטח המשולש BCD»; 23/4 «E היא נקודת החיתוך של אלכסוני הדלתון» (and so «F על הקטע EC» `unknown-reference`); 1/5 «המשכי הצלעות AD ו-BC נפגשים בנקודה E»; 17/5 «הנקודה A נמצאת על המשך ME» (and so «AB שווה לרדיוס» `unknown-reference`); 18/4 «שכל קודקודיו מונחים על הצירים» and «E על המשך הצלע BC ונתון כי DE = DC»; 4/5 «E על צלע BC כך ש-AE = AC». «האלכסון AC (במרובע ABCD)» `not-handled`. Parity gaps: cat-2d-035, -054, -055, -137, diag-meet. The issue's "`ambiguous-shape` on a diagonal meet with one trapezoid" no longer reproduced (3/4 and 8/4 land) — but `meet-of` ignored the NOUN: «אלכסוני הטרפז» beside a plain quadrilateral asked, and in a figure with only a kite it resolved to the kite.
+
+**2-D's verdicts, measured (`decideDeterministic2D` + the store) and followed.** «E על המשך BC» → `point-on-segment` t > 1 past C, segments BC and CE drawn, the ends introduced on an empty canvas; «המשכי AD ו-BC נפגשים ב-E» → the meet past D and past C (`dir1`/`dir2`); «המשך AC חותך את מעגל O …» → `extend-onto-circle`; «E על BC כך ש-AE = AC» → the incidence plus `set-equal`; «האלכסונים AC ו-BD …» → the meet, both segments drawn (on an empty canvas too); «אלכסוני הטרפז …» → the trapezoid (a right trapezoid is one), `ambiguousShape` with two, `shapeNotFound` with none; «קטע האמצעים לצלע BC במשולש ABC» → midpoints M (AB), N (AC) and MN; «קטע האמצעים בטרפז ABCD» → the midpoints of BC and DA. 2-D's own defects found on the way were filed, not copied: #1682 (it drops «ונתון כי DE = DC» and «מעבר לנקודה B» after an extension) and #1683 (it reads «האלכסונים AB ו-CD» in ABCD as AC/BD).
+
+**The class (docs/17 §1).** *A point stated on a PART of a line, or at the meet of NAMED or CONTEXTUAL lines, had no sentence and one region missing* — the engine had the collinearity, the closed-form meet and the midpoint; the grammar and the region "past the end" were missing. And *a contextual shape noun did not select its rings* in two of its three readers (`meet-of`, `area-of`; the perimeter already used `ringsNamed`).
+
+**Decision.**
+1. **`Selector.beyond`** — past `b`, away from `a`, visibly (`t > 1`, distance ≥ `apartOf`). Judged in `failingSelectors` beside `between`; seeded past the end at a seed-varied distance when the point is free. One `extensionFacts` lowers every extension sentence: the side (introducing its ends, 2-D's verdict), `declare`, the unbounded incidence, the selector, the drawn piece end→point; the operand goes through `incidenceOn`, so «המשך השוק AD» states the leg's claim. «מעבר ל-X» picks the end (X must be one of the pair). «המשכי … נפגשים» / «המשך … והמשך … נפגשים» is two of them on one point; «המשך AC חותך את …» is the crossing sentence's own facts with the pair's incidence unbounded and the selector added.
+2. **`conditionClauses`** (frame) — «X כך ש-Y» / "X such that Y" → X and Y; «…בנקודה M, שנמצאת על …» → the sentence and «M נמצאת על …». Offered after the whole line fails and taken only when every clause parses: an unreadable condition refuses the line, and the placement is never kept alone. 21/4's area ratio is read by the existing length-expression grammar, so it is honoured, not refused.
+3. **Named diagonals** — `meet-of.named` (through `concurrencyOf`, so the verb form «… נפגשים בנקודה E» and the noun forms «E מפגש …» / «E היא נקודת החיתוך של …» are one reader); both segments drawn; a ring of the four vertices must have them as its diagonals — `not-a-diagonal` otherwise (new code, He/En). **The contextual noun** — `meet-of.noun`, resolved by `ringsNamed`, which now also matches a noun's refinements (`refines`: «טרפז ישר זווית» is a «טרפז», as 2-D stores it); `area-of` resolves through it too. «נקודת החיתוך של» joins «מפגש» as the concurrency head. «האלכסון AC (במרובע ABCD)» declares the segment (and the ring, checked non-adjacent).
+4. **The midsegment** — two `midpoint` derivations and their segment. Unnamed midpoints carry `FRESH_PREFIX` placeholders resolved in list order by `derive` (`resolveFresh`): an existing midpoint of the pair keeps its letter, else 2-D's preferred letters (M N P Q / N P Q S) not used by EARLIER lines, else a subscript; reported through `minted`. A trapezoid's legs are BC and DA — the pair its noun assumes parallel at the time of the sentence (2-D's reading too).
+5. **«שכל קודקודיו מונחים על הצירים»** (#1620 item 3) — `vertices-on-axes`, resolved at M1 over the one ring into ONE `choice` of the 2ⁿ axis assignments, each a conjunction (`Constraint.all`, new and only inside a choice: `resolveChoices` flattens it; `constraintRefs` / `canonicalConstraint` / `describeConstraint` / `holdsInEveryConfiguration` read it; `residual` refuses it as it refuses `choice`). A choice per vertex would cycle on one seed index and never mix the axes. Dead assignments are skipped by ADR-AG-197.
+
+**Locks** (`issue-1620-diagonals-extensions.test.ts`, 48): six extension spellings record; E on BC and past C at 8 seeds; «מעבר ל-B» past B at 8 seeds; the distance past the end takes more than two values (a free DOF); cat-2d-035 on an empty canvas; stability under a later line; a point placed inside the side `unsatisfiable`; an extension condition that cannot hold `unsatisfiable` on its line; 17/5 and 18/4 to the printed coordinates; five meet spellings; the meet on both lines past D and C at 8 seeds; parallel sides `unsatisfiable`; 1/5 (D = (−4, 6)); the circle extension at 8 seeds; 4/5 (E between, AE = AC = 15) at 8 seeds; three condition spellings carry the length given; 21/4 (F past D, area BFC = 2·BCD, M on the y-axis); an unreadable condition refuses the whole line and E is not drawn; named diagonals meet on AC and BD with both drawn; on an empty canvas; 10/5 (E = (3, 0)); sides named as diagonals `not-a-diagonal`; «נקודת החיתוך של אלכסוני הדלתון» ≡ the verb form; 23/4's E and «F על הקטע EC»; the noun selects the trapezoid beside a quadrilateral, a right trapezoid, two trapezoids ask, no trapezoid refused, the generic noun with two asks; the relative clause's given; «האלכסון AC» three ways; 8/5's taught sentence; a side as a diagonal refused (He, En); the triangle midsegment at 3 seeds named M, N; the trapezoid's legs; letters in use skipped and an existing midpoint kept; the student's letters; a later «M(1,2)» is the minted M; every vertex on an axis at 8 seeds with more than one assignment; the spellings record, no ring refused; the six completed corpus questions land whole. **Fails before: 44 of 48** (the 4 controls: two trapezoids ask, the generic noun with two asks, a right trapezoid alone, and the unreadable-condition refusal).
+
+**Parity** (`shell/__tests__/fixtures/geo-input-parity.ts`): cat-2d-035, cat-2d-054, cat-2d-055, diag-meet and cat-3d-001 (the «כך ש-» frame) move to parity for analytic. cat-2d-137 stays a gap, re-owned by **#1622**: the extension is read (row ext-circle-1620), and what is left is cat-2d-138's class — «מעגל P» names a circle the figure lacks, which 2-D creates. Fifteen rows added (`*-1620`); 3-D is a known gap (#1679) on eleven, and «האלכסון AC במרובע ABCD» is a 2-D gap (#1677).
+
+**Measured.** 471 corpus: **228/263 lines, 27/46 questions** (was 217 / 21); 1/5, 4/5, 10/5, 17/5, 18/4 and 21/4 land whole; 23/4 gains lines 5–6 and stops at «שיעור ה-y של הקודקוד D קטן מ-9» (not this stream's). Every line of those questions submits in ≤ 113 ms (18/4's last line). The ratchet's floor is the integrator's to raise.
+
+**Not built, said out loud.**
+- «קטע האמצעים לצלע BC» with no triangle named (2-D resolves the apex from the figure) and the base-less «EG קטע אמצעים» (2-D's cyclable variant, ADR-199) — `not-handled` here.
+- A trapezoid midsegment typed before a stated parallel pair that differs from the assumed AB ∥ DC keeps the legs it read (2-D's reading has the same staleness).
+- «המשך AC חותך את מעגל P …» with no circle P (cat-2d-137) — the implied circle is #1622's.
+- 2-D's two defects above (#1682, #1683) — not mirrored.
+
+**Consequences.** `engine/types.ts` (`Selector.beyond`, `meet-of.noun` / `named`, the `vertices-on-axes` fact), `engine/solve.ts` (`Constraint.all`), `engine/evaluate.ts` (`beyondParam`, the judge, the seeding, `holds` reads `all`), `engine/apply.ts` (`meet-of`, `area-of`, `vertices-on-axes`, `not-a-diagonal`), `engine/shapes.ts` (`ringsNamed` refinements), `engine/derive.ts` (`resolveFresh`; a choice's blame through `all`), `parser/parseAnalytic.ts` (the extension rules, named diagonals, `parseDiagonalDecl`, `parseMidsegment`, `parseVerticesOnAxes`, `FRESH_PREFIX`, the concurrency head), `parser/frameAnalytic.ts` (`conditionClauses`), the catalog (ten rows), store / errorText / i18n (`not-a-diagonal`). Sibling check (docs/17 §1): 2-D is the reference and has every capability; its two honesty defects are filed (#1682, #1683). 3-D answers these sentences `not-handled` (#1679's parity scope).
+## ADR-AG-206 — The exam's construction imperatives are taught as the sentence they build; the corpus counts what the student confirms (#1620)
+
+**Status:** accepted · 2026-10-02 · operator ruling 2026-10-01 on #1620 (*the exam's construction imperatives are taught, not accepted as typed — the ADR-W-030 pattern*) · stream S1 of slice C, branch `feat/1620-s1-imperatives` off `feat/1620-construction-vocabulary` @ 92881500.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R114 amended (the exam's construction imperatives are taught; a descriptive «שהורידו» line is not), and the R132 note «wait on #1620» resolved. · **Design:** [04c](04c-design-analytic.md): new section "The exam's construction register". · **LADDER stage:** the submit gate (before parse); no parser, fold, solver or render change.
+
+**Cites** [ADR-W-030](06w-decisions-workspace.md#adr-w-030) (non-canonical input is taught), [ADR-AG-150](#adr-ag-150) / #1353 (the analytic wrapper register and its gate), [ADR-AG-187](#adr-ag-187) (slice A: the exam frame, proof targets; the imperatives parked there), [ADR-AG-195](#adr-ag-195) (#1637 B3: the tangent and chord noun forms the lessons lower onto), #1102 (*locks must call, not reproduce*).
+
+**Context — measured at pickup** (each corpus line typed after its own question's earlier lines, through `decideSubmit`): all twelve exam imperatives answered `not-handled` — a paid fallback for sentences the tool can read once they are in textbook form. The wrapper register could not reach them: it strips a verb only at the START of a line, its lexicon held `העבר` but not `העבירו / הורידו / מעבירים / מורידים / בחרו`, and the exam's object is indefinite with its claims in relative clauses («ישר המקביל … החותך …»), so even a stripped remainder («משיק למעגל בנקודה C», «מן הנקודה B אנך לציר ה-x») is not the textbook sentence. **Class:** an instruction register read at one position (verb first) by one transformation (strip), where the exam's register needs a FRAME.
+
+**Decision.**
+1. **A second, closed register — the exam's — composes the declarative sentence by frame** (`constructionCandidates`, `parser/scopeAnalytic.ts`): `ADVERBIAL* VERB ADVERBIAL* NOUN NAMES? REST` after `unwrap`. The verbs `CONSTRUCTION_VERBS_HE` (also added to `IMPERATIVE_VERBS_HE`, so #1353's catalog net covers them) are matched as WHOLE tokens — «שהורידו / שהעבירו» never match — and mid-line only after one of three adverbials («מן/מ(ה)נקודה|קודקוד(ים) X», «דרך (הנקודה) X (שעל ה…)», «ב<polygon> XYZ»). Relative participles become the predicate; «כרצונכם» is dropped. One composition per noun: the tangent at the through-point; a line or segment «העובר דרך …»; a perpendicular «מ<anchor>»; an altitude or median as the copula «ב<polygon>, X ו-Y הם גבהים …»; the definite subject otherwise. The frame's reading comes before the verb-first strip.
+2. **The register never decides.** Every composed string is a candidate that `decideSubmit` keeps only if `parseLine` and the fold accept it, so a lesson is always a sentence the next Enter accepts. An exam candidate is also taught when the figure ALREADY holds it — the exam restates givens («בחרו נקודה E כרצונכם, הנמצאת על הצלע DC» after «במלבן ABCD, הנקודה E נמצאת על הצלע DC»); confirming it answers «already known». The tool wrapper keeps #1353's `record`-only promise (its lock is unchanged and green).
+3. **The ratchet counts what the student confirms.** `confirmTaught(lines, seed)` (`app/submit.ts`, exported) walks a question through `decideSubmit` as typed lines arrive and substitutes each lesson; the 471 ratchet derives that list. The test calls the app's decision and does not know the register exists. The FLOOR is not raised here (the integrator raises it).
+
+**The contract with streams S2–S4** — the exact taught sentence per exam line. Each is locked as the register's first reading now, and as the decision's lesson once its sentence parses:
+
+| exam line (corpus) | taught | on this branch |
+| --- | --- | --- |
+| העבירו משיק למעגל בנקודה C (5/5) | המשיק למעגל בנקודה C | taught |
+| דרך הנקודה D שעל המעגל העבירו משיק למעגל (21/5) | המשיק למעגל בנקודה D | taught; D on the circle measured |
+| העבירו מיתר AD (11/5) | המיתר AD | taught |
+| בחרו נקודה E כרצונכם, הנמצאת על הצלע DC (2/4) | הנקודה E נמצאת על הצלע DC | taught (already known there) |
+| העבירו את האלכסון AC במרובע ABCD (8/5) | האלכסון AC במרובע ABCD | S3 |
+| מן הנקודה B הורידו אנך לציר ה-x (5/5) | האנך מהנקודה B לציר ה-x | S2 |
+| מן הקודקוד C העבירו אנך לציר ה-x, החותך אותו בנקודה D (17/4) | האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D | S2 |
+| מן הקודקודים A ו-C העבירו אנכים לציר ה-x, החותכים … בהתאמה (20/4) | האנכים מהקודקודים A ו-C לציר ה-x חותכים אותו בנקודות E ו-F בהתאמה | S2 |
+| מן הנקודה E העבירו ישר המקביל לציר ה-y וחותך את הצלע AB בנקודה F (13/4) | הישר העובר דרך הנקודה E מקביל לציר ה-y וחותך את הצלע AB בנקודה F | S2 |
+| מנקודה D העבירו ישר המקביל לציר ה-x החותך את הצלע AB בנקודה E (14/4) | הישר העובר דרך הנקודה D מקביל לציר ה-x וחותך את הצלע AB בנקודה E | S2 |
+| דרך E מעבירים קטע EF המקביל ל-DA (2/4) | הקטע EF מקביל ל-DA | parses, but refused today (`unknown-reference` F: the NEXT line places F) — S2 |
+| במשולש OBC העבירו גבהים OD ו-BE לצלעות BC ו-OC בהתאמה (7/4) | במשולש OBC, OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה | S4 |
+
+**Locks** (`issue-1620-imperatives-taught.test.ts`, 37 tests, all through `decideSubmit` / `confirmTaught` over the corpus file):
+- The twelve contract strings are the register's first reading.
+- The four S1 rows are taught exactly, the quoted verb is the student's own word, and the next Enter is accepted.
+- The ADR-W-030 property: the confirmed list ends in the canonical string and derives the SAME construction as typing that string.
+- 21/5: D is on the circle, and the stated tangent is perpendicular to MD at D.
+- The eight S2–S4 rows are never committed, and if taught, only with the contract string. These rows upgrade themselves on integration.
+- 11/5 and 21/5 land whole.
+- «בחרו … כרצונכם» on a bare rectangle teaches the incidence, which records.
+- The singular and present-tense verbs take the same frames.
+
+Controls:
+- A descriptive «שהורידו / שהעבירו» line (and corpus 5/5 #6) is not taught.
+- A mid-line verb with no adverbial is not read.
+- Proof targets stay `proof-target`, and no exam imperative parses as one.
+
+**Fails before: 25 of 37.** The 12 that pass before are the eight not-yet-parsing rows (honest refusals before and after) and four controls. `issue-1353-imperatives-taught` is unchanged and green.
+
+**Measured.** 471 corpus (seed 0, through `confirmTaught`): **217/263 → 222/263 lines, 21/46 → 23/46 questions** (+11/5, +21/5; 2/4 #5 and 5/5 #3 also land). The ratchet run costs ~7 s (one `decideSubmit` per line).
+
+**2-D's verdict on the same imperatives** (`decideDeterministic2D`, in 2-D-expressible contexts): «העבירו משיק למעגל בנקודה C» and «העבירו מיתר AD» **COMMIT silently**. `REQUEST_WORDS` strips «העבירו» and no teaching note is shown, so the imperative is recorded as the student's sentence — the ADR-W-030 defect in the sibling. Reported for filing against `2d`, not fixed here. The rest:
+- escalate as `dropped`: «דרך הנקודה D שעל המעגל העבירו משיק למעגל», «דרך E מעבירים קטע EF …».
+- escalate as `not-handled`: «העבירו את האלכסון …», «בחרו נקודה E כרצונכם …», «מן הקודקוד C הורידו אנך לצלע AB», «במשולש OBC העבירו גבהים …».
+- refused (`unresolved dependencies`): «מן הנקודה E העבירו ישר המקביל ל-AC …».
+- refused as analytic-only: the axis lines.
+
+**Not built, said out loud.**
+- **English** exam frames («from B drop a perpendicular to the x-axis»): the corpus is Hebrew; the English verb-first wrapper is unchanged.
+- **Parity rows** for the imperatives are not added. 2-D (the reference) commits two of them, so a row would lock the defect; they belong with the 2-D finding.
+- The S2–S4 lessons are delivered by this mechanism the moment their sentences parse; nothing more is needed here.
+
+**Consequences.** `parser/scopeAnalytic.ts` (`CONSTRUCTION_VERBS_HE`, `constructionCandidates`, `ImperativeCandidate.exam`, five verbs in `IMPERATIVE_VERBS_HE`, `imperativeCandidates` offers the frames first; imports `unwrap`), `app/submit.ts` (the exam candidate's acceptance set; `confirmTaught`), `__tests__/issue-1618-corpus471-ratchet.test.ts` (measures `confirmTaught`). Sibling check (docs/17 §1): 2-D as above; 3-D's `scope3` has its own register and no analytic-axis sentences, so it was not measured here.
+
+## ADR-AG-209 — The cevian family completed: the angle bisector is the third role, a cevian may leave its target or its foot to the figure, and the tool names an unnamed foot (#1284, #1222, #1240, #1620 S4)
+
+**Status:** accepted · 2026-10-02 · stream S4 of slice C (#1620), branch `feat/1620-s4-bisectors-cevians` off `feat/1620-construction-vocabulary` (= main @ 92881500). Operator rulings followed, none re-asked: analytic gives 2-D's experience for plane geometry (2026-10-02, the reference verdicts below are MEASURED through `decideDeterministic2D`); the tool may name what the student did not, in a reserved name, and says so (#1263, 2026-09-20); "invent a letter … the user can always change it" (#1222, 2026-09-19); the cevian with no target asks when the figure leaves it open (#1240's plan, R32).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R103b (new); R103a's "still not accepted" struck. · **Design:** [04c](04c-design-analytic.md) — new section "The cevian family: one lowering, three roles, the target or the foot from the figure". · **LADDER stage:** parse (`parseCevianFamily`, `cevianWithTarget`), M1 (`bisects`, `cevian-of`), the mint seam (`derive.resolveMints`), seeding + validity (`angle-side`). No new residual kind: the bisector reuses `angle-ratio` (#1331).
+
+**Cites** [ADR-AG-109](#adr-ag-109) (a cevian lowers to its whole definition), [ADR-AG-117](#adr-ag-117) (the triangle names the side), [ADR-AG-158](#adr-ag-158) (the lone-vertex angle resolver), [ADR-AG-164](#adr-ag-164) / #1281 (the `P₁` mint seam), [ADR-AG-192](#adr-ag-192) (the tool's letters are renamable by materializing), [ADR-AG-200](#adr-ag-200) (role nouns; median/altitude claims stay unlowered), [ADR-052](06-decisions.md#adr-052).
+
+**Context — measured at pickup** (2-D through `decideDeterministic2D`, analytic through `decideSubmit`, main @ 92881500):
+
+| sentence (after the context shown) | 2-D | analytic before | analytic after |
+| --- | --- | --- | --- |
+| «משולש ABC» · «AD חוצה את הזווית BAC» / «AD חוצה זווית A» / «AD bisects angle BAC» | builds: `bisector` ∩ line BC = D, segment AD | not-handled | records — D on BC, ∠BAD = ∠DAC |
+| «CE חוצה זווית C במשולש ABC» | builds | not-handled | records |
+| «משולש ABC» · «D על BC» · «AD חוצה זווית BAC» (D exists) | `set-angle-ratio` | not-handled | records — D on the bisector's ray |
+| «טרפז ABCD» · «האלכסון DB חוצה את הזווית ADC» (3/4) | `set-angle-ratio` + segment | not-handled | records |
+| «משולש CMD» · «AM הוא חוצה זווית CMD» (22/5) | escalates (copula) | not-handled | records |
+| «E חיתוך חוצי הזוויות BAC ו-BCA» | builds: two bisectors meet | `bad-operand` | records — the incentre |
+| «טרפז ABCD» · «EB ו-EC הם חוצי הזווית ABC ו-BCD בהתאמה הנפגשים בנקודה E» (1/4) | builds | not-handled | records |
+| «חוצה זווית ABC» | builds: a visible bisector | not-handled | records — the bisector line |
+| «משולש ABC» · «AD גובה» / «AD תיכון» | builds (foot D) | not-handled | records |
+| «תיכון מ-A במשולש ABC» / «גובה מ-A במשולש ABC» (empty canvas) | builds: the triangle + M / F | not-handled | records: the triangle + M₁ / H₁ |
+| «גובה מנקודה A» · «תיכון לצלע BC» · «גובה לצלע BC» · «תיכון מ-A לצלע BC» | builds (M / F) | not-handled | records (M₁ / H₁) |
+| «גובה המשולש לצלע AB הוא CD» | escalates | not-handled | records |
+| «הגובה AD לצלע BC» · "the altitude from A" | builds | not-handled | records |
+| «(במשולש OBC,) OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה» (7/4 as S1 teaches it) | not-handled | not-handled | records |
+| «BE ו-CF הם גבהים במשולש ABC» | builds | not-handled | records |
+| «AD חוצה זווית C» | builds the bisector of **A** (drops «C») | not-handled | `bisector-wrong-apex` |
+| «CE חוצה זווית A במשולש ABC» · «XD חוצה זווית BAC» | `bisectorWrongApex` · escalates | not-handled | `bisector-wrong-apex` |
+| «משולש ABC» · «משולש ABD» · «AE גובה» | builds, picks ABC silently | not-handled | `ambiguous-cevian` (asks) |
+| «נקודה A» · «AD גובה» | — | not-handled | `cevian-no-triangle` |
+| «זווית BAC = 60» · «AD חוצה זווית BAC» · «זווית BAD = 40» | — | — | the last line `unsatisfiable`, named |
+| «משולש ישר-זווית ABC» · «תיכון ליתר» | builds (right angle at C by convention) | not-handled | not-handled (**not done**, below) |
+
+**The class (docs/17 §1): the cevian rule required operands the figure already determines, and had one role short.** #1284 measured the bisector `not-handled` in every spelling (`CEVIAN_ROLE_HE = 'תיכון|גובה'`); #1240 the forms that drop the target or the foot; #1222 the apex-fronted form whose foot has no letter. Three issues, one rule — built together here so the spellings cannot drift again.
+
+**Decision.**
+1. **One lowering** (`engine/cevian.ts`): `cevianFacts(role, apex, foot, u, v)` — the foot on the side's line, then `midpoint` / `perpendicular` / `angle-ratio ∠(u,apex,foot) = ∠(foot,apex,v)`; the existing named rule now calls it (its facts unchanged — #1231/#1232's locks hold). `onBisectorFacts` for a bisector through an existing point: the equal-angle row plus a new selector `angle-side` (the point on the bisector's own ray, not the opposite one — a region, judged in validity and seeded by reflecting a wrong-side seed through the vertex). #1284's body proposed the ratio lowering (AE·CB = EB·CA) because no angle residual existed then; #1331 has since added `angle-ratio`, which is 2-D's `set-angle-ratio`, has no external-division root, and serves the existing-point case the ratio cannot.
+2. **The bisector is a third role**, read with the target («… במשולש ABC», «… לצלע AB») and by its angle alone (`bisects { at, p? }`, M1). The stated vertex is READ: it must be the segment's apex (either end may be written first), else `bisector-wrong-apex` (new code, He/En) — where 2-D silently drops it (filed #1684). M1 follows 2-D: a `p` the figure lacks is the FOOT on the line through the angle's ray points; an existing `p` is on the ray; no `p` («חוצה זווית ABC») draws the bisector as a `line-at` along the new `Direction` `{ k: 'bisector' }`. The meeting point of two bisectors declares its point first, so neither reads it as a foot.
+3. **The target from the figure** (`cevian-of`, M1): the triangles holding the apex (or the side) — one builds, several `ambiguous-cevian` (asks: name the side or the triangle; 2-D picks silently, #1684), none `cevian-no-triangle`. Both new codes He/En.
+4. **The tool names an unnamed foot** through the #1263 seam: a `@mint:foot:<role>:<key>` placeholder, named by `resolveMints` `M₁…` (median, 2-D's M) or `H₁…` (altitude — 2-D's `F` is the conic focus's letter in this tree, #1167), shown on the row («הכלי קרא לנקודה M₁»), renamable (`cevianNamingCandidates` materializes «A<foot> <role> …», proven by fold equality).
+5. **A sentence that names its triangle introduces it** («גובה מ-A במשולש ABC» on an empty canvas), as 2-D does; a drawn triangle absorbs it. This changes the facts of «AD תיכון במשולש ABC» (the polygon first) — the #1165 parity lock is restated as "the side form plus the triangle's fact", still parity.
+6. **Noun-first and plural forms rewrite** to the singular named sentences (`viaSentences`), Hebrew and English («בהתאמה» / "respectively", «במשולש ABC» / "in triangle ABC", the meeting tail).
+
+**Locks** (`issue-1620-bisectors-cevians.test.ts`, 47, all through `derive` / `decideSubmit` / `decideRename`): eight bisector spellings — equal angles and the foot strictly inside the opposite side at seeds 0–5; an existing point and 3/4's diagonal on the internal ray; the bisector meet is the incentre (all three bisectors) and 1/4's plural; five spellings draw the identical figure; the minted M₁ is the midpoint and H₁ the perpendicular foot at six seeds; six altitude spellings ⟂ with the foot on the side line; three median spellings at the midpoint; 7/4's plural, both altitudes; a minted foot skips a taken M₁; renaming M₁/H₁ writes the letter into the sentence (four forms); DOF — a new foot consumes none of the triangle, an existing point loses exactly one; a pinned triangle never moves; each new spelling draws what the shipped named spelling draws at every seed; refusals — a contradicting stated angle (`unsatisfiable`, naming «זווית BAD = 40»), the reverse order, `unknown-reference`, `bisector-wrong-apex` ×3, `degenerate-role` ×2, `ambiguous-cevian`, `cevian-no-triangle`. **Fails before: 46 of 47** (the green one: a meeting point that is itself a vertex is not accepted — refused before as `not-handled`, after by name). Parity (`geo-input-parity.ts`): analytic's known gap dropped on `cat-2d-043`, `044`, `049`, `052`, `056`, `057`, `bisector-named`, `altitude-is-segment`; new rows `cevian-named-only` (3-D builds it too), `cevian-to-side`, `cevian-plural-respectively`, `bisector-copula` (2-D gap #1685), `bisector-wrong-vertex`, `cevian-apex-two-triangles` (2-D gap #1684). Catalog: eight F16 rows (He + En). `issue-1165-cevian-target.test.ts` restated (item 5). `issue-1275-guide-featured` narrowed to the two #1165 rows by name: no new row is featured, because which six «נקודות נגזרות» shows is the operator's pedagogy call (#1347).
+
+**Measured.** 471 corpus (seed 0): **220/263 lines** (+3: 1/4 line 2, 3/4 line 2, 22/5 line 4), **21/46 questions** — no question completes from this stream alone: 1/4 and 3/4 stop at «נסמן …» (slice D), 7/4 at «העבירו …» (S1) and «S_BDC / S_ODC» (slice D), 22/5 at its transcriber's figure note.
+
+**⚠ Not done, said out loud.**
+- **«תיכון ליתר»** (`cat-2d-051`, #1222): in this tool «משולש ישר-זווית ABC» leaves the right angle a discrete CHOICE (#1049), so the hypotenuse — and the median's apex — differ per configuration; 2-D fixes the right angle at C by convention. Building it needs either a ruling (ask which side is the hypotenuse, as `ambiguous-cevian` does; or let a stated right angle collapse it first) or a compound choice. Left `not-handled`; **a question for the operator** (recommend: build it when the right angle is determined, ask otherwise).
+- **`bisector-foot`** («D על AC כך ש-OD חוצה-זווית AOC»): every clause reads; the «X על Y כך ש-…» combinator is stream S3's, so the row flips when S3 lands — the integrator re-runs the parity lock.
+- **Stability of a free figure**: adding ANY cevian to a free «משולש ABC» re-picks the triangle at the same seed — the SHIPPED «AD גובה לצלע BC» already moves A by ~12 at seed 0 on main. The configuration search chooses the picture, not the cevian; this change introduces no jump of its own (locked as parity with the shipped spelling) and a pinned figure never moves. Worth its own issue (the root CLAUDE.md's "adding a constraint never makes the existing figure jump").
+- Median/altitude as a CLAIMED role noun inside a length («אורך התיכון AD הוא 5», ADR-AG-200) stays refused: `cevian-of` could lower the claim now, but ADR-AG-200's locks assert the refusal and lifting it is a separate decision.
+- 2-D gaps found and filed: **#1684** (P1 — «AD חוצה זווית C» draws the bisector of A; «AE גובה» with A in two triangles picks one), **#1685** (plural cevians with «בהתאמה», the copula before «חוצה זווית»).
+
+**Consequences.** `engine/cevian.ts` (new), `engine/types.ts` (`cevian-of`, `bisects` facts; `angle-side` selector), `engine/solve.ts` (`Direction.bisector`), `engine/apply.ts` (two M1 cases, three error codes, the selector's refs), `engine/evaluate.ts` (`angleSideOf`, validity + seeding), `engine/derive.ts` (foot mints, segment re-key), `parser/parseAnalytic.ts` (`parseCevianFamily` and its regexes, `cevianWithTarget`, `bisector-wrong-apex`), `parser/catalogAnalytic.ts` (eight rows — the LLM vocabulary grows: diff the built proxy before deploy), `app/rename.ts` (`cevianNamingCandidates`), `app/errorText.ts` + `i18n/index.ts` (three new texts; `errDegenerateRole`/`errApexNotAVertex` name the bisector), `store/useAnalyticStore.ts` (three `InputError` keys). Sibling check (docs/17 §1): 2-D is the reference (two defects filed); 3-D's cevians are #1679.
+
+
+## ADR-AG-211 — The tool's letters are 2-D's, through one role → letter table; the cevian's tool foot is derived; «תיכון ליתר» asks unless the right angle is stated (#1620 S6, #1222)
+
+**Status:** accepted · 2026-10-02 · operator rulings on #1620, 2026-10-02: (1) *a point the student did not name takes 2-D's letter — M for a midpoint, F for a foot, the next free letter if taken; analytic uses H for a foot because F is the focus letter (#1167); announced on the row and renameable*; (2) *«תיכון ליתר»: build when a stated right angle fixes the vertex, otherwise ASK which side is the hypotenuse; never assume C.* Branch `feat/1620-s6-letters` off `feat/1620-construction-vocabulary` @ b1b1683d (S1–S4 integrated). A NEW ADR, not an amendment of ADR-AG-209: the change crosses three streams — S2's [ADR-AG-207](#adr-ag-207) (the perpendicular's foot and the perpendicular bisector's midpoint took `P₁`), S3's [ADR-AG-208](#adr-ag-208) (the midsegment's `FRESH_PREFIX`) and S4's [ADR-AG-209](#adr-ag-209) (`M₁`/`H₁`) — and supersedes each one's letter rule.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R103c (new); R103b's foot letters and its "not yet: «תיכון ליתר»" amended; the perpendicular-foot bullet (ADR-AG-207) amended: P₁ → H. · **Design:** [04c](04c-design-analytic.md) — new section "The tool's letters: one table, one resolver"; ADR-AG-209's "tool-named foot" paragraph superseded. · **LADDER stage:** the mint seam (`resolveToolLetters`, before `resolveMints`), M1 (`cevian-of` `toolFoot` / `hypotenuse`). No solver change.
+
+**Context — measured** (2-D through `decideDeterministic2D`; analytic through `decideSubmit` / `derive`, on b1b1683d):
+
+| sequence (after «משולש ABC» unless shown) | 2-D | analytic before | analytic after |
+| --- | --- | --- | --- |
+| «תיכון מ-A במשולש ABC» | M | M₁ | M |
+| «נקודה M» · «תיכון מ-A …» | **M again** (over the free M) | M₁ | N |
+| two medians from A and B | 2nd **refused** «M coincides …» | M₁, M₂ | M, N |
+| «גובה מ-A במשולש ABC» | F | H₁ | H |
+| «נקודה F» · altitude | G | H₁ | H (F is never the tool's) |
+| F, G, H taken · altitude | P | H₁ | P (H, G taken → P) |
+| two altitudes | F, G | H₁, H₂ | H, G |
+| «האנך מ-C ל-AB» | F | P₁ | H |
+| «אנך אמצעי ל-AB» | M (over a free M too) | P₁ | M (N when M is taken) |
+| «קטע האמצעים לצלע BC במשולש ABC» | M, N | M, N | M, N |
+| «D אמצע BC» · «תיכון מ-A …» | — | a second point M₁ on D | the median runs to D (one point) |
+| «משולש ישר-זווית ABC» · «תיכון ליתר» | median from **C** (assumed) | not-handled | **asks** (`ambiguous-hypotenuse`) |
+| … · «זווית C ישרה» / «זווית A ישרה» · «תיכון ליתר» | from C / from A | not-handled | from C / from A |
+| … · «גובה ליתר» (stated A) | foot F from A | not-handled | foot H from A, ⟂ BC |
+| «משולש ABC» · «תיכון ליתר» | asks (`roleSideUnresolved`) | not-handled | asks (`ambiguous-no-right-angle`) |
+| «משולש ישר-זווית ABC» · «תיכון ליתר AB» | builds (right angle at C) | not-handled | builds (the claim puts it at C) |
+| rename the perpendicular bisector's tool midpoint | — | `rename-not-typed` | «אנך אמצעי ל-AB חותך אותו בנקודה K» |
+
+Also measured: the S4 cevian foot was a FREE point plus constraints, so adding «תיכון מ-A במשולש ABC» to a free triangle re-solved and moved the triangle (ADR-AG-209's "not done").
+
+**The class (docs/17 §1): three letter rules for one act.** Naming a point the student did not name was implemented three times, with three namespaces and two notions of "taken" (S2/S4 against the WHOLE list — so a later «AM = 3» would have renamed the earlier mint — and S3 against the earlier lines). One act, one mechanism.
+
+**Decision.**
+1. **One table, one resolver** — `engine/toolLetters.ts`: `TOOL_LETTERS` (midpoint `MNPQ`, midpoint-2 `NPQS`, foot `HGP` — 2-D's `freeLabel` preferences, F → H), 2-D's pool, then a subscript. Every rule writes `toolPoint(role, key)`; `resolveToolLetters` resolves in list order against the EARLIER facts' letters (a later line refers to the tool's point and never re-letters it) and gives a placeholder whose derivation an earlier point already has that point's name (#1153). S3's `resolveFresh` and S2's/S4's branches in `resolveMints` are gone; `resolveMints` keeps only the coordinate point's reserved `P₁` (#1281 — a different ruling, not a construct). `derive` drops a `minted` entry whose point the fold did not create.
+2. **The cevian's tool foot is DERIVED** (`toolFootFacts`): `midpoint(u, v)` / ADR-AG-207's `foot(apex → uv)`. It is a closed form, so the triangle never moves (ADR-AG-209's open stability item, for this path), and «האנך מ-A ל-BC» and «גובה מ-A במשולש ABC» are one point. A foot the STUDENT names keeps `cevianFacts` (ADR-AG-109's conjunction, untouched).
+3. **Naming after the fact** — `FOOT_TAIL` («… פוגש את הצלע בנקודה K», "… at K") on the apex, side and hypotenuse forms, lowered as the tool's foot; the rename writes it (`cevianNamingCandidates`, tried first). The perpendicular bisector reads S2's «… חותך אותו בנקודה K», which the rename already wrote, so its midpoint is renameable now.
+4. **The hypotenuse** (`TO_HYP_*`, `cevian-of { hypotenuse }`): the right angle the figure STATES (a non-choice constraint equal to `rightAngleAt`) decides; an open right-triangle noun or several right triangles `ambiguous-hypotenuse`, none `ambiguous-no-right-angle` — both ask, He/En texts. «תיכון ליתר AB» states ADR-AG-200's hypotenuse claim and builds.
+
+**Locks.** `issue-1620-tool-letters.test.ts` (41): per role the letter and its fallbacks (median ×5, perpendicular bisector ×2, midsegment ×2, altitude ×6, perpendicular ×2); the coordinate `P₁` control; the row; one point reached two ways (median to D; perpendicular = altitude; `already-known`); a later naming is `already-named` holding M; a later line using M refers to it; five tool-foot lines leave a FREE triangle unmoved at seeds 0–5; letters and geometry stable at six seeds; five renames to K (median, altitude, hypotenuse median, perpendicular bisector, axis perpendicular), each folding to the same position; the hypotenuse — open asks (three spellings), none asks, stated C / A / plain triangle builds the right median at six seeds, the altitude ⟂, «תיכון ליתר AB» puts the right angle at C, a contradicting named hypotenuse is `unsatisfiable`. **Fails before: 37 of 41** (green before: S3's two midsegment rows, the `P₁` control, and the perpendicular bisector's stability — S2's midpoint was already derived). **Locks changed to this ruling:** `issue-1620-bisectors-cevians` (M₁/H₁ → M/H; the fallback row; renames now write «… פוגש את הצלע בנקודה K»; the "draws what «AH₁ …» draws" parity row removed — the tool foot no longer moves the triangle, locked above), `issue-1620-perpendiculars` (P₁ → H; the bisector's midpoint P₁ → M). Parity: `cat-2d-051` expect `asks` (2-D gap **#1689**, filed: 2-D assumes C); new rows `hypotenuse-median-stated`, `hypotenuse-median-named` (builds), `hypotenuse-no-right-angle` (asks). Catalog: «תיכון ליתר AB».
+
+**Measured.** 471 corpus: 250/263 lines, 35/46 questions — unchanged.
+
+**2-D, filed:** **#1689** (P2 — «תיכון ליתר» assumes the right angle at C); **#1690** (P2 — the median's and perpendicular bisector's midpoint is always M, over a taken M; a second median is refused).
+
+**Not done.** The bare tail «… בנקודה K» (without «פוגש את הצלע») is not read — an earlier rule claims «X בנקודה K»; the rename never writes it. A student-NAMED cevian foot («AD גובה לצלע BC») is still a free point plus constraints (ADR-AG-109), so it can still move a free triangle (ADR-AG-209's open item, now confined to that path).
+
+**Consequences.** `engine/toolLetters.ts` (new), `engine/derive.ts` (`resolveFresh` removed, `resolveMints` coordinate-only, the minted filter), `engine/cevian.ts` (`toolFootRule`, `toolFootFacts`), `engine/types.ts` (`cevian-of.hypotenuse`, `.toolFoot`), `engine/apply.ts` (the `cevian-of` hypotenuse and tool-foot arms, two codes), `parser/parseAnalytic.ts` (`toolPoint` at the S2/S3/S4 sites, `FOOT_TAIL`, `TO_HYP`, the perpendicular bisector's tail; `FRESH_PREFIX` re-exported), `app/rename.ts`, `app/errorText.ts`, `i18n/index.ts`, `store/useAnalyticStore.ts`, `parser/catalogAnalytic.ts` (one row — diff the built proxy before deploy).
 ## ADR-AG-210 — A radius names an unnamed centre, a reference states the circle it names, and a bare relation mints its new letters — by 2-D's rule (#1670, #1686)
 
 **Status:** accepted · 2026-10-02.
@@ -9402,3 +9654,102 @@ The figure-level check (`constructionShape` + faults, ADR-AG-191) still guards e
 - `parser/catalogAnalytic.ts`: new entry «AB ו-CD מיתרים במעגל O».
 
 Sibling check (docs/17 §1): 2-D is the reference and builds every row above except the refusals. 3-D has no free points and no circles of this kind (X8/X9), and its parity lock is green.
+
+## ADR-AG-212 — The analytic palette carries every 2-D chip whose sentence it reads: ⊥ ∥ ∠ ° and √() (#1696)
+
+**Status:** accepted · 2026-10-03 · operator, playing PR #1695: *"analytics tool doesnt have parallel and perpendiculatr symbols. review all symobols from 2d and decide what should be in analytics too"*; the review was put to the operator with a per-symbol decision table (#1696) and approved (*"yes"*, to add the now-set in PR #1695).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R11a (the set amended). · **Design:** none (internal) — data in `src-analytic/ui/symbols.ts`; the palette's shape (`shell/symbols`) is unchanged.
+
+**Context.** The 2-D palette has 21 chips, analytic's had 12. Analytic's rule (R11a, ADR-AG-122) is that a chip may only be offered when its sentence is read, so each 2-D chip was measured through `derive` on PR #1695's branch, on a figure where its sentence can hold:
+
+| 2-D chip | sentence | analytic | decision |
+|---|---|---|---|
+| ⊥ ∥ | «AD ⊥ BC», «AB ∥ CD» | builds | added |
+| ∠ | «∠ABC = 37°» | builds (#1330: one lowering with «∢», «זווית») | added — 2-D's glyph |
+| ° | «∢ABC = 90°» | builds | added — the 2026-09-16 hold (angles unbuilt) no longer applies |
+| √() | «AB = √(2/3)» | builds | replaces the bare `√`, so a selection lands inside the brackets as in 2-D |
+| α β γ δ θ · S_{} · < | «∢ABC = α», «S_{ABC} = 13», «AB < BC» | `bad-equation` / not-handled | held — owed by #1621 |
+| △ ≅ ~ · ⌢{} | «△ABC ≅ △DEF», «⌢{AC} = 60°» | not-handled | held — owed by #1622 |
+| xⁿ | — | `^` already reads inside equations | not offered: `²` `³` cover the exam's powers |
+
+**Decision.** Add ⊥ ∥ ∠ ° and replace `√` by the wrapping `√()`, each with a he/en title. Each held chip is recorded on the issue that will make its sentence readable (#1621, #1622 comments), so it ships in that notation's own PR.
+
+**A vacuous lock, found and replaced.** `symbols-module.test.ts` held `°` with «זווית BAC = 90°» on A(0,0) B(4,0) C(1,3). That triangle's angle at A is fixed near 72°, so the line faulted `unsatisfiable` and "°  still does not parse" passed by contradiction, after `°` had started to parse. The replacement holds each still-absent chip on a figure where its sentence could hold, and requires a READING fault (`not-handled` / `bad-equation` / `bad-operand`), so the row goes red the day the notation lands.
+
+**Locks.** `symbols-module.test.ts`: four new parse proofs (totality-guarded), `√()` as a wrap («AB = 20» with «20» selected → «AB = √(20)», builds), the original-six row updated on purpose, six held-chip rows. `palette-faces-1348` (each one-character face inserts its own glyph) and the bidi no-split row cover the new chips unchanged. **Fails before: 3 of 21** — the totality guard, the `√()` wrap proof and the original-six row; the four new parse proofs iterate the palette, so they do not exist before it.
+
+## ADR-AG-213 — The two tangents meet where 2-D says they do; «נפגשים» is «נחתכים» for two lines; the open-bound floor keeps the scale the figure was sampled at (#1620 S7)
+
+**Status:** accepted · 2026-10-03 · #1620 slice C, stream S7 (branch `feat/1620-s7-tangents-meet` off `feat/1620-construction-vocabulary` @ 5dab4a4a). Standing rulings applied: analytic gives 2-D's experience for plane geometry (2026-10-02, #1649/#1669) — 2-D's verdict and drawing are the reference, measured through `decideDeterministic2D`; a sentence that names a circle not yet in the figure states it (ADR-AG-210, #1670); a figure drawn green for givens that cannot hold is the honesty class (2026-09-21 #1328).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R141 amended (the two tangents meet; the meet verbs). · **Design:** [04c](04c-design-analytic.md) — new section "The two tangents meet; the meet verbs; a floor that does not collapse with the figure". · **LADDER stage:** parse (`tangentsMeet`, `sharedCircle`, the meet verbs, the tangent noun's trailing circle) and M1 (`crossing-kind` `tangent`); the stage-two admissibility judge (`openBoundFloor`'s sampled scale). No new object, no new derived rule.
+
+**Cites** [ADR-AG-195](#adr-ag-195) (the tangent as an object; «המשיק» as a reference), [ADR-AG-207](#adr-ag-207) (it left `cat-2d-111` unbuilt and said why), [ADR-AG-210](#adr-ag-210) (`statingNamedCircle`), #1429 (`crossing-kind`, the bare «הישרים»), #1081 (the verb is an alternation), #1504 / [ADR-AG-167](#adr-ag-167) amendment 1 (the open-bound floor), [ADR-052](06-decisions.md#adr-052), #1687 (stability under a new free point).
+
+**Context — measured at pickup (5dab4a4a).** 2-D through `decideDeterministic2D`, analytic through `decideSubmit` / `derive`:
+
+| sequence | 2-D | analytic before | analytic after |
+|---|---|---|---|
+| «המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D» (empty canvas, `cat-2d-111`) | builds — circle O, A and C on it, both tangents, D | `not-handled` | builds, the same objects |
+| «מעגל O» · «A על המעגל» · «C על המעגל» · the same sentence | builds | `not-handled` | builds |
+| «מעגל O» · two tangents drawn · «המשיקים נפגשים בנקודה D» | builds — D, **and segments AD, CD** | `not-handled` | builds, AD and CD drawn |
+| … · «המשיקים נחתכים בנקודה D» / "the tangents meet at D" | builds | `not-handled` | builds |
+| «מעגל O» · «המשיק בנקודה A והמשיק בנקודה C נפגשים בנקודה D» | builds | `not-handled` | builds |
+| "the tangent at A and the tangent at C to circle O meet at D" | builds | `not-handled` | builds |
+| «מעגל O» · «AC קוטר במעגל O» · the sentence (parallel tangents) | **refused** («lines tan-A and tan-C are parallel») | `not-handled` | refused `unsatisfiable`, naming the line (amendment 1: without the letter hint) |
+| … the canonical «D נקודת החיתוך של המשיק בנקודה A עם המשיק בנקודה C» after the diameter | — | **recorded, drawn green: O, A, C, D on one dot, r ≈ 4·10⁻⁶** | refused `unsatisfiable` |
+| «המשיקים למעגל O בנקודות A ו-C נפגשים בנקודה D» | `not-handled` | `not-handled` | builds |
+| «מעגל O» · «המשיק בנקודה A והמשיק בנקודה C למעגל O נחתכים בנקודה D» | `not-handled` (reads «נפגשים», not «נחתכים») | `not-handled` | builds |
+| "the tangents to circle O at A and C meet at D" | refused `crossingAlreadyNamed` (holder O — a 2-D defect) | `not-handled` | builds |
+| «מעגל O» · one tangent · «המשיקים נפגשים בנקודה D» | `not-handled` | `not-handled` | asks which two (`ambiguous-shape`, found 1) |
+| «מרובע ABCD» · «הישר AC והישר BD נפגשים בנקודה E» | builds (as «נחתכים») | `not-handled` (while «נחתכים» built) | builds, the «נחתכים» point |
+
+**Root causes.** (1) *Spelling, not machinery:* the canonical crossing over two tangent nouns already built everything, including the circle on an empty canvas; but the tangent noun read its circle only BEFORE the point, the two-line meet read only «נחתכים», and a circle said once after the pair («… והמשיק בנקודה C למעגל O») reached only the second tangent. (2) *A floor that collapses with the figure:* the open-bound floor (#1504) is a fraction of the SOLVED figure's scale. A figure with no stated magnitude can meet a contradiction in the limit of shrinking to a point — parallel tangents "meet" when r → 0 — and at that limit the span shrank with the radius, so r ≈ 4·10⁻⁶ read as positive and the collapsed figure was drawn with no fault. That defect was reachable on the base through the canonical spelling.
+
+**The class (docs/17 §1).** *A sentence about objects the tool already builds missed because one modifier's position, one verb, or one plural was unwritten* — the same two-spelling class as #1081; and *a scale-relative judge whose reference scale is the very quantity going degenerate.*
+
+**Decision.**
+1. **The tangent noun reads its circle on either side of the point** (`TANGENT_CIRCLE_HE` / `_EN`): «המשיק בנקודה C למעגל O», "the tangent at C to circle O". Never both sides — that names two circles and is not read.
+2. **The meet verbs are one verb** for the two-line meet: «נחתכים / נפגשים / מצטלבים» (either gender), «בנקודה D / ב-D», English meet / intersect / cross. A subject this rule cannot read as two lines still falls through (`viaCanonical` answers `null`), so the concurrency rule keeps «הגבהים … נפגשים».
+3. **A circle said once belongs to both tangents** (`sharedCircle`): when both operands are tangents at named points and exactly one names its circle, both are spelled with it — otherwise on an empty canvas the first tangent reaches M1 before the circle exists. One touch point twice is `repeated-vertex`.
+4. **The plural** «המשיקים (למעגל O) בנקודות A ו-C (למעגל O) נפגשים/נחתכים בנקודה D» and "the tangents (to circle O) at A and C meet at D" distribute into the two singular tangents. **The bare plural** «המשיקים נפגשים בנקודה D», «D נקודת החיתוך של המשיקים», "the tangents meet at D" is `crossing-kind { kind: 'tangent', pieces: true }`: the two tangent objects in the figure (the «המשיק» test, `isTangentObject`), and — as 2-D draws that sentence — the pieces AD and CD. None, one or three is `ambiguous-shape` (host `line`, need 2), the «הישרים» refusal.
+5. **The open-bound floor never drops below the scale the solve started from.** `openBoundFloor(at, env, syms, sampled)` = `SOLVE_RESOLUTION × max(figureScale(solved), sampled)`; stage two's `admissible` passes the seeded start's `figureScale` (its vertices and sampled parameters, all inside their domains). A descent that shrank the whole figure past the solver's resolution relative to where it began has reached the bound, not a configuration. It states no magnitude (ADR-052) — the reference is the sample's own extent. Parallel tangents are now refused `unsatisfiable`, naming the line (amendment 1 corrects the message).
+
+**Locks** (`issue-1620-tangents-meet.test.ts`, 13; **fails before: 12 of 13** — only "a tangent naming two circles is not read" passed on the base): `cat-2d-111` on an empty canvas at 8 seeds — A and C on circle O (r > 0.5), DA ⟂ OA, DC ⟂ OC, DA = DC, the three curves drawn, nothing minted; the operator's context records and builds; twelve spellings (circle before / after / shared, «נחתכים», the plural, English, the canonical) give the identical O, A, C, D; ADR-052 (the radius and the touch points move with the seed); «המשיק בנקודה A למעגל O» is the circle-first tangent; the bare plural in four spellings at 8 seeds with AD and CD drawn; none / one / three tangents asks; parallel tangents refused `unsatisfiable` for the sentence and for the bare plural; the canonical crossing after the diameter faults its own line instead of collapsing (the floor); one tangent twice refused; two circle phrases not read; «נפגשים» / «מצטלבים» give the «נחתכים» point, and "l1 and l2 meet at E" is (1, 1).
+
+**Parity** (`shell/__tests__/fixtures/geo-input-parity.ts`): `cat-2d-111` loses its analytic #1620 gap (no other product carried one; X8 keeps 3-D out). New rows `an-1620-tan-01…06` agree with 2-D (04 and 05 are the parallel refusals); `an-1620-tan-08`, `-09`, `-11`, `-12`, `-13` are analytic-ahead with 2-D's gap on #1677; `meet-verb-1620` agrees with 2-D, with 3-D's gap on #1679. The English spellings are locked in the test file, not as rows (X8's patterns are Hebrew).
+
+**Measured.** 471 corpus (seed 0, through `confirmTaught`): **251/263 lines, 35/46 questions** — unchanged; no corpus line uses these sentences. The analytic suite (`src-analytic/` + `shell/`, 4,476 tests) is green with the floor change. Every new sentence records in ≤ 5 ms; the parallel refusal costs ~2.5 s, as the collapsed figure it replaces cost ~2 s (the multi-start runs out before giving up either way).
+
+**Not built, said out loud.**
+- **Stability.** Adding D re-solves the figure jointly and moves A, C and O (seed 0: r 3.46 → 1.31) — the analytic free-point property #1687 already files; 2-D's D is a derived point and moves nothing. Not changed here: the cure is that issue's, not this sentence's.
+- «המשיקים למעגל בנקודות A ו-C נפגשים ב-D» on an EMPTY canvas asks which circle (an unnamed circle is not created by a tangent), where 2-D is `not-handled`. Honest; the tangent's create-an-unnamed-circle path is the #1670 class and outside this stream.
+- 2-D's defects measured on the way, for #1677: "the tangents to circle O at A and C meet at D" refused as `crossingAlreadyNamed` (holder O); «… למעגל O נחתכים בנקודה D» `not-handled` while «נפגשים» builds; the plural «המשיקים … בנקודות A ו-C …» `not-handled`.
+- «AC ו-BD נפגשים בנקודה E» now builds as the crossing of the lines AC and BD, exactly as «AC ו-BD נחתכים» already did; 2-D also draws the segments and bounds E to them. That drawing difference predates this ADR (the «נחתכים» reading) and is S3's diagonals family.
+
+**Consequences.** `parser/parseAnalytic.ts` (`TANGENT_CIRCLE_HE/_EN`, `readTangentNoun`, `MEET_VERB_HE`, `AT_POINT_HE`, `sharedCircle`, `tangentsMeet`, the meet branch), `engine/types.ts` (`crossing-kind` `tangent`, `pieces`), `engine/apply.ts` (the `crossing-kind` arm), `engine/evaluate.ts` (`figureScale`, `openBoundFloor`'s `sampled`, stage two's `sampledScale`), `parser/catalogAnalytic.ts` (three entries), the parity fixture. Sibling check (docs/17 §1): 2-D is the reference and has the sentence; its three gaps above go to #1677; 3-D has no circles in the plane (X8).
+
+**Amendment 1 — 2026-10-03, the integrator's browser pre-play on PR #1695.** Typing «AC קוטר במעגל O» and then the sentence on an empty canvas was refused with «A כבר מוגדרת: "AC קוטר במעגל O" … לנקודה חדשה בחרו אות אחרת». That message tells the student to pick another letter for a "new point", which is wrong: the real reason is that the two tangents are parallel. The original lock *asserted* that hint (`definedBy`), and this ADR misread it as "naming the diameter".
+
+Measured on 4b2608ab with a sweep through `decideSubmit`. The integrator's hypothesis was that the sentence re-introduces A. It does not: the trial fold refers to the existing A, and the fault code was already `unsatisfiable`. Two separate defects showed up:
+
+| context, then the sentence (or its plural) | before | after |
+|---|---|---|
+| «AC קוטר במעגל O»; «מעגל O» with «AC קוטר» / «הקוטר AC» / «AC קוטר במעגל» / «AC קוטר במעגל O»; «A על המעגל» · «C על המעגל» · either diameter | `unsatisfiable` **with `reusedId: A`**, rendered as the "pick another letter" hint | `unsatisfiable`, naming the line, no hint |
+| «AC קוטר» / «הקוטר AC» / «AC קוטר במעגל» (unnamed circle), then «המשיק בנקודה A והמשיק בנקודה C נפגשים בנקודה D» or the plural | **recorded, A = C = D on one point, no fault** | `unsatisfiable`, naming the line |
+
+**Root causes.**
+1. `subjectIdsOf` (the #1423 hint's notion of "the point this line defines") counted every `declare`. A tangent declares its touch point only so it can be introduced if absent: «המשיק בנקודה A» refers to A, it does not define it.
+2. A diameter-defined circle has no radius parameter, so the floor of Decision 5 never applied. The solve collapsed A, C and D onto one point. Every scale-relative judge, including a `distinct` over the diameter's ends, measured against that collapsed span and held. This is the same class as Decision 5, reached through the vertices instead of a parameter.
+
+**Decision (amending 5).**
+- `subjectIdsOf` skips a `declare` whose id is a `tangent-line-at` touch point in the same line. `definingLineOf` still counts it, so a tangent sentence that introduced A remains A's defining line.
+- **A whole figure shrunk to a point is not a solution.** After the solve, `evaluate` compares `figureScale` of the solved figure (points and parameters) with that of the figure as sampled. Below `SOLVE_RESOLUTION` times the sampled scale, the last given is reported unsatisfied, as the thin-ring arm does (ADR-492's shortest infeasible prefix).
+- It applies only while the figure keeps freedom (`figureDofOf` > 0). A coincidence the givens force with no freedom left is #1254's `crossing-already-named` arm, which names the point already there. A figure whose sample was already one point never triggers.
+- The parameter floor of Decision 5 stays: it rejects the collapse earlier, inside stage two's attempts.
+- **A `distinct` over a diameter's ends was tried and dropped.** It did not catch the collapse, because `apartOf` is measured against the collapsed span. It also changed two existing verdicts: «BD קוטר במעגל» once BD is drawn no longer read as already-follows, and «BA קוטר» on A(0,0), B(0,0) gained a second fault. The collapse check covers the case.
+
+**Locks** (+2, now 15 in all): every diameter spelling × the sentence and its plural, with no `reusedId`; the unnamed-circle diameters × two spellings. Both fail on 4b2608ab (2 of 2).
+
+**Open for the operator.** «AC קוטר» (unnamed circle) followed by «המשיק בנקודה A והמשיק בנקודה C **למעגל O** נפגשים בנקודה D» records. «למעגל O» states a *second* circle O through A and C (ADR-AG-210, and the #1673 ruling that an unlabelled centre never answers to «O»), and the tangents to that circle meet. 2-D reads O as the one circle and refuses the sentence as parallel. Left as built and not locked: the question is on the round report.

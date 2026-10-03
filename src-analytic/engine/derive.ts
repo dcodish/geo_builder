@@ -11,6 +11,8 @@ import { reportedDof } from './carriers';
 import { drawableAt, viewBox, type Figure } from './evaluate';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
+import { resolveToolLetters } from './toolLetters';
+import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
 import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
@@ -111,7 +113,9 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       owner.push(index);
     }
   });
-  const { facts: resolved, minted } = resolveMints(parsed, owner);
+  const fresh = resolveToolLetters(parsed, owner);
+  const { facts: resolved, minted } = resolveMints(fresh.facts, owner);
+  minted.unshift(...fresh.minted);
   // The canonical circle's centre, named O by the tool (#1270) — inserted with its owning line, so the
   // fold and every per-line rollup below see it as part of the circle's sentence.
   const centred = nameCanonicalCentres(resolved, owner);
@@ -122,6 +126,10 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
   const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices } = fold(facts, owner);
   const construction: Construction = Object.keys(seedNames).length > 0 ? { ...folded, seedNames: { ...seedNames } } : folded;
+  // A tool letter whose point the fold did not create — the cevian ran to a point the figure already named the same
+  // way (ADR-AG-211), or its line was refused — named nothing, and the row must not claim it did (#1263's rule).
+  const present = new Set(construction.objects.map((o) => o.id));
+  minted.splice(0, minted.length, ...minted.filter((m) => present.has(m.id)));
   // Said on the circle's row only when the name was actually GIVEN — a default that yielded to a letter
   // already in the figure named nothing, and the list must not claim it did (#1263's rule).
   for (const i of centred.offered) if (effects[i] === 'created') minted.push({ index: owner[i], id: CENTRE_LETTER });
@@ -231,7 +239,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     let at = construction.constraints.indexOf(k);
     if (at < 0) {
       at = construction.constraints.findIndex(
-        (c) => c.t === 'choice' && c.options.includes(k),
+        (c) => c.t === 'choice' && c.options.some((o) => o === k || (o.t === 'all' && o.of.includes(k))),
       );
     }
     const fact = at >= 0 ? constraintFact[at] : undefined;
@@ -515,7 +523,9 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
   // A placeholder is a whole id or the SUFFIX of one (#1432 am. 1 — `circle-at-@mint:2,3`, `r_@mint:2,3` for a
   // circle centred on a coordinate point), so it is replaced up to the closing quote, never only as a whole string.
   const out = JSON.parse(text.replace(/@mint:[^"]*/g, (q) => JSON.stringify(names.get(q) ?? q).slice(1, -1))) as Fact[];
-  return { facts: out, minted };
+  // A segment to a minted point was keyed before the point had its name, and a segment id is its two ends SORTED —
+  // so it is keyed again from its (now named) ends, or «AP₁» typed later would name a second segment.
+  return { facts: out.map((f) => (f.t === 'segment' && f.id.includes(MINT_PREFIX) ? { ...f, id: segmentIdOf(f.a, f.b) } : f)), minted };
 }
 
 /**

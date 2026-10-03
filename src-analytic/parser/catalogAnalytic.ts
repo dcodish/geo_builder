@@ -120,6 +120,45 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'lines', family: 'F3', he: 'דרך P עובר ישר', en: 'a line through P' },
   { category: 'lines', family: 'F3', he: 'דרך P עובר ישר l3', en: 'line l3 through P' },
   /**
+   * The exam's constructions as declarative sentences (#1620 slice C, ADR-AG-207) — the perpendicular dropped from a
+   * point and its foot (corpus 5/5, 17/4, 20/4), the line through a point that cuts a side (13/4, 14/4), and the
+   * perpendicular named by its description (5/5). The imperatives («הורידו», «העבירו») are taught onto these.
+   */
+  { category: 'lines', family: 'F3', he: 'האנך מהנקודה B לציר ה-x', en: 'the perpendicular from B to the x-axis', needs: ['B(1,14)'] },
+  { category: 'lines', family: 'F3', he: 'האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D', en: 'the perpendicular from C to the x-axis meets it at D', needs: ['C(4,6)'] },
+  { category: 'lines', family: 'F3', he: 'D רגל האנך מ-C לציר ה-x', en: 'D is the foot of the perpendicular from C to the x-axis', needs: ['C(4,6)'] },
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'האנכים מהקודקודים A ו-C לציר ה-x חותכים אותו בנקודות E ו-F בהתאמה',
+    en: 'the perpendiculars from A and C to the x-axis meet it at E and F respectively',
+    needs: ['A(2,3)', 'C(5,7)'],
+  },
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'הישר העובר דרך הנקודה E מקביל לציר ה-y וחותך את הצלע AB בנקודה F',
+    en: 'the line through E parallel to the y-axis cuts side AB at F',
+    needs: ['A(0,0)', 'B(6,4)', 'E(3,-2)'],
+  },
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'הנקודה E נמצאת על האנך שהורידו מנקודה B לציר ה-x',
+    en: 'E is on the perpendicular from B to the x-axis',
+    needs: ['B(1,14)', 'האנך מהנקודה B לציר ה-x'],
+  },
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'המשיק והאנך נחתכים בנקודה D',
+    en: 'the tangent and the perpendicular intersect at D',
+    needs: ['נתון מעגל שמרכזו M(7,6) ורדיוסו 5', 'C(4,10)', 'המשיק למעגל בנקודה C', 'B(1,14)', 'האנך מהנקודה B לציר ה-x'],
+  },
+  { category: 'lines', family: 'F3', he: 'ישר דרך P מאונך ל-AB', en: 'line through P perpendicular to AB', needs: ['A(0,0)', 'B(4,3)', 'נקודה P'] },
+  { category: 'lines', family: 'F3', he: 'F רגל האנך מ-C ל-AD', en: 'F is the foot of the perpendicular from C to AD', needs: ['מרובע ABCD'] },
+  { category: 'lines', family: 'F3', he: 'אנך אמצעי ל-AB', en: 'the perpendicular bisector of AB', needs: ['A(0,0)', 'B(4,3)'] },
+  /**
    * A line by a POINT AND A SLOPE (#1278, ADR-AG-186) — written in point-slope form, the stated numbers
    * copied as given. The equation layer evaluates it as it stands (no CAS: nothing is simplified), so
    * the textbook's own form needs no arithmetic from the student or from the LLM lane, which had no
@@ -373,6 +412,10 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'the equation of the tangent to the circle at A is 3x+4y=25',
     needs: ['נתון מעגל x^2+y^2=25', 'A(3,4)'],
   },
+  // The two tangents meet (#1620 S7, ADR-AG-213) — 2-D's sentence, its plural, and the bare reference.
+  { category: 'circles', family: 'F5', he: 'המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D', en: 'the tangent at A and the tangent at C to circle O meet at D' },
+  { category: 'circles', family: 'F5', he: 'המשיקים למעגל O בנקודות A ו-C נפגשים בנקודה D', en: 'the tangents to circle O at A and C meet at D' },
+  { category: 'circles', family: 'F5', he: 'המשיקים נפגשים בנקודה D', en: 'the tangents meet at D', needs: ['מעגל O', 'המשיק למעגל O בנקודה A', 'המשיק למעגל O בנקודה C'] },
   { category: 'circles', family: 'F5', he: 'דרך P עובר משיק למעגל', en: 'a tangent to the circle passes through P', needs: ['נתון מעגל x^2+y^2=25', 'P(10,0)'] },
   { category: 'circles', family: 'F5', he: 'AB מיתר במעגל', en: 'AB is a chord of the circle', needs: ['נתון מעגל x^2+y^2=25'] },
   // Two chords of a circle not stated yet: the sentence states it on its centre letter, as 2-D does (#1670, ADR-AG-210).
@@ -915,6 +958,75 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     // (the foot beyond an endpoint is honest), but a reference card should show the ordinary case.
     needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
   },
+  // --- F16 · the cevian family completed (#1284, #1222, #1240; ADR-AG-209) ---
+  // The third ROLE (the angle bisector, by its triangle and by its angle), the meeting point of two
+  // bisectors, the bisector drawn alone, and the spellings that leave the target or the foot to the
+  // figure: «AD גובה» (the side from the one triangle), «גובה מ-A במשולש ABC» and «תיכון לצלע BC»
+  // (the tool names the foot), and the exam's plural with «בהתאמה» (7/4).
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'CE חוצה זווית C במשולש ABC',
+    en: 'CE is the angle bisector of angle C in triangle ABC',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'AD חוצה את הזווית BAC',
+    en: 'AD bisects angle BAC',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'E חיתוך חוצי הזוויות BAC ו-BCA',
+    en: 'E is the intersection of the bisectors of angles BAC and BCA',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'חוצה זווית ABC',
+    en: 'the bisector of angle ABC',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'AD גובה',
+    en: 'AD is the altitude',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)', 'משולש ABC'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'גובה מ-A במשולש ABC',
+    en: 'the altitude from A in triangle ABC',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'תיכון ליתר AB',
+    en: 'the median to the hypotenuse AB',
+    // ADR-AG-211 (#1222): the hypotenuse is named — or faces a STATED right angle; an open one is asked, never assumed.
+    needs: ['A(4,0)', 'B(0,3)', 'C(0,0)', 'משולש ישר-זווית ABC'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'תיכון לצלע BC',
+    en: 'the median to side BC',
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)', 'משולש ABC'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה',
+    en: 'OD and BE are the altitudes to sides BC and OC respectively',
+    needs: ['O(0,0)', 'B(4,8)', 'C(10,0)'],
+  },
   {
     category: 'derived',
     family: 'F16',
@@ -969,4 +1081,17 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'במלבן ABCD, הנקודה E נמצאת על הצלע DC',
     en: 'in rectangle ABCD, E is on side DC',
   },
+  /*
+   * --- DIAGONALS, EXTENSIONS, MIDSEGMENTS (#1620, ADR-AG-208) — 471 corpus sentences, each with 2-D's verdict ---
+   */
+  { category: 'points', family: 'F17', he: 'הנקודה E נמצאת על המשך הצלע BC', en: 'E is on the extension of side BC', needs: ['מרובע ABCD'] },
+  { category: 'points', family: 'F17', he: 'הנקודה E נמצאת על צלע BC כך ש-AE = AC', en: 'E is on side BC such that AE = AC', needs: ['משולש ABC'] },
+  { category: 'derived', family: 'F17', he: 'המשכי הצלעות AD ו-BC נפגשים בנקודה E', en: 'the extensions of sides AD and BC meet at E', needs: ['מרובע ABCD'] },
+  { category: 'derived', family: 'F17', he: 'המשך AC חותך את מעגל O בנקודה E', en: 'the extension of AC cuts circle O at E', needs: ['מעגל O', 'משולש ABC'] },
+  { category: 'derived', family: 'F17', he: 'האלכסונים AC ו-BD נפגשים בנקודה E', en: 'the diagonals AC and BD meet at E', needs: ['מרובע ABCD'] },
+  { category: 'derived', family: 'F17', he: 'E היא נקודת החיתוך של אלכסוני הדלתון', en: 'E is the intersection of the diagonals of the kite', needs: ['דלתון ABCD'] },
+  { category: 'lines', family: 'F17', he: 'האלכסון AC במרובע ABCD', en: 'diagonal AC of quadrilateral ABCD' },
+  { category: 'derived', family: 'F17', he: 'קטע האמצעים לצלע BC במשולש ABC', en: 'midsegment to BC in triangle ABC' },
+  { category: 'derived', family: 'F17', he: 'קטע האמצעים בטרפז ABCD', en: 'midsegment of trapezoid ABCD' },
+  { category: 'points', family: 'F17', he: 'שכל קודקודיו מונחים על הצירים', en: 'all the vertices of the trapezoid lie on the axes', needs: ['טרפז ABCD'] },
 ];

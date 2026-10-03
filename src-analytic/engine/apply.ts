@@ -26,6 +26,7 @@ import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, pr
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { RESERVED_SYMBOLS, radiusSymbol, toolSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
+import { cevianFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
 import {
   CENTRE_SENTINEL,
   CIRCLE_SENTINEL,
@@ -122,6 +123,12 @@ export type ApplyErrorCode =
    */
   | 'undistinguished-diagonal'
   /**
+   * «האלכסונים AB ו-CD» where «מרובע ABCD» makes AB and CD two of its SIDES (#1620, ADR-AG-208). The letters
+   * say which segments; the noun says they are diagonals; the figure says they are not — so the sentence is
+   * refused, never quietly re-read as the quadrilateral's real diagonals.
+   */
+  | 'not-a-diagonal'
+  /**
    * NAMING SOMETHING THAT ALREADY HAS A NAME (#1153).
    *
    * «P מרכז המעגל I» then «O מרכז המעגל I» minted a SECOND point on top of the first, and a
@@ -140,6 +147,25 @@ export type ApplyErrorCode =
    */
   | 'repeated-vertex'
   | 'out-of-scope'
+  /**
+   * The cevian parser refusal a cevian resolved at M1 can also reach (#1240, ADR-AG-209): «AB גובה» once the
+   * figure says `B` is a vertex of the side the altitude would be drawn to.
+   */
+  | 'degenerate-role'
+  /**
+   * «AD גובה» · «גובה לצלע BC» where the figure holds the apex (or the side) in SEVERAL triangles with
+   * different targets (#1240, ADR-AG-209) — a question, never a guess (02c R32): the student names the side
+   * or the triangle. And `cevian-no-triangle` when it holds it in none: there is no side to draw it to.
+   */
+  | 'ambiguous-cevian'
+  | 'cevian-no-triangle'
+  /**
+   * «תיכון ליתר» where the figure leaves the right angle open (a right triangle's noun alone) or holds several right
+   * triangles — a QUESTION: which side is the hypotenuse (#1222, operator ruling 2026-10-02 on #1620). And
+   * `ambiguous-no-right-angle` where no triangle has a right angle at all: there is no hypotenuse.
+   */
+  | 'ambiguous-hypotenuse'
+  | 'ambiguous-no-right-angle'
   /**
    * A STATED value substituted into a symbol whose domain it violates (#1432 amendment 1) — «רדיוס
    * המעגל הוא -3», «שרדיוסו 0». The radius symbol carries `{min: 0, minOpen}` and the substitution
@@ -161,7 +187,8 @@ export type ApplyErrorCode =
  * (area, meet), whose kite example is the right remedy.
  */
 export interface HostRef {
-  kind: 'circle' | 'parabola' | 'ellipse' | 'line' | 'polygon';
+  /** `perpendicular` (#1620, ADR-AG-207): «האנך» — the one perpendicular dropped from a point in the figure. */
+  kind: 'circle' | 'parabola' | 'ellipse' | 'line' | 'polygon' | 'perpendicular';
   found: number;
   need?: number;
   /**
@@ -1647,9 +1674,32 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * figure makes it unambiguous; none or several makes it a refusal, never a pick.
      */
     case 'meet-of': {
-      const rings = c.objects.filter(
-        (o) => o.kind === 'polygon' && o.vertices.length === f.arity,
-      ) as PolygonObject[];
+      /*
+       * THE DIAGONALS NAMED BY THEIR LETTERS (#1620, ADR-AG-208) — «האלכסונים AC ו-BD נפגשים בנקודה E». A ring of
+       * those four vertices is the quadrilateral they are diagonals OF, so they must be its diagonals: «AB ו-CD» in
+       * «מרובע ABCD» names two of its sides, and is refused rather than read as the other pair. With no such ring
+       * the two named segments stand alone, and their meet is the `diagonals` rule over the named order.
+       */
+      if (f.named) {
+        const named = f.named;
+        const key = (a: Id, b: Id) => [a, b].sort().join('');
+        const wanted = new Set([key(named[0], named[2]), key(named[1], named[3])]);
+        const same = (c.objects.filter((o) => o.kind === 'polygon') as PolygonObject[]).filter(
+          (o) => o.vertices.length === 4 && named.every((x) => o.vertices.includes(x)),
+        );
+        for (const ring of same) {
+          const [p, q, r, s] = ring.vertices;
+          if (!wanted.has(key(p, r)) || !wanted.has(key(q, s))) {
+            return { ok: false, error: { code: 'not-a-diagonal', detail: f.src } };
+          }
+        }
+        return applyFact(c, { t: 'derived', id: f.id, rule: { t: 'diagonals', v: [...named] }, src: f.src });
+      }
+      /*
+       * THE NOUN SELECTS (#1620, ADR-AG-208) — «אלכסוני הטרפז» is the trapezoid's, even beside another quadrilateral,
+       * and is refused in a figure with no trapezoid; the generic «המרובע» is any ring of the arity (2-D's verdicts).
+       */
+      const rings = (ringsNamed(c.objects, f.noun) as PolygonObject[]).filter((o) => o.vertices.length === f.arity);
       if (rings.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
       const v = rings[0].vertices;
       const rule: DerivedRule =
@@ -1758,6 +1808,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (prior.kind !== 'line-at') {
           return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };
         }
+        // A carrier line (`drawn: false`) stated AS A LINE is now drawn (#1620, ADR-AG-207) — the same object, upgraded.
+        if (prior.drawn === false && f.drawn !== false) {
+          const { drawn: _carrier, ...line } = prior;
+          return { ok: true, effect: 'narrowed', next: { ...c, objects: c.objects.map((o) => (o.id === f.id ? line : o)) } };
+        }
         return { ok: true, effect: 'known', next: c };
       }
       return {
@@ -1767,7 +1822,15 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           ...c,
           objects: [
             ...c.objects,
-            { kind: 'line-at', id: f.id, through: f.through, dir: f.dir, perp: f.perp, ...(f.name ? { name: f.name } : {}) },
+            {
+              kind: 'line-at',
+              id: f.id,
+              through: f.through,
+              dir: f.dir,
+              perp: f.perp,
+              ...(f.name ? { name: f.name } : {}),
+              ...(f.drawn === false ? { drawn: false as const } : {}),
+            },
           ],
         },
       };
@@ -1926,6 +1989,23 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (!named) return statingNamedCircle(c, f.circle, f) ?? { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
         if (curveKindOf(named) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
         return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: named.id }, src: f.src });
+      }
+      /*
+       * «האנך» — the one PERPENDICULAR the figure drew (#1620, ADR-AG-207): a `foot` derived point, whose line is the
+       * point it is dropped from through the foot. Narrowed by the description when the sentence gives one («האנך
+       * שהורידו מנקודה B לציר ה-x»). A reference, never a construction: none or several is the «המשיק» refusal.
+       */
+      if (f.kind === 'perpendicular') {
+        const feet = c.objects.filter(
+          (o): o is Extract<GeoObject, { kind: 'derived' }> =>
+            o.kind === 'derived' &&
+            o.rule.t === 'foot' &&
+            (!f.foot || (o.rule.from === f.foot.from && (!f.foot.onto || sameDerivation(o.rule, { t: 'foot', from: f.foot.from, onto: f.foot.onto })))),
+        );
+        if (feet.length !== 1) return { ok: false, error: noHost(f.src, 'perpendicular', feet.length) };
+        const foot = feet[0];
+        if (foot.rule.t !== 'foot') return { ok: false, error: noHost(f.src, 'perpendicular', 0) };
+        return applyFact(c, { t: 'constraint', k: { t: 'on-line-2pt', id: f.id, a: foot.rule.from, b: foot.id }, src: f.src });
       }
       // «המשיק» — the one tangent OBJECT (#1619 B3): a line built at a touch point, never any line.
       const matches = c.objects.filter((o) => (f.kind === 'tangent' ? isTangentObject(o) : curveKindOf(o) === f.kind));
@@ -2182,12 +2262,17 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // `on-kind` rule, one arity up, resolved by the same fit-level kind test.
       const point = objectById(c, f.id);
       if (!point || !isPositional(point)) return { ok: false, error: unknownRef(c, f.id) };
-      const pair = c.objects.filter((o) => curveKindOf(o) === f.kind);
-      if (pair.length !== 2) return { ok: false, error: noHost(f.src, f.kind, pair.length, 2) };
-      return applyAll(
-        c,
-        pair.map((o) => ({ t: 'constraint' as const, k: { t: 'on-curve' as const, id: f.id, curve: o.id }, src: f.src })),
-      );
+      // «המשיקים נפגשים בנקודה D» (#1620 S7, ADR-AG-213): the TANGENT objects, by the test «המשיק» resolves with.
+      const pair = c.objects.filter((o) => (f.kind === 'tangent' ? isTangentObject(o) : curveKindOf(o) === f.kind));
+      if (pair.length !== 2) return { ok: false, error: noHost(f.src, f.kind === 'tangent' ? 'line' : f.kind, pair.length, 2) };
+      // …and, as 2-D draws that sentence, the piece from each touch point to the crossing.
+      const pieces: Fact[] = f.pieces
+        ? pair.flatMap((o) => (o.kind === 'line-at' ? [{ t: 'segment' as const, id: segmentIdOf(o.through, f.id), a: o.through, b: f.id, src: f.src }] : []))
+        : [];
+      return applyAll(c, [
+        ...pair.map((o) => ({ t: 'constraint' as const, k: { t: 'on-curve' as const, id: f.id, curve: o.id }, src: f.src })),
+        ...pieces,
+      ]);
     }
 
     case 'tangent-of': {
@@ -2488,13 +2573,36 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'area-of': {
-      const rings = c.objects.filter(
-        (o) => o.kind === 'polygon' && o.noun === f.noun,
-      ) as PolygonObject[];
+      // The rings the noun names — `ringsNamed`, the one answer for a contextual shape noun (#1620, ADR-AG-208):
+      // «שטח הטרפז» is a right trapezoid's area too, as «אלכסוני הטרפז» are its diagonals.
+      const rings = ringsNamed(c.objects, f.noun) as PolygonObject[];
       if (rings.length !== 1) {
         return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
       }
       return applyFact(c, { t: 'constraint', k: { t: 'area', ids: rings[0].vertices, value: f.value }, src: f.src });
+    }
+
+    /**
+     * «שכל קודקודיו מונחים על הצירים» — EVERY VERTEX ON SOME AXIS (#1620 item 3, ADR-AG-208).
+     *
+     * The ring is the one the sentence refers to («קודקודיו» — its vertices; «קודקודי הטרפז»). Each vertex is on
+     * the x-axis or the y-axis and the sentence does not say which, so the statement is ONE discrete choice over
+     * the 2ⁿ assignments, each option the conjunction of its n incidences (`all`): a choice per vertex would
+     * cycle on one seed index and never mix the axes. Which assignment the figure takes is the seed's preference
+     * among the options the other givens leave alive (#1642's `evaluateTryingChoices`), never a guess the tool
+     * makes — and an assignment the ring cannot be drawn on (three vertices on one axis) is simply not admitted.
+     */
+    case 'vertices-on-axes': {
+      const rings = ringsNamed(c.objects, f.noun) as PolygonObject[];
+      if (rings.length !== 1) return { ok: false, error: noHost(f.src, 'polygon', rings.length) };
+      const v = rings[0].vertices;
+      const onAxis = (id: Id, axis: 'x' | 'y'): Constraint =>
+        axis === 'x' ? { t: 'on-line', id, a: 0, b: 1, c: 0 } : { t: 'on-line', id, a: 1, b: 0, c: 0 };
+      const options: Constraint[] = [];
+      for (let mask = 0; mask < 1 << v.length; mask += 1) {
+        options.push({ t: 'all', of: v.map((id, i) => onAxis(id, (mask >> i) & 1 ? 'y' : 'x')) });
+      }
+      return applyFact(c, { t: 'constraint', k: { t: 'choice', options }, src: f.src });
     }
 
     case 'right-angle': {
@@ -2523,6 +2631,92 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         k: { t: 'angle-ratio', left: left.ref, right: right.ref, k: f.rhs.k },
         src: f.src,
       });
+    }
+
+    /**
+     * A CEVIAN WHOSE TARGET THE FIGURE DETERMINES (#1240, #1222; ADR-AG-209) — «AD גובה», «תיכון מנקודה A»,
+     * «גובה לצלע BC». The triangles of the figure that hold the named apex (or both ends of the named side)
+     * are the candidates; one target builds through the one lowering, several ask, none refuses.
+     */
+    case 'cevian-of': {
+      const targets = new Map<string, { apex: Id; u: Id; v: Id }>();
+      let openRight = false;
+      // Both named («גובה מ-A לצלע BC בנקודה D»): nothing to resolve.
+      if (f.apex && f.side) targets.set('named', { apex: f.apex, u: f.side[0], v: f.side[1] });
+      for (const o of f.apex && f.side ? [] : c.objects) {
+        if (o.kind !== 'polygon' || o.vertices.length !== 3) continue;
+        const ring = o.vertices;
+        if (f.hypotenuse) {
+          // The right angle the figure STATES — a constraint, never the noun's open choice (ADR-052: never assume C).
+          const right = ring.filter((v) => {
+            const [p, q] = ring.filter((x) => x !== v);
+            const k = rightAngleAt(v, p, q);
+            return c.constraints.some((g) => g.t !== 'choice' && sameConstraint(g, k));
+          });
+          if (right.length === 1) {
+            const [u, v] = ring.filter((x) => x !== right[0]);
+            targets.set(`${right[0]}|${[u, v].sort().join('')}`, { apex: right[0], u, v });
+          } else if (right.length === 0 && o.noun && /ישר/.test(o.noun)) openRight = true;
+        } else if (f.side) {
+          const [u, v] = f.side;
+          if (!ring.includes(u) || !ring.includes(v) || u === v) continue;
+          const apex = ring.find((x) => x !== u && x !== v)!;
+          if (f.apex && f.apex !== apex) continue;
+          targets.set(`${apex}|${[u, v].sort().join('')}`, { apex, u, v });
+        } else if (f.apex && ring.includes(f.apex)) {
+          const [u, v] = ring.filter((x) => x !== f.apex);
+          targets.set(`${f.apex}|${[u, v].sort().join('')}`, { apex: f.apex, u, v });
+        }
+      }
+      if (f.hypotenuse && (openRight ? targets.size === 0 : false)) return { ok: false, error: { code: 'ambiguous-hypotenuse', detail: f.src } };
+      if (f.hypotenuse && targets.size === 0) return { ok: false, error: { code: 'ambiguous-no-right-angle', detail: f.src } };
+      if (f.hypotenuse && (targets.size > 1 || openRight)) return { ok: false, error: { code: 'ambiguous-hypotenuse', detail: f.src } };
+      if (targets.size === 0) return { ok: false, error: { code: 'cevian-no-triangle', detail: f.src } };
+      if (targets.size > 1) return { ok: false, error: { code: 'ambiguous-cevian', detail: f.src } };
+      const [{ apex, u, v }] = [...targets.values()];
+      if (f.foot === apex || f.foot === u || f.foot === v) return { ok: false, error: { code: 'degenerate-role', detail: f.src } };
+      if (f.toolFoot && !objectById(c, f.foot)) {
+        // The same point derived the same way already has a name (#1153): the cevian runs to IT.
+        const rule = toolFootRule(f.role, apex, u, v);
+        const same = c.objects.find((o) => o.kind === 'derived' && sameDerivation(o.rule, rule));
+        if (same) return applyAll(c, [{ t: 'segment', id: `seg-${[apex, same.id].sort().join('')}`, a: apex, b: same.id, src: f.src }]);
+        return applyAll(c, toolFootFacts(f.role, apex, f.foot, u, v, f.src));
+      }
+      return applyAll(c, cevianFacts(f.role, apex, f.foot, u, v, f.src));
+    }
+
+    /**
+     * «AD חוצה את הזווית BAC» (#1284, ADR-AG-209) — 2-D's verdict: a `p` the figure does not have yet is the
+     * bisector's foot on the line through the angle's ray points; an existing `p` lies on the bisector's ray.
+     */
+    case 'bisects': {
+      const at = resolveAngleName(c, f.at, f.src);
+      if (!at.ok) return at;
+      for (const id of [at.ref.v, at.ref.a, at.ref.b]) {
+        const o = objectById(c, id);
+        if (!o || !isPositional(o)) return { ok: false, error: unknownRef(c, id) };
+      }
+      // «חוצה זווית ABC» on its own: the bisector LINE through the vertex, named by its angle so it is drawn once.
+      if (f.p === undefined) {
+        const [a, b] = [at.ref.a, at.ref.b].sort();
+        return applyFact(c, {
+          t: 'line-at',
+          id: `line-bisector-${a}${at.ref.v}${b}`,
+          through: at.ref.v,
+          dir: { k: 'bisector', v: at.ref.v, a, b },
+          perp: false,
+          src: f.src,
+        });
+      }
+      if (f.p === at.ref.a || f.p === at.ref.b) return { ok: false, error: { code: 'degenerate-role', detail: f.src } };
+      const prior = objectById(c, f.p);
+      if (prior && !isPositional(prior)) {
+        return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };
+      }
+      return applyAll(
+        c,
+        prior ? onBisectorFacts(at.ref, f.p, f.src) : cevianFacts('bisector', at.ref.v, f.p, at.ref.a, at.ref.b, f.src),
+      );
     }
 
     /**
@@ -2607,7 +2801,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
               : f.sel.kind === 'coord-compare'
                 ? // Both points of «x_B > x_D» must exist (#1462); a value names none.
                   [f.sel.id, ...('point' in f.sel.rhs ? [f.sel.rhs.point] : [])]
-                : [f.sel.id, f.sel.a, f.sel.b];
+                : f.sel.kind === 'angle-side'
+                  ? [f.sel.id, f.sel.v, f.sel.a, f.sel.b]
+                  : [f.sel.id, f.sel.a, f.sel.b];
       for (const id of refs) {
         const o = objectById(c, id);
         if (!o || !isPositional(o)) {
@@ -2687,7 +2883,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         // A centre names an equation curve; a touch point names two circles of any construction (#1504), and
         // a side's touch point one circle of any construction (#1619 B2).
         const anyCircle = f.t === 'derived' && (f.rule.t === 'touch-point' || f.rule.t === 'side-touch');
-        const ok = anyCircle ? !!o && curveKindOf(o) === 'circle' : !!o && o.kind === 'curve';
+        // A foot is dropped onto any LINE object — stated by its equation, constructed, a tangent (#1620, ADR-AG-207).
+        const anyLine = f.t === 'derived' && f.rule.t === 'foot';
+        const ok = anyCircle ? !!o && curveKindOf(o) === 'circle' : anyLine ? !!o && curveKindOf(o) === 'line' : !!o && o.kind === 'curve';
         if (!ok) {
           return { ok: false, error: unknownRef(c, curveRef) };
         }

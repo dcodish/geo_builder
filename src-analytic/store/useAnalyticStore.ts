@@ -94,6 +94,16 @@ export type InputError =
   | { key: 'degenerate-role'; detail: string }
   /** A cevian named by its triangle whose apex is not a vertex of that triangle (#1165). */
   | { key: 'apex-not-a-vertex'; detail: string }
+  /** An angle bisector that does not start at its angle's vertex (#1284, ADR-AG-209). */
+  | { key: 'bisector-wrong-apex'; detail: string }
+  /** A cevian whose target the figure leaves open — the apex (or side) in several triangles (#1240, ADR-AG-209). */
+  | { key: 'ambiguous-cevian'; detail: string }
+  /** A cevian whose apex (or side) is in no triangle of the figure (#1240, ADR-AG-209). */
+  | { key: 'cevian-no-triangle'; detail: string }
+  /** «תיכון ליתר» with the right angle open, or several right triangles — asks which side is the hypotenuse (#1222). */
+  | { key: 'ambiguous-hypotenuse'; detail: string }
+  /** «תיכון ליתר» with no right angle in the figure (#1222). */
+  | { key: 'ambiguous-no-right-angle'; detail: string }
   /** A crossing the student named that the figure already names — carrying WHO holds it (#1175). */
   | { key: 'crossing-already-named'; detail: string; holder: string }
   /** A crossing of a line with itself — «הישר AB עם הישר BA» names no point (#1255). */
@@ -139,6 +149,8 @@ export type InputError =
   | { key: 'out-of-domain'; detail: string; domain?: { min?: number; minOpen?: boolean; max?: number; maxOpen?: boolean; exclude?: number[] } }
   /** «האלכסון הראשי» where the shape distinguishes no principal diagonal (#1070). */
   | { key: 'undistinguished-diagonal'; detail: string }
+  /** «האלכסונים AB ו-CD» where the quadrilateral makes them sides (#1620, ADR-AG-208). */
+  | { key: 'not-a-diagonal'; detail: string }
   /**
    * A naming of something that already has a name (#1153) — carrying WHO holds it.
    *

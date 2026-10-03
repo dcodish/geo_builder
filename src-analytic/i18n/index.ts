@@ -108,6 +108,10 @@ const he = {
   symAbs: 'אורך הקטע',
   symDist: 'מרחק בין שתי נקודות',
   symComponent: 'שיעור ה-x של נקודה',
+  symPerp: 'מאונך ל־',
+  symPar: 'מקביל ל־',
+  symAngle: 'זווית',
+  symDeg: 'מעלות',
   // A vertical segment HAS no slope, and that is an answer rather than an absence (#1078).
   slopeVertical: 'אנכי (אין שיפוע)',
   // #1322 — the angle a line makes with the positive x-axis, beside its slope (m = tan α)
@@ -219,6 +223,8 @@ const he = {
   'locus.circle.2': 'שני מעגלים',
   'locus.parabola.2': 'שתי פרבולות',
   'locus.ellipse.2': 'שתי אליפסות',
+  errNotADiagonal:
+    'האותיות האלה הן צלעות של המרובע, לא אלכסונים שלו: "{{detail}}". אלכסון מחבר שני קודקודים שאינם סמוכים, למשל «האלכסונים AC ו-BD נפגשים בנקודה E» במרובע ABCD.',
   errNoPrincipalDiagonal:
     'בצורה הזאת אין אלכסון ראשי ואלכסון משני — ההבחנה הזאת קיימת רק בצורות כמו דלתון: "{{detail}}". אפשר לציין את האלכסון לפי הקודקודים, למשל «משוואת האלכסון AC היא y=2x».',
   errAmbiguousShape:
@@ -234,6 +240,8 @@ const he = {
   'errHost.many.ellipse': 'יש בשרטוט יותר מאליפסה אחת, ולא ברור לאיזו מהן המשפט מתייחס: "{{detail}}".',
   'errHost.none.line': 'אין בשרטוט ישר שהמשפט יכול להתייחס אליו: "{{detail}}". הגדירו קודם את הישר, למשל «הישר l1: y=2x+1».',
   'errHost.many.line': 'יש בשרטוט יותר מישר אחד, ולא ברור לאיזה מהם המשפט מתייחס: "{{detail}}". כתבו במשפט את שם הישר, למשל «הישר l1».',
+  'errHost.none.perpendicular': 'אין בשרטוט אנך שהמשפט יכול להתייחס אליו: "{{detail}}". הורידו קודם את האנך, למשל «האנך מהנקודה B לציר ה-x».',
+  'errHost.many.perpendicular': 'יש בשרטוט יותר מאנך אחד, ולא ברור לאיזה מהם המשפט מתייחס: "{{detail}}". כתבו מאיזו נקודה ואל איזה ישר, למשל «האנך מהנקודה B לציר ה-x».',
   'errHost.none.polygon': 'אין בשרטוט מצולע שהמשפט יכול להתייחס אליו: "{{detail}}". כתבו את הקודקודים, למשל «היקף המשולש ABC הוא 12».',
   'errHost.many.polygon': 'יש בשרטוט יותר ממצולע אחד כזה, ולא ברור לאיזה מהם המשפט מתייחס: "{{detail}}". כתבו את הקודקודים, למשל «היקף המשולש ABC הוא 12».',
   'errHost.pair.line': 'המשפט מתייחס לשני ישרים בלי לתת להם שמות, ובשרטוט יש {{found}}: "{{detail}}". כתבו את שמות הישרים, למשל «E נקודת החיתוך של הישרים l1 ו-l2».',
@@ -281,13 +289,31 @@ const he = {
   // #1231 — names the STATEMENT and the reason, never internal state, and shows what a correct
   // sentence looks like: a median or an altitude runs from a vertex to the side facing it.
   errDegenerateRole:
-    'תיכון וגובה יוצאים מקודקוד אל הצלע שמולו, ובמשפט "{{detail}}" הקודקוד עצמו נמצא על הצלע הזאת ' +
+    'תיכון, גובה וחוצה זווית יוצאים מקודקוד אל הצלע שמולו, ובמשפט "{{detail}}" הקודקוד עצמו נמצא על הצלע הזאת ' +
     '(או שהוא גם הקודקוד וגם הרגל). אפשר לכתוב למשל "AD תיכון לצלע BC".',
   // #1165 — «XD תיכון במשולש ABC». The triangle spelling works by removing the apex from the ring,
   // so an apex outside it leaves three candidate sides and nothing to choose between them.
   errApexNotAVertex:
-    'תיכון או גובה יוצאים מקודקוד של המשולש, ובמשפט "{{detail}}" הקודקוד שנכתב אינו אחד מקודקודי ' +
+    'תיכון, גובה או חוצה זווית יוצאים מקודקוד של המשולש, ובמשפט "{{detail}}" הקודקוד שנכתב אינו אחד מקודקודי ' +
     'המשולש. אפשר לכתוב את הקודקוד שבמשולש, למשל "AD תיכון במשולש ABC", או לציין את הצלע במפורש.',
+  // #1284 (ADR-AG-209) — the bisector runs FROM the vertex of the angle it bisects.
+  errBisectorWrongApex:
+    'חוצה זווית יוצא מקודקוד הזווית שהוא חוצה, ובמשפט "{{detail}}" הקטע אינו יוצא מהקודקוד הזה. ' +
+    'כתבו קטע שמתחיל בקודקוד הזווית, למשל "AD חוצה את הזווית BAC".',
+  // #1240 (ADR-AG-209) — a cevian whose target the figure does not determine: ask, never guess.
+  errAmbiguousCevian:
+    'הקודקוד או הצלע במשפט "{{detail}}" שייכים ליותר ממשולש אחד בשרטוט, ולכן לא ברור לאיזו צלע הוא יורד. ' +
+    'אפשר לציין את הצלע או את המשולש, למשל "AD גובה לצלע BC" או "AD גובה במשולש ABC".',
+  // #1222 (ADR-AG-211) — the hypotenuse is the side facing a STATED right angle; an open one is asked, never assumed.
+  errAmbiguousHypotenuse:
+    'לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: "{{detail}}". ' +
+    'כתבו איזו צלע היא היתר, למשל "תיכון ליתר AB", או איזו זווית ישרה, למשל "זווית C ישרה".',
+  errCevianNoRightAngle:
+    'במשפט "{{detail}}" אין בשרטוט משולש ישר-זווית, ולכן אין יתר. ' +
+    'אפשר לציין קודם זווית ישרה, למשל "זווית C ישרה", או לכתוב את הצלע במפורש, למשל "תיכון לצלע AB".',
+  errCevianNoTriangle:
+    'במשפט "{{detail}}" אין בשרטוט משולש שהקודקוד או הצלע שייכים לו, ולכן אין צלע שאליה הוא יורד. ' +
+    'אפשר להגדיר קודם את המשולש, או לכתוב את הצלע במפורש, למשל "AD גובה לצלע BC".',
   // #1175 — the refusal's job is to tell them WHICH point is already there. It names the holder and
   // the reason, so a student who mis-read their own figure learns the thing they got wrong.
   errCrossingAlreadyNamed:
@@ -480,6 +506,10 @@ const en: typeof he = {
   symAbs: 'the length of a segment',
   symDist: 'distance between two points',
   symComponent: 'the x-coordinate of a point',
+  symPerp: 'perpendicular to',
+  symPar: 'parallel to',
+  symAngle: 'angle',
+  symDeg: 'degrees',
   slopeVertical: 'vertical (no slope)',
   angleWithX: 'angle with the x-axis',
   secParams: 'Parameters',
@@ -569,6 +599,9 @@ const en: typeof he = {
   'locus.circle.2': 'two circles',
   'locus.parabola.2': 'two parabolas',
   'locus.ellipse.2': 'two ellipses',
+  errNotADiagonal:
+    'Those letters name sides of the quadrilateral, not its diagonals: "{{detail}}". A diagonal joins two ' +
+    'vertices that are not adjacent, for example "the diagonals AC and BD meet at E" in quadrilateral ABCD.',
   errNoPrincipalDiagonal:
     'This shape has no principal and secondary diagonal — that distinction exists only for shapes ' +
     'like a kite: "{{detail}}". Name the diagonal by its vertices instead, for example "the ' +
@@ -583,6 +616,8 @@ const en: typeof he = {
   'errHost.many.ellipse': 'Your figure has more than one ellipse, so it is unclear which one this sentence means: "{{detail}}".',
   'errHost.none.line': 'There is no line in your figure for this sentence to refer to: "{{detail}}". Define the line first, e.g. "line l1: y=2x+1".',
   'errHost.many.line': 'Your figure has more than one line, so it is unclear which one this sentence means: "{{detail}}". Name the line, e.g. "line l1".',
+  'errHost.none.perpendicular': 'There is no perpendicular in your figure for this sentence to refer to: "{{detail}}". Drop the perpendicular first, e.g. "the perpendicular from B to the x-axis".',
+  'errHost.many.perpendicular': 'Your figure has more than one perpendicular, so it is unclear which one this sentence means: "{{detail}}". Say from which point and onto which line, e.g. "the perpendicular from B to the x-axis".',
   'errHost.none.polygon': 'There is no polygon in your figure for this sentence to refer to: "{{detail}}". Write its vertices, e.g. "the perimeter of triangle ABC is 12".',
   'errHost.many.polygon': 'Your figure has more than one such polygon, so it is unclear which one this sentence means: "{{detail}}". Write its vertices, e.g. "the perimeter of triangle ABC is 12".',
   'errHost.pair.line': 'This sentence refers to two unnamed lines, and your figure has {{found}}: "{{detail}}". Name the lines, e.g. "E is the intersection of lines l1 and l2".',
@@ -627,13 +662,28 @@ const en: typeof he = {
   errRepeatedVertex:
     'The same letter appears more than once in "{{detail}}". Each vertex needs its own name.',
   errDegenerateRole:
-    'A median or an altitude runs from a vertex to the side OPPOSITE it, and in "{{detail}}" that ' +
+    'A median, an altitude or an angle bisector runs from a vertex to the side OPPOSITE it, and in "{{detail}}" that ' +
     'vertex lies on the side itself (or is its own foot). Write it as, for example, ' +
     '"AD is the median to side BC".',
   errApexNotAVertex:
-    'A median or an altitude starts at a VERTEX of the triangle, and in "{{detail}}" the point ' +
+    'A median, an altitude or an angle bisector starts at a VERTEX of the triangle, and in "{{detail}}" the point ' +
     'written is not one of that triangle’s vertices. Use a vertex of the triangle — for ' +
     'example "AD is the median in triangle ABC" — or name the side outright.',
+  errBisectorWrongApex:
+    'An angle bisector starts at the VERTEX of the angle it bisects, and the segment in "{{detail}}" does not. ' +
+    'Start the segment at the angle’s vertex — for example "AD bisects angle BAC".',
+  errAmbiguousCevian:
+    'The vertex or side in "{{detail}}" belongs to more than one triangle in your figure, so it is unclear which side it is drawn to. ' +
+    'Name the side or the triangle — for example "AD is the altitude to side BC" or "AD is the altitude in triangle ABC".',
+  errAmbiguousHypotenuse:
+    'Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: "{{detail}}". ' +
+    'Name the hypotenuse — for example "the median to the hypotenuse AB" — or the right angle, for example "angle C is right".',
+  errCevianNoRightAngle:
+    'In "{{detail}}" there is no right triangle in your figure, so there is no hypotenuse. ' +
+    'State a right angle first, for example "angle C is right", or name the side outright, for example "the median to side AB".',
+  errCevianNoTriangle:
+    'In "{{detail}}" the vertex or side belongs to no triangle in your figure, so there is no side to draw it to. ' +
+    'Define the triangle first, or name the side outright — for example "AD is the altitude to side BC".',
   errCrossingAlreadyNamed:
     'Those lines meet at {{holder}}, and that point already has a name. "{{detail}}" would give it a second one. If you meant a different point, check which two lines cross there.',
   errSelfCrossing:

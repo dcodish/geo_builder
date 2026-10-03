@@ -26,13 +26,19 @@
  * Constructive forms («מעגל שמרכזו M ורדיוסו 5») synthesize the same `Expr`, so there is one
  * representation, not two.
  */
-import type { DerivedRule } from './derived';
+import type { DerivedRule, FootLine } from './derived';
 import type { AngleName, Constraint, Direction, TangentLineRef } from './solve';
 import type { Expr } from './expr';
 import type { LengthExpr } from './lengths';
 import { lineIdOf, numeralCurveId } from './names';
 
 export type Id = string;
+
+/** A perpendicular named by its DESCRIPTION — the point it is dropped from and, when said, the line it is dropped onto (#1620). */
+export interface PerpRef {
+  from: Id;
+  onto?: FootLine;
+}
 
 // ---------------------------------------------------------------------------
 // Parameters and the THREE kinds of inequality (ADR-AG-005 D7)
@@ -242,6 +248,37 @@ export type Fact =
       rhs: { t: 'value'; value: Expr } | { t: 'angle'; of: AngleName; k: Expr };
     })
   /**
+   * A CEVIAN WHOSE TARGET ONLY THE FIGURE KNOWS (#1240, #1222; ADR-AG-209) — «AD גובה», «תיכון מנקודה A»,
+   * «גובה לצלע BC». The sentence names the apex, or the side, and not both: given «משולש ABC», apex `A`
+   * determines side `BC` and side `BC` determines apex `A`. Which triangle holds them is a question about the
+   * construction, so it is resolved at M1 (the `right-angle` seam): exactly one triangle builds through
+   * `cevianFacts`; several ask (`ambiguous-cevian`); none is refused (`cevian-no-triangle`). `foot` may be a
+   * mint placeholder — the tool names an unnamed foot (#1263's ruling), resolved by `derive` before M1.
+   */
+  | (FactBase & {
+      t: 'cevian-of';
+      role: 'median' | 'altitude';
+      apex?: Id;
+      foot: Id;
+      side?: [Id, Id];
+      /**
+       * «תיכון ליתר» (#1222, operator ruling 2026-10-02 on #1620): the side is the HYPOTENUSE of the one triangle whose
+       * right angle the figure states; a right triangle whose right angle is still a choice asks which side it is.
+       */
+      hypotenuse?: true;
+      /** The TOOL named the foot (ADR-AG-211): it is lowered as a derived point (`toolFootFacts`), never a free one. */
+      toolFoot?: true;
+    })
+  /**
+   * «AD חוצה את הזווית BAC» · «האלכסון DB חוצה את הזווית ADC» · «AM הוא חוצה זווית CMD» — a segment from the
+   * angle's vertex that bisects it (#1284; ADR-AG-209). `p` is the segment's other end. What the sentence
+   * adds depends on the figure, exactly as in 2-D: a `p` the figure does not have yet is the bisector's FOOT
+   * on the line through the angle's two ray points (`cevianFacts`), and an existing `p` lies on the bisector's
+   * ray (`onBisectorFacts`). A lone vertex («זווית A») is resolved by the one angle resolver. With NO `p` —
+   * «חוצה זווית ABC» on its own — the bisector is drawn as a line through the vertex (2-D's visible `bisector`).
+   */
+  | (FactBase & { t: 'bisects'; at: AngleName; p?: Id })
+  /**
    * «שטח הדלתון הוא 24» — a shape named by its NOUN, with no vertices (#1049).
    *
    * A CONTEXTUAL reference: "the kite" means the one the student already drew. Which ring that is
@@ -258,7 +295,17 @@ export type Fact =
    * The contextual sibling of `area-of`: the shape is whichever one in the figure has the right
    * number of vertices, resolved at M1 and refused when that is not exactly one.
    */
-  | (FactBase & { t: 'meet-of'; role: DerivedRule['t']; arity: number; id: Id })
+  | (FactBase & { t: 'meet-of'; role: DerivedRule['t']; arity: number; id: Id; noun?: string; named?: [Id, Id, Id, Id] })
+  /*
+   * `noun` (#1620, ADR-AG-208) — the shape noun the sentence wrote («אלכסוני הטרפז»): the rings it names are
+   * `ringsNamed`'s (a specific noun its own rings and their refinements, a generic noun every ring of its
+   * arity), so «הטרפז» resolves to the one trapezoid beside a plain quadrilateral and is refused where the
+   * figure has none — 2-D's verdict. Absent: every ring of the arity, as before.
+   *
+   * `named` (#1620, ADR-AG-208) — the diagonals NAMED by their letters («האלכסונים AC ו-BD»), as the ring order
+   * the `diagonals` rule reads (v0v2, v1v3). A ring of those four vertices whose diagonals they are NOT («AB ו-CD»
+   * in «מרובע ABCD», two of its sides) refuses the sentence; with no such ring the named segments stand alone.
+   */
   /**
    * «משוואת האלכסון הראשי היא y=2x» — a diagonal named by its ROLE rather than its endpoints.
    *
@@ -278,7 +325,12 @@ export type Fact =
    * unknown the rest of the question determines. `name` is the student's own name for it («ישר l3»),
    * absent for an anonymous one.
    */
-  | (FactBase & { t: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string })
+  /**
+   * `drawn: false` (#1620, ADR-AG-207) — the line is a CARRIER, not a drawing: «הישר העובר דרך E מקביל לציר ה-y
+   * וחותך את הצלע AB בנקודה F» draws the piece EF and keeps the line only to hold F (2-D's `visible: false`).
+   * A later sentence that states the line itself draws it (M1's upgrade).
+   */
+  | (FactBase & { t: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string; drawn?: false })
   /**
    * «מעגל ABD» · «המעגל העובר דרך A, B ו-D» · «נתון מעגל שקוטרו BD» — a circle COMPUTED from points
    * (#1464, #1324, ADR-AG-160). `name` is the student's own name for it, absent for an anonymous one.
@@ -368,8 +420,11 @@ export type Fact =
    * WHICH two objects is a question about the construction, so M1 answers it: exactly two of the
    * kind lower to the two incidences the spelled-out sentence would carry, anything else refuses
    * `ambiguous-shape` — the `on-kind` rule, one arity up.
+   *
+   * `tangent` (#1620 S7, ADR-AG-213): «המשיקים נפגשים בנקודה D» — the two TANGENT objects; `pieces` also draws
+   * each touch point's piece to the crossing, as 2-D draws it.
    */
-  | (FactBase & { t: 'crossing-kind'; id: Id; kind: 'line' | 'circle' })
+  | (FactBase & { t: 'crossing-kind'; id: Id; kind: 'line' | 'circle' | 'tangent'; pieces?: true })
   /**
    * «הנקודה A נמצאת על האליפסה» — a point on a curve named only by its KIND (#1057).
    *
@@ -377,7 +432,12 @@ export type Fact =
    * means is a question about the construction, so M1 answers it, and refuses where the figure
    * holds none or several of that kind.
    */
-  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent'; circle?: string })
+  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent' | 'perpendicular'; circle?: string; foot?: PerpRef })
+  /*
+   * `kind: 'perpendicular'` (#1620, ADR-AG-207) — «E על האנך», «המשיק והאנך נחתכים בנקודה D»: the one perpendicular
+   * the figure DREW (a `foot` derived point and the line from its point to it). `foot` narrows it by its description
+   * («האנך שהורידו מנקודה B לציר ה-x»); a reference, never a construction — none or several is refused by name.
+   */
   /*
    * With no circle in the figure, `on-kind` circle STATES one (#1669 for a chord's end, ADR-AG-204; #1670 for every
    * incidence, ADR-AG-210 — 2-D's «A על המעגל» creates its circle): centre unnamed, ADR-AG-196's none → create. A
@@ -461,7 +521,14 @@ export type Fact =
    * the chord, diameter and tangent claims lower straight to the facts their own sentences carry. M1 resolves
    * it once (`applyRoleOf`): the right claim on the polygon or circle the figure holds, a conflict refused.
    */
-  | (FactBase & { t: 'role-of'; role: PolygonOrRadiusRole; a: Id; b: Id });
+  | (FactBase & { t: 'role-of'; role: PolygonOrRadiusRole; a: Id; b: Id })
+  /**
+   * «שכל קודקודיו מונחים על הצירים» · «כל קודקודי הטרפז נמצאים על הצירים» — EVERY VERTEX ON SOME AXIS (#1620 item 3,
+   * ADR-AG-208). Not a frame: each vertex is on the x-axis OR the y-axis, and the sentence does not say which, so
+   * it is a DISCRETE choice over the assignments (02c R14, «discrete ones cycle») — M1 builds it over the one ring
+   * the sentence refers to (`ringsNamed`; none or several is refused, as every contextual shape reference is).
+   */
+  | (FactBase & { t: 'vertices-on-axes'; noun?: string });
 
 /** The role claims that need the FIGURE to lower (#1651, ADR-AG-200) — the rest lower in the parser. */
 export type PolygonOrRadiusRole = 'radius' | 'leg' | 'base' | 'hypotenuse';
@@ -579,7 +646,7 @@ export type GeoObject =
    * `name` is how the student refers to it («ישר l3»), so a crossing can name it; absent for an
    * anonymous line.
    */
-  | { kind: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string }
+  | { kind: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string; drawn?: false }
   /**
    * A circle COMPUTED FROM POINTS (#1464, #1324, [ADR-AG-160](../../docs/06c-decisions-analytic.md#adr-ag-160))
    * — «מעגל ABD», the circle through three points, and «BD קוטר במעגל», the circle on a diameter.
@@ -713,6 +780,17 @@ export type Selector =
    */
   | { kind: 'between'; id: Id; a: Id; b: Id }
   /**
+   * «E על המשך הצלע BC» — the point lies on the line `ab` BEYOND `b`, on the far side from `a` (#1620,
+   * ADR-AG-208). `between`'s complement on the same line, and a selector for the same reason: the
+   * collinearity beside it consumes the degree of freedom, «המשך» only says WHICH part of the line, so the
+   * point keeps its one DOF (how far past `b` is unstated, ADR-052). Open at `b` — a point AT the end is on
+   * the side, not on its extension — judged at the figure's visible resolution, like `distinct`.
+   *
+   * The DIRECTION is the student's: «המשך BC» runs past C (the 2-D reading, ADR-054), and «… מעבר ל-B»
+   * swaps the ends. «המשכי AD ו-BC נפגשים ב-E» is two of these on one point.
+   */
+  | { kind: 'beyond'; id: Id; a: Id; b: Id }
+  /**
    * The vertices of a shape are DISTINCT POINTS (#1077).
    *
    * Every shape noun asserts this and none of them encoded it, so the solve was free to satisfy
@@ -806,7 +884,16 @@ export type Selector =
    * walks to an acute configuration, and a determined figure whose triangle is not acute is refused on the
    * sentence (the #1069 predicate). `ids` is the ring, three vertices.
    */
-  | { kind: 'acute'; ids: Id[] };
+  | { kind: 'acute'; ids: Id[] }
+  /**
+   * «DB חוצה את הזווית ADC» about an EXISTING B — B IS ON THE BISECTOR'S OWN RAY, not its opposite (#1284, ADR-AG-209).
+   *
+   * The equal-angle row (`angle-ratio`, unsigned) holds on the whole bisector LINE: on the opposite ray both angles
+   * are 180° − α/2. Which ray is a REGION, not an equation — D7's kind 2, like `between` — so it is a selector:
+   * `id` lies in the open half-plane at `v` that holds the angle (a, v, b)'s interior, i.e. on the internal
+   * bisector's side of the perpendicular to it at `v`. Consumes no freedom; judged inside validity; seeded.
+   */
+  | { kind: 'angle-side'; id: Id; v: Id; a: Id; b: Id };
 
 /**
  * A quantity the figure DERIVES — never a symbol the student declared (that is a domain, kind 1).

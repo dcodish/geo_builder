@@ -161,9 +161,12 @@ tree; subscripts are new to this input language.
 then refuses hands the student `not-handled` on their own click, which is worse than no chip —
 #511's rule, and the operator's own framing when ruling the analytic set.
 
-The set: `²` `³` `√` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}`. **`°` and `∡` are deliberately absent**
-until the angle capability exists (§5d marks «∡ACB = 90°» ✗); they arrive in that work's own change,
-because a chip is part of shipping a notation rather than a follow-up to it.
+The set: `²` `³` `√()` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}` `⊥` `∥` `∠` `°`
+([ADR-AG-212](06c-decisions-analytic.md#adr-ag-212), [#1696](https://github.com/dcodish/geo_builder/issues/1696):
+the 2-D palette reviewed chip by chip; `√()` wraps a selection as 2-D's does). The 2-D chips still absent
+are absent because their sentences are not read yet — α β γ δ θ, `S_{}` and `<` between measures
+(#1621), `△` `≅` `~` and `⌢{}` (#1622) — and each arrives in that work's own change, because a
+chip is part of shipping a notation rather than a follow-up to it.
 
 Mechanically enforced: every entry is driven through the real grammar, with a totality guard so a
 button cannot be added without a proof — and pressing any chip inside a Hebrew sentence must not
@@ -1037,6 +1040,22 @@ imperative over something the tool does not understand («צייר משהו יפ
 today. The verbs are a closed, published list, not a model's judgement: what counts as non-canonical
 input is a teaching decision this product owns.
 
+**The exam's own construction imperatives are taught the same way** ([ADR-AG-206](06c-decisions-analytic.md#adr-ag-206),
+[#1620](https://github.com/dcodish/geo_builder/issues/1620); operator ruling 2026-10-01). The bagrut builds its
+figure with «העבירו», «הורידו», «מעבירים», «בחרו», often after an adverbial and not at the start of the line. Each
+is answered with the plain sentence, pre-filled for the student to confirm:
+
+- «העבירו משיק למעגל בנקודה C» → «המשיק למעגל בנקודה C»; «דרך הנקודה D שעל המעגל העבירו משיק למעגל» → «המשיק למעגל בנקודה D» (a tangent at D touches the circle at D, so nothing is dropped).
+- «העבירו מיתר AD» → «המיתר AD»; «העבירו את האלכסון AC במרובע ABCD» → «האלכסון AC במרובע ABCD».
+- «בחרו נקודה E כרצונכם, הנמצאת על הצלע DC» → «הנקודה E נמצאת על הצלע DC» («כרצונכם» says the point is free, which it already is). When the figure already holds the sentence, it is still taught, and confirming it answers «already known».
+- «מן הנקודה B הורידו אנך לציר ה-x» → «האנך מהנקודה B לציר ה-x»; «מן הקודקודים A ו-C העבירו אנכים לציר ה-x, החותכים אותו בנקודות E ו-F בהתאמה» → «האנכים מהקודקודים A ו-C לציר ה-x חותכים אותו בנקודות E ו-F בהתאמה».
+- «מן הנקודה E העבירו ישר המקביל לציר ה-y וחותך את הצלע AB בנקודה F» → «הישר העובר דרך הנקודה E מקביל לציר ה-y וחותך את הצלע AB בנקודה F».
+- «דרך E מעבירים קטע EF המקביל ל-DA» → «הקטע EF מקביל ל-DA»; «במשולש OBC העבירו גבהים OD ו-BE לצלעות BC ו-OC בהתאמה» → «במשולש OBC, OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה».
+
+A sentence the tool cannot yet accept is not taught: the line keeps its honest refusal. A sentence that DESCRIBES
+a drawn object with the same verb — «הנקודה E נמצאת על האנך שהורידו מנקודה B לציר ה-x» — is not an instruction
+and is never taught.
+
 **R113 — a display name reads in the right order, whatever its script**
 ([ADR-AG-149](06c-decisions-analytic.md#adr-ag-149),
 [#1344](https://github.com/dcodish/geo_builder/issues/1344)). The panel's equations row must read
@@ -1849,10 +1868,62 @@ leaves three candidate sides, and the tool refuses it by name rather than choosi
 never invents what the student did not state). That refusal is its own message, because the two
 neighbouring ones would each say something untrue about a sentence whose triangle is perfectly good.
 
-**Still not accepted, and deliberately:** the spellings that name no target at all — «AD גובה»,
-«תיכון מ-A לצלע BC» with no letter for the foot. Those need the FIGURE to say what the cevian reaches
-or need the tool to mint a name, and this parser reads one sentence with no figure in hand
-([#1240](https://github.com/dcodish/geo_builder/issues/1240), and #1222's apex-fronted arm).
+~~**Still not accepted, and deliberately:** the spellings that name no target at all — «AD גובה»,
+«תיכון מ-A לצלע BC» with no letter for the foot.~~ Accepted since R103b.
+
+**R103b — the angle bisector is the third cevian, and a cevian may leave its target or its foot to the figure**
+([ADR-AG-209](06c-decisions-analytic.md#adr-ag-209), [#1284](https://github.com/dcodish/geo_builder/issues/1284),
+[#1222](https://github.com/dcodish/geo_builder/issues/1222), [#1240](https://github.com/dcodish/geo_builder/issues/1240);
+operator rulings: the 2-D tool's verdict is the reference, 2026-10-02; the tool may name what the student did not, in a
+reserved name, and says so — #1263, 2026-09-20; "the user can always change it" — #1222, 2026-09-19).
+
+- **The angle bisector** reads in every shape the median and altitude read: «CE חוצה זווית C במשולש ABC», «CE חוצה-זווית
+  לצלע AB», «CE הוא חוצה זווית C במשולש ABC»; and by its ANGLE alone: «AD חוצה את הזווית BAC», «AD חוצה זווית A»,
+  «האלכסון DB חוצה את הזווית ADC», «AM הוא חוצה זווית CMD» (the vertex may be either end of the segment), "AD bisects
+  angle BAC". The two angles at the vertex are equal on the drawn figure.
+- When the segment's other end is a NEW point, it is the bisector's foot on the opposite side (inside it). When it is a
+  point the figure already has, that point lies on the bisector — on the bisector's own ray, never the opposite one.
+- «E חיתוך חוצי הזוויות BAC ו-BCA» (and «E נקודת החיתוך של חוצי הזוויות A ו-C», «חוצי הזוויות … נחתכים בנקודה E»)
+  puts E on both bisectors; «חוצה זווית ABC» on its own draws the bisector as a line.
+- **A cevian whose target the figure determines:** «AD גובה», «AD תיכון» (the side opposite A in the one triangle that
+  has A), «גובה לצלע BC» / «תיכון לצלע BC» (the apex is the third vertex). An apex in several triangles ASKS which
+  (name the side or the triangle); in none, the sentence is refused.
+- **A cevian whose foot has no letter:** «תיכון מ-A במשולש ABC», «גובה מ-A במשולש ABC», «גובה מנקודה A», «תיכון מ-A
+  לצלע BC», "the altitude from A". The tool names the foot with 2-D's letter (R103c) — M for a median's foot, H for an
+  altitude's — and the fact row says «הכלי קרא לנקודה M». The student can rename it like any letter; the sentence is
+  then rewritten to name it («תיכון מ-A במשולש ABC פוגש את הצלע בנקודה K»).
+- A sentence that names its triangle («… במשולש ABC») draws the triangle when the figure does not have it yet, as in
+  2-D.
+- «גובה המשולש לצלע AB הוא CD», «הגובה AD לצלע BC» read as «CD גובה לצלע AB» / «AD גובה לצלע BC».
+- **Plural, paired by «בהתאמה»:** «OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה», «BE ו-CF הם גבהים במשולש ABC», «EB ו-EC הם
+  חוצי הזווית ABC ו-BCD בהתאמה הנפגשים בנקודה E», and the English "OD and BE are the altitudes to sides BC and OC
+  respectively" — each segment is its own cevian; a shared end of two bisectors is where they meet.
+- **Refused, each by name:** a bisector whose segment does not start at the angle's vertex («XD חוצה זווית BAC», «AD
+  חוצה זווית C», «CE חוצה זווית A במשולש ABC»); a bisector ending on one of its own rays («AB חוצה זווית BAC»); a
+  bisector of an angle whose points the figure lacks; a bisector that contradicts a stated angle (the later statement
+  is refused as unsatisfiable, named).
+- ~~**Not yet:** «תיכון ליתר».~~ Accepted since R103c.
+
+**R103c — the tool's letters are 2-D's, and «תיכון ליתר» never assumes the right angle**
+([ADR-AG-211](06c-decisions-analytic.md#adr-ag-211), [#1620](https://github.com/dcodish/geo_builder/issues/1620),
+[#1222](https://github.com/dcodish/geo_builder/issues/1222); operator rulings 2026-10-02 on #1620).
+
+- A point a sentence introduces without a letter takes 2-D's letter: **M** for a midpoint (a median's foot, a
+  perpendicular bisector's midpoint, a midsegment's first end — its second end N), **H** for a foot (an altitude's, a
+  perpendicular's; 2-D writes F, which is the focus letter in this tool). When the letter is taken, the next free one:
+  M, N, P, Q …; H, G, P …. F is never chosen. Two medians are M and N; two altitudes H and G.
+- The row says «הכלי קרא לנקודה M». A later sentence that uses the letter refers to that point; a later sentence that
+  names the same point a second time is refused and names the letter («already-named»), and the student renames it.
+  The letter never changes when lines are added.
+- The same point reached two ways is one point: «D אמצע BC» then «תיכון מ-A במשולש ABC» runs the median to D.
+- Adding such a cevian never moves the triangle: the tool's foot is computed from it.
+- Any tool letter can be renamed; the sentence is rewritten to name it («… פוגש את הצלע בנקודה K», «אנך אמצעי ל-AB
+  חותך אותו בנקודה K»).
+- A point given only by its coordinates keeps its own reserved name (P₁, #1281) — it is not a construct.
+- «תיכון ליתר» / «גובה ליתר» / "the median to the hypotenuse": when the figure states the right angle («זווית C ישרה»),
+  the cevian runs from it to the side facing it. When it does not — «משולש ישר-זווית ABC» alone — the tool ASKS which
+  side is the hypotenuse; it never assumes C (2-D does: #1689). With no right triangle at all it asks too.
+  «תיכון ליתר AB» names the hypotenuse, and so states that the right angle faces AB.
 
 **R123 — a canonical circle's centre is the point O, unless a letter is already there**
 ([ADR-AG-184](06c-decisions-analytic.md#adr-ag-184), [#1270](https://github.com/dcodish/geo_builder/issues/1270)).
@@ -2020,7 +2091,7 @@ The student types the exam's own tangency sentence with its touch point and the 
 - A line may be tangent to a circle given by its equation: «הישר y=kx+10 משיק למעגל x²+y²=25» finds the values of k, cycled by «הציגו תצורה אחרת». «דרך P עובר משיק למעגל» draws a tangent from P, and the other tangent is the other configuration.
 - A chord is accepted: «AB מיתר במעגל», «הצלע AB נמצאת על המעגל», «במעגל המיתרים AC ו-BD נפגשים בנקודה E», «במעגל שמרכזו M המיתרים AB ו-BC שווים».
 
-Refused by name, never drawn: a tangent from a point inside the circle, a touch point that would coincide with the line's other end, and a bare «המשיק» when the figure has no tangent or several. The imperatives «העבירו משיק / מיתר» wait on #1620.
+Refused by name, never drawn: a tangent from a point inside the circle, a touch point that would coincide with the line's other end, and a bare «המשיק» when the figure has no tangent or several. The imperatives «העבירו משיק / מיתר» are taught as these sentences (R114).
 
 **R133 — «המעגל» is the circle the figure has**
 ([ADR-AG-196](06c-decisions-analytic.md#adr-ag-196), [#1633](https://github.com/dcodish/geo_builder/issues/1633), [#1619](https://github.com/dcodish/geo_builder/issues/1619)).
@@ -2103,6 +2174,32 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - With no circle in the figure, «AB קוטר» draws the circle on AB, and «מיתר AB» / «המיתר AB …» draws a circle through A and B; the centre has no letter until «O מרכז המעגל» names it. An equation stated afterwards («משוואת המעגל היא …») is that circle's equation.
 - With one circle the sentence is about that circle; with several it asks which.
 - «OA רדיוס» means OA is a radius (as «הרדיוס OA»). With no circle at all it is still refused. On a circle whose centre has no letter, the radius now names the centre (R143, #1670).
+
+**R141 — the perpendicular from a point and its foot, the line through a point that cuts a side, and «האנך» as a reference**
+([ADR-AG-207](06c-decisions-analytic.md#adr-ag-207), [#1620](https://github.com/dcodish/geo_builder/issues/1620) slice C; operator ruling 2026-10-02: the analytic tool behaves as the 2-D tool does for plane geometry).
+
+- «האנך מהנקודה B לציר ה-x» (also to a side, «לצלע AC», to a line, «לישר l1», or to a tangent) draws the perpendicular from B to its foot. The foot is a point; with no letter given the tool names it (H, then G, P … — R103c) and says so on the row, and the student can rename it.
+- The foot named in the same sentence — «האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D», «D רגל האנך מ-C לציר ה-x», «האנכים מהקודקודים A ו-C לציר ה-x חותכים אותו בנקודות E ו-F בהתאמה» — is that letter. A foot on a side's line may lie beyond the side, as in 2-D. «אנך אמצעי ל-AB» draws the midpoint and the perpendicular bisector.
+- «הישר העובר דרך הנקודה E מקביל לציר ה-y וחותך את הצלע AB בנקודה F» (and «דרך E עובר ישר מקביל ל-… החותך את …», «ישר דרך P מאונך ל-AB») states the line and where it cuts the side; on a SIDE the point lies between its ends. The piece EF is drawn and the line itself is not, as in 2-D, until a sentence states the line.
+- «האנך» refers to the perpendicular already drawn — «הנקודה E נמצאת על האנך שהורידו מנקודה B לציר ה-x», «המשיק והאנך נחתכים בנקודה D». With none, or several and no description that picks one, the sentence is refused and says how to name it.
+- «הצלע CB מקבילה לציר ה-x, וחותכת את ציר ה-y בנקודה E» is both statements about CB.
+- «הקטע EF מקביל ל-DA» (and «EF ∥ DA», «הצלע EF מקבילה ל-DA», «הישר EF מקביל ל-DA», R143) with F not yet placed adds F, free to move along the parallel through E, until a later given places it.
+- Refused by name: a perpendicular from a point of the line itself, a foot that is its own point, a line the sentence does not name readably.
+- **Amended by [ADR-AG-213](06c-decisions-analytic.md#adr-ag-213) (#1620 S7) — the two tangents meet.** «המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D» draws both tangents and D where they cross, as 2-D does; on an empty canvas it also adds circle O and puts A and C on it, free to move. «למעגל O» said once belongs to both tangents, before or after the point. «המשיקים למעגל O בנקודות A ו-C נפגשים בנקודה D» and English ("the tangent at A and the tangent at C to circle O meet at D", "the tangents to circle O at A and C meet at D") say the same. «המשיקים נפגשים בנקודה D» (also «D נקודת החיתוך של המשיקים», "the tangents meet at D") means the two tangents already drawn and also draws AD and CD; with none, one or three tangents the tool asks which two. Tangents at the two ends of a diameter are parallel: the sentence is refused as impossible, naming the sentence, in every spelling of the diameter («AC קוטר», «AC קוטר במעגל O», «הקוטר AC», «AC קוטר במעגל», and after «A על המעגל» / «C על המעגל»). It never carries the "pick another letter" hint, because the sentence refers to A and C rather than defining them. It is never drawn as a circle shrunk to a dot, nor as A, C and D on one point. One tangent named twice is refused.
+- «נפגשים», «נחתכים» and «מצטלבים» mean the same for two lines («הישר AC והישר BD נפגשים בנקודה E», "l1 and l2 meet at E"), as in 2-D.
+
+**R142 — diagonals, extensions, the midsegment and a point on a side with a condition read as the 2-D tool reads them**
+([ADR-AG-208](06c-decisions-analytic.md#adr-ag-208), [#1620](https://github.com/dcodish/geo_builder/issues/1620); operator ruling 2026-10-02: the analytic tool gives the same experience as 2-D for plane geometry).
+
+- «E על המשך הצלע BC» (and «E על המשך BC», «נקודה E על המשך הקטע BC») puts E on the line BC past C, free to slide along the extension; «… מעבר ל-B» puts it past B instead. A sentence about «המשך AD» on an empty canvas adds A and D, as 2-D does. A point placed inside the side is not on its extension, and saying it is is refused naming the sentence.
+- «המשכי הצלעות AD ו-BC נפגשים בנקודה E» (and «המשך הצלע AD והמשך הצלע BC נפגשים …») puts E where the two lines cross, past D and past C. Parallel sides do not meet, and the sentence is refused.
+- «המשך AC חותך את מעגל O בנקודה E» puts E on the circle, on the line AC past C.
+- «הנקודה E נמצאת על צלע BC כך ש-AE = AC» places E on the side and states AE = AC; «כך ש-…» joins any placement to the condition after it. Both parts are givens: a condition the tool cannot read refuses the whole line, never keeping the placement without it. A condition the placement cannot meet is refused naming the sentence.
+- «האלכסונים AC ו-BD נפגשים בנקודה E» puts E where the two named diagonals meet, and draws them; it works on an empty canvas too. Two sides named as diagonals («האלכסונים AB ו-CD» in «מרובע ABCD») are refused, never read as the real diagonals.
+- «אלכסוני הטרפז נפגשים בנקודה M» and «E היא נקודת החיתוך של אלכסוני הדלתון» mean that shape's diagonals: the trapezoid beside a plain quadrilateral, a right trapezoid as a trapezoid. With two trapezoids the tool asks which; with none it refuses. «…, שנמצאת על ציר ה-y» after a sentence that names a point is a given about that point. «שטח הטרפז …» finds a right trapezoid the same way.
+- «האלכסון AC» and «האלכסון AC במרובע ABCD» draw the diagonal (the second also states the quadrilateral); a side named as its diagonal is refused.
+- «קטע האמצעים לצלע BC במשולש ABC» draws the segment joining the midpoints of AB and AC, and «קטע האמצעים בטרפז ABCD» the one joining the midpoints of the legs BC and DA. The midpoints are named M and N, as in 2-D (the next free letters when those are taken, and the student's own letters in «DE קטע אמצעים …»); the tool says it named them. A midpoint the student already named keeps its letter.
+- «שכל קודקודיו מונחים על הצירים» (and «כל קודקודי הטרפז נמצאים על הצירים») puts every vertex of the shape on the x-axis or the y-axis; which axis each vertex takes is not stated, so «הציגו תצורה אחרת» moves between the possible assignments.
 
 **R143 — a sentence that names points or a circle the figure does not have yet builds as it does in the 2-D tool**
 ([ADR-AG-210](06c-decisions-analytic.md#adr-ag-210), [#1670](https://github.com/dcodish/geo_builder/issues/1670), [#1686](https://github.com/dcodish/geo_builder/issues/1686); operator rulings 2026-10-02: follow 2-D, *"accept new letter with same logic the 2d tool has"*, an unlabelled centre is never «O» until named, and a new letter beside it is a free point until a sentence places it).
