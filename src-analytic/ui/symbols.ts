@@ -19,7 +19,7 @@
  *
  * The 2-D chips whose sentences analytic does not read yet — measured, and locked as still refused in
  * `symbols-module.test.ts`, so the day one parses the lock goes red and the chip is owed:
- * `S_{}` (slice D, #1621 — stream D1);
+ * (slice D's chips — α β γ δ θ, `<` and `S_{}` — shipped with #1621);
  * `△` `≅` `~` and `⌢{}` (slice E, #1622). A chip inserting a character the grammar then refuses
  * hands the student `not-handled` on their own click, so each joins in its notation's own PR.
  * `xⁿ` is not offered: `²` and `³` cover the exam's powers and `^` is on every keyboard.
@@ -77,4 +77,9 @@ export const SYMBOLS: readonly SymbolSpec[] = [
    * and a bound («AB < 10»). `≤` and `≥` above serve the same sentences, with the boundary admitted.
    */
   { label: '<', titleKey: 'symLt', before: '<' },
+  /**
+   * #1621 (ADR-AG-214) — the area notation, in the PR that made it read: select «ABC», press it, get
+   * «S_{ABC}» (2-D's chip, the same wrap). «S_{ABC} = 13» and «S_BDC / S_ODC = 0.8» (corpus 7/4) are «שטח ABC».
+   */
+  { label: 'S_{}', titleKey: 'symArea', before: 'S_{', after: '}' },
 ];

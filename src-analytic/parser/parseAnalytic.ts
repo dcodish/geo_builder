@@ -3931,9 +3931,14 @@ function acuteAdjective(phrase: string): { noun: string; acute: boolean } {
 const AREA_HE = new RegExp(
   `^${HE_GIVEN}שטח\\s+(ה?[א-ת]+(?:[- ][א-ת]+){0,2})?\\s*(${NAME_RUN})?${HE_IS}\\s*(?:שווה\\s+ל-?)?\\s*(.+)$`,
 );
+/**
+ * NOT case-insensitive (#1621, ADR-AG-214): under the `i` flag the noun's `[a-z]+` also matched the VERTEX
+ * RUN, so «the area of triangle ABC is 45» read the noun «triangle ABC», found no such shape and fell to
+ * `not-handled` — every English area value with vertices did, measured. A noun word is a letter and then
+ * LOWERCASE letters, which no run of vertex names is; only the keywords keep their capital.
+ */
 const AREA_EN = new RegExp(
-  `^(?:the\\s+)?area\\s+of\\s+(?:the\\s+)?([a-z]+(?:[- ][a-z]+){0,2})?\\s*(${NAME_RUN})?\\s+is\\s+(.+)$`,
-  'i',
+  `^(?:[Tt]he\\s+)?[Aa]rea\\s+of\\s+(?:the\\s+)?([A-Za-z][a-z]+(?:[- ][a-z]+){0,2})?\\s*(${NAME_RUN})?\\s+(?:is|IS|Is)\\s+(.+)$`,
 );
 
 /**
@@ -5346,8 +5351,46 @@ const COMPARISONS: Array<{ re: RegExp; eq: (x: string, k: string, y: string) => 
   { re: /^(.+?)\s+is\s+(.+?)\s+times\s+(.+)$/i, eq: (x, k, y) => `${x} = (${k})*(${y})` },
 ];
 
+/**
+ * «היחס בין שטח המשולש AOB לשטח הטרפז ADCB הוא 4:5» — the exam's prose RATIO of two measures (#1621,
+ * ADR-AG-214; corpus 6/5). The same vocabulary-not-mechanism decision as the comparisons above: «היחס בין X
+ * ל-Y הוא p:q» means `q·X = p·Y`, and a plain value `r` («הוא 0.8», «הוא 4/5») means `X = r·Y` — one
+ * `length-eq` over whatever MEASURES X and Y are (areas, lengths, distances), so it inherits the solve and the
+ * refusals of every other measure given instead of needing them again.
+ *
+ * **The join is found by the MEASURES, not by the first «ל».** Hebrew glues the preposition to the second
+ * measure («לשטח», «למרחק») and a measure may itself contain one («המרחק מ-A לישר l1»), so every «ל» / «לבין»
+ * / «ובין» / "to" / "and" is a candidate, and the split taken is the first whose two sides each read as a
+ * measure (`parseLengthExpr`, the reader the equation itself will go through). A sentence with no such split
+ * is not this rule's, and is left untouched.
+ *
+ * The DIVIDER spelling «היחס בין AC ל-CB הוא 3:2» — two segments sharing a point, which mints that point —
+ * is `parseDividesInRatio`'s and runs earlier in `parseClauseRules`, so it never reaches here.
+ */
+const RATIO_HE = /^ה?יחס\s+(?:בין\s+|של\s+)?(.+?)\s+(?:הוא|הינו|=|שווה\s+ל-?)\s*(\S.*)$/;
+const RATIO_EN = /^(?:the\s+)?ratio\s+(?:of|between)\s+(.+?)\s+(?:is|=|equals)\s+(\S.*)$/i;
+const RATIO_JOIN = /\s+(?:ו?לבין\s+|ובין\s+|ל-?(?=\S)|to\s+|and\s+)/g;
+/** An English measure's own article is not a symbol: «the area of …» would otherwise multiply t·h·e (#1321). */
+const measureSide = (t: string) => t.trim().replace(/^the\s+/i, '');
+
+function ratioAsEquation(line: string): string | null {
+  const m = RATIO_HE.exec(line) ?? RATIO_EN.exec(line);
+  if (!m) return null;
+  const [, pair, value] = m;
+  for (const j of pair.matchAll(RATIO_JOIN)) {
+    const x = measureSide(pair.slice(0, j.index));
+    const y = measureSide(pair.slice(j.index! + j[0].length));
+    if (!x || !y || !parseLengthExpr(x) || !parseLengthExpr(y)) continue;
+    const pq = /^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/.exec(value.trim());
+    return pq ? `(${pq[2]})*(${x}) = (${pq[1]})*(${y})` : `${x} = (${trim(value)})*(${y})`;
+  }
+  return null;
+}
+
 /** The line as an EQUATION, when it was written as a comparison. `null` leaves it untouched. */
 function asEquation(line: string): string | null {
+  const ratio = ratioAsEquation(line);
+  if (ratio) return ratio;
   for (const c of COMPARISONS) {
     const m = c.re.exec(line);
     if (m) return c.eq(trim(m[1]), trim(m[2]), trim(m[3]));

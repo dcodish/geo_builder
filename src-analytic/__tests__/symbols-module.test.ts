@@ -97,6 +97,8 @@ const TEMPLATES: Record<
   symTheta: { value: '∠ABC = 2', sel: [8, 8], expected: '∠ABC = 2θ', setup: ['משולש ABC'] },
   // #1621 D3 (ADR-AG-216) — an order between two measures.
   symLt: { value: 'AB  BC', sel: [3, 3], expected: 'AB < BC', setup: ['משולש ABC'] },
+  // #1621 (ADR-AG-214) — the area notation, wrapped around the selected vertices.
+  symArea: { value: 'ABC = 13', sel: [0, 3], expected: 'S_{ABC} = 13', setup: ['משולש ABC'] },
 };
 
 describe('the symbol palette parses — every offered button, through the real grammar (#1129)', () => {
@@ -180,7 +182,6 @@ describe('the symbol palette parses — every offered button, through the real g
    */
   const READING = ['not-handled', 'bad-equation', 'bad-operand'];
   it.each<[string, string[], string]>([
-    ['S_{', ['משולש ABC'], 'S_{ABC} = 13'],
     ['△', ['משולש ABC', 'משולש DEF'], '△ABC ≅ △DEF'],
     ['~', ['משולש ABC', 'משולש DEF'], 'ABC ~ DEF'],
     ['⌢', ['x^2+y^2=25', 'A על המעגל', 'C על המעגל'], '⌢{AC} = 60°'],

@@ -24,6 +24,7 @@
 import { ANGLE_STEM_HE, EN_SHAPE, SHAPES, normalizeShapeNoun } from '../engine/shapes';
 import { isNumeralName } from '../engine/names';
 import { stripFormatControls } from '../../shell/bidi';
+import { areaNotation } from '../engine/lengths';
 
 // ---------------------------------------------------------------------------
 // Orthography — character-level folds, always applied
@@ -41,7 +42,8 @@ import { stripFormatControls } from '../../shell/bidi';
  * article's hyphen is «ציר ה-x». Character-level, so every rule reads the one spelling.
  */
 export function orthography(raw: string): string {
-  return stripFormatControls(raw)
+  // `S_{ABC}` / `S_ABC` is the notation for «שטח ABC» (#1621, ADR-AG-214) — one spelling for every rule.
+  return areaNotation(stripFormatControls(raw))
     .replace(/^\s*(?:[·•∙*]|-(?=\s))\s*/, '')
     .replace(/־/g, '-')
     .replace(/ /g, ' ')
