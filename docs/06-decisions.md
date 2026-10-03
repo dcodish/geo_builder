@@ -13943,3 +13943,53 @@ The humanizer already strips id prefixes (`bis-CAB` → `CAB`), so what a studen
 - `src/parser/parse.ts`: `letteredCentreLines`; `specialPointMeet` reads lettered lines through their rules; `withRoleClaims` lowers `diagonal`.
 
 **Behaviour change for a student:** in a quadrilateral ABCD, «האלכסונים AB ו-CD נפגשים בנקודה E» is now refused with a note saying AB is a side, not a diagonal, instead of quietly drawing where AC and BD cross. «התיכונים AD ו-BE נפגשים בנקודה G» now makes D and E the midpoints. Typed on an empty page, «האלכסונים AC ו-BD נפגשים בנקודה E» now shows the "not a diagonal of any shape" note until the quadrilateral is declared, as «האלכסון AC» already did.
+
+## ADR-570 — A point placement keeps its tail: a condition clause is a given, «מעבר ל-X» picks the end (#1682)
+
+**Status:** accepted · 2026-10-03 · bug (P1, the honesty class) · round #1721 (operator: *"Fold all into one round"*) · found by the #1620 analytic stream (ADR-AG-208) · branch `fix/1682-extension-condition` off `main` @ deed7b20
+
+**Requirements:** [FR-IN-4d](02-requirements.md) (new) — a point placement keeps its tail · **Design:** [04-design.md](04-design.md) § "A point placement keeps its tail" · **LADDER stage:** the parser (the `compoundSuchThat` splitter, `pointOnExtension`) and the dropped-relation honesty gate it and the submit seam share. No solver, replay or render change.
+
+**Cites** [ADR-024](#adr-024) (the leftover guard), [ADR-264](#adr-264) (`droppedGivenRelations` and the clause fallback), the #760 `compoundSuchThat` / `compoundAtDistance` composition, the #108 operator ruling (a shape with a property glued on is taught as two steps), ADR-AG-208 (analytic reads the clause and the `beyond` direction).
+
+**Context — measured at pickup on deed7b20, through `runSubmit` / `decideDeterministic2D` + the store, seed 0.** The issue's claims held, and the class was wider:
+
+| typed, after «מרובע ABCD» unless noted | before |
+| --- | --- |
+| «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC» | commits the extension only; DE = DC dropped, green |
+| «הנקודה E נמצאת על המשך הצלע BC מעבר לנקודה B» / «E על המשך BC מעבר ל-B» / "E on the extension of BC beyond B" | E drawn past **C** |
+| «E על המשך BC מעבר לנקודה A» | committed past C — the stated letter (not an end of BC) dropped |
+| «E על המשך BC ו-DE = DC», «E על המשך BC, DE = DC» | DE = DC dropped |
+| «משולש ABC» · «D על BC ונתון כי AD = AC» / «… וידוע ש-AD = AC» | AD = AC dropped |
+| «E על המשך BC כך ש-DE = DC» | correct (the «כך ש» splitter) |
+| «משולש ABC ונתון כי AB = AC» | the #108 two-step teaching (correct, by ruling) |
+
+**Class.** *A point-placement sentence keeps its prefix and drops its tail* — the point-on-carrier rules are not anchored, so a condition clause or an end qualifier after the carrier is never read; and the net that should catch a dropped relation, `droppedGivenRelations`, counted «DE = DC» as carried because **some** label of it (E) is introduced by **some** command of the line.
+
+**Decision.**
+1. **The given-conjunction is a condition after a point placement.** `compoundSuchThat` also splits on `GIVEN_AND` («ונתון כי / ש», «וידוע כי / ש», "and it is given that") when the left half is a point placement (`POINT_PLACEMENT`); each half parses through the real grammar, all or nothing, as «כך ש» does. A shape subject is not split — the #108 ruling stands.
+2. **`pointOnExtension` reads the end qualifier** «מעבר ל(-)(נקודה) X» / "beyond X": the far end keeps the carrier, the near end reverses it (E on the extension of CB), any other letter escalates the line whole (`stop`).
+3. **The gate's exemption is narrowed to what it was written for.** A relation is accounted by an introduced point only when the command that introduces it carries every label of the relation («K על המשך AB כך ש AB=BK» baked as t = 2). This is the class's net: it now catches the drop for every rule and for the LLM lane, and the parser's own clause fallback (ADR-264), which consults it, reads «E על המשך BC ו-DE = DC» and «…, DE = DC» correctly with no new code.
+
+**Sibling audit.** Grepped the point-on rules (`pointOnSegment`, `pointsOnSegment`, `pointOnExtension`, `extendVerb`) — all unanchored; decision 3 is the shared net, decisions 1–2 the reads. Grepped `droppedGivenRelations`' callers (the submit seam, the clause fallback, the LLM lane) — all inherit the narrowed exemption. **Analytic:** reads both (ADR-AG-208). **3-D:** has it — `decideSubmit3` records «משולש ABC» · «D על BC ונתון כי AD = AC» as `point-on-segment3 D on BC` only, green; filed **#1730** (P1, 3d). The extension forms are not read by 3-D at all (`not-handled`, the existing #1679 gap).
+
+**Measured after** (`src/app/__tests__/issue-1682-point-placement-tail.test.ts`):
+
+| typed | now |
+| --- | --- |
+| «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC», «… ונתון ש-…», «… וידוע כי …», "… and it is given that DE = DC", «… ו-DE = DC», «…, DE = DC» | commits with `set-equal DE = DC`; DE = DC at seeds 0–3, no violations, no paid call |
+| «משולש ABC» · «הנקודה D נמצאת על הצלע BC ונתון כי AD = AC» | commits with AD = AC |
+| «… מעבר לנקודה B», «… מעבר ל-B», "… beyond B" | E past B at seeds 0–3 |
+| «… מעבר לנקודה C», «E על המשך BC» | E past C, unchanged |
+| «E על המשך BC מעבר לנקודה B ונתון כי DE = DC» | both held |
+| «E על המשך BC מעבר לנקודה A» | not committed (escalates) |
+| «משולש ABC ונתון כי AB = AC» | the #108 teaching, unchanged |
+
+**Unchanged, measured.** 217 test files that touch extensions, conditions, the honesty gates (grep of המשך / extension / כך ש / such that / droppedGivenRelations / honesty / gate …) plus the ratchet and the four #1649 parity files: 3974 tests, green. Decide-parity goldens: **no recorded hash changed** across all four shards (the narrowed exemption moves no corpus decision); shard 4 gains the new scenario's key. The full suite is the batch gate (round #1721).
+
+**Locks.** `src/app/__tests__/issue-1682-point-placement-tail.test.ts` (16, through `decideDeterministic2D` and the store). **Fails before: 13 of 16**, measured by reverting `parse.ts` to deed7b20; the 3 that pass before are controls (the #108 shape teaching, «מעבר לנקודה C», the bare extension). Scenario `point-placement-keeps-its-tail-1682` (corpus 4). #1649 rows `ext-given-clause-1682`, `ext-beyond-1682` (3-D known gap #1679), `side-given-clause-1682` (3-D passes the verdict but drops the given — #1730).
+
+**Consequences.**
+- `src/parser/parse.ts`: `GIVEN_AND` / `POINT_PLACEMENT` in `compoundSuchThat`; the end qualifier in `pointOnExtension`; `droppedGivenRelations`' exemption (b).
+
+**Behaviour change for a student:** «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC» now draws E so that DE = DC, instead of quietly ignoring the second half. «… מעבר לנקודה B» now puts E past B, not past C. A sentence like «E על המשך BC מעבר לנקודה A», whose letter is not an end of BC, is no longer drawn.

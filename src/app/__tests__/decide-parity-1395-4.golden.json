@@ -163,5 +163,6 @@
  "fixture:issue-989-trapezoid-stated-pair.geo.json": "5ac9c9b206c76b86",
  "fixture:parallel-chords.geo.json": "54f8605ea57acfa6",
  "fixture:trapezoid-altitude.geo.json": "abbbf2a8308ff3fa",
- "scenario:diagonals-named-by-letters-1683": "54f38ccf867bda6e"
+ "scenario:diagonals-named-by-letters-1683": "54f38ccf867bda6e",
+ "scenario:point-placement-keeps-its-tail-1682": "dc2212fa248c24a2"
 }

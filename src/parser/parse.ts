@@ -2248,6 +2248,19 @@ const pointOnExtension: Rule = (s, ctx) => {
     id = up(m[1]);
   }
   if (!seg) return null;
+  /**
+   * #1682 ([ADR-570](../../docs/06-decisions.md#adr-570)) — WHICH END the extension passes. «מעבר לנקודה B» /
+   * «מעבר ל-B» / "beyond B" names it, and the rule never looked: «על המשך הצלע BC מעבר לנקודה B» drew E past
+   * C. The named end is honoured — the far letter as before, the near letter reverses the carrier (E on the
+   * extension of CB) — and a letter that is neither end is not an extension of this segment: escalate whole,
+   * never a figure with the qualifier dropped.
+   */
+  const beyond = s.match(new RegExp(String.raw`(?:מעבר\s*ל(?:-|\s*)?(?:ה?נקודה\s+)?|\bbeyond\s+(?:the\s+)?(?:point\s+)?)(${LABEL})(?![A-Za-z\d])`, 'i'));
+  if (beyond) {
+    const end = up(beyond[1]);
+    if (end === seg[0]) seg = [seg[1], seg[0]];
+    else if (end !== seg[1]) return 'stop';
+  }
   // "C on the extension of DA" beyond A → order D→A→C. If C ALREADY EXISTS (e.g. an inscribed vertex still
   // on the circle), creating it afresh as an off-object on-segment point would keep it pinned to its prior
   // carrier and the apply path picks the WRONG (near) intersection, losing the order. Emit an ORDERED
@@ -9578,8 +9591,18 @@ const shapeWithConstruct: Rule = (s, ctx) => {
   return null;
 };
 
+/**
+ * #1682 ([ADR-570](../../docs/06-decisions.md#adr-570)) — «ונתון כי / ונתון ש / וידוע כי» ("and it is given
+ * that") after a POINT PLACEMENT is the same condition as «כך ש»: «הנקודה E נמצאת על המשך הצלע BC ונתון כי
+ * DE = DC» places E and states DE = DC. The point rules read their prefix and dropped the clause, green.
+ * Only after a point-on-carrier subject: a SHAPE with a given glued on («משולש ABC ונתון כי AB = AC») is the
+ * #108 compound the operator ruled is TAUGHT as two steps, and stays so.
+ */
+const GIVEN_AND = /\s+(?:ו-?\s*(?:נתון|ידוע)\s*(?:כי|ש-?)|and\s+(?:it\s+is\s+)?(?:given|known)\s+that)\s*/i;
+const POINT_PLACEMENT = /^(?:ה?נקודה\s+|the\s+point\s+|point\s+)?[A-Z]\d*\s+(?:נמצא[הת]?\s+|is\s+|lies\s+)?(?:על|\bon\b)\s/i;
 const compoundSuchThat: Rule = (s, ctx) => {
-  const parts = s.split(SUCH_THAT);
+  const given = s.split(GIVEN_AND);
+  const parts = given.length === 2 && POINT_PLACEMENT.test(given[0].trim()) ? given : s.split(SUCH_THAT);
   if (parts.length < 2) return null;
   const left = parts[0].trim();
   const right = parts.slice(1).join(' ').trim();
@@ -12565,16 +12588,22 @@ export function droppedGivenRelations(utterance: string, commands: AnyCommand[])
     isConstraint: typeof (c as { type?: unknown }).type === 'string' && (c as { type: string }).type.startsWith('set-'),
     labels: new Set(JSON.stringify(c).match(/[A-Z]\d*/g) ?? []),
   }));
-  const introduced = new Set(
-    commands
-      .map((c) => (c as { id?: unknown }).id)
-      .filter((x): x is string => typeof x === 'string' && /^[A-Z]\d*$/.test(x)),
-  );
+  /**
+   * (b) as written: the point-definition command that INTRODUCES one of the relation's labels must itself
+   * carry every label of it — «K על המשך AB כך ש AB=BK» baked as `point-on-segment K on AB (t = 2)`.
+   * #1682 ([ADR-570](../../docs/06-decisions.md#adr-570)): "some label is introduced by ANY command" let
+   * «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC» through — E is introduced (on BC), D is in no command
+   * of the line, and DE = DC vanished green. A definition that never mentions D cannot carry a relation on D.
+   */
+  const definers = commands.flatMap((c) => {
+    const id = (c as { id?: unknown }).id;
+    return typeof id === 'string' && /^[A-Z]\d*$/.test(id) ? [{ id, labels: new Set(JSON.stringify(c).match(/[A-Z]\d*/g) ?? []) }] : [];
+  });
   const dropped: string[] = [];
   for (const m of s.matchAll(rel)) {
     const labels = [...new Set([m[1], m[2], m[4], m[5]])];
     const accounted =
-      labels.some((l) => introduced.has(l)) ||
+      definers.some((d) => labels.includes(d.id) && labels.every((l) => d.labels.has(l))) ||
       perCommand.some((c) => c.isConstraint && labels.every((l) => c.labels.has(l)));
     if (!accounted) dropped.push(m[0].replace(/\s+/g, ' ').trim());
   }

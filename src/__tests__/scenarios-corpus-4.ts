@@ -3303,4 +3303,20 @@ export const SCENARIOS_4: Scenario[] = [
       expect(off(B, D, E), 'E on BD').toBeLessThan(1e-6);
     },
   },
+  {
+    id: 'point-placement-keeps-its-tail-1682',
+    title: '#1682 (ADR-570): «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC» holds DE = DC; «… מעבר לנקודה B» puts E past B',
+    guards:
+      "Found by the #1620 analytic stream (ADR-AG-208), measured on main deed7b20 (seed 0): after «מרובע ABCD», «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC» committed only the extension (|DE| = 4.47, |DC| = 4.12), and «… מעבר לנקודה B» drew E past C — both green. Root cause: the point-on-carrier rules read their prefix and ignore the tail, and droppedGivenRelations counted DE = DC as carried because E is introduced by the line. Fix: the given-conjunction clause after a point placement splits like «כך ש»; pointOnExtension reads «מעבר ל-X»; the gate's introduced-point exemption needs the defining command to carry every label. Asserts the operator's exact line holds DE = DC, and that the qualifier line puts E beyond B. The spelling matrix (ונתון ש / וידוע כי / English / «ו-» / comma / «על הצלע»), the seeds and the #108 shape control are in src/app/__tests__/issue-1682-point-placement-tail.test.ts.",
+    steps: ['מרובע ABCD', 'הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E');
+      expect(dist(D, E), 'DE = DC').toBeCloseTo(dist(D, C), 6);
+      const beyond = replay(factsOf(['מרובע ABCD', 'הנקודה E נמצאת על המשך הצלע BC מעבר לנקודה B']), 0);
+      const B2 = beyond.positions.get('B')!, C2 = beyond.positions.get('C')!, E2 = beyond.positions.get('E')!;
+      const t = ((E2.x - B2.x) * (C2.x - B2.x) + (E2.y - B2.y) * (C2.y - B2.y)) / dist(B2, C2) ** 2;
+      expect(t, '«מעבר לנקודה B» puts E past B').toBeLessThan(0);
+    },
+  },
 ];
