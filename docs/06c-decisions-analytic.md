@@ -9987,6 +9987,24 @@ Sibling check (docs/17 §1):
 - 2-D is the reference for the alias and the pin, and agrees.
 - 2-D's trig reading is the defect #1698 records.
 - 3-D's known gaps are on #1679.
+
+**Amendment 1 (2026-10-03, found by stream E5 — a stated value vanished).**
+
+- **Symptom.** «α = 50», then «α = 40», both recorded green. A pin was judged only once an angle used the name.
+- **Measured.** `paramRegister` returned `[]` for the two-pin construction.
+  - The pin's SUBJECT was stored as a bare string (`sym: 'α'`), so the register's structural walk over `{ kind: 'sym' }` nodes (`constraintSymbols`, #1343) could not see it.
+  - The value `50` holds no symbol either, so α was never registered and never sampled.
+  - The residual then read `env['α']` as undefined and answered "cannot be judged", which the solve reads as satisfied.
+- **Fix.** The subject is carried as the expression node the walk reads (`sym: { kind: 'sym', name }`). The pinned symbol is therefore registered by the same mechanism as every value — no per-kind list.
+- **Now.** «α = 50 · α = 40» is `unsatisfiable` on the second line, naming it. A consistent pin on an unused alias records and holds its value. «θ = 2β · β = 20 · θ = 50» is refused on the third line.
+- **Sweep, locked.**
+  - Two pins.
+  - A pin, then an angle that uses it.
+  - An angle, then two pins.
+  - An angle, then a repeated pin.
+- **Not covered: a declared domain plus a pin.** A Greek letter cannot be declared today: «0 < α < 90» and «α < 90» are `not-handled`, because the domain rules read Latin letters only. So that combination has no case on this side.
+- **Locks.** Three new cases in `issue-1621-d2-angle-alias-tan.test.ts` (21 in all). **Fails before: 3 of 3.**
+
 ## ADR-AG-216 — A coordinate stated about a vertex («הקודקוד A»), and an ORDER between measures read as 2-D's region (#1621 D3)
 
 **Status:** accepted · 2026-10-03 · slice D stream D3 (#1621, the V4 plan #1616). Standing rulings applied: analytic gives the same experience as 2-D for plane geometry (2026-10-02, #1649/#1669 — 2-D's verdict measured through `decideDeterministic2D` for every sentence below); every unstated magnitude is a free DOF (ADR-052); no stated given may vanish; the palette chip ships with its notation (#1696, ADR-AG-212).

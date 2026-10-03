@@ -95,6 +95,42 @@ describe('an angle named by a Greek letter — free until pinned (ADR-052)', () 
     expect(wide.faults.find((f) => f.index === 2)).toMatchObject({ code: 'unsatisfiable', detail: 'α = 200' });
   });
 
+  /**
+   * ADR-AG-215 am. 1 (found by stream E5): a pin on an alias NO ANGLE USES YET was never registered — its subject was
+   * a string the register's structural walk cannot see — so «α = 50» · «α = 40» both recorded green. Typed one line
+   * at a time through `decideSubmit`, as the student types them.
+   */
+  const typed = (lines: readonly string[]) => {
+    const kept: string[] = [];
+    return lines.map((line) => {
+      const v = decideSubmit(line, kept, 0);
+      if (v.kind === 'record') kept.push(v.line);
+      return v.kind === 'refused' ? `refused:${v.error.key}` : v.kind;
+    });
+  };
+  it('two pins on an unused alias: the second is refused `unsatisfiable`, naming it; a repeat is already known', () => {
+    expect(typed(['α = 50', 'α = 40'])).toEqual(['record', 'refused:unsatisfiable']);
+    expect(derive(['α = 50', 'α = 40'], 0).faults.find((f) => f.index === 1)).toMatchObject({ code: 'unsatisfiable', detail: 'α = 40' });
+    expect(typed(['α = 50', 'α = 50'])).toEqual(['record', 'already-known']);
+    expect(typed(['θ = 2β', 'β = 20', 'θ = 50'])).toEqual(['record', 'record', 'refused:unsatisfiable']);
+  });
+  it('a consistent pin on an unused alias records, holds its value, and binds the angle that uses it later', () => {
+    expect(typed(['α = 50'])).toEqual(['record']);
+    expect(clean(derive(['α = 50'], 0)).figure.env['α']).toBeCloseTo(50, 4);
+    expect(typed(['α = 50', 'β = 40'])).toEqual(['record', 'record']);
+    for (const seed of [0, 1, 2]) {
+      const d = clean(derive(['α = 50', 'משולש ABC', '∢ABC = 2α'], seed));
+      expect(deg(d, 'B', 'A', 'C')).toBeCloseTo(100, 3);
+    }
+    // …and an angle that cannot take the pinned value is refused on the angle.
+    expect(typed(['α = 200', 'משולש ABC', '∢ABC = α'])).toEqual(['record', 'record', 'refused:unsatisfiable']);
+  });
+  it('the sweep: two pins, then the angle; the angle, then two pins; the angle, then a repeated pin', () => {
+    expect(typed(['α = 50', 'α = 40', 'משולש ABC', '∢ABC = α'])[1]).toBe('refused:unsatisfiable');
+    expect(typed(['משולש ABC', '∢ABC = α', 'α = 50', 'α = 40'])).toEqual(['record', 'record', 'record', 'refused:unsatisfiable']);
+    expect(typed(['משולש ABC', '∢ABC = α', 'α = 50', 'α = 50'])).toEqual(['record', 'record', 'record', 'already-known']);
+  });
+
   it('a pin the figure AGREES with builds (the determined angle’s own value)', () => {
     const d = clean(derive(['A(0,0)', 'B(4,0)', 'C(0,3)', '∢ABC = 2a'], 0));
     expect(2 * d.figure.env['a']).toBeCloseTo((Math.atan(3 / 4) * 180) / Math.PI, 3);
