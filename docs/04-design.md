@@ -924,11 +924,14 @@ different given. A line in which tan / tg / cot / ctg / sin / cos (or «טנגנ
 «סינוס», with a clitic prefix) is applied to an angle — an angle noun in the line, or a label right after the
 function — belongs to it whole. The one canonical shape (`trigLine`: [lead-in] FN [of|של] [(] [angle noun]
 LABELS [)] copula VALUE, the value read by the shared `NUMEXPR` atom, optionally signed) lowers to the arms'
-`segment`s plus a `measure-angle` whose `expr` is `{ value: <the angle in degrees>, text: '<fn>=<value as
-typed>' }` — the existing literal-measure path (`lowerOne` → `set-angle`; `measureLabelForms` prints `text`),
-so the figure shows the given and every downstream consumer sees an ordinary angle. tan / cot map through the
+`segment`s plus a `measure-angle` whose `expr` is `{ value: <the angle in degrees> }` with NO `text` — the
+existing literal-measure path (`lowerOne` → `set-angle`), so every downstream consumer sees an ordinary angle
+and the label is `measureLabelForms`' number branch, `fmtNum(value) + '°'` through the shared rounder
+(«63.43°»; [ADR-572](06-decisions.md#adr-572), #1718 — ADR-566 carried `text: 'tan=2'`). The fact row shows
+the utterance, so the sentence as typed is never lost. tan / cot map through the
 principal angle and add 180° when negative; cos through `acos`. The transformed ratio is declared in
-`consumed.numbers` (ADR-462), so the numbers gates account «√3», «-2», «3/4». Anything else returns
+`consumed.numbers` (ADR-462), so the numbers gates account «√3», «-2», «3/4»; the span accountant credits a
+stated fraction sign-blind («-1/2» against −0.5), as its single-number pass always did (ADR-572). Anything else returns
 `{ ok: false, reason: 'trig-given', why, fn, sentence }` — `sine-two-angles` (checked first, in every form),
 `out-of-range`, or `form` — answered by `decideFromParse` with `input.trigGiven.<why>`; it never reaches the
 angle rules and never escalates. `NOTATION_WORDS` (units + the Latin function names) is the one list of

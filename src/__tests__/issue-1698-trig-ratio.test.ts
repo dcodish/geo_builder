@@ -70,13 +70,14 @@ describe('#1698 — every spelling of a tan / cos given asserts the trig inverse
     });
   }
 
-  it('the figure prints the given as stated («tan=2»), never a computed number of degrees', async () => {
+  // #1718 (ADR-572) amends ADR-566's «tan=2» label: the figure prints the ANGLE the given draws.
+  it('the figure prints the resulting angle («63.43°»), never the ratio «tan=2»', async () => {
     const v = await decide(TRI, 'tan∢ABC = 2');
     const m = committed(v).find((c) => c.type === 'measure-angle');
-    expect(m && m.type === 'measure-angle' && 'value' in m.expr ? m.expr.text : undefined).toBe('tan=2');
+    expect(m && m.type === 'measure-angle' && 'value' in m.expr ? m.expr.text : 'absent', 'no typed text rides the measure').toBeUndefined();
     const fig = replay(factsOf([...TRI, 'tan∢ABC = 2']), 0);
     const atB = fig.labels.angles.filter((l) => l.vertex === 'B');
-    expect(atB.map((l) => l.text), 'the wedge at B carries the stated given').toEqual(['tan=2']);
+    expect(atB.map((l) => l.text), 'the wedge at B carries the angle').toEqual(['63.43°']);
   });
 });
 

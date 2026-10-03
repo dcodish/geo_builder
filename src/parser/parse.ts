@@ -3174,8 +3174,10 @@ const ANGLE_KW = /angle|∠|∢|הזוו?ית|זוו?ית/i;
 //
 // The lowering. tan and cos are one-to-one on an angle's range (0°, 180°) — tan through its sign
 // (positive acute, negative obtuse), cos outright — so a value fixes ONE angle, a `measure-angle`
-// whose value is that angle in degrees and whose `text` is the student's own given, so the figure
-// prints «tan=2», never a computed 63.43° (canvas = inputs, ADR-W-047). cot is 1/tan. sin is NOT
+// whose value is that angle in degrees. It carries NO `text`: the figure labels the ANGLE the given
+// draws, through the one label builder's number branch (`measureLabelForms` → the shared `fmtNum`
+// rounder), so «tan∢ABC = 2» prints «63.43°» and the fact row keeps the sentence as typed (#1718,
+// ADR-572, amending ADR-566's «tan=2»). cot is 1/tan. sin is NOT
 // one-to-one there (sin θ = sin(180° − θ)): the line is refused, naming the two angles, until a
 // cyclable acute/obtuse choice exists (follow-up issue). A cosine outside [−1, 1] has no angle.
 const TRIG_FN_EN = String.raw`(?<![A-Za-z])(?<en>tan|tg|ctg|cotg|cot|sin|cos)(?![A-Za-z])|(?<![A-Za-z])(?:the\s+)?(?<enw>tangent|cotangent|sine|cosine)\s+of(?![A-Za-z])`;
@@ -3245,15 +3247,15 @@ function trigGiven(s: string, ctx: ParseContext): ParseResult | null {
   const arms = angleArms(g.lab ?? '', ctx);
   if (!arms) return refuse('form');
   if ('clarify' in arms) return arms.clarify === 'ambiguous-angle' ? { ok: false, reason: 'ambiguous-angle', vertex: arms.vertex } : refuse('form');
-  const text = `${shown}=${g.sg ? '-' : ''}${magnitude.text}`;
   return {
     ok: true,
     commands: [
       { type: 'segment', a: arms.vertex, b: arms.ray1 },
       { type: 'segment', a: arms.vertex, b: arms.ray2 },
       // The stated ratio is TRANSFORMED (2 → 63.43°), so the rule declares it consumed (#784, ADR-462):
-      // the numbers gates then account the student's «√3» / «-2» / «3/4» against this command.
-      { type: 'measure-angle', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2, expr: { value, text }, consumed: { numbers: [v] } },
+      // the numbers gates then account the student's «√3» / «-2» / «3/4» against this command. No
+      // `text`: the canvas labels the resulting angle, rounded by the shared display rounder (#1718).
+      { type: 'measure-angle', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2, expr: { value }, consumed: { numbers: [v] } },
     ],
   };
 }
