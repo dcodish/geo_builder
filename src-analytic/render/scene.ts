@@ -114,7 +114,8 @@ export interface SceneSegment {
    * Present only when a given pinned it — «AB = 10». A length the tool DERIVED is an answer and
    * belongs in the data panel, not on the figure
    * ([ADR-AG-016](../../docs/06c-decisions-analytic.md#adr-ag-016)). The engine decides which is
-   * which; this carries the text and where to put it.
+   * which; this carries the text and where to put it — the label's CENTRE, placed clear of every other
+   * label by `placeLengthLabels` (#1717).
    */
   label?: { text: string; x: number; y: number };
   /** #1653 — the display key (`segKey` of its endpoints) and how it is inked (`shell`'s `segInk`). */
@@ -145,6 +146,156 @@ export interface SceneMeasure {
 
 /** Screen-space leg length of the right-angle tick at the foot of a perpendicular. */
 const RIGHT_ANGLE = 9;
+
+/**
+ * Where a point's label is drawn relative to its dot, and at what size (#1717). `Figure.tsx` paints from these and
+ * the length-label placement below measures against them, so the two can never disagree about where a label is.
+ */
+export const POINT_LABEL = { dx: 7, dy: -7, font: 13 } as const;
+/** A stated length's font size (#1065). */
+export const LENGTH_LABEL_FONT = 12;
+/** The axis tick labels' font size and their offsets from the axes — furniture a length label must not cover either. */
+export const TICK_LABEL = { font: 11, below: 14, left: 6 } as const;
+
+/** An axis-aligned screen box. */
+export interface LabelBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * A text's width, estimated from its glyph count. The scene has no font metrics to ask — the renderer lays the
+ * label out as SVG — and an estimate is the honest instrument for the one question asked here: do two labels
+ * overlap. The 0.6 em per glyph is 2-D's own estimate (`labelScale` in `src/render/scene.ts`).
+ */
+const textWidth = (chars: number, font: number): number => Math.max(1, chars) * font * 0.6;
+
+/** The box a point's label covers: name, then its stated coordinates when it has any (subscripts at 9px). */
+export function pointLabelBox(p: ScenePoint): LabelBox {
+  const f = POINT_LABEL.font;
+  let w = textWidth(p.label.length, f);
+  let sub = false;
+  if (p.coords) {
+    // «(» + «, » + «)», each part's own text, and a subscript at its own smaller size
+    w += textWidth(4, f);
+    for (const part of p.coords) {
+      w += textWidth(part.text.length, f);
+      if (part.sub) {
+        w += textWidth(part.sub.length, 9);
+        sub = true;
+      }
+    }
+  }
+  const x0 = p.cx + POINT_LABEL.dx;
+  const base = p.cy + POINT_LABEL.dy;
+  return { x0, y0: base - f * 0.8, x1: x0 + w, y1: base + f * 0.25 + (sub ? 3 : 0) };
+}
+
+const overlaps = (a: LabelBox, b: LabelBox): boolean => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+type ScreenLine = { x1: number; y1: number; x2: number; y2: number };
+/** Does a drawn line pass through the box? Liang–Barsky clipping of the segment against it. */
+const crosses = (l: ScreenLine, b: LabelBox): boolean => {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = l.x2 - l.x1;
+  const dy = l.y2 - l.y1;
+  const edges: Array<[number, number]> = [
+    [-dx, l.x1 - b.x0],
+    [dx, b.x1 - l.x1],
+    [-dy, l.y1 - b.y0],
+    [dy, b.y1 - l.y1],
+  ];
+  for (const [p, q] of edges) {
+    if (p === 0) {
+      if (q < 0) return false;
+    } else {
+      const r = q / p;
+      if (p < 0) t0 = Math.max(t0, r);
+      else t1 = Math.min(t1, r);
+      if (t0 > t1) return false;
+    }
+  }
+  return true;
+};
+
+/** The clear gap between a segment and its length label, and the step taken outward while the label still collides. */
+const LENGTH_GAP = 4;
+const LENGTH_STEP = 4;
+const LENGTH_MAX_STEPS = 12;
+
+/**
+ * WHERE A STATED LENGTH IS WRITTEN (#1717) — 2-D's value-label rule, COPIED (`src/render/scene.ts`, ADR-031 / #126:
+ * «a length sits at its segment's midpoint, nudged perpendicular to the OUTSIDE, away from the figure's centroid»),
+ * plus the step this canvas needs and 2-D's does not.
+ *
+ * Operator, corpus 9/4: *"AO=3 is not created"* — it was, but its «3» sat at AO's midpoint 6px up, inside A's own
+ * label, and read «A(x_A, 0)3». A point label here carries the point's stated coordinates, so it is several times
+ * wider than 2-D's single letter, and any short segment, or any segment ending at a labelled point, put the two on
+ * top of each other. **The class: a length label was placed with no knowledge of the other labels.** So, from the
+ * outward side's first clear position, the label steps along the normal until its box clears every point label,
+ * every point dot, every axis tick label, every drawn segment and every length label already placed; when the outward side never
+ * clears, the inward side is tried; when neither does, it keeps the outward first position — still drawn, never
+ * dropped (a stated given stays visible).
+ *
+ * The returned position is the label's CENTRE; `Figure.tsx` centres the text on it.
+ */
+export function placeLengthLabels(
+  segs: ReadonlyArray<{ x1: number; y1: number; x2: number; y2: number; text: string }>,
+  points: readonly ScenePoint[],
+  furniture: readonly LabelBox[] = [],
+  lines: readonly ScreenLine[] = [],
+): Array<{ x: number; y: number }> {
+  const cen = points.length
+    ? { x: points.reduce((s, p) => s + p.cx, 0) / points.length, y: points.reduce((s, p) => s + p.cy, 0) / points.length }
+    : { x: 0, y: 0 };
+  const obstacles: LabelBox[] = [
+    ...points.map(pointLabelBox),
+    ...points.map((p) => ({ x0: p.cx - 4, y0: p.cy - 4, x1: p.cx + 4, y1: p.cy + 4 })),
+    ...furniture,
+  ];
+  return segs.map((s) => {
+    const mid = { x: (s.x1 + s.x2) / 2, y: (s.y1 + s.y2) / 2 };
+    const dx = s.x2 - s.x1;
+    const dy = s.y2 - s.y1;
+    const l = Math.hypot(dx, dy) || 1;
+    let n = { x: -dy / l, y: dx / l };
+    const out = (mid.x - cen.x) * n.x + (mid.y - cen.y) * n.y;
+    // A segment through the centroid (9/4's AO, on the axis the rectangle straddles) has no outside. Its two sides
+    // tie, and a sign read off float noise would flip the label between configurations of ONE figure; so a tie
+    // takes a fixed orientation and then the side that clears in the fewer steps.
+    const tie = Math.abs(out) < 0.5;
+    if (tie) {
+      if (n.y < 0 || (n.y === 0 && n.x < 0)) n = { x: -n.x, y: -n.y };
+    } else if (out < 0) n = { x: -n.x, y: -n.y }; // outward
+    // the bidi isolates (`lbl`) are invisible, so they take no width
+    const hw = textWidth(s.text.replace(/[\u2066-\u2069]/g, '').length, LENGTH_LABEL_FONT) / 2;
+    const hh = LENGTH_LABEL_FONT / 2;
+    // the box's own half-extent along the normal, so the first position clears the segment whatever its slope
+    const reach = hw * Math.abs(n.x) + hh * Math.abs(n.y) + LENGTH_GAP;
+    const boxAt = (c: { x: number; y: number }): LabelBox => ({ x0: c.x - hw, y0: c.y - hh, x1: c.x + hw, y1: c.y + hh });
+    const at = (side: 1 | -1, k: number) => {
+      const d = (reach + k * LENGTH_STEP) * side;
+      return { x: mid.x + n.x * d, y: mid.y + n.y * d };
+    };
+    const firstClear = (side: 1 | -1): { k: number; c: { x: number; y: number } } | null => {
+      for (let k = 0; k <= LENGTH_MAX_STEPS; k += 1) {
+        const c = at(side, k);
+        const b = boxAt(c);
+        if (!obstacles.some((o) => overlaps(o, b)) && !lines.some((l) => crosses(l, b))) return { k, c };
+      }
+      return null;
+    };
+    const outward = firstClear(1);
+    const inward = !outward || tie ? firstClear(-1) : null;
+    const best = outward && (!inward || !tie || outward.k <= inward.k) ? outward : inward;
+    const pos = best ? best.c : at(1, 0);
+    obstacles.push(boxAt(pos));
+    return pos;
+  });
+}
 
 export interface Scene {
   width: number;
@@ -356,7 +507,7 @@ export function buildScene(
   // A segment is already resolved to endpoints by `evaluate`, so this is a pure projection — the
   // renderer never looks a vertex up, which is what keeps it a consumer rather than a second
   // geometry implementation.
-  const segments: SceneSegment[] = fig.segments.map((s) => {
+  const projected: SceneSegment[] = fig.segments.map((s) => {
     const x1 = t.sx(s.a.x);
     const y1 = t.sy(s.a.y);
     const x2 = t.sx(s.b.x);
@@ -443,6 +594,40 @@ export function buildScene(
   });
 
   /**
+   * The stated lengths' labels, placed now that every point label exists to be avoided (#1717).
+   *
+   * The axes' numbers are furniture a length label must not join, and not only by overlap: a «3» standing in the row
+   * of tick numbers under the x-axis READS as a tick (measured on 9/4's first cut, where AO's «3» landed between «−2»
+   * and «O»). So each axis's whole label row is one obstacle band — the x-axis's row of numbers under it, the y-axis's
+   * column to its left, the O marker where they meet.
+   */
+  const xAxisY = t.sy(0);
+  const yAxisX = t.sx(0);
+  const xTicks = ticks(box.minX, box.maxX, t.sx);
+  const yTicks = ticks(box.minY, box.maxY, t.sy);
+  const tf = TICK_LABEL.font;
+  const FAR = 1e6;
+  const rowY = xAxisY + TICK_LABEL.below;
+  const colR = yAxisX - TICK_LABEL.left;
+  const colW = Math.max(1, ...yTicks.map((k) => k.label.length));
+  const furniture: LabelBox[] = [
+    { x0: -FAR, y0: rowY - tf * 0.8, x1: FAR, y1: rowY + tf * 0.25 },
+    { x0: colR - textWidth(colW, tf), y0: -FAR, x1: colR, y1: FAR },
+  ];
+  const labelled = projected.filter((s) => s.label);
+  const placed = placeLengthLabels(
+    labelled.map((s) => ({ x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, text: s.label!.text })),
+    points,
+    furniture,
+    projected.filter((s) => s.ink !== 'ghost'),
+  );
+  const placedOf = new Map(labelled.map((s, i) => [s, placed[i]] as const));
+  const segments: SceneSegment[] = projected.map((s) => {
+    const at = placedOf.get(s);
+    return at && s.label ? { ...s, label: { ...s.label, x: at.x, y: at.y } } : s;
+  });
+
+  /**
    * The perpendicular, projected (#1048). The RIGHT-ANGLE tick is built here rather than in the
    * renderer because it is geometry — two short legs of equal screen length along the foot's own two
    * directions — and building it from screen vectors keeps it square at every zoom, which a
@@ -505,12 +690,7 @@ export function buildScene(
   return {
     width,
     height,
-    axes: {
-      xAxisY: t.sy(0),
-      yAxisX: t.sx(0),
-      xTicks: ticks(box.minX, box.maxX, t.sx),
-      yTicks: ticks(box.minY, box.maxY, t.sy),
-    },
+    axes: { xAxisY, yAxisX, xTicks, yTicks },
     curves,
     segments,
     arcs,

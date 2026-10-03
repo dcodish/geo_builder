@@ -1540,6 +1540,10 @@ sounds: they are not composed strings. A tick is `String(r)` for a number the ax
 carries its own id — single-script by construction, with no Hebrew to mix and nothing to reorder. The
 seam covers every channel whose text is BUILT from parts, which is every channel where the defect can
 occur.
+### Where a stated length is written ([ADR-AG-223](06c-decisions-analytic.md#adr-ag-223), #1717)
+
+`buildScene` places every stated length through `placeLengthLabels`, after the point labels exist. The rule is 2-D's (copied, never imported): the label starts at the midpoint and moves along the normal away from the figure's centroid. It then steps outward until its box clears every point label, point dot, drawn segment and earlier length label, and each axis's whole row of numbers. The row is one band, because a number standing among the ticks reads as a tick. The label is written in the figure's blue, as 2-D writes its values. If the outward side never clears, it tries the inward side. Box widths are estimated at 0.6 em per glyph, 2-D's own estimate. A segment through the centroid takes a fixed orientation, so its label cannot flip between seeds. The scene hands the label's centre to `Figure.tsx`. The label and tick geometry are shared constants (`POINT_LABEL`, `LENGTH_LABEL_FONT`, `TICK_LABEL`), so painting and placement agree. This is the second copy of the rule after 2-D. 3-D uses a fixed offset, so nothing is hoisted to `shell/`.
+
 ## A curve reads as an equation plus its properties ([ADR-AG-097](06c-decisions-analytic.md#adr-ag-097))
 
 `curveParts(c: NumCurve) → { equation, details? }` is the tree's ONE curve-text decision, in

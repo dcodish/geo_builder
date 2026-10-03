@@ -10544,3 +10544,49 @@ Two more items, built on top of ef942ea7:
 - As the integrator's message allows, the FLOOR is raised to 357 / 45. The ratchet's header now says the notes are included.
 
 **Requirements:** R161 amended (x/y refused); R165 extended. **Design:** 04c — the E2 section's length bullet is rewritten, and this ADR's section is extended.
+
+## ADR-AG-223 — A stated length is written clear of every other label: 2-D's outward rule, then a step along the normal (#1717)
+
+**Date:** 2026-10-03 · round #1721 · **Status:** accepted
+
+**Report.** The operator, playing corpus 9/4 (T6): *"AO=3 is not created. you can see in your own diagram this is not respected"*.
+
+**Re-measured at pickup (deed7b20).** The given IS respected: A = (−3, 0) and AO = 3 at every seed.
+- **The segment is already drawn over the axis.** `seg-AO` is painted after the axes, in the figure's ink (#2563eb, 2px) over the grey 1.5px axis. A crop of the play screenshot shows the blue run between A and O. So the plan's first bullet ("draw a stated segment on an axis above the axis, in figure ink") already held. It is now locked rather than built.
+- **What hid the given was its label.** The «3» was written at AO's midpoint, 6px up, inside A's own label. The canvas read «A(x_A, 0)3», so the 3 looked like part of A's label and AO looked like the axis.
+
+**Class.** *A length label is placed with no knowledge of the other labels on the canvas.* An analytic point label carries the point's stated coordinates («A(x_A, 0)»), so it is several times wider than 2-D's single letter. Any short segment, or any segment ending at a labelled point, could put the two labels on top of each other. Measured before the fix on a second member: «A(0,0)», «B(1,0)», «C(0,6)», «משולש ABC», «AB = 1» wrote its «1» inside «A(0, 0)».
+
+**Mechanism.** `placeLengthLabels` (`render/scene.ts`) does two things:
+- **It copies 2-D's value-label rule** (`src/render/scene.ts`, ADR-031 / #126). The label starts at the segment's midpoint and is pushed along the normal away from the figure's centroid. The first position is the label box's own half-extent along the normal plus a 4px gap, so it clears the segment at any slope.
+- **It adds what this canvas needs: a step along the normal.** The label moves outward 4px at a time, up to 12 steps, until its box clears all of these:
+  - every point label and every point dot;
+  - every drawn segment;
+  - every length label already placed;
+  - each axis's whole ROW of numbers (the band under the x-axis and the column left of the y-axis).
+
+  When the outward side never clears, the inward side is tried. When neither clears, the label keeps its first outward position: still drawn, never dropped.
+- **Why a band, and not each tick.** On the first cut, AO's «3» landed below the axis between «−2» and «O». Its box overlapped neither, but it READ as a tick number. The play-sheet render showed this; the overlap test could not.
+- **The label is written in the figure's blue.** 2-D writes its values this way "to set them apart from point names". Here it also sets them apart from the grey axis numbers.
+- **A segment through the centroid has no outside.** This is 9/4's AO, on the axis the rectangle straddles. A sign read off float noise would flip the label between configurations of one figure. So a tie takes a fixed orientation and then the side that clears in fewer steps. It is locked: one label position over eight seeds.
+- **The scene returns the label's centre.** `Figure.tsx` centres the glyphs on it (`dy="0.35em"`). The point-label offsets, the length font and the tick-label offsets are exported constants (`POINT_LABEL`, `LENGTH_LABEL_FONT`, `TICK_LABEL`). The painter draws with them and the placement measures against them, so the two cannot disagree.
+
+**The third-copy rule (ADR-W-016, #1353).** This is the SECOND copy of the outward-normal rule, after 2-D.
+- 3-D writes a length at a fixed screen offset (`scene3.ts`, `labelX: mid + 9, labelY: mid − 7`). It does not use this rule.
+- complex has no length labels.
+- So nothing is hoisted to `shell/`. A third builder that adopts the rule moves it there, with a §5c lock.
+
+**Sibling audit.**
+- 2-D's placement is blind to point labels too. But a 2-D point label is one letter, placed away from the incident segments, and a short side's value is shrunk to fit (`labelScale`, #1337). No report; not filed.
+- 3-D's fixed offset could meet a vertex label on a short edge. It has never been reported, and 3-D labels are single letters too. Not filed.
+
+**Locks.** `src-analytic/__tests__/issue-1717-length-label.test.tsx`, 41 tests. The locks read the DRAWN markup (`<Figure>` rendered to static markup). The box estimates are the test's own, at 0.6 em per glyph, as an independent oracle. They cover:
+- 9/4 at eight seeds:
+  - AO's «3» clears every other text on the canvas and every inked side;
+  - AO is inked solid in the figure's stroke, painted after the x-axis;
+  - the label does not change side between seeds;
+- the class: a short side between two coordinate-labelled points; a vertical side on the y-axis; three stated sides whose labels must also clear each other, each at eight seeds.
+
+**Fails before: 32 of 41.** At every seed these are: the 9/4 label (inside A's label), the short-side member, the y-axis member and the three-sided triangle (labels crossing drawn sides). The 9/4 paint-order tests pass before, which is the re-measurement above.
+
+**Requirements:** R166 (new). **Design:** 04c — the canvas's bidi chokepoint section gains "where a stated length is written".
