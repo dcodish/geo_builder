@@ -945,6 +945,21 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'the tangent of angle ABC is 2',
     needs: ['משולש ABC'],
   },
+  // #1719 (ADR-AG-227): sin fixes two angles, θ and 180° − θ — a choice «הציגו תצורה אחרת» cycles
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'sin∢ABC = 0.5',
+    en: 'sin∠ABC = 0.5',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'סינוס הזווית ABC הוא 0.5',
+    en: 'the sine of angle ABC is 0.5',
+    needs: ['משולש ABC'],
+  },
   {
     category: 'relations',
     family: 'F17',

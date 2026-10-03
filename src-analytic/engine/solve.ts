@@ -22,7 +22,7 @@
  * show the least-bad one: `solve` reports that it did not converge, and the caller says so. A drawn
  * figure that violates its own givens is the defect this whole product is built to avoid.
  */
-import { evalExpr, exprText, type Env } from './expr';
+import { evalExpr, exprText, symbolsOf, type Env } from './expr';
 import type { Id, NumCurve } from './types';
 import { residual as curveResidual } from './curves';
 import { SEGMENT_EXTENT_TOL, segmentParam } from './extent';
@@ -180,7 +180,9 @@ export type Constraint =
        * orientation stays as free as it is for a value in degrees. sin is not: sin θ = sin(180° − θ), a
        * discrete choice this kind does not carry, so «sin∢…» is not read (ADR-AG-215 "not built").
        */
-      measure?: 'tan' | 'cos';
+      measure?: 'tan' | 'cos' | 'sin';
+      /** sin only (#1719, ADR-AG-227): this option is the OBTUSE root, 180° − asin. Absent: the acute one. */
+      obtuse?: true;
     }
   /**
    * `∠ABC = ∠ACB` · `∠ABC = 2∠ACB` — two angles in a stated ratio (#1331, the 2-D `angle-ratio` shape,
@@ -401,6 +403,24 @@ export type Constraint =
  * «הציגו תצורה אחרת» reaches each one instead of landing on a favourite. A choice with no options
  * cannot happen (the registry never builds one) and is dropped rather than crashing the figure.
  */
+/**
+ * THE TWO ANGLES A SINE FIXES (#1719, ADR-AG-227) — operator ruling 2026-10-03: *"if by any chance they will have
+ * cos or sin of an angle, translate it to an angle"*, with sin built as a two-option choice. sin θ = sin(180° − θ),
+ * so «sin∢ABC = ½» fixes the angle up to a DISCRETE choice, acute or obtuse (02c R14: "discrete ones cycle").
+ *
+ * The choice is between the two ROOTS of one equation, so it is a constraint `choice` (#1049's, the right-triangle
+ * seat's) over two `angle` constraints, each with ONE root — `measure: 'sin'`, and `obtuse` on the second. It is
+ * resolved before the solve, so each configuration solves for its own root and «הציגו תצורה אחרת» reaches both.
+ * Measured first as ADR-AG-222's SELECTOR choice (the plan's sketch): the solve reached the obtuse root at 0 of 8
+ * seeds, because a selector only filters the root the descent happened to land on. A sine of ±1 has one angle
+ * (90°) and no choice; a sine still written as a letter may be either.
+ */
+export function sineAngle(at: AngleRef, value: Expr): Constraint {
+  const acute: Constraint = { t: 'angle', at, value, measure: 'sin' };
+  const single = symbolsOf(value).length === 0 && Math.abs(Math.abs(evalExpr(value)) - 1) <= 1e-12;
+  return single ? acute : { t: 'choice', options: [acute, { ...acute, obtuse: true }] };
+}
+
 export function resolveChoices(ks: readonly Constraint[], seed: number): Constraint[] {
   return ks.flatMap((k) => {
     if (k.t === 'all') return resolveChoices(k.of, seed);
@@ -597,7 +617,7 @@ export function describeConstraint(k: Constraint): string {
     case 'perpendicular':
       return `${k.a}${k.b} ⊥ ${k.c}${k.d}`;
     case 'angle':
-      return `${k.measure ?? ''}∠${k.at.a}${k.at.v}${k.at.b} = ${exprText(k.value)}`;
+      return `${k.measure ?? ''}∠${k.at.a}${k.at.v}${k.at.b} = ${exprText(k.value)}${k.obtuse ? ' (∠ > 90°)' : ''}`;
     case 'param-eq':
       return `${k.sym.name} = ${exprText(k.value)}`;
     case 'angle-ratio':
@@ -936,6 +956,16 @@ export function residualRows(
        */
       if (k.measure === 'tan') return { eq: [(Math.sin(theta) - value * Math.cos(theta)) / Math.sqrt(1 + value * value)] };
       if (k.measure === 'cos') return { eq: [(Math.cos(theta) - value) / 2] };
+      /*
+       * sin (#1719, ADR-AG-227): each option of `sineAngle`'s choice has ONE root — asin, or 180° − asin for `obtuse` —
+       * written as the degree residual is. A value outside [-1, 1] has no angle: the plain difference, never zero, so
+       * the figure is honestly `unsatisfiable` (cos's rule).
+       */
+      if (k.measure === 'sin') {
+        if (Math.abs(value) > 1) return { eq: [(Math.sin(theta) - value) / 2] };
+        const root = Math.asin(Math.abs(value));
+        return { eq: [(theta - (k.obtuse ? Math.PI - root : root)) / Math.PI] };
+      }
       return { eq: [(theta - (value * Math.PI) / 180) / Math.PI] };
     }
     case 'param-eq': {

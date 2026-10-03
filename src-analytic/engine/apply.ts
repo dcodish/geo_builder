@@ -21,7 +21,7 @@ import { parabolaDirectrix, resolveCurve } from './curves';
 import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule } from './derived';
 import { sameDerivation } from './sameDerivation';
-import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
+import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, sineAngle, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, promisesOneParallelPair, rightAngleAt, ringsNamed, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { RESERVED_SYMBOLS, radiusSymbol, toolSymbol } from './carriers';
@@ -3180,6 +3180,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       const left = resolveAngleName(c, f.left, f.src);
       if (!left.ok) return left;
       if (f.rhs.t === 'value') {
+        // sin (#1719, ADR-AG-227): the lone vertex resolved, the same choice its three-letter twin carries.
+        if (f.rhs.measure === 'sin') return applyFact(c, { t: 'constraint', k: sineAngle(left.ref, f.rhs.value), src: f.src });
         const k: Constraint = { t: 'angle', at: left.ref, value: f.rhs.value };
         if (f.rhs.measure) k.measure = f.rhs.measure;
         return applyFact(c, { t: 'constraint', k, src: f.src });

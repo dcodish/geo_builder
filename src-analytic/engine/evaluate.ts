@@ -1446,6 +1446,14 @@ function choiceCount(c: Construction): number {
  * THE REGION CHOICE RESOLVED (#1708, ADR-AG-222) — `resolveChoices`' rule for a selector `choice`: the option the
  * choice seed indexes, so every later stage (validity, seeding, `drawableAt`) sees one ordinary selector.
  */
+/** WHICH OPTION each discrete choice takes at a choice seed — constraint and region choices alike (#1719). */
+function choiceOptions(c: Construction, choiceSeed: number): string {
+  const pick = (n: number) => ((choiceSeed % n) + n) % n;
+  const ks = c.constraints.filter((k) => k.t === 'choice' && k.options.length > 1).map((k) => pick((k as { options: unknown[] }).options.length));
+  const ss = c.selectors.filter((s) => s.kind === 'choice' && s.options.length > 1).map((s) => pick((s as { options: unknown[] }).options.length));
+  return `${ks.join(',')}|${ss.join(',')}`;
+}
+
 export function resolveSelectorChoices(selectors: readonly Selector[], seed: number): Selector[] {
   if (!selectors.some((s) => s.kind === 'choice')) return selectors as Selector[];
   return selectors.flatMap((s) => {
@@ -2863,9 +2871,20 @@ export function drawableAt(
    * budget is a PREFERENCE's budget; validity (a non-whole first figure) keeps the full walk.
    */
   const budget = whole(first) && first.carrierDof === 0 ? 8 : DRAWABLE_TRIES;
+  /**
+   * A PREFERENCE NEVER CROSSES A DISCRETE CHOICE (#1719, ADR-AG-227). The walk below looks for a PRETTIER drawing
+   * of the same configuration; a later seed also resolves every \`choice\` afresh, so it could reach another OPTION —
+   * and when the seed's own option is legitimately narrow («sin∢ABC = ½»'s 150°, whose other two angles share 30°)
+   * the spread preference walked to the acute option at every seed: «הציגו תצורה אחרת» could never show the obtuse
+   * one the ruling cycles to. So once the first figure is VALID, a candidate counts only if it took the same options;
+   * validity itself (a first figure that is not whole) still walks to any option, as before.
+   */
+  const firstOptions = choiceOptions(c, first.choiceSeed ?? seed);
+  const sameChoices = (f: Figure, s: number) => !whole(first) || choiceOptions(c, f.choiceSeed ?? s) === firstOptions;
   if (!preferred(first)) {
     for (let extra = 1; extra <= budget; extra += 1) {
       const candidate = evaluate(c, seed + extra);
+      if (!sameChoices(candidate, seed + extra)) continue;
       if (preferred(candidate)) {
         chosen = candidate;
         fallback = candidate;
@@ -3258,18 +3277,25 @@ export function isKnowledge(
  *
  * Fills the pool: the caller is a submit, one action, and a settled answer is the only one it can act on.
  */
+/**
+ * DOES THIS CONSTRAINT HOLD ON THIS DRAWN FIGURE? — the residual at the figure's own positions, against `evaluate`'s
+ * `SATISFIED_EPS` bar. A `choice` holds when one option does. Exported for #1719 (ADR-AG-227): the stated-measure
+ * layer reads WHICH option of a choice the drawn figure took off the figure itself, never off a seed it was not drawn at.
+ */
+export function holdsOn(c: Construction, k: Constraint, f: Figure): boolean {
+  if (k.t === 'choice') return k.options.some((o) => holdsOn(c, o, f));
+  if (k.t === 'all') return k.of.every((o) => holdsOn(c, o, f));
+  const pos = new Map<Id, Pt>(f.points.map((p) => [p.id, { x: p.x, y: p.y }]));
+  const at = (id: Id): Pt | null => pos.get(id) ?? null;
+  const r = residual(k, at, f.env, curveAtOf(c, f.env, at), lineAtOf(c, f.env, at));
+  return r !== null && r.every((v) => Math.abs(v) <= SATISFIED_EPS);
+}
+
 export function holdsInEveryConfiguration(c: Construction, ks: readonly Constraint[]): boolean {
   if (ks.length === 0) return true;
   const pool = poolOf(c);
   pool.fill();
-  const holds = (k: Constraint, f: Figure): boolean => {
-    if (k.t === 'choice') return k.options.some((o) => holds(o, f));
-    if (k.t === 'all') return k.of.every((o) => holds(o, f));
-    const pos = new Map<Id, Pt>(f.points.map((p) => [p.id, { x: p.x, y: p.y }]));
-    const at = (id: Id): Pt | null => pos.get(id) ?? null;
-    const r = residual(k, at, f.env, curveAtOf(c, f.env, at), lineAtOf(c, f.env, at));
-    return r !== null && r.every((v) => Math.abs(v) <= SATISFIED_EPS);
-  };
+  const holds = (k: Constraint, f: Figure): boolean => holdsOn(c, k, f);
   // Only the configurations the pool ADMITS (#1642): a figure that breaks a given entails nothing.
   const admitted = admittedOf(c, pool.ready());
   if (admitted.length === 0) return false;

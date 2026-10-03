@@ -20,7 +20,7 @@
 import type { DerivedRule, FootLine } from '../engine/derived';
 import { cevianFacts, toolFootFacts, type CevianRole } from '../engine/cevian';
 import { toolPoint, type ToolPointRole } from '../engine/toolLetters';
-import { isAngleRef, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
+import { isAngleRef, sineAngle, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { evalExpr, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS, directionSymbol, mentionsPlane, radiusSymbol, toolSymbol } from '../engine/carriers';
 
@@ -5351,10 +5351,14 @@ function parseAngleLabel(line: string): RuleOutcome {
  * is 2". The angle is named exactly as the numeric-angle rule names it (one letter or three), so it lowers to
  * the SAME `angle` constraint — or `vertex-angle` fact — with its `measure`.
  *
- * sin is deliberately absent: sin θ = sin(180° − θ), so «sin∢ABC = 3/4» leaves a discrete choice (acute or
- * obtuse) this measure does not carry. It stays unread (`not-handled`) rather than drawn at one of the two.
+ * sin (#1719, ADR-AG-227; operator ruling 2026-10-03): sin θ = sin(180° − θ), so «sin∢ABC = 3/4» states the
+ * angle up to a discrete choice, acute or obtuse — built as `sineAngle`'s choice between the two roots, cycled by
+ * «הציגו תצורה אחרת», never drawn at one of the two silently.
  */
-const MEASURE_FN: Readonly<Record<string, 'tan' | 'cos'>> = {
+const MEASURE_FN: Readonly<Record<string, 'tan' | 'cos' | 'sin'>> = {
+  sin: 'sin',
+  sine: 'sin',
+  סינוס: 'sin',
   tan: 'tan',
   tg: 'tan',
   tangent: 'tan',
@@ -5364,7 +5368,7 @@ const MEASURE_FN: Readonly<Record<string, 'tan' | 'cos'>> = {
   קוסינוס: 'cos',
 };
 /** The function word, in either language, with its optional «של» / "of (the)". One head, so «tan of angle …» is read. */
-const MEASURE_HEAD = new RegExp(`^${HE_GIVEN}(?:the\\s+)?(tan|tg|cos|tangent|cosine|טנגנס|קוסינוס)(?![A-Za-z])\\s*(?:(?:של|of)\\s+)?(?:the\\s+)?`);
+const MEASURE_HEAD = new RegExp(`^${HE_GIVEN}(?:the\\s+)?(tan|tg|cos|sin|tangent|cosine|sine|טנגנס|קוסינוס|סינוס)(?![A-Za-z])\\s*(?:(?:של|of)\\s+)?(?:the\\s+)?`);
 const MEASURE_ANGLE_HE = new RegExp(`^(?:${ANGLE_NOUN_HE})?${ANGLE_LETTERS}${HE_IS}\\s*(?:=\\s*)?(.+)$`);
 const MEASURE_ANGLE_EN = new RegExp(`^(?:${ANGLE_NOUN_EN})?${ANGLE_LETTERS}\\s*(?:is\\s+|equals?\\s+)?(?:=\\s*)?(.+)$`);
 
@@ -5385,7 +5389,8 @@ function parseAngleMeasure(line: string): RuleOutcome {
   if (!claimable(valueSrc)) return null;
   const value = valueExpr(valueSrc);
   if (!value) return refuse('bad-equation', valueSrc);
-  if (isAngleRef(left)) return made([{ t: 'constraint', k: { t: 'angle', at: left, value, measure }, src: line }]);
+  // sin (ADR-AG-227): the choice between its two angles; tan and cos fix one.
+  if (isAngleRef(left)) return made([{ t: 'constraint', k: measure === 'sin' ? sineAngle(left, value) : { t: 'angle', at: left, value, measure }, src: line }]);
   return made([{ t: 'vertex-angle', left, rhs: { t: 'value', value, measure }, src: line }]);
 }
 

@@ -10683,3 +10683,55 @@ Two more items, built on top of ef942ea7:
 **Consequences.**
 - `engine/evaluate.ts`: `MAX_LISTED_VALUES`, `Values`, `knownValues`, `knownValue`, `knownCurveOptions`; `Knowledge` gains `options`.
 - `app/panelRows.ts` (`valueText`, the rows); `app/pointText.ts`; `app/lineAngle.ts`; `App.tsx` (the parameter, equation, slope, angle and length rows).
+
+## ADR-AG-227 — A trig given is written down as its angle and indicates a slope; sin builds as a two-option choice; a display preference never crosses a discrete choice (#1719)
+
+**Status:** accepted · 2026-10-03 · fix-round #1721, stream R5 item 3 (PR stacked on #1716's). **Operator ruling, 2026-10-03 (T31):** *"in the analytics tool, we should both translate to an angle and treat it as an indication of a slope. in analytucs, if by any chance they will have cos or sin of an angle, translate it to an angle and right it down"*. The issue's plan: write the angle on the arc and in the panel; show the slope through #1716's up-to-two rule; build sin as a choice of θ or 180° − θ, cycled by «הציגו תצורה אחרת», with both listed until a given settles it; refuse |sin| > 1.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R168. · **Design:** [04c](04c-design-analytic.md), "A trig given is an angle; sin is a choice between two roots".
+
+**Measured at pickup** (on `feat/1716-two-values`):
+- «tan∢ABC = 2»: the canvas already wrote «63.43°» (ADR-AG-225), but no panel row stated the angle.
+- 9/4: slope AB «-2 או 2» from the exam lines and «2» with the figure note (ADR-AG-226). Plan item 2 was therefore already met by the stack, and is locked here.
+- «sin∢ABC = 0.5» and «סינוס הזווית ACB = 1/2» were `not-handled` (ADR-AG-215's "not built").
+
+**Decision.**
+
+1. **The angle in the panel.** A new «זוויות» section (`panelKnowledge.angles`, `trigAngles`) has one row per angle a TRIG given states: «∢BAO = 63.43°», «∢ABC = 60°» for «cos∢ABC = 0.5». The row reads the measured angle through the one value gate (`knownValue`, ADR-AG-226), so a sine's two angles list as «30° או 150°» until a given settles them. A degree given is the student's own number and gets no computed row.
+2. **sin is a CONSTRAINT choice between the two roots** (`sineAngle` in `engine/solve.ts`): `choice([angle sin, angle sin obtuse])`. Each option has ONE root: the residual is θ − asin|v|, or θ − (180° − asin|v|) when `obtuse`. A value outside [−1, 1] keeps the plain difference, which is never zero, so the figure is `unsatisfiable` (cos's rule) and the line is refused, naming it. A sine of ±1 has one angle, 90°, and no choice. The parser reads «sin», «sine», «סינוס» through the same head as tan/cos; the lone-vertex form goes through `vertex-angle` and builds the same choice.
+   - **Deviation from the plan's sketch, measured.** The plan named ADR-AG-222's SELECTOR `choice` (`∢ < 90` / `∢ > 90` beside one `sin θ = v` constraint). Built that way first, the solve reached the obtuse root at **0 of 8 seeds**. A selector only filters the root a descent happened to land on, and `evaluateTryingChoices` then fell back to the acute option at the same samples. The choice is between the ROOTS of an equation, which is what the constraint `choice` (#1049's, the right-triangle seat's) resolves before the solve. The ruling's substance — two options, cycled, both listed until settled — is what is built.
+3. **A display preference never crosses a discrete choice** (`drawableAt`, `choiceOptions`).
+   - With the choice in place, the obtuse option was still never DRAWN. Its 150° leaves the other two angles 30° between them, so #1174's spread preference walked to the next seed. That seed resolves every `choice` afresh and took the acute option, at every seed.
+   - The class: *a preference walk silently changes a discrete choice.* It also reaches a right triangle's seat or an obtuse triangle's vertex whenever a narrow drawing triggers the walk.
+   - The fix: once the first figure is VALID, the walk accepts only candidates that took the same options. Validity (a first figure that is not whole) still walks to any option, as before.
+   - Measured after: «sin∢ABC = 0.5» draws 30°, 150°, 30°, 150° at seeds 0–3.
+4. **The canvas writes the option the figure DREW.** `drawableAt` may draw another seed's configuration, so the seed does not say which option of a choice is on screen. The stated-measure layer now reads it off the figure: `derive` passes `resolve`, which takes the first option that holds on the drawn figure (`holdsOn`, extracted from `holdsInEveryConfiguration`'s inner test). Measured before: seed 1 drew 30° and labelled it «150°». This also makes ADR-AG-225's right-triangle knee read off the figure rather than the seed.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1719-trig-angle-slope.test.ts`, 11 tests:
+  - tan, cos and a negative tan as angles on the canvas and in the panel, at four seeds;
+  - 9/4 (∢BAO = 63.43°; slope AB «-2 או 2» / «2»);
+  - sin lowered to the two-option choice, the configurations walking BOTH angles with the canvas writing the drawn one, the panel's «30° או 150°» settled by «∢ABC > 90» to 150° at every seed;
+  - the lone-vertex Hebrew form;
+  - sin = 1 a knee, and |sin| > 1 refused.
+- **Fails before: 11 of 11** (on `feat/1716-two-values`).
+- `issue-1621-d2-angle-alias-tan.test.ts`'s "sin is NOT read" lock asserted ADR-AG-215's "not built". The operator's ruling supersedes it, and it now asserts the choice.
+- Parity (#1649):
+  - `trig-sin-1719` and `trig-sin-he-1719` build in analytic. 2-D on `main` refuses them by name (`input.trigGiven.sine-two-angles`), so each carries a 2-D gap on #1711, whose PR builds 2-D's sin as the same choice. The ratchet will ask for the gap to be removed when it lands.
+  - `trig-sin-range-1719` is refused in both.
+  - Catalog: «sin∢ABC = 0.5», «סינוס הזווית ABC הוא 0.5» (He/En).
+- Every analytic test file is green: 208 files, run in five slices after the `drawableAt` change.
+
+**Not built, said out loud.**
+- A sine still written as a letter («sin∢ABC = k») builds the choice, and the canvas writes «sin=k» until the letter is valued.
+- An angle "of known direction" other than an axis indicates a slope the same way: the slope row reads it through the gate whenever the configuration fixes it up to two. Nothing direction-specific was added, because the gate already answers it.
+
+**Sibling check.** 2-D's sin is #1711 (stream R3 of this round, its own PR), built as the same two-angle choice. 3-D reads no trig given (#1679). The `drawableAt` preference class is analytic's own walk. 2-D's `firstSatisfyingSeed` spread preference is a separate mechanism, not measured here and reported for the integrator.
+
+**Consequences.**
+- `engine/solve.ts`: `sineAngle`, `measure: 'sin'`, `obtuse`, the residual.
+- `engine/evaluate.ts`: `holdsOn`, `choiceOptions`, the `drawableAt` guard.
+- `engine/statedMeasures.ts` (`resolve`, the sin value); `engine/derive.ts`; `engine/apply.ts` (`vertex-angle`); `engine/types.ts`.
+- `parser/parseAnalytic.ts`; `parser/catalogAnalytic.ts`.
+- `app/panelRows.ts` (`trigAngles`, `angles`); `App.tsx` (the «זוויות» section); `i18n/index.ts` (`secAngles`).
+- `shell/__tests__/fixtures/geo-input-parity.ts`.

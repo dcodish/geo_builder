@@ -8,7 +8,7 @@
  */
 import { fold, existingKindOf, type ApplyError, type ApplyNotice } from './apply';
 import { reportedDof } from './carriers';
-import { drawableAt, viewBox, type Figure } from './evaluate';
+import { drawableAt, holdsOn, viewBox, type Figure } from './evaluate';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
 import { resolveToolLetters } from './toolLetters';
@@ -16,7 +16,7 @@ import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
 import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
-import { SOLVE_TOL } from './solve';
+import { SOLVE_TOL, resolveChoices } from './solve';
 import { NO_STATED_MEASURES, statedMeasures, type StatedMeasures } from './statedMeasures';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
@@ -480,7 +480,12 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       const f = constraintFact[at] === undefined ? undefined : facts[constraintFact[at]];
       return f === undefined ? undefined : f.t === 'constraint' && f.definition ? 'definition' : 'statement';
     },
-    figure.choiceSeed ?? seed,
+    // WHICH option the drawn figure took (#1719): the first that holds on it, read off the figure — `drawableAt` may
+    // have drawn another seed's configuration, so the seed alone does not say. None holding (a faulted figure): the seed's.
+    (k) => {
+      const held = k.options.find((o) => holdsOn(construction, o, figure));
+      return resolveChoices([held ?? k], figure.choiceSeed ?? seed);
+    },
   );
   return { construction, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices, constraintLine, stated };
 }

@@ -2335,3 +2335,12 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - A row whose value takes exactly two values across the configurations the givens allow lists both, joined by «או». This applies to every row: a coordinate pair, a parameter, a slope and its angle with the x-axis, a length, and an equation. Example: 9/4 typed as the exam prints it (without the figure note) shows «שיפוע AB: -2 או 2».
 - More than two values, or a value that moves continuously, shows «—». A point with four possible positions shows «—».
 - A given that settles the choice («A משמאל ל-O …») turns the row back into one value («2»).
+
+**R168 — a trig given is written as its angle and indicates a slope; sin is a choice between two angles**
+([ADR-AG-227](06c-decisions-analytic.md#adr-ag-227), [#1719](https://github.com/dcodish/geo_builder/issues/1719); operator ruling 2026-10-03: *"translate it to an angle and write it down"*).
+
+- «tan∢BAO = 2», «cos∢ABC = 0.5», «sin∢ABC = 0.5» are written as the ANGLE they fix: on the canvas at the angle's arc («63.43°», never «tan=2»), and in the data panel under «זוויות» («∢BAO = 63.43°»).
+- When one arm of the angle is an axis or a line of known direction, the given also fixes the other arm's slope, shown in the slope row with up to two values (R167). Corpus 9/4 typed as printed gives «-2 או 2»; with its figure note it gives «2».
+- «sin∢ABC = 0.5» (also «סינוס הזווית ABC הוא 0.5», "the sine of angle ABC is 0.5") fits two angles, 30° and 150°. The first figure draws one, «הציגו תצורה אחרת» moves to the other, and the panel lists both («30° או 150°») until a given settles it («∢ABC > 90» leaves 150°).
+- «sin∢ABC = 1» is the right angle. A sine greater than 1 or less than −1 is refused, naming the line.
+- A choice the givens leave open is never changed silently in favour of a better-looking drawing: the drawing shown belongs to the option the configuration took.

@@ -217,10 +217,13 @@ describe('tan and cos of an angle — a measure of the angle (operator ruling 20
     expect(d.figure.env['k']).toBeCloseTo(0.75, 4);
   });
 
-  it('sin is NOT read — sin θ = sin(180° − θ) is a choice this measure does not carry (ADR-AG-215 "not built")', () => {
+  it('sin is read since #1719 (ADR-AG-227, operator ruling 2026-10-03) — as the choice between its two angles, never one of them silently', () => {
+    // ADR-AG-215 left sin unread because sin θ = sin(180° − θ) is a choice this measure did not carry; ADR-AG-227
+    // carries it (`sineAngle`), so the sentence builds. The choice itself is locked in issue-1719-trig-angle-slope.
     for (const s of ['sin∢ACB = 1/2', 'סינוס הזווית ACB = 1/2']) {
       const d = derive(['משולש ABC', s], 0);
-      expect(d.faults.map((f) => [f.index, f.code]), s).toEqual([[1, 'not-handled']]);
+      expect(d.faults, s).toEqual([]);
+      expect(d.construction.constraints.map((k) => k.t), s).toEqual(['choice']);
     }
   });
 });
