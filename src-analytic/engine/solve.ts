@@ -533,6 +533,8 @@ function describeRule(r: DerivedRule): string {
       return `נקודת ההשקה של ${r.circle} עם ${r.a}${r.b}`;
     case 'foot':
       return `רגל האנך מ-${r.from}`;
+    case 'regular-vertex':
+      return `קודקוד ${r.k + 1} של המצולע המשוכלל על ${r.a}${r.b}`;
     default: {
       const undescribed: never = r;
       throw new Error(`rule has no description: ${JSON.stringify(undescribed)}`);

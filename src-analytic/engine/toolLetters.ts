@@ -25,7 +25,7 @@
 import { sameDerivation } from './sameDerivation';
 import type { Fact, Id } from './types';
 
-export type ToolPointRole = 'midpoint' | 'midpoint-2' | 'foot';
+export type ToolPointRole = 'midpoint' | 'midpoint-2' | 'foot' | 'vertex';
 
 /** The ONE role → letters table. The first free letter wins; then 2-D's pool; then the first letter subscripted. */
 export const TOOL_LETTERS: Readonly<Record<ToolPointRole, string>> = {
@@ -35,6 +35,13 @@ export const TOOL_LETTERS: Readonly<Record<ToolPointRole, string>> = {
   'midpoint-2': 'NPQS',
   /** The foot of a perpendicular or an altitude: 2-D's F, G, H, P with F → H (#1167). */
   foot: 'HGP',
+  /**
+   * A VERTEX of a shape (or an end of a line) the sentence did not letter — «ריבוע שצלעו 4», «קו ועליו נקודה A» (#1622,
+   * ADR-AG-217): 2-D's `autoVertexLabels`, the first free letters of the alphabet in order, so a fresh square is ABCD
+   * and, after A, a line's ends are B and C. Unlike the other roles a vertex IS nothing but its line's own, so its
+   * placeholder is LINE-SCOPED: «ריבוע» twice is two squares (ABCD, then EFGH), as in 2-D.
+   */
+  vertex: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
 };
 /** 2-D's `freeLabel` pool, minus nothing: it holds no F. */
 const POOL = 'MNPQRSTUVWXYZKLGHIJ';
@@ -48,6 +55,9 @@ const PLACEHOLDER = /@fresh:[^"|]*\|[^"@]*/g;
 const subscript = (n: number): string => String(n).replace(/[0-9]/g, (d) => String.fromCharCode(0x2080 + Number(d)));
 
 const segId = (a: Id, b: Id): Id => `seg-${[a, b].sort().join('')}`;
+/** A ring's canonical id — the smallest rotation of the ring or its reverse (the parser's `polygonId`, copied). */
+const polyId = (v: readonly Id[]): Id =>
+  `poly-${[[...v], [...v].reverse()].flatMap((b) => b.map((_, i) => [...b.slice(i), ...b.slice(0, i)].join(''))).sort()[0]}`;
 
 export function resolveToolLetters(
   facts: readonly Fact[],
@@ -61,10 +71,12 @@ export function resolveToolLetters(
   facts.forEach((f0, i) => {
     // A segment's id is its SORTED ends, and a placeholder may sort first inside it — it is re-keyed from its ends
     // below, so its id is never where a placeholder is discovered.
-    const scan = f0.t === 'segment' ? { ...f0, id: '' } : f0;
+    const scan = f0.t === 'segment' || f0.t === 'polygon' ? { ...f0, id: '' } : f0;
     let text = JSON.stringify(scan);
+    // A vertex placeholder belongs to its LINE (see `TOOL_LETTERS.vertex`); every other role to what the point is.
+    const nameKey = (ph: string): string => (ph.startsWith(`${TOOL_PREFIX}vertex|`) ? `${owner[i]}#${ph}` : ph);
     for (const ph of new Set(text.match(PLACEHOLDER) ?? [])) {
-      if (names.has(ph)) continue;
+      if (names.has(nameKey(ph))) continue;
       const role = ph.slice(TOOL_PREFIX.length).split('|')[0] as ToolPointRole;
       // The same point already derived the same way keeps ITS name (#1153: one position, one name).
       const own =
@@ -78,13 +90,15 @@ export function resolveToolLetters(
         do name = `${base}${subscript(++n)}`;
         while (used.has(name));
       }
-      names.set(ph, name);
+      names.set(nameKey(ph), name);
       used.add(name);
       if (!own) minted.push({ index: owner[i], id: name });
     }
-    text = text.replace(PLACEHOLDER, (ph) => names.get(ph) ?? ph);
+    text = text.replace(PLACEHOLDER, (ph) => names.get(nameKey(ph)) ?? ph);
     let f = JSON.parse(text) as Fact;
     if (f.t === 'segment') f = { ...f, id: f0.t === 'segment' && !f0.id.includes(TOOL_PREFIX) ? f0.id : segId(f.a, f.b) };
+    // A ring the TOOL lettered is re-keyed from its resolved vertices, as a segment is (#1622).
+    if (f.t === 'polygon') f = { ...f, id: f0.t === 'polygon' && !f0.id.includes(TOOL_PREFIX) ? f0.id : polyId(f.vertices) };
     for (const m of text.match(/"[A-Z][0-9₀-₉]?"/g) ?? []) used.add(m.slice(1, -1));
     out.push(f);
   });

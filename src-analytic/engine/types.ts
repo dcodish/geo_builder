@@ -890,7 +890,26 @@ export type Selector =
    * `id` lies in the open half-plane at `v` that holds the angle (a, v, b)'s interior, i.e. on the internal
    * bisector's side of the perpendicular to it at `v`. Consumes no freedom; judged inside validity; seeded.
    */
-  | { kind: 'angle-side'; id: Id; v: Id; a: Id; b: Id };
+  | { kind: 'angle-side'; id: Id; v: Id; a: Id; b: Id }
+  /**
+   * «C ו-D בצדדים שונים של AB» · «… באותו צד של AB» — WHICH SIDE OF THE LINE `ab` (#1622, ADR-AG-217; 2-D's
+   * `points-line-side`, ADR-389). `same`: every subject on one side; else the two on opposite sides. A region — D7's
+   * kind 2, consuming no freedom; a subject ON the line is on neither side. Judged inside validity, and seeded.
+   */
+  | { kind: 'line-side'; ids: Id[]; a: Id; b: Id; same: boolean }
+  /**
+   * «E בתוך המשולש KAO» · «E מחוץ למרובע ABCD» — INSIDE OR OUTSIDE A RING (#1622, ADR-AG-217; 2-D's
+   * `point-polygon-side`). `closed`: the boundary counts as inside — an inscribed shape's vertex riding a side
+   * (on the side's line AND in the closed triangle is on the side). Open otherwise: a point on the boundary is
+   * neither inside nor outside. A region, D7's kind 2. Judged inside validity, and seeded.
+   */
+  | { kind: 'in-polygon'; id: Id; ring: Id[]; inside: boolean; closed?: true }
+  /**
+   * «5 < AB < 9» · «AB גדול מ-5» · «AB ≤ 9» — A BOUND ON A LENGTH (#1622, ADR-AG-217; 2-D's `set-length-bound`,
+   * ADR-390, with #1265's per-end strictness). Not an equality: a region, removing no freedom (D7's kind 2), judged
+   * at the solver's resolution so a length the givens pin AT a strict bound fails it and one at a closed bound holds.
+   */
+  | { kind: 'length-bound'; a: Id; b: Id; min?: number; minStrict?: boolean; max?: number; maxStrict?: boolean };
 
 /**
  * A quantity the figure DERIVES — never a symbol the student declared (that is a domain, kind 1).

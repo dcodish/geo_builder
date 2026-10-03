@@ -32,7 +32,8 @@ function valueExpr(src: string): Expr | null {
 import { constantLengthExpr, namedLengthPairs, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
 import { CENTRE_SENTINEL, CIRCLE_SENTINEL, UNBOUNDED, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type PerpRef, type Selector } from '../engine/types';
-import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
+import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, BARE_POLYGON_NOT_BUILT, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
+import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
 import {
   centreClauses,
@@ -155,7 +156,14 @@ export type ParseFailure =
    */
   | { code: 'inscribed-contradicts-noun'; detail: string; shape: string; forced: string }
   /** «האלכסון AB במרובע ABCD» — the pair is a SIDE of the ring the sentence names (#1620, ADR-AG-208). */
-  | { code: 'not-a-diagonal'; detail: string };
+  | { code: 'not-a-diagonal'; detail: string }
+  /**
+   * «מלבן ABCD שצלעו 4» — «its side» on a shape whose sides are NOT all equal by definition: WHICH side is unstated
+   * (ADR-052), so the sentence asks (#1622, ADR-AG-217; 2-D's `sideUnspecified`).
+   */
+  | { code: 'ambiguous-side'; detail: string }
+  /** «משובע ABCDEFG» — a polygon noun 2-D builds only when regular (#835), refused by name (#1622, ADR-AG-217). */
+  | { code: 'polygon-not-supported'; detail: string };
 
 export type ParseResult = { ok: true; facts: Fact[] } | ({ ok: false } & ParseFailure);
 
@@ -3576,6 +3584,9 @@ function namedShapeFacts(noun: string | undefined, ids: Id[], line: string): Fac
   const row = shapeRow(key);
   if (!row) return [];
   if (ids.length !== row.arity) return 'bad-arity';
+  // A regular noun is CONSTRUCTED (#1622, ADR-AG-217) — the declaration's own lowering, so naming it in passing draws
+  // the same figure.
+  if (row.regular) return shapeDeclaration(key, ids, line).filter((f) => f.t !== 'selector');
   return [
     { t: 'polygon', id: polygonId(ids), vertices: ids, noun: key, src: line },
     ...row.givens(ids).map((k: Constraint) => ({ t: 'constraint' as const, k, src: line })),
@@ -3777,19 +3788,44 @@ function parseShape(line: string): RuleOutcome {
      * student would describe it.
      */
     return made([
-      { t: 'polygon', id: polygonId(vertices), vertices, noun: normalizeShapeNoun(noun), src: line },
-      /**
-       * The given every shape noun carries and none of them wrote down (#1077): these are DIFFERENT
-       * POINTS. Without it the solve may satisfy «דלתון ABCD» by putting `B` and `D` in one place,
-       * where both equal-side givens hold trivially — measured in 25 of 60 configurations.
-       */
-      { t: 'selector' as const, sel: { kind: 'distinct' as const, ids: vertices }, src: line },
-      ...row.givens(vertices).map((k: Constraint) => ({ t: 'constraint' as const, k, src: line })),
+      ...shapeDeclaration(noun, vertices, line),
       ...(acute ? [{ t: 'selector' as const, sel: { kind: 'acute' as const, ids: vertices }, src: line }] : []),
     ]);
   }
 
   return null;
+}
+
+/**
+ * THE ONE LOWERING OF A SHAPE DECLARED BY ITS NOUN — the ring, the distinct-vertices given, and what the noun asserts.
+ *
+ * A REGULAR polygon's noun (#1622, ADR-AG-217) is constructed rather than constrained: its first two vertices are
+ * introduced free and every other one is the `regular-vertex` closed form over that first side (2-D's ADR-111 figure,
+ * rigid up to similarity). A vertex the figure already has takes the derivation as a condition (M1's `derived-at`).
+ */
+function shapeDeclaration(noun: string, vertices: Id[], line: string): Fact[] {
+  const row = shapeRow(noun)!;
+  const n = row.regular;
+  const built: Fact[] = n
+    ? [
+        { t: 'declare', id: vertices[0], src: line },
+        { t: 'declare', id: vertices[1], src: line },
+        ...vertices.slice(2).map(
+          (id, i): Fact => ({ t: 'derived', id, rule: { t: 'regular-vertex', a: vertices[0], b: vertices[1], n, k: i + 2 }, src: line }),
+        ),
+      ]
+    : [];
+  return [
+    ...built,
+    { t: 'polygon', id: polygonId(vertices), vertices, noun: normalizeShapeNoun(noun), src: line },
+    /**
+     * The given every shape noun carries and none of them wrote down (#1077): these are DIFFERENT
+     * POINTS. Without it the solve may satisfy «דלתון ABCD» by putting `B` and `D` in one place,
+     * where both equal-side givens hold trivially — measured in 25 of 60 configurations.
+     */
+    { t: 'selector' as const, sel: { kind: 'distinct' as const, ids: vertices }, src: line },
+    ...row.givens(vertices).map((k: Constraint) => ({ t: 'constraint' as const, k, src: line })),
+  ];
 }
 
 /**
@@ -5797,6 +5833,452 @@ const HAS_A_WORD = /(?:^|\s)[A-Za-z]{3,}(?=\s|$)/;
  * ONE CLAUSE: the grammar's reading, then the points its ROLE sentence introduces (#1669, ADR-AG-204). Every leaf
  * reading — direct, framed, split — passes through here, so the introductions are declared at ONE place.
  */
+// ---------------------------------------------------------------------------
+// #1622 slice E1 (ADR-AG-217) — the shapes and points 2-D reads: each sentence lowered onto the canonical
+// sentences this grammar already owns, so it adds vocabulary and no second lowering. 2-D's rules are the template
+// (`src/parser/parse.ts`, copied — never imported).
+// ---------------------------------------------------------------------------
+
+/**
+ * Stand-ins for the vertices the TOOL letters (ADR-AG-211's ruling, 2-D's `autoVertexLabels`): a canonical sentence is
+ * parsed with these, then each becomes a `vertex` placeholder that `engine/toolLetters.ts` resolves to the first free
+ * letters in order. `NAME` reads them (a capital and one subscript digit); no student writes them.
+ */
+const VERTEX_SENTINELS = ['Y₀', 'Y₁', 'Y₂', 'Y₃', 'Y₄', 'Y₅', 'Y₆', 'Y₇', 'Y₈', 'Y₉'];
+
+/**
+ * Parse `sentences` — the canonical sentences a line means — and re-attribute every fact to the student's line. The
+ * first `toolVertices` sentinels become the tool's vertex placeholders. A canonical sentence this grammar cannot read
+ * leaves the line unread (`null`); one it refuses refuses the line, quoting the student's own words.
+ */
+function lowered(line: string, sentences: readonly string[], toolVertices = 0): RuleOutcome {
+  const facts: Fact[] = [];
+  for (const s of sentences) {
+    const r = parseClause(s);
+    if (!r.ok) return r.code === 'not-handled' ? null : ({ ...r, detail: line } as ParseResult);
+    facts.push(...r.facts);
+  }
+  let text = JSON.stringify(facts.map((f) => ({ ...f, src: line })));
+  for (let i = 0; i < toolVertices; i += 1) text = text.split(VERTEX_SENTINELS[i]).join(toolPoint('vertex', `v${i}`));
+  return made(JSON.parse(text) as Fact[]);
+}
+
+/** The registry key a noun phrase names — Hebrew or English — or null when it names no shape. */
+function shapeKeyOf(phrase: string): string | null {
+  const p = trim(phrase).replace(/^(?:an?|the)\s+/i, '');
+  const key = EN_SHAPE[normalizeShapeNoun(p).toLowerCase()] ?? normalizeShapeNoun(p);
+  return shapeRow(key) ? key : null;
+}
+
+const NUM_ATOM = '(\\d+(?:\\.\\d+)?)';
+/** A shape stated without letters — «ריבוע», «משולש שווה צלעות», "a square". A definite noun refers, so it is not this. */
+const UNNAMED_SHAPE_HE = new RegExp(`^${HE_GIVEN}([א-ת]+(?:[- ][א-ת]+){0,2})$`);
+const UNNAMED_SHAPE_EN = /^(?:an?\s+)?([a-z]+(?:[- ][a-z]+){0,2})$/i;
+
+/** A shape HEAD — the noun with its vertex run, or the noun alone (the tool letters it). */
+function shapeHead(head: string): { key: string; vertices: Id[] | null } | null {
+  const named = SHAPE_HE.exec(head) ?? SHAPE_EN.exec(head);
+  // (English is case-insensitive, so "a square" also reads as the noun «a» with the run «square» — not a shape.)
+  const namedKey = named ? shapeKeyOf(named[1]) : null;
+  if (named && namedKey) return { key: namedKey, vertices: splitNames(named[2]) };
+  const bare = UNNAMED_SHAPE_HE.exec(head) ?? UNNAMED_SHAPE_EN.exec(head);
+  if (!bare || /^ה/.test(bare[1]) || /^the\s/i.test(bare[1])) return null;
+  const key = shapeKeyOf(bare[1]);
+  return key ? { key, vertices: null } : null;
+}
+
+/**
+ * «מחומש ABCDE» … a polygon noun 2-D builds only when REGULAR — «משובע», «מתושע», «מעושר» bare — is refused BY NAME,
+ * offering the nouns that build (2-D's #835 ruling and its `polygonNotSupported` note), never handed to the model.
+ */
+function parsePolygonNotBuilt(line: string): RuleOutcome {
+  const named = SHAPE_HE.exec(line);
+  const bare = named ? null : UNNAMED_SHAPE_HE.exec(line);
+  const noun = named?.[1] ?? bare?.[1];
+  if (!noun) return null;
+  return BARE_POLYGON_NOT_BUILT.has(normalizeShapeNoun(noun)) ? refuse('polygon-not-supported', line) : null;
+}
+
+/**
+ * «ריבוע» · «משולש שווה צלעות» · "a square" — A SHAPE WITH NO LETTERS (#1622, ADR-AG-217; 2-D's `shapeMacro` with
+ * `autoVertexLabels`). The tool letters it A, B, C, … — the first free letters, announced on the row (ADR-AG-211) —
+ * and it is then exactly the shape those letters would declare. Every vertex is a free DOF (ADR-052).
+ */
+function parseUnnamedShape(line: string): RuleOutcome {
+  const head = shapeHead(line);
+  if (!head || head.vertices) return null;
+  const n = shapeRow(head.key)!.arity;
+  return lowered(line, [`${head.key} ${VERTEX_SENTINELS.slice(0, n).join('')}`], n);
+}
+
+/**
+ * «ABC» · «ABCD» — A BARE RUN OF THREE OR FOUR LETTERS is the triangle / quadrilateral they name (2-D's bare-label
+ * shape: «ABCD» → `quadrilateral`, «ABC» → `triangle`; a run of five is not read there either).
+ */
+const BARE_RUN = new RegExp(`^((?:${NAME}){3,4})$`);
+function parseBareRun(line: string): RuleOutcome {
+  const m = BARE_RUN.exec(line);
+  if (!m) return null;
+  const v = splitNames(m[1]);
+  if (v.length < 3 || v.length > 4) return null;
+  if (hasRepeat(v)) return refuse('repeated-vertex', line);
+  return lowered(line, [`${v.length === 3 ? 'משולש' : 'מרובע'} ${v.join('')}`]);
+}
+
+/**
+ * A SHAPE THAT STATES ITS OWN SIZE (#1622, ADR-AG-217; 2-D's #458 / #591 / #957):
+ *
+ *  - «ריבוע ABCD שצלעו הוא 1» · «ריבוע שצלעו 4» · "square whose side is 1" — the side, on a noun whose sides are ALL
+ *    equal by definition (`ShapeRow.equalSides`: square, rhombus, equilateral triangle, a regular polygon). On any
+ *    other noun «its side» is an unstated pick of WHICH side (ADR-052), so the sentence ASKS (`ambiguous-side`), as
+ *    2-D's `sideUnspecified` does.
+ *  - «מלבן במידות 4*6» · «מלבן ABCD 4 על 6» · "rectangle 4 by 6" — a quadrilateral's two leading edges, |v0v1| and
+ *    |v1v2| (2-D's order convention: the first number is the base).
+ *
+ * Each magnitude is lowered as the student's «AB = 4» would be, so every value form that sentence reads (√2, 2√3) is
+ * read here too, and it is never dropped.
+ */
+const SIDE_TAIL_HE = new RegExp(
+  `^(.+?)\\s*,?\\s+(?:ש?צלעו|שאורך\\s+צלעו|שכל\\s+צלע\\s+שלו|שהצלע\\s+שלו|שהצלע\\s+שלה)\\s*(?:(?:הוא|היא|שווה(?:\\s*ל\\s*-?)?)\\s*|=\\s*)?(?=[√\\d(])(.+)$`,
+);
+const SIDE_TAIL_EN = /^(.+?)\s*,?\s+(?:whose\s+side(?:\s+length)?|with\s+side(?:\s+length)?)\s*(?:is\s+|=\s*)?(?=[√\d(])(.+)$/i;
+const DIMS_TAIL = new RegExp(
+  `^(.+?)\\s+(?:ב?מידות\\s*|with\\s+dimensions?\\s+|dimensions?\\s+)?${NUM_ATOM}\\s*(?:\\*|×|✕|x|X|\\s+על\\s+|\\s+by\\s+)\\s*${NUM_ATOM}$`,
+  'i',
+);
+function parseSizedShape(line: string): RuleOutcome {
+  const side = SIDE_TAIL_HE.exec(line) ?? SIDE_TAIL_EN.exec(line);
+  const dims = side ? null : DIMS_TAIL.exec(line);
+  const m = side ?? dims;
+  if (!m) return null;
+  const head = shapeHead(trim(m[1]));
+  if (!head) return null;
+  const row = shapeRow(head.key)!;
+  if (dims && row.arity !== 4) return null;
+  if (head.vertices && head.vertices.length !== row.arity) return refuse('bad-arity', line);
+  if (side && !row.equalSides) return refuse('ambiguous-side', line);
+  const v = head.vertices ?? VERTEX_SENTINELS.slice(0, row.arity);
+  const sizes = side ? [`${v[0]}${v[1]} = ${trim(m[2])}`] : [`${v[0]}${v[1]} = ${m[2]}`, `${v[1]}${v[2]} = ${m[3]}`];
+  return lowered(line, [`${head.key} ${v.join('')}`, ...sizes], head.vertices ? 0 : row.arity);
+}
+
+/**
+ * «אמצע AB» · «אמצע הצלע AB» · "midpoint of AB" — A MIDPOINT THE STUDENT DID NOT LETTER (#1622; 2-D names it M). The
+ * tool's midpoint letter (ADR-AG-211's table: M, then N, P, Q), and the same point as every other unnamed midpoint of
+ * that pair — a median's foot, a midsegment's end — so stating it twice names it once.
+ */
+const MIDPOINT_BARE_HE = new RegExp(`^${HE_GIVEN}ה?אמצע\\s+(?:ה?(?:צלע|קטע)\\s+)?(${NAME})(${NAME})$`);
+const MIDPOINT_BARE_EN = new RegExp(`^(?:the\\s+|a\\s+)?mid-?point\\s+of\\s+(?:(?:the\\s+)?(?:side|segment)\\s+)?(${NAME})(${NAME})$`, 'i');
+function parseBareMidpoint(line: string): RuleOutcome {
+  const m = MIDPOINT_BARE_HE.exec(line) ?? MIDPOINT_BARE_EN.exec(line);
+  if (!m) return null;
+  const [, a, b] = m;
+  if (a === b) return refuse('repeated-vertex', line);
+  return made([{ t: 'derived', id: toolPoint('midpoint', `mid:${[a, b].sort().join(',')}`), rule: { t: 'midpoint', a, b }, src: line }]);
+}
+
+/**
+ * «נקודה E על AC ב-40%» · «E על הצלע AC ב-40%» · "E on AC at 40%" — A POINT AT A FRACTION OF A SEGMENT, measured from
+ * the first-named end (2-D's `pointOnSegment` with its `t`). The segment drawn, and E dividing it 40 : 60 — the ratio
+ * sentence's own lowering. A fraction written without «%» must lie strictly between 0 and 1 (2-D reads it as `t`).
+ */
+const AT_FRACTION_HE = new RegExp(
+  `^${HE_GIVEN}(?:ה?נקודה\\s+)?(${NAME})\\s+(?:(?:נמצאת|נמצא)\\s+)?על\\s+(?:ה?(?:צלע|קטע)\\s+)?(${NAME})(${NAME})\\s+(?:ב-?\\s*)?${NUM_ATOM}\\s*(%)?$`,
+);
+const AT_FRACTION_EN = new RegExp(
+  `^(?:(?:the\\s+)?point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:(?:the\\s+)?(?:side|segment)\\s+)?(${NAME})(${NAME})\\s+(?:at\\s+)?${NUM_ATOM}\\s*(%)?$`,
+  'i',
+);
+function parseAtFraction(line: string): RuleOutcome {
+  const m = AT_FRACTION_HE.exec(line) ?? AT_FRACTION_EN.exec(line);
+  if (!m) return null;
+  const [, p, a, b, num, pct] = m;
+  const t = pct ? Number(num) / 100 : Number(num);
+  if (!(t > 0 && t < 1)) return null;
+  if (p === a || p === b || a === b) return refuse('repeated-vertex', line);
+  const near = Math.round(t * 1e9) / 1e7;
+  const far = Math.round((1 - t) * 1e9) / 1e7;
+  return lowered(line, [`הקטע ${a}${b}`, `${p} מחלקת את ${a}${b} ביחס ${near}:${far}`]);
+}
+
+/**
+ * «C במרחק 5 מ-A ו-5 מ-B» · "C is 5 from A and 5 from B" — A POINT AT TWO STATED DISTANCES (2-D's `pointByDistances`):
+ * the two lengths, as «AC = 5» and «BC = 5» state them.
+ */
+const BY_DISTANCES_HE = new RegExp(
+  `^(?:ה?נקודה\\s+)?(${NAME})\\s+(?:(?:נמצאת|נמצא)\\s+)?במרחק\\s+${NUM_ATOM}\\s+מ-?\\s*(${NAME})\\s+ו-?\\s*(?:במרחק\\s+)?${NUM_ATOM}\\s+מ-?\\s*(${NAME})$`,
+);
+const BY_DISTANCES_EN = new RegExp(
+  `^(?:(?:the\\s+)?point\\s+)?(${NAME})\\s+(?:is\\s+)?(?:at\\s+(?:a\\s+)?distance\\s+(?:of\\s+)?)?${NUM_ATOM}\\s+from\\s+(${NAME})\\s+and\\s+${NUM_ATOM}\\s+from\\s+(${NAME})$`,
+  'i',
+);
+function parseByDistances(line: string): RuleOutcome {
+  const m = BY_DISTANCES_HE.exec(line) ?? BY_DISTANCES_EN.exec(line);
+  if (!m) return null;
+  const [, p, d1, a, d2, b] = m;
+  if (p === a || p === b || a === b) return refuse('repeated-vertex', line);
+  return lowered(line, [`${a}${p} = ${d1}`, `${b}${p} = ${d2}`]);
+}
+
+/**
+ * «D על AB במרחק 3 מ-A» · "D on AB at a distance of 3 from A" — A POINT ON A CARRIER, AT A STATED DISTANCE (2-D's
+ * #760 `compoundAtDistance`): the left half through the real grammar (so every carrier that sentence reads is read
+ * here), then the distance as «AD = 3». The subject must be the one point the left half places.
+ */
+const AT_DISTANCE_TAIL = new RegExp(
+  `^(.+?)\\s+(?:במרחק|at\\s+(?:a\\s+)?distance(?:\\s+of)?)\\s+${NUM_ATOM}\\s+(?:מ-?\\s*|from\\s+)(${NAME})$`,
+  'i',
+);
+const AT_DISTANCE_SUBJECT = new RegExp(`^(?:ה?נקודה\\s+|(?:the\\s+)?point\\s+)?(${NAME})\\s+(?:(?:נמצאת|נמצא|is|lies)\\s+)?(?:על|on)\\s`, 'i');
+function parseAtDistance(line: string): RuleOutcome {
+  const m = AT_DISTANCE_TAIL.exec(line);
+  if (!m) return null;
+  const [, left, num, from] = m;
+  const subj = AT_DISTANCE_SUBJECT.exec(trim(left));
+  if (!subj || subj[1] === from) return null;
+  return lowered(line, [trim(left), `${from}${subj[1]} = ${num}`]);
+}
+
+/**
+ * «C ו-D בצדדים שונים של AB» · «C ו-D באותו צד של הישר AB» · "C and D are on opposite sides of AB" — WHICH SIDE OF A
+ * LINE (2-D's `pointsVsLine`, ADR-389). The carrier drawn (2-D's segment), each subject introduced, and the
+ * `line-side` selector: a region, consuming no freedom (D7's kind 2). «בצדדים שונים» takes exactly two points.
+ */
+const LINE_SIDE = new RegExp(
+  `^(?:ה?נקודות\\s+|ה?נקודה\\s+|נקודת\\s+|points?\\s+)?((?:${NAME})(?:(?:\\s*,\\s*|\\s+ו-?\\s*|\\s+and\\s+)${NAME})*)\\s+` +
+    `(?:נקודות\\s+|(?:is\\s+|are\\s+)?)?(?:נמצא(?:ת|ות|ים)?\\s+|lies?\\s+|lie\\s+)?(?:on\\s+)?` +
+    `(בצדדים\\s+(?:שונים|נגדיים)|מצדדים\\s+שונים|משני\\s+(?:ה?צדדים|צי?די)|באותו\\s+ה?צד|מאותו\\s+ה?צד|(?:different|opposite)\\s+sides?|(?:the\\s+)?same\\s+side)` +
+    `\\s+(?:של\\s+|of\\s+)?(?:ה?ישר\\s+|ה?קטע\\s+|(?:the\\s+)?line\\s+|(?:the\\s+)?segment\\s+)?(${NAME})(${NAME})$`,
+  'i',
+);
+function parseLineSide(line: string): RuleOutcome {
+  const m = LINE_SIDE.exec(line);
+  if (!m) return null;
+  const same = !/שונים|נגדיים|different|opposite|משני/i.test(m[2]);
+  const [a, b] = [m[3], m[4]];
+  const subjects = splitNames(m[1]);
+  if (a === b || hasRepeat(subjects) || subjects.some((x) => x === a || x === b)) return null;
+  if (same ? subjects.length < 2 : subjects.length !== 2) return null;
+  const drawn = lowered(line, [`הקטע ${a}${b}`]);
+  if (!drawn?.ok) return drawn;
+  return made([
+    ...drawn.facts,
+    ...subjects.map((id): Fact => ({ t: 'declare', id, src: line })),
+    { t: 'selector', sel: { kind: 'line-side', ids: subjects, a, b, same }, src: line },
+  ]);
+}
+
+/**
+ * «הנקודה E נמצאת בתוך המשולש KAO» · «E מחוץ למרובע ABCD» · "point E inside triangle KAO" — A POINT INSIDE OR OUTSIDE
+ * A POLYGON (2-D's `regionSideFallback`, `point-polygon-side`). Naming the shape draws it (analytic's #1080 ruling —
+ * 2-D creates an all-new triangle the same way), the point is introduced, and the `in-polygon` selector is the region.
+ */
+const REGION = new RegExp(
+  `^(?:ה?נקודה\\s+|(?:the\\s+)?point\\s+)?(${NAME})[,\\s]+(?:ש?נמצאת\\s+|ש?נמצא\\s+|is\\s+|lies\\s+)*` +
+    `(בתוך|מחוץ\\s*ל-?|inside(?:\\s+of)?|outside(?:\\s+of)?)\\s*(?:the\\s+|a\\s+)?(ה?[א-ת]+(?:[- ][א-ת]+){0,2}|[a-z]+(?:[- ][a-z]+){0,2})\\s+((?:${NAME}){3,4})$`,
+  'i',
+);
+function parseRegion(line: string): RuleOutcome {
+  const m = REGION.exec(line);
+  if (!m) return null;
+  const [, id, where, nounSrc, run] = m;
+  const key = shapeKeyOf(nounSrc.replace(/^ל/, ''));
+  if (!key) return null;
+  const ring = splitNames(run);
+  if (ring.length !== shapeRow(key)!.arity) return refuse('bad-arity', line);
+  const shape = lowered(line, [`${key} ${ring.join('')}`]);
+  if (!shape?.ok) return shape;
+  return made([
+    ...shape.facts,
+    { t: 'declare', id, src: line },
+    { t: 'selector', sel: { kind: 'in-polygon', id, ring, inside: /בתוך|inside/i.test(where) }, src: line },
+  ]);
+}
+
+/**
+ * «ישר ABE» · «הישר ABEF» · "line ABE" — POINTS ON ONE LINE, IN THE ORDER WRITTEN (2-D's `set-line`: collinear, B
+ * between A and E). The segment from the first to the last drawn (2-D draws it), and each inner point BETWEEN its two
+ * neighbours — «B על הקטע AE» — so a new letter is introduced exactly where the order puts it.
+ */
+const ORDERED_LINE_HE = new RegExp(`^${HE_GIVEN}ה?ישר\\s+((?:${NAME}){3,})$`);
+const ORDERED_LINE_EN = new RegExp(`^(?:the\\s+|a\\s+)?(?:straight\\s+)?line\\s+((?:${NAME}){3,})$`, 'i');
+function parseOrderedLine(line: string): RuleOutcome {
+  const m = ORDERED_LINE_HE.exec(line) ?? ORDERED_LINE_EN.exec(line);
+  if (!m) return null;
+  const v = splitNames(m[1]);
+  if (hasRepeat(v)) return refuse('repeated-vertex', line);
+  const inner = v.slice(1, -1).map((p, i) => `${p} על הקטע ${v[i]}${v[i + 2]}`);
+  return lowered(line, [`הקטע ${v[0]}${v[v.length - 1]}`, ...inner]);
+}
+
+/**
+ * «קו ועליו נקודה A» · «ישר עם הנקודות A ו-B» · "a line with point A on it" — A LINE THE STUDENT DID NOT LETTER, WITH
+ * POINTS ON IT (2-D's `pointOnTheLine`, creation arm): the line drawn as 2-D draws it — a segment whose ends the tool
+ * letters after the student's points (ADR-AG-211: «קו ועליו נקודה A» is BC, as in 2-D) — and each point on it. The
+ * indefinite «קו» states a new line; a definite «הקו» refers to one, and is not this sentence.
+ */
+const LINE_WITH_POINTS_HE = new RegExp(
+  `^(?:קו|ישר)\\s+(?:ועליו|שעליו|עם)\\s+ה?נקוד(?:ה|ות)\\s+((?:${NAME})(?:(?:\\s*,\\s*|\\s+ו-?\\s*)${NAME})*)$`,
+);
+const LINE_WITH_POINTS_EN = new RegExp(
+  `^(?:a\\s+)?line\\s+(?:with|and\\s+on\\s+it)\\s+(?:the\\s+|a\\s+)?points?\\s+((?:${NAME})(?:(?:\\s*,\\s*|\\s+and\\s+)${NAME})*)(?:\\s+on\\s+it)?$`,
+  'i',
+);
+function parseLineWithPoints(line: string): RuleOutcome {
+  const m = LINE_WITH_POINTS_HE.exec(line) ?? LINE_WITH_POINTS_EN.exec(line);
+  if (!m) return null;
+  const pts = splitNames(m[1]);
+  if (hasRepeat(pts)) return refuse('repeated-vertex', line);
+  const [e0, e1] = VERTEX_SENTINELS;
+  return lowered(line, [...pts.map((p) => `נקודה ${p}`), `הקטע ${e0}${e1}`, ...pts.map((p) => `${p} על הקטע ${e0}${e1}`)], 2);
+}
+
+/**
+ * «מעוין BDEF חסום במשולש ABC» · «מלבן DEFG חסום במשולש ABC» · "square DEFG inscribed in triangle ABC" — A POLYGON
+ * INSCRIBED IN A TRIANGLE (2-D's `inscribedInPolygon`, ADR-262). The triangle and the shape, each declared by its own
+ * sentence; a vertex both name IS the triangle's vertex; every other vertex rides a side (`engine/inscribe.ts`, 2-D's
+ * placement walk, copied). What the letters do not pin — the mirror direction, which side carries two vertices — is a
+ * `choice` over the placements, cycled by «הציגו תצורה אחרת». A rider lies ON its side, not its extension: the
+ * `in-polygon` selector, closed, on the triangle (convex, so on the side's line and in the closed triangle is on the
+ * side).
+ */
+const INSCRIBED_SHAPE_HE = new RegExp(
+  `^${HE_GIVEN}ה?(ריבוע|מלבן|מעוין|מקבילית)\\s+((?:${NAME}){4})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?(?:חסום|חסומה)\\s+ב(?:ה)?משולש\\s+((?:${NAME}){3})$`,
+);
+const INSCRIBED_SHAPE_EN = new RegExp(
+  `^(?:the\\s+|a\\s+)?(square|rectangle|rhombus|parallelogram)\\s+((?:${NAME}){4})\\s+(?:is\\s+)?inscribed\\s+in\\s+(?:the\\s+|a\\s+)?triangle\\s+((?:${NAME}){3})$`,
+  'i',
+);
+function parseInscribedInTriangle(line: string): RuleOutcome {
+  const m = INSCRIBED_SHAPE_HE.exec(line) ?? INSCRIBED_SHAPE_EN.exec(line);
+  if (!m) return null;
+  const key = shapeKeyOf(m[1])!;
+  const ids = splitNames(m[2]);
+  const tri = splitNames(m[3]);
+  if (hasRepeat(ids) || hasRepeat(tri)) return refuse('repeated-vertex', line);
+  const placements = inscribePlacements(ids, tri);
+  if (placements.length === 0) return null;
+  const shapes = lowered(line, [`משולש ${tri.join('')}`, `${key} ${ids.join('')}`]);
+  if (!shapes?.ok) return shapes;
+  const riders = ids.filter((id) => !tri.includes(id));
+  const options: Constraint[] = placements.map((p) => ({
+    t: 'all',
+    of: p.flatMap((q, i): Constraint[] => (q.at === 'side' ? [{ t: 'on-line-2pt', id: ids[i], a: q.a, b: q.b, bounded: true }] : [])),
+  }));
+  return made([
+    ...shapes.facts,
+    { t: 'constraint', k: options.length === 1 ? options[0] : { t: 'choice', options }, src: line },
+    ...riders.map((id): Fact => ({ t: 'selector', sel: { kind: 'in-polygon', id, ring: tri, inside: true, closed: true }, src: line })),
+  ]);
+}
+
+/**
+ * «5 < AB < 9» · «AB > 5» · «AB ≤ 9» · «AB בין 5 ל-9» · «AB גדול מ-5» · «AB לפחות 5» — A BOUND ON A LENGTH (2-D's
+ * `measureBound`, ADR-390, the length operand; #1265's strictness per end). A bound is not an equality: it states a
+ * REGION, removes no freedom, and is judged as a selector (`length-bound`), so «הציגו תצורה אחרת» varies the length
+ * within it and no value is reported for it (ADR-052). The segment is drawn, as 2-D draws it.
+ */
+const LEN_OPERAND = new RegExp(`^\\|?\\s*(${NAME})\\s*(${NAME})\\s*\\|?$`);
+const CMP_BIG = 'גדול[֐-׿]*|larger|longer|greater|bigger|more';
+const CMP_SMALL = 'קט[ןנ][֐-׿]*|smaller|shorter|less';
+const CMP_AT_LEAST = 'לפחות|at\\s+least|no\\s+less\\s+than';
+const CMP_AT_MOST = 'לכל\\s+היותר|at\\s+most|no\\s+more\\s+than';
+const isNumChunk = (t: string): boolean => /^\s*\d+(?:\.\d+)?\s*$/.test(t);
+type LengthBound = { min?: number; max?: number; minStrict?: boolean; maxStrict?: boolean };
+function parseLengthBound(line: string): RuleOutcome {
+  const body = normalizeMath(line)
+    .replace(/≤/g, '<=')
+    .replace(/≥/g, '>=')
+    .replace(/^\s*(?:נתון(?:\s+כי)?|given(?:\s+that)?)[\s:,-]*/i, '')
+    .trim();
+  let operand: string | null = null;
+  let bound: LengthBound | null = null;
+  const between = new RegExp(`^(.*?)\\s*(?:בין|between)\\s*${NUM_ATOM}\\s*(?:ל-?|עד|and|to)\\s*${NUM_ATOM}$`, 'i').exec(body);
+  const word = between ? null : new RegExp(`^(.*?)\\s*(?:(${CMP_BIG})|(${CMP_SMALL}))\\s*(?:than\\s+|מ-?|מן\\s+)?\\s*${NUM_ATOM}$`, 'i').exec(body);
+  const lax = between || word ? null : new RegExp(`^(.*?)\\s*(?:(${CMP_AT_LEAST})|(${CMP_AT_MOST}))\\s*${NUM_ATOM}$`, 'i').exec(body);
+  const strip = (s: string) => s.replace(/(?:^|\s)(?:is|are|הוא|היא|נמצא|נמצאת)(?=\s|$)/gi, ' ');
+  if (between) {
+    operand = strip(between[1]);
+    const [x, y] = [Number(between[2]), Number(between[3])];
+    bound = { min: Math.min(x, y), max: Math.max(x, y) };
+  } else if (word) {
+    operand = strip(word[1]);
+    const n = Number(word[4]);
+    bound = word[2] ? { min: n, minStrict: true } : { max: n, maxStrict: true };
+  } else if (lax) {
+    operand = strip(lax[1]);
+    const n = Number(lax[4]);
+    bound = lax[2] ? { min: n, minStrict: false } : { max: n, maxStrict: false };
+  } else {
+    const parts = body.split(/(<=|>=|<|>)/);
+    const less = (o: string) => o.startsWith('<');
+    const strict = (o: string) => o === '<' || o === '>';
+    if (parts.length === 3) {
+      const [l, o, r] = parts;
+      if (isNumChunk(l) === isNumChunk(r)) return null;
+      if (isNumChunk(r)) {
+        operand = l;
+        const n = Number(r);
+        bound = less(o) ? { max: n, maxStrict: strict(o) } : { min: n, minStrict: strict(o) };
+      } else {
+        operand = r;
+        const n = Number(l);
+        bound = less(o) ? { min: n, minStrict: strict(o) } : { max: n, maxStrict: strict(o) };
+      }
+    } else if (parts.length === 5) {
+      const [a, o1, mid, o2, c] = parts;
+      if (!isNumChunk(a) || !isNumChunk(c) || less(o1) !== less(o2)) return null;
+      operand = mid;
+      bound = less(o1)
+        ? { min: Number(a), minStrict: strict(o1), max: Number(c), maxStrict: strict(o2) }
+        : { max: Number(a), maxStrict: strict(o1), min: Number(c), minStrict: strict(o2) };
+    }
+  }
+  if (operand === null || !bound) return null;
+  const seg = LEN_OPERAND.exec(trim(operand));
+  if (!seg) return null;
+  const [, a, b] = seg;
+  if (a === b) return refuse('repeated-vertex', line);
+  // An EMPTY window («9 < AB < 5») is a contradiction, not a statement (2-D defers it rather than record a no-op).
+  if (bound.min !== undefined && bound.max !== undefined && !(bound.min < bound.max)) return null;
+  const drawn = lowered(line, [`הקטע ${a}${b}`]);
+  if (!drawn?.ok) return drawn;
+  return made([
+    ...drawn.facts,
+    {
+      t: 'selector',
+      sel: {
+        kind: 'length-bound',
+        a,
+        b,
+        ...(bound.min !== undefined ? { min: bound.min, minStrict: bound.minStrict !== false } : {}),
+        ...(bound.max !== undefined ? { max: bound.max, maxStrict: bound.maxStrict !== false } : {}),
+      },
+      src: line,
+    },
+  ]);
+}
+
+/** The E1 rules, in the order they claim (each answers its own sentence or `null`). */
+function parseShapesAndPoints(line: string): RuleOutcome {
+  return (
+    parsePolygonNotBuilt(line) ??
+    parseInscribedInTriangle(line) ??
+    parseSizedShape(line) ??
+    parseUnnamedShape(line) ??
+    parseBareRun(line) ??
+    parseBareMidpoint(line) ??
+    parseAtFraction(line) ??
+    parseByDistances(line) ??
+    parseAtDistance(line) ??
+    parseLineSide(line) ??
+    parseRegion(line) ??
+    parseOrderedLine(line) ??
+    parseLineWithPoints(line) ??
+    parseLengthBound(line)
+  );
+}
+
 function parseClause(raw: string): ParseResult {
   const r = parseClauseRules(raw);
   return r.ok ? made(withRoleIntroductions(r.facts)) : r;
@@ -5849,6 +6331,10 @@ function parseClauseRules(raw: string): ParseResult {
   // A coordinate compared (#1462) — after the parameter domains, whose atoms are single symbols.
   const compared = parseCompare(line);
   if (compared) return compared;
+
+  // The shapes and points 2-D reads (#1622 slice E1, ADR-AG-217) — each lowered onto the canonical sentences below.
+  const shapesAndPoints = parseShapesAndPoints(line);
+  if (shapesAndPoints) return shapesAndPoints;
 
   /**
    * A circle stated by its CENTRE runs before `matchCurve` (#1060), because that rule’s tail is
