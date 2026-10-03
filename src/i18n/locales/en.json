@@ -142,6 +142,7 @@
     "cevianApexIsFoot": "{{apex}}{{foot}} is not a segment — {{kind}} runs from a vertex to a different point.",
     "cevianWrongSide": "The bisector from {{apex}} meets side {{actual}}, not {{stated}}.",
     "bisectorWrongApex": "The bisector runs from {{apex}}, but the angle you named has its vertex at {{stated}}. Check which vertex you meant.",
+    "ambiguousCevian": "\"{{sentence}}\": vertex {{apex}} belongs to several shapes ({{shapes}}), each with a different side opposite it — so it is unclear which side {{kind}} drops to. Name the side (e.g. \"to side {{side}}\") or the triangle (e.g. \"in triangle {{shape}}\").",
     "arcCopula": "\"arc {{a}} is arc {{b}}\" says they are the same arc. To say their measures are equal: \"arc {{a}} equals arc {{b}}\".",
     "crossingAlreadyNamed": "The point you asked for is «{{holder}}» — a point already in the figure. {{s1}} and {{s2}} do meet there, but there is no new point here to call «{{id}}»; if you meant another point, check which two lines cross there."
   },

@@ -387,6 +387,18 @@ export async function decideFromParse(
     return refuse('guided', { source: 'parser', result: `bisector-wrong-apex:${r.apex}:${r.stated}` }, { key: 'input.bisectorWrongApex', params: { apex: r.apex, stated: r.stated } });
   }
   /**
+   * #1684 ([ADR-568](../../docs/06-decisions.md#adr-568)): «AE גובה» when A is a vertex of several shapes that
+   * give it different opposite sides. Which side is a given the sentence did not state, so it is ASKED,
+   * quoting the sentence and the shapes — never one picked silently, never a paid guess.
+   */
+  if (!r.ok && r.reason === 'ambiguous-cevian') {
+    const kind = r.role === 'median' ? 'input.cevianRoleMedian' : 'input.cevianRoleAltitude';
+    return refuse('clarify', { source: 'parser', result: `ambiguous-cevian:${r.role}:${r.apex}:${r.shapes.join(',')}` }, {
+      key: 'input.ambiguousCevian',
+      params: { sentence: utterance.trim(), apex: r.apex, shapes: r.shapes.join(', '), side: r.side, shape: r.shapes[0], kind: { t: kind } },
+    });
+  }
+  /**
    * #1274 (operator ruling, ADR-W-066): «D = חיתוך AB ו-BC» — AB and BC meet at B and nowhere else, so
    * the letter the student asked for would be a second name for a point the figure already has. The
    * crossing is AFFIRMED and the name refused (3-D's ADR-3D-183 wording, now 2-D's too); the text stays

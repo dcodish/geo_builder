@@ -13797,3 +13797,52 @@ Not changed: size (`radius.via !== 'free'`) and size order (`orderedBelow`) alre
 - `src/parser/context.ts`: `autosInterchangeable` reads `requirements`, with a disjoint pair unordered.
 
 **Behaviour change for a student:** after «מעגל מוכל בתוך המעגל הגדול» (or «שני מעגלים מוכלים»), «C על מעגל P» asks which circle P is instead of silently taking the big one. Naming one first («מרכז המעגל הקטן הוא P») builds as before.
+
+## ADR-568 — A cevian sentence's stated vertex and its shape are honoured or asked, never dropped or picked (#1684)
+
+**Status:** accepted · 2026-10-03 · bug (P1, the honesty class) · round #1721 (operator: *"Fold all into one round"*) · found by the #1620 analytic stream (ADR-AG-209) · branch `fix/1684-bisector-vertex` off `main` @ deed7b20
+
+**Requirements:** [FR-IN-9 (Must)](02-requirements.md) extended — a cevian whose shape is not stated asks; a bisector's stated vertex is honoured or refused · **Design:** [04-design.md](04-design.md) § "A refusal names what the rule matched" (the stated-vertex reader and `cevianShapeEdges`) · **LADDER stage:** the parser (the bisector, median and altitude rules) and the pre-LLM decision's refusal arms. No solver, replay or render change.
+
+**Cites** [ADR-528](#adr-528) (#1266/#1267: a cevian refusal names what the rule matched), [ADR-540](#adr-540) (#1285: `statedTriangle`, the triangle form's lone vertex), [ADR-052](#adr-052), ADR-AG-209 / ADR-AG-222 (the analytic verdicts this ports: `bisector-wrong-apex`, `ambiguous-cevian`, the foot narrowing the apex).
+
+**Context — measured at pickup on deed7b20, through `runSubmit` / `decideDeterministic2D`.** Both of the issue's claims held as written.
+
+| typed | before |
+| --- | --- |
+| «משולש ABC» · «AD חוצה זווית C» (also «… את זווית C», "AD bisects angle C") | commits `bisector bis-BAC (vertex A)` — the bisector of ∠A; «C» gone |
+| «משולש ABC» · «CE חוצה זווית A במשולש ABC» | refused `bisector-wrong-apex` (the #1285 triangle form) |
+| «משולש ABC» · «משולש ABD» · «AE גובה» / «גובה מ-A» | commits `foot E from A to BC` — ABC picked silently |
+| same figure · «AE תיכון» | escalates to the paid model (`not-handled`) |
+| same figure · «AE חוצה זווית» | asks `ambiguous-angle` (already right) |
+
+**Class.** *A cevian sentence's stated or unstated choice of angle or target shape is resolved by the rule's own default instead of by the sentence.* Two members: (1) the angle's vertex letter was read only in the triangle form, so the bare form fell back to the apex's neighbours and dropped the letter; (2) `oppositePolygonEdges` unions the opposite sides of EVERY polygon holding the apex, and the altitude took the first (the median, seeing several, escalated) — a union that is right inside one shape (a parallelogram's heights, the operator's draw-one steer) and wrong across shapes.
+
+**Decision.**
+1. **One stated-vertex reader for both bisector forms.** The vertex is the letter right after the angle word («זווית C», «הזווית B», "angle C", «∠C»); the triangle form keeps its lone-letter fallback (and only it — a stray letter in «CD חוצה את AB בנקודה K» is the segment-bisection rule's). The vertex is honoured or refused: the segment's first letter → the angle there (arms from the triangle, else the figure, as before); the segment's far end → the angle at that EXISTING point with one angle there (the existing `vertex === D` constraint — «BD חוצה זווית D» in a quadrilateral); anything else, or a far end that is not yet a point → `bisector-wrong-apex`, quoting both letters.
+2. **`cevianShapeEdges` decides the target shape, for every cevian rule that derives it.** It groups the opposite sides by the polygon holding the apex. One target set → the old union (so a single shape, including a parallelogram's several heights, is unchanged); shapes that give the apex different opposite sides → the new clarify `ambiguous-cevian`, which the decision maps to `input.ambiguousCevian`, quoting the sentence, the shapes, and an example side and triangle. A foot the figure already puts on exactly one candidate side answers it (analytic's ADR-AG-222 reading). All three callers of `oppositePolygonEdges` (the median's named and classic forms, the altitude) go through it; a stated side or triangle never reaches it.
+
+**Sibling audit.** Grepped every caller of `oppositePolygonEdges` (3, all routed) and every reader of a single-letter angle in the bisector rule (1). Other `ambiguous-angle` raisers already ask. **Analytic:** already answers both (ADR-AG-209). **3-D:** the class is not present — `parse3` returns `not-handled` for the single-letter bisector forms (it escalates, nothing is dropped), and «AE גובה» there is the pyramid height, resolved at apply. **Found, not fixed:** the `input.ambiguousAngle` example hard-codes `A{{vertex}}C`, so for vertex A it teaches «∠AAC» — filed as #1722 (P3).
+
+**Measured after** (`src/app/__tests__/issue-1684-cevian-stated-vertex.test.ts`):
+
+| typed | now |
+| --- | --- |
+| «משולש ABC» · «AD חוצה זווית C» / «… את זווית C» / «… את הזווית B» / "AD bisects [the] angle C" | refused `bisector-wrong-apex`, no paid call |
+| «משולש ABC» · «AD חוצה זווית A» / «CE חוצה זווית C במשולש ABC» / «CD חוצה זווית במשולש ABC» | builds, unchanged |
+| «מרובע ABCD» · «BD חוצה זווית D» | builds the equal-angle constraint at D |
+| «משולש ABC» · «AD חוצה זווית D» | refused (D is not a point yet) |
+| «משולש ABC» · «משולש ABD» · «AE גובה» / «AE תיכון» / «גובה מ-A» / «תיכון מ-A» / "AE height" / "height from A" | asks `ambiguous-cevian`, no paid call |
+| same · «AE גובה לצלע BD» / «… במשולש ABD» / «… במשולש ABC» / «AE תיכון לצלע BC» | builds on the named side |
+| same · «E על BC» · «AE גובה» | builds to BC (the foot narrows) |
+| «מקבילית ABCD» · «AE גובה»; «משולש ABC» · «AE גובה» | builds, unchanged |
+
+**Unchanged, measured.** The 74 existing test files that exercise cevian/bisector sentences (grep of חוצה/גובה/תיכון/altitude/median/bisector/ambiguous-angle) plus the four #1649 parity files: 78 files, 2556 tests, green; decide-parity goldens: no recorded hash changed, shard 4 gains the new scenario's key only. The full suite is the batch gate (round #1721).
+
+**Locks.** `src/app/__tests__/issue-1684-cevian-stated-vertex.test.ts` (23, through `decideDeterministic2D` after a gate-driven prefix). **Fails before: 14 of 23**, measured by reverting the parser, decision and locale changes to deed7b20; the 9 that pass before are controls (the apex vertex, the triangle form, the named side or triangle, the foot narrowing, the parallelogram and single-triangle builds). Scenario `cevian-stated-vertex-and-shape-1684` (corpus 4). #1649 parity: `bisector-wrong-vertex` and `cevian-apex-two-triangles` drop their 2-D known gap; new rows `bisector-wrong-vertex-en` (refused) and `cevian-apex-two-triangles-side` (builds).
+
+**Consequences.**
+- `src/parser/parse.ts`: the stated-vertex reader in `bisectorPlacesPoint`; `cevianShapeEdges`; the `ambiguous-cevian` clarify and parse result.
+- `src/app/decideDeterministic.ts`: the `ambiguous-cevian` arm. `src/i18n/locales/{he,en}.json`: `input.ambiguousCevian`.
+
+**Behaviour change for a student:** «AD חוצה זווית C» is now refused with a note saying the bisector runs from A, not C, instead of quietly drawing the bisector of angle A. «AE גובה» (or «AE תיכון») when A is a corner of two triangles now asks which side or triangle is meant instead of picking one.

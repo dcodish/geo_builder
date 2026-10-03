@@ -3252,4 +3252,23 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(at(fig, 'D'), at(fig, 'O')), 'D on the container O').toBeCloseTo(O!.radius.value, 6);
     },
   },
+  {
+    id: 'cevian-stated-vertex-and-shape-1684',
+    title: '#1684 (ADR-568): «AD חוצה זווית C» is refused (a segment from A cannot bisect ∠C); «AE גובה» with A in triangles ABC and ABD asks; naming the side builds',
+    guards:
+      "Found by the #1620 analytic stream (ADR-AG-209), measured on main deed7b20 through decideDeterministic2D: «משולש ABC» · «AD חוצה זווית C» committed the bisector of ∠A with the stated vertex C dropped, and «משולש ABC» · «משולש ABD» · «AE גובה» committed the foot on BC, triangle ABC picked silently. Root cause: the bisector rule read a lone vertex letter only in the triangle form (#1285), and the cevian rules unioned the opposite sides of every polygon holding the apex (`oppositePolygonEdges`) and took the first. Fix: one stated-vertex reader for both bisector forms, and `cevianShapeEdges`, which asks (`ambiguous-cevian`) when the shapes holding the apex give it different opposite sides. Asserts the refusal and the ask at the gate, and that naming the side builds the foot on BD with AE ⟂ BD. The submit-door matrix (spellings, both locales, the foot-on-side narrowing, the parallelogram steer) is in src/app/__tests__/issue-1684-cevian-stated-vertex.test.ts.",
+    steps: ['משולש ABC', 'משולש ABD', 'AE גובה לצלע BD'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const wrong = gateVerdict(factsOf(['משולש ABC']), 'AD חוצה זווית C');
+      expect(wrong.kind === 'refused' && wrong.detail, '«AD חוצה זווית C» is refused by the parser').toBe('bisector-wrong-apex');
+      const two = gateVerdict(factsOf(['משולש ABC', 'משולש ABD']), 'AE גובה');
+      expect(two.kind === 'refused' && two.detail, '«AE גובה» with A in two triangles asks').toBe('ambiguous-cevian');
+      const A = at(fig, 'A'), B = at(fig, 'B'), D = at(fig, 'D'), E = at(fig, 'E');
+      const dot = (E.x - A.x) * (D.x - B.x) + (E.y - A.y) * (D.y - B.y);
+      expect(Math.abs(dot) / (dist(A, E) * dist(B, D)), 'AE ⟂ BD').toBeLessThan(1e-6);
+      const cross = (E.x - B.x) * (D.y - B.y) - (E.y - B.y) * (D.x - B.x);
+      expect(Math.abs(cross) / dist(B, D), 'E on line BD').toBeLessThan(1e-6);
+    },
+  },
 ];
