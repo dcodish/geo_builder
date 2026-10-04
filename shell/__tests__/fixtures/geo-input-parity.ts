@@ -948,6 +948,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'role-length-median-1607', family: 'lengths', steps: ['משולש ABC', 'התיכון AM = 5'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1679' }] },
   { id: 'role-length-altitude-1607', family: 'lengths', steps: ['משולש ABC', 'הגובה AH הוא 5'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1679' }] },
   { id: 'role-length-bound-1607', family: 'lengths', steps: ['משולש ABC', 'התיכון AM גדול מ-5'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1679' }], note: 'a bound, never |AM| = 5 (#1248)' },
+  // ── #1443 (ADR-575): a height stated as a magnitude with no segment named — the trapezoid builds, the others ask ──
+  { id: 'height-trapezoid-1443', family: 'lengths', steps: ['טרפז ABCD', 'גובה הטרפז 4'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448' }], note: 'the reported sentence; the height is minted and drawn between the bases' },
+  { id: 'height-trapezoid-copula-1443', family: 'lengths', steps: ['טרפז ABCD', 'גובה הטרפז הוא 4'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448' }] },
+  { id: 'height-trapezoid-introduced-1443', family: 'lengths', steps: ['גובה הטרפז ABCD הוא 4'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448' }], note: 'the trapezoid named by its letters on an empty canvas is introduced (the #1720 precedent)' },
+  { id: 'height-triangle-asks-1443', family: 'lengths', steps: ['משולש ABC', 'גובה המשולש 4'], expect: 'asks', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448' }], note: 'three heights — which one is the student’s to say (ADR-052)' },
+  { id: 'height-parallelogram-asks-1443', family: 'lengths', steps: ['מקבילית ABCD', 'גובה המקבילית הוא 4'], expect: 'asks', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448' }] },
+  { id: 'height-to-side-1443', family: 'lengths', steps: ['משולש ABC', 'הגובה לצלע BC הוא 4'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448' }] },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
