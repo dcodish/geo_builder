@@ -993,6 +993,8 @@
  "suite:[\"the midpoint of SA\",\"S\",\"A\"]": "eb7638b9c4fee794",
  "suite:[\"Midpoint of BB'\",\"B\",\"B'\"]": "7fb55c02c55b391e",
  "suite:[\"middle of AB\",\"A\",\"B\"]": "52ca2efb6e109407",
+ "suite:[\"קוביה ABCDA'B'C'D'\",\"מישור A'B'C'D' הוא x+4y-8z-126=0\",\"B(0,7,8)\"]": "8ced9211a008ff05",
+ "suite:[\"w\",\"|w|\",\"w·w\"]": "6e8fea9a7a3a1014",
  "suite:[\"׳\",\"ʹ\",\"ʼ\",\"′\",\"’\",\"‘\",\"´\",\"`\"]": "e4def2a33dd24763",
  "suite:[\"קוביה ABCDA'B'C'D'\"]": "5a077e6538231b91",
  "suite:[\"B(0,7,8)\"]": "8d2eeb091794ec52",

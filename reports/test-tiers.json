@@ -6,10 +6,9 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-10-03",
+  "updatedAt": "2026-10-04",
   "slow": [
     "src-analytic/__tests__/issue-1353-imperatives-taught.test.ts",
-    "src-analytic/__tests__/issue-1464-1324-1462-kite-exercise.test.ts",
     "src-analytic/__tests__/issue-1473-perf-budget.test.ts",
     "src-analytic/__tests__/issue-1473-pool-invariant.test.ts",
     "src-analytic/__tests__/issue-1556-freerank-equality-rows.test.ts",
