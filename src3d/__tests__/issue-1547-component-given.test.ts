@@ -130,8 +130,18 @@ describe('#1547 — a component rides what the point already sits on', () => {
 describe('#1547 — ASKABLE (ADR-3D-279): the question is the statement with its value dropped', () => {
   const QS = ['x_B', 'x_{B}=?', 'שיעור ה-x של B', 'מהו שיעור ה-x של נקודה B?', 'what is the x-coordinate of B?'];
 
-  it.each(QS)('«%s» on B(1, t, 2) answers x_B = 1', (q) => {
-    expect(ask(build(['B(1, t, 2)']), q).answer).toBe('x_B = 1');
+  it.each(QS)('«%s» on B(1, t, 2) answers 1', (q) => {
+    expect(ask(build(['B(1, t, 2)']), q).answer).toBe('1');
+  });
+
+  /**
+   * The ask row prints «<question> = <answer>» (App3's query section), so the answer is the bare value —
+   * the round-#1736 pre-play saw «x_B = x_B = 1» when the answer carried the name too.
+   */
+  it('the ask row reads «x_B = 1», the name once', () => {
+    const r = ask(build(['B(1, t, 2)']), 'x_B');
+    expect(`${r.text} = ${r.answer}`).toBe('x_B = 1');
+    expect(r.answer).not.toMatch(/x_B/);
   });
 
   it('an open component is undetermined, never a sample', () => {
@@ -141,14 +151,14 @@ describe('#1547 — ASKABLE (ADR-3D-279): the question is the statement with its
 
   it('a component stated on a NEW point is knowledge with no frame — and the panel agrees', () => {
     const st = build(['x_B = 3']);
-    expect(ask(st, 'x_B').answer).toBe('x_B = 3');
+    expect(ask(st, 'x_B').answer).toBe('3');
     expect(ask(st, 'y_B')).toMatchObject({ answer: null, note: 'undetermined' });
     expect(ask(st, 'B').answer).toBe('B(3, ?, ?)');
   });
 
   it('a stated sign is answered as a sign', () => {
     const st = build(['A(0,0,0)', 'x_B = 3', 'שיעור ה-z של B חיובי']);
-    expect(ask(st, 'z_B').answer).toBe('z_B = +?');
+    expect(ask(st, 'z_B').answer).toBe('+?');
   });
 
   it('a letter that is not a point of the figure is not understood', () => {
@@ -163,7 +173,7 @@ describe('#1547 — ASKABLE (ADR-3D-279): the question is the statement with its
     for (const r of rows) {
       for (const text of [r.he, r.en]) {
         const q = text.replace(/\s*(?:הוא|is|=)\s*3$/, '');
-        expect(ask(st, q).answer, `«${q}»`).toBe('x_B = 1');
+        expect(ask(st, q).answer, `«${q}»`).toBe('1');
       }
     }
   });

@@ -168,7 +168,7 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   and a true one stays green. The same frame takes a sign («…חיובי», «x_B > 0», «x_B < 0»). A letter value
   («x_B = 2t») is refused by name rather than guessed, and a comparison with a number other than zero
   («x_B > x_D», «y_B < 6») is not read yet. The question is the statement with its value dropped — «x_B»,
-  «x_{B} = ?», «מהו שיעור ה-x של B?» — and answers `x_B = 1`, a sign (`+?`), or «not determined», from the
+  «x_{B} = ?», «מהו שיעור ה-x של B?» — and the row reads «x_B = 1», a sign (`+?`), or «not determined», from the
   panel's own per-coordinate judgement. *(Realised — [ADR-3D-299](06b-decisions-3d.md#adr-3d-299), #1547.)*
 
 ## Vectors — the geometric lane

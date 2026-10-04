@@ -607,12 +607,12 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
     return entry ? { text, answer: `${q.id}${entry.text}` } : { text, answer: null, note: 'undetermined' };
   }
 
-  // #1547 — ONE coordinate, from the SAME per-axis decision the panel and the whole-point answer use: a
-  // known value prints as the exam writes it (`x_B = 1`); a sign-only component prints its sign (`+?`);
+  // #1547 — ONE coordinate, from the SAME per-axis decision the panel and the whole-point answer use: the
+  // answer is the bare VALUE, like every scalar kind — the ask row prints «<question> = <answer>» (`x_B = 1`); a sign-only component prints its sign (`+?`);
   // an open one is honestly undetermined — never one configuration's sample (ADR-052).
   if (q.kind === 'component') {
     const comp = dataView(c, seed).pointComps[q.id]?.[['x', 'y', 'z'].indexOf(q.axis)];
-    return comp !== undefined && comp !== '?' ? { text, answer: `${q.axis}_${q.id} = ${comp}` } : { text, answer: null, note: 'undetermined' };
+    return comp !== undefined && comp !== '?' ? { text, answer: comp } : { text, answer: null, note: 'undetermined' };
   }
 
   // #317 — a PLANE's canonical equation, through the derivation the panel's planes block shares
