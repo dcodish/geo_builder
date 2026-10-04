@@ -434,23 +434,11 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
  *
  * #1546 (ADR-3D-282) — every claim verifies at the SAME configurations, so a figure's samples are
  * resolved once per (construction, seed), never once per claim: four coordinate claims on a pivot figure
- * re-solved the pivot sixteen times per derive (the #863 sample-count lock caught it). Keyed on the
- * construction's identity — `apply` clones, never mutates — like the store's derive memo (#1422).
+ * re-solved the pivot sixteen times per derive (the #863 sample-count lock caught it). #863 (ADR-3D-304)
+ * moved that memo down to `resolve3` itself, so the claim verifier, the data panel and the ask lane share
+ * ONE solve per configuration — `knowledgeSamples3` is called directly here.
  */
-const samplesMemo = new WeakMap<Construction3, Map<number, Resolved3[]>>();
-function samplesAt(c: Construction3, seed: number): Resolved3[] {
-  let per = samplesMemo.get(c);
-  if (!per) samplesMemo.set(c, (per = new Map()));
-  let r = per.get(seed);
-  if (!r) {
-    r = knowledgeSamples3(c, [seed]);
-    per.set(seed, r);
-    if (per.size > 16) per.delete(per.keys().next().value as number);
-  }
-  return r;
-}
-
 export function verifyClaim(claim: Claim3, c: Construction3, seed: number): boolean {
   // one base seed at a time, so a refuted claim still stops at the first failing seed (docs/17 §7)
-  return claimSeeds(seed).every((s) => samplesAt(c, s).every((r) => holdsAt(claim, c, r)));
+  return claimSeeds(seed).every((s) => knowledgeSamples3(c, [s]).every((r) => holdsAt(claim, c, r)));
 }

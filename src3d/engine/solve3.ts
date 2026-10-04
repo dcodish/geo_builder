@@ -54,7 +54,17 @@ const unpack = (x: number[]) => ({ t: v3(x[0], x[1], x[2]), w: v3(x[3], x[4], x[
  * Small n (≤ ~10), tiny residual functions — exactness comes from the quadratic
  * convergence near the solution, polished to ~1e-12.
  */
-export function leastSquares(residuals: (x: number[]) => number[], x0: number[], iterations = 120): { x: number[]; err: number } {
+/** #863 (ADR-3D-304): the solver-volume counter — the perf canary for the anchored lanes. `solves` counts
+ *  {@link leastSquares} calls, `evals` every residual evaluation they make (the Jacobian's included) and every
+ *  one the anchored projected walk makes. Locks assert these by COUNT, never by clock. */
+export const leastSquaresStats = { solves: 0, evals: 0 };
+
+export function leastSquares(residuals0: (x: number[]) => number[], x0: number[], iterations = 120): { x: number[]; err: number } {
+  leastSquaresStats.solves++;
+  const residuals = (y: number[]): number[] => {
+    leastSquaresStats.evals++;
+    return residuals0(y);
+  };
   let x = [...x0];
   let r = residuals(x);
   let err = r.reduce((s, v) => s + v * v, 0);
