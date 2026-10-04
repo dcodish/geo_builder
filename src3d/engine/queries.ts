@@ -19,7 +19,7 @@ import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { angleBetweenOperands, distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
 import { revolutionMeasure } from './claims';
-import { angleAskOperands, componentAskOf, revolutionAskOf } from '../parser/parse3';
+import { angleAskOperands, componentAskOf, foldPrimes3, revolutionAskOf } from '../parser/parse3';
 import { readOperand } from '../parser/operandToken';
 import { figureSymbolsOf } from './types';
 import type { Construction3, Id, Operand3, Positions3, Requirement3 } from './types';
@@ -113,7 +113,7 @@ function atomVec(c: Construction3, a: Atom, pos: Positions3): Vec3 | null {
 
 /** Parse a query string into a typed request (no coordinates yet), or null if unrecognised. */
 export function parseQuery(c: Construction3, raw: string): Query | null {
-  const s = raw.replace(/[′’]/g, "'").replace(/\s+/g, ' ').trim();
+  const s = foldPrimes3(raw).replace(/\s+/g, ' ').trim(); // #1545: the parser's own prime fold
   if (!s) return null;
 
   // #319 — LINE↔PLANE angle: «הזווית בין SB למישור ABC» / «angle between SB and plane ABC»

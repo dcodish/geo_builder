@@ -11758,3 +11758,25 @@ Both build with every row ok and 8 points, and in both the point that was A now 
 **Consequences.** `src3d/parser/parse3.ts`, `catalog3.ts`, `llmShared3.ts`; `src3d/engine/queries.ts`, `dataView.ts`; `src3d/store/store3.ts`; `src3d/i18n/errorText3.ts` + locales; `shell/__tests__/fixtures/geo-input-parity.ts`.
 
 **Behaviour change for a student:** a single coordinate of a point — «x_B = 3», «שיעור ה-x של נקודה B הוא 3» — is now drawn instead of being sent to the model, and can be asked («x_B»); «שיעור ה-x של נקודה B חיובי» (without «ה» before «נקודה») now reads. On a figure with no typed coordinate point, the data panel now prints the coordinate a student stated on a new point («B(3, ?, ?)»; «D(+?, 0, 0)» for «D על החלק החיובי של ציר ה-x»), where it printed nothing.
+
+## ADR-3D-300 — The prime fold is one set, and the Hebrew geresh «׳» is a prime (#1545)
+
+**Status:** accepted · 2026-10-04 · bug (P3) · round #1753 · branch `fix/1545-geresh-prime` off `main` @ c098af9b
+
+**Requirements:** none (internal) · **Design:** docs/04b — "The normalisation seam": the prime fold is one set
+
+**Class.** A **prime mark** typed with any glyph but ASCII `'` is **read differently by each reader that canonicalises it**, because the fold was spelled per reader. Instance: «קוביה ABCDA׳B׳C׳D׳» (Hebrew GERESH, U+05F3 — the typographic Hebrew apostrophe a Hebrew keyboard offers).
+
+**Context — re-measured at c098af9b (issue's own commands, all held).** `parse3("קוביה ABCDA׳B׳C׳D׳")` → `ok`, ids `A,B,C,D,A,B,C,D`; store submit → `bad-solid`; `parse3("B׳(2,15,-8)")` → `not-handled`; on the #1541 figure ask «BB׳» → `notUnderstood` while «BB'» → `(2, 8, -16)`. Same for ʹ (U+02B9). In the ask lane ‘ and \` were also unread although `normalize3` folded them.
+
+**Root cause.** No step DELETES the geresh. It survives `normalize3` (not in `[′’‘\`]`) and is not a label character, so the label `RUN` regex stops at it and the next run restarts after it: «ABCDA׳B׳C׳D׳» is the runs `ABCDA`, `B`, `C`, `D` — eight tokens, duplicated. The fold existed in **four** spellings, each a different subset: `normalize3` (′’‘\`), `parseQuery` (′’), `restoreStatedSequences3` (′’), `normalizeLabel3` in the rename dialog (’´\`). A fifth reader, the bidi run alphabet `CORE` in `i18n/bidi.ts`, knew only `'′`, so a run ending in any other prime left the last one outside the LTR isolate (an RTL paragraph puts it at the far end of the label).
+
+**Decision.** `PRIME_GLYPHS3` (′ ’ ‘ \` ´ ׳ ʹ ʼ) and `foldPrimes3` live in `src3d/lexicon/marks3.ts` — the import-free notation-mark leaf the vector arrows already live in (#1194), so `parser/`, `engine/`, `store/` and `i18n/` all read it without depending on each other. `normalize3` applies it (re-exported from `parse3`), `parseQuery`, `restoreStatedSequences3` and `normalizeLabel3` call it, `relabelTokens3` treats every member as a prime boundary (renaming `A` never touches «A׳»; renaming `A'` reaches it and keeps the student's glyph), and `CORE` is built from it. The set is the union of the four old copies plus ׳, ʹ, ʼ; every member is one code unit, so the fold is length-preserving (the sequence gate relies on it). «״» (gershayim) is a quotation mark and stays out.
+
+**Plan vs build.** The plan named three copies and "normalizer only". Measured: a fourth copy (`rename3.normalizeLabel3`) and a display reader (`bidi.ts` `CORE`) — the latter becomes reachable only once the geresh cube is accepted (before, it was refused and never rendered), so leaving it would ship a figure whose fact row shows its last prime detached. Both join the one set; no new mechanism. The duplicated-ids parse itself is still refused honestly by the store's solid check for any glyph outside the set; generalising `labelTokens` to refuse an interrupted run is not done here (no other glyph is known to reach it).
+
+**Sibling audit.** 2-D (`src/parser/lexicon.ts` `LABEL = [A-Za-z]\d*`), analytic and complex have **no primed labels** — the class has no member there. In `src3d/`, the lock below greps every non-test source for a regex-literal prime class.
+
+**Locks.** `src3d/__tests__/issue-1545-prime-fold.test.ts` (52): per glyph — the cube (He + En) parses equal to ASCII, `B׳(2,15,-8)` parses, `parseQuery` agrees with the ASCII spelling, the LLM sequence gate restores a reordered run, the bidi isolate keeps the whole primed run, the rename dialog folds it and keeps `A`/`A׳` apart; no src3d regex literal spells its own prime class; his figure with the geresh builds and «BB׳» answers `(2, 8, -16)`. Fixture `fixtures3/geresh-prime-cube-1545.geo3.json` (the #1541 figure typed with ׳ on every line). #1394 golden re-recorded: **keys added only, no recorded hash changed**.
+
+**Behaviour change for a student:** a prime typed as the Hebrew geresh «׳» (or ʹ, ʼ, ´) is now a prime everywhere — the cube builds, «BB׳» is answered, a rename finds it, and the fact row keeps the prime beside its letter.

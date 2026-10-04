@@ -70,3 +70,29 @@ export function isVectorMarked3(s: string): boolean {
   if (VECTOR_ARROW_RE.test(s)) return true;
   return new RegExp(String.raw`(?:^|[\s:,])${VECTOR_WORD_SRC}(?:\s|$)`, 'i').test(s);
 }
+
+/**
+ * THE PRIME MARK — every glyph a student, a keyboard or a paste puts after a label to mean «prime»
+ * (#1545, ADR-3D-300). The canonical spelling is ASCII `'`; these are the others.
+ *
+ * The fold was spelled in FOUR places — `normalize3`, the ask lane's `parseQuery`, the LLM sequence gate
+ * and the rename dialog's `normalizeLabel3` — each a different subset, and the Hebrew GERESH «׳» (U+05F3,
+ * the typographic Hebrew apostrophe a Hebrew keyboard offers) was in none. Unfolded it is not a label
+ * character, so the label RUN stopped at it and restarted after it: «ABCDA׳B׳C׳D׳» read as
+ * A,B,C,D,A,B,C,D, a cube whose top ring duplicated its base. The display had the same hole one layer
+ * over — `i18n/bidi.ts`'s run alphabet knew only `'` and `′`, so a run ending in any other prime left it
+ * outside the isolate, where an RTL paragraph puts it at the far end of the label.
+ *
+ * Members: ′ U+2032 prime · ’ U+2019 · ‘ U+2018 · ` · ´ U+00B4 · ׳ U+05F3 geresh · ʹ U+02B9 modifier
+ * prime · ʼ U+02BC modifier apostrophe. Every one is a SINGLE code unit, so the fold is length-preserving
+ * (the sequence gate matches on the folded line and emits by the same indices). «״» (gershayim) is a
+ * quotation mark, not a prime, and stays out.
+ */
+export const PRIME_GLYPHS3 = '′’‘`´׳ʹʼ';
+
+const PRIME_FOLD_RE = new RegExp(`[${PRIME_GLYPHS3}]`, 'g');
+
+/** Canonicalise every prime glyph to ASCII `'` — the ONE prime fold; every reader calls this. */
+export function foldPrimes3(s: string): string {
+  return s.replace(PRIME_FOLD_RE, "'");
+}

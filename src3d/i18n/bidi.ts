@@ -16,6 +16,8 @@
  * covered without their author having to think about bidi, which is the whole defect class.
  */
 
+import { PRIME_GLYPHS3 } from '../lexicon/marks3';
+
 /** Hebrew LETTERS (not the whole block — Hebrew punctuation and niqqud must not split a run). */
 const HEBREW_LETTER = /[א-ת]/;
 
@@ -43,7 +45,10 @@ const HEBREW_LETTER = /[א-ת]/;
 // U+20D7 has no standalone glyph and rendered as tofu on the button and in the input alike. U+20D7
 // STAYS: a student can still paste it and the parser still reads it, so a run carrying it must not
 // split. Adding the character the palette offers is exactly the #482 drift the lock guards against.
-const CORE = /[A-Za-z0-9'′·<½¾²³ℓ\u20D7→Α-ω|∠∡∢⊥∥△▲√⌢°]/;
+// #1545 (ADR-3D-300): the prime glyphs are the ONE set the grammar folds (`lexicon/marks3`), not a local
+// `'′` — a run ending in a geresh «A׳» left its last prime outside the isolate, and an RTL paragraph put
+// it at the far end of the label.
+const CORE = new RegExp(`[A-Za-z0-9'${PRIME_GLYPHS3}·<½¾²³ℓ\\u20D7→Α-ω|∠∡∢⊥∥△▲√⌢°]`);
 
 /**
  * Delimiters that HUG a run and belong inside the isolate with it — `(1, 2, -3)` is the 3-D case that
