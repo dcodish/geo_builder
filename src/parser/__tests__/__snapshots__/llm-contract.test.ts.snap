@@ -1780,6 +1780,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "line-circle-intersection",
     ],
   },
+  "the diagonal AC is 8": {
+    "en": [
+      "segment",
+      "set-distance",
+    ],
+    "he": [
+      "segment",
+      "set-distance",
+    ],
+  },
   "the diameter of circle O from F cuts side AC at E": {
     "en": [
       "line-line-intersection",

@@ -127,6 +127,23 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
+      "segment",
+    ],
+    "text": "the diagonal AC is 8",
+    "winner": "roleLength",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "segment",
+      "distanceConstraint",
+    ],
+    "text": "האלכסון AC = 8",
+    "winner": "roleLength",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
       "circle",
     ],
     "text": "circle centered at O radius 5",
@@ -1230,6 +1247,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "lang": "he",
     "text": "AB = 6",
     "winner": "distanceConstraint",
+  },
+  {
+    "lang": "en",
+    "text": "the diagonal AC is 8",
+    "winner": "roleLength",
+  },
+  {
+    "lang": "he",
+    "text": "האלכסון AC = 8",
+    "winner": "roleLength",
   },
   {
     "lang": "en",
