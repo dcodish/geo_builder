@@ -11078,3 +11078,30 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Not changed.** The exam imperative stays a TEACH in analytic (ADR-AG-206), where 2-D obeys it; that divergence predates this ADR. With P inside the circle the imperative's lesson is dropped by the gate (its candidate does not fold) and the line answers `not-handled` — the ADR-AG-206 rule for a candidate the fold refuses, unchanged here.
 
 **Consequences.** `parser/parseAnalytic.ts` (`fromPointVerb`, the shared lowering), `parser/scopeAnalytic.ts` (`משיקים`, `שני`, the from-point frame), `parser/catalogAnalytic.ts` (one row — it feeds `PROMPT_SPEC_ANALYTIC`, so the LLM proxy needs a redeploy), `shell/__tests__/fixtures/geo-input-parity.ts` (five rows).
+
+## ADR-AG-236 — Two conics have a root order: the reading direction, so «הראשונה» / «השנייה» of a conic pair select (#1416)
+
+**Date:** 2026-10-04 · **Status:** accepted · fix-round #1753 (batch bug). #1416 approved 2026-09-27 (batch, `auto-ok`).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R85 — amended (two conics have the order; the duplicate refusal names its operands). · **Design:** [04c](04c-design-analytic.md), "Two conics are ordered by the reading direction" (beside ADR-AG-157's "A pair's crossings have ONE order"). · **LADDER stage:** validity (the `crossing-nth` selector and `meetsTwice`, `crossing-order.ts`) and the seeding that starts a named crossing on its root; `derive`'s positional duplicate fault. No parser, catalog or fold change.
+
+**Closes** [ADR-AG-157](#adr-ag-157)'s first limit and [ADR-AG-185](#adr-ag-185)'s "two conics have none".
+
+**Re-measured at pickup** (origin/main c098af9b, real `derive` / `decideSubmit`), «מעגל I: x^2+y^2=25», «מעגל II: (x-4)^2+(y-1)^2=9»:
+- «P נקודת החיתוך הראשונה של המעגל I עם המעגל II» and «…השנייה…» → both (4.609, −1.937) at seeds 0–2: the ordinal chose nothing.
+- «המעגל I חותך את המעגל II בנקודות A ו-B» (and «…נחתכים בנקודות…», «A ו-B נקודות החיתוך של…») → `unsatisfiable` at every seed: `meetsTwice` answered false for any conic pair, so the both-crossings sentence could never hold. Same class, same chokepoint — found while measuring.
+- The duplicate refusal's only wording is «הישרים האלה נפגשים ב-…», whatever the operands.
+
+**Root cause.** `orderedCrossings` (`crossing-order.ts`) defined an order only for a straight × conic pair and returned `null` for two conics, which `nthHolds` reads as "cannot be judged → holds", so both ordinals held at either root and the solve's first converged start decided. `meetsTwice` hard-coded "two of a kind ⇒ false". The refusal text was written for the one pair the structural parse arm catches (two straights) and reused by `derive`'s positional arm for every pair.
+
+**Decision.**
+1. **The order is the reading direction**: left to right, bottom to top where two crossings stand one above the other — the rule a straight with no points of its own already follows (`walkOfCoefficients`), and the one the issue proposed ("left to right"). It belongs to the plane, not the words, so swapping the operands changes nothing.
+2. `conicsMeet(c1, c2)`: two circles via their **radical line** walked as a coefficient line (`conicMeet` on the first circle — exact, and the tangency/miss come from the same discriminant); any other pair by walking the closed conic (circle or ellipse) once round, sampling the other's implicit function (1440 samples), bisecting each sign change, and sorting left to right with a tie at 1e-9 of the conics' scale; two parabolas `y² = 2p·x` touch at the vertex or coincide. `orderedCrossings` uses it, so the selector, the seeding and `meetsTwice` all read it.
+3. `meetsTwice` judges a conic pair by the same order and floor (scale = the larger conic).
+4. **The refusal names its operands.** `derive`'s positional `crossing-already-named` fault carries `operands`, each incidence said by `incidenceWords` (`crossings.ts` — the rings' nouns: «המעגל I», «הפרבולה y^2=4x», «הצלע/הקטע/הישר AB», «ציר ה-x»); `errorText` then uses `errCrossingAlreadyNamedOperands` — «נקודת החיתוך של {first} עם {second} היא {holder}, …», the sentence's own construct, which needs no gender/number agreement. Where an operand has no sayable name, and for the parse-time arm (two straights sharing a letter, ADR-AG-116), the straights' wording stays.
+
+**Locks.** `src-analytic/__tests__/issue-1416-conic-root-order.test.ts` (9 tests; **fails before: 8 of 9** — the control is the two-straights refusal): two circles, two circles side by side, circle × ellipse (four crossings), circle × parabola — each ordinal lands on its own `conicsMeet` root at seeds 0–3 with no fault; the order is left→right / bottom→top and operand-swap invariant; a tangency is one touching point, concentric circles meet nowhere; the both-crossings sentence (two spellings) builds with A, B on the two roots; a second «הראשונה» is refused with `holder: P`, `operands: ['המעגל I', 'המעגל II']` and a Hebrew text naming both circles and not «הישרים», while «השנייה» records.
+
+**Not changed.** The canvas still offers no ring at a conic × conic crossing (`crossingsOf` searches straight × straight and straight × conic only) — a click affordance, not this bug. The grammar's ordinals stay two («הראשונה», «השנייה»); a circle × ellipse pair's third and fourth crossings are reachable only without an ordinal.
+
+**Consequences.** `engine/crossing-order.ts` (`conicsMeet`, `orderedCrossings`, `meetsTwice`); `engine/crossings.ts` (`incidenceWords`); `engine/derive.ts` (`LineFault.operands`); `store/useAnalyticStore.ts`, `app/submit.ts`, `app/errorText.ts`; `i18n/index.ts` (one key per locale).

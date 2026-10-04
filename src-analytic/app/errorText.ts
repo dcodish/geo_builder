@@ -140,7 +140,8 @@ export function errorText(error: InputError, t: Translate): string {
     'cevian-no-triangle': 'errCevianNoTriangle',
     'ambiguous-hypotenuse': 'errAmbiguousHypotenuse',
     'ambiguous-no-right-angle': 'errCevianNoRightAngle',
-    'crossing-already-named': 'errCrossingAlreadyNamed',
+    // #1416 — the operands named when the figure can say them; the straights' wording is for two straights only
+    'crossing-already-named': error.key === 'crossing-already-named' && error.operands ? 'errCrossingAlreadyNamedOperands' : 'errCrossingAlreadyNamed',
     'self-crossing': 'errSelfCrossing',
     'llm-busy': 'errLlmBusy',
     'llm-understood-unsupported': 'errLlmUnderstood',
@@ -203,6 +204,8 @@ export function errorText(error: InputError, t: Translate): string {
     found: host ? host.found : 0,
     range: error.key === 'out-of-domain' && error.domain ? rangeText(error.domain, t) : '',
     holder: 'holder' in error ? (error.holder ?? '') : '',
+    first: error.key === 'crossing-already-named' && error.operands ? error.operands[0] : '',
+    second: error.key === 'crossing-already-named' && error.operands ? error.operands[1] : '',
     other: 'other' in error ? error.other : '',
     reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '',
     definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '',

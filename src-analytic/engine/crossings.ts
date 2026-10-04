@@ -17,6 +17,7 @@
  */
 import type { Figure } from './evaluate';
 import type { Construction, CurveKind, Id, NumCurve } from './types';
+import type { Constraint } from './solve';
 import { objectById } from './types';
 import { numeralKey, refKindOf, statedName } from './names';
 import { isPolygonSide, withinSegment } from './extent';
@@ -210,6 +211,28 @@ function words(c: Construction, id: Id, classified?: CurveKind): string | null {
       return name.startsWith('מעגל') ? `ה${name}` : `המעגל ${name}`;
     }
     return `הישר ${name}`;
+  }
+  return null;
+}
+
+/**
+ * HOW A CROSSING'S OPERAND IS SAID — one incidence of a crossing, in the words the rings use (#1416).
+ *
+ * The duplicate-crossing refusal used to say «הישרים האלה» ("these LINES") whatever the operands were, so a
+ * second «הראשונה» of two circles was told about lines. It now names the two things that cross, in the
+ * grammar's own nouns: the same `words` the rings offer for a curve, and for a straight through two points
+ * the noun its extent carries — «הצלע» for a polygon side, «הקטע» for a bounded piece, «הישר» otherwise.
+ * `null` when the operand has no name a sentence can use; the caller then keeps a kind-free wording.
+ */
+export function incidenceWords(c: Construction, k: Constraint): string | null {
+  if (k.t === 'on-line-2pt') {
+    const noun = isPolygonSide(c, k.a, k.b) ? 'הצלע' : (k as { bounded?: boolean }).bounded ? 'הקטע' : 'הישר';
+    return `${noun} ${k.a}${k.b}`;
+  }
+  if (k.t === 'on-curve') return words(c, k.curve);
+  if (k.t === 'on-line' && k.c === 0) {
+    if (k.a === 0 && k.b !== 0) return 'ציר ה-x';
+    if (k.b === 0 && k.a !== 0) return 'ציר ה-y';
   }
   return null;
 }

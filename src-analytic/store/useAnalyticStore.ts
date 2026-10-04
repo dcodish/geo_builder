@@ -106,7 +106,7 @@ export type InputError =
   /** «תיכון ליתר» with no right angle in the figure (#1222). */
   | { key: 'ambiguous-no-right-angle'; detail: string }
   /** A crossing the student named that the figure already names — carrying WHO holds it (#1175). */
-  | { key: 'crossing-already-named'; detail: string; holder: string }
+  | { key: 'crossing-already-named'; detail: string; holder: string; operands?: [string, string] }
   /** A crossing of a line with itself — «הישר AB עם הישר BA» names no point (#1255). */
   | { key: 'self-crossing'; detail: string }
   /**

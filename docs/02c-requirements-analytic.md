@@ -1382,8 +1382,14 @@ of the order above and the second letter the second — the operator's ruling, e
 sentences would say. The assignment is fixed: «הציגו תצורה אחרת» never swaps it, and a student who wants
 the other assignment swaps the letters in the sentence (the points stay; the letters move). The sentence
 states TWO points, so a pair that does not meet in two points is refused on that sentence — a line that
-misses the conic or touches it, two straight lines (which meet once), and two conics (which have no order
-this tool defines).
+misses the conic or touches it, and two straight lines (which meet once).
+**Amended by [ADR-AG-236](06c-decisions-analytic.md#adr-ag-236) (#1416): two conics have the order too.** A
+pair of conics — two circles, a circle and an ellipse or a parabola — is numbered in the READING direction
+of the plane: left to right, and bottom to top where two crossings stand one above the other (the order a
+straight with no points of its own already takes). So «P נקודת החיתוך הראשונה של המעגל I עם המעגל II» and
+«…השנייה…» name two different points, and «המעגל I חותך את המעגל II בנקודות A ו-B» names both. Naming a
+crossing that already has a letter is refused naming that letter AND the two things that cross, as the
+grammar says them («נקודת החיתוך של המעגל I עם המעגל II היא P…») — never calling two circles «ישרים».
 
 **R86 — a measurement can be reached by CLICKING, and a distance is shown as a construction**
 ([ADR-AG-066](06c-decisions-analytic.md#adr-ag-066)). Clicking a point or a line offers the questions
