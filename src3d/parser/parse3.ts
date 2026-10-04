@@ -2890,9 +2890,21 @@ const PAR_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מקביל(?:ים|ות|ה)?|∥|\|\||
  * back — the asymmetry the operator hit within minutes of the row existing. Both frames are added
  * together, per the CROSS_HE_VERB/CROSS_HE_NOUN precedent: reach for only one and the other silently
  * drops.
+ *
+ * #1608 (ADR-3D-298) — the VERB IS OPTIONAL. «נקודה E במישור ABC» is the textbook's own spelling (it
+ * is #1498's title) and it fell between two owners: `membership`/`pointRelPlane` read «על» with an
+ * optional verb, this frame read «ב…» only AFTER a verb, so the verbless «ב-» had no rule — for a point
+ * AND for a line («AB במישור ABC», «ℓ במישור π1» escalated alike). The bare preposition is admitted
+ * here, in the one frame both containment rules share, so the operand kinds decide the lowering
+ * exactly as they do for the verb-headed form. It is gated on an explicit PLANE NOUN (מישור / פאה /
+ * בסיס, `plane` / `face` / `base`) held in a lookahead, so the noun still reaches the operand reader
+ * and «C ב-AB» (a segment) is not newly a containment sentence.
  */
-const CONTAINED_SPLIT =
-  /\s*(?:(?:is|are)\s+)?(?:מוכל(?:ים|ות|ת)?|נמצא(?:ים|ות|ת)?|מונח(?:ים|ות|ת)?|contained(?:\s+in)?|lies?\s+(?:in|on)|lying\s+(?:in|on))\s*(?:ב(?=\S)|על\s+|in\s+|on\s+)?-?\s*/;
+const CONTAINED_VERB = String.raw`(?:(?:is|are)\s+)?(?:מוכל(?:ים|ות|ת)?|נמצא(?:ים|ות|ת)?|מונח(?:ים|ות|ת)?|contained(?:\s+in)?|lies?\s+(?:in|on)|lying\s+(?:in|on))\s*(?:ב(?=\S)|על\s+|in\s+|on\s+)?`;
+const CONTAINER_NOUN_AHEAD = String.raw`(?=-?\s*(?:${HE_PLANE}|ה?פא(?:ה|ות)|ה?בסיס|(?:the\s+)?(?:planes?|faces?|bases?)\b))`;
+const CONTAINED_SPLIT = new RegExp(
+  String.raw`(?:\s*${CONTAINED_VERB}|\s+(?:(?:is|are)\s+)?(?:ב|in\s+)${CONTAINER_NOUN_AHEAD})-?\s*`,
+);
 
 /** The CONTAINER-headed frame — «המישור P מכיל את ℓ», `plane P contains ℓ`. Directed: the sides arrive
  *  reversed, so it cannot ride the symmetric splitter table and gets its own reader. */
