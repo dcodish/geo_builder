@@ -63,6 +63,11 @@ export type InputError =
    */
   | { key: 'glued-i'; detail: string; suggestion: string }
   /**
+   * #1534 — a trigonometric form whose `cos` and `sin` disagree («cos45 + i sin30»): it is not r·cisθ
+   * for any θ, so it is refused naming the two angles, never read as one of them.
+   */
+  | { key: 'trig-mismatch'; detail: string; cos: string; sin: string }
+  /**
    * #1428 — the fold could not use the statement `detail`, for a reason it KNOWS (`why`): a reserved
    * letter, today. The strip words that reason; the generic «incompatible» would claim a contradiction
    * that may not exist (`z = 1+i` after `z^2 = 2i` — 1+i IS a root).

@@ -182,8 +182,79 @@ const TRANSFORMS: readonly { readonly why: string; readonly apply: (s: string) =
   },
   { why: 'remaining subscript digits join the name', apply: (s) => s.replace(/[₀₁₂₃₄₅₆₇₈₉]/g, (c) => SUBSCRIPTS[c]) },
   { why: 'the degree sign is decoration on an angle', apply: (s) => s.replace(/°/g, '') },
+  {
+    // #1534 — «2(cos45 + i sin45)» is «2cis45»: the textbook form the cis notation abbreviates
+    why: 'the trigonometric form r(cosθ + i·sinθ) is r·cisθ',
+    apply: (s) => trigToCis(s),
+  },
   { why: 'collapse whitespace', apply: (s) => s.replace(/\s+/g, ' ').trim() },
 ];
+
+/**
+ * #1534 ([ADR-CX-059](../../docs/06d-decisions-complex.md#adr-cx-059)) — THE TRIGONOMETRIC FORM.
+ *
+ * `r(cosθ + i·sinθ)` is how every textbook writes the number `r·cisθ` abbreviates, and the operator
+ * ruled it is read as exactly that number (2026-10-04). It is a SPELLING of `cis`, so it is fixed here,
+ * at the chokepoint, the way «הצמוד של z1» becomes `conj(z1)`: every rule — the expression grammar's
+ * `r·cisθ` literal, `generic-polar`'s symbolic `r cis θ`, a product, a power — then reads one spelling,
+ * and the facts the line lowers to are the facts `r cisθ` lowers to by construction, not by a second
+ * polar path that would have to agree with the first.
+ *
+ * The rewrite happens only when the reading is the student's, unambiguously:
+ * - **the same angle in both slots** — `cos45 + i sin30` is not a cis of anything; it is left as typed,
+ *   so the line refuses, and the submit path names the two angles (`trigAngleMismatch`);
+ * - the `i` on either side of `sin`: `i sin`, `i*sin` (the dot is `*` by now), `isin`, `sinθ i`, `sinθ*i`;
+ * - the angle is whatever `cis` reads — a number of degrees (the `°` is already gone), signed, optionally
+ *   parenthesised, or a symbolic letter (`θ` is `theta` by now) — so the two spellings never diverge;
+ * - **a parenthesised group** `(cos θ + i sin θ)` becomes `cis(θ)`, so a modulus in front of it
+ *   (`2(…)`, `√2(…)`, `r(…)`, `|z1|(…)`) attaches exactly as it does to `cis`. A group RAISED to a power
+ *   keeps its parentheses — `2(cos45 + i sin45)^2` is 2·(cis45)², never `2cis45^2`, which the grammar
+ *   reads as (2cis45)²;
+ * - **an unparenthesised sum** `cos θ + i sin θ` (r omitted ⇒ 1) only where it is a whole additive term:
+ *   after the start, `=`, `(` or `+`, and before the end, `=`, `)`, `+` or `-`. `2cos45 + i sin45` or
+ *   `-cos45 + i sin45` is a different number and is left alone.
+ */
+const TRIG_ANGLE = String.raw`(?:-\s*)?(?:\d+(?:\.\d+)?|[A-Za-z]+\d*)`;
+const TRIG_ARG = String.raw`(${TRIG_ANGLE}|\(\s*${TRIG_ANGLE}\s*\))`;
+const TRIG_CORE = String.raw`(?<![A-Za-z])cos\s*${TRIG_ARG}\s*\+\s*(?:i\s*\*?\s*sin\s*${TRIG_ARG}|sin\s*${TRIG_ARG}\s*\*?\s*i)(?![A-Za-z\d])`;
+const TRIG_GROUP = new RegExp(String.raw`\(\s*${TRIG_CORE}\s*\)(\s*\^)?`, 'g');
+const TRIG_BARE = new RegExp(String.raw`(?<=(?:^|[=(+])\s*)${TRIG_CORE}(?=\s*(?:$|[)=+\-]))`, 'g');
+const TRIG_ANY = new RegExp(TRIG_CORE, 'g');
+
+/** An angle as typed, without its parentheses and spaces: `( -30 )` → `-30`. */
+const bareAngle = (a: string): string => a.replace(/[\s()]/g, '');
+/** One angle, one key: `45` ≡ `45.0` ≡ `(45)`; a letter compares by name. */
+const angleKey = (a: string): string => {
+  const b = bareAngle(a);
+  return /^-?\d/.test(b) ? String(Number(b)) : b.toLowerCase();
+};
+
+function trigToCis(s: string): string {
+  const same = (cos: string, sin: string): boolean => angleKey(cos) === angleKey(sin);
+  return s
+    .replace(TRIG_GROUP, (m, cos: string, sinA: string | undefined, sinB: string | undefined, power: string | undefined) =>
+      same(cos, (sinA ?? sinB)!) ? (power ? ` (cis(${bareAngle(cos)}))${power}` : ` cis(${bareAngle(cos)})`) : m,
+    )
+    .replace(TRIG_BARE, (m, cos: string, sinA: string | undefined, sinB: string | undefined) =>
+      same(cos, (sinA ?? sinB)!) ? `cis(${bareAngle(cos)})` : m,
+    );
+}
+
+/**
+ * The two angles of a trigonometric form whose `cos` and `sin` disagree — `cos45 + i sin30` — or null.
+ * Read on the NORMALIZED line, where every agreeing form has already become `cis`, so whatever is left
+ * is a mismatch; the submit path names both angles rather than refusing the line as unreadable.
+ */
+export function trigAngleMismatch(raw: string): { readonly cos: string; readonly sin: string } | null {
+  for (const m of normalize(raw).matchAll(TRIG_ANY)) {
+    const cos = m[1];
+    const sin = (m[2] ?? m[3])!;
+    // shown as the angle the student typed, in degrees (the `°` normalization removed comes back)
+    const shown = (a: string): string => (/^-?\d/.test(bareAngle(a)) ? `${bareAngle(a)}°` : bareAngle(a));
+    if (angleKey(cos) !== angleKey(sin)) return { cos: shown(cos), sin: shown(sin) };
+  }
+  return null;
+}
 
 /** The one entry point. Every rule sees the output of this and nothing else. */
 export function normalize(raw: string): string {

@@ -137,6 +137,14 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   product offered («z*i»); `pi` is never read as p·i. *(#1365, operator ruling 2026-09-24; realised —
   [ADR-CX-058](06d-decisions-complex.md#adr-cx-058). Counting the number's freedom as two rather than
   four is #1410.)*
+- **FR-CN-11 (Must)** — **The trigonometric form is the same number as cis.** «z1 = 2(cos45 + i sin45)»,
+  «z1 = √2(cos45 + i·sin45)», «z1 = cos45 + i sin45» (r omitted is 1), with `i·sin`, `i*sin`,
+  `sin45·i`, the `°` or without it, a signed or parenthesised angle, and a symbolic one
+  («r(cosθ + i sinθ)»), read exactly as «2cis45» / «r cis θ» does — the same facts, and the student's
+  line stays as typed. A form whose two angles differ («cos45 + i sin30») is refused naming both angles,
+  never read as either. Angles are read the way `cis` reads them: degrees (radians such as `π/4` are
+  read by neither). *(#1534, operator ruling 2026-10-04; realised —
+  [ADR-CX-059](06d-decisions-complex.md#adr-cx-059).)*
 
 ## Knowledge and claims
 

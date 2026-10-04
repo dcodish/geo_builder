@@ -40,6 +40,7 @@
 
 import { readEnvelope, type LoadAudit } from '../../shell/save';
 import { parseLineV2 } from '../parser/rules';
+import { trigAngleMismatch } from '../parser/normalize';
 import { complexScopeOf, parseAsk } from './deriveLines';
 import { type ComplexScope, gluedISpelledOut } from '../parser/exprParse';
 import type { Derived2 } from '../replay/derive2';
@@ -161,6 +162,9 @@ export function gluedISuggestion(line: string, lines: readonly string[]): string
 
 /** THE refusal for a line the grammar could not read — one wording for every entry point. */
 function unreadRefusal(parsed: Extract<ReturnType<typeof parseLineV2>, { ok: false }>, line: string, lines: readonly string[]): InputError {
+  // #1534 — `cos45 + i sin30` is a trigonometric form with two angles: name them, it is not unreadable
+  const trig = trigAngleMismatch(line);
+  if (trig) return { key: 'trig-mismatch', detail: line, cos: trig.cos, sin: trig.sin };
   if (parsed.reason === 'unaccounted') return { key: 'unaccounted', detail: parsed.items.join(', ') };
   const suggestion = wordRootSuggestion(line, lines);
   if (suggestion) return { key: 'word-root', detail: line, suggestion };

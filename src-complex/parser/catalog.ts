@@ -86,6 +86,14 @@ export const CATALOG: readonly CatalogEntry[] = [
     descEn: 'a polar definition',
   },
   {
+    // #1534 (ADR-CX-059): the textbook trigonometric form IS r·cisθ — the same angle in both slots
+    family: 'F2',
+    he: 'z1 = 2(cos45 + i·sin45)',
+    en: 'z1 = 2(cos45 + i·sin45)',
+    descHe: 'הצורה הטריגונומטרית — אותו מספר כמו 2cis45 (גם √2(cos45 + i sin45), cos45 + i sin45)',
+    descEn: 'the trigonometric form — the same number as 2cis45 (also √2(cos45 + i sin45), cos45 + i sin45)',
+  },
+  {
     family: 'F2',
     featured: true,
     he: 'w = z1*z2',

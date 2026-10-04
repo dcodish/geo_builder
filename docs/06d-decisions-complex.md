@@ -3572,3 +3572,78 @@ and both parameters forced; a negative forced value; hand-over to the exact carr
 `glued-i` clarification that then reads; the `not-handled` refusals; the declared letter) · fixtures
 `symbolic-cartesian-modulus-1365`, `symbolic-cartesian-forced-1365`, `symbolic-cartesian-quadrant-1365`,
 `symbolic-cartesian-ib-1365`. ADR-CX-040's 28 locks are unchanged and green.
+
+## ADR-CX-059 — «z1 = 2(cos45 + i sin45)»: the trigonometric form is a spelling of cis (#1534)
+
+**Status:** accepted, 2026-10-04 (operator ruling 2026-10-04, the /decisions pass) ·
+**Issue:** [#1534](https://github.com/dcodish/geo_builder/issues/1534) (feature, `complex`, PR) · round #1753
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-11 (new): the trigonometric form is the same number as cis ·
+**Design:** [04d](04d-design-complex.md), "The trigonometric form is a SPELLING of cis, fixed at the orthography chokepoint" ·
+**Ladder:** stage 0a ([LADDER-CX](LADDER-CX.md))
+
+**What was missing.** `z1 = 2(cos45 + i sin45)` and `z1 = √2(cos45 + i sin45)` were `not-handled`,
+measured at pickup on `c098af9b`, as were `cos45 + i sin45`, `i·sin`, `isin`, `sin45 i` and the `°`
+spelling. The lexer has no `cos`/`sin`, so `cos45` was a letter run and ADR-CX-040's floor refused it.
+Every `cis` spelling read. The ruling: read the textbook form as the same number as `r·cisθ`, and keep
+the student's spelling.
+
+**Decision — one spelling problem, fixed where spellings are fixed.** The form is what `cis`
+abbreviates, so it is rewritten at the orthography chokepoint (`normalize`, stage 0a), the way
+«הצמוד של z1» becomes `conj(z1)`: `(cos θ + i sin θ)` → `cis(θ)`. Every rule then reads one spelling:
+the expression grammar's `r·cisθ` literal (`withCis`), `generic-polar`'s symbolic `r cis θ`, a product,
+a quotient, a power. So the line lowers to the facts `r cis θ` lowers to by construction. There is no
+second polar path that would have to agree with the first. Two locks hold it: equal facts and equal
+readings for every spelling.
+
+The rewrite fires only when the reading is unambiguous:
+1. **The same angle in both slots**, compared by value (`45` ≡ `45.0` ≡ `(45)`; a letter by name).
+2. **The `i` on either side of `sin`:** `i sin`, `i·sin`, `i*sin`, `isin`, `sin45·i`, `sin45 i`.
+3. **The angle is whatever `cis` reads:** degrees with or without `°`, signed or parenthesised, or a
+   symbolic letter (`θ` → `theta`). The token set is `cis`'s own.
+4. **A parenthesised group** becomes `cis(θ)` with no parentheses, so a modulus in front attaches
+   exactly as it does to `cis`: `2(…)`, `√2(…)`, `r(…)`, `|z1|(…)`, `z1(…)`. A group RAISED to a
+   power keeps them. `2(cos45 + i sin45)^2` is 2·(cis45)² = 2cis90. `withCis` reads `2cis45^2` as
+   (2cis45)², so dropping the parentheses would have changed the number.
+5. **An unparenthesised sum** (r omitted, so 1) is rewritten only as a whole additive term: after the
+   start, `=`, `(` or `+`, and before the end, `=`, `)`, `+` or `-`. `2cos45 + i sin45` and
+   `-cos45 + i sin45` are different numbers and are left alone (still `not-handled`).
+
+**The mismatch refusal.** A form whose angles differ (`cos45 + i sin30`) is left as typed, so the line
+does not parse. The submit seam (`unreadRefusal`) then asks `trigAngleMismatch` and refuses with
+`trig-mismatch`, naming both angles: «הזווית של cos (45°) שונה מהזווית של sin (30°)». It is checked
+before the generic reasons, because it is the most specific thing that can be said. It is never read
+as either angle.
+
+**Display.** The line list, the refusal strip and every `untranslated` row carry the raw line, so the
+student's spelling is what they see. The canvas and the panel print the number's reading
+(«z₁ = 2·cis45°»), as for any given. A claim or premise row printed from a fact's `src` shows the
+normalized text, as it already does for `°`, `·` and «הצמוד של». A second mention in trig form is a
+given that agrees, so it prints no claim row. Keeping the entry format on those rows in every tool is
+#1497's scope.
+
+**Deviation — radians.** The plan said radians like `π/4` are read "the way cis reads them". Measured,
+`cis` reads NO radians. `z1 = 2cis(π/4)` and `z1 = 2cis(pi/4)` are `not-handled` on `c098af9b`, and
+the lexer has no π (ADR-CX-058 keeps `pi` a word). The plan's mechanism (same reading as cis) and its
+lock (`cos(π/4)+i sin(π/4)` reads) contradict each other. The mechanism was followed. The lock is now
+a parity lock: the trig spelling reads π/4 exactly when the cis spelling does. Adding radians to the
+angle grammar is a capability of `cis` itself. It needs its own item, and the trig form inherits it
+with no change here.
+
+**Sibling audit.** 2-D, 3-D and analytic have no complex-number grammar and no cis. No sibling gap.
+
+**Cost.** Three regex passes per line at normalization, linear in the line. No new solve.
+
+**Consequences.** `parser/normalize.ts` (`trigToCis`, `trigAngleMismatch`), `app/submit.ts`
+(`unreadRefusal`), `store/useComplexStore.ts` + `app/errorText.ts` + `i18n/index.ts` (`trig-mismatch` /
+`errTrigMismatch`, he + en), `parser/catalog.ts` (new F2 row «z1 = 2(cos45 + i·sin45)»). The
+complex parser is bundled into the proxy (`server/adminConfig.ts` imports `parseLineV2`), so the
+proxy needs a redeploy at deploy. The complex builder has no LLM lane, so there is no grammar
+prompt to change.
+
+**Locks.** `src-complex/__tests__/trig-form-1534.test.ts` (33 tests): 19 spellings ≡ their cis
+spelling, by lowered facts and by readings, including the operator's line, the √2 variant, r omitted,
+`|z1|(…)`, `z1(…)`, `1/(…)`, a signed angle, a non-table angle and the symbolic `r(cosθ + i sinθ)`.
+Also: the power keeps its parentheses; the line is recorded verbatim through `submitLine`; a
+disagreeing second mention is refused exactly as the cis spelling is; three mismatch refusals naming
+both angles (he wording); the non-rewrites; and radian parity with cis. Fixtures
+`trig-form-1534`, `trig-form-sqrt2-1534`.
