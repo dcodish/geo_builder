@@ -27,7 +27,7 @@
 import { describe, it, expect } from 'vitest';
 import { deserializeFigure } from '@/store/figureFile';
 import { replay, groupKey } from '@/store/geoStore';
-import { findValidConfig } from '@/replay/core';
+import { findValidConfig, meetsRequirements } from '@/replay/core';
 import type { Fact } from '@/store/geoStore';
 import { parse, buildParseCtx } from '@/parser';
 import type { AnyCommand } from '@/engine';
@@ -57,8 +57,15 @@ const FIXTURE_DEGENERATE: Record<string, string[]> = {
  * C, where «קשת AB = קשת BC» holds only as a needle; the app reseats it at B on load. The net applies that
  * same rescue for a fixture listed here and for NO other — a fixture newly needing it fails loudly, which
  * is the point of a net. The artifact's bytes are untouched.
+ *
+ * #1471 (ADR-576): the second member is the #855 tangency figure, saved at the SAMPLED seed 17. A membership
+ * now moves the unstated circle to B instead of B onto the default ring, so every sampled seat shifts; seed 17
+ * now samples C outside the circle «C בתוך המעגל» states (a sampled-seat region miss — on the pre-change base
+ * seeds 15 and 33 of 0..40 already did, now only 17). The app's load event rescues exactly that (resolveView
+ * asks `meetsRequirements`), so the precondition below asks the same predicate. #855's own claim — no seed
+ * accuses the student — stays locked seed by seed in `engine/__tests__/issue-855.test.ts`.
  */
-const FIXTURE_LOAD_RESCUED = new Set<string>(['issue-572-load-collapse']);
+const FIXTURE_LOAD_RESCUED = new Set<string>(['issue-572-load-collapse', 'issue-855-tangency-sampled-seat']);
 
 describe('figure-file fixtures net', () => {
   it('the net is not empty', () => {
@@ -80,7 +87,8 @@ describe('figure-file fixtures net', () => {
       const rescued = FIXTURE_LOAD_RESCUED.has(name) ? findValidConfig(savedFacts) : null;
       if (FIXTURE_LOAD_RESCUED.has(name)) {
         it('the load rescue reseats a figure whose default configuration is refused (ADR-537 on ADR-446)', () => {
-          expect(replay(savedFacts, savedSeed).lastError, 'the default configuration IS refused — else this fixture no longer belongs in FIXTURE_LOAD_RESCUED').not.toBeNull();
+          // the app's own trigger (resolveView): the saved configuration fails its requirements
+          expect(meetsRequirements(savedFacts, savedSeed), 'the saved configuration IS failing — else this fixture no longer belongs in FIXTURE_LOAD_RESCUED').toBe(false);
           expect(rescued, 'the app finds the honest configuration').not.toBeNull();
         });
       }

@@ -167,5 +167,6 @@
  "fixture:issue-989-trapezoid-after-triangle.geo.json": "0703ef8c37579057",
  "fixture:issue-989-trapezoid-stated-pair.geo.json": "5ac9c9b206c76b86",
  "fixture:parallel-chords.geo.json": "54f8605ea57acfa6",
- "fixture:trapezoid-altitude.geo.json": "abbbf2a8308ff3fa"
+ "fixture:trapezoid-altitude.geo.json": "abbbf2a8308ff3fa",
+ "fixture:issue-1471-circumcircle-by-membership.geo.json": "0d3700bfe1282811"
 }
