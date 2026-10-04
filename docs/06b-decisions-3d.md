@@ -11711,3 +11711,25 @@ Both build with every row ok and 8 points, and in both the point that was A now 
 - `src3d/engine/types.ts` (`seg-cross`, `SegCrossingCommand`, `segments-do-not-meet`), `vec3.ts` (`lineCrossing3`), `evaluate.ts`, `apply.ts`; `src3d/store/store3.ts` (the meet check, the coincidence set), `figureFile3.ts`; `src3d/parser/parse3.ts`; `src3d/i18n/errorText3.ts` + locales.
 
 **Behaviour change for a student:** in a quadrilateral ABCD, «האלכסונים AB ו-CD נפגשים בנקודה E» is now refused — AB is a side, not a diagonal — instead of putting E halfway along AB. «האלכסונים AC ו-BD נפגשים בנקודה E» (and «E מפגש האלכסונים של ABCD») now puts E where the two diagonals actually cross; before, on a quadrilateral that is not a parallelogram, E sat beside the second diagonal.
+
+## ADR-3D-298 — «נקודה E במישור ABC»: the containment verb is optional, the plane noun is not (#1608)
+
+**Status:** accepted · 2026-10-04 · bug (P2) · round #1736 · branch `fix/1608-verbless-in-plane` off `main` @ d9a5910f
+
+**Requirements:** [FR-SP-11](02b-requirements-3d.md) extended — membership also reads the verbless «ב-» / "in plane" · **Design:** [04b-design-3d.md](04b-design-3d.md) § "A frame's operand coverage is part of the relation" (new bullet: the verb is optional, the plane noun is not) · **LADDER stage:** the parser (`CONTAINED_SPLIT`, shared by `planeRelGiven` and `lineRelGiven`). No apply, solver, replay or render change.
+
+**Cites** [ADR-3D-189](#adr-3d-189) (#614, the containment frame), [ADR-3D-238](#adr-3d-238) (#963, a point is a contained side), ADR-3D-015 (`on-planes`), [ADR-3D-100](#adr-3d-100) (kinds decide, nouns never).
+
+**Context — measured at pickup on d9a5910f through `parse3`.** The issue held, and the class was wider than points: «נקודה E במישור ABC», «E במישור ABCD», «E במישור π1», «AB במישור ABC», «הישר ℓ במישור ABC», «ℓ במישור π1» and "E in plane ABC" were all `not-handled`, while «E על המישור ABC», «E נמצאת במישור ABC» and «AB מוכל במישור ABC» built. Two owners split the grammar: `membership`/`pointRelPlane` read «על» (verb optional); the containment frame read «ב…» only after a verb (`מוכל`/`נמצא`/`מונח`). The plan's precondition was checked first: nothing owned the verbless line form either, so there was nothing to steal.
+
+**Decision.** The bare preposition is admitted in `CONTAINED_SPLIT` — the one frame both containment rules read — as a verbless alternative `\s+(?:is\s+)?(?:ב|in\s+)` that counts only before an explicit plane noun (מישור / פאה / בסיס, plane / face / base), held in a lookahead so the noun still reaches the operand reader. The operand kinds then decide the lowering exactly as for the verb-headed form: a point → `plane-through` + `on-planes` (identical to «E על המישור ABC»), a segment → `plane-rel contained`, a named line → `line-rel contained`.
+
+**Plan vs mechanism (recorded).** The plan sketched the alternation inside `membership`. Measured, `membership` owns only the named-π cell (`pointRelPlane` owns the point-run cell), and the line form had the same gap; the frame both containment rules share is the single place that serves every operand kind (FR-SP-11's "a relation extended to a new spelling must be extended for every kind at once"). One edit, no new rule.
+
+**Unchanged, refused:** «C ב-AB», «C בקטע AB», «E ב-ABC» (no plane noun — a segment is no container), «E במישור» (no plane), «E במישור xy» (the coordinate frame keeps its own cell).
+
+**Locks.** `src3d/__tests__/issue-1608-verbless-in-plane.test.ts` (23) — the grid {נקודה E, E} × {במישור, על המישור, נמצאת במישור, נמצאת על המישור} × {ABC, ABCD} through the store's real submit on a pyramid, identical commands; the named/face/English rows; the line rows (verbless ≡ verb-headed); the refusals. **Fails before: 9 of 23** (patch-reverted `parse3.ts`). Fixture `fixtures3/verbless-in-plane-1608.geo3.json` — the operator's prod session uhqzlqgk through «נקודה E במישור ABC».
+
+**Neighbouring gap, not in scope:** the `coordPoint` membership tail («A(1,2,3) על המישור …») reads only a named π after «על»; «A(1,2,3) במישור ABC» stays not-handled.
+
+**Behaviour change for a student:** «נקודה E במישור ABC» (and the same for a line, «AB במישור ABC») is now understood directly instead of going to the LLM.

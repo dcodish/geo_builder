@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-04T05:45:56.961Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "ABC משולש",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AB=u",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "B",
+          "terms": [
+            {
+              "coeff": {
+                "k": 1,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "u"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AC=v",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "C",
+          "terms": [
+            {
+              "coeff": {
+                "k": 1,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "v"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "A(0,2,-1)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 0,
+          "y": 2,
+          "z": -1
+        }
+      ]
+    },
+    {
+      "utterance": "B(-3,2,2)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "B",
+          "x": -3,
+          "y": 2,
+          "z": 2
+        }
+      ]
+    },
+    {
+      "utterance": "D על BC",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "D",
+          "a": "B",
+          "b": "C"
+        }
+      ]
+    },
+    {
+      "utterance": "D(-2,3,1)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "D",
+          "x": -2,
+          "y": 3,
+          "z": 1
+        }
+      ]
+    },
+    {
+      "utterance": "AD=(2/3)u+(1/3)v",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "D",
+          "terms": [
+            {
+              "coeff": {
+                "k": 0.6666666666666666,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "u"
+              }
+            },
+            {
+              "coeff": {
+                "k": 0.3333333333333333,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "v"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "נקודה E במישור ABC",
+      "cmds": [
+        {
+          "type": "plane-through",
+          "name": "ABC",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        {
+          "type": "on-planes",
+          "id": "E",
+          "plane": "ABC"
+        }
+      ]
+    }
+  ]
+}

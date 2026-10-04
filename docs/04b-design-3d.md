@@ -307,6 +307,14 @@ Two things generalise, and both are cheap to check in review:
   is one edit serving every spelling in both languages. Whenever a report's axis is a language, a spelling
   or a single input, measure the neighbouring cells before believing it (the FR-SP-11 promise is written
   against the corrected axis, not the reported one).
+- **The verb is optional; the plane noun is not** (#1608, [ADR-3D-298](06b-decisions-3d.md#adr-3d-298)).
+  «נקודה E במישור ABC» fell between two owners: `membership`/`pointRelPlane` read «על» with an optional
+  verb, and `CONTAINED_SPLIT` read «ב…» only after a verb. The verbless «ב-» (and English "in plane") is
+  admitted in `CONTAINED_SPLIT` itself — the frame `planeRelGiven` and `lineRelGiven` share — so a point,
+  a segment and a named line all gain it at once and the operand kind decides the lowering. The bare
+  preposition counts as a connective only before an explicit plane noun (מישור / פאה / בסיס, plane / face
+  / base), held in a lookahead so the noun still reaches the operand reader; «C ב-AB» is not a containment
+  sentence.
 **Vocabulary is not a rule's private property** (#977, [ADR-3D-241](06b-decisions-3d.md#adr-3d-241)).
 Two rules read angle statements, and each carried its own inline copy of the angle NOUN and the COPULA.
 The copies had drifted before anyone noticed: one accepted a bare `angle ABC` and the other demanded

@@ -123,7 +123,8 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   said about a point — to be accepted too, and a frame that serves one kind and silently escalates
   another is indistinguishable to them from the tool not knowing the relation at all. So a relation's
   operand coverage is a promise, not an implementation detail: **membership** («מוכל ב…», «נמצא ב…»,
-  «מונח על…», "is contained in", "lies in", and the container-headed «המישור π מכיל את …») reads a point
+  «מונח על…», "is contained in", "lies in", the verbless «E במישור ABC» / "E in plane ABC" — #1608,
+  [ADR-3D-298](06b-decisions-3d.md#adr-3d-298) — and the container-headed «המישור π מכיל את …») reads a point
   and a line alike, in **both languages and both frames**, and lowers each to the command that kind
   already has. Where a kind genuinely has no meaning under a relation the answer is a **refusal**, never
   silence: a point has no direction, so «C מאונך למישור π1» is refused rather than escalated. The

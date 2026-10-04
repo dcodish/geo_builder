@@ -268,6 +268,20 @@ const SEEDED: SeededCorpus = {
   // CD named as diagonals) is a refusal and lives in issue-1728-diagonals-meet.test.ts; this is its building
   // twin, with «E על BD» — refuted while E sat at AC's midpoint — so the net holds the meet and the drift.
   'diagonals-named-meet-1728.geo3.json': ['מרובע ABCD', 'האלכסונים AC ו-BD נפגשים בנקודה E', 'E על BD'],
+  // #1608 (ADR-3D-298) — the operator's exact prod session (uhqzlqgk, 2026-09-28) through the verbless
+  // «נקודה E במישור ABC», which was not-handled and went to the LLM. The essence is "this builds green and
+  // verifies"; the spelling grid (point × line, ב/על/verb) lives in issue-1608-verbless-in-plane.test.ts.
+  'verbless-in-plane-1608.geo3.json': [
+    'ABC משולש',
+    'AB=u',
+    'AC=v',
+    'A(0,2,-1)',
+    'B(-3,2,2)',
+    'D על BC',
+    'D(-2,3,1)',
+    'AD=(2/3)u+(1/3)v',
+    'נקודה E במישור ABC',
+  ],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
