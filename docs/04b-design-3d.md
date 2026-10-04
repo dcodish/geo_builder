@@ -893,7 +893,7 @@ on the raw text, which is #868's pinned property. Since #1195 the two can displa
 that property may now be over-fitted — measured and decided in #1314, not here.
 
 **`vectorNotation` stays in `render/notation.ts`, not in `i18n/bidi.ts`.** `i18n/bidi.ts` imports
-**nothing** — it is a leaf, which is what lets `parser/`, `engine/` and `render/` all depend on it — so
+**nothing but the `lexicon/` leaf** (the prime set, ADR-3D-300) — it is a leaf in effect, which is what lets `parser/`, `engine/` and `render/` all depend on it — so
 having it reach into `render` would invert the dependency. `render` already depends downward on `i18n`
 and `lexicon`, so the composed function sits there, beside `factDisplay3`, which is also the function
 its lock compares against.
