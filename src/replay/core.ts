@@ -20,7 +20,7 @@ import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY } from '@/engine';
-import { chargeHit, computeWithCell, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
+import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents } from '@/engine/types';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
@@ -374,6 +374,9 @@ interface FoldNode {
    *  apply an appended fact BEFORE that fact, the full fold applies it after — the memo must stay a pure cache
    *  (ADR-280/406). Relation-only retries leave it false, so their resume behaviour is unchanged. */
   retriedCreating: boolean;
+  /** #1671 (ADR-584): the fold's recorded work (its ledger's total), carried across the ADR-290 worker
+   *  transplant so a primed fold is charged what computing it cost (#1605's rule). Set by {@link getFoldFor}. */
+  work?: number;
 }
 
 /**
@@ -431,9 +434,13 @@ export function clearReplayCaches(): void {
   sampleMemo = null;
 }
 export function getFoldFor(facts: Fact[]): FoldNode | null {
-  return foldCache.get(foldKey(facts)) ?? null;
+  const node = foldCache.get(foldKey(facts)) ?? null;
+  const cell = node ? cellOf.get(node) : undefined;
+  if (node && cell) node.work = ledgerTotal(cell);
+  return node;
 }
 export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
+  if (fold.work !== undefined) cellOf.set(fold, flatLedger(fold.work)); // #1671: charged like a fold computed here
   if (foldCache.size >= FOLD_CACHE_MAX) foldCache.delete(foldCache.keys().next().value as string);
   foldCache.set(foldKey(facts), fold);
 }
@@ -1983,7 +1990,7 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
  * #1668 (ADR-564): and the classifier's verdict is PER FACT — `Derived.concluded` carries it, so a line
  * one of whose members the fold filed as a concluded contradiction never parks on another member's flex.
  */
-export function deferralWorthwhile(facts: Fact[], commands: AnyCommand[], seed = 0): boolean {
+export function deferralWorthwhile(facts: Fact[], commands: AnyCommand[], seed = 0, opts: { seatsExhausted?: boolean } = {}): boolean {
   if (!hasDeferrableConstraint(commands)) return false;
   const symtab = buildSymTab([...facts.filter((f) => f.enabled).map((f) => f.cmd), ...commands]);
   const lowered = commands.flatMap((c) => lowerOne(c, symtab)) as Command[];
@@ -1997,14 +2004,16 @@ export function deferralWorthwhile(facts: Fact[], commands: AnyCommand[], seed =
   // flex probe already refuses never pays it.
   //
   // The fold's verdict is taken at the CURRENT right-angle seat, and an unstated seat yields (ADR-551
-  // Am. 1): a failure it may cure is not concluded. `dryRunOutcome` tries that cure under a 1.5 s
-  // budget; a line it could not finish there (measured: the #546 arc line on a triangle with its two
-  // circles — cold rotated folds, ~20 s) keeps the ADR-104 route, and the post-commit config search
-  // reseats it. So a concluded member refuses only where no unpinned seat could still yield.
+  // Am. 1): a failure it may cure is not concluded. `dryRunOutcome` tries that cure (the seat sweep) under a
+  // fixed WORK cap — #1671 (ADR-584) replaced the 1.5 s clock, which a cold sweep always outran, so the line
+  // parked and painted red. A sweep the cap cuts still keeps the ADR-104 route (the post-commit config search
+  // reseats); one that FINISHED without a cure (`seatsExhausted`) proves no unstated seat yields.
   const all = trialFacts(facts, commands);
   const trial = replay(all, seed);
   if (!trialChanges(facts, all).some((f) => trial.concluded.has(f.id))) return true;
-  return unpinnedSeats(all).length > 0;
+  // #1671 (ADR-584): the seat exception holds only while a seat MIGHT still cure it — a dry run whose seat
+  // sweep finished and cured nothing (`seatsExhausted`) has shown that no unstated seat yields here.
+  return unpinnedSeats(all).length > 0 && !opts.seatsExhausted;
 }
 
 /** The figure's overall scale (bounding-box diagonal of all placed points) — the yardstick a clearance
@@ -2879,24 +2888,113 @@ export function variantRescue(facts: Fact[], deadline: number): { facts: Fact[];
  * failures belong to the unstated seat. Zero cost when no unpinned right-triangle exists.
  */
 export function seatRescue(facts: Fact[], deadline: number): { facts: Fact[]; seed: number } | null {
+  return seatSweep(facts, { deadline }).cured;
+}
+
+/** #1671 ([ADR-584](docs/06-decisions.md#adr-584)): the rewritten fact lists the seat sweep tries — every
+ *  unpinned seat flipped to each of its other `rot`s, in sweep order. One list, so the sweep and the
+ *  off-thread warm-up ({@link seatSweepWarmup}) can never disagree about which folds the sweep reads. */
+export function seatRotations(facts: Fact[]): Fact[][] {
+  const out: Fact[][] = [];
   for (const { f, i } of unpinnedSeats(facts)) {
     const cur = (f.cmd as { rot?: 1 | 2 }).rot ?? 0;
     for (const rot of ([1, 2, 0] as const).filter((r) => r !== cur)) {
-      const fc = facts.map((g, idx) => {
-        if (idx !== i) return g;
-        const { rot: _prev, ...rest } = g.cmd as Extract<typeof g.cmd, { type: 'right-triangle' }>;
-        return { ...g, cmd: rot === 0 ? rest : { ...rest, rot } } as Fact;
-      });
-      for (let s = 0; s < 6; s++) {
-        if (Date.now() > deadline) return null;
-        if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
+      out.push(
+        facts.map((g, idx) => {
+          if (idx !== i) return g;
+          const { rot: _prev, ...rest } = g.cmd as Extract<typeof g.cmd, { type: 'right-triangle' }>;
+          return { ...g, cmd: rot === 0 ? rest : { ...rest, rot } } as Fact;
+        }),
+      );
+    }
+  }
+  return out;
+}
+
+/** #1671 (ADR-584): the seat sweep's counters — the locks count operations, never time. */
+export const seatSweepStats = { sweeps: 0, complete: 0, cured: 0, cut: 0, executed: 0, charged: 0, maxCuredCharged: 0, maxCompleteCharged: 0 };
+
+/**
+ * #1671 ([ADR-584](docs/06-decisions.md#adr-584)) — the seat sweep, reporting whether it FINISHED. A sweep
+ * that tried every rotation at every seed and found no cure has PROVED no unstated seat can cure the
+ * failure — the submit gate may then refuse it ({@link deferralWorthwhile}); a sweep its budget cut proved
+ * nothing, and the line keeps the ADR-104 route as before. The submit gate bounds it by a fixed amount of WORK
+ * in charged units ({@link SEAT_SWEEP_WORK_CAP}, operator ruling 2026-10-04), so the verdict is the same on
+ * every device and cold or warm; the configuration search's seat tier keeps its wall-clock deadline (an
+ * interactive view search, ADR-558). The submit path also warms the rotated folds off the main thread first
+ * ({@link seatSweepWarmup}), so the wait sits in the worker.
+ */
+export function seatSweep(facts: Fact[], limit: { deadline: number } | { workCap: number }): { cured: { facts: Fact[]; seed: number } | null; complete: boolean } {
+  const rotations = seatRotations(facts);
+  if (rotations.length === 0) return { cured: null, complete: true };
+  seatSweepStats.sweeps++;
+  const e0 = work.executed;
+  const d0 = work.done;
+  try {
+    if ('deadline' in limit) return withWorkEpoch(() => sweepRotations(rotations, () => Date.now() > limit.deadline));
+    // #1671 (ADR-584): the submit gate's sweep is bounded by WORK, in charged units (every memo hit charged
+    // the work it saved, ADR-582) — the same verdict on every device and cold or warm. A ladder the cap cut
+    // mid-fold ends the sweep as incomplete: a cut fold is not THE fold, so it can neither cure nor refute.
+    return withWorkBudget(limit.workCap, () => {
+      const at = work.done + limit.workCap;
+      const aborts0 = solveBudget.aborts;
+      return sweepRotations(rotations, () => work.done > at || solveBudget.aborts !== aborts0);
+    });
+  } finally {
+    seatSweepStats.executed += work.executed - e0;
+    seatSweepStats.charged += work.done - d0;
+  }
+}
+function sweepRotations(rotations: Fact[][], stop: () => boolean): { cured: { facts: Fact[]; seed: number } | null; complete: boolean } {
+  const d0 = work.done;
+  for (const fc of rotations) {
+    for (let s = 0; s < 6; s++) {
+      if (stop()) {
+        seatSweepStats.cut++;
+        return { cured: null, complete: false };
+      }
+      const ok = meetsRequirements(fc, s);
+      if (stop()) {
+        seatSweepStats.cut++;
+        return { cured: null, complete: false };
+      }
+      if (ok) {
+        seatSweepStats.cured++;
+        seatSweepStats.maxCuredCharged = Math.max(seatSweepStats.maxCuredCharged, work.done - d0);
+        return { cured: { facts: fc, seed: s }, complete: true };
       }
     }
   }
-  return null;
+  seatSweepStats.complete++;
+  seatSweepStats.maxCompleteCharged = Math.max(seatSweepStats.maxCompleteCharged, work.done - d0);
+  return { cured: null, complete: true };
+}
+/**
+ * #1671 ([ADR-584](docs/06-decisions.md#adr-584)): the submit gate's seat-sweep budget, in CHARGED work units
+ * (operator ruling 2026-10-04 — a fixed amount of work, not the 1.5 s clock it replaced, so the verdict is the
+ * same on every device). Calibrated over the corpus scenarios, the fixtures and the decide-parity shards: above
+ * the most expensive sweep there that CURED a line (see the ADR). A test may lower it.
+ */
+export const SEAT_SWEEP_WORK_CAP = 4_000_000;
+export const seatSweepConfig = { cap: SEAT_SWEEP_WORK_CAP };
+
+/**
+ * #1671 (ADR-584): the fact lists whose FOLDS the gate's seat sweep will read for this step — warmed by the
+ * submit path in the geometry worker before the dry run (the ADR-290 prefold); a transplanted fold carries its
+ * recorded work (`FoldNode.work`), so the sweep's charged count — and its verdict — is the same either way. Empty unless the figure has an
+ * unpinned seat AND the step fails at the current one (a step that builds never sweeps).
+ */
+export function seatSweepWarmup(facts: Fact[], commands: AnyCommand[], seed = 0): Fact[][] {
+  const all = trialFacts(facts, commands);
+  if (unpinnedSeats(all).length === 0) return [];
+  const after = replay(all, seed);
+  if (!trialChanges(facts, all).some((f) => after.status[f.id] !== 'ok')) return [];
+  return seatRotations(all);
 }
 
-export type StepOutcome = { produced: true } | { produced: false; reason: 'error' | 'empty' | 'implied'; detail?: string };
+/** `seatsExhausted` (#1671, ADR-584): the step errs at every unstated right-angle seat — the seat sweep FINISHED
+ *  and cured nothing — so the failure is the givens', not the seat's. */
+export type StepOutcome = { produced: true } | { produced: false; reason: 'error' | 'empty' | 'implied'; detail?: string; seatsExhausted?: boolean };
 
 /**
  * Dry-run a parsed step's engine commands on top of the current facts WITHOUT committing, to decide
@@ -3002,13 +3100,15 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
     // lands the reseat off-thread: the same rescue the old PENDING path always reached, minus the
     // ~20 s ladder burn. An explicitly pinned seat leaves the sweep empty, so an honest refusal
     // (the obtuse-side message naming both givens) stands unchanged.
-    if (seatRescue(all, Date.now() + 1500)) return { produced: true };
+    const seats = seatSweep(all, { workCap: seatSweepConfig.cap });
+    if (seats.cured) return { produced: true };
     // #1711 (ADR-573): the same for an unstated VARIANT — the sine's other root, an isosceles apex. When
     // another assignment of the figure's variant choices (the trial's own among them) admits the whole
     // trial figure, the step commits; `settleVariantDefaults` settles the new fact's own choice at commit
     // and the post-commit `autoResolve` (`findValidConfig`'s variant tier) flips an earlier one.
     if (variantRescue(all, Date.now() + 1500)) return { produced: true };
-    return { produced: false, reason: 'error', detail: after.status[errored.id] };
+    // #1671 (ADR-584): a FINISHED sweep over at least one unpinned seat that cured nothing is a proof.
+    return { produced: false, reason: 'error', detail: after.status[errored.id], ...(seats.complete && unpinnedSeats(all).length ? { seatsExhausted: true } : {}) };
   }
   // "Built something" = added a shape/constraint/label, OR RESHAPED the figure — a step like "diameter AB"
   // on a cyclic quad adds no new object (it converts a vertex to an antipode and re-places the others), so

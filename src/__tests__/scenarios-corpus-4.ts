@@ -3384,4 +3384,20 @@ export const SCENARIOS_4: Scenario[] = [
       expect(other.kind === 'refused' && other.detail, 'a different spelling is refused naming the unticked row').toMatch(/belong to the unticked row «משולש ABC»/);
     },
   },
+  {
+    id: 'impossible-chord-refused-beside-unstated-right-angle-1671',
+    title: '#1671 (ADR-584): on «משולש ישר זווית ABC» (the right angle unstated) with its circumcircle, «המיתר AM מקביל ל-DE» for the midpoint M of AB is REFUSED like on any other figure — and «קשת AB = קשת BC», which the right angle at B satisfies, still commits',
+    guards:
+      "#1668 leftover (ADR-564 'Not built'), operator rulings 2026-10-04 (warm the rotated folds; then option A — bound the check by a fixed amount of work, never the clock). Measured on 7ed5baa8 through runSubmit: «המיתר AM מקביל ל-DE» committed with three red rows, because a figure with an unpinned right-angle seat kept the ADR-104 route whenever the gate's seat sweep had not proved that no seat cures the line — and the sweep, reading one cold fold per rotated seat, gave up at its 1.5 s budget. Root fix: the gate's sweep is bounded by a deterministic work cap in charged units (SEAT_SWEEP_WORK_CAP) instead of the clock, the submit path warms its rotated folds in the worker (seatSweepWarmup), and a finished sweep that cured nothing is a proof (seatsExhausted) the gate refuses on. Asserts through the gate: the impossible line is refused with the conflict detail; the #546 arc line commits (its cure is the seat at B); the prefix is green. The submit-door matrix (cold and warm, the work counts) is in src/app/__tests__/issue-1671-seat-sweep.test.ts.",
+    steps: ['משולש ישר זווית ABC', 'משולש ABC חסום במעגל', 'M אמצע AB', 'קטע DE'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ישר זווית ABC', 'משולש ABC חסום במעגל', 'M אמצע AB', 'קטע DE']);
+      const v = gateVerdict(facts, 'המיתר AM מקביל ל-DE');
+      expect(v.kind === 'refused' && v.reason, 'the impossible chord claim is refused at the door').toBe('error');
+      expect(v.kind === 'refused' ? v.detail : '').toMatch(/OM\| = \|OA\| cannot hold/);
+      const arc = factsOf(['משולש ישר זווית ABC', 'משולש ABC חסום במעגל']);
+      expect(gateVerdict(arc, 'קשת AB = קשת BC').kind, 'a seat cures it — the line commits').toBe('commit');
+    },
+  },
 ];

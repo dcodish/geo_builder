@@ -14430,3 +14430,37 @@ Every verdict and note identical (refused / committed, the same `[vs #N]` tail).
 - `src/app/decideDeterministic.ts`: `ROLE_READING_WORK_CAP`, the decision-wide work epoch.
 
 **Behaviour change for a student:** none in what is drawn, accepted or refused, or in any message — an impossible line is refused sooner («המיתר AB מקביל ל-CD» ~6 s → ~1 s; «חצי מעגל ABC» minutes → tens of seconds).
+
+## ADR-584 — The submit gate's seat sweep is bounded by work, not the clock: an impossible line beside an unstated right angle is refused (#1671)
+
+**Status:** accepted · 2026-10-04 · bug (P3, 2-D) · operator rulings 2026-10-04 on #1671 (option b — warm the rotated folds; then option A — a fixed amount of work, never the clock) · fix-round #1767 · branch `fix/1671-seat-rescue-work-cap` (stacked on ADR-583)
+
+**Requirements:** none (internal) — the existing promise (a contradiction is refused at the door, naming the statement) now holds on a right triangle whose right angle the student never placed · **Design:** [04-design.md](04-design.md) § "The pre-LLM decision" — *Deferral reads the fold's per-fact verdict* · **LADDER stage:** the submit gate (the ADR-104 deferral decision and the ADR-551 Am. 1 seat cure); no parser or solver change.
+
+**Cites** [ADR-564](#adr-564) ("Not built, said out loud" — this ADR builds it), [ADR-551](#adr-551) Am. 1 (the unstated seat yields at the gate), [ADR-445](#adr-445) (the seat tier), [ADR-290](#adr-290) (the worker prefold), [ADR-558](#adr-558) (verdicts a student reads are bounded by work, not time), [ADR-582](#adr-582) (charged memo hits), [ADR-583](#adr-583).
+
+**Context — re-measured at pickup through `runSubmit` (model mocked).** On «משולש ישר זווית ABC · משולש ABC חסום במעגל · M אמצע AB · קטע DE» (M the midpoint of a chord, so never on the circle), «המיתר AM מקביל ל-DE» **committed with three red rows** on 7ed5baa8 (10,010,821 evaluateCore calls cold, 1,015,015 warm). The fold had filed the chord claim as a concluded contradiction, but the figure has an UNPINNED right-angle seat, so ADR-564 kept the ADR-104 route unless the dry run's seat sweep cured it — and the sweep ran under `Date.now() + 1500`, read one cold fold per rotated seat (seconds each) and gave up. The ruling's first framing named «קשת AB = קשת BC»; measured, that line is DRAWABLE (the right angle at B satisfies it — ADR-564 decision 3) and must still commit; the operator's correction (2026-10-04) names the impossible chord line above as the member to refuse.
+
+**Class.** *A verdict the student reads (refuse vs commit) was decided by a wall clock* — whether the seat sweep finished in 1.5 s — so the same line could be refused on a fast machine and committed red on a slow one, and on every machine cold it was committed red. The WIP that only warmed the folds measured exactly that: the refusal lock passed and failed on consecutive runs (the sweep still paid ~472k evaluations of per-seed tails, ~1 s in vitest, against 1.5 s).
+
+**Decision.**
+1. **The gate's sweep is bounded by WORK** (`seatSweep(facts, { workCap })`, `SEAT_SWEEP_WORK_CAP` = 4,000,000 charged units, `withWorkBudget` — every memo hit charged its work, ADR-582). A ladder the cap cuts mid-fold ends the sweep as incomplete (a cut fold is not THE fold). The configuration search's seat tier (`findValidConfig` → `seatRescue(facts, deadline)`) keeps its wall clock — an interactive view search (ADR-558's split).
+2. **A finished sweep is a proof.** `seatSweep` reports `complete`; `dryRunOutcome` returns `seatsExhausted` when a sweep over at least one unpinned seat finished with no cure; `deferralWorthwhile(…, { seatsExhausted })` then refuses a concluded member like on any other figure. A sweep the cap cut proves nothing and keeps the old route.
+3. **The rotated folds are warmed off the main thread** (`seatSweepWarmup` → the ADR-290 worker prefold, only when the figure has an unpinned seat and the step fails at the current one), so the wait sits in the worker. A transplanted fold now carries its recorded work (`FoldNode.work`, set by `getFoldFor`, turned into a ledger by `primeFoldFor`), so a worker-warmed fold is charged what computing it costs — the verdict does not depend on whether the worker or this thread computed it.
+4. The test mirror `gateVerdict` (`src/__tests__/submit-gate.ts`) warms and passes the flag exactly as the app.
+
+**Calibration (before setting the cap).** With the cap off, over the eight `scenarios-e2e` shards, `fixtures.test.ts`, the four decide-parity shards, `issue-1668-claim-gate-parity`, both `issue-1411-*` locks, `deferral-gate`, `scenarios-props-submit-gate` and the new lock (523 tests): **the most expensive sweep that CURED a line charged 2,753,757 units**; the most expensive sweep that finished without a cure charged 3,847,203. The cap (4,000,000) sits above both, so no currently-successful rescue is cut.
+
+**Measured after.** «המיתר AM מקביל ל-DE»: **refused**, cold and warm, one identical note («|OM| = |OA| cannot hold [vs #2]»), nothing committed; the sweep finished, charged 1,635,515 units cold = warm. «קשת AB = קשת BC» (#546's line): committed cold and warm, the sweep curing it at the seat at B; the post-commit search draws every row green.
+
+**Locks.** `src/app/__tests__/issue-1671-seat-sweep.test.ts` (4, through `runSubmit`): the impossible line refused cold = warm with an identical note and equal charged sweep work, never escalated; a cap too small to finish keeps the ADR-104 route (the verdict is a function of the cap, not the clock); the #546 arc line commits cold and warm, cured inside the cap, and `findValidConfig` draws it green; the same line on a PINNED seat refused with no sweep. Scenario `impossible-chord-refused-beside-unstated-right-angle-1671` (corpus 4, through `gateVerdict`). Unchanged and green: `issue-1668-claim-gate-parity` (ADR-564's door), `deferral-gate`, the decide-parity shards (shard 4 re-recorded: ONE key added — the new scenario — no existing hash changed), both 1411 locks, the e2e shards, fixtures, `src/replay/__tests__`, `src/engine/__tests__`.
+
+**Sibling audit.** `src3d/` has no right-triangle seat sweep at its gate (grep `seatRescue|unpinnedSeats`: none); `src-analytic/`, `src-complex/`: none.
+
+**Consequences.**
+- `src/replay/core.ts`: `seatSweep` (work cap or deadline), `seatRotations`, `seatSweepWarmup`, `SEAT_SWEEP_WORK_CAP` / `seatSweepConfig` / `seatSweepStats`, `StepOutcome.seatsExhausted`, `deferralWorthwhile(…, opts)`, `FoldNode.work` on transplant.
+- `src/engine/solveBudget.ts`: `ledgerTotal`, `flatLedger`.
+- `src/app/decideDeterministic.ts`: the seat warm-up prefold; passes `seatsExhausted`.
+- `src/__tests__/submit-gate.ts`: the mirror.
+
+**Behaviour change for a student:** on a right triangle whose right angle they never placed, a line that cannot hold at ANY right-angle position is now refused with the conflict («… cannot hold») instead of being added with red rows; a line that one of the positions satisfies still commits and is drawn green. The verdict is the same on every computer; on a slow one the refusal may take a second or two.

@@ -109,12 +109,15 @@ describe('#1584 — the refusals the round measured, bounded', () => {
     expect(cold.executed).toBeLessThanOrEqual(3_100_000);
   }, 240_000);
 
-  it('«חצי מעגל ABC»: bounded — ≤ 25M executed (was 194M, ~7 min), the same refusal', async () => {
+  it('«חצי מעגל ABC»: bounded — ≤ 40M executed (was 194M, ~7 min), the same refusal', async () => {
     clearReplayCaches();
     const cold = await measure(RIGHT_15_10, 'חצי מעגל ABC');
     expect(cold.accepted).toBe(false);
     expect(cold.note).toMatch(/AC\| = \|AB\| cannot hold/);
-    expect(cold.executed).toBeLessThanOrEqual(25_000_000);
+    // 20.9M under ADR-583; ADR-584 (#1671) then replaced the gate seat sweep 1.5 s clock with a 4M charged-work
+    // cap and warms the rotated folds first, so the three sweeps here (the line, two role readings) run to the cap
+    // instead of quitting at 1.5 s — measured 34.5M, the verdict unchanged.
+    expect(cold.executed).toBeLessThanOrEqual(40_000_000);
   }, 600_000);
 
   it('«α = 50» still commits, still names itself (ADR-554), bounded', async () => {

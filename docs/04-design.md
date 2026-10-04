@@ -862,7 +862,13 @@ contradiction. The fold now records that per-fact verdict from its first build, 
 (`FoldNode.concludedByIndex` → `Derived.concluded`), and the gate refuses any line with a member in it —
 unless the figure has an unpinned right-angle seat (`unpinnedSeats`, shared with `seatRescue`): that verdict
 is taken at the current seat, and a seat the student never stated yields (ADR-551 Am. 1), so the post-commit
-config search gets the line. One claim therefore gets one verdict however it is spelled. On the submit path the read is a fold-memo hit:
+config search gets the line — **unless the dry run's seat sweep FINISHED and cured nothing**
+(`StepOutcome.seatsExhausted`, [ADR-584](06-decisions.md#adr-584), #1671): then no unstated seat can yield and
+the line is refused like on any other figure. The gate's sweep (`seatSweep`) is bounded by a fixed amount of
+WORK in charged units (`SEAT_SWEEP_WORK_CAP`, replacing the 1.5 s clock — the same verdict on every device,
+cold or warm), and the submit path warms its rotated folds in the worker first (`seatSweepWarmup`; a
+transplanted fold carries its recorded work, `FoldNode.work`, so it is charged the same). The configuration
+search's seat tier keeps its wall-clock deadline. One claim therefore gets one verdict however it is spelled. On the submit path the read is a fold-memo hit:
 the dry run has just folded the same trial.
 
 ## Re-reading a role-assigned letter run ([ADR-521](06-decisions.md#adr-521))

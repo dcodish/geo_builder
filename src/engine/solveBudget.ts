@@ -145,6 +145,27 @@ export function chargeHit(cell: WorkCell | undefined): boolean {
   return true;
 }
 
+/** #1671 (ADR-584): a ledger's total — every `own` in its closure once — the work a transplanted entry
+ *  (a fold computed in the geometry worker) is charged on this thread, so a worker-warmed fold costs the
+ *  same in a work budget as one this thread computed. */
+export function ledgerTotal(cell: WorkCell): number {
+  const seen = new Set<WorkCell>();
+  const stack = [cell];
+  let n = 0;
+  while (stack.length) {
+    const c = stack.pop()!;
+    if (seen.has(c)) continue;
+    seen.add(c);
+    n += c.own;
+    for (const d of c.deps) stack.push(d);
+  }
+  return n;
+}
+/** #1671 (ADR-584): a flat ledger of `units` (the transplant side of {@link ledgerTotal}). */
+export function flatLedger(units: number): WorkCell {
+  return { own: units, deps: [], charged: 0 };
+}
+
 /** Run `fn` inside a work epoch (nested calls share the outer one): every memo entry it touches is charged once. */
 export function withWorkEpoch<T>(fn: () => T): T {
   if (epochOpen) return fn();
