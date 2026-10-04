@@ -169,22 +169,39 @@ const cleanCoef = (x: number): string => cleanNum(x, 2e-3);
  * and [ADR-3D-118](docs/06b-decisions-3d.md) for the canvas edition of the same rule): with two roots the
  * honest answer to «what is m?» is `±√2` — the student's own answer to that exam question — and printing
  * `-1.41` instead would state one of them as if the givens had forced it. Language-neutral by
- * construction (`±`, `{…}`), because it renders inside both locales.
+ * construction (`±`, `,`), because it renders inside both locales.
+ *
+ * #1591 ([ADR-3D-303](docs/06b-decisions-3d.md#adr-3d-303), operator ruling 2026-09-30): the roots are
+ * written the way the student writes the answer — a symmetric pair keeps `±√2`; every other set repeats
+ * the symbol before each root, `m = -2, m = 4` (`m = -2, m = 0, m = 4`), never the set `{-2, 4}`.
+ * This returns the per-root VALUE strings, ascending (`['±√2']` for a symmetric pair); {@link branchAnswer}
+ * joins them, and is what both callers print.
  *
  * `null` means the figure does not determine the symbol at all — the caller decides whether that reads
  * as an open `?` row or an «undetermined» note.
  */
-export function formatBranches(branches: number[]): string | null {
+export function formatBranches(branches: number[]): string[] | null {
   if (branches.length === 0) return null;
-  if (branches.length === 1) return cleanMag(branches[0]);
+  if (branches.length === 1) return [cleanMag(branches[0])];
   const sorted = [...branches].sort((a, b) => a - b);
   // a symmetric pair is the common bagrut shape (±√2, ±2√15) and reads best in ± form
   if (sorted.length === 2 && Math.abs(sorted[0] + sorted[1]) <= 1e-6 * Math.max(1, Math.abs(sorted[1]))) {
-    return `±${cleanMag(Math.abs(sorted[1]))}`;
+    return [`±${cleanMag(Math.abs(sorted[1]))}`];
   }
   // #1440 (ADR-3D-262): never point-free — `Array.map` passes the INDEX as `cleanMag`'s optional
   // `decimals`, which rounded root 0 to 0 dp and root 1 to 1 dp («t = {0, 2.6}» for −0.23 and 2.63).
-  return `{${sorted.map((x) => cleanMag(x)).join(', ')}}`;
+  return sorted.map((x) => cleanMag(x));
+}
+
+/**
+ * #1591 (ADR-3D-303) — the ANSWER half of «sym = …» for a parameter's root set: everything after the
+ * first `sym = `. The panel prints `${sym} = ${branchAnswer}` and the ask lane's row prints
+ * `${question} = ${answer}` (App3), so both read `m = -2, m = 4` from this one join and the symbol is
+ * never printed twice (#1746's class). `null` exactly when {@link formatBranches} is.
+ */
+export function branchAnswer(sym: string, branches: number[]): string | null {
+  const parts = formatBranches(branches);
+  return parts ? parts.join(`, ${sym} = `) : null;
 }
 
 export const coordStr = (v: Vec3): string => `(${cleanMag(v.x)}, ${cleanMag(v.y)}, ${cleanMag(v.z)})`;
@@ -1246,7 +1263,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       // the branch set is a property of the GIVENS, so it must agree across seeds; if it somehow
       // does not, the symbol is not knowledge and reads open rather than picking a seed's version
       const agree = perSeed.every((b) => b.length === perSeed[0].length && b.every((v, i) => Math.abs(v - perSeed[0][i]) <= 1e-6 * Math.max(1, Math.abs(v))));
-      const text = agree ? formatBranches(perSeed[0]) : null;
+      const text = agree ? branchAnswer(sym, perSeed[0]) : null;
       params.push(text ? { sym, text: `${sym} = ${text}`, open: false } : { sym, text: `${sym} = ?`, open: true });
       continue;
     }

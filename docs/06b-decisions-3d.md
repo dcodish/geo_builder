@@ -11758,3 +11758,19 @@ Both build with every row ok and 8 points, and in both the point that was A now 
 **Consequences.** `src3d/parser/parse3.ts`, `catalog3.ts`, `llmShared3.ts`; `src3d/engine/queries.ts`, `dataView.ts`; `src3d/store/store3.ts`; `src3d/i18n/errorText3.ts` + locales; `shell/__tests__/fixtures/geo-input-parity.ts`.
 
 **Behaviour change for a student:** a single coordinate of a point — «x_B = 3», «שיעור ה-x של נקודה B הוא 3» — is now drawn instead of being sent to the model, and can be asked («x_B»); «שיעור ה-x של נקודה B חיובי» (without «ה» before «נקודה») now reads. On a figure with no typed coordinate point, the data panel now prints the coordinate a student stated on a new point («B(3, ?, ?)»; «D(+?, 0, 0)» for «D על החלק החיובי של ציר ה-x»), where it printed nothing.
+
+## ADR-3D-303 — A parameter's roots read «m = -2, m = 4», never «m = {-2, 4}» (#1591)
+
+**Status:** accepted · 2026-10-04 · feature (P3) · round #1753 · operator ruling 2026-09-30 on #1591 (*"the m = ±√2 is correct if the 2 solutions are plus minus of each other. in any other case, separate them"*) · branch `feat/1591-param-solutions` off `main` @ c098af9b
+
+**Requirements:** docs/02b FR-EQ-4b (new) · **Design:** docs/04b — "A parameter's roots: one join, two surfaces"
+
+**Context (re-measured at c098af9b, the store's real submit → `dataView` / `answerQuery`).** Operator, 2026-09-30, playing round #1571 T7: *"when there are 2 solutions to a parameter, show them as m=-2, m=4"*. «המישור π1: z = 1 · המישור π2: z - m = 0 · המרחק בין המישורים π1 ו-π2 הוא 3» printed «m = {-2, 4}» in the data panel and in the ask row for «m»; #1474's figure B printed «m = {-2, 0, 4}»; the symmetric pair (ℓ ∥ π) printed «m = ±√2»; a pinned root «m = 4».
+
+**Decision.** `formatBranches` (src3d/engine/dataView.ts, the one formatter #480 shares between both surfaces) now returns the per-root value strings, ascending, with #1440's per-root `cleanMag` kept; a symmetric pair stays one `±` string. A new `branchAnswer(sym, branches)` joins them with `, ${sym} = `, which is the ANSWER half of the row. The panel prints `${sym} = ${answer}`; the ask lane returns the answer, and App3 prints its row as `${question} = ${answer}`. So both read «m = -2, m = 4» from one join, and the ask row never carries the symbol twice (the #1746 class).
+
+**Locks.** `src3d/__tests__/issue-1591-param-solutions.test.ts` (8): the formatter shapes; T7's figure, the ±√2 pair, figure B (three roots) and a pinned single root through the real submit, asserting the panel row and the JOINED ask-row text. **Fails before: 6 of 8** (patch-reverted engine; the ±√2 pair and the single root are the unchanged controls). `issue-1440-format-branches.test.ts` and `issue-1474-branch-coverage.test.ts` move to the new spelling by design (the ruling names the first). The #1394 golden is unchanged: no key was added (the new test passes its sequences as arguments, and the formatter assertions compare joined strings, not string arrays).
+
+**Consequences.** `src3d/engine/dataView.ts`, `src3d/engine/queries.ts`; two tests moved; docs/02b, docs/04b. Language-neutral (`,` and `±`), so both locales read the same text. Siblings unchanged: analytic writes a point's options with «או», and complex has its own spelling. The request was 3-D's parameter row.
+
+**Behaviour change for a student:** when the givens leave a parameter several values, the data panel and the answer to «m» now read «m = -2, m = 4» (or «m = -2, m = 0, m = 4») instead of «m = {-2, 4}». A ± pair still reads «m = ±√2».

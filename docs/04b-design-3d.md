@@ -861,6 +861,13 @@ exactly that here: `stated` first shipped as `dir: 'ltr'`, since its rows are pu
 looks obviously right. That is the list-wide override #559 exists to prevent; the bidi layer places an
 LTR run inside an RTL base correctly, and a section that decides for itself is how that stopped.
 
+**A parameter's roots: one join, two surfaces (#1591, [ADR-3D-303](06b-decisions-3d.md#adr-3d-303)).**
+`formatBranches` returns the per-root value strings, ascending (`['±√2']` for a symmetric pair), and
+`branchAnswer(sym, branches)` joins them with `, ${sym} = ` — the ANSWER half of «m = -2, m = 4». The
+panel's `params` row prints `${sym} = ${answer}`; the ask lane returns the answer and App3's row prints
+`${question} = ${answer}`. Both callers go through `branchAnswer`, so they cannot disagree (#480) and the
+row never carries the symbol twice (#1746's class).
+
 ## The input preview composes, and who may import whom (#1195, [ADR-3D-255](06b-decisions-3d.md#adr-3d-255))
 
 The strip under the input box **returns a NODE, not a string** — `inputPreviewNode3` in
