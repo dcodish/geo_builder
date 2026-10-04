@@ -468,6 +468,14 @@ midpoint, the altitude's foot, and their refusals), the length half through the 
 the plain frame uses (copula → equality, relation → bound, anything else → bow out, failing closed). Either
 half unreadable → the rule bows out and the line is read as before.
 
+**A HEIGHT AS A MAGNITUDE, with no segment named** ([ADR-575](06-decisions.md#adr-575), #1443). Two readings feed
+the same composer. A cevian PHRASE that names a side or an apex but no segment («הגובה לצלע BC הוא 4», «התיכון
+מ-A הוא 5») is read by the cevian rule alone, and the length lands on the segment that reading drew (apex to the
+foot or midpoint it minted). A SHAPE height («גובה הטרפז 4») is resolved against the declared polygons: a
+trapezoid's is rewritten to the cevian phrase between its bases (ADR-169's `ctx.parallels`) and composed, so the
+foot is minted and drawn by the altitude rule; a parallelogram's (two) and a triangle's (three) ASK through
+`ambiguous-construct`, offering side-naming sentences that carry the student's value and each build.
+
 ADR-498 stopped the VALUE lanes from locating by copula. The RELATION readers — `angleEquality`,
 `arcEquality`, `measureSum` — still split the line on the literal `=`, so «זווית ABC היא זווית DEF» was
 `not-handled` while «= זווית DEF» and «שווה לזווית DEF» worked. The seam has ONE home: `normalizeWordEquality`

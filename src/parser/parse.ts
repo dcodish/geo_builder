@@ -9935,6 +9935,7 @@ export const RULES: Rule[] = [
   shapeWithConstruct, // #461: «<shape> ABCD עם <construct>» — SPLIT, so every shape and every construct come along by construction
   compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
   compoundAtDistance, // #760: "<point> on <carrier> at distance N from X" — membership + set-distance, composed
+  shapeHeight, // #1443: «גובה הטרפז 4» — a height magnitude with no segment named: mint + draw the foot, or ASK which height
   roleLength, // #1607: «האלכסון AC = 8» / «התיכון AM הוא 5» — the role's own reading + the length, composed
   roleSideLine, // #775: «תיכון ליתר» — role noun → the declared side, rewritten and re-parsed
   multiStatement, // "AB = 4, BC = 6" — split comma/and-joined GIVENS, parse each all-or-nothing (PAR-2)
@@ -11151,29 +11152,138 @@ const normalizeVerboseLength = (s: string): string =>
  * contain (it must not cross a label), so the English form takes its own closed copula set and no relation.
  */
 const ROLE_LENGTH_HE = new RegExp(
-  String.raw`^(?:אורך\s+)?(ה?(?:אלכסון|תיכון|גובה))\s+(${LABEL}\s*${LABEL})(${LENGTH_CONNECTIVE})(?=[√\d(])(.+)$`,
+  String.raw`^(?:אורך\s+)?(ה?(?:אלכסון|תיכון|גובה))\s+(${LABEL}\s*${LABEL})(?!\d)(${LENGTH_CONNECTIVE})(?=[√\d(])(.+)$`,
 );
 const ROLE_LENGTH_EN = new RegExp(
-  String.raw`^(?:the\s+)?(?:length\s+of\s+(?:the\s+)?)?(diagonal|median|altitude|height)\s+(${ULABEL}\s*${ULABEL})\s*(?:=|is(?:\s+equal\s+to)?|equals)?\s*(?=[√\d(])(.+)$`,
+  String.raw`^(?:the\s+)?(?:length\s+of\s+(?:the\s+)?)?(diagonal|median|altitude|height)\s+(${ULABEL}\s*${ULABEL})(?!\d)\s*(?:=|is(?:\s+equal\s+to)?|equals)?\s*(?=[√\d(])(.+)$`,
   'i',
 );
-function roleLength(s: string, ctx: ParseContext): AnyCommand[] | null {
-  const he = s.match(ROLE_LENGTH_HE);
-  const en = he ? null : s.match(ROLE_LENGTH_EN);
-  if (!he && !en) return null;
-  const noun = (he ?? en)![1];
-  const seg = (he ?? en)![2].replace(/\s+/g, '');
-  const route = he ? routeLength(seg, he[3]) : `${seg} = `;
-  if (route === null) return null; // neither a copula nor a relation — fail closed (#1248)
-  const tail = he ? he[4] : en![3];
-  const role = parse(`${noun} ${seg}`, ctx);
+/**
+ * #1443 ([ADR-575](../../docs/06-decisions.md#adr-575)) — the SAME composition when the sentence names no segment:
+ * «הגובה לצלע BC הוא 4», «הגובה מ-A הוא 4», «התיכון מ-A במשולש ABC = 5», "the height from A to side CD is 4".
+ * The phrase is whatever the cevian rule reads on its own (it ends at the last label before the value); the
+ * length lands on the segment that reading DREW — apex to the foot it minted ({@link cevianSegmentOf}) — so the
+ * student's height is exactly the drawn one. Only the cevian nouns: a diagonal is always named by its pair.
+ */
+const ROLE_PHRASE_HE = new RegExp(
+  String.raw`^(?:אורך\s+)?(ה?(?:תיכון|גובה)\s+\S.*?${LABEL})(?!\d)(${LENGTH_CONNECTIVE})(?=[√\d(])(.+)$`,
+);
+const ROLE_PHRASE_EN = new RegExp(
+  String.raw`^(?:the\s+)?(?:length\s+of\s+(?:the\s+)?)?((?:median|altitude|height)\s+\S.*?${ULABEL})(?!\d)\s*(?:=|is(?:\s+equal\s+to)?|equals)?\s*(?=[√\d(])(.+)$`,
+  'i',
+);
+/** The segment a cevian reading drew: from the apex to the point it minted (a foot or a midpoint), or — for an
+ *  altitude whose foot IS a vertex (ADR-527's right angle, `altitudeAtVertex`) — its first segment. */
+const cevianSegmentOf = (cmds: readonly AnyCommand[]): string | null => {
+  const minted = cmds.find((c) => c.type === 'foot' || c.type === 'midpoint') as { id: Id } | undefined;
+  const segs = cmds.filter((c) => c.type === 'segment') as { a: Id; b: Id }[];
+  const s = minted ? segs.find((x) => x.a === minted.id || x.b === minted.id) : cmds.some((c) => c.type === 'set-perpendicular') ? segs[0] : undefined;
+  return s ? `${s.a}${s.b}` : null;
+};
+/**
+ * The role's own reading of `phrase`, plus the length on `seg` — or, when the sentence names none, on the
+ * segment that reading drew. `conn` is routed by {@link routeLength}, the one decision the plain frame uses.
+ */
+function composeRoleLength(phrase: string, seg: string | null, conn: string, tail: string, ctx: ParseContext): AnyCommand[] | null {
+  if (routeLength('', conn) === null) return null; // neither a copula nor a relation — fail closed (#1248)
+  const role = parse(phrase, ctx);
   if (!role.ok) return null; // the role half is unreadable or refused on its own — unchanged, as before
-  const length = parse(`${route}${tail}`, ctx);
+  const pq = seg ?? cevianSegmentOf(role.commands);
+  if (!pq) return null;
+  const length = parse(`${routeLength(pq, conn)}${tail}`, ctx);
   if (!length.ok) return null;
   // the length lane draws the segment too; the role half already drew it (with its own flags)
   const key = (a: string, b: string) => [a, b].sort().join('|');
   const drawn = new Set(role.commands.flatMap((c) => (c.type === 'segment' ? [key(c.a, c.b)] : [])));
   return [...role.commands, ...length.commands.filter((c) => !(c.type === 'segment' && drawn.has(key(c.a, c.b))))];
+}
+function roleLength(s: string, ctx: ParseContext): AnyCommand[] | null {
+  const he = s.match(ROLE_LENGTH_HE);
+  const en = he ? null : s.match(ROLE_LENGTH_EN);
+  if (he || en) {
+    const seg = (he ?? en)![2].replace(/\s+/g, '');
+    return composeRoleLength(`${(he ?? en)![1]} ${seg}`, seg, he ? he[3] : ' = ', he ? he[4] : en![3], ctx);
+  }
+  const ph = s.match(ROLE_PHRASE_HE);
+  const pe = ph ? null : s.match(ROLE_PHRASE_EN);
+  if (ph) return composeRoleLength(ph[1], null, ph[2], ph[3], ctx);
+  if (pe) return composeRoleLength(pe[1], null, ' = ', pe[2], ctx);
+  return null;
+}
+
+/**
+ * A HEIGHT STATED AS A MAGNITUDE, WITH NO SEGMENT NAMED (#1443, [ADR-575](../../docs/06-decisions.md#adr-575)).
+ *
+ * «גובה הטרפז 4», «גובה הטרפז ABCD הוא 4», «הגובה הוא 4», "the height of the trapezoid is 4" — a textbook given
+ * with no form: the engine's `set-distance` is point–point, and no rule minted a foot for a magnitude. The height
+ * is a segment the student did not name, so it is MINTED and DRAWN (operator ruling 2026-09-27: everything stated
+ * is visible) by the altitude rule itself — the sentence is turned into the cevian phrase that rule already reads
+ * and handed to {@link composeRoleLength}, so the foot, its letter and the length are exactly what «הגובה מ-D
+ * לצלע AB הוא 4» gives.
+ *
+ * WHICH height is the shape's to answer, never the tool's to pick (ADR-052):
+ * - a TRAPEZOID has one — the distance between its bases (`ctx.parallels`, the ADR-169 reading the altitude rule
+ *   uses). Drawn from the vertex next to the ring's first vertex on the other base, onto the base through the
+ *   first vertex («טרפז ABCD», AB∥DC → from D to AB); every such segment has the same length, so this is gauge.
+ * - a PARALLELOGRAM has two different heights, a TRIANGLE three: those ASK (`ambiguous-construct`), quoting
+ *   sentences that name the side and carry the student's own value and connective, each of which builds.
+ * - a shape noun the figure does not have is `shape-not-found`; several candidate shapes, or another kind of
+ *   quadrilateral, are left to the old path (unchanged).
+ */
+const HEIGHT_SHAPE_HE = new RegExp(
+  String.raw`^(?:אורך\s+)?ה?גובה(?:\s+(?:של\s+)?ב?ה?(טרפז|מקבילית|משולש)(?:\s+((?:${ULABEL}\s*){3,4}))?)?(${LENGTH_CONNECTIVE})(?=[√\d(])(.+)$`,
+);
+const HEIGHT_SHAPE_EN = new RegExp(
+  String.raw`^(?:[Tt]he\s+)?[Hh]eight(?:\s+(?:of|in)\s+(?:the\s+)?(trapezoid|parallelogram|triangle)(?:\s+((?:${ULABEL}\s*){3,4}))?)?\s*(?:=|is(?:\s+equal\s+to)?|equals)?\s*(?=[√\d(])(.+)$`,
+);
+const HEIGHT_KIND: Record<string, 'trapezoid' | 'parallelogram' | 'triangle'> = {
+  טרפז: 'trapezoid', מקבילית: 'parallelogram', משולש: 'triangle', trapezoid: 'trapezoid', parallelogram: 'parallelogram', triangle: 'triangle',
+};
+function shapeHeight(s: string, ctx: ParseContext): AnyCommand[] | Clarify | null {
+  const he = s.match(HEIGHT_SHAPE_HE);
+  const en = he ? null : s.match(HEIGHT_SHAPE_EN);
+  if (!he && !en) return null;
+  const m = (he ?? en)!;
+  const nounWord = m[1] ?? null;
+  const kind = nounWord ? HEIGHT_KIND[nounWord] : null;
+  const letters = m[2] ? (m[2].match(new RegExp(ULABEL, 'g')) ?? []) : null;
+  const conn = he ? he[3] : ' = '; // English: the copula was consumed, and only a copula is read there
+  const tail = he ? he[4] : en![3];
+  if (routeLength('', conn) === null) return null; // fail closed (#1248)
+  let cands = (ctx.declaredPolygons ?? []).map((p) => ({ ring: p.vertices.map(up), kind: p.kind }));
+  if (kind) cands = cands.filter((p) => (kind === 'triangle' ? p.ring.length === 3 : p.kind === kind));
+  if (letters) cands = cands.filter((p) => p.ring.length === letters.length && letters.every((v) => p.ring.includes(v)));
+  const phrase = (apex: Id | null, side: readonly Id[]) =>
+    he ? `הגובה ${apex ? `מ-${apex} ` : ''}לצלע ${side[0]}${side[1]}` : `the height ${apex ? `from ${apex} ` : ''}to side ${side[0]}${side[1]}`;
+  // A TRAPEZOID NAMED BY ITS LETTERS ON A FIGURE THAT HAS NONE OF THEM is introduced by the sentence, as a cevian
+  // sentence introduces the triangle it names (#1720, ADR-571): «גובה הטרפז ABCD הוא 4» on an empty canvas. Its
+  // bases are the declaration's own (the trapezoid macro's AB ∥ DC), so the height is the one the figure case
+  // draws — from the fourth letter onto the first side. A partly-known ring is not guessed at.
+  const pts = new Set((ctx.points ?? []).map(up));
+  if (cands.length === 0 && kind === 'trapezoid' && nounWord && letters?.length === 4 && !letters.some((v) => pts.has(v))) {
+    const decl = parse(`${nounWord} ${letters.join('')}`, ctx);
+    if (!decl.ok) return null;
+    const h = composeRoleLength(phrase(letters[3], [letters[0], letters[1]]), null, conn, tail, ctx);
+    return h ? [...decl.commands, ...h] : null;
+  }
+  if (cands.length === 0) return kind && nounWord ? { clarify: 'shape-not-found', noun: nounWord } : null;
+  if (cands.length > 1) return null;
+  const { ring, kind: k } = cands[0];
+  const option = (apex: Id | null, side: readonly Id[]) => (he ? `${phrase(apex, side)}${conn}${tail}` : `${phrase(apex, side)} is ${tail}`);
+  const ask = (options: string[]): Clarify => ({ clarify: 'ambiguous-construct', noun: he ? 'גובה' : 'height', options });
+  if (ring.length === 3) return ask([[ring[1], ring[2]], [ring[0], ring[2]], [ring[0], ring[1]]].map((sd) => option(null, sd)));
+  if (ring.length !== 4) return null;
+  const isEdge = (e: readonly string[]) => ring.some((v, i) => sameSide(v, ring[(i + 1) % 4], up(e[0]), up(e[1])));
+  const bases = (ctx.parallels ?? []).filter(([e1, e2]) => isEdge(e1) && isEdge(e2));
+  // a parallelogram's two heights differ — the two sides opposite the first vertex name them
+  if (k === 'parallelogram' || (k === 'trapezoid' && bases.length === 2)) return ask([option(ring[0], [ring[2], ring[3]]), option(ring[0], [ring[1], ring[2]])]);
+  if (k !== 'trapezoid' || bases.length !== 1) return null;
+  const [e1, e2] = bases[0].map((e) => e.map(up));
+  const base = e1.includes(ring[0]) ? e1 : e2;
+  const top = base === e1 ? e2 : e1;
+  const apex = top.find((v) => v === ring[1] || v === ring[3]);
+  if (!apex) return null;
+  return composeRoleLength(phrase(apex, base), null, conn, tail, ctx);
 }
 
 
