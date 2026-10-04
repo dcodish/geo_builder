@@ -982,7 +982,9 @@ get the right figure. It consumes no freedom. A comparison no drawing can satisf
 [ADR-AG-168](06c-decisions-analytic.md#adr-ag-168), [#1429](https://github.com/dcodish/geo_builder/issues/1429):
 «P על המעגל I» in every spelling, digits and Roman numerals one circle, the crossing sentence with the clitic
 as written («ו-l2», «והישר l2»), the distributive «של הישרים l1 ו-l2», the bare «של הישרים» resolved to the
-exactly-two, both verb orders («נחתכים בנקודה E», «חותך את … בנקודה E»), a contextual «עם המעגל», and an
+exactly-two, both verb orders («נחתכים בנקודה E», «חותך את … בנקודה E»), the meeting noun as the crossing's head («A מפגש
+הישרים 1 ו-2», «A נקודת המפגש של הישר l1 עם הישר l2» — [ADR-AG-230](06c-decisions-analytic.md#adr-ag-230),
+[#1609](https://github.com/dcodish/geo_builder/issues/1609); a concurrency role after it stays the role), a contextual «עם המעגל», and an
 equation operand meaning THE existing curve that carries it — never a second copy and never an internal id in
 a refusal. «…בנקודות A ו-B» awaits the operator's root-assignment ruling, #1512). A point on a line may be said with the LINE first («הישר CD עובר דרך P»,
 «ישר 3 עובר דרך הנקודה N», «CD מכיל את P»), with a SIDE as the subject («הצלע BC נמצאת על הישר y=x-4», «האלכסון BD
