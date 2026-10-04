@@ -57,6 +57,7 @@ import {
   nameCentreFacts,
   renameFacts,
   replay,
+  seatSweepWarmup,
   stepAsideFacts,
   trialFacts,
 } from '@/store/geoStore';
@@ -522,6 +523,11 @@ export async function decideFromParse(
       // the commit, and every later replay of this content then run at TAIL speed on the main thread
       // (the one unbudgeted cold fold, measured ~26 s on the #59 figure, used to block the tab here).
       if (hooks.prefold) await hooks.prefold(trialFacts(facts, r.commands), seed);
+      // #1671 (ADR-584): a step that fails at the current unstated right-angle seat is judged by the dry
+      // run's seat sweep, which reads one fold per rotated seat — cold, those are seconds each and the sweep
+      // gave up at its 1.5 s budget, so an impossible line committed red. Warm them here, in the worker,
+      // like the trial's own fold: the sweep then pays only tails and finishes, cold and warm alike.
+      if (hooks.prefold) for (const fc of seatSweepWarmup(facts, r.commands, seed)) await hooks.prefold(fc, seed);
       // A deterministic parse can "succeed" yet build NOTHING — apply with an error (kept-prior) or
       // change nothing at all. Dry-run before committing so a silent fail isn't shown as success
       // (operator request); a step that builds something commits immediately.
@@ -624,7 +630,7 @@ export async function decideFromParse(
       // The gate is the SAME one `classify` applies after replay (issue #207 / ADR-385): a CONCLUDED
       // contradiction — a relation whose residual is invariant or provably one-signed across the free
       // configurations — must take the honest-refusal route below, never park as «waiting for givens».
-      if (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands, seed)) {
+      if (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands, seed, { seatsExhausted: outcome.seatsExhausted })) {
         return {
           kind: 'commit', deferred: true, binds, commands: r.commands, note: null,
           logs: [...logs, { source: 'parser', result: 'deferred-constraint', detail: outcome.detail, commands: r.commands }],
