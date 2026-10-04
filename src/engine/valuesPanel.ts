@@ -196,9 +196,22 @@ export const QUERY_NOTES = [
    * what is true (the answer is waiting) and what to do about it, which is guideline 8 in docs/10.
    */
   'pending',
+  /**
+   * #1605 ([ADR-582](docs/06-decisions.md#adr-582)) — the question's answer IS being computed right now (the
+   * values compute for the current figure is in flight). The operator waited ~25 s on a row that told him
+   * to press «חשב ערכים» while the computation was already running and the answer then arrived unpressed.
+   * `pending` stays for the honest other case: nothing is running.
+   */
+  'computing',
 ] as const;
 
 export type QueryNote = (typeof QUERY_NOTES)[number];
+
+/** #1605 (ADR-582): the note an unanswered question carries while its figure's values are not current —
+ *  «מחשב…» while a values compute for this figure is running, «לחצו «חשב ערכים»» only when nothing is. */
+export function waitingNote(computing: boolean): QueryNote {
+  return computing ? 'computing' : 'pending';
+}
 
 /** One answered (or honestly refused) query. */
 export interface QueryRow {

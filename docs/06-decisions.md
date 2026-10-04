@@ -14352,3 +14352,36 @@ The full suite is the batch gate (round #1736).
 - `src/debug/StepPanel.tsx` (new), `src/main.tsx` (the DEV + `?steps` mount), `locales/he.json` + `en.json` (`devSteps.*`).
 
 **Behaviour change for a student:** none — the panel does not exist in the production build.
+
+## ADR-582 — A memo hit is charged the work it saved, so a work-bounded verdict is the same cold and warm (#1605)
+
+**Status:** accepted · 2026-10-04 · bug (P2, 2-D) · fix-round #1767 · branch `fix/1605-charge-memo-hits`
+
+**Requirements:** [02-requirements.md](02-requirements.md) FR-RV-5 (a question asked after the figure was checked is answered from that check; a running computation says «מחשב…») · **Design:** [04-design.md](04-design.md) § the admissible-set pool ("Bounded, failing CLOSED" — the work ledger, the memoized cut pool, `waitingNote`) · **LADDER stage:** none — a cost-accounting change; no solve stage moves.
+
+**Cites** [ADR-558](#adr-558) (the work-bounded knowledge pool this makes deterministic), [ADR-280](#adr-280) (the fold memo and its "a budget-cut fold is never memoized" rule, now applied to every memo), [ADR-401](#adr-401) (the content-keyed pool memo), [ADR-W-038](06w-decisions-workspace.md) (the ask lane).
+
+**Context — re-measured at pickup on 7ed5baa8.** The operator asked «O1D» on the T12 figure (two tangent circles, tangents from B) and waited ~25 s on a row reading «ממתין לחישוב — לחצו «חשב ערכים»» while the computation was already running. Measured in one process on `sharedSamples` over the operator's facts: cold `complete: false`, 21 samples, 4,403,930 work units; the ask's values op then recomputed the pool (a cut pool was never served from the memo) and came back `complete: true`, 23 samples, 575,822 units — the same facts, two verdicts. The status line read «מורכב מדי» off the first while the panel read complete off the second.
+
+**Class.** *A deterministic work budget charges a memo hit nothing, so the counted work — and the verdict it bounds — depends on cache warmth.* ADR-558's lock ("identical verdict on a second run") passed only because its figure's cost sat in un-memoized per-seed evaluates; T12's cost sits in memoized replays and folds.
+
+**Decision.**
+1. **A work ledger per memo entry** (`engine/solveBudget.ts`): `computeWithCell` records an entry's OWN `evaluateCore` units and the entries it touched; `chargeHit` charges a hit inside a **work epoch** (`withWorkEpoch`; `withWorkBudget` opens one) the units of every entry in its closure not yet charged in that epoch — each entry at most once per epoch, exactly as a cold run computes it once and then serves it from the memo it filled. The units an epoch counts are therefore those it would count from EMPTY caches: a function of the input alone. Outside an epoch nothing is charged (no budget reads the counter there).
+2. **Every memo on the counted path keeps a ledger**: the replay cache, the fold memo (including the #365 prefix resume, which is a hit on the prefix node), the drop-one search memo, and the engine's `evaluate`, `resolveDriven` and `freeDofCount` memos. The ledger is a side table — the fold node stays pure clone-safe data for the ADR-290 worker transplant (a transplanted fold has no ledger and is served free, as before).
+3. **An unaffordable hit is recomputed.** Under an armed budget a hit whose charge would cross the limit returns `false` and the caller recomputes, so it aborts exactly where a cold run would; a computation whose ladder a budget cut short is never memoized (ADR-280's fold rule, extended to the replay cache, the search memo and the engine memos — before this the replay cache memoized a budget-cut replay).
+4. **The work-path pool is memoized whether complete or not** — it is now deterministic. `sharedSamples` runs one epoch over setup + jobs (the setup charges the figure's own fold before the cap is armed, so a job re-reading it pays nothing — the cold accounting ADR-558 calibrated against), and the values op after the detect sweep is a memo hit: one sweep per facts.
+5. **The ask row tells the truth while it waits:** a new query note `computing` — «מחשב… התשובה תופיע כשהחישוב יסתיים» — while a values compute for the current figure runs (`waitingNote(computingValues)`); `pending` («לחצו «חשב ערכים»») only when nothing is.
+
+**Measured after (vitest, same process).** T12 cold: 4,739,299 units, `complete: false`, 21 samples; T12 re-sampled over warm caches: **4,739,299** units, `complete: false`, 21 identical samples (before: 575,822 units, complete, 23). The ask: values op **0** units, 3 ms (before: 575,822 units, ~3 s here, ~12 s in the browser), «O1D = 9.767» from the detect pool. The cold count rose 4.40M → 4.74M because memo entries warm from before the call and first touched by a job are now charged; the T12 verdict did not move.
+
+**Locks.** `src/__tests__/issue-1605-charged-memo-hits.test.ts` — T12 cold then re-sampled warm: equal counted work, equal `complete`, identical samples; detect then the ask: one sweep, zero new work, one `complete` verdict, O1D answered; the ledger primitive (charged once per epoch, free outside one, an unaffordable hit recomputed at cold cost); the `computing` note. `issue-1599-1601-knowledge-pool.test.ts`: the cut pool is now reused from the memo (sweeps unchanged). `values-panel-notes.test.ts` walks the new note against both locales.
+
+**Sibling audit.** `src3d/`, `src-complex/`, `src-analytic/`, `shell/`: no work budget exists (grep `withWorkBudget|countWork|WORK_CAP`) — class not present. The wall-clock budgets (`SAMPLE_BUDGET_MS`, the seed searches) are interactive and out of this class by ADR-558's ruling; the display-seed setup of the pool (`firstSatisfyingSeed`) stays on its existing search budget, unbounded under tests.
+
+**Consequences.**
+- `src/engine/solveBudget.ts`: `WorkCell`, `computeWithCell`, `chargeHit`, `withWorkEpoch`; `withWorkBudget` opens an epoch.
+- `src/engine/evaluate.ts`, `src/engine/sample.ts`: the `evaluate` / `resolveDriven` / DOF memos carry ledgers and skip memoizing a budget-cut result.
+- `src/replay/core.ts`: the replay cache, fold memo, prefix resume and search memo charge hits; `sharedSamples` serves the cut pool from the memo inside one epoch.
+- `src/engine/valuesPanel.ts` (`computing`, `waitingNote`), `src/App.tsx`, `locales/he.json` + `en.json` (`values.q.computing`).
+
+**Behaviour change for a student:** asking a value on a heavy figure answers as soon as the figure's check finishes (T12: the answer arrives with the status line instead of ~12 s after it), and while it waits the row says «מחשב…» instead of telling them to press a button. On a figure too heavy to check fully the panel and the status line now agree that the check was cut («מורכב מדי»); before, the panel could come back "complete" on its second, warmer pass.

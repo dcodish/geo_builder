@@ -678,12 +678,20 @@ knowledge gates ask "is this the same in every configuration?", and the pool is 
 - **Cost:** a few replays per determined figure at panel/relations time in the worker, memoized per fact
   list, never in the submit path. A rewrite that is INFEASIBLE pays the recruiter ladder to conclude it
   (the #259 class — 96 s deadline-free on the quarter-circle figure); the work cap cuts that and the figure
-  falls to the not-determined branch above, and says so. The cap bounds the JOBS only: the setup (the
-  display-seed search, the base replays) is the figure's own fold, already paid by the drawing and held by
-  the fold memo — charging it made a second call on the same facts come back complete where the first was
-  cut. The UI-thread submit gate's «כבר קיים» test (`impliedByPrior`) keeps its wall-clock bound
-  (`sharedSamples(facts, { deadlineMs })`) — an interactive check that fails open — on the narrow three-seed set (the widened set doubled its main-thread cost), and an incomplete pool
-  is never served from the memo as if it were complete.
+  falls to the not-determined branch above, and says so. The cap bounds the JOBS; the work it counts is a function of the input alone because **every memo hit
+  on the counted path is charged the work it saved** (#1605, [ADR-582](06-decisions.md#adr-582)): each memo
+  entry (replay cache, fold memo, drop-one search memo, the `evaluate` / `resolveDriven` / DOF memos)
+  carries a work ledger (`engine/solveBudget.ts` — its own `evaluateCore` units plus the entries it
+  touched), and inside a work EPOCH (the whole `sharedSamples` call) each entry is charged once — the first
+  touch, computed or hit. So the setup (the display-seed search, the base replays) charges the figure's own
+  fold before the cap is armed and a job re-reading it pays nothing, cold or warm, while a job touching any
+  other memo pays its recorded work warm exactly as it would compute it cold. A hit an armed budget cannot
+  afford is recomputed (aborting where a cold run would), and a budget-cut computation is never memoized. The UI-thread submit gate's «כבר קיים» test (`impliedByPrior`) keeps its wall-clock bound
+  (`sharedSamples(facts, { deadlineMs })`) — an interactive check that fails open — on the narrow three-seed set (the widened set doubled its main-thread cost). The work-path pool is memoized
+  whether complete or not (it is deterministic), so the values op after the detect sweep reuses it: one sweep
+  per facts, and the status line and the values panel read one verdict. While the values compute for the
+  current figure runs, an asked question's row reads «מחשב… התשובה תופיע כשהחישוב יסתיים» (`waitingNote`);
+  «לחצו «חשב ערכים»» only when nothing is running.
 - **The status cue reads the same pool (#1444, [ADR-556](06-decisions.md#adr-556)).** `figureDeterminacy`
   (`replay/core.ts`) returns the pool's `determined` flag, the number of DISTINCT shapes in it — two samples
   are one configuration when every labelled pairwise distance agrees up to one common scale (a mirror or a

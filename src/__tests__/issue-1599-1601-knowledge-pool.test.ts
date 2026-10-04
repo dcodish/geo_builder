@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { factsOf } from './scenario-pipeline';
-import { CONFIG_SEEDS, POOL_WORK_CAP, computeValues, figureDeterminacy, sharedSamples } from '@/replay/core';
+import { CONFIG_SEEDS, POOL_WORK_CAP, computeValues, figureDeterminacy, sampleStats, sharedSamples } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
 import { freeDofCount } from '@/engine';
 import { replay } from '@/store/geoStore';
@@ -83,8 +83,12 @@ describe('#1601 — the pool is bounded by WORK, never by time', () => {
     // one shape in hand from a cut pool proves nothing → «too complex»; a second shape it DID find is a fact
     expect(figureStatus(facts.length, 0, verdict)?.key).toBe(verdict.configurations > 1 ? 'actions.dofConfigsMany' : 'actions.dofTooComplex');
     expect(computeValues(facts).complete, 'the values panel says so too').toBe(false);
-    // determinism: an incomplete pool is never served from the memo — a second call re-runs to the SAME point
+    // determinism: #1605 (ADR-582) charges every memo hit its work, so a cut pool is a function of the input
+    // alone and IS served from the memo (one sweep per facts) — the cold = warm recompute is locked in
+    // issue-1605-charged-memo-hits.test.ts
+    const sweeps0 = sampleStats.sweeps;
     const again = sharedSamples(factsOf(HEAVY));
+    expect(sampleStats.sweeps, 'the cut pool is reused, not recomputed').toBe(sweeps0);
     expect(again.samples.length).toBe(pool.samples.length);
     expect(figureDeterminacy(again)).toEqual(verdict);
   }, 120_000);

@@ -25,7 +25,7 @@ import {
   unit,
 } from './geometry';
 import { carriesBoundAim, constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates, withToleranceFactor } from './solve';
-import { budgetExceeded, countWork } from './solveBudget';
+import { budgetExceeded, chargeHit, computeWithCell, countWork, solveBudget, type WorkCell } from './solveBudget';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
 export interface ResolvedLine {
@@ -1180,13 +1180,15 @@ export function drivenConstraintsOf(c: Construction): Constraint[] {
  * every mutation site builds new arrays), WeakMap so retired constructions are collectable. Measured on
  * the ADR-123 heavy figure this halves a cold replay; it changes NO result, only reuse.
  */
-const evalMemo = new WeakMap<Construction, EvalResult>();
+const evalMemo = new WeakMap<Construction, { r: EvalResult; cell: WorkCell }>();
 
 export function evaluate(c: Construction): EvalResult {
   const hit = evalMemo.get(c);
-  if (hit) return hit;
-  const r = evaluateUncached(c);
-  evalMemo.set(c, r);
+  // #1605 (ADR-582): a hit is charged the work it saved; one a work budget cannot afford is recomputed
+  if (hit && chargeHit(hit.cell)) return hit.r;
+  const aborts0 = solveBudget.aborts;
+  const { value: r, cell } = computeWithCell(() => evaluateUncached(c));
+  if (solveBudget.aborts === aborts0) evalMemo.set(c, { r, cell }); // a budget-cut solve is not THE result
   return r;
 }
 
@@ -1196,12 +1198,13 @@ export function evaluate(c: Construction): EvalResult {
  * drawn figure. `evaluate` fills it, so a consumer that needs the solved configuration of a figure that
  * was already evaluated — the DOF accountant's Jacobian (#1264) — pays no second solve.
  */
-const resolvedMemo = new WeakMap<Construction, Construction>();
+const resolvedMemo = new WeakMap<Construction, { r: Construction; cell: WorkCell }>();
 export function resolveDrivenMemo(c: Construction): Construction {
   const hit = resolvedMemo.get(c);
-  if (hit) return hit;
-  const r = resolveDriven(c);
-  resolvedMemo.set(c, r);
+  if (hit && chargeHit(hit.cell)) return hit.r; // #1605 (ADR-582): charged like every memo on the counted path
+  const aborts0 = solveBudget.aborts;
+  const { value: r, cell } = computeWithCell(() => resolveDriven(c));
+  if (solveBudget.aborts === aborts0) resolvedMemo.set(c, { r, cell });
   return r;
 }
 

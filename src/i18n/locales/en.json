@@ -552,6 +552,7 @@
     "q.unavailable": "Those points are not in the figure",
     "q.undetermined": "Not determined by the givens",
     "q.pending": "waiting — press «compute values»",
+    "q.computing": "computing… the answer will appear when it is done",
     "q.scale": "Depends on the scale — state one size in the figure",
     "paletteShow": "Symbols"
   },

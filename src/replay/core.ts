@@ -20,7 +20,7 @@ import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY } from '@/engine';
-import { work, withWorkBudget } from '@/engine/solveBudget';
+import { chargeHit, computeWithCell, work, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -230,6 +230,9 @@ function applyReflections(c: Construction, mask: number): Construction {
  * not a ledger). `replayStats.computes` counts REAL recomputes (cache misses) for the perf canary (A5).
  */
 const replayCache = new WeakMap<Fact[], { snapshot: readonly Fact[]; bySeed: Map<string, Derived> }>();
+/** #1605 (ADR-582): each memoized replay's and fold's WORK LEDGER (engine/solveBudget.ts) — a side table, so
+ *  the fold node stays pure, structured-clone-safe data for the ADR-290 worker transplant. */
+const cellOf = new WeakMap<object, WorkCell>();
 const REPLAY_CACHE_MAX = 512; // per facts-array — above this the sweep is exploring, not re-checking
 export const replayStats = { computes: 0 };
 
@@ -291,9 +294,14 @@ export function replay(facts: Fact[], seed = 0): Derived {
   const fresh = entry && entry.snapshot.length === facts.length && entry.snapshot.every((f, i) => f === facts[i]);
   if (entry && !fresh) entry = undefined;
   const hit = fresh ? entry!.bySeed.get(key) : undefined;
-  if (hit) return hit;
-  const out = computeReplay(facts, seed);
+  // #1605 (ADR-582): a hit is charged the work it saved; one an armed work budget cannot afford is recomputed
+  if (hit && chargeHit(cellOf.get(hit))) return hit;
+  const aborts0 = solveBudget.aborts;
+  const { value: out, cell } = computeWithCell(() => computeReplay(facts, seed));
   replayStats.computes++;
+  // A replay whose solve ladder a budget cut short is not THE replay of these facts (the fold memo's rule).
+  if (solveBudget.aborts !== aborts0) return out;
+  cellOf.set(out, cell);
   if (!entry) {
     entry = { snapshot: facts.slice(), bySeed: new Map() };
     replayCache.set(facts, entry);
@@ -478,14 +486,17 @@ export function trialFacts(facts: Fact[], commands: AnyCommand[]): Fact[] {
 function computeReplay(facts: Fact[], seed = 0): Derived {
   const key = foldKey(facts);
   let fold = foldCache.get(key);
+  if (fold && !chargeHit(cellOf.get(fold))) fold = undefined; // #1605: unaffordable under the budget → recompute
   if (!fold) {
     const abortsBefore = solveBudget.aborts;
-    fold = computeFold(facts);
+    const { value, cell } = computeWithCell(() => computeFold(facts));
+    fold = value;
     foldStats.computes++;
     // A fold whose recruit ladder was cut short by the view-search budget is NOT the fold for this
     // content — memoizing it would pin the degraded figure for every later, unbudgeted replay.
     if (solveBudget.aborts === abortsBefore) {
-      if (foldCache.size >= FOLD_CACHE_MAX) foldCache.delete(foldCache.keys().next().value as string);
+      cellOf.set(fold, cell);
+      if (!foldCache.has(key) && foldCache.size >= FOLD_CACHE_MAX) foldCache.delete(foldCache.keys().next().value as string);
       foldCache.set(key, fold);
     }
   }
@@ -540,10 +551,13 @@ export const conflictSearchStats = { folds: 0 };
 function foldForSearch(facts: Fact[]): FoldNode {
   const key = foldKey(facts);
   const hit = searchFoldCache.get(key);
-  if (hit) return hit;
-  const node = computeFold(facts, 0, false);
+  if (hit && chargeHit(cellOf.get(hit))) return hit; // #1605 (ADR-582): charged like the main memo
+  const aborts0 = solveBudget.aborts;
+  const { value: node, cell } = computeWithCell(() => computeFold(facts, 0, false));
   conflictSearchStats.folds++;
-  if (searchFoldCache.size >= SEARCH_FOLD_CACHE_MAX) searchFoldCache.delete(searchFoldCache.keys().next().value as string);
+  if (solveBudget.aborts !== aborts0) return node; // a budget-cut trial fold is never memoized (the main memo's rule)
+  cellOf.set(node, cell);
+  if (!searchFoldCache.has(key) && searchFoldCache.size >= SEARCH_FOLD_CACHE_MAX) searchFoldCache.delete(searchFoldCache.keys().next().value as string);
   searchFoldCache.set(key, node);
   return node;
 }
@@ -832,6 +846,9 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       if (node.prescanSig !== prescanSigFor(count)) continue;
       resumeFrom = { node, count };
     }
+    // #1605 (ADR-582): resuming IS a memo hit on the prefix node — charged its work, and declined (a full
+    // fold instead) when an armed work budget cannot afford it, exactly as a cold fold would have run.
+    if (resumeFrom && !chargeHit(cellOf.get(resumeFrom.node))) resumeFrom = null;
     if (resumeFrom) foldStats.resumes++;
   }
   // Build the construction by folding the enabled facts. `forced` maps a fact id to a status string that
@@ -3384,18 +3401,25 @@ function preciseSamples(c0: Construction, samples: Map<Id, Vec>[]): Map<Id, Vec>
 }
 
 export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number } = {}): SharedSamples {
+  // #1605 (ADR-582): the work-bounded pool is now a function of the input alone (every memo hit inside it is
+  // charged — engine/solveBudget.ts), so a pool the cap cut is served from the memo like a complete one: the
+  // values op after the detect sweep reuses it instead of recomputing the whole pool, and the status line and
+  // the values panel read ONE verdict.
   const hit = memoHit(facts);
-  if (hit && (hit.complete || opts.deadlineMs !== undefined)) return hit;
+  if (hit) return hit;
+  return withWorkEpoch(() => samplePool(facts, opts));
+}
+function samplePool(facts: Fact[], opts: { deadlineMs?: number }): SharedSamples {
   sampleStats.sweeps++;
   // The UI-thread gate samples the NARROW set (ADR-509's three seeds, no extra button seeds): measured while
   // building ADR-558, the widened set doubled its main-thread cost on a determined figure (0.67 s → 1.32 s
   // on a 3-4-5 restatement). Its narrow pool never replaces the knowledge memo.
   const narrow = opts.deadlineMs !== undefined;
-  // The budget bounds the JOBS — the samples themselves, each a freshly perturbed figure no memo can serve,
-  // so the same input stops at the same job on every run. The setup (the display-seed search and the base
-  // replays) is the figure's own fold, which the drawing already paid and the fold memo holds: charging it
-  // would make the verdict depend on how warm the caches were (measured while building ADR-558 — a second
-  // call on the same facts came back complete where the first was cut).
+  // The budget bounds the JOBS, so the same input stops at the same job on every run. The setup (the
+  // display-seed search and the base replays) runs in the same work EPOCH but before the cap is armed: what
+  // it touches is charged once there, so a job re-reading the figure's own fold pays nothing — as on a cold
+  // run — and a job touching anything else pays its full recorded work, warm or cold (#1605, ADR-582). Before
+  // that, a job's memo hit was free, so the pool came back cut cold and complete warm.
   const memoBefore = sampleMemo;
   const { jobs, finish } = samplingJobs(facts, { wide: !narrow });
   const aborts0 = solveBudget.aborts;

@@ -22,6 +22,7 @@ import { carrierOf, isShapeCarrier } from './carriers';
 import { constraintRefs } from './solve';
 import { evaluate } from './evaluate';
 import { constraintRank } from './dofRank';
+import { chargeHit, computeWithCell, solveBudget, type WorkCell } from './solveBudget';
 
 /**
  * An ORDER/REGION constraint ('angle-order' / 'length-order' / 'collinear-order' / 'angle-acuteness')
@@ -745,12 +746,13 @@ function allConstraints(c: Construction): Set<Constraint> {
  * reporting MORE freedom, never less. Memoised per construction identity (the `evaluate` idiom) — the
  * rank costs 2·(movable parameters) `evaluateCore` calls and every consumer asks about the same figure.
  */
-const dofMemo = new WeakMap<Construction, number>();
+const dofMemo = new WeakMap<Construction, { n: number; cell: WorkCell }>();
 export function freeDofCount(c: Construction): number {
   const hit = dofMemo.get(c);
-  if (hit !== undefined) return hit;
-  const n = freeDofCountUncached(c);
-  dofMemo.set(c, n);
+  if (hit && chargeHit(hit.cell)) return hit.n; // #1605 (ADR-582): the rank's evaluateCore calls are charged on a hit
+  const aborts0 = solveBudget.aborts;
+  const { value: n, cell } = computeWithCell(() => freeDofCountUncached(c));
+  if (solveBudget.aborts === aborts0) dofMemo.set(c, { n, cell });
   return n;
 }
 function freeDofCountUncached(c: Construction): number {
