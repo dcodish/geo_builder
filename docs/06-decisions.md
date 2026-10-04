@@ -14176,6 +14176,7 @@ The full suite is the batch gate (round #1736).
 - `src/engine/apply.ts`: `reseatFreeCircle`; the (c2) call, the re-seated centre spot, and the arm-2 collision rule.
 
 **Behaviour change for a student:** after «משולש ABC» and «מעגל O», «המעגל עובר דרך A, B ו-C» (or «A, B ו-C על המעגל») is accepted: the triangle stays where it was and the circle becomes its circumcircle, instead of being refused. Putting one or two vertices of a drawn shape on a drawn circle no longer moves those vertices; the circle moves to them.
+
 ## ADR-577 — A row that creates a point, left above the rows that declare its operands, builds; a failed row claims only what it defines (#1411)
 
 **Status:** accepted · 2026-10-04 · bug (P2) · round #1736 · branch `fix/1411-fold-creating-retry` off `main` @ d9a5910f · the 2-D half of [ADR-W-089](06w-decisions-workspace.md#adr-w-089)
