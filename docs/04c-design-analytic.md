@@ -1571,6 +1571,15 @@ given by its centre those properties ARE the givens. The ask lane answers `«מ�
 It used to take the formatter as a PARAMETER; it imports it now, which is what makes "one formatting for
 both surfaces" a fact rather than a convention every call site has to keep.
 
+**`details` is a list of labelled lines** ([ADR-AG-232](06c-decisions-analytic.md#adr-ag-232), #1597):
+`DetailLine = { label?: DetailLabelKey; text }`. The label is a locale KEY (`curveCentreLabel`,
+`curveFocusLabel`, `curveDirectrixLabel`, `curveFociLabel`) because this module holds no locale. A line
+that opens with a coordinate or is a role line always carries one; `r = …`, `a = …, b = …` and a line's
+explicit form name themselves and carry none. The panel renders one `<div>` per line through
+`detailRowText` (`app/panelRows.ts`: the label isolated as one RTL island, then `panelRowText`). A caller
+with nowhere to stack lines joins them with ` · ` (`detailsText`, `describeCurve`); without a label
+resolver it gets the texts unlabelled, never an English key.
+
 ## A display decision is measured in the figure's units ([ADR-AG-123](06c-decisions-analytic.md#adr-ag-123))
 
 Two questions every printer in this tree asks — *is this coefficient zero* and *is this line vertical* —
@@ -2033,6 +2042,14 @@ Binding an undescribed «חסום במעגל» to a circle already in the figure
 **Tangency to a determined circle.** `tangent-curve { circle, line }` and `tangent-line` share `lineTangencyRows(centre, radius, line, pair)`. One reads the centre and radius from the resolved circle, the other from the centre point and radius symbol. `tangent-of` picks by host: `circle-at` → `tangent-axis`/`tangent-line`, anything else → `tangent-curve` (axes refused by name).
 
 **Chords.** A chord is lowered only to existing facts: `declare` both ends, `on-curve` or `on-kind` on the circle, and the segment. Two chords that meet use the bounded crossing of the two segments. Equal chords use `length-eq`. `parseChord` runs with `parseTangentObject` before `parseCircleAt`, whose verb split would otherwise read «משוואת המשיק» as a subject before the verb.
+
+**Tangents from a point, the verb frame** ([ADR-AG-233](06c-decisions-analytic.md#adr-ag-233), #1430). `parseCircleFamilies`'s
+from-point reader has a second regex, `fromPointVerb`, for the same sentence with a movement verb («יוצא(ים)», «עובר(ים)»),
+a bare plural («משיקים»), the target circle, and an optional touch clause («הנוגעים בו בנקודות A ו-B»); English "from
+(point) P two tangents / a tangent (are/is drawn) to the circle". Both regexes feed ONE lowering (`touchAt` per touch,
+`distinct`, the segments from P). An unnamed touch is `toolPoint('touch', 'from-P…')` (T, S). The exam register
+(`constructionCandidates`) knows the noun «משיקים» (and «שני» before a plural noun); a tangent FROM a point — or the plural
+THROUGH one — composes «מ<הנקודה P> יוצא משיק / יוצאים שני משיקים …».
 
 ## The contextual circle: one binding for every sentence about «המעגל» ([ADR-AG-196](06c-decisions-analytic.md#adr-ag-196), #1633, #1619)
 

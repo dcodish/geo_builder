@@ -7,7 +7,7 @@ import { lineAngleOf } from './lineAngle';
 import { isDirectionSymbol, paramRegister, usedSymbols } from '../engine/carriers';
 import { type Construction, type ParamDecl, positionalOf } from '../engine/types';
 import { exprText, symbolsOf, type Expr } from '../engine/expr';
-import { curveEquationText } from './curveText';
+import { curveEquationText, type DetailLabelKey, type DetailLine } from './curveText';
 import { isolateRtlName } from '../../shell/bidi';
 
 /**
@@ -280,6 +280,19 @@ export const panelRowText = (text: string): string => {
   const braced = text.replace(/([A-Za-z])_([A-Za-z0-9]+)/g, '$1_{$2}');
   return ANY_ISOLATE.test(braced) ? braced : braced.replace(HEBREW_PHRASE, (m) => isolateRtlName(m));
 };
+
+/**
+ * ONE LINE OF A CURVE'S FOLDED DETAILS, as the panel shows it (#1597, ADR-AG-232).
+ *
+ * A labelled line is `<label>: <text>` in the panel's LTR section, the label one right-to-left island
+ * (`isolateRtlName`, as `slopeRowText` isolates its angle label) so «מרכז המעגל» reads whole and
+ * the colon stays between it and the coordinates. The result passes through `panelRowText`, which
+ * then sees the isolate and only adds subscript braces. An unlabelled line is `panelRowText` of its
+ * text, exactly as the old one-string row was.
+ */
+export function detailRowText(line: DetailLine, label: (key: DetailLabelKey) => string): string {
+  return panelRowText(line.label ? `${isolateRtlName(label(line.label))}: ${line.text}` : line.text);
+}
 
 /**
  * THE «שיפועים» ROW (#1646, ADR-AG-199) — its parts in a FIXED visual order, each Hebrew part an island.

@@ -15,7 +15,7 @@ import { derive } from '../engine/derive';
 import { isCanonicalCircle } from '../engine/conic';
 import { equationExpr } from '../parser/parseAnalytic';
 import { centresOf, pointAt } from '../engine/crossings';
-import { curveParts } from '../app/curveText';
+import { curveParts, detailsText } from '../app/curveText';
 
 type Fig = {
   points: { id: string; x: number; y: number }[];
@@ -36,7 +36,8 @@ const run = (seq: string[]) => {
       const p = figure.points.find((q) => q.id === id);
       return !!p && Math.abs(p.x) < 1e-12 && Math.abs(p.y) < 1e-12;
     },
-    row: circle ? curveParts(circle.curve, (x, y) => pointAt(d.figure as never, x, y)).details : undefined,
+    // #1597: the row is labelled lines now; these locks are about the centre's NAME, so they read the texts.
+    row: circle ? detailsText(curveParts(circle.curve, (x, y) => pointAt(d.figure as never, x, y)).details ?? []) : undefined,
   };
 };
 
@@ -45,7 +46,7 @@ describe('ADR-AG-184 — the issue’s table, as the class (#1270)', () => {
   it('x²+y²=16 → O(0, 0), and O is a real point', () => {
     const r = run(['x^2+y^2=16']);
     expect(r.faults).toEqual([]);
-    expect(r.row).toBe('O(0, 0), r = 4');
+    expect(r.row).toBe('O(0, 0) · r = 4');
     expect(r.points).toEqual(['O']);
     expect(r.atOrigin('O')).toBe(true);
   });
@@ -57,7 +58,7 @@ describe('ADR-AG-184 — the issue’s table, as the class (#1270)', () => {
   ])('%j → the point at the origin names the centre; no second point', (seq) => {
     const r = run(seq);
     expect(r.faults).toEqual([]);
-    expect(r.row).toBe('A(0, 0), r = 4');
+    expect(r.row).toBe('A(0, 0) · r = 4');
     expect(r.points).toEqual(['A']);
   });
 
@@ -83,9 +84,9 @@ describe('ADR-AG-184 — the issue’s table, as the class (#1270)', () => {
 
   /** Rule 3 — not canonical: coordinates alone (his «canonical only»). */
   it.each([
-    ['(x-3)^2+(y-4)^2=9', '(3, 4), r = 3'],
-    ['נתון מעגל שמשוואתו (x-3)^2+(y-4)^2=25', '(3, 4), r = 5'],
-    ['נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9', '(3, 4), r = 3'],
+    ['(x-3)^2+(y-4)^2=9', '(3, 4) · r = 3'],
+    ['נתון מעגל שמשוואתו (x-3)^2+(y-4)^2=25', '(3, 4) · r = 5'],
+    ['נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9', '(3, 4) · r = 3'],
   ])('%s → %s, no point', (line, row) => {
     const r = run([line]);
     expect(r.faults).toEqual([]);
@@ -102,7 +103,7 @@ describe('ADR-AG-184 — the issue’s table, as the class (#1270)', () => {
   ])('%j → the centre keeps its coordinates alone', (seq) => {
     const r = run(seq);
     expect(r.faults).toEqual([]);
-    expect(r.row).toBe('(0, 0), r = 4');
+    expect(r.row).toBe('(0, 0) · r = 4');
     expect(r.points.filter((p) => p === 'O')).toHaveLength(1);
     expect(r.atOrigin('O')).toBe(false);
     expect(r.d.minted).toEqual([]);
@@ -112,7 +113,7 @@ describe('ADR-AG-184 — the issue’s table, as the class (#1270)', () => {
   it('an O declared earlier by a shape noun keeps the letter; the centre is coordinates alone', () => {
     const r = run(['משולש AOB', 'x^2+y^2=16']);
     expect(r.faults).toEqual([]);
-    expect(r.row).toBe('(0, 0), r = 4');
+    expect(r.row).toBe('(0, 0) · r = 4');
     expect(r.d.minted).toEqual([]);
   });
 

@@ -18,16 +18,21 @@
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
 import { pointAt, centresOf } from '../engine/crossings';
-import { curveParts } from '../app/curveText';
+import { curveParts, detailsText } from '../app/curveText';
 
-/** The `details` string the panel would print for the figure's first stated curve. */
+/**
+ * The `details` the panel would print for the figure's first stated curve — its lines' texts joined
+ * with ` · ` (#1597 split the row into labelled lines; the labels have their own lock in
+ * issue-1597-labelled-details). These locks are about WHO names a position, so they read the texts.
+ */
 const details = (seq: string[]): string | undefined => {
   const d = derive(seq, 0) as unknown as {
     figure: { curves: { stated: boolean; curve: Parameters<typeof curveParts>[0] }[] };
   };
   const cu = d.figure.curves.find((c) => c.stated);
   if (!cu) throw new Error('no stated curve in the figure');
-  return curveParts(cu.curve, (x, y) => pointAt(d.figure as never, x, y)).details;
+  const lines = curveParts(cu.curve, (x, y) => pointAt(d.figure as never, x, y)).details;
+  return lines && detailsText(lines);
 };
 
 /** The operator's own sequence. */
@@ -36,7 +41,7 @@ const REPORTED = ['A(0,0)', 'B(6,0)', 'C(3,5)', 'משולש ABC', 'x^2+y^2=16'];
 describe('ADR-AG-115 — the panel names a position by who is there (#1167)', () => {
   /** THE REPORTED CASE: the circle's centre is where A sits, so it is A. */
   it('a circle centred on an existing point uses THAT point’s name', () => {
-    expect(details(REPORTED)).toBe('A(0, 0), r = 4');
+    expect(details(REPORTED)).toBe('A(0, 0) · r = 4');
   });
 
   it('and the invented letter is gone', () => {
@@ -53,20 +58,20 @@ describe('ADR-AG-115 — the panel names a position by who is there (#1167)', ()
    * half of the rule is unchanged and is asserted on a non-canonical circle instead.
    */
   it('a circle centred where no point sits names no letter at all', () => {
-    expect(details(['(x-3)^2+(y-4)^2=9'])).toBe('(3, 4), r = 3');
+    expect(details(['(x-3)^2+(y-4)^2=9'])).toBe('(3, 4) · r = 3');
   });
 
   it('a canonical circle’s centre is the real point O the tool declared (#1270)', () => {
-    expect(details(['x^2+y^2=16'])).toBe('O(0, 0), r = 4');
+    expect(details(['x^2+y^2=16'])).toBe('O(0, 0) · r = 4');
   });
 
   /** The same rule at the parabola's focus — one of the three sites that were NOT reported. */
   it('a parabola focus with nobody there names no letter', () => {
-    expect(details(['y^2=54x'])).toBe('(27/2, 0), x = -27/2');
+    expect(details(['y^2=54x'])).toBe('(27/2, 0) · x = -27/2');
   });
 
   it('a parabola focus occupied by the student’s own F uses F', () => {
-    expect(details(['F(13.5,0)', 'y^2=54x'])).toBe('F(27/2, 0), x = -27/2');
+    expect(details(['F(13.5,0)', 'y^2=54x'])).toBe('F(27/2, 0) · x = -27/2');
   });
 
   /**
@@ -75,7 +80,7 @@ describe('ADR-AG-115 — the panel names a position by who is there (#1167)', ()
    */
   it('a real F somewhere else does not get borrowed for the focus', () => {
     const d = details(['F(1,1)', 'y^2=54x']);
-    expect(d).toBe('(27/2, 0), x = -27/2');
+    expect(d).toBe('(27/2, 0) · x = -27/2');
     expect(d).not.toContain('F(');
   });
 

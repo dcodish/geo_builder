@@ -955,6 +955,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'height-triangle-asks-1443', family: 'lengths', steps: ['משולש ABC', 'גובה המשולש 4'], expect: 'asks', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448' }], note: 'three heights — which one is the student’s to say (ADR-052)' },
   { id: 'height-parallelogram-asks-1443', family: 'lengths', steps: ['מקבילית ABCD', 'גובה המקבילית הוא 4'], expect: 'asks', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448' }] },
   { id: 'height-to-side-1443', family: 'lengths', steps: ['משולש ABC', 'הגובה לצלע BC הוא 4'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448' }] },
+
+  // ── #1430 (ADR-AG-233): tangents FROM a point with a movement verb / unnamed touches, and a polygon side as the subject — 2-D builds each ──
+  { id: 'tan-from-1430-01', family: 'tangents', steps: ['מעגל O', 'מנקודה P יוצאים שני משיקים למעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'tan-from-1430-02', family: 'tangents', steps: ['מעגל O', 'מנקודה P יוצא משיק למעגל O'], expect: 'builds', exception: 'X8' },
+  { id: 'tan-from-1430-03', family: 'tangents', steps: ['מעגל O', 'מנקודה P יוצאים שני משיקים למעגל O, הנוגעים בו בנקודות A ו-B'], expect: 'builds', exception: 'X8' },
+  { id: 'tan-side-1430-04', family: 'tangents', steps: ['משולש ABC', 'מעגל O', 'הצלע AB משיקה למעגל O'], expect: 'builds', exception: 'X8' },
+  { id: 'tan-side-1430-05', family: 'tangents', steps: ['משולש ABC', 'מעגל O', 'AB משיק למעגל O'], expect: 'builds', exception: 'X8' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

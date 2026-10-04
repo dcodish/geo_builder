@@ -62,7 +62,8 @@ describe('#1212 — every curve kind states an equation', () => {
   it('a circle writes the centre-radius form, not its centre and radius', () => {
     expect(curveParts({ kind: 'circle', cx: 3, cy: 4, r: 3 })).toEqual({
       equation: '(x - 3)² + (y - 4)² = 9',
-      details: '(3, 4), r = 3',
+      // #1597 (ADR-AG-232): the details are labelled LINES — the centre says it is the centre.
+      details: [{ label: 'curveCentreLabel', text: '(3, 4)' }, { text: 'r = 3' }],
     });
   });
 
@@ -77,11 +78,20 @@ describe('#1212 — every curve kind states an equation', () => {
     expect(p.equation).toBe('x²/16 + y²/9 = 1');
     // a = 4, b = 3 → c² = 7, so the foci are at (±√7, 0) — present, but no longer the whole row.
     // `ellipseFoci` names the POSITIVE one F₁, which #1212 does not touch; only their home moved.
-    expect(p.details).toBe(`a = 4, b = 3, (${fmtAnalytic(Math.sqrt(7))}, 0), (${fmtAnalytic(-Math.sqrt(7))}, 0)`);
+    expect(p.details).toEqual([
+      { text: 'a = 4, b = 3' },
+      { label: 'curveFociLabel', text: `(${fmtAnalytic(Math.sqrt(7))}, 0), (${fmtAnalytic(-Math.sqrt(7))}, 0)` },
+    ]);
   });
 
   it("a parabola's focus and directrix move out of the equation line", () => {
-    expect(curveParts({ kind: 'parabola', p: 4 })).toEqual({ equation: 'y² = 8x', details: '(2, 0), x = -2' });
+    expect(curveParts({ kind: 'parabola', p: 4 })).toEqual({
+      equation: 'y² = 8x',
+      details: [
+        { label: 'curveFocusLabel', text: '(2, 0)' },
+        { label: 'curveDirectrixLabel', text: 'x = -2' },
+      ],
+    });
     // The line terms' magnitude rule applies here too: `y² = x`, never `y² = 1x`.
     expect(curveParts({ kind: 'parabola', p: 0.5 }).equation).toBe('y² = x');
     expect(curveParts({ kind: 'parabola', p: -2 }).equation).toBe('y² = -4x');

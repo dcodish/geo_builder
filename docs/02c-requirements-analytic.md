@@ -1841,6 +1841,13 @@ equation, because that is what was asked.
 The exception is a curve the givens have not FIXED, which shows its open form rather than an invented
 equation — no coefficient is ever sampled and printed as fact (R21, [#1023](https://github.com/dcodish/geo_builder/issues/1023)).
 
+**The folded properties are one LINE per fact, and a bare coordinate says what it is**
+([ADR-AG-232](06c-decisions-analytic.md#adr-ag-232), [#1597](https://github.com/dcodish/geo_builder/issues/1597);
+operator ruling 2026-09-30). A circle shows «מרכז המעגל: (3, 4)» and «r = 5» on two lines — «מרכז המעגל: O(0, 0)»
+when a point sits at the centre. A parabola shows «מוקד: (27/2, 0)» and «מדריך: x = -27/2». An ellipse shows
+«a = 5, b = 3» and «מוקדים: (4, 0), (-4, 0)». A line's single line («y = 2x + 1, m = 2») names itself and is
+unchanged.
+
 **R103 — a named cevian ACTUALLY REACHES its side, and may reach the side's extension**
 ([#1232](https://github.com/dcodish/geo_builder/issues/1232)).
 
@@ -2096,6 +2103,13 @@ The student types the exam's own tangency sentence with its touch point and the 
 - A chord is accepted: «AB מיתר במעגל», «הצלע AB נמצאת על המעגל», «במעגל המיתרים AC ו-BD נפגשים בנקודה E», «במעגל שמרכזו M המיתרים AB ו-BC שווים».
 
 Refused by name, never drawn: a tangent from a point inside the circle, a touch point that would coincide with the line's other end, and a bare «המשיק» when the figure has no tangent or several. The imperatives «העבירו משיק / מיתר» are taught as these sentences (R114).
+
+**R132 amendment — tangents FROM a point, in every spelling 2-D reads**
+([ADR-AG-233](06c-decisions-analytic.md#adr-ag-233), [#1430](https://github.com/dcodish/geo_builder/issues/1430)).
+«מנקודה P יוצאים שני משיקים למעגל», «מהנקודה P יוצא משיק למעגל O», «מנקודה P משיקים למעגל», «… הנוגעים בו בנקודות A ו-B»,
+"from point P two tangents are drawn to the circle" draw the tangent(s) from P. Touch points the sentence does not name are
+named by the tool, T then S (as 2-D names them). The exam's «מהנקודה P העבירו משיקים למעגל» is taught onto «מהנקודה P
+יוצאים שני משיקים למעגל» (R114). A point inside the circle is refused, naming the line.
 
 **R133 — «המעגל» is the circle the figure has**
 ([ADR-AG-196](06c-decisions-analytic.md#adr-ag-196), [#1633](https://github.com/dcodish/geo_builder/issues/1633), [#1619](https://github.com/dcodish/geo_builder/issues/1619)).

@@ -137,6 +137,7 @@ const IN_ADV = new RegExp(String.raw`^(ב${SETTING_NOUN}(?:\s+[א-ת-]+){0,3}?\s
  */
 const CONSTRUCTION_NOUNS: Record<string, { def: string; plural?: boolean; role?: boolean }> = {
   משיק: { def: 'המשיק' },
+  משיקים: { def: 'המשיקים', plural: true },
   מיתר: { def: 'המיתר' },
   קוטר: { def: 'הקוטר' },
   אלכסון: { def: 'האלכסון' },
@@ -150,7 +151,7 @@ const CONSTRUCTION_NOUNS: Record<string, { def: string; plural?: boolean; role?:
   תיכון: { def: 'תיכון', role: true },
   תיכונים: { def: 'תיכונים', plural: true, role: true },
 };
-const NOUN_RE = new RegExp(String.raw`^(?:את\s+)?ה?(${Object.keys(CONSTRUCTION_NOUNS).sort((a, b) => b.length - a.length).join('|')})(?![א-ת])\s*`);
+const NOUN_RE = new RegExp(String.raw`^(?:את\s+)?(שני\s+)?ה?(${Object.keys(CONSTRUCTION_NOUNS).sort((a, b) => b.length - a.length).join('|')})(?![א-ת])\s*`);
 /** The object's own names — «AD», «EF», «OD ו-BE»: one- or two-letter names, as a list. */
 const SEG = String.raw`(?:${LBL}){1,2}`;
 const LABELS_AFTER_NOUN = new RegExp(String.raw`^(${SEG}(?:\s*(?:,|ו-?)\s*${SEG})*)(?=[\s,]|$)\s*`);
@@ -215,8 +216,10 @@ export function constructionCandidates(raw: string): ImperativeCandidate[] {
 
   const nm = s.match(NOUN_RE);
   if (!nm) return [];
-  const noun = nm[1];
+  const noun = nm[2];
   const spec = CONSTRUCTION_NOUNS[noun];
+  // «שני» counts a PLURAL noun («שני משיקים», «שני אנכים»); before a singular it is not this grammar.
+  if (nm[1] && !spec.plural) return [];
   s = s.slice(nm[0].length);
   const lm = s.match(LABELS_AFTER_NOUN);
   const labels = lm ? lm[1] : '';
@@ -237,7 +240,17 @@ export function constructionCandidates(raw: string): ImperativeCandidate[] {
   }
   const tail = setting ?? '';
   switch (noun) {
+    case 'משיקים':
     case 'משיק': {
+      /**
+       * #1430 (ADR-AG-233) — a tangent FROM a point is the from-point sentence 2-D's catalog writes: «מהנקודה P העבירו
+       * משיקים למעגל» → «מהנקודה P יוצאים שני משיקים למעגל», «… העבירו משיק למעגל» → «מהנקודה P יוצא משיק למעגל».
+       * Through a point, the PLURAL can only be tangents from it (two tangents at one point are one line).
+       */
+      const single = from && !/,|ו-?/.test(from.labels);
+      const anchor = single ? fromNp : spec.plural && through && !through.on ? throughNp : '';
+      if (anchor && !labels) out.push(join(`מ${anchor}`, spec.plural ? 'יוצאים שני משיקים' : 'יוצא משיק', rest, tail));
+      if (spec.plural) break;
       if (from) out.push(join(spec.def, labels, rest, `מ${fromNp}`, tail));
       else if (through) {
         // «דרך הנקודה D שעל המעגל העבירו משיק למעגל» — a tangent AT D puts D on that circle, so the

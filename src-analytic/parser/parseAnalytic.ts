@@ -3413,10 +3413,28 @@ function parseCircleFamilies(raw: string): RuleOutcome {
   const fromPoint =
     new RegExp(`^מ(?:ה)?נקודה\\s+(${NAME})(?:\\s+(?:ה?נמצאת\\s+)?מחוץ\\s+למעגל(?:\\s+(${NAME}))?)?\\s*,?\\s+(?:(שני\\s+משיקים\\s+נוגעים)|משיק\\s+נוגע)\\s+ב?ה?מעגל(?:\\s+(${NAME}))?\\s+ב(?:נקודה\\s+(${NAME})|נקודות\\s+(${NAME})${AND_HE}(${NAME}))$`).exec(g) ??
     new RegExp(`^from\\s+(?:a\\s+|the\\s+)?point\\s+(${NAME})(?:\\s+outside\\s+(?:the\\s+)?circle(?:\\s+(${NAME}))?)?\\s*,?\\s+(?:(two\\s+tangents\\s+touch)|a\\s+tangent\\s+touches)\\s+(?:the\\s+)?circle(?:\\s+(${NAME}))?\\s+at\\s+(?:(?:the\\s+)?(?:point\\s+)?(${NAME})|(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME}))$`, 'i').exec(g);
-  if (fromPoint) {
-    const [, e, o1, twoWord, o2, one, a2, b2] = fromPoint;
+  /**
+   * THE SAME SENTENCE WITH A MOVEMENT VERB, A BARE PLURAL, OR NO TOUCH NAMED (#1430 remainder, ADR-AG-233 — 2-D's
+   * `tangentsFromExternal` / `tangentFromExternal` read every one): «מנקודה P יוצאים שני משיקים למעגל», «מהנקודה P
+   * יוצא משיק למעגל O», «מנקודה P שני משיקים למעגל, הנוגעים בו בנקודות A ו-B», "from point P two tangents are drawn
+   * to the circle". It is the reading above with its words optional, so it lowers through the SAME facts below:
+   * plural (`שני משיקים` / `משיקים` / "two tangents" / "tangents") is two touches, singular one. A touch the
+   * sentence does not name is the tool's (2-D's T, then S — `toolPoint('touch')`), as «משיק למעגל» names its own.
+   * The exam's imperative («מהנקודה P העבירו משיקים למעגל») is TAUGHT onto this sentence (ADR-AG-206).
+   */
+  const fromPointVerb = fromPoint
+    ? null
+    : new RegExp(`^מ(?:ן\\s+)?(?:ה)?נקודה\\s+(${NAME})(?:\\s+(?:ה?נמצאת\\s+|ש)?מחוץ\\s+למעגל(?:\\s+(${NAME}))?)?\\s*,?\\s+(?:(?:יוצא(?:ים|ות)?|עובר(?:ים)?)\\s+)?(?:(שני\\s+(?:ה)?משיקים|משיקים)|משיק)(?:\\s+(?:ל|אל)\\s*ה?מעגל(?:\\s+(${NAME}))?)?(?:\\s*,?\\s+(?:ה|ש)?נוגע(?:ים)?\\s+(?:בו|ב?ה?מעגל(?:\\s+${NAME})?))?(?:\\s+ב(?:נקודה\\s+(${NAME})|נקודות\\s+(${NAME})${AND_HE}(${NAME})))?$`).exec(g) ??
+      new RegExp(`^from\\s+(?:a\\s+|the\\s+)?(?:point\\s+)?(${NAME})(?:\\s+outside\\s+(?:the\\s+)?circle(?:\\s+(${NAME}))?)?\\s*,?\\s+(?:(two\\s+tangents|tangents)|a\\s+tangent)\\s+(?:(?:are|is)\\s+)?(?:drawn\\s+)?(?:to\\s+(?:the\\s+)?circle(?:\\s+(${NAME}))?)?(?:\\s*,?\\s+(?:touching\\s+it|(?:which|that)\\s+touch(?:es)?\\s+it)\\s+at\\s+(?:(?:the\\s+)?(?:point\\s+)?(${NAME})|(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME})))?$`, 'i').exec(g);
+  if (fromPoint || fromPointVerb) {
+    const [, e, o1, twoWord, o2, one, a2, b2] = (fromPoint ?? fromPointVerb)!;
     if (o1 && o2 && o1 !== o2) return null;
-    const touches = twoWord ? (a2 ? [a2, b2] : null) : one ? [one] : null;
+    // A named touch count that disagrees with the noun («שני משיקים … בנקודה D») is not this sentence.
+    if ((twoWord && one) || (!twoWord && a2)) return null;
+    const minted = (k: string) => toolPoint('touch', `from-${e}${k}`);
+    const touches = twoWord
+      ? (a2 ? [a2, b2] : fromPointVerb ? [minted('-1'), minted('-2')] : null)
+      : one ? [one] : fromPointVerb ? [minted('')] : null;
     if (!touches) return null;
     if (new Set([e, ...touches]).size !== touches.length + 1) return refuse('repeated-vertex', line);
     return aboutCircles([oneCircleSlot(o1 ?? o2)], [
