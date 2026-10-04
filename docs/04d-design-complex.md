@@ -114,6 +114,14 @@ never as a contradiction or a refutation.
   label), a constant (`ii`, `oi`), or the run is glued to a following operand (`ib z1`); `pi` and `im`
   are words and never split. For a complex letter the submit path offers the explicit product
   (`z*i`) as a clarification, only once the grammar has read it.
+- **The trigonometric form is a SPELLING of cis, fixed at the orthography chokepoint** (`trigToCis` in
+  `parser/normalize.ts`; [ADR-CX-059](06d-decisions-complex.md#adr-cx-059)). `(cos θ + i sin θ)` becomes
+  `cis(θ)` before any rule reads the line, so `2(…)`, `√2(…)`, `r(…)`, `|z1|(…)` attach a modulus
+  exactly as they do to `cis` and the line lowers to the facts `r cis θ` lowers to — one polar path,
+  not two that must agree. Only when the reading is unambiguous: the same angle in both slots; a group
+  raised to a power keeps its parentheses (`2(cis45)^2`, never `(2cis45)^2`); an unparenthesised sum
+  only as a whole additive term. A form with two different angles is left as typed, refuses, and the
+  submit path names both angles (`trigAngleMismatch`, `trig-mismatch`).
 - **A number DEFINED by real parameters reads as its definition** (`model/cartesianForm.ts`;
   [ADR-CX-058](06d-decisions-complex.md#adr-cx-058)). `z1 = a+bi` is carried as a free unknown plus a
   numeric relation (making it a function of a and b in the solver is #1410), so its exact carriers
