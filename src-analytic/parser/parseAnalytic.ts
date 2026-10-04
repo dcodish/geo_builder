@@ -1669,6 +1669,8 @@ function meetFrame(line: string): RuleOutcome {
  *   החיתוך של הישר l1 עם המעגל I» — see `bothCrossings`.
  */
 function intersectionSpellings(line: string): RuleOutcome {
+  const meeting = meetingSpelling(line);
+  if (meeting) return meeting;
   const both = bothCrossings(line);
   if (both) return both;
   const ordWord = (s: string | undefined) => (s ? ` ${s.replace(/^ה?/, 'ה')}` : '');
@@ -1712,6 +1714,41 @@ function intersectionSpellings(line: string): RuleOutcome {
     const [, a, b, id] = cuts;
     return viaCanonical(line, null, () => [`${id} נקודת החיתוך של ${withLineNoun(a)} עם ${withLineNoun(b)}`]);
   }
+  return null;
+}
+
+/**
+ * «מפגש» IS «נקודת החיתוך» (#1609, [ADR-AG-230](../../docs/06c-decisions-analytic.md#adr-ag-230)).
+ *
+ * «A מפגש הישרים 1 ו-2» · «A נקודת המפגש של הישר l1 עם הישר l2» · «A מפגש l1 ו-l2» · «A מפגש הישרים» —
+ * the meeting noun was read only as the head of a concurrency ROLE («M מפגש התיכונים במשולש ABC»), so a
+ * tail naming two curves fell out as `not-handled` while the identical «נקודת החיתוך» sentence built. The
+ * head word is the only difference, so the sentence is re-spelled with the canonical head and handed to the
+ * one crossing rule (`viaCanonical`): every operand form, ordinal and «אחת מ…» the crossing reads, the
+ * meeting noun reads, and they cannot drift.
+ *
+ * A tail the concurrency reader CLAIMS (`concurrencyOf` — a role, or the named-diagonals form) is not a
+ * crossing of two curves: this answers `null` and `CONCURRENCY_HE` keeps it, unchanged. An owned refusal
+ * of the canonical sentence is this sentence's (with this sentence as its detail); `not-handled` hands the
+ * line back to the chain.
+ */
+const MEETING_HE = new RegExp(
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*(${ONE_OF_HE})(ה?נקודות|ה?נקודת)?\\s*ה?מפגש\\s*(${NTH_HE})\\s*(?:של\\s+)?(.+)$`,
+);
+const MEETING_EN = new RegExp(`^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+meeting\\s+point\\s+of\\s+(.+)$`, 'i');
+function meetingSpelling(line: string): RuleOutcome {
+  const he = MEETING_HE.exec(line);
+  const en = he ? null : MEETING_EN.exec(line);
+  if (!he && !en) return null;
+  const id = (he ?? en)![1];
+  const tail = he ? he[5] : en![2];
+  if (concurrencyOf(id, tail, line)) return null;
+  const canonical = he
+    ? `${id} ${he[2]}${he[3] && /נקודות/.test(he[3]) ? 'נקודות' : 'נקודת'} החיתוך${he[4] ? ` ${he[4].replace(/^ה?/, 'ה')}` : ''} של ${tail}`
+    : `${id} is the intersection of ${tail}`;
+  const r = parseClause(canonical);
+  if (r.ok) return made(r.facts.map((f) => ({ ...f, src: line })));
+  if (r.code !== 'not-handled') return { ...r, detail: line } as ParseResult;
   return null;
 }
 

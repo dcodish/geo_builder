@@ -748,6 +748,10 @@ key), and the apply boundary resolves it to the existing curve carrying that equ
 probe-environment identity) or mints `stated: false`; `curve-anon` ids therefore never reach a refusal. The
 crossing's other spellings — the clitic as written, the distributive and bare plurals (`crossing-kind`,
 exactly-two at M1), both verb orders — normalise onto the canonical sentence through `intersectionSpellings`.
+Its first step is `meetingSpelling` ([ADR-AG-230](06c-decisions-analytic.md#adr-ag-230), #1609): «מפגש» /
+«נקודת המפגש (של)» / "the meeting point of" is re-spelled with the canonical head «נקודת החיתוך של» (keeping
+«אחת מ…» and an ordinal) and re-parsed — unless `concurrencyOf` claims the tail (a role: «התיכונים במשולש
+ABC»), when it answers `null` and `CONCURRENCY_HE` keeps the sentence.
 
 ## A cevian lowers to its WHOLE definition ([ADR-AG-109](06c-decisions-analytic.md#adr-ag-109))
 

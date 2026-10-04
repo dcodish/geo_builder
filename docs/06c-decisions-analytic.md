@@ -10989,3 +10989,35 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 - `parser/parseAnalytic.ts`: `perpendicularRef` and `parseIntersectionPlain`'s own-line foot.
 - `engine/apply.ts`: the `on-kind` perpendicular arm.
 - The two locks above.
+
+## ADR-AG-230 — «מפגש» is the crossing's head word: «A מפגש הישרים 1 ו-2» reads as «A נקודת החיתוך של הישרים 1 ו-2» (#1609)
+
+**Date:** 2026-10-04 · **Status:** accepted · round #1736, batch item for #1609
+
+**Requirements:** [02c](02c-requirements-analytic.md) R119 — the meeting noun added to the crossing's spellings. · **Design:** [04c](04c-design-analytic.md) — the operand-vocabulary paragraph names `meetingSpelling`. · **LADDER stage:** parse only (a normaliser inside `intersectionSpellings`). No new fact, object or rule.
+
+**Context.** Two prod students (log-triage 2026-09-30, sessions `e5k11473`, `iltebh4m`) stated two lines and typed «A מפגש הישרים 1 ו-2». The deterministic lane answered `not-handled`, the model was rejected, and they got nothing — while «A נקודת החיתוך של הישרים 1 ו-2» builds. Measured on d9a5910f: every meeting-noun spelling of a crossing was `not-handled` («A מפגש הישרים 1 ו-2», «A נקודת המפגש של הישרים 1 ו-2», «A מפגש הישר 1 עם הישר 2», «A מפגש הישרים»), and so were the plane forms «M מפגש AC ו-BD» / «M נקודת המפגש של AC ו-BD» after «מרובע ABCD», which 2-D builds.
+
+**Root cause.** «מפגש» was read only by `CONCURRENCY_HE`, as the head of a concurrency ROLE («M מפגש התיכונים במשולש ABC»). The crossing rule and its #1429 normaliser (`intersectionSpellings`) knew only «(נקודת) החיתוך». So the same sentence with a different head word had no rule: a two-spellings defect. `concurrencyOf` already declines (returns `null`) when the tail is not a role, so the plan's "make `CONCURRENCY_HE` yield" was already true. What was missing was a crossing reading for the line to fall to.
+
+**Decision.** `meetingSpelling` is the first step of `intersectionSpellings`. It matches «X (אחת מ)(נקודת|נקודות)? (ה)מפגש (ordinal)? (של)? <tail>» and English "X is the meeting point of <tail>":
+- if `concurrencyOf` claims the tail (a role, a miscounted role's own refusal, or the named-diagonals form) it answers `null`, and `CONCURRENCY_HE` reads the sentence exactly as before;
+- otherwise the sentence is re-spelled with the canonical head «נקודת החיתוך» (keeping «אחת מ…» and the ordinal) and re-parsed by the one crossing rule, so every operand form the crossing reads — the distributive and bare plurals, «X עם Y», «X ו-Y», curves, axes, the contextual «המעגל» — the meeting noun reads too, with identical facts;
+- an owned refusal of the canonical sentence is this sentence's, with this sentence as its detail; `not-handled` hands the line back to the chain («A מפגש הדרכים» is still the model's).
+
+**Class check.** The other «מפגש» readers already accept both heads: the tangents' meeting (`tangentsMeet`), the bisectors' crossing (`BISECTORS_MEET_HE`), the verb frame (`meetFrame`). The noun head was the one place a crossing knew only «חיתוך».
+
+**Parity (#1649).** 2-D builds all five plane rows. Added `meet-noun-1609`, `meet-point-of-1609`, `meet-lines-plural-1609`, `meet-line-with-1609`, and the control `cross-lines-plural-1609` (analytic built it before), all `builds`. The first four fail on d9a5910f in analytic. 3-D answers `not-handled` to all five, including the «נקודת החיתוך» control, so each carries the 3-D known gap #1679.
+
+**Locks.** `src-analytic/__tests__/issue-1609-meeting-crossing.test.ts`, 43 tests, **31 fail before**:
+- the prod session through `decideSubmit`: all three lines record, and A is (-2, 4);
+- 5 heads × 7 operand forms build A at (-2, 4);
+- meeting and canonical facts are identical, in Hebrew and English, with an ordinal and a circle operand;
+- controls: the centroid, orthocentre and diagonals keep «מפגש»; «מפגש התיכונים במרובע ABCD» keeps `bad-arity`; «A מפגש הדרכים» stays `not-handled`.
+
+**Not changed.** A line named «1» is not «l1». «A מפגש הישרים l1 ו-l2» beside lines 1 and 2 answers `unknown-reference`, exactly as «A נקודת החיתוך של הישרים l1 ו-l2» does there. The parser catalog and the LLM grammar are unchanged.
+
+**Consequences.**
+- `parser/parseAnalytic.ts`: `MEETING_HE`, `MEETING_EN`, `meetingSpelling`.
+- `shell/__tests__/fixtures/geo-input-parity.ts`: five rows.
+- The new lock.
