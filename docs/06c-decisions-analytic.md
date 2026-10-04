@@ -11212,3 +11212,29 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Not changed.** The canvas still offers no ring at a conic × conic crossing (`crossingsOf` searches straight × straight and straight × conic only) — a click affordance, not this bug. The grammar's ordinals stay two («הראשונה», «השנייה»); a circle × ellipse pair's third and fourth crossings are reachable only without an ordinal.
 
 **Consequences.** `engine/crossing-order.ts` (`conicsMeet`, `orderedCrossings`, `meetsTwice`); `engine/crossings.ts` (`incidenceWords`); `engine/derive.ts` (`LineFault.operands`); `store/useAnalyticStore.ts`, `app/submit.ts`, `app/errorText.ts`; `i18n/index.ts` (one key per locale).
+
+## ADR-AG-237 — A stated altitude draws its knee at the FOOT; a derived 90° still draws none (#1241)
+
+**Date:** 2026-10-04 · **Status:** proposed (PR, awaiting play) · fix-round #1753 (feature item). #1241 `auto-ok` 2026-09-21 (/decisions pass); re-measured 2026-10-04 in round #1736.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R40 — its "still open" line on the altitude's right angle replaced by the operator's ruling; R168 — one bullet (an altitude or perpendicular draws a knee at its foot). · **Design:** [04c](04c-design-analytic.md), "The stated-measure layer" — the `perpendicular` kind, the derived foot, `alt`. · **LADDER stage:** render input only (`statedMeasures`, read after the fold and solve) and `statedScene`'s knee loop. No parser, fold, solver or catalog change.
+
+**Builds on** [ADR-AG-225](#adr-ag-225) (#1714 — the stated-measure layer and its knee). **Answers** R40's open question (ADR-AG-014).
+
+**Ruling** (operator, 2026-09-19): *"when we do a height, I want the knee to show since this is a direct request from the user. if the angle is calculated as 90 we don't show it since its derived"*. The mark shows the student's own given back; a knee on a 90° the tool worked out would assert a conclusion as a given.
+
+**Re-measured at pickup** (origin/main c098af9b, `derive` → `buildScene(…, { stated })`, seeds 0–2): a stated right angle (`זווית ABC ישרה`) draws one knee and coordinates A(0,0) B(6,0) C(0,8) draw none — #1714 delivered those — but «AD גובה לצלע BC», «AD גובה במשולש ABC», «∢BAC = 120» + «AD גובה לצלע BC» and «הגובה מ-A לצלע BC» each drew **0** knees.
+
+**Root cause** (the re-measure's hypothesis, confirmed). The named altitude lowers (`cevian.ts`) to `perpendicular {a: A, b: D, c: B, d: C}` plus `D on-line-2pt BC`; `statedMeasures.read` handled `angle` = 90 and `relation`/⊥ only, so this kind fell to `default` — and its knee belongs at D, which is not an end of BC, so `kneeOf`'s shared-end rule could not have placed it anyway. The unnamed altitude lowers to a derived `foot` rule with no constraint, so nothing reached the layer.
+
+**Decision.**
+1. `read` handles `perpendicular`: pairs sharing an end knee there (`kneeOf`); otherwise the knee is at the FOOT — the end of one pair that an `on-line-2pt` incidence puts on the other pair's line (the same structural test `apply.ts` uses to find an altitude's named foot), legs toward the pair's other end and along the line. Read off the constraints, never off the drawn figure (the ruling's whole point — measuring the output is how a derived 90° would sneak in).
+2. A derived `foot` object onto a line through two points is a stated perpendicular: its three producers (the cevian's unnamed foot, «רגל האנך», «האנך מ-…») are all sentences about one. Origin needs no flag: no noun definition builds a foot.
+3. `rights[i].alt` names the line's second point; `statedScene` runs the knee toward whichever of `b`, `alt` is farther from the foot, so a foot that lands on an endpoint (a right angle at C) still has a leg, and a foot beyond C (the obtuse case) runs back along the line.
+4. One right angle, one knee: a foot's knee claims both corner keys at its vertex (`D:A|B` and `D:A|C`), so the altitude restated, or «זווית ADB ישרה» / «זווית ADC ישרה» in either order, adds none.
+
+**Locks.** `src-analytic/__tests__/issue-1241-altitude-knee.test.ts` (12 tests; **fails before: 7 of 12** — the five controls pass on both): exactly one knee, square at the foot with legs toward A and along BC (shared `kneeFaults`, seeds 0–5), for «AD גובה לצלע BC», «AD גובה במשולש ABC», the operator's «∢BAC = 120» case, a foot truly BEYOND C («∢ACB = 120», C between B and D asserted), the unnamed «הגובה מ-A לצלע BC», and «D רגל האנך מ-A ל-BC»; one knee for the restated / «זווית ADB|ADC ישרה» combinations; controls — no knee for coordinates A(0,0) B(6,0) C(0,8), Thales' C(3,4) on the diameter, a median, «מלבן ABCD»; «זווית ABC ישרה» still one knee at B.
+
+**Not changed / limits.** A foot dropped onto an AXIS or a line object («D רגל האנך מ-C לציר ה-x») has no named point on its line for the knee's leg and draws none (the renderer's corner needs two named points). A stated `AB ⊥ CD` whose pairs neither share an end nor put an end on the other line has no named vertex and draws none, as before. 2-D's default canvas already draws knees only from asserted facts (the /decisions note of 2026-09-21), so the two products agree on what a knee means.
+
+**Consequences.** `engine/statedMeasures.ts` (`perpendicular` case, derived feet, `alt`, `footOn`, the knee's claimed keys); `render/scene.ts` (the knee's leg toward the farther named point).

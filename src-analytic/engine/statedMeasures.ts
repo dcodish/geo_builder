@@ -14,6 +14,8 @@
  * - a **length** against a value («AB = 5», «AB = 3a»), an **angle** against a value («∢ABC = 30», «∢ABC = α»,
  *   «tan∢BAO = 2»), an **area** («שטח המשולש ABC הוא 13»), an **arc** («⌢AC = 60°»);
  * - a **right angle** stated at a vertex («זווית ABC ישרה», «AB ⊥ BC», «∢ABC = 90») — a knee, never «90°»;
+ * - an **altitude** or a **perpendicular** («AD גובה לצלע BC», «הגובה מ-A לצלע BC», «D רגל האנך מ-A ל-BC») — a knee
+ *   at its FOOT (#1241, ADR-AG-237), on the side or on its extension;
  * - an **equality** of two lengths or two angles («AB = AC», «∢ABC = ∢ACB») — hatch ticks or arcs.
  *
  * **A noun's own givens are its DEFINITION, not a statement** (2-D's rule: «מלבן ABCD» draws no knees, «מעוין»
@@ -31,6 +33,7 @@ import { exprText, evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { isTermPlaceholder, type LengthExpr } from './lengths';
 import type { Constraint, Direction } from './solve';
 import type { Construction, Id } from './types';
+import type { FootLine } from './derived';
 
 /** A stated value, as the renderer should write it: a NUMBER the givens fix, or the student's own TEXT. */
 export type StatedValue = { num: number } | { text: string };
@@ -40,8 +43,12 @@ export interface StatedMeasures {
   lengths: Array<{ a: Id; b: Id; value: StatedValue }>;
   /** «∢ABC = 30» — an arc at `v` between the rays to `a` and `b`, with the value; `num` is in DEGREES. */
   angles: Array<{ v: Id; a: Id; b: Id; value: StatedValue }>;
-  /** A stated right angle at `v` — the knee. */
-  rights: Array<{ v: Id; a: Id; b: Id }>;
+  /**
+   * A stated right angle at `v` — the knee. `alt` is a second named point on the `b` ray's LINE (an altitude's foot
+   * lies on the side, between or beyond its ends): the renderer runs the knee toward whichever of `b`, `alt` is
+   * farther from `v`, so a foot that lands on an endpoint still has a ray to draw along (#1241).
+   */
+  rights: Array<{ v: Id; a: Id; b: Id; alt?: Id }>;
   /** «שטח המשולש ABC הוא 13» — written at the ring's centroid. */
   areas: Array<{ ids: Id[]; value: StatedValue }>;
   /** «⌢AC = 60°» — written ON the arc of `circle` between `a` and `b` (2-D's ADR-335: never a wedge at the centre). */
@@ -197,6 +204,27 @@ export function statedMeasures(
         if (k.k.kind === 'num' && k.k.value === 1) anglePairs.push([k.left, k.right]);
         return;
       }
+      case 'perpendicular': {
+        /**
+         * AN ALTITUDE (#1241, ADR-AG-237) — the cevian lowers «AD גובה לצלע BC» to `AD ⊥ BC` with D on the line BC. The
+         * knee belongs at the FOOT, which is not an endpoint of BC: it is read off the constraint and the incidence that
+         * puts one pair's end on the other pair's line — never off the drawn figure. Pairs sharing a point knee there.
+         */
+        const u: Direction = { k: 'points', a: k.a, b: k.b };
+        const w: Direction = { k: 'points', a: k.c, b: k.d };
+        const knee = kneeOf(u, w);
+        if (knee) {
+          right(knee);
+          return;
+        }
+        const foot = footOn(k.b, k.c, k.d) ? { v: k.b, a: k.a, on: [k.c, k.d] }
+          : footOn(k.a, k.c, k.d) ? { v: k.a, a: k.b, on: [k.c, k.d] }
+            : footOn(k.d, k.a, k.b) ? { v: k.d, a: k.c, on: [k.a, k.b] }
+              : footOn(k.c, k.a, k.b) ? { v: k.c, a: k.d, on: [k.a, k.b] }
+                : null;
+        if (foot) right({ v: foot.v, a: foot.a, b: foot.on[0], alt: foot.on[1] });
+        return;
+      }
       case 'relation': {
         if (k.rel !== 'perpendicular' || k.assumed) return;
         const knee = kneeOf(k.u, k.v);
@@ -221,12 +249,19 @@ export function statedMeasures(
         return;
     }
   };
-  const right = (r: { v: Id; a: Id; b: Id }): void => {
-    const key = angKey(r.v, r.a, r.b);
-    if (seenRight.has(key)) return;
-    seenRight.add(key);
+  /**
+   * One knee per right angle. A foot's knee stands for the right angle between its ray and EITHER end of the line it
+   * sits on, so «AD גובה לצלע BC» and «זווית ADB ישרה» (in either order) are one knee, not two.
+   */
+  const right = (r: { v: Id; a: Id; b: Id; alt?: Id }): void => {
+    const keys = [angKey(r.v, r.a, r.b), ...(r.alt ? [angKey(r.v, r.a, r.alt)] : [])];
+    if (keys.some((key) => seenRight.has(key))) return;
+    keys.forEach((key) => seenRight.add(key));
     out.rights.push(r);
   };
+  /** Is `p` put on the line `ab` by an incidence of the construction? — how an altitude's foot is said to be on its side. */
+  const footOn = (p: Id, a: Id, b: Id): boolean =>
+    p !== a && p !== b && c.constraints.some((q) => q.t === 'on-line-2pt' && q.id === p && ((q.a === a && q.b === b) || (q.a === b && q.b === a)));
 
   c.constraints.forEach((k, at) => {
     const from = origin(at);
@@ -238,6 +273,20 @@ export function statedMeasures(
     }
     if (from === 'statement') read(k);
   });
+
+  /**
+   * THE STATED FOOT (#1241, ADR-AG-237) — «הגובה מ-A לצלע BC», «D רגל האנך מ-A ל-BC» build the foot as a derived point
+   * (`foot` rule), with no constraint for the layer to read. Every producer of that rule is a sentence about a
+   * perpendicular (the cevian's unnamed foot, «רגל האנך», «האנך מ-…»), so the rule IS the statement. Its knee needs two
+   * named points to run along, which a foot on a line through two points has; a foot on an axis or a line object
+   * has no named point on its line, and draws none (a known limit, ADR-AG-237).
+   */
+  for (const o of c.objects) {
+    if (o.kind !== 'derived' || o.rule.t !== 'foot') continue;
+    const onto: FootLine = o.rule.onto;
+    if (onto.k !== 'points') continue;
+    right({ v: o.id, a: o.rule.from, b: onto.a, alt: onto.b });
+  }
 
   out.lengths = [...lenAt.values()];
   out.angles = [...angAt.values()];

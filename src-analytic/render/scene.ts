@@ -916,7 +916,12 @@ function statedScene(
   };
 
   for (const r of stated.rights) {
-    const c = corner(r.v, r.a, r.b);
+    // A foot's knee runs along its line toward the FARTHER of its two named points (#1241) — a foot on an endpoint
+    // (a right angle at C) still has the other end to draw toward.
+    const V = at(r.v);
+    const far = (id: string) => { const p = at(id); return V && p ? Math.hypot(p.x - V.x, p.y - V.y) : -1; };
+    const b = r.alt !== undefined && far(r.alt) > far(r.b) ? r.alt : r.b;
+    const c = corner(r.v, r.a, b);
     if (c) out.marks.push({ kind: 'right', d: pathOf(rightAngleKnee(c.V, c.A, c.B, STATED_KNEE_PX * c.k)) });
   }
   for (const g of stated.angles) {
