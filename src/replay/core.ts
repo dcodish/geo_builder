@@ -297,7 +297,11 @@ export function replay(facts: Fact[], seed = 0): Derived {
   if (entry && !fresh) entry = undefined;
   const hit = fresh ? entry!.bySeed.get(key) : undefined;
   // #1605 (ADR-582): a hit is charged the work it saved; one an armed work budget cannot afford is recomputed
-  if (hit && chargeHit(cellOf.get(hit))) return hit;
+  if (hit && chargeHit(cellOf.get(hit))) {
+    const cutKey = cutKeyOf.get(hit);
+    if (cutKey !== undefined) noteReattemptCut(cutKey); // #1770: a served cut fold is read as one, warm or cold
+    return hit;
+  }
   const aborts0 = solveBudget.aborts;
   const { value: out, cell } = computeWithCell(() => computeReplay(facts, seed));
   replayStats.computes++;
@@ -377,6 +381,36 @@ interface FoldNode {
   /** #1671 (ADR-584): the fold's recorded work (its ledger's total), carried across the ADR-290 worker
    *  transplant so a primed fold is charged what computing it cost (#1605's rule). Set by {@link getFoldFor}. */
   work?: number;
+  /** #1770 ([ADR-586](docs/06-decisions.md#adr-586)): a RE-attempt inside this fold (or a fold nested in it, or a
+   *  clean prefix it resumed from) was cut by the ADR-583 re-attempt cap. The fold is still THE fold for its
+   *  content (the cap is deterministic), but a fact it reports failed may not have been examined to the end —
+   *  so a check that reads this fold as evidence ("this configuration fails") is not complete. Plain data, so
+   *  it travels with the ADR-290 worker transplant. Absent ⇒ no cut. */
+  reattemptCut?: true;
+}
+
+/**
+ * #1770 ([ADR-586](docs/06-decisions.md#adr-586)) — WHO READ A CUT FOLD. A check that concludes from folds it
+ * reads — the configuration pool ("no other configuration exists"), the gate's seat sweep ("no unstated seat
+ * cures this") — must know when one of those folds carries a re-attempt the cap cut: ADR-583 restores
+ * `solveBudget.aborts` on such a cut (it is part of what the fold IS), so the abort test those checks use
+ * cannot see it. {@link observeReattemptCuts} collects the fold KEYS (`foldKey`) of every cut fold read while
+ * `fn` runs — computed, or served from the fold memo or the replay memo, so the answer is the same cold and warm.
+ */
+const cutObservers: Set<string>[] = [];
+/** The fold key of the cut fold a memoized replay came from (a replay-memo hit never reaches the fold memo). */
+const cutKeyOf = new WeakMap<Derived, string>();
+function noteReattemptCut(key: string): void {
+  for (const s of cutObservers) s.add(key);
+}
+export function observeReattemptCuts<T>(fn: () => T): { value: T; cutKeys: Set<string> } {
+  const cutKeys = new Set<string>();
+  cutObservers.push(cutKeys);
+  try {
+    return { value: fn(), cutKeys };
+  } finally {
+    cutObservers.splice(cutObservers.lastIndexOf(cutKeys), 1);
+  }
 }
 
 /**
@@ -516,7 +550,12 @@ function computeReplay(facts: Fact[], seed = 0): Derived {
       foldCache.set(key, fold);
     }
   }
-  return tailChoice(fold, facts, seed);
+  const out = tailChoice(fold, facts, seed);
+  if (fold.reattemptCut) {
+    noteReattemptCut(key); // #1770 (ADR-586)
+    cutKeyOf.set(out, key);
+  }
+  return out;
 }
 
 /** Per-seed candidate choice: try the HOIST rescue chain first; a rescue whose tail evaluates clean at
@@ -569,7 +608,11 @@ function foldForSearch(facts: Fact[]): FoldNode {
   // re-attempts under the re-attempt cap — so the facts that had failed are part of what the node IS.
   const key = `${foldKey(facts)}\n#failed:${attemptScope ? [...attemptScope.first.keys()].sort().join('\u0001') : ''}`;
   const hit = searchFoldCache.get(key);
-  if (hit && chargeHit(cellOf.get(hit))) return hit; // #1605 (ADR-582): charged like the main memo
+  if (hit && chargeHit(cellOf.get(hit))) {
+    // #1605 (ADR-582): charged like the main memo; #1770 (ADR-586): a cut trial fold marks the outer fold cut
+    if (hit.reattemptCut && attemptScope) attemptScope.cut = true;
+    return hit;
+  }
   const aborts0 = solveBudget.aborts;
   const { value: node, cell } = computeWithCell(() => computeFold(facts, 0, false));
   conflictSearchStats.folds++;
@@ -602,6 +645,8 @@ export const OVER_CONSTRAINED_VS = /^over-constrained: (.+) cannot hold(?: \[vs 
 interface AttemptScope {
   failures: Map<string, { error: string; degenerate: boolean; cell: WorkCell }>;
   first: Map<string, { error: string; degenerate: boolean }>;
+  /** #1770 (ADR-586): a re-attempt in the fold being computed was cut by the cap (→ `FoldNode.reattemptCut`). */
+  cut: boolean;
 }
 let attemptScope: AttemptScope | null = null;
 /**
@@ -686,10 +731,25 @@ export function solveSignature(cur: Construction, cmds: Command[]): string {
 }
 
 function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode {
-  if (attemptScope) return computeFoldInScope(facts, hoistDepth, attribute);
-  attemptScope = { failures: new Map(), first: new Map() };
+  if (attemptScope) {
+    // #1770 (ADR-586): a nested fold (a HOIST re-fold, a drop-one trial fold) is flagged by ITS OWN cuts — it
+    // may be memoized and served to a later outer fold — and its cuts are the outer fold's too.
+    const scope = attemptScope;
+    const outerCut = scope.cut;
+    scope.cut = false;
+    try {
+      const node = computeFoldInScope(facts, hoistDepth, attribute);
+      if (scope.cut) node.reattemptCut = true;
+      return node;
+    } finally {
+      scope.cut = outerCut || scope.cut;
+    }
+  }
+  attemptScope = { failures: new Map(), first: new Map(), cut: false };
   try {
-    return computeFoldInScope(facts, hoistDepth, attribute);
+    const node = computeFoldInScope(facts, hoistDepth, attribute);
+    if (attemptScope.cut) node.reattemptCut = true;
+    return node;
   } finally {
     attemptScope = null;
   }
@@ -722,6 +782,7 @@ function attemptFact(cur: Construction, cmds: Command[]): ReturnType<typeof tryA
     reattemptStats.capped++;
     const out = withExecutedCap(reattemptConfig.cap, () => tryApplyFact(cur, cmds));
     exhausted = out.exhausted;
+    if (exhausted) scope.cut = true; // #1770 (ADR-586): the fold now holds a verdict the cap cut short
     return out.value;
   });
   let r = value;
@@ -1026,6 +1087,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     // fold instead) when an armed work budget cannot afford it, exactly as a cold fold would have run.
     if (resumeFrom && !chargeHit(cellOf.get(resumeFrom.node))) resumeFrom = null;
     if (resumeFrom) foldStats.resumes++;
+    if (resumeFrom?.node.reattemptCut && attemptScope) attemptScope.cut = true; // #1770: the prefix's cut is ours
   }
   // Build the construction by folding the enabled facts. `forced` maps a fact id to a status string that
   // BLOCKS it (an atomic-group casualty — see the poisoning pass below): the fact is neither applied nor
@@ -2931,15 +2993,26 @@ export function seatSweep(facts: Fact[], limit: { deadline: number } | { workCap
   const e0 = work.executed;
   const d0 = work.done;
   try {
-    if ('deadline' in limit) return withWorkEpoch(() => sweepRotations(rotations, () => Date.now() > limit.deadline));
-    // #1671 (ADR-584): the submit gate's sweep is bounded by WORK, in charged units (every memo hit charged
-    // the work it saved, ADR-582) — the same verdict on every device and cold or warm. A ladder the cap cut
-    // mid-fold ends the sweep as incomplete: a cut fold is not THE fold, so it can neither cure nor refute.
-    return withWorkBudget(limit.workCap, () => {
-      const at = work.done + limit.workCap;
-      const aborts0 = solveBudget.aborts;
-      return sweepRotations(rotations, () => work.done > at || solveBudget.aborts !== aborts0);
+    const { value: r, cutKeys } = observeReattemptCuts(() => {
+      if ('deadline' in limit) return withWorkEpoch(() => sweepRotations(rotations, () => Date.now() > limit.deadline));
+      // #1671 (ADR-584): the submit gate's sweep is bounded by WORK, in charged units (every memo hit charged
+      // the work it saved, ADR-582) — the same verdict on every device and cold or warm. A ladder the cap cut
+      // mid-fold ends the sweep as incomplete: a cut fold is not THE fold, so it can neither cure nor refute.
+      return withWorkBudget(limit.workCap, () => {
+        const at = work.done + limit.workCap;
+        const aborts0 = solveBudget.aborts;
+        return sweepRotations(rotations, () => work.done > at || solveBudget.aborts !== aborts0);
+      });
     });
+    // #1770 (ADR-586): a sweep that read a rotation whose fold had a re-attempt cut by the ADR-583 cap has not
+    // shown that rotation fails — it found no cure, but it did not FINISH (the abort test above cannot see the
+    // cut: the cap restores `aborts`). A cure it found is still a cure.
+    if (!r.cured && r.complete && cutKeys.size > 0) {
+      seatSweepStats.complete--;
+      seatSweepStats.cut++;
+      return { cured: null, complete: false };
+    }
+    return r;
   } finally {
     seatSweepStats.executed += work.executed - e0;
     seatSweepStats.charged += work.done - d0;
@@ -3690,18 +3763,27 @@ function samplePool(facts: Fact[], opts: { deadlineMs?: number }): SharedSamples
   // run — and a job touching anything else pays its full recorded work, warm or cold (#1605, ADR-582). Before
   // that, a job's memo hit was free, so the pool came back cut cold and complete warm.
   const memoBefore = sampleMemo;
-  const { jobs, finish } = samplingJobs(facts, { wide: !narrow });
+  // #1770 (ADR-586): every fold the pool reads — its setup and its jobs — is observed for re-attempt cuts.
+  const observed = observeReattemptCuts(() => samplingJobs(facts, { wide: !narrow }));
+  const { jobs, finish } = observed.value;
   const aborts0 = solveBudget.aborts;
   const runJobs = (stop: () => boolean) => {
     let ran = 0;
-    for (let i = 0; i < jobs.length; i++) {
-      if (i > 0 && stop()) break; // the first job always runs — never an empty pool for a buildable figure
-      jobs[i]();
-      ran++;
-    }
+    const { cutKeys } = observeReattemptCuts(() => {
+      for (let i = 0; i < jobs.length; i++) {
+        if (i > 0 && stop()) break; // the first job always runs — never an empty pool for a buildable figure
+        jobs[i]();
+        ran++;
+      }
+    });
     // #434: a determined figure's admissible set must be COMPLETE to count (the sweep's `finish` fails closed);
-    // a job whose solve was aborted mid-ladder did not finish either.
-    return finish(ran === jobs.length && solveBudget.aborts === aborts0);
+    // a job whose solve was aborted mid-ladder did not finish either — and (#1770, ADR-586) neither did one that
+    // read a configuration's fold in which the ADR-583 cap cut a re-attempt: that configuration's failure was
+    // not examined to the end, so its absence from the pool proves nothing. The student's OWN figure is exempt:
+    // its cut re-attempt is already on screen as that row's status (ADR-583), and every pool reads it.
+    const base = foldKey(facts);
+    const cut = [...observed.cutKeys, ...cutKeys].some((k) => k !== base);
+    return finish(ran === jobs.length && solveBudget.aborts === aborts0 && !cut);
   };
   if (opts.deadlineMs !== undefined) {
     const deadline = Date.now() + opts.deadlineMs;

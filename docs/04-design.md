@@ -218,6 +218,11 @@ src/
                    failure verbatim when cut; the first attempt is never capped (ADR-281). A role
                    re-reading's dry run (`decideDeterministic`) is capped likewise in charged units,
                    inside one work epoch with the line's own dry run (`ROLE_READING_WORK_CAP`).
+                   A fold in which the cap CUT a re-attempt carries `reattemptCut` (ADR-586, #1770);
+                   `observeReattemptCuts` reports the cut folds a check read (computed or served from
+                   the fold/replay memo), and a check that concludes from failures — the configuration
+                   pool's `complete`, the gate seat sweep's `complete` — reads a cut as NOT finished
+                   (the student's own figure's fold is exempt in the pool: its cut is its row status).
                  — the fold's RETRY PASS and CLAIM RULE (ADR-577, #1411): one lowering
                    (`engineCmdsOf`) and one all-or-nothing apply (`tryApplyFact`) serve the in-order
                    pass and the ADR-104 retry alike. The retry takes every red, enabled, non-forced,

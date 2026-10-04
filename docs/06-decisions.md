@@ -14431,6 +14431,8 @@ Every verdict and note identical (refused / committed, the same `[vs #N]` tail).
 
 **Behaviour change for a student:** none in what is drawn, accepted or refused, or in any message — an impossible line is refused sooner («המיתר AB מקביל ל-CD» ~6 s → ~1 s; «חצי מעגל ABC» minutes → tens of seconds).
 
+**Amended by [ADR-586](#adr-586) (#1770):** a cut re-attempt restores `aborts`, so a check that read a cut fold could not see the cut. The fold now carries `reattemptCut`, and the configuration pool and the gate seat sweep read a cut fold as an unfinished check.
+
 ## ADR-584 — The submit gate's seat sweep is bounded by work, not the clock: an impossible line beside an unstated right angle is refused (#1671)
 
 **Status:** accepted · 2026-10-04 · bug (P3, 2-D) · operator rulings 2026-10-04 on #1671 (option b — warm the rotated folds; then option A — a fixed amount of work, never the clock) · fix-round #1767 · branch `fix/1671-seat-rescue-work-cap` (stacked on ADR-583)
@@ -14505,3 +14507,41 @@ The 24-seed sweep rises because the samples now jitter around the drawn kite (B,
 **Behaviour change for a student:** each line after «BE⊥DC» answers faster (the whole 8-line sequence through the parse path: 948,579 → 257,307 evaluateCore calls). Verdicts are unchanged. The drawings after «BE⊥DC» can differ: at configuration 0 the area-ratio line now keeps B where it was (a 60° kite) instead of springing it back, and the configurations offered by the auto-advance and "show another configuration" are sampled around the drawn kite (line 7 auto-advances to configuration 2 instead of 1 — that auto-advance itself is pre-existing, both before and after).
 
 **Found, not fixed (pre-existing, same before and after):** an impossible ratio on this figure («שטח משולש NCE = שטח משולש ACD») refuses after ~16–20 s (2.9M evaluateCore calls; 4.0M before) and the refusal note blames «BE ⟂ DC» rather than the area statement.
+
+## ADR-586 — A check that read a re-attempt the cap cut did not finish: the pool and the seat sweep say so (#1770)
+
+**Status:** accepted · 2026-10-04 · bug (P2, 2-D, honesty class, latent) · branch `fix/1770-capped-reattempt-complete` · amends [ADR-583](#adr-583)
+
+**Requirements:** none (internal). The existing promise holds in more cases: «✓ הציור נקבע במלואו» is said only when the configuration check finished (ADR-558) · **Design:** [04-design.md](04-design.md) § module map, `replay/`: the attempt scope's `reattemptCut`; [LADDER.md](LADDER.md) stage 5: the attempt scope · **LADDER stage:** stage 5 (the attempt scope) and the two checks that read folds: the shared sample pool and the submit gate's seat sweep. No solver change.
+
+**Cites** [ADR-583](#adr-583) (the re-attempt cap), [ADR-558](#adr-558) (an incomplete pool says so), [ADR-582](#adr-582) (cold = warm), [ADR-584](#adr-584) (the seat sweep's `complete`), [ADR-509](#adr-509) (the admissible set must be complete), [ADR-290](#adr-290) (the worker transplant).
+
+**Context.** Found while verifying round #1767. ADR-583's `withExecutedCap` restores `solveBudget.aborts` when a RE-attempt is cut by the 750k executed-unit cap. That is right for memoization: the cap is part of what the fold IS. But the two checks that conclude from the failures they read decided "finished" from the abort count alone:
+- `samplePool` → `finish(ran === jobs.length && aborts unchanged)`;
+- `seatSweep` (the gate's work-capped sweep): stop on `aborts` moved.
+
+So when a configuration's fold failed because a re-attempt was cut, the check read an ordinary failure. That configuration was not examined to the end, yet it was dropped from the pool, and the pool could come back `complete:true` with one shape. The status then claimed «נקבע במלואו»; the sweep could claim "no seat cures it" and let the gate refuse on it. This was not observed on any shipped figure. On round #1767's T12 figure, `reattemptStats` capped = 0 and exhausted = 0.
+
+**Class.** *A deterministic cut that is deliberately not counted as an abort is invisible to every check that uses the abort count to mean "I finished".* Any reader of folds that turns "this fold failed" into evidence has this problem: today that is the pool (configurations) and the seat sweep (cures).
+
+**Decision.**
+1. **The cut is part of the fold's record** (`replay/core.ts`). The attempt scope gains `cut`. `attemptFact` sets it when `withExecutedCap` reports `exhausted`. `computeFold` writes `FoldNode.reattemptCut = true` on the outermost node. It also writes it on every nested node (a HOIST re-fold or a drop-one trial fold, flagged by its own cuts, which also propagate to the outer fold). A served drop-one trial fold or a resumed clean prefix that carries the flag marks the scope too. The flag is plain data, so it survives the ADR-290 worker transplant.
+2. **Who read a cut fold.** `observeReattemptCuts(fn)` collects the fold keys of every cut fold read while `fn` runs. This includes folds computed in `computeReplay`, folds served from the fold memo, and replays served from the replay memo (`cutKeyOf`). The answer is therefore the same cold and warm.
+3. **The pool.** `samplePool` observes its setup and its jobs. `finish(…)` is complete only if no fold other than the student's own figure's (`foldKey(facts)`) was cut. The own fold is exempt: ADR-583 already shows its cut as that row's status, and every pool reads it. A cut means `complete:false` and so `determined:false`, which is the same meaning as a work-cap cut. Every consumer reads that one memoized verdict: `figureDeterminacy` → the status («…מורכב מדי כדי לבדוק אם יש לו תצורה נוספת»), `computeValues` (`values.incomplete`), and the detect sweep's gates (which fall back to their pool-size floor). The narrow «כבר קיים» gate pool goes through the same `runJobs`.
+4. **The seat sweep** (the analogous pattern found by the audit the issue asked for): if a sweep found no cure but read a rotation whose fold was cut, it is reported `complete:false`. `seatsExhausted` is then not set, and the line keeps the ADR-104 route instead of a refusal that rests on unexamined work. A cure it found is still a cure.
+
+**Measured.** With the real cap (750,000), the four decide-parity shards are byte-identical to their goldens, and `issue-1671-seat-sweep` (its refusal and its cure) is unchanged. No corpus figure's pool or gate verdict moved. On T12: capped 0, exhausted 0, `complete:true`, «נקבע במלואו». The seat-sweep half is reachable with the real cap: «ABC משולש ישר זוית · AB=5 · BC=3 · AC=4 · זווית BAC = 80» reads a cut rotation (2 cuts). That sweep is already incomplete there through the 4M work cap, so its verdict does not move.
+
+**Locks.** `src/__tests__/issue-1770-capped-reattempt-pool.test.ts` (5):
+- The cut is forced through ADR-583's own seam (`reattemptConfig.cap = 1000`) on «ABC משולש ישר זוית · AB=5 · BC=3 · AC=4». Its A and B seats fail, and those rewrites' folds re-attempt the failed side. The test asserts `complete:false`, `figureDeterminacy().complete === false`, status `actions.dofTooComplex` (not `actions.determined`) and `computeValues().complete === false`. It checks this cold, warm through the replay memo, and warm through the fold memo. **Fails before** (complete:true, «נקבע במלואו»).
+- The same figure at the real cap reads «נקבע במלואו».
+- T12 stays `complete:true` / «נקבע במלואו» with capped = exhausted = 0.
+- The seat sweep on «… AB=2 · BC=3 · AC=6» with the forced cap reads `complete:false`, cold and warm. **Fails before** (complete:true). At the real cap it reads `complete:true`.
+
+**Sibling audit.** `src3d/`, `src-analytic/`, `src-complex/` have no ADR-583 re-attempt cap, so there is nothing to observe.
+
+**Consequences.**
+- `src/replay/core.ts`: `FoldNode.reattemptCut`, `AttemptScope.cut`, `observeReattemptCuts`, `cutKeyOf`; `samplePool` and `seatSweep` read them.
+- `docs/04-design.md`, `docs/LADDER.md`: one sentence each.
+
+**Behaviour change for a student:** none on any figure measured. If a configuration check ever does skip work this way, the status line says «מורכב מדי כדי לבדוק…» instead of claiming «נקבע במלואו», and the values panel says it is incomplete. A line beside an unstated right angle that a cut sweep could not clear is added as before (red), not refused.
