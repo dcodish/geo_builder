@@ -42,6 +42,8 @@ export const PROMPT_EXAMPLES_3D: PromptExample3[] = [
   { freeform: 'סמן את הצלעות של הקובייה כוקטורים u v w', steps: ['קובייה ABCD', "נסמן: AB = u, AD = v, AA' = w"] },
   { freeform: 'שני מישורים שהזווית ביניהם 45 מעלות', steps: ['המישור π1: z - 3 = 0', 'המישור π2: ay + z - 8 = 0', 'הזווית בין המישורים π1 ו-π2 היא 45'] },
   { freeform: 'a cone with apex S over center O, radius 5 and height 12', steps: ['cone with apex S base center O radius 5 height 12'] },
+  // #1547 (ADR-3D-299): ONE coordinate is its own given — never invent the other two as letters («B(3, y, z)»)
+  { freeform: 'שיעור ה x של הנקודה B שווה ל-3', steps: ['x_B = 3'] },
 ];
 
 /**

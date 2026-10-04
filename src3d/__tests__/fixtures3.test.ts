@@ -268,6 +268,10 @@ const SEEDED: SeededCorpus = {
   // CD named as diagonals) is a refusal and lives in issue-1728-diagonals-meet.test.ts; this is its building
   // twin, with «E על BD» — refuted while E sat at AC's midpoint — so the net holds the meet and the drift.
   'diagonals-named-meet-1728.geo3.json': ['מרובע ABCD', 'האלכסונים AC ו-BD נפגשים בנקודה E', 'E על BD'],
+  // #1547 (ADR-3D-299) — the operator's two lines, ONE coordinate of a point: his subscript on a cube, and
+  // his Hebrew spelling (spacing kept) on a free point beside a typed origin.
+  'component-given-1547.geo3.json': ["קובייה ABCDA'B'C'D'", 'x_{B}=3'],
+  'component-given-he-1547.geo3.json': ['A(0,0,0)', 'שיעור ה- x של נקודה B הוא 3'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

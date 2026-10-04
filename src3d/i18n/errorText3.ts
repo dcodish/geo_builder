@@ -60,6 +60,9 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #1666: the tool draws the givens; a claim to prove is named and left out.
     case 'proof-target':
       return t('err.proofTarget', { sentence: err.sentence });
+    // #1547: a single coordinate with a symbolic value — named by the student's own component.
+    case 'component-symbolic':
+      return t('err.componentSymbolic', { component: err.component });
     // #926: the change went through; this names the rows it left without effect (they stay, marked).
     case 'dependents-broken':
       return t('err.dependentsBroken', { cause: err.cause, items: err.items });

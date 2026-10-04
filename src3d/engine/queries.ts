@@ -19,7 +19,7 @@ import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { angleBetweenOperands, distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
 import { revolutionMeasure } from './claims';
-import { angleAskOperands, revolutionAskOf } from '../parser/parse3';
+import { angleAskOperands, componentAskOf, revolutionAskOf } from '../parser/parse3';
 import { readOperand } from '../parser/operandToken';
 import { figureSymbolsOf } from './types';
 import type { Construction3, Id, Operand3, Positions3, Requirement3 } from './types';
@@ -50,6 +50,9 @@ type Query =
   // answer «m» (a lowercase figure symbol, ADR-3D-119) but not «A», on figures where A is the more
   // natural question.
   | { kind: 'point'; id: Id }
+  // #1547 (ADR-3D-299): ONE coordinate of a point — «x_B», «שיעור ה-x של B», «x_{B} = ?» — read by the
+  // statement's own component frame (`componentAskOf`), answered from the panel's per-axis decision.
+  | { kind: 'component'; id: Id; axis: 'x' | 'y' | 'z' }
   // #317: «מישור ABC» / «plane ABC» / a named plane — its canonical equation, when it is forced.
   // The exam's «מצאו את משוואת המישור» asked as a QUESTION instead of entered as a figure-changing fact.
   | { kind: 'plane'; name: string | null; ids: Id[] | null };
@@ -251,6 +254,13 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
     if (c.planes.has(nm) || c.pointPlanes.has(nm) || c.relPlanes.has(nm)) return { kind: 'plane', name: nm, ids: null };
   }
 
+  // #1547 — ONE COORDINATE: the statement grammar's frame with its value dropped. The point must BE a
+  // point of this construction, exactly as the whole-point head below demands.
+  {
+    const comp = componentAskOf(s);
+    if (comp && c.points.has(comp.id)) return { kind: 'component', id: comp.id, axis: comp.axis };
+  }
+
   // #496 — POINT: a bare label «A», or «שיעורי A» / «coordinates of A» / «A = ?». The label must BE a
   // point of THIS construction, so a stray letter in the query box is never treated as one. No tie with
   // the vector lane is possible: `atomOf` reads a named vector only from a LOWERCASE letter, and a pair
@@ -339,6 +349,7 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCt
     // answers both before the numeric path. Listed explicitly so the switch stays exhaustive and a
     // future kind cannot slip through as a silent `undefined`.
     case 'point':
+    case 'component':
     case 'plane':
       return null;
     case 'distance': {
@@ -594,6 +605,14 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
   if (q.kind === 'point') {
     const entry = dataView(c, seed).pointCoords[q.id];
     return entry ? { text, answer: `${q.id}${entry.text}` } : { text, answer: null, note: 'undetermined' };
+  }
+
+  // #1547 — ONE coordinate, from the SAME per-axis decision the panel and the whole-point answer use: a
+  // known value prints as the exam writes it (`x_B = 1`); a sign-only component prints its sign (`+?`);
+  // an open one is honestly undetermined — never one configuration's sample (ADR-052).
+  if (q.kind === 'component') {
+    const comp = dataView(c, seed).pointComps[q.id]?.[['x', 'y', 'z'].indexOf(q.axis)];
+    return comp !== undefined && comp !== '?' ? { text, answer: `${q.axis}_${q.id} = ${comp}` } : { text, answer: null, note: 'undetermined' };
   }
 
   // #317 — a PLANE's canonical equation, through the derivation the panel's planes block shares

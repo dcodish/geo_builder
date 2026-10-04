@@ -369,4 +369,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // #1302 / #1631: the SWAP — two taken letters change places (the popover offers it on a taken letter).
   // Read by the same second reader (`parseRewrite3`); «בין» is what makes it a swap, not a rename.
   { category: 'editing', lane: 'rewrite', he: 'החלף בין A ל-B', en: 'swap A and B' },
+  // #1547 (ADR-3D-299): ONE coordinate of a point given a value — «B(3, ·, ·)» with y and z unstated (free).
+  // Appended LAST so every earlier entry keeps its index (the #1394 parity golden is keyed by it).
+  { category: 'points', he: 'שיעור ה-x של B הוא 3', en: 'the x-coordinate of B is 3' },
+  { category: 'points', he: 'x_B = 3', en: 'x_B = 3' },
 ];

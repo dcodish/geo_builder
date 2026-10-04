@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-04T06:05:43.758Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "A(0,0,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "שיעור ה- x של נקודה B הוא 3",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "B",
+          "x": 3,
+          "y": null,
+          "z": null
+        }
+      ]
+    }
+  ]
+}
