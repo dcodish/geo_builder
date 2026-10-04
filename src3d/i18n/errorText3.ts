@@ -137,6 +137,8 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       return t('err.lineMissesPlane', { id: err.id });
     case 'crossing-off-segment':
       return t('err.crossingOffSegment', { id: err.id });
+    case 'segments-do-not-meet':
+      return t('err.segmentsDoNotMeet', { id: err.id, s1: err.s1, s2: err.s2 });
     case 'symbolic-new-point':
       return t('err.symbolicNewPoint', { id: err.id });
     case 'power-needs-solid':

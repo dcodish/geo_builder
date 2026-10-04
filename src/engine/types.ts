@@ -1208,7 +1208,10 @@ export type Command =
 // `const` is an additive constant (the affine term): `k + 2` ⇒ {coef:1, var:'k', const:2}; `k − 5/2` ⇒ const:-2.5.
 // `text` is an optional faithful display of the original expression (e.g. "12√2", "7k/5") shown on the
 // figure while unresolved, so the label matches what the student typed rather than a decimal/derived form.
-export type MeasureExpr = { value: number; text?: string } | { coef: number; var: string; pow?: number; const?: number; text?: string };
+// `roots` (a literal angle only, #1711 / ADR-573): the stated given fits SEVERAL angles — a sine's θ and
+// 180° − θ — and `value` is the one the figure draws now, `roots[variant]` of the owning `measure-angle`.
+// The choice is unstated (ADR-052), so it is a cyclable variant (`engine/variants.ts`), never a guess.
+export type MeasureExpr = { value: number; text?: string; roots?: number[] } | { coef: number; var: string; pow?: number; const?: number; text?: string };
 
 /**
  * The reserved variable name for a circle's radius (ADR-034). `R`/`r` are never point
@@ -1228,7 +1231,7 @@ export const RADIUS_VAR = 'R';
  */
 export type SymbolicCommand =
   | { type: 'measure-length'; a: Id; b: Id; expr: MeasureExpr }
-  | { type: 'measure-angle'; vertex: Id; ray1: Id; ray2: Id; expr: MeasureExpr }
+  | { type: 'measure-angle'; vertex: Id; ray1: Id; ray2: Id; expr: MeasureExpr; variant?: number } // variant: which of `expr.roots` is drawn (#1711)
   // A VALUELESS stated-angle MARK ([issue #106], FR-RN-7): draw an angle arc at `vertex` between the rays to
   // `ray1`/`ray2` WITHOUT asserting any value — a highlightable marker (e.g. a valueless central angle). It
   // adds no geometry (the arms are drawn as their own `segment`s) and lowers to nothing for the engine.

@@ -65,10 +65,10 @@ describe('#303 — two named diagonals land the crossing at the face centre', ()
     check('אלכסוני ABCD נחתכים בנקודה O');
   });
 
-  it('the pair form lowers to the crossing of the FIRST stated diagonal', () => {
+  it('the pair form lowers to BOTH stated diagonals and their crossing (#1728 — it was the midpoint of the first)', () => {
     expect(parse3('האלכסונים AC ו BD נחתכים בנקודה O')).toEqual({
       ok: true,
-      commands: [{ type: 'point-on-segment3', id: 'O', a: 'A', b: 'C', t: 0.5 }],
+      commands: [{ type: 'segment3', a: 'A', b: 'C', diagonal: 'any' }, { type: 'segment3', a: 'B', b: 'D', diagonal: 'any' }, { type: 'seg-crossing3', id: 'O', a1: 'A', b1: 'C', a2: 'B', b2: 'D' }],
     });
   });
 

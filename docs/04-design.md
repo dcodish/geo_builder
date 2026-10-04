@@ -930,15 +930,43 @@ different given. A line in which tan / tg / cot / ctg / sin / cos (or «טנגנ
 «סינוס», with a clitic prefix) is applied to an angle — an angle noun in the line, or a label right after the
 function — belongs to it whole. The one canonical shape (`trigLine`: [lead-in] FN [of|של] [(] [angle noun]
 LABELS [)] copula VALUE, the value read by the shared `NUMEXPR` atom, optionally signed) lowers to the arms'
-`segment`s plus a `measure-angle` whose `expr` is `{ value: <the angle in degrees>, text: '<fn>=<value as
-typed>' }` — the existing literal-measure path (`lowerOne` → `set-angle`; `measureLabelForms` prints `text`),
-so the figure shows the given and every downstream consumer sees an ordinary angle. tan / cot map through the
+`segment`s plus a `measure-angle` whose `expr` is `{ value: <the angle in degrees> }` with NO `text` — the
+existing literal-measure path (`lowerOne` → `set-angle`), so every downstream consumer sees an ordinary angle
+and the label is `measureLabelForms`' number branch, `fmtNum(value) + '°'` through the shared rounder
+(«63.43°»; [ADR-572](06-decisions.md#adr-572), #1718 — ADR-566 carried `text: 'tan=2'`). The fact row shows
+the utterance, so the sentence as typed is never lost. tan / cot map through the
 principal angle and add 180° when negative; cos through `acos`. The transformed ratio is declared in
-`consumed.numbers` (ADR-462), so the numbers gates account «√3», «-2», «3/4». Anything else returns
-`{ ok: false, reason: 'trig-given', why, fn, sentence }` — `sine-two-angles` (checked first, in every form),
-`out-of-range`, or `form` — answered by `decideFromParse` with `input.trigGiven.<why>`; it never reaches the
+`consumed.numbers` (ADR-462), so the numbers gates account «√3», «-2», «3/4»; the span accountant credits a
+stated fraction sign-blind («-1/2» against −0.5), as its single-number pass always did (ADR-572). Anything else returns
+`{ ok: false, reason: 'trig-given', why, fn, sentence }` — `sine-out-of-range` (a sine outside (0, 1]),
+`out-of-range` (a cosine outside [−1, 1]), or `form` — answered by `decideFromParse` with `input.trigGiven.<why>`; it never reaches the
 angle rules and never escalates. `NOTATION_WORDS` (units + the Latin function names) is the one list of
 Latin words the label-counting gates (`statedLabelTokens`, the span accountant) never read as point labels.
+
+## A sine is a two-root angle choice; the configuration searches walk every variant ([ADR-573](06-decisions.md#adr-573))
+
+A sine in (0, 1) lowers through `trigGiven` to the same `measure-angle`, with `expr: { value: θ, roots: [θ,
+180° − θ] }` and `variant: 0`. A multi-root literal angle is a **variant command** (`engine/variants.ts`):
+`variantCountOf` is the root count, and `withVariant` sets `variant` AND rewrites `expr.value` to
+`roots[variant]`, so every reader of the value (the lowering to `set-angle`, the label's `fmtNum`, the
+verifier) sees the drawn angle and none of them knows a choice exists. `variantConfigs` samples across the roots
+as it does a shape-variant's pairs, so a relation true at one root is never reported forced.
+
+The variant dimension of the two configuration searches is ONE list, `variantAxes` (`replay/core.ts`): every
+enabled cyclable variant fact, in fact order, at most four.
+- **`variantRescue(facts, deadline)`** tries the other assignments of the axes — fewest changed facts first, so
+  the figure moves as little as possible — and returns the first rewritten fact list meeting every requirement
+  at seeds 0–5 (at most 32 assignments). It is the `seatRescue` shape and has the same two callers:
+  `findValidConfig`'s **variant tier** (after the seat tier, before the reflection masks — a wrong variant
+  fails at every seed) and `dryRunOutcome`'s curable test (a step whose error a variant cures commits; the new
+  fact's own choice settles in `settleVariantDefaults` at commit, an earlier fact's in the post-commit
+  `autoResolve`).
+- **`searchAnotherView`** walks the PRODUCT of the axes as an odometer (the first axis turns fastest): the
+  variant step `v` advances the mixed-radix assignment by `v`, so successive presses reach every combination.
+  It used to step only the first variant fact.
+
+The App's «הציגו תצורה אחרת» enablement reads `cyclableVariant` (the search's own predicate), so a figure the
+givens otherwise determine — the ambiguous case «AB = 4», «AC = 3», «sin∢ACB = 3/4» — still offers its choice.
 
 ## A variable statement waits for its letter ([ADR-562](06-decisions.md#adr-562))
 

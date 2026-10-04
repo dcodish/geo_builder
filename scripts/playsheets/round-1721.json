@@ -1,0 +1,418 @@
+{
+ "name": "round-1721",
+ "title": "סבב תיקונים 2026-10-03 (#1721) — 7 תיקונים ב-main, 5 PRs",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "הנדסת המישור (#1684): «AD חוצה זווית C» — חוצה זווית מקודקוד אחר נדחה (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AD חוצה זווית C"
+   ],
+   "expectRefusal": "בקודקוד C",
+   "lookFor": "השורה השנייה נדחית ומסבירה שחוצה הזווית יוצא מ-A, לא מ-C",
+   "before": "שורטט בשקט חוצה זווית A"
+  },
+  {
+   "id": "T2",
+   "title": "הנדסת המישור (#1684): «AE גובה» כש-A בשני משולשים — הכלי שואל (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "משולש ABD",
+    "AE גובה"
+   ],
+   "expectRefusal": "ציינו את הצלע",
+   "lookFor": "השורה השלישית שואלת לאיזו צלע או משולש, ומצטטת «AE גובה»",
+   "before": "שורטט בשקט הגובה ל-BC"
+  },
+  {
+   "id": "T3",
+   "title": "הנדסת המישור (#1683): «האלכסונים AB ו-CD» במרובע ABCD נדחה (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "האלכסונים AB ו-CD נפגשים בנקודה E"
+   ],
+   "expectRefusal": "אינו אלכסון",
+   "lookFor": "השורה השנייה נדחית: AB היא צלע, לא אלכסון",
+   "before": "שורטט בשקט מפגש AC ו-BD"
+  },
+  {
+   "id": "T4",
+   "title": "הנדסת המישור (#1683): «האלכסונים AC ו-BD נפגשים בנקודה E» מצייר את האלכסונים",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "האלכסונים AC ו-BD נפגשים בנקודה E"
+   ],
+   "lookFor": "שתי השורות ירוקות; AC ו-BD מצוירים ו-E בחיתוך",
+   "before": "רק E, בלי האלכסונים"
+  },
+  {
+   "id": "T5",
+   "title": "הנדסת המישור (#1683): «התיכונים AD ו-BE נפגשים בנקודה G»",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "D על BC",
+    "E על AC",
+    "התיכונים AD ו-BE נפגשים בנקודה G"
+   ],
+   "lookFor": "כל השורות ירוקות; D ו-E הופכות לאמצעי הצלעות, ו-G היא מפגש התיכונים",
+   "before": "D ו-E נשארו חופשיות"
+  },
+  {
+   "id": "T6",
+   "title": "הנדסת המישור (#1682): «… על המשך הצלע BC ונתון כי DE = DC» — התנאי נשמר",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC"
+   ],
+   "lookFor": "שתי השורות ירוקות; DE = DC בשרטוט",
+   "before": "התנאי DE = DC נעלם בשקט"
+  },
+  {
+   "id": "T7",
+   "title": "הנדסת המישור (#1682): «… מעבר לנקודה B» — E מעבר ל-B",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "הנקודה E נמצאת על המשך הצלע BC מעבר לנקודה B"
+   ],
+   "lookFor": "שתי השורות ירוקות; E על המשך BC מהצד של B",
+   "before": "E שורטטה מעבר ל-C"
+  },
+  {
+   "id": "T8",
+   "title": "הנדסת המישור (#1720): «AD תיכון במשולש ABC» על קנבס ריק",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "AD תיכון במשולש ABC"
+   ],
+   "lookFor": "ירוק; המשולש מצויר ו-D באמצע BC",
+   "before": "נדחה «unresolved dependencies for: D»"
+  },
+  {
+   "id": "T9",
+   "title": "הנדסת המישור (#1720): «AD תיכון לצלע BC» על קנבס ריק — סירוב שמצטט את המשפט",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "AD תיכון לצלע BC"
+   ],
+   "expectRefusal": "עדיין לא בסרטוט",
+   "lookFor": "נדחה; ההודעה מצטטת את המשפט ואומרת ש-B ו-C עדיין לא בשרטוט",
+   "before": "הודעה פנימית"
+  },
+  {
+   "id": "T10",
+   "title": "אנליטית (#1717): בחינה 9/4 — ה-«3» של AO לא נדבק לתווית של A",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "במלבן ABCD",
+    "הקודקוד B נמצא על ציר ה-y",
+    "והקודקודים A ו-C נמצאים על ציר ה-x, כמתואר בציור",
+    "O - ראשית הצירים",
+    "tan∢BAO = 2",
+    "AO = 3",
+    "A משמאל ל-O ו-C מימין ל-O; B על החלק החיובי של ציר y; D מתחת לציר x (ציור)"
+   ],
+   "lookFor": "כל השורות ירוקות; «3» כחול ליד AO, נקי מ-«A(x_A, 0)» וממספרי הציר",
+   "before": "«A(x_A, 0)3»"
+  },
+  {
+   "id": "T11",
+   "title": "אנליטית (#1715): «חוצה זוית C וחוצה זוית B נפגשים בנקודה E»",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "חוצה זוית C וחוצה זוית B נפגשים בנקודה E"
+   ],
+   "lookFor": "שתי השורות ירוקות; חוצי הזוויות מ-B ומ-C מצוירים עד E בתוך המשולש",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T12",
+   "title": "אנליטית (#1715): «הגובה מ-A והתיכון מ-B נפגשים בנקודה E»",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "הגובה מ-A והתיכון מ-B נפגשים בנקודה E"
+   ],
+   "lookFor": "שתי השורות ירוקות; הגובה והתיכון מצוירים ו-E במפגש",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T13",
+   "title": "אנליטית (#1715): אותו חוצה זווית פעמיים — נדחה (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "חוצה זוית B וחוצה הזווית B נפגשים בנקודה E"
+   ],
+   "expectRefusal": "יותר מפעם אחת",
+   "lookFor": "השורה השנייה נדחית — זה אותו ישר פעמיים",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T14",
+   "title": "הנדסת המישור (PR #1723): «tan∢ABC = 2» — על השרטוט רק הזווית",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5184",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "tan∢ABC = 2"
+   ],
+   "lookFor": "שתי השורות ירוקות; ב-B כתוב 63.43° ואין «tan=2»",
+   "before": "«tan=2»"
+  },
+  {
+   "id": "T15",
+   "title": "הנדסת המישור (PR #1723): «cos∢ABC = -1/2» — 120°",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5184",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "cos∢ABC = -1/2"
+   ],
+   "lookFor": "שתי השורות ירוקות; ב-B כתוב 120°",
+   "before": "«cos=-1/2»"
+  },
+  {
+   "id": "T16",
+   "title": "הנדסת המישור (PR #1729): «sin∢ACB = 3/4» — שתי זוויות, «הציגו תצורה אחרת» מחליף",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5185",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "sin∢ACB = 3/4"
+   ],
+   "lookFor": "שתי השורות ירוקות; ב-C כ-48.59°; «הציגו תצורה אחרת» מחליף ל-131.41° וחזרה",
+   "before": "נדחה"
+  },
+  {
+   "id": "T17",
+   "title": "הנדסת המישור (PR #1729): sin ואז «זווית ACB קהה» — 131.41°",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5185",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "sin∢ACB = 3/4",
+    "זווית ACB קהה"
+   ],
+   "lookFor": "כל השורות ירוקות; C קהה, 131.41°",
+   "before": "שורה 2 נדחתה"
+  },
+  {
+   "id": "T18",
+   "title": "הנדסת המישור (PR #1729): «sin∢ACB = 5/4» נדחה (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5185",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "sin∢ACB = 5/4"
+   ],
+   "expectRefusal": "5/4",
+   "lookFor": "השורה השנייה נדחית — סינוס אינו גדול מ-1",
+   "before": "נדחה עם הסבר על שתי זוויות"
+  },
+  {
+   "id": "T19",
+   "title": "אנליטית (PR #1724): זווית ואורך נתונים מופיעים על השרטוט",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5181",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "∢ABC = 30",
+    "AB = 3a"
+   ],
+   "lookFor": "כל השורות ירוקות; קשת ב-B עם «30°», ו-«3a» על AB",
+   "before": "לא הופיע כלום על השרטוט"
+  },
+  {
+   "id": "T20",
+   "title": "אנליטית (PR #1724): זווית ישרה, אורכים שווים ושטח",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5181",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "זווית BAC ישרה",
+    "AB = AC",
+    "שטח המשולש ABC הוא 13"
+   ],
+   "lookFor": "כל השורות ירוקות; ריבוע זווית ישרה ב-A, סימון שווה על AB ועל AC, ו-«S=13»",
+   "before": "לא הופיע כלום על השרטוט"
+  },
+  {
+   "id": "T21",
+   "title": "אנליטית (PR #1724): מידת קשת על הקשת",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5181",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+y^2=25",
+    "A על המעגל",
+    "C על המעגל",
+    "⌢{AC} = 60°"
+   ],
+   "lookFor": "כל השורות ירוקות; «60°» על הקשת AC",
+   "before": "לא הופיע כלום"
+  },
+  {
+   "id": "T22",
+   "title": "אנליטית (PR #1724): 9/4 — «63.43°» ו-«3» לא עולים זה על זה",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5181",
+   "path": "/analytic.html",
+   "lines": [
+    "במלבן ABCD",
+    "הקודקוד B נמצא על ציר ה-y",
+    "והקודקודים A ו-C נמצאים על ציר ה-x, כמתואר בציור",
+    "O - ראשית הצירים",
+    "tan∢BAO = 2",
+    "AO = 3",
+    "A משמאל ל-O ו-C מימין ל-O; B על החלק החיובי של ציר y; D מתחת לציר x (ציור)"
+   ],
+   "lookFor": "כל השורות ירוקות; «63.43°» ליד הזווית ב-A ו-«3» ליד AO, בלי חפיפה. ה-«63.43°» עשוי לשבת רחוק מהקשת — האם זה מקובל?",
+   "before": "לא הופיע כלום"
+  },
+  {
+   "id": "T23",
+   "title": "אנליטית (PR #1731): 9/4 כפי שהודפס — «-2 או 2»",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5182",
+   "path": "/analytic.html",
+   "lines": [
+    "במלבן ABCD",
+    "הקודקוד B נמצא על ציר ה-y",
+    "והקודקודים A ו-C נמצאים על ציר ה-x, כמתואר בציור",
+    "O - ראשית הצירים",
+    "tan∢BAO = 2",
+    "AO = 3"
+   ],
+   "lookFor": "כל השורות ירוקות; בלוח שיפוע AB: «-2 או 2»",
+   "before": "«—»"
+  },
+  {
+   "id": "T24",
+   "title": "אנליטית (PR #1731): 9/4 עם הערת השרטוט — «2»",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5182",
+   "path": "/analytic.html",
+   "lines": [
+    "במלבן ABCD",
+    "הקודקוד B נמצא על ציר ה-y",
+    "והקודקודים A ו-C נמצאים על ציר ה-x, כמתואר בציור",
+    "O - ראשית הצירים",
+    "tan∢BAO = 2",
+    "AO = 3",
+    "A משמאל ל-O ו-C מימין ל-O; B על החלק החיובי של ציר y; D מתחת לציר x (ציור)"
+   ],
+   "lookFor": "כל השורות ירוקות; בלוח שיפוע AB: 2, ו-D = (9, -6)",
+   "before": "«—»"
+  },
+  {
+   "id": "T25",
+   "title": "אנליטית (PR #1732): «sin∢ABC = 0.5» — 30° או 150°",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5183",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "sin∢ABC = 0.5"
+   ],
+   "lookFor": "שתי השורות ירוקות; 30° ב-B, «הציגו תצורה אחרת» מחליף ל-150°; בלוח «∢ABC = 30° או 150°»",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T26",
+   "title": "אנליטית (PR #1732): sin ואז «∢ABC > 90» — 150°",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5183",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "sin∢ABC = 0.5",
+    "∢ABC > 90"
+   ],
+   "lookFor": "כל השורות ירוקות; ∢ABC = 150°",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T27",
+   "title": "אנליטית (PR #1732): «sin∢ABC = 2» נדחה (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5183",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "sin∢ABC = 2"
+   ],
+   "expectRefusal": "לא נמצאה תצורה",
+   "lookFor": "השורה השנייה נדחית",
+   "before": "לא הובן"
+  }
+ ]
+}

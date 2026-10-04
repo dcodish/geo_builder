@@ -11606,3 +11606,108 @@ Both build with every row ok and 8 points, and in both the point that was A now 
 **Measured.** `src3d/__tests__/proof-target-1666.test.ts`: the shared rows through `decideSubmit3`, the Hebrew and English text, the parser no longer reading past «הוכיחו כי» or "prove that" (the given framing unchanged), the bare claim still recording, and no catalog line reading as a target. On the pre-change tree, 3 of its 5 tests fail. `parse3-v1.test.ts` drops the «הוכיחו כי CA' מאונך למישור BC'D» input from its perp-plane spellings.
 
 **Consequences.** `src3d/store/store3.ts` (`StoreError3`, `readStatement3`), `src3d/parser/parse3.ts`, `src3d/i18n/errorText3.ts`, `src3d/i18n/locales/{he,en}.json`. Behaviour change: the proof-verb form of a claim is refused, where it used to be read (and could drive the figure).
+
+## ADR-3D-296 — A point placement keeps its tail: the condition after «X על YZ» is a given (#1730)
+
+**Status:** accepted · 2026-10-04 · bug (P1, the honesty class) · round #1721 (operator, 2026-10-03: *"fix the P1s now as well"*) · found by the 2-D #1682 stream (ADR-570) · branch `fix/1730-3d-placement-tail` off `main` @ 4fbb3293
+
+**Requirements:** [FR-SP-13](02b-requirements-3d.md) (new) — a point placement keeps its condition · **Design:** [04b-design-3d.md](04b-design-3d.md) § "A point placement keeps its tail" · **LADDER stage:** the parser (`onSegment`, `readCondition3`) and the honesty gates `lostGivens3` shares with the LLM lane. No solver, replay or render change.
+
+**Cites** ADR-570 (the 2-D twin, copied as a pattern — `src3d` never imports `src/`), ADR-024 (the leftover guard), [ADR-3D-147](#adr-3d-147) (the gates bound to the event), [ADR-3D-224](#adr-3d-224) (#921: the ratio letter), the #108 ruling (a shape with a property glued on is two steps).
+
+**Context — measured at pickup on 4fbb3293, through `decideSubmit3`, seed 0.** The issue's claim held, and the class was wider:
+
+| typed, after «משולש ABC» | before |
+| --- | --- |
+| «D על BC ונתון כי AD = AC» (also «ונתון ש-», «וידוע כי», «, AD = AC», «ו-AD = AC», "and it is given that") | records `point-on-segment3 D on BC` alone, green; D lands where AD ≠ AC |
+| «D על BC כך ש-AD = AC» | the same — even «כך ש» was dropped unless the condition was a ratio of D itself |
+| «D על BC ונתון כי AD = 3» | the same: the 3 was "accounted" by the digit in the command's own type name, `point-on-segment3` |
+| «D על AB במרחק 3 מ-A» | the same (the #1649 rows `cat-2d-027` / `e1-at-distance-far-end` passed on it) |
+| «K על AA' כך ש-AK = 2KA'» | correct: `t = ⅔` (the ratio lane) |
+
+**Class.** *A point-placement sentence keeps its prefix and drops its tail* — `onSegment` was not anchored after the carrier, so any condition that was not a ratio of the rider vanished; and no gate could see it: the label gate found every letter referenced by the rider, 3-D had no relation gate at all, and the number gate counted the digit in a command's `type` string as a payload.
+
+**Decision.**
+1. **`onSegment` is anchored.** After «X על YZ» comes nothing (a free rider), a distance tail («במרחק 3 מ-A», "at distance 3 from A" — the condition `AX = 3`), or a connector and a condition. The connector vocabulary is one fragment, `PLACEMENT_CONNECTOR`: «כך ש», the given-conjunction «ונתון כי / ש», «וידוע כי / ש» (2-D's ADR-570 reading), «ו-», a comma, "such that", "and (it is) given that". Anything else declines the line (→ the model lane), never commits the placement alone.
+2. **A whole ratio of the rider keeps the ratio lane** (`WHOLE_RATIO`: a baked `t`, the #921 letter, and a ratio that does not fit the rider still refused). **Any other condition is read by `readCondition3`** — the ordinary rule list, all or nothing — beside the free rider, which the condition then drives. The one difference from a line of its own: a bare pair equation is a LENGTH there (`CONDITION_LENGTHS`), as it always was inside a ratio clause, so «AD = AC» is `|AD| = |AC|` rather than the `ambiguous-vector-length` question. A shape subject is not a placement — «משולש ABC ונתון כי AB = AC» stays the #108 two-step teaching.
+3. **The net: `droppedGivenRelations3` joins `lostGivens3`.** A stated `XY = ZW` / `⊥` / `∥` between point pairs must be carried by ONE command that states something; a free rider (`point-on-segment3` with no `t`/`sym`) and plain ink (`segment3`) do not vouch for a relation merely because they mention the point the line introduces — the exemption ADR-570 narrowed in 2-D, here never granted. Both statement seams (the deterministic one and the model's `submitSteps`) share it.
+4. **The number gate ignores `type` tags.** A discriminator is not a payload.
+
+**Plan vs mechanism (recorded).** The issue's plan was the clause split and the gate check; 3-D had no relation gate, so decision 3 adds the 2-D one with the narrowed exemption built in. Decision 4 and the distance tail are the same class found while measuring (the 3 that vanished in «… ונתון כי AD = 3» and «… במרחק 3 מ-A»).
+
+**Sibling audit.** Grepped the 3-D placement rules: `onSegment` was the one unanchored reader (`midpoint` counts its labels and declines a tail; «M אמצע BC ונתון כי AM = 3» stays `not-understood`, an honest escalation, not read here). The extension form («על המשך BC …») is not read by 3-D at all (#1679). **2-D:** fixed by ADR-570. **Analytic:** reads both (ADR-AG-208).
+
+**Measured after** (`src3d/__tests__/issue-1730-placement-tail.test.ts`, through `decideSubmit3` and the drawn positions):
+
+| typed, after «משולש ABC» | now |
+| --- | --- |
+| «D על BC ונתון כי AD = AC» and the eight other connectors (He/En) | records `length-rel AD = AC`; AD = AC at seeds 0–3 |
+| «D על AB» · «E על BC ונתון כי DE = DC» | DE = DC at seeds 0–3 |
+| «D על BC ונתון כי AD ⊥ BC» | records the `cos-angle` |
+| «D על AB במרחק 0.5 מ-A» / English | AD = 0.5 |
+| «K על AA' כך ש-AK = 2KA'» / «… AB = 2KA'» / «D על BC» | unchanged (`t = ⅔` / refused / free rider) |
+| «D על BC ונתון כי משהו אחר» | not read (declines whole) |
+
+**Found, filed.** «D על AB במרחק 3 מ-A» now reads AD = 3 — and on a triangle of unstated size the pivot refuses it `givens-contradict` (AD = 2 builds, AD = 3 does not; stating AB = 5 first works). That is a solver reach defect the old drop hid, filed as **#1735** (P2, 3d); the two #1649 rows that passed by dropping the 3 now carry it as a 3-D known gap.
+
+**Locks.** `issue-1730-placement-tail.test.ts` (20). **Fails before: 17 of 20**, measured by reverting `parse3.ts`, `honesty3.ts` and `store3.ts` to 4fbb3293 (with a no-op `droppedGivenRelations3` stub); the 3 that pass before are controls (the ratio lane, the #108 shape subject, a relation a command carries). Fixture `fixtures3/placement-condition-1730.geo3.json` (the operator's exact sequence; the drift net holds the stored `length-rel`). #1649: `side-given-clause-holds-1730` (new — «AC = 2» · «D על BC ונתון כי AD = AC» · «AD = 1» is refused in all three builders; on 4fbb3293 3-D built it), and `cat-2d-027` / `e1-at-distance-far-end` gain the 3-D known gap #1735.
+
+**Unchanged, measured.** `npx vitest run src3d` (the whole 3-D tree, run alone): 291 files, 5345 tests, green after one re-record — the `decide-submit3-parity-1394` golden gains this ADR's new sequences (14 keys added, **no recorded hash changed**). `honesty3.test.ts` (the catalog is gate-clean under the new relation gate) and `student-text-1455` are inside that run. The three products' #1649 parity locks and the meta-lock: green. The full suite is the batch gate (round #1721).
+
+**Consequences.**
+- `src3d/parser/parse3.ts`: `PLACEMENT_CONNECTOR`, `PLACEMENT_CLAUSE`, `WHOLE_RATIO`, `AT_DISTANCE`, the anchored `onSegment`, `readCondition3` + `CONDITION_LENGTHS` (read in `lengthRel`).
+- `src3d/parser/honesty3.ts`: `droppedGivenRelations3`; `droppedGivenNumbers3` skips `type` tags. `src3d/store/store3.ts`: the gate in `lostGivens3`.
+
+**Behaviour change for a student:** «D על BC ונתון כי AD = AC» (or «כך ש-AD = AC», «, AD = AC», «במרחק 3 מ-A») now draws D so the condition holds, instead of quietly ignoring it. A condition the tool cannot read is no longer half-drawn: the whole line goes to the fallback.
+
+## ADR-3D-297 — Two diagonals named by letters meet where both are; the diagonal crossing is a crossing, not a midpoint (#1728)
+
+**Status:** accepted · 2026-10-04 · bug (P1, the honesty class) · round #1721 (operator, 2026-10-03: *"fix the P1s now as well"*) · found by the 2-D #1683 stream (ADR-569) · branch `fix/1728-3d-diagonals-meet` off `main` @ 4fbb3293. Numbered after ADR-3D-296 (#1730), which lands in the same round.
+
+**Requirements:** [FR-CL-2](02b-requirements-3d.md) extended — the diagonal claim travels into every sentence naming pairs after the noun, and the meet is of the pairs the sentence names · **Design:** [04b-design-3d.md](04b-design-3d.md) § "A named meeting point is a crossing, judged on the figure" · **LADDER stage:** the parser (`diagIntersection`), the apply reducer (`seg-crossing3`, `diag-intersection`), evaluate (the `seg-cross` point kind, closed form) and the `derive3` status pass. No solver change.
+
+**Cites** ADR-569 (the 2-D twin, copied as a pattern), [ADR-3D-071](#adr-3d-071) (two runs of two letters are two diagonals), [ADR-3D-203](#adr-3d-203) / [ADR-3D-246](#adr-3d-246) (the «אלכסון» claim, apply + verifier), ADR-052 (no unstated property).
+
+**Context — measured at pickup on 4fbb3293, through `parse3` / `decideSubmit3`.** The issue's claim held, and the class was wider:
+
+| typed | before |
+| --- | --- |
+| «מרובע ABCD» · «האלכסונים AB ו-CD נפגשים בנקודה E» (also «נחתכים», English) | records `point-on-segment3 E on AB, t = ½` — CD and the meet dropped, the sides accepted as diagonals |
+| «מרובע ABCD» · «האלכסונים AC ו-BD נפגשים בנקודה E» | records E at the midpoint of AC: on the general quad E is **off BD** (0.14–0.19 at seeds 0–2), and a following «E על BD» is refused `claim-refuted` |
+| «מרובע ABCD» · «E מפגש האלכסונים של ABCD» (the named-quad form, `diag-intersection`) | the same midpoint of AC, off BD — the parallelogram assumption ADR-3D's V8-a recorded as "filed" |
+| «האלכסונים AC ו-BD …» on an empty canvas | refused `dropped-given B, D` |
+| «התיכונים AD ו-BE נפגשים בנקודה G», «הגבהים AD ו-BE …», «האלכסון AB חותך את CD בנקודה E» | `not-understood` (escalates — honest; 3-D does not read these, so the 2-D median/altitude arms have no 3-D counterpart to fix) |
+
+**Class.** *A sentence naming two segments that meet at a point is lowered to a point on ONE of them* — the meet of the second segment is dropped, and the lowering assumes a parallelogram (the diagonals bisect each other) that the student never stated; the role noun «אלכסונים» before letters carried no claim.
+
+**Decision.**
+1. **A new point kind, `seg-cross { a1, b1, a2, b2 }`** — where the two lines cross, in closed form (`lineCrossing3`, the midpoint of the closest approach; unplaced when parallel). It is a derived 0-DOF kind: `GAUGE_KINDS`, `structurallyOnRun3`, and the #769 coincidence set know it.
+2. **Two named diagonals lower to what the sentence says:** `segment3 a1b1 {diagonal: 'any'}`, `segment3 a2b2 {diagonal: 'any'}` (ADR-3D-203's claim — the apply refusal and the verifier, no new check), and `seg-crossing3` (new command; draws both segments). AB named as a diagonal of the quad ABCD is refused `not-a-diagonal`, naming the pair, as «אלכסון AB» already was.
+3. **The named-quad form uses the same kind** (`diag-intersection` → `seg-cross` of the 1st↔3rd and 2nd↔4th vertices), so no spelling of the diagonal crossing assumes a parallelogram. On a parallelogram the point is where it was.
+4. **The meeting is the figure's to show.** `derive3` checks that the two drawn segments meet — `mutualHolds('intersecting')`, bounded, at `MUTUAL_VERIFY_TOL`, the predicate the stated «AC ו-BD נחתכים» claim already uses — and refuses `segments-do-not-meet { id, s1, s2 }` («הקטעים «AC» ו-«B'D'» אינם נפגשים בציור — אין להם נקודת מפגש «E»»), naming the student's segments.
+
+**Plan vs mechanism (recorded).** The plan's sketch asked the rule to "consume both pairs (the lines' crossing) or refuse"; 3-D had no point kind for a crossing of two segments, so decision 1 adds it (a closed form beside `plane-cut`, no solver). Decision 3 is the same class found while measuring (the plan named only the lettered form).
+
+**Sibling audit.** Grepped every 3-D reader of a diagonal/meet sentence: `diagIntersection` (both forms fixed), `quadDiagonals` (draws, names no point — unaffected), `centroidRule` (medians by the noun, the centroid kind — exact, unaffected). 3-D reads no lettered median/altitude/bisector meet (`not-understood`). **2-D:** ADR-569. **Analytic:** refuses the sides form (ADR-AG-208).
+
+**Measured after** (`src3d/__tests__/issue-1728-diagonals-meet.test.ts`, through `decideSubmit3` and the drawn positions):
+
+| typed | now |
+| --- | --- |
+| «מרובע ABCD» · «האלכסונים AB ו-CD נפגשים בנקודה E» / «נחתכים» / English | refused `not-a-diagonal` (AB) |
+| «מרובע ABCD» · «האלכסונים AC ו-BD …» / «BD ו-AC» / «נחתכים» / English | E on both diagonals, inside both, seeds 0–3 |
+| … · «E על BD» | builds (true) |
+| «מרובע ABCD» · «E מפגש האלכסונים של ABCD» | E on both diagonals, seeds 0–3 |
+| «מנסרה ישרה שבסיסה מלבן» · «האלכסונים AC ו-BD נפגשים בנקודה O»; «קובייה …» · «האלכסונים AB' ו-A'B …» | the face centre (controls) |
+| «קובייה ABCDA'B'C'D'» · «האלכסונים AC ו-B'D' נפגשים בנקודה E» (skew) | refused `segments-do-not-meet` naming AC and B'D' |
+| «אלכסוני ABCD נחתכים בנקודה O», «אלכסוני הריבוע …» | `diag-intersection`, unchanged |
+| empty canvas | refused (unknown point), never half-built |
+
+**Unchanged, measured.** `npx vitest run src3d` (the whole 3-D tree, run alone): 291 files, 5341 tests, green. Three locks asserted the old lowering (`point-on-segment3 … t = ½` for the pair form) and now expect the two claimed segments and the crossing: `diagonal-pair.test.ts`, `at-point-marker.test.ts`, `shadow-matrix3.test.ts`. The `decide-submit3-parity-1394` golden gains this ADR's new sequences (keys added only, **no recorded hash changed**). The three products' #1649 parity locks and the meta-lock: green. The full suite is the batch gate (round #1721).
+
+**Locks.** `issue-1728-diagonals-meet.test.ts` (14). **Fails before: 10 of 14**, measured by reverting `src3d/{engine,parser,store,i18n}` to 4fbb3293; the 4 that pass before are controls (the rectangle and cube faces, where the midpoint is the crossing; the unlettered forms; the empty canvas). Fixture `fixtures3/diagonals-named-meet-1728.geo3.json` («מרובע ABCD» · the named meet · «E על BD»). #1649: `diag-meet-sides-1683` drops its 3-D known gap (3-D refuses, like 2-D and analytic); `diag-meet-holds-1728` (new — the content check: «E על BD» after the meet builds in all three builders; 3-D refuted it before).
+
+**Consequences.**
+- `src3d/engine/types.ts` (`seg-cross`, `SegCrossingCommand`, `segments-do-not-meet`), `vec3.ts` (`lineCrossing3`), `evaluate.ts`, `apply.ts`; `src3d/store/store3.ts` (the meet check, the coincidence set), `figureFile3.ts`; `src3d/parser/parse3.ts`; `src3d/i18n/errorText3.ts` + locales.
+
+**Behaviour change for a student:** in a quadrilateral ABCD, «האלכסונים AB ו-CD נפגשים בנקודה E» is now refused — AB is a side, not a diagonal — instead of putting E halfway along AB. «האלכסונים AC ו-BD נפגשים בנקודה E» (and «E מפגש האלכסונים של ABCD») now puts E where the two diagonals actually cross; before, on a quadrilateral that is not a parallelogram, E sat beside the second diagonal.

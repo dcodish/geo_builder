@@ -232,6 +232,12 @@ const TOKEN = /[A-Z]\d*'?/g;
 /** The label-token SOURCE fragment (no captures) — compose new rules from this, never re-spell
  *  the fragment inline (the S2.1 lexical-ratchet discipline). */
 const LBL = String.raw`[A-Z]\d*'?`;
+/** The UNSIGNED decimal — the atom every numeric fragment in this file is built from, and the one
+ *  {@link NUM} signs. Introduced with #513 because the lexical ratchet (docs/24 S2.1) is right: a new
+ *  regex must COMPOSE from an atom, never inline a fresh copy. Composing the radicand work from it
+ *  retires more inline copies than the fix adds, so the recorded ceiling moves DOWN. *  Declared beside {@link LBL} (#1730 integration, round 2026-10-04) so module-level rules that sit
+ *  above its old place — `WHOLE_RATIO` — compose from it instead of inlining the fragment. */
+const UNUM = String.raw`\d+(?:\.\d+)?`;
 
 /**
  * #486 — Hebrew noun gates, shared. Two things a student writes freely and a hand-written rule keeps
@@ -1196,24 +1202,80 @@ function ratioSym(s: string, id: Id, a: Id, b: Id): { sym: string; fromB: boolea
   return side === 'invalid' ? 'invalid' : { sym, fromB: side === 'from-b' };
 }
 
-/** `K על AA'` (+ optional `כך ש-AK = 2KA'`) / `K on AA' such that AK = 2KA'`. No ratio ⇒ a free slider. */
+/**
+ * #1730 (ADR-3D-296) — THE CONNECTOR between a point placement and the condition that follows it.
+ *
+ * «D על BC ונתון כי AD = AC» states two givens: D is on BC, and AD = AC. The rule read the prefix and
+ * dropped everything after the carrier — «כך ש», «ונתון כי» and the rest alike — so the second given
+ * vanished under a green row. The condition is a given whichever connector introduces it: «כך ש» (such
+ * that), the given-conjunction «ונתון כי / ונתון ש / וידוע כי / וידוע ש» ("and it is given that" — the
+ * 2-D ADR-570 reading), a bare «ו-», or a comma. One vocabulary, so no connector means less than another.
+ */
+const PLACEMENT_CONNECTOR = String.raw`כך\s*ש-?|ו?(?:נתון|ידוע)\s+(?:כי\s+|ש-?)|such\s+that|and\s+(?:it\s+is\s+)?given\s+that|ו-?(?=\s*${LBL})|and(?=\s+${LBL})`;
+const PLACEMENT_CLAUSE = new RegExp(
+  String.raw`^\s*(?:,\s*(?:(?:${PLACEMENT_CONNECTOR})\s*)?|(?:${PLACEMENT_CONNECTOR})\s*)(.+)$`,
+  'i',
+);
+
+/** A ratio clause that IS the whole condition — «AK = 2KA'», «AE:EC = 2:1», «SE = t·SA». It keeps the ratio
+ *  lane's own reading (#748, #921): a ratio of this rider bakes its `t`, and one that does not fit the rider
+ *  is refused, as before. */
+const WHOLE_RATIO = new RegExp(
+  String.raw`^(?:${LBL}${LBL}\s*:\s*${LBL}${LBL}\s*=\s*${UNUM}\s*:\s*${UNUM}|${LBL}${LBL}\s*=\s*(?:${UNUM}|[a-z]\d?)\s*[·×*]?\s*${LBL}${LBL})\s*$`,
+);
+
+/**
+ * #1730 — the distance tail «D על AB במרחק 3 מ-A» / "D on AB at (a) distance (of) 3 from A": the same
+ * given as «AD = 3», and read as that condition. It too was dropped, the 3 "accounted" by the command's
+ * own type string (see `droppedGivenNumbers3`).
+ */
+const AT_DISTANCE = new RegExp(
+  String.raw`^\s*,?\s*(?:ב(?:ה)?מרחק\s+(?:של\s+)?(\S+)\s+מ-?\s*(?:ה?נקודה\s+|ה(?=[A-Z]))?(${LBL})|at\s+(?:a\s+)?distance\s+(?:of\s+)?(\S+)\s+from\s+(?:(?:the\s+)?point\s+)?(${LBL}))\s*$`,
+  'i',
+);
+
+/**
+ * `K על AA'` (+ a condition: `כך ש-AK = 2KA'`, `ונתון כי AD = AC`) / `K on AA' such that AK = 2KA'`.
+ * No condition ⇒ a free slider.
+ *
+ * #1730: the rule is ANCHORED — the carrier is followed by nothing, by a distance tail, or by a connector
+ * and a condition ({@link PLACEMENT_CLAUSE}). A ratio condition keeps the ratio lane ({@link WHOLE_RATIO});
+ * any other condition is read as its own statement ({@link readCondition3}) and kept beside the free
+ * rider, which the condition then drives. A tail the rule cannot read declines the whole sentence (the
+ * leftover guard, ADR-024) — it is never read around.
+ */
 const onSegment: Rule = (s) => {
   if (GREEK.test(s)) return null; // Greek scalars = the spanPoint form; never swallow its condition as a free point
   const m = s.match(
-    new RegExp(`^${HE_SUBJ}(${LBL})\\s+(?:נמצאת\\s+|נמצא\\s+|is\\s+)?(?:על|on)\\s+(?:${HE_SEG}\\s+|segment\\s+|edge\\s+)?(${LBL})(${LBL})(?![A-Z0-9'])`),
+    new RegExp(String.raw`^${HE_SUBJ}(${LBL})\s+(?:נמצאת\s+|נמצא\s+|is\s+)?(?:על|on)\s+(?:${HE_SEG}\s+|segment\s+|edge\s+)?(${LBL})(${LBL})(?![A-Z0-9'])`),
   );
   if (!m) return null;
   const [, id, a, b] = m;
   if (id === a || id === b || a === b) return null;
-  const t = ratioT(s, id, a, b);
-  if (t === 'invalid') return null;
-  if (t === undefined) {
+  const rider: Command3 = { type: 'point-on-segment3', id, a, b, t: undefined };
+  const tail = s.slice(m[0].length);
+  if (tail.trim() === '') return [rider];
+  const far = tail.match(AT_DISTANCE);
+  if (far) {
+    const [value, from] = far[1] !== undefined ? [far[1], far[2]] : [far[3], far[4]];
+    if (from === id) return null;
+    const cond = readCondition3(`${from}${id} = ${value}`);
+    return cond ? [rider, ...cond] : null;
+  }
+  const clause = tail.match(PLACEMENT_CLAUSE);
+  if (!clause) return null; // an unread tail: decline, never drop it
+  const body = clause[1].trim();
+  if (WHOLE_RATIO.test(body)) {
+    const t = ratioT(body, id, a, b);
+    if (t === 'invalid') return null; // a ratio that does not describe this rider — refused, never dropped
+    if (t !== undefined) return [{ type: 'point-on-segment3', id, a, b, t }];
     // No numeric ratio — but the clause may state one with a LETTER, which must not vanish (#921).
-    const named = ratioSym(s, id, a, b);
+    const named = ratioSym(body, id, a, b);
     if (named === 'invalid') return null;
     if (named) return [{ type: 'point-on-segment3', id, a, b, sym: named.sym, ...(named.fromB ? { symFromB: true as const } : {}) }];
   }
-  return [{ type: 'point-on-segment3', id, a, b, t }];
+  const cond = readCondition3(body);
+  return cond ? [rider, ...cond] : null;
 };
 
 // ---------------------------------------------------------------------------
@@ -1394,9 +1456,9 @@ const AT_POINT = String.raw`בנקוד[הת]\s*`;
 /**
  * `E מפגש האלכסונים של הפאה ABCD` / `O נקודת חיתוך אלכסוני הבסיס` / `O = intersection
  * of diagonal AC with diagonal BD` (V8-a, G3) — the diagonal crossing of a
- * parallelogram face/base. Three forms: a NAMED quad (4 cyclic vertices → the crossing
- * is the midpoint of the 1st & 3rd), TWO explicit diagonals (→ midpoint of the first),
- * or the implicit `the base` (0 vertices → the base sentinel, resolved by apply).
+ * face/base. Three forms: a NAMED quad (4 cyclic vertices → the crossing of the 1st↔3rd and
+ * 2nd↔4th diagonals), TWO explicit diagonals (→ both drawn and claimed, and their crossing —
+ * #1728), or the implicit `the base` (0 vertices → the base sentinel, resolved by apply).
  */
 const diagIntersection: Rule = (s) => {
   if (!/אלכסו[ןנ]|diagonal/i.test(s)) return null;
@@ -1442,9 +1504,18 @@ const diagIntersection: Rule = (s) => {
     .map((r) => r.match(TOKEN) ?? [])
     .filter((g) => !(g.length === 1 && g[0] === id));
   if (rest.length === 4 && groups.length === 2 && groups.every((g) => g.length === 2)) {
-    const [a, b] = groups[0]; // two explicit diagonals — the crossing is on the first, a–b
+    // #1728 — TWO NAMED DIAGONALS are read as named: each pair is drawn and carries the diagonal claim
+    // (ADR-3D-203's `segment3 {diagonal}`, judged at apply and again by the verifier), and the point is
+    // where THEY cross (`seg-crossing3`). This used to lower to the midpoint of the first pair alone —
+    // the second pair and the meeting dropped, and a parallelogram assumed — so «האלכסונים AB ו-CD
+    // נפגשים בנקודה E» on the quad ABCD put E halfway along the side AB, green. The 2-D twin is ADR-569.
+    const [[a1, b1], [a2, b2]] = groups;
     if (new Set(rest).size !== 4 || rest.includes(id)) return null;
-    return [{ type: 'point-on-segment3', id, a, b, t: 0.5 }];
+    return [
+      { type: 'segment3', a: a1, b: b1, diagonal: 'any' },
+      { type: 'segment3', a: a2, b: b2, diagonal: 'any' },
+      { type: 'seg-crossing3', id, a1, b1, a2, b2 },
+    ];
   }
   if (rest.length === 4) return [{ type: 'diag-intersection', id, face: rest }]; // named quad, cyclic
   if (rest.length === 0) return [{ type: 'diag-intersection', id, face: [] }]; // `the base` sentinel
@@ -1615,11 +1686,6 @@ const spanPoint: Rule = (s) => {
  * still refuses honestly; that is the arithmetic-expression reader ruled for #509, not a fourth
  * private branch here.
  */
-/** The UNSIGNED decimal — the atom every numeric fragment in this file is built from, and the one
- *  {@link NUM} signs. Introduced with #513 because the lexical ratchet (docs/24 S2.1) is right: a new
- *  regex must COMPOSE from an atom, never inline a fresh copy. Composing the radicand work from it
- *  retires more inline copies than the fix adds, so the recorded ceiling moves DOWN. */
-const UNUM = String.raw`\d+(?:\.\d+)?`;
 
 const RADICAND = String.raw`(?:\(\s*${UNUM}(?:\s*\/\s*${UNUM})?\s*\)|${UNUM})`;
 
@@ -1722,6 +1788,9 @@ function evalRadical(raw: string): number | null {
  *  LENGTH relation (never a vector equation unless an explicit ⃗ arrow was typed). */
 const lengthRel: Rule = (s) => {
   if (VEC_MARKED) return null; // the arrow says VECTOR — vecEqClaim's territory
+  // #1730: inside a placement's CONDITION a bare `AD = AC` is a length, as it always was in the ratio
+  // clause («כך ש-AK = 2KA'», `ratioT`) — the vector reading has no subject there. Read as the `|AD|` form.
+  if (CONDITION_LENGTHS) s = s.replace(/^([A-Z]\d*'?[A-Z]\d*'?)(\s*(?:=|שווה\s+ל)\s*)(?=.*[A-Z])/, '|$1|$2');
   const P = "([A-Z]\\d*'?)([A-Z]\\d*'?)";
   // |w| = 2 — a numeric magnitude on a NAMED vector (resolved to its pair at apply)
   const vm = s.match(/^\|([a-w])\|\s*(?:=|שווה\s+ל)\s*(.+)$/);
@@ -4653,6 +4722,29 @@ const NOUN_PREFIX_REWRITES: { when: RegExp; to: (m: RegExpMatchArray) => string 
     to: (m) => `משוואת הישר ${m[1]} היא ${m[2]}`,
   },
 ];
+
+/** #1730: set while {@link readCondition3} reads a placement's condition — a bare `AD = AC` is a length there. */
+let CONDITION_LENGTHS = false;
+
+/**
+ * #1730 (ADR-3D-296) — read a point placement's CONDITION («… כך ש-AD = AC», «… ונתון כי AD = AC») as
+ * its own statement, through the same rules a line is read by. All or nothing: `null` when no rule reads
+ * the whole condition, and the placement then declines with it — the condition is never dropped. The
+ * one difference from a line of its own is the length reading of a bare pair equation (see `lengthRel`).
+ */
+function readCondition3(body: string): Command3[] | null {
+  const was = CONDITION_LENGTHS;
+  CONDITION_LENGTHS = true;
+  try {
+    for (const rule of RULES) {
+      const commands = rule(body);
+      if (commands) return commands;
+    }
+    return null;
+  } finally {
+    CONDITION_LENGTHS = was;
+  }
+}
 
 /** Guards the single re-parse below against any possibility of recursion. */
 let REWRITING = false;

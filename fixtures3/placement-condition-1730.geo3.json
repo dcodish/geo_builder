@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-03T21:03:28.704Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "D על BC ונתון כי AD = AC",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "D",
+          "a": "B",
+          "b": "C"
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "D"
+        },
+        {
+          "type": "length-rel",
+          "a1": "A",
+          "b1": "D",
+          "rhs": {
+            "pair": [
+              "A",
+              "C"
+            ]
+          },
+          "c": 1
+        }
+      ]
+    }
+  ]
+}

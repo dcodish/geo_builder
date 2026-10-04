@@ -153,6 +153,14 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   them ([FR-SP-2](#the-space-model)/[FR-SP-3](#the-space-model)). It is never minted **on** the known
   point: a zero segment drawn green asserts a perpendicular the figure does not have.
   *(Realised — [ADR-3D-268](06b-decisions-3d.md#adr-3d-268), #1499.)*
+- **FR-SP-13 (Must)** — **A point placement keeps its condition.** «D על BC ונתון כי AD = AC» states two
+  givens, and both are honoured: D rides BC and AD = AC drives it. The condition is a given whichever
+  connector introduces it — «כך ש», «ונתון כי / ש», «וידוע כי / ש», «ו-», a comma, "such that", "and it is
+  given that" — and so is a distance tail («D על AB במרחק 3 מ-A»). A ratio of the rider itself
+  («K על AA' כך ש-AK = 2KA'») keeps its ratio reading. A condition the tool cannot read declines the whole
+  line; it never commits the placement alone. A stated pair relation («AD = AC», «AD ⊥ BC») that no
+  committed command carries is refused, naming it — on every statement seam, the model's included. The
+  2-D twin is FR-IN-4d. *(Realised — [ADR-3D-296](06b-decisions-3d.md#adr-3d-296), #1730.)*
 
 ## Vectors — the geometric lane
 
@@ -353,7 +361,11 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   of the same kind: «אלכסון AB» / «אלכסון ראשי AB» is checked at the apply moment when one solid can judge
   it, and **again on the final figure** for every solid that holds both letters — a pair no solid holds
   stays unjudged, never refused ([ADR-3D-203](06b-decisions-3d.md#adr-3d-203),
-  [ADR-3D-246](06b-decisions-3d.md#adr-3d-246)).
+  [ADR-3D-246](06b-decisions-3d.md#adr-3d-246)). The claim travels with the noun into every sentence that
+  names pairs after it: «האלכסונים AC ו-BD נפגשים בנקודה E» draws and claims both pairs, and E is where the
+  pairs **the sentence names** meet — never a midpoint of one of them, and never a parallelogram the student
+  did not state. Two named segments that do not meet in the figure are refused, naming both
+  ([ADR-3D-297](06b-decisions-3d.md#adr-3d-297), #1728; the 2-D twin is ADR-569).
 - **FR-CL-2a (Must)** — **A segment RATIO is one notation with two separators.** «BE/ED = 1:3» and
   «BE:ED = 1:3» are the same statement and are read identically, in every combination of the two
   separators and with a bare number on the right («AB/BC = 2»); `/` is how a textbook writes it. A

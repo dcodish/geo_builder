@@ -2142,7 +2142,7 @@ export const separatedView = (fig: Derived): boolean => fig.coincidences.length 
  *  `findValidConfig` produced the last returned config. Lets a test assert the tier ORDERING
  *  deterministically — a wall-clock assertion on the real worker budget flaked at 28 s under the
  *  suite's CPU contention (5 s solo), which is exactly why `SEARCH_BUDGET_MS` is Infinity in tests. */
-export let lastConfigTier: 'current' | 'relaxed' | 'sweep' | 'seat' | 'reflect' | 'branch' | null = null;
+export let lastConfigTier: 'current' | 'relaxed' | 'sweep' | 'seat' | 'variant' | 'reflect' | 'branch' | null = null;
 
 export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_BUDGET_MS): { facts: Fact[]; seed: number } | null {
   lastConfigTier = null;
@@ -2234,6 +2234,18 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     if (seatFound) {
       lastConfigTier = 'seat';
       return seatFound;
+    }
+    if (Date.now() > deadline) return null;
+    // #1711 (ADR-573): the VARIANT dimension — every unstated configuration choice a fact carries (a
+    // sine's acute/obtuse root, an isosceles apex, a kite axis, an inscribed seating, a circle pair's
+    // position, a common tangent's basin). Before this tier the search never left the variants the facts
+    // already held, so a figure whose CURRENT variant a later given made impossible was refused although
+    // another variant draws it — «sin∢ACB = 3/4» then «זווית ACB קהה». Seed-invariant like the seat
+    // (a wrong root fails at every seed), so it runs here, before the mask × seed product.
+    const variantFound = variantRescue(facts, deadline);
+    if (variantFound) {
+      lastConfigTier = 'variant';
+      return variantFound;
     }
     if (Date.now() > deadline) return null;
     // Discrete REFLECTION alternatives (#441). The sweep above varies only the CONTINUOUS jitter — the
@@ -2379,20 +2391,24 @@ export function searchAnotherView(
   const cur = replay(facts, seed);
   const branchId = firstCyclableBranch(cur.construction);
   const nBranch = branchId ? Math.max(1, branchCount(cur.construction, branchId)) : 1;
-  const variantFact = facts.find((f) => f.enabled && cyclableVariant(f.cmd));
-  const nVariant = variantFact ? variantCountOf(variantFact.cmd) : 1;
+  // #1711 (ADR-573): the variant dimension is the PRODUCT of every cyclable variant fact, walked as an
+  // odometer — step v advances the mixed-radix assignment by v — so successive presses reach every
+  // combination. It used to step only the FIRST variant fact, so a second sine (or a sine beside an
+  // isosceles apex) never changed.
+  const axes = variantAxes(facts);
+  const nVariant = axes.reduce((p, a) => p * a.n, 1);
   const hasDofs = freeDofs(cur.construction).length > 0;
   const curStrict = meetsRequirements(facts, seed);
   const seatFact = cyclableSeat(facts);
   const nSeat = seatFact ? 3 : 1; // rot ∈ {0,1,2} — which of the three vertices carries the angle
 
-  // A candidate's fact rewrite — the SAME steps `cycleAlt`/`cycleVariant` would apply.
-  const stepped = (b: number, v: number, r = 0): Fact[] =>
+  // A candidate's fact rewrite — the branch and seat steps `cycleAlt` would apply; the variant step is
+  // the odometer below.
+  const stepped0 = (b: number, r = 0): Fact[] =>
     facts.map((f) => {
       let cmd = f.cmd;
       if (b && f.enabled && branchId && BRANCH_CYCLE_KINDS.has(cmd.type) && 'id' in cmd && (cmd as { id?: Id }).id === branchId)
         cmd = { ...cmd, branch: ((((cmd as { branch?: number }).branch ?? 0) + b) % nBranch) } as AnyCommand;
-      if (v && variantFact && f === variantFact) cmd = withVariant(cmd, ((((cmd as { variant: number }).variant ?? 0) + v) % nVariant));
       if (r && seatFact && f === seatFact) {
         const { rot: prev, ...rest } = cmd as Extract<AnyCommand, { type: 'right-triangle' }>;
         const next = (((prev ?? 0) + r) % nSeat) as 0 | 1 | 2;
@@ -2400,6 +2416,7 @@ export function searchAnotherView(
       }
       return cmd === f.cmd ? f : { ...f, cmd };
     });
+  const stepped = (b: number, v: number, r = 0): Fact[] => (v ? withVariantAssignment(stepped0(b, r), axes, advanceAssignment(axes, v)) : stepped0(b, r));
 
   // Discrete combos: everything-advances first (the legacy intent), then each family walked fully.
   // The seat is walked LAST of the three: it reshapes the figure most drastically, so branch and
@@ -2470,6 +2487,78 @@ export function unpinnedSeats(facts: Fact[]): { f: Fact; i: number }[] {
     .map((f, i) => ({ f, i }))
     .filter(({ f }) => f.enabled && f.cmd.type === 'right-triangle' && !f.cmd.ids.some((id) => pinnedRA.has(id)))
     .slice(0, 2);
+}
+
+/** How many variant facts a configuration search steps (bounded like the branch tier's four points). */
+const VARIANT_AXES_MAX = 4;
+/** How many alternative variant assignments `variantRescue` tries (the branch tier's 16, doubled). */
+const VARIANT_COMBOS_MAX = 32;
+/** One cyclable variant fact: its index in the fact list, its count and its current variant. */
+export interface VariantAxis { i: number; n: number; cur: number }
+
+/**
+ * The cyclable variant facts of a figure, in fact order (#1711, ADR-573) — the one list both searches
+ * (`variantRescue`, `searchAnotherView`) step, so they can never disagree about which choices exist.
+ */
+export function variantAxes(facts: Fact[]): VariantAxis[] {
+  const out: VariantAxis[] = [];
+  facts.forEach((f, i) => {
+    if (out.length >= VARIANT_AXES_MAX || !f.enabled || !cyclableVariant(f.cmd)) return;
+    const n = variantCountOf(f.cmd);
+    const v = (f.cmd as { variant?: number }).variant ?? 0;
+    out.push({ i, n, cur: ((v % n) + n) % n });
+  });
+  return out;
+}
+
+/** The assignment `steps` places further round the odometer (the first axis turns fastest). */
+function advanceAssignment(axes: VariantAxis[], steps: number): number[] {
+  let idx = 0;
+  for (let k = axes.length - 1; k >= 0; k--) idx = idx * axes[k].n + axes[k].cur;
+  const total = axes.reduce((p, a) => p * a.n, 1);
+  let next = (((idx + steps) % total) + total) % total;
+  return axes.map((a) => {
+    const d = next % a.n;
+    next = Math.floor(next / a.n);
+    return d;
+  });
+}
+
+/** The facts with each axis set to its digit of `assignment` (unchanged facts keep their identity). */
+function withVariantAssignment(facts: Fact[], axes: VariantAxis[], assignment: number[]): Fact[] {
+  return facts.map((f, i) => {
+    const k = axes.findIndex((a) => a.i === i);
+    if (k < 0 || assignment[k] === axes[k].cur) return f;
+    return { ...f, cmd: withVariant(f.cmd, assignment[k]) };
+  });
+}
+
+/**
+ * THE VARIANT DIMENSION OF THE CONFIGURATION SEARCH (#1711, [ADR-573](docs/06-decisions.md#adr-573)).
+ *
+ * A variant is an unstated choice (ADR-052), so a failure the current variants cause belongs to the
+ * choice, not to the givens: try the other assignments — fewest changed facts first, so the figure moves
+ * as little as possible (the stability property) — and accept the first rewritten fact list that meets
+ * every requirement at a low seed. ONE helper shared by `findValidConfig`'s variant tier and the submit
+ * gate's curable test (`dryRunOutcome`), the `seatRescue` shape, so the door and the search agree about
+ * which failures a variant cures. Zero cost when no fact carries a cyclable variant.
+ */
+export function variantRescue(facts: Fact[], deadline: number): { facts: Fact[]; seed: number } | null {
+  const axes = variantAxes(facts);
+  if (axes.length === 0) return null;
+  const total = axes.reduce((p, a) => p * a.n, 1);
+  const changed = (a: number[]): number => a.reduce((c, d, k) => c + (d === axes[k].cur ? 0 : 1), 0);
+  const candidates = Array.from({ length: total - 1 }, (_, s) => advanceAssignment(axes, s + 1))
+    .sort((x, y) => changed(x) - changed(y))
+    .slice(0, VARIANT_COMBOS_MAX);
+  for (const assignment of candidates) {
+    const fc = withVariantAssignment(facts, axes, assignment);
+    for (let s = 0; s < 6; s++) {
+      if (Date.now() > deadline) return null;
+      if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
+    }
+  }
+  return null;
 }
 
 /**
@@ -2604,6 +2693,11 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
     // ~20 s ladder burn. An explicitly pinned seat leaves the sweep empty, so an honest refusal
     // (the obtuse-side message naming both givens) stands unchanged.
     if (seatRescue(all, Date.now() + 1500)) return { produced: true };
+    // #1711 (ADR-573): the same for an unstated VARIANT — the sine's other root, an isosceles apex. When
+    // another assignment of the figure's variant choices (the trial's own among them) admits the whole
+    // trial figure, the step commits; `settleVariantDefaults` settles the new fact's own choice at commit
+    // and the post-commit `autoResolve` (`findValidConfig`'s variant tier) flips an earlier one.
+    if (variantRescue(all, Date.now() + 1500)) return { produced: true };
     return { produced: false, reason: 'error', detail: after.status[errored.id] };
   }
   // "Built something" = added a shape/constraint/label, OR RESHAPED the figure — a step like "diameter AB"
@@ -2766,7 +2860,9 @@ function addMeasureLabel(
  * excluded here; it stays cyclable via the "show another configuration" button (`cycleVariant`).
  */
 export function variantConfigs(facts: Fact[]): Fact[][] {
-  const variantFacts = facts.filter((f) => f.enabled && f.cmd.type === 'shape-variant' && variantCountOf(f.cmd) > 1);
+  // #1711 (ADR-573): a multi-root angle given («sin∢ACB = 3/4») chooses a VALUE, so a relation true at one
+  // root only is the student's choice, never forced — it samples across its roots like a shape-variant.
+  const variantFacts = facts.filter((f) => f.enabled && (f.cmd.type === 'shape-variant' || f.cmd.type === 'measure-angle') && variantCountOf(f.cmd) > 1);
   if (variantFacts.length === 0) return [facts];
   const configs: Fact[][] = [facts];
   for (const vf of variantFacts) {

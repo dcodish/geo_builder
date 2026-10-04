@@ -376,6 +376,14 @@ canvas, the pair inside one of them) gets the same `not-a-diagonal { a, b, kind 
 `submit` refuses it through the fold with the same words. A pair reaching a free point or straddling two
 solids stays accepted: not yet checkable is not yet false.
 
+**A named meeting point is a crossing, judged on the figure ([ADR-3D-297](06b-decisions-3d.md#adr-3d-297), #1728).**
+Two named diagonals («האלכסונים AC ו-BD נפגשים בנקודה E») lower to the two claimed `segment3 {diagonal}` and
+`seg-crossing3`, whose point kind `seg-cross` is evaluated in closed form (`lineCrossing3`: the midpoint of the
+lines' closest approach). The named-quad form (`diag-intersection`) uses the same kind for its 1st↔3rd and
+2nd↔4th diagonals — the midpoint of one diagonal was exact only for a parallelogram. `derive3` checks the
+sentence's claim that the segments meet with `mutualHolds('intersecting')`, bounded, at the verify tolerance —
+the predicate the stated «AC ו-BD נחתכים» claim uses — and refuses `segments-do-not-meet { id, s1, s2 }`.
+
 **A change that orphans a row, and the symbol retry pass ([ADR-3D-220](06b-decisions-3d.md#adr-3d-220), #926).**
 `derive3` applies each fact through one `applyFact` (count-delta attribution included) and then re-applies,
 in a bounded pass to a fixpoint, every row still red that a DRY RUN shows would now succeed
@@ -614,6 +622,18 @@ The three statement seams share their pieces: `readStatement3` (the grammar plus
 #516 typed refusals), `lostGivens3` (the honesty gates), and `decideCommands3` (gates → twin → derive →
 search), which the LLM lane's `submitSteps` also ends in. A new branch belongs in the decision; the parity
 lock replays 1,500 sequences against the recorded behaviour.
+
+## A point placement keeps its tail (#1730, [ADR-3D-296](06b-decisions-3d.md#adr-3d-296))
+
+`onSegment` («X על YZ») is anchored: after the carrier comes nothing, a distance tail («במרחק 3 מ-A»), or
+a connector (`PLACEMENT_CONNECTOR` — «כך ש», «ונתון כי/ש», «וידוע כי/ש», «ו-», a comma, the English
+forms) and a condition. A condition that is a whole ratio of the rider (`WHOLE_RATIO`) keeps the ratio lane
+(a baked `t`, or the #921 letter); any other is read by `readCondition3` — the ordinary rule list, all or
+nothing, with one difference: a bare pair equation is a LENGTH there (`CONDITION_LENGTHS`), as it always
+was inside a ratio clause. The rider stays free and the condition drives it. An unread tail declines the
+line. The net behind it is `droppedGivenRelations3` in `lostGivens3`: a stated pair relation must be
+carried by one command that states something — a free rider and plain ink do not vouch for it — and the
+number gate no longer counts the digit in a command's `type` name as a payload.
 
 ## Known gaps
 

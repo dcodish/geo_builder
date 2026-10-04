@@ -39,9 +39,9 @@ import { verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
-import { meaningKey } from '../engine/operands';
+import { meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
 import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
-import { droppedConstructNoun3, droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
+import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
 import { parse3, parseRewrite3 } from '../parser/parse3';
 
 export interface Fact3 {
@@ -676,7 +676,7 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
   // (`namedPointAt`), so the OFFER lane and the TYPED lane answer one question the same way (#653).
   {
     const DERIVED = new Set([
-      'on-segment', 'centroid', 'in-span', 'right-apex', 'foot-plane', 'foot-line', 'line-plane', 'plane-cut',
+      'on-segment', 'seg-cross', 'centroid', 'in-span', 'right-apex', 'foot-plane', 'foot-line', 'line-plane', 'plane-cut',
       'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'vec-defined', 'vec-pair',
       // #984: the parallelogram corner was a `vec-defined` point until ADR-3D-257 gave it its own
       // kind — it stays in this set, or the rename would silently drop its coincidence refusal.
@@ -777,6 +777,21 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
           break;
         }
         // (claims these relations may have recorded are verified by the count-delta pass above)
+      } else if ((cmd.type === 'seg-crossing3' || cmd.type === 'diag-intersection') && c.points.get(cmd.id)?.kind === 'seg-cross') {
+        // #1728 — A STATED MEETING POINT MEETS. «האלכסונים AC ו-BD נפגשים בנקודה E» names two segments
+        // and says they meet at E; the point is placed where their lines cross, and this checks the
+        // sentence's own claim against the figure: the two DRAWN segments meet (coplanar, not parallel,
+        // crossing inside both). The predicate is `mutualHolds` at the verify tolerance — the same one the
+        // stated «AC ו-BD נחתכים» claim is judged by — so the two spellings cannot disagree.
+        const def = c.points.get(cmd.id) as Extract<PointDef, { kind: 'seg-cross' }>;
+        const [A1, B1, A2, B2] = [def.a1, def.b1, def.a2, def.b2].map((p) => positions.get(p));
+        const meets =
+          !!A1 && !!B1 && !!A2 && !!B2 && positions.has(cmd.id) &&
+          mutualHolds('intersecting', { geom: { point: A1, dir: sub3(B1, A1) }, bounded: true }, { geom: { point: A2, dir: sub3(B2, A2) }, bounded: true }, MUTUAL_VERIFY_TOL);
+        if (!meets) {
+          status[f.id] = { code: 'segments-do-not-meet', id: cmd.id, s1: `${def.a1}${def.b1}`, s2: `${def.a2}${def.b2}` };
+          break;
+        }
       } else if (cmd.type === 'line-plane-point') {
         if (!positions.has(cmd.id)) {
           status[f.id] = { code: 'line-misses-plane', id: cmd.id }; // parallel at the chosen parameter
@@ -1061,6 +1076,7 @@ function lostGivens3(utterance: string, commands: readonly Command3[], prior: Co
     ...droppedShapeNoun3(utterance, cmds), // #587 / ADR-3D-084: a stated base shape the lane cannot lower
     ...droppedTriShape3(utterance, cmds), // #424: a stated triangle qualifier silently dropped
     ...droppedConstructNoun3(utterance, cmds), // #438/#440: a stated OBJECT never materialised
+    ...droppedGivenRelations3(utterance, cmds), // #1730: a stated pair relation no command carries
   ];
 }
 

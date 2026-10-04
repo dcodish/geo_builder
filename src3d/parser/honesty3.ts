@@ -267,6 +267,36 @@ export function droppedNewLabels3(
 }
 
 /**
+ * #1730 (ADR-3D-296) — a stated two-pair RELATION («AD = AC», «AD ⊥ BC», «AB ∥ CD») that no committed
+ * command carries — the 2-D `droppedGivenRelations` (ADR-264, narrowed by ADR-570), copied per docs/20 §12.
+ *
+ * The label gate cannot see this drop: «D על BC ונתון כי AD = AC» names A, B, C, D and the lone
+ * `point-on-segment3 D on BC` references D, B, C — every label of the line "accounted", while AD = AC
+ * vanished. A relation is accounted only by ONE command that carries every label of it and states
+ * something: a rider with no ratio (`point-on-segment3` with neither `t` nor `sym`) places a point and
+ * relates nothing, and a `segment3` is ink — neither may vouch for a relation merely because it mentions
+ * the point the line introduces (the 2-D exemption ADR-570 narrowed). A ratio a rider BAKES («K על AA' כך
+ * ש-AK = 2KA'» → `t = ⅔`) does carry its relation.
+ *
+ * Conservative on the utterance side: only a bare pair-relation-pair of point labels is demanded; a
+ * coefficient («AB = 2CD»), a magnitude bar, a named vector or a plane run is another gate's business.
+ */
+export function droppedGivenRelations3(utterance: string, commands: Command3[]): string[] {
+  const s = normalize3(utterance);
+  const L = String.raw`[A-Z]\d*'?`;
+  const rel = new RegExp(String.raw`(?<![A-Za-z\d'|])(${L})(${L})\s*(=|⊥|⟂|∥)\s*(${L})(${L})(?![A-Za-z\d'|])`, 'g');
+  const statesNothing = (c: Command3): boolean =>
+    c.type === 'segment3' || (c.type === 'point-on-segment3' && c.t === undefined && c.sym === undefined);
+  const carriers = commands.filter((c) => !statesNothing(c)).map((c) => new Set(JSON.stringify(c).match(/[A-Z]\d*'?/g) ?? []));
+  const dropped: string[] = [];
+  for (const m of s.matchAll(rel)) {
+    const labels = [...new Set([m[1], m[2], m[4], m[5]])];
+    if (!carriers.some((have) => labels.every((l) => have.has(l)))) dropped.push(m[0].replace(/\s+/g, ' ').trim());
+  }
+  return [...new Set(dropped)];
+}
+
+/**
  * Stated numeric magnitudes absent from every committed command's payload — the sign the LLM
  * decomposition silently DROPPED a given. Returns the lost numbers as the raw stated snippets
  * (empty = pass).
@@ -300,7 +330,10 @@ export function droppedGivenNumbers3(utterance: string, commands: Command3[]): s
       if (v.length && v.every((x) => typeof x === 'string')) add(v.length); // a count lowered by structure
       for (const x of v) walk(x);
     } else if (v && typeof v === 'object') {
-      for (const x of Object.values(v)) walk(x);
+      // #1730: a `type` tag is a discriminator, never a payload — `point-on-segment3` / `segment3` / `line3`
+      // carry the digit 3 in their NAME, and that accounted a stated «3» for free: «D על BC ונתון כי AD = 3»
+      // committed the rider alone, green, with the 3 "paid for" by the command's own type string.
+      for (const [k, x] of Object.entries(v)) if (k !== 'type') walk(x);
     }
   };
   for (const c of commands) walk(c);

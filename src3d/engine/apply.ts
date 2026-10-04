@@ -943,6 +943,8 @@ export function structurallyOnRun3(c: Construction3, run: Id[], q: Id, seen: Set
     case 'foot-seg':
     case 'plane-cut':
       return all([def.a, def.b]); // both lie on the carrier segment a–b
+    case 'seg-cross':
+      return all([def.a1, def.b1]); // it lies on the first segment (and the second)
     case 'centroid':
       return all(def.of);
     case 'parallelogram-point':
@@ -1490,10 +1492,27 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const ring = resolveQuadRing(c, cmd.face, cmd.id);
       if (!ring.ok) return { ok: false, error: ring.error };
       const face = ring.face;
-      // a parallelogram's diagonals bisect ⇒ the crossing = midpoint of a diagonal
-      // (1st & 3rd cyclic vertices); reuses the on-segment point kind (no eval change)
+      // #1728: the crossing of the two diagonals (1st↔3rd, 2nd↔4th cyclic vertices). It used to be the
+      // midpoint of the first diagonal — exact only for a parallelogram, so on a general quad («מרובע
+      // ABCD», a general-quad base) the point sat off the second diagonal, under a green row.
       const next = clone(c);
-      next.points.set(cmd.id, { kind: 'on-segment', a: face[0], b: face[2], t: 0.5 });
+      next.points.set(cmd.id, { kind: 'seg-cross', a1: face[0], b1: face[2], a2: face[1], b2: face[3] });
+      return { ok: true, next };
+    }
+
+    case 'seg-crossing3': {
+      // #1728: «האלכסונים AC ו-BD נפגשים בנקודה E» — the meeting point of two NAMED segments. Both are drawn
+      // (the student named them); whether they really meet is the figure's to show, judged in derive3.
+      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      const ends = [cmd.a1, cmd.b1, cmd.a2, cmd.b2];
+      const missing = missingPoint(c, ends);
+      if (missing) return { ok: false, error: missing };
+      if (cmd.a1 === cmd.b1 || cmd.a2 === cmd.b2) return { ok: false, error: { code: 'no-solution', id: cmd.id } };
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'seg-cross', a1: cmd.a1, b1: cmd.b1, a2: cmd.a2, b2: cmd.b2 });
+      for (const [p, q] of [[cmd.a1, cmd.b1], [cmd.a2, cmd.b2]] as const) {
+        if (!hasSegment(next, p, q)) next.segments.push([p, q]);
+      }
       return { ok: true, next };
     }
 

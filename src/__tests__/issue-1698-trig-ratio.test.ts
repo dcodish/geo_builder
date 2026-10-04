@@ -70,13 +70,14 @@ describe('#1698 — every spelling of a tan / cos given asserts the trig inverse
     });
   }
 
-  it('the figure prints the given as stated («tan=2»), never a computed number of degrees', async () => {
+  // #1718 (ADR-572) amends ADR-566's «tan=2» label: the figure prints the ANGLE the given draws.
+  it('the figure prints the resulting angle («63.43°»), never the ratio «tan=2»', async () => {
     const v = await decide(TRI, 'tan∢ABC = 2');
     const m = committed(v).find((c) => c.type === 'measure-angle');
-    expect(m && m.type === 'measure-angle' && 'value' in m.expr ? m.expr.text : undefined).toBe('tan=2');
+    expect(m && m.type === 'measure-angle' && 'value' in m.expr ? m.expr.text : 'absent', 'no typed text rides the measure').toBeUndefined();
     const fig = replay(factsOf([...TRI, 'tan∢ABC = 2']), 0);
     const atB = fig.labels.angles.filter((l) => l.vertex === 'B');
-    expect(atB.map((l) => l.text), 'the wedge at B carries the stated given').toEqual(['tan=2']);
+    expect(atB.map((l) => l.text), 'the wedge at B carries the angle').toEqual(['63.43°']);
   });
 });
 
@@ -104,8 +105,9 @@ describe('#1698 — what names no single angle is refused by name, never drawn a
   const REFUSED: [string, string][] = [
     ['cos∢ABC = 2', 'input.trigGiven.out-of-range'],
     ['קוסינוס הזווית ACB = 5/4', 'input.trigGiven.out-of-range'],
-    ['sin∢ACB = 3/4', 'input.trigGiven.sine-two-angles'],
-    ['סינוס הזווית ACB = 3/4', 'input.trigGiven.sine-two-angles'],
+    // #1711 (ADR-573): a sine in (0, 1) now BUILDS as a two-root choice; only a sine with no angle is refused.
+    ['sin∢ACB = 5/4', 'input.trigGiven.sine-out-of-range'],
+    ['סינוס הזווית ACB = -1/2', 'input.trigGiven.sine-out-of-range'],
     ['tan∢ABC > 1', 'input.trigGiven.form'],
     ['tan∢ABC = α', 'input.trigGiven.form'],
     ['זווית B שטנגנס שלה 2', 'input.trigGiven.form'],
