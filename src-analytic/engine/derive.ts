@@ -18,6 +18,7 @@ import { isCanonicalCircle } from './conic';
 import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
 import { SOLVE_TOL, resolveChoices } from './solve';
 import { NO_STATED_MEASURES, statedMeasures, type StatedMeasures } from './statedMeasures';
+import { incidenceWords } from './crossings';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
 /** The point ids an incidence constraint is ABOUT — how a crossing is recognised (#1254). */
@@ -40,6 +41,8 @@ export interface LineFault {
   /** #1432 am. 1 — the host a contextual reference needed, and the bound a stated value broke. */
   host?: ApplyError['host'];
   domain?: ApplyError['domain'];
+  /** For a crossing already named: the two things that cross, as the grammar says them (#1416). */
+  operands?: [string, string];
 }
 
 /**
@@ -382,7 +385,11 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
         if (qi !== undefined && qi > index) return false; // only a point that was ALREADY there
         return Math.hypot(q.x - pt.x, q.y - pt.y) < near;
       });
-      if (holder) faults.push({ index, code: 'crossing-already-named', detail: lines[index], holder: holder.id });
+      if (!holder) continue;
+      // The refusal names the two operands (#1416) — read off the crossing's own incidences, never assumed lines.
+      const said = construction.constraints.filter((k) => incidenceIds(k).includes(pt.id)).map((k) => incidenceWords(construction, k));
+      const operands: [string, string] | undefined = said.length === 2 && said[0] && said[1] ? [said[0], said[1]] : undefined;
+      faults.push({ index, code: 'crossing-already-named', detail: lines[index], holder: holder.id, ...(operands ? { operands } : {}) });
     }
   }
   for (const v of figure.vacant) {
