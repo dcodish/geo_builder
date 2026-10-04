@@ -38,6 +38,12 @@ export type Id = string;
 export interface PerpRef {
   from: Id;
   onto?: FootLine;
+  /**
+   * The tool letter of the foot, when the perpendicular is named IN FULL (its point and its line): the figure has no
+   * such perpendicular yet, so the reference BUILDS it with this foot (#1727, ADR-AG-229). One already drawn is still
+   * the one referred to, and the letter then names nothing (`derive` drops a tool letter the fold did not create).
+   */
+  mint?: Id;
 }
 
 // ---------------------------------------------------------------------------

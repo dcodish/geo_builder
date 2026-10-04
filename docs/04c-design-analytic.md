@@ -2318,7 +2318,14 @@ No new constraint kind and no new solver: every form lowers to the `length-eq` t
 
 - **`meetFrame`** reads «<subject> נפגשים/נחתכים בנקודה E». It runs before `parsePerpendicular` in the rule chain. It tries every join in the subject (the clitic «ו» now also before ח ג ת), left to right. Each split goes through the canonical crossing «E נקודת החיתוך של X עם Y», and the first split that parses wins. An owned refusal is the sentence's own; no reading at all is `null`, for the rules after it.
 - **`lineObjectOperand`** reads a line-object noun phrase through `parseClause`, the same rule that reads it as a sentence. It puts the point on the line that sentence built, using one table: `bisects` → `p`; `cevian-of` → apex–foot; a piece ending at a derived point → that piece's line; `line-at` → `on-curve`.
-- **`incidenceOn`** returns it as `{ t: 'object', facts }`, after the tangent and the contextual «האנך» (ADR-AG-207's reference rule; question #1727).
+- **`incidenceOn`** returns it as `{ t: 'object', facts }`, after the tangent and «האנך».
+- **«האנך» named in full builds when absent** ([ADR-AG-229](06c-decisions-analytic.md#adr-ag-229), #1727, amending ADR-AG-207):
+  - `perpendicularRef` gives `on-kind perpendicular` a `foot.mint`, the foot's tool placeholder;
+  - M1's arm counts the matching perpendiculars: a `foot` derived the same way, or an altitude with a student-named foot (AD ⟂ BC, D on BC);
+  - one → the reference, and the unused letter is dropped by `derive`;
+  - none → it builds the derived foot and the piece, then the point on it;
+  - several → `ambiguous-shape`.
+  - A perpendicular crossed with its own line lowers to the named foot («E רגל האנך …»), in `parseIntersectionPlain`.
 - **`parseIntersectionPlain`** lowers it like a contextual operand: declare, each side's facts, `crossing-distinct`. Two operands with the same incidence are `repeated-vertex`.
 - **The point-on sentence** lowers an object operand to the declare and its facts.
 

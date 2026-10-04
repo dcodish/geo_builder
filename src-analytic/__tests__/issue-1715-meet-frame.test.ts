@@ -148,8 +148,9 @@ describe('#1715 — the classical centres, each through the frame', () => {
       near(d, pt(d, 'E'), orthocentre(pt(d, 'A'), pt(d, 'B'), pt(d, 'C')));
     }
   });
-  it('an undrawn «האנך מ-C ל-AB» in the frame asks which perpendicular (ADR-AG-207’s reference rule)', () => {
-    expect(verdict([TRI, 'חוצה זוית B והאנך מ-C ל-AB נפגשים בנקודה E'])).toBe('refused:ambiguous-shape');
+  // #1727 (ADR-AG-229): a perpendicular named in full is built when the figure has none.
+  it('an undrawn «האנך מ-C ל-AB» in the frame is built (#1727, amending ADR-AG-207)', () => {
+    expect(verdict([TRI, 'חוצה זוית B והאנך מ-C ל-AB נפגשים בנקודה E'])).toBe('record');
   });
 });
 
