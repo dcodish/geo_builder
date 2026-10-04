@@ -751,7 +751,9 @@ exactly-two at M1), both verb orders — normalise onto the canonical sentence t
 Its first step is `meetingSpelling` ([ADR-AG-230](06c-decisions-analytic.md#adr-ag-230), #1609): «מפגש» /
 «נקודת המפגש (של)» / "the meeting point of" is re-spelled with the canonical head «נקודת החיתוך של» (keeping
 «אחת מ…» and an ordinal) and re-parsed — unless `concurrencyOf` claims the tail (a role: «התיכונים במשולש
-ABC»), when it answers `null` and `CONCURRENCY_HE` keeps the sentence.
+ABC»), when it answers `null` and `CONCURRENCY_HE` keeps the sentence. The distributive plural «(ה)ישרים X ו-Y» / "(the) lines X and Y" has ONE
+reader, `distributedLines` ([ADR-AG-235](06c-decisions-analytic.md#adr-ag-235), #1749): the crossing noun and the meet
+verb (`meetFrame`) both hand it their operand phrase, which it reads whole as «הישר X», «הישר Y».
 
 ## A cevian lowers to its WHOLE definition ([ADR-AG-109](06c-decisions-analytic.md#adr-ag-109))
 
@@ -2337,7 +2339,7 @@ No new constraint kind and no new solver: every form lowers to the `length-eq` t
 
 ## One meet frame; a line-object as an operand ([ADR-AG-224](06c-decisions-analytic.md#adr-ag-224), #1715)
 
-- **`meetFrame`** reads «<subject> נפגשים/נחתכים בנקודה E». It runs before `parsePerpendicular` in the rule chain. It tries every join in the subject (the clitic «ו» now also before ח ג ת), left to right. Each split goes through the canonical crossing «E נקודת החיתוך של X עם Y», and the first split that parses wins. An owned refusal is the sentence's own; no reading at all is `null`, for the rules after it.
+- **`meetFrame`** reads «<subject> נפגשים/נחתכים בנקודה E». It runs before `parsePerpendicular` in the rule chain. It tries every join in the subject (the clitic «ו» now also before ח ג ת), left to right. Each split goes through the canonical crossing «E נקודת החיתוך של X עם Y», and the first split that parses wins. A distributive plural subject («הישרים 1 ו-2») is tried first, whole, through `distributedLines` (#1749, ADR-AG-235) — never split, so the noun covers both names. An owned refusal is the sentence's own; no reading at all is `null`, for the rules after it.
 - **`lineObjectOperand`** reads a line-object noun phrase through `parseClause`, the same rule that reads it as a sentence. It puts the point on the line that sentence built, using one table: `bisects` → `p`; `cevian-of` → apex–foot; a piece ending at a derived point → that piece's line; `line-at` → `on-curve`.
 - **`incidenceOn`** returns it as `{ t: 'object', facts }`, after the tangent and «האנך».
 - **«האנך» named in full builds when absent** ([ADR-AG-229](06c-decisions-analytic.md#adr-ag-229), #1727, amending ADR-AG-207):

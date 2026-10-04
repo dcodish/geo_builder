@@ -1641,10 +1641,17 @@ function meetFrame(line: string): RuleOutcome {
   const m = he ?? new RegExp(`^(.+?)\\s+(?:intersect|meet|cross)\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`, 'i').exec(line);
   if (!m) return null;
   const [, subject, id] = m;
+  /**
+   * The subject's two operands, in the order they are tried. A DISTRIBUTIVE plural («(ה)ישרים 1 ו-2», "the lines l1
+   * and l2") is read by the crossing's own reader (`distributedLines`, #1749) — the noun covers both names, so it is
+   * never split as two phrases (the split would hand «2» to the operand resolver with no noun). Otherwise every join.
+   */
+  const pairs: Array<[string, string]> = [];
+  const dist = distributedLines(subject);
+  if (dist) pairs.push(dist);
   const join = he ? new RegExp(INTERSECT_JOIN, 'g') : /\s+and\s+/gi;
-  for (const j of subject.matchAll(join)) {
-    const left = subject.slice(0, j.index);
-    const right = subject.slice(j.index! + j[0].length);
+  for (const j of subject.matchAll(join)) pairs.push([subject.slice(0, j.index), subject.slice(j.index! + j[0].length)]);
+  for (const [left, right] of pairs) {
     if (!trim(left) || !trim(right)) continue;
     const [a, b] = sharedCircle(left, right);
     const canonical = `${id} נקודת החיתוך של ${withLineNoun(a)} עם ${withLineNoun(b)}`;
@@ -1675,12 +1682,13 @@ function intersectionSpellings(line: string): RuleOutcome {
   if (both) return both;
   const ordWord = (s: string | undefined) => (s ? ` ${s.replace(/^ה?/, 'ה')}` : '');
   const HEAD = `^${HE_POINT}(${NAME})${HE_IS}\\s*${ONE_OF_HE}(?:ה?נקודת|ה?נקודות)?\\s*ה?חיתוך\\s*(ה?ראשונה|ה?שניי?ה|ה?אחרת)?\\s*`;
-  const dist =
-    new RegExp(`${HEAD}(?:של\\s+)?ה?ישרים\\s+(\\S+)\\s+ו-?\\s*(\\S+)$`).exec(line) ??
-    new RegExp(`^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+()intersection\\s+of\\s+(?:the\\s+)?lines\\s+(\\S+)\\s+and\\s+(\\S+)$`, 'i').exec(line);
-  if (dist) {
-    const [, id, ord, a, b] = dist;
-    return viaCanonical(line, null, () => [`${id} נקודת החיתוך${ordWord(ord)} של הישר ${a} עם הישר ${b}`]);
+  const distHead =
+    new RegExp(`${HEAD}(?:של\\s+)?(.+)$`).exec(line) ??
+    new RegExp(`^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+()intersection\\s+of\\s+(.+)$`, 'i').exec(line);
+  const dist = distHead ? distributedLines(distHead[3]) : null;
+  if (distHead && dist) {
+    const [, id, ord] = distHead;
+    return viaCanonical(line, null, () => [`${id} נקודת החיתוך${ordWord(ord)} של ${dist[0]} עם ${dist[1]}`]);
   }
   const bare = new RegExp(`${HEAD}(?:של\\s+)?ה?ישרים$`).exec(line) ??
     new RegExp(`^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+()intersection\\s+of\\s+the\\s+lines$`, 'i').exec(line);
@@ -1852,8 +1860,21 @@ function bothCrossings(line: string): RuleOutcome {
 
 /** A bare token («l1», «AB») gets its noun back for the canonical spelling; a PLURAL noun that
  *  distributed over the pair («הישרים l1») is normalised to its singular; a full phrase passes. */
+/**
+ * THE DISTRIBUTIVE PLURAL — «(ה)ישרים 1 ו-2», «הישרים l1 ו-l2», "(the) lines l1 and l2" — as its two singular
+ * operands «הישר 1», «הישר 2» (#1429; ONE reader since #1749, ADR-AG-235). The plural noun covers BOTH names, so the
+ * phrase is read whole: the crossing noun («A נקודת החיתוך של הישרים 1 ו-2», and «מפגש» through it) and the meet verb
+ * («הישרים 1 ו-2 נפגשים בנקודה A») both hand their operand phrase here. Before #1749 the verb split the phrase at «ו-»
+ * and gave the noun to the left half only, so a bare digit name on the right («2») reached the resolver with no noun.
+ */
+function distributedLines(phrase: string): [string, string] | null {
+  const t = trim(phrase);
+  const m = /^ה?ישרים\s+(\S+)\s+ו[-־]?\s*(\S+)$/.exec(t) ?? /^(?:the\s+)?lines\s+(\S+)\s+and\s+(\S+)$/i.exec(t);
+  return m ? [`הישר ${m[1]}`, `הישר ${m[2]}`] : null;
+}
+
 function withLineNoun(s: string): string {
-  const t = trim(s).replace(/^ה?ישרים\s+/, 'הישר ');
+  const t = trim(s);
   return /^[ℓl][0-9]?$/.test(t) || /^[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?$/.test(t) ? `הישר ${t}` : t;
 }
 

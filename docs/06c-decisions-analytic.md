@@ -11078,3 +11078,23 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Not changed.** The exam imperative stays a TEACH in analytic (ADR-AG-206), where 2-D obeys it; that divergence predates this ADR. With P inside the circle the imperative's lesson is dropped by the gate (its candidate does not fold) and the line answers `not-handled` — the ADR-AG-206 rule for a candidate the fold refuses, unchanged here.
 
 **Consequences.** `parser/parseAnalytic.ts` (`fromPointVerb`, the shared lowering), `parser/scopeAnalytic.ts` (`משיקים`, `שני`, the from-point frame), `parser/catalogAnalytic.ts` (one row — it feeds `PROMPT_SPEC_ANALYTIC`, so the LLM proxy needs a redeploy), `shell/__tests__/fixtures/geo-input-parity.ts` (five rows).
+
+## ADR-AG-235 — The meet verb reads the distributive plural through the crossing's reader: «ישרים 1 ו-2 נפגשים בנקודה A» (#1749)
+
+**Date:** 2026-10-04 · **Status:** accepted · fix-round #1753, batch item for #1749
+
+**Requirements:** none (internal) — R119 already promises every operand form in every order; this makes the verb keep that promise. · **Design:** [04c](04c-design-analytic.md) — the operand-vocabulary paragraph and the `meetFrame` bullet name `distributedLines`. · **LADDER stage:** parse only (an operand reader shared by `intersectionSpellings` and `meetFrame`). No new fact, object or rule.
+
+**Context.** Operator, round #1736 play, T1: *"check also that «ישרים 1 ו- 2 נפגשים בנקודה A» works. It did for me but maybe went to LLM before success"*. Re-measured at pickup (origin/main c098af9b, `decideSubmit`, after «נתון הישר 1: 2x-y+8=0» · «משוואת ישר 2 היא x+3y-10=0»): «(ה)ישרים 1 ו-2 נפגשים/נחתכים בנקודה A», with «ו- 2» and with the UI's ⁦⁩ isolates, all `not-handled` (the LLM's); «הישר 1 והישר 2 נפגשים», «A מפגש הישרים 1 ו-2», «הישרים l1 ו-l2 נפגשים» recorded. English "the lines l1 and l2 meet at A" was `not-handled` too — the same class, unreported.
+
+**Root cause.** Two readers for one operand phrase. The crossing noun read the distributive plural «הישרים X ו-Y» whole (its `dist` regex in `intersectionSpellings`). The meet verb (`meetFrame`, #1715) split the subject at «ו-» and handed each half to the canonical crossing, with `withLineNoun` turning the LEFT half's «הישרים» into «הישר»; the right half got a noun only when it looked like a name (`l2`, `AC`). A bare digit name («2») reached the resolver with no noun and the split failed. The English verb had no plural reading at all.
+
+**Decision.** One reader, `distributedLines(phrase)`: «(ה)ישרים X ו[-־]? Y» / "(the) lines X and Y" → [«הישר X», «הישר Y»]. The crossing noun's distributive path hands it the tail after its head (ordinal kept); `meetFrame` tries it first on its subject, whole, before the per-join splits. `withLineNoun` loses its «הישרים → הישר» rewrite, so no second plural reader is left. The frame's subject still resolves to two explicit operand strings (the #1751 hook: a later change can draw them).
+
+**Class check.** Other plural readers: `tangentsMeet` (the tangents' own plural, unchanged), `BISECTORS_MEET_HE` (its own nouns, unchanged). The both-crossings verb (`BOTH_HE`) also splits at `INTERSECT_JOIN`, but its plural subject would name two straight lines, which meet once — not a sentence that form can build, so it is left alone. Sibling products: digit-named lines are analytic-only. 2-D's verb frame reads «הישרים AC ו-BD נפגשים בנקודה M» (measured by the parity row below).
+
+**Parity (#1649).** Added the control `meet-verb-lines-plural-1749` («מרובע ABCD» · «הישרים AC ו-BD נפגשים בנקודה M», `builds`; 3-D known gap #1679). Analytic built it before through `withLineNoun`, and now through `distributedLines`.
+
+**Locks.** `src-analytic/__tests__/issue-1749-meet-verb-digit-lines.test.ts`, 29 tests, **17 fail before**: the operator's line through `decideSubmit` (also «ו-2» and isolate-wrapped), A at (-2, 4); the grid {ישרים, הישרים, הישר X והישר Y} × {1 ו-2, 1 ו- 2, l1 ו-l2} × {נפגשים, נחתכים}; two English verbs; the verb lowers to exactly the noun sentence's facts (four pairs); a line not in the figure is still refused.
+
+**Consequences.** `parser/parseAnalytic.ts` (`distributedLines`; `intersectionSpellings`; `meetFrame`; `withLineNoun`), `shell/__tests__/fixtures/geo-input-parity.ts` (one row), `docs/04c-design-analytic.md`. Catalog unchanged.
