@@ -1526,6 +1526,8 @@ The existing `two-circles-mutual-tangent-secants` scenario was found to have the
 
 **Scope / limits.** Deferral gives order-independence for a COMPLETE, consistent given set — it re-orders failed constraints to the end. It does NOT make a genuinely under-determined partial figure (e.g. CE⟂AB with the sizes never entered) snap to a configuration — that stays pending until the determining givens arrive (correct: there's no unique figure yet). The "decision of what point is fixed" the operator objected to is gone for these cases: every unstated magnitude (G's extension distance, C's angle, the circle centres/radii) is a free DOF the solver may drive, and a derived point (F from G) re-evaluates from its parents — nothing is artificially pinned.
 
+**Amendment (2026-10-04, [ADR-577](#adr-577), #1411) — the post-pass retry takes CREATING facts too.** "A point-introducing fact is never deferred" was the right rule for the IN-ORDER fold, which still never reorders. It does not apply to the retry pass, which touches only red rows, in list order, to a fixpoint: a row that read a point before it existed is itself red and lands after it. The limit is lifted there (the 2-D half of [ADR-W-089](06w-decisions-workspace.md#adr-w-089)); a lost-definition guard keeps the removal/mute cascade.
+
 **Amendment (2026-06-23) — the INPUT GATE must commit a deferrable constraint, not escalate it.** The first cut put deferral in `replay`, which operates on the COMMITTED fact list — but the operator re-ran the flow and it still failed on the ⟂. Root cause: `App.submit` dry-runs a parsed step (`dryRunOutcome`) before committing, and a constraint that can't be satisfied at its position returns `reason: 'error'`, which the gate treated as "weak" → **escalated to the LLM** (which re-emits the same command, or drops it) → the ⟂ **never entered the fact list**, so `replay`'s deferral never saw it. Fix: when a deterministic parse (no dropped labels) yields a step whose dry-run errors but which carries a **deferrable constraint** (`hasDeferrableConstraint` — a `set-perpendicular`/`set-distance`/`set-angle`/… relation that introduces no new point), `App.submit` now **commits it** instead of escalating. It shows as a failing step until later givens pin it, at which point deferral resolves it; a genuine contradiction surfaces honestly as a failing step rather than a misleading "couldn't read that". Locked by the App.submit-faithful test `q4-commit-deferred-perpendicular` (the operator's exact sequence through parse → gate → execute). **1262 tests green.**
 
 ---
@@ -14174,3 +14176,62 @@ The full suite is the batch gate (round #1736).
 - `src/engine/apply.ts`: `reseatFreeCircle`; the (c2) call, the re-seated centre spot, and the arm-2 collision rule.
 
 **Behaviour change for a student:** after «משולש ABC» and «מעגל O», «המעגל עובר דרך A, B ו-C» (or «A, B ו-C על המעגל») is accepted: the triangle stays where it was and the circle becomes its circumcircle, instead of being refused. Putting one or two vertices of a drawn shape on a drawn circle no longer moves those vertices; the circle moves to them.
+## ADR-577 — A row that creates a point, left above the rows that declare its operands, builds; a failed row claims only what it defines (#1411)
+
+**Status:** accepted · 2026-10-04 · bug (P2) · round #1736 · branch `fix/1411-fold-creating-retry` off `main` @ d9a5910f · the 2-D half of [ADR-W-089](06w-decisions-workspace.md#adr-w-089)
+
+**Requirements:** [FR-IN-10](02-requirements.md) (extended — the list itself is order-free) · **Design:** [04-design.md](04-design.md) the `replay/` entry (the fold's retry pass and claim rule) · **LADDER stage:** the replay fold (in-order pass → ADR-104 retry), plus `evaluate`'s stuck-branch message. No parser, solver or render change.
+
+**Cites** [ADR-104](#adr-104) (the deferral — amended), [ADR-015](#adr-015) (muting cascades), [ADR-280](#adr-280) / [ADR-406](#adr-406) (the fold memo and #365 prefix resume), [ADR-337](#adr-337) / [ADR-338](#adr-338) (all-or-nothing apply, apply units), [ADR-407](#adr-407) (#403 futility), [ADR-508](#adr-508) / [ADR-554](#adr-554) (the drop-one counterpart search), [ADR-571](#adr-571) (the submit refusal that names missing operands).
+
+**Context — re-measured at pickup on d9a5910f, through `runSubmit` (LLM mocked) + the row's delete (`removeGroup`).** The issue's claims held exactly:
+
+| sequence | before |
+| --- | --- |
+| «משולש ABC» · «M אמצע AB» · delete the triangle · «משולש ABC» | M row `unresolved dependencies for: M` (humanised «relies on M»), no M; the triangle ok |
+| «משולש ABC» · «AM תיכון» · delete · «משולש ABC» | the re-typed triangle REFUSED «A is no longer available»; the median rows red |
+| «משולש ABC» · «AD גובה» · delete · «משולש ABC» | refused the same way |
+
+**Class.** *A creating statement whose operands are declared only by a LATER row.* What a row carries depends on the context it was parsed in: typed under the triangle, «M אמצע AB» stores just `midpoint{M,A,B}` (the parser emits `segment AB` only when A or B is missing). After a delete or a ✎ edit, or on loading a file saved in that order, the row sits above its operands, and whether it built depended on hidden state the student cannot see. Every derived-point lowering is a member (midpoint, foot, bisector∩side, line∩line, the median/altitude/bisector groups, any LLM-sourced derived point).
+
+**Root cause — two seams in `computeFold`/`runBuild` (`src/replay/core.ts`), plus a misleading message.**
+1. The ADR-104 retry skipped every fact whose lowering introduces a point (`introducedPointIds === 0`), so a creating row that failed at its position was never retried against the completed figure. That limit is right for the in-order fold and wrong for the post-pass, which touches only red rows, in list order, to a fixpoint (ADR-W-089's argument).
+2. A FAILED fact claimed every point it would introduce, including free points it would only have auto-created. The red `segment AM` of the median claimed A, so the re-typed triangle tripped the `broken` cascade («A is no longer available»).
+3. `evaluate`'s stuck branch named the STUCK object (M) instead of the absent operands (A, B).
+
+**Decision (M2 — order independence in the fold).**
+1. **One lowering, one apply.** `engineCmdsOf(f)` (memoised per fact OBJECT — a dry-run trial list can repeat `~try.N` ids, and an id-keyed memo broke the #541 lock in development; the shape-variant/inscribe expansion plus every pre-scan reseat: rtReorder/rot, msRiderMove, trapRotate, legsReseat, promoteCentres, pairSwap) and `tryApplyFact(cur, cmds)` (the ADR-338 unit loop, all or nothing) serve the in-order pass and the retry alike. The retry used to lower with bare `lowerOne` and apply command by command — harmless while only pure relations were retried.
+2. **The retry takes CREATING facts.** `deferrable` = red, enabled, non-forced, non-futile (#403), ≥1 lowered command; the ADR-280 purity skip stays. One guard keeps the cascade honest: a fact is not retried while it would re-introduce a point that ANOTHER statement claims and the figure lacks (its definition is gone — the phase3 «removing an early step cascades» lock). The fold records which statements claim each point (`claimedBy`), so a fact's own claim never blocks itself.
+3. **A failed fact claims only what it DEFINES** — `introducedDefinedPointIds` (exported beside `introducedPointIds`): the introduced points whose kind is not `free-point` (`triangle` → none, `segment AM` → none, `midpoint` → M, `foot` → D, `square ABCD` → C, D). Disabled and atomic-poisoned facts keep the full claim, so muting still cascades (ADR-015).
+4. **Memo exactness.** A fold node where a creating fact landed on the retry pass carries `retriedCreating: true` and is never a #365 prefix-resume point: resume would apply an appended fact before it, the full fold after. Relation-only retries leave the flag false, so their resume behaviour is unchanged.
+5. **Honest message.** When a stuck object's parents include point ids that are not objects in the construction at all, `evaluate` returns `undefined point: A, B` (points only, deduped, first-reference order; `stuckIds` unchanged); `unresolved dependencies for:` stays for a genuine cycle. Humanised by `errors.undefinedPoints` (he: «הנקודות A, B לא הוגדרו — הוסיפו שורה שמגדירה אותן…»). The submit seam's ADR-571 missing-operand refusal now matches both wordings.
+
+**Measured after** (`src/app/__tests__/issue-1411-creating-row-above-parent.test.ts`, the real submit path):
+
+| sequence | now |
+| --- | --- |
+| «משולש ABC» · «M אמצע AB» · delete · «משולש ABC» | ok, ok; M the midpoint of AB |
+| … «AM תיכון» … | the triangle commits; all rows ok; M the midpoint of BC, AM drawn |
+| … «AD גובה» … | all ok; D the foot on BC |
+| … «M אמצע AB» · «N אמצע AM» … | all ok; the chain settles in one pass |
+| delete, do not re-type | the M row red, «undefined point: A, B» → «הנקודות A, B לא הוגדרו…» |
+| mute the triangle / un-mute | the M row not ok, no M / ok, M back (ADR-015 unchanged) |
+| A, B, C after the re-type | equal to «משולש ABC» typed alone at seed 0 (stability) |
+| append «AB = 6» | no prefix resume; equals a cold fold |
+
+**One recorded behaviour moved — a refusal's counterpart, now the newest.** Decide-parity shard 4: `quarter-circle-conflict-names-no-innocent-given-1203` («ABC משולש ישר זוית · AC=15 · BC=10 · רבע מעגל CAB»). The refusal is still the quarter's own statement and the three givens stay green (the scenario's assertions hold unchanged); its counterpart tail moved from `[vs #1]` («AC=15») to `[vs #3]` («BC=10»). Measured: the ADR-508/554 search tries the latest earlier statement first; the trial fold with «BC=10» removed used to FAIL — the quarter's `circle-C` (a creating fact) failed at its position and was never retried, the very class fixed here — so the search fell through to «AC=15». That trial now builds (CA = CB = 15, ∠ACB = 90°, verifier clean), so the latest statement whose removal lets the quarter hold is named, per the ADR-492/508 doctrine. Golden re-recorded; shard 4 also gains this ADR's scenario key.
+
+**Perf** (docs/17 §7; cold fold, 5 reps with memo eviction, min / median ms). #59 fixture (`2022-summer-a-issue59`): before 313 / 325; after 333 / 359 and 291 / 309 (two runs — noise). `issue-572-load-collapse` (one red row): before 3350 / 3507; after 4034 / 4685 and 3437 / 3508 (the first run noisy; the repeat equals the baseline). Green folds pay nothing new (the retry loop is gated on a red row; lowering is now memoised). A red creating row pays at most one more trial per progressing pass, bounded by #403 futility and the ADR-280 purity skip — the worst-case multiplier is ADR-104's, ≤ (red rows) × (passes ≤ facts).
+
+**Sibling audit.** 3-D and analytic: built by ADR-W-089 (ADR-3D-259, ADR-AG-156). Complex: resolves references at parse time (ADR-W-089). In 2-D, every `introducedPointIds` consumer in `core.ts` was read: the futility universe (unchanged, over-approximation-safe), the claim sites (changed here), HOIST (relations only, by design — unchanged), the ADR-508 relevance filter (read-only). The submit seam's missing-operand refusal (ADR-571) matched the old wording only — widened to both.
+
+**Unchanged, measured.** `phase3` (both «removing an early step cascades» cases unchanged; the deselect case's wording assertion now also accepts «undefined point»), `futile-failure`, `fold-cache`, `transactional-fold`, `basin-ownership`, `status-attribution`, the i18n suite (the #983 pattern-coverage gate gained the CASES row), `issue-1720-cevian-triangle`, `membership-cycle`, `fixtures`, every `src/app`, `src/store`, `src/replay`, `src/engine` and `src/i18n` test file, and the eight scenario e2e shards — 201 files, 3575 tests, green. The full suite is the batch gate (round #1736).
+
+**Locks.** `src/app/__tests__/issue-1411-creating-row-above-parent.test.ts` (8; **fails before: 6 of 8**, measured by reverse-applying the source patch — the 2 that pass before are the mute (f) and stability (g) regression guards). `src/replay/__tests__/issue-1411-creating-deferral.test.ts` (the claim rule over five commands, called not re-implemented; the stored shapes; the chain; the muted-circle guard; the disabled claim; futility). `src/engine/__tests__/issue-1411-undefined-point.test.ts` (absent operands vs a cycle). Scenario `creating-row-above-retyped-parent-1411` (corpus 4, the stored shape as an `{ llm: [command] }` step — a `.geo.json` fixture would be re-parsed on an empty context and emit the segment that hides the bug).
+
+**Consequences.**
+- `src/replay/core.ts`: `engineCmdsOf`, `tryApplyFact`, the widened `deferrable` + lost-definition guard, `claimedBy`, `introducedDefinedPointIds`, `FoldNode.retriedCreating` and the resume filter.
+- `src/engine/evaluate.ts`: the stuck-branch message. `src/i18n/humanizeError.ts`, `locales/he.json` + `en.json`: `errors.undefinedPoints`. `src/app/decideDeterministic.ts`: the ADR-571 match.
+- ADR-104 amended; ADR-W-089's *Halves* line and 2-D row point here.
+
+**Behaviour change for a student:** after deleting a triangle and typing it again, a midpoint, median or altitude row left above it now comes back instead of staying red, and the re-typed triangle is no longer refused. A row whose points nothing defines now says which points are missing («הנקודות A, B לא הוגדרו»), not the point it was making. One refusal reads differently: «רבע מעגל CAB» after «AC=15 · BC=10» now names «BC=10» as the given it contradicts (it named «AC=15»).

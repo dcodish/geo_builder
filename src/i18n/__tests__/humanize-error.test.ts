@@ -42,6 +42,7 @@ const CASES: { raw: string; contains: string[] }[] = [
   // step.ts danglingCircleError (#186) — a reference to a circle that doesn't exist
   { raw: "circle 'O2' is not defined", contains: ['O2'] },
   { raw: 'unresolved dependencies for: A, B, circle-O', contains: ['A, B, O'] },
+  { raw: 'undefined point: A, B', contains: ['A, B'] }, // #1411 (ADR-577): evaluate names the ABSENT operands
   { raw: 'non-finite position computed', contains: [] },
   { raw: '|AB| = |AD| references an unknown point', contains: ['|AB| = |AD|'] },
   { raw: 'over-constrained: |AC| = 9 cannot hold', contains: ['|AC| = 9'] },

@@ -4625,7 +4625,7 @@ of both were identical.
 
 **Status:** accepted, 2026-09-24 · **Issues:** [#1339](https://github.com/dcodish/geo_builder/issues/1339) (bug, `P2`, `3d`), [#1340](https://github.com/dcodish/geo_builder/issues/1340) (bug, `P2`, `analytic`) · operator ruling 2026-09-21 on #1339: *"yes - it should"* · round [#1408](https://github.com/dcodish/geo_builder/issues/1408)
 **Requirements:** [02b](02b-requirements-3d.md) FR-VC-2c (extended) · [02c](02c-requirements-analytic.md) R19 (extended) · **Design:** [04b](04b-design-3d.md) the retry pass · [04c](04c-design-analytic.md) the fold's deferral
-**Halves:** [ADR-3D-259](06b-decisions-3d.md#adr-3d-259) (3-D) · [ADR-AG-156](06c-decisions-analytic.md#adr-ag-156) (analytic) · 2-D: not yet, filed as [#1411](https://github.com/dcodish/geo_builder/issues/1411)
+**Halves:** [ADR-3D-259](06b-decisions-3d.md#adr-3d-259) (3-D) · [ADR-AG-156](06c-decisions-analytic.md#adr-ag-156) (analytic) · 2-D: [ADR-577](06-decisions.md#adr-577) ([#1411](https://github.com/dcodish/geo_builder/issues/1411), round #1736)
 
 **The operator's question.** Playing round #1332 T30, «M אמצע SA» left above «פירמידה SABCD שבסיסה ריבוע»
 stayed red while «∠SAB = 70» in the same place built: *"why would it stay red if the inputs allow it to
@@ -4653,7 +4653,7 @@ half. Each product keeps its own unit of application (analytic: the line, all it
 | 3-D | store: pyramid, midpoint, delete the pyramid, type it again → `unknown-point S`, no M | ok, ok. M at the midpoint of SA ([ADR-3D-259](06b-decisions-3d.md#adr-3d-259)) |
 | analytic | store: A, B, M, delete A and B, type them again → `unknown-reference A`, no M | no faults. M = (2, 0) ([ADR-AG-156](06c-decisions-analytic.md#adr-ag-156)) |
 | 2-D | typed first on an empty canvas («M אמצע AB» · «משולש ABC») → builds, because the parser introduces A and B as free points | unchanged |
-| 2-D | the same list reached by deleting and re-typing the triangle (T30's shape) → `unresolved dependencies for: M`, no M | **not built here.** Filed as [#1411](https://github.com/dcodish/geo_builder/issues/1411) |
+| 2-D | the same list reached by deleting and re-typing the triangle (T30's shape) → `unresolved dependencies for: M`, no M | **not built here.** Filed as [#1411](https://github.com/dcodish/geo_builder/issues/1411); built since by [ADR-577](06-decisions.md#adr-577): ok, ok, M at the midpoint of AB |
 
 The #1339 ruling said 2-D "already builds". That was measured only on the typed-first line. The edited
 list, which is the shape the operator actually reached in 3-D, fails in 2-D. `src/replay/core.ts`'s

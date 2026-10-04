@@ -215,6 +215,10 @@ export const PATTERNS: Pattern[] = [
   // evaluate.ts:851 — `unresolved dependencies for: A, B, circle-O`
   { re: /^unresolved dependencies for: (.+)$/, key: 'errors.unresolvedDeps', params: (m) => ({ ids: m[1] }) },
 
+  // evaluate.ts stuck branch (#1411, ADR-577) — `undefined point: A, B` (points the statement relies on that
+  // nothing in the figure defines; the row's own new point is never named)
+  { re: /^undefined point: (.+)$/, key: 'errors.undefinedPoints', params: (m) => ({ ids: m[1] }) },
+
   // evaluate.ts:855 — `non-finite position computed`
   { re: /^non-finite position computed$/, key: 'errors.nonFinite', saysSubject: true },
 

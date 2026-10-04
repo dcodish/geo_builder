@@ -1320,6 +1320,18 @@ export function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean
   }
   if (remaining.size > 0 || remainingLines.size > 0 || remainingCircles.size > 0) {
     const stuck = [...remaining, ...remainingLines, ...remainingCircles];
+    // #1411 (ADR-577): name what is MISSING, not what is stuck. When a stuck object relies on a POINT that is
+    // not in the construction at all, the honest message is the points it relies on — «M אמצע AB» with no A, B
+    // used to read «relies on M», the very point the row creates. `unresolved dependencies` stays for a
+    // genuine cycle (every parent exists, nothing resolves).
+    const present = new Set(c.objects.map((o) => o.id));
+    const missing: Id[] = [];
+    for (const id of stuck) {
+      const o = c.objects.find((x) => x.id === id);
+      if (!o) continue;
+      for (const p of objectParents(o)) if (/^[A-Z]\d*$/.test(p) && !present.has(p) && !missing.includes(p)) missing.push(p);
+    }
+    if (missing.length) return { ok: false, error: `undefined point: ${missing.join(', ')}`, stuckIds: stuck };
     return { ok: false, error: `unresolved dependencies for: ${stuck.join(', ')}`, stuckIds: stuck };
   }
 

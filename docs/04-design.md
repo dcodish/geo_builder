@@ -211,6 +211,18 @@ src/
                    the listed slice, since what counts as "new" for ACCEPTANCE is a different question
   replay/        core.ts — the PURE replay layer (S1.2): fold memo + deferral + HOIST + seed/config
                  searches + the shared sample core; engine ← replay ← store enforced by test
+                 — the fold's RETRY PASS and CLAIM RULE (ADR-577, #1411): one lowering
+                   (`engineCmdsOf`) and one all-or-nothing apply (`tryApplyFact`) serve the in-order
+                   pass and the ADR-104 retry alike. The retry takes every red, enabled, non-forced,
+                   non-futile row — CREATING rows too (the 2-D half of ADR-W-089) — in list order to a
+                   fixpoint, except a row that would re-introduce a point ANOTHER statement claims and
+                   the figure lacks (its definition is gone: the removal/mute cascade). A FAILED row
+                   claims only the points it DEFINES (`introducedDefinedPointIds` — never a free point
+                   it would merely auto-create); a disabled or atomic-poisoned row still claims all.
+                   A node where a creating row landed on the retry carries `retriedCreating` and is
+                   never a #365 prefix-resume point, so the memo stays a pure cache. `evaluate`'s
+                   stuck branch names an absent operand («undefined point: A, B») and keeps
+                   «unresolved dependencies for:» for a genuine cycle
                  — the config searches RANK rather than merely accept (ADR-486, #942): a view that
                    stacks two named points is legal (ADR-123 — a forced coincidence must still draw)
                    but is the LAST tier, below every separated one. `separatedView` is that predicate,

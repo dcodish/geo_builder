@@ -126,7 +126,7 @@
  "scenario:stated-side-vs-incidence-refused-1470": "8d1ec38e9cc51beb",
  "scenario:values-panel-names-circles-1442": "c4ac514000ae1a1d",
  "scenario:overconstrained-names-the-completing-statement-1203": "752efb01f271d1a0",
- "scenario:quarter-circle-conflict-names-no-innocent-given-1203": "f086586001bbd226",
+ "scenario:quarter-circle-conflict-names-no-innocent-given-1203": "6a63f7baafc7b287",
  "scenario:shared-endpoint-crossing-refused-944": "79415c09829a39f8",
  "scenario:zero-dof-configurations-status-1444": "9b00153cdeea57c1",
  "scenario:tangents-perpendicular-foot-values-1601": "71d94094f0cdffc8",
@@ -168,5 +168,6 @@
  "fixture:issue-989-trapezoid-stated-pair.geo.json": "5ac9c9b206c76b86",
  "fixture:parallel-chords.geo.json": "54f8605ea57acfa6",
  "fixture:trapezoid-altitude.geo.json": "abbbf2a8308ff3fa",
- "fixture:issue-1471-circumcircle-by-membership.geo.json": "0d3700bfe1282811"
+ "fixture:issue-1471-circumcircle-by-membership.geo.json": "0d3700bfe1282811",
+ "scenario:creating-row-above-retyped-parent-1411": "014fadf075a2d9e2"
 }
