@@ -287,6 +287,10 @@ const SEEDED: SeededCorpus = {
   // his Hebrew spelling (spacing kept) on a free point beside a typed origin.
   'component-given-1547.geo3.json': ["קובייה ABCDA'B'C'D'", 'x_{B}=3'],
   'component-given-he-1547.geo3.json': ['A(0,0,0)', 'שיעור ה- x של נקודה B הוא 3'],
+
+  // #1545 (ADR-3D-300) — the #1541 figure typed with the Hebrew GERESH «׳» (U+05F3) as the prime, every
+  // line. Before: the cube refused «bad-solid» (the label run stopped at ׳, so the top ring duplicated the base).
+  'geresh-prime-cube-1545.geo3.json': ['קוביה ABCDA׳B׳C׳D׳', 'מישור A׳B׳C׳D׳ הוא x+4y-8z-126=0', 'B(0,7,8)'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

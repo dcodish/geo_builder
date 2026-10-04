@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-04T09:28:29.857Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קוביה ABCDA׳B׳C׳D׳",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מישור A׳B׳C׳D׳ הוא x+4y-8z-126=0",
+      "cmds": [
+        {
+          "type": "claim",
+          "claim": {
+            "type": "plane-eq",
+            "ids": [
+              "A'",
+              "B'",
+              "C'",
+              "D'"
+            ],
+            "cx": 1,
+            "cy": 4,
+            "cz": -8,
+            "d": -126
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "B(0,7,8)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "B",
+          "x": 0,
+          "y": 7,
+          "z": 8
+        }
+      ]
+    }
+  ]
+}

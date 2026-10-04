@@ -23,7 +23,10 @@ import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX } from '../lexicon/nouns3';
-import { VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
+import { foldPrimes3, VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
+// #1545 (ADR-3D-300): the ONE prime fold lives in the vocabulary leaf; re-exported so every parser-side
+// reader (the ask lane, the LLM sequence gate) reaches it through the normaliser that applies it.
+export { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 import { riderPairsT, riderWholeSide, riderWholeT } from '../engine/onSegmentRatio';
 
@@ -147,7 +150,9 @@ const SCRIPT_BOUNDARY_HE_LATIN = /([א-ת]{2,})(?=[A-Za-z])/g;
 export function normalize3(s: string): string {
   // #751 (ADR-W-029): the control set is the SHARED one (shell/bidi) — it had three copies.
   return upliftLowercaseLabels(
-    stripFormatControls(s)
+    // #1545 (ADR-3D-300): every prime glyph → `'` through the ONE fold (lexicon/marks3), which the ask
+    // lane and the LLM sequence gate also call — it used to be spelled here and twice more, narrower.
+    foldPrimes3(stripFormatControls(s))
       // #531 ([ADR-3D-144](../../docs/06b-decisions-3d.md)): INVISIBLE bidi/format controls are not
       // something the student typed — the APP injects them (`isolateLtrRuns3` isolates LTR runs for
       // display, ADR-3D-116/121), and the rendered fact list is text the student SELECTS AND COPIES
@@ -166,7 +171,6 @@ export function normalize3(s: string): string {
       // «מישור  x+…» double space), and a literal-space gate must not care which space arrived.
       .replace(/ /g, ' ')
       .replace(/ {2,}/g, ' ')
-      .replace(/[′’‘`]/g, "'")
       .replace(new RegExp(`[${VECTOR_ARROW_CLASS}]`, 'g'), '') // #1194: one vocabulary, three readers
       .replace(/[−־]/g, '-')
       // #773 — a SCRIPT TRANSITION is a token boundary, in both directions.

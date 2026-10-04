@@ -35,7 +35,10 @@ productive pattern in this tree precisely because the seam exists.
 
 **The normalisation seam and case ([ADR-3D-039](06b-decisions-3d.md#adr-3d-039), [ADR-3D-223](06b-decisions-3d.md#adr-3d-223)).**
 `normalize3` is the one boundary every rule reads: format controls stripped, primes and minus unified,
-script transitions split — and lowercase labels uplifted by `upliftLowercaseLabels`, the ONE chokepoint,
+script transitions split. **The prime fold is one set** ([ADR-3D-300](06b-decisions-3d.md#adr-3d-300)):
+`PRIME_GLYPHS3` / `foldPrimes3` in `lexicon/marks3.ts` (′ ’ ‘ \` ´ and the Hebrew geresh ׳, ʹ, ʼ → `'`),
+called by `normalize3`, the ask lane's `parseQuery`, the LLM sequence gate, the rename dialog, and read by
+the bidi run alphabet — no reader spells its own prime class — and lowercase labels uplifted by `upliftLowercaseLabels`, the ONE chokepoint,
 only in positions an anchor proves are labels (the angle glyph/word, a point/vertex noun, the head of a
 coordinate definition, the single-letter subject of a midpoint statement — [ADR-3D-287](06b-decisions-3d.md#adr-3d-287)).
 New label-demanding positions join that function, never a rule. **An auto-name arm consumes the whole
@@ -890,7 +893,7 @@ on the raw text, which is #868's pinned property. Since #1195 the two can displa
 that property may now be over-fitted — measured and decided in #1314, not here.
 
 **`vectorNotation` stays in `render/notation.ts`, not in `i18n/bidi.ts`.** `i18n/bidi.ts` imports
-**nothing** — it is a leaf, which is what lets `parser/`, `engine/` and `render/` all depend on it — so
+**nothing but the `lexicon/` leaf** (the prime set, ADR-3D-300) — it is a leaf in effect, which is what lets `parser/`, `engine/` and `render/` all depend on it — so
 having it reach into `render` would invert the dependency. `render` already depends downward on `i18n`
 and `lexicon`, so the composed function sits there, beside `factDisplay3`, which is also the function
 its lock compares against.

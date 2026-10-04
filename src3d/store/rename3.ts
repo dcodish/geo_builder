@@ -14,6 +14,7 @@
  */
 
 import type { Command3 } from '../engine/types';
+import { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';
 import type { Fact3 } from './store3';
 import type { PlaneDisplayMode3Map } from './figureFile3';
 import type { LetterRenameResult } from '../../shell/frame/letterOffer';
@@ -43,8 +44,14 @@ const PURE_LABELS = /^(?:[A-Z]\d*'?)+$/;
  * metacharacter. A caller that skips that normalisation is the bug, not the escaping.
  */
 export function relabelTokens3(s: string, from: string, to: string): string {
-  const tail = from.endsWith("'") ? "(?![a-z0-9])" : "(?![a-z0-9'])";
-  return s.replace(new RegExp(`(?<![a-z0-9'])${from}${tail}`, 'g'), to);
+  // #1545 (ADR-3D-300): a prime is ANY glyph of the one prime set, because the utterance is the
+  // student's RAW text — «A׳» (geresh) and «A′» are the vertex `A'`, so renaming `A` must not touch
+  // them and renaming `A'` must reach them. The student's own glyph is kept when both ends are primed.
+  const P = `'${PRIME_GLYPHS3}`;
+  if (!from.endsWith("'")) return s.replace(new RegExp(`(?<![a-z0-9${P}])${from}(?![a-z0-9${P}])`, 'g'), to);
+  const base = from.slice(0, -1);
+  return s.replace(new RegExp(`(?<![a-z0-9${P}])${base}([${P}])(?![a-z0-9])`, 'g'), (_m, g: string) =>
+    to.endsWith("'") ? to.slice(0, -1) + g : to);
 }
 
 /**
@@ -154,7 +161,7 @@ export function renameFacts3(
 
 /** Upper-case a typed letter and keep a legal label; null when it is not one. */
 export function normalizeLabel3(raw: string): string | null {
-  const s = raw.trim().toUpperCase().replace(/[’´`]/g, "'"); // a typed curly quote is a prime
+  const s = foldPrimes3(raw.trim().toUpperCase()); // #1545: the ONE prime fold (lexicon/marks3)
   return /^[A-Z]\d*'?$/.test(s) ? s : null;
 }
 

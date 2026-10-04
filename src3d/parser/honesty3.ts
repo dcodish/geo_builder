@@ -29,7 +29,7 @@
 import type { Command3, Id } from '../engine/types';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { QUAD_PYRAMIDS, type QuadBase } from '../engine/baseShapes';
-import { CONSTRUCT_NOUNS, labelTokens, normalize3 } from './parse3';
+import { CONSTRUCT_NOUNS, foldPrimes3, labelTokens, normalize3 } from './parse3';
 
 /**
  * Uppercase point labels (and conventional vector names) the utterance STATES but the committed
@@ -468,7 +468,7 @@ export function restoreStatedSequences3(
     run: () => /(?<![A-Za-z])(?:[A-Z]\d*'?){3,}(?![a-z\d])/g,
     normalizeUtterance: normalize3,
     prepareLine: (line) => {
-      const canon = line.replace(/[′’]/g, "'");
+      const canon = foldPrimes3(line); // #1545: the parser's own prime fold
       return { match: canon, emit: canon };
     },
   });
