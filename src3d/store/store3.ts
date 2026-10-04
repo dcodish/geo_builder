@@ -80,6 +80,9 @@ export type StoreError3 =
   /** #1666 (ADR-3D-295, ADR-W-107): a PROOF TARGET («הוכיחו כי …», "prove that …") — what the student must
    *  show, never a given. `sentence` is the proof sentence as typed. Typed, so it never escalates. */
   | { code: 'proof-target'; sentence: string }
+  /** #1547 (ADR-3D-299): «x_B = 2t» — one coordinate given a SYMBOLIC value, recognised and not yet
+   *  supported. Typed, so it never escalates; `component` is the student's own component («x_B»). */
+  | { code: 'component-symbolic'; component: string }
   /** The LLM decomposition lost part of the stated input (docs/24 S2.3 honesty gates) — `items` names
    *  the dropped labels/magnitudes; nothing was committed. */
   | { code: 'dropped-given'; items: string }
@@ -1060,7 +1063,9 @@ function readStatement3(
             ? { code: 'ambiguous-main-diagonal', pairs: mainDiagonalCandidates(st) }
             : parsed.reason === 'ambiguous-angle-vertex'
               ? { code: 'ambiguous-angle-vertex', vertex: parsed.vertex, angles: angleCandidatesAt(st, parsed.vertex).join(', ') }
-              : { code: 'not-understood' },
+              : parsed.reason === 'component-symbolic'
+                ? { code: 'component-symbolic', component: parsed.component }
+                : { code: 'not-understood' },
   };
 }
 

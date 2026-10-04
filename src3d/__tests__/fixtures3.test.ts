@@ -282,6 +282,11 @@ const SEEDED: SeededCorpus = {
     'AD=(2/3)u+(1/3)v',
     'נקודה E במישור ABC',
   ],
+
+  // #1547 (ADR-3D-299) — the operator's two lines, ONE coordinate of a point: his subscript on a cube, and
+  // his Hebrew spelling (spacing kept) on a free point beside a typed origin.
+  'component-given-1547.geo3.json': ["קובייה ABCDA'B'C'D'", 'x_{B}=3'],
+  'component-given-he-1547.geo3.json': ['A(0,0,0)', 'שיעור ה- x של נקודה B הוא 3'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

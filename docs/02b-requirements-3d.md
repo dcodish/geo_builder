@@ -162,6 +162,15 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   line; it never commits the placement alone. A stated pair relation («AD = AC», «AD ⊥ BC») that no
   committed command carries is refused, naming it — on every statement seam, the model's included. The
   2-D twin is FR-IN-4d. *(Realised — [ADR-3D-296](06b-decisions-3d.md#adr-3d-296), #1730.)*
+- **FR-SP-14 (Must)** — **One coordinate of a point can be stated and asked.** «x_B = 3», «x_{B}=3», «B_x = 3»,
+  «שיעור ה-x של (נקודה) B הוא 3», «x של B הוא 3», «שיעור ה-x של B שווה ל-3» and "the x-coordinate of B is 3"
+  state B's x and nothing else: on a new B the point is created with x = 3 and its y and z free (they move
+  on «הציגו תצורה אחרת»); on a solid's vertex the solid follows; on a typed point a false value is refused
+  and a true one stays green. The same frame takes a sign («…חיובי», «x_B > 0», «x_B < 0»). A letter value
+  («x_B = 2t») is refused by name rather than guessed, and a comparison with a number other than zero
+  («x_B > x_D», «y_B < 6») is not read yet. The question is the statement with its value dropped — «x_B»,
+  «x_{B} = ?», «מהו שיעור ה-x של B?» — and the row reads «x_B = 1», a sign (`+?`), or «not determined», from the
+  panel's own per-coordinate judgement. *(Realised — [ADR-3D-299](06b-decisions-3d.md#adr-3d-299), #1547.)*
 
 ## Vectors — the geometric lane
 

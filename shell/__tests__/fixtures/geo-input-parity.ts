@@ -134,8 +134,9 @@ export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
   },
   X6: {
     title: 'coordinate components and distance notation',
-    reason: 'coordinate notation («x של A הוא 5», «x_B > x_D», «d_{AB} = 10»)',
-    products: ['analytic'],
+    reason:
+      'coordinate notation («x של A הוא 5», «x_B > x_D», «d_{AB} = 10»). 3-D reads ONE coordinate of a point — a value, a sign, a comparison with zero (#1547, ADR-3D-299); the two-point comparison and the distance notation are analytic-only, so those rows carry only: [analytic]',
+    products: ['analytic', '3d'],
     mustRefuse: ['2d'],
     topic: true,
     patterns: [/[xyz]_\{?[A-Z]/, /[xyz] של/, /שיעור ה-?\s?[xyz]/, /d_\{/],
@@ -907,10 +908,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'ex-parametric-line', family: 'topic', steps: ['הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)'], expect: 'builds', exception: 'X3' },
   { id: 'ex-named-line', family: 'topic', steps: ['ישר l1'], expect: 'builds', exception: 'X4', knownGap: [{ product: 'analytic', issue: '#1171' }] },
   { id: 'ex-parameter', family: 'topic', steps: ['k הוא פרמטר'], expect: 'builds', exception: 'X5', only: ['analytic'], note: "3-D declares a parameter its own way («t פרמטר חיובי»)" },
-  { id: 'ex-coordinate-of', family: 'topic', steps: ['נקודה A', 'x של A הוא 5'], expect: 'builds', exception: 'X6' },
+  { id: 'ex-coordinate-of', family: 'topic', steps: ['נקודה A', 'x של A הוא 5'], contextFor: { '3d': [] }, expect: 'builds', exception: 'X6', note: '3-D has no bare point declaration; the coordinate creates A there (#1547)' },
   { id: 'ex-coordinate-of-vertex-1621', family: 'topic', steps: ['משולש ABC', 'שיעור ה-y של הקודקוד A הוא 10'], expect: 'builds', exception: 'X6', note: '#1621: the exam names a vertex «הקודקוד A»' },
-  { id: 'ex-coordinate-compare-vertex-1621', family: 'topic', steps: ['משולש ABC', 'שיעור ה-y של הקודקוד B קטן מ-6'], expect: 'builds', exception: 'X6' },
-  { id: 'ex-distance-notation', family: 'topic', steps: ['A(0,0)', 'נקודה B', 'd_{AB} = 10'], contextFor: { '2d': ['נקודה A', 'נקודה B'] }, expect: 'builds', exception: 'X6' },
+  { id: 'ex-coordinate-compare-vertex-1621', family: 'topic', steps: ['משולש ABC', 'שיעור ה-y של הקודקוד B קטן מ-6'], expect: 'builds', exception: 'X6', only: ['analytic'], note: '3-D reads a comparison with ZERO only (#1547 scope ruling, 2026-09-29); a comparison with another number is its successor' },
+  { id: 'ex-distance-notation', family: 'topic', steps: ['A(0,0)', 'נקודה B', 'd_{AB} = 10'], contextFor: { '2d': ['נקודה A', 'נקודה B'] }, expect: 'builds', exception: 'X6', only: ['analytic'] },
+  // #1547 (ADR-3D-299): one coordinate on an empty canvas — the point is created with that coordinate and the rest free
+  { id: 'ex-coordinate-subscript-1547', family: 'topic', steps: ['x_B = 3'], expect: 'builds', exception: 'X6' },
+  { id: 'ex-coordinate-value-1547', family: 'topic', steps: ['שיעור ה-x של B הוא 3'], expect: 'builds', exception: 'X6' },
   { id: 'ex-solid', family: 'topic', steps: ['פירמידה SABCD שבסיסה ריבוע'], expect: 'builds', exception: 'X7' },
   { id: 'ex-cube', family: 'topic', steps: ["קובייה ABCDA'B'C'D'"], expect: 'builds', exception: 'X7' },
   { id: 'ex-plane-1656', family: 'topic', steps: ['משולש ACD', 'נקודה S', 'דרך AC העבירו מישור המקביל ל-SD'], contextFor: { '3d': ['פירמידה SABCD שבסיסה ריבוע'] }, expect: 'builds', exception: 'X7', note: '#1656: 2-D used to commit AC ∥ SD' },

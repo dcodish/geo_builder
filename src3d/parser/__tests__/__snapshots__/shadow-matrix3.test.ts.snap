@@ -1426,12 +1426,12 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   {
     "lang": "en",
     "text": "the z-coordinate of C' is positive",
-    "winner": "signGiven",
+    "winner": "componentGiven",
   },
   {
     "lang": "he",
     "text": "שיעור ה-z של C' חיובי",
-    "winner": "signGiven",
+    "winner": "componentGiven",
   },
   {
     "lang": "en",
@@ -2352,6 +2352,26 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
     "lang": "he",
     "text": "זווית SAB גדולה מ-60",
     "winner": "angleBound3",
+  },
+  {
+    "lang": "en",
+    "text": "the x-coordinate of B is 3",
+    "winner": "componentGiven",
+  },
+  {
+    "lang": "he",
+    "text": "שיעור ה-x של B הוא 3",
+    "winner": "componentGiven",
+  },
+  {
+    "lang": "en",
+    "text": "x_B = 3",
+    "winner": "componentGiven",
+  },
+  {
+    "lang": "he",
+    "text": "x_B = 3",
+    "winner": "componentGiven",
   },
 ]
 `;

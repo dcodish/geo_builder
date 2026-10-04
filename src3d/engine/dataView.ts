@@ -81,6 +81,10 @@ export interface DataPanel {
    *  while the base still tilts about AB). A point with NO stable component gets no
    *  label — a sample coordinate is not knowledge (operator rule, 2026-07-09). */
   pointCoords: Record<string, { text: string; kind: 'fact' | 'partial' }>;
+  /** #1547 (ADR-3D-299): the same decision as `pointCoords`, per AXIS — a value, `?`, or a sign-upgraded
+   *  `+?`/`−?` — so the ask lane answers ONE coordinate from the panel's own judgement (the #481 rule:
+   *  one decision, two surfaces) instead of re-deciding it. Present exactly when `pointCoords` is. */
+  pointComps: Record<string, readonly [string, string, string]>;
   /** #325 (ADR-3D-079 Am. 2): the pins' OPEN symbols (`B(2t,t,k)` → t, k) — a determined
    *  symbol (identical across every sampled configuration) prints its value (`k = -3`); a
    *  still-free one prints open (`t = ?`), so the stated given visibly took effect. */
@@ -1137,9 +1141,18 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // a number on a node is read as known; one drawing's sample is not knowledge).
   const points: string[] = [];
   const pointCoords: Record<string, { text: string; kind: 'fact' | 'partial' }> = {};
-  if (translationPinned) { // #315: a point coordinate is gauge until a real point injection anchors translation
+  const pointComps: Record<string, readonly [string, string, string]> = {};
+  {
+    // #315: a point coordinate is gauge until a real point injection anchors translation.
+    // #1547 (ADR-3D-299): with ONE exception — a component the student STATED on a new point («x_B = 3»,
+    // the ADR-3D-094 `partial` point) is placed absolutely, never by the gauge, so it is knowledge with or
+    // without a frame. Without one, only those stated components are judged; everything else stays silent.
     const axes = ['x', 'y', 'z'] as const;
     for (const id of positions[0].keys()) {
+      const def = c.points.get(id);
+      const statedOnly = !translationPinned;
+      if (statedOnly && def?.kind !== 'partial') continue;
+      const stated = (ax: 'x' | 'y' | 'z'): boolean => !statedOnly || (def?.kind === 'partial' && def[ax] !== null);
       const ps = positions.map((pos) => pos.get(id));
       if (ps.some((p) => !p)) continue;
       /**
@@ -1163,7 +1176,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
           const scale = Math.max(...roots.map(rootScale));
           return roots.every((q) => rootsAgree(q[ax], roots[0][ax], scale));
         });
-      const stableAx = axes.map((ax) => ps.every((p) => near(ps[0]![ax], p![ax])) && branchAgrees(ax));
+      const stableAx = axes.map((ax) => stated(ax) && ps.every((p) => near(ps[0]![ax], p![ax])) && branchAgrees(ax));
       const nStable = stableAx.filter(Boolean).length;
       /**
        * #1506 (ADR-3D-289) — EXACTLY TWO admissible configurations print both, one row each:
@@ -1171,11 +1184,12 @@ export function dataView(c: Construction3, seed: number): DataPanel {
        * canvas label (`pointCoords`) keeps the #827 partial form: the node shows ONE configuration,
        * and a component that is a branch choice is still not knowledge about the point on screen.
        */
-      const two = nStable < 3 ? twoConfigurations3(resolved.map((r, k) => ({ roots: r.pivot?.pointRoots?.[id], drawn: ps[k]! }))) : null;
+      const two = nStable < 3 && !statedOnly ? twoConfigurations3(resolved.map((r, k) => ({ roots: r.pivot?.pointRoots?.[id], drawn: ps[k]! }))) : null;
       if (two) two.forEach((q, k) => points.push(`${configLabel(id, k + 1)}${coordStr(q)}`));
       if (nStable === 3) {
         const cs = coordStr(ps[0]!);
         pointCoords[id] = { text: cs, kind: 'fact' };
+        pointComps[id] = [cleanMag(ps[0]!.x), cleanMag(ps[0]!.y), cleanMag(ps[0]!.z)];
         points.push(`${id}${cs}`);
       } else if (nStable > 0) {
         // PARTIALLY determined (S with only A,B injected: y = 0 is a fact while the
@@ -1186,8 +1200,10 @@ export function dataView(c: Construction3, seed: number): DataPanel {
           const sg = c.signGivens.find((g) => g.id === id && g.axis === ax);
           return sg ? (sg.positive ? '+?' : '−?') : '?';
         };
-        const cs = `(${axes.map((ax, i) => (stableAx[i] ? cleanMag(ps[0]![ax]) : free(ax))).join(', ')})`;
+        const comps = axes.map((ax, i) => (stableAx[i] ? cleanMag(ps[0]![ax]) : free(ax))) as [string, string, string];
+        const cs = `(${comps.join(', ')})`;
         pointCoords[id] = { text: cs, kind: 'partial' };
+        pointComps[id] = comps;
         if (!two) points.push(`${id}${cs}`);
       }
       // no stable axis at all → no label (a sample coordinate is not knowledge)
@@ -1298,7 +1314,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
 
   // #1196: the STATED vector rows need no sampling — they are givens, not measurements — so they are
   // composed from the construction rather than from the three resolved configurations above.
-  return { stated: statedVectorRows(c), relations, mutual, vectors: entries, points, pointCoords, planes, params };
+  return { stated: statedVectorRows(c), relations, mutual, vectors: entries, points, pointCoords, pointComps, planes, params };
 }
 
 /**

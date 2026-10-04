@@ -643,6 +643,17 @@ line. The net behind it is `droppedGivenRelations3` in `lostGivens3`: a stated p
 carried by one command that states something — a free rider and plain ink do not vouch for it — and the
 number gate no longer counts the digit in a command's `type` name as a payload.
 
+## One coordinate of a point (#1547, [ADR-3D-299](06b-decisions-3d.md#adr-3d-299))
+
+«x_B = 3» is «B(3, ·, ·)» with y and z unstated (analytic's ADR-AG-042 identity): `componentGiven` lowers
+it to a `point3` whose other two components are null and carry no `syms`, so the engine needs nothing new
+— an existing id takes the M1 pin and the #1546 `coords-eq` claim, a new id is the ADR-3D-094 `partial`
+point. One frame table (`COMPONENT_FRAMES`: the Hebrew noun form, the bare «x של B», the subscript both
+ways, English) is read by the value tail, the sign tail (the former `signGiven`) and the ask head
+(`componentAskOf`), so the three cannot drift apart. The answer comes from `dataView`'s per-axis decision
+(`pointComps`, beside `pointCoords`); without a frame, a `partial` point's STATED components are the one
+thing judged, because they are placed absolutely and never by the gauge.
+
 ## Known gaps
 
 Recorded here because a design doc that omits its weakest properties is not describing the system.

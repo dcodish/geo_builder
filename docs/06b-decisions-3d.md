@@ -11733,3 +11733,28 @@ Both build with every row ok and 8 points, and in both the point that was A now 
 **Neighbouring gap, not in scope:** the `coordPoint` membership tail («A(1,2,3) על המישור …») reads only a named π after «על»; «A(1,2,3) במישור ABC» stays not-handled.
 
 **Behaviour change for a student:** «נקודה E במישור ABC» (and the same for a line, «AB במישור ABC») is now understood directly instead of going to the LLM.
+
+## ADR-3D-299 — One coordinate of a point is a given and a question: «x_B = 3» is «B(3, ·, ·)» (#1547)
+
+**Status:** accepted · 2026-10-04 · feature (P2) · round #1736 · operator ruling 2026-09-29 on #1547 (*"the plan is approved as written. Scope: this PR takes the zero comparison (`x_B > 0`) only"*) · branch `feat/1547-1310-3d-coordinate-vectors` off `main` @ d9a5910f
+
+**Requirements:** docs/02b FR-SP-14 (new) · **Design:** docs/04b — "One coordinate of a point"
+
+**Context (re-measured at d9a5910f, `decideSubmit3`).** Operator, 2026-09-29: *"x_{B}=3 is not supported on 3d tool. same for שיעור ה- x של נקודה B הוא 3"*. Both lines, and `x_B = 3`, `y_B=-2`, `z_{B}=0`, `B_x=3`, «x של B הוא 3», "the x-coordinate of B is 3" and `x_B > 0`, were `not-understood` (escalated to the model) on an empty canvas, a cube, `B(0,7,8)`, `B(1,t,2)` and `A(0,0,0)`. The sign rule hand-spelled its subject noun, so «שיעור ה-x של נקודה B חיובי» was refused while «…של הנקודה B חיובי» built. The ask lane read no component question. The engine already lowered «B(3, n, p)» correctly after #1546 (ADR-3D-282).
+
+**Decision.**
+1. **One frame, three readers (`parse3.ts`).** `COMPONENT_FRAMES` reads «שיעור / ערך / קואורדינטת ה-x של (נקודה) B» (article spaced, hyphenated or absent; «של» optional; the shared `HE_SUBJ`), the bare «x של B» («של» required), the subscript `x_B` / `x_{B}` / `B_x`, and English. `componentGiven` replaces `signGiven` at its slot and reads a value tail («הוא», «שווה ל-», "is", `=`, `:`), or a sign tail (the sign words, or a STRICT comparison with zero). `componentAskOf` reads the question through the same frame. Composed from `LBL` / `HE_SUBJ` / `COMP` — the lexical ratchet's counts go down (two label inlines retired).
+2. **The lowering is the ADR-AG-042 identity**: `{type:'point3', id, x|y|z: v, others: null}`, no `syms`. No engine change: an existing id takes the pin + the #1546 claim (a false value on a typed point is `claim-refuted`), a new id is the ADR-3D-094 `partial` point with its open components free (ADR-052).
+3. **A letter value is refused by name.** «x_B = 2t» is a typed `component-symbolic` refusal («שיעור יחיד עם ערך באותיות («x_B») עדיין לא נתמך …»), never `not-handled`: on a new id the coord-sym lowering would zero the unstated components. `x_B ≥ 0` stays unread (the sign given is strict; reading it would strengthen the statement).
+4. **Askable (ADR-3D-279).** `parseQuery` gains `component`, answered from `dataView`'s new per-axis `pointComps` — the same decision as `pointCoords` and the whole-point answer (#481). The answer is the bare value (`1`, a sign `+?`, or `undetermined`) like every scalar kind, because the ask row prints «question = answer»: «x_B = 1».
+5. **A stated component on a new point is knowledge without a frame.** `dataView` used to judge point coordinates only once translation was anchored, so «x_B = 3» on an empty canvas answered «undetermined» to «x_B». A `partial` point's STATED components are placed absolutely, never by the gauge, so without a frame those components alone are judged (seed-stable as before); every other point stays silent, as #315 requires. This also covers «D על החלק החיובי של ציר ה-x» (panel: `D(+?, 0, 0)`).
+6. **Catalog + prompt.** Two rows (`שיעור ה-x של B הוא 3` / `x_B = 3`), appended last so the #1394 golden keys keep their index; one `PROMPT_EXAMPLES_3D` pair. **The proxy must be redeployed.**
+7. **Parity (#1649).** Family X6 now lists 3-D; two new rows (`x_B = 3`, «שיעור ה-x של B הוא 3» on an empty canvas). «שיעור ה-y של הקודקוד B קטן מ-6» (a comparison with a non-zero number) and `d_{AB}` are `only: ['analytic']`.
+
+**Not built (successors to file).** «x_B > x_D» / «y_B < 6» (comparisons beyond zero — a new requirement kind for the configuration selector, ADR-3D-053); «x_B = 2t» (a symbolic single component).
+
+**Measured.** `src3d/__tests__/issue-1547-component-given.test.ts` (39): his two lines on a cube and an empty canvas, every frame spelling, the equivalence lock (`x_B = 3` vs `B(3, n, p)` minus `syms`, both through `parse3`), the sign frame, the refusals, riders, and the ask answers incl. a catalog walk. **Fails before: 37 of 39** (the two controls are the out-of-scope `not-handled` rows). Fixtures `fixtures3/component-given-1547.geo3.json` (cube · `x_{B}=3`) and `component-given-he-1547.geo3.json` (`A(0,0,0)` · his Hebrew line). Shadow-matrix snapshot: the two sign rows rename their winner, four new rows, nothing shadowed. #1394 golden: keys added only, **no recorded hash changed**.
+
+**Consequences.** `src3d/parser/parse3.ts`, `catalog3.ts`, `llmShared3.ts`; `src3d/engine/queries.ts`, `dataView.ts`; `src3d/store/store3.ts`; `src3d/i18n/errorText3.ts` + locales; `shell/__tests__/fixtures/geo-input-parity.ts`.
+
+**Behaviour change for a student:** a single coordinate of a point — «x_B = 3», «שיעור ה-x של נקודה B הוא 3» — is now drawn instead of being sent to the model, and can be asked («x_B»); «שיעור ה-x של נקודה B חיובי» (without «ה» before «נקודה») now reads. On a figure with no typed coordinate point, the data panel now prints the coordinate a student stated on a new point («B(3, ?, ?)»; «D(+?, 0, 0)» for «D על החלק החיובי של ציר ה-x»), where it printed nothing.

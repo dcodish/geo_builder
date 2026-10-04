@@ -62,7 +62,10 @@ export type ParseResult3 =
   // The candidate angles are NOT listed here — `parse3` is context-free by design, exactly as
   // `ambiguous-main-diagonal` above — they are derived from the figure in the store, which knows which
   // edges meet at the vertex.
-  | { ok: false; reason: 'ambiguous-angle-vertex'; vertex: string; rider: string };
+  | { ok: false; reason: 'ambiguous-angle-vertex'; vertex: string; rider: string }
+  // #1547 (ADR-3D-299): «x_B = 2t» — ONE coordinate given a symbolic value. Recognised and refused by
+  // name: on a new point the coord-sym lowering would zero the two unstated components (ADR-052).
+  | { ok: false; reason: 'component-symbolic'; component: string };
 
 const NOT_HANDLED: ParseResult3 = { ok: false, reason: 'not-handled' };
 
@@ -3327,16 +3330,99 @@ const vectorInjection: Rule = (s) => {
   return [{ type: 'inject-vector', name: m[1], x: comps[0].num, y: comps[1].num, z: comps[2].num, ...(symExprs ? { symExprs } : {}), ...(syms ? { syms } : {}) }];
 };
 
-/** `שיעור ה-z של C' חיובי` / `the z-coordinate of C' is positive` — a sign branch given.
- *  Article spaced or hyphenated (`ה z`/`ה-z`/`הz`, the on-axes idiom) and the copula
- *  (`הוא`/`היא`/`is`) optional — the ADR-3D-026 phrasing class. */
-const signGiven: Rule = (s) => {
-  const m =
-    s.match(/^שיעור\s+ה\s*[-־]?\s*([xyz])\s+של\s+(?:הקודקוד\s+|הנקודה\s+)?([A-Z]\d*'?)\s+(?:הוא\s+|היא\s+)?(חיובי|שלילי)$/) ??
-    s.match(/^(?:the\s+)?([xyz])(?:-coordinate|\s+coordinate)\s+of\s+(?:vertex\s+|point\s+)?([A-Z]\d*'?)\s+is\s+(positive|negative)$/);
-  if (!m) return null;
-  return [{ type: 'sign-given', id: m[2], axis: m[1] as 'x' | 'y' | 'z', positive: m[3] === 'חיובי' || m[3] === 'positive' }];
+/**
+ * #1547 (ADR-3D-299) — ONE COORDINATE of a point, in every spelling, read by ONE frame.
+ *
+ * Operator, 2026-09-29: *"x_{B}=3 is not supported on 3d tool. same for שיעור ה- x של נקודה B הוא 3"*.
+ * The sign given («שיעור ה-z של C' חיובי») was the only single-component sentence 3-D read, and it
+ * hand-spelled its own subject noun (`(?:הקודקוד|הנקודה)`), so «…של נקודה B חיובי» was refused while
+ * «…של הנקודה B חיובי» built. The value and the sign are the SAME frame with a different tail, so they
+ * are read by one frame here and cannot drift apart again; the ask lane reads its question through the
+ * same frame ({@link componentAskOf}).
+ *
+ * The frames (analytic's #1040 / #1127 set, ADR-AG-042 / ADR-AG-078, with this product's primed label):
+ * - «שיעור / ערך / קואורדינטת ה-x של (נקודה) B» — article spaced, hyphenated or absent, «של» optional;
+ * - the bare «x של B» — «של» REQUIRED (a lone `x` at a line's start is too weak a claim);
+ * - the subscript `x_B` / `x_{B}` and the reversed `B_x` — language-neutral;
+ * - English «the x-coordinate / x coordinate / x value of (point) B».
+ *
+ * «x_B = 3» is «B(3, ·, ·)» with y and z UNSTATED (the ADR-AG-042 identity): a `point3` with the two
+ * other components null and no `syms`, so an existing B takes the M1 pin + the #1546 claim, and a new B
+ * is the ADR-3D-094 partial point whose open components are free DOFs (ADR-052).
+ */
+const COMPONENT_FRAMES: readonly { re: RegExp; axis: 1 | 2; id: 1 | 2 }[] = [
+  {
+    re: new RegExp(String.raw`^ה?(?:שיעור|ערך|קואורדינט[הת])\s+ה?\s*[-־]?\s*([xyz])\s+(?:של\s+)?${HE_SUBJ}(${LBL})(?![A-Za-z0-9'])`),
+    axis: 1,
+    id: 2,
+  },
+  { re: new RegExp(String.raw`^([xyz])\s+של\s+${HE_SUBJ}(${LBL})(?![A-Za-z0-9'])`), axis: 1, id: 2 },
+  { re: new RegExp(String.raw`^([xyz])\s*_\s*\{?\s*(${LBL})\s*\}?`), axis: 1, id: 2 },
+  { re: new RegExp(String.raw`^(${LBL})\s*_\s*\{?\s*([xyz])\s*\}?`), axis: 2, id: 1 },
+  {
+    re: new RegExp(String.raw`^(?:[Tt]he\s+)?([xyz])(?:-|\s+)(?:coordinate|coord|value)\s+of\s+(?:the\s+)?(?:point\s+|vertex\s+)?(${LBL})(?![A-Za-z0-9'])`),
+    axis: 1,
+    id: 2,
+  },
+];
+
+/** The component frame at the head of `s`: which point, which axis, and the text after it. */
+function readComponentFrame(s: string): { axis: 'x' | 'y' | 'z'; id: string; rest: string } | null {
+  for (const f of COMPONENT_FRAMES) {
+    const m = s.match(f.re);
+    if (m) return { axis: m[f.axis] as 'x' | 'y' | 'z', id: m[f.id], rest: s.slice(m[0].length) };
+  }
+  return null;
+}
+
+/** The sign tail — a word («חיובי», "is positive") or a comparison with ZERO (`> 0`, `< 0`). Strict
+ *  only: `≥ 0` admits 0 and the sign given does not, so it is left unread rather than strengthened. */
+const COMPONENT_SIGN_TAIL = /^(?:\s+(?:הוא\s+|היא\s+|is\s+)?(חיובי|שלילי|positive|negative)|\s*([<>])\s*0)$/;
+/** The value tail — a copula («הוא», «שווה ל-», "is"), `=` or `:`, then one component. */
+const COMPONENT_VALUE_TAIL = new RegExp(
+  String.raw`^(?:\s+(?:הוא\s+|היא\s+)?שו?וה\s+ל\s*-?\s*|\s+(?:הוא|היא|is|equals)\s*[=:]?\s*|\s*[=:]\s*)(${COMP})$`,
+);
+
+/**
+ * #1547: a SYMBOLIC single component («x_B = 2t») recognised and not yet supported — v1 reads numbers
+ * only. A typed refusal, never `not-handled`: on a NEW id the one-letter coord-sym lowering would set
+ * the two unstated components to 0, an invented given (ADR-052), and the LLM lane would be paid to guess
+ * exactly that. Holds the student's component (`x_B`) for the message.
+ */
+let COMPONENT_SYMBOLIC: string | null = null;
+
+const componentGiven: Rule = (s) => {
+  const f = readComponentFrame(s);
+  if (!f) return null;
+  const sign = f.rest.match(COMPONENT_SIGN_TAIL);
+  if (sign) {
+    const positive = sign[1] !== undefined ? sign[1] === 'חיובי' || sign[1] === 'positive' : sign[2] === '>';
+    return [{ type: 'sign-given', id: f.id, axis: f.axis, positive }];
+  }
+  const val = f.rest.match(COMPONENT_VALUE_TAIL);
+  if (!val) return null;
+  const comp = parseComp(val[1]);
+  if (unreadableComp(comp)) return null; // #510: a malformed literal is never an unknown coordinate
+  if (comp.num === null) {
+    COMPONENT_SYMBOLIC = `${f.axis}_${f.id}`;
+    return null;
+  }
+  return [{ type: 'point3', id: f.id, x: f.axis === 'x' ? comp.num : null, y: f.axis === 'y' ? comp.num : null, z: f.axis === 'z' ? comp.num : null }];
 };
+
+/**
+ * #1547 — the single-component QUESTION («x_B», «x_{B} = ?», «מהו שיעור ה-x של B?», "what is the
+ * x-coordinate of B?"), read through the statement's own frame (ADR-3D-279: anything statable is
+ * askable) so the two lanes cannot drift apart.
+ */
+export function componentAskOf(raw: string): { id: string; axis: 'x' | 'y' | 'z' } | null {
+  const s = normalize3(raw)
+    .replace(/^(?:מה(?:ו|י)?|[Ww]hat\s+is)\s+/, '')
+    .replace(/\s*(?:=\s*)?\?$/, '')
+    .trim();
+  const f = readComponentFrame(s);
+  return f && f.rest.trim() === '' ? { id: f.id, axis: f.axis } : null;
+}
 
 // #333 (ADR-3D-153): `pointPlanesLine` — the POINT-RUN sibling of `intersectionLine` — is gone.
 // Two rules for one relation, each with its own hand-rolled connective grammar, IS the overfit this
@@ -4596,7 +4682,7 @@ export const RULES: Rule[] = [
   crossingPoint,
   planeThroughBare, // bare `מישור ABC` — after the `:`-carrying plane rules
   injectionList,
-  signGiven,
+  componentGiven, // #1547: one coordinate of a point — value, sign, or a comparison with zero
   // #333 (ADR-3D-153): ONE intersection-line rule, at the slot its point-run half used to hold —
   // its head is specific (`ישר/קו החיתוך`), so it can claim nothing else. `crossingPoint` (above)
   // declines a plane×plane pair by KIND, so the old ordering hazard against it is structural now.
@@ -4765,6 +4851,7 @@ export function parse3(utterance: string): ParseResult3 {
   markVectorContext(utterance);
   PARAM_CONFLATED = null;
   MAIN_DIAGONAL_AMBIGUOUS = false;
+  COMPONENT_SYMBOLIC = null;
   const s = normalize3(utterance);
   if (!s) return NOT_HANDLED;
   if (!VEC_MARKED && /^([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*$/.test(s))
@@ -4779,6 +4866,8 @@ export function parse3(utterance: string): ParseResult3 {
   // #836: «אלכסון ראשי» names none of a solid's four space diagonals — ask which, never pick one. A
   // RECOGNISED ambiguity is reported, never rewritten around, so it is checked before the #837 seam.
   if (MAIN_DIAGONAL_AMBIGUOUS) return { ok: false, reason: 'ambiguous-main-diagonal' };
+  // #1547: a single component with a SYMBOLIC value — recognised, not yet supported (see componentGiven)
+  if (COMPONENT_SYMBOLIC) return { ok: false, reason: 'component-symbolic', component: COMPONENT_SYMBOLIC };
   // #866: «AD חוצה את זווית A» — the bisected angle named by its VERTEX alone. Checked AFTER every rule,
   // so the three-letter form «AD חוצה זווית BAC» (which builds) can never reach it, and the frame is
   // reported as under-specified rather than escalated to the lane whose job is to guess.
