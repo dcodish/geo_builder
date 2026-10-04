@@ -11829,3 +11829,27 @@ Both build with every row ok and 8 points, and in both the point that was A now 
 **Consequences.** `src3d/engine/dataView.ts`, `src3d/engine/queries.ts`; two tests moved; docs/02b, docs/04b. Language-neutral (`,` and `±`), so both locales read the same text. Siblings unchanged: analytic writes a point's options with «או», and complex has its own spelling. The request was 3-D's parameter row.
 
 **Behaviour change for a student:** when the givens leave a parameter several values, the data panel and the answer to «m» now read «m = -2, m = 4» (or «m = -2, m = 0, m = 4») instead of «m = {-2, 4}». A ± pair still reads «m = ±√2».
+
+## ADR-3D-304 — One solve per configuration, and the anchored solve finishes instead of running out of budget (#863)
+
+**Status:** accepted · 2026-10-04 · bug (P3) · round #1767 · operator ruling 2026-10-04 on #863 (Part B's redraw ACCEPTED) · branch `fix/863-anchored-solve` off `main` @ 7ed5baa8
+
+**Requirements:** none (internal — no given is accepted or refused differently) · **Design:** docs/04b — "The solver", *One solve per configuration*
+
+**Context (re-measured at 7ed5baa8, through `derive3` and `dataView` on `fixtures3/symbolic-line-equation-863`, seed 0).** One `derive3` of line 3: **382 `leastSquares` solves, 678,346 residual evaluations** (1 resolve; the submit does 1 uncached derive since #1422). The data panel, open by default at ≥ 1000 px, then ran `dataView`: **836 more solves, 1.44 M evals, 3 resolves** — one of them the derive's own `(c, seed)` — and a second render of the same panel paid all of it again.
+
+### Part A — the resolve memo (outcome-identical)
+
+**Root cause.** A pure function of `(construction, seed, paramValue)` was memoized per CONSUMER (`claims.ts`'s `samplesMemo`, #1546) instead of at its chokepoint, so every other consumer — the panel, the ask lane — re-solved configurations the derive had already solved. Class: *a pure solve memoized above its chokepoint is re-paid by every consumer the memo does not cover.*
+
+**Decision.** `resolve3` is memoized in a WeakMap keyed on the construction object, then `seed` / `seed|paramValue` (64 entries per figure). The body is `resolve3Uncached`. `claims.ts`'s `samplesMemo` is removed — `verifyClaim` calls `knowledgeSamples3` directly and hits the same memo. `resolveStats3 { uncached, hits }` and `leastSquaresStats { solves, evals }` are the count seams. **Cache-hit charging (#1605):** no 3-D budget counts solver work — `firstSatisfyingSeed3`'s budget counts seeds — so no budget reads a hit as free work.
+
+**Measured (Part A alone).** #863 line 3: derive 1 resolve; panel cold **2** new resolves, 454 solves / 759,173 evals (was 3 / 836 / 1,437,519); panel warm **0** (was the same 3 / 836 / 1.44 M again). Every `fixtures3` derive drops one resolve (5 → 4; the claim verifier's display seed is the derive's own). Statuses and positions of all 44 `fixtures3` at 24 seeds: byte-identical.
+
+**Locks.** `src3d/__tests__/issue-863-resolve-memo.test.ts`: the cold/warm counts above; a hit is the identical object; another seed or an explicit `paramValue` is its own solve; a different construction object is never served another's resolution.
+
+**Sibling audit.** 2-D memoizes `replay` at its chokepoint already (the fold-memo rule, #1422's source); analytic and complex resolve in closed form per call. Class not open elsewhere.
+
+### Part B — exact-then-nearest anchored solve: built, measured, NOT shipped (escalated)
+
+The planned mechanism was built (LM on the primary residuals to exactness, then a projected walk to the nearest point of the solution set to the anchors) and cuts the #863 derive from 382 solves / 678,346 evals to 98 / 42,852. Its own safety net failed on two clauses at 24 seeds × 44 fixtures. Pool sizes differed on 5 fixtures (794, 509, 820, 863, 1608). Pin-symbol root sets differed on 2: #509, whose open symbols were sampled at budget-cap points, and #863, where the membership drive keeps the FIRST accepted solution, so the root k ∈ {−1, 2} is picked by start order, not by the givens. Fact statuses stayed identical (one non-whole seed of #863 became whole), and so did branches and determinism. Parked on branch `wip/863-anchored-partB` for the operator's ruling; #863 stays open.

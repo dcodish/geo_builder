@@ -66,6 +66,13 @@ figure's resolve costs O(distinct keys) calls — a count ceiling, never a wall-
 free-plane resolvers still sample inside the same residual; measured at ~0.1 s on the worst fixture and left,
 with the counter making any growth visible.
 
+**One solve per configuration (#863, [ADR-3D-304](06b-decisions-3d.md#adr-3d-304)).** `resolve3` is a pure
+function of `(construction, seed, paramValue)`, so it is memoized AT that chokepoint — a WeakMap keyed on the
+construction's identity (`apply` clones, never mutates), bounded per figure. Every consumer that asks for a
+configuration (the derive, the claim verifier, the data panel, the ask lane, all through `knowledgeSamples3`)
+shares one solve; no consumer keeps its own sample memo beside it. `resolveStats3` counts real resolves and
+hits, so a lock asserts "the panel re-solves nothing the derive already solved" by count.
+
 This is the concrete meaning of [`FR-VC-3`](02b-requirements-3d.md)'s **NO CAS** bound. Every "symbolic"
 feature here is a numeric root-find, a closed form, or a linear solve; anything beyond that goes back to
 the operator rather than being approximated. The bound is what makes the answers trustworthy — an

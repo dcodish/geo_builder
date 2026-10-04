@@ -1540,8 +1540,42 @@ export function pivotFamilies3(c: Construction3): PivotFamily3[] {
   ];
 }
 
+/** #863 (ADR-3D-304) — the resolve counter: `uncached` counts real resolves, `hits` memo answers. A lock
+ *  asserts these by COUNT, never by clock. */
+export const resolveStats3 = { uncached: 0, hits: 0 };
+
+/**
+ * #863 (ADR-3D-304) — THE RESOLVE MEMO. `resolve3` is a pure function of (construction, seed, paramValue):
+ * every step below is deterministic, and `apply` clones a construction, never mutates it (the property the
+ * store's derive memo #1422 and the old claim-sample memo #1546 already stand on). So one figure is solved
+ * once per configuration however many consumers ask — the derive, the claim verifier, the data panel, the
+ * ask lane — instead of once per consumer (the panel re-solved the derive's own seed: 1.7 s of the #863
+ * figure's 3.9 s panel). Keyed on the construction's IDENTITY (a WeakMap, so a session's figures are dropped
+ * with them) and the configuration; bounded per construction, since a seed sweep touches many seeds.
+ * Callers treat `Resolved3` as read-only — it was already shared across the render tree via `Derived3`.
+ * This memo replaces the claim verifier's narrower one; do not add another beside it (docs/17 M3).
+ */
+const resolveMemo3 = new WeakMap<Construction3, Map<string, Resolved3>>();
+const RESOLVE_MEMO_PER_FIGURE = 64;
+
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number, opts: { paramValue?: number } = {}): Resolved3 {
+  const key = opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`;
+  let per = resolveMemo3.get(c);
+  const hit = per?.get(key);
+  if (hit) {
+    resolveStats3.hits++;
+    return hit;
+  }
+  const out = resolve3Uncached(c, seed, opts);
+  if (!per) resolveMemo3.set(c, (per = new Map()));
+  per.set(key, out);
+  if (per.size > RESOLVE_MEMO_PER_FIGURE) per.delete(per.keys().next().value as string);
+  return out;
+}
+
+function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: number }): Resolved3 {
+  resolveStats3.uncached++;
   const pos: Positions3 = new Map<Id, Vec3>();
 
   // coordinate points don't depend on anything — place them first (membership branch-selection reads them)
