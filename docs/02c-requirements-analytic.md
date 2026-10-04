@@ -2102,6 +2102,13 @@ The student types the exam's own tangency sentence with its touch point and the 
 
 Refused by name, never drawn: a tangent from a point inside the circle, a touch point that would coincide with the line's other end, and a bare «המשיק» when the figure has no tangent or several. The imperatives «העבירו משיק / מיתר» are taught as these sentences (R114).
 
+**R132 amendment — tangents FROM a point, in every spelling 2-D reads**
+([ADR-AG-233](06c-decisions-analytic.md#adr-ag-233), [#1430](https://github.com/dcodish/geo_builder/issues/1430)).
+«מנקודה P יוצאים שני משיקים למעגל», «מהנקודה P יוצא משיק למעגל O», «מנקודה P משיקים למעגל», «… הנוגעים בו בנקודות A ו-B»,
+"from point P two tangents are drawn to the circle" draw the tangent(s) from P. Touch points the sentence does not name are
+named by the tool, T then S (as 2-D names them). The exam's «מהנקודה P העבירו משיקים למעגל» is taught onto «מהנקודה P
+יוצאים שני משיקים למעגל» (R114). A point inside the circle is refused, naming the line.
+
 **R133 — «המעגל» is the circle the figure has**
 ([ADR-AG-196](06c-decisions-analytic.md#adr-ag-196), [#1633](https://github.com/dcodish/geo_builder/issues/1633), [#1619](https://github.com/dcodish/geo_builder/issues/1619)).
 *(Operator, 2026-10-01: "now we need to work on phase B"; #1633: "The student stated ONE circle twice.")*

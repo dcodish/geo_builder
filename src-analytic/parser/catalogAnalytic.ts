@@ -446,6 +446,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'circles', family: 'F5', he: 'המשיקים למעגל O בנקודות A ו-C נפגשים בנקודה D', en: 'the tangents to circle O at A and C meet at D' },
   { category: 'circles', family: 'F5', he: 'המשיקים נפגשים בנקודה D', en: 'the tangents meet at D', needs: ['מעגל O', 'המשיק למעגל O בנקודה A', 'המשיק למעגל O בנקודה C'] },
   { category: 'circles', family: 'F5', he: 'דרך P עובר משיק למעגל', en: 'a tangent to the circle passes through P', needs: ['נתון מעגל x^2+y^2=25', 'P(10,0)'] },
+  // #1430 (ADR-AG-233): the two tangents from a point, touches named by the tool (2-D's T, S) — the sentence «מהנקודה P העבירו משיקים למעגל» is taught onto.
+  { category: 'circles', family: 'F5', he: 'מנקודה P יוצאים שני משיקים למעגל', en: 'from point P two tangents are drawn to the circle', needs: ['נתון מעגל x^2+y^2=25', 'P(10,0)'] },
   { category: 'circles', family: 'F5', he: 'AB מיתר במעגל', en: 'AB is a chord of the circle', needs: ['נתון מעגל x^2+y^2=25'] },
   // Two chords of a circle not stated yet: the sentence states it on its centre letter, as 2-D does (#1670, ADR-AG-210).
   { category: 'circles', family: 'F5', he: 'AB ו-CD מיתרים במעגל O', en: 'AB and CD are chords of the circle O' },

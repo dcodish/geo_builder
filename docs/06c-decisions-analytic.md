@@ -11018,3 +11018,31 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 - Moved by design: `issue-1167-panel-names`, `issue-1270-canonical-centre-o` (read the texts joined with ` · `; they lock the centre's NAME), `issue-1212-curve-equation`, `issue-1219-line-details` (the structured lines).
 
 **Consequences.** `app/curveText.ts` (`DetailLine`, `DetailLabelKey`, `detailLineText`, `detailsText`); `app/panelRows.ts` (`detailRowText`); `App.tsx` (one line per entry); `i18n/index.ts` (four keys per locale).
+
+## ADR-AG-233 — Tangents from a point read 2-D's spellings: a movement verb, a bare plural, unnamed touches; the exam imperative is taught onto them (#1430 remainder)
+
+**Date:** 2026-10-04 · **Status:** accepted · fix-round #1736 (PR item, with #1597). #1430 approved 2026-09-27 (batch) and widened 2026-09-29 (side-as-subject arm).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R132 amendment (tangents from a point, every spelling). · **Design:** [04c](04c-design-analytic.md), "Tangents from a point, the verb frame" (in the ADR-AG-195 section). · **LADDER stage:** parse (`parseCircleFamilies` from-point reader) and the submit gate's exam register (`constructionCandidates`). No new fact, no fold, solver or render change.
+
+**Cites** [ADR-AG-195](#adr-ag-195) (tangency at a point; the from-point sentence with named touches), [ADR-AG-196](#adr-ag-196), [ADR-AG-206](#adr-ag-206) (the exam's construction imperatives are taught), [ADR-AG-219](#adr-ag-219) (the tool's touch letters T, S).
+
+**Re-measured at pickup** (origin/main d9a5910f, through `decideSubmit`). Of the issue body's ten forms and the 2026-09-29 side-as-subject amendment, everything already recorded green except the from-point family:
+- recorded: «הישר l1 משיק למעגל (I)», «הישר y=kx+1 משיק למעגל», «דרך A עובר משיק למעגל», «(ה)משיק למעגל בנקודה A», «PA משיק למעגל בנקודה A», «AB משיק למעגל», «הצלע AB משיקה למעגל», «הקטע AB משיק למעגל», "side AB is tangent to the circle". The side arm's lock (≡ «מעגל M משיק לצלע AB», 24 seeds) is already in `issue-1619-b3-tangents-chords.test.ts`.
+- `not-handled`: «מהנקודה P העבירו משיקים למעגל», «מהנקודה P יוצאים שני משיקים למעגל», «מנקודה P יוצא משיק למעגל», "from point P two tangents are drawn to the circle". 2-D builds every one (`tangentsFromExternal` / `tangentFromExternal`).
+
+**Root cause.** The analytic from-point reader (ADR-AG-195 family) accepted only «מנקודה E … (שני משיקים נוגעים | משיק נוגע) במעגל ב(נקודה D | נקודות A ו-B)»: the participle «נוגע(ים)» and NAMED touches were both mandatory. The movement verbs, the bare plural and an unnamed touch had no reading; and the exam register had no noun «משיקים» and composed the singular from-point lesson as «המשיק למעגל מהנקודה P», which no reader accepts — so the lesson was never offered.
+
+**Decision.**
+1. A second regex beside the existing one (`fromPointVerb`): «מ(ן )?(ה)נקודה P (מחוץ למעגל O)? (יוצא(ים)|עובר(ים))? (שני משיקים | משיקים | משיק) (למעגל O)? (, הנוגעים בו)? (ב(נקודה D | נקודות A ו-B))?» and the English "from (the) (point) P (outside the circle O)? (two tangents | tangents | a tangent) (are/is)? (drawn)? (to the circle O)? (touching it at …)?". Both feed the SAME lowering: `touchAt` per touch, `distinct`, the segments from P. No second tangency.
+2. A touch the sentence does not name is minted (`toolPoint('touch', 'from-P…')`) — T, then S, 2-D's letters. A named count that disagrees with the noun («שני משיקים … בנקודה A») is not read.
+3. The exam register: «משיקים» is a construction noun (plural), «שני» may precede a plural noun, and a tangent FROM a point (or the plural THROUGH one) composes «מ<הנקודה P> יוצא משיק / יוצאים שני משיקים <rest>». The singular «דרך הנקודה D שעל המעגל העבירו משיק» keeps its lesson «המשיק למעגל בנקודה D».
+4. A point inside (or on) the circle: the fold refuses the line `unsatisfiable`, naming it — the same as the named-touch form.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1430-tangents-from-point.test.ts` (17 tests; **fails before: 15 of 17** — the controls are the count-mismatch refusal and the singular-through lesson): seven spellings record and each touch is a tangency (on the circle, cos∠OTP = 0) at 8 seeds, the two touches distinct; the named-touch form parses to the identical facts as the «נוגעים» sentence; restating is `already-known`; four imperatives teach the declarative and the declarative records; P inside is refused naming the line.
+- Parity rows `tan-from-1430-01..03` (from-point, 2-D builds; analytic was `not-handled`) and `tan-side-1430-04/05` (a triangle's side as the subject; both products already built — controls). Catalog: «מנקודה P יוצאים שני משיקים למעגל» added (F5).
+
+**Not changed.** The exam imperative stays a TEACH in analytic (ADR-AG-206), where 2-D obeys it; that divergence predates this ADR. With P inside the circle the imperative's lesson is dropped by the gate (its candidate does not fold) and the line answers `not-handled` — the ADR-AG-206 rule for a candidate the fold refuses, unchanged here.
+
+**Consequences.** `parser/parseAnalytic.ts` (`fromPointVerb`, the shared lowering), `parser/scopeAnalytic.ts` (`משיקים`, `שני`, the from-point frame), `parser/catalogAnalytic.ts` (one row — it feeds `PROMPT_SPEC_ANALYTIC`, so the LLM proxy needs a redeploy), `shell/__tests__/fixtures/geo-input-parity.ts` (five rows).

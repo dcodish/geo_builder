@@ -938,6 +938,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'meet-perpendicular-drawn-1715', family: 'intersections', steps: ['משולש ABC', 'האנך מ-C ל-AB', 'חוצה זוית B והאנך מ-C ל-AB נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: '«האנך מ-C ל-AB» refers to the drawn perpendicular (ADR-AG-207)' },
   { id: 'meet-same-line-twice-1715', family: 'intersections', steps: ['משולש ABC', 'חוצה זוית B וחוצה הזווית B נפגשים בנקודה E'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: 'one line twice names no point; 2-D builds a point on it' },
   { id: 'meet-parallel-1715', family: 'intersections', steps: ['מלבן ABCD', 'הישר AB והישר CD נפגשים בנקודה E'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679' }] },
+  // ── #1430 (ADR-AG-233): tangents FROM a point with a movement verb / unnamed touches, and a polygon side as the subject — 2-D builds each ──
+  { id: 'tan-from-1430-01', family: 'tangents', steps: ['מעגל O', 'מנקודה P יוצאים שני משיקים למעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'tan-from-1430-02', family: 'tangents', steps: ['מעגל O', 'מנקודה P יוצא משיק למעגל O'], expect: 'builds', exception: 'X8' },
+  { id: 'tan-from-1430-03', family: 'tangents', steps: ['מעגל O', 'מנקודה P יוצאים שני משיקים למעגל O, הנוגעים בו בנקודות A ו-B'], expect: 'builds', exception: 'X8' },
+  { id: 'tan-side-1430-04', family: 'tangents', steps: ['משולש ABC', 'מעגל O', 'הצלע AB משיקה למעגל O'], expect: 'builds', exception: 'X8' },
+  { id: 'tan-side-1430-05', family: 'tangents', steps: ['משולש ABC', 'מעגל O', 'AB משיק למעגל O'], expect: 'builds', exception: 'X8' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

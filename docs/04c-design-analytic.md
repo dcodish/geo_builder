@@ -2039,6 +2039,14 @@ Binding an undescribed «חסום במעגל» to a circle already in the figure
 
 **Chords.** A chord is lowered only to existing facts: `declare` both ends, `on-curve` or `on-kind` on the circle, and the segment. Two chords that meet use the bounded crossing of the two segments. Equal chords use `length-eq`. `parseChord` runs with `parseTangentObject` before `parseCircleAt`, whose verb split would otherwise read «משוואת המשיק» as a subject before the verb.
 
+**Tangents from a point, the verb frame** ([ADR-AG-233](06c-decisions-analytic.md#adr-ag-233), #1430). `parseCircleFamilies`'s
+from-point reader has a second regex, `fromPointVerb`, for the same sentence with a movement verb («יוצא(ים)», «עובר(ים)»),
+a bare plural («משיקים»), the target circle, and an optional touch clause («הנוגעים בו בנקודות A ו-B»); English "from
+(point) P two tangents / a tangent (are/is drawn) to the circle". Both regexes feed ONE lowering (`touchAt` per touch,
+`distinct`, the segments from P). An unnamed touch is `toolPoint('touch', 'from-P…')` (T, S). The exam register
+(`constructionCandidates`) knows the noun «משיקים» (and «שני» before a plural noun); a tangent FROM a point — or the plural
+THROUGH one — composes «מ<הנקודה P> יוצא משיק / יוצאים שני משיקים …».
+
 ## The contextual circle: one binding for every sentence about «המעגל» ([ADR-AG-196](06c-decisions-analytic.md#adr-ag-196), #1633, #1619)
 
 **One fact, one resolver.** A sentence about THE circle lowers to `the-circle { create, about, match? }`. `create` is the sentence's own creation (the curve, the computed circle, the circle on a centre, with their incidences); `about` is the statement about an existing circle, with `CIRCLE_SENTINEL` where the circle's id goes. M1's `theCircle(c, match)` decides: `match.centre` (a centre-described circle, also «מעגל M שמשוואתו …») → `circleByName`; `match.eq` → `resolveCurveByEq`; no match → the figure's circles (0 create, 1 bind, ≥2 `ambiguous-shape`). The bound branch substitutes the id into `about` and applies it with `applyAll`, so its effect and its refusals are the spelled-out statements' own.
