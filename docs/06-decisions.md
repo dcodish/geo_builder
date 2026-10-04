@@ -14464,3 +14464,44 @@ Every verdict and note identical (refused / committed, the same `[vs #N]` tail).
 - `src/__tests__/submit-gate.ts`: the mirror.
 
 **Behaviour change for a student:** on a right triangle whose right angle they never placed, a line that cannot hold at ANY right-angle position is now refused with the conflict («… cannot hold») instead of being added with red rows; a line that one of the positions satisfies still commits and is drawn green. The verdict is the same on every computer; on a slow one the refusal may take a second or two.
+
+## ADR-585 — An accepted step keeps the free vertices its own solve moved (#4)
+
+**Status:** accepted · 2026-10-04 · debt (P3, performance) · fix-round #1767 · branch `fix/4-recruitment-cost`
+
+**Requirements:** none (internal — no product promise changes; the figure a student sees at each step is the same drawing, and it no longer jumps back later) · **Design:** [LADDER.md](LADDER.md) stage 2j · **LADDER stage:** 2j (new) — after every `applyStep` / `applyCoupledStep` accept, before the requirements record.
+
+**Cites** [ADR-097](#adr-097) (the convex ladder recruits a declared polygon's free on-circle vertices), [ADR-052](#adr-052) (a default is a starting value, never a given), [ADR-123](#adr-123) (the issue's origin), [ADR-281](#adr-281) (the earlier guess that this was a stage-(B) over-recruit), [ADR-399](#adr-399) (the accept-time transplant this mirrors: values written, verified stable).
+
+**Context — re-measured at pickup on 7ed5baa8.** Cold `replay` of the scenario `area-ratio-converges-points-allowed` costs **484,883 evaluateCore calls (~1.3–1.6 s)**. The issue (and its 2026-08-26 plan) blamed the area-ratio step's stage-(B) recruitment. The measurement says otherwise: the area-ratio step costs 46,067 (9.5%). **88%** (426,686) is five identical joint solves, one per step from «BE⊥DC» on: carriers A, C (driven by AB=AD, CB=CD) fail the convex-required solve (~43k), then `resolveMixedCarriers` recruits the free vertices B, D (ADR-097) and succeeds (~42k). At the default kite E's foot falls outside segment DC, so the drawing needs B and D moved — and the step accepted that drawing **without keeping it**: B and D stayed at their stored values, which the step had just shown cannot be drawn. Every later step builds a new construction (a memo miss), so each re-ran the failing search and then the recruited one from scratch; every `applySeed` sample starts from those same stored values. Worse, once the area ratio made D a driven carrier, the driven-only solve succeeded without B, and **B jumped back** to its old default (1.74 units) — the stability rule broken by a fact that never mentions B.
+
+**Class (docs/17 §1).** *A step's accepted drawing depends on a value the construction does not store.* Any figure whose undriven free vertex is moved by `evaluate`'s own recruitment (today: the convex ladder's ADR-097 rung — the only path where `resolveDriven` writes an object with no `solve`) pays that recruitment again at every later step, and loses it the moment a later given lets the driven-only solve pass. It is not area-ratio specific and not a recruiter (step.ts stage-3) defect: the recruiter never ran here (`main:primary` accepted).
+
+**Decision.**
+1. `commitDrawnFreeVertices` (`src/engine/step.ts`) wraps every ok result of `applyStep` and `applyCoupledStep` — the two entry points the fold uses. It reads the accepted solve from `resolveDrivenMemo` (filled by the accept's own `evaluate` — no extra solve), and for every object **without** a `solve` directive whose carrier parameters the solve changed, writes the drawn value as the stored one (`setCarrierVals`). The vertex stays free: no directive is added, sampling treats it exactly as before.
+2. Try-and-verify: the committed construction is re-evaluated and kept only when it draws the same figure (every point within 1e-6·span); otherwise the step's own result is returned untouched.
+3. Driven carriers are not touched: they re-solve every evaluate, and their stored value is a seed for the branch choice, not the drawing.
+4. Out of scope, deliberately: `resolveMixedCarriers`' internal search cost (another item in this round owns that function).
+
+**Measured (operation counts).**
+
+| | before | after |
+|---|---|---|
+| cold `replay` of the 8-line kite (evaluateCore) | 484,883 | **122,909** (−75%) |
+| the step after «BE⊥DC» («AC») | 85,358 | 2,065 |
+| the area-ratio step | 46,067 | 14,760 |
+| `sharedSamples` (knowledge pool, wide) | 2,188,451 | 2,144,427 |
+| warm replay (content-equal facts) | 0 | 0 |
+| 24-seed sweep, this figure | 1,233,356 | 1,503,902 (+22%) |
+
+The 24-seed sweep rises because the samples now jitter around the drawn kite (B, D near the edge of E's feasibility) instead of the undrawable default; whole-rate is unchanged (24/24). 24-seed whole-rates, before = after: `area-ratio-converges-points-allowed` 24/24, `area-ratio-reshapes` 24/24, `q22-arc-sum-enforced-not-truncated` 11/24 (same seed pattern), `tangent-rider-collinear-solves-own-offset` 24/24, `q5-isosceles-incircle-sqrt3-ratio-and-area` 24/24; controls `congruent-triangles-word-form` 24/24, `symbolic-area-label-not-swallowed` 24/24 — those six with identical work counts (the mechanism does not fire on them).
+
+**Locks.** `src/__tests__/issue-4-recruitment-cost.test.ts` (4) — the operator's exact sequence as inline facts (so the first replay is cold): cold work < 200,000 and warm = 0; the step after «BE⊥DC» < 20,000; no undriven carrier of the accepted construction is moved by its solve (exercised-counter ≥ 2); B does not move when the area ratio is added. **Fails before: 4 of 4** (484,883 · 85,694 · B stored 5.934 vs drawn 6.283 · B jumps 1.737). The scenario `area-ratio-converges-points-allowed` stays green, all scenario slices green, decide-parity shards unchanged.
+
+**Consequences.**
+- `src/engine/step.ts`: `commitDrawnFreeVertices`; `applyStep` / `applyCoupledStep` route their result through it.
+- `docs/LADDER.md`: stage 2j.
+
+**Behaviour change for a student:** each line after «BE⊥DC» answers faster (the whole 8-line sequence through the parse path: 948,579 → 257,307 evaluateCore calls). Verdicts are unchanged. The drawings after «BE⊥DC» can differ: at configuration 0 the area-ratio line now keeps B where it was (a 60° kite) instead of springing it back, and the configurations offered by the auto-advance and "show another configuration" are sampled around the drawn kite (line 7 auto-advances to configuration 2 instead of 1 — that auto-advance itself is pre-existing, both before and after).
+
+**Found, not fixed (pre-existing, same before and after):** an impossible ratio on this figure («שטח משולש NCE = שטח משולש ACD») refuses after ~16–20 s (2.9M evaluateCore calls; 4.0M before) and the refusal note blames «BE ⟂ DC» rather than the area statement.

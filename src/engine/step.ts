@@ -11,7 +11,7 @@ import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObjec
 import { LEN_EPS, isGeoPoint, isOrderConstraint } from './types';
 import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
 import { lower } from './lower';
-import { evaluate, evaluateTightened, resolveDriven, drivenConstraintsOf } from './evaluate';
+import { carrierParams, evaluate, evaluateTightened, resolveDriven, resolveDrivenMemo, drivenConstraintsOf, setCarrierVals } from './evaluate';
 import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist, isRingDiagonal, sub } from './geometry';
 import { budgetExceeded } from './solveBudget';
@@ -824,9 +824,53 @@ function withRequirements(r: StepResult, prev: Construction, cmds: Command[]): S
   return { ...r, construction: { ...rest, ...requirementsField(reqs) } };
 }
 
+/**
+ * #4 ([ADR-585](../../docs/06-decisions.md#adr-585)) — COMMIT THE DRAWN FREE VERTICES of an accepted step.
+ *
+ * `evaluate`'s convex-by-default ladder may move an UNDRIVEN free vertex to find the accepted drawing: when
+ * the driven carriers alone have no convex solution, it recruits the declared polygon's free on-circle
+ * vertices (ADR-097) for that one solve. That recruitment was EPHEMERAL — the accepted construction kept
+ * those vertices at their old stored values, which are exactly the values the step just proved infeasible.
+ * So every later `evaluate` of every later step (a new construction, a memo miss) re-ran the doomed
+ * driven-only search and then the recruited one from scratch (#4: a kite whose «BE⊥DC» foot left segment DC
+ * paid ~85k evaluateCore calls per step for every step after it — 88% of the figure's cold cost), and the
+ * vertices sprang back to their old values as soon as a later given let the driven-only search succeed
+ * without them (a figure jump — the stability rule).
+ *
+ * The drawn figure IS the truth of the step, so an undriven vertex the accepted solve moved keeps its drawn
+ * value as its stored value: still free (no directive is added — it is sampled exactly as before), only its
+ * starting value is the one the student sees. Try-and-verify: kept only when the committed construction
+ * evaluates to the SAME drawing, otherwise the step's own result is returned untouched.
+ */
+function commitDrawnFreeVertices(r: StepResult): StepResult {
+  if (!r.ok) return r;
+  const c = r.construction;
+  const baked = resolveDrivenMemo(c); // the accepted evaluate filled this memo — no second solve
+  if (baked === c) return r;
+  const bakedById = new Map(baked.objects.map((o) => [o.id, o] as const));
+  const moved = new Map<Id, number[]>();
+  for (const o of c.objects) {
+    if ((o as { solve?: unknown }).solve !== undefined) continue; // a DRIVEN carrier re-solves every evaluate — its seed is not the drawing's
+    const b = bakedById.get(o.id);
+    if (!b || b.kind !== o.kind) continue;
+    const was = carrierParams(o);
+    const now = carrierParams(b);
+    if (!was || !now || was.length !== now.length) continue;
+    if (was.some((v, i) => Math.abs(v - now[i]) > 1e-12)) moved.set(o.id, now);
+  }
+  if (!moved.size) return r;
+  const committed = setCarrierVals(c, moved); // undriven objects: `solve` was already absent
+  const e = evaluate(committed);
+  if (!e.ok) return r;
+  let span = 1;
+  for (const p of r.positions.values()) span = Math.max(span, Math.abs(p.x), Math.abs(p.y));
+  if (maxDelta(r.positions, e.positions, [...r.positions.keys()]) > 1e-6 * span) return r;
+  return { ...r, construction: committed, positions: e.positions };
+}
+
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
-  return withRequirements(applyStepLadder(prev, cmd), prev, [cmd]);
+  return withRequirements(commitDrawnFreeVertices(applyStepLadder(prev, cmd)), prev, [cmd]);
 }
 
 function applyStepLadder(prev: Construction, cmd: Command): StepResult {
@@ -1016,7 +1060,7 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
  * composition to mirror. A run of ONE is just `applyStep`, so nothing outside a multi-constraint macro moves.
  */
 export function applyCoupledStep(prev: Construction, cmds: Command[]): StepResult {
-  return withRequirements(applyCoupledStepLadder(prev, cmds), prev, cmds);
+  return withRequirements(commitDrawnFreeVertices(applyCoupledStepLadder(prev, cmds)), prev, cmds);
 }
 
 function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult {
