@@ -36,7 +36,9 @@ type Query =
   // #1449: a solid of revolution's volume / lateral / total surface, from its stated sizes.
   | { kind: 'rev'; solid: string; measure: 'volume' | 'lateral' | 'surface' }
   | { kind: 'dot'; a: Atom; b: Atom }
-  | { kind: 'length'; a: Atom }
+  // #1543: `read` records HOW the magnitude was asked — bars «|AB|» are the magnitude of the VECTOR AB;
+  // the word «אורך AB» is a segment's length. Same number, different reading, and the echo shows the reading.
+  | { kind: 'length'; a: Atom; read: 'vector' | 'segment' }
   | { kind: 'vector'; a: Atom } // the VECTOR itself — its u/v/w decomposition (+ coords when a frame exists)
   | { kind: 'symbol'; sym: string } // a free parameter «t» from «AE=t·AS» — its solved value (scale-invariant)
   | { kind: 'angle-vertex'; p: Id; q: Id; r: Id }
@@ -76,6 +78,60 @@ export interface QueryResult {
   note?: string;
   /** For note `depends`: the free named parameter(s) the quantity is a function of («α»). */
   param?: string;
+  /**
+   * #1543 (ADR-3D-301) — how the question's ECHO is rendered: `'vector'` iff the parse bound at least one
+   * operand as a VECTOR ({@link queryEcho3}); `'plain'` otherwise, and always for a question that was not
+   * understood. The echo used to go through `VecMath` ungated, and `VecMath` arrows ANY two-label run — so
+   * a refused «משוואת BB'» came back wearing a vector arrow the tool never read. The renderer is
+   * `askEchoNode3` (render/FactRow3), beside the fact row's and the preview's gates.
+   */
+  echo: QueryEcho3;
+}
+
+/** #1543 — the echo's reading. See {@link QueryResult.echo}. */
+export type QueryEcho3 = 'vector' | 'plain';
+
+/** A result before its echo is attached — what the per-kind answerers build. */
+type Answer3 = Omit<QueryResult, 'echo'>;
+
+/**
+ * #1543 (ADR-3D-301) — the operands this question READ AS VECTORS. The rule, not an enumeration of
+ * display cases: a pair wears an arrow iff the parse bound it as a vector `Atom`. The switch is TOTAL over
+ * `Query['kind']` (the `never` default), so a new kind cannot compile without saying which of its operands
+ * are vectors — it inherits no arrow by accident. The command-side twin is #1549's `Command3` registry.
+ */
+function vectorAtoms(q: Query): Atom[] {
+  switch (q.kind) {
+    case 'dot':
+    case 'angle-vec':
+      return [q.a, q.b];
+    case 'vector':
+      return [q.a];
+    case 'length':
+      return q.read === 'vector' ? [q.a] : [];
+    case 'line-plane':
+    case 'plane-plane':
+    case 'angle-ops':
+    case 'rev':
+    case 'symbol':
+    case 'angle-vertex':
+    case 'area':
+    case 'volume':
+    case 'distance':
+    case 'point':
+    case 'component':
+    case 'plane':
+      return [];
+    default: {
+      const unhandled: never = q;
+      return unhandled;
+    }
+  }
+}
+
+/** #1543 — the echo's reading of a PARSED question (a refused one is `'plain'` by construction). */
+export function queryEcho3(q: Query): QueryEcho3 {
+  return vectorAtoms(q).length > 0 ? 'vector' : 'plain';
 }
 
 const PT = String.raw`[A-Z]\d*'?`;
@@ -192,7 +248,7 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
   const lenTok = barM?.[1] ?? lenWord?.[1];
   if (lenTok) {
     const a = atomOf(c, lenTok);
-    if (a) return { kind: 'length', a };
+    if (a) return { kind: 'length', a, read: barM ? 'vector' : 'segment' };
   }
 
   // AREA: «area ABC» / «שטח ABC» / «S_{ABC}» / «SABC»
@@ -498,7 +554,7 @@ function pinFreeMeasures(c: Construction3): { c: Construction3; params: string }
  * The note is set in both outcomes — with an answer it explains why no equation follows, without one
  * it is the whole reply.
  */
-function framelessPlane(c: Construction3, text: string, q: Extract<Query, { kind: 'plane' }>, seed: number): QueryResult {
+function framelessPlane(c: Construction3, text: string, q: Extract<Query, { kind: 'plane' }>, seed: number): Answer3 {
   const ids = q.ids ?? (q.name ? c.pointPlanes.get(q.name) : undefined);
   const label = q.name ?? (ids ? ids.join('') : '');
   const parts: string[] = [];
@@ -531,7 +587,12 @@ export const querySeeds3 = (seed: number): number[] => [seed, seed + 1013, seed 
 
 export function answerQuery(c: Construction3, text: string, seed: number): QueryResult {
   const q = parseQuery(c, text);
-  if (!q) return { text, answer: null, note: 'notUnderstood' };
+  if (!q) return { text, answer: null, note: 'notUnderstood', echo: 'plain' };
+  return { ...answerParsed(c, text, q, seed), echo: queryEcho3(q) };
+}
+
+/** Answer one PARSED question (the echo is attached by {@link answerQuery}). */
+function answerParsed(c: Construction3, text: string, q: Query, seed: number): Answer3 {
   const seeds = querySeeds3(seed);
   const stableNums = (vals: (number | null)[]): number | null => {
     if (vals.some((v) => v === null || !Number.isFinite(v))) return null;

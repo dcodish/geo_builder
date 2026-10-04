@@ -30,6 +30,7 @@ import { isolateLtrRuns3, textDir3 } from '../i18n/bidi';
 import { factDisplay3, isVectorFact3, vectorNotation } from './notation';
 import { isVectorMarked3 } from '../lexicon/marks3';
 import { VecMath, tokenizeRow } from './VecMath';
+import type { QueryEcho3 } from '../engine/queries';
 
 /** The structural shape a row needs — matching `isVectorFact3`, so a test may pass a literal. */
 export type FactRowFact3 = {
@@ -69,8 +70,32 @@ export function factRowText3(f: FactRowFact3, vecNames: Set<string>): string {
 
 export function FactRowText3({ f, vecNames }: { f: FactRowFact3; vecNames: Set<string> }): React.ReactElement {
   if (isVectorFact3(f)) return <VecMath text={factDisplay3(f, vecNames)} vecNames={vecNames} />;
-  if (hasMath(f.utterance)) return <MathText text={isolateLtrRuns3(f.utterance)} />;
-  return <>{isolateLtrRuns3(f.utterance)}</>;
+  return plainRowNode3(f.utterance);
+}
+
+/** The two NON-vector renderers, shared by the fact row and the ask echo (#1543): structure is
+ *  content-gated (`hasMath`), and the text is isolated first, per this file's opening docblock. */
+function plainRowNode3(text: string): React.ReactElement {
+  if (hasMath(text)) return <MathText text={isolateLtrRuns3(text)} />;
+  return <>{isolateLtrRuns3(text)}</>;
+}
+
+/**
+ * The ASK ECHO — the student's question as the ask row repeats it (#1543,
+ * [ADR-3D-301](docs/06b-decisions-3d.md#adr-3d-301)). The third `VecMath` caller, and the one that
+ * skipped the gate: `App3.tsx` rendered every echo through `VecMath`, whose `PAIR` regex arrows ANY
+ * two-label run, so a REFUSED «משוואת BB'» came back as «משוואת BB⃗'» — the tool asserting a vector
+ * reading it never made, on the row that should teach the student what to fix.
+ *
+ * The gate, as for the other two callers, is the CALLER's: the fact row asks `isVectorFact3` (the parsed
+ * commands), the preview asks `isVectorMarked3` (what was typed), and the echo asks the QUESTION's own
+ * parse — `QueryResult.echo`, which is `'vector'` iff `parseQuery` bound an operand as a vector (`|AB|`,
+ * `AB·CD`, `∠(AB,CD)`, a bare `BB'`), and `'plain'` for a length by word, a distance, a plane, or a
+ * question not understood. Otherwise the plain branch is exactly the fact row's.
+ */
+export function askEchoNode3(text: string, echo: QueryEcho3, vecNames: Set<string>): React.ReactElement {
+  if (echo === 'vector') return <VecMath text={text} vecNames={vecNames} />;
+  return plainRowNode3(text);
 }
 
 /**
