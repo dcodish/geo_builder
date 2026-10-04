@@ -140,6 +140,152 @@ export function leastSquares(residuals0: (x: number[]) => number[], x0: number[]
   return { x, err };
 }
 
+/** Symmetric eigen-decomposition by cyclic Jacobi rotations (n ≤ ~16 here). `vectors[k]` is the k-th eigenvector. */
+function symEigen(S: number[][]): { values: number[]; vectors: number[][] } {
+  const n = S.length;
+  const A = S.map((row) => [...row]);
+  const V: number[][] = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));
+  for (let sweep = 0; sweep < 60; sweep++) {
+    let off = 0;
+    let diag = 0;
+    for (let i = 0; i < n; i++) {
+      diag += A[i][i] * A[i][i];
+      for (let j = i + 1; j < n; j++) off += A[i][j] * A[i][j];
+    }
+    if (off <= 1e-30 * Math.max(diag, 1e-300)) break;
+    for (let p = 0; p < n; p++) {
+      for (let q = p + 1; q < n; q++) {
+        if (Math.abs(A[p][q]) < 1e-300) continue;
+        const theta = (A[q][q] - A[p][p]) / (2 * A[p][q]);
+        const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+        const cs = 1 / Math.sqrt(t * t + 1);
+        const sn = t * cs;
+        for (let k = 0; k < n; k++) {
+          const akp = A[k][p];
+          const akq = A[k][q];
+          A[k][p] = cs * akp - sn * akq;
+          A[k][q] = sn * akp + cs * akq;
+        }
+        for (let k = 0; k < n; k++) {
+          const apk = A[p][k];
+          const aqk = A[q][k];
+          A[p][k] = cs * apk - sn * aqk;
+          A[q][k] = sn * apk + cs * aqk;
+        }
+        for (let k = 0; k < n; k++) {
+          const vkp = V[k][p];
+          const vkq = V[k][q];
+          V[k][p] = cs * vkp - sn * vkq;
+          V[k][q] = sn * vkp + cs * vkq;
+        }
+      }
+    }
+  }
+  return { values: A.map((row, i) => row[i]), vectors: Array.from({ length: n }, (_, k) => V.map((row) => row[k])) };
+}
+
+/**
+ * #863 (ADR-3D-304) — the NEAREST point of the solution manifold {f = 0} to the anchors, from an exact x.
+ *
+ * The anchored lanes used to ask Levenberg–Marquardt to minimise ‖f‖² + ‖w·(x_I − target)‖² with w = 1e-4:
+ * the primary residuals are exact within a few iterations, and LM then CREEPS along the manifold toward the
+ * soft anchors (~1 %/iteration), so every start hit the 120-iteration cap and was "polished" three more
+ * times — the drawn point was wherever the budget ran out. This walk asks the question directly: a
+ * projected step toward the anchor targets on the NULL SPACE of f's Jacobian (the manifold's tangent), then
+ * a Gauss–Newton restoration back onto f = 0 (min-norm, the chord Jacobian), accepted only when it is still
+ * exact, still a figure (`ok`) and strictly nearer the anchors; otherwise the step halves. It stops when
+ * the projected pull vanishes (‖P(target − x)‖ < 1e-9) or the step stalls. Deterministic: no randomness,
+ * a fixed iteration cap, and every decision is a comparison of numbers the residual returned.
+ */
+function nearestOnManifold(
+  f: (x: number[]) => number[],
+  x0: number[],
+  idx: readonly number[],
+  target: readonly number[],
+  ok: (x: number[]) => boolean,
+): number[] {
+  const count = (y: number[]): number[] => {
+    leastSquaresStats.evals++;
+    return f(y);
+  };
+  const sq = (r: number[]): number => r.reduce((s, v) => s + v * v, 0);
+  const dist = (y: number[]): number => idx.reduce((s, i, k) => s + (y[i] - target[k]) ** 2, 0);
+  const n = x0.length;
+  let x = [...x0];
+  let r = count(x);
+  const eTol = Math.max(sq(r), 1e-22);
+  for (let it = 0; it < 40; it++) {
+    // central-difference Jacobian at x (the same stencil as `leastSquares`)
+    const J: number[][] = [];
+    for (let j = 0; j < n; j++) {
+      const h = 1e-6 * Math.max(1, Math.abs(x[j]));
+      const xp = [...x];
+      const xm = [...x];
+      xp[j] += h;
+      xm[j] -= h;
+      const rp = count(xp);
+      const rm = count(xm);
+      J.push(rp.map((v, i) => (v - rm[i]) / (2 * h)));
+    }
+    const m = r.length;
+    const JtJ = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => {
+      let s = 0;
+      for (let k = 0; k < m; k++) s += J[i][k] * J[j][k];
+      return s;
+    }));
+    const { values, vectors } = symEigen(JtJ);
+    const lmax = Math.max(0, ...values);
+    const tau = 1e-12 * lmax + 1e-24;
+    const nullV = vectors.filter((_, k) => values[k] < tau);
+    const rangeK = values.map((_, k) => k).filter((k) => values[k] >= tau);
+    if (nullV.length === 0) break; // nothing to slide along: the anchors cannot move an isolated solution
+    const d = new Array<number>(n).fill(0);
+    idx.forEach((i, k) => (d[i] += target[k] - x[i]));
+    const Pd = new Array<number>(n).fill(0);
+    for (const v of nullV) {
+      const c = v.reduce((s, vi, i) => s + vi * d[i], 0);
+      for (let i = 0; i < n; i++) Pd[i] += c * v[i];
+    }
+    if (Math.sqrt(sq(Pd)) < 1e-9) break;
+    /** min-norm Gauss–Newton correction −J⁺r on the chord Jacobian (range directions only). */
+    const restore = (y: number[], ry: number[]): number[] => {
+      const Jtr = new Array<number>(n).fill(0);
+      for (let i = 0; i < n; i++) for (let k = 0; k < m; k++) Jtr[i] += J[i][k] * ry[k];
+      const out = [...y];
+      for (const k of rangeK) {
+        const v = vectors[k];
+        const c = v.reduce((s, vi, i) => s + vi * Jtr[i], 0) / values[k];
+        for (let i = 0; i < n; i++) out[i] -= c * v[i];
+      }
+      return out;
+    };
+    const d0 = dist(x);
+    let moved = false;
+    for (let alpha = 1; alpha >= 1 / 64; alpha /= 2) {
+      let y = x.map((v, i) => v + alpha * Pd[i]);
+      let ry = count(y);
+      let ey = sq(ry);
+      for (let k = 0; k < 8 && ey > eTol; k++) {
+        const y2 = restore(y, ry);
+        const r2 = count(y2);
+        const e2 = sq(r2);
+        if (!(e2 < ey)) break;
+        y = y2;
+        ry = r2;
+        ey = e2;
+      }
+      if (ey <= eTol && dist(y) < d0 - 1e-15 * Math.max(1, d0) && ok(y)) {
+        x = y;
+        r = ry;
+        moved = true;
+        break;
+      }
+    }
+    if (!moved) break;
+  }
+  return x;
+}
+
 /** Gaussian elimination with partial pivoting; null when singular. */
 function solveLinear(A: number[][], b: number[]): number[] | null {
   const n = b.length;
@@ -1563,6 +1709,47 @@ export function solvePivot(
     // basin); ACCEPTANCE is on the primary residuals so exact solutions always pass.
     const primaryErr = (x: number[]): number => fPrimary(x).reduce((s, v) => s + v * v, 0);
     /**
+     * #863 (ADR-3D-304) — EXACT, THEN NEAREST: the anchored solve, finished instead of budget-capped.
+     *
+     * The anchors' job is to choose WHERE on the solution set an under-determined figure sits (the seed's
+     * dims, scale, symbol and rider samples — ADR-052); they never decide whether the givens hold. Asking
+     * LM to minimise primary + 1e-4·anchor jointly made it creep along the solution manifold at ~1 % per
+     * iteration: every start ran its 120-iteration cap and three polish restarts (~7,900 residual
+     * evaluations a start), and the drawn point was wherever the budget ran out. So the two questions are
+     * asked in order: (1) LM on the PRIMARY residuals alone, to exactness; (2) the deterministic projected
+     * walk to the point of that manifold nearest the anchor targets (`nearestOnManifold`). A candidate
+     * phase 1 leaves collapsed or inexact is returned as it stands, and the acceptance below judges it
+     * exactly as before. The returned `err` is the FULL anchored error, so best-selection (where the
+     * anchor's pull punishes the collapse basin) reads the same quantity it always did.
+     */
+    const anchorIdx = [
+      ...(planeDrive ? [6, ...dims0.map((_, i) => 7 + i)] : []),
+      ...pinSyms.map((_, i) => 7 + nDims + nSym + i),
+      ...riders.map((_, i) => riderBase + i),
+    ];
+    const anchoredSolve = (targets: number[], x0: number[]): { x: number[]; err: number } => {
+      const tgt = [...(planeDrive ? [0, ...dims0] : []), ...targets, ...riders.map((r) => r.t0)];
+      const full = fFor(targets);
+      const fullErr = (x: number[]): number => full(x).reduce((s, v) => s + v * v, 0);
+      const r1 = leastSquares(fPrimary, x0);
+      if (r1.err >= ACCEPT || degenerate(r1.x)) return { x: r1.x, err: fullErr(r1.x) };
+      const x = nearestOnManifold(fPrimary, r1.x, anchorIdx, tgt, (y) => !degenerate(y));
+      return { x, err: fullErr(x) };
+    };
+    /** The one solve every anchored site below calls; the unanchored lanes keep LM + polish verbatim. */
+    const solveFrom = (targets: number[], x0: number[]): { x: number[]; err: number } => {
+      if (anchored) return anchoredSolve(targets, x0);
+      const f = fFor(targets);
+      let r = leastSquares(f, x0);
+      // polish: restart LM (fresh damping) from the found point until it stops improving
+      for (let polish = 0; polish < 3 && r.err > 1e-24 && r.err < 1e-4; polish++) {
+        const r2 = leastSquares(f, r.x);
+        if (r2.err >= r.err * 0.99) break;
+        r = r2;
+      }
+      return r;
+    };
+    /**
      * #518 (ADR-3D-133) — park an UNDRIVEN scale at the seed's target, POST-HOC. In-solve anchors were
      * tried at two weights and both failed a full-suite calibration: 1e-4 measurably displaced
      * determined coordinates, and even 1e-6 stalls LM on TANGENTIAL constraint directions (a quadratic
@@ -1632,15 +1819,8 @@ export function solvePivot(
       const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, cx[riderBase + i]])) : undefined;
       results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...cx], mirror), err: rAccept, x: [...cx] });
     };
-    const fSeed = fFor(symAnchorTargets);
     for (const x0 of starts) {
-      let r0 = leastSquares(fSeed, x0);
-      // polish: restart LM (fresh damping) from the found point until it stops improving
-      for (let polish = 0; polish < 3 && r0.err > 1e-24 && r0.err < 1e-4; polish++) {
-        const r2 = leastSquares(fSeed, r0.x);
-        if (r2.err >= r0.err * 0.99) break;
-        r0 = r2;
-      }
+      const r0 = solveFrom(symAnchorTargets, x0);
       if (degenerate(r0.x)) continue;
       collect(r0);
       if (!best || r0.err < best.err) best = r0; // FULL err — the anchor punishes collapse
@@ -1678,7 +1858,7 @@ export function solvePivot(
             // the pinned stage only steers the gauge into the target's basin — 40 iterations
             // suffice (warm start, and the RELEASE solve carries the precision)
             const rp = leastSquares(fPin, x0, 40);
-            collect(leastSquares(fFor(rp.x.slice(7 + nDims + nSym, 7 + nDims + nSym + nPinSym)), rp.x));
+            collect(anchoredSolve(rp.x.slice(7 + nDims + nSym, 7 + nDims + nSym + nPinSym), rp.x));
             return primaryErr(rp.x) < ACCEPT;
           };
           // Probe first: a symbol admissible OFF its converged value is CONTINUOUS — its
@@ -1718,7 +1898,7 @@ export function solvePivot(
             const target = -v;
             const fPin = (y: number[]) => [...fPrimary(y), 1e3 * ((cd.value(atFor(mirror, y)) ?? 0) - target)];
             const rp = leastSquares(fPin, [...sol.x], 40);
-            collect(leastSquares(fFor(symAnchorTargets), rp.x));
+            collect(anchored ? anchoredSolve(symAnchorTargets, rp.x) : leastSquares(fFor(symAnchorTargets), rp.x));
           }
         }
       }
@@ -1763,12 +1943,7 @@ export function solvePivot(
         for (const f of variants) {
           const widened = dims0.map(f);
           for (const x0 of starts) {
-            let r = leastSquares(fSeed, [...x0.slice(0, 7), ...widened, ...x0.slice(7 + nDims)]);
-            for (let polish = 0; polish < 3 && r.err > 1e-24 && r.err < 1e-4; polish++) {
-              const r2 = leastSquares(fSeed, r.x);
-              if (r2.err >= r.err * 0.99) break;
-              r = r2;
-            }
+            const r = solveFrom(symAnchorTargets, [...x0.slice(0, 7), ...widened, ...x0.slice(7 + nDims)]);
             if (degenerate(r.x)) continue;
             collect(r);
             if (!best || r.err < best.err) best = r;
