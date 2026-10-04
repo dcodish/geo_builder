@@ -14328,3 +14328,27 @@ The full suite is the batch gate (round #1736).
 - `src/__tests__/fixtures.test.ts`: the drift check compares through `committedStepCommands`.
 
 **Behaviour change for a student:** loading a figure saved a moment ago no longer says «הקובץ נשמר בגרסה קודמת — N צעדים עודכנו», and the loaded list is exactly the saved one: no duplicated rows.
+
+## ADR-581 — A dev-only step-through panel over `replaySession` (#910)
+
+**Status:** accepted · 2026-10-04 · feature (P3, dev tooling) · armed in the /decisions batch of 2026-09-05 · fix-round #1753 · branch `feat/553-910-clause-order-steppanel`
+
+**Requirements:** none (internal — dev tooling, no product promise) · **Design:** [04-design.md](04-design.md) § "The dev step-through panel" · **LADDER stage:** none — a consumer of the existing replay harness; no parser, solver, replay or render change.
+
+**Cites** [ADR-171](#adr-171) (the shared `buildParseCtx` the harness uses, so it cannot drift from the app), [ADR-098](#adr-098) (the first-satisfying-seed auto-advance the panel exposes as a toggle), [ADR-484](#adr-484) (`(facts, seed)` is the session's source of truth).
+
+**Context — measured at pickup on c098af9b.** `src/validation/replaySession.ts` already replays an ordered utterance list through the real `parse → dryRun → commit → replay` path and classifies each step, but returns only the FINAL figure, and no `.tsx` anywhere referenced it. Re-testing a step-5 failure meant retyping four steps in the app.
+
+**Decision.**
+1. **The report carries the fact list per step, not a figure per step.** `SessionReport.factsAfter[k]` is the ordered fact list after step k (a snapshot, because a rename/swap step relabels the facts before it). A step's figure is RE-DERIVED from its prefix by `figureAtStep(report, k, opts)`, with the same seed rule as `final` (`seedAtStep`) — the store's own model (facts are the truth, the figure is derived), so no figure is retained twice.
+2. **The panel** (`src/debug/StepPanel.tsx`): paste utterances one per line → Run → the step list (category, prod outcome label, committed ✓/✗, `alreadyDefined`, `detail`); clicking a step draws the figure as of that step; "load into the builder at this step" puts exactly those facts and that seed into the live session through the save envelope (`serializeFigure` → `deserializeFigure` → `loadFigure`), so the next line is typed in the real app. `ReplayOpts.satisfyingSeed` is a visible checkbox (default on, as the app): "what does the app show" and "what does seed 0 show" are different questions and the panel does not pick one silently. Strings through `t()` (`devSteps.*`, he + en).
+3. **Dev only.** `main.tsx` mounts it beside `<App />` only when `import.meta.env.DEV` and the URL carries `?steps`. The lazy import sits inside the DEV conditional, so a production build folds it away — verified by grepping the built bundle for the panel's identifiers (none) and by the chunk list (no StepPanel chunk).
+4. **A consumer only.** It has no parse/commit path of its own; everything it shows comes from `replaySession`, which mirrors the app's submit decision tree. (The harness does not call the LLM; a step the app would escalate shows as `coverage-gap`, as before.)
+
+**Locks.** `src/debug/__tests__/step-panel-910.test.tsx` (7): for every step k, `figureAtStep(report, k)` equals the final figure of `replaySession` over the first k+1 utterances (both seed modes) and the last step equals `final`; a non-committing step leaves the fact list unchanged; a rename relabels only from its own step on; the panel renders a known session's categories in order (`ok, ok, coverage-gap, empty, ok`) and draws step k's figure only once one is selected. The existing `replaySession` / `triageDump` tests are unchanged.
+
+**Consequences.**
+- `src/validation/replaySession.ts`: `factsAfter`, `figureAtStep`, `seedAtStep`; the step body became a closure so every path records its snapshot.
+- `src/debug/StepPanel.tsx` (new), `src/main.tsx` (the DEV + `?steps` mount), `locales/he.json` + `en.json` (`devSteps.*`).
+
+**Behaviour change for a student:** none — the panel does not exist in the production build.

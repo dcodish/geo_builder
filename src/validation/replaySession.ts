@@ -51,6 +51,14 @@ export interface SessionReport {
   final: Derived;
   /** Roll-up counts by category, for quick triage scanning. */
   totals: Record<StepCategory, number>;
+  /**
+   * #910 ([ADR-581](../../docs/06-decisions.md#adr-581)) — the ordered FACT list as it stood after each step
+   * (`factsAfter[k]` = after `steps[k]`). Facts, never figures: the store's model is that the fact list is
+   * the source of truth and the figure is derived, so a step's figure is RE-DERIVED from its prefix by
+   * {@link figureAtStep} rather than retained. A snapshot per step (not a slice of the final list) because a
+   * rename/swap step relabels the facts before it.
+   */
+  factsAfter: Fact[][];
 }
 
 /** The figure context the app feeds the parser — the shared builder (ADR-171), so the triage harness
@@ -88,14 +96,34 @@ export interface ReplayOpts {
   satisfyingSeed?: boolean;
 }
 
+/** The seed a fact list is shown at — the app's auto-advance (ADR-098) or seed 0, per {@link ReplayOpts}. */
+const seedFor = (facts: Fact[], satisfyingSeed: boolean): number => (satisfyingSeed ? firstSatisfyingSeed(facts) : 0);
+
+/**
+ * #910 ([ADR-581](../../docs/06-decisions.md#adr-581)) — the figure AS OF step `k`, re-derived from the facts
+ * committed through that step (the dev step-through panel's one read). Same seed rule as the report's
+ * `final`, so the last step's figure IS `final`, and step `k`'s figure is what `replaySession` over the
+ * first `k + 1` utterances would have ended on.
+ */
+export function figureAtStep(report: Pick<SessionReport, 'factsAfter'>, k: number, opts: ReplayOpts = {}): Derived {
+  return replay(report.factsAfter[k] ?? [], seedAtStep(report, k, opts));
+}
+
+/** The configuration index step `k`'s figure is shown at (what "load into the builder" carries). */
+export function seedAtStep(report: Pick<SessionReport, 'factsAfter'>, k: number, opts: ReplayOpts = {}): number {
+  return seedFor(report.factsAfter[k] ?? [], opts.satisfyingSeed ?? true);
+}
+
 /** Replay one session's ordered utterances through the real pipeline and classify each step. */
 export function replaySession(utterances: string[], opts: ReplayOpts = {}): SessionReport {
   const { satisfyingSeed = true } = opts;
   let facts: Fact[] = [];
   const steps: StepResult[] = [];
+  const factsAfter: Fact[][] = [];
   let g = 0;
 
-  for (const utterance of utterances) {
+  // One step = one utterance; `return` ends the step (each path pushes exactly one StepResult).
+  const applyStep = (utterance: string): void => {
     const op = storeOp(utterance);
     if (op) {
       // Best-effort label rewrite so later steps resolve; we don't model merge's point-folding.
@@ -104,7 +132,7 @@ export function replaySession(utterances: string[], opts: ReplayOpts = {}): Sess
         facts = facts.map((f) => relabelFact(f, map));
       }
       steps.push({ utterance, category: 'edit', outcome: op.kind, committed: true });
-      continue;
+      return;
     }
 
     const before = replay(facts);
@@ -112,13 +140,13 @@ export function replaySession(utterances: string[], opts: ReplayOpts = {}): Sess
     const r = parse(utterance, ctx);
     if (!r.ok) {
       steps.push({ utterance, category: 'coverage-gap', outcome: 'not-handled', committed: false });
-      continue;
+      return;
     }
 
     const dropped = droppedNewLabels(utterance, r.commands, ctx.points);
     if (dropped.length) {
       steps.push({ utterance, category: 'coverage-gap', outcome: `weak:dropped:${dropped.join(',')}`, committed: false });
-      continue;
+      return;
     }
 
     const outcome = dryRunOutcome(facts, r.commands);
@@ -126,13 +154,13 @@ export function replaySession(utterances: string[], opts: ReplayOpts = {}): Sess
       const group = `g${g++}`;
       r.commands.forEach((c) => facts.push({ id: `${group}.${facts.length}`, group, cmd: c, enabled: true, utterance }));
       steps.push({ utterance, category: 'ok', outcome: 'parser-ok', committed: true });
-      continue;
+      return;
     }
     if (outcome.reason === 'error' && hasDeferrableConstraint(r.commands)) {
       const group = `g${g++}`;
       r.commands.forEach((c) => facts.push({ id: `${group}.${facts.length}`, group, cmd: c, enabled: true, utterance }));
       steps.push({ utterance, category: 'deferred', outcome: 'deferred-constraint', committed: true, detail: outcome.detail });
-      continue;
+      return;
     }
     // Parsed but built nothing → did every id it would introduce already exist? (the "ABCD already defined"
     // collision) — that's a data-entry / error-message issue, distinct from a true engine fault.
@@ -146,10 +174,14 @@ export function replaySession(utterances: string[], opts: ReplayOpts = {}): Sess
       alreadyDefined: alreadyDefined.length ? alreadyDefined : undefined,
       detail: outcome.detail,
     });
+  };
+  for (const utterance of utterances) {
+    applyStep(utterance);
+    factsAfter.push(facts.slice());
   }
 
   // Mirror the app's auto-advance to the first configuration that satisfies directional extensions (ADR-098).
-  const final = replay(facts, satisfyingSeed ? firstSatisfyingSeed(facts) : 0);
+  const final = replay(facts, seedFor(facts, satisfyingSeed));
   // A committed-but-amber figure (verifier violations) is the strongest "built the wrong thing" signal —
   // promote the most recent committed `ok` step to `ok-amber` when the final figure has violations.
   if (final.violations.length) {
@@ -163,5 +195,5 @@ export function replaySession(utterances: string[], opts: ReplayOpts = {}): Sess
   const totals = { ok: 0, 'ok-amber': 0, deferred: 0, empty: 0, 'coverage-gap': 0, edit: 0 } as Record<StepCategory, number>;
   for (const s of steps) totals[s.category]++;
 
-  return { steps, final, totals };
+  return { steps, final, totals, factsAfter };
 }

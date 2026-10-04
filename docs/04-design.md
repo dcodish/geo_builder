@@ -1116,3 +1116,19 @@ The point-on-carrier rules (`pointOnExtension`, `pointOnSegment`) match a prefix
   it, with the same margins as their inside tests.
 - **Parser.** `regionSideFallback` no longer declines a region's own vertex («A בתוך המשולש ABC»): it
   parses, and the prover refuses it with the reason, instead of «I didn't understand».
+
+
+## The dev step-through panel ([ADR-581](06-decisions.md#adr-581))
+
+A DEV-only tool over the headless session harness `validation/replaySession.ts`. Open the dev server with
+`?steps` (`http://localhost:5173/?steps`): a panel beside the app takes a pasted utterance list, replays it
+through the real `parse → dryRun → commit → replay` path, lists each step's category, and draws the figure
+AS OF any selected step. "Load into the builder" puts that step's facts and seed into the live session, so a
+step-5 failure is re-tested without retyping steps 1–4.
+
+- **Facts, not figures.** The harness reports `factsAfter[k]` per step; `figureAtStep` re-derives the figure
+  from that prefix with the report's own seed rule — the same `(facts, seed) → figure` model the store uses.
+- **No second pipeline.** The panel only reads `replaySession`; it cannot drift from the submit decision tree
+  the harness mirrors.
+- **Never shipped.** `main.tsx` mounts it inside an `import.meta.env.DEV` conditional, which the production
+  build folds to `false`, dropping the lazy import and its chunk.

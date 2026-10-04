@@ -582,5 +582,15 @@
     "copyButton": "Copy",
     "storeFull": "The share space on the server is full — this is the long link, and it works",
     "offline": "Could not make a short link — this is the long link, and it works"
+  },
+  "devSteps": {
+    "title": "Step-through (dev)",
+    "close": "Close",
+    "placeholder": "One utterance per line",
+    "satisfyingSeed": "Advance to the first satisfying configuration (as the app does)",
+    "run": "Run",
+    "alreadyDefined": "Already defined: {{ids}}",
+    "asOf": "Figure as of step {{n}}",
+    "load": "Load into the builder at this step"
   }
 }
