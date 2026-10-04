@@ -43,7 +43,9 @@ describe('#1259 — the tangential figure is ONE point, not four cases', () => {
     const d = derive([...BASE, 'MA = 5'], 0);
     const opts = knownOptions(d.construction, readM)!;
     expect(opts).toHaveLength(2);
-    expect(opts.map((o) => Math.round(o[1]))).toEqual([-3, 3]);
+    // BOTH roots, in either order (#1492 ruling 2, ADR-AG-231): which one the configuration search meets first is a
+    // basin fact, and the residual cap moved the basins — «הציגו תצורה אחרת» reaching both is what ADR-052 requires.
+    expect(opts.map((o) => Math.round(o[1])).sort((a, b) => a - b)).toEqual([-3, 3]);
     expect(my(d.construction).known, 'y is genuinely two-valued — not knowledge').toBe(false);
   });
 
@@ -66,7 +68,8 @@ describe('#1227 — the locus of a determined point is that point, or that finit
   it('«MA = 5»: the two positions, as a fact about the figure — never «cannot be computed»', () => {
     const a = locus([...BASE, 'MA = 5']);
     expect(a.fact).toBe('points');
-    expect(a.points?.map((p) => [Math.round(p.x), Math.round(p.y)])).toEqual([[4, -3], [4, 3]]);
+    // Both positions, in either order (#1492 ruling 2): the order is the configuration search's, never a given.
+    expect(a.points?.map((p) => [Math.round(p.x), Math.round(p.y)]).sort((p, q) => p[1] - q[1])).toEqual([[4, -3], [4, 3]]);
     expect(a.value).toBeNull();
     expect(a.unreadable).toBeUndefined();
   });

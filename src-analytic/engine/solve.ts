@@ -903,6 +903,14 @@ export function residualRows(
    * cannot resolve names hands nothing, and those operands report "cannot be judged".
    */
   lineAt?: (name: string) => { a: number; b: number; c: number } | null,
+  /**
+   * THE FIGURE'S SPAN — the cap on the `length-eq` operand normaliser (#1492, ADR-AG-231). See that arm.
+   *
+   * Optional, like the resolvers before it: a caller with no figure to measure (a hand-built test, the
+   * ask lane's spot checks) hands nothing, and the normaliser is the operands' own size, uncapped, as it
+   * always was. `evaluate` hands `residualScale` at every site that solves or judges.
+   */
+  scale?: number,
 ): ResidualRows | null {
   const pts = constraintRefs(k).map(at);
   if (pts.some((p) => p === null)) return null;
@@ -1016,8 +1024,25 @@ export function residualRows(
        * Scale-normalised, like the area residual and for the same reason: a figure measured in
        * thousands and one measured in units must converge alike, and a raw difference would let
        * the larger figure dominate a joint solve purely because its numbers are bigger.
+       *
+       * **The operand normaliser is CAPPED at the figure's span (#1492, ADR-AG-231).** Divided by the
+       * operands alone, the row has a ZERO AT INFINITY: for a point sliding out along a line, `|CB| − |CD|`
+       * tends to a constant (the projection of BD on the line) while `max(|l|, |r|)` grows without bound,
+       * so the residual tends to 0 and the descent follows it outward — the operator's kite drew C at
+       * (−3081, 6179), "satisfied" at 3.9e-4, at 4 of 24 raw seeds. Past the figure's span the denominator
+       * stops growing, so the far field keeps its gradient and the runaway turns home.
+       *
+       * Below the span it is the operands' own size, exactly as before — and that half is load-bearing: it
+       * keeps a RATIO contradiction scale-free. «ריבוע ABCD» · «AB = 2BC» reads 0.5 at every size, so the
+       * descent cannot buy progress by shrinking the square; a fixed denominator (round #1510's variant A)
+       * handed it that shrink gradient and drew the square collapsed to a point, green.
+       *
+       * The cap is in the operands' own DIMENSION: an equation of areas («שטח ABC = 3·שטח CEF») has
+       * operands of span², and capping it at span would weigh it as a raw difference. Same class, same rule.
        */
-      return { eq: [(l - r) / Math.max(1, Math.abs(l), Math.abs(r))] };
+      const dim = [...k.left.terms, ...k.right.terms].some((t) => t.kind === 'area') ? 2 : 1;
+      const cap = scale !== undefined && Number.isFinite(scale) && scale > 0 ? scale ** dim : Infinity;
+      return { eq: [(l - r) / Math.max(1, Math.min(Math.max(Math.abs(l), Math.abs(r)), cap))] };
     }
     case 'on-curve': {
       const c = curveAt?.(k.curve) ?? null;
