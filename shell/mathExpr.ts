@@ -36,7 +36,7 @@
  * term   := factor (('·' | '*' | '/' | juxtaposition) factor)*
  * factor := '-' factor | power
  * power  := atom ('^' digits | '²')?
- * atom   := '√' factor | '(' expr ')' | '|' expr '|' | id ['_{' id '}'] | num
+ * atom   := '√' factor | '(' expr ')' | '|' expr '|' | id ['_' ('{' id '}' | id | num)] | num
  * ```
  *
  * **`√` binds tighter than `/`, by taking a FACTOR rather than a term** — so `√2/3` is `(√2)/3` and
@@ -210,9 +210,17 @@ class Parser {
     if (p.k === 'id') {
       this.eat();
       // `x_{A}` — the subscript the value layer also understands, kept working inside an expression.
+      // The BARE `x_A` is the same subscript (#1540, ADR-W-111): the catalog teaches it, so
+      // `(x_A+x_B)/2` must typeset as the braced form does rather than refuse the whole span.
       if (this.isOp('_')) {
         const save = this.i;
         this.eat();
+        const bare = this.peek();
+        // A lone LETTER only, as in `math.tsx`'s SUB: `foo_bar` is an identifier, not a subscript.
+        if (bare && (bare.k === 'id' || bare.k === 'num') && /^[A-Za-z]$/.test(p.v)) {
+          this.eat();
+          return `<msub>${mi(p.v)}${mi(bare.v)}</msub>`;
+        }
         if (this.isOp('{')) {
           this.eat();
           const s = this.peek();

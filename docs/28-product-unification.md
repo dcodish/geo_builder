@@ -727,6 +727,9 @@ the same way, and means the same thing"* — or an explicit `n/a` with a reason.
   is `hasMath` — the presence of mathematics rather than the presence of a bidi change — so an
   all-LTR equation grows a strip where isolation alone produced none
   ([ADR-W-069](06w-decisions-workspace.md#adr-w-069), [#1152](https://github.com/dcodish/geo_builder/issues/1152)).
+  A subscript is typeset in **either spelling** — braced `x_{B}` (what the chip inserts) or bare
+  `x_B` (what the catalogs teach), byte-identically, inside an expression too; an underscore inside a
+  word stays text ([ADR-W-111](06w-decisions-workspace.md#adr-w-111), [#1540](https://github.com/dcodish/geo_builder/issues/1540)).
   Parity is held by `shell/__tests__/issue-1152-typeset-preview-parity.test.ts`; this is the third
   surface the #1082 typesetting ruling had to be carried to by hand, which is the cost of the
   older-tree-as-template habit rather than of the seam.

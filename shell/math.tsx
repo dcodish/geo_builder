@@ -27,7 +27,18 @@ const RADICAND = String.raw`\(\s*${NUM}(?:\s*\/\s*${NUM})?\s*\)|${NUM}`;
 const RTERM = String.raw`(?:${NUM}\s*[*·]?\s*)?√\s*(?:${RADICAND})|${NUM}`;
 // a value: TERM optionally over TERM
 const VALUE = String.raw`(?:${RTERM})(?:\s*\/\s*(?:${RTERM}))?`;
-const SUB = String.raw`[A-Za-z]_\{[A-Za-z0-9]+\}`;
+/**
+ * A SUBSCRIPT, braced OR bare (#1540, ADR-W-111).
+ *
+ * The rule used to accept only the braced `x_{B}` the `x_{}` chip inserts. The BARE `x_B` is the
+ * catalog's own canonical spelling (analytic `x_B > x_D`, `x_A = 5`; 3-D `x_B = 3`) and what students
+ * and the LLM type, so the form the tool teaches was the one it printed with a literal underscore.
+ *
+ * The bare subscript is the letter/digit run after `_`, ending at the first non-alphanumeric
+ * character: `x_B>x_D` is sub `B` then `>`, `S_ABC = 12` is sub `ABC`. The lookbehind keeps an
+ * underscore INSIDE a word (`foo_bar`, `seg_AB`) out: only a lone letter carries a subscript.
+ */
+const SUB = String.raw`(?<![A-Za-z0-9])[A-Za-z]_(?:\{[A-Za-z0-9]+\}|[A-Za-z0-9]+)`;
 /**
  * A POWER, over a single symbol OR a parenthesised group (#1097).
  *
@@ -130,8 +141,9 @@ function splitTopLevelSlash(v: string): [string, string] | null {
   return null;
 }
 function subML(t: string): string {
-  const m = t.match(/^([A-Za-z])_\{([A-Za-z0-9]+)\}$/)!;
-  return `<math><msub>${mi(m[1])}${mi(m[2])}</msub></math>`;
+  // Either spelling (#1540): `x_{B}` and `x_B` are one subscript and render byte-identically.
+  const m = t.match(/^([A-Za-z])_(?:\{([A-Za-z0-9]+)\}|([A-Za-z0-9]+))$/)!;
+  return `<math><msub>${mi(m[1])}${mi(m[2] ?? m[3])}</msub></math>`;
 }
 function supML(t: string): string {
   const m = t.match(/^(\([^()]+\)|[A-Za-z0-9])(²|\^(\d+))$/)!;
@@ -161,15 +173,15 @@ function arcML(pair: string): string {
 }
 
 /**
- * True when the text carries math notation worth formatting (a radical, a fraction, a subscript, a
- * power, an arc).
+ * True when the text carries math notation worth formatting (a radical, a fraction, a subscript —
+ * braced `x_{B}` or bare `x_B` (#1540) — a power, an arc).
  *
  * The `/` clause used to require a DIGIT either side, which is why «משוואת הישר AB»'s trace —
  * `m = (4 - 0) / (3 - 0)` — reported `hasMath: false` and was never typeset at all (#1125). A fraction
  * bar between two bracketed sub-expressions is exactly as much a fraction as one between two numbers.
  */
 export function hasMath(text: string): boolean {
-  return /√|_\{|²|\^\d|[\d)|]\s*\/\s*[\d√(|]|⌢|⏜|(?:ה?קשת|(?<![A-Za-z])arc)\s*\{?[A-Z]\d*[A-Z]/u.test(text);
+  return /√|_\{|(?<![A-Za-z0-9])[A-Za-z]_[A-Za-z0-9]|²|\^\d|[\d)|]\s*\/\s*[\d√(|]|⌢|⏜|(?:ה?קשת|(?<![A-Za-z])arc)\s*\{?[A-Z]\d*[A-Z]/u.test(text);
 }
 
 /**
