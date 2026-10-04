@@ -10229,6 +10229,14 @@ The gate stays the caller's job either way: `VecMath`'s `PAIR` regex matches a b
 
 **Consequences.** `render/FactRow3.tsx` (+`inputPreviewNode3`, +`typesetsAsVector`); `render/notation.ts` (−`inputPreviewDisplay3`, which was the wrong shape — one string cannot be both isolated for the plain branch and un-isolated for `VecMath`); `App3.tsx` (the two props now call the shared routing). `issue-1195-vector-preview.test.ts` → **`.tsx` (34)**: every marked line rendered through the real `FactRowText3` and compared as MARKUP, the `U+20D7`-absence assertion on both surfaces, the pair-spanning assertion, the anti-assertion guard, the `null` contract, and the marking vocabulary.
 
+#### ADR-3D-255 Am. 2 — The preview's base direction stays the RAW text's: measured, nothing to change (#1314)
+
+**Status:** accepted · 2026-10-04 · round #1753 · no code change.
+
+**Requirements:** none (internal). **Design:** docs/04b — the preview-direction note now points here.
+
+#1314 asked whether, since #1195 made the preview display text different from what was typed (vector arrows), the preview should take its base direction from the DISPLAYED text instead of the raw one. Measured in a real browser (Playwright, a server built from `1b7a4ad0`, build id confirmed): «וקטור AB = 5», «וקטור AB = (1,2,3)» and «וקטור AB + וקטור BC = וקטור AC» render with `dir=rtl`, right-aligned under the right-aligned input, not reordered; `DC→=3AB→` renders `ltr`, left-aligned. Taking the direction from the displayed text instead would push the RTL lines to the far left, away from what the student typed. **Decision: keep the raw-text direction; #868's lock stands unchanged.**
+
 ## ADR-3D-257 — The fold's post-pass retry covers every NON-CREATING red row, decided by a dry run: a constraint typed before its points is honoured (#1327; the ADR-AG-133 port)
 
 **Status:** accepted, 2026-09-21 · **Issue:** #1327 (bug, P2, `3d`) · found by the docs/17 §1 sibling audit while fixing #1242 (analytic, ADR-AG-133) · operator ruling on #1242, 2026-09-19: *"the idea of order is not relevant since the diagram should either respect all input or refuse to build"* · round #1332

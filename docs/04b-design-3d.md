@@ -898,7 +898,7 @@ exists because #900 found exactly this decision written as a ternary in a callba
 test"* — and #1195 then wrote the preview's routing as a ternary in a callback, where #1312 hid. The
 The base DIRECTION is deliberately NOT computed there: box and preview both resolve through `textDir3`
 on the raw text, which is #868's pinned property. Since #1195 the two can display different text, so
-that property may now be over-fitted — measured and decided in #1314, not here.
+that property may now be over-fitted — measured in #1314 and kept: the raw-text direction is correct (ADR-3D-255 Am. 2).
 
 **`vectorNotation` stays in `render/notation.ts`, not in `i18n/bidi.ts`.** `i18n/bidi.ts` imports
 **nothing but the `lexicon/` leaf** (the prime set, ADR-3D-300) — it is a leaf in effect, which is what lets `parser/`, `engine/` and `render/` all depend on it — so
