@@ -160,7 +160,11 @@ export const v2Labels = (d: Derived2, view: 'polar' | 'cart' = 'polar'): string[
   // is the ASK lane, when the student asks for that name explicitly (3-D's query lane already
   // answers that way; the complex ask input rides #623).
   // #703: the rows follow the VIEW — the same stage-5d compositions the canvas prints.
-  d.points.filter((p) => p.modulusKnown && p.argumentKnown).map((p) => (view === 'cart' ? p.readingCart : p.reading));
+  // #1365 (ADR-CX-058): a number DEFINED by real parameters has something to say — «z₁ = a+bi» in the
+  // cartesian view while a parameter is free, the number itself in both views once all are forced.
+  d.points
+    .filter((p) => (p.modulusKnown && p.argumentKnown) || p.defined === 'closed' || (view === 'cart' && p.defined === 'symbolic'))
+    .map((p) => (view === 'cart' ? p.readingCart : p.reading));
 
 /**
  * The sheet formulas this figure is using, with the lines that brought each up.

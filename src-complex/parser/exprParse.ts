@@ -164,7 +164,86 @@ function rootIndexOf(text: string): bigint | null {
   return glyph === '√' ? 2n : glyph === '∛' ? 3n : 4n;
 }
 
-function lex(src: string, from: number, to: number): Tok[] | null {
+/**
+ * #1365 ([ADR-CX-058](../../docs/06d-decisions-complex.md#adr-cx-058)) — the textbook cartesian form
+ * `a+bi`: a two-letter run made of a parameter letter and the imaginary unit is that parameter TIMES
+ * `i`. `bi` → `b·i`, and the engineering spelling `ib` → `i·b`, so «z = a+bi», «z = x+yi»,
+ * «z = a-bi», «z = a+ib» and «w = c+di» all read the way every textbook writes them.
+ *
+ * Until this, `bi` lexed as ONE name (the name alternative is a letter run), so ADR-CX-040's floor
+ * refused it — the honest answer while the meaning was missing. The decision lives HERE, in the
+ * lexer, because that is where a run is cut into tokens: `nameExpr` only ever sees what the lexer
+ * hands it, and splitting there would re-decide what a token is.
+ *
+ * The run is split only when the reading is UNAMBIGUOUS. It is `ambiguous` (kept whole, so the line
+ * refuses and the submit path offers the explicit product as a clarification) when:
+ * - the other letter is itself complex — `zi`, `wi`, a capital point label, or a family the student
+ *   declared complex («u מספר מרוכב» makes `ui` ambiguous): `z·i` and «z sub i» are both readings;
+ * - the other letter is `i` or `o` (the unit and the origin are constants, never coefficients);
+ * - the run does not END a term — `ib z1`, `in Q2`, `is real`: another operand glued after the run
+ *   means it may be a word, not a coefficient, and juxtaposition cannot tell.
+ *
+ * A KNOWN WORD is never split and never offered: `pi` (this grammar has no π, and `p·i` would be the
+ * ADR-CX-040 invented-coefficient class run backwards) and `im` (the projection keyword — `im` without
+ * its parenthesis must not become `i·m`). Lowercase `i` only: a capital `I` is a point label's
+ * register.
+ */
+export type GluedI =
+  | { readonly kind: 'split'; readonly letter: string; readonly iFirst: boolean }
+  | {
+      readonly kind: 'ambiguous';
+      readonly letter: string;
+      readonly iFirst: boolean;
+      /** `complex`: the letter is a complex number · `constant`: `i`/`o` · `glued`: the run does not end a term */
+      readonly why: 'complex' | 'constant' | 'glued';
+    };
+
+const GLUED_I_WORDS: ReadonlySet<string> = new Set(['pi', 'im']);
+
+export function gluedI(run: string, scope: ComplexScope, endsTerm: boolean): GluedI | null {
+  if (run.length !== 2 || GLUED_I_WORDS.has(run.toLowerCase())) return null;
+  const iFirst = run[0] === 'i' && run[1] !== 'i';
+  if (!iFirst && run[1] !== 'i') return null;
+  const letter = iFirst ? run[1] : run[0];
+  if (!/^[A-Za-z]$/.test(letter)) return null;
+  const name = canonName(letter);
+  if (isComplexName(name, scope)) return { kind: 'ambiguous', letter: name, iFirst, why: 'complex' };
+  if (/^[io]$/.test(name) || !PARAM_NAME.test(name)) return { kind: 'ambiguous', letter: name, iFirst, why: 'constant' };
+  if (!endsTerm) return { kind: 'ambiguous', letter: name, iFirst, why: 'glued' };
+  return { kind: 'split', letter: name, iFirst };
+}
+
+/**
+ * Does the text after `pos` (up to `to`) END the current term — nothing left, or an operator that
+ * cannot glue an operand on (`+ - * / ^ ) |` and `=`, for a caller that hands a whole equation)?
+ */
+function termEndsAt(src: string, pos: number, to: number): boolean {
+  const rest = src.slice(pos, to).trimStart();
+  return rest === '' || /^[+\-*/^)|=]/.test(rest);
+}
+
+/**
+ * The line with every glued `i` run whose other letter is a COMPLEX number written as the explicit
+ * product (`zi` → `z*i`), or null when it has none. Only that case is offered: a run glued to a
+ * following word (`is real`) is far likelier a word than a product, and spelling a product into it
+ * would teach a meaning nobody typed — the clarification the submit path offers when the
+ * line refused (#1365). The caller must parse the suggestion before offering it (a taught remedy must
+ * drive — the #1156 lesson); this only spells it.
+ */
+export function gluedISpelledOut(line: string, scope: ComplexScope = NO_SCOPE): string | null {
+  let changed = false;
+  const out = line.replace(/(?<![A-Za-z\d_])[A-Za-z]{2}(?![A-Za-z\d])/g, (run, offset: number) => {
+    const ends = termEndsAt(line, offset + run.length, line.length);
+    const g = gluedI(run, scope, ends);
+    if (!ends || g?.kind !== 'ambiguous' || g.why !== 'complex') return run;
+    changed = true;
+    const letter = run[g.iFirst ? 1 : 0];
+    return g.iFirst ? `i*${letter}` : `${letter}*i`;
+  });
+  return changed ? out : null;
+}
+
+function lex(src: string, from: number, to: number, scope: ComplexScope = NO_SCOPE): Tok[] | null {
   const out: Tok[] = [];
   TOKEN.lastIndex = from;
   let pos = from;
@@ -192,7 +271,19 @@ function lex(src: string, from: number, to: number): Tok[] | null {
     } else if (/^\d/.test(text)) {
       const [w, f = ''] = text.split('.');
       out.push({ t: 'num', v: rat(BigInt(w + f), 10n ** BigInt(f.length)), at, len });
-    } else if (/^[A-Za-z]/.test(text)) out.push({ t: 'name', v: text, at, len });
+    } else if (/^[A-Za-z]/.test(text)) {
+      // #1365 — `bi` / `ib` is a coefficient times i, decided in ONE place (`gluedI`)
+      const g = gluedI(text, scope, termEndsAt(src, pos, to));
+      if (g?.kind === 'split') {
+        const nameAt = g.iFirst ? at + 1 : at;
+        const iAt = g.iFirst ? at : at + 1;
+        const pair: Tok[] = [
+          { t: 'name', v: g.letter, at: nameAt, len: 1 },
+          { t: 'i', at: iAt, len: 1 },
+        ];
+        out.push(...(g.iFirst ? pair.reverse() : pair));
+      } else out.push({ t: 'name', v: text, at, len });
+    }
     else out.push({ t: 'op', v: text, at, len });
   }
   return pos >= to ? out : null;
@@ -208,7 +299,7 @@ export function parseExpr(
   /** #1405 — the letter families declared complex elsewhere in the figure */
   scope: ComplexScope = NO_SCOPE,
 ): Expr | null {
-  const toks = lex(src, from, to);
+  const toks = lex(src, from, to, scope);
   if (!toks || toks.length === 0) return null;
   let i = 0;
   let absDepth = 0;

@@ -3486,3 +3486,89 @@ The pre-played sheet (PR #1515, 20 cases, 6 red) found five classes. Each is fix
 **Locks.** `src-complex/value/__tests__/gaussian.test.ts` (the plan's identities, rational parts, the inert prime, the budget, a 3 720-pair atan2 sweep to 1e-9°, M-d read-back, the three `zeroness` answers); `src-complex/solve/__tests__/tier1-zeroness-1481.test.ts` (certified nonzero is inconsistent; opaque clearly-nonzero is inconsistent; opaque ≈ 0 is undecided through both the integrality and the leftover halves, with provenance; unbound is undecided); the class lock `src-complex/__tests__/literal-angles-1481.test.ts` through `acceptLine` (rows 1–10, both entry orders, the `·` / juxtaposed spellings; refusals on the argument and on the modulus; the four claim verdicts and the opaque unknown; the opaque undecided net and its false twin refused; exact asks); the operator's sequence as `src-complex/__tests__/fixtures/issue-1481-literal-product.complex.json`. `issue-1436-exact-ask.test.ts` unchanged and green.
 
 **Round:** #1559.
+
+## ADR-CX-058 — «z1 = a+bi»: a glued `i` is a coefficient times i, and a number defined by parameters reads as its definition (#1365)
+
+**Status:** accepted, 2026-10-04 (operator ruling 2026-09-24, option (c) of the round-#1382 escalation) ·
+**Issue:** [#1365](https://github.com/dcodish/geo_builder/issues/1365) (feature, `complex`, PR) · round #1736
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-10 (new): the symbolic cartesian form reads as the textbook writes it ·
+**Design:** [04d](04d-design-complex.md), "A glued `i` is a coefficient times i" and "A number DEFINED by real parameters reads as its definition" ·
+**Ladder:** stages 0b and 5d ([LADDER-CX](LADDER-CX.md))
+
+**What was missing.** `z1 = a+bi`, `z = x+yi`, `z1 = a-bi`, `z1 = a+ib`, `w = c+di` were all refused
+(`line-unrecognized`), measured at pickup on `d9a5910f`. The tokenizer's name alternative is a letter
+RUN, so `bi` was one name and ADR-CX-040's floor refused it — the honest answer while the meaning did
+not exist. `z1 = a + b*i` was accepted and, since ADR-CX-045, builds at 24/24 seeds with `|z1| = 5` or a
+quadrant, but it read as a bare «z₁» in both views, even after `a = 3 · b = 4`.
+
+**Class.** *A spelling the curriculum uses for a number defined from real parameters has no reading:
+the lexer cannot cut the glued coefficient, and stage 5d has no symbolic form for a number its exact
+carriers do not know.*
+
+**Decision.**
+
+1. **The split lives in the lexer** (`gluedI` in `parser/exprParse.ts`). A two-letter run of a
+   parameter letter and a lowercase `i`, in either order, at the END of a term (end of range, or an
+   operator that cannot glue an operand on), lexes as `name` + `i`. `bi` ≡ `b*i`, `ib` ≡ `i*b`; `2+bi`,
+   `3bi`, `-a-bi`, `(a+bi)/2`, `|a+bi|` follow. `nameExpr` and the floor are untouched: they never see
+   the run. `3+4i` is unchanged.
+2. **Ambiguity keeps the run whole, so the floor refuses it**: the other letter is complex (`zi`, `wi`,
+   a capital point label, or a family declared complex — «u מספר מרוכב» makes `ui` ambiguous, through the
+   scope ADR-CX-047 already hands every parse), a constant (`ii`, `oi`), or the run is glued to a
+   following operand (`ib z1`, `in Q2`, `is real`). `pi` and `im` are words and are never split: this
+   grammar has no π, and `p·i` would be ADR-CX-040's invented-coefficient class run backwards; `im` is
+   the projection keyword.
+3. **The clarification.** When the line refused and a run was ambiguous because its letter is a complex
+   number, the submit path refuses with `glued-i` and offers the explicit product («z1 = z*i» for
+   «z1 = zi»), and only once the grammar has read the suggestion (`gluedISuggestion`, the
+   `wordRootSuggestion` pattern: a taught remedy must drive, #1156). `pi`, `ii` and the glued-word case
+   refuse as `not-handled`, with nothing offered.
+4. **The symbolic reading** (`model/cartesianForm.ts`, stage 5d in `derive2.ts`). A point whose exact
+   carriers do not know it as a number, and which has a definition `name = E` (E names no complex number
+   and is affine in its parameters over the Gaussian rationals), gets its cartesian reading from E. Every
+   parameter whose value is a known exact rational with a known sign (the parameter rows' own
+   predicate) is substituted: «z₁ = a+bi», then «z₁ = 3+bi» after `a = 3`. With no parameter left the
+   number is closed and reads exactly as the literal does in BOTH views («z₁ = 3+4i», «z₁ ≈ 5·cis53.13°»).
+   The polar view stays bare while a parameter is free (FR-KN-1). `DerivedPoint.defined`
+   (`symbolic`/`closed`) lets `v2Labels` print the row: the cartesian panel shows «z₁ = a+bi», the polar
+   panel shows nothing until closed. A number the carriers know only parametrically (`z2 = 2bi` is
+   `2|b|·cis90°`) keeps its polar form, but its cartesian reading was the SAMPLE printed as «z₂ ≈ 0.4i»
+   (a guess under the no-guess ruling). With a definition it now reads «z₂ = 2bi».
+
+**Measured after** (real `submitLine` + `deriveLines`): every spelling above is accepted and reads
+symbolically. `z1 = a+bi` with `|z1| = 5` (either order), with `z1 ברביע השני`, and `z = x+yi` with a
+quadrant are all satisfied at 24/24 seeds, and the quadrant-II figure is in quadrant II at every seed.
+`|z1| = 5 · arg z1 = 120` hands over to the exact readings («z₁ = 5·cis120°», «z₁ = -5/2+(5√3/2)i»).
+
+**Deviation: the two-DOF definition is NOT here.** The ruling took it from #1387. That item parked it
+(ADR-CX-045, "Deviation"), and it lives on as #1410 (open, P3 debt): `z1 = a+bi` still publishes
+`["|z1|","arg z1","a","b"]`. So with `a = 3 · b = 4` the READING closes to 3+4i, but `ask z1` and the
+DOF cue still treat z₁ as free. The reading is honest: a and b are knowledge and the definition is a
+given, so z₁ = 3+4i is entailed. Only the solver does not yet carry the entailment. #1410 owns that. Nothing
+here makes it harder: when the definition lands, the carriers know z₁ and stage 5d takes the existing
+path ahead of this one.
+
+**Also not here.** A number known only parametrically WITHOUT an affine definition (`|z1| = 9r · arg z1 =
+30`, `z1 = a·bi`) still prints its sampled cartesian decimal. That is the same no-guess class one level
+out, reported for filing rather than widened into this item.
+
+**Sibling audit.** 2-D and 3-D have no complex expression grammar. Analytic's parameters need a
+declaration and a one-letter capture, and analytic has no imaginary unit. No sibling gap.
+
+**Cost.** One regex test per two-letter run in the lexer. One affine walk per undetermined point with a
+definition, at stage 5d only. No new solve.
+
+**Consequences.** `parser/exprParse.ts` (`gluedI`, `gluedISpelledOut`, `lex(…, scope)`),
+`model/cartesianForm.ts` (new), `replay/derive2.ts` (`DerivedPoint.defined`, `rationalParams`,
+`shownPoints`), `replay/scene2.ts` (`v2Labels`), `app/submit.ts` (`gluedISuggestion`),
+`store/useComplexStore.ts` + `app/errorText.ts` + `i18n/index.ts` (`glued-i` / `errGluedI`, he + en),
+`parser/catalog.ts` (new F2 row «z1 = a+bi», so the LLM grammar needs the proxy redeployed).
+
+**Locks.** `src-complex/parser/__tests__/glued-i-1365.test.ts` (39: each glued spelling ≡ its explicit
+product; the ambiguous runs refuse; the declared scope; the floor on longer runs; the `gluedI` table; the
+clarification spelling) · `src-complex/__tests__/symbolic-cartesian-1365.test.ts` (29: the class through
+`submitLine` with both views and both panels; the escalation's cases at 24/24 seeds; quadrant II held; one
+and both parameters forced; a negative forced value; hand-over to the exact carriers; `z2 = 2bi`; the
+`glued-i` clarification that then reads; the `not-handled` refusals; the declared letter) · fixtures
+`symbolic-cartesian-modulus-1365`, `symbolic-cartesian-forced-1365`, `symbolic-cartesian-quadrant-1365`,
+`symbolic-cartesian-ib-1365`. ADR-CX-040's 28 locks are unchanged and green.

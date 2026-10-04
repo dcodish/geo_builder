@@ -129,6 +129,14 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   the engine genuinely cannot decide (a direction with no exact relation to the others, such as
   1+√2i), a given is accepted and listed as undecided, and a claim reads «unknown» — never a refusal,
   never ✗. *(#1481, operator ruling P1; realised — [ADR-CX-057](06d-decisions-complex.md#adr-cx-057).)*
+- **FR-CN-10 (Must)** — **The symbolic cartesian form reads as the textbook writes it.** «z1 = a+bi»,
+  «z = x+yi», «z1 = a-bi», «z1 = a+ib», «w = c+di» define a number from two real parameters, with no
+  `*`. The number reads «z₁ = a+bi» in the cartesian view while a and b are free (the polar view prints
+  no value), «z₁ = 3+bi» once a = 3 is forced, and exactly as the literal 3+4i once both are. A glued
+  `i` whose other letter is a complex number («zi») is ambiguous and is refused with the explicit
+  product offered («z*i»); `pi` is never read as p·i. *(#1365, operator ruling 2026-09-24; realised —
+  [ADR-CX-058](06d-decisions-complex.md#adr-cx-058). Counting the number's freedom as two rather than
+  four is #1410.)*
 
 ## Knowledge and claims
 

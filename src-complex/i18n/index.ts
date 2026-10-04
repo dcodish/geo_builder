@@ -41,6 +41,8 @@ const he = {
   errRefused: 'המשפט "{{detail}}" לא נוסף — {{reason}}',
   // #1435 — the 2-D #246 guidance (input.scope.word-root), in this tool's words: the √ spelling, and the button
   errWordRoot: 'כתבו את השורש עם הסמל √ — יש כפתור √ בלוח «סמלים». למשל "{{suggestion}}" במקום "{{detail}}".',
+  // #1365 — «zi» glues a complex number to i: z·i, or a name? Asked, with the product spelled out
+  errGluedI: 'לא ברור אם הכוונה לכפל — אם כן, כתבו את הכפל במפורש: "{{suggestion}}" במקום "{{detail}}".',
   errWrongApp: 'הקובץ שייך לכלי אחר ({{detail}}) — כאן נטענים קבצים של בונה המרוכבים בלבד',
   errNewerVersion: 'הקובץ נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב',
   errTooLarge: 'הקובץ גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{detail}} משפטים',
@@ -270,6 +272,7 @@ const en: typeof he = {
   errComplexAsReal: 'Statement not added — {{letter}} is declared a complex number, but "{{detail}}" uses it as a real number (a size or an angle)',
   errRefused: 'Statement "{{detail}}" not added — {{reason}}',
   errWordRoot: 'Write the root with the √ symbol — there is a √ button under «Symbols». E.g. "{{suggestion}}" instead of "{{detail}}".',
+  errGluedI: 'Is this a product? If so, write it explicitly: "{{suggestion}}" instead of "{{detail}}".',
   errWrongApp: 'This file belongs to another tool ({{detail}}) — only Complex Builder files load here',
   errNewerVersion: 'This file was saved by a newer version of the tool — refresh the page and try again',
   errTooLarge: 'This file is too large to open — a figure can hold up to {{detail}} statements',
