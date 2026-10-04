@@ -11098,3 +11098,27 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Locks.** `src-analytic/__tests__/issue-1749-meet-verb-digit-lines.test.ts`, 29 tests, **17 fail before**: the operator's line through `decideSubmit` (also «ו-2» and isolate-wrapped), A at (-2, 4); the grid {ישרים, הישרים, הישר X והישר Y} × {1 ו-2, 1 ו- 2, l1 ו-l2} × {נפגשים, נחתכים}; two English verbs; the verb lowers to exactly the noun sentence's facts (four pairs); a line not in the figure is still refused.
 
 **Consequences.** `parser/parseAnalytic.ts` (`distributedLines`; `intersectionSpellings`; `meetFrame`; `withLineNoun`), `shell/__tests__/fixtures/geo-input-parity.ts` (one row), `docs/04c-design-analytic.md`. Catalog unchanged.
+
+## ADR-AG-234 — An unknown name that is a near miss of one the figure has is refused WITH that name, when it builds (#1750)
+
+**Date:** 2026-10-04 · **Status:** accepted · fix-round #1753, batch item for #1750
+
+**Requirements:** [02c](02c-requirements-analytic.md) R109 amendment (the refusal names the near miss). · **Design:** [04c](04c-design-analytic.md), "A refusal names the KIND it expected" — the near-miss paragraph. · **LADDER stage:** none (the submit decision's refusal text; no parse, fold or solver change).
+
+**Context.** Operator, round #1736 play, T2: *"if i say «A היא נקודת המפגש של הישר 1 עם הישר 2» - it rejects without explaining that l1 is not like 1"*. Re-measured at pickup (origin/main c098af9b, `decideSubmit`, after «נתון הישר l1: y=x+1» · «נתון הישר l2: y=-x+5»): the operator's line and the canonical «A נקודת החיתוך של הישרים 1 ו-2» both refused `unknown-reference {detail: "1", expected: "line"}` → «הישר 1 עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.» Also measured: «A על הישר ℓ1» beside l1 is refused the same bare way (a script variant of the same name).
+
+**Root cause.** The refusal is built from the error alone (`errorText`), and the error carried only the missing name and its kind. Nothing in the submit path looked at the names the figure HAS, so a near miss — the one thing that would lead the student to the fix — could not be said. The refusal itself is right (#1609 kept «1» ≠ «l1» deliberately).
+
+**Decision.**
+- `app/nearMiss.ts`: `nameKey` folds what a student does not read as a different name — NFKC (ℓ → l, ₁ → 1), lower case, primes, a line's `l` before digits. `namesOfKind(construction, kind)` lists the figure's names of the expected kind (points: `point`/`derived`/`free`; curves by id prefix, anonymous curves excluded). `nearMissOf` is the figure's name with the same key. `withName` rewrites a sentence by whole name — never inside an equation («y=x+1»), a number («1.5») or a longer name («l12»); a Hebrew clitic before it («ו-2») is kept.
+- **Driven** (the taught-remedies rule): `decideSubmit` post-processes an `unknown-reference` refusal. The sentence is rewritten with the near miss and decided again; a refusal naming the NEXT near miss («2» after «1») is rewritten in turn (bounded at six steps; each replaces a missing name by an existing one). Only a rewrite that RECORDS attaches `nearMiss: { suggest, existing }` to the refusal — `suggest` is the first near miss, `existing` every name of that kind.
+- `errorText` appends `errNearMiss`: he «באיור יש את {{names}}. התכוונתם ל-{{suggest}}?», en "The figure has {{names}}. Did you mean {{suggest}}?"; `names` is «הישר l1» for one, «הישרים l1 ו-l2» for several (new keys `nounThe{Points,Lines,Circles,Parabolas,Ellipses,Curves}`, `listAnd`).
+- No near miss, or a rewrite that would be refused for another reason, leaves the message exactly as it was.
+
+**Third-copy check.** Neither 2-D nor 3-D has a "did you mean" for an unknown name (2-D's `hebrew-labels` lesson maps Hebrew letters to Latin ones — a different mechanism, at parse time). This is the first copy, so it is product-local. 2-D's `unknownPoint` refusal could carry the same suggestion; not filed (2-D points have no `l`-prefix family, so the reported shape cannot occur there).
+
+**Engine untouched.** The numeral twin («1» vs «I», `notationMix`, `numeral-notation`) stays the engine's own refusal; this sits after it, at the submit decision, because whether the remedy holds needs the parser and the fold.
+
+**Locks.** `src-analytic/__tests__/issue-1750-unknown-ref-near-miss.test.ts`, 11 tests, **5 fail before** (the three controls, the two unit tests and the bare drive check pass before by design): the operator's line through `decideSubmit`, exact he and en text, and the rewritten sentence records; the canonical plural; the reverse direction («l1» when the figure has «1»); «ℓ1»; a POINT near miss («A₁» when the figure has A1, singular noun); controls — «הישר 7» and point «B» unchanged, and a near miss whose rewrite would itself be refused («שיפוע הישר 1 הוא חיובי» when l1's slope is negative) offers nothing; `nameKey` and `withName` unit cases.
+
+**Consequences.** `app/nearMiss.ts` (new), `app/submit.ts` (`withNearMiss` around the decision, now `decideOnce`), `app/errorText.ts` (`nearMissText`), `store/useAnalyticStore.ts` (`nearMiss` on `unknown-reference`), `i18n/index.ts` (8 keys per locale). Catalog unchanged.

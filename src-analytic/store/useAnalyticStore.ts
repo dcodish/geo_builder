@@ -129,7 +129,11 @@ export type InputError =
    */
   | { key: 'name-kind-clash'; detail: string; existing?: string }
   /** A construction that refers to a point the figure does not have yet (#1028). */
-  | { key: 'unknown-reference'; detail: string; expected?: RefKind }
+  /**
+   * `nearMiss` (#1750): the figure has a name the student's is a near miss of («l1» for «1»), and the sentence with
+   * `suggest` in it records — the message names it. Set by the submit decision only.
+   */
+  | { key: 'unknown-reference'; detail: string; expected?: RefKind; nearMiss?: { suggest: string; existing: readonly string[] } }
   /**
    * The noun and the equation name different families (02c R7, #1514 pre-play) — «פרבולה I שמשוואתה
    * x^2+y^2=16». `existing` is what the equation describes (`curve:<kind>`), `expected` the noun written.
