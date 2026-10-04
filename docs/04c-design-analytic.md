@@ -1506,6 +1506,15 @@ The locale holds four whole sentences, not one with a noun slotted in — Hebrew
 clause («הנקודה … הוגדרה» vs «הישר … הוגדר»). An anonymous curve has no name the student wrote, so it
 gets the kind-free wording rather than a guessed noun.
 
+**A near miss is named, when it builds ([ADR-AG-234](06c-decisions-analytic.md#adr-ag-234), #1750).** The submit
+decision (`decideSubmit`) post-processes an `unknown-reference` refusal: `app/nearMiss.ts` looks for a name of
+the expected kind in the figure with the same `nameKey` (NFKC, lower case, primes dropped, a line's `l` before
+digits dropped). The student's sentence is rewritten with that name (`withName`, a whole-name replace) and
+decided again; a refusal naming another near miss is rewritten in turn. Only a rewrite that RECORDS attaches
+`nearMiss: { suggest, existing }` to the refusal, and `errorText` appends `errNearMiss` («באיור יש את הישרים
+l1 ו-l2. התכוונתם ל-l1?»). The engine is untouched: which names are near is a question about what the student
+sees, and whether the remedy holds needs the parser and the fold.
+
 ## The canvas's bidi chokepoint ([ADR-AG-087](06c-decisions-analytic.md#adr-ag-087))
 
 The renderer has **one** place where a label's text is decided: `buildScene`. Every channel that can

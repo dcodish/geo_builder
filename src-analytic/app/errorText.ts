@@ -101,6 +101,30 @@ const THE_NOUN_KEY: Record<RefKind, string> = {
   curve: 'nounTheCurve',
 };
 
+/** The DEFINITE plural — «הישרים» / "the lines" — before a list of names (#1750). */
+const THE_PLURAL_KEY: Record<RefKind, string> = {
+  point: 'nounThePoints',
+  line: 'nounTheLines',
+  circle: 'nounTheCircles',
+  parabola: 'nounTheParabolas',
+  ellipse: 'nounTheEllipses',
+  curve: 'nounTheCurves',
+};
+
+/**
+ * The NEAR-MISS sentence (#1750, ADR-AG-234): «באיור יש את הישרים l1 ו-l2. התכוונתם ל-l1?». The names are the
+ * figure's, of the kind the statement expected; the submit decision attached them only after the student's sentence
+ * with `suggest` in it recorded.
+ */
+export function nearMissText(kind: RefKind, near: { suggest: string; existing: readonly string[] }, t: Translate): string {
+  const names = near.existing;
+  const list =
+    names.length === 1
+      ? `${t(THE_NOUN_KEY[kind])} ${names[0]}`
+      : `${t(THE_PLURAL_KEY[kind])} ${names.slice(0, -1).join(', ')}${t('listAnd')}${names[names.length - 1]}`;
+  return t('errNearMiss', { names: list, suggest: near.suggest });
+}
+
 /**
  * The remedy for a curve named by its noun alone (#1514 pre-play): the student's OWN sentence with the
  * first candidate's name after the noun — «P על הפרבולה» → «P על הפרבולה I». When the sentence does
@@ -189,6 +213,7 @@ export function errorText(error: InputError, t: Translate): string {
     'load-too-large': 'errLoadTooLarge',
     'load-unreadable': 'errLoadUnreadable',
   }[error.key];
+  const near = error.key === 'unknown-reference' && error.nearMiss ? ` ${nearMissText(kind ?? 'curve', error.nearMiss, t)}` : '';
   return t(key, {
     detail: error.detail,
     max: MAX_FIGURE_STATEMENTS,
@@ -211,5 +236,5 @@ export function errorText(error: InputError, t: Translate): string {
     forcedHe: 'forced' in error ? (error.forced ?? '') : '',
     shapeEn: 'shape' in error ? enNoun(error.shape) : '',
     forcedEn: 'forced' in error ? enNoun(error.forced) : '',
-  });
+  }) + near;
 }

@@ -28,6 +28,7 @@ import { holdsInEveryConfiguration } from '../engine/evaluate';
 import type { ApplyNotice } from '../engine/apply';
 import { factsWithin, type Fact } from '../engine/types';
 import { activeOf, rowOf } from './active';
+import { namesOfKind, nearMissOf, withName } from './nearMiss';
 
 /** What a recorded line tells the student (#1350) — the engine's notice, without the line index. */
 export type RecordNotice = ApplyNotice;
@@ -149,6 +150,46 @@ export function decideSubmit(
   lines: readonly string[],
   seed: number,
   current: Derivation = derive(lines, seed),
+): SubmitVerdict {
+  return withNearMiss(raw.trim(), decideOnce(raw, lines, seed, current), (l) => decideOnce(l, lines, seed, current), current);
+}
+
+/**
+ * AN UNKNOWN NAME THAT IS A NEAR MISS OF ONE THE FIGURE HAS (#1750, ADR-AG-234) — «הישר 1» when the figure has
+ * «l1». The refusal stays (they are different names); it gains the name the figure has, but ONLY when the
+ * student's own sentence with that name in it would RECORD — a taught remedy must be one the next Enter accepts.
+ * Several near misses in one sentence («הישרים 1 ו-2» beside l1, l2) are substituted in turn, each refusal naming
+ * the next; the suggestion is the first. Bounded: every step replaces a name the figure lacks by one it has.
+ */
+function withNearMiss(
+  line: string,
+  verdict: SubmitVerdict,
+  decide: (line: string) => SubmitVerdict,
+  current: Derivation,
+): SubmitVerdict {
+  if (verdict.kind !== 'refused' || verdict.error.key !== 'unknown-reference' || !verdict.error.expected) return verdict;
+  const { detail, expected } = verdict.error;
+  const suggest = nearMissOf(current.construction, detail, expected);
+  if (!suggest) return verdict;
+  let next: SubmitVerdict = verdict;
+  let sentence = line;
+  for (let step = 0; step < 6 && next.kind === 'refused' && next.error.key === 'unknown-reference'; step++) {
+    const err = next.error;
+    const to = err.expected ? nearMissOf(current.construction, err.detail, err.expected) : null;
+    const rewritten = to ? withName(sentence, err.detail, to) : null;
+    if (!rewritten) return verdict;
+    sentence = rewritten;
+    next = decide(sentence);
+  }
+  if (next.kind !== 'record') return verdict;
+  return { kind: 'refused', error: { ...verdict.error, nearMiss: { suggest, existing: namesOfKind(current.construction, expected) } } };
+}
+
+function decideOnce(
+  raw: string,
+  lines: readonly string[],
+  seed: number,
+  current: Derivation,
 ): SubmitVerdict {
   const line = raw.trim();
   if (!line) return { kind: 'ignored' };

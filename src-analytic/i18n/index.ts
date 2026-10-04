@@ -189,6 +189,9 @@ const he = {
   // #1514 pre-play — a named conic is a noun of its own; it was reported as a missing POINT with its raw id.
   errUnknownRefParabola: 'הפרבולה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
   errUnknownRefEllipse: 'האליפסה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
+  // #1750 (ADR-AG-234): the name the figure HAS that the student's is a near miss of — offered only when it builds.
+  errNearMiss: 'באיור יש את {{names}}. התכוונתם ל-{{suggest}}?',
+  listAnd: ' ו-',
   // 02c R7 (#1514 pre-play) — the noun and the equation name different families; never drawn.
   errKindMismatch:
     'המשוואה במשפט "{{detail}}" מתארת {{existing}}, לא {{claimed}}. בדקו את המשוואה, או כתבו את שם הצורה שהיא מתארת.',
@@ -388,6 +391,12 @@ const he = {
   nounTheParabola: 'הפרבולה',
   nounTheEllipse: 'האליפסה',
   nounTheCurve: 'העצם',
+  nounThePoints: 'הנקודות',
+  nounTheLines: 'הישרים',
+  nounTheCircles: 'המעגלים',
+  nounTheParabolas: 'הפרבולות',
+  nounTheEllipses: 'האליפסות',
+  nounTheCurves: 'העצמים',
   kindMidpoint: 'אמצע קטע',
   kindCentroid: 'מפגש התיכונים',
   kindIncentre: 'מפגש חוצי הזוויות',
@@ -607,6 +616,8 @@ const en: typeof he = {
   errUnknownRefCircle: 'The circle {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefParabola: 'The parabola {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefEllipse: 'The ellipse {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errNearMiss: 'The figure has {{names}}. Did you mean {{suggest}}?',
+  listAnd: ' and ',
   errKindMismatch:
     'The equation in "{{detail}}" describes {{existing}}, not {{claimed}}. Check the equation, or name the shape it describes.',
   'errHost.named':
@@ -776,6 +787,12 @@ const en: typeof he = {
   nounTheParabola: 'the parabola',
   nounTheEllipse: 'the ellipse',
   nounTheCurve: 'the object',
+  nounThePoints: 'the points',
+  nounTheLines: 'the lines',
+  nounTheCircles: 'the circles',
+  nounTheParabolas: 'the parabolas',
+  nounTheEllipses: 'the ellipses',
+  nounTheCurves: 'the objects',
   kindMidpoint: 'a midpoint',
   kindCentroid: 'the centroid',
   kindIncentre: 'the incentre',

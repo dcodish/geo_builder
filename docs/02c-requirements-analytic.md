@@ -907,6 +907,13 @@ circle precedent), so the panel and the exam agree. «II» is a numeral, never *
 refused. A bare equation opening with a digit is still an equation. In an operand slot a numeral needs its
 noun («הישר 3»); with the line noun dropped, a Roman numeral is still a circle (R-#1072).
 
+**R109 amendment (2026-10-04, [ADR-AG-234](06c-decisions-analytic.md#adr-ag-234),
+[#1750](https://github.com/dcodish/geo_builder/issues/1750)).** «1» and «l1» stay different names, and a
+reference to one the figure lacks is still refused. When the figure has a name the student's is a NEAR MISS of
+— the same name but for an `l`/`ℓ` before a line's digits, a prime, a subscript digit or letter case — the
+refusal names the figure's names of that kind and the one meant: «הישר 1 עדיין לא הוגדר. … באיור יש את הישרים l1
+ו-l2. התכוונתם ל-l1?». It is offered only when the student's sentence with that name in it would be accepted.
+
 **R110 — the SIGN of a derived quantity is a stated given, honoured as a selector** ([ADR-AG-144](06c-decisions-analytic.md#adr-ag-144),
 [#1323](https://github.com/dcodish/geo_builder/issues/1323)). «שיפוע הישר l5 שלילי», «השיפוע של l1 חיובי»,
 «שיפוע l1 קטן מ-0», «the slope of l1 is negative» — the exam's *«ושיפועו שלילי»* — pick between the
