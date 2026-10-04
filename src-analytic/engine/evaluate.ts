@@ -3186,7 +3186,12 @@ export function reportPending(c: Construction): void {
 }
 
 /** A knowledge verdict. `pending` is never a value: the pool has not been read to the end. */
-export type Knowledge = { known: true; value: number } | { known: false; pending?: true };
+/**
+ * `options` (#1716, ADR-AG-226): not one value, but exactly {@link MAX_LISTED_VALUES} across the admissible
+ * configurations — set only by {@link knownValue}, never by {@link isKnowledge}, which answers the narrower
+ * question "is this ONE value".
+ */
+export type Knowledge = { known: true; value: number } | { known: false; pending?: true; options?: readonly number[] };
 
 /**
  * The seeds a DEFAULT gate reads, or `null` for "fill and read all". On a deferred pool, first the
@@ -3517,6 +3522,121 @@ export function knownOptions(
     }
     return 0;
   });
+}
+
+/**
+ * HOW MANY VALUES A ROW MAY LIST (#1716, ADR-AG-226). Operator ruling, 2026-10-03: *"if there are 2 options, we
+ * always show up to 2 options"* — one value prints as one, two as «2 או −2», and more keeps «—».
+ */
+export const MAX_LISTED_VALUES = 2;
+
+/** A value's verdict for a row: ONE value, up to {@link MAX_LISTED_VALUES} OPTIONS, pending, or open. */
+export type Values = { known: true; value: number[] } | { known: false; pending?: true; options?: number[][] };
+
+/**
+ * THE ONE VALUE GATE OF THE DATA PANEL (#1716, ADR-AG-226) — every row asks it, never `isKnowledge` and
+ * `knownOptions` side by side: a coordinate pair, a slope, a length, a parameter, an equation's coefficients.
+ *
+ * Operator, playing T6 (#1716): «tan∢BAO = 2» fixes |slope AB| = 2, but the sign depends on the quadrant, which
+ * only the exam's printed figure settles — and the panel said «—», hiding what the student DID fix. The two
+ * questions were already answered, separately: `isKnowledge` ("one value in every configuration") and the
+ * #1036 option set `knownOptions` ("a small stable set") — but only the point rows asked the second, at a cap of
+ * four, so a slope, a length or an equation with two values read as open.
+ *
+ * So one function answers, in order:
+ * 1. every component invariant → **known** (the honesty gate, unchanged);
+ * 2. some component still awaiting the pool, none seen to move → **pending** (#1473);
+ * 3. the value takes a stable discrete set of at most {@link MAX_LISTED_VALUES} → **options** (each is possible,
+ *    and the SET is knowledge — `knownOptions`'s argument, #1036);
+ * 4. otherwise **open** — the dash.
+ *
+ * `read` returns the whole value as a vector (`size` components), for the reason `knownOptions` gives: a point
+ * is `(1,-5)` or `(3,3)`, never the four products of its per-axis options.
+ */
+export function knownValues(
+  c: Construction,
+  read: (f: Figure) => number[] | null,
+  size: number,
+  /**
+   * May the RENDER complete a deferred pool to answer? Only the point rows' option walk — the walk the render
+   * path paid before #1473, which the B′ ruling grandfathers (*"we cannot afford 0.5 s addition"*). Every other
+   * row answers from what is evaluated: a value already seen to take more than two values is open; one that
+   * may still be a two-value set is PENDING («בודק…») until the idle loop completes the pool. The VERDICT is
+   * the same either way once the pool is complete; only who pays for completing it differs.
+   */
+  opts: { fillPool?: boolean } = {},
+): Values {
+  let pending = false;
+  let open = false;
+  const value: number[] = [];
+  for (let i = 0; i < size; i += 1) {
+    const k = isKnowledge(c, (f) => {
+      const v = read(f);
+      return v === null || v.length <= i ? null : v[i];
+    });
+    if (k.known) value.push(k.value);
+    else if (k.pending) pending = true;
+    else open = true;
+  }
+  if (!open && !pending) return { known: true, value };
+  if (!open) return { known: false, pending: true };
+  const pool = poolOf(c);
+  if (!opts.fillPool && pool.deferred && !pool.complete()) {
+    const seen: number[][] = [];
+    for (const f of admittedOf(c, pool.ready())) {
+      const v = read(f);
+      if (v === null || v.some((n) => !Number.isFinite(n))) return { known: false };
+      seen.push(v);
+    }
+    const scale = Math.max(1, ...seen.flat().map(Math.abs));
+    const distinct: number[][] = [];
+    for (const v of seen) if (!distinct.some((d) => d.every((n, i) => Math.abs(n - v[i]) <= SAME_VALUE_EPS * scale))) distinct.push(v);
+    if (distinct.length > MAX_LISTED_VALUES) return { known: false };
+    pool.notePending();
+    return { known: false, pending: true };
+  }
+  const options = knownOptions(c, read);
+  return options && options.length <= MAX_LISTED_VALUES ? { known: false, options } : { known: false };
+}
+
+/** {@link knownValues} for one number — the {@link Knowledge} every scalar row renders, with its `options`. */
+export function knownValue(c: Construction, read: (f: Figure) => number | null): Knowledge {
+  const v = knownValues(
+    c,
+    (f) => {
+      const x = read(f);
+      return x === null ? null : [x];
+    },
+    1,
+  );
+  if (v.known) return { known: true, value: v.value[0] };
+  if (v.options) return { known: false, options: v.options.map(([x]) => x) };
+  return v.pending ? { known: false, pending: true } : { known: false };
+}
+
+/**
+ * A curve's equation when it takes up to {@link MAX_LISTED_VALUES} values across the configurations (#1716) —
+ * `knownCurve`'s twin through the one gate: the coefficients read as ONE vector, so «y = 2x + 6 או y = −2x − 6»
+ * is two whole equations, never a mix of their coefficients. `null` when the curve is known (ask `knownCurve`),
+ * open, or pending.
+ */
+export function knownCurveOptions(c: Construction, id: Id): NumCurve[] | null {
+  const read = (f: Figure) => f.curves.find((q) => q.id === id)?.curve ?? null;
+  const first = read(drawableAt(c, 0));
+  if (!first) return null;
+  const fields = (Object.keys(first) as Array<keyof NumCurve>).filter((k) => typeof first[k] === 'number');
+  const v = knownValues(
+    c,
+    (f) => {
+      const cur = read(f);
+      // A curve of a DIFFERENT family at another configuration is no member of a set of equations.
+      if (!cur || cur.kind !== first.kind) return null;
+      return fields.map((k) => (cur as unknown as Record<string, number>)[k as string]);
+    },
+    fields.length,
+  );
+  if (v.known || !v.options) return null;
+  return v.options.map((vals) => ({ ...first, ...Object.fromEntries(fields.map((k, i) => [k, vals[i]])) }) as NumCurve);
 }
 /**
  * Is this curve's SHAPE knowledge — every coefficient invariant across the free DOFs — or is the

@@ -2344,3 +2344,11 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - «שטח המשולש ABC הוא 13» writes «S=13» inside the triangle; «⌢AC = 60°» writes «60°» on the arc, never at the centre.
 - Each value sits AT its mark (#1733, ADR-AG-228): an angle's value next to its arc, never farther than 2.5 times the arc's radius from the vertex; an area's inside its shape; an arc's along the arc. A length label moves out of an angle value's way, and no value covers a point's label.
 - A shape noun's own definition is not marked («מלבן ABCD» draws no knees, «מעוין ABCD» no ticks), and a value the tool computed is never written on the canvas: it is in the data panel.
+
+**R169 — a value the givens fix up to two choices shows both**
+([ADR-AG-226](06c-decisions-analytic.md#adr-ag-226), [#1716](https://github.com/dcodish/geo_builder/issues/1716); operator ruling 2026-10-03: *"if there are 2 options, we always show up to 2 options"*).
+
+- A data-panel row whose value is the same in every configuration shows it, as before.
+- A row whose value takes exactly two values across the configurations the givens allow lists both, joined by «או». This applies to every row: a coordinate pair, a parameter, a slope and its angle with the x-axis, a length, and an equation. Example: 9/4 typed as the exam prints it (without the figure note) shows «שיפוע AB: -2 או 2».
+- More than two values, or a value that moves continuously, shows «—». A point with four possible positions shows «—».
+- A given that settles the choice («A משמאל ל-O …») turns the row back into one value («2»).
