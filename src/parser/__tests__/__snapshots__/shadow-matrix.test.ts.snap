@@ -1030,6 +1030,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "the height of trapezoid ABCD is 4",
+    "winner": "shapeHeight",
+  },
+  {
+    "lang": "he",
+    "text": "גובה הטרפז ABCD הוא 4",
+    "winner": "shapeHeight",
+  },
+  {
+    "lang": "en",
     "text": "perpendicular bisector of AB",
     "winner": "perpBisector",
   },

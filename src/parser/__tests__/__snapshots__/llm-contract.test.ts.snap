@@ -1802,6 +1802,20 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "segment",
     ],
   },
+  "the height of trapezoid ABCD is 4": {
+    "en": [
+      "trapezoid",
+      "foot",
+      "segment",
+      "set-distance",
+    ],
+    "he": [
+      "trapezoid",
+      "foot",
+      "segment",
+      "set-distance",
+    ],
+  },
   "the line AO cuts circle O at C and D": {
     "en": [
       "circle",
