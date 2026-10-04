@@ -62,6 +62,15 @@ export const CATALOG: readonly CatalogEntry[] = [
     descEn: 'a cartesian definition',
   },
   {
+    // #1365 (ADR-CX-058): the textbook symbolic form — bi is b·i (also ib, x+yi); a and b are free real
+    // parameters, and the number reads «z₁ = a+bi» until they are forced
+    family: 'F2',
+    he: 'z1 = a+bi',
+    en: 'z1 = a+bi',
+    descHe: 'צורה קרטזית כללית — a ו-b מספרים ממשיים (גם a+ib, x+yi)',
+    descEn: 'the general cartesian form — a and b are real numbers (also a+ib, x+yi)',
+  },
+  {
     family: 'F2',
     he: 'z1 = √3 + i',
     en: 'z1 = √3 + i',

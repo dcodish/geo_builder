@@ -23,6 +23,7 @@ const ERROR_KEY: Record<InputError['key'], string> = {
   'complex-as-real': 'errComplexAsReal',
   refused: 'errRefused',
   'word-root': 'errWordRoot',
+  'glued-i': 'errGluedI',
 };
 
 /**

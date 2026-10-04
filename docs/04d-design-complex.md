@@ -106,6 +106,23 @@ never as a contradiction or a refutation.
   claimed — as a parameter — so the line balanced perfectly while meaning something the student never
   wrote. A grammar where juxtaposition means multiplication needs both: every span claimed, and a
   floor on what a claim may invent.
+- **A glued `i` is a coefficient times i, decided in the LEXER** (`gluedI` in `exprParse.ts`;
+  [ADR-CX-058](06d-decisions-complex.md#adr-cx-058)). A two-letter run of a parameter letter and `i`
+  (`bi`, `ib`) at the END of a term lexes as two tokens, so `a+bi` reads `a + b·i` — the floor
+  above is untouched, because it never sees the run. The run stays one name (and the floor refuses it)
+  when the reading is ambiguous: the other letter is complex (`zi`, `wi`, a declared family, a point
+  label), a constant (`ii`, `oi`), or the run is glued to a following operand (`ib z1`); `pi` and `im`
+  are words and never split. For a complex letter the submit path offers the explicit product
+  (`z*i`) as a clarification, only once the grammar has read it.
+- **A number DEFINED by real parameters reads as its definition** (`model/cartesianForm.ts`;
+  [ADR-CX-058](06d-decisions-complex.md#adr-cx-058)). `z1 = a+bi` is carried as a free unknown plus a
+  numeric relation (making it a function of a and b in the solver is #1410), so its exact carriers
+  know nothing. Stage 5d reads the student's own definition instead — any `name = E` with E free of
+  complex names and affine in its parameters over the Gaussian rationals — substitutes every parameter
+  whose value is a known exact rational, and prints «z₁ = a+bi» / «z₁ = 3+bi» in the cartesian view
+  (the polar view stays bare, FR-KN-1). With no parameter left the number is closed and reads exactly as
+  the literal would, in both views. `DerivedPoint.defined` tells the panel rows the reading has
+  something to say.
 - **A radical is a token, and a radical LITERAL is a value** ([ADR-CX-056](06d-decisions-complex.md#adr-cx-056)).
   «√» / «∛» / «∜» / «ⁿ√» / «sqrt(» lex as one root token; a root of a rational literal becomes an exact
   value on the modulus exponent vector (so «√2cis45» stays a tier-1 literal), and any other radicand is

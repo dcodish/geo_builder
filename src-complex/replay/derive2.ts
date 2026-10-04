@@ -26,7 +26,8 @@
 
 import { fmtNum } from '../../shell/format';
 import type { Cx } from '../value/value';
-import { cPolar, evaluate, exact, formatPolar } from '../value/value';
+import { cArgDeg, cPolar, evaluate, exact, formatPolar, fromCartesian } from '../value/value';
+import { closedParts, definitionOf, substituteKnown, symbolicParts } from '../model/cartesianForm';
 import { type Rat, rat, toNumber, add as ratAdd, sub as ratSub, mul as ratMul, div as ratDiv, neg as ratNeg, isZero as ratIsZero, sqrtExact } from '../value/rational';
 import { composeCartesian, gaussianRationalParts, numericPart, ratPart, readableCartesianParts } from '../value/cartesian';
 import { type ExpVec, evaluate as evalMod, format as fmtMod, fromRational as modFromRational, pow as modPow, isOne as modIsOne, isParametric } from '../value/modulus';
@@ -138,6 +139,14 @@ export interface DerivedPoint {
   readonly modulusKnown: boolean;
   /** the givens FORCE this direction */
   readonly argumentKnown: boolean;
+  /**
+   * #1365 (ADR-CX-058) — the number is DEFINED by real parameters (`z1 = a+bi`) and is not known
+   * through its exact carriers: `symbolic` while a parameter is still free (the cartesian reading is
+   * «z₁ = a+bi», the polar one stays bare), `closed` once every parameter is forced to an exact
+   * rational (both readings print the number). Null otherwise. What the panel rows read to decide
+   * whether a reading has something to say.
+   */
+  readonly defined: 'symbolic' | 'closed' | null;
 }
 
 /**
@@ -1167,6 +1176,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
   }
 
   const points: DerivedPoint[] = [];
+  /** #1365 — names whose exact modulus still holds a parameter: KNOWN only as a function of it */
+  const parametricNames = new Set<string>();
   if (!t1.inconsistent) {
     // the union: names the constraints mention PLUS bare declarations, so a number the student merely
     // named is still on the canvas (always-visualise) rather than waiting for a constraint to earn it
@@ -1180,6 +1191,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
       const a = argumentOf(name, state);
       if (!Number.isFinite(m.value) || !Number.isFinite(a.deg)) continue;
       const modulus = m.exact ? fmtMod(asMagnitude(m.exact)) : round2(m.value);
+      if (m.exact && isParametric(m.exact)) parametricNames.add(name);
       // a cycle needs BOTH halves exact: unit modulus, and an argument that is a rational part of a turn
       const cycle = m.exact && a.exact && modIsOne(m.exact) ? anglePeriod(a.exact) : null;
       // a DIRECTION, folded into one turn — see the note on `argumentDeg` below
@@ -1229,6 +1241,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
         cyclePeriod: cycle === null ? null : Number(cycle),
         modulusKnown: m.exact !== null,
         argumentKnown: a.exact !== null,
+        defined: null,
       });
     }
   }
@@ -1740,6 +1753,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * The value comes only from tier 1's exact solve, so a parameter is printed exactly when the givens
    * force it, and reads free otherwise.
    */
+  /** #1365 — every parameter whose value is KNOWN and an exact rational: what a definition's reading substitutes */
+  const rationalParams = new Map<string, Rat>();
   const params: ParamRow[] = [...sample.keys()]
     .filter((p) => !literalSample.has(p))
     .map((p) => {
@@ -1751,8 +1766,53 @@ export function foldConstraints(input: FoldInput): Derived2 {
       const verdict = knowledgeOf(false, exactClosure, configEnvs.map((env) => realValue(env.param(p) ?? null)));
       const differs = !verdict.known && verdict.why.code === 'multi-config';
       const prefix = differs || sgn === null ? '±' : sameDirection(sgn, HALF_TURN) ? '-' : '';
+      if (prefix !== '±' && !isParametric(v)) {
+        const q = gaussianRationalParts(v, prefix === '-' ? HALF_TURN : angZero());
+        if (q && ratIsZero(q.im)) rationalParams.set(p, q.re);
+      }
       return { name: p, value: `${prefix}${fmtMod(v)}` };
     });
+
+  /**
+   * #1365 (ADR-CX-058) — STAGE 5d for a number DEFINED by real parameters. `z1 = a+bi` is carried as a
+   * free unknown plus a numeric relation (the definition mechanism is #1410), so its exact carriers
+   * know nothing and both readings were the bare name. The definition itself is the student's own
+   * statement, so the cartesian reading restates it with every KNOWN rational parameter substituted
+   * («z₁ = a+bi», «z₁ = 3+bi»); once none is left the number is closed and reads exactly as the literal
+   * would, in both views. Points the exact carriers know as a NUMBER are untouched — the numeric
+   * reading has taken over. Points they know only as a function of a parameter (`z2 = 2bi` is
+   * `2|b|·cis90°`) keep that polar form, but their cartesian reading was the SAMPLE printed as a
+   * decimal («z₂ ≈ 0.4i», a guess under the no-guess rule); a definition now says «z₂ = 2bi».
+   */
+  const shownPoints: DerivedPoint[] = points.map((p) => {
+    const parametric = parametricNames.has(p.name);
+    if (p.modulusKnown && p.argumentKnown && !parametric) return p;
+    const def = definitionOf(p.name, constraints);
+    if (!def) return p;
+    const form = substituteKnown(def, rationalParams);
+    const closed = closedParts(form);
+    if (!closed) {
+      const parts = symbolicParts(form, p.z);
+      return { ...p, readingCart: `${p.display} = ${composeCartesian(parts.re, parts.im)}`, defined: 'symbolic' };
+    }
+    const lit = fromCartesian(closed.re, closed.im).value;
+    const z = { re: toNumber(closed.re), im: toNumber(closed.im) };
+    if (lit.kind !== 'exact') return { ...p, reading: `${p.display} = 0`, readingCart: `${p.display} = 0`, defined: 'closed' };
+    const argumentDeg = cArgDeg(z);
+    return {
+      ...p,
+      reading: readingOf({
+        display: p.display,
+        exactLabel: exactLabelOf(lit.mod, lit.arg),
+        modulus: fmtMod(lit.mod),
+        modulusKnown: true,
+        argumentDeg,
+        argumentKnown: true,
+      }),
+      readingCart: readingCartOf({ display: p.display, z, known: true, exactParts: readableCartesianParts(lit.mod, lit.arg) }),
+      defined: 'closed',
+    };
+  });
 
   const knowledge: KnowledgeRow[] = queries.map((q) => {
     const value = measureAt(finalEnv, q);
@@ -1801,7 +1861,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
 
   return {
     contradiction: t1.inconsistent,
-    points,
+    points: shownPoints,
     objects: t1.inconsistent ? [] : resolveObjects(objects, points, sample, solutionSets),
     sequences: t1.inconsistent ? [] : resolveSequences(sequences, points),
     rotations: t1.inconsistent ? [] : resolveRotations(constraints, points),

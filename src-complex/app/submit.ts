@@ -41,7 +41,7 @@
 import { readEnvelope, type LoadAudit } from '../../shell/save';
 import { parseLineV2 } from '../parser/rules';
 import { complexScopeOf, parseAsk } from './deriveLines';
-import type { ComplexScope } from '../parser/exprParse';
+import { type ComplexScope, gluedISpelledOut } from '../parser/exprParse';
 import type { Derived2 } from '../replay/derive2';
 import { type InputError, type SavedSession, useComplexStore } from '../store/useComplexStore';
 import { deriveLines } from './deriveLines';
@@ -148,11 +148,24 @@ export function wordRootSuggestion(line: string, lines: readonly string[]): stri
   return parseInFigure(suggestion, lines).ok ? suggestion : null;
 }
 
+/**
+ * #1365 (ADR-CX-058) — the CLARIFICATION for a glued `i` the lexer would not split because its other
+ * letter is a complex number: `zi` may be `z·i` or «z sub i», and juxtaposition cannot tell. The line
+ * is refused with the explicit product spelled out, offered only when that spelling really reads
+ * (a taught remedy must drive — #1156). `bi` (a parameter) never reaches here: it reads.
+ */
+export function gluedISuggestion(line: string, lines: readonly string[]): string | null {
+  const suggestion = gluedISpelledOut(line, scopeOf(lines));
+  return suggestion !== null && parseInFigure(suggestion, lines).ok ? suggestion : null;
+}
+
 /** THE refusal for a line the grammar could not read — one wording for every entry point. */
 function unreadRefusal(parsed: Extract<ReturnType<typeof parseLineV2>, { ok: false }>, line: string, lines: readonly string[]): InputError {
   if (parsed.reason === 'unaccounted') return { key: 'unaccounted', detail: parsed.items.join(', ') };
   const suggestion = wordRootSuggestion(line, lines);
-  return suggestion ? { key: 'word-root', detail: line, suggestion } : { key: 'not-handled', detail: line };
+  if (suggestion) return { key: 'word-root', detail: line, suggestion };
+  const product = gluedISuggestion(line, lines);
+  return product ? { key: 'glued-i', detail: line, suggestion: product } : { key: 'not-handled', detail: line };
 }
 
 export type Verdict =

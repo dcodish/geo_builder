@@ -58,6 +58,11 @@ export type InputError =
    */
   | { key: 'word-root'; detail: string; suggestion: string }
   /**
+   * #1365 — a glued `i` whose other letter is a complex number («zi»): ambiguous, so refused with
+   * `suggestion` — the line with the explicit product (`z*i`), which the grammar has already read.
+   */
+  | { key: 'glued-i'; detail: string; suggestion: string }
+  /**
    * #1428 — the fold could not use the statement `detail`, for a reason it KNOWS (`why`): a reserved
    * letter, today. The strip words that reason; the generic «incompatible» would claim a contradiction
    * that may not exist (`z = 1+i` after `z^2 = 2i` — 1+i IS a root).
