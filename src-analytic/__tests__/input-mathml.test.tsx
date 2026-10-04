@@ -97,3 +97,18 @@ describe('#1097 — presentation only', () => {
     expect(src).toContain('editValueOf={(id) => lines[Number(id)] ?? \'\'}');
   });
 });
+
+describe('#1540 — the bare subscript the catalog teaches typesets in the given list', () => {
+  it('the operator’s own row «x_B>x_D» renders two subscripts, no literal underscore', () => {
+    const line = 'x_B>x_D';
+    expect(hasMath(line)).toBe(true);
+    const html = rendered(line);
+    expect(html).toContain('<msub><mi>x</mi><mi>B</mi></msub>');
+    expect(html).toContain('<msub><mi>x</mi><mi>D</mi></msub>');
+    expect(html.replace(/<math>[\s\S]*?<\/math>/g, '')).not.toContain('_');
+  });
+
+  it('the bare and braced spellings render byte-identically', () => {
+    expect(rendered('x_B>x_D')).toBe(rendered('x_{B}>x_{D}'));
+  });
+});

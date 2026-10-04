@@ -5269,3 +5269,25 @@ The class has two halves. One mechanism (the prune marker) silently covered only
 - **A row in the ADR-W-090 shell fixture.** `shell/` may not import `server/`, and reading the constant out of the source text would reproduce the decision rather than call it.
 
 **Consequences.** Prod: `EVENTS_RETENTION_DAYS` must stay unset on the proxy (it was not set on 2026-10-02). The proxy and the four static bundles ship together, since the note text is in the bundles. After the next UTC day, each `events*.jsonl` should have its oldest event at most 30 days old.
+
+## ADR-W-111 — The shared renderer typesets the bare subscript `x_B`, not only the braced `x_{B}` (#1540)
+
+**Status:** accepted · 2026-10-04 · round #1753 · amends [ADR-W-040](#adr-w-040) (the shared math-text core). Operator report, 2026-09-29, analytic: *"the x_B>x_D in input is not shown mathml"*.
+
+**Requirements:** none (internal) — no requirement row names the subscript spelling; this makes the existing typesetting promise hold for the spelling the catalogs already teach. · **Design:** [28](28-product-unification.md) §5a, the utterance-input row — a subscript is typeset in either spelling. **Product:** shell (all four builders).
+
+**Context.** Every product's given rows, previews and traces go through `shell/math` (`hasMath` + `mathHtml`, with `shell/mathExpr` for expression spans). Its subscript rule was braces-only: `SUB = [A-Za-z]_\{…\}`, `hasMath`'s `_\{` clause, and the `id _ { id }` branch of the expression parser. The braced form is what the `x_{}` chip inserts. The **bare** form is the catalogs' canonical spelling (analytic `x_B > x_D`, `x_A = 5`, `y_A < 0`; 3-D `x_B = 3`) and what students and the LLM type. Measured on `c098af9b`: `x_B>x_D`, `x_B = 3`, `S_ABC = 12` all gave `hasMath: false` and rendered as plain text, and `(x_A+x_B)/2` matched as an expression span and was refused whole. The form the tool teaches was the one it could not typeset.
+
+**Decision.** One fix in the shared core, none per product.
+1. **`SUB`** accepts both forms: `(?<![A-Za-z0-9])[A-Za-z]_(?:\{[A-Za-z0-9]+\}|[A-Za-z0-9]+)`. The bare subscript is the letter/digit run after `_`, ending at the first non-alphanumeric character (`x_B>x_D` → sub `B`, then `>`; `S_ABC` → sub `ABC`). The lookbehind keeps an underscore inside a word (`foo_bar`, `seg_AB`) as text.
+2. **`subML`** reads either form and emits byte-identical MathML for both; **`hasMath`** gains the same bare clause.
+3. **`mathExpr`**: after `id _`, a bare `id`/`num` is the subscript when the base is a lone letter, so `(x_A+x_B)/2` is one `<mfrac>` with two `<msub>`, identical to the braced spelling.
+4. **Presentation only.** Stored lines are untouched; ✎ still edits the raw typed text.
+
+**Corpus sweep.** Every `he`/`en` example of all four catalogs (1456 strings), rendered the way rows are (`hasMath ? mathHtml : text`) before and after. The only rows whose output changed are the bare-subscript rows: 3-D `x_B = 3`; analytic `x_A = 5`, `x_B > x_D`, `x_B > 3`, `y_A < 0` (each in both languages). No catalog row carries an underscore that is not a subscript.
+
+**Locks.** `shell/__tests__/issue-1540-bare-subscript.test.ts`: the issue's measurement table in both spellings (each gives `<msub>`, no literal `_`, byte-identical to its braced rewrite); `(x_A+x_B)/2` → one `<math>`, one `<mfrac>`, two `<msub>`; negative controls (`foo_bar`, `seg_AB = 3`, `abc_d`, `max_x/2`, `1_000` keep their underscore). The catalog sweep is `shell/__tests__/fixtures/issue-1540-subscript-sweep.ts`, run by each product against its own catalog (`issue-1540-catalog-subscripts.test.ts` in `src/parser`, `src3d/parser`, `src-complex/parser` and `src-analytic` `__tests__`; `shell/` may not import a product tree and `server/` may not import `shell/`, the `issue-1152-preview-rows.ts` shape): no catalog example leaves a raw `_` outside MathML, and every example renders identically in its bare and braced spellings. `src-analytic/__tests__/input-mathml.test.tsx` gains the operator's exact row `x_B>x_D`. Fails before: 20 of 41 across the six files (the 2-D and complex sweeps pass before, as their catalogs carry only braced subscripts).
+
+**Rejected.**
+- **Adding braces per product at the display boundary** (what analytic's value rows do for engine symbols). That is a fourth fork of a shared decision, and it would miss the given rows, previews and the other three products.
+- **Any `_` followed by letters is a subscript.** That would typeset the inside of identifiers; a subscript base is one letter.
