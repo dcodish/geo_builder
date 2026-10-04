@@ -43,6 +43,7 @@ const he = {
   secEquations: 'משוואות',
   secLengths: 'אורכים',
   secSlopes: 'שיפועים',
+  secAngles: 'זוויות',
   // The ASK lane (#1027) — the panel's own input: two surfaces, one grammar.
   // Short enough to READ in the panel's column — a placeholder clipped at its start teaches nothing.
   askPlaceholder: 'שאלו: AB, שטח ABC, זווית ABC',
@@ -490,6 +491,7 @@ const en: typeof he = {
   secEquations: 'Equations',
   secLengths: 'Lengths',
   secSlopes: 'Slopes',
+  secAngles: 'Angles',
   askPlaceholder: 'Ask: AB, area of ABC, angle ABC',
   askAdd: 'Ask',
   askTraceLabel: 'how this is reached',

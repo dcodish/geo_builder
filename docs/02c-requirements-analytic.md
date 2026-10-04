@@ -2184,6 +2184,7 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - The foot named in the same sentence — «האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D», «D רגל האנך מ-C לציר ה-x», «האנכים מהקודקודים A ו-C לציר ה-x חותכים אותו בנקודות E ו-F בהתאמה» — is that letter. A foot on a side's line may lie beyond the side, as in 2-D. «אנך אמצעי ל-AB» draws the midpoint and the perpendicular bisector.
 - «הישר העובר דרך הנקודה E מקביל לציר ה-y וחותך את הצלע AB בנקודה F» (and «דרך E עובר ישר מקביל ל-… החותך את …», «ישר דרך P מאונך ל-AB») states the line and where it cuts the side; on a SIDE the point lies between its ends. The piece EF is drawn and the line itself is not, as in 2-D, until a sentence states the line.
 - «האנך» refers to the perpendicular already drawn — «הנקודה E נמצאת על האנך שהורידו מנקודה B לציר ה-x», «המשיק והאנך נחתכים בנקודה D». With none, or several and no description that picks one, the sentence is refused and says how to name it.
+- A perpendicular named in full inside another sentence — its point and its line, «E על האנך מ-A ל-BC», «האנך מ-A ל-BC והתיכון מ-B נפגשים בנקודה E» — is drawn when the figure has none: the foot (named by the tool) and the piece. One already drawn (also as «הגובה מ-A» or «AD גובה לצלע BC») is the one meant, never drawn again. «E נקודת החיתוך של האנך מ-A ל-BC עם הישר BC» names the foot E ([ADR-AG-229](06c-decisions-analytic.md#adr-ag-229), #1727).
 - «הצלע CB מקבילה לציר ה-x, וחותכת את ציר ה-y בנקודה E» is both statements about CB.
 - «הקטע EF מקביל ל-DA» (and «EF ∥ DA», «הצלע EF מקבילה ל-DA», «הישר EF מקביל ל-DA», R143) with F not yet placed adds F, free to move along the parallel through E, until a later given places it.
 - Refused by name: a perpendicular from a point of the line itself, a foot that is its own point, a line the sentence does not name readably.
@@ -2331,7 +2332,7 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - The same lines work in «E נקודת החיתוך של X עם Y», «X חותך את Y בנקודה E» and «E על X».
 - Parallel lines are refused as impossible. The same line written twice is refused. Two named lines that share a letter («הישר AB והישר BC») are refused, because they meet at that point.
 - An altitude or median named only by its side («הגובה לצלע BC») is not read in these sentences.
-- A perpendicular «האנך מ-P ל-X» must already be drawn (R141).
+- A perpendicular «האנך מ-P ל-X» is drawn if the figure has none, and is the drawn one otherwise (R141, #1727).
 
 **R168 — what the student stated about a length, an angle, an area or an arc is written on the figure, as in the 2-D tool**
 ([ADR-AG-225](06c-decisions-analytic.md#adr-ag-225), [#1714](https://github.com/dcodish/geo_builder/issues/1714); operator ruling 2026-10-02: analytic gives 2-D's experience for plane geometry; the canvas shows the inputs, the panel the computed values — ADR-W-047).
@@ -2352,3 +2353,12 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - A row whose value takes exactly two values across the configurations the givens allow lists both, joined by «או». This applies to every row: a coordinate pair, a parameter, a slope and its angle with the x-axis, a length, and an equation. Example: 9/4 typed as the exam prints it (without the figure note) shows «שיפוע AB: -2 או 2».
 - More than two values, or a value that moves continuously, shows «—». A point with four possible positions shows «—».
 - A given that settles the choice («A משמאל ל-O …») turns the row back into one value («2»).
+
+**R170 — a trig given is written as its angle and indicates a slope; sin is a choice between two angles**
+([ADR-AG-227](06c-decisions-analytic.md#adr-ag-227), [#1719](https://github.com/dcodish/geo_builder/issues/1719); operator ruling 2026-10-03: *"translate it to an angle and write it down"*).
+
+- «tan∢BAO = 2», «cos∢ABC = 0.5», «sin∢ABC = 0.5» are written as the ANGLE they fix: on the canvas at the angle's arc («63.43°», never «tan=2»), and in the data panel under «זוויות» («∢BAO = 63.43°»).
+- When one arm of the angle is an axis or a line of known direction, the given also fixes the other arm's slope, shown in the slope row with up to two values (R169). Corpus 9/4 typed as printed gives «-2 או 2»; with its figure note it gives «2».
+- «sin∢ABC = 0.5» (also «סינוס הזווית ABC הוא 0.5», "the sine of angle ABC is 0.5") fits two angles, 30° and 150°. The first figure draws one, «הציגו תצורה אחרת» moves to the other, and the panel lists both («30° או 150°») until a given settles it («∢ABC > 90» leaves 150°).
+- «sin∢ABC = 1» is the right angle. A sine greater than 1 or less than −1 is refused, naming the line.
+- A choice the givens leave open is never changed silently in favour of a better-looking drawing: the drawing shown belongs to the option the configuration took.

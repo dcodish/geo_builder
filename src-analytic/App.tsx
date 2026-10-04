@@ -1683,6 +1683,21 @@ export function App() {
                 }),
               },
               {
+                key: 'angles',
+                title: t('secAngles'),
+                dir: 'ltr',
+                /**
+                 * A TRIG GIVEN IS WRITTEN AS ITS ANGLE (#1719, ADR-AG-227; operator ruling 2026-10-03: *"translate it to an
+                 * angle and write it down"*). «tan∢BAO = 2» → «∢BAO = 63.43°»; a sine's two angles «30° או 150°» until a
+                 * given settles them — through the panel's one value gate (ADR-AG-226).
+                 */
+                rows: knows.angles.map(({ at, k }) => {
+                  const name = `∢${at.a}${at.v}${at.b}`;
+                  const shown = valueText(k, angleText);
+                  return <span key={name}><ValueRow text={`${name} = ${shown ?? (!k.known && k.pending ? checking : '—')}`} /></span>;
+                }),
+              },
+              {
                 key: 'slopes',
                 title: t('secSlopes'),
                 dir: 'ltr',

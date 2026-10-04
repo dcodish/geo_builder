@@ -64,7 +64,7 @@ describe('#1289 — freedom in the panel means something in the panel is unknown
   }, 600_000);
 
   it('the predicate FIRES on the #1282 state: every value known, freedom reported', () => {
-    const allKnown = { params: [], points: [{ id: 'A', x: { known: true as const, value: 1 }, y: { known: true as const, value: 2 } }], curves: [] };
+    const allKnown = { params: [], points: [{ id: 'A', x: { known: true as const, value: 1 }, y: { known: true as const, value: 2 } }], curves: [], angles: [] };
     expect(panelShowsUnknown(allKnown)).toBe(false);
     expect(panelShowsUnknown({ ...allKnown, points: [{ id: 'A', x: { known: false as const }, y: { known: true as const, value: 2 } }] })).toBe(true);
   });

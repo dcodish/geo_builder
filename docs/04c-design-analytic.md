@@ -2318,7 +2318,14 @@ No new constraint kind and no new solver: every form lowers to the `length-eq` t
 
 - **`meetFrame`** reads «<subject> נפגשים/נחתכים בנקודה E». It runs before `parsePerpendicular` in the rule chain. It tries every join in the subject (the clitic «ו» now also before ח ג ת), left to right. Each split goes through the canonical crossing «E נקודת החיתוך של X עם Y», and the first split that parses wins. An owned refusal is the sentence's own; no reading at all is `null`, for the rules after it.
 - **`lineObjectOperand`** reads a line-object noun phrase through `parseClause`, the same rule that reads it as a sentence. It puts the point on the line that sentence built, using one table: `bisects` → `p`; `cevian-of` → apex–foot; a piece ending at a derived point → that piece's line; `line-at` → `on-curve`.
-- **`incidenceOn`** returns it as `{ t: 'object', facts }`, after the tangent and the contextual «האנך» (ADR-AG-207's reference rule; question #1727).
+- **`incidenceOn`** returns it as `{ t: 'object', facts }`, after the tangent and «האנך».
+- **«האנך» named in full builds when absent** ([ADR-AG-229](06c-decisions-analytic.md#adr-ag-229), #1727, amending ADR-AG-207):
+  - `perpendicularRef` gives `on-kind perpendicular` a `foot.mint`, the foot's tool placeholder;
+  - M1's arm counts the matching perpendiculars: a `foot` derived the same way, or an altitude with a student-named foot (AD ⟂ BC, D on BC);
+  - one → the reference, and the unused letter is dropped by `derive`;
+  - none → it builds the derived foot and the piece, then the point on it;
+  - several → `ambiguous-shape`.
+  - A perpendicular crossed with its own line lowers to the named foot («E רגל האנך …»), in `parseIntersectionPlain`.
 - **`parseIntersectionPlain`** lowers it like a contextual operand: declare, each side's facts, `crossing-distinct`. Two operands with the same incidence are `repeated-vertex`.
 - **The point-on sentence** lowers an object operand to the declare and its facts.
 
@@ -2336,5 +2343,12 @@ No new constraint kind and no new solver: every form lowers to the `length-eq` t
 - **The gate.** `knownValues(c, read, size, { fillPool? })` in `engine/evaluate.ts` answers each row in a fixed order: known (every component invariant, the `isKnowledge` test); pending; `options` (`knownOptions` with at most `MAX_LISTED_VALUES = 2` members); or open. `knownValue` is the scalar form, returning `Knowledge` with `options`. `knownCurveOptions` reads a curve's coefficients as ONE vector.
 - **The rows.** `panelKnowledge` (parameters, curves), `segmentKnowledge` (slopes, lengths), `lineAngleOf`, `pointText` and `scalarText` all ask the gate. `valueText` (`app/panelRows.ts`) is the one formatter: the value, or two options in ascending order joined by «או».
 - **Cost.** On a deferred, incomplete pool the gate does not fill the pool. It reads the evaluated figures: more than two values is open, anything else is pending until the idle loop completes the pool. Only `pointText` passes `fillPool: true`, the walk #1473 B′ grandfathered.
+
+## A trig given is an angle; sin is a choice between two roots ([ADR-AG-227](06c-decisions-analytic.md#adr-ag-227), #1719)
+
+- **sin.** `sineAngle(at, value)` (`engine/solve.ts`) is a constraint `choice` of two `angle` constraints with `measure: 'sin'`, the second `obtuse`. Each has one root (θ − asin|v|, or θ − (180° − asin|v|)). |v| > 1 keeps `sin θ − v`, which is never zero, so the line is refused as `unsatisfiable`. ±1 has no choice. The parser's trig head reads sin / sine / סינוס; `vertex-angle` builds the same choice.
+- **The choice stays put.** `drawableAt` compares `choiceOptions(c, choiceSeed)` for its preference walk: once the first figure is valid, a candidate that took other options is skipped, so a narrow option is drawn rather than walked away from.
+- **Which option is drawn.** `derive` hands `statedMeasures` a `resolve` that picks the first option that holds on the drawn figure (`holdsOn`), so a label never describes an option the figure did not take.
+- **The panel.** `trigAngles(constraints)` lists each trig-stated angle. `panelKnowledge.angles` reads its measured value through `knownValue`, and `App.tsx` renders the «זוויות» section with `valueText` + `angleText`.
 
 - **Placement.** `statedScene` in `render/scene.ts` draws an 18 px arc and a 10 px knee shrunk into a short corner by `markFitScale`, and turns every value into a `LabelRequest`: an angle's value outside its arc along the bisector, an area's «S=…» on its centroid, an arc's value on the minor arc stepping inward. They are placed in ONE `placeSceneLabels` call with the stated lengths (#1717's collision-avoiding rule; `placeLengthLabels` is its adapter), so no value lands on another. A value bound to a mark carries BOUNDED candidates (ADR-AG-228, #1733): an angle's within 2.5 arc radii of its vertex (bisector, ±25°/±50° inside the span, then the reflex side), an area's inside its ring, an arc's in its band; angle values are placed first so lengths yield to them, an angle value may cross its own arms, and with nothing clear it keeps the first spot that covers no point label. `render/Figure.tsx` writes them as it writes the lengths and paints the marks in 2-D's measure blue.

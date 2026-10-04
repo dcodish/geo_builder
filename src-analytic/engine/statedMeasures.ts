@@ -29,7 +29,7 @@
  */
 import { exprText, evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { isTermPlaceholder, type LengthExpr } from './lengths';
-import { resolveChoices, type Constraint, type Direction } from './solve';
+import type { Constraint, Direction } from './solve';
 import type { Construction, Id } from './types';
 
 /** A stated value, as the renderer should write it: a NUMBER the givens fix, or the student's own TEXT. */
@@ -118,14 +118,14 @@ const segKey = (a: Id, b: Id): string => [a, b].sort().join('|');
 const angKey = (v: Id, a: Id, b: Id): string => `${v}:${[a, b].sort().join('|')}`;
 
 /**
- * Read the stated measures off a construction. `origin(at)` is the source of constraint `at`; `choiceSeed` is the
- * seed this configuration's discrete choices were resolved at (`Figure.choiceSeed`), so a resolved noun choice is
- * shown where the figure actually built it.
+ * Read the stated measures off a construction. `origin(at)` is the source of constraint `at`; `resolve` answers which
+ * option of a discrete `choice` THIS configuration took (read off the drawn figure, #1719), so a resolved choice — a
+ * right triangle's seat, a sine's acute or obtuse angle — is shown where the figure actually built it.
  */
 export function statedMeasures(
   c: Construction,
   origin: (at: number) => ConstraintOrigin | undefined,
-  choiceSeed: number,
+  resolve: (k: Extract<Constraint, { t: 'choice' }>) => readonly Constraint[],
 ): StatedMeasures {
   const env = valuedSymbols(c.constraints);
   /** The student's value: a number when nothing in it is free, else their own text. */
@@ -175,7 +175,14 @@ export function statedMeasures(
               valueOf(k.value, (t) => { const d = (Math.atan(t) * 180) / Math.PI; return d < 0 ? d + 180 : d; })
             : k.measure === 'cos'
               ? valueOf(k.value, (x) => (Math.abs(x) <= 1 ? (Math.acos(x) * 180) / Math.PI : NaN))
-              : valueOf(k.value);
+              : k.measure === 'sin'
+                ? // sin (ADR-AG-227): THIS configuration's option of the choice — asin, or 180° − asin when obtuse
+                  valueOf(k.value, (x) => {
+                    if (Math.abs(x) > 1) return NaN;
+                    const d = (Math.asin(Math.abs(x)) * 180) / Math.PI;
+                    return k.obtuse ? 180 - d : d;
+                  })
+                : valueOf(k.value);
         // A trig given whose value is still a letter is written as the student wrote it, measure and all.
         const shown: StatedValue = 'text' in value && k.measure ? { text: `${k.measure}=${value.text}` } : value;
         // A stated 90° is a right angle, drawn as the knee — never an arc labelled «90°» (2-D's rule).
@@ -226,7 +233,7 @@ export function statedMeasures(
     if (from === undefined) return;
     if (k.t === 'choice') {
       // The configuration's OWN option — what the figure drew — whoever opened the choice.
-      resolveChoices([k], choiceSeed).forEach(read);
+      resolve(k).forEach(read);
       return;
     }
     if (from === 'statement') read(k);

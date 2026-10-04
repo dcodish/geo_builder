@@ -38,6 +38,12 @@ export type Id = string;
 export interface PerpRef {
   from: Id;
   onto?: FootLine;
+  /**
+   * The tool letter of the foot, when the perpendicular is named IN FULL (its point and its line): the figure has no
+   * such perpendicular yet, so the reference BUILDS it with this foot (#1727, ADR-AG-229). One already drawn is still
+   * the one referred to, and the letter then names nothing (`derive` drops a tool letter the fold did not create).
+   */
+  mint?: Id;
 }
 
 // ---------------------------------------------------------------------------
@@ -251,7 +257,7 @@ export type Fact =
       t: 'vertex-angle';
       left: AngleName;
       /** `measure` (#1621, ADR-AG-215): «tan∢A = 2» — the `angle` constraint's measure, carried to it unchanged. */
-      rhs: { t: 'value'; value: Expr; measure?: 'tan' | 'cos' } | { t: 'angle'; of: AngleName; k: Expr };
+      rhs: { t: 'value'; value: Expr; measure?: 'tan' | 'cos' | 'sin' } | { t: 'angle'; of: AngleName; k: Expr };
       /** «A = 40» — no angle noun (#1622, ADR-AG-218): a letter that is no point of the figure is not understood, not refused. */
       bare?: true;
     })

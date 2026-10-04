@@ -203,13 +203,17 @@ describe('«האנך» as a reference — the perpendicular the figure drew', ()
     }
   });
 
-  it('none, several, or a description that matches none — refused by name (the «המשיק» rule)', () => {
+  // #1727 (ADR-AG-229, operator ruling 2026-10-03): a perpendicular named IN FULL that matches none is BUILT, not refused
+  // — «E על האנך מ-C ל-AB» beside the perpendicular from A draws the one from C. Bare «האנך» still refers.
+  it('none or several — refused by name (the «המשיק» rule); a full description that matches none is built (#1727)', () => {
     expect(derive(['משולש ABC', 'E על האנך'], 0).faults[0]).toMatchObject({ code: 'ambiguous-shape', host: { kind: 'perpendicular', found: 0 } });
     expect(derive(['משולש ABC', 'האנך מ-A ל-BC', 'האנך מ-B ל-AC', 'E על האנך'], 0).faults[0]).toMatchObject({
       code: 'ambiguous-shape',
       host: { kind: 'perpendicular', found: 2 },
     });
-    expect(derive(['משולש ABC', 'האנך מ-A ל-BC', 'E על האנך מ-C ל-AB'], 0).faults[0]).toMatchObject({ code: 'ambiguous-shape' });
+    const built = clean(derive(['משולש ABC', 'האנך מ-A ל-BC', 'E על האנך מ-C ל-AB'], 0));
+    expect(built.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'E', 'G', 'H']);
+    expect(built.figure.segments.map((s) => s.id).filter((id) => id.startsWith('seg-')).sort()).toEqual(['seg-AH', 'seg-CG']);
     // …and a description picks one of several
     const d = clean(derive(['משולש ABC', 'האנך מ-A ל-BC', 'האנך מ-B ל-AC', 'E על האנך מ-B ל-AC'], 0));
     const [a, c, b, e] = ['A', 'C', 'B', 'E'].map((id) => pt(d, id));

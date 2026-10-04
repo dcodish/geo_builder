@@ -20,7 +20,7 @@
 import type { DerivedRule, FootLine } from '../engine/derived';
 import { cevianFacts, toolFootFacts, type CevianRole } from '../engine/cevian';
 import { toolPoint, type ToolPointRole } from '../engine/toolLetters';
-import { isAngleRef, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
+import { isAngleRef, sineAngle, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { evalExpr, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS, directionSymbol, mentionsPlane, radiusSymbol, toolSymbol } from '../engine/carriers';
 
@@ -1521,6 +1521,29 @@ function parseIntersectionPlain(
    */
   if (left.t === 'kind' || right.t === 'kind' || left.t === 'object' || right.t === 'object') {
     if (ordinalOf(line) !== null) return refuse('bad-operand', line);
+    /**
+     * A PERPENDICULAR CROSSED WITH ITS OWN LINE meets it at its FOOT (#1727, ADR-AG-229): «E נקודת החיתוך של האנך מ-A
+     * ל-BC עם הישר BC», «האנך מ-A ל-BC והישר BC נפגשים בנקודה E» say «E רגל האנך מ-A ל-BC». Lowered as that sentence —
+     * the foot named E, and the piece drawn — so a perpendicular already drawn with its own foot is the #1153 refusal
+     * («already-named», naming the foot), never a second letter on one point.
+     */
+    const ownLine = (p: Constraint | KindOperand | ObjectOperand, q: Constraint | KindOperand | ObjectOperand): Fact[] | null => {
+      if (p.t !== 'kind' || p.kind !== 'perpendicular' || !p.foot?.onto || !p.foot.mint) return null;
+      const onto = p.foot.onto;
+      const same =
+        onto.k === 'points'
+          ? q.t === 'on-line-2pt' && ((q.a === onto.a && q.b === onto.b) || (q.a === onto.b && q.b === onto.a))
+          : onto.k === 'axis'
+            ? q.t === 'on-line' && (onto.axis === 'x' ? q.a === 0 && q.c === 0 : q.b === 0 && q.c === 0)
+            : q.t === 'on-curve' && q.curve === onto.id;
+      if (!same || id === p.foot.from) return null;
+      return [
+        { t: 'derived', id, rule: { t: 'foot', from: p.foot.from, onto }, src: line },
+        { t: 'segment', id: segmentId(p.foot.from, id), a: p.foot.from, b: id, ref: true, src: line },
+      ];
+    };
+    const foot = ownLine(left, right) ?? ownLine(right, left);
+    if (foot) return made([...foot, ...axisPart]);
     const side = (k: Constraint | KindOperand | ObjectOperand): Fact[] =>
       k.t === 'object'
         ? k.facts.map((f) => ({ ...f, src: line }))
@@ -5450,10 +5473,14 @@ function parseAngleLabel(line: string): RuleOutcome {
  * is 2". The angle is named exactly as the numeric-angle rule names it (one letter or three), so it lowers to
  * the SAME `angle` constraint — or `vertex-angle` fact — with its `measure`.
  *
- * sin is deliberately absent: sin θ = sin(180° − θ), so «sin∢ABC = 3/4» leaves a discrete choice (acute or
- * obtuse) this measure does not carry. It stays unread (`not-handled`) rather than drawn at one of the two.
+ * sin (#1719, ADR-AG-227; operator ruling 2026-10-03): sin θ = sin(180° − θ), so «sin∢ABC = 3/4» states the
+ * angle up to a discrete choice, acute or obtuse — built as `sineAngle`'s choice between the two roots, cycled by
+ * «הציגו תצורה אחרת», never drawn at one of the two silently.
  */
-const MEASURE_FN: Readonly<Record<string, 'tan' | 'cos'>> = {
+const MEASURE_FN: Readonly<Record<string, 'tan' | 'cos' | 'sin'>> = {
+  sin: 'sin',
+  sine: 'sin',
+  סינוס: 'sin',
   tan: 'tan',
   tg: 'tan',
   tangent: 'tan',
@@ -5463,7 +5490,7 @@ const MEASURE_FN: Readonly<Record<string, 'tan' | 'cos'>> = {
   קוסינוס: 'cos',
 };
 /** The function word, in either language, with its optional «של» / "of (the)". One head, so «tan of angle …» is read. */
-const MEASURE_HEAD = new RegExp(`^${HE_GIVEN}(?:the\\s+)?(tan|tg|cos|tangent|cosine|טנגנס|קוסינוס)(?![A-Za-z])\\s*(?:(?:של|of)\\s+)?(?:the\\s+)?`);
+const MEASURE_HEAD = new RegExp(`^${HE_GIVEN}(?:the\\s+)?(tan|tg|cos|sin|tangent|cosine|sine|טנגנס|קוסינוס|סינוס)(?![A-Za-z])\\s*(?:(?:של|of)\\s+)?(?:the\\s+)?`);
 const MEASURE_ANGLE_HE = new RegExp(`^(?:${ANGLE_NOUN_HE})?${ANGLE_LETTERS}${HE_IS}\\s*(?:=\\s*)?(.+)$`);
 const MEASURE_ANGLE_EN = new RegExp(`^(?:${ANGLE_NOUN_EN})?${ANGLE_LETTERS}\\s*(?:is\\s+|equals?\\s+)?(?:=\\s*)?(.+)$`);
 
@@ -5484,7 +5511,8 @@ function parseAngleMeasure(line: string): RuleOutcome {
   if (!claimable(valueSrc)) return null;
   const value = valueExpr(valueSrc);
   if (!value) return refuse('bad-equation', valueSrc);
-  if (isAngleRef(left)) return made([{ t: 'constraint', k: { t: 'angle', at: left, value, measure }, src: line }]);
+  // sin (ADR-AG-227): the choice between its two angles; tan and cos fix one.
+  if (isAngleRef(left)) return made([{ t: 'constraint', k: measure === 'sin' ? sineAngle(left, value) : { t: 'angle', at: left, value, measure }, src: line }]);
   return made([{ t: 'vertex-angle', left, rhs: { t: 'value', value, measure }, src: line }]);
 }
 
@@ -6113,7 +6141,11 @@ function perpendicularRef(text: string): KindOperand | null | 'bad' {
   if (!ontoText) return { t: 'kind', kind: 'perpendicular', foot: { from } };
   const onto = footLineOf(ontoText, { out: [], src: '' });
   if (!onto) return 'bad';
-  return { t: 'kind', kind: 'perpendicular', foot: { from, onto } };
+  // A point of the line has no perpendicular onto it (2-D's #1233, `perpendicularFacts`'s refusal).
+  // It is not built (no `mint`) and stays the reference ADR-AG-207 made of it.
+  if (onto.k === 'points' && (from === onto.a || from === onto.b)) return { t: 'kind', kind: 'perpendicular', foot: { from, onto } };
+  // Named IN FULL, it is built when the figure has none (#1727, ADR-AG-229): the foot's tool letter rides the reference.
+  return { t: 'kind', kind: 'perpendicular', foot: { from, onto, mint: toolPoint('foot', footKey(from, onto)) } };
 }
 
 /** A direction as a STABLE string, for the content-derived id above. */

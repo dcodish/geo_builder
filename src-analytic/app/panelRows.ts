@@ -1,6 +1,7 @@
 import type { Derivation } from '../engine/derive';
 import { isKnowledge, knownCurve, knownCurveOptions, knownValue, settled, type Figure, type Knowledge } from '../engine/evaluate';
 import type { NumCurve } from '../engine/types';
+import { angleAt, type AngleRef, type Constraint } from '../engine/solve';
 import { VERTICAL_TOL, verticality } from '../engine/lines';
 import { lineAngleOf } from './lineAngle';
 import { isDirectionSymbol, paramRegister, usedSymbols } from '../engine/carriers';
@@ -73,6 +74,11 @@ export interface PanelKnowledge {
   readonly params: readonly { sym: string; domain: ParamDecl['domain']; used: boolean; k: PanelKnown }[];
   /** each positional object's coordinates (ADR-AG-003 §2) */
   readonly points: readonly { id: string; x: PanelKnown; y: PanelKnown }[];
+  /**
+   * each angle a TRIG given states (#1719, ADR-AG-227) — «tan∢BAO = 2» written as the ANGLE, «∢BAO = 63.43°»; a sine's
+   * two angles listed until a given settles them («30° או 150°»), through the one value gate (ADR-AG-226)
+   */
+  readonly angles: readonly { at: AngleRef; k: PanelKnown }[];
   /** each LISTED curve, with its equation when every coefficient is invariant, else null; `pending` = not yet settled (#1473) */
   readonly curves: readonly { id: string; known: ReturnType<typeof knownCurve>; pending: boolean; options: NumCurve[] | null }[];
 }
@@ -93,6 +99,15 @@ export function panelKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): 
       x: isKnowledge(c, (f) => f.points.find((q) => q.id === p.id)?.x ?? null),
       y: isKnowledge(c, (f) => f.points.find((q) => q.id === p.id)?.y ?? null),
     })),
+    angles: trigAngles(c.constraints).map((at) => ({
+      at,
+      k: knownValue(c, (f) => {
+        const pt = (id: string) => f.points.find((q) => q.id === id) ?? null;
+        const [v, a, b] = [pt(at.v), pt(at.a), pt(at.b)];
+        const r = v && a && b ? angleAt(v, a, b) : null;
+        return r === null ? null : (r * 180) / Math.PI;
+      }),
+    })),
     curves: d.figure.curves.filter(panelListsCurve).map((cu) => {
       const s = settled(() => knownCurve(c, cu.id));
       // #1716: an equation with exactly two values across the configurations lists both, through the one gate.
@@ -100,6 +115,25 @@ export function panelKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): 
       return { id: cu.id, known: s.value, pending: s.pending, options };
     }),
   };
+}
+
+/**
+ * THE ANGLES A TRIG GIVEN STATES (#1719, ADR-AG-227) — an `angle` constraint with a `measure` (tan, cos, sin), or a
+ * sine's choice between its two roots; each angle once, whichever ray is named first.
+ */
+export function trigAngles(ks: readonly Constraint[]): AngleRef[] {
+  const out: AngleRef[] = [];
+  const seen = new Set<string>();
+  const visit = (k: Constraint): void => {
+    if (k.t === 'choice') return k.options.forEach(visit);
+    if (k.t !== 'angle' || !k.measure) return;
+    const key = `${k.at.v}:${[k.at.a, k.at.b].sort().join('')}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(k.at);
+  };
+  ks.forEach(visit);
+  return out;
 }
 
 /**

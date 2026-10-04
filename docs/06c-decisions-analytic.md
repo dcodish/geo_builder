@@ -10840,6 +10840,58 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 - `engine/evaluate.ts`: `MAX_LISTED_VALUES`, `Values`, `knownValues`, `knownValue`, `knownCurveOptions`; `Knowledge` gains `options`.
 - `app/panelRows.ts` (`valueText`, the rows); `app/pointText.ts`; `app/lineAngle.ts`; `App.tsx` (the parameter, equation, slope, angle and length rows).
 
+## ADR-AG-227 — A trig given is written down as its angle and indicates a slope; sin builds as a two-option choice; a display preference never crosses a discrete choice (#1719)
+
+**Status:** accepted · 2026-10-03 · fix-round #1721, stream R5 item 3 (PR stacked on #1716's). **Operator ruling, 2026-10-03 (T31):** *"in the analytics tool, we should both translate to an angle and treat it as an indication of a slope. in analytucs, if by any chance they will have cos or sin of an angle, translate it to an angle and right it down"*. The issue's plan: write the angle on the arc and in the panel; show the slope through #1716's up-to-two rule; build sin as a choice of θ or 180° − θ, cycled by «הציגו תצורה אחרת», with both listed until a given settles it; refuse |sin| > 1.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R170. · **Design:** [04c](04c-design-analytic.md), "A trig given is an angle; sin is a choice between two roots".
+
+**Measured at pickup** (on `feat/1716-two-values`):
+- «tan∢ABC = 2»: the canvas already wrote «63.43°» (ADR-AG-225), but no panel row stated the angle.
+- 9/4: slope AB «-2 או 2» from the exam lines and «2» with the figure note (ADR-AG-226). Plan item 2 was therefore already met by the stack, and is locked here.
+- «sin∢ABC = 0.5» and «סינוס הזווית ACB = 1/2» were `not-handled` (ADR-AG-215's "not built").
+
+**Decision.**
+
+1. **The angle in the panel.** A new «זוויות» section (`panelKnowledge.angles`, `trigAngles`) has one row per angle a TRIG given states: «∢BAO = 63.43°», «∢ABC = 60°» for «cos∢ABC = 0.5». The row reads the measured angle through the one value gate (`knownValue`, ADR-AG-226), so a sine's two angles list as «30° או 150°» until a given settles them. A degree given is the student's own number and gets no computed row.
+2. **sin is a CONSTRAINT choice between the two roots** (`sineAngle` in `engine/solve.ts`): `choice([angle sin, angle sin obtuse])`. Each option has ONE root: the residual is θ − asin|v|, or θ − (180° − asin|v|) when `obtuse`. A value outside [−1, 1] keeps the plain difference, which is never zero, so the figure is `unsatisfiable` (cos's rule) and the line is refused, naming it. A sine of ±1 has one angle, 90°, and no choice. The parser reads «sin», «sine», «סינוס» through the same head as tan/cos; the lone-vertex form goes through `vertex-angle` and builds the same choice.
+   - **Deviation from the plan's sketch, measured.** The plan named ADR-AG-222's SELECTOR `choice` (`∢ < 90` / `∢ > 90` beside one `sin θ = v` constraint). Built that way first, the solve reached the obtuse root at **0 of 8 seeds**. A selector only filters the root a descent happened to land on, and `evaluateTryingChoices` then fell back to the acute option at the same samples. The choice is between the ROOTS of an equation, which is what the constraint `choice` (#1049's, the right-triangle seat's) resolves before the solve. The ruling's substance — two options, cycled, both listed until settled — is what is built.
+3. **A display preference never crosses a discrete choice** (`drawableAt`, `choiceOptions`).
+   - With the choice in place, the obtuse option was still never DRAWN. Its 150° leaves the other two angles 30° between them, so #1174's spread preference walked to the next seed. That seed resolves every `choice` afresh and took the acute option, at every seed.
+   - The class: *a preference walk silently changes a discrete choice.* It also reaches a right triangle's seat or an obtuse triangle's vertex whenever a narrow drawing triggers the walk.
+   - The fix: once the first figure is VALID, the walk accepts only candidates that took the same options. Validity (a first figure that is not whole) still walks to any option, as before.
+   - Measured after: «sin∢ABC = 0.5» draws 30°, 150°, 30°, 150° at seeds 0–3.
+4. **The canvas writes the option the figure DREW.** `drawableAt` may draw another seed's configuration, so the seed does not say which option of a choice is on screen. The stated-measure layer now reads it off the figure: `derive` passes `resolve`, which takes the first option that holds on the drawn figure (`holdsOn`, extracted from `holdsInEveryConfiguration`'s inner test). Measured before: seed 1 drew 30° and labelled it «150°». This also makes ADR-AG-225's right-triangle knee read off the figure rather than the seed.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1719-trig-angle-slope.test.ts`, 11 tests:
+  - tan, cos and a negative tan as angles on the canvas and in the panel, at four seeds;
+  - 9/4 (∢BAO = 63.43°; slope AB «-2 או 2» / «2»);
+  - sin lowered to the two-option choice, the configurations walking BOTH angles with the canvas writing the drawn one, the panel's «30° או 150°» settled by «∢ABC > 90» to 150° at every seed;
+  - the lone-vertex Hebrew form;
+  - sin = 1 a knee, and |sin| > 1 refused.
+- **Fails before: 11 of 11** (on `feat/1716-two-values`).
+- `issue-1621-d2-angle-alias-tan.test.ts`'s "sin is NOT read" lock asserted ADR-AG-215's "not built". The operator's ruling supersedes it, and it now asserts the choice.
+- Parity (#1649):
+  - `trig-sin-1719` and `trig-sin-he-1719` build in analytic. 2-D on `main` refuses them by name (`input.trigGiven.sine-two-angles`), so each carries a 2-D gap on #1711, whose PR builds 2-D's sin as the same choice. The ratchet will ask for the gap to be removed when it lands.
+  - `trig-sin-range-1719` is refused in both.
+  - Catalog: «sin∢ABC = 0.5», «סינוס הזווית ABC הוא 0.5» (He/En).
+- Every analytic test file is green: 208 files, run in five slices after the `drawableAt` change.
+
+**Not built, said out loud.**
+- A sine still written as a letter («sin∢ABC = k») builds the choice, and the canvas writes «sin=k» until the letter is valued.
+- An angle "of known direction" other than an axis indicates a slope the same way: the slope row reads it through the gate whenever the configuration fixes it up to two. Nothing direction-specific was added, because the gate already answers it.
+
+**Sibling check.** 2-D's sin is #1711 (stream R3 of this round, its own PR), built as the same two-angle choice. 3-D reads no trig given (#1679). The `drawableAt` preference class is analytic's own walk. 2-D's `firstSatisfyingSeed` spread preference is a separate mechanism, not measured here and reported for the integrator.
+
+**Consequences.**
+- `engine/solve.ts`: `sineAngle`, `measure: 'sin'`, `obtuse`, the residual.
+- `engine/evaluate.ts`: `holdsOn`, `choiceOptions`, the `drawableAt` guard.
+- `engine/statedMeasures.ts` (`resolve`, the sin value); `engine/derive.ts`; `engine/apply.ts` (`vertex-angle`); `engine/types.ts`.
+- `parser/parseAnalytic.ts`; `parser/catalogAnalytic.ts`.
+- `app/panelRows.ts` (`trigAngles`, `angles`); `App.tsx` (the «זוויות» section); `i18n/index.ts` (`secAngles`).
+- `shell/__tests__/fixtures/geo-input-parity.ts`.
+
 ## ADR-AG-228 — A value label stays bound to its mark: bounded candidates, an angle value placed first, its own arms crossable (#1733)
 
 **Status:** accepted · 2026-10-03 · fix-round #1721 (PR #1724, then restacked into #1731 and #1732). It **amends ADR-AG-225 amendment 1** (the single label placement). Operator, playing round #1721 T23 (9/4, :5182): *"the angle location is wrong."* Approved for fixing at once ("fix 1733 now").
@@ -10878,3 +10930,62 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Not built.** The rotation candidates are fixed angles (±25°, ±50°), as planned. A vertex crowded on every side keeps the first spot that covers no point label, and may overlap a length label or a line.
 
 **Sibling check.** 2-D's value labels take a fixed offset per rank on the bisector (`angleValueOffset`, `rank`) and do not avoid other labels. Analytic now avoids them, inside a bound. 3-D's arcs are its own (ADR-3D-222).
+
+## ADR-AG-229 — A perpendicular named in full is built when the figure has none; one already drawn is referred to (#1727, amends ADR-AG-207)
+
+**Date:** 2026-10-03 · **Status:** accepted · PR for #1727
+
+**Requirements:** [02c](02c-requirements-analytic.md) R141 and R167 amended. · **Design:** [04c](04c-design-analytic.md) — the ADR-AG-224 section's `incidenceOn` bullet, and a new bullet on `on-kind perpendicular`. · **LADDER stage:** parse (`perpendicularRef`, `parseIntersectionPlain`) and M1 (the `on-kind` perpendicular arm). No new object kind, no new derived rule.
+
+**Ruling.** On #1727 the operator ruled, 2026-10-03: *"1727 - yes"*. A fully described «האנך מ-P ל-X» (point AND line named) builds the perpendicular from P to X, with its foot, when no such perpendicular is drawn. That includes its use as an operand of the meet frame (ADR-AG-224). A perpendicular already drawn with that description is still the one referred to, never duplicated. This amends ADR-AG-207 decision 5 ("a reference, never a construction").
+
+**Measured on 4fbb3293 before the change** (through `decideSubmit`):
+
+| sequence | before | after |
+|---|---|---|
+| «משולש ABC» · «האנך מ-A ל-BC והתיכון מ-B נפגשים בנקודה E» | `ambiguous-shape` (found 0) | builds: foot H, AH drawn, E on AH and on the median |
+| «משולש ABC» · «E על האנך מ-A ל-BC» | `ambiguous-shape` | builds: H, AH, E on AH |
+| «B(1,14)» · «E על האנך מהנקודה B לציר ה-x» | `ambiguous-shape` | builds: H(1,0), E at x = 1 |
+| corpus 5/5's «האנך מהנקודה B לציר ה-x» (the sentence) | builds H | unchanged |
+| … «האנך מ-A ל-BC» drawn · «E על האנך מ-A ל-BC» | builds on H | unchanged: no second foot, no second piece |
+| «הגובה מ-A» · «E על האנך מ-A ל-BC» | builds on the altitude's H | unchanged |
+| «AD גובה לצלע BC» · «E על האנך מ-A ל-BC» | `ambiguous-shape` (a named-foot altitude was not a perpendicular to M1) | builds on AD, with no new point |
+| «E נקודת החיתוך של האנך מ-A ל-BC עם הישר BC» | `ambiguous-shape` | E is the foot (see 3) |
+| «E על האנך» / «E על האנך מ-B» | `ambiguous-shape` | unchanged |
+
+**Decision.**
+1. **The reference carries a way to build itself.** When the perpendicular is named in full, `perpendicularRef` still lowers to `on-kind perpendicular { foot: { from, onto } }`, and the foot reference now carries `mint`. `mint` is the tool placeholder of its foot, `toolPoint('foot', footKey(from, onto))`, the same key the sentence «האנך מ-A ל-BC» uses. `derive`'s `resolveToolLetters` letters it with the other tool letters, in list order.
+2. **M1 decides, because only the figure knows whether it exists** (`on-kind`, apply.ts). The arm counts the perpendiculars that match the description:
+   - a `foot` derived the same way (the sentence, or an altitude's tool foot, ADR-AG-211);
+   - an altitude whose foot the student named, «AD גובה לצלע BC». That is the constraint AD ⟂ BC with D on BC, which was not a perpendicular to M1 before.
+
+   What M1 does with the count:
+   - **one** → it is the one referred to (as before), and the minted letter names nothing (`derive` drops a tool letter the fold did not create, #1263's rule);
+   - **none**, named in full → the perpendicular is BUILT, exactly as its own sentence builds it: the derived foot and the piece from the point to it, then the point is put on that line;
+   - **several, or none for a partial description** → `ambiguous-shape`, as before.
+3. **A perpendicular crossed with its own line meets it at its foot.** «E נקודת החיתוך של האנך מ-A ל-BC עם הישר BC» and «האנך מ-A ל-BC והישר BC נפגשים בנקודה E» now say «E רגל האנך מ-A ל-BC». They are lowered as that sentence: the foot named E, and the piece drawn. Building first and then crossing would have put two letters on one point (the #1113 family).
+   - With the perpendicular already drawn, the sentence is the #1153 `already-named` refusal, naming the foot.
+   - The axis line and a named curve are matched the same way.
+4. **A perpendicular from a point of its own line onto it** («האנך מ-A ל-AB») is not built. It keeps the reference reading and its refusal.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1727-perpendicular-builds.test.ts`, 13 tests. **Fails before: 7 of 13.** The 6 controls are the reference cases (drawn before, a named foot, the altitude), the cases that stay references, and corpus 5/5. The tests cover:
+  - built from nothing at 8 seeds: H equals `footOn(A, B, C)`, AH is the only piece, E ⟂ BC through A, H announced;
+  - the meet frame with a median, and two undrawn perpendiculars meeting at the `orthocentre`, both at 8 seeds;
+  - onto the x-axis;
+  - "never duplicated" for four drawn forms: no new point and no new letter announced;
+  - the foot case in both spellings, and its refusal after the perpendicular is drawn;
+  - bare «האנך» and «האנך מ-B», the degenerate case, and the sentence form.
+- **The ADR-AG-207 lock is updated to the ruling.** In `issue-1620-perpendiculars.test.ts`, «E על האנך מ-C ל-AB» beside the perpendicular from A now builds the one from C (points A B C E G H, pieces AH and CG). It was `ambiguous-shape`. The none and several cases keep their refusals.
+- **The ADR-AG-224 lock is updated.** `issue-1715-meet-frame.test.ts`'s "an undrawn «האנך מ-C ל-AB» asks" now records.
+- **Gate:** `npx vitest run src-analytic shell src/__tests__/geo-input-parity.test.ts src3d/__tests__/geo-input-parity.test.ts` gives 265 files and 5,293 tests, green. `tsc -b` is clean.
+
+**Parity.** No row changes verdict. `meet-perpendicular-drawn-1715` draws the perpendicular first, and `an-1620-perp-03` refers to one drawn. 2-D leaves the operand forms `not-handled` (#1677). Its own sentence «האנך מ-C ל-AB» builds, as here.
+
+**Sibling audit.** 2-D has no operand reading of a perpendicular (recorded on #1677). 3-D has no feet (#1679).
+
+**Consequences.**
+- `engine/types.ts`: `PerpRef.mint`.
+- `parser/parseAnalytic.ts`: `perpendicularRef` and `parseIntersectionPlain`'s own-line foot.
+- `engine/apply.ts`: the `on-kind` perpendicular arm.
+- The two locks above.
