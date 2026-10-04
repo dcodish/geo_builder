@@ -938,6 +938,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'meet-perpendicular-drawn-1715', family: 'intersections', steps: ['משולש ABC', 'האנך מ-C ל-AB', 'חוצה זוית B והאנך מ-C ל-AB נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: '«האנך מ-C ל-AB» refers to the drawn perpendicular (ADR-AG-207)' },
   { id: 'meet-same-line-twice-1715', family: 'intersections', steps: ['משולש ABC', 'חוצה זוית B וחוצה הזווית B נפגשים בנקודה E'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }], note: 'one line twice names no point; 2-D builds a point on it' },
   { id: 'meet-parallel-1715', family: 'intersections', steps: ['מלבן ABCD', 'הישר AB והישר CD נפגשים בנקודה E'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679' }] },
+  // ── #1607 (ADR-574): a role noun before a length keeps the role AND the length ──
+  { id: 'role-length-diagonal-1607', family: 'lengths', steps: ['מקבילית ABCD', 'האלכסון AC = 8'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1679' }] },
+  { id: 'role-length-median-1607', family: 'lengths', steps: ['משולש ABC', 'התיכון AM = 5'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1679' }] },
+  { id: 'role-length-altitude-1607', family: 'lengths', steps: ['משולש ABC', 'הגובה AH הוא 5'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1679' }] },
+  { id: 'role-length-bound-1607', family: 'lengths', steps: ['משולש ABC', 'התיכון AM גדול מ-5'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1679' }], note: 'a bound, never |AM| = 5 (#1248)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
