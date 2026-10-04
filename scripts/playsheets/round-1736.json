@@ -1,0 +1,648 @@
+{
+ "name": "round-1736",
+ "title": "סבב תיקונים #1736 — 2026-10-04",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "אנליטית (#1609): «A מפגש הישרים 1 ו-2» — מפגש של שני ישרים",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון הישר 1: 2x-y+8=0",
+    "משוואת ישר 2 היא x+3y-10=0",
+    "A מפגש הישרים 1 ו-2"
+   ],
+   "lookFor": "כל השורות ירוקות; A = (-2, 4)",
+   "before": "«לא הבנתי» בשורה השלישית",
+   "expect": [
+    "(-2, 4)"
+   ]
+  },
+  {
+   "id": "T2",
+   "title": "אנליטית (#1609): «נקודת המפגש של הישר l1 עם הישר l2»",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון הישר l1: y=x+1",
+    "נתון הישר l2: y=-x+5",
+    "A היא נקודת המפגש של הישר l1 עם הישר l2"
+   ],
+   "lookFor": "כל השורות ירוקות; A = (2, 3)",
+   "before": "«לא הבנתי»",
+   "expect": [
+    "(2, 3)"
+   ]
+  },
+  {
+   "id": "T3",
+   "title": "אנליטית (#1609): «M מפגש AC ו-BD» במרובע",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מרובע ABCD",
+    "M מפגש AC ו-BD"
+   ],
+   "lookFor": "שתי השורות ירוקות; M במפגש האלכסונים",
+   "before": "«לא הבנתי» (בדו-ממד זה עבד)"
+  },
+  {
+   "id": "T4",
+   "title": "אנליטית (#1609): ישרים מקבילים אינם נפגשים (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון הישר l1: y=2",
+    "נתון הישר l2: y=5",
+    "A מפגש הישרים l1 ו-l2"
+   ],
+   "lookFor": "השורה השלישית נדחית — הישרים מקבילים",
+   "before": "«לא הבנתי»",
+   "expectRefusal": "לא נמצאה תצורה"
+  },
+  {
+   "id": "T5",
+   "title": "מרחב (#1608): «נקודה E במישור ABC» בלי פועל",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "נקודה E במישור ABC"
+   ],
+   "lookFor": "שתי השורות ירוקות; E על המישור ABC",
+   "before": "«לא זוהה»"
+  },
+  {
+   "id": "T6",
+   "title": "מרחב (#1608): נקודה על הבסיס ונקודה על פאה",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "פירמידה SABCD",
+    "E במישור ABCD",
+    "נקודה F בפאה SBC"
+   ],
+   "lookFor": "כל השורות ירוקות; E על הבסיס, F על הפאה SBC",
+   "before": "«לא זוהה» בשתי השורות"
+  },
+  {
+   "id": "T7",
+   "title": "מרחב (#1608): ישר במישור — נכון",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AC במישור ABCD"
+   ],
+   "lookFor": "שתי השורות ירוקות",
+   "before": "«לא זוהה»"
+  },
+  {
+   "id": "T8",
+   "title": "מרחב (#1608): ישר שאינו במישור (סירוב)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AC' במישור ABCD"
+   ],
+   "lookFor": "השורה השנייה נדחית — הטענה אינה מתקיימת",
+   "before": "«לא זוהה»",
+   "expectRefusal": "הטענה לא מתקיימת"
+  },
+  {
+   "id": "T9",
+   "title": "הנדסת המישור (#1607): «האלכסון AC = 8»",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מקבילית ABCD",
+    "האלכסון AC = 8"
+   ],
+   "lookFor": "שתי השורות ירוקות; האלכסון AC מצויר ואורכו 8",
+   "before": "נשלח למודל בתשלום (המספר 8 נעלם)"
+  },
+  {
+   "id": "T10",
+   "title": "הנדסת המישור (#1607): «התיכון AM הוא 5»",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "התיכון AM הוא 5"
+   ],
+   "lookFor": "שתי השורות ירוקות; M אמצע BC ו-AM = 5",
+   "before": "נשלח למודל בתשלום"
+  },
+  {
+   "id": "T11",
+   "title": "הנדסת המישור (#1607): «הגובה AH = 5»",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "הגובה AH = 5"
+   ],
+   "lookFor": "שתי השורות ירוקות; H רגל הגובה על BC ו-AH = 5",
+   "before": "נשלח למודל בתשלום"
+  },
+  {
+   "id": "T12",
+   "title": "הנדסת המישור (#1607): «האלכסון AB» במקבילית — AB צלע (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מקבילית ABCD",
+    "האלכסון AB = 8"
+   ],
+   "lookFor": "השורה השנייה נדחית: AB אינו אלכסון אלא צלע",
+   "before": "נשלח למודל בתשלום",
+   "expectRefusal": "אינו אלכסון"
+  },
+  {
+   "id": "T13",
+   "title": "הנדסת המישור (#1471): המעגל עובר דרך שלושת קודקודי המשולש",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "מעגל O",
+    "המעגל עובר דרך A, B ו-C"
+   ],
+   "lookFor": "כל השורות ירוקות; המשולש לא זז והמעגל עובר דרך שלושת הקודקודים",
+   "before": "נדחה: «הנתונים סותרים»"
+  },
+  {
+   "id": "T14",
+   "title": "הנדסת המישור (#1471): «הנקודות A, B ו-C נמצאות על המעגל»",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "מעגל O",
+    "הנקודות A, B ו-C נמצאות על המעגל"
+   ],
+   "lookFor": "כמו הקודם",
+   "before": "נדחה"
+  },
+  {
+   "id": "T15",
+   "title": "הנדסת המישור (#1471): צלע של ריבוע על מעגל",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "מעגל O",
+    "A ו-B על המעגל"
+   ],
+   "lookFor": "הריבוע שומר על גודלו ומקומו; המעגל עובר דרך A ו-B",
+   "before": "התקבל, אבל הריבוע קרס לנקודה"
+  },
+  {
+   "id": "T16",
+   "title": "הנדסת המישור (#1471): מעגל ברדיוס 2 דרך B ו-C",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "מעגל O ברדיוס 2",
+    "B ו-C על המעגל"
+   ],
+   "lookFor": "כל השורות ירוקות; BC ≤ 4 ו-B ≠ C",
+   "before": "נדחה"
+  },
+  {
+   "id": "T17",
+   "title": "הנדסת המישור (#1471): מיתר ארוך מהקוטר (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB = 10",
+    "מעגל O ברדיוס 3",
+    "A ו-B על המעגל"
+   ],
+   "lookFor": "השורה הרביעית נדחית ומזכירה את AB = 10",
+   "before": "ללא שינוי",
+   "expectRefusal": "סותר נתון קודם"
+  },
+  {
+   "id": "T18",
+   "title": "הנדסת המישור (#1411): אמצע חוזר כשמקלידים שוב את המשולש",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "M אמצע AB"
+   ],
+   "lookFor": "אחרי מחיקת שורת «משולש ABC» ב-✕ והקלדתה מחדש: כל השורות הפעילות ירוקות ו-M על AB",
+   "before": "שורת M אדומה «מסתמך על M…» ואין M"
+  },
+  {
+   "id": "T19",
+   "title": "הנדסת המישור (#1411): תיכון שורד הקלדה מחדש של המשולש",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AM תיכון"
+   ],
+   "lookFor": "מחקו את שורת המשולש ב-✕ והקלידו אותו מחדש: המשולש מתקבל; M על BC ו-AM מצויר",
+   "before": "המשולש החדש נדחה: «A is no longer available»"
+  },
+  {
+   "id": "T20",
+   "title": "הנדסת המישור (#1411): גובה שורד הקלדה מחדש",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AD גובה"
+   ],
+   "lookFor": "מחקו את שורת המשולש ב-✕ והקלידו אותו מחדש: המשולש מתקבל; D רגל הגובה על BC",
+   "before": "נדחה"
+  },
+  {
+   "id": "T21",
+   "title": "הנדסת המישור (#1411): מפגש האלכסונים שורד הקלדה מחדש של הריבוע",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "E נקודת חיתוך האלכסונים"
+   ],
+   "lookFor": "מחקו את שורת הריבוע ב-✕ והקלידו אותו מחדש: הריבוע מתקבל; E במפגש האלכסונים",
+   "before": "שורת E אדומה"
+  },
+  {
+   "id": "T22",
+   "title": "הנדסת המישור (#1411): בלי המשולש — הודעה כנה (סירוב)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "M אמצע AB"
+   ],
+   "lookFor": "מחקו את שורת המשולש ב-✕ (בלי להקליד מחדש): שורת M אומרת שהנקודות A, B לא הוגדרו ומציעה להוסיף שורה",
+   "before": "«הצעד הזה מסתמך על M…»"
+  },
+  {
+   "id": "T23",
+   "title": "הנדסת המישור (PR #1443): «גובה הטרפז 4»",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "טרפז ABCD",
+    "גובה הטרפז 4"
+   ],
+   "lookFor": "שתי השורות ירוקות; גובה מצויר בין הבסיסים ואורכו 4",
+   "before": "נשלח למודל בתשלום"
+  },
+  {
+   "id": "T24",
+   "title": "הנדסת המישור (PR #1443): «גובה הטרפז הוא 4»",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "טרפז ABCD",
+    "גובה הטרפז הוא 4"
+   ],
+   "lookFor": "כמו הקודם",
+   "before": "נשלח למודל בתשלום"
+  },
+  {
+   "id": "T25",
+   "title": "הנדסת המישור (PR #1443): «גובה המקבילית הוא 4» — הכלי שואל איזה גובה (סירוב)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "מקבילית ABCD",
+    "גובה המקבילית הוא 4"
+   ],
+   "lookFor": "השורה השנייה שואלת איזה גובה ומציעה «הגובה מ-A לצלע CD הוא 4» / «…לצלע BC הוא 4»",
+   "before": "נשלח למודל בתשלום",
+   "expectRefusal": "כמה אפשרויות"
+  },
+  {
+   "id": "T26",
+   "title": "הנדסת המישור (PR #1443): «הגובה לצלע BC הוא 4»",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "הגובה לצלע BC הוא 4"
+   ],
+   "lookFor": "שתי השורות ירוקות; גובה מ-A ואורכו 4",
+   "before": "הגובה צויר, ה-4 נעלם והשורה נשלחה למודל"
+  },
+  {
+   "id": "T27",
+   "title": "הנדסת המישור (PR #1443): «גובה הטרפז» כשאין טרפז (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "גובה הטרפז 4"
+   ],
+   "lookFor": "השורה השנייה נדחית: באיור אין טרפז",
+   "before": "נשלח למודל בתשלום",
+   "expectRefusal": "באיור אין טרפז"
+  },
+  {
+   "id": "T28",
+   "title": "אנליטית (PR #1597): שורת המעגל — מרכז ורדיוס בשתי שורות",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל שמשוואתו (x-3)^2+(y-4)^2=25"
+   ],
+   "lookFor": "בנתוני המעגל: «מרכז המעגל: (3, 4)» ובשורה נפרדת «r = 5»",
+   "before": "שורה אחת «(3, 4), r = 5»",
+   "expect": [
+    "מרכז המעגל"
+   ]
+  },
+  {
+   "id": "T29",
+   "title": "אנליטית (PR #1597): פרבולה ואליפסה עם תוויות",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "y^2=54x",
+    "x^2/25+y^2/9=1"
+   ],
+   "lookFor": "«מוקד:» / «מדריך:» לפרבולה; «a = 5, b = 3» / «מוקדים:» לאליפסה",
+   "before": "שורות פסיקים בלי תוויות",
+   "expect": [
+    "מוקד",
+    "מדריך"
+   ]
+  },
+  {
+   "id": "T30",
+   "title": "אנליטית (PR #1430): שני משיקים מנקודה",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל x^2+y^2=25",
+    "P(8,1)",
+    "מנקודה P יוצאים שני משיקים למעגל"
+   ],
+   "lookFor": "כל השורות ירוקות; PT ו-PS משיקים למעגל ב-T וב-S",
+   "before": "«לא הבנתי»"
+  },
+  {
+   "id": "T31",
+   "title": "אנליטית (PR #1430): «העבירו משיקים» — הכלי מלמד את הניסוח",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל x^2+y^2=25",
+    "P(8,1)",
+    "מהנקודה P העבירו משיקים למעגל"
+   ],
+   "lookFor": "שורת הקלט מתמלאת ב-«מהנקודה P יוצאים שני משיקים למעגל»; Enter מצייר את T ו-S",
+   "before": "«לא הבנתי»"
+  },
+  {
+   "id": "T32",
+   "title": "אנליטית (PR #1430): נקודה בתוך המעגל (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל x^2+y^2=25",
+    "P(1,1)",
+    "מנקודה P יוצא משיק למעגל"
+   ],
+   "lookFor": "השורה השלישית נדחית — אין משיק מנקודה פנימית",
+   "before": "«לא הבנתי»",
+   "expectRefusal": "לא נמצאה תצורה"
+  },
+  {
+   "id": "T33",
+   "title": "מרחב (PR #1547): «x_{B}=3» בקובייה",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5176",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "x_{B}=3"
+   ],
+   "lookFor": "שתי השורות ירוקות; בלוח B(3, ?, ?)",
+   "before": "«לא זוהה»"
+  },
+  {
+   "id": "T34",
+   "title": "מרחב (PR #1547): «שיעור ה- x של נקודה B הוא 3»",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5176",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "שיעור ה- x של נקודה B הוא 3"
+   ],
+   "lookFor": "כמו הקודם",
+   "before": "«לא זוהה»"
+  },
+  {
+   "id": "T35",
+   "title": "מרחב (PR #1547): קנבס ריק — «x_B = 3», ותצורה אחרת",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5176",
+   "path": "/3d.html",
+   "lines": [
+    "x_B = 3"
+   ],
+   "lookFor": "B מצוירת; בלוח B(3, ?, ?); «הציגו תצורה אחרת» מזיז את B רק ב-y וב-z",
+   "before": "«לא זוהה»",
+   "cycles": 1
+  },
+  {
+   "id": "T36",
+   "title": "מרחב (PR #1547): שיעור שסותר נקודה ידועה (סירוב)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5176",
+   "path": "/3d.html",
+   "lines": [
+    "B(0,7,8)",
+    "x_B = 3"
+   ],
+   "lookFor": "השורה השנייה נדחית; B נשארת (0,7,8)",
+   "before": "«לא זוהה»",
+   "expectRefusal": "הטענה לא מתקיימת"
+  },
+  {
+   "id": "T37",
+   "title": "מרחב (PR #1547): שיעור עם ערך באותיות (סירוב)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5176",
+   "path": "/3d.html",
+   "lines": [
+    "x_B = 2t"
+   ],
+   "lookFor": "נדחה: «שיעור יחיד עם ערך באותיות… עדיין לא נתמך»",
+   "before": "«לא זוהה»",
+   "expectRefusal": "עדיין לא נתמך"
+  },
+  {
+   "id": "T38",
+   "title": "מרחב (PR #1547): לשאול שיעור",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5176",
+   "path": "/3d.html",
+   "lines": [
+    "B(1, t, 2)"
+   ],
+   "lookFor": "שאלה «x_B» → 1; שאלה «y_B» → לא נקבע",
+   "before": "לא הובן",
+   "asks": [
+    "x_B",
+    "y_B"
+   ]
+  },
+  {
+   "id": "T39",
+   "title": "מרוכבים (PR #1365): «z1 = a+bi»",
+   "class": "play",
+   "product": "complex",
+   "base": "http://localhost:5177",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = a+bi"
+   ],
+   "lookFor": "התקבל; הנקודה והשורה בלוח: «z₁ = a+bi»; בתצוגה הקוטבית אין ערך",
+   "before": "נדחה: «לא הצלחתי להבין את המשפט»"
+  },
+  {
+   "id": "T40",
+   "title": "מרוכבים (PR #1365): «z = x+yi» ברביע השני",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5177",
+   "path": "/complex.html",
+   "lines": [
+    "z = x+yi",
+    "z ברביע השני"
+   ],
+   "lookFor": "שתי השורות מתקבלות; z ברביע השני גם אחרי «הציגו תצורה אחרת»",
+   "before": "השורה הראשונה נדחתה",
+   "cycles": 1
+  },
+  {
+   "id": "T41",
+   "title": "מרוכבים (PR #1365): «z1 = a+ib», ואז a = 3, b = 4",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5177",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = a+ib",
+    "a = 3",
+    "b = 4"
+   ],
+   "lookFor": "אחרי a = 3: «z₁ = 3+bi»; אחרי b = 4: «z₁ = 3+4i»",
+   "before": "השורה הראשונה נדחתה",
+   "expect": [
+    "3+4i"
+   ]
+  },
+  {
+   "id": "T42",
+   "title": "מרוכבים (PR #1365): «z1 = zi» — מציע «z1 = z*i» (סירוב)",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5177",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = zi"
+   ],
+   "lookFor": "נדחה, וההודעה מציעה «z1 = z*i»",
+   "before": "«לא הצלחתי להבין»",
+   "expectRefusal": "כתבו את הכפל במפורש"
+  },
+  {
+   "id": "T43",
+   "title": "מרוכבים (PR #1365): «z1 = pi» אינו p כפול i (סירוב)",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5177",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = pi"
+   ],
+   "lookFor": "נדחה בלי הצעה",
+   "before": "ללא שינוי",
+   "expectRefusal": "לא הצלחתי להבין את המשפט"
+  }
+ ]
+}
