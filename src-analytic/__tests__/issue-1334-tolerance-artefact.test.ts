@@ -36,9 +36,22 @@ describe('#1334 — the needle is refused at EVERY seed, never drawn green', () 
   it('the seeds that accepted the needle before (0, 2, 3) now blame the statement that completed the contradiction — «∠ABC = 90»', () => {
     for (const seed of [0, 2, 3]) {
       expect(codes(NEEDLE, seed), `seed ${seed}`).toContain('unsatisfiable@2');
-      // and the figure they hold IS a needle — the report is about a real collapse, not a false positive
-      expect(side(NEEDLE, seed, 'B', 'C') / side(NEEDLE, seed, 'A', 'B'), `seed ${seed}: |BC|/|AB|`).toBeLessThan(2e-3);
+      /*
+       * …and the figure they hold IS a needle — the report is about a real collapse, not a false positive. Judged by the
+       * product's own thinness bar (`THIN_SIN_TOL`, the trigger of the re-solve above), not a ratio fitted to the
+       * configurations one basin reached: #1492's residual cap moved seed 0's needle from |BC|/|AB| = 7.0e-4 to 2.2e-3
+       * (the baseline's own seeds 4–7 sat at 2.9e-3–6.9e-3), still a needle at a 0.13° apex.
+       */
+      const d = derive(NEEDLE, seed);
+      const ring = ['A', 'B', 'C'].map((id) => d.figure.points.find((q) => q.id === id)!);
+      expect(minCornerSin(ring), `seed ${seed}: the smallest corner's sine`).toBeLessThan(THIN_SIN_TOL);
+      expect(side(NEEDLE, seed, 'B', 'C') / side(NEEDLE, seed, 'A', 'B'), `seed ${seed}: |BC|/|AB|`).toBeLessThan(1e-2);
     }
+  });
+
+  it('EVERY seed blames «∠ABC = 90» and only it — the drop-one probe names the completing statement whatever basin the solve reached (#1492, ADR-AG-231)', () => {
+    // Before the probe the blame read the residual snapshot: «AB = AC» at seeds 1 and 5, both lines at 4, 6 and 7.
+    for (let seed = 0; seed < 8; seed++) expect(codes(NEEDLE, seed), `seed ${seed}`).toEqual(['unsatisfiable@2']);
   });
 
   it('the submit gate refuses the third line at EVERY seed — including the seeds where the solver blames «AB = AC», because a line that turns a green figure red is the line to refuse', () => {

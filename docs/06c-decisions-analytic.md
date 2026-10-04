@@ -10989,3 +10989,57 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 - `parser/parseAnalytic.ts`: `perpendicularRef` and `parseIntersectionPlain`'s own-line foot.
 - `engine/apply.ts`: the `on-kind` perpendicular arm.
 - The two locks above.
+
+## ADR-AG-231 — The `length-eq` operand normaliser is capped at the figure's span; a refusal blames the statement whose removal lets the figure solve (#1492)
+
+**Date:** 2026-10-04 · **Status:** accepted · round #1736 (bug, batch)
+
+**Requirements:** none (internal) — the honesty promise is unchanged; a refusal still names a student's sentence. · **Design:** [04c](04c-design-analytic.md), "Residuals and their scale" and "Blame is a drop-one probe, not a snapshot". · **LADDER stage:** solve (the `length-eq` residual row, `residualRows`) and report (`derive`'s `unsatisfiable` attribution). No new constraint kind.
+
+**Ruling.** Operator, 2026-09-29, on round #1510's escalation: *"1492 - full fix"* — variant C (the operand normaliser capped at 1× the figure's span), root-order flips accepted as a basin shift (ADR-AG-085's precedent, ADR-052 intact), #1334's blame rebuilt as a drop-one conflict probe in the same issue, variant A (a fixed denominator) stays rejected.
+
+**Class.** A relative residual has a zero at infinity. `length-eq` was `(l − r) / max(1, |l|, |r|)`: for a point sliding out along a line, `|CB| − |CD|` tends to a constant while the denominator grows without bound, so the row tends to 0 and the descent follows it. On the operator's kite (prod `j73pikxb`) a far step of the Levenberg–Marquardt descent was accepted because the far field read nearly satisfied, then stalled there: C = (−3081, 6179) at seeds 1, 13, 18, 21. Sibling: an equation of AREAS (`length-eq` with area terms) has the same form. Not in the class: the `area`, `param-eq` and `midpoint` rows divide by a stated target or a parent spread that does not grow with the moving point; a `length-eq` with one constant side tends to 1, not 0.
+
+**Decision.**
+1. **The cap.** `length-eq` divides by `max(1, min(max(|l|, |r|), cap))`, where `cap` is `residualScale(c, env)` — the larger HALF-side of `searchSpan`, the seeder's arena: the stated points' spread once it passes 12, and 6 + half of it below — raised to the operands' dimension (span² when an area term is present). Read off the stated figure and the environment, never a free point. One scale at every site that solves or judges (`carrierSystem`, the created-shape fit, the post-hoc check, `holdsOn`). Below the cap the row is byte-identical to before, which keeps a ratio contradiction scale-free («ריבוע ABCD» · «AB = 2BC» reads −0.5 at every size, so there is no shrink gradient — variant A's collapse).
+   - "1× span" measured: this half-side gives the kite 23/24; the full side (2× it) gives 13/24, as round #1510's 4× variant B did.
+2. **The blame is a drop-one probe** (`completingStatement`, evaluate.ts). When the drawn figure has an unmet given, `derive` asks which statement, taken away, lets the figure solve. A statement is what its line added: the constraints it owns and the points whose coordinates it pinned. Taking it away removes those constraints and leaves those points free, so «O(0,0)» on a centre the circle through A, B, D cannot have is a statement like any other. The statements are tried newest first, each at up to 3 seeds, within a counted budget of 24 evaluations (one drawable walk), and the first whose removal gives an admitted figure is blamed alone. When none does (two independent contradictions, or a figure the search missed), the residual snapshot's blame stands.
+
+**Measured** (raw `evaluate`, seeds 0–23, on d9a5910f → this change):
+
+| figure | before | after |
+|---|---|---|
+| the kite | 13/24 (C runs away at 4) | 23/24 (no runaway) |
+| the kite + the circle through A, B, D | 11/24 | 21/24 |
+| «ריבוע ABCD» · «AB = 2BC» | refused, blames lines 0 and 1 | refused, blames line 1 |
+| the needle «משולש ABC» · «AB = AC» · «∠ABC = 90», seeds 0–7 | blames line 2 at 0, 2, 3; line 1 at 1, 5; both at 4, 6, 7 | blames line 2 at every seed |
+| «A(0,0)» · «B(8,0)» · «נקודה M» · «MA = MB» · «MA = 5» | both roots, (4,−3) first in `knownOptions` | both roots, order may flip |
+
+- **Page timing** (Playwright on the dev server, the kite + circle typed line by line, two runs each): slowest line 1.64 s / 1.73 s before, 0.78 s / 0.78 s after.
+- **The corpus sweep** (1,612 sequences: every string-array literal in `src-analytic/__tests__` plus the 46 corpus-471 questions, each 24 raw seeds): whole seeds 33,667 → 33,747; figures whole at 24/24 1,267 → 1,278.
+  - 30 figures gain seeds (113 in all, e.g. «משולש ABC» · «AB = 3a» 20 → 24, «D על AB במרחק 3 מ-A» 11 → 17).
+  - **24 lose seeds (33 in all): 20 lose one, one loses 2, two lose 3, one loses 5** (the tangent circle «מעגל שמרכזו M משיק לציר ה-x…» · «M(3,5)», 11 → 6). None drops below 5/24, so every one is still drawn green, and none changes its faults.
+  - This is the basin shift the ruling accepted for root order. It contradicts the ruling's gate "no figure loses whole seeds", which is the open question the round reports.
+  - Sweep time 119 s → 103 s (wall clock, one machine). On the refusal path the probe adds at most 24 evaluations: the 100 refused sequences measured 13.6 s → 18.8 s, not counting one harvested parser list of every shape noun, which is not a student sequence (54 s → 92 s).
+- **Blame changes** across the sweep: 30 refused sequences, none of which changes whether it is refused. Each now names one statement, the newest whose removal admits the figure, where the snapshot named several. Four of them name a line the snapshot did not:
+  - «מלבן ABCD» · «הישר AB והישר CD נפגשים בנקודה E»: line 0 → line 1.
+  - the angle bisector with «זווית BAD = 40»: lines 1, 2 → line 3.
+  - #1493's control «…» · «O(0,0)»: lines 4, 5, 6 (the incidences) → line 7, the stated centre. Its lock is updated.
+  - «טרפז ישר זווית ABCD» with four pinned vertices: line 0 → line 4, «D(1,3)».
+
+**Locks.**
+- `src-analytic/__tests__/issue-1492-length-eq-cap.test.ts`:
+  - the kite ≥ 21/24 raw-whole with no runaway C on a whole seed; kite + circle ≥ 20/24;
+  - the row's zero at infinity, uncapped versus capped; scale-free below the span; the area cap at span²;
+  - `residualScale` reads the stated figure; a figure in thousands still converges;
+  - the square's refusal at seeds 0–3 on line 1;
+  - the probe on the needle; a pinning statement blamed («O(0,0)», in both entry orders); `null` and both lines blamed for two independent contradictions.
+- `issue-1334-tolerance-artefact.test.ts`:
+  - the blame clause holds unchanged at seeds 0, 2, 3, and a new test pins line 2 alone at every seed 0–7;
+  - the "it IS a needle" clause now judges by the product's own `THIN_SIN_TOL` plus |BC|/|AB| < 1e-2. The 2e-3 bar was fitted to one basin: seed 0 moved from 7.0e-4 to 2.2e-3, a 0.13° apex, and the baseline's own seeds 4–7 sat at 2.9e-3–6.9e-3.
+- `issue-1493-domain-effort.test.ts`: the control now expects line 7 alone.
+- `issue-1259-1227-degenerate-locus.test.ts`: "exactly two options" and "the two positions" compare sorted (ruling 2). The "panel and answer row agree" clause is unchanged.
+
+**Sibling audit.** In `solve.ts`, every row normalised by operands that move was checked; only `length-eq` divides by its own unbounded operands (see Class). For the sibling products, `src/`, `src3d/` and `src-complex/` were grepped for the operand-relative divisor `Math.max(1, Math.abs(…))`. Every hit is a comparison tolerance or a finite-difference step, and none is a residual row divided by its own moving operands. No sibling was changed, and none was measured.
+
+**Consequences.** `engine/solve.ts`: `residualRows` takes an optional `scale`. `engine/evaluate.ts`: `residualScale` and `completingStatement` (exported). `engine/derive.ts`: the probe in front of the snapshot attribution.

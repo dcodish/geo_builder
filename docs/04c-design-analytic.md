@@ -617,6 +617,20 @@ are measured against the configuration that was reached, whether or not a solve 
 free carriers has nothing to *move* and still has givens that must *hold*. The solve is an attempt to
 reach a configuration; the check is the report on the one reached.
 
+**Residuals and their scale ([ADR-AG-231](06c-decisions-analytic.md#adr-ag-231), #1492).** A `length-eq` row is
+normalised by its operands' own size so a figure in thousands converges like one in units — and below the figure's
+span that is what keeps a ratio contradiction («ריבוע ABCD» · «AB = 2BC») scale-free, so the descent cannot shrink the
+figure to meet it. Above the span the normaliser is CAPPED (`residualScale`: the larger half-side of the seeder's
+arena, read off the stated points and the environment, never off a free point), because a row divided by operands
+that grow without bound has a zero at infinity and the descent follows it outward. One scale for every site that
+solves or judges. An equation of areas is capped at span².
+
+**Blame is a drop-one probe, not a snapshot (ADR-AG-231).** A refused figure's `unsatisfiable` fault names the
+statement whose removal lets the figure solve (`completingStatement`; a statement is the constraints its line owns
+plus the points it pinned, which go free when it is taken away; newest first, a counted budget of one drawable
+walk), so it names the statement that completed the contradiction whatever basin the refused solve reached. Only when
+no single removal admits a figure does the residual snapshot's blame stand.
+
 **A noun gate declines a tail that is not an equation** ([#1059](https://github.com/dcodish/geo_builder/issues/1059)).
 Every `matchCurve` branch ends in `(.+)`, which is right for «נתון הישר ℓ1: 4y-3x-20=0» and wrong for
 «הישר DE מקביל לישר BF». The discriminator is that the tail contains **no Hebrew** — not that it

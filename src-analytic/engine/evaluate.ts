@@ -217,6 +217,23 @@ function searchSpan(c: Construction, env: Env): Span {
   return { x: axis(xs), y: axis(ys) };
 }
 
+/**
+ * THE FIGURE'S SPAN, AS THE RESIDUALS' SCALE (#1492, ADR-AG-231) — the larger HALF-side of the arena the seeder
+ * samples in (`searchSpan`: the stated points, padded by half their spread and at least 6 a side). That is the stated
+ * points' own spread once it passes 12, and 6 + half of it below — so a figure with no stated point measures 6, the
+ * scale its free vertices are drawn at. The cap on the `length-eq` operand normaliser (`residualRows`), at 1× as
+ * ruled (2026-09-29): measured on the kite, the cap at this span gives 23/24 raw-whole, at twice it 13/24 — the far
+ * field flattens again and the runaway seeds stall (round #1510's variant B at 4×: 13/24).
+ *
+ * Read off the STATED figure and the environment only, never off a free point's current position: a scale
+ * that followed the moving point would grow with it, which is exactly the zero at infinity it exists to remove.
+ * One function for every site that solves or judges, so the solve and the verdict measure one residual.
+ */
+export function residualScale(c: Construction, env: Env): number {
+  const s = searchSpan(c, env);
+  return Math.max(s.x.hi - s.x.lo, s.y.hi - s.y.lo) / 2;
+}
+
 /** A tiny deterministic hash → [0,1). Same seed, same figure; different seed, different figure. */
 /**
  * Offsets the seed onto a second, disjoint jitter stream so an unbounded parameter's SIGN is drawn
@@ -430,6 +447,8 @@ export function carrierSystem(
     return out;
   };
   const positionsAt = (x: number[]) => place(c, envAt(x), asMap(x));
+  // Once per system, at the system's own environment (#1492): the scale must not move with the iterate.
+  const scale = residualScale(c, env);
   return {
     ids,
     syms,
@@ -459,7 +478,7 @@ export function carrierSystem(
       const pos = positionsAt(x);
       const at = (id: Id) => pos.get(id) ?? null;
       return c.constraints.flatMap(
-        (k) => residual(k, at, e, curveAtOf(c, e, at), lineAtOf(c, e, at)) ?? [0],
+        (k) => residual(k, at, e, curveAtOf(c, e, at), lineAtOf(c, e, at), scale) ?? [0],
       );
     },
     equalitiesAt: (x) => {
@@ -467,7 +486,7 @@ export function carrierSystem(
       const pos = positionsAt(x);
       const at = (id: Id) => pos.get(id) ?? null;
       return c.constraints.flatMap(
-        (k) => equalityResidual(k, at, e, curveAtOf(c, e, at), lineAtOf(c, e, at)) ?? [0],
+        (k) => equalityResidual(k, at, e, curveAtOf(c, e, at), lineAtOf(c, e, at), scale) ?? [0],
       );
     },
   };
@@ -1638,13 +1657,14 @@ function fitCreatedShapes(raw: Construction, c: Construction, env: Env, seeded: 
     movers.forEach((id, i) => free.set(id, { x: x[2 * i], y: x[2 * i + 1] }));
     return { e, free };
   };
+  const ownScale = residualScale(c, env); // the whole figure's scale, the one the main solve measures by (#1492)
   const residualsAt = (x: number[]): number[] => {
     const { e, free } = unpack(x);
     const pos = place(c, e, free);
     const at = (id: Id) => pos.get(id) ?? null;
     const curveAt = curveAtOf(c, e, at);
     const lineAt = lineAtOf(c, e, at);
-    return own.flatMap((k) => residual(k, at, e, curveAt, lineAt) ?? [0]);
+    return own.flatMap((k) => residual(k, at, e, curveAt, lineAt, ownScale) ?? [0]);
   };
   /*
    * THE STARTS. Each touch point first goes onto the piece its noun bounds («הצלע AO»: inside A–O) — at its seed's
@@ -2429,8 +2449,9 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
    */
   if (c.constraints.length > 0) {
     const pos = place(c, env, free);
+    const scale = residualScale(c, sampledEnv);
     for (const k of c.constraints) {
-      const r = residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null), lineAtOf(c, env, (id) => pos.get(id) ?? null));
+      const r = residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null), lineAtOf(c, env, (id) => pos.get(id) ?? null), scale);
       // `null` is "cannot be judged", not "false": a constraint naming a point that vanished at this
       // parameter value must not be reported as a given the student got wrong — that would blame the
       // wrong statement, and vacancy is not a fault ([ADR-AG-008]).
@@ -3287,8 +3308,58 @@ export function holdsOn(c: Construction, k: Constraint, f: Figure): boolean {
   if (k.t === 'all') return k.of.every((o) => holdsOn(c, o, f));
   const pos = new Map<Id, Pt>(f.points.map((p) => [p.id, { x: p.x, y: p.y }]));
   const at = (id: Id): Pt | null => pos.get(id) ?? null;
-  const r = residual(k, at, f.env, curveAtOf(c, f.env, at), lineAtOf(c, f.env, at));
+  const r = residual(k, at, f.env, curveAtOf(c, f.env, at), lineAtOf(c, f.env, at), residualScale(c, f.env));
   return r !== null && r.every((v) => Math.abs(v) <= SATISFIED_EPS);
+}
+
+/**
+ * WHICH STATEMENT COMPLETED THE CONTRADICTION? — a DROP-ONE CONFLICT PROBE (#1492 ruling 3, ADR-AG-231; it rebuilds #1334's
+ * blame, ADR-AG-143).
+ *
+ * A refused figure used to be blamed on whatever its RESIDUAL SNAPSHOT showed: the constraints still unmet in the one
+ * configuration the solve happened to reach. That is a fact about the basin, not about the givens. «משולש ABC» ·
+ * «AB = AC» · «∠ABC = 90» has no triangle in it, and which of the two equalities the stalled descent left unmet moved
+ * with the seed — so when #1492's residual cap moved the basins, seed 0 blamed «AB = AC», a sentence that is fine on its
+ * own, instead of the line that made the figure impossible.
+ *
+ * The question asked instead is the student's: **which statement, taken away, lets the figure solve?** A statement is what
+ * its line added: the constraints it owns (`groupOf`, positional over `c.constraints`) and the points whose coordinates it
+ * PINNED (`pinnedBy`: «O(0,0)» on a centre the figure had left free). Taking it away removes those constraints and leaves
+ * those points free — named, with no position given — which is the figure without that sentence. The statements are
+ * tried NEWEST FIRST, so the answer is the latest
+ * statement whose removal admits a figure: the one that completed the contradiction (ADR-492's shortest infeasible
+ * prefix), whatever basin the refused solve reached. `null` when no single removal admits one — two independent
+ * contradictions, or a figure the search simply missed — and the caller keeps the snapshot's blame, which still names a
+ * genuinely unmet statement.
+ *
+ * Budgeted by COUNT (docs/17 §7, ADR-AG-180's discipline): at most `CONFLICT_PROBE_SEEDS` seeds per statement and
+ * `CONFLICT_PROBE_BUDGET` evaluations in all — one drawable walk's worth, so the refusal path costs at most twice what
+ * the refused figure's own search already paid. In a session built line by line the newest line is the culprit and the
+ * probe ends on its first evaluation.
+ */
+export const CONFLICT_PROBE_BUDGET = 24;
+const CONFLICT_PROBE_SEEDS = 3;
+export function completingStatement(
+  c: Construction,
+  groupOf: readonly number[],
+  seed: number,
+  pinnedBy: ReadonlyMap<Id, number> = new Map(),
+): number | null {
+  const groups = [...new Set([...groupOf, ...pinnedBy.values()].filter((g) => g >= 0))].sort((a, b) => b - a);
+  let spent = 0;
+  for (const g of groups) {
+    const without: Construction = {
+      ...c,
+      objects: c.objects.map((o): GeoObject => (o.kind === 'point' && pinnedBy.get(o.id) === g ? { kind: 'free', id: o.id } : o)),
+      constraints: c.constraints.filter((_, i) => groupOf[i] !== g),
+    };
+    for (let k = 0; k < CONFLICT_PROBE_SEEDS; k += 1) {
+      if (spent >= CONFLICT_PROBE_BUDGET) return null;
+      spent += 1;
+      if (admittedFigure(evaluate(without, seed + k))) return g;
+    }
+  }
+  return null;
 }
 
 export function holdsInEveryConfiguration(c: Construction, ks: readonly Constraint[]): boolean {
