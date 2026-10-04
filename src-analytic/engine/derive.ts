@@ -8,7 +8,7 @@
  */
 import { fold, existingKindOf, type ApplyError, type ApplyNotice } from './apply';
 import { reportedDof } from './carriers';
-import { drawableAt, holdsOn, viewBox, type Figure } from './evaluate';
+import { completingStatement, drawableAt, holdsOn, viewBox, type Figure } from './evaluate';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
 import { resolveToolLetters } from './toolLetters';
@@ -234,7 +234,30 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * figure is never shown as though it satisfied a given it does not
    * ([02c](../../docs/02c-requirements-analytic.md) honesty invariants).
    */
-  for (const k of figure.unsatisfied) {
+  /**
+   * …and WHICH line: the one whose removal lets the figure solve (#1492 ruling 3, ADR-AG-231), when one does. The
+   * snapshot below names the constraints unmet in the configuration the solve REACHED, which is a fact about the basin:
+   * the needle «AB = AC» · «∠ABC = 90» blamed either sentence depending on the seed. The drop-one probe asks the
+   * student's question instead and names the statement that completed the contradiction, whatever basin was reached.
+   * When no single line's removal admits a figure, the snapshot's blame stands — it still names an unmet statement.
+   */
+  const pinnedBy = new Map<string, number>();
+  facts.forEach((f, i) => {
+    if (f.t === 'point' && !errors[i]) pinnedBy.set(f.id, owner[i]); // the LAST line to place it
+  });
+  const completing =
+    figure.unsatisfied.length > 0
+      ? completingStatement(
+          construction,
+          construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]])),
+          seed,
+          pinnedBy,
+        )
+      : null;
+  if (completing !== null && !faults.some((f) => f.index === completing && f.code === 'unsatisfiable')) {
+    faults.push({ index: completing, code: 'unsatisfiable', detail: lines[completing] });
+  }
+  for (const k of completing === null ? figure.unsatisfied : []) {
     /**
      * Which constraint IS this, in the construction (#1079)?
      *

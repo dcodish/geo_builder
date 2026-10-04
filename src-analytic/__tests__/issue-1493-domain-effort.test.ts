@@ -45,10 +45,10 @@ describe('#1493 — the drawn effort stays inside every declared domain', () => 
   });
 
   it('the stated centre was always refused, and still is (the issue’s control)', () => {
+    // Blamed on «O(0,0)» itself since #1492's drop-one probe (ADR-AG-231): the newest statement whose removal lets the
+    // figure solve. The residual snapshot named the three incidences the stalled solve left unmet (lines 4, 5, 6).
     expect(faults(['A(0,4)', 'B(-3,0)', 'D(3,0)', 'נתון מעגל O', 'A על המעגל', 'B על המעגל', 'D על המעגל', 'O(0,0)'])).toEqual([
-      [4, 'unsatisfiable'],
-      [5, 'unsatisfiable'],
-      [6, 'unsatisfiable'],
+      [7, 'unsatisfiable'],
     ]);
   });
 });
