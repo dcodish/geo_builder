@@ -876,6 +876,14 @@ It routes three ways, and which branch is taken decides how the text is prepared
 | vector (#1195) | `isVectorMarked3` | `vectorNotation` on **raw** text, then `VecMath` |
 | plain | — | isolated, `null` when isolation changes nothing |
 
+**Every `VecMath` caller gates it, and the gate is the caller's** ([ADR-3D-301](06b-decisions-3d.md#adr-3d-301), #1543).
+`VecMath` is lexical — its `PAIR` regex arrows any two-label run — so whether a pair IS a vector is decided
+upstream, once per surface, all three in `FactRow3.tsx`: the step row by the parsed commands
+(`isVectorFact3`), the preview by what was typed (`isVectorMarked3`), and the ask echo (`askEchoNode3`)
+by the question's own parse — `QueryResult.echo` is `'vector'` iff `parseQuery` bound an operand as a
+vector atom (`|AB|`, `AB·CD`, `∠(AB,CD)`, bare `AB`), and `'plain'` for a length by word, a distance, a
+plane, or a question not understood. The non-vector branch of the echo is the step row's.
+
 **The vector branch must NOT pre-isolate.** `VecMath` isolates at the render event itself
 ([ADR-3D-184](06b-decisions-3d.md#adr-3d-184)) and its tokenizer reads LRI/PDI as `op` tokens — measured,
 «וקטור AB = 5» isolated first tokenizes as `op ⁦ · pair AB · … · op ⁩`. The mathematics and plain branches

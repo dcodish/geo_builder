@@ -66,7 +66,7 @@ import { dihedralChipsByFact, shownDihedrals } from './store/dihedralChips';
 import { paramChipsByFact } from './store/paramChips';
 import { collectWedges, competingArcSymbols } from './render/wedges';
 import { displayModeOf } from '../shell/displayMode';
-import { FactRowText3, factRowText3, inputPreviewNode3 } from './render/FactRow3';
+import { askEchoNode3, FactRowText3, factRowText3, inputPreviewNode3 } from './render/FactRow3';
 import { VecMath } from './render/VecMath';
 import { errorText3 } from './i18n/errorText3';
 import { emptyStateChips3 } from './emptyChips3';
@@ -1205,7 +1205,8 @@ export default function App3() {
                     rows: queryResults.map((r, i) => (
                       <span key={r.text + i} dir={textDir3(r.text)} className="flex items-center justify-between gap-2">
                         <span>
-                          <VecMath text={r.text} vecNames={new Set(derived.construction.vectors.keys())} />
+                          {/* #1543 (ADR-3D-301): the echo is arrowed only when the QUESTION was read as a vector */}
+                          {askEchoNode3(r.text, r.echo, new Set(derived.construction.vectors.keys()))}
                           {r.answer !== null ? (
                             <span className="font-medium">
                               {/* #823: an answer may have several ROWS — a plane gives its standard and

@@ -11758,3 +11758,28 @@ Both build with every row ok and 8 points, and in both the point that was A now 
 **Consequences.** `src3d/parser/parse3.ts`, `catalog3.ts`, `llmShared3.ts`; `src3d/engine/queries.ts`, `dataView.ts`; `src3d/store/store3.ts`; `src3d/i18n/errorText3.ts` + locales; `shell/__tests__/fixtures/geo-input-parity.ts`.
 
 **Behaviour change for a student:** a single coordinate of a point — «x_B = 3», «שיעור ה-x של נקודה B הוא 3» — is now drawn instead of being sent to the model, and can be asked («x_B»); «שיעור ה-x של נקודה B חיובי» (without «ה» before «נקודה») now reads. On a figure with no typed coordinate point, the data panel now prints the coordinate a student stated on a new point («B(3, ?, ?)»; «D(+?, 0, 0)» for «D על החלק החיובי של ציר ה-x»), where it printed nothing.
+
+## ADR-3D-301 — The ask echo wears a vector arrow only when the question was read as a vector (#1543)
+
+**Status:** accepted · 2026-10-04 · bug (P3) · round #1753 · branch `fix/1543-ask-echo-vector` off `main` @ c098af9b
+
+**Requirements:** none (internal display honesty) · **Design:** docs/04b — "The input preview composes": every `VecMath` caller gates it; the ask echo is the third gate
+
+**Class.** A **display surface** that renders student text through `VecMath` **without a vector gate** asserts a vector reading the engine never made. Instance: the operator asked «משוואת BB'» (prod, 2026-09-29) and the refusal row echoed «משוואת BB⃗' — לא זוהה».
+
+**Context — re-measured at c098af9b.** On his figure (the cube, `מישור A'B'C'D' הוא x+4y-8z-126=0`, `B(0,7,8)`), the echo rendered through `VecMath` carried a `<mover>` for every one of «משוואת BB'» (notUnderstood), «משוואת הישר AB» (notUnderstood), «אורך AB» (a segment length), «המרחק בין A ל-BC» (a distance), «|BB'|», «BB'», «AB·CD», «∠(AB,CD)». The issue's diagnosis held as written.
+
+**Root cause.** `App3.tsx` rendered every ask row's echo as `<VecMath text={r.text}/>` with no gate. `VecMath` is lexical by design (its `PAIR` regex matches any bare two-label run); the decision "is this pair a vector?" belongs to the caller, and the other two callers make it — the step row on `isVectorFact3`, the input preview on `isVectorMarked3`. The echo was the third call site and skipped it (the #1312 shape: a new surface skipping the gate the row uses).
+
+**Decision.**
+1. **The reading travels with the answer.** `QueryResult` gains `echo: 'vector' | 'plain'`, attached in ONE place: `answerQuery` parses, delegates to `answerParsed` (the old body, which now returns the result without its echo), and sets `echo = queryEcho3(q)`; a question not understood is `'plain'` by construction.
+2. **Rule, not enumeration.** `queryEcho3` is `'vector'` iff `vectorAtoms(q)` — the operands the parse bound as vector `Atom`s — is non-empty. `vectorAtoms` is a TOTAL switch over `Query['kind']` with a `never` default, so a future kind cannot compile without declaring which operands it reads as vectors. The only ambiguity was `length`: the parse now records `read: 'vector'` for the bars («|AB|», the magnitude of the vector AB) and `'segment'` for the word («אורך AB»), the reading the student wrote.
+3. **One helper beside the other two gates.** `askEchoNode3(text, echo, vecNames)` in `render/FactRow3.tsx`: `VecMath` for `'vector'`, otherwise the step row's plain branch (`hasMath` → `MathText(isolateLtrRuns3(…))`, else `isolateLtrRuns3`) — factored out as `plainRowNode3`, which `FactRowText3` now also calls, so the echo cannot drift from the row. Answer rows (`r.rows`) keep `VecMath`: they are the tool's own notation and are unchanged.
+
+**Twin (#1549).** #1549 is the mirror — the fact row FAILING to arrow what is a vector (`render/notation.ts`'s `VEC_CMD_TYPES` hand list). Its planned `Record<Command3['type'], …>` registry is the command-side twin of `vectorAtoms`; both answer "did the parse read this pair as a vector?". When #1549 lands it should sit beside this in `FactRow3.tsx`'s gate family and take the same total-over-kinds shape.
+
+**Sibling audit.** Other `VecMath` callers in `App3.tsx`: the data panel's vector rows (`${v.label} = ${v.decomp}` / coords — the tool's own vector notation, gated by being the vectors section) and the answer rows — both correct. 2-D has no vector notation by design (vectors are 3-D only, #1184); analytic/complex have no `VecMath`. Class not present elsewhere.
+
+**Locks.** `src3d/__tests__/issue-1543-ask-echo.test.tsx` (16), rendering through the helper `App3` calls: his exact sequence → «משוואת BB'» is refused, `echo: 'plain'`, no `<mover>`; «אורך AB», «length AB», «משוואת הישר AB», «המרחק בין A ל-BC», «זווית ABC», a plane, a point, an area → no arrow; «BB'», «וקטור AB», «|BB'|», «AB·CD», «∠(AB,CD)» → `<mover>`; a named vector (`w`, `|w|`, `w·w`) stays typeset; the plain echo keeps the row's LTR isolate. **Fails before: 16 of 16.**
+
+**Behaviour change for a student:** the ask box no longer draws a vector arrow over letters it did not read as a vector — a question it did not understand, a length asked with «אורך», a distance or a line is echoed in plain letters; vector questions («BB'», «|BB'|», «AB·CD») keep their arrow.
