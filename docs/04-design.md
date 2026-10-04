@@ -211,6 +211,13 @@ src/
                    the listed slice, since what counts as "new" for ACCEPTANCE is a different question
   replay/        core.ts — the PURE replay layer (S1.2): fold memo + deferral + HOIST + seed/config
                  searches + the shared sample core; engine ← replay ← store enforced by test
+                 — the fold's ATTEMPT SCOPE (ADR-583, #1675/#1584): every per-fact apply goes through
+                   `attemptFact` — a fact the outermost fold already failed is a RE-attempt: answered
+                   from the scope's failure memo when its `solveSignature` is unchanged, else run under
+                   the deterministic `REATTEMPT_WORK_CAP` (executed units) and reported with its first
+                   failure verbatim when cut; the first attempt is never capped (ADR-281). A role
+                   re-reading's dry run (`decideDeterministic`) is capped likewise in charged units,
+                   inside one work epoch with the line's own dry run (`ROLE_READING_WORK_CAP`).
                  — the fold's RETRY PASS and CLAIM RULE (ADR-577, #1411): one lowering
                    (`engineCmdsOf`) and one all-or-nothing apply (`tryApplyFact`) serve the in-order
                    pass and the ADR-104 retry alike. The retry takes every red, enabled, non-forced,

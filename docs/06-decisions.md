@@ -14385,3 +14385,48 @@ The full suite is the batch gate (round #1736).
 - `src/engine/valuesPanel.ts` (`computing`, `waitingNote`), `src/App.tsx`, `locales/he.json` + `en.json` (`values.q.computing`).
 
 **Behaviour change for a student:** asking a value on a heavy figure answers as soon as the figure's check finishes (T12: the answer arrives with the status line instead of ~12 s after it), and while it waits the row says «מחשב…» instead of telling them to press a button. On a figure too heavy to check fully the panel and the status line now agree that the check was cut («מורכב מדי»); before, the panel could come back "complete" on its second, warmer pass.
+
+## ADR-583 — A refusal costs about one failed solve: the duplicate relaxed solve, the signature failure memo, and the re-attempt cap (#1675, #1584)
+
+**Status:** accepted · 2026-10-04 · bug (P2, 2-D) · fix-round #1767 · branch `fix/1675-1584-reattempt-cost` (stacked on ADR-582)
+
+**Requirements:** none (internal — no verdict, refusal wording or figure changes; a refusal arrives sooner) · **Design:** [04-design.md](04-design.md) § module map, `replay/` — the fold's ATTEMPT SCOPE; [LADDER.md](LADDER.md) stage 5 — the attempt scope · **LADDER stage:** inserts at stage 5 (around every per-fact apply of the fold) and inside stages 2–3's driven solvers (the convex-first rung).
+
+**Cites** [ADR-104](#adr-104) (the deferral retry), [ADR-231](#adr-231) (HOIST), [ADR-508](#adr-508)/[ADR-554](#adr-554) (the drop-one search), [ADR-280](#adr-280) (the reference-identity purity skip this generalises), [ADR-281](#adr-281) (the first attempt is never budgeted), [ADR-097](#adr-097) (the convex-first ladder), [ADR-577](#adr-577) (the regression: creating facts retried), [ADR-582](#adr-582) (charged memo hits — the precondition for a deterministic cap), [ADR-564](#adr-564) (the door verdicts that must not move).
+
+**Context — re-measured at pickup on 7ed5baa8 through `runSubmit` (model mocked), evaluateCore calls.** «המיתר AB מקביל ל-CD» on a midpoint B: **9,575,270** (refused after ~6 s in the browser) — the same doomed `point-on-circle B` solve attempted six times: in order, the ADR-104 retry, the HOIST fold's in-order pass and retry, and a drop-one trial fold's pass and retry. «היתר AC = 5» (right angle at C): 2,232,060. «רבע מעגל CAB»: 8,722,291. «α = 50»: 2,789,713. «חצי מעגל ABC»: **194,430,889** cold (434 s in vitest), 109,801,044 warm. The plan's diagnosis held as measured.
+
+**Class.** *A fact the fold already concluded cannot hold is attempted again — by the retry, the rebuild, the HOIST re-folds, the drop-one search and the role re-readings — and every attempt pays the whole unbudgeted failure ladder again*, so a refusal costs a multiple of a success (docs/17 §7). Two of the multiplier's members were pure duplication; the rest needed a bound.
+
+**Decision.**
+1. **Arm 1 — one convex-first solve when there is no ≥4-gon** (`engine/evaluate.ts`, `declaresConvexity`). Without a declared polygon of ≥4 vertices `declaredPolygonsConvex` is true at every candidate, so `resolveFreeDriven`'s `pick(true)`→`pick(false)` and `resolveMixedCarriers`' rung 1→rung 3 ran the identical solve twice. They now run it once. Outcome-identical by construction.
+2. **Arm 2 — the failure memo by solve signature** (`replay/core.ts`, `solveSignature`, `attemptFact`). One ATTEMPT SCOPE per outermost fold, shared by every fold nested in it (HOIST, the drop-one trial folds) and the atomic rebuild. A failed attempt is stored under its signature — the commands; the objects they name; every drivable DOF upstream of them; the constraint component over those DOFs (checked and driven, to a fixpoint) plus every order/bound constraint (the driven solvers join them whole); every object that moves with those DOFs and everything those are built from; the stated sides. A leaf drawn segment nothing builds on or constrains is ink and is left out. A later attempt with the same signature is answered from the memo, charged the stored work (ADR-582). Stored only with no budget armed and no outer abort. The memo is scoped to the fold, so the fold stays a function of its content (the search memo's key carries the scope's failed set).
+3. **Arm 3 — the re-attempt cap** (`engine/solveBudget.ts` `withExecutedCap`; `replay/core.ts` `REATTEMPT_WORK_CAP` = 750,000 executed evaluateCore calls). Any attempt at commands that already failed in the scope runs under the cap; cut, it reports the fact's FIRST failure verbatim (so statuses and wording cannot move), and the cut result is memoized under its signature too (the cap is deterministic). The cap counts EXECUTED units: inside one fold every memo a re-attempt touches was filled by that fold, so the count is a function of the content. A cut charged to this cap alone restores `aborts` — the cap is part of what the fold is, so the fold stays memoizable; an outer clock/work budget that also ran out keeps its abort. The first attempt at a fact is never capped (ADR-281). **Role re-readings** (`app/decideDeterministic.ts`): the line's dry run and its re-readings are one work epoch; each reading's dry run runs under `ROLE_READING_WORK_CAP` = 1,000,000 charged units, and a reading the cap cuts is not adopted (the line's own refusal stands).
+4. **Calibration (before setting the caps).** With both caps off, the eight `scenarios-e2e` shards, `fixtures.test.ts`, the four decide-parity shards, `issue-1668-claim-gate-parity` and the `issue-1411-*` locks (503 tests): **the most expensive SUCCESSFUL re-attempt was 511,224 executed units** (the plan expected ~46 ms; it is ~1 s), and the only role reading that built cost 339,252 charged. The caps sit above both (≈1.5× and ≈3×).
+
+**Measured after (same harness, executed evaluateCore calls; cold / warm).**
+
+| line | before | after |
+|---|---|---|
+| «המיתר AB מקביל ל-CD» | 9,575,270 / 6 | **1,415,687** / 6 |
+| «היתר AC = 5» | 2,232,060 / 24,808 | **795,113** / 24,808 |
+| «זווית ABC = 90» (same figure) | 1,206,609 / 24,807 | 492,093 / 24,807 |
+| «רבע מעגל CAB» | 8,722,291 / 582,751 | **3,032,084** / 403,903 |
+| «α = 50» | 2,789,713 / 0 | 1,021,654 / 0 |
+| «חצי מעגל ABC» | 194,430,889 / 109,801,044 | **20,862,751** / 15,289,133 |
+
+Every verdict and note identical (refused / committed, the same `[vs #N]` tail). Arms 1+2 alone: chord 3.19M → 1.60M once the leaf segment left the signature; arm 3 then took the chord to 1.42M and the quarter from 5.01M to 3.03M (its two cut re-attempts differ only in constraint ORDER — the HOIST permutes it — and the signature keeps order, conservatively).
+
+**Deviations from the plan, recorded.** (i) The quarter lock is ≤ 3.1M, not "~2.5M": the cap cannot sit below the 511k successful re-attempt the calibration measured, and two cut re-attempts at 750k remain. (ii) The semicircle's remaining cost is mostly outside this mechanism: its first fold (~11M, ~1,080 capped re-attempts) and the seat rescue (5–11M executed; it is bounded by a 1.5 s WALL CLOCK checked only between `meetsRequirements` calls, so one 9 s call overshoots it — #1671's subject). (iii) The trapezoid «O על ED» single 22 s ladder is M3 (an early-out inside the ladder), filed separately by the plan.
+
+**Locks.** `src/app/__tests__/issue-1675-1584-reattempt-cost.test.ts`: through `runSubmit`, executed work cold then warm — chord ≤ 2.0M, hypotenuse ≤ 0.8M, quarter ≤ 3.1M, semicircle ≤ 25M, «α = 50» ≤ 1.5M — each with its exact refusal/commit verdict; the chord dry run charged the same units cold and warm inside one epoch (ADR-582); a cap too small for any re-attempt changes no verdict or wording (the first failure is reported verbatim); and the **differential** — every fixture, the operator's red figures and corpus chunk 4's conflict/refusal/deferral scenarios replayed with the failure memo on and off give identical statuses, with an exercised-counter (a one-off run over all 153 corpus-4 scenarios was also identical). Unchanged and green: the four decide-parity shards byte-identical, `issue-1668-claim-gate-parity` (ADR-564's six spellings refused with the identical note, B on the circle accepted green), `issue-1411-*`, the eight `scenarios-e2e` shards, `fixtures.test.ts`, `src/replay/__tests__`, `src/engine/__tests__`. **24-seed sweep** (`replay(facts, s)`, s = 0..23, positions to 1e-6 and errors hashed): the #1668 red figure 0/24 whole, its B-on-circle control 24/24, the quarter red figure 0/24, an SSA control 24/24 — identical hashes before and after.
+
+**Sibling audit.** `src3d/` has its own fold and retry; its re-attempt multiplier was not measured here — the class sentence is product-neutral, so whether a refused 3-D line re-runs its failed solve is worth one measurement (flagged to the round, not filed by this agent). `src-analytic/`, `src-complex/`: no deferral retry or HOIST.
+
+**Consequences.**
+- `src/engine/evaluate.ts`: `declaresConvexity`; the duplicate relaxed solve skipped in both driven solvers.
+- `src/engine/solveBudget.ts`: `work.executed`, `executedCap`, `withExecutedCap`.
+- `src/replay/core.ts`: `solveSignature`, `attemptFact`, the attempt scope, `REATTEMPT_WORK_CAP` / `reattemptConfig` / `reattemptStats`, `clearReplayCaches` (test-only); the search memo key carries the scope's failed set.
+- `src/app/decideDeterministic.ts`: `ROLE_READING_WORK_CAP`, the decision-wide work epoch.
+
+**Behaviour change for a student:** none in what is drawn, accepted or refused, or in any message — an impossible line is refused sooner («המיתר AB מקביל ל-CD» ~6 s → ~1 s; «חצי מעגל ABC» minutes → tens of seconds).

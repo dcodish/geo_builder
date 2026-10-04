@@ -479,9 +479,12 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     if (retry.ok && barrierAt(retry.x) < b0) return retry;
     return base;
   };
+  // #1675 (ADR-583): without a declared ≥4-gon the convex requirement accepts exactly what the relaxed one
+  // does, so the fallback would re-run the identical solve to the identical failure (half of every refusal).
+  const convexMatters = declaresConvexity(c);
   const solveAll = (): { x: number[]; ok: boolean } => {
     const conv = pick(true);
-    return conv.ok ? conv : pick(false);
+    return conv.ok || !convexMatters ? conv : pick(false);
   };
   let out = solveAll();
   // THE AIM YIELDS (#1351, ADR-547). A bound's visible gap is a drawing PREFERENCE, lexicographically below
@@ -554,6 +557,16 @@ export function multiStartSolve(
   }
   if (accept(best)) return best;
   return accepted ?? seed; // keep an accepted solution if the polish ended on a rejected one
+}
+
+/**
+ * #1675 ([ADR-583](docs/06-decisions.md#adr-583)): does the figure declare any polygon the convex-first
+ * preference can judge (≥4 vertices)? When it does not, `declaredPolygonsConvex` is true at every candidate,
+ * so a convex-required solve and its relaxed fallback are the same computation — the driven solvers then run
+ * it once. Outcome-identical by construction.
+ */
+export function declaresConvexity(c: Construction): boolean {
+  return c.objects.some((o) => o.kind === 'polygon' && o.vertices.length >= 4);
 }
 
 /**
@@ -964,9 +977,10 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
   // still no convex solution exists fall back to the relaxed accept with the original carriers — so a figure
   // that genuinely has no convex drawing still solves. When no ≥4-gon is declared, `declaredPolygonsConvex`
   // is always true ⇒ step (1) succeeds immediately and behaviour is unchanged.
+  const convexMatters = declaresConvexity(c); // #1675 (ADR-583): see resolveFreeDriven — rungs 2-3 repeat rung 1 without a ≥4-gon
   const ladder = (aim: boolean): { result: Construction; ok: boolean } => {
     const conv = solveFor(carriers, true, aim);
-    if (conv.ok) return conv;
+    if (conv.ok || !convexMatters) return conv;
     const extra = freePolygonVerticesToRecruit(c, carriers);
     if (extra.length) {
       const conv2 = solveFor([...carriers, ...extra], true, aim);

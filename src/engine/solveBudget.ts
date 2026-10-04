@@ -45,11 +45,12 @@ export function withSolveBudget<T>(deadlineAt: number, fn: () => T): T {
  * (the operator's ruling on #1601 — "same input, same answer"). The interactive searches keep the wall
  * clock; only the knowledge pool is bounded this way.
  */
-export const work: { done: number; limitAt: number | null } = { done: 0, limitAt: null };
+export const work: { done: number; limitAt: number | null; executed: number } = { done: 0, limitAt: null, executed: 0 };
 
-/** One unit of work (called by `evaluateCore`). */
+/** One unit of work (called by `evaluateCore`). `executed` counts only the calls actually made — never a charged hit. */
 export function countWork(): void {
   work.done++;
+  work.executed++;
   if (frame) frame.own++;
 }
 
@@ -158,9 +159,42 @@ export function withWorkEpoch<T>(fn: () => T): T {
 
 /** Has the armed WORK budget run out? Never true when unarmed. Counted as a ladder abort, like the clock. */
 export function workExceeded(): boolean {
-  if (work.limitAt === null || work.done <= work.limitAt) return false;
+  const over = (work.limitAt !== null && work.done > work.limitAt) || (executedCap.limitAt !== null && work.executed > executedCap.limitAt);
+  if (!over) return false;
   solveBudget.aborts++;
   return true;
+}
+
+/**
+ * #1675/#1584 ([ADR-583](docs/06-decisions.md#adr-583)) — THE RE-ATTEMPT CAP. A fact the fold already
+ * failed is attempted again by the ADR-104 retry, the atomic rebuild, the HOIST re-folds and the drop-one
+ * search; each attempt at an infeasible system pays the whole unbudgeted failure ladder again. A re-attempt
+ * runs under this cap: `units` EXECUTED `evaluateCore` calls (never charged hits — inside one fold every
+ * memo a re-attempt can touch was filled by that same fold, so the executed count is a function of the
+ * fold's content alone). Returns whether the cap cut the computation. A cut charged to THIS cap alone is
+ * not an abort of the surrounding computation: the cap is part of what the fold IS, the same on every run,
+ * so `aborts` is restored and the fold stays memoizable — unless an outer budget (a clock, a work budget,
+ * an outer cap) also ran out, which keeps its abort.
+ */
+export const executedCap: { limitAt: number | null } = { limitAt: null };
+export function withExecutedCap<T>(units: number, fn: () => T): { value: T; exhausted: boolean } {
+  const prev = executedCap.limitAt;
+  const at = work.executed + units;
+  executedCap.limitAt = prev === null ? at : Math.min(prev, at);
+  const aborts0 = solveBudget.aborts;
+  let value: T;
+  try {
+    value = fn();
+  } finally {
+    executedCap.limitAt = prev;
+  }
+  const exhausted = solveBudget.aborts !== aborts0 && work.executed > at;
+  const outerRanOut =
+    (solveBudget.deadlineAt !== null && Date.now() > solveBudget.deadlineAt) ||
+    (work.limitAt !== null && work.done > work.limitAt) ||
+    (prev !== null && work.executed > prev);
+  if (exhausted && !outerRanOut) solveBudget.aborts = aborts0;
+  return { value, exhausted };
 }
 
 /** Arm a budget of `units` of work for `fn` (nested arms keep the tighter limit; always restored). */

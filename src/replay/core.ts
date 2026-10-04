@@ -20,7 +20,9 @@ import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY } from '@/engine';
-import { chargeHit, computeWithCell, work, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
+import { chargeHit, computeWithCell, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
+import { allDrivableAncestors } from '@/engine/step';
+import { objectParents } from '@/engine/types';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -421,6 +423,13 @@ function translateFold(node: FoldNode, permToOrig: number[]): FoldNode {
  * that content runs at TAIL speed and the tab never pays the cold fold.
  */
 export type { FoldNode };
+/** Test-only: forget every memoized replay, fold and pool (a COLD measurement on demand). The replay cache is
+ *  identity-keyed, so a fresh facts array is already cold there. */
+export function clearReplayCaches(): void {
+  foldCache.clear();
+  searchFoldCache.clear();
+  sampleMemo = null;
+}
 export function getFoldFor(facts: Fact[]): FoldNode | null {
   return foldCache.get(foldKey(facts)) ?? null;
 }
@@ -549,7 +558,9 @@ const SEARCH_FOLD_CACHE_MAX = 24;
 /** #943: how many trial folds the drop-one search has run — the counter lock (zero on every green replay). */
 export const conflictSearchStats = { folds: 0 };
 function foldForSearch(facts: Fact[]): FoldNode {
-  const key = foldKey(facts);
+  // #1675 (ADR-583): a trial fold runs inside the outer fold's attempt scope, whose already-failed facts it
+  // re-attempts under the re-attempt cap — so the facts that had failed are part of what the node IS.
+  const key = `${foldKey(facts)}\n#failed:${attemptScope ? [...attemptScope.first.keys()].sort().join('\u0001') : ''}`;
   const hit = searchFoldCache.get(key);
   if (hit && chargeHit(cellOf.get(hit))) return hit; // #1605 (ADR-582): charged like the main memo
   const aborts0 = solveBudget.aborts;
@@ -564,7 +575,165 @@ function foldForSearch(facts: Fact[]): FoldNode {
 /** #943: the structured tail an over-constrained status carries once the other side is known — `[vs #<fact index>]`. */
 export const OVER_CONSTRAINED_VS = /^over-constrained: (.+) cannot hold(?: \[vs #(\d+)\])?$/;
 
+/**
+ * #1675/#1584 ([ADR-583](docs/06-decisions.md#adr-583)) — ONE ATTEMPT SCOPE PER OUTERMOST FOLD.
+ *
+ * A fact the fold failed is attempted again and again inside the same fold: the ADR-104 retry, the atomic
+ * rebuild, the HOIST re-folds (depths 1–2) and the drop-one search's trial folds. On an infeasible system
+ * each attempt paid the whole unbudgeted failure ladder again (measured: «המיתר AB מקביל ל-CD» on a midpoint
+ * B — six attempts, 9.58M evaluations; «רבע מעגל CAB» 8.72M). The scope, shared by every fold nested in the
+ * outermost one, holds two things:
+ *  - `failures` — a FAILURE MEMO keyed by the fact's {@link solveSignature}: an attempt whose inputs did
+ *    not change since it failed is answered from the memo (its work charged, #1605). Stored only for a
+ *    failure computed with no budget armed and no abort — a cut search is not THE failure.
+ *  - `first` — the fact's FIRST failure. Any later attempt at the same commands is a RE-attempt and runs
+ *    under {@link reattemptConfig}'s cap; a re-attempt the cap cuts reports the first failure verbatim, so
+ *    the statuses stay what they were. The first attempt is never capped (ADR-281: a solvable figure must
+ *    build, whatever it costs).
+ * Both are functions of the outermost fold's content alone, so the fold stays a pure memo entry.
+ */
+interface AttemptScope {
+  failures: Map<string, { error: string; degenerate: boolean; cell: WorkCell }>;
+  first: Map<string, { error: string; degenerate: boolean }>;
+}
+let attemptScope: AttemptScope | null = null;
+/**
+ * #1675/#1584 (ADR-583): the re-attempt cap, in EXECUTED evaluateCore calls. Calibrated over the corpus
+ * scenarios, the fixtures and the four decide-parity shards (see the ADR): above the most expensive
+ * SUCCESSFUL re-attempt measured there. A test may lower it to exercise the cut.
+ */
+export const REATTEMPT_WORK_CAP = 750_000;
+/** `memo: false` disables the failure memo — the differential lock compares the two (never off in the app). */
+export const reattemptConfig = { cap: REATTEMPT_WORK_CAP, memo: true };
+/** #1675/#1584: the counters the re-attempt locks read (operation counts, never time). */
+export const reattemptStats = { attempts: 0, memoHits: 0, capped: 0, exhausted: 0, maxOkExecuted: 0 };
+
+/**
+ * #1675 (ADR-583) — THE SOLVE SIGNATURE of applying `cmds` to `cur`: everything the attempt's solve can
+ * read or move. The objects the commands name; every drivable DOF upstream of them; every constraint (checked
+ * or driven) sharing such a DOF, to a fixpoint — the constraint COMPONENT (S3.2) — plus every order/bound
+ * constraint, which the driven solvers join whole; every object that moves when those DOFs move (a polygon
+ * touching them included) and everything those objects are built from; the stated sides. Two attempts with
+ * the same signature solve the same system from the same start, so they fail the same way; an unrelated
+ * fact landing elsewhere leaves the signature — and the verdict — unchanged.
+ */
+export function solveSignature(cur: Construction, cmds: Command[]): string {
+  const byId = new Map(cur.objects.map((o) => [o.id, o] as const));
+  const seeds = new Set<Id>();
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') {
+      if (byId.has(v)) seeds.add(v);
+    } else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') for (const x of Object.values(v)) walk(x);
+  };
+  cmds.forEach(walk);
+  const dofsOf = new Map<Id, Id[]>();
+  const drivable = (id: Id): Id[] => {
+    let d = dofsOf.get(id);
+    if (!d) dofsOf.set(id, (d = allDrivableAncestors(cur.objects, id)));
+    return d;
+  };
+  const dofs = new Set<Id>();
+  for (const id of seeds) for (const d of drivable(id)) dofs.add(d);
+  const cons = [...cur.constraints, ...drivenConstraintsOf(cur)];
+  const consDofs = cons.map((k) => new Set(constraintRefs(k).flatMap(drivable)));
+  const taken: boolean[] = cons.map(() => false);
+  for (let grew = true; grew; ) {
+    grew = false;
+    cons.forEach((k, i) => {
+      if (taken[i]) return;
+      if (!isOrderConstraint(k) && ![...consDofs[i]].some((d) => dofs.has(d))) return;
+      taken[i] = true;
+      grew = true;
+      for (const d of consDofs[i]) dofs.add(d);
+      for (const r of constraintRefs(k)) if (byId.has(r)) seeds.add(r);
+    });
+  }
+  // what moves with the DOFs: their descendants (and the seeds')
+  const children = new Map<Id, Id[]>();
+  for (const o of cur.objects) for (const par of objectParents(o)) (children.get(par) ?? children.set(par, []).get(par)!).push(o.id);
+  const related = new Set<Id>();
+  const down = [...dofs, ...seeds];
+  while (down.length) {
+    const id = down.pop()!;
+    if (related.has(id)) continue;
+    related.add(id);
+    for (const ch of children.get(id) ?? []) down.push(ch);
+  }
+  // …and everything those are built from
+  const up = [...related];
+  while (up.length) {
+    const o = byId.get(up.pop()!);
+    if (!o) continue;
+    for (const par of objectParents(o)) {
+      if (related.has(par)) continue;
+      related.add(par);
+      up.push(par);
+    }
+  }
+  // A drawn segment nothing builds on and nothing constrains is ink: no solve reads it, so it does not enter
+  // the signature («המיתר AB …» lands its segment AB after B failed — the retry's system is the same one).
+  const referenced = new Set<Id>([...cur.objects.flatMap(objectParents), ...cons.flatMap(constraintRefs)]);
+  const ink = (o: Construction['objects'][number]) => o.kind === 'segment' && !seeds.has(o.id) && !referenced.has(o.id);
+  return JSON.stringify([cmds, cur.objects.filter((o) => related.has(o.id) && !ink(o)), cons.filter((_, i) => taken[i]), cur.requirements ?? null]);
+}
+
 function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode {
+  if (attemptScope) return computeFoldInScope(facts, hoistDepth, attribute);
+  attemptScope = { failures: new Map(), first: new Map() };
+  try {
+    return computeFoldInScope(facts, hoistDepth, attribute);
+  } finally {
+    attemptScope = null;
+  }
+}
+
+/**
+ * #1675/#1584 (ADR-583): apply a fact's commands inside the attempt scope — the failure memo first, the
+ * re-attempt cap on any attempt at commands that already failed, the first attempt unarmed.
+ */
+function attemptFact(cur: Construction, cmds: Command[]): ReturnType<typeof tryApplyFact> {
+  const scope = attemptScope!;
+  reattemptStats.attempts++;
+  const key = JSON.stringify(cmds);
+  const first = scope.first.get(key);
+  let sigKey: string | null = null;
+  if (first && reattemptConfig.memo) {
+    sigKey = solveSignature(cur, cmds);
+    const hit = scope.failures.get(sigKey);
+    if (hit && chargeHit(hit.cell)) {
+      reattemptStats.memoHits++;
+      return { ok: false, error: hit.error, degenerate: hit.degenerate };
+    }
+  }
+  const unarmed = solveBudget.deadlineAt === null && work.limitAt === null;
+  const aborts0 = solveBudget.aborts;
+  let exhausted = false;
+  const e0 = work.executed;
+  const { value, cell } = computeWithCell(() => {
+    if (!first) return tryApplyFact(cur, cmds);
+    reattemptStats.capped++;
+    const out = withExecutedCap(reattemptConfig.cap, () => tryApplyFact(cur, cmds));
+    exhausted = out.exhausted;
+    return out.value;
+  });
+  let r = value;
+  if (first && r.ok) reattemptStats.maxOkExecuted = Math.max(reattemptStats.maxOkExecuted, work.executed - e0);
+  if (exhausted && !r.ok) {
+    reattemptStats.exhausted++;
+    r = { ok: false, error: first!.error, degenerate: first!.degenerate }; // the first failure, verbatim
+  }
+  if (!r.ok) {
+    if (!first) scope.first.set(key, { error: r.error, degenerate: r.degenerate });
+    // A re-attempt the cap cut is memoized too: the cap is deterministic and the attempt a function of its
+    // signature, so the same signature would be cut at the same point again (withExecutedCap restored
+    // `aborts` — only an outer budget leaves it moved, and that cut is never stored).
+    if (reattemptConfig.memo && unarmed && solveBudget.aborts === aborts0) scope.failures.set(sigKey ?? solveSignature(cur, cmds), { error: r.error, degenerate: r.degenerate, cell });
+  }
+  return r;
+}
+
+function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode {
   // Symbol table over the ENABLED facts, so a value given later (`x = 4`) resolves an
   // earlier `AB = 3x`, and two segments sharing a variable become a proportion (ADR-031).
   const enabledCmds = facts.filter((f) => f.enabled).map((f) => f.cmd);
@@ -1086,7 +1255,7 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       // `applied` — the verifier read CLEAN on a figure violating the step's own stated relations (docs/17
       // §6 honesty). So build into a `trial` and commit only if EVERY command succeeded; this mirrors the
       // pattern the ADR-104 deferral retry below already uses (both call `tryApplyFact`, #1411).
-      const r = tryApplyFact(cur, engineCmds);
+      const r = attemptFact(cur, engineCmds);
       if (r.ok) {
         cur = r.construction;
         status[f.id] = 'ok';
@@ -1138,7 +1307,7 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
         if (failedWith.get(f.id) === cur) continue;
         const engineCmds = engineCmdsOf(f);
         if (lostDefinition(fi, engineCmds)) continue;
-        const r = tryApplyFact(cur, engineCmds);
+        const r = attemptFact(cur, engineCmds);
         if (r.ok) {
           cur = r.construction;
           status[f.id] = 'ok';
