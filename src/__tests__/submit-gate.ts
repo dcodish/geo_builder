@@ -26,7 +26,7 @@
  * throws (the #567 layering split that created `scenario-pipeline.ts`).
  */
 import { parse, droppedNewLabels, droppedGivenNumbers } from '@/parser';
-import { useGeoStore, dryRunOutcome, deferralWorthwhile } from '@/store/geoStore';
+import { useGeoStore, dryRunOutcome, deferralWorthwhile, replay, seatSweepWarmup } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
 import { ctxOf } from './scenario-pipeline';
@@ -63,8 +63,10 @@ export function gateVerdict(facts: Fact[], utterance: string, seed = 0): GateVer
   if (droppedNewLabels(utterance, r.commands, ctx.points ?? []).length > 0 || droppedGivenNumbers(utterance, r.commands).length > 0) {
     return { kind: 'refused', reason: 'honesty-gate' };
   }
+  // #1671 (ADR-584): the app warms the seat sweep's rotated folds (in the worker) before the dry run — mirrored here.
+  for (const fc of seatSweepWarmup(facts, r.commands, seed)) replay(fc, seed);
   const outcome = dryRunOutcome(facts, r.commands, seed);
-  if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands, seed))) {
+  if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands, seed, { seatsExhausted: outcome.seatsExhausted }))) {
     return { kind: 'commit', commands: r.commands };
   }
   if (outcome.reason === 'empty') {

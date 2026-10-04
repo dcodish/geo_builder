@@ -211,6 +211,13 @@ src/
                    the listed slice, since what counts as "new" for ACCEPTANCE is a different question
   replay/        core.ts — the PURE replay layer (S1.2): fold memo + deferral + HOIST + seed/config
                  searches + the shared sample core; engine ← replay ← store enforced by test
+                 — the fold's ATTEMPT SCOPE (ADR-583, #1675/#1584): every per-fact apply goes through
+                   `attemptFact` — a fact the outermost fold already failed is a RE-attempt: answered
+                   from the scope's failure memo when its `solveSignature` is unchanged, else run under
+                   the deterministic `REATTEMPT_WORK_CAP` (executed units) and reported with its first
+                   failure verbatim when cut; the first attempt is never capped (ADR-281). A role
+                   re-reading's dry run (`decideDeterministic`) is capped likewise in charged units,
+                   inside one work epoch with the line's own dry run (`ROLE_READING_WORK_CAP`).
                  — the fold's RETRY PASS and CLAIM RULE (ADR-577, #1411): one lowering
                    (`engineCmdsOf`) and one all-or-nothing apply (`tryApplyFact`) serve the in-order
                    pass and the ADR-104 retry alike. The retry takes every red, enabled, non-forced,
@@ -678,12 +685,20 @@ knowledge gates ask "is this the same in every configuration?", and the pool is 
 - **Cost:** a few replays per determined figure at panel/relations time in the worker, memoized per fact
   list, never in the submit path. A rewrite that is INFEASIBLE pays the recruiter ladder to conclude it
   (the #259 class — 96 s deadline-free on the quarter-circle figure); the work cap cuts that and the figure
-  falls to the not-determined branch above, and says so. The cap bounds the JOBS only: the setup (the
-  display-seed search, the base replays) is the figure's own fold, already paid by the drawing and held by
-  the fold memo — charging it made a second call on the same facts come back complete where the first was
-  cut. The UI-thread submit gate's «כבר קיים» test (`impliedByPrior`) keeps its wall-clock bound
-  (`sharedSamples(facts, { deadlineMs })`) — an interactive check that fails open — on the narrow three-seed set (the widened set doubled its main-thread cost), and an incomplete pool
-  is never served from the memo as if it were complete.
+  falls to the not-determined branch above, and says so. The cap bounds the JOBS; the work it counts is a function of the input alone because **every memo hit
+  on the counted path is charged the work it saved** (#1605, [ADR-582](06-decisions.md#adr-582)): each memo
+  entry (replay cache, fold memo, drop-one search memo, the `evaluate` / `resolveDriven` / DOF memos)
+  carries a work ledger (`engine/solveBudget.ts` — its own `evaluateCore` units plus the entries it
+  touched), and inside a work EPOCH (the whole `sharedSamples` call) each entry is charged once — the first
+  touch, computed or hit. So the setup (the display-seed search, the base replays) charges the figure's own
+  fold before the cap is armed and a job re-reading it pays nothing, cold or warm, while a job touching any
+  other memo pays its recorded work warm exactly as it would compute it cold. A hit an armed budget cannot
+  afford is recomputed (aborting where a cold run would), and a budget-cut computation is never memoized. The UI-thread submit gate's «כבר קיים» test (`impliedByPrior`) keeps its wall-clock bound
+  (`sharedSamples(facts, { deadlineMs })`) — an interactive check that fails open — on the narrow three-seed set (the widened set doubled its main-thread cost). The work-path pool is memoized
+  whether complete or not (it is deterministic), so the values op after the detect sweep reuses it: one sweep
+  per facts, and the status line and the values panel read one verdict. While the values compute for the
+  current figure runs, an asked question's row reads «מחשב… התשובה תופיע כשהחישוב יסתיים» (`waitingNote`);
+  «לחצו «חשב ערכים»» only when nothing is running.
 - **The status cue reads the same pool (#1444, [ADR-556](06-decisions.md#adr-556)).** `figureDeterminacy`
   (`replay/core.ts`) returns the pool's `determined` flag, the number of DISTINCT shapes in it — two samples
   are one configuration when every labelled pairwise distance agrees up to one common scale (a mirror or a
@@ -847,7 +862,13 @@ contradiction. The fold now records that per-fact verdict from its first build, 
 (`FoldNode.concludedByIndex` → `Derived.concluded`), and the gate refuses any line with a member in it —
 unless the figure has an unpinned right-angle seat (`unpinnedSeats`, shared with `seatRescue`): that verdict
 is taken at the current seat, and a seat the student never stated yields (ADR-551 Am. 1), so the post-commit
-config search gets the line. One claim therefore gets one verdict however it is spelled. On the submit path the read is a fold-memo hit:
+config search gets the line — **unless the dry run's seat sweep FINISHED and cured nothing**
+(`StepOutcome.seatsExhausted`, [ADR-584](06-decisions.md#adr-584), #1671): then no unstated seat can yield and
+the line is refused like on any other figure. The gate's sweep (`seatSweep`) is bounded by a fixed amount of
+WORK in charged units (`SEAT_SWEEP_WORK_CAP`, replacing the 1.5 s clock — the same verdict on every device,
+cold or warm), and the submit path warms its rotated folds in the worker first (`seatSweepWarmup`; a
+transplanted fold carries its recorded work, `FoldNode.work`, so it is charged the same). The configuration
+search's seat tier keeps its wall-clock deadline. One claim therefore gets one verdict however it is spelled. On the submit path the read is a fold-memo hit:
 the dry run has just folded the same trial.
 
 ## Re-reading a role-assigned letter run ([ADR-521](06-decisions.md#adr-521))

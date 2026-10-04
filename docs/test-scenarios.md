@@ -1675,3 +1675,7 @@ over all four (ADR-041).
 ### `untick-then-retype-reenables-1748` — re-typing an unticked «משולש ABC» ticks it again; «משולש ACB» over it is refused naming the row (#1748, ADR-578)
 
 **Guards against:** the submit dry run modelling a different fact list from the one the commit saves. «משולש ABC» · «M אמצע AB» · untick the triangle · «משולש ABC» was refused «A, B, C כבר אינה זמינה»: the trial kept the unticked triangle (which reserves A, B, C) and appended a copy, while the commit re-enables the twin. Asserts the identical re-type commits through the gate, and that a different spelling is refused naming the unticked row.
+
+### `impossible-chord-refused-beside-unstated-right-angle-1671` — on a right triangle whose right angle was never placed, an impossible chord line is refused; a line one seat satisfies still commits (#1671, ADR-584)
+
+**Guards against:** a line that cannot hold at any right-angle position being added with red rows because the gate's seat sweep ran out of a 1.5 s clock. «משולש ישר זווית ABC · משולש ABC חסום במעגל · M אמצע AB · קטע DE · המיתר AM מקביל ל-DE» committed with three red rows; it is now refused naming |OM| = |OA|, while «קשת AB = קשת BC» (the right angle at B satisfies it) still commits. The sweep is bounded by a fixed amount of charged work, so the verdict is the same on every device; the submit-door matrix is in `src/app/__tests__/issue-1671-seat-sweep.test.ts`.

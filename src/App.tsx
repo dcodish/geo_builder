@@ -17,7 +17,7 @@ import { useStore } from 'zustand';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { privacyDeclaration } from './ui/privacy';
 import { aboutContent } from './ui/about';
-import type { QueryNote } from '@/engine/valuesPanel';
+import { waitingNote } from '@/engine/valuesPanel';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
@@ -1973,7 +1973,7 @@ export default function App() {
                     waiting, while it is not — never a silently dropped question. */}
                 {/* #882: the fallback row's note is a real `QueryNote`, so a value with no message
                     cannot ship again — `values-panel-notes.test.ts` walks that union against both locales. */}
-                {(valuesLayer?.queryRows ?? queries.map((text) => ({ text, label: undefined, value: null, exact: undefined, kind: undefined, unit: undefined, note: 'pending' satisfies QueryNote }))).map((qr) => (
+                {(valuesLayer?.queryRows ?? queries.map((text) => ({ text, label: undefined, value: null, exact: undefined, kind: undefined, unit: undefined, note: waitingNote(computingValues) }))).map((qr) => (
                   <div key={qr.text} style={{ display: 'flex', gap: 6, alignItems: 'baseline', padding: '1px 2px' }}>
                     <button
                       type="button"

@@ -20,7 +20,9 @@ import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY } from '@/engine';
-import { work, withWorkBudget } from '@/engine/solveBudget';
+import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
+import { allDrivableAncestors } from '@/engine/step';
+import { objectParents } from '@/engine/types';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -230,6 +232,9 @@ function applyReflections(c: Construction, mask: number): Construction {
  * not a ledger). `replayStats.computes` counts REAL recomputes (cache misses) for the perf canary (A5).
  */
 const replayCache = new WeakMap<Fact[], { snapshot: readonly Fact[]; bySeed: Map<string, Derived> }>();
+/** #1605 (ADR-582): each memoized replay's and fold's WORK LEDGER (engine/solveBudget.ts) — a side table, so
+ *  the fold node stays pure, structured-clone-safe data for the ADR-290 worker transplant. */
+const cellOf = new WeakMap<object, WorkCell>();
 const REPLAY_CACHE_MAX = 512; // per facts-array — above this the sweep is exploring, not re-checking
 export const replayStats = { computes: 0 };
 
@@ -291,9 +296,14 @@ export function replay(facts: Fact[], seed = 0): Derived {
   const fresh = entry && entry.snapshot.length === facts.length && entry.snapshot.every((f, i) => f === facts[i]);
   if (entry && !fresh) entry = undefined;
   const hit = fresh ? entry!.bySeed.get(key) : undefined;
-  if (hit) return hit;
-  const out = computeReplay(facts, seed);
+  // #1605 (ADR-582): a hit is charged the work it saved; one an armed work budget cannot afford is recomputed
+  if (hit && chargeHit(cellOf.get(hit))) return hit;
+  const aborts0 = solveBudget.aborts;
+  const { value: out, cell } = computeWithCell(() => computeReplay(facts, seed));
   replayStats.computes++;
+  // A replay whose solve ladder a budget cut short is not THE replay of these facts (the fold memo's rule).
+  if (solveBudget.aborts !== aborts0) return out;
+  cellOf.set(out, cell);
   if (!entry) {
     entry = { snapshot: facts.slice(), bySeed: new Map() };
     replayCache.set(facts, entry);
@@ -364,6 +374,9 @@ interface FoldNode {
    *  apply an appended fact BEFORE that fact, the full fold applies it after — the memo must stay a pure cache
    *  (ADR-280/406). Relation-only retries leave it false, so their resume behaviour is unchanged. */
   retriedCreating: boolean;
+  /** #1671 (ADR-584): the fold's recorded work (its ledger's total), carried across the ADR-290 worker
+   *  transplant so a primed fold is charged what computing it cost (#1605's rule). Set by {@link getFoldFor}. */
+  work?: number;
 }
 
 /**
@@ -413,10 +426,21 @@ function translateFold(node: FoldNode, permToOrig: number[]): FoldNode {
  * that content runs at TAIL speed and the tab never pays the cold fold.
  */
 export type { FoldNode };
+/** Test-only: forget every memoized replay, fold and pool (a COLD measurement on demand). The replay cache is
+ *  identity-keyed, so a fresh facts array is already cold there. */
+export function clearReplayCaches(): void {
+  foldCache.clear();
+  searchFoldCache.clear();
+  sampleMemo = null;
+}
 export function getFoldFor(facts: Fact[]): FoldNode | null {
-  return foldCache.get(foldKey(facts)) ?? null;
+  const node = foldCache.get(foldKey(facts)) ?? null;
+  const cell = node ? cellOf.get(node) : undefined;
+  if (node && cell) node.work = ledgerTotal(cell);
+  return node;
 }
 export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
+  if (fold.work !== undefined) cellOf.set(fold, flatLedger(fold.work)); // #1671: charged like a fold computed here
   if (foldCache.size >= FOLD_CACHE_MAX) foldCache.delete(foldCache.keys().next().value as string);
   foldCache.set(foldKey(facts), fold);
 }
@@ -478,14 +502,17 @@ export function trialFacts(facts: Fact[], commands: AnyCommand[]): Fact[] {
 function computeReplay(facts: Fact[], seed = 0): Derived {
   const key = foldKey(facts);
   let fold = foldCache.get(key);
+  if (fold && !chargeHit(cellOf.get(fold))) fold = undefined; // #1605: unaffordable under the budget → recompute
   if (!fold) {
     const abortsBefore = solveBudget.aborts;
-    fold = computeFold(facts);
+    const { value, cell } = computeWithCell(() => computeFold(facts));
+    fold = value;
     foldStats.computes++;
     // A fold whose recruit ladder was cut short by the view-search budget is NOT the fold for this
     // content — memoizing it would pin the degraded figure for every later, unbudgeted replay.
     if (solveBudget.aborts === abortsBefore) {
-      if (foldCache.size >= FOLD_CACHE_MAX) foldCache.delete(foldCache.keys().next().value as string);
+      cellOf.set(fold, cell);
+      if (!foldCache.has(key) && foldCache.size >= FOLD_CACHE_MAX) foldCache.delete(foldCache.keys().next().value as string);
       foldCache.set(key, fold);
     }
   }
@@ -538,19 +565,182 @@ const SEARCH_FOLD_CACHE_MAX = 24;
 /** #943: how many trial folds the drop-one search has run — the counter lock (zero on every green replay). */
 export const conflictSearchStats = { folds: 0 };
 function foldForSearch(facts: Fact[]): FoldNode {
-  const key = foldKey(facts);
+  // #1675 (ADR-583): a trial fold runs inside the outer fold's attempt scope, whose already-failed facts it
+  // re-attempts under the re-attempt cap — so the facts that had failed are part of what the node IS.
+  const key = `${foldKey(facts)}\n#failed:${attemptScope ? [...attemptScope.first.keys()].sort().join('\u0001') : ''}`;
   const hit = searchFoldCache.get(key);
-  if (hit) return hit;
-  const node = computeFold(facts, 0, false);
+  if (hit && chargeHit(cellOf.get(hit))) return hit; // #1605 (ADR-582): charged like the main memo
+  const aborts0 = solveBudget.aborts;
+  const { value: node, cell } = computeWithCell(() => computeFold(facts, 0, false));
   conflictSearchStats.folds++;
-  if (searchFoldCache.size >= SEARCH_FOLD_CACHE_MAX) searchFoldCache.delete(searchFoldCache.keys().next().value as string);
+  if (solveBudget.aborts !== aborts0) return node; // a budget-cut trial fold is never memoized (the main memo's rule)
+  cellOf.set(node, cell);
+  if (!searchFoldCache.has(key) && searchFoldCache.size >= SEARCH_FOLD_CACHE_MAX) searchFoldCache.delete(searchFoldCache.keys().next().value as string);
   searchFoldCache.set(key, node);
   return node;
 }
 /** #943: the structured tail an over-constrained status carries once the other side is known — `[vs #<fact index>]`. */
 export const OVER_CONSTRAINED_VS = /^over-constrained: (.+) cannot hold(?: \[vs #(\d+)\])?$/;
 
+/**
+ * #1675/#1584 ([ADR-583](docs/06-decisions.md#adr-583)) — ONE ATTEMPT SCOPE PER OUTERMOST FOLD.
+ *
+ * A fact the fold failed is attempted again and again inside the same fold: the ADR-104 retry, the atomic
+ * rebuild, the HOIST re-folds (depths 1–2) and the drop-one search's trial folds. On an infeasible system
+ * each attempt paid the whole unbudgeted failure ladder again (measured: «המיתר AB מקביל ל-CD» on a midpoint
+ * B — six attempts, 9.58M evaluations; «רבע מעגל CAB» 8.72M). The scope, shared by every fold nested in the
+ * outermost one, holds two things:
+ *  - `failures` — a FAILURE MEMO keyed by the fact's {@link solveSignature}: an attempt whose inputs did
+ *    not change since it failed is answered from the memo (its work charged, #1605). Stored only for a
+ *    failure computed with no budget armed and no abort — a cut search is not THE failure.
+ *  - `first` — the fact's FIRST failure. Any later attempt at the same commands is a RE-attempt and runs
+ *    under {@link reattemptConfig}'s cap; a re-attempt the cap cuts reports the first failure verbatim, so
+ *    the statuses stay what they were. The first attempt is never capped (ADR-281: a solvable figure must
+ *    build, whatever it costs).
+ * Both are functions of the outermost fold's content alone, so the fold stays a pure memo entry.
+ */
+interface AttemptScope {
+  failures: Map<string, { error: string; degenerate: boolean; cell: WorkCell }>;
+  first: Map<string, { error: string; degenerate: boolean }>;
+}
+let attemptScope: AttemptScope | null = null;
+/**
+ * #1675/#1584 (ADR-583): the re-attempt cap, in EXECUTED evaluateCore calls. Calibrated over the corpus
+ * scenarios, the fixtures and the four decide-parity shards (see the ADR): above the most expensive
+ * SUCCESSFUL re-attempt measured there. A test may lower it to exercise the cut.
+ */
+export const REATTEMPT_WORK_CAP = 750_000;
+/** `memo: false` disables the failure memo — the differential lock compares the two (never off in the app). */
+export const reattemptConfig = { cap: REATTEMPT_WORK_CAP, memo: true };
+/** #1675/#1584: the counters the re-attempt locks read (operation counts, never time). */
+export const reattemptStats = { attempts: 0, memoHits: 0, capped: 0, exhausted: 0, maxOkExecuted: 0 };
+
+/**
+ * #1675 (ADR-583) — THE SOLVE SIGNATURE of applying `cmds` to `cur`: everything the attempt's solve can
+ * read or move. The objects the commands name; every drivable DOF upstream of them; every constraint (checked
+ * or driven) sharing such a DOF, to a fixpoint — the constraint COMPONENT (S3.2) — plus every order/bound
+ * constraint, which the driven solvers join whole; every object that moves when those DOFs move (a polygon
+ * touching them included) and everything those objects are built from; the stated sides. Two attempts with
+ * the same signature solve the same system from the same start, so they fail the same way; an unrelated
+ * fact landing elsewhere leaves the signature — and the verdict — unchanged.
+ */
+export function solveSignature(cur: Construction, cmds: Command[]): string {
+  const byId = new Map(cur.objects.map((o) => [o.id, o] as const));
+  const seeds = new Set<Id>();
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') {
+      if (byId.has(v)) seeds.add(v);
+    } else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') for (const x of Object.values(v)) walk(x);
+  };
+  cmds.forEach(walk);
+  const dofsOf = new Map<Id, Id[]>();
+  const drivable = (id: Id): Id[] => {
+    let d = dofsOf.get(id);
+    if (!d) dofsOf.set(id, (d = allDrivableAncestors(cur.objects, id)));
+    return d;
+  };
+  const dofs = new Set<Id>();
+  for (const id of seeds) for (const d of drivable(id)) dofs.add(d);
+  const cons = [...cur.constraints, ...drivenConstraintsOf(cur)];
+  const consDofs = cons.map((k) => new Set(constraintRefs(k).flatMap(drivable)));
+  const taken: boolean[] = cons.map(() => false);
+  for (let grew = true; grew; ) {
+    grew = false;
+    cons.forEach((k, i) => {
+      if (taken[i]) return;
+      if (!isOrderConstraint(k) && ![...consDofs[i]].some((d) => dofs.has(d))) return;
+      taken[i] = true;
+      grew = true;
+      for (const d of consDofs[i]) dofs.add(d);
+      for (const r of constraintRefs(k)) if (byId.has(r)) seeds.add(r);
+    });
+  }
+  // what moves with the DOFs: their descendants (and the seeds')
+  const children = new Map<Id, Id[]>();
+  for (const o of cur.objects) for (const par of objectParents(o)) (children.get(par) ?? children.set(par, []).get(par)!).push(o.id);
+  const related = new Set<Id>();
+  const down = [...dofs, ...seeds];
+  while (down.length) {
+    const id = down.pop()!;
+    if (related.has(id)) continue;
+    related.add(id);
+    for (const ch of children.get(id) ?? []) down.push(ch);
+  }
+  // …and everything those are built from
+  const up = [...related];
+  while (up.length) {
+    const o = byId.get(up.pop()!);
+    if (!o) continue;
+    for (const par of objectParents(o)) {
+      if (related.has(par)) continue;
+      related.add(par);
+      up.push(par);
+    }
+  }
+  // A drawn segment nothing builds on and nothing constrains is ink: no solve reads it, so it does not enter
+  // the signature («המיתר AB …» lands its segment AB after B failed — the retry's system is the same one).
+  const referenced = new Set<Id>([...cur.objects.flatMap(objectParents), ...cons.flatMap(constraintRefs)]);
+  const ink = (o: Construction['objects'][number]) => o.kind === 'segment' && !seeds.has(o.id) && !referenced.has(o.id);
+  return JSON.stringify([cmds, cur.objects.filter((o) => related.has(o.id) && !ink(o)), cons.filter((_, i) => taken[i]), cur.requirements ?? null]);
+}
+
 function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode {
+  if (attemptScope) return computeFoldInScope(facts, hoistDepth, attribute);
+  attemptScope = { failures: new Map(), first: new Map() };
+  try {
+    return computeFoldInScope(facts, hoistDepth, attribute);
+  } finally {
+    attemptScope = null;
+  }
+}
+
+/**
+ * #1675/#1584 (ADR-583): apply a fact's commands inside the attempt scope — the failure memo first, the
+ * re-attempt cap on any attempt at commands that already failed, the first attempt unarmed.
+ */
+function attemptFact(cur: Construction, cmds: Command[]): ReturnType<typeof tryApplyFact> {
+  const scope = attemptScope!;
+  reattemptStats.attempts++;
+  const key = JSON.stringify(cmds);
+  const first = scope.first.get(key);
+  let sigKey: string | null = null;
+  if (first && reattemptConfig.memo) {
+    sigKey = solveSignature(cur, cmds);
+    const hit = scope.failures.get(sigKey);
+    if (hit && chargeHit(hit.cell)) {
+      reattemptStats.memoHits++;
+      return { ok: false, error: hit.error, degenerate: hit.degenerate };
+    }
+  }
+  const unarmed = solveBudget.deadlineAt === null && work.limitAt === null;
+  const aborts0 = solveBudget.aborts;
+  let exhausted = false;
+  const e0 = work.executed;
+  const { value, cell } = computeWithCell(() => {
+    if (!first) return tryApplyFact(cur, cmds);
+    reattemptStats.capped++;
+    const out = withExecutedCap(reattemptConfig.cap, () => tryApplyFact(cur, cmds));
+    exhausted = out.exhausted;
+    return out.value;
+  });
+  let r = value;
+  if (first && r.ok) reattemptStats.maxOkExecuted = Math.max(reattemptStats.maxOkExecuted, work.executed - e0);
+  if (exhausted && !r.ok) {
+    reattemptStats.exhausted++;
+    r = { ok: false, error: first!.error, degenerate: first!.degenerate }; // the first failure, verbatim
+  }
+  if (!r.ok) {
+    if (!first) scope.first.set(key, { error: r.error, degenerate: r.degenerate });
+    // A re-attempt the cap cut is memoized too: the cap is deterministic and the attempt a function of its
+    // signature, so the same signature would be cut at the same point again (withExecutedCap restored
+    // `aborts` — only an outer budget leaves it moved, and that cut is never stored).
+    if (reattemptConfig.memo && unarmed && solveBudget.aborts === aborts0) scope.failures.set(sigKey ?? solveSignature(cur, cmds), { error: r.error, degenerate: r.degenerate, cell });
+  }
+  return r;
+}
+
+function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode {
   // Symbol table over the ENABLED facts, so a value given later (`x = 4`) resolves an
   // earlier `AB = 3x`, and two segments sharing a variable become a proportion (ADR-031).
   const enabledCmds = facts.filter((f) => f.enabled).map((f) => f.cmd);
@@ -832,6 +1022,9 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       if (node.prescanSig !== prescanSigFor(count)) continue;
       resumeFrom = { node, count };
     }
+    // #1605 (ADR-582): resuming IS a memo hit on the prefix node — charged its work, and declined (a full
+    // fold instead) when an armed work budget cannot afford it, exactly as a cold fold would have run.
+    if (resumeFrom && !chargeHit(cellOf.get(resumeFrom.node))) resumeFrom = null;
     if (resumeFrom) foldStats.resumes++;
   }
   // Build the construction by folding the enabled facts. `forced` maps a fact id to a status string that
@@ -1069,7 +1262,7 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       // `applied` — the verifier read CLEAN on a figure violating the step's own stated relations (docs/17
       // §6 honesty). So build into a `trial` and commit only if EVERY command succeeded; this mirrors the
       // pattern the ADR-104 deferral retry below already uses (both call `tryApplyFact`, #1411).
-      const r = tryApplyFact(cur, engineCmds);
+      const r = attemptFact(cur, engineCmds);
       if (r.ok) {
         cur = r.construction;
         status[f.id] = 'ok';
@@ -1121,7 +1314,7 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
         if (failedWith.get(f.id) === cur) continue;
         const engineCmds = engineCmdsOf(f);
         if (lostDefinition(fi, engineCmds)) continue;
-        const r = tryApplyFact(cur, engineCmds);
+        const r = attemptFact(cur, engineCmds);
         if (r.ok) {
           cur = r.construction;
           status[f.id] = 'ok';
@@ -1797,7 +1990,7 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
  * #1668 (ADR-564): and the classifier's verdict is PER FACT — `Derived.concluded` carries it, so a line
  * one of whose members the fold filed as a concluded contradiction never parks on another member's flex.
  */
-export function deferralWorthwhile(facts: Fact[], commands: AnyCommand[], seed = 0): boolean {
+export function deferralWorthwhile(facts: Fact[], commands: AnyCommand[], seed = 0, opts: { seatsExhausted?: boolean } = {}): boolean {
   if (!hasDeferrableConstraint(commands)) return false;
   const symtab = buildSymTab([...facts.filter((f) => f.enabled).map((f) => f.cmd), ...commands]);
   const lowered = commands.flatMap((c) => lowerOne(c, symtab)) as Command[];
@@ -1811,14 +2004,16 @@ export function deferralWorthwhile(facts: Fact[], commands: AnyCommand[], seed =
   // flex probe already refuses never pays it.
   //
   // The fold's verdict is taken at the CURRENT right-angle seat, and an unstated seat yields (ADR-551
-  // Am. 1): a failure it may cure is not concluded. `dryRunOutcome` tries that cure under a 1.5 s
-  // budget; a line it could not finish there (measured: the #546 arc line on a triangle with its two
-  // circles — cold rotated folds, ~20 s) keeps the ADR-104 route, and the post-commit config search
-  // reseats it. So a concluded member refuses only where no unpinned seat could still yield.
+  // Am. 1): a failure it may cure is not concluded. `dryRunOutcome` tries that cure (the seat sweep) under a
+  // fixed WORK cap — #1671 (ADR-584) replaced the 1.5 s clock, which a cold sweep always outran, so the line
+  // parked and painted red. A sweep the cap cuts still keeps the ADR-104 route (the post-commit config search
+  // reseats); one that FINISHED without a cure (`seatsExhausted`) proves no unstated seat yields.
   const all = trialFacts(facts, commands);
   const trial = replay(all, seed);
   if (!trialChanges(facts, all).some((f) => trial.concluded.has(f.id))) return true;
-  return unpinnedSeats(all).length > 0;
+  // #1671 (ADR-584): the seat exception holds only while a seat MIGHT still cure it — a dry run whose seat
+  // sweep finished and cured nothing (`seatsExhausted`) has shown that no unstated seat yields here.
+  return unpinnedSeats(all).length > 0 && !opts.seatsExhausted;
 }
 
 /** The figure's overall scale (bounding-box diagonal of all placed points) — the yardstick a clearance
@@ -2693,24 +2888,113 @@ export function variantRescue(facts: Fact[], deadline: number): { facts: Fact[];
  * failures belong to the unstated seat. Zero cost when no unpinned right-triangle exists.
  */
 export function seatRescue(facts: Fact[], deadline: number): { facts: Fact[]; seed: number } | null {
+  return seatSweep(facts, { deadline }).cured;
+}
+
+/** #1671 ([ADR-584](docs/06-decisions.md#adr-584)): the rewritten fact lists the seat sweep tries — every
+ *  unpinned seat flipped to each of its other `rot`s, in sweep order. One list, so the sweep and the
+ *  off-thread warm-up ({@link seatSweepWarmup}) can never disagree about which folds the sweep reads. */
+export function seatRotations(facts: Fact[]): Fact[][] {
+  const out: Fact[][] = [];
   for (const { f, i } of unpinnedSeats(facts)) {
     const cur = (f.cmd as { rot?: 1 | 2 }).rot ?? 0;
     for (const rot of ([1, 2, 0] as const).filter((r) => r !== cur)) {
-      const fc = facts.map((g, idx) => {
-        if (idx !== i) return g;
-        const { rot: _prev, ...rest } = g.cmd as Extract<typeof g.cmd, { type: 'right-triangle' }>;
-        return { ...g, cmd: rot === 0 ? rest : { ...rest, rot } } as Fact;
-      });
-      for (let s = 0; s < 6; s++) {
-        if (Date.now() > deadline) return null;
-        if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
+      out.push(
+        facts.map((g, idx) => {
+          if (idx !== i) return g;
+          const { rot: _prev, ...rest } = g.cmd as Extract<typeof g.cmd, { type: 'right-triangle' }>;
+          return { ...g, cmd: rot === 0 ? rest : { ...rest, rot } } as Fact;
+        }),
+      );
+    }
+  }
+  return out;
+}
+
+/** #1671 (ADR-584): the seat sweep's counters — the locks count operations, never time. */
+export const seatSweepStats = { sweeps: 0, complete: 0, cured: 0, cut: 0, executed: 0, charged: 0, maxCuredCharged: 0, maxCompleteCharged: 0 };
+
+/**
+ * #1671 ([ADR-584](docs/06-decisions.md#adr-584)) — the seat sweep, reporting whether it FINISHED. A sweep
+ * that tried every rotation at every seed and found no cure has PROVED no unstated seat can cure the
+ * failure — the submit gate may then refuse it ({@link deferralWorthwhile}); a sweep its budget cut proved
+ * nothing, and the line keeps the ADR-104 route as before. The submit gate bounds it by a fixed amount of WORK
+ * in charged units ({@link SEAT_SWEEP_WORK_CAP}, operator ruling 2026-10-04), so the verdict is the same on
+ * every device and cold or warm; the configuration search's seat tier keeps its wall-clock deadline (an
+ * interactive view search, ADR-558). The submit path also warms the rotated folds off the main thread first
+ * ({@link seatSweepWarmup}), so the wait sits in the worker.
+ */
+export function seatSweep(facts: Fact[], limit: { deadline: number } | { workCap: number }): { cured: { facts: Fact[]; seed: number } | null; complete: boolean } {
+  const rotations = seatRotations(facts);
+  if (rotations.length === 0) return { cured: null, complete: true };
+  seatSweepStats.sweeps++;
+  const e0 = work.executed;
+  const d0 = work.done;
+  try {
+    if ('deadline' in limit) return withWorkEpoch(() => sweepRotations(rotations, () => Date.now() > limit.deadline));
+    // #1671 (ADR-584): the submit gate's sweep is bounded by WORK, in charged units (every memo hit charged
+    // the work it saved, ADR-582) — the same verdict on every device and cold or warm. A ladder the cap cut
+    // mid-fold ends the sweep as incomplete: a cut fold is not THE fold, so it can neither cure nor refute.
+    return withWorkBudget(limit.workCap, () => {
+      const at = work.done + limit.workCap;
+      const aborts0 = solveBudget.aborts;
+      return sweepRotations(rotations, () => work.done > at || solveBudget.aborts !== aborts0);
+    });
+  } finally {
+    seatSweepStats.executed += work.executed - e0;
+    seatSweepStats.charged += work.done - d0;
+  }
+}
+function sweepRotations(rotations: Fact[][], stop: () => boolean): { cured: { facts: Fact[]; seed: number } | null; complete: boolean } {
+  const d0 = work.done;
+  for (const fc of rotations) {
+    for (let s = 0; s < 6; s++) {
+      if (stop()) {
+        seatSweepStats.cut++;
+        return { cured: null, complete: false };
+      }
+      const ok = meetsRequirements(fc, s);
+      if (stop()) {
+        seatSweepStats.cut++;
+        return { cured: null, complete: false };
+      }
+      if (ok) {
+        seatSweepStats.cured++;
+        seatSweepStats.maxCuredCharged = Math.max(seatSweepStats.maxCuredCharged, work.done - d0);
+        return { cured: { facts: fc, seed: s }, complete: true };
       }
     }
   }
-  return null;
+  seatSweepStats.complete++;
+  seatSweepStats.maxCompleteCharged = Math.max(seatSweepStats.maxCompleteCharged, work.done - d0);
+  return { cured: null, complete: true };
+}
+/**
+ * #1671 ([ADR-584](docs/06-decisions.md#adr-584)): the submit gate's seat-sweep budget, in CHARGED work units
+ * (operator ruling 2026-10-04 — a fixed amount of work, not the 1.5 s clock it replaced, so the verdict is the
+ * same on every device). Calibrated over the corpus scenarios, the fixtures and the decide-parity shards: above
+ * the most expensive sweep there that CURED a line (see the ADR). A test may lower it.
+ */
+export const SEAT_SWEEP_WORK_CAP = 4_000_000;
+export const seatSweepConfig = { cap: SEAT_SWEEP_WORK_CAP };
+
+/**
+ * #1671 (ADR-584): the fact lists whose FOLDS the gate's seat sweep will read for this step — warmed by the
+ * submit path in the geometry worker before the dry run (the ADR-290 prefold); a transplanted fold carries its
+ * recorded work (`FoldNode.work`), so the sweep's charged count — and its verdict — is the same either way. Empty unless the figure has an
+ * unpinned seat AND the step fails at the current one (a step that builds never sweeps).
+ */
+export function seatSweepWarmup(facts: Fact[], commands: AnyCommand[], seed = 0): Fact[][] {
+  const all = trialFacts(facts, commands);
+  if (unpinnedSeats(all).length === 0) return [];
+  const after = replay(all, seed);
+  if (!trialChanges(facts, all).some((f) => after.status[f.id] !== 'ok')) return [];
+  return seatRotations(all);
 }
 
-export type StepOutcome = { produced: true } | { produced: false; reason: 'error' | 'empty' | 'implied'; detail?: string };
+/** `seatsExhausted` (#1671, ADR-584): the step errs at every unstated right-angle seat — the seat sweep FINISHED
+ *  and cured nothing — so the failure is the givens', not the seat's. */
+export type StepOutcome = { produced: true } | { produced: false; reason: 'error' | 'empty' | 'implied'; detail?: string; seatsExhausted?: boolean };
 
 /**
  * Dry-run a parsed step's engine commands on top of the current facts WITHOUT committing, to decide
@@ -2816,13 +3100,15 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
     // lands the reseat off-thread: the same rescue the old PENDING path always reached, minus the
     // ~20 s ladder burn. An explicitly pinned seat leaves the sweep empty, so an honest refusal
     // (the obtuse-side message naming both givens) stands unchanged.
-    if (seatRescue(all, Date.now() + 1500)) return { produced: true };
+    const seats = seatSweep(all, { workCap: seatSweepConfig.cap });
+    if (seats.cured) return { produced: true };
     // #1711 (ADR-573): the same for an unstated VARIANT — the sine's other root, an isosceles apex. When
     // another assignment of the figure's variant choices (the trial's own among them) admits the whole
     // trial figure, the step commits; `settleVariantDefaults` settles the new fact's own choice at commit
     // and the post-commit `autoResolve` (`findValidConfig`'s variant tier) flips an earlier one.
     if (variantRescue(all, Date.now() + 1500)) return { produced: true };
-    return { produced: false, reason: 'error', detail: after.status[errored.id] };
+    // #1671 (ADR-584): a FINISHED sweep over at least one unpinned seat that cured nothing is a proof.
+    return { produced: false, reason: 'error', detail: after.status[errored.id], ...(seats.complete && unpinnedSeats(all).length ? { seatsExhausted: true } : {}) };
   }
   // "Built something" = added a shape/constraint/label, OR RESHAPED the figure — a step like "diameter AB"
   // on a cyclic quad adds no new object (it converts a vertex to an antipode and re-places the others), so
@@ -3384,18 +3670,25 @@ function preciseSamples(c0: Construction, samples: Map<Id, Vec>[]): Map<Id, Vec>
 }
 
 export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number } = {}): SharedSamples {
+  // #1605 (ADR-582): the work-bounded pool is now a function of the input alone (every memo hit inside it is
+  // charged — engine/solveBudget.ts), so a pool the cap cut is served from the memo like a complete one: the
+  // values op after the detect sweep reuses it instead of recomputing the whole pool, and the status line and
+  // the values panel read ONE verdict.
   const hit = memoHit(facts);
-  if (hit && (hit.complete || opts.deadlineMs !== undefined)) return hit;
+  if (hit) return hit;
+  return withWorkEpoch(() => samplePool(facts, opts));
+}
+function samplePool(facts: Fact[], opts: { deadlineMs?: number }): SharedSamples {
   sampleStats.sweeps++;
   // The UI-thread gate samples the NARROW set (ADR-509's three seeds, no extra button seeds): measured while
   // building ADR-558, the widened set doubled its main-thread cost on a determined figure (0.67 s → 1.32 s
   // on a 3-4-5 restatement). Its narrow pool never replaces the knowledge memo.
   const narrow = opts.deadlineMs !== undefined;
-  // The budget bounds the JOBS — the samples themselves, each a freshly perturbed figure no memo can serve,
-  // so the same input stops at the same job on every run. The setup (the display-seed search and the base
-  // replays) is the figure's own fold, which the drawing already paid and the fold memo holds: charging it
-  // would make the verdict depend on how warm the caches were (measured while building ADR-558 — a second
-  // call on the same facts came back complete where the first was cut).
+  // The budget bounds the JOBS, so the same input stops at the same job on every run. The setup (the
+  // display-seed search and the base replays) runs in the same work EPOCH but before the cap is armed: what
+  // it touches is charged once there, so a job re-reading the figure's own fold pays nothing — as on a cold
+  // run — and a job touching anything else pays its full recorded work, warm or cold (#1605, ADR-582). Before
+  // that, a job's memo hit was free, so the pool came back cut cold and complete warm.
   const memoBefore = sampleMemo;
   const { jobs, finish } = samplingJobs(facts, { wide: !narrow });
   const aborts0 = solveBudget.aborts;

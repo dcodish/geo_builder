@@ -57,6 +57,7 @@ import {
   nameCentreFacts,
   renameFacts,
   replay,
+  seatSweepWarmup,
   stepAsideFacts,
   trialFacts,
 } from '@/store/geoStore';
@@ -64,6 +65,20 @@ import { spanShadow } from '@/parser/spanAccounting';
 import { findProofTarget } from '../../shell/proofTarget';
 import { honestyGateReport } from './honestyGates';
 import { honoursConstruct, roleReadings } from './roleReadings';
+import { solveBudget, work, withWorkBudget, withWorkEpoch } from '@/engine/solveBudget';
+
+/**
+ * #1584 ([ADR-583](../../docs/06-decisions.md#adr-583)) — a ROLE RE-READING is a re-attempt of a line that
+ * already failed, so its dry run runs under a deterministic WORK cap (charged units, #1605 — the whole
+ * decision is one work epoch, so the figure's own fold, touched by the first dry run, is never charged to
+ * a reading). A reading the cap cuts is not adopted — the line's own refusal stands. Calibrated over the
+ * corpus scenarios, the fixtures and the decide-parity shards: above the most expensive reading measured
+ * there that BUILT. A test may lower it to exercise the cut.
+ */
+export const ROLE_READING_WORK_CAP = 1_000_000;
+export const roleReadingConfig = { cap: ROLE_READING_WORK_CAP };
+/** #1584: the role-reading counters the locks read (operation counts). */
+export const roleReadingStats = { readings: 0, cut: 0, maxProduced: 0 };
 
 /** What the figure looks like to the parser — the DISPLAY view (the ADR-293 never-blank fallback). */
 export interface DecideView {
@@ -508,47 +523,68 @@ export async function decideFromParse(
       // the commit, and every later replay of this content then run at TAIL speed on the main thread
       // (the one unbudgeted cold fold, measured ~26 s on the #59 figure, used to block the tab here).
       if (hooks.prefold) await hooks.prefold(trialFacts(facts, r.commands), seed);
+      // #1671 (ADR-584): a step that fails at the current unstated right-angle seat is judged by the dry
+      // run's seat sweep, which reads one fold per rotated seat (seconds each, cold). Warm them here, in the
+      // worker, like the trial's own fold, so the wait is off the main thread; the sweep itself is bounded by
+      // a fixed amount of charged work, so its verdict does not depend on whether they were warm.
+      if (hooks.prefold) for (const fc of seatSweepWarmup(facts, r.commands, seed)) await hooks.prefold(fc, seed);
       // A deterministic parse can "succeed" yet build NOTHING — apply with an error (kept-prior) or
       // change nothing at all. Dry-run before committing so a silent fail isn't shown as success
       // (operator request); a step that builds something commits immediately.
-      let outcome = dryRunOutcome(facts, r.commands, seed);
-      /**
-       * A ROLE-ASSIGNED LETTER RUN IS RE-READ BEFORE IT IS REFUSED (#1012).
-       *
-       * «רבע מעגל OAB» means *centre O, ends A and B* — a convention the catalog never taught. So
-       * «רבע מעגל ODC» was refused after ~17 s, blaming the student's «O על AC», while «רבע מעגל CDO»
-       * built the very same figure in one second.
-       *
-       * The run is re-read over the other role assignments and the first that BUILDS is adopted, then
-       * taught below through the canonical-hint seam that already exists. Ordered by a probe over the
-       * figure the student already has, so the reading that works is tried first and costs one dry run
-       * rather than three (`roleReadings`).
-       *
-       * Nothing is spent when there is no such run — the overwhelmingly common case returns `null`
-       * before any work — and nothing is spent when no alternative reading is more promising than what
-       * the student wrote, which is what keeps an honest refusal close to the cost it has today.
-       */
-      let adopted: string | null = null;
-      if (!outcome.produced) {
-        const readings = roleReadings(utterance, r.commands, (s) => replay(facts, s).positions);
-        for (const reading of readings ?? []) {
-          const alt = parse(reading.utterance, pctx);
-          if (!alt.ok || !honestyGateReport(reading.utterance, alt.commands, pctx).clean) continue;
-          const tryOutcome = dryRunOutcome(facts, alt.commands, seed);
-          if (!tryOutcome.produced) continue;
-          /**
-           * `produced` means SOMETHING was built, not that the construct's promise holds — measured,
-           * «רבע מעגל CAB» produces a "quarter circle" whose two radii are 15 and 10. Answering a
-           * refusal with a wrong figure would be strictly worse than the refusal, so an adopted
-           * reading has to honour what it claims to be.
-           */
-          if (!honoursConstruct(alt.commands, replay(trialFacts(facts, alt.commands), seed).positions)) continue;
-          r = alt;
-          outcome = tryOutcome;
-          adopted = reading.utterance;
-          break;
+      // #1584 (ADR-583): the line's dry run and its role re-readings are ONE work epoch — see ROLE_READING_WORK_CAP.
+      const parsed = r;
+      const decided = withWorkEpoch(() => {
+        let rr = parsed;
+        let outcome = dryRunOutcome(facts, rr.commands, seed);
+        /**
+         * A ROLE-ASSIGNED LETTER RUN IS RE-READ BEFORE IT IS REFUSED (#1012).
+         *
+         * «רבע מעגל OAB» means *centre O, ends A and B* — a convention the catalog never taught. So
+         * «רבע מעגל ODC» was refused after ~17 s, blaming the student's «O על AC», while «רבע מעגל CDO»
+         * built the very same figure in one second.
+         *
+         * The run is re-read over the other role assignments and the first that BUILDS is adopted, then
+         * taught below through the canonical-hint seam that already exists. Ordered by a probe over the
+         * figure the student already has, so the reading that works is tried first and costs one dry run
+         * rather than three (`roleReadings`).
+         *
+         * Nothing is spent when there is no such run — the overwhelmingly common case returns `null`
+         * before any work — and nothing is spent when no alternative reading is more promising than what
+         * the student wrote, which is what keeps an honest refusal close to the cost it has today.
+         */
+        let adopted: string | null = null;
+        if (!outcome.produced) {
+          const readings = roleReadings(utterance, parsed.commands, (s) => replay(facts, s).positions);
+          for (const reading of readings ?? []) {
+            const alt = parse(reading.utterance, pctx);
+            if (!alt.ok || !honestyGateReport(reading.utterance, alt.commands, pctx).clean) continue;
+            const aborts0 = solveBudget.aborts;
+            const done0 = work.done;
+            const tryOutcome = withWorkBudget(roleReadingConfig.cap, () => dryRunOutcome(facts, alt.commands, seed));
+            roleReadingStats.readings++;
+            if (solveBudget.aborts !== aborts0) {
+              roleReadingStats.cut++; // cut by the cap: not THE outcome of this reading — the line's own refusal stands
+              continue;
+            }
+            if (!tryOutcome.produced) continue;
+            roleReadingStats.maxProduced = Math.max(roleReadingStats.maxProduced, work.done - done0);
+            /**
+             * `produced` means SOMETHING was built, not that the construct's promise holds — measured,
+             * «רבע מעגל CAB» produces a "quarter circle" whose two radii are 15 and 10. Answering a
+             * refusal with a wrong figure would be strictly worse than the refusal, so an adopted
+             * reading has to honour what it claims to be.
+             */
+            if (!honoursConstruct(alt.commands, replay(trialFacts(facts, alt.commands), seed).positions)) continue;
+            rr = alt;
+            outcome = tryOutcome;
+            adopted = reading.utterance;
+            break;
+          }
         }
-      }
+        return { rr, outcome, adopted };
+      });
+      r = decided.rr;
+      const { outcome, adopted } = decided;
       if (outcome.produced) {
         // One utterance → one BATCH commit (one group id, one set, ONE undo entry — E4/STO-4).
         // SPAN-ACCOUNTING SHADOW (S3.1 of docs/24 — never refuses; the enforcing flip is the
@@ -594,7 +630,7 @@ export async function decideFromParse(
       // The gate is the SAME one `classify` applies after replay (issue #207 / ADR-385): a CONCLUDED
       // contradiction — a relation whose residual is invariant or provably one-signed across the free
       // configurations — must take the honest-refusal route below, never park as «waiting for givens».
-      if (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands, seed)) {
+      if (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands, seed, { seatsExhausted: outcome.seatsExhausted })) {
         return {
           kind: 'commit', deferred: true, binds, commands: r.commands, note: null,
           logs: [...logs, { source: 'parser', result: 'deferred-constraint', detail: outcome.detail, commands: r.commands }],
