@@ -9935,6 +9935,7 @@ export const RULES: Rule[] = [
   shapeWithConstruct, // #461: «<shape> ABCD עם <construct>» — SPLIT, so every shape and every construct come along by construction
   compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
   compoundAtDistance, // #760: "<point> on <carrier> at distance N from X" — membership + set-distance, composed
+  roleLength, // #1607: «האלכסון AC = 8» / «התיכון AM הוא 5» — the role's own reading + the length, composed
   roleSideLine, // #775: «תיכון ליתר» — role noun → the declared side, rewritten and re-parsed
   multiStatement, // "AB = 4, BC = 6" — split comma/and-joined GIVENS, parse each all-or-nothing (PAR-2)
   setRadius, // "radius of circle P is 4" — set an EXISTING circle's radius; before `circle` (creation) and the shape rules (which 'stop' on רדיוס)
@@ -11115,10 +11116,65 @@ const LENGTH_COPULA = new RegExp(String.raw`^[\s.,:]*(?:=|הוא|היא|הם|ה�
  * neither a copula nor a relation — stays exactly as written, so the frame still fails CLOSED.
  */
 const LENGTH_RELATION = new RegExp(String.raw`(?:<=|>=|<|>|≤|≥|${CMP_BIG}|${CMP_SMALL}|${CMP_AT_LEAST}|${CMP_AT_MOST}|בין)`, 'i');
+/**
+ * WHERE A LENGTH FRAME'S VALUE GOES — the one routing decision, shared by the plain-noun rewrite below and
+ * the role-noun composition ({@link roleLength}, #1607). A copula makes it the equality `SEG = value`; a
+ * relation hands the value to the bound/ratio rule verbatim (#1249); anything else is `null` — not a
+ * length statement this lane may rewrite, so the frame fails CLOSED (#1248).
+ */
+const routeLength = (seg: string, conn: string): string | null =>
+  LENGTH_COPULA.test(conn) ? `${seg} = ` : LENGTH_RELATION.test(conn) ? `${seg}${conn}` : null;
 const normalizeVerboseLength = (s: string): string =>
-  s.replace(VERBOSE_LENGTH, (m: string, seg: string, conn: string) =>
-    LENGTH_COPULA.test(conn) ? `${seg} = ` : LENGTH_RELATION.test(conn) ? `${seg}${conn}` : m,
-  );
+  s.replace(VERBOSE_LENGTH, (m: string, seg: string, conn: string) => routeLength(seg, conn) ?? m);
+
+/**
+ * A ROLE NOUN BEFORE A LENGTH KEEPS BOTH (#1607, [ADR-574](../../docs/06-decisions.md#adr-574)).
+ *
+ * «האלכסון AC = 8», «התיכון AM הוא 5», «הגובה AH = 5» — a textbook sentence that says two things: what the
+ * segment IS (a diagonal, a median, an altitude) and how LONG it is. The role rules (`segment` for the
+ * diagonal, `median`, `altitude`) read their noun and pair through `labelRun`, which ignores the residue,
+ * so they won the line and the number was left unaccounted: the honesty gate (correctly) refused, and the
+ * student's line went to a paid model. Measured on d9a5910f across every role noun × every copula × the
+ * «אורך ה…» prefix, in Hebrew and English. `LENGTH_NOUN` above knew only the role-LESS nouns
+ * (אורך/הצלע/הקטע), whose rewrite to a bare `SEG = value` is lossless; for a role noun that rewrite would
+ * drop the role, which is itself a stated given (ADR-499: «אלכסון» is a claim; a median/altitude mints its
+ * foot).
+ *
+ * So the line is COMPOSED, the {@link compoundAtDistance} shape: the role half «<noun> XY» is parsed by the
+ * real grammar — whatever the role rule reads for the bare sentence, including its foot, its diagonal claim
+ * and its refusals — and the length half by the length lane, through the SAME {@link routeLength} decision
+ * the plain nouns use. No third copy of either rule exists here: a role this composer does not name stays
+ * exactly as before, and a connective that is neither a copula nor a relation («גדול פי 2 מ…» is a
+ * relation; an unknown word is neither) is not rewritten, so the line still escalates honestly.
+ *
+ * English twin: the connective there may be a word («is»), which the Hebrew `LENGTH_CONNECTIVE` cannot
+ * contain (it must not cross a label), so the English form takes its own closed copula set and no relation.
+ */
+const ROLE_LENGTH_HE = new RegExp(
+  String.raw`^(?:אורך\s+)?(ה?(?:אלכסון|תיכון|גובה))\s+(${LABEL}\s*${LABEL})(${LENGTH_CONNECTIVE})(?=[√\d(])(.+)$`,
+);
+const ROLE_LENGTH_EN = new RegExp(
+  String.raw`^(?:the\s+)?(?:length\s+of\s+(?:the\s+)?)?(diagonal|median|altitude|height)\s+(${ULABEL}\s*${ULABEL})\s*(?:=|is(?:\s+equal\s+to)?|equals)?\s*(?=[√\d(])(.+)$`,
+  'i',
+);
+function roleLength(s: string, ctx: ParseContext): AnyCommand[] | null {
+  const he = s.match(ROLE_LENGTH_HE);
+  const en = he ? null : s.match(ROLE_LENGTH_EN);
+  if (!he && !en) return null;
+  const noun = (he ?? en)![1];
+  const seg = (he ?? en)![2].replace(/\s+/g, '');
+  const route = he ? routeLength(seg, he[3]) : `${seg} = `;
+  if (route === null) return null; // neither a copula nor a relation — fail closed (#1248)
+  const tail = he ? he[4] : en![3];
+  const role = parse(`${noun} ${seg}`, ctx);
+  if (!role.ok) return null; // the role half is unreadable or refused on its own — unchanged, as before
+  const length = parse(`${route}${tail}`, ctx);
+  if (!length.ok) return null;
+  // the length lane draws the segment too; the role half already drew it (with its own flags)
+  const key = (a: string, b: string) => [a, b].sort().join('|');
+  const drawn = new Set(role.commands.flatMap((c) => (c.type === 'segment' ? [key(c.a, c.b)] : [])));
+  return [...role.commands, ...length.commands.filter((c) => !(c.type === 'segment' && drawn.has(key(c.a, c.b))))];
+}
 
 
 /**

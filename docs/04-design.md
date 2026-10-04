@@ -460,6 +460,14 @@ never merged into one alternation — a relation word beside the copulas is how 
 (#1248, the P1). `CMP_AT_LEAST`/`CMP_AT_MOST` are the non-strict words («לפחות», «לכל היותר», "at least",
 "at most"): the bound rule lowers them with `minStrict: false` / `maxStrict: false`, the ADR-529 fields.
 
+**A ROLE noun in front of the segment composes instead of rewriting** ([ADR-574](06-decisions.md#adr-574), #1607).
+«האלכסון AC = 8», «התיכון AM הוא 5», «הגובה AH = 5» say what the segment IS as well as how long it is, so the
+lossless role-less rewrite above would drop a given. `roleLength` parses the two halves through the real
+grammar — the role half «<noun> XY» exactly as the role rule reads it alone (the diagonal claim, the median's
+midpoint, the altitude's foot, and their refusals), the length half through the SAME `routeLength` decision
+the plain frame uses (copula → equality, relation → bound, anything else → bow out, failing closed). Either
+half unreadable → the rule bows out and the line is read as before.
+
 ADR-498 stopped the VALUE lanes from locating by copula. The RELATION readers — `angleEquality`,
 `arcEquality`, `measureSum` — still split the line on the literal `=`, so «זווית ABC היא זווית DEF» was
 `not-handled` while «= זווית DEF» and «שווה לזווית DEF» worked. The seam has ONE home: `normalizeWordEquality`

@@ -1,0 +1,49 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-04T00:00:00.000Z",
+  "name": "issue-1607-diagonal-length",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מקבילית ABCD",
+      "group": "g0",
+      "cmd": {
+        "type": "parallelogram",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.0",
+      "utterance": "האלכסון AC = 8",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "C",
+        "diagonal": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "האלכסון AC = 8",
+      "group": "g1",
+      "cmd": {
+        "type": "set-distance",
+        "a": "A",
+        "b": "C",
+        "value": 8
+      },
+      "enabled": true
+    }
+  ]
+}
