@@ -810,6 +810,13 @@ fact ids, and the dry run judges `trialChanges` — the facts the fold changed (
 empty. A second copy of the rule is how #1 (ADR-320) and #1748 happened: each time the trial modelled a list
 the commit would not save.
 
+**The load refresh and the load audit judge through it too ([ADR-579](06-decisions.md#adr-579), #1604).** A saved
+step and today's re-parse are compared as `committedStepCommands(prefix, …)` on BOTH sides — the rows a commit of
+those commands onto the prefix would append — and a refreshed step is written as those rows, never the raw parse.
+The fixtures drift net (`fixtures.test.ts`) asks the same question. A raw parse that re-mentions an existing
+segment («PD חותך את AC בנקודה E» after «AC⊥DB») is a lowering the commit never stored; comparing to it made every
+such save read as «saved by an older version» and wrote the duplicate back as a second fact.
+
 An unticked row keeps the letters it introduces (ADR-010: muting is reversible). A DIFFERENTLY spelled
 statement over them is refused naming the row — «A, B, C שייכות לשורה המבוטלת «משולש ABC» — סמנו אותה שוב
 או מחקו אותה» (`errors.mutedRowOwns`) — instead of the generic «… כבר אינה זמינה».

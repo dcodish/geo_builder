@@ -14302,3 +14302,29 @@ The full suite is the batch gate (round #1736).
 - The load refresh (#1604, ADR-579) folds its fresh parse through the same `foldCommand`.
 
 **Behaviour change for a student:** after unticking a row, typing the same sentence again ticks the row back instead of refusing. Typing a different sentence over the unticked row's letters is still refused, but now says which unticked row holds them and to tick it again or delete it.
+
+## ADR-579 — A save loads exactly as saved: the load refresh and audit compare through the commit's fold (#1604)
+
+**Status:** accepted · 2026-10-04 · bug (P2) · round #1753 · branch `fix/1604-load-audit-duplicates`, stacked on `fix/1748-untick-retype` (ADR-578, whose `foldCommand` it calls)
+
+**Requirements:** [FR-HS-10](02-requirements.md) (extended — a save loads exactly as saved; stale means "a commit would store different rows") · **Design:** [04-design.md](04-design.md) "One fold rule: the dry run judges the list the commit saves" (the load paragraph) · **LADDER stage:** none — the load path (`store/loadAudit.ts`) before replay. No parser, engine or render change.
+
+**Cites** [ADR-578](#adr-578) (the shared fold rule), [ADR-314](#adr-314) (#120: the load refresh), [ADR-242](#adr-242) (the load audit), [ADR-232](#adr-232) (load replays saved commands; LLM steps never re-escalate), [ADR-320](#adr-320) (the same class at the dry run).
+
+**Context — re-measured at pickup on the #1748 tip through `runSubmit` (LLM mocked) → `serializeFigure` → `loadFigureText`.** The operator's #1601 figure («מעגל O» … «AC⊥DB» · «PD חותך את AC בנקודה E» · «EC=x»), saved and loaded at once: `refreshed = [8, 9]`, 18 saved rows became 20 loaded rows, and `auditLoadedFigure` flagged steps 8 and 9 as `drift`. Two steps, not the one the issue named: «AC⊥DB» re-mentions a segment too.
+
+**Class (docs/17 §1).** *A saved step is compared on load against a lowering the commit never stored.* The commit folds each command through the fold rule (now `foldCommand`, ADR-578), which drops a command duplicating an earlier fact (FR-EN-9) and folds a repeated one once. `refreshLoadedFigure` and `auditLoadedFigure` compared the RAW re-parse to the saved rows (`JSON.stringify` inequality), so any step whose parse re-mentions an existing object read as "saved by an older version", and the refresh then wrote the duplicate back as a second fact, bypassing the fold. The fixtures drift net (`fixtures.test.ts`) asked the same raw question, so a fixture saved from the app with such a step could not even be committed. The class lock below found it in three of the twenty existing fixtures (`2022-summer-a-issue59`, `issue-260-two-host-membership`, `issue-760-point-at-distance`) once they were committed through the real store. Sibling audit: 3-D, analytic and complex have no load refresh of this shape (the issue's audit, unchanged).
+
+**Decision.**
+1. `committedStepCommands(prefix, cmds)` (`store/loadAudit.ts`): the rows a commit of `cmds` onto `prefix` would append — each command folded through `foldCommand`, keeping the appended ones. In-place effects on earlier rows belong to those rows.
+2. The refresh and the audit compare `committedStepCommands(prefix, fresh)` with `committedStepCommands(prefix, saved)` — both sides through the fold, so a save from a version that stored a duplicate is not flagged for that alone. The refresh writes the FOLDED fresh rows; a fresh reading that folds to nothing keeps the saved row rather than deleting it.
+3. `fixtures.test.ts`'s drift check asks the same question through the same helper.
+4. A genuinely stale step still refreshes: `load-refresh.test.ts` (#120, the pre-#119 `K` without `onSegment`) is unchanged and green.
+
+**Locks.** `src/store/__tests__/issue-1604-load-roundtrip.test.ts` (25): the operator's exact sequence through `runSubmit` → save → `loadFigureText` (nothing refreshed, the audit silent, the loaded rows equal to the saved rows); `committedStepCommands` units (an earlier duplicate dropped, an in-step repeat folded once); a stale step re-lowered to the folded reading with no duplicate written back; and **the class lock** — every fixture committed through the store's real commit (`executeMany`, each deterministic line re-parsed against the live figure, LLM steps committing their stored commands), saved and loaded: nothing refreshed, no findings, identical rows, with an exercised-counter. **Fails before: 6 of 25** (the operator case, the stale-write case, three fixtures, the counter). Fixture `src/__tests__/fixtures/issue-1604-saved-reload.geo.json` — the operator's sequence as the app saves it (rows without the duplicate segments), which the old raw drift net rejected. `decide-parity-1395-4` golden re-recorded: one key added, no hash changed.
+
+**Consequences.**
+- `src/store/loadAudit.ts`: `committedStepCommands`, `lowersAsSaved`; `refreshLoadedFigure` / `auditLoadedFigure` compare and write through them.
+- `src/__tests__/fixtures.test.ts`: the drift check compares through `committedStepCommands`.
+
+**Behaviour change for a student:** loading a figure saved a moment ago no longer says «הקובץ נשמר בגרסה קודמת — N צעדים עודכנו», and the loaded list is exactly the saved one: no duplicated rows.

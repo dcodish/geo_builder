@@ -31,6 +31,7 @@ import { findValidConfig, meetsRequirements } from '@/replay/core';
 import type { Fact } from '@/store/geoStore';
 import { parse, buildParseCtx } from '@/parser';
 import type { AnyCommand } from '@/engine';
+import { committedStepCommands } from '@/store/loadAudit';
 
 const files = import.meta.glob('./fixtures/*.geo.json', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>;
 
@@ -119,7 +120,9 @@ describe('figure-file fixtures net', () => {
           const { construction, positions } = replay(prefix);
           const p = parse(step.utterance, buildParseCtx(construction, positions));
           if (!p.ok) continue; // out-of-grammar — an LLM-escalated step, stored as canonical commands
-          expect(p.commands, `"${step.utterance}" lowers differently than when saved`).toEqual(step.cmds);
+          // #1604 (ADR-579): both sides through the commit's fold — the load refresh's own comparison, so a
+          // duplicate the commit dropped (a re-mentioned segment) is not drift here either.
+          expect(committedStepCommands(prefix, p.commands), `"${step.utterance}" lowers differently than when saved`).toEqual(committedStepCommands(prefix, step.cmds));
         }
       });
     });
