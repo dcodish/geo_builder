@@ -126,7 +126,7 @@
  "scenario:stated-side-vs-incidence-refused-1470": "8d1ec38e9cc51beb",
  "scenario:values-panel-names-circles-1442": "c4ac514000ae1a1d",
  "scenario:overconstrained-names-the-completing-statement-1203": "752efb01f271d1a0",
- "scenario:quarter-circle-conflict-names-no-innocent-given-1203": "f086586001bbd226",
+ "scenario:quarter-circle-conflict-names-no-innocent-given-1203": "6a63f7baafc7b287",
  "scenario:shared-endpoint-crossing-refused-944": "79415c09829a39f8",
  "scenario:zero-dof-configurations-status-1444": "9b00153cdeea57c1",
  "scenario:tangents-perpendicular-foot-values-1601": "71d94094f0cdffc8",
@@ -146,6 +146,11 @@
  "scenario:nested-circles-new-letter-asks-1709": "798df55ca2452855",
  "scenario:trig-given-label-is-the-angle-1718": "e572393d0da71d16",
  "scenario:sine-is-a-two-angle-choice-1711": "4e258742815d4b09",
+ "scenario:cevian-stated-vertex-and-shape-1684": "8a7fa9ec24cc7042",
+ "scenario:triangle-form-cevian-introduces-triangle-1720": "66d4dac428433bae",
+ "scenario:diagonals-named-by-letters-1683": "54f38ccf867bda6e",
+ "scenario:point-placement-keeps-its-tail-1682": "dc2212fa248c24a2",
+ "scenario:creating-row-above-retyped-parent-1411": "014fadf075a2d9e2",
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",
  "fixture:defining-interaction.geo.json": "453b283f490e90b0",
  "fixture:equilateral-inscribed.geo.json": "d8a2b3c24fc515b8",
@@ -162,9 +167,5 @@
  "fixture:issue-989-trapezoid-after-triangle.geo.json": "0703ef8c37579057",
  "fixture:issue-989-trapezoid-stated-pair.geo.json": "5ac9c9b206c76b86",
  "fixture:parallel-chords.geo.json": "54f8605ea57acfa6",
- "fixture:trapezoid-altitude.geo.json": "abbbf2a8308ff3fa",
- "scenario:cevian-stated-vertex-and-shape-1684": "8a7fa9ec24cc7042",
- "scenario:triangle-form-cevian-introduces-triangle-1720": "66d4dac428433bae",
- "scenario:diagonals-named-by-letters-1683": "54f38ccf867bda6e",
- "scenario:point-placement-keeps-its-tail-1682": "dc2212fa248c24a2"
+ "fixture:trapezoid-altitude.geo.json": "abbbf2a8308ff3fa"
 }

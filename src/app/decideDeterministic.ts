@@ -611,7 +611,8 @@ export async function decideFromParse(
        * internal object, never the sentence. Here the refusal quotes the sentence and names the student's
        * own letters it relies on that nothing has defined (`missingOperandLetters`).
        */
-      if (outcome.reason === 'error' && /^unresolved dependencies/.test(outcome.detail ?? '')) {
+      // #1411 (ADR-577): `evaluate` now names an absent operand directly («undefined point: A, B») — same class.
+      if (outcome.reason === 'error' && /^(?:unresolved dependencies|undefined point)/.test(outcome.detail ?? '')) {
         const missing = missingOperandLetters(viewNow().construction, r.commands);
         return refuse(
           'guided',

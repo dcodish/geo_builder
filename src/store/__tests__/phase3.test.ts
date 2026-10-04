@@ -159,7 +159,8 @@ describe('store — select / deselect / delete (ADR-010)', () => {
     s().toggle(squareFactId); // turn the square off
     expect(ids()).not.toContain('A');
     expect(ids()).not.toContain('G'); // G can't resolve without A/D
-    expect(derived().status[s().facts[1].id]).toMatch(/unresolved|already|construct/i);
+    // #1411 (ADR-577): the row now names the points it relies on that are gone («undefined point: A, D»)
+    expect(derived().status[s().facts[1].id]).toMatch(/unresolved|undefined point|already|construct/i);
 
     s().toggle(squareFactId); // turn it back on
     expect(ids()).toContain('A');

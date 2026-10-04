@@ -3351,4 +3351,21 @@ export const SCENARIOS_4: Scenario[] = [
       expect(t, '«מעבר לנקודה B» puts E past B').toBeLessThan(0);
     },
   },
+  {
+    id: 'creating-row-above-retyped-parent-1411',
+    title: '#1411 (ADR-577): «M אמצע AB» left above a re-typed «משולש ABC» builds (M the midpoint of AB); the median form «AM תיכון» above it builds too',
+    guards:
+      "Measured 2026-09-29 and re-measured on d9a5910f through runSubmit + the row's delete: «משולש ABC» · «M אמצע AB» · delete the triangle · «משולש ABC» left the M row red «unresolved dependencies for: M» with no M; with «AM תיכון» instead, the re-typed triangle itself was REFUSED «A is no longer available». The row was parsed while A, B existed, so it stores only midpoint{M,A,B} — the step lists below are that stored shape (a re-parse on an empty context would emit the segment that hides the bug, which is why this is an llm-command step and not a .geo.json fixture). Root cause, two fold seams: the ADR-104 retry skipped CREATING facts, and a FAILED fact claimed the free points it would only have auto-created (the red segment AM claimed A). Fix: the retry covers creating facts (a lost-definition guard keeps the cascade), a failed fact claims only what it defines, and a creating fact that lands late disqualifies the node from prefix resume. The submit-path sequence, the chain, the refusal text, muting and the memo are locked in src/app/__tests__/issue-1411-creating-row-above-parent.test.ts.",
+    steps: [{ llm: [{ type: 'midpoint', id: 'M', a: 'A', b: 'B' }] }, 'משולש ABC'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), M = at(fig, 'M');
+      expect(dist(A, M), 'M is the midpoint of AB').toBeCloseTo(dist(M, B), 6);
+      expect(dist(A, M) * 2, 'M lies on AB').toBeCloseTo(dist(A, B), 6);
+      const med = replay(factsOf([{ llm: [{ type: 'midpoint', id: 'M', a: 'B', b: 'C' }, { type: 'segment', a: 'A', b: 'M' }] }, 'משולש ABC']), 0);
+      expect(Object.values(med.status).every((x) => x === 'ok'), `the median form builds: ${JSON.stringify(med.status)}`).toBe(true);
+      const p = (k: string) => med.positions.get(k)!;
+      expect(dist(p('B'), p('M')), 'M is the midpoint of BC').toBeCloseTo(dist(p('M'), p('C')), 6);
+    },
+  },
 ];

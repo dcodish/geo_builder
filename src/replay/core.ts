@@ -359,6 +359,11 @@ interface FoldNode {
   /** #365: the point ids claimed by the fold's facts (`owned`) — the resume state a prefix append
    *  needs that isn't derivable from the other fields without re-lowering every prefix fact. */
   ownedIds: Id[];
+  /** #1411 ([ADR-577](docs/06-decisions.md#adr-577)): a CREATING fact landed on the ADR-104 retry pass, i.e.
+   *  after facts that follow it in the list. Such a node is never a #365 prefix-resume point: resume would
+   *  apply an appended fact BEFORE that fact, the full fold applies it after — the memo must stay a pure cache
+   *  (ADR-280/406). Relation-only retries leave it false, so their resume behaviour is unchanged. */
+  retriedCreating: boolean;
 }
 
 /**
@@ -782,6 +787,7 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       const count = k.split('\n').length;
       if (resumeFrom && count <= resumeFrom.count) continue;
       if (node.pending || node.buildError !== null || node.rescue !== null) continue;
+      if (node.retriedCreating) continue; // #1411: a creating fact landed AFTER later facts — resume would reorder it
       if (node.statusByIndex.some((s) => s !== 'ok' && s !== 'disabled')) continue;
       if (node.prescanSig !== prescanSigFor(count)) continue;
       resumeFrom = { node, count };
@@ -801,10 +807,74 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
   // Written at the one site a step's error becomes a status; a later run that lands the fact makes its
   // status `ok`, which `classify` filters first, so a stale entry can never matter.
   const rigid = new Set<string>();
+  // #1411 (ADR-577): ONE lowering of a fact into the engine commands the fold applies — the shape-variant /
+  // inscribe expansion plus every pre-scan reseat (rtReorder/rot, msRiderMove, trapRotate, legsReseat,
+  // promoteCentres, the common-tangent pairSwap). The in-order pass and the ADR-104 retry both call it, so a
+  // fact retried after the pass is the SAME fact it was in order (the retry used to lower with bare
+  // `lowerOne`, which skipped every reseat — harmless while only pure relations were retried).
+  // Memoised per fact OBJECT (not id — a dry-run trial list can carry repeated `~try.N` ids): the pre-scan
+  // maps it reads are fixed for the whole fold (every runBuild).
+  const engineCmdsCache = new Map<Fact, Command[]>();
+  const engineCmdsOf = (f: Fact): Command[] => {
+    const hit = engineCmdsCache.get(f);
+    if (hit) return hit;
+    const out = lowerFact(f);
+    engineCmdsCache.set(f, out);
+    return out;
+  };
+  const lowerFact = (f: Fact): Command[] => {
+    // Lower the fact to the engine command(s) it produces (symbolic measures →
+    // ratio/distance/angle/[]; engine commands pass through; a `shape-variant` → base shape + the
+    // variant-selected equal pairs, with an explicit equality pinning the variant — ADR-138).
+    // 0 commands ⇒ a label-only / data-only fact (a free representative or `set-var`) — applied as a no-op.
+    let engineCmds: AnyCommand[] =
+      f.cmd.type === 'shape-variant' ?
+        expandShapeVariant(msSvMove.has(f.id) ? { ...f.cmd, ids: msSvMove.get(f.id)! } : f.cmd, explicitEqs, explicitOnSegs)
+      : f.cmd.type === 'inscribe' ? expandInscribe(f.cmd, explicitOnSegs)
+      : lowerOne(f.cmd, symtab);
+    // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see
+    // pre-scan), or — #566 (ADR-445) — onto the SOLVE-CHOSEN `rot` seat; the explicit pin always wins.
+    const reseat = rtReorder.get(f.id);
+    if (reseat || (f.cmd.type === 'right-triangle' && f.cmd.rot))
+      engineCmds = engineCmds.map((ec) => (ec.type === 'right-triangle' ? { ...ec, ids: rtEffectiveIds(ec, reseat) } : ec));
+    // Re-seat a midsegment default rider onto the side the student explicitly stated (ADR-412 pre-scan).
+    const riderMove = msRiderMove.get(f.id);
+    if (riderMove) engineCmds = engineCmds.map((ec) => (ec.type === 'point-on-segment' ? { ...ec, a: riderMove[0], b: riderMove[1] } : ec));
+    // Rotate a trapezoid whose stated base order contradicts the template's long-base default (ADR-341).
+    const trot = trapRotate.get(f.id);
+    if (trot) engineCmds = engineCmds.map((ec) => (ec.type === 'trapezoid' ? { ...ec, ids: trot } : ec));
+    // Re-seat the isosceles-trapezoid macro's leg equality onto the legs of the ring in force (#989, ADR-506).
+    const legs = legsReseat.get(f.id);
+    if (legs) engineCmds = engineCmds.map((ec) => (ec.type === 'set-equal' ? { ...ec, ...legs } : ec));
+    // Promote anonymous centres a semantic centre-use named (ADR-342, '@ctr-O' → 'O').
+    engineCmds = promoteCentres(engineCmds as Command[]);
+    // Swap a common-tangent group's soft touch↔circle pairing to the explicitly-stated one (ADR-239 pre-scan).
+    const pairSwap = pairSwapByGroup.get(groupKey(f));
+    if (pairSwap) {
+      const letterSwap = new Map([...pairSwap].map(([k, v]) => [k.replace(/^circle-/, ''), v.replace(/^circle-/, '')]));
+      engineCmds = engineCmds.map((ec) => {
+        if (ec.type === 'point-on-circle' && ec.softPair && pairSwap.has(ec.circle)) return { ...ec, circle: pairSwap.get(ec.circle)! };
+        if (ec.type === 'set-perpendicular' && letterSwap.has(ec.a)) return { ...ec, a: letterSwap.get(ec.a)! }; // the radius-⟂'s centre follows its touch
+        return ec;
+      });
+    }
+    return engineCmds as Command[];
+  };
   const runBuild = (forced: Map<string, string>, start: { node: FoldNode; count: number } | null = null) => {
     let cur = start ? start.node.cur : emptyConstruction();
     const status: Record<string, FactStatus> = {};
     const owned = new Set<Id>(start ? start.node.ownedIds : []);
+    // #1411 (ADR-577): WHICH statements claim each owned point — the retry's lost-definition guard must
+    // ignore a fact's own claim. Keyed by fact INDEX (a dry-run trial list can repeat `~try.N` ids). A resumed
+    // prefix is fully clean, so its claims are attributed to a sentinel no retried fact can be (-1).
+    const claimedBy = new Map<Id, Set<number>>();
+    for (const id of owned) claimedBy.set(id, new Set([-1]));
+    const claimPoint = (id: Id, by: number) => {
+      owned.add(id);
+      const s = claimedBy.get(id);
+      if (s) s.add(by); else claimedBy.set(id, new Set([by]));
+    };
+    let retriedCreating = false;
     const applied: Command[] = start ? [...start.node.applied] : [];
     // #360 (ADR-398): ownership maps for per-seed failure attribution — filled after each successful
     // commit, first-wins (the fact whose commit first made the constraint/object appear owns it). The
@@ -873,43 +943,14 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
     };
     for (const [fi, f] of facts.entries()) {
       if (start && fi < start.count) continue; // #365: already folded — resumed from the cached prefix
-      // Lower the fact to the engine command(s) it produces (symbolic measures →
-      // ratio/distance/angle/[]; engine commands pass through; a `shape-variant` → base shape + the
-      // variant-selected equal pairs, with an explicit equality pinning the variant — ADR-138).
-      // 0 commands ⇒ a label-only / data-only fact (a free representative or `set-var`) — applied as a no-op.
-      let engineCmds =
-        f.cmd.type === 'shape-variant' ?
-          expandShapeVariant(msSvMove.has(f.id) ? { ...f.cmd, ids: msSvMove.get(f.id)! } : f.cmd, explicitEqs, explicitOnSegs)
-        : f.cmd.type === 'inscribe' ? expandInscribe(f.cmd, explicitOnSegs)
-        : lowerOne(f.cmd, symtab);
-      // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see
-      // pre-scan), or — #566 (ADR-445) — onto the SOLVE-CHOSEN `rot` seat; the explicit pin always wins.
-      const reseat = rtReorder.get(f.id);
-      if (reseat || (f.cmd.type === 'right-triangle' && f.cmd.rot))
-        engineCmds = engineCmds.map((ec) => (ec.type === 'right-triangle' ? { ...ec, ids: rtEffectiveIds(ec, reseat) } : ec));
-      // Re-seat a midsegment default rider onto the side the student explicitly stated (ADR-412 pre-scan).
-      const riderMove = msRiderMove.get(f.id);
-      if (riderMove) engineCmds = engineCmds.map((ec) => (ec.type === 'point-on-segment' ? { ...ec, a: riderMove[0], b: riderMove[1] } : ec));
-      // Rotate a trapezoid whose stated base order contradicts the template's long-base default (ADR-341).
-      const trot = trapRotate.get(f.id);
-      if (trot) engineCmds = engineCmds.map((ec) => (ec.type === 'trapezoid' ? { ...ec, ids: trot } : ec));
-      // Re-seat the isosceles-trapezoid macro's leg equality onto the legs of the ring in force (#989, ADR-506).
-      const legs = legsReseat.get(f.id);
-      if (legs) engineCmds = engineCmds.map((ec) => (ec.type === 'set-equal' ? { ...ec, ...legs } : ec));
-      // Promote anonymous centres a semantic centre-use named (ADR-342, '@ctr-O' → 'O').
-      engineCmds = promoteCentres(engineCmds as Command[]);
-      // Swap a common-tangent group's soft touch↔circle pairing to the explicitly-stated one (ADR-239 pre-scan).
-      const pairSwap = pairSwapByGroup.get(groupKey(f));
-      if (pairSwap) {
-        const letterSwap = new Map([...pairSwap].map(([k, v]) => [k.replace(/^circle-/, ''), v.replace(/^circle-/, '')]));
-        engineCmds = engineCmds.map((ec) => {
-          if (ec.type === 'point-on-circle' && ec.softPair && pairSwap.has(ec.circle)) return { ...ec, circle: pairSwap.get(ec.circle)! };
-          if (ec.type === 'set-perpendicular' && letterSwap.has(ec.a)) return { ...ec, a: letterSwap.get(ec.a)! }; // the radius-⟂'s centre follows its touch
-          return ec;
-        });
-      }
+      const engineCmds = engineCmdsOf(f);
       const intro = engineCmds.flatMap(introducedPointIds);
-      const claim = () => intro.forEach((id) => owned.add(id));
+      const claim = () => intro.forEach((id) => claimPoint(id, fi));
+      // #1411 (ADR-577): a statement that FAILED claims only the points it DEFINES. A free point it would
+      // merely have auto-created carries no definition — a later statement introducing that letter
+      // contradicts nothing (the re-typed «משולש ABC» under a red «AM תיכון» was refused «A is no longer
+      // available» because the red segment AM had claimed its free endpoint A).
+      const claimDefined = () => engineCmds.flatMap(introducedDefinedPointIds).forEach((id) => claimPoint(id, fi));
       // Blocked by the atomic-group poisoning pass: don't apply/measure it, but claim its points so any
       // dependent of a point ONLY this failed group introduced still cascades honestly.
       if (forced.has(f.id)) {
@@ -955,7 +996,7 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       const broken = intro.filter((id) => owned.has(id) && !cur.objects.some((o) => o.id === id));
       if (broken.length) {
         status[f.id] = `can't build: ${broken.join(', ')} is no longer available (an earlier step it relies on was removed or failed)`;
-        claim();
+        claimDefined();
         continue;
       }
       // TRANSACTIONAL — a fact's lowering is ALL-OR-NOTHING ([ADR-337](docs/06-decisions.md#adr-337)).
@@ -966,43 +1007,49 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       // the figure moved although the step is red, and — because the failing constraint never reached
       // `applied` — the verifier read CLEAN on a figure violating the step's own stated relations (docs/17
       // §6 honesty). So build into a `trial` and commit only if EVERY command succeeded; this mirrors the
-      // pattern the ADR-104 deferral retry below already uses.
-      let trial = cur;
-      let ok = true;
-      for (const unit of applyUnits(engineCmds as Command[])) {
-        const r = unit.length > 1 ? applyCoupledStep(trial, unit) : applyStep(trial, unit[0]);
-        if (r.ok) trial = r.construction;
-        else {
-          status[f.id] = r.error; // dependencies gone, contradiction, etc. — keep prior figure
-          if (r.degenerate) rigid.add(f.id); else rigid.delete(f.id);
-          ok = false;
-          failedWith.set(f.id, cur); // the PRE-fact figure — what the retry must compare against (ADR-280 purity skip)
-          break;
-        }
-      }
-      if (ok) {
-        cur = trial;
+      // pattern the ADR-104 deferral retry below already uses (both call `tryApplyFact`, #1411).
+      const r = tryApplyFact(cur, engineCmds);
+      if (r.ok) {
+        cur = r.construction;
         status[f.id] = 'ok';
-        applied.push(...(engineCmds as Command[]));
+        applied.push(...engineCmds);
         recordOwnership(fi); // #360: whatever this commit added, this fact owns
         labelFrom(f); // #955: the fact held — now, and only now, it may annotate the figure
+        claim();
+      } else {
+        status[f.id] = r.error; // dependencies gone, contradiction, etc. — keep prior figure
+        if (r.degenerate) rigid.add(f.id); else rigid.delete(f.id);
+        failedWith.set(f.id, cur); // the PRE-fact figure — what the retry must compare against (ADR-280 purity skip)
+        claimDefined(); // #1411: a failed statement keeps only what it DEFINES
       }
-      claim();
     }
     // ORDER-INDEPENDENCE ([ADR-104](docs/06-decisions.md#adr-104)): a CONSTRAINT that couldn't be satisfied
     // at its position — an under-determined solve the engine can't pin down yet — may become solvable once
     // LATER facts add givens that remove the slack (e.g. "CE⟂AB" entered before "CD=36, DE=18": with the
     // sizes the figure is determinate and the ⟂ solves; without them it's an unconstrained coupled solve the
-    // solver can't land). So after the in-order pass, RETRY the still-failed constraint-only facts against the
-    // now-complete figure, to a fixpoint — applying such a constraint LAST is exactly the working reordering.
-    // Only pure constraints (no NEW points) are retried: re-ordering a point-introducing fact to the end would
-    // strand its dependents. A genuinely contradictory constraint simply keeps failing. This makes the figure
-    // build the same whatever order the constraints were typed (the operator's "order shouldn't matter").
+    // solver can't land). So after the in-order pass, RETRY the still-failed facts against the now-complete
+    // figure, to a fixpoint — applying such a constraint LAST is exactly the working reordering.
+    // A genuinely contradictory constraint simply keeps failing. This makes the figure build the same
+    // whatever order the constraints were typed (the operator's "order shouldn't matter").
+    //
+    // #1411 ([ADR-577](docs/06-decisions.md#adr-577), the 2-D half of ADR-W-089): CREATING facts are retried
+    // too. ADR-104 excluded them ("re-ordering a point-introducing fact to the end would strand its
+    // dependents"), but this loop cannot strand anything: it touches only RED rows, in list order, pass after
+    // pass — a row that read M before M existed is itself red and lands after M in the same pass, and a green
+    // row never depended on a point that did not exist. The exclusion left «M אמצע AB» red forever once it
+    // sat above «משולש ABC» (delete the triangle and re-type it — the row was parsed when A, B existed, so it
+    // carries no segment that would create them). The in-order pass itself still never reorders.
+    //
+    // One guard keeps the cascade honest: a fact is NOT retried while it would (re)introduce a point that
+    // ANOTHER statement claims and that is absent from the figure — that point's definition is gone (the
+    // phase3 «removing an early step cascades» lock: a segment on circle points whose circle was removed or
+    // muted must not land by minting fresh free endpoints). The fact's own claim never blocks itself.
+    const lostDefinition = (fi: number, cmds: Command[]): boolean =>
+      cmds.flatMap(introducedPointIds).some((id) => !cur.objects.some((o) => o.id === id) && [...(claimedBy.get(id) ?? [])].some((c) => c !== fi));
     const deferrable = (f: Fact): boolean => {
       if (forced.has(f.id) || !f.enabled || status[f.id] === 'ok' || status[f.id] === 'disabled') return false;
       if (futileFact(f)) return false; // #403: a dangling reference can never resolve by retrying
-      const ec = lowerOne(f.cmd, symtab);
-      return ec.length > 0 && ec.every((c) => introducedPointIds(c).length === 0);
+      return engineCmdsOf(f).length > 0;
     };
     for (let pass = 0; pass < facts.length && facts.some(deferrable); pass++) {
       let progressed = false;
@@ -1011,30 +1058,29 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
         // Purity skip (ADR-280): the figure hasn't changed since this fact failed against it, so the
         // retry would re-run the identical expensive search to the identical failure.
         if (failedWith.get(f.id) === cur) continue;
-        const engineCmds = lowerOne(f.cmd, symtab);
-        let trial = cur;
-        let ok = true;
-        for (const ec of engineCmds) {
-          const r = applyStep(trial, ec);
-          if (r.ok) trial = r.construction;
-          else {
-            if (r.degenerate) rigid.add(f.id); // #1328: a retry that found only a degenerate solution is a rigid contradiction too
-            ok = false;
-            break;
-          }
-        }
-        if (ok) {
-          cur = trial;
+        const engineCmds = engineCmdsOf(f);
+        if (lostDefinition(fi, engineCmds)) continue;
+        const r = tryApplyFact(cur, engineCmds);
+        if (r.ok) {
+          cur = r.construction;
           status[f.id] = 'ok';
-          applied.push(...(engineCmds as Command[]));
+          applied.push(...engineCmds);
           recordOwnership(fi); // #360: a deferral-retry commit owns its additions just like an in-order one
           labelFrom(f); // #955: a measure honoured on the retry labels exactly like an in-order one
+          // #1411: the fact now holds — it claims everything it introduced, exactly as an in-order commit does
+          for (const id of engineCmds.flatMap(introducedPointIds)) claimPoint(id, fi);
+          // #1411: a CREATING fact that landed here sits AFTER facts that followed it in the list — a #365
+          // prefix resume would apply an appended fact BEFORE it instead, so the node must not be resumed.
+          if (engineCmds.some((c) => introducedPointIds(c).length > 0)) retriedCreating = true;
           progressed = true;
-        } else failedWith.set(f.id, cur);
+        } else {
+          if (r.degenerate) rigid.add(f.id); // #1328: a retry that found only a degenerate solution is a rigid contradiction too
+          failedWith.set(f.id, cur);
+        }
       }
       if (!progressed) break;
     }
-    return { cur, status, applied, ownerByConKey, ownerByObjId, owned };
+    return { cur, status, applied, ownerByConKey, ownerByObjId, owned, retriedCreating };
   };
   // Classify what (if anything) remains unsatisfiable after the retries. A still-failed step that is a
   // DEFERRABLE constraint while the figure is still UNDER-DETERMINED isn't a contradiction — it's just
@@ -1062,7 +1108,7 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
     const pending = failedFacts.length > 0 && failedFacts.every((f) => waits(cur, f));
     return { failedFacts, pending };
   };
-  let { cur, status, applied, ownerByConKey, ownerByObjId, owned } = runBuild(new Map(), resumeFrom);
+  let { cur, status, applied, ownerByConKey, ownerByObjId, owned, retriedCreating } = runBuild(new Map(), resumeFrom);
   /**
    * #1668 ([ADR-564](docs/06-decisions.md#adr-564)) — WHICH FACTS THE BUILD ITSELF FILED AS A CONCLUDED
    * CONTRADICTION. Read off the FIRST build, before atomic-group poisoning spreads one member's error over
@@ -1115,7 +1161,7 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
         }
       }
       if (!grew) break; // no newly-mixed group — the figure is at the atomic fixpoint
-      ({ cur, status, applied, ownerByConKey, ownerByObjId, owned } = runBuild(forced));
+      ({ cur, status, applied, ownerByConKey, ownerByObjId, owned, retriedCreating } = runBuild(forced));
       ({ failedFacts, pending } = classify(cur, status));
       if (pending) break; // a deferral state emerged — keep scaffolding per ADR-104
     }
@@ -1345,6 +1391,7 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
     rescue,
     prescanSig: prescanSigFor(facts.length),
     ownedIds: [...owned],
+    retriedCreating,
   };
 }
 
@@ -1585,6 +1632,22 @@ const isRelationCommand = (c: AnyCommand): boolean =>
  * macro that creates between constraints still applies those constraints separately — correct, since a
  * creation in between means they aren't a simultaneous system.
  */
+/**
+ * #1411 ([ADR-577](docs/06-decisions.md#adr-577)) — apply ONE fact's lowered commands ALL-OR-NOTHING
+ * ([ADR-337](docs/06-decisions.md#adr-337)): unit by unit ({@link applyUnits} — a run of relations is one
+ * coupled solve), into a trial that is returned only if every unit succeeded. The fold's in-order pass and
+ * its ADR-104 retry both call it, so a fact lands by the same rule wherever in the fold it lands.
+ */
+function tryApplyFact(cur: Construction, cmds: Command[]): { ok: true; construction: Construction } | { ok: false; error: string; degenerate: boolean } {
+  let trial = cur;
+  for (const unit of applyUnits(cmds)) {
+    const r = unit.length > 1 ? applyCoupledStep(trial, unit) : applyStep(trial, unit[0]);
+    if (!r.ok) return { ok: false, error: r.error, degenerate: !!r.degenerate };
+    trial = r.construction;
+  }
+  return { ok: true, construction: trial };
+}
+
 function applyUnits(cmds: Command[]): Command[][] {
   const out: Command[][] = [];
   for (const c of cmds) {
@@ -3389,6 +3452,22 @@ export function introducedIds(cmd: AnyCommand): Id[] {
 /** The POINT ids a command would introduce (created or auto-created) — for cascade detection. */
 function introducedPointIds(cmd: Command): Id[] {
   return applyCommand(emptyConstruction(), cmd).objects.filter(isGeoPoint).map((o) => o.id);
+}
+
+/**
+ * #1411 ([ADR-577](docs/06-decisions.md#adr-577)) — the point ids a command would introduce WITH A
+ * DEFINITION: {@link introducedPointIds} minus the ones it would only auto-create as FREE points
+ * (`triangle ABC` → none; `segment AM` → none; `midpoint M` → M; `foot D` → D; `square ABCD` → C, D).
+ *
+ * The fold's claim rule for a FAILED statement. A failed statement keeps the points it DEFINES (a later
+ * statement that re-creates one of them would be building on a definition that is gone — the
+ * «M is no longer available» cascade). A free point it would merely have auto-created carries no
+ * definition, so a later statement that introduces that letter contradicts nothing and must be free to.
+ * Disabled and atomic-poisoned statements still claim everything ({@link introducedPointIds}) — muting
+ * a statement cascades its dependents (ADR-015). One named decision, called by the fold and its lock.
+ */
+export function introducedDefinedPointIds(cmd: Command): Id[] {
+  return applyCommand(emptyConstruction(), cmd).objects.filter((o) => isGeoPoint(o) && o.kind !== 'free-point').map((o) => o.id);
 }
 
 /**

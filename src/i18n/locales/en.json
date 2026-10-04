@@ -278,6 +278,7 @@
     "notDeterminedHereBare": "Your givens are fine. In the placement the tool picked, {{what}} can't hold — press «show another configuration».",
     "unknownPoint": "{{what}} refers to a point that hasn't been defined yet. Create it first.",
     "unknownPoint_said": "«{{said}}» refers to a point that hasn't been defined yet ({{what}}). Create it first.",
+    "undefinedPoints": "The points {{ids}} are not defined — add a line that defines them (for example the shape they are corners of).",
     "unresolvedDeps": "This step relies on {{ids}}, which aren't defined yet (or an earlier step it depends on failed). Define them first.",
     "unknownCircle": "Circle {{center}} is not defined — there is no circle by that name in the figure. You can name an existing circle, e.g.: the centre of the circle is {{center}}.",
     "noLongerAvailable": "Can't build: {{ids}} is no longer available — an earlier step it relies on was removed or failed.",
