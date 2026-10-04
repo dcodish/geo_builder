@@ -14,6 +14,7 @@ import { isGeoPoint } from '@/engine/types';
 import { len, rot90, sub, unit } from '@/engine/geometry';
 import { formatMeasure, formatAngle } from '@/format';
 import { visibleCoincidences } from './pointDescriptions';
+import { MARK_FIT_FRACTION, MIN_MARK_SCALE, markFitScale } from '../../shell/marks';
 import { resolveCircle, resolveDrawnLines, orientArc, type DefiniteAngle, type DefiniteLength, type RelationsResult, type ResolvedCircle } from '@/engine';
 
 export interface ScenePoint {
@@ -905,7 +906,8 @@ export function angleValueOffset(r: number, fontSize: number): number {
  * The ruling is SHRINK, never drop: everything the student stated stays visible (the honesty
  * invariant), so this returns a ratio with a floor and never zero.
  */
-export const MARK_FIT_FRACTION = 0.35;
+// #1714 (ADR-AG-225): the fit rule is `shell/marks` — analytic's stated marks shrink by the same one.
+export { MARK_FIT_FRACTION };
 /**
  * A mark never shrinks past this — but the floor is deliberately TINY, because it must not fight the
  * fit. With `MARK_FIT_FRACTION = 0.35`, two marks at the ends of one side occupy `0.7 · room` and
@@ -914,7 +916,7 @@ export const MARK_FIT_FRACTION = 0.35;
  * and that is the one that keeps a value readable — the operator asked for values shown very small, not
  * for marks that stay big.
  */
-export const MIN_MARK_SCALE = 0.05;
+export { MIN_MARK_SCALE };
 /** …and a value never prints smaller than this many px, whatever the ratio says. */
 export const MIN_MEASURE_FONT_PX = 8;
 
@@ -925,9 +927,7 @@ export const MIN_MEASURE_FONT_PX = 8;
  * calls it rather than reproducing the arithmetic ([ADR-W-053](../../docs/06w-decisions-workspace.md)).
  */
 export function markScale(roomPx: number, r: number): number {
-  const full = ANGLE_ARC_R * r;
-  if (!Number.isFinite(roomPx) || roomPx <= 0 || full <= 0) return 1;
-  return Math.min(1, Math.max(MARK_FIT_FRACTION * roomPx / full, MIN_MARK_SCALE));
+  return markFitScale(roomPx, ANGLE_ARC_R * r);
 }
 
 /**

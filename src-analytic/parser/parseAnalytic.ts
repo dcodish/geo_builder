@@ -4272,7 +4272,7 @@ function parseCongruence(line: string): RuleOutcome {
         { t: 'length-eq', left: len(e, f), right: len(b, c) },
         { t: 'length-eq', left: len(f, d), right: len(c, a) },
       ];
-  return made([...shapes, ...givens.map((k): Fact => ({ t: 'constraint', k, src: line }))]);
+  return made([...shapes, ...givens.map((k): Fact => ({ t: 'constraint', k, src: line, definition: true }))]);
 }
 
 function namedShapeFacts(noun: string | undefined, ids: Id[], line: string): Fact[] | 'bad-arity' {
@@ -4286,7 +4286,7 @@ function namedShapeFacts(noun: string | undefined, ids: Id[], line: string): Fac
   if (row.regular) return shapeDeclaration(key, ids, line).filter((f) => f.t !== 'selector');
   return [
     { t: 'polygon', id: polygonId(ids), vertices: ids, noun: key, src: line },
-    ...row.givens(ids).map((k: Constraint) => ({ t: 'constraint' as const, k, src: line })),
+    ...row.givens(ids).map((k: Constraint) => ({ t: 'constraint' as const, k, src: line, definition: true as const })),
   ];
 }
 /**
@@ -4522,7 +4522,7 @@ function shapeDeclaration(noun: string, vertices: Id[], line: string): Fact[] {
      * where both equal-side givens hold trivially — measured in 25 of 60 configurations.
      */
     { t: 'selector' as const, sel: { kind: 'distinct' as const, ids: vertices }, src: line },
-    ...row.givens(vertices).map((k: Constraint) => ({ t: 'constraint' as const, k, src: line })),
+    ...row.givens(vertices).map((k: Constraint) => ({ t: 'constraint' as const, k, src: line, definition: true as const })),
   ];
 }
 

@@ -204,7 +204,12 @@ export type Fact =
    *
    * It carries no id because it creates nothing: it consumes the freedom of points that already do.
    */
-  | (FactBase & { t: 'constraint'; k: Constraint })
+  /*
+   * `definition` (#1714, ADR-AG-225) — the constraint is the DEFINITION of a named shape («מלבן ABCD»'s right angle)
+   * or of a stated correspondence («△ABC ≅ △DEF»'s equal sides), not a measure the sentence states. The parser,
+   * which built it from the noun, says so once; the stated-measure layer leaves it off the figure, as 2-D does.
+   */
+  | (FactBase & { t: 'constraint'; k: Constraint; definition?: true })
   /**
    * D7 KIND 2 — a BRANCH SELECTOR, not a constraint ([ADR-AG-005](../../docs/06c-decisions-analytic.md#adr-ag-005)).
    *

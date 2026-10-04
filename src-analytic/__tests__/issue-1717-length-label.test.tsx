@@ -63,7 +63,8 @@ const hit = (a: Box, b: Box) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y
 function drawn(lines: readonly string[], seed: number) {
   const d = derive(lines, seed);
   expect(d.faults, `${lines.join(' · ')} @${seed}`).toEqual([]);
-  const scene = buildScene(d.figure, d.box, 800, 600);
+  // the app's own hand-off (#1714): the stated lengths come from `Derivation.stated`, as `App.tsx` passes them
+  const scene = buildScene(d.figure, d.box, 800, 600, { stated: d.stated });
   const markup = renderToStaticMarkup(<Figure scene={scene} />);
   return { scene, markup, boxes: textBoxes(markup) };
 }
