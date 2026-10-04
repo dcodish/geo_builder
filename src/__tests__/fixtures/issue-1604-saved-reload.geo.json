@@ -1,0 +1,223 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "name": "issue-1604-saved-reload",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "lTgqdmtyWCJZm_DjNNoY3",
+      "utterance": "מעגל O",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "w1VdcDpMvPy-gIFvxy3E_",
+      "utterance": "נקודה P מחוץ למעגל",
+      "cmd": {
+        "type": "point-circle-side",
+        "id": "P",
+        "circle": "circle-O",
+        "side": "outside"
+      },
+      "enabled": true
+    },
+    {
+      "id": "hhcy71r4oYlC-_oxjZzv4",
+      "utterance": "PA ו PB משיקים למעגל",
+      "group": "67STC1Sp--B13hxd0FRSJ",
+      "cmd": {
+        "type": "segment",
+        "a": "P",
+        "b": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "H_7jv0Lln03jofZDL4_64",
+      "utterance": "PA ו PB משיקים למעגל",
+      "group": "67STC1Sp--B13hxd0FRSJ",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "dlJrsVDaozKS4Sc-qBbMq",
+      "utterance": "PA ו PB משיקים למעגל",
+      "group": "67STC1Sp--B13hxd0FRSJ",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "O",
+        "b": "A",
+        "c": "P",
+        "d": "A",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "845sf9Akyf13urFSxpbZ9",
+      "utterance": "PA ו PB משיקים למעגל",
+      "group": "67STC1Sp--B13hxd0FRSJ",
+      "cmd": {
+        "type": "segment",
+        "a": "P",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "doEXJYa7KlwAD1bHMbN2K",
+      "utterance": "PA ו PB משיקים למעגל",
+      "group": "67STC1Sp--B13hxd0FRSJ",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "mL3OmqJikAV69M1-Uztep",
+      "utterance": "PA ו PB משיקים למעגל",
+      "group": "67STC1Sp--B13hxd0FRSJ",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "O",
+        "b": "B",
+        "c": "P",
+        "d": "B",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "ke-_PttxLMLSgkvuIbQa0",
+      "utterance": "המשך BO חותך את המעגל בנקודה D",
+      "cmd": {
+        "type": "extend-onto-circle",
+        "id": "D",
+        "a": "B",
+        "b": "O",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "jNSaF6Z2UzCtttS_1Hehw",
+      "utterance": "PO",
+      "cmd": {
+        "type": "segment",
+        "a": "P",
+        "b": "O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "1gWv63pRnbixr8HlayZ7o",
+      "utterance": "AD",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "BNI8N2tuSccwaH7nmiiXy",
+      "utterance": "C נמצאת על DB",
+      "group": "BNExX0o7wpG7Huf4Vzm9v",
+      "cmd": {
+        "type": "segment",
+        "a": "D",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "GG8wEVFenx3ZPo-JTlb0s",
+      "utterance": "C נמצאת על DB",
+      "group": "BNExX0o7wpG7Huf4Vzm9v",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "C",
+        "a": "D",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "UjoaqCCc7Ml9zl_mH7DxR",
+      "utterance": "AC⊥DB",
+      "group": "IDzL9bcPo-LLJlgzEjlEO",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "4-0tpRse7VycemwRzU6tS",
+      "utterance": "AC⊥DB",
+      "group": "IDzL9bcPo-LLJlgzEjlEO",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "A",
+        "b": "C",
+        "c": "D",
+        "d": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "GTiL2KP5RG256Sf4wZ6Nt",
+      "utterance": "PD חותך את AC בנקודה E",
+      "group": "aomtsAQ1uTK7bwFlWSUHj",
+      "cmd": {
+        "type": "segment",
+        "a": "P",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "_QsgiVerguz-C2KyGBjG7",
+      "utterance": "PD חותך את AC בנקודה E",
+      "group": "aomtsAQ1uTK7bwFlWSUHj",
+      "cmd": {
+        "type": "line-line-intersection",
+        "id": "E",
+        "a": "P",
+        "b": "D",
+        "c": "A",
+        "d": "C",
+        "onSeg": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "H-4_xuN-YC3El52-l2TQj",
+      "utterance": "EC=x",
+      "cmd": {
+        "type": "measure-length",
+        "a": "E",
+        "b": "C",
+        "expr": {
+          "coef": 1,
+          "var": "x"
+        }
+      },
+      "enabled": true
+    }
+  ]
+}

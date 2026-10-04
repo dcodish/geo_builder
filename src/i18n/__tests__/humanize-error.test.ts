@@ -42,6 +42,8 @@ const CASES: { raw: string; contains: string[] }[] = [
   // step.ts danglingCircleError (#186) — a reference to a circle that doesn't exist
   { raw: "circle 'O2' is not defined", contains: ['O2'] },
   { raw: 'unresolved dependencies for: A, B, circle-O', contains: ['A, B, O'] },
+  // core.ts (#1748, ADR-578) — a differently spelled re-statement over an unticked row's letters names the row
+  { raw: "can't build: A, B, C belong to the unticked row «משולש ABC» — tick it again or delete it", contains: ['A, B, C', '«משולש', 'ABC', 'המבוטלת'] },
   { raw: 'undefined point: A, B', contains: ['A, B'] }, // #1411 (ADR-577): evaluate names the ABSENT operands
   { raw: 'non-finite position computed', contains: [] },
   { raw: '|AB| = |AD| references an unknown point', contains: ['|AB| = |AD|'] },

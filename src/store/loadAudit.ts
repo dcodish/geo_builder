@@ -19,7 +19,7 @@
  * ADR-241 — that is the manual re-lower path this audit points at).
  */
 import type { Fact } from './geoStore';
-import { groupKey, replay } from './geoStore';
+import { foldCommand, groupKey, replay } from './geoStore';
 import { buildParseCtx, droppedNewLabels, parse } from '@/parser';
 import type { AnyCommand } from '@/engine';
 
@@ -48,6 +48,31 @@ function stepsOf(facts: Fact[]): { utterance?: string; cmds: AnyCommand[]; start
     else steps.push({ utterance: facts[i].utterance, cmds: [facts[i].cmd], start: i });
   }
   return steps;
+}
+
+/**
+ * The commands a COMMIT of `cmds` onto `prefix` would store as the step's own rows (#1604,
+ * [ADR-579](../../docs/06-decisions.md#adr-579)): each command folded through the shared
+ * {@link foldCommand} rule the store's commit uses (ADR-578), keeping what it APPENDS. A command that
+ * duplicates an earlier fact — «PD חותך את AC בנקודה E» re-mentions `segment AC` after «AC⊥DB» drew it —
+ * is dropped exactly as the commit dropped it, and a command repeated inside the step folds once.
+ * In-place effects on earlier rows (re-enabling, a free-point move) belong to those rows, not this one.
+ *
+ * A saved step and a fresh parse are compared THROUGH this, on both sides: the question a load asks is
+ * "would committing today's reading store what the save stored?", never "is the raw parse byte-equal to
+ * the stored rows" — a raw parse is a lowering the commit never stored.
+ */
+export function committedStepCommands(prefix: Fact[], cmds: AnyCommand[]): AnyCommand[] {
+  let n = 0;
+  const mint = (cmd: AnyCommand): Fact => ({ id: `~load.${n++}`, group: '~load', enabled: true, cmd });
+  const all = cmds.reduce((acc, c) => foldCommand(acc, c, mint), prefix);
+  return all.slice(prefix.length).map((f) => f.cmd); // foldCommand only maps in place or appends
+}
+
+/** Does today's parse of a step store the same rows the save stored? (#1604) — both sides through the
+ *  commit's fold, so a duplicate the commit dropped never reads as drift. */
+function lowersAsSaved(prefix: Fact[], fresh: AnyCommand[], saved: AnyCommand[]): boolean {
+  return JSON.stringify(committedStepCommands(prefix, fresh)) === JSON.stringify(committedStepCommands(prefix, saved));
 }
 
 /**
@@ -91,11 +116,15 @@ export function refreshLoadedFigure(facts: Fact[], budgetMs = 4000): { facts: Fa
     // Re-parse against the prefix built from the ALREADY-refreshed earlier steps (`out`).
     const { construction, positions } = replay(out);
     const p = parse(step.utterance, buildParseCtx(construction, positions));
-    if (p.ok && JSON.stringify(p.commands) !== JSON.stringify(step.cmds)) {
+    // #1604 (ADR-579): compare and write what a COMMIT would store — the fresh parse folded against the
+    // refreshed prefix, the same rule the save's own commit applied — never the raw parse. A fresh reading
+    // that folds to nothing (a pure restatement today) keeps the saved row rather than deleting it.
+    const fresh = p.ok ? committedStepCommands(out, p.commands) : [];
+    if (p.ok && fresh.length > 0 && !lowersAsSaved(out, p.commands, step.cmds)) {
       const group = groupFacts[0].group;
       const enabled = groupFacts[0].enabled; // a step toggles enabled as a unit
       refreshed.push(i + 1);
-      p.commands.forEach((cmd, j) => {
+      fresh.forEach((cmd, j) => {
         out.push({
           id: groupFacts[j]?.id ?? `${step.start}r${j}`,
           utterance: step.utterance,
@@ -129,7 +158,7 @@ export function auditLoadedFigure(facts: Fact[], budgetMs = 3000): { findings: L
       continue; // `dropped` subsumes `drift` for the step — one finding per row
     }
     const p = parse(step.utterance, ctx);
-    if (p.ok && JSON.stringify(p.commands) !== JSON.stringify(step.cmds))
+    if (p.ok && !lowersAsSaved(prefix, p.commands, step.cmds)) // #1604: through the commit's fold, both sides
       findings.push({ step: i + 1, utterance: step.utterance, kind: 'drift', labels: [], group, cmds: step.cmds });
   }
   return { findings, complete: true };

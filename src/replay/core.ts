@@ -421,18 +421,58 @@ export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
   foldCache.set(foldKey(facts), fold);
 }
 
+/**
+ * THE fold rule — how ONE command enters the fact list (the execute policy, FR-EN-9 / ADR-011). The single
+ * decision behind both the store's commit (`foldFact`) and the submit dry run ({@link trialFacts}), so the
+ * list the gate judges and the list the commit saves cannot drift (#1748, [ADR-578](docs/06-decisions.md#adr-578);
+ * the load refresh folds through it too, #1604). In order:
+ *
+ * - an exact duplicate of an existing fact is idempotent: an ENABLED twin leaves the list unchanged, a
+ *   DISABLED twin (an unticked row) is re-enabled in place — re-typing never stacks a second copy;
+ * - a free point re-stated by id is moved in place (ADR-011);
+ * - a re-stated STANDALONE circle is resized in place (a circle inside a bigger step falls through to an
+ *   append, keeping that step's label intact);
+ * - anything else is appended as `mint(cmd)`.
+ *
+ * Returns the SAME array when nothing changed, and never mutates: a changed fact is a new object, so
+ * {@link trialChanges} can name exactly what a candidate step touched.
+ */
+export function foldCommand(facts: Fact[], cmd: AnyCommand, mint: (cmd: AnyCommand) => Fact, utterance?: string): Fact[] {
+  const dup = facts.find((f) => deepEqual(f.cmd, cmd));
+  if (dup) return dup.enabled ? facts : facts.map((f) => (f.id === dup.id ? { ...f, enabled: true } : f));
+  if (cmd.type === 'free-point') {
+    const prev = facts.find((f) => f.cmd.type === 'free-point' && f.cmd.id === cmd.id);
+    if (prev) return facts.map((f) => (f === prev ? { ...f, cmd, utterance, enabled: true } : f));
+  }
+  if (cmd.type === 'circle' || cmd.type === 'circle-through') {
+    const prev = facts.find((f) => (f.cmd.type === 'circle' || f.cmd.type === 'circle-through') && f.cmd.id === cmd.id);
+    if (prev && !facts.some((f) => f.id !== prev.id && groupKey(f) === groupKey(prev)))
+      return facts.map((f) => (f === prev ? { ...f, cmd, utterance, enabled: true } : f));
+  }
+  return [...facts, mint(cmd)];
+}
+
+/** The facts of a folded list that the fold CHANGED — appended, re-enabled, moved or resized (by object
+ *  identity: {@link foldCommand} never reuses a changed fact's object). What a dry run judges. */
+export function trialChanges(facts: Fact[], all: Fact[]): Fact[] {
+  const prior = new Set(facts);
+  return all.filter((f) => !prior.has(f));
+}
+
 /** The dry-run trial fact list for a candidate step — the FIRST content the submit path folds, shared
- *  here so a worker prefold warms exactly the content `dryRunOutcome` (and usually the commit) will use.
- *  It models what `foldFact` will actually commit: a command that exactly duplicates an ENABLED fact is a
- *  friendly idempotent no-op (FR-EN-9) and is dropped, so the trial's net content matches the committed
- *  figure. Without this a re-stated constraint (re-typing `AB=AC`, or a compound step like an altitude that
- *  re-emits its base `triangle ABC`) would append a redundant copy — two identical `set-equal`s perturb the
- *  solver ~0.75 and read as a phantom "produced" (issue #1 / ADR-234) though the real figure never moves. A
- *  DISABLED twin is kept (the commit re-enables it — a genuine change; the disabled copy is inert in replay). */
+ *  here so a worker prefold warms exactly the content `dryRunOutcome` (and the commit) will use.
+ *  It folds every command through {@link foldCommand}, the rule the commit itself uses, so the trial IS
+ *  the list the commit would save (bar fact ids). A re-stated constraint (re-typing `AB=AC`, or a compound
+ *  step like an altitude that re-emits its base `triangle ABC`) nets nothing — two identical `set-equal`s
+ *  would perturb the solver ~0.75 and read as a phantom "produced" (issue #1 / ADR-234). And a command
+ *  equal to an UNTICKED fact re-enables it, exactly as the commit does (#1748): the old trial kept the
+ *  disabled twin AND appended a copy, and the disabled twin claimed the copy's points in the fold, so the
+ *  gate refused «A, B, C כבר אינה זמינה» a line whose commit builds. The step's own facts are
+ *  {@link trialChanges}, never `all.slice(facts.length)` — a re-enable appends nothing. */
 export function trialFacts(facts: Fact[], commands: AnyCommand[]): Fact[] {
-  const enabled = facts.filter((f) => f.enabled).map((f) => f.cmd);
-  const eff = commands.filter((c) => !enabled.some((e) => deepEqual(e, c)));
-  return [...facts, ...eff.map((c, i) => ({ id: `~try.${i}`, group: '~try', enabled: true, cmd: c }))];
+  let n = 0;
+  const mint = (cmd: AnyCommand): Fact => ({ id: `~try.${n++}`, group: '~try', enabled: true, cmd });
+  return commands.reduce((all, c) => foldCommand(all, c, mint), facts.slice());
 }
 
 function computeReplay(facts: Fact[], seed = 0): Derived {
@@ -874,6 +914,20 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       const s = claimedBy.get(id);
       if (s) s.add(by); else claimedBy.set(id, new Set([by]));
     };
+    /** #1748 (ADR-578): the first UNTICKED row above fact `fi` that reserves any of `ids` (a disabled fact
+     *  claims everything it introduces, ADR-010/015), with the reserved subset — or null. Read off the
+     *  fact list, not `claimedBy`, so a prefix resumed from the memo answers the same. A row with no
+     *  utterance (a direct command) has nothing to name, so it keeps the generic cascade message. */
+    const mutedOwnerOf = (ids: Id[], fi: number): { ids: Id[]; utterance: string } | null => {
+      for (let i = 0; i < fi; i++) {
+        const g = facts[i];
+        if (g.enabled || !g.utterance) continue;
+        const intro = new Set(engineCmdsOf(g).flatMap(introducedPointIds));
+        const held = ids.filter((id) => intro.has(id));
+        if (held.length) return { ids: held, utterance: g.utterance };
+      }
+      return null;
+    };
     let retriedCreating = false;
     const applied: Command[] = start ? [...start.node.applied] : [];
     // #360 (ADR-398): ownership maps for per-seed failure attribution — filled after each successful
@@ -995,7 +1049,14 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
       // isn't in the figure now ⇒ its definition is gone, so this fact can't build either.
       const broken = intro.filter((id) => owned.has(id) && !cur.objects.some((o) => o.id === id));
       if (broken.length) {
-        status[f.id] = `can't build: ${broken.join(', ')} is no longer available (an earlier step it relies on was removed or failed)`;
+        // #1748 (ADR-578): letters an UNTICKED row reserves (ADR-010 — muting is reversible, so the row
+        // keeps its points for when it returns) are not "removed or failed": say which row holds them and
+        // the two ways out. Reached by a DIFFERENTLY spelled re-statement — an identical one re-enables the
+        // twin through the shared fold rule (`foldCommand`) and never gets here.
+        const muted = mutedOwnerOf(broken, fi);
+        status[f.id] = muted
+          ? `can't build: ${muted.ids.join(', ')} belong to the unticked row «${muted.utterance}» — tick it again or delete it`
+          : `can't build: ${broken.join(', ')} is no longer available (an earlier step it relies on was removed or failed)`;
         claimDefined();
         continue;
       }
@@ -1756,7 +1817,7 @@ export function deferralWorthwhile(facts: Fact[], commands: AnyCommand[], seed =
   // reseats it. So a concluded member refuses only where no unpinned seat could still yield.
   const all = trialFacts(facts, commands);
   const trial = replay(all, seed);
-  if (!all.slice(facts.length).some((f) => trial.concluded.has(f.id))) return true;
+  if (!trialChanges(facts, all).some((f) => trial.concluded.has(f.id))) return true;
   return unpinnedSeats(all).length > 0;
 }
 
@@ -2689,7 +2750,7 @@ export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0):
   try {
     const before = replay(facts, seed);
     const all = trialFacts(facts, commands);
-    if (all.length === facts.length) return false; // nothing added — `empty`'s business, not this arm's
+    if (trialChanges(facts, all).length === 0) return false; // nothing changed — `empty`'s business, not this arm's
     const after = replay(all, seed);
     // Anything OTHER than a constraint means the step built something. Objects and labels are visible;
     // a step that adds one has produced, whatever else it also did.
@@ -2739,7 +2800,7 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
   const labelCount = (l: MeasureLabels) => l.lengths.length + l.angles.length + l.areas.length;
   const before = replay(facts, seed);
   const all = trialFacts(facts, commands);
-  const trial = all.slice(facts.length);
+  const trial = trialChanges(facts, all); // #1748: a re-enabled twin is the step's fact too, not only an append
   const after = replay(all, seed);
   // #926: a `set-var` whose letter nothing binds YET is marked in the fold (a pending row with its reason,
   // never a silent ✓) but is still data the student may state first — it commits as data-only below.

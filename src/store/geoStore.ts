@@ -21,7 +21,7 @@ import { nanoid } from 'nanoid';
 import { ingestTypedText } from '../../shell/bidi';
 import type { ValuesPanelResult } from '@/engine/valuesPanel';
 import type { AnyCommand, Id, RelationsResult, ShapesResult, StatedShapeEquality } from '@/engine';
-import { branchCount, cyclableVariant, deepEqual, variantCountOf, withVariant } from '@/engine';
+import { branchCount, cyclableVariant, variantCountOf, withVariant } from '@/engine';
 import { parseValueQuery } from '@/parser/valueQuery';
 import type { FigureFile } from './figureFile';
 
@@ -29,7 +29,7 @@ import type { FigureFile } from './figureFile';
 // existing consumer path ('@/store/geoStore') keeps working; the store is now a thin stateful shell.
 export * from '@/replay/core';
 export * from '@/replay/viewDelta';
-import { replay, groupKey, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, commandPointIds, BRANCH_CYCLE_KINDS } from '@/replay/core';
+import { replay, groupKey, foldCommand, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, commandPointIds, BRANCH_CYCLE_KINDS } from '@/replay/core';
 import type { DetectAllResult, Determinacy, Fact } from '@/replay/core';
 import { viewDelta } from '@/replay/viewDelta';
 import type { ViewDelta } from '@/replay/viewDelta';
@@ -589,25 +589,14 @@ const cleanUtterance = (u: string | undefined): string | undefined =>
   u === undefined ? undefined : ingestTypedText(u);
 
 /**
- * Fold ONE command into the fact list per the execute policy: idempotent duplicate (FR-EN-9 — re-issuing
- * re-enables a deselected twin, never stacks), a free-point move updates its fact in place (ADR-011), and
- * re-stating a STANDALONE circle resizes it in place (a circle inside a bigger step falls through to an
- * override append, keeping that step's label intact). Returns the same array when nothing changed.
+ * Fold ONE command into the fact list per the execute policy — the shared {@link foldCommand} rule
+ * (idempotent duplicate re-enabling a deselected twin, free-point move, standalone-circle resize), the SAME
+ * decision the submit dry run (`trialFacts`, #1748) and the load refresh (#1604) fold through, so none of
+ * them can model a list the commit would not save. Returns the same array when nothing changed.
  */
 function foldFact(facts: Fact[], cmd: AnyCommand, utterance?: string, group?: string): Fact[] {
   utterance = cleanUtterance(utterance);
-  const dup = facts.find((f) => deepEqual(f.cmd, cmd));
-  if (dup) return dup.enabled ? facts : facts.map((f) => (f.id === dup.id ? { ...f, enabled: true } : f));
-  if (cmd.type === 'free-point') {
-    const prev = facts.find((f) => f.cmd.type === 'free-point' && f.cmd.id === cmd.id);
-    if (prev) return facts.map((f) => (f.id === prev.id ? { ...f, cmd, utterance, enabled: true } : f));
-  }
-  if (cmd.type === 'circle' || cmd.type === 'circle-through') {
-    const prev = facts.find((f) => (f.cmd.type === 'circle' || f.cmd.type === 'circle-through') && f.cmd.id === cmd.id);
-    if (prev && !facts.some((f) => f.id !== prev.id && groupKey(f) === groupKey(prev)))
-      return facts.map((f) => (f.id === prev.id ? { ...f, cmd, utterance, enabled: true } : f));
-  }
-  return [...facts, { id: nanoid(), cmd, utterance, group, enabled: true }];
+  return foldCommand(facts, cmd, (c) => ({ id: nanoid(), cmd: c, utterance, group, enabled: true }), utterance);
 }
 
 /**

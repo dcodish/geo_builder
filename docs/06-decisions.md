@@ -14266,3 +14266,65 @@ The full suite is the batch gate (round #1736).
 - `src/parser/catalog.ts`: one row.
 
 **Behaviour change for a student:** «גובה הטרפז 4» now draws the trapezoid's height (with a letter for its foot) and makes it 4. «גובה המשולש 4» and «גובה המקבילית 4» now ask which height and offer sentences to copy. «הגובה לצלע BC הוא 4» and «התיכון מ-A הוא 5» now build instead of going to the paid model.
+
+## ADR-578 — Re-typing an unticked row ticks it again: the dry run folds through the commit's own rule (#1748)
+
+**Status:** accepted · 2026-10-04 · bug (P2) · round #1753 · branch `fix/1748-untick-retype` off `main` @ c098af9b
+
+**Requirements:** [FR-EN-9](02-requirements.md) (extended — re-typing an unticked row ticks it; a different spelling over its letters is refused naming the row) · **Design:** [04-design.md](04-design.md) "One fold rule: the dry run judges the list the commit saves" · **LADDER stage:** the submit gate's dry run (`trialFacts` → `dryRunOutcome`) and the replay fold's cascade message. No parser, solver or render change.
+
+**Cites** [ADR-010](#adr-010) (muting is reversible — an unticked row keeps its letters), [ADR-015](#adr-015) (muting cascades), [ADR-320](#adr-320) (#1: the dry-run trial models the commit's dedup — this finishes it), [ADR-577](#adr-577) (the claim rule this message sits on).
+
+**Context — re-measured at pickup on c098af9b through `runSubmit` (LLM mocked) + the row's tick (`runSetGroupEnabled`).** Every sequence in the issue reproduced:
+
+| sequence | before |
+| --- | --- |
+| «משולש ABC» · «M אמצע AB» · untick the triangle · «משולש ABC» | refused «A, B, C כבר אינה זמינה»; the triangle stays unticked |
+| «משולש ABC» · untick · «משולש ABC» | refused the same way |
+| «קטע AB» · untick · «קטע AB» | refused «A, B …» |
+| «משולש ABC» · «AM תיכון» · untick the median · «AM תיכון» | refused «M …» |
+| «ריבוע ABCD» · «E נקודת חיתוך האלכסונים» · untick E · the same line | refused «E …» |
+| «משולש ABC» · untick · «משולש ACB» / «משולש שווה שוקיים ABC» | refused «… כבר אינה זמינה — צעד קודם … נמחק או נכשל» (untrue: nothing was deleted or failed) |
+
+**Class (docs/17 §1).** *The submit dry run models a fact list the commit would not save.* The commit folds each command through `foldFact` (`store/geoStore.ts`); the dry run built its trial with its own copy of part of that rule (`trialFacts`, `replay/core.ts`). ADR-320 copied the ENABLED-duplicate half and left the rest out: a command equal to a DISABLED fact, a re-stated free point (moved in place by the commit), a re-stated standalone circle (resized in place), and a command repeated inside one step (folded once by the commit) were all appended in the trial. The disabled case is the one that bites: a disabled fact claims every point it introduces in the fold (ADR-010/015), so the appended copy cascaded «no longer available» while the commit would have re-enabled the twin and built.
+
+**Decision.**
+1. **One rule.** `foldCommand(facts, cmd, mint, utterance?)` in `replay/core.ts` is the execute policy (FR-EN-9 / ADR-011), extracted verbatim from `foldFact`; `foldFact` is now `foldCommand` with a nanoid mint and the cleaned utterance, and `trialFacts` reduces the step's commands through the same function with `~try.N` mints. The trial is the committed list bar ids.
+2. **The step's facts are what the fold changed.** `trialChanges(facts, all)` — the facts of the folded list not present (by identity) in the prior list; `foldCommand` never reuses a changed fact's object. `dryRunOutcome` judges those (an error on a re-enabled twin is the step's error), `deferralWorthwhile` reads their concluded verdicts, and `impliedByPrior` treats "nothing changed" as `empty`'s business — all three used `all.slice(facts.length)`, which a re-enable leaves empty.
+3. **The honest refusal (the armed option 3).** An unticked row keeps its letters (ADR-010; option 2 — letting a new spelling take them — was declined by the record, 2026-10-04 comment). When the fold's `broken` cascade fires on letters an earlier UNTICKED row introduces (`mutedOwnerOf`, read off the fact list so a memo-resumed prefix answers the same), the status names the row: `can't build: A, B, C belong to the unticked row «משולש ABC» — tick it again or delete it` → `errors.mutedRowOwns` «לא ניתן לבנות: A, B, C שייכות לשורה המבוטלת «משולש ABC» — סמנו אותה שוב או מחקו אותה.» (He + En). A row with no utterance, or letters held by a removed/failed step, keeps the generic message — phase3's "reversible" lock (a muted CIRCLE cascading the segment through its red riders) is unchanged.
+
+**Locks.** `src/app/__tests__/issue-1748-untick-retype.test.ts` (11): the five re-type sequences through `runSubmit` + `runSetGroupEnabled` — no note, the twin re-enabled (list length unchanged), every row ticked and ok; the two differently spelled refusals, raw and humanised in Hebrew, the row left unticked, and re-ticking it afterwards builds; `foldCommand` unit (re-enable in place, enabled twin returns the same array, `trialChanges`); `trialFacts` over an unticked twin equals the committed list; a command repeated in one step folds once. **Fails before: 10 of 11 on c098af9b** (the re-tick control passes before by design; the `foldCommand` unit fails by absence). Scenario `untick-then-retype-reenables-1748` at the end of `scenarios-corpus-4.ts` (the gate on the operator's exact sequence with the triangle muted; a `.geo.json` fixture cannot carry an untick). humanize CASES row for the new pattern (#983 gate).
+
+**Consequences.**
+- `src/replay/core.ts`: `foldCommand`, `trialChanges`, `trialFacts` rewritten over them; `dryRunOutcome` / `deferralWorthwhile` / `impliedByPrior` judge `trialChanges`; `mutedOwnerOf` + the muted-row message in the fold.
+- `src/store/geoStore.ts`: `foldFact` delegates to `foldCommand`.
+- `src/i18n/humanizeError.ts`, `locales/{he,en}.json`: `errors.mutedRowOwns`.
+- The load refresh (#1604, ADR-579) folds its fresh parse through the same `foldCommand`.
+
+**Behaviour change for a student:** after unticking a row, typing the same sentence again ticks the row back instead of refusing. Typing a different sentence over the unticked row's letters is still refused, but now says which unticked row holds them and to tick it again or delete it.
+
+## ADR-579 — A save loads exactly as saved: the load refresh and audit compare through the commit's fold (#1604)
+
+**Status:** accepted · 2026-10-04 · bug (P2) · round #1753 · branch `fix/1604-load-audit-duplicates`, stacked on `fix/1748-untick-retype` (ADR-578, whose `foldCommand` it calls)
+
+**Requirements:** [FR-HS-10](02-requirements.md) (extended — a save loads exactly as saved; stale means "a commit would store different rows") · **Design:** [04-design.md](04-design.md) "One fold rule: the dry run judges the list the commit saves" (the load paragraph) · **LADDER stage:** none — the load path (`store/loadAudit.ts`) before replay. No parser, engine or render change.
+
+**Cites** [ADR-578](#adr-578) (the shared fold rule), [ADR-314](#adr-314) (#120: the load refresh), [ADR-242](#adr-242) (the load audit), [ADR-232](#adr-232) (load replays saved commands; LLM steps never re-escalate), [ADR-320](#adr-320) (the same class at the dry run).
+
+**Context — re-measured at pickup on the #1748 tip through `runSubmit` (LLM mocked) → `serializeFigure` → `loadFigureText`.** The operator's #1601 figure («מעגל O» … «AC⊥DB» · «PD חותך את AC בנקודה E» · «EC=x»), saved and loaded at once: `refreshed = [8, 9]`, 18 saved rows became 20 loaded rows, and `auditLoadedFigure` flagged steps 8 and 9 as `drift`. Two steps, not the one the issue named: «AC⊥DB» re-mentions a segment too.
+
+**Class (docs/17 §1).** *A saved step is compared on load against a lowering the commit never stored.* The commit folds each command through the fold rule (now `foldCommand`, ADR-578), which drops a command duplicating an earlier fact (FR-EN-9) and folds a repeated one once. `refreshLoadedFigure` and `auditLoadedFigure` compared the RAW re-parse to the saved rows (`JSON.stringify` inequality), so any step whose parse re-mentions an existing object read as "saved by an older version", and the refresh then wrote the duplicate back as a second fact, bypassing the fold. The fixtures drift net (`fixtures.test.ts`) asked the same raw question, so a fixture saved from the app with such a step could not even be committed. The class lock below found it in three of the twenty existing fixtures (`2022-summer-a-issue59`, `issue-260-two-host-membership`, `issue-760-point-at-distance`) once they were committed through the real store. Sibling audit: 3-D, analytic and complex have no load refresh of this shape (the issue's audit, unchanged).
+
+**Decision.**
+1. `committedStepCommands(prefix, cmds)` (`store/loadAudit.ts`): the rows a commit of `cmds` onto `prefix` would append — each command folded through `foldCommand`, keeping the appended ones. In-place effects on earlier rows belong to those rows.
+2. The refresh and the audit compare `committedStepCommands(prefix, fresh)` with `committedStepCommands(prefix, saved)` — both sides through the fold, so a save from a version that stored a duplicate is not flagged for that alone. The refresh writes the FOLDED fresh rows; a fresh reading that folds to nothing keeps the saved row rather than deleting it.
+3. `fixtures.test.ts`'s drift check asks the same question through the same helper.
+4. A genuinely stale step still refreshes: `load-refresh.test.ts` (#120, the pre-#119 `K` without `onSegment`) is unchanged and green.
+
+**Locks.** `src/store/__tests__/issue-1604-load-roundtrip.test.ts` (25): the operator's exact sequence through `runSubmit` → save → `loadFigureText` (nothing refreshed, the audit silent, the loaded rows equal to the saved rows); `committedStepCommands` units (an earlier duplicate dropped, an in-step repeat folded once); a stale step re-lowered to the folded reading with no duplicate written back; and **the class lock** — every fixture committed through the store's real commit (`executeMany`, each deterministic line re-parsed against the live figure, LLM steps committing their stored commands), saved and loaded: nothing refreshed, no findings, identical rows, with an exercised-counter. **Fails before: 6 of 25** (the operator case, the stale-write case, three fixtures, the counter). Fixture `src/__tests__/fixtures/issue-1604-saved-reload.geo.json` — the operator's sequence as the app saves it (rows without the duplicate segments), which the old raw drift net rejected. `decide-parity-1395-4` golden re-recorded: one key added, no hash changed.
+
+**Consequences.**
+- `src/store/loadAudit.ts`: `committedStepCommands`, `lowersAsSaved`; `refreshLoadedFigure` / `auditLoadedFigure` compare and write through them.
+- `src/__tests__/fixtures.test.ts`: the drift check compares through `committedStepCommands`.
+
+**Behaviour change for a student:** loading a figure saved a moment ago no longer says «הקובץ נשמר בגרסה קודמת — N צעדים עודכנו», and the loaded list is exactly the saved one: no duplicated rows.

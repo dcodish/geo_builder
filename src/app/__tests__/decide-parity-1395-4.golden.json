@@ -150,10 +150,14 @@
  "scenario:triangle-form-cevian-introduces-triangle-1720": "66d4dac428433bae",
  "scenario:diagonals-named-by-letters-1683": "54f38ccf867bda6e",
  "scenario:point-placement-keeps-its-tail-1682": "dc2212fa248c24a2",
+ "scenario:creating-row-above-retyped-parent-1411": "014fadf075a2d9e2",
+ "scenario:untick-then-retype-reenables-1748": "489374a1b538e318",
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",
  "fixture:defining-interaction.geo.json": "453b283f490e90b0",
  "fixture:equilateral-inscribed.geo.json": "d8a2b3c24fc515b8",
  "fixture:issue-1443-trapezoid-height.geo.json": "7e8f5579f6759742",
+ "fixture:issue-1471-circumcircle-by-membership.geo.json": "0d3700bfe1282811",
+ "fixture:issue-1604-saved-reload.geo.json": "55abd9b8eb5ca177",
  "fixture:issue-1607-diagonal-length.geo.json": "a9beb0c5f7099622",
  "fixture:issue-260-two-host-membership.geo.json": "167ca5c3e43619c1",
  "fixture:issue-497-right-trapezoid-typo.geo.json": "2038594394a49fa7",
@@ -168,7 +172,5 @@
  "fixture:issue-989-trapezoid-after-triangle.geo.json": "0703ef8c37579057",
  "fixture:issue-989-trapezoid-stated-pair.geo.json": "5ac9c9b206c76b86",
  "fixture:parallel-chords.geo.json": "54f8605ea57acfa6",
- "fixture:trapezoid-altitude.geo.json": "abbbf2a8308ff3fa",
- "fixture:issue-1471-circumcircle-by-membership.geo.json": "0d3700bfe1282811",
- "scenario:creating-row-above-retyped-parent-1411": "014fadf075a2d9e2"
+ "fixture:trapezoid-altitude.geo.json": "abbbf2a8308ff3fa"
 }
