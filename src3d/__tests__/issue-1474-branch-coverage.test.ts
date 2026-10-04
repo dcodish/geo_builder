@@ -63,10 +63,10 @@ describe('#1474 — the ask lane and the panel never answer from a subset of the
     }
   });
 
-  it('figure B: the stated angle still prints at every seed, and m reads {−2, 0, 4}', () => {
+  it('figure B: the stated angle still prints at every seed, and m reads m = −2, m = 0, m = 4 (#1591)', () => {
     build(FIG_B);
     for (const s of SEEDS) expect(ask('הזווית בין ℓ למישור π', s), `seed ${s}`).toBe('30°');
-    expect(ask('m', 0)).toBe('{-2, 0, 4}');
+    expect(ask('m', 0)).toBe('-2, m = 0, m = 4');
   });
 
   it('figure A (the title\'s case): an angle equal on both branches stays answered at every seed', () => {
@@ -112,7 +112,7 @@ describe('#1474 — structural: the knowledge sample IS the branch pool, for eve
 
   it('the panel\'s m row reads the whole pool at every seed', () => {
     build(FIG_B);
-    for (const s of SEEDS) expect(dataView(at(s).construction, s).params.find((p) => p.sym === 'm')?.text, `seed ${s}`).toBe('m = {-2, 0, 4}');
+    for (const s of SEEDS) expect(dataView(at(s).construction, s).params.find((p) => p.sym === 'm')?.text, `seed ${s}`).toBe('m = -2, m = 0, m = 4');
   });
 
   it('P1 lock, panel edition: a NAMED angle that differs across the branches prints no value (it read «α = 30°» at every seed ≡ 2 mod 3)', () => {

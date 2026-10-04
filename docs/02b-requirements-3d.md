@@ -341,6 +341,13 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   form of FR-EQ-4. The canvas label keeps the «?» form too, because the node shows one configuration.
   *(Realised — [ADR-3D-289](06b-decisions-3d.md#adr-3d-289), #1506;
   `issue-1506-two-configurations.test.ts`.)*
+- **FR-EQ-4b (Should)** — **A parameter's roots are written as the student writes the answer.** When the
+  givens leave a figure parameter more than one value, the data panel and the ask lane both list every
+  root: a pair that are negatives of each other reads **«m = ±√2»**; every other set repeats the symbol
+  before each root, ascending — **«m = -2, m = 4»**, **«m = -2, m = 0, m = 4»** — never a set
+  «{-2, 4}». The two surfaces print the same text, and the ask row never prints the symbol twice
+  (operator ruling 2026-09-30). *(Realised — [ADR-3D-303](06b-decisions-3d.md#adr-3d-303), #1591;
+  `issue-1591-param-solutions.test.ts`.)*
 
 ## Claims — the student's answer, never a driver
 

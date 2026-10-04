@@ -32,31 +32,31 @@ function run(...lines: string[]) {
 
 describe('#1440 — formatBranches rounds every root the same way, whatever its position', () => {
   it('two roots: {-0.23, 2.63}, not {0, 2.6}', () => {
-    expect(formatBranches([-0.228, 2.628])).toBe('{-0.23, 2.63}');
-    expect(formatBranches([2.628, -0.228])).toBe('{-0.23, 2.63}');
+    expect(formatBranches([-0.228, 2.628])?.join(' ; ')).toBe('-0.23 ; 2.63');
+    expect(formatBranches([2.628, -0.228])?.join(' ; ')).toBe('-0.23 ; 2.63');
   });
 
   it('three roots: the third is not the only one given two places', () => {
-    expect(formatBranches([-1.234, 0.456, 7.891])).toBe('{-1.23, 0.46, 7.89}');
+    expect(formatBranches([-1.234, 0.456, 7.891])?.join(' ; ')).toBe('-1.23 ; 0.46 ; 7.89');
   });
 
   it('the exact forms and the ± path are unchanged', () => {
-    expect(formatBranches([4, -1.6])).toBe('{-8/5, 4}');
-    expect(formatBranches([-Math.SQRT2, Math.SQRT2])).toBe('±√2');
-    expect(formatBranches([2.628])).toBe('2.63');
+    expect(formatBranches([4, -1.6])?.join(' ; ')).toBe('-8/5 ; 4');
+    expect(formatBranches([-Math.SQRT2, Math.SQRT2])?.join(' ; ')).toBe('±√2');
+    expect(formatBranches([2.628])?.join(' ; ')).toBe('2.63');
   });
 });
 
 describe('#1440 — the reported sequence through the real submit → query / panel path', () => {
-  it('A(1,4,-3) · B(2t,t,1) · |AB| = 6 → t = {-0.23, 2.63}, and the panel row says the same', () => {
+  it('A(1,4,-3) · B(2t,t,1) · |AB| = 6 → t = -0.23, t = 2.63 (the #1591 spelling), and the panel row says the same', () => {
     const { query, panel } = run('A(1,4,-3)', 'B(2t,t,1)', '|AB| = 6');
-    expect(query).toBe('{-0.23, 2.63}');
+    expect(query).toBe('-0.23, t = 2.63');
     expect(panel).toBe(`t = ${query}`);
   });
 
-  it('|AB| = 7 → {-0.95, 3.35} (was {-1, 3.4})', () => {
+  it('|AB| = 7 → -0.95, t = 3.35 (was {-1, 3.4})', () => {
     const { query, panel } = run('A(1,4,-3)', 'B(2t,t,1)', '|AB| = 7');
-    expect(query).toBe('{-0.95, 3.35}');
+    expect(query).toBe('-0.95, t = 3.35');
     expect(panel).toBe(`t = ${query}`);
   });
 });

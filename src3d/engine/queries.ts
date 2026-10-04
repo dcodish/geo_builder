@@ -14,7 +14,7 @@
 
 import { knowledgeSamples3, resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
 import { SHAPE_SUBJ } from '../lexicon/nouns3';
-import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, decompStr, formatBranches, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr, planeSymbols } from './dataView';
+import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, branchAnswer, decompStr, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr, planeSymbols } from './dataView';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { angleBetweenOperands, distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
@@ -610,7 +610,7 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
   // undetermined and says so.
   if (q.kind === 'symbol' && q.sym === c.param) {
     const branches = resolve3(c, seed).param?.branches ?? [];
-    const shown = formatBranches(branches);
+    const shown = branchAnswer(q.sym, branches); // #1591: «m = -2, m = 4» once joined by the ask row
     return shown ? { text, answer: shown } : { text, answer: null, note: 'undetermined' };
   }
   /**
