@@ -9,7 +9,7 @@ Quality attributes and constraints. IDs are stable references (`NFR-<area>-<n>`)
 - **NFR-US-1** — Usable by a high-school student with **no training or documentation**. Core actions (add a fact, cycle alternative, undo, clear) are discoverable on first use.
 - **NFR-US-2** — Hebrew, right-to-left, is the default and a first-class experience (not a translation afterthought). Layout, input, and labels all respect RTL.
 - **NFR-US-3** — Errors and contradictions are explained in plain student language, never as stack traces or jargon.
-- **NFR-US-4** — Works on a typical school desktop/laptop browser and is usable on a **tablet** (touch: pinch-zoom, tap-to-focus, +/− buttons — hardening F2, [ADR-207](06-decisions.md#adr-207)). **Phones are explicitly out of scope for this phase** (operator ruling 2026-07-03, reaffirmed 2026-07-11: "I don't want to support mobile phones at this phase, but tablets should be").
+- **NFR-US-4** — Works on a typical school desktop/laptop browser and is usable on a **tablet** (touch: pinch-zoom, tap-to-focus, +/− buttons — hardening F2, [ADR-207](06-decisions.md#adr-207)). **Phones are explicitly out of scope for this phase** (operator ruling 2026-07-03, reaffirmed 2026-07-11: "I don't want to support mobile phones at this phase, but tablets should be"). On a narrow screen (≤ 900px, a portrait tablet) every builder puts the **input above the figure** and the fact list under it, so the input is on the first screen and the figure a student just changed stays in view after «הוסף» ([ADR-W-112](06w-decisions-workspace.md#adr-w-112), #1459).
 
 ## Stability (a hard requirement, not a nice-to-have)
 

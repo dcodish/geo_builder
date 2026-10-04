@@ -1207,6 +1207,12 @@ export function App() {
                 </Banner>
               </div>
             ))}
+          </div>
+        }
+        factsZone={
+          <>
+            {/* #1459 (ADR-W-112): the fact list is its own zone, so a STACKED layout can put it under the
+                figure while the entry above stays beside the figure's top. Wide, it renders right here as before. */}
             <FactList
               rows={lines.map((line, i) => ({
                 id: String(i),
@@ -1292,7 +1298,7 @@ export function App() {
               }
               testId="analytic-facts"
             />
-          </div>
+          </>
         }
         canvasZone={
           <>

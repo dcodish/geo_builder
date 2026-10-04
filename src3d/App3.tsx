@@ -868,7 +868,10 @@ export default function App3() {
           {/* The examples dropdown retired (B4 completed, operator's parity catch 2026-08-18):
               the examples are the shared quick-command STRIP inside the input card now, the same
               place as in every builder — and a pick BUILDS (D9b), instead of only filling the box. */}
-
+      </>}
+      factsZone={<>
+          {/* #1459 (ADR-W-112): the fact list is its own zone, so a STACKED layout can put it under the
+              figure while the entry above stays beside the figure's top. Wide, it renders right here as before. */}
           {/* B5 (#670, D6): the SHARED fact-list chrome — row cards, mute checkbox, ✎ edit-in-place,
               ✕ delete, one look across the builders. The row CONTENT stays this product's:
               claim-✓/status dot, the row text (routed by `FactRow3` — #482 ADR-3D-121 isolation is

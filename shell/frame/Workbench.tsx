@@ -20,8 +20,8 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { color } from '../theme';
 
-/** The one breakpoint every builder shares: below it the workbench STACKS (canvas → input →
- *  data) and the page scrolls natively — three fixed columns on a phone collapse into slivers
+/** The one breakpoint every builder shares: below it the workbench STACKS (input → canvas →
+ *  facts → data, #1459) and the page scrolls natively — three fixed columns on a phone collapse into slivers
  *  (operator: "on mobile the sites look crap"). The desktop no-scroll ruling applies to
  *  desktops; a stacked phone page scrolls by nature. */
 const NARROW_QUERY = '(max-width: 900px)';
@@ -40,8 +40,14 @@ function useNarrow(): boolean {
 }
 
 export interface WorkbenchProps {
-  /** Content of the input column (input card, fact list card, …). */
+  /** The ENTRY: the input card and the feedback about the last submit (errors, notices). */
   inputZone: ReactNode;
+  /**
+   * The FACT LIST — what the student has already said (#1459). Wide, it sits under the entry in the
+   * same column, exactly as before; stacked, it goes BELOW the figure, because a list that grows with
+   * every «הוסף» would otherwise push the figure off the screen the entry was moved up to keep in view.
+   */
+  factsZone: ReactNode;
   /** Content of the canvas CARD (name field, toolbar, the drawing surface, figure actions). */
   canvasZone: ReactNode;
   /** Content of the data column (the נתונים panel card). */
@@ -52,14 +58,27 @@ export interface WorkbenchProps {
   barsHeight?: number;
 }
 
-export function Workbench({ inputZone, canvasZone, dataZone, emptyOverlay, barsHeight = 126 }: WorkbenchProps) {
+export function Workbench({ inputZone, factsZone, canvasZone, dataZone, emptyOverlay, barsHeight = 126 }: WorkbenchProps) {
   const narrow = useNarrow();
 
   if (narrow) {
-    // STACKED (phone/tablet-portrait): the figure first, then what-I-said, then the data —
-    // full-width cards, native page scroll.
+    /**
+     * STACKED (phone/tablet-portrait): the entry FIRST, then the figure, then the fact list, then
+     * the data — full-width cards, native page scroll.
+     *
+     * #1459 (ADR-W-112, operator ruling 2026-09-27: *"input above the canvas"*). The figure used to
+     * come first, which put the input below it: below the fold on a portrait tablet in analytic
+     * (y = 1092 of 1080) and on a phone in 2-D and 3-D, so a student who pressed «הוסף» could not
+     * see the figure they had just changed without scrolling. With the input above, the box and the
+     * top of the figure share the first screen — and the fact list goes UNDER the figure, since a list
+     * that grows with every add would push the figure back off that screen (measured with the list
+     * above it: analytic's canvas fell to y = 958 of a 1080 viewport after its smoke sequence). The
+     * order is the DOM order, not a CSS `order`, so the tab order and a screen reader follow what is
+     * seen. The wide layout is untouched: the entry and the list share the input column as before.
+     */
     return (
       <div style={stackPage}>
+        <div style={stackZone}>{inputZone}</div>
         <section style={{ ...canvasCard, minHeight: '58vh', flex: 'none' }}>
           {canvasZone}
           {emptyOverlay != null && (
@@ -68,7 +87,7 @@ export function Workbench({ inputZone, canvasZone, dataZone, emptyOverlay, barsH
             </div>
           )}
         </section>
-        <div style={stackZone}>{inputZone}</div>
+        <div style={stackZone}>{factsZone}</div>
         <div style={stackZone}>{dataZone}</div>
       </div>
     );
@@ -77,7 +96,7 @@ export function Workbench({ inputZone, canvasZone, dataZone, emptyOverlay, barsH
   return (
     <div style={{ ...page, height: `calc(100vh - ${barsHeight}px)` }}>
       <div style={row}>
-        <aside style={inputCol}>{inputZone}</aside>
+        <aside style={inputCol}>{inputZone}{factsZone}</aside>
         <section style={canvasCard}>
           {canvasZone}
           {emptyOverlay != null && (
