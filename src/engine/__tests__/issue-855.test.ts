@@ -97,7 +97,10 @@ describe('#855 — a sampled value never accuses the student', () => {
     });
 
     it('says instead which objects are still free — named by the structural walk', () => {
-      const failing = sweep(STATED).filter((r) => r.status);
+      // #1471 (ADR-576): «AB משיקה למעגל בנקודה B» now moves the circle to B instead of B onto the default ring,
+      // so the stated-radius seat is infeasible far less often (seed 78 of 0..200, was ≥ 1 of 0..40). The sweep
+      // is widened so the message is still EXERCISED — the assertion below keeps that honest.
+      const failing = sweep(STATED, 100).filter((r) => r.status);
       expect(failing.length, 'the stated-radius sibling still has an infeasible seat').toBeGreaterThan(0);
       for (const r of failing) {
         expect(r.status, `seed ${r.seed}`).toMatch(/^not determined: .+ still free, so .+ cannot be judged in this configuration$/);

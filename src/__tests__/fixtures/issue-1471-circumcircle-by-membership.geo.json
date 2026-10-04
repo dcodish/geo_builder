@@ -1,0 +1,69 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-04T12:00:00.000Z",
+  "name": "issue-1471-circumcircle-by-membership",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "f0",
+      "utterance": "משולש ABC",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "f1",
+      "utterance": "מעגל O",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.0",
+      "utterance": "המעגל עובר דרך A, B ו-C",
+      "group": "g2",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.1",
+      "utterance": "המעגל עובר דרך A, B ו-C",
+      "group": "g2",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.2",
+      "utterance": "המעגל עובר דרך A, B ו-C",
+      "group": "g2",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

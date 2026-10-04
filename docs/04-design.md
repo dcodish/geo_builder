@@ -862,6 +862,17 @@ list). A definition lowers exactly one through point; a longer list is the circu
 now reads list separators) or it fails closed. The old "uppercase residue for the post-passes" allowance
 is gone: no post-pass ever claimed it.
 
+**The membership seats the circle, not the point ([ADR-576](06-decisions.md#adr-576)).** When the point a
+`point-on-circle` names already exists as a free vertex, apply.ts branch (c2) converts it to an `on-circle`
+rider. Before converting, `reseatFreeCircle` moves the circle's UNSTATED seat through it: with one member the centre slides along the ray
+from P until P is on the ring (the drawn size kept); with two, a free radius moves the centre to the perpendicular
+bisector and a stated one to the R-circles' crossing nearest it; with three, a free radius becomes the circumcircle. Every existing member's θ is re-derived so it stays put, and
+P then converts at its exact bearing. The guard is semantic: the centre is an unpinned, un-driven free point,
+the circle carries no `solve` or radius order, no constraint or side record names either, and no point other
+than a free member depends on them. Otherwise the projection seat stands, but a bearing that would land on an
+existing member takes the fresh `nextTheta` slot instead (ADR-123), so a default collision never refuses a
+satisfiable figure.
+
 ## A tangency about the circle asks the shared resolver ([ADR-560](06-decisions.md#adr-560))
 
 `cornerTangentCircle` (two sides tangent to a circle, `src/parser/parse.ts`) no longer keeps its own copy of

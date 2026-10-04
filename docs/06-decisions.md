@@ -14077,3 +14077,73 @@ The humanizer already strips id prefixes (`bis-CAB` → `CAB`), so what a studen
 - `src/parser/parse.ts`: `GIVEN_AND` / `POINT_PLACEMENT` in `compoundSuchThat`; the end qualifier in `pointOnExtension`; `droppedGivenRelations`' exemption (b).
 
 **Behaviour change for a student:** «הנקודה E נמצאת על המשך הצלע BC ונתון כי DE = DC» now draws E so that DE = DC, instead of quietly ignoring the second half. «… מעבר לנקודה B» now puts E past B, not past C. A sentence like «E על המשך BC מעבר לנקודה A», whose letter is not an end of BC, is no longer drawn.
+
+## ADR-576 — A membership moves an unstated circle, not a stated figure (#1471)
+
+**Status:** accepted · 2026-10-04 · bug (2d, batch) · round #1736 · branch `fix/1471-reseat-free-circle` off `main` @ d9a5910f
+
+**Requirements:** [FR-IN-12](02-requirements.md) — one sentence added: points of a drawn figure put on a circle whose size or place was never stated move the circle, not the figure · **Design:** [04-design.md](04-design.md) § "A through-statement about a drawn circle is a reference" — the (c2) seat rule paragraph · **LADDER stage:** **2a** (`applyCommand`, the M1 membership at the apply boundary), before any evaluate; [LADDER.md](LADDER.md) row 2a gains one clause.
+
+**Cites** [ADR-080](#adr-080) (the (c2) conversion of a free vertex to an `on-circle` rider), [ADR-140](#adr-140) (a converted vertex keeps its `solve`), [ADR-354](#adr-354) (the cycle gate), [ADR-123](#adr-123) (a default collision is avoided, a constraint-driven one allowed), [ADR-548](#adr-548) (the through-statement lowers to `point-on-circle`), [ADR-052](#adr-052) / M4 (defaults yield to statements).
+
+**Context — measured at pickup on d9a5910f** through `decideDeterministic2D` + the store + `replay` (the issue's 2026-09-29 table re-ran unchanged):
+
+| typed | before |
+| --- | --- |
+| «משולש ABC» · «מעגל O» · «המעגל עובר דרך A, B ו-C» (the report), «A, B ו-C על המעגל», circle first, "A, B and C are on the circle" | refused, `over-constrained` |
+| … · «B ו-C על המעגל» | refused |
+| … · «A ו-B על המעגל» | committed, A jumps (2,3.6)→(5.44,2.05), B (6,0)→(5,0) |
+| «משולש ABC» · «מעגל O ברדיוס 3» / «ברדיוס 2» · «B ו-C על המעגל» | refused |
+| «ריבוע ABCD» · «מעגל O» · «A ו-B על המעגל» | committed with A = B = C = D = (4,0) at seed 0; `meetsRequirements(seed 0) = false` |
+| «משולש ABC» · «AB = 10» · «מעגל O ברדיוס 3» · «A ו-B על המעגל» | refused naming \|AB\| = 10 (correct) |
+
+**Root cause.** apply.ts `point-on-circle`, branch (c2), converted an existing free vertex to `{kind:'on-circle', theta: bearing}` at its bearing from the circle's **default** centre, on the **default** radius, and left the circle where it was. The circle's seat (`מעגל O` at (10,0), r = 5) states nothing, yet the membership moved the figure onto it. So every existing member jumped, and two vertices on one ray from the default centre (B and C, collinear with O) landed on one spot; the accept gate then refused a satisfiable figure, or (an all-coincident ring is not "flat") the fold committed it collapsed. The conversion adds no constraint, so no rung could rescue it.
+
+**Class.** *A membership statement that puts an EXISTING point on a circle whose place/size are still unstated defaults is seated by moving the point onto the default circle instead of moving the circle's own free DOFs through the point.* Members measured: three vertices (every order, one per line, circle first, English), two vertices, a stated radius, and two vertices of a square/rectangle/segment (committed collapsed). Not members: fresh points (`nextTheta`), the `circumcircle` definition, derived/pinned points ((c3)/(c4)/(d) already move the circle), through-radius circles ((c)).
+
+**Decision — M1 lowering + M4 (the circle's unstated seat yields).** New `reseatFreeCircle` in `src/engine/apply.ts`, called at the top of (c2). It re-seats the circle **by value** so it passes through the new point and every current member at its current position, then re-derives each member's θ from the new centre. Members M = current members ∪ {P}:
+- |M| = 1 (either radius kind): the centre slides along ray P→O until P is on the ring; the circle keeps its drawn size (stated, or the default scale) and moves the least.
+- free radius: |M| = 2 → the centre = the foot of O on the perpendicular bisector (least move); |M| = 3 → the circumcircle (collinear ⇒ no re-seat); |M| ≥ 4 → no re-seat (the 4th point is a real constraint).
+- stated radius R: |M| = 2 → the R-circles' intersection nearest O (|M₁M₂| > 2R ⇒ no re-seat); |M| ≥ 3 → no re-seat.
+
+**Deviation from the plan, measured (|M| = 1, free radius).** The plan kept the centre and set r = |O·P|. That lets the distance of an unstated default centre dictate the circle's size. Scenario `extension-crossing-then-midpoint-given` (#110, corpus 4) went red under it: «הנקודה O נמצאת על המעגל הגדול» grew the big circle to r = 12.47 beside the small r = 3.6, and the later «M אמצע OK» then committed with «E בתוך המשולש KAO» violated. Sliding the centre and keeping the drawn size is the same "move the unstated seat, not the figure" rule, it unifies the free and stated cases, and the scenario is green under it.
+
+**Guard** (keyed on "the seat is unstated", never on solver state or the collision): the centre is an unpinned, un-driven, region-free, non-rigid free point; the circle has no `solve` and no radius order (`innerOf`/`orderedBelow`, either direction); no constraint and no side record names the centre or the circle; and every point downstream of the centre/circle is a free θ-sliding member (which stays put). Otherwise (c2) keeps its projection seat. The (c2) centre spot is read from the re-seated object, not the pre-step `pos` snapshot (which, in a coupled run, also predates earlier commands of the same run).
+
+**Arm 2.** When the seat cannot move, the projection seat still never lands a default collision on another member: a bearing within 1e-6 rad of an existing member's θ takes `nextTheta` (the ADR-123 fresh-point rule). This is what lets «מעגל O ברדיוס 2» · «B ו-C על המעגל» (|BC| = 6 > 2R) commit: the triangle shrinks to fit.
+
+**Why not a patch (docs/17 §2).** No chokepoint list grows; it is a seat rule inside the existing (c2) branch. The engine gains a capability: a membership moves an unstated circle, not a stated figure. It closes unreported members (the committed collapsed square, the stated-radius refusals, the jump on every accepted membership).
+
+**Measured after** (`src/engine/__tests__/issue-1471-free-circle-seat.test.ts`):
+
+| typed | now |
+| --- | --- |
+| the report and its four permutations, and one membership per line | committed; A, B, C unmoved (< 1e-6); O = circumcentre; 24/24 seeds `meetsRequirements` |
+| «B ו-C על המעגל» / «A ו-B על המעגל» | committed, unmoved |
+| square/rectangle/segment · «A ו-B על המעגל» | committed, unmoved, `meetsRequirements(seed 0)` true |
+| «ברדיוס 3» · «B ו-C על המעגל» | committed, B and C unmoved, \|OB\| = \|OC\| = 3 |
+| «ברדיוס 2» · «B ו-C על המעגל» | committed, \|BC\| ≈ 2.23 ≤ 4, B ≠ C |
+| «AB = 10» · «ברדיוס 3» · «A ו-B על המעגל» | refused naming \|AB\| = 10 (unchanged) |
+| «קטע AB» · «C על AB» · «מעגל O» · «A, B ו-C על המעגל» | refused (C would have to coincide with A or B); the student sees the humanized "no second crossing" note — before it was "cannot build line line-AB: A and B coincide" |
+| quadrilateral/square/rectangle · four vertices | committed (unchanged) |
+| a stated (pinned) centre | not re-seated (unchanged) |
+
+**Stability.** Restored for the class: before, every accepted existing-vertex membership moved the vertex; now only the circle, which carried no givens, moves. The one visible change in an already-accepted case is the circle-first order (`מעגל O` · `משולש ABC` · …): the drawn default circle now moves to the triangle rather than the triangle to the circle — the same principle.
+
+**Perf (docs/17 §7).** Closed form, O(members); multiplier ×1, no solve, no sampling. Cold `replay` of the slowest fixture (`issue-572-load-collapse`), back to back on a quiet machine: **7.22 s before, 6.91 s after**; all 17 pre-existing fixtures 8.19 s → 7.86 s (noise-level).
+
+**Sibling audit.** Grepped every `on-circle` conversion in `src/engine/apply.ts`: (b)/(c)/(c3)/(c4)/(d) already move the circle or push a constraint; fresh points use `nextTheta`; (c2) was the only seat that moved the figure. **3-D:** `src3d/engine/apply.ts` `point-on-circle3` is a membership check/claim with no conversion or seat, so the class is not present. **Analytic:** a membership is a residual in one joint solve over every carrier (`src-analytic/engine/solve.ts`); there is no conversion seat, so the class is not present by construction (not measured by sequence). **Complex:** no circle-membership conversion.
+
+**Measured across the circle tests.** Every 2-D test file that mentions a circle (grep of «מעגל» / `circle`, 264 files), plus the eight `scenarios-e2e` slices and the fixture net: green after two lock re-pins. Each was measured on the pre-change base first:
+- **Fixture `issue-855-tangency-sampled-seat`** is saved at the SAMPLED seed 17. Every sampled seat shifts because the circle now moves to B. Seed 17 now samples C outside the circle that «C בתוך המעגל» states. That is a sampled-seat region miss, and the same five lines already miss at seeds 15 and 33 of 0..40 on the base, where now only seed 17 does. The app's load event rescues exactly this (`resolveView` asks `meetsRequirements`, ADR-446), so the fixture joins `FIXTURE_LOAD_RESCUED`, and that list's precondition now asks the app's own predicate (`meetsRequirements(saved) === false`) instead of `lastError`. #855's own claim, that no seed accuses the student, stays locked seed by seed in `issue-855.test.ts` (all 41 seeds, green).
+- **`issue-855.test.ts` "says instead which objects are still free"** asserts that the stated-radius sibling still HAS an infeasible seat, so that its message is exercised. With the circle moved to B, that seat is infeasible far less often: seed 78 of 0..200, against at least one of 0..40 before. The sweep is widened to 0..100, and the exercised-assertion is kept.
+The full suite is the batch gate (round #1736).
+
+**Found, not folded.** Under the plan's |M| = 1 rule, the `extension-crossing-then-midpoint-given` scenario committed «M אמצע OK» at seed 0 with «E בתוך המשולש KAO» violated. Under the rule as built, the #855 figure replays seed 17 with «C בתוך המעגל» violated, and the base already does this at seeds 15 and 33. A stated REGION on a point that a later given drives is only as safe as the seat it happens to start from. The fold, and the per-seed tail, do not steer a driven point back inside its stated region. That class is older than this change. It is worth its own issue.
+
+**Locks.** `src/engine/__tests__/issue-1471-free-circle-seat.test.ts` (18, through `decideDeterministic2D` and the store). **Fails before: 14 of 18**, measured by reverting `apply.ts` to d9a5910f; the 4 that pass before are guards (the |AB| = 10 refusal, the collinear case, the four-vertex shapes, the pinned centre). Fixture `src/__tests__/fixtures/issue-1471-circumcircle-by-membership.geo.json` (the operator's exact sequence; replays green, no parser drift). Re-pinned with the reasons above: `src/__tests__/fixtures.test.ts` (`FIXTURE_LOAD_RESCUED` + its precondition) and `src/engine/__tests__/issue-855.test.ts` (one sweep bound).
+
+**Consequences.**
+- `src/engine/apply.ts`: `reseatFreeCircle`; the (c2) call, the re-seated centre spot, and the arm-2 collision rule.
+
+**Behaviour change for a student:** after «משולש ABC» and «מעגל O», «המעגל עובר דרך A, B ו-C» (or «A, B ו-C על המעגל») is accepted: the triangle stays where it was and the circle becomes its circumcircle, instead of being refused. Putting one or two vertices of a drawn shape on a drawn circle no longer moves those vertices; the circle moves to them.

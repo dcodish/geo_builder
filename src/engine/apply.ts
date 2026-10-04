@@ -11,7 +11,7 @@
 import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, Vec } from './types';
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
-import { add, dist, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringSimple, scale, sub } from './geometry';
+import { add, circleCircleIntersect, circumcenter, dist, footOnLine, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringSimple, scale, sub } from './geometry';
 import { constraintKey, constraintRefs, residual, residualTolerance } from './solve';
 import { evaluateCore } from './evaluate';
 import { applySeed } from './sample';
@@ -870,6 +870,114 @@ export function wouldInvertDependency(objects: GeoObject[], x: Id, refs: Id[]): 
     if (o) queue.push(...objectParents(o));
   }
   return false;
+}
+
+/**
+ * #1471 ([ADR-576](../../docs/06-decisions.md#adr-576)) — SEAT THE CIRCLE, NOT THE POINT. A membership statement
+ * that puts an EXISTING free point P on a circle whose place and/or size were never stated («מעגל O» — a
+ * default seat, M4) must move the circle's unstated DOFs through P, not move P onto the default ring: the
+ * figure carried the student's givens, the circle's seat carried none. Without this the (c2) conversion
+ * projected every new member onto the default ring — existing points JUMPED (the stability invariant), and
+ * two points sharing a ray from the default centre COLLIDED, so «משולש ABC · מעגל O · A, B ו-C על המעגל»
+ * was refused as over-constrained (B and C both landed on (5,0)) and a square's «A ו-B על המעגל» was
+ * committed shrunk to a point.
+ *
+ * Re-seats BY VALUE only (no new object kinds, no new constraints): the circle passes through P and every
+ * current member at its current position; each existing member's θ is re-derived from the new centre so it
+ * stays exactly where it was. Members M = current members ∪ {P}:
+ *  - |M| = 1 (either radius kind): the centre slides along ray P→O until P is on the ring — the circle keeps
+ *    its drawn size (stated, or the default scale) and moves the least. Keeping the CENTRE and resizing to
+ *    |O·P| instead lets the unstated default centre's distance dictate the size (a 12.5 : 3.6 circle pair in
+ *    the #110 scenario, whose later region given then could not hold) — measured, rejected.
+ *  - free radius: |M| = 2 → centre = foot of O on the perpendicular bisector (least move), r = |O·M₁|;
+ *    |M| = 3 → the circumcircle (collinear ⇒ none); |M| ≥ 4 → none (a real constraint).
+ *  - stated radius R: |M| = 2 → the R-circles' intersection nearest O (|M₁M₂| > 2R ⇒ none); |M| ≥ 3 → none.
+ * Guard — the seat must be genuinely UNSTATED and moving it must move no other point: the centre is an
+ * unpinned, un-driven, region-free free point; the circle carries no `solve` and no radius order; no
+ * constraint or side record names the centre or the circle; and every point that transitively depends on
+ * the centre/circle is a free (θ-sliding) member — which is re-derived to stay put. Otherwise false, and
+ * (c2) keeps its projection seat. Returns true when it re-seated (objects mutated in place).
+ */
+function reseatFreeCircle(
+  objects: GeoObject[],
+  constraints: readonly Constraint[],
+  requirements: readonly unknown[] | undefined,
+  pos: Map<Id, Vec>,
+  circleId: Id,
+  newMember: Id,
+): boolean {
+  const ci = objects.findIndex((o) => o.id === circleId && o.kind === 'circle');
+  if (ci < 0) return false;
+  const circ = objects[ci] as Extract<GeoObject, { kind: 'circle' }>;
+  if (circ.solve || circ.innerOf || circ.orderedBelow) return false;
+  if (circ.radius.via !== 'free' && circ.radius.via !== 'length') return false;
+  const oi = objects.findIndex((o) => o.id === circ.center);
+  const cen = objects[oi];
+  if (!cen || cen.kind !== 'free-point' || cen.pinned || cen.region?.length || (cen as { solve?: unknown }).solve || (cen as { rigid?: unknown }).rigid) return false;
+  if (objects.some((o) => o.kind === 'circle' && (o.innerOf === circleId || o.orderedBelow === circleId))) return false;
+  if (constraints.some((c) => constraintRefs(c).includes(circ.center))) return false;
+  const reqText = JSON.stringify(requirements ?? []);
+  if (reqText.includes(`"${circleId}"`) || reqText.includes(`"${circ.center}"`)) return false;
+  // The members that slide on θ (re-derived below so they stay put); any OTHER point downstream of the
+  // centre/circle would move with the seat — then the seat is not free to move.
+  const members = objects.filter(
+    (o): o is Extract<GeoObject, { kind: 'on-circle' }> => o.kind === 'on-circle' && o.circle === circleId && o.free === true && !o.solve && !o.between,
+  );
+  const memberIds = new Set(members.map((m) => m.id));
+  const moving = new Set<Id>([circ.center, circleId]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const o of objects) {
+      if (moving.has(o.id) || memberIds.has(o.id) || !objectParents(o).some((p) => moving.has(p))) continue;
+      if (isGeoPoint(o)) return false;
+      moving.add(o.id);
+      grew = true;
+    }
+  }
+  const O: Vec = { x: cen.x, y: cen.y };
+  const r0 = circ.radius.value;
+  const spots: Vec[] = members.map((m) => ({ x: O.x + r0 * Math.cos(m.theta), y: O.y + r0 * Math.sin(m.theta) }));
+  const P = pos.get(newMember);
+  if (!P) return false;
+  spots.push(P);
+  let centre: Vec | null = null;
+  let radius = 0;
+  if (spots.length === 1) {
+    const d = dist(P, O);
+    if (d < 1e-9) return false;
+    radius = r0;
+    centre = add(P, scale(sub(O, P), r0 / d));
+  } else if (circ.radius.via === 'free') {
+    if (spots.length === 2) {
+      const [m1, m2] = spots;
+      if (dist(m1, m2) < 1e-9) return false;
+      const mid = scale(add(m1, m2), 0.5);
+      const dir = sub(m2, m1);
+      centre = footOnLine(O, mid, add(mid, { x: -dir.y, y: dir.x }));
+    } else if (spots.length === 3) {
+      centre = circumcenter(spots[0], spots[1], spots[2]);
+    }
+    if (!centre) return false;
+    radius = dist(centre, spots[0]);
+  } else {
+    const R = circ.radius.value;
+    if (spots.length === 2) {
+      const cand = circleCircleIntersect(spots[0], R, spots[1], R);
+      if (!cand.length) return false;
+      centre = cand.reduce((best, c) => (dist(c, O) < dist(best, O) ? c : best));
+    } else {
+      return false;
+    }
+    radius = R;
+  }
+  if (!(radius > 1e-9) || spots.some((s) => dist(s, centre!) < 1e-9)) return false;
+  objects[oi] = { ...cen, x: centre.x, y: centre.y };
+  if (circ.radius.via === 'free') objects[ci] = { ...circ, radius: { via: 'free', value: radius } };
+  members.forEach((m, k) => {
+    const mi = objects.findIndex((o) => o.id === m.id);
+    objects[mi] = { ...m, theta: Math.atan2(spots[k].y - centre!.y, spots[k].x - centre!.x) };
+  });
+  return true;
 }
 
 function pointOnCircle(objects: GeoObject[], id: Id, circleId: Id): boolean {
@@ -1734,10 +1842,26 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
           // seeded inside a triangle converts to the on-circle spot NEAREST that seat, instead of
           // jumping to nextTheta on the far side (play-test session yla2d4xo — "E בתוך משולש" then
           // "E על מעגל O" landed E outside the stated region).
+          //
+          // #1471 (ADR-576) — but the bearing alone moves the point onto the circle's DEFAULT ring. When the
+          // circle's place/size were never stated, re-seat the CIRCLE through P and its current members first
+          // (`reseatFreeCircle`), so P lands exactly where it was and no existing point jumps. The centre spot
+          // is then read from the re-seated object (the `pos` snapshot predates the re-seat — and, in a
+          // coupled run, every earlier command of the run).
+          const reseated = reseatFreeCircle(objects, constraints, prev.requirements, pos, cmd.circle, cmd.id);
           const eSpot = pos.get(cmd.id);
-          const cSpot = pos.get(circ.center);
-          const bearing =
+          const cObj = objects.find((o) => o.id === circ.center);
+          const cSpot = reseated && cObj?.kind === 'free-point' ? { x: cObj.x, y: cObj.y } : pos.get(circ.center);
+          let bearing =
             eSpot && cSpot && dist(eSpot, cSpot) > 1e-9 ? Math.atan2(eSpot.y - cSpot.y, eSpot.x - cSpot.x) : nextTheta(objects, cmd.circle);
+          // Arm 2 (ADR-576): when the seat could NOT move (|M| ≥ 4, a chord longer than a stated diameter, a
+          // stated centre, a non-free member), the projection seat must still never land a DEFAULT collision on
+          // another member — the fresh-point rule (ADR-123: a default coincidence is avoided, a constraint-driven
+          // one is allowed). The free θs then let the sampler and the rungs find the real figure.
+          if (!reseated && objects.some((o) => o.kind === 'on-circle' && o.circle === cmd.circle && !o.between && o.id !== cmd.id
+              && Math.abs(Math.atan2(Math.sin(o.theta - bearing), Math.cos(o.theta - bearing))) < 1e-6)) {
+            bearing = nextTheta(objects, cmd.circle);
+          }
           objects[i] = { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: bearing, free: true, ...(solve ? { solve } : {}) };
           break;
         }
