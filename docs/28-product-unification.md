@@ -716,7 +716,9 @@ a promise that four-plus builders can break silently.
 What a student learns once and expects everywhere. Each row is *"this control exists, is reachable
 the same way, and means the same thing"* — or an explicit `n/a` with a reason.
 
-- **The utterance input**: same position, same submit behaviour, same symbol palette (shared
+- **The utterance input**: same position (wide: the input column at the reading start; stacked below
+  900px: the entry card ABOVE the figure, the fact list below it — the `Workbench`'s `inputZone` /
+  `factsZone` split, [ADR-W-112](06w-decisions-workspace.md#adr-w-112)), same submit behaviour, same symbol palette (shared
   vocabulary + per-builder extension, the operator's ruling on
   [#525](https://github.com/dcodish/geo_builder/issues/525)), same live preview, same RTL/bidi
   handling of the student's own text ([#482](https://github.com/dcodish/geo_builder/issues/482)).

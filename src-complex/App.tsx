@@ -695,6 +695,10 @@ export function App() {
                 <Banner kind="error">{errorText(lastError, t)}</Banner>
               )}
             </InputArea>
+          </>}
+          factsZone={<>
+            {/* #1459 (ADR-W-112): the fact list is its own zone, so a STACKED layout can put it under the
+                figure while the entry above stays beside the figure's top. Wide, it renders right here as before. */}
             {/*
               THE STATEMENT LIST — the SHARED chrome (B5/D6: disable + edit + delete, everywhere).
               The rows ARE the student's lines, the store's source of truth (#658's lesson); a

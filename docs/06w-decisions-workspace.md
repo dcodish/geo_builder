@@ -5291,3 +5291,39 @@ The class has two halves. One mechanism (the prune marker) silently covered only
 **Rejected.**
 - **Adding braces per product at the display boundary** (what analytic's value rows do for engine symbols). That is a fourth fork of a shared decision, and it would miss the given rows, previews and the other three products.
 - **Any `_` followed by letters is a subscript.** That would typeset the inside of identifiers; a subscript base is one letter.
+
+## ADR-W-112 — Stacked below 900px, the input sits above the figure and the fact list below it, in every builder (#1459)
+
+**Status:** accepted · 2026-10-04 · round #1753 (feature, PR). Ruling cited:
+- **2026-09-27, /decisions pass on #1459:** *"Input above the canvas"* — chosen over pinning the input to the bottom, scrolling to the figure after each add, or leaving it.
+
+**Requirements:** [03](03-nonfunctional-requirements.md) NFR-US-4 — on a narrow screen the input is above the figure and the figure stays in view after «הוסף». · **Design:** [28](28-product-unification.md) §5a, the utterance-input row — the `Workbench`'s `inputZone` / `factsZone` split. **Product:** shell (all four builders).
+
+**Context.** Below the shared stack breakpoint (`(max-width: 900px)`), `shell/frame/Workbench.tsx` stacked canvas → input zone → data. Measured on `c098af9b` with Playwright, before any add: at 810×1080 (a portrait tablet, in scope) analytic's input was at y = 1092, below the fold, and complex's at 1036–1078; at 390×844 2-D's was at 1084 and 3-D's at 971. A student had to scroll to type and then scroll back to see what the line did.
+
+**The first build was measured and rejected.** Moving the whole input zone above the canvas did put the box on the first screen. But each product's input zone also holds the **fact list**, which grows with every add. After the visual-smoke sequence, analytic's canvas started at y = 958 of 1080 on the tablet and y = 1157 of 844 on the phone. 2-D's started at 769 of 844 on the phone. That is the reported defect again, from the other side. The ruling says the input *card*, so the list had to come out.
+
+**Decision.**
+1. **`Workbench` gains a required `factsZone`.** `inputZone` is now the entry: the input card plus the feedback about the last submit (errors, notices, warnings). `factsZone` is the fact list.
+2. **Stacked order: entry → canvas → fact list → data.** It is the DOM order, not a CSS `order`, so tab order and screen readers follow what is seen. The empty-state chips stay over the canvas.
+3. **Wide is unchanged.** The input column renders `inputZone` then `factsZone`, which are the same children in the same order as before. At 1440×900 the input and canvas rects are identical before and after in all four builders.
+4. **Every builder passes it.** 2-D: the steps card and the hidden file picker. 3-D, complex and analytic: their `FactList`. Analytic's unused `display: contents` wrapper now holds only the entry.
+
+**Measured after** (top of the input / visible canvas, after the smoke sequence; the canvas no longer moves as facts are added):
+
+| viewport | 2-D | 3-D | complex | analytic |
+|---|---|---|---|---|
+| 810×1080 | 217 / 689 px | 204 / 626 px | 204 / 765 px | 204 / 726 px |
+| 390×844 | 350 / 280 px | 337 / 306 px | 292 / 367 px | 292 / 327 px |
+
+On a phone (out of scope, NFR-US-4) only the top third of the figure shares the first screen with the input. The palette wraps into several rows above the box there.
+
+**Locks.**
+- `shell/__tests__/workbench-stack-order-1459.test.tsx`: narrow DOM order is entry < canvas < facts < data, and the chips stay in the canvas card; wide is two `aside`s, with entry and facts in the first, before the canvas. Fails before: 2 of 3 (the narrow order, and the wide column that has no facts zone).
+- `shell/__tests__/row-parity.test.ts` (§5c, all four builders): each App's `<FactList` sits inside `factsZone=`. A builder that left its list in `inputZone` would still compile, since any node satisfies the prop, and this lock catches it. `tsc` enforces that the prop is present.
+- The screenshot evidence at 810×1080, 390×844 and 1440×900 for every builder is on the round's play sheet. It is not a suite lock: the visual smoke runs at one desktop viewport.
+
+**Rejected.**
+- **Sticky bottom input** (the filing session's recommendation). The operator chose otherwise.
+- **The whole input zone above the canvas.** Measured above: it pushes the figure off-screen as facts accumulate.
+- **Splitting the zone inside `Workbench`** by walking the children of the node it is given. That guesses at each product's markup. The products already know which card is which.

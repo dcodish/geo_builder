@@ -1580,7 +1580,10 @@ export default function App() {
               </ul>
             </div>
           )}
-
+        </>}
+        factsZone={<>
+          {/* #1459 (ADR-W-112): the fact list is its own zone, so a STACKED layout can put it under the
+              figure while the entry above stays beside the figure's top. Wide, it renders right here as before. */}
           <div style={sideCard}>
             {/* Card header: title, the figure's remaining freedom as a compact pill (was a loose
                 line floating between buttons), and undo/redo/clear as small in-context utilities

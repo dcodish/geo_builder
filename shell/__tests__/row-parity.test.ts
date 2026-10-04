@@ -319,3 +319,24 @@ describe('#1099 — the gap this file found, and closed', () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe('#1459 / ADR-W-112 — every builder hands its fact list to the Workbench as its own zone', () => {
+  it('the FactList sits inside factsZone, not inputZone, in all four builders', () => {
+    /**
+     * Stacked (< 900px), the Workbench puts the entry ABOVE the figure and the fact list BELOW it.
+     * A builder that kept its list in `inputZone` would compile (factsZone is required, but any node
+     * satisfies it) and put a growing list back above the figure — the regression this guards.
+     */
+    const zoneOf = (src: string, at: number) => {
+      const before = src.slice(0, at);
+      const zones = ['inputZone=', 'factsZone=', 'canvasZone=', 'dataZone='];
+      return zones.map((z) => [z, before.lastIndexOf(z)] as const).sort((a, b) => b[1] - a[1])[0][0];
+    };
+    const wrong = APPS.filter((rel) => {
+      const src = read(rel);
+      const at = src.indexOf('<FactList');
+      return at < 0 || zoneOf(src, at) !== 'factsZone=';
+    });
+    expect(wrong).toEqual([]);
+  });
+});
