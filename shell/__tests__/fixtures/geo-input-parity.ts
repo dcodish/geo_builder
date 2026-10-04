@@ -629,8 +629,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-3d-008', family: 'lengths', steps: ['מרובע ABCD', 'המרחק בין D לישר AB הוא 5'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }] },
   { id: 'cat-3d-009', family: 'lengths', steps: ['טרפז ABCD', 'המרחק בין AB לבין CD הוא 3'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }] },
   { id: 'cat-3d-010', family: 'angles', steps: ['משולש ABC', 'קוסינוס הזווית ACB = 3/4'], expect: 'builds', note: '2-D draws acos 3/4 ≈ 41.41° since #1698 (ADR-566)' },
-  { id: 'trig-sine-choice-1711', family: 'angles', steps: ['משולש ABC', 'סינוס הזווית ACB = 3/4'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1719' }, { product: '3d', issue: '#1726' }], note: 'a sine fits θ and 180° − θ — a configuration choice «הציגו תצורה אחרת» cycles (#1711, operator ruling 2026-10-03)' },
-  { id: 'trig-sine-out-of-range-1711', family: 'angles', steps: ['משולש ABC', 'סינוס הזווית ACB = 5/4'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1719' }, { product: '3d', issue: '#1726' }], note: 'no angle has a sine above 1 (#1711)' },
+  { id: 'trig-sine-choice-1711', family: 'angles', steps: ['משולש ABC', 'סינוס הזווית ACB = 3/4'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1726' }], note: 'a sine fits θ and 180° − θ — a configuration choice «הציגו תצורה אחרת» cycles (#1711, operator ruling 2026-10-03)' },
+  { id: 'trig-sine-out-of-range-1711', family: 'angles', steps: ['משולש ABC', 'סינוס הזווית ACB = 5/4'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1726' }], note: 'no angle has a sine above 1 (#1711)' },
   { id: 'cat-3d-011', family: 'angles', steps: ['משולש ABC ישר זווית'], expect: 'builds' },
   { id: 'cat-3d-012', family: 'polygons', steps: ['ABC משולש שווה צלעות'], expect: 'builds' },
   { id: 'cat-3d-013', family: 'polygons', steps: ['ABC משולש שווה שוקיים'], expect: 'builds' },
@@ -848,8 +848,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'trig-tan-he-1621', family: 'angles', steps: ['משולש ABC', 'טנגנס הזווית ABC הוא 2'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: '2-D: 2° (#1698)' },
   { id: 'trig-cos-1621', family: 'angles', steps: ['משולש ABC', 'cos∢ACB = 3/4'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: '2-D: 3° (#1698)' },
   // ── #1719 (ADR-AG-227): sin of an angle — a choice between its two angles; |sin| > 1 is refused ──
-  { id: 'trig-sin-1719', family: 'angles', steps: ['משולש ABC', 'sin∢ABC = 0.5'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1711' }, { product: '3d', issue: '#1679' }], note: '2-D on main refuses it by name (input.trigGiven.sine-two-angles); #1711 builds it as the same two-angle choice' },
-  { id: 'trig-sin-he-1719', family: 'angles', steps: ['משולש ABC', 'סינוס הזווית ABC הוא 0.5'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1711' }, { product: '3d', issue: '#1679' }], note: '2-D on main refuses it by name (input.trigGiven.sine-two-angles); #1711 builds it as the same two-angle choice' },
+  { id: 'trig-sin-1719', family: 'angles', steps: ['משולש ABC', 'sin∢ABC = 0.5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: '2-D builds it too since #1711 (ADR-573, a two-angle choice); 3-D does not read sin (#1726/#1679)' },
+  { id: 'trig-sin-he-1719', family: 'angles', steps: ['משולש ABC', 'סינוס הזווית ABC הוא 0.5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: '2-D builds it too since #1711 (ADR-573, a two-angle choice); 3-D does not read sin (#1726/#1679)' },
   { id: 'trig-sin-range-1719', family: 'angles', steps: ['משולש ABC', 'sin∢ABC = 2'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'altitude-is-segment', family: 'cevians-centres', steps: ['משולש ABC', 'גובה המשולש לצלע AB הוא CD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }], note: "3-D's catalog sentence; 2-D does not read it" },
   // ── an ORDER between measures, a bound, an angle's acuteness (#1621 D3, ADR-AG-216): regions, as 2-D reads them ──
