@@ -76,4 +76,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Budgets must charge cache hits](budgets-must-charge-cache-hits.md) — a work-count budget is deterministic only if memo hits are charged their cost; lock determinism cold AND warm on a memo-heavy figure (ADR-558 → #1605, 2026-09-30)
 - [Jev experiment (parked)](jev-experiment.md) — TypeSafe Jev tested as "did you mean", parked as #1674 P3; harness + key in `C:\projects\jev-experiment\` (home PC only, not git); operator pre-approved Jev calls (2026-10-02)
 - [git stash is shared across worktrees](git-stash-is-shared-across-worktrees.md) — refs/stash is one stack for every worktree; parallel agents popped each other's work (2026-10-01 #1619) — use a patch file for fails-before checks
-- [Analytic V4 plan lives on #1616](analytic-v4-plan-on-1616.md) — read the newest handoff comment on #1616; as of 2026-10-03 C/D/E are built as stacked PRs #1695 → #1700 → #1705 awaiting play; merge C→D→E
+- [Analytic V4 plan lives on #1616](analytic-v4-plan-on-1616.md) — COMPLETE as of 2026-10-04: A–E + follow-up PRs merged and deployed (prod/2026-10-04); next work is the open analytic issue queue
