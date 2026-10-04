@@ -10989,3 +10989,32 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 - `parser/parseAnalytic.ts`: `perpendicularRef` and `parseIntersectionPlain`'s own-line foot.
 - `engine/apply.ts`: the `on-kind` perpendicular arm.
 - The two locks above.
+
+## ADR-AG-232 — A curve's folded details are labelled lines, one per fact (#1597)
+
+**Date:** 2026-10-04 · **Status:** accepted · fix-round #1736 (PR item, with #1430)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R102 amended (one line per fact; a bare coordinate is labelled). · **Design:** [04c](04c-design-analytic.md), "A curve reads as an equation plus its properties", the `details` paragraph. · **LADDER stage:** none (display only).
+
+**Context.** Operator, 2026-09-30, playing round #1571 T49: *"we need to break this to 2 lines: «(3, 4), r = 5». one clearly saying מרכז המעגל and the other can be r = 5"*. Ruling the same day: the parabola and ellipse rows get labelled lines too; a line is unchanged.
+
+**Root cause.** `curveParts` (`app/curveText.ts`) returned `details` as ONE comma-joined string. A string has no place for a label per fact, so every conic printed its coordinates bare: the circle's centre, the parabola's focus (and its directrix beside it), the ellipse's foci. One shape, three kinds.
+
+**Decision.**
+- `CurveParts.details` is `DetailLine[]`, `DetailLine = { label?: DetailLabelKey; text }`. The label is a locale key; the module still holds no locale (ADR-AG-085).
+- circle: `{curveCentreLabel, "(3, 4)"}` · `{"r = 5"}`. The centre's name rule (ADR-AG-115/184) is unchanged: «מרכז המעגל: O(0, 0)».
+- parabola: `{curveFocusLabel, "(27/2, 0)"}` · `{curveDirectrixLabel, "x = -27/2"}`.
+- ellipse: `{"a = 5, b = 3"}` · `{curveFociLabel, "(4, 0), (-4, 0)"}`.
+- line: one unlabelled line, text unchanged (the vertical word too).
+- Labels: he «מרכז המעגל», «מוקד», «מדריך», «מוקדים»; en "centre", "focus", "directrix", "foci".
+- The panel renders one line per entry through `detailRowText` (`app/panelRows.ts`): the label is one RTL island (`isolateRtlName`), as `slopeRowText` isolates its angle label, then `panelRowText`.
+- Single-line callers join with ` · ` (`detailsText`; `describeCurve` takes an optional label resolver). Without one, the lines come unlabelled — never an English key on a Hebrew surface, the `CurveWords` rule.
+- Consumers audited: the panel (`App.tsx`) is the only surface that shows details. The ask lane uses `curveParts(...).equation` only; the export is the canvas image. Neither changes.
+
+**Not changed.** An OPEN circle given by its centre prints its definition in the equation slot («O(O), r = r_O», #1023/#1060). That is the equation row of an unfixed curve, not the details row, and is not this ruling.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1597-labelled-details.test.ts` (10 tests): the T49 circle row is «מרכז המעגל: (3, 4)» / «r = 5» through `derive → knownCurve → curveParts → detailRowText` with the real `he` resources; the canonical circle reads «מרכז המעגל: O(0, 0)»; the parabola and ellipse rows; a line unchanged; the class lock (no coordinate-led line of any kind lacks a label); every label resolves in he and en and passes `studentFacingViolations`.
+- Moved by design: `issue-1167-panel-names`, `issue-1270-canonical-centre-o` (read the texts joined with ` · `; they lock the centre's NAME), `issue-1212-curve-equation`, `issue-1219-line-details` (the structured lines).
+
+**Consequences.** `app/curveText.ts` (`DetailLine`, `DetailLabelKey`, `detailLineText`, `detailsText`); `app/panelRows.ts` (`detailRowText`); `App.tsx` (one line per entry); `i18n/index.ts` (four keys per locale).

@@ -1567,6 +1567,15 @@ given by its centre those properties ARE the givens. The ask lane answers `«מ�
 It used to take the formatter as a PARAMETER; it imports it now, which is what makes "one formatting for
 both surfaces" a fact rather than a convention every call site has to keep.
 
+**`details` is a list of labelled lines** ([ADR-AG-232](06c-decisions-analytic.md#adr-ag-232), #1597):
+`DetailLine = { label?: DetailLabelKey; text }`. The label is a locale KEY (`curveCentreLabel`,
+`curveFocusLabel`, `curveDirectrixLabel`, `curveFociLabel`) because this module holds no locale. A line
+that opens with a coordinate or is a role line always carries one; `r = …`, `a = …, b = …` and a line's
+explicit form name themselves and carry none. The panel renders one `<div>` per line through
+`detailRowText` (`app/panelRows.ts`: the label isolated as one RTL island, then `panelRowText`). A caller
+with nowhere to stack lines joins them with ` · ` (`detailsText`, `describeCurve`); without a label
+resolver it gets the texts unlabelled, never an English key.
+
 ## A display decision is measured in the figure's units ([ADR-AG-123](06c-decisions-analytic.md#adr-ag-123))
 
 Two questions every printer in this tree asks — *is this coefficient zero* and *is this line vertical* —

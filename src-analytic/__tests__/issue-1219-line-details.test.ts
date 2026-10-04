@@ -43,7 +43,8 @@ describe('ADR-AG-121 — a line row shows its slope and explicit form (#1219)', 
     ['horizontal', 'נתון הישר l3: y=3', 'y - 3 = 0', 'y = 3, m = 0'],
     ['through the origin', 'נתון הישר l5: y=0', 'y = 0', 'y = 0, m = 0'],
   ])('%s', (_what, line, equation, details) => {
-    expect(panelRow([line])).toEqual({ equation, details });
+    // #1597: details are lines; a line's single line names itself and carries no label.
+    expect(panelRow([line])).toEqual({ equation, details: [{ text: details }] });
   });
 
   /**
@@ -53,7 +54,7 @@ describe('ADR-AG-121 — a line row shows its slope and explicit form (#1219)', 
    */
   it('a vertical line says «אנכי», and offers no explicit form', () => {
     const r = panelRow(['נתון הישר l2: x=4']);
-    expect(r).toEqual({ equation: 'x - 4 = 0', details: W.vertical });
+    expect(r).toEqual({ equation: 'x - 4 = 0', details: [{ text: W.vertical }] });
     expect(explicitLineText(1, 0, -4)).toBeNull();
     expect(slopeOf(1, 0)).toBeNull();
   });
@@ -83,7 +84,7 @@ describe('ADR-AG-121 — a fractional slope is written the textbook way (#1219)'
     ['m = 3/4', 'נתון הישר l6: 3x-4y=0', 'y = 3x/4'],
     ['m = -2/3', 'נתון הישר l7: 2x+3y=6', 'y = -2x/3 + 2'],
   ])('%s', (_what, line, explicit) => {
-    expect(panelRow([line])!.details!.startsWith(explicit)).toBe(true);
+    expect(panelRow([line])!.details![0].text.startsWith(explicit)).toBe(true);
   });
 
   it('never a fraction standing directly in front of x', () => {
@@ -113,8 +114,9 @@ describe('ADR-AG-121 — a fractional slope is written the textbook way (#1219)'
  */
 describe('ADR-AG-121 — the other curve kinds are untouched (#1219)', () => {
   it.each([
-    ['circle', 'נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', '(x - 3)² + (y - 4)² = 9', '(3, 4), r = 3'],
-    ['parabola', 'y^2=54x', 'y² = 54x', '(27/2, 0), x = -27/2'],
+    // #1597 (ADR-AG-232) moved these rows by design: labelled lines, one per fact.
+    ['circle', 'נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', '(x - 3)² + (y - 4)² = 9', [{ label: 'curveCentreLabel', text: '(3, 4)' }, { text: 'r = 3' }]],
+    ['parabola', 'y^2=54x', 'y² = 54x', [{ label: 'curveFocusLabel', text: '(27/2, 0)' }, { label: 'curveDirectrixLabel', text: 'x = -27/2' }]],
   ])('%s', (_what, line, equation, details) => {
     expect(panelRow([line])).toEqual({ equation, details });
   });

@@ -36,7 +36,7 @@ import { commitRecord, decideEdit, decideSubmit, decideToggle, noticeText, reach
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
-import { openCurveText, panelKnowledge, panelRowText, segmentKnowledge, slopeRowText, valueText } from './app/panelRows';
+import { detailRowText, openCurveText, panelKnowledge, panelRowText, segmentKnowledge, slopeRowText, valueText } from './app/panelRows';
 import { isolateRtlName } from '../shell/bidi';
 import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
@@ -1674,7 +1674,12 @@ export function App() {
                             {t(curveDetailsKey(known!.kind))}
                           </summary>
                           <div style={askTrace}>
-                            <MathText text={panelRowText(parts.details)} />
+                            {/* #1597 (ADR-AG-232) — one line per fact, a bare coordinate labelled. */}
+                            {parts.details.map((line, i) => (
+                              <div key={i}>
+                                <MathText text={detailRowText(line, (k) => t(k))} />
+                              </div>
+                            ))}
                           </div>
                         </details>
                       )}

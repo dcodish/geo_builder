@@ -68,6 +68,14 @@ const he = {
   curveDetailsEllipse: 'נתוני האליפסה',
   /** The tooltip names no kind, so it needs no fourth string and cannot reintroduce the old noun. */
   curveDetailsToggle: 'הצגה/הסתרה של הנתונים',
+  /**
+   * The labels of the detail lines (#1597, ADR-AG-232; operator ruling 2026-09-30): a bare coordinate
+   * says what it is. `r = …` and `a = …, b = …` name themselves and carry none.
+   */
+  curveCentreLabel: 'מרכז המעגל',
+  curveFocusLabel: 'מוקד',
+  curveDirectrixLabel: 'מדריך',
+  curveFociLabel: 'מוקדים',
   askRemove: 'הסירו את המדידה',
   // Three different answers, because they are three different situations.
   askOpen: 'עדיין לא נקבע מהנתונים',
@@ -502,6 +510,10 @@ const en: typeof he = {
   curveDetailsParabola: "the parabola's properties",
   curveDetailsEllipse: "the ellipse's properties",
   curveDetailsToggle: 'show or hide these properties',
+  curveCentreLabel: 'centre',
+  curveFocusLabel: 'focus',
+  curveDirectrixLabel: 'directrix',
+  curveFociLabel: 'foci',
   askRemove: 'Remove this measurement',
   askOpen: 'not fixed by the givens yet',
   askNoValue: 'cannot be computed from the givens',

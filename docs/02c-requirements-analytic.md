@@ -1839,6 +1839,13 @@ equation, because that is what was asked.
 The exception is a curve the givens have not FIXED, which shows its open form rather than an invented
 equation — no coefficient is ever sampled and printed as fact (R21, [#1023](https://github.com/dcodish/geo_builder/issues/1023)).
 
+**The folded properties are one LINE per fact, and a bare coordinate says what it is**
+([ADR-AG-232](06c-decisions-analytic.md#adr-ag-232), [#1597](https://github.com/dcodish/geo_builder/issues/1597);
+operator ruling 2026-09-30). A circle shows «מרכז המעגל: (3, 4)» and «r = 5» on two lines — «מרכז המעגל: O(0, 0)»
+when a point sits at the centre. A parabola shows «מוקד: (27/2, 0)» and «מדריך: x = -27/2». An ellipse shows
+«a = 5, b = 3» and «מוקדים: (4, 0), (-4, 0)». A line's single line («y = 2x + 1, m = 2») names itself and is
+unchanged.
+
 **R103 — a named cevian ACTUALLY REACHES its side, and may reach the side's extension**
 ([#1232](https://github.com/dcodish/geo_builder/issues/1232)).
 

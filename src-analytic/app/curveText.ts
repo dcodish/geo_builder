@@ -340,8 +340,47 @@ function shifted(sym: string, at: number): string {
 export interface CurveParts {
   /** Always an equation. This is what the «משוואות» section — and «משוואת I» — must show. */
   equation: string;
-  /** Centre, radius, foci, directrix: true, useful, and secondary. Absent when there are none. */
-  details?: string;
+  /**
+   * Centre, radius, foci, directrix: true, useful, and secondary — ONE LINE PER FACT, each that is a
+   * bare coordinate carrying the label that says what it is (#1597). Absent when there are none.
+   */
+  details?: DetailLine[];
+}
+
+/**
+ * THE LABELS A DETAIL LINE CAN CARRY (#1597, ADR-AG-232) — locale KEYS, because this module holds no
+ * locale (ADR-AG-085). The caller resolves them with `t()`.
+ */
+export type DetailLabelKey = 'curveCentreLabel' | 'curveFocusLabel' | 'curveDirectrixLabel' | 'curveFociLabel';
+
+/**
+ * ONE LINE OF A CURVE'S FOLDED DETAILS (#1597).
+ *
+ * Operator, 2026-09-30: *"we need to break this to 2 lines: «(3, 4), r = 5». one clearly saying מרכז
+ * המעגל and the other can be r = 5"*. The row was one comma string, so a bare `(3, 4)` sat beside
+ * `r = 5` with nothing saying it was the centre — and the parabola's focus and the ellipse's foci
+ * printed the same unlabelled way (ruling 2026-09-30: the same class, labelled too).
+ *
+ * A line that names itself (`r = 5`, `a = 4, b = 3`, a line's `y = 2x + 1, m = 2`) carries no
+ * label; a bare coordinate or a role line always does.
+ */
+export interface DetailLine {
+  label?: DetailLabelKey;
+  text: string;
+}
+
+/** One detail line as text — `<label>: <text>`, the label resolved by the caller's `t()`. */
+export function detailLineText(line: DetailLine, label: (key: DetailLabelKey) => string): string {
+  return line.label ? `${label(line.label)}: ${line.text}` : line.text;
+}
+
+/**
+ * The details on ONE line, for a caller with nowhere to stack them — joined with ` · ` (#1597).
+ * Without a resolver a caller gets the lines unlabelled, as a vertical line without `words` gets no
+ * word: no English key ever reaches a Hebrew surface.
+ */
+export function detailsText(lines: readonly DetailLine[], label?: (key: DetailLabelKey) => string): string {
+  return lines.map((l) => (label ? detailLineText(l, label) : l.text)).join(' · ');
 }
 
 /**
@@ -417,14 +456,17 @@ export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): Cu
        * one surface that had not inherited it, and moving the slope into the row without this would
        * have rendered an empty detail for every vertical line.
        */
-      if (explicit === null) return { equation, ...(words ? { details: words.vertical } : {}) };
+      if (explicit === null) return { equation, ...(words ? { details: [{ text: words.vertical }] } : {}) };
       const m = slopeOf(c.a, c.b)!;
-      return { equation, details: `${explicit}, m = ${fmt(m)}` };
+      return { equation, details: [{ text: `${explicit}, m = ${fmt(m)}` }] };
     }
     case 'circle':
       return {
         equation: `${shifted('x', c.cx)} + ${shifted('y', c.cy)} = ${fmt(c.r * c.r)}`,
-        details: `${at(nameAt, c.cx, c.cy, `${fmt(c.cx)}, ${fmt(c.cy)}`)}, r = ${fmt(c.r)}`,
+        details: [
+          { label: 'curveCentreLabel', text: at(nameAt, c.cx, c.cy, `${fmt(c.cx)}, ${fmt(c.cy)}`) },
+          { text: `r = ${fmt(c.r)}` },
+        ],
       };
     case 'parabola': {
       const f = parabolaFocus(c);
@@ -434,14 +476,20 @@ export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): Cu
       return {
         equation: `y² = ${k < 0 ? '-' : ''}${mag}x`,
         // The focus and the directrix from their own derivations — no coordinate assumed (#1432 am. 1).
-        details: `${at(nameAt, f.x, f.y, `${fmt(f.x)}, ${fmt(f.y)}`)}, ${directrixText(c)}`,
+        details: [
+          { label: 'curveFocusLabel', text: at(nameAt, f.x, f.y, `${fmt(f.x)}, ${fmt(f.y)}`) },
+          { label: 'curveDirectrixLabel', text: directrixText(c) },
+        ],
       };
     }
     case 'ellipse': {
       const [f1, f2] = ellipseFoci(c);
       return {
         equation: `x²/${fmt(c.a * c.a)} + y²/${fmt(c.b * c.b)} = 1`,
-        details: `a = ${fmt(c.a)}, b = ${fmt(c.b)}, ${at(nameAt, f1.x, f1.y, `${fmt(f1.x)}, ${fmt(f1.y)}`)}, ${at(nameAt, f2.x, f2.y, `${fmt(f2.x)}, ${fmt(f2.y)}`)}`,
+        details: [
+          { text: `a = ${fmt(c.a)}, b = ${fmt(c.b)}` },
+          { label: 'curveFociLabel', text: `${at(nameAt, f1.x, f1.y, `${fmt(f1.x)}, ${fmt(f1.y)}`)}, ${at(nameAt, f2.x, f2.y, `${fmt(f2.x)}, ${fmt(f2.y)}`)}` },
+        ],
       };
     }
   }
@@ -491,9 +539,9 @@ export function namedRow(name: string, body: string): string {
   return name ? `${isolateRtlName(name)}: ${body}` : body;
 }
 
-export function describeCurve(name: string, c: NumCurve, nameAt?: NameAt): string {
+export function describeCurve(name: string, c: NumCurve, nameAt?: NameAt, label?: (key: DetailLabelKey) => string): string {
   const { equation, details } = curveParts(c, nameAt);
-  return namedRow(name, `${equation}${details ? `, ${details}` : ''}`);
+  return namedRow(name, `${equation}${details ? ` · ${detailsText(details, label)}` : ''}`);
 }
 
 /**
