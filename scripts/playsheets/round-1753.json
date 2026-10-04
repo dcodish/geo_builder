@@ -1,0 +1,652 @@
+{
+ "name": "round-1753",
+ "title": "סבב #1753 — הפריטים הקטנים",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "אנליטית (#1749): «ישרים 1 ו- 2 נפגשים בנקודה A»",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון הישר 1: 2x-y+8=0",
+    "משוואת ישר 2 היא x+3y-10=0",
+    "ישרים 1 ו- 2 נפגשים בנקודה A"
+   ],
+   "lookFor": "כל השורות ירוקות; A = (-2, 4) — בלי מודל השפה",
+   "before": "לא הובן — נשלח למודל השפה",
+   "expect": [
+    "(-2, 4)"
+   ]
+  },
+  {
+   "id": "T2",
+   "title": "אנליטית (#1749): «הישרים 1 ו-2 נחתכים בנקודה A»",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון הישר 1: 2x-y+8=0",
+    "משוואת ישר 2 היא x+3y-10=0",
+    "הישרים 1 ו-2 נחתכים בנקודה A"
+   ],
+   "lookFor": "A = (-2, 4)",
+   "before": "לא הובן",
+   "expect": [
+    "(-2, 4)"
+   ]
+  },
+  {
+   "id": "T3",
+   "title": "אנליטית (#1749): ישר שלא הוגדר (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון הישר 1: 2x-y+8=0",
+    "משוואת ישר 2 היא x+3y-10=0",
+    "ישרים 1 ו-3 נפגשים בנקודה A"
+   ],
+   "lookFor": "נדחה: «הישר 3 עדיין לא הוגדר…»",
+   "before": "לא הובן — נשלח למודל השפה",
+   "expectRefusal": "עדיין לא הוגדר"
+  },
+  {
+   "id": "T4",
+   "title": "אנליטית (#1750): «הישר 1» כשהישרים נקראים l1, l2 — «התכוונתם ל-l1?» (סירוב)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון הישר l1: y=x+1",
+    "נתון הישר l2: y=-x+5",
+    "A היא נקודת המפגש של הישר 1 עם הישר 2"
+   ],
+   "lookFor": "נדחה, וההודעה מסתיימת ב-«באיור יש את הישרים l1 ו-l2. התכוונתם ל-l1?»",
+   "before": "«הישר 1 עדיין לא הוגדר…» בלי רמז",
+   "expectRefusal": "התכוונתם ל-"
+  },
+  {
+   "id": "T5",
+   "title": "אנליטית (#1750): «A על הישר 1» — אותה הצעה (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון הישר l1: y=x+1",
+    "נתון הישר l2: y=-x+5",
+    "A על הישר 1"
+   ],
+   "lookFor": "נדחה עם «התכוונתם ל-l1?»",
+   "before": "בלי רמז",
+   "expectRefusal": "התכוונתם ל-"
+  },
+  {
+   "id": "T6",
+   "title": "אנליטית (#1750): להפך — «l1» כשהישרים נקראים 1, 2 (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון הישר 1: y=x+1",
+    "נתון הישר 2: y=-x+5",
+    "A נקודת החיתוך של הישרים l1 ו-l2"
+   ],
+   "lookFor": "נדחה עם «…התכוונתם ל-1?»",
+   "before": "בלי רמז",
+   "expectRefusal": "התכוונתם ל-"
+  },
+  {
+   "id": "T7",
+   "title": "אנליטית (#1750): בלי שם דומה — בלי הצעה (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון הישר l1: y=x+1",
+    "נתון הישר l2: y=-x+5",
+    "A על הישר 7"
+   ],
+   "lookFor": "נדחה: «הישר 7 עדיין לא הוגדר…» בלי הצעה",
+   "before": "ללא שינוי",
+   "expectRefusal": "עדיין לא הוגדר"
+  },
+  {
+   "id": "T8",
+   "title": "הנדסת המישור (#1748): מבטלים סימון של משולש ומקלידים אותו שוב — השורה חוזרת",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "M אמצע AB"
+   ],
+   "lookFor": "ביטול הסימון של «משולש ABC» מאדים את שורת M (היא תלויה במשולש); הקלדה של «משולש ABC» שוב: השורה מסומנת שוב, בלי שורה חדשה ובלי סירוב, הכול ירוק ו-M מצוירת",
+   "before": "נדחה: «A, B, C כבר אינה זמינה»",
+   "after": [
+    {
+     "toggle": 1
+    },
+    {
+     "type": "משולש ABC"
+    }
+   ],
+   "expectRefusal": "לא נמצאה תצורה"
+  },
+  {
+   "id": "T9",
+   "title": "הנדסת המישור (#1748): אותו דבר עם קטע",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "קטע AB"
+   ],
+   "lookFor": "אחרי ביטול הסימון והקלדה שוב: הקטע חוזר, שורה אחת",
+   "before": "נדחה",
+   "after": [
+    {
+     "toggle": 1
+    },
+    {
+     "type": "קטע AB"
+    }
+   ]
+  },
+  {
+   "id": "T10",
+   "title": "הנדסת המישור (#1748): כתיב אחר על שורה מבוטלת — ההודעה מצביעה עליה (סירוב)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC"
+   ],
+   "lookFor": "אחרי ביטול הסימון, «משולש ACB» נדחה: «A, C, B שייכות לשורה המבוטלת «משולש ABC» — סמנו אותה שוב או מחקו אותה»",
+   "before": "«…כבר אינה זמינה — צעד קודם … נמחק או נכשל»",
+   "after": [
+    {
+     "toggle": 1
+    },
+    {
+     "type": "משולש ACB"
+    }
+   ],
+   "expectRefusal": "שייכות לשורה המבוטלת"
+  },
+  {
+   "id": "T11",
+   "title": "הנדסת המישור (#1604): טוענים ציור ששמרתם הרגע — בלי הודעת «גרסה קודמת»",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "נקודה P מחוץ למעגל",
+    "PA ו PB משיקים למעגל",
+    "המשך BO חותך את המעגל בנקודה D",
+    "PO",
+    "AD",
+    "C נמצאת על DB",
+    "AC⊥DB",
+    "PD חותך את AC בנקודה E",
+    "EC=x"
+   ],
+   "lookFor": "שמרו (תפריט ⋯ → שמירה), ואז טענו את הקובץ: אין הודעה «הקובץ נשמר בגרסה קודמת», ואותן 10 שורות בדיוק",
+   "before": "«… 2 צעדים עודכנו» ושורות כפולות"
+  },
+  {
+   "id": "T12",
+   "title": "מרחב (#1545): גרש עברי «׳» כפריים",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קוביה ABCDA׳B׳C׳D׳"
+   ],
+   "lookFor": "הקובייה נבנית עם A׳…D׳, וכל ׳ צמוד לאות שלו בשורה",
+   "before": "נדחה: «bad-solid»"
+  },
+  {
+   "id": "T13",
+   "title": "מרחב (#1545): נקודה עם ׳ על קנבס ריק",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "B׳(2,15,-8)"
+   ],
+   "lookFor": "הנקודה B׳ מוצבת",
+   "before": "לא הובן"
+  },
+  {
+   "id": "T14",
+   "title": "מרחב (#1545): לשאול «BB׳»",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קוביה ABCDA׳B׳C׳D׳",
+    "מישור A׳B׳C׳D׳ הוא x+4y-8z-126=0",
+    "B(0,7,8)"
+   ],
+   "lookFor": "שאלה «BB׳» → (2, 8, -16), כמו «BB'»",
+   "before": "«לא זוהה»",
+   "asks": [
+    "BB׳"
+   ]
+  },
+  {
+   "id": "T15",
+   "title": "מרחב (#1543): הד השאלה — חץ וקטור רק על וקטור",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "מישור A'B'C'D' הוא x+4y-8z-126=0",
+    "B(0,7,8)"
+   ],
+   "lookFor": "בשאלות: «משוואת BB'» ו-«אורך AB» בלי חץ; «BB'» עם חץ",
+   "before": "חץ וקטור מעל כל הד",
+   "asks": [
+    "משוואת BB'",
+    "אורך AB",
+    "BB'"
+   ]
+  },
+  {
+   "id": "T16",
+   "title": "כל הכלים (#1540): «x_B>x_D» מוצג כמתמטיקה",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "B(7,7)",
+    "D(1,1)",
+    "x_B>x_D"
+   ],
+   "lookFor": "בשורה: x עם B קטנה למטה, >, x עם D קטנה למטה — בלי קו תחתון",
+   "before": "הטקסט הגולמי «x_B>x_D»"
+  },
+  {
+   "id": "T17",
+   "title": "כל הכלים (#1540): «S_ABC = 12» בדו-ממד",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "S_ABC = 12"
+   ],
+   "lookFor": "S עם ABC קטנה למטה",
+   "before": "גולמי"
+  },
+  {
+   "id": "T18",
+   "title": "כל הכלים (#1540): «x_B = 3» במרחב",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCD",
+    "x_B = 3"
+   ],
+   "lookFor": "x עם B קטנה למטה",
+   "before": "גולמי"
+  },
+  {
+   "id": "T19",
+   "title": "אנליטית (#1492): הדלתון עם המעגל — נשאר שלם",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "דלתון ABCD",
+    "AB=AD",
+    "CB=CD",
+    "A(1,7)",
+    "משוואת הקטע BD היא y=x",
+    "נקודה C נמצאת על הישר y=-2x+17",
+    "AB=6",
+    "נתון מעגל O",
+    "A על המעגל",
+    "B על המעגל",
+    "D על המעגל"
+   ],
+   "lookFor": "כל השורות ירוקות; «הציגו תצורה אחרת» כמה פעמים — הדלתון נשאר שלם ו-C ליד הציור, לא בורח רחוק; השורות מתקבלות מהר",
+   "before": "C ברח לאינסוף בחצי מנקודות ההתחלה; כ-1.7 שניות לשורה",
+   "cycles": 2
+  },
+  {
+   "id": "T20",
+   "title": "אנליטית (#1492): ריבוע עם יחס סותר (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "ריבוע ABCD",
+    "AB = 2BC"
+   ],
+   "lookFor": "השורה השנייה נדחית ומזכירה את «AB = 2BC»; הריבוע לא מתכווץ",
+   "before": "ללא שינוי",
+   "expectRefusal": "AB = 2BC"
+  },
+  {
+   "id": "T21",
+   "title": "אנליטית (#1492): משולש שווה-שוקיים ישר-זווית בקודקוד הבסיס (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "AB = AC",
+    "∠ABC = 90"
+   ],
+   "lookFor": "השורה השלישית נדחית ומזכירה אותה בלבד",
+   "before": "ללא שינוי",
+   "expectRefusal": "∠ABC = 90"
+  },
+  {
+   "id": "T22",
+   "title": "אנליטית (#1416): «הראשונה/השנייה» בין שני מעגלים",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל I שמשוואתו x^2+y^2=25",
+    "נתון מעגל II שמשוואתו (x-4)^2+(y-1)^2=9",
+    "P נקודת החיתוך הראשונה של המעגל I עם המעגל II",
+    "Q נקודת החיתוך השנייה של המעגל I עם המעגל II"
+   ],
+   "lookFor": "P בנקודת החיתוך השמאלית (3.16, 3.88), Q בימנית (4.61, -1.94)",
+   "before": "P נחתה בימנית — המילה לא בחרה"
+  },
+  {
+   "id": "T23",
+   "title": "אנליטית (#1416): «המעגל I חותך את המעגל II בנקודות A ו-B»",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל I שמשוואתו x^2+y^2=25",
+    "נתון מעגל II שמשוואתו (x-4)^2+(y-1)^2=9",
+    "המעגל I חותך את המעגל II בנקודות A ו-B"
+   ],
+   "lookFor": "נבנה: A שמאלית, B ימנית; «הציגו תצורה אחרת» מחליף ביניהן",
+   "before": "נדחה: «unsatisfiable»",
+   "cycles": 1
+  },
+  {
+   "id": "T24",
+   "title": "אנליטית (#1416): «הראשונה» פעמיים (סירוב)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל I שמשוואתו x^2+y^2=25",
+    "נתון מעגל II שמשוואתו (x-4)^2+(y-1)^2=9",
+    "P נקודת החיתוך הראשונה של המעגל I עם המעגל II",
+    "Q נקודת החיתוך הראשונה של המעגל I עם המעגל II"
+   ],
+   "lookFor": "Q נדחית, וההודעה מזכירה את P ואת שני המעגלים (לא «הישרים»)",
+   "before": "Q נרשמה — שתי אותיות על אותה נקודה",
+   "expectRefusal": "כבר יש שם"
+  },
+  {
+   "id": "T25",
+   "title": "אנליטית (#1416): מעגל ופרבולה — «השנייה»",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל I שמשוואתו (x-2)^2+y^2=9",
+    "נתונה הפרבולה y^2=4x",
+    "P נקודת החיתוך השנייה של המעגל I עם הפרבולה y^2=4x"
+   ],
+   "lookFor": "P בחיתוך העליון (2.24, 2.99)",
+   "before": "P בתחתון"
+  },
+  {
+   "id": "T26",
+   "title": "פיתוח (PR #910): לוח צעד-אחר-צעד",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/?steps",
+   "lines": [
+    "ריבוע ABCD"
+   ],
+   "lookFor": "פתחו http://localhost:5174/?steps , הדביקו בלוח «ריבוע ABCD / M אמצע AB / קשקוש בלי שום משמעות / N אמצע CD» ולחצו «הרץ»: ok / ok / coverage-gap / ok; לחיצה על צעד 2 מציירת את הריבוע עם M בלבד; «טען לבונה עד צעד זה» טוען שתי שורות",
+   "before": "אין לוח כזה"
+  },
+  {
+   "id": "T27",
+   "title": "פיתוח (PR #910): בלי ?steps — אין לוח",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD"
+   ],
+   "lookFor": "הבונה הרגיל, בלי לוח",
+   "before": "ללא שינוי"
+  },
+  {
+   "id": "T28",
+   "title": "אנליטית (PR #1241): גובה — ריבוע ישר-זווית ברגל",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "AD גובה לצלע BC"
+   ],
+   "lookFor": "סימן זווית ישרה אחד ב-D",
+   "before": "אין סימן"
+  },
+  {
+   "id": "T29",
+   "title": "אנליטית (PR #1241): רגל הגובה מחוץ לצלע",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "∢ACB = 120",
+    "AD גובה לצלע BC"
+   ],
+   "lookFor": "סימן אחד ב-D, על המשך BC מעבר ל-C",
+   "before": "אין סימן"
+  },
+  {
+   "id": "T30",
+   "title": "אנליטית (PR #1241): «הגובה מ-A לצלע BC»",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "הגובה מ-A לצלע BC"
+   ],
+   "lookFor": "סימן אחד ברגל",
+   "before": "אין סימן"
+  },
+  {
+   "id": "T31",
+   "title": "אנליטית (PR #1241): זווית ישרה מחושבת — בלי סימן",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(6,0)",
+    "C(0,8)",
+    "משולש ABC",
+    "AD תיכון לצלע BC"
+   ],
+   "lookFor": "אין סימן זווית ישרה (90° ב-A רק מחושבת)",
+   "before": "ללא שינוי"
+  },
+  {
+   "id": "T32",
+   "title": "מרחב (PR #1591): שני פתרונות — «m = -2, m = 4»",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5176",
+   "path": "/3d.html",
+   "lines": [
+    "המישור π1: z = 1",
+    "המישור π2: z - m = 0",
+    "המרחק בין המישורים π1 ו-π2 הוא 3"
+   ],
+   "lookFor": "בלוח ובשאלה «m»: «m = -2, m = 4»",
+   "before": "«m = {-2, 4}»",
+   "asks": [
+    "m"
+   ]
+  },
+  {
+   "id": "T33",
+   "title": "מרחב (PR #1591): זוג סימטרי נשאר «±»",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5176",
+   "path": "/3d.html",
+   "lines": [
+    "הישר ℓ: x = (0,0,0) + t(m,1,1)",
+    "המישור π: mx - y - z + 3 = 0",
+    "הישר ℓ מקביל למישור π"
+   ],
+   "lookFor": "«m = ±√2»",
+   "before": "ללא שינוי"
+  },
+  {
+   "id": "T34",
+   "title": "מרוכבים (PR #1534): «z1 = 2(cos45 + i sin45)»",
+   "class": "play",
+   "product": "complex",
+   "base": "http://localhost:5177",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = 2(cos45 + i sin45)"
+   ],
+   "lookFor": "מתקבל; z₁ ב-2·cis45° (√2+√2i), והשורה כתובה כפי שהוקלדה",
+   "before": "נדחה: לא הובן"
+  },
+  {
+   "id": "T35",
+   "title": "מרוכבים (PR #1534): √2, בלי r, ומכפלה",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5177",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = √2(cos45 + i·sin45)",
+    "z2 = cos30 + i sin30",
+    "w = z1*z2"
+   ],
+   "lookFor": "z₁ = √2·cis45°, z₂ = cis30°, w = √2·cis75°",
+   "before": "השורה הראשונה נדחתה"
+  },
+  {
+   "id": "T36",
+   "title": "מרוכבים (PR #1534): זוויות שונות (סירוב)",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5177",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = cos45 + i sin30"
+   ],
+   "lookFor": "נדחה: «…הזווית של cos (45°) שונה מהזווית של sin (30°)…»",
+   "before": "לא הובן",
+   "expectRefusal": "שונה מהזווית"
+  },
+  {
+   "id": "T37",
+   "title": "מרוכבים (PR #1534): חזקה שומרת על הסוגריים",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5177",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = 2(cos45 + i sin45)^2"
+   ],
+   "lookFor": "z₁ = 2·cis90° (= 2i), לא 4·cis90°",
+   "before": "נדחה"
+  },
+  {
+   "id": "T38",
+   "title": "כל הכלים (PR #1459): בטאבלט — שורת הקלט מעל הציור",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5178",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "נקודה G על AD",
+    "זווית GBA = 37"
+   ],
+   "lookFor": "בחלון צר (כ-810×1080, או טאבלט אמיתי): שורת הקלט מעל הציור, והריבוע כולו גלוי אחרי כל «הוסף»; רשימת הנתונים מתחת לציור",
+   "before": "שורת הקלט מתחת לציור — צריך לגלול"
+  },
+  {
+   "id": "T39",
+   "title": "כל הכלים (PR #1459): אנליטית בטאבלט",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5178",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9",
+    "נתונה הנקודה A(2,6)"
+   ],
+   "lookFor": "שורת הקלט במסך הראשון; רשימת הנתונים גדלה מתחת לציור",
+   "before": "שורת הקלט מתחת לקפל (y=1092)"
+  },
+  {
+   "id": "T40",
+   "title": "כל הכלים (PR #1459): במחשב — ללא שינוי",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5178",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD"
+   ],
+   "lookFor": "במסך רחב: שלוש העמודות כמו קודם",
+   "before": "ללא שינוי"
+  }
+ ]
+}
