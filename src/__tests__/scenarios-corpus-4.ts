@@ -3368,4 +3368,20 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(p('B'), p('M')), 'M is the midpoint of BC').toBeCloseTo(dist(p('M'), p('C')), 6);
     },
   },
+  {
+    id: 'untick-then-retype-reenables-1748',
+    title: '#1748 (ADR-578): «משולש ABC» · «M אמצע AB» · untick the triangle · «משולש ABC» again re-enables the row (was refused «A, B, C כבר אינה זמינה»); «משולש ACB» over the unticked row is refused naming it',
+    guards:
+      "Found by the round #1736 browser pre-play, measured on 17472c0e and re-measured on c098af9b through runSetGroupEnabled + runSubmit: untick «משולש ABC», type «משולש ABC» again -> refused «A, B, C כבר אינה זמינה». Root cause: the submit dry run (trialFacts) modelled a different list from the one the commit saves — it dropped a re-typed command only when it duplicated an ENABLED fact, so it kept the unticked triangle (which claims A, B, C in the fold, ADR-010) AND appended a copy, while foldFact re-enables the twin. Fix: one shared fold rule (foldCommand) for the commit and the trial, the step judged by trialChanges; a differently spelled re-statement keeps the ADR-010 reservation and names the unticked row. The submit-path matrix (segment, median, square diagonals, the refusals) is in src/app/__tests__/issue-1748-untick-retype.test.ts.",
+    steps: ['משולש ABC', 'M אמצע AB'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC', 'M אמצע AB']);
+      const tri = facts[0].group ?? facts[0].id;
+      const muted = facts.map((f) => ((f.group ?? f.id) === tri ? { ...f, enabled: false } : f));
+      expect(gateVerdict(muted, 'משולש ABC').kind, 'the identical re-type re-enables the unticked row').toBe('commit');
+      const other = gateVerdict(muted, 'משולש ACB');
+      expect(other.kind === 'refused' && other.detail, 'a different spelling is refused naming the unticked row').toMatch(/belong to the unticked row «משולש ABC»/);
+    },
+  },
 ];

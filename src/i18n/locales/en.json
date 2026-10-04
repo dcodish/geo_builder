@@ -282,6 +282,7 @@
     "unresolvedDeps": "This step relies on {{ids}}, which aren't defined yet (or an earlier step it depends on failed). Define them first.",
     "unknownCircle": "Circle {{center}} is not defined — there is no circle by that name in the figure. You can name an existing circle, e.g.: the centre of the circle is {{center}}.",
     "noLongerAvailable": "Can't build: {{ids}} is no longer available — an earlier step it relies on was removed or failed.",
+    "mutedRowOwns": "Can't build: {{ids}} belong to the unticked row «{{row}}» — tick it again or delete it.",
     "sameSpot": "With these givens {{a}} and {{b}} land at the same place. Check whether you meant a single point, or add a given that separates them.",
     "diagonalIsSide": "{{pair}} is not a diagonal of {{shape}} — it is a side of it. A diagonal joins two corners that are not next to each other.",
     "diagonalNoneHere": "{{pair}} is not a diagonal — {{shape}} has no diagonals at all (every pair of its corners is a side).",

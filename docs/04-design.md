@@ -799,6 +799,21 @@ Two rules keep it honest:
 The membership is tested at the gate the app calls, never below it: #1011 reached a play session at all
 because the feature's own lock drove the store directly and never crossed `dryRunOutcome`.
 
+## One fold rule: the dry run judges the list the commit saves ([ADR-578](06-decisions.md#adr-578))
+
+How ONE command enters the fact list is a single pure decision, `foldCommand` in `replay/core.ts`: an exact
+duplicate of an enabled fact is a no-op, of an UNTICKED fact re-enables it in place, a re-stated free point
+moves in place, a re-stated standalone circle resizes in place, anything else is appended. The store's commit
+(`foldFact`) and the submit dry run (`trialFacts`) both fold through it, so the trial is the committed list bar
+fact ids, and the dry run judges `trialChanges` — the facts the fold changed (by object identity, since
+`foldCommand` never reuses a changed fact's object) — never `all.slice(facts.length)`, which a re-enable leaves
+empty. A second copy of the rule is how #1 (ADR-320) and #1748 happened: each time the trial modelled a list
+the commit would not save.
+
+An unticked row keeps the letters it introduces (ADR-010: muting is reversible). A DIFFERENTLY spelled
+statement over them is refused naming the row — «A, B, C שייכות לשורה המבוטלת «משולש ABC» — סמנו אותה שוב
+או מחקו אותה» (`errors.mutedRowOwns`) — instead of the generic «… כבר אינה זמינה».
+
 ## The pre-LLM decision ([ADR-546](06-decisions.md#adr-546))
 
 `runSubmit` no longer decides. Everything up to the model call — store operations, the pre-parse guards,

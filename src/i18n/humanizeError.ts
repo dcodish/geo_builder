@@ -283,6 +283,9 @@ export const PATTERNS: Pattern[] = [
   // geoStore.ts:190 — `can't build: D is no longer available (an earlier step it relies on was removed or failed)`
   { re: /^can't build: (.+) is no longer available/, key: 'errors.noLongerAvailable', params: (m) => ({ ids: m[1] }) },
 
+  // core.ts (#1748, ADR-578) — `can't build: A, B, C belong to the unticked row «משולש ABC» — tick it again or delete it`
+  { re: /^can't build: (.+) belong to the unticked row «(.+)» — tick it again or delete it$/, key: 'errors.mutedRowOwns', params: (m) => ({ ids: m[1], row: m[2] }) },
+
   // core.ts (#926) — `variable α is not defined by any statement (the step that defined it was removed, muted or failed)`
   { re: /^variable (\S+) is not defined by any statement/, key: 'errors.unboundVariable', params: (m) => ({ name: m[1] }) },
 
