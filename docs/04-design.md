@@ -913,6 +913,18 @@ a construct that pins no angle (a general sector) leaves it unscored rather than
 holds, so an adopted reading is checked against that promise — equal radii, and the pinned angle
 (`honoursConstruct`). Answering a refusal with a wrong figure would be worse than the refusal.
 
+**A semicircle through three vertices picks its diameter the same way, but BEFORE the first dry run**
+([ADR-589](06-decisions.md#adr-589)). When the three letters of «חצי מעגל ABC» are vertices of one
+existing polygon (structurally not collinear), the `semicircle` rule reads all three ON the semicircle —
+a midpoint centre on a starting side, the third vertex a `point-on-circle`, the arc bulging toward it.
+`thalesReadings` rewrites the run into the explicit spelling «חצי מעגל שקוטרו XY העובר דרך Z» for each
+side and orders the three by Thales' probe (how far the angle at Z is from 90°, on the figure already
+drawn). They are tried best first — the first like any line, the others under the role-reading cap —
+because on an unseated right angle the parser's starting side could build and move the seat, while the
+probe-best side keeps it. The adopted sentence is taught; `honoursConstruct` also checks that every
+other `point-on-circle` of the arc's circle is at its radius. No side holds → the stated reading's own
+refusal. An explicit diameter («שקוטרו AB … דרך C») is never re-read.
+
 ### The commit-seam inventory ([ADR-522](06-decisions.md#adr-522))
 
 Six store actions reset the seed, and every one is a seam that must decide whether to launch the

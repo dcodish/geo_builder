@@ -14606,6 +14606,82 @@ It runs among the `pre:impossible` gates of `applyStep`, right after the angle-s
 
 **Behaviour change for a student:** erasing, muting, editing or undoing the line that named a circle (or a touch point) by use now takes the name away; a line the tool refuses no longer names the circle on its way out; a line whose only effect is naming a circle now appears as its own row.
 
+## ADR-589 — «חצי מעגל ABC» on three vertices of a shape puts all three ON the semicircle, and the figure picks the diameter (#1771)
+
+**Status:** accepted · 2026-10-05 · feature (P2, 2-D) · branch `feat/1771-semicircle-thales` · round #1776 · amends [ADR-534](#adr-534)
+
+**Requirements:** [02](02-requirements.md): the arc family's letter run, with a new paragraph on three vertices of a shape · **Design:** [04](04-design.md) § Re-reading a role-assigned letter run: `thalesReadings` · **LADDER stage:** none. This is the parse and the pre-LLM decision; no solver change.
+
+**Cites** [ADR-534](#adr-534) (the centre-first 3-run), [ADR-521](#adr-521) (re-read, adopt, teach), [ADR-583](#adr-583) (the role-reading cap), [ADR-584](#adr-584) (the unstated right-angle seat), [ADR-052](#adr-052) (no fixed assumptions).
+
+**The report.** Operator, round #1767 play: *"half a circle is possible in this case where AB is the diameter"*. The sequence was «ABC משולש ישר זוית» · «AC=15» · «BC=10» · «חצי מעגל ABC», and the last line was refused after 33 s. ADR-534 reads a 3-run centre-first. On a triangle every centre-first reading is impossible from the lengths alone, and ADR-521's re-read found none either.
+
+**The ruling (operator, 2026-10-04).** When «חצי מעגל XYZ» names three points that are not collinear, all three lie ON the semicircle. The diameter is the side that can be opposite the right angle (Thales), whatever order the letters were written in.
+
+**Re-measured at pickup** (origin/main 9d1b0b1f, `decideDeterministic2D`, LLM mocked): refused in 33.3 s, as the issue says. «C על חצי המעגל» was `not-handled` (escalated), as the issue says.
+
+**The mechanism. Two halves, one per layer.**
+- **Parser (`semicircle` rule).** The three-on reading is used when the run's three letters are all vertices of one existing polygon. That is how "not collinear" is read, STRUCTURALLY and never off coordinates. Three loose points keep ADR-534's centre-first reading, because nothing says they are not on one line, and ADR-534's own re-read lock is exactly such a run.
+  - The lowering: the diameter's midpoint as the centre, the circle through one end, the other end and the third vertex as `point-on-circle`, the 180° arc with `bulgeRef` = the third vertex and `bulgeToward` (so the vertex is on the DRAWN half), and the diameter segment.
+  - The parse needs a starting side: the declared hypotenuse (`roleSides`) when it is one of these sides, else the first two letters. That is a starting point, not a convention; the next layer decides.
+  - The explicit spelling is new and reads the same way: «חצי מעגל שקוטרו AB העובר דרך C» / «… העובר בנקודה C» / "semicircle with diameter AB through C". A stated diameter is honoured as stated.
+  - «C על חצי המעגל» / "C is on the semicircle" is handed to `pointOnCircle`, so it reads like «C על המעגל».
+- **Decision (`thalesReadings`, `app/roleReadings.ts`).** This is ADR-521's route: rewrite and re-parse.
+  - Each side becomes the sentence «חצי מעגל שקוטרו XY העובר דרך Z», with the diameter in the written order.
+  - The three are ordered by Thales' probe: how far ∠Z is from 90°, at its worst over the configurations already sampled.
+  - They are tried **best first, before any refusal**, unlike ADR-521. On an unseated right angle the parser's starting side could BUILD by moving the seat, while the probe-best side keeps the figure where it is.
+  - The first reading is dry-run like any line, the other two under the role-reading cap.
+  - The adopted sentence is taught through the canonical-hint seam, so the student sees which side became the diameter.
+  - `honoursConstruct` now also checks that every other `point-on-circle` of the arc's circle is at its radius.
+  - If no side holds, the line gets its stated reading's own refusal. An explicit diameter is never re-read (no bare 3-run, so `thalesReadings` returns `null`).
+
+**Measured after.**
+
+```
+ABC משולש ישר זוית · AC=15 · BC=10 · חצי מעגל ABC   ->  builds 823 ms, diameter AB, ∠C = 90, C on the arc
+  (BCA / CAB / ACB / CBA / "semicircle ABC")        ->  the same diameter AB
+משולש ABC · זווית BAC = 90 · AB=5 · AC=12            ->  diameter BC
+משולש ABC · זווית ABC = 90                           ->  diameter AC
+ריבוע ABCD · חצי מעגל ABC                             ->  diameter AC, B on the arc (the parser started on AB; the probe chose AC)
+ABC משולש ישר זוית (no lengths)                      ->  builds, A, B, C do not move
+משולש שווה צלעות ABC                                 ->  refused (5.1 s)
+... AC=15 · BC=10 · חצי מעגל שקוטרו BC העובר דרך A   ->  refused (stated, not re-read; 8.78M executed)
+```
+
+The executed work of the operator's line fell from the 34.5M that ADR-583/584 bounded as a refusal to 0.42M as a build.
+
+**A lock this changes, and why that is not a widening.** `issue-1675-1584-reattempt-cost.test.ts` bounded «חצי מעגל ABC» on this figure as a *refusal* («|AC| = |AB| cannot hold»). That verdict is exactly what the ruling withdraws. The row now asserts that it builds within 1.5M executed, and it keeps a bounded refusal on the same figure with the stated diameter BC (≤ 12M). ADR-534's own locks (`issue-1204-semicircle-run.test.ts`, 11) are unchanged and green: the centre-first reading, the quarter skeleton, and the «חצי מעגל DCO» re-read on loose points.
+
+**Class sweep (the plan's ask).**
+- **«רבע מעגל ABC» on a triangle needs no new reading ruling.** ADR-521 already picks the quarter's centre from the figure. It can only be a right-angle vertex with equal legs, and on the operator's triangle no reading holds.
+- **But it is accepted instead of refused, and turns «AC=15»/«BC=10» red.** The same happens with no arc: «AB=5» · «BC=13» beside an unseated right angle. Filed as [#1794](https://github.com/dcodish/geo_builder/issues/1794) (P2) with the route to measure first: the ADR-104 deferral or ADR-586's red commit of a cut sweep.
+- **Found while building:** «מעגל שקוטרו AB עובר דרך C» on a triangle commits green with «עובר דרך C» silently dropped. `circleOnDiameter` has no leftover guard. Filed as [#1795](https://github.com/dcodish/geo_builder/issues/1795) (P1, the honesty class). It should share this ADR's `SEMI_THROUGH`.
+
+**Locks.**
+- `src/app/__tests__/issue-1771-semicircle-thales.test.ts` (16), through `runSubmit`, read off the built figure:
+  - the operator's line: diameter AB, ∠C = 90, C on the arc, the lengths kept, the taught spelling, no LLM call;
+  - five letter orders and English;
+  - the right angle at A, at B, and the square;
+  - the no-jump unseated case;
+  - the equilateral refusal and the stated-diameter refusal;
+  - the explicit spelling in Hebrew and English;
+  - loose points stay centre-first;
+  - «C על חצי המעגל» = «C על המעגל», built without the LLM;
+  - `thalesReadings` returns `null` on an explicit diameter.
+- Fixture `src/__tests__/fixtures/issue-1771-semicircle-three-vertices.geo.json`: the operator's exact sequence, replayed green, with the parser-drift net.
+
+**Consequences.**
+- `src/parser/parse.ts`: the `semicircle` rule gets the three-on reading and the through-clause (`SEMI_THROUGH`), plus the membership hand-off (`SEMI_MEMBERSHIP`).
+- `src/app/roleReadings.ts`: `thalesReadings`, and the third-point radius check in `honoursConstruct`.
+- `src/app/decideDeterministic.ts`: the best-first Thales loop inside the line's work epoch.
+- `src/parser/catalog.ts`: the semicircle row teaches both readings, and there is a new row for the through spelling.
+- `docs/02-requirements.md` and `docs/04-design.md`: one paragraph each.
+- Parity (ADR-W-108): three rows are added to `shell/__tests__/fixtures/geo-input-parity.ts` (the through spelling, the three vertices, and «C על חצי המעגל»). Analytic answers not-handled to all three, so each carries `knownGap: analytic → #1796`.
+- `shadow-allowlist.json`: adds `semicircle → diameterFromPoint` and `semicircle → circumcircle`. These are the full-circle readings of the new catalog sentence, and the semicircle rule already ran before them.
+- Pinned snapshots (`shadow-matrix`, `llm-contract`) and decide-parity shard 4: additions only.
+
+**Behaviour change for a student.** «חצי מעגל ABC» on a triangle (or on three corners of a square) now draws the semicircle through all three corners. It used to be refused, or read A as the centre. A note shows which side became the diameter. Three letters that are not corners of one shape still mean «centre first».
+
 ## ADR-591 — A word fraction or a wish is taught as the given it means, proved before it is shown (#1611)
 
 **Status:** accepted · 2026-10-06 · feature (P3, 2-D) · branch `feat/1611-teach-fraction` · round #1776

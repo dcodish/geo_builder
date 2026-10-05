@@ -217,8 +217,90 @@ export function honoursConstruct(
   if (!(ra > 0) || !(rb > 0)) return false;
   // Two radii of one circle. Relative, so a large figure is not judged by an absolute epsilon.
   if (Math.abs(ra - rb) / Math.max(ra, rb) > tolerance) return false;
+  // #1771: every other point the construct puts ON its circle (a semicircle's third vertex) is at the
+  // same radius — the Thales reading's whole promise.
+  const circleIds = new Set(
+    commands.flatMap((c) => ((c.type === 'circle' || c.type === 'circle-through') && c.center === arc.center ? [c.id] : [])),
+  );
+  for (const c of commands) {
+    if (c.type !== 'point-on-circle' || !circleIds.has(c.circle) || c.id === arc.from || c.id === arc.to) continue;
+    const P = at(c.id);
+    if (!P || Math.abs(Math.hypot(P.x - C.x, P.y - C.y) - ra) / ra > tolerance) return false;
+  }
   const target = pinnedAngle(commands);
   if (target === null) return true; // a general sector pins no angle — nothing more to check
   const held = angleAt(positions, arc.center, arc.from, arc.to);
   return held !== null && Math.abs(held - target) <= 0.5;
+}
+
+/**
+ * A SEMICIRCLE THROUGH THREE VERTICES: THE FIGURE PICKS THE DIAMETER (#1771, ADR-589).
+ *
+ * Operator ruling, 2026-10-04: when «חצי מעגל XYZ» names three points that are not collinear, all three
+ * lie ON the semicircle and the diameter is the side that can be opposite the right angle (Thales),
+ * whatever order the letters were written in. The parser reads the run that way and starts from one
+ * side; this module answers *which side*, by the same re-read-and-adopt route as the centre run above:
+ * each candidate is a SENTENCE — «חצי מעגל שקוטרו AB העובר דרך C» — handed back to the same parser, and
+ * the one that builds is taught.
+ *
+ * The probe is Thales' own angle: a third point on a semicircle sees the diameter at 90°, so each vertex
+ * is scored by how far its angle in the figure the student already has is from 90°, at its worst sampled
+ * configuration. On the operator's triangle the right angle sits at C (score 0), so diameter AB is tried
+ * first and costs one dry run; on an unseated right triangle the vertex currently carrying the right
+ * angle wins, so the figure does not jump to a different seat.
+ *
+ * Returns ALL THREE readings, best first (the parsed one included, flagged `stated`), or `null` when the
+ * parse is not a three-points-on semicircle written as a bare 3-run — an explicit «שקוטרו AB … דרך C»
+ * is a stated diameter and is never re-read.
+ */
+export interface ThalesReading {
+  utterance: string;
+  /** The vertex that sits on the arc, opposite the diameter. */
+  on: Id;
+  score: number | null;
+  /** The reading the parser produced. */
+  stated: boolean;
+}
+
+export function thalesReadings(
+  utterance: string,
+  commands: readonly AnyCommand[],
+  sample: (seed: number) => ReadonlyMap<Id, { x: number; y: number }> | Record<Id, { x: number; y: number }>,
+  seeds: readonly number[] = [0, 1, 2],
+): ThalesReading[] | null {
+  const arc = arcOf(commands);
+  if (!arc || arc.spanDeg !== 180 || !arc.bulgeToward || !arc.bulgeRef) return null;
+  const on = arc.bulgeRef;
+  // The three-points-on lowering, and only it: the third point is a MEMBER of the semicircle's circle.
+  if (!commands.some((c) => c.type === 'point-on-circle' && c.id === on)) return null;
+  const roles = [arc.to, arc.from, on];
+  if (new Set(roles).size !== 3) return null;
+  const run = runIn(utterance, roles);
+  if (!run) return null;
+  const hebrew = /[א-ת]/.test(utterance);
+  const score = (vertex: Id): number | null => {
+    const [a, b] = roles.filter((r) => r !== vertex);
+    let worst: number | null = null;
+    for (const seed of seeds) {
+      const at = angleAt(sample(seed), vertex, a, b);
+      if (at === null) return null;
+      worst = Math.max(worst ?? 0, Math.abs(at - 90));
+    }
+    return worst;
+  };
+  // The diameter keeps the letters' written order, so the taught sentence reads like what was typed.
+  const written = (run.text.match(/[A-Z][0-9]?/g) ?? []) as Id[];
+  const out: ThalesReading[] = written.map((vertex) => {
+    const [a, b] = written.filter((r) => r !== vertex);
+    const phrase = hebrew ? `שקוטרו ${a}${b} העובר דרך ${vertex}` : `with diameter ${a}${b} through ${vertex}`;
+    return {
+      on: vertex,
+      score: score(vertex),
+      stated: vertex === on,
+      utterance: utterance.slice(0, run.at) + phrase + utterance.slice(run.at + run.text.length),
+    };
+  });
+  // Best first; a tie keeps the parsed reading ahead, then the written order.
+  const key = (r: ThalesReading) => r.score ?? Number.POSITIVE_INFINITY;
+  return out.sort((x, y) => key(x) - key(y) || Number(y.stated) - Number(x.stated));
 }

@@ -294,6 +294,27 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
+      "circleOnDiameter",
+      "diameterFromPoint",
+      "diameter",
+      "circumcircle",
+    ],
+    "text": "semicircle with diameter AB through C",
+    "winner": "semicircle",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "circleOnDiameter",
+      "diameterFromPoint",
+      "diameter",
+    ],
+    "text": "חצי מעגל שקוטרו AB העובר דרך C",
+    "winner": "semicircle",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
       "pointOnSegment",
     ],
     "text": "semicircle on side AB outside triangle ABC",
@@ -1716,6 +1737,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   {
     "lang": "he",
     "text": "חצי מעגל שקוטרו AB",
+    "winner": "semicircle",
+  },
+  {
+    "lang": "en",
+    "text": "semicircle with diameter AB through C",
+    "winner": "semicircle",
+  },
+  {
+    "lang": "he",
+    "text": "חצי מעגל שקוטרו AB העובר דרך C",
     "winner": "semicircle",
   },
   {

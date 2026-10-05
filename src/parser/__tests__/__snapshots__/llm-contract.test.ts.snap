@@ -1690,6 +1690,24 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "segment",
     ],
   },
+  "semicircle with diameter AB through C": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "arc",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "arc",
+      "segment",
+    ],
+  },
   "square ABCD": {
     "en": [
       "square",
