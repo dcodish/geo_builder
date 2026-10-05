@@ -279,7 +279,9 @@ describe('#1620 — the diagonals NAMED by their letters', () => {
     expect(last(['דלתון ABCD', 'E היא נקודת החיתוך של אלכסוני הדלתון'])).toBe('record');
     const a = derive(['דלתון ABCD', 'E היא נקודת החיתוך של אלכסוני הדלתון'], 0).construction.objects.map((o) => o.id);
     const b = derive(['דלתון ABCD', 'אלכסוני הדלתון נפגשים בנקודה E'], 0).construction.objects.map((o) => o.id);
-    expect(a).toEqual(b);
+    // #1751 (ADR-AG-241): the same point; the verb draws the two diagonals it is about, the noun does not.
+    expect(b.filter((id) => !a.includes(id)).sort()).toEqual(['seg-AC', 'seg-BD']);
+    expect(b.filter((id) => id !== 'seg-AC' && id !== 'seg-BD')).toEqual(a);
   });
 
   it('23/4: E is the kite’s diagonal meet, and «F על הקטע EC» now finds E', () => {

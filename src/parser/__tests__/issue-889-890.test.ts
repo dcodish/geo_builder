@@ -185,10 +185,10 @@ describe('#890 — a STATED shape materialises', () => {
       if (r.ok) expect(r.commands.map((c) => c.type)).not.toContain('triangle');
     });
 
-    it('and the run-only form, which states no shape, declares nothing', () => {
+    it('and the run-only form, which states no shape, declares nothing (the verb draws its two diagonals, #1751)', () => {
       const r = parse('אלכסוני ABCD נחתכים בנקודה M', ctxOf(factsOf(['ריבוע ABCD'])));
       expect(r.ok).toBe(true);
-      if (r.ok) expect(r.commands.map((c) => c.type)).toEqual(['line-line-intersection']);
+      if (r.ok) expect(r.commands.map((c) => c.type)).toEqual(['segment', 'segment', 'line-line-intersection']);
     });
   });
 });

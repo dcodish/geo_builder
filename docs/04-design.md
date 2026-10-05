@@ -1158,3 +1158,7 @@ step-5 failure is re-tested without retyping steps 1–4.
   the harness mirrors.
 - **Never shipped.** `main.tsx` mounts it inside an `import.meta.env.DEV` conditional, which the production
   build folds to `false`, dropping the lazy import and its chunk.
+
+## A crossing draws what its subject is ([ADR-592](06-decisions.md#adr-592))
+
+A crossing sentence has a FRAME, and only the frame decides whether its operand lines are drawn (#1751, operator rulings 2026-10-04). The verb frame — `lineLineIntersection`'s lines-first and cut branches, and a role meet whose `crossingSubjectOf` is `'lines'` (a meet verb, no point-first noun head) — inks its operands: the lettered pairs as before, and «האלכסונים נפגשים בנקודה M» the ring's two diagonals (plain segments: derived from the ring the sentence resolved, so no ADR-499 claim). The noun frame — the point-first branch, `cross(…, 'point')`, and the role meet with a noun head — inks nothing; it ensures its operands' endpoints as `ifAbsent` free points so the statement stands alone (an empty canvas, and the #943 drop-one re-fold, which never re-parses). Analytic reads the same rule (ADR-AG-241).

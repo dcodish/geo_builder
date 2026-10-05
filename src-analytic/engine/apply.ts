@@ -2024,7 +2024,16 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         f.role === 'diagonals'
           ? { t: 'diagonals', v: [v[0], v[1], v[2], v[3]] }
           : ({ t: f.role, v: [v[0], v[1], v[2]] } as DerivedRule);
-      return applyFact(c, { t: 'derived', id: f.id, rule, src: f.src });
+      const point: Fact = { t: 'derived', id: f.id, rule, src: f.src };
+      // #1751 (ADR-AG-241): the verb frame draws the diagonals it names by role — the ring's, now that M1 knows it.
+      if (f.draw && f.role === 'diagonals') {
+        return applyAll(c, [
+          point,
+          { t: 'segment', id: segmentIdOf(v[0], v[2]), a: v[0], b: v[2], ref: true, src: f.src },
+          { t: 'segment', id: segmentIdOf(v[1], v[3]), a: v[1], b: v[3], ref: true, src: f.src },
+        ]);
+      }
+      return applyFact(c, point);
     }
 
     /**

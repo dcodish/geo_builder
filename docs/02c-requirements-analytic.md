@@ -1002,7 +1002,7 @@ a refusal. «…בנקודות A ו-B» awaits the operator's root-assignment ru
 מונח על הישר y=x», «הבסיס CD נמצא על ישר העובר דרך …»), and with a point given only by its COORDINATES («הנקודה
 (-3,7)») — each means exactly what the point-first sentence means. A point given only by coordinates is named by
 the tool from a reserved set (P₁, P₂, …) unless the student already named a point there, and the row says the tool
-named it. A side on a circle is refused by name.
+named it. A side on a circle is refused by name. **What a crossing draws is its grammatical subject's** ([ADR-AG-241](06c-decisions-analytic.md#adr-ag-241), [#1751](https://github.com/dcodish/geo_builder/issues/1751)): the verb («AC ו-BD נפגשים בנקודה M», «AC חותך את BD בנקודה M», «האלכסונים נפגשים בנקודה M») draws its lines named by letters or by role, with M; the noun («M מפגש AC ו-BD», «M נקודת החיתוך של AC ו-BD», «M מפגש האלכסונים») draws M alone — 2-D's rule (ADR-592).
 
 **R120 — a circle can be pinned by tangency to a LINE, in every order**
 ([ADR-AG-165](06c-decisions-analytic.md#adr-ag-165), [#1501](https://github.com/dcodish/geo_builder/issues/1501);

@@ -17,15 +17,19 @@ const codes = (lines: string[]) => derive(lines, 0).faults.map((f) => f.code);
 const ids = (lines: string[]) => derive(lines, 0).construction.objects.map((o) => o.id);
 
 describe('#1070 — the same fact, whichever way the corpus writes it', () => {
-  it('«אלכסוני המרובע ABCD נפגשים בנקודה O» builds the SAME figure as the noun phrase', () => {
-    // A sentence and a noun phrase saying one thing. Compared as constructions rather than as
-    // parses, because what must agree is the figure, not the route to it.
+  it('«אלכסוני המרובע ABCD נפגשים בנקודה O» builds the SAME point as the noun phrase, and draws its diagonals', () => {
+    // A sentence and a noun phrase naming one point. Compared as constructions rather than as
+    // parses, because what must agree is the figure, not the route to it. Since #1751 (ADR-AG-241,
+    // operator ruling 2026-10-04) the VERB is about the diagonals and draws them; the NOUN draws O only.
     const verb = derive(['מרובע ABCD', 'אלכסוני המרובע ABCD נפגשים בנקודה O'], 0);
     const noun = derive(['מרובע ABCD', 'O מפגש האלכסונים במרובע ABCD'], 0);
     expect(verb.faults).toEqual([]);
-    expect(JSON.stringify(verb.construction.objects.map((o) => o.id))).toBe(
-      JSON.stringify(noun.construction.objects.map((o) => o.id)),
-    );
+    const ink = new Set(['seg-AC', 'seg-BD']);
+    const vIds = verb.construction.objects.map((o) => o.id);
+    const nIds = noun.construction.objects.map((o) => o.id);
+    expect(vIds.filter((id) => ink.has(id)).sort()).toEqual(['seg-AC', 'seg-BD']);
+    expect(nIds.filter((id) => ink.has(id))).toEqual([]);
+    expect(JSON.stringify(vIds.filter((id) => !ink.has(id)))).toBe(JSON.stringify(nIds));
   });
 
   it('carries the other concurrency points with it — one alternation, not three rules', () => {

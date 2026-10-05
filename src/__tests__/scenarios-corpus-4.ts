@@ -3400,4 +3400,28 @@ export const SCENARIOS_4: Scenario[] = [
       expect(gateVerdict(arc, 'קשת AB = קשת BC').kind, 'a seat cures it — the line commits').toBe('commit');
     },
   },
+  {
+    id: 'meet-verb-draws-noun-does-not-1751',
+    title: '#1751 (ADR-592): in «מרובע ABCD», his T3 line «AC ו- BD נפגשים בנקודה M» draws AC and BD with M at their crossing; «M מפגש AC ו-BD» builds M only — the grammatical subject decides',
+    guards:
+      "Operator, round #1736 play, T3, and two rulings of 2026-10-04: the VERB frame is about the lines (draw them, by letters or by role), the NOUN frame is about the point (M only), in BOTH 2-D and analytic. Measured on 4d6e3fd6: 2-D drew AC and BD for the noun spellings too, and drew no diagonals for «האלכסונים נפגשים בנקודה M». Root fix: the crossing lowering carries the frame (lineLineIntersection's point-first branch; crossingSubjectOf for the role meet) and that alone decides the operand ink; the noun frame ensures its operand ends as ifAbsent free points. The per-spelling matrix for both builders is in src/app/__tests__/issue-1751-meet-draws-segments.test.ts and src-analytic/__tests__/issue-1751-meet-draws-segments.test.ts.",
+    steps: ['מרובע ABCD', 'AC ו- BD נפגשים בנקודה M'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const inked = (f: typeof fig) =>
+        f.construction.objects
+          .flatMap((o) => (o.kind === 'segment' ? [[o.a, o.b].sort().join('')] : []))
+          .filter((k) => !['AB', 'BC', 'CD', 'AD'].includes(k))
+          .sort();
+      expect(inked(fig), 'the verb draws its subject lines').toEqual(['AC', 'BD']);
+      const noun = replay(factsOf(['מרובע ABCD', 'M מפגש AC ו-BD']), 0);
+      expect(Object.values(noun.status).every((x) => x === 'ok'), 'the noun form builds').toBe(true);
+      expect(inked(noun), 'the noun draws the point only').toEqual([]);
+      for (const f of [fig, noun]) {
+        const [A, B, C, D, M] = ['A', 'B', 'C', 'D', 'M'].map((k) => f.positions.get(k)!);
+        expect(Math.abs((C.x - A.x) * (M.y - A.y) - (C.y - A.y) * (M.x - A.x)), 'M on AC').toBeLessThan(1e-6);
+        expect(Math.abs((D.x - B.x) * (M.y - B.y) - (D.y - B.y) * (M.x - B.x)), 'M on BD').toBeLessThan(1e-6);
+      }
+    },
+  },
 ];

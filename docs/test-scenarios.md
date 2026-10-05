@@ -1679,3 +1679,7 @@ over all four (ADR-041).
 ### `impossible-chord-refused-beside-unstated-right-angle-1671` — on a right triangle whose right angle was never placed, an impossible chord line is refused; a line one seat satisfies still commits (#1671, ADR-584)
 
 **Guards against:** a line that cannot hold at any right-angle position being added with red rows because the gate's seat sweep ran out of a 1.5 s clock. «משולש ישר זווית ABC · משולש ABC חסום במעגל · M אמצע AB · קטע DE · המיתר AM מקביל ל-DE» committed with three red rows; it is now refused naming |OM| = |OA|, while «קשת AB = קשת BC» (the right angle at B satisfies it) still commits. The sweep is bounded by a fixed amount of charged work, so the verdict is the same on every device; the submit-door matrix is in `src/app/__tests__/issue-1671-seat-sweep.test.ts`.
+
+### `meet-verb-draws-noun-does-not-1751` — a crossing sentence draws what its subject is: the verb its lines, the noun the point only (#1751, ADR-592)
+
+**Guards against:** the noun and the verb drawing the same thing. In «מרובע ABCD», «AC ו- BD נפגשים בנקודה M» (the operator's T3 line) must draw AC and BD with M at their crossing, and «M מפגש AC ו-BD» must build M alone — before #1751, 2-D drew AC and BD for both, and analytic drew neither.

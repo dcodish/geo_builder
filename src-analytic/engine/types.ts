@@ -309,8 +309,11 @@ export type Fact =
    * The contextual sibling of `area-of`: the shape is whichever one in the figure has the right
    * number of vertices, resolved at M1 and refused when that is not exactly one.
    */
-  | (FactBase & { t: 'meet-of'; role: DerivedRule['t']; arity: number; id: Id; noun?: string; named?: [Id, Id, Id, Id] })
+  | (FactBase & { t: 'meet-of'; role: DerivedRule['t']; arity: number; id: Id; noun?: string; named?: [Id, Id, Id, Id]; draw?: true })
   /*
+   * `draw` (#1751, ADR-AG-241) — the VERB frame («האלכסונים נפגשים בנקודה M») is about the diagonals, so the resolved
+   * ring's two diagonals are drawn with the point; the NOUN frame («M מפגש האלכסונים») leaves it off and draws M only.
+   *
    * `noun` (#1620, ADR-AG-208) — the shape noun the sentence wrote («אלכסוני הטרפז»): the rings it names are
    * `ringsNamed`'s (a specific noun its own rings and their refinements, a generic noun every ring of its
    * arity), so «הטרפז» resolves to the one trapezoid beside a plain quadrilateral and is refused where the

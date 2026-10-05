@@ -33,7 +33,8 @@ describe('#461 — the shape and its construct in one line', () => {
     const r = p(line);
     expect(r.ok, line).toBe(true);
     if (r.ok) {
-      expect(r.commands.map((c) => c.type)).toEqual([shape, 'line-line-intersection']);
+      // #1751 (ADR-592): the synthesized «אלכסוני ABCD נחתכים» is the VERB frame, so the diagonals are drawn
+      expect(r.commands.map((c) => c.type)).toEqual([shape, 'segment', 'segment', 'line-line-intersection']);
     }
   });
 
