@@ -14,11 +14,13 @@
 import { describe, expect, it } from 'vitest';
 import { parse3 } from '../parser/parse3';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from '../parser/scope3';
+import { decideDeterministic3 } from '../app/decideDeterministic3';
 
-/** The App3 decision, verbatim: nudge iff a candidate exists AND it parses (App3.tsx, the pre-LLM seam). */
+/** The App3 decision itself (#1692): `decideDeterministic3` is what App3 dispatches — nudge iff a candidate
+ *  exists AND it parses, after the store's own decision said not-understood. Called, never re-implemented. */
 const nudges = (u: string): boolean => {
-  const c = upperCasedLabelCandidate3(u);
-  return !!c && parse3(c).ok;
+  const v = decideDeterministic3({ facts: [], seed: 0 }, u);
+  return v.kind === 'guided' && v.register === 'lowercase-labels';
 };
 
 describe('#924 arm 2 — a long or primed vertex run is taught, not escalated', () => {

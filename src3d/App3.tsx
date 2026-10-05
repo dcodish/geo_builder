@@ -39,8 +39,7 @@ import { SYMBOL_SPECS_3 } from './ui/symbols3';
 import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
 import { restoreStatedSequences3 } from './parser/honesty3';
-import { classifyGuidance3, upperCasedLabelCandidate3 } from './parser/scope3';
-import { parse3 } from './parser/parse3';
+import { decideDeterministic3 } from './app/decideDeterministic3';
 import Figure3 from './render/Figure3';
 import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
@@ -123,6 +122,7 @@ export default function App3() {
   const lastError = useGeo3((s) => s.lastError);
   const lastNotice = useGeo3((s) => s.lastNotice); // #613 — the statement succeeded and added nothing
   const submit = useGeo3((s) => s.submit);
+  const dispatchVerdict = useGeo3((s) => s.dispatchVerdict);
   const toggle = useGeo3((s) => s.toggle);
   const remove = useGeo3((s) => s.remove);
   const replaceFact = useGeo3((s) => s.replaceFact);
@@ -557,30 +557,25 @@ export default function App3() {
     if (!raw.trim() || busy) return;
     setGuidanceNote(null); // a fresh submit clears the previous guidance
     setLoadNote(null); // …and the load note, which described the file as opened
-    submit(raw);
+    // #1692 (ADR-3D-305): the whole pre-LLM decision — the store's `decideSubmit3`, then the #353
+    // lowercase-label nudge, then the #73 (ADR-3D-040) guidance register, in that order — is ONE pure
+    // function, `decideDeterministic3`. This handler only dispatches it, so the log-triage replay, which
+    // CALLS the same function, cannot disagree with what a student is shown.
+    const v = decideDeterministic3(useGeo3.getState(), raw);
+    if (v.kind === 'guided') {
+      // A guided line never reaches the model: a non-constructive family can never build, so an LLM call
+      // on it is pure cost (the 2-D ADR-289 twin), and a lowercase-label line is taught its spelling.
+      logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: 'not-understood', intermediate: true });
+      logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'scope', result: v.tag });
+      setGuidanceNote(v.register === 'lowercase-labels' ? t('scope.lowercase-labels', { corrected: v.corrected }) : t(v.match.messageKey));
+      useGeo3.setState({ lastError: null });
+      return;
+    }
+    dispatchVerdict(v);
     let err = useGeo3.getState().lastError;
     logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
     // out-of-grammar → escalate to the LLM proxy; the returned canonical lines re-parse deterministically
     if (err?.code === 'not-understood') {
-      // #73 (ADR-3D-040): the GUIDANCE register short-circuits BEFORE the LLM — a non-constructive
-      // family can never build, so an LLM call on it is pure cost (the 2-D ADR-289 twin, copied).
-      // #353: lowercase NODE labels — if reading them as uppercase makes the utterance parse, the only
-      // problem was the case convention. Say so (with the corrected spelling) instead of paying for an LLM
-      // call. Proof-based, so a genuine gap stays a genuine gap; checked before the pattern register.
-      const upper = upperCasedLabelCandidate3(raw);
-      if (upper && parse3(upper).ok) {
-        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'scope', result: 'scope:lowercase-labels' });
-        setGuidanceNote(t('scope.lowercase-labels', { corrected: upper }));
-        useGeo3.setState({ lastError: null });
-        return;
-      }
-      const g = classifyGuidance3(raw);
-      if (g) {
-        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'scope', result: `scope:${g.category}` });
-        setGuidanceNote(t(g.messageKey));
-        useGeo3.setState({ lastError: null });
-        return;
-      }
       setBusy(true);
       try {
         const ctx = `Existing points: ${[...derived.construction.points.keys()].join(', ') || '(none)'}.`;
