@@ -106,15 +106,16 @@ describe('#831 — the shared reader, which is where the fix actually lives', ()
   });
 
   it('an AMBIGUOUS vertex ASKS rather than guessing — in the symbolic lane too', () => {
-    // A has three edges once the diagonal is drawn, so "the angle at A" names several. The numeric
-    // lane always asked; sharing the reader is what gives the symbolic lane the same honesty
-    // instead of an LLM escalation or a silent pick.
-    const r = parse('זווית A=α', figure(['ריבוע ABCD', 'אלכסון AC']));
+    // A has three edges and belongs to no polygon, so "the angle at A" names several. (Since #1445 / ADR-590
+    // a vertex of ONE polygon names its interior angle — the square + diagonal this lock used to draw now
+    // reads ∠DAB.) The numeric lane always asked; sharing the reader is what gives the symbolic lane the same
+    // honesty instead of an LLM escalation or a silent pick.
+    const r = parse('זווית A=α', figure(['AB', 'AC', 'AD']));
     expect(r).toMatchObject({ ok: false, reason: 'ambiguous-angle', vertex: 'A' });
   });
 
   it('both value kinds answer the ambiguous vertex the SAME way — one reader, one behaviour', () => {
-    const setup = ['ריבוע ABCD', 'אלכסון AC'];
+    const setup = ['AB', 'AC', 'AD'];
     const sym = parse('זווית A=α', figure(setup));
     const numeric = parse('זווית A=40', figure(setup));
     expect(sym).toEqual(numeric);

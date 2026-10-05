@@ -755,6 +755,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'symbol-length-letter-root-1622', family: 'lengths', steps: ['AD = 12√a'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'vertex-value-1622', family: 'angles', steps: ['משולש ABC', 'A = 40'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'vertex-value-free-1622', family: 'angles', steps: ['נקודה A', 'A = 40'], expect: 'asks', exception: 'X9', note: 'a free point has no arms: 2-D asks which angle' },
+  { id: 'vertex-angle-after-altitude-1445', family: 'angles', steps: ['משולש ABC', 'BD גובה', 'זווית B = 30'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1799' }], note: 'B has three edges but is a vertex of ONE triangle: ∠B is ∠ABC, said aloud (operator ruling 2026-09-27, #1445)' },
+  { id: 'vertex-angle-ratio-after-bisector-1445', family: 'angles', steps: ['משולש ABC', 'BD חוצה זווית B', 'זווית B = 2 זווית C'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1799' }] },
+  { id: 'vertex-angle-two-triangles-1445', family: 'angles', steps: ['משולש ABC', 'D על AC', 'BD', 'משולש ABD', 'זווית B = 30'], expect: 'asks', note: 'two triangles at B (the sub-triangle counts): it still asks, listing the angles (#1445)' },
   { id: 'area-label-1622', family: 'area-perimeter', steps: ['מרובע ABCD', 'נסמן את שטח ABCD ב-S'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
   // #1622 E5 (ADR-AG-221): an order between angle aliases, an angle named by a label, and an area label on an empty canvas.
   { id: 'alias-order-bound-1622', family: 'angles', steps: ['α < 30'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: "2-D's measure-bound on the alias, before any angle names it" },

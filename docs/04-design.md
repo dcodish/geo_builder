@@ -422,6 +422,18 @@ worth keeping in view when the next mode is added:
   answered "which angle is named" were never brought in. A declared single reader with unmigrated callers
   is not a chokepoint, it is a convention — and conventions are what #967 paid three edits for.
 
+**Which angle a lone vertex names is one function too** (#1445, [ADR-590](06-decisions.md#adr-590)).
+`resolveVertexAngle(v, ctx, exclude?)` answers it for every single-letter site — `angleArms` (so the value,
+symbol, acuteness and bound lanes), the bare `B = 30`, the equality sides, the measure-sum terms, the
+bisector's vertex form and both bisector apex reads — which until then each kept their own `nb.length !== 2`
+test. Its order: exactly two edges → that angle; else exactly one declared polygon (`ctx.polygons`, deduplicated
+by vertex set) holding the vertex → its interior angle (ring neighbours); else `ambiguous-angle` with
+`options` (every edge pair, less a straight pair the construction states via `onSegment`/`midpointOf`). A
+polygon-default reading is pushed to a **reading sink** owned by the outermost `parse` call; `parse` reports
+only the readings its winning commands name (`angleReadings` on the ok result), and the submit path turns
+them into the `input.vertexAngleReadAs` note («הובן כ-∠ABC»). The sink is reset when `parse` returns, so the
+parser stays a pure function of `(utterance, ctx)`.
+
 **The refusal is part of the capability.** Two segments that never meet have no vertex between them, and
 2-D has no line-line angle constraint — *every* angle constraint here is vertex-anchored
 (`set-angle`, `-bound`, `-ratio`, `-order`, `-acuteness`, `measure-angle`). So the honest answer is neither

@@ -258,6 +258,11 @@ export interface ApplyError {
    * would be a guess.
    */
   example?: string;
+  /**
+   * #1445 (ADR-AG-243): every angle a lone vertex could name, three letters each (rays sorted), when it names
+   * several — the refusal LISTS them. Absent when there are fewer than two.
+   */
+  options?: string[];
   /** For `ambiguous-shape`: the kind the reference needed and how many the figure holds (#1432 am. 1). */
   host?: HostRef;
   /** For `out-of-domain`: the bound the stated value violates (#1432 am. 1). */
@@ -461,32 +466,52 @@ function resolveAngleName(
   c: Construction,
   n: AngleName,
   src: string,
-): { ok: true; ref: AngleRef } | { ok: false; error: ApplyError } {
+): { ok: true; ref: AngleRef; readAs?: ApplyNotice } | { ok: false; error: ApplyError } {
   if (isAngleRef(n)) return { ok: true, ref: n };
   const host = objectById(c, n.v);
   if (!host || !isPositional(host)) return { ok: false, error: unknownRef(c, n.v) };
   const edges = edgesAt(c, n.v);
   if (edges.length === 2) return { ok: true, ref: { v: n.v, a: edges[0], b: edges[1] } };
+  const name = (a: Id, b: Id) => `${statedName(a)}${statedName(n.v)}${statedName(b)}`;
+  // #1445 (ADR-AG-243, operator ruling 2026-09-27 — 2-D's ADR-590): a vertex of exactly ONE shape names that
+  // shape's interior angle, however many segments leave it, and the reading is said aloud (`angle-read-as`).
+  // A shape stated twice is one shape; two shapes through the vertex (a sub-triangle too) stay ambiguous.
+  const rings = [
+    ...new Map(
+      (c.objects.filter((g) => g.kind === 'polygon') as PolygonObject[]).map((g) => [[...g.vertices].sort().join('|'), g.vertices] as const),
+    ).values(),
+  ].filter((r) => r.includes(n.v));
+  const ringPair = (ring: readonly Id[]): [Id, Id] => {
+    const i = ring.indexOf(n.v);
+    const pair = [ring[(i - 1 + ring.length) % ring.length], ring[(i + 1) % ring.length]].sort();
+    return [pair[0], pair[1]];
+  };
+  if (edges.length > 2 && rings.length === 1) {
+    const [a, b] = ringPair(rings[0]);
+    return { ok: true, ref: { v: n.v, a, b }, readAs: { code: 'angle-read-as', detail: src, holder: name(a, b) } };
+  }
   let taught: [Id, Id] | null = null;
+  const options: string[] = [];
   if (edges.length > 2) {
-    const ring = (c.objects.find((g) => g.kind === 'polygon' && g.vertices.includes(n.v)) as PolygonObject | undefined)
-      ?.vertices;
-    if (ring) {
-      const i = ring.indexOf(n.v);
-      const pair = [ring[(i - 1 + ring.length) % ring.length], ring[(i + 1) % ring.length]].sort();
-      taught = [pair[0], pair[1]];
-    } else {
-      taught = [edges[0], edges[1]];
-    }
+    taught = rings.length > 0 ? ringPair(rings[0]) : [edges[0], edges[1]];
+    for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) options.push(name(edges[i], edges[j]));
   }
   return {
     ok: false,
     error: {
       code: 'ambiguous-angle',
       detail: src,
-      ...(taught ? { example: `${statedName(taught[0])}${statedName(n.v)}${statedName(taught[1])}` } : {}),
+      ...(taught ? { example: name(taught[0], taught[1]) } : {}),
+      ...(options.length > 1 ? { options } : {}),
     },
   };
+}
+
+/** #1445: an outcome that landed carries the lone-vertex reading notice, unless it already carries one. */
+function withReadAs(out: ApplyOutcome, ...reads: Array<{ readAs?: ApplyNotice }>): ApplyOutcome {
+  const holders = reads.flatMap((r) => (r.readAs ? [r.readAs] : []));
+  if (!out.ok || out.notice || holders.length === 0) return out;
+  return { ...out, notice: { code: 'angle-read-as', detail: holders[0].detail, holder: holders.map((h) => h.holder).join(', ') } };
 }
 
 /** What a name already holds, in terms the student can recognise — see `ApplyError.existing`. */
@@ -550,7 +575,12 @@ export type LineEffect = 'created' | 'known' | 'narrowed';
  * `holder` the existing line's; both are the student's own tokens, never an id.
  */
 export interface ApplyNotice {
-  code: 'name-reads-as';
+  /**
+   * `angle-read-as` (#1445, ADR-AG-243, operator ruling 2026-09-27): a lone vertex was read as the interior
+   * angle of the ONE shape it belongs to, though more than two edges meet there — «זווית B» in △ABC with a
+   * cevian at B is ∠ABC, and the student is told so. `detail` is the sentence, `holder` the three letters.
+   */
+  code: 'name-reads-as' | 'angle-read-as';
   detail: string;
   holder: string;
 }
@@ -3203,7 +3233,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     case 'right-angle': {
       const at = resolveAngleName(c, { v: f.id }, f.src);
       if (!at.ok) return at;
-      return applyFact(c, { t: 'constraint', k: rightAngleAt(f.id, at.ref.a, at.ref.b), src: f.src });
+      return withReadAs(applyFact(c, { t: 'constraint', k: rightAngleAt(f.id, at.ref.a, at.ref.b), src: f.src }), at);
     }
 
     /**
@@ -3222,18 +3252,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (!left.ok) return left;
       if (f.rhs.t === 'value') {
         // sin (#1719, ADR-AG-227): the lone vertex resolved, the same choice its three-letter twin carries.
-        if (f.rhs.measure === 'sin') return applyFact(c, { t: 'constraint', k: sineAngle(left.ref, f.rhs.value), src: f.src });
+        if (f.rhs.measure === 'sin') return withReadAs(applyFact(c, { t: 'constraint', k: sineAngle(left.ref, f.rhs.value), src: f.src }), left);
         const k: Constraint = { t: 'angle', at: left.ref, value: f.rhs.value };
         if (f.rhs.measure) k.measure = f.rhs.measure;
-        return applyFact(c, { t: 'constraint', k, src: f.src });
+        return withReadAs(applyFact(c, { t: 'constraint', k, src: f.src }), left);
       }
       const right = resolveAngleName(c, f.rhs.of, f.src);
       if (!right.ok) return right;
-      return applyFact(c, {
-        t: 'constraint',
-        k: { t: 'angle-ratio', left: left.ref, right: right.ref, k: f.rhs.k },
-        src: f.src,
-      });
+      return withReadAs(
+        applyFact(c, {
+          t: 'constraint',
+          k: { t: 'angle-ratio', left: left.ref, right: right.ref, k: f.rhs.k },
+          src: f.src,
+        }),
+        left,
+        right,
+      );
     }
 
     /**
@@ -3315,23 +3349,26 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // «חוצה זווית ABC» on its own: the bisector LINE through the vertex, named by its angle so it is drawn once.
       if (f.p === undefined) {
         const [a, b] = [at.ref.a, at.ref.b].sort();
-        return applyFact(c, {
-          t: 'line-at',
-          id: `line-bisector-${a}${at.ref.v}${b}`,
-          through: at.ref.v,
-          dir: { k: 'bisector', v: at.ref.v, a, b },
-          perp: false,
-          src: f.src,
-        });
+        return withReadAs(
+          applyFact(c, {
+            t: 'line-at',
+            id: `line-bisector-${a}${at.ref.v}${b}`,
+            through: at.ref.v,
+            dir: { k: 'bisector', v: at.ref.v, a, b },
+            perp: false,
+            src: f.src,
+          }),
+          at,
+        );
       }
       if (f.p === at.ref.a || f.p === at.ref.b) return { ok: false, error: { code: 'degenerate-role', detail: f.src } };
       const prior = objectById(c, f.p);
       if (prior && !isPositional(prior)) {
         return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };
       }
-      return applyAll(
-        c,
-        prior ? onBisectorFacts(at.ref, f.p, f.src) : cevianFacts('bisector', at.ref.v, f.p, at.ref.a, at.ref.b, f.src),
+      return withReadAs(
+        applyAll(c, prior ? onBisectorFacts(at.ref, f.p, f.src) : cevianFacts('bisector', at.ref.v, f.p, at.ref.a, at.ref.b, f.src)),
+        at,
       );
     }
 

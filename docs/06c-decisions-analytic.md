@@ -11342,3 +11342,26 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Consequences.** `parser/parseAnalytic.ts` (`operandPieces`, `withOperandPieces`, `LETTERED_OPERAND`; `meetFrame`; the cut verbs; `concurrencyOf`'s `frame`), `engine/types.ts` (`meet-of.draw`), `engine/apply.ts` (`meet-of`), `shell/__tests__/fixtures/geo-input-parity.ts` (ten rows), `docs/02c-requirements-analytic.md`, `docs/04c-design-analytic.md`.
 
 **Behaviour change for a student:** «AC ו-BD נפגשים בנקודה M», «AC חותך את BD בנקודה M» and «האלכסונים נפגשים בנקודה M» now draw the two lines with M, as in 2-D; «M מפגש AC ו-BD» still draws M alone.
+
+## ADR-AG-243 — «זווית B» in a triangle is the triangle's angle, said aloud, however many segments leave B (#1445; amends ADR-AG-158)
+
+**Status:** accepted · 2026-10-05 · feature (P3, `analytic` + `2d`) · branch `feat/1445-polygon-angle-default` · round #1776 · operator ruling 2026-09-27 on #1445 (*"Triangle's angle, said aloud"*, in both 2-D and analytic)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R115 amendment 2 · **Design:** [04c](04c-design-analytic.md#relations-and-the-direction-resolver-adr-ag-024), the *Angles* paragraph (`resolveAngleName`'s middle step, `withReadAs`, `options`)
+
+**Cites** [ADR-AG-158](#adr-ag-158) (the lone-vertex resolver and its 2026-09-27 amendment: distinct edges decide), [ADR-AG-183](#adr-ag-183) (the record notice), 2-D [ADR-590](06-decisions.md#adr-590) (the same ruling), [ADR-W-108](06w-decisions-workspace.md#adr-w-108).
+
+**Measured at pickup** (`9d1b0b1f`, the real `decideSubmit`). After «משולש ABC» and any of «BD חוצה זווית B», «BD גובה», «BD תיכון», or «D על AC» · «הקטע BD», the following were all refused `ambiguous-angle` (example «ABC»): «זווית B = 2 זווית C», «זווית B = 30», «זווית B ישרה», «זווית B = זווית C». 2-D refused the same lines, so the builders agreed on the wrong answer.
+
+**The decision.** `resolveAngleName` (`engine/apply.ts`) is still the one resolver behind `right-angle`, `vertex-angle` and `bisects`. It gains 2-D's middle step:
+- **Exactly two edges:** the angle between them, unchanged and not announced.
+- **More than two edges, and the vertex belongs to exactly ONE shape** (shapes deduplicated by vertex set): that shape's interior angle, rays sorted as before. The outcome carries a new `ApplyNotice` code, `angle-read-as` (`holder` = the three letters), added by `withReadAs` at the four call sites. The record verdict shows it through `noticeText` as `noticeAngleReadAs`: «הובן כ-∠ABC — הזווית של הצורה בקודקוד הזה…».
+- **Otherwise** (no shape, or two or more: the #1407 figure's C and A, or a sub-triangle «משולש ABD»): `ambiguous-angle` as before, still with `example`. It now also carries `options`, every edge pair in three letters, which `derive`'s fault and both submit verdicts pass through. With two or more options, the refusal is `errAmbiguousAngleOptions`, which lists them («∠ABC, ∠ABD, ∠CBD»). The lock drives the example line through `decideSubmit`, and it records.
+
+**Unchanged:** the #1407 ruling figure («משולש ABC» · «מרובע ABCD»): B and D build, C and A ask (both shapes hold them). A vertex with fewer than two edges refuses with no example. Every existing analytic lock was re-run green, untouched.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1445-polygon-angle-default.test.ts` (22): the four lines × four cevian prefixes record with the `angle-read-as` notice, and each means its three-letter twin; the notice text in both locales; no notice at two edges; the ratio holds at four seeds; REFUSALS that list (two triangles at B, three segments at A) with the taught line recording; the #1407 figure unchanged.
+- The shared parity rows `vertex-angle-after-altitude-1445`, `vertex-angle-ratio-after-bisector-1445` and `vertex-angle-two-triangles-1445` (2-D = analytic; 3-D gap #1799).
+
+**Consequences.** `engine/apply.ts` (`resolveAngleName`, `withReadAs`, `ApplyNotice.code`, `ApplyError.options`); `engine/derive.ts`, `app/submit.ts` and `store/useAnalyticStore.ts` (carry `options`); `app/errorText.ts`, `i18n/index.ts` (`errAmbiguousAngleOptions`, `noticeAngleReadAs`).

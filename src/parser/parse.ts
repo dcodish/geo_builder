@@ -30,7 +30,7 @@ import { foreignGiven } from './scope';
 import { readShapePhrase, lowerShape, SHAPE_ADJ_ANY, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
 
 export type ParseResult =
-  | { ok: true; commands: AnyCommand[] }
+  | { ok: true; commands: AnyCommand[]; angleReadings?: string[] }
   | { ok: false; reason: 'not-handled' }
   // #1654–#1657 (ADR-562): a FOREIGN GIVEN — a slope, a quadrant, axes/coordinates (the analytic Builder's), a
   // plane, a sphere or another solid (the Space Builder's). Decided BEFORE every rule (`foreignGiven`), because
@@ -40,7 +40,8 @@ export type ParseResult =
   // A rule recognised an angle named by a SINGLE vertex ("∠B = 90") but the figure has ≠2 edges there, so
   // WHICH angle is meant is ambiguous (or its arms don't exist yet). Surfaced as a clarification — "name all
   // three letters" — NOT escalated to the LLM (which would only guess). `vertex` is the named vertex.
-  | { ok: false; reason: 'ambiguous-angle'; vertex: string }
+  // #1445 (ADR-590): `options` lists the candidate angles (three letters each) when the vertex has several.
+  | { ok: false; reason: 'ambiguous-angle'; vertex: string; options?: string[] }
   // #777: a comparative whose COMPARAND is missing («צלע AD גדולה פי 2» — twice WHAT?). The only way
   // to "handle" it is to invent the second operand, and an invented comparand is a given the student
   // never stated (ADR-052) — committed with a green ✓ and one Enter from the figure. So it ASKS, and
@@ -326,7 +327,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -2092,9 +2093,9 @@ const bareVertexAngle: Rule = (s, ctx) => {
   if (!m) return null;
   const v = m[1];
   if (!(ctx.points ?? []).includes(v)) return null; // not a point → not an angle statement
-  const nb = (ctx.neighbors ?? {})[v] ?? [];
-  if (nb.length !== 2) return { clarify: 'ambiguous-angle', vertex: v };
-  return [{ type: 'set-angle', vertex: v, ray1: nb[0], ray2: nb[1], value: Number(m[2]) }];
+  const at = resolveVertexAngle(v, ctx); // #1445: the one lone-vertex resolver
+  if ('clarify' in at) return at;
+  return [{ type: 'set-angle', vertex: v, ray1: at.ray1, ray2: at.ray2, value: Number(m[2]) }];
 };
 
 const BISECTOR_KW = rx(BISECT_KW); // #361 (ADR-501): the lexicon's `BISECT_KW` — English "bisector"; Hebrew חוצה / חוצי
@@ -2124,9 +2125,9 @@ const bisectorIntersection: Rule = (s, ctx) => {
     const triples: string[] = [];
     for (const raw of [vform[1], vform[2]]) {
       const v = up(raw);
-      const nb = (ctx.neighbors ?? {})[v] ?? [];
-      if (nb.length !== 2) return { clarify: 'ambiguous-angle', vertex: v };
-      triples.push(`${nb[0]}${v}${nb[1]}`);
+      const at = resolveVertexAngle(v, ctx); // #1445: the one lone-vertex resolver
+      if ('clarify' in at) return at;
+      triples.push(`${at.ray1}${v}${at.ray2}`);
     }
     const [t1, t2] = triples;
     return [
@@ -2388,6 +2389,85 @@ const centralAngle: Rule = (s, ctx) => {
  * Latin letter be counted as a second label.
  */
 type AngleArms = { ray1: Id; vertex: Id; ray2: Id };
+type AmbiguousAngle = { clarify: 'ambiguous-angle'; vertex: string; options?: string[] };
+
+/**
+ * #1445 ([ADR-590](../../docs/06-decisions.md#adr-590), operator ruling 2026-09-27, partially superseding
+ * [ADR-164](../../docs/06-decisions.md#adr-164)) — WHICH ANGLE A LONE VERTEX NAMES. The one resolver behind
+ * every single-letter angle in the grammar: the value lanes (`angleArms`), the bare `B = 30`, the equality
+ * sides, the measure-sum terms, the bisector's vertex form and both bisector apex reads. They each kept
+ * their own `nb.length !== 2` test until now (the #970 drift lesson), so the rule lives here only.
+ *
+ * In order:
+ *  1. **Exactly two edges at V** (after `exclude`) — the one angle there (ADR-164, unchanged).
+ *  2. **V is a vertex of exactly ONE declared polygon** — that polygon's INTERIOR angle, its two ring
+ *     neighbours. In △ABC, ∠B means ∠ABC however many cevians leave B: the bagrut convention (∢B in △ABC).
+ *     The reading is SAID ALOUD — recorded in the parse's reading sink, surfaced as «הובן כ-∠ABC» on the
+ *     committed step — so it is never a silent pick.
+ *  3. **Otherwise** (0 polygons, or ≥ 2 — including a sub-triangle the cevian itself declared) the honest
+ *     ambiguity: `ambiguous-angle`, listing the candidate angles (every pair of edges at V, less a straight
+ *     pair the construction states — V riding or bisecting that segment).
+ *
+ * "Declared" is a polygon OBJECT (`ctx.polygons`), deduplicated by vertex set, so a shape stated twice is
+ * one shape. Never coordinates.
+ */
+function resolveVertexAngle(v: Id, ctx: ParseContext, exclude: readonly Id[] = []): AngleArms | AmbiguousAngle {
+  const nb = ((ctx.neighbors ?? {})[v] ?? []).filter((x) => !exclude.includes(x));
+  if (nb.length === 2) return { ray1: nb[0], vertex: v, ray2: nb[1] };
+  const rings = [...new Map((ctx.polygons ?? []).map((p) => p.map(up)).map((p) => [[...p].sort().join(''), p] as const)).values()].filter((p) =>
+    p.includes(v),
+  );
+  if (rings.length === 1) {
+    const ring = rings[0];
+    const i = ring.indexOf(v);
+    const prev = ring[(i - 1 + ring.length) % ring.length];
+    const next = ring[(i + 1) % ring.length];
+    if (prev !== next && !exclude.includes(prev) && !exclude.includes(next)) {
+      const arms = { ray1: prev, vertex: v, ray2: next };
+      angleReadingSink?.push(arms);
+      return arms;
+    }
+  }
+  const straight = [ctx.onSegment?.[v], ctx.midpointOf?.[v]].filter((p): p is [string, string] => !!p);
+  const options: string[] = [];
+  for (let i = 0; i < nb.length; i++)
+    for (let j = i + 1; j < nb.length; j++) {
+      if (straight.some(([a, b]) => (a === nb[i] && b === nb[j]) || (a === nb[j] && b === nb[i]))) continue;
+      options.push(`${nb[i]}${v}${nb[j]}`);
+    }
+  return options.length > 1 ? { clarify: 'ambiguous-angle', vertex: v, options } : { clarify: 'ambiguous-angle', vertex: v };
+}
+
+/**
+ * The polygon-default readings `resolveVertexAngle` made during ONE top-level `parse` call (#1445). Owned by
+ * the outermost `parse` (nested calls — a chain's clauses, the clause split — share it), reset when it
+ * returns, so the parser stays a pure function of `(utterance, ctx)`. A rule that tried a reading and then
+ * failed may leave an entry behind; `parse` keeps only readings the winning commands actually name.
+ */
+let angleReadingSink: AngleArms[] | null = null;
+
+/**
+ * #1445 — the readings to attach to a successful parse: those whose three letters a winning command names
+ * (all three labels among one command's string operands), deduplicated, as `ray1·vertex·ray2`.
+ */
+function angleReadingsOf(cmds: AnyCommand[], sink: AngleArms[]): string[] {
+  const operands = (c: AnyCommand): Set<string> => {
+    const out = new Set<string>();
+    for (const [k, val] of Object.entries(c)) {
+      if (k === 'type') continue;
+      if (typeof val === 'string') out.add(val);
+      else if (Array.isArray(val)) for (const x of val) if (typeof x === 'string') out.add(x);
+    }
+    return out;
+  };
+  const sets = cmds.map(operands);
+  const seen = new Set<string>();
+  for (const a of sink) {
+    if (!sets.some((s) => s.has(a.ray1) && s.has(a.vertex) && s.has(a.ray2))) continue;
+    seen.add(`${a.ray1}${a.vertex}${a.ray2}`);
+  }
+  return [...seen];
+}
 /**
  * #967 — the SEGMENT-PAIR addressing mode: «הזווית בין BD ל-BA היא 30» / «angle between BD and BA is 30».
  *
@@ -2443,10 +2523,7 @@ function angleArms(text: string, ctx: ParseContext): AngleArms | Clarify | null 
   // only when there is NO uppercase label, so a filler word's letters are never counted.
   const lowerLoners = upperCount === 0 ? (text.match(/(?<![A-Za-z])[a-z](?![A-Za-z])/g) ?? []).length : 0;
   if (!one || upperCount + lowerLoners !== 1) return null;
-  const v = one[0];
-  const nb = (ctx.neighbors ?? {})[v] ?? [];
-  if (nb.length === 2) return { ray1: nb[0], vertex: v, ray2: nb[1] };
-  return { clarify: 'ambiguous-angle', vertex: v };
+  return resolveVertexAngle(one[0], ctx); // #1445: the one lone-vertex resolver
 }
 
 /**
@@ -2773,16 +2850,14 @@ const angleEquality: Rule = (s, ctx) => {
   // SINGLE vertex carrying its OWN angle keyword, resolved from the figure when the vertex has exactly
   // two edges (one possible angle). ≠2 edges is the honest ambiguity — the clarification now also
   // points at the «נסמן זוית … כ-B1» alias syntax, which is exactly what the book's subscripts solve.
-  const sideTriple = (p: string): [Id, Id, Id] | null | { clarify: 'ambiguous-angle'; vertex: string } => {
+  const sideTriple = (p: string): [Id, Id, Id] | null | AmbiguousAngle => {
     const t = labelRun(strip(p), 3);
     if (t) return t as [Id, Id, Id];
     if (!/(?:angle|∠|∢|זוו?ית)/i.test(p)) return null; // a single-vertex side must carry its own keyword
     const one = labelRun(strip(p), 1);
     if (!one) return null; // numeric/symbolic side ("= 37°", "= 2α") → defer to angle/measureAngle
-    const v = one[0];
-    const nb = (ctx.neighbors ?? {})[v] ?? [];
-    if (nb.length === 2) return [nb[0], v, nb[1]];
-    return { clarify: 'ambiguous-angle', vertex: v };
+    const at = resolveVertexAngle(one[0], ctx); // #1445: the one lone-vertex resolver
+    return 'clarify' in at ? at : [at.ray1, at.vertex, at.ray2];
   };
   const left = sideTriple(parts[0]);
   const right = sideTriple(parts[1]);
@@ -3347,7 +3422,7 @@ function trigGiven(s: string, ctx: ParseContext): ParseResult | null {
   }
   const arms = angleArms(g.lab ?? '', ctx);
   if (!arms) return refuse('form');
-  if ('clarify' in arms) return arms.clarify === 'ambiguous-angle' ? { ok: false, reason: 'ambiguous-angle', vertex: arms.vertex } : refuse('form');
+  if ('clarify' in arms) return arms.clarify === 'ambiguous-angle' ? refusalOf(arms) : refuse('form');
   return {
     ok: true,
     commands: [
@@ -3439,9 +3514,9 @@ function parseMeasureSide(raw: string, ctx: ParseContext, center: string | null)
       }
       const one = labelRun(stripped, 1);
       if (!one || labels.length > 1) return null;
-      const nb = (ctx.neighbors ?? {})[one[0]] ?? [];
-      if (nb.length !== 2) return { clarify: 'ambiguous-angle', vertex: one[0] };
-      side.terms.push({ coef: sign * coef, kind: 'angle', ids: [nb[0], one[0], nb[1]] });
+      const at = resolveVertexAngle(one[0], ctx); // #1445: the one lone-vertex resolver
+      if ('clarify' in at) return at;
+      side.terms.push({ coef: sign * coef, kind: 'angle', ids: [at.ray1, one[0], at.ray2] });
       sign = 1;
       continue;
     }
@@ -9441,9 +9516,9 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
     } else if (at === D) {
       // The angle at the segment's far end: D must already be a figure point with exactly one angle there.
       if (!(ctx.points ?? []).includes(D)) return { clarify: 'bisector-wrong-apex', apex, stated: D };
-      const nbD = ((ctx.neighbors ?? {})[D] ?? []).filter((x) => x !== apex);
-      if (nbD.length !== 2) return { clarify: 'ambiguous-angle', vertex: D };
-      tri = [nbD[0], D, nbD[1]];
+      const atD = resolveVertexAngle(D, ctx, [apex]); // #1445: the one lone-vertex resolver (less the bisector itself)
+      if ('clarify' in atD) return atD;
+      tri = [atD.ray1, D, atD.ray2];
     }
   }
   if (!tri) {
@@ -9456,9 +9531,9 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
     // the three letters rather than guessing or dropping it to the LLM (which drew a bare line with no
     // equal-angle constraint — the reported bug).
     if (!/angle|זוו?ית/i.test(s)) return null;
-    const nb = (ctx.neighbors ?? {})[apex] ?? [];
-    if (nb.length === 2) tri = [nb[0], apex, nb[1]];
-    else if ((ctx.points ?? []).includes(apex)) return { clarify: 'ambiguous-angle', vertex: apex };
+    const at = resolveVertexAngle(apex, ctx); // #1445: the one lone-vertex resolver
+    if (!('clarify' in at)) tri = [at.ray1, apex, at.ray2];
+    else if ((ctx.points ?? []).includes(apex)) return at;
     else return null;
   }
   const vertex = tri[1];
@@ -11595,6 +11670,21 @@ const withReservedGuard = (r: ParseResult, ctx: ParseContext): ParseResult => {
 const isAmbiguityQuestion = (reason: string): boolean =>
   reason === 'ambiguous-shape' || reason === 'ambiguous-construct' || reason === 'side-unspecified';
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
+  // #1445: the OUTERMOST call owns the lone-vertex reading sink; nested calls (a chain's clauses, the split)
+  // write into it, and only readings the winning commands name are reported (said aloud on commit).
+  if (angleReadingSink) return parseEntry(raw, ctx);
+  angleReadingSink = [];
+  try {
+    const r = parseEntry(raw, ctx);
+    if (!r.ok || angleReadingSink.length === 0) return r;
+    const angleReadings = angleReadingsOf(r.commands, angleReadingSink);
+    return angleReadings.length ? { ...r, angleReadings } : r;
+  } finally {
+    angleReadingSink = null;
+  }
+}
+
+function parseEntry(raw: string, ctx: ParseContext): ParseResult {
   let s = normalizeUtterance(raw);
   if (!s) return { ok: false, reason: 'not-handled' };
   // #1666: a claim to prove never reaches a rule (`shell/proofTarget`, shared by all three builders).
@@ -12194,7 +12284,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
 function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'shape-not-found') return { ok: false, reason: 'shape-not-found', noun: res.noun };
   if (res.clarify === 'polygon-not-supported') return { ok: false, reason: 'polygon-not-supported', noun: res.noun, offer: BARE_POLY_OFFER };
-  if (res.clarify === 'ambiguous-angle') return { ok: false, reason: 'ambiguous-angle', vertex: res.vertex };
+  if (res.clarify === 'ambiguous-angle') return { ok: false, reason: 'ambiguous-angle', vertex: res.vertex, ...(res.options ? { options: res.options } : {}) };
   if (res.clarify === 'ambiguous-circle-ref') return { ok: false, reason: 'ambiguous-circle-ref', centers: res.centers };
   if (res.clarify === 'ambiguous-container') return { ok: false, reason: 'ambiguous-container', centers: res.centers };
   if (res.clarify === 'ambiguous-shape') return { ok: false, reason: 'ambiguous-shape', noun: res.noun, shapes: res.shapes };

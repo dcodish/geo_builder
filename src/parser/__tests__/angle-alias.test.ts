@@ -142,8 +142,10 @@ describe('bare-vertex angle EQUALITY (#235, the ADR-164 pattern)', () => {
   });
 
   it('an ambiguous vertex (≠2 edges) clarifies — the message now suggests the נסמן syntax', () => {
-    const ctx = ctxOf(factsOf(['משולש ABC', 'AD']));
-    expect(parse('∠A=∠B', ctx)).toEqual({ ok: false, reason: 'ambiguous-angle', vertex: 'A' });
+    // #1445 (ADR-590, operator ruling 2026-09-27): a vertex of ONE triangle now names the triangle's angle
+    // («משולש ABC · AD» reads ∠BAC), so the ambiguity is a vertex in TWO triangles.
+    const ctx = ctxOf(factsOf(['משולש ABC', 'משולש ABD']));
+    expect(parse('∠A=∠B', ctx)).toMatchObject({ ok: false, reason: 'ambiguous-angle', vertex: 'A' });
   });
 
   it('a single-vertex side must carry its OWN angle keyword («זוית ABC = C» is not an equality)', () => {

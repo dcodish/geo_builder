@@ -95,13 +95,14 @@ describe('submit pipeline — grammar path', () => {
 
   it('an ambiguous single-vertex angle asks for three letters instead of guessing or escalating', async () => {
     const { deps: d1 } = makeDeps();
-    await runSubmit('ריבוע ABCD', d1);
-    await runSubmit('קטע BD', d1); // B now has 3 edges → "∠B" is ambiguous
+    // three loose segments at B, no polygon → "∠B" is ambiguous (a polygon vertex reads its interior angle
+    // since #1445 / ADR-590, so this lock no longer uses the square + diagonal)
+    for (const seg of ['קטע AB', 'קטע BC', 'קטע BD']) await runSubmit(seg, d1);
     const before = useGeoStore.getState().facts.length;
     const { deps, notes } = makeDeps();
     await runSubmit('∠B = 90', deps);
     expect(useGeoStore.getState().facts.length).toBe(before);
-    expect(notes()).toEqual(['input.ambiguousAngle:{"vertex":"B"}']);
+    expect(notes()).toEqual(['input.ambiguousAngleOptions:{"vertex":"B","options":"∠ABC, ∠ABD, ∠CBD","example":"ABC"}']);
     expect(llmParseMock).not.toHaveBeenCalled();
   });
 });

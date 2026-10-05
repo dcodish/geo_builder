@@ -179,7 +179,8 @@ export function errorText(error: InputError, t: Translate): string {
     'ring-contradicts-noun': 'errRingContradictsNoun',
     'inscribed-contradicts-noun': 'errInscribedContradictsNoun',
     // #1407 — a vertex in SEVERAL shapes gets the three-letter name it needs; in none, the general form.
-    'ambiguous-angle': error.key === 'ambiguous-angle' && error.example ? 'errAmbiguousAngleArms' : 'errAmbiguousAngle',
+    // #1445 (ADR-AG-243) — several angles at the vertex: the refusal LISTS them.
+    'ambiguous-angle': error.key === 'ambiguous-angle' && (error.options?.length ?? 0) > 1 ? 'errAmbiguousAngleOptions' : error.key === 'ambiguous-angle' && error.example ? 'errAmbiguousAngleArms' : 'errAmbiguousAngle',
     // ONE chooser for "the reference found none / several of its host" (#1432 am. 1 + #1514): the host
     // kind and arity pick the remedy; several NAMED candidates get the sentence that names them. The
     // polygon-noun sites (no host) keep the kite example.
@@ -227,6 +228,7 @@ export function errorText(error: InputError, t: Translate): string {
       ? ambiguousCurveExample(error.detail, theNoun, candidates[0])
       : 'example' in error ? (error.example ?? '') : '',
     found: host ? host.found : 0,
+    options: error.key === 'ambiguous-angle' && error.options ? error.options.map((o) => `∠${o}`).join(', ') : '',
     range: error.key === 'out-of-domain' && error.domain ? rangeText(error.domain, t) : '',
     holder: 'holder' in error ? (error.holder ?? '') : '',
     first: error.key === 'crossing-already-named' && error.operands ? error.operands[0] : '',

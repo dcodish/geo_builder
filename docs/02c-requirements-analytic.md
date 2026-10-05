@@ -961,6 +961,16 @@ angle to write instead («זווית ACB»), and that sentence builds; when fewe
 and asks for three letters. Restating the same angle in three letters, in either ray order,
 is recognised as already known.
 
+**R115 amendment 2 (2026-10-05, [ADR-AG-243](06c-decisions-analytic.md#adr-ag-243),
+[#1445](https://github.com/dcodish/geo_builder/issues/1445); operator ruling 2026-09-27).** More than two edges
+at a vertex no longer make a lone vertex ambiguous when the vertex belongs to exactly ONE shape: the letter then
+names that shape's interior angle. After «משולש ABC» · «BD חוצה זווית B» (or «BD גובה», «BD תיכון», «D על AC» ·
+«הקטע BD»), «זווית B = 2 זווית C», «זווית B = 30», «זווית B ישרה» and «זווית B = זווית C» mean what their
+three-letter forms with ∠ABC mean, and the tool says so: «הובן כ-∠ABC». With no shape at the vertex, or two or
+more (a sub-triangle «משולש ABD» counts, and so does the #1407 figure's C), the tool still refuses, and now lists
+every angle at the vertex in three letters («∠ABC, ∠ABD, ∠CBD»). The same sentence reads the same way in the 2-D
+Builder (ADR-590).
+
 **R116 — a line's angle with the positive x-axis is shown and can be asked**
 ([ADR-AG-154](06c-decisions-analytic.md#adr-ag-154), [#1322](https://github.com/dcodish/geo_builder/issues/1322)).
 Beside each slope the panel prints the angle α the line makes with the positive x-axis (m = tan α), in

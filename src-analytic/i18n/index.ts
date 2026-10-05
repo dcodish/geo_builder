@@ -290,6 +290,8 @@ const he = {
   'askHost.many.polygon': 'יש בשרטוט יותר ממצולע אחד כזה — כתבו את הקודקודים, למשל «היקף ABC»',
   errAmbiguousAngle:
     'האות אחת לא מספיקה כדי לדעת באיזו זווית מדובר: "{{detail}}". אפשר לכתוב את שלוש האותיות, והקודקוד באמצע, למשל «זווית ABC», או לציין קודם את הצורה שבה הקודקוד נמצא.',
+  errAmbiguousAngleOptions:
+    'בקודקוד הזה יש כמה זוויות — {{options}} — ואות אחת לא אומרת לאיזו מהן התכוונתם: "{{detail}}". כתבו את הזווית בשלוש אותיות, והקודקוד באמצע — למשל «זווית {{example}}».',
   errAmbiguousAngleArms:
     'בקודקוד הזה נפגשות יותר משתי צלעות, ולכן יש בו כמה זוויות ואות אחת לא אומרת באיזו מהן מדובר: "{{detail}}". כתבו את הזווית בשלוש אותיות, והקודקוד באמצע — למשל «זווית {{example}}».',
   errDoesNotExist:
@@ -417,6 +419,7 @@ const he = {
     'השרטוט מוצג כפי שהנתונים קובעים. כדי לחזור לטרפז, אפשר לערוך את המשפט הזה, למחוק אותו או לבטל את «כלול בציור».',
   noticeAlreadyKnown: 'זה כבר ידוע מהנתונים שכתבתם, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
   // #1350 (operator ruling 2026-09-22) — the line IS recorded; this is about identity, never an error.
+  noticeAngleReadAs: 'הובן כ-{{holder}} — הזווית של הצורה בקודקוד הזה. לזווית אחרת שם, כתבו את שלוש האותיות שלה.',
   noticeNameReadsAs: 'שימו לב: הישר {{detail}} והישר {{holder}} הם שני ישרים שונים — השמות נקראים דומה, אבל כל שם מתייחס לישר שלו.',
   // A different sentence from «כבר ידוע» on purpose (#1063): the student did NOT repeat themselves —
   // they stated something the figure had already settled, which is a thing worth telling them.
@@ -704,6 +707,9 @@ const en: typeof he = {
   errAmbiguousAngle:
     'One letter is not enough to say which angle is meant: "{{detail}}". Write all three letters, the vertex ' +
     'in the middle — for example "angle ABC" — or state the shape the vertex belongs to first.',
+  errAmbiguousAngleOptions:
+    'That vertex has several angles — {{options}} — and one letter does not say which you mean: "{{detail}}". ' +
+    'Write the angle with three letters, the vertex in the middle — for example "angle {{example}}".',
   errAmbiguousAngleArms:
     'More than two sides meet at that vertex, so it has several angles and one letter does not say which is meant: "{{detail}}". ' +
     'Write the angle with three letters, the vertex in the middle — for example "angle {{example}}".',
@@ -810,6 +816,7 @@ const en: typeof he = {
     'Trapezoid {{shape}} is no longer a trapezoid: with "{{line}}" both pairs of its opposite sides are parallel, so it is a parallelogram (or a rectangle). ' +
     'The figure is drawn as your givens fix it. To get a trapezoid back, edit or delete that statement, or untick «Include in the figure».',
   noticeAlreadyKnown: 'That is already known from what you have written, so I did not add another row: "{{detail}}"',
+  noticeAngleReadAs: "Read as {{holder}} — the shape's angle at that vertex. For another angle there, write its three letters.",
   noticeNameReadsAs: 'Note: line {{detail}} and line {{holder}} are two different lines — the names read alike, but each one refers to its own line.',
   save: 'Save',
   load: 'Load',
