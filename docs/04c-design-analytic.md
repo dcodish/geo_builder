@@ -631,7 +631,11 @@ solves or judges. An equation of areas is capped at span².
 statement whose removal lets the figure solve (`completingStatement`; a statement is the constraints its line owns
 plus the points it pinned, which go free when it is taken away; newest first, a counted budget of one drawable
 walk), so it names the statement that completed the contradiction whatever basin the refused solve reached. Only when
-no single removal admits a figure does the residual snapshot's blame stand.
+no single removal admits a figure does the residual snapshot's blame stand. **It is the one blame for the whole
+admission verdict (ADR-AG-240):** "admits" means every given, every selector and the ring hold, so when the probe
+names a statement, the selectors and hard ring faults the compromise configuration broke are that same contradiction
+— `derive`'s selector and ring arms stay silent and the statement is blamed alone, whether the list was typed line by
+line or derived whole. When the probe answers `null`, every arm reports as before.
 
 **A noun gate declines a tail that is not an equation** ([#1059](https://github.com/dcodish/geo_builder/issues/1059)).
 Every `matchCurve` branch ends in `(.+)`, which is right for «נתון הישר ℓ1: 4y-3x-20=0» and wrong for

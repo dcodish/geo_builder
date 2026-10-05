@@ -173,6 +173,36 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   let figure = drawableAt(construction, seed, true);
 
   /**
+   * …and WHICH line: the one whose removal lets the figure solve (#1492 ruling 3, ADR-AG-231), when one does. The
+   * snapshot below names the constraints unmet in the configuration the solve REACHED, which is a fact about the basin:
+   * the needle «AB = AC» · «∠ABC = 90» blamed either sentence depending on the seed. The drop-one probe asks the
+   * student's question instead and names the statement that completed the contradiction, whatever basin was reached.
+   * When no single line's removal admits a figure, the snapshot's blame stands — it still names an unmet statement.
+   */
+  const pinnedBy = new Map<string, number>();
+  facts.forEach((f, i) => {
+    if (f.t === 'point' && !errors[i]) pinnedBy.set(f.id, owner[i]); // the LAST line to place it
+  });
+  const completing =
+    figure.unsatisfied.length > 0
+      ? completingStatement(
+          construction,
+          construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]])),
+          seed,
+          pinnedBy,
+        )
+      : null;
+  /**
+   * ONE BLAME MECHANISM FOR THE WHOLE ADMISSION VERDICT (#1699, ADR-AG-240). The probe's answer is a statement whose
+   * removal ADMITS a figure — every given holds, every selector holds, the ring is the noun's (`admittedFigure`). So when
+   * it names one, every other admission failure of the drawn figure (a selector, a hard ring fault) is the same
+   * contradiction read off the compromise configuration, not a second culprit: the selector and ring arms below stay
+   * silent and the completing statement is blamed alone. Measured on corpus 7/4 derived whole: «S_BDC / S_ODC = 0.8»
+   * completes the contradiction, and the triangle's `distinct` («במשולש OBC …», line 0), «B ברביע הראשון» and
+   * «E על הקטע OC» — selectors the compromise broke — were refused beside it. When no single removal admits a figure
+   * (two independent contradictions, or a search miss), `completing` is null and every arm reports as before.
+   */
+  /**
    * A selector that can NEVER hold is reported — the docblock above has always said so, and nothing
    * did it (#1069).
    *
@@ -203,7 +233,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * not a second, earlier culprit. Measured over the corpus: three already-refused figures («AB = AC» ·
    * «∠ABC = 90» on «משולש ABC») would otherwise blame «משולש ABC» too.
    */
-  if (!figure.selectorsOk && (reportedDof(construction, figure.carrierDof) === 0 || figure.unsatisfied.length === 0)) {
+  if (completing === null && !figure.selectorsOk && (reportedDof(construction, figure.carrierDof) === 0 || figure.unsatisfied.length === 0)) {
     const blamed = new Set<number>();
     // Only the sentences whose selector FAILED (#1268): a triangle's `distinct` did not make a crossing's
     // ordinal impossible. Without the per-selector verdict, every selector line, as before.
@@ -237,26 +267,6 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * figure is never shown as though it satisfied a given it does not
    * ([02c](../../docs/02c-requirements-analytic.md) honesty invariants).
    */
-  /**
-   * …and WHICH line: the one whose removal lets the figure solve (#1492 ruling 3, ADR-AG-231), when one does. The
-   * snapshot below names the constraints unmet in the configuration the solve REACHED, which is a fact about the basin:
-   * the needle «AB = AC» · «∠ABC = 90» blamed either sentence depending on the seed. The drop-one probe asks the
-   * student's question instead and names the statement that completed the contradiction, whatever basin was reached.
-   * When no single line's removal admits a figure, the snapshot's blame stands — it still names an unmet statement.
-   */
-  const pinnedBy = new Map<string, number>();
-  facts.forEach((f, i) => {
-    if (f.t === 'point' && !errors[i]) pinnedBy.set(f.id, owner[i]); // the LAST line to place it
-  });
-  const completing =
-    figure.unsatisfied.length > 0
-      ? completingStatement(
-          construction,
-          construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]])),
-          seed,
-          pinnedBy,
-        )
-      : null;
   if (completing !== null && !faults.some((f) => f.index === completing && f.code === 'unsatisfiable')) {
     faults.push({ index: completing, code: 'unsatisfiable', detail: lines[completing] });
   }
@@ -458,7 +468,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * a true trapezoid wherever one exists (`drawableAt`'s `whole()`), and when none does the figure is
    * drawn and `app/shapeWarnings.ts` names the trapezoid and the line that forced it.
    */
-  if (figure.ringFaults.length > 0 && reportedDof(construction, figure.carrierDof) === 0) {
+  if (completing === null && figure.ringFaults.length > 0 && reportedDof(construction, figure.carrierDof) === 0) {
     /** Which line declared each polygon — the line the refusal belongs on (#1145). */
     const declaredPolygonOn = new Map<string, number>();
     facts.forEach((f, i) => {

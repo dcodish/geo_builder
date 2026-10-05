@@ -11238,3 +11238,32 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Not changed / limits.** A foot dropped onto an AXIS or a line object («D רגל האנך מ-C לציר ה-x») has no named point on its line for the knee's leg and draws none (the renderer's corner needs two named points). A stated `AB ⊥ CD` whose pairs neither share an end nor put an end on the other line has no named vertex and draws none, as before. 2-D's default canvas already draws knees only from asserted facts (the /decisions note of 2026-09-21), so the two products agree on what a knee means.
 
 **Consequences.** `engine/statedMeasures.ts` (`perpendicular` case, derived feet, `alt`, `footOn`, the knee's claimed keys); `render/scene.ts` (the knee's leg toward the farther named point).
+
+## ADR-AG-240 — The drop-one probe is the one blame for the whole admission verdict: selectors and ring faults the compromise broke are not second culprits (#1699)
+
+**Date:** 2026-10-05 · **Status:** accepted · fix-round #1776 (bug). #1699 `auto-ok` 2026-10-05.
+
+**Requirements:** none (internal) — the honesty promise is unchanged: a refused figure still names a student's sentence, now only the one that completed the contradiction. · **Design:** [04c](04c-design-analytic.md), "Blame is a drop-one probe, not a snapshot" — one sentence added. · **LADDER stage:** report (`derive`'s attribution arms). No solver, fold, parser or catalog change.
+
+**Extends** [ADR-AG-231](#adr-ag-231) (one blame mechanism, not two). **Re-measures** the issue's plan.
+
+**Re-measured at pickup** (origin/main 4d6e3fd6, `derive(confirmTaught(corpus 7/4), seed)`, seeds 0–3). The corpus question now carries 8 lines (the transcribers' figure notes are typed lines since ADR-AG-222). Derived whole, it was refused on lines **0, 5, 6** (and 7 at seed 3) as well as line 4: «במשולש OBC …», «B ברביע הראשון», «E על הקטע OC», «D על BC» beside «נתון: S_BDC / S_ODC = 0.8». ADR-AG-231's probe already named line 4 correctly. The extra blames came from the **selector arm**, which ran before the probe and refused every selector the compromise configuration failed (the triangle's `distinct`, the quadrant, two betweennesses) whenever the figure had no freedom left — #1069's rule, which never asked whether a given had already failed.
+
+**Root cause.** Two attributions answered one question. The probe's answer is a statement whose removal **admits** a figure (`admittedFigure`: every given, every selector and the ring hold), so it already accounts for every selector and ring failure of the drawn figure. The selector arm and the ring arm read those failures off the compromise configuration a contradictory solve stalled in — the same class as #902 / #1334: blame landing on whatever the compromise left unmet. The selector arm's own docblock stated the intent ("a triangle's `distinct` failing because its givens collapse it is not a second, earlier culprit"), but its gate let it fire at 0 DOF anyway.
+
+**Decision.**
+1. `derive` runs the probe **before** the selector arm (moved, not duplicated; the same call, the same budget).
+2. When the probe names a statement, the **selector arm and the ring arm stay silent**: that statement is blamed alone. When it answers `null` (two independent contradictions, or a search miss), every arm reports exactly as before.
+3. **The ring arm is in the class, measured.** With only the selector arm gated, the 7/4 variants below refuse line 0 as `ring-contradicts-noun` instead — the collapsed triangle is the compromise's, not the pins'. #1170's pinned-ring ruling is untouched: the probe runs only when a given fails, and a pinned ring with every given holding never reaches it.
+4. **Not the issue's prefix re-derivation.** The plan proposed re-deriving prefixes on the unsatisfied path; ADR-AG-231's newest-first drop-one probe already asks that question (its docblock: ADR-492's shortest infeasible prefix) within a counted budget. A second mechanism would be two blames again.
+
+**Measured** (seed 0; harness: every string-array literal in `src-analytic/__tests__` plus the 46 corpus-471 questions; `derive` whole; before = 4d6e3fd6):
+- Blame changes: **0 of 1,610** harvested sequences; in the corpus, **7/4 only**: `[0, 5, 6, 4]` → `[4]`. No refusal flips.
+- Cost: none added — the probe call is moved, not added, and runs only when a given fails. Corpus per-line timing (each line's prefix derived, best of 2, 361 lines): total 8.31 s → 8.41 s, median 2.5 → 2.5 ms, p95 67.1 → 70.7 ms (noise), worst line 18/4 line 10 585 → 598 ms. Sweep wall-clock 77.3 s → 78.1 s.
+- Ratchet: 471 corpus **357 → 360 / 361 lines**, 45/46 questions; floor raised to 360.
+
+**Locks.** `src-analytic/__tests__/issue-1699-blame-first-unsat.test.ts` (6 tests; **fails before: 3 of 6**, the 3 controls pass on both): 7/4 derived whole blames line 4 alone at seeds 0–3; «S_BDC = 5» on the same figure, and the ratio stated LAST after the selectors it breaks, each blamed alone (both also lock the ring arm's gate); controls — typed line by line, lines 0–3 record and line 4 is refused; two independent contradictions (7/4 + «OC = 3») name both givens with the probe `null`; #1069's selector-only case still refuses the selector's line. `issue-1618-corpus471-ratchet.test.ts`: floor 357 → 360.
+
+**Not changed / limits.** The probe evaluates without the selector-steered search, so where a removal admits a figure only on a selector-respecting root it can miss it and name an earlier statement instead (measured: «A(0,0)» · «C(10,0)» · «B על הישר y = -2x + 20» · «B ברביע השני» · «AB = 1» blames line 2, where before it blamed lines 2 and 3). That is ADR-AG-231's search reach, not this gate. The `crossing-already-named` and `does-not-exist` arms are not admission criteria (a vacancy is admitted), so the probe does not speak for them and they are not gated.
+
+**Consequences.** `engine/derive.ts` (the probe moved ahead of the selector arm; `completing === null` gates the selector and ring arms). 2-D and 3-D have no drop-one probe; nothing to port.
