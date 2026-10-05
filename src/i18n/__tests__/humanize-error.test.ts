@@ -29,6 +29,9 @@ const CASES: { raw: string; contains: string[] }[] = [
   { raw: 'impossible: the angles of ABCD sum to 400°, exceeding 360°: ∠DAB = 100°, ∠ABC = 100°, ∠BCD = 100°, ∠CDA = 100°', contains: ['ABCD', '400°', '360°'] },
   // metricFeasibility.ts (#1335, ADR-540) — the bound twin: a stated value and a stated bound of the
   // same measure that exclude each other. Both halves are the student's own sentences.
+  // metricFeasibility.ts (#1712, ADR-587) — a stated measure outside its range, BOTH wordings
+  { raw: 'impossible: ∠ABC = -2° — an angle measures between 0° and 180°', contains: ['∠ABC = -2°', '180°'] },
+  { raw: 'impossible: |AB| = -3 — a length is never negative', contains: ['|AB| = -3'] },
   { raw: 'impossible: |BC| = 4 contradicts |BC| > 10', contains: ['|BC| = 4', '|BC| > 10'] },
   { raw: 'impossible: ∠ABC = 40° contradicts ∠ABC > 100°', contains: ['∠ABC = 40°', '∠ABC > 100°'] },
   // metricFeasibility.ts (#1441) — the obtuse-side member, BOTH wordings: the hypotenuse sentence at

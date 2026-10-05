@@ -26,6 +26,7 @@
  */
 
 import type { Constraint, GeoObject, Id } from './types';
+import { describeConstraint } from './solve';
 
 export interface MetricImpossibility {
   /** the two endpoints of the pinned edge that cannot be that long */
@@ -399,4 +400,95 @@ export function obtuseSideImpossibilityError(m: ObtuseSideImpossibility): string
     `impossible: the angle at ${m.vertex} is ${numText(m.deg)}°, so |${m.hypA}${m.hypB}| must be the longest side, ` +
     `but |${m.hypA}${m.hypB}| = ${numText(m.hypLen)} and |${m.legA}${m.legB}| = ${numText(m.legLen)}`
   );
+}
+
+/**
+ * A STATED MEASURE OUTSIDE THE RANGE ANY CONFIGURATION CAN GIVE IT (#1712, ADR-587) — the fifth member.
+ *
+ * «∢ABC = -2» committed: the residual ∠ABC − (−2) moves as the triangle flexes, so the ADR-104 flex
+ * probe (`constraintIsPending`) filed it as a PENDING given waiting for the rest of the figure — for a
+ * value no figure can ever reach. Every angle measures between 0° and 180° and every length is ≥ 0, so
+ * a statement whose stated number lies outside that range is impossible ON ITS OWN — no other given, no
+ * placement and no free DOF is involved. That is what makes it provable here, one-way sound like its
+ * siblings: a hit PROVES impossibility, a miss proves nothing.
+ *
+ * Read on the CONSTRAINT, not on the parser's sentence: every spelling («∢ABC = -2», «זווית ABC = -30»,
+ * "angle ABC = 200", a value reached through a variable «∢ABC = 0.5x» · «x = -10») lowers to the one
+ * `angle` constraint, so the gate is the one place all of them pass.
+ *
+ * Members:
+ *  - `angle` (not an ARC measure — the arc reader keeps its own (0°, 360°) window): value ∉ [0°, 180°];
+ *  - `angle-bound`: a window that misses [0°, 180°] («∢ABC > 200», «∢ABC < -5»), strictness respected;
+ *  - `distance` / `length-bound`: the same against [0, ∞);
+ *  - `measure-sum`: by SIGN only — every term is ≥ 0, so a combination whose coefficients all share a sign
+ *    cannot reach a target of the other sign («∠A + ∠B = -10»). Its UPPER bound is deliberately NOT read:
+ *    the parser lowers an ARC term to its central angle, so «arc + arc = 380» and «∠A + ∠B = 380» are the
+ *    same constraint and only one of them is impossible.
+ * The endpoints are reachable (a flat 180° or a 0° angle is a degenerate figure, not an impossible one —
+ * the solver and the degeneracy gates own those), so only a value strictly outside is refused.
+ */
+export interface MeasureRangeImpossibility {
+  /** the statement, as `describeConstraint` writes it */
+  statement: string;
+  unit: 'angle' | 'length';
+}
+
+const ANGLE_RANGE = { lo: 0, hi: 180 } as const;
+
+/** Does a bound window miss the closed range [lo, hi] entirely? */
+function windowMissesRange(c: { min?: number; max?: number; minStrict?: boolean; maxStrict?: boolean }, lo: number, hi: number): boolean {
+  const tol = BOUND_TOL * Math.max(1, ...[hi, lo].filter(Number.isFinite).map(Math.abs)); // [0, ∞) has no finite top
+  if (c.min !== undefined && Number.isFinite(c.min)) {
+    if (c.min > hi + tol) return true;
+    if (c.minStrict !== false && c.min >= hi - tol) return true; // «> 180» — nothing above the top
+  }
+  if (c.max !== undefined && Number.isFinite(c.max)) {
+    if (c.max < lo - tol) return true;
+    if (c.maxStrict !== false && c.max <= lo + tol) return true; // «< 0» — nothing below the bottom
+  }
+  return false;
+}
+
+/** The constraint's out-of-range verdict, or null. Pure in the one constraint — no figure is read. */
+export function measureOutOfRange(con: Constraint): MeasureRangeImpossibility | null {
+  const tolOf = (v: number) => BOUND_TOL * Math.max(1, Math.abs(v));
+  switch (con.type) {
+    case 'angle':
+      if (con.arcOf || !Number.isFinite(con.value)) return null;
+      return con.value < ANGLE_RANGE.lo - tolOf(con.value) || con.value > ANGLE_RANGE.hi + tolOf(con.value)
+        ? { statement: describeConstraint(con), unit: 'angle' }
+        : null;
+    case 'angle-bound':
+      return windowMissesRange(con, ANGLE_RANGE.lo, ANGLE_RANGE.hi) ? { statement: describeConstraint(con), unit: 'angle' } : null;
+    case 'distance':
+      return Number.isFinite(con.value) && con.value < -tolOf(con.value) ? { statement: describeConstraint(con), unit: 'length' } : null;
+    case 'length-bound':
+      return windowMissesRange(con, 0, Infinity) ? { statement: describeConstraint(con), unit: 'length' } : null;
+    case 'measure-sum': {
+      if (!Number.isFinite(con.target) || !con.coefs.length) return null;
+      const tol = tolOf(con.target);
+      const allPos = con.coefs.every((k) => k >= 0);
+      const allNeg = con.coefs.every((k) => k <= 0);
+      const impossible = (allPos && con.target < -tol) || (allNeg && con.target > tol);
+      return impossible ? { statement: describeConstraint(con), unit: con.unit } : null;
+    }
+    default:
+      return null;
+  }
+}
+
+/** The first constraint of the list whose stated measure no configuration can take, or null. */
+export function measureRangeImpossibility(constraints: readonly Constraint[]): MeasureRangeImpossibility | null {
+  for (const con of constraints) {
+    const hit = measureOutOfRange(con);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/** The wire message; `humanizeError` maps it to the student's language. The statement is the student's own. */
+export function measureRangeImpossibilityError(m: MeasureRangeImpossibility): string {
+  return m.unit === 'angle'
+    ? `impossible: ${m.statement} — an angle measures between 0° and 180°`
+    : `impossible: ${m.statement} — a length is never negative`;
 }

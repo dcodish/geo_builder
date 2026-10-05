@@ -22,6 +22,8 @@ import {
   angleSumImpossibilityError,
   boundImpossibility,
   boundImpossibilityError,
+  measureRangeImpossibility,
+  measureRangeImpossibilityError,
   metricImpossibility,
   metricImpossibilityError,
   obtuseSideImpossibility,
@@ -911,6 +913,15 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
     return { ok: false, error: angleSumImpossibilityError(angleErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
 
+  // #1712 (ADR-587): the fifth member — a stated measure no configuration can take on its own
+  // («∢ABC = -2», «∢ABC > 200», «AB = -3»). Read on the step's NEW constraints only, so an older fact is
+  // never blamed for this line. After the angle-sum prover, so an over-180° interior angle of a declared
+  // polygon keeps ADR-538's curriculum sentence (its lock); off a polygon this one names it.
+  const rangeErr = measureRangeImpossibility(probed.constraints.slice(prev.constraints.length));
+  if (rangeErr) {
+    return { ok: false, error: measureRangeImpossibilityError(rangeErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  }
+
   // #1335 (ADR-540): the third member — a stated BOUND and a stated VALUE of the same measure that
   // exclude each other («BC > 10» · «BC = 4»). The residual moves on a free triangle, so the flex probe
   // filed it as a PENDING "add the remaining givens" for a pair no later given can reconcile. Same
@@ -1075,6 +1086,12 @@ function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult
   let next = prev;
   for (const cmd of cmds) next = applyCommand(next, cmd, prevPositions);
   const newCons = next.constraints.slice(prev.constraints.length);
+  // #1712 (ADR-587): a coupled line is still a list of statements — one that no configuration can take
+  // on its own is refused by name here too, never handed to the joint solve to fail anonymously.
+  const rangeErr = measureRangeImpossibility(newCons);
+  if (rangeErr) {
+    return { ok: false, error: measureRangeImpossibilityError(rangeErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  }
   const res = evaluate(next);
   if (res.ok && stepAccepted(next, res.positions, newCons)) {
     const owned = ensureOwnership(next, newCons, res.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF

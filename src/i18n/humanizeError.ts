@@ -192,6 +192,14 @@ export const PATTERNS: Pattern[] = [
     keyOf: (m) => (m[3] === '180°' ? 'errors.angleSumImpossibleTriangle' : 'errors.angleSumImpossiblePolygon'),
     params: (m) => ({ poly: m[1], sum: m[2], bound: m[3], angles: m[4] }),
   },
+  // metricFeasibility.ts (#1712, ADR-587) — `impossible: ∠ABC = -2° — an angle measures between 0° and 180°`
+  // / `impossible: |AB| = -3 — a length is never negative`. The statement is the student's own given.
+  {
+    re: new RegExp(`^impossible: (.+) ${EMDASH} (an angle measures between 0° and 180°|a length is never negative)$`),
+    key: 'errors.angleOutOfRange',
+    keyOf: (m) => (m[2].startsWith('an angle') ? 'errors.angleOutOfRange' : 'errors.lengthNegative'),
+    params: (m) => ({ given: m[1] }),
+  },
   // metricFeasibility.ts (#1335, ADR-540) — `impossible: |BC| = 4 contradicts |BC| > 10`
   // Both halves are the student's own statements, so the sentence names what they said and nothing
   // internal — there is no geometry principle to cite here, only the two givens.

@@ -301,6 +301,8 @@
     "retryHint": "You can try a different order (enter the givens first), reword it, or build it in a few smaller steps.",
     "unboundVariable": "The letter {{name}} is not defined by any statement — it was never defined, or the step that defined it was removed, muted or failed. The statement stays in the list and takes effect once a statement defines it — e.g. AB = {{name}}.",
     "unenforceableRelation": "The relation on {{names}} can't be enforced: a letter is used in a form this relation can't follow (a power, a constant, an area), or it compares an angle with a length.",
+    "angleOutOfRange": "Impossible: {{given}} — an angle always measures between 0° and 180°. Check the given.",
+    "lengthNegative": "Impossible: {{given}} — a length is never negative. Check the given.",
     "boundImpossible": "Impossible: {{value}} contradicts {{bound}} — no figure can satisfy both givens. Check the givens.",
     "hypotenuseImpossible": "Impossible: with the right angle at {{v}}, the hypotenuse {{hyp}} is the longest side of the triangle — but |{{hyp}}| = {{hypVal}} while |{{leg}}| = {{legVal}}. Check the givens.",
     "obtuseSideImpossible": "Impossible: the side opposite the {{deg}}° angle at {{v}} is the longest side — but |{{hyp}}| = {{hypVal}} while |{{leg}}| = {{legVal}}. Check the givens."

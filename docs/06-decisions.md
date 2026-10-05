@@ -14545,3 +14545,31 @@ So when a configuration's fold failed because a re-attempt was cut, the check re
 - `docs/04-design.md`, `docs/LADDER.md`: one sentence each.
 
 **Behaviour change for a student:** none on any figure measured. If a configuration check ever does skip work this way, the status line says «מורכב מדי כדי לבדוק…» instead of claiming «נקבע במלואו», and the values panel says it is incomplete. A line beside an unstated right angle that a cut sweep could not clear is added as before (red), not refused.
+
+## ADR-587 — A stated measure no figure can take is refused by name: an angle outside 0°–180°, a negative length (#1712)
+
+**Status:** accepted · 2026-10-05 · bug (P2, 2-D, honesty class) · fix-round #1776 · branch `fix/1712-angle-range`
+
+**Requirements:** none (internal). The existing honesty promise (a given that cannot hold is refused naming the statement) now reaches a value that is impossible on its own · **Design:** [LADDER.md](LADDER.md) stage 0, row 0f′ (a fifth `pre:impossible` prover, also run by `constraintIsPending`) · **LADDER stage:** stage 0 (pre-gates) and stage 5 (the classifier's pending probe). No solver change.
+
+**Cites** [ADR-104](#adr-104) (the deferral bet), [ADR-417](#adr-417), [ADR-538](#adr-538), [ADR-540](#adr-540), [ADR-551](#adr-551) (the one-way-sound provers this joins), [ADR-W-108](06w-decisions-workspace.md#adr-w-108) (the parity rows).
+
+**Context.** Measured on 4d6e3fd6 through `runSubmit` after «משולש ABC»: «∢ABC = -2», «זווית ABC = -30» and «angle ABC = -40» **committed**, with the triangle unchanged (∠B stayed 41.99°). The dry run failed, but `deferralWorthwhile` → `constraintIsPending` saw the residual ∠ABC − (−2) move as the free triangle flexed and filed the given as PENDING. «∢ABC = 200» was refused, but only by the angle-sum prover («the angles of ABC sum to 200°»), so off a polygon it would have deferred too. The parser was not the cause: every spelling, and the variable route («∢ABC = 0.5x» · «x = -10»), lowers to the same `angle` constraint. The class reaches past angle values. «AB = -3», «∢ABC > 200», «∢ABC < -5» and «זווית A + זווית B = -10» all committed the same way.
+
+**Class.** *A stated measure whose number lies outside the range any configuration can give that measure.* It is impossible on its own: no other given, placement or DOF is involved. The flex probe asks whether the residual moves, not whether it can reach zero (the #420 lesson again).
+
+**Decision.** `measureRangeImpossibility` in `engine/metricFeasibility.ts`, a fifth one-way-sound prover read on the constraint:
+- `angle` (not an arc measure; the arc reader keeps its own (0°, 360°) window): value ∉ [0°, 180°];
+- `angle-bound` / `length-bound`: a window that misses [0°, 180°] / [0, ∞), strictness respected («≥ 180» is a flat angle and stays);
+- `distance`: value < 0;
+- `measure-sum`: by sign only. Every term is ≥ 0, so a same-sign combination cannot reach a target of the other sign. The upper bound is deliberately not read: an arc term is lowered to its central angle, so «arc + arc = 380» and «∠A + ∠B = 380» are the same constraint, and only one of them is impossible.
+
+It runs among the `pre:impossible` gates of `applyStep`, right after the angle-sum prover (so an over-180° interior angle of a declared polygon keeps ADR-538's curriculum sentence, which `angle-sum-feasibility.test.ts` locks), on the step's NEW constraints only, so an older fact is never blamed. It also runs in `applyCoupledStep` and in `constraintIsPending`, so a refused line can never be re-filed as pending. The wire message is `impossible: <describeConstraint> — an angle measures between 0° and 180°` / `— a length is never negative`. `humanizeError` maps these to `errors.angleOutOfRange` / `errors.lengthNegative` (he + en), and the message names the student's statement.
+
+**Deviation from the plan.** The plan said to refuse outside the OPEN interval (0°, 180°) "at the angle-value reader". The refusal sits on the lowered constraint instead, because that is the one place every spelling and the variable route pass through. It also refuses only values strictly outside the CLOSED range: 0° and 180° are reachable (degenerate) configurations, and `degenerate-constraint.test.ts` locks ∠ABA = 0 as holding. On a triangle, «זווית B = 0» / «= 180» were already refused by the solver (unchanged).
+
+**Analytic / 3-D (docs/22 §10).** Five parity rows (`angle-negative-1712`, `angle-negative-he-1712`, `angle-reflex-1712`, `angle-bound-out-of-range-1712`, `length-negative-1712`, all `refused`). Analytic already refuses all five. 3-D refuses three and does not handle the `∢`-glyph value lines «∢ABC = -2» / «∢ABC = 200» (they go to the model). Those are known-gap rows owned by #1777.
+
+**Locks.** `src/engine/__tests__/measure-range-1712.test.ts` (8): the predicate matrix (angles, the endpoints, arcs, bounds with strictness, lengths including the cat-2d-087 «5 < AB < 9» window, sums by sign and the unread upper bound); the he/en humanised message; `applyStep` refusing at `pre:impossible`; and `deferralWorthwhile` no longer pending (**fails before**). Scenario `angle-out-of-range-refused-1712` (corpus chunk 4): the operator's three lines are refused through the submit gate (the two negatives with the range message, 200° with the triangle angle-sum one), and «∢ABC = 90» commits. The shard-4 decide-parity golden gains the scenario's row (additive only). The parity rows above are also locks.
+
+**Behaviour change for a student:** «∢ABC = -2», «זווית ABC = -30», «AB = -3», «זווית ABC גדולה מ-200» are now refused with «לא ייתכן: ∠ABC = -2° — גודל של זווית הוא תמיד בין 0° ל-180°» (or the length sentence) instead of being added and silently doing nothing. «∢ABC = 200» on a triangle keeps its angle-sum refusal; off a polygon it now gets this sentence.

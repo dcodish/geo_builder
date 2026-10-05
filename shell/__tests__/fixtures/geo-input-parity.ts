@@ -632,6 +632,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-3d-010', family: 'angles', steps: ['משולש ABC', 'קוסינוס הזווית ACB = 3/4'], expect: 'builds', note: '2-D draws acos 3/4 ≈ 41.41° since #1698 (ADR-566)' },
   { id: 'trig-sine-choice-1711', family: 'angles', steps: ['משולש ABC', 'סינוס הזווית ACB = 3/4'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1726' }], note: 'a sine fits θ and 180° − θ — a configuration choice «הציגו תצורה אחרת» cycles (#1711, operator ruling 2026-10-03)' },
   { id: 'trig-sine-out-of-range-1711', family: 'angles', steps: ['משולש ABC', 'סינוס הזווית ACB = 5/4'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1726' }], note: 'no angle has a sine above 1 (#1711)' },
+  // #1712 (ADR-587) — an angle measures between 0° and 180°, a length is never negative: refused by name
+  { id: 'angle-negative-1712', family: 'angles', steps: ['משולש ABC', '∢ABC = -2'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1777' }] },
+  { id: 'angle-negative-he-1712', family: 'angles', steps: ['משולש ABC', 'זווית ABC = -30'], expect: 'refused' },
+  { id: 'angle-reflex-1712', family: 'angles', steps: ['משולש ABC', '∢ABC = 200'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1777' }] },
+  { id: 'angle-bound-out-of-range-1712', family: 'angles', steps: ['משולש ABC', 'זווית ABC גדולה מ-200'], expect: 'refused' },
+  { id: 'length-negative-1712', family: 'lengths', steps: ['משולש ABC', 'AB = -3'], expect: 'refused' },
   { id: 'cat-3d-011', family: 'angles', steps: ['משולש ABC ישר זווית'], expect: 'builds' },
   { id: 'cat-3d-012', family: 'polygons', steps: ['ABC משולש שווה צלעות'], expect: 'builds' },
   { id: 'cat-3d-013', family: 'polygons', steps: ['ABC משולש שווה שוקיים'], expect: 'builds' },
