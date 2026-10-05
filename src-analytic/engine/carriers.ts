@@ -54,6 +54,32 @@ export const RESERVED_SYMBOLS: ReadonlySet<string> = new Set(['x', 'y']);
  */
 export const mentionsPlane = (e: Expr): boolean => symbolsOf(e).some((s) => RESERVED_SYMBOLS.has(s));
 
+const NO_CAPITALS: ReadonlySet<string> = new Set();
+
+/**
+ * A MEASURE'S VALUE NEVER NAMES A POINT (#1701, ADR-AG-238).
+ *
+ * A capital Latin letter is a point's shape in this tree («נקודה A1», «A1(1,2)»), and a lengths-or-angle value is
+ * where 2-D's reference draws the line (its `VAR` is lowercase or Greek: *"points stay uppercase, so the two never
+ * collide"*, ADR-031). Juxtaposition hides the collision: «∠CAB = A1» lexes as `A·1`, so before #1701 it recorded a
+ * free parameter named `A` — a sentence about a point turned into a sentence about an invented parameter, built green.
+ * 2-D escalates the same line, so a value that names a point is declined (`not-handled`), never read.
+ *
+ * `allow` carries the one capital 2-D admits as a SIZE: the radius `R` beside a length («AC = 1.6R», ADR-034). The
+ * test is semantic, like `mentionsPlane`: `A1`, `2A`, `A·B` all reach a capital symbol. It is applied only to a
+ * length's or an angle's value: an AREA's label is a capital in 2-D's grammar too («שטח ABC = S», «נסמן את שטח ABCD ב-S»),
+ * and coordinates, slopes and equations are analytic's own families with no 2-D reference, so they are left as they read.
+ */
+export const mentionsPointName = (e: Expr, allow: ReadonlySet<string> = NO_CAPITALS): boolean =>
+  symbolsOf(e).some((s) => /^[A-Z]$/.test(s) && !allow.has(s));
+/** The capital a LENGTH's value may carry — 2-D's radius symbol (`LVAR`, ADR-034). An angle admits none. */
+export const LENGTH_CAPITALS: ReadonlySet<string> = new Set(['R']);
+/**
+ * The same test on text the expression layer cannot read — «A₁», «A_1»: a capital standing alone (no letter beside
+ * it), with an optional index. A reader uses it to decline rather than answer `bad-equation` about a point's name.
+ */
+export const POINT_TOKEN = /(?<![A-Za-z])[A-Z](?:[0-9₀-₉]+|_\{?\d+\}?)?(?![A-Za-z])/;
+
 /**
  * The kind of freedom an object carries *itself* — as opposed to the freedom it inherits from the
  * parameters in its expressions.

@@ -226,8 +226,12 @@ export interface ParityRow {
   /**
    * The verdict every expected product must give on the last line: 2-D's, measured — or, on a row where
    * 2-D itself is the known gap, the verdict the other builders give and 2-D owes.
+   *
+   * `not-handled` is a verdict too (#1701, ADR-AG-238): where 2-D's deterministic lane DECLINES a sentence and hands
+   * it to the model, a builder that reads it deterministically into something else («∠CAB = A1» as a parameter A·1)
+   * has given a different verdict — the row asserts every expected builder declines as 2-D does.
    */
-  expect: Exclude<Verdict, 'not-handled'>;
+  expect: Verdict;
   exception?: ExceptionId;
   /**
    * Narrows an exception row to SOME of the family's builders, where another reads the family in its own
@@ -968,6 +972,22 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'tan-from-1430-03', family: 'tangents', steps: ['מעגל O', 'מנקודה P יוצאים שני משיקים למעגל O, הנוגעים בו בנקודות A ו-B'], expect: 'builds', exception: 'X8' },
   { id: 'tan-side-1430-04', family: 'tangents', steps: ['משולש ABC', 'מעגל O', 'הצלע AB משיקה למעגל O'], expect: 'builds', exception: 'X8' },
   { id: 'tan-side-1430-05', family: 'tangents', steps: ['משולש ABC', 'מעגל O', 'AB משיק למעגל O'], expect: 'builds', exception: 'X8' },
+
+  // ── #1701 (ADR-AG-238): a point's name is never a measure's VALUE — 2-D declines each (its value variable is lowercase or Greek) ──
+  { id: 'point-value-angle-1701', family: 'angles', steps: ['משולש ABC', '∠CAB = A1'], expect: 'not-handled', note: 'the reported line: analytic read A1 as the parameter A times 1' },
+  { id: 'point-value-angle-letter-1701', family: 'angles', steps: ['משולש ABC', '∠ABC = A'], expect: 'not-handled', knownGap: [{ product: '3d', issue: '#1784' }] },
+  { id: 'point-value-angle-index-1701', family: 'angles', steps: ['משולש ABC', '∠ABC = B2'], expect: 'not-handled' },
+  { id: 'point-value-angle-subscript-1701', family: 'angles', steps: ['משולש ABC', '∠ABC = A₁'], expect: 'not-handled', note: 'analytic answered bad-equation about a point name' },
+  { id: 'point-value-angle-copula-1701', family: 'angles', steps: ['משולש ABC', 'זווית CAB היא A1'], expect: 'not-handled' },
+  { id: 'point-value-vertex-1701', family: 'angles', steps: ['משולש ABC', '∠B = A1'], expect: 'not-handled' },
+  { id: 'point-value-alias-1701', family: 'angles', steps: ['משולש ABC', '∢ABC = α', 'α = A1'], contextFor: { '3d': ['משולש ABC'] }, expect: 'not-handled', note: '3-D reads no angle alias (#1679), so its context is the triangle alone' },
+  { id: 'point-value-angle-order-1701', family: 'angles', steps: ['משולש ABC', '∢ABC < A'], expect: 'not-handled' },
+  { id: 'point-value-length-1701', family: 'lengths', steps: ['משולש ABC', 'AB = A1'], expect: 'not-handled' },
+  { id: 'point-value-length-coef-1701', family: 'lengths', steps: ['משולש ABC', 'AB = 2A'], expect: 'not-handled' },
+  { id: 'point-value-length-sum-1701', family: 'lengths', steps: ['משולש ABC', 'AB = AC + D'], expect: 'not-handled', note: 'a capital left over after the pairs were read' },
+  { id: 'point-value-length-order-1701', family: 'lengths', steps: ['משולש ABC', 'AB < C'], expect: 'not-handled' },
+  { id: 'radius-value-length-1701', family: 'lengths', steps: ['משולש ABC', 'AB = 1.6R'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'control — the radius R is the one capital a length value admits (2-D ADR-034)' },
+  { id: 'area-label-capital-1701', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC = S'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'control — an area label is a capital in 2-D (parseAreaExpr)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

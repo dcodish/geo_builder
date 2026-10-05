@@ -22,12 +22,25 @@ import { cevianFacts, toolFootFacts, type CevianRole } from '../engine/cevian';
 import { toolPoint, type ToolPointRole } from '../engine/toolLetters';
 import { isAngleRef, sineAngle, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { evalExpr, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
-import { RESERVED_SYMBOLS, directionSymbol, mentionsPlane, radiusSymbol, toolSymbol } from '../engine/carriers';
+import { POINT_TOKEN, RESERVED_SYMBOLS, directionSymbol, mentionsPlane, mentionsPointName, radiusSymbol, toolSymbol } from '../engine/carriers';
 
 /** A student's VALUE — a number or an expression in parameters, never the plane's x/y (#1496, `mentionsPlane`). */
 function valueExpr(src: string): Expr | null {
   const e = parseExpr(normalizeMath(src));
   return e && !mentionsPlane(e) ? e : null;
+}
+
+/**
+ * AN ANGLE'S VALUE — `valueExpr`, but a point's name is no value (#1701, ADR-AG-238). «∠CAB = A1» lexed as `A·1` and
+ * recorded a free parameter named A; 2-D escalates it (its angle variable is lowercase or Greek), so the reader answers
+ * `'point'` and the rule DECLINES — the line reaches `not-handled`, as in 2-D, never `bad-equation` about a point's name.
+ * Every reader of an angle's (or an order's, a parameter's) value goes through here, so the class closes at one place;
+ * a length's value is the same test in `lengths.ts` (`constantLengthExpr`, `readLength`), with the radius R allowed.
+ */
+function measureValue(src: string): Expr | 'point' | null {
+  const e = valueExpr(src);
+  if (e ? mentionsPointName(e) : POINT_TOKEN.test(src)) return 'point';
+  return e;
 }
 import { angleLabelSymbol, constantLengthExpr, namedLengthPairs, planeLetterLength, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
@@ -5406,8 +5419,8 @@ function orderSide(src: string, claims: ClaimSink): { side: OrderSide; text: str
     const measured = le.terms.every((x) => x.kind === undefined || x.kind === 'length' || x.kind === 'area');
     return measured ? { side: { t: 'length', le }, text: roled } : null;
   }
-  const value = valueExpr(t.replace(DEGREE_TAIL, ''));
-  return value ? { side: { t: 'value', value }, text: t } : null;
+  const value = measureValue(t.replace(DEGREE_TAIL, ''));
+  return value && value !== 'point' ? { side: { t: 'value', value }, text: t } : null;
 }
 
 /** The facts of one order: the pairs a length side names are drawn (#1652's rule, as «AB = …» draws them), then the selector. */
@@ -5585,7 +5598,8 @@ function parseAngleMeasure(line: string): RuleOutcome {
   if (!left) return refuse('repeated-vertex', line);
   const valueSrc = trim(rhsSrc);
   if (!claimable(valueSrc)) return null;
-  const value = valueExpr(valueSrc);
+  const value = measureValue(valueSrc);
+  if (value === 'point') return null;
   if (!value) return refuse('bad-equation', valueSrc);
   // sin (ADR-AG-227): the choice between its two angles; tan and cos fix one.
   if (isAngleRef(left)) return made([{ t: 'constraint', k: measure === 'sin' ? sineAngle(left, value) : { t: 'angle', at: left, value, measure }, src: line }]);
@@ -5608,8 +5622,8 @@ function parseParamValue(line: string): RuleOutcome {
   if (!m) return null;
   const valueSrc = m[2].replace(DEGREE_TAIL, '');
   if (!claimable(valueSrc)) return null;
-  const value = valueExpr(valueSrc);
-  if (!value) return null;
+  const value = measureValue(valueSrc);
+  if (!value || value === 'point') return null;
   return made([{ t: 'constraint', k: { t: 'param-eq', sym: { kind: 'sym', name: m[1] }, value }, src: line }]);
 }
 
@@ -5686,7 +5700,8 @@ function parseAngleBetween(line: string): RuleOutcome {
   const v = shared[0];
   const a = p1 === v ? p2 : p1;
   const b = q1 === v ? q2 : q1;
-  const value = valueExpr(valueSrc);
+  const value = measureValue(valueSrc);
+  if (value === 'point') return null;
   if (!value) return refuse('bad-equation', valueSrc);
   return made([
     { t: 'constraint', k: { t: 'angle', at: { v, a, b }, value }, src: line },
@@ -6491,7 +6506,8 @@ function parseConstraint(raw: string): RuleOutcome {
      */
     const lengthOnly = !!left && left.terms.every((t) => t.kind === undefined || t.kind === 'length');
     if (lengthOnly && rightSrc !== null && !parseLengthExpr(rightSrc) && planeLetterLength(rightSrc)) return refuse('length-xy', line);
-    const right = rightSrc === null ? null : parseLengthExpr(rightSrc) ?? constantLengthExpr(rightSrc);
+    const ofArea = !!left && left.terms.some((t) => t.kind === 'area');
+    const right = rightSrc === null ? null : parseLengthExpr(rightSrc) ?? constantLengthExpr(rightSrc, ofArea);
     // At least ONE side must mention a length, or this is an ordinary equation (`y=2x`) that the
     // bare-equation branch reads far better than we would.
     /*
@@ -6753,7 +6769,8 @@ function parseConstraint(raw: string): RuleOutcome {
     // A word on the right («חדה», «acute») is not a value this rule reads — leave the sentence to
     // whoever owns it rather than answer with an equation error.
     if (claimable(valueSrc)) {
-      const value = valueExpr(valueSrc);
+      const value = measureValue(valueSrc);
+      if (value === 'point') return null;
       if (!value) return refuse('bad-equation', valueSrc);
       if (isAngleRef(left)) return made([{ t: 'constraint', k: { t: 'angle', at: left, value }, src: line }]);
       return made([{ t: 'vertex-angle', left, rhs: { t: 'value', value }, src: line }]);
@@ -7575,8 +7592,8 @@ function arcSide(side: string): Array<{ k: Expr; a: Id; b: Id } | { value: Expr 
     }
     const at = t.search(/ה?קשת|⌢|⏜|arcs?/i);
     if (at < 0) {
-      const v = valueExpr(t.replace(/°|מעלות|degrees?/gi, '').trim());
-      if (!v) return null;
+      const v = measureValue(t.replace(/°|מעלות|degrees?/gi, '').trim());
+      if (!v || v === 'point') return null;
       out.push({ value: sign < 0 ? { kind: 'neg', a: v } : v });
       continue;
     }
