@@ -2065,6 +2065,32 @@ Binding an undescribed «חסום במעגל» to a circle already in the figure
 משיק לצלעות …»; a centre letter on a computed circle (stream B1); tangency to an equation circle (stream B3's
 `tangent-curve`); the right-trapezoid ruling (#1554 vs #1627).
 
+### The quadrilateral's incircle centre, the side list, the sentence with no letters ([ADR-AG-242](06c-decisions-analytic.md#adr-ag-242), #1554)
+
+**One incircle lowering.** `incircleCore(v, centre?)` is the only place that states an incircle: the Pitot
+`length-eq` for n = 4, then `the-circle { match: inscribed }` creating the `incircle` circle and, when a centre is
+named, the derived centre — `incentre` for n = 3, the new rule `incircle-centre` for n = 4 (evaluated by
+`incircleCentre`, the closed form the circle is drawn with, so point and circle cannot disagree; `centreRuleOf`
+answers it too, so «O מרכז המעגל» names it). With a centre the whole is wrapped in an outer
+`the-circle { match: { centre } }` whose `about` is one `tangent-of` per side: a circle on that centre the figure
+already has is the circle the sentence is about (solved tangency), never a second circle. `incircleFacts` (every
+«חסום/חוסם» voice; a tail is «שמרכזו X» before or after the ring, or the bare centre letter of «מעגל O») and the
+circle-subject branch of `circleSubjectFacts` both call it.
+
+**The side list.** `tangentTargets` reads the plural head after its preposition («לצלעות AB, …»). A NAMED circle
+subject whose bounded targets close one ring (`touchedRing`, ADR-AG-198 Am. 1) with nothing else in the sentence
+lowers to `incircleCore` — so the list and «מעגל M חסום במרובע ABCD» are the same facts. A subset, a radius, a
+position, an axis or a modifier keeps the general `circle-at` + `tangent-line` lowering.
+
+**No letters.** `unletteredInscribed` runs after every lettered voice: an indefinite shape noun (the container's
+«ב» stripped) of arity 3 or 4 not followed by a run takes `VERTEX_SENTINELS`, and the sentence is re-read by the
+lettered rule through `lowered` — ADR-AG-217's tool-lettering — so its verdicts (including the right-trapezoid
+refusal) are the lettered sentence's.
+
+### Not here (ADR-AG-242)
+The four one-side lines «מעגל M משיק לצלע AB» … stay a solved `circle-at`: the same geometry, not the computed
+incircle (a fourth tangency would have to rewrite the circle and its centre in place at M1).
+
 ## Tangency at a point, the tangent object, chords ([ADR-AG-195](06c-decisions-analytic.md#adr-ag-195), #1619 B3, #1430)
 
 **The radius is a direction.** `Direction` has a fifth member, `{ k: 'radius', circle, at }`. `dirVector` resolves it from the circle's `NumCurve` (`curveAt`), so it needs no centre POINT, and every circle kind — `circle-at`, an equation `curve`, `circle-thru` — works the same way. `dirRefs` reports `at`, and `constraintCurveRefs` reports the circle through the `relation` arm, so the apply boundary's existence checks cover it unchanged.

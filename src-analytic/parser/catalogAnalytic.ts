@@ -335,6 +335,17 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['מעגל חסום במשולש ABC'],
   },
   { category: 'circles', family: 'F5', he: 'מעגל חסום במרובע ABCD', en: 'a circle inscribed in quadrilateral ABCD' },
+  // #1554 (ADR-AG-242): the quadrilateral's incircle on a named centre, the same circle spelled side by side, and
+  // the sentence with no letters (the tool letters the ring, as 2-D does).
+  { category: 'circles', family: 'F5', he: 'במרובע ABCD חסום מעגל O', en: 'circle O is inscribed in quadrilateral ABCD' },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'מעגל M משיק לצלעות AB, BC, CD ו-DA',
+    en: 'circle M is tangent to the sides AB, BC, CD and DA',
+    needs: ['מרובע ABCD'],
+  },
+  { category: 'circles', family: 'F5', he: 'מרובע חסום במעגל', en: 'a quadrilateral is inscribed in a circle' },
 
   // --- F5 · tangency — how the corpus pins a circle WITHOUT giving its radius (#1060 axes,
   // #1501 lines). These rows are also what teaches the LLM lane the vocabulary: neither half was
