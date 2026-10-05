@@ -369,6 +369,10 @@ What the lock does not check: whether the words are good. That is prose, per pro
 
 A `SymbolSpec` whose face (`label`) is one character inserts exactly that character, or carries `keyboardForm` saying why not. `shell/__tests__/fixtures/palette-faces.ts` checks it, and every product runs it over its own palette. The store-side ingest (ADR-W-029) is `ingestTypedText` in `bidi.ts`: `stripFormatControls` and then `foldComparisons` (`>=` → `≥`, `<=` → `≤`, a bare two-character operator only). Every product store records through it, analytic's included, which had no ingest boundary before. The parsers keep only the strip; every grammar reads both spellings the same way.
 
+## The spaced conjunction ([ADR-AG-239](06c-decisions-analytic.md#adr-ag-239))
+
+`shell/conjunction.ts` `foldConjunctionSpacing` turns «AB ו- BC», «AB ו -BC» and «AB ו - BC» into «AB ו-BC». It is a PARSER-boundary fold, not a store one: 2-D `normalizeUtterance`, 3-D `normalize3` and analytic `orthography` call it, and the stored line stays as typed. A glued «ו-» always folds; a hyphen with a space before it folds only before a name-shaped token, so a minus sign («2 ו -3», «ו -y = x», «a ו -a») is never absorbed into the conjunction. The cross-builder lock is the parity rows `conj-space-*-1691-*`.
+
 ## Student-facing text ([ADR-W-096](06w-decisions-workspace.md#adr-w-096))
 
 `shell/studentText.ts` `studentFacingViolations(values, { typed, names })` judges the VALUES a message interpolates, never its template, since a template may quote a worked example. A value may name what the student typed (case-insensitive) or what the figure shows; an id-shaped token (`~x`, `@x`, `#x`, `kind-Id`), an untyped English word, or an unknown capital label is a violation. Each product runs it over its own refusal corpus through its own humanizer. 3-D's is `src3d/i18n/errorText3.ts`; the other three are #1522.

@@ -19,6 +19,7 @@
 
 import { readOperand, readRelationSides } from './operandToken';
 import { stripFormatControls } from '../../shell/bidi';
+import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
@@ -152,7 +153,8 @@ export function normalize3(s: string): string {
   return upliftLowercaseLabels(
     // #1545 (ADR-3D-300): every prime glyph → `'` through the ONE fold (lexicon/marks3), which the ask
     // lane and the LLM sequence gate also call — it used to be spelled here and twice more, narrower.
-    foldPrimes3(stripFormatControls(s))
+    // #1691 (ADR-AG-239): «AB ו- CD», «ו -CD», «ו - CD» are «ו-CD» — the shared fold every builder's boundary calls.
+    foldConjunctionSpacing(foldPrimes3(stripFormatControls(s)))
       // #531 ([ADR-3D-144](../../docs/06b-decisions-3d.md)): INVISIBLE bidi/format controls are not
       // something the student typed — the APP injects them (`isolateLtrRuns3` isolates LTR runs for
       // display, ADR-3D-116/121), and the rendered fact list is text the student SELECTS AND COPIES

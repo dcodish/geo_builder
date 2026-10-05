@@ -104,6 +104,7 @@ The list itself is the smell: each is a point where a general decision is being 
 | Commit seams that reset the seed (any store action writing `seed: 0` / `patch.seed = 0`) | the seam registry — `shell/__tests__/seam-registry.test.ts` ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)). Each seam is `wired` / `exempt` / `gap`, a non-wired one carries a reason and a `gap` names its issue. Adding a seam without a status fails the suite |
 | A decision reachable from no test (an `app/`-layer module a lock reproduces instead of calling) | same registry, second half — every `*/app/` module must be imported by a test. The root of #1102 and #1041 |
 | Student-facing message text (every value a refusal or notice interpolates) | `shell/studentText` `studentFacingViolations` + a per-product corpus lock ([ADR-W-096](06w-decisions-workspace.md#adr-w-096)): a value names only what the student typed or the figure shows. 3-D is locked; 2-D, complex and analytic are #1522 |
+| The «ו-» conjunction inside a list reader (any `ו-?…` in a parser rule) | `shell/conjunction` `foldConjunctionSpacing` at every builder's parser boundary ([ADR-AG-239](06c-decisions-analytic.md#adr-ag-239)): rules may assume «ו-X» — never re-spell the spaced forms per reader; the minus guard lives in the fold |
 
 ## 3b. ParseContext — the deictic/semantic fence (S2.4 of docs/24)
 

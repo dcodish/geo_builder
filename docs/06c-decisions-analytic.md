@@ -11238,3 +11238,26 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Not changed / limits.** A foot dropped onto an AXIS or a line object («D רגל האנך מ-C לציר ה-x») has no named point on its line for the knee's leg and draws none (the renderer's corner needs two named points). A stated `AB ⊥ CD` whose pairs neither share an end nor put an end on the other line has no named vertex and draws none, as before. 2-D's default canvas already draws knees only from asserted facts (the /decisions note of 2026-09-21), so the two products agree on what a knee means.
 
 **Consequences.** `engine/statedMeasures.ts` (`perpendicular` case, derived feet, `alt`, `footOn`, the knee's claimed keys); `render/scene.ts` (the knee's leg toward the farther named point).
+
+## ADR-AG-239 — The spaced «ו-» conjunction is folded once, in `shell/`, at every builder's parser boundary (#1691)
+
+**Date:** 2026-10-05 · **Status:** accepted · fix-round #1776 (bug item). #1691 `auto-ok` 2026-10-05 (/status-update pass, ADR-W-014 Am. 1). **The mechanism is SHARED** — `shell/conjunction.ts`, called by 2-D, 3-D and analytic — and is logged here because the reported defect is analytic's; the 2-D and 3-D lanes were run too.
+
+**Requirements:** none (internal) — a spelling of a sentence every builder already promises; no new capability. · **Design:** [04c](04c-design-analytic.md) "The frame" (`orthography` gains the fold); [04w](04w-design-shell.md) "The spaced conjunction" (the new shared primitive); the docs/17 chokepoint registry gains a row. · **LADDER stage:** none (parser boundary, before every rule).
+
+**Symptom** (prod, 2026-10-01, analytic). «מעגל O», then «AB ו- BC משיקים למעגל» — not understood, escalated to the paid lane, the model's answer rejected. «AB ו-BC» builds. The operator's own sentence that started tangent support (#1501) was «l1 ו- l2».
+
+**Re-measured at pickup** (origin/main 4d6e3fd6, `replayAnalyticSession` and the three parity thin locks). Matched the issue and **reached further than it**: analytic missed «ו- X» in the tangency reader only (as reported), but «ו -X» and «ו - X» failed in analytic's points-on, perpendicular, parallel and crossing readers too — and in **2-D** (tangents, points-on, two-tangent touches, «נחתכים») and **3-D** (perpendicular, parallel, «נחתכים»). The issue's "2-D reads both spellings" held for «ו- X» only.
+
+**Root cause.** Each builder's list readers spell the conjunction themselves. Most use `ו-?\s*`, which tolerates a space AFTER the hyphen but not one BEFORE it; analytic's `tangentTargets` used `ו-?(?=\S)`, which tolerates neither. So the class is "every list reader re-spells the conjunction", not one regex — any future reader could reintroduce the miss.
+
+**Decision.** One fold, `foldConjunctionSpacing` (`shell/conjunction.ts`), at each builder's parser boundary — 2-D `normalizeUtterance` (after the orthographic chain, so the «ן-» slip fold runs first), 3-D `normalize3` (after the prime fold), analytic `orthography` (before the word-number fold). Every rule, honesty gate and LLM lane downstream reads «ו-X». The stored line stays the one typed.
+- «ו- X» (hyphen glued to a standalone «ו») → «ו-X», always: a glued hyphen is the maqaf.
+- **The minus guard.** «ו -X» / «ו - X» fold only when X is a NAME-shaped token: letter-led, no operator, bracket or digit start, not a lone lowercase letter. «2 ו -3», «y = x ו -y = 2x + 1», «a ו -a», «P ו -(1,2)» are left exactly as typed — a hyphen with a space before it may be a sign, and folding it into the conjunction would drop the sign.
+- The «ו» must stand alone (start or after whitespace): «שלו -», «קו -AB» are untouched. The maqaf (U+05BE) is read as the hyphen.
+
+**Why shell, not analytic only.** The class reaches all three plane builders (measured), and ADR-W-108 asks one sentence, one verdict; two per-tree copies would be the drift the shared fold removes (the `stripFormatControls` precedent, ADR-W-029).
+
+**Locks.** `shell/__tests__/conjunction-1691.test.ts` (25: the folds, and 13 inputs the guard must leave byte-identical); `src-analytic/__tests__/issue-1691-conjunction-spacing.test.ts` (13: the student's exact two-line sequence, the measured table with each «ו-X» control, a coordinate's minus sign beside the conjunction); 14 parity rows `conj-space-*-1691-*` in `shell/__tests__/fixtures/geo-input-parity.ts` (tangents ×7 as X8, points-on ×3 with 3-D's existing #1679 gap — 3-D reads no points-on list in either spelling — perpendicular, parallel, two crossings). **Fails before** (the fold made the identity): 27 of 44 across the three files, in all three builders. `src/parser/__tests__/issue-506.test.ts` asserted the boundary TEXT «AC ו- DB» after the «ן-» slip fold; it now reads «AC ו-DB» (the slip still lands on the connective).
+
+**Not changed / limits.** «מעגל M משיק לצלעות AB ו-BC» is not read by analytic in either spelling, and 3-D reads no circle sentences; both are spacing-independent and out of this scope. Complex has no plane-geometry lists and does not call the fold.
