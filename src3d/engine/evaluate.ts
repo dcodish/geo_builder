@@ -2096,10 +2096,26 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
           // (branch choices preserved, minimal movement) instead of re-rolling the basins
           const retry = solvePivot(c, EC, dims0, seed, undefined, members, warm.x, lines);
           // several basins converge (mirrors, rotations) and not every one satisfies the
-          // membership on FINAL positions — validate each candidate and keep the first
-          // fully-good one (membership + signs + the param root-find), never seed-modulo
-          let accepted = false;
+          // membership on FINAL positions — validate each candidate (membership + signs + the
+          // param root-find) and keep the first fully-good one PER ROOT.
+          //
+          // #1769 (ADR-3D-306): «first fully-good one» overall was a root pick by START ORDER — the
+          // operator's prism (k ∈ {−1, 2}) landed k = 2 at 20 seeds and k = −1 at 4, the pool was size 1,
+          // so `symRoots` held one value and the panel printed «k = 2» as knowledge (#797's class, one
+          // stage later). Every admissible ROOT now joins the pool: one representative per distinct
+          // pin-symbol vector, each the first fully-good candidate of its root (the warm start's
+          // minimal-movement basin keeps winning within a root). A figure with no pin symbol has one key,
+          // so it still stops at its first good candidate — bit-identical, and no extra validation.
+          const rootKey = (sol: PivotResult): string =>
+            sol.pinSymbols ? Object.keys(sol.pinSymbols).sort().map((s) => sol.pinSymbols![s].toFixed(3)).join(',') : '';
+          const good: PivotResult[] = [];
+          const goodKeys = new Set<string>();
+          const pinKeyed = retry.some((sol) => rootKey(sol) !== '');
+          let lastApplied: PivotResult | null = null;
           for (const sol of retry) {
+            const key = rootKey(sol);
+            if (goodKeys.has(key)) continue; // this root already has its representative
+            lastApplied = sol;
             applySolutions([sol]);
             pinParam();
             resolveLatePlanes();
@@ -2107,9 +2123,19 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
             const paramBroke =
               paramBefore !== null && Number.isFinite(paramBefore.value) && !(paramOut !== null && Number.isFinite(paramOut.value));
             if (!stillUnmet && !paramBroke && (!signsBefore || signsHold())) {
-              accepted = true;
-              break;
+              good.push(sol);
+              goodKeys.add(key);
+              if (!pinKeyed) break; // one key only ⇒ the first good candidate is the whole answer
             }
+          }
+          const accepted = good.length > 0;
+          if (good.length > 1 || (accepted && lastApplied !== good[0])) {
+            // the admissible pool: `applySolutions` picks `pool[seed % n]` (so «show another
+            // configuration» cycles the roots) and records every root in `symRoots` / `pointRoots`.
+            // (One root whose candidate is not the last one tried is re-applied the same way.)
+            applySolutions(good);
+            pinParam();
+            resolveLatePlanes();
           }
           if (!accepted && retry.length > 0) {
             pos.clear();
@@ -2164,8 +2190,23 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
         if (!attempt(true)) restore();
       }
       if (pivot !== pivotBefore && pivotBefore) {
-        // the slide is a re-placement of the CHOSEN configuration, not a new pool
-        pivot = { ...pivot!, solutions: pivotBefore.solutions, chosen: pivotBefore.chosen };
+        // the slide is a re-placement of the CHOSEN configuration, not a new pool — so the pool's own
+        // record stays the pool's: #1769 (ADR-3D-306), the admissible root sets were dropped here (the
+        // slid single solution carries one root), and the panel's singleton gate read the missing set
+        // as «one root» — the drive's k ∈ {−1, 2} printed «k = 2» at every seed whose drive slid.
+        // The record is carried only when it describes the slid figure: every symbol value the slid
+        // configuration holds must be one of the pool's roots. (A stage-4 drive that was rolled back
+        // leaves `warm` on its rejected candidate, so the slide can re-place a configuration the
+        // restored pool does not contain — that pool's roots say nothing about the drawing.)
+        const { symRoots, pointRoots } = pivotBefore;
+        const slidSyms = Object.entries(pivot!.pinSymbols ?? {});
+        const describes = slidSyms.every(([s, v]) => symRoots?.[s]?.some((r) => Math.abs(r - v) <= 1e-3 * Math.max(1, Math.abs(r))) ?? true);
+        const { symRoots: slidRoots, pointRoots: slidPoints, ...slid } = pivot!;
+        pivot = {
+          ...slid, solutions: pivotBefore.solutions, chosen: pivotBefore.chosen,
+          ...(describes ? (symRoots ? { symRoots } : {}) : slidRoots ? { symRoots: slidRoots } : {}),
+          ...(describes ? (pointRoots ? { pointRoots } : {}) : slidPoints ? { pointRoots: slidPoints } : {}),
+        };
       }
     }
   }

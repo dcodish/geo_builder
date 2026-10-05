@@ -1653,13 +1653,18 @@ export function solvePivot(
     // cold solutions landed k ≈ 1 while k = 2 was equally admissible — a root the pool does not
     // carry is invisible to every honesty gate downstream). One round, from one base per
     // distinct symbol vector; roots within ±3 of a found one join the pool.
+    // #1769 (ADR-3D-306): the walk is a function so the dims-widening failure path below can run it on
+    // the roots IT finds — before, a root found only by the widening was never walked, so the other root
+    // stayed out of the pool (the operator's prism at seed 0: both mirrors empty after the cold starts,
+    // k = 2 found by the widening, k = −1 never looked for). `walked` keeps a base from being walked twice.
+    const walked = new Set<string>();
+    const symbolWalk = (): void => {
     if (collectAll && nPinSym > 0) {
-      const seenSym = new Set<string>();
       const bases = results.filter((r) => {
         if (r.mirror !== mirror || !r.pinSymbols) return false;
         const key = pinSyms.map((s) => r.pinSymbols![s].toFixed(3)).join(',');
-        if (seenSym.has(key)) return false;
-        seenSym.add(key);
+        if (walked.has(key)) return false;
+        walked.add(key);
         return true;
       });
       for (const sol of bases) {
@@ -1679,7 +1684,12 @@ export function solvePivot(
             // suffice (warm start, and the RELEASE solve carries the precision)
             const rp = leastSquares(fPin, x0, 40);
             collect(leastSquares(fFor(rp.x.slice(7 + nDims + nSym, 7 + nDims + nSym + nPinSym)), rp.x));
-            return primaryErr(rp.x) < ACCEPT;
+            // #1769 (ADR-3D-306): a COLLAPSED figure is not a figure (`collect` already says so) — and it
+            // is no evidence that the displaced value is admissible either. The pinned stage zeroes the
+            // primary residuals "for free" by shrinking the solid (the operator's prism at k = 2.75: error
+            // 1e-27, every vertex coincident), and reading that as «continuous» skipped the fan that
+            // reaches the other root (k = −1, three units away) at most seeds.
+            return primaryErr(rp.x) < ACCEPT && !degenerate(rp.x);
           };
           // Probe first: a symbol admissible OFF its converged value is CONTINUOUS — its
           // openness is already honest (the Am. 2 seed anchor varies it), so the fan is
@@ -1691,6 +1701,8 @@ export function solvePivot(
         }
       }
     }
+    };
+    symbolWalk();
     // #818 (ADR-3D-179): SIGN-AXIS CONTINUATION — the #797 walk, for a stated coordinate sign. The
     // cold starts spread the GAUGE (eight rotations) and the symbol walk spreads the pin symbols; the
     // shape DIMS start at the seed's one sample in every start, so a branch that differs only in a dim
@@ -1776,6 +1788,9 @@ export function solvePivot(
           // one accepted solution is enough when we are not building the configuration pool
           if (!collectAll && best && (anchored ? primaryErr(best.x) : best.err) < ACCEPT) break;
         }
+        // #1769 (ADR-3D-306): the roots the widening found get the same symbol walk the cold starts'
+        // roots got above — failure path only, so a figure the cold starts solved is untouched.
+        symbolWalk();
       }
     }
     // acceptance: per-residual ~1e-6 — far under the 2e-5 claim tolerance (the numeric-
