@@ -1321,8 +1321,24 @@ export interface Consumed {
   verbs?: string[];
 }
 
-/** What the parser produces and a `Fact` stores: engine commands plus the symbolic layer. */
-export type AnyCommand = (Command | SymbolicCommand) & { consumed?: Consumed };
+/** A side named by its ROLE in a triangle (#775). */
+export type SideRole = 'hypotenuse' | 'base' | 'leg';
+
+/**
+ * The parse-time resolution a role-named command was lowered against (#1810, ADR-596): the role, the
+ * triangle's ring and the distinguished vertex (right-angle vertex / apex) its letters were resolved at.
+ * Rides on the command like `consumed`; the replay fold re-resolves it (`engine/roleSides.ts`).
+ */
+export interface RoleSideBinding {
+  role: SideRole;
+  ring: Id[];
+  at: Id;
+}
+
+/** What the parser produces and a `Fact` stores: engine commands plus the symbolic layer. `roleSide` (#1810,
+ *  ADR-596): the side a role noun («הבסיס», «היתר», «השוק») was resolved to at parse time, re-resolved by the
+ *  replay fold against the configuration in force — see `engine/roleSides.ts`. The engine ignores it. */
+export type AnyCommand = (Command | SymbolicCommand) & { consumed?: Consumed; roleSide?: RoleSideBinding };
 
 /**
  * DISPLAY-ONLY COMMANDS — a command that changes what the student SEES while adding no object, no

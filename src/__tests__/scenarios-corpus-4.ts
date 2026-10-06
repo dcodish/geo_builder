@@ -3574,6 +3574,45 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.construction.objects.some((o) => o.id === 'H') && fig.construction.objects.some((o) => o.id === 'K'), 'the chord exists').toBe(true);
     },
   },
+  {
+    id: 'isosceles-base-median-follows-config-1810',
+    title: '#1810 (ADR-596): «משולש שווה שוקיים ABC · תיכון לבסיס» — after «הציגו תצורה אחרת» the median still goes to the BASE (the side opposite the new apex), never to a leg',
+    guards:
+      "Operator ruling 2026-10-06 (#1807 triage): «תיכון לבסיס» is allowed and must change with other configs. Measured on b14d11d5 and re-measured on fa1d2492 through parse -> replay, stepping the isosceles variant as cycleVariant does: the median was drawn to BC at all three apexes, so at apex B and apex C it landed on a LEG while the row still read «the base». Root cause: roleSideLine (#775) resolved the role noun to letters ONCE at parse time, against the configuration showing then, and the fact kept only the letters. Fix (ADR-596): the commands carry a RoleSideBinding (role, triangle ring, the apex/right-angle vertex they were resolved at) and the replay fold re-resolves it against the construction in force (engine/roleSides.ts) — rotating the triangle letters when the distinguished vertex moved, and waiting (ADR-104 retry) when a later statement is what declares the role. The class matrix (base/legs × median/altitude × every variant, the later «AB = BC» pin, typed letters stay literal, the hypotenuse after a right-angle reseat, stability, rename, theorem context) is src/parser/__tests__/issue-775.test.ts.",
+    steps: ['משולש שווה שוקיים ABC', 'תיכון לבסיס'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש שווה שוקיים ABC', 'תיכון לבסיס']);
+      /** In one drawn view: M's side [p,q] and the third vertex r must make |rp| = |rq| — r is the apex, [p,q] the base. */
+      const medianOnBase = (view: ReturnType<typeof replay>): Id => {
+        const mid = view.construction.objects.find((o) => o.kind === 'midpoint') as { a: Id; b: Id } | undefined;
+        expect(mid, 'the median foot is drawn').toBeDefined();
+        const r = ['A', 'B', 'C'].find((v) => v !== mid!.a && v !== mid!.b)!;
+        const P = (id: Id) => view.positions.get(id)!;
+        expect(dist(P(r), P(mid!.a)), `the median from ${r} goes to the base ${mid!.a}${mid!.b}`).toBeCloseTo(dist(P(r), P(mid!.b)), 6);
+        expect(view.lastError, 'every view builds').toBeNull();
+        return r;
+      };
+      // every configuration the button can step to (the isosceles apex is the cyclable variant)
+      const sv = facts.find((f) => f.cmd.type === 'shape-variant')!;
+      const apexes = new Set<Id>();
+      for (let v = 0; v < 3; v++) {
+        const fv = facts.map((f) => (f === sv ? { ...f, cmd: { ...f.cmd, variant: v } as AnyCommand } : f));
+        expect(meetsRequirements(fv, 0), `variant ${v} keeps every given`).toBe(true);
+        apexes.add(medianOnBase(replay(fv, 0)));
+      }
+      expect([...apexes].sort(), 'the three apexes each get their own base').toEqual(['A', 'B', 'C']);
+      // and the button itself: two presses, every view shown keeps the median on the base
+      let cur = { facts, seed: firstSatisfyingSeed(facts) };
+      medianOnBase(replay(cur.facts, cur.seed));
+      for (let k = 0; k < 2; k++) {
+        const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY);
+        if (!next) break;
+        cur = next;
+        medianOnBase(replay(cur.facts, cur.seed));
+      }
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

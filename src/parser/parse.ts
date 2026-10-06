@@ -19,7 +19,7 @@
  * no digits). Keywords are bilingual; the same rule matches either language.
  */
 
-import { MIDSEGMENT_SHAPES, RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
+import { MIDSEGMENT_SHAPES, RADIUS_VAR, type RoleSideBinding, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
 import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
@@ -261,7 +261,9 @@ export interface ParseContext {
    *  «הבסיס»/«השוק» — the isosceles base/legs), derived SEMANTICALLY from declared structure in
    *  `buildParseCtx`, never from drawn coordinates. A role noun with no unique referent refuses
    *  naming the statement — it never falls back to an arbitrary side (ADR-052). */
-  roleSides?: { role: 'hypotenuse' | 'base' | 'leg'; edge: [string, string] }[];
+  /** #1810: `ring`/`at` — the triangle and its distinguished vertex (right-angle vertex / apex), so a role-named
+   *  command can carry its binding and follow «show another configuration» (ADR-596). */
+  roleSides?: { role: 'hypotenuse' | 'base' | 'leg'; edge: [string, string]; ring?: string[]; at?: string }[];
   /** #805 play (ADR-465 Am. 2): existing altitude FEET — lets a repeated auto-named altitude REUSE
    *  its foot (identical re-lowering → the #613 restate-dedupe reads the repeat as the same
    *  statement) and lets the leg-role pick rotate to the leg not yet carrying one. */
@@ -8832,7 +8834,19 @@ const roleSideLine: Rule = (s, ctx) => {
   const target = heb ? ` לצלע ${p}${q} ` : ` to side ${p}${q} `;
   const rewritten = (restated.test(s) ? s.replace(restated, target) : s.replace(ROLE_NOUN_RX, target)).replace(/\s+/g, ' ').trim();
   const r = parse(rewritten, ctx);
-  return r.ok ? r.commands : null;
+  if (!r.ok) return null;
+  // #1810 (ADR-596): the fact keeps the ROLE, not only the letters. The letters above are the resolution at
+  // the configuration showing NOW; when the role hangs off an unstated choice (the isosceles apex, a re-seated
+  // right angle), «show another configuration» moves it, and the replay fold re-resolves the binding
+  // (`bindRoleSide`) so the median to «the base» stays on the base. Only when every triangle letter the
+  // commands carry came from the RESOLVER: a vertex the student typed («AD גובה לבסיס», «גובה לשוק AC»,
+  // «תיכון ליתר AB») is the student's own choice and stays literal (the #1810 ruling).
+  const ring = pick.ring;
+  const at = pick.at;
+  const typedTriVertex = ring !== undefined && statedLabelTokens(s).some((l) => ring.includes(l));
+  if (!ring || !at || typedTriVertex) return r.commands;
+  const binding: RoleSideBinding = { role, ring: [...ring], at };
+  return r.commands.map((c) => ({ ...c, roleSide: binding }));
 };
 
 /**

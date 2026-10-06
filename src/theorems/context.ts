@@ -9,6 +9,7 @@ import { circleMembers, pointNeighbors } from '../engine/step';
 import { groupKey, type Fact } from '../replay/core';
 import { resolveBinds } from '../replay/naming';
 import type { DetectedShape } from '../engine/detectShapes';
+import { bindRoleSide } from '../engine/roleSides';
 import type { MatchCtx, ObservedInputs } from './types';
 
 /**
@@ -129,7 +130,11 @@ export function buildMatchCtx(
   observed?: ObservedInputs,
 ): MatchCtx {
   // #1697 (ADR-588): the facts as the figure reads them — every naming by use applied (same ids, same order)
-  const enabled = resolveBinds(facts).filter((f) => f.enabled);
+  // #1810 (ADR-596): a role-named line («תיכון לבסיס») read as the figure draws it — re-resolved against this
+  // construction exactly as the replay fold resolved it, so a premise never quotes the side it USED to name.
+  const enabled = resolveBinds(facts)
+    .filter((f) => f.enabled)
+    .map((f) => (f.cmd.roleSide ? { ...f, cmd: bindRoleSide(f.cmd, construction) } : f));
 
   // Circles: centre + stated on-circle members (`circleMembers`), enriched with the circle object's
   // id/hidden flag so a cyclic (hidden) circle still counts for the concyclic-quad trigger (87).

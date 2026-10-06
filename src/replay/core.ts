@@ -24,7 +24,7 @@ import { DISPLAY_ONLY } from '@/engine';
 import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents } from '@/engine/types';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 import { resolveBinds } from './naming';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -1159,6 +1159,31 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     }
     return engineCmds as Command[];
   };
+  /**
+   * #1810 ([ADR-596](docs/06-decisions.md#adr-596)): a side named by its ROLE («תיכון לבסיס») is re-resolved HERE,
+   * against the construction in force at the moment the fact applies — the one point where the role's triangle
+   * and the configuration being replayed are both known. The parser bound the letters at the configuration
+   * showing when the line was typed; when «show another configuration» (or a later statement) has moved the
+   * apex / right angle since, `bindRoleSide` rotates the triangle letters so the line follows the role. Applied
+   * after the per-fact lowering cache, because the same fact resolves differently against different figures.
+   */
+  const boundCmdsOf = (f: Fact, cur: Construction): Command[] | null => {
+    const cmds = engineCmdsOf(f);
+    const binding = f.cmd.roleSide;
+    if (!binding) return cmds;
+    const out: Command[] = [];
+    for (const c of cmds) {
+      const r = resolveRoleSide(c, cur, binding);
+      if (!r) return null; // the role is not declared at this point of the figure — the fact waits (ADR-104 retry)
+      out.push(r);
+    }
+    return out;
+  };
+  /** The status of a role-bound fact whose role nothing in the figure declares yet (#1810). */
+  const roleNotInForce = (f: Fact): string => {
+    const b = f.cmd.roleSide!;
+    return `can't build yet: no ${b.role} is declared in triangle ${b.ring.join('')} at this point`;
+  };
   const runBuild = (forced: Map<string, string>, start: { node: FoldNode; count: number } | null = null) => {
     let cur = start ? start.node.cur : emptyConstruction();
     const status: Record<string, FactStatus> = {};
@@ -1256,7 +1281,8 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     };
     for (const [fi, f] of facts.entries()) {
       if (start && fi < start.count) continue; // #365: already folded — resumed from the cached prefix
-      const engineCmds = engineCmdsOf(f);
+      const resolved = boundCmdsOf(f, cur);
+      const engineCmds = resolved ?? engineCmdsOf(f);
       const intro = engineCmds.flatMap(introducedPointIds);
       const claim = () => intro.forEach((id) => claimPoint(id, fi));
       // #1411 (ADR-577): a statement that FAILED claims only the points it DEFINES. A free point it would
@@ -1328,6 +1354,14 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       // `applied` — the verifier read CLEAN on a figure violating the step's own stated relations (docs/17
       // §6 honesty). So build into a `trial` and commit only if EVERY command succeeded; this mirrors the
       // pattern the ADR-104 deferral retry below already uses (both call `tryApplyFact`, #1411).
+      // #1810 (ADR-596): a role-named line whose role nothing declares at this point («the base» before the
+      // «AB = BC» that pins the apex) waits — the retry below lands it once the figure declares the role.
+      if (!resolved) {
+        status[f.id] = roleNotInForce(f);
+        failedWith.set(f.id, cur);
+        claimDefined();
+        continue;
+      }
       const r = attemptFact(cur, engineCmds);
       if (r.ok) {
         cur = r.construction;
@@ -1378,7 +1412,11 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
         // Purity skip (ADR-280): the figure hasn't changed since this fact failed against it, so the
         // retry would re-run the identical expensive search to the identical failure.
         if (failedWith.get(f.id) === cur) continue;
-        const engineCmds = engineCmdsOf(f);
+        const engineCmds = boundCmdsOf(f, cur);
+        if (!engineCmds) {
+          failedWith.set(f.id, cur); // #1810: the role is still not declared — nothing to try against this figure
+          continue;
+        }
         if (lostDefinition(fi, engineCmds)) continue;
         const r = attemptFact(cur, engineCmds);
         if (r.ok) {
