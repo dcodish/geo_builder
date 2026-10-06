@@ -24,6 +24,7 @@ import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecuted
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents } from '@/engine/types';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { resolveBinds } from './naming';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -468,7 +469,7 @@ export function clearReplayCaches(): void {
   sampleMemo = null;
 }
 export function getFoldFor(facts: Fact[]): FoldNode | null {
-  const node = foldCache.get(foldKey(facts)) ?? null;
+  const node = foldCache.get(foldKey(resolveBinds(facts))) ?? null;
   const cell = node ? cellOf.get(node) : undefined;
   if (node && cell) node.work = ledgerTotal(cell);
   return node;
@@ -476,7 +477,7 @@ export function getFoldFor(facts: Fact[]): FoldNode | null {
 export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
   if (fold.work !== undefined) cellOf.set(fold, flatLedger(fold.work)); // #1671: charged like a fold computed here
   if (foldCache.size >= FOLD_CACHE_MAX) foldCache.delete(foldCache.keys().next().value as string);
-  foldCache.set(foldKey(facts), fold);
+  foldCache.set(foldKey(resolveBinds(facts)), fold);
 }
 
 /**
@@ -533,7 +534,9 @@ export function trialFacts(facts: Fact[], commands: AnyCommand[]): Fact[] {
   return commands.reduce((all, c) => foldCommand(all, c, mint), facts.slice());
 }
 
-function computeReplay(facts: Fact[], seed = 0): Derived {
+function computeReplay(raw: Fact[], seed = 0): Derived {
+  // #1697 (ADR-588): a naming by use is a FACT of the line that made it — applied here, to the facts before it
+  const facts = resolveBinds(raw);
   const key = foldKey(facts);
   let fold = foldCache.get(key);
   if (fold && !chargeHit(cellOf.get(fold))) fold = undefined; // #1605: unaffordable under the budget → recompute
@@ -3882,7 +3885,7 @@ export function introducedIds(cmd: AnyCommand): Id[] {
   if (cmd.type === 'measure-length') return [cmd.a, cmd.b];
   if (cmd.type === 'measure-angle' || cmd.type === 'mark-angle') return [cmd.vertex, cmd.ray1, cmd.ray2];
   if (cmd.type === 'measure-area') return cmd.ids; // highlight the polygon the area annotates
-  if (cmd.type === 'set-var' || cmd.type === 'measure-order' || cmd.type === 'measure-bound') return []; // a relation over variables — no object to highlight
+  if (cmd.type === 'set-var' || cmd.type === 'measure-order' || cmd.type === 'measure-bound' || cmd.type === 'name-by-use') return []; // a relation over variables — no object to highlight
   if (cmd.type === 'shape-variant') return cmd.ids; // the named shape's vertices (ADR-138)
   if (cmd.type === 'inscribe') return variantVertices(cmd); // container + inscribed vertices (ADR-262)
   return applyCommand(emptyConstruction(), cmd).objects.map((o) => o.id);
@@ -3938,7 +3941,8 @@ export function commandPointIds(cmd: AnyCommand): Id[] {
  * to wire or drift. Consumed by the `impliedPointBinding` naming-by-use decision (the #186 pattern,
  * point edition): a student's fresh label may bind to one of THESE, never to a label the student chose.
  */
-export function autoNamedLabels(facts: Fact[]): Set<Id> {
+export function autoNamedLabels(raw: Fact[]): Set<Id> {
+  const facts = resolveBinds(raw); // #1697: the labels as the figure has them, every naming by use applied
   const typed = new Set<string>();
   for (const f of facts) if (f.enabled && f.utterance) for (const m of f.utterance.match(/[A-Z]\d*/g) ?? []) typed.add(m);
   const out = new Set<Id>();

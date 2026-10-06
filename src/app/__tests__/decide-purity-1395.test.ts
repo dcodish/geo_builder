@@ -16,6 +16,7 @@ const logDebugMock = vi.fn();
 vi.mock('@/debug/sessionLog', async (orig) => ({ ...(await orig<object>()), logDebug: (...a: unknown[]) => logDebugMock(...a) }));
 
 import { decideDeterministic2D, type Verdict2D } from '../decideDeterministic';
+import { commitVerdict } from '../submitPipeline';
 import { replay, useGeoStore } from '@/store/geoStore';
 import { factsOf } from '@/__tests__/scenario-pipeline';
 
@@ -70,7 +71,7 @@ describe('#1395 — asking the decision changes nothing', () => {
   it('the #186 circle auto-bind is SIMULATED: the verdict carries the bind, the store keeps its unnamed circle', async () => {
     const v = await askPurely(['שני מעגלים משיקים מבחוץ'], 'היקף מעגל O1 הוא 6π');
     expect(v.kind).toBe('commit');
-    expect(v.kind === 'store-op' ? [] : v.binds, 'the case really binds (the lock is not vacuous)').toEqual([{ op: 'name-centre', from: 'O', to: 'O1' }]);
+    expect(v.kind === 'store-op' ? [] : v.binds, 'the case really binds (the lock is not vacuous)').toEqual([{ op: 'name-centre', from: '@ctr-O', to: 'O1' }]); // #1697: the resolved (anonymous) source
   });
 
   it('the #539 point auto-bind is SIMULATED too', async () => {
@@ -80,12 +81,7 @@ describe('#1395 — asking the decision changes nothing', () => {
       const st = stateOf();
       const v = await decideDeterministic2D(st, line, 'he');
       if (v.kind === 'store-op') continue;
-      for (const b of v.binds) {
-        if (b.op === 'name-centre') useGeoStore.getState().nameCentre(b.from, b.to);
-        else if (b.op === 'step-aside') useGeoStore.getState().reletterHidden(b.from, b.to);
-        else useGeoStore.getState().rename(b.from, b.to);
-      }
-      if (v.kind === 'commit') useGeoStore.getState().executeMany([...v.commands], line);
+      commitVerdict(v, line); // #1697: the pipeline's own commit — the naming is a fact of the line
     }
     logDebugMock.mockReset();
     const v = await askPurely([], 'ישר A O1 E O2 C');

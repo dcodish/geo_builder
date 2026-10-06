@@ -1,0 +1,109 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-06T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "XbXn9yh2m8B6Dj6n2gpq-",
+      "utterance": "שני מעגלים נחתכים בנקודות A ו B",
+      "group": "IKaUbiELZq7ssRYmUsUYK",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "freeRadius": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "cSatBf8pC9cnCw0QKhL6M",
+      "utterance": "שני מעגלים נחתכים בנקודות A ו B",
+      "group": "IKaUbiELZq7ssRYmUsUYK",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "@ctr-P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "OoyxImlMsM5Ids8vPWjFp",
+      "utterance": "שני מעגלים נחתכים בנקודות A ו B",
+      "group": "IKaUbiELZq7ssRYmUsUYK",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "A",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "branch": 0
+      },
+      "enabled": true
+    },
+    {
+      "id": "3S_lWrrFld24f1YWAhyrk",
+      "utterance": "שני מעגלים נחתכים בנקודות A ו B",
+      "group": "IKaUbiELZq7ssRYmUsUYK",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "B",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "branch": 1,
+        "avoid": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "_-XSXQ5oioManzZZkuvxs",
+      "utterance": "נקודה C על מעגל P",
+      "group": "VhsOUfHuCRUv9lIkoZe5Y",
+      "cmd": {
+        "type": "name-by-use",
+        "op": "step-aside",
+        "from": "@ctr-P",
+        "to": "@ctr-Q"
+      },
+      "enabled": true
+    },
+    {
+      "id": "thDYPskJw5MqWvCkTp-0E",
+      "utterance": "נקודה C על מעגל P",
+      "group": "VhsOUfHuCRUv9lIkoZe5Y",
+      "cmd": {
+        "type": "name-by-use",
+        "op": "centre",
+        "from": "@ctr-O",
+        "to": "P"
+      },
+      "enabled": true
+    },
+    {
+      "id": "5ZVWe-QBrcJZFEbh5ZfbG",
+      "utterance": "נקודה C על מעגל P",
+      "group": "VhsOUfHuCRUv9lIkoZe5Y",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-P"
+      },
+      "enabled": true
+    },
+    {
+      "id": "1oUzIBj9bSBlPq_SbYUd0",
+      "utterance": "D על מעגל P",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-P"
+      },
+      "enabled": true
+    }
+  ]
+}

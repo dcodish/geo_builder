@@ -47,7 +47,8 @@ function angleText(vertex: Id, ray1: Id, ray2: Id, value: number, _locale: Local
  * ink the angle statement implies, not part of what the student said.
  */
 export function canonicalText(cmds: AnyCommand[], locale: Locale): string | null {
-  const meaningful = cmds.filter((c) => c.type !== 'segment');
+  // #1697: a naming by use is what the line DID to an existing circle/point, not a statement it made
+  const meaningful = cmds.filter((c) => c.type !== 'segment' && c.type !== 'name-by-use');
   if (meaningful.length !== 1) return null;
   const c = meaningful[0];
   if (c.type === 'set-angle') return angleText(c.vertex, c.ray1, c.ray2, c.value, locale);

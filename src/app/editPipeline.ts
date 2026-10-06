@@ -18,7 +18,8 @@
  * editor already shipped, not a new behaviour.
  */
 import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabelFold, parse, typedLabels } from '@/parser';
-import { autoNamedLabels, groupKey, replay, stepAsideFacts, useGeoStore } from '@/store/geoStore';
+import { autoNamedLabels, groupKey, nameByUseCommands, nameCentreFacts, renameFacts, replay, resolveBinds, stepAsideFacts, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
+import type { DecideBind } from './decideDeterministic';
 import { honestyGateReport } from './honestyGates';
 import { impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
@@ -58,11 +59,23 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   // step), so context-sensitive lowering (M1 existing-id → constraint) chose a constraint form that is
   // wrong at the replay position — editing "AB קוטר"→"AC קוטר" saw the ⊥-step's C "existing" and
   // lowered to a bare collinearity, silently dropping the diameter's circle membership (ADR-241).
+  //
+  // #1697 (ADR-588): the edit's own namings by use are SIMULATED on a working copy, exactly as the submit
+  // decision does, and committed as `name-by-use` facts in the edited group — never applied to the store as
+  // renames no line owns (a REFUSED edit used to keep them). The copy is the PREFIX as the figure reads it
+  // (every earlier naming applied) followed by the LATER facts as stored; the edited group's old facts are
+  // left out, so its old naming no longer applies to the prefix the new text is read against.
+  const raw = store().facts;
+  const start = raw.findIndex((f) => groupKey(f) === key);
+  let end = start; // the group's facts are one contiguous run (replaceGroup's own reading)
+  while (start >= 0 && end < raw.length && groupKey(raw[end]) === key) end++;
+  const prefixRaw = start >= 0 ? raw.slice(0, start) : raw;
+  const afterRaw = start >= 0 ? raw.slice(end) : [];
+  const afterIds = new Set(afterRaw.map((f) => f.id));
+  let work: Fact[] = [...resolveBinds(prefixRaw), ...afterRaw];
+  const binds: DecideBind[] = [];
   const prefixCtx = () => {
-    const facts = store().facts;
-    const start = facts.findIndex((f) => groupKey(f) === key);
-    const prefix = start >= 0 ? facts.slice(0, start) : facts;
-    const before = replay(prefix);
+    const before = replay(work.filter((f) => !afterIds.has(f.id)));
     return buildParseCtx(before.construction, before.positions);
   };
   // #1666 (ADR-561): an edit is a statement too — a proof target is refused here exactly as at submit.
@@ -72,7 +85,9 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     return false;
   }
   // #1673 (ADR-565): a hidden circle token the edit types steps aside first, exactly as at submit
-  for (const m of stepAsideFacts(store().facts, typedLabels(editText)).moves) store().reletterHidden(m.from, m.to);
+  const aside = stepAsideFacts(work, typedLabels(editText));
+  work = aside.facts;
+  for (const m of aside.moves) binds.push({ op: 'step-aside', from: m.from, to: m.to });
   let ectx = prefixCtx();
   let r = parse(editText, ectx);
   // #186: an edit referencing a circle by a name that matches no circle binds an UNNAMED circle the
@@ -84,16 +99,20 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
       return false;
     }
     if (bind) {
-      const res = store().nameCentre(bind.from, bind.to);
+      const res = nameCentreFacts(work, bind.from, bind.to);
       if (!res.ok) break;
+      work = res.facts;
+      binds.push({ op: 'name-centre', from: res.source, to: bind.to });
     } else {
       // #539: the POINT edition, mirroring submit — a fresh set-line label whose slot an auto-named
       // drawn point structurally occupies renames that point (auto-named judged over ALL facts, so a
       // label the student typed anywhere is never grabbed).
-      const pbind = impliedPointBinding(r.commands, ectx, autoNamedLabels(store().facts));
+      const pbind = impliedPointBinding(r.commands, ectx, autoNamedLabels(work));
       if (!pbind) break;
-      const res = store().rename(pbind.from, pbind.to);
+      const res = renameFacts(work, pbind.from, pbind.to);
       if (!res.ok) break;
+      work = res.facts;
+      binds.push({ op: 'rename', from: pbind.from, to: pbind.to });
     }
     ectx = prefixCtx();
     r = parse(editText, ectx);
@@ -136,18 +155,17 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
    * seam's existing convention (`editRefused`, `editDropped`, the #779 nudge all return false with a
    * note); the edit seam never escalates to the LLM (operator ruling, 2026-08-25).
    */
-  const prefixFacts = (() => {
-    const facts = store().facts;
-    const start = facts.findIndex((f) => groupKey(f) === key);
-    return start >= 0 ? facts.slice(0, start) : facts;
-  })();
+  const bindCmds = nameByUseCommands(binds);
+  const prefixFacts = bindCmds.length ? trialFacts(prefixRaw, bindCmds) : prefixRaw; // #1697: with the edit's own naming
   if (impliedByPrior(prefixFacts, r.commands, store().seed)) {
     logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-implied-restatement', commands: r.commands });
     setInputNote(t('input.alreadyDrawn'));
     return false;
   }
   const wasOk = replay(store().facts, store().seed).status;
-  store().replaceGroup(key, r.commands, editText.trim());
+  // #1697: the edit's naming goes in its own group; LATER facts were read in the world before it, so they follow
+  // the naming now (the working copy's rewrite of them — exactly what the old store-wide rename did to them)
+  store().replaceGroup(key, [...bindCmds, ...r.commands], editText.trim(), bindCmds.length ? work.filter((f) => afterIds.has(f.id)) : undefined);
   logDebug({ kind: 'action', action: 'edit', detail: `${key} → ${editText.trim()}` }); // #84: so a reported session replays edits
   const after = replay(store().facts, store().seed).status;
   const orphaned = store().facts.filter((f) => wasOk[f.id] === 'ok' && after[f.id] !== 'ok' && after[f.id] !== 'disabled');
