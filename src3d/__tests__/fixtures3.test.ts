@@ -264,6 +264,11 @@ const SEEDED: SeededCorpus = {
   // Before, the clause was dropped and the line recorded the rider alone; the drift net now holds the
   // stored `length-rel`, and the connector sweep and the held equality live in issue-1730-placement-tail.test.ts.
   'placement-condition-1730.geo3.json': ['משולש ABC', 'D על BC ונתון כי AD = AC'],
+  // #1735 (ADR-3D-306) — the reported sequence: a rider length on a triangle of unstated size. Refused
+  // `givens-contradict` at every seed (each exact solve slid D past B and was discarded); the off-host rider
+  // is now re-seated and the triangle grows. The class rows and the 24-seed lock live in
+  // issue-1735-rider-host-reseat.test.ts.
+  'rider-length-1735.geo3.json': ['משולש ABC', 'D על AB', 'AD = 3'],
   // #1728 (ADR-3D-297) — the named diagonals of a general quad meet where BOTH are. The reported line (sides AB,
   // CD named as diagonals) is a refusal and lives in issue-1728-diagonals-meet.test.ts; this is its building
   // twin, with «E על BD» — refuted while E sat at AC's midpoint — so the net holds the meet and the drift.

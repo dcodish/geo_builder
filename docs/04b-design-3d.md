@@ -827,6 +827,19 @@ bound. Recorded as not-drivable in the table itself: a side-point's height (its 
 static) and riders of free planes/lines (#557 re-seats them after the pivot). Enrollment stays the
 measured probe.
 
+**A host bound is restored, not only enforced** (#1735, [ADR-3D-306](06b-decisions-3d.md#adr-3d-306)). A
+bounded carrier's `[lo, hi]` is not inside the solve: `offHost` (the #820 half of `degenerate()`) rejects a
+candidate after it converged. A given the figure can satisfy by sliding the rider **or** by growing its host
+(«משולש ABC · D על AB · AD = 3», the size unstated) is reached the cheap way — LM's minimum-norm step spends
+the deficit on `t` and lands past the host's end — so every exact candidate used to be discarded and the empty
+pool reached the student as `givens-contradict`. So an acceptance site keeps each exact candidate it discarded
+ONLY for an off-host rider, and on the failure path `reseatOffHost` pins those riders back at their seed
+samples while the gauge, dims and other riders adapt, then releases on the site's own residuals; the result is
+judged by the site's ordinary acceptance, so a re-seat cannot invent a solution. It fires only when the pool is
+otherwise empty — after the frozen-dims retry, whose recursive solve has the same chance — so every figure that
+built before is bit-identical. Sites: the cold-start loop, the dims widening, `collect()` (the #797/#818
+continuations) and the `invariantOnly` dims-only loop.
+
 **The ⟂-from-an-in-plane-point disposition** (#1499, [ADR-3D-268](06b-decisions-3d.md#adr-3d-268)). The
 `seg-plane-rel` one-new-letter funnel asks `structurallyOnRun3` — position-free, recursive: is the known
 endpoint forced into the run's plane by its definition? Off-plane keeps ADR-3D-146's foot; in-plane mints
