@@ -41,7 +41,7 @@ import { dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
 import { meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
 import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
-import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
+import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { parse3, parseRewrite3 } from '../parser/parse3';
 
 export interface Fact3 {
@@ -83,6 +83,10 @@ export type StoreError3 =
   /** #1547 (ADR-3D-299): «x_B = 2t» — one coordinate given a SYMBOLIC value, recognised and not yet
    *  supported. Typed, so it never escalates; `component` is the student's own component («x_B»). */
   | { code: 'component-symbolic'; component: string }
+  /** #1792 (the #1554 ruling): a shape a circle cannot pass around without turning it into `forced` — a
+   *  right trapezoid in a circle is a rectangle. `shape`/`forced` are `notice.shape.*` keys; `sentence` is
+   *  the line as typed. Typed, so it never escalates. */
+  | { code: 'inscribed-contradicts-noun'; shape: string; forced: string; sentence: string }
   /** The LLM decomposition lost part of the stated input (docs/24 S2.3 honesty gates) — `items` names
    *  the dropped labels/magnitudes; nothing was committed. */
   | { code: 'dropped-given'; items: string }
@@ -407,17 +411,19 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
   // triangle the student never asked for — so any explicit equal pair among the three sides retires
   // the guess. One registry per soft kind, so a third slots in without new branching.
   const key3 = (labels: string[]) => [...labels].sort().join('');
-  const explicitRightAngles = new Set<string>();
+  /** key3 → the three labels (#1792: a ring-scoped soft default asks whether a triple lies on its ring) */
+  const explicitRightAngles = new Map<string, string[]>();
+  const addRight = (labels: string[]) => explicitRightAngles.set(key3(labels), labels);
   const explicitEqualSides = new Set<string>();
   for (const f of facts) {
     if (!f.enabled) continue;
     for (const cmd of f.cmds) {
       if (cmd.type === 'cos-angle' && !cmd.soft && Math.abs(cmd.cos) < 1e-9 && cmd.u.kind === 'pair' && cmd.v.kind === 'pair' && cmd.u.from === cmd.v.from)
-        explicitRightAngles.add(key3([cmd.u.from, cmd.u.to, cmd.v.to]));
+        addRight([cmd.u.from, cmd.u.to, cmd.v.to]);
       if (cmd.type === 'claim' && cmd.claim.type === 'angle-seg-eq' && Math.abs(cmd.claim.deg - 90) < 1e-9 && cmd.claim.a1 === cmd.claim.a2)
-        explicitRightAngles.add(key3([cmd.claim.a1, cmd.claim.b1, cmd.claim.b2]));
+        addRight([cmd.claim.a1, cmd.claim.b1, cmd.claim.b2]);
       if (cmd.type === 'claim' && cmd.claim.type === 'vertex-angle-eq' && Math.abs(cmd.claim.deg - 90) < 1e-9)
-        explicitRightAngles.add(key3([cmd.claim.vertex, cmd.claim.p, cmd.claim.q]));
+        addRight([cmd.claim.vertex, cmd.claim.p, cmd.claim.q]);
       // an explicit |xy| = |zw| whose two pairs span exactly THREE labels names a triangle's side pair
       if (cmd.type === 'length-rel' && !cmd.soft && cmd.c === 1 && 'pair' in cmd.rhs) {
         const labels = new Set([cmd.a1, cmd.b1, ...cmd.rhs.pair]);
@@ -426,9 +432,24 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
     }
   }
   const droppedSoft = (cmd: Command3): boolean => {
-    if (cmd.type === 'cos-angle')
-      return !!cmd.soft && cmd.u.kind === 'pair' && cmd.v.kind === 'pair' &&
-        explicitRightAngles.has(key3([cmd.u.from, cmd.u.to, cmd.v.to]));
+    if (cmd.type === 'cos-angle') {
+      if (!cmd.soft || cmd.u.kind !== 'pair' || cmd.v.kind !== 'pair') return false;
+      // #1792: a soft right angle that belongs to a RING (a right trapezoid's) yields to an explicit
+      // right angle at ANY CORNER of that ring — which leg is perpendicular is the student's to state. A
+      // corner is a ring vertex between its two ring neighbours (an angle with a diagonal arm is not one).
+      const ring = cmd.ring;
+      if (ring) {
+        const n = ring.length;
+        const isCorner = ([v, p, q]: string[]): boolean => {
+          const i = ring.indexOf(v);
+          if (i < 0) return false;
+          const nb = [ring[(i + 1) % n], ring[(i + n - 1) % n]];
+          return p !== q && nb.includes(p) && nb.includes(q);
+        };
+        return [...explicitRightAngles.values()].some(isCorner);
+      }
+      return explicitRightAngles.has(key3([cmd.u.from, cmd.u.to, cmd.v.to]));
+    }
     if (cmd.type === 'length-rel' && cmd.soft && 'pair' in cmd.rhs) {
       const labels = new Set([cmd.a1, cmd.b1, ...cmd.rhs.pair]);
       return labels.size === 3 && explicitEqualSides.has(key3([...labels]));
@@ -1069,7 +1090,9 @@ function readStatement3(
               ? { code: 'ambiguous-angle-vertex', vertex: parsed.vertex, angles: angleCandidatesAt(st, parsed.vertex).join(', ') }
               : parsed.reason === 'component-symbolic'
                 ? { code: 'component-symbolic', component: parsed.component }
-                : { code: 'not-understood' },
+                : parsed.reason === 'inscribed-contradicts-noun'
+                  ? { code: 'inscribed-contradicts-noun', shape: parsed.shape, forced: parsed.forced, sentence: utterance.trim() }
+                  : { code: 'not-understood' },
   };
 }
 
@@ -1083,7 +1106,7 @@ function lostGivens3(utterance: string, commands: readonly Command3[], prior: Co
     ...droppedNewLabels3(utterance, cmds, [...prior.points.keys()], [...prior.vectors.keys()]),
     ...droppedGivenNumbers3(utterance, cmds),
     ...droppedShapeNoun3(utterance, cmds), // #587 / ADR-3D-084: a stated base shape the lane cannot lower
-    ...droppedTriShape3(utterance, cmds), // #424: a stated triangle qualifier silently dropped
+    ...droppedShapeAdjective3(utterance, cmds), // #424/#1792: a stated shape adjective silently dropped (per phrase)
     ...droppedConstructNoun3(utterance, cmds), // #438/#440: a stated OBJECT never materialised
     ...droppedGivenRelations3(utterance, cmds), // #1730: a stated pair relation no command carries
   ];

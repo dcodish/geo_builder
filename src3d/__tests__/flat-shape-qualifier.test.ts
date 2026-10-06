@@ -27,7 +27,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { parse3 } from '../parser/parse3';
-import { droppedTriShape3 } from '../parser/honesty3';
+import { droppedShapeAdjective3 } from '../parser/honesty3';
 import { derive3, useGeo3 } from '../store/store3';
 
 function reset() {
@@ -192,24 +192,24 @@ describe('#424 — right + isosceles anchors the equal pair at the RIGHT-ANGLE v
 
 describe('#424 — the honesty gate is bound to the EVENT, not to the LLM path', () => {
   it('a stated qualifier no command accounts for is named as lost', () => {
-    expect(droppedTriShape3('ABC משולש שווה צלעות', [{ type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] }]))
+    expect(droppedShapeAdjective3('ABC משולש שווה צלעות', [{ type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] }]))
       .toEqual(['שווה צלעות']);
-    expect(droppedTriShape3('isosceles triangle ABC', [{ type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] }]))
+    expect(droppedShapeAdjective3('isosceles triangle ABC', [{ type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] }]))
       .toEqual(['isosceles']);
   });
 
   it('an equal-length relation OR an equilateral-by-construction kind accounts for it (generous side)', () => {
-    expect(droppedTriShape3('ABC משולש שווה צלעות', [
+    expect(droppedShapeAdjective3('ABC משולש שווה צלעות', [
       { type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] },
       { type: 'length-rel', a1: 'A', b1: 'B', rhs: { pair: ['B', 'C'] }, c: 1 },
     ])).toEqual([]);
-    expect(droppedTriShape3('מנסרה ישרה שבסיסה משולש שווה צלעות', [
+    expect(droppedShapeAdjective3('מנסרה ישרה שבסיסה משולש שווה צלעות', [
       { type: 'solid', kind: 'prism3e', ids: ['A', 'B', 'C', "A'", "B'", "C'"] },
     ])).toEqual([]);
   });
 
   it('an utterance with no qualifier is never gated', () => {
-    expect(droppedTriShape3('משולש ABC', [{ type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] }])).toEqual([]);
+    expect(droppedShapeAdjective3('משולש ABC', [{ type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] }])).toEqual([]);
   });
 
   it('every shipped form passes its own gate (no false positive on the real parser)', () => {
@@ -222,7 +222,7 @@ describe('#424 — the honesty gate is bound to the EVENT, not to the LLM path',
       const p = parse3(u);
       expect(p.ok, u).toBe(true);
       if (!p.ok) continue;
-      expect(droppedTriShape3(u, p.commands), u).toEqual([]);
+      expect(droppedShapeAdjective3(u, p.commands), u).toEqual([]);
     }
   });
 });

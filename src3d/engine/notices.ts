@@ -109,6 +109,16 @@ export type BuildNotice3 =
       to: string;
     }
   | {
+      /** #1792: a stated quad was constrained into the cyclic member of its family so the circle stated
+       *  THROUGH its vertices could hold («טרפז ABCD חסום במעגל» — a cyclic trapezoid is isosceles). */
+      kind: 'inscribed-constrained';
+      /** The ring, as the student lettered it. */
+      ids: Id[];
+      /** The shape the student stated, and the shape it became — both `notice.shape.*` keys. */
+      from: QuadBase;
+      to: string;
+    }
+  | {
       /** #375: the student called a LINE a plane («ACD אנך למישור ℓ1»). The kinds are known, so the
        *  relation is built — and the wording is corrected here rather than silently ignored. */
       kind: 'line-called-plane';
@@ -479,6 +489,15 @@ export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = 
     const entry = CYCLIC_MEMBER[spec.base];
     if (entry.fix.kind === 'none') continue; // square / rectangle are cyclic already — nothing changed
     out.push({ kind: 'base-constrained', ids: [...s.ids], from: spec.base, to: CYCLIC_MEMBER_NAME[spec.base] });
+  }
+  // #1792: the same registry, reached by a circle through a stated quad's vertices. Derived from the
+  // construction (the circle and the stated shape), so it survives undo/load like every notice.
+  for (const k of c.circles3) {
+    if (k.def.kind !== 'circum' || k.def.ring.length !== 4) continue;
+    const ring = k.def.ring;
+    const stated = c.quadShapes.find((q) => q.ids.length === 4 && q.ids.every((id) => ring.includes(id)));
+    if (!stated || CYCLIC_MEMBER[stated.base].fix.kind === 'none') continue;
+    out.push({ kind: 'inscribed-constrained', ids: [...ring], from: stated.base, to: CYCLIC_MEMBER_NAME[stated.base] });
   }
   // #853 (ADR-3D-209): everything that says «true, and already known» — one predicate, one channel.
   // The four cases that used to live here inline (a redundant shape, a relation between two

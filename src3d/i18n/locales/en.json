@@ -154,6 +154,7 @@
     "ambiguousVectorLength": "vector or length? write vector AB = vector CD (or AB→ = CD→), or |AB| = |CD|",
     "paramRolesConflated": "the letter {{letter}} is used both as the running parameter (outside the parentheses) and as a component inside them — it isn't clear which you meant. Pick a different letter for the running parameter, e.g. x=t({{letter}}-1, 5-{{letter}}, -2)",
     "componentSymbolic": "A single coordinate with a letter value («{{component}}») is not supported yet — give it a number, e.g. {{component}} = 3",
+    "inscribedContradictsNoun": "A {{shape}} cannot be inscribed in a circle: «{{sentence}}». A circle through every vertex would make it a {{forced}}, and a {{forced}} is not a {{shape}}. If the shape is a {{forced}}, write \"{{forced}}\" instead of \"{{shape}}\".",
     "proofTarget": "That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{sentence}}»",
     "droppedGiven": "The statement was not added to the figure, because we could not draw: {{items}}. Try splitting it into shorter givens or rephrasing",
     "noPrismToMakeRight": "there is no prism in the figure to make right — build a prism or a parallelepiped first",
@@ -249,6 +250,7 @@
   "load.partial": "The file opened, but {{count}} step(s) could not be rebuilt (step {{steps}}) — they are flagged in the list. The steps are kept exactly as saved.",
   "notice": {
     "baseConstrained": "For the pyramid to be right, the base ({{ids}}) was constrained from a {{from}} to a {{to}}.",
+    "inscribedConstrained": "For the circle to pass through every vertex, {{ids}} was constrained from a {{from}} to a {{to}}.",
     "shape": {
       "square": "square",
       "rectangle": "rectangle",
@@ -259,7 +261,8 @@
       "quad": "quadrilateral",
       "rightKite": "right kite",
       "isoTrapezoid": "isosceles trapezoid",
-      "cyclicQuad": "cyclic quadrilateral"
+      "cyclicQuad": "cyclic quadrilateral",
+      "rightTrapezoid": "right trapezoid"
     },
     "lineCalledPlane": "Note: {{line}} is a line, not a plane. Read as \"plane {{ids}} is perpendicular to line {{line}}\".",
     "lineRelNoun": "Note: {{line}} is a line, not a plane — the relation was built against line {{line}}.",

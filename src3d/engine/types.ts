@@ -1085,7 +1085,9 @@ export type Command3 =
   | { type: 'perp-to-base'; from?: Id; face?: Id[]; len?: number }
   // V8-f (G6): cos of the angle between two operands = a value. `cos∠ACB = 3/4`
   // (vertex ⇒ pairs) · `קוסינוס הזווית בין הוקטורים w ו-u הוא √35/10` (named vectors).
-  | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number; soft?: boolean }
+  // `ring` (#1792): the polygon a SOFT default right angle belongs to — a right trapezoid's. An explicit
+  // right angle at any vertex of that ring retires it (derive3); absent, the ring is the angle's own three labels.
+  | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number; soft?: boolean; ring?: Id[] }
   | { type: 'concyclic'; ids: Id[] } // #305: A,B,C,D on one circle (the right-pyramid base fix) // `soft` (issue #116): a right-triangle's DEFAULT right-angle vertex, dropped in derive3 when an explicit ∠=90 on the same triangle is stated (M4 defaults-yield)
   // V8-f (G9): a CHAIN of dot products all equal — `u·v = v·w = u·w`. Apply lowers to
   // pairwise dot-eq relations (drive on a free figure, else verify).
@@ -1675,7 +1677,9 @@ export type Requirement3 =
   // here (sample-and-gate) and never in the solver: the shape's own dims keep their freedom and
   // «show another configuration» varies them, but the seeds that look like a MORE SPECIFIC shape are
   // not shown while a general one is reachable.
-  | { kind: 'quad-general'; base: QuadBase; ids: [Id, Id, Id, Id] };
+  // `right` (#1792): a right angle is STATED at a corner of this ring (a right trapezoid, a cyclic kite),
+  // so a right corner is not a special case the drawing must avoid.
+  | { kind: 'quad-general'; base: QuadBase; ids: [Id, Id, Id, Id]; right?: true };
 
 export type EngineError3 =
   | { code: 'already-defined'; id: Id }

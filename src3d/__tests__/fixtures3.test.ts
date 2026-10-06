@@ -269,6 +269,10 @@ const SEEDED: SeededCorpus = {
   // is now re-seated and the triangle grows. The class rows and the 24-seed lock live in
   // issue-1735-rider-host-reseat.test.ts.
   'rider-length-1735.geo3.json': ['משולש ABC', 'D על AB', 'AD = 3'],
+  // #1792 (ADR-3D-307) — a trapezoid inscribed in a circle. Committed green on main with a ring no circle passes
+  // through; it now draws the cyclic member (equal diagonals) and the concyclic backstop verifies every vertex.
+  // The second line is the issue's own adjective, standalone. The class sweep lives in issue-1792-shape-phrase.test.ts.
+  'trapezoid-circumcircle-1792.geo3.json': ['טרפז ABCD חסום במעגל', 'טרפז ישר זווית EFGH'],
   // #1728 (ADR-3D-297) — the named diagonals of a general quad meet where BOTH are. The reported line (sides AB,
   // CD named as diagonals) is a refusal and lives in issue-1728-diagonals-meet.test.ts; this is its building
   // twin, with «E על BD» — refuted while E sat at AC's midpoint — so the net holds the meet and the drift.

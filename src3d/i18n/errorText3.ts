@@ -63,6 +63,11 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #1547: a single coordinate with a symbolic value — named by the student's own component.
     case 'component-symbolic':
       return t('err.componentSymbolic', { component: err.component });
+    // #1792 (the #1554 ruling): name both shapes and quote the sentence — 2-D/analytic's wording, 3-D keys.
+    case 'inscribed-contradicts-noun':
+      return t('err.inscribedContradictsNoun', {
+        sentence: err.sentence, shape: t(`notice.shape.${err.shape}`), forced: t(`notice.shape.${err.forced}`),
+      });
     // #926: the change went through; this names the rows it left without effect (they stay, marked).
     case 'dependents-broken':
       return t('err.dependentsBroken', { cause: err.cause, items: err.items });

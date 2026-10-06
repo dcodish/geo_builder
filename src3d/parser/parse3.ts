@@ -25,6 +25,7 @@ import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind,
 import { MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX } from '../lexicon/nouns3';
 import { foldPrimes3, VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
+import { quadNoun3, readShapePhrase3, SHAPE_ADJ_EN_ANY3, SHAPE_ADJ_WORDS3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
 // #1545 (ADR-3D-300): the ONE prime fold lives in the vocabulary leaf; re-exported so every parser-side
 // reader (the ask lane, the LLM sequence gate) reaches it through the normaliser that applies it.
 export { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';
@@ -69,7 +70,10 @@ export type ParseResult3 =
   | { ok: false; reason: 'ambiguous-angle-vertex'; vertex: string; rider: string }
   // #1547 (ADR-3D-299): «x_B = 2t» — ONE coordinate given a symbolic value. Recognised and refused by
   // name: on a new point the coord-sym lowering would zero the two unstated components (ADR-052).
-  | { ok: false; reason: 'component-symbolic'; component: string };
+  | { ok: false; reason: 'component-symbolic'; component: string }
+  // #1792 (ADR-3D-307): the #1554 ruling — a shape inscribed in a circle that the circle would turn into
+  // ANOTHER noun («טרפז ישר זווית ABCD חסום במעגל»: a rectangle). Refused naming both; never escalated.
+  | { ok: false; reason: 'inscribed-contradicts-noun'; shape: string; forced: string };
 
 const NOT_HANDLED: ParseResult3 = { ok: false, reason: 'not-handled' };
 
@@ -787,14 +791,8 @@ const rightPyramidPoint: Rule = (s) => {
  * cannot recur. Ordered specific → generic, so `מעוין` is never claimed by the generic `מרובע`.
  */
 function statedQuadBase(s: string): QuadBase | null {
-  if (/ריבוע/.test(s) || /\bsquare\b/i.test(s)) return 'square';
-  if (/מלבן/.test(s) || /\brectang/i.test(s)) return 'rectangle';
-  if (/מעויי?ן/.test(s) || /\brhombus\b/i.test(s)) return 'rhombus';
-  if (/מקבילית/.test(s) || /\bparallelogram\b/i.test(s)) return 'parallelogram';
-  if (/דלתון/.test(s) || /\bkite\b/i.test(s)) return 'kite';
-  if (/טרפז/.test(s) || /\btrapez/i.test(s)) return 'trapezoid';
-  if (/מרובע/.test(s) || /\bquadrilateral\b/i.test(s)) return 'quad';
-  return null;
+  // #1792: the words live in the lexicon's shape-phrase vocabulary, beside the adjectives they take
+  return quadNoun3(s);
 }
 
 /**
@@ -827,8 +825,9 @@ const TRI_RIGHT_WORDS = /ישר\s*[-\s]?\s*זו?וית|\bright[-\s]?angled\b|\br
 const RIGHT_TRI_PHRASE = /משולש.*ישר\s*[-\s]?\s*זו?וית|ישר\s*[-\s]?\s*זו?וית.*משולש|right[-\s]?(?:angled\s+)?triangle/i;
 
 function statedTriShapeWord(s: string): TriShape | null {
-  if (/שווה[\s-]?צלעות/.test(s) || /כל\s+מקצועותיה\s+שוו/.test(s) || /\bequilateral\b/i.test(s)) return 'equilateral';
-  if (/שווה[\s-]?שוקיים/.test(s) || /\bisosceles\b/i.test(s)) return 'isosceles';
+  // #1792: the adjective words are the lexicon's — one spelling list for every noun they modify
+  if (new RegExp(SHAPE_ADJ_WORDS3.equilateral, 'i').test(s)) return 'equilateral';
+  if (new RegExp(SHAPE_ADJ_WORDS3.isosceles, 'i').test(s)) return 'isosceles';
   return null;
 }
 
@@ -860,18 +859,38 @@ function withoutTriQualifier(s: string): string {
 }
 
 /**
- * The constraints a qualifier stated on a QUAD base adds beyond the base kind itself (#424) — today
- * exactly one pair needs it: `טרפז שווה שוקיים` / `isosceles trapezoid`, whose equal legs are already
- * the registry's own `CYCLIC_MEMBER.trapezoid.fix`. Every other quad qualifier is carried by a noun of
- * its own (an equilateral parallelogram is a `מעוין`), so this stays a one-member reading rather than
- * a second vocabulary. `already` are the commands the caller has emitted, so a RIGHT trapezoid — which
- * receives the same constraint from its cyclic fix — is not given it twice.
+ * The constraints the ADJECTIVES stated on a QUAD noun add beyond the noun itself (#424, generalised by
+ * #1792 to read the shape phrase): the trapezoid is the one quad noun an adjective refines — every other
+ * quad qualifier is carried by a noun of its own (an equilateral parallelogram is a `מעוין`).
+ *
+ *  - **isosceles trapezoid** → the equal legs |AD| = |BC|, the registry's own `CYCLIC_MEMBER.trapezoid.fix`;
+ *  - **right trapezoid** → AD ⟂ AB at the first vertex (with AB ∥ DC that makes ∠D right too — 2-D's
+ *    `rightTrapezoid` vertex), **soft**: "right trapezoid" says SOME leg is perpendicular to the bases, and
+ *    which one is the student's to state (M4 / ADR-052). It carries its `ring`, so an explicit right angle
+ *    at ANY vertex of the ring retires it in derive3, as a right triangle's middle-vertex default yields (#116).
+ *
+ * `already` are the commands the caller has emitted, so a constraint a cyclic fix already carries (a RIGHT
+ * pyramid over an isosceles trapezoid) is not given twice.
  */
 function quadShapeCommands(s: string, base: QuadBase, ring: Id[], already: Command3[]): Command3[] {
-  if (base !== 'trapezoid' || statedTriShapeWord(s) !== 'isosceles') return [];
-  const legs = cyclicFixCommands('trapezoid', ring);
-  const has = already.some((c) => c.type === 'length-rel' && legs.some((l) => l.type === 'length-rel' && l.a1 === c.a1 && l.b1 === c.b1));
-  return has ? [] : legs;
+  return quadAdjCommands(readShapePhrase3(s), base, ring, already);
+}
+
+/** {@link quadShapeCommands} over a phrase already read. */
+function quadAdjCommands(phrase: ShapePhrase3 | null, base: QuadBase, ring: Id[], already: Command3[]): Command3[] {
+  if (base !== 'trapezoid' || !phrase) return [];
+  const out: Command3[] = [];
+  if (phrase.consumed.includes('isosceles')) out.push(...cyclicFixCommands('trapezoid', ring));
+  if (phrase.consumed.includes('right')) {
+    const [a, b, , d] = ring;
+    out.push({ type: 'cos-angle', u: { kind: 'pair', from: a, to: d }, v: { kind: 'pair', from: a, to: b }, cos: 0, soft: true, ring: [...ring] });
+  }
+  return out.filter((k) => !already.some((c) => sameLengthRel(c, k)));
+}
+
+/** Two `length-rel` commands over the same first pair — the de-duplication `quadShapeCommands` always did. */
+function sameLengthRel(x: Command3, y: Command3): boolean {
+  return x.type === 'length-rel' && y.type === 'length-rel' && x.a1 === y.a1 && x.b1 === y.b1;
 }
 
 /**
@@ -948,8 +967,12 @@ function cyclicFixCommands(base: QuadBase, ring: Id[]): Command3[] {
       const nxt = ring[(fix.vertex + 1) % 4];
       return [{ type: 'cos-angle', u: { kind: 'pair', from: v, to: prev }, v: { kind: 'pair', from: v, to: nxt }, cos: 0 }];
     }
-    case 'equal-legs': // an isosceles trapezoid: the legs AD and BC are equal
-      return [{ type: 'length-rel', a1: ring[0], b1: ring[3], rhs: { pair: [ring[1], ring[2]] }, c: 1 }];
+    // an isosceles trapezoid: its DIAGONALS are equal, |AC| = |BD|. #1792: not the legs — with AB ∥ DC,
+    // |AD| = |BC| also holds on every PARALLELOGRAM, and a free flat ring solved onto that branch at 3 of 8
+    // seeds (a circle through a parallelogram's vertices then missed one). Equal diagonals on a trapezoid
+    // admit only the isosceles trapezoid and the rectangle — both cyclic, both isosceles trapezoids.
+    case 'equal-diagonals':
+      return [{ type: 'length-rel', a1: ring[0], b1: ring[2], rhs: { pair: [ring[1], ring[3]] }, c: 1 }];
     case 'concyclic':
       return [{ type: 'concyclic', ids: [...ring] }];
   }
@@ -4264,6 +4287,83 @@ const rightTriangle: Rule = (s) => {
 const POLY_WORDS_HE3 = 'משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע';
 const POLY_WORDS_EN3 = String.raw`triangle|quad\w*|square|rectangle|rhombus|trapez\w*|parallelogram|kite|polygon`;
 
+/** An inscription sentence: an inscribe/circumscribe verb and a circle. */
+function isInscription3(s: string): boolean {
+  return /חסומ?|חוסמ?|inscrib\w*|circumscrib\w*/i.test(s) && /מעגל|\bcircle\b/i.test(s);
+}
+
+/**
+ * Does the CIRCLE contain the polygon (`true`: the polygon is inscribed in it), the polygon contain the
+ * circle (`false`), or is the sentence undecidable (`null`)? `ring` is the polygon's named run — empty for
+ * an unlettered sentence, which names its polygon by the noun alone.
+ *
+ * #1792 (arm C): the container marker belongs to the whole shape PHRASE, adjective included. English puts
+ * the adjective between «in» and the noun ("in right triangle ABC"), and a marker test against the bare
+ * noun missed it, so the verb fallback made the CIRCLE the container and drew a circumcircle for a
+ * sentence about an incircle. Hebrew puts the adjective after the noun («במשולש ישר זווית»), so the
+ * marker always touches the noun there.
+ */
+function circleContains3(s: string, ring: readonly Id[]): boolean | null {
+  const polyRe = new RegExp(`${POLY_WORDS_HE3}|${POLY_WORDS_EN3}`, 'i');
+  // #586: the polygon NOUN is OPTIONAL. The ring is what identifies the polygon, and students write it
+  // bare — «מעגל חוסם את ABCD». Requiring the noun made this the #494/#513/#529 framing gap (a rule
+  // spelling one form of a subject written several ways); everything downstream already worked.
+  const nounIdx = s.search(polyRe);
+  const runIdx = ring.length ? s.indexOf(ring.join('')) : -1;
+  const adj = String.raw`(?:(?:${SHAPE_ADJ_EN_ANY3})\s+)*`;
+  // which side carries the "in" marker — the CONTAINER. With no noun, the marker rides the RUN itself
+  // («מעגל חסום ב-ABCD»), which is the bare-run twin of `בתוך ה?<noun>`.
+  const polyContainer =
+    new RegExp(
+      String.raw`(?:ב|בתוך\s+ה?)(?:${POLY_WORDS_HE3})|\bin(?:side)?\s+(?:an?\s+|the\s+)?${adj}(?:${POLY_WORDS_EN3})`,
+      'i',
+    ).test(s) ||
+    (nounIdx < 0 && ring.length > 0 &&
+      new RegExp(String.raw`(?:(?:ב|בתוך\s+ה?)-?\s*|\bin(?:side)?\s+(?:the\s+)?)${ring.join('')}\b`, 'i').test(s));
+  const circContainer = /(?:ב|בתוך\s+ה?)מעגל|\bin(?:side)?\s+(?:an?\s+|the\s+)?circle/i.test(s);
+  if (polyContainer !== circContainer) return circContainer;
+  // neither (or both) marked — fall back to the VERB: «חוסם» names what CONTAINS.
+  const circIdx = s.search(/מעגל|\bcircle\b/i);
+  const polyIdx = nounIdx >= 0 ? nounIdx : runIdx;
+  if (circIdx < 0 || polyIdx < 0) return null;
+  // #1792: "X circumscribed about Y" names its CONTAINER as its subject, as «X חוסם את Y» does — so word
+  // order decides it. The old rule forced the POLYGON to contain whenever the verb read "circumscribed
+  // about", and «circle circumscribed about triangle ABC» drew an INcircle.
+  return /חוסמ?\s*(?:את\s*)?(?:ה?מעגל)/i.test(s) ? false : circIdx < polyIdx;
+}
+
+/**
+ * #1792 — the #1554 ruling (operator, 2026-10-01): a shape phrase that a circle through every vertex
+ * would turn into ANOTHER noun is refused, naming both. «טרפז ישר זווית ABCD חסום במעגל»: a cyclic
+ * trapezoid has equal legs, and a right one with equal legs is a rectangle, which is not a trapezoid.
+ * Read before any label, so the lettered, unlettered and English sentences all get it (2-D ADR-595 §3,
+ * analytic ADR-AG-198). Context-free, so `parse3` asks it before its rules.
+ */
+function inscribedContradiction3(s: string): { shape: string; forced: string } | null {
+  if (!isInscription3(s)) return null;
+  const phrase = readShapePhrase3(s);
+  if (!phrase || phrase.cyclic === 'yes') return null;
+  return circleContains3(s, firstLabelRun(s)) === true ? phrase.cyclic : null;
+}
+
+/**
+ * #1792 (arm B) — what a circle THROUGH every vertex makes of a ring of four or more. Nothing lowered
+ * the inscription for n ≥ 4: the circle's centre was fitted (`ringCircumcentre3`) and its radius read
+ * from vertex 0, so «טרפז ABCD חסום במעגל» drew a trapezoid the circle missed and reported ✓.
+ *
+ * A quad takes its noun's `CYCLIC_MEMBER` fix — the registry the operator ruled for right pyramids
+ * (#305), reused rather than re-decided: a rhombus becomes a square, a parallelogram a rectangle, a kite
+ * a right kite, a trapezoid isosceles, a general quad concyclic (and `notices.ts` names what it became). A
+ * pentagon has no family to specialise, so each vertex past the third is put on the circle through the
+ * first three. Lowered as relations (the ADR-110 macro pattern), so M1 drives a free ring and verifies a
+ * determined one (a solid's face). `already` de-duplicates a constraint the noun's adjective carries.
+ */
+function cyclicRingCommands(base: QuadBase | null, ring: Id[], already: Command3[]): Command3[] {
+  if (ring.length === 4) return cyclicFixCommands(base ?? 'quad', ring).filter((k) => !already.some((c) => sameLengthRel(c, k)));
+  if (ring.length === 5) return ring.slice(3).map((v): Command3 => ({ type: 'concyclic', ids: [ring[0], ring[1], ring[2], v] }));
+  return [];
+}
+
 /**
  * #442 — a circle INSCRIBED IN / CIRCUMSCRIBED ABOUT a polygon, in R³.
  *
@@ -4272,7 +4372,7 @@ const POLY_WORDS_EN3 = String.raw`triangle|quad\w*|square|rectangle|rhombus|trap
  * ported verbatim, and it is ported because 2-D learned it the hard way: the order test silently built
  * the CONVERSE for every inverted Hebrew passive, in production, for months. It also settles the
  * operator's own mixed phrasing `משולש ABC חוסם במעגל` — circumscribe VERB, but the ב marker sits on
- * מעגל, so the circle is the container and the triangle is inscribed in it.
+ * מעגל, so the circle is the container and the triangle is inscribed in it ({@link circleContains3}).
  *
  *   משולש ABC חסום במעגל   → the triangle is IN the circle  → `circum` (through A,B,C)
  *   מעגל חסום במשולש ABC   → the circle is IN the triangle  → `incircle`
@@ -4282,44 +4382,26 @@ const POLY_WORDS_EN3 = String.raw`triangle|quad\w*|square|rectangle|rhombus|trap
  * The ring may be a flat polygon or a SOLID'S FACE (the operator's case: ABC as a pyramid base) — both
  * are just a run of existing labels lying in a plane, so one rule serves both. The circle's centre is
  * derived, never a created point (the V6 unnamed-centre rule).
+ *
+ * #1792: the polygon is read as a SHAPE PHRASE ({@link readShapePhrase3}) — its noun decides the arity, an
+ * adjective the noun lowers is lowered, and one it cannot («מרובע ישר זווית») declines the rule (the line
+ * escalates; the adjective is never dropped). A circle through a ring of four or more makes the ring cyclic.
  */
 const polygonCircle3: Rule = (s) => {
-  if (!/חסומ?|חוסמ?|inscrib\w*|circumscrib\w*/i.test(s)) return null;
-  if (!/מעגל|\bcircle\b/i.test(s)) return null;
-  const polyRe = new RegExp(`${POLY_WORDS_HE3}|${POLY_WORDS_EN3}`, 'i');
+  if (!isInscription3(s)) return null;
   const ring = firstLabelRun(s);
   if (ring.length < 3 || ring.length > 5) return null; // the polygon must be NAMED — an unnamed one has no ring to fit
-  // #586: the polygon NOUN is OPTIONAL. The ring is what identifies the polygon, and students write it
-  // bare — «מעגל חוסם את ABCD». Requiring the noun made this the #494/#513/#529 framing gap (a rule
-  // spelling one form of a subject written several ways); everything downstream already worked.
-  const nounIdx = s.search(polyRe);
-  const runIdx = s.indexOf(ring.join(''));
-  // which side carries the "in" marker — the CONTAINER. With no noun, the marker rides the RUN itself
-  // («מעגל חסום ב-ABCD»), which is the bare-run twin of `בתוך ה?<noun>`.
-  const polyContainer =
-    new RegExp(
-      String.raw`(?:ב|בתוך\s+ה?)(?:${POLY_WORDS_HE3})|\bin(?:side)?\s+(?:an?\s+|the\s+)?(?:${POLY_WORDS_EN3})`,
-      'i',
-    ).test(s) ||
-    (nounIdx < 0 &&
-      new RegExp(String.raw`(?:(?:ב|בתוך\s+ה?)-?\s*|\bin(?:side)?\s+(?:the\s+)?)${ring.join('')}\b`, 'i').test(s));
-  const circContainer = /(?:ב|בתוך\s+ה?)מעגל|\bin(?:side)?\s+(?:an?\s+|the\s+)?circle/i.test(s);
-  let circleIsContainer: boolean;
-  if (polyContainer !== circContainer) circleIsContainer = circContainer;
-  else {
-    // neither (or both) marked — fall back to the VERB: «חוסם» names what CONTAINS.
-    const circIdx = s.search(/מעגל|\bcircle\b/i);
-    const polyIdx = nounIdx >= 0 ? nounIdx : runIdx;
-    if (circIdx < 0 || polyIdx < 0) return null;
-    circleIsContainer = /חוסמ?\s*(?:את\s*)?(?:ה?מעגל)|circumscrib\w*\s+(?:about|around)/i.test(s)
-      ? false
-      : circIdx < polyIdx;
-  }
+  const circleIsContainer = circleContains3(s, ring);
+  if (circleIsContainer === null) return null;
   // an explicitly named circle keeps its letter; otherwise the id is derived from the ring, so the
   // implicit-reference lane (`c.circles3.length === 1`) still resolves «המעגל»
   const named = s.match(/(?:מעגל|circle)\s+([A-Z]\d*)/);
   const id = named ? `circle-${named[1]}` : `circle-${ring.join('')}`;
   const def: Circle3Def = circleIsContainer ? { kind: 'circum', ring } : { kind: 'incircle', ring };
+  // #1792: an adjective this noun cannot carry — or a bare adjective on a ring that is not a triangle's —
+  // declines the rule. Escalating is honest; committing the polygon without it is the silent drop.
+  const phrase = readShapePhrase3(s);
+  if (phrase && (phrase.unconsumed.length > 0 || (phrase.noun === null && ring.length !== 3))) return null;
   // #440: the sentence states TWO objects — the polygon AND its circle — so it must emit both. This rule
   // took the utterance off `planarPolygon` (the ADR-024 leftover guard at its head), which made the
   // POLYGON the newly-dropped half: `משולש ABC חסום במעגל` as an opening move referenced A, B, C that
@@ -4331,23 +4413,23 @@ const polygonCircle3: Rule = (s) => {
   // not a rule — it forgot every quad noun `POLY_WORDS_HE3` admits, so `מעגל חוסם את ריבוע ABCD` passed
   // the noun gate, emitted the circle ALONE, and refused `unknown-point A` as an opening move: the #440
   // half-drop re-opened on the nouns the map happened to miss. A STATED noun still has to agree with the
-  // run it names (`statedQuadBase` is the one quad vocabulary, #305/ADR-3D-090) — a mismatch is a
-  // contradiction the student wrote, and refusing is honest where guessing which half to believe is not.
-  const statedArity = /משולש|\btriangle\b/i.test(s) ? 3 : statedQuadBase(s) ? 4 : /מחומש|\bpentagon\b/i.test(s) ? 5 : null;
-  if (statedArity !== null && statedArity !== ring.length) return null;
+  // run it names (#1792: the phrase's noun decides its arity) — a mismatch is a contradiction the student
+  // wrote, and refusing is honest where guessing which half to believe is not.
+  if (phrase?.noun && phrase.arity !== ring.length) return null;
   const polyKind = ring.length === 3 ? 'polygon3' : ring.length === 4 ? 'polygon4' : 'polygon5';
   // #424's ONE vocabulary: a qualifier the parser recognises must be one it can lower, on every rule
   // that declares a polygon — `משולש שווה שוקיים ABC חסום במעגל` states the equal pair too.
   const shape: TriSpec = polyKind === 'polygon3' ? statedTriShape(s) : { equal: null, right: false };
   // #587: the quad half — `מעגל חוסם את ריבוע ABCD` states the square too, and `quad-shape` declares
-  // the ring itself (its arm 1), exactly as it does on the bare-declaration rule. ADR-3D-149 already
-  // made this rule's arity come from the ring, so the quad nouns reach here; they stopped at the
-  // honesty gate only because nothing lowered them.
-  const lowered = quadShapeCommand(polyKind === 'polygon4' ? statedQuadBase(s) : null, ring);
+  // the ring itself (its arm 1), exactly as it does on the bare-declaration rule. #1792: and the
+  // adjective the noun carries («טרפז שווה שוקיים») lowers beside it.
+  const base = polyKind === 'polygon4' ? statedQuadBase(s) : null;
+  const lowered = quadShapeCommand(base, ring);
   const poly: Command3[] = lowered.length
-    ? lowered
+    ? [...lowered, ...(base ? quadAdjCommands(phrase, base, ring, lowered) : [])]
     : [{ type: 'solid', kind: polyKind, ids: ring }, ...triShapeCommands(shape, ring)];
-  return [...poly, { type: 'circle3', id, def }];
+  const cyclic = circleIsContainer ? cyclicRingCommands(base, ring, poly) : [];
+  return [...poly, ...cyclic, { type: 'circle3', id, def }];
 };
 
 const planarPolygon: Rule = (s) => {
@@ -4384,8 +4466,13 @@ const planarPolygon: Rule = (s) => {
   // because only apply knows how many corners already exist. Emitting the bare `solid` first would fix
   // the answer to "declare" before that is known, and a ring with ONE new corner (`ריבוע ABCE` over an
   // existing ABC) would refuse `already-defined` instead of completing it.
+  // #1792: a quad or pentagon noun reads its ADJECTIVES through the shape phrase. One the noun lowers
+  // («טרפז ישר זווית», «טרפז שווה שוקיים») lowers beside `quad-shape`; one it cannot («מרובע ישר זווית»)
+  // declines the rule, so the line escalates instead of committing the polygon without it.
+  const phrase = kind === 'polygon3' ? null : readShapePhrase3(s);
+  if (phrase && phrase.unconsumed.length > 0) return null;
   const lowered = quadShapeCommand(kind === 'polygon4' ? quadBase : null, ids);
-  if (lowered.length) return lowered;
+  if (lowered.length) return [...lowered, ...(quadBase ? quadAdjCommands(phrase, quadBase, ids, lowered) : [])];
   return [{ type: 'solid', kind, ids }, ...triShapeCommands(shape, ids)];
 };
 
@@ -4862,6 +4949,9 @@ export function parse3(utterance: string): ParseResult3 {
   if (!s) return NOT_HANDLED;
   if (!VEC_MARKED && /^([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*$/.test(s))
     return { ok: false, reason: 'ambiguous-vector-length' };
+  // #1792: read BEFORE any rule (and so before any label), so every form of the sentence is refused alike
+  const contradiction = inscribedContradiction3(s);
+  if (contradiction) return { ok: false, reason: 'inscribed-contradicts-noun', ...contradiction };
   for (const rule of RULES) {
     const commands = rule(s);
     if (commands) return { ok: true, commands };

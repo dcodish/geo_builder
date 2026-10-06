@@ -53,8 +53,9 @@ The remaining niche is low-frequency and coordinate-expressible: orthoscheme / d
   pattern in this tree; reach for it before adding a construct.
 - **Defaults yield to statements ([ADR-052](../docs/06-decisions.md#adr-052)).** Never invent an unstated
   property: a prism not stated right is **oblique**; a qualifier the parser recognises must be one it can
-  lower (`statedQuadBase` / `statedTriShape` are the one vocabulary — a position-local qualifier test is
-  how gaps hide).
+  lower (`lexicon/shapePhrase3.ts` is the one vocabulary of nouns AND adjectives, read through `statedQuadBase` /
+  `statedTriShape` / `readShapePhrase3` — a position-local qualifier test is how gaps hide). A circle through a
+  ring is a claim the ring is cyclic: lower the noun's `CYCLIC_MEMBER` fix, never fit a centre and hope.
 - **Gauge vs knowledge.** A figure's placement/rotation/scale is a gauge, sampled freely **unless** something
   absolute is present (an equation plane, a parametric line, a coordinate point, a pin) — the landing funnel
   classifies which gauge components are provably free. Consequently: **a number drawn on the canvas must be
