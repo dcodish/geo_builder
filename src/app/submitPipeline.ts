@@ -36,7 +36,7 @@ import {
 } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
-import { isGeoPoint } from '@/engine';
+import { circleMembers, isGeoPoint } from '@/engine';
 import type { Construction, Id, Vec } from '@/engine';
 import { dryRunOutcome, nameByUseCommands, primeFoldFor, replay, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
 import { geoWork, isCancelled } from '@/store/geoWork';
@@ -364,9 +364,13 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     // and SPAN ACCOUNTING (ADR-453): the enforcing verdict the grammar path takes must hold on the
     // second attempt too — the two seams ask the identical question, or the LLM path becomes the
     // weaker one by drift (the ADR-240 pattern this whole battery exists to keep).
+    // #1795 (ADR-597): an existing label is context only when the decomposition refers to it — the figure's
+    // circles and polygons say what a reference reaches, exactly as on the grammar seam.
     ...unaccountedSpans(utterance, llmCmds, {
       existingPoints: llmFig.objects.filter(isGeoPoint).map((o) => o.id),
       radiusSymbols: llmFig.objects.flatMap((o) => (o.kind === 'circle' && o.radiusSymbol ? [o.radiusSymbol] : [])),
+      circleMembers: circleMembers(llmFig),
+      polygons: llmFig.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])),
     }).map((x) => x.text),
   ];
   if (stillDropped.length > 0) {

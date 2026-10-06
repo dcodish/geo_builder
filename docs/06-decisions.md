@@ -14943,3 +14943,48 @@ No gate accounted for a noun by its arity: `droppedShapeNoun` returned false as 
 - «טרפז ישר זווית חסום במעגל» is refused, naming the right trapezoid and the rectangle, instead of drawing a triangle.
 - «מלבן ABCD» · «ABCD חסום במעגל» draws instead of «already defined».
 - An adjective the tool cannot draw on that noun («מרובע ישר זווית חסום במעגל») now goes to the model instead of being dropped.
+
+## ADR-597 — An existing label is context only when the lowering refers to it: a clause about points already on the figure is never dropped green (#1795)
+
+**Status:** accepted · 2026-10-06 · bug (P1, 2-D, honesty class) · branch `fix/1795-existing-label-tail` · round #1831
+
+**Requirements:** [02-requirements.md](02-requirements.md) FR-IN-4f (new): a clause about points already on the figure is never dropped. It reaches the figure, or the line is not committed · **Design:** [04-design.md](04-design.md) § "An existing label is context only through a reference" · **LADDER stage:** parse (`parseResolved`'s gate block and the clause split) and the commit seams' honesty battery. No engine, replay or solver change.
+
+**Cites** [ADR-089](#adr-089) (the dropped-label gate), [ADR-264](#adr-264) (the clause split), [ADR-453](#adr-453) (span accounting enforcing), [ADR-461](#adr-461) (one battery, both seams), [ADR-570](#adr-570) (the precedent: narrow a gate's exemption and let the clause fallback read the compound)
+
+**Context.** Re-measured on fa1d2492 through `decideDeterministic2D` (LLM mocked). After «משולש ABC», «מעגל שקוטרו AB עובר דרך C» committed `segment AB · midpoint @ctr-O · circle-through A`, green, with C gone. The «העובר», English and «AB קוטר במעגל …» spellings did the same. So did «מעגל שקוטרו AB, C על המעגל» and «… ו-C על המעגל», although each clause reads correctly on its own. The triage's class table reproduced row for row: after «משולש ABC · נקודה D», «M אמצע AB ו-D על BC» committed only the midpoint, «מעגל חוסם את המשולש ABC עובר דרך D» only the circumcircle, and «מעגל שמרכזו A עובר דרך B ו-D על BC» only `D on BC`, with the circle gone. The 2026-10-06 row matched too: «B מתחת לאלכסון AC» after «ריבוע ABCD» committed as «draw AC».
+
+**Class.** *A clause that states a given about labels that ALREADY EXIST is dropped silently whenever the winning rule reads only a prefix of the sentence.* `droppedNewLabels` and the span accountant's label pass both exempted every existing label as "context", for the stated reason "a tangent at an existing point". Neither checked that the lowering referred to the label. So a clause naming only existing letters was invisible to the only total mechanism the gate family has. None of the category gates (numbers, symbol relations, the four verbs, polygon nouns, the circle-predicate tail) covers incidence words, and so the clause split (ADR-264), which runs only when a gate trips, never ran. 111 of the 132 rules have no leftover guard, and per-rule guards are the enumeration docs/17 §3 forbids.
+
+**Decision.**
+1. **The exemption is narrowed at the total mechanism.** The label pass moves to `src/parser/labelAccounting.ts` (`unaccountedLabels`), so the parser can call it (`spanAccounting.ts` imports `parse.ts`). An EXISTING label is context only when the lowering refers to it. It may be a member or the centre of a circle the commands reference (`circleMembers`). It may name a circle («במעגל O», "circle O") when the lowering touches a circle. Or it may be a vertex of an existing polygon the sentence names by its noun («במשולש ABC») when the commands carry one of its vertices. Masks for the area marker, radius symbols and angle aliases are unchanged. `droppedNewLabels` is left alone: its job is NEW labels, and it is a #758 retirement candidate.
+2. **The context reaches every caller.** `GateCtx` gains `circleMembers` and `polygons`. The grammar seam, the ✎ edit seam (both pass a `ParseContext`), the span shadow log and the LLM second attempt in `submitPipeline` all pass them.
+3. **The parser asks it too, for this class.** `parseResolved` adds `droppedLabelSpan` beside `droppedShapeNoun` and the rest. An EXISTING uppercase label that is unaccounted routes the line to `splitStatements`. A NEW label left unread stays the commit seam's question (`droppedNewLabels`, ADR-089), so the partial parse still reaches the gate that names what it lost (the ✎ edit message, the #779 nudge). Lowercase Latin runs are read as labels only at the seams (#779), never here, where «is» / «x» in «זווית ABC is x» are a word and a symbol. A first cut that routed every unaccounted label turned 71 locks red, among them those three behaviours. The split's `parseClause` asks again so a half-read clause cannot survive the split. With no new reading code, «מעגל שקוטרו AB ו-C על המעגל», «…, C על המעגל» and «… וגם C על המעגל» now build the circle with C on it. «M אמצע AB ו-D על BC», «AH גובה לצלע BC ו-D על BC» and «מעגל שמרכזו A עובר דרך B ו-D על BC» build both clauses. A through-form no rule reads («מעגל שקוטרו AB עובר דרך C») escalates. The canonical decomposition the model should give, «מעגל שקוטרו AB» · «C על המעגל», parses and builds through the real gate (∠ACB = 90°).
+4. **A defect the split exposed, fixed at its root.** `augmentParseCtx` registered a clause's anonymous centre by its raw id (`@ctr-O`), so the next clause's «C על המעגל» lowered onto the non-existent `circle-@CTR-O`. It now registers the centre TOKEN with `centrePoint`, as `buildParseCtx` does for a drawn circle.
+
+**Measured.**
+- **The class battery** has 37 rows: 19 constructs × {«עובר דרך D», «ו-D על BC»}, Hebrew plus the English mirror, minus one tautology. No row commits without its clause, and no row calls the model.
+- **False-flag net: zero changed verdicts.** Every typed step of the scenario corpus (1422 steps, each parsed against its real prefix context and then put through the honesty battery) gives the same verdict on this branch as on fa1d2492. The triage's five candidate false flags (naive narrowing, no reference rules) all stay clean under rules 2–3: «AD קוטר במעגל ABCD», the restated «המעגל חוסם את CEFO», «המעגל החוסם את CEFO חותך את הצלע AC בנקודה D», «F אמצע הקשת BC במעגל O» and the circumcircle tangent.
+- **Perf:** one token pass over the commands per parse. The reference closure is computed only when an existing label is not carried.
+
+**Not caught, by design (successors).**
+- The dropped clause's letters are all carried by ANOTHER clause. Examples: «AB מקביל ל-CD ו-D על BC», «AB מאונך ל-CD ו-D על BC», and «מעגל חוסם את המשולש ABC ו-AD מאונך ל-BC» (the circle dropped). Token accounting cannot see these. They are #1798's clause-coverage gate, recorded as `it.todo` in the class test.
+- «B below diagonal AC» still commits, because English «diagonal AC» draws BOTH diagonals today (the `diagonals` rule's `\bdiagonals?\b` reads the singular as the plural), so B is carried by a segment BD nobody stated. That is #1742. The Hebrew position-word rows and «B is above segment AC» no longer commit (operator ruling 2026-10-06: 2-D does not read them; they must only not commit green).
+
+**Sibling audit.**
+- Grepped every label-keyed exemption in `src/`. `droppedNewLabels` exempts by design (new labels only) and the accountant was the hole. `droppedRegionSubject` already asks the commands.
+- **Analytic** reads «מעגל שקוטרו AB ו-C על המעגל» (`diameter-of` + `on-kind`) and refuses the through-forms `not-handled`, which is honest.
+- **3-D** answers `not-understood` / `refused:dropped-given` on every row (triage of 2026-10-05), which is also honest.
+- The class is 2-D only.
+
+**Locks.**
+- `src/app/__tests__/issue-1795-existing-label-tail.test.ts`: the battery, the issue's spellings, the split lock with Thales at seeds 0–3, the oracle decomposition, the position-word rows, the reference-rule unit cases and the controls.
+- Scenario `existing-label-clause-never-dropped-1795` (corpus-4). Its decide-parity case is the one key added to shard 4's golden; no existing golden hash moved.
+- `production-feedback.test.ts`: «OB רדיוס = 5» with B an existing point NOT on circle O lowered to a bare `set-radius`, which drops «B is on the circle», a member of this class. It is now not committed there, and it still reads `set-radius` when the figure has B on the circle (the lock's own intent: the numeric radius is not hijacked).
+- Parity row `mid-compound` («משולש ABC» · «הנקודה D היא אמצע הצלע AB, והנקודה E היא אמצע הצלע BC»): 2-D now builds both midpoints. The whole-line rule dropped the existing C, so the clause split reads the line. 2-D's known gap (#1677) is dropped from that row (#1677 keeps its other rows); 3-D's (#1679) stays.
+- `span-gate-differential`'s ADR-264 "measured hole" ratchet tripped in the good direction: «CE⊥AB» lowered to a bare segment CE is now caught by its labels A, B. The lock now states the hole in its true form (every operand carried, the relation dropped, which is still `droppedGivenRelations`'s alone) and asserts the narrowed half.
+
+**Behaviour change for a student:**
+- «מעגל שקוטרו AB ו-C על המעגל» (and the comma form) draws C on the circle in one line.
+- «מעגל שקוטרו AB עובר דרך C» goes to the model instead of drawing a circle that ignores C.
+- A line that says something about a point already on the figure is never drawn with that part missing.

@@ -708,7 +708,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'circ-diam', family: 'inscribed', steps: ['משולש ABC חסום במעגל שקוטרו AC'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#1677' }] },
   { id: 'touch-list', family: 'tangents', steps: ['משולש ABC', 'הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#1660' }] },
   { id: 'passes', family: 'points-incidence', steps: ['משולש ABC', 'נקודה P', 'AC עובר דרך P'], expect: 'builds', exception: 'X9', knownGap: [{ product: '2d', issue: '#1677' }] },
-  { id: 'mid-compound', family: 'midpoint-ratio', steps: ['משולש ABC', 'הנקודה D היא אמצע הצלע AB, והנקודה E היא אמצע הצלע BC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }, { product: '3d', issue: '#1679' }] },
+  { id: 'mid-compound', family: 'midpoint-ratio', steps: ['משולש ABC', 'הנקודה D היא אמצע הצלע AB, והנקודה E היא אמצע הצלע BC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: '2-D builds both midpoints since #1795 (ADR-597): the whole-line rule dropped the existing C, so the clause split reads the compound' },
   { id: 'dist-line', family: 'lengths', steps: ['משולש ABD', 'המרחק בין D לישר AB הוא 5'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677' }] },
   { id: 'diag-meet', family: 'intersections', steps: ['מרובע ABCD', 'האלכסונים AC ו-BD נפגשים בנקודה E'], expect: 'builds' },
 

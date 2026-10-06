@@ -1176,6 +1176,16 @@ The point-on-carrier rules (`pointOnExtension`, `pointOnSegment`) match a prefix
 - **The end qualifier** — `pointOnExtension` reads «מעבר ל(-)(נקודה) X» / "beyond X": X the far end keeps the carrier; X the near end reverses it (E on the extension of CB); any other letter escalates the line whole.
 - **The net** — `droppedGivenRelations`'s exemption (b) holds only when the command that INTRODUCES one of the relation's labels itself carries every label of the relation (`K על המשך AB כך ש AB=BK` baked as t = 2). "Some label is introduced by any command" accounted «DE = DC» because E was introduced on BC. With the exemption narrowed, the parser's own clause fallback (ADR-264) reads «E על המשך BC ו-DE = DC» and «…, DE = DC», which consult the same gate, and every rule and the LLM lane are held to it.
 
+## An existing label is context only through a reference ([ADR-597](06-decisions.md#adr-597))
+
+The label pass of the span accountant lives in `src/parser/labelAccounting.ts`, so the parser can ask it as well as the commit seams (`spanAccounting.ts` imports `parse.ts`, so the parser cannot import the accountant). Every stated label must be **carried** by a command value, **masked** as notation (the area marker, a bound radius symbol, an angle alias), or be an **existing label the lowering refers to**:
+
+- a member or the centre of a circle the commands reference (`circle-X`, or its centre id) — `ParseContext.circleMembers`;
+- the name of a circle («במעגל O», "circle O") when the lowering touches a circle;
+- a vertex of an existing polygon the sentence names with its noun («במשולש ABC») when the commands carry one of its vertices — `ParseContext.polygons`.
+
+An existing label that none of these reach is unaccounted, exactly like a new one. Three callers ask one function: `honestyGateReport` (the grammar commit seam and the ✎ edit seam; `GateCtx` carries `circleMembers` and `polygons`), the LLM second attempt in `submitPipeline`, and `parseResolved`, where an unaccounted EXISTING (uppercase) label routes the line to the clause split (a new label stays the commit seam's `droppedNewLabels` question, and lowercase runs are read as labels only at the seams) (`splitStatements`, ADR-264), whose `parseClause` asks it again so a half-read clause cannot survive the split. `augmentParseCtx` registers a clause's anonymous circle centre (`@ctr-O`) by its token, with `centrePoint`, as `buildParseCtx` does, so a later clause's «C על המעגל» lands on `circle-O`. Widening the reference closure is the sanctioned direction when a real reference is found un-exempted; re-widening the exemption is not.
+
 ## A stated side is a requirement record, checked at stage 0g′ and read wherever a point is placed ([ADR-549](06-decisions.md#adr-549), [ADR-594](06-decisions.md#adr-594))
 
 - **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`) — `circle-side`,

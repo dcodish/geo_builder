@@ -9,7 +9,7 @@ import type { AnyCommand } from '@/engine';
  * of those clusters, asserted from the EXACT utterances students typed (the dominant end-to-end session
  * is locked separately in `src/__tests__/scenarios.test.ts` → `bagrut-chord-diameter-perp-session`).
  */
-const types = (u: string, ctx: { points?: string[]; circles?: string[] } = {}) => {
+const types = (u: string, ctx: { points?: string[]; circles?: string[]; circleMembers?: { id: string; center: string; points: string[] }[] } = {}) => {
   const r = parse(u, { points: [], circles: [], circleMembers: [], ...ctx } as never);
   return r.ok ? (r.commands as AnyCommand[]).map((c) => c.type) : null;
 };
@@ -224,6 +224,10 @@ describe('production feedback — name/draw a radius "OB רדיוס" (#8)', () =
   }
   it('does not hijack "D אמצע הרדיוס OB" (a midpoint) or a numeric radius', () => {
     expect(types('D אמצע הרדיוס OB', { circles: ['O'], points: ['A', 'B', 'O', 'D'] })).toContain('midpoint');
-    expect(types('OB רדיוס = 5', ctx)).not.toContain('point-on-circle');
+    // #1795 (ADR-597): «OB רדיוס» says B is ON circle O. With B an existing point the figure does not have on the
+    // circle, a bare set-radius drops that — so the line is not committed; on a figure where B IS on it, it reads.
+    const onCircle = { ...ctx, circleMembers: [{ id: 'circle-O', center: 'O', points: ['B'] }] };
+    expect(types('OB רדיוס = 5', onCircle)).toEqual(['set-radius']);
+    expect(types('OB רדיוס = 5', ctx), 'B not on the circle: not committed with the incidence dropped').toBeNull();
   });
 });

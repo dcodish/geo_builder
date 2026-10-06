@@ -68,6 +68,10 @@ export interface GateCtx {
   points?: Id[];
   radiusSymbols?: { name: string }[];
   angleAliases?: { name: string }[];
+  /** #1795 (ADR-597): an EXISTING label is context only when the lowering refers to it — through a circle it
+   *  references (its members and centre) or a polygon the sentence names. A `ParseContext` carries both. */
+  circleMembers?: { id?: string; center: string; points: string[] }[];
+  polygons?: string[][];
 }
 
 export interface GateReport {
@@ -99,9 +103,15 @@ export interface GateReport {
 export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx: GateCtx): GateReport {
   const pts = ctx.points ?? [];
   const radiusSymbols = (ctx.radiusSymbols ?? []).map((x) => x.name);
-  // The accountant's context — the same exemptions the label gate takes (an EXISTING point, a bound
-  // radius symbol, an angle alias are all legitimately unclaimed by a new command).
-  const actx = { existingPoints: pts, radiusSymbols, angleAliases: (ctx.angleAliases ?? []).map((x) => x.name) };
+  // The accountant's context. A bound radius symbol and an angle alias are notation; an EXISTING point is
+  // context only when the lowering refers to it (#1795, ADR-597) — so the figure's circles and polygons come too.
+  const actx = {
+    existingPoints: pts,
+    radiusSymbols,
+    angleAliases: (ctx.angleAliases ?? []).map((x) => x.name),
+    circleMembers: ctx.circleMembers,
+    polygons: ctx.polygons,
+  };
 
   // A typo in a keyword (e.g. "מנוקדה" for "מנקודה") can make a rule match PARTIALLY, silently dropping
   // a NEW label it introduced ("from D …") — committing a wrong/partial figure (ADR-089). An EXISTING

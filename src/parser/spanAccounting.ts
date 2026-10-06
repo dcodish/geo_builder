@@ -40,7 +40,8 @@
  * bucket, never silently treated as filler.
  */
 import type { AnyCommand } from '@/engine';
-import { normalizeUtterance, NOTATION_WORDS } from './parse';
+import { normalizeUtterance } from './parse';
+import { unaccountedLabels, type LabelAccountCtx } from './labelAccounting';
 
 export interface UnaccountedSpan {
   kind: 'label' | 'number' | 'relation' | 'unknown-word';
@@ -130,43 +131,23 @@ const wordAccounted = (word: string): boolean => {
   return false;
 };
 
+/** The figure context the accountant's exemptions come from. An EXISTING label is context only when the
+ *  lowering refers to it (#1795, ADR-597 — `labelAccounting.ts` says what "refers" means). */
+export type AccountCtx = LabelAccountCtx;
+
 /**
  * Classify the utterance's significant tokens and report the ones `commands` does not account for.
  * Accounting rules (token-level, see the header's honest boundary):
- *  - a LABEL run's letters must each appear in the commands' JSON (as ids/refs);
+ *  - a LABEL must be carried by a command value, masked as notation, or EXISTING context the lowering
+ *    refers to (#1795 — see `labelAccounting.ts`);
  *  - a NUMBER must appear in the commands (exact string or numeric equality);
  *  - a RELATION SYMBOL (=, ⊥/⟂, ∥, <, >, ≅, ~) requires at least one constraint-ish command;
  *  - a WORD must be filler or a known keyword stem — else it lands in `unknown-word`.
  */
-export interface AccountCtx {
-  /** Labels already ON the figure — a reference to an existing point is context, never a drop
-   *  (mirrors droppedNewLabels' exemption; closes the idempotent-membership + circumscribe classes). */
-  existingPoints?: string[];
-  /** Bound radius-symbol letters (R/r, #54) — measure names, not points. */
-  radiusSymbols?: string[];
-  /** Bound angle-alias names (ADR-386, «נסמן זוית BAM כ-A1») — notation, not points. */
-  angleAliases?: string[];
-}
-
 export function accountUtterance(utterance: string, commands: AnyCommand[], actx: AccountCtx = {}): UnaccountedSpan[] {
   const s = normalizeUtterance(utterance);
-  // Label accounting is CASE-SENSITIVE over command string VALUES: an id like 'seg-AB' contributes
-  // the uppercase tokens A,B (its lowercase machine prefix contributes nothing), so a field name or
-  // a type string can never false-account a student label (the "TYPE contains E" trap).
-  const strVals: string[] = [];
-  const collect = (v: unknown): void => {
-    if (typeof v === 'string') strVals.push(v);
-    else if (Array.isArray(v)) v.forEach(collect);
-    else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => k !== 'type' && collect(x));
-  };
-  commands.forEach(collect);
-  const valueLabels = new Set(strVals.flatMap((v) => v.match(/[A-Z]\d*/g) ?? []));
-  // #779: a WHOLE value that is one label token claims its canonical form case-blind — the bound
-  // radius symbol `name: "r"` (#54) accounts a lowercase-stated «r» without letting a type string's
-  // letters account anything (values only, `type` excluded above).
-  for (const v of strVals) if (/^[A-Za-z]\d*$/.test(v)) valueLabels.add(v.toUpperCase());
   // #1698 (ADR-566): numbers come from the commands' VALUES, never their field NAMES — the same
-  // discipline the label pass above applies. Scanning the serialized JSON let `ray1`/`ray2` (and
+  // discipline the label pass applies. Scanning the serialized JSON let `ray1`/`ray2` (and
   // `line1`, `circle2`, `v1`, …) account a stated 1 or 2, so «∢ABC = 3/4» lowered to 3° passed with its
   // «4» "accounted" by √4 = 2 from the key `ray2`.
   const numVals: number[] = [];
@@ -180,33 +161,11 @@ export function accountUtterance(utterance: string, commands: AnyCommand[], actx
   const cmdNumbers = numVals;
   const out: UnaccountedSpan[] = [];
 
-  // labels: split glued runs (ABCD → A,B,C,D; O1 stays O1). The AREA MARKER S is notation, not a
-  // point (the ADR-121/236 class): in «S_{ABC}» / the normalized glued «SABC», the leading S names
-  // the measure — mask it exactly like the honesty gates do.
-  const areaMarker = /(?<![A-Za-z])S(?=[A-Z]{3,4}(?![A-Z]))/.test(s) || /S_/.test(utterance);
-  const existing = new Set((actx.existingPoints ?? []).map((x) => x.toUpperCase()));
-  const symbols = new Set([...(actx.radiusSymbols ?? []), ...(actx.angleAliases ?? [])]);
-  // #779: symbol masks compare case-blind — a bound «r» masks the canonical R the case-blind
-  // extraction below produces, exactly as droppedNewLabels' mask does.
-  const symbolsUpper = new Set([...symbols].map((x) => x.toUpperCase()));
-  const account = (label: string): void => {
-    if (label === 'S' && areaMarker) return;
-    if (existing.has(label) || symbols.has(label) || symbolsUpper.has(label)) return;
-    if (!valueLabels.has(label)) out.push({ kind: 'label', text: label });
-  };
-  for (const run of s.match(/(?:[A-Z]\d*)+/g) ?? []) for (const label of run.match(/[A-Z]\d*/g) ?? []) account(label);
-  // #779: in HEBREW text a standalone Latin run is notation regardless of case — the parser's own
-  // captures accept lowercase, so the accountant must too, or «… על המעגל a ו b» commits green while
-  // its uppercase twin refuses (the P1). Latin-only text keeps the uppercase-only read: lowercase
-  // words there are English, not labels (the word loop reports them instead). Unit tokens excluded.
-  const labelWords = new Set<string>();
-  if (/[א-ת]/.test(s)) {
-    for (const run of s.match(/(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g) ?? []) {
-      if (NOTATION_WORDS.has(run.toLowerCase())) continue; // units and trig function names (#1698)
-      labelWords.add(run.toLowerCase());
-      for (const label of run.toUpperCase().match(/[A-Z]\d*/g) ?? []) account(label);
-    }
-  }
+  // labels — one pass, shared with the parser's own guard (`labelAccounting.ts`, #1795): split glued runs
+  // (ABCD → A,B,C,D; O1 stays O1), mask the area marker and bound symbols, and exempt an EXISTING label
+  // only when the lowering refers to it.
+  const { labels, labelWords } = unaccountedLabels(s, commands, actx, { raw: utterance });
+  for (const label of labels) out.push({ kind: 'label', text: label });
   // numbers — the divergence classes the first catalog sweep surfaced (reports/span-accounting-shadow.md):
   //  · a minus glued after a Hebrew letter is the maqaf preposition («מ-40»), not a sign → lookbehind;
   //  · a stated value may LOWER halved (diameter→radius; circumference 6π → r = 6/2) or ÷100 (40% → t=0.4);

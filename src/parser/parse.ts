@@ -27,6 +27,7 @@ import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { findProofTarget } from '../../shell/proofTarget';
 import { foreignGiven } from './scope';
+import { NOTATION_WORDS, UNIT_WORDS, unaccountedLabels } from './labelAccounting';
 import { readShapePhrase, lowerShape, SHAPE_ADJ_ANY, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
 
 export type ParseResult =
@@ -11785,6 +11786,31 @@ function resolveSizeQualifier(s: string, ctx: ParseContext): { s: string; assert
   return { s: out, ...(assert ? { assert } : {}) };
 }
 
+/**
+ * #1795 ([ADR-597](../../docs/06-decisions.md#adr-597)) — the label pass of the span accountant, asked at the
+ * parser's own guard, for the class it closes: an EXISTING point the student named that the lowering neither
+ * carries nor refers to (`labelAccounting.ts` says what "refers" means). A NEW label left unread stays the commit
+ * seam's question (`droppedNewLabels`, ADR-089) — the partial parse reaches the gate, which names what it lost —
+ * and a lowercase Latin run is read as labels only there (#779), never here, where «is» / «x» are a word and a symbol.
+ */
+function droppedLabelSpan(s: string, commands: AnyCommand[], ctx: ParseContext): boolean {
+  const existing = new Set((ctx.points ?? []).map((p) => p.toUpperCase()));
+  if (existing.size === 0) return false;
+  const { labels } = unaccountedLabels(
+    s,
+    commands,
+    {
+      existingPoints: ctx.points,
+      radiusSymbols: (ctx.radiusSymbols ?? []).map((x) => x.name),
+      angleAliases: (ctx.angleAliases ?? []).map((x) => x.name),
+      circleMembers: ctx.circleMembers,
+      polygons: ctx.polygons,
+    },
+    { lowercaseRuns: false },
+  );
+  return labels.some((l) => existing.has(l));
+}
+
 /** The parse body AFTER normalization + size-qualifier resolution (the pre-#102 `parse`). */
 function parseResolved(s: string, ctx: ParseContext): ParseResult {
   const whole = runRules(s, ctx);
@@ -11808,7 +11834,11 @@ function parseResolved(s: string, ctx: ParseContext): ParseResult {
         droppedRadiusSymbol(s, whole.commands).length > 0 ||
         droppedGivenRelations(s, whole.commands).length > 0 ||
         droppedCompoundRelation(s, whole.commands).length > 0 ||
-        droppedRegionSubject(s, whole.commands))) ||
+        droppedRegionSubject(s, whole.commands) ||
+        // #1795 (ADR-597): a stated LABEL the lowering neither carries nor refers to — above all a clause
+        // about points that already exist («מעגל שקוטרו AB עובר דרך C», «M אמצע AB ו-D על BC»): the rule
+        // read a prefix and the rest would vanish green. The label pass the span accountant enforces.
+        droppedLabelSpan(s, whole.commands, ctx))) ||
     // #461: …but an AMBIGUITY question is not a gate failure. `shapeWithConstruct` answers
     // «ריבוע ABCD עם אלכסון» with "which diagonal — AC or BD?", and that reply names no commands, so
     // the dropped-noun gate saw an unconsumed «אלכסון» and replaced the question with `not-handled` —
@@ -12361,7 +12391,8 @@ function splitStatements(s0: string, ctx: ParseContext): ParseResult | null {
       !droppedShapeNoun(p, r.commands, c0) &&
       !droppedMidsegment(p, r.commands) &&
       !droppedCirclePredicate(p, r.commands) &&
-      droppedRadiusSymbol(p, r.commands).length === 0
+      droppedRadiusSymbol(p, r.commands).length === 0 &&
+      !droppedLabelSpan(p, r.commands, c0) // #1795: a half-read clause cannot survive the split either
     )
       return r.commands;
     const m = p.match(CIRCLE_PRED_TAIL);
@@ -12409,6 +12440,7 @@ function augmentParseCtx(ctx: ParseContext, cmds: AnyCommand[]): ParseContext {
   for (const l of JSON.stringify(cmds).match(/[A-Z]\d*/g) ?? []) points.add(l);
   const polygons = [...(ctx.polygons ?? [])];
   const circles = new Set(ctx.circles ?? []);
+  const centrePoint: Record<string, string> = { ...(ctx.centrePoint ?? {}) };
   const neighbors: Record<string, string[]> = { ...(ctx.neighbors ?? {}) };
   const link = (a: string, b: string) => {
     neighbors[a] = [...(neighbors[a] ?? [])];
@@ -12432,9 +12464,16 @@ function augmentParseCtx(ctx: ParseContext, cmds: AnyCommand[]): ParseContext {
       for (let i = 0; i < ids.length; i++) link(ids[i] as string, ids[(i + 1) % ids.length] as string);
     }
     if (c.type === 'segment' && typeof c.a === 'string' && typeof c.b === 'string') link(c.a, c.b);
-    if (typeof c.center === 'string') circles.add(c.center);
+    // A circle is referenced by its centre TOKEN — an anonymous auto centre ('@ctr-O', ADR-342) by its letter,
+    // with the translation in centrePoint, exactly as buildParseCtx records a drawn one. Registering the raw id
+    // made a later clause's «C על המעגל» lower onto the non-existent 'circle-@CTR-O' (#1795).
+    if (typeof c.center === 'string') {
+      const token = c.center.replace(/^@ctr-/, '');
+      circles.add(token);
+      centrePoint[token] = c.center;
+    }
   }
-  return { ...ctx, points: [...points], polygons, declaredPolygons, circles: [...circles], neighbors };
+  return { ...ctx, points: [...points], polygons, declaredPolygons, circles: [...circles], centrePoint, neighbors };
 }
 
 /**
@@ -12456,13 +12495,9 @@ function augmentParseCtx(ctx: ParseContext, cmds: AnyCommand[]): ParseContext {
  *    The commit-seam fold nudge ({@link lowercaseLabelFold}) still covers folded ones by command
  *    evidence, so English lowercase labels teach rather than silently commit too.
  */
-const UNIT_WORDS = new Set(['cm', 'mm']);
-/**
- * #1698 (ADR-566): Latin NOTATION words that are never a run of point labels — the units above and the
- * trigonometric function names `trigGiven` reads («נתון: tan∢ABC = 2» is not the points T, A, N). One
- * list, read by every gate that asks which labels a text states (this file's and the span accountant's).
- */
-export const NOTATION_WORDS: ReadonlySet<string> = new Set([...UNIT_WORDS, 'tan', 'tg', 'ctg', 'cotg', 'cot', 'sin', 'cos']);
+// UNIT_WORDS / NOTATION_WORDS (#1698, ADR-566) live in `labelAccounting.ts` since #1795 — the label pass
+// the span accountant and `parseResolved` share — and are re-exported here for the parser's public surface.
+export { NOTATION_WORDS };
 const hasHebrewScript = (s: string): boolean => /[א-ת]/.test(s);
 /** Standalone Latin runs that CONTAIN a lowercase letter (boundaries exclude digit-glued expression
  *  tokens like «18r»). The raw runs, case preserved — callers decide scope and canonicalization. */

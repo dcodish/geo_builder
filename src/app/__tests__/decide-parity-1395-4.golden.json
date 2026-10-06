@@ -162,6 +162,7 @@
  "scenario:two-independent-crossings-four-configs-1600": "4f3839388b8df168",
  "scenario:point-inside-triangle-two-presses-1739": "1de11964ee578c39",
  "scenario:right-trapezoid-inscribed-refused-names-both-nouns-1790": "6e89624c38415dff",
+ "scenario:existing-label-clause-never-dropped-1795": "7667668e8b24d9a1",
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",
  "fixture:defining-interaction.geo.json": "453b283f490e90b0",
  "fixture:equilateral-inscribed.geo.json": "d8a2b3c24fc515b8",
