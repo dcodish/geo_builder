@@ -1056,6 +1056,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'unlettered-1554-14', family: 'inscribed', steps: ['מעגל חסום במרובע'], expect: 'builds', exception: 'X8' },
   { id: 'unlettered-1554-15', family: 'inscribed', steps: ['מעגל חסום בדלתון'], expect: 'builds', exception: 'X8' },
   { id: 'right-trapezoid-1554-16', family: 'inscribed', steps: ['טרפז ישר זווית ABCD חסום במעגל'], expect: 'refused', exception: 'X8', note: 'operator ruling 2026-10-01: a cyclic right trapezoid is a rectangle — refused naming both nouns' },
+  // #1798 (ADR-598, operator ruling 2026-10-06): a one-line compound is all or nothing — refused whole when a clause is not honoured
+  { id: 'compound-all-or-none-1798-01', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB מקביל ל-CD ו-D על BC'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1842' }] },
+  { id: 'compound-all-or-none-1798-02', family: 'inscribed', steps: ['משולש ABC', 'מעגל חוסם את המשולש ABC ו-AD מאונך ל-BC'], expect: 'refused' },
+  { id: 'compound-all-or-none-1798-03', family: 'intersections', steps: ['ריבוע ABCD', 'F אמצע DO, O - חיתוך של AC ו-BD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1842' }, { product: '3d', issue: '#1842' }], note: 'analytic reads both clauses and builds; 2-D refuses per the 2026-10-04 #553 ruling — which one should move is the question #1842 asks' },
+  { id: 'compound-all-or-none-1798-04', family: 'lengths', steps: ['מרובע ABCD', 'AB=4, CD=3'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1842' }], note: 'every clause honoured: a compound commits' },
+  { id: 'compound-all-or-none-1798-05', family: 'points-incidence', steps: ['ריבוע ABCD, נקודה G על AD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1842' }], note: 'every clause honoured: a compound commits' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

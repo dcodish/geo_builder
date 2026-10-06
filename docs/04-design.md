@@ -1186,6 +1186,21 @@ The label pass of the span accountant lives in `src/parser/labelAccounting.ts`, 
 
 An existing label that none of these reach is unaccounted, exactly like a new one. Three callers ask one function: `honestyGateReport` (the grammar commit seam and the ✎ edit seam; `GateCtx` carries `circleMembers` and `polygons`), the LLM second attempt in `submitPipeline`, and `parseResolved`, where an unaccounted EXISTING (uppercase) label routes the line to the clause split (a new label stays the commit seam's `droppedNewLabels` question, and lowercase runs are read as labels only at the seams) (`splitStatements`, ADR-264), whose `parseClause` asks it again so a half-read clause cannot survive the split. `augmentParseCtx` registers a clause's anonymous circle centre (`@ctr-O`) by its token, with `centrePoint`, as `buildParseCtx` does, so a later clause's «C על המעגל» lands on `circle-O`. Widening the reference closure is the sanctioned direction when a real reference is found un-exempted; re-widening the exemption is not.
 
+## A one-line compound is all or nothing: the clause-coverage gate ([ADR-598](06-decisions.md#adr-598))
+
+`src/app/clauseCoverage.ts`, called from `decideFromParse` (`decideDeterministic.ts`) at two points:
+
+- **Commit path** (`droppedClause`, after the honesty battery is clean and before the dry run). The line's clauses come from `clausesOf` (`independence.ts`, the ONE splitter). Each is lowered ALONE, in the figure's context plus the clauses before it (`augmentParseCtx`). A clause that lowers is **covered** when any of its significant commands (scaffolding segments and free points aside):
+  1. has a same-type whole-line command naming all its labels;
+  2. defines an object the whole line also defines (same `id`);
+  3. only declares an object the figure already has (a reference by name); or
+  4. is **entailed**: dry-run after the whole line's commands, the outcome is `empty` or `implied` (ADR-156 / ADR-542). An error is not entailment, because a clause that cannot hold beside the line is not honoured.
+
+  An uncovered clause refuses the line, `guided`, with `input.scope.split-statements` listing every clause. A clause that does not lower alone is no evidence on this path: the honesty battery has already accounted every token.
+- **Weak path** (`compoundNotHonoured`, after an honesty gate fired). A compound whose every clause lowers alone in sequence is refused with the same message instead of escalating. A line whose pieces do not all read alone escalates as before.
+
+`clausesOf` cuts at punctuation (a full stop between digits is a decimal point), at the explicit connectives, and at «ו» before a Hebrew word or a label. It never leaves a piece that only names points («AC ו-BD», «D ו-E על BC», «נקודות F, G, H …»). It keeps a subject-less piece with the clause before it when that clause's subject plus the piece reads as a statement («AB … ומשיק למעגל P» → «AB משיק למעגל P»).
+
 ## A stated side is a requirement record, checked at stage 0g′ and read wherever a point is placed ([ADR-549](06-decisions.md#adr-549), [ADR-594](06-decisions.md#adr-594))
 
 - **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`) — `circle-side`,

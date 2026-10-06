@@ -3559,6 +3559,21 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs(angle(A, C, B) - 90), 'C is on the circle with diameter AB: ∠ACB = 90° (solver precision)').toBeLessThan(1e-3);
     },
   },
+  {
+    id: 'compound-line-all-or-none-1798',
+    title: '#1798 (ADR-598): a one-line compound whose every clause is honoured commits whole — «AB=4, CD=3», «AB=u, AC=v, AS=w», «AB מיתר במעגל O ומשיק למעגל P»; the refusal side (a dropped clause → the shared split-statements message) is locked through decideDeterministic2D',
+    guards:
+      "The operator's ruling of 2026-10-06 (#1798): a one-line compound is all or nothing — every clause honoured commits; any clause dropped or failing refuses the whole line with input.scope.split-statements. Measured on 7f4a170c: «מרובע ABCD» · «AB מקביל ל-CD ו-D על BC» committed the parallel with «D על BC» gone, green — every token accounted, so no gate could see it. Fix: the clause-coverage gate (src/app/clauseCoverage.ts) lowers each clause alone in sequence context and refuses a clause the whole-line lowering neither traces nor entails; the one splitter (clausesOf) now cuts «ו-X» boundaries but keeps operand pairs, label lists and subject-less continuations whole. This scenario locks the ALLOWED side with the operator's own examples (the refusal is a decision verdict, not a parse — src/app/__tests__/issue-1798-compound-all-or-none.test.ts locks it).",
+    steps: ['מרובע ABCD', 'AB=4, CD=3', 'AE=u, AF=v, AG=w', 'מעגל O', 'מעגל P', 'HK מיתר במעגל O ומשיק למעגל P'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'A'), at(fig, 'B')), 'AB = 4').toBeCloseTo(4, 6);
+      expect(dist(at(fig, 'C'), at(fig, 'D')), 'CD = 3').toBeCloseTo(3, 6);
+      // «AE=u, AF=v, AG=w» names three measures (no constraint, no new point) — allStepsOk above proves every clause applied
+      // one statement about HK with two predicates: K is on circle O, and HK touches circle P
+      expect(fig.construction.objects.some((o) => o.id === 'H') && fig.construction.objects.some((o) => o.id === 'K'), 'the chord exists').toBe(true);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

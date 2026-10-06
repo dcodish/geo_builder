@@ -14988,3 +14988,62 @@ No gate accounted for a noun by its arity: `droppedShapeNoun` returned false as 
 - «מעגל שקוטרו AB ו-C על המעגל» (and the comma form) draws C on the circle in one line.
 - «מעגל שקוטרו AB עובר דרך C» goes to the model instead of drawing a circle that ignores C.
 - A line that says something about a point already on the figure is never drawn with that part missing.
+
+## ADR-598 — A one-line compound is all or nothing: the clause-coverage gate refuses a line that drops a clause, with the one shared message (#1798, #553)
+
+**Status:** accepted · 2026-10-06 · bug (P1, 2-D, honesty class) · branch `fix/1798-clause-coverage` (stacked on ADR-597's `fix/1795-existing-label-tail`) · round #1831 · implements the operator ruling of 2026-10-06 on #1798 and #553
+
+**Requirements:** [02-requirements.md](02-requirements.md) FR-IN-4g (new): a one-line compound is all or nothing. Every clause honoured commits; any clause dropped or unreadable refuses the whole line with the shared `split-statements` message · **Design:** [04-design.md](04-design.md) § "A one-line compound is all or nothing: the clause-coverage gate" · **LADDER stage:** the deterministic decision (`decideFromParse`), after the honesty battery and before the dry run. The entailment probe is one extra dry run, only for an untraced clause. No engine or solver change.
+
+**Cites** [ADR-264](#adr-264) (the clause split), [ADR-156](#adr-156) / [ADR-542](#adr-542) (the empty / implied restatement outcomes, reused as entailment), [ADR-460](#adr-460) (#763's `independentConstructs` and its splitter), [ADR-597](#adr-597) (the residual this closes)
+
+**The ruling (operator, 2026-10-06, verbatim).** *"when a user enters several clauses in one line and one of them fails, reject the entire line. so we accept all or none"* · *"there are cases that i dont want the user to have to split. for instance AB=4, CD=3 can be one line if the user wants. same as AB=u. AC=v, AS=w. but even in these cases, if something is wrong, we reject the whole line with the message."* The mechanism is the clause check now (the docs/24 per-rule claimed extent stays the next #310 rung). The message is the shipped `input.scope.split-statements` text everywhere. #553 is folded in: one gate, one message.
+
+**Context.** Re-measured on the ADR-597 tip (7f4a170c) through `decideDeterministic2D`, LLM mocked:
+- «מרובע ABCD» · «AB מקביל ל-CD ו-D על BC» → `commit [segment, segment, set-parallel]`, with «D על BC» gone;
+- «משולש ABC» · «מעגל חוסם את המשולש ABC ו-AD מאונך ל-BC» → the ⊥ only, with the circle gone;
+- #553's «ריבוע ABCD» · «F אמצע DO, O - חיתוך של AC ו-BD», both orders and the «ן-» typo → `escalate weak:dropped`, a paid call the 2026-10-04 ruling ("they should be 2 lines") says not to make.
+- The operator's own compounds committed, as they must keep doing.
+
+**Plan vs code (a re-measurement, not an escalation).** The plan named `clausesOf` and asked first whether it respects operand pairs. It did, but only because it never cut at «ו-X» at all, so on the plan's own two flagship lines it yielded ONE clause and the gate would have been a no-op. Plan step 5 ("fix it inside `clausesOf`") covers this.
+
+**Class.** *A whole-line rule claims a compound line, lowers one clause and drops the others while every token stays "accounted"* («AB מקביל ל-CD ו-D על BC»: D, B and C all ride the parallel's operands). Nothing on the SUCCESS path asked whether each clause was honoured. The token-level accountant cannot see it (the honest boundary ADR-597 named).
+
+**Decision.**
+1. **One splitter, made able to see the class** (`clausesOf`, `independence.ts`, shared with #763; not forked).
+   - It cuts at «ו» before a label too.
+   - It never leaves a piece that only names points («AC ו-BD», «D ו-E על BC», «נקודות F, G, H על …»).
+   - A full stop between digits is a decimal point.
+   - A piece with no subject of its own continues the previous clause when that clause's subject plus the piece reads as a statement («AB מיתר במעגל O ומשיק למעגל P» is one statement about AB). This is decided by the grammar, not a word list.
+2. **The commit-path gate** (`droppedClause`, `src/app/clauseCoverage.ts`). Each clause is lowered alone in the figure's context plus the clauses before it. It is covered if any of its significant commands is traced:
+   - (1) a same-type whole-line command names all its labels;
+   - (2) the whole line defines the same object (one id);
+   - (3) it only declares an object the figure already has;
+   - else (4) it is **entailed**: dry-run after the whole line's commands, it is `empty` or `implied`. An error is not entailment.
+
+   An uncovered clause refuses the whole line: `guided`, `input.scope.split-statements`, with `all` listing the clauses, never escalated. A clause that does not read alone is no evidence on this path (the splitter over-splits, and the battery already accounted every token).
+3. **The weak path** (`compoundNotHonoured`). An honesty gate fired and the line is a compound whose every clause reads alone in sequence: same refusal, same message, no paid call. Otherwise it escalates as before.
+
+**Measured.**
+- **False-refusal net (the plan's fixtures measurement, widened to the corpus).** Every typed step of the scenario corpus and the 26 saved fixtures was taken against its real prefix context: 1497 steps, 45 compound. **0 newly refused.**
+  - The first cut (type trace only) false-refused 12, all splitter fragments: «מעגל O ומעגל P» noun operands, «… וחותך אותו בנקודה E» continuations, a comma label list.
+  - Entailment alone mis-judged «D על BC» (an error read as "not produced") and re-declarations.
+  - Rules (2) and (3) plus the label-list and continuation rules took it to 0 with every target still refused.
+- **Parity rows** caught one more 2-D false refusal the corpus lacked: «AB מיתר במעגל O ומשיק למעגל P». The continuation rule fixed it; on main that line also got a spurious "independent clauses" advisory, which it no longer does.
+- **Perf.** The gate's total over the 1497 steps is 215 ms; the worst line is 3.4 ms.
+
+**Parity (ADR-W-108).**
+- Analytic gives 2-D's verdict on four of five rows. On #553's line it reads both clauses and builds, which is honest but the opposite verdict.
+- 3-D answers `not-handled` on four rows: it reads no one-line compound, even «AB=4, CD=3».
+- Both are known-gap rows naming the successor **#1842** (filed). Whether analytic should refuse #553's line or 2-D should read it is that issue's question for the operator.
+
+**Locks.**
+- `src/app/__tests__/issue-1798-compound-all-or-none.test.ts`: the six refusals with the exact clause list and no LLM call; the taught lines building one by one; the operator's examples committing; the advisory kept; the splitter table; the coverage unit cases.
+- ADR-597's three `it.todo` residual rows become assertions in `issue-1795-existing-label-tail.test.ts`.
+- Scenario `compound-line-all-or-none-1798` (corpus-4, the allowed side).
+- Parity rows `compound-all-or-none-1798-01…05`.
+
+**Behaviour change for a student:**
+- A line with two givens where the tool would silently keep only one is now refused, with the two lines to type.
+- #553's line gets that message instead of a long wait that ended in «couldn't build».
+- «AB מיתר במעגל O ומשיק למעגל P» no longer shows a "you wrote two givens" tip.

@@ -80,7 +80,7 @@ const TAILS: { tail: 'through' | 'on'; he: string; en: string }[] = [
 
 /**
  * The residual the token-level accountant cannot see: the dropped clause's letters are all carried by
- * ANOTHER clause of the line. That is #1798's class (the clause-coverage gate), recorded here as `it.todo`.
+ * ANOTHER clause of the line. That is #1798's class (the clause-coverage gate), closed by #1798's clause-coverage gate (ADR-598).
  */
 const RESIDUAL_1798 = new Set(['AB מקביל ל-CD ו-D על BC', 'AB מאונך ל-CD ו-D על BC', 'מעגל חוסם את המשולש ABC ו-AD מאונך ל-BC']);
 
@@ -94,7 +94,13 @@ describe('#1795 — the class battery: no row commits without its clause', () =>
     expect(llmParseMock).not.toHaveBeenCalled();
   });
 
-  for (const line of RESIDUAL_1798) it.todo(`«${line}» — the dropped clause's letters ride another clause (#1798)`);
+  // #1798 (ADR-598) closed the residual: the clause-coverage gate refuses the whole line with the shared message.
+  it.each([...RESIDUAL_1798])('«%s» — the dropped clause rides another clause’s letters, and the line is refused whole (#1798)', async (line) => {
+    const v = await decide(PREFIX, line);
+    expect(v.kind).toBe('refuse');
+    expect(v.kind === 'refuse' && v.note).toMatchObject({ key: 'input.scope.split-statements' });
+    expect(llmParseMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('#1795 — the issue’s own line and its spellings', () => {
