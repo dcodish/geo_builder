@@ -24,6 +24,13 @@ pushed with a red lane and no PR while the report listed #955 as untouched). For
 read its tip commit subject and the issue thread it names, and carry it into "Waiting on you" as
 *work in flight with no PR* — with its real state (green / red / unknown), never assumed finished.
 
+**The icebox count** (#1804). Parked issues are closed "not planned" with the `icebox` label, so the
+open-queue query above never sees them. Count them separately. The operator wants the count only, never the list:
+
+```sh
+gh issue list --state closed --label icebox --limit 1000 --json number --jq length
+```
+
 For grading you also need the bodies of issues you don't already know. Fetch them in bulk (one call,
 not N):
 
@@ -70,6 +77,7 @@ section is information, not clutter):
 Open: N (P1: n / P2: n / P3: n) · bugs n · features n · debt n
 Attention: needs-operator n · plans awaiting auto-ok n · PRs awaiting play n · rounds in flight n · rounds awaiting play n
 Prod: <current prod tag> · undeployed on main: <none | short list>
+Icebox: N parked (closed, reopened when a student hits one or the operator asks)
 
 ## P1 — drop everything
 | # | Product | Type | Title (shortened) | Value | Complexity/Risk |

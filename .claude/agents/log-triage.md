@@ -38,6 +38,13 @@ State for each cluster whether it's genuinely new, a planned slice, a documented
 Save `reports/log-triage-recommendations-<YYYY-MM-DD>.md` (gitignored; Dropbox-synced) with: a snapshot table (per app: submits/sessions/visitors/bucket %, and the auto-removed count), then per app a **ranked table** — cluster · **type (bug/feature)** · **proposed priority (P1/P2/P3)** · verbatim examples · distinct users · diagnosis · proposed root-cause action (rule/construct + where) · rough effort — most-impactful first, then the "no action" notes.
 
 ## 5. File the BUG issues, return for approval — and STOP
+**First, check the icebox for every cluster, bug or feature (#1804).** Parked issues are closed "not planned" with the `icebox` label and promise to be reopened "when a student hits it". Run `gh issue list --state closed --label icebox --limit 1000 --json number,title --search "<construct words>"` and read the body of any candidate to confirm it covers the same construct. On a match, reopen it rather than filing a new issue:
+1. `gh issue reopen <N>`.
+2. `gh issue edit <N> --remove-label icebox`.
+3. A comment with the prod evidence: verbatim utterances, sessions, distinct users and the run date.
+
+This needs no further approval, since the operator approved it with the parking, and it arms nothing. List the reopens in the report and the final message under **↺ Reopened from icebox**.
+
 **Bugs are reports and get FILED NOW** (docs/22 §1 — a wrong figure in prod must not wait for a build decision): for each `bug` cluster, first dedupe against `gh issue list --state open` (search by keyword; add a comment to an existing issue instead of duplicating), then `gh issue create` with labels `bug` + priority + app (`2d`/`3d`), body in the docs/22 §1 format (verbatim utterances, session/user counts, evidence, class hypothesis). **`feature` clusters are NOT filed yet** — they are recommendations; include ready-to-file issue title+body text for each in the report, so the approved ones can be filed (labels `feature` + priority + app) the moment the operator approves.
 
 Your final message MUST: (a) give a scannable ranked summary of the top recommendations for each app with type, priority, distinct-user counts and effort, (b) list the bug issues you filed (numbers + titles), (c) name the report file, (d) suggest a first batch (quick + high-signal), and (e) explicitly **ask the operator which items to approve for building** — on approval, the approved feature clusters are filed as issues and built per the docs/22 feature route (a PR). Do not start building — that happens only after approval, as separate work following the normal slice discipline (root-cause fix, a scenario/gate test replaying the exact prod utterance, `tsc -b`/tests green, an ADR, commit + deploy).
@@ -45,6 +52,6 @@ Your final message MUST: (a) give a scannable ranked summary of the top recommen
 ## Rules
 - **Never fire a live Anthropic/LLM call** to test the fallback (operator policy) — reason as the oracle yourself.
 - Prioritize by **distinct users**.
-- **Issue hygiene:** always dedupe against open issues before filing; never file `feature` issues without operator approval; use only the standard labels (type + P1/P2/P3 + app, per docs/22 §1/§6).
+- **Issue hygiene:** check the icebox (closed `icebox` issues) and reopen a match instead of filing (#1804); always dedupe against open issues before filing; never file `feature` issues without operator approval; use only the standard labels (type + P1/P2/P3 + app, per docs/22 §1/§6).
 - Raw logs (`logs/prod-events-*.jsonl`) and reports (`reports/…`) are gitignored — local only.
 - Utterances are math constructions, not PII; IPs arrive already hashed. Safe to analyze.

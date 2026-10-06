@@ -71,6 +71,12 @@ For each cluster, check what already exists so the recommendation is precise and
 
 **Classify every cluster per [docs/22-workflow.md](../../../docs/22-workflow.md) (ADR-265):** type **`bug`** (the tool did the WRONG thing — wrong/partial figure with ✓, silently dropped given, half-parse, misleading refusal, crash) vs **`feature`** (an honest refusal/escalation on a missing capability — most LIVE grammar gaps), plus a proposed **P1/P2/P3** (P1 = a student can see a wrong-but-plausible figure or lose a given silently; P2 = real demand; P3 = tail).
 
+**Check the icebox before anything else (#1804).** Parked issues are closed "not planned" with the `icebox` label. Each one promises to be reopened "when a student hits it". For EVERY cluster, bug or feature, search the parked issues for the same construct:
+```
+gh issue list --state closed --label icebox --limit 1000 --json number,title --search "<key words / symbol of the construct>"
+```
+Try the cluster's distinctive words and its Hebrew noun. A matching title is not proof: read the parked issue's body to confirm it covers the same construct. On a match, **reopen it now**: `gh issue reopen <N>`, then remove the label with `gh issue edit <N> --remove-label icebox`. Then add a comment carrying the prod evidence: the verbatim utterances, session ids, distinct users and this run's date. Don't file a new issue. The operator approved this reopen when he approved the parking, so it needs no further approval. It arms nothing either, because a reopened issue has no `auto-ok`. List every reopen in the report under **↺ Reopened from icebox**.
+
 **File the `bug` clusters as GitHub issues NOW** (they are reports, not build decisions): dedupe against `gh issue list --state open` first, then `gh issue create` with labels `bug` + priority + app, body per docs/22 §1. **`feature` clusters are recommendations** — include ready-to-file issue text in the report; file them only after operator approval.
 
 Summarize the top recommendations inline (and they're already persisted in the report file). For each: cluster name + type + proposed priority + verbatim examples + distinct-user count + proposed root-cause action (rule/construct + where) + rough effort, most-impactful first. Keep garbage / UI-requests / out-of-scope in a short "no action" note so nothing is silently dropped.
@@ -84,4 +90,5 @@ Summarize the top recommendations inline (and they're already persisted in the r
 - Utterances are math constructions, not PII; IPs arrive already hashed. Safe to analyze.
 - **Prioritize by all-time `users`, but spend attention on the `▶ NEW` rows** — `↩ carried over` was already put in front of the operator. Don't re-argue it unless a decision is pending or a new row changes its weight.
 - Keep the classifier + build paths in `triage.mjs` in sync with `server/admin.ts`, `App.tsx#submit`, and the store APIs if they change — `src/parser/__tests__/triage-mirror.test.ts` guards the submit mirror (ADR-346), nothing guards the `admin.ts` bucket mirror.
+- **The icebox is checked before filing, every run** (#1804). A parked issue a student has now hit is reopened, never re-filed as a new issue. Re-filing loses its diagnosis and plan, and breaks the promise the parking was approved on.
 - A **`⊘ guided`** or **`⇗ would-escalate`** row is not a gap. If you want to change what the tool does there, that's a product decision (the scope register / a gate) — raise it as such, don't file it as missing grammar.
