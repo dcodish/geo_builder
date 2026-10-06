@@ -7008,6 +7008,10 @@ claim of the fix); entry-order permutation with the pins after the relation (M2 
 0 → 1 → 0; a relation no `t` satisfies still refusing («SB מקביל למישור ACK»); and an unmentioned rider
 still sampled and seed-varying.
 
+**Later (#1735, [ADR-3D-306](#adr-3d-306)).** The host bound this ADR added to `degenerate` was a
+rejection only; a rider length on a figure of unstated size slid every start off the host and was refused.
+Off-host candidates are now re-seated on the failure path.
+
 ### ADR-3D-205 — an angle's ARM is an operand kind, not a spelling (#862)
 
 **The hollow row.** `relationTable` declared `angle|segment|vector` **supported**, with actions
@@ -11879,3 +11883,31 @@ The degradation policy is deliberately unchanged (a line this code does not comm
 **Sibling audit.** 2-D: `session2d` calls `decideDeterministic2D` (#1395) — clean. Analytic: `replayAnalyticSession` calls `decideSubmit` — clean. Complex posts no events, so it has no replay. Same smell OUTSIDE triage: `.claude/skills/exercise-sequence/run-sequence.mjs`'s 3-D branch calls `parse3` + the registers by hand, and its 2-D branch calls `parse` rather than `decideDeterministic2D` — filed as #1786.
 
 **Consequences.** `src3d/app/` (2 new), `src3d/store/store3.ts`, `src3d/App3.tsx`, `.claude/skills/log-triage/triage.mjs`, `BOUNDARIES.json`, docs/04b, 3 tests moved, 1 new. Re-running `/log-triage --app 3d --reverify` moves «הוכיחו כי AB ⊥ AC» from ▶ LIVE to ⊘ guided.
+
+## ADR-3D-306 — A host bound is restored, not only enforced: an off-host rider is re-seated (#1735)
+
+**Status:** accepted · 2026-10-06 · bug (P1) · round #1776 · operator ruling 2026-10-05 on #1735 (item 15; #1769 escalated, so built on `main`) · branch `fix/1735-rider-reseat` off `main` @ b14d11d5
+
+**Requirements:** none (internal — a satisfiable given already builds; this removes a false refusal) · **Design:** docs/04b — "The carrier table", *A host bound is restored, not only enforced*
+
+**Context (re-measured at b14d11d5 through `decideSubmit3`, nothing mocked).** «משולש ABC · D על AB · AD = 3» refused `givens-contradict` at 4/4 seeds (3.1 s for the line); so did «|AD| = 3», the #1730 tails «D על AB במרחק 3 מ-A / מ-B», «AC = 5 · D על BC · AD = 7», the box and quadrilateral rider rows, two riders, «זווית ACD = 100», and «D על AB · AD = 3 · AB = 5» (the entry-order twin of a row that builds). «BD = 3» on BC and the pyramid «SE = 4» failed at seed 1. The triage's diagnosis held as written.
+
+**Root cause.** A bounded carrier's host interval `[lo, hi]` was enforced only as a post-hoc rejection (`degenerate()`'s #820 clause), never restored. A given the figure can satisfy by sliding the rider OR by growing its host is reached the cheap way — LM's minimum-norm step spends the deficit on `t`, landing D at t = 1.2–1.6 past B — at every start; every exact candidate was discarded, and the empty pool reached the student as their own contradiction. Class: *an exact candidate whose only defect is a bounded carrier off its host is discarded instead of re-seated, so a satisfiable given is refused and the verdict depends on entry order and seed.*
+
+**Decision.**
+1. `degenerate(x)` splits into `collapsed(x)` (the solid checks, unchanged) and `offHost(x)` (the indices of riders outside their own carrier `lo`/`hi` — the one carrier table, no kind list); `degenerate` is their OR, so every other caller is unchanged.
+2. One helper, `reseatOffHost(y, off, at, fPin, fRelease)`: HARD-pin the off-host riders at their seed samples `t0` (weight 1e3, 60 LM iterations, primary residuals) while gauge, dims and the other riders adapt, then release on the site's own residuals. It admits nothing: the caller's ordinary acceptance (exact AND `!degenerate`) judges the result, so a true contradiction stays refused.
+3. Every acceptance site that discards for host reasons keeps those candidates (exact, not collapsed, ≤ 8 per mirror / site): the cold-start loop, the #816 dims widening, `collect()` (which serves the #797/#818 continuations and the re-seat's own release), and the `invariantOnly` dims-only loop. The frozen-dims retry inherits it through its recursive call.
+4. **Trigger: the empty pool, after the #1499 frozen-dims retry.** The re-seat runs only when the whole solve, retry included, found nothing — so every figure that builds today is bit-identical. The per-candidate trigger the triage also measured (richer pools, faster last line, fixes the "D hugs B" drawings of «AD = 2») was NOT built: it changes pools of figures that build today, which needs its own measurement and ruling.
+
+**Measured.**
+- Class rows, 24 seeds each, through `decideSubmit3` (before → after; mean time of the last line after): «AD = 3» 0 → 24/24 (3.2 s) · «|AD| = 3» 0 → 24 · «במרחק 3 מ-A» 0 → 24 · «במרחק 3 מ-B» 0 → 24 · «AC = 5 · D על BC · AD = 7» 1 → 24 (3.5 s) · «BD = 3» 24/24 · box «AE = 3» 0 → 24 (4.2 s) · quad «AE = 3» 0 → 24 · pyramid «SE = 4» 24/24 · two riders 0 → 24 (4.7 s) · «זווית ACD = 100» 0 → 24 (0.06 s) · «AD = 3 · AB = 5» 0 → 24 · «AD = 2» 24/24 (21/24 in the triage). In every one the stated lengths hold and the rider is on its host (|AD| + |DB| = |AB| to 1e-6); AB varies with the seed (4.3–7.1 for «AD = 3», ADR-052). The honest refusals «AB = 5 · D על AB · AD = 7» and «תיבה … AB = 2 · E על AB · AE = 3» stay refused at 24/24.
+- The last line's time is unchanged (≈ 3 s, the cost of the failure path the re-seat now ends). The triage's 0.75 s belongs to the per-candidate trigger, not built (4).
+- **Bit-identity:** the 44 `fixtures3` × 24 seeds read every fixture 24/24 except `symbolic-line-equation-863` 23/24, before and after (the round's baseline); total 220.8 s → 226.4 s on this machine (run-to-run noise; the success path calls nothing new beyond one `primaryErr` per discarded candidate). The #1394 `decideSubmit3` golden showed **zero drift** over its whole recorded corpus before the new keys were added.
+- **Site coverage (instrumented, not committed):** the cold-start and widening sites feed every gauge-path row; `invariantOnly` feeds «זווית ACD = 100»; `collect()` receives off-host candidates on «AC = 5 · AD = 7» (re-seat releases that slid back off — kept out of the pool). The #797/#818 continuations need a found solution to start from, so under the empty-pool trigger their off-host candidates are recorded but never re-seated (by construction the pool was not empty).
+
+**Locks.** `fixtures3/rider-length-1735.geo3.json` (the reported sequence; full verifier + parser drift). `src3d/__tests__/issue-1735-rider-host-reseat.test.ts` (14), through `decideSubmit3`: the reported case at seeds 0–23 with AB ≥ 3 and varying; the other class rows at seeds 0–3 (the 24-seed sweep is the measurement above, kept out of the suite for time); the dims-only angle; both entry orders of «AB = 5»; the two honest refusals. **Fails before: 12 of 12 building cases + the fixture** (the two refusal controls pass before and after). `shell/__tests__/fixtures/geo-input-parity.ts`: `cat-2d-027` and `e1-at-distance-far-end` drop `knownGap #1735`. The #1394 golden gains only the new keys (the fixture and the new test's sequences).
+
+**Sibling audit.** 2-D refuses «AC = 5 · D על BC · AD = 7» the same way (`conflict: cannot place D on segment BC`) — filed as #1781, not fixed here (different product and lane). Measured in the triage and filed separately: the 3-D cube rider «קובייה ABCD · AB = 2 · E על AB · AE = 1» refused `claim-refuted` (a rigid solid never enters the pivot; #1782), and «AD = 3BD» recorded as a claim instead of a drive (#1783). `scaled-offset` and `bisector-ray` carriers are bounded on one side and take the same path from the table; no failing member was found for them.
+
+**Behaviour change for a student:** a length stated on part of a side cut by a point («D על AB» then «AD = 3», or «D על AB במרחק 3 מ-A») now builds on a figure of unstated size — the figure grows to fit — instead of being refused as a contradiction of their own givens. Figures that built before draw exactly as before.

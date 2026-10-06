@@ -1166,7 +1166,8 @@ export function solvePivot(
     return out;
   };
 
-  const degenerate = (x: number[]): boolean => {
+  /** The SOLID half of `degenerate` (#1735 split it out): a collapsed solid is not a figure. */
+  const collapsed = (x: number[]): boolean => {
     // S3 (#378): NOT gated on `planeDrive` any more. A collapsed solid is not a figure whatever
     // given caused the collapse — the gate was a per-path proxy for the semantic question (the
     // ADR-3D-101 class, and the same shape as `scalePinned`'s exclusion list). It let a plane
@@ -1207,11 +1208,19 @@ export function solvePivot(
       // collapsed one only when nothing else satisfies the givens (then the collapse was stated).
       if (!FLAT_SOLID_KINDS.has(solid.kind) && pts.length >= 3 && maxD > 1e-12 && norm3(runNormal(pts)) <= 1e-4 * maxD * maxD) return true;
     }
-    // #820: a candidate that slid a rider OFF its host segment is not a figure either — «K על SB»
-    // is a given like any other, so a solution reaching the relation at t = 1.4 has not satisfied
-    // the student's statements. Checked here because every acceptance site already asks `degenerate`.
-    return riders.some((r, i) => !(x[riderBase + i] >= r.lo - 1e-9 && x[riderBase + i] <= r.hi + 1e-9));
+    return false;
   };
+  /**
+   * #820: a candidate that slid a rider OFF its host segment is not a figure either — «K על SB»
+   * is a given like any other, so a solution reaching the relation at t = 1.4 has not satisfied
+   * the student's statements. #1735 (ADR-3D-306): returns WHICH riders left their host (indices into
+   * `riders`, bounds from each rider's own carrier `lo`/`hi` — the one table, no kind list), so an
+   * acceptance site can RE-SEAT them (`reseatOffHost` below) instead of only discarding the candidate.
+   */
+  const offHost = (x: number[]): number[] =>
+    riders.flatMap((r, i) => (x[riderBase + i] >= r.lo - 1e-9 && x[riderBase + i] <= r.hi + 1e-9 ? [] : [i]));
+  /** Not a figure: a collapsed solid, or a rider off its host. Every acceptance site asks this. */
+  const degenerate = (x: number[]): boolean => collapsed(x) || offHost(x).length > 0;
 
   /**
    * #820 — WHICH riders are unknowns: the ones a residual actually reads. Measured by moving each
@@ -1233,6 +1242,43 @@ export function solvePivot(
     riders = riders.filter((_, i) => reads[i]);
   }
   const nRider = riders.length;
+
+  /**
+   * #1735 (ADR-3D-306) — A HOST BOUND IS RESTORED, NOT ONLY ENFORCED.
+   *
+   * The host interval [lo, hi] of a bounded carrier was never inside the solve: it was a post-hoc
+   * rejection (`offHost`). So a given the figure can satisfy by sliding the rider OR by growing / reshaping
+   * its host — «משולש ABC · D על AB · AD = 3» on a triangle of unstated size — was reached the cheap way
+   * (LM's minimum-norm step spends the deficit on `t`, landing D at t = 1.2–1.6 past B) at EVERY start,
+   * every exact candidate was discarded, and the empty pool reached the student as `givens-contradict`.
+   *
+   * The re-seat: HARD-pin each off-host rider back at its seed sample `t0` (on the host by construction)
+   * while the gauge, dims and the other riders adapt on the primary residuals, then RELEASE on the site's
+   * own residuals from there — the #797 / #518 pin-then-release pattern. Nothing is admitted here: the
+   * caller judges the result with its ordinary acceptance (exact AND `!degenerate`), so a re-seat cannot
+   * invent a solution — a true contradiction («AB = 5 · D על AB · AD = 7») stays refused.
+   *
+   * `y` is the site's own unknown vector and `at` the index of its first rider slot (riderBase on the
+   * gauge-solving path, nDims on the dims-only `invariantOnly` path).
+   */
+  const reseatOffHost = (
+    y: readonly number[],
+    off: readonly number[],
+    at: number,
+    fPin0: (v: number[]) => number[],
+    fRelease: (v: number[]) => number[],
+  ): { x: number[]; err: number } => {
+    const y0 = [...y];
+    for (const i of off) y0[at + i] = riders[i].t0;
+    const fPin = (v: number[]) => [...fPin0(v), ...off.map((i) => 1e3 * (v[at + i] - riders[i].t0))];
+    const rp = leastSquares(fPin, y0, 60); // the pinned stage only steers into the on-host basin
+    return leastSquares(fRelease, rp.x);
+  };
+  /** At most this many off-host candidates are kept for a re-seat (per mirror / per site). */
+  const RESEAT_CAP = 8;
+  /** An EXACT candidate rejected only because a rider left its host — what a re-seat can repair. */
+  const offHostOnly = (x: number[], primary: number): boolean =>
+    nRider > 0 && primary < 1e-6 && !collapsed(x) && offHost(x).length > 0;
 
   /**
    * #1499 — THE FROZEN-DIMS FAILURE-PATH RETRY (the V8-c / ADR-3D-030 retry shape, one lane over).
@@ -1332,6 +1378,8 @@ export function solvePivot(
       .map((d, i) => [...d, ...riderStarts[i]]);
     if (warmDims) dimStarts.unshift(warmDims);
     let best: { x: number[]; err: number } | null = null;
+    const pd = (d: number[]): number => fd(d).reduce((s, v) => s + v * v, 0);
+    const invOffHost: number[][] = []; // #1735: exact candidates discarded only for a rider off its host
     for (const d0 of dimStarts) {
       let r = leastSquares(fr, d0);
       for (let polish = 0; polish < 3 && r.err > 1e-24 && r.err < 1e-4; polish++) {
@@ -1344,23 +1392,49 @@ export function solvePivot(
       // unchecked — «המישור ABC מתלכד עם המישור A'B'C'» drove a box's height to 0 and reported
       // success, because in the collapsed figure the two planes genuinely do coincide. A
       // collapsed solid is not a figure, whichever solver produced it.
-      if (degenerate([0, 0, 0, 0, 0, 0, 0, ...r.x])) continue;
+      const full = [0, 0, 0, 0, 0, 0, 0, ...r.x];
+      if (degenerate(full)) {
+        if (invOffHost.length < RESEAT_CAP && offHostOnly(full, pd(r.x))) invOffHost.push(r.x);
+        continue;
+      }
       if (!best || r.err < best.err) best = r;
       if (best.err < 1e-22) break;
     }
-    if (!best) return retryFrozenDims();
-    const primary = fd(best.x).reduce((s, v) => s + v * v, 0);
+    const invResult = (bx: number[], primary: number): PivotResult[] => {
+      const invSol: PivotResult[] = [{
+        transform: (p) => p, mirror: false, dims: bx.slice(0, nDims), err: primary,
+        ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, bx[nDims + i]])) } : {}),
+        scalarConsumed: scalarConsumedAt([0, 0, 0, 0, 0, 0, 0, ...bx], false), // #990
+        x: [0, 0, 0, 0, 0, 0, 0, ...bx],
+      }];
+      const uncollapsed = preferUncollapsed(invSol); // #1499: a flat ring the solve collapsed, retried
+      return uncollapsed.length > 0 ? uncollapsed : invSol;
+    };
+    /**
+     * #1735 (ADR-3D-306): the failure path, AFTER the #1499 frozen-dims retry — so a figure that builds
+     * today is untouched. Each exact candidate discarded only because a rider left its host is re-seated
+     * (pinned back at its sample while the dims adapt, then released on the anchored dims-only residuals)
+     * and judged by this site's own acceptance. «זווית ACD = 100» after «D על AB» on a triangle whose
+     * sampled angle ACB is under 100° is reached by opening the triangle, not by sliding D past B.
+     */
+    const failed = (): PivotResult[] => {
+      const frozen = retryFrozenDims();
+      if (frozen.length > 0) return frozen;
+      let found: { x: number[]; primary: number } | null = null;
+      for (const d of invOffHost) {
+        const r = reseatOffHost(d, offHost([0, 0, 0, 0, 0, 0, 0, ...d]), nDims, fd, fr);
+        const primary = pd(r.x);
+        if (primary >= 1e-10 || degenerate([0, 0, 0, 0, 0, 0, 0, ...r.x])) continue;
+        if (!found || primary < found.primary) found = { x: r.x, primary };
+      }
+      return found ? invResult(found.x, found.primary) : [];
+    };
+    if (!best) return failed();
+    const primary = pd(best.x);
     // acceptance: the regulariser's pull stops LM at a primary floor of ~(REG·dims)² —
     // 1e-10 sits above that equilibrium and far under the 2e-5 claim tolerance
-    if (primary >= 1e-10) return retryFrozenDims();
-    const invSol: PivotResult[] = [{
-      transform: (p) => p, mirror: false, dims: best.x.slice(0, nDims), err: primary,
-      ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, best!.x[nDims + i]])) } : {}),
-      scalarConsumed: scalarConsumedAt([0, 0, 0, 0, 0, 0, 0, ...best.x], false), // #990
-      x: [0, 0, 0, 0, 0, 0, 0, ...best.x],
-    }];
-    const uncollapsed = preferUncollapsed(invSol); // #1499: a flat ring the solve collapsed, retried
-    return uncollapsed.length > 0 ? uncollapsed : invSol;
+    if (primary >= 1e-10) return failed();
+    return invResult(best.x, primary);
   }
 
   // #518 (ADR-3D-133): the gauge's SCALE gets a seed-dependent SOFT ANCHOR, like every other DOF the
@@ -1496,6 +1570,8 @@ export function solvePivot(
     const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, xr[riderBase + i]])) : undefined;
     return [{ transform: (q) => applyGauge(q, g), mirror: probe.mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt(xr, probe.mirror), err: pErr(xr), x: [...xr] }];
   }
+  /** #1735: per mirror, the deferred re-seat of its off-host candidates — run only when the pool is empty. */
+  const reseatStages: (() => void)[] = [];
   for (const mirror of [false, true]) {
     const fPrimary = residualsFor(mirror);
     if (scaleFree) {
@@ -1585,9 +1661,17 @@ export function solvePivot(
     };
     let best: { x: number[]; err: number } | null = null;
     const seen = new Set<string>();
+    /** #1735: exact candidates of this mirror discarded ONLY because a rider left its host. */
+    const offHostRejects: number[][] = [];
+    const noteOffHost = (x: number[]): void => {
+      if (offHostRejects.length < RESEAT_CAP && offHostOnly(x, primaryErr(x))) offHostRejects.push([...x]);
+    };
     /** Accept/dedup/push one converged candidate into the pool (collectAll only). */
     const collect = (cand0: { x: number[]; err: number }): void => {
-      if (degenerate(cand0.x)) return; // a collapsed solid is not a figure (general position)
+      if (degenerate(cand0.x)) {
+        noteOffHost(cand0.x); // #1735: kept for the re-seat, never admitted as it stands
+        return; // a collapsed solid is not a figure (general position)
+      }
       /**
        * #1311 (ADR-3D-260) — RELEASE a candidate the anchors held just short of exact.
        *
@@ -1641,7 +1725,10 @@ export function solvePivot(
         if (r2.err >= r0.err * 0.99) break;
         r0 = r2;
       }
-      if (degenerate(r0.x)) continue;
+      if (degenerate(r0.x)) {
+        noteOffHost(r0.x); // #1735
+        continue;
+      }
       collect(r0);
       if (!best || r0.err < best.err) best = r0; // FULL err — the anchor punishes collapse
       if (!collectAll && best.err < 1e-22) break;
@@ -1769,7 +1856,10 @@ export function solvePivot(
               if (r2.err >= r.err * 0.99) break;
               r = r2;
             }
-            if (degenerate(r.x)) continue;
+            if (degenerate(r.x)) {
+              noteOffHost(r.x); // #1735
+              continue;
+            }
             collect(r);
             if (!best || r.err < best.err) best = r;
           }
@@ -1777,6 +1867,15 @@ export function solvePivot(
           if (!collectAll && best && (anchored ? primaryErr(best.x) : best.err) < ACCEPT) break;
         }
       }
+    }
+    // #1735 (ADR-3D-306): deferred — fired below only when the WHOLE pool is empty after the #1499
+    // frozen-dims retry, so every figure that builds today is bit-identical. Each kept candidate is
+    // re-seated (its off-host riders pinned back at their samples, then released on the anchored
+    // residuals) and offered to `collect`, whose ordinary acceptance (exact, `!degenerate`) judges it.
+    if (collectAll) {
+      reseatStages.push(() => {
+        for (const x of offHostRejects.splice(0)) collect(reseatOffHost(x, offHost(x), riderBase, fPrimary, fSeed));
+      });
     }
     // acceptance: per-residual ~1e-6 — far under the 2e-5 claim tolerance (the numeric-
     // Jacobian floor rises with mixed scalar residuals; 1e-16 was V4-era point-pins-only)
@@ -1816,6 +1915,9 @@ export function solvePivot(
   if (results.length === 0) {
     const frozen = retryFrozenDims();
     if (frozen.length > 0) return frozen;
+    // #1735 (ADR-3D-306): …and only then, the off-host candidates the acceptance sites discarded are
+    // re-seated onto their hosts (the frozen retry's own recursive solve has already had this chance).
+    for (const stage of reseatStages) stage();
   }
   // #1499: …or it found only figures that collapse a flat solid's ring — prefer a figure that
   // satisfies the givens without the collapse, and keep the flat one only when nothing else does.
