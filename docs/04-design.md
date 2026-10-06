@@ -1063,6 +1063,22 @@ into the waiting register, `classify` counts it as pending, and `dryRunOutcome` 
 whose letters are bound but in a form it cannot follow (`unenforceableRelation` — it lowers to nothing) gets an
 error status and is refused at submit. `lowerOne` scales a bound by a positive linear coefficient. A waiting row is not a failing one (Am. 1): `factsWaitingForLetter` — the same `unboundSubjectOf` over the same table — is read by `meetsRequirements` (a waiting row cannot fail a view, so no configuration search and no «no configuration» notice) and by the step list (a third row state, ⧗ waiting, beside ✓ / ✗ / ○).
 
+## One shape-phrase reader ([ADR-595](06-decisions.md#adr-595))
+
+`src/parser/shapePhrase.ts` reads a polygon NOUN with the shape-property adjectives stated on it
+(`readShapePhrase(s)` → `{ noun, kind, arity, stated, consumed, unconsumed, strip, lower, cyclic }`). The noun
+decides the arity; an adjective is consumed only when the (noun, adjective) pair has a lowering — «ישר זווית» on
+«משולש» (or with no noun) is a right triangle, on «טרפז» a right trapezoid, on «מרובע» nothing, so it stays in
+`unconsumed` and in the caller's sentence for the leftover gate to escalate. `lowerShape(kind, ids)` is the
+standalone lowering the shape macros emit; the inscription rules (`inscribedPolygon`, `incircle`,
+`inscribedInPolygon`'s container and inner shape) read through the same reader, so one sentence has one reading
+whether it stands alone or sits in an inscription. `cyclic` carries analytic's `notCyclic` (a right trapezoid
+→ rectangle), which `inscribedPolygon` turns into the `inscribed-contradicts-noun` refusal. Two gates back it:
+`droppedShapeNoun` accounts a noun only by a materialised ring of ITS arity, and `droppedShapeAdjective` asks the
+commands to carry each stated property. At the apply boundary, `commandConflict` treats a generic
+`quadrilateral` / `triangle` over an already-declared ring as a supertype restatement (a reference), never a
+redefinition.
+
 ## A role noun is a claim, lowered once ([ADR-563](06-decisions.md#adr-563))
 
 `src/parser/roleNouns.ts` is the one vocabulary of role nouns (chord, diameter, radius, tangent, leg, base,

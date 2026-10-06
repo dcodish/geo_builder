@@ -14545,3 +14545,56 @@ So when a configuration's fold failed because a re-attempt was cut, the check re
 - `docs/04-design.md`, `docs/LADDER.md`: one sentence each.
 
 **Behaviour change for a student:** none on any figure measured. If a configuration check ever does skip work this way, the status line says «מורכב מדי כדי לבדוק…» instead of claiming «נקבע במלואו», and the values panel says it is incomplete. A line beside an unstated right angle that a cut sweep could not clear is added as before (red), not refused.
+
+## ADR-595 — One shape-phrase reader: an inscription honours the shape's adjective, a right trapezoid in a circle is refused, and a generic restatement of a declared ring is a reference (#1790)
+
+**Status:** accepted · 2026-10-06 · bug (P1, 2-D, honesty class) · branch `fix/1790-shape-phrase-reader` · round #1776 · implements the #1554 ruling of 2026-10-01 in 2-D (the analytic side is [ADR-AG-198](06c-decisions-analytic.md) and ADR-AG-242)
+
+**Requirements:** [02-requirements.md](02-requirements.md) FR-EN-14: an inscription honours every stated shape adjective in both directions; «טרפז ישר זווית [ABCD] חסום במעגל» is refused naming both nouns (now in 2-D as well as analytic); a ring declared and then inscribed by its letters is drawn, never refused · **Design:** [04-design.md](04-design.md) § "One shape-phrase reader" · **LADDER stage:** parse (the rules and the `parseResolved` gates) and the apply boundary (`commandConflict`, docs/17 M1); `variantConfigs` in the sample core. No solver change.
+
+**Cites** [ADR-117](#adr-117) (inscribed triangle shapes), [ADR-138](#adr-138) (shape variants and their pins), [ADR-157](#adr-157) (a named shape is immutable), [ADR-165](#adr-165) (a morph is amber, not refused), [ADR-262](#adr-262) (polygon in polygon), [ADR-264](#adr-264) (the dropped-noun gate), [ADR-487](#adr-487) (a refusal names the statement), [ADR-502](#adr-502) (`unstatedChoices`).
+
+**Context.** Found while measuring #1554, re-measured on b14d11d5 through `decideDeterministic2D`:
+- «טרפז ישר זווית חסום במעגל» committed a circle and a TRIANGLE ABC.
+- «טרפז ישר זווית ABCD חסום במעגל» was refused «'poly-ABCD' is already defined» on an empty canvas.
+- «מעגל חסום במשולש ישר זווית ABC» committed a generic triangle (A(2,3.6) B(6,0) C(0,0)).
+- «מלבן DEFG חסום במשולש ישר זווית ABC» built a generic container.
+- «מלבן ABCD» · «ABCD חסום במעגל» was refused as a redefinition.
+
+**Class.** *A shape-property adjective (right-angled / isosceles / equilateral) on a polygon noun inside an inscription, in either direction, was read by the inscription rule's own private shape ladder.* There were three such ladders beside the correct standalone macros:
+- `inscribedPolygon` tested «ישר זווית» before the noun, so every noun became a right triangle. Its strip list consumed every noun and adjective word, so nothing was left for the leftover gate.
+- `incircle` read the noun only and had no leftover guard.
+- `inscribedInPolygon`'s `containerRole` read the container noun only.
+
+No gate accounted for a noun by its arity: `droppedShapeNoun` returned false as soon as any command carried a ≥3-id run, so a triangle accounted for «טרפז». No gate accounted for an adjective at all.
+
+**Decision.**
+1. **One reader** (`src/parser/shapePhrase.ts`, the 2-D port of 3-D's #424 single vocabulary and analytic's `SHAPES` row). `readShapePhrase(s)` returns the noun, the resolved kind, the arity, the stated / consumed / unconsumed adjectives, `strip`, `lower` and `cyclic`. **The noun decides the arity; an adjective only refines it**, and only when the (noun, adjective) pair has a lowering: triangle × {right, equilateral, isosceles}, trapezoid × {right, isosceles}. A bare adjective is a triangle. `lowerShape` is the standalone lowering. The shape macros (`rightTriangle`, `isoscelesTriangle`, `equilateral`, `rightTrapezoid`, `isoscelesTrapezoid`, `kite`) now call it, byte-identically.
+2. **The inscription rules read through it.**
+   - `inscribedPolygon` takes its kind from the reader and strips only the phrase's own span. An adjective it cannot lower («מרובע ישר זווית») is a leftover, and the line escalates.
+   - `incircle` builds the container with `phrase.lower(ids)` (a right triangle, the isosceles variant, the right trapezoid's ⟂, the isosceles trapezoid's legs). It gains the missing leftover guard. A symbolic «radius r» is consumed (the binding post-pass owns it); a numeric inradius escalates.
+   - `inscribedInPolygon` reads the container phrase on the marked side of the inscription verb and lowers it. An adjective on an already-drawn container escalates.
+3. **The ruling.** The right trapezoid carries `cyclic: { forces: 'rectangle' }` (analytic's `notCyclic`). `inscribedPolygon` turns it into `inscribed-contradicts-noun` **before any label is read**, so the unlettered, lettered and English sentences all get it. `decideDeterministic` refuses it with `input.inscribedContradictsNoun` (worded as analytic's `errInscribedContradictsNoun`, quoting the sentence) and never escalates. A one-reason exemption in `parseResolved`'s gate block keeps the clause split from re-reading a sentence the ruling refuses.
+4. **The gates** (a backstop for every rule).
+   - `droppedShapeNoun` accounts a noun only by a materialised ring of ITS arity (`ids`, or a polygon-in-polygon's `container`). The reference exemptions are unchanged.
+   - `droppedShapeAdjective` (new; one line in the `parseResolved` gate block) asks the commands to carry each stated property: a right-triangle / ⟂ / 90° / rectangle / square / a diameter (Thales) for «ישר זווית»; an equal pair / a shape variant / a trapezoid on a circle for «שווה שוקיים»; two equal pairs / a square / a rhombus for «שווה צלעות». The reference exemptions are the same.
+5. **M1 subsumption at the apply boundary** (`commandConflict`, a docs/17 §3 chokepoint). A GENERIC polygon command (`quadrilateral` / `triangle` with no `declaredAs`) over a ring already declared as a specific shape of the same arity is a **supertype restatement**. Every square is a quadrilateral, so the sentence references the ring. `addObj` already keeps the existing polygon and its `declaredAs`, so nothing structural changes, and whatever else the sentence adds is judged on its own. This is a semantic rule, not a per-kind carve-out: only the supertype word passes, and specific → different specific (a trapezoid's cycle re-declared a square) stays ADR-157's refusal. «טרפז ישר זווית ABCD» · «ABCD חסום במעגל» therefore draws with ADR-165's amber "no longer a trapezoid", the #1627 path for givens that force the rectangle later. The inscription SENTENCE that names the right trapezoid stays refused.
+6. **The residual message guard.** A redefinition whose first definition came from the same sentence (the object was not in the figure before it) is refused `input.sentenceSelfConflict`, quoting the sentence and the student's letters. It no longer says «edit or delete the earlier step» on a canvas with no earlier step.
+7. **A pinned variant offers no configuration** (`variantConfigs`). Honouring «שווה שוקיים» in corpus-2 `q5` («במשולש שווה שוקיים חסום מעגל O» · «AC=AB») exposed an older defect. An isosceles / kite / midsegment variant whose choice the student already pinned (ADR-138/412) was still enumerated: three identical drawings, so a determined figure read undetermined. The standalone «משולש שווה שוקיים ABC» · «AC=AB» did the same on main. `variantConfigs` now skips a shape-variant that `unstatedChoices` (ADR-502, the engine's one "is this choice still the tool's?" predicate) does not list.
+
+**Measured.** The class sweep has 216 rows: 8 nouns × 3 adjectives × 4 sentence shapes × lettered/unlettered, plus English. **51 commit, 4 refuse, 161 escalate. Every commit holds its property and its circle (on every vertex, or tangent to every side) at all 24 seeds.** The escalations are exactly the nouns that cannot carry the stated adjective. On main, the unlettered circle-container rows with «ישר זווית» on a non-triangle noun committed a right triangle (6/6), and 40/40 Hebrew + 18/18 English incircle rows dropped the adjective. In `q5`, line 2 still commits (`AC=AB` pins the apex the line-1 variant already drew). Its decide-parity golden moved because line 1 now lowers to the isosceles variant, and it stays in the determined-prints lock.
+
+**Locks.**
+- `src/app/__tests__/issue-1790-shape-phrase.test.ts`: the 216-row sweep at 24 seeds; the six ruled refusals with their params and no `poly-`; Arm C for eight nouns and the amber morph; the reader; both gates; the self-conflict message.
+- Scenario `right-trapezoid-inscribed-refused-names-both-nouns-1790` (corpus-4).
+- Fixture `issue-1790-incircle-right-triangle.geo.json`.
+- Parity rows `*-1790-01…04`. The unlettered refusal is a known analytic gap until PR #1791 lands; that PR drops the `knownGap`.
+- `lexical-ratchet`: 342 → 334.
+
+**Sibling audit.** 3-D has the quad half of the class (#1792, filed). Analytic reads through its `SHAPES` registry. The inscribed right triangle that is always drawn isosceles is #1793, not this ADR.
+
+**Behaviour change for a student:**
+- «מעגל חסום במשולש ישר זווית ABC» draws a right triangle around its incircle (likewise isosceles and equilateral triangles, and the isosceles or right trapezoid).
+- «טרפז ישר זווית חסום במעגל» is refused, naming the right trapezoid and the rectangle, instead of drawing a triangle.
+- «מלבן ABCD» · «ABCD חסום במעגל» draws instead of «already defined».
+- An adjective the tool cannot draw on that noun («מרובע ישר זווית חסום במעגל») now goes to the model instead of being dropped.

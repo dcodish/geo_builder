@@ -26,6 +26,7 @@ import { roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
 import { findProofTarget } from '../../shell/proofTarget';
 import { foreignGiven } from './scope';
+import { readShapePhrase, lowerShape, SHAPE_ADJ_ANY, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
 
 export type ParseResult =
   | { ok: true; commands: AnyCommand[] }
@@ -63,6 +64,10 @@ export type ParseResult =
   // segment's first letter. The bisector runs FROM its first letter, so the sentence contradicts itself;
   // refused quoting both letters, never silently redirected to either.
   | { ok: false; reason: 'bisector-wrong-apex'; apex: string; stated: string }
+  // #1790 (ADR-595): «טרפז ישר זווית [ABCD] חסום במעגל» — the inscription contradicts its own noun: a circle
+  // through the four vertices forces `forced` (a rectangle), which is not `shape`. Refused naming both nouns
+  // (the #1554 ruling of 2026-10-01; analytic's `inscribed-contradicts-noun`), never escalated.
+  | { ok: false; reason: 'inscribed-contradicts-noun'; shape: string; forced: string }
   | { ok: false; reason: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: string; shapes: string[]; side: string }
   // #1666 (ADR-561, ADR-W-107): a PROOF TARGET — «הוכיחו כי AB ⊥ AC», "prove that …" — is what the student
   // must SHOW, never a given. Every rule used to read the claim inside it and lower it as a constraint.
@@ -320,7 +325,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -1101,9 +1106,7 @@ const bareLabelRunShape: Rule = (s, ctx) => {
  *  whose equal-pair AXIS is a cyclable choice
  *  ([ADR-138](docs/06-decisions.md#adr-138)): variant 0 = axis AC (|AB|=|AD|, |CB|=|CD|), variant 1 = axis BD.
  *  `replay` expands it to a free quad + the selected pair; an explicit `AB=BC` pins the other axis. */
-const kite = shapeMacro(/kite|דלתון/i, /kite|דלתון/gi, 4, (ids) => [
-  { type: 'shape-variant', shape: 'kite', ids: [ids[0], ids[1], ids[2], ids[3]], variant: 0 },
-]);
+const kite = shapeMacro(/kite|דלתון/i, /kite|דלתון/gi, 4, (ids) => lowerShape('kite', ids));
 
 /** "isosceles triangle ABC" / "משולש שווה שוקיים ABC" → a `shape-variant` whose APEX is a cyclable choice
  *  ([ADR-138](docs/06-decisions.md#adr-138), subsuming the ADR-114 soft default): variant 0 = apex A
@@ -1115,7 +1118,7 @@ const isoscelesTriangle = shapeMacro(
   /isosceles|שווה[\s-]?שוקיים/i,
   /isosceles|triangle|שווה[\s-]?שוקיים|משולש/gi,
   3,
-  (ids) => [{ type: 'shape-variant', shape: 'isosceles', ids: [ids[0], ids[1], ids[2]], variant: 0 }],
+  (ids) => lowerShape('isosceles-triangle', ids), // the ONE lowering (shapePhrase.ts, ADR-595)
   triThroughCircle,
 );
 
@@ -1124,11 +1127,7 @@ const equilateral = shapeMacro(
   /equilateral|שווה[\s-]?צלעות/i,
   /equilateral|triangle|שווה[\s-]?צלעות|משולש/gi,
   3,
-  (ids) => [
-    { type: 'triangle', ids: [ids[0], ids[1], ids[2]] },
-    { type: 'set-equal', a: ids[0], b: ids[1], c: ids[1], d: ids[2] }, // |AB| = |BC|
-    { type: 'set-equal', a: ids[1], b: ids[2], c: ids[2], d: ids[0] }, // |BC| = |CA|
-  ],
+  (ids) => lowerShape('equilateral-triangle', ids), // triangle + |AB| = |BC| = |CA| (shapePhrase.ts, ADR-595)
   triThroughCircle,
 );
 
@@ -1141,10 +1140,7 @@ const isoscelesTrapezoid = shapeMacro(
   /(?:isosceles|שווה[\s-]?שוקיים)[\s\S]*(?:trapezoid|trapezium|טרפז)|(?:trapezoid|trapezium|טרפז)[\s\S]*(?:isosceles|שווה[\s-]?שוקיים)/i,
   /isosceles|שווה[\s-]?שוקיים|trapezoid|trapezium|טרפז/gi,
   4,
-  (ids) => [
-    { type: 'trapezoid', ids: [ids[0], ids[1], ids[2], ids[3]] },
-    { type: 'set-equal', a: ids[0], b: ids[3], c: ids[1], d: ids[2], trapezoidLegs: true }, // |AD| = |BC| (the two legs; AB ∥ DC assumed)
-  ],
+  (ids) => lowerShape('isosceles-trapezoid', ids), // trapezoid + |AD| = |BC| legs (shapePhrase.ts, ADR-595)
 );
 
 /** "right trapezoid ABCD" / "טרפז ישר זווית ABCD" → a trapezoid (AB∥DC) + one leg ⟂ the bases (AD ⟂ AB),
@@ -1155,10 +1151,7 @@ const rightTrapezoid = shapeMacro(
   /(?:right[\s-]?(?:angled?\s*)?|ישר[\s-]?זוו?ית)[\s\S]*(?:trapezoid|trapezium|טרפז)|(?:trapezoid|trapezium|טרפז)[\s\S]*(?:right[\s-]?(?:angled?\s*)?|ישר[\s-]?זוו?ית)/i,
   /right[\s-]?angled|right[\s-]?angle|right|ישר[\s-]?זוו?ית|זוו?ית|ישרה|trapezoid|trapezium|טרפז/gi,
   4,
-  (ids) => [
-    { type: 'trapezoid', ids: [ids[0], ids[1], ids[2], ids[3]] },
-    { type: 'set-perpendicular', a: ids[0], b: ids[3], c: ids[0], d: ids[1] }, // AD ⟂ AB ⇒ right angles at A and D
-  ],
+  (ids) => lowerShape('right-trapezoid', ids), // trapezoid + AD ⟂ AB ⇒ right angles at A and D (shapePhrase.ts, ADR-595)
 );
 
 /**
@@ -2029,7 +2022,7 @@ const rightTriangleShape = shapeMacro(
   /right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זוו?ית/i,
   /right[\s-]?angled|right[\s-]?angle|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|ישרה/gi,
   3,
-  (ids) => [{ type: 'right-triangle', ids: [ids[0], ids[1], ids[2]] }],
+  (ids) => lowerShape('right-triangle', ids), // shapePhrase.ts, ADR-595
 );
 // The named wrapper keeps this rule NAMED in the shadow-matrix instrument: `shapeMacro` returns an
 // anonymous closure, and the matrix reads `rule.name`, so calling it directly would drop a previously
@@ -5169,18 +5162,25 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // 180°), but the circumscribing circle is NOT drawn — only the polygon. (vs "inscribed"/"חסום",
   // which draws the circle.)
   const hidden = /בר[\s-]?חסימה|\bcyclic\b|concyclic|inscribable/i.test(s);
-  // A right triangle inscribed in a circle IS constructible (Thales — the
-  // hypotenuse is a diameter, the right angle is on the circle): handle it.
-  let kind =
-    /right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זוו?ית/i.test(s) ? 'right-triangle'
-    : /triangle|משולש/i.test(s) ? 'triangle'
-    : /square|ריבוע/i.test(s) ? 'square'
-    : /rectangle|מלבן/i.test(s) ? 'rectangle'
-    : /rhombus|מעוין/i.test(s) ? 'rhombus'
-    : /kite|דלתון/i.test(s) ? 'kite'
-    : /trapez|טרפז/i.test(s) ? 'trapezoid'
-    : /quad|מרובע/i.test(s) ? 'quad'
-    : null;
+  // #1790 (ADR-595): the shape is read by the ONE shape-phrase reader — the noun decides the arity, an
+  // adjective only modifies the noun. This used to be a private ladder that tested «ישר זווית» BEFORE the
+  // noun, so «טרפז ישר זווית חסום במעגל» built a right TRIANGLE. A right triangle inscribed in a circle IS
+  // constructible (Thales — the hypotenuse is a diameter, the right angle is on the circle): handle it.
+  const phrase = readShapePhrase(s);
+  // A phrase that contradicts the inscription (a right trapezoid: a circle through its four vertices makes it
+  // a rectangle, and a rectangle is not a trapezoid) is REFUSED naming both nouns, before any label is read,
+  // so the lettered, unlettered and English sentences all get it (#1554 ruling, 2026-10-01; analytic's
+  // `inscribed-contradicts-noun`, ADR-AG-198/242). Never escalated: it is a ruling, not a phrasing gap.
+  if (phrase && phrase.cyclic !== 'yes') return { clarify: 'inscribed-contradicts-noun', shape: phrase.kind, forced: phrase.cyclic.forces };
+  // A parallelogram in a circle has no cyclic lowering here: decline (honest not-handled), never a generic quad.
+  if (phrase?.noun === 'parallelogram') return null;
+  const INSCRIBED_KIND: Partial<Record<ShapePhrase['kind'], string>> = {
+    triangle: 'triangle', 'isosceles-triangle': 'triangle', 'equilateral-triangle': 'triangle', 'right-triangle': 'right-triangle',
+    square: 'square', rectangle: 'rectangle', rhombus: 'rhombus', kite: 'kite', quad: 'quad',
+    // A cyclic trapezoid IS isosceles (AB ∥ CD on a circle), so the adjective is honoured by the circle itself.
+    trapezoid: 'trapezoid', 'isosceles-trapezoid': 'trapezoid',
+  };
+  let kind: string | null = phrase ? (INSCRIBED_KIND[phrase.kind] ?? null) : null;
   // «המצולע חסום במעגל» / "the polygon is inscribed in a circle" (#185 row 1): the GENERIC polygon noun
   // is a DEFINITE reference — bind THE unique existing polygon (the ADR-245 pattern); its arity picks the
   // triangle/quad branch and `existingPolygon` below supplies the ids. Zero or several polygons (or a
@@ -5208,17 +5208,16 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // the same equal-side relations the standalone macros (ADR-110) emit, so the constraint solver flexes the
   // inscribed triangle into shape. Was silently DROPPED: "שווה צלעות"/"equilateral" is not a SHAPE_LEFTOVER
   // token, so it parsed as a GENERIC inscribed triangle (no equal sides) rather than escalating.
-  const triShape: 'equilateral' | 'isosceles' | null = isTri
-    ? /equilateral|שווה[\s-]?צלעות/i.test(s)
-      ? 'equilateral'
-      : /isosceles|שווה[\s-]?שוקיים/i.test(s)
-        ? 'isosceles'
-        : null
-    : null;
+  const triShape: 'equilateral' | 'isosceles' | null =
+    phrase?.kind === 'equilateral-triangle' ? 'equilateral' : phrase?.kind === 'isosceles-triangle' ? 'isosceles' : null;
   const named = circleCenter(s); // may be null — "inscribed in a circle" need not name the centre
   const r = parseRadius(s);
-  let rest = dropCircleRef(s).replace(
-    /equilateral|שווה[\s-]?צלעות|isosceles|שווה[\s-]?שוקיים|right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|kite|דלתון|trapez\w*|טרפז|quad\w*|מרובע|polygon|מצולע|inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
+  // The phrase's OWN span is the only shape vocabulary consumed (#1790): an adjective the reader did not
+  // lower on this noun («מרובע ישר זווית», "isosceles kite") stays in `rest`, so the leftover gate below
+  // escalates the line instead of this rule dropping the property. (The old strip list consumed every noun
+  // and every adjective word, which is how «ישר זווית» vanished from an inscribed trapezoid.)
+  let rest = (phrase ? phrase.strip(dropCircleRef(s)) : dropCircleRef(s)).replace(
+    /polygon|מצולע|inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
     ' ',
   );
   if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
@@ -5375,38 +5374,8 @@ const inscribedPolygon: Rule = (s, ctx) => {
   return cmds;
 };
 
-/** The engine command that CREATES a container polygon of a given word (when its vertices aren't yet drawn). */
-const CONTAINER_CREATE: Record<string, (ids: Id[]) => Command> = {
-  triangle: (ids) => ({ type: 'triangle', ids: [ids[0], ids[1], ids[2]] }),
-  quad: (ids) => ({ type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] }),
-  square: (ids) => ({ type: 'square', ids: [ids[0], ids[1], ids[2], ids[3]] }),
-  rectangle: (ids) => ({ type: 'rectangle', ids: [ids[0], ids[1], ids[2], ids[3]] }),
-  rhombus: (ids) => ({ type: 'rhombus', ids: [ids[0], ids[1], ids[2], ids[3]] }),
-  parallelogram: (ids) => ({ type: 'parallelogram', ids: [ids[0], ids[1], ids[2], ids[3]] }),
-  trapezoid: (ids) => ({ type: 'trapezoid', ids: [ids[0], ids[1], ids[2], ids[3]] }),
-};
-
-/** A polygon word → the generic container role: triangle (3 sides) vs quad (4 sides), plus the creation key. */
-const containerRole = (word: string): { kind: 'triangle' | 'quad'; create: string } | null => {
-  if (/triangle|משולש/i.test(word)) return { kind: 'triangle', create: 'triangle' };
-  if (/square|ריבוע/i.test(word)) return { kind: 'quad', create: 'square' };
-  if (/rectangle|מלבן/i.test(word)) return { kind: 'quad', create: 'rectangle' };
-  if (/rhombus|מעוין/i.test(word)) return { kind: 'quad', create: 'rhombus' };
-  if (/parallelogram|מקבילית/i.test(word)) return { kind: 'quad', create: 'parallelogram' };
-  if (/trapez|טרפז/i.test(word)) return { kind: 'quad', create: 'trapezoid' };
-  if (/quad|מרובע|kite|דלתון/i.test(word)) return { kind: 'quad', create: 'quad' };
-  return null;
-};
-
-/** The inscribed SHAPE the utterance names (the 4 constrained quads that make an inscription determinate).
- *  Detected on `s` with the CONTAINER noun already stripped, so "rhombus inscribed in a square" reads the
- *  rhombus as the inner shape. A generic/unsupported inner (bare quad, triangle) → null. */
-const innerShapeKind = (s: string): 'rhombus' | 'rectangle' | 'square' | 'parallelogram' | null =>
-  /square|ריבוע/i.test(s) ? 'square'
-  : /rectangle|מלבן/i.test(s) ? 'rectangle'
-  : /rhombus|מעוין/i.test(s) ? 'rhombus'
-  : /parallelogram|מקבילית/i.test(s) ? 'parallelogram'
-  : null;
+/** The inner shapes a polygon-in-polygon inscription can make determinate (the 4 constrained quads). */
+const INNER_SHAPES = new Set<ShapePhrase['kind']>(['square', 'rectangle', 'rhombus', 'parallelogram']);
 
 /**
  * "מעוין BDEF חסום במשולש ABC" / "rectangle inscribed in triangle ABC" — a POLYGON INSCRIBED IN A POLYGON
@@ -5414,9 +5383,15 @@ const innerShapeKind = (s: string): 'rhombus' | 'rectangle' | 'square' | 'parall
  * command; `replay` expands the inscribe to on-segment riders + the shape's constraints (see engine/inscribe.ts).
  * Runs BEFORE `incircle`/`inscribedPolygon` (both match "inscribed"/"חסום") and the base shape rules. The inner
  * shape and its container are told apart by the ב/"in" preposition, never word order (the ADR-245 principle).
+ *
+ * #1790 (ADR-595): both shapes are read by the ONE shape-phrase reader. The container used to be read by a
+ * private noun-only ladder, so «מלבן DEFG חסום במשולש ישר זווית ABC» built a GENERIC triangle — the adjective
+ * silently dropped. The container is now its phrase's standalone lowering (a right triangle, an equilateral
+ * one…), and an adjective neither phrase can lower escalates.
  */
 const inscribedInPolygon: Rule = (s, ctx) => {
-  if (!/inscrib\w*|חסום/i.test(s)) return null;
+  const verb = /inscrib\w*|חסום\S*/i.exec(s);
+  if (!verb) return null;
   if (/circle|מעגל|incircle/i.test(s)) return null; // a circle is involved → the circle-inscription rules own it
   // The CONTAINER is the polygon carrying ב / "in [a/the]".
   const contRe = new RegExp(
@@ -5426,31 +5401,44 @@ const inscribedInPolygon: Rule = (s, ctx) => {
   const cm = contRe.exec(s);
   if (!cm || cm.index === undefined) return null;
   const contWord = cm[1] ?? cm[2];
-  const role = containerRole(contWord);
-  if (!role) return null;
+  // The container's phrase is the side of the inscription verb that carries the marker («במשולש ישר זווית ABC»
+  // after «חסום», or «במשולש ABC» before it in the inverted order). When that side does not read as the marked
+  // noun (the verb inside the container phrase, "inscribed in triangle ABC is …"), the bare noun is the phrase.
+  const contSide = cm.index >= verb.index ? s.slice(verb.index + verb[0].length) : s.slice(0, verb.index);
+  const nounOnly = readShapePhrase(contWord);
+  if (!nounOnly?.noun) return null;
+  const sidePhrase = readShapePhrase(contSide);
+  const cont = sidePhrase?.noun === nounOnly.noun ? sidePhrase : nounOnly;
+  if (cont.unconsumed.length) return 'stop'; // «במעוין ישר זווית»: a property this noun cannot carry — escalate
   // Container labels: the run of `contN` labels following the marker (works for both "…in triangle ABC" and
   // the inverted "במשולש ABC חסום …").
-  const contN = role.kind === 'triangle' ? 3 : 4;
+  const contN = cont.arity;
   const afterCont = s.slice(cm.index + cm[0].length);
   const contIds = labelRun(afterCont, contN) ?? existingPolygon(ctx, contN) ?? autoVertexLabels(contN, ctx.points ?? []);
-  // The inner shape: read from the utterance with the container noun + its labels removed, so a same-family
-  // container (rhombus in a rhombus) doesn't confuse the inner-shape detection.
+  // The inner shape: read from the utterance with the container noun, its consumed adjective and its labels
+  // removed, so a same-family container (rhombus in a rhombus) doesn't confuse the inner-shape detection.
   let inner = s.replace(cm[0], ' ');
+  if (cont.consumed) inner = inner.replace(new RegExp(SHAPE_ADJ_WORDS[cont.consumed], 'i'), ' ');
   for (const id of contIds) inner = inner.replace(new RegExp(String.raw`\b${id}\b`, 'g'), ' ');
-  const shape = innerShapeKind(inner);
-  if (!shape) return 'stop'; // a polygon inscription we can't make determinate — escalate, never a plain-shape misparse
+  const innerPhrase = readShapePhrase(inner);
+  // a polygon inscription we can't make determinate — or an inner shape carrying an adjective it cannot
+  // lower — escalates, never a plain-shape misparse
+  if (!innerPhrase?.noun || !INNER_SHAPES.has(innerPhrase.kind) || innerPhrase.stated.length) return 'stop';
+  const shape = innerPhrase.kind as 'rhombus' | 'rectangle' | 'square' | 'parallelogram';
   // Inner shape labels (always a quad, n=4): the run after the shape word, or auto-named avoiding existing +
   // the container's labels (so an auto-named shape doesn't accidentally coincide with a container vertex).
   const taken = [...(ctx.points ?? []), ...contIds];
-  const shapeWordRe = /square|ריבוע|rectangle|מלבן|rhombus|מעוין|parallelogram|מקבילית/i;
-  const wm = shapeWordRe.exec(inner);
+  const wm = new RegExp(SHAPE_NOUN_WORDS[innerPhrase.noun], 'i').exec(inner);
   const afterShape = wm ? inner.slice(wm.index + wm[0].length) : inner;
   const ids = labelRun(afterShape, 4) ?? autoVertexLabels(4, taken);
 
   const cmds: AnyCommand[] = [];
   const allExist = contIds.every((c) => (ctx.points ?? []).includes(c));
-  if (!allExist) cmds.push(CONTAINER_CREATE[role.create](contIds)); // create the container unless it's already drawn (M1 reuse)
-  cmds.push({ type: 'inscribe', shape, ids, container: contIds, containerKind: role.kind, variant: 0 });
+  // An adjective stated on an ALREADY-DRAWN container is a new claim about it, not a creation — escalate
+  // rather than drop it (#1790).
+  if (allExist && cont.consumed) return 'stop';
+  if (!allExist) cmds.push(...cont.lower(contIds)); // create the container unless it's already drawn (M1 reuse)
+  cmds.push({ type: 'inscribe', shape, ids, container: contIds, containerKind: contN === 3 ? 'triangle' : 'quad', variant: 0 });
   return cmds;
 };
 
@@ -5956,33 +5944,35 @@ const incircle: Rule = (s, ctx) => {
   // … OR "<polygon> ABCD circumscribes the circle" — the polygon encloses the circle (same figure). Ordered
   // (polygon-labels … circumscribes … circle) so a CIRCLE-first "מעגל חוסם משולש" (a circumcircle) does NOT
   // match here — only the polygon-as-subject reading does.
-  const circumscribes =
-    new RegExp(String.raw`(?:${POLY_WORDS_EN}|${POLY_WORDS_HE})\s+[A-Za-z]\d*.*?(?:circumscrib\w*|חוסם).*?(?:circle|מעגל)`, 'i').test(s);
+  // A shape-property adjective may sit between the noun and its labels («טרפז ישר זווית ABCD חוסם מעגל», #1790).
+  const circumscribes = new RegExp(
+    String.raw`(?:${POLY_WORDS_EN}|${POLY_WORDS_HE})(?:\s+(?:${SHAPE_ADJ_ANY}))?\s+${LABEL}.*?(?:circumscrib\w*|חוסם).*?(?:circle|מעגל)`,
+    'i',
+  ).test(s);
   if (!inscribed && !circumscribes) return null;
-  // The polygon kind → vertex count. (Every triangle has an incircle; a quad needs to be TANGENTIAL, which
-  // the construction below flexes it to be — sum of opposite sides equal, Pitot.)
-  const kind =
-    /triangle|משולש/i.test(s) ? 'triangle'
-    : /square|ריבוע/i.test(s) ? 'square'
-    : /rectangle|מלבן/i.test(s) ? 'rectangle'
-    : /rhombus|מעוין/i.test(s) ? 'rhombus'
-    : /kite|דלתון/i.test(s) ? 'kite'
-    : /trapez|טרפז/i.test(s) ? 'trapezoid'
-    : /parallelogram|מקבילית/i.test(s) ? 'parallelogram'
-    : /quad\w*|מרובע/i.test(s) ? 'quad'
-    : null;
-  if (!kind) return null;
-  const n = kind === 'triangle' ? 3 : 4;
+  // The polygon → vertex count, read by the ONE shape-phrase reader (#1790, ADR-595): the noun decides the
+  // arity and its stated adjective refines the container («במשולש ישר זווית ABC» is a RIGHT triangle). This
+  // used to be a private noun-only ladder, so every adjective here was silently dropped. (Every triangle has
+  // an incircle; a quad needs to be TANGENTIAL, which the construction below flexes it to be — Pitot.)
+  const phrase = readShapePhrase(s);
+  if (!phrase?.noun) return null;
+  const n = phrase.arity;
   const taken = ctx.points ?? []; // auto-named points must dodge labels already in the figure
   // The vertices: named in the utterance, or auto-named A,B,C(,D) — "O מרכז המעגל החסום בטרפז" names none.
   const namedC = circleCenter(s);
   const incLabel = incenterLabel(s);
-  let rest = dropCircleRef(s).replace(
-    /incircle|inscrib\w*|חסום|circumscrib\w*|חוסם|triangle|משולש|square|ריבוע|rectangle|מלבן|rhombus|מעוין|kite|דלתון|trapez\w*|טרפז|parallelogram|מקבילית|quad\w*|מרובע|polygon|circles?|מעגל\w*|cent(?:er|re)\w*|ה?מרכז\w*/gi,
+  // Only the phrase's OWN words are consumed (the noun + the adjective it lowers); an adjective it cannot lower
+  // on this noun stays, and the leftover guard below escalates the line (#1790).
+  let rest = phrase.strip(dropCircleRef(s)).replace(
+    /incircle|inscrib\w*|חסום|circumscrib\w*|חוסם|polygon|circles?|מעגל\w*|cent(?:er|re)\w*|ה?מרכז\w*|בתוך|\binside\b|radius|רדיוס\S*/gi,
     ' ',
   );
   if (namedC) rest = rest.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ');
   if (incLabel) rest = rest.replace(new RegExp(String.raw`\b${incLabel}\b`, 'gi'), ' ');
+  // A SYMBOLIC radius («radius r») names the incircle's own radius — the binding post-pass attaches the letter
+  // (#54). A NUMERIC one is left in `rest`: the inradius is derived, so a stated value is a compound to escalate.
+  const rad = parseRadius(s);
+  if (rad.symbolic && rad.sym) rest = rest.replace(new RegExp(String.raw`\b${rad.sym}\b`, 'g'), ' ');
   const ids =
     labelRun(rest, n) ??
     (namesVertices(rest)
@@ -5990,6 +5980,10 @@ const incircle: Rule = (s, ctx) => {
       : (existingPolygon(ctx, n) ??
         autoVertexLabels(n, [...taken, ...(namedC ? [namedC] : []), ...(incLabel ? [incLabel] : [])])));
   if (!ids) return null;
+  // #1790: the leftover guard this rule never had — after the circle, the phrase, the centre and the vertices
+  // are consumed, anything geometry-significant left (an adjective the phrase could not lower on this noun, a
+  // second statement) is a compound: escalate, never build the bare noun and drop it.
+  if (shapeLeftover(removeClaimed(rest, ids))) return 'stop';
   const [A, B, C] = ids;
   // EXISTING circle as the incircle — "משולש DEF חוסם את המעגל O" where circle O is ALREADY in the figure
   // (here O is also the circumcircle of an earlier triangle). The triangle's three sides are tangent to the
@@ -6002,6 +5996,9 @@ const incircle: Rule = (s, ctx) => {
   // existing-circle branch and the pole-of-chord two-tangent rule.
   const namedCenter = circleCenter(s);
   if (n === 3 && namedCenter && (ctx.circles ?? []).some((c) => up(c) === up(namedCenter))) {
+    // The dual's vertices are tangent-line meets with no free DOF a shape property could flex, so a refined
+    // triangle (right / isosceles / equilateral) around an existing circle escalates (#1790).
+    if (phrase.kind !== 'triangle') return 'stop';
     const O = up(namedCenter);
     const circ = circleId(O);
     // The three tangency touch points are SCAFFOLDING the student didn't name (#32) — anonymous promotable
@@ -6026,19 +6023,11 @@ const incircle: Rule = (s, ctx) => {
 
   // The polygon's defining command (carries its constraints: trapezoid AB∥CD, rhombus equal sides, …), so the
   // shape stays the named shape while the tangential flex below adjusts it to admit an incircle.
+  // #1790: it is the phrase's STANDALONE lowering (shapePhrase.ts) — the very commands «טרפז ישר זווית ABCD» /
+  // «משולש שווה שוקיים ABC» emit alone — so the container keeps every stated property. A kite is its ADR-138
+  // shape-variant (every kite is tangential — Pitot — so the tangency force below is always satisfiable).
   const v = ids;
-  const shapeCmd: AnyCommand =
-    kind === 'triangle' ? { type: 'triangle', ids: [v[0], v[1], v[2]] }
-    : kind === 'square' ? { type: 'square', ids: [v[0], v[1], v[2], v[3]] }
-    : kind === 'rectangle' ? { type: 'rectangle', ids: [v[0], v[1], v[2], v[3]] }
-    : kind === 'rhombus' ? { type: 'rhombus', ids: [v[0], v[1], v[2], v[3]] }
-    // A kite is its ADR-138 shape-variant macro (expands to the quadrilateral + the equal ADJACENT pairs,
-    // axis cyclable/pinnable) — the same lowering the standalone/inscribed kite uses. Every kite is
-    // tangential (AB=AD, CB=CD ⇒ Pitot), so the tangency force below is always satisfiable.
-    : kind === 'kite' ? { type: 'shape-variant', shape: 'kite', ids: [v[0], v[1], v[2], v[3]], variant: 0 }
-    : kind === 'trapezoid' ? { type: 'trapezoid', ids: [v[0], v[1], v[2], v[3]] }
-    : kind === 'parallelogram' ? { type: 'parallelogram', ids: [v[0], v[1], v[2], v[3]] }
-    : { type: 'quadrilateral', ids: [v[0], v[1], v[2], v[3]] };
+  const shapeCmds: AnyCommand[] = phrase.lower(v);
 
   // Generic incircle construction. The incentre is where the angle bisectors meet — it exists for ANY triangle,
   // and for a quad ONLY when the quad is TANGENTIAL (Pitot). We take the bisectors at two ADJACENT vertices (v0,
@@ -6063,9 +6052,9 @@ const incircle: Rule = (s, ctx) => {
   // `point-on-circle` case (a) makes this a true no-op. Both reuse paths had to move together: a gate
   // that stops special-casing one of them would false-refuse the other.
   if (lines.has(bis0) && lines.has(bis1))
-    return [shapeCmd, { type: 'point-on-circle', id: anonId('f', `${v[0]}${v[1]}`), circle: circleId(I) }];
+    return [...shapeCmds, { type: 'point-on-circle', id: anonId('f', `${v[0]}${v[1]}`), circle: circleId(I) }];
   const cmds: AnyCommand[] = [
-    shapeCmd,
+    ...shapeCmds,
     { type: 'bisector', id: bis0, vertex: v[0], p: a0p, q: a0q },
     { type: 'bisector', id: bis1, vertex: v[1], p: b1p, q: b1q },
     { type: 'line-intersection', id: I, line1: bis0, line2: bis1 }, // the incentre
@@ -11599,6 +11588,7 @@ function parseResolved(s: string, ctx: ParseContext): ParseResult {
   if (
     (whole.ok &&
       (droppedShapeNoun(s, whole.commands, ctx) ||
+        droppedShapeAdjective(s, whole.commands, ctx) || // #1790: a stated shape property must travel too
         droppedMidsegment(s, whole.commands) ||
         droppedCirclePredicate(s, whole.commands) ||
         droppedRadiusSymbol(s, whole.commands).length > 0 ||
@@ -11611,7 +11601,9 @@ function parseResolved(s: string, ctx: ParseContext): ParseResult {
     // sending a recognised ambiguity to the LLM, which is the #516 class this tree keeps closing. The
     // comment directly below already states the rule ("a clarification is a rule's genuine question —
     // propagate it, never second-guess it with a split"); this makes the condition agree with it.
-    (!whole.ok && whole.reason !== 'not-handled' && !isAmbiguityQuestion(whole.reason) && droppedShapeNoun(s, [], ctx))
+    // #1790 (ADR-595): `inscribed-contradicts-noun` is a refusal ABOUT the noun — the rule read it, and
+    // re-splitting would only let a clause half-parse the sentence the ruling refuses. One reason, here only.
+    (!whole.ok && whole.reason !== 'not-handled' && whole.reason !== 'inscribed-contradicts-noun' && !isAmbiguityQuestion(whole.reason) && droppedShapeNoun(s, [], ctx))
   ) {
     return splitStatements(s, ctx) ?? regionSideFallback(s, ctx) ?? { ok: false, reason: 'not-handled' };
   }
@@ -11742,13 +11734,74 @@ export function droppedMidsegment(utterance: string, commands: AnyCommand[]): bo
     (c) => c.type === 'midpoint' || (c.type === 'shape-variant' && MIDSEGMENT_SHAPES.has(c.shape)) || c.type === 'set-equal',
   );
 }
-function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseContext): boolean {
-  if (commands.some((c) => Array.isArray((c as { ids?: unknown }).ids) && ((c as { ids: unknown[] }).ids.length >= 3))) return false;
+/**
+ * #1790 ([ADR-595](docs/06-decisions.md#adr-595)) — the gate twin for a shape-PROPERTY adjective. `CONSTRUCT_NOUNS`
+ * excludes a shape's own property by design, and the span accountant counts «ישר» / «זווית» / «שוקיים» as
+ * vocabulary, so nothing accounted for the adjective: an inscription rule that consumed «ישר זווית» without
+ * lowering it committed the bare noun. This asks the COMMANDS: a stated adjective on a polygon noun must
+ * travel as something that makes it true —
+ *  - right: a right-triangle, a ⟂, a 90° angle, a rectangle/square, or a diameter (Thales: two vertices
+ *    antipodal on one circle — how the inscribed right triangle is built);
+ *  - isosceles: an equal pair, a shape variant, or a trapezoid on a circle (a cyclic trapezoid IS isosceles);
+ *  - equilateral: two equal pairs, or a square/rhombus.
+ * A sentence whose polygon nouns are all REFERENCES (their letters already drawn, or a bare noun beside
+ * existing polygons) restates, and is exempt — the `droppedShapeNoun` exemptions, unchanged.
+ */
+export function droppedShapeAdjective(s: string, commands: AnyCommand[], ctx: ParseContext): boolean {
+  const nouns = [...s.matchAll(POLY_NOUN)];
+  if (!nouns.length) return false; // a noun-less adjective is the standalone right/isosceles triangle's own
+  const pts = new Set((ctx.points ?? []).map((p) => p.toUpperCase()));
+  const isReference = (m: RegExpMatchArray): boolean => {
+    const run =
+      s.slice(m.index! + m[0].length).match(/^(?:ים|ות)?\s+(?:\S+\s+){0,2}?ה?((?:[A-Z]\d*\s*){3,})/)?.[1] ??
+      s.slice(0, m.index!).match(/((?:[A-Z]\d*\s*){3,})\s*$/)?.[1];
+    if (!run) return (ctx.polygons?.length ?? 0) > 0;
+    return (run.match(/[A-Z]\d*/g) ?? []).every((l) => pts.has(l));
+  };
+  if (nouns.every(isReference)) return false;
+  const has = (t: AnyCommand['type']) => commands.some((c) => c.type === t);
+  const count = (t: AnyCommand['type']) => commands.filter((c) => c.type === t).length;
+  const onCircle = commands.flatMap((c) => (c.type === 'point-on-circle' && typeof c.theta === 'number' ? [c] : []));
+  const diameter = onCircle.some((p, i) =>
+    onCircle.some((q, j) => j > i && p.circle === q.circle && Math.abs(Math.abs(p.theta! - q.theta!) - Math.PI) < 1e-9),
+  );
+  const accounts: Record<keyof typeof SHAPE_ADJ_WORDS, () => boolean> = {
+    right: () =>
+      has('right-triangle') || has('set-perpendicular') || has('rectangle') || has('square') || diameter ||
+      commands.some((c) => c.type === 'set-angle' && Math.abs(c.value - 90) < 1e-9),
+    isosceles: () =>
+      has('set-equal') || has('shape-variant') ||
+      (commands.some((c) => c.type === 'trapezoid' || (c.type === 'quadrilateral' && c.declaredAs === 'trapezoid')) &&
+        (has('point-on-circle') || has('set-concyclic'))),
+    equilateral: () => count('set-equal') >= 2 || has('square') || has('rhombus'),
+  };
+  return (Object.keys(accounts) as (keyof typeof accounts)[]).some(
+    (adj) => new RegExp(SHAPE_ADJ_WORDS[adj], 'i').test(s) && !accounts[adj](),
+  );
+}
+
+/** Each polygon noun's vertex count — what a MATERIALISED polygon must have to account for it (#1790). */
+const polyNounArity = (noun: string): number =>
+  /משולש|triangle/i.test(noun) ? 3 : /מחומש|pentagon/i.test(noun) ? 5 : /משושה|hexagon/i.test(noun) ? 6 : 4;
+export function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseContext): boolean {
+  // #1790 (ADR-595): a noun is accounted for by a materialised polygon of ITS arity, not by any polygon. The
+  // old first line returned false as soon as ANY command carried a ≥3-id run, so a triangle accounted for
+  // «טרפז» and «טרפז ישר זווית חסום במעגל» committed a triangle green. The ring a command materialises is its
+  // `ids` (a shape) or `container` (a polygon-in-polygon's host).
+  const arities = new Set(
+    commands.flatMap((c) =>
+      (['ids', 'container'] as const).flatMap((k) => {
+        const v = (c as Record<string, unknown>)[k];
+        return Array.isArray(v) && v.length >= 3 ? [v.length] : [];
+      }),
+    ),
+  );
   const known = new Set([
     ...(ctx.points ?? []).map((p) => p.toUpperCase()),
     ...(JSON.stringify(commands).match(/[A-Z]\d*/g) ?? []),
   ]);
   for (const m of s.matchAll(POLY_NOUN)) {
+    if (arities.has(polyNounArity(m[0]))) continue; // a polygon of this noun's arity was materialised
     const after = s.slice(m.index! + m[0].length);
     const before = s.slice(0, m.index!);
     const run =
@@ -12040,6 +12093,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'crossing-already-named')
     return { ok: false, reason: 'crossing-already-named', holder: res.holder, id: res.id, s1: res.s1, s2: res.s2 };
   if (res.clarify === 'arc-copula') return { ok: false, reason: 'arc-copula', a: res.a, b: res.b };
+  if (res.clarify === 'inscribed-contradicts-noun') return { ok: false, reason: 'inscribed-contradicts-noun', shape: res.shape, forced: res.forced };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 

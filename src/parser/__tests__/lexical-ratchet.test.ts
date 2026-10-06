@@ -23,7 +23,9 @@ const count = (src: string, literal: string): number => src.split(literal).lengt
 // The recorded ceilings (2026-07-24 baselines). LOWER when you sweep; NEVER raise — compose new
 // regexes from src/parser/lexicon.ts atoms instead of inlining a fresh fragment.
 const CEILINGS = {
-  parse2Label: 342, // '[A-Za-z]\d*' in parse.ts
+  // #1790 (ADR-595): the inscription rules read their shape through src/parser/shapePhrase.ts and the incircle's
+  // circumscribes pattern composes the LABEL atom — lowered to the measured count (342 → 334, earlier drift included).
+  parse2Label: 334, // '[A-Za-z]\d*' in parse.ts
   parse2Num: 31, //    '\d+(?:\.\d+)?' in parse.ts
   parse3Label: 163, // '[A-Z]\d*' in parse3.ts
   // #513 (ADR-3D-135) swept parse3's number fragment onto the new `UNUM` atom while widening the
