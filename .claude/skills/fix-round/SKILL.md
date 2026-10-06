@@ -123,7 +123,12 @@ Sequential, one item at a time (parallel items in one tree overwrite each other)
   item branches merge, in composition order, into a STAGING tip (`round/<date>`, its own worktree);
   conflicts are reconciled there (ADR-log tails always collide — keep both, in order); the batch's
   **`npm run test:full` runs once on that tip** (again only if red — fix on the staging tip, re-run);
-  then `main` fast-forwards to it and pushes ONCE. Item commit messages state the root cause and
+  then `main` fast-forwards to it and pushes ONCE. **Parity goldens are the batch's to judge**
+  ([ADR-W-113](../../../docs/06w-decisions-workspace.md#adr-w-113)): `decide-parity-1395-*` and
+  `decide-submit3-parity-1394` are slow-tier, so items no longer see their drift. A red golden on the
+  tip is read from its drift report (`reports/decide-parity-drift-<shard>.json`, or the test's diff),
+  each drifted case is attributed to the item whose behaviour change explains it, and an unexplained
+  drift is a defect, not a re-record. Then it is re-recorded ONCE (`UPDATE_PARITY_GOLDEN=1`) on the tip. Item commit messages state the root cause and
   carry `Fixes #NN` + `round #RR`; the ledger's SHA column is filled at the push. Remove the
   worktrees after the push.
 - **Features** (including bugs reclassified as capability gaps): `gh pr create` with
