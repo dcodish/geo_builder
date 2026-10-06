@@ -76,6 +76,7 @@
     "src3d/__tests__/issue-1506-two-configurations.test.ts",
     "src3d/__tests__/issue-1560-vector-pin-claims.test.ts",
     "src3d/__tests__/issue-1735-rider-host-reseat.test.ts",
+    "src3d/__tests__/issue-1792-shape-phrase.test.ts",
     "src3d/__tests__/issue-814.test.ts",
     "src3d/__tests__/issue-815.test.ts",
     "src3d/__tests__/issue-816.test.ts",

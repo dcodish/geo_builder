@@ -164,6 +164,7 @@
  "scenario:right-trapezoid-inscribed-refused-names-both-nouns-1790": "6e89624c38415dff",
  "scenario:existing-label-clause-never-dropped-1795": "7667668e8b24d9a1",
  "scenario:compound-line-all-or-none-1798": "9082a7e0ffba356e",
+ "scenario:isosceles-base-median-follows-config-1810": "99f24ceb6c302071",
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",
  "fixture:defining-interaction.geo.json": "453b283f490e90b0",
  "fixture:equilateral-inscribed.geo.json": "d8a2b3c24fc515b8",
