@@ -144,6 +144,12 @@
     "missingOperands": "\"{{sentence}}\": {{points}} are not in the figure yet, so there is nothing to build this sentence on. Define those points first — for example the shape they are corners of.",
     "unresolvedSentence": "\"{{sentence}}\": this sentence relies on something that is not in the figure yet, so it was not built. Define what it refers to first.",
     "bisectorWrongApex": "The bisector runs from {{apex}}, but the angle you named has its vertex at {{stated}}. Check which vertex you meant.",
+    "inscribedContradictsNoun": "A {{shape}} cannot be inscribed in a circle: \"{{detail}}\". A circle around it would make it a {{forced}}, and a {{forced}} is not a {{shape}}. If the shape is a {{forced}}, write \"{{forced}} ABCD is inscribed in a circle\".",
+    "shapeNoun": {
+      "right-trapezoid": "right trapezoid",
+      "rectangle": "rectangle"
+    },
+    "sentenceSelfConflict": "\"{{sentence}}\": this sentence defines {{id}} twice, as two different things, so it was not added.",
     "ambiguousCevian": "\"{{sentence}}\": vertex {{apex}} belongs to several shapes ({{shapes}}), each with a different side opposite it — so it is unclear which side {{kind}} drops to. Name the side (e.g. \"to side {{side}}\") or the triangle (e.g. \"in triangle {{shape}}\").",
     "arcCopula": "\"arc {{a}} is arc {{b}}\" says they are the same arc. To say their measures are equal: \"arc {{a}} equals arc {{b}}\".",
     "crossingAlreadyNamed": "The point you asked for is «{{holder}}» — a point already in the figure. {{s1}} and {{s2}} do meet there, but there is no new point here to call «{{id}}»; if you meant another point, check which two lines cross there."

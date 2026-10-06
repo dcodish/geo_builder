@@ -1020,6 +1020,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'conj-space-par-1691-12', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'הישרים AB ו - CD מקבילים'], expect: 'builds' },
   { id: 'conj-space-meet-1691-13', family: 'intersections', steps: ['מרובע ABCD', 'האלכסונים AC ו - BD נפגשים בנקודה E'], expect: 'builds' },
   { id: 'conj-space-cut-1691-14', family: 'intersections', steps: ['מרובע ABCD', 'AC ו -BD נחתכים'], expect: 'builds' },
+
+  // ── #1790 (ADR-595): an inscription honours the shape's adjective — the noun decides the shape, the adjective refines it ──
+  // The unlettered right trapezoid: analytic refuses it once PR #1791 (ADR-AG-242, `unletteredInscribed`) lands — drop this knownGap then.
+  { id: 'right-trapezoid-unlettered-1790-01', family: 'inscribed', steps: ['טרפז ישר זווית חסום במעגל'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1554' }], note: 'operator ruling 2026-10-01 (#1554): refused naming both nouns; 2-D drew a triangle' },
+  { id: 'incircle-right-triangle-1790-02', family: 'inscribed', steps: ['מעגל חסום במשולש ישר זווית ABC'], expect: 'builds', exception: 'X8', note: '2-D drew a generic triangle (the adjective dropped)' },
+  { id: 'incircle-isosceles-trapezoid-1790-03', family: 'inscribed', steps: ['מעגל חסום בטרפז שווה שוקיים ABCD'], expect: 'builds', exception: 'X8' },
+  { id: 'restated-ring-inscribed-1790-04', family: 'inscribed', steps: ['מלבן ABCD', 'ABCD חסום במעגל'], expect: 'builds', exception: 'X8', note: '2-D refused «poly-ABCD is already defined»: a generic restatement is a reference (M1 subsumption)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

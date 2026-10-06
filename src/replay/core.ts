@@ -24,7 +24,7 @@ import { DISPLAY_ONLY } from '@/engine';
 import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents } from '@/engine/types';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 import { resolveBinds } from './naming';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -3419,7 +3419,15 @@ function addMeasureLabel(
 export function variantConfigs(facts: Fact[]): Fact[][] {
   // #1711 (ADR-573): a multi-root angle given («sin∢ACB = 3/4») chooses a VALUE, so a relation true at one
   // root only is the student's choice, never forced — it samples across its roots like a shape-variant.
-  const variantFacts = facts.filter((f) => f.enabled && (f.cmd.type === 'shape-variant' || f.cmd.type === 'measure-angle') && variantCountOf(f.cmd) > 1);
+  // #1790 (ADR-595): a shape-variant whose choice the student already PINNED (a stated equal pair on an
+  // isosceles/kite, a placed midsegment endpoint — ADR-138/412) draws identically in every variant, so it
+  // offers no configuration. `unstatedChoices` is the engine's one "is this choice still the tool's?"
+  // predicate; a shape-variant it does not list is pinned. Without this, «במשולש שווה שוקיים …» · «AC=AB»
+  // read as undetermined once the inscription began honouring «שווה שוקיים».
+  const open = new Set(unstatedChoices(facts).map((c) => c.factId));
+  const variantFacts = facts.filter(
+    (f) => f.enabled && (f.cmd.type === 'shape-variant' ? open.has(f.id) : f.cmd.type === 'measure-angle') && variantCountOf(f.cmd) > 1,
+  );
   if (variantFacts.length === 0) return [facts];
   const configs: Fact[][] = [facts];
   for (const vf of variantFacts) {

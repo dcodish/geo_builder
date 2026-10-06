@@ -402,6 +402,19 @@ export async function decideFromParse(
   if (!r.ok && r.reason === 'cevian-wrong-side') {
     return refuse('guided', { source: 'parser', result: `cevian-wrong-side:${r.apex}:${r.stated.join('')}/${r.actual.join('')}` }, { key: 'input.cevianWrongSide', params: { apex: r.apex, stated: r.stated.join(''), actual: r.actual.join('') } });
   }
+  /**
+   * #1790 ([ADR-595](../../docs/06-decisions.md#adr-595)): «טרפז ישר זווית חסום במעגל» — the sentence contradicts
+   * its own noun. A circle through the four vertices makes the shape a rectangle, and a rectangle is not a
+   * trapezoid. Refused naming both nouns and quoting the sentence (the #1554 ruling of 2026-10-01, worded as
+   * analytic's `errInscribedContradictsNoun`). Never escalated: the LLM could only draw something else.
+   */
+  if (!r.ok && r.reason === 'inscribed-contradicts-noun') {
+    return refuse(
+      'guided',
+      { source: 'parser', result: `inscribed-contradicts-noun:${r.shape}:${r.forced}` },
+      { key: 'input.inscribedContradictsNoun', params: { detail: utterance.trim(), shape: { t: `input.shapeNoun.${r.shape}` }, forced: { t: `input.shapeNoun.${r.forced}` } } },
+    );
+  }
   // #1285: the same channel — the angle's stated vertex is not the bisector's own first letter.
   if (!r.ok && r.reason === 'bisector-wrong-apex') {
     return refuse('guided', { source: 'parser', result: `bisector-wrong-apex:${r.apex}:${r.stated}` }, { key: 'input.bisectorWrongApex', params: { apex: r.apex, stated: r.stated } });
@@ -661,6 +674,21 @@ export async function decideFromParse(
           missing.length
             ? { key: 'input.missingOperands', params: { sentence: utterance.trim(), points: missing.join(', ') } }
             : { key: 'input.unresolvedSentence', params: { sentence: utterance.trim() } },
+        );
+      }
+      /**
+       * #1790 ([ADR-595](../../docs/06-decisions.md#adr-595)): a redefinition whose FIRST definition came from this
+       * same sentence. The engine's message («… is already defined — edit or delete the earlier step») names an
+       * object and points at an earlier step that does not exist — on an empty canvas, there is none. The
+       * conflict is between two readings of one sentence, so the refusal quotes the sentence and the student's
+       * own letters, never an internal id.
+       */
+      const redefined = outcome.reason === 'error' ? /^'(.+)' is already defined/.exec(outcome.detail ?? '')?.[1] : undefined;
+      if (redefined && !viewNow().construction.objects.some((o) => o.id === redefined)) {
+        return refuse(
+          'conflict',
+          { source: 'parser', result: `self-conflict:${redefined}`, detail: outcome.detail, commands: r.commands },
+          { key: 'input.sentenceSelfConflict', params: { sentence: utterance.trim(), id: redefined.replace(/^[a-z]+-(?=[A-Z])/, '') } }, // 'poly-ABCD' → ABCD
         );
       }
       if (outcome.reason === 'error') {

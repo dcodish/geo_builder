@@ -112,6 +112,17 @@ export function diagonalClaimRefusal(prev: Construction, cmd: Command): string |
   return `${cmd.a}${cmd.b} is not a diagonal of ${ring.join('')} — it is a side`;
 }
 
+/**
+ * #1790 (ADR-595): is `cmd` the SUPERTYPE word restated over an already-declared ring of the same arity — a
+ * bare `quadrilateral` over a declared square/trapezoid/…, a bare `triangle` over a declared right triangle?
+ * Every square is a quadrilateral, so that is a reference to the ring, never a redefinition of it.
+ */
+function isSupertypeRestatement(cmd: Command, existing: Extract<GeoObject, { kind: 'polygon' }>): boolean {
+  if (cmd.type === 'quadrilateral') return !cmd.declaredAs && existing.vertices.length === 4;
+  if (cmd.type === 'triangle') return !cmd.declaredAs && existing.vertices.length === 3;
+  return false;
+}
+
 export function commandConflict(prev: Construction, cmd: Command): string | null {
   const produced = applyCommand(emptyConstruction(), cmd).objects;
   // A command "reuses or creates" its base points when applying it CREATES free-points — a shape's
@@ -163,6 +174,14 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     // DECLARED as a shape — ADR-157 immutability: re-declaring a trapezoid's cycle as a square stays
     // THIS refusal, never a silent morph.
     if (SHAPE_CORNER_KINDS.has(o.kind) && isGeoPoint(existing) && shapeLowersToConstraints(prev, cmd)) continue;
+    // #1790 (ADR-595) — SUPERTYPE RESTATEMENT. A GENERIC polygon command (`quadrilateral` / `triangle` with no
+    // `declaredAs`) over a vertex cycle already declared as a specific shape says only "ABCD is a
+    // quadrilateral" — true of every square, rectangle, trapezoid. It REFERENCES the declared ring; it does not
+    // redefine it. apply's `addObj` already keeps the existing polygon (and its `declaredAs`), so the restatement
+    // changes nothing structurally, and whatever else the sentence adds (a circle through the four vertices)
+    // is judged on its own. Semantic, not per-kind: only the supertype word of the same arity passes — a
+    // specific → different-specific re-declaration (a trapezoid's cycle as a square) stays ADR-157's refusal.
+    if (o.kind === 'polygon' && existing.kind === 'polygon' && isSupertypeRestatement(cmd, existing)) continue;
     return `'${o.id}' is already defined — it can't be redefined as something different`;
   }
   return null;

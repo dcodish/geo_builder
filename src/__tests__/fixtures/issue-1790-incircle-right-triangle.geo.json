@@ -1,0 +1,115 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-06T12:00:00.000Z",
+  "name": "issue-1790-incircle-right-triangle",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מעגל חסום במשולש ישר זווית ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "right-triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "מעגל חסום במשולש ישר זווית ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "bisector",
+        "id": "bis-CAB",
+        "vertex": "A",
+        "p": "C",
+        "q": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "מעגל חסום במשולש ישר זווית ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "bisector",
+        "id": "bis-ABC",
+        "vertex": "B",
+        "p": "A",
+        "q": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.3",
+      "utterance": "מעגל חסום במשולש ישר זווית ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "line-intersection",
+        "id": "@ctr-O",
+        "line1": "bis-CAB",
+        "line2": "bis-ABC"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.4",
+      "utterance": "מעגל חסום במשולש ישר זווית ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "foot",
+        "id": "@f-AB",
+        "from": "@ctr-O",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.5",
+      "utterance": "מעגל חסום במשולש ישר זווית ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "circle-through",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "through": "@f-AB",
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.6",
+      "utterance": "מעגל חסום במשולש ישר זווית ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "foot",
+        "id": "@f-BC",
+        "from": "@ctr-O",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.7",
+      "utterance": "מעגל חסום במשולש ישר זווית ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "foot",
+        "id": "@f-CA",
+        "from": "@ctr-O",
+        "a": "C",
+        "b": "A"
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

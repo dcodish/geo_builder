@@ -3521,6 +3521,28 @@ export const SCENARIOS_4: Scenario[] = [
       for (const v of views) expect(v.violations, 'D inside ABC in every view shown').toEqual([]);
     },
   },
+  {
+    id: 'right-trapezoid-inscribed-refused-names-both-nouns-1790',
+    title: '#1790 (ADR-595): «טרפז ישר זווית חסום במעגל» — unlettered, lettered and English — is refused naming the right trapezoid and the rectangle (never a triangle, never "already defined"); the taught remedy «מלבן ABCD חסום במעגל» builds',
+    guards:
+      "Found while measuring #1554 (fix round #1776), re-measured on b14d11d5 through decideDeterministic2D: «טרפז ישר זווית חסום במעגל» committed a circle and a TRIANGLE ABC (inscribedPolygon's private shape ladder tested «ישר זווית» before the noun, so every noun became a right triangle, and its strip list consumed «טרפז»); «טרפז ישר זווית ABCD חסום במעגל» was refused «'poly-ABCD' is already defined» on an empty canvas (the clause split re-declared the ring as a generic quadrilateral); 'right trapezoid inscribed in a circle' drew an isosceles trapezoid with 'right' dropped. The operator ruled on 2026-10-01 (#1554) that the sentence is REFUSED naming both nouns — a cyclic right trapezoid can only be a rectangle, and a rectangle is not a trapezoid — as analytic does (ADR-AG-198/242). Root fix: one shape-phrase reader (src/parser/shapePhrase.ts) for the standalone macros and every inscription rule; the right trapezoid's `cyclic: { forces: 'rectangle' }` becomes `inscribed-contradicts-noun` before any label is read. The class sweep (216 rows, 24 seeds) is src/app/__tests__/issue-1790-shape-phrase.test.ts.",
+    steps: ['טרפז ישר זווית חסום במעגל', 'טרפז ישר זווית ABCD חסום במעגל', 'right trapezoid inscribed in a circle', 'מלבן ABCD חסום במעגל'],
+    refusedSteps: [1, 2, 3].map((step) => ({
+      step,
+      reason: 'inscribed-contradicts-noun' as const,
+      with: { shape: 'right-trapezoid', forced: 'rectangle' },
+      why: 'operator ruling 2026-10-01 on #1554: a right trapezoid inscribed in a circle is refused naming both nouns',
+    })),
+    check: (fig) => {
+      allStepsOk(fig);
+      // nothing of the three refused sentences reached the figure: the only ring is the remedy's rectangle
+      const polys = fig.construction.objects.filter((o) => o.kind === 'polygon').map((o) => o.id);
+      expect(polys).toEqual(['poly-ABCD']);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      expect(Math.abs(angle(D, A, B) - 90), 'the remedy is a rectangle: ∠DAB = 90°').toBeLessThan(1e-6);
+      expect(dist(A, C), 'its diagonals are equal (both diameters)').toBeCloseTo(dist(B, D), 6);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */
