@@ -39,7 +39,8 @@ interface CorpusQuestion {
 const CORPUS: CorpusQuestion[] = JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'corpus471.json'), 'utf8'));
 
 /** The floors. Raise them in the commit that earns them; never lower them. */
-const FLOOR = { lines: 357, questions: 45 }; // ADR-AG-222 amendment: the figure-position notes are typed lines (#1706)
+const FLOOR = { lines: 360, questions: 45 }; // ADR-AG-240 (#1699): 7/4 derived whole blames its impossible line 4 alone, 357 → 360
+// (earlier: ADR-AG-222 amendment: the figure-position notes are typed lines (#1706).)
 
 function measure() {
   let lines = 0;
