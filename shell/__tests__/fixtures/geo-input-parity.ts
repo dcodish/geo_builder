@@ -1027,6 +1027,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'incircle-right-triangle-1790-02', family: 'inscribed', steps: ['מעגל חסום במשולש ישר זווית ABC'], expect: 'builds', exception: 'X8', note: '2-D drew a generic triangle (the adjective dropped)' },
   { id: 'incircle-isosceles-trapezoid-1790-03', family: 'inscribed', steps: ['מעגל חסום בטרפז שווה שוקיים ABCD'], expect: 'builds', exception: 'X8' },
   { id: 'restated-ring-inscribed-1790-04', family: 'inscribed', steps: ['מלבן ABCD', 'ABCD חסום במעגל'], expect: 'builds', exception: 'X8', note: '2-D refused «poly-ABCD is already defined»: a generic restatement is a reference (M1 subsumption)' },
+
+  // ── #1611 (ADR-591): a word fraction / a wish is TAUGHT (refused with the canonical line pre-filled), never sent to the model ──
+  { id: 'teach-fraction-wish-1611', family: 'lengths', steps: ['מקבילית ABCD', 'E על BC', 'F על AD', 'אני רוצה ש- BE ו- DF יהיו רבע מהצלע של המקבילית'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1802' }, { product: '3d', issue: '#1802' }], note: 'teaches «BE = 1/4 BC, DF = 1/4 AD»' },
+  { id: 'teach-fraction-command-1611', family: 'lengths', steps: ['מקבילית ABCD', 'E על BC', 'F על AD', 'הפוך את BE ואת DF להיות 3/4 מצלע המקבילית'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1802' }, { product: '3d', issue: '#1802' }] },
+  { id: 'teach-fraction-word-1611', family: 'lengths', steps: ['מקבילית ABCD', 'E על BC', 'BE = רבע BC'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1802' }, { product: '3d', issue: '#1802' }], note: 'teaches «BE = 1/4 BC»' },
+  { id: 'teach-fraction-taught-1611', family: 'lengths', steps: ['מקבילית ABCD', 'E על BC', 'F על AD', 'BE = 1/4 BC, DF = 1/4 AD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1802' }], note: 'the taught line itself' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

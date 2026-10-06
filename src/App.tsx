@@ -766,6 +766,7 @@ export default function App() {
         setRenameNote,
         setLlmDropped,
         clearText: () => setText(''),
+        setText,
         setBusy,
       },
       view: () => ({ construction, positions }),

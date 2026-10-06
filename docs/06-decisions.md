@@ -14606,6 +14606,38 @@ It runs among the `pre:impossible` gates of `applyStep`, right after the angle-s
 
 **Behaviour change for a student:** erasing, muting, editing or undoing the line that named a circle (or a touch point) by use now takes the name away; a line the tool refuses no longer names the circle on its way out; a line whose only effect is naming a circle now appears as its own row.
 
+## ADR-591 — A word fraction or a wish is taught as the given it means, proved before it is shown (#1611)
+
+**Status:** accepted · 2026-10-06 · feature (P3, 2-D) · branch `feat/1611-teach-fraction` · round #1776
+
+**Requirements:** [02-requirements.md](02-requirements.md) FR-IN-4e (new) · **Design:** [04-design.md](04-design.md) § the pre-LLM decision: the fraction teacher · **LADDER stage:** none (input lane, before any solve; the proof is the existing dry run)
+
+**Cites** [ADR-497](#adr-497) (the proof-based label nudge, the closest sibling), [ADR-546](#adr-546) (the pure pre-LLM decision), [ADR-W-030](06w-decisions-workspace.md#adr-w-030) (teach by pre-filling the student's own sentence), [ADR-289](#adr-289) (the guidance register short-circuits the model).
+
+**Context.** Log-triage 2026-09-30 (F2): one student, in a parallelogram with E on BC and F on AD, typed
+«אני רוצה ש- BE ו- DF יהיו רבע מהצלע של המקבילית» and three variants («שלושה רבעים», «הפוך את BE ואת DF להיות 3/4 מצלע המקבילית»). All four went to the paid model. Operator ruling: *"no, but we need to teach and tell how to enter the data"* — word fractions and wish phrasing are **not** accepted; the tool answers with the canonical sentence. Re-measured at pickup (tip 9d1b0b1f): the four lines, «BE = רבע BC», «BE = רבע מ-BC» and «BE הוא רבע מ-BC» all `not-handled` → escalate; «BE = 1/4 BC» and «BE = 1/4 BC, DF = 1/4 AD» commit.
+
+**Class.** *A given the grammar can already state, written in a register it deliberately does not read* — a word fraction, a wish/command wrapper, a side named by its shape instead of its letters. The same class as lowercase and Hebrew-letter labels (ADR-497): the fix is to propose the canonical spelling and prove it, never to widen the grammar.
+
+**Decision.**
+1. **Propose (pure, `src/parser/fractionTeach.ts`).** `fractionTeachCandidate(utterance, ctx)` peels a wish/command wrapper (Hebrew and English), splits the subjects («BE ו-DF», «BE ואת DF»), reads the fraction — `p/q`, or a word: numerators 1–9 over halves…tenths, both genders, Hebrew and English — and the comparand: a named segment, or «(ה)צלע (של) ה<shape>» resolved **per subject** to the one edge of a declared shape of that kind whose line the subject structurally lies on (`onSegment`/`midpointOf`, never coordinates). An edge that is not unique, the side itself, or no comparand at all («BE = רבע») proposes nothing.
+2. **Prove (`decideDeterministic.ts`, at the escalation seam, after the label nudges).** The proposed line is run through `decideFromParse` itself on the same facts and view (`{ teaching: true }`, so the proof never teaches in turn). Only a non-deferred `commit` is adopted; anything else — a conflict, a deferral, a refusal — and the line escalates exactly as before. *Taught remedies are hypotheses* (#1183): the tool never shows a sentence it would itself refuse.
+3. **Answer.** A `refuse` verdict (`guided`, log `scope:teach-fraction`) with note `input.scope.teach-fraction` quoting the line, and a new optional field `prefill`. `runSubmit` replaces the input text with it through the new optional `SubmitUi.setText` (wired in `App.tsx`), so one Enter builds it — the ADR-W-030 target, the first 2-D use of pre-fill.
+
+**Not done here, by the brief.** The shared imperative/teaching register is #1358's to hoist into `shell/`; this lands in the 2-D decision where that hoist will pick it up, and is noted on #1358.
+
+**Locks.** `src/__tests__/teach-fraction-1611.test.ts` (9), all through the real `runSubmit` with the model mocked:
+- the four prod lines plus «BE = רבע BC» and «BE הוא רבע מ-BC»: the note, the exact pre-filled line, no model call, no commit — **and then the pre-filled text is submitted through the same `runSubmit` on the same figure and must commit** (set-ratio count, every fact `ok`, no violations). **Fails before** (escalated).
+- negative: «BE = רבע» teaches nothing and escalates.
+- negative, the proof gate: with BC = 8, BE = 5 given, «אני רוצה ש-BE יהיה רבע מ-BC» is proposed («BE = 1/4 BC») but not proved, so nothing is taught and it escalates.
+- the proposal, pure: Hebrew and English word fractions, the English wrapper with a side reference, and five no-proposal cases (no comparand, already canonical, the side itself, a shape kind not in the figure, a diagonal).
+- fixture `src/__tests__/fixtures/issue-1611-taught-fraction.geo.json`: the taught sequence builds green and verifies.
+- parity rows `teach-fraction-{wish,command,word,taught}-1611` (docs/22 §10): 2-D refuses (teaches) the three and builds the taught line; analytic and 3-D still send the three to the model, and 3-D does not build the taught line, so these are known-gap rows naming **#1802**, the successor issue that ports the teacher.
+
+**Consequences.** `src/parser/fractionTeach.ts` (new) and its export; `decideFromParse` gains an internal `opts` argument; `Verdict2D` refuse gains `prefill?`; `SubmitUi` gains `setText?`; two locale strings. Cost: a proposal that does not prove costs one dry run before the escalation it would have reached anyway.
+
+**Behaviour change for a student:** «BE = רבע BC», «אני רוצה ש-BE ו-DF יהיו רבע מהצלע של המקבילית» and the like no longer go to the AI: the tool says how the given is written and puts «BE = 1/4 BC, DF = 1/4 AD» in the input; Enter draws it.
+
 ## ADR-592 — The grammatical subject of a crossing sentence decides what is drawn: the verb draws its lines, the noun only the point (#1751; amends ADR-569)
 
 **Status:** accepted · 2026-10-05 · bug (P2) · fix-round #1776 · operator rulings 2026-10-04 (two, on #1751) · branch `fix/1751-meet-draws-segments` off `main` @ 4d6e3fd6
