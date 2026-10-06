@@ -5357,3 +5357,40 @@ On a phone (out of scope, NFR-US-4) only the top third of the figure shares the 
 - **Sampling *inside* the sweep files** (seeds, corpus cases) is not rejected. It is measured separately on #1813 before anything is built.
 
 **Not built here (#1813 steps 3–5):** re-running only the failing files after a red; recording the parity goldens once, on the staging tip; and splitting the heavy files.
+
+## ADR-W-114 — A fix round runs its items in parallel, test runs queue on one lock, and a question never pauses the round (#1813)
+
+**Status:** accepted · 2026-10-06 · the remaining round-speed items of #1813 (file splitting stays open). Ruling cited:
+- **2026-10-06, operator:** *"the goal is to dramatically reduce the testing time so we can speed up the rounds"*. Asked whether to build the remaining items, the operator answered *"now"*.
+
+**Requirements:** none (internal). · **Design:** [08](08-testing-strategy.md) "Two tiers": test runs queue on one lock. [22](22-workflow.md) §2d: execution is parallel by chokepoint stream. **Product:** workspace (test tooling and the fix-round workflow).
+
+**Context.** Round #1776 (16 items) took ~21 h to build (#1813, measured from the session transcript and commits):
+- **Its items ran strictly one after another.** That was ~12.5 agent-hours, though its composition put every item on a separate chokepoint. The fix-round skill said *"Sequential, one item at a time (parallel items in one tree overwrite each other)"*, a reason that stopped holding once each item got its own worktree. Rounds #1721, #1736 and #1767 had run items in parallel and built 5–12 items in 1.5–3 h, but that practice never reached the skill, and a fresh session followed the text.
+- **It sat idle 8.5 h overnight.** At 22:54 the session asked a blocking `AskUserQuestion` about scheduling #1795, an issue for the NEXT round. Nothing was dispatched until the answer at 07:57, although the running item had finished at ~23:30.
+- **Whole lanes were re-run after one-file fixes.** #1751 ran six lanes, 46 of its 75 min.
+- **Overlap.** Parallel items revive the hazard ADR-W-034 item 3 recorded (overlapping runs doubled every gate in round #822), and with items running at once, a discipline-only rule becomes a race.
+
+**Decision.**
+1. **Parallel by chokepoint stream.** Items sharing a chokepoint form one stream: one agent, in composition order, each on its own branch stacked on the previous one. Every other item is its own stream. All streams are dispatched at once as background agents, up to ~10, each in its own worktree. Landing is unchanged: a staging tip, one batch `test:full`, one push.
+2. **One suite lock across every worktree.** `scripts/suite-lock.mjs` holds a lock file in the git common dir (`git rev-parse --git-common-dir`, shared by all worktrees and never committed).
+   - `test:fast`, `test:full` (via `scripts/test-tiers.mjs`) and the `test:run[:<product>]` lanes take it themselves, so runs queue instead of overlapping.
+   - Ad-hoc runs use `npm run test:locked -- <command>`.
+   - The lock is published by hard-linking a fully written draft, which is atomic and exclusive, so a waiter never reads a half-written lock. A dead or over-age holder is taken over by rename, which exactly one waiter wins, and the takeover is printed. A nested run (`GEO_SUITE_LOCK_HELD=1`) does not wait for its parent.
+   - CI calls vitest directly and is unaffected. The watch-mode scripts take no lock.
+3. **After a red run, re-run only the failing files**, then one confirming `test:fast`.
+4. **A question never pauses the round.** It is asked in plain text, never with a blocking prompt, so background completions keep waking the session. A question that doesn't gate this round is asked and the round carries on. One that gates an item holds only that item's stream, or escalates it per Step 4.
+
+**Locks.** `server/__tests__/suite-lock.test.ts` (8): the stale rule (dead pid, over-age, unreadable) against a live, fresh holder. In real processes:
+- three concurrent CLI runs execute strictly one at a time and all run;
+- the exit status passes through, and a failing run still releases the lock;
+- a dead holder's lock is taken over and the takeover is printed;
+- a nested run does not wait for its parent.
+
+Fails before: 2 of 8 (concurrency and takeover) with the link step neutered so that every caller wins. Also measured: the lock path is identical from the shared tree and from a worktree (`C:\projects\geo_builder\.git\geo-suite.lock`), and `npm run test:run:complex` runs through it green (168 files) and leaves no lock behind.
+
+**Rejected.**
+- **A mkdir- or `open('wx')`-based lock.** Both are exclusive, but the content lands after the name, so a waiter can read an empty lock and judge it stale.
+- **Locking every targeted single-file run automatically.** That would mean wrapping `npx vitest`. Most targeted runs take seconds, so the skill names the heavy ones instead.
+
+**Not built (#1813 stays open):** splitting the ~40 heaviest test files. It only shortens the full suite (~14.7 → ~8.5 min, about twice per round), it is the most work, and docs/08 records that splitting a scenario's oracles across files re-pays the cold solve.

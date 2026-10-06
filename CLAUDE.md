@@ -185,6 +185,7 @@ by `tool:`, never forked). Boundaries are declared in `BOUNDARIES.json` and enfo
 - **`npm run test:docs`** — the doc gate (~2 s) — the correct bar for a **doc-only** change; anything touching `.ts`/`.tsx` pays `test:full` ([ADR-W-041](docs/06w-decisions-workspace.md#adr-w-041)).
 - `npm run test:tiers` — which slow files have actually caught a regression the fast tier missed.
 - `npm run test:2d` / `test:3d` / `test:complex` / `test:analytic` — per-product slice (tree + shared `server/`); CI mirrors the split.
+- Test runs **queue on one lock across all worktrees** — `test:fast`, `test:full` and `test:run:*` take it themselves; an ad-hoc run uses `npm run test:locked -- npx vitest run <files>` ([ADR-W-114](docs/06w-decisions-workspace.md#adr-w-114)).
 - Tier mechanics and the fold-memo rule: [docs/08](docs/08-testing-strategy.md). The `@/` alias is 2-D-only; that hazard and every import edge: [`BOUNDARIES.json`](BOUNDARIES.json).
 
 ## Cross-machine setup

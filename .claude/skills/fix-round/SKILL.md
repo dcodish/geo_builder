@@ -76,7 +76,29 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
 
 ## Step 2 — execute each item, isolated
 
-Sequential, one item at a time (parallel items in one tree overwrite each other):
+**In parallel, by chokepoint stream** ([ADR-W-114](../../../docs/06w-decisions-workspace.md#adr-w-114), #1813).
+Items that share a chokepoint form ONE stream: they run in composition order, each on its own branch
+stacked on the previous one, inside one agent. Every other item is its own stream. Dispatch every
+stream at once as a background agent (up to ~10 at a time, then dispatch the next as one finishes),
+each in its own worktree. That is what makes parallel safe: "one tree" was the reason for the old
+sequential rule, and it no longer holds. Round #1776 ran its 16 items one after another (~12.5 agent-hours
+over ~21 h); the parallel rounds #1721/#1736/#1767 built 5–12 items in 1.5–3 h.
+
+- **Test runs queue, never overlap.** `test:fast`, `test:full` and the `test:run:<product>` lanes take the
+  shared suite lock themselves (`scripts/suite-lock.mjs`, in the git common dir every worktree sees). Any
+  other vitest run an agent makes that takes more than a few seconds goes through
+  `npm run test:locked -- npx vitest run <files>`. Waiting is printed; a dead holder is taken over.
+- **After a red run, re-run only the failing files** (by path, through the lock), then ONE confirming
+  `test:fast`. Never re-run a whole lane or suite to check a one-file fix: #1751 spent 46 of its 75 min
+  on six lane runs.
+- **A question never pauses the round.** Ask the operator in plain chat text, never with a blocking
+  prompt (`AskUserQuestion`). The background agents keep running, and their completions keep waking the
+  session. A question that does not gate this round's work (scheduling a newly found issue, a ruling
+  for a later round) is asked and the round carries on. A question that gates an item pauses only that
+  item's stream: escalate it per Step 4 if the plan cannot proceed, otherwise let the stream wait while
+  the rest land. Round #1776 sat idle for 8.5 h overnight on a blocking question about the NEXT round.
+
+Each item, inside its stream:
 
 1. **Worktree per item**, outside the repo: `"$TMPDIR"/claude/geo-wt/<branch>`, branch
    `fix/<issue#>-<slug>` (or `feat/<issue#>-<slug>`), branched from current `main`. Run
@@ -108,7 +130,8 @@ Sequential, one item at a time (parallel items in one tree overwrite each other)
    #1813). Those surface at the batch, whose full suite and in-round bisect are built for it. The
    FULL suite is the BATCH gate (Step 3), not a per-item one
    ([ADR-W-034](../../../docs/06w-decisions-workspace.md)). **Never overlap suite runs** — a
-   `test:fast`, a lane or a full suite runs alone; overlapping doubled every gate in round #822.
+   `test:fast`, a lane or a full suite runs alone; overlapping doubled every gate in round #822. The
+   suite lock enforces it (above); run the item's own heavy files through `npm run test:locked --`.
 5. **Commits reference the round:** every item commit carries `Fixes #NN` AND mentions the
    round issue (`round #RR`) — from any commit you can find the round, from the round every
    commit.
@@ -269,7 +292,8 @@ reply). Keep it to one short list; `/status-update` stays the full surface.
 ## What a round NEVER does
 
 Pick anything without `auto-ok` · write a fix plan for an unplanned issue · merge a feature PR
-· deploy · take a P1 silently · run over a dirty/behind tree · keep a symptom patch to avoid
+· deploy · take a P1 silently · run over a dirty/behind tree · stall every stream on a blocking
+question (ask in text; Step 2) · overlap two test runs (the suite lock queues them) · keep a symptom patch to avoid
 an escalation · exceed the announced composition mid-round (found new work → file an issue) ·
 land over unreconciled external `origin/main` movement · leave outcomes, deviations, or skips
 out of the ledger (chat is not a record) · finish with the `in-round` label still on · report a

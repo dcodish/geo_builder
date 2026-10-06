@@ -161,6 +161,12 @@ run by path, not on its product lane; the FULL suite runs once per batch, on the
 the batch lands on `main` in ONE push. Round #822 measured the per-item full-suite alternative at ~5 hours
 for 8 items, and round #1776 spent ≥170 min on 47 per-item lane runs (#1813).
 
+**Execution (ADR-W-114):** items run in PARALLEL, one background agent per chokepoint stream, each in its
+own worktree. Items sharing a chokepoint are stacked in one stream. Test runs queue on the shared suite lock
+(`scripts/suite-lock.mjs`; `npm run test:locked -- <cmd>` for ad-hoc runs) instead of overlapping. A
+question to the operator is asked in plain text, never as a blocking prompt, so the other streams keep
+landing. Round #1776, sequential and stalled overnight on a question about the next round, took ~21 h.
+
 **Phase 2 (not yet built, not yet decided):** scheduled unattended rounds and their landing policy
 (bugs direct-to-main vs one-PR-per-round) wait on Phase 1's measured escalation rate ([ADR-W-012](06w-decisions-workspace.md)).
 [ADR-W-028](06w-decisions-workspace.md) spent that data on the *cap* only — every round measured so far had

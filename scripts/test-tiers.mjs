@@ -34,6 +34,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, rmS
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
+import { acquireSync } from './suite-lock.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TIERS = join(ROOT, 'reports', 'test-tiers.json');
@@ -230,6 +231,9 @@ function fast() {
  * leave a completed run with no record of whether it was green.
  */
 function runAndRecord(mode, extraArgs) {
+  // ADR-W-114: queue behind any other worktree's run instead of overlapping it. Taken BEFORE the tree
+  // state is read, so the verdict describes the tree as it was when this run actually started.
+  const release = acquireSync(`test:${mode} in ${ROOT}`);
   const { sha, dirty } = treeState();
   const at = new Date().toISOString();
   const out = join(tmpdir(), `geo-suite-${process.pid}.json`);
@@ -238,6 +242,7 @@ function runAndRecord(mode, extraArgs) {
     ['--reporter=default', '--reporter=json', `--outputFile.json=${out}`, `--reporter=${FILE_TIME_REPORTER}`, ...extraArgs],
     { GEO_FILE_TIMES_OUT: timesOut },
   );
+  release();
   const report = readJson(out, null);
   const trueTimes = readJson(timesOut, null);
   try {
