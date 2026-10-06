@@ -11,7 +11,7 @@ import { FREE_LINE_TOKEN } from './freeLine';
 import { riderPairsT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
+import { CYCLIC_MEMBER, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { claimPointIds, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import { firstFreeLetter } from './freeLetter';
 import { carrierParams3, readCoordGiven } from './carriers';
@@ -248,6 +248,38 @@ function knownQuadShape(c: Construction3, ids: Id[]): QuadBase | null {
     if (ring.length === 4 && sameRing(ring, ids)) return spec.base;
   }
   return null;
+}
+
+/**
+ * #1792 — a circle THROUGH a stated quad's vertices entails its family's cyclic member (`CYCLIC_MEMBER`):
+ * a rhombus in a circle IS a square, a parallelogram a rectangle, a kite a right kite. The #615 preference
+ * ("draw the stated shape visibly as itself, never as a special case") must then be judged against what
+ * was stated IN TOTAL — otherwise it fails at every seed, and the sweep pays its whole 200-seed budget
+ * before yielding (measured 3 s for «דלתון ABCD חסום במעגל»). Mutated on the clone the caller returns.
+ */
+function noteInscribedQuad(next: Construction3, ring: Id[]): void {
+  next.requirements = next.requirements.flatMap((req) => {
+    if (req.kind !== 'quad-general' || !sameRing(req.ids, ring)) return [req];
+    const { member, fix } = CYCLIC_MEMBER[req.base];
+    if (QUAD_BASE_DIMS[member] === 0) return []; // a square has no freedom left to be drawn wrongly
+    return [{ ...req, base: member, ...(fix.kind === 'right-angle' || req.right ? { right: true as const } : {}) }];
+  });
+}
+
+/**
+ * #1792 — a right angle STATED at a corner of a stated quad (a right trapezoid's, a cyclic kite's) is not
+ * a special case the drawing must avoid: the #615 preference stops vetoing right corners on that ring.
+ */
+function noteStatedRightAngle(next: Construction3, u: VecAtom, v: VecAtom): void {
+  if (u.kind !== 'pair' || v.kind !== 'pair' || u.from !== v.from) return;
+  const [vx, p, q] = [u.from, u.to, v.to];
+  next.requirements = next.requirements.map((req) => {
+    if (req.kind !== 'quad-general' || req.right) return req;
+    const i = req.ids.indexOf(vx);
+    if (i < 0) return req;
+    const nb = [req.ids[(i + 1) % 4], req.ids[(i + 3) % 4]];
+    return p !== q && nb.includes(p) && nb.includes(q) ? { ...req, right: true as const } : req;
+  });
 }
 
 /** #612/#615: remember the stated shape, and require its drawing to stay visibly general. */
@@ -2967,6 +2999,17 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (cmd.touch && c.points.has(cmd.touch)) return { ok: false, error: { code: 'already-defined', id: cmd.touch } };
       const next = clone(c);
       next.circles3.push({ id: cmd.id, def: cmd.def });
+      // #1792 — the BACKSTOP, total over every route (grammar rule or LLM line): a circle THROUGH a ring of
+      // four or more is a claim that the ring is concyclic, and the figure must prove it. The circle's
+      // centre is FITTED (`ringCircumcentre3`) and its radius read from vertex 0, so without this a
+      // non-cyclic ring drew a circle that missed a vertex and reported ✓. The grammar lowers the noun's
+      // cyclic fix before this (so the claim verifies); a line that did not is refuted, never drawn.
+      // One 4-point claim per vertex past the third, on the circle through the first three.
+      if (cmd.def.kind === 'circum' && cmd.def.ring.length >= 4) {
+        const r = cmd.def.ring;
+        for (const v of r.slice(3)) next.claims.push({ type: 'concyclic', ids: [r[0], r[1], r[2], v] });
+        if (r.length === 4) noteInscribedQuad(next, r);
+      }
       if (cmd.touch && cmd.def.kind === 'tangent-line') {
         next.points.set(cmd.touch, { kind: 'foot-line', from: cmd.def.center, line: cmd.def.line }); // the tangent point = foot ⟂ from centre
       }
@@ -2993,6 +3036,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const next = clone(c);
       drawAtom(next, cmd.u);
       drawAtom(next, cmd.v);
+      if (Math.abs(cmd.cos) < 1e-9) noteStatedRightAngle(next, cmd.u, cmd.v); // #1792
       // ADR-3D-056 (#286): a PERPENDICULAR whose one arm carries a free symbol-defined point (E on AS
       // via `AE=t·AS`) PINS that symbol — E slides to the foot of the perpendicular. Otherwise the ⊥ was
       // pushed onto the free solid dims and held only at lucky seeds. Only when exactly ONE arm carries a

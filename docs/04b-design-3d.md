@@ -631,6 +631,43 @@ gives that corner the kind `parallelogram-point` too, so both one-unknown arms n
 same way and neither emits ink. **The general form: when a construction reaches for a COMMAND to compute
 something, it inherits everything that command does for a student — including what it draws.**
 
+### One shape phrase, and a circle through a ring (#1792, [ADR-3D-307](06b-decisions-3d.md#adr-3d-307))
+
+A polygon is stated as a **shape phrase** — a noun and the adjectives on it — and `src3d/lexicon/shapePhrase3.ts`
+is where the two meet. It knows only spelling and which (noun, adjective) pairs exist: **the noun decides the
+arity, and an adjective is consumed only where `parse3` has a lowering** (triangle × right / isosceles /
+equilateral, trapezoid × right / isosceles). An unconsumed adjective declines the rule, so the line escalates;
+it is never dropped. `statedQuadBase` and the triangle qualifiers read the lexicon's words, so the "ONE
+vocabulary" rule now covers adjectives too.
+
+The right trapezoid lowers to `quad-shape trapezoid` plus a **soft** AD ⟂ AB that carries its `ring`: derive3
+retires it when the student states a right angle at any corner of that ring (M4), the ring-scoped form of the
+#116 right-triangle default.
+
+**A circle through a ring is a claim about the ring.** `circle3 {circum}` fits its centre to the ring, so the
+figure must make the ring cyclic, and two mechanisms do it:
+
+- **the lowering** — `polygonCircle3` emits the noun's `CYCLIC_MEMBER` fix (the #305 registry the right pyramid
+  already reads): rhombus → square, parallelogram → rectangle, kite → right kite, trapezoid → equal diagonals,
+  generic quad → `concyclic`; a pentagon puts each vertex past the third on the circle through the first three.
+  `notices.ts` derives `inscribed-constrained` from the circle and the stated shape;
+- **the backstop** — `apply` records one `concyclic` claim per vertex past the third for every such circle,
+  whatever produced the line, so a ring nothing made cyclic is refuted rather than drawn.
+
+**Why the trapezoid's fix is equal diagonals.** Equal legs with AB ∥ DC also hold on every parallelogram, and a
+free flat ring solves onto that branch from a generic start. Equal diagonals on a trapezoid leave only the
+isosceles trapezoid and the rectangle — both cyclic. A constraint that "characterises" a shape must do so
+*among the shapes the solver can reach*, not only among the ones a textbook draws.
+
+**The #615 preference is judged against what was stated in total.** «Draw a מקבילית visibly as a parallelogram»
+is false for a parallelogram inscribed in a circle, which IS a rectangle. The circle rewrites the ring's
+`quad-general` preference to the cyclic member, and a right angle stated at a corner marks it `right`; otherwise
+the preference fails at every seed and the sweep pays its full budget before yielding.
+
+A right trapezoid in a circle cannot be itself (`cyclic.forced = rectangle`): `parse3` refuses it with
+`inscribed-contradicts-noun` before any rule reads a label (the #1554 ruling). A quadrilateral's **incircle**
+still refuses `incircle-needs-triangle` — #1838.
+
 ## The submit decision (#1394, [ADR-3D-258](06b-decisions-3d.md#adr-3d-258))
 
 `store3.submit` decides nothing itself: `decideSubmit3(state, utterance)` returns a `Verdict3` (rename ·

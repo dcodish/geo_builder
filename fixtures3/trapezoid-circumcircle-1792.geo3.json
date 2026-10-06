@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-06T19:10:20.008Z",
+  "seed": 1,
+  "facts": [
+    {
+      "utterance": "טרפז ABCD חסום במעגל",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "trapezoid",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "type": "length-rel",
+          "a1": "A",
+          "b1": "C",
+          "rhs": {
+            "pair": [
+              "B",
+              "D"
+            ]
+          },
+          "c": 1
+        },
+        {
+          "type": "circle3",
+          "id": "circle-ABCD",
+          "def": {
+            "kind": "circum",
+            "ring": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "טרפז ישר זווית EFGH",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "trapezoid",
+          "ids": [
+            "E",
+            "F",
+            "G",
+            "H"
+          ]
+        },
+        {
+          "type": "cos-angle",
+          "u": {
+            "kind": "pair",
+            "from": "E",
+            "to": "H"
+          },
+          "v": {
+            "kind": "pair",
+            "from": "E",
+            "to": "F"
+          },
+          "cos": 0,
+          "soft": true,
+          "ring": [
+            "E",
+            "F",
+            "G",
+            "H"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -2195,6 +2195,36 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "right trapezoid ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "טרפז ישר-זווית ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "isosceles trapezoid ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "טרפז שווה שוקיים ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "trapezoid ABCD inscribed in a circle",
+    "winner": "polygonCircle3",
+  },
+  {
+    "lang": "he",
+    "text": "טרפז ABCD חסום במעגל",
+    "winner": "polygonCircle3",
+  },
+  {
+    "lang": "en",
     "text": "D is on the circle",
     "winner": "onCircle3",
   },

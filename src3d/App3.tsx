@@ -818,6 +818,8 @@ export default function App3() {
             <div key={`notice-${i}`} role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {n.kind === 'base-constrained'
                 ? t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
+                : n.kind === 'inscribed-constrained' // #1792
+                  ? t('notice.inscribedConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
                 : n.kind === 'line-rel-noun'
                   ? t('notice.lineRelNoun', { line: n.line })
                   : n.kind === 'line-auto-named'

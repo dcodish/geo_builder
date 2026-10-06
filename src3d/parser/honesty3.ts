@@ -27,6 +27,7 @@
  */
 
 import type { Command3, Id } from '../engine/types';
+import { readShapePhrase3, SHAPE_ADJ_WORDS3 } from '../lexicon/shapePhrase3';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { QUAD_PYRAMIDS, type QuadBase } from '../engine/baseShapes';
 import { CONSTRUCT_NOUNS, foldPrimes3, labelTokens, normalize3 } from './parse3';
@@ -144,37 +145,64 @@ export function droppedShapeNoun3(utterance: string, commands: Command3[]): stri
  *
  * Doctrine (the sibling gates'): the utterance side is CONSERVATIVE and the command side GENEROUS — a
  * false account only suppresses a warning, while a false drop would refuse a working input. So ANY
- * equal-length relation accounts for the qualifier (an isosceles TRAPEZOID's `equal-legs` lowering
+ * equal-length relation accounts for the qualifier (an isosceles TRAPEZOID's `equal-diagonals` lowering
  * accounts for its own `שווה שוקיים`), as does a kind whose triangular base is equilateral by
  * construction.
  */
 const EQUILATERAL_BY_KIND = new Set(['prism3e', 'pyramid3e']);
 
-export function droppedTriShape3(utterance: string, commands: Command3[]): string[] {
+export function droppedShapeAdjective3(utterance: string, commands: Command3[]): string[] {
   const s = normalize3(utterance);
   // #435: right-angledness joins the vocabulary this gate watches. It is checked SEPARATELY from the
   // equal-sides family because the two are independent givens — a figure that accounts for the equal
   // pair while dropping the right angle (the reported defect) must still be caught.
+  // #1792: the English right angle is the lexicon's — "right" on ANY polygon noun ("right trapezoid"),
+  // not only on "triangle", and "right-angled" wherever it stands. "right prism" is not a shape adjective.
   const eq = s.match(/שווה[\s-]?צלעות|שווה[\s-]?שוקיים|\bequilateral\b|\bisosceles\b/i);
-  const rt = s.match(/ישר\s*[-\s]?\s*זו?וית|\bright[-\s]?(?:angled\s+)?triangle\b/i);
+  const rt = s.match(new RegExp(SHAPE_ADJ_WORDS3.right, 'i'));
   if (!eq && !rt) return [];
+  // #1792 — PER PHRASE, not kind-blind (2-D ADR-595 arm 4's fix, 3-D edition): an adjective is a property
+  // of ITS polygon, so only a constraint ON a ring the commands name can carry it — an unrelated `⟂` or
+  // equal pair stated in the same line must not account for «ישר זווית». Generous where the line names no
+  // ring at all (a statement about a polygon already drawn): any constraint of the kind still accounts.
+  const rings = namedRings3(commands, readShapePhrase3(s)?.arity ?? 3);
+  const onRing = (ids: Id[]): boolean => rings.length === 0 || rings.some((r) => ids.every((id) => r.includes(id)));
   const lost: string[] = [];
   if (eq) {
     const accounted = commands.some(
       (c) =>
-        (c.type === 'length-rel' && c.c === 1) ||
-        c.type === 'concyclic' || // a cyclic-fix macro reshaped the base per its own stated noun
+        (c.type === 'length-rel' && c.c === 1 && ('pair' in c.rhs ? onRing([c.a1, c.b1, ...c.rhs.pair]) : true)) ||
+        (c.type === 'concyclic' && onRing(c.ids)) || // a cyclic-fix macro reshaped the base per its own stated noun
         (c.type === 'solid' && EQUILATERAL_BY_KIND.has(c.kind)),
     );
     if (!accounted) lost.push(eq[0]);
   }
-  // A right angle is accounted for by any perpendicularity the commands assert (`cos-angle` 0), or by
-  // a kind whose template carries a right angle of its own. Generous per the gate doctrine above.
+  // A right angle is accounted for by a perpendicularity (`cos-angle` 0) at a corner of the phrase's ring.
   if (rt) {
-    const accounted = commands.some((c) => c.type === 'cos-angle' && c.cos === 0);
+    const accounted = commands.some(
+      (c) =>
+        c.type === 'cos-angle' && c.cos === 0 &&
+        (c.u.kind === 'pair' && c.v.kind === 'pair' ? onRing([c.u.from, c.u.to, c.v.from, c.v.to]) : true),
+    );
     if (!accounted) lost.push(rt[0]);
   }
   return lost;
+}
+
+/**
+ * The rings a decomposition names that could be the phrase's OWN polygon — a flat polygon, a stated quad
+ * or a circle's ring of the noun's ARITY (a triangle cannot carry «טרפז ישר זווית»), or a solid of any
+ * size (a base phrase's ring is the solid's first vertices: «פירמידה ABCDS שבסיסה טרפז ישר זווית»).
+ */
+function namedRings3(commands: Command3[], arity: number): Id[][] {
+  const out: Id[][] = [];
+  for (const c of commands) {
+    if (c.type === 'solid' && /^polygon\d$/.test(c.kind)) { if (c.ids.length === arity) out.push(c.ids); }
+    else if (c.type === 'solid' && c.ids.length >= 3) out.push(c.ids);
+    else if (c.type === 'quad-shape') { if (arity === 4) out.push([...c.ids]); }
+    else if (c.type === 'circle3' && (c.def.kind === 'circum' || c.def.kind === 'incircle')) { if (c.def.ring.length === arity) out.push(c.def.ring); }
+  }
+  return out;
 }
 
 /**
@@ -190,7 +218,7 @@ export function droppedTriShape3(utterance: string, commands: Command3[]): strin
  * OBJECT materialised at all.** A rule can only drop what some gate is not watching, so the durable fix
  * is the missing question, asked once, for every rule at once.
  *
- * **Bound to the EVENT, not to a path** — like `droppedTriShape3` and for the same reason (`src3d/CLAUDE.md`:
+ * **Bound to the EVENT, not to a path** — like `droppedShapeAdjective3` and for the same reason (`src3d/CLAUDE.md`:
  * "a guard bound to a code path rather than to the event it guards will be bypassed"). Both #438 and #440
  * were GRAMMAR-rule drops on the deterministic path, where the LLM-seam gates never run.
  *
@@ -204,7 +232,7 @@ export function droppedConstructNoun3(utterance: string, commands: Command3[]): 
   // The nouns that name an OBJECT OF THEIR OWN — something a bare shape declaration can never be. Each
   // is a construct the curriculum draws ON a figure, so stating one and committing nothing but the
   // figure is precisely the drop. (A shape's own PROPERTY — right-angled, isosceles, rhombic — is not
-  // here: `droppedTriShape3` / `droppedShapeNoun3` own those, and they must not be double-gated.)
+  // here: `droppedShapeAdjective3` / `droppedShapeNoun3` own those, and they must not be double-gated.)
   // #498: the list lives in `parse3.ts` and is shared with the fail-closed declaration gate, so a noun
   // that gate lets THROUGH is exactly a noun this one is watching — neither can assume the other covers it.
   const m = s.match(CONSTRUCT_NOUNS);

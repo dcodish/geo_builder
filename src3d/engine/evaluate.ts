@@ -3568,7 +3568,7 @@ export function meetsShapePreferences3(c: Construction3, seed: number): boolean 
     if (req.kind !== 'quad-general') return true;
     const ring = req.ids.map((id) => r.positions.get(id));
     if (ring.some((p) => !p)) return true; // unresolvable: nothing to judge, never a veto
-    return !quadDrawnDegenerate(req.base, ring as Vec3[]);
+    return !quadDrawnDegenerate(req.base, ring as Vec3[], undefined, req.right === true);
   });
 }
 

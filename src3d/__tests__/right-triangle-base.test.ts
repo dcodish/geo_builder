@@ -7,7 +7,7 @@
  * both logged `parser/ok`. Two defects in one utterance:
  *
  *  (1) the stated right angle was SILENTLY DROPPED — `statedTriShape` (the ONE vocabulary ADR-3D-110
- *      created for exactly this) had no right-angled member, and `droppedTriShape3` watched only the
+ *      created for exactly this) had no right-angled member, and `droppedShapeAdjective3` watched only the
  *      equal-sides words, so nothing warned either;
  *  (2) the `ישר` of `ישר זווית` — a word describing the BASE — was matched by the pyramid's own
  *      `/ישרה?/` rightness test, so a free `tetra` silently became a `pyramid3` (apex over the
@@ -22,7 +22,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { parse3 } from '../parser/parse3';
-import { droppedTriShape3 } from '../parser/honesty3';
+import { droppedShapeAdjective3 } from '../parser/honesty3';
 import { derive3, useGeo3 } from '../store/store3';
 import type { Vec3 } from '../engine/vec3';
 
@@ -147,16 +147,16 @@ describe('#435 — the honesty gate watches the same vocabulary', () => {
   it('flags a dropped right angle even when the equal pair IS accounted for', () => {
     // the exact pre-fix shape: an isosceles `length-rel` landed, the right angle did not
     const partial = cmds('פירמידה SABC שבסיסה משולש שווה שוקיים ABC');
-    expect(droppedTriShape3('פירמידה SABC שבסיסה משולש ישר זווית ושווה שוקיים ABC', partial)).toContain('ישר זווית');
+    expect(droppedShapeAdjective3('פירמידה SABC שבסיסה משולש ישר זווית ושווה שוקיים ABC', partial)).toContain('ישר זווית');
   });
 
   it('passes when both givens land', () => {
     const u = 'פירמידה SABC שבסיסה משולש ישר זווית ושווה שוקיים ABC';
-    expect(droppedTriShape3(u, cmds(u))).toEqual([]);
+    expect(droppedShapeAdjective3(u, cmds(u))).toEqual([]);
   });
 
   it('does not fire on a solid whose own rightness is stated but has no triangle qualifier', () => {
     const u = 'פירמידה ישרה SABC שבסיסה משולש ABC';
-    expect(droppedTriShape3(u, cmds(u))).toEqual([]);
+    expect(droppedShapeAdjective3(u, cmds(u))).toEqual([]);
   });
 });

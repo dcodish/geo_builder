@@ -230,7 +230,7 @@ export const quadSpecialisations = (base: QuadBase): QuadBase[] =>
  * (*"dx > 0 keeps it off a RIGHT trapezoid"*), so the lattice alone would have missed exactly the case
  * the operator's screenshot showed. Each row below mirrors that function's own comments.
  */
-export function quadDrawnDegenerate(base: QuadBase, ring: Vec3[], tol = 0.06): boolean {
+export function quadDrawnDegenerate(base: QuadBase, ring: Vec3[], tol = 0.06, statedRight = false): boolean {
   if (ring.length !== 4) return false;
   const [a, b, c, d] = ring;
   const rightAt = (v: Vec3, p: Vec3, q: Vec3) => {
@@ -239,7 +239,8 @@ export function quadDrawnDegenerate(base: QuadBase, ring: Vec3[], tol = 0.06): b
     const den = norm3(u) * norm3(w);
     return den > 1e-12 && Math.abs(dot3(u, w) / den) <= tol;
   };
-  const anyRight = rightAt(a, d, b) || rightAt(b, a, c) || rightAt(c, b, d) || rightAt(d, c, a);
+  // #1792: a right corner the student STATED (a right trapezoid) is not a special case to avoid
+  const anyRight = !statedRight && (rightAt(a, d, b) || rightAt(b, a, c) || rightAt(c, b, d) || rightAt(d, c, a));
   // every strictly-more-specific shape this drawing already satisfies
   if (quadSpecialisations(base).some((sp) => quadShapeDrawn(sp, ring, tol))) return true;
   switch (base) {
@@ -386,7 +387,7 @@ export const ringCircumcentre = (ring: Pt2[]): Pt2 => ringCircumcentre2(ring);
 export type CyclicFix =
   | { kind: 'none' } // already cyclic at every seed
   | { kind: 'right-angle'; vertex: number } // the ring angle at this vertex is 90°
-  | { kind: 'equal-legs' } // |AD| = |BC| — the trapezoid's legs
+  | { kind: 'equal-diagonals' } // |AC| = |BD| — an isosceles trapezoid (#1792: the legs alone admit a parallelogram)
   | { kind: 'concyclic' }; // Ptolemy: |AC|·|BD| = |AB|·|CD| + |BC|·|AD|
 
 /** What each base becomes under «ישרה», and the constraint that takes it there. */
@@ -400,7 +401,7 @@ export const CYCLIC_MEMBER: Record<QuadBase, { member: QuadBase; fix: CyclicFix 
   // a cyclic kite is a RIGHT KITE — the two vertices off the symmetry axis are right angles
   kite: { member: 'kite', fix: { kind: 'right-angle', vertex: 1 } },
   // a cyclic trapezoid is an ISOSCELES trapezoid (equal legs)
-  trapezoid: { member: 'trapezoid', fix: { kind: 'equal-legs' } },
+  trapezoid: { member: 'trapezoid', fix: { kind: 'equal-diagonals' } },
   quad: { member: 'quad', fix: { kind: 'concyclic' } },
 };
 

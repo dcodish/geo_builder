@@ -171,6 +171,15 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   («x_B > x_D», «y_B < 6») is not read yet. The question is the statement with its value dropped — «x_B»,
   «x_{B} = ?», «מהו שיעור ה-x של B?» — and the row reads «x_B = 1», a sign (`+?`), or «not determined», from the
   panel's own per-coordinate judgement. *(Realised — [ADR-3D-299](06b-decisions-3d.md#adr-3d-299), #1547.)*
+- **FR-SP-15 (Must)** — **A shape's adjective is honoured, and a circle through a polygon passes through every
+  vertex.** An adjective stated on a polygon noun («טרפז ישר זווית», «טרפז שווה שוקיים», «משולש ישר זווית», "isosceles
+  trapezoid", "right triangle") is drawn, standalone and inside an inscription in either direction; one the noun
+  cannot carry («מרובע ישר זווית») is never dropped — the line goes to the model. A quadrilateral inscribed in a
+  circle is drawn as the cyclic member of its own family (a trapezoid becomes isosceles, a parallelogram a
+  rectangle, a rhombus a square, a kite a right kite), with a notice naming what it became, and every vertex is on
+  the circle. A right trapezoid inscribed in a circle is refused, naming the right trapezoid and the rectangle a
+  circle would force (the 2026-10-01 ruling on #1554). The 2-D twin is FR-EN-14. *(Realised —
+  [ADR-3D-307](06b-decisions-3d.md#adr-3d-307), #1792; a quadrilateral's incircle is #1838.)*
 
 ## Vectors — the geometric lane
 
