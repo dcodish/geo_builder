@@ -24,10 +24,9 @@ describe('#44 — special-point meets (noun form)', () => {
   // Only the CENTRE point is drawn — the construction (diagonals/medians/altitudes/⊥-bisectors and their
   // helper feet/midpoints) is invisible scaffolding (operator, 2026-07-14): no `segment` commands, helper
   // points are `~`-prefixed (unrendered), ⊥-bisector lines are `visible:false`.
-  it('diagonals meet — the quad crossing, no drawn diagonals (several phrasings, He/En)', () => {
+  it('diagonals meet, NOUN form — the quad crossing, no drawn diagonals (several phrasings, He/En)', () => {
     for (const u of [
       'G נקודת מפגש האלכסונים',
-      'האלכסונים נחתכים בנקודה O',
       'E נקודת חיתוך האלכסונים',
       'הנקודה O היא מפגש אלכסוני הטרפז',
       'M is the intersection of the diagonals',
@@ -35,6 +34,12 @@ describe('#44 — special-point meets (noun form)', () => {
       expect(types(u, QUAD)).toEqual(['line-line-intersection']); // only the point, no segments
     }
     expect(idOf('G נקודת מפגש האלכסונים', QUAD, 'line-line-intersection')).toBe('G');
+  });
+
+  it('diagonals meet, VERB form — the diagonals are the subject, so they are drawn (#1751, ADR-592)', () => {
+    for (const u of ['האלכסונים נחתכים בנקודה O', 'האלכסונים נפגשים בנקודה O', 'the diagonals meet at O']) {
+      expect(types(u, QUAD)).toEqual(['segment', 'segment', 'line-line-intersection']);
+    }
   });
 
   it('medians meet — centroid (hidden midpoints + crossing, no drawn medians)', () => {

@@ -970,6 +970,17 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'height-parallelogram-asks-1443', family: 'lengths', steps: ['מקבילית ABCD', 'גובה המקבילית הוא 4'], expect: 'asks', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448' }] },
   // ── #1749 (ADR-AG-235): the meet VERB reads the distributive plural through the crossing's reader ──
   { id: 'meet-verb-lines-plural-1749', family: 'intersections', steps: ['מרובע ABCD', 'הישרים AC ו-BD נפגשים בנקודה M'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'control — analytic built it before through a second plural reader (`withLineNoun`); now through `distributedLines`' },
+  // ── #1751 (ADR-592 · ADR-AG-241): the grammatical SUBJECT decides what a crossing draws — the verb its lines, the noun the point only ──
+  { id: 'meet-verb-letters-1751', family: 'intersections', steps: ['מרובע ABCD', 'AC ו-BD נפגשים בנקודה M'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'verb: the lines are the subject — AC, BD and M drawn in both (per-builder locks: issue-1751-meet-draws-segments)' },
+  { id: 'meet-verb-letters-spaced-1751', family: 'intersections', steps: ['מרובע ABCD', 'AC ו- BD נפגשים בנקודה M'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'the operator’s exact line (T3)' },
+  { id: 'meet-verb-letters-cuts-1751', family: 'intersections', steps: ['מרובע ABCD', 'AC חותך את BD בנקודה M'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'verb (cut): AC and BD drawn' },
+  { id: 'meet-verb-diagonals-1751', family: 'intersections', steps: ['מרובע ABCD', 'האלכסונים נפגשים בנקודה M'], expect: 'builds', note: 'verb, role: the ring’s diagonals drawn (follow-up ruling)' },
+  { id: 'meet-noun-letters-1751', family: 'intersections', steps: ['מרובע ABCD', 'M מפגש AC ו-BD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'noun: the point is the subject — M only, in both' },
+  { id: 'meet-noun-letters-chitukh-1751', family: 'intersections', steps: ['מרובע ABCD', 'M נקודת החיתוך של AC ו-BD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'noun: M only' },
+  { id: 'meet-noun-letters-mifgash-1751', family: 'intersections', steps: ['מרובע ABCD', 'M נקודת המפגש של AC ו-BD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'noun: M only' },
+  { id: 'meet-noun-letters-hi-1751', family: 'intersections', steps: ['מרובע ABCD', 'M היא נקודת החיתוך של AC ו-BD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'noun: M only' },
+  { id: 'meet-noun-diagonals-1751', family: 'intersections', steps: ['מרובע ABCD', 'M מפגש האלכסונים'], expect: 'builds', note: 'noun, role: M only' },
+  { id: 'meet-noun-diagonals-chitukh-1751', family: 'intersections', steps: ['מרובע ABCD', 'M נקודת החיתוך של האלכסונים'], expect: 'builds', note: 'noun, role: M only' },
   { id: 'height-to-side-1443', family: 'lengths', steps: ['משולש ABC', 'הגובה לצלע BC הוא 4'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448' }] },
 
   // ── #1430 (ADR-AG-233): tangents FROM a point with a movement verb / unnamed touches, and a polygon side as the subject — 2-D builds each ──

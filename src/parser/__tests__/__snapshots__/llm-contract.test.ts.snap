@@ -494,13 +494,17 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "M is the intersection of AC and BD": {
     "en": [
-      "segment",
-      "segment",
+      "free-point",
+      "free-point",
+      "free-point",
+      "free-point",
       "line-line-intersection",
     ],
     "he": [
-      "segment",
-      "segment",
+      "free-point",
+      "free-point",
+      "free-point",
+      "free-point",
       "line-line-intersection",
     ],
   },

@@ -1490,6 +1490,19 @@ const letteredCentreLines = (s: string, he: RegExp, en: RegExp): [Id, Id][] | nu
   return out.length >= 2 ? out : null;
 };
 
+/**
+ * #1751 ([ADR-592](../../docs/06-decisions.md#adr-592), operator rulings 2026-10-04; amends ADR-569) — THE GRAMMATICAL
+ * SUBJECT OF A CROSSING SENTENCE DECIDES WHAT IS DRAWN. The VERB frame («AC ו-BD נפגשים בנקודה M», «האלכסונים נחתכים
+ * בנקודה M», «AC חותך את BD בנקודה M», "the diagonals meet at M") is about the LINES, so they are drawn — named by
+ * letters or by role. The NOUN frame («M מפגש AC ו-BD», «M נקודת החיתוך של האלכסונים», "M is the intersection of …")
+ * is about the POINT and draws M only. Decided by the frame, never per spelling; analytic reads the same rule
+ * (ADR-AG-241). This reads the frame of a role-named meet: a meet VERB with no point-first noun head.
+ */
+type CrossingSubject = 'lines' | 'point';
+const MEET_VERB_RE = /נפגש|נחתכ|מצטלב|\b(?:meet|intersect|cross)\b/i;
+const crossingSubjectOf = (s: string, pointFirst: boolean): CrossingSubject =>
+  !pointFirst && MEET_VERB_RE.test(s) ? 'lines' : 'point';
+
 const specialPointMeet: Rule = (s, ctx) => {
   if (!/מפגש|נפגש|נחתכ|חיתוך|concurren|intersection\s+of|\bmeet\b/i.test(s)) return null; // a MEETING statement
   const fam = CENTER_FAMILIES.find((f) => f.he.test(s) || f.en.test(s));
@@ -1622,8 +1635,16 @@ const specialPointMeet: Rule = (s, ctx) => {
   // rendered (and is excluded from detection, ADR-295), a `bisector`/`perpendicular-line` Line object is drawn
   // only when `visible`, and `line-line-intersection` computes its crossing without drawing the operand lines.
   if (fam.key === 'diag') {
-    // quad ABCD: the crossing of the two diagonals (the diagonals themselves are not drawn).
-    return [...declared, { type: 'line-line-intersection', id: X, a: A, b: C, c: B, d: D }];
+    // quad ABCD: the crossing of the two diagonals. The NOUN frame («M מפגש האלכסונים») draws the point only; the
+    // VERB frame («האלכסונים נפגשים בנקודה M») is about the diagonals and draws them (#1751, ADR-592). Plain segments,
+    // no ADR-499 `diagonal` claim: the pair was DERIVED from the ring this sentence resolved, so it is a diagonal of
+    // that ring by construction — and the ring may be named only here («אלכסוני המרובע ABCO») with no shape object to
+    // check a claim against (the claim would read as a violation of the student's own true statement).
+    const drawn: AnyCommand[] =
+      crossingSubjectOf(s, !!before) === 'lines'
+        ? [{ type: 'segment', a: A, b: C }, { type: 'segment', a: B, b: D }]
+        : [];
+    return [...declared, ...drawn, { type: 'line-line-intersection', id: X, a: A, b: C, c: B, d: D }];
   }
   if (fam.key === 'median') {
     const ma = `~med-${B}${C}`, mb = `~med-${A}${C}`; // hidden side-midpoints (median 1: A→mid BC, median 2: B→mid AC)
@@ -1858,7 +1879,7 @@ const lineLineIntersection: Rule = (s, ctx) => {
   // point, so the student sees the line reaching it (the operator drew BG/CG by hand otherwise). Order
   // matters: a segment to the point before it exists would create it as a stray free point and conflict
   // with the intersection ("'G' is already defined") — so extension segments come AFTER the intersection.
-  const cross = (id: string, a: string, b: string, c: string, d: string, sem1: 'bare' | 'ext' | 'line' = 'bare', sem2: 'bare' | 'ext' | 'line' = 'bare'): Command[] | Extract<Clarify, { clarify: 'crossing-already-named' }> => {
+  const cross = (id: string, a: string, b: string, c: string, d: string, sem1: 'bare' | 'ext' | 'line' = 'bare', sem2: 'bare' | 'ext' | 'line' = 'bare', subject: CrossingSubject = 'lines'): Command[] | Extract<Clarify, { clarify: 'crossing-already-named' }> => {
     // #1274 (operator ruling, ADR-W-066 — «we refuse the B=D»): two carriers named by two points each that
     // share exactly ONE letter meet at that letter, whatever the configuration — no solve, no seed, no
     // tolerance. There is no new point to make, so the crossing is affirmed and the NAME refused. The test
@@ -1881,6 +1902,17 @@ const lineLineIntersection: Rule = (s, ctx) => {
     };
     const pre: Command[] = [];
     const post: Command[] = [];
+    if (subject === 'point') {
+      // #1751 (ADR-592): the NOUN frame is about the point — no operand ink. The operands' ENDPOINTS are still the
+      // sentence's: each is ensured (the ADR-236 `ifAbsent` free point — skipped when the figure has it, never moving
+      // it), so the statement stands on its own whatever came before — on an empty canvas it introduces A, B, C, D and
+      // M with no lines, as analytic does, and the #943 drop-one trial (which re-folds WITHOUT re-parsing) can still
+      // remove an earlier statement and see this one hold. Defaults in general position, the two pairs crossing; free
+      // DOFs (ADR-052), never pinned.
+      const at: Array<[number, number]> = [[0, 0], [4, 3], [4, 0], [0, 3]];
+      [a, b, c, d].forEach((p, i) => pre.push({ type: 'free-point', id: up(p), x: at[i][0], y: at[i][1], free: true, ifAbsent: true }));
+      return [...pre, inter];
+    }
     if (sem1 === 'ext') post.push({ type: 'segment', a: up(a), b: up(id) });
     else pre.push({ type: 'segment', a: up(a), b: up(b) });
     if (sem2 === 'ext') post.push({ type: 'segment', a: up(c), b: up(id) });
@@ -1900,7 +1932,7 @@ const lineLineIntersection: Rule = (s, ctx) => {
     const from = kw ? (kw.index ?? 0) + kw[0].length : 0;
     const [s1, s2] = operandSpans(t, [m[2], m[3]], [m[4], m[5]], from);
     const sem1 = semOf(s1);
-    return cross(m[1], m[2], m[3], m[4], m[5], sem1, distribute(sem1, semOf(s2)));
+    return cross(m[1], m[2], m[3], m[4], m[5], sem1, distribute(sem1, semOf(s2)), 'point'); // the noun head: point first
   }
   const linesFirst = t.match(
     /\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?(?:intersect\w*|∩|חיתוך|נחתך|נחתכ|נפגש|meets?).*?\b([A-Za-z]\d*)\b/i,

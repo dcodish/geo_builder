@@ -1683,3 +1683,7 @@ over all four (ADR-041).
 ### `angle-out-of-range-refused-1712` — «∢ABC = -2», «זווית ABC = -30» and «∢ABC = 200» on a triangle are refused naming the given; «∢ABC = 90» still commits (#1712, ADR-587)
 
 **Guards against:** an angle value no figure can take being accepted as a given that is merely waiting for more information. «משולש ABC · ∢ABC = -2» committed with the triangle unchanged, because the residual moved as the triangle flexed and the deferral probe read that as "pending". Asserts the two negative lines are refused with «∠ABC = …° — an angle measures between 0° and 180°», «∢ABC = 200» with the triangle angle-sum sentence, and that an in-range angle still commits. The predicate matrix (bounds, lengths, sums, arcs, the endpoints) is in `src/engine/__tests__/measure-range-1712.test.ts`.
+
+### `meet-verb-draws-noun-does-not-1751` — a crossing sentence draws what its subject is: the verb its lines, the noun the point only (#1751, ADR-592)
+
+**Guards against:** the noun and the verb drawing the same thing. In «מרובע ABCD», «AC ו- BD נפגשים בנקודה M» (the operator's T3 line) must draw AC and BD with M at their crossing, and «M מפגש AC ו-BD» must build M alone — before #1751, 2-D drew AC and BD for both, and analytic drew neither.

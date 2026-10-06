@@ -86,12 +86,16 @@ describe('#1683 — diagonals named by letters are claims about those letters', 
     expect(pairsOf(meet(v))).toEqual(['AE', 'BF']);
   });
 
-  it('the unlettered forms are unchanged: the meet of the ring\'s diagonals, nothing drawn', async () => {
-    for (const line of ['האלכסונים נפגשים בנקודה E', 'אלכסוני ABCD נפגשים בנקודה E']) {
+  it('the unlettered forms meet the ring\'s diagonals; the VERB draws them (#1751, ADR-592), the NOUN does not', async () => {
+    for (const [line, drawn] of [
+      ['האלכסונים נפגשים בנקודה E', ['AC', 'BD']],
+      ['אלכסוני ABCD נפגשים בנקודה E', ['AC', 'BD']],
+      ['E מפגש האלכסונים', []],
+    ] as const) {
       useGeoStore.getState().clear();
       const v = await decide(['מרובע ABCD'], line);
       expect(pairsOf(meet(v)), line).toEqual(['AC', 'BD']);
-      expect(segs(v), line).toEqual([]);
+      expect(segs(v).sort(), line).toEqual(drawn);
     }
   });
 });

@@ -184,8 +184,15 @@ describe('parser — Phase-5a constructs (he/en)', () => {
     has('E is the intersection of AC and BD', { type: 'line-line-intersection', id: 'E', a: 'A', b: 'C', c: 'B', d: 'D', onSeg: true }));
   it('line∩line intersection (hebrew)', () =>
     has('M חיתוך AC ו-BD', { type: 'line-line-intersection', id: 'M', a: 'A', b: 'C', c: 'B', d: 'D', onSeg: true }));
-  it('also draws the two referenced segments', () => {
+  // #1751 (ADR-592): the NOUN form is about the point — it ensures the four ends (ifAbsent) and draws no line;
+  // the VERB form is about the lines and draws them.
+  it('the noun form draws no segment; it ensures the four ends', () => {
     const r = parse('E is the intersection of AC and BD');
+    expect(r.ok && r.commands.filter((c) => c.type === 'segment').length).toBe(0);
+    expect(r.ok && r.commands.filter((c) => c.type === 'free-point' && c.ifAbsent).map((c) => (c as { id: string }).id)).toEqual(['A', 'C', 'B', 'D']);
+  });
+  it('the verb form draws the two referenced segments', () => {
+    const r = parse('AC and BD meet at E');
     expect(r.ok && r.commands.filter((c) => c.type === 'segment').length).toBe(2); // AC and BD drawn
   });
 });

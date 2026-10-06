@@ -1669,7 +1669,8 @@ function meetFrame(line: string): RuleOutcome {
     const [a, b] = sharedCircle(left, right);
     const canonical = `${id} נקודת החיתוך של ${withLineNoun(a)} עם ${withLineNoun(b)}`;
     const r = parseClause(canonical);
-    if (r.ok) return made(r.facts.map((f) => ({ ...f, src: line })));
+    // The verb's SUBJECT is the lines, so they are drawn (#1751, `operandPieces`); the canonical noun draws none.
+    if (r.ok) return made([...r.facts.map((f) => ({ ...f, src: line })), ...operandPieces([a, b], line)]);
     if (r.code !== 'not-handled' && r.code !== 'bad-operand') return { ...r, detail: line } as ParseResult;
   }
   return null;
@@ -1723,19 +1724,49 @@ function intersectionSpellings(line: string): RuleOutcome {
   ).exec(line);
   if (cutsTwo) {
     const [, a, b, p, c2, q] = cutsTwo;
-    return viaCanonical(line, null, () => [
+    return withOperandPieces(viaCanonical(line, null, () => [
       `${p} נקודת החיתוך של ${withLineNoun(a)} עם ${withLineNoun(b)}`,
       `${q} נקודת החיתוך של ${withLineNoun(a)} עם ${withLineNoun(c2)}`,
-    ]);
+    ]), [a, b, c2], line);
   }
   const cuts =
     new RegExp(`^(.+?)\\s+חות(?:ך|כת|כים|כות)\\s+את\\s+(.+?)\\s+ב?נקודה\\s+(${NAME})$`).exec(line) ??
     new RegExp(`^(.+?)\\s+(?:cuts|intersects)\\s+(.+?)\\s+at\\s+(?:point\\s+)?(${NAME})$`, 'i').exec(line);
   if (cuts) {
     const [, a, b, id] = cuts;
-    return viaCanonical(line, null, () => [`${id} נקודת החיתוך של ${withLineNoun(a)} עם ${withLineNoun(b)}`]);
+    return withOperandPieces(viaCanonical(line, null, () => [`${id} נקודת החיתוך של ${withLineNoun(a)} עם ${withLineNoun(b)}`]), [a, b], line);
   }
   return null;
+}
+
+/**
+ * THE GRAMMATICAL SUBJECT DECIDES WHAT IS DRAWN (#1751, operator rulings 2026-10-04; [ADR-AG-241](../../docs/06c-decisions-analytic.md#adr-ag-241)).
+ *
+ * A crossing sentence has one of two FRAMES, and the frame alone decides whether its operand lines join the figure:
+ *  - the VERB frame — «AC ו-BD נפגשים בנקודה M», «AC חותך את BD בנקודה M», "AC and BD meet at M" — is about the LINES
+ *    (they are its subject), so each operand named by its two letters is drawn: `pieceFacts`, the noun deciding the
+ *    extent as everywhere (#1234: «הישר AC» the line, bare «AC» / «הקטע AC» the segment);
+ *  - the NOUN frame — «M מפגש AC ו-BD», «M נקודת החיתוך של AC ו-BD», "M is the intersection of AC and BD" — is about
+ *    the POINT, and draws only M.
+ * 2-D reads the same rule (ADR-592). The role-named diagonals follow it in `concurrencyOf` (`frame`). An operand that is
+ * not a lettered pair (a named line «l1», a curve, a tangent, a line-object) is already drawn by its own statement.
+ */
+const LETTERED_OPERAND = new RegExp(
+  `^(?:(ה?(?:ישר|קטע|צלע|אלכסון)|(?:the\\s+)?(?:line|segment|side|diagonal))\\s+)?(${NAME})(${NAME})$`,
+);
+function operandPieces(operands: readonly string[], src: string): Fact[] {
+  const seen = new Set<string>();
+  return operands.flatMap((o) => {
+    const m = LETTERED_OPERAND.exec(trim(o));
+    if (!m) return [];
+    const key = [m[2], m[3]].sort().join();
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return pieceFacts(pieceNounOf(m[1]), m[2], m[3], src);
+  });
+}
+function withOperandPieces(r: RuleOutcome, operands: readonly string[], src: string): RuleOutcome {
+  return r && r.ok ? made([...r.facts, ...operandPieces(operands, src)]) : r;
 }
 
 /**
@@ -1763,7 +1794,7 @@ function meetingSpelling(line: string): RuleOutcome {
   if (!he && !en) return null;
   const id = (he ?? en)![1];
   const tail = he ? he[5] : en![2];
-  if (concurrencyOf(id, tail, line)) return null;
+  if (concurrencyOf(id, tail, line, 'point')) return null;
   const canonical = he
     ? `${id} ${he[2]}${he[3] && /נקודות/.test(he[3]) ? 'נקודות' : 'נקודת'} החיתוך${he[4] ? ` ${he[4].replace(/^ה?/, 'ה')}` : ''} של ${tail}`
     : `${id} is the intersection of ${tail}`;
@@ -1935,7 +1966,7 @@ function namedDiagonalsMeet(id: Id, subject: string, line: string): RuleOutcome 
   ]);
 }
 
-function concurrencyOf(id: Id, subject: string, line: string): RuleOutcome {
+function concurrencyOf(id: Id, subject: string, line: string, frame: 'lines' | 'point'): RuleOutcome {
   const named = namedDiagonalsMeet(id, subject, line);
   if (named) return named;
   let role: (typeof ROLES)[number] | undefined;
@@ -1960,7 +1991,9 @@ function concurrencyOf(id: Id, subject: string, line: string): RuleOutcome {
   if (!run) {
     const key = noun ? (EN_SHAPE[normalizeShapeNoun(noun).toLowerCase()] ?? normalizeShapeNoun(noun)) : undefined;
     const shaped = key !== undefined && shapeRow(key) ? { noun: key } : {};
-    return made([{ t: 'meet-of', role: role.t, arity: role.n, id, ...shaped, src: line }]);
+    // The VERB frame draws the diagonals it is about (#1751, ADR-AG-241); which ones is M1's, with the ring.
+    const draw = frame === 'lines' && role.t === 'diagonals' ? { draw: true as const } : {};
+    return made([{ t: 'meet-of', role: role.t, arity: role.n, id, ...shaped, ...draw, src: line }]);
   }
   const v = splitNames(run);
   /**
@@ -1981,7 +2014,8 @@ function concurrencyOf(id: Id, subject: string, line: string): RuleOutcome {
   // there is a triangle, not only which points the centroid is of.
   const shape = namedShapeFacts(noun, v, line);
   if (shape === 'bad-arity') return refuse('bad-arity', line);
-  return made([...shape, { t: 'derived', id, rule, src: line }]);
+  const drawn = frame === 'lines' && role.t === 'diagonals' ? [...pieceFacts('segment', v[0], v[2], line), ...pieceFacts('segment', v[1], v[3], line)] : [];
+  return made([...shape, { t: 'derived', id, rule, src: line }, ...drawn]);
 }
 
 function parseDerived(line: string): RuleOutcome {
@@ -2031,13 +2065,13 @@ function parseDerived(line: string): RuleOutcome {
   // נפגשים בנקודה O») answers `null` and the rules after this one get the sentence.
   const meet = MEET_HE.exec(line) ?? MEET_EN.exec(line);
   if (meet) {
-    const found = concurrencyOf(meet[2], meet[1], line);
+    const found = concurrencyOf(meet[2], meet[1], line, 'lines');
     if (found) return found;
   }
 
   // «O מפגש האלכסונים במרובע ABCD» — the NOUN form, through the same reader (#1283).
   const con = CONCURRENCY_HE.exec(line) ?? CONCURRENCY_EN.exec(line);
-  if (con) return concurrencyOf(con[1], con[2], line);
+  if (con) return concurrencyOf(con[1], con[2], line, 'point');
 
   return null;
 }

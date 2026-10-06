@@ -170,10 +170,11 @@ const CORPUS: BQuestion[] = [
       'CE median to AB',
       'BD median to AC',
       'AF median to BC',
-      'M is the intersection of CE and BD',
+      // #1751 (ADR-592): the booklet figure DRAWS these lines; the noun form («X is the intersection of …») now draws the point only, so the verb carries them
+      'CE and BD meet at M',
       // The third median passes through the centroid — a theorem-true check, stated as the given:
       'M on line AF',
-      'K is the intersection of AM and ED',
+      'AM and ED meet at K',
       'circle through A E M',
       'D on the circle',
     ],
@@ -307,7 +308,8 @@ const CORPUS: BQuestion[] = [
       'L is the foot of the perpendicular from E to AC',
       'AL = LK',
       'LK = KC',
-      'G is the intersection of EK and DL',
+      // #1751 (ADR-592): the booklet figure DRAWS these lines; the noun form («X is the intersection of …») now draws the point only, so the verb carries them
+      'EK and DL meet at G',
     ],
     // The emergent BEGD rhombus fires 37/38 through the ADR-244 kite-class observed path; the
     // isosceles bundle (24) and the equidistance converse (83, |BA|=|BC| with AC drawn) fire too.
@@ -335,7 +337,8 @@ const CORPUS: BQuestion[] = [
     steps: [
       'rectangle ABCD',
       'E on AD',
-      'F is the intersection of CE and BD',
+      // #1751 (ADR-592): the booklet figure DRAWS these lines; the noun form («X is the intersection of …») now draws the point only, so the verb carries them
+      'CE and BD meet at F',
       'cyclic quadrilateral EABF',
     ],
     expect: [52, 43, 46, 48, 50, 2, 4, 10, 87],
@@ -437,7 +440,8 @@ const CORPUS: BQuestion[] = [
     title: 'cyclic quad, tangent at C, AB = CB, bisecting diagonal',
     steps: [
       'quadrilateral ABCD inscribed in circle O',
-      'F is the intersection of AC and BD',
+      // #1751 (ADR-592): the booklet figure DRAWS these lines; the noun form («X is the intersection of …») now draws the point only, so the verb carries them
+      'AC and BD meet at F',
       'the tangent at C meets the extension of AB at E',
       'AB = CB',
       'AC bisects angle ECD',

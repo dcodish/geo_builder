@@ -16,7 +16,7 @@
  "scenario:rectangle-named-over-existing-riders": "21ef6d3fa8714a5f",
  "scenario:segment-tangent-binds-named-segment": "4aa7515d0d5ccf06",
  "scenario:symbolic-area-label-not-swallowed": "0eda97f2cdc4902e",
- "scenario:seed-coincident-angle-not-swallowed": "c69716a0b66375f9",
+ "scenario:seed-coincident-angle-not-swallowed": "629ad206c74d6c9a",
  "scenario:definite-circles-tangent-binds-pair": "f23b1bde28dee64f",
  "scenario:two-tangents-from-apex-to-both-circles": "9d2ce82bdbbd55d7",
  "scenario:unnamed-construct-chain": "1a872beb3c8aa37f",
