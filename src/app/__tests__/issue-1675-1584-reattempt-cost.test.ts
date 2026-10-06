@@ -109,15 +109,22 @@ describe('#1584 — the refusals the round measured, bounded', () => {
     expect(cold.executed).toBeLessThanOrEqual(3_100_000);
   }, 240_000);
 
-  it('«חצי מעגל ABC»: bounded — ≤ 40M executed (was 194M, ~7 min), the same refusal', async () => {
+  /**
+   * #1771 (ADR-589): the operator's line is no longer a refusal — the three vertices are read ON the semicircle
+   * and the figure picks the diameter (AB, the right angle at C), so it BUILDS, and at the cost of one dry run.
+   * The refusal this row used to bound is kept by the line on the same figure that cannot build: the stated
+   * diameter BC (A cannot see BC at 90° when AC = 15 > BC = 10) — stated, so never re-read.
+   */
+  it('«חצי מעגל ABC»: builds now (#1771) — bounded, and its refusing neighbour stays bounded', async () => {
     clearReplayCaches();
-    const cold = await measure(RIGHT_15_10, 'חצי מעגל ABC');
-    expect(cold.accepted).toBe(false);
-    expect(cold.note).toMatch(/AC\| = \|AB\| cannot hold/);
-    // 20.9M under ADR-583; ADR-584 (#1671) then replaced the gate seat sweep 1.5 s clock with a 4M charged-work
-    // cap and warms the rotated folds first, so the three sweeps here (the line, two role readings) run to the cap
-    // instead of quitting at 1.5 s — measured 34.5M, the verdict unchanged.
-    expect(cold.executed).toBeLessThanOrEqual(40_000_000);
+    const built = await measure(RIGHT_15_10, 'חצי מעגל ABC');
+    expect(built.accepted).toBe(true);
+    expect(built.executed).toBeLessThanOrEqual(1_500_000); // measured 0.42M — the probe-best reading is the first dry run
+    clearReplayCaches();
+    const stated = await measure(RIGHT_15_10, 'חצי מעגל שקוטרו BC העובר דרך A');
+    expect(stated.accepted).toBe(false);
+    expect(stated.note).toMatch(/cannot hold/);
+    expect(stated.executed).toBeLessThanOrEqual(12_000_000); // measured 8.78M — an explicit diameter is never re-read
   }, 600_000);
 
   it('«α = 50» still commits, still names itself (ADR-554), bounded', async () => {

@@ -66,7 +66,7 @@ import {
 import { spanShadow } from '@/parser/spanAccounting';
 import { findProofTarget } from '../../shell/proofTarget';
 import { honestyGateReport } from './honestyGates';
-import { honoursConstruct, roleReadings } from './roleReadings';
+import { honoursConstruct, roleReadings, thalesReadings } from './roleReadings';
 import { solveBudget, work, withWorkBudget, withWorkEpoch } from '@/engine/solveBudget';
 
 /**
@@ -560,6 +560,39 @@ export async function decideFromParse(
       // #1584 (ADR-583): the line's dry run and its role re-readings are ONE work epoch — see ROLE_READING_WORK_CAP.
       const parsed = r;
       const decided = withWorkEpoch(() => {
+        /**
+         * A SEMICIRCLE THROUGH THREE VERTICES: THE FIGURE PICKS THE DIAMETER (#1771, ADR-589).
+         *
+         * «חצי מעגל ABC» on a triangle puts all three vertices ON the semicircle (operator ruling,
+         * 2026-10-04), and which side is the diameter is the figure's call — the side opposite the angle
+         * that is, or can become, the right angle. The readings are probed on the figure the student
+         * already has and tried BEST FIRST, before any refusal rather than after it: the probe-best
+         * reading is the one that keeps an unseated right angle where it is, so trying the parser's
+         * starting side first could build — and move the figure — when the figure itself says otherwise.
+         * The first is dry-run like any line; the others under the role-reading cap. Whichever is
+         * adopted is taught in its explicit spelling, so the student sees which side became the diameter.
+         */
+        const thales = thalesReadings(utterance, parsed.commands, (s) => replay(facts, s).positions);
+        if (thales) {
+          let statedOutcome: ReturnType<typeof dryRunOutcome> | null = null;
+          for (const [i, reading] of thales.entries()) {
+            const alt = parse(reading.utterance, pctx);
+            if (!alt.ok || !honestyGateReport(reading.utterance, alt.commands, pctx).clean) continue;
+            const aborts0 = solveBudget.aborts;
+            const tryOutcome = i === 0 ? dryRunOutcome(facts, alt.commands, seed) : withWorkBudget(roleReadingConfig.cap, () => dryRunOutcome(facts, alt.commands, seed));
+            if (i > 0) {
+              roleReadingStats.readings++;
+              if (solveBudget.aborts !== aborts0) { roleReadingStats.cut++; continue; } // cut by the cap: not THE outcome of this reading
+            }
+            if (reading.stated) statedOutcome = tryOutcome;
+            if (!tryOutcome.produced) continue;
+            if (!honoursConstruct(alt.commands, replay(trialFacts(facts, alt.commands), seed).positions)) continue;
+            return { rr: alt, outcome: tryOutcome, adopted: reading.utterance as string | null };
+          }
+          // No side holds: the line's verdict is its own stated reading's, exactly as without the probe
+          // (its rewrite lowers to the same commands, so its dry run IS the line's).
+          if (statedOutcome) return { rr: parsed, outcome: statedOutcome, adopted: null };
+        }
         let rr = parsed;
         let outcome = dryRunOutcome(facts, rr.commands, seed);
         /**

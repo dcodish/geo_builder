@@ -1,0 +1,145 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-05T12:00:00.000Z",
+  "name": "issue-1771",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "ABC משולש ישר זוית",
+      "group": "g0",
+      "cmd": {
+        "type": "right-triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "AC=15",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "utterance": "AC=15",
+      "group": "g1",
+      "cmd": {
+        "type": "set-distance",
+        "a": "A",
+        "b": "C",
+        "value": 15
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.3",
+      "utterance": "BC=10",
+      "group": "g2",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.4",
+      "utterance": "BC=10",
+      "group": "g2",
+      "cmd": {
+        "type": "set-distance",
+        "a": "B",
+        "b": "C",
+        "value": 10
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3.5",
+      "utterance": "חצי מעגל ABC",
+      "group": "g3",
+      "cmd": {
+        "type": "midpoint",
+        "id": "@ctr-O",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3.6",
+      "utterance": "חצי מעגל ABC",
+      "group": "g3",
+      "cmd": {
+        "type": "circle-through",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "through": "A",
+        "hidden": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3.7",
+      "utterance": "חצי מעגל ABC",
+      "group": "g3",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3.8",
+      "utterance": "חצי מעגל ABC",
+      "group": "g3",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3.9",
+      "utterance": "חצי מעגל ABC",
+      "group": "g3",
+      "cmd": {
+        "type": "arc",
+        "id": "arc-BA",
+        "center": "@ctr-O",
+        "from": "B",
+        "to": "A",
+        "spanDeg": 180,
+        "bulgeRef": "C",
+        "bulgeToward": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3.10",
+      "utterance": "חצי מעגל ABC",
+      "group": "g3",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    }
+  ]
+}

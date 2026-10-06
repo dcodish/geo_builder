@@ -5686,6 +5686,15 @@ const semicirclesOnEverySide: Rule = (s, ctx) => {
 const BULGE_CLAUSE =
   /(?:מחוץ\s*ל|בתוך\s*ה?|מבחוץ|מבפנים|(?<![א-ת])בחוץ(?![א-ת])|\boutside(?:\s+of)?\b|\binside(?:\s+of)?\b)\s*(?:the\s+)?(?:ה?(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע)|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite|polygon)?\s*(?:[A-Z]\d*\s*){0,4}/gi;
 
+/** #1771 (ADR-589): «… העובר דרך C» / «… דרך C» / "… through C" — the third point a semicircle passes through
+ *  (the explicit spelling of the three-points-on reading). Captures the point's label. */
+const SEMI_THROUGH =
+  /(?:(?<![א-ת])[הש]?עוב(?:ר|רת)\s+(?:דרך\s+|ב-?)|(?<![א-ת])דרך\s+|\b(?:passing\s+|(?:which|that)\s+passes\s+|goes\s+)?through\s+|\bvia\s+)(?:ה?נקודה\s+|(?:the\s+)?point\s+)?([A-Z]\d*)(?![A-Za-z0-9])/;
+
+/** #1771 (ADR-589): a membership on THE semicircle — «C [ו-D] [נמצאת] על חצי המעגל» / "C is on the semicircle". */
+const SEMI_MEMBERSHIP =
+  /^\s*(?:ה?נקוד(?:ה|ות)\s+|points?\s+)?[A-Z]\d*(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)[A-Z]\d*)*\s+(?:נמצא(?:ת|ות|ים)?\s+|(?:is|are|lies|lie)\s+)?(?:על\s+חצי[\s-]?ה(?:מעגל|עיגול)|on\s+the\s+(?:semicircle|half[\s-]?circle))\s*\.?\s*$/;
+
 /** Resolve a semicircle's bulge orientation (#outward): "outside/inside the <shape>" → the reference vertex
  *  (a vertex of the shape NOT on the diameter side) + `bulgeToward` for inside. The shape is a named run,
  *  else the figure's single polygon whose edge is the diameter. No qualifier / unresolvable → no control. */
@@ -5713,6 +5722,9 @@ function semicircleBulge(s: string, ctx: ParseContext, a: Id, b: Id): { bulgeRef
 
 const semicircle: Rule = (s, ctx) => {
   if (!/semicircle|half[\s-]?circle|חצי[\s-]?ה?מעגל|חצי[\s-]?ה?עיגול/i.test(s)) return null;
+  // #1771 (ADR-589): «C על חצי המעגל» / "C is on the semicircle" is a MEMBERSHIP on the semicircle that
+  // exists — `pointOnCircle`'s sentence, not a new semicircle. Handed on, so it reads like «C על המעגל».
+  if (SEMI_MEMBERSHIP.test(s)) return null;
   const r = parseRadius(s);
   const namedC = circleCenter(s); // "חצי מעגל P שקוטרו CD" names the hidden circle's centre P
   // A SIDE reference is this rule's own vocabulary — «על צלע CD יש חצי מעגל» states the side IS the
@@ -5726,7 +5738,86 @@ const semicircle: Rule = (s, ctx) => {
     /semicircle|half[\s-]?circle|חצי[\s-]?ה?מעגל|חצי[\s-]?ה?עיגול|(?<![א-ת])חצי(?![א-ת])|\bhalf\b|diameter|קוטר|שקוטרו|צלע\S*|\bsides?\b|(?<![א-ת])יש(?![א-ת])|על|\bon\b|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
     ' ',
   );
-  const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
+  const restNoC0 = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
+  /**
+   * A THIRD POINT ON THE SEMICIRCLE (#1771, ADR-589) — «חצי מעגל שקוטרו AB העובר דרך C» / "semicircle with
+   * diameter AB through C". The explicit spelling of the three-points-on reading below, and the sentence
+   * the decide layer TEACHES when it picks a 3-run's diameter from the figure. Stripped before the run is
+   * read so the through-letter is never mistaken for part of the diameter.
+   */
+  const thruM = restNoC0.match(SEMI_THROUGH);
+  const thru = thruM ? up(thruM[1]) : null;
+  const restNoC = thruM ? restNoC0.replace(thruM[0], ' ') : restNoC0;
+  const exists = (p: string) => (ctx.points ?? []).some((q) => up(q) === up(p));
+  /**
+   * THREE VERTICES ON THE SEMICIRCLE (#1771, ADR-589; operator ruling 2026-10-04).
+   *
+   * «חצי מעגל ABC» on a right triangle was read centre-first (ADR-534), which on a triangle is impossible
+   * from the lengths alone, and refused. Ruled: when the three letters are not collinear, all three lie ON
+   * the semicircle and the diameter is the side that can be opposite the right angle (Thales), whatever
+   * order the letters were written in. "Not collinear" is read STRUCTURALLY — the three are vertices of
+   * one existing polygon — never off drawn coordinates; three loose points keep the centre-first reading,
+   * since nothing says they are not on one line (ADR-534's own lock is exactly such a run).
+   *
+   * Which side is the diameter is the FIGURE's call, and the decide layer makes it (`thalesReadings`):
+   * it probes the inscribed angle at each vertex on the figure the student already has and tries the
+   * readings best first. The parse only needs a starting reading: the declared hypotenuse when the
+   * figure has one among these sides, else the first two letters — a starting point the decide layer
+   * overrides, never a convention it teaches.
+   */
+  const run3 = !thru && !namedC ? labelRun(restNoC, 3) : null;
+  const onVertices =
+    run3 && new Set(run3.map(up)).size === 3 && run3.every(exists) &&
+    (ctx.polygons ?? []).some((poly) => run3.every((p) => poly.map(up).includes(up(p))))
+      ? run3.map(up)
+      : null;
+  if (thru || onVertices) {
+    let dia2: Id[] | null;
+    let on: Id;
+    if (onVertices) {
+      const hyp = (ctx.roleSides ?? []).find((rs) => rs.role === 'hypotenuse' && rs.edge.every((e) => onVertices.includes(up(e))));
+      on = hyp ? onVertices.find((v) => !hyp.edge.map(up).includes(v))! : onVertices[2];
+      dia2 = onVertices.filter((v) => v !== on);
+    } else {
+      dia2 = labelRun(restNoC, 2);
+      on = thru!;
+    }
+    if (!dia2 || dia2.map(up).includes(on)) return 'stop'; // «…דרך C» with no two-letter diameter, or a diameter end as the third point
+    const [a, b] = dia2.map(up);
+    const claimed = onVertices ? [...run3!] : [a, b];
+    if (shapeLeftover(stripConsumedNumber(removeClaimed(restNoC, claimed), r.numeric))) return 'stop';
+    // The third point must lie on the DRAWN half, so the arc bulges toward it; a stated outside/inside
+    // clause would contradict that, and is escalated rather than half-honoured.
+    if (Object.keys(semicircleBulge(s, ctx, a, b)).length) return 'stop';
+    const center =
+      (namedC && up(namedC) !== a && up(namedC) !== b && up(namedC) !== on ? up(namedC) : null) ??
+      freeLabel([a, b, on, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M', 'N', 'S']);
+    const circ = circleId(center);
+    const arc: AnyCommand = { type: 'arc', id: `arc-${b}${a}`, center, from: b, to: a, spanDeg: 180, bulgeRef: on, bulgeToward: true };
+    if (exists(a) && exists(b) && !r.numeric && !exists(center)) {
+      return [
+        { type: 'midpoint', id: center, a, b },
+        { type: 'circle-through', id: circ, center, through: a, hidden: true, ...(namedC ? {} : { autoCenter: true }) },
+        { type: 'point-on-circle', id: b, circle: circ }, // the antipode — a recorded, passing check
+        { type: 'point-on-circle', id: on, circle: circ }, // the third point ON the semicircle (Thales)
+        arc,
+        { type: 'segment', a, b }, // the diameter
+      ];
+    }
+    const cmds: AnyCommand[] = [
+      { type: 'circle', id: circ, center, radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(namedC ? {} : { autoCenter: true }) },
+    ];
+    if (r.varCmd) cmds.push(r.varCmd);
+    const members = membersOfCenter(ctx, center);
+    for (const [p, theta] of [[a, Math.PI], [b, 0], [on, Math.PI / 2]] as const) {
+      if (exists(p)) {
+        if (!members.has(p)) cmds.push({ type: 'point-on-circle', id: p, circle: circ });
+      } else cmds.push({ type: 'point-on-circle', id: p, circle: circ, theta });
+    }
+    if (exists(a) || exists(b)) cmds.push({ type: 'set-collinear', a, b: center, c: b });
+    cmds.push(arc, { type: 'segment', a, b });
+    return cmds;
+  }
   /**
    * A CENTRE-FIRST 3-RUN — «חצי מעגל ODC» (#1204, ADR-545).
    *
@@ -5769,7 +5860,6 @@ const semicircle: Rule = (s, ctx) => {
     (namedC && up(namedC) !== up(a) && up(namedC) !== up(b) ? up(namedC) : null) ??
     freeLabel([up(a), up(b), ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M', 'N', 'S']);
   const circ = circleId(center);
-  const exists = (p: string) => (ctx.points ?? []).some((q) => up(q) === up(p));
   // BOTH endpoints EXIST and no numeric radius contradicts: the semicircle is CLOSED-FORM — centre =
   // the midpoint of the stated diameter, radius through an endpoint. Zero solve, so the prior figure
   // cannot move (the stability principle by construction); the other endpoint's membership lands as a

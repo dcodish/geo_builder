@@ -542,6 +542,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-149', family: 'circles', steps: ['מרכז המעגל'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-150', family: 'tangents', steps: ['AB משיק למעגל C'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-151', family: 'tangents', steps: ['מנקודה A יוצאים שני משיקים לשני המעגלים'], expect: 'builds', exception: 'X8' },
+  { id: 'cat-2d-152', family: 'chords-arcs', steps: ['חצי מעגל שקוטרו AB העובר דרך C'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1796' }] }, // #1771 (ADR-589)
+  { id: 'e1771-semi-three-vertices', family: 'chords-arcs', steps: ['משולש ABC', 'זווית ACB = 90', 'חצי מעגל ABC'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1796' }] }, // #1771: all three ON it, the figure picks AB
+  { id: 'e1771-on-the-semicircle', family: 'chords-arcs', steps: ['חצי מעגל שקוטרו AB', 'C על חצי המעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1796' }] }, // #1771: reads like «C על המעגל»
   { id: 'cat-an-001', family: 'points-incidence', steps: ['נקודה M'], expect: 'builds', exception: 'X9' },
   { id: 'cat-an-002', family: 'points-incidence', steps: ['הישר AB'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'cat-an-003', family: 'points-incidence', steps: ['נקודה P', 'דרך P עובר ישר'], expect: 'builds', exception: 'X9', knownGap: [{ product: '2d', issue: '#1677' }] },

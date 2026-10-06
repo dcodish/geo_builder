@@ -242,3 +242,12 @@ siblings built. A family with two conventions is one a student cannot learn.
 For a semicircle that reading also says the centre is the MIDPOINT of the two ends — not an extra
 assumption but what the sentence means, and what its own two-letter spelling already builds. It lowers
 to constraints, so a figure that cannot honour it is refused honestly rather than drawn wrong.
+
+**Except on three vertices of a shape: then all three are ON the semicircle, and the figure picks the
+diameter** ([ADR-589](06-decisions.md#adr-589), [#1771](https://github.com/dcodish/geo_builder/issues/1771),
+operator ruling 2026-10-04). «חצי מעגל ABC» on a right triangle means the semicircle through A, B and C;
+its diameter is the side that can be opposite the right angle (Thales), whatever order the letters were
+written in — on the triangle with the right angle at C it is AB. The step teaches the explicit spelling it
+used, «חצי מעגל שקוטרו AB העובר דרך C», which a student may also type directly (a stated diameter is
+honoured as stated). Three loose points keep the centre-first reading. When no side can be the diameter
+(an equilateral triangle) the step is refused. «C על חצי המעגל» reads like «C על המעגל».
