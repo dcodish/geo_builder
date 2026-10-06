@@ -3543,6 +3543,22 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(A, C), 'its diagonals are equal (both diameters)').toBeCloseTo(dist(B, D), 6);
     },
   },
+  {
+    id: 'existing-label-clause-never-dropped-1795',
+    title: '#1795 (ADR-597): «מעגל שקוטרו AB עובר דרך C» after «משולש ABC» is not committed with C gone; «מעגל שקוטרו AB ו-C על המעגל» builds the circle with C on it (Thales)',
+    guards:
+      "Reported on #1795 and re-measured on fa1d2492 through decideDeterministic2D (the check asserts the operator's line «מעגל שקוטרו AB עובר דרך C» through the submit gate; the steps build its compound spelling): after «משולש ABC», «מעגל שקוטרו AB עובר דרך C» committed segment AB · midpoint · circle-through A, green, with C gone; «מעגל שקוטרו AB ו-C על המעגל» and «…, C על המעגל» did the same, although each clause reads on its own. Root cause: every label gate exempted an EXISTING label as context without asking whether any command referred to it, so a clause naming only existing points was invisible and the parser's clause split never ran. Fix: an existing label is context only when the lowering refers to it (a referenced circle's members and centre, a circle name, a named existing polygon) — src/parser/labelAccounting.ts, consulted by the span accountant and by parseResolved. The 38-row class battery, the position-word rows and the reference controls are src/app/__tests__/issue-1795-existing-label-tail.test.ts.",
+    steps: ['משולש ABC', 'מעגל שקוטרו AB ו-C על המעגל'],
+    check: (fig) => {
+      allStepsOk(fig);
+      // the operator's own line, on the figure it was typed on: the grammar does not commit it without C — it goes to
+      // the model (whose canonical decomposition is «מעגל שקוטרו AB» · «C על המעגל»). `not-handled` is not a declarable
+      // `refusedSteps` reason, so it is asserted here through the real submit gate.
+      expect(gateVerdict(factsOf(['משולש ABC']), 'מעגל שקוטרו AB עובר דרך C'), 'the through-form is not committed with C gone').toEqual({ kind: 'refused', reason: 'parse', detail: 'not-handled' });
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(Math.abs(angle(A, C, B) - 90), 'C is on the circle with diameter AB: ∠ACB = 90° (solver precision)').toBeLessThan(1e-3);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

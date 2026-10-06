@@ -657,7 +657,7 @@ export async function decideFromParse(
         // SPAN-ACCOUNTING SHADOW (S3.1 of docs/24 — never refuses; the enforcing flip is the
         // operator's, §4.2): log what the total accountant WOULD have flagged on this committed
         // parse, so real traffic accumulates the divergence evidence the flip decision needs.
-        const shadow = spanShadow(utterance, r.commands, { existingPoints: pctx.points, radiusSymbols: (pctx.radiusSymbols ?? []).map((x) => x.name), angleAliases: (pctx.angleAliases ?? []).map((x) => x.name) });
+        const shadow = spanShadow(utterance, r.commands, { existingPoints: pctx.points, radiusSymbols: (pctx.radiusSymbols ?? []).map((x) => x.name), angleAliases: (pctx.angleAliases ?? []).map((x) => x.name), circleMembers: pctx.circleMembers, polygons: pctx.polygons });
         const commitLogs: DecideLog[] = [...logs, { source: 'parser', commands: r.commands, ...(shadow ? { spanShadow: shadow } : {}) }];
         // ADR-428 obligation 2 — TEACH on acceptance. The step committed; if the phrasing was understood
         // but is not the canonical form, show the canonical spelling so the habit the student builds is

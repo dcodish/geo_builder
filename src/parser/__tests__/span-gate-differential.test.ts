@@ -112,14 +112,19 @@ describe('ADR-453 — the gate-retirement differential', () => {
   it('ADR-264 class: a relation between points that ALL already exist — the measured hole', () => {
     // The reason `droppedGivenRelations` is still wired. `accountUtterance` decides relation symbols
     // with ONE global `hasConstraint` flag: any command matching /segment|point|line|circle|…/ marks
-    // every relation symbol in the utterance as accounted. So «CE⊥AB» lowered to a bare segment reads
-    // clean, and with A/B/C/E all pre-existing there is no label span either — the accountant sees
+    // every relation symbol in the utterance as accounted. So «CE⊥AB» lowered to the two bare segments
+    // reads clean: every label is carried, and the symbol rides the global flag — the accountant sees
     // NOTHING while the gate names the whole relation.
-    const cmds = [{ type: 'segment', a: 'C', b: 'E' }] as Parameters<typeof droppedGivenRelations>[1];
+    const cmds = [{ type: 'segment', a: 'C', b: 'E' }, { type: 'segment', a: 'A', b: 'B' }] as Parameters<typeof droppedGivenRelations>[1];
     expect(droppedGivenRelations('CE⊥AB', cmds)).toEqual(['CE⊥AB']);
     expect(
       unaccountedSpans('CE⊥AB', cmds, { existingPoints: ['A', 'B', 'C', 'E'] }),
       'if this is no longer empty the accountant grew per-relation operand checking — droppedGivenRelations can retire (#758)',
     ).toEqual([]);
+    // #1795 (ADR-597) narrowed the hole, not closed it: an EXISTING label is context only when the lowering
+    // refers to it, so a lowering that drops the relation's other operands (the bare segment CE) is now
+    // caught by its labels. What stays invisible is the relation whose every operand is carried.
+    const bare = [{ type: 'segment', a: 'C', b: 'E' }] as Parameters<typeof droppedGivenRelations>[1];
+    expect(unaccountedSpans('CE⊥AB', bare, { existingPoints: ['A', 'B', 'C', 'E'] }).map((x) => x.text)).toEqual(['A', 'B']);
   });
 });
