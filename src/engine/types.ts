@@ -1240,6 +1240,11 @@ export type SymbolicCommand =
   // `measure-length`: a value → `set-area`; a shared variable → `set-area-ratio` against the representative.
   | { type: 'measure-area'; ids: Id[]; expr: MeasureExpr }
   | { type: 'set-var'; name: string; value: number }
+  // A NAMING BY USE ([ADR-588](docs/06-decisions.md#adr-588), #1697): the line «נקודה C על מעגל P» named an unnamed
+  // circle P (`centre`, #186), a fresh label named an auto-named point (`point`, #539), or a typed letter moved a
+  // hidden circle token out of its way (`step-aside`, #1673). Owned by the line's group and applied by `replay`
+  // (`resolveBinds`) to the facts BEFORE it — never a store rewrite no line owns. Lowers to nothing.
+  | { type: 'name-by-use'; op: 'centre' | 'point' | 'step-aside'; from: Id; to: Id }
   // An ordering between two named measures — "α < β" / "x > y" (ADR-039). Lowered (lower.ts) to a
   // `set-angle-order`/`set-length-order` once the symbol table says which measure each variable names.
   | { type: 'measure-order'; left: string; op: '<' | '>' | '<=' | '>='; right: string }

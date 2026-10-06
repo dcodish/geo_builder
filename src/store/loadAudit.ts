@@ -69,6 +69,14 @@ export function committedStepCommands(prefix: Fact[], cmds: AnyCommand[]): AnyCo
   return all.slice(prefix.length).map((f) => f.cmd); // foldCommand only maps in place or appends
 }
 
+/**
+ * #1697 ([ADR-588](../../docs/06-decisions.md#adr-588)): a step's `name-by-use` facts are what its line DID to
+ * the figure before its statements were read («נקודה C על מעגל P» named the unnamed circle P), not parser output.
+ * A re-read happens in the world they make — the prefix plus the step's own naming facts — and compares only
+ * the statements; the naming facts are kept as saved.
+ */
+const isNaming = (c: AnyCommand) => c.type === 'name-by-use';
+
 /** Does today's parse of a step store the same rows the save stored? (#1604) — both sides through the
  *  commit's fold, so a duplicate the commit dropped never reads as drift. */
 function lowersAsSaved(prefix: Fact[], fresh: AnyCommand[], saved: AnyCommand[]): boolean {
@@ -113,20 +121,25 @@ export function refreshLoadedFigure(facts: Fact[], budgetMs = 4000): { facts: Fa
       out.push(...groupFacts);
       continue;
     }
+    const namingFacts = groupFacts.filter((f) => isNaming(f.cmd)); // #1697: read in the world the line's naming made
+    const statedFacts = groupFacts.filter((f) => !isNaming(f.cmd));
+    const stated = statedFacts.map((f) => f.cmd);
+    const base = namingFacts.length ? [...out, ...namingFacts] : out;
     // Re-parse against the prefix built from the ALREADY-refreshed earlier steps (`out`).
-    const { construction, positions } = replay(out);
+    const { construction, positions } = replay(base);
     const p = parse(step.utterance, buildParseCtx(construction, positions));
     // #1604 (ADR-579): compare and write what a COMMIT would store — the fresh parse folded against the
     // refreshed prefix, the same rule the save's own commit applied — never the raw parse. A fresh reading
     // that folds to nothing (a pure restatement today) keeps the saved row rather than deleting it.
-    const fresh = p.ok ? committedStepCommands(out, p.commands) : [];
-    if (p.ok && fresh.length > 0 && !lowersAsSaved(out, p.commands, step.cmds)) {
+    const fresh = p.ok ? committedStepCommands(base, p.commands) : [];
+    if (p.ok && fresh.length > 0 && !lowersAsSaved(base, p.commands, stated)) {
       const group = groupFacts[0].group;
       const enabled = groupFacts[0].enabled; // a step toggles enabled as a unit
       refreshed.push(i + 1);
+      out.push(...namingFacts);
       fresh.forEach((cmd, j) => {
         out.push({
-          id: groupFacts[j]?.id ?? `${step.start}r${j}`,
+          id: statedFacts[j]?.id ?? `${step.start}r${j}`,
           utterance: step.utterance,
           ...(group !== undefined ? { group } : {}),
           cmd,
@@ -148,17 +161,20 @@ export function auditLoadedFigure(facts: Fact[], budgetMs = 3000): { findings: L
     if (Date.now() - t0 > budgetMs) return { findings, complete: false };
     const step = steps[i];
     if (!step.utterance) continue;
-    const prefix = facts.slice(0, step.start);
+    const end = steps[i + 1]?.start ?? facts.length;
+    const naming = facts.slice(step.start, end).filter((f) => isNaming(f.cmd)); // #1697: the line's own naming applied
+    const stated = step.cmds.filter((c) => !isNaming(c));
+    const prefix = [...facts.slice(0, step.start), ...naming];
     const { construction, positions } = replay(prefix);
     const ctx = buildParseCtx(construction, positions);
     const group = groupKey(facts[step.start]);
-    const dropped = droppedNewLabels(step.utterance, step.cmds, ctx.points ?? []);
+    const dropped = droppedNewLabels(step.utterance, stated, ctx.points ?? []);
     if (dropped.length > 0) {
       findings.push({ step: i + 1, utterance: step.utterance, kind: 'dropped', labels: dropped, group, cmds: step.cmds });
       continue; // `dropped` subsumes `drift` for the step — one finding per row
     }
     const p = parse(step.utterance, ctx);
-    if (p.ok && !lowersAsSaved(prefix, p.commands, step.cmds)) // #1604: through the commit's fold, both sides
+    if (p.ok && !lowersAsSaved(prefix, p.commands, stated)) // #1604: through the commit's fold, both sides
       findings.push({ step: i + 1, utterance: step.utterance, kind: 'drift', labels: [], group, cmds: step.cmds });
   }
   return { findings, complete: true };

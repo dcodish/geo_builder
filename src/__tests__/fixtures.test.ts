@@ -114,16 +114,21 @@ describe('figure-file fixtures net', () => {
       });
 
       it('its utterances still lower to the same commands (parser drift)', () => {
-        for (const step of stepsOf(facts)) {
-          if (!step.utterance) continue; // a direct command (no text) — nothing to re-parse
-          const prefix = facts.slice(0, step.start);
+        const steps = stepsOf(facts);
+        steps.forEach((step, i) => {
+          if (!step.utterance) return; // a direct command (no text) — nothing to re-parse
+          // #1697 (ADR-588): a step's `name-by-use` facts are what its line did to the figure before its statements
+          // were read — the re-read happens in that world (the load refresh's own rule), and compares the statements
+          const naming = facts.slice(step.start, steps[i + 1]?.start ?? facts.length).filter((f) => f.cmd.type === 'name-by-use');
+          const stated = step.cmds.filter((c) => c.type !== 'name-by-use');
+          const prefix = [...facts.slice(0, step.start), ...naming];
           const { construction, positions } = replay(prefix);
           const p = parse(step.utterance, buildParseCtx(construction, positions));
-          if (!p.ok) continue; // out-of-grammar — an LLM-escalated step, stored as canonical commands
+          if (!p.ok) return; // out-of-grammar — an LLM-escalated step, stored as canonical commands
           // #1604 (ADR-579): both sides through the commit's fold — the load refresh's own comparison, so a
           // duplicate the commit dropped (a re-mentioned segment) is not drift here either.
-          expect(committedStepCommands(prefix, p.commands), `"${step.utterance}" lowers differently than when saved`).toEqual(committedStepCommands(prefix, step.cmds));
-        }
+          expect(committedStepCommands(prefix, p.commands), `"${step.utterance}" lowers differently than when saved`).toEqual(committedStepCommands(prefix, stated));
+        });
       });
     });
   }

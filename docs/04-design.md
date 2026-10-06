@@ -155,7 +155,8 @@ src/
                  directly tested (S0.4)
                  decideDeterministic.ts — the whole PRE-LLM lane as one pure verdict (ADR-546, #1395):
                    runSubmit dispatches it, log-triage calls it; it never touches the store, logs, or
-                   calls the model (the auto-binds are simulated on a copy of the facts)
+                   calls the model (the auto-binds are simulated on a copy of the facts, and committed
+                   as the line's own `name-by-use` facts by `commitVerdict` — ADR-588)
                  - THE COMMIT SEAMS AND THE POST-COMMIT SEARCH (ADR-518, #1041). Three store actions
                    change the fact list; the configuration search is a property of the SEAM, and the
                    list below is an assertion in `app/__tests__/issue-1041-edit-resolve.test.ts`,
@@ -211,6 +212,10 @@ src/
                    the listed slice, since what counts as "new" for ACCEPTANCE is a different question
   replay/        core.ts — the PURE replay layer (S1.2): fold memo + deferral + HOIST + seed/config
                  searches + the shared sample core; engine ← replay ← store enforced by test
+                 — naming.ts (ADR-588, #1697): the naming cores (rename / name-centre / step-aside,
+                   moved from the store)
+                   and `resolveBinds`: a line's `name-by-use` facts applied to the facts before it,
+                   at the head of every replay
                  — the fold's ATTEMPT SCOPE (ADR-583, #1675/#1584): every per-fact apply goes through
                    `attemptFact` — a fact the outermost fold already failed is a RE-attempt: answered
                    from the scope's failure memo when its `solveSignature` is unchanged, else run under
@@ -991,6 +996,13 @@ bare `free-point` definition, is no shape's vertex, and is first used after the 
 `parseNameCenter`, the `nameCenter` rule and `impliedCircleBinding`. A radius sentence («OB רדיוס», «הרדיוס OB»)
 whose centre end is such a letter emits the ADR-347 implied circle (`radiusNamesCentre`). `circleOnDiameter` does
 the same for «AB קוטר במעגל O» when A and B already ride the unnamed circle.
+
+**A naming by use is a fact of its line ([ADR-588](06-decisions.md#adr-588), #1697).** The decision's binds (the
+circle naming, the #539 point naming, the step-aside) are committed as `name-by-use` facts at the head of the line's
+own group (`commitVerdict`), never as store renames. `resolveBinds` (`replay/naming.ts`, where the naming cores now
+live) applies each enabled one, through the same core, to the facts BEFORE it — positional, so a prefix replay never
+sees a later name and a letter it freed can be minted again. Deleting, muting, editing or undoing the line removes
+the name; a refused line names nothing. The relabelling store operations rewrite the resolved list.
 
 The naming core never collides. `nameCentreFacts` and `renameFacts` step another circle's hidden token aside
 when the target letter is that token. `withAnonymousAutoCentres` re-picks a new unnamed circle's token when a

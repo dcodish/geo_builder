@@ -38,10 +38,10 @@ import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { isGeoPoint } from '@/engine';
 import type { Construction, Id, Vec } from '@/engine';
-import { dryRunOutcome, primeFoldFor, replay, trialFacts, useGeoStore } from '@/store/geoStore';
+import { dryRunOutcome, nameByUseCommands, primeFoldFor, replay, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
 import { geoWork, isCancelled } from '@/store/geoWork';
 import { unaccountedSpans } from '@/parser/spanAccounting';
-import { type DecideLog, type DecideNote, decideFromParse, decidePreParse } from './decideDeterministic';
+import { type DecideLog, type DecideNote, type Verdict2D, decideFromParse, decidePreParse } from './decideDeterministic';
 import { logDebug } from '@/debug/sessionLog';
 
 export interface SubmitUi {
@@ -72,6 +72,21 @@ export interface SubmitDeps {
    *  own sentence, which becomes the refusal's SUBJECT where the engine fragment cannot identify the
    *  rejected statement (#943, ADR-487). */
   explainError(raw: string | null | undefined, said?: string): string;
+}
+
+/**
+ * #1697 ([ADR-588](../../docs/06-decisions.md#adr-588)) — THE ONE PLACE a deterministic verdict reaches the store.
+ *
+ * A `commit` is the line's naming by use (`name-by-use` facts) followed by its statements, ONE batch — one group,
+ * one row, one undo entry. A `noop` whose naming changed the figure («D ו-F על מעגל O1» when D, F already ride
+ * it) is a row that owns that naming; a step-aside alone is invisible and commits nothing. A refusal or an
+ * escalation commits nothing here, naming included. The pipeline calls this, and so do the locks that replay a
+ * sequence through `decideDeterministic2D` — four of them used to re-apply the binds by hand.
+ */
+export function commitVerdict(verdict: Verdict2D, utterance: string): void {
+  const st = useGeoStore.getState();
+  if (verdict.kind === 'commit') st.executeMany([...nameByUseCommands(verdict.binds), ...verdict.commands], utterance);
+  else if (verdict.kind === 'noop' && verdict.binds.some((b) => b.op !== 'step-aside')) st.executeMany(nameByUseCommands(verdict.binds), utterance);
 }
 
 export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<void> {
@@ -147,17 +162,14 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
       }
     },
   });
-  // The #186 / #539 auto-binds the decision simulated are applied to the store first, whatever the
-  // verdict — the submission already named a circle or a point, exactly as it did inline before.
-  if (verdict.kind !== 'store-op') {
-    // #1673: a refused line that only stepped a hidden token aside commits nothing — leave the store (no phantom undo)
-    const asideOnly = verdict.kind === 'refuse' && verdict.binds.every((b) => b.op === 'step-aside');
-    for (const b of verdict.binds) {
-      if (b.op === 'name-centre') store().nameCentre(b.from, b.to);
-      else if (b.op === 'step-aside') { if (!asideOnly) store().reletterHidden(b.from, b.to); }
-      else store().rename(b.from, b.to);
-    }
-  }
+  // #1697 (ADR-588): the #186 / #539 auto-binds (and the #1673 step-aside) the decision simulated are the LINE'S
+  // OWN facts — `name-by-use` commands committed in the line's group, ahead of its statements, and applied by
+  // `replay`. They used to be store renames applied here whatever the verdict, so the name belonged to no line:
+  // erasing, muting or editing the line left it, and a REFUSED line still renamed the circle. Now a line that
+  // commits nothing names nothing.
+  const bindCmds = verdict.kind === 'store-op' ? [] : nameByUseCommands(verdict.binds);
+  /** The facts with this line's naming applied — what the LLM's second attempt reads and is judged against. */
+  const withBinds = (facts: Fact[]): Fact[] => (bindCmds.length ? trialFacts(facts, bindCmds) : facts);
   switch (verdict.kind) {
     case 'store-op':
       return; // unreachable: store operations are decided before the parse
@@ -168,13 +180,14 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
       return; // keep the text so the student can edit it
     case 'commit':
       // One utterance → one BATCH commit (one group id, one set, ONE undo entry — E4/STO-4).
-      store().executeMany([...verdict.commands], utterance);
+      commitVerdict(verdict, utterance);
       for (const e of verdict.logs) log(e);
       if (verdict.note) ui.setInputNote(noteText(verdict.note));
       ui.clearText();
       deps.resolveAfterCommit();
       return;
     case 'noop':
+      commitVerdict(verdict, utterance); // #1697: a naming that changed the figure is a row that owns it
       for (const e of verdict.logs) log(e);
       if (verdict.note) ui.setInputNote(noteText(verdict.note));
       ui.clearText();
@@ -189,7 +202,13 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   // using the current figure as context. The spinner is already up (painted at the top of submit) and
   // stays up across the network call AND the post-LLM dry-run/commit below; it's cleared on the
   // not-understood return and by `resolveAfterCommit` on success.
-  const v = deps.view();
+  const boundView = () => {
+    if (!bindCmds.length) return deps.view();
+    const st = store();
+    const d = replay(withBinds(st.facts), st.seed);
+    return { construction: d.construction, positions: d.positions };
+  };
+  const v = boundView();
   const ctx = figureContext(
     v.construction.objects.filter(isGeoPoint).map((o) => o.id),
     v.construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
@@ -201,7 +220,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   const timeout = setTimeout(() => controller.abort(), 15_000);
   let out: Awaited<ReturnType<typeof llmParse>>;
   try {
-    out = await llmParse(utterance, ctx, parseCtxNow(), { signal: controller.signal });
+    out = await llmParse(utterance, ctx, bindCmds.length ? buildParseCtx(v.construction, v.positions) : parseCtxNow(), { signal: controller.signal });
   } finally {
     clearTimeout(timeout);
     deps.llmAbortRef.current = null;
@@ -227,13 +246,14 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   // facts — an undo/canvas action during the network call would otherwise be validated against the
   // pre-await snapshot while `executeMany` commits onto the live list (a stale-commit race).
   const cur = store();
+  const curFacts = withBinds(cur.facts); // #1697: the line's naming, applied to the figure the decomposition is judged on
   // The LLM only counts if its decomposition actually BUILDS something — else it's another silent
   // fail. Dry-run the combined commands; if neither grammar nor LLM built anything, say so plainly.
   const llmCmds = out ? out.built.flatMap((g) => g.commands) : [];
   // #41 (ADR-290): same worker prefold for the LLM decomposition's content before ITS dry-run.
   if (out !== null && out.built.length > 0) {
     try {
-      const trial = trialFacts(cur.facts, llmCmds);
+      const trial = trialFacts(curFacts, llmCmds);
       const fold = await geoWork.prefold(trial, cur.seed);
       if (fold) primeFoldFor(trial, fold);
     } catch (err) {
@@ -241,7 +261,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     }
   }
   const llmBuilds =
-    out !== null && out.built.length > 0 && dryRunOutcome(cur.facts, llmCmds, cur.seed).produced;
+    out !== null && out.built.length > 0 && dryRunOutcome(curFacts, llmCmds, cur.seed).produced;
   if (!llmBuilds) {
     // Both the grammar AND the LLM failed to BUILD anything. Distinguish a deliberately OUT-OF-SCOPE
     // concept — a named angle/theorem relationship, a proof or compute request, or pure free text —
@@ -293,7 +313,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   // canonical line is re-parsed by the SAME grammar that just dropped the label, so the round-trip can
   // return the identical partial lowering ("A ו C נמצאות על המעגל" committed as A alone — the
   // operator's saved-figure C floating off its circle). Name the lost label and keep the text to edit.
-  const llmFig = replay(cur.facts).construction;
+  const llmFig = replay(curFacts).construction;
   const stillDropped: (string | number)[] = [
     ...droppedNewLabels(
       utterance,
@@ -371,7 +391,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   // (a Hebrew input must never surface as an English row). All built commands share one group, exactly
   // like a deterministic multi-command parse, so editing the row re-runs the original wording. The
   // canonical decomposition + any unbuildable steps stay in the debug log / `dropped` report.
-  store().executeMany(llmCmds, utterance); // one batch → one step row AND one undo entry (E4)
+  store().executeMany([...bindCmds, ...llmCmds], utterance); // one batch → one step row AND one undo entry (E4)
   // `commands` carries the LLM's committed canonical commands into the PROD analytics event too (issue
   // #84) — a `source:llm, result:ok` submit is otherwise opaque and a reported session can't reconstruct.
   // `restored` (#536): stated point-runs whose LLM respelling the sequence gate corrected («ABD→ADB») —

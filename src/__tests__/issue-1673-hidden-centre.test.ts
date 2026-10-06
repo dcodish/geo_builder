@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/parser/llm', () => ({ llmParse: vi.fn(async () => ({ built: [], dropped: [] })) }));
 
 import { decideDeterministic2D, type Verdict2D } from '@/app/decideDeterministic';
+import { commitVerdict } from '@/app/submitPipeline';
 import { replay, useGeoStore } from '@/store/geoStore';
 import { llmParse } from '@/parser/llm';
 import type { Vec } from '@/engine';
@@ -31,13 +32,7 @@ async function run(lines: string[], locale: 'he' | 'en' = 'he'): Promise<Verdict
       const res = v.op === 'name-centre' ? st().nameCentre(v.from, v.to) : v.op === 'rename' ? st().rename(v.from, v.to) : v.op === 'swap' ? st().swap(v.from, v.to) : st().merge(v.from, v.to);
       expect(res, `«${line}» store op`).toEqual({ ok: true });
     } else {
-      const asideOnly = v.kind === 'refuse' && v.binds.every((b) => b.op === 'step-aside');
-      for (const b of v.binds) {
-        if (b.op === 'name-centre') st().nameCentre(b.from, b.to);
-        else if (b.op === 'step-aside') { if (!asideOnly) st().reletterHidden(b.from, b.to); }
-        else st().rename(b.from, b.to);
-      }
-      if (v.kind === 'commit') st().executeMany([...v.commands], line);
+      commitVerdict(v, line); // #1697: the pipeline's own commit — the naming is a fact of the line
     }
     out.push(v);
   }

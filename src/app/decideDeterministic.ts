@@ -57,6 +57,7 @@ import {
   nameCentreFacts,
   renameFacts,
   replay,
+  resolveBinds,
   seatSweepWarmup,
   stepAsideFacts,
   trialFacts,
@@ -101,7 +102,8 @@ export type DecideNote =
 /** A log event the caller emits, in order — `kind`, `utterance` and `locale` are the caller's to add. */
 export type DecideLog = Readonly<Record<string, unknown>>;
 
-/** An auto-bind the parse loop made (#186 circle / #539 point) — the caller applies it to the store. */
+/** An auto-bind the parse loop made (#186 circle / #539 point / #1673 step-aside). #1697 (ADR-588): the caller commits it
+ *  as a `name-by-use` fact in the line's own group (`nameByUseCommands`) — never as a store rename no line owns. */
 export interface DecideBind {
   /** `step-aside` (#1673, ADR-565): a hidden circle token re-lettered out of the student's way — still unnamed */
   readonly op: 'name-centre' | 'rename' | 'step-aside';
@@ -227,8 +229,9 @@ export async function decideFromParse(
 ): Promise<Verdict2D> {
   const logs: DecideLog[] = [];
   const binds: DecideBind[] = [];
-  /** The facts as the auto-binds leave them — a COPY; the store is never touched here. */
-  let facts: Fact[] = [...state.facts];
+  /** The facts as the auto-binds leave them — a COPY; the store is never touched here. #1697 (ADR-588): the
+   *  earlier lines' namings by use applied first (`resolveBinds`), so the simulation starts from the figure. */
+  let facts: Fact[] = [...resolveBinds(state.facts as Fact[])];
   const seed = state.seed;
   const refuse = (category: 'guided' | 'clarify' | 'conflict', log: DecideLog, note: DecideNote): Verdict2D => ({
     kind: 'refuse', category, preParse: false, binds, logs: [...logs, log], note,
@@ -267,7 +270,9 @@ export async function decideFromParse(
       const res = nameCentreFacts(facts, bind.from, bind.to);
       if (!res.ok) break; // can't bind (e.g. letter taken) — the implicit creation stands, as before
       facts = res.facts;
-      binds.push({ op: 'name-centre', from: bind.from, to: bind.to });
+      // #1697 (ADR-588): the RESOLVED source (`@ctr-O` for an anonymous centre), so the replayed naming fact
+      // names exactly the circle this simulation named, and never reads as a student's letter O
+      binds.push({ op: 'name-centre', from: res.source, to: bind.to });
       boundName = true;
       logs.push({ source: 'name-center', rename: bind, result: 'auto-bind', intermediate: true });
     } else {
