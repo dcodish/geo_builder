@@ -11238,3 +11238,30 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Not changed / limits.** A foot dropped onto an AXIS or a line object («D רגל האנך מ-C לציר ה-x») has no named point on its line for the knee's leg and draws none (the renderer's corner needs two named points). A stated `AB ⊥ CD` whose pairs neither share an end nor put an end on the other line has no named vertex and draws none, as before. 2-D's default canvas already draws knees only from asserted facts (the /decisions note of 2026-09-21), so the two products agree on what a knee means.
 
 **Consequences.** `engine/statedMeasures.ts` (`perpendicular` case, derived feet, `alt`, `footOn`, the knee's claimed keys); `render/scene.ts` (the knee's leg toward the farther named point).
+
+## ADR-AG-238 — A measure's value never names a point: «∠CAB = A1» without «נסמן» declines, as in 2-D (#1701)
+
+**Date:** 2026-10-05 · **Status:** accepted · fix-round #1776 (bug item, branch `fix/1701-point-token-value`). #1701 `auto-ok` 2026-10-05 (/status-update pass).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R164 — one bullet (without the verb, a point's name is never a length's or an angle's value; R and an area label still read). · **Design:** [04c](04c-design-analytic.md), "A value never mentions the plane" — the measure-value half (`mentionsPointName`, `measureValue`, `LENGTH_CAPITALS`, `POINT_TOKEN`). · **LADDER stage:** parse only (the value readers). No fold, solver or render change.
+
+**Builds on** [ADR-AG-163](#adr-ag-163) (#1496 — one semantic check for every value slot, `mentionsPlane`; `equationExpr` already refuses a capital as a symbol) and [ADR-AG-221](#adr-ag-221) (E5 — «נסמן ∠CAB = A1» binds the label `∠A1`). Follows [ADR-W-108](06w-decisions-workspace.md#adr-w-108) (2-D's verdict is the reference).
+
+**Re-measured at pickup** (origin/main 4d6e3fd6, `decideSubmit` after «משולש ABC»): «∠CAB = A1», «∠ABC = A», «∠ABC = B2», «∠ABC = D», «AB = A1», «AB = C», «AB = 2A», «AB = AC + D», «זווית CAB היא A1», «angle CAB = A1», «∠B = A1», «∢ABC < A», «AB < C», «∠ABC = AB», «tan∢ABC = A», «α = A1» (after «∢ABC = α») all **recorded**; «∠ABC = A₁» was refused `bad-equation`. 2-D (`decideDeterministic2D`) answers **escalate / not-handled** to every one of them except «tan∢ABC = A», which it refuses with its trig-form teaching message. Matched the issue, and the class reaches lengths, orders, the vertex angle, the alias pin and tan — wider than the angle the issue names.
+
+**Root cause.** The expression layer multiplies by juxtaposition and admits any Latin letter as a parameter symbol, so «A1» lexes as `A·1`. Every reader of a measure's VALUE — the angle rule's `valueExpr`, the length rule's `constantLengthExpr`, the leftover symbols of `readLength` — accepted the capital, and the register (built from the symbols an expression uses, #1014) then minted a free parameter `A`. A capital is a point's shape in this tree; `equationExpr` already refused it as a symbol (ADR-AG-163), but the measure readers never asked. 2-D's value variable is lowercase or Greek (ADR-031: *"points stay uppercase, so the two never collide"*), plus the radius `R` beside a length (ADR-034).
+
+**Decision.**
+1. **One predicate, `mentionsPointName(e, allow)`** (`carriers.ts`, beside `mentionsPlane`): the expression uses a capital Latin symbol not in `allow`. `LENGTH_CAPITALS = {R}`. `POINT_TOKEN` is the same test on text the layer cannot lex («A₁», «A_1»).
+2. **Angles:** `measureValue` (`parseAnalytic.ts`) wraps `valueExpr` and answers `'point'`; the angle value rule, the trig measure, the two-pair angle, an order's value side, the Greek alias's pin and an arc term all DECLINE on it (`null` → `not-handled`), never `bad-equation` about a point's name.
+3. **Lengths:** `constantLengthExpr` and `readLength` decline a value naming a point, `R` excepted. An expression that measures an AREA keeps its capitals (`constantLengthExpr(src, ofArea)`; `readLength` when a term is an area): an area label is a capital in 2-D's grammar too (`parseAreaExpr`, «שטח ABC = S»).
+4. **Not a label.** The issue offered reading the bare form as E5's `∠A1`; 2-D escalates it (it binds only after the verb), so analytic declines — one sentence, one verdict.
+5. **Parity rows can say `not-handled`.** `ParityRow.expect` admitted every verdict but `not-handled`, so a sentence 2-D declines could not be a row; it is now a verdict like the others (the meta-lock is unchanged and green). Fourteen `*-1701` rows: twelve declines, two controls («AB = 1.6R», «שטח המשולש ABC = S»).
+
+**Locks.** `src-analytic/__tests__/issue-1701-point-value.test.ts` (28 tests; **fails before: 19 of 30** run with the parity file — the controls pass on both): the predicate; the length readers; the reported line declines and no parameter A is registered; the sweep declines; «∠ABC = 2a», «∠ABC = α», «AB = 3a», «AB = 1.6R», «AB = 2BC», «שטח המשולש ABC = S», «נסמן ∠CAB=A1» still record, and the label is `∠A1`, never `A`. The parity rows `point-value-*-1701` (2-D, analytic and 3-D thin locks). No `.geo.json` fixture: the essence is a decline, which a saved figure cannot hold.
+
+**3-D.** «∠ABC = A» records an angle MARK labelled «A» there — the same class, filed as [#1784](https://github.com/dcodish/geo_builder/issues/1784) and carried as that row's known gap. The alias, R and area controls are 3-D's existing #1679 gap.
+
+**Not changed.** Coordinates («B(A,3)»), slopes and coordinate comparisons are analytic's own families with no 2-D reference and are not measure values; they read as before. «שטח המשולש ABC = A1» still records the area as `A·1` (2-D refuses it with its split-statements message) — an area-label disparity outside this class. «x²+y²=R²» stays `not-handled` (ADR-AG-163's equation rule).
+
+**Consequences.** `engine/carriers.ts` (`mentionsPointName`, `LENGTH_CAPITALS`, `POINT_TOKEN`); `engine/lengths.ts` (`constantLengthExpr`, `readLength`); `parser/parseAnalytic.ts` (`measureValue` and its six callers, the length rule's `ofArea`); `shell/__tests__/fixtures/geo-input-parity.ts` (`expect: Verdict`, the rows).

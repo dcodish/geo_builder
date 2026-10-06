@@ -20,7 +20,7 @@
  * parameter — `2a·AB` keeps its `a`.
  */
 import { evalExpr, normalizeMath, parseExpr, type Env, type Expr } from './expr';
-import { mentionsPlane } from './carriers';
+import { LENGTH_CAPITALS, mentionsPlane, mentionsPointName } from './carriers';
 import type { Pt } from './derived';
 import type { Id } from './types';
 
@@ -408,15 +408,24 @@ function readLength(src: string, named?: Set<number>): LengthExpr | null {
   });
   if (terms.length === 0) return null;
   const expr = parseExpr(encoded);
-  // A length never mentions the plane: `y` here means the sentence was an equation (#1496) — decline it.
+  // A length never mentions the plane: `y` here means the sentence was an equation (#1496) — decline it. Nor does it
+  // name a point as a VALUE: a capital left over after the pairs were read («AB = AC + D») is a point, never a free
+  // parameter (#1701, ADR-AG-238) — the radius R excepted, as in 2-D. An AREA's label is a capital in 2-D's grammar
+  // («שטח ABC = S», its `parseAreaExpr`), so an expression that measures an area keeps its capitals.
   if (!expr || mentionsPlane(expr)) return null;
+  if (!terms.some((t) => t.kind === 'area') && mentionsPointName(expr, LENGTH_CAPITALS)) return null;
   return { expr, terms };
 }
 
-/** A length expression that is only a number — the right-hand side of `AB = 10`. */
-export function constantLengthExpr(src: string): LengthExpr | null {
+/**
+ * A length expression that is only a value — the right-hand side of `AB = 10`, `AB = 3a`. Never a point's name:
+ * «AB = A1» lexes as `A·1`, and a capital is a point here, so it is declined (#1701, ADR-AG-238; R excepted).
+ * `ofArea`: the other side measures an AREA, whose label may be a capital («שטח המשולש ABC = S», 2-D's grammar).
+ */
+export function constantLengthExpr(src: string, ofArea = false): LengthExpr | null {
   const expr = parseExpr(normalizeMath(src));
-  return expr && !mentionsPlane(expr) ? { expr, terms: [] } : null;
+  if (!expr || mentionsPlane(expr)) return null;
+  return ofArea || !mentionsPointName(expr, LENGTH_CAPITALS) ? { expr, terms: [] } : null;
 }
 
 
