@@ -24,6 +24,7 @@ import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enW
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
+import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { findProofTarget } from '../../shell/proofTarget';
 import { foreignGiven } from './scope';
 
@@ -11383,7 +11384,8 @@ export function normalizeUtterance(raw: string): string {
   // #1157 (ADR-524) — the verbose length frame is read POSITIONALLY, after the unit tolerance its
   // sibling lanes already had. Both run on the fully-orthographic text, so every value-bearing rule
   // downstream sees one shape.
-  const lengths = normalizeVerboseLength(stripValueUnits(orth));
+  // #1691 (ADR-AG-239): «F ו- G», «F ו -G», «F ו - G» are «F ו-G» — the shared fold every builder's boundary calls.
+  const lengths = normalizeVerboseLength(stripValueUnits(foldConjunctionSpacing(orth)));
   const words = normalizeWordEquality(normalizeWordDegrees(lengths));
   return normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(words.trim().replace(/\s+/g, ' ')))));
 }

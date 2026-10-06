@@ -24,6 +24,7 @@
 import { ANGLE_STEM_HE, EN_SHAPE, SHAPES, normalizeShapeNoun } from '../engine/shapes';
 import { isNumeralName } from '../engine/names';
 import { stripFormatControls } from '../../shell/bidi';
+import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { areaNotation } from '../engine/lengths';
 
 /**
@@ -67,7 +68,8 @@ export function orthography(raw: string): string {
     .replace(/(?<![א-ת])מונח(ת|ים|ות)?(?![א-ת])/g, (_m, s: string | undefined) => `נמצא${s ?? ''}`)
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/^.*$/, (t) => wordDegrees(t).trim());
+    // «AB ו- BC», «ו -BC», «ו - BC» are «ו-BC» — the shared fold every builder's boundary calls (#1691, ADR-AG-239).
+    .replace(/^.*$/, (t) => wordDegrees(foldConjunctionSpacing(t)).trim());
 }
 
 /*

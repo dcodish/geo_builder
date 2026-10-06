@@ -994,6 +994,21 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'point-value-length-order-1701', family: 'lengths', steps: ['משולש ABC', 'AB < C'], expect: 'not-handled' },
   { id: 'radius-value-length-1701', family: 'lengths', steps: ['משולש ABC', 'AB = 1.6R'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'control — the radius R is the one capital a length value admits (2-D ADR-034)' },
   { id: 'area-label-capital-1701', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC = S'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'control — an area label is a capital in 2-D (parseAreaExpr)' },
+  // ── #1691 (ADR-AG-239): the spaced conjunction — «ו- X», «ו -X», «ו - X» read as «ו-X» in every builder (one shared fold) ──
+  { id: 'conj-space-tan-1691-01', family: 'tangents', steps: ['משולש ABC', 'מעגל O', 'AB ו- BC משיקים למעגל'], expect: 'builds', exception: 'X8', note: 'the prod sentence (#1691)' },
+  { id: 'conj-space-tan-1691-02', family: 'tangents', steps: ['משולש ABC', 'מעגל O', 'AB ו -BC משיקים למעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'conj-space-tan-1691-03', family: 'tangents', steps: ['משולש ABC', 'מעגל O', 'AB ו - BC משיקים למעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'conj-space-tan-1691-04', family: 'tangents', steps: ['משולש ABC', 'מעגל M משיק ל-AB ו- BC'], expect: 'builds', exception: 'X8', note: 'circle-first order — the same target reader' },
+  { id: 'conj-space-tan-1691-05', family: 'tangents', steps: ['מעגל O', 'AB ו- AD משיקים למעגל O בנקודות E ו - K'], expect: 'builds', exception: 'X8' },
+  { id: 'conj-space-tan-1691-06', family: 'tangents', steps: ['AB משיק משותף למעגלים O ו- P'], expect: 'builds', exception: 'X8' },
+  { id: 'conj-space-tan-1691-07', family: 'tangents', steps: ['מעגל O', 'מנקודה P יוצאים שני משיקים למעגל O, הנוגעים בו בנקודות A ו - B'], expect: 'builds', exception: 'X8' },
+  { id: 'conj-space-on-1691-08', family: 'points-incidence', steps: ['משולש ABC', 'הנקודות D ו- E על AB'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: '3-D reads no points-on list in either spelling' },
+  { id: 'conj-space-on-1691-09', family: 'points-incidence', steps: ['משולש ABC', 'הנקודות D ו -E על AB'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
+  { id: 'conj-space-on-1691-10', family: 'points-incidence', steps: ['משולש ABC', 'D ו - E על AB'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
+  { id: 'conj-space-perp-1691-11', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'הישרים AB ו - CD מאונכים'], expect: 'builds' },
+  { id: 'conj-space-par-1691-12', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'הישרים AB ו - CD מקבילים'], expect: 'builds' },
+  { id: 'conj-space-meet-1691-13', family: 'intersections', steps: ['מרובע ABCD', 'האלכסונים AC ו - BD נפגשים בנקודה E'], expect: 'builds' },
+  { id: 'conj-space-cut-1691-14', family: 'intersections', steps: ['מרובע ABCD', 'AC ו -BD נחתכים'], expect: 'builds' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
