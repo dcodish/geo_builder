@@ -49,7 +49,7 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
    */
   it('#1395 — session2d decides through decideDeterministic2D, the function runSubmit dispatches', () => {
     expect(triageSrc).toMatch(/import\s*\{\s*decideDeterministic2D\s*\}\s*from\s*'\.\.\/\.\.\/\.\.\/src\/app\/decideDeterministic\.ts'/);
-    const s2 = triageSrc.slice(triageSrc.indexOf('async function session2d'), triageSrc.indexOf('function session3d'));
+    const s2 = triageSrc.slice(triageSrc.indexOf('async function session2d'), triageSrc.indexOf('/* 3-D: #1692'));
     expect(s2, 'session2d must call the App decision').toContain('decideDeterministic2D(');
     expect(pipeSrc, 'runSubmit must dispatch the same decision').toContain('decidePreParse(');
     expect(pipeSrc, 'runSubmit must dispatch the same decision').toContain('decideFromParse(');
@@ -108,7 +108,7 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
 
   it('#182 — the 3-D sink logs what the 3-D session replay follows (the #84/#189 mirror, 3-D edition)', () => {
     // The 3-D app must log the LLM's committed canonical lines (`commands`) and its store actions, and
-    // session3d must FOLLOW them — else 3-D permanently stays the weaker instrument (28% of its sessions
+    // the 3-D replay must FOLLOW them — else 3-D permanently stays the weaker instrument (28% of its sessions
     // held an unfollowable llm-built step before #182). Same textual-guard discipline as the 2-D checks.
     const app3Src = readFileSync(path.join(root, 'src3d/App3.tsx'), 'utf8');
     const sink3Src = readFileSync(path.join(root, 'src3d/debug/sessionLog3.ts'), 'utf8');
@@ -118,26 +118,35 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
     }
     expect(sink3Src, 'the lean 3-D sink must forward `action` events').toContain("event.kind === 'action'");
     expect(sink3Src, 'the lean 3-D sink must forward llm `commands`').toContain("event.source === 'llm' && event.commands");
-    // session3d follows: clear/undo/redo via the history, llm steps via loggedCommands re-parsed with parse3.
-    const s3 = triageSrc.slice(triageSrc.indexOf('function session3d'));
-    for (const a of ['clear', 'undo', 'redo']) expect(s3, `session3d must follow '${a}'`).toContain(`e.action === '${a}'`);
-    expect(s3, 'session3d must follow the logged canonical lines').toContain('loggedCommands(e)');
+    // #1692: the replay lives in the product tree. It follows clear/undo/redo via its history, and llm
+    // steps through `decideSteps3` — the decision the store's `submitSteps` dispatches. Its behaviour is
+    // locked in src3d/__tests__/issue-1692-triage-replay3.test.ts; this pins only the wiring.
+    const r3Src = readFileSync(path.join(root, 'src3d/app/triageReplay3.ts'), 'utf8');
+    for (const a of ['clear', 'undo', 'redo']) expect(r3Src, `the 3-D replay must follow '${a}'`).toContain(`a === '${a}'`);
+    expect(r3Src, 'the 3-D replay must follow the logged canonical lines through the LLM lane decision').toContain('decideSteps3(');
   });
 
-  it('#243 — session3d mirrors App3\'s pre-LLM guidance register (ADR-3D-040, the 3-D twin of the PRE_LLM check)', () => {
-    // The 4th drift instance: commit 7280754 gave App3 a pre-LLM guidance register (classifyGuidance3)
-    // and the harness didn't follow — 8 of 15 carried-over 3-D "LIVE gaps" in the 2026-07-21 run were
-    // families the App answers on purpose. A register consulted by only one side is false signal.
+  it('#1692 — the 3-D replay CALLS the decision App3 dispatches; nothing re-implements it', () => {
+    // The 5th drift instance (after #35, #243, #829 and the #1395 2-D cut): #1666 put the proof-target
+    // refusal in the store, the hand mirror in triage.mjs called `parse3` directly, and «הוכיחו כי AB ⊥ AC»
+    // was listed as a LIVE 3-D gap. The pre-LLM lane — store decision, lowercase nudge, guidance register —
+    // is now ONE pure function, `decideDeterministic3`; App3 dispatches it and triageReplay3 calls it.
     const app3Src = readFileSync(path.join(root, 'src3d/App3.tsx'), 'utf8');
-    expect(app3Src, 'App3 must consult the guidance register before the LLM (#73)').toContain('classifyGuidance3(');
-    const s3 = triageSrc.slice(triageSrc.indexOf('function session3d'));
-    expect(s3, 'session3d must consult the guidance register on a failed parse (#243)').toContain('classifyGuidance3(');
-    expect(s3, "a guidance match must land in the 'guided' bucket, never 'not-handled'").toContain("now: 'guided'");
-    // #353: App3 also short-circuits on the lowercase-node CONVENTION nudge, whose trigger is a PREDICATE
-    // (not a scope category) and so is invisible to a register check — session3d must call it too, or those
-    // utterances keep being reported as LIVE gaps while the App answers them on purpose.
-    expect(app3Src, 'App3 must consult the lowercase-label nudge before the LLM (#353)').toContain('upperCasedLabelCandidate3(');
-    expect(s3, 'session3d must mirror the lowercase-label nudge (#353, ADR-346)').toContain('upperCasedLabelCandidate3(');
+    const r3Src = readFileSync(path.join(root, 'src3d/app/triageReplay3.ts'), 'utf8');
+    // (two halves, so this file never carries an import-shaped string the isolation scanner would read)
+    expect(triageSrc).toContain('import { replay3dSession }');
+    expect(triageSrc).toContain("/src3d/app/triageReplay3.ts';");
+    expect(triageSrc).toContain("session: (evs) => replay3dSession(evs, sessionBudgetMs)");
+    expect(r3Src).toContain('decideDeterministic3(');
+    expect(app3Src, 'App3 must dispatch the shared decision').toContain('decideDeterministic3(');
+    expect(app3Src).toContain('dispatchVerdict(v)');
+    for (const copy of ['parse3(', 'classifyGuidance3(', 'upperCasedLabelCandidate3(', 'derive3(']) {
+      expect(triageSrc, `triage.mjs re-implements part of the 3-D decision again (${copy}) — call replay3dSession`).not.toContain(copy);
+      expect(r3Src, `triageReplay3 re-implements part of the 3-D decision (${copy}) — call decideDeterministic3`).not.toContain(copy);
+    }
+    for (const copy of ['parse3(', 'classifyGuidance3(', 'upperCasedLabelCandidate3(']) {
+      expect(app3Src, `App3 decides part of the pre-LLM lane itself again (${copy}) — put it in decideDeterministic3`).not.toContain(copy);
+    }
   });
 
   it('all-time counts survive the incremental split (the ranking rule the operator kept)', () => {

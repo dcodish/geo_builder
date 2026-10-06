@@ -641,6 +641,15 @@ The three statement seams share their pieces: `readStatement3` (the grammar plus
 search), which the LLM lane's `submitSteps` also ends in. A new branch belongs in the decision; the parity
 lock replays 1,500 sequences against the recorded behaviour.
 
+**The App's pre-LLM lane is one function too (#1692, [ADR-3D-305](06b-decisions-3d.md#adr-3d-305)).**
+`src3d/app/decideDeterministic3` wraps `decideSubmit3` with the two registers App3 consults on
+`not-understood` — the #353 lowercase nudge, then the ADR-3D-040 guidance register — and returns either a
+`Verdict3` or `guided`. App3 dispatches it (`dispatchVerdict`, the store action `submit` is built on); the
+LLM lane's step decision is `decideSteps3`, which `submitSteps` dispatches. `/log-triage` replays a 3-D
+session through `src3d/app/triageReplay3` — it CALLS both functions, so a new step in the App's decision
+reaches the triage report the day it is written. `refusalCategory3` sorts a refused verdict into guided /
+clarify / refused for that report, as a Record over every store-level refusal code.
+
 ## A point placement keeps its tail (#1730, [ADR-3D-296](06b-decisions-3d.md#adr-3d-296))
 
 `onSegment` («X על YZ») is anchored: after the carrier comes nothing, a distance tail («במרחק 3 מ-A»), or

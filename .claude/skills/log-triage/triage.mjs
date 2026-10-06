@@ -74,9 +74,7 @@ import path from 'node:path';
 // here (PRE_LLM, the gate list, the seam guards, the auto-bind loop) drifted five times (ADR-346).
 import { decideDeterministic2D } from '../../../src/app/decideDeterministic.ts';
 import { replay, nameCentreFacts, renameFacts } from '../../../src/store/geoStore.ts';
-import { parse3 } from '../../../src3d/parser/parse3.ts';
-import { classifyGuidance3, upperCasedLabelCandidate3 } from '../../../src3d/parser/scope3.ts';
-import { derive3 } from '../../../src3d/store/store3.ts';
+import { replay3dSession } from '../../../src3d/app/triageReplay3.ts';
 // #1362 — analytic: the dashboard's OWN classifier (one taxonomy, the operator's 2026-09-24 ruling) and the
 // product's own replay, which calls the App's `decideSubmit` rather than mirroring it.
 import { outcomeOfAnalytic } from '../../../server/admin.ts';
@@ -134,7 +132,7 @@ function outcome3D(e) {
  */
 const ADAPTERS = {
   '2d': { name: 'Geo Builder (2-D)', classify: outcome2D, session: async (evs) => session2d(evs) },
-  '3d': { name: 'Space Builder (3-D)', classify: outcome3D, session: (evs) => session3d(evs) },
+  '3d': { name: 'Space Builder (3-D)', classify: outcome3D, session: (evs) => replay3dSession(evs, sessionBudgetMs) },
   analytic: { name: 'Analytic Builder', classify: outcomeOfAnalytic, session: (evs) => replayAnalyticSession(evs, sessionBudgetMs) },
 };
 const classify = (a, e) => ADAPTERS[a].classify(e);
@@ -347,84 +345,11 @@ async function session2d(evs) {
   return out;
 }
 
-/** One 3-D session. `parse3` is context-free BY DESIGN (it takes no ParseContext — App3 mirrors that), so
- *  only the BUILD needs the session prefix: the `unknown-point` refusals are prefix artifacts, not gaps.
- *  Since #182 the 3-D sink logs `action` lines + the LLM's committed canonical LINES (`commands`), so this
- *  replay FOLLOWS clear/undo/redo and llm-built steps exactly like `session2d` — degradation is reserved
- *  for what we genuinely cannot reproduce (delete / show-another / load, pre-#182 llm steps). */
-function session3d(evs) {
-  const out = [];
-  let facts = [];
-  let degraded = false;
-  const history = [];
-  let future = [];
-  const advance = (next) => { history.push(facts); future = []; facts = next; };
-  const t0 = Date.now();
-  for (const e of evs) {
-    if (e.ev === 'action') {
-      if (e.action === 'clear') { advance([]); out.push({ now: 'skip', detail: 'action:clear', degraded }); continue; }
-      if (e.action === 'undo') {
-        if (history.length) { future.push(facts); facts = history.pop(); out.push({ now: 'skip', detail: 'action:undo', degraded }); }
-        else { degraded = true; out.push({ now: 'skip', detail: 'action:undo (past tracked history)', degraded }); }
-        continue;
-      }
-      if (e.action === 'redo') {
-        if (future.length) { history.push(facts); facts = future.pop(); out.push({ now: 'skip', detail: 'action:redo', degraded }); }
-        else { degraded = true; out.push({ now: 'skip', detail: 'action:redo (past tracked history)', degraded }); }
-        continue;
-      }
-      degraded = true; out.push({ now: 'skip', detail: `action:${e.action}`, degraded }); continue;
-    }
-    const u = norm(e.utterance);
-    if (!u) { out.push({ now: 'skip', detail: '', degraded }); continue; }
-    if (Date.now() - t0 > sessionBudgetMs) { out.push({ now: 'unverified', detail: 'session budget', degraded: true }); continue; }
-    let res;
-    try {
-      const r = parse3(u);
-      if (!r.ok) {
-        // #243 mirror: App3 consults the ADR-3D-040 guidance register BEFORE the LLM escalation
-        // (App3.tsx#onSubmit) — a guided family is a deliberate answer, never a grammar gap.
-        // #353: the lowercase-node CONVENTION nudge is consulted first, exactly as App3 orders it —
-        // proof-based (the upper-cased candidate must actually parse), so a real gap stays a real gap.
-        const upper3 = upperCasedLabelCandidate3(u);
-        const g = classifyGuidance3(u);
-        res =
-          upper3 && parse3(upper3).ok ? { now: 'guided', detail: 'scope:lowercase-labels' }
-          : g ? { now: 'guided', detail: `scope:${g.category}` }
-          : { now: 'not-handled', detail: r.reason };
-      } else {
-        const id = `f${facts.length}`;
-        const next = [...facts, { id, utterance: u, cmds: r.commands, enabled: true }];
-        const d = derive3(next, 0);
-        const st = d.status[id];
-        if (st && st !== 'ok' && st !== 'disabled') res = { now: 'refused', detail: (typeof st === 'string' ? st : st.code ?? JSON.stringify(st)).slice(0, 60) };
-        else if (d.positions.size === 0) res = { now: 'built-nothing', detail: r.commands.map((c) => c.type).join(',') };
-        else { res = { now: 'built', detail: r.commands.map((c) => c.type).join(',') }; advance(next); }
-      }
-    } catch (err) { res = { now: 'error', detail: String(err?.message ?? err).slice(0, 70) }; }
-    out.push({ ...res, degraded });
-    if (res.now === 'built' || res.now === 'skip') continue;
-    // Our grammar didn't land this step — follow what the LLM actually committed (#182: the canonical
-    // LINES, re-parsed through parse3 so parser drift is caught, the scenarios' mocked-LLM form). The
-    // verdict above still reports OUR coverage honestly; only the prefix stays faithful.
-    const lines = loggedCommands(e);
-    if (!lines || !lines.every((l) => typeof l === 'string')) { degraded = true; continue; }
-    try {
-      let next = facts;
-      let ok = true;
-      for (const line of lines) {
-        const lr = parse3(norm(line));
-        if (!lr.ok) { ok = false; break; }
-        next = [...next, { id: `L${next.length}`, utterance: line, cmds: lr.commands, enabled: true }];
-      }
-      const d = ok ? derive3(next, 0) : null;
-      const bad = d && Object.entries(d.status).find(([, v]) => v !== 'ok' && v !== 'disabled');
-      if (!ok || bad) degraded = true; // the logged lines don't replay cleanly here — don't pretend they did
-      else advance(next);
-    } catch { degraded = true; }
-  }
-  return out;
-}
+/* 3-D: #1692 (ADR-3D-305) — there is no 3-D replay in this file any more. `session3d` used to copy App3's
+ * decision by hand (`parse3`, then the guidance register and the lowercase nudge) and so missed every
+ * step that lives in the store: #1666's proof-target refusal read as a LIVE gap, #866's one-angle repair
+ * as `not-handled`. The product tree now owns its replay — `src3d/app/triageReplay3.ts`, which CALLS
+ * `decideDeterministic3`, the function App3 dispatches — the shape analytic already had (#1362). */
 
 /** Replay every session of an app; return normalized-utterance → the outcomes it got across sessions.
  *  Sessions are re-replayed only when NEW, GROWN, or holding a still-open row (ADR-346 Am. 2). */

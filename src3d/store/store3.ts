@@ -936,6 +936,10 @@ export interface Geo3State {
    */
   lastNotice: { code: 'already-stated'; utterance: string } | null;
   submit: (utterance: string) => void;
+  /** #1692 (ADR-3D-305): DISPATCH a verdict already decided by `decideSubmit3` (or by the App's
+   *  `decideDeterministic3`, which wraps it). `submit` is exactly `dispatchVerdict(decideSubmit3(...))`; the App
+   *  asks the decision itself, so its pre-LLM registers sit in ONE pure function the triage replay can call. */
+  dispatchVerdict: (v: Verdict3) => void;
   /** Add ONE fact from LLM-normalised canonical lines (each re-parsed deterministically; all-or-nothing). */
   submitSteps: (utterance: string, steps: string[]) => void;
   toggle: (factId: string) => void;
@@ -1178,6 +1182,32 @@ export function decideCommands3(
   return { kind: 'record', fact, facts: candidate, seed: found };
 }
 
+/**
+ * The LLM lane's decision (#1692, ADR-3D-305): the model's canonical lines, each re-parsed by the tested
+ * grammar (one line the parser cannot read refuses the whole step), then the SAME gates and candidate
+ * derive as the deterministic lane ({@link decideCommands3}) — without the twin rule and without the
+ * configuration search, exactly as `submitSteps` always has. HONESTY GATES on this seam (docs/24 S2.3 —
+ * the 2-D ADR-240/ADR-250 line): the decomposition must account for every NEW label and every stated
+ * magnitude of the student's ORIGINAL utterance, or the commit refuses NAMING what was lost. Pure, so the
+ * log-triage replay follows a logged LLM step through this function instead of a copy of it.
+ */
+export function decideSteps3(
+  st: { facts: Fact3[]; seed: number },
+  rawUtterance: string,
+  steps: readonly string[],
+  newId: () => string = () => nanoid(8),
+): Verdict3 {
+  const utterance = ingestTypedText(rawUtterance); // #751 (ADR-W-029)
+  const all: Command3[] = [];
+  for (const step of steps) {
+    const p = parse3(step);
+    if (!p.ok) return { kind: 'not-understood' }; // an LLM step the parser can't read — refuse whole
+    all.push(...p.commands);
+  }
+  if (all.length === 0) return { kind: 'not-understood' };
+  return decideCommands3(st, utterance, all, { twins: false, seedSearch: false }, newId);
+}
+
 export const useGeo3 = create<Geo3State>()(
   temporal(
     (set, get) => ({
@@ -1193,7 +1223,10 @@ export const useGeo3 = create<Geo3State>()(
 
       submit: (utterance) => {
         // #1394: DECIDED, then dispatched — every branch lives in `decideSubmit3`, pure over the state.
-        const v = decideSubmit3(get(), utterance);
+        get().dispatchVerdict(decideSubmit3(get(), utterance));
+      },
+
+      dispatchVerdict: (v) => {
         switch (v.kind) {
           case 'rename':
             get().rename(v.from, v.to);
@@ -1217,31 +1250,9 @@ export const useGeo3 = create<Geo3State>()(
       },
 
       submitSteps: (utterance, steps) => {
-        utterance = ingestTypedText(utterance); // #751 (ADR-W-029)
-        const all: Command3[] = [];
-        for (const step of steps) {
-          const p = parse3(step);
-          if (!p.ok) {
-            set({ lastError: { code: 'not-understood' } }); // an LLM step the parser can't read — refuse whole
-            return;
-          }
-          all.push(...p.commands);
-        }
-        if (all.length === 0) {
-          set({ lastError: { code: 'not-understood' } });
-          return;
-        }
-        // HONESTY GATES on the LLM seam (docs/24 S2.3 — the 2-D ADR-240/ADR-250 line, copied per
-        // docs/20 §12): the decomposition must account for every NEW label and every stated magnitude
-        // of the student's ORIGINAL utterance, or the commit refuses NAMING what was lost — a
-        // silently-partial figure must never sit on the canvas with a green row. #1394: the SAME gate
-        // list and candidate derive as the deterministic lane (`decideCommands3`), not a copy of it.
-        const v = decideCommands3(get(), utterance, all, { twins: false, seedSearch: false });
-        if (v.kind === 'refused') {
-          set({ lastError: v.error });
-          return;
-        }
-        if (v.kind === 'record') set({ facts: v.facts, lastError: null, lastNotice: null });
+        // #1692: decided by `decideSteps3` (pure — the triage replay follows an LLM step through the same
+        // function), then dispatched like every other verdict.
+        get().dispatchVerdict(decideSteps3(get(), utterance, steps));
       },
 
       toggle: (factId) => {
