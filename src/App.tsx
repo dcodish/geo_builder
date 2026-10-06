@@ -30,7 +30,7 @@ import { ToolButton } from '../shell/frame/ToolButton';
 // #1376: the row's ORDER is a shared contract — a product supplies actions by id, never by position.
 import { orderToolActions } from '../shell/frame/toolRow';
 import registry from '../products.json';
-import { cyclableVariant, firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, unstatedChoices } from '@/engine';
+import { freeDofs, freeDofCount, isGeoPoint, unstatedChoices } from '@/engine';
 import { viewDeltaOf } from '@/store/geoStore';
 import type { ViewDelta, ViewDeltaItem } from '@/store/geoStore';
 import { unstatedChoiceText } from '@/ui/unstatedChoice';
@@ -53,7 +53,7 @@ import { btn, card as themeCard, fs, sectionTitle } from '@/ui/theme';
 // #743: the under-canvas row's ONE look — the style contract lives in shell (seeded from this
 // tree's own btn.accent/btn.subtle, which the operator praised); every builder's row consumes it.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
-import { cyclableSeat, factsWaitingForLetter, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
+import { configurationAxes, factsWaitingForLetter, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, figureNameFromFileName, figureStateOf, namedFigureFileName, serializeFigure } from '@/store/figureFile';
@@ -1010,16 +1010,11 @@ export default function App() {
     void detectShapes().finally(() => setDetecting(false));
   }, [discoveryLevel, shapesLayer, detecting, facts, detectShapes]);
 
-  // The first point with an unshown discrete solution to step to — circle∩circle, line∩circle,
-  // arc-midpoint, or a driven on-segment point (the kinds `cycleAlt` can step). A two-circle figure
-  // has BOTH crossings on screen (A=branch 0, B=branch 1), so cycling would only collide them —
-  // `firstCyclableBranch` excludes it and "show another configuration" resamples the circles
-  // instead. With no cyclable branch, it re-samples the free DOFs. (Single source of truth, ADR-043.)
-  const branchId = firstCyclableBranch(construction);
-  // Any cyclable VARIANT — a kite/isosceles equal-pair (ADR-138), an inscribed seating, a sine's two roots
-  // (#1711, ADR-573) — so "show another configuration" offers it even when the figure is otherwise
-  // determined (SSA: «AB = 4», «AC = 3», «sin∢ACB = 3/4»). The search's OWN predicate, never restated.
-  const hasVariant = facts.some((f) => f.enabled && cyclableVariant(f.cmd));
+  // #1600 (ADR-593): every unstated DISCRETE choice the button can step — every cyclable branch point (a
+  // two-circle figure with BOTH crossings on screen has none: cycling would only collide them, so the button
+  // resamples the circles instead), a composition side, every variant, the unpinned right-angle seat — from
+  // the ONE registry the search, the pool and the rescue tier call. Never restated here (ADR-043, ADR-481).
+  const hasChoice = useMemo(() => configurationAxes(facts, construction).length > 0, [facts, construction]);
   // #786 (ADR-460 Am. 3, play amendment 2026-09-13): the one-fact-per-line ADVISORY is a property of the
   // committed STEP — the line packed two independent constructs — so it lives on the step's row, derived on
   // every render from the step's own utterance (the same discriminator the seam uses), not only as the
@@ -1032,7 +1027,7 @@ export default function App() {
   // #973 (ADR-502): the choices the tool is making for an UNSTATED given — which pair is equal, which
   // side a free endpoint rides, which pair a trapezoid assumed parallel — SAID for as long as the student
   // has not stated them (operator ruling 2026-09-11: persistent, never a one-shot). Derived from the fact
-  // list on every render exactly like `hasVariant` above, so the note appears with the fact, follows
+  // list on every render exactly like `hasChoice` above, so the note appears with the fact, follows
   // «הציגו תצורה אחרת» (the drawn pair is read from the active variant), and vanishes when a later fact
   // pins the choice or the fact is disabled or removed. Nothing stored; nothing can go stale. A fact whose
   // row is broken draws nothing, so it names no choice either.
@@ -1427,12 +1422,10 @@ export default function App() {
         {(
           <div style={figureActions}>
             {(() => {
-              // #569 (ADR-481): the SEAT counts. Without it the button stayed disabled on a
-              // DETERMINED right-triangle figure — exactly where the seat is the only choice left —
-              // so the dimension `searchAnotherView` had just learned was unreachable by the student.
-              // `cyclableSeat` is the search's OWN predicate, imported rather than restated.
-              const canCycle =
-                facts.length > 0 && (branchId || hasVariant || freeDofs(construction).length > 0 || !!cyclableSeat(facts));
+              // #569 (ADR-481) → #1600 (ADR-593): any registered choice counts — on a DETERMINED figure the
+              // seat, a crossing or a composition side may be the only choice left, and a button that
+              // stays disabled there makes the dimension the search just learned unreachable.
+              const canCycle = facts.length > 0 && (hasChoice || freeDofs(construction).length > 0);
               return (
                 <button
                   type="button"

@@ -7,11 +7,11 @@
  * the Phase-1 gate needs.)
  */
 
-import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Polygon, SolveDirective, Vec } from './types';
-import { LEN_EPS, isGeoPoint, isOrderConstraint } from './types';
+import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Polygon, SideChoice, SolveDirective, Vec } from './types';
+import { LEN_EPS, edgeSideToward, isGeoPoint, isOrderConstraint } from './types';
 import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
 import { lower } from './lower';
-import { carrierParams, evaluate, evaluateTightened, resolveDriven, resolveDrivenMemo, drivenConstraintsOf, setCarrierVals } from './evaluate';
+import { carrierParams, crossingBranchCount, evaluate, evaluateTightened, resolveDriven, resolveDrivenMemo, drivenConstraintsOf, setCarrierVals } from './evaluate';
 import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist, isRingDiagonal, sub } from './geometry';
 import { budgetExceeded } from './solveBudget';
@@ -870,7 +870,7 @@ function commitDrawnFreeVertices(r: StepResult): StepResult {
 
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
-  return withRequirements(commitDrawnFreeVertices(applyStepLadder(prev, cmd)), prev, [cmd]);
+  return withSideChoices(withRequirements(commitDrawnFreeVertices(applyStepLadder(prev, cmd)), prev, [cmd]), prev);
 }
 
 function applyStepLadder(prev: Construction, cmd: Command): StepResult {
@@ -1004,9 +1004,11 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
     if (choice) {
       const token = choice.construction === next ? 'main:primary' : 'main:mirror';
       const newConsChoice = choice.construction.constraints.slice(prev.constraints.length);
+      // #1600 (ADR-593): a genuine side choice is recorded on the result (withSideChoices carries it forward).
+      const sided = (c: Construction): Construction => (choice.side ? { ...c, sideChoices: [choice.side] } : c);
       const owned = ensureOwnership(choice.construction, newConsChoice, choice.positions); // ADR-399
-      if (owned) return { ok: true, construction: owned.construction, positions: owned.positions, ladder: [token, 'main:own'] };
-      return { ok: true, construction: choice.construction, positions: choice.positions, ladder: [token] };
+      if (owned) return { ok: true, construction: sided(owned.construction), positions: owned.positions, ladder: [token, ...(choice.side ? ['main:side-choice'] : []), 'main:own'] };
+      return { ok: true, construction: sided(choice.construction), positions: choice.positions, ladder: [token, ...(choice.side ? ['main:side-choice'] : [])] };
     }
     // No coincidence-free placement. If a side merely STACKS (evaluates ok but two nodes coincide), this is
     // a default collision the composition can't dodge → keep prior with a clear message (ADR-123: avoid
@@ -1060,7 +1062,7 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
  * composition to mirror. A run of ONE is just `applyStep`, so nothing outside a multi-constraint macro moves.
  */
 export function applyCoupledStep(prev: Construction, cmds: Command[]): StepResult {
-  return withRequirements(commitDrawnFreeVertices(applyCoupledStepLadder(prev, cmds)), prev, cmds);
+  return withSideChoices(withRequirements(commitDrawnFreeVertices(applyCoupledStepLadder(prev, cmds)), prev, cmds), prev);
 }
 
 function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult {
@@ -1909,46 +1911,76 @@ function chooseComposition(
   defEval: EvalResult,
   mir: Construction,
   mirEval: EvalResult,
-): { construction: Construction; positions: Map<Id, Vec> } | null {
+): { construction: Construction; positions: Map<Id, Vec>; side?: SideChoice } | null {
   // A composition must not default two nodes onto each other — a placement that COINCIDES is not "clean"
   // even though `evaluate` now allows a coincidence (a constraint-DRIVEN one is fine, but a default-placement
   // one is avoidable: flip to the other side). So prefer a coincidence-free side; if neither is clean, this
   // composition can't avoid a collision → null (applyStep keeps prior). ([ADR-123](docs/06-decisions.md#adr-124).)
   const clean = (e: EvalResult): e is Extract<EvalResult, { ok: true }> => e.ok && !(e.coincidences && e.coincidences.length > 0);
   if (clean(defEval) && clean(mirEval)) {
-    const flip = preferMirror(prev, cmd, prevPos, defEval.positions);
-    return flip
-      ? { construction: mir, positions: mirEval.positions }
-      : { construction: def, positions: defEval.positions };
+    const { flip, choice } = preferMirror(prev, cmd, prevPos, defEval.positions);
+    // #1600 (ADR-593): when the side is a genuine CHOICE — both sides clean, and off-edge geometry makes them
+    // different figures — it is stored on the command (`edgeSide: 'toward'` takes the other clean side) and
+    // recorded on the construction, so the configuration search can step it. Absent ⇒ the away default, so
+    // every figure without the field is unchanged. A stacking side (only one clean) and a mirror-only
+    // composition (nothing off the edge — the two sides are congruent) record nothing: not a choice.
+    const toward = choice && edgeSideToward(cmd);
+    const take = toward ? !flip : flip;
+    const side: SideChoice | undefined = choice && 'ids' in cmd ? { type: cmd.type, ids: [...(cmd.ids as Id[])].sort(), toward } : undefined;
+    return take
+      ? { construction: mir, positions: mirEval.positions, ...(side ? { side } : {}) }
+      : { construction: def, positions: defEval.positions, ...(side ? { side } : {}) };
   }
   if (clean(defEval)) return { construction: def, positions: defEval.positions };
   if (clean(mirEval)) return { construction: mir, positions: mirEval.positions };
   return null;
 }
 
-/** True when the default placement lands on the same side of the base edge as the existing geometry (so flip). */
-function preferMirror(prev: Construction, cmd: Command, prevPos: Map<Id, Vec>, defPos: Map<Id, Vec>): boolean {
-  if (!('ids' in cmd)) return false;
+/**
+ * `flip`: the default placement lands on the same side of the base edge as the existing geometry (so flip).
+ * `choice` (#1600): the two sides are different figures — there IS off-edge geometry on one definite side
+ * for the new vertices to sit beside or away from.
+ */
+function preferMirror(prev: Construction, cmd: Command, prevPos: Map<Id, Vec>, defPos: Map<Id, Vec>): { flip: boolean; choice: boolean } {
+  const none = { flip: false, choice: false };
+  if (!('ids' in cmd)) return none;
   const anchors = (cmd.ids as Id[]).filter((id) => prev.objects.some((o) => o.id === id));
-  if (anchors.length !== 2) return false;
+  if (anchors.length !== 2) return none;
   const A = prevPos.get(anchors[0]);
   const B = prevPos.get(anchors[1]);
-  if (!A || !B) return false;
+  if (!A || !B) return none;
   const signed = (p: Vec) => (B.x - A.x) * (p.y - A.y) - (B.y - A.y) * (p.x - A.x); // side of edge AB
 
   const existing = prev.objects
     .filter(isGeoPoint)
     .map((o) => prevPos.get(o.id))
     .filter((p): p is Vec => !!p && Math.abs(signed(p)) > LEN_EPS); // off-edge only
-  if (existing.length === 0) return false; // nothing to avoid → keep default
+  if (existing.length === 0) return none; // nothing to avoid → keep default
 
   const prevIds = new Set(prev.objects.map((o) => o.id));
   const newPts = [...defPos].filter(([id]) => !prevIds.has(id)).map(([, p]) => p);
-  if (newPts.length === 0) return false;
+  if (newPts.length === 0) return none;
 
   const sideExisting = Math.sign(signed(centroid(existing)));
   const sideNew = Math.sign(signed(centroid(newPts)));
-  return sideNew !== 0 && sideNew === sideExisting;
+  return { flip: sideNew !== 0 && sideNew === sideExisting, choice: sideNew !== 0 && sideExisting !== 0 };
+}
+
+/**
+ * #1600 (ADR-593): a committed figure carries every side choice its compositions made. Stamped HERE, once, on
+ * every accepted result (the `withRequirements` discipline): the step that composed contributes its record,
+ * and every earlier record rides forward — the ladder's many rebuild paths construct fresh figures and need
+ * not know the field exists. A later record for the same command replaces the earlier one.
+ */
+function withSideChoices(r: StepResult, prev: Construction): StepResult {
+  if (!r.ok) return r;
+  const key = (s: SideChoice) => `${s.type}|${s.ids.join(',')}`;
+  const merged = new Map<string, SideChoice>();
+  for (const s of prev.sideChoices ?? []) merged.set(key(s), s);
+  for (const s of r.construction.sideChoices ?? []) merged.set(key(s), s);
+  if (!merged.size && !r.construction.sideChoices) return r;
+  const { sideChoices: _drop, ...rest } = r.construction;
+  return { ...r, construction: merged.size ? { ...rest, sideChoices: [...merged.values()] } : rest };
 }
 
 /** Apply a sequence expecting success; throws on unexpected failure (for fixtures/tests). */
@@ -2079,10 +2111,13 @@ export function branchCount(c: Construction, id: Id): number {
     const ts = solvedOnSegmentCandidates(o, e.positions);
     return ts === 'pending' ? 0 : ts.length;
   }
-  // A crossing pinned to "the OTHER one" (avoid) is determined — not cyclable (line∩circle or circle∩circle).
-  if ((o.kind === 'line-circle' || o.kind === 'circle-circle') && o.avoid) return 1;
-  // Both arcs have a midpoint; a line/another circle meets a circle in up to two points.
-  if (o.kind === 'arc-midpoint' || o.kind === 'line-circle' || o.kind === 'circle-circle') return 2;
+  // #1600 (ADR-593): a line∩circle / circle∩circle crossing counts the roots EVALUATE's own selection chooses
+  // among (`crossingChoice`) — 1 when "the OTHER one" (`avoid`) is meaningful or a single root is in-segment,
+  // else the roots `branch` steps. It used to answer 1 for every `avoid`, so a non-crossing `avoid` (ADR-470's
+  // ordinary branch pick) was a choice the drawing made and nothing could step or count.
+  if (o.kind === 'line-circle' || o.kind === 'circle-circle') return crossingBranchCount(c, e, id);
+  // Both arcs have a midpoint.
+  if (o.kind === 'arc-midpoint') return 2;
   return 0;
 }
 

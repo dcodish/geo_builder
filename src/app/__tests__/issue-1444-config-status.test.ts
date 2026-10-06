@@ -147,6 +147,24 @@ describe('#1444 — one representative per measured cause (ADR-556 sweep table)'
     const bases = new Set(sharedSamples(r.facts).samples.map((p) => d(p.get('B')!, p.get('C')!) / d(p.get('A')!, p.get('B')!)).map((x) => (x * 5).toFixed(3)));
     expect([...bases].sort()).toEqual(['6.000', '8.000']);
   }, 120_000);
+
+  // #1600 (ADR-593): the three causes ADR-556 left out as "a reachability gap … a follow-up".
+  it('#1600 a line–circle crossing whose `avoid` is off the circle: «יש 2 תצורות אפשריות»', async () => {
+    const r = await play(['משולש ABC', 'AB=4, BC=5, AC=6', 'מעגל A ברדיוס 4.5', 'הישר BC פוגש את מעגל A בנקודה E']);
+    expect(r.notes).toEqual([]);
+    expect(r.statusText).toBe(TWO_HE);
+  }, 120_000);
+
+  it('#1600 the side of a shape erected on an edge: «יש 2 תצורות אפשריות»', async () => {
+    const r = await play(['ריבוע ABCD', 'משולש שווה צלעות ABE']);
+    expect(r.notes).toEqual([]);
+    expect(r.statusText).toBe(TWO_HE);
+  }, 120_000);
+
+  it('#1600 two independent circle–circle crossings: «יש 4 תצורות אפשריות»', async () => {
+    const r = await play(['משולש ABC', 'AB=6, BC=5, AC=7', 'מעגל A ברדיוס 4', 'מעגל B ברדיוס 5', 'G חיתוך מעגל A ומעגל B', 'מעגל C ברדיוס 3', 'H חיתוך מעגל B ומעגל C']);
+    expect(r.status).toEqual({ key: 'actions.dofConfigs', n: 4 });
+  }, 120_000);
 });
 
 describe('#1444 — guards: no configuration note where there is one shape, or where DOF > 0', () => {

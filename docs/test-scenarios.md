@@ -1679,3 +1679,23 @@ over all four (ADR-041).
 ### `impossible-chord-refused-beside-unstated-right-angle-1671` — on a right triangle whose right angle was never placed, an impossible chord line is refused; a line one seat satisfies still commits (#1671, ADR-584)
 
 **Guards against:** a line that cannot hold at any right-angle position being added with red rows because the gate's seat sweep ran out of a 1.5 s clock. «משולש ישר זווית ABC · משולש ABC חסום במעגל · M אמצע AB · קטע DE · המיתר AM מקביל ל-DE» committed with three red rows; it is now refused naming |OM| = |OA|, while «קשת AB = קשת BC» (the right angle at B satisfies it) still commits. The sweep is bounded by a fixed amount of charged work, so the verdict is the same on every device; the submit-door matrix is in `src/app/__tests__/issue-1671-seat-sweep.test.ts`.
+
+### `line-circle-avoid-off-circle-two-configs-1600` — «הישר BC פוגש את מעגל A» with B off the circle has two figures, and the button reaches both (#1600, ADR-593)
+
+**Guards against:** a crossing marked "the other one" (`avoid`) when its reference point is not on the circle being counted as determined. The status read «✓ נקבע במלואו» and the values panel printed BE = 1.621 / CE = 6.621 as definite while the other crossing gives 2.621 / 2.379, and the button returned nothing. Asserts «יש 2 תצורות», BE/CE withheld, and the press reaching BE = 2.621.
+
+### `segment-secant-both-roots-two-configs-1600` — «BC חותך את מעגל A» with both crossings inside BC has two figures (#1600, ADR-593)
+
+**Guards against:** the same count/selection drift on the segment form: BE = 0.199 printed as definite (the other root gives 0.801). Asserts «יש 2 תצורות», BE withheld, both shapes reached.
+
+### `equilateral-on-square-side-two-sides-1600` — an equilateral triangle on a square's side can be drawn inside or outside (#1600, ADR-593)
+
+**Guards against:** the side of a shape built on an existing edge being recomputed and stored nowhere, so «הציגו תצורה אחרת» could never show the other side and the status claimed «נקבע במלואו». Asserts «יש 2 תצורות» and both sides reached.
+
+### `square-on-triangle-side-two-sides-1600` — a square erected on a fixed triangle's side has two sides (#1600, ADR-593)
+
+**Guards against:** the same, for a square («ריבוע ABDE» on AB of a sized triangle).
+
+### `two-independent-crossings-four-configs-1600` — two independent circle crossings: four figures, all reachable (#1600, ADR-593)
+
+**Guards against:** the button stepping only the first cyclable crossing while the status counted every one — «יש 4 תצורות» with a button that toggled between two for ever. Asserts the count 4 and four shapes reached.

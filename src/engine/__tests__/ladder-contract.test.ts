@@ -27,6 +27,25 @@ describe('ladder contract (docs/LADDER.md)', () => {
     expect(r.ladder).toEqual(['main:primary']);
   });
 
+  it('#1600 (ADR-593): a shape on an existing edge beside off-edge geometry records its side choice at 2c', () => {
+    const r = run([
+      { type: 'square', ids: ['A', 'B', 'C', 'D'] },
+      { type: 'triangle', ids: ['A', 'B', 'E'] },
+    ]);
+    expect(r.ok).toBe(true);
+    expect(r.ladder).toContain('main:side-choice');
+    expect(r.construction.sideChoices).toEqual([{ type: 'triangle', ids: ['A', 'B', 'E'], toward: false }]);
+    // the record rides forward on a later accept, and `edgeSide: 'toward'` takes the other clean side
+    const later = applyStep(r.construction, { type: 'segment', a: 'C', b: 'E' });
+    expect(later.construction.sideChoices).toEqual(r.construction.sideChoices);
+    const toward = run([
+      { type: 'square', ids: ['A', 'B', 'C', 'D'] },
+      { type: 'triangle', ids: ['A', 'B', 'E'], edgeSide: 'toward' } as Command,
+    ]);
+    expect(toward.construction.sideChoices?.[0].toward).toBe(true);
+    expect(toward.ladder?.[0], 'the default is the mirror (away); toward keeps the primary').not.toBe(r.ladder?.[0]);
+  });
+
   it('a structurally degenerate constraint refuses at the pre-gate', () => {
     const r = run([
       { type: 'triangle', ids: ['A', 'B', 'C'] },

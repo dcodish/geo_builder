@@ -1517,8 +1517,112 @@ export function otherCrossing(sols: Vec[], placed: Vec[], avoid: Vec | undefined
   // root (the operator's «AC חותכת את המעגל בנקודה D» with A outside: D was placed beyond C at t=1.9,
   // violating the A–D–C the same command asserts, and the order was then reported impossible).
   // Unmeaningful ⇒ fall through to the ordinary branch pick, exactly as an absent `avoid` does.
-  if (!avoid || !sols.some((s) => dist(s, avoid) < LEN_EPS)) return fresh[branch % fresh.length];
-  return fresh.reduce((far, s) => (dist(s, avoid) > dist(far, avoid) ? s : far), fresh[0]);
+  if (!avoidIsCrossing(sols, avoid)) return fresh[branch % fresh.length];
+  return fresh.reduce((far, s) => (dist(s, avoid!) > dist(far, avoid!) ? s : far), fresh[0]);
+}
+
+/** #830's precondition, named once (#1600): `avoid` determines the pick only when it IS one of the crossings. */
+export function avoidIsCrossing(sols: Vec[], avoid: Vec | undefined): boolean {
+  return !!avoid && sols.some((s) => dist(s, avoid) < LEN_EPS);
+}
+
+/**
+ * #1600 ([ADR-593](docs/06-decisions.md#adr-593)) — THE CHOICE a line∩circle / circle∩circle point makes: the
+ * roots it chooses among (`among`) and the one it picks (`pick`). `among.length` is how many configurations
+ * stepping `branch` can reach — 1 when the choice is DETERMINED (an `avoid` that is one of the crossings, a
+ * single in-segment root, a tangent), else the roots `branch` indexes. `tryEval` draws `pick`; `branchCount`
+ * counts `among`. One function, so the selection and the count can never drift apart again: ADR-470 (#830)
+ * taught the pick that a non-crossing `avoid` is an ordinary branch pick and left the count answering
+ * "determined" for every `avoid`, so «הציגו תצורה אחרת» and the status line never saw a choice the drawing made.
+ * Null when no fresh root remains (the caller reports the tangency).
+ */
+export function crossingChoice(
+  p: Extract<GeoPoint, { kind: 'line-circle' | 'circle-circle' }>,
+  sols: Vec[],
+  pos: Map<Id, Vec>,
+  line?: ResolvedLine,
+): { among: Vec[]; pick: Vec } | null {
+  const placed = [...pos.values()];
+  const fresh = (roots: Vec[]) => roots.filter((s) => !placed.some((q) => dist(s, q) < LEN_EPS));
+  // "The OTHER crossing" (`avoid` set): determined when `avoid` is a crossing, else the fresh roots by branch.
+  const avoided = (roots: Vec[]): { among: Vec[]; pick: Vec } | null => {
+    const at = pos.get(p.avoid!);
+    const kept = otherCrossing(roots, placed, at, p.branch);
+    if (!kept) return null;
+    return { among: at && avoidIsCrossing(roots, at) ? [kept] : fresh(roots), pick: kept };
+  };
+  if (p.kind === 'circle-circle') {
+    if (p.avoid) return avoided(sols);
+    return { among: sols, pick: sols[p.branch % sols.length] };
+  }
+  const l = line!;
+  // `onSegment` [a,b] (ADR-313 / issue #119): pick the crossing WITHIN the a–b segment as a stable
+  // SELECTION — the root whose parameter is in (0,1) along a→b. Used when one endpoint is inside the
+  // circle (the extreme case: the centre) so exactly one root is within; being scale-invariant, the pick
+  // can't flip to the far root when a later size given rescales the figure. A pure pick — no constraint,
+  // so it never contends with a sibling crossing on the same line (unlike the driving `order`).
+  if (p.onSegment) {
+    const a = pos.get(p.onSegment[0]);
+    const b = pos.get(p.onSegment[1]);
+    if (a && b) {
+      const d = sub(b, a);
+      const L2 = d.x * d.x + d.y * d.y;
+      if (L2 > 1e-18) {
+        const within = sols.filter((s) => {
+          const t = ((s.x - a.x) * d.x + (s.y - a.y) * d.y) / L2;
+          return t > 1e-6 && t < 1 - 1e-6;
+        });
+        if (within.length === 1) return { among: within, pick: within[0] };
+        if (within.length >= 2) {
+          // Two crossings both within the segment (a through-secant): tiebreak by `avoid`, else a stable side.
+          if (p.avoid) {
+            const kept = avoided(within);
+            if (kept) return kept;
+          }
+          const sided = bySide(within, l.anchor, l.dir);
+          return { among: sided, pick: sided[p.branch % within.length] };
+        }
+        // No root strictly within at this config — fall through to avoid/branch (safety; shouldn't
+        // happen for a centre-endpoint segment where a within crossing always exists).
+      }
+    }
+  }
+  // "The OTHER crossing" (`avoid` set): the secant runs through a KNOWN on-circle point (a line
+  // endpoint), so one root is that point — keep the genuinely new one (see {@link otherCrossing}).
+  if (p.avoid) return avoided(sols);
+  // No `avoid`: `branch` selects a stable geometric SIDE along the line's direction (R8), so cycling
+  // and re-evaluation pick the same physical crossing as the figure flexes (the raw root order flips).
+  const sided = bySide(sols, l.anchor, l.dir);
+  return { among: sided, pick: sided[p.branch % sols.length] };
+}
+
+/**
+ * #1600 (ADR-593): how many configurations stepping a crossing point's `branch` reaches in the evaluated
+ * figure `e` — {@link crossingChoice}'s `among`, judged against every OTHER placed point. 0 when the point
+ * or its carriers are unresolved.
+ */
+export function crossingBranchCount(c: Construction, e: EvalOk, id: Id): number {
+  const p = c.objects.find((o) => o.id === id);
+  if (!p || (p.kind !== 'line-circle' && p.kind !== 'circle-circle')) return 0;
+  const pos = new Map(e.positions);
+  pos.delete(id);
+  let sols: Vec[];
+  let line: ResolvedLine | undefined;
+  if (p.kind === 'circle-circle') {
+    const c1 = e.circles.get(p.circle1);
+    const c2 = e.circles.get(p.circle2);
+    if (!c1 || !c2) return 0;
+    sols = circleCircleIntersect(c1.center, c1.r, c2.center, c2.r);
+  } else {
+    const lo = c.objects.find((o): o is Line => o.id === p.line && o.kind === 'line');
+    const circ = e.circles.get(p.circle);
+    const l = lo ? resolveLine(lo, e.positions, e.circles) : null;
+    if (!circ || !l || typeof l === 'string') return 0;
+    line = l;
+    sols = lineCircleIntersect(l.anchor, l.dir, circ.center, circ.r);
+  }
+  if (!sols.length) return 0;
+  return crossingChoice(p, sols, pos, line)?.among.length ?? 0;
 }
 
 /** Resolve one point: a Vec, 'pending' (deps not ready yet), or an error string. */
@@ -1730,49 +1834,14 @@ function tryEval(
       if (!l || !c) return 'pending';
       const sols = lineCircleIntersect(l.anchor, l.dir, c.center, c.r);
       if (sols.length === 0) return `cannot construct ${p.id}: line ${p.line} does not meet circle ${p.circle}`;
-      // `onSegment` [a,b] (ADR-313 / issue #119): pick the crossing WITHIN the a–b segment as a stable
-      // SELECTION — the root whose parameter is in (0,1) along a→b. Used when one endpoint is inside the
-      // circle (the extreme case: the centre) so exactly one root is within; being scale-invariant, the pick
-      // can't flip to the far root when a later size given rescales the figure. A pure pick — no constraint,
-      // so it never contends with a sibling crossing on the same line (unlike the driving `order`).
-      if (p.onSegment) {
-        const a = pos.get(p.onSegment[0]);
-        const b = pos.get(p.onSegment[1]);
-        if (a && b) {
-          const d = sub(b, a);
-          const L2 = d.x * d.x + d.y * d.y;
-          if (L2 > 1e-18) {
-            const within = sols.filter((s) => {
-              const t = ((s.x - a.x) * d.x + (s.y - a.y) * d.y) / L2;
-              return t > 1e-6 && t < 1 - 1e-6;
-            });
-            if (within.length === 1) return within[0];
-            if (within.length >= 2) {
-              // Two crossings both within the segment (a through-secant): tiebreak by `avoid`, else a stable side.
-              if (p.avoid) {
-                const kept = otherCrossing(within, [...pos.values()], pos.get(p.avoid), p.branch);
-                if (kept) return kept;
-              }
-              return bySide(within, l.anchor, l.dir)[p.branch % within.length];
-            }
-            // No root strictly within at this config — fall through to avoid/branch (safety; shouldn't
-            // happen for a centre-endpoint segment where a within crossing always exists).
-          }
-        }
-      }
-      // "The OTHER crossing" (`avoid` set): the secant runs through a KNOWN on-circle point (a line
-      // endpoint), so one root is that point — keep the genuinely new one (see {@link otherCrossing}).
-      if (p.avoid) {
-        const kept = otherCrossing(sols, [...pos.values()], pos.get(p.avoid), p.branch);
-        if (kept) return kept;
-        // No NEW crossing: the line meets the circle ONLY at points already placed — it is tangent at
-        // `avoid` (touches just there), or both its named ends are on the circle (a chord). Report it
-        // clearly instead of collapsing the new point onto `avoid` (the tangent-extension crash).
-        return `cannot place ${p.id}: line ${p.line} is tangent to circle ${p.circle} at ${p.avoid} — it has no second crossing to extend onto`;
-      }
-      // No `avoid`: `branch` selects a stable geometric SIDE along the line's direction (R8), so cycling
-      // and re-evaluation pick the same physical crossing as the figure flexes (the raw root order flips).
-      return bySide(sols, l.anchor, l.dir)[p.branch % sols.length];
+      // The selection (in-segment root, "the OTHER crossing", or a stable side by `branch`) is ONE shared
+      // function with the branch count (#1600, ADR-593) — see {@link crossingChoice}.
+      const choice = crossingChoice(p, sols, pos, l);
+      if (choice) return choice.pick;
+      // No NEW crossing: the line meets the circle ONLY at points already placed — it is tangent at
+      // `avoid` (touches just there), or both its named ends are on the circle (a chord). Report it
+      // clearly instead of collapsing the new point onto `avoid` (the tangent-extension crash).
+      return `cannot place ${p.id}: line ${p.line} is tangent to circle ${p.circle} at ${p.avoid} — it has no second crossing to extend onto`;
     }
 
     case 'circle-circle': {
@@ -1782,13 +1851,11 @@ function tryEval(
       const sols = circleCircleIntersect(c1.center, c1.r, c2.center, c2.r);
       if (sols.length === 0) return `cannot construct ${p.id}: circles ${p.circle1} and ${p.circle2} do not meet`;
       // "The second intersection" (`avoid` set, the other crossing already placed): keep the root that
-      // isn't it — geometric, so it doesn't flip with branch order as the circles move (R8).
-      if (p.avoid) {
-        const kept = otherCrossing(sols, [...pos.values()], pos.get(p.avoid), p.branch);
-        if (kept) return kept;
-        return `cannot construct ${p.id}: circles ${p.circle1} and ${p.circle2} meet only at ${p.avoid} (they are tangent)`;
-      }
-      return sols[p.branch % sols.length];
+      // isn't it — geometric, so it doesn't flip with branch order as the circles move (R8). Shared with the
+      // branch count (#1600, ADR-593) — see {@link crossingChoice}.
+      const choice = crossingChoice(p, sols, pos);
+      if (choice) return choice.pick;
+      return `cannot construct ${p.id}: circles ${p.circle1} and ${p.circle2} meet only at ${p.avoid} (they are tangent)`;
     }
 
     case 'radial-toward': {

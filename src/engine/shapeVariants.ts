@@ -17,6 +17,7 @@
  */
 
 import type { AnyCommand, Command, Id, VariantShape } from './types';
+import { edgeSideToward } from './types';
 
 export type { VariantShape };
 
@@ -208,7 +209,9 @@ export function expandShapeVariant(
   const eqs: Command[] = all[chosen]
     .filter((pair) => !matchesAny(pair))
     .map(([a, b, c, d]) => ({ type: 'set-equal', a, b, c, d }) as Command);
-  return [baseCommand(cmd.shape, cmd.ids), ...eqs];
+  // #1600 (ADR-593): the stored composition side rides onto the base shape — the command that composes.
+  const base = baseCommand(cmd.shape, cmd.ids);
+  return [edgeSideToward(cmd) ? ({ ...base, edgeSide: 'toward' } as unknown as Command) : base, ...eqs];
 }
 
 /**

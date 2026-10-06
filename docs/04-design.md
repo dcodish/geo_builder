@@ -1052,8 +1052,9 @@ enabled cyclable variant fact, in fact order, at most four.
   variant step `v` advances the mixed-radix assignment by `v`, so successive presses reach every combination.
   It used to step only the first variant fact.
 
-The App's «הציגו תצורה אחרת» enablement reads `cyclableVariant` (the search's own predicate), so a figure the
-givens otherwise determine — the ambiguous case «AB = 4», «AC = 3», «sin∢ACB = 3/4» — still offers its choice.
+The App's «הציגו תצורה אחרת» enablement reads the registry (below), so a figure the givens otherwise determine
+— the ambiguous case «AB = 4», «AC = 3», «sin∢ACB = 3/4» — still offers its choice. (#1600 / ADR-593 folded
+`variantRescue` into `choiceRescue` and the variant odometer into the one over every axis — next section.)
 
 ## A variable statement waits for its letter ([ADR-562](06-decisions.md#adr-562))
 
@@ -1158,3 +1159,47 @@ step-5 failure is re-tested without retyping steps 1–4.
   the harness mirrors.
 - **Never shipped.** `main.tsx` mounts it inside an `import.meta.env.DEV` conditional, which the production
   build folds to `false`, dropping the lazy import and its chunk.
+
+## One registry of unstated discrete choices ([ADR-593](06-decisions.md#adr-593))
+
+An unstated discrete choice — which crossing, which side of an edge, which root, which vertex carries the right
+angle — is reachable by «הציגו תצורה אחרת», counted by the status line and judged by the values panel **only if
+it is registered** in `configurationAxes(facts, construction)` (`replay/core.ts`). Each axis is
+`{ kind, i, n, cur, set(cmd, digit) }`: the fact index that stores the choice, its count, its current digit and
+the rewrite. Kinds, in odometer order (first turns fastest):
+
+| Kind | Where it comes from | Stored as |
+|---|---|---|
+| `branch` | every `cyclableBranch` point, counted by `branchCount` | `branch` on the crossing's fact |
+| `side` | the construction's `sideChoices` (LADDER stage 2c) | `edgeSide: 'toward'` on the composing fact |
+| `variant` | `variantAxes` (ADR-573) | `variant` (via `withVariant`) |
+| `seat` | `cyclableSeat` (ADR-481) | `rot` on the right triangle |
+
+Consumers, each a caller and never a restatement:
+- **`searchAnotherView`** walks ONE odometer over the product of every axis from the current assignment —
+  step k advances the mixed-radix assignment by k, at most 63 steps per press — so successive presses reach
+  every combination. (It used to step only the FIRST cyclable branch, after an everything-advances candidate
+  that on a 2×2 space toggles between two of the four shapes.)
+- **`admissibleRewrites`** (the knowledge pool of a determined figure) enumerates every axis but `variant`
+  (variants are sampled as constructions of their own by `variantConfigs`); over `ADMISSIBLE_REWRITE_CAP` it
+  fails closed.
+- **`choiceRescue`** (`findValidConfig`'s tier after the seat, and `dryRunOutcome`'s curable test) tries the
+  other assignments of the `variant` and `side` axes, fewest changes first. The seat and the branch keep their
+  own tiers so tier order — and every default drawing — is unchanged.
+- **`App.tsx`** enables the button when any axis exists or the figure has free DOFs.
+
+**The crossing count is evaluate's own selection.** `crossingChoice` (`engine/evaluate.ts`) returns the roots a
+line∩circle / circle∩circle point chooses among and the one it picks; `tryEval` draws the pick and
+`crossingBranchCount` (behind `branchCount`) counts the roots. An `avoid` that is one of the crossings, a single
+in-segment root or a tangent is determined (1); an `avoid` that is not a crossing — the parser's fallback for
+«הישר BC פוגש את מעגל A» when neither endpoint is on the circle — is an ordinary branch pick (ADR-470), so 2.
+
+**The composition side is stored, not recomputed.** `chooseComposition` keeps the away-from-existing-geometry
+default; when both sides are clean and off-edge geometry on a definite side makes them different figures, it
+reads `edgeSide: 'toward'` (take the other clean side) and records a `SideChoice { type, ids, toward }` on the
+result, which `withSideChoices` carries forward on every accepted step (the `withRequirements` discipline). A
+stacking side and a mirror-only composition record nothing. The registry maps a record back to the fact whose
+lowering reaches the composing command with the side set (a direct shape, or a shape-variant's base shape —
+`expandShapeVariant` carries `edgeSide`). The field is optional: a saved figure without it loads and draws
+unchanged. A STATED side wins: the search offers the other side only through `meetsRequirements`, and a default
+the stated side contradicts is cured by `choiceRescue`'s side axis.

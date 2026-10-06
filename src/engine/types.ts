@@ -1013,6 +1013,28 @@ export interface Construction {
   constraints: Constraint[];
   /** Stated sides (#1470, ADR-549) — absent when none was stated, so every figure without one is unchanged. */
   requirements?: SideRequirement[];
+  /** #1600 (ADR-593): the shapes composed on an existing edge whose SIDE of that edge was a genuine choice
+   *  (LADDER stage 2c) — recorded by the step that made it, read by the configuration-axis registry. Absent
+   *  when no such composition exists. */
+  sideChoices?: SideChoice[];
+}
+
+/**
+ * #1600 ([ADR-593](../../docs/06-decisions.md#adr-593)) — ONE SIDE CHOICE: the composing command (`type`, its
+ * `ids` as a set) placed its new vertices on one side of the shared edge although the other side was clean
+ * too, and existing off-edge geometry made the two sides different figures. `toward` records which side is
+ * drawn: false is the textbook default (away from the existing geometry), true is the command's stored
+ * `edgeSide: 'toward'`. Never parser-emitted — like `branch` and `rot`, the configuration search sets it.
+ */
+export interface SideChoice {
+  type: string;
+  ids: Id[];
+  toward: boolean;
+}
+
+/** #1600 (ADR-593): the stored side a composing command asks for — `edgeSide: 'toward'` (solve-chosen, never parsed). */
+export function edgeSideToward(cmd: unknown): boolean {
+  return (cmd as { edgeSide?: unknown } | null)?.edgeSide === 'toward';
 }
 
 /** Commands the engine applies. The parser (Phase 4) will produce these. */
