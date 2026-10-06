@@ -7,7 +7,7 @@
  * fact in the naming line's own group, and {@link resolveBinds} applies it during replay through these
  * same cores. Deleting, muting, editing or undoing the line therefore takes the name with it.
  */
-import type { AnyCommand, Id } from '@/engine';
+import type { AnyCommand, Id, RoleSideBinding } from '@/engine';
 import { commandPointIds } from './core';
 import type { Fact } from './core';
 
@@ -33,6 +33,11 @@ export function renameInCommand(cmd: AnyCommand, from: Id, to: Id): AnyCommand {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(cmd)) {
     if (k === 'expr') out[k] = v; // a measure expr holds a variable/text, not point ids — never rewrite
+    // #1810 (ADR-596): a role binding names the triangle it was resolved against — a renamed vertex renames it too
+    else if (k === 'roleSide' && v && typeof v === 'object') {
+      const b = v as RoleSideBinding;
+      out[k] = { ...b, ring: b.ring.map((e) => relabelId(e, from, to)), at: relabelId(b.at, from, to) };
+    }
     else if (typeof v === 'string') out[k] = relabelId(v, from, to);
     else if (Array.isArray(v)) out[k] = v.map((e) => (typeof e === 'string' ? relabelId(e, from, to) : e));
     else out[k] = v;

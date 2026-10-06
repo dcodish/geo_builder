@@ -14943,3 +14943,48 @@ No gate accounted for a noun by its arity: `droppedShapeNoun` returned false as 
 - «טרפז ישר זווית חסום במעגל» is refused, naming the right trapezoid and the rectangle, instead of drawing a triangle.
 - «מלבן ABCD» · «ABCD חסום במעגל» draws instead of «already defined».
 - An adjective the tool cannot draw on that noun («מרובע ישר זווית חסום במעגל») now goes to the model instead of being dropped.
+
+## ADR-596 — A side named by its ROLE follows the configuration: the fact keeps the role, the fold resolves it (#1810)
+
+**Status:** accepted · 2026-10-06 · bug (P1, 2-D, honesty class) · branch `fix/1810-role-sides` · round #1831 · amends [ADR-465](#adr-465) (#775, #805's leg rotation)
+
+**Requirements:** [02-requirements.md](02-requirements.md) FR-ALT-7: a line drawn to «הבסיס» / «השוק» / «היתר» stays on that role's side in every configuration «הציגו תצורה אחרת» shows, and after a later statement that settles the apex or the right angle · **Design:** [04-design.md](04-design.md) § "A side named by its role follows the configuration" · **LADDER stage:** parse (`roleSideLine` attaches the binding) and the replay fold's per-fact apply (stage 2, before `attemptFact`). No solver change.
+
+**Cites** [ADR-052](#adr-052) (an unstated choice is a DOF the configuration cycles), [ADR-104](#adr-104) (the retry pass), [ADR-138](#adr-138) (the isosceles apex variant and its pin), [ADR-445](#adr-445) (the right-angle seat), [ADR-465](#adr-465) (the role resolver), [ADR-588](#adr-588) (the rename cores).
+
+**Context.** Operator ruling, 2026-10-06, while triaging #1807: *"תיכון לבסיס should be allowed and it should change with other configs."* Measured on b14d11d5 and re-measured on fa1d2492 through `parse → replay`, stepping the isosceles fact's `variant` the way `cycleVariant` does:
+
+| sequence | variant 0 (apex A) | variant 1 (apex B) | variant 2 (apex C) |
+|---|---|---|---|
+| «משולש שווה שוקיים ABC · תיכון לבסיס» | median to BC ✓ | to BC ✗ (a leg) | to BC ✗ (a leg) |
+| «… · גובה לבסיס» | foot on BC from A ✓ | the same ✗ | the same ✗ |
+| «… · גובה לשוק · גובה לשוק» | AB, AC ✓ | AB, AC ✗ (AC is the base) | AB, AC ✗ (AB is the base) |
+| «… · תיכון לשוק» | AB ✓ | AB ✓ | AB ✗ (the base) |
+| «… · תיכון לבסיס · AB = BC» | BC ✗ — `AB = BC` makes AC the base | | |
+
+The row kept reading «תיכון לבסיס» with a ✓ while the figure drew the median to a leg.
+
+**Class.** *A statement that names a side by its ROLE is resolved to letters once, at parse time, against the configuration showing then — so when the role's distinguished vertex (the isosceles apex, the right-angle vertex) moves, by «הציגו תצורה אחרת» or by a later statement that settles it, the line stays on the old letters.* `roleSideLine` (ADR-465) rewrote the utterance to the letter form and committed only the letters; the role was gone from the fact, so nothing later could re-resolve it. Members: «תיכון/גובה לבסיס», «תיכון/גובה לשוק» (and the #805 rotation of a repeated one), «תיכון/גובה ליתר» after a re-seated right angle, in both languages — every line `roleSideLine` serves.
+
+**Decision.**
+1. **The fact keeps the role.** `roleSideLine` still resolves the role to letters (a valid drawing at the configuration showing, and the figure the dry-run gate judges), but now stamps every command it returns with a `roleSide: { role, ring, at }` binding — the triangle's ring and the distinguished vertex the letters were resolved at. The binding rides on `AnyCommand` like `consumed`: the engine never reads it. **Letters the student typed stay literal** (the #1810 plan): when the sentence names any vertex of that triangle («AD גובה לבסיס», «גובה לשוק AC», «תיכון לבסיס BC»), no binding is attached.
+2. **One definition of the roles.** The role derivation moved from `buildParseCtx` into `src/engine/roleSides.ts` (`roleSidesOf`, unchanged semantics: declared structure only, never coordinates), now returning each role's ring and distinguished vertex. The parser context and the fold call the same function.
+3. **The fold resolves it.** `computeFold`'s per-fact apply (`boundCmdsOf`, both the in-order pass and the ADR-104 retry) runs `resolveRoleSide` against the construction in force — the one point where the role's triangle and the configuration being replayed are both known:
+   - the bound vertex still carries the role → the command is unchanged (stability: nothing moves when nothing changed);
+   - exactly one OTHER vertex carries it → the triangle's letters are **rotated** along the bound ring by the step between the two (letters outside the triangle — the new foot, the new midpoint — never move). A rotation, not a swap, because it is canonical: statements bound at different configurations that named the same side land on the same side again, whatever path the cycling took, so «גובה לשוק» twice keeps its two legs;
+   - several referents and none of them the bound one (an equilateral) → unchanged;
+   - **no vertex carries it here** → the fact waits (status `can't build yet: no base is declared in triangle ABC at this point`), and the ADR-104 retry lands it once the figure declares the role. This is the later-pin case: «AB = BC» pins the isosceles apex (ADR-138) and the variant leaves that pair to the later statement, so at the median's position no apex is declared yet; on the retry the apex is B and the median goes to AC.
+4. **Every reader of the fact reads it the same way.** The theorem context (`buildMatchCtx`) resolves role-bound facts against its construction, so a premise never quotes the side the line used to name. The rename core (`renameInCommand`) renames the binding's ring and vertex with the rest of the command.
+
+**Why not a `pick` index for the legs (the plan's step 3).** The rotation preserves the two-legs property structurally (a bijection on the ring maps two different legs to two different legs), and the parse-time rotation of #805 already picks the unoccupied leg at the configuration showing. A stored pick would be a second, parallel encoding of the same choice.
+
+**Measured after.** All five rows above are on the role's side at every variant (median and altitude, base and legs, Hebrew and English), every fact `ok`; A, B, C do not move when «תיכון לבסיס» is added, at any variant; «משולש ישר זווית ABC · תיכון ליתר · זווית BAC = 90» draws the median to BC; «משולש ABC · תיכון ליתר» still refuses naming the hypotenuse.
+
+**Locks.**
+- `src/parser/__tests__/issue-775.test.ts`, the `#1810` block: base median/altitude at every variant (Hebrew + English), legs ×2 at every variant, path independence (a second leg altitude typed after a press), stability, the later «AB = BC» pin, the hypotenuse after a re-seat, typed letters stay literal, rename, the theorem context.
+- Scenario `isosceles-base-median-follows-config-1810` (corpus-4): the operator's sequence at all three variants and over two presses of the button.
+- Parity row `isosceles-base-median-1810` (ADR-W-108): builds in 2-D; analytic is the known gap #1807 (the same contract, resolved per choice option there); 3-D does not read role nouns (the sibling hypotenuse rows' gap).
+
+**Sibling audit.** Every `ctx.roleSides` reader was checked. `withRoleClaims` (ADR-563) binds a role noun to a pair the student TYPED («הבסיס BC») and lowers it to the role's canonical constraint, which pins the variant (ADR-138) — it follows by construction, not a member. The semicircle-on-a-triangle reading (~5853) uses the hypotenuse only as a starting reading the decide layer overrides. Analytic owns the same contract as #1807 (open). 3-D has no role-noun grammar (parity row). **Not in this ADR:** a typed apex («AD גובה לבסיס») is literal by the plan's ruling, so after a press it can name a leg; whether such a sentence should instead PIN the variant is a separate question, filed as #1839.
+
+**Behaviour change for a student:** after «משולש שווה שוקיים ABC · תיכון לבסיס», each press of «הציגו תצורה אחרת» redraws the median from the new apex to the new base; «גובה לשוק» twice keeps its two altitudes on the two legs; and «תיכון לבסיס» followed by «AB = BC» draws the median to AC (the base the later statement made), not BC.

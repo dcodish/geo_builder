@@ -1168,6 +1168,23 @@ them. Diagonals go to the lettered meet rule (and the registry carries the claim
 bisectors are distributed through their own rule («AD תיכון»), all or nothing, and the point is the crossing of
 the first two named lines. The ⊥-bisector family names sides, not lines, and keeps the derived form.
 
+## A side named by its role follows the configuration ([ADR-596](06-decisions.md#adr-596))
+
+`roleSideLine` (ADR-465) resolves «הבסיס» / «השוק» / «היתר» to letters at the configuration showing and re-parses
+the letter form, but the commands it returns carry a `roleSide: { role, ring, at }` binding (an optional field
+on `AnyCommand`, like `consumed`; the engine ignores it). `ring` is the triangle, `at` its distinguished vertex
+at parse time — the apex for base and legs, the right-angle vertex for the hypotenuse. No binding is attached
+when the sentence names a vertex of that triangle: typed letters stay literal.
+
+The roles themselves have one definition, `roleSidesOf(construction)` in `src/engine/roleSides.ts` (declared
+structure only — the right-triangle perp-offset, a ⟂ / 90° constraint, an equal-sides constraint). The parser
+context reads it, and so does the replay fold: for a role-bound fact, `boundCmdsOf` passes every lowered
+command through `resolveRoleSide` against the construction in force at that fact's apply (in-order pass and
+ADR-104 retry alike). Same vertex → unchanged; one other vertex → the triangle letters ROTATE along the bound
+ring by the step between them (canonical, so the result is independent of the cycling path); several, none
+the bound one → unchanged; none → the fact waits for the figure that declares the role (a later «AB = BC»).
+The theorem context resolves the same way, and the rename core renames the binding.
+
 ## A point placement keeps its tail ([ADR-570](06-decisions.md#adr-570))
 
 The point-on-carrier rules (`pointOnExtension`, `pointOnSegment`) match a prefix and are not anchored, so whatever followed the carrier was never read. Three seams now carry the tail:
