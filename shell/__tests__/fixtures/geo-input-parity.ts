@@ -848,6 +848,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #1622 E3 + #1693 (ADR-AG-219): the circle sentences analytic now reads, and the #1688 naming by order ──
   { id: 'two-circles-named-by-order-1693', family: 'circles', steps: ['שני מעגלים נחתכים בנקודות A ו B', 'נקודה C על מעגל P', 'המשך CA חותך את מעגל O בנקודה D', 'המשך CB חותך את מעגל O בנקודה E'], expect: 'builds', exception: 'X8', note: 'two fresh interchangeable circles are named by order on first mention (#1688 ruling)' },
+  { id: 'chord-fresh-letter-names-drawn-circle-1694', family: 'circles', steps: ['שני מעגלים נחתכים בנקודות A ו-B', 'AD מיתר במעגל P'], expect: 'builds', exception: 'X8', note: 'P names the drawn circle A rides, never a third circle (#1694); analytic already names circle-pair1-1' },
   { id: 'two-circles-centres-by-order-1693', family: 'circles', steps: ['שני מעגלים נחתכים', 'O מרכז המעגל', 'P מרכז המעגל'], expect: 'builds', exception: 'X8', note: 'the first naming names one circle, the next the other (#1688 ruling)' },
   { id: 'two-circles-nested-1622', family: 'circles', steps: ['שני מעגלים מוכלים'], expect: 'builds', exception: 'X8' },
   { id: 'circle-by-area-1622', family: 'circles', steps: ['מעגל O ששטחו 9π'], expect: 'builds', exception: 'X8' },

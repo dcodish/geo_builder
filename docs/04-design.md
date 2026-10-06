@@ -1026,8 +1026,18 @@ Naming places a free point. `nameCentreFacts` absorbs a target letter that nothi
 bare `free-point` definition, is no shape's vertex, and is first used after the circle exists. Its bare
 `free-point` is dropped, and the centre takes the letter. `ctx.freePoints` exposes these points to
 `parseNameCenter`, the `nameCenter` rule and `impliedCircleBinding`. A radius sentence («OB רדיוס», «הרדיוס OB»)
-whose centre end is such a letter emits the ADR-347 implied circle (`radiusNamesCentre`). `circleOnDiameter` does
-the same for «AB קוטר במעגל O» when A and B already ride the unnamed circle.
+whose centre end is such a letter emits the ADR-347 implied circle (`radiusNamesCentre`).
+
+**A rule's own circle for a fresh letter is a naming candidate ([ADR-599](06-decisions.md#adr-596), #1694).** When a
+sentence names a point that already rides an unnamed circle (`namesUnnamedCircleMember`), the circle a rule introduces
+for the student's fresh letter carries `implied: 'by-member'`, beside the `implied: true` reference that
+`withImplicitCircles` mints. The rules are `resolveOrIntroduceCircle`'s named branch (chord, tangent at a point, secant
+and its other callers) and `circleOnDiameter` («AD קוטר במעגל P» with A on a drawn circle). `impliedCircleBinding`
+walks every candidate in sentence order. A by-member candidate binds only on a membership signal: one signalled circle
+binds; the crossing of two interchangeable circles names the first; circles a statement tells apart ask. It has no
+sole-unnamed-circle fallback, so with no signal the creation stands as the new circle the letter declares.
+`circleOnDiameter`'s candidate also states `set-collinear [A, X, B]`, so it is a diameter whether or not it binds. The
+unrelated #184 option «a construct noun presupposes its circle» is called `presupposes`.
 
 **A naming by use is a fact of its line ([ADR-588](06-decisions.md#adr-588), #1697).** The decision's binds (the
 circle naming, the #539 point naming, the step-aside) are committed as `name-by-use` facts at the head of the line's

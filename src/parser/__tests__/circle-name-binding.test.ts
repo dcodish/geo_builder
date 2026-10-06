@@ -12,11 +12,16 @@
  * existing point (a "circle centred X" creation) or nothing unnamed exists (the LLM decomposition
  * seam keeps its implicit creation).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('@/parser/llm', () => ({ llmParse: vi.fn(async () => ({ built: [], dropped: [] })) })); // never asked (standing rule 2)
 import { parse, impliedCircleBinding, buildParseCtx } from '@/parser';
 import { replay, nameCentreFacts } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
+import { decideDeterministic2D, type Verdict2D } from '@/app/decideDeterministic';
+import { commitVerdict } from '@/app/submitPipeline';
+import { useGeoStore } from '@/store/geoStore';
 
 const factsFrom = (steps: string[] | Fact[]): Fact[] => {
   if (steps.length && typeof steps[0] !== 'string') return steps as Fact[];
@@ -114,5 +119,110 @@ describe('#186 — implied circle tagging + the binding decision', () => {
     const cmds = parseOk('D על מעגל Q', facts);
     const bind = impliedCircleBinding(cmds, ctxOf(facts));
     expect(bind).toBeNull();
+  });
+});
+
+/**
+ * #1694 — a FRESH circle letter in a sentence that places an existing point on that circle names the drawn circle
+ * the point rides; it never mints a further circle through the student's points. The creation a rule makes for the
+ * letter (`resolveOrIntroduceCircle`, `circleOnDiameter`) is a `'by-member'` naming-by-use candidate, and
+ * `impliedCircleBinding` binds it ONLY on a membership signal. Through the real pre-LLM decision, each accepted line
+ * applied as the pipeline applies it, counting circles in the figure.
+ */
+describe('#1694 — a fresh letter in a chord/diameter sentence names the drawn circle its point rides', () => {
+  const st = () => useGeoStore.getState();
+  const OPEN = 'שני מעגלים נחתכים בנקודות A ו-B';
+  async function run(lines: string[]): Promise<Verdict2D[]> {
+    st().clear();
+    const out: Verdict2D[] = [];
+    for (const line of lines) {
+      const d = replay(st().facts, st().seed);
+      const v = await decideDeterministic2D({ facts: st().facts, seed: st().seed, view: { construction: d.construction, positions: d.positions } }, line, /[א-ת]/.test(line) ? 'he' : 'en');
+      if (v.kind === 'store-op') expect(v.op === 'name-centre' ? st().nameCentre(v.from, v.to) : st().rename(v.from, v.to)).toEqual({ ok: true });
+      else commitVerdict(v, line);
+      out.push(v);
+    }
+    return out;
+  }
+  const fig = () => replay(st().facts, st().seed);
+  const centres = () => (fig().construction.objects.filter((o) => o.kind === 'circle') as unknown as { center: string }[]).map((c) => c.center);
+  /** the circles a crossing point is structurally built from */
+  const crossingOf = (id: string) => {
+    const o = fig().construction.objects.find((x) => x.id === id) as unknown as { kind: string; circle1: string; circle2: string };
+    return o.kind === 'circle-circle' ? [o.circle1, o.circle2].sort() : [];
+  };
+  const green = (vs: Verdict2D[]) => {
+    vs.forEach((v, i) => expect(['commit', 'noop', 'store-op'], `line ${i + 1}: ${JSON.stringify(v).slice(0, 160)}`).toContain(v.kind));
+    expect(Object.values(fig().status).every((s) => s === 'ok')).toBe(true);
+  };
+
+  // the class: every rule family that introduces the letter, both locales
+  for (const [title, line, letter] of [
+    ['a chord', 'AD מיתר במעגל P', 'P'],
+    ['a chord, noun first', 'המיתר AD במעגל P', 'P'],
+    ['a diameter with a new end', 'AD קוטר במעגל P', 'P'],
+    ['a diameter through the other crossing', 'BD קוטר במעגל O', 'O'],
+    ['a chord between the two crossings', 'AB מיתר במעגל O', 'O'],
+    ['a tangent at a crossing', 'משיק למעגל P בנקודה A', 'P'],
+    ['English: a chord', 'chord AD in circle P', 'P'],
+    ['English: a diameter', 'AD is a diameter of circle P', 'P'],
+  ] as const) {
+    it(`${title} — «${line}» names one of the two drawn circles ${letter}; no third circle`, async () => {
+      green(await run([line.startsWith('chord') || line.startsWith('AD is') ? 'two circles intersecting at A and B' : OPEN, line]));
+      expect(centres(), 'still two circles').toHaveLength(2);
+      expect(centres(), `one of them is named ${letter}`).toContain(letter);
+      expect(crossingOf('A'), `A is a crossing of circle ${letter} itself`).toContain(`circle-${letter}`);
+    });
+  }
+
+  it('the operator\'s combined sentence names BOTH circles — O by its tangency, P by its chord', async () => {
+    green(await run([OPEN, 'AD מיתר במעגל P משיק למעגל O בנקודה A']));
+    expect(centres().sort()).toEqual(['O', 'P']);
+    expect(crossingOf('A')).toEqual(['circle-O', 'circle-P']);
+    expect(crossingOf('B')).toEqual(['circle-O', 'circle-P']);
+  });
+
+  it('one circle named, one not: «AD מיתר במעגל P» names the OTHER circle (A rides only that unnamed one)', async () => {
+    green(await run([OPEN, 'O מרכז המעגל', 'AD מיתר במעגל P']));
+    expect(centres().sort()).toEqual(['O', 'P']);
+  });
+
+  it('a diameter that names the circle is still a diameter: P lies on AD, midway', async () => {
+    green(await run([OPEN, 'AD קוטר במעגל P']));
+    const p = fig().positions;
+    const [A, D, P] = ['A', 'D', 'P'].map((id) => p.get(id)!);
+    expect(Math.hypot((A.x + D.x) / 2 - P.x, (A.y + D.y) / 2 - P.y), 'P is the midpoint of AD').toBeLessThan(1e-6);
+  });
+
+  it('circles a statement tells apart: the crossing A rides both, so «AD מיתר במעגל P» ASKS which circle', async () => {
+    const vs = await run([OPEN, 'C על המעגל הגדול', 'AD מיתר במעגל P']);
+    expect(vs[2]).toMatchObject({ kind: 'refuse', category: 'clarify', note: { key: 'input.unknownCircle' } });
+    expect(centres(), 'nothing minted').toHaveLength(2);
+  });
+
+  // must-not-change guards: no membership signal → the letter declares a NEW circle (ADR-565 decision 1)
+  it('«CD קוטר במעגל O» with new C, D beside the pair is still a NEW circle', async () => {
+    green(await run([OPEN, 'CD קוטר במעגל O']));
+    expect(centres(), 'the pair + the new circle on CD').toHaveLength(3);
+  });
+
+  it('«מעגל O» alone is still a new circle', async () => {
+    green(await run([OPEN, 'מעגל O']));
+    expect(centres()).toHaveLength(3);
+  });
+
+  it('«שני מעגלים משיקים מבחוץ» · «AB קוטר במעגל O» with A, B new is still a new circle (nothing rides the pair)', async () => {
+    green(await run(['שני מעגלים משיקים מבחוץ', 'AB קוטר במעגל O']));
+    expect(centres()).toHaveLength(3);
+  });
+
+  it('decision level: a by-member candidate with NO membership signal binds nothing (no sole-circle fallback)', () => {
+    const facts = factsFrom(['AB קוטר']); // ONE unnamed circle — the sole-circle fallback would have bound it
+    const candidate = (implied: true | 'by-member'): AnyCommand[] => [
+      { type: 'circle', id: 'circle-X', center: 'X', radius: 5, freeRadius: true, ifAbsent: true, implied },
+      { type: 'point-on-circle', id: 'Z', circle: 'circle-X' }, // Z is new: no signal
+    ];
+    expect(impliedCircleBinding(candidate('by-member'), ctxOf(facts))).toBeNull();
+    expect(impliedCircleBinding(candidate(true), ctxOf(facts)), 'a reference (`implied: true`) still binds the sole circle').toEqual({ from: expect.any(String), to: 'X' });
   });
 });
