@@ -364,7 +364,9 @@ describe('#1619 B2 — refusals keep their meaning', () => {
 
   it('a given the incircle rule cannot honour is refused BY NAME, never dropped', () => {
     expect(codes(['מעגל שרדיוסו 2 חסום במשולש ABC'])).toEqual([[0, 'out-of-scope']]);
-    expect(codes(['מעגל שמרכזו P חסום במרובע ABCD'])).toEqual([[0, 'out-of-scope']]);
+    // A quadrilateral's incircle centre was refused here only until #1554 built it (ADR-AG-194's "not built" list →
+    // ADR-AG-242: the derived `incircle-centre`); it now records — locked in issue-1554-quad-incircle.test.ts.
+    expect(codes(['מעגל שמרכזו P חסום במרובע ABCD'])).toEqual([]);
   });
 
   // Integration (ADR-AG-196): this was refused only because B2's lowering had no way to pull a side tangent to

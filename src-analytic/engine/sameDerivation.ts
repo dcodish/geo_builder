@@ -59,6 +59,8 @@ export function sameDerivation(a: DerivedRule, b: DerivedRule): boolean {
       return 'v' in b && b.v.length === 3 && sameSet(a.v, b.v);
     case 'diagonals':
       return b.t === 'diagonals' && sameRing(a.v, b.v);
+    case 'incircle-centre':
+      return b.t === 'incircle-centre' && sameRing(a.v, b.v);
     case 'circle-centre':
       return b.t === 'circle-centre' && a.curve === b.curve;
     case 'parabola-focus':

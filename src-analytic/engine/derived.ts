@@ -43,6 +43,13 @@ export type DerivedRule =
   /** `G מפגש האלכסונים במרובע ABCD` — AC ∩ BD. */
   | { t: 'diagonals'; v: [Id, Id, Id, Id] }
   /**
+   * «מעגל M חסום במרובע ABCD» — the centre of a QUADRILATERAL's incircle (#1554, ADR-AG-242): where the internal
+   * bisectors meet, through `incircleCentre`, the one closed form the computed incircle itself is drawn with — so the
+   * named centre and the circle cannot disagree. It exists because the sentence states the Pitot condition that makes
+   * the incircle exist; a triangle's centre is `incentre`, unchanged.
+   */
+  | { t: 'incircle-centre'; v: [Id, Id, Id, Id] }
+  /**
    * `מעגל O שמשוואתו …` — the point the student named as the circle`s CENTRE (#1059).
    *
    * Operator ruling, 2026-09-15: *"«מעגל O» means the center letter is O"*. So this is the one
@@ -108,6 +115,7 @@ export function parentsOf(r: DerivedRule): Id[] {
     case 'circumcentre':
       return [...r.v];
     case 'diagonals':
+    case 'incircle-centre':
       return [...r.v];
     // The side's two ends; the circle is its CURVE parent (`curveParentsOf`).
     case 'side-touch':
@@ -145,6 +153,8 @@ export function ruleLabel(r: DerivedRule): string {
       return `מפגש האנכים האמצעיים ${r.v.join('')}`;
     case 'diagonals':
       return `מפגש האלכסונים ${r.v.join('')}`;
+    case 'incircle-centre':
+      return `מרכז המעגל החסום ב-${r.v.join('')}`;
     case 'circle-centre':
       return 'מרכז המעגל';
     case 'parabola-focus':
@@ -449,6 +459,8 @@ export function evalRule(
       return circumcentre(p[0], p[1], p[2]);
     case 'diagonals':
       return diagonalMeet(p[0], p[1], p[2], p[3]);
+    case 'incircle-centre':
+      return incircleCentre(p);
     default: {
       const unevaluated: never = r;
       throw new Error(`derived rule has no evaluation: ${JSON.stringify(unevaluated)}`);
@@ -626,6 +638,9 @@ export function constructionOf(
     // The two diagonals whose crossing this is.
     case 'diagonals':
       return { lines: [{ a: p[0], b: p[2] }, { a: p[1], b: p[3] }], feet: [] };
+    // The four angle bisectors, each from its vertex to the centre where they meet.
+    case 'incircle-centre':
+      return { lines: p.map((v) => ({ a: v, b: self })), feet: [] };
 
     // A centre has no SCAFFOLDING: there are no auxiliary lines a student would draw to find it,
     // because reading it off the equation is the whole method. Its own mark is the answer.

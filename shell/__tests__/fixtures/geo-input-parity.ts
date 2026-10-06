@@ -499,7 +499,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-106', family: 'inscribed', steps: ['משולש ABC', 'נקודה E', 'נקודה D', 'המעגל החוסם את משולש ABC חותך את CE בנקודה D'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-107', family: 'inscribed', steps: ['משולש DEF חוסם את המעגל'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-108', family: 'inscribed', steps: ['מעגל חסום בטרפז ABCD'], expect: 'builds', exception: 'X8' },
-  { id: 'cat-2d-109', family: 'inscribed', steps: ['במרובע ABCD חסום מעגל O'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1554' }] },
+  { id: 'cat-2d-109', family: 'inscribed', steps: ['במרובע ABCD חסום מעגל O'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-110', family: 'inscribed', steps: ['מעגל חסום בדלתון ABCD'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-111', family: 'tangents', steps: ['המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-112', family: 'tangents', steps: ['מעגל O', 'AB ו-AD משיקים למעגל O בנקודות E ו-K'], expect: 'builds', exception: 'X8' },
@@ -1028,8 +1028,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'conj-space-cut-1691-14', family: 'intersections', steps: ['מרובע ABCD', 'AC ו -BD נחתכים'], expect: 'builds' },
 
   // ── #1790 (ADR-595): an inscription honours the shape's adjective — the noun decides the shape, the adjective refines it ──
-  // The unlettered right trapezoid: analytic refuses it once PR #1791 (ADR-AG-242, `unletteredInscribed`) lands — drop this knownGap then.
-  { id: 'right-trapezoid-unlettered-1790-01', family: 'inscribed', steps: ['טרפז ישר זווית חסום במעגל'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1554' }], note: 'operator ruling 2026-10-01 (#1554): refused naming both nouns; 2-D drew a triangle' },
+  { id: 'right-trapezoid-unlettered-1790-01', family: 'inscribed', steps: ['טרפז ישר זווית חסום במעגל'], expect: 'refused', exception: 'X8', note: 'operator ruling 2026-10-01 (#1554): refused naming both nouns; 2-D drew a triangle' },
   { id: 'incircle-right-triangle-1790-02', family: 'inscribed', steps: ['מעגל חסום במשולש ישר זווית ABC'], expect: 'builds', exception: 'X8', note: '2-D drew a generic triangle (the adjective dropped)' },
   { id: 'incircle-isosceles-trapezoid-1790-03', family: 'inscribed', steps: ['מעגל חסום בטרפז שווה שוקיים ABCD'], expect: 'builds', exception: 'X8' },
   { id: 'restated-ring-inscribed-1790-04', family: 'inscribed', steps: ['מלבן ABCD', 'ABCD חסום במעגל'], expect: 'builds', exception: 'X8', note: '2-D refused «poly-ABCD is already defined»: a generic restatement is a reference (M1 subsumption)' },
@@ -1039,6 +1038,24 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'teach-fraction-command-1611', family: 'lengths', steps: ['מקבילית ABCD', 'E על BC', 'F על AD', 'הפוך את BE ואת DF להיות 3/4 מצלע המקבילית'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1802' }, { product: '3d', issue: '#1802' }] },
   { id: 'teach-fraction-word-1611', family: 'lengths', steps: ['מקבילית ABCD', 'E על BC', 'BE = רבע BC'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1802' }, { product: '3d', issue: '#1802' }], note: 'teaches «BE = 1/4 BC»' },
   { id: 'teach-fraction-taught-1611', family: 'lengths', steps: ['מקבילית ABCD', 'E על BC', 'F על AD', 'BE = 1/4 BC, DF = 1/4 AD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1802' }], note: 'the taught line itself' },
+
+  // ── #1554 (ADR-AG-242): the quadrilateral's incircle on a named centre, the circle-subject side list, and the sentence with no letters — 2-D builds each ──
+  { id: 'incircle-centre-1554-01', family: 'inscribed', steps: ['מעגל M חסום במרובע ABCD'], expect: 'builds', exception: 'X8' },
+  { id: 'incircle-centre-1554-02', family: 'inscribed', steps: ['מעגל O חסום בטרפז ABCD'], expect: 'builds', exception: 'X8' },
+  { id: 'incircle-centre-1554-03', family: 'inscribed', steps: ['מעגל חסום במרובע ABCD שמרכזו O'], expect: 'builds', exception: 'X8' },
+  { id: 'incircle-centre-1554-04', family: 'inscribed', steps: ['במשולש ABC חסום מעגל O'], expect: 'builds', exception: 'X8' },
+  { id: 'side-list-1554-05', family: 'tangents', steps: ['מרובע ABCD', 'מעגל M משיק לצלעות AB, BC, CD ו-DA'], expect: 'builds', exception: 'X8' },
+  { id: 'side-list-1554-06', family: 'tangents', steps: ['מרובע ABCD', 'מעגל M משיק לצלעות AB, BC, CD, DA'], expect: 'builds', exception: 'X8' },
+  { id: 'side-list-1554-07', family: 'tangents', steps: ['משולש ABC', 'מעגל M משיק לצלעות AB, BC ו-CA'], expect: 'builds', exception: 'X8' },
+  { id: 'side-list-1554-08', family: 'tangents', steps: ['מרובע ABCD', 'מעגל M משיק לצלעות AB ו-BC'], expect: 'builds', exception: 'X8', note: 'two sides: a circle on M, not the incircle' },
+  { id: 'side-list-1554-09', family: 'tangents', steps: ['מרובע ABCD', 'מעגל O', 'המעגל משיק לצלעות AB, BC, CD ו-DA'], expect: 'builds', exception: 'X8' },
+  { id: 'side-list-1554-10', family: 'tangents', steps: ['מרובע ABCD', 'המעגל משיק לצלעות AB, BC, CD ו-DA'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#1677' }], note: 'no circle yet: analytic states it (ADR-AG-198 ruling b); 2-D does not read the plural with no circle' },
+  { id: 'unlettered-1554-11', family: 'inscribed', steps: ['מרובע חסום במעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'unlettered-1554-12', family: 'inscribed', steps: ['טרפז חסום במעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'unlettered-1554-13', family: 'inscribed', steps: ['משולש חסום במעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'unlettered-1554-14', family: 'inscribed', steps: ['מעגל חסום במרובע'], expect: 'builds', exception: 'X8' },
+  { id: 'unlettered-1554-15', family: 'inscribed', steps: ['מעגל חסום בדלתון'], expect: 'builds', exception: 'X8' },
+  { id: 'right-trapezoid-1554-16', family: 'inscribed', steps: ['טרפז ישר זווית ABCD חסום במעגל'], expect: 'refused', exception: 'X8', note: 'operator ruling 2026-10-01: a cyclic right trapezoid is a rectangle — refused naming both nouns' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

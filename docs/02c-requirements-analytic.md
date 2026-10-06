@@ -2115,9 +2115,27 @@ The diameter forms land: «AD הוא קוטר במעגל», «הצלע AC היא
 המעגל AC נמצא על הישר 3y − 2x − 4 = 0» — including a diameter between vertices the circle passes through by
 incidence. A sentence followed by its givens in parentheses is read as both.
 
-Refused by name, never dropped: a radius, an equation or a quadrilateral's centre on an incircle; a touch on a
-circle that cannot be made tangent (one given by its equation). «טרפז ישר זווית ABCD חסום במעגל» is never shown
-as a valid trapezoid; whether it is refused or drawn with a warning awaits a ruling (#1554 vs #1627).
+Refused by name, never dropped: a radius or an equation on an incircle; a touch on a circle that cannot be made
+tangent (one given by its equation). «טרפז ישר זווית ABCD חסום במעגל» is refused (R135, operator ruling
+2026-10-01).
+
+**R131 amendment — a quadrilateral's incircle on a named centre, the side list, and the sentence with no letters**
+([ADR-AG-242](06c-decisions-analytic.md#adr-ag-242), [#1554](https://github.com/dcodish/geo_builder/issues/1554); the
+2-D sibling builds each, ADR-W-108).
+- «במרובע ABCD חסום מעגל O», «מעגל M חסום במרובע ABCD», «מעגל חסום במרובע ABCD שמרכזו O», "circle O is inscribed in
+  quadrilateral ABCD" (and every quadrilateral noun): the named letter is the centre of the inscribed circle, which
+  touches all four sides in every configuration. «O מרכז המעגל» after «מעגל חסום במרובע ABCD» names the same point.
+  «במשולש ABC חסום מעגל O» names the triangle's incentre the same way.
+- «מעגל M משיק לצלעות AB, BC, CD ו-DA» (also with commas only, and "circle M is tangent to the sides AB, BC, CD and
+  DA") is the same statement as «מעגל M חסום במרובע ABCD» and draws the same figure. When the figure already has a
+  circle M, the sentence is about that circle: it becomes tangent to all four sides, and no second circle appears.
+  A list of only some of the sides («מעגל M משיק לצלעות AB ו-BC») draws a circle on M touching those sides.
+- «מרובע חסום במעגל», «טרפז חסום במעגל», «משולש חסום במעגל», «מעגל חסום במרובע», "a quadrilateral is inscribed in a
+  circle" — the sentence with no letters — is read as the lettered sentence: the tool names the vertices with the
+  next free letters (ABCD on an empty canvas), as the 2-D tool does. «טרפז ישר זווית חסום במעגל» is refused like the
+  lettered sentence. «המרובע חסום במעגל» (the definite noun) refers to a shape the figure has and is not this sentence.
+- Not yet: the same circle typed as four separate lines («מעגל M משיק לצלע AB» …) touches all four sides, but it
+  is a different drawing from the sentence's, not the same one.
 
 **R132 — a tangent at a named point, the tangent as an object, tangency to any circle, and chords**
 ([ADR-AG-195](06c-decisions-analytic.md#adr-ag-195), [#1619](https://github.com/dcodish/geo_builder/issues/1619) B3, [#1430](https://github.com/dcodish/geo_builder/issues/1430)).

@@ -660,8 +660,10 @@ function centreRuleOf(o: GeoObject): DerivedRule | null {
     if (o.def.t === 'through') return { t: 'circumcentre', v: [o.def.pts[0], o.def.pts[1], o.def.pts[2]] };
     if (o.def.t === 'diameter') return { t: 'midpoint', a: o.def.a, b: o.def.b };
     // The incircle (#1619 B2): a triangle's centre is the incentre (the same closed form `incircleCentre`
-    // uses); a quadrilateral's bisector meet has no derived rule, so its centre stays unnamed.
-    return o.def.pts.length === 3 ? { t: 'incentre', v: [o.def.pts[0], o.def.pts[1], o.def.pts[2]] } : null;
+    // uses); a quadrilateral's is the bisector meet `incircleCentre` draws the circle on (#1554, ADR-AG-242).
+    const v = o.def.pts;
+    if (v.length === 3) return { t: 'incentre', v: [v[0], v[1], v[2]] };
+    return v.length === 4 ? { t: 'incircle-centre', v: [v[0], v[1], v[2], v[3]] } : null;
   }
   return null;
 }
