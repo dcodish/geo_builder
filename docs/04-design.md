@@ -1116,7 +1116,7 @@ The point-on-carrier rules (`pointOnExtension`, `pointOnSegment`) match a prefix
 - **The end qualifier** — `pointOnExtension` reads «מעבר ל(-)(נקודה) X» / "beyond X": X the far end keeps the carrier; X the near end reverses it (E on the extension of CB); any other letter escalates the line whole.
 - **The net** — `droppedGivenRelations`'s exemption (b) holds only when the command that INTRODUCES one of the relation's labels itself carries every label of the relation (`K על המשך AB כך ש AB=BK` baked as t = 2). "Some label is introduced by any command" accounted «DE = DC» because E was introduced on BC. With the exemption narrowed, the parser's own clause fallback (ADR-264) reads «E על המשך BC ו-DE = DC» and «…, DE = DC», which consult the same gate, and every rule and the LLM lane are held to it.
 
-## A stated side is a requirement record, checked at stage 0g′ ([ADR-549](06-decisions.md#adr-549))
+## A stated side is a requirement record, checked at stage 0g′ and read wherever a point is placed ([ADR-549](06-decisions.md#adr-549), [ADR-594](06-decisions.md#adr-594))
 
 - **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`) — `circle-side`,
   `polygon-side`, `line-side`, and since [ADR-567](06-decisions.md#adr-567) (#1709) `circle-position`: two circles'
@@ -1143,6 +1143,14 @@ The point-on-carrier rules (`pointOnExtension`, `pointOnSegment`) match a prefix
   it, with the same margins as their inside tests.
 - **Parser.** `regionSideFallback` no longer declines a region's own vertex («A בתוך המשולש ABC»): it
   parses, and the prover refuses it with the reason, instead of «I didn't understand».
+- **Read wherever a point is placed ([ADR-594](06-decisions.md#adr-594), #1739).** The record is not only a
+  prover input: ONE definition, `sideShortfall(req, positions, circles, aim)` (`engine/requirements.ts`, 0 iff
+  `sideHolds`, the test `checkGivens` itself calls), is read by every stage that places a point — the 1-D
+  root pick (side-keeping roots first), a retry-only side steer as the last rung of both driven solvers, the
+  sampler's region seat (`seatStatedSides` in `applySeed`: circle, polygon and line sides, on a free point or
+  a free on-circle rider) and the knowledge pool (`sideSamples`). `FreePoint.region` (ADR-511) is retired —
+  the region rides the record, which survives every ladder rebuild, where the field vanished on an M1
+  conversion. So a satisfiable side holds in every configuration the tool offers, not only at lucky seeds.
 
 
 ## The dev step-through panel ([ADR-581](06-decisions.md#adr-581))

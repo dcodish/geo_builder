@@ -67,8 +67,9 @@ describe('#556 — the reported two-tangents figure', () => {
     const facts = factsOf(TWO_TANGENTS);
     const c = replay(facts, 0).construction;
     expect(applySeed(c, 0)).toBe(c);
-    const B = c.objects.find((o) => o.id === 'B') as FreePoint;
-    expect(B.region, 'the apex carries its declared region').toEqual([{ circle: 'circle-O2', side: 'outside' }]);
+    // #1739 (ADR-594): the region rides the construction's requirement record, not the point (FreePoint.region retired).
+    expect(c.requirements, 'the apex carries its declared side').toContainEqual({ kind: 'circle-side', id: 'B', circle: 'circle-O2', side: 'outside' });
+    expect(Object.keys(c.objects.find((o) => o.id === 'B') as FreePoint)).not.toContain('region');
   });
 });
 
@@ -96,13 +97,22 @@ describe('#556 — the class: every ADR-254 side record is a sampling region', (
     expect(allSeedsMeet(['מעגל O', 'מנקודה A מחוץ למעגל O ישר חותך את המעגל בנקודות C ו-B'])).toEqual([]);
   });
 
-  it('the region is recorded ON the free point — one per circle, the latest side winning', () => {
+  it('the region is the requirement RECORD — one per circle — and every sampled seed keeps M on BOTH sides (#1739, ADR-594)', () => {
     const facts = factsOf(['מעגל O', 'מעגל P', 'M מחוץ למעגל O', 'M בתוך מעגל P']);
-    const M = replay(facts, 0).construction.objects.find((o) => o.id === 'M') as FreePoint;
-    expect(M.region).toEqual([
-      { circle: 'circle-O', side: 'outside' },
-      { circle: 'circle-P', side: 'inside' },
+    const c = replay(facts, 0).construction;
+    expect(c.requirements).toEqual([
+      { kind: 'circle-side', id: 'M', circle: 'circle-O', side: 'outside' },
+      { kind: 'circle-side', id: 'M', circle: 'circle-P', side: 'inside' },
     ]);
+    // the behaviour the old field protected: the sampler keeps the point inside its region at every seed it can
+    let held = 0;
+    for (let s = 1; s < 24; s++) {
+      const e = evaluate(applySeed(c, s));
+      if (!e.ok) continue;
+      const M = e.positions.get('M')!, O = e.circles.get('circle-O')!, P = e.circles.get('circle-P')!;
+      if (dist(M, P.center) < P.r && dist(M, O.center) > O.r) held++;
+    }
+    expect(held, 'M sits outside O and inside P at the sampled seeds').toBeGreaterThanOrEqual(12);
   });
 
   it('the sampler re-seats a wrong-side sample onto its side, and leaves a right-side sample alone', () => {

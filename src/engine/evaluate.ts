@@ -25,6 +25,7 @@ import {
   unit,
 } from './geometry';
 import { carriesBoundAim, constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates, withToleranceFactor } from './solve';
+import { sideRecordsOf, sideShortfall, type SideRecord } from './requirements';
 import { budgetExceeded, chargeHit, computeWithCell, countWork, solveBudget, type WorkCell } from './solveBudget';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
@@ -92,6 +93,70 @@ function withOrderCons(cons: Constraint[], c: Construction): Constraint[] {
     cons.push(k);
   }
   return cons;
+}
+
+/**
+ * #1739 ([ADR-594](../../docs/06-decisions.md#adr-594)): the stated SIDES a solve over `carrierIds` can move —
+ * a side whose subject, region or carrier line is one of the carriers or is built (transitively) from one.
+ * Empty for every figure without a stated side, so the side steer costs nothing there.
+ */
+function sidesMovedBy(c: Construction, carrierIds: Id[]): SideRecord[] {
+  const sides = sideRecordsOf(c);
+  if (!sides.length) return sides;
+  const moved = new Set<Id>(carrierIds);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const o of c.objects) if (!moved.has(o.id) && objectParents(o).some((p) => moved.has(p))) (moved.add(o.id), (grew = true));
+  }
+  const refs = (r: SideRecord): Id[] => (r.kind === 'circle-side' ? [r.id, r.circle] : r.kind === 'polygon-side' ? [r.id, ...r.poly] : [r.a, r.b, ...r.subjects]);
+  return sides.filter((r) => refs(r).some((id) => moved.has(id)));
+}
+/** The sides `carrierId` moves that no other DRIVEN carrier (an object with a `solve`) moves too (#1739). */
+function sidesSettledBy(c: Construction, carrierId: Id): SideRecord[] {
+  const mine = sidesMovedBy(c, [carrierId]);
+  if (!mine.length) return mine;
+  const others = c.objects.filter((o) => o.id !== carrierId && (o as { solve?: unknown }).solve !== undefined).map((o) => o.id);
+  if (!others.length) return mine;
+  const theirs = new Set(sidesMovedBy(c, others));
+  return mine.filter((r) => !theirs.has(r));
+}
+/** The side steer's AIM: clearance asked for inside the region, relative to its scale (ADR-390's visible-gap idiom). */
+const SIDE_AIM = 0.03;
+/** The steer's weight — a stated side is a requirement, so it is weighed like a relative residual. */
+const SIDE_W = 1;
+/** Σ shortfall² of `sides` at an evaluated figure (`aim` 0 = the verifier's own test). */
+const sideCost = (sides: SideRecord[], pos: Map<Id, Vec>, circles: Map<Id, ResolvedCircle>, aim: number): number => {
+  let s = 0;
+  for (const r of sides) s += sideShortfall(r, pos, circles, aim) ** 2;
+  return SIDE_W * s;
+};
+/**
+ * The carriers that DEFINE a side's region (a polygon's vertices, a circle and its centre, the line's two
+ * points) and are not themselves a side's subject. The steer HOLDS them where the first solve put them: a
+ * side is a statement about its subject, so the cure moves the subject, never the region around it — measured,
+ * an equilateral apex stated outside a square was otherwise "cured" by rotating the whole square.
+ */
+function regionCarriers(c: Construction, sides: SideRecord[], carrierIds: Id[]): Set<Id> {
+  const subjects = new Set(sides.flatMap((r) => (r.kind === 'line-side' ? r.subjects : [r.id])));
+  const region = new Set<Id>();
+  for (const r of sides) {
+    if (r.kind === 'circle-side') {
+      region.add(r.circle);
+      const o = c.objects.find((x) => x.id === r.circle);
+      if (o && o.kind === 'circle') region.add(o.center);
+    } else if (r.kind === 'polygon-side') r.poly.forEach((v) => region.add(v));
+    else (region.add(r.a), region.add(r.b));
+  }
+  return new Set(carrierIds.filter((id) => region.has(id) && !subjects.has(id)));
+}
+/** How hard the steer holds a region carrier at its first-solve value (relative units, squared). */
+const FREEZE_W = 10;
+/** Does every stated side of `c` hold in the figure `x` places — the steer's extra accept bar. */
+function allSidesHold(c: Construction, placed: Construction): boolean {
+  const sides = sideRecordsOf(c);
+  if (!sides.length) return true;
+  const r = evaluateCore(placed, { skipConstraints: true });
+  return r.ok && sides.every((s) => sideShortfall(s, r.positions, r.circles) === 0);
 }
 
 // Exported for the freeze-and-co-drive recruiter (ADR-229): it BAKES the current valid solution (params
@@ -331,6 +396,22 @@ function solveOneParam(c: Construction, carrier: Extract<GeoObject, { kind: 'on-
       };
       ordered = [...roots].sort((a, b) => near(a) - near(b));
     }
+    // #1739 (ADR-594): a root that keeps every stated side the carrier moves ranks before one that breaks it —
+    // a stable partition, so when every root (or none) keeps its sides the order above is unchanged. Only a side
+    // no OTHER driven carrier still moves: while one is unsolved its subject sits at its pre-solve seat, and a
+    // side judged there says nothing about the figure. And only the ISOLATED roots of an equality: an order-only
+    // carrier's "roots" are a whole satisfying region sampled on a grid, where preferring a side-keeping grid
+    // point is an arbitrary far move — measured, it let a step-ladder rung that used to fail succeed by flinging
+    // O round its circle on the bagrut-2025 figure (a figure that already honoured its side, now jumping).
+    const sides = ordered.length > 1 && !isOrderConstraint(dir.constraint) ? sidesSettledBy(c, carrier.id) : [];
+    if (sides.length) {
+      const keeps = (v: number): boolean => {
+        const r = evaluateCore(withParam(c, carrier.id, v), { skipConstraints: true });
+        return r.ok && sides.every((sd) => sideShortfall(sd, r.positions, r.circles) === 0);
+      };
+      const k = ordered.map(keeps);
+      ordered = [...ordered.filter((_, i) => k[i]), ...ordered.filter((_, i) => !k[i])];
+    }
     return withParam(c, carrier.id, ordered[dir.branch % ordered.length]);
   }
 }
@@ -410,9 +491,17 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   // `aim`: whether a stated bound still reaches for ADR-390's visible gap — false only on the relaxed
   // pass below, once the gap proved unreachable beside the givens (#1351, ADR-547).
   let aim = true;
-  const residFull = (x: number[]): { s: number; pos: Map<Id, Vec> | null } => {
+  // #1739 (ADR-594): the SIDE STEER — off (null) on every solve but the retry-only rung below, which sets the
+  // shortfall's aim: SIDE_AIM for the basin search, 0 (the verifier's own test) for the polish.
+  const sides = sidesMovedBy(c, ids);
+  let steer = false;
+  const frozen = sides.length ? [...regionCarriers(c, sides, ids)].map((id) => ids.indexOf(id)) : [];
+  let freezeAt: number[] = [];
+  const residFull = (x: number[], search = false): { s: number; pos: Map<Id, Vec> | null } => {
     const r = evaluateCore(place(x), { skipConstraints: true });
     if (!r.ok) return { s: Infinity, pos: null };
+    let extra = steer ? sideCost(sides, r.positions, r.circles, search ? SIDE_AIM : 0) : 0;
+    if (steer) for (const i of frozen) extra += (FREEZE_W * ((x[2 * i] - freezeAt[2 * i]) ** 2 + (x[2 * i + 1] - freezeAt[2 * i + 1]) ** 2)) / (span * span);
     let s = 0;
     for (const con of cons) {
       for (const id of constraintRefs(con)) if (!r.positions.has(id)) return { s: Infinity, pos: null };
@@ -425,13 +514,13 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
       // a hard constraint's root.
       s += jointCostTerm(con, get, aim);
     }
-    return { s, pos: r.positions };
+    return { s: s + extra, pos: r.positions };
   };
   const resid = (x: number[]): number => residFull(x).s;
   const barrier = collapseBarrier(c, cons, ids);
   const lambda = 1e-3 / (span * span); // scale-free; only breaks ties on the solution manifold
   const regCost = (x: number[]): number => {
-    const base = resid(x);
+    const base = residFull(x, true).s;
     if (!isFinite(base)) return Infinity;
     let s = base;
     for (let i = 0; i < x.length; i++) s += lambda * (x[i] - seed[i]) * (x[i] - seed[i]);
@@ -440,7 +529,7 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   // The barrier-augmented search cost — used ONLY by the anti-collapse RETRY (never the primary
   // descent, whose basin choice previously-green figures depend on — see `collapseBarrier`).
   const regCostB = (x: number[]): number => {
-    const { s: base, pos } = residFull(x);
+    const { s: base, pos } = residFull(x, true);
     if (!isFinite(base) || !pos) return Infinity;
     let s = base + barrier(pos);
     for (let i = 0; i < x.length; i++) s += lambda * (x[i] - seed[i]) * (x[i] - seed[i]);
@@ -460,11 +549,13 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   ]);
   // Convex-first (ADR-097): prefer a configuration whose declared polygons are convex; fall back to the
   // relaxed accept only if no convex solution is reachable. A no-op when the figure declares no ≥4-gon.
+  const accepted = (x: number[], requireConvex: boolean): boolean =>
+    solutionAccepted(c, place, x, cons, span, requireConvex) && (!steer || allSidesHold(c, place(x)));
   const finish = (requireConvex: boolean, useBarrier = false): { x: number[]; ok: boolean } => {
     const best = multiStartSolve(seed, offsets, span * 0.2, useBarrier ? regCostB : regCost, resid, [span * 0.05, span * 0.005], 400, (x) =>
-      solutionAccepted(c, place, x, cons, span, requireConvex),
+      accepted(x, requireConvex),
     );
-    return { x: best, ok: solutionAccepted(c, place, best, cons, span, requireConvex) };
+    return { x: best, ok: accepted(best, requireConvex) };
   };
   // Anti-collapse retry (ADR-238): when the plain search FAILED or parked at a near-degenerate spot
   // (barrier > 0 — e.g. a slack carrier hugging its constraint's own collapse point), re-search with the
@@ -496,6 +587,17 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     aim = false;
     const relaxed = solveAll();
     if (relaxed.ok) out = relaxed;
+  }
+  // THE SIDE STEER (#1739, ADR-594) — the ADR-238/547 retry-only rung. A stated side is a requirement with
+  // nothing to drive (ADR-254), so the solve above never saw it: when its ACCEPTED result breaks a side the
+  // carriers move, re-solve once with the side's shortfall in the cost, and keep the re-solve only if it is
+  // accepted AND every side holds. A solve that already honours its sides returns untouched (byte-identical).
+  if (out.ok && sides.length && !allSidesHold(c, place(out.x))) {
+    steer = true;
+    freezeAt = out.x;
+    const steered = solveAll();
+    steer = false;
+    if (steered.ok) out = steered;
   }
   return place(out.x);
 }
@@ -792,7 +894,7 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
   // Solve a given carrier list: returns the chosen construction and whether a solution was ACCEPTED
   // (under `requireConvex`). Extra carriers with NO `solve` directive (recruited free polygon vertices)
   // contribute DOF but no constraint — they give the joint solve room to land on a CONVEX branch (ADR-097).
-  const solveFor = (carrierList: GeoObject[], requireConvex: boolean, aim = true): { result: Construction; ok: boolean } => {
+  const solveFor = (carrierList: GeoObject[], requireConvex: boolean, aim = true, steer = false, freeze?: Map<Id, number[]>): { result: Construction; ok: boolean } => {
     const span = Math.max(1, ...carrierList.flatMap((o) => (o.kind === 'free-point' && o.solve ? [Math.abs(o.x), Math.abs(o.y)] : [])));
     // A spec for each carrier: a constraint-carrier via carrierSpec, or a recruited FREE on-circle vertex
     // (no solve) as a plain bounded θ DOF.
@@ -823,10 +925,25 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     // the solver can't "cheat" a length/ratio by collapsing the constrained part (and a collapse, scale→0,
     // blows the relative residual up). It also normalises constraints of different magnitudes against
     // each other so the joint solve doesn't favour the larger one. (ADR-033.)
-    const costFull = (u: number[]): { s: number; pos: Map<Id, Vec> | null } => {
+    // #1739 (ADR-594): the side steer's term — only on the retry-only rung (`steer`); `search` aims inside the
+    // region (SIDE_AIM), the polish asks only for the verifier's own test.
+    const sides = steer ? sidesMovedBy(c, specs.map((sp) => sp.id)) : [];
+    // the region carriers held at the first solve's values (normalised): the cure moves the subject, not the region
+    const held: { k: number; t: number }[] = [];
+    if (sides.length && freeze) {
+      const hold = regionCarriers(c, sides, specs.map((sp) => sp.id));
+      let k = 0;
+      for (const sp of specs) {
+        const t = freeze.get(sp.id);
+        if (hold.has(sp.id) && t) sp.scale.forEach((sc, i) => held.push({ k: k + i, t: t[i] / sc }));
+        k += sp.n;
+      }
+    }
+    const costFull = (u: number[], search = false): { s: number; pos: Map<Id, Vec> | null } => {
       const r = evaluateCore(place(u), { skipConstraints: true });
       if (!r.ok) return { s: Infinity, pos: null };
-      let s = 0;
+      let s = sides.length ? sideCost(sides, r.positions, r.circles, search ? SIDE_AIM : 0) : 0;
+      for (const h of held) s += FREEZE_W * (u[h.k] - h.t) ** 2;
       for (const con of cons) {
         for (const id of constraintRefs(con)) if (!r.positions.has(id)) return { s: Infinity, pos: null };
         const get = (id: Id) => r.positions.get(id)!;
@@ -840,7 +957,7 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     const barrier = collapseBarrier(c, cons, specs.map((s) => s.id));
     const lambda = 1e-3; // tiny tie-breaker toward the seed (normalised space)
     const regCost = (u: number[]): number => {
-      const base = cost(u);
+      const base = costFull(u, true).s;
       if (!isFinite(base)) return Infinity;
       let s = base;
       for (let i = 0; i < u.length; i++) s += lambda * (u[i] - seedU[i]) * (u[i] - seedU[i]);
@@ -848,7 +965,7 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     };
     // Barrier-augmented search cost for the anti-collapse RETRY only (ADR-238 — see resolveFreeDriven).
     const regCostB = (u: number[]): number => {
-      const { s: base, pos } = costFull(u);
+      const { s: base, pos } = costFull(u, true);
       if (!isFinite(base) || !pos) return Infinity;
       let s = base + barrier(pos);
       for (let i = 0; i < u.length; i++) s += lambda * (u[i] - seedU[i]) * (u[i] - seedU[i]);
@@ -939,17 +1056,18 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     // pushed by a range of magnitudes in normalised units); polish on the residual through several decades so
     // a coupled system lands tightly ON the constraints; accept a genuine non-degenerate solution else keep
     // the seed. Shared scaffold.
+    const acc = (u: number[]): boolean => solutionAccepted(c, place, u, cons, span, requireConvex) && (!steer || allSidesHold(c, place(u)));
     const restarts = [
       ...extraRestarts,
       ...[0.5, 1, -1, 2, -2].flatMap((d) => seedU.map((_, j) => seedU.map((v, i) => (i === j ? v + d : v)))),
     ];
     const run = (rc: (u: number[]) => number): { u: number[]; ok: boolean } => {
       const best = multiStartSolve(seedU, restarts, 0.3, rc, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, (x) =>
-        solutionAccepted(c, place, x, cons, span, requireConvex),
+        acc(x),
       );
-      return { u: best, ok: solutionAccepted(c, place, best, cons, span, requireConvex) };
+      return { u: best, ok: acc(best) };
     };
-    if (near && solutionAccepted(c, place, near, cons, span, requireConvex)) {
+    if (near && acc(near)) {
       // NEAR-FIRST stability: a small reshape keeps the current configuration — unless it parked
       // near-degenerate (barrier > 0), where a barrier-augmented re-search may find a healthy
       // configuration; keep `near` when it doesn't (ADR-238).
@@ -978,24 +1096,36 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
   // that genuinely has no convex drawing still solves. When no ≥4-gon is declared, `declaredPolygonsConvex`
   // is always true ⇒ step (1) succeeds immediately and behaviour is unchanged.
   const convexMatters = declaresConvexity(c); // #1675 (ADR-583): see resolveFreeDriven — rungs 2-3 repeat rung 1 without a ≥4-gon
-  const ladder = (aim: boolean): { result: Construction; ok: boolean } => {
-    const conv = solveFor(carriers, true, aim);
+  const ladder = (aim: boolean, steer = false, freeze?: Map<Id, number[]>): { result: Construction; ok: boolean } => {
+    const conv = solveFor(carriers, true, aim, steer, freeze);
     if (conv.ok || !convexMatters) return conv;
     const extra = freePolygonVerticesToRecruit(c, carriers);
     if (extra.length) {
-      const conv2 = solveFor([...carriers, ...extra], true, aim);
+      const conv2 = solveFor([...carriers, ...extra], true, aim, steer, freeze);
       if (conv2.ok) return conv2;
     }
-    return solveFor(carriers, false, aim);
+    return solveFor(carriers, false, aim, steer, freeze);
+  };
+  // THE SIDE STEER (#1739, ADR-594) — resolveFreeDriven's retry-only rung: only when the ACCEPTED result breaks
+  // a stated side the carriers move; kept only if accepted AND every side holds, else the first result stands.
+  const steered = (first: { result: Construction; ok: boolean }, aim: boolean): Construction => {
+    if (!first.ok || !sidesMovedBy(c, carriers.map((o) => o.id)).length || allSidesHold(c, first.result)) return first.result;
+    const freeze = new Map<Id, number[]>();
+    for (const o of first.result.objects) {
+      const v = carrierParams(o);
+      if (v) freeze.set(o.id, v);
+    }
+    const again = ladder(aim, true, freeze);
+    return again.ok ? again.result : first.result;
   };
   const out = ladder(true);
   // THE AIM YIELDS (#1351, ADR-547) — the same rung as resolveFreeDriven's: only when the aim-first ladder
   // found nothing, and only when a bound is in the system (`withOrderCons` joins every one in `c`).
   if (!out.ok && carriesBoundAim(c.constraints)) {
     const relaxed = ladder(false);
-    if (relaxed.ok) return relaxed.result;
+    if (relaxed.ok) return steered(relaxed, false);
   }
-  return out.result;
+  return steered(out, true);
 }
 
 /**

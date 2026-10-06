@@ -31,14 +31,6 @@ export interface FreePoint {
   y: number;
   pinned?: boolean;
   /**
-   * #556 ([ADR-511](docs/06-decisions.md#adr-511)): the admissible REGION(s) a consuming construction
-   * declared for this point — a side of a circle the statement forces (an external tangent/secant apex,
-   * a stated «M מחוץ למעגל»). Recorded by the `point-circle-side` apply case, the ONE chokepoint of the
-   * ADR-254 family; read by {@link applySeed}, which keeps every sample inside the region instead of
-   * guessing and letting `meetsRequirements` discard the seed afterwards (9 of 24 seeds, measured).
-   */
-  region?: { circle: Id; side: 'inside' | 'outside' }[];
-  /**
    * A base vertex of a fully-committed regular shape (a square): its equal sides and
    * right angles are intrinsic, so a constraint that contradicts the shape is a real
    * over-constraint — the solver must not drive it (ADR-030). Generic shapes
@@ -994,9 +986,11 @@ export type Constraint =
  * [ADR-549](docs/06-decisions.md#adr-549)) — the ADR-254 family («E מחוץ למעגל», «E בתוך המשולש ABC»,
  * «C ו-D בצדדים שונים של AB»). A side is an inequality with nothing to drive, so it pushes no
  * constraint; before this record it survived only as a fact COMMAND, which the step ladder never sees —
- * and the sampler hint (`FreePoint.region`) vanishes the moment M1 turns the point into an on-circle
- * rider. Recorded by the three apply cases ({@link recordRequirement}); read by the stage-0g′ prover
- * `sideImpossibility`, which refuses a later (or earlier) statement that structurally contradicts it.
+ * and the old sampler hint on the point itself vanished the moment M1 turned it into an on-circle rider.
+ * Recorded by the three apply cases ({@link recordRequirement}); read by the stage-0g′ prover
+ * `sideImpossibility`, which refuses a later (or earlier) statement that structurally contradicts it, and
+ * (#1739, ADR-594, which retired `FreePoint.region`) by every stage that PLACES a point through
+ * `sideShortfall`: the 1-D root pick, the retry-only side steer, the sampler's region seat and the pool filter.
  */
 export type SideRequirement =
   | { kind: 'circle-side'; id: Id; circle: Id; side: 'inside' | 'outside' }

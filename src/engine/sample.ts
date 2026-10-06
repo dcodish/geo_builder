@@ -16,11 +16,13 @@
  * default (returns the construction unchanged).
  */
 
-import type { Constraint, Construction, FreePoint, GeoObject, Id, OnCirclePoint, OnLinePoint, SolveDirective } from './types';
+import type { Constraint, Construction, FreePoint, GeoObject, Id, OnCirclePoint, OnLinePoint, SolveDirective, Vec } from './types';
 import { isGeoPoint, isOrderConstraint } from './types';
 import { carrierOf, isShapeCarrier } from './carriers';
 import { constraintRefs } from './solve';
 import { evaluate } from './evaluate';
+import { lineOffset, polygonMargin, sideRecordsOf, type SideRecord } from './requirements';
+import { pointInPolygon, pointOutsidePolygon } from './geometry';
 import { constraintRank } from './dofRank';
 import { chargeHit, computeWithCell, solveBudget, type WorkCell } from './solveBudget';
 
@@ -461,45 +463,181 @@ export function applySeed(c: Construction, seed: number): Construction {
     }
     return o;
   });
-  // #556 ([ADR-511](docs/06-decisions.md#adr-511)): a free point whose consuming construction declared an
-  // admissible REGION (`region` — a side of a circle: an external tangent/secant apex, a stated «M מחוץ
-  // למעגל») is kept INSIDE that region by the sampler itself, instead of being jittered blindly and having
-  // `meetsRequirements` discard the seed afterwards (the two-tangents figure lost 9 of 24 seeds that way —
-  // the from-point landed in the target circle and the Thales construction had no touch). The region is
-  // judged on the SAMPLED figure's own circles (one evaluate — the centre may itself be sampled or solved),
-  // and the correction is a deterministic radial re-seat with the point's own rng, so a seed stays a seed.
-  const regioned = objects.filter((o): o is FreePoint => o.kind === 'free-point' && !o.pinned && !!o.region?.length);
-  if (regioned.length) {
-    const full = evaluate({ ...c, objects });
-    for (const fp of regioned) {
-        // A seed that puts the point on the WRONG side is often exactly the seed on which the consuming
-        // construction cannot build at all (no tangent from inside the circle) — so when the full figure
-        // fails, judge the region on the PREFIX up to this point (its circle is defined before it), with
-        // constraints skipped: the circle's sampled centre and radius are what the re-seat needs.
-        const at = objects.findIndex((o) => o.id === fp.id);
-        const prefix = [...objects.slice(0, at), fp];
-        const inPrefix = new Set(prefix.map((o) => o.id));
-        const e = full.ok ? full : evaluate({ ...c, objects: prefix, constraints: c.constraints.filter((k) => constraintRefs(k).every((id) => inPrefix.has(id))) });
-        if (!e.ok) continue;
-        let p = e.positions.get(fp.id);
-        if (!p) continue;
-        const jr = mulberry32((seed ^ hashId(fp.id) ^ 0x5bd1e995) >>> 0);
-        let moved = false;
-        for (const r of fp.region!) {
-          const circ = e.circles.get(r.circle);
-          if (!circ || !(circ.r > 0)) continue;
-          const d = Math.hypot(p.x - circ.center.x, p.y - circ.center.y);
-          const wrong = r.side === 'outside' ? d <= circ.r * REGION_MARGIN_OUT : d >= circ.r * REGION_MARGIN_IN;
-          if (!wrong) continue;
-          const th: number = d > 1e-9 ? Math.atan2(p.y - circ.center.y, p.x - circ.center.x) : jr() * 2 * Math.PI;
-          const k = r.side === 'outside' ? 1.15 + jr() * 0.65 : 0.25 + jr() * 0.45; // outside: [1.15, 1.8]·r (the textbook apex, close to the circle) · inside: [0.25, 0.7]·r
-          p = { x: circ.center.x + circ.r * k * Math.cos(th), y: circ.center.y + circ.r * k * Math.sin(th) };
-          moved = true;
+  // #556 ([ADR-511](docs/06-decisions.md#adr-511)) → #1739 ([ADR-594](docs/06-decisions.md#adr-594)): a point with a
+  // STATED SIDE — a side of a circle (an external tangent/secant apex, «M מחוץ למעגל»), of a polygon («D בתוך
+  // המשולש ABC») or of a line («C ו-D בצדדים שונים של AB») — is kept on that side by the sampler itself,
+  // instead of being jittered blindly and having `meetsRequirements` discard the seed afterwards. The region
+  // rides the construction's REQUIREMENT RECORD (ADR-549), not the point: a record survives every ladder
+  // rebuild and M1 conversion, so all three kinds are seated, on a free point AND on a free on-circle rider.
+  return { ...c, objects: clampToPlacementPreconditions(c, seatStatedSides(c, objects, seed)) };
+}
+
+/** #556: the sampler's circle bars — an 'outside' sample must clear 1.05·r, an 'inside' one stay under 0.95·r. */
+const REGION_MARGIN_OUT = 1.05;
+const REGION_MARGIN_IN = 0.95;
+/** #1739: the sampler's polygon and line bars, as fractions of the region's span (the apply seat's 6 %). */
+const REGION_MARGIN_POLY = 0.06;
+const REGION_MARGIN_LINE = 0.05;
+
+/**
+ * #1739 ([ADR-594](../../docs/06-decisions.md#adr-594)) — THE SAMPLER'S REGION SEAT, read off the requirement
+ * records. The region is judged on the SAMPLED figure (one evaluate — the region's own circle or vertices may
+ * themselves be sampled or solved); a seed that puts the point on the wrong side is often exactly the seed on
+ * which a consuming construction cannot build at all (no tangent from inside the circle), so when the full
+ * figure fails the region is judged on the PREFIX up to the point. The correction is deterministic with the
+ * point's own rng, so a seed stays a seed:
+ *  - circle: a radial re-seat (ADR-511, unchanged);
+ *  - polygon: scaled toward (inside) or away from (outside) the polygon's centroid until it clears;
+ *  - line: moved across the carrier line to the stated side;
+ *  - a free on-circle rider: its θ re-seated round its circle (the `point-polygon-side` apply case's move).
+ * A pinned, derived or driven-parametric subject is never moved — the solve steer and the verifier own it.
+ */
+function seatStatedSides(c: Construction, objects: GeoObject[], seed: number): GeoObject[] {
+  const sides = sideRecordsOf(c);
+  if (!sides.length) return objects;
+  const seatable = (id: Id): boolean => {
+    const o = objects.find((x) => x.id === id);
+    return !!o && ((o.kind === 'free-point' && !o.pinned) || (o.kind === 'on-circle' && !!o.free && !o.solve && !o.between));
+  };
+  const subjectsOf = (r: SideRecord): Id[] => (r.kind === 'line-side' ? r.subjects : [r.id]);
+  if (!sides.some((r) => subjectsOf(r).some(seatable))) return objects;
+  const out = [...objects];
+  let full: ReturnType<typeof evaluate> | null = null;
+  /** The figure to judge `id`'s region on: the full sampled figure, else the prefix up to `id`. */
+  const judge = (id: Id): ReturnType<typeof evaluate> | null => {
+    full ??= evaluate({ ...c, objects: out });
+    if (full.ok) return full;
+    const at = out.findIndex((o) => o.id === id);
+    const prefix = out.slice(0, at + 1);
+    const inPrefix = new Set(prefix.map((o) => o.id));
+    const e = evaluate({ ...c, objects: prefix, constraints: c.constraints.filter((k) => constraintRefs(k).every((x) => inPrefix.has(x))) });
+    return e.ok ? e : null;
+  };
+  /** Positions already re-seated in this pass win over the (stale) judged figure. */
+  const moved = new Map<Id, Vec>();
+  const posOf = (e: { positions: Map<Id, Vec> }, id: Id): Vec | undefined => moved.get(id) ?? e.positions.get(id);
+  /** Re-seat `id` so `ok` holds: a free point takes `propose()`, a free rider the first θ round its circle that does. */
+  const reseat = (id: Id, e: ReturnType<typeof evaluate> & { ok: true }, ok: (p: Vec) => boolean, propose: () => Vec | null): void => {
+    const i = out.findIndex((o) => o.id === id);
+    const o = out[i];
+    const p = posOf(e, id);
+    if (!o || !p || ok(p)) return;
+    if (o.kind === 'free-point') {
+      const q = propose();
+      if (q && ok(q)) {
+        out[i] = { ...o, x: q.x, y: q.y };
+        moved.set(id, q);
+        full = null;
+      }
+      return;
+    }
+    if (o.kind !== 'on-circle') return;
+    const circ = e.circles.get(o.circle);
+    if (!circ || !(circ.r > 0)) return;
+    const jr = mulberry32((seed ^ hashId(id) ^ 0x5bd1e995) >>> 0);
+    const start = o.theta + jr() * 2 * Math.PI;
+    for (let k = 0; k < 72; k++) {
+      const th = start + (k * Math.PI * 2) / 72;
+      const q = { x: circ.center.x + circ.r * Math.cos(th), y: circ.center.y + circ.r * Math.sin(th) };
+      if (ok(q)) {
+        out[i] = { ...o, theta: th };
+        moved.set(id, q);
+        full = null;
+        return;
+      }
+    }
+  };
+  for (const r of sides) {
+    if (r.kind === 'circle-side') {
+      if (!seatable(r.id)) continue;
+      const e = judge(r.id);
+      if (!e || !e.ok) continue;
+      const circ = e.circles.get(r.circle);
+      if (!circ || !(circ.r > 0)) continue;
+      const d = (p: Vec) => Math.hypot(p.x - circ.center.x, p.y - circ.center.y);
+      const ok = (p: Vec) => (r.side === 'outside' ? d(p) > circ.r * REGION_MARGIN_OUT : d(p) < circ.r * REGION_MARGIN_IN);
+      reseat(r.id, e, ok, () => {
+        const p = posOf(e, r.id)!;
+        const jr = mulberry32((seed ^ hashId(r.id) ^ 0x5bd1e995) >>> 0);
+        const th: number = d(p) > 1e-9 ? Math.atan2(p.y - circ.center.y, p.x - circ.center.x) : jr() * 2 * Math.PI;
+        const k = r.side === 'outside' ? 1.15 + jr() * 0.65 : 0.25 + jr() * 0.45; // outside: [1.15, 1.8]·r (the textbook apex, close to the circle) · inside: [0.25, 0.7]·r
+        return { x: circ.center.x + circ.r * k * Math.cos(th), y: circ.center.y + circ.r * k * Math.sin(th) };
+      });
+    } else if (r.kind === 'polygon-side') {
+      if (!seatable(r.id)) continue;
+      const e = judge(r.id);
+      if (!e || !e.ok) continue;
+      const verts = r.poly.map((v) => posOf(e, v));
+      if (verts.some((v) => !v)) continue;
+      const vs = verts as Vec[];
+      const { cx, cy, rspan } = polygonMargin(vs);
+      const m = rspan * REGION_MARGIN_POLY;
+      const ok = (p: Vec) => (r.side === 'inside' ? pointInPolygon(p, vs, m) : pointOutsidePolygon(p, vs, m));
+      reseat(r.id, e, ok, () => {
+        const p = posOf(e, r.id)!;
+        const jr = mulberry32((seed ^ hashId(r.id) ^ 0x5bd1e995) >>> 0);
+        const away = Math.hypot(p.x - cx, p.y - cy) > 1e-9 ? { x: p.x - cx, y: p.y - cy } : { x: Math.cos(jr() * 2 * Math.PI) * rspan, y: Math.sin(jr() * 2 * Math.PI) * rspan };
+        const at = (k: number): Vec => ({ x: cx + k * away.x, y: cy + k * away.y });
+        // The extreme scale that clears along the point's own ray from the centroid, then a seeded fraction of
+        // the way there — so the samples spread through the region rather than piling on its edge.
+        if (r.side === 'inside') {
+          for (let k = 1; k > 0.02; k -= 0.04) {
+            if (!ok(at(k))) continue;
+            const q = at(k * (0.35 + jr() * 0.6));
+            return ok(q) ? q : at(k);
+          }
+          return null;
         }
-        if (moved) objects[at] = { ...fp, x: p.x, y: p.y };
+        for (let k = 1; k < 6; k += 0.1) {
+          if (!ok(at(k))) continue;
+          const q = at(k * (1 + jr() * 0.5));
+          return ok(q) ? q : at(k);
+        }
+        return null;
+      });
+    } else {
+      const e0 = judge(r.subjects[r.subjects.length - 1]);
+      if (!e0 || !e0.ok) continue;
+      const e = e0;
+      const pa = posOf(e, r.a), pb = posOf(e, r.b);
+      if (!pa || !pb) continue;
+      const L = Math.hypot(pb.x - pa.x, pb.y - pa.y);
+      if (L < 1e-9) continue;
+      const off = (p: Vec) => lineOffset(p, pa, pb, L);
+      const n = { x: (pb.y - pa.y) / L, y: -(pb.x - pa.x) / L }; // the unit normal whose offset is +1
+      const m = L * REGION_MARGIN_LINE;
+      // The side each subject must take: «different» — opposite the subject that stays (the first unseatable
+      // one, else the first); «same» — the first subject's side.
+      const anchorId = (r.rel === 'different' ? r.subjects.find((id) => !seatable(id)) : undefined) ?? r.subjects[0];
+      const ap0 = posOf(e, anchorId);
+      if (!ap0) continue;
+      // An anchor sampled ON the line has no side to be opposite to: push it off first, along its own side.
+      if (Math.abs(off(ap0)) <= m && seatable(anchorId)) {
+        const s0 = Math.sign(off(ap0)) || 1;
+        reseat(anchorId, e, (p) => off(p) * s0 > m, () => {
+          const jr = mulberry32((seed ^ hashId(anchorId) ^ 0x5bd1e995) >>> 0);
+          const mag = L * (0.15 + jr() * 0.35);
+          return { x: ap0.x + n.x * (s0 * mag - off(ap0)), y: ap0.y + n.y * (s0 * mag - off(ap0)) };
+        });
+      }
+      const ap = posOf(e, anchorId)!;
+      if (Math.abs(off(ap)) <= m) continue;
+      const sAnchor = Math.sign(off(ap));
+      for (const id of r.subjects) {
+        if (id === anchorId || !seatable(id)) continue;
+        const want = r.rel === 'different' ? -sAnchor : sAnchor;
+        const ok = (p: Vec) => off(p) * want > m;
+        reseat(id, e, ok, () => {
+          const p = posOf(e, id)!;
+          const jr = mulberry32((seed ^ hashId(id) ^ 0x5bd1e995) >>> 0);
+          const mag = Math.max(Math.abs(off(p)), L * (0.15 + jr() * 0.35));
+          const o = off(p);
+          return { x: p.x + n.x * (want * mag - o), y: p.y + n.y * (want * mag - o) }; // across the line, to the stated side
+        });
+      }
     }
   }
-  return { ...c, objects: clampToPlacementPreconditions(c, objects) };
+  return out;
 }
 
 /**
@@ -538,9 +676,6 @@ export function freeDofs(c: Construction): Id[] {
  * deliberately searches mask>0 seeds. (The reflection itself — mirroring the apex's solver-seed across its
  * anchor line, which needs the evaluated anchor positions — lives in the store's `applyReflections`.)
  */
-/** #556: the sampler's region bars — an 'outside' sample must clear 1.05·r, an 'inside' one stay under 0.95·r. */
-const REGION_MARGIN_OUT = 1.05;
-const REGION_MARGIN_IN = 0.95;
 export const REFLECT_MAX = 4; // cap reflectable points at 4 → mask ∈ [0, 15], bounded combinatorics
 export const REFLECT_STRIDE = 1 << 20; // continuous base seed occupies [0, 2^20); mask = seed >> 20
 export const reflectMaskOf = (seed: number): number => Math.floor(seed / REFLECT_STRIDE);

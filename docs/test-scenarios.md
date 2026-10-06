@@ -1699,3 +1699,7 @@ over all four (ADR-041).
 ### `two-independent-crossings-four-configs-1600` — two independent circle crossings: four figures, all reachable (#1600, ADR-593)
 
 **Guards against:** the button stepping only the first cyclable crossing while the status counted every one — «יש 4 תצורות» with a button that toggled between two for ever. Asserts the count 4 and four shapes reached.
+
+### `point-inside-triangle-two-presses-1739` — a point stated inside a triangle stays inside on every «הציגו תצורה אחרת» press (#1739, ADR-594)
+
+**Guards against:** a stated side being read only by the verifier. «משולש ABC · D בתוך המשולש ABC» sampled D outside the triangle at 94 of 101 seeds, so the second press found nothing and said «אין תצורה אחרת — הצורה נקבעה» about a figure with four free DOF (and the knowledge pool held 14 of 16 off-side samples). Asserts the default view and two presses all exist and all keep D inside; the class matrix (circle, polygon and line sides, the BD=DC stability case, the pool) is `src/engine/__tests__/issue-1739-side-everywhere.test.ts`.

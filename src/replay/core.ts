@@ -16,6 +16,7 @@
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
 import { angleSumImpossibility, boundImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
+import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
@@ -3532,6 +3533,22 @@ export function admissibleRewrites(facts: Fact[], c: Construction, cap = ADMISSI
   }
   return out;
 }
+/**
+ * #1739 ([ADR-594](../../docs/06-decisions.md#adr-594), ADR-256's deferred follow-up): a sample in which a STATED
+ * SIDE does not hold («D בתוך המשולש ABC» with D outside) is not a configuration of the figure — counting it
+ * lets the knowledge layers reason over drawings the student's given excludes. Judged by the ONE definition
+ * (`sideShortfall`, the verifier's test) on the sample's own circles. Same fallback as its siblings: never
+ * strips below 2 — a thin pool over-claims, the unfiltered pool only under-claims.
+ */
+function sideSamples(c0: Construction, samples: Map<Id, Vec>[]): Map<Id, Vec>[] {
+  if (!sideRecordsOf(c0).length) return samples;
+  const kept = samples.filter((pos) => {
+    const c = constructionOfSample.get(pos) ?? c0;
+    const circles = circlesOfSample.get(pos) ?? new Map<Id, ResolvedCircle>();
+    return sideRecordsOf(c).every((r) => sideShortfall(r, pos, circles) === 0);
+  });
+  return kept.length >= 2 ? kept : samples;
+}
 export function samplingJobs(facts: Fact[], opts: { wide?: boolean } = {}) {
   const configs = variantConfigs(facts);
   const seed0 = configs.length === 1 ? firstSatisfyingSeed(facts) : 0;
@@ -3616,7 +3633,7 @@ export function samplingJobs(facts: Fact[], opts: { wide?: boolean } = {}) {
     // otherwise poison the ground-truth pool the relations/shapes layers share.
     // A point-free crossing statement (`segments-cross`, ADR-383) is fact-level like the extensions, so
     // its sample filter lives HERE (the store core), not in the object-level `requirementSamples`.
-    const within = requirementSamples(c0, distinctSamples(c0, preciseSamples(c0, converged))).filter((pos) => segmentsCrossWithin(facts, pos));
+    const within = sideSamples(c0, requirementSamples(c0, distinctSamples(c0, preciseSamples(c0, converged))).filter((pos) => segmentsCrossWithin(facts, pos)));
     const strict = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived));
     const key = foldKey(facts);
     if (strict.length >= 2) return (sampleMemo = { facts, key, constructions, samples: strict, determined: complete_, complete: complete && !overCap });

@@ -3465,6 +3465,18 @@ export const SCENARIOS_4: Scenario[] = [
       expect(shapesReached(facts, 6)).toBe(4);
     },
   },
+  {
+    id: 'point-inside-triangle-two-presses-1739',
+    title: '#1739 (ADR-594): «משולש ABC · D בתוך המשולש ABC» — two presses of «הציגו תצורה אחרת» both find a view with D inside (the second said «אין תצורה אחרת — הצורה נקבעה»)',
+    guards: `Triage of #1739 (measured on 4d6e3fd6, re-measured on the #1600 tip dedbccae, seeds 0..100, through parse -> replay): a stated side was a requirement record only the verifier read. The sampler re-seated only a circle side on a bare free point (ADR-511's \`FreePoint.region\`), so «D בתוך המשולש ABC» put D outside at 94 of 101 seeds; the second press found nothing and the note claimed the shape was determined while the triangle and D carry 4 free DOF; the knowledge pool held 14 of 16 samples with D outside. Root cause and fix (ADR-594): one definition, \`sideShortfall\` (0 iff the verifier accepts), read by the 1-D root pick, a retry-only side steer in the driven solve, the sampler's region seat (all three kinds, from the requirement record) and the pool filter. The class matrix is src/engine/__tests__/issue-1739-side-everywhere.test.ts.`,
+    steps: ['משולש ABC', 'D בתוך המשולש ABC'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const views = pressAll(factsOf(['משולש ABC', 'D בתוך המשולש ABC']), 2);
+      expect(views.length, 'the default view and two presses').toBe(3);
+      for (const v of views) expect(v.violations, 'D inside ABC in every view shown').toEqual([]);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */
