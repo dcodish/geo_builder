@@ -38,6 +38,8 @@ export interface LineFault {
   holder?: ApplyError['holder'];
   /** For an ambiguous one-letter angle: the three-letter name to write instead (#1407). */
   example?: ApplyError['example'];
+  /** For an ambiguous one-letter angle naming several: every candidate, three letters each (#1445). */
+  options?: ApplyError['options'];
   /** #1432 am. 1 — the host a contextual reference needed, and the bound a stated value broke. */
   host?: ApplyError['host'];
   domain?: ApplyError['domain'];
@@ -146,10 +148,10 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   const reported = new Set<string>();
   errors.forEach((e, i) => {
     if (!e) return;
-    const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null]);
+    const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null, e.options ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}) });
   });
 
   /**

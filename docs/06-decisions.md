@@ -14682,6 +14682,58 @@ The executed work of the operator's line fell from the 34.5M that ADR-583/584 bo
 
 **Behaviour change for a student.** «חצי מעגל ABC» on a triangle (or on three corners of a square) now draws the semicircle through all three corners. It used to be refused, or read A as the centre. A note shows which side became the diameter. Three letters that are not corners of one shape still mean «centre first».
 
+## ADR-590 — «זווית B» in a triangle is the triangle's angle, said aloud, however many cevians leave B (#1445)
+
+**Status:** accepted · 2026-10-05 · feature (P3, 2-D + analytic) · branch `feat/1445-polygon-angle-default` · round #1776 · **partially supersedes [ADR-164](#adr-164)** by operator ruling (2026-09-27, the /decisions pass: *"Triangle's angle, said aloud"*)
+
+**Requirements:** [02-requirements.md](02-requirements.md) FR-IN-7d (new: an angle named by its vertex alone, the polygon default, the read-as note, the listed question) · **Design:** [04-design.md](04-design.md) § *Addressing an angle*: `resolveVertexAngle` and the reading sink · **LADDER stage:** none (parser, plus the submit path's note). No solver change.
+
+**Cites** [ADR-164](#adr-164) (the single-vertex angle: exactly two edges, else ask), [ADR-428](#adr-428) (teach on acceptance), [ADR-496](#adr-496) / [ADR-500](#adr-500) (one reader for "which angle"), [ADR-386](#adr-386) (the «נסמן» suggestion), [ADR-568](#adr-568) (the bisector's stated vertex), analytic [ADR-AG-243](06c-decisions-analytic.md#adr-ag-243) (the same ruling there), [ADR-W-108](06w-decisions-workspace.md#adr-w-108) (one sentence, one verdict).
+
+**What the student saw.** An external review of prod, relayed 2026-09-27: «זווית B = 2 זווית C» is rejected once B has more than one angle, and in a triangle it should mean ∠ABC.
+
+**Measured at pickup** (`9d1b0b1f`, the real `decideDeterministic2D`). «משולש ABC · זווית B = 2 זווית C» committed, and so did the same line after «D על AC». After any cevian at B («BD חוצה זווית B», «BD גובה», «BD תיכון», or «D על AC» · «BD») the line was refused «יש יותר מזווית אחת בקודקוד B…». The same refusal hit «זווית B = 30», «B = 30», «זווית B = זווית C», «זווית B חדה», «זווית B = α», «זווית B + זווית C = 100» and «BE חוצה זווית B». It matched the issue. Analytic refused the same lines (`ambiguous-angle`, example «ABC»).
+
+**The class.** *A lone vertex was resolved by counting the edges at it, so drawing a cevian, which the student does all the time, turned the triangle's own angle into a question.* The count lived in seven places: `angleArms`, `bareVertexAngle`, the bisector-meet vertex form, `angleEquality`'s sides, the measure-sum terms, and the bisector's apex and far-end reads. The issue named four of them. Each was a separate `nb.length !== 2`, which is the #970 drift shape.
+
+**The decision (the ruling, as built).**
+1. **One resolver.** `resolveVertexAngle(v, ctx, exclude?)` in `parse.ts` is the only place that decides which angle a lone vertex names. All seven sites call it.
+   - Exactly two edges: the one angle there (ADR-164, unchanged).
+   - Otherwise, a vertex of exactly ONE declared polygon: that polygon's interior angle, its two ring neighbours. "Declared" means `ctx.polygons`, deduplicated by vertex set, so a shape stated twice is one shape.
+   - Otherwise (no polygon, or two or more, including a sub-triangle the cevian declared): `ambiguous-angle`.
+2. **Said aloud.** A polygon-default reading goes into a reading sink owned by the outermost `parse` call.
+   - `parse` reports only the readings that its winning commands name, as `angleReadings` on the ok result. A rule that tried a reading and then failed leaves nothing behind. The sink is reset when `parse` returns, so the parser stays a pure function of `(utterance, ctx)`.
+   - The submit path turns the readings into the note `input.vertexAngleReadAs`: «הובן כ-∠ABC — הזווית של המצולע בקודקוד הזה. לזווית אחרת שם, כתבו את שלוש האותיות שלה.» A deferred commit gets the same note. An adopted role reading, a packed-line advisory, and the bare `B = 30` canonical hint (which already names ∠ABC) keep priority.
+3. **The question lists the candidates.** `ambiguous-angle` now carries `options`: every pair of edges at the vertex, minus a straight pair that the construction states (the vertex rides or bisects that segment, via `onSegment` / `midpointOf`). With two or more options, the refusal is `input.ambiguousAngleOptions`: «בקודקוד B יש כמה זוויות: ∠ABC, ∠ABD, ∠CBD. לאיזו התכוונתם? …». Its example is the first candidate, and the lock drives that taught line through the gate. With fewer than two edges there is nothing to list, so the old message stays.
+
+**What did NOT change.** Exactly two edges resolve exactly as before, and are never announced. The three-letter form is untouched. A vertex in no polygon, or in two polygons, still asks, and is still never escalated. The bisector's triangle form («… במשולש ABC», ADR-540) still answers from the stated triangle.
+
+**Locks that the ruling overrides** (each asserted ADR-164's "polygon vertex + one more edge ⇒ ask"; each now keeps its guard on a figure that is still ambiguous under the ruling):
+- `angle-alias.test.ts`: «משולש ABC · AD» → «משולש ABC · משולש ABD».
+- `issue-831.test.ts`: square + diagonal → three loose segments at A.
+- `issue-1285-bisector-triangle.test.ts`: the bare form asks on «משולש ABC · משולש ACD».
+- `submitPipeline.test.ts`: square + «קטע BD» → three loose segments at B. The note now lists the angles.
+
+The locks that the ruling does NOT override (no polygon, a hand context with no polygons, two edges) are unchanged and green.
+
+**Locks.**
+- `src/__tests__/issue-1445-polygon-angle-default.test.ts` (62):
+  - the resolver by edge count × polygons (2/3/4 edges; 0/1/2 polygons; duplicate shape; no edges; the straight pair excluded; quadrilateral + diagonal; the sink is per call);
+  - all ten single-letter forms after each of four cevian prefixes, lowering to ∠ABC with `angleReadings: ['ABC']`;
+  - the far-end bisector;
+  - the submit gate: the issue's line commits with «הובן כ-∠ABC» after each cevian, no note without one, the bare form's canonical hint, the English note;
+  - REFUSALS that list their candidates (two triangles at B; three loose segments), plus the taught line building;
+  - the figure: ∠ABC = 2∠ACB with BD bisecting, at six seeds.
+- Fixture `src/__tests__/fixtures/issue-1445-triangle-angle-by-vertex.geo.json` (the issue's lock sequence, saved through the submit gate).
+- Three parity rows in `shell/__tests__/fixtures/geo-input-parity.ts`. Two build, in 2-D and analytic. 3-D still asks or escalates, a known gap → #1799 (the port, filed). The two-triangles row asks in all three builders.
+
+**Sibling audit.**
+- *Analytic:* the same ruling, the same verdicts, in [ADR-AG-243](06c-decisions-analytic.md#adr-ag-243), in this PR.
+- *3-D:* resolves a `vertex-angle` at apply (ADR-3D-049) and still counts edges. Measured: «משולש ABC · BD גובה · זווית B = 30» asks. Filed as #1799, with known-gap rows.
+- *Observed, not changed:* «חוצה זווית B וחוצה זווית C נפגשים בנקודה O» (double-vav זווית) is claimed by `specialPointMeet` as the incentre. It lowers the bisectors at A and B rather than at the stated B and C. The point O is the same (the incentre), so the figure is right, but the vertex form never runs for that spelling.
+
+**Behaviour change for a student.** In a triangle (or any one polygon), «זווית B» means the polygon's angle at B even after drawing a cevian, a segment or an altitude from B. The tool says «הובן כ-∠ABC» on that step. When B belongs to no shape, or to two shapes, the question now lists the angles at B to choose from.
+
 ## ADR-591 — A word fraction or a wish is taught as the given it means, proved before it is shown (#1611)
 
 **Status:** accepted · 2026-10-06 · feature (P3, 2-D) · branch `feat/1611-teach-fraction` · round #1776

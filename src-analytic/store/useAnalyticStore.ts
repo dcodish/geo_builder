@@ -145,7 +145,7 @@ export type InputError =
   /** #1554 ruling 1 (ADR-AG-198) — a noun no circle can pass around, said to be inscribed: both nouns, registry keys. */
   | { key: 'inscribed-contradicts-noun'; detail: string; shape?: string; forced?: string }
   /** A vertex that does not name an angle on its own — no shape through it, or several (#1049). */
-  | { key: 'ambiguous-angle'; detail: string; example?: string }
+  | { key: 'ambiguous-angle'; detail: string; example?: string; options?: string[] }
   /** A shape named by its noun alone, where the figure has no such shape or several (#1049). */
   | { key: 'ambiguous-shape'; detail: string; host?: { kind: string; found: number; need?: number; candidates?: string[] } }
   /** «ישר I» where the figure's line is «ישר 1» (ruling 2026-09-29): typed numeral, the one in use, the kind. */

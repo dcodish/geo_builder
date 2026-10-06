@@ -91,6 +91,7 @@
       "leg-apex": "\"{{noun}} {{pair}}\": in a triangle a leg starts at the apex — {{a}} or {{b}} — and the sentence does not say which. Write the equality: \"{{a}}{{b}} = {{a}}{{other}}\" or \"{{b}}{{a}} = {{b}}{{other}}\"."
     },
     "ambiguousAngle": "There's more than one angle at {{vertex}}, so I can't tell which one you mean. Name all three letters of the angle — e.g. \"∠A{{vertex}}C = 90\" — or give it a name: \"denote angle A{{vertex}}C as {{vertex}}1\".",
+    "ambiguousAngleOptions": "There are several angles at {{vertex}}: {{options}}. Which one do you mean? Write it with three letters — e.g. \"∠{{example}} = 90\" — or give it a name: \"denote angle {{example}} as {{vertex}}1\".",
     "tangentsAmbiguous": "More than two tangents are drawn here ({{points}}), so it is unclear which two meet. Name them — e.g. «the tangent at {{a}} and the tangent at {{b}} meet at E».",
     "aliasTaken": "The name {{name}} is already taken on this figure, so it can't name an angle. Pick another name — e.g. a letter with a different digit.",
     "reservedSymbol": "The letter {{symbol}} denotes the circle's radius, not a point. Pick another letter for a point on the circle.",
@@ -128,6 +129,7 @@
     "tangentsExhaustedIntTangent": "The single common tangent is already drawn — internally tangent circles have exactly one, at the touch point.",
     "measureCaseNote": "The letter {{letter}} was read as a measure symbol (a radius) — lowercase letters are for measures; point labels are uppercase.",
     "canonicalHint": "Got it. Next time you can write: {{canonical}} — that form always works.",
+    "vertexAngleReadAs": "Read as {{angles}} — the polygon's angle at that vertex. For another angle there, write its three letters.",
     "polygonNotSupported": "The polygon \"{{noun}}\" is not supported. Supported: {{offer}} — add \"regular\" for a regular one (e.g. \"regular pentagon\").",
     "incompleteComparative": "{{factor}} times WHAT? Name the segment it is compared to — e.g. \"{{subject}} is {{factor}} times AB\".",
     "trigGiven": {

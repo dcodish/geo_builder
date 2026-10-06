@@ -305,6 +305,7 @@ function decideOnce(
       error: {
         key: fault.code, detail: fault.detail, existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example, host: fault.host, domain: fault.domain,
         ...(fault.operands ? { operands: fault.operands } : {}),
+        ...(fault.options ? { options: fault.options } : {}),
         ...(reused && definedBy ? { reusedId: reused, definedBy } : {}),
       } as InputError,
     };
@@ -455,7 +456,10 @@ export type NoticeT = (key: string, vars?: Record<string, string>) => string;
 
 /** A recorded line's notice, worded for the student — one wording for the typed and the LLM lanes (#1350). */
 export const noticeText = (n: RecordNotice | undefined, t: NoticeT): string | null =>
-  n ? t('noticeNameReadsAs', { detail: n.detail, holder: n.holder }) : null;
+  !n ? null
+    // #1445 (ADR-AG-243): a lone vertex read as its one shape's interior angle is said aloud — «הובן כ-∠ABC».
+    : n.code === 'angle-read-as' ? t('noticeAngleReadAs', { holder: n.holder.split(', ').map((h) => `∠${h}`).join(', ') })
+    : t('noticeNameReadsAs', { detail: n.detail, holder: n.holder });
 
 /** What muting or un-muting a row decided (#1548). */
 export type ToggleVerdict =
@@ -504,6 +508,7 @@ export function decideToggle(
       error: {
         key: fault.code, detail: lines[index], existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example,
         ...(fault.operands ? { operands: fault.operands } : {}),
+        ...(fault.options ? { options: fault.options } : {}),
       } as InputError,
     };
   }

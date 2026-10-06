@@ -587,7 +587,12 @@ every segment and shape side through it, deduplicated, sorted — the port of 2-
 two are the rays, and the same `angle` / `angle-ratio` row the three-letter twin lowers to applies. More than
 two is `ambiguous-angle` with an `example` three-letter name (the first shape's angle there, else the first
 two edges); fewer than two, `ambiguous-angle` with none. The number of shapes holding the vertex is not read.
-`canonicalConstraint` sorts each angle's rays, so either ray order is one given.
+`canonicalConstraint` sorts each angle's rays, so either ray order is one given. Since #1445 ([ADR-AG-243](06c-decisions-analytic.md#adr-ag-243), 2-D's ADR-590)
+the resolver has a middle step: more than two edges at a vertex that belongs to exactly ONE shape (shapes
+deduplicated by vertex set) name that shape's interior angle, and the outcome carries an `angle-read-as`
+`ApplyNotice` (`withReadAs`, at the four call sites) that the record verdict shows as «הובן כ-∠ABC». With no
+shape there, or several, `ambiguous-angle` also carries `options` — every edge pair, three letters each — which
+`derive`'s fault and the submit verdict pass through to `errAmbiguousAngleOptions`.
 
 Four things in this grammar have a direction:
 

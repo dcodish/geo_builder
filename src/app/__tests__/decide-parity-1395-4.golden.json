@@ -166,6 +166,7 @@
  "fixture:defining-interaction.geo.json": "453b283f490e90b0",
  "fixture:equilateral-inscribed.geo.json": "d8a2b3c24fc515b8",
  "fixture:issue-1443-trapezoid-height.geo.json": "7e8f5579f6759742",
+ "fixture:issue-1445-triangle-angle-by-vertex.geo.json": "6b53465574954b70",
  "fixture:issue-1471-circumcircle-by-membership.geo.json": "0d3700bfe1282811",
  "fixture:issue-1604-saved-reload.geo.json": "55abd9b8eb5ca177",
  "fixture:issue-1607-diagonal-length.geo.json": "a9beb0c5f7099622",

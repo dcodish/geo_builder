@@ -334,6 +334,14 @@ export async function decideFromParse(
     return refuse('clarify', { source: 'parser', result: `tangents-ambiguous:${r.points.join(',')}` }, { key: 'input.tangentsAmbiguous', params: { points: r.points.join(', '), a: r.points[0] ?? 'A', b: r.points[1] ?? 'B' } });
   }
   if (!r.ok && r.reason === 'ambiguous-angle') {
+    // #1445 (ADR-590): with several angles at the vertex the question LISTS them, each in three letters.
+    const options = r.options ?? [];
+    if (options.length > 1) {
+      return refuse('clarify', { source: 'parser', result: `ambiguous-angle:${r.vertex}` }, {
+        key: 'input.ambiguousAngleOptions',
+        params: { vertex: r.vertex, options: options.map((o) => `∠${o}`).join(', '), example: options[0] },
+      });
+    }
     return refuse('clarify', { source: 'parser', result: `ambiguous-angle:${r.vertex}` }, { key: 'input.ambiguousAngle', params: { vertex: r.vertex } });
   }
   // An angle-alias name that is already taken (an existing point, or an alias bound to a different
@@ -672,6 +680,9 @@ export async function decideFromParse(
           commitLogs.push({ source: 'parser', result: 'advisory:independent-clauses', commands: r.commands });
           note = { key: 'input.scope.split-advisory', params: packed.params };
         } else if (teach) note = { key: 'input.canonicalHint', params: { canonical: teach } };
+        // #1445 (ADR-590, operator ruling 2026-09-27): a lone vertex read as its polygon's interior angle
+        // («זווית B» in △ABC with a cevian at B) is SAID ALOUD — «הובן כ-∠ABC» — never a silent pick.
+        else if (r.angleReadings?.length) note = readAsNote(r.angleReadings);
         // #779 Am. (operator ruling 2026-08-25): a lowercase MEASURE letter the parse bound
         // case-preserved («שרדיוסו r») gets a non-blocking note saying WHY lowercase passed here —
         // measure letters keep their case (the exam's R vs r), point labels are uppercase.
@@ -691,7 +702,7 @@ export async function decideFromParse(
       // configurations — must take the honest-refusal route below, never park as «waiting for givens».
       if (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands, seed, { seatsExhausted: outcome.seatsExhausted })) {
         return {
-          kind: 'commit', deferred: true, binds, commands: r.commands, note: null,
+          kind: 'commit', deferred: true, binds, commands: r.commands, note: readAsNote(r.angleReadings),
           logs: [...logs, { source: 'parser', result: 'deferred-constraint', detail: outcome.detail, commands: r.commands }],
         };
       }
@@ -893,6 +904,15 @@ export function missingOperandLetters(prev: Construction, commands: readonly Any
   };
   for (const cmd of commands) for (const [k, v] of Object.entries(cmd)) if (k !== 'type') visit(v);
   return [...referenced].filter((x) => !defined.has(x)).sort();
+}
+
+/**
+ * #1445 ([ADR-590](../../docs/06-decisions.md#adr-590), operator ruling 2026-09-27) — the note a committed step
+ * carries when a lone vertex was read as its polygon's interior angle: «הובן כ-∠ABC», said aloud, never a
+ * silent pick. Null when the parse made no such reading.
+ */
+function readAsNote(readings: readonly string[] | undefined): DecideNote | null {
+  return readings?.length ? { key: 'input.vertexAngleReadAs', params: { angles: readings.map((a) => `∠${a}`).join(', ') } } : null;
 }
 
 /** The whole pre-LLM lane in one call — for a caller with no spinner to paint (log-triage, #1358). */

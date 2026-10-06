@@ -1,0 +1,132 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-05T00:00:00.000Z",
+  "name": "issue-1445-triangle-angle-by-vertex",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "5Ymp6wcqKOId2IP7qC9gx",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "IVuD2_D2mW3RqSFBJ3dyj",
+      "utterance": "BD חוצה זווית B",
+      "group": "g1",
+      "cmd": {
+        "type": "bisector",
+        "id": "bis-ABC",
+        "vertex": "B",
+        "p": "A",
+        "q": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "0osCCpaFE2RMbzjZQLFis",
+      "utterance": "BD חוצה זווית B",
+      "group": "g1",
+      "cmd": {
+        "type": "line-through",
+        "id": "line-AC",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "TDcPdCUM66NbdR9XCX06d",
+      "utterance": "BD חוצה זווית B",
+      "group": "g1",
+      "cmd": {
+        "type": "line-intersection",
+        "id": "D",
+        "line1": "bis-ABC",
+        "line2": "line-AC"
+      },
+      "enabled": true
+    },
+    {
+      "id": "G4uD2GXdf3dBXGPlqhmEy",
+      "utterance": "BD חוצה זווית B",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "STGi60U_m72_kkwivmT2G",
+      "utterance": "זווית B = 2 זווית C",
+      "group": "g5",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "FiSqb7kPc8TuhTRS5PicS",
+      "utterance": "זווית B = 2 זווית C",
+      "group": "g5",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "GRukErUQb6_FzaamDQATP",
+      "utterance": "זווית B = 2 זווית C",
+      "group": "g5",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "0RB5tYLuBRsCxFHFCYGGj",
+      "utterance": "זווית B = 2 זווית C",
+      "group": "g5",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "76auIj744E4fPt4xhMM6h",
+      "utterance": "זווית B = 2 זווית C",
+      "group": "g5",
+      "cmd": {
+        "type": "set-angle-ratio",
+        "v1": "B",
+        "a1": "A",
+        "b1": "C",
+        "v2": "C",
+        "a2": "B",
+        "b2": "A",
+        "k": 2
+      },
+      "enabled": true
+    }
+  ]
+}

@@ -52,8 +52,9 @@ describe('#1285 — «CE חוצה זווית C במשולש ABC» is «CE חוצ
   });
 
   it('the widening: the triangle form answers where the bare form must ask — a vertex with three edges', () => {
-    // D is a fourth point joined to C, so C has three edges and «זווית C» alone names no single angle.
-    const base = ['משולש ABC', 'נקודה D', 'CD'];
+    // C belongs to TWO triangles and has three edges, so «זווית C» alone names no single angle. (Since #1445 /
+    // ADR-590 a vertex of ONE triangle — «משולש ABC · נקודה D · CD», this lock's old figure — names ∠ACB.)
+    const base = ['משולש ABC', 'נקודה D', 'משולש ACD'];
     const ctx = ctxOf(factsOf(base as never));
     const bare = parse('CE חוצה זווית C', ctx);
     expect(bare.ok).toBe(false);
