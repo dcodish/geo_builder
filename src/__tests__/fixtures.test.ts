@@ -65,8 +65,11 @@ const FIXTURE_DEGENERATE: Record<string, string[]> = {
  * seeds 15 and 33 of 0..40 already did, now only 17). The app's load event rescues exactly that (resolveView
  * asks `meetsRequirements`), so the precondition below asks the same predicate. #855's own claim — no seed
  * accuses the student — stays locked seed by seed in `engine/__tests__/issue-855.test.ts`.
+ *
+ * #1739 (ADR-594): #855 LEFT this set. The stated side is now read by the solve that places C (the retry-only
+ * side steer), so the saved seed 17 keeps C inside the circle and the figure reopens as saved — no rescue.
  */
-const FIXTURE_LOAD_RESCUED = new Set<string>(['issue-572-load-collapse', 'issue-855-tangency-sampled-seat']);
+const FIXTURE_LOAD_RESCUED = new Set<string>(['issue-572-load-collapse']);
 
 describe('figure-file fixtures net', () => {
   it('the net is not empty', () => {

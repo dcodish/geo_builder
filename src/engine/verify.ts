@@ -14,10 +14,11 @@
 
 import type { Command, Constraint, Construction, Id, Polygon, Vec } from './types';
 import type { ResolvedCircle } from './evaluate';
-import { angleDeg, dist, isRingDiagonal, pointInPolygon, pointOutsidePolygon, polygonArea } from './geometry';
+import { angleDeg, dist, isRingDiagonal, polygonArea } from './geometry';
 import { angleOffSpans, angleOnSpans, drawnArcSpans, type ArcSpan } from './arcs';
 import { constraintRefs, describeConstraint, isSatisfied, residual, residualTolerance } from './solve';
 import { formatMeasure } from '../format';
+import { onCircleTol as onCircleTolShared, sideHolds, sideRequirementOf, type SideRecord } from './requirements';
 
 export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
@@ -93,8 +94,8 @@ function onCircleRefs(commands: Command[]): { point: Id; circle: Id }[] {
   return out;
 }
 
-/** Absolute tolerance for "on the circle", scaled to the radius (2%, with a small floor). */
-const onCircleTol = (r: number) => Math.max(0.05, r * 0.02);
+/** Absolute tolerance for "on the circle", scaled to the radius (2%, with a small floor) — one definition, shared with the side test. */
+const onCircleTol = onCircleTolShared;
 
 /** Friendly circle name for messages: `circle-P` → `circle P`. */
 const circleLabel = (id: Id) => id.replace(/^circle-/, 'circle ');
@@ -255,9 +256,8 @@ export function checkGivens(
     const p = positions.get(cmd.id);
     if (!c || !p) continue;
     const d = dist(p, c.center);
-    const tol = onCircleTol(c.r);
-    const ok = cmd.side === 'outside' ? d > c.r + tol : d < c.r - tol;
-    if (!ok) {
+    // #1739 (ADR-594): the ONE definition of "the side holds" — the solver's steer reads the same function.
+    if (!sideHolds(sideRequirementOf(cmd) as SideRecord, positions, circles)) {
       violations.push({
         relation: 'circle-side',
         ids: [cmd.id, cmd.circle],
@@ -410,13 +410,9 @@ export function checkGivens(
     const p = positions.get(cmd.id);
     const verts = cmd.poly.map((v) => positions.get(v));
     if (!p || verts.some((v) => v === undefined)) continue; // a ref isn't placed — a different failure mode
-    const vs = verts as Vec[];
-    const cx = vs.reduce((s, v) => s + v.x, 0) / vs.length;
-    const cy = vs.reduce((s, v) => s + v.y, 0) / vs.length;
-    const rspan = Math.max(...vs.map((v) => dist(v, { x: cx, y: cy })));
     // #1487 (ADR-549): the boundary is neither side — outside is STRICT with the same clearance as inside.
-    const ok = cmd.side === 'inside' ? pointInPolygon(p, vs, rspan * 0.01) : pointOutsidePolygon(p, vs, rspan * 0.01);
-    if (!ok) {
+    // #1739 (ADR-594): judged by the ONE definition the solver, sampler and pool also read.
+    if (!sideHolds(sideRequirementOf(cmd) as SideRecord, positions, circles)) {
       const polyName = cmd.poly.join('');
       violations.push({
         relation: 'region-side',
@@ -470,25 +466,9 @@ export function checkGivens(
     const pa = positions.get(cmd.a);
     const pb = positions.get(cmd.b);
     if (!pa || !pb) continue; // a ref isn't placed — a different failure mode
-    const L = dist(pa, pb);
-    if (L < 1e-9) continue; // degenerate carrier — not a measurable side
-    const offs: number[] = [];
-    let missing = false;
-    for (const id of cmd.subjects) {
-      const p = positions.get(id);
-      if (!p) {
-        missing = true;
-        break;
-      }
-      offs.push(((p.x - pa.x) * (pb.y - pa.y) - (p.y - pa.y) * (pb.x - pa.x)) / L);
-    }
-    if (missing) continue;
-    const tol = 1e-3 * Math.max(1, L); // strictly off the line — above solver noise, below anything visible
-    const strict = offs.every((o) => Math.abs(o) > tol);
-    const ok =
-      strict &&
-      (cmd.rel === 'different' ? offs.length === 2 && offs[0] * offs[1] < 0 : offs.every((o) => o * offs[0] > 0));
-    if (!ok) {
+    if (cmd.subjects.some((id) => !positions.has(id))) continue;
+    // Strictly off the line, on different (resp. the same) sides — #1739 (ADR-594): the ONE definition.
+    if (!sideHolds(sideRequirementOf(cmd) as SideRecord, positions, circles)) {
       const seg = `${cmd.a}${cmd.b}`;
       violations.push({
         relation: 'line-side',

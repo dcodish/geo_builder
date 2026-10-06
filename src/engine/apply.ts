@@ -893,7 +893,7 @@ export function wouldInvertDependency(objects: GeoObject[], x: Id, refs: Id[]): 
  *    |M| = 3 → the circumcircle (collinear ⇒ none); |M| ≥ 4 → none (a real constraint).
  *  - stated radius R: |M| = 2 → the R-circles' intersection nearest O (|M₁M₂| > 2R ⇒ none); |M| ≥ 3 → none.
  * Guard — the seat must be genuinely UNSTATED and moving it must move no other point: the centre is an
- * unpinned, un-driven, region-free free point; the circle carries no `solve` and no radius order; no
+ * unpinned, un-driven free point; the circle carries no `solve` and no radius order; no
  * constraint or side record names the centre or the circle; and every point that transitively depends on
  * the centre/circle is a free (θ-sliding) member — which is re-derived to stay put. Otherwise false, and
  * (c2) keeps its projection seat. Returns true when it re-seated (objects mutated in place).
@@ -913,7 +913,7 @@ function reseatFreeCircle(
   if (circ.radius.via !== 'free' && circ.radius.via !== 'length') return false;
   const oi = objects.findIndex((o) => o.id === circ.center);
   const cen = objects[oi];
-  if (!cen || cen.kind !== 'free-point' || cen.pinned || cen.region?.length || (cen as { solve?: unknown }).solve || (cen as { rigid?: unknown }).rigid) return false;
+  if (!cen || cen.kind !== 'free-point' || cen.pinned || (cen as { solve?: unknown }).solve || (cen as { rigid?: unknown }).rigid) return false;
   if (objects.some((o) => o.kind === 'circle' && (o.innerOf === circleId || o.orderedBelow === circleId))) return false;
   if (constraints.some((c) => constraintRefs(c).includes(circ.center))) return false;
   const reqText = JSON.stringify(requirements ?? []);
@@ -1547,15 +1547,12 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         }
         return { x: c.x + rad, y: c.y };
       };
-      // #556 (ADR-511): the side is also the point's admissible REGION for the sampler — recorded on the
-      // free point itself (`region`), so `applySeed` keeps every sampled configuration on the stated side.
-      const region = { circle: cmd.circle, side: cmd.side };
-      const withRegion = (fp: Extract<GeoObject, { kind: 'free-point' }>): typeof fp =>
-        fp.region?.some((r) => r.circle === region.circle) ? { ...fp, region: fp.region.map((r) => (r.circle === region.circle ? region : r)) } : { ...fp, region: [...(fp.region ?? []), region] };
+      // #556 (ADR-511) → #1739 (ADR-594): the side is also the point's admissible REGION for the sampler — it
+      // rides the construction's requirement record (stamped by applyStep), which `applySeed` seats from.
       const existing = objects.find((o) => o.id === cmd.id);
       if (!existing) {
         const p = seedSpot();
-        objects.push(withRegion({ kind: 'free-point', id: cmd.id, x: p.x, y: p.y })); // a real free DOF (ADR-052) — not pinned
+        objects.push({ kind: 'free-point', id: cmd.id, x: p.x, y: p.y }); // a real free DOF (ADR-052) — not pinned
       } else if (existing.kind === 'free-point' && !existing.pinned && centre) {
         // M1: a side statement about an EXISTING point is a statement about that point, never a
         // re-creation. An under-determined (non-pinned) free point currently on the WRONG side gets its
@@ -1565,7 +1562,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         const wrong = cmd.side === 'outside' ? d <= rr : d >= rr;
         const p = wrong ? seedSpot() : { x: existing.x, y: existing.y };
         const i = objects.findIndex((o) => o.id === cmd.id);
-        objects[i] = withRegion({ ...existing, x: p.x, y: p.y });
+        objects[i] = { ...existing, x: p.x, y: p.y };
       }
       break;
     }

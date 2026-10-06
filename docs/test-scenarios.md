@@ -1687,3 +1687,27 @@ over all four (ADR-041).
 ### `meet-verb-draws-noun-does-not-1751` — a crossing sentence draws what its subject is: the verb its lines, the noun the point only (#1751, ADR-592)
 
 **Guards against:** the noun and the verb drawing the same thing. In «מרובע ABCD», «AC ו- BD נפגשים בנקודה M» (the operator's T3 line) must draw AC and BD with M at their crossing, and «M מפגש AC ו-BD» must build M alone — before #1751, 2-D drew AC and BD for both, and analytic drew neither.
+
+### `line-circle-avoid-off-circle-two-configs-1600` — «הישר BC פוגש את מעגל A» with B off the circle has two figures, and the button reaches both (#1600, ADR-593)
+
+**Guards against:** a crossing marked "the other one" (`avoid`) when its reference point is not on the circle being counted as determined. The status read «✓ נקבע במלואו» and the values panel printed BE = 1.621 / CE = 6.621 as definite while the other crossing gives 2.621 / 2.379, and the button returned nothing. Asserts «יש 2 תצורות», BE/CE withheld, and the press reaching BE = 2.621.
+
+### `segment-secant-both-roots-two-configs-1600` — «BC חותך את מעגל A» with both crossings inside BC has two figures (#1600, ADR-593)
+
+**Guards against:** the same count/selection drift on the segment form: BE = 0.199 printed as definite (the other root gives 0.801). Asserts «יש 2 תצורות», BE withheld, both shapes reached.
+
+### `equilateral-on-square-side-two-sides-1600` — an equilateral triangle on a square's side can be drawn inside or outside (#1600, ADR-593)
+
+**Guards against:** the side of a shape built on an existing edge being recomputed and stored nowhere, so «הציגו תצורה אחרת» could never show the other side and the status claimed «נקבע במלואו». Asserts «יש 2 תצורות» and both sides reached.
+
+### `square-on-triangle-side-two-sides-1600` — a square erected on a fixed triangle's side has two sides (#1600, ADR-593)
+
+**Guards against:** the same, for a square («ריבוע ABDE» on AB of a sized triangle).
+
+### `two-independent-crossings-four-configs-1600` — two independent circle crossings: four figures, all reachable (#1600, ADR-593)
+
+**Guards against:** the button stepping only the first cyclable crossing while the status counted every one — «יש 4 תצורות» with a button that toggled between two for ever. Asserts the count 4 and four shapes reached.
+
+### `point-inside-triangle-two-presses-1739` — a point stated inside a triangle stays inside on every «הציגו תצורה אחרת» press (#1739, ADR-594)
+
+**Guards against:** a stated side being read only by the verifier. «משולש ABC · D בתוך המשולש ABC» sampled D outside the triangle at 94 of 101 seeds, so the second press found nothing and said «אין תצורה אחרת — הצורה נקבעה» about a figure with four free DOF (and the knowledge pool held 14 of 16 off-side samples). Asserts the default view and two presses all exist and all keep D inside; the class matrix (circle, polygon and line sides, the BD=DC stability case, the pool) is `src/engine/__tests__/issue-1739-side-everywhere.test.ts`.

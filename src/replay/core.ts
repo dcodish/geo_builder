@@ -16,6 +16,7 @@
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
 import { angleSumImpossibility, boundImpossibility, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
+import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
@@ -23,7 +24,7 @@ import { DISPLAY_ONLY } from '@/engine';
 import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents } from '@/engine/types';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 import { resolveBinds } from './naming';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -2629,7 +2630,7 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     // already held, so a figure whose CURRENT variant a later given made impossible was refused although
     // another variant draws it — «sin∢ACB = 3/4» then «זווית ACB קהה». Seed-invariant like the seat
     // (a wrong root fails at every seed), so it runs here, before the mask × seed product.
-    const variantFound = variantRescue(facts, deadline);
+    const variantFound = choiceRescue(facts, deadline);
     if (variantFound) {
       lastConfigTier = 'variant';
       return variantFound;
@@ -2768,6 +2769,100 @@ export function cyclableSeat(facts: Fact[]): Fact | undefined {
   return facts.find((f) => f.enabled && f.cmd.type === 'right-triangle' && !f.cmd.ids.some((id) => pinned.has(id)));
 }
 
+/**
+ * #1600 ([ADR-593](docs/06-decisions.md#adr-593)) — THE CONFIGURATION-AXIS REGISTRY: every unstated DISCRETE
+ * choice of a figure, as one typed list. An unstated choice is reachable by «הציגו תצורה אחרת», counted by the
+ * status line and judged by the values panel only if it is registered here — and every consumer CALLS this:
+ * the button's search ({@link searchAnotherView}, all kinds), the knowledge pool ({@link admissibleRewrites},
+ * every kind but `variant`, which {@link variantConfigs} samples as constructions of their own), the rescue
+ * tier ({@link choiceRescue}) and the App's button enablement. There used to be four enumerations and they
+ * disagreed: the search stepped only the FIRST cyclable branch while the pool walked them all, so a status of
+ * «יש 4 תצורות» came with a button that reached 2 (ADR-573 merged the variant axis and left the others out).
+ *
+ * Kinds, in odometer order (the first turns fastest, so the seat — the most drastic reshaping — turns last):
+ * - `branch` — every cyclable branch point (`cyclableBranch`, so a sibling already drawing the other root is
+ *   not a choice), its count from evaluate's own selection (`crossingChoice`, ADR-593 arm A);
+ * - `side` — a shape composed on an existing edge whose side was a genuine choice (the construction's
+ *   `sideChoices`, recorded by LADDER stage 2c), stored as `edgeSide: 'toward'` on the composing fact;
+ * - `variant` — every cyclable variant fact ({@link variantAxes}, ADR-573);
+ * - `seat` — the unpinned right-angle seat ({@link cyclableSeat}, ADR-481).
+ *
+ * `c` is the construction the facts fold to (any seed — a discrete choice is seed-invariant). An axis whose
+ * rewrite cannot reach its fact (no fact carries the choice) is not registered: a press that changes nothing
+ * is not another configuration.
+ */
+export type ChoiceKind = 'branch' | 'side' | 'variant' | 'seat';
+export interface ChoiceAxis {
+  kind: ChoiceKind;
+  /** The fact index the choice is stored on. */
+  i: number;
+  n: number;
+  cur: number;
+  /** The command with this axis set to `digit`. */
+  set: (cmd: AnyCommand, digit: number) => AnyCommand;
+}
+const sameIdSet = (a: readonly Id[], b: readonly Id[]) => a.length === b.length && [...a].sort().join(',') === [...b].sort().join(',');
+const withEdgeSide = (cmd: AnyCommand, toward: boolean): AnyCommand => {
+  const { edgeSide: _drop, ...rest } = cmd as AnyCommand & { edgeSide?: 'toward' };
+  return (toward ? { ...rest, edgeSide: 'toward' } : rest) as AnyCommand;
+};
+export function configurationAxes(facts: Fact[], c: Construction): ChoiceAxis[] {
+  const axes: ChoiceAxis[] = [];
+  for (const o of c.objects) {
+    if (!('branch' in o) || !cyclableBranch(c, o.id)) continue;
+    const i = facts.findIndex((f) => f.enabled && BRANCH_CYCLE_KINDS.has(f.cmd.type) && (f.cmd as { id?: Id }).id === o.id);
+    if (i < 0) continue;
+    const n = Math.max(1, branchCount(c, o.id));
+    const b = (facts[i].cmd as { branch?: number }).branch ?? 0;
+    axes.push({ kind: 'branch', i, n, cur: ((b % n) + n) % n, set: (cmd, d) => ({ ...cmd, branch: d }) as AnyCommand });
+  }
+  for (const s of c.sideChoices ?? []) {
+    // The fact the composing command lowers from — and only one whose stored side actually REACHES that
+    // command through the lowering (a direct shape, or a shape-variant's base shape).
+    const i = facts.findIndex(
+      (f) =>
+        f.enabled &&
+        'ids' in f.cmd &&
+        Array.isArray(f.cmd.ids) &&
+        sameIdSet(f.cmd.ids as Id[], s.ids) &&
+        lower([withEdgeSide(f.cmd, true)]).some((l) => l.type === s.type && 'ids' in l && sameIdSet(l.ids as Id[], s.ids) && edgeSideToward(l)),
+    );
+    if (i < 0 || axes.some((a) => a.kind === 'side' && a.i === i)) continue;
+    axes.push({ kind: 'side', i, n: 2, cur: edgeSideToward(facts[i].cmd) ? 1 : 0, set: (cmd, d) => withEdgeSide(cmd, d === 1) });
+  }
+  for (const a of variantAxes(facts)) axes.push({ kind: 'variant', i: a.i, n: a.n, cur: a.cur, set: (cmd, d) => withVariant(cmd, d) });
+  const seatFact = cyclableSeat(facts);
+  if (seatFact) {
+    const i = facts.indexOf(seatFact);
+    axes.push({
+      kind: 'seat',
+      i,
+      n: 3, // rot ∈ {0,1,2} — which of the three vertices carries the angle
+      cur: (seatFact.cmd as { rot?: number }).rot ?? 0,
+      set: (cmd, d) => {
+        const { rot: _prev, ...rest } = cmd as Extract<AnyCommand, { type: 'right-triangle' }>;
+        return (d === 0 ? rest : { ...rest, rot: d as 1 | 2 }) as AnyCommand;
+      },
+    });
+  }
+  return axes;
+}
+
+/** The facts with each axis set to its digit of `assignment` — several axes on one fact compose; a fact no
+ *  digit changes keeps its identity. */
+function withAssignment(facts: Fact[], axes: ChoiceAxis[], assignment: number[]): Fact[] {
+  return facts.map((f, i) => {
+    let cmd = f.cmd;
+    axes.forEach((a, k) => {
+      if (a.i === i && assignment[k] !== a.cur) cmd = a.set(cmd, assignment[k]);
+    });
+    return cmd === f.cmd ? f : { ...f, cmd };
+  });
+}
+
+/** How many odometer steps one press of «הציגו תצורה אחרת» may try (the deadline bounds it too). */
+const SEARCH_AXIS_STEPS_MAX = 63;
+
 export function searchAnotherView(
   facts: Fact[],
   seed: number,
@@ -2776,43 +2871,18 @@ export function searchAnotherView(
 ): { facts: Fact[]; seed: number } | null {
   const deadline = Date.now() + budgetMs;
   const cur = replay(facts, seed);
-  const branchId = firstCyclableBranch(cur.construction);
-  const nBranch = branchId ? Math.max(1, branchCount(cur.construction, branchId)) : 1;
-  // #1711 (ADR-573): the variant dimension is the PRODUCT of every cyclable variant fact, walked as an
-  // odometer — step v advances the mixed-radix assignment by v — so successive presses reach every
-  // combination. It used to step only the FIRST variant fact, so a second sine (or a sine beside an
-  // isosceles apex) never changed.
-  const axes = variantAxes(facts);
-  const nVariant = axes.reduce((p, a) => p * a.n, 1);
+  // #1600 (ADR-593): the discrete space is the PRODUCT of every registered axis — every cyclable branch, the
+  // composition side, every variant (#1711, ADR-573) and the seat — walked as ONE odometer from the current
+  // assignment: step k advances the mixed-radix assignment by k, so successive presses reach every combination
+  // (it used to step only the FIRST branch, and an everything-advances candidate first, which on a 2×2 space
+  // toggles between two of the four shapes for ever). The seat is the slowest digit: it reshapes the figure
+  // most drastically, so branch, side and variant are offered before it.
+  const axes = configurationAxes(facts, cur.construction);
+  const total = axes.reduce((p, a) => p * a.n, 1);
   const hasDofs = freeDofs(cur.construction).length > 0;
   const curStrict = meetsRequirements(facts, seed);
-  const seatFact = cyclableSeat(facts);
-  const nSeat = seatFact ? 3 : 1; // rot ∈ {0,1,2} — which of the three vertices carries the angle
-
-  // A candidate's fact rewrite — the branch and seat steps `cycleAlt` would apply; the variant step is
-  // the odometer below.
-  const stepped0 = (b: number, r = 0): Fact[] =>
-    facts.map((f) => {
-      let cmd = f.cmd;
-      if (b && f.enabled && branchId && BRANCH_CYCLE_KINDS.has(cmd.type) && 'id' in cmd && (cmd as { id?: Id }).id === branchId)
-        cmd = { ...cmd, branch: ((((cmd as { branch?: number }).branch ?? 0) + b) % nBranch) } as AnyCommand;
-      if (r && seatFact && f === seatFact) {
-        const { rot: prev, ...rest } = cmd as Extract<AnyCommand, { type: 'right-triangle' }>;
-        const next = (((prev ?? 0) + r) % nSeat) as 0 | 1 | 2;
-        cmd = (next === 0 ? rest : { ...rest, rot: next }) as AnyCommand;
-      }
-      return cmd === f.cmd ? f : { ...f, cmd };
-    });
-  const stepped = (b: number, v: number, r = 0): Fact[] => (v ? withVariantAssignment(stepped0(b, r), axes, advanceAssignment(axes, v)) : stepped0(b, r));
-
-  // Discrete combos: everything-advances first (the legacy intent), then each family walked fully.
-  // The seat is walked LAST of the three: it reshapes the figure most drastically, so branch and
-  // variant — the cycles a student is likelier to mean — are offered before it.
-  const combos: [number, number, number][] = [];
-  if (nBranch > 1 && nVariant > 1) combos.push([1, 1, 0]);
-  for (let b = 1; b < nBranch; b++) combos.push([b, 0, 0]);
-  for (let v = 1; v < nVariant; v++) combos.push([0, v, 0]);
-  for (let r = 1; r < nSeat; r++) combos.push([0, 0, r]);
+  const steps = Math.min(total - 1, SEARCH_AXIS_STEPS_MAX);
+  const candidates = Array.from({ length: Math.max(0, steps) }, (_, k) => withAssignment(facts, axes, advanceAssignment(axes, k + 1)));
 
   let fallback: { facts: Fact[]; seed: number } | null = null;
   /**
@@ -2822,15 +2892,14 @@ export function searchAnotherView(
    */
   let coincident: { facts: Fact[]; seed: number } | null = null;
   let k = 0;
-  const total = combos.length * (hasDofs ? 4 : 1) + (hasDofs ? CONFIG_SEEDS : 0);
-  for (const [b, v, r] of combos) {
+  const totalWork = candidates.length * (hasDofs ? 4 : 1) + (hasDofs ? CONFIG_SEEDS : 0);
+  for (const fc of candidates) {
     if (Date.now() > deadline) break;
-    const fc = stepped(b, v, r);
     // Fresh seeds first (the legacy press resampled AND flipped), the current seed as the in-combo fallback.
     const seeds = hasDofs ? [seed + 1, seed + 2, seed + 3, seed] : [seed];
     for (const s of seeds) {
       if (Date.now() > deadline) break;
-      onProgress?.(++k, total);
+      onProgress?.(++k, totalWork);
       if (withSolveBudget(deadline, () => meetsRequirements(fc, s))) {
         // #942: separated wins outright; coincident is remembered and only used if nothing else turns up.
         if (withSolveBudget(deadline, () => separatedView(replay(fc, s)))) return { facts: fc, seed: s };
@@ -2842,7 +2911,7 @@ export function searchAnotherView(
   }
   // The plain seed resample (no discrete step) — shape-diff gated, existing semantics.
   if (hasDofs && Date.now() <= deadline) {
-    const s = searchResample(facts, seed, (kk, n) => onProgress?.(Math.min(k + kk, total), Math.max(total, k + n)), Math.max(0, deadline - Date.now()));
+    const s = searchResample(facts, seed, (kk, n) => onProgress?.(Math.min(k + kk, totalWork), Math.max(totalWork, k + n)), Math.max(0, deadline - Date.now()));
     if (s !== null) return { facts, seed: s };
   }
   // #942 (ADR-486): the coincident view is offered only now, with every separated option exhausted —
@@ -2878,14 +2947,14 @@ export function unpinnedSeats(facts: Fact[]): { f: Fact; i: number }[] {
 
 /** How many variant facts a configuration search steps (bounded like the branch tier's four points). */
 const VARIANT_AXES_MAX = 4;
-/** How many alternative variant assignments `variantRescue` tries (the branch tier's 16, doubled). */
+/** How many alternative choice assignments `choiceRescue` tries (the branch tier's 16, doubled). */
 const VARIANT_COMBOS_MAX = 32;
 /** One cyclable variant fact: its index in the fact list, its count and its current variant. */
 export interface VariantAxis { i: number; n: number; cur: number }
 
 /**
- * The cyclable variant facts of a figure, in fact order (#1711, ADR-573) — the one list both searches
- * (`variantRescue`, `searchAnotherView`) step, so they can never disagree about which choices exist.
+ * The cyclable variant facts of a figure, in fact order (#1711, ADR-573) — the registry's `variant` axes
+ * ({@link configurationAxes}, #1600), so every consumer steps the same list.
  */
 export function variantAxes(facts: Fact[]): VariantAxis[] {
   const out: VariantAxis[] = [];
@@ -2899,7 +2968,7 @@ export function variantAxes(facts: Fact[]): VariantAxis[] {
 }
 
 /** The assignment `steps` places further round the odometer (the first axis turns fastest). */
-function advanceAssignment(axes: VariantAxis[], steps: number): number[] {
+function advanceAssignment(axes: readonly { n: number; cur: number }[], steps: number): number[] {
   let idx = 0;
   for (let k = axes.length - 1; k >= 0; k--) idx = idx * axes[k].n + axes[k].cur;
   const total = axes.reduce((p, a) => p * a.n, 1);
@@ -2911,27 +2980,26 @@ function advanceAssignment(axes: VariantAxis[], steps: number): number[] {
   });
 }
 
-/** The facts with each axis set to its digit of `assignment` (unchanged facts keep their identity). */
-function withVariantAssignment(facts: Fact[], axes: VariantAxis[], assignment: number[]): Fact[] {
-  return facts.map((f, i) => {
-    const k = axes.findIndex((a) => a.i === i);
-    if (k < 0 || assignment[k] === axes[k].cur) return f;
-    return { ...f, cmd: withVariant(f.cmd, assignment[k]) };
-  });
-}
-
 /**
- * THE VARIANT DIMENSION OF THE CONFIGURATION SEARCH (#1711, [ADR-573](docs/06-decisions.md#adr-573)).
+ * THE UNSTATED-CHOICE RESCUE TIER OF THE CONFIGURATION SEARCH (#1711 [ADR-573](docs/06-decisions.md#adr-573),
+ * generalised by #1600 [ADR-593](docs/06-decisions.md#adr-593)).
  *
- * A variant is an unstated choice (ADR-052), so a failure the current variants cause belongs to the
- * choice, not to the givens: try the other assignments — fewest changed facts first, so the figure moves
- * as little as possible (the stability property) — and accept the first rewritten fact list that meets
- * every requirement at a low seed. ONE helper shared by `findValidConfig`'s variant tier and the submit
- * gate's curable test (`dryRunOutcome`), the `seatRescue` shape, so the door and the search agree about
- * which failures a variant cures. Zero cost when no fact carries a cyclable variant.
+ * A variant or a composition side is an unstated choice (ADR-052), so a failure the current choices cause
+ * belongs to the choice, not to the givens: try the other assignments of the registry's `variant` and `side`
+ * axes ({@link configurationAxes}) — fewest changed facts first, so the figure moves as little as possible (the
+ * stability property) — and accept the first rewritten fact list that meets every requirement at a low seed.
+ * The `side` axis is what cures a default composition that a STATED side contradicts (#1600 B.3: measured, a
+ * stated «מחוץ לריבוע» does not pull a vertex out of the wrong composition basin — the side must be chosen).
+ * ONE helper shared by `findValidConfig`'s tier and the submit gate's curable test (`dryRunOutcome`), the
+ * `seatRescue` shape, so the door and the search agree about which failures a choice cures. The seat keeps
+ * its own earlier tier (ADR-445 Am. 1, ADR-584's counted sweep) and the branch its later one (after the
+ * reflection tier), so tier ORDER — and with it every default drawing — is unchanged. Zero cost when no fact
+ * carries a cyclable variant and no composition recorded a side choice.
  */
-export function variantRescue(facts: Fact[], deadline: number): { facts: Fact[]; seed: number } | null {
-  const axes = variantAxes(facts);
+export function choiceRescue(facts: Fact[], deadline: number): { facts: Fact[]; seed: number } | null {
+  const mayHaveSide = facts.some((f) => f.enabled && 'ids' in f.cmd);
+  if (!mayHaveSide && variantAxes(facts).length === 0) return null;
+  const axes = configurationAxes(facts, replay(facts).construction).filter((a) => a.kind === 'variant' || a.kind === 'side');
   if (axes.length === 0) return null;
   const total = axes.reduce((p, a) => p * a.n, 1);
   const changed = (a: number[]): number => a.reduce((c, d, k) => c + (d === axes[k].cur ? 0 : 1), 0);
@@ -2939,7 +3007,7 @@ export function variantRescue(facts: Fact[], deadline: number): { facts: Fact[];
     .sort((x, y) => changed(x) - changed(y))
     .slice(0, VARIANT_COMBOS_MAX);
   for (const assignment of candidates) {
-    const fc = withVariantAssignment(facts, axes, assignment);
+    const fc = withAssignment(facts, axes, assignment);
     for (let s = 0; s < 6; s++) {
       if (Date.now() > deadline) return null;
       if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
@@ -3185,7 +3253,7 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
     // another assignment of the figure's variant choices (the trial's own among them) admits the whole
     // trial figure, the step commits; `settleVariantDefaults` settles the new fact's own choice at commit
     // and the post-commit `autoResolve` (`findValidConfig`'s variant tier) flips an earlier one.
-    if (variantRescue(all, Date.now() + 1500)) return { produced: true };
+    if (choiceRescue(all, Date.now() + 1500)) return { produced: true };
     // #1671 (ADR-584): a FINISHED sweep over at least one unpinned seat that cured nothing is a proof.
     return { produced: false, reason: 'error', detail: after.status[errored.id], ...(seats.complete && unpinnedSeats(all).length ? { seatsExhausted: true } : {}) };
   }
@@ -3449,50 +3517,43 @@ export const ADMISSIBLE_SEEDS = 3;
 export const CONFIG_SEEDS = 24;
 /**
  * The DISCRETE rewrites of a determined figure's admissible set (#434, ADR-509) — the exact fact rewrites
- * «הציגו תצורה אחרת» applies ({@link searchAnotherView} / `cycleAlt`): every cyclable branch point stepped
- * through each of its branches, crossed with the right-angle seat ({@link cyclableSeat}, rot ∈ {0,1,2}).
- * The current facts are element 0 (the identity); a rewrite that changes no fact is dropped. Returns
- * `null` when the cross product exceeds {@link ADMISSIBLE_REWRITE_CAP} — the caller then fails CLOSED.
+ * «הציגו תצורה אחרת» applies ({@link searchAnotherView}): the product of the registry's axes
+ * ({@link configurationAxes}, #1600 ADR-593) — every cyclable branch point, every composition side and the
+ * right-angle seat. The current facts are element 0 (the identity); a rewrite that changes no fact is dropped.
+ * Returns `null` when the cross product exceeds {@link ADMISSIBLE_REWRITE_CAP} — the caller then fails CLOSED.
  *
- * ONLY branch and seat participate: the reflection mask is subsumed by the seed axis (measured on the
+ * Variants do not participate here (see below); the reflection mask is subsumed by the seed axis (measured on the
  * corpus, 2026-09-11: every mask-varying print also varied with the seed), and the `inscribe` variant is
  * a placement/relabeling choice that {@link variantConfigs} deliberately keeps out of the pool (ADR-262).
  */
 export function admissibleRewrites(facts: Fact[], c: Construction, cap = ADMISSIBLE_REWRITE_CAP): Fact[][] | null {
-  const branchPts = c.objects
-    .filter((o) => 'branch' in o && cyclableBranch(c, o.id))
-    .map((o) => ({ id: o.id, n: Math.max(1, branchCount(c, o.id)) }));
-  const seatFact = cyclableSeat(facts);
-  const nSeat = seatFact ? 3 : 1;
-  const seatRot = seatFact ? ((seatFact.cmd as { rot?: number }).rot ?? 0) : 0;
-  const total = branchPts.reduce((p, b) => p * b.n, 1) * nSeat;
+  // #1600 (ADR-593): the registry's axes — the SAME list the button steps — minus `variant` (sampled as
+  // constructions of their own by `variantConfigs`, so a figure with one is never "determined" here).
+  const axes = configurationAxes(facts, c).filter((a) => a.kind !== 'variant');
+  const total = axes.reduce((p, a) => p * a.n, 1);
   if (total > cap) return null;
-  const rewrite = (branches: number[], rot: number): Fact[] =>
-    facts.map((f) => {
-      let cmd = f.cmd;
-      if (f.enabled && BRANCH_CYCLE_KINDS.has(cmd.type) && 'id' in cmd) {
-        const k = branchPts.findIndex((b) => b.id === (cmd as { id?: Id }).id);
-        if (k >= 0 && ((cmd as { branch?: number }).branch ?? 0) !== branches[k]) cmd = { ...cmd, branch: branches[k] } as AnyCommand;
-      }
-      if (seatFact && f === seatFact && rot !== seatRot) {
-        const { rot: _prev, ...rest } = cmd as Extract<AnyCommand, { type: 'right-triangle' }>;
-        cmd = (rot === 0 ? rest : { ...rest, rot: rot as 1 | 2 }) as AnyCommand;
-      }
-      return cmd === f.cmd ? f : { ...f, cmd };
-    });
   const out: Fact[][] = [facts];
-  const walk = (k: number, branches: number[]) => {
-    if (k === branchPts.length) {
-      for (let r = 0; r < nSeat; r++) {
-        const fc = rewrite(branches, (seatRot + r) % nSeat);
-        if (fc.some((f, i) => f !== facts[i])) out.push(fc);
-      }
-      return;
-    }
-    for (let b = 0; b < branchPts[k].n; b++) walk(k + 1, [...branches, b]);
-  };
-  walk(0, []);
+  for (let k = 1; k < total; k++) {
+    const fc = withAssignment(facts, axes, advanceAssignment(axes, k));
+    if (fc.some((f, i) => f !== facts[i])) out.push(fc);
+  }
   return out;
+}
+/**
+ * #1739 ([ADR-594](../../docs/06-decisions.md#adr-594), ADR-256's deferred follow-up): a sample in which a STATED
+ * SIDE does not hold («D בתוך המשולש ABC» with D outside) is not a configuration of the figure — counting it
+ * lets the knowledge layers reason over drawings the student's given excludes. Judged by the ONE definition
+ * (`sideShortfall`, the verifier's test) on the sample's own circles. Same fallback as its siblings: never
+ * strips below 2 — a thin pool over-claims, the unfiltered pool only under-claims.
+ */
+function sideSamples(c0: Construction, samples: Map<Id, Vec>[]): Map<Id, Vec>[] {
+  if (!sideRecordsOf(c0).length) return samples;
+  const kept = samples.filter((pos) => {
+    const c = constructionOfSample.get(pos) ?? c0;
+    const circles = circlesOfSample.get(pos) ?? new Map<Id, ResolvedCircle>();
+    return sideRecordsOf(c).every((r) => sideShortfall(r, pos, circles) === 0);
+  });
+  return kept.length >= 2 ? kept : samples;
 }
 export function samplingJobs(facts: Fact[], opts: { wide?: boolean } = {}) {
   const configs = variantConfigs(facts);
@@ -3578,7 +3639,7 @@ export function samplingJobs(facts: Fact[], opts: { wide?: boolean } = {}) {
     // otherwise poison the ground-truth pool the relations/shapes layers share.
     // A point-free crossing statement (`segments-cross`, ADR-383) is fact-level like the extensions, so
     // its sample filter lives HERE (the store core), not in the object-level `requirementSamples`.
-    const within = requirementSamples(c0, distinctSamples(c0, preciseSamples(c0, converged))).filter((pos) => segmentsCrossWithin(facts, pos));
+    const within = sideSamples(c0, requirementSamples(c0, distinctSamples(c0, preciseSamples(c0, converged))).filter((pos) => segmentsCrossWithin(facts, pos)));
     const strict = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived));
     const key = foldKey(facts);
     if (strict.length >= 2) return (sampleMemo = { facts, key, constructions, samples: strict, determined: complete_, complete: complete && !overCap });

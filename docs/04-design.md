@@ -1064,8 +1064,9 @@ enabled cyclable variant fact, in fact order, at most four.
   variant step `v` advances the mixed-radix assignment by `v`, so successive presses reach every combination.
   It used to step only the first variant fact.
 
-The App's «הציגו תצורה אחרת» enablement reads `cyclableVariant` (the search's own predicate), so a figure the
-givens otherwise determine — the ambiguous case «AB = 4», «AC = 3», «sin∢ACB = 3/4» — still offers its choice.
+The App's «הציגו תצורה אחרת» enablement reads the registry (below), so a figure the givens otherwise determine
+— the ambiguous case «AB = 4», «AC = 3», «sin∢ACB = 3/4» — still offers its choice. (#1600 / ADR-593 folded
+`variantRescue` into `choiceRescue` and the variant odometer into the one over every axis — next section.)
 
 ## A variable statement waits for its letter ([ADR-562](06-decisions.md#adr-562))
 
@@ -1127,7 +1128,7 @@ The point-on-carrier rules (`pointOnExtension`, `pointOnSegment`) match a prefix
 - **The end qualifier** — `pointOnExtension` reads «מעבר ל(-)(נקודה) X» / "beyond X": X the far end keeps the carrier; X the near end reverses it (E on the extension of CB); any other letter escalates the line whole.
 - **The net** — `droppedGivenRelations`'s exemption (b) holds only when the command that INTRODUCES one of the relation's labels itself carries every label of the relation (`K על המשך AB כך ש AB=BK` baked as t = 2). "Some label is introduced by any command" accounted «DE = DC» because E was introduced on BC. With the exemption narrowed, the parser's own clause fallback (ADR-264) reads «E על המשך BC ו-DE = DC» and «…, DE = DC», which consult the same gate, and every rule and the LLM lane are held to it.
 
-## A stated side is a requirement record, checked at stage 0g′ ([ADR-549](06-decisions.md#adr-549))
+## A stated side is a requirement record, checked at stage 0g′ and read wherever a point is placed ([ADR-549](06-decisions.md#adr-549), [ADR-594](06-decisions.md#adr-594))
 
 - **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`) — `circle-side`,
   `polygon-side`, `line-side`, and since [ADR-567](06-decisions.md#adr-567) (#1709) `circle-position`: two circles'
@@ -1154,6 +1155,14 @@ The point-on-carrier rules (`pointOnExtension`, `pointOnSegment`) match a prefix
   it, with the same margins as their inside tests.
 - **Parser.** `regionSideFallback` no longer declines a region's own vertex («A בתוך המשולש ABC»): it
   parses, and the prover refuses it with the reason, instead of «I didn't understand».
+- **Read wherever a point is placed ([ADR-594](06-decisions.md#adr-594), #1739).** The record is not only a
+  prover input: ONE definition, `sideShortfall(req, positions, circles, aim)` (`engine/requirements.ts`, 0 iff
+  `sideHolds`, the test `checkGivens` itself calls), is read by every stage that places a point — the 1-D
+  root pick (side-keeping roots first), a retry-only side steer as the last rung of both driven solvers, the
+  sampler's region seat (`seatStatedSides` in `applySeed`: circle, polygon and line sides, on a free point or
+  a free on-circle rider) and the knowledge pool (`sideSamples`). `FreePoint.region` (ADR-511) is retired —
+  the region rides the record, which survives every ladder rebuild, where the field vanished on an M1
+  conversion. So a satisfiable side holds in every configuration the tool offers, not only at lucky seeds.
 
 
 ## The dev step-through panel ([ADR-581](06-decisions.md#adr-581))
@@ -1174,3 +1183,47 @@ step-5 failure is re-tested without retyping steps 1–4.
 ## A crossing draws what its subject is ([ADR-592](06-decisions.md#adr-592))
 
 A crossing sentence has a FRAME, and only the frame decides whether its operand lines are drawn (#1751, operator rulings 2026-10-04). The verb frame — `lineLineIntersection`'s lines-first and cut branches, and a role meet whose `crossingSubjectOf` is `'lines'` (a meet verb, no point-first noun head) — inks its operands: the lettered pairs as before, and «האלכסונים נפגשים בנקודה M» the ring's two diagonals (plain segments: derived from the ring the sentence resolved, so no ADR-499 claim). The noun frame — the point-first branch, `cross(…, 'point')`, and the role meet with a noun head — inks nothing; it ensures its operands' endpoints as `ifAbsent` free points so the statement stands alone (an empty canvas, and the #943 drop-one re-fold, which never re-parses). Analytic reads the same rule (ADR-AG-241).
+
+## One registry of unstated discrete choices ([ADR-593](06-decisions.md#adr-593))
+
+An unstated discrete choice — which crossing, which side of an edge, which root, which vertex carries the right
+angle — is reachable by «הציגו תצורה אחרת», counted by the status line and judged by the values panel **only if
+it is registered** in `configurationAxes(facts, construction)` (`replay/core.ts`). Each axis is
+`{ kind, i, n, cur, set(cmd, digit) }`: the fact index that stores the choice, its count, its current digit and
+the rewrite. Kinds, in odometer order (first turns fastest):
+
+| Kind | Where it comes from | Stored as |
+|---|---|---|
+| `branch` | every `cyclableBranch` point, counted by `branchCount` | `branch` on the crossing's fact |
+| `side` | the construction's `sideChoices` (LADDER stage 2c) | `edgeSide: 'toward'` on the composing fact |
+| `variant` | `variantAxes` (ADR-573) | `variant` (via `withVariant`) |
+| `seat` | `cyclableSeat` (ADR-481) | `rot` on the right triangle |
+
+Consumers, each a caller and never a restatement:
+- **`searchAnotherView`** walks ONE odometer over the product of every axis from the current assignment —
+  step k advances the mixed-radix assignment by k, at most 63 steps per press — so successive presses reach
+  every combination. (It used to step only the FIRST cyclable branch, after an everything-advances candidate
+  that on a 2×2 space toggles between two of the four shapes.)
+- **`admissibleRewrites`** (the knowledge pool of a determined figure) enumerates every axis but `variant`
+  (variants are sampled as constructions of their own by `variantConfigs`); over `ADMISSIBLE_REWRITE_CAP` it
+  fails closed.
+- **`choiceRescue`** (`findValidConfig`'s tier after the seat, and `dryRunOutcome`'s curable test) tries the
+  other assignments of the `variant` and `side` axes, fewest changes first. The seat and the branch keep their
+  own tiers so tier order — and every default drawing — is unchanged.
+- **`App.tsx`** enables the button when any axis exists or the figure has free DOFs.
+
+**The crossing count is evaluate's own selection.** `crossingChoice` (`engine/evaluate.ts`) returns the roots a
+line∩circle / circle∩circle point chooses among and the one it picks; `tryEval` draws the pick and
+`crossingBranchCount` (behind `branchCount`) counts the roots. An `avoid` that is one of the crossings, a single
+in-segment root or a tangent is determined (1); an `avoid` that is not a crossing — the parser's fallback for
+«הישר BC פוגש את מעגל A» when neither endpoint is on the circle — is an ordinary branch pick (ADR-470), so 2.
+
+**The composition side is stored, not recomputed.** `chooseComposition` keeps the away-from-existing-geometry
+default; when both sides are clean and off-edge geometry on a definite side makes them different figures, it
+reads `edgeSide: 'toward'` (take the other clean side) and records a `SideChoice { type, ids, toward }` on the
+result, which `withSideChoices` carries forward on every accepted step (the `withRequirements` discipline). A
+stacking side and a mirror-only composition record nothing. The registry maps a record back to the fact whose
+lowering reaches the composing command with the side set (a direct shape, or a shape-variant's base shape —
+`expandShapeVariant` carries `edgeSide`). The field is optional: a saved figure without it loads and draws
+unchanged. A STATED side wins: the search offers the other side only through `meetsRequirements`, and a default
+the stated side contradicts is cured by `choiceRescue`'s side axis.

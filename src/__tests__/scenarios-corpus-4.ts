@@ -49,7 +49,7 @@ import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-ha
 import { ctxOf } from './scenario-pipeline';
 import { gateVerdict } from './submit-gate';
 import { parse } from '@/parser';
-import { computeValues, figureDeterminacy, findValidConfig, searchAnotherView, sharedSamples } from '@/replay/core';
+import { computeValues, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
 import { drivenSolveStats } from '@/engine/evaluate';
 
@@ -3444,4 +3444,116 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'line-circle-avoid-off-circle-two-configs-1600',
+    title: '#1600 (ADR-593): «הישר BC פוגש את מעגל A בנקודה E» with B off the circle — «יש 2 תצורות», BE/CE withheld (was 1.621 / 6.621 as definite), the button reaches the other crossing (BE = 2.621)',
+    guards: guards1600(),
+    steps: ['משולש ABC', 'AB=4, BC=5, AC=6', 'מעגל A ברדיוס 4.5', 'הישר BC פוגש את מעגל A בנקודה E'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC', 'AB=4, BC=5, AC=6', 'מעגל A ברדיוס 4.5', 'הישר BC פוגש את מעגל A בנקודה E']);
+      expect(configsShown(facts)).toBe(2);
+      const rows = computeValues(facts).rows.filter((r) => r.kind === 'length').map((r) => r.label);
+      expect(rows.includes('BE') || rows.includes('CE'), 'no definite BE/CE while two figures exist').toBe(false);
+      const be = pressAll(facts, 3).map((f) => dist(f.positions.get('B')!, f.positions.get('E')!));
+      expect(be.some((x) => Math.abs(x - 2.621) < 1e-3), `the other crossing is reached: ${be}`).toBe(true);
+      expect(shapesReached(facts, 4)).toBe(2);
+    },
+  },
+  {
+    id: 'segment-secant-both-roots-two-configs-1600',
+    title: '#1600 (ADR-593): «BC חותך את מעגל A בנקודה E» with both crossings inside BC — «יש 2 תצורות», BE withheld (was 0.199 as definite), both reached',
+    guards: guards1600(),
+    steps: ['משולש ABC', 'AB=4, BC=5, AC=6', 'מעגל A ברדיוס 3.98', 'BC חותך את מעגל A בנקודה E'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC', 'AB=4, BC=5, AC=6', 'מעגל A ברדיוס 3.98', 'BC חותך את מעגל A בנקודה E']);
+      expect(configsShown(facts)).toBe(2);
+      expect(computeValues(facts).rows.some((r) => r.kind === 'length' && r.label === 'BE'), 'BE withheld').toBe(false);
+      expect(shapesReached(facts, 4)).toBe(2);
+    },
+  },
+  {
+    id: 'equilateral-on-square-side-two-sides-1600',
+    title: '#1600 (ADR-593): «ריבוע ABCD» · «משולש שווה צלעות ABE» — «יש 2 תצורות»; the default draws E outside the square and the button reaches the inside',
+    guards: guards1600(),
+    steps: ['ריבוע ABCD', 'משולש שווה צלעות ABE'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['ריבוע ABCD', 'משולש שווה צלעות ABE']);
+      expect(configsShown(facts)).toBe(2);
+      expect(shapesReached(facts, 4)).toBe(2);
+    },
+  },
+  {
+    id: 'square-on-triangle-side-two-sides-1600',
+    title: '#1600 (ADR-593): a square erected on a fixed triangle’s side («ריבוע ABDE») — «יש 2 תצורות», both sides reached',
+    guards: guards1600(),
+    steps: ['משולש ABC', 'AB=4, BC=5, AC=6', 'ריבוע ABDE'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC', 'AB=4, BC=5, AC=6', 'ריבוע ABDE']);
+      expect(configsShown(facts)).toBe(2);
+      expect(shapesReached(facts, 4)).toBe(2);
+    },
+  },
+  {
+    id: 'two-independent-crossings-four-configs-1600',
+    title: '#1600 (ADR-593): two independent circle∩circle crossings (G, H) — «יש 4 תצורות» and the button reaches all four (it walked two for ever)',
+    guards: guards1600(),
+    steps: ['משולש ABC', 'AB=6, BC=5, AC=7', 'מעגל A ברדיוס 4', 'מעגל B ברדיוס 5', 'G חיתוך מעגל A ומעגל B', 'מעגל C ברדיוס 3', 'H חיתוך מעגל B ומעגל C'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC', 'AB=6, BC=5, AC=7', 'מעגל A ברדיוס 4', 'מעגל B ברדיוס 5', 'G חיתוך מעגל A ומעגל B', 'מעגל C ברדיוס 3', 'H חיתוך מעגל B ומעגל C']);
+      expect(configsShown(facts)).toBe(4);
+      expect(shapesReached(facts, 6)).toBe(4);
+    },
+  },
+  {
+    id: 'point-inside-triangle-two-presses-1739',
+    title: '#1739 (ADR-594): «משולש ABC · D בתוך המשולש ABC» — two presses of «הציגו תצורה אחרת» both find a view with D inside (the second said «אין תצורה אחרת — הצורה נקבעה»)',
+    guards: `Triage of #1739 (measured on 4d6e3fd6, re-measured on the #1600 tip dedbccae, seeds 0..100, through parse -> replay): a stated side was a requirement record only the verifier read. The sampler re-seated only a circle side on a bare free point (ADR-511's \`FreePoint.region\`), so «D בתוך המשולש ABC» put D outside at 94 of 101 seeds; the second press found nothing and the note claimed the shape was determined while the triangle and D carry 4 free DOF; the knowledge pool held 14 of 16 samples with D outside. Root cause and fix (ADR-594): one definition, \`sideShortfall\` (0 iff the verifier accepts), read by the 1-D root pick, a retry-only side steer in the driven solve, the sampler's region seat (all three kinds, from the requirement record) and the pool filter. The class matrix is src/engine/__tests__/issue-1739-side-everywhere.test.ts.`,
+    steps: ['משולש ABC', 'D בתוך המשולש ABC'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const views = pressAll(factsOf(['משולש ABC', 'D בתוך המשולש ABC']), 2);
+      expect(views.length, 'the default view and two presses').toBe(3);
+      for (const v of views) expect(v.violations, 'D inside ABC in every view shown').toEqual([]);
+    },
+  },
 ];
+
+/** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */
+function guards1600(): string {
+  return `Sweep-found by ADR-556 (no operator utterance; the triage's probe lines are the lock), measured on 4d6e3fd6 and re-measured on 9d1b0b1f through parse -> replay: «הציגו תצורה אחרת» returned null from every start while the givens admit another figure. Root cause (ADR-593), one class — an unstated discrete choice is reachable only if registered as an axis the configuration search steps: (A) \`branchCount\` answered 1 for every \`avoid\` crossing, though \`evaluate\` (ADR-470) treats an \`avoid\` that is not a crossing as an ordinary branch pick; (B) the side of a shape erected on an edge was recomputed at every fold and stored nowhere; (C) the button stepped only the FIRST cyclable branch while the pool counted all of them. Fix: one registry (\`configurationAxes\`) that the search, the pool, the rescue tier and the App all call; the crossing count IS evaluate's selection (\`crossingChoice\`); the composition side is stored (\`edgeSide\`) and recorded (\`sideChoices\`). The unit matrix (stated sides both ways, the rescue, the guards) is src/__tests__/issue-1600-choice-registry.test.ts.`;
+}
+
+/** #1600: the configuration count the status line shows (1 when it says «נקבע במלואו»). */
+function configsShown(facts: Fact[]): number {
+  const st = figureStatus(facts.length, freeDofCount(replay(facts).construction), figureDeterminacy(sharedSamples(facts)));
+  return st?.key === 'actions.dofConfigs' ? (st as { n: number }).n : st?.key === 'actions.determined' ? 1 : -1;
+}
+/** #1600: the default view plus `presses` presses of «הציגו תצורה אחרת» — every view shown meets the givens. */
+function pressAll(facts: Fact[], presses: number) {
+  let cur = { facts, seed: firstSatisfyingSeed(facts) };
+  const out = [replay(cur.facts, cur.seed)];
+  for (let k = 0; k < presses; k++) {
+    const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY);
+    if (!next) break;
+    expect(meetsRequirements(next.facts, next.seed), 'a press never breaks a given').toBe(true);
+    cur = next;
+    out.push(replay(cur.facts, cur.seed));
+  }
+  return out;
+}
+/** #1600: how many distinct shapes (similarity-invariant) the button shows. */
+function shapesReached(facts: Fact[], presses: number): number {
+  const sig = (f: ReturnType<typeof replay>) => {
+    const ids = [...f.positions.keys()].filter((id) => /^[A-Z]$/.test(id)).sort();
+    const ds: number[] = [];
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) ds.push(dist(f.positions.get(ids[i])!, f.positions.get(ids[j])!));
+    const m = Math.max(...ds);
+    return ds.map((x) => (x / m).toFixed(3)).join(',');
+  };
+  return new Set(pressAll(facts, presses).map(sig)).size;
+}
