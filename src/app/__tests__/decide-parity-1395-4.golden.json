@@ -153,6 +153,7 @@
  "scenario:creating-row-above-retyped-parent-1411": "014fadf075a2d9e2",
  "scenario:untick-then-retype-reenables-1748": "489374a1b538e318",
  "scenario:impossible-chord-refused-beside-unstated-right-angle-1671": "f074f309d9dbbf0c",
+ "scenario:angle-out-of-range-refused-1712": "bc2ee590fd453753",
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",
  "fixture:defining-interaction.geo.json": "453b283f490e90b0",
  "fixture:equilateral-inscribed.geo.json": "d8a2b3c24fc515b8",

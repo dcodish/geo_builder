@@ -14,11 +14,12 @@ _Instrumentation: `StepResult.ladder` (an ordered string trace of the stages tra
 | 0d | `normalizeShapeComposition` — rotate a shape's vertices onto an existing edge (rewrite, not a gate) | — | no |
 | 0e | `metricImpossibility` — a pinned distance longer than the shortest pinned PATH between its endpoints ([ADR-417](06-decisions.md#adr-417); as-found, recorded here by ADR-538) | `pre:impossible` | yes |
 | 0f | `angleSumImpossibility` — a declared polygon's stated interior angles summing past its own (n − 2)·180° ([ADR-538](06-decisions.md#adr-538)) | `pre:impossible` | yes |
+| 0f′ | `measureRangeImpossibility` — a stated measure outside the range ANY configuration gives it, read on the step's new constraints alone: an angle ∉ [0°, 180°] (not an arc), an angle/length bound whose window misses the range, a length < 0, a same-sign measure sum of the other sign. Also run by `applyCoupledStep` ([ADR-587](06-decisions.md#adr-587)) | `pre:impossible` | yes |
 | 0g | `boundImpossibility` — a stated BOUND and a stated VALUE of the same measure that exclude each other, strictness respected ([ADR-541](06-decisions.md#adr-541)) | `pre:impossible` | yes |
 | 0g′ | `sideImpossibility` — a stated SIDE (inside/outside a circle or polygon, same/different sides of a line) and a statement that STRUCTURALLY puts the point elsewhere: on the circle, its centre (outside), a vertex / edge / edge midpoint of the region, on the line, or the opposite side. Reads the construction's side REQUIREMENT records plus the incoming command's own asserted objects, so both orders are one case ([ADR-549](06-decisions.md#adr-549)) | `pre:impossible` | yes |
 
-All four provers are SOUND one way only: a violation proves impossibility and refuses before the ladder;
-passing proves nothing. The same four run inside the classifier's `constraintIsPending` (stage 5), so a
+All five provers are SOUND one way only: a violation proves impossibility and refuses before the ladder;
+passing proves nothing. The same five run inside the classifier's `constraintIsPending` (stage 5), so a
 proven contradiction is never filed as ADR-104's pending state — and, because they run before anything
 mutates, the refusal is also the CHEAP path (#1335 measured 19.6 s → 2.2 s on its own sequence).
 

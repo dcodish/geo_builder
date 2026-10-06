@@ -14,7 +14,7 @@
  */
 
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { angleSumImpossibility, boundImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
+import { angleSumImpossibility, boundImpossibility, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
@@ -1996,6 +1996,9 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   const probe = cmds.reduce((c, cmd) => applyCommand(c, cmd), cur);
   const newCons = probe.constraints.slice(cur.constraints.length);
   if (newCons.length === 0) return false;
+  // #1712 (ADR-587): a stated measure outside the range any figure can give it («∢ABC = -2») has a
+  // residual that MOVES on a free triangle — which is not whether it can reach zero. It never can.
+  if (measureRangeImpossibility(newCons)) return false;
   // #420 (ADR-417): a PROVEN metric contradiction is never "waiting for more givens". The flex probe
   // below asks whether the residual MOVES, which is not whether it can reach ZERO — on «AB=4, BC=4,
   // AC=9» the free radius and placement do move |AC|, so the impossibility was reported as a pending

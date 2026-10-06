@@ -3400,4 +3400,24 @@ export const SCENARIOS_4: Scenario[] = [
       expect(gateVerdict(arc, 'קשת AB = קשת BC').kind, 'a seat cures it — the line commits').toBe('commit');
     },
   },
+  {
+    id: 'angle-out-of-range-refused-1712',
+    title: '#1712 (ADR-587): on «משולש ABC», «∢ABC = -2», «זווית ABC = -30» and «∢ABC = 200» are REFUSED naming the given (an angle measures between 0° and 180°; on the triangle 200° keeps the angle-sum sentence) — and «∢ABC = 90» still commits',
+    guards:
+      "Measured on 4d6e3fd6 through runSubmit: «∢ABC = -2» and «זווית ABC = -30» COMMITTED as a deferred given (the triangle unchanged, ∠B still 41.99°), because the ADR-104 flex probe saw the residual ∠ABC − (−2) move on the free triangle and filed it as pending; «∢ABC = 200» was refused only by the triangle's angle-sum gate. Root fix: a fifth one-way-sound prover beside ADR-417/538/540/551 — a stated measure outside the range any configuration gives it (angle ∉ [0°, 180°], a bound window that misses it, a length < 0, a same-sign measure sum of the other sign) — read on the lowered CONSTRAINT, so every spelling and the variable route meet it, in the step's pre-ladder gate AND in constraintIsPending. The predicate matrix is in src/engine/__tests__/measure-range-1712.test.ts.",
+    steps: ['משולש ABC'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC']);
+      for (const line of ['∢ABC = -2', 'זווית ABC = -30']) {
+        const v = gateVerdict(facts, line);
+        expect(v.kind, `«${line}» is refused`).toBe('refused');
+        expect(v.kind === 'refused' ? v.detail : '', `«${line}» names the given and the range`).toMatch(/^impossible: ∠ABC = -\d+° — an angle measures between 0° and 180°$/);
+      }
+      // over 180° on a declared triangle keeps ADR-538's curriculum sentence (the angle-sum prover runs first)
+      const reflex = gateVerdict(facts, '∢ABC = 200');
+      expect(reflex.kind === 'refused' ? reflex.detail : '', '«∢ABC = 200» is refused by the triangle angle sum').toMatch(/^impossible: the angles of ABC sum to 200°/);
+      expect(gateVerdict(facts, '∢ABC = 90').kind, 'an angle inside the range still commits').toBe('commit');
+    },
+  },
 ];
