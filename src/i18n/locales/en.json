@@ -74,7 +74,8 @@
       "foreign-given": "\"{{phrase}}\" is a given this tool can't represent, so nothing from this sentence was built (not even part of it). {{guide}}",
       "word-root": "Write the root value with the √ symbol — there's a √() button in the toolbar. E.g. \"√27\" instead of the word \"root 27\".",
       "lowercase-labels": "Point labels are written in UPPERCASE letters. Try: {{corrected}}",
-      "hebrew-labels": "Vertices are named with uppercase Latin letters here, not Hebrew ones. Did you mean: {{corrected}}"
+      "hebrew-labels": "Vertices are named with uppercase Latin letters here, not Hebrew ones. Did you mean: {{corrected}}",
+      "teach-fraction": "Write the given itself, with the fraction in digits: \"{{corrected}}\". It is in the input box now — press Enter to draw it."
     },
     "shapeNotFound": "There is no {{noun}} in this figure — check the shape name, or declare it first (e.g. \"{{noun}} ABCD\").",
     "producedNothing": "I understood that but it didn't build anything on the figure — I tried rephrasing it too. Check the names/relations, or word it differently.",

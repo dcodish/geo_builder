@@ -50,6 +50,11 @@ export interface SubmitUi {
   setLlmDropped(steps: string[]): void;
   /** Clear the input field (a successful submission). */
   clearText(): void;
+  /**
+   * #1611 (ADR-591, ADR-W-030): REPLACE the input text with a taught canonical sentence, so one Enter builds
+   * what the note teaches. Optional — a caller with no input box (a headless driver) omits it.
+   */
+  setText?(text: string): void;
   setBusy(busy: boolean): void;
 }
 
@@ -176,6 +181,8 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     case 'refuse':
       for (const e of verdict.logs) log(e);
       ui.setInputNote(noteText(verdict.note));
+      // #1611: a taught sentence that was PROVED to build replaces the text; any other refusal keeps it
+      if (verdict.prefill !== undefined) ui.setText?.(verdict.prefill);
       ui.setBusy(false);
       return; // keep the text so the student can edit it
     case 'commit':

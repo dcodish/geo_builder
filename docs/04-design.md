@@ -863,6 +863,14 @@ the sentence, quoted, and `missingOperandLetters` — the point labels the batch
 figure nor the batch (applied structurally) defines. With none to name it answers `input.unresolvedSentence`.
 Internal ids are never point labels, so none reaches the student.
 
+**A word fraction or a wish is taught, proved first ([ADR-591](06-decisions.md#adr-591)).** At the escalation
+seam, `parser/fractionTeach.ts` (`fractionTeachCandidate`, pure over the text and the `ParseContext`) proposes the
+canonical line — wrapper peeled, word fraction as `p/q`, «הצלע של ה<shape>» resolved per subject through
+`declaredPolygons` + `onSegment`/`midpointOf`. The decision then PROVES it by running itself on the proposal
+(`decideFromParse(…, { teaching: true })`, one level only) and adopts it only on a non-deferred `commit`. The
+verdict is a `refuse` carrying `prefill`; `runSubmit` replaces the input text through the optional
+`SubmitUi.setText`. This is the 2-D seat #1358 hoists into `shell/` with the imperative register.
+
 **Deferral reads the fold's per-fact verdict ([ADR-564](06-decisions.md#adr-564)).** When the dry run
 errors, the decision asks `deferralWorthwhile` whether to commit the line as "waiting for givens" (ADR-104)
 or refuse it. The fold's classifier judges each failed FACT (`waits` in `computeFold`); the gate used to

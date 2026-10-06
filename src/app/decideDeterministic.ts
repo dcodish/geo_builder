@@ -28,6 +28,7 @@
 import {
   buildParseCtx,
   classifyOutOfScope,
+  fractionTeachCandidate,
   impliedCircleBinding,
   impliedPointBinding,
   looksLikeLatex,
@@ -133,6 +134,11 @@ export type Verdict2D =
       readonly binds: readonly DecideBind[];
       readonly logs: readonly DecideLog[];
       readonly note: DecideNote;
+      /**
+       * #1611 (ADR-591): the canonical sentence the note teaches, to be PRE-FILLED into the input in place of
+       * the student's text (ADR-W-030) — set only when that sentence was proved to commit on this figure.
+       */
+      readonly prefill?: string;
     }
   /** committed as ONE batch (one group, one undo entry); `note` is a teaching note on a successful step */
   | {
@@ -226,6 +232,8 @@ export async function decideFromParse(
   utterance: string,
   locale: 'he' | 'en',
   hooks: DecideHooks = {},
+  /** `teaching`: this run is the PROOF of a taught sentence (#1611) — it never teaches in turn */
+  opts: { readonly teaching?: boolean } = {},
 ): Promise<Verdict2D> {
   const logs: DecideLog[] = [];
   const binds: DecideBind[] = [];
@@ -796,6 +804,30 @@ export async function decideFromParse(
       const hr = parse(latin, buildParseCtx(v.construction, v.positions));
       if (hr.ok && hr.commands.length > 0) {
         return refuse('guided', { source: 'scope', result: 'scope:hebrew-labels' }, { key: 'input.scope.hebrew-labels', params: { corrected: latin } });
+      }
+    }
+  }
+  /**
+   * #1611 ([ADR-591](../../docs/06-decisions.md#adr-591), operator ruling 2026-09-30) — a length given written
+   * as a WORD fraction and/or wrapped in a wish or a command («אני רוצה ש-BE ו-DF יהיו רבע מהצלע של
+   * המקבילית») is not accepted as input: it is TAUGHT. The canonical sentence it meant («BE = 1/4 BC, DF =
+   * 1/4 AD») is proposed by `fractionTeachCandidate` and then PROVED here — run through this very decision,
+   * on this very figure, and adopted only if it COMMITS (not deferred). A proposal the tool would itself
+   * refuse is never shown (#1183: taught remedies are hypotheses); the line then escalates exactly as before.
+   * Pre-LLM, so the paid call the prod session made on these lines is saved. One level only: the proof run
+   * does not teach.
+   */
+  if (!opts.teaching) {
+    const cand = fractionTeachCandidate(utterance, pctx);
+    if (cand) {
+      const proof = await decideFromParse({ facts, seed, view: viewNow() }, cand.line, locale, hooks, { teaching: true });
+      if (proof.kind === 'commit' && !proof.deferred) {
+        return {
+          kind: 'refuse', category: 'guided', preParse: false, binds,
+          logs: [...logs, { source: 'scope', result: 'scope:teach-fraction', corrected: cand.line }],
+          note: { key: 'input.scope.teach-fraction', params: { corrected: cand.line } },
+          prefill: cand.line,
+        };
       }
     }
   }

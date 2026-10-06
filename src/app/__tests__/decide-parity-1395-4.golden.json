@@ -169,6 +169,7 @@
  "fixture:issue-1471-circumcircle-by-membership.geo.json": "0d3700bfe1282811",
  "fixture:issue-1604-saved-reload.geo.json": "55abd9b8eb5ca177",
  "fixture:issue-1607-diagonal-length.geo.json": "a9beb0c5f7099622",
+ "fixture:issue-1611-taught-fraction.geo.json": "c7f11746e0f832a4",
  "fixture:issue-1697-naming-by-use-is-a-fact.geo.json": "60b7ab3b775b51cc",
  "fixture:issue-1790-incircle-right-triangle.geo.json": "be13a8024bd6f3aa",
  "fixture:issue-260-two-host-membership.geo.json": "167ca5c3e43619c1",

@@ -1,0 +1,98 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-06T00:00:00.000Z",
+  "name": "issue-1611-taught-fraction",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "WRmTZsx3F8ttCUGTanSV2",
+      "utterance": "מקבילית ABCD",
+      "cmd": {
+        "type": "parallelogram",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "l0uVE5f-mRjS1rgwTSvsC",
+      "utterance": "E על BC",
+      "group": "2FFhQ5uouLHsAQSMfbz2u",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "zwmMME3C_XBoAKkDR6u8t",
+      "utterance": "E על BC",
+      "group": "2FFhQ5uouLHsAQSMfbz2u",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "E",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "m1l4SgkL6zB3CNu-ihRQ6",
+      "utterance": "F על AD",
+      "group": "PGBqUZlwVtmk09AAZ1SQS",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "lDJ6GVSboFcarxk2AiVur",
+      "utterance": "F על AD",
+      "group": "PGBqUZlwVtmk09AAZ1SQS",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "F",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "T0efFtvqMaufdoqQYxTrv",
+      "utterance": "BE = 1/4 BC, DF = 1/4 AD",
+      "group": "Gy2aviUzb80jfkHISOXdC",
+      "cmd": {
+        "type": "set-ratio",
+        "a": "B",
+        "b": "E",
+        "c": "B",
+        "d": "C",
+        "k": 0.25
+      },
+      "enabled": true
+    },
+    {
+      "id": "KV6TumsHiO1ShVWAFU_zb",
+      "utterance": "BE = 1/4 BC, DF = 1/4 AD",
+      "group": "Gy2aviUzb80jfkHISOXdC",
+      "cmd": {
+        "type": "set-ratio",
+        "a": "D",
+        "b": "F",
+        "c": "A",
+        "d": "D",
+        "k": 0.25
+      },
+      "enabled": true
+    }
+  ]
+}
