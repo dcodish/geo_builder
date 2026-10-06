@@ -12435,7 +12435,7 @@ function splitStatements(s0: string, ctx: ParseContext): ParseResult | null {
  *  `buildParseCtx`, which reads a replayed figure the batch doesn't have yet): every label the commands
  *  reference joins `points`; a ≥3-vertex ids run joins `polygons` + ring `neighbors`; a segment joins
  *  `neighbors`; a `center` field joins `circles`. Copy-on-write — the caller's context is never mutated. */
-function augmentParseCtx(ctx: ParseContext, cmds: AnyCommand[]): ParseContext {
+export function augmentParseCtx(ctx: ParseContext, cmds: AnyCommand[]): ParseContext {
   const points = new Set(ctx.points ?? []);
   for (const l of JSON.stringify(cmds).match(/[A-Z]\d*/g) ?? []) points.add(l);
   const polygons = [...(ctx.polygons ?? [])];

@@ -46,15 +46,52 @@ import type { AnyCommand } from '@/engine';
 /**
  * Liberal clause separators. NO noun lookahead anywhere — that is the enumeration this issue exists
  * to retire. A bare «ו» glued to any Hebrew word splits; so do the explicit connectives and ordinary
- * punctuation. Over-splitting costs nothing: every piece must independently pass `standsAlone`.
+ * punctuation. A full stop between digits is a decimal point, never a separator.
+ *
+ * #1798 ([ADR-598](../../docs/06-decisions.md#adr-598)): «ו» before a LABEL splits too («AB מקביל ל-CD ו-D על BC»,
+ * «מעגל חוסם את המשולש ABC ו-AD מאונך ל-BC») — before it, the clause after «ו-X» was invisible to every
+ * clause reader. What keeps that from cutting an OPERAND PAIR is {@link clausesOf}'s rule, not this list.
  */
-const SEPARATORS = /[,;.\n]|\s+(?:וגם|ואז|and|then|with)\s+|\s+ו(?=[א-ת])/g;
+const SEPARATORS = /([,;\n]|(?<!\d)\.|\.(?!\d)|\s+(?:וגם|ואז|and|then|with)\s+|\s+ו(?=[א-ת])|\s+ו-?(?=[A-Z]))/;
 
-const clausesOf = (utterance: string): string[] =>
-  utterance
-    .split(SEPARATORS)
-    .map((p) => p.replace(/^\s*[ו]?\s*/, '').trim())
-    .filter((p) => p.length > 1);
+/** A piece that only NAMES points (with an optional point word) — half of an operand pair or a conjoined
+ *  subject, never a statement: «AC ו-BD», «D ו-E על BC», «AB and CD are parallel», «נקודות F, G, H על …». */
+const BARE_LABELS = /^(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?[A-Z]\d*(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+|\s*)[A-Z]\d*)*$/;
+
+/**
+ * The line's clauses — THE splitter (#763's `independentConstructs` and #1798's clause-coverage gate both
+ * read it; never fork it). A boundary is cut only when the text on BOTH sides of it says something beyond
+ * naming points, so «O - חיתוך של AC ו-BD» stays one clause and «D ו-E על BC» stays one subject.
+ *
+ * And a piece with NO SUBJECT of its own continues the clause before it (#1798): «AB מיתר במעגל O ומשיק למעגל P»
+ * is one statement about AB with two predicates, not «… מעגל O» plus a free-standing tangent. Decided by the
+ * grammar, not a word list: the piece does not open with a label, the clause before it does, and that subject
+ * with the piece reads as a statement («AB משיק למעגל P»).
+ */
+export const clausesOf = (utterance: string): string[] => {
+  const bits = utterance.split(SEPARATORS);
+  const clean = (p: string) => p.replace(/^\s*[ו]?-?\s*/, '').trim();
+  const continues = (prev: string, piece: string): boolean => {
+    if (/^[A-Z]/.test(piece)) return false;
+    const subject = prev.match(/^(?:[A-Z]\d*)+(?![A-Za-z\d])/)?.[0];
+    if (!subject) return false;
+    const r = parse(`${subject} ${piece}`, {});
+    return r.ok && r.commands.length > 0;
+  };
+  const out: string[] = [];
+  let cur = bits[0] ?? '';
+  for (let i = 1; i < bits.length; i += 2) {
+    const sep = bits[i];
+    const next = bits[i + 1] ?? '';
+    if (BARE_LABELS.test(clean(cur)) || BARE_LABELS.test(clean(next)) || continues(clean(cur), clean(next))) cur += sep + next;
+    else {
+      out.push(cur);
+      cur = next;
+    }
+  }
+  out.push(cur);
+  return out.map(clean).filter((p) => p.length > 1);
+};
 
 /** The uppercase point labels a clause names. */
 const labelsOf = (s: string): string[] => s.match(/[A-Z]\d*/g) ?? [];

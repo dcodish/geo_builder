@@ -49,6 +49,7 @@ import {
   typedLabels,
 } from '@/parser';
 import { independentConstructs } from './independence';
+import { compoundNotHonoured, droppedClause } from './clauseCoverage';
 import { applyCommand, type AnyCommand, type Command, type Construction, type Id, type Vec } from '@/engine';
 import {
   type Fact,
@@ -553,6 +554,20 @@ export async function decideFromParse(
     const gates = honestyGateReport(utterance, r.commands, pctx);
     const { dropped, droppedNums, droppedRels, droppedVerbs, droppedCompound, droppedConstruct, unaccounted } = gates;
     if (gates.clean) {
+      // #1798 (ADR-598, operator ruling 2026-10-06): a one-line compound is ALL OR NOTHING. A clause that reads on
+      // its own but leaves no trace in the whole-line lowering was dropped by a rule that read only part of the
+      // line — every token of it can still be "accounted" («AB מקביל ל-CD ו-D על BC»: D, B, C ride the parallel).
+      // The line is refused whole with the one shared message, never committed and never escalated.
+      const parsedCmds = r.commands;
+      const drop = droppedClause(utterance, parsedCmds, pctx, (clause) => {
+        // entailment: after the whole line's own commands, the clause adds nothing (empty / implied)
+        const whole = trialFacts(facts, parsedCmds).map((f) => (f.group === '~try' ? { ...f, id: f.id.replace('~try', '~line'), group: '~line' } : f));
+        const o = dryRunOutcome(whole, clause, seed);
+        return !o.produced && (o.reason === 'empty' || o.reason === 'implied');
+      });
+      if (drop) {
+        return refuse('guided', { source: 'scope', result: 'scope:split-statements:dropped-clause', commands: r.commands }, { key: drop.messageKey, params: drop.params });
+      }
       // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
       // the commit, and every later replay of this content then run at TAIL speed on the main thread
       // (the one unbudgeted cold fold, measured ~26 s on the #59 figure, used to block the tab here).
@@ -790,6 +805,13 @@ export async function decideFromParse(
     } else {
       weak = 'dropped'; // a typo dropped a stated label/number/relation/verb/compound-structure/object → escalate rather than commit the partial parse
       logs.push({ source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct, ...unaccounted.map((x) => `${x.kind}:${x.text}`)].join(',')}`, commands: r.commands, intermediate: true });
+      // #1798 / #553 (ADR-598): the dropped content belongs to a COMPOUND whose every clause reads on its own —
+      // «F אמצע DO, O - חיתוך של AC ו-BD». All or nothing: refused whole with the shared message listing the
+      // clauses, instead of a paid call that would re-read the compound the ruling says to type line by line.
+      const compound = compoundNotHonoured(utterance, pctx);
+      if (compound) {
+        return refuse('guided', { source: 'scope', result: 'scope:split-statements:dropped-clause', commands: r.commands }, { key: compound.messageKey, params: compound.params });
+      }
     }
   }
   // A magnitude written with the WORD «שורש N» that reached the escalation seam — the #105 `שורש→√`
