@@ -507,8 +507,11 @@ const existingCircleRef = (s: string, ctx: ParseContext): string | null => {
 /** The one circle EVERY informative utterance label lives on, or null. A label on no circle says nothing
  *  (a fresh touch/crossing point); labels on circles vote by INTERSECTION — membership over position
  *  (ADR-233/119). Unique survivor → that circle; none or several → null (genuinely ambiguous). */
+/** The point labels a sentence names, its circle reference dropped — the membership voters of the tie-break (#546) and
+ *  of the #1694 candidate gate. */
+const sentencePointLabels = (s: string): string[] => [...new Set((dropCircleRef(s).match(/[A-Za-z]\d*/g) ?? []).filter((t) => isUpperLabel(t)).map(up))];
 const anonymousCircleTieBreak = (s: string, ctx: ParseContext, circles: string[]): string | null => {
-  const pts = [...new Set((dropCircleRef(s).match(/[A-Za-z]\d*/g) ?? []).filter((t) => isUpperLabel(t)).map(up))];
+  const pts = sentencePointLabels(s);
   let cand: string[] | null = null;
   for (const p of pts) {
     const hosts = circles.filter((c) => membersOfCenter(ctx, c).has(p));
@@ -524,7 +527,19 @@ const anonymousCircleOf = (s: string, ctx: ParseContext): string | null => {
   return circles.length > 1 ? anonymousCircleTieBreak(s, ctx, circles) : null;
 };
 
-const resolveOrIntroduceCircle = (s: string, ctx: ParseContext, opts?: { implied?: boolean }): { center: string; prepend: AnyCommand[] } | null => {
+/** #1694: does the sentence name a point that already rides an UNNAMED (auto-centre) circle? Then a fresh circle letter
+ *  in it may be the student's name for that circle, and the rule's creation is a naming-by-use CANDIDATE
+ *  (`implied: 'by-member'`). Only the gate for the mark — which circle, or whether to ask, is
+ *  `impliedCircleBinding`'s decision alone. A sentence with no such point keeps its plain creation (ADR-565
+ *  decision 1), byte-identical to before, so saved figures re-read unchanged. */
+const namesUnnamedCircleMember = (s: string, ctx: ParseContext): boolean => {
+  const autos = ctx.autoCenters ?? [];
+  if (!autos.length) return false;
+  const pts = sentencePointLabels(s);
+  return autos.some((t) => { const m = membersOfCenter(ctx, t); return pts.some((p) => m.has(p)); });
+};
+
+const resolveOrIntroduceCircle = (s: string, ctx: ParseContext, opts?: { presupposes?: boolean }): { center: string; prepend: AnyCommand[] } | null => {
   const namedRaw = circleCenter(s);
   // A real centre label is uppercase — guard against an English article read as a label ("the circle a line" → "a").
   const named = namedRaw && /^[A-Z]/.test(namedRaw) ? up(namedRaw) : null;
@@ -532,14 +547,20 @@ const resolveOrIntroduceCircle = (s: string, ctx: ParseContext, opts?: { implied
   const existing = existingCircleRef(s, ctx);
   if (existing) return { center: existing, prepend: [] };
   if (named) {
+    // #1694: a FRESH letter beside UNNAMED circles may be the student's name for one of them — «AD מיתר במעגל P»
+    // after «שני מעגלים נחתכים בנקודות A ו-B», where A rides the drawn circles. The creation is a naming-by-use
+    // CANDIDATE (`implied: 'by-member'`): `impliedCircleBinding` binds it when a point the sentence places on it
+    // already rides an unnamed circle, and otherwise it stands as the new circle the letter declares (ADR-565
+    // decision 1: «CD קוטר במעגל O» with new C, D). Unmarked, it skipped the #186 seam and drew a third circle.
+    const candidate = namesUnnamedCircleMember(s, ctx) ? { implied: 'by-member' as const } : {};
     return {
       center: named,
-      prepend: [{ type: 'circle', id: circleId(named), center: named, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true }],
+      prepend: [{ type: 'circle', id: circleId(named), center: named, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, ...candidate }],
     };
   }
-  // `implied` (#184): a construct noun that presupposes its circle — a bare «קוטר»/"a diameter",
+  // `presupposes` (#184): a construct noun that presupposes its circle — a bare «קוטר»/"a diameter",
   // «משיק»/"a tangent" — introduces one even without the circle word.
-  if (circles.length === 0 && (mentionsCircle(s) || opts?.implied)) {
+  if (circles.length === 0 && (mentionsCircle(s) || opts?.presupposes)) {
     // #1650: the auto letter dodges the sentence's OWN labels too, not only the drawn ones — the anonymiser
     // (`withAnonymousAutoCentres`) remaps every exact use of the letter, so a letter the sentence also names
     // as a point (a fresh «O» typed in the same line) would be swallowed into the hidden centre.
@@ -6460,7 +6481,7 @@ const chord: Rule = (s, ctx) => {
   if (!center) {
     // «מיתר» presupposes its circle — INTRODUCE one on a circle-less figure (#231; the ADR-367 `implied`
     // discipline, «קוטר»/«משיק»'s sibling). The endpoints then land on the minted circle as on a named one.
-    const intro = resolveOrIntroduceCircle(s, ctx, { implied: true });
+    const intro = resolveOrIntroduceCircle(s, ctx, { presupposes: true });
     if (!intro) return null;
     center = intro.center;
     prepend = intro.prepend;
@@ -6536,13 +6557,20 @@ const circleOnDiameter: Rule = (s, ctx) => {
       const pts = e.points.map(up);
       return pts.includes(up(ids[0])) && pts.includes(up(ids[1]));
     });
-  // #1673 (ADR-565): «AB קוטר במעגל O» where A and B already ride an UNNAMED circle — the student's name for THAT
-  // circle (the hidden token stepped aside, so O matched nothing). Naming-by-use, as «C על מעגל K» (ADR-347): the
-  // implied circle and the two memberships let the #186 seam bind O to the circle they ride; the re-parse then adds
-  // the diameter to it. Never a second circle through two points of the first.
-  if (named && !explicitNew && endpointsExist && (ctx.autoCenters ?? []).some((t) => ids.every((x) => membersOfCenter(ctx, up(t)).has(up(x))))) {
+  // #1673 (ADR-565) / #1694: «AB קוטר במעגל O» — or «BD קוטר במעגל O» with only B drawn — where an endpoint already
+  // rides an UNNAMED circle: the fresh letter may be the student's name for THAT circle (the hidden token stepped
+  // aside, so O matched nothing). The statement is emitted as the shared naming-by-use CANDIDATE (`'by-member'`, the
+  // `resolveOrIntroduceCircle` mark) with the endpoints placed on it, so `impliedCircleBinding` alone decides: one
+  // circle the endpoints ride → bind (the re-parse then adds the diameter to it); the crossing of two interchangeable
+  // circles → the first, by order; circles a statement tells apart → ask. Never a second circle through its points.
+  // Should the binding stand down (X is a placed point), the creation still says "diameter": the centre lies on AB.
+  if (named && !explicitNew && namesUnnamedCircleMember(ids.join(' '), ctx)) {
     const X = up(named);
-    return [impliedCentreCircle(X), ...ids.map((x): AnyCommand => ({ type: 'point-on-circle', id: up(x), circle: circleId(X) }))];
+    return [
+      { ...impliedCentreCircle(X), implied: 'by-member' },
+      ...ids.map((x): AnyCommand => ({ type: 'point-on-circle', id: up(x), circle: circleId(X) })),
+      { type: 'set-collinear', a: up(ids[0]), b: X, c: up(ids[1]) },
+    ];
   }
   const referencedCircleMissing = named ? true : circles.length === 0 || hostIsEndpoint || explicitNew || crossMembers; // (a named-and-existing circle already returned above)
   // DEFINE-from-new signal (vs the ADD phrasing "diameter DE in circle O"): the diameter LABELS come
@@ -6748,7 +6776,7 @@ const pairOnCircle: Rule = (s, ctx) => {
   if (!m) return null;
   const [a, b] = [up(m[1]), up(m[2])];
   if (a === b) return null;
-  const intro = resolveOrIntroduceCircle(s, ctx, { implied: true });
+  const intro = resolveOrIntroduceCircle(s, ctx, { presupposes: true });
   if (!intro) return null;
   if (!centrePt(ctx, up(intro.center)).startsWith('@') && (a === up(intro.center) || b === up(intro.center))) return null; // an endpoint that IS the centre is no chord (#152)
   const circ = circleId(intro.center);
@@ -7118,7 +7146,7 @@ const parallelCircleIntersection: Rule = (s, ctx) => {
  *  - with THREE OR MORE it returns null — which pair is meant is ambiguous; defer, never pick
  *    arbitrarily (the P1 shape: a referent silently dropped while everything renders green).
  *
- * `implied` lets a rule whose noun implies the pair (a "common tangent") bind the exactly-two case
+ * `presupposes` lets a rule whose noun implies the pair (a "common tangent") bind the exactly-two case
  * without a plural word; completion/introduction still require an explicit plural circles mention.
  * Shared by circlesTangent / commonTangent / twoCirclesPosition / twoCirclesMeet so the class cannot
  * re-open per rule.
@@ -7154,7 +7182,7 @@ const withEqualRadii = (s: string, cmds: AnyCommand[], id1: Id, id2: Id): AnyCom
 const resolveCirclePair = (
   s: string,
   ctx: ParseContext,
-  opts?: { implied?: boolean },
+  opts?: { presupposes?: boolean },
 ): { kind: 'named' | 'existing' | 'complete'; centres: [string, string] } | 'introduce' | null => {
   let named = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
   if (named.length < 2) {
@@ -7166,7 +7194,7 @@ const resolveCirclePair = (
   if (named.length >= 2) return named[0] === named[1] ? null : { kind: 'named', centres: [named[0], named[1]] };
   if (named.length === 1) return null; // a half-named pair — ambiguous which circle is the other; defer
   const plural = /\bcircles\b|מעגלים|שני\s+מעגל|שתי\s+מעגל/i.test(s);
-  if (!plural && !opts?.implied) return null;
+  if (!plural && !opts?.presupposes) return null;
   const circs = (ctx.circles ?? []).filter((c) => !c.startsWith('~')).map(up);
   if (circs.length === 2) return { kind: 'existing', centres: [circs[0], circs[1]] };
   if (!plural) return null; // implied-only resolution binds an existing pair, never creates one
@@ -7946,7 +7974,7 @@ const commonTangent: Rule = (s, ctx) => {
   // «AB משיק משותף חיצוני לשני המעגלים», which `circlesTangent` used to mis-claim as MUTUAL tangency
   // (inventing the circles and dropping the stated AB — the #215 class). An unbindable reference
   // beside existing circles defers — never an invented pairing next to drawn circles.
-  const resolved = resolveCirclePair(s, ctx, { implied: true });
+  const resolved = resolveCirclePair(s, ctx, { presupposes: true });
   const noCircles = (ctx.circles ?? []).filter((c) => !c.startsWith('~')).length === 0;
   const introduce = noCircles && (resolved === 'introduce' || (resolved === null && /מעגלים|\bcircles\b/i.test(s)));
   if (!introduce && (resolved === null || resolved === 'introduce')) return null; // no two distinct circles to be common to → LLM
@@ -9887,7 +9915,7 @@ const multiStatement: Rule = (s, ctx) => {
  *  On an empty figure the circle is INTRODUCED (the #159 seam — a tangent implies its circle). */
 const bareTangent: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
-  const resolved = resolveOrIntroduceCircle(s, ctx, { implied: true });
+  const resolved = resolveOrIntroduceCircle(s, ctx, { presupposes: true });
   if (!resolved) return null;
   const center = resolved.center;
   // Nothing but the tangent noun + the circle reference + request words may remain — labels, at/from
@@ -9911,7 +9939,7 @@ const bareTangent: Rule = (s, ctx) => {
  *  On an empty figure the circle is INTRODUCED (the #159 seam — a diameter implies its circle). */
 const bareDiameter: Rule = (s, ctx) => {
   if (!/diameter|קוטר/i.test(s)) return null;
-  const resolved = resolveOrIntroduceCircle(s, ctx, { implied: true });
+  const resolved = resolveOrIntroduceCircle(s, ctx, { presupposes: true });
   if (!resolved) return null;
   const center = resolved.center;
   const leftover = dropCircleRef(s)
@@ -10395,10 +10423,27 @@ export function impliedCircleBinding(
   commands: AnyCommand[],
   ctx: ParseContext,
 ): { from: string; to: string } | { clarify: 'unknown-circle'; center: string } | null {
-  const implied = commands.find(
-    (c): c is Extract<AnyCommand, { type: 'circle' }> => c.type === 'circle' && (c as { implied?: boolean }).implied === true,
+  // #1694: every candidate creation, in the sentence's order — a reference (`implied: true`, minted by
+  // `withImplicitCircles`) or a rule's own creation for a fresh letter (`'by-member'`, `resolveOrIntroduceCircle`
+  // / `circleOnDiameter`). «AD מיתר במעגל P משיק למעגל O בנקודה A» carries one of each; the first that decides wins
+  // and the caller re-parses for the next.
+  const candidates = commands.filter(
+    (c): c is Extract<AnyCommand, { type: 'circle' }> => c.type === 'circle' && (c.implied === true || c.implied === 'by-member'),
   );
-  if (!implied) return null;
+  for (const cand of candidates) {
+    const decision = bindingFor(cand, commands, ctx);
+    if (decision) return decision;
+  }
+  return null;
+}
+
+/** One candidate's binding decision — the ADR-347 resolution order. A `'by-member'` candidate (#1694) binds ONLY on a
+ *  membership signal: it has no "sole unnamed circle" fallback, so with no signal the rule's creation stands. */
+function bindingFor(
+  implied: Extract<AnyCommand, { type: 'circle' }>,
+  commands: AnyCommand[],
+  ctx: ParseContext,
+): { from: string; to: string } | { clarify: 'unknown-circle'; center: string } | null {
   const autos = ctx.autoCenters ?? [];
   if (autos.length === 0) return null; // no unnamed circle to bind — the implicit creation stands
   const X = up(implied.center); // the letter the student used IS the implied centre
@@ -10412,6 +10457,12 @@ export function impliedCircleBinding(
   );
   const signal = new Set(subjects.filter((p) => points.has(p)).flatMap((p) => autos.filter((tok) => members.get(circleId(tok))?.has(p))));
   if (signal.size === 1) return { from: [...signal][0], to: X };
+  if (implied.implied === 'by-member') {
+    if (signal.size === 0) return null; // nothing the sentence places rides an unnamed circle — a new circle, as declared
+    // the subjects ride BOTH unnamed circles (their crossing A) — interchangeable ones name by order (ruling (b), #1688)
+    if (signal.size === 2 && autos.length === 2 && ctx.autosInterchangeable) return { from: autos[0], to: X };
+    return { clarify: 'unknown-circle', center: X };
+  }
   if (autos.length === 1) return { from: autos[0], to: X };
   // #538: two unnamed circles NOTHING yet distinguishes (a fresh pair macro — free radii, no members,
   // no size order, a symmetric mutual relation) are interchangeable: binding the student's name to
@@ -10630,7 +10681,7 @@ function withRoleClaims(commands: AnyCommand[], s: string, ctx: ParseContext): A
   const circleFor = (): { center: string; prepend: AnyCommand[] } | null => {
     if (circle !== undefined) return circle;
     const pointed = circumscribingRef(s, ctx) ?? directionalCircleRef(s, ctx);
-    const r = pointed ? { center: pointed, prepend: [] } : resolveOrIntroduceCircle(s, ctx, { implied: true });
+    const r = pointed ? { center: pointed, prepend: [] } : resolveOrIntroduceCircle(s, ctx, { presupposes: true });
     // The winning rule created the circle itself (one, in this very utterance) — that is the referent,
     // never a second, introduced one beside it.
     circle = r && r.prepend.length && madeCircles.length === 1 ? { center: madeCircles[0], prepend: [] } : r;

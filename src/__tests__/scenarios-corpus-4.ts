@@ -933,7 +933,8 @@ export const SCENARIOS_4: Scenario[] = [
       "operator session eew5ezi5 (2026-07-10, the ADR-124/#6 source question re-typed correctly with the NEW point E): two circles meet at A,B; chord AD in P tangent to O at A; chord CB in O tangent to P at B; 'המשך AC חותך את מעגל P בנקודה E' (the operator typed חותר — a typo the LLM corrected). Every step showed ✓ but E landed BETWEEN C and A (t = 0.64), amber-flagged orderBeyond — 'fails to create the C-A-E sequence'. Root cause (issue #19): ADR-142's shared-endpoint either-side semantics lived ONLY behind extensionsClear's `relax` flag, set solely by firstSatisfyingSeed's fallback pass — so (a) the strict primary sweep demanded E beyond C, which is geometrically impossible here at EVERY seed (CB tangent to circle P pins C outside P), burning the app's 2500ms wall budget before the fallback ever ran, and (b) meetsRequirements/`findValidConfig` used the STRICT form, rejecting the very seed the fallback found — the consumers disagreed. Fix (ADR-267): a PREFERENCE LADDER — strict letter order wherever achievable (the ADR-098 free-DOF family, where the order genuinely SELECTS the config), the ADR-142 either-side bar as the ACCEPTANCE tier, searched in ONE interleaved budget-safe sweep (a fallback bar rides the same loop, never a second pass); meetsRequirements/findValidConfig/resample/the ADR-256 sample filter all honour the ladder.",
     steps: [
       'שני מעגלים נחתכים בנקודות A ו-B',
-      'O מרכז המעגל', 'P מרכז המעגל', // #1673 (ADR-565): named so the second-drawn circle is P — with P named by order onto the first circle the app's config search finds no valid configuration (issue #19 lock)
+      // #1694: the operator's exact sequence again — the «O/P מרכז המעגל» lines ADR-565 added are gone. Without them the
+      // chord's fresh «מעגל P» minted a THIRD circle through A, D (every row green); now it names the drawn circle A rides.
       'AD מיתר במעגל P משיק למעגל O בנקודה A',
       'CB מיתר במעגל O משיק למעגל P בנקודה B',
       { llm: ['המשך AC חותך את מעגל P בנקודה E'] }, // the operator's חותר typo, as the LLM's corrected canonical line
@@ -941,6 +942,15 @@ export const SCENARIOS_4: Scenario[] = [
     ],
     check(fig) {
       allStepsOk(fig);
+      // #1694: the exercise has TWO circles. «מעגל P» names a drawn one by use, never a third through A, D, B.
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle') as unknown as { id: Id; center: Id }[];
+      expect(circles.map((c) => c.center).sort(), 'exactly the two drawn circles, named O and P').toEqual(['O', 'P']);
+      // A and B are the circles' structural CROSSINGS — of circle P too, not points that ride a new P by constraint.
+      for (const X of ['A', 'B']) {
+        const obj = fig.construction.objects.find((o) => o.id === X) as unknown as { kind: string; circle1?: Id; circle2?: Id };
+        expect(obj.kind, `${X} is a crossing of the two circles`).toBe('circle-circle');
+        expect([obj.circle1, obj.circle2].sort(), `${X} crosses circles O and P`).toEqual(['circle-O', 'circle-P']);
+      }
       const C = at(fig, 'C'), A = at(fig, 'A'), E = at(fig, 'E');
       // E is ON line CA…
       const ca = { x: A.x - C.x, y: A.y - C.y };

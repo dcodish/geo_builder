@@ -1,0 +1,250 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-06T00:00:00.000Z",
+  "seed": 5,
+  "facts": [
+    {
+      "id": "_bQf4mqzRfKlnlbsUXr5y",
+      "utterance": "שני מעגלים נחתכים בנקודות A ו-B",
+      "group": "cA9IlJYiKN7MeQiujw94t",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "freeRadius": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "0RqH5FEGtEXUrWsO4rYoc",
+      "utterance": "שני מעגלים נחתכים בנקודות A ו-B",
+      "group": "cA9IlJYiKN7MeQiujw94t",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "@ctr-P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "eaIv1BBBbE-nnBYIb8GVo",
+      "utterance": "שני מעגלים נחתכים בנקודות A ו-B",
+      "group": "cA9IlJYiKN7MeQiujw94t",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "A",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "branch": 0
+      },
+      "enabled": true
+    },
+    {
+      "id": "4z12ecyz-fEZ_aarF-A9C",
+      "utterance": "שני מעגלים נחתכים בנקודות A ו-B",
+      "group": "cA9IlJYiKN7MeQiujw94t",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "B",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "branch": 1,
+        "avoid": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "FDddh3q-Q23PNDdjryjNe",
+      "utterance": "AD מיתר במעגל P משיק למעגל O בנקודה A",
+      "group": "m2EVPoSQJlrIgwQYcK1RF",
+      "cmd": {
+        "type": "name-by-use",
+        "op": "step-aside",
+        "from": "@ctr-O",
+        "to": "@ctr-Q"
+      },
+      "enabled": true
+    },
+    {
+      "id": "yOZEjtp3TgfxkedcQLfuI",
+      "utterance": "AD מיתר במעגל P משיק למעגל O בנקודה A",
+      "group": "m2EVPoSQJlrIgwQYcK1RF",
+      "cmd": {
+        "type": "name-by-use",
+        "op": "step-aside",
+        "from": "@ctr-P",
+        "to": "@ctr-K"
+      },
+      "enabled": true
+    },
+    {
+      "id": "_-ybZNEkku2eg8pGUV85Y",
+      "utterance": "AD מיתר במעגל P משיק למעגל O בנקודה A",
+      "group": "m2EVPoSQJlrIgwQYcK1RF",
+      "cmd": {
+        "type": "name-by-use",
+        "op": "centre",
+        "from": "@ctr-Q",
+        "to": "O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "kebmdLzOXJ4H9WOBYYUrq",
+      "utterance": "AD מיתר במעגל P משיק למעגל O בנקודה A",
+      "group": "m2EVPoSQJlrIgwQYcK1RF",
+      "cmd": {
+        "type": "name-by-use",
+        "op": "centre",
+        "from": "@ctr-K",
+        "to": "P"
+      },
+      "enabled": true
+    },
+    {
+      "id": "e7uhTYWP-4g5r45pxPj5o",
+      "utterance": "AD מיתר במעגל P משיק למעגל O בנקודה A",
+      "group": "m2EVPoSQJlrIgwQYcK1RF",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-P"
+      },
+      "enabled": true
+    },
+    {
+      "id": "wO11wN7tfBzMrdcY99tgH",
+      "utterance": "AD מיתר במעגל P משיק למעגל O בנקודה A",
+      "group": "m2EVPoSQJlrIgwQYcK1RF",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-P"
+      },
+      "enabled": true
+    },
+    {
+      "id": "LgYt32Jy4DeIdbs3e84w_",
+      "utterance": "AD מיתר במעגל P משיק למעגל O בנקודה A",
+      "group": "m2EVPoSQJlrIgwQYcK1RF",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "F5ynp22m7Srxn6XIOzsfi",
+      "utterance": "AD מיתר במעגל P משיק למעגל O בנקודה A",
+      "group": "m2EVPoSQJlrIgwQYcK1RF",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "O",
+        "b": "A",
+        "c": "A",
+        "d": "D",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "qnSlJKq4ZC-RyeJo7qgBL",
+      "utterance": "AD מיתר במעגל P משיק למעגל O בנקודה A",
+      "group": "m2EVPoSQJlrIgwQYcK1RF",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "TfZkcrLQsX2arAB956eRj",
+      "utterance": "CB מיתר במעגל O משיק למעגל P בנקודה B",
+      "group": "A_ozlHKlfoRC_hJ0Exad4",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "Dr41lqpe1mWWAqwtxfhsr",
+      "utterance": "CB מיתר במעגל O משיק למעגל P בנקודה B",
+      "group": "A_ozlHKlfoRC_hJ0Exad4",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "M__6_M9MzGYfnOl6J3X5p",
+      "utterance": "CB מיתר במעגל O משיק למעגל P בנקודה B",
+      "group": "A_ozlHKlfoRC_hJ0Exad4",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-P"
+      },
+      "enabled": true
+    },
+    {
+      "id": "zd1heEqwXcq3xKZt71Dit",
+      "utterance": "CB מיתר במעגל O משיק למעגל P בנקודה B",
+      "group": "A_ozlHKlfoRC_hJ0Exad4",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "P",
+        "b": "B",
+        "c": "C",
+        "d": "B",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "v20JVcGs7Ud5Li4JyQFgC",
+      "utterance": "CB מיתר במעגל O משיק למעגל P בנקודה B",
+      "group": "A_ozlHKlfoRC_hJ0Exad4",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "7wsLSXM-vlCet2SW7RxqR",
+      "utterance": "המשך AC חותך את מעגל P בנקודה E",
+      "cmd": {
+        "type": "extend-onto-circle",
+        "id": "E",
+        "a": "A",
+        "b": "C",
+        "circle": "circle-P"
+      },
+      "enabled": true
+    },
+    {
+      "id": "ZDie1CeVmgWt4o2HROAXa",
+      "utterance": "CE",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "E"
+      },
+      "enabled": true
+    }
+  ]
+}
