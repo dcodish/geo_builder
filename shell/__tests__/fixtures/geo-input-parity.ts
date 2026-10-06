@@ -778,7 +778,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'distances-free-1622', family: 'lengths', steps: ['נקודה A', 'נקודה B', 'C במרחק 5 מ-A ו-5 מ-B'], expect: 'builds', exception: 'X9' },
   { id: 'chain-length-value-1622', family: 'lengths', steps: ['משולש ABC', 'AB = AC = 5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'angle-sides-disjoint-1622', family: 'angles', steps: ['מרובע ABCD', 'הזווית בין BD ל-CA היא 30'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679' }], note: 'sides with no common end form no angle: 2-D refuses' },
-  { id: 'chord-cross', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'C על מעגל O', 'D על מעגל O', 'במעגל המיתרים AC ו-BD נפגשים בנקודה E'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#1678' }], note: '2-D answers a conflict: its free points on the circle do not keep AC and BD crossing' },
+  { id: 'chord-cross', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'C על מעגל O', 'D על מעגל O', 'במעגל המיתרים AC ו-BD נפגשים בנקודה E'], expect: 'builds', exception: 'X8', note: 'ADR-601 / #1678: 2-D reads the crossing of AC and BD (the locative «במעגל» is the scene, not the met circle), and the order of the four points on the circle is a sampled DOF that follows the stated crossing — the configuration search draws AC and BD crossing' },
   // ── #1622 slice E1 (ADR-AG-217): what the shapes-and-points port reads beyond the rows above, 2-D measured ──
   { id: 'e1-bare-run-3', family: 'polygons', steps: ['ABC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }] },
   { id: 'e1-unnamed-square', family: 'polygons', steps: ['ריבוע'], expect: 'builds' },

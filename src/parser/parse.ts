@@ -619,6 +619,8 @@ const dropCircleRef = (s: string): string =>
 // point label and must survive — "through point A a tangent is drawn" read the article as a second label
 // A, producing a degenerate pair (issue #100 En mirror).
 const FILLER = /\b(?:a|an|to|the|and|of|is|are|at|on|in|with|from|that|so|such)\b/g;
+/** One whole word of {@link FILLER} (non-global, anchored) — for testing a single token. */
+const FILLER_WORD = new RegExp(`^${FILLER.source}$`);
 
 /**
  * Leading REQUEST words (#184) — imperatives («הוסף/להוסיף/צייר/העבר», "add/draw") and the given-marker
@@ -869,6 +871,36 @@ const removeClaimed = (s: string, ids: Id[]): string =>
     (a, id) => a.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
     ids.length ? s.replace(new RegExp(String.raw`\b${ids.join('')}\b`, 'i'), ' ') : s,
   );
+/**
+ * #1678 ([ADR-601](../../docs/06-decisions.md#adr-601)) — the ADR-024 leftover guard AT THE RUN: the labels a
+ * fixed-size `labelRun(body, n)` read did NOT take. `labelRun` returns the FIRST run of exactly n labels and
+ * says nothing about the rest of the body, so a rule that reads «AC» out of «המיתרים AC ו-BD נפגשים» builds
+ * from AC and the stated «BD» vanishes — and the honesty gates cannot see it, because B and D already exist
+ * and an existing label is "legitimately unclaimed" to them. A rule whose operand is a fixed-size run must
+ * consume the WHOLE label body: `run` is the run it read and `also` every other label it did account for (the
+ * crossing it names, the circle's centre), and a non-empty answer means the sentence says more than the rule can express —
+ * defer (another rule, or the LLM), never half-parse.
+ */
+const LABEL_RUN_G = rx(String.raw`(?<![A-Za-z])(?:${ULABEL})+(?![A-Za-z])`, 'g'); // a whole uppercase label run
+const unclaimedLabels = (body: string, run: readonly Id[], also: readonly (Id | null | undefined)[] = []): string[] => {
+  // the run first (contiguous «AC» or spaced «A C» — `removeClaimed`), then each other claimed label on its own
+  const rest = also
+    .filter((c): c is Id => !!c)
+    .reduce((acc, id) => removeClaimed(acc, [up(id)]), removeClaimed(body.replace(FILLER, ' ').replace(REQUEST_WORDS, ' '), [...run]));
+  return rest.match(LABEL_RUN_G) ?? [];
+};
+
+/**
+ * #1678 ([ADR-601](../../docs/06-decisions.md#adr-601)) — a LOCATIVE circle phrase is the scene, not the operand.
+ * «במעגל המיתרים AC ו-BD נפגשים בנקודה E» / "in the circle, chords AC and BD meet at E": the opening «ב+מעגל» /
+ * "in the circle" says WHERE the statement lives, the way «במשולש ABC» does; the thing the verb meets is named
+ * after it. A rule whose operand is "the circle the line meets" must find the circle as the verb's SUBJECT or
+ * OBJECT («חותך את המעגל», «נפגש עם המעגל», "meets the circle") — the external-secant `cutsCircle` shape. True
+ * when every circle mention in `s` is such a sentence-opening locative.
+ */
+const LOCATIVE_CIRCLE = rx(String.raw`^\s*(?:ב(?:ה)?מעגל(?![א-ת])|[Ii]n\s+(?:the\s+|a\s+)?circle)(?:\s+${ULABEL}(?![A-Za-z]))?\s*,?`, '');
+const circleIsOnlyLocative = (s: string): boolean => LOCATIVE_CIRCLE.test(s) && !mentionsCircle(s.replace(LOCATIVE_CIRCLE, ' '));
+
 /** Strip the numeric radius/diameter value a rule already CONSUMED via `parseRadius` — those digits
  *  are the rule's own vocabulary and the fail-closed gate would flag them (#497). Only when the rule
  *  actually read a number (`consumed`): an unconsumed numeral must keep flagging. */
@@ -1862,7 +1894,13 @@ const lineLineIntersection: Rule = (s, ctx) => {
   // the LLM / the `perpendicular … cuts … at` form supplies it).
   if (/\bperpendicular\b|\bparallel\b|מאונ[כך]|אנ[כך]|מקביל|[⊥⟂∥]/i.test(s)) return 'stop';
   // Drop filler words so they aren't mistaken for two-letter line labels ("of"!).
-  const t = s.replace(/\b(?:is|the|of|between|at|point|הוא|בין|בנקודה|נקודה)\b/gi, ' ');
+  // #1678 (ADR-601): a TWO-letter En filler word («in», «on», «to», and the sentence-initial «In») is a word, never
+  // the line I–N — "in the circle chords AC and BD meet at E" read it as one. Lowercase or capitalised only, so a
+  // typed label «IN»/«ON» survives (a label run is one case throughout, #497); longer filler («and») stays, the
+  // unnamed conjunction form reads it.
+  const t = s
+    .replace(/(?<![A-Za-z\d])(?:[a-z]{2}|[A-Z][a-z])(?![A-Za-z\d])/g, (w) => (FILLER_WORD.test(w.toLowerCase()) ? ' ' : w))
+    .replace(/\b(?:is|the|of|between|at|point|הוא|בין|בנקודה|נקודה)\b/gi, ' ');
   // #776: «מפגש» (and En "meeting") join the label-first slot — «M מפגש AB ו-CD» is the same
   // statement as «M חיתוך AB ו-CD», and the terse spelling is what prod typed (session ah1kqxz5).
   const pointFirst = t.match(
@@ -7488,6 +7526,7 @@ const extendOntoCircle: Rule = (s, ctx) => {
   if (/\bfrom\b|מנקודה|מהנקודה/i.test(s)) return null; // "from <point>" → the external-point secant
   const center = resolveMentionedCircle(s, ctx); // a named circle, or "the circle" when there's exactly one
   if (!center) return null; // must REFER to a circle (else pointOnExtension on a segment / line∩line)
+  if (circleIsOnlyLocative(s)) return null; // #1678: a locative «במעגל …» is the scene, never the met object
   // the new crossing: the label after the "at"/"בנקודה" that FOLLOWS the circle mention
   const R = crossingAfterCircle(s);
   if (!R) return null;
@@ -7497,6 +7536,7 @@ const extendOntoCircle: Rule = (s, ctx) => {
     .replace(/extension|extended|\bline\b|המש(?:ך|כי(?:ם|הם|הן)?)|הישר|הקו|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?/gi, ' ');
   const pr = labelRun(body, 2);
   if (!pr || pr.includes(R)) return null;
+  if (unclaimedLabels(body, pr, [R, center]).length) return null; // #1678: the WHOLE label body, or defer
   const [a, b] = pr;
   return [{ type: 'extend-onto-circle', id: R, a, b, circle: circleId(center) }];
 };
@@ -7514,6 +7554,7 @@ const lineCutsCircleTwice: Rule = (s, ctx) => {
   // TWO crossing labels: "at C and D" / "בנקודות C ו-D"
   const twoM = s.match(/(?:\bat\b|בנקודות?|ב-)\s*([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i);
   if (!twoM) return null;
+  if (circleIsOnlyLocative(s)) return null; // #1678: a locative «במעגל …» is the scene, never the met object
   const center = resolveCenter(s, ctx); // a named circle, or the figure's single circle
   if (!center) return null;
   const [C, D] = [up(twoM[1]), up(twoM[2])];
@@ -7523,6 +7564,7 @@ const lineCutsCircleTwice: Rule = (s, ctx) => {
     .replace(/\bline\b|הישר|הקו|ישר|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?|המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/gi, ' ');
   const pr = labelRun(body, 2);
   if (!pr || pr.includes(C) || pr.includes(D)) return null; // the line's points must differ from the crossings
+  if (unclaimedLabels(body, pr, [center]).length) return null; // #1678: the WHOLE label body, or defer
   const [a, b] = pr;
   const circ = circleId(center);
   const lineId = `sec-${a}${b}`;
@@ -7621,6 +7663,7 @@ const secantFarPoint: Rule = (s, ctx) => {
   if (/המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(s)) return null; // המשך → extendOntoCircle
   if (/\bline\b|\bray\b|הישר|הקו|קרן/i.test(s)) return null; // an EXPLICIT line/ray ("the line GB…") is a defined line, crossing named separately → lineMeetsCircle/lineCutsCircleTwice (the B13 opt-out)
   if (/קוטר|diameter/i.test(s)) return null; // a diameter compound ("קוטר מעגל O … חותך את הצלע AC") → the diameter rules, never an apex secant
+  if (circleIsOnlyLocative(s)) return null; // #1678: a locative «במעגל …» is the scene, never the cut object
   const center = resolveMentionedCircle(s, ctx); // a named circle, or "the circle" when there's exactly one
   if (!center) return null; // must REFER to a circle
   const circ = circleId(center);
@@ -7657,6 +7700,7 @@ const secantFarPoint: Rule = (s, ctx) => {
     .replace(/חות[כך]|נחתכ?\w*|פוגש\w*|\bsecant\b|cuts?|meets?|crosses|\bline\b|הישר|הקו|ועובר|עובר/gi, ' ');
   const pr = labelRun(body, 2);
   if (!pr) return null;
+  if (unclaimedLabels(body, pr, [center, near, thr]).length) return null; // #1678: the WHOLE label body, or defer
   const [A, D] = pr;
   if (new Set([A, D, near, thr].filter(Boolean)).size !== [A, D, near, thr].filter(Boolean).length) return null; // labels distinct
   // D is the FAR crossing = a BRAND-NEW point (created on the circle). If D already exists as a point OR is
@@ -7675,6 +7719,7 @@ const lineMeetsCircle: Rule = (s, ctx) => {
   if (!INTERSECT_KW.test(s) && !/מפגש|\bmeeting\b/i.test(s)) return null;
   if (/tangent|משיק/i.test(s)) return null; // tangent line → tangentMeetsOtherCircle / tangentLine
   if (/\bfrom\b|מנקודה|מהנקודה/i.test(s)) return null; // "from <point>" → the external-point secant
+  if (circleIsOnlyLocative(s)) return null; // #1678: «במעגל …» is the scene — the verb meets something named after it
   const center = resolveMentionedCircle(s, ctx); // a named circle, or "the circle" when there's exactly one
   if (!center) return null; // must REFER to a circle (else it's line∩line, a constraint, etc.)
   const circ = circleId(center);
@@ -7694,6 +7739,7 @@ const lineMeetsCircle: Rule = (s, ctx) => {
     .replace(/extension|extended|\bline\b|המש(?:ך|כי(?:ם|הם|הן)?)|הישר|הקו|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?/gi, ' ');
   const pr = labelRun(body, 2);
   if (!pr || pr.includes(R)) return null;
+  if (unclaimedLabels(body, pr, [R, center]).length) return null; // #1678: the WHOLE label body, or defer
   const [a, b] = pr;
   // avoid the endpoint already on the target circle (default to `a` — the avoid branch drops all
   // placed roots regardless, so the new crossing is found either way); draw from the off-circle end.
@@ -8706,10 +8752,13 @@ const circumcircleMeetsSegment: Rule = (s, ctx) => {
   const between = s.slice(cue.index! + cue[0].length, cut.index).replace(/triangle|משולש|מרובע|quad\w*|את|\bof\b|\bthe\b/gi, ' ');
   const tri = labelRun(between, 4) ?? labelRun(between, 3);
   if (!tri) return null;
+  if (unclaimedLabels(between, tri).length) return null; // #1678: the WHOLE vertex span, or defer
   const [a, b, c] = tri;
   // the cut segment: the 2 labels between the cut verb and "at".
-  const seg = labelRun(s.slice(cut.index! + cut[0].length, at.index).replace(/את|\bthe\b|\bline\b|הישר|הקו|המש(?:ך|כי(?:ם|הם|הן)?)/gi, ' '), 2);
+  const segBody = s.slice(cut.index! + cut[0].length, at.index).replace(/את|\bthe\b|\bline\b|הישר|הקו|המש(?:ך|כי(?:ם|הם|הן)?)/gi, ' ');
+  const seg = labelRun(segBody, 2);
   if (!seg || seg.includes(D)) return null;
+  if (unclaimedLabels(segBody, seg).length) return null; // #1678: the WHOLE cut-segment span, or defer
   const [p, q] = seg;
   const shared = [p, q].find((x) => [a, b, c].includes(x)) ?? p; // the endpoint already on the circumcircle
   const other = shared === p ? q : p; // the segment's OTHER endpoint

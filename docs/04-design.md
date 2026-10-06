@@ -1284,6 +1284,45 @@ step-5 failure is re-tested without retyping steps 1–4.
 
 A crossing sentence has a FRAME, and only the frame decides whether its operand lines are drawn (#1751, operator rulings 2026-10-04). The verb frame — `lineLineIntersection`'s lines-first and cut branches, and a role meet whose `crossingSubjectOf` is `'lines'` (a meet verb, no point-first noun head) — inks its operands: the lettered pairs as before, and «האלכסונים נפגשים בנקודה M» the ring's two diagonals (plain segments: derived from the ring the sentence resolved, so no ADR-499 claim). The noun frame — the point-first branch, `cross(…, 'point')`, and the role meet with a noun head — inks nothing; it ensures its operands' endpoints as `ifAbsent` free points so the statement stands alone (an empty canvas, and the #943 drop-one re-fold, which never re-parses). Analytic reads the same rule (ADR-AG-241).
 
+## A fixed-run rule consumes the whole label body ([ADR-601](06-decisions.md#adr-601))
+
+`labelRun(body, n)` returns the FIRST run of exactly n labels and says nothing about the rest of the body. A rule
+whose operand is such a run therefore owes the ADR-024 leftover guard **at the run**: `unclaimedLabels(body, run,
+also)` (`parse.ts`) strips the run and every other label the rule accounted for (the crossing it names, the circle's
+centre, a through point), and a non-empty answer makes the rule return `null`. The sentence then falls to a rule
+that reads all of it, or escalates. The gates cannot be the backstop for this: they exempt every EXISTING label, so a
+stated pair of drawn points («BD» in «המיתרים AC ו-BD נפגשים») vanishes unseen (the gate arm is #1833). Members
+today: the line-meets-circle family (`lineMeetsCircle`, `extendOntoCircle`, `lineCutsCircleTwice`,
+`secantFarPoint`) and both spans of `circumcircleMeetsSegment`.
+
+The same rules take the circle as the meet verb's subject or object, never as the scene: `circleIsOnlyLocative(s)`
+is true when every circle mention is a sentence-opening «ב+מעגל [O]» / "in the circle [O]". That is the precedence
+half of the fix (docs/17 §3, keyword bow-outs): it is a statement about what the circle phrase IS, not a word test.
+`lineLineIntersection` reads with the lowercase En `FILLER` stripped, and a capitalised filler word too («In the
+circle, …»), so a word is never read as a two-letter line.
+
+A sentence-opening locative that NAMES its circle («במעגל O, המיתר AC …») is label-accounted context (rule 5 of
+`labelAccounting.ts`) exactly when the figure already holds what it says: at least two existing points carried, all
+on that circle. Otherwise the letter stays unaccounted, so the scene's membership is never dropped green.
+
+## The order of points on a circle is a sampled DOF ([ADR-601](06-decisions.md#adr-601))
+
+Free riders on a circle take golden-angle default slots (`nextTheta`), and the sampler holds a cluster of them
+(the vertices of an inscribed polygon, or three or more riders with no polygon on the circle) to a tight ±30°
+jitter so an inscribed shape keeps its spread. That jitter also kept the slots' CYCLIC ORDER, so the order the
+defaults happened to produce (four points typed A, B, C, D land in the order A, C, B, D) acted as a fixed given.
+`statedCyclicOrderSeat` (`engine/sample.ts`, called by `applySeed` for every seed but 0) treats the order as a
+discrete DOF of the sample: per circle with at least four tight riders, it deals the cluster's own slots in a
+cyclic order drawn (seeded) from the orders the construction's records allow. A declared polygon with at least four
+vertices in the cluster keeps its vertex order; two chords stated to meet within a segment (`line-line-intersection`
+with an `onSeg` flag, four distinct ends in the cluster) have alternating ends. When the records leave only the
+default order (up to reflection) the default is kept, and an unsatisfiable set keeps the default for the verifier.
+The seat runs before the jitter, so spread protection is unchanged; it adds no evaluate. Its reach is the seed
+sweep every view search already runs (ADR-106's post-commit `findValidConfig`, «הציגו תצורה אחרת»'s resample), so
+a requirement the default order misses is met at the first seed that deals a lawful order. It is the sampler's
+counterpart of the stated-side seat (ADR-594): a sampled DOF follows what was stated, and varies only where
+nothing was.
+
 ## One registry of unstated discrete choices ([ADR-593](06-decisions.md#adr-593))
 
 An unstated discrete choice — which crossing, which side of an edge, which root, which vertex carries the right

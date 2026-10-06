@@ -97,7 +97,7 @@ The list itself is the smell: each is a point where a general decision is being 
 | Parser per-rule "existing object" guards (tangent/incircle/chord/inscribe rules in `parse.ts`) | M1 |
 | `recruitFreeDofs` case ladder (A–F) and its experiment ordering (`src/engine/step.ts`) | M2 carrier ownership |
 | `keepTangencyDriven` / `applyRadiusGiven` routing (`src/engine/apply.ts`) | M2 |
-| Keyword bow-outs between parser rules (`return null` on a word test) | parser precedence + leftover guard (ADR-024) |
+| Keyword bow-outs between parser rules (`return null` on a word test) | parser precedence + leftover guard (ADR-024). A rule reading a fixed-size `labelRun` checks the WHOLE body with `unclaimedLabels`, and a sentence-opening «במעגל» is the scene, not the operand (`circleIsOnlyLocative`). Both are statements about what the sentence says, not word tests ([ADR-601](06-decisions.md#adr-601)) |
 | Sampling loops (any new `for (seed…) replay/evaluate`) | M3 one sampler, budgeted |
 | Hard-coded defaults in shape macros (apex choice, right-angle vertex, equal pair) | M4 defaults yield to statements |
 | Inline lexical fragments in parser rules (label token, number grammar, keyword morphology) | `src/parser/lexicon.ts` atoms + the `lexical-ratchet.test.ts` ceilings (S2.1 of docs/24 — counts may only go DOWN; compose new rules from the atoms) |
