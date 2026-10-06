@@ -1015,6 +1015,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'point-value-length-order-1701', family: 'lengths', steps: ['משולש ABC', 'AB < C'], expect: 'not-handled' },
   { id: 'radius-value-length-1701', family: 'lengths', steps: ['משולש ABC', 'AB = 1.6R'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'control — the radius R is the one capital a length value admits (2-D ADR-034)' },
   { id: 'area-label-capital-1701', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC = S'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'control — an area label is a capital in 2-D (parseAreaExpr)' },
+  // ── #1785 (ADR-AG-244): an indexed name («S1», «a1», «α1») is one name, never letter × index — every builder declines it ──
+  { id: 'indexed-length-1785', family: 'lengths', steps: ['משולש ABC', 'AB = a1'], expect: 'not-handled', note: 'analytic read a·1; «AC = a2» then forced AC = 2·AB' },
+  { id: 'indexed-area-1785', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC = S1'], expect: 'not-handled', knownGap: [{ product: '2d', issue: '#1814' }], note: '2-D cuts it at the `=` (split-statements, a misfire over the decline)' },
+  { id: 'indexed-area-point-1785', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC = A1'], expect: 'not-handled', knownGap: [{ product: '2d', issue: '#1814' }], note: 'the reported line: analytic recorded a parameter A' },
+  { id: 'indexed-angle-1785', family: 'angles', steps: ['משולש ABC', '∠ABC = α1'], expect: 'not-handled', knownGap: [{ product: '2d', issue: '#1814' }], note: '2-D drops the α and draws a 1° angle' },
+  { id: 'area-label-point-letter-1785', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC = B'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679' }], note: 'control — a lone point letter is an area label in 2-D (parseAreaExpr), and analytic keeps it' },
   // ── #1691 (ADR-AG-239): the spaced conjunction — «ו- X», «ו -X», «ו - X» read as «ו-X» in every builder (one shared fold) ──
   { id: 'conj-space-tan-1691-01', family: 'tangents', steps: ['משולש ABC', 'מעגל O', 'AB ו- BC משיקים למעגל'], expect: 'builds', exception: 'X8', note: 'the prod sentence (#1691)' },
   { id: 'conj-space-tan-1691-02', family: 'tangents', steps: ['משולש ABC', 'מעגל O', 'AB ו -BC משיקים למעגל'], expect: 'builds', exception: 'X8' },

@@ -29,7 +29,10 @@ const expr = (s: string) => parseExpr(normalizeMath(s))!;
 
 describe('#1701 — the predicate', () => {
   it('a capital symbol is a point name; lowercase, Greek and numbers are not', () => {
-    for (const s of ['A1', 'A', '2A', 'A·B', 'B2']) expect(mentionsPointName(expr(s)), s).toBe(true);
+    for (const s of ['A', '2A', 'A·B', 'A + 1']) expect(mentionsPointName(expr(s)), s).toBe(true);
+    // An INDEXED capital («A1», «B2») no longer reaches the predicate: the tokenizer refuses it first (#1785, ADR-AG-244),
+    // and the readers decline it through `INDEXED_TOKEN` — still `not-handled`, now for two reasons (the sweep below).
+    for (const s of ['A1', 'B2']) expect(parseExpr(normalizeMath(s)), s).toBeNull();
     for (const s of ['a', '2a', 'k+1', '40', 'α', '√3']) expect(mentionsPointName(expr(s)), s).toBe(false);
   });
   it('a length admits the radius R (2-D ADR-034) and nothing else', () => {

@@ -79,6 +79,16 @@ export const LENGTH_CAPITALS: ReadonlySet<string> = new Set(['R']);
  * it), with an optional index. A reader uses it to decline rather than answer `bad-equation` about a point's name.
  */
 export const POINT_TOKEN = /(?<![A-Za-z])[A-Z](?:[0-9₀-₉]+|_\{?\d+\}?)?(?![A-Za-z])/;
+/**
+ * AN INDEXED NAME — «S1», «a2», «α1», «m1», «A1», «S_1», «S_{1}», «S₁» (#1785, ADR-AG-244): one letter (Latin or Greek)
+ * with an index, standing alone. The expression tokenizer refuses it (`expr.ts`, the index boundary) because the tool
+ * has no indexed-name symbol and juxtaposition would read it as letter × index; a value reader that finds its source
+ * unreadable tests this to DECLINE (`not-handled`, the LLM fallback's seam) instead of answering `bad-equation` about a
+ * name the student spelled correctly. Pure and product-free on purpose: 2-D carries the same class (#1814), and when
+ * it adopts this test it is the second copy — the point at which it moves to `shell/` (BOUNDARIES.json: shell is
+ * seeded by surfaces implemented ≥ 2 times).
+ */
+export const INDEXED_TOKEN = /(?<![A-Za-z])[A-Za-zα-ω](?:[0-9₀-₉]+|_\{?\d+\}?)(?![A-Za-z])/;
 
 /**
  * The kind of freedom an object carries *itself* — as opposed to the freedom it inherits from the

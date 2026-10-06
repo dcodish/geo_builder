@@ -22,7 +22,7 @@ import { cevianFacts, toolFootFacts, type CevianRole } from '../engine/cevian';
 import { toolPoint, type ToolPointRole } from '../engine/toolLetters';
 import { isAngleRef, sineAngle, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { evalExpr, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
-import { POINT_TOKEN, RESERVED_SYMBOLS, directionSymbol, mentionsPlane, mentionsPointName, radiusSymbol, toolSymbol } from '../engine/carriers';
+import { INDEXED_TOKEN, POINT_TOKEN, RESERVED_SYMBOLS, directionSymbol, mentionsPlane, mentionsPointName, radiusSymbol, toolSymbol } from '../engine/carriers';
 
 /** A student's VALUE — a number or an expression in parameters, never the plane's x/y (#1496, `mentionsPlane`). */
 function valueExpr(src: string): Expr | null {
@@ -33,14 +33,28 @@ function valueExpr(src: string): Expr | null {
 /**
  * AN ANGLE'S VALUE — `valueExpr`, but a point's name is no value (#1701, ADR-AG-238). «∠CAB = A1» lexed as `A·1` and
  * recorded a free parameter named A; 2-D escalates it (its angle variable is lowercase or Greek), so the reader answers
- * `'point'` and the rule DECLINES — the line reaches `not-handled`, as in 2-D, never `bad-equation` about a point's name.
+ * `'declined'` and the rule DECLINES — the line reaches `not-handled`, as in 2-D, never `bad-equation` about a point's name.
  * Every reader of an angle's (or an order's, a parameter's) value goes through here, so the class closes at one place;
  * a length's value is the same test in `lengths.ts` (`constantLengthExpr`, `readLength`), with the radius R allowed.
  */
-function measureValue(src: string): Expr | 'point' | null {
+function measureValue(src: string): Expr | 'declined' | null {
   const e = valueExpr(src);
-  if (e ? mentionsPointName(e) : POINT_TOKEN.test(src)) return 'point';
+  if (e ? mentionsPointName(e) : POINT_TOKEN.test(src) || INDEXED_TOKEN.test(src)) return 'declined';
   return e;
+}
+
+/**
+ * AN UNREADABLE VALUE OR EQUATION — `bad-equation` about it, UNLESS an indexed name is why (#1785, ADR-AG-244).
+ *
+ * «S1», «a2», «α1», «y = m1x + 2» are spelled correctly; the tool simply has no indexed-name symbol, so the
+ * tokenizer refuses them (`expr.ts`, the index boundary). Telling the student the equation is malformed would be a
+ * false verdict, so the rule DECLINES — `not-handled`, as 2-D and 3-D answer, and the seam where the LLM fallback can
+ * rewrite the name. Every site that refuses an unreadable value or equation source goes through here, so one sentence
+ * gets one verdict whatever the slot (length, angle, area, slope, coordinate, radius, equation) and whatever the
+ * index spelling («S1», «S_1», «S₁»).
+ */
+function unreadable(src: string): RuleOutcome {
+  return INDEXED_TOKEN.test(src) ? null : refuse('bad-equation', src);
 }
 import { angleLabelSymbol, constantLengthExpr, namedLengthPairs, planeLetterLength, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
@@ -2056,7 +2070,7 @@ function parseDerived(line: string): RuleOutcome {
   if (diag && claimable(diag[2])) {
     const [, which, eqSrc] = diag;
     const eq = equationExpr(eqSrc);
-    if (!eq) return refuse('bad-equation', trim(eqSrc));
+    if (!eq) return unreadable(trim(eqSrc));
     const principal = /ראשי|main|principal|major/i.test(which);
     return made([{ t: 'diagonal-eq', principal, eq, src: line }]);
   }
@@ -2717,7 +2731,7 @@ function parseMeasureRoles(line: string): RuleOutcome {
         const src = value.replace(/^(?:ה?ישר\s+)?(?:ש?משוואתו\s+)?/, '').replace(/^(?:the\s+)?line\s+/i, '');
         if (!src.includes('=')) continue;
         const eq = equationExpr(src);
-        if (!eq) return refuse('bad-equation', trim(src));
+        if (!eq) return unreadable(trim(src));
         return made([{ t: 'directrix-eq', eq, eqSrc: trim(src), src: line }]);
       }
       case 'foci':
@@ -2864,14 +2878,14 @@ function oneCircleFacts(subject: CircleSubject & { kind: 'one' }, targets: Tange
  */
 function circleSubjectGate(subject: CircleSubject | null, line: string): RuleOutcome {
   if (!subject || subject.kind !== 'one') return null;
-  if (subject.radius !== undefined && !roleScalar(subject.radius)) return refuse('bad-equation', subject.radius);
+  if (subject.radius !== undefined && !roleScalar(subject.radius)) return unreadable(subject.radius);
   if (subject.placed !== undefined) {
     const placed = parseClause(`${subject.name}${subject.placed}`);
     if (!placed.ok) return placed;
   }
   if (subject.coords !== undefined) {
     const slot = pointSlot(subject.coords);
-    if (!slot || 'name' in slot) return refuse('bad-equation', subject.coords);
+    if (!slot || 'name' in slot) return unreadable(subject.coords);
     const coords = subject.coords;
     return viaCanonical(line, slot, (p) => [line.replace(coords, p)]);
   }
@@ -3017,7 +3031,7 @@ function parseTangentObject(line: string): RuleOutcome {
     if (!noun) return null;
     const eqSrc = trim(eqm[2]);
     const eq = equationExpr(eqSrc);
-    if (!eq || !symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) return refuse('bad-equation', eqSrc);
+    if (!eq || !symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) return unreadable(eqSrc);
     const id = `curve-${anonIndex(eqSrc)}`;
     if (!noun.at) return made([{ t: 'tangent-eq', id, eq, eqSrc, ...(noun.circle ? { circle: noun.circle } : {}), src: line }]);
     return made([
@@ -3337,7 +3351,7 @@ function parseCircleFamilies(raw: string): RuleOutcome {
     new RegExp(`^(?:a\\s+)?circle\\s+(?:around|about|cent(?:re|er)ed\\s+at|with\\s+cent(?:re|er))\\s+(${NAME})(?:\\s*,?\\s+(?:with\\s+)?radius\\s+(\\S+))?$`, 'i').exec(g);
   if (around) {
     const r = around[2] !== undefined ? radiusOfSize('radius', around[2]) : null;
-    if (around[2] !== undefined && !r) return refuse('bad-equation', around[2]);
+    if (around[2] !== undefined && !r) return unreadable(around[2]);
     const facts = namedCircleFacts(around[1], r, line);
     return facts ? made(facts) : null;
   }
@@ -5552,7 +5566,7 @@ function orderSide(src: string, claims: ClaimSink): { side: OrderSide; text: str
     return measured ? { side: { t: 'length', le }, text: roled } : null;
   }
   const value = measureValue(t.replace(DEGREE_TAIL, ''));
-  return value && value !== 'point' ? { side: { t: 'value', value }, text: t } : null;
+  return value && value !== 'declined' ? { side: { t: 'value', value }, text: t } : null;
 }
 
 /** The facts of one order: the pairs a length side names are drawn (#1652's rule, as «AB = …» draws them), then the selector. */
@@ -5731,8 +5745,8 @@ function parseAngleMeasure(line: string): RuleOutcome {
   const valueSrc = trim(rhsSrc);
   if (!claimable(valueSrc)) return null;
   const value = measureValue(valueSrc);
-  if (value === 'point') return null;
-  if (!value) return refuse('bad-equation', valueSrc);
+  if (value === 'declined') return null;
+  if (!value) return unreadable(valueSrc);
   // sin (ADR-AG-227): the choice between its two angles; tan and cos fix one.
   if (isAngleRef(left)) return made([{ t: 'constraint', k: measure === 'sin' ? sineAngle(left, value) : { t: 'angle', at: left, value, measure }, src: line }]);
   return made([{ t: 'vertex-angle', left, rhs: { t: 'value', value, measure }, src: line }]);
@@ -5755,7 +5769,7 @@ function parseParamValue(line: string): RuleOutcome {
   const valueSrc = m[2].replace(DEGREE_TAIL, '');
   if (!claimable(valueSrc)) return null;
   const value = measureValue(valueSrc);
-  if (!value || value === 'point') return null;
+  if (!value || value === 'declined') return null;
   return made([{ t: 'constraint', k: { t: 'param-eq', sym: { kind: 'sym', name: m[1] }, value }, src: line }]);
 }
 
@@ -5833,8 +5847,8 @@ function parseAngleBetween(line: string): RuleOutcome {
   const a = p1 === v ? p2 : p1;
   const b = q1 === v ? q2 : q1;
   const value = measureValue(valueSrc);
-  if (value === 'point') return null;
-  if (!value) return refuse('bad-equation', valueSrc);
+  if (value === 'declined') return null;
+  if (!value) return unreadable(valueSrc);
   return made([
     { t: 'constraint', k: { t: 'angle', at: { v, a, b }, value }, src: line },
     { t: 'segment', id: segmentId(v, a), a: v, b: a, src: line },
@@ -6601,7 +6615,7 @@ function parseConstraint(raw: string): RuleOutcome {
     const u = direction(slope[1], claims);
     if (!u) return refuse('bad-operand', line);
     const value = valueExpr(slope[2]);
-    if (!value) return refuse('bad-equation', trim(slope[2]));
+    if (!value) return unreadable(trim(slope[2]));
     return made([{ t: 'constraint', k: { t: 'slope', u, value }, src: line }, ...claims.out]);
   }
 
@@ -6691,7 +6705,7 @@ function parseConstraint(raw: string): RuleOutcome {
     // it rather than refuse it, which is the rule contract for "not my sentence".
     if (noun && !shapeRow(noun)) return null;
     const value = valueExpr(valueSrc);
-    if (!value) return refuse('bad-equation', trim(valueSrc));
+    if (!value) return unreadable(trim(valueSrc));
     if (run) {
       const ids = splitNames(run);
       // The same class as the shape nouns (#1042): this rule recognised its own sentence, so a
@@ -6890,7 +6904,7 @@ function parseConstraint(raw: string): RuleOutcome {
       const right = angleNameOf(p2, v2, q2);
       if (!right) return refuse('repeated-vertex', line);
       const k = valueExpr(kSrc ?? '1');
-      if (!k) return refuse('bad-equation', rhs);
+      if (!k) return unreadable(rhs);
       // Three letters on both sides need no figure; a lone vertex on either side is resolved at M1.
       if (isAngleRef(left) && isAngleRef(right)) {
         return made([{ t: 'constraint', k: { t: 'angle-ratio', left, right, k }, src: line }]);
@@ -6902,8 +6916,8 @@ function parseConstraint(raw: string): RuleOutcome {
     // whoever owns it rather than answer with an equation error.
     if (claimable(valueSrc)) {
       const value = measureValue(valueSrc);
-      if (value === 'point') return null;
-      if (!value) return refuse('bad-equation', valueSrc);
+      if (value === 'declined') return null;
+      if (!value) return unreadable(valueSrc);
       if (isAngleRef(left)) return made([{ t: 'constraint', k: { t: 'angle', at: left, value }, src: line }]);
       return made([{ t: 'vertex-angle', left, rhs: { t: 'value', value }, src: line }]);
     }
@@ -6934,7 +6948,7 @@ function parseConstraint(raw: string): RuleOutcome {
   if (comp && claimable(comp[3])) {
     const [, axis, id, valueSrc] = comp;
     const value = valueExpr(valueSrc);
-    if (!value) return refuse('bad-equation', trim(valueSrc));
+    if (!value) return unreadable(trim(valueSrc));
     // It DECLARES, like every rule that names a point and says where it is (#1069). The other
     // component is simply absent, which is what leaves it free.
     return made([
@@ -7725,7 +7739,7 @@ function arcSide(side: string): Array<{ k: Expr; a: Id; b: Id } | { value: Expr 
     const at = t.search(/ה?קשת|⌢|⏜|arcs?/i);
     if (at < 0) {
       const v = measureValue(t.replace(/°|מעלות|degrees?/gi, '').trim());
-      if (!v || v === 'point') return null;
+      if (!v || v === 'declined') return null;
       out.push({ value: sign < 0 ? { kind: 'neg', a: v } : v });
       continue;
     }
@@ -8145,7 +8159,7 @@ function parseClauseRules(raw: string): ParseResult {
     // the rule never read (#1272, `claimable`) — so this rule has no claim
   } else if (curve) {
     const eq = equationExpr(curve.eqSrc);
-    if (!eq) return { ok: false, code: 'bad-equation', detail: trim(curve.eqSrc) };
+    if (!eq) return unreadable(trim(curve.eqSrc)) ?? { ok: false, code: 'not-handled', detail: line };
     /**
      * A line NAMED BY TWO POINTS is a statement about those points (#1066).
      *

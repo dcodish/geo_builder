@@ -100,6 +100,10 @@ const SYMBOL_RE = /[A-Za-z-α-ορ-ω]/;
  */
 const LATIN_RE = /[A-Za-z]/;
 
+/** The letters a student can index (Latin and Greek — never the private-use length encoding), and what starts an index (#1785). */
+const INDEXED_LETTER_RE = /[A-Za-zα-ορ-ω]/;
+const INDEX_START_RE = /[0-9_₀-₉]/;
+
 function tokenize(src: string): Tok[] | null {
   const out: Tok[] = [];
   let i = 0;
@@ -152,6 +156,19 @@ function tokenize(src: string): Tok[] | null {
         if (run >= 3 && spaceDelimited) return null; // a WORD — #1068's ruled boundary
         if (run >= 2 && src[j] === '(') return null; // a function APPLICATION — the only function is √
       }
+      /**
+       * AN INDEXED NAME IS NOT A PRODUCT (#1785, ADR-AG-244) — the third boundary, one character class over.
+       *
+       * «S1», «a2», «α1», «m1», «A1» are the book's indexed names: ONE name each. Juxtaposition read them as letter ×
+       * index, so «S1» and «S2» became `S` and `2S` — one shared parameter and a 1 : 2 ratio the student never
+       * stated, drawn green. The tool has no indexed-name symbol (that is a capability, not this fix), so a letter
+       * followed IMMEDIATELY by a digit, a `_` or a subscript digit is refused here, and the value readers map the
+       * refusal to a decline (`INDEXED_TOKEN`, carriers.ts) — the LLM fallback can rewrite it into a supported form.
+       * Number-then-letter (`2a`, `25k²`, `2π`) is unchanged: only letter-then-index is a name. The private-use
+       * range (`lengths.ts`'s encoding of `AB`, `A1B2` as one character) is never a student's letter, so it is exempt.
+       * Curve and point names («l1», «A1») are consumed by their sentence rules before any text reaches here.
+       */
+      if (INDEXED_LETTER_RE.test(c) && i + 1 < src.length && INDEX_START_RE.test(src[i + 1])) return null;
       out.push({ t: 'sym', v: c });
       i += 1;
       continue;
