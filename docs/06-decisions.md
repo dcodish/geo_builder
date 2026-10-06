@@ -14981,6 +14981,7 @@ No gate accounted for a noun by its arity: `droppedShapeNoun` returned false as 
 - `src/app/__tests__/issue-1795-existing-label-tail.test.ts`: the battery, the issue's spellings, the split lock with Thales at seeds 0–3, the oracle decomposition, the position-word rows, the reference-rule unit cases and the controls.
 - Scenario `existing-label-clause-never-dropped-1795` (corpus-4). Its decide-parity case is the one key added to shard 4's golden; no existing golden hash moved.
 - `production-feedback.test.ts`: «OB רדיוס = 5» with B an existing point NOT on circle O lowered to a bare `set-radius`, which drops «B is on the circle», a member of this class. It is now not committed there, and it still reads `set-radius` when the figure has B on the circle (the lock's own intent: the numeric radius is not hijacked).
+- Parity row `mid-compound` («משולש ABC» · «הנקודה D היא אמצע הצלע AB, והנקודה E היא אמצע הצלע BC»): 2-D now builds both midpoints. The whole-line rule dropped the existing C, so the clause split reads the line. 2-D's known gap (#1677) is dropped from that row (#1677 keeps its other rows); 3-D's (#1679) stays.
 - `span-gate-differential`'s ADR-264 "measured hole" ratchet tripped in the good direction: «CE⊥AB» lowered to a bare segment CE is now caught by its labels A, B. The lock now states the hole in its true form (every operand carried, the relation dropped, which is still `droppedGivenRelations`'s alone) and asserts the narrowed half.
 
 **Behaviour change for a student:**
