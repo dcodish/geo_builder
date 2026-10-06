@@ -100,10 +100,15 @@ Sequential, one item at a time (parallel items in one tree overwrite each other)
 4. **Per-item gates, no exceptions:** ADR entry in the product's log; per-fix unit test; the
    regression lock per standing rule 4 (fixtures-first — a `.geo.json` fixture when the essence
    is "builds green and verifies", a scenario in the LAST corpus chunk when a bespoke assertion
-   is needed); `tsc -b` + build clean; the PRODUCT LANE green (`npm run test:run:3d` /
-   `test:run:2d`) plus the item's own locks. The FULL suite is the BATCH gate (Step 3), not a
-   per-item one ([ADR-W-034](../../../docs/06w-decisions-workspace.md)). **Never overlap suite
-   runs** — a lane or a full suite runs alone; overlapping doubled every gate in round #822.
+   is needed); `tsc -b` + build clean; **`npm run test:fast` green** (every product, ~2 min) plus
+   **every test file the item added or changed, run by path** (a slow-tier file is excluded from
+   `test:fast`, so the item's own heavy locks must be named). **Not the product lane:** a lane
+   costs 4–11 min because it waits on its slowest file, and only 4 of 59 recorded red full runs
+   were caught by slow files alone ([ADR-W-113](../../../docs/06w-decisions-workspace.md#adr-w-113),
+   #1813). Those surface at the batch, whose full suite and in-round bisect are built for it. The
+   FULL suite is the BATCH gate (Step 3), not a per-item one
+   ([ADR-W-034](../../../docs/06w-decisions-workspace.md)). **Never overlap suite runs** — a
+   `test:fast`, a lane or a full suite runs alone; overlapping doubled every gate in round #822.
 5. **Commits reference the round:** every item commit carries `Fixes #NN` AND mentions the
    round issue (`round #RR`) — from any commit you can find the round, from the round every
    commit.

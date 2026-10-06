@@ -39,6 +39,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TIERS = join(ROOT, 'reports', 'test-tiers.json');
 const CATCHES = join(ROOT, 'reports', 'tier-catches.jsonl');
 const VERDICT = join(ROOT, 'reports', 'suite-verdict.json');
+// #1813: hook-inclusive per-file times — see the reporter's header and `timedFiles` below.
+const FILE_TIME_REPORTER = join(ROOT, 'scripts', 'lib', 'file-time-reporter.mjs').replace(/\\/g, '/');
 /**
  * WHICH FILES ARE "SLOW" — a RELATIVE rule (#484).
  *
@@ -155,13 +157,32 @@ export function writeVerdict(verdict, dest = VERDICT) {
   }
 }
 
-function runVitest(extraArgs) {
+function runVitest(extraArgs, env = {}) {
   const r = spawnSync('npx', ['vitest', 'run', ...extraArgs], {
     cwd: ROOT,
     stdio: 'inherit',
     shell: process.platform === 'win32',
+    env: { ...process.env, ...env },
   });
   return r.status ?? 1;
+}
+
+/**
+ * #1813 (ADR-W-113) — each file's measured cost, the input to `classifySlow`.
+ *
+ * `trueTimes` (absolute path → ms, from `scripts/lib/file-time-reporter.mjs`) includes the file's hooks.
+ * The JSON reporter's `endTime - startTime` does NOT — it spans first test to last test — and deriving
+ * the tiers from it left every `beforeAll`-heavy file (the #1395 parity shards: 0 s in the JSON, 207 s
+ * alone) in the fast tier. The span is kept only as the fallback for a run whose reporter wrote nothing.
+ * Pure; exported for `server/__tests__/test-tiers.test.ts`.
+ */
+export function timedFiles(report, trueTimes) {
+  const byRel = new Map(Object.entries(trueTimes ?? {}).map(([p, ms]) => [rel(p), ms]));
+  return report.testResults.map((t) => ({
+    file: rel(t.name),
+    ms: byRel.get(rel(t.name)) ?? t.endTime - t.startTime,
+    failures: t.assertionResults.filter((a) => a.status === 'failed').map((a) => a.fullName),
+  }));
 }
 
 /**
@@ -212,29 +233,32 @@ function runAndRecord(mode, extraArgs) {
   const { sha, dirty } = treeState();
   const at = new Date().toISOString();
   const out = join(tmpdir(), `geo-suite-${process.pid}.json`);
-  const status = runVitest(['--reporter=default', '--reporter=json', `--outputFile.json=${out}`, ...extraArgs]);
+  const timesOut = join(tmpdir(), `geo-file-times-${process.pid}.json`);
+  const status = runVitest(
+    ['--reporter=default', '--reporter=json', `--outputFile.json=${out}`, `--reporter=${FILE_TIME_REPORTER}`, ...extraArgs],
+    { GEO_FILE_TIMES_OUT: timesOut },
+  );
   const report = readJson(out, null);
+  const trueTimes = readJson(timesOut, null);
   try {
     rmSync(out, { force: true });
+    rmSync(timesOut, { force: true });
   } catch {
     /* best effort */
   }
   writeVerdict(buildVerdict({ mode, status, report, at, sha, dirty }));
-  return { status, report };
+  return { status, report, trueTimes };
 }
 
 function full() {
-  const { status, report } = runAndRecord('full', []);
+  const { status, report, trueTimes } = runAndRecord('full', []);
   if (!report?.testResults) {
     console.error('test:full — no JSON report produced; tier membership and catch tracking skipped.');
     process.exit(status);
   }
+  if (!trueTimes) console.error('test:full — the file-time reporter wrote nothing; tiers use the JSON span (blind to hooks).');
 
-  const files = report.testResults.map((t) => ({
-    file: rel(t.name),
-    ms: t.endTime - t.startTime,
-    failures: t.assertionResults.filter((a) => a.status === 'failed').map((a) => a.fullName),
-  }));
+  const files = timedFiles(report, trueTimes);
 
   updateTiers(files);
   trackCatches(files);

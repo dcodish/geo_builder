@@ -314,3 +314,50 @@ describe('#812 — the tier artifact holds no per-machine state', () => {
     expect([...(onDisk.slow as string[])].sort()).toEqual(onDisk.slow);
   });
 });
+
+/**
+ * #1813 (ADR-W-113) — A FILE'S COST INCLUDES ITS HOOKS.
+ *
+ * The JSON reporter's per-file `endTime - startTime` spans first test → last test, so `beforeAll` work is
+ * invisible. The #1395 parity shards do all their work there: shard 4 read 0 s in the JSON report and takes
+ * 207 s alone. Tiers derived from that span kept five such files (84–327 s each) in the fast tier, and
+ * `test:fast` grew from ~60 s to 6 min unnoticed. These call the two functions `full()` derives membership
+ * through, and assert the hook-heavy file is classed slow.
+ */
+// @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
+import { timedFiles } from '../../scripts/test-tiers.mjs';
+// @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
+import { fileDurationMs } from '../../scripts/lib/file-time-reporter.mjs';
+
+describe('#1813 — tier timing counts the work a file does in its hooks', () => {
+  // A vitest File task whose two tests take <1 s but whose beforeAll replays a corpus for 271 s.
+  const HOOK_HEAVY_TASK = { result: { duration: 271_000 }, collectDuration: 800, setupDuration: 0, prepareDuration: 60 };
+
+  it('the reporter charges a file its suite run (hooks included) plus collect, setup and prepare', () => {
+    expect(fileDurationMs(HOOK_HEAVY_TASK)).toBe(271_860);
+    expect(fileDurationMs({})).toBe(0); // a file that never ran is not a crash
+  });
+
+  // The JSON report for the same run: the tests start and end within one second of each other.
+  const heavy = { name: join(ROOT, 'src/app/__tests__/parity-shard.test.ts'), startTime: 1_000, endTime: 1_650, assertionResults: [] };
+  const cheap = Array.from({ length: 200 }, (_, i) => ({
+    name: join(ROOT, `src/t${i}.test.ts`), startTime: 0, endTime: 300, assertionResults: [],
+  }));
+  const report = { testResults: [heavy, ...cheap] };
+  const trueTimes = { [heavy.name.replace(/\\/g, '/')]: fileDurationMs(HOOK_HEAVY_TASK) };
+
+  it('a file whose work sits in beforeAll is classed SLOW when its true time is known', () => {
+    const files = timedFiles(report, trueTimes);
+    expect(files.find((f: { file: string }) => f.file === 'src/app/__tests__/parity-shard.test.ts').ms).toBe(271_860);
+    expect(names(files)).toContain('src/app/__tests__/parity-shard.test.ts');
+  });
+
+  it('the defect, stated: from the JSON span alone the same file reads as cheap and stays in the fast tier', () => {
+    expect(names(timedFiles(report, null))).not.toContain('src/app/__tests__/parity-shard.test.ts');
+  });
+
+  it('paths match whichever separator each reporter used (Windows backslashes vs vitest forward slashes)', () => {
+    const backslashed = { [heavy.name.replace(/\//g, '\\')]: 271_860 };
+    expect(timedFiles(report, backslashed)[0].ms).toBe(271_860);
+  });
+});

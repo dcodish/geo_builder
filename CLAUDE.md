@@ -181,7 +181,7 @@ by `tool:`, never forked). Boundaries are declared in `BOUNDARIES.json` and enfo
 - `npm run build` — `tsc -b` then `vite build`; `build:3d` / `build:complex` / `build:analytic` for the siblings
 - `npm test` — Vitest (watch). Single file: `npx vitest run <path>`. By name: `npx vitest run -t "<name>"`
 - **`npm run test:full`** — the FULL suite (~10 min) — **the bar before any commit and any deploy**. Claim green by READING `reports/suite-verdict.json`, never an exit code ([ADR-W-033](docs/06w-decisions-workspace.md#adr-w-033)).
-- **`npm run test:fast`** — every file measured under 60 s (~60 s) — the development loop, **never a gate**.
+- **`npm run test:fast`** — every file outside the measured slow tier, all products (~2 min) — the development loop and a fix round's per-item check, **never a commit or deploy gate** ([ADR-W-113](docs/06w-decisions-workspace.md#adr-w-113)).
 - **`npm run test:docs`** — the doc gate (~2 s) — the correct bar for a **doc-only** change; anything touching `.ts`/`.tsx` pays `test:full` ([ADR-W-041](docs/06w-decisions-workspace.md#adr-w-041)).
 - `npm run test:tiers` — which slow files have actually caught a regression the fast tier missed.
 - `npm run test:2d` / `test:3d` / `test:complex` / `test:analytic` — per-product slice (tree + shared `server/`); CI mirrors the split.

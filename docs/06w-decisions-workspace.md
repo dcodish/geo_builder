@@ -1535,6 +1535,8 @@ was "full suite on the rebased tip", so item N could not start its gate until N�
    suite (`npm run test:full`) runs **once, on the merged batch tip, before the push** — and again only
    when it comes back red (fix, re-run). The bar on what actually lands is unchanged: nothing reaches
    `main` without a green full suite on exactly that state.
+   *Amended 2026-10-06 by [ADR-W-113](#adr-w-113): the per-item test is `npm run test:fast` plus the item's
+   own test files, not the product lane.*
 2. **Land in one push at the end.** Item branches merge, in composition order, into a staging tip
    (`round/<date>` on the shared tree or a worktree); conflicts are reconciled there; the batch's full
    suite runs on that tip; then `main` fast-forwards to it and pushes once. The ledger still records
@@ -5327,3 +5329,28 @@ On a phone (out of scope, NFR-US-4) only the top third of the figure shares the 
 - **Sticky bottom input** (the filing session's recommendation). The operator chose otherwise.
 - **The whole input zone above the canvas.** Measured above: it pushes the figure off-screen as facts accumulate.
 - **Splitting the zone inside `Workbench`** by walking the children of the node it is given. That guesses at each product's markup. The products already know which card is which.
+
+## ADR-W-113 — A file's test time includes its hooks, and a fix-round item is gated on `test:fast`, not its product lane (#1813)
+
+**Status:** accepted · 2026-10-06 · steps 1–2 of #1813. Ruling cited:
+- **2026-10-06, operator:** *"the goal is to dramatically reduce the testing time so we can speed up the rounds"* · *"lets build 1-2 first … we always do a full check at the end and before deploy so nothing will slip"*.
+
+**Requirements:** none (internal). · **Design:** [08](08-testing-strategy.md) "Two tiers": the measured file cost includes hooks, and the per-item check is `test:fast`. **Product:** workspace (test tooling and the fix-round workflow).
+
+**Context.** Round #1776 took ~21 h to build. Its 16 items spent about 7.5 of their ~12.5 agent-hours in tests: 47 product-lane runs (≥170 min measured) and 308 targeted runs. The full suite ran once, at the batch. Measured on `dc86550a` with hook-inclusive per-file times (#1813 comment):
+- **A lane waits on its slowest file.** Vitest parallelises across files, never within one, so analytic's lane takes about as long as `issue-1473-pool-invariant` (669 s), 2-D's as `issue-1675-1584-reattempt-cost` (483 s) and 3-D's as `issue-1735-rider-host-reseat` (418 s). 40 files over 60 s hold 67% of the suite's CPU.
+- **`test:fast` took 6 min, not ~60 s.** `scripts/test-tiers.mjs` timed a file as the JSON reporter's `endTime - startTime`, which spans first test → last test and excludes `beforeAll`. Five hook-heavy files stayed in the fast tier: `decide-submit3-parity-1394` (327 s), `decide-parity-1395-4` (271 s), `student-text-1455` (257 s), `decide-parity-1395-2` (100 s), `decide-parity-1395-1` (84 s). The parity harness reads 0 s in the JSON report and takes 207 s alone.
+- **The slow tier rarely catches alone.** `reports/tier-catches.jsonl` has 59 red full runs since 2026-07-27. In only 4 was the fast tier green.
+
+**Decision.**
+1. **A file's cost is its suite run including hooks, plus collect, setup and prepare.** `scripts/lib/file-time-reporter.mjs` records it; `test:full` passes it through `timedFiles()` into `classifySlow`. The JSON span is kept only as the fallback when the reporter wrote nothing, and that case is printed.
+2. **A fix-round item is gated on `tsc -b` + build + `npm run test:fast` (every product) + its own new or changed test files run by path.** This amends [ADR-W-034](#adr-w-034) item 1's "product lane". The full suite on the batch tip and the pre-deploy full run are unchanged, and they remain the only gates that can call a state green. A break only a slow file sees surfaces at the batch, where the round's in-round bisect handles it. `test:fast` stays out of the commit and deploy gates, for docs/08's mutation reason.
+
+**Locks.** `server/__tests__/test-tiers.test.ts` (#1813 block, 4 cases): the reporter charges hooks plus phases; a file whose work sits in `beforeAll` is classed slow through `timedFiles`; the JSON span alone leaves it cheap (the defect, stated); and Windows backslash paths match vitest's forward slashes. Fails before: 2 of 4, the `beforeAll` classification and the path match, with `timedFiles` reverted to the span.
+
+**Rejected.**
+- **Only the tests that import the changed files (`vitest related`).** Safe: it would have selected 79 of the 86 reds seen in recent rounds' items, and every miss read the tree through `fs`. But it saves nothing: for round #1776's 15 branches it selects 85–110% of the lane, because nearly every test imports the parser or engine.
+- **Randomly sampling test files.** A third of past breaks turned exactly one or two files red, so a 50% sample would catch ~82% of breaks at half the cost. `test:fast` catches ~93% for less.
+- **Sampling *inside* the sweep files** (seeds, corpus cases) is not rejected. It is measured separately on #1813 before anything is built.
+
+**Not built here (#1813 steps 3–5):** re-running only the failing files after a red; recording the parity goldens once, on the staging tip; and splitting the heavy files.
