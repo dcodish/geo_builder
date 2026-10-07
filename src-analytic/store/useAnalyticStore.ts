@@ -97,6 +97,8 @@ export type InputError =
   /** An angle bisector that does not start at its angle's vertex (#1284, ADR-AG-209). */
   | { key: 'bisector-wrong-apex'; detail: string }
   | { key: 'length-xy'; detail: string }
+  /** A domain stated for x or y — «y = 2x + 1, x > 0»: a restriction on the curve, which the tool cannot draw (#1832, ADR-AG-246). */
+  | { key: 'coordinate-restriction'; detail: string }
   /** A cevian whose target the figure leaves open — the apex (or side) in several triangles (#1240, ADR-AG-209). */
   | { key: 'ambiguous-cevian'; detail: string }
   /** A cevian whose apex (or side) is in no triangle of the figure (#1240, ADR-AG-209). */

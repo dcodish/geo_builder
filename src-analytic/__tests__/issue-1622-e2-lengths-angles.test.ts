@@ -129,7 +129,7 @@ describe('#1622 E2 — a letter in a length; x and y refused (operator ruling 20
     expect(parseLine('שטח המשולש ABC הוא y').ok).toBe(false);
   });
 
-  it('a parameter is its own letter (the withdrawn length variable left no second symbol): «x > 0» declares x', () => {
+  it('a parameter is its own letter (the withdrawn length variable left no second symbol): «x > 0» parses as a domain for x — which the fold refuses (#1832, ADR-AG-246)', () => {
     const p = parseLine('x > 0');
     expect(p.ok && p.facts[0].t === 'param' && p.facts[0].sym).toBe('x');
     expect(exprText({ kind: 'mul', a: { kind: 'num', value: 3 }, b: { kind: 'sym', name: 'a' } })).toBe('3·a');

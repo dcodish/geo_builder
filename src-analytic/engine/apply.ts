@@ -188,7 +188,15 @@ export type ApplyErrorCode =
    */
   | 'out-of-domain'
   /** A stated given the solve could not satisfy — reported, never drawn as if it held. */
-  | 'unsatisfiable';
+  | 'unsatisfiable'
+  /**
+   * A DOMAIN stated for a plane coordinate — «y = 2x + 1, x > 0», «x^2 + y^2 = 4, y > 0», «x הוא פרמטר» (#1832,
+   * ADR-AG-246). `x` and `y` are the plane's variables (`RESERVED_SYMBOLS`), so a `param` fact naming one declares
+   * a parameter nothing reads: the curve's equation keeps them out of the free register, and the line committed with
+   * the restriction doing nothing. Refused here, at the one boundary every producer of a `param` fact passes, never
+   * silently absorbed. Drawing only the part of a curve where x > 0 is a capability of its own (#1846).
+   */
+  | 'coordinate-restriction';
 
 /**
  * WHICH OBJECT a contextual reference needed, and how many the figure holds (#1432 amendment 1).
@@ -1493,6 +1501,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
   }
   switch (f.t) {
     case 'param': {
+      // A plane coordinate is never a parameter (#1832, ADR-AG-246): its "domain" is a restriction on the curve.
+      if (RESERVED_SYMBOLS.has(f.sym)) return { ok: false, error: { code: 'coordinate-restriction', detail: f.src } };
       const prior = c.params.find((p) => p.sym === f.sym);
       if (prior) {
         // A re-declaration NARROWS: «a הוא פרמטר» then «נתון כי a<13» is the corpus's own
