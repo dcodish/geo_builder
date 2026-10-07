@@ -167,6 +167,16 @@ own worktree. Items sharing a chokepoint are stacked in one stream. Test runs qu
 question to the operator is asked in plain text, never as a blocking prompt, so the other streams keep
 landing. Round #1776, sequential and stalled overnight on a question about the next round, took ~21 h.
 
+**The live dashboard ([ADR-W-116](06w-decisions-workspace.md#adr-w-116), #1853):** the operator follows a
+round's progress on one private page, from any device. It is **tracking only**: what is in the round,
+what each item is about, and where it is now. The end-of-round report and play sheet stay Step 5b's own
+page, unchanged; the dashboard only links to it. Every actor appends one line per phase change to an
+event log in the git common dir (`node scripts/round-event.mjs emit …`), which every worktree shares.
+The page renders a pure fold of that log (`scripts/lib/round-core.mjs`), and the orchestrator pushes
+the fold into the page's database on every wake, woken mid-item by a `Monitor` on `round-event.mjs
+watch`. The log is the record and the page a projection of it: the ledger's `stats:` line is the same
+fold's summary. A single-issue fix session can use the same recipe with its own issue number.
+
 **Phase 2 (not yet built, not yet decided):** scheduled unattended rounds and their landing policy
 (bugs direct-to-main vs one-PR-per-round) wait on Phase 1's measured escalation rate ([ADR-W-012](06w-decisions-workspace.md)).
 [ADR-W-028](06w-decisions-workspace.md) spent that data on the *cap* only — every round measured so far had

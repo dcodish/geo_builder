@@ -5396,6 +5396,51 @@ Fails before: 2 of 8 (concurrency and takeover) with the link step neutered so t
 
 **Not built (#1813 stays open):** splitting the ~40 heaviest test files. It only shortens the full suite (~14.7 → ~8.5 min, about twice per round), it is the most work, and docs/08 records that splitting a scenario's oracles across files re-pays the cold solve.
 
+
+## ADR-W-116 — A fix round's progress is tracked on one live dashboard, folded from an event log every worktree writes (#1853)
+
+**Status:** accepted · 2026-10-07 · PR for #1853. Rulings cited:
+- **2026-10-07, operator:** *"I vision a dashboard (html) where I see what open issues are included in this round and what each issue is about. I want to see the progress of the workflow which includes the full flow until all issues are completed and i get the test sheet."*
+- **2026-10-07, operator, scoping (this session):** the surface is a published live page, and the data comes from *the round writes events*. Rejected: a local HTML file, an in-Claude-Code pane mod, and inferring progress from git/gh or from a tool-watching mod.
+- **2026-10-07, operator, scope:** *"the mod should just show me the progress and what is happening. this is for tracking only. at the end of the round, the fix page shows and that will work like today (manually)"*. A first build that also folded the play sheet and its verdicts into the dashboard was cut back to tracking.
+
+**Requirements:** none (internal). · **Design:** [22](22-workflow.md) §2d "The live dashboard". **Product:** workspace (the fix-round workflow).
+
+**Context.** While a round ran, its only live state was the round issue's ledger. That ledger is prose and is updated when an item *resolves*. Since ADR-W-114 the items run as background agents in separate worktrees, so between dispatch and completion nothing recorded which item was re-measuring, fixing, waiting on the suite lock or escalating. The operator, often on the other PC or a phone, could see the round only by asking the session.
+
+There is a constraint on how the page can be fed. Only a Claude session can write an artifact's database (`ArtifactData`), but the agents doing the work are background agents in other worktrees.
+
+**Decision.**
+1. **An append-only event log is the record.** `scripts/round-event.mjs emit <R> round|item …` appends one validated JSON line to `<git common dir>/geo-rounds/<R>.jsonl`. This is the same home as the suite lock (ADR-W-114): every worktree sees it, and git never commits it.
+   - An agent in any worktree reports a phase with one command and needs no tool permission.
+   - A misspelt phase, key, field or kind is **refused at emit time** (exit 2). It never vanishes from the page.
+   - A torn or foreign line is counted and skipped by the reader, never thrown on.
+2. **The page is a pure fold of the log.** `scripts/lib/round-core.mjs` holds the round phases (`compose → execute → batch → land → playsheet → awaiting-play`) and the item phases (`queued → remeasure → fixing → gates → ready`, ending `landed | pr | escalated | skipped | closed`). `fold()` turns the log into one state document: per-item phase, entry time and timeline, counts, and the feed. The ledger's `stats:` line can be read off the same fold.
+3. **The orchestrator syncs on every wake.** `round-event.mjs state` writes the fold, and the session pushes it into the page's `round/state` document with a pinned write. A `Monitor` on `round-event.mjs watch` wakes the session on each new event, so mid-item phases show up without waiting for an agent to finish. The page prints its last-sync age and turns it into a warning past 20 min mid-round, so a stalled sync is visible.
+4. **Tracking only.** `scripts/round-dashboard/dashboard.html` is one tracked template, published once per round (`round-event.mjs page`) with `capabilities: {db: {}}`. It shows:
+   - the pipeline stepper, a progress bar and the per-item rows (issue, what is wrong for a student, the plan gist, route, phase, time in phase, branch/SHA/PR/ADRs, deviations, timeline);
+   - a recent-activity feed.
+
+   **Step 5b is unchanged:** the round still writes and publishes its report and play sheet on their own page, as today. The dashboard only links to it, through a `reportUrl` the round emits with `awaiting-play`.
+
+**Locks.** `server/__tests__/round-events.test.ts` (13):
+- the fold keeps composition order; `since` is entry time; skipped round phases are marked, and stepping back clears later ones; counts and the `stats:` line agree; the feed is bounded;
+- the report is carried only as a link, and a `sheet` event is refused;
+- a misspelt phase, key, field or kind is refused;
+- a torn line is counted and skipped;
+- in real processes: the log path is the git common dir; three concurrent agents × 8 emits land 24 whole lines and none is lost; a refused emit writes nothing; `state` and `page` produce the folded state and a titled page with no external loads, whose inline script compiles.
+
+Also exercised end to end: a published demo replaying round #1845 (real composition and outcomes), synced with pinned `ArtifactData` writes, read back at `view` level, and rendered at desktop and phone width in both themes with no page errors and no sideways scroll.
+
+**Rejected.**
+- **Direct `ArtifactData` writes from item agents.** They are background agents in other worktrees, and a tool write from each would be N writers racing pinned versions. The log keeps one writer to the page.
+- **Inferring progress from git/gh.** It cannot tell re-measuring from fixing from waiting on the lock.
+- **A Claude Code mod watching tool calls.** It is per-machine, lives outside git, and misses background agents' own calls.
+- **A local auto-refreshing HTML file.** It is unreadable from the phone or the other PC.
+- **Folding the play sheet and verdicts into the dashboard.** Built first, cut by the operator's scope ruling: the report stays manual, as today.
+
+**Not built.** An `ArtifactData` allow rule in `.claude/settings.json`. Whether an unattended round's sync writes prompt for approval depends on the session's permission mode, and adding the rule is the operator's call (PR heads-up).
+
 ## ADR-W-115 — A declared polygon the givens force flat is REFUSED in every builder; the flat-figure notice stays only for what is not a declared polygon (#1849, amends ADR-W-048)
 
 **Status:** accepted · 2026-10-07 · **Issue:** #1849 (bug, P1, honesty class) · **Amends:** [ADR-W-048](#adr-w-048) · **Supersedes:** #1835 (3-D notice) and #1836 (analytic build-with-notice), folded into #1849

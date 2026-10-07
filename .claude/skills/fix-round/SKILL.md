@@ -74,6 +74,48 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
   or died mid-flight*; a session that finds an open `in-round` issue at start reports it instead
   of starting a new round.
 
+## Step 1b — open the live dashboard (ADR-W-116, #1853)
+
+The operator follows the round's PROGRESS on one page, from any device. It is **tracking only**
+(operator ruling 2026-10-07, #1853): what is in the round, what each item is about, and where it is
+now. The end-of-round report and play sheet stay Step 5b's own page, unchanged; this one only links to
+it. The round's progress lives in an append-only
+event log (`scripts/round-event.mjs`, in the git common dir, so every worktree writes the same file);
+the page is a fold of that log, pushed into its database by this session. `<R>` below is the round
+issue's number.
+
+1. **Emit the composition** — once the round issue exists:
+   ```sh
+   node scripts/round-event.mjs emit <R> round compose --data '{"title":"<issue title>","issueUrl":"<url>"}'
+   node scripts/round-event.mjs emit <R> item <key> queued --data '{"title":"…","about":"…","plan":"…","route":"bug|feature","stream":"A"}'
+   ```
+   One `queued` per item, in composition order. `<key>` is the issue number, `N+M` for a bundle.
+   **`about` is what is wrong for a STUDENT, in one sentence** (what they typed, what they saw) — the
+   page is read by the operator scanning for his own report, not by an engineer. `plan` is the plan
+   gist, one sentence. `title` leads with his words, as the issue title does.
+2. **Publish the page and seed it:**
+   ```sh
+   node scripts/round-event.mjs page <R> --out "$SCRATCH/round-<R>.html"
+   node scripts/round-event.mjs state <R> --out "$SCRATCH/round-<R>-state.json"
+   ```
+   Publish the page with the Artifact tool (`capabilities: {db: {}}`, icon `progress`), then
+   `ArtifactData set` collection `round`, doc `state`, `file_path` the state file. Put the page's URL
+   on its own line at the TOP of the round issue body, and in the chat composition announcement.
+3. **Watch the log:** arm a `Monitor` on `node scripts/round-event.mjs watch <R>` (30-min max,
+   re-armed on expiry), so a phase change in a background agent wakes this session.
+4. **Sync rule — on EVERY wake** (a Monitor line, an agent completion, a ledger edit): run `state`
+   again and `ArtifactData set` it, pinned with `if_version` (the version the last write returned;
+   re-read on a conflict). Batch quick bursts into one write. The page shows its last-sync age and
+   turns it into a warning past 20 min mid-round, so a stalled sync is visible, never silent.
+
+Vocabulary (refused at emit time if misspelt): round `compose → execute → batch → land → playsheet →
+awaiting-play`; item `queued → remeasure → fixing → gates → ready`, ending `landed | pr |
+escalated | skipped | closed` (closed = already fixed at re-measure). `--note` is one line of what is
+happening now, in plain words; `--data` may set `sha`, `pr`, `adrs`, `branch`, `deviations`.
+
+**A single-issue fix session uses the same recipe** with `<R>` = the issue's own number, when the
+operator asks to watch it.
+
 ## Step 2 — execute each item, isolated
 
 **In parallel, by chokepoint stream** ([ADR-W-114](../../../docs/06w-decisions-workspace.md#adr-w-114), #1813).
@@ -132,6 +174,13 @@ Each item, inside its stream:
    ([ADR-W-034](../../../docs/06w-decisions-workspace.md)). **Never overlap suite runs** — a
    `test:fast`, a lane or a full suite runs alone; overlapping doubled every gate in round #822. The
    suite lock enforces it (above); run the item's own heavy files through `npm run test:locked --`.
+4b. **Report each phase to the round log** — every item agent's prompt carries its round number, item
+   key and these lines, run from its own worktree (the log is shared):
+   `node scripts/round-event.mjs emit <R> item <key> remeasure` at pickup · `fixing --note "<what the
+   re-measure showed>"` · `gates --note "<which gate is running>"` · `ready --data
+   '{"branch":"…","sha":"…","adrs":[…],"deviations":"…"}'` when its gates are green (a feature emits
+   `pr --data '{"pr":N}'` instead) · or `escalated` / `closed` with a one-line `--note`. A failed emit
+   (exit 2) is a typo to fix, not a step to skip.
 5. **Commits reference the round:** every item commit carries `Fixes #NN` AND mentions the
    round issue (`round #RR`) — from any commit you can find the round, from the round every
    commit.
@@ -161,6 +210,10 @@ Each item, inside its stream:
 - If the batch's full-suite run is red, bisect INSIDE the round (drop items from the staging tip
   until green, then re-add) — never push a red combination; an item that cannot be made green on
   the tip is recorded as skipped, with the failing file named.
+- **Report the landing phases** on the round log: `round batch` when the staging tip is assembled
+  (and a `--note` per full-suite run), `round execute --note "batch red — bisecting"` if it is red,
+  `round land` at the push, and `item <key> landed --data '{"sha":"…"}'` per landed item.
+
 - **Update the ledger as each item resolves** — landed (SHA), PR'd (PR#), escalated, or
   skipped, appended to the round issue body (`gh issue edit --body-file`) with the item's
   evidence lines (Step 5 format). The ledger never lies about progress: an item is recorded
@@ -177,7 +230,7 @@ Escalate — do not patch — when any of these hits:
 
 Escalating means: comment the docs/17 escalation template on the issue (what the plan said,
 what the code showed, the options with costs), swap labels `auto-ok` → `needs-operator`, drop
-the worktree, record it in the ledger (issue → why, one line), move to the next item. The escalation
+the worktree, record it in the ledger (issue → why, one line), emit `item <key> escalated --note "<why, one line>"`, move to the next item. The escalation
 comment opens with `## Escalation — …` (what `queue-hygiene` reads as a question), and when a later
 session transcribes the operator's answer to it, that comment opens with the canonical
 `## Operator ruling — YYYY-MM-DD` (#1325, ADR-W-073) — never a phrasing of its own. An
@@ -270,6 +323,11 @@ Two things the page must actually do, because they are why it exists:
 it is still the validation signal. The issue copy, the chat copy and the page carry the **same case
 list** — two versions that differ is how a case gets skipped.
 
+**Hand the report to the dashboard** (ADR-W-116): once the page above is published, emit
+`node scripts/round-event.mjs emit <R> round awaiting-play --data '{"reportUrl":"<its URL>"}'` and
+sync, so the dashboard shows a link to this page. Emit `round playsheet` when you start writing the
+sheet. The dashboard never carries the cases or the verdicts itself.
+
 ## Step 6 — readiness gate (standing rule 5)
 
 Standing rule 5 (CLAUDE.md) governs — it is the same gate every "ready" report passes, and a round
@@ -299,4 +357,4 @@ land over unreconciled external `origin/main` movement · leave outcomes, deviat
 out of the ledger (chat is not a record) · finish with the `in-round` label still on · report a
 play sheet whose servers are not running, whose cases are not numbered, or whose heads-up items
 send the operator to an ADR to find out what changed · finish without publishing the report (Step 5b)
-or without its URL in the round issue.
+or without its URL in the round issue · let the dashboard go unsynced through a wake (Step 1b rule 4).
