@@ -246,6 +246,97 @@ function figureScale(c: Construction, ignore: Set<Id>): number {
   return Math.max(1, s);
 }
 
+/** Above this cluster size the cyclic orders are sampled (seeded tries) rather than enumerated ((n−1)! grows fast). */
+const ORDER_ENUMERATE_MAX = 7;
+const ORDER_SAMPLE_TRIES = 256;
+
+/**
+ * #1678 ([ADR-601](../../docs/06-decisions.md#adr-601)) — THE CYCLIC ORDER OF FREE POINTS ON A CIRCLE IS A
+ * DISCRETE DOF, AND A STATEMENT FIXES IT. Four «X על מעגל O» points take golden-angle default slots
+ * (`nextTheta`), so A, B, C, D land in the cyclic order A, C, B, D — and the sampler's tight cluster jitter
+ * (±30°, which protects the spread) can never change it. Every figure whose givens need another order was
+ * unreachable at every seed: chords AC and BD stated to cross, the quadrilateral ABCD declared over the four
+ * points («המרובע ABCD חסום במעגל O»). An unstated order acting as a fixed given is the ADR-052 / M4 smell.
+ *
+ * This deals each circle's cluster (`members`, the tight free riders) into its own default slots in a cyclic
+ * order chosen among the orders the STATEMENTS allow — the construction's own records, read semantically:
+ *  - a declared polygon with ≥ 4 of its vertices in the cluster keeps them in its vertex order (either way round);
+ *  - two chords stated to meet within a segment (`line-line-intersection` with `onSeg`/`onSeg1`/`onSeg2`),
+ *    all four ends in the cluster and no end shared: the ends alternate. Line BD meets the disk only in chord
+ *    BD, so a crossing inside chord AC is inside both chords, which happens exactly when B, D separate A, C.
+ * The choice is seeded, so «הציגו תצורה אחרת» and the config search reach every allowed order. When the
+ * statements leave nothing open (the default order is the only allowed one, up to reflection) the default is
+ * kept — no drift on a figure whose order is already stated and met. Fewer than four points: every order is
+ * the default's rotation or mirror image, so there is nothing to choose. Statements that admit no order
+ * (contradictory) keep the default and leave the verdict to the verifier. A point-free crossing
+ * (`segments-cross`) lives only in the facts; the seeded choice still reaches its order, and the
+ * requirement-gated sweep keeps it.
+ */
+export function statedCyclicOrderSeat(c: Construction, members: readonly OnCirclePoint[], seed: number): Map<Id, number> {
+  const out = new Map<Id, number>();
+  const byCircle = new Map<Id, OnCirclePoint[]>();
+  for (const o of members) byCircle.set(o.circle, [...(byCircle.get(o.circle) ?? []), o]);
+  for (const [circle, pts] of byCircle) {
+    const n = pts.length;
+    if (n < 4) continue;
+    const norm = (t: number) => ((t % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    // The default slots, ccw, and the default order they carry.
+    const sorted = [...pts].sort((p, q) => norm(p.theta) - norm(q.theta));
+    const slots = sorted.map((p) => p.theta);
+    const ids = sorted.map((p) => p.id);
+    const inCluster = new Set(ids);
+    // The stated orders, as predicates over a candidate cyclic order (position of each id).
+    const checks: ((pos: Map<Id, number>) => boolean)[] = [];
+    for (const o of c.objects) {
+      if (o.kind === 'polygon') {
+        const vs = o.vertices.filter((v) => inCluster.has(v));
+        if (vs.length < 4) continue;
+        checks.push((pos) => {
+          const seq = vs.map((v) => pos.get(v)!);
+          // In cyclic order iff walking the polygon's vertices advances one way round and winds exactly once.
+          const wind = (dir: 1 | -1) => seq.reduce((s, p, i) => s + ((dir * (seq[(i + 1) % seq.length] - p)) % n + n) % n, 0) === n;
+          return wind(1) || wind(-1);
+        });
+      } else if (o.kind === 'line-line-intersection' && (o.onSeg || o.onSeg1 || o.onSeg2)) {
+        const ends = [o.a, o.b, o.c, o.d];
+        if (!ends.every((e) => inCluster.has(e)) || new Set(ends).size < 4) continue;
+        checks.push((pos) => {
+          const [a, b] = [pos.get(o.a)!, pos.get(o.b)!].sort((x, y) => x - y);
+          const between = (e: Id) => { const p = pos.get(e)!; return p > a && p < b; };
+          return between(o.c) !== between(o.d);
+        });
+      }
+    }
+    const posOf = (order: readonly Id[]) => new Map(order.map((id, i) => [id, i]));
+    const allowed = (order: readonly Id[]) => { const pos = posOf(order); return checks.every((k) => k(pos)); };
+    /** Same cyclic order as the default, either way round (the first id is fixed in every candidate). */
+    const isDefault = (order: readonly Id[]) => order.every((id, i) => id === ids[i]) || order.every((id, i) => id === ids[(n - i) % n]);
+    const rng = mulberry32((seed ^ hashId(circle) ^ 0x2c1b3c6d) >>> 0);
+    let candidates: Id[][] = [];
+    if (n <= ORDER_ENUMERATE_MAX) {
+      const rest = ids.slice(1);
+      const perm = (pre: Id[], left: Id[]): void => {
+        if (!left.length) { const o = [ids[0], ...pre]; if (allowed(o)) candidates.push(o); return; }
+        left.forEach((x, i) => perm([...pre, x], [...left.slice(0, i), ...left.slice(i + 1)]));
+      };
+      perm([], rest);
+    } else {
+      for (let k = 0; k < ORDER_SAMPLE_TRIES; k++) {
+        const rest = ids.slice(1);
+        for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+        const o = [ids[0], ...rest];
+        if (allowed(o)) candidates.push(o);
+      }
+    }
+    if (!candidates.length) continue; // contradictory statements: keep the default, the verifier speaks
+    if (candidates.every(isDefault)) continue; // the order is stated and the default already holds it
+    candidates = candidates.filter((o, i, all) => all.findIndex((x) => x.every((id, j) => id === o[j])) === i);
+    const pick = candidates[Math.floor(rng() * candidates.length)];
+    pick.forEach((id, i) => out.set(id, slots[i]));
+  }
+  return out;
+}
+
 export function applySeed(c: Construction, seed: number): Construction {
   if (!seed) return c;
   // A non-pinned free point is perturbed even when a constraint drives it: one scalar constraint
@@ -321,6 +412,11 @@ export function applySeed(c: Construction, seed: number): Construction {
   // (±153°) so the chord can get short enough to draw a clean tangent/secant figure.
   const circJitOf = (id: Id) =>
     inscribedPolyVerts.has(id) || (!anyPolyTouchesCircle && freeCircle.length >= 3) ? Math.PI / 6 : Math.PI * 0.85;
+  // #1678 (ADR-601): the TIGHT jitter above keeps a cluster's spread and therefore its CYCLIC ORDER, so the
+  // order the defaults happened to produce acted as a fixed given. The order is a discrete DOF of its own:
+  // `orderSeat` deals the cluster's slots in an order consistent with every STATED order (a declared
+  // polygon's vertex order, two chords stated to cross), seeded among the orders the statements leave open.
+  const orderSeat = statedCyclicOrderSeat(c, freeCircle.filter((o) => !o.between && circJitOf(o.id) < Math.PI / 2), seed);
 
   // How many free on-line markers sit on each line. A LONE marker (e.g. a tangent's single external apex,
   // ADR-084) may flip to EITHER side of the anchor — a fixed side is a fixed assumption (ADR-085); a ±PAIR
@@ -374,7 +470,7 @@ export function applySeed(c: Construction, seed: number): Construction {
       // A point ON an arc (between, ADR-042): theta is a fraction in [−1,1] of the arc, so vary it
       // WITHIN the arc rather than spinning around the whole circle.
       if ((o as OnCirclePoint).between) return { ...o, theta: jr() * 2 - 1 };
-      return { ...o, theta: (o as OnCirclePoint).theta + circSpin + (jr() * 2 - 1) * circJitOf(o.id) };
+      return { ...o, theta: (orderSeat.get(o.id) ?? (o as OnCirclePoint).theta) + circSpin + (jr() * 2 - 1) * circJitOf(o.id) };
     }
     // Free on-segment point (ADR-052): the student gave no ratio, so slide it along the segment to a
     // genuinely different spot (kept off the endpoints so it doesn't collapse onto a or b).

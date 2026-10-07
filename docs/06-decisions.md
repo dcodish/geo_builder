@@ -4249,6 +4249,7 @@ Each item is a widening of the rule that already OWNS the construct — never a 
 6. **`EF קטע אמצעים במשולש DCB`** (both letters fresh) — `midsegmentBaseless` gains the named-triangle branch: E rides the FIRST named side (the student's own vertex order — a discrete labeling read) as a `point-on-segment` rider, and the ADR-199 `shape-variant` channel cycles F's side on "show another configuration". Anchored forms byte-unchanged.
 
 **Deferred out of the batch (recorded on #71):** the compound `מנקודה E מחוץ למעגל יוצאים חותך ABC ומשיק AD` — the 3-letter secant run's semantics are ambiguous (which letters are the crossings?) and per ADR-052 we never guess; and `זוית מרכזית נשענת על קשת CD` — a value-less angle MARK register, which belongs to the #43/#73 guidance work (or a future bare-angle-mark feature), not a parse widening.
+
 ## ADR-289 — The guidance register: non-constructive input families answer with "what to do instead" (issue #43)
 
 **Status:** Accepted (2026-07-11; issue #43 — the baseline log-triage's largest cluster, ~15 distinct prod users; operator-approved). *Files: `src/parser/scope.ts` (5 new categories), `src/i18n/locales/he.json`/`en.json` (`input.scope.<category>`), `src/App.tsx` (the pre-LLM short-circuit widened), `src/parser/__tests__/scope.test.ts`.*
@@ -4372,6 +4373,7 @@ Applied in this PR to the **incircle** (fresh feet + the ADR-115 existing-circle
 **Tests / lock.** `radical-fraction-values.test.ts` (all quotient forms × length/area/radius × He/En, no-theft, honesty gate green, angle excluded); scenario `radical-fraction-length-value` (the operator's exact «נתון: BC = 35/√32» builds with |BC| = 35/√32).
 
 **Amendment (2026-07-12, operator review of PR #92 — the DISAMBIGUATION + rendering the first pass missed).** The operator flagged that `5√2/3` is ambiguous (root of `2/3`, or `(√2)/3`?) and that the SPEC intent — never captured in the written issue — was that the √ button produce `√()` (explicit grouping) and that the input render as formatted math. Both were genuinely missing (the flat `[coef]√n [/ √?d]` grammar had no parenthesised-radicand concept, and there was no math rendering; the MathML half is separately issue #40). Fixed in the same PR: (1) **`NUMTERM` gains a parenthesised radicand** `√(n)` / `√(n/d)` — distinct from a bare `√n` whose radicand is JUST the number so `√2/3` stays `(√2)/3` (textbook convention) while `√(2/3)` is the whole-fraction root — plus optional outer-paren term grouping `(5√2)/3`; the position gates widen from "has a divisor" to `isNewValueForm` (divisor OR parenthesised radicand, so `√(2/3)` with no top-level `/` is claimed too); the `droppedGivenNumbers` gate's value pass is made paren-radical-aware over the WHOLE value expression (one longest-match pass, no double-count of an inner `2/3`). (2) **The √ toolbar button inserts `√()`** with the caret between the parens (the `S_{}` pattern), so students produce the explicit grouping by default. (3) **`src/render/mathText.tsx`** renders the math tokens (fractions / radicals incl. `√()` / subscripts / superscripts) as **MathML** — a LIVE preview under the input (the interpretation is visible while typing: `√(2/3)` is a radical over the fraction, `√2/3` is `(√2)/3`) and in the step-list rows (issue #40). Locked by the √() cases in `radical-fraction-values.test.ts` (incl. `√(2/3) ≠ √2/3` by value) + `mathText.test.ts`. **Process note:** the requirements were missed because they were an input-UX design the operator held but the triaged issue captured only the parser grammar; when the ambiguity surfaced at `5√2/3` it should have been raised, not resolved silently by convention.
+
 ## ADR-299 — Right-angle word / glyph / homoglyph forms, normalized at the chokepoint (issue #45)
 
 **Status:** Accepted (2026-07-12; feature, issue #45 → PR). *Files: `src/parser/parse.ts` (`normalizeUtterance` symbol pass + `CYRILLIC_TO_LATIN`; the `angle` rule's `ישרה`/right-angle word + lowercase-vertex handling); `src/parser/__tests__/right-angle-forms.test.ts`, scenario `right-angle-word-and-glyph-forms`.*
@@ -4595,6 +4597,7 @@ Operator building bagrut 2023-קיץ-א Q4 ("a line from B cuts the circle at E 
 **Root fix (three seams, plus a guided refusal).** (1) `normalizeUtterance` gains two normalisations so EVERY length/ratio path inherits them: `שורש N → √N` (the Hebrew word for square-root, only before a number/`(`), and a verbose LENGTH frame `(אורך|הצלע|הקטע) <seg> (הוא|היא|שווה) <value> → <seg> = <value>` (gated on a following value, so the ratio comparative `…גדולה פי…` is untouched). (2) The `ratioConstraint` Hebrew branch skips an optional segment-noun after `מ` (`מהקטע`/`מהצלע`/`מאורך`), and its LHS noun prefix rides the existing `[^=]*?`. (3) **`ratioConstraint` moved BEFORE `segment` in the rule list** — the real cause of the Q5 miss was the loose `segment` rule (keyed on any `קטע`) grabbing the `קטע` inside `מהקטע` and half-parsing the ratio into a bare `segment AC` (the ADR-024 class; `dividesInRatio` already sits before `segment` for the same reason). This is a precedence fix, not a keyword bow-out (docs/17 §2.4). (4) The vague unnamed-sides form `צלע אחת 10 צלע שניה 5` becomes an `unnamed-sides` guidance category (short-circuits before the LLM) with a "name the sides — AB=10, BC=5" message, not a silent escalation.
 
 **No regressions.** `AB = CD` (equal), `AB = 6` (distance), `AB = 12√2` (measure-length), `AB = 2 AD` (ratio), `הקטע AB` (segment) all still lower correctly with `ratioConstraint` earlier — it requires TWO labels each side of `=`, which numeric/symbolic measures never have. Locked by `size-given-phrasings.test.ts` (14: verbose length, relational ratio incl. the Q5 form, the reorder regressions, the guided refusal + no-misclassify) + scenario `verbose-relational-ratio-builds`. Related: #114/ADR-310 fixed the radical-COEFFICIENT vocabulary; this fixes the wordy WRAPPER.
+
 ## ADR-319 — Prod analytics logs the LLM commands + store interactions so a session reconstructs (issue #84)
 
 **Status:** Accepted (2026-07-13; issue #84). *Files: `src/debug/sessionLog.ts` (`analyticsSubmit`); `server/eventLog.ts` (`normalise` + `UsageEvent`); `src/App.tsx` (action hooks + `commands` on the LLM submit); `src/debug/__tests__/sessionLog.test.ts`; `server/__tests__/eventLog.test.ts`.*
@@ -4626,6 +4629,7 @@ Operator building bagrut 2023-קיץ-א Q4 ("a line from B cuts the circle at E 
 **Class.** A rule with permissive gaps claims material across an unmarked clause boundary (the ADR-119 class). Two prod users typed a whole bagrut given-list as ONE unpunctuated submission (`AB קוטר במעגל D אמצע הרדיוס OB … DE מקביל ל BC ED=EC …`); a permissive circle compound matched the run-on FIRST (first-match-wins) and lowered it to garbage — `במעגל D` swallowed the next clause's D as the circle name, `מקביל` bound the wrong operands (`set-parallel(A,B, O,B)`), and `ED=EC` vanished. `parse` returned that as `ok:true`; only the App-level honesty gates (`droppedNewLabels`=[C,E,F], `droppedGivenRelations`=[ED=EC]) stood between it and a committed wrong figure — and the refusal a user could see was the nonsense `AB ∥ OB cannot hold`.
 
 **Fix (complete the chokepoint family, no per-rule tightening).** The `parseResolved` winning-parse guard already refuses a parse that silently drops a stated shape noun / circle predicate / radius symbol / region subject (§3 chokepoint discipline: never commit a lax half-parse). A dropped symbol-form RELATION is the same class, so `droppedGivenRelations(s, whole.commands).length > 0` joins the guard — the run-on now returns `not-handled` (→ honest LLM escalation) instead of garbage `ok:true`, and a run-on variant whose labels happen to land in commands can no longer commit a set-parallel it never meant. `droppedGivenRelations` is already the App's commit gate, so a legitimate single-rule parse (the relation lands in a `set-*` command or introduces one of its labels) is never blocked — all 1049 parser tests + the full 2-D slice stay green. The separator-less run-on still can't be split deterministically (`splitStatements` needs separators), so LLM escalation is the honest outcome; clause-by-clause entry parses each clause correctly, unchanged. Locked by `clause-split.test.ts` (the exact prod run-on refused, never `set-parallel`; the individual `∥`/`=` clauses still parse).
+
 ## ADR-323 — Central angle «זוית מרכזית COD» / «נשענת על קשת CD» (issue #106)
 
 **Status:** Accepted (2026-07-14; issue #106, prod log-triage; feature PR). *Files: `src/parser/parse.ts` (`centralAngle` rule); `src/engine/types.ts` (`mark-angle`); `src/engine/lower.ts` (`mark-angle` → `[]`); `src/store/geoStore.ts` (`angleMarkFor`, `introducedIds`); `src/parser/catalog.ts`; `src/parser/__tests__/central-angle.test.ts`; scenario `central-angle-valueless-and-valued`.*
@@ -4667,6 +4671,7 @@ Operator building bagrut 2023-קיץ-א Q4 ("a line from B cuts the circle at E 
 **Class (phrasing gap, not a missing construct).** The drawn parallel-line and perpendicular-line rules (`parallelLine`/`perpendicularLine`, ADR-019/ADR-036) already build a line through a point ∥/⊥ to a segment, but their shared through-point anchor `THROUGH_PT` accepted only `through`/`דרך`/`בנקודה`/`at`. Prod users wrote the **"from a point" origin** used everywhere else in the grammar — `מנקודה A ישר מקביל ל-DO` / `from point A a line parallel to DO` — so the rule returned null and the utterance escalated to the paid LLM (1 user, a real figure blocked mid-build).
 
 **Fix (root, scoped to where the gap is).** A new `FROM_PT` anchor (`from (a/the) point` / `from` + label and `מנקודה`/`מהנקודה`/`מ-נקודה`/`מ-` + label — the `מ-`/`מנקודה` idiom the tangent/secant/diameter rules already use, `:3455`) is read by the **parallel-line rule only**, as a fallback after `THROUGH_PT`. Within a `מקביל`/parallel utterance a "from X" is unambiguously the origin (the parallel-TO segment always uses `מקביל ל-`, never a bare `מ-`), so `FROM_PT` is safe there. It is deliberately NOT added to the shared perpendicular path: the perpendicular "from a point" is already read — better — by the **foot rule** (`מנקודה A ... מאונך ל-DO` drops a ⟂ from external A onto DO, foot F + segment AF), and a "from" anchor on the ⟂ rule would make it grab foot phrasings, which carry both `אנך`/perpendicular AND a "from X" source ("the foot of the perpendicular from C to AD" — regressed 7 tests in a first shared-regex attempt). The `ל=` typo for `ל-` is tolerated in the parallel-to clause (`ל[-=]?`). Locked by `parallel-line-from-point.test.ts` (He/En, `מ-A`, `ל=` typo, perpendicular-via-foot, no-regression on `through`/`דרך`) + the end-to-end scenario, and the foot/named-foot/shadow-matrix suites (which the shared attempt broke) stay green.
+
 ## ADR-328 — A bare free point «נקודה A» (2 DOF), positioned by the next statement (issue #104)
 
 **Status:** Accepted (2026-07-14; issue #104, prod log-triage; feature PR). *Files: `src/parser/parse.ts` (`bareFreePoint`); `src/parser/catalog.ts`; `src/parser/__tests__/bare-free-point.test.ts`; scenario `bare-free-point-positioned-by-next-statement`.*
@@ -4674,6 +4679,7 @@ Operator building bagrut 2023-קיץ-א Q4 ("a line from B cuts the circle at E 
 **Class (a missing re-exposure, not a missing engine capability).** The original model listed "free point — 2 DOF, placed, draggable" as a core primitive, but the rebuild only ever created points via a relation (on-segment, intersection, midpoint, …). A bare declaration `נקודה A` / `point A` had no rule and escalated to the LLM (verified not-handled; ~4 distinct prod users, one typing `נקודה A`, `נקודה P`, `נקודה G`, `הוסף נקודה P`). The engine `free-point` command + `FreePoint` object already existed — only the parser boundary was missing.
 
 **Fix.** A `bareFreePoint` rule (He `נקודה X` / `הוסף נקודה X`, En `point X` / `add point X`) → `{ type:'free-point', id, x, y, free:true, ifAbsent:true }`. `free:true` makes the two DOF sampled (ADR-052 — "show another" moves it, a later constraint recruits it); `ifAbsent:true` makes it idempotent — re-declaring is a no-op and naming an existing point is a no-op statement (M1), never a redefinition. The rule is anchored end-to-end (`^…$`) so a trailing relation (`נקודה A על AB`) is claimed by the relational rules first, and the `נקודה`/`point` keyword is required so a lone letter (`C`) stays escalation. It runs AFTER the coordinate `freePoint` rule, which keeps owning the `נקודה A ב-(0,0)` / `A=(3,4)` pinned form. Design steer (operator): a bare `נקודה A` is a valid first half of a two-step entry — the point exists, the following utterance says where. Locked by `bare-free-point.test.ts` (He/En forms, coord form still pins, trailing relation not swallowed, lone letter escalates) + the end-to-end scenario (`נקודה A` + `נקודה B` + `AB=5` → |AB|=5).
+
 ## ADR-329 — Named special-point meets: the NOUN form of a triangle/quad centre (issue #44)
 
 **Status:** Accepted (2026-07-14; issue #44, prod log-triage; feature PR). *Files: `src/parser/parse.ts` (`specialPointMeet` + `CENTER_FAMILIES`); `src/parser/catalog.ts`; `src/parser/__tests__/special-point-meet.test.ts`; scenarios `diagonals-meet-noun-form`, `medians-meet-centroid-noun-form`.*
@@ -4681,6 +4687,7 @@ Operator building bagrut 2023-קיץ-א Q4 ("a line from B cuts the circle at E 
 **Class.** Naming a concurrency point by its NOUN — «X מפגש האלכסונים» / «X נקודת מפגש התיכונים» / «ה<noun> נפגשים בנקודה X» — was not-handled; only the explicitly-lettered form («E חיתוך AC ו-BD») parsed. ~5-6 prod users named the diagonal crossing this way; the operator asked to include it AND generalize to the four triangle centres.
 
 **Fix (ADR-110 macro — no new engine construct).** A `specialPointMeet` rule over five `CENTER_FAMILIES`: diagonals (quad), medians / angle-bisectors / altitudes / ⊥-bisectors (triangle). It fires only on BOTH a meet cue (`מפגש`/`נפגש`/`נחתכ`/`חיתוך`/`intersection of`/`meet`) AND a plural centre-NOUN stem (so the lettered forms stay with their own rules). The shape resolves from a named «במשולש ABC»/«במרובע ABCD» qualifier, else the figure's SINGLE polygon of the right vertex count; anything ambiguous (0 or 2+ candidates) DEFERS (ADR-052). Each family lowers to the intersection of two special lines, and **only the CENTRE point is drawn** — the construction (diagonals, medians, altitudes, ⊥-bisectors, and their helper feet/midpoints) is invisible scaffolding (operator, 2026-07-14): no `segment` commands are emitted, helper points are `~`-prefixed (unrendered per scene.ts, and excluded from detection by ADR-295), and `perpendicular-line`/`bisector` Line objects stay `visible:false` (drawn only when visible). diagonals → `line-line-intersection` of the four vertices; medians → 2 hidden `~med-*` midpoints + `line-line-intersection` (centroid); altitudes → 2 hidden `~alt-*` feet + `line-line-intersection` (orthocentre); angle bisectors → 2 invisible `bisector` lines + `line-intersection` (incentre); ⊥-bisectors → 2 hidden `~pb-*` midpoints + 2 invisible `perpendicular-line`s + `line-intersection` (circumcentre). Runs before the shape rules (so a qualifier isn't grabbed by `quadrilateral`) and before `diagonals`. He noun patterns are STEMS so the construct form matches too (`אלכסוני הטרפז`, not only `אלכסונים`). Locked by `special-point-meet.test.ts` (all five families He/En, defer-on-ambiguous, no-theft on the lettered form) + two end-to-end scenarios verifying the centroid = (A+B+C)/3 and the square's diagonal crossing = the centre.
+
 ## ADR-330 — A semicircle on EVERY side of a polygon (issue #29)
 
 **Status:** Accepted (2026-07-14; issue #29, prod session p3du4l9p; feature PR). *Files: `src/parser/parse.ts` (`semicirclesOnEverySide`); `src/parser/catalog.ts`; `src/parser/__tests__/semicircle-every-side.test.ts`; scenario `semicircle-on-every-side-of-square`.*
@@ -4688,6 +4695,7 @@ Operator building bagrut 2023-קיץ-א Q4 ("a line from B cuts the circle at E 
 **Class.** The classic bagrut composite — a polygon with a 180° arc erected on every side — was not-handled: only the SINGLE-side form («על צלע CD יש חצי מעגל», already closed-form since issue #28/ADR-284) parsed; the quantified «על כל צלע של ריבוע יש חצי מעגל» / «a semicircle on each side of the square» fell through (the surviving `כל`/`ריבוע` tripped the semicircle rule's SHAPE_LEFTOVER → escalate, #27).
 
 **Fix (ADR-110 macro — no new engine construct).** A `semicirclesOnEverySide` rule (before `semicircle`) gated on both a semicircle keyword AND the `כל צלע`/`every side`/`each side` quantifier. It resolves the polygon — a named «ריבוע ABCD» label run, else the figure's SINGLE polygon (ADR-245 definite reference) — and emits ONE closed-form semicircle per side (the exact commands the single-side rule produces: midpoint centre + hidden `circle-through` + the antipode membership + the arc + the diameter segment), with a distinct auto-named centre per side. When a NAMED polygon's vertices are all new it builds the shape inline first (the self-contained «…על כל צלע של ריבוע ABCD…», restricted to shapes creatable outright — square/rectangle/rhombus/quad/triangle); a partial vertex set or an ambiguous polygon DEFERS (ADR-052). **Known limitation (documented follow-up):** the bulge SIDE (outward vs inward) is winding-dependent and cannot be computed at parse time (the parser has no coordinates), so v1 uses the single-rule's consistent arc convention; a per-side outward orientation (a reflection branch, ADR-166 class) is left for a follow-up. Locked by `semicircle-every-side.test.ts` (He/En, named/context polygon, triangle→3, defer-on-ambiguous, no-theft on the single-side form) + the end-to-end scenario (4 arcs on a square, all steps ok).
+
 ## ADR-331 — A semicircle on a polygon side, oriented OUTSIDE / INSIDE the shape (issue #134)
 
 **Status:** Accepted (2026-07-14; issue #134, operator play-test; feature PR). *Files: `src/engine/types.ts` (arc `bulgeRef`/`bulgeToward`); `src/engine/apply.ts`; `src/render/scene.ts`; `src/parser/parse.ts` (`semicircleBulge` + `BULGE_CLAUSE`); `src/render/__tests__/semicircle-bulge.test.tsx`; scenario `semicircle-outside-a-triangle-side`.*
@@ -4934,6 +4942,7 @@ if (ok) { cur = trial; status[f.id] = 'ok'; applied.push(...engineCmds); }
 4. **Shape-with-side** (`normalizeShapeSide`): «ריבוע ABCD שצלעו הוא 1» rewrites to the appositive «ריבוע ABCD, AB = 1» the clause split already reads (both shape-run orders). Scoped to shapes whose sides are all equal BY DEFINITION (square/rhombus/equilateral triangle) — on a rectangle "its side" would be an unstated pick (ADR-052), so it stays out. The follow-up form «צלע אחת 10 צלע שניה 5» is a new rule (`twoSidesValues`): two ADJACENT ring edges of THE unique polygon (the ADR-245 definite reference) take the values — a rectangle's length and width; the ADR-289 `unnamed-sides` guidance now fires only when no unique polygon exists (parse wins first, guidance remains the no-figure fallback).
 
 **Locks:** scenarios `angle-word-number-degrees`, `isosceles-paren-appositive`, `square-with-side-in-one-line`, `rectangle-two-sides-values`, `chained-angle-word-equality`, `arc-word-equality`; catalog +4 (word-degrees, chained word equality, paren appositive, shape-with-side; both locales, snapshot re-pinned).
+
 ### ADR-352 — the admin gap card consumes the triage VERDICT MAP: prod-time outcomes are annotated with what the CURRENT code does (issue #183)
 
 **Context.** `server/admin.ts` builds «פערים אמיתיים (לטיפול)» — the surface the operator opens to decide what to build — purely from the outcome recorded **in prod at the time**. Nothing ever re-verified, so an utterance fixed the day after it was logged sat in the card forever, presented unhedged as work to do. Measured on the all-time log: **~4/5 of the card was noise**, and not random noise — recently-fixed constructs are exactly the context-dependent ones, so **the freshest work ranked highest**. This is the #35/ADR-346 class (prod-time outcome ≠ current truth), on the surface with a URL.
@@ -4981,6 +4990,7 @@ if (ok) { cur = trial; status[f.id] = 'ok'; applied.push(...engineCmds); }
 **Decision.** (1) The arc object carries its intended central angle — `spanDeg` (90 quarter, 180 semicircle, a future sector's stated angle) — emitted by all four parser arc sites, threaded through the `arc` command/`Arc` object. (2) `arcGeometry` resolves the traversal: it draws whichever direction (received-frame CCW or CW) realises the intended span; without `spanDeg` the identity is the legacy model-frame CCW from→to, parity-corrected under a mirrored view (`buildScene` opts.mirrored, passed by `Figure` as `flipX !== flipY`). A tie (the semicircle's 180°) keeps CCW, so the bulge orientation machinery is untouched. (3) The duplicated convention removed: `SceneArc` publishes the resolved traversal (`startAng` + signed `sweepAng`) and `scenePositions` reads it instead of re-deriving a CCW span. Identity frames are byte-stable (unmirrored, no-span arcs draw exactly as before).
 
 **Locks:** the ADR-356 block in `arc-shapes.test.tsx` — mirrored VIEW frame and mirrored SOLVE both still draw the 90° quarter, the semicircle keeps 180° + bulge, identity-frame flags byte-stable; the ADR-354 scenario keeps the in-triangle figure green.
+
 ### ADR-357 — the circular SECTOR construct «גזרה» (issue #171)
 
 **Context (operator request 2026-07-16 + prod session `cm4ak2yo` 2026-07-17).** «נתונה גזרה» — a sector like רבע מעגל but with a non-90° angle — appeared nowhere in the vocabulary; `גזרה DCE` escalated to the LLM and came back not-understood. The operator's framing (recorded in #171): **a sector is the general construct; its central angle is an unstated magnitude ⇒ a free DOF** (ADR-052); רבע/חצי מעגל are the specializations that pin it. Reflex sectors (>180°) are in scope by operator ruling.
@@ -5073,11 +5083,13 @@ if (ok) { cur = trial; status[f.id] = 'ok'; applied.push(...engineCmds); }
 **The gap.** The engine auto-named derived points for median/altitude/foot but midpoint, diameter, tangent, centre, and the unnamed secant required a student-supplied name — the same sentence shape split arbitrarily («הוסף תיכון לצלע AB» ✓ auto-names M; «הוסף אמצע צלע AB» ✗ not-handled). ~6 distinct prod users hit the misses (log-triage 2026-07-17, operator-approved P2).
 
 **Decision.** ONE shared discipline, never seven per-rule patches: (1) a `REQUEST_WORDS` strip (imperatives «הוסף/להוסיף/צייר/העבר», the given-markers «נתון/יש», the object marker «את», En add/draw/given — lowercase-only En per FILLER; consumed ONLY by rules whose semantics are "draw me the construct"); (2) strict LAST-RESORT rules registered after every richer sibling — `bareTangent` (tangent at an auto-named FREE on-circle touch), `bareDiameter` (both endpoints auto-named), `unnamedSecant` (two auto-named on-circle points + the drawn secant; the crossings-named twin «בנקודות C ו-D» rides the same rule; stated EXISTING crossings defer as an M1 statement), `showCenter` (reveal the single circle's hidden centre by its own token — `name-center`), plus an unnamed branch in `midpoint` and two `circle`-rule gaps («נתון מעגל» via the request strip; «מעגל עם מרכז O» via a LOCAL with-centre form — widening `circleCenter` itself would touch every consumer); (3) auto labels via `freeLabel` with every existing label + centre excluded (the ADR-263 foot-naming rule; alphabet exhaustion diverges the second label per the quarterCircle legacy-default precedent). (4) The circle resolves per ADR-029 and — composing with ADR-367 — is INTRODUCED on an empty figure (`implied`: a tangent/diameter presupposes its circle), so every catalog form parses context-free; unnamed beside ≥2 circles defers (ambiguous). Locks: `auto-name-constructs.test.ts` (19 — every verbatim prod miss He+En + no-theft + ambiguity), scenarios `unnamed-construct-chain` + `unnamed-midpoint-auto-label`, catalog +7, snapshots additive-only (no new shadow pairs — the hard allowlist gate unchanged).
+
 ### ADR-369 — segment tangency with NO touch named is a constraint on the existing circle (issue #203, feature PR)
 
 **The gap.** «AB משיק למעגל C» / "AB tangent to circle C" with both endpoints existing off-circle and NO touch named had no owner — the tangency family covered a tangent AT a named touch (ADR-081), THROUGH an on-circle point (ADR-302), at an on-circle endpoint (ADR-082), corner tangents (ADR-115/116), and from-external with a named apex (ADR-233) — so the natural phrasing fell to the LLM → not-understood, blocking the quarter-circle-in-a-right-triangle bagrut figure (arc centred at the right-angle vertex, hypotenuse tangent).
 
 **Decision.** The NO-TOUCH member joins the same tangency-constraint chokepoint (`tangentLine`), per the ADR-115 discipline (never a rebuilt circle): materialise the touch as the FOOT of the perpendicular from the centre onto line AB — an ADR-297 anonymous dot `@tang-…` (the student named no touch; promotable) — and assert its MEMBERSHIP, ⟺ dist(centre, AB) = r, driving the free radius/centre exactly like the corner-tangent per-arm ⟂. A bare pair means the SEGMENT (ADR-077): `set-line [A, F, B]` keeps the touch WITHIN AB (drive-or-check — flexes the figure rather than ambering; «הישר»/line opts out to the infinite-line reading). A segment FROM the centre defers honestly (can never be tangent). **The opener twin** (both endpoints NEW, e.g. the catalog line context-free): a drawn tangent at an anonymous free touch with A,B as ±offset markers (ADR-036), the circle created if absent (the ADR-367 seam). No-theft: a named touch, an on-circle endpoint, or a single-existing-endpoint apex all keep their earlier owners. Locks: `segment-tangency-no-touch.test.ts` (6 — He/En/implicit + הישר opt-out + the full operator figure with the tangency verified numerically + no-theft), scenario `hypotenuse-tangent-to-quarter-circle` (the exact prod sequence), catalog +1. ADR-368 is reserved by the concurrent feat/184 PR.
+
 ### ADR-370 — the common tangent THROUGH a named apex (issue #214, feature PR)
 
 **The gap.** A tangent statement whose source is a NAMED point and whose target is TWO circles had no owner: the apex role existed only in the single-circle rules, and `commonTangent` (ADR-239) knew only touch labels — «מנקודה A יוצא משיק לשני המעגלים» (the classic bagrut figure: two circles, the two external tangents from A) was silently mis-parsed as an invented mutual tangency (#215's P1, fixed to defer), and even «…משיק משותף…» swept «מנקודה A» into the touch labels, placing the student's external A ON circle O — wrong figure, all green.
@@ -5119,6 +5131,7 @@ if (ok) { cur = trial; status[f.id] = 'ok'; applied.push(...engineCmds); }
 **The gap.** «מעגל מוכל בתוך המעגל הגדול» (prod `0yqufnuv` 09:23, typed beside the one circle «AB קוטר» drew) had no owner: the #196 `twoCirclesPosition` pair-resolver (#215) can bind two named circles, THE two drawn circles, or introduce a fresh pair — but not "a NEW circle inside THE existing one" (a half-named/sub-plural reference → defer), and the #102 size-qualifier rewrite («המעגל הגדול» → «מעגל O») required exactly TWO drawn circles. So the parser deferred, the LLM dropped the «מוכל» given (`dropped-labels`), and the bare «מעגל מוכל» came back not-understood — the containment lost.
 
 **Decision.** Two widenings at the existing chokepoints, no new machinery. (1) `resolveSizeQualifier` accepts a SINGLE-circle figure: the definite qualified reference resolves to THE circle (ADR-029 — with one circle you needn't name it; the adjective is the student's forward-looking role), no role assert. (2) `twoCirclesPosition` gains the indefinite-subject lane `containedNewInExisting`, running before the noun-count guard: an INDEFINITE subject noun (no ה, no letter; one adjective tolerated; En "a circle … contained") + a container resolved from the reference — named «בתוך מעגל O» (created `ifAbsent` when absent), definite «בתוך המעגל» = THE single circle, bare «מעגל מוכל» = the single circle implicitly; an EMPTY figure introduces the container too (the containment presupposes it — ADR-367 `implied`); **2+ circles without a binding reference defer, never guess**. The subject is a new auto-centred free-radius circle (ADR-052) at the pair-macro 0.72 seed; the `set-circle-position contained` REQUIREMENT seats it via the #196 verifier/`meetsRequirements` machinery. No-theft: the named-pair and plural forms keep their owners byte-identically (locked). Locks: `definite-containment.test.ts` (9 — the exact prod utterance, bare/named/En/empty-figure, the 2+-ambiguity defer, no-theft), scenario `circle-contained-in-definite-circle`, catalog +1.
+
 ### ADR-377 — a stated tangency/membership is ENFORCED, not partially encoded (issues #233 P1 + #230)
 
 **Class.** Two members of one statement-integrity class, reported in the same operator round. (1) The #226/ADR-374 class, third member: `tangentLine`'s ADR-075 existing-touch branch lowered «AD משיק למעגל בנקודה E» to the radius-⟂ ALONE — its own scope comment documented the hole ("assumes T is already on the circle … a follow-up"). Tangency is a THREE-conjunct statement (T ∈ circle ∧ T ∈ line ∧ radius ⟂ line); stating one is trivially satisfiable — E slid to the ⟂ foot, the circle stayed put, every row green with AD nowhere near the circle (the operator's rectangle screenshot). The operand-aware verb gate correctly passes it — the ⟂ binds the stated operands — a missing CONJUNCT is the rule's lowering to fix, not the gate's. (2) The M1 membership class (#230): `point-on-circle` on an existing point has a rich structural reinterpretation ladder ((a) idempotent, (b) second-crossing, (c) size-to-through-point, (c2) free-vertex conversion, (c3) radius-through, (c4) numeric-radius distance), but when EVERY branch is cycle-gated or inapplicable — the rectangle chord «BC מיתר» whose derived corner C sits behind circle→E/rider→par-vertex→rider cycles — the (d) fall-through pushed NO constraint: verifier-amber forever, the retype swallowed as «noop-exists», the student blocked.
@@ -5507,6 +5520,7 @@ Locked by `main-thread-sweeps.test.ts` (the source ratchet — the recorded main
 **Perf (docs/17 §7).** The gate is O(constraints+objects) key hashing per rescue accept — trivial beside the evaluate it follows; the repair path (one extra evaluate) runs only when a destruction actually occurred. Measured suite wall unchanged (membership-conversion 76 s before/after within noise).
 
 Locked by `obligation-preservation.test.ts` (the four storage shapes; the case-(1) guard keeping a rider's directive intact; the equal surviving + holding in every entry order) and the flipped `membership-conversion.test.ts` sizes-early assertion (exact book values — the test that had been waiting for this fix). Exposure: `settleOnFrozenPrior` landed 2026-07-11 (ADR-276), so ~2.5 weeks of prod.
+
 ### ADR-403 — The active-voice extension verb; «BC בסיס» is orientation; a container-less containment ASKS (#350/#352/#354)
 
 Three input-convention fixes from the 2026-07-26 log-triage, each an operator decision.
@@ -5590,6 +5604,7 @@ The ADR-407 futility universe counts set-line/set-collinear labels as introducib
 **Found en route, filed not bundled:** #404 — the subsequent «GH מקביל ל AD» morphs the declared trapezoid into a parallelogram (ADR-165 amber) instead of sliding the referenced extension rider G; probe-proved PRE-EXISTING on main (the operator's own workaround flow morphs identically). The scenario carries it as an asserted known-issue ratchet.
 
 Locked by `newlabel-collinear.test.ts` (7) + scenario `newlabel-collinear-rider` (the exact operator sequence).
+
 ### ADR-410 — The VALUES PANEL: the student's "what do I know so far" index (#217)
 
 **What (operator-commissioned 2026-07-19, rulings same day):** the 2-D edition of the 3-D "organize your data" sidebar — every fixed/known value the figure carries, stated (נתון) and derived (נגזר) alike, surfaced passively in a panel: segment lengths over the detection layers' own edge universe, polygon-corner and stated angles, radii, polygon/circle areas, and **area-ratio classes** (S, 2S, ½S — similarity-gauge-invariant knowledge even on an unscaled figure; the student's own letter reused when ADR-121 bound one). The 3-D `dataView` precedent COPIED, never imported (docs/20 §12).
@@ -5603,6 +5618,7 @@ Locked by `newlabel-collinear.test.ts` (7) + scenario `newlabel-collinear-rider`
 **Ratio classes (ruling: denominator ≤ 4):** pairwise polygon-area ratios stable across every sample and small-rational join one class; the letter is the student's bound S when present.
 
 Locked by `values-panel.test.ts` (6): the recognizer's curriculum forms + never-dress-a-decimal; the sized square (stated vs derived sides, the 4√2 diagonal, shoelace 16, right angles); the 9π circle area; the median's S/S class on a FREE triangle (no absolute row leaks); the free-figure nothing-numeric gate.
+
 ### ADR-409 — A membership statement presupposes its circle: the `implied` discipline adopted by the last two rules (#362)
 
 **Class:** the ADR-367 `implied` discipline — a statement that PRESUPPOSES an object introduces it rather than deferring — had 10 call sites (`מיתר`, `קוטר`, `משיק`, the glued pair…) and two holdouts: `pointOnCircle` (single/list «A ו-C נמצאות על המעגל») and `pointVsCircle` («M מחוץ למעגל»), both still answering "which EXISTING circle?" via `resolveCenter` and deferring to the LLM on a circle-less figure — an escalation for a statement whose meaning is unambiguous. Adoption debt, not a new mechanism.
@@ -5612,6 +5628,7 @@ Locked by `values-panel.test.ts` (6): the recognizer's curriculum forms + never-
 One pre-#362 lock (`circle-side.test.ts`'s "no circle ⇒ defers") deliberately updated to pin the new semantics; the ambiguity half it really guarded lives on in the new suite.
 
 Locked by `implied-circle-membership.test.ts` (9) + scenario `implied-circle-membership` (list membership + side form binding the same minted circle).
+
 ### ADR-411 — A midsegment statement NEVER lowers to a bare segment: the determined both-anchored case + the definite-reference bare case + the `droppedMidsegment` gate (#405)
 
 **Class:** the flavoured-segment-noun silent drop (the ADR-119 chord family, third member) meeting M1. `midsegmentBaseless` (ADR-199) handled exactly-one-anchored; every other configuration — BOTH endpoints already riding sides (the operator's prod figure `bad-2d-1`) and NEITHER existing (the bare «DE קטע אמצעים» right after the triangle) — returned null "so the utterance falls through to the plain-segment rule", which is precisely the outcome ADR-199's own Context names as the bug: a bare `segment D E`, the given SILENTLY DROPPED, every row ✓. Neither honesty gate fired (`droppedShapeNoun` = polygon nouns, `droppedGivenRelations` = symbol relations). A 6-ref worktree sweep (ADR-199's birth commit + 5 prod tags) proved the bare-segment claim byte-identical at every ref — a hole since the rule was born, masked at seed 0 by the free rider sampling at t = 0.5 (a perfect-LOOKING drawing with nothing holding it).
@@ -5702,6 +5719,7 @@ Locked by `values-panel.test.ts` (+4: the circle's 6π beside 9π, a sized squar
 The sibling sweep the issue asked for came back clean: this was the only `if (!X) return null` bail of its kind in the parser.
 
 Locked by `unnamed-concurrency.test.ts` (6 — three registers, the conventional letter per family, named forms unchanged, never stealing a taken letter or a host vertex, the ambiguous-host defer, and the built figure's centre property) + scenario `unnamed-concurrency-point`.
+
 ### ADR-416 — A constraint description's WORDS are translated at the humanising layer; its symbols are not (#413)
 
 **Class:** user-facing text assembled from two sources with different locale status, where only one was handled. Operator screenshot (2026-07-29): «לא ניתן: הנתון **H, C, D collinear** סותר נתון קודם» — a correct Hebrew sentence with an English clause inside it.
@@ -7820,6 +7838,7 @@ Locks: `radius-symbol-slot-772.test.ts` (18 tests — the reported hole, the nin
 number/symbol equivalence, the lowercase bagrut letter, and each of the three separations above) plus
 the corpus scenario `copula-less-symbolic-radius-binds-existing-circle-772`, which replays the prod
 session's own rows with the workaround replaced by the statement the student first tried.
+
 ## ADR-460 — an utterance packing INDEPENDENT constructs is taught, never decomposed (#763)
 
 **Operator ruling (2026-08-19):** *"what we should do in such cases is ask user to input one fact at a
@@ -8157,6 +8176,7 @@ is exactly the intended preemption (the compound runs before the membership rule
 the magnitude). Locks: `src/parser/__tests__/issue-760.test.ts` (the class battery + fall-through)
 and fixture `issue-760-point-at-distance.geo.json` (builds green; |AB| = 8, |AD| = 3 verified in
 the drawing).
+
 ## ADR-465 — a side named by its ROLE resolves against the DECLARED shape (#775)
 
 **2026-08-27 · round #800.** Prod (session `ks1up71f`): «תיכון ליתר» — the median to the hypotenuse,
@@ -8205,6 +8225,7 @@ free one, so the second «גובה לשוק» lands on the other leg (the repeat
 IDENTICAL commands and the #613 restate-dedupe reads it as «already stated» — no new row, no
 stacked points. The reuse is the CLASS fix: it serves the letter forms («גובה לצלע BC» repeated)
 exactly as the role forms.
+
 ## ADR-466 — the TERSE label-first intersection joins its owning rules (#776)
 
 **2026-08-27 · round #800.** Prod (session `ah1kqxz5`): «D מפגש המעגל עם AB» → LLM →
@@ -8318,6 +8339,7 @@ miscounted as a label.
 separately; no equivalent single-vertex/symbol hole found there. The general class — *sibling rules
 that split one statement and drift apart in what each accepts* — is the one #772 also belongs to and
 is worth watching wherever a statement is split by value kind.
+
 ## ADR-469 — the post-parse escalation seams are DERIVED, like the pre-parse guards (#829)
 
 **Status:** accepted, 2026-08-31. The **5th** instance of the #35 mirror-drift class, and the one the
@@ -8856,6 +8878,7 @@ stated-radius sibling, no `over-constrained` at any seed, the structural-walk me
 and `A`, and the stated radius never bent), plus the fixture
 `src/__tests__/fixtures/issue-855-tangency-sampled-seat.geo.json` — the operator's exact sequence saved
 **at seed 17**, so the fixture net replays the very configuration the bug was filed on.
+
 ## ADR-477 — a recognized ambiguity ASKS; and a rule's `stop` may not outrank a typed question (#519)
 
 **Status:** accepted, 2026-09-02 · **Ports:** [ADR-3D-131](06b-decisions-3d.md#adr-3d-131) (#516) to 2-D · **Round:** #878
@@ -9761,6 +9784,7 @@ showing values unchanged; and the chip's ownership is stable across seeds, which
 **Remaining adoptions**, for the record: the 3-D **coordinate** lane (panel-competing — the first
 non-canvas chip, and the case that proves the predicate is not canvas-specific) and **complex**, whose
 render side is still unmeasured.
+
 ## ADR-489 — An intersection at the carriers' SHARED ENDPOINT is the answer, not a near-miss (#944)
 
 > **PARTLY SUPERSEDED, 2026-09-20 — [ADR-531](#adr-531) (#1274), on the operator's ruling *"we refuse the
@@ -10298,6 +10322,7 @@ re-entry no-op, and a deferrable constraint typed EARLY still committing (ADR-10
 case a careless gate would break); and `driveThroughGate` leaving no fact behind for a refused line,
 **with an explicit assertion that this is exactly where it differs from `factsOf`** — the difference this
 ADR exists for.
+
 ## ADR-490 — An incomplete comparative ASKS; it is never guessed and never escalated (#777)
 
 **Status:** accepted, 2026-09-09 (fix-round #949, item 7) · **Issue:** #777 · **Operator approval:** `/log-triage` 2026-08-24 ("fix this")
@@ -10418,6 +10443,7 @@ asserts ∠DBA really measures 30° on the drawing.
 **Found and not claimed here.** «זווית ABC היא 2α» silently commits **2°** — `measureAngle` requires `=`, so
 the «היא» spelling bypasses it and the numeric lane grabs the coefficient. Pre-existing on the *untouched*
 triple form (measured on the same HEAD), so it is neither caused nor fixed by this ADR; filed separately.
+
 ## ADR-497 — HEBREW-LETTER VERTEX LABELS ARE TAUGHT, NOT SUPPORTED (#968)
 
 **Status:** accepted, 2026-09-10 · **Issue:** #968 (prod log-triage 2026-09-10, 1 distinct user)
@@ -10643,6 +10669,7 @@ in the same round. Its ADR and this one stay separate, as #969's own thread inst
 different halves, and the value half's fix (one *value* reader) is what this one's fix (one *naming*
 reader) composes with. Together they mean an angle statement now has exactly one reader for each of its
 two questions.
+
 ## ADR-499 — A ROLE NOUN IS A CLAIM, AND IT IS CHECKED IN THE LAYER THAT CAN ANSWER IT (#966)
 
 **Status:** accepted, 2026-09-10 · **Issue:** #966 (the 2-D half of #859's operator ruling)
@@ -10899,6 +10926,7 @@ or pure Latin, the unclosed `(` inside the run at the tail, the half-typed pin o
 isolated; isolated / byte-for-byte recoverable / idempotent over the student's text; and the live-tail rule
 OFF for messages and the export (a trailing full stop stays outside the run). Driven in the real app: the
 preview under the box shows «משולש שווה שוקיים ABC (» laid out correctly at the stage the box mangles.
+
 ## ADR-502 — A CHOICE THE TOOL MAKES FOR AN UNSTATED GIVEN IS SAID, FOR AS LONG AS IT IS UNSTATED (#973)
 
 **Status:** accepted, 2026-09-11 · **Issue:** #973 (feature, P3) · round #992 · feature route (PR)
@@ -10966,6 +10994,7 @@ it until the paren closes (measured key by key, the stored value byte-correct th
 fix is #997 on `main`). «AB=AC» as the next line pins the apex identically and is the product's own
 one-fact-per-line posture, so `stateIsosceles`/`stateKite` collapse into one `stateEqualPair` and the
 i18n net now asserts no suggested pin contains a parenthesis.
+
 ## ADR-503 — THE CONTEXTUAL PLURAL REACHES THE TANGENTS-AT-POINTS FAMILY: «המשיקים נחתכים בנקודה E» after two drawn tangents (#554)
 
 **Status:** accepted, 2026-09-11 · **Issue:** #554 (feature, P3 — prod REC-2, log-triage 2026-08-11) · round #992 · feature route (PR)
@@ -11280,6 +11309,7 @@ determined" (the ≥ 4 floor), not an empty pool: relations are still read off t
 exactly how an under-determined figure is treated. (iii) A second defect surfaced on the same figure and is
 FILED, not fixed: a free radius that a `length-radius` directive consumes is sampled by nothing, so the
 panel still prints the drawing's radius (#1002 — the CLAUDE.md conformance smell, verbatim).
+
 ## ADR-510 — THE SUBMIT COMMIT IS THE FACTS ALONE: the seed auto-advance leaves the UI thread ("accept the flash") (#364)
 
 **Status:** accepted, 2026-09-13 · **Issue:** #364 (debt, P3 — the operator's 2026-09-11 ruling *"364 - accept"*) · round #1001 · debt route (landed on `main`) · completes [ADR-401](#adr-401)'s ratchet (the last recorded main-thread sweep goes to 0); the transaction shape of [ADR-098](#adr-098)/[ADR-484](#adr-484) changes as ruled
@@ -11325,6 +11355,7 @@ in `meetsRequirements`.
 clean at seed 0 on all eight steps (`meetsRequirements` true after each; the last step 3.0 s of fold, no
 search); the body's "0–4192 ms per candidate seed" was the cost of a search that this figure no longer
 triggers. Nothing freezes there before or after.
+
 ## ADR-511 — A CONSTRUCTION DECLARES ITS FREE OPERAND'S REGION, AND THE SAMPLER KEEPS IT THERE (#556)
 
 **Status:** accepted, 2026-09-13 · **Issue:** #556 (bug, P3 — the 2026-08-26 re-measured plan; the honesty half had already closed under ADR-445/481) · round #1001 · bug route (landed on `main`) · extends [ADR-254](#adr-254) (the circle-side family) to the sampler; the placement lens of [ADR-052](#adr-052)
@@ -11395,6 +11426,7 @@ failing at HEAD; the lock says so instead of pretending. The first cut replaced 
 by the family's `seedSpot` — measured, that moved the whole figure's basin (the «ישר ADB» variant lost
 seeds 4, 5, 7 and two more seeds tripped the distinctness floor), so the default was kept and only the
 declaration added. The 3-D sibling audit the plan does not ask for was not run.
+
 ## ADR-512 — A STATEMENT THAT MAKES A POINT THE MEETING OF TWO CARRIERS MOVES THE LOOSE CARRIER — routed by the semantic fact, not the call site (#260)
 
 **Status:** accepted, 2026-09-13 · **Issue:** #260 (bug, P3 — the 2026-08-25 plan) · round #1001 · bug route (landed on `main`) · generalises [ADR-255](#adr-255) (the loose-endpoint re-seat) and completes the crossing-statement family of [ADR-383](#adr-383); the mechanism-exists-wired-at-one-site shape of [ADR-167](#adr-167)
@@ -11453,6 +11485,7 @@ two measured obstacles inside the re-seat (candidate set, rider anchors) had to 
 moved the student's FIRST segment. The plan's "keep the honest refusal for the genuinely-pinned case" holds
 only when every endpoint is pinned; with one segment free the tool draws the figure, which is the
 statement's meaning.
+
 ## ADR-513 — A DECLARED POLYGON THE GIVENS FORCE FLAT IS SAID OUT LOUD, naming the statements — the 2-D half of ADR-W-048 (#945)
 
 **Status:** accepted, 2026-09-13 · **Issue:** #945 (feature, P3 — the 2026-09-13 plan) · round #1001 · feature route (PR) · **Adopts:** [ADR-W-048](06w-decisions-workspace.md#adr-w-048) (ruled 2026-09-08 for both products; the 3-D half is [ADR-3D-234](06b-decisions-3d.md#adr-3d-234)); the channel shape of [ADR-123](#adr-123) (coincidences) and the prefix rule of [ADR-492](#adr-492); layered above the accept gate of [ADR-413](#adr-413)
@@ -11588,6 +11621,7 @@ store and its `resample` action, asserting the seed moves, the invariant ratio m
 (the ADR-511 requirement still gates the new view) — standing rule 4.
 
 **Deviations from the plan:** none.
+
 ## ADR-515 — THE ARMED BUDGET IS CONSULTED INSIDE THE JOINT SOLVE, not only between experiments (#259, direction A)
 
 **Status:** accepted, 2026-09-14 · **Issue:** #259 (debt, P3 — the 2026-08-25 plan, direction **A** only) · round #1006 · debt route (landed on `main`) · extends [ADR-281](#adr-281) (budget scope) and the issue-#59 ladder budget · docs/17 §7
@@ -11658,6 +11692,7 @@ deliberately loose so a slow box cannot flake.
 
 **Deviations from plan:** the commit says `Refs #259`, not a closing keyword — (A) is landed, (B) is not,
 and closing the issue would misreport the work.
+
 ## ADR-517 — «SHOW ANOTHER CONFIGURATION» SAYS WHAT IT CHANGED AND WHAT IT KEPT (#65)
 
 **Status:** accepted, 2026-09-14 · **Issue:** #65 (feature, P3 — external architecture review, operator-commissioned 2026-07-11) · round #1006 · feature route (PR) · makes [ADR-052](#adr-052) visible; the cue sibling of [ADR-101](#adr-101)/[ADR-112](#adr-112); rests on the invariance of [ADR-065](#adr-065)/[ADR-514](#adr-514)
@@ -11820,6 +11855,7 @@ So a student whose radii were already on the canvas typed a valueless central an
 #1011 was filed against **PR #1008's branch**, and that PR was **closed without merging** — so «זוית ABC», its headline utterance, does not parse on `main` at all. The issue could have been read as stale. It is not: the valueless **central** angle lowers to the same `mark-angle` and was swallowed identically, which is the witness above and the one the lock uses. The class was always the point; the PR was only where it was first seen.
 
 **Consequences.** `DISPLAY_ONLY` (new, `engine/types.ts`), one line in `replay/core.ts`. `issue-1011-display-only.test.ts` (7) — driven through `parse → dryRunOutcome`, the REAL gate, because the defect reached play precisely by being locked below it. 2-D lane 391 files / 6752 tests.
+
 ## ADR-520 — A TAKEN LETTER NAMES ITS HOLDER, AND CAN BE TAKEN BACK WHEN THE HOLDER IS ORPHANED (#238)
 
 **Status:** accepted, 2026-09-14 · **Issue:** #238 (feature, P3 — split out of #234 at the operator's request, 2026-07-21) · round #1006 · feature route (PR) · the remaining half of #234 after [ADR-379](#adr-379) fixed its root · one-`set` undo per the [ADR-232](#adr-232) load precedent · the target-taken guard of [ADR-122](#adr-122)
@@ -12175,6 +12211,7 @@ Verified to bite: **13 of the 25 assertions fail against pristine `parse.ts`.**
 `parser/parse.ts`: the copula alternation is gone, replaced by `stripValueUnits` and `normalizeVerboseLength` above `normalizeUtterance`, both applied in its chain.
 
 `length-copula-value.test.ts` (25), named after its ADR-498 sibling `angle-copula-value.test.ts`. 2-D lane green.
+
 ## ADR-525 — A cevian's incidence is checked in every rule that emits a foot (#1233)
 
 **Requirements:** none (internal) — the promise is unchanged and already written: a figure never contradicts the word the student used to declare it. This restores it in the rules that had lost it. **Design:** [04](04-design.md) — the cevian family and its shared well-formedness predicate. **LADDER stage:** parse. No engine, solver or render change. **Extends** the median's own gate; sibling of the analytic ADR for #1231.
@@ -12244,6 +12281,7 @@ The corpus was the plan's proposed home for this lock and is the wrong one: `fac
 `parser/parse.ts`: `cevianWellFormed` above the median rule, called from four emit sites; the median's inline gate becomes a call; the altitude's half gate on the stated side is removed.
 
 `cevian-well-formed.test.ts` (24). 2-D lane green.
+
 ## ADR-526 — An untethered free point's DISTANCE is sampled, in the figure's own units (#1192)
 
 **Requirements:** [02](02-requirements.md) FR-CF — «הציגו תצורה אחרת» is the promise that an unstated relation is not silently decided; this makes it true for a free point's distance. **Design:** [04](04-design.md) — the seed sampler's DOF inventory. **LADDER stage:** configuration sampling (`applySeed`). No parse, apply or solver change. **Cites** ADR-052, ADR-018.
@@ -12529,6 +12567,7 @@ Option **(1)** of the arming comment is taken — allow it; the declaration foll
 **A note on the first lock written for this, because it is the reusable lesson.** The store's `swap` action was ALWAYS symmetric — the asymmetry lived one layer up, in the offer. A lock driving only the store therefore passed on the unfixed code, and it was measured doing so before the gate block was added. That is the `locks-must-call` failure mode ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)) in its purest form: the test exercised the layer that was never broken. Extracting `swapOffered` is what made the real decision callable.
 
 **Consequences.** `store/geoStore.ts` (−`swappable` from `LetterHolder` and from the predicate, which is now four lines shorter); `render/Figure.tsx` (−the flag from `FigureLetterHolder`, +`swapOffered`, the gate rewired). `issue-1199-symmetric-letter-offer.test.ts` (17): both-directions agreement over four setups; the OFFER asserted through `swapOffered` on real `letterHolder` output, including the shape-held letter that was refused before; nothing dropped and one-undo restoration; and the ring block, stated as a property of the SIDE SET rather than as a claim about which letters are opposite. `issue-238-letter-holder.test.ts`: the three rows that asserted `swappable` now assert what they were really about — the refusal still names its holder, and the swap still drops nothing — with the shape-held row flipped from "not offered" to "offered, and it keeps every point", which is what #1013 predicted it would be.
+
 ## ADR-533 — The bare copulas are ANGLES only; between two arcs the tool teaches «שווה ל» (#1000)
 
 **Status:** accepted, 2026-09-20 · **Issue:** #1000 (bug, P3, `2d`) · operator ruling 2026-09-14 · round #1292
@@ -15186,3 +15225,54 @@ The row kept reading «תיכון לבסיס» with a ✓ while the figure drew 
 **Consequences.** `shell/indexedName.ts` (new); `src/parser/lexicon.ts`, `parse.ts` (reader, `VALUE_SYMBOL_LEFT`, subscript fold, number gate, `PI_CONSUMED`/`piDeclared`), `spanAccounting.ts` (`symbol` kind), `scope.ts` (`splitGuidance`), `src/engine/types.ts` (`Consumed.symbols`, inert in the engine).
 
 **Behaviour change for a student:** «∠ABC = α1» (and every Greek-indexed, subscripted, compared or expression value) no longer draws a 1° angle: the line goes to the fallback. «שטח המשולש ABC = S1» is no longer told to split into two lines. «∠ABC = π» no longer silently makes π a free letter; it goes to the fallback.
+
+## ADR-601 — Chords stated to cross are read and drawn crossing: a rule consumes the whole label body, and the order of points on a circle is a sampled DOF that follows the stated order (#1678)
+
+**Status:** accepted · 2026-10-07 · bug (P1, 2-D, honesty class) · branch `fix/1678-chords-crossing` · rounds #1831 (parser arm, escalated) and #1845 (both arms, fix-now by the operator's 2026-10-07 instruction). Renumbered from the round-#1831 draft "ADR-596", which #1810 took on main.
+
+**Requirements:** [02-requirements.md](02-requirements.md) FR-ALT-2 — "next configuration explores the whole residual freedom" now names the order of points on a circle as part of it, and says a stated order is kept. The honesty invariant (a stated given is never silently dropped) is enforced, not changed · **Design:** [04-design.md](04-design.md) § "A fixed-run rule consumes the whole label body" and § "The order of points on a circle is a sampled DOF"; [LADDER.md](LADDER.md) stage 5, the per-seed tail; [17-design-rules.md](17-design-rules.md) §3, the keyword bow-out row · **LADDER stage:** parse (rule precedence) and **inserts at stage 5**, the per-seed tail's `applySeed` (the stated-order seat). No gate, solver or apply change.
+
+**Cites** [ADR-024](#adr-024) (the leftover guard), [ADR-029](#adr-029) (the implicit «המעגל»), [ADR-052](#adr-052) (no fixed assumptions), [ADR-106](#adr-106) (the post-commit config search), [ADR-592](#adr-592) (a crossing draws what its subject is), [ADR-594](#adr-594) (the stated-side seat, the precedent for a sampler that reads statements), [ADR-597](#adr-597) (label accounting).
+
+**Context.** Two causes, measured through the real submit gate with the LLM mocked.
+1. *The misparse* (round #1831, origin/main fa1d2492). With circle O and A/B/C/D on it, «במעגל המיתרים AC ו-BD נפגשים בנקודה E» lowered to `line-through chord-AC` + `line-circle-intersection E` and was refused «line chord-AC is tangent to circle circle-O». «BD» appeared in no command. With C a free point instead, the line **committed** a wrong E with no red mark. The comma form, the singular «המיתר AC חותך את המיתר BD» and the English "in the circle chords … meet at" did the same.
+2. *The order* (round #1845, origin/main e17a7d1e plus arm 1). With the sentence read correctly, the row committed `line-line-intersection E = AC ∩ BD (onSeg)`, but `meetsRequirements` was false at **24/24** seeds and `findValidConfig` returned **null**. Four «X על מעגל O» points take golden-angle default slots (`nextTheta`) in the cyclic order **A, C, B, D**, and the sampler's tight cluster jitter (±30°, which protects an inscribed shape's spread) never changes that order. So A and C are always neighbours and chords AC and BD can never cross. The class is wider than the row, measured the same way: «מרובע ABCD» and «המרובע ABCD חסום במעגל O» typed after the four points also failed at 24/24 (ABCD drawn self-crossing), and so did a five-point cluster with chords AD and BF stated to cross. Typed A, C, B, D, the row held at 24/24.
+
+**Class.**
+- Arm 1: *a parser rule that reads a fixed-size label run accepts a sentence whose body carries more stated labels than it consumed.* The honesty gates exempt existing labels, so a stated relation between existing points is silently dropped. In the reported case the opening «במעגל» ("in the circle", the scene) was taken as the circle the line meets, `labelRun(body, 2)` took «AC», and «ו-BD» was ignored.
+- Arm 2: *an unstated cyclic order of points on a circle acts as a fixed given.* The default slots fix an order, and neither the sampler nor the configuration search could reach another, so any figure whose givens need a different order is unreachable. This is the ADR-052 / docs/17 M4 class (a default must yield to a statement, or be varied by «הציגו תצורה אחרת»).
+
+**Decision.**
+1. **The whole label body** (`unclaimedLabels(body, run, also)`, `parse.ts`). This is the ADR-024 leftover guard applied where the run is read. It strips the run (contiguous or spaced) and every other label the rule accounted for, then reports any uppercase label run left. A non-empty answer returns `null`. Applied to the line-meets-circle family: `lineMeetsCircle`, `extendOntoCircle`, `lineCutsCircleTwice` and `secantFarPoint`, plus both spans of `circumcircleMeetsSegment` (the vertex run and the cut segment).
+2. **A locative circle is the scene** (`circleIsOnlyLocative`). The same four rules need the circle as the verb's subject or object («חותך את המעגל», «נפגש עם המעגל», "meets the circle"). That is the shape the external-secant `cutsCircle` test already required. A sentence whose every circle mention is a sentence-opening «ב+מעגל [O]» / "in the circle [O]" is not theirs. This is a statement about what the phrase is, not a keyword bow-out: «AB קוטר במעגל O» or «AD מיתר במעגל P …» (not sentence-opening) are untouched.
+3. **`lineLineIntersection` reads without filler.** The sentence now falls to this rule. It strips the lowercase En `FILLER` (as `labelRun` already did) and a capitalised filler word, so «in» / «In» is never read as the line I–N.
+4. **A named locative is accounted context when the figure already holds it** (`labelAccounting.ts`, rule 5). ADR-597, which landed between the two rounds, made an existing label context only when the lowering refers to it. That turned «במעגל O המיתר AC חותך את המיתר BD בנקודה E» (the named form) into not-handled, because the crossing's commands never mention a circle. The scene says one thing: the points it is about lie on that circle. So the circle's letter is context when at least two existing points are carried and every one of them is a member of the named circle. A carried point off the circle leaves the letter unaccounted, so the scene is never dropped green. Measured: with C a free point, the lowering carries `point-on-circle C` itself.
+5. **The stated-order seat** (`statedCyclicOrderSeat`, `engine/sample.ts`, called by `applySeed`). For each circle whose tight cluster (the free, undriven, off-arc riders the ±30° jitter holds) has at least four points, the sampler deals the cluster's own default slots in a cyclic order chosen among the orders the **statements** allow, read off the construction's records:
+   - a declared polygon with at least four vertices in the cluster keeps them in its vertex order, either way round;
+   - two chords stated to meet within a segment (`line-line-intersection` with `onSeg`, `onSeg1` or `onSeg2`), all four ends in the cluster and none shared, have alternating ends. Line BD meets the disk only in chord BD, so a crossing inside chord AC is inside both chords, which happens exactly when B and D separate A and C.
+
+   The choice is seeded among the allowed orders, so «הציגו תצורה אחרת» and the post-commit config search (ADR-106's seed sweep) reach every one. When the statements leave nothing open (the default order is the only one allowed, up to reflection) the default is kept, so a figure whose order is already stated and met does not drift. Below four points every order is the default's rotation or mirror image, so nothing is chosen. Statements that admit no order keep the default and leave the verdict to the verifier. A point-free crossing (`segments-cross`) lives only in the facts; the seeded choice still reaches its order and the requirement-gated sweep keeps it. Seed 0 (the default drawing) is untouched, so the step commits on the default and the existing post-commit search moves to the first seed that meets every requirement, as for any other requirement the default misses. Cost: at most (n−1)! order checks per circle per sample for n ≤ 7 (720 at n = 7), else 256 seeded tries. No replay or evaluate is added.
+
+**Why not a configuration-axis registry entry (ADR-593).** The registry holds discrete choices the facts or construction RECORD (a branch, a side, a variant, a seat), stepped by rewriting the facts. The cyclic order is not recorded anywhere: it is a property of the sampled θs of free riders, which is the sampler's domain (M3). Making it an axis would need a new recorded field and a rewrite path for a choice that `applySeed` already owns. The seat keeps it where the other sampled DOFs live, and the registry's consumers reach it through the seed sweep they already run.
+
+**Sibling audit.**
+- `labelRun(` has 64 call sites in `parse.ts`. The five rules in decision 1 read a run out of a whole-sentence body under a meet verb, which is how this class reaches a stated second pair. They are guarded, and the per-fix test drives each one with a body longer than its run. The other sites read scoped spans or pass through the `shapeLeftover` gate; #1833's gate arm is the backstop for any that remain. `lineLineIntersection`'s five-label regexes are the next suspect named there.
+- The gate arm (narrowing the existing-label exemption) was measured in round #1831 over 1412 corpus steps: 3 false positives, filed as #1833, not armed.
+- The order class beyond the row, measured before and after: «מרובע ABCD» and «המרובע ABCD חסום במעגל O» over four typed points (0/24 → 23/24, findValidConfig null → seed 1), chords AD × BF over five points (0/24 → 20/24), chords crossing with the operands swapped (BD × AC). All in the per-fix test.
+- 24-seed whole-rate sweep over every corpus scenario and fixture whose figure has a circle with ≥ 4 free riders (the only figures the seat can touch; elsewhere its map is empty and every θ is unchanged): 25 figures, 484 → 511 of 600 seed-passes, no figure lower. `q22-arc-sum-typed-early-order-independence` rose 1 → 5 and the new fixture 0 → 23. Per-figure sweep time within noise (largest 4736 → 4923 ms over 24 seeds).
+- Other products: in 3-D the row is X8 (circles are not modelled in the space builder; `decideSubmit3` answers not-understood from «מעגל O» on), so neither class has a 3-D member. Analytic builds the row with its own reader (its parity verdict is `builds`); `src-analytic/` does not share 2-D's `applySeed`, so the 2-D seat neither reaches nor is needed by it. Analytic's own order sampling for «מרובע ABCD» over typed points was not measured here.
+- Out of class, filed as #1834 (P3): «AC חותך את המעגל בנקודה E» with A and C on the circle is refused in internal ids and calls the chord a tangent.
+
+**Locks.**
+- `src/parser/__tests__/issue-1678-locative-circle-whole-body.test.ts`: the five phrasings (Hebrew and English) read as `line-line-intersection` AC×BD; the locative-diameter sentence is not read as line∩circle; the class sweep over the five rules (a parse that succeeds names every stated label); the must-not-change guards («AD חותך את המעגל בנקודה E» with D new, «הישר AB פוגש את המעגל O בנקודה E», the noun form); the silent-commit probe through the real submit gate; and the named locative with its points on O and with C off O (the lowering carries C onto O).
+- `src/__tests__/issue-1678-cyclic-order-seat.test.ts`: the row, the swapped operands, «מרובע ABCD» and «המרובע ABCD חסום במעגל O» hold at every sampled seed and `findValidConfig` finds them; entry order A, C, B, D holds at the default too; the five-point crossing; four bare points reach all three cyclic orders; no drift where nothing is open (ACBD stated and met, three points); a stated ABCD is drawn in its own order at every seed.
+- Fixture `src/__tests__/fixtures/issue-1678-chords-cross-in-the-circle.geo.json`: the operator's exact steps, saved at the configuration the app's search lands on (seed 1). It replays green and re-parses to the same commands.
+- The `chord-cross` row in `shell/__tests__/fixtures/geo-input-parity.ts` loses its 2-D `knownGap` (#1678) and is a parity row; the 2-D parity lock enforces it.
+
+**Open, not ruled.** The round-#1831 escalation asked whether the 2-D parity runner should stop scoring a commit whose figure fails its requirements as `builds` (that is how the plan's unprefixed control read as green). The runner is unchanged here; the question stays with the operator.
+
+**Behaviour change for a student:**
+- «במעגל המיתרים AC ו-BD נפגשים בנקודה E» after four points on the circle is read as the crossing of AC and BD and drawn with the chords crossing inside the circle. It is no longer refused as "tangent", and with C a free point it no longer silently draws a wrong E on line AC alone.
+- The same holds for «במעגל, AC ו-BD נחתכים בנקודה E», «במעגל O המיתר AC חותך את המיתר BD בנקודה E» and "in the circle, chords AC and BD meet at E".
+- «מרובע ABCD» or «המרובע ABCD חסום במעגל O» typed after four points on a circle is drawn as a convex ABCD. Before, it was drawn self-crossing with the no-valid-configuration note.
+- After the step the points on the circle may move to a new order (the search picks the first configuration that meets the statement). «הציגו תצורה אחרת» on bare points on a circle now also shows them in other orders.

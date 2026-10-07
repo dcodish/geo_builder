@@ -20,7 +20,9 @@
  *     «AD קוטר במעגל ABCD» names the circle by its points, and the lowering references the circle;
  *  3. it NAMES a circle («במעגל O», "circle O") and the lowering touches a circle;
  *  4. it is a vertex of an existing POLYGON the sentence names with its noun («במשולש ABC»), when the
- *     commands carry at least one of that polygon's vertices — a definite reference to the shape.
+ *     commands carry at least one of that polygon's vertices — a definite reference to the shape;
+ *  5. it names the circle of a sentence-opening LOCATIVE («במעגל O, המיתר AC …») and the figure already
+ *     holds what the scene says — at least two existing points carried, all on that circle (#1678, ADR-601).
  * A bound radius symbol or angle alias stays masked as notation, exactly as before.
  *
  * Widening this closure is the sanctioned direction when a real reference is found un-exempted
@@ -54,6 +56,8 @@ export interface LabelAccountCtx {
 const POLY_NOUN_RUN =
   /(?:משולש|מרובע|ריבוע|מלבן|מעוין|מעויין|טרפז|דלתון|מקבילית|מחומש|משושה|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|kite|parallelogram|pentagon|hexagon)\s+((?:[A-Z]\d*\s*){3,})/gi;
 const CIRCLE_NAME = /(?:מעגל|circle)\s+([A-Z]\d*)(?![A-Za-z\d])/gi;
+/** A sentence-opening locative that names its circle — «במעגל O …», "in (the) circle O …" (rule 5). */
+const LOCATIVE_CIRCLE_NAME = /^\s*(?:ב(?:ה)?מעגל|[Ii]n\s+(?:the\s+|a\s+)?circle)\s+([A-Z]\d*)(?![A-Za-z\d])/;
 
 /** Every string VALUE of the commands (field names and `type` excluded — the "TYPE contains E" trap). */
 function commandStrings(commands: AnyCommand[]): string[] {
@@ -99,6 +103,20 @@ export function referencedContextLabels(s: string, commands: AnyCommand[], actx:
   // 3 — a circle NAME, when the lowering touches a circle at all.
   const touchesCircle = commands.some((c) => /circle|inscribe|tangent|chord|arc|diameter/i.test(c.type)) || [...vals].some((v) => /^circle-|^@ctr-/.test(v));
   if (touchesCircle) for (const m of s.matchAll(CIRCLE_NAME)) out.add(m[1].toUpperCase());
+  // 5 — #1678 (ADR-601): a sentence-opening LOCATIVE circle («במעגל O, המיתר AC חותך את המיתר BD …» / "in
+  // circle O, …") is the scene the statement lives in, and it says one thing: the points the statement is about
+  // lie on that circle. The lowering refers to it exactly when that already holds — at least two existing
+  // points carried, every one a member of the named circle. A carried point OFF the circle keeps the label
+  // unaccounted (the scene states a membership the lowering does not carry — never dropped green).
+  const loc = s.match(LOCATIVE_CIRCLE_NAME);
+  if (loc) {
+    const x = loc[1].toUpperCase();
+    const circle = (actx.circleMembers ?? []).find((e) => (e.id ?? `circle-${centreLetter(e.center)}`) === `circle-${x}` || centreLetter(e.center) === x);
+    const existing = new Set((actx.existingPoints ?? []).map((p) => p.toUpperCase()));
+    const members = new Set((circle?.points ?? []).map((p) => p.toUpperCase()));
+    const about = [...carried].filter((p) => existing.has(p) && p !== x);
+    if (circle && about.length >= 2 && about.every((p) => members.has(p))) out.add(x);
+  }
   // 4 — a polygon named by its noun, when it is an EXISTING polygon and the lowering touches it.
   const polys = (actx.polygons ?? []).map((v) => new Set(v.map((x) => x.toUpperCase())));
   for (const m of s.matchAll(POLY_NOUN_RUN)) {

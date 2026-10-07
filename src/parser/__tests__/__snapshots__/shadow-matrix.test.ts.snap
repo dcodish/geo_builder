@@ -210,7 +210,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
-      "lineMeetsCircle",
       "lineLineIntersection",
     ],
     "text": "the circle through A B C cuts CE at D",
@@ -335,14 +334,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     ],
     "text": "גזרה AOB בזווית 80",
     "winner": "sector",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
-      "lineMeetsCircle",
-    ],
-    "text": "the line AO cuts circle O at C and D",
-    "winner": "lineCutsCircleTwice",
   },
   {
     "lang": "en",

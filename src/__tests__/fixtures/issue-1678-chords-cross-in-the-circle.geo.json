@@ -1,0 +1,104 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-07T00:00:00.000Z",
+  "name": "issue-1678-chords-cross-in-the-circle",
+  "seed": 1,
+  "facts": [
+    {
+      "id": "X2KG5A54SGQXU5IESWf9a",
+      "utterance": "מעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "UsNR6aY-0HDlImz_XfI7H",
+      "utterance": "A על מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "sCD5DHHxd6sGwaJiY9U7v",
+      "utterance": "B על מעגל O",
+      "group": "g2",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "00eOvmFjr5Unqh5v0yQOg",
+      "utterance": "C על מעגל O",
+      "group": "g3",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "bHu0NZSBp00NE-mEYzK_Z",
+      "utterance": "D על מעגל O",
+      "group": "g4",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "b2fZ84RcL4KLzPpUbd2g6",
+      "utterance": "במעגל המיתרים AC ו-BD נפגשים בנקודה E",
+      "group": "g5",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "XxLvYBcdisrlByZC27-lk",
+      "utterance": "במעגל המיתרים AC ו-BD נפגשים בנקודה E",
+      "group": "g5",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "kQaD5c4_tmgPRbEwwXC7F",
+      "utterance": "במעגל המיתרים AC ו-BD נפגשים בנקודה E",
+      "group": "g5",
+      "cmd": {
+        "type": "line-line-intersection",
+        "id": "E",
+        "a": "A",
+        "b": "C",
+        "c": "B",
+        "d": "D",
+        "onSeg": true
+      },
+      "enabled": true
+    }
+  ]
+}
