@@ -1,5 +1,7 @@
 # 3-D relations — the operand-atom program
 
+> **Archived 2026-10-07 (#1861).** History — never a rule or a status. Its live parts now live in: [04b](../04b-design-3d.md) "Adding a relation: the registration surfaces and the non-negotiables" (from §5 and §7).
+
 **Status: COMPLETE (2026-07-28) — all six slices landed.** Originally PROPOSED v2 (2026-07-28). v1 written same day; **v2 supersedes it after a max-effort design
 review** that corrected §2 (the single `relate3` command is withdrawn — it would break saves and the
 fixtures drift-net), corrected S1's gate (rule identities are preserved, so the shadow snapshot goal is
@@ -10,12 +12,12 @@ Commissioned by the operator: *"since we need all of these relations… we also 
 a big task here to just do all of them… I think it's better to have the right generic solution."*
 
 Authoritative for the relation-coverage work. Per-slice decisions go in
-[06b-decisions-3d.md](06b-decisions-3d.md); status updates go in CLAUDE.md's 3-D section. Umbrella
+[06b-decisions-3d.md](../06b-decisions-3d.md); status updates go in CLAUDE.md's 3-D section. Umbrella
 issue: **#378**.
 
 ## 1. The problem, measured
 
-Four bugs on 2026-07-28 ([ADR-3D-095](06b-decisions-3d.md#adr-3d-095), 097, 098, 100) were one class: *a
+Four bugs on 2026-07-28 ([ADR-3D-095](../06b-decisions-3d.md#adr-3d-095), 097, 098, 100) were one class: *a
 relation modelled correctly, exposed through an enumeration that covers a subset of its operand kinds.*
 Fixing cells one at a time is what built this table (measured on `main` + #375):
 
@@ -32,9 +34,9 @@ Fixing cells one at a time is what built this table (measured on `main` + #375):
 | point ON it | — | **✗** | ✓ (planes) | — |
 
 **The pattern: a named line is a second-class operand, and ∥ is thinner than ⟂ everywhere.** The
-capabilities largely EXIST — `on-line` is fully built ([ADR-3D-031](06b-decisions-3d.md#adr-3d-031)),
-`line-plane-angle` works for a segment ([ADR-3D-027](06b-decisions-3d.md#adr-3d-027)), skew/parallel/
-intersecting are built claims for segments (V7-T3, [ADR-3D-010](06b-decisions-3d.md#adr-3d-010)), the
+capabilities largely EXIST — `on-line` is fully built ([ADR-3D-031](../06b-decisions-3d.md#adr-3d-031)),
+`line-plane-angle` works for a segment ([ADR-3D-027](../06b-decisions-3d.md#adr-3d-027)), skew/parallel/
+intersecting are built claims for segments (V7-T3, [ADR-3D-010](../06b-decisions-3d.md#adr-3d-010)), the
 plane∩plane line exists for same-form pairs. What is missing is *reach*, not machinery.
 
 ## 2. Constraints that shape the design (why v1's §2 was wrong)
@@ -59,7 +61,7 @@ Saved `.geo3.json` files carry lowered commands verbatim and replay them through
 The shadow-matrix snapshot records the winning RULE per catalog utterance. S1 preserves **rule identities**
 (each existing rule becomes a thin wrapper over the shared core), so its gate is a **zero-diff snapshot** —
 stronger and simpler than "pure addition". Later slices add rows only (the
-[ADR-3D-090](06b-decisions-3d.md#adr-3d-090) discipline).
+[ADR-3D-090](../06b-decisions-3d.md#adr-3d-090) discipline).
 
 ### 2.3 The frame classifier — the central routing invariant
 
@@ -67,9 +69,9 @@ Every relation *instance* is classified by its **operands**, not its pin kind:
 
 - **gauge × gauge** (two segments of a solid): similarity-invariant → a shape drive (scalar-pin family,
   gauge frozen). Angles never pin scale; lengths/distances do (`scalePinned`,
-  [ADR-3D-054](06b-decisions-3d.md#adr-3d-054)).
+  [ADR-3D-054](../06b-decisions-3d.md#adr-3d-054)).
 - **gauge × absolute** (a face against a parametric line): absolute-frame → must be able to ROTATE the
-  figure; **excluded from `invariantOnly`** (the [ADR-3D-100](06b-decisions-3d.md#adr-3d-100) lesson) and
+  figure; **excluded from `invariantOnly`** (the [ADR-3D-100](../06b-decisions-3d.md#adr-3d-100) lesson) and
   solved as a pivot residual.
 - **absolute × absolute** (ℓ against π): the figure is not involved. With a symbolic parameter in either
   operand → a **parameter root-find** (`pinningGivens`/`paramRoots`, roots = branches); with none → a
@@ -87,9 +89,9 @@ below):
 `rider` (create a free-DOF point, e.g. a new id on ℓ) · `drive-dims` (shape) · `drive-gauge`
 (orientation/placement) · `param-root` (pin the figure parameter; sign-change vs touch-zero root-finding
 chosen per residual — ∥ residuals are non-negative and need the minima-scan, the
-[ADR-3D-006](06b-decisions-3d.md#adr-3d-006) touch-zero lesson) · `requirement` (open conditions —
+[ADR-3D-006](../06b-decisions-3d.md#adr-3d-006) touch-zero lesson) · `requirement` (open conditions —
 skew/intersecting as GIVENS are inequalities/generic-position conditions: sample-and-gate via
-`meetsRequirements3`/`firstSatisfyingSeed3` ([ADR-3D-064](06b-decisions-3d.md#adr-3d-064)), never
+`meetsRequirements3`/`firstSatisfyingSeed3` ([ADR-3D-064](../06b-decisions-3d.md#adr-3d-064)), never
 least-squares) · `claim` (verify on a determined figure) · `refuse` (honest, with a reasoned message).
 
 M1 duality per relation: most cells carry **two** actions (drive when free, claim when determined), routed
@@ -97,14 +99,14 @@ at apply exactly like memberships today.
 
 ### 2.5 The landing funnel (S0) — one honesty check every path funnels through
 
-[ADR-3D-095](06b-decisions-3d.md#adr-3d-095)'s general-position guard has now been bypassed **four** times:
+[ADR-3D-095](../06b-decisions-3d.md#adr-3d-095)'s general-position guard has now been bypassed **four** times:
 the projection (#372), the driven path (#375 Am. 1), and the two doors found by this review (§4). Each
 bypass had the same cause: per-path boolean proxies (`pivot === null`, `positionPinned`, `rotationSolved`)
 standing in for the semantic fact — *which gauge components did the solve actually determine?*
 
 S0 replaces them with **one post-solve stage**: classify each gauge component {translation, rotation,
 scale} as *pinned-by-residuals* / *frozen-arbitrary* / *solved*, then sample every non-pinned component
-under the clearance guard (world + default-view projection, [ADR-3D-099](06b-decisions-3d.md#adr-3d-099)).
+under the clearance guard (world + default-view projection, [ADR-3D-099](../06b-decisions-3d.md#adr-3d-099)).
 Key classifications the proxies got wrong:
 
 - an `invariantOnly` pivot ⇒ the gauge is **frozen-arbitrary**, not solved — and gauge motion *preserves*
@@ -117,7 +119,7 @@ Key classifications the proxies got wrong:
 
 **Stated-incidence allowlist:** the clearance guard must exempt contacts the figure ASSERTS (a stated
 meet, an on-line rider, the ⟂ crossing) — otherwise S4's intersect-GIVEN fights the sampler forever (the
-2-D forced-coincidence lesson, [ADR-123](06-decisions.md#adr-123), 3-D edition). The funnel takes the
+2-D forced-coincidence lesson, [ADR-123](../06-decisions.md#adr-123), 3-D edition). The funnel takes the
 construction and derives the allowlist from it; nothing else may edit it.
 
 ## 3. The architecture
@@ -135,7 +137,7 @@ type Operand3 =
 ```
 
 ONE tokenizer reads an operand from text. Nouns are optional and **non-deciding** — classification is by
-what the token IS, since the kinds are known (the [ADR-3D-100](06b-decisions-3d.md#adr-3d-100) lesson); a
+what the token IS, since the kinds are known (the [ADR-3D-100](../06b-decisions-3d.md#adr-3d-100) lesson); a
 noun that contradicts the kind is built-and-corrected via the notices channel, never guessed from.
 
 ### 3.2 The resolver returns THUNKS — one seam for five consumers
@@ -160,7 +162,7 @@ collector explicitly (DoD §5.9).
 
 A data structure, not prose: `(rel × lhsKind × rhsKind) → { action(s), status }` with
 `status ∈ {supported, planned, out-of-scope, n/a}`. Totality-tested (every combination classified — the
-[ADR-235](06-decisions.md#adr-235) pattern), and **the single source of truth**: the battery iterates it,
+[ADR-235](../06-decisions.md#adr-235) pattern), and **the single source of truth**: the battery iterates it,
 the catalog references it, a slice "lands" by flipping cells to `supported`.
 
 ### 3.4 The battery — one generic test per supported cell
@@ -168,8 +170,8 @@ the catalog references it, a slice "lands" by flipping cells to `supported`.
 For every `supported` cell, one shared harness asserts: builds from a minimal figure (He + En; operand
 order swapped where symmetric; nouns present and absent) · **drives or verifies per its action** (a drive
 genuinely moves the figure — asserted non-satisfied *before*, the anti-luck discipline from the
-[ADR-3D-100](06b-decisions-3d.md#adr-3d-100) lock) · DOF cue monotone
-([ADR-3D-060](06b-decisions-3d.md#adr-3d-060)) · save→load round-trip · **general position: the relation
+[ADR-3D-100](../06b-decisions-3d.md#adr-3d-100) lock) · DOF cue monotone
+([ADR-3D-060](../06b-decisions-3d.md#adr-3d-060)) · save→load round-trip · **general position: the relation
 holds AND every gauge vertex clears absolute objects AND the placement varies across seeds** (this single
 property is the funnel's lock — it catches both "guard skipped" and "guard undoes the drive") · a
 symbolic-operand variant exercises `param-root` where the cell declares it · unknown references refuse
@@ -224,7 +226,7 @@ the allowlist plumbing (empty allowlist for now). Gate: the doors' figures clear
 locks (`placement-gauge`, `view-legibility`, `plane-line-perp` Am. 1) still green **through the funnel**,
 their per-path guards deleted.
 
-**S1 — atoms + TABLE + battery harness** *(landed 2026-07-28, [ADR-3D-102](06b-decisions-3d.md#adr-3d-102))*.
+**S1 — atoms + TABLE + battery harness** *(landed 2026-07-28, [ADR-3D-102](../06b-decisions-3d.md#adr-3d-102))*.
 Operand tokenizer + thunk resolver; RELATION_TABLE seeded with the measured `supported` cells; the battery
 over them; `planeLinePerp` migrated as the exemplar. **Amendment vs v2:** the remaining rules migrate
 PER-FAMILY in the slice that widens that family's cells (S2/S3/S4) — migrating a rule twice, once for form
@@ -232,7 +234,7 @@ and again for function, is waste, and the zero-diff gate is cleanest kept absolu
 snapshot zero-byte diff**, full suite green, battery green. First find: #380 (primed labels rejected by the
 seg↔plane family).
 
-**S2 — the named-line column** *(landed 2026-07-28, [ADR-3D-103](06b-decisions-3d.md#adr-3d-103))*.
+**S2 — the named-line column** *(landed 2026-07-28, [ADR-3D-103](../06b-decisions-3d.md#adr-3d-103))*.
 Point-on-ℓ phrasings → the existing `on-line` command; ∥/⟂/angle for ℓ operands via the classifier
 (gauge×absolute → the `lineRels` pivot residual; absolute×absolute symbolic → param-root, gated on a
 DIRECTION carrying the parameter; numeric → claim). 14 cells flipped; two root fixes en route (the
@@ -241,7 +243,7 @@ spelling-tolerance "decision (filed separately)" was never actually filed** — 
 silently dropped; file it when the spelling recurs in a log. Through-line (`pointLines`) operands stay
 claim-only until an exam needs the drive (recorded in the table notes).
 
-**S4 — mutual positions** *(landed 2026-07-28, [ADR-3D-104](06b-decisions-3d.md#adr-3d-104))*.
+**S4 — mutual positions** *(landed 2026-07-28, [ADR-3D-104](../06b-decisions-3d.md#adr-3d-104))*.
 intersecting / parallel / skew / coincident as first-class statements over the operand pair. The
 mechanism follows the CLOSED/OPEN split, not the relation name: the closed three carry a scale-free
 residual (signed components — the ADR-3D-006 touch-zero lesson) and drive when both operands ride the
@@ -256,7 +258,7 @@ given build silently), and «X ו-Y מקבילים» / «X מקביל ל-Y» had
 **Out, filed as #386:** the gauge×absolute closed drive (needs the pivot trigger generalized, not a
 second parallel array).
 
-**S3 — plane ↔ plane** *(landed 2026-07-28, [ADR-3D-105](06b-decisions-3d.md#adr-3d-105))*. They did
+**S3 — plane ↔ plane** *(landed 2026-07-28, [ADR-3D-105](../06b-decisions-3d.md#adr-3d-105))*. They did
 fall out of the resolvers' normals — via ONE generalization: a relation reads off the angle between
 the sides' characteristic vectors (direction, or normal) and inverts exactly when the sides are of
 different types, so `relDeviation` serves the whole matrix and `lineRelDeviation` is a special case
@@ -265,7 +267,7 @@ Three path-bound guards found and fixed en route — the general-position check 
 two solve paths (a plane coincidence flattened a box to zero height and reported success), and the
 funnel treated a plane-locked base as free to rotate. **Out:** `contains` («מוכל»).
 
-**S5 — distances** *(landed 2026-07-28, [ADR-3D-106](06b-decisions-3d.md#adr-3d-106))*. One
+**S5 — distances** *(landed 2026-07-28, [ADR-3D-106](../06b-decisions-3d.md#adr-3d-106))*. One
 `distanceBetween` over the operand pair covers the curriculum's four cases (point–plane, point–line,
 skew lines, parallel planes); intersecting objects are honestly 0 apart rather than a special case.
 The one relation carrying UNITS, so a stated distance PINS THE SCALE and a derived one prints only
@@ -279,7 +281,7 @@ slice (S0 as a bug fix goes straight to main per the workflow).
 ## 7. Non-negotiables
 
 - S1 changes no lowering and no snapshot; later slices change the snapshot by addition only.
-- M1 duality per relation — verify-only is not finished ([ADR-3D-095](06b-decisions-3d.md#adr-3d-095)
+- M1 duality per relation — verify-only is not finished ([ADR-3D-095](../06b-decisions-3d.md#adr-3d-095)
   makes it refuse `claim-refuted` on nearly every seed).
 - Every drive path lands through the S0 funnel; **no new per-path guards, ever**.
 - Both locales, both orders, nouns non-deciding.

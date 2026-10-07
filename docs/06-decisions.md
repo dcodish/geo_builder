@@ -517,7 +517,7 @@ This requires a **pinned-vs-free distinction on points** that the engine current
 1. **Structural-first detection.** A theorem's hypothesis is matched against the **typed construct and its dependency parents**, not against numeric coordinate measurements — built a diameter + an inscribed point subtending it → raise 103/104, because *that is what was constructed*. Each catalog theorem gets a structural matcher keyed on construct + parent-relationship pattern; the [Pedagogy §4 trigger map](10-pedagogy.md#4-construction--theorem-triggers-the-pedagogical-payload) is the spec for these matchers.
 2. **Whole-figure analysis, delta presentation.** Each step the matchers run over the **entire accumulated figure** (all enabled facts), *not* just the last fact — a hypothesis can span several facts and be completed (or change tier) only by a later one, and an already-shown theorem's confidence must update as the figure grows. What *surfaces* is the **diff** (newly-satisfied theorems + tier/relevance changes); results live in a **growing feed beside the canvas**, each entry attributed to the fact that completed/last-changed it, updated in place (not re-listed), and dropped/downgraded when a fact it depended on is removed (FR-TH-1/2).
 3. **Graded confidence as ordinal tiers** — *certain / possible / recall* — driving order and colour (FR-TH-3). Not a continuous probability: structural matching yields "hypothesis met / one given away / merely evoked," which maps to tiers, and a fabricated percentage would undercut the catalog's exact-and-citable authority (Pedagogy §5.4).
-4. **Geometric (coordinate) detection is deferred and re-homed.** It is *not* auto-fed as theorems — that would violate "no unsolicited clues" (Pedagogy §5.1). The same coordinate analysis instead powers an **opt-in Reveal** feature (FR-RV-\*) in a **separate later phase** ([Plan Phase 9](09-implementation-plan.md#phase-9--reveal--figure-unmasking-deferred)): the student presses a button to unmask equal segments/angles/measures. Theorems (Phase 6) and Reveal (Phase 9) are independent — either ships without the other.
+4. **Geometric (coordinate) detection is deferred and re-homed.** It is *not* auto-fed as theorems — that would violate "no unsolicited clues" (Pedagogy §5.1). The same coordinate analysis instead powers an **opt-in Reveal** feature (FR-RV-\*) in a **separate later phase** ([Plan Phase 9](archive/09-implementation-plan.md#phase-9--reveal--figure-unmasking-deferred)): the student presses a button to unmask equal segments/angles/measures. Theorems (Phase 6) and Reveal (Phase 9) are independent — either ships without the other.
 
 **Why.** (1) Faithful to the pedagogy — the theorem is about *the given the student entered*, not a numeric accident; trace-to-trigger is exact and free (the parent facts are already known). (2) Reuses the dependency graph; no floating-point tolerance tuning in the must-have path. (3) Cheaper to build and test — the Phase 6 gate is symbolic and deterministic. (4) Splitting geometric analysis into opt-in Reveal resolves the tension between "reach your own conclusions unclued" and "it's valuable to see what the shape really is" — the analysis exists, but only on demand.
 
@@ -585,11 +585,11 @@ This requires a **pinned-vs-free distinction on points** that the engine current
 
 ---
 
-> **ADR-043 … ADR-047 below are the re-work directions from the [2026-06-17 design audit](13-design-audit-2026-06-17.md).** They are **Proposed** (not yet Accepted) — recorded as decisions-of-record candidates pending discussion. The audit's full evidence (file:line) lives in doc 13; these entries state the decision and consequences. Phase 6 (theorems) is deferred by operator decision (2026-06-17): the goal is a *full working diagramming tool first*, and these consolidations are the path to it.
+> **ADR-043 … ADR-047 below are the re-work directions from the [2026-06-17 design audit](archive/13-design-audit-2026-06-17.md).** They are **Proposed** (not yet Accepted) — recorded as decisions-of-record candidates pending discussion. The audit's full evidence (file:line) lives in doc 13; these entries state the decision and consequences. Phase 6 (theorems) is deferred by operator decision (2026-06-17): the goal is a *full working diagramming tool first*, and these consolidations are the path to it.
 
 ## ADR-043 — Collapse the hand-synced enumerations into single sources of truth (carrier descriptor, SHAPES/reuse registry, branchable source, compiler-checked kinds)
 
-**Status:** Proposed (2026-06-17) · from the [design audit §3 items 1–2, R2/R3/R4](13-design-audit-2026-06-17.md)
+**Status:** Proposed (2026-06-17) · from the [design audit §3 items 1–2, R2/R3/R4](archive/13-design-audit-2026-06-17.md)
 
 **Context.** The audit's named root cause of the "case-by-case patching" feeling: the same concept is **hand-enumerated across 5–8 sites with no compiler link, and a missing copy fails silently** (a dropped DOF, a false conflict — not a type error). Three concrete enumerations: (1) "which point kinds carry a DOF" is re-typed in `driveOrCheck` (`apply.ts:44–108`), the four `resolveDriven` filters (`evaluate.ts:86–101`), `carrierSpec`/`setCarrierVals`, `sample.ts` `freeDofs`/`rawMovableDof`, `step.ts` `freeDrivableAncestors`/`markDriven`; and `POINT_KINDS` (`types.ts:327`) is a hand-typed `ReadonlySet<string>` parallel to the 21-member `GeoPoint` union with no compiler reconciliation. (2) "which commands reuse-or-create base points" lives in `isShape` (`step.ts:64`), `DERIVED_SLOTS`, `POINT_PLACEMENTS`, `shapeKinds`, `mirrorComposition` — restating the real authority `placeBase` (`apply.ts:306`); this list already drifted in production (the circumcircle false-conflict, git `1fdd6a0`). (3) "which kinds have cyclable branches" is enumerated 3× with mismatched lists (`step.ts:613` 5 kinds vs `App.tsx:264`/`scenarios.test.ts:654` 4 kinds).
 
@@ -609,7 +609,7 @@ This requires a **pinned-vs-free distinction on points** that the engine current
 
 ## ADR-044 — The engine owns resolved geometry; the renderer consumes it (no re-derivation)
 
-**Status:** Proposed (2026-06-17) · from the [design audit R1](13-design-audit-2026-06-17.md) · reinforces [ADR-004](#adr-004)
+**Status:** Proposed (2026-06-17) · from the [design audit R1](archive/13-design-audit-2026-06-17.md) · reinforces [ADR-004](#adr-004)
 
 **Context.** The renderer is meant to be a pure consumer ([ADR-004](#adr-004)), but `scene.ts:117` `lineGeometry` verbatim re-implements `evaluate.ts:696` `resolveLine` (its comment admits it "mirrors the engine's `resolveLine` … because the engine doesn't expose its internal resolution"), and `scene.ts:209–221` re-derives circle radius including the tangent-inner formula. They have **already diverged**: a tangent-inner circle with a `via:'through'` outer renders nothing. The data is already computed and discarded — `evaluateCore` holds populated `lines`/`circles` maps (`evaluate.ts:586–587`) but `EvalOk` (`evaluate.ts:39–42`) returns only `{ positions }`.
 
@@ -623,7 +623,7 @@ This requires a **pinned-vs-free distinction on points** that the engine current
 
 ## ADR-045 — One driven-DOF solver, one residual/degeneracy policy; binding decided once (capability-preserving)
 
-**Status:** Proposed (2026-06-17) · from the [design audit R5/R7/R8](13-design-audit-2026-06-17.md) · refines [ADR-014](#adr-014)/[ADR-030](#adr-030)/[ADR-033](#adr-033)
+**Status:** Proposed (2026-06-17) · from the [design audit R5/R7/R8](archive/13-design-audit-2026-06-17.md) · refines [ADR-014](#adr-014)/[ADR-030](#adr-030)/[ADR-033](#adr-033)
 
 **Context.** The DOF re-solver fractured into 3 near-duplicate numeric bodies + a 6-way router (`evaluate.ts:106` → coupled `139–224`, `resolveFreeDriven` `235–306`, `resolveMixedCarriers` `381–454`), with **three** residual conventions (coupled absolute+soft-barrier; free absolute+hard-reject; mixed relative+hard-reject), degeneracy thresholds ~40× apart, and a byte-identical "is satisfied?" gate copied at four sites (192/302/450/665). Separately, carrier→DOF binding is split across two phases that override each other (greedy `driveOrCheck` at apply time vs after-failure `recruitFreeDofs`, `step.ts:365`, whose own comment admits the greedy pick can be wrong), with three near-identical ancestor walkers and two bespoke diameter siblings. Branch identity is a position in a numerically-ordered list whose order flips as the figure flexes.
 
@@ -656,7 +656,7 @@ This requires a **pinned-vs-free distinction on points** that the engine current
 
 ## ADR-046 — Parser: one `=`-RHS rule; construct-vs-constrain folds into the engine's existing reinterpretation
 
-**Status:** Proposed (2026-06-17) · from the [design audit R6/R9](13-design-audit-2026-06-17.md) · refines [ADR-002](#adr-002)/[ADR-024](#adr-024)/[ADR-026](#adr-026)
+**Status:** Proposed (2026-06-17) · from the [design audit R6/R9](archive/13-design-audit-2026-06-17.md) · refines [ADR-002](#adr-002)/[ADR-024](#adr-024)/[ADR-026](#adr-026)
 
 **Context.** The parser re-implements construct-vs-constrain in ~8 rules, each open-coding its own existence check, and ~20 of 62 rules carry "must run before X" comments with no ordering-invariant test. Eight `=`-RHS rules match the same `XY =` prefix and **none return `'stop'` on a partial match** — they return `null` and depend entirely on RULES-list position to avoid a silent half-parse (the documented [ADR-024](#adr-024)/[ADR-026](#adr-026) `"AB = 12√x"` → `set-distance 12` bug). Meanwhile the engine *already* has the generic construct-vs-constrain home: `reinterpretAsConstraint` + `POINT_PLACEMENTS` (`step.ts:464–482`) auto-lowers a re-definition into a `coincide` constraint driving a free DOF.
 
@@ -671,7 +671,7 @@ This requires a **pinned-vs-free distinction on points** that the engine current
 
 ## ADR-047 — Test strategy: a property/invariant/differential layer; demote (don't delete) the per-figure scenario mandate
 
-**Status:** Proposed (2026-06-17) · from the [design audit §5](13-design-audit-2026-06-17.md) · refines [ADR-008](#adr-008) and the [testing strategy](08-testing-strategy.md)
+**Status:** Proposed (2026-06-17) · from the [design audit §5](archive/13-design-audit-2026-06-17.md) · refines [ADR-008](#adr-008) and the [testing strategy](08-testing-strategy.md)
 
 **Context.** The current methodology **amplifies** the patch loop: the NON-NEGOTIABLE "every reported bug becomes an end-to-end scenario" rule produces a monotonically growing example suite (24 additive commits, 0 removals; ~26 scenarios), while the one general asset — the 343-case campaign — is **positive-only by construction** (two `.toBe(true)` assertions, zero rejection assertions). `fast-check`/Playwright were specified in [ADR-008](#adr-008) and **never adopted**. Universal promises (stability, determinism, distinctness, replay-equivalence) are each pinned by a few hardcoded fixtures and tested on no generated figure — which is why bug *classes* surface one figure at a time.
 
@@ -708,7 +708,7 @@ This requires a **pinned-vs-free distinction on points** that the engine current
 
 ## ADR-049 — LLM as strategist + seed for figures the engine can't solve alone (engine stays the arithmetic + verifier); harvest failures into the corpus
 
-**Status:** Proposed (2026-06-17) · design only, not built · extends [ADR-023](#adr-023) (LLM fallback) · relates to [ADR-045](#adr-045) (one solver/seeding), [ADR-014](#adr-014) (generic constraints), the [compiler lens](11-architecture-as-compiler.md), and the "reported bugs become regression scenarios" rule (CLAUDE.md). Satisfies a future FR (TBD on acceptance).
+**Status:** Proposed (2026-06-17) · design only, not built · extends [ADR-023](#adr-023) (LLM fallback) · relates to [ADR-045](#adr-045) (one solver/seeding), [ADR-014](#adr-014) (generic constraints), the [compiler lens](archive/11-architecture-as-compiler.md), and the "reported bugs become regression scenarios" rule (CLAUDE.md). Satisfies a future FR (TBD on acceptance).
 
 **Context.** The engine occasionally fails to produce a figure for an input that is *not* contradictory: a construct or binding strategy it lacks, or — more often — a numerical solver that lands in the wrong basin / misses a far branch (the audit's own caveat: "port the grid-scan seeding or far-branch parametric figures regress"). We already have a server-side LLM path ([ADR-023](#adr-023)). The operator asked whether, in these rare cases, we could send all constraints to the LLM, get coordinates back, draw the figure, and use a feedback loop to "teach the engine."
 
@@ -1311,7 +1311,7 @@ The rule fires **only for an EXISTING circle** (named, a bare centre-letter that
 
 **Status:** Accepted (2026-06-22, operator session).
 
-**Context.** The operator typed "**מנוקדה** D יוצא משיק למעגל בנקודה B" — a typo of "מנקודה" (the ק/ו swapped). The deterministic parser still matched the tangent rule on the correctly-spelled tail ("…בנקודה B"), drew the tangent at B, but **silently dropped the "from D" apex** (the typo'd "מנוקדה D" wasn't recognised). It then **committed that partial figure** instead of escalating to the LLM — whose job is exactly freeform/typo input ([ADR-023](#adr-023); the operator's standing note: typo-tolerance is the LLM's role, not the grammar's). This is the [N1 escalation-calibration gap](PROJECT-MEMORY.md): a parser-handled-but-subtly-wrong parse never escalates.
+**Context.** The operator typed "**מנוקדה** D יוצא משיק למעגל בנקודה B" — a typo of "מנקודה" (the ק/ו swapped). The deterministic parser still matched the tangent rule on the correctly-spelled tail ("…בנקודה B"), drew the tangent at B, but **silently dropped the "from D" apex** (the typo'd "מנוקדה D" wasn't recognised). It then **committed that partial figure** instead of escalating to the LLM — whose job is exactly freeform/typo input ([ADR-023](#adr-023); the operator's standing note: typo-tolerance is the LLM's role, not the grammar's). This is the [N1 escalation-calibration gap](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/PROJECT-MEMORY.md): a parser-handled-but-subtly-wrong parse never escalates.
 
 **Decision.** Add a parser→LLM escalation **gate**: after a successful deterministic parse, if the utterance names a **NEW** uppercase point label (not already in the figure) that the emitted commands **never reference**, treat the parse as **weak** and escalate to the LLM rather than commit. The signal is `droppedNewLabels(utterance, commands, existingPoints)`: input labels minus (labels used anywhere in the commands, incl. inside ids like `circle-P`/`tan-B`) minus (labels already in the figure). Wired into `App.submit` alongside the existing dry-run gate.
 
@@ -1339,7 +1339,7 @@ The rule fires **only for an EXISTING circle** (named, a bare centre-letter that
 1. "B אמצע הקטע AC" on an empty figure → `midpoint` → **"unresolved dependencies for: B"**. `midpoint` (unlike `segment`) did not create its endpoints, so with A,C absent there was nothing to bisect.
 2. "AB קוטר במעגל שמרכזו O ורדיוסו R" (AB is a diameter in a circle whose centre is O, radius R) → routed to `diameter` (the "במעגל" = *in* a circle) → **"'B' is already defined"** (it tried to make the existing B an antipode), although the circle was being **defined** by its centre/radius.
 
-These reinforce the [N1 calibration point](PROJECT-MEMORY.md): the LLM cannot rescue a STRUCTURAL gap (it would emit the same midpoint and hit the same wall), and core constructs should not depend on it anyway. The LLM *was* reached in both cases (the log shows `src:llm`) and built nothing.
+These reinforce the [N1 calibration point](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/PROJECT-MEMORY.md): the LLM cannot rescue a STRUCTURAL gap (it would emit the same midpoint and hit the same wall), and core constructs should not depend on it anyway. The LLM *was* reached in both cases (the log shows `src:llm`) and built nothing.
 
 **Decision.**
 1. **`midpoint` creates its endpoints when new.** "B is the midpoint of segment AC" implies the segment AC: when an endpoint is not already in the figure, `midpoint` prepends an (idempotent) `segment` that creates + draws AC; when both endpoints exist it emits just the midpoint (unchanged — no surprise segment on existing figures).
@@ -1594,7 +1594,7 @@ The existing `two-circles-mutual-tangent-secants` scenario was found to have the
 
 ## ADR-109 — Coordinate-validation campaign: a differential check against an independent closed-form oracle
 
-**Status.** Accepted (2026-06-24) · built · 1286 tests green, build clean. The long-parked "differential coordinate-validation campaign" (see [09-implementation-plan.md](09-implementation-plan.md) session log, 2026-06-11). Complements — does not replace — the **invariants** campaign ([ADR-047](#adr-047) Tier-A; `engine/__tests__/campaign.test.ts`) and the **givens verifier** ([ADR-053](#adr-053)).
+**Status.** Accepted (2026-06-24) · built · 1286 tests green, build clean. The long-parked "differential coordinate-validation campaign" (see [09-implementation-plan.md](archive/09-implementation-plan.md) session log, 2026-06-11). Complements — does not replace — the **invariants** campaign ([ADR-047](#adr-047) Tier-A; `engine/__tests__/campaign.test.ts`) and the **givens verifier** ([ADR-053](#adr-053)).
 
 **Context — what the existing nets can and can't catch.** Two correctness nets already exist: the *invariants* campaign checks each generated figure against geometric RELATIONS a valid drawing must satisfy (true anywhere — `|MA|=|MB|`, perpendicularity, …); the *givens verifier* checks, live, that the relations a figure's COMMANDS asserted hold at the final coordinates ("green = verified"). Neither pins down an *exact position* against an *independent* source: a derived point can satisfy every checked relation and still be computed wrong, and the verifier only re-checks what was stated. A differential coordinate check closes that gap — but only where coordinates are unique.
 
@@ -1772,7 +1772,7 @@ The decomposition is sound and over-constraint-free (a general quad has 4 free v
 
 ## ADR-123 — A FORCED coincidence is allowed (with a notice), not a hard error
 
-**Status.** Accepted (2026-06-25). Operator-directed, from the bagrut kite figure (session `id4dn4a2`). Supersedes the abandoned recruiter-tuning approach (see the investigation in [09-implementation-plan.md](09-implementation-plan.md)).
+**Status.** Accepted (2026-06-25). Operator-directed, from the bagrut kite figure (session `id4dn4a2`). Supersedes the abandoned recruiter-tuning approach (see the investigation in [09-implementation-plan.md](archive/09-implementation-plan.md)).
 
 **Context.** On a kite ABCD inscribed in a circle, with E on DC, BE⟂DC, N = BE∩AC, the given `area(NCE) = ¼·area(ACD)` errored **"O and N would be at the same point"** on every seed. The investigation (worth recording, because the first hypotheses were wrong):
 - △NCE ~ △ACD is **structural** — a cyclic kite is a *right kite* (∠ADC = 90°), and BE⟂DC gives ∠NEC = 90°, with a shared ∠C — so the area ratio ¼ is **exactly equivalent to the linear ratio CN/CA = ½** (the engine confirms the angle-triples match to <0.1° in every configuration).
@@ -1912,7 +1912,7 @@ The decomposition is sound and over-constraint-free (a general quad has 4 free v
 **Context.** Israeli geometry problems ship as **verbal statement + figure**. The app already turns a description into a figure (the construction pipeline) and exports the figure as an **image** (FR-HS-5). Teachers/authors composing an exam want the **other half**: from a figure they built, get the **verbal givens** to paste next to the diagram. A raw transcript of the steps is wrong for this — it leaks the construction order, the user's exact wording, and scaffolding (helper points, the path used to place a point). A textbook poses the *givens* in a normalised register ("ABCD is a trapezoid inscribed in a circle; the tangent at C meets the extension of AB at E; BE = BC"), independent of how the figure was drawn.
 
 **Decision (the plan).**
-1. **A reverse stage — the "decompiler."** This is the inverse of the input pipeline ([11-architecture-as-compiler.md](11-architecture-as-compiler.md)): instead of `utterance → command[] → figure`, it is `figure/relations → verbal statement`. The source of truth is the **engine model** (objects + constraints + the *verified* relations from `verify.ts`), NOT the raw fact/utterance list — so the prose describes what the figure IS, not how it was typed. Construction order, helper scaffolding, and synonymous phrasings are normalised away before/within generation.
+1. **A reverse stage — the "decompiler."** This is the inverse of the input pipeline ([11-architecture-as-compiler.md](archive/11-architecture-as-compiler.md)): instead of `utterance → command[] → figure`, it is `figure/relations → verbal statement`. The source of truth is the **engine model** (objects + constraints + the *verified* relations from `verify.ts`), NOT the raw fact/utterance list — so the prose describes what the figure IS, not how it was typed. Construction order, helper scaffolding, and synonymous phrasings are normalised away before/within generation.
 2. **LLM-backed phrasing.** A deterministic pass first serialises the model into a neutral relation list (shapes, memberships, tangencies, equalities, angles, the givens the verifier confirmed); the LLM then renders that list as fluent textbook prose in the target language (He/En), in the "נתון…" register. The LLM does *style*, not geometry — the relations are fixed by the engine, so it cannot invent or drop a given. (Model: the cheapest sufficient one, per NFR-CT-3; routed through the same server-side proxy as the parser fallback, NFR-SE-1.)
 3. **Output is editable text.** Presented as a third export beside "image" and "copy construction"; the author can edit before pasting. He/En per the UI locale.
 4. **Premium, flag-gated (NFR-FG).** Costs extra LLM spend and is a **paid-tier candidate**, so it sits behind a single feature flag: **on for local development**, **off in the default production build**, where the UI shows it as a **paid option** (a labelled, disabled affordance — never hidden, never an error) and the endpoint does nothing / is unreachable (no API call, no cost, no leak when off).
@@ -2459,7 +2459,7 @@ A reproduction (rectangle `ABCD`; equilateral `BCE`,`DAF` inward; `EC ∩ DF = G
 
 **Status:** Accepted (2026-07-02)
 
-**Context.** The 2026-07-02 multi-area review (see [15-hardening-plan.md](15-hardening-plan.md)) identified *silent mis-parse* as the parser's systemic risk: `parse()` is first-match-wins over the ordered `RULES` array, and an earlier, coarser rule can CLAIM a fragment a later, more-specific rule should own — returning a partial command array that commits silently (the escalation tripwire `droppedNewLabels` only fires on a *new* dropped label, so any mis-parse reusing existing labels is invisible). Every historical instance is the same shape (ADR-119 parallel-chords, ADR-077, ADR-166's parser half) and each was found only by an operator session. Rule ordering was defended solely by hand-written cases; there was no structural guard against a NEW shadow introduced by a keyword edit or a new rule.
+**Context.** The 2026-07-02 multi-area review (see [15-hardening-plan.md](archive/15-hardening-plan.md)) identified *silent mis-parse* as the parser's systemic risk: `parse()` is first-match-wins over the ordered `RULES` array, and an earlier, coarser rule can CLAIM a fragment a later, more-specific rule should own — returning a partial command array that commits silently (the escalation tripwire `droppedNewLabels` only fires on a *new* dropped label, so any mis-parse reusing existing labels is invisible). Every historical instance is the same shape (ADR-119 parallel-chords, ADR-077, ADR-166's parser half) and each was found only by an operator session. Rule ordering was defended solely by hand-written cases; there was no structural guard against a NEW shadow introduced by a keyword edit or a new rule.
 
 **Decision.** Export `RULES` (test-only) and add a shadow-matrix guard ([src/parser/__tests__/shadow-matrix.test.ts](../src/parser/__tests__/shadow-matrix.test.ts)) that runs EVERY rule against a corpus (the supported `COMMAND_CATALOG` examples, he+en) without stopping at the first match, and per utterance records the `winner` (the rule `parse()` uses) and `shadowedBy` (later rules returning a DIVERGENT array). Three checks: (1) the winner rule per catalog utterance is snapshot-pinned; (2) the divergent later-claimers (candidate shadows) are snapshot-pinned; (3) every supported catalog utterance is claimed by *some* deterministic rule (none silently escalate). A `known shadow-prone probes` block snapshots the CURRENT behaviour of the twelve review-verified Phase-C targets so each fix flips one entry visibly. The analysis runs the same `normalizeUtterance` the rules see (extracted from `parse` for this — it is now the single normalization site, forward-compatible with PAR-7's maqaf/bidi work).
 
@@ -2843,7 +2843,7 @@ With this, the impossible ⟂ hard-fails; the store keeps the prior figure (F st
 
 ## ADR-200 — one exhaustive `objectParents` for the dependency walk (retire `evaluate`'s hand-scraped `PT_FIELDS`)
 
-**Status:** Accepted (2026-07-02) · Hardening plan [Phase D / D1 / ENG-1](15-hardening-plan.md)
+**Status:** Accepted (2026-07-02) · Hardening plan [Phase D / D1 / ENG-1](archive/15-hardening-plan.md)
 
 **Context.** `evaluate`'s coupled-solve detector ([evaluate.ts](../src/engine/evaluate.ts) `resolveDriven`) walks the object→references graph to decide whether an `on-segment-solved` point is part of a dependency cycle (each such point needs another's position → the topological evaluator deadlocks and must promote the pair to the numeric joint solver — [ADR-045](#adr-045)). It walked the graph with `PT_FIELDS`, a hand-maintained string list of point-id field names scraped off each object (`typeof o[f] === 'string'`). That list **silently dropped edges**: it lacked `to` (perp-offset / rotated / scaled-offset / arc-midpoint), `toward` (radial-toward), `line`/`line1`/`line2` (line-circle / on-line / line-intersection), and `circle1`/`circle2` (circle-circle), and — because line/circle refs live nested under `.spec`/`.radius` — it never chased a line's or circle's defining points at all. So a solved point coupled to another **through** such an edge went undetected → it stayed closed-form → `evaluate` errored **"unresolved dependencies"** instead of routing it numerically. This is the same silent-drop anti-pattern the point-kind whitelist ([ADR-043](#adr-043)) was built to prevent, but here with no exhaustiveness guard: a newly-added object kind's references were simply invisible.
 
@@ -2855,7 +2855,7 @@ With this, the impossible ⟂ hard-fails; the store keeps the prior figure (F st
 
 ## ADR-201 — `evaluate` publishes solved radii; the renderer stops reconstructing them (retire `pointOnCircleId`)
 
-**Status:** Accepted (2026-07-02) · Hardening plan [Phase D / D2 / ENG-2 + REN-6](15-hardening-plan.md)
+**Status:** Accepted (2026-07-02) · Hardening plan [Phase D / D2 / ENG-2 + REN-6](archive/15-hardening-plan.md)
 
 **Context.** A `via:'free'` circle radius the solver drives is baked into `positions` (its on-circle points sit at the solved radius) but the stored circle object keeps its SEED. `resolveCircle` reads the object, so it returns the seed. The renderer ([scene.ts](../src/render/scene.ts)) therefore reverse-engineered the true radius via `pointOnCircleId` — a **six-kind whitelist** (`on-circle`/`line-circle`/`antipode`/`arc-midpoint`/`radial-toward`/`circle-circle`) picking any point known to lie on the circle, then measuring centre→point. This is the strongest "renderer is a pure consumer" violation (it re-derives a solver internal) and the same kind-whitelist anti-pattern as ADR-200 — it already bit once ([ADR-144](#adr-144): the whitelist omitted `radial-toward`, so a tangent circle whose only on-circle point is its touch point drew at the seed with the touch point floating inside it).
 
@@ -2881,7 +2881,7 @@ With this, the impossible ⟂ hard-fails; the store keeps the prior figure (F st
 
 **Status:** Accepted (2026-07-03)
 
-**Context.** After Phases A–D of the [hardening plan](15-hardening-plan.md) landed, the operator asked for a fresh multi-agent review **of the hardening diff itself** (`6dbcc0e..26efa93`) to validate the fixes before continuing to Phase E. Eight finder angles + five verification agents ran; every candidate was **verified by execution** (parser probes at HEAD vs the base commit, store probes, an engine timing repro, a server concurrency probe) — 16 confirmed findings, several of them regressions introduced *by* the hardening fixes themselves. All fixed in one batch, each at the layer the defect originates.
+**Context.** After Phases A–D of the [hardening plan](archive/15-hardening-plan.md) landed, the operator asked for a fresh multi-agent review **of the hardening diff itself** (`6dbcc0e..26efa93`) to validate the fixes before continuing to Phase E. Eight finder angles + five verification agents ran; every candidate was **verified by execution** (parser probes at HEAD vs the base commit, store probes, an engine timing repro, a server concurrency probe) — 16 confirmed findings, several of them regressions introduced *by* the hardening fixes themselves. All fixed in one batch, each at the layer the defect originates.
 
 **The findings and their root fixes** (IDs are the review's; tests in brackets):
 
@@ -2909,7 +2909,7 @@ With this, the impossible ⟂ hard-fails; the store keeps the prior figure (F st
 
 ## ADR-204 — replay is memoized and the config search is wall-clock-bounded (Phase E: E1/STO-1, E2/STO-2, A5/TST-5)
 
-**Status:** Accepted (2026-07-03) · Hardening plan [Phase E](15-hardening-plan.md)
+**Status:** Accepted (2026-07-03) · Hardening plan [Phase E](archive/15-hardening-plan.md)
 
 **Context.** `replay(facts, seed, overrides)` is pure but was treated as free: one user action ran it from four layers (dry-run, commit guard, debug snapshot, render), and the config search (`firstSatisfyingSeed` / `findValidConfig` / `meetsRequirements`) re-replayed the SAME (facts, seed) pairs across its passes — on the documented heavy figures (~1.5 s/replay, ADR-123) that compounded into multi-second freezes. Separately, the debug-snapshot subscription ran a full `replay` on every store change **in production**, where `analyticsSubmit` then discarded the event; and the search loops were deadline-free on the UI thread.
 
@@ -2919,7 +2919,7 @@ With this, the impossible ⟂ hard-fails; the store keeps the prior figure (F st
 
 ## ADR-205 — the submit pipeline is race-safe and cancellable; one user action = one undo entry restoring the seen view (Phase E: E3/STO-3, E4/STO-4, E5/STO-5)
 
-**Status:** Accepted (2026-07-03) · Hardening plan [Phase E](15-hardening-plan.md)
+**Status:** Accepted (2026-07-03) · Hardening plan [Phase E](archive/15-hardening-plan.md)
 
 **Context.** Three coupled store/App defects: (a) `submit` awaited the network then dry-ran the LLM result against the **pre-await** facts snapshot while committing onto the live list, and only the Submit button (not the example chips) was gated — concurrent submits could race; `llmParse` had no timeout/abort, so a hung proxy meant a permanent spinner. (b) A multi-command utterance committed as N separate `execute` calls → zundo recorded N entries, so one undo peeled a single command off a step whose row still showed ✓; `autoResolve`'s rewrite added another invisible entry. (c) History partialized `facts` only, while `execute` auto-advances the seed and `autoResolve`/`resample` set it — undo replayed the reverted list at a *different* seed, showing a figure the student never saw (violating the stability promise at the history layer); dialed radii also survived undo.
 
@@ -2929,7 +2929,7 @@ With this, the impossible ⟂ hard-fails; the store keeps the prior figure (F st
 
 ## ADR-206 — subscripted-point store ops + algebraic round-trip properties over the scenario corpus (Phase E: E6/STO-6/7, E7/TST-4)
 
-**Status:** Accepted (2026-07-03) · Hardening plan [Phase E](15-hardening-plan.md)
+**Status:** Accepted (2026-07-03) · Hardening plan [Phase E](archive/15-hardening-plan.md)
 
 **Context.** Store ops mutate facts via JSON/string rewriting — historically the highest-density bug area (ADR-122's substring corruption; the review's S1 partial structured-id rename) — yet only example-based tests existed. And the ops' point-id guard was `/^[A-Z]$/`: a subscripted point (`O1`, which the LLM path legitimately produces and PAR-10 explicitly widened `absorb` for) could not be renamed/swapped/merged ("no-source"), and `renameSegKey` assumed 2-char endpoints so a styled `seg-O1O2` went stale.
 
@@ -2939,7 +2939,7 @@ With this, the impossible ⟂ hard-fails; the store keeps the prior figure (F st
 
 ## ADR-207 — hardening Phase F: renderer/UX for the real audience (RTL, tablets, teachers' exports, a11y)
 
-**Status:** Accepted (2026-07-03) · Hardening plan [Phase F](15-hardening-plan.md) · **F2 scope set by the operator: tablets, not phones** ("I'm not concerned about mobile — the UX won't be good; but we do need to think about tablets").
+**Status:** Accepted (2026-07-03) · Hardening plan [Phase F](archive/15-hardening-plan.md) · **F2 scope set by the operator: tablets, not phones** ("I'm not concerned about mobile — the UX won't be good; but we do need to think about tablets").
 
 **Context & decisions**, one per plan item:
 
@@ -2956,7 +2956,7 @@ With this, the impossible ⟂ hard-fails; the store keeps the prior figure (F st
 
 ## ADR-208 — Phase 6a: the live theorem-surfacing feed (help, don't reveal)
 
-**Status:** Accepted (2026-07-04) · Implementation plan [Phase 6a](09-implementation-plan.md) · theorem plan [docs/16-theorems-plan.md](16-theorems-plan.md) · corpus [docs/sample questions/theorem-ground-truth.md](sample%20questions/theorem-ground-truth.md).
+**Status:** Accepted (2026-07-04) · Implementation plan [Phase 6a](archive/09-implementation-plan.md) · theorem plan [docs/16-theorems-plan.md](archive/16-theorems-plan.md) · corpus [docs/sample questions/theorem-ground-truth.md](sample%20questions/theorem-ground-truth.md).
 
 **Context.** Phase 6 surfaces the relevant bagrut theorems as a student builds. The pedagogy charter's headline rule is **stated-vs-derived** ("help, don't reveal"): the feed surfaces the theorems the student's STATED givens *announce* (a stated diameter announces Thales; an inscribed triangle announces the inscribed-angle theorem), and NEVER the derived "aha" theorem whose recognition IS the exercise (the similar-triangle pairing to be proven, the angle-bisector ratio to be derived). Getting that boundary wrong hands over the solution.
 
@@ -3396,7 +3396,7 @@ Design decision (operator): a bagrut book often DESCRIBES what the student sees 
 
 ## ADR-235 — theorem-discovery v2 slice T1 (measure & map): the coverage disposition map, the measured fill order, the full B-series corpus gate, and the feed audit harness
 
-**Context.** The theorem-relevance replan ([docs/18](18-theorem-relevance-plan.md), accepted decision-complete 2026-07-06) diagnosed the operator's "theorems that should appear don't appear, and the order seems random" into four structural causes (R1 coverage / R2 matcher-local evidence / R3 undesigned ranking / R4 no intent layer). Slice **T1 — measure & map** builds the bookkeeping and harnesses that make the remaining work enumerable and testable, deliberately changing **no matcher, no ranking, no engine code**.
+**Context.** The theorem-relevance replan ([docs/18](archive/18-theorem-relevance-plan.md), accepted decision-complete 2026-07-06) diagnosed the operator's "theorems that should appear don't appear, and the order seems random" into four structural causes (R1 coverage / R2 matcher-local evidence / R3 undesigned ranking / R4 no intent layer). Slice **T1 — measure & map** builds the bookkeeping and harnesses that make the remaining work enumerable and testable, deliberately changing **no matcher, no ranking, no engine code**.
 
 **Built.**
 1. **`src/theorems/coverage.ts` — the disposition map** (`THEOREM_COVERAGE`): every id in [07](07-theorem-reference.md) (1–109, 201, A1–A6, B1–B4 — 120 ids) carries exactly one explicit disposition — `tabled` (50 today) · `no-reveal` (68/70/76, ADR-208) · `supplemental` (A1/B1/B2/B4, the Appendix ids ADR-217 did NOT keep) · `planned` with a T2 slice tag (65 ids) · `needs-construct` (#88, a circle inscribed in a *quadrilateral*). `integrity.test.ts` gained **totality** guards: total over 07, no stray keys, and the three policy kinds are checked as *equivalences* (`tabled` ⇔ in `THEOREM_TABLE`, etc.), so the map can never drift from the table or the ADR-208/217 sets. "Absent" is now a tracked state answerable in one lookup (R1's root fix).
@@ -3934,7 +3934,7 @@ Operator's live prod test of the inscribed rhombus surfaced three issues, all fi
 
 > **Later:** this is a *workspace* decision that happens to live in the 2-D log — the misfiling that prompted [ADR-W-001](06w-decisions-workspace.md#adr-w-001). It keeps its id and its home deliberately (200+ ADR ids are referenced from docs and code; stable anchors beat tidy filing); new cross-product decisions go in `docs/06w-decisions-workspace.md`. The isolation mechanism below is **generalized by [ADR-W-003](06w-decisions-workspace.md#adr-w-003)**: the edges now live in `BOUNDARIES.json`, which `isolation.test.ts` reads, with directory-layer classification asserted total.
 
-**Context.** The repo already hosts two products (2-D Geo Builder `src/`, 3-D Space Builder `src3d/`) under the sibling-app pattern (docs/20 §12: own entry/build/dist/prod-path, isolation by copied patterns, one shared parameterized server). Two more are planned — **analytic geometry** (the 471 4-pt + 572 5-pt questions) and **complex numbers**. Three gaps: (1) CI was one serial job running the FULL build + ~3,900-test suite for any non-docs change (~13 min), so every product paid for every other product's tests; (2) the per-product conventions (ADR log, label, status home, PR scoping) existed de facto but were written nowhere — a session had to infer which product a request relates to; (3) the isolation rule was held by convention only, and `vite.config.3d.ts` even carried an `@` → `src/` alias, so a stray `@/` import in src3d would have silently coupled the products.
+**Context.** The repo already hosts two products (2-D Geo Builder `src/`, 3-D Space Builder `src3d/`) under the sibling-app pattern (docs/22 §9: own entry/build/dist/prod-path, isolation by copied patterns, one shared parameterized server). Two more are planned — **analytic geometry** (the 471 4-pt + 572 5-pt questions) and **complex numbers**. Three gaps: (1) CI was one serial job running the FULL build + ~3,900-test suite for any non-docs change (~13 min), so every product paid for every other product's tests; (2) the per-product conventions (ADR log, label, status home, PR scoping) existed de facto but were written nowhere — a session had to infer which product a request relates to; (3) the isolation rule was held by convention only, and `vite.config.3d.ts` even carried an `@` → `src/` alias, so a stray `@/` import in src3d would have silently coupled the products.
 
 **Decision.** (1) **Per-product CI lanes** (`.github/workflows/ci.yml`): a `changes` job classifies the push/PR diff — `src3d/`, `3d.html`, `fixtures3/`, `vite.config.3d.ts` → the 3-D lane; `src/`, `index.html` → the 2-D lane; docs paths → none; **everything else (server/, package.json, tsconfig, vite.config.ts, .github/, any uncategorized new path) → ALL lanes** — unknown-by-default is "run everything", never "skip". Each lane builds its own bundle and runs `vitest run <tree>/ server/` (the shared-server tests run in every lane; `tsc -b` covers src+src3d in both lanes, keeping the cross-product typecheck net). Lanes run in parallel; an unusable diff base (force-push/new branch) runs all lanes. Local mirrors: `npm run test:2d` / `test:3d` (+ `test:run:*`). The **full suite stays the bar before any deploy** and for shared-surface changes. (2) **The product registry** (docs/22 §9): per product — source dir, entry/build/dist, prod path, ADR log + id prefix, plan/status home, issue label, test filter, CI lane, fixtures dir — plus the *adding product N+1* recipe. Future tools decided: analytic geometry is **one product** (`src-analytic/`, `06c-decisions-analytic.md`, `ADR-AG-NNN`, label `analytic`) serving 471+572 as curriculum profiles of one engine; complex numbers separate (`src-complex/`, `06d-decisions-complex.md`, `ADR-CX-NNN`, label `complex`). (3) **Isolation made mechanical**: `server/__tests__/isolation.test.ts` scans both trees' import specifiers — src3d must not use `@/` or relative paths into `src/`, and vice versa — and runs in every CI lane; the dangerous `@` alias is removed from `vite.config.3d.ts` (a cross-product import now fails the 3-D build outright).
 
@@ -4264,7 +4264,7 @@ Each item is a widening of the rule that already OWNS the construct — never a 
 
 **The whole register short-circuits BEFORE the LLM** (the analytic precedent — none of these can ever build, so an LLM call is pure cost); post-LLM classification is inherited unchanged. **No-theft is a locked invariant:** every supported catalog example (both locales) must classify `null` — a real construction may never get a guidance brush-off (`scope.test.ts` sweeps the catalog).
 
-The 3-D twin is #73 (`scope3.ts`, COPIED per docs/20 §12 — never shared).
+The 3-D twin is #73 (`scope3.ts`, COPIED per docs/22 §9 — never shared).
 
 ## ADR-290 — The geometry WORKER: heavy searches off the main thread, fold transplants, progress + cancel (issue #41)
 
@@ -5607,7 +5607,7 @@ Locked by `newlabel-collinear.test.ts` (7) + scenario `newlabel-collinear-rider`
 
 ### ADR-410 — The VALUES PANEL: the student's "what do I know so far" index (#217)
 
-**What (operator-commissioned 2026-07-19, rulings same day):** the 2-D edition of the 3-D "organize your data" sidebar — every fixed/known value the figure carries, stated (נתון) and derived (נגזר) alike, surfaced passively in a panel: segment lengths over the detection layers' own edge universe, polygon-corner and stated angles, radii, polygon/circle areas, and **area-ratio classes** (S, 2S, ½S — similarity-gauge-invariant knowledge even on an unscaled figure; the student's own letter reused when ADR-121 bound one). The 3-D `dataView` precedent COPIED, never imported (docs/20 §12).
+**What (operator-commissioned 2026-07-19, rulings same day):** the 2-D edition of the 3-D "organize your data" sidebar — every fixed/known value the figure carries, stated (נתון) and derived (נגזר) alike, surfaced passively in a panel: segment lengths over the detection layers' own edge universe, polygon-corner and stated angles, radii, polygon/circle areas, and **area-ratio classes** (S, 2S, ½S — similarity-gauge-invariant knowledge even on an unscaled figure; the student's own letter reused when ADR-121 bound one). The 3-D `dataView` precedent COPIED, never imported (docs/22 §9).
 
 **Knowledge discipline:** a number prints only when it is IDENTICAL across every sampled configuration — the ADR-295/#88 gate (`freeDofCount === 0` figures accept any pool; sampled ones need ≥ 4 agreeing samples). On a free figure the panel prints ratio classes and nothing numeric — seed-invariance IS the 2-D scale gate (free points are sampled, so an unsized square's side varies by seed and correctly never prints; unlike the 3-D frozen gauge there is no `AB = 1` trap to special-case).
 
@@ -6429,7 +6429,7 @@ Narrower than 3-D's by luck rather than by mechanism: the other three phrasings 
 a guard, and a capability landing on any of those phrasings would open the hole without touching the gate.
 
 **Decision — the MECHANISM only; the capability is a feature.** `droppedConstructNoun`, copied from
-`droppedConstructNoun3` as a **pattern, never imported** (docs/20 §12 — `src/` and `src3d/` share no
+`droppedConstructNoun3` as a **pattern, never imported** (docs/22 §9 — `src/` and `src3d/` share no
 code), wired beside the existing seven on the deterministic path **and** into the LLM seam. Bound to the
 commit EVENT, not to a code path, for the reason `src3d/CLAUDE.md` already states: *a guard bound to a
 code path rather than to the event it guards will be bypassed* — both reported 3-D drops were GRAMMAR
@@ -9489,7 +9489,7 @@ CLAUDE.md and routed as a PR.
 
 **Precedent.** 3-D has printed solved symbols since [ADR-3D-219](06b-decisions-3d.md#adr-3d-219)
 (`figureSymbolsOf`, the DISPLAY registry of symbols with a solved value — «k = ½», «p = 3»). This is that
-idea in 2-D's own terms, pattern-copied and not imported (docs/20 §12).
+idea in 2-D's own terms, pattern-copied and not imported (docs/22 §9).
 
 **Locks.** `engine/__tests__/issue-929-symbol-quantity.test.ts`: the operator's figure printing x = 10/√13
 and the AC row agreeing with it to 1e-6; «x» asked returning the same number; the free-gauge case
@@ -9754,7 +9754,7 @@ Clause 3 (a parameter they never valued is never replaced) already held and was 
    and enumerating them is precisely what ADR-W-047 says not to do.
 4. `src/store/paramChips.ts` derives chip ownership from the FACT LIST — the enabled fact whose
    `set-var` values a competing symbol, first-binding-wins. Copied from `src3d/store/paramChips.ts`,
-   never imported (docs/20 §12); the two real differences are the command shape (`set-var` vs
+   never imported (docs/22 §9); the two real differences are the command shape (`set-var` vs
    `symbol-value`) and the two competing kinds.
 5. `displayMode` sits beside `seed` in `geoStore` — `partialize`, temporal `equality`, cleared by
    `clear`, pruned on `removeGroup`/`replaceGroup` — and is applied by `applyDisplayMode` in
@@ -10305,7 +10305,7 @@ his canvas showed.
 that line is refused **pre-commit**, so the student sees a note quoting «x = 8» and there is no row at
 all. The student-visible substance was right — «x = 8» named, no label on AB — which is why it played
 green, but the mechanism in the wording was not. Play cases are validated through `gateVerdict` before
-they are listed; the memory note `play-cases-pass-the-gate` carries the habit.
+they are listed; the [`/playsheet` skill](../.claude/skills/playsheet/SKILL.md) §1 carries the habit.
 
 **Part 2 — recorded, deliberately NOT armed.** The audit (run first, as a measurement) found **22 of 324
 scenarios** contain a step the gate refuses: 15 `gate:error`, 5 `gate:empty`, 2 honesty-gate. Most are
@@ -12643,7 +12643,7 @@ Both siblings read a 3-run as *centre, then the two ends*. The semicircle read n
 ## ADR-535 — 2-D's input preview ISOLATES before it typesets (#1316)
 
 **Status:** accepted, 2026-09-21 · **Issue:** #1316 (bug, P1, `2d`)
-**Requirements:** [02](02-requirements.md) — the honesty invariant that a student never reads a formula they did not write · **Design:** [28](28-product-unification.md#5b-the-shared-bidi-cores-run-span-rule)
+**Requirements:** [02](02-requirements.md) — the honesty invariant that a student never reads a formula they did not write · **Design:** [28](archive/28-product-unification.md#5b-the-shared-bidi-cores-run-span-rule)
 **Ports** [#1215](https://github.com/dcodish/geo_builder/issues/1215)'s analytic fix into the last builder that lacked it, and closes the exclusion [#1152](https://github.com/dcodish/geo_builder/issues/1152) wrote down without arguing
 
 **How it was found, and it could only have been found this way.** Playing the #1315 sheet, case T6 asked the operator to LOOK at 2-D's preview strip. He passed it — and the case was wrong: the line it gave, «משולש ABC ושטחו x^2», produces **one** `<math>` island, while the reversal needs **two inside one expression**. A passing case that never exercised the mechanism, caught before the issue was closed on it.

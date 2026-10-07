@@ -1,21 +1,23 @@
 # 19 — Analytic-geometry tool (a sibling app): corpus reading, chassis fit, the build plan
 
+> **Archived 2026-10-07 (#1861).** History — never a rule or a status. Its live parts now live in: [02c](../02c-requirements-analytic.md) §1a "Scope and non-goals" (from §3 and §9) and §3a "Input language and notation (families F1–F15)" (from §10).
+
 **History.** Analytic is deployed (prod/2026-09-16). The contract is 02c/04c; where this plan differs from them, they win. (#1861)
 
 _Drafted 2026-07-06 from an operator question ("I want to build a similar tool for analytical geometry —
 is it a different tool altogether?"). **Rewritten 2026-09-03** against the real corpus — twenty
 consecutive 572 Q1s instead of the original three-exam sample — which changed three premises and
 resolved the §6 decision that had blocked this plan for two months. Status: **ACCEPTED,
-decision-complete — D1/D2 by [ADR-AG-001](06c-decisions-analytic.md#adr-ag-001), the pedagogy lane by
-[ADR-AG-002](06c-decisions-analytic.md#adr-ag-002) as amended by
-[ADR-AG-003](06c-decisions-analytic.md#adr-ag-003) (the data panel follows the 3-D contract;
+decision-complete — D1/D2 by [ADR-AG-001](../06c-decisions-analytic.md#adr-ag-001), the pedagogy lane by
+[ADR-AG-002](../06c-decisions-analytic.md#adr-ag-002) as amended by
+[ADR-AG-003](../06c-decisions-analytic.md#adr-ag-003) (the data panel follows the 3-D contract;
 multipart is a workspace model), conformance as a V0 gate by
-[ADR-AG-004](06c-decisions-analytic.md#adr-ag-004), and the **input language** (§10) by
-[ADR-AG-005](06c-decisions-analytic.md#adr-ag-005). **V0 slice A BUILT**
-([ADR-AG-006](06c-decisions-analytic.md#adr-ag-006)) — the tree is registered and the tool draws;
-it is deliberately **not deployed** ([ADR-AG-007](06c-decisions-analytic.md#adr-ag-007)).
-**§7 RE-SEQUENCED 2026-09-15** by [ADR-AG-009](06c-decisions-analytic.md#adr-ag-009): the object-first
-re-founding ([02c](02c-requirements-analytic.md) R1) comes before the relations lane, and the
+[ADR-AG-004](../06c-decisions-analytic.md#adr-ag-004), and the **input language** (§10) by
+[ADR-AG-005](../06c-decisions-analytic.md#adr-ag-005). **V0 slice A BUILT**
+([ADR-AG-006](../06c-decisions-analytic.md#adr-ag-006)) — the tree is registered and the tool draws;
+it is deliberately **not deployed** ([ADR-AG-007](../06c-decisions-analytic.md#adr-ag-007)).
+**§7 RE-SEQUENCED 2026-09-15** by [ADR-AG-009](../06c-decisions-analytic.md#adr-ag-009): the object-first
+re-founding ([02c](../02c-requirements-analytic.md) R1) comes before the relations lane, and the
 requirements contract — not this plan — is where the model now lives.**_
 
 The 2-D Geo Builder is **synthetic** plane geometry: relations → a figure, coordinates deliberately
@@ -41,7 +43,7 @@ tool found ([docs/27 §1](27-complex-numbers-tool.md), "the Gauss plane is a dra
 prints"), and it is why this is a product rather than a feature.
 
 **A separate app at its own URL, a sibling in this repo** — shared `node_modules`, one test suite,
-the shared `shell/` chrome ([ADR-W-016](06w-decisions-workspace.md#adr-w-016)), its own entry, build
+the shared `shell/` chrome ([ADR-W-016](../06w-decisions-workspace.md#adr-w-016)), its own entry, build
 config and deploy directory. The student picks the tool by topic: these are different bagrut
 questions (**Q1 analytic** vs Q2 vectors vs Q3 complex, all in פרק ראשון of שאלון 572/582). Product
 #4 is the first born *after* the shared chassis existed, which is a real saving against the July
@@ -127,23 +129,23 @@ closed at `{line, circle, parabola, ellipse}` and should be hard-coded as such.
 ## 4. Product definition — what the student does, per ask type
 
 Charter: **reproduce and answer, never solve**
-([ADR-AG-001](06c-decisions-analytic.md#adr-ag-001) D1, **amended by
-[ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)** — the verify half is withdrawn; operator,
+([ADR-AG-001](../06c-decisions-analytic.md#adr-ag-001) D1, **amended by
+[ADR-AG-072](../06c-decisions-analytic.md#adr-ag-072)** — the verify half is withdrawn; operator,
 2026-09-16: *"I dont want a validation tool"*). "Never solve" still means no CAS and is untouched.
 The student never types a claimed answer to be graded; the tool shows what it can determine, and
 shows the shape alone when it cannot.
 
 | Exam ask | Tool behaviour |
 |---|---|
-| `מצאו את משוואת המעגל` | The data panel carries the equation once it is **knowledge**, behind the student's own checkbox — the 3-D contract ([ADR-AG-003](06c-decisions-analytic.md#adr-ag-003) §2, §4b). Nothing is typed to be graded ([ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)). |
+| `מצאו את משוואת המעגל` | The data panel carries the equation once it is **knowledge**, behind the student's own checkbox — the 3-D contract ([ADR-AG-003](../06c-decisions-analytic.md#adr-ag-003) §2, §4b). Nothing is typed to be graded ([ADR-AG-072](../06c-decisions-analytic.md#adr-ag-072)). |
 | `הביעו באמצעות k את משוואת המעגל` | **Not answered.** A coefficient that moves with `k` is not knowledge, and recognising the symbolic dependence across samples is the CAS boundary. The figure is drawn for the sampled `k` and cycles with it. |
-| `מצאו את משוואת המקום הגיאומטרי` | The tool sweeps the point's residual DOF and **paints the trace**, **names the kind**, and **prints the equation when it can determine it** — the two-seed set test of [ADR-AG-072](06c-decisions-analytic.md#adr-ag-072) §4. When the set moves with a parameter, the shape is shown and no equation is. |
+| `מצאו את משוואת המקום הגיאומטרי` | The tool sweeps the point's residual DOF and **paints the trace**, **names the kind**, and **prints the equation when it can determine it** — the two-seed set test of [ADR-AG-072](../06c-decisions-analytic.md#adr-ag-072) §4. When the set moves with a parameter, the shape is shown and no equation is. |
 | `שרטטו את שתי האפשרויות` | Both roots of the parameter pin are real configurations; `show another configuration` cycles them — the existing branch index. |
 | `מצאו את הערך של a` | The student states the pinning relation; the tool root-finds, and a two-root pin surfaces as two branches, never as a silently-chosen one. |
 | `האם קיימת נקודה שבעבורה…?` | A refusal is a first-class answer. `no-roots` is an honest contradiction, never a fabricated point. |
 | `סרטטו את שני המעגלים וכל המשיקים המשותפים` | This *is* the tool. No verification needed — the drawing is the deliverable. |
 
-## 4b. Multipart, the data panel, and the trace ([ADR-AG-002](06c-decisions-analytic.md#adr-ag-002) · [ADR-AG-003](06c-decisions-analytic.md#adr-ag-003))
+## 4b. Multipart, the data panel, and the trace ([ADR-AG-002](../06c-decisions-analytic.md#adr-ag-002) · [ADR-AG-003](../06c-decisions-analytic.md#adr-ag-003))
 
 §2's shape has a consequence for how the student works: the input here is **sparse**. A Q1 gives four
 lines of givens and then asks a question, so unlike the sibling tools the student is not typing many
@@ -155,7 +157,7 @@ the last.
 There is no per-section state. The **ordered fact list accumulates across the whole question**, the
 figure is re-derived, and the data panel is that ledger made visible; section 2's givens are simply
 appended after section 1's. What makes a later section land without surprise is **M1 — existing-id
-lowering** ([docs/17 §M1](17-design-rules.md)):
+lowering** ([docs/17 §M1](../17-design-rules.md)):
 
 > A command that would create an object whose id already exists is not a conflict and not a
 > re-creation: it **lowers to constraints on the existing object** … The lowering lives in ONE place
@@ -165,29 +167,29 @@ That is exactly the section-2 case: the student restates something section 1 est
 object section 1 created, and it lands as a *given on the existing object*. It is mature in every
 tree (`reinterpretAsConstraint` and the #613 restate-dedupe in 2-D; "M1 duality intact — new id →
 free rider, existing id → verified/driven given" in 3-D) and has twice been exercised on real
-multipart exams: [ADR-308](06-decisions.md#adr-308) (a 2025-bagrut **part-ב** undrawable until M1's
-over-constraint reporting was fixed) and [ADR-3D-031](06b-decisions-3d.md#adr-3d-031) (a 2024-Q2
+multipart exams: [ADR-308](../06-decisions.md#adr-308) (a 2025-bagrut **part-ב** undrawable until M1's
+over-constraint reporting was fixed) and [ADR-3D-031](../06b-decisions-3d.md#adr-3d-031) (a 2024-Q2
 **part-ב** chain landing on the book's answer).
 
 > **Obligation on this product:** `src-analytic/` inherits M1 **at the apply boundary from day one**,
 > not as a later refinement. Without it every second section of every question is a false conflict.
-> This is [ADR-W-004](06w-decisions-workspace.md#adr-w-004) applied forward rather than after a bug —
+> This is [ADR-W-004](../06w-decisions-workspace.md#adr-w-004) applied forward rather than after a bug —
 > the products copy patterns by design, so a load-bearing pattern is copied deliberately.
 
 ### The data panel — the 3-D contract, unchanged
 
-**What is fixed by the data is shown** ([ADR-AG-003](06c-decisions-analytic.md#adr-ag-003) §2,
+**What is fixed by the data is shown** ([ADR-AG-003](../06c-decisions-analytic.md#adr-ag-003) §2,
 operator: *"this should be just like the 3d — we show the values and equations once they are defined
 by the input"*). Derived results, equations and coordinates included, appear when they are
 **knowledge** — invariant across every valid configuration, never one sample's value
-([ADR-052](06-decisions.md#adr-052)) — behind the same explicit student checkbox that gates the 3-D
-panel ([src3d/engine/dataView.ts](../src3d/engine/dataView.ts)). The honesty gate is the one the
+([ADR-052](../06-decisions.md#adr-052)) — behind the same explicit student checkbox that gates the 3-D
+panel ([src3d/engine/dataView.ts](../../src3d/engine/dataView.ts)). The honesty gate is the one the
 shared skeleton already binds: *"a value row may print a VALUE only when it is knowledge."*
 
 ### The ask channel already exists
 
 `shell/frame/DataPanel.tsx` ships the fixed section skeleton *points · measures · relations ·
-parameters · **ask***; `src3d/engine/queries.ts` ([ADR-3D-057](06b-decisions-3d.md#adr-3d-057)) is
+parameters · **ask***; `src3d/engine/queries.ts` ([ADR-3D-057](../06b-decisions-3d.md#adr-3d-057)) is
 the channel — "a question, never a fact: it never enters `replay`, never moves a point, never appears
 in the step list". The third utterance class (**givens · claims · asks**) is settled architecture in
 shared chrome and arrives with the chassis.
@@ -195,7 +197,7 @@ shared chrome and arrives with the chassis.
 ### Later — the derivation trace
 
 The one thing this product wants that the siblings do not have: **"how was this row reached?"** —
-which givens and which formula produced it (operator, [ADR-AG-003](06c-decisions-analytic.md#adr-ag-003)
+which givens and which formula produced it (operator, [ADR-AG-003](../06c-decisions-analytic.md#adr-ag-003)
 §3: *"an option of showing how we reached this result… we can scope this as a later version"*).
 
 Its substrate is an **authored technique table** — the ~30 named moves of the subject (line through
@@ -213,18 +215,18 @@ corpus's most common `הוכיחו` item) stays deferred separately (D5, R2).
 
 ## 5. Decisions
 
-**Resolved** ([ADR-AG-001](06c-decisions-analytic.md#adr-ag-001) and
-[ADR-AG-002](06c-decisions-analytic.md#adr-ag-002), operator 2026-09-03):
+**Resolved** ([ADR-AG-001](../06c-decisions-analytic.md#adr-ag-001) and
+[ADR-AG-002](../06c-decisions-analytic.md#adr-ag-002), operator 2026-09-03):
 
 - **D1 — draw-and-verify, NO CAS.** The §6 deadlock of the July draft. The `src3d` NO-CAS boundary
-  ([src3d/CLAUDE.md](../src3d/CLAUDE.md) rule 3) is adopted verbatim, escalation route included.
-  ~~The verify half~~ — **withdrawn by [ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)** (operator,
+  ([src3d/CLAUDE.md](../../src3d/CLAUDE.md) rule 3) is adopted verbatim, escalation route included.
+  ~~The verify half~~ — **withdrawn by [ADR-AG-072](../06c-decisions-analytic.md#adr-ag-072)** (operator,
   2026-09-16: *"I dont want a validation tool"*). The charter is **draw-and-answer, NO CAS**: the tool
   shows what it can determine and shows the shape alone when it cannot. The NO-CAS half stands
   unchanged and is what keeps the parameterised asks honest.
 - **D2 — V0 is the equation + tangency substrate, not the locus.** See §7.
 - ~~**D3** — the route lane splits by currency~~ · ~~**D4** — the tool never chains~~ —
-  **both amended the same day by [ADR-AG-003](06c-decisions-analytic.md#adr-ag-003)**, below.
+  **both amended the same day by [ADR-AG-003](../06c-decisions-analytic.md#adr-ag-003)**, below.
 - **D3′ — the data panel follows the 3-D contract.** What is fixed by the data is shown — equations
   and coordinates included — when it is knowledge, behind the same student checkbox that gates the
   3-D panel. See §4b.
@@ -236,21 +238,21 @@ corpus's most common `הוכיחו` item) stays deferred separately (D5, R2).
 - **D6 — naming conventions taken from the corpus**: circles named, conics anonymous, lines
   `ℓ1`/`ℓ2` typed `l1`/`l2` with the 3-D `\w` trap inherited. See §10a.
   *(The "one parabola and one ellipse, max" half of D6 was withdrawn by
-  [ADR-AG-018](06c-decisions-analytic.md#adr-ag-018): it was never a decision about figures, only an
+  [ADR-AG-018](../06c-decisions-analytic.md#adr-ag-018): it was never a decision about figures, only an
   id collision between two anonymous conics. Anonymous conics now take a content-derived id and a
-  figure may hold as many as the question does — which §5b of [02c](02c-requirements-analytic.md)
+  figure may hold as many as the question does — which §5b of [02c](../02c-requirements-analytic.md)
   needs, since a real exam's part ג asks for a second ellipse.)*
 - **D7 — an inequality is one of THREE things** — parameter domain (declaration, filters roots) ·
   branch selector (post-solve, picks among branches) · sweep range (sampling, bounds a free DOF).
   Not interchangeable; V0's gate exam needs the first two at once. See
-  [ADR-AG-005](06c-decisions-analytic.md#adr-ag-005).
+  [ADR-AG-005](../06c-decisions-analytic.md#adr-ag-005).
 - **D8 — the catalog carries the `catalog3.ts` contract** — reference + coverage map + the LLM's only
   allowed vocabulary, over corpus phrasings rather than an invented command language. See §10.
 - **Settled by convention:** URL `/analytic-builder/`, devUrl `/analytic.html`, `build:analytic` →
   `dist-analytic/`, matching the three siblings.
 
 **Deliberately still open:** the 471 ↔ 572 profile split (the registry's "ONE engine with
-curriculum-level profiles" — [docs/22 §9](22-workflow.md)); V0/V1 target 572 only · whether an
+curriculum-level profiles" — [docs/22 §9](../22-workflow.md)); V0/V1 target 572 only · whether an
 answer is ever revealed after a wrong claim (largely moot under D3′).
 
 ## 6. Architecture — what is new, what is transplanted
@@ -258,7 +260,7 @@ answer is ever revealed after a wrong claim (largely moot under D3′).
 **New core #1 — the coordinate substrate.** Axes, gridlines, an **absolutely pinned gauge**. This is
 the deepest departure from the 2-D tool, where placement is gauge and "a number drawn on the canvas
 must be seed-invariant knowledge". Here the coordinate frame is given, so **coordinates *are*
-knowledge**. `src3d` already draws exactly this line ("gauge vs knowledge" — [src3d/CLAUDE.md](../src3d/CLAUDE.md)),
+knowledge**. `src3d` already draws exactly this line ("gauge vs knowledge" — [src3d/CLAUDE.md](../../src3d/CLAUDE.md)),
 and its landing funnel is the model to copy.
 
 **New core #2 — curves as first-class objects carrying an equation.** A closed family of four:
@@ -267,7 +269,7 @@ coefficient form, an evaluator, a plotter, a point-membership residual, and a ta
 against each of the other three. A parameter may occupy any coefficient slot. **This is a fixed
 table of ~10 curve-pair relations, not an algebra system.**
 
-**~~New core #3~~ — the locus sweep is NOT a new core** ([ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)).
+**~~New core #3~~ — the locus sweep is NOT a new core** ([ADR-AG-072](../06c-decisions-analytic.md#adr-ag-072)).
 The July draft's observation — *a locus **is** a swept free DOF, and `שתי האפשרויות` **is** the branch
 index* — understated itself. Measured against the built engine, the freedom is not merely analogous to
 the DOF cue's number, it **is** that number: `carrierDofOf` + `freeRank` + `solveLM` already detect the
@@ -278,33 +280,33 @@ withdrawn with D1's verify half.
 
 **Transplanted whole (not re-derived):** the one-parameter pin by numeric root-find, roots as
 branches, `no-roots` as an honest contradiction — `src3d`'s algebraic lane
-([ADR-3D-002](06b-decisions-3d.md#adr-3d-002)) · the claim-verification-across-configurations
+([ADR-3D-002](../06b-decisions-3d.md#adr-3d-002)) · the claim-verification-across-configurations
 mechanism · M1 duality (a statement about an existing object is a given, not a re-creation) ·
-[ADR-052](06-decisions.md#adr-052) (an unstated magnitude is a free DOF, never a default asserted as
+[ADR-052](../06-decisions.md#adr-052) (an unstated magnitude is a free DOF, never a default asserted as
 fact).
 
 **Reuse table.**
 
 | Layer | Status |
 |---|---|
-| `shell/` — `AppFrame`, `Switcher`, `Workbench`, `InputArea`, `FactList`, `DataPanel`, `AskLane`, `QuickChips`, `SymbolRow`, `ManualScreen`, `canvasControls`, theme/bidi/format/i18n/save/symbols/export | **mandatory, not merely free** — mount it; re-implementing any of it fails V0's conformance gate ([ADR-AG-004](06c-decisions-analytic.md#adr-ag-004)). All three shipped products already consume it |
+| `shell/` — `AppFrame`, `Switcher`, `Workbench`, `InputArea`, `FactList`, `DataPanel`, `AskLane`, `QuickChips`, `SymbolRow`, `ManualScreen`, `canvasControls`, theme/bidi/format/i18n/save/symbols/export | **mandatory, not merely free** — mount it; re-implementing any of it fails V0's conformance gate ([ADR-AG-004](../06c-decisions-analytic.md#adr-ag-004)). All three shipped products already consume it |
 | SVG renderer + `transform.ts` (world→screen, isotropic fit, Y-flip) | **copied**, + axes/grid and curve plotting |
 | Parser front-end, rule pipeline, `catalog` as coverage map, LLM fallback via the `tool:`-parameterised proxy | **copied**, new grammar |
 | Store: Zustand + zundo, ordered fact list as source of truth, derive-on-demand, save/load, image export | **copied** |
-| Free-DOF sampler + branch index | **copied — and it is the locus generator**, literally: a locus is a point whose residual `carrierDof` is 1, and the sampler already walks it one seed at a time ([ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)) |
-| Engine geometry, constraint solve | **new** (product trees never share; [BOUNDARIES.json](../BOUNDARIES.json)) |
+| Free-DOF sampler + branch index | **copied — and it is the locus generator**, literally: a locus is a point whose residual `carrierDof` is 1, and the sampler already walks it one seed at a time ([ADR-AG-072](../06c-decisions-analytic.md#adr-ag-072)) |
+| Engine geometry, constraint solve | **new** (product trees never share; [BOUNDARIES.json](../../BOUNDARIES.json)) |
 
 ## 7. Phased build plan (gates in the doc-20 style; each gate = tests green + `tsc`/build clean + the operator can PLAY it)
 
 > **NOT DEPLOYED until the tool has decent capability** (operator, 2026-09-03 —
-> [ADR-AG-007](06c-decisions-analytic.md#adr-ag-007)). The registry entry carries `enabled: false`,
+> [ADR-AG-007](../06c-decisions-analytic.md#adr-ag-007)). The registry entry carries `enabled: false`,
 > so no deployed builder can render a chip pointing at a path that would 404; `devOnly: true` keeps
 > the tool in its own switcher locally. Undeploying is one registry line plus a RUNBOOK row.
 
-> **RE-SEQUENCED, 2026-09-15 — [ADR-AG-009](06c-decisions-analytic.md#adr-ag-009).** The **object-first
-> re-founding** ([02c](02c-requirements-analytic.md) R1, ruled 2026-09-04 and ratified now) comes
+> **RE-SEQUENCED, 2026-09-15 — [ADR-AG-009](../06c-decisions-analytic.md#adr-ag-009).** The **object-first
+> re-founding** ([02c](../02c-requirements-analytic.md) R1, ruled 2026-09-04 and ratified now) comes
 > **before** V0's relations lane, as slices **B1 → B3**. The reason is measured, not stylistic: run
-> through the real path, [02c §5](02c-requirements-analytic.md)'s three corpus questions produce
+> through the real path, [02c §5](../02c-requirements-analytic.md)'s three corpus questions produce
 > *nothing* on the equation-first model — §5c refuses every line. The relations below are not cancelled
 > and their gate stands; they land on B1's object layer, where a tangency is a relation between two
 > objects rather than a special case of two equations. Slice contents and gates: ADR-AG-009 §Staging.
@@ -314,14 +316,14 @@ fact).
   the one-parameter pin with roots as branches. Covers outright the ~7 of 20 exams with no locus
   ask. **Gate — BOTH halves, one gate:** (a) **קיץ א' 2022** reproduced — two internally tangent
   circles, both possibilities for M, all common tangents drawn in one coordinate system; and
-  (b) **the suite-conformance checklist green** ([ADR-AG-004](06c-decisions-analytic.md#adr-ag-004)) —
+  (b) **the suite-conformance checklist green** ([ADR-AG-004](../06c-decisions-analytic.md#adr-ag-004)) —
   the tool's chip in every other builder's switcher, its `switcherAnalytic` key in *every* product's
   He and En resources, the shared frame mounted rather than re-implemented, the
-  [ADR-W-024](06w-decisions-workspace.md#adr-w-024) canvas cluster, `BOUNDARIES.json` moved out of
+  [ADR-W-024](../06w-decisions-workspace.md#adr-w-024) canvas cluster, `BOUNDARIES.json` moved out of
   `plannedTrees` with a total classification, and the `shell/__tests__` parity locks enumerating the
   fourth tree. [docs/28 §5](28-product-unification.md) Phase 4 is the whole return on the
   unification work: this is the first product that never re-derives the chrome.
-- **V1 — the locus lane** ([ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)), split in two. **A
+- **V1 — the locus lane** ([ADR-AG-072](../06c-decisions-analytic.md#adr-ag-072)), split in two. **A
   locus is a named point whose residual `carrierDof` is 1** — measured, not assumed: `MA=MB` already
   lands M on `x=4` at every seed and `∠APB=90°` already lands P on the circle of diameter AB, so the
   detector and the sampler are the shipped solve. The lane sweeps that DOF by **continuation**, paints
@@ -355,7 +357,7 @@ nothing:
 
 ## 8. Testing & validation corpus
 
-Per [docs/08](08-testing-strategy.md) and standing rule 4: reported inputs become permanent coverage,
+Per [docs/08](../08-testing-strategy.md) and standing rule 4: reported inputs become permanent coverage,
 fixtures-first. The twenty Q1s are the validation corpus, indexed the way `fixtures3/` indexes the
 3-D exams — **we reproduce each figure, never solve it**, and compare against the official answer
 only for the *pinned parameter values*, which are the one thing the exam publishes that the tool
@@ -372,21 +374,21 @@ also computes.
   answer *is* an equation the engine will be holding.
 - **The gauge inversion is the subtle hazard.** Every honesty habit in the 2-D tree assumes drawn
   coordinates are meaningless. Here they are the answer. A pattern copied across without re-reading
-  that assumption is the predictable first bug class ([ADR-W-004](06w-decisions-workspace.md#adr-w-004)).
+  that assumption is the predictable first bug class ([ADR-W-004](../06w-decisions-workspace.md#adr-w-004)).
 - **The knowledge gate now carries the whole honesty boundary.** With D3′ the panel prints equations
   and coordinates, so nothing is protected by withholding any more — everything rests on "a value row
   may print a VALUE only when it is knowledge". A value that is really one sample's, printed here, is
   not a cosmetic bug: it is the tool asserting a given the question never gave
-  ([ADR-052](06-decisions.md#adr-052)).
+  ([ADR-052](../06-decisions.md#adr-052)).
 - **The trace must explain, never plan.** R1 answers "how was *this* reached", over the path the
   engine actually took, for a row already on screen. It must not answer "how *could* you reach X" for
   something not yet determined — that is a planner, and it grows by increments. A search, a depth
   parameter, or a route ranked by which one the engine would take is the tripwire.
 - **M1 skipped early is the predictable first bug class** — see §4b. Every multipart question breaks
   at its second section without it, and it is much cheaper at the apply boundary on day one than
-  retrofitted per parser rule ([docs/17 §M1](17-design-rules.md)).
+  retrofitted per parser rule ([docs/17 §M1](../17-design-rules.md)).
 
-## 10. The input language — sentence families ([ADR-AG-005](06c-decisions-analytic.md#adr-ag-005))
+## 10. The input language — sentence families ([ADR-AG-005](../06c-decisions-analytic.md#adr-ag-005))
 
 Extracted from the same twenty exams as §2. This is the [docs/27 §10](27-complex-numbers-tool.md)
 layer for this product, and it seeds `src-analytic/parser/catalogAnalytic.ts` — which, on the
@@ -402,8 +404,8 @@ a phrasing that actually occurs in the corpus, not an invented command language.
 
 | Object | Convention | Notes |
 |---|---|---|
-| Point | Capital letter, optional digit subscript — `A`, `M`, `F₁`, `D₂` | The [ADR-228](06-decisions.md#adr-228) subscript convention; typed `F1`, `D2` |
-| Line | `ℓ`, `ℓ₁`, `ℓ₂` — typed `l`, `l1`, `l2`; or by two points (`AB`); or by role (`המשיק`) | **Inherits the 3-D trap: `ℓ` is not a `\w` character** — never `\b` after a line name, use an explicit lookahead ([src3d/CLAUDE.md](../src3d/CLAUDE.md)) |
+| Point | Capital letter, optional digit subscript — `A`, `M`, `F₁`, `D₂` | The [ADR-228](../06-decisions.md#adr-228) subscript convention; typed `F1`, `D2` |
+| Line | `ℓ`, `ℓ₁`, `ℓ₂` — typed `l`, `l1`, `l2`; or by two points (`AB`); or by role (`המשיק`) | **Inherits the 3-D trap: `ℓ` is not a `\w` character** — never `\b` after a line name, use an explicit lookahead ([src3d/CLAUDE.md](../../src3d/CLAUDE.md)) |
 | Circle | **Named** — `מעגל I` / `מעגל II` (Roman numerals, the corpus's own device), or `המעגל שמרכזו M`, or bare `המעגל` when unique | Circles are the one family that regularly comes in twos, so naming is not optional |
 | Parabola, ellipse | **Anonymous** — `הפרבולה`, `האליפסה` | No exam in twenty carries two parabolas or two ellipses; at most one of each per figure |
 | Axes, origin | `ציר ה-x`, `ציר ה-y`, `ראשית הצירים` (`O`) | The frame always exists; it is never declared |

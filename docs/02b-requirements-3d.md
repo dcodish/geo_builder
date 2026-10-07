@@ -2,7 +2,7 @@
 
 _The contract for `src3d/`, live at `/3d-builder/`. Registered in [`DOCS.json`](../DOCS.json) as the
 `3d` product's requirements doc ([ADR-W-041](06w-decisions-workspace.md#adr-w-041)). Decisions:
-[06b](06b-decisions-3d.md) (`ADR-3D-NNN`). Build plan: [docs/20](20-space-vectors-tool.md)._
+[06b](06b-decisions-3d.md) (`ADR-3D-NNN`). Build plan (archived history): [docs/20](archive/20-space-vectors-tool.md)._
 
 ## What this document owns — and what it deliberately does not
 
@@ -29,12 +29,47 @@ Shared surfaces — the suite chrome, the ask lane and data panel, save/load, ex
 IDs are stable references. "Must" = the product is dishonest or broken without it; "Should" = desirable;
 "Later" = not yet.
 
+## Scope and non-goals (moved from docs/20 §3 and §10, #1861)
+
+**The scope is the curriculum's space/vectors unit** (`תכני לימוד יב – 5 יחידות`; vectors are 50
+hours, the largest י"ב topic):
+
+1. **Geometric vectors**: directed segments, equality, addition, subtraction and scalar multiples.
+2. **Linear dependence and uniqueness**: combinations, the line and the plane they span, and the
+   segment-ratio arguments that uniqueness of representation gives.
+3. **The dot product**: `u·v = |u||v|cos α`, angles and lengths, and vector arguments for space theorems
+   (a line ⟂ a plane iff it is ⟂ two non-parallel lines in it; three perpendiculars).
+4. **Algebraic R³**: coordinates, ratio division, the parametric line, the plane in both parametric and
+   `ax + by + cz + d = 0` form, mutual positions, every distance and every angle.
+5. **Solid-geometry applications**: cylinder, cone, sphere, prism and pyramid; their angles, lengths,
+   areas and volumes. In scope by the operator's ruling D4 (2026-07-06).
+
+Which of these the student can type today is the catalogue ([`catalog3.ts`](../src3d/parser/catalog3.ts))
+and FR-SP-7, not this list.
+
+**The formula sheet** gives exactly: `|u| = √(u₁² + u₂² + u₃²)`, both forms of the dot product, the
+point–plane distance, the distance between parallel planes, `sin β = |n·u| / (|n||u|)` (line–plane),
+`cos α = |n₁·n₂| / (|n₁||n₂|)` (plane–plane), and the solids' volume and area formulas. Two consequences:
+- **There is no cross product** in the curriculum or on the sheet. Normals come from the equation form or
+  from perpendicularity conditions, so no cross-product step is ever shown to a student, although the
+  engine may compute one internally (FR-VC-4; `src3d/engine/vec3.ts`).
+- **Projections and feet are constructions** the student states, not quoted formulas.
+
+**The operator's scope rulings** (2026-07-06, recorded in docs/20 §10):
+- **D2 — Rendering is a custom SVG projection**: a textbook wireframe with dashed hidden edges, which the
+  student orbits (FR-RD-1). The renderer is swappable. A three.js shaded view is **deferred**: the
+  product has none, and adding one is a decision.
+- **D3 — NO CAS. The operator marked this as key.** It is a hard boundary with operator authority: a
+  feature that seems to need symbolic equation solving beyond a 1–2-DOF numeric root-find goes back to
+  the operator; it never grows a CAS quietly (FR-VC-3).
+- **D5 — Force and physics vector questions are out of scope**, to be revisited on corpus evidence.
+
 ## The two lanes
 
 - **FR-SP-1 (Must)** — The product supports **two lanes over one model**: a **geometric** lane, where the
   student names basis vectors on a solid (`נסמן: AB=u…`) and reasoning is affine, and an **algebraic**
   lane of R³ coordinates, parametric lines and plane equations. A figure may use both; the lane is a
-  property of the *statement*, never a mode the student must select. *(Realised — [docs/20](20-space-vectors-tool.md) §4.)*
+  property of the *statement*, never a mode the student must select. *(Realised — [docs/20](archive/20-space-vectors-tool.md) §4.)*
 
 ## The space model
 
@@ -324,7 +359,7 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
 - **FR-VC-3 (Must)** — **NO CAS.** Every "symbolic" feature is a numeric root-find, a closed form, or a
   linear solve. Anything needing symbolic solving beyond that is **refused and escalated to the operator**,
   not approximated. This bound is what keeps the engine's answers trustworthy. *(Operator authority,
-  [docs/20 §10 D3](20-space-vectors-tool.md).)*
+  D3 above; first recorded in [docs/20 §10](archive/20-space-vectors-tool.md).)*
 - **FR-VC-4 (Must)** — **No cross product is surfaced to a student.** The curriculum has none; it may be
   used internally, never shown or taught. *(Operator authority.)*
 
@@ -527,7 +562,7 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
 
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it.
-  *(Realised — [docs/20](20-space-vectors-tool.md) §14, V8 complete. The documented remaining niche is
+  *(Realised — [docs/20](archive/20-space-vectors-tool.md) §14, V8 complete. The documented remaining niche is
   low-frequency and coordinate-expressible: orthoscheme. The dihedral face↔base angle is supported —
   [ADR-3D-266](06b-decisions-3d.md#adr-3d-266), `angle-operand-cluster.test.ts`; amended 2026-10-07, #1861.)*
 - **FR-SP-8 (Must)** — **Case in labels: where the anchor proves a run is a label, it is read as one;
@@ -552,6 +587,8 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
 
 - **Solving the exam question.** The tool draws and verifies; the student solves.
 - **A CAS** (FR-VC-3), and **the cross product** as a taught operation (FR-VC-4).
+- **Force and physics vector questions** (D5), and **a shaded three.js view** (D2, deferred). See
+  *Scope and non-goals* above.
 - **Importing from a sibling product.** `src3d/` never imports `src/`; patterns are copied, not shared
   ([`BOUNDARIES.json`](../BOUNDARIES.json)). This is a hard boundary with operator authority, and it is
   mechanically enforced.

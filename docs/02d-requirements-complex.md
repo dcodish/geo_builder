@@ -2,8 +2,8 @@
 
 _The contract for `src-complex/`, live at `/complex-builder/`. Registered in [`DOCS.json`](../DOCS.json)
 as the `complex` product's requirements doc ([ADR-W-041](06w-decisions-workspace.md#adr-w-041)).
-Decisions: [06d](06d-decisions-complex.md) (`ADR-CX-NNN`). Plan and grammar contract:
-[docs/27](27-complex-numbers-tool.md)._
+Decisions: [06d](06d-decisions-complex.md) (`ADR-CX-NNN`). Grammar contract: the appendix
+*Grammar families* below. Build plan (history): [docs/27](archive/27-complex-numbers-tool.md)._
 
 ## What this document owns
 
@@ -12,8 +12,10 @@ line and **the Gauss plane draws itself — the drawing the exam never prints.**
 sibling: **the student types the givens, the tool reproduces the figure and verifies claims — it never
 solves the exam question.**
 
-**Contract, not catalogue.** The sentence families the parser accepts are
-[docs/27 §10](27-complex-numbers-tool.md), which is the authoritative grammar contract, and the formula
+**Contract, not catalogue.** The sentence families the language is built from are the appendix
+*Grammar families* below (moved from docs/27 §10 and §10b), which is the authoritative grammar contract.
+What parses today is the catalogue, [`src-complex/parser/catalog.ts`](../src-complex/parser/catalog.ts),
+the coverage map. The formula
 sheet is [docs/29](29-complex-formula-reference.md) — **byte-matched against the formula table by a
 test**, so it cannot drift. This document owns what the product promises: what is exact, what a number
 on screen means, what may never be dropped, and how a claim is answered.
@@ -226,3 +228,74 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   ([`BOUNDARIES.json`](../BOUNDARIES.json), [ADR-W-016](06w-decisions-workspace.md#adr-w-016)).
 - **Regressing a sibling.** Capability grows here and the shipped products never regress — checked by
   `npm run check:siblings`, not promised ([ADR-W-017](06w-decisions-workspace.md#adr-w-017)).
+
+## Appendix — Grammar families (moved from docs/27 §10 and §10b, #1861)
+
+**The input language is a contract of generic sentence FAMILIES**
+([ADR-CX-003](06d-decisions-complex.md#adr-cx-003), extended by
+[ADR-CX-007](06d-decisions-complex.md#adr-cx-007)). Operator directive (2026-08-14): the language supports
+the corpus's questions *"and all families of them"*, *"not only these specific formats"*. A question
+that fits no family is a family-level addition to this appendix first, never a one-off parser rule. Every
+family carries at least two corpus witnesses, so none is speculative.
+
+**The tables are the contract; the catalogue is the coverage.**
+[`src-complex/parser/catalog.ts`](../src-complex/parser/catalog.ts) types every entry by its family id
+(`parser/families.ts`), and a guard test reads each entry in Hebrew and English. So which families work
+today is a lookup in the catalogue, not a claim of these tables.
+
+Two principles cover most of the surface:
+- **P1 — One sentence form; the engine decides whether it drives or checks.** «שטח OZ₁Z₂Z₃ הוא 150r²»
+  pins a degree of freedom in one question and is a checkable statement in another. The grammar has ONE
+  form per relation. Whether it drives or checks is the engine's degree-of-freedom decision, never a
+  second phrasing (the 2-D principle, verbatim).
+- **P2 — Display typography normalizes at the parse seam.** Students paste from exam PDFs. Unicode
+  subscripts (`Z₁`), superscripts (`Z₂³`), `°`, `−`, `·` and invisible bidi controls normalize before the
+  grammar sees them ([ADR-448](06-decisions.md#adr-448), [ADR-3D-144](06b-decisions-3d.md#adr-3d-144)).
+  `Z₁Z₂³Z₄` and `z1*z2^3*z4` are the same line.
+
+### The core families (F1–F13)
+
+| # | Family (generic form) | Canonical Hebrew (one witness) | Corpus witnesses |
+|---|---|---|---|
+| F1 | **Declarations**: k names as complex numbers; real parameters with a domain (`≠ 0`, `> 0`, `טבעי`, an interval). **Implicit typing ([ADR-CX-004](06d-decisions-complex.md#adr-cx-004))**: z- and w-family names (`z`, `z2`, `z10`, `w1`…) are complex WITHOUT a declaration, and the first reference creates a visible free number; other letters (a, d, m, n, r, t…) are real parameters by the same exam convention. **A declaration types a letter family for the whole figure (FR-CN-8, [ADR-CX-047](06d-decisions-complex.md#adr-cx-047))**: «u מספר מרוכב» makes u, u₁, u₂… complex in every line, before or after it; a size or an angle cannot be declared complex | `Z1 ו-Z2 מספרים מרוכבים` (optional for z/w) · `r ≠ 0` · `π/2 < α < π` | §2b, 2020, 2022, 2023 |
+| F2 | **Value definitions**: `name = expr`. A literal is cartesian (`3+4i`, or from two real parameters with a glued `i`: `a+bi`, `a+ib`, `x+yi`, FR-CN-10, [ADR-CX-058](06d-decisions-complex.md#adr-cx-058)), polar (`r cis θ`) or trigonometric (`r(cosθ + i sinθ)`, read as the same number as cis, FR-CN-11, [ADR-CX-059](06d-decisions-complex.md#adr-cx-059)). Radicals are input, carried exactly (`√3 + i`, `³√8`, `√2cis45`, FR-LN-4, [ADR-CX-056](06d-decisions-complex.md#adr-cx-056)). Components and angles may be expressions in real parameters; six operations, the conjugate, integer and symbolic `kn+c` powers | `w = (z1/2)^(4n)` · `z1 = (2a²+5a+4) + (2a²+3a+2)i` · `z1 = a+bi` · `z1 = 2(cos45 + i sin45)` · `z1 = √3 + i` | §2b, 2018, 2020, 2022 |
+| F3 | **Modulus relations**: `\|A\| ⟨cmp⟩ rhs`, where rhs is a number, a parameter expression or `k·\|B\|`; chained equalities; cmp ∈ {=, <, >, ≤, ≥, ≠} | `\|Z1\| = 9r` · `\|z1\| = \|z2\| = r` · `2\|z_A\| = \|z_M\|` | §2b, 2018, 2024 |
+| F4 | **Argument relations**: signed sums and integer multiples of `arg` terms against an angle or each other, any comparator. An inequality is a BRANCH SELECTOR | `arg Z1 − arg Z2 = 90` · `arg Z2 < 45` · `לשניהם אותו ארגומנט` | §2b, 2018, 2024 |
+| F5 | **Location givens**: a quadrant; on an axis or half-axis; on a stated line or ray; on a circle; inside, on or outside a region | `Z2 ברביע הראשון` · `C על הישר y=x` · `על ישר העובר דרך ראשית הצירים` | §2b, 2011, 2018, 2023 |
+| F6 | **Objects**: a segment between numbers; a polygon of any arity over represented points (the origin `O` is always available); a circle by centre and radius, or circumscribed (`מעגל חוסם`) | `הקטע Z1Z2` · `המרובע OZ1Z2Z3` · `המעגל החוסם את המשולש ABC` | §2b, 2015, 2023 |
+| F7 | **Measures** (driving or checked, P1): length or distance, perimeter, area, modulus, argument; the right side a number or a parameter expression | `אורך Z1Z2 = 15r` · `שטח OZ1Z2Z3 הוא 150r²` · `היקף … = 60r` | §2b, 2018, 2023 |
+| F8 | **Equations and solution sets**: an equation is ABOUT its letter, in every spelling (`X^n = expr`, `z³ − 8 = 0`, `2z³ = 16`). A FRESH bare letter whose right side uses only numbers already stated enumerates the solution set as X₁..Xₙ in argument order, and the bare letter then names that set: a later line that uses it is refused, saying so (FR-CN-6; [ADR-CX-005](06d-decisions-complex.md#adr-cx-005) as amended by [ADR-CX-042](06d-decisions-complex.md#adr-cx-042), [ADR-CX-048](06d-decisions-complex.md#adr-cx-048) and [ADR-CX-050](06d-decisions-complex.md#adr-cx-050)). A stated Xₖ must be one of the solutions, matched by set membership, or the equation is refused ([ADR-CX-044](06d-decisions-complex.md#adr-cx-044)). An indexed letter (`z1² − 4z1 + 13 = 0`), an existing free letter, or an equation that brings a new name into being on its right side is ONE number constrained by the equation, its roots the configurations (FR-CN-3, [ADR-CX-049](06d-decisions-complex.md#adr-cx-049)); a determined letter makes it a checked statement. Solutions are selected by quadrant, argument range or ordinal; an enumeration ask (`כל האפשרויות`) is the branch surface | `Z^5 = Z1·Z2³·Z4` · `z0 הוא הפתרון ברביע הרביעי` · `(z3)² = 2i — שתי האפשרויות` | §2b, 2018, 2020, 2023, 2024 |
+| F9 | **Sequences**: geometric or arithmetic over ℂ; term positions in any order (`בהתאמה`); a term defined by the others; the ratio or difference as a derived (multi-branch) value; sums of consecutive terms, including a symbolic count `kn` | `Z1 ו-Z2 הם שני האיברים הראשונים בסדרה הנדסית שבה האיבר השלישי הוא Z4` · `מנת הסדרה — כל האפשרויות` · `w + w² + … + w^(4n)` | §2b, 2015, 2024 |
+| F10 | **Number-type claims**: real, pure imaginary, conjugates of each other | `w מדומה טהור` · `z1 ו-z2 צמודים זה לזה` | 2018, 2020, 2022 |
+| F11 | **Classification claims**: triangle types (שווה-שוקיים, שווה-צלעות, ישר-זווית), quadrilateral types (the 2-D Hebrew lexicon: מקבילית, מלבן, ריבוע, מעוין, טרפז, דלתון), a regular n-gon, including over a solution set | `OZ2Z3Z4 מקבילית` · `הפתרונות קדקודים של משושה משוכלל` | §2b, 2015, 2018, 2020 |
+| F12 | **Quantified claims**: `לכל n טבעי`, a minimal or existential n, and COUNT claims over a set against a region (`כמה … בתוך / על / מחוץ`) | `לכל n, w1 ממשי` · `ה-n המינימלי שעבורו…` · `פתרון אחד על המרובע, אחד בתוכו, שלושה מחוצה לו` | §2b, 2013, 2022, 2023 |
+| F13 | **Loci**: `המקום הגאומטרי` of the points satisfying an equation in z (and z̄) from the closed list of locus shapes; locus-type claims (`הוא מעגל`) | `\|z − p\| = m` · `המקום הגאומטרי … הוא מעגל` | 2022, 2024 |
+
+### The extended families (G1–G9, the eleven-exam re-reading)
+
+Re-reading eleven exams of the 2020–2025 booklet against F1–F13 found nine with at least one statement no
+family covered; five of the new families carry three or four independent witnesses each.
+
+| # | Family (generic form) | Canonical Hebrew (one witness) | Corpus witnesses |
+|---|---|---|---|
+| G1 | **Polynomial equations over ℂ** beyond `X^n = expr`. A polynomial of degree 2–4 in a fresh letter with number coefficients (complex ones included) names ALL its roots X₁..Xₙ, in argument order, exact where a small power of the modulus is rational; a repeated root is one solution (FR-CN-6, [ADR-CX-050](06d-decisions-complex.md#adr-cx-050)). The forms: quadratic and quartic, factored, an **affine base** `(z+c)^n = e`, a **leading coefficient** `c·z^n = rhs` (a binomial of any degree is the power shape). A polynomial whose coefficients name another number or a real parameter, or of degree 5 or more that is not a binomial, keeps the one-point reading of FR-CN-3 | `z² − (1+i)z + 2i + 2 = 0` · `z⁴ − 2z² + 4 = 0` · `(z+i)² = 2 + 2√3i` · `i·z⁶ = 1/64` | 2021 חורף ב, 2021 קיץ ב, 2022 נבצרים, 2021 חורף א — **4** |
+| G2 | **Generative point-set asks**: complete the polygon from its known vertices, list the numbers representing a vertex set, sample a witness on a locus | `מצאו את שיעוריהם של שאר קדקודי המשושה` · `רשמו את המספרים המרוכבים המתאימים לקדקודי המצולע` · `תנו דוגמה למספר הנמצא על המקום הגיאומטרי` | 2020 קיץ, 2021 חורף ב, 2023 מיוחד ×2 — **4** |
+| G3 | **Intersection as a constructor**: line ∩ circle, line ∩ locus, locus ∩ circumscribed circle, naming new points, **selected** by quadrant, ordinal or exclusion (`בשתי נקודות אחרות`) | `הישר AO חותך את המעגל בנקודות C ו-D` · `הישר y = x חותך את המקומות הגאומטריים` | 2021 חורף ב, 2022 נבצרים, 2023 מיוחד — **3** |
+| G4 | **Transform over a point SET**: multiply every element of a set by `w`; constrain the image (orientation, coincidence with another set); **solve for the multiplier** | `כופלים כל אחד מהפתרונות במספר מרוכב קבוע w` · `מתקבל מלבן שצלעותיו מקבילות לצירים` · `קדקודי I מתלכדים עם קדקודי II — מצאו את w` | 2020 קיץ ב, 2021 חורף א, 2023 מיוחד — **3** |
+| G5 | **Incidence on a regular n-gon**: stated points ARE vertices, driving the integer `n`; per-vertex existence and uniqueness; vertex-count equality between two polygons | `נתון כי D, C, B הן קדקודים של המצולע` · `לכל קדקוד קיים קודקוד אחד בדיוק ש…` · `מספר הקדקודים של II שווה למספר הקדקודים של I` | 2021 חורף ב, 2021 חורף א, 2023 מיוחד — **3** |
+| G6 | **Equation synthesis (inverse F8)**: write an equation whose solution set is a given point set | `כתבו משוואה שפתרונותיה הם 12 המספרים` | 2021 חורף א, 2021 חורף ב — **2** |
+| G7 | **Sums over a SET, and of an expression in the terms**, not only consecutive sequence terms | `z₁·z̄₁ + z₂·z̄₂ + … + z₁₀·z̄₁₀` · `סכום המספרים שהתקבלו הוא אפס` | 2024 חורף, 2021 חורף א — **2** |
+| G8 | **Real-parameter algebra**: sign claims, parameter ratios, ratios of two measures, answers demanded symbolically. **⚠ Ruled to change (2026-10-07, ADR-W-118 B14/D3 · #1870):** a line that asks to prove («הוכיחו כי …») is refused as in the other builders (FR-SU-15, FR-KN-2); the sign claim is then typed as a bare statement, which keeps its claim check | `a·b > 0` (the exam: `הוכיחו כי a·b > 0`) · `מצאו את היחס b/a` · `מצאו את היחס בין השטחים` · `הביעו באמצעות a ו-b` | 2021 קיץ ב ×3, 2020 חורף — **2 exams, 4 statements** |
+| G9 | **Non-linear loci**: a locus in `z²` that falls outside the closed locus list; `z̄` with a squared modulus and moduli of constants on both sides | `\|z² − i\| = \|z² + 3i\|` → `y = −1/(2x)` · `\|6 − z̄ − 8i\|² − \|10i\| = \|9+12i\|` | 2023 מיוחד, 2024 חורף — **2** |
+
+**Deferred, and named** (a deferral is recorded, never silent): **G10** Re/Im extraction of a solution
+set into *ordered* real parameters (`נסמן את החלקים הממשיים … a₁ < a₂`, 2022 נבצרים) · **G11** a symbolic
+degree: `z^n = 2^n` with `n` itself the unknown, pinned by an area equation *in n* (2020 קיץ ב) · **G12**
+locus fitting, the inverse of F13: solve for `p, m` so an infinite point family lies on `|z − p| = m`
+(2022 חורף).
+
+**A stated non-goal.** 2021 קיץ מועד ב Q3 is the one sampled question a picture barely helps: a quartic,
+a factored polynomial in two real parameters, `הוכיחו כי a·b > 0`, and every answer demanded `באמצעות a
+ו-b`. The product's thesis is that the figure answers the question, and this exam is the honest
+counterexample. It is recorded as a limitation; it does not drive a parameter-algebra subsystem nothing
+else needs.

@@ -1,6 +1,6 @@
 # The solve ladder — the one ordered contract
 
-_Slice S0.2 of [docs/24](24-foundation-hardening-plan.md). This is the cross-layer contract [docs/17 §4](17-design-rules.md) implies but never wrote down: the exact order in which mechanisms fire for a submitted command, from pre-gates to seed sweeps. **Every future mechanism ADR must state "inserts at stage N.x" and update this file** — the docs/23 review found the order was emergent from nested code across three files, with pieces existing in triplicate._
+_Slice S0.2 of [docs/24](archive/24-foundation-hardening-plan.md). This is the cross-layer contract [docs/17 §4](17-design-rules.md) implies but never wrote down: the exact order in which mechanisms fire for a submitted command, from pre-gates to seed sweeps. **Every future mechanism ADR must state "inserts at stage N.x" and update this file** — the docs/23 review found the order was emergent from nested code across three files, with pieces existing in triplicate._
 
 _Instrumentation: `StepResult.ladder` (an ordered string trace of the stages traversed, ending with the stage that accepted or refused) — attached by `applyStep`/`applyCoupledStep`, asserted by `src/engine/__tests__/ladder-contract.test.ts`. Diagnostic metadata only; never semantics._
 

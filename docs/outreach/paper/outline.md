@@ -16,13 +16,13 @@ Representing a figure as a **DOF-classified dependency graph** — rather than m
 2. **Related work**
    - *Solver side:* Geometric Constraint Solving; DOF analysis (Kramer); rigidity theory (Laman); how production GCS differs (Newton/Levenberg–Marquardt). → draws on [`01-methods-and-mathematical-lineage.md`](01-methods-and-mathematical-lineage.md).
    - *Interaction side:* dynamic geometry systems; natural-language geometry input.
-3. **Architecture** — the compiler-pipeline lens (front-end ‖ LLM desugarer → IR → constraint interpreter → retargetable renderer; event-sourced replay driver). → [`../11-architecture-as-compiler.md`](../11-architecture-as-compiler.md).
+3. **Architecture** — the compiler-pipeline lens (front-end ‖ LLM desugarer → IR → constraint interpreter → retargetable renderer; event-sourced replay driver). → [`../11-architecture-as-compiler.md`](../../archive/11-architecture-as-compiler.md).
 4. **The representation** — free / on-object / derived points; the dependency DAG; the DOF ledger and the similarity gauge; "no fixed assumptions."
 5. **Evaluation & constraint solving** — topological + fixed-point evaluation; drive-or-check; the numeric core (bisection; derivative-free nonlinear least squares; multi-start; Tikhonov regularization for stability); over-constraint detection. → the Methods prose in [`01-*`](01-methods-and-mathematical-lineage.md).
 6. **Alternatives as model enumeration** — branches + seeded resampling + reflection DOFs; why this falls out of the representation.
 7. **Order-independence & stability** — replay with deferral; persistent parameters.
 8. **Correctness / verification** — the givens verifier (runs in production) + the independent closed-form oracle (dev/CI); the machine-epsilon agreement result.
-9. **Pedagogy** — what the construction→theorem model teaches. → [`../10-pedagogy.md`](../10-pedagogy.md).
+9. **Pedagogy** — what the construction→theorem model teaches. → [`../10-pedagogy.md`](../../10-pedagogy.md).
 10. **Results** — corpus coverage (bagrut Q1–Q7), test counts, the oracle sweep, bilingual coverage.
 11. **Limitations & future work** — under-determined partial figures; the reverted global solver; Phase 6 (theorems).
 

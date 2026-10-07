@@ -5,7 +5,7 @@ design doc ([ADR-W-041](06w-decisions-workspace.md#adr-w-041))._
 
 **What it must promise** is [02c](02c-requirements-analytic.md) — the V1 pedagogy and requirements
 captured live from the operator. Decisions are [06c](06c-decisions-analytic.md). 02c and this doc are the
-contract; [docs/19](19-analytic-geometry-tool.md) is the finished build plan (history), and where it
+contract; [docs/19](archive/19-analytic-geometry-tool.md) is the finished build plan (history), and where it
 differs, they win (amended 2026-10-07, #1861).
 
 > **Status: DEPLOYED since `prod/2026-09-16`** at `/analytic-builder/` (`products.json` `enabled: true`; the
@@ -16,7 +16,7 @@ differs, they win (amended 2026-10-07, #1861).
 
 The siblings **reproduce** a printed figure. This one **produces the figure the exam withheld** — 17 of
 20 sampled שאלון 572 Q1s print no drawing, and two instruct the student to draw one
-([docs/19 §2](19-analytic-geometry-tool.md)). Every design choice below follows from that asymmetry, and
+([docs/19 §2](archive/19-analytic-geometry-tool.md)). Every design choice below follows from that asymmetry, and
 from the ruling that **text is the only source of givens**: where an exam leans on its picture to carry a
 given, that is a defect in the exam, not a gap the tool should paper over
 ([02c](02c-requirements-analytic.md) P2/P3).
@@ -1163,7 +1163,7 @@ applied to the fourth.
 ## Known gaps
 
 - ~~**`02c` is still marked IN PROGRESS**~~ — resolved: 02c and 04c are the contract, and where
-  [docs/19](19-analytic-geometry-tool.md) differs, they win (amended 2026-10-07, #1861). **Ratified
+  [docs/19](archive/19-analytic-geometry-tool.md) differs, they win (amended 2026-10-07, #1861). **Ratified
   along the way:** R1/R2/R5 — the object-first model and the tier-3 solve
   ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009)) — and the teacher lane, 02c §7
   ([ADR-AG-010](06c-decisions-analytic.md#adr-ag-010)).
@@ -2451,7 +2451,7 @@ No new constraint kind and no new solver: every form lowers to the `length-eq` t
 - **⚠ Ruled to change (2026-10-07, ADR-W-118 B2 · #1805):** a stated equality (two plain lengths, an `angle-ratio` with k = 1) draws no tick or arc at rest; it stays in the givens list, drawn only in an opt-in relations layer. The text below describes the code until that ships.
 - **What was stated.** `engine/statedMeasures.ts` `statedMeasures(construction, origin, choiceSeed)` reads the constraints a SENTENCE added: `length-eq` with one plain length against a value side, or two plain lengths (an equality); `angle` (degrees, or the angle a `tan` / `cos` fixes); `angle-ratio` with k = 1; a `relation` ⊥ whose point pairs share one end (a knee); the cevian's `perpendicular` (#1241, ADR-AG-237) — a knee at the shared end, else at the FOOT: the end of one pair that an `on-line-2pt` incidence puts on the other pair's line, its legs toward the other end and along the line (`alt` names the line's second point; `statedScene` runs the knee toward whichever is farther, so a foot on an endpoint still has a leg); a derived `foot` object onto a line through two points (every producer of that rule is a sentence about a perpendicular; a foot on an axis or a line object has no named point to run along and draws none); a foot's knee also claims the two corner keys at its vertex, so a restatement or «זווית ADB ישרה» adds none; `area`; a one-term `arc-sum`; and the option a `choice` resolved to at `Figure.choiceSeed`. `origin` comes from the fold's `constraintFact` and the parser's `Fact.definition` flag (a shape row's or a congruence's givens), so a noun's definition is not marked but its resolved choice is. A value is a `{ num }` when its symbols are all valued by `param-eq` (to a fixpoint), else `{ text }` in the student's notation (`statedText`). A measure stated twice keeps a number over a letter, otherwise the later one.
 - **Where it travels.** `derive` → `Derivation.stated` → `App` → `buildScene(…, { stated })` → `Scene.stated` (`marks`, `ticks`, `labels`). A stated length rides `SceneSegment.label`, which replaced `FigureSegment.pinnedLength` (retired with `pinnedLengths`).
-- **One planar mark geometry.** `shell/marks.ts` — `rightAngleKnee`, `angleArcPoints`, `wedgeBisector`, `equalTickSegments`, `unitOf`, `markFitScale` — is shared with 2-D's `Figure.tsx` / `scene.ts` (byte-identical markup) and used for analytic's #1048 knee. The checks live once in `shell/__tests__/fixtures/mark-geometry-rows.ts` (docs/28 §5c), with a meta-lock and a thin lock per tree.
+- **One planar mark geometry.** `shell/marks.ts` — `rightAngleKnee`, `angleArcPoints`, `wedgeBisector`, `equalTickSegments`, `unitOf`, `markFitScale` — is shared with 2-D's `Figure.tsx` / `scene.ts` (byte-identical markup) and used for analytic's #1048 knee. The checks live once in `shell/__tests__/fixtures/mark-geometry-rows.ts` (the [04w](04w-design-shell.md) cross-product guard pattern, formerly docs/28 §5c), with a meta-lock and a thin lock per tree.
 - **Placement.** `statedScene` in `render/scene.ts` draws an 18 px arc and a 10 px knee shrunk into a short corner by `markFitScale`, and turns every value into a `LabelRequest`: an angle's value outside its arc along the bisector, an area's «S=…» on its centroid, an arc's value on the minor arc stepping inward. They are placed in ONE `placeSceneLabels` call with the stated lengths (#1717's collision-avoiding rule; `placeLengthLabels` is its adapter), so no value lands on another. A value bound to a mark carries BOUNDED candidates (ADR-AG-228, #1733): an angle's within 2.5 arc radii of its vertex (bisector, ±25°/±50° inside the span, then the reflex side), an area's inside its ring, an arc's in its band; angle values are placed first so lengths yield to them, an angle value may cross its own arms, and with nothing clear it keeps the first spot that covers no point label. `render/Figure.tsx` writes them as it writes the lengths and paints the marks in 2-D's measure blue.
 
 ## One value gate; up to two values ([ADR-AG-226](06c-decisions-analytic.md#adr-ag-226), #1716)

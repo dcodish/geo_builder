@@ -14,8 +14,8 @@ reproduces the figure and verifies claims — it never solves the exam question.
 `themathbible.com/complex-builder/`.
 
 **Contract:** [02d](../docs/02d-requirements-complex.md) (what) · [04d](../docs/04d-design-complex.md) (how) ·
-decisions [06d](../docs/06d-decisions-complex.md); grammar families:
-[docs/27](../docs/27-complex-numbers-tool.md) §10/§10b until they move into 02d (#1861). The corpus is
+decisions [06d](../docs/06d-decisions-complex.md); grammar families: the
+[02d](../docs/02d-requirements-complex.md) appendix "Grammar families". The corpus is
 the יואל גבע 572 booklet, 2020–2025, Q3 of every exam.
 
 ## The four hard boundaries

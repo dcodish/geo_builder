@@ -1,6 +1,6 @@
 # Paper & Theory
 
-The home for **academic writing about Geo Builder** and the **theory behind the implementation** — the material that would go into a paper, thesis chapter, or conference talk, kept separate from the engineering docs (which live one level up in [`docs/`](../README.md)).
+The home for **academic writing about Geo Builder** and the **theory behind the implementation** — the material that would go into a paper, thesis chapter, or conference talk, kept separate from the engineering docs (which live one level up in [`docs/`](../../README.md)).
 
 Everything here syncs via Dropbox, so it travels across machines like the rest of the repo (per the [project-memory rule](../PROJECT-MEMORY.md)). Durable theory context goes **here**, not in machine-local memory.
 
@@ -25,6 +25,6 @@ Everything here syncs via Dropbox, so it travels across machines like the rest o
 ## Related artifacts elsewhere in the repo
 
 - [`../presentation/geo-builder-algorithms.html`](../presentation/geo-builder-algorithms.html) — the **talk deck** (figures + pseudocode: pipeline, DOF dependency graph, the algorithms, the verification stack). The visual companion to this folder's prose.
-- [`../11-architecture-as-compiler.md`](../11-architecture-as-compiler.md) — the compiler-pipeline lens; the conceptual spine the paper's architecture section builds on.
-- [`../06-decisions.md`](../06-decisions.md) — the ADR log; the primary-source record of *why* each design choice was made (cite ADRs for provenance).
-- [`../10-pedagogy.md`](../10-pedagogy.md) — the teaching charter; the "why it matters for students" argument.
+- [`../11-architecture-as-compiler.md`](../../archive/11-architecture-as-compiler.md) — the compiler-pipeline lens; the conceptual spine the paper's architecture section builds on.
+- [`../06-decisions.md`](../../06-decisions.md) — the ADR log; the primary-source record of *why* each design choice was made (cite ADRs for provenance).
+- [`../10-pedagogy.md`](../../10-pedagogy.md) — the teaching charter; the "why it matters for students" argument.

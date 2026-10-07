@@ -13,9 +13,8 @@ Living project documentation for a **four-product workspace**: the 2-D Geo Build
 
 > **How statuses in this index work.** A status below is **what the document says about itself**. Where a
 > document states none, this table describes its content and makes no status claim. **Do not write a
-> status here that the document does not carry** — the previous version of this index asserted statuses
-> for docs 19, 20, 27 and 28 that all four contradicted, and omitted 15 documents entirely. Totality is
-> now enforced: `docs-hygiene.test.ts` fails if any `docs/*.md` is missing from this file.
+> status here that the document does not carry.** Totality is enforced: `docs-hygiene.test.ts` fails if
+> any `docs/*.md` is missing from this file.
 
 ## The contract — what the products promise, and how they are built
 
@@ -68,46 +67,48 @@ design, `02w`/`04w` for shared surfaces), registered in [`DOCS.json`](../DOCS.js
 | # | Document | What it covers |
 |---|---|---|
 | 07 | [Theorem Reference](07-theorem-reference.md) | The official bagrut theorem list (109 + appendices), bilingual, IDs + role tags. **Byte-matched against `THEOREM_TABLE` by a test** |
-| 10 | [Pedagogy](10-pedagogy.md) | The teaching charter, and the operator-editable principles catalog (byte-guarded). The theorem surface is switched off by the operator (#740) |
-| 11 | [Architecture as a Compiler](11-architecture-as-compiler.md) | The pipeline lens, revised 2026-07-24 after the docs/23 review corrected three stale premises |
+| 10 | [Pedagogy](10-pedagogy.md) | The pedagogy charter (being rewritten for all four builders, #1861) |
 | 12 | [Letter Placement](12-letter-placement.md) | The two levers that decide a figure's lettering: naming order and orientation |
-| 30 | [How the tools are built](30-how-the-tools-are-built.md) | Outreach reference: the algorithms under all four builders, each pointed at its file, plus the LinkedIn post drafts |
 | 29 | [Complex formula sheet](29-complex-formula-reference.md) | The official formula sheet, transcribed. **Byte-matched against the formula table by a test** |
+| — | [`sample questions/`](sample%20questions/) | Real bagrut problems (text + image), the validation corpus. `theorem-ground-truth.md` there is read by a test |
+| — | [`5pts_GeometryList_Teachers.pdf`](5pts_GeometryList_Teachers.pdf) | The official theorem list, the source of 07 (07's header says how to read it) |
 
-## Product plans
+## Outreach
 
-Each is the build plan for one product; the *contract* lives in that product's requirements/design docs
-above, and the *current state* in its decision log.
-
-| # | Document | Status (as the document states it) |
+| # | Document | What it covers |
 |---|---|---|
-| 19 | [Analytic-geometry tool](19-analytic-geometry-tool.md) | Finished build plan; the contract is [02c](02c-requirements-analytic.md)/[04c](04c-design-analytic.md) |
-| 20 | [Space/vectors tool (3-D)](20-space-vectors-tool.md) | **Accepted, built and in production.** V8 complete — every 2009–2024 exam's space/vectors input is expressible |
-| 27 | [Complex-numbers tool](27-complex-numbers-tool.md) | **Accepted; shipped** `prod/2026-08-17-4` |
-| 28 | [Product unification](28-product-unification.md) | **Plan of record** ([ADR-W-018](06w-decisions-workspace.md#adr-w-018)); delivered except Phase 2 (#663, #664); umbrella #648 closed |
-| 24 | [Foundation hardening plan](24-foundation-hardening-plan.md) | **Executed 2026-07-24/25**; the one remaining solver step is being filed under [#1861](https://github.com/dcodish/geo_builder/issues/1861) |
+| — | [`outreach/`](outreach/) | Material for posts, talks and teachers — [30, how the tools are built](outreach/30-how-the-tools-are-built.md), the [paper](outreach/paper/README.md) drafts and the algorithms [presentation](outreach/presentation/geo-builder-algorithms.html). Not a rule or a spec |
 
-## Historical — completed or superseded
+## Archive — history, never a rule
 
-**These describe finished or replaced work.** They carry useful background; none is current status. Read
-them for *why* something is the way it is, never for *what is true now*.
+[`archive/`](archive/) holds finished plans and reviews. Read them for *why* something is the way it is,
+never for *what is true now*: each carries a banner naming where its live parts went.
 
-| # | Document | Why it is here |
+| # | Document | What replaced it |
 |---|---|---|
-| 09 | [Implementation Plan](09-implementation-plan.md) | The original phased build plan. Background; lags the ADR logs ([ADR-W-002](06w-decisions-workspace.md#adr-w-002)) |
-| 09b | [Status Log](09b-status-log.md) | Explicitly archived 2026-07-16 — the status blockquote stack that had grown to ~81 KB on one line |
-| 13 | [Design Audit (2026-06-17)](13-design-audit-2026-06-17.md) | The case-by-case-patching audit; its directions became ADR-043…047 |
-| 14 | [Backlog & Quick-Win Triage](14-backlog.md) | Superseded by the issue queue ([ADR-265](06-decisions.md#adr-265)). Surviving items are being swept into issues |
-| 15 | [Hardening Plan (2026-07-02)](15-hardening-plan.md) | The sequenced A–F program from the multi-area review; its tracking table is ticked through ADR-170…207 |
-| 16 | [Phase 6 Theorems Plan](16-theorems-plan.md) | **Superseded for 6b+ by [18](18-theorem-relevance-plan.md)**, per its own header |
-| 18 | [Theorem Discovery v2 — relevance replan](18-theorem-relevance-plan.md) | *"The replan is fully built (T1–T5)"*; operator play-and-judge gates remain. The theorem surface is switched off by the operator (#740) |
-| 21 | [572 coverage audit](21-572-coverage-audit.md) | A point-in-time sweep of ~42 exams (2026-07-08) that scoped the 3-D V8 work |
-| 23 | [Architecture review (2026-07)](23-architecture-review-2026-07.md) | Commissioned review; findings adopted, execution became [24](24-foundation-hardening-plan.md) |
-| 25 | [Joint-solve design](25-joint-solve-design.md) | S3.2 design; approved and built 2026-07-25 with one measured amendment |
-| 26 | [3-D relations plan](26-3d-relations-plan.md) | **Complete (2026-07-28)** — all six slices landed |
-| — | [Manual verification (2026-06-15)](manual-verification-2026-06-15.md) | A dated verification record for the deferred-backlog batch |
-| — | [Project Memory](PROJECT-MEMORY.md) | Operational notes + a dated session log. Background, not status; lags the ADR logs |
-| — | [Paper & Theory](paper/README.md) | Academic writing and the theory/algorithmic lineage behind the implementation |
+| 09 | [Implementation Plan](archive/09-implementation-plan.md) | The ADR logs and the issue queue |
+| 11 | [Architecture as a Compiler](archive/11-architecture-as-compiler.md) | [04 §1](04-design.md#1-guiding-principles), "The compiler lens" |
+| 13 | [Design Audit (2026-06-17)](archive/13-design-audit-2026-06-17.md) | Its directions became ADR-043…047 |
+| 15 | [Hardening Plan (2026-07-02)](archive/15-hardening-plan.md) | Done; its items shipped as ADR-170…207 |
+| 16 | [Phase 6 Theorems Plan](archive/16-theorems-plan.md) | Superseded by 18. The theorem surface is switched off (#740) |
+| 18 | [Theorem Discovery v2](archive/18-theorem-relevance-plan.md) | Built, then switched off (#740); its intent is quoted in [10](10-pedagogy.md) |
+| 19 | [Analytic-geometry tool](archive/19-analytic-geometry-tool.md) | [02c](02c-requirements-analytic.md) §1a and §3a, [04c](04c-design-analytic.md) |
+| 20 | [Space/vectors tool (3-D)](archive/20-space-vectors-tool.md) | [02b](02b-requirements-3d.md) "Scope and non-goals", [04b](04b-design-3d.md), `catalog3.ts` |
+| 21 | [572 coverage audit](archive/21-572-coverage-audit.md) | The 3-D catalog, `catalog3.ts` |
+| 23 | [Architecture review (2026-07)](archive/23-architecture-review-2026-07.md) | Executed as 24 |
+| 24 | [Foundation hardening plan](archive/24-foundation-hardening-plan.md) | Executed; the remaining solver step is #1874 |
+| 25 | [Joint-solve design](archive/25-joint-solve-design.md) | Built 2026-07-25; the remaining solver step is #1874 |
+| 26 | [3-D relations plan](archive/26-3d-relations-plan.md) | [04b](04b-design-3d.md) "Adding a relation" |
+| 27 | [Complex-numbers tool](archive/27-complex-numbers-tool.md) | [02d](02d-requirements-complex.md) "Appendix — Grammar families", [04d](04d-design-complex.md) |
+| 28 | [Product unification](archive/28-product-unification.md) | [04w](04w-design-shell.md) (§5b–§5d) and [02w](02w-requirements-workspace.md) "Suite rulings"; Phase 2 is #663/#664 |
+
+Deleted in #1861 and reachable only in git history:
+[PROJECT-MEMORY](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/PROJECT-MEMORY.md),
+[09b (status log)](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/09b-status-log.md),
+[14 (backlog)](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/14-backlog.md) and the
+[2026-06-15 manual-verification record](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/manual-verification-2026-06-15.md).
+The pre-adoption deploys PROJECT-MEMORY held are now in
+[DEPLOY-LOG](DEPLOY-LOG.md#pre-adoption-deploys-untagged-2026-07-0407-10).
 
 ## How to use these
 

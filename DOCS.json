@@ -105,17 +105,17 @@
     "3d": {
       "requirements": "docs/02b-requirements-3d.md",
       "design": "docs/04b-design-3d.md",
-      "note": "Requirements 02b, design 04b. catalog3.ts (230 entries, guard-tested He+En) is the construct inventory; docs/20 is the build plan."
+      "note": "Requirements 02b, design 04b. catalog3.ts (230 entries, guard-tested He+En) is the construct inventory; docs/20, the build plan, is archived (docs/archive/, #1861)."
     },
     "complex": {
       "requirements": "docs/02d-requirements-complex.md",
       "design": "docs/04d-design-complex.md",
-      "note": "Requirements 02d, design 04d. docs/27 §10 is the authoritative grammar contract; docs/29 is byte-matched by a test."
+      "note": "Requirements 02d, design 04d. The 02d appendix 'Grammar families' is the authoritative grammar contract (moved from the archived docs/27, #1861); docs/29 is byte-matched by a test."
     },
     "analytic": {
       "requirements": "docs/02c-requirements-analytic.md",
       "design": "docs/04c-design-analytic.md",
-      "note": "Requirements 02c, design 04c -- these two are the contract. Deployed since prod/2026-09-16. docs/19 is the finished build plan."
+      "note": "Requirements 02c, design 04c -- these two are the contract. Deployed since prod/2026-09-16. docs/19, the finished build plan, is archived (docs/archive/, #1861)."
     },
     "workspace": {
       "requirements": "docs/02w-requirements-workspace.md",

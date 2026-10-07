@@ -1,8 +1,10 @@
 # 16 — Phase 6 Plan: Theorem Surfacing (pedagogy-first)
 
+> **Archived 2026-10-07 (#1861).** History — never a rule or a status. Its live parts now live in: none. Theorem surfacing is switched off ([#740](https://github.com/dcodish/geo_builder/issues/740)); its intent is quoted in [docs/10](../10-pedagogy.md).
+
 > **2026-07-06 — superseded for 6b+ by [18-theorem-relevance-plan.md](18-theorem-relevance-plan.md)** (the relevance-first replan, drafted after the operator's dissatisfaction review: coverage disposition map, evidence-predicate library, explainable rank bands, the observed lane, and the new intent-hints layer). This document remains the authoritative record of the 6a design and its pedagogy decisions (§2, §10), which the replan preserves.
 
-_Drafted 2026-07-03 from the operator's design session. This is the detailed pre-dev plan for [Phase 6](09-implementation-plan.md#phase-6--theorems); it builds on the settled foundations — [ADR-038](06-decisions.md#adr-038) (structural-first detection), FR-TH-1..6 ([02-requirements](02-requirements.md#theorems)), and the [pedagogy charter §3–5](10-pedagogy.md) — and makes the remaining product decisions. **Nothing here touches figure-building behaviour: detection is a pure, read-only consumer of the engine's output, exactly like `detectRelations`/`detectShapes`. Any engine bug it surfaces during testing is pre-existing and gets the usual root-cause treatment.**_
+_Drafted 2026-07-03 from the operator's design session. This is the detailed pre-dev plan for [Phase 6](09-implementation-plan.md#phase-6--theorems); it builds on the settled foundations — [ADR-038](../06-decisions.md#adr-038) (structural-first detection), FR-TH-1..6 ([02-requirements](../02-requirements.md#theorems)), and the [pedagogy charter §3–5](../10-pedagogy.md) — and makes the remaining product decisions. **Nothing here touches figure-building behaviour: detection is a pure, read-only consumer of the engine's output, exactly like `detectRelations`/`detectShapes`. Any engine bug it surfaces during testing is pre-existing and gets the usual root-cause treatment.**_
 
 ---
 
@@ -24,7 +26,7 @@ This "stated-vs-derived" line was already drawn by ADR-038 (structural matching 
 | Surface | Stated (premise-side) — Phase 6, allowed | Derived (conclusion-side) — Phase 9 Reveal, forbidden here |
 |---|---|---|
 | **Trigger** | The theorem's *hypothesis* is instantiated by facts the student typed (incl. the decomposition of a shape word they typed — "דלתון" states equal adjacent sides). | The hypothesis holds only because of computed geometry (an *emergent* kite from `detectShapes`, a chord that numerically passes through the centre). |
-| **Text** | Bagrut number + the catalog's **general statement** (He/En, [07](07-theorem-reference.md)) — **no student letters in the statement**. | An instantiated conclusion ("so ∠ACB = 90°"). Never shown. |
+| **Text** | Bagrut number + the catalog's **general statement** (He/En, [07](../07-theorem-reference.md)) — **no student letters in the statement**. | An instantiated conclusion ("so ∠ACB = 90°"). Never shown. |
 | **Highlight** | Click an entry → highlight the **triggering objects** — the diameter, the circle, the inscribed vertex *the student created*. | Highlighting/marking the **conclusion** objects (drawing the right-angle knee at C). Never done — surfacing must not add a single mark to the figure. |
 | **Ordering** | Tier + recency + salience (below). | "Usefulness for the answer." The engine doesn't know the question and must not pretend to. |
 
@@ -103,7 +105,7 @@ export interface TheoremMatch {
 }
 ```
 
-One `THEOREM_TABLE: TheoremDef[]`; `detectTheorems` folds it into a sorted `TheoremFeedEntry[]`. A guard test asserts every table id exists in [07](07-theorem-reference.md) with a matching P/C tag, and that no O-tagged id ever enters the table.
+One `THEOREM_TABLE: TheoremDef[]`; `detectTheorems` folds it into a sorted `TheoremFeedEntry[]`. A guard test asserts every table id exists in [07](../07-theorem-reference.md) with a matching P/C tag, and that no O-tagged id ever enters the table.
 
 ## 5. The v1 matcher set (~40 theorems, corpus-driven)
 
@@ -158,7 +160,7 @@ Each slice: ADR + tests + gates before "ready", per the standing rules. Phase 9 
 1. ~~Live feed vs button~~ — **DECIDED: live** ("live is important"), with the hide toggle.
 2. ~~Tiers in v1~~ — **DECIDED: tiers ship in v1** ("so is the separation to tiers"), with the **authored-trigger semantics** of D3: green = the stated given announces the theorem (diameter → 103 immediately); a combination-theorem stays **hidden until its operative object is drawn** (isosceles apex-line coincidence needs the line on the diagram); amber reserved for sparing, authored secondary conditions.
 3. **Converses (C) footing** — implicitly same-footing (the operator's diameter example bundles 103 with its converse); confirm during the 6a feed review, no blocker.
-4. **Corpus ground truth — AUTHORED** (operator: "I do not know what the theorems for each question are… that is something I would want you to do"). The assistant solved Q1–Q7 and wrote **[sample questions/theorem-ground-truth.md](sample%20questions/theorem-ground-truth.md)** — per question: givens, solution sketch, and three id lists that formalize "help, don't reveal": `expectSurfaced` (⊆ feed asserted), `solutionUses` (coverage metric, operator review aid), `mustNotSurface` (∩ feed = ∅ asserted — e.g. Q7's bisector-ratio #76, whose bisector the student must *prove*, is the corpus's sharpest no-reveal case). **Operator action reduced to review**, not authorship. The corpus was extended to the full 571 booklet (B-series, question 4 of every exam) and **operator-reviewed 2026-07-03** (see the ground-truth doc's resolved checklist); it is now the phase gate. New questions gate 6b; 6a starts on Q5–Q7.
+4. **Corpus ground truth — AUTHORED** (operator: "I do not know what the theorems for each question are… that is something I would want you to do"). The assistant solved Q1–Q7 and wrote **[sample questions/theorem-ground-truth.md](../sample%20questions/theorem-ground-truth.md)** — per question: givens, solution sketch, and three id lists that formalize "help, don't reveal": `expectSurfaced` (⊆ feed asserted), `solutionUses` (coverage metric, operator review aid), `mustNotSurface` (∩ feed = ∅ asserted — e.g. Q7's bisector-ratio #76, whose bisector the student must *prove*, is the corpus's sharpest no-reveal case). **Operator action reduced to review**, not authorship. The corpus was extended to the full 571 booklet (B-series, question 4 of every exam) and **operator-reviewed 2026-07-03** (see the ground-truth doc's resolved checklist); it is now the phase gate. New questions gate 6b; 6a starts on Q5–Q7.
 
 ## 10. Review outcomes (operator, 2026-07-03) — pedagogy decisions folded in
 

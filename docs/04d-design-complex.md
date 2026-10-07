@@ -4,8 +4,8 @@ _How the complex product is built. Registered in [`DOCS.json`](../DOCS.json) as 
 design doc ([ADR-W-041](06w-decisions-workspace.md#adr-w-041))._
 
 **What it must promise** is [02d](02d-requirements-complex.md). Decisions are
-[06d](06d-decisions-complex.md); the plan and the authoritative grammar contract are
-[docs/27](27-complex-numbers-tool.md). The ordered stage contract every mechanism inserts into is
+[06d](06d-decisions-complex.md); the grammar contract is the [02d](02d-requirements-complex.md) appendix "Grammar families",
+and the build plan, [docs/27](archive/27-complex-numbers-tool.md), is archived history. The ordered stage contract every mechanism inserts into is
 [LADDER-CX](LADDER-CX.md) — **every mechanism ADR names its stage and updates that file.**
 
 ## The central idea: log-polar makes the corpus linear

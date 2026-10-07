@@ -1,6 +1,6 @@
 # ADR draft — Solver A/B experiment harness
 
-> **This is a draft, not yet in the ADR log.** It is parked here to avoid a merge / ADR-number collision with the concurrent hardening session (which is appending ADRs — the log is at ADR-171 and climbing). **When that session lands, insert this into [`../06-decisions.md`](../06-decisions.md) as the next free number (≥ ADR-172)** and delete this file (leaving a pointer from the paper folder). Formatted to drop in verbatim.
+> **This is a draft, not yet in the ADR log.** It is parked here to avoid a merge / ADR-number collision with the concurrent hardening session (which is appending ADRs — the log is at ADR-171 and climbing). **When that session lands, insert this into [`../06-decisions.md`](../../06-decisions.md) as the next free number (≥ ADR-172)** and delete this file (leaving a pointer from the paper folder). Formatted to drop in verbatim.
 
 ---
 

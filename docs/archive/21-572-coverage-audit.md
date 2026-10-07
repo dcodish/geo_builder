@@ -1,5 +1,7 @@
 # 572 space-question coverage audit (2009–2024)
 
+> **Archived 2026-10-07 (#1861).** History — never a rule or a status. Its live parts now live in: none.
+
 _Produced 2026-07-08 by a full sweep of every 572 exam in `C:\Users\User\Dropbox\Math\בגרויות\572` (~42 papers, 2009–2024). Goal: for each exam, does the 3-D builder support the **inputs** (the givens/construction)? We do NOT solve the questions. Drives the [V8 roadmap](20-space-vectors-tool.md#14-v8--full-legacy-572-coverage)._
 
 ## Structure finding

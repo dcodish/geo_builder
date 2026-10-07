@@ -1,16 +1,18 @@
 # 27 — Complex-numbers tool (a sibling app): corpus reading, chassis fit, open decisions
 
+> **Archived 2026-10-07 (#1861).** History — never a rule or a status. Its live parts now live in: [02d](../02d-requirements-complex.md) "Appendix — Grammar families" (from §10 and §10b).
+
 _Drafted 2026-08-14 from an operator request: "I want to start thinking what a tool for complex numbers
 would look like." The product is already **registered** as the fourth sibling
-([docs/22 §9](22-workflow.md)): `src-complex/`, ADR log `06d-decisions-complex.md`, ids `ADR-CX-NNN`,
+([docs/22 §9](../22-workflow.md)): `src-complex/`, ADR log `06d-decisions-complex.md`, ids `ADR-CX-NNN`,
 label `complex` — but until this note it had no corpus reading and no plan. Grounded in a fresh corpus
 reading of **eight** 572 exams (§2) and the official formula sheet (§3), in the mold of
 [19-analytic-geometry-tool.md](19-analytic-geometry-tool.md) (analytic, still PROPOSED) and
 [20-space-vectors-tool.md](20-space-vectors-tool.md) (3-D, shipped). Status: **ACCEPTED and BUILDING.**
-_D1–D5 resolved 2026-08-14 (§8, [ADR-CX-001](06d-decisions-complex.md#adr-cx-001)); the C0 prototype
+_D1–D5 resolved 2026-08-14 (§8, [ADR-CX-001](../06d-decisions-complex.md#adr-cx-001)); the C0 prototype
 shipped and hit its solver ceiling; the foundation was re-designed 2026-08-15 over a log-polar engine
-([ADR-CX-006](06d-decisions-complex.md#adr-cx-006)) with the grammar contract re-derived from eleven
-exams ([ADR-CX-007](06d-decisions-complex.md#adr-cx-007)). **The live plan is §9b (S0–S7); §10 + §10b
+([ADR-CX-006](../06d-decisions-complex.md#adr-cx-006)) with the grammar contract re-derived from eleven
+exams ([ADR-CX-007](../06d-decisions-complex.md#adr-cx-007)). **The live plan is §9b (S0–S7); §10 + §10b
 is the grammar contract.**_
 
 Same charter as every sibling: **the student types the givens, the tool reproduces the figure and
@@ -79,7 +81,7 @@ parameter algebra (2022).
 While resolving the prototype-vs-define question the operator supplied one exam question with the
 ruling: *"from a pedagogy POV, I would like the user to be able to enter the inputs from this
 question and have the tool visualize the location of points and calculations."* Transcription
-(operator-supplied image, [ADR-CX-002](06d-decisions-complex.md#adr-cx-002)):
+(operator-supplied image, [ADR-CX-002](../06d-decisions-complex.md#adr-cx-002)):
 
 > המספרים המרוכבים Z₁ ו-Z₂ נמצאים על מישור גאוס ומקיימים: arg Z₁ − arg Z₂ = 90°,
 > |Z₁| = 9r, |Z₂| = 12r (r ≠ 0). המספר Z₂ נמצא ברביע הראשון ונתון: arg Z₂ < 45°.
@@ -108,7 +110,7 @@ triangle); perimeter of OZ₁Z₂Z₃ = 60r (sides 9r, 15r, 16r, 20r); OZ₂Z₃
 spacing, counted 1 on / 1 inside / 3 outside. All linear-in-r claims verify across sampled r
 (r stays a free DOF end to end — ADR-052).
 
-**Grammar deltas this adds to the D2 v1 list** ([ADR-CX-002](06d-decisions-complex.md#adr-cx-002)):
+**Grammar deltas this adds to the D2 v1 list** ([ADR-CX-002](../06d-decisions-complex.md#adr-cx-002)):
 argument **inequalities/ranges** as givens (branch selectors; quadrant givens are the special
 case) · **measure claims as expressions in a parameter** (`אורך Z₁Z₂ = 15r`, `היקף … = 60r`; the
 area form as a *pinning given*) · **polygon objects over represented points** including the named
@@ -141,7 +143,7 @@ The constructive engine's three central ideas each map onto a corpus archetype *
   "show another configuration" button *is* the exam's "מצא את כל האפשרויות". A quadrant given
   ("ברביע הרביעי") is a branch-selection fact — precisely the 3-D tool's "שיעור ה-z חיובי" idiom.
 - **Free DOF ↔ the unstated parameter.** `|z₁| = |z₂| = r` with r unstated is a free DOF
-  ([ADR-052](06-decisions.md#adr-052) verbatim: sampled, resampled on cycle, pinned the moment a
+  ([ADR-052](../06-decisions.md#adr-052) verbatim: sampled, resampled on cycle, pinned the moment a
   relation arrives — `שטח המשולש הוא 5d+6` pins d exactly like a 2-D length given pins a side).
   A number constrained by `arg z₁ + arg z₂ = 90°` is a point with 1 remaining DOF — the
   point-on-object idiom on the ray/circle.
@@ -208,7 +210,7 @@ plane, not a projection). Building complex first would also land the **axes/coor
 that analytic needs anyway, as a smaller, decision-complete project. **This is D5 — the operator's
 call, not a decision this note makes.**
 
-## 8. Decisions — RESOLVED by the operator (2026-08-14, [ADR-CX-001](06d-decisions-complex.md#adr-cx-001))
+## 8. Decisions — RESOLVED by the operator (2026-08-14, [ADR-CX-001](../06d-decisions-complex.md#adr-cx-001))
 
 - **D1 — verification substrate: EXACT polar core.** Arguments as rational multiples of π, moduli as
   bounded radicals (`rational · √rational`), numeric fallback for non-nice values. For-all-n and
@@ -231,15 +233,15 @@ call, not a decision this note makes.**
 - **D4 — series are IN scope.** "Series are many times part of the questions" — power-cycle plots
   and verification of student-claimed sum values ship in v1 (see §5/§6).
 - **D5 — build order: complex BEFORE analytic.** "We will leave analytic to the end." The queue is
-  now: complex next, analytic last. Registry updated ([docs/22 §9](22-workflow.md)).
+  now: complex next, analytic last. Registry updated ([docs/22 §9](../22-workflow.md)).
 
 ## 9. Phased build plan — corpus-gated slices (doc-20 style)
 
-> **Superseded 2026-08-15 ([ADR-CX-008](06d-decisions-complex.md#adr-cx-008)).** The C0–C5 plan below
+> **Superseded 2026-08-15 ([ADR-CX-008](../06d-decisions-complex.md#adr-cx-008)).** The C0–C5 plan below
 > was written before the C0 prototype shipped and hit its solver ceiling
 > ([#607](https://github.com/dcodish/geo_builder/issues/607)). It is kept for provenance — the corpus
 > gates it names are still the gates — but **the live plan is §9b**, which is foundation-first over the
-> log-polar engine ([ADR-CX-006](06d-decisions-complex.md#adr-cx-006)) rather than feature-first over
+> log-polar engine ([ADR-CX-006](../06d-decisions-complex.md#adr-cx-006)) rather than feature-first over
 > the prototype.
 
 Every slice ends with an exam question reproducing **end-to-end through the real parse → replay
@@ -285,11 +287,11 @@ play-and-approve; corpus gates become permanent fixtures/scenarios in the produc
 _Decided with the operator: **foundation first** — the value core, the solver and replay land before
 the visualization sits on top of them. v2 grows beside the prototype behind an `?engine=v2` switch, so
 `main` stays deployable and both engines are playable side by side; the last slice flips the default
-and deletes the old engine ([ADR-CX-008](06d-decisions-complex.md#adr-cx-008))._
+and deletes the old engine ([ADR-CX-008](../06d-decisions-complex.md#adr-cx-008))._
 
 | # | slice | gate |
 |---|---|---|
-| **S0** | **shell + registration** — the `shell/` tree ([ADR-W-016](06w-decisions-workspace.md#adr-w-016)); `BOUNDARIES.json` edges; the CI `changes` classifier + a `test-complex` lane; `src-complex/CLAUDE.md`; [LADDER-CX.md](LADDER-CX.md); `deploy/apache-complex-builder.conf` | isolation + docs-hygiene green; **2-D and 3-D bytes unchanged** |
+| **S0** | **shell + registration** — the `shell/` tree ([ADR-W-016](../06w-decisions-workspace.md#adr-w-016)); `BOUNDARIES.json` edges; the CI `changes` classifier + a `test-complex` lane; `src-complex/CLAUDE.md`; [LADDER-CX.md](../LADDER-CX.md); `deploy/apache-complex-builder.conf` | isolation + docs-hygiene green; **2-D and 3-D bytes unchanged** |
 | **S1** | **value layer** — ℚ arithmetic, exponent-vector moduli, turns + symbolic angle atoms, the six operations, the exact-form recognizer, polar and cartesian formatting | the exact-value corpus of the sampled exams round-trips: `√2`, `2^(3/2)`, `16r`, `2^(1/3)`, `3π/4`, `arctan(1/2) + k·72°` |
 | **S2** | **model + tier-1 solver** — facts, the `Expr` AST, monomial-vs-general classification, the two ℚ-linear systems, nullspace DOF, branch enumeration, inequality filters, typed `strength` | **#607 solves in closed form**, four branches, the quadrant given pruning to `√2·cis45°`; 2024 חורף `q⁴ = 2` → four branches; 2020 חורף `a_{n+4} = 16·a_n` for all n decided exactly |
 | **S3** | **tier-2 + replay + verifier** — numeric residuals over the free basis, LM + multi-start, root enumeration, the fold/tail memo, the packed configuration index, `isDisplayable`, budgeted config search, the independent givens verifier | the §2b capstone: θ pinned by the area given, `arg Z₂ < 45°` pruning the second branch, perimeter `60r`; **stability** — adding a fact never moves settled numbers |
@@ -298,7 +300,7 @@ and deletes the old engine ([ADR-CX-008](06d-decisions-complex.md#adr-cx-008))._
 | **S6** | **claims + knowledge panel + formula surfacing** — exact claim verification, on-request knowledge rows, parameter-expression rows (`15r`), families G4–G9, the formula table + its integrity test | 2023 קיץ א ד (minimal n, outside the circumscribed circle) and 2023 קיץ ב ג/ד verify exactly |
 | **S7** | **corpus gates + cutover** — every booklet Q3 as a saved fixture, the scenario corpus for bespoke assertions, tier membership; delete the old engine and the switch | the booklet's Q3s build green and verify; the prototype's ~85 tests pass on v2; `npm run test:full` green |
 
-## 10. The input language — generic sentence families ([ADR-CX-003](06d-decisions-complex.md#adr-cx-003))
+## 10. The input language — generic sentence families ([ADR-CX-003](../06d-decisions-complex.md#adr-cx-003))
 
 Operator directive (2026-08-14): the language must support the §2b exemplar **and every family it
 belongs to — "not only these specific formats but all families of them."** This section is the
@@ -316,14 +318,14 @@ collapse most of the surface area:
 
 | # | Family (generic form) | Canonical He (one witness form) | Corpus witnesses | Slice |
 |---|---|---|---|---|
-| F1 | **Declarations**: k names as complex numbers; real parameters with domain (`≠ 0`, `> 0`, `טבעי`, an interval). **Implicit typing ([ADR-CX-004](06d-decisions-complex.md#adr-cx-004)): z- and w-family names (`z`, `z2`, `z10`, `w1`…) are complex WITHOUT declaration — first reference auto-creates a visible free number; other letters (a, d, m, n, r, t…) are real parameters by the same exam convention**. **A declaration types a letter family for the whole figure ([ADR-CX-047](06d-decisions-complex.md#adr-cx-047)): «u מספר מרוכב» makes u, u₁, u₂… complex in every line, before or after it; a size or an angle cannot be declared complex** | `Z1 ו-Z2 מספרים מרוכבים` (optional for z/w) · `r ≠ 0` · `π/2 < α < π` | §2b, 2020, 2022, 2023 | C0/C2 |
+| F1 | **Declarations**: k names as complex numbers; real parameters with domain (`≠ 0`, `> 0`, `טבעי`, an interval). **Implicit typing ([ADR-CX-004](../06d-decisions-complex.md#adr-cx-004)): z- and w-family names (`z`, `z2`, `z10`, `w1`…) are complex WITHOUT declaration — first reference auto-creates a visible free number; other letters (a, d, m, n, r, t…) are real parameters by the same exam convention**. **A declaration types a letter family for the whole figure ([ADR-CX-047](../06d-decisions-complex.md#adr-cx-047)): «u מספר מרוכב» makes u, u₁, u₂… complex in every line, before or after it; a size or an angle cannot be declared complex** | `Z1 ו-Z2 מספרים מרוכבים` (optional for z/w) · `r ≠ 0` · `π/2 < α < π` | §2b, 2020, 2022, 2023 | C0/C2 |
 | F2 | **Value definitions**: `name = expr` — literals cart/polar, components/angles may be expressions in real parameters; six ops, conjugate, integer & symbolic `kn+c` powers | `w = (z1/2)^(4n)` · `z1 = (2a²+5a+4) + (2a²+3a+2)i` | §2b, 2018, 2020, 2022 | C0/C1, C5 |
 | F3 | **Modulus relations**: `\|A\| ⟨cmp⟩ rhs`, rhs = number · param-expr · `k·\|B\|`; chained equalities; cmp ∈ {=, <, >, ≤, ≥, ≠} | `\|Z1\| = 9r` · `\|z1\| = \|z2\| = r` · `2\|z_A\| = \|z_M\|` | §2b, 2018, 2024 | C2 |
 | F4 | **Argument relations**: signed sums/integer multiples of `arg` terms vs an angle or each other, any comparator — inequalities are BRANCH SELECTORS | `arg Z1 − arg Z2 = 90` · `arg Z2 < 45` · `לשניהם אותו ארגומנט` | §2b, 2018, 2024 | C2 |
 | F5 | **Location givens**: quadrant; on an axis/half-axis; on a stated line/ray; on a circle; inside/on/outside a region | `Z2 ברביע הראשון` · `C על הישר y=x` · `על ישר העובר דרך ראשית הצירים` | §2b, 2011, 2018, 2023 | C2/C4 |
 | F6 | **Objects**: segment between numbers; polygon of any arity over represented points (the origin `O` is always available); circle by center+radius or circumscribed (`מעגל חוסם`) | `הקטע Z1Z2` · `המרובע OZ1Z2Z3` · `המעגל החוסם את המשולש ABC` | §2b, 2015, 2023 | C2/C3 |
 | F7 | **Measures** (given OR claim, P1): length/distance, perimeter, area, modulus, argument — rhs number or param-expr | `אורך Z1Z2 = 15r` · `שטח OZ1Z2Z3 הוא 150r²` · `היקף … = 60r` | §2b, 2018, 2023 | C2 |
-| F8 | **Equations & solution sets**: `X^n = expr` — and the equation is ABOUT its letter ([ADR-CX-005](06d-decisions-complex.md#adr-cx-005)): a FRESH X enumerates the solution set and reserves the bare letter (X is related to X₁..Xₙ, never a disconnected point); an existing FREE X is CONSTRAINED by the equation (snaps to a solution, candidates drawn; self-referential rhs allowed); a DETERMINED X makes it a verified claim. Solutions referenced collectively (`הפתרונות`), selected by quadrant / argument-range / ordinal; enumeration asks (`כל האפשרויות`) are the branch surface | `Z^5 = Z1·Z2³·Z4` · `הפתרון שברביע הרביעי` · `(z3)² = 2i — שתי האפשרויות` | §2b, 2018, 2020, 2023, 2024 | C3 |
+| F8 | **Equations & solution sets**: `X^n = expr` — and the equation is ABOUT its letter ([ADR-CX-005](../06d-decisions-complex.md#adr-cx-005)): a FRESH X enumerates the solution set and reserves the bare letter (X is related to X₁..Xₙ, never a disconnected point); an existing FREE X is CONSTRAINED by the equation (snaps to a solution, candidates drawn; self-referential rhs allowed); a DETERMINED X makes it a verified claim. Solutions referenced collectively (`הפתרונות`), selected by quadrant / argument-range / ordinal; enumeration asks (`כל האפשרויות`) are the branch surface | `Z^5 = Z1·Z2³·Z4` · `הפתרון שברביע הרביעי` · `(z3)² = 2i — שתי האפשרויות` | §2b, 2018, 2020, 2023, 2024 | C3 |
 | F9 | **Sequences**: geometric/arithmetic over ℂ; term-position givens in any positions (`בהתאמה`); a term defined by the others; the ratio/difference as a derived (multi-branch) value; sums of consecutive terms incl. symbolic count `kn` | `Z1 ו-Z2 הם שני האיברים הראשונים בסדרה הנדסית שבה האיבר השלישי הוא Z4` · `מנת הסדרה — כל האפשרויות` · `w + w² + … + w^(4n)` | §2b, 2015, 2024 | C5 |
 | F10 | **Number-type claims**: real, pure imaginary, conjugates of each other | `w מדומה טהור` · `z1 ו-z2 צמודים זה לזה` | 2018, 2020, 2022 | C2 |
 | F11 | **Classification claims**: triangle types (שווה-שוקיים, שווה-צלעות, ישר-זווית), quadrilateral types (the 2-D He lexicon: מקבילית, מלבן, ריבוע, מעוין, טרפז, דלתון), regular n-gon — incl. over a solution set | `OZ2Z3Z4 מקבילית` · `הפתרונות קדקודים של משושה משוכלל` | §2b, 2015, 2018, 2020 | C3 |
@@ -341,7 +343,7 @@ carries at least two corpus witnesses — no speculative grammar. A catalog entr
 per-slice from this table; the table, not any single question's phrasing, is what "supported"
 means.
 
-## 10b. Nine more families — the eleven-exam re-reading ([ADR-CX-007](06d-decisions-complex.md#adr-cx-007))
+## 10b. Nine more families — the eleven-exam re-reading ([ADR-CX-007](../06d-decisions-complex.md#adr-cx-007))
 
 The F1–F13 contract was authored from **eight** exams. The operator's 2026 מיקוד confirms the whole
 יואל גבע 572 booklet (2020–2025) is in scope — Q3 is complex numbers in ~22 papers. Re-reading
@@ -386,9 +388,9 @@ always-visualize + polar↔cartesian toggle, series in scope, complex before ana
 intact, but two things it assumed did not. The 2-D *solver* does not transfer — per-fact drives cannot
 reach the corpus's chained equation systems (#607), so the engine is a **log-polar constraint system**
 whose multiplicative core is an exact ℚ-linear solve and whose branches are the integer unknowns in
-its angle equations ([ADR-CX-006](06d-decisions-complex.md#adr-cx-006)). And the grammar was authored
+its angle equations ([ADR-CX-006](../06d-decisions-complex.md#adr-cx-006)). And the grammar was authored
 from too small a sample — nine more sentence families, five with 3–4 witnesses each, came out of
-re-reading eleven exams (§10b, [ADR-CX-007](06d-decisions-complex.md#adr-cx-007)). **The live build
+re-reading eleven exams (§10b, [ADR-CX-007](../06d-decisions-complex.md#adr-cx-007)). **The live build
 plan is §9b (S0–S7), foundation-first, behind an `?engine=v2` switch
-([ADR-CX-008](06d-decisions-complex.md#adr-cx-008)); the four mechanisms the sibling products deferred
-and paid for are built on day one ([ADR-CX-009](06d-decisions-complex.md#adr-cx-009)).**
+([ADR-CX-008](../06d-decisions-complex.md#adr-cx-008)); the four mechanisms the sibling products deferred
+and paid for are built on day one ([ADR-CX-009](../06d-decisions-complex.md#adr-cx-009)).**

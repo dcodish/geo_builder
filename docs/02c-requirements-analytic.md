@@ -7,11 +7,11 @@ the `02c` slot by [ADR-W-041](06w-decisions-workspace.md#adr-w-041) (2026-09-05,
 **That promotion changed this file's lifecycle, so the change is recorded rather than made silently.**
 The original header said this file *"folds into 19 and is deleted"* once its decisions ratified as
 `ADR-AG-NNN` in [06c](06c-decisions-analytic.md). It no longer does. Under ADR-W-041 a product's
-requirements are a **standing contract** and [docs/19](19-analytic-geometry-tool.md) is its build
+requirements are a **standing contract** and [docs/19](archive/19-analytic-geometry-tool.md) is its build
 **plan** — a plan finishes and becomes history, a contract does not. Ratification therefore changes
 this file's *status line*, not its existence; the analytic sections of `docs/19` fold into **here**,
 not the reverse. 02c is the analytic contract (with [04c](04c-design-analytic.md) for the how);
-[docs/19](19-analytic-geometry-tool.md) is the finished build plan (history), and where the two differ,
+[docs/19](archive/19-analytic-geometry-tool.md) is the finished build plan (history), and where the two differ,
 02c wins (amended 2026-10-07, #1861).
 
 Read it as *the operator's intent plus its consequences*, with the open questions marked. Where a
@@ -60,6 +60,57 @@ sloppy question visibly sloppy. That is a feature.
 
 ---
 
+## 1a — Scope and non-goals (moved from docs/19 §3 and §9, #1861)
+
+**The formula sheet sets the scope.** The 5-unit sheet's whole analytic-geometry section is two
+formulas: the distance between two points, and the canonical ellipse `x²/a² + y²/b² = 1`. The line
+equation, `y − y₁ = m(x − x₁)`, the circle, the point–line distance and the parabola are expected by
+heart. So the parabola appears in the corpus only in the canonical form `y² = 2px`, with focus
+`F(p/2, 0)` and directrix `x = −p/2`. The student recites that triple, and the tool reads it natively.
+No hyperbola is on the sheet, and none appears in twenty sampled exams.
+
+**R173 — NO CAS** ([ADR-AG-001](06c-decisions-analytic.md#adr-ag-001) D1; operator authority). The
+equation layer parses and evaluates. It never simplifies, solves or manipulates symbolically. Pinning a
+parameter is a numeric root-find of one or two degrees of freedom. A feature that needs more goes back to
+the operator; the tool never grows an algebra system by increments. So a value that moves with a
+parameter is never written as an expression in it: «הביעו באמצעות k» is not answered, and the figure
+is drawn for the sampled value ([ADR-AG-072](06c-decisions-analytic.md#adr-ag-072) decision 4).
+*(Realised — `src-analytic/CLAUDE.md` hard boundary 2; R5 stages the base model inside this line.)*
+
+**R174 — The curve family is closed: the line, the circle, the canonical parabola `y² = 2px` and the
+canonical ellipse `x²/a² + y²/b² = 1`.** A hyperbola, a rotated conic, a translated parabola or ellipse,
+and a parabola on the y-axis are each refused by name, never drawn as something else. Adding one is a
+decision, not a fix. A figure may hold as many parabolas and ellipses as the question does
+([ADR-AG-018](06c-decisions-analytic.md#adr-ag-018)). *(Realised — `src-analytic/engine/conic.ts`,
+`src-analytic/CLAUDE.md` hard boundary 3; the refusal names the stated noun, R7.)*
+
+**What the tool shows, and what it never shows.**
+- An answer the givens determine may be shown when the student asks for it, in the data panel, never
+  unbidden on the canvas (R20, R21, R25; [ADR-AG-016](06c-decisions-analytic.md#adr-ag-016)).
+  Step-by-step solutions are never shown ([ADR-W-118](06w-decisions-workspace.md#adr-w-118) B5: *"we
+  dont solve it for you means we dont show you step-by-step solutions"*).
+- **The technique trace explains, never plans** ([ADR-AG-062](06c-decisions-analytic.md#adr-ag-062),
+  #1053; R100). Beside an answer the student asked for, it shows the formula with this figure's values
+  substituted, never the arithmetic worked through. It explains a row already on screen. It never
+  answers "how could you reach X" for something not yet determined: that is a planner, and it grows by
+  increments. *(Whether B5 changes this trace is not yet ruled; this line describes the code.)*
+- The tool grades nothing. There is no claim lane: a student never types an answer to be checked
+  ([ADR-AG-072](06c-decisions-analytic.md#adr-ag-072); operator, 2026-09-16: *"I dont want a validation
+  tool"*).
+- **The knowledge gate carries the whole honesty boundary.** Coordinates and equations are shown, so
+  nothing is protected by withholding. A row prints a value only when it is knowledge (R3, R25). A value
+  that is really one sample's, printed here, asserts a given the question never gave
+  ([ADR-052](06-decisions.md#adr-052)).
+- **The gauge is inverted.** Every honesty habit in the 2-D tree assumes drawn coordinates mean nothing.
+  Here they are the answer (R2). A pattern copied from a sibling is re-read against that assumption
+  before it lands ([ADR-W-004](06w-decisions-workspace.md#adr-w-004)).
+
+*Not carried over from docs/19, because a later ruling replaced it:* "never print an answer the exam
+asks for" (R21, ADR-AG-016, ADR-W-118 B5) · the claim verifier (ADR-AG-072) · "at most one parabola and
+one ellipse per figure" (ADR-AG-018) · "a segment ratio is not a given" (R88).
+
+---
+
 ## 2 — The base model
 
 **R1 — The base is geometry with coordinates, because that is how the bagrut is built.** *(Operator
@@ -78,7 +129,7 @@ discarded — it stops being the model and becomes *how an equation identifies w
 
 > **RATIFIED — [ADR-AG-009](06c-decisions-analytic.md#adr-ag-009) (2026-09-15).** The operator
 > re-affirmed R1 and directed that the re-founding is the **next slice**, ahead of the relations lane
-> [docs/19 §7](19-analytic-geometry-tool.md) had sequenced first. The consequence above is discharged
+> [docs/19 §7](archive/19-analytic-geometry-tool.md) had sequenced first. The consequence above is discharged
 > there: ADR-AG-006 D1 is superseded as a statement about the *model* and retained as a statement about
 > *curve objects*. The timing note held — nothing was built on either shape in the interval, and the
 > three §5 questions were measured through the real path before the ADR was written.
@@ -247,6 +298,72 @@ Two prohibitions, both already ruled in the family: never accept silently withou
 (ADR-W-030), and never escalate to the paid LLM, because this is input we recognise —
 [ADR-3D-214](06b-decisions-3d.md#adr-3d-214) D2's *"a refusal we own, not a question we outsource"*
 applies even more plainly to recognised-but-misspelled than to recognised-but-unsupported.
+
+---
+
+## 3a — Input language and notation (families F1–F15) (moved from docs/19 §10, #1861)
+
+**R175 — The student types the exam's own sentence** ([ADR-AG-005](06c-decisions-analytic.md#adr-ag-005)
+D8). Every canonical form is a phrasing that occurs in the corpus, never an invented command language.
+Where the exam says «נתון מעגל I שמשוואתו (x−3)²+(y−4)²=9, ומרכזו בנקודה K», that sentence is the input.
+
+**The catalog is the coverage map.** [`src-analytic/parser/catalogAnalytic.ts`](../src-analytic/parser/catalogAnalytic.ts)
+is three things at once: the student's reference (the in-app guide), the coverage map (a guard test
+re-parses every entry in Hebrew and English and builds it), and the only vocabulary the LLM fallback may
+emit. The families below say what the language is built from. They are not a coverage claim: a phrasing
+parses when the catalog carries it. The catalog's own `family` field is a coarser index and does not
+follow these numbers past F6. F18–F20 are catalog tags with no row here (relations between directions;
+distance and slope; length, ratio and area values), and its F16/F17 are wider than §8b defines them.
+
+### Naming conventions
+
+| Object | Convention | Notes |
+|---|---|---|
+| Point | A capital letter with an optional index: `A`, `M`, `F₁`, `D₂`, typed `F1`, `D2` | The [ADR-228](06-decisions.md#adr-228) subscript convention. A name typed in a different spelling of one the figure has (`ℓ1` for `l1`, a subscript glyph, a prime, a case change) is not silently equated; the refusal offers the figure's name ([ADR-AG-234](06c-decisions-analytic.md#adr-ag-234), R32) |
+| Line | `ℓ`, `ℓ₁`, `ℓ₂`, typed `l`, `l1`, `l2`; or a number («הישר 1», «ישר 2», «הישר I»); or two points (`AB`); or a role (`המשיק`) | **`ℓ` is not a `\w` character**: a line name is never followed by `\b`, only by an explicit lookahead (the 3-D trap, [src3d/CLAUDE.md](../src3d/CLAUDE.md)) |
+| Circle | **Named**: `מעגל I` / `מעגל II` (the corpus's Roman numerals), a digit (`מעגל 1`), `המעגל שמרכזו M`, or bare `המעגל` when it is the only one | Circles regularly come in twos, so a name is the norm |
+| Parabola, ellipse | **Anonymous** by default (`הפרבולה`, `האליפסה`), or named (`פרבולה I`) | A figure may hold several ([ADR-AG-018](06c-decisions-analytic.md#adr-ag-018)). An unnamed curve's identity is its equation (R44) |
+| Axes, origin | `ציר ה-x`, `ציר ה-y`, `ראשית הצירים` (`O`) | The frame always exists and is never declared |
+
+### The fifteen families
+
+Each family lists the phrasing the corpus uses; the English column is the catalog's parallel entry.
+
+| # | Family | Hebrew (canonical) | English |
+|---|---|---|---|
+| **F1** | Point by coordinates | `נתונה הנקודה A(2,6)` · `A(−9a,0)` | `point A(2,6)` |
+| **F2** | Incidence | `הנקודה A נמצאת על האליפסה` · `B נמצאת על החלק החיובי של ציר ה-x` · `M נמצאת ברביע הראשון` · `E היא נקודה כלשהי על מעגל II` | `A is on the ellipse` · `B is on the positive x-axis` · `E is any point on circle II` |
+| **F3** | Line by equation | `נתון הישר ℓ1: 4y−3x−20=0` · `משוואת הישר AC היא y=−2x+8` · `הישר x=−4` | `line l1: 4y−3x−20=0` |
+| **F4** | Line by construction | `D היא נקודת החיתוך של הישר AC עם ציר ה-y` · `דרך A העבירו ישר המקביל לציר ה-x` · `מ-M מורידים אנך לציר ה-x החותך אותו בנקודה K` · `הישר העובר דרך ראשית הצירים ודרך A` | `D is the intersection of AC with the y-axis` · `through A draw a line parallel to the x-axis` |
+| **F5** | Circle | `נתון מעגל I שמשוואתו (x−3)²+(y−4)²=9, ומרכזו בנקודה K` · `משוואת המעגל x²+y²−2ax−2x=0` · `מעגל שמרכזו M(6,10)` · `מעגל שמרכזו F העובר דרך B` · `המשולש ABC חסום במעגל שמרכזו M` · `מעגל חסום במעוין` | `circle I: (x−3)²+(y−4)²=9, centre K` · `circle centred M through B` · `circle inscribed in the rhombus` |
+| **F6** | Conic (canonical only, R174) | `נתונה פרבולה קנונית שמשוואתה y²=54x` · `נתונה אליפסה שמשוואתה x²/9+y²/b²=1` · `אורך הציר הראשי של האליפסה הוא 4t` | `canonical parabola y²=54x` · `the major axis of the ellipse is 4t` |
+| **F7** | Role | `F1 הוא המוקד הימני של האליפסה` · `מוקדי האליפסה נמצאים על ציר ה-x` · `הנקודה (t,0) היא מוקד של פרבולה קנונית` · `הישר ℓ2 הוא מדריך של פרבולה קנונית` · `AC הוא קוטר במעגל` · `הקטע AB הוא מיתר במעגל` | `F1 is the right focus of the ellipse` · `l2 is the directrix of a canonical parabola` · `AC is a diameter of the circle` |
+| **F8** | Tangency | `הישר y=x משיק למעגל` · `המשיק למעגל בנקודה A` · `דרך D העבירו משיק למעגל` · `הישר mx−y+n=0 הוא משיק משותף לשני המעגלים` · `מעגל שמרכזו M משיק לישרים ℓ1 ו-ℓ2` · `שני מעגלים המשיקים זה לזה מבחוץ` / `מבפנים` · `הישר ℓ משיק לפרבולה בנקודה A` | `y=x is tangent to the circle` · `the tangent to the circle at A` · `a common tangent to the two circles` · `two circles tangent externally` |
+| **F9** | Mutual position | `הישר BM מאונך לציר ה-x` · `AC מקביל ל-MB` · `הישר הנתון ניצב לישר שמצאתם בסעיף א` | `BM is perpendicular to the x-axis` |
+| **F10** | Metric given | `AB = 4√5` · `אורך הקטע המחבר את מרכזי המעגלים הוא 9` · `רדיוס המעגל שווה ל-5` · `היחס בין אורכי הרדיוסים הוא 1:2` · `AC:CB = 3:2` (R88) · `∡APB = 90°` · `שטח המשולש KLM הוא 9` · `השטח הגדול ביותר של המשולש APB הוא 156.25` · `המרחק בין הישרים EF1 ו-GF2 הוא 24` · `AC²+BC²=1250` | `AB = 4√5` · `the ratio of the radii is 1:2` · `the largest possible area of APB is 156.25` |
+| **F11** | Parameter declaration (a domain, not a constraint) | `a הוא פרמטר חיובי` · `a הוא פרמטר שונה מאפס` · `t הוא פרמטר קטן מ-9` · `0<k<6` | `a is a positive parameter` · `t is a parameter less than 9` |
+| **F12** | Curve edit (affine) | `מזיזים את המעגל ב-9 יחידות ימינה ו-12 יחידות למטה` · `מכפילים את שיעור ה-y של כל נקודה על המעגל ב-2/3` | `translate the circle 9 right and 12 down` · `multiply the y-coordinate of every point on the circle by 2/3` |
+| **F13** | Locus: **asked, not stated** (R87, [ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)) | Ordinary givens leave a point one degree of freedom, then the ask lane is asked: `המקום הגיאומטרי של P` · `משוואת המקום הגיאומטרי של P`. The set-former phrasing (`המקום הגיאומטרי של כל הנקודות M המקיימות MA=MB`) is sugar over the same figure, never a prerequisite. A locus over objects (`מרכזי המעגלים שהקטע AB הוא מיתר שלהם`) is refused by name | `the locus of P` |
+| **F14** | Branch selector / sweep range | `שיעור ה-y של B קטן מ-6` · `שיעור ה-x של M קטן משיעור ה-x של A` · `A היא נקודה כלשהי על מעגל II כך ש-−1.5 ≤ שיעור ה-y של A ≤ 1.5` | `the y-coordinate of B is less than 6` |
+| **F15** | Ask (the data panel's lane, R23) | `משוואת BD` · `\|AB\|` · `שטח ABC` · `הזווית BAC` | `equation of BD` · `area ABC` |
+
+**An inequality is one of three things, and they are not interchangeable**
+([ADR-AG-005](06c-decisions-analytic.md#adr-ag-005) D7): a parameter's domain (F11, which filters
+roots), a branch selector (F14, which picks among branches after the solve), or a sweep range (F14,
+which bounds a free degree of freedom). §4 (R13) is where a stated kind meets a domain.
+
+### Input normalization
+
+A student types on a keyboard and the exam is typeset. Both reach one internal form at one chokepoint,
+`normalizeMath` in `src-analytic/engine/expr.ts`, never per rule: `^2` ≡ `²` and `^3` ≡ `³` ·
+`-` ≡ `−` · `*` ≡ `·` · `sqrt(5)` ≡ `√5`. A comparison reads the same as `<=` / `>=` or `≤` / `≥`, and
+`pi` reads as `π`. Every glyph the palette offers must parse (R11a).
+
+### Out of the language
+
+- Any curve outside R174's closed family.
+- A request to prove («הוכיחו כי …», «הראו כי …»). It is refused as a claim to prove and never recorded
+  as a given ([FR-SU-15](02w-requirements-workspace.md)).
 
 ---
 
@@ -646,7 +763,7 @@ it. **Not rejected on the merits — not in scope now**, and nothing above forec
 ## 8 — The «lines and points» corpus, and what it changes
 
 **Status: a SECOND corpus, read 2026-09-15.** Sections 1–7 are written against the שאלון 572 Q1
-corpus — conics, tangency, loci, symbolic parameters ([docs/19 §2](19-analytic-geometry-tool.md)). The
+corpus — conics, tangency, loci, symbolic parameters ([docs/19 §2](archive/19-analytic-geometry-tool.md)). The
 operator then brought roughly forty exercises from the topic they are **teaching now**: midpoints,
 medians, centroids, incircles, areas, sides given by equation. It is the same product and a different
 exam topic, and it changes the priorities enough to be written down rather than absorbed.
@@ -677,7 +794,7 @@ Tallied over the ~40 exercises, most common first:
 
 ### 8b — Two new input families (F16, F17)
 
-The docs/19 §10 families F1–F15 were extracted from the 572 corpus. These two come from this one, and
+The families F1–F15 (§3a, moved from docs/19 §10) were extracted from the 572 corpus. These two come from this one, and
 are numbered onward rather than renumbering a settled table.
 
 | # | family | Hebrew | English |
@@ -1364,7 +1481,7 @@ same row, in the same order, as every other builder. **A step can always be take
 redo cover adding, editing, deleting and clearing, and because the session is the line list, an undone
 figure is re-derived rather than restored.
 **The givens list offers the suite's three row operations** ([ADR-AG-177](06c-decisions-analytic.md#adr-ag-177),
-docs/28 D6): a checkbox MUTES a given — the row stays, the figure is drawn as if it had never been said —
+02w ruling D6): a checkbox MUTES a given — the row stays, the figure is drawn as if it had never been said —
 alongside ✎ edit in place and ✕ delete. Un-muting a given that the figure has since contradicted is refused,
 naming that given, and the row stays muted. A muted given is saved, shared and restored muted, and undo
 takes a mute back.

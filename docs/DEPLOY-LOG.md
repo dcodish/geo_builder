@@ -1,6 +1,6 @@
 # DEPLOY LOG — what is live on themathbible.com
 
-Append-only, newest first. One entry per deploy, written **at deploy time** ([docs/22 §5](22-workflow.md)). Every entry pairs with a git tag `prod/YYYY-MM-DD[-n]` on the deployed commit. This file is canonical — deploy notes no longer accumulate in PROJECT-MEMORY. Pre-adoption deploy history (2026-07-04 … 2026-07-10) lives in PROJECT-MEMORY's operational notes.
+Append-only, newest first. One entry per deploy, written **at deploy time** ([docs/22 §5](22-workflow.md)). Every entry pairs with a git tag `prod/YYYY-MM-DD[-n]` on the deployed commit. This file is canonical. The untagged deploys made before the workflow was adopted (2026-07-04 … 2026-07-09) are the [Pre-adoption deploys](#pre-adoption-deploys-untagged-2026-07-0407-10) table at the bottom.
 
 | Date | Tag | Commit | App(s) | Bundle(s) | What changed |
 | --- | --- | --- | --- | --- | --- |
@@ -197,3 +197,21 @@ Append-only, newest first. One entry per deploy, written **at deploy time** ([do
 | 2026-07-10 | `prod/2026-07-10-3` | `499675f` | 3-D (static only; proxy untouched) | `3d-BGQndf-i.js` | ADR-3D-034 — V8-j: a point on a segment positioned so a derived pyramid is RIGHT (apex above the base centre, closed-form t; honest no-solution when the segment misses the centre). **Completes V8** (full legacy-572 input coverage). PR #12, closes #11. |
 | 2026-07-10 | `prod/2026-07-10-2` | `e39679a` | 3-D (static only; proxy untouched) | `3d-C0CHZumu.js` | ADR-3D-033 — a membership statement about an existing point DRIVES the figure (stage-4 member-pin re-solve, warm-started, transactional); fixes #9 (session `n6lmx1rj`, `M על מישור DCC'D'` refused not-on-plane). |
 | 2026-07-10 | `prod/2026-07-10` | `6168d0c` | 2-D + 3-D (static only; proxy untouched) | `index-42UWO93R.js` / `3d-BJG80kY4.js` | 2-D: ADR-262 Am.1, ADR-264 (+Am.1/2) — clause split, honesty gates, hover/canvas fixes. 3-D: ADR-3D-030/031/032 — plane-eq as M1 given, pair-named parametric line, derived plane equations, symbolic coordinate. (Tag added retroactively at workflow adoption.) |
+
+## Pre-adoption deploys (untagged, 2026-07-04…07-10)
+
+Rescued from the deleted PROJECT-MEMORY's operational notes (#1861). Each was a static-only deploy: the proxy was untouched. Newest first. The 2026-07-10 deploy that list also recorded is the tagged `prod/2026-07-10` row above. Earlier deploys (the 2026-06-26 go-live … 2026-07-03) appear only inside that file's dated session entries ([permalink](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/PROJECT-MEMORY.md)).
+
+| Date | What shipped | Commit |
+| --- | --- | --- |
+| 2026-07-09 (5th) | 2-D: hovering or tapping an angle or side picks it again — the pick used the props' size, not the measured canvas (`index-Dd_SV8gj.js`) | not named |
+| 2026-07-09 (4th) | 2-D: the canvas toolbar moved from an overlay into a row above the figure (`index-COxrz1SQ.js`) | not named |
+| 2026-07-09 (3rd) | 2-D: ADR-262 Am. 1 points 2–3 — ∠B = ∠CDE surfaces; the canvas fit reserves a label margin (`index-Lg7uF1Ud.js`) | not named (working tree) |
+| 2026-07-09 (2nd) | 2-D: ADR-262 redeployed — an inscribed polygon now draws its sides (`index-cmz2vPKu.js`) | not named |
+| 2026-07-09 (1st) | 2-D: ADR-262 — a polygon inscribed in a polygon (`index-Dg6EVb1l.js`) | none (uncommitted tree, `rebuild-foundation`) |
+| 2026-07-08 (4th) | 3-D: the examples folded into a «דוגמאות» dropdown (`3d-6J9XYod8.js`) | none (uncommitted tree) |
+| 2026-07-08 (3rd) | 2-D: ADR-257 — the similar-triangles list reports congruent sub-groups (`index-DmgcBqJW.js`) | `03aaf1b` |
+| 2026-07-08 (2nd) | 3-D: ADR-3D-017 — perpendicular declared vectors show as u·v = 0 in the data panel (`3d-CGizBUwR.js`) | none (uncommitted tree) |
+| 2026-07-08 (1st) | Both apps: 2-D ADR-253..256 + 3-D ADR-3D-015 (`index-CVq99mSj.js` / `3d-DR4Wkfyl.js`) | `40fc47b` + `b9ec05d` |
+| 2026-07-06 | 2-D: the ADR-240/241/242 honesty triple (`index-CCHI2HF5.js`) | `9da88c8` |
+| 2026-07-04 | 2-D: the shape-detection work; the theorem feed built disabled (`VITE_ENABLE_THEOREMS`) | not named |

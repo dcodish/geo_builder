@@ -10,7 +10,7 @@ the tree exists at all.
 ## The problem it solves
 
 Three products grew the same chrome three times and it looked and behaved like three different apps.
-[docs/28 §1](28-product-unification.md) measured the divergence: the ask lane existed in three shapes,
+[docs/28 §1](archive/28-product-unification.md) measured the divergence: the ask lane existed in three shapes,
 bidi isolation was present in two builders and absent in the third, and the doctrine was duplicated **in
 prose** across the orientation files — which §1c named as the real defect. Copying an engine is correct
 (2-D and 3-D geometry differ in kind); copying a *button row* is not.
@@ -49,7 +49,7 @@ extracted later.
 | Layer | Modules | What they are |
 |---|---|---|
 | **Primitives** | `theme.ts` · `bidi.ts` · `i18n.ts` · `format.ts` · `math.tsx` · `symbols.ts` · `save.ts` · `switcherConfig.ts` | Pure, no React, no product knowledge. Design tokens, bidi isolation, the i18n bootstrap, number/math display, the save envelope, the config overlay merge |
-| **Frame** | `AppFrame` · `Workbench` · `Switcher` · `InputArea` · `FactList` · `DataPanel` · `AskLane` · `SymbolRow` · `QuickChips` · `Banner` · `ManualScreen` · `Modal` · `ToolButton` · `FigureName` | React components implementing the D1–D10 rulings ([docs/28 §4a](28-product-unification.md)), each taking its product-shaped content as a slot |
+| **Frame** | `AppFrame` · `Workbench` · `Switcher` · `InputArea` · `FactList` · `DataPanel` · `AskLane` · `SymbolRow` · `QuickChips` · `Banner` · `ManualScreen` · `Modal` · `ToolButton` · `FigureName` | React components implementing the D1–D10 rulings ([02w, *Suite rulings*](02w-requirements-workspace.md), moved from docs/28 §4a), each taking its product-shaped content as a slot |
 | **Export** | `export/svgToPng.ts` · `export/questionDoc.ts` | The shared output paths behind "save image" and "download question" |
 
 The primitives layer is the one a product can adopt without changing its layout, which is why adoption
@@ -111,11 +111,113 @@ has not grown a `variant` / `mode` / `kind` prop that *is* product identity wear
 the same fork, one layer down. Today that holds by review and by the slot discipline above, and the
 audit found it clean; nothing makes it fail automatically if it stops being true.
 
-The designed mechanism is the **conformance matrix** ([docs/28 §5 Phase 2](28-product-unification.md),
+The designed mechanism is the **conformance matrix** ([docs/28 §5 Phase 2](archive/28-product-unification.md),
 issue [#664](https://github.com/dcodish/geo_builder/issues/664)) — one row per shared contract, one
 column per builder, where *an unexamined cell fails the suite*. It is specified and not yet built.
 Recorded here rather than only in the issue, because a design doc that omits the weakest property of its
 central rule is not describing the system.
+
+## How a cross-product wiring guard is written (docs/28 §5c, moved in #1861; [ADR-W-071](06w-decisions-workspace.md#adr-w-071))
+
+`shell/` may never import a product tree, so a guard that wants to check "every builder does X" cannot
+simply call all four. The tempting answer is to read each `App*.tsx` as text and grep for the shape. That
+asserts where a decision LIVES rather than that the product MAKES it, and it breaks the first time
+someone extracts the decision into its own function. That is what went red in #1315, on a refactor that
+improved the code.
+
+**The pattern instead:**
+
+1. The product's decision is a **callable function**, not an arrow inside a JSX prop. A ternary in a prop
+   is invisible to every test, which is what forces the source scan in the first place.
+2. The **rows and the checks** live once, in `shell/__tests__/fixtures/`, as a pure
+   `xFaults(subject, opts) → string[]` plus a thin `xSuite()` wrapper that runs it as `it` rows.
+3. Each tree has a **thin lock** that imports its own function and calls the shared suite. A product
+   importing `shell/` is the allowed direction.
+4. Where products legitimately differ, the difference is an **explicit option** on the suite
+   (`isolatesFirst` for the preview), never a silent exclusion.
+5. A **meta-lock** in `shell/` runs the shared checks against deliberately broken stubs and asserts each
+   is caught. It calls the same `xFaults`, never its own copy.
+
+**The registry is the fixtures directory:** every `shell/__tests__/fixtures/*-rows.ts` file (and
+`geo-input-parity.ts`) is an instance, and its meta-lock sits beside it as `*-meta*.test.ts`. Three
+instances stretch the pattern, and are the models for the next one of their kind:
+- `privacy-disclosure-rows.ts` (#1426, [ADR-W-090](06w-decisions-workspace.md#adr-w-090)) applies it to
+  WIRING rather than behaviour. The product's callable is `privacyDeclaration(t)`, and the fixture
+  measures the other side itself by walking the bundle's import graph from the product's real entry. It is
+  an import-reachability scan, not a text grep of `App*.tsx`, so moving a sink into a new file cannot hide
+  it.
+- `about-content-rows.ts` (#1477, [ADR-W-091](06w-decisions-workspace.md#adr-w-091)) holds a DECLARATION
+  to the product's BEHAVIOUR. The callable is `aboutContent(t)`, and the product also passes a step runner
+  over its real submit gate, so every «try this» line the About shows must build in sequence on an empty
+  canvas. The runner returns one verdict per step: an early return is a fault, never a pass.
+- `geo-input-parity.ts` (#1649, [ADR-W-108](06w-decisions-workspace.md#adr-w-108)) asserts EQUALITY across
+  builders without one test seeing two of them. Each row carries the reference verdict (2-D's) as a
+  literal, `expect`, and every tree's thin lock asserts its own submit decision against that literal, so
+  the builders agree transitively. Known gaps are a ratchet: a gap that closes fails until its row moves
+  to the parity rows. Each catalog's sentences must be covered by a row or a topic exception.
+
+## The shared bidi core's run-span rule (formerly docs/28 §5b, moved in #1861; [ADR-W-070](06w-decisions-workspace.md#adr-w-070))
+
+`makeBidi().segments` (`shell/bidi.ts`) decides where a technical run begins and ends: the one decision
+every bidi surface is built on. The span is `[first CORE character … last CORE character]`, then grown
+by three rules:
+
+1. **partner debt**: a delimiter whose partner is already inside the span joins it;
+2. **a leading SIGN**: `-`, `−` or `+` immediately before the span joins it, **unless a Hebrew letter sits
+   immediately before the sign**. Then it is a particle's maqaf («ציר ה-x», «ו-B», «מ-9») and belongs to
+   the Hebrew;
+3. **balanced hug**: a delimiter pair wrapping the span joins it, outermost last.
+
+**The order of 2 and 3 is load-bearing.** `(-2,4)` must become the span `-2,4` before the hug runs, so
+that the hug then sees `(` and `)` adjacent and absorbs the pair. Reversed, the parens stay outside and
+the student reads «(2,4-)», the #1296 defect.
+
+The signs are **not** in the run alphabet (`BASE_CORE`). A CORE character may START a run on its own, and
+a bare `-` between Hebrew words is a maqaf; a sign extends a run that already exists, at its left edge.
+
+**Three copies, one table.** `shell/bidi.ts` serves analytic and complex. 2-D (`src/i18n/bidi.ts`) and
+3-D (`src3d/i18n/bidi.ts`) keep their own copies ([ADR-W-016](06w-decisions-workspace.md#adr-w-016)). The
+rule is locked by one row table, `shell/__tests__/fixtures/issue-1296-rows.ts`, asserted identically
+against each copy (in `shell/__tests__`, `src/i18n/__tests__` and `src3d/__tests__`), because a per-tree
+lock cannot see a copy drifting. The one legitimate divergence is 3-D's `declSplit` (a declaration renders
+as a name island plus an equation island, a documented `makeBidi` option). It is asserted on both sides,
+so a migration of 3-D onto the shared core has to decide about it rather than lose it.
+
+## The sequence gate (docs/28 §5d, moved in #1861; [ADR-W-076](06w-decisions-workspace.md#adr-w-076))
+
+*Never reorder the letters of a point sequence: the sequence IS the statement.* One algorithm,
+`shell/llm/sequenceGate.ts`, three consumers.
+
+```
+shell/llm/sequenceGate.ts        the algorithm: stated runs by label multiset, ambiguity -> refuse,
+                                 reverse == same statement, rewrite by match index
+        ^            ^            ^
+        |            |            |
+src/parser/parse.ts  src3d/parser/honesty3.ts  src-analytic/parser/honestyAnalytic.ts
+  ULABEL             primed labels             a capital + optional digit
+  normalizeUtterance normalize3                identity
+  mask the area S    canonicalise primes       identity
+  emit the ORIGINAL  emit the CANONICALISED    emit the original
+```
+
+Read the last row of that table first. The two shipped copies **differed** in what they emit, and the
+extraction preserved the difference (`prepareLine` returns `{ match, emit }`) rather than unifying it.
+Unifying would have changed output in a shipped tool: a behaviour change wearing a refactor's clothes.
+
+**Where each product runs it:** 2-D in `submitPipeline`, 3-D in `App3`, analytic in `runFallback`. In
+every case it runs on the model's lines and **before** the deterministic re-parse, because the restored
+spelling is what must be parsed, recorded and read back. Complex has no LLM lane yet
+([ADR-W-118](06w-decisions-workspace.md#adr-w-118) B14, #1869).
+
+**The corrections are logged.** Each product puts `restored` (`WAS→WANT`) on the submit event. Without
+it, a submit that was silently corrected looks exactly like one that needed no correction, which is how
+2-D #536 went unnoticed until it reached production.
+
+**The rows, and the proof they bite.** `shell/__tests__/fixtures/sequence-gate-rows.ts` holds the checks
+once; each tree has a thin lock; 3-D's primed alphabet rides as an explicit option. The meta-lock
+(`issue-1356-sequence-gate-meta.test.ts`) runs those rows against deliberately broken gates (one that
+does nothing, one that restores without logging, one that rewrites a reversal, one that invents an
+unstated run, one that picks a spelling the student left ambiguous) and asserts each is caught. A row the meta-lock shows cannot fail is deleted, never kept as a check of nothing.
 
 ## The session seam ([ADR-W-078](06w-decisions-workspace.md#adr-w-078))
 

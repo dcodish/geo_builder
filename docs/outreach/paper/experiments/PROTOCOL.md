@@ -12,9 +12,9 @@ This is the **comparative layer** on top of the existing correctness nets — it
 
 | Existing net | Role here |
 |---|---|
-| Givens verifier ([ADR-053](../../06-decisions.md#adr-053), `verify.ts`) | correctness signal for **every** figure (verified vs. amber) |
-| Invariants campaign ([ADR-047](../../06-decisions.md#adr-047), `campaign.test.ts`) | correctness for under-determined figures (relations hold) |
-| Coordinate-validation campaign ([ADR-109](../../06-decisions.md#adr-109), `src/validation/`) | correctness for the 0-shape-DOF slice (exact match to an independent oracle) |
+| Givens verifier ([ADR-053](../../../06-decisions.md#adr-053), `verify.ts`) | correctness signal for **every** figure (verified vs. amber) |
+| Invariants campaign ([ADR-047](../../../06-decisions.md#adr-047), `campaign.test.ts`) | correctness for under-determined figures (relations hold) |
+| Coordinate-validation campaign ([ADR-109](../../../06-decisions.md#adr-109), `src/validation/`) | correctness for the 0-shape-DOF slice (exact match to an independent oracle) |
 | Additive-stability property | a method must not make points jump |
 
 The comparative layer adds the **cross-method dimension**, the **cost/robustness metrics**, and the **provenance ledger**. It is dev/CI-only; nothing here ships.
@@ -78,7 +78,7 @@ Aggregations: a per-figure table + a summary (medians, totals, **win/loss/tie vs
 
 1. **Hard gate (correctness).** challenger pass-rate ≥ baseline **and** zero new regressions **and** stability preserved. Fail → **disqualified**, ignore its speed.
 2. **Improvement.** Meets the **pre-registered** threshold — e.g. "≥30% fewer `fnEvals` with identical roots," or "converges on the hard set where baseline does not" — and the loss profile is acceptable.
-3. **Verdict.** `adopt` / `reject` / `inconclusive`, recorded with the numbers. **Adoption is then its own gated change** (a new ADR + the standard [Definition of Ready](../../08-testing-strategy.md#definition-of-ready-the-gate)); the experiment justifies it, it does not perform it.
+3. **Verdict.** `adopt` / `reject` / `inconclusive`, recorded with the numbers. **Adoption is then its own gated change** (a new ADR + the standard [Definition of Ready](../../../08-testing-strategy.md#definition-of-ready-the-gate)); the experiment justifies it, it does not perform it.
 
 ---
 

@@ -1,6 +1,6 @@
 # 04 — Design & Architecture
 
-_Last updated: 2026-07-24 (S4.3 of [docs/24](24-foundation-hardening-plan.md) — the layer map truthed-up to the built system; the original 2026-06-10 design text is kept where it still describes reality). Status: **built and in production** — everything below exists. The day-to-day working doctrine is [docs/17](17-design-rules.md); the solve-ladder contract is [docs/LADDER.md](LADDER.md); the current architectural assessment is [docs/23](23-architecture-review-2026-07.md)._
+_Last updated: 2026-07-24 (S4.3 of [docs/24](archive/24-foundation-hardening-plan.md) — the layer map truthed-up to the built system; the original 2026-06-10 design text is kept where it still describes reality). Status: **built and in production** — everything below exists. The day-to-day working doctrine is [docs/17](17-design-rules.md); the solve-ladder contract is [docs/LADDER.md](LADDER.md); the 2026-07 architecture review, [docs/23](archive/23-architecture-review-2026-07.md), is archived history._
 
 ## 1. Guiding principles
 
@@ -8,6 +8,30 @@ _Last updated: 2026-07-24 (S4.3 of [docs/24](24-foundation-hardening-plan.md) �
 - **Describe, then construct.** The user states facts; the system constructs. The construction is a *dependency graph*, not a recognized template.
 - **Stability is structural.** Continuity between steps comes from persisting degrees of freedom and branch choices, not from after-the-fact smoothing heuristics.
 - **The LLM is optional and replaceable.** It sits behind a narrow boundary and handles only the inputs a free local parser can't.
+
+**The compiler lens (moved from docs/11, #1861).** The pipeline reads like a compiler (utterance → commands
+→ evaluation → SVG), but the system is an **incremental, order-normalizing constraint interpreter**: a
+statement's position in the list is presentation, not meaning; a relation is true when it holds in every
+valid configuration; and the front end resolves references against the current model. Its nearest
+relatives are a parametric-CAD kernel and SMT model enumeration, not a compiler. Four corrections to the
+plain compiler reading hold:
+1. **Re-mention is assertion, never redefinition.** A second mention of an id is almost always a given
+   about the existing object, not a "redefinition error". It lowers to constraints on that object, in one
+   place at the apply boundary (M1, [docs/17](17-design-rules.md) §4); `commandConflict` refuses only what
+   cannot be lowered. Ids are names, not declarations.
+2. **The parser may read the drawing, but only to resolve a pointing reference.** «המעגל הגדול»,
+   «הימני» and «נקודת ההשקה» are resolved from the drawn seed through `ParseContext`'s deictic fields,
+   and every such read emits a locking assertion. Coordinates never decide the meaning of a statement that
+   does not point ([docs/17](17-design-rules.md) §3b).
+3. **The stored artifact is source plus lowering.** A fact carries both its utterance and its lowered
+   commands, because the source is not deterministically recompilable (LLM steps, cost). An edited step
+   re-lowers against its own position's prefix ([ADR-241](06-decisions.md#adr-241)). On load, a step that
+   re-parses deterministically adopts the current lowering and an LLM step keeps its saved commands
+   (`refreshLoadedFigure`, [ADR-314](06-decisions.md#adr-314)); what remains is audited for drift and
+   dropped labels ([ADR-242](06-decisions.md#adr-242), [ADR-321](06-decisions.md#adr-321)).
+4. **The solve ladder is part of the semantics.** Constraint satisfaction runs through an ordered,
+   cross-layer ladder ([docs/LADDER.md](LADDER.md)). Which stage fired is observable
+   (`StepResult.ladder`) and contract-tested (`ladder-contract.test.ts`).
 
 ## 2. Pipeline overview
 
@@ -280,7 +304,7 @@ src3d/           the sibling 3-D product (pattern-copied, never imported — see
 
 ## 10. Build order (de-risk the core first) — *historical: all steps complete*
 
-> The full phased plan (scope, dependencies, requirement coverage, per-phase gates, milestones) is in [`09-implementation-plan.md`](09-implementation-plan.md). The list below is the summary.
+> The full phased plan (scope, dependencies, requirement coverage, per-phase gates, milestones) is in the archived [`09-implementation-plan.md`](archive/09-implementation-plan.md). The list below is the summary.
 
 1. **Engine core slice** — dependency graph + topological eval + free/on-segment/intersection points + branch cycle. Prove it on fixtures (build + stability; a genuine two-branch construction; a contradiction) from hardcoded command lists. *Make-or-break.*
 2. **SVG renderer** for that slice.

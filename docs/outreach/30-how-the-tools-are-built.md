@@ -1,8 +1,10 @@
 # 30 — How the tools are built: the mathematics under the four builders
 
+> Outreach material, not a rule or a spec (#1861).
+
 _Written 2026-09-29 as outreach material: a plain-language account of the algorithms behind the four
 products, for posts, talks and teacher conversations. It is a **reference**, not a contract — the
-mechanisms themselves are specified in [11](11-architecture-as-compiler.md), [LADDER](LADDER.md) and
+mechanisms themselves are specified in [11](../archive/11-architecture-as-compiler.md), [LADDER](../LADDER.md) and
 the ADR logs. Every algorithm named here points at the file that implements it, so a claim made in
 public can be checked against the code. If a file moves, fix the pointer; if an algorithm is replaced,
 fix the claim._
@@ -38,45 +40,45 @@ The LLM is a translator; the engine decides what is true.
 
 | Algorithm | What it does here | Where |
 | --- | --- | --- |
-| **Topological evaluation of a dependency DAG** | Every object is placed only after everything it depends on. A free point has 2 degrees of freedom, a point on a segment 1, a derived point 0 | [src/engine/evaluate.ts](../src/engine/evaluate.ts) |
-| **Levenberg–Marquardt** (damped Gauss–Newton, central-difference Jacobian) | When several constraints act on several points at once, the figure is a nonlinear least-squares problem. LM behaves like gradient descent far from the answer and like Gauss–Newton near it | 2-D [src/engine/solveLM.ts](../src/engine/solveLM.ts) · 3-D [src3d/engine/solve3.ts](../src3d/engine/solve3.ts) · analytic [src-analytic/engine/solve.ts](../src-analytic/engine/solve.ts) (multi-start) |
-| **Seeded pseudo-random sampling** (mulberry32 PRNG, FNV-1a hashing) | Unstated magnitudes are *sampled*, not assumed. The same seed gives the same figure, so undo and replay are exact. A relation counts as true only if it holds in **every** sampled configuration | [src/engine/sample.ts](../src/engine/sample.ts) |
-| **Gaussian elimination with partial pivoting** | Linear sub-systems, and the numerical rank of a constraint matrix | [src3d/engine/solve3.ts](../src3d/engine/solve3.ts) |
+| **Topological evaluation of a dependency DAG** | Every object is placed only after everything it depends on. A free point has 2 degrees of freedom, a point on a segment 1, a derived point 0 | [src/engine/evaluate.ts](../../src/engine/evaluate.ts) |
+| **Levenberg–Marquardt** (damped Gauss–Newton, central-difference Jacobian) | When several constraints act on several points at once, the figure is a nonlinear least-squares problem. LM behaves like gradient descent far from the answer and like Gauss–Newton near it | 2-D [src/engine/solveLM.ts](../../src/engine/solveLM.ts) · 3-D [src3d/engine/solve3.ts](../../src3d/engine/solve3.ts) · analytic [src-analytic/engine/solve.ts](../../src-analytic/engine/solve.ts) (multi-start) |
+| **Seeded pseudo-random sampling** (mulberry32 PRNG, FNV-1a hashing) | Unstated magnitudes are *sampled*, not assumed. The same seed gives the same figure, so undo and replay are exact. A relation counts as true only if it holds in **every** sampled configuration | [src/engine/sample.ts](../../src/engine/sample.ts) |
+| **Gaussian elimination with partial pivoting** | Linear sub-systems, and the numerical rank of a constraint matrix | [src3d/engine/solve3.ts](../../src3d/engine/solve3.ts) |
 
 ### Plane geometry (2-D)
 
 | Algorithm | What it does here | Where |
 | --- | --- | --- |
-| **Bracketing + bisection** | «∠GBA = 37°» leaves one unknown — where G sits on AD. The range is scanned for sign changes and each bracket is bisected to machine precision, so **every** root is found. Each root is a valid drawing; the configuration button cycles through them | [src/engine/geometry.ts](../src/engine/geometry.ts) (`solveParam`) |
-| **Nelder–Mead simplex** | Inequality givens ("inside the circle", "between B and C") have no smooth zero. A derivative-free simplex minimises the violation plus a penalty for moving, so the figure does not jump | [src/engine/evaluate.ts](../src/engine/evaluate.ts) |
-| **Numerical Jacobian rank** | "Is the figure fully determined?" counts only *independent* constraints. «AB ⟂ BC» after «∠ABC = 90°» is redundant and removes no freedom | [src/engine/dofRank.ts](../src/engine/dofRank.ts) |
-| **Dijkstra's shortest path** | Before drawing, a stated length longer than the shortest path between its endpoints (the triangle inequality, generalised) is proven impossible and refused, naming the conflicting statement | [src/engine/metricFeasibility.ts](../src/engine/metricFeasibility.ts) |
-| **Union–find** | Groups triangles into congruence and similarity classes; merges points stated to coincide | [src/engine/detectShapes.ts](../src/engine/detectShapes.ts), [src/engine/sideFeasibility.ts](../src/engine/sideFeasibility.ts) |
-| **Shoelace formula** | Polygon areas, and orientation (which way round a polygon is lettered) | [src/engine/geometry.ts](../src/engine/geometry.ts) |
+| **Bracketing + bisection** | «∠GBA = 37°» leaves one unknown — where G sits on AD. The range is scanned for sign changes and each bracket is bisected to machine precision, so **every** root is found. Each root is a valid drawing; the configuration button cycles through them | [src/engine/geometry.ts](../../src/engine/geometry.ts) (`solveParam`) |
+| **Nelder–Mead simplex** | Inequality givens ("inside the circle", "between B and C") have no smooth zero. A derivative-free simplex minimises the violation plus a penalty for moving, so the figure does not jump | [src/engine/evaluate.ts](../../src/engine/evaluate.ts) |
+| **Numerical Jacobian rank** | "Is the figure fully determined?" counts only *independent* constraints. «AB ⟂ BC» after «∠ABC = 90°» is redundant and removes no freedom | [src/engine/dofRank.ts](../../src/engine/dofRank.ts) |
+| **Dijkstra's shortest path** | Before drawing, a stated length longer than the shortest path between its endpoints (the triangle inequality, generalised) is proven impossible and refused, naming the conflicting statement | [src/engine/metricFeasibility.ts](../../src/engine/metricFeasibility.ts) |
+| **Union–find** | Groups triangles into congruence and similarity classes; merges points stated to coincide | [src/engine/detectShapes.ts](../../src/engine/detectShapes.ts), [src/engine/sideFeasibility.ts](../../src/engine/sideFeasibility.ts) |
+| **Shoelace formula** | Polygon areas, and orientation (which way round a polygon is lettered) | [src/engine/geometry.ts](../../src/engine/geometry.ts) |
 
 ### Space geometry (3-D)
 
 | Algorithm | What it does here | Where |
 | --- | --- | --- |
-| **Levenberg–Marquardt** | The pivot solver for solids whose dimensions are pinned by stated lengths and angles | [src3d/engine/solve3.ts](../src3d/engine/solve3.ts) |
-| **Numerical matrix rank** | How many independent scalars a set of givens actually pins | [src3d/engine/solve3.ts](../src3d/engine/solve3.ts) |
-| **Cramer's rule** | Decomposing a vector in a basis — one 3×3 solve, no computer-algebra system | [src3d/engine/vecExpr.ts](../src3d/engine/vecExpr.ts) |
+| **Levenberg–Marquardt** | The pivot solver for solids whose dimensions are pinned by stated lengths and angles | [src3d/engine/solve3.ts](../../src3d/engine/solve3.ts) |
+| **Numerical matrix rank** | How many independent scalars a set of givens actually pins | [src3d/engine/solve3.ts](../../src3d/engine/solve3.ts) |
+| **Cramer's rule** | Decomposing a vector in a basis — one 3×3 solve, no computer-algebra system | [src3d/engine/vecExpr.ts](../../src3d/engine/vecExpr.ts) |
 
 ### Complex numbers
 
 | Algorithm | What it does here | Where |
 | --- | --- | --- |
-| **Durand–Kerner (Weierstrass) iteration** | Finds **all** roots of a polynomial at once — the fundamental theorem of algebra, made computational | [src-complex/solve/census.ts](../src-complex/solve/census.ts) |
-| **Newton's method** | Polishes each root to machine precision | [src-complex/solve/census.ts](../src-complex/solve/census.ts) |
-| **Horner's scheme** | Evaluates polynomials efficiently and stably | [src-complex/solve/census.ts](../src-complex/solve/census.ts) |
+| **Durand–Kerner (Weierstrass) iteration** | Finds **all** roots of a polynomial at once — the fundamental theorem of algebra, made computational | [src-complex/solve/census.ts](../../src-complex/solve/census.ts) |
+| **Newton's method** | Polishes each root to machine precision | [src-complex/solve/census.ts](../../src-complex/solve/census.ts) |
+| **Horner's scheme** | Evaluates polynomials efficiently and stably | [src-complex/solve/census.ts](../../src-complex/solve/census.ts) |
 
 ### Analytic geometry
 
 | Algorithm | What it does here | Where |
 | --- | --- | --- |
-| **Numerical continuation along the Jacobian's null space** | Traces a locus: solve once, step along the direction the figure is free to move by a fixed arclength, re-solve, repeat — outward in both directions. Chosen over marching squares, which cannot trace a point that is downstream of the free one | [src-analytic/engine/locus.ts](../src-analytic/engine/locus.ts) |
-| **Cyclic Jacobi eigendecomposition** | Recognises *what* a traced locus is: the least-squares conic through the traced points is the eigenvector of the smallest eigenvalue of a 6×6 matrix — so the tool can say "this is a circle / parabola / ellipse" | [src-analytic/engine/locusFit.ts](../src-analytic/engine/locusFit.ts) |
-| **Multi-start Levenberg–Marquardt** | Several starting points, first success wins — a nonlinear system can have more than one basin | [src-analytic/engine/solve.ts](../src-analytic/engine/solve.ts) |
+| **Numerical continuation along the Jacobian's null space** | Traces a locus: solve once, step along the direction the figure is free to move by a fixed arclength, re-solve, repeat — outward in both directions. Chosen over marching squares, which cannot trace a point that is downstream of the free one | [src-analytic/engine/locus.ts](../../src-analytic/engine/locus.ts) |
+| **Cyclic Jacobi eigendecomposition** | Recognises *what* a traced locus is: the least-squares conic through the traced points is the eigenvector of the smallest eigenvalue of a 6×6 matrix — so the tool can say "this is a circle / parabola / ellipse" | [src-analytic/engine/locusFit.ts](../../src-analytic/engine/locusFit.ts) |
+| **Multi-start Levenberg–Marquardt** | Several starting points, first success wins — a nonlinear system can have more than one basin | [src-analytic/engine/solve.ts](../../src-analytic/engine/solve.ts) |
 
 ## 4. The surprising ones (for a general audience)
 

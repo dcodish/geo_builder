@@ -1,12 +1,14 @@
 # 28 — Product unification: making three tools feel and behave like one
 
+> **Archived 2026-10-07 (#1861).** History — never a rule or a status. Its live parts now live in: [04w](../04w-design-shell.md) (§5b, §5c and §5d, under headings that name them) and [02w](../02w-requirements-workspace.md) "Suite rulings" (from §4 and §4a).
+
 > **Status (2026-10-07, #1861): delivered except Phase 2** — the conformance matrix, #663 and #664, still
 > open; umbrella #648 is closed. §5b–§5d (live design) move to 04w and the still-live D-rulings to 02w in
 > #1861; this document then becomes history. The original status follows.
 >
-> **Status: PLAN OF RECORD — accepted by [ADR-W-018](06w-decisions-workspace.md#adr-w-018)
+> **Status: PLAN OF RECORD — accepted by [ADR-W-018](../06w-decisions-workspace.md#adr-w-018)
 > (2026-08-16), merged via PR #660. Execution began 2026-08-17 with A1 (#673, the `shell/` tree —
-> [ADR-W-019](06w-decisions-workspace.md#adr-w-019)).** Tracking issue
+> [ADR-W-019](../06w-decisions-workspace.md#adr-w-019)).** Tracking issue
 > [#648](https://github.com/dcodish/geo_builder/issues/648); the work items are #673, #661–#665
 > (track A) and #666–#672 (track B).
 > **§8 is empty of open questions** — every fork, every interface decision (§4a D1–D10) and all
@@ -41,7 +43,7 @@ That is three distinct complaints, and they have three different answers. Measur
 | i18n bootstrap | `i18n/index.ts` | `i18n/index3.ts` | `i18n/index.ts` — ~25 lines, written **three times** |
 | bidi isolation | in the format layer | `i18n/bidi.ts` | absent |
 
-[ADR-W-016](06w-decisions-workspace.md#adr-w-016) recorded the behavioural half on 2026-08-15: the
+[ADR-W-016](../06w-decisions-workspace.md#adr-w-016) recorded the behavioural half on 2026-08-15: the
 load audit (ADR-242 / ADR-3D-087 — complex has neither), save naming (ADR-274/286 — complex's store
 comment claims a convention its code does not implement), the in-app privacy note (NFR-SE-3, absent
 in a publicly linked product), the build stamp, usage logging, and the palette-as-assertable-module,
@@ -60,9 +62,9 @@ built — see §5 phase 1.
 | `src-complex/` (model+solve+replay) | ~4,900 | log-polar carriers, exact ℚ arithmetic |
 
 A circle-circle intersection and a plane-normal resolution are not the same code wearing different
-names. [ADR-W-003](06w-decisions-workspace.md#adr-w-003)'s *engine is copied, never shared* is
+names. [ADR-W-003](../06w-decisions-workspace.md#adr-w-003)'s *engine is copied, never shared* is
 **correct and this draft does not propose changing it.** Sharing that layer is the speculative
-generality ADR-W-003 was written to prevent, and [ADR-W-004](06w-decisions-workspace.md#adr-w-004)
+generality ADR-W-003 was written to prevent, and [ADR-W-004](../06w-decisions-workspace.md#adr-w-004)
 already states why copying is right there: *"the check IS the mechanism."*
 
 ### 1c. The doctrine is duplicated in PROSE — which is the real defect
@@ -90,7 +92,7 @@ Measured evidence that it transfers only by human memory:
   gate is absent in 3-D, and its 2-D twin was a **P1** that committed the negation of a stated
   betweenness under a green ✓.
 
-- **The solve ladder is documented twice** ([LADDER.md](LADDER.md), [LADDER-CX.md](LADDER-CX.md))
+- **The solve ladder is documented twice** ([LADDER.md](../LADDER.md), [LADDER-CX.md](../LADDER-CX.md))
   and **3-D has no ladder document at all**, despite every 3-D mechanism ADR being required to name
   the stage it inserts at.
 
@@ -104,7 +106,7 @@ products' weaker mechanism onto the one that got it right.
 
 ### 1d. "Fix in one, break another" — already solved this morning
 
-[ADR-W-017](06w-decisions-workspace.md#adr-w-017) (2026-08-16) added `npm run check:siblings`: a diff
+[ADR-W-017](../06w-decisions-workspace.md#adr-w-017) (2026-08-16) added `npm run check:siblings`: a diff
 refusal on shipped siblings' files (escape hatch is a *reason*, `ALLOW_SIBLING_EDIT="why"`, not a
 flag) plus the sibling builds run regardless of the diff, to catch shared-surface breakage the diff
 cannot see. ~10 seconds.
@@ -121,7 +123,7 @@ Recorded so that no phase below is read as proposing otherwise:
 - **Engine, model, solver, replay, scene, parser rules and catalogs** — copied, never shared
   (ADR-W-003, ADR-W-004). The sibling *audit* spans the trees; the *code* does not.
 - **Locale files, ADR logs, fixtures, deploy targets, CI lanes, save-file suffixes** — per-product
-  by [docs/22 §9](22-workflow.md).
+  by [docs/22 §9](../22-workflow.md).
 - **A product never imports another product's tree.** `BOUNDARIES.json` is the authority and
   `server/__tests__/isolation.test.ts` reads it.
 
@@ -406,7 +408,7 @@ a UI behaviour.
 > with edit and delete only; the chrome's *no handler, no control* rule made the missing checkbox
 > invisible until the operator compared the four tools by eye. It now mutes like complex (`disabled:
 > number[]`, an active projection every figure consumer reads) with the 3-D refusal surface (a dependent
-> faults on its own row), per rulings (a)/(b) above ([ADR-AG-177](06c-decisions-analytic.md#adr-ag-177)).
+> faults on its own row), per rulings (a)/(b) above ([ADR-AG-177](../06c-decisions-analytic.md#adr-ag-177)).
 > **The row is now held mechanically:** `shell/__tests__/fact-list-ops-parity-1548.test.ts` requires every
 > builder's `<FactList>` to pass all three handlers, with a stated `EXEMPT` table — the §6 *unset fails*
 > rule for this one row, ahead of the full matrix.
@@ -520,7 +522,7 @@ strip and the whole surface in 3-D and complex are new.
 
 *Cost accepted:* one more line in the column D1 was chosen to unclutter.
 
-> **WITHDRAWN, 2026-09-16 (#1105, [ADR-AG-064](06c-decisions-analytic.md#adr-ag-064)).** The second
+> **WITHDRAWN, 2026-09-16 (#1105, [ADR-AG-064](../06c-decisions-analytic.md#adr-ag-064)).** The second
 > half — *"shrinking to a one-line strip above the input once a figure exists"* — is reversed. The
 > operator, seeing it built for the first time: *"on the input panel, I dont want to see the chips.
 > behavior should be like 2d and 3d tools"*. The *cost accepted* above is no longer accepted.
@@ -530,7 +532,7 @@ strip and the whole surface in 3-D and complex are new.
 > on the empty canvas and in the manual, and that is now the ruling for every product. The empty-state
 > half of D9b stands unchanged.
 
-> **3-D realisation, 2026-09-29 (#1446, [ADR-3D-288](06b-decisions-3d.md#adr-3d-288)).** Two of the four
+> **3-D realisation, 2026-09-29 (#1446, [ADR-3D-288](../06b-decisions-3d.md#adr-3d-288)).** Two of the four
 > 3-D chips («M אמצע BB'», «K על AA' כך ש-AK = 2KA'») presumed a solid and were refused on the very
 > canvas they were shown on. "See build without data entry" means **every empty-state chip builds on an
 > empty canvas**; in 3-D that is locked over the rendered list (`empty-chips-1446.test.ts`), as 2-D's
@@ -598,7 +600,7 @@ their entry, routing, bundle or prod path.
 products before the next surface starts.
 
 ### Phase 4 — analytic geometry starts on the shared floor
-`src-analytic/` is deliberately last ([ADR-CX-001](06d-decisions-complex.md) D5). If phases 1–3
+`src-analytic/` is deliberately last ([ADR-CX-001](../06d-decisions-complex.md) D5). If phases 1–3
 land first, it is the first product that never has to re-derive the doctrine or re-implement the
 chrome — which is the whole return on this work.
 
@@ -606,7 +608,7 @@ chrome — which is the whole return on this work.
 
 ## 5a. How this is executed — branch strategy and the work items
 
-**Accepted by [ADR-W-018](06w-decisions-workspace.md#adr-w-018). Operator ruling, 2026-08-16:**
+**Accepted by [ADR-W-018](../06w-decisions-workspace.md#adr-w-018). Operator ruling, 2026-08-16:**
 *"we might want to create this as a fork … so we dont impact existing tools until i confirm all works
 well."*
 
@@ -636,7 +638,7 @@ The visible migration of the shipped builders. Each PR: full gates, both sibling
 plays the branch**, then it merges into `unify/ui`. `unify/ui` merges to `main` when the operator
 accepts the whole interface.
 
-> **Amended by [ADR-W-020](06w-decisions-workspace.md#adr-w-020) (operator ruling, 2026-08-17):
+> **Amended by [ADR-W-020](../06w-decisions-workspace.md#adr-w-020) (operator ruling, 2026-08-17):
 > acceptance runs PROD-PARALLEL.** Each shipped builder gets a `-next` URL
 > (`…/geo-builder-next/`, `…/3d-builder-next/`) serving the `unify/ui` build, while the canonical
 > URL keeps the untouched current build for the whole of Track B — students can only ever be on the
@@ -645,7 +647,7 @@ accepts the whole interface.
 > owns the deploy channel; its first use is the B1 build, a deliberate visual no-op for 2-D, so the
 > channel is proven before any visible surface rides it.
 >
-> **Closed by [ADR-W-025](06w-decisions-workspace.md#adr-w-025) (2026-08-18, [#747](https://github.com/dcodish/geo_builder/issues/747)):**
+> **Closed by [ADR-W-025](../06w-decisions-workspace.md#adr-w-025) (2026-08-18, [#747](https://github.com/dcodish/geo_builder/issues/747)):**
 > the switchover happened — `prod/2026-08-18` deployed the unified build to the canonical
 > `/geo-builder/` and `/3d-builder/` URLs and the `-next` channel was torn down. `main` → canonical
 > is once again the only deploy path.
@@ -722,7 +724,7 @@ the same way, and means the same thing"* — or an explicit `n/a` with a reason.
 
 - **The utterance input**: same position (wide: the input column at the reading start; stacked below
   900px: the entry card ABOVE the figure, the fact list below it — the `Workbench`'s `inputZone` /
-  `factsZone` split, [ADR-W-112](06w-decisions-workspace.md#adr-w-112)), same submit behaviour, same symbol palette (shared
+  `factsZone` split, [ADR-W-112](../06w-decisions-workspace.md#adr-w-112)), same submit behaviour, same symbol palette (shared
   vocabulary + per-builder extension, the operator's ruling on
   [#525](https://github.com/dcodish/geo_builder/issues/525)), same live preview, same RTL/bidi
   handling of the student's own text ([#482](https://github.com/dcodish/geo_builder/issues/482)).
@@ -732,10 +734,10 @@ the same way, and means the same thing"* — or an explicit `n/a` with a reason.
   through the typesetter untouched while typesetting raw text would reorder the equation. The trigger
   is `hasMath` — the presence of mathematics rather than the presence of a bidi change — so an
   all-LTR equation grows a strip where isolation alone produced none
-  ([ADR-W-069](06w-decisions-workspace.md#adr-w-069), [#1152](https://github.com/dcodish/geo_builder/issues/1152)).
+  ([ADR-W-069](../06w-decisions-workspace.md#adr-w-069), [#1152](https://github.com/dcodish/geo_builder/issues/1152)).
   A subscript is typeset in **either spelling** — braced `x_{B}` (what the chip inserts) or bare
   `x_B` (what the catalogs teach), byte-identically, inside an expression too; an underscore inside a
-  word stays text ([ADR-W-111](06w-decisions-workspace.md#adr-w-111), [#1540](https://github.com/dcodish/geo_builder/issues/1540)).
+  word stays text ([ADR-W-111](../06w-decisions-workspace.md#adr-w-111), [#1540](https://github.com/dcodish/geo_builder/issues/1540)).
   Parity is held by `shell/__tests__/issue-1152-typeset-preview-parity.test.ts`; this is the third
   surface the #1082 typesetting ruling had to be carried to by hand, which is the cost of the
   older-tree-as-template habit rather than of the seam.
@@ -760,11 +762,11 @@ builders and was simply never considered in the fourth.
 per-product lane and a product cannot skip its own row by staying in its lane.
 
 **Precedents in-repo, so this is not a new pattern:**
-- [ADR-W-003](06w-decisions-workspace.md#adr-w-003) — classification is **total**; an unclassified
+- [ADR-W-003](../06w-decisions-workspace.md#adr-w-003) — classification is **total**; an unclassified
   directory fails the test.
-- [ADR-W-006](06w-decisions-workspace.md#adr-w-006) — a mirror's contract is **derived** from the
+- [ADR-W-006](../06w-decisions-workspace.md#adr-w-006) — a mirror's contract is **derived** from the
   mirrored source, never enumerated by hand.
-- [ADR-W-017](06w-decisions-workspace.md#adr-w-017) — an unrecognised path is **shared, never
+- [ADR-W-017](../06w-decisions-workspace.md#adr-w-017) — an unrecognised path is **shared, never
   inert**; unknown-by-default must mean "check it".
 
 **Explicitly NOT this:** a shared honesty-gate *implementation*. That would drag `src-complex`'s
@@ -858,7 +860,7 @@ counter-example found" is not "holds".
 
 **Q4 — one machine-readable product registry, several consumers — plus operator-editable config.**
 
-The registry is the machine version of the [docs/22 §9](22-workflow.md) table that nothing enforces
+The registry is the machine version of the [docs/22 §9](../22-workflow.md) table that nothing enforces
 today: id, label key, URL, icon, source tree, build target. `shell/`'s switcher renders it as **data,
 never imports** (the forbidden edge stands), and the isolation test cross-checks it against
 `BOUNDARIES.json` — a registered tree with no roster entry **fails**, so builder 5 cannot ship missing
@@ -903,7 +905,7 @@ down or unreachable leaves every builder working with its built-in roster.
 - **Any change to the products' URLs, entry points, bundles or deploy topology.** Ruled out by §4:
   the builders stay separate apps at separate links, and the switcher is a link in a shared toolbar.
 
-## 5b. The shared bidi core's run-span rule ([ADR-W-070](06w-decisions-workspace.md#adr-w-070))
+## 5b. The shared bidi core's run-span rule ([ADR-W-070](../06w-decisions-workspace.md#adr-w-070))
 
 `makeBidi().segments` decides where a technical run begins and ends — the one decision every bidi surface
 in every product is built on. The span is `[first CORE character … last CORE character]`, then grown by
@@ -923,13 +925,13 @@ The signs are **not** in the run alphabet (`BASE_CORE`). A CORE character may ST
 bare `-` between Hebrew words is a maqaf; a sign is a left-edge extension of a run that already exists.
 
 **Three copies, one table.** `shell/bidi.ts` serves analytic and complex; 2-D and 3-D keep their own copies
-until Track B migrates them ([ADR-W-016](06w-decisions-workspace.md#adr-w-016)). Any change to this rule is
+until Track B migrates them ([ADR-W-016](../06w-decisions-workspace.md#adr-w-016)). Any change to this rule is
 locked by a single fixture table run against **all three kits**
 (`shell/__tests__/issue-1296-leading-sign.test.ts`), because a per-tree lock cannot see a copy drifting.
 The one legitimate divergence is 3-D's `declSplit` (a declaration renders as a name island plus an equation
 island); it is asserted per product so a migration has to decide about it rather than lose it.
 
-## 5c. How a cross-product wiring guard is written ([ADR-W-071](06w-decisions-workspace.md#adr-w-071))
+## 5c. How a cross-product wiring guard is written ([ADR-W-071](../06w-decisions-workspace.md#adr-w-071))
 
 `shell/` may never import a product tree, so a guard that wants to check "every builder does X" cannot
 simply call all four. The tempting answer — read each `App*.tsx` as text and grep for the shape — asserts
@@ -950,20 +952,20 @@ the decision into its own function. That is what went red in #1315, on a refacto
    is caught. It calls the same `xFaults`, never its own copy.
 
 Live instances: `issue-1152-preview-rows.ts` (the input preview) and `issue-1296-rows.ts` (bidi run spans).
-`privacy-disclosure-rows.ts` (#1426, [ADR-W-090](06w-decisions-workspace.md#adr-w-090)) applies the pattern
+`privacy-disclosure-rows.ts` (#1426, [ADR-W-090](../06w-decisions-workspace.md#adr-w-090)) applies the pattern
 to a subject that is WIRING rather than behaviour: the product's callable is `privacyDeclaration(t)`, and
 the fixture measures the other side itself by walking the bundle's import graph from the product's real
 entry — an import-reachability scan, not a text grep of `App*.tsx`, so moving a sink into a new file
 cannot hide it.
 
-`about-content-rows.ts` (#1477, [ADR-W-091](06w-decisions-workspace.md#adr-w-091)) holds a DECLARATION to
+`about-content-rows.ts` (#1477, [ADR-W-091](../06w-decisions-workspace.md#adr-w-091)) holds a DECLARATION to
 the product's BEHAVIOUR. The callable is `aboutContent(t)`, and the product also passes a step runner
 over its real submit gate, so every «try this» line the About shows must build in sequence on an empty
 canvas. The runner must return one verdict per step: an early return is a fault, never a pass.
 
-`geo-input-parity.ts` (#1649, [ADR-W-108](06w-decisions-workspace.md#adr-w-108)) asserts EQUALITY across builders without one test seeing two of them. Each row carries the reference verdict as a literal (`expect`, 2-D's), and every tree's thin lock asserts its own submit decision against that literal, so the builders agree transitively. Known gaps are a ratchet: a gap that closes fails until its row moves to the parity rows. Each catalog's sentences must be covered by a row or a topic exception.
+`geo-input-parity.ts` (#1649, [ADR-W-108](../06w-decisions-workspace.md#adr-w-108)) asserts EQUALITY across builders without one test seeing two of them. Each row carries the reference verdict as a literal (`expect`, 2-D's), and every tree's thin lock asserts its own submit decision against that literal, so the builders agree transitively. Known gaps are a ratchet: a gap that closes fails until its row moves to the parity rows. Each catalog's sentences must be covered by a row or a topic exception.
 
-## 5d. The sequence gate ([ADR-W-076](06w-decisions-workspace.md#adr-w-076))
+## 5d. The sequence gate ([ADR-W-076](../06w-decisions-workspace.md#adr-w-076))
 
 *Never reorder the letters of a point sequence — the sequence IS the statement.* One algorithm,
 `shell/llm/sequenceGate.ts`, three consumers.
