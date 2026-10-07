@@ -160,6 +160,7 @@ export function errorText(error: InputError, t: Translate): string {
     'apex-not-a-vertex': 'errApexNotAVertex',
     'bisector-wrong-apex': 'errBisectorWrongApex',
     'length-xy': 'errLengthXY',
+    'coordinate-restriction': 'errCoordinateRestriction',
     'ambiguous-cevian': 'errAmbiguousCevian',
     'cevian-no-triangle': 'errCevianNoTriangle',
     'ambiguous-hypotenuse': 'errAmbiguousHypotenuse',

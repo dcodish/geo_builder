@@ -328,6 +328,11 @@ const he = {
   errLengthXY:
     'בכלי הגיאומטריה האנליטית x ו-y הם שיעורי המישור, ולכן הם לא יכולים לסמן אורך ב-"{{detail}}". ' +
     'סמנו את האורך באות אחרת, למשל "AB = 3a" או "AB = 3k".',
+  // #1832 (ADR-AG-246) — a domain on x or y restricts the CURVE; the tool cannot draw part of a curve yet, and says so.
+  errCoordinateRestriction:
+    'בכלי הגיאומטריה האנליטית x ו-y הם שיעורי המישור, ולא פרמטרים, ולכן ההגבלה ב-"{{detail}}" מגבילה את הקו שהמשוואה מתארת. ' +
+    'הכלי עדיין לא יודע לצייר רק חלק ממנו (למשל רק את החלק שבו x > 0). כתבו את המשוואה בלי ההגבלה; ' +
+    'ואם התכוונתם לפרמטר, סמנו אותו באות אחרת, למשל "a > 0".',
   errBisectorWrongApex:
     'חוצה זווית יוצא מקודקוד הזווית שהוא חוצה, ובמשפט "{{detail}}" הקטע אינו יוצא מהקודקוד הזה. ' +
     'כתבו קטע שמתחיל בקודקוד הזווית, למשל "AD חוצה את הזווית BAC".',
@@ -742,6 +747,10 @@ const en: typeof he = {
   errLengthXY:
     'In the analytic tool x and y are the coordinates of the plane, so they cannot name a length in "{{detail}}". ' +
     'Name the length with another letter, e.g. "AB = 3a" or "AB = 3k".',
+  errCoordinateRestriction:
+    'In the analytic tool x and y are the coordinates of the plane, not parameters, so the condition in "{{detail}}" restricts the curve itself. ' +
+    'The tool cannot yet draw only part of a curve (e.g. only where x > 0). Write the equation without the condition; ' +
+    'if you meant a parameter, use another letter, e.g. "a > 0".',
   errBisectorWrongApex:
     'An angle bisector starts at the VERTEX of the angle it bisects, and the segment in "{{detail}}" does not. ' +
     'Start the segment at the angle’s vertex — for example "AD bisects angle BAC".',

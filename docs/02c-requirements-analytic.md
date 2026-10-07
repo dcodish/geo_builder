@@ -2426,3 +2426,11 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - «sin∢ABC = 0.5» (also «סינוס הזווית ABC הוא 0.5», "the sine of angle ABC is 0.5") fits two angles, 30° and 150°. The first figure draws one, «הציגו תצורה אחרת» moves to the other, and the panel lists both («30° או 150°») until a given settles it («∢ABC > 90» leaves 150°).
 - «sin∢ABC = 1» is the right angle. A sine greater than 1 or less than −1 is refused, naming the line.
 - A choice the givens leave open is never changed silently in favour of a better-looking drawing: the drawing shown belongs to the option the configuration took.
+
+**R171 — a condition on x or y is never taken for a parameter; until a curve can be drawn in part, it is refused and says so**
+([ADR-AG-246](06c-decisions-analytic.md#adr-ag-246), [#1832](https://github.com/dcodish/geo_builder/issues/1832)).
+
+- «y = 2x + 1, x > 0», «x^2 + y^2 = 4, y > 0», and a condition on its own line after a curve («x > 0», «y ≥ 0», «0 < x < 3», «x ≠ 0») are refused, naming the line: x and y are the coordinates of the plane, the tool cannot yet draw only part of a curve, write the equation without the condition, and a parameter takes another letter («a > 0»). Nothing of the line is recorded — never the curve drawn whole with the condition silently doing nothing.
+- «x הוא פרמטר» and "y is a parameter" are refused the same way.
+- A condition on any other letter is a parameter's domain, as before: «y = ax + 1, a > 0», «0 < k < 6».
+- Drawing only the allowed part of the curve (a ray, a half-circle) is [#1846](https://github.com/dcodish/geo_builder/issues/1846).

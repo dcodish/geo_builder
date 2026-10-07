@@ -1072,6 +1072,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'compound-all-or-none-1798-03', family: 'intersections', steps: ['ריבוע ABCD', 'F אמצע DO, O - חיתוך של AC ו-BD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1842' }, { product: '3d', issue: '#1842' }], note: 'analytic reads both clauses and builds; 2-D refuses per the 2026-10-04 #553 ruling — which one should move is the question #1842 asks' },
   { id: 'compound-all-or-none-1798-04', family: 'lengths', steps: ['מרובע ABCD', 'AB=4, CD=3'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1842' }], note: 'every clause honoured: a compound commits' },
   { id: 'compound-all-or-none-1798-05', family: 'points-incidence', steps: ['ריבוע ABCD, נקודה G על AD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1842' }], note: 'every clause honoured: a compound commits' },
+  // #1832 (ADR-AG-246): a domain on x or y is a restriction on the CURVE — analytic refuses it, never a parameter named x
+  { id: 'coordinate-restriction-line-1832', family: 'topic', steps: ['y = 2x + 1, x > 0'], expect: 'refused', exception: 'X2', note: 'used to commit the whole line with a parameter named x' },
+  { id: 'coordinate-restriction-circle-1832', family: 'topic', steps: ['x^2 + y^2 = 4, y > 0'], expect: 'refused', exception: 'X2' },
+  { id: 'coordinate-restriction-param-control-1832', family: 'topic', steps: ['y = ax + 1, a > 0'], expect: 'builds', exception: 'X2', note: 'a genuine parameter keeps its domain' },
+  { id: 'letter-bound-x-1832', family: 'lengths', steps: ['משולש ABC', 'AB = 3x', 'x > 2'], contextFor: { analytic: ['y = 2x + 1'] }, expect: 'builds', exception: 'X10', knownGap: [{ product: '3d', issue: '#1679' }], note: "2-D bounds its length letter x; in analytic x is the plane's coordinate, so the bound is refused (#1832)" },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
