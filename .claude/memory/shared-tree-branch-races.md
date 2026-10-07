@@ -22,7 +22,7 @@ ref you didn't just create) must re-verify branch + cleanliness in the SAME guar
 operation — e.g. `test "$(git branch --show-current)" = "main" && git merge --ff-only …` — or better,
 avoid the shared tree entirely: land on main by pushing the gated branch (`git push origin
 <branch>:main`) and fast-forwarding the local ref via `git fetch . <branch>:main`. See
-[[work-pc-cross-machine]].
+CLAUDE.md "Cross-machine setup".
 
 **Second instance, new mechanism (2026-08-17):** the Bash tool's cwd RESETS to the project root at
 turn boundaries — a session working in a worktree composed a commit there, the turn ended (background

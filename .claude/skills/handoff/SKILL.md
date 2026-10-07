@@ -15,8 +15,8 @@ The `SessionEnd` hook pushes *committed* work automatically — it is a safety n
 
 2. **Account for every changed file.** For each one decide: commit it, or deliberately leave it. Say which, out loud, in the summary. Scratch files that were never meant to be kept should be deleted, not silently left dirty for the next session to trip over. Watch for:
    - `.claude/memory/*` — auto-memory written this session. **Always commit these**; they are how the other machine inherits what was learned.
-   - `docs/PROJECT-MEMORY.md`, `docs/06-decisions.md`, `docs/09-implementation-plan.md` — if this session made a decision or moved status and these were not updated, that is a gap to fix now, not after the handoff. The next session on the other machine reads these first.
-   - `fixtures/*.geo.json`, `fixtures3/*.geo3.json` — saved manual sessions are permanent regression coverage; they only count once committed.
+   - the product's ADR log (`docs/06*.md`) and its requirements/design docs (standing rule 6) — if this session made a decision and these were not updated, that is a gap to fix now, not after the handoff. Status lives in the issue queue, open PRs and DEPLOY-LOG, never in a narrative doc (ADR-W-002).
+   - fixtures in each product's fixtures folder (`src/__tests__/fixtures/`, `fixtures3/`, … — docs/22 §9) — saved manual sessions are permanent regression coverage; they only count once committed.
 
 3. **Verify before committing** if source changed: `npm run test:fast` (or the per-product `npm run test:run:2d` / `test:run:3d`) and `npx tsc -b`. Report results honestly — never describe a red or unrun suite as green. If something fails, say so and ask whether to commit anyway (work-in-progress that needs to reach the other machine is a legitimate reason to commit red, but it must be stated in the commit message).
 
@@ -26,7 +26,7 @@ The `SessionEnd` hook pushes *committed* work automatically — it is a safety n
 
 6. **Name the work that is finished but not LANDED** (#488). Pushed is not the finish line, and two states are invisible to `git status`:
    - `gh pr list --state open` — **an open PR is a feature waiting on the operator's play-and-approve.** PR #471 was built, green and pushed on one machine, and the operator found the feature missing in prod on the other because nothing in the handoff or the session start ever said "it is sitting in a PR". Name every open PR, with what it needs.
-   - the newest `prod/*` tag vs `main` — commits merged but **not deployed**, and whether any of them touch `server/` (a proxy deploy, not a static push). The proxy once went two weeks undeployed under a run of static-only deploys with nothing saying so.
+   - the newest `prod/*` tag vs `main` — commits merged but **not deployed**. Whether the proxy needs a deploy is answered by `npm run deploy:preflight`, never by "did `server/` change" (RUNBOOK: that rule is unsound — the proxy bundle reaches beyond `server/`). The proxy once went two weeks undeployed under a run of static-only deploys with nothing saying so.
 
 7. **Report** — the operator is walking away, so the summary must stand alone:
    - what was committed and pushed (one line each)
@@ -37,4 +37,4 @@ The `SessionEnd` hook pushes *committed* work automatically — it is a safety n
 
 ## Arriving on the other machine
 
-Nothing to type. The `SessionStart` hook runs `scripts/session-sync.mjs start`, which pulls `--ff-only` and reports what arrived, whether dependencies changed, whether anything was left uncommitted or unpushed, **any open PR awaiting play-and-approve, and any commit on `main` that is not yet deployed** (#488). Then read the tails of [docs/06-decisions.md](docs/06-decisions.md) / [docs/06b-decisions-3d.md](docs/06b-decisions-3d.md) and `gh issue list` — the sources that are actually kept current (ADR-W-002).
+Nothing to type. The `SessionStart` hook runs `scripts/session-sync.mjs start`, which pulls `--ff-only` and reports what arrived, whether dependencies changed, whether anything was left uncommitted or unpushed, **any open PR awaiting play-and-approve, and any commit on `main` that is not yet deployed** (#488). Then read the tail of the relevant ADR log (06 / 06b / 06c / 06d / 06w) and `gh issue list` — the sources that are actually kept current (ADR-W-002).

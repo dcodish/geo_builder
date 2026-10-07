@@ -12,17 +12,13 @@ work) and `gh issue list --label analytic`. A guard test rejects dated progress 
 
 The **fourth** app in this repo, for the bagrut **analytic-geometry** question (שאלון 572 Q1): the
 coordinate plane, with points, lines, circles and canonical conics as objects carrying equations.
-Plan: [docs/19](../docs/19-analytic-geometry-tool.md). Decisions: `ADR-AG-NNN` in
-[06c](../docs/06c-decisions-analytic.md). Issue label `analytic`.
+**Contract:** [02c](../docs/02c-requirements-analytic.md) (what) · [04c](../docs/04c-design-analytic.md) (how) ·
+decisions `ADR-AG-NNN` in [06c](../docs/06c-decisions-analytic.md); [docs/19](../docs/19-analytic-geometry-tool.md)
+is the finished build plan. Issue label `analytic`.
 
-**DEPLOYED** since `prod/2026-09-16` at `/analytic-builder/` — the registry entry carries `enabled: true`
-(the [ADR-AG-007](../docs/06c-decisions-analytic.md#adr-ag-007) hold was lifted by the operator; see
-[DEPLOY-LOG](../docs/DEPLOY-LOG.md) 2026-09-16). A change in this tree reaches students on the next deploy
-and pays the RUNBOOK's analytic row. Holding a builder back is one registry line (`enabled: false` plus
-`devOnly: true`, which the roster filter still honours).
+Deployed at `/analytic-builder/` (`products.json` is the deploy record).
 
-**Its distinguishing fact: the exam prints no figure.** 17 of the 20 sampled Q1s carry no drawing at
-all and two of them instruct the student to draw one. The siblings *reproduce* a printed figure;
+**Its distinguishing fact: the exam prints no figure** (17 of 20 sampled Q1s). The siblings *reproduce* a printed figure;
 this tool *supplies* the one the exam withholds.
 
 ## Hard boundaries (operator authority)
@@ -54,9 +50,15 @@ this tool *supplies* the one the exam withholds.
 | `engine/apply.ts` | **The M1 boundary** — the one place that decides new-object vs statement-about-an-existing-one. Here on day one because questions arrive in SECTIONS |
 | `engine/evaluate.ts` | Construction + seed → figure; `sampleParam`, and `isKnowledge` — the honesty gate |
 | `engine/derive.ts` | `parse → fold → evaluate`, written once so app and tests take the same route |
+| `engine/solve.ts` | Constraints (refs + residual + name) and the joint solve |
+| `engine/shapes.ts` | Shape registry: a noun is a table row of existing constraints |
+| `engine/statedMeasures.ts` | What the student stated, for the canvas |
+| `engine/locus.ts` · `crossings.ts` | Locus tracer; crossings offered as sentences |
+| `app/` | The submit path, the ask lane, panel rows, session persistence |
 | `parser/` | `parseAnalytic.ts` (the docs/19 §10 families) + `catalogAnalytic.ts`, the coverage map with a guard test asserting every entry parses in He **and** En |
 | `render/` | `scene.ts` (pure: isotropic, Y-flipped transform + axes) + `Figure.tsx` |
 | `store/`, `App.tsx`, `i18n/` | Lines as the source of truth; the shared frame mounted; He/En resources |
+| `debug/`, `ui/` | The dual-sink session log; About, privacy and palette content |
 
 ## The model in one page
 
@@ -78,9 +80,9 @@ this tool *supplies* the one the exam withholds.
   altitudes or bisectors that define it, with each median's parts labelled `2x`/`x`. It is
   **decoration**: no id, no letter, never in the fact list. It must be drawn from the REAL geometry,
   so its tests assert geometry, not pixels ([ADR-AG-014](../docs/06c-decisions-analytic.md#adr-ag-014)).
-- **A shape noun that carries a GIVEN may not be drawn as a plain ring of sides.** «מקבילית» asserts
-  AB ∥ DC; until the constraint layer can honour it, it is refused BY NAME (`out-of-scope`) — never
-  flattened (a stated given may not vanish), never escalated to the LLM (we understand it).
+- **A shape noun that carries a GIVEN may not be drawn as a plain ring of sides.** «מקבילית» is
+  honoured as its two ∥ givens (`engine/shapes.ts`, [ADR-AG-035](../docs/06c-decisions-analytic.md#adr-ag-035))
+  — a stated given may not vanish.
 - **A shape noun also promises a RING** no constraint can keep: `engine/rings.ts` is the predicate,
   `drawableAt`'s `whole()` its only consumer; **simple not convex, collapsed not narrow**
   ([ADR-AG-080](../docs/06c-decisions-analytic.md#adr-ag-080)). **A locus is KNOWLEDGE AS A SET** —
@@ -100,10 +102,9 @@ this tool *supplies* the one the exam withholds.
 
 ## Recurring traps
 
-- **This tree has no private display rounder.** Numbers go through `shell/format.ts` `fmtNum` — the
-  operator's two-decimal ruling (#723) is a CHOKEPOINT, not a precision. A local `toPrecision` here
-  printed a centroid as `-1.666666667` and stayed invisible until the tool computed its first
-  non-terminating coordinate (#1029).
+- **One display formatter.** Numbers go through `format.ts` `fmtAnalytic` — exact forms first (`4/3`,
+  the operator's "exact forms" ruling, ADR-AG-084), then `shell/format.ts` `fmtNum`; the two-decimal
+  ruling (#723) is a CHOKEPOINT, not a precision. Never a local `toPrecision` (#1029).
 
 - **Hebrew morphology: write out the alternation.** «נתון» ends in FINAL nun (ן) and «נתונה /
   נתונים / נתונות» in medial nun (נ), so `נתונ(ה|ים|ות)?` silently drops the commonest form. This is
@@ -113,6 +114,5 @@ this tool *supplies* the one the exam withholds.
 - **A case-insensitive Roman-numeral class eats real input.** `[IVX]{1,3}` with the `i` flag read the
   `x` of «the circle x²+y²−2ax−2x=0» as a numeral and swallowed the equation. Numerals are matched
   case-sensitively with a following-separator lookahead.
-- **Adding this product changed SIBLING tests.** `products.json` feeds the admin form and the docs/22
-  table, so a fourth entry moved fixtures in `server/__tests__/admin-config.test.ts` and required the
-  §9 column. Expect roster-shaped changes to surface outside this tree.
+- **Roster changes surface outside this tree.** `products.json` feeds the admin form
+  (`server/__tests__/admin-config.test.ts`) and the docs/22 §9 table.

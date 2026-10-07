@@ -11488,7 +11488,7 @@ statement's meaning.
 
 ## ADR-513 — A DECLARED POLYGON THE GIVENS FORCE FLAT IS SAID OUT LOUD, naming the statements — the 2-D half of ADR-W-048 (#945)
 
-**Status:** accepted, 2026-09-13 · **Issue:** #945 (feature, P3 — the 2026-09-13 plan) · round #1001 · feature route (PR) · **Adopts:** [ADR-W-048](06w-decisions-workspace.md#adr-w-048) (ruled 2026-09-08 for both products; the 3-D half is [ADR-3D-234](06b-decisions-3d.md#adr-3d-234)); the channel shape of [ADR-123](#adr-123) (coincidences) and the prefix rule of [ADR-492](#adr-492); layered above the accept gate of [ADR-413](#adr-413)
+**Status:** accepted, 2026-09-13 · **Issue:** #945 (feature, P3 — the 2026-09-13 plan) · round #1001 · feature route (PR) · **Adopts:** [ADR-W-048](06w-decisions-workspace.md#adr-w-048) (ruled 2026-09-08 for both products; the 3-D half is [ADR-3D-234](06b-decisions-3d.md#adr-3d-234)); the channel shape of [ADR-123](#adr-123) (coincidences) and the prefix rule of [ADR-492](#adr-492); layered above the accept gate of [ADR-413](#adr-413) · **⚠ Superseded for declared polygons by [ADR-602](#adr-602) (2026-10-07):** refused, not noticed
 **Requirements:** [02](02-requirements.md) FR-RN-13 (new — the 2-D twin of 02b FR-RD-7) · **Design:** [04](04-design.md) — "A declared polygon the givens force FLAT is said out loud"
 
 **Measured at HEAD, before the change** (the plan's step 1 — the 2-D trigger family was to be established by
@@ -11695,7 +11695,7 @@ and closing the issue would misreport the work.
 
 ## ADR-517 — «SHOW ANOTHER CONFIGURATION» SAYS WHAT IT CHANGED AND WHAT IT KEPT (#65)
 
-**Status:** accepted, 2026-09-14 · **Issue:** #65 (feature, P3 — external architecture review, operator-commissioned 2026-07-11) · round #1006 · feature route (PR) · makes [ADR-052](#adr-052) visible; the cue sibling of [ADR-101](#adr-101)/[ADR-112](#adr-112); rests on the invariance of [ADR-065](#adr-065)/[ADR-514](#adr-514)
+**Status:** accepted, 2026-09-14 · **Issue:** #65 (feature, P3 — external architecture review, operator-commissioned 2026-07-11) · round #1006 · feature route (PR) · makes [ADR-052](#adr-052) visible; the cue sibling of [ADR-101](#adr-101)/[ADR-112](#adr-112); rests on the invariance of [ADR-065](#adr-065)/[ADR-514](#adr-514) · **⚠ Ruled to change 2026-10-07 (ADR-W-118 B11 · #1866):** reworded in a student's words
 **Requirements:** [02](02-requirements.md) — FR-TH-6a: the press accounts for the choice it moved · **Design:** [04](04-design.md) — the view delta
 
 **What the student saw.** The figure jumped, with no account of which unstated choice moved. The mechanism

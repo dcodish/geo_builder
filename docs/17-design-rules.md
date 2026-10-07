@@ -34,15 +34,19 @@ until it names categories. Two real examples from this repo's history:
 The grep test: after stating the class, **search for its siblings** (`grep` the codebase for the same
 shape of code; scan `logs/debug-log.jsonl` for the same error family — the ADR-115 log-class audit is
 the exemplar). A true class fix usually closes bugs nobody reported yet. If your fix couldn't possibly
-close an unreported sibling, it is a patch.
+close an unreported sibling, it is a patch. **A sibling has the same wrong outcome** — in another
+spelling, rule, seed or builder. A behaviour the report did not describe is not a sibling: it is a
+`[proposed]` line for the operator, never part of the fix (CLAUDE.md rule 7, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)).
 
 **Search the SIBLING PRODUCT too** (ADR-W-004). The products copy patterns by design, so they copy
 *defects* by design: ADR-3D-110 is "the ADR-3D-069 shape verbatim", ADR-3D-093 is "the ADR-167 shape",
 ADR-424 is the 2-D twin of ADR-3D-070. Each was found months later, by accident, because nothing in the
 routine asked. Your class sentence names categories, not files — so it is already product-neutral, and
-the question "does `src3d/` (or `src/`) have this same class?" is one grep away. **State the answer in
-the ADR either way.** If the sibling has it: file an issue against that product (do not fix it in the
-same commit — different product, different lane, different ADR log). Note that no amount of code
+the question "do the other builders have this same class?" is one grep away. **State the answer in
+the ADR either way.** If a sibling has it: a plane-geometry input or display change lands in every
+builder that should have it, or adds a known-gap row naming its issue (docs/22 §10, ADR-W-108,
+ADR-W-118); anything else is filed against that product as `needs-operator` with a proposed priority
+(CLAUDE.md rule 7). Note that no amount of code
 sharing would prevent this: these classes live in the `engine` layer, which is copied on purpose
 (`BOUNDARIES.json`). The check *is* the mechanism.
 
@@ -187,7 +191,7 @@ statement is asserting a given the student never gave.
    2026-09-19/20: four of the ten items picked up carried a claim that had gone stale — and all four
    still built and landed. The re-measurement costs minutes; skipping it costs the fix session.
 
-   Four different things can come back, and **only the last is a signal about the triage**:
+   Five different things can come back, and **only the last two are a signal about the triage**:
 
    | what you find | what it is | what to do |
    | --- | --- | --- |
@@ -195,10 +199,12 @@ statement is asserting a given the student never gave.
    | one of several symptoms is gone | partly fixed, by something else | correct the record in the issue *and* the ADR; build what is left |
    | a named dependency has landed | the scope shrank, or unblocked | re-scope, then build |
    | the cause the plan names is **not what fires** | the diagnosis was never true | §8 escalation |
+   | the plan's account of **the request, of 2-D, or of another builder** is not what you measure | the plan's premise was never true | §8 escalation — never build it "because the plan lists it" ([ADR-W-117](06w-decisions-workspace.md#adr-w-117)) |
 
    The first three rows are the ordinary cost of a fast trunk. Record them in one line as what they
    are — a re-measurement — and carry on; writing them up as "deviations from plan" overstates them
-   and buries the one row that matters. **The fourth row is different in kind**: it was wrong when
+   and buries the rows that matter. A re-scope still gets one line in the round ledger, and the Heads-up
+   if what the student sees changes. **The last two rows are different in kind**: it was wrong when
    written, it will be wrong again in the next plan written the same way, and it is worth the
    escalation template.
 
@@ -212,7 +218,7 @@ statement is asserting a given the student never gave.
 2. **State the class** (§1) and **grep for siblings** — in this product *and in the sibling product*.
 3. **Locate the mechanism**: which of M1–M4 (or which missing mechanism) should own this? If the answer
    is "none — it's genuinely local", say so in the ADR and prove it by showing the class has one member.
-4. **Decide scope with the operator when in doubt** (CLAUDE.md rule 4). Present: the class sentence,
+4. **Decide scope with the operator when in doubt** (CLAUDE.md rules 1 and 7). Present: the class sentence,
    the mechanism, what the full fix touches, what the interim state is if deferred. Never present a
    patch as one of the options.
 
@@ -221,7 +227,8 @@ statement is asserting a given the student never gave.
 - The **mechanism** is fixed or created; the chokepoint list did not grow (or an ADR justifies why).
 - **Class tests**, not just the instance: entry-order permutations for anything touching M2; slot/order
   mirrors for anything positional; both locales for anything parsed.
-- The **operator's exact sequence** is permanent coverage — a saved `.geo.json` fixture when the essence
+- The **operator's exact sequence** is permanent coverage — a saved fixture in the product's fixtures
+  folder (docs/22 §9) when the essence
   is "this figure now builds green and verifies" (fixtures-first, S4.1), otherwise a scenario appended to
   the LAST chunk of `src/__tests__/scenarios-corpus-{1..4}.ts` and indexed in `docs/test-scenarios.md`
   (non-negotiable, CLAUDE.md).
@@ -229,10 +236,13 @@ statement is asserting a given the student never gave.
   **including the sibling PRODUCT** (§1). "Checked `src3d/`, class not present" is a complete answer;
   silence is not.
 - **Honesty invariants hold**: no stated magnitude is ever silently dropped (a given parses to a
-  constraint, escalates, or errors — it never vanishes); everything the student stated is visible on
-  the figure (labels/marks); error messages name the conflicting *statement*, not internal state.
+  constraint, escalates, or errors — it never vanishes); every stated **value** is visible on the figure
+  (length, angle, area, letter, right-angle knee) and a stated **relation** is in the givens list, drawn
+  only in an opt-in relations layer, never as a mark at rest ([ADR-W-118](06w-decisions-workspace.md#adr-w-118) B2); error messages name the conflicting *statement*, not internal state.
+- **Nothing the operator did not ask for**: every student-visible change is `[asked]`, `[ruled]` or `[2-D]`
+  in the plan's `## What the student will see` (CLAUDE.md rule 7).
 - **ADR names the class**, the mechanism, and the root cause in one paragraph; the commit message
-  states the root cause (CLAUDE.md rule 5).
+  states the root cause (CLAUDE.md rule 1).
 - Full suite green, build clean, no `.only`/skips (readiness gate).
 
 ## 7. Performance rules (so speed doesn't rot back)
@@ -251,5 +261,5 @@ statement is asserting a given the student never gave.
 
 Post to the operator, verbatim structure: **Class** (one sentence) · **Mechanism** (which of M1–M4, or
 the missing one) · **Full fix** (files, risk, rough size) · **What stays broken meanwhile** (honest) ·
-**Recommendation**. Do not attach a patch. The operator decides; "the big correct fix is always the
-right thing" (CLAUDE.md) — the only acceptable deferral is the operator's explicit one.
+**Recommendation**. Do not attach a patch. The operator decides; the size of the correct fix is not a reason
+to avoid it (CLAUDE.md rule 1) — the only acceptable deferral is the operator's explicit one.

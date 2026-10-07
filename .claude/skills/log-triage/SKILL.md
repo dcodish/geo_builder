@@ -64,7 +64,7 @@ Group the surviving utterances into **intent clusters** — the construct or phr
 For each cluster, check what already exists so the recommendation is precise and root-cause (docs/17 — a construct, not a one-off patch):
 - Catalogs: `src3d/parser/catalog3.ts` (3-D), `src/parser/catalog.ts` (2-D), `src-analytic/parser/catalogAnalytic.ts` (analytic).
 - **Analytic buckets (ADR-W-083):** `not-handled` → ▶ LIVE; `out-of-scope` → ⊘ declined; every other refusal (the ruled `bad-equation` / `unknown-reference` / `bad-arity` and the unruled codes) → ⚠ review. The first analytic report should COUNT how the review codes distribute — that is the ruling's revisit trigger.
-- 3-D: `docs/21-572-coverage-audit.md`, `docs/20-space-vectors-tool.md` §14, `docs/06b-decisions-3d.md`. 2-D: `docs/06-decisions.md`, `docs/09-implementation-plan.md`.
+- 3-D: `docs/21-572-coverage-audit.md`, `docs/20-space-vectors-tool.md` §14, `docs/06b-decisions-3d.md`. 2-D: `src/parser/catalog.ts` (the coverage map), `docs/02-requirements.md`, `docs/06-decisions.md`.
 - Say whether a gap is a planned slice, a documented deferral, or genuinely new, and which existing rule/pattern a fix would mirror.
 
 ## Step 4 — classify, file bugs, ranked recommendation, then STOP for approval
@@ -77,7 +77,7 @@ gh issue list --state closed --label icebox --limit 1000 --json number,title --s
 ```
 Try the cluster's distinctive words and its Hebrew noun. A matching title is not proof: read the parked issue's body to confirm it covers the same construct. On a match, **reopen it now**: `gh issue reopen <N>`, then remove the label with `gh issue edit <N> --remove-label icebox`. Then add a comment carrying the prod evidence: the verbatim utterances, session ids, distinct users and this run's date. Don't file a new issue. The operator approved this reopen when he approved the parking, so it needs no further approval. It arms nothing either, because a reopened issue has no `auto-ok`. List every reopen in the report under **↺ Reopened from icebox**.
 
-**File the `bug` clusters as GitHub issues NOW** (they are reports, not build decisions): dedupe against `gh issue list --state open` first, then `gh issue create` with labels `bug` + priority + app, body per docs/22 §1. **`feature` clusters are recommendations** — include ready-to-file issue text in the report; file them only after operator approval.
+**File the `bug` clusters as GitHub issues NOW** (they are reports, not build decisions): dedupe against `gh issue list --state open` first, then `gh issue create` with labels `bug` + the proposed priority + app + **`needs-operator`**, body per docs/22 §1 (CLAUDE.md rule 7: found work is proposed, not queued — the operator confirms the priority before it is planned or armed). The one exception: a figure drawn green for givens that cannot hold is filed `P1` and announced at the top of the report. **`feature` clusters are recommendations** — include ready-to-file issue text in the report; file them only after operator approval.
 
 Summarize the top recommendations inline (and they're already persisted in the report file). For each: cluster name + type + proposed priority + verbatim examples + distinct-user count + proposed root-cause action (rule/construct + where) + rough effort, most-impactful first. Keep garbage / UI-requests / out-of-scope in a short "no action" note so nothing is silently dropped.
 

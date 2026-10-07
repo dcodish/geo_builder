@@ -16,7 +16,7 @@
     "engine": {
       "question": "Does it reason about points, lines, planes, DOF, or constraints?",
       "sharing": "copied-never-shared",
-      "rationale": "2-D and 3-D geometry differ in kind; an abstraction over both leaks. docs/20 §12 stands unchanged here."
+      "rationale": "2-D and 3-D geometry differ in kind; an abstraction over both leaks. The isolation rules (docs/22 §9 \"Isolation rules\", and this file) stand unchanged here."
     },
     "lexicon": {
       "question": "Does it name Hebrew/English vocabulary, or map a noun to a shape?",
@@ -95,7 +95,7 @@
       {
         "from": "src",
         "to": "src3d",
-        "why": "Product trees never import each other (ADR-266; docs/20 §12). A change in one product must not be able to break another."
+        "why": "Product trees never import each other (ADR-266; docs/22 §9 \"Isolation rules\", and this file). A change in one product must not be able to break another."
       },
       {
         "from": "src3d",

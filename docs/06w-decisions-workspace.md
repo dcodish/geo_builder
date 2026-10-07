@@ -515,6 +515,20 @@ is now readable on the issue itself. Touchpoints: docs/22 §2d, CLAUDE.md label 
 `.claude/skills/status-update/SKILL.md` (the arming line), `.claude/skills/fix-round/SKILL.md`
 (Step 1 validity rule + Step 6 digest).
 
+**ADR-W-014 Amendment 1 (2026-08-13, operator ruling): a CLEAR PLAN is itself the approval.** After one
+day of batch-approval practice the operator ruled: *"If an issue has a clear plan, it should be
+auto-ok."* The default inverts — an issue whose body carries a concrete, self-contained fix plan and no
+open operator question is ARMED (`auto-ok` + an audit comment citing this ruling) as part of triage or
+the status pass, without a per-batch okay. What still gates: `needs-operator` and any unanswered
+ruling/scope question in the body disqualify; a plan that is a sketch with open options ("needs a scope
+call", "two directions worth measuring", diagnosis incomplete) is NOT a clear plan; P1s never enter
+rounds silently; and the round's escalation exit remains the safety valve — a plan that fails contact
+with the code goes back to `needs-operator` with the template. Batch approval (the original ADR-W-014
+flow) remains for compositions and anything a session is unsure about. Applied retroactively to the
+open queue the same day: 41 planned issues armed, each with the audit comment.
+
+**⚠ Amended by [ADR-W-117](#adr-w-117) (2026-10-07):** a clear plan is the approval only when its `## What the student will see` section carries no `[proposed]` line and no question is open. A product choice the operator has not ruled makes the issue `needs-operator`, however concrete the plan.
+
 ## ADR-W-015 — exercise-sequence agent: textbook exercise → VERIFIED utterance sequence (#567)
 
 **Status:** accepted, 2026-08-13
@@ -552,17 +566,6 @@ split gives ANY future headless tool the exact app path without vitest, keeping 
 count at one. Verdicts are HEAD-truth, so a sequence that stops building is caught the next time it
 is verified, not when the operator plays it.
 
-**ADR-W-014 Amendment 1 (2026-08-13, operator ruling): a CLEAR PLAN is itself the approval.** After one
-day of batch-approval practice the operator ruled: *"If an issue has a clear plan, it should be
-auto-ok."* The default inverts — an issue whose body carries a concrete, self-contained fix plan and no
-open operator question is ARMED (`auto-ok` + an audit comment citing this ruling) as part of triage or
-the status pass, without a per-batch okay. What still gates: `needs-operator` and any unanswered
-ruling/scope question in the body disqualify; a plan that is a sketch with open options ("needs a scope
-call", "two directions worth measuring", diagnosis incomplete) is NOT a clear plan; P1s never enter
-rounds silently; and the round's escalation exit remains the safety valve — a plan that fails contact
-with the code goes back to `needs-operator` with the template. Batch approval (the original ADR-W-014
-flow) remains for compositions and anything a session is unsure about. Applied retroactively to the
-open queue the same day: 41 planned issues armed, each with the audit comment.
 
 ## ADR-W-016 — The shell layer becomes physically shared, seeded by evidence and consumed by the third product first
 
@@ -2307,6 +2310,7 @@ file load still works.
 
 **Status:** accepted, 2026-09-08 (fix-round #946, item 1) · **Issues:** #937 (the rule), #925 (its first adoption)
 **Operator ruling:** 2026-09-08, playing round #931 T10, with three scope answers the same day
+**⚠ Scope ruled 2026-10-07 ([ADR-W-118](#adr-w-118) B6/B7):** every builder follows this, complex included (#1862). The recorded exceptions are: a typed complex number in its polar form in the polar view; analytic's computed circle centre, and its parabola/ellipse foci and directrix, written when determined (#1863); 3-D's computed coordinates while its data panel is open.
 **Requirements:** [02b](02b-requirements-3d.md) FR-RD-3 — amended · **Design:** [04b](04b-design-3d.md) — the display seam
 **Adoptions:** 3-D angle arc — [ADR-3D-233](06b-decisions-3d.md#adr-3d-233), this PR. 2-D, the 3-D coordinate lane and complex follow as their own issues.
 
@@ -3292,6 +3296,8 @@ The three refusal rows are the ones that matter, and they are asserted alongside
 
 ## ADR-W-064 — A fix session RE-MEASURES the issue before it reads the plan, and a divergence is the expected case (#1252)
 
+**⚠ Amended by [ADR-W-117](#adr-w-117) (2026-10-07):** one more row escalates — the measurement contradicts what the plan says about the request, about 2-D or about another builder. Such an item never ships "because the plan lists it".
+
 **Requirements:** none (process). **Design:** [docs/17 §5 step 0](17-design-rules.md) — the protocol; [docs/22 §3](22-workflow.md) — the bug route; the `fix-round` skill, Step 2. **Operator, 2026-09-20:** *"we can continue the loop approach but we should add something in your instructions that acknowledges that diagnosis needs to re-run every time - i think you do this today anyway but just document it so you dont panic when something is different between diagnosis and fix time."*
 
 ### The observation that prompted it, which is the operator's
@@ -3553,7 +3559,7 @@ standing rule 5's content and its running-server requirement (one port per unmer
 boundary on unattended rounds (ADR-W-054).
 
 **Why not just a local `.html` file.** He reads a round's output in a different session and often on the
-other PC ([[work-pc-cross-machine]]). A file in the worktree is gone when the worktree is; a published
+other PC (CLAUDE.md "Cross-machine setup"). A file in the worktree is gone when the worktree is; a published
 artifact has a URL that outlives the session and a database that can hold his verdicts. That was
 ADR-W-054's reasoning and it is unchanged — only its reach is, from overnight rounds to all of them.
 
@@ -5196,6 +5202,8 @@ So in two builders the figure was made to satisfy the claim the student had to p
 5. **The meta-lock** `shell/__tests__/geo-input-parity-meta.test.ts` runs the same `parityFaults` / `catalogCoverageFaults` / `rowFaults` against an oracle built from the rows and against broken variants: an early return, always-builds, always-refuses, swapped asks/refused, a healed known gap, a broken context, an absorbing excluded builder, an uncovered sentence, and a stale allowlist entry. Each is caught.
 6. **The rule** is docs/22 §10: a plane-geometry input change lands in every builder that should read it, or adds a known-gap row naming its issue; an exception needs a family in `EXCEPTIONS`.
 
+**⚠ Withdrawn by [ADR-W-118](#adr-w-118) (2026-10-07, ruling B1):** for plane geometry 2-D is the reference for display too — marks, labels, label text and status wording. The paragraph below is history.
+
 **Not a verdict.** How a figure is drawn (#1652's "both segments drawn") and which points or circle a sentence introduces are left to each builder's own locks. The ruling's "the same points introduced, the same circle created or bound" is a next step for this lock, not built here.
 
 **Rejected.**
@@ -5448,7 +5456,7 @@ Also exercised end to end: a published demo replaying round #1845 (real composit
 
 > *"refuse on all tools with a message since it contradicts ABC is a triangle and a flat line is not a triangle"*
 
-**Requirements:** [02](02-requirements.md) FR-RN-13 (rewritten: refused, not noticed) and FR-EN-8 (one sentence) · [02b](02b-requirements-3d.md) FR-RD-7 (a workspace note: the declared-polygon half is reversed; the 3-D slice owns the rest) · **Design:** none at workspace level (each product's own: [04](04-design.md) for 2-D) · **Adoptions:** 2-D — [ADR-602](06-decisions.md#adr-602). 3-D — ADR-3D-310. Analytic — ADR-AG-247. Each product cites this rule rather than re-deciding it.
+**Requirements:** [02](02-requirements.md) FR-RN-13 (rewritten: refused, not noticed) and FR-EN-8 (one sentence) · [02b](02b-requirements-3d.md) FR-RD-7 (the declared-polygon half is reversed — folded into the requirement's body on 2026-10-07, #1861; the 3-D slice owns the rest) · **Design:** none at workspace level (each product's own: [04](04-design.md) for 2-D) · **Adoptions:** 2-D — [ADR-602](06-decisions.md#adr-602). 3-D — ADR-3D-310. Analytic — ADR-AG-247. Each product cites this rule rather than re-deciding it.
 
 **What it reverses.** ADR-W-048 ruled (2026-09-08) that a figure whose givens force a named object flat is drawn, with a notice naming the statements — *"a notice, not a refusal … refusing would be the opposite error"*. The operator has now ruled the other way for **declared polygons**: «משולש ABC» says the figure is a triangle, and a flat line is not one, so the givens that flatten it contradict the declaration. The ruling is option (b) of #1849's question, chosen over (a) keeping ADR-W-048 and (c) refusing only the named polygon while drawing a stated coincidence.
 
@@ -5463,3 +5471,136 @@ Also exercised end to end: a published demo replaying round #1845 (real composit
 **Unchanged from ADR-W-048:** copied, never imported (each product derives its own predicate and calibration); the tolerance is relative to the polygon's own extent; the corpus sweep is a lock; the false-refusal net — an ordinary figure must still build — is the half that matters.
 
 **Parity (ADR-W-108).** One row family in `shell/__tests__/fixtures/geo-input-parity.ts`, `expect: 'refused'` for 5·3·8 (both orders), 4·4·8, the ratio form and the 1·1·1·3 quadrilateral, and `expect: 'builds'` for the 3° control. Analytic already refuses every refused row (measured 2026-10-07); 3-D builds them and carries `knownGap … #1849` until ADR-3D-310 lands. T31's sentence «AB מתלכד עם CD» is not read by 2-D's grammar (it goes to the model), so its row belongs to the slices that read it.
+
+## ADR-W-117 — The operator decides what a student sees; a session decides how (standing rule 7) (#1861)
+
+**Status:** accepted · 2026-10-07 · process (#1861, step 1). **Amends:**
+- [ADR-W-014](#adr-w-014) Amendment 1 ("a clear plan is itself the approval");
+- [ADR-W-064](#adr-w-064) (adds a stop);
+- [ADR-W-013](#adr-w-013) (adds a ledger line);
+- [ADR-W-092](#adr-w-092) (case classes).
+
+**Rulings cited** (2026-10-07, the docs audit, answered on the audit page and recorded on #1861):
+- **A1 = a:** adopt this rule as drafted.
+- **A2 = a:** issues a session finds are filed `needs-operator` with a proposed priority. They are not armed, and not made P1, until he looks. The one exception: a figure drawn green for givens that cannot hold is filed P1 and announced.
+- **A3 = b:** a session never picks an answer to an open question. The one exception: a P1 session may ship an honest refusal that reuses an existing message, flagged in the Heads-up.
+- **B1, his note:** *"If I ask for a behavior that doesnt match the 2d decision in a non-2d tool, I want to be warned about it. If i change behavior in 2d tool that affects the other tools, i should be asked about it too."*
+
+**Requirements:** none (process). · **Design:** none (process). The rule lives in:
+- CLAUDE.md standing rule 7, plus the amended rules 1, 4 and 5 and the label glossary;
+- [docs/22](22-workflow.md) §2b, §2d, §4 and §10;
+- [docs/17](17-design-rules.md) §1 and §8;
+- the `fix-round`, `decisions`, `status-update` and `handoff` skills, and the `decision-dossier` agent.
+
+**Product:** workspace.
+
+**Context.** The operator: *"the fix process opens issues and makes decisions i didnt want (for instance giving ticks to שווה שוקיים)"*. The ticks were traced end to end:
+1. **The request.** #1714 asked for the stated *values* on the analytic figure "like the 2d tool does".
+2. **The plan.** The triage plan claimed that 2-D draws equal-length ticks for «AB = AC». The 2-D column was never measured.
+3. **The arming.** The plan was armed in a batch: *"i auto-ok the round 2 and 3 items so they can run"*.
+4. **The build.** The building session measured 2-D, found that it draws nothing at rest, and wrote *"the plan lists the ticks, so a stated equality is marked persistently"* (ADR-AG-225, under "Not built"). It cited the invariant "everything the student stated is visible on the figure" as its reason.
+5. **The report.** The round ledger said "equalities always drawn", the Heads-up was silent, and a look-only case made the ticks its pass condition.
+6. **The ruling.** #1805: *"remove entirely. i never asked for this"*.
+
+Each step followed a written rule. ADR-W-014 Amendment 1 is the operator's own ruling of 2026-08-13 (*"If an issue has a clear plan, it should be auto-ok"*). Its "clear plan" test checked that no question was open. It did not check whether the plan contained product choices the operator had never seen.
+
+The same audit sampled the issues opened from 2026-10-05 to 10-07 (#1786–#1860):
+- 48 of the 68 that were not round ledgers were opened by sessions. Of those 48, 16 were armed, 8 were made P1, and 5 were sent to the operator as questions.
+- Rounds #1845 and the #1815 / #1817 audit comments record "defaults taken" on questions he never answered.
+- Several plans were widened as "the whole class" into behaviour nobody asked for (#1715, #1701, #1697).
+
+**Decision.**
+1. **The split.** A session decides the mechanism alone: files, tests, refactors, performance. It may also restore a behaviour that a dated operator ruling, or 2-D measured at HEAD, already defines. Everything else a student can see is a **product decision** and needs a dated operator ruling that names it. That covers anything drawn, hidden, labelled, refused, accepted, read, worded or computed differently.
+2. **Every fix plan ends with `## What the student will see`.** It has one line per student-visible change, and each line is tagged:
+   - `[asked]`, quoting the operator;
+   - `[ruled]`, linking the ruling;
+   - `[2-D]`, the 2-D verdict measured at a named commit;
+   - or `[proposed]`.
+   A mechanism-only plan says "none".
+3. **Arming** (amends ADR-W-014 Am. 1). A clear plan is the approval only if it has that section, no `[proposed]` line, and no open question. A `[proposed]` line makes the issue `needs-operator`; it is not a clear plan and is never armed.
+4. **"The whole class"** (rule 1) means the same wrong outcome in more places: other spellings, rules, seeds or builders. An outcome the report did not describe is never class-widening. It is `[proposed]`.
+5. **Measured beats written** (amends ADR-W-064). The pickup measurement may contradict what the plan says about the request, about 2-D, or about another builder. When it does, the item escalates (docs/17 §8). It never ships "because the plan lists it".
+6. **No defaults** (A3). An unanswered question waits for the operator. A recommendation does not become a ruling by going unopposed. The one P1 exception is an honest refusal that reuses an existing message, flagged in the Heads-up.
+7. **Found work is proposed, not queued** (A2). It is filed `needs-operator` with a proposed priority. It is not armed, and not made P1, until he looks. The one exception: a figure drawn green for givens that cannot hold is filed P1 and announced at once.
+8. **Cross-tool warnings** (B1). The operator may ask a non-2-D tool for a behaviour that differs from 2-D's. If so, the session says so before building and names 2-D's behaviour. A 2-D change may change what the other tools should do under the reference rule (ADR-W-118). If so, the session asks whether the change applies to them.
+9. **Reporting.**
+   - Each round-ledger item carries the line `beyond the request:`, which should read "none".
+   - The Heads-up names anything shipped that the operator did not ask for.
+   - A case whose outcome goes beyond the request is 🎮, never 👁 or ✅.
+
+**Consequences.**
+- Fewer items arm themselves, and rounds escalate more. Questions that used to be answered by default now reach the operator as `needs-operator`.
+- The `/decisions` pass changes its aim. It used to aim at "enough armed work to run rounds without him"; it now aims at "no product question left unasked".
+- The memory notes "plan mechanism beats plan locks", "ship the mechanism, file the judgement" and "parked arms need successor issues" are read under this rule. They move into docs/22 when the memory is reorganised (#1861, C2).
+
+## ADR-W-118 — The rulings of 2026-10-07: 2-D is the reference for display too, the honesty invariant names values not relations, and the docs are reorganised (#1861)
+
+**Status:** accepted · 2026-10-07. The operator answered 24 questions from the docs audit, plus four follow-ups the same day. All are recorded verbatim on #1861 with the audit page. **Amends:**
+- [ADR-W-108](#adr-w-108): its "Not a verdict: how a figure is drawn" exclusion is withdrawn.
+- [ADR-W-047](#adr-w-047): its recorded exceptions.
+
+This entry is the citable source for each ruling until the pedagogy charter (docs/10) and the cross-tool behaviour table (02w) are rewritten from it (#1861 steps 3–4). **Where docs/10 or a product doc differs from this entry, this entry wins.**
+
+**Requirements:** [02w](02w-requirements-workspace.md). FR-SU-1/2/4/13/15/16, FR-EX-2 and FR-WI-2 carry ⚠ markers or corrections now; the behaviour table follows in #1861 step 3. · **Design:** [docs/22](22-workflow.md) §10 (display follows 2-D); [docs/17](17-design-rules.md) §6 (the invariant); CLAUDE.md "Conventions to carry forward". **Product:** workspace (all four builders).
+
+**The rulings.**
+
+*What students see, in every tool:*
+- **B1 — 2-D is the reference for display too, for plane geometry.** This covers marks, labels, label text and status wording, as well as input verdicts. A display behaviour 2-D lacks lands in 2-D first or needs a ruling. The warning duty in both directions is ADR-W-117 §8.
+- **B2 — The honesty invariant names values.** Every stated **value** is on the figure: a length, an angle, an area, a letter, the right-angle knee. A stated **relation** (AB = AC, ∥) is in the givens list. It is drawn only in an opt-in relations layer, never as a mark at rest, in every tool. #1805 removes analytic's at-rest ticks.
+- **B3 — One pedagogy charter.** *"the pedagogy is where the logic is and why i would want certain behaviors. its supposed to help design the features using my guildelines. we need a general pedagogy and perhaps per tool where things differ"*.
+  - docs/10 is rewritten as a general charter that gives the reasons, with per-tool sections where the tools differ.
+  - Every principle cites a dated ruling; anything without one is marked "proposed".
+  - Alongside it, one cross-tool behaviour table goes in 02w. Product docs point to these and never re-decide them.
+- **B4 — The theorem surface stays off** (#740). The engine and its tests stay. The eight principle tips are labelled session-drafted, awaiting review.
+- **B5 — We don't solve it for you.** *"we dont solve it for you means we dont show you step-by-step solutions"*. In every tool:
+  - nothing appears unbidden on the canvas;
+  - an answer appears when asked, and only if the givens determine it;
+  - the working is never shown.
+- **B6 + D1 — Complex follows ADR-W-047 fully** (#1862). Inputs go on the canvas and computed values go in the panel. A letter the student did not value is never replaced. This supersedes the 2026-08-18 ruling that "the reading returns to the canvas". **Recorded exception (D1):** a number the student typed shows as typed in the cartesian view and in its polar form in the polar view.
+- **B7 + D2 — Recorded exceptions to canvas = inputs.**
+  - Analytic writes a computed circle centre's coordinates whenever the givens determine them (ADR-AG-036).
+  - 3-D writes computed coordinates while its data panel is open (ADR-3D-014 Am. 3).
+  - Analytic marks a parabola's focus and directrix, and an ellipse's foci, always. It writes their values when determined, and draws no ellipse directrices (#1863).
+- **B8 — «✓ הציור נקבע במלואו» appears only when exactly one figure exists, in every tool** (#1596, raised to P2).
+- **B9 — The area label is «S=13» everywhere.** 2-D changes (#1865).
+- **B10 — A choice the tool made is said, never as if forced.** 2-D's notes are ported to analytic (#1864). The right-angle seat notice stays withdrawn.
+- **B11 — ADR-517's «נשמר: הענף של E» is reworded in a student's words** (#1866). The new text is the operator's to approve.
+- **B12 — Two possible values are shown both, joined by «או», in every tool.** *"complex should also show both values - so it should follow all of the tools"* (#1867). This supersedes ADR-CX-049's withholding.
+- **B13 — One refusal voice.** Each refusal kind has one wording, with 2-D as the reference. "The tool's limit, not your mistake" applies everywhere (#1868).
+- **B14 + D3 — Complex gets the LLM fallback (#1869) and the proof-verb refusal (#1870).** A bare statement keeps its claim check.
+- **B15 — Small alignments, all approved.**
+  - The analytic empty state uses the shared title.
+  - 2-D's hide-segment action becomes undoable.
+  - The data-panel control is one «נתונים» checkbox in all four tools (D4), with a "computing" state where values are expensive (#1871).
+  - 3-D's missing segment menu is recorded as n/a.
+  - 3-D's panel coordinates are a recorded exception.
+  - 3-D's core plane parity is **parked**, not realised (FR-SU-16).
+  - The three-valued claim verdict stays deferred (#909).
+  - Analytic keeps the knee for an unstated right-angle seat.
+- **B16 — «הורידו שאלה» in every builder.** *"add it to complex too. this is a basic capability of the tool"* (#1872). This supersedes #745's exclusion of complex.
+
+*Process:* A1–A3 are [ADR-W-117](#adr-w-117).
+
+*Docs:*
+- **C1 — The archive/delete list is approved.**
+  - Delete: PROJECT-MEMORY, 09b, 14, manual-verification-2026-06-15, the old `archive/` code and `resolve.cjs`.
+  - Archive: the finished plans and reviews, after their live sections move into the specs.
+  - Move docs/30, `paper/` and `presentation/` to `docs/outreach/`.
+- **C2 — Memory is cut to the harness notes.** The rules move into docs/17, docs/22, the RUNBOOK and a /playsheet skill. MEMORY.md gets a size guard.
+- **C3 — The specs are right-sized,** one PR per product. Each is grouped by topic, the history moves to the ADRs, and withdrawn text is edited in place.
+- **C4 — Guards are added:**
+  - a superseded ADR points to its successor;
+  - requirement ids are unique;
+  - an ADR naming LADDER appears there;
+  - an operator ruling on student-visible behaviour never says "Requirements: none";
+  - every parity gap names an open issue;
+  - instruction files never link archived paths;
+  - MEMORY.md has a size ceiling.
+- **C5 — Two plans are settled.** The next solver step is filed and #310 is closed; the DerivedVertex refactor goes to the icebox.
+
+**Context.** The audit's cross-tool pass found about 15 student-visible differences between the four builders, and about half had no ruling behind them. ADR-W-108's own text left display to each builder ("Not a verdict: how a figure is drawn"). That exclusion, together with the invariant's "(labels/marks)", let analytic invent at-rest equality marks (ADR-AG-225, #1805).
+
+**Consequences.**
+- ⚠ markers now sit wherever a product doc describes a behaviour these rulings change but no code has changed yet. They read "Ruled to change (2026-10-07, ADR-W-118 Bx · #NNNN)", so a session neither preserves the old behaviour nor builds the new one unasked.
+- The product changes are the issues listed above. None is armed until its plan exists. Under ADR-W-117 a plan whose every outcome line is `[ruled]` may be armed.

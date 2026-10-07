@@ -1,6 +1,9 @@
 # 01 — Vision & Purpose
 
-_Last updated: 2026-06-10_
+> Written for the 2-D builder. Geo Builder is now four builders (2-D, 3-D, analytic, complex), and the
+> pedagogy charter (docs/10) is being rewritten for all of them (#1861). Theorem surfacing (goal G4) is
+> switched off by the operator (#740). The operator's rulings in
+> [ADR-W-118](06w-decisions-workspace.md#adr-w-118) win where this document differs.
 
 ## The problem
 

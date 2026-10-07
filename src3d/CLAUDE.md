@@ -11,21 +11,19 @@ adds only what is specific to 3-D.
 ## What this is
 
 A **second app** in this repo for the bagrut **space/vectors** question (Q2): geometric `u,v,w` vectors on
-solids, plus algebraic R³ lines and planes. Plan: [docs/20-space-vectors-tool.md](../docs/20-space-vectors-tool.md).
-Decisions: [docs/06b-decisions-3d.md](../docs/06b-decisions-3d.md), ids `ADR-3D-NNN`. Issue label `3d`.
+solids, plus algebraic R³ lines and planes. **Contract:** [02b](../docs/02b-requirements-3d.md) (what) ·
+[04b](../docs/04b-design-3d.md) (how) · decisions [06b](../docs/06b-decisions-3d.md), ids `ADR-3D-NNN`;
+[docs/20](../docs/20-space-vectors-tool.md) is the finished build plan. Issue label `3d`.
 Deployed at `themathbible.com/3d-builder/` (admin dashboard at `/admin3`).
 
-Every 2009–2024 space/vectors exam input is expressible; the relations program (docs/26) is complete.
-The remaining niche is low-frequency and coordinate-expressible: orthoscheme / dihedral-face-angle.
-
-## Hard boundaries (operator authority — docs/20 §12)
+## Hard boundaries (operator authority — [docs/22 §9](../docs/22-workflow.md) "Isolation rules" + [`BOUNDARIES.json`](../BOUNDARIES.json))
 
 1. **`src3d/` never imports from `src/`.** Patterns are COPIED, not shared. A stray `@/` import would
    typecheck (the alias is repo-wide) while silently coupling the products — `server/__tests__/isolation.test.ts`
    rejects it. `vite.config.3d.ts` deliberately defines no alias.
 2. **3-D work never touches 2-D artifacts** — not the 2-D locale files, not `docs/06-decisions.md`, not the
    2-D status text. Decisions go in 06b; orientation updates go in this file.
-3. **NO CAS.** Anything needing symbolic solving beyond a 1–2-DOF numeric root-find goes back to the
+3. **NO CAS** (docs/20 §10 D3). Anything needing symbolic solving beyond a 1–2-DOF numeric root-find goes back to the
    operator. Every "symbolic" feature here is a numeric root-find, a closed form, or a linear solve.
 4. **No cross product.** The curriculum has none. It may be used internally, never surfaced to a student.
 
@@ -56,10 +54,13 @@ The remaining niche is low-frequency and coordinate-expressible: orthoscheme / d
   lower (`lexicon/shapePhrase3.ts` is the one vocabulary of nouns AND adjectives, read through `statedQuadBase` /
   `statedTriShape` / `readShapePhrase3` — a position-local qualifier test is how gaps hide). A circle through a
   ring is a claim the ring is cyclic: lower the noun's `CYCLIC_MEMBER` fix, never fit a centre and hope.
-- **Gauge vs knowledge.** A figure's placement/rotation/scale is a gauge, sampled freely **unless** something
-  absolute is present (an equation plane, a parametric line, a coordinate point, a pin) — the landing funnel
-  classifies which gauge components are provably free. Consequently: **a number drawn on the canvas must be
-  seed-invariant knowledge.** One drawing's values are not a given, and printing them is dishonest.
+- **Gauge vs knowledge.** A figure's placement/rotation/scale is a gauge. An unanchored figure (no equation
+  plane, parametric line, coordinate point, pin, solid, revolution or circle) is normalised onto the floor at
+  the end of `resolve3`, so «הציגו תצורה אחרת» changes only its shape ([ADR-3D-272](../docs/06b-decisions-3d.md#adr-3d-272));
+  the landing funnel classifies which gauge components are provably free. **What the canvas carries** is the
+  student's inputs ([ADR-W-047](../docs/06w-decisions-workspace.md#adr-w-047)), plus one recorded 3-D
+  exception: computed coordinates while the data panel is open (ADR-3D-014 Am. 3, ADR-W-118 B7). A number
+  drawn must also be seed-invariant knowledge — one drawing's values are not a given.
 - **Under-determination is welcome.** An unstated dimension stays a free, resampled DOF while the pinned
   parts stand still.
 

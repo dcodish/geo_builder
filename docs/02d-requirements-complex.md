@@ -129,14 +129,14 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   the engine genuinely cannot decide (a direction with no exact relation to the others, such as
   1+√2i), a given is accepted and listed as undecided, and a claim reads «unknown» — never a refusal,
   never ✗. *(#1481, operator ruling P1; realised — [ADR-CX-057](06d-decisions-complex.md#adr-cx-057).)*
-- **FR-CN-10 (Must)** — **The symbolic cartesian form reads as the textbook writes it.** «z1 = a+bi»,
+- **FR-CN-10 (Must)** — **The symbolic cartesian form reads as the textbook writes it.** **⚠ Ruled to change (2026-10-07, ADR-W-118 B6/D1 · #1862):** the canvas shows the number as the student typed it (its polar form in the polar view) and the computed values go to the data panel — a letter the student did not value is never replaced, so «z₁ = a+bi» does not become «z₁ = 3+bi» on the canvas. The text below describes the code until that ships. «z1 = a+bi»,
   «z = x+yi», «z1 = a-bi», «z1 = a+ib», «w = c+di» define a number from two real parameters, with no
   `*`. The number reads «z₁ = a+bi» in the cartesian view while a and b are free (the polar view prints
   no value), «z₁ = 3+bi» once a = 3 is forced, and exactly as the literal 3+4i once both are. A glued
   `i` whose other letter is a complex number («zi») is ambiguous and is refused with the explicit
   product offered («z*i»); `pi` is never read as p·i. *(#1365, operator ruling 2026-09-24; realised —
   [ADR-CX-058](06d-decisions-complex.md#adr-cx-058). Counting the number's freedom as two rather than
-  four is #1410.)*
+  four is #1410, closed and parked in the icebox.)*
 - **FR-CN-11 (Must)** — **The trigonometric form is the same number as cis.** «z1 = 2(cos45 + i sin45)»,
   «z1 = √2(cos45 + i·sin45)», «z1 = cos45 + i sin45» (r omitted is 1), with `i·sin`, `i*sin`,
   `sin45·i`, the `°` or without it, a signed or parenthesised angle, and a symbolic one
@@ -156,7 +156,7 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   before, «?» / «= ?» after — for every ask kind alike, and a statement in a frame is never recorded as a
   given. *(#1437; realised — [ADR-CX-055](06d-decisions-complex.md#adr-cx-055), Amendment 1.)*
 
-- **FR-KN-1 (Must)** — **A number printed on screen is knowledge**: invariant across every valid
+- **FR-KN-1 (Must)** — **⚠ Ruled to change (2026-10-07, ADR-W-118 B12 · #1867):** a quantity with two possible values shows both, joined by «או», as in every other tool — here too for a question about a solution-set letter (FR-CN-6). The text below describes the code until that ships. **A number printed on screen is knowledge**: invariant across every valid
   configuration, with its gauge pinned. **The figure shows everything; the panel prints only what was
   asked for, and only what is known.** A value true of the current drawing but not forced by the givens
   is not printed. *(The product's statement of the suite rule [FR-DP-3](02w-requirements-workspace.md).)*
@@ -166,7 +166,9 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   בוודאות» — and prints nothing. *(Amended — operator ruling 2026-09-27,
   [ADR-CX-049](06d-decisions-complex.md#adr-cx-049).)*
 - **FR-KN-2 (Must)** — **A claim is the student's answer: verified, never obeyed.** A claim never
-  reshapes the figure to become true.
+  reshapes the figure to become true. **⚠ Ruled to change (2026-10-07, ADR-W-118 B14/D3 · #1870):** a line
+  that asks the student to PROVE something («הוכיחו כי …») is refused like in the other builders
+  ([FR-SU-15](02w-requirements-workspace.md)); a bare statement keeps its claim check.
 - **FR-KN-3 (Must)** — **A claim gets one of THREE verdicts, and the third is not optional:**
   - **holds** — the givens force it, decided exactly;
   - **refuted** — the givens forbid it, decided exactly;
@@ -177,12 +179,13 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   had not finished entering the question. In a product whose defining interaction is entering a problem
   **line by line**, that distinction is the difference between a tool that checks a student and one that
   contradicts them out of its own incompleteness. *(Realised — `src-complex/model/claim.ts`. The 3-D
-  builder collapses `unknown` into `refuted`; that is [#909](https://github.com/dcodish/geo_builder/issues/909),
-  found by writing this requirement.)*
+  builder refuses a claim its givens do not determine ([02b FR-CL-1](02b-requirements-3d.md),
+  [ADR-3D-260](06b-decisions-3d.md#adr-3d-260)); the operator deferred a three-valued verdict for 3-D
+  ([#909](https://github.com/dcodish/geo_builder/issues/909)); amended 2026-10-07, #1861.)*
 - **FR-KN-4 (Must)** — **The engine states WHAT happened; the reading layer words it.** A verdict carries
   a structured reason code, not a sentence, so the same fact reads correctly in Hebrew and English and
   the wording can improve without touching the engine. *(Realised — `model/why.ts`, #716.)*
-- **FR-KN-5 (Must)** — **A real parameter is visible.** Every parameter the figure mentions is listed
+- **FR-KN-5 (Must)** — **⚠ Ruled to change (2026-10-07, ADR-W-118 B6/D1 · #1862):** a letter the student did not value is never replaced on the canvas — `|z₂| = 18r` stays «18r» there, and its value (10) is in the data panel. The text below describes the code until that ships. **A real parameter is visible.** Every parameter the figure mentions is listed
   in the data panel: its exact value when the givens force it (`u^5 = 32` → `u = 2`), «חופשי» when they
   do not. It can be asked (`r`, `9r`), and wherever a solved parameter would print inside another value,
   its value is printed instead (`|z₂| = 18r` with r = 5/9 reads 10). An accepted given never leaves

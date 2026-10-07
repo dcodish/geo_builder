@@ -1,5 +1,7 @@
 # 24 — Foundation hardening plan (robustness · scalability · accuracy · testability · quality)
 
+_**2026-10-07 (#1861):** stages S3.2 (a)+(b) were built 2026-07-25 and the S3.1 enforcing flip shipped as ADR-453 (2026-08-19); the one remaining solver step is filed under #1861, and this plan becomes history._
+
 _Status: **EXECUTED 2026-07-24/25 (overnight run, operator: "run through all of these phases … one phase at a time"). Phases 0–2 COMMITTED (one commit per phase, gates green); Phase 3: S3.1 built in SHADOW mode (report: `reports/span-accounting-shadow.md` — the enforcing flip stays with the operator per §4.2), S3.2 remains DESIGN-ONLY ([docs/25](25-joint-solve-design.md), §4.1 sign-off reserved); Phase 4: policy/docs halves done (fixtures-first, docs/04+11+17 truth-ups), code halves per the final program comment on [#310](https://github.com/dcodish/geo_builder/issues/310). Baseline tag for full revert: `baseline/2026-07-24-pre-hardening`.**_
 _Source of findings: [docs/23-architecture-review-2026-07.md](23-architecture-review-2026-07.md) (the commissioned review). Execution route: [docs/22-workflow.md](22-workflow.md) — each slice is a GitHub issue + its own PR branch; umbrella issue tracks the program. Doctrine: [docs/17-design-rules.md](17-design-rules.md) applies to every slice._
 

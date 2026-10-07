@@ -1,6 +1,6 @@
 ---
 name: decisions
-description: Walk the operator through every open decision blocking the queue — one at a time, in plain language, with real options and a marked recommendation — and transcribe each ruling to GitHub as it is given, so the pass ends with nothing waiting on the operator and enough armed work for autonomous fix rounds. Use when the operator asks to go through decisions, clear what needs their attention, unblock the queue, answer open questions, "what do you need from me", "מה צריך ממני", or wants to hand over enough rulings that work can continue without them.
+description: Walk the operator through every open decision blocking the queue — one at a time, in plain language, with real options and a marked recommendation — and transcribe each ruling to GitHub as it is given, so the pass ends with every product question asked and answered, and the plans that follow from his answers armed. Use when the operator asks to go through decisions, clear what needs their attention, unblock the queue, answer open questions, "what do you need from me", "מה צריך ממני", or wants to hand over enough rulings that work can continue without them.
 ---
 
 # Decisions — the operator-unblocking pass
@@ -16,8 +16,9 @@ time, in the language of *what a student sees* rather than what the code does.
 3. **Closed** — the ruling resolved it (wontfix, duplicate, already true)
 4. **Blocked on something that is not the operator** — an upstream issue, a PR in flight
 
-Nothing is left in "waiting on the operator". That is the whole deliverable: **the queue stops needing
-them, and there is enough armed work to run rounds without them.**
+Nothing is left in "waiting on the operator". That is the whole deliverable: **no product question is
+left unasked**, and the plans that follow from his answers are armed. Armed work is a by-product of his
+rulings, never the goal: a pass that arms plans he has not seen has failed (CLAUDE.md rule 7).
 
 ## What this pass is NOT
 
@@ -61,8 +62,9 @@ inline burns the context the conversation itself needs.
 frees none — the point of this pass is throughput after it ends. Break ties with P1 > P2 > P3.
 
 An issue that merely *lacks* a plan is **not** automatically blocking. If the plan is writable from the
-code and the rulings already on record, **write it and arm it** — do not spend an operator question on
-work the session can do. Bring them only what is genuinely theirs: product behaviour, pedagogy, UX,
+code and the rulings already on record, **write it** — and arm it only if every line of its
+`## What the student will see` is `[asked]`, `[ruled]` or `[2-D]` (CLAUDE.md rule 7). Do not spend an
+operator question on mechanism the session can work out. Bring them only what is genuinely theirs: product behaviour, pedagogy, UX,
 scope, priority, and anything that reverses a shipped promise.
 
 ---
@@ -124,13 +126,14 @@ Per ruling:
    issue body** — a body is written once; rulings live in comments.
 2. **Update the labels to match the new truth:**
    - clear `needs-operator`
-   - apply `auto-ok` **only** when the ruling leaves a concrete, self-contained plan (per
-     [ADR-W-014](../../../docs/06w-decisions-workspace.md) Am. 1), with an audit comment quoting the
-     approval and its date
+   - apply `auto-ok` **only** when the ruling leaves a concrete, self-contained plan whose
+     `## What the student will see` has no `[proposed]` line (per
+     [ADR-W-014](../../../docs/06w-decisions-workspace.md) Am. 1 and ADR-W-117), with an audit comment
+     quoting the approval and its date
    - relabel `bug` → `feature` when the ruling says the gap is a missing capability
    - re-prioritise when the ruling changes what is at stake
 3. **Name the ADR obligation.** A ruling that settles a design or reverses shipped behaviour requires an
-   ADR — say which log it lands in (`06` 2-D · `06b` 3-D · `06d` complex · `06w` cross-product) and let
+   ADR — say which log it lands in (`06` 2-D · `06b` 3-D · `06c` analytic · `06d` complex · `06w` cross-product) and let
    the implementing session write it. An ADR is required for any significant decision.
 4. **A deferral is a resolution.** Record it as one: what was asked, what they said, what happens
    meanwhile. Do not leave it looking unasked.
@@ -147,9 +150,10 @@ A ruling that leaves no plan has not unblocked anything. For each issue ruled th
 
 - If the mechanism is now derivable, **write the fix plan into the issue** (root cause, mechanism, files,
   locks — per [docs/22 §2b](../../../docs/22-workflow.md) and docs/17), then arm it.
-- If the ruling opened a **class** wider than the reported instance, say so in the plan. Standing rule 1
-  governs planned work exactly as it governs written work: a plan scoped to one symptom is a patch
-  waiting to be committed.
+- If the same wrong outcome reaches further than the reported instance (other spellings, rules, seeds or
+  builders), say so in the plan: a plan scoped to one symptom is a patch waiting to be committed
+  (standing rule 1). A **new** outcome the operator did not rule is never "the class" — it is a
+  `[proposed]` line and a question for him (rule 7).
 - If the mechanism still is not derivable, say plainly what is missing and what would settle it. That is
   an honest outcome; a vague plan that arms itself is not.
 

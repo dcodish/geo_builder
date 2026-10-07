@@ -1,8 +1,9 @@
 # 06c — Decision log: the analytic-geometry tool (`src-analytic/`)
 
 _The analytic track's OWN ADR log (ids `ADR-AG-NNN`), separate from the sibling logs **by design** —
-docs/20 §12 rule 3: parallel session streams must not race on one ADR numbering sequence. Same
-conventions otherwise: every significant decision gets an entry; the plan of record is
+[docs/22 §9](22-workflow.md) ("Isolation rules"): parallel session streams must not race on one ADR numbering sequence. Same
+conventions otherwise: every significant decision gets an entry. The contract is
+[02c](02c-requirements-analytic.md) (what) and [04c](04c-design-analytic.md) (how); the finished build plan was
 [19-analytic-geometry-tool.md](19-analytic-geometry-tool.md)._
 
 ---
@@ -423,6 +424,8 @@ D7 kinds 2 and 3 land with the pin.
 ---
 
 ## ADR-AG-007 — The analytic tool is NOT DEPLOYED, and that is structural (2026-09-03)
+
+**⚠ Lifted 2026-09-16:** analytic is deployed (prod/2026-09-16; products.json enabled, operator-ruled)
 
 **Context.** Operator, on seeing V0 slice A run: *"we now set a rule that analytical tool doesnt get
 deployed. so the deployed version doesnt have this capability and only local testing would show it.
@@ -2316,7 +2319,7 @@ now much rarer, because the common case no longer exhausts anything.
 
 ## ADR-AG-036 — A circle MARKS its centre, and the mark is not the label (#1024)
 
-**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067) · **confirmed 2026-10-07 as a recorded exception (ADR-W-118 B7); foci/directrix to follow (#1863)**
 
 **Requirements:** [02c](02c-requirements-analytic.md) §9 R61. **Design:** none (the renderer).
 
@@ -10709,7 +10712,7 @@ All four parity locks are green. Catalog: two entries (F17), «חוצה זוית
 
 ## ADR-AG-225 — What the student stated is written on the figure, as 2-D writes it: the stated-measure layer, on one planar mark geometry hoisted to `shell/marks` (#1714)
 
-**Status:** accepted · 2026-10-03 · fix-round #1721, stream R5 item 1 (PR, base `main`). Operator report, playing round #1709 T5: *"when an angle or segment are given, we need to put those values on the segment or angle like the 2d tool does"*; the T6 comment adds that «tan∢BAO = 2» shows nothing. Rulings applied:
+**Status:** accepted · 2026-10-03 · fix-round #1721, stream R5 item 1 (PR, base `main`). Operator report, playing round #1709 T5: *"when an angle or segment are given, we need to put those values on the segment or angle like the 2d tool does"*; the T6 comment adds that «tan∢BAO = 2» shows nothing. Rulings applied: · **⚠ §1/§2 equality marks ruled for removal 2026-10-06 (#1805; ADR-W-118 B2); §3's «S=13» is now the standard in every tool (B9, #1865)**
 - the canvas shows the inputs and the panel the computed values (ADR-AG-016, [ADR-W-047](06w-decisions-workspace.md#adr-w-047), re-affirmed on #1563);
 - analytic gives 2-D's experience for plane geometry (2026-10-02);
 - a trig given is written as the ANGLE in degrees («63.43°», never «tan=2»; #1718/#1719, 2026-10-03);

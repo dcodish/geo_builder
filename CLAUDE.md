@@ -9,51 +9,53 @@ not append dated progress entries here; a guard test rejects them ([ADR-W-002](d
 
 ## What this is
 
-Geo Builder is a browser app where Israeli high-school students describe a geometry construction in natural language (Hebrew or English) and watch it render on an interactive canvas, **building the figure up one step at a time**, with relevant theorems surfaced as they build. UI is RTL Hebrew by default.
+Geo Builder is a family of four browser builders (2-D geometry, 3-D space, analytic geometry, complex numbers) where Israeli high-school students describe a construction in natural language (Hebrew or English) and watch it render on an interactive canvas, **building the figure up one step at a time**. UI is RTL Hebrew by default. (2-D has a theorem-surfacing engine; its surface is switched off by the operator, #740.)
 
 The defining interaction: a student adds information incrementally — "square ABCD" → "point G on AD" → "angle GBA = 37°" (G slides along AD until the angle holds) — and the figure forms and adapts as constraints accumulate. When a construction has more than one valid drawing, one is shown and the student can press a button to cycle to an alternative configuration.
 
 The pipeline is a compiler: **natural language → commands → constructive evaluation → rendered figure**
 ([docs/11](docs/11-architecture-as-compiler.md)). Every object is defined in terms of earlier objects in a
 dependency graph, classified by degrees of freedom — free point (2), point-on-object (1, the parameter that
-makes "G on AD" representable), derived point (0). Evaluation is topological; a multi-solution construction
-stores a **branch index**, which is what "show another configuration" cycles; stability is structural, so
-adding a constraint never makes the existing figure jump.
+makes "G on AD" representable), derived point (0). Evaluation is topological. Every unstated magnitude or choice is a free degree of freedom (ADR-052);
+«הציגו תצורה אחרת» re-samples them all, branches and free magnitudes alike (02 FR-ALT-2). Stability is
+structural: adding a constraint never makes the existing figure jump.
 
 ## Where things live
 
 The layering `engine ← replay ← store` is mechanically enforced by
 `src/replay/__tests__/import-direction.test.ts`. Product trees never import each other
-(`server/__tests__/isolation.test.ts`).
+(`server/__tests__/isolation.test.ts`). **Every import edge is declared once, in
+[`BOUNDARIES.json`](BOUNDARIES.json)**; read it there, never from prose.
 
-| Module | What it is | Must not import |
-| --- | --- | --- |
-| `src/engine/` | The constructive engine: dependency-graph data model, pure geometry, constraint solve/residuals, `applyCommand` reducer, topological `evaluate`, `step` (apply / keep-prior / alternatives), the givens verifier | store, parser, render, React |
-| `src/replay/` | Top orchestration — the replay/fold memo, deferral fixpoint, atomic-group poisoning, seed/config searches, the shared detection sample core, validity predicates. Pure over `(facts, seed, overrides)` | zustand, parser, render, React |
-| `src/store/` | Session store (Zustand + `zundo`). **The source of truth is `(facts, seed)` — the ordered fact list plus the configuration index; the figure is derived by `replay`** — positions are never stored, so undo cannot desync. A structural edit resets the seed ([ADR-484](docs/06-decisions.md#adr-484)) | render, parser internals |
-| `src/parser/` | Deterministic bilingual `utterance → command[]`. `catalog.ts` is the user-facing reference **and** coverage map (drives the in-app commands panel). Unmatched input returns `not-handled` — the seam where the LLM fallback escalates | engine internals beyond types |
-| `src/theorems/` | Read-only theorem-surfacing spine over a **coordinate-free** `MatchCtx`; folds an authored table, never calls `replay`/`evaluate` | anything that mutates |
-| `src/render/` | Pure SVG renderer: `transform.ts` + `scene.ts` (no React) + `Figure.tsx`. A **pure consumer** of engine output and swappable | engine internals |
-| `src/app/` | The submit pipeline — the whole text→command orchestration behind an injected `SubmitDeps` UI interface. New submit-path behaviour goes here, never inline in the component | — |
-| `src/validation/` | Differential coordinate check against an **independent closed-form oracle**. Dev/CI only | **the engine** — the oracle's independence is the whole point |
-| `src/ui/`, `src/i18n/`, `src/export/` | Chrome: theme + modal, i18n bootstrap and locales, image/`.docx` export | engine |
-| `src3d/` | The 3-D Space Builder — a second product. See [`src3d/CLAUDE.md`](src3d/CLAUDE.md) | **`src/` (anything)** |
-| `src-complex/` | The complex-numbers Builder — a third product. See [`src-complex/CLAUDE.md`](src-complex/CLAUDE.md) | **`src/`, `src3d/`** |
-| `shell/` | The shared chrome tree ([ADR-W-016](docs/06w-decisions-workspace.md#adr-w-016), [ADR-W-019](docs/06w-decisions-workspace.md#adr-w-019)): design tokens, bidi core, i18n bootstrap, save envelope + naming + load audit, symbol-palette core, app frame (header, `⋯` menu, About/privacy modal, banners, product switcher). Parameterized by the caller — no strings, no product knowledge, no `if (product === …)`. Consumed by all three products (docs/28 §5a) | **product trees, `server/`** |
-| `server/` | The shared LLM proxy + admin dashboard, parameterized by `tool:` — never forked per product | product trees |
-| `archive/` | The old template-based implementation. Not compiled, not bundled, excluded from tests. Reference only | — |
+| Module | What it is |
+| --- | --- |
+| `src/engine/` | The constructive engine: dependency-graph data model, pure geometry, constraint solve/residuals, `applyCommand` reducer, topological `evaluate`, `step` (apply / keep-prior / alternatives), the givens verifier |
+| `src/replay/` | Top orchestration — the replay/fold memo, deferral fixpoint, atomic-group poisoning, seed/config searches, the shared detection sample core, validity predicates. Pure over `(facts, seed, overrides)` |
+| `src/store/` | Session store (Zustand + `zundo`). **The source of truth is `(facts, seed)` — the ordered fact list plus the configuration index; the figure is derived by `replay`** — positions are never stored, so undo cannot desync. A structural edit resets the seed ([ADR-484](docs/06-decisions.md#adr-484)) |
+| `src/parser/` | Deterministic bilingual `utterance → command[]`. `catalog.ts` is the user-facing reference **and** coverage map (drives the in-app commands panel). Unmatched input returns `not-handled` — the seam where the LLM fallback escalates |
+| `src/theorems/` | Read-only theorem-surfacing spine over a **coordinate-free** `MatchCtx`; folds an authored table, never calls `replay`/`evaluate` |
+| `src/render/` | Pure SVG renderer: `transform.ts` + `scene.ts` (no React) + `Figure.tsx`. A **pure consumer** of engine output and swappable |
+| `src/app/` | The submit pipeline — the whole text→command orchestration behind an injected `SubmitDeps` UI interface. New submit-path behaviour goes here, never inline in the component |
+| `src/validation/` | Differential coordinate check against an **independent closed-form oracle**. Dev/CI only. `coordOracle.ts` imports no engine code: the oracle's independence is the whole point |
+| `src/ui/`, `src/i18n/`, `src/export/` | Chrome: theme + modal, i18n bootstrap and locales, image/`.docx` export |
+| `src3d/` | The 3-D Space Builder: see [`src3d/CLAUDE.md`](src3d/CLAUDE.md) |
+| `src-complex/` | The complex-numbers Builder: see [`src-complex/CLAUDE.md`](src-complex/CLAUDE.md) |
+| `src-analytic/` | The analytic-geometry Builder: see [`src-analytic/CLAUDE.md`](src-analytic/CLAUDE.md) |
+| `shell/` | The shared chrome tree ([ADR-W-016](docs/06w-decisions-workspace.md#adr-w-016), [ADR-W-019](docs/06w-decisions-workspace.md#adr-w-019)): design tokens, bidi core, i18n bootstrap, save envelope + naming + load audit, symbol-palette core, app frame (header, About/privacy modal, banners, product switcher). Parameterized by the caller — no strings, no product knowledge, no `if (product === …)`. Consumed by all four products (docs/28 §5a) |
+| `server/` | The shared LLM proxy + admin dashboard, parameterized by `tool:` — never forked per product |
+| `archive/` | The old template-based implementation. Not compiled, not bundled, excluded from tests. Reference only |
 
 ## Where the current state lives
 
 **No state in this file.** The live sources, in order of reliability:
 
-- **[`docs/06-decisions.md`](docs/06-decisions.md)** (2-D, `ADR-NNN`) and **[`docs/06b-decisions-3d.md`](docs/06b-decisions-3d.md)** (3-D, `ADR-3D-NNN`) — the decision logs. The tail of each is the most recent work, and these are the records that are actually maintained. **An ADR is required for any significant decision.**
+- **The five decision logs**: [06](docs/06-decisions.md) (2-D, `ADR-NNN`), [06b](docs/06b-decisions-3d.md) (3-D, `ADR-3D-NNN`), [06c](docs/06c-decisions-analytic.md) (analytic, `ADR-AG-NNN`), [06d](docs/06d-decisions-complex.md) (complex, `ADR-CX-NNN`), [06w](docs/06w-decisions-workspace.md) (workspace, `ADR-W-NNN`). They record what was decided and why. The newest entries sit near the end of each log, but not in strict numeric order. A replaced entry carries a **⚠ Superseded** stamp naming its successor; a behaviour the operator has ruled to change before any code changed carries **⚠ Ruled to change**. **An ADR is required for any significant decision.**
+- **What a product promises today** is its requirements doc (rule 6), edited in the same commit as the code. Where an old ADR and the requirements doc differ, the doc and the newer ADR win.
 - **`gh issue list`** — the live queue (labels: type + priority + product). "What's open / what's next" is answered with the **open-issues report** ([docs/22 §2c](docs/22-workflow.md)) — grouped, with complexity and a recommended order — never a raw dump.
 - **`gh pr list`** — work that is finished and pushed but **not merged**: an open PR is a feature awaiting the operator's play-and-approve, and nothing else records it. Pushed is not the finish line ([ADR-W-007](docs/06w-decisions-workspace.md)).
 - **[`docs/DEPLOY-LOG.md`](docs/DEPLOY-LOG.md)** — canonical deploy history, one entry per `prod/YYYY-MM-DD` tag. It records what WAS deployed, never what is awaiting deploy — for that, compare the newest `prod/*` tag against `main` (the session-start hook reports both).
 
-Older narrative logs (`docs/09-implementation-plan.md`, `docs/09b-status-log.md`, `docs/PROJECT-MEMORY.md`)
-carry useful background but **lag behind the ADR logs** — read them for context, never as current status.
+Older narrative logs (docs/09, 09b, PROJECT-MEMORY) lag the ADR logs: background only, never status.
 
 ## Standing rules
 
@@ -62,19 +64,18 @@ These are non-negotiable and they override default behaviour.
 **1 — Root cause over symptom. NEVER PATCH.** Fix the core feature that failed, never the surface symptom,
 and never special-case the one input that errored — the size of the correct fix is not a reason to avoid it.
 A green test on the reported case is necessary but **not sufficient**: ask whether the same *class* can still
-happen elsewhere. A narrow local patch is not an acceptable outcome; if the proper fix looks large, or you are
+happen elsewhere: the same wrong outcome in another spelling, rule, seed or builder. A behaviour the report
+did not describe is never "the class"; it is a proposal for the operator (rule 7). A narrow local patch is not an acceptable outcome; if the proper fix looks large, or you are
 unsure what the core feature is or how far it should reach, **stop and ask the operator** rather than quietly
 shipping a patch. State the root cause in the commit message.
 **How to comply is dictated in [docs/17-design-rules.md](docs/17-design-rules.md)** — class-first diagnosis,
 the patch tripwires, the chokepoint registry, the mechanisms M1–M4, perf rules, the escalation template.
 **Read it before fixing any reported bug; it has operator authority.**
 
-**2 — No autonomous Anthropic API calls.** Never fire a live Anthropic/Haiku call on your own, though the
-key in `.env.local` makes it technically possible. **Only the operator authorises a live call.** To test the
-LLM fallback, act as the **oracle yourself with your own session model** — reason out the canonical command
-lines the LLM should emit, then verify they parse and build through the real `parse → replay` path. Escalate
-to a live Haiku call only with explicit operator approval, and only when the operator's live results diverge
-from your prediction.
+**2 — No autonomous Anthropic API calls.** The key in `.env.local` makes a live call possible; **only the
+operator authorises one.** To test the LLM fallback, be the **oracle yourself**: reason out the canonical lines
+the LLM should emit and verify they parse and build through the real `parse → replay` path. A live call needs
+his explicit approval, and only when his live results diverge from your prediction.
 
 **3 — Triage-first when the operator is testing.** A session in which the operator reports issues does the
 FULL triage — file each as an issue, root-cause diagnosis per docs/17, classify and prioritise, write a
@@ -85,8 +86,9 @@ prod-honesty emergencies preempt, announced first.
 
 **4 — Reported bugs become regression scenarios.** A fix is not complete until the operator's *exact
 utterance sequence* is permanent coverage. **Fixtures-first:** when the essence is "this figure now builds
-green and verifies", the default lock is a saved `.geo.json` fixture in `fixtures/` (zero authoring, full
-verifier + parser-drift net). Write a hand-authored scenario only when the lock needs a bespoke assertion
+green and verifies", the default lock is a saved fixture in the product's fixtures folder (2-D: `src/__tests__/fixtures/`;
+the others: the "Fixtures" row of [docs/22 §9](docs/22-workflow.md)) (zero authoring, full verifier +
+parser-drift net). Write a hand-authored scenario only when the lock needs a bespoke assertion
 (a specific relation, ordering, refusal, or branch) — those live in `src/__tests__/scenarios-corpus-{1..4}.ts`
 (**append to the LAST chunk**), with the harness in `scenarios-harness.ts`, run by the sharded
 `scenarios-e2e-*.test.ts` slices, indexed in [`docs/test-scenarios.md`](docs/test-scenarios.md). This is in
@@ -101,7 +103,8 @@ summary, not prose. The operator works down it without opening any other documen
 
 1. **`## Heads-up` first** — plain language, self-contained (no ADR/issue id as the only pointer; say
    what changed for a **student**). One line each, nothing else: a **behaviour change**, above all
-   anything WITHDRAWN · **approved but not delivered**, and what it needs · anything **needing a
+   anything WITHDRAWN · anything shipped that the operator **did not ask for** (there should be none: rule 7;
+   such a case is always 🎮) · **approved but not delivered**, and what it needs · anything **needing a
    ruling**, as the question · the **riskiest area** + the test number covering it. Nothing to say?
    "Nothing surprising here" — never pad.
 2. **Cases `T1…Tn`, numbered continuously** across every product, route and PR, so "T7 is wrong"
@@ -133,6 +136,23 @@ Strategy and per-step gates: [`docs/08-testing-strategy.md`](docs/08-testing-str
 and deterministic and is tested hardest; the LLM fallback is always mocked. The **stability** regression —
 existing points must not jump when a fact is added — is a first-class test.
 
+**7 — The operator decides what a student sees; a session decides how** ([ADR-W-117](docs/06w-decisions-workspace.md#adr-w-117)).
+A session decides the mechanism alone (files, tests, refactors, performance), and may restore a behaviour
+that a dated operator ruling, or 2-D measured at HEAD, already defines. Anything else a student can see
+(drawn, hidden, labelled, refused, accepted, read, worded or computed differently) is a **product decision**
+and needs his dated ruling.
+- Every fix plan ends with `## What the student will see`, one line per change, tagged `[asked]` (quote him),
+  `[ruled]` (link), `[2-D]` (measured at a named commit) or `[proposed]`. A `[proposed]` line makes the issue
+  `needs-operator`; it is never armed.
+- **Measured beats written.** If the pickup measurement contradicts the plan's account of the request, of 2-D
+  or of another builder, stop and escalate (docs/17 §8). Never ship "because the plan lists it".
+- **No defaults.** An open question waits for him, in P1 sessions too. The one exception: a P1 session may
+  ship an honest refusal that reuses an existing message, flagged in the Heads-up.
+- **Found work is proposed, not queued.** File it `needs-operator` with a proposed priority; never arm it or
+  make it P1 yourself, except a figure drawn green for givens that cannot hold (P1, announced at once).
+- **Cross-tool warnings.** When he asks a non-2-D tool for behaviour that differs from 2-D, say so before
+  building. When a 2-D change would change what the other tools should do, ask whether it applies to them.
+
 ## Workflow — the standard operating route
 
 Authoritative: [docs/22-workflow.md](docs/22-workflow.md) ([ADR-265](docs/06-decisions.md#adr-265)).
@@ -140,10 +160,11 @@ Authoritative: [docs/22-workflow.md](docs/22-workflow.md) ([ADR-265](docs/06-dec
 **Every operator report or request is FILED as a GitHub issue first** (`gh issue create` on
 `dcodish/geo_builder`, even when fixed in the same session). Labels: type `bug`/`feature`/`debt` + priority
 `P1` (prod honesty/correctness — drop everything) / `P2` (real input fails visibly — schedule by log-triage
-demand) / `P3` (polish/debt — batch) + product `2d`/`3d`/`server`/`workspace`; `needs-operator` when blocked
-on a decision; `auto-ok` (operator-**approved** ONLY — a session may apply it only as transcription of
-the operator's explicit batch approval, with an audit comment on the issue, ADR-W-014) marks a fix plan
-approved for the autonomous `/fix-round` loop, whose round issues carry `awaiting-play` until the
+demand) / `P3` (polish/debt — batch) + product `2d`/`3d`/`analytic`/`complex`/`server`/`workspace`; `needs-operator` when blocked
+on a decision; `icebox` for a closed, parked issue (never one that shows something false); `auto-ok`
+marks a fix plan approved for the autonomous `/fix-round` loop. A session applies `auto-ok` only as
+transcription of the operator's explicit approval, or to a plan whose every `What the student will see`
+line is `[asked]`/`[ruled]`/`[2-D]` (rule 7), always with an audit comment (ADR-W-014, ADR-W-117). The loop's round issues carry `awaiting-play` until the
 operator validates the batch ([docs/22 §2d](docs/22-workflow.md), ADR-W-012). A "bug" diagnosed as a **missing capability is relabelled `feature` and treated as one** —
 never silently built under a bug's banner.
 
@@ -165,8 +186,9 @@ never silently built under a bug's banner.
 
 One workspace, several sibling products: the **2-D Geo Builder** (`src/`, log 06, label `2d`), the **3-D Space
 Builder** (`src3d/`, log 06b, ids `ADR-3D-NNN`, label `3d`), the **complex-numbers Builder** (`src-complex/`,
-log 06d, ids `ADR-CX-NNN`, label `complex`), the **shared server** (`server/`, label `server`), and planned
-**analytic geometry** (`src-analytic/`, `ADR-AG-NNN` in 06c, label `analytic`). Cross-product decisions go in
+log 06d, ids `ADR-CX-NNN`, label `complex`), the **analytic-geometry Builder**
+(`src-analytic/`, log 06c, ids `ADR-AG-NNN`, label `analytic`) — all four deployed — plus the shared chrome
+(`shell/`) and the **shared server** (`server/`, label `server`). Cross-product decisions go in
 `docs/06w-decisions-workspace.md` as `ADR-W-nnn`.
 
 Every workflow artifact is per-product — issue label, ADR log, CI lane, deploy path — so **identify which
@@ -184,40 +206,35 @@ by `tool:`, never forked). Boundaries are declared in `BOUNDARIES.json` and enfo
 - **`npm run test:fast`** — every file outside the measured slow tier, all products (~2 min) — the development loop and a fix round's per-item check, **never a commit or deploy gate** ([ADR-W-113](docs/06w-decisions-workspace.md#adr-w-113)).
 - **`npm run test:docs`** — the doc gate (~2 s) — the correct bar for a **doc-only** change; anything touching `.ts`/`.tsx` pays `test:full` ([ADR-W-041](docs/06w-decisions-workspace.md#adr-w-041)).
 - `npm run test:tiers` — which slow files have actually caught a regression the fast tier missed.
-- `npm run test:2d` / `test:3d` / `test:complex` / `test:analytic` — per-product slice (tree + shared `server/`); CI mirrors the split.
+- `npm run test:run:2d` / `test:run:3d` / `test:run:complex` / `test:run:analytic` — per-product slice (tree + `server/`, plus `shell/` for complex and analytic); CI mirrors the split. The same names without `run:` start watch mode and never exit.
 - Test runs **queue on one lock across all worktrees** — `test:fast`, `test:full` and `test:run:*` take it themselves; an ad-hoc run uses `npm run test:locked -- npx vitest run <files>` ([ADR-W-114](docs/06w-decisions-workspace.md#adr-w-114)).
 - Tier mechanics and the fold-memo rule: [docs/08](docs/08-testing-strategy.md). The `@/` alias is 2-D-only; that hazard and every import edge: [`BOUNDARIES.json`](BOUNDARIES.json).
 
 ## Cross-machine setup
 
-David works from two PCs. **This project is NOT in Dropbox** (it corrupted `node_modules`, `.git` and
-source): it lives at `C:\projects\geo_builder` and **everything syncs through git.** New machine:
-`gh repo clone dcodish/geo_builder C:\projects\geo_builder`, `npm install`, copy `.env.local`. Claude's
-auto-memory (`.claude/memory/`) is git-**tracked** so it travels too — the deliberate exception to the
-workspace "keep projects in Dropbox for memory" convention.
-
-The switch is mechanical (`scripts/session-sync.mjs` + hooks): a `SessionStart` hook pulls `--ff-only` and
-reports anything needing a decision; the **`/handoff` skill** commits, pushes, and reports what does not travel;
-a `SessionEnd` hook pushes committed work as a net. **Nothing auto-commits.** **What never travels, by design:**
+David works from two PCs. The project lives at `C:\projects\geo_builder` (**not** Dropbox) and **everything
+syncs through git**; `.claude/memory/` is git-tracked so it travels too. New machine: `gh repo clone
+dcodish/geo_builder C:\projects\geo_builder`, `npm install`, copy `.env.local`. A `SessionStart` hook pulls
+`--ff-only` and reports what needs a decision; the **`/handoff` skill** commits, pushes and reports what does
+not travel; a `SessionEnd` hook pushes committed work. **Nothing auto-commits.** Never travels, by design:
 `.env.local`, `logs/`, `node_modules/`, `.claude/settings.local.json`.
 
 ## Conventions to carry forward
 
-- **No fixed assumptions — every unstated magnitude is a free DOF, not a fixed value ([ADR-052](docs/06-decisions.md#adr-052)).** A student enters only what the question shows; the tool must assume no size/angle/position/proportion unless it was stated (a number, an angle, or a relation that forces it). A default value is allowed as a *starting* point so the figure can be drawn, but it must change on "show another configuration" or when a later constraint forces it — a fixed default silently asserts a given the question never gave (the same cardinal sin as drawing a figure that violates the givens). Conformance smell: a value counted by `rawMovableDof` but absent from `freeDofs` (so never sampled) is a default masquerading as fixed.
-- **One plane-geometry sentence, one verdict in every builder.** A plane-geometry input change lands in every builder that should read it (2-D is the reference), or adds a known-gap row naming its issue; a sentence one builder reads by design needs an `EXCEPTIONS` family. Rows and rule: [docs/22 §10](docs/22-workflow.md) ([ADR-W-108](docs/06w-decisions-workspace.md#adr-w-108)).
-- **Honesty invariants.** No stated magnitude is ever silently dropped — a given parses to a constraint, escalates, or errors, but never vanishes. Everything the student stated is visible on the figure. Error messages name the conflicting *statement*, never internal state.
+- **No fixed assumptions — every unstated magnitude is a free DOF, not a fixed value ([ADR-052](docs/06-decisions.md#adr-052)).** A student enters only what the question shows; the tool assumes no size, angle, position or proportion that was not stated or forced. A default is only a *starting* point: it must change on «הציגו תצורה אחרת» or when a later constraint forces it, because a fixed default silently asserts a given the question never gave. Smell: a value counted by `rawMovableDof` but absent from `freeDofs` (never sampled).
+- **One plane-geometry sentence, one verdict, one drawing in every builder.** For plane geometry 2-D is the reference for the verdict **and** for how the figure is drawn: marks, labels, label text, status wording ([ADR-W-118](docs/06w-decisions-workspace.md#adr-w-118) B1). A plane-geometry input change lands in every builder that should read it, or adds a known-gap row naming its issue; a sentence one builder reads by design needs an `EXCEPTIONS` family. Rows and rule: [docs/22 §10](docs/22-workflow.md) ([ADR-W-108](docs/06w-decisions-workspace.md#adr-w-108)).
+- **Honesty invariants.** No stated magnitude is ever silently dropped — a given parses to a constraint, escalates, or errors, but never vanishes. Every stated **value** is visible on the figure (a length, angle, area, letter, the right-angle knee); a stated **relation** (AB = AC, ∥) is in the givens list and is drawn only in an opt-in relations layer, never as a mark at rest ([ADR-W-118](docs/06w-decisions-workspace.md#adr-w-118) B2). Error messages name the conflicting *statement*, never internal state.
 - **RTL Hebrew is the default.** All user-facing strings go through `useTranslation`/`t()` (`src/i18n/`, `locales/he.json` + `en.json`). Toggling language updates `document.documentElement.dir`. The parser and the LLM fallback handle both Hebrew and English input.
 - **Deterministic element IDs** (`seg-AB`, `poly-ABC`) so re-issuing the same command is idempotent.
 - **Stack:** React + Vite + Zustand (+ `zundo` for temporal undo/redo) + TypeScript.
 
 ## Documentation
 
-Full docs live in [`docs/`](docs/) — start at [`docs/README.md`](docs/README.md). They are the authoritative,
-detailed source; this file is the quick orientation. The ones you will actually need:
-[17-design-rules](docs/17-design-rules.md) (how to fix a bug without degrading the codebase — operator authority),
+Start at [`docs/README.md`](docs/README.md). The ones you will actually need:
+[17-design-rules](docs/17-design-rules.md) (fixing without degrading the codebase — operator authority),
 [22-workflow](docs/22-workflow.md), [08-testing-strategy](docs/08-testing-strategy.md),
-[LADDER](docs/LADDER.md) (the cross-layer solve-ladder contract — every mechanism ADR names the stage it inserts
-at), [10-pedagogy](docs/10-pedagogy.md), and the ADR logs.
+[LADDER](docs/LADDER.md) (the solve-ladder contract; every mechanism ADR names its stage),
+[10-pedagogy](docs/10-pedagogy.md) (the operator's rulings in ADR-W-118 win where it differs), and the ADR logs.
 
 **Validation corpus:** `docs/sample questions/` holds real bagrut problems (text + image). The work is
 corpus-driven — we reproduce each *figure* (never solve it) and compare against the official image.

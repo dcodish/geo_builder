@@ -2,8 +2,7 @@
 
 Living project documentation for a **four-product workspace**: the 2-D Geo Builder
 (`themathbible.com/geo-builder/`), the 3-D Space Builder (`/3d-builder/`), the complex-numbers Builder
-(`/complex-builder/`), and the analytic Builder (`src-analytic/` — **built locally, deliberately not
-deployed**, [ADR-AG-007](06c-decisions-analytic.md)). The machine-readable roster is
+(`/complex-builder/`), and the analytic Builder (`/analytic-builder/`, deployed since `prod/2026-09-16`). The machine-readable roster is
 [`products.json`](../products.json); the documentation registry is [`DOCS.json`](../DOCS.json).
 
 **For current state, read the tail of the relevant decision log, `gh issue list`, and
@@ -22,8 +21,7 @@ deployed**, [ADR-AG-007](06c-decisions-analytic.md)). The machine-readable roste
 
 Per-product docs follow the decision-log suffixes (`02b`/`02c`/`02d` requirements, `04b`/`04c`/`04d`
 design, `02w`/`04w` for shared surfaces), registered in [`DOCS.json`](../DOCS.json)
-([ADR-W-041](06w-decisions-workspace.md#adr-w-041)). Entries marked *(to write)* are declared gaps
-tracked by [#904](https://github.com/dcodish/geo_builder/issues/904), not oversights.
+([ADR-W-041](06w-decisions-workspace.md#adr-w-041)).
 
 | # | Document | What it covers |
 |---|---|---|
@@ -36,7 +34,7 @@ tracked by [#904](https://github.com/dcodish/geo_builder/issues/904), not oversi
 | 03 | [Non-Functional Requirements](03-nonfunctional-requirements.md) | Quality attributes (`NFR-*`): usability, stability, cost, security, privacy |
 | 04 | [Design — 2-D](04-design.md) | Architecture, data model, engine, input layer, rendering. **2-D only** |
 | 04b | [Design — 3-D](04b-design-3d.md) | The context-free parser and why that is the better architecture, the coordinate-injection pivot, the landing funnel, relations as a disposition map |
-| 04c | [Design — Analytic](04c-design-analytic.md) | The smallest tree: the parameter-carrying expression layer, the conic fit and canonicity gate, and the first builder born after the chassis |
+| 04c | [Design — Analytic](04c-design-analytic.md) | The parameter-carrying expression layer, the conic fit and canonicity gate, and the first builder born after the chassis |
 | 04d | [Design — Complex](04d-design-complex.md) | Log-polar makes the corpus LINEAR — exact ℚ elimination, branches as integer unknowns, DOF as nullspace dimension, and the three-valued claim verdict |
 | 04w | [Design — the shared chrome](04w-design-shell.md) | How `shell/` is built: slots not flags, the evidence-seeded entry rule, the two layers, the staggered adoption, and the rule that is enforced at import level only |
 | 04s | [Design — the shared server](04s-design-server.md) | The one Node service: single-file bundle, the key boundary, one proxy parameterized by `tool:`, cost controls, the event sink and dashboard — and the tree's missing type gate |
@@ -70,7 +68,7 @@ tracked by [#904](https://github.com/dcodish/geo_builder/issues/904), not oversi
 | # | Document | What it covers |
 |---|---|---|
 | 07 | [Theorem Reference](07-theorem-reference.md) | The official bagrut theorem list (109 + appendices), bilingual, IDs + role tags. **Byte-matched against `THEOREM_TABLE` by a test** |
-| 10 | [Pedagogy](10-pedagogy.md) | The teaching charter, and the operator-editable principles catalog (byte-guarded) |
+| 10 | [Pedagogy](10-pedagogy.md) | The teaching charter, and the operator-editable principles catalog (byte-guarded). The theorem surface is switched off by the operator (#740) |
 | 11 | [Architecture as a Compiler](11-architecture-as-compiler.md) | The pipeline lens, revised 2026-07-24 after the docs/23 review corrected three stale premises |
 | 12 | [Letter Placement](12-letter-placement.md) | The two levers that decide a figure's lettering: naming order and orientation |
 | 30 | [How the tools are built](30-how-the-tools-are-built.md) | Outreach reference: the algorithms under all four builders, each pointed at its file, plus the LinkedIn post drafts |
@@ -83,11 +81,11 @@ above, and the *current state* in its decision log.
 
 | # | Document | Status (as the document states it) |
 |---|---|---|
-| 19 | [Analytic-geometry tool](19-analytic-geometry-tool.md) | **Accepted**, rewritten 2026-09-03 against twenty consecutive 572 Q1s; V0 in build (#888). Not deployed |
+| 19 | [Analytic-geometry tool](19-analytic-geometry-tool.md) | Finished build plan; the contract is [02c](02c-requirements-analytic.md)/[04c](04c-design-analytic.md) |
 | 20 | [Space/vectors tool (3-D)](20-space-vectors-tool.md) | **Accepted, built and in production.** V8 complete — every 2009–2024 exam's space/vectors input is expressible |
 | 27 | [Complex-numbers tool](27-complex-numbers-tool.md) | **Accepted; shipped** `prod/2026-08-17-4` |
-| 28 | [Product unification](28-product-unification.md) | **Plan of record** ([ADR-W-018](06w-decisions-workspace.md#adr-w-018)); executing since 2026-08-17 |
-| 24 | [Foundation hardening plan](24-foundation-hardening-plan.md) | **Executed 2026-07-24/25**, but the umbrella issue [#310](https://github.com/dcodish/geo_builder/issues/310) is still open — treat as in progress |
+| 28 | [Product unification](28-product-unification.md) | **Plan of record** ([ADR-W-018](06w-decisions-workspace.md#adr-w-018)); delivered except Phase 2 (#663, #664); umbrella #648 closed |
+| 24 | [Foundation hardening plan](24-foundation-hardening-plan.md) | **Executed 2026-07-24/25**; the one remaining solver step is being filed under [#1861](https://github.com/dcodish/geo_builder/issues/1861) |
 
 ## Historical — completed or superseded
 
@@ -102,7 +100,7 @@ them for *why* something is the way it is, never for *what is true now*.
 | 14 | [Backlog & Quick-Win Triage](14-backlog.md) | Superseded by the issue queue ([ADR-265](06-decisions.md#adr-265)). Surviving items are being swept into issues |
 | 15 | [Hardening Plan (2026-07-02)](15-hardening-plan.md) | The sequenced A–F program from the multi-area review; its tracking table is ticked through ADR-170…207 |
 | 16 | [Phase 6 Theorems Plan](16-theorems-plan.md) | **Superseded for 6b+ by [18](18-theorem-relevance-plan.md)**, per its own header |
-| 18 | [Theorem Discovery v2 — relevance replan](18-theorem-relevance-plan.md) | *"The replan is fully built (T1–T5)"*; operator play-and-judge gates remain |
+| 18 | [Theorem Discovery v2 — relevance replan](18-theorem-relevance-plan.md) | *"The replan is fully built (T1–T5)"*; operator play-and-judge gates remain. The theorem surface is switched off by the operator (#740) |
 | 21 | [572 coverage audit](21-572-coverage-audit.md) | A point-in-time sweep of ~42 exams (2026-07-08) that scoped the 3-D V8 work |
 | 23 | [Architecture review (2026-07)](23-architecture-review-2026-07.md) | Commissioned review; findings adopted, execution became [24](24-foundation-hardening-plan.md) |
 | 25 | [Joint-solve design](25-joint-solve-design.md) | S3.2 design; approved and built 2026-07-25 with one measured amendment |

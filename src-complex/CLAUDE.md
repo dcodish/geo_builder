@@ -13,20 +13,21 @@ the exam never prints. Same charter as every sibling: **the student types the gi
 reproduces the figure and verifies claims — it never solves the exam question.** Deployed at
 `themathbible.com/complex-builder/`.
 
-The corpus is the יואל גבע 572 booklet, 2020–2025, Q3 of every exam. The plan of record is
-[`docs/27-complex-numbers-tool.md`](../docs/27-complex-numbers-tool.md): §10 is the **authoritative
-grammar contract** (sentence families), §9 the slice plan.
+**Contract:** [02d](../docs/02d-requirements-complex.md) (what) · [04d](../docs/04d-design-complex.md) (how) ·
+decisions [06d](../docs/06d-decisions-complex.md); grammar families:
+[docs/27](../docs/27-complex-numbers-tool.md) §10/§10b until they move into 02d (#1861). The corpus is
+the יואל גבע 572 booklet, 2020–2025, Q3 of every exam.
 
 ## The four hard boundaries
 
-1. **`src-complex/` never imports from `src/` or `src3d/`.** Patterns are COPIED, not shared;
+1. **`src-complex/` never imports another product tree** (`src/`, `src3d/`, `src-analytic/`). Patterns are COPIED, not shared;
    `server/__tests__/isolation.test.ts` reads `BOUNDARIES.json` and rejects a violation, including via
    the `@/` alias — which is why `vite.config.complex.ts` deliberately defines none. The one sanctioned
    shared code is the `shell/` tree ([ADR-W-016](../docs/06w-decisions-workspace.md#adr-w-016)): chrome
    only, parameterized by the caller, never branching on product identity. The `engine` layer is
    copied-never-shared, always.
-2. **Complex work never touches 2-D or 3-D artifacts** — their locales, their ADR logs, their status
-   text.
+2. **Complex work never touches another builder's artifacts** — their locales, their ADR logs, their
+   status text.
 3. **NO CAS.** The exact core is bounded linear algebra over ℚ on two vector spaces
    ([ADR-CX-006](../docs/06d-decisions-complex.md#adr-cx-006)). Anything wanting general symbolic
    algebra goes back to the operator.
@@ -61,10 +62,10 @@ mechanism ADR names its stage and updates that file.**
 ## The siblings are never harmed — and it is checked, not promised
 
 The operator's standing requirement for this rebuild
-([ADR-W-017](../docs/06w-decisions-workspace.md#adr-w-017)): capability grows here, and the two
-shipped products never regress. **Run `npm run check:siblings` before every commit in this tree.** It
-refuses any change to `src/` or `src3d/` (escape hatch: `ALLOW_SIBLING_EDIT="the reason"`, a reason
-rather than a flag) and builds both siblings regardless of the diff, because a shared-surface edit can
+([ADR-W-017](../docs/06w-decisions-workspace.md#adr-w-017)): capability grows here, and the other three
+builders never regress. **Run `npm run check:siblings` before every commit in this tree** — CI runs it
+in every lane. It refuses a change that edits a sibling tree (escape hatch: `ALLOW_SIBLING_EDIT="the
+reason"`, a reason rather than a flag) and builds the three siblings regardless of the diff, because a shared-surface edit can
 break them without touching one of their files. It takes ~10 seconds; it does **not** replace
 `npm run test:full`, which is still the gate — the builds prove the siblings compile, only the suite
 proves they behave.

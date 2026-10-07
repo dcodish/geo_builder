@@ -39,6 +39,6 @@ Corollary: never let a denial become a hand-back either — see [[deploys-are-mi
 
 Corollary: this is the same failure as writing a plausible-but-unverified diagnosis into a bug report.
 The rule is `docs/17`'s "state the root cause" applied to my own tooling — do not narrate a cause I have
-not established. See [[work-pc-cross-machine]] for what genuinely does not travel between machines
+not established. See CLAUDE.md "Cross-machine setup" for what genuinely does not travel between machines
 (`.env.local`, `logs/`, `node_modules/`) — permission rules in `.claude/settings.json` DO travel, which is
 exactly what I got wrong.

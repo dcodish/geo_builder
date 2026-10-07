@@ -8,9 +8,7 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Vision and stall](vision-and-stall.md) — what Geo Builder is really for (incremental figure-building) and why the template-based engine dead-ended
 - [Architecture decisions](architecture-decisions.md) — settled rebuild direction: constructive engine, parser-first + Haiku API fallback, cost controls
 - [Bagrut theorem source](bagrut-theorem-source.md) — the official theorem list PDF (canonical source for the theorem feature) + how to read it
-- [Memory in repo](memory-in-repo.md) — keep durable memory in the repo (docs/), not local memory, so it travels across computers
 - [Tool denials are observations](tool-denials-are-observations.md) — never report "I can't do X" from a denial without checking the permission config and retrying the canonical minimal command form
-- [Work PC / cross-machine](work-pc-cross-machine.md) — David switches work/home PCs; project syncs via git/GitHub (moved out of Dropbox 2026-07-23) — pick up cross-machine progress via git + the ADR-log tails at session start
 - [Prior rulings live in comments](prior-rulings-live-in-comments.md) — an issue body is written once and never revised: the ruling may sit in a comment, and the WORK may already have shipped — check comments AND `git log` before calling anything open — and a STALE TITLE misfiles the issue the same way (2026-08-16 #509; 2026-08-25 #659; 2026-09-22 #1279)
 - [Shared-tree branch races](shared-tree-branch-races.md) — re-verify the shared tree's branch in the SAME compound as any write git op there; a parallel session can switch it mid-flight (2026-08-13 near-miss)
 - [Gate lines are read, not matched](gate-lines-are-read-not-matched.md) — evidence produced is not evidence read; && between gates; quote the decisive lines before claiming green
@@ -66,7 +64,6 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Probe the sink, not the artifact](deploy-probe-the-sink.md) — a green deploy proves the artifact shipped, never that the capability works; a swallowed write still answers 204 (2026-09-22 #1363, analytic collected nothing while every check was green)
 - [The dev log has his exact run](dev-log-has-his-exact-run.md) — read logs/debug-log.jsonl before saying "could not reproduce"; it records every submit's result and the rows he deleted before screenshotting (2026-09-22 #1349 → #1351)
 - [The third copy is the shared one](third-copy-is-the-shared-one.md) — count the siblings before writing a product-local mechanism; two existing copies means yours belongs in `shell/` with a §5c lock (2026-09-22 #1353/#1358)
-- [LLM-lane convergence plan](llm-lane-convergence-plan.md) — the 2026-09-22 four-step plan: steps 1-2 shipped, #1243 is COLLECTION not evidence, and #1355 waits on #1362 + a deploy
 - [Promo video plan (parked)](promo-video-plan.md) — Hebrew teacher-facing Instagram/WhatsApp videos: format, storyboard, pipeline, open questions; parked 2026-09-27, not priority
 - [PR servers have no LLM key](pr-servers-have-no-llm-key.md) — a PR worktree has no .env.local, so the fallback answers "none" in ~3 ms and reads as "not escalated"; by operator ruling they STAY keyless (cost, and it exposes grammar gaps) — say so on the sheet, never copy .env.local (2026-09-24 #1407)
 - [Play-sheet driver blind spots](playsheet-driver-blind-spots.md) — slow 2-D refusals (>2 s) and ⚠-channel notices read as false reds; verify by a timed probe on branch AND main, never "fix" them (round #1571)
