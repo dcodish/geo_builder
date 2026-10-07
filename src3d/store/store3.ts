@@ -614,6 +614,39 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
    * marked refuted too. A claim cannot be refuted by a figure that has none.
    */
   const paramContradiction = resolved.param !== null && paramPinOwners.length > 0 && resolved.param.roots.length === 0;
+  /**
+   * #1815 (ADR-3D-309) — THE SAME RULE FOR AN ATTRIBUTED COLLAPSE. When the pivot reports that its only
+   * figures flatten a declared polygon that an incidence on a rider forced (`pivot.collapse`), the
+   * figure the claim pass would verify against is the unsolved seed sample, not a figure of the givens —
+   * so a claim recorded by a statement the collapse is attributed to cannot be refuted by it. Those
+   * statements are skipped, and the pin-owner guard below speaks, naming them. Before this, the claim
+   * pass ran first and «M אמצע BC» on the rider «M על AB» was answered «בדקו את החישוב» — the
+   * verify-your-answer register for a construction given.
+   *
+   * Scoped to the attributed collapse on purpose: on any OTHER empty pivot, a pin that carries its own
+   * claim keeps the claim as its arbiter (the ADR-3D-030 pin-and-claim pattern) — a wrong exam answer
+   * («a wrong K») is the student's answer and is refuted in that register, a rule fifteen locks hold.
+   *
+   * The attribution: the statements that minted the enrolled riders (from the pivot's own carrier keys,
+   * resolved to each point's minting statement) and the pin owners that name one of those riders — a
+   * metric pin beside them («AB = 3») is not part of the conflict and is not named. Derived, never a
+   * list of command kinds.
+   */
+  const riderOwnerIds = new Set<string>();
+  const collapseOwnerIds = new Set<string>();
+  if (resolved.pivot?.collapse) {
+    const keys = new Set(resolved.pivot.collapse.riderKeys);
+    const riderPoints = new Set<string>();
+    for (const [id, def] of c.points) {
+      if (!carrierParams3(c, id, def).some((cp) => keys.has(cp.key))) continue;
+      riderPoints.add(id);
+      const owner = facts.find((f) => f.enabled && f.cmds.some((cmd) => 'id' in cmd && cmd.id === id));
+      if (owner) riderOwnerIds.add(owner.id);
+    }
+    const namesRider = (v: unknown): boolean =>
+      typeof v === 'string' ? riderPoints.has(v) : typeof v === 'object' && v !== null && Object.values(v).some(namesRider);
+    for (const f of facts) if (riderOwnerIds.has(f.id) || (pinOwnerIds.has(f.id) && f.cmds.some(namesRider))) collapseOwnerIds.add(f.id);
+  }
   if (paramContradiction) {
     const blamed = paramPinOwners[paramPinOwners.length - 1];
     if (status[blamed] === 'ok')
@@ -627,6 +660,7 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
     // verify every recorded claim against the FINAL figure, attributed to its fact
     for (const owner of claimOwners) {
       if (status[owner.factId] !== 'ok') continue;
+      if (collapseOwnerIds.has(owner.factId)) continue; // #1815: an attributed collapse — the guard below speaks
       for (let i = owner.from; i < owner.to; i++) {
         const claim = c.claims[i];
         // V2 honest boundary, narrowed by #754 (ADR-3D-171): a magnitude statement on a solid
@@ -686,9 +720,15 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
   const blamedPinOwner = [...pinOwnerIds].pop();
   if (blamedPinOwner !== undefined && status[blamedPinOwner] === 'ok' && resolved.pivot && resolved.pivot.solutions === 0) {
     const f = facts.find((x) => x.id === blamedPinOwner)!;
-    status[blamedPinOwner] = coordPinOwnerIds.has(blamedPinOwner)
-      ? { code: 'injection-unsatisfiable' }
-      : { code: 'givens-contradict', stated: f.utterance, others: namedStatements(pinOwnerIds, blamedPinOwner) };
+    const collapse = resolved.pivot.collapse;
+    status[blamedPinOwner] = collapse
+      ? {
+          code: 'polygon-collapsed', stated: f.utterance, others: namedStatements(collapseOwnerIds, blamedPinOwner),
+          sides: collapse.ring.length, ring: collapse.ring.join(''),
+        }
+      : coordPinOwnerIds.has(blamedPinOwner)
+        ? { code: 'injection-unsatisfiable' }
+        : { code: 'givens-contradict', stated: f.utterance, others: namedStatements(pinOwnerIds, blamedPinOwner) };
   }
 
   // #769 (ADR-3D-183) — A DERIVED POINT THAT LANDS ON AN EXISTING NAMED POINT IS NOT MINTED. The

@@ -125,6 +125,13 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       return err.others.length > 0
         ? t('err.noRootsWith', { sym: err.sym, stated: err.stated, others: quoteList(err.others) })
         : t('err.noRoots', { sym: err.sym, stated: err.stated });
+    // #1815 (ADR-3D-309): 2-D's «X סותר את Y — אי אפשר לקיים את שניהם יחד» frame, with the geometric reason
+    case 'polygon-collapsed': {
+      const shape = t(`err.polygonNoun.${err.sides}`, { ring: err.ring });
+      return err.others.length > 0
+        ? t('err.polygonCollapsed', { stated: err.stated, others: quoteList(err.others), shape })
+        : t('err.polygonCollapsedAlone', { stated: err.stated, shape });
+    }
     case 'givens-contradict':
       return err.others.length > 0
         ? t('err.givensContradict', { stated: err.stated, others: quoteList(err.others) })

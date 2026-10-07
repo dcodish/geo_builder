@@ -1742,6 +1742,10 @@ export type EngineError3 =
   // #425: the same "no placement" finding on a figure whose pins are not coordinates (angles, equal
   // sides, plane equations) — the givens contradict each other, and the message names which.
   | { code: 'givens-contradict'; stated: string; others: string[] }
+  // #1815 (ADR-3D-309): the same finding when the only figures satisfying the givens FLATTEN a declared
+  // polygon that only an incidence forced flat — named by the statements and the polygon (noun by its
+  // vertex count, and its letters), both on the student's figure.
+  | { code: 'polygon-collapsed'; stated: string; others: string[]; sides: number; ring: string }
   | { code: 'sign-unsatisfiable'; id: Id } // no pivot solution has the stated coordinate sign
   | { code: 'no-such-solid'; id: string } // a volume/area claim names a solid kind the figure doesn't have (or has twice)
   | { code: 'free-size-claim'; id: string } // a numeric volume/area claim on a solid whose dims are unstated

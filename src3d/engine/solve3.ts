@@ -19,7 +19,7 @@
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { carrierParams3 } from './carriers';
-import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind } from './types';
+import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind, type SolidObj } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, bisectorDir3, cross3, dist3, dot3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -217,6 +217,19 @@ export interface PivotResult {
 }
 
 /**
+ * #1815 (ADR-3D-309) — why a pool came back EMPTY when the empty answer is an invented collapse: the
+ * flat ring every solution flattened, and the carrier keys of the riders whose incidences forced it.
+ * The store names the statements behind both (the refusal must name the student's statements, never
+ * internal state); a plain contradiction carries no record.
+ */
+export interface InventedCollapse3 {
+  ring: Id[];
+  riderKeys: string[];
+}
+/** A solve's pool — the solutions, plus the #1815 record when it is empty because of an invented collapse. */
+export type PivotPool = PivotResult[] & { readonly collapse?: InventedCollapse3 };
+
+/**
  * Solve the pivot: find gauge (+ dims) such that every pin lands on its target.
  * `evalCanonical(dims)` re-derives the canonical positions for a dim vector.
  * Returns every converged solution (both mirrors when both converge).
@@ -378,7 +391,7 @@ export function solvePivot(
    * freedom, `[]` when translation is pinned (the walk snaps back) or `x` is not exact.
    */
   probe?: { x: number[]; mirror: boolean; flip?: boolean },
-): PivotResult[] {
+): PivotPool {
   const pointPins = c.pins;
   const vecPins = c.vectorPins;
   const memberPins = members ?? [];
@@ -1205,7 +1218,8 @@ export function solvePivot(
       // and FR-RD-7's rule is that a forced-flat figure is DRAWN, never refused — so the flat kinds'
       // collapse is judged after the solve (`collapsedRing` below): a pool whose every solution
       // collapsed retries with the dims frozen and prefers a non-collapsed figure, and keeps the
-      // collapsed one only when nothing else satisfies the givens (then the collapse was stated).
+      // collapsed one only when the givens that are not incidences on a rider force it (#1815,
+      // `collapseIsStated`; an incidence-invented collapse is refused).
       if (!FLAT_SOLID_KINDS.has(solid.kind) && pts.length >= 3 && maxD > 1e-12 && norm3(runNormal(pts)) <= 1e-4 * maxD * maxD) return true;
     }
     return false;
@@ -1229,17 +1243,29 @@ export function solvePivot(
    * enumeration is not a rule"), and this cannot drift from the residual set because it IS the
    * residual set. A rider nothing reads leaves the lane, so its figure solves exactly as before.
    */
+  /**
+   * #1815 (ADR-3D-309): the probe also records WHICH residual rows the riders read — the rows an
+   * incidence on a rider writes. `collapseIsStated` re-solves the figure without them. `null` when the
+   * row layout moved under the probe, so rows cannot be attributed (the judgement then keeps today's
+   * answer rather than guessing).
+   */
+  let riderRowMask: boolean[] | null = null;
   if (riders.length > 0) {
     const base = [0, 0, 0, 0, 0, 0, 0, ...dims0, ...Array(nSym).fill(0.2), ...Array(nPinSym).fill(0.3), ...riders.map((r) => r.t0)];
     const at = residualsFor(false);
     const r0 = at(base);
+    const mask = r0.map(() => false);
+    let attributable = true;
     const reads = riders.map((r, i) => {
       const probeX = [...base];
       probeX[riderBase + i] = r.t0 > 0.5 ? r.t0 - 0.3 : r.t0 + 0.3;
       const r1 = at(probeX);
+      if (r1.length !== r0.length) attributable = false;
+      else r1.forEach((v, k) => { if (Math.abs(v - r0[k]) > 1e-9) mask[k] = true; });
       return r1.some((v, k) => Math.abs(v - (r0[k] ?? 0)) > 1e-9) || r1.length !== r0.length;
     });
     riders = riders.filter((_, i) => reads[i]);
+    riderRowMask = attributable ? mask : null;
   }
   const nRider = riders.length;
 
@@ -1309,7 +1335,8 @@ export function solvePivot(
    * from the result's own record (dims + riderTs), so the joint solve's and the retry's solutions
    * are judged by one predicate despite their different unknown vectors.
    */
-  const collapsedRing = (r: PivotResult): boolean => {
+  /** The first flat solid whose ring this solution collapsed (#1815: the refusal names it), or null. */
+  const collapsedRingOf = (r: Pick<PivotResult, 'dims' | 'riderTs'>): SolidObj | null => {
     const pos = evalCanonical(r.dims, undefined, r.riderTs ? new Map(Object.entries(r.riderTs)) : undefined);
     for (const solid of c.solids) {
       if (!FLAT_SOLID_KINDS.has(solid.kind)) continue;
@@ -1317,18 +1344,90 @@ export function solvePivot(
       if (pts.length < 3) continue;
       let maxD = 0;
       for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) maxD = Math.max(maxD, norm3(sub3(pts[j], pts[i])));
-      if (maxD > 1e-12 && norm3(runNormal(pts)) <= 1e-4 * maxD * maxD) return true;
+      if (maxD > 1e-12 && norm3(runNormal(pts)) <= 1e-4 * maxD * maxD) return solid;
     }
-    return false;
+    return null;
   };
-  /** The retry trigger above, applied to a candidate pool; [] means "keep what you have". */
-  const preferUncollapsed = (rs: PivotResult[]): PivotResult[] => {
+  const collapsedRing = (r: Pick<PivotResult, 'dims' | 'riderTs'>): boolean => collapsedRingOf(r) !== null;
+  /**
+   * #1815 (ADR-3D-309, amends ADR-3D-268 part 2) — WHICH GIVENS FORCED THE COLLAPSE.
+   *
+   * A pool whose every solution flattens a flat ring, with the frozen-dims retry finding nothing better,
+   * was kept on the inference "nothing else satisfies the givens, so the collapse was stated". That
+   * inference is false: "nothing else satisfies" means the givens FORCE the flatness, not that the
+   * student STATED it. «משולש ABC · M על AB · M אמצע BC» forces it — M on line AB and on line BC at
+   * once — and nobody said the triangle is flat. 2-D refuses that family (ADR-413); 3-D drew it green.
+   *
+   * So the collapse is ATTRIBUTED, structurally: re-solve the figure on the residual rows NO enrolled
+   * rider reads (the #820 probe's row mask) — the givens with every incidence on a rider removed. If
+   * that reduced system can hold with the ring NOT collapsed, the flatness was invented to satisfy an
+   * incidence: not a figure, refused (an empty pool marked `collapse`, so the step keeps its prior figure
+   * and the store names the statements). If
+   * every reduced solution is still collapsed (or none is found), the non-incidence givens force it —
+   * «AB = 5 · BC = 3 · AC = 8» — and FR-RD-7 draws it, exactly as before. One bounded solve on the
+   * failure path only; it never recurses (no rider rows remain to remove).
+   */
+  const collapseIsStated = (): boolean => {
+    const mask = riderRowMask;
+    if (!mask || !mask.some(Boolean)) return true;
+    const ringCollapsedAt = (x: number[]): boolean =>
+      collapsedRing({
+        dims: x.slice(7, 7 + nDims),
+        ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, x[riderBase + i]])) } : {}),
+      });
+    const REG_C = 1e-4;
+    const EXACT = 1e-20;
+    const dimStarts = [dims0, dims0.map((v) => v * 0.75), dims0.map((v) => v * 1.3), dims0.map((v, i) => (i % 2 ? v * 0.6 : v * 1.2))];
+    const tail = [...Array(nSym).fill(0.2), ...Array(nPinSym).fill(0.3), ...riders.map((r) => r.t0)];
+    const reduced = (mirror: boolean) => {
+      const f = residualsFor(mirror);
+      // a layout that moved since the probe cannot be attributed: judge it on every row (today's answer)
+      return (x: number[]): number[] => {
+        const r = f(x);
+        return r.length === mask.length ? r.filter((_, k) => !mask[k]) : r;
+      };
+    };
+    // the mirrored placement is a second problem only when some reduced row is chiral — measured at two
+    // starts rather than enumerated by pin kind (a kind list drifts); an achiral system is solved once
+    const x0s = dimStarts.slice(0, 2).map((d) => [0, 0, 0, 0, 0, 0, 0, ...d, ...tail]);
+    const [plain, mirrored] = [reduced(false), reduced(true)];
+    const chiral = x0s.some((x) => {
+      const [a, b] = [plain(x), mirrored(x)];
+      return a.length !== b.length || a.some((v, k) => Math.abs(v - b[k]) > 1e-12);
+    });
+    for (const mirror of chiral ? [false, true] : [false]) {
+      const fm = mirror ? mirrored : plain;
+      const pm = (x: number[]): number => fm(x).reduce((sum, v) => sum + v * v, 0);
+      const anchored = (x: number[]): number[] => [...fm(x), ...x.slice(7, 7 + nDims).map((v, j) => REG_C * (v - dims0[j]))];
+      for (const d of dimStarts) {
+        const x0 = [0, 0, 0, 0, 0, 0, 0, ...d, ...tail];
+        // the anchor steers away from the collapse basin; the release then demands the reduced givens
+        // EXACTLY. A metric-forced flatness («5 · 3 · 8») admits a sliver only to second order — its
+        // residual floors where the anchor's pull balances it — so a loose acceptance would read that
+        // sliver as "an open figure exists" (measured: it did, at 1e-10). An honest open figure
+        // converges quadratically far below `EXACT`; a sliver cannot reach it.
+        const x = pm(x0) < EXACT ? x0 : leastSquares(fm, leastSquares(anchored, x0).x).x;
+        if (pm(x) < EXACT && !ringCollapsedAt(x)) return false;
+      }
+    }
+    return true;
+  };
+  /**
+   * The retry trigger above, applied to a candidate pool: [] means "keep what you have"; a marked
+   * empty pool (`collapse` set) means every solution collapsed a flat ring that the incidence-free
+   * givens leave open (#1815) — the caller returns it, and the step is refused naming the statements.
+   */
+  const preferUncollapsed = (rs: PivotResult[]): PivotPool => {
     if (rs.length === 0 || nRider === 0 || nDims === 0 || probe || coupled) return [];
     if (!c.solids.some((s) => FLAT_SOLID_KINDS.has(s.kind))) return [];
     if (!rs.every(collapsedRing)) return [];
     const frozen = retryFrozenDims();
-    return frozen.length > 0 && !frozen.every(collapsedRing) ? frozen : [];
+    if (frozen.length > 0 && !frozen.every(collapsedRing)) return frozen;
+    if (collapseIsStated()) return [];
+    const ring = collapsedRingOf(rs[0])!.ids;
+    return Object.assign([] as PivotResult[], { collapse: { ring: [...ring], riderKeys: riders.map((r) => r.id) } });
   };
+  const isInvented = (pool: PivotPool): boolean => pool.collapse !== undefined;
 
   if (invariantOnly) {
     // #820: with a rider in the lane there IS something to flex, so the immediate answer below does
@@ -1400,7 +1499,7 @@ export function solvePivot(
       if (!best || r.err < best.err) best = r;
       if (best.err < 1e-22) break;
     }
-    const invResult = (bx: number[], primary: number): PivotResult[] => {
+    const invResult = (bx: number[], primary: number): PivotPool => {
       const invSol: PivotResult[] = [{
         transform: (p) => p, mirror: false, dims: bx.slice(0, nDims), err: primary,
         ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, bx[nDims + i]])) } : {}),
@@ -1408,6 +1507,7 @@ export function solvePivot(
         x: [0, 0, 0, 0, 0, 0, 0, ...bx],
       }];
       const uncollapsed = preferUncollapsed(invSol); // #1499: a flat ring the solve collapsed, retried
+      if (isInvented(uncollapsed)) return uncollapsed; // #1815: the collapse was invented by an incidence
       return uncollapsed.length > 0 ? uncollapsed : invSol;
     };
     /**
@@ -1417,7 +1517,7 @@ export function solvePivot(
      * and judged by this site's own acceptance. «זווית ACD = 100» after «D על AB» on a triangle whose
      * sampled angle ACB is under 100° is reached by opening the triangle, not by sliding D past B.
      */
-    const failed = (): PivotResult[] => {
+    const failed = (): PivotPool => {
       const frozen = retryFrozenDims();
       if (frozen.length > 0) return frozen;
       let found: { x: number[]; primary: number } | null = null;
@@ -1920,10 +2020,11 @@ export function solvePivot(
     for (const stage of reseatStages) stage();
   }
   // #1499: …or it found only figures that collapse a flat solid's ring — prefer a figure that
-  // satisfies the givens without the collapse, and keep the flat one only when nothing else does.
+  // satisfies the givens without the collapse, and keep the flat one only when the givens that are NOT
+  // incidences on a rider force it (#1815: an incidence-invented collapse is refused).
   {
     const uncollapsed = preferUncollapsed(results);
-    if (uncollapsed.length > 0) return uncollapsed;
+    if (isInvented(uncollapsed) || uncollapsed.length > 0) return uncollapsed;
   }
   return results;
 }
