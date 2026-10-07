@@ -22,7 +22,7 @@ import { carrierParams3 } from './carriers';
 import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind, type SolidObj } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
-import { add3, bisectorDir3, cross3, dist3, dot3, ringCollapsed3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
+import { add3, bisectorDir3, cross3, dist3, dot3, ringCollapsed3, ringOpenness3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 export interface GaugeParams {
   /** [tx, ty, tz, rx, ry, rz (axis-angle), logScale, ...dims] */
@@ -1351,6 +1351,14 @@ export function solvePivot(
     return null;
   };
   const collapsedRing = (r: Pick<PivotResult, 'dims' | 'riderTs' | 'symbols'>): boolean => collapsedRingOf(r) !== null;
+  /** #1849: the declared polygon whose ring is least open in this solution (the released-sliver refusal names it). */
+  const thinnestRingOf = (r: Pick<PivotResult, 'dims' | 'riderTs' | 'symbols'>): SolidObj => {
+    const override = coupled && r.symbols ? new Map(coupled.syms.map((s, i) => [s, r.symbols![i]])) : undefined;
+    const pos = evalCanonical(r.dims, override, r.riderTs ? new Map(Object.entries(r.riderTs)) : undefined);
+    const flat = c.solids.filter((s) => FLAT_SOLID_KINDS.has(s.kind));
+    const openness = (s: SolidObj) => ringOpenness3(s.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p));
+    return flat.reduce((a, b) => (openness(b) < openness(a) ? b : a));
+  };
   /**
    * #1815 (ADR-3D-309, amends ADR-3D-268 part 2) — WHICH GIVENS FORCED THE COLLAPSE.
    *
@@ -1469,20 +1477,52 @@ export function solvePivot(
    * attribution (`collapseIsStated`) now chooses only WHICH statements the refusal names, never
    * whether it refuses; with no enrolled rider there is nothing to attribute and it costs nothing.
    */
+  /**
+   * #1849 (ADR-3D-310 Am.) — A SLIVER THE ANCHOR HELD OPEN IS NOT AN OPEN FIGURE. An accepted solution is
+   * exact only to the acceptance floor (1e-10 / 1e-12), and the anchored solves (the `invariantOnly` REG
+   * pull, the rider lane) balance their pull against the residuals there. A metric-forced flatness admits a
+   * height only to SECOND order, so that equilibrium is a sliver: «AB : BC = 5 : 3 · AB : AC = 5 : 8» was
+   * accepted with C 0.004 off line AB (openness 1.5e-3, above the 1e-4 collapse line) and drawn as a
+   * "triangle". ADR-3D-309 met the same sliver in the attribution and answered it with a strict release; this
+   * is that answer applied to the pool. A solution whose declared ring is THIN (openness under the #936
+   * notice's 1e-2 band) is released on its own residuals alone (the gauge stays frozen where its path froze
+   * it); if the released figure is exact and collapsed, the open one was the anchor's, and it is judged
+   * collapsed. A genuinely thin triangle (3°, 5·3·7.99) is exact where it stands and stays open.
+   */
+  const SLIVER_BAND = 1e-2;
+  const EXACT_RELEASE = 1e-20;
+  const fullLen = 7 + nDims + nSym + nPinSym + nRider;
+  const anchorSliver = (r: PivotResult): boolean => {
+    if (coupled || r.x.length !== fullLen) return false;
+    const pos = evalCanonical(r.dims, undefined, r.riderTs ? new Map(Object.entries(r.riderTs)) : undefined);
+    const thin = c.solids.some(
+      (s) => FLAT_SOLID_KINDS.has(s.kind) && ringOpenness3(s.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p)) < SLIVER_BAND,
+    );
+    if (!thin) return false;
+    const f = residualsFor(r.mirror);
+    const lift = (y: number[]): number[] => (invariantOnly ? [0, 0, 0, 0, 0, 0, 0, ...y] : y);
+    const x = lift(leastSquares((y) => f(lift(y)), invariantOnly ? r.x.slice(7) : [...r.x]).x);
+    const err = f(x).reduce((sum, v) => sum + v * v, 0);
+    return err < EXACT_RELEASE && collapsedRing({
+      dims: x.slice(7, 7 + nDims),
+      ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((rd, i) => [rd.id, x[riderBase + i]])) } : {}),
+    });
+  };
   const settleFlatRings = (rs: PivotResult[]): PivotPool => {
     if (rs.length === 0 || probe) return [];
     if (!c.solids.some((s) => FLAT_SOLID_KINDS.has(s.kind))) return [];
-    const open = rs.filter((r) => !collapsedRing(r));
+    const open = rs.filter((r) => !collapsedRing(r) && !anchorSliver(r));
     if (open.length === rs.length) return [];
     if (open.length > 0) return open; // a collapsed member is not a configuration to cycle to
-    const frozenOpen = retryFrozenDims().filter((r) => !collapsedRing(r));
+    const frozenOpen = retryFrozenDims().filter((r) => !collapsedRing(r) && !anchorSliver(r));
     if (frozenOpen.length > 0) return frozenOpen;
     const reopened = openFigureRetry();
     if (reopened.length > 0) return reopened;
     // the attribution's reduced re-solve reads the rider rows; with none (or a V8-c layout) the
     // non-incidence givens are all there is, so they forced it
     const forced = nRider === 0 || coupled !== undefined || collapseIsStated();
-    const ring = collapsedRingOf(rs[0])!.ids;
+    // the ring the refusal names: the one collapsed, or (a released sliver) the thinnest declared one
+    const ring = (collapsedRingOf(rs[0]) ?? thinnestRingOf(rs[0])).ids;
     return Object.assign([] as PivotResult[], { collapse: { ring: [...ring], riderKeys: riders.map((r) => r.id), forced } });
   };
   const isCollapse = (pool: PivotPool): boolean => pool.collapse !== undefined;

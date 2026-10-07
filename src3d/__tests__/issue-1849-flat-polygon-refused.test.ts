@@ -92,6 +92,21 @@ describe('#1849 — a declared polygon the givens force flat is refused, naming 
     for (const seed of SEEDS_24) refused(lines, seed, ring, others);
   }, 120_000);
 
+  /**
+   * The ratio / proportion family (staging parity row `flat-triangle-ratio-1849`): scale-free givens that
+   * force 5 : 3 : 8 were accepted as a SLIVER — the anchored dims-only solve balances its pull at C 0.004 off
+   * the line (openness 1.5e-3, above the 1e-4 collapse line). Released on its own residuals it falls flat,
+   * so it is refused (ADR-3D-310, the sliver amendment).
+   */
+  it.each<[string, string[], string[]]>([
+    ['two ratios forcing 5 : 3 : 8', ['משולש ABC', 'AB : BC = 5 : 3', 'AB : AC = 5 : 8'], ['AB : BC = 5 : 3']],
+    ['the ratios in the other order', ['משולש ABC', 'AB : AC = 5 : 8', 'AB : BC = 5 : 3'], ['AB : AC = 5 : 8']],
+    ['|AB| = |BC| and |AC| = 2|AB|', ['משולש ABC', '|AB| = |BC|', '|AC| = 2|AB|'], ['|AB| = |BC|']],
+    ['the length-noun spelling', ['משולש ABC', 'אורך AB=BC', 'אורך AC = 2AB'], ['אורך AB=BC']],
+  ])('a proportion family member — %s — is refused at all 24 seeds', (_name, lines, others) => {
+    for (const seed of SEEDS_24) expect(refused(lines, seed, 'ABC', others)).toBeLessThan(1000);
+  }, 120_000);
+
   it('the exact Hebrew and English wording names every given and says a line is not a triangle', () => {
     const r = run(['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'], 0);
     expect(plain(errorText3(he, r.error))).toBe(
@@ -126,6 +141,9 @@ describe('#1849 — controls: a thin but real figure builds, and so does a coinc
     ['an angle of 3°', ['משולש ABC', '∠ABC = 3°'], ['A', 'B', 'C']],
     ['a triangle on three non-collinear coordinates (bound)', ['A(0,0,0)', 'B(1,0,0)', 'C(2,1,0)', 'משולש ABC'], ['A', 'B', 'C']],
     ['a triangle through a side\'s midpoint and the opposite vertex (bound)', ['משולש ABC', 'D אמצע AB', 'משולש ACD'], ['A', 'C', 'D']],
+    ['ratios of a thin real triangle (5 : 3 : 7.9)', ['משולש ABC', 'AB : BC = 5 : 3', 'AB : AC = 5 : 7.9'], ['A', 'B', 'C']],
+    ['|AC| = 1.95|AB| on an isosceles triangle', ['משולש ABC', '|AB| = |BC|', '|AC| = 1.95|AB|'], ['A', 'B', 'C']],
+    ['5 · 3 · 7.99', ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.99'], ['A', 'B', 'C']],
     ['two sides of different triangles coincide', ['משולש ABC', 'משולש DEF', 'AB מתלכד עם DE'], ['A', 'B', 'C']],
   ])('%s builds open at all 24 seeds', (_name, lines, ring) => {
     for (const seed of SEEDS_24) expect(builds(lines, seed, ring), `seed ${seed}`).toBeGreaterThan(1e-3);
