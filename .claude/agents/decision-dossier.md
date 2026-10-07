@@ -24,7 +24,7 @@ gh pr list --state open --json number,title,headRefName,body,url
 
 Comments are where the truth usually lives — an issue body is written once and never revised, so a
 ruling, a scope change, or a "this already shipped" note sits in a comment. **Read the comments of every
-candidate before judging it.** Also read the tails of `docs/06-decisions.md`, `06b`, `06d` and `06w`:
+candidate before judging it.** Also read the tails of `docs/06-decisions.md`, `06b`, `06c`, `06d` and `06w`:
 a decision recorded there may already answer a question the issue still poses.
 
 ---
@@ -46,9 +46,12 @@ The labels lag reality. Scan for all eight shapes:
 
 **Rule these OUT — they are not operator questions:**
 
-- An issue with a concrete plan, no open question, and no `needs-operator`. Under
-  [ADR-W-014](../../docs/06w-decisions-workspace.md) Am. 1 that is already approved; report it as
-  **armable** so the caller arms it, and do not turn it into a question.
+- An issue with a concrete plan, no open question, no `needs-operator`, and a `## What the student
+  will see` section whose every line is `[asked]`, `[ruled]` or `[2-D]`. Under
+  [ADR-W-014](../../docs/06w-decisions-workspace.md) Am. 1 as narrowed by ADR-W-117 that is already
+  approved; report it as **armable** so the caller arms it. A plan with a `[proposed]` line — or one
+  that changes what a student sees with no such section — IS an operator question (CLAUDE.md rule 7):
+  put the proposed outcome to him.
 - Anything answerable from the code, the ADR logs, or the issue's own comments. **Go and answer it.**
   Report the answer instead of the question. Every question you drop this way is operator time returned.
 - A missing plan you could write yourself. Report it as **plannable**, with the plan's shape.

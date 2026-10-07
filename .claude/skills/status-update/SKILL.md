@@ -1,6 +1,6 @@
 ---
 name: status-update
-description: The operator's STANDARD issue-queue report — open issues grouped P1/P2/P3 and split by product (2d/3d/server/workspace), bugs vs features vs debt distinguished, a value indicator and a complexity/risk grade per issue, the full ATTENTION surface (decisions waiting on the operator, fix plans awaiting auto-ok, PRs awaiting play-and-approve, fix-round output awaiting validation), and a recommended composition for the next fix round. Use this whenever the operator asks for a list of issues, the open queue, project status, "what's open", "what should we fix next", "מה המצב", what needs their attention, a status update, or wants to plan the next fix session — even if they don't say "status-update" by name.
+description: The operator's STANDARD issue-queue report — open issues grouped P1/P2/P3 and split by product (2d/3d/analytic/complex/server/workspace), bugs vs features vs debt distinguished, a value indicator and a complexity/risk grade per issue, the full ATTENTION surface (decisions waiting on the operator, fix plans awaiting auto-ok, PRs awaiting play-and-approve, fix-round output awaiting validation), and a recommended composition for the next fix round. Use this whenever the operator asks for a list of issues, the open queue, project status, "what's open", "what should we fix next", "מה המצב", what needs their attention, a status update, or wants to plan the next fix session — even if they don't say "status-update" by name.
 ---
 
 # Status update — the standard issue-queue report
@@ -83,7 +83,7 @@ Icebox: N parked (closed, reopened when a student hits one or the operator asks)
 | # | Product | Type | Title (shortened) | Value | Complexity/Risk |
 
 ## P2 — real input fails visibly
-(one table like the above, rows sorted: 2d, then 3d, then server/workspace)
+(one table like the above, rows sorted: 2d, then 3d, analytic, complex, then server/workspace)
 
 ## P3 — polish / debt, batched
 (same table shape)
@@ -124,12 +124,14 @@ reason the report exists as a habit. Its four sub-lists:
    A `stale-label` row is a label to CLEAR (say so, with the ruling it quotes). An
    `unlabelled-question` row is an unanswered escalation missing its label — report it here; applying
    that label belongs to the round that escalated.
-2. **Plans awaiting your `auto-ok`** — since ADR-W-014 Am. 1 ("a clear plan is itself the
+2. **Plans awaiting your `auto-ok`** — since ADR-W-014 Am. 1 as narrowed by ADR-W-117 ("a clear plan is itself the
    approval") this list should normally be EMPTY: an open issue with a concrete, self-contained
-   fix plan (root cause + mechanism + files, per docs/22 §2b), no `needs-operator`, and no open
-   ruling/scope question gets ARMED during this report (apply `auto-ok` + the audit comment citing
+   fix plan (root cause + mechanism + files, per docs/22 §2b), no `needs-operator`, no open
+   ruling/scope question, and a `## What the student will see` section with no `[proposed]` line
+   (CLAUDE.md rule 7) gets ARMED during this report (apply `auto-ok` + the audit comment citing
    the ruling), not listed for a blessing. List here only the borderline ones you deliberately did
-   NOT arm — a plan that is a sketch with open options — each with one line on what's missing. An
+   NOT arm — a plan that is a sketch with open options, or whose outcome section has a `[proposed]`
+   line or is missing while the plan changes what a student sees — each with one line on what's missing. An
    issue with NO plan is not a candidate; it belongs in the tables, flagged per the honesty rule.
 3. **PRs awaiting play-and-approve** — every open PR (`gh pr list`): finished, unplayed work
    (ADR-W-007). One row: PR#, what it delivers, which issues it closes. **Plus every pushed branch

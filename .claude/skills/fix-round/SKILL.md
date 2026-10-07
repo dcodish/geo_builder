@@ -20,7 +20,9 @@ the round escalates and skips (Step 4); skipping always beats patching.
 2. **Cross-machine check:** if memory or the operator has flagged uncommitted work on the other
    PC, do not run — report why and stop.
 3. **P1 gate:** any open P1 → STOP and announce it. A fix round never picks up a P1 silently;
-   the operator decides whether the round becomes a P1 session.
+   the operator decides whether the round becomes a P1 session. A P1 session runs under the same
+   rules: no defaults on open questions (one exception: an honest refusal that reuses an existing
+   message, flagged in the Heads-up), and a P1 the session found itself is announced first.
 4. **Stale-round gate:** an open issue labeled `in-round` means a previous round is executing
    or died mid-flight → STOP and report it with its ledger state; the operator decides whether
    to close it, resume it, or fold its remnants into this round. Never open a second live round.
@@ -28,10 +30,16 @@ the round escalates and skips (Step 4); skipping always beats patching.
 ## Step 1 — compose the round
 
 ```sh
-gh issue list --state open --label auto-ok --json number,title,labels,body,url
+gh issue list --state open --label auto-ok --limit 500 --json number,title,labels,body,url
 ```
 
-Eligible = `auto-ok` AND a concrete fix plan in the body/comments AND not `needs-operator`.
+Eligible = `auto-ok` AND a concrete fix plan in the body/comments AND not `needs-operator` AND no
+`[proposed]` line in its `## What the student will see` and no open question (CLAUDE.md rule 7,
+[ADR-W-117](../../../docs/06w-decisions-workspace.md#adr-w-117)). A plan armed before 2026-10-07 has no such section:
+**write it at pickup** from the issue thread — quote the operator for `[asked]`, link the ruling for
+`[ruled]`, measure 2-D for `[2-D]` — and post it on the issue. Any line you cannot tag that way is
+`[proposed]` → Step 4 escalation, never a default.
+**Without `--limit`, `gh` returns 30 rows** and the round silently never sees the rest of the queue.
 An `auto-ok` issue with no real plan is a labeling error: record it in the ledger's Skipped
 section, leave a comment asking for triage, skip it — never invent the plan inline.
 
@@ -152,7 +160,10 @@ Each item, inside its stream:
    lands ~35 commits a day, and a round composed from issues days old will find several. An
    already-fixed item is **closed, not built** (and the ledger records it under Skipped with the
    evidence); a partly-fixed one has its record corrected in the issue and the ADR; a landed
-   dependency re-scopes the item. Only *"the cause the plan names is not what fires"* is Step 4.
+   dependency re-scopes the item (one line in the ledger; the Heads-up too if what the student sees
+   changes). Two findings are Step 4: *"the cause the plan names is not what fires"*, and *"what the plan
+   says about the request, about 2-D or about another builder is not what I measure"* — never build the
+   plan's version "because the plan lists it" (ADR-W-117).
 
    **Re-measure per item, at pickup — not once when composing the round.** A long round invalidates
    its own queue: on 2026-09-19/20 one item's symptom was changed by another item landing four hours
@@ -224,6 +235,11 @@ Each item, inside its stream:
 Escalate — do not patch — when any of these hits:
 
 - the plan's stated root cause turns out wrong or incomplete;
+- the plan's account of the request, of 2-D or of another builder is not what you measure;
+- the fix would change something a student sees that the plan does not tag `[asked]`, `[ruled]` or
+  `[2-D]` — including anything "the whole class" would add (CLAUDE.md rule 7);
+- an open question has no operator answer. **Never take a default.** In a P1 session the one exception is
+  an honest refusal that reuses an existing message, flagged in the Heads-up;
 - the correct fix outgrows the plan's scope (new mechanism, cross-layer reach, an operator
   ruling needed);
 - two serious attempts leave the gates red.
@@ -262,8 +278,10 @@ Final body, in order:
   plan-vs-outcome is readable without the session chat.
 - **Landed** — per item: issue → commit SHA · **ADR id(s)** · a one-line **gate record**
   (full suite at which commit, test counts, `tsc`/build) · a required
-  **"deviations from plan:"** line — `none`, or what and why. Writing that line honestly is
-  itself a tripwire: a deviation you struggle to justify in one line was an escalation.
+  **"deviations from plan:"** line — `none`, or what and why — and a required **"beyond the
+  request:"** line, which should read `none`: anything shipped that the operator did not ask for
+  goes in the Heads-up and its case is 🎮. Writing those lines honestly is itself a tripwire: a
+  deviation you struggle to justify in one line was an escalation.
 - **In PRs** — issue → PR#, same evidence lines.
 - **Escalated** — issue → why, one line each (the template lives on the issue itself).
 - **Skipped** — anything eligible the round did not resolve (labeling errors, mid-round
@@ -352,7 +370,9 @@ reply). Keep it to one short list; `/status-update` stays the full surface.
 Pick anything without `auto-ok` · write a fix plan for an unplanned issue · merge a feature PR
 · deploy · take a P1 silently · run over a dirty/behind tree · stall every stream on a blocking
 question (ask in text; Step 2) · overlap two test runs (the suite lock queues them) · keep a symptom patch to avoid
-an escalation · exceed the announced composition mid-round (found new work → file an issue) ·
+an escalation · exceed the announced composition mid-round (found new work → file an issue `needs-operator` with a
+proposed priority — never armed, never made P1 by the round, except a figure drawn green for givens
+that cannot hold) · take a default on an open question · ship a `[proposed]` outcome ·
 land over unreconciled external `origin/main` movement · leave outcomes, deviations, or skips
 out of the ledger (chat is not a record) · finish with the `in-round` label still on · report a
 play sheet whose servers are not running, whose cases are not numbered, or whose heads-up items

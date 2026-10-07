@@ -28,14 +28,14 @@ gh issue view <NN> --json body -q '.body' | head -3   # ← never skip: confirm 
 
 A heredoc into `--body "$(cat <<'EOF' … EOF)"` also works. The verify step is the part that matters — a filing failure here is silent and costs the whole diagnosis.
 
-**Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3`; one *app* — `2d` | `3d` | `server`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the operator has approved the issue's fix plan for autonomous execution (§2d — operator-applied ONLY), `in-round` on a fix-round's round issue while the round executes (an open `in-round` issue with no session running it = a round died mid-flight — [ADR-W-013](06w-decisions-workspace.md)), and `awaiting-play` on the same issue from round-finish until the operator validates the batch (§2d).
+**Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3`; one *product* — `2d` | `3d` | `analytic` | `complex` | `server` | `workspace`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the issue's fix plan is approved for autonomous execution (by the operator's explicit approval, or because every line of its `## What the student will see` is `[asked]`/`[ruled]`/`[2-D]` — §2d, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)), `icebox` on a closed, parked issue (never one that shows something false), `in-round` on a fix-round's round issue while the round executes (an open `in-round` issue with no session running it = a round died mid-flight — [ADR-W-013](06w-decisions-workspace.md)), and `awaiting-play` on the same issue from round-finish until the operator validates the batch (§2d).
 
 **What each type means** (#1763). The type is decided by what the STUDENT experiences, not by the size of the change:
 - **`bug`** — the product does something wrong for a student: a wrong figure, a dropped or misread given, a false refusal, a crash, a misleading message. Route: a fix on `main` (§3).
 - **`feature`** — the product cannot do something it should: a sentence it does not read, a capability or surface that does not exist. A "bug" diagnosed as a missing capability is relabelled `feature`. Route: always a PR, played and approved (§4).
 - **`debt`** — the product is right for the student, but the code makes the next change harder, slower or riskier. Nothing a student sees or can do changes. Examples: duplicated mechanisms to hoist into `shell/`, machinery to retire or tidy, performance nobody sees, audits and conformance checks, follow-up bookkeeping, umbrella hardening programmes. Route: straight to `main` like a bug (no PR, no play gate — there is nothing for the operator to judge); its gates are the same tests. Priority: **P3 by default**; **P2 when it blocks other scheduled work** (e.g. a hoist that stops a fourth copy from being written). The moment a debt item would change what a student sees, it is not debt — split that part out as a `bug` or `feature`.
 
-**"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. ([14-backlog.md](14-backlog.md) is fully migrated as of 2026-09-05, #907 — it is now a historical record. ADR prose is still swept opportunistically.)
+**"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. **Found work is proposed, not queued** (CLAUDE.md rule 7): a session files what it finds as `needs-operator` with a proposed priority, and never arms it or makes it P1 itself — except a figure drawn green for givens that cannot hold, which is filed P1 and announced at once. ([14-backlog.md](14-backlog.md) is fully migrated as of 2026-09-05, #907 — it is now a historical record. ADR prose is still swept opportunistically.)
 
 **Prod-log triage findings follow the same taxonomy:** the log-triage agent/skill classifies each cluster `bug` vs `feature` with a proposed priority, **files the `bug` clusters as issues immediately** (deduped against open issues), and holds `feature` clusters as recommendations — those are filed as issues only once the operator approves them for building (then built via the feature route, §4).
 
@@ -53,7 +53,7 @@ The operator raises issues **while testing**, often several per pass. If the rep
 
 1. **File the issue** (§1) with type + priority + app labels.
 2. **Diagnose to the class level** (per [docs/17](17-design-rules.md)): reproduce from the logs, find the root cause, classify `bug` vs `feature`, set the priority.
-3. **Write the analysis into the issue** (a comment or the body): root cause, the class it belongs to, a concrete fix plan (mechanism, files, tests, blast radius), open questions for the operator.
+3. **Write the analysis into the issue** (a comment or the body): root cause, the class it belongs to, a concrete fix plan (mechanism, files, tests, blast radius), open questions for the operator — and a closing **`## What the student will see`** section: one line per student-visible change, tagged `[asked]` (quote the operator), `[ruled]` (link the ruling), `[2-D]` (2-D's behaviour measured at a named commit) or `[proposed]`; "none" for a mechanism-only plan. Never describe what 2-D or another builder does without measuring it. A `[proposed]` line is an open question: the issue is `needs-operator` (CLAUDE.md rule 7, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)).
 4. **STOP — do not implement.** No branch, no code, no "it's a one-liner" exceptions. Reply to the operator with the classification + plan and move to the next report.
 
 **A ruling is transcribed under ONE heading.** When the operator's answer to an escalation or an open question is written onto the issue — by the `/decisions` pass or by the session resolving a round's escalation — the comment opens with `## Operator ruling — YYYY-MM-DD`, verbatim ([ADR-W-073](06w-decisions-workspace.md#adr-w-073)). `scripts/queue-hygiene.mjs` reads that shape (and the handful measured from older threads) as an answer; a pass that invents its own phrasing is how a ruled thread is reported to the operator as still waiting on them (#1325).
@@ -111,16 +111,22 @@ transcription ([ADR-W-014](06w-decisions-workspace.md)): when a session has pres
 issues and posts an **audit comment on each** quoting the approval and its date. **And since
 [ADR-W-014 Am. 1](06w-decisions-workspace.md) (operator ruling 2026-08-13, "if an issue has a clear
 plan, it should be auto-ok"): a CLEAR PLAN is itself the approval** — an issue whose body carries a
-concrete, self-contained fix plan and no open operator question is armed at triage/status time with an
-audit comment citing the ruling. What still disqualifies: `needs-operator`, any unanswered
-ruling/scope question, and a plan that is a sketch with open options ("needs a scope call", "two
+concrete, self-contained fix plan, a `## What the student will see` section with no `[proposed]` line,
+and no open operator question is armed at triage/status time with an audit comment citing the ruling
+([ADR-W-117](06w-decisions-workspace.md#adr-w-117) narrowed it). What still disqualifies: `needs-operator`,
+any unanswered ruling/scope question, any `[proposed]` outcome, and a plan that is a sketch with open options ("needs a scope call", "two
 directions worth measuring", incomplete diagnosis). A bare `auto-ok` with neither an audit comment nor
 the operator's own hand behind it remains a labeling error, not an eligibility. The round's ONE durable artifact, the **round issue**, is
 opened **at composition time** (label `in-round` — [ADR-W-013](06w-decisions-workspace.md)) carrying
 the announced composition plus the eligible-but-not-picked list, and is updated as each item resolves —
 a live ledger, so a crashed session leaves a discoverable round rather than orphaned commits. Each item
-is fixed **at the root, per its plan**, in its own worktree under the full gates (ADR + rule-4
-regression lock + full suite + `tsc` + build). Bugs land on `main` (`Fixes #NN` + `round #RR`, §3)
+is fixed **at the root, per its plan**, in its own worktree under the item gates (ADR + rule-4
+regression lock + `tsc` + build + `test:fast`; the full suite runs once per batch, see "Gating and landing" below).
+A plan armed before 2026-10-07 has no outcome section: the round writes it at pickup from the issue
+thread, and any line it cannot tag `[asked]`/`[ruled]`/`[2-D]` escalates. **A round never takes a default
+on an open question** — the item waits for the operator; a P1 session may
+ship only an honest refusal that reuses an existing message, flagged in the Heads-up. **Each ledger item
+carries a `beyond the request:` line**, which should read "none" ([ADR-W-117](06w-decisions-workspace.md#adr-w-117)). Bugs land on `main` (`Fixes #NN` + `round #RR`, §3)
 after a fetch confirms `origin/main` has not moved externally mid-round; features become PRs the round
 **never merges** (§4). A plan that fails contact with the code is **escalated, never patched**: the
 docs/17 escalation template goes on the issue, `auto-ok` → `needs-operator`, and the round moves on —
@@ -227,12 +233,12 @@ Both routes carry it, because the contract was the one artifact with **no home a
 Applies to feature requests **and** bug reports reclassified as capability gaps. Steps 1–2 run in the reporting session; building (steps 3–7) starts **only in a dedicated session on operator go** (§2b).
 
 1. **File the issue** labeled `feature` + priority.
-2. **Scope with the operator** before building anything non-trivial (the ADR-262 pattern — AskUserQuestion rounds; big things get a plan doc first, like docs/18/20).
+2. **Scope with the operator** before building anything non-trivial (the ADR-262 pattern — AskUserQuestion rounds; big things get a plan doc first, like docs/18/20). An armed feature plan counts as scoped only if every line of its `## What the student will see` is `[asked]`, `[ruled]` or `[2-D]` (CLAUDE.md rule 7).
 3. **Branch:** `feat/<issue#>-<slug>` (fixes that go the PR route: `fix/<issue#>-<slug>`). Prefer a **git worktree** when the shared tree carries another session's work — created **outside the repo tree** under `"$TMPDIR"/claude/geo-wt/<branch>` (§7).
 4. **Build** under the normal gates (ADR, tests, scenario/fixture, suite + `tsc` + build green).
    **If the change touches a UI surface, the visual smoke is part of those gates**
    ([ADR-W-035](06w-decisions-workspace.md#adr-w-035)): `npm run dev` then
-   `npm run smoke:visual -- --app <2d|3d|complex>` (add `--base http://localhost:PORT` for a PR on
+   `npm run smoke:visual -- --app <2d|3d|complex|analytic>` (add `--base http://localhost:PORT` for a PR on
    its own port, #783). The script drives the real app, captures the states the play sheet will ask
    the operator to check, and **fails on a blank capture, a refused line, or an uncaught page
    error** — then the session **reads the screenshots itself** and fixes or files what it sees.
@@ -304,14 +310,13 @@ working tree**, and an uncommitted change in it belongs to whoever commits next.
 
 | Event | Record |
 | --- | --- |
-| Request / bug report | GitHub issue (type + priority + app labels) |
-| Decision | ADR in [06](06-decisions.md) / [06b](06b-decisions-3d.md) |
-| New capability | FR line in [02-requirements.md](02-requirements.md) (existing rule) + `feature` issue + PR |
+| Request / bug report | GitHub issue (type + priority + product labels) |
+| Decision | ADR in the product's log: [06](06-decisions.md) / [06b](06b-decisions-3d.md) / [06c](06c-decisions-analytic.md) / [06d](06d-decisions-complex.md), or [06w](06w-decisions-workspace.md) for workspace |
+| New capability | requirement in the product's requirements doc (02 / 02b / 02c / 02d / 02w) + `feature` issue + PR |
 | The fix itself | commit/PR with `Fixes #NN`, root cause in the message |
-| Regression lock | scenario in `scenarios.test.ts` + [test-scenarios.md](test-scenarios.md) (+ fixture where natural) |
+| Regression lock | fixture first (the product's fixtures folder, §9); a hand-authored scenario only for a bespoke assertion, indexed in [test-scenarios.md](test-scenarios.md) (CLAUDE.md rule 4) |
 | Deploy | tag `prod/…` + [DEPLOY-LOG.md](DEPLOY-LOG.md) entry, per [RUNBOOK.md](RUNBOOK.md) |
-| Session narrative | [PROJECT-MEMORY.md](PROJECT-MEMORY.md) session log (unchanged) |
-| Status / resume pointer | [09-implementation-plan.md](09-implementation-plan.md) + CLAUDE.md (unchanged) |
+| Status | the issue queue, open PRs, the ADR-log tails and DEPLOY-LOG ([ADR-W-002](06w-decisions-workspace.md#adr-w-002)); never a narrative log, never CLAUDE.md |
 
 ## 9. The multi-product workspace (product registry — ADR-266)
 
@@ -329,35 +334,22 @@ the shell switcher renders it as data, `server/__tests__/isolation.test.ts` cros
 | **Source** | `src/` | `src3d/` | `src-complex/` | `src-analytic/` | `server/` |
 | **Entry / build** | `index.html` · `npm run build` → `dist/` | `3d.html` · `npm run build:3d` → `dist-3d/` | `complex.html` · `npm run build:complex` → `dist-complex/` | `analytic.html` · `npm run build:analytic` → `dist-analytic/` | `npm run build:proxy` → `dist-server/` |
 | **Prod path** | `/geo-builder/` | `/3d-builder/` | `/complex-builder/` | `/analytic-builder/` | proxy service `:8788` |
-| **ADR log** | [06-decisions.md](06-decisions.md) (`ADR-NNN`) | [06b-decisions-3d.md](06b-decisions-3d.md) (`ADR-3D-NNN`) | [06d-decisions-complex.md](06d-decisions-complex.md) (`ADR-CX-NNN`) | [06c-decisions-analytic.md](06c-decisions-analytic.md) (`ADR-AG-NNN`) | in 06 (repo-wide/infra ADRs also live here) |
-| **Plan / status** | the [06](06-decisions.md) tail + `gh issue list` ([20](20-space-vectors-tool.md)/[09](09-implementation-plan.md) for background) | the [06b](06b-decisions-3d.md) tail + `gh issue list` | the [06d](06d-decisions-complex.md) tail + `gh issue list` ([27](27-complex-numbers-tool.md) for the plan) | the [06c](06c-decisions-analytic.md) tail + `gh issue list` ([19](19-analytic-geometry-tool.md) for the plan) | RUNBOOK.md |
+| **ADR log** | [06-decisions.md](06-decisions.md) (`ADR-NNN`) | [06b-decisions-3d.md](06b-decisions-3d.md) (`ADR-3D-NNN`) | [06d-decisions-complex.md](06d-decisions-complex.md) (`ADR-CX-NNN`) | [06c-decisions-analytic.md](06c-decisions-analytic.md) (`ADR-AG-NNN`) | [06w](06w-decisions-workspace.md) (`ADR-W-NNN`; older repo-wide ADRs stay in 06) |
+| **Plan / status** | spec: [02](02-requirements.md)/[04](04-design.md); state: the [06](06-decisions.md) tail + `gh issue list` | spec: [02b](02b-requirements-3d.md)/[04b](04b-design-3d.md); state: the [06b](06b-decisions-3d.md) tail + `gh issue list` | spec: [02d](02d-requirements-complex.md)/[04d](04d-design-complex.md); state: the [06d](06d-decisions-complex.md) tail + `gh issue list` | spec: [02c](02c-requirements-analytic.md)/[04c](04c-design-analytic.md); state: the [06c](06c-decisions-analytic.md) tail + `gh issue list` | RUNBOOK.md |
 | **Orientation file** | [CLAUDE.md](../CLAUDE.md) | [src3d/CLAUDE.md](../src3d/CLAUDE.md) | [src-complex/CLAUDE.md](../src-complex/CLAUDE.md) | [src-analytic/CLAUDE.md](../src-analytic/CLAUDE.md) | in the root CLAUDE.md |
 | **Issue label** | `2d` | `3d` | `complex` | `analytic` | `server` |
-| **Tests (local)** | `npm run test:2d` (= `vitest src/ server/`) | `npm run test:3d` (= `vitest src3d/ server/`) | `npm run test:complex` (= `vitest src-complex/ shell/ server/`) | `npm run test:analytic` (= `vitest src-analytic/ shell/ server/`) | runs in **every** lane |
+| **Tests (local)** | `npm run test:run:2d` (= `vitest run src/ server/`) | `npm run test:run:3d` (= `vitest run src3d/ server/`) | `npm run test:run:complex` (= `vitest run src-complex/ shell/ server/`) | `npm run test:run:analytic` (= `vitest run src-analytic/ shell/ server/`) | runs in **every** lane |
 | **CI lane** | `test-2d` | `test-3d` | `test-complex` | `test-analytic` | all |
 | **Fixtures** | `src/__tests__/fixtures/` | `fixtures3/` | `src-complex/__tests__/fixtures/` | `src-analytic/__tests__/fixtures/` | — |
 | **Save-file suffix** | `-geo` (`<name>-geo.json`, ADR-274) | `-vectors` (`<name>-vectors.json`, ADR-3D-036) | `-complex` (`<name>-complex.json`) | `-analytic` (`<name>-analytic.json`) | — |
 
-**Complex numbers SHIPPED 2026-08-17** (`prod/2026-08-17-4`, the log-polar engine cutover — the row
-above was added by [ADR-W-021](06w-decisions-workspace.md#adr-w-021) after this table had run a full
-product behind reality, which is the drift the machine registry exists to kill). Planned, and
-deliberately **last** (D5 ruling, [ADR-CX-001](06d-decisions-complex.md#adr-cx-001)): **analytic
-geometry** — the 471 (4-pt) + 572 (5-pt) analytic-geometry questions as ONE engine with
-curriculum-level profiles (`src-analytic/`, ADR log `06c-decisions-analytic.md`, ids `ADR-AG-NNN`,
-label `analytic`). **Planned 2026-09-03** ([ADR-AG-001](06c-decisions-analytic.md#adr-ag-001)
-through [ADR-AG-005](06c-decisions-analytic.md#adr-ag-005)) and **V0 in build** (#888): the tree is
-registered in `BOUNDARIES.json`, the suite-conformance checklist is half of V0's acceptance gate
-([ADR-AG-004](06c-decisions-analytic.md#adr-ag-004)), and the plan of record is
-[docs/19](19-analytic-geometry-tool.md). **It is deliberately NOT DEPLOYED**
-([ADR-AG-007](06c-decisions-analytic.md#adr-ag-007)): its registry entry carries `enabled: false`
-(so no shipped builder links to it) plus `devOnly: true` (so it appears in its own switcher
-locally), and it has no RUNBOOK row until the operator lifts the rule.
+All four builders are deployed. `products.json` is the only record of deploy state (its `enabled` flag and comments); DEPLOY-LOG records each deploy. Do not restate deploy status in prose here or in any spec.
 
 **Cross-product decisions** — ones belonging to no single product (this registry, the isolation rule, deploy topology, documentation structure) — go in [06w-decisions-workspace.md](06w-decisions-workspace.md) as `ADR-W-nnn`, under the issue label `workspace` ([ADR-W-001](06w-decisions-workspace.md#adr-w-001)). Pre-existing workspace decisions keep their original homes and ids: [ADR-266](06-decisions.md#adr-266) stays in the 2-D log, deliberately — over 200 ADR ids are referenced from docs and code comments, and stable anchors beat tidy filing.
 
 **Orientation files carry no history or status** ([ADR-W-002](06w-decisions-workspace.md#adr-w-002)): CLAUDE.md and src3d/CLAUDE.md say what exists, where it lives, and what must never be done. A dated progress entry belongs in the ADR, which is the copy actually kept current; `server/__tests__/docs-hygiene.test.ts` enforces this in every CI lane.
 
-### Isolation rules (operator authority — generalizes docs/20 §12)
+### Isolation rules (operator authority)
 
 - **`BOUNDARIES.json` (repo root) is the authority** ([ADR-W-003](06w-decisions-workspace.md#adr-w-003)): trees, layers, and every import edge with its rationale. `server/__tests__/isolation.test.ts` **reads** it — adding a product or an edge is a manifest edit, not a test edit, and the rule is never restated in two places that can drift.
 - A product's source tree **never imports another product's tree** — patterns are **COPIED**, not shared. Exception: *within* one product family (e.g. the analytic tool's 471/572 levels) sharing is free — they are one product with profiles.
@@ -365,18 +357,18 @@ locally), and it has no RUNBOOK row until the operator lifts the rule.
 - **Every directory carries a layer** — `engine` (reasons about points/lines/planes/DOF/constraints; copied, never shared), `lexicon` (vocabulary, noun→shape), `shell` (everything else). Classification is total: an unclassified directory fails the test. Whether a non-`engine` layer may be *physically* shared is deliberately undecided — see ADR-W-003's trigger. Before copying a file because the sibling tree has one like it, apply the copy tripwire ([17 §2](17-design-rules.md), item 8).
 - **A diagnosed bug class is checked against the sibling product** and the answer stated in the ADR ([ADR-W-004](06w-decisions-workspace.md#adr-w-004)) — the products copy patterns by design, so they copy defects by design.
 - The 2-D locale files, ADR logs, and status text of one product are never touched by another product's work.
-- Full-suite runs (`npm run test:run`) remain the bar **before any deploy** and for changes to the shared surface; the per-product lanes are for the edit-push loop.
+- The full suite (`npm run test:full`, green read from `reports/suite-verdict.json`) remains the bar **before any deploy** and for changes to the shared surface; the per-product lanes are for the edit-push loop.
 
 ### Adding product N+1 (the sibling-app recipe)
 
 1. Plan doc first (the docs/20 pattern: corpus audit → scope → decisions doc `06X-decisions-<tool>.md` with id prefix `ADR-<TOOL>-NNN`).
 2. `src-<tool>/` + `<tool>.html` + `vite.config.<tool>.ts` (own `base`, own `dist-<tool>/`, **no `@` alias** — it maps to `src/`) + `npm run build:<tool>`.
-3. GitHub label `<tool>`; a status section in CLAUDE.md (own section, like the 3-D one).
+3. GitHub label `<tool>`; an orientation file `src-<tool>/CLAUDE.md` (no status — ADR-W-002) and a row in the root CLAUDE.md module table.
 4. CI: add the product's exclusive paths to the `changes` classifier in `.github/workflows/ci.yml` + a `test-<tool>` lane (`vitest src-<tool>/ server/`); add `test:<tool>` npm scripts. **Until the classifier knows the new paths they fall in the uncategorized bucket and run all lanes — safe by default.**
 5. Server: a `tool:` value + log sink + `DashboardProfile` in the shared proxy; Apache directives per RUNBOOK/deploy docs.
-6. Extend `server/__tests__/isolation.test.ts` with the new tree.
+6. Register the new tree in `BOUNDARIES.json` and `products.json` (a manifest edit — the isolation test reads them).
 
-## 10. One plane-geometry sentence, one verdict in every builder ([ADR-W-108](06w-decisions-workspace.md#adr-w-108))
+## 10. One plane-geometry sentence, one verdict, one drawing in every builder ([ADR-W-108](06w-decisions-workspace.md#adr-w-108), [ADR-W-118](06w-decisions-workspace.md#adr-w-118))
 
 **A plane-geometry input change lands in every builder that should read it, or adds a known-gap row naming its issue; an exception needs a family in `EXCEPTIONS`.**
 
@@ -387,4 +379,5 @@ locally), and it has no RUNBOOK row until the operator lifts the rule.
   - a known-gap row naming the issue that ports it (`knownGap: [{ product, issue: '#NNNN' }]`). When the port lands the row fails with "move it to the parity rows", so the list only shrinks;
   - an `EXCEPTIONS` family, X1–X10: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, free points in 3-D, x or y as a length in analytic (ADR-W-109). A new family is an ADR-W decision, never a quiet edit.
 - **The catalog check** makes this reach every guide sentence. Each builder's catalog sentence is a step of some row, belongs to a topic exception, or sits on `UNCOVERED_CATALOG`. That allowlist is a ratchet: it may shrink, never grow.
-- **Not a verdict:** how the figure is drawn (which segments, which marks). That stays with each builder's own locks.
+- **Display follows 2-D too** (ruling B1, 2026-10-07, [ADR-W-118](06w-decisions-workspace.md#adr-w-118)): for plane geometry, marks, labels, label text and status wording follow 2-D. A display behaviour 2-D lacks lands in 2-D first or needs an operator ruling; a recorded exception names its ruling. There is no display lock yet, so this rule is checked by reading: before building anything a student sees in a non-2-D builder, measure what 2-D does.
+- **Warn both ways** ([ADR-W-117](06w-decisions-workspace.md#adr-w-117) §8): when the operator asks a non-2-D builder for behaviour that differs from 2-D, say so before building; when a 2-D change would change what the other builders should do, ask whether it applies to them.
