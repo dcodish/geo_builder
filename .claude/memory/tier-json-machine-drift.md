@@ -18,7 +18,7 @@ instead of conflicting on a column of numbers.
 between the two PCs, because the relative rule (the heaviest files holding 75% of suite time) is
 invariant under a *uniform* speed difference and the machines are not uniformly different (core counts
 change per-file wall time unevenly). So it can still ping-pong across a cross-machine round
-([[work-pc-cross-machine]]), just without the noise on top.
+(CLAUDE.md "Cross-machine setup"), just without the noise on top.
 
 **And it is noisy run-to-run on ONE machine.** Measured 2026-09-01: two full runs 40 minutes apart on the
 same PC moved three files in and out of the tier. The rule is a share of total suite time, so ordinary

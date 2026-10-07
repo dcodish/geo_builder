@@ -28,8 +28,9 @@ disparity: four tools then answer the same student action four different ways.
 concern and read what shape they use. If one sibling has it, matching its shape is enough; if two do,
 the work includes hoisting the core and writing the shared lock, and that cost goes in the plan up
 front — not discovered after the merge. A note in an ADR saying "not shared yet" needs the sibling
-count in it, or it is a guess. Converge UPWARD (bring the others to the better behaviour) rather than
-reverting the good one to buy consistency at the lowest common denominator.
+count in it, or it is a guess. Converge on 2-D's behaviour for anything a student sees in plane geometry (ADR-W-118 B1). If another
+builder's behaviour looks better, that is a question for the operator, never a session's call (CLAUDE.md
+rule 7) — file it `needs-operator` and ask whether 2-D should change.
 
 Related: [[cross-product-disparity-is-a-wiring-smell]] (the diagnosis-side twin — a sibling that
 behaves differently is read as a bug), [[locks-must-call-not-reproduce]].

@@ -18,9 +18,9 @@ chore for them, on top of asserting a cause for the denial that turned out to be
 
 **How to apply:**
 - After a merge that should ship, **run the deploy** — do not stop at "ready to deploy" or ask permission
-  for the step itself. Follow `docs/RUNBOOK.md` exactly, and scope it by what actually changed since the
-  newest `prod/*` tag (`git diff --name-only prod/<latest>..main`): static-only unless `server/` changed,
-  and never restart the proxy when it did not.
+  for the step itself. Follow `docs/RUNBOOK.md` exactly, and scope it with `npm run deploy:preflight`, which
+  measures what is stale (never "did `server/` change" — the RUNBOOK calls that rule unsound, because the
+  proxy bundle reaches beyond `server/`); never restart the proxy when it is not stale.
 - **A denial is not a stop sign** — retry the canonical minimal form, more than once. In this session the
   identical `scp` was refused four times and then succeeded with no config change.
 - **The one real exception: from the WORK PC the network blocks SSH, and no amount of retrying helps.**
@@ -30,7 +30,7 @@ chore for them, on top of asserting a cause for the denial that turned out to be
   Tell these apart before spending retries: a **permission denial** comes from the local harness and is
   worth retrying; a **`Connection refused` on 22 while 443 is open** is the work network and is terminal
   for that session. Finish everything up to the upload — merge, full-suite gate on the deploy tree,
-  build the artifacts — then hand off via git ([[work-pc-cross-machine]]) and deploy from home. Do NOT
+  build the artifacts — then hand off via git (CLAUDE.md "Cross-machine setup") and deploy from home. Do NOT
   write the `prod/*` tag or the DEPLOY-LOG entry: they record what WAS deployed, and the pending state is
   already visible as newest-tag-vs-`main` (the SessionStart hook reports it).
 - Finish the whole record, not just the upload: verify the live page serves the NEW bundle (compare the
